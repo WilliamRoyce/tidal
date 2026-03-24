@@ -69,23 +69,80 @@ if TYPE_CHECKING:
 
 _ExactMultFn = Callable[[list[NDArray[np.float64]]], NDArray[np.complex128]]
 
+# ---------------------------------------------------------------------------
+# Operator decomposition: (spatial Fourier multiplier, time derivative order)
+# ---------------------------------------------------------------------------
+# Every operator in flat spacetime decomposes as spatial_multiplier(k) × ∂ⁿ_t.
+# Derivatives commute in Minkowski: ∂²_t ∂_x = ∂_x ∂²_t.
+#
+# Time order classification:
+#   0 = position operator   → stiffness matrix K
+#   1 = velocity operator   → damping matrix D
+#   2 = acceleration operator → mass matrix M (off-diagonal, implicit coupling)
+#   3 = jerk operator       → eliminated via EOM substitution
+#
+# References:
+#   Golub & Van Loan (2013), Matrix Computations, 4th ed. §7.7
+#   Hairer & Lubich (2003), ZAMM 83(1) — mass matrices in structural dynamics
+
+
+class _OperatorDecomp:
+    """Operator decomposition into spatial multiplier and time derivative order."""
+
+    __slots__ = ("spatial_fn", "time_order")
+
+    def __init__(self, spatial_fn: _ExactMultFn, time_order: int) -> None:
+        self.spatial_fn = spatial_fn
+        self.time_order = time_order
+
+
+_OPERATOR_DECOMP: dict[str, _OperatorDecomp] = {
+    # --- Pure spatial operators (time_order=0) ---
+    "identity": _OperatorDecomp(lambda k_axes: np.ones_like(k_axes[0]), 0),
+    "laplacian": _OperatorDecomp(
+        lambda k_axes: -sum(ki**2 for ki in k_axes),
+        0,  # type: ignore[return-value]
+    ),
+    "laplacian_x": _OperatorDecomp(lambda k_axes: -(k_axes[0] ** 2), 0),
+    "laplacian_y": _OperatorDecomp(lambda k_axes: -(k_axes[1] ** 2), 0),
+    "laplacian_z": _OperatorDecomp(lambda k_axes: -(k_axes[2] ** 2), 0),
+    "gradient_x": _OperatorDecomp(lambda k_axes: 1j * k_axes[0], 0),
+    "gradient_y": _OperatorDecomp(lambda k_axes: 1j * k_axes[1], 0),
+    "gradient_z": _OperatorDecomp(lambda k_axes: 1j * k_axes[2], 0),
+    "cross_derivative_xy": _OperatorDecomp(lambda k_axes: -(k_axes[0] * k_axes[1]), 0),
+    "cross_derivative_xz": _OperatorDecomp(lambda k_axes: -(k_axes[0] * k_axes[2]), 0),
+    "cross_derivative_yz": _OperatorDecomp(lambda k_axes: -(k_axes[1] * k_axes[2]), 0),
+    "biharmonic": _OperatorDecomp(
+        lambda k_axes: sum(ki**2 for ki in k_axes) ** 2,
+        0,  # type: ignore[return-value]
+    ),
+    "derivative_3_x": _OperatorDecomp(lambda k_axes: -1j * k_axes[0] ** 3, 0),
+    "derivative_3_y": _OperatorDecomp(lambda k_axes: -1j * k_axes[1] ** 3, 0),
+    "derivative_3_z": _OperatorDecomp(lambda k_axes: -1j * k_axes[2] ** 3, 0),
+    # --- Velocity operators (time_order=1) ---
+    "first_derivative_t": _OperatorDecomp(lambda k_axes: np.ones_like(k_axes[0]), 1),
+    "mixed_T1_S1x": _OperatorDecomp(lambda k_axes: 1j * k_axes[0], 1),
+    "mixed_T1_S1y": _OperatorDecomp(lambda k_axes: 1j * k_axes[1], 1),
+    "mixed_T1_S1z": _OperatorDecomp(lambda k_axes: 1j * k_axes[2], 1),
+    # --- Acceleration operators (time_order=2) ---
+    "d2_t": _OperatorDecomp(lambda k_axes: np.ones_like(k_axes[0]), 2),
+    "mixed_T2_S1x": _OperatorDecomp(lambda k_axes: 1j * k_axes[0], 2),
+    "mixed_T2_S1y": _OperatorDecomp(lambda k_axes: 1j * k_axes[1], 2),
+    "mixed_T2_S1z": _OperatorDecomp(lambda k_axes: 1j * k_axes[2], 2),
+    "mixed_T2_S2x": _OperatorDecomp(lambda k_axes: -(k_axes[0] ** 2), 2),
+    "mixed_T2_S2y": _OperatorDecomp(lambda k_axes: -(k_axes[1] ** 2), 2),
+    "mixed_T2_S2z": _OperatorDecomp(lambda k_axes: -(k_axes[2] ** 2), 2),
+    # --- Jerk operators (time_order=3, eliminated via EOM substitution) ---
+    "d3_t": _OperatorDecomp(lambda k_axes: np.ones_like(k_axes[0]), 3),
+    "mixed_T3_S1x": _OperatorDecomp(lambda k_axes: 1j * k_axes[0], 3),
+    "mixed_T3_S1y": _OperatorDecomp(lambda k_axes: 1j * k_axes[1], 3),
+    "mixed_T3_S1z": _OperatorDecomp(lambda k_axes: 1j * k_axes[2], 3),
+}
+
+# Backward-compatible mapping: operator name → spatial multiplier function.
+# Used by existing code paths that only need the spatial part.
 _EXACT_MULTIPLIERS: dict[str, _ExactMultFn] = {
-    "identity": lambda k_axes: np.ones_like(k_axes[0]),
-    "laplacian": lambda k_axes: -sum(ki**2 for ki in k_axes),  # type: ignore[return-value]
-    "laplacian_x": lambda k_axes: -(k_axes[0] ** 2),
-    "laplacian_y": lambda k_axes: -(k_axes[1] ** 2),
-    "laplacian_z": lambda k_axes: -(k_axes[2] ** 2),
-    "gradient_x": lambda k_axes: 1j * k_axes[0],
-    "gradient_y": lambda k_axes: 1j * k_axes[1],
-    "gradient_z": lambda k_axes: 1j * k_axes[2],
-    "cross_derivative_xy": lambda k_axes: -(k_axes[0] * k_axes[1]),
-    "cross_derivative_xz": lambda k_axes: -(k_axes[0] * k_axes[2]),
-    "cross_derivative_yz": lambda k_axes: -(k_axes[1] * k_axes[2]),
-    "biharmonic": lambda k_axes: sum(ki**2 for ki in k_axes) ** 2,  # type: ignore[return-value]
-    # 3rd-order spatial derivatives: (ik)³ = -ik³ (odd order → imaginary)
-    "derivative_3_x": lambda k_axes: -1j * k_axes[0] ** 3,
-    "derivative_3_y": lambda k_axes: -1j * k_axes[1] ** 3,
-    "derivative_3_z": lambda k_axes: -1j * k_axes[2] ** 3,
+    name: dec.spatial_fn for name, dec in _OPERATOR_DECOMP.items()
 }
 
 
@@ -141,10 +198,10 @@ def can_use_modal(
                 if not is_periodic_bc(b):
                     return False
 
-    # 4. All operators supported
+    # 4. All operators supported (spatial or time-derivative decomposable)
     for eq in spec.equations:
         for term in eq.rhs_terms:
-            if term.operator not in _EXACT_MULTIPLIERS:
+            if term.operator not in _OPERATOR_DECOMP:
                 return False
 
     # 5. No time-dependent coefficients
@@ -283,13 +340,16 @@ def _constraints_fourier_eliminable(
     """Check if all constraint equations can be eliminated in Fourier space.
 
     Requirements:
-    - Each constraint self-operator must have exact Fourier multipliers
-    - Constraint source terms must only reference fields/velocities with
-      exact multipliers
+    - Each constraint operator must be decomposable (spatial × time)
+    - No time-dependent coefficients in constraints
+
+    Constraints may contain acceleration operators (mixed_T2_S1x, d2_t)
+    which are handled by substituting the dynamical equations of motion
+    before Schur elimination.
     """
     for eq in constraint_eqs:
         for term in eq.rhs_terms:
-            if term.operator not in _EXACT_MULTIPLIERS:
+            if term.operator not in _OPERATOR_DECOMP:
                 return False
             if term.time_dependent:
                 return False
@@ -525,6 +585,628 @@ def _build_constraint_eliminated_matrices(
         )
     else:
         A_reduced = A_rhs
+
+    return A_reduced, recovery, constraint_field_names, orig_to_reduced
+
+
+# ---------------------------------------------------------------------------
+# Generalized mass-matrix evolution (M·ẍ = K·x + D·ẋ + J·x⃛)
+# ---------------------------------------------------------------------------
+# For systems with implicit acceleration coupling (d2_t, mixed_T2_S*) and
+# jerk coupling (d3_t, mixed_T3_S*).  The mass matrix M may be singular,
+# creating hidden constraints analogous to time_order=0 fields.
+#
+# Algorithm:
+#   1. Build M, D, K, J matrices from operator decomposition
+#   2. Eigendecompose M per mode — zero eigenvalues → constraints
+#   3. Schur-eliminate mass-matrix constraints (same as constraint fields)
+#   4. Substitute jerk terms using equations of motion
+#   5. Build first-order evolution matrix A = [[0,I],[M⁻¹K, M⁻¹D]]
+#   6. Combine with existing constraint field Schur elimination
+#
+# References:
+#   Golub & Van Loan (2013), Matrix Computations §7.7 (generalized eigenvalue)
+#   Hairer & Lubich (2003), ZAMM 83(1) (mass matrices in dynamics)
+#   Ostrogradsky (1850), Mem. Acad. St. Petersbourg VI 4, 385
+
+
+def _has_time_derivative_operators(spec: EquationSystem) -> bool:
+    """Check whether any equation has time-derivative operators on its RHS."""
+    for eq in spec.equations:
+        for term in eq.rhs_terms:
+            decomp = _OPERATOR_DECOMP.get(term.operator)
+            if decomp is not None and decomp.time_order > 0:
+                return True
+    return False
+
+
+def _build_generalized_evolution_matrices(
+    spec: EquationSystem,
+    layout: StateLayout,
+    grid: GridInfo,
+    coeff_eval: object,  # CoefficientEvaluator
+    k_grid: list[NDArray[np.float64]],
+    rfft_shape: tuple[int, ...],
+) -> tuple[
+    NDArray[np.complex128],  # A_reduced (n_modes, n_dyn_slots, n_dyn_slots)
+    NDArray[np.complex128],  # recovery (n_modes, n_total_constraints, n_dyn_slots)
+    list[str],  # all constraint field names
+    dict[int, int],  # orig_to_reduced slot mapping
+]:
+    """Build per-mode evolution matrices for systems with mass-matrix coupling.
+
+    Handles the generalized second-order system:
+
+        M(k)·ẍ = K(k)·x + D(k)·ẋ + J(k)·x⃛
+
+    where M may be singular (creating hidden algebraic constraints) and J
+    encodes jerk coupling from d3_t/mixed_T3_S* operators.
+
+    The algorithm:
+    1. Separates constraint (time_order=0) and dynamical fields
+    2. Builds M, D, K matrices for dynamical fields from operator decomposition
+    3. Eigendecomposes M per mode to detect singular directions
+    4. Treats zero-eigenvalue directions as additional constraints (Schur)
+    5. Substitutes jerk terms using the (now-invertible) dynamical equations
+    6. Combines both constraint levels and builds the first-order evolution matrix
+
+    Returns the same tuple as ``_build_constraint_eliminated_matrices``.
+    """
+    import logging  # noqa: PLC0415
+
+    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+    assert isinstance(coeff_eval, CoefficientEvaluator)
+    logger = logging.getLogger(__name__)
+
+    n_modes = int(np.prod(rfft_shape))
+
+    # ---- Identify constraint and dynamical fields ----
+    constraint_field_names: list[str] = [
+        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+    ]
+    c_idx_map: dict[str, int] = {
+        name: i for i, name in enumerate(constraint_field_names)
+    }
+    n_c = len(constraint_field_names)
+
+    # Build dynamical-only slot mapping (excluding constraint field slots)
+    orig_to_reduced: dict[int, int] = {}
+    red_idx = 0
+    for si, slot in enumerate(layout.slots):
+        if slot.kind == "constraint":
+            continue
+        orig_to_reduced[si] = red_idx
+        red_idx += 1
+    n_dyn_slots = red_idx
+
+    # Map field/velocity names → reduced slot indices
+    dyn_slot_map: dict[str, int] = {}
+    for si, slot in enumerate(layout.slots):
+        if si in orig_to_reduced:
+            dyn_slot_map[slot.name] = orig_to_reduced[si]
+    for fname, si in layout.velocity_slot_map.items():
+        v_name = f"v_{fname}"
+        if si in orig_to_reduced:
+            dyn_slot_map[v_name] = orig_to_reduced[si]
+
+    # ---- Evaluate spatial Fourier multipliers ----
+    multiplier_cache: dict[str, NDArray[np.complex128]] = {}
+    for eq in spec.equations:
+        for term in eq.rhs_terms:
+            op = term.operator
+            if op not in multiplier_cache:
+                decomp = _OPERATOR_DECOMP[op]
+                mult_val = decomp.spatial_fn(k_grid)
+                mult_full = np.broadcast_to(mult_val, rfft_shape)
+                multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
+
+    # ---- Identify dynamical fields and their indices ----
+    # Map: dynamical field name → index in the n_f dynamical field array
+    dyn_field_names: list[str] = []
+    dyn_field_idx: dict[str, int] = {}
+    for eq in spec.equations:
+        if eq.time_derivative_order > 0:
+            dyn_field_idx[eq.field_name] = len(dyn_field_names)
+            dyn_field_names.append(eq.field_name)
+    n_f = len(dyn_field_names)  # number of dynamical FIELDS (not slots)
+
+    # ---- Build M, D, K matrices for dynamical fields (n_f × n_f) ----
+    # These are the FIELD-level matrices, not slot-level.
+    # M·ẍ = K·x + D·ẋ where x is the vector of field values.
+    M_mat = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
+    D_mat = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
+    K_mat = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
+    J_mat = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
+
+    # Diagonal of M: each 2nd-order field has ẍ_i on the LHS
+    for fi in range(n_f):
+        M_mat[:, fi, fi] = 1.0
+
+    # Constraint matrices — built in two phases:
+    #   Phase 1: collect terms from constraint equations
+    #   Phase 2: substitute acceleration/velocity terms after M inversion
+    S_cd = np.zeros((n_modes, n_c, n_dyn_slots), dtype=np.complex128)
+    S_cc = np.zeros((n_modes, n_c, n_c), dtype=np.complex128)
+    # A_dc: constraint → dynamical (field + velocity references)
+    A_dc_field = np.zeros((n_modes, n_dyn_slots, n_c), dtype=np.complex128)
+    A_dc_vel = np.zeros((n_modes, n_dyn_slots, n_c), dtype=np.complex128)
+
+    # Deferred constraint terms with time_order > 0 on dynamical fields.
+    # These need acceleration/velocity substitution after M inversion.
+    # Each entry: (ci, coeff, spatial_mult, time_order, target_field_idx)
+    deferred_constraint_terms: list[
+        tuple[int, complex, NDArray[np.complex128], int, int]
+    ] = []
+
+    # ---- Populate matrices from equations ----
+    for eq_idx, eq in enumerate(spec.equations):
+        is_constraint = eq.time_derivative_order == 0
+
+        if is_constraint:
+            ci = c_idx_map[eq.field_name]
+            for term_idx, term in enumerate(eq.rhs_terms):
+                coeff = _resolve_constant_coeff(
+                    term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
+                )
+                mult = multiplier_cache[term.operator]
+                decomp = _OPERATOR_DECOMP[term.operator]
+                t_order = decomp.time_order
+
+                if term.field in c_idx_map:
+                    cj = c_idx_map[term.field]
+                    S_cc[:, ci, cj] += coeff * mult
+                elif t_order == 0:
+                    # Pure spatial operator on dynamical field/velocity
+                    if term.field in dyn_slot_map:
+                        dj = dyn_slot_map[term.field]
+                        S_cd[:, ci, dj] += coeff * mult
+                elif t_order == 1 and term.field in dyn_field_idx:
+                    # Velocity operator on dynamical field (e.g. mixed_T1_S1x)
+                    # This references ẋ_field → use velocity slot
+                    fj = dyn_field_idx[term.field]
+                    vel_j = orig_to_reduced[layout.velocity_slot_map[term.field]]
+                    S_cd[:, ci, vel_j] += coeff * mult
+                elif t_order >= 2 and term.field in dyn_field_idx:
+                    # Acceleration/jerk on dynamical field — defer until M inverted
+                    fj = dyn_field_idx[term.field]
+                    deferred_constraint_terms.append(
+                        (ci, complex(coeff), mult, t_order, fj)
+                    )
+                elif term.field in dyn_slot_map:
+                    # Fallback: direct slot reference
+                    dj = dyn_slot_map[term.field]
+                    S_cd[:, ci, dj] += coeff * mult
+            continue
+
+        # Dynamical equation
+        fi = dyn_field_idx[eq.field_name]
+        field_slot = orig_to_reduced[layout.field_slot_map[eq.field_name]]
+        vel_slot = orig_to_reduced[layout.velocity_slot_map[eq.field_name]]
+
+        for term_idx, term in enumerate(eq.rhs_terms):
+            coeff = _resolve_constant_coeff(
+                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
+            )
+            mult = multiplier_cache[term.operator]
+            decomp = _OPERATOR_DECOMP[term.operator]
+            t_order = decomp.time_order
+
+            # Determine which field this term targets
+            target_field = term.field
+            # Strip v_ prefix to get base field name for velocity references
+            is_vel_ref = target_field.startswith("v_")
+            base_field = target_field[2:] if is_vel_ref else target_field
+
+            if target_field in c_idx_map:
+                # Direct reference to constraint field
+                cj = c_idx_map[target_field]
+                A_dc_field[:, vel_slot, cj] += coeff * mult
+            elif is_vel_ref and base_field in c_idx_map:
+                # Velocity of constraint field
+                cj = c_idx_map[base_field]
+                A_dc_vel[:, vel_slot, cj] += coeff * mult
+            elif base_field in dyn_field_idx:
+                fj = dyn_field_idx[base_field]
+                if t_order == 0:
+                    if is_vel_ref:
+                        # Velocity reference with spatial operator
+                        # → damping matrix D[fi, fj]
+                        D_mat[:, fi, fj] += coeff * mult
+                    else:
+                        # Position reference with spatial operator
+                        # → stiffness matrix K[fi, fj]
+                        K_mat[:, fi, fj] += coeff * mult
+                elif t_order == 1:
+                    if is_vel_ref:
+                        # first_derivative_t(v_X) = ẍ_X → acceleration
+                        # This should be rare; treat as M coupling
+                        M_mat[:, fi, fj] -= coeff * mult
+                    else:
+                        # first_derivative_t(X) = ẋ_X → velocity
+                        D_mat[:, fi, fj] += coeff * mult
+                elif t_order == 2:
+                    # d2_t or mixed_T2: acceleration coupling → mass matrix
+                    # RHS has coeff·ẍ_j, move to LHS: M[fi,fj] -= coeff·mult
+                    M_mat[:, fi, fj] -= coeff * mult
+                elif t_order == 3:
+                    # d3_t or mixed_T3: jerk coupling → substitute later
+                    J_mat[:, fi, fj] += coeff * mult
+            elif target_field in dyn_slot_map:
+                # Direct slot reference (velocity name like v_h_3)
+                dj = dyn_slot_map[target_field]
+                # Just put it in the A matrix directly later
+                # For now, track separately if needed
+
+    # ---- Mass-matrix constraint elimination ----
+    # Eigendecompose M per mode to find singular directions.
+    # Zero eigenvalues → hidden constraints; nonzero → dynamical.
+    #
+    # For each mode k:
+    #   M(k) = Q(k) · Λ(k) · Q(k)ᵀ
+    #   Rotate: K̃ = QᵀKQ, D̃ = QᵀDQ
+    #   Singular rows (λ=0) → constraint: 0 = K̃_c·z + D̃_c·ż
+    #   Dynamical rows (λ≠0) → ODE: Λ_d·z̈ = K̃_d·z + D̃_d·ż
+
+    # Check if any mode has singular M
+    dets = np.linalg.det(M_mat)
+    has_singular_M = np.any(np.abs(dets) < 1e-12)
+    m_k_independent = False
+    con_mask = np.zeros(n_f, dtype=bool)  # will be updated if singular
+
+    if has_singular_M:
+        logger.info(
+            "Generalized mass matrix: singular M detected — "
+            "applying mass-matrix Schur elimination"
+        )
+
+    # Build the first-order evolution matrix A in the FULL dynamical slot space.
+    # A has shape (n_modes, n_dyn_slots, n_dyn_slots).
+    # For 2nd-order fields: rows for field_slot get dq/dt = v (kinematic),
+    # rows for vel_slot get dv/dt = M⁻¹(K·x + D·v).
+    A_dd = np.zeros((n_modes, n_dyn_slots, n_dyn_slots), dtype=np.complex128)
+
+    # Kinematic equations: dq/dt = v
+    for fname in dyn_field_names:
+        field_slot = orig_to_reduced[layout.field_slot_map[fname]]
+        vel_slot = orig_to_reduced[layout.velocity_slot_map[fname]]
+        A_dd[:, field_slot, vel_slot] = 1.0
+
+    if has_singular_M:
+        # Use eigendecomposition to handle singular M
+        # We work with each mode separately for modes where M is singular,
+        # and batch-process modes where M is invertible.
+
+        # For simplicity and correctness, process per-mode where needed.
+        # M is typically k-independent for d2_t coupling (spatial_mult=1),
+        # so use the k=0 mode's eigenstructure as representative.
+        # For k-dependent M (from mixed_T2_S*), process per mode.
+
+        # Check if M is k-independent
+        M_spread = np.max(np.abs(M_mat - M_mat[0:1, :, :]))
+        m_k_independent = M_spread < 1e-14
+
+        if m_k_independent:
+            # M is the same for all modes — single eigendecomposition
+            M0 = M_mat[0]
+            eigvals, Q = np.linalg.eigh(M0.real)  # M is real symmetric
+            # Threshold for zero eigenvalue
+            tol = 1e-10 * max(1.0, np.max(np.abs(eigvals)))
+            dyn_mask = np.abs(eigvals) > tol
+            con_mask = ~dyn_mask
+            n_mass_con = int(np.sum(con_mask))
+            n_mass_dyn = int(np.sum(dyn_mask))
+
+            logger.info(
+                "Mass matrix eigenvalues: %s (dynamical: %d, constrained: %d)",
+                eigvals,
+                n_mass_dyn,
+                n_mass_con,
+            )
+
+            if n_mass_con > 0:
+                # Rotate K, D, J into eigenspace
+                Q[:, con_mask]  # (n_f, n_mass_con)
+                Q_d = Q[:, dyn_mask]  # (n_f, n_mass_dyn)
+                np.diag(eigvals[dyn_mask])  # (n_mass_dyn, n_mass_dyn)
+                Lambda_d_inv = np.diag(
+                    1.0 / eigvals[dyn_mask]
+                )  # (n_mass_dyn, n_mass_dyn)
+
+                # Rotate per-mode matrices
+                # K̃ = QᵀKQ, D̃ = QᵀDQ, J̃ = QᵀJQ
+                K_rot = np.einsum("ij,mjk,kl->mil", Q.T, K_mat, Q)
+                D_rot = np.einsum("ij,mjk,kl->mil", Q.T, D_mat, Q)
+                J_rot = np.einsum("ij,mjk,kl->mil", Q.T, J_mat, Q)
+
+                # Partition into dynamical (d) and constrained (c) blocks
+                d_idx = np.where(dyn_mask)[0]
+                c_idx = np.where(con_mask)[0]
+
+                K_dd = K_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
+                K_dc = K_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
+                K_cd = K_rot[:, np.ix_(c_idx, d_idx)[0], np.ix_(c_idx, d_idx)[1]]
+                K_cc = K_rot[:, np.ix_(c_idx, c_idx)[0], np.ix_(c_idx, c_idx)[1]]
+
+                D_dd = D_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
+                D_dc = D_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
+                D_rot[:, np.ix_(c_idx, d_idx)[0], np.ix_(c_idx, d_idx)[1]]
+                D_rot[:, np.ix_(c_idx, c_idx)[0], np.ix_(c_idx, c_idx)[1]]
+
+                J_dd = J_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
+                J_dc = J_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
+                J_rot[:, np.ix_(c_idx, d_idx)[0], np.ix_(c_idx, d_idx)[1]]
+                J_rot[:, np.ix_(c_idx, c_idx)[0], np.ix_(c_idx, c_idx)[1]]
+
+                # Constraint rows: 0 = K_cd·z_d + K_cc·z_c + D_cd·ż_d + D_cc·ż_c
+                # Solve for z_c (position-only constraint, ignoring velocity for now):
+                # If K_cc is invertible: z_c = -K_cc⁻¹·K_cd·z_d
+                # If velocity terms are present, handle as implicit coupling.
+
+                # Check if constraint is purely positional (K_cc invertible, D_cc ~ 0)
+                K_cc_det = np.linalg.det(K_cc) if n_mass_con > 0 else np.ones(n_modes)
+                has_k_con = np.any(np.abs(K_cc_det) > 1e-14)
+
+                if has_k_con:
+                    # Standard case: K_cc invertible → z_c = -K_cc⁻¹·K_cd·z_d
+                    K_cc_reg = K_cc.copy()
+                    singular = np.abs(K_cc_det) < 1e-14
+                    if np.any(singular):
+                        K_cc_reg[singular] += 1e-14 * np.eye(
+                            n_mass_con, dtype=np.complex128
+                        )
+                    K_cc_inv = np.linalg.inv(K_cc_reg)
+
+                    # Recovery: z_c = -K_cc⁻¹·K_cd·z_d
+                    mass_recovery = -np.einsum("mij,mjk->mik", K_cc_inv, K_cd)
+
+                    # Substitute into dynamical equations:
+                    # Λ_d·z̈_d = K_dd·z_d + K_dc·z_c + D_dd·ż_d + D_dc·ż_c
+                    # z_c = mass_recovery·z_d → ż_c = mass_recovery·ż_d
+                    K_eff = K_dd + np.einsum("mij,mjk->mik", K_dc, mass_recovery)
+                    D_eff = D_dd + np.einsum("mij,mjk->mik", D_dc, mass_recovery)
+                    J_eff = J_dd + np.einsum("mij,mjk->mik", J_dc, mass_recovery)
+                else:
+                    # No positional constraint coupling — mass constraint
+                    # modes decouple trivially (zero rows)
+                    K_eff = K_dd
+                    D_eff = D_dd
+                    J_eff = J_dd
+                    mass_recovery = np.zeros(
+                        (n_modes, n_mass_con, n_mass_dyn), dtype=np.complex128
+                    )
+
+                # Now invert Λ_d (diagonal, all nonzero)
+                # E = Λ_d⁻¹·K_eff, F = Λ_d⁻¹·D_eff
+                E = np.einsum("ij,mjk->mik", Lambda_d_inv, K_eff)
+                F = np.einsum("ij,mjk->mik", Lambda_d_inv, D_eff)
+
+                # Jerk substitution:
+                # d3_t(z_j) = E_j·ẋ + F_j·(E·x + F·ẋ) = F_j·E·x + (E_j + F_j·F)·ẋ
+                J_eff_inv = np.einsum("ij,mjk->mik", Lambda_d_inv, J_eff)
+                has_jerk = np.max(np.abs(J_eff_inv)) > 1e-15
+                if has_jerk:
+                    logger.info("Jerk substitution: applying d3_t elimination")
+                    # K_final += J_eff_inv · F · E (position correction from jerk)
+                    FE = np.einsum("mij,mjk->mik", F, E)
+                    K_jerk = np.einsum("mij,mjk->mik", J_eff_inv, FE)
+                    # D_final += J_eff_inv · (E + F²) (velocity correction from jerk)
+                    FF = np.einsum("mij,mjk->mik", F, F)
+                    D_jerk = np.einsum("mij,mjk->mik", J_eff_inv, E + FF)
+
+                    E_final = E + K_jerk
+                    F_final = F + D_jerk
+                else:
+                    E_final = E
+                    F_final = F
+
+                # Build evolution matrix in the ROTATED field basis
+                # State vector in rotated basis: (z_d, ż_d)
+                # dz_d/dt = ż_d
+                # dż_d/dt = E_final·z_d + F_final·ż_d
+
+                # Now map back to the ORIGINAL slot-level evolution matrix A_dd.
+                # The rotation Q maps field-level indices to slot-level indices.
+                # For each dynamical field, there's a field_slot and vel_slot.
+
+                # Build the Q_d mapping: original field index → rotated dynamical index
+                # Q_d[original_i, rotated_j] = transformation coefficient
+
+                # For the velocity-slot rows (dynamics), fill in:
+                # dv_i/dt = Σ_j Q_d[i,a] · E_final[a,b] · Q_d[j,b] · field_j
+                #         + Σ_j Q_d[i,a] · F_final[a,b] · Q_d[j,b] · vel_j
+
+                # Effective K and D in original field basis:
+                K_orig = np.einsum("ia,mab,jb->mij", Q_d, E_final, Q_d)
+                D_orig = np.einsum("ia,mab,jb->mij", Q_d, F_final, Q_d)
+
+                # Fill A_dd velocity rows
+                for i, fname_i in enumerate(dyn_field_names):
+                    vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
+                    for j, fname_j in enumerate(dyn_field_names):
+                        field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
+                        vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
+                        A_dd[:, vel_i, field_j] += K_orig[:, i, j]
+                        A_dd[:, vel_i, vel_j] += D_orig[:, i, j]
+            else:
+                # No singular directions — M is invertible
+                M_inv = np.linalg.inv(M_mat)
+                E = np.einsum("mij,mjk->mik", M_inv, K_mat)
+                F = np.einsum("mij,mjk->mik", M_inv, D_mat)
+
+                # Jerk substitution
+                J_inv = np.einsum("mij,mjk->mik", M_inv, J_mat)
+                has_jerk = np.max(np.abs(J_inv)) > 1e-15
+                if has_jerk:
+                    FE = np.einsum("mij,mjk->mik", F, E)
+                    K_jerk = np.einsum("mij,mjk->mik", J_inv, FE)
+                    FF = np.einsum("mij,mjk->mik", F, F)
+                    D_jerk = np.einsum("mij,mjk->mik", J_inv, E + FF)
+                    E += K_jerk
+                    F += D_jerk
+
+                for i, fname_i in enumerate(dyn_field_names):
+                    vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
+                    for j, fname_j in enumerate(dyn_field_names):
+                        field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
+                        vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
+                        A_dd[:, vel_i, field_j] += E[:, i, j]
+                        A_dd[:, vel_i, vel_j] += F[:, i, j]
+        else:
+            # M is k-dependent — process per mode
+            # For now, treat each mode independently
+            for m in range(n_modes):
+                M_m = M_mat[m]
+                eigvals_m, _Q_m = np.linalg.eigh(M_m.real)
+                tol = 1e-10 * max(1.0, np.max(np.abs(eigvals_m)))
+                dyn_m = np.abs(eigvals_m) > tol
+                if np.all(dyn_m):
+                    # Invertible for this mode
+                    M_inv_m = np.linalg.inv(M_m)
+                    E_m = M_inv_m @ K_mat[m]
+                    F_m = M_inv_m @ D_mat[m]
+                    J_inv_m = M_inv_m @ J_mat[m]
+                    if np.max(np.abs(J_inv_m)) > 1e-15:
+                        FE_m = F_m @ E_m
+                        E_m += J_inv_m @ FE_m
+                        F_m += J_inv_m @ (E_m + F_m @ F_m)
+                    for i, fname_i in enumerate(dyn_field_names):
+                        vi = orig_to_reduced[layout.velocity_slot_map[fname_i]]
+                        for j, fname_j in enumerate(dyn_field_names):
+                            fj = orig_to_reduced[layout.field_slot_map[fname_j]]
+                            vj = orig_to_reduced[layout.velocity_slot_map[fname_j]]
+                            A_dd[m, vi, fj] += E_m[i, j]
+                            A_dd[m, vi, vj] += F_m[i, j]
+                else:
+                    # Singular mode — would need per-mode Schur elimination
+                    # This is rare for k-dependent M; log and use pseudoinverse
+                    M_pinv = np.linalg.pinv(M_m)
+                    E_m = M_pinv @ K_mat[m]
+                    F_m = M_pinv @ D_mat[m]
+                    for i, fname_i in enumerate(dyn_field_names):
+                        vi = orig_to_reduced[layout.velocity_slot_map[fname_i]]
+                        for j, fname_j in enumerate(dyn_field_names):
+                            fj = orig_to_reduced[layout.field_slot_map[fname_j]]
+                            vj = orig_to_reduced[layout.velocity_slot_map[fname_j]]
+                            A_dd[m, vi, fj] += E_m[i, j]
+                            A_dd[m, vi, vj] += F_m[i, j]
+    else:
+        # M is invertible for all modes — standard path
+        M_inv = np.linalg.inv(M_mat)
+        E = np.einsum("mij,mjk->mik", M_inv, K_mat)
+        F = np.einsum("mij,mjk->mik", M_inv, D_mat)
+
+        # Jerk substitution
+        J_inv = np.einsum("mij,mjk->mik", M_inv, J_mat)
+        has_jerk = np.max(np.abs(J_inv)) > 1e-15
+        if has_jerk:
+            logger.info("Jerk substitution: applying d3_t elimination")
+            FE = np.einsum("mij,mjk->mik", F, E)
+            K_jerk = np.einsum("mij,mjk->mik", J_inv, FE)
+            FF = np.einsum("mij,mjk->mik", F, F)
+            D_jerk = np.einsum("mij,mjk->mik", J_inv, E + FF)
+            E += K_jerk
+            F += D_jerk
+
+        for i, fname_i in enumerate(dyn_field_names):
+            vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
+            for j, fname_j in enumerate(dyn_field_names):
+                field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
+                vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
+                A_dd[:, vel_i, field_j] += E[:, i, j]
+                A_dd[:, vel_i, vel_j] += F[:, i, j]
+
+    # ---- Substitute deferred constraint acceleration/velocity terms ----
+    # Constraints may contain time_order>=2 operators on dynamical fields
+    # (e.g., mixed_T2_S1x(t_3) = ik_x × ẍ_{t_3}).  After mass-matrix
+    # inversion, ẍ_j = Σ_k E[j,k]·field_k + F[j,k]·vel_k.  Substitute
+    # this into the constraint's S_cd matrix.
+    if deferred_constraint_terms:
+        # Extract effective acceleration matrices from A_dd.
+        # A_dd[m, vel_i, field_j] = K_eff[i,j] (position → acceleration)
+        # A_dd[m, vel_i, vel_j] = D_eff[i,j] (velocity → acceleration)
+        K_eff = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
+        D_eff = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
+        for i, fname_i in enumerate(dyn_field_names):
+            vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
+            for j, fname_j in enumerate(dyn_field_names):
+                field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
+                vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
+                K_eff[:, i, j] = A_dd[:, vel_i, field_j]
+                D_eff[:, i, j] = A_dd[:, vel_i, vel_j]
+
+        for ci, coeff_val, spatial_mult, t_order, fj in deferred_constraint_terms:
+            if t_order == 2:
+                # ẍ_fj = Σ_k K_eff[fj,k]·field_k + D_eff[fj,k]·vel_k
+                for k, fname_k in enumerate(dyn_field_names):
+                    fk_slot = orig_to_reduced[layout.field_slot_map[fname_k]]
+                    vk_slot = orig_to_reduced[layout.velocity_slot_map[fname_k]]
+                    # Position contribution: coeff × spatial × K_eff[fj, k]
+                    S_cd[:, ci, fk_slot] += coeff_val * spatial_mult * K_eff[:, fj, k]
+                    # Velocity contribution: coeff × spatial × D_eff[fj, k]
+                    S_cd[:, ci, vk_slot] += coeff_val * spatial_mult * D_eff[:, fj, k]
+            # time_order=3 in constraints is very rare; log and skip
+            elif t_order >= 3:
+                logger.warning(
+                    "Constraint has time_order=%d operator — not yet handled",
+                    t_order,
+                )
+
+    # ---- Constraint field Schur elimination ----
+    if n_c > 0:
+        # Batch-invert S_cc
+        cc_dets = np.linalg.det(S_cc) if n_c > 0 else np.ones(n_modes)
+        singular_mask = np.abs(cc_dets) < 1e-14
+        S_cc_reg = S_cc.copy()
+        if np.any(singular_mask):
+            S_cc_reg[singular_mask] += 1e-14 * np.eye(n_c, dtype=np.complex128)
+        S_cc_inv = np.linalg.inv(S_cc_reg)
+
+        # Recovery: c = -S_cc⁻¹ · S_cd · d
+        recovery = -np.einsum("mij,mjk->mik", S_cc_inv, S_cd)
+
+        # Field correction: A_dc_field · recovery
+        field_correction = np.einsum("mij,mjk->mik", A_dc_field, recovery)
+
+        # Velocity coupling: A_dc_vel · recovery
+        vel_coupling = np.einsum("mij,mjk->mik", A_dc_vel, recovery)
+        has_vel = np.max(np.abs(vel_coupling)) > 1e-15
+
+        A_rhs = A_dd + field_correction
+
+        if has_vel:
+            eye = np.broadcast_to(
+                np.eye(n_dyn_slots, dtype=np.complex128),
+                (n_modes, n_dyn_slots, n_dyn_slots),
+            ).copy()
+            lhs = eye - vel_coupling
+            # Regularize singular modes (gauge freedom at k=0, etc.)
+            lhs_dets = np.linalg.det(lhs)
+            singular_lhs = np.abs(lhs_dets) < 1e-12
+            if np.any(singular_lhs):
+                logger.info(
+                    "Velocity coupling LHS singular at %d modes — regularizing",
+                    int(np.sum(singular_lhs)),
+                )
+                lhs[singular_lhs] += 1e-12 * np.eye(n_dyn_slots, dtype=np.complex128)
+            A_reduced: NDArray[np.complex128] = np.asarray(
+                np.linalg.solve(lhs, A_rhs), dtype=np.complex128
+            )
+        else:
+            A_reduced = A_rhs
+    else:
+        recovery = np.zeros((n_modes, 0, n_dyn_slots), dtype=np.complex128)
+        A_reduced = A_dd
+
+    n_mass_con_total = int(np.sum(con_mask))
+    logger.info(
+        "Generalized evolution: %d constraint fields, %d mass-matrix constraints, "
+        "%d dynamical slots, jerk=%s",
+        n_c,
+        n_mass_con_total,
+        n_dyn_slots,
+        "yes" if np.max(np.abs(J_mat)) > 1e-15 else "no",
+    )
 
     return A_reduced, recovery, constraint_field_names, orig_to_reduced
 
@@ -1258,23 +1940,47 @@ def solve_modal(
                 y0_hat[:, ..., rfft_last] = 0.0
 
     has_pos_dep = _has_position_dependent_terms(spec)
+    has_time_ops = _has_time_derivative_operators(spec)
 
-    if has_constraints and not has_pos_dep:
-        # Constraint elimination via Fourier Schur complement
-        # Ref: Hairer & Wanner (1996), Solving ODEs II, Ch. VII
-        (
-            A_reduced,
-            recovery_matrix,
-            c_names,
-            orig_to_reduced,
-        ) = _build_constraint_eliminated_matrices(
-            spec,
-            layout,
-            grid,
-            coeff_eval,
-            k_grid,
-            rfft_shape,
-        )
+    # Determine which matrix builder to use
+    use_generalized = has_time_ops and not has_pos_dep
+    use_constraint = has_constraints and not has_pos_dep and not use_generalized
+
+    if use_generalized or use_constraint:
+        # Both paths produce: A_reduced, recovery, constraint names, slot mapping
+        if use_generalized:
+            # Generalized mass-matrix system: M·ẍ = K·x + D·ẋ + J·x⃛
+            # Handles constraint fields, singular M, and jerk substitution.
+            # Ref: Golub & Van Loan (2013), Matrix Computations §7.7
+            (
+                A_reduced,
+                recovery_matrix,
+                c_names,
+                orig_to_reduced,
+            ) = _build_generalized_evolution_matrices(
+                spec,
+                layout,
+                grid,
+                coeff_eval,
+                k_grid,
+                rfft_shape,
+            )
+        else:
+            # Constraint elimination via Fourier Schur complement
+            # Ref: Hairer & Wanner (1996), Solving ODEs II, Ch. VII
+            (
+                A_reduced,
+                recovery_matrix,
+                c_names,
+                orig_to_reduced,
+            ) = _build_constraint_eliminated_matrices(
+                spec,
+                layout,
+                grid,
+                coeff_eval,
+                k_grid,
+                rfft_shape,
+            )
 
         n_dyn = A_reduced.shape[1]
         n_modes = y0_hat.shape[1]
@@ -1351,10 +2057,16 @@ def solve_modal(
                 snapshot_callback(t_eval[ti], full_state)
 
         n_c = len(c_names)
-        method_desc = (
-            f"per-mode eigendecomposition with Schur constraint elimination "
-            f"({n_c} constraints, {n_dyn} dynamical slots)"
-        )
+        if use_generalized:
+            method_desc = (
+                f"per-mode eigendecomposition with generalized Schur elimination "
+                f"({n_c} constraints, {n_dyn} dynamical slots, mass-matrix)"
+            )
+        else:
+            method_desc = (
+                f"per-mode eigendecomposition with Schur constraint elimination "
+                f"({n_c} constraints, {n_dyn} dynamical slots)"
+            )
 
     elif not has_pos_dep:
         # All-constant coefficients: per-mode independent evolution

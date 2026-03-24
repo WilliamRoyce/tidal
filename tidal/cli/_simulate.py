@@ -1977,7 +1977,14 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     if args.mode == "constraint":
         return _constraint_mode(args, spec, grid_info, y0, params, bc, log)
 
-    _warn_zero_evolution(spec, grid_info, y0, params, bc)
+    import contextlib
+
+    with contextlib.suppress(ValueError):
+        # May raise ValueError for systems with time-derivative operators
+        # (d2_t, mixed_T2_S1x, etc.) that the physical-space RHS evaluator
+        # cannot handle. These are simulated by the modal solver's
+        # generalized mass-matrix path which works directly in Fourier space.
+        _warn_zero_evolution(spec, grid_info, y0, params, bc)
     _check_mass_stability(args, spec, grid_info, params)
 
     # 5. Compute dt for leapfrog (needed before snapshot configuration)

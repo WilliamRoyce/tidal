@@ -525,6 +525,88 @@ At each output time, constraint fields are reconstructed directly from the saved
 
 \textbf{References}: Hairer \& Wanner (1996), \emph{Solving ODEs II}, Ch.\ VII; Ascher \& Petzold (1998), \emph{Computer Methods for ODEs/DAEs}, \S10.2.
 
+\subsection{Generalized Mass Matrix (Higher-Derivative Theories)}
+\label{sec:modal-mass-matrix}
+
+Higher-derivative theories such as PGT with $\tilde{R}^2$ terms produce equations with implicit acceleration coupling: \texttt{d2\_t(field\_j)} appearing on the RHS of \texttt{field\_i}'s equation, meaning $\ddot{q}_j$ couples into $\ddot{q}_i$'s dynamics. After Ostrogradsky reduction (\cref{sec:ostrogradsky-reduction}), the system has the generalized form:
+\begin{equation}
+  M(k) \cdot \ddot{x} = K(k) \cdot x + D(k) \cdot \dot{x} + J(k) \cdot \dddot{x}
+  \label{eq:generalized-mass}
+\end{equation}
+where $M$ is the \emph{mass matrix} (from \texttt{d2\_t}, \texttt{mixed\_T2\_S*} operators), $K$ is the stiffness matrix (pure spatial operators), $D$ is the damping matrix (\texttt{first\_derivative\_t}, \texttt{mixed\_T1\_S*} operators), and $J$ is the jerk matrix (\texttt{d3\_t}, \texttt{mixed\_T3\_S*}).
+
+\subsubsection{Operator Decomposition}
+\label{sec:modal-operator-decomp}
+
+Every operator in flat spacetime decomposes as $\text{spatial\_multiplier}(k) \times \partial_t^n$:
+\begin{table}[htbp]
+\centering
+\caption{Operator decomposition into spatial multiplier and time derivative order.}
+\label{tab:operator-decomposition}
+\begin{tabular}{@{}llcl@{}}
+\toprule
+Operator & Spatial mult.\ & Time order & Matrix \\
+\midrule
+\texttt{identity} & $1$ & 0 & $K$ \\
+\texttt{laplacian\_x} & $-k_x^2$ & 0 & $K$ \\
+\texttt{gradient\_x} & $ik_x$ & 0 & $K$ \\
+\texttt{first\_derivative\_t} & $1$ & 1 & $D$ \\
+\texttt{mixed\_T1\_S1x} & $ik_x$ & 1 & $D$ \\
+\texttt{d2\_t} & $1$ & 2 & $M$ \\
+\texttt{mixed\_T2\_S1x} & $ik_x$ & 2 & $M$ \\
+\texttt{mixed\_T2\_S2x} & $-k_x^2$ & 2 & $M$ \\
+\texttt{d3\_t} & $1$ & 3 & $J$ \\
+\texttt{mixed\_T3\_S1x} & $ik_x$ & 3 & $J$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Singular Mass Matrix}
+\label{sec:modal-singular-mass}
+
+For PGT with $\tilde{R}^2$, the mass matrix is \emph{singular}. The graviton-torsion system has $M = \bigl[\begin{smallmatrix} 1 & 1 \\ 1 & 1 \end{smallmatrix}\bigr]$ for the $\{t_3, t_7\}$ pair (eigenvalues $\{0, 2\}$) and similarly for $\{w_{h_3}, w_{h_5}\}$. The zero eigenvalue creates a hidden algebraic constraint: $t_3 = t_7$.
+
+The algorithm eigendecomposes $M$ per mode:
+\begin{enumerate}
+  \item Compute $M = Q \Lambda Q^T$ (real symmetric eigendecomposition)
+  \item Zero eigenvalues $\to$ constraint directions: $0 = \tilde{K}_c \cdot z + \tilde{D}_c \cdot \dot{z}$ where $z = Q^T x$
+  \item Nonzero eigenvalues $\to$ dynamical directions: $\Lambda_d \cdot \ddot{z}_d = \tilde{K}_d \cdot z + \tilde{D}_d \cdot \dot{z}$
+  \item Schur-eliminate constrained modes (same algorithm as \cref{sec:modal-constraint-elimination})
+  \item Invert $\Lambda_d$ (diagonal, invertible) to get $\ddot{z}_d = \Lambda_d^{-1} \tilde{K}_d \cdot z + \Lambda_d^{-1} \tilde{D}_d \cdot \dot{z}$
+\end{enumerate}
+
+\subsubsection{Jerk Substitution}
+\label{sec:modal-jerk}
+
+After mass-matrix elimination, the jerk coupling $J \cdot \dddot{x}$ remains. Since $\dddot{x}_j = \mathrm{d}/\mathrm{d}t(\ddot{x}_j)$ and $\ddot{x}_j$ is now expressed in terms of $x$ and $\dot{x}$:
+\begin{equation}
+  \dddot{x}_j = E_j \cdot \dot{x} + F_j \cdot \ddot{x} = E_j \cdot \dot{x} + F_j \cdot (E \cdot x + F \cdot \dot{x})
+\end{equation}
+where $E = M_{\text{dyn}}^{-1} K$ and $F = M_{\text{dyn}}^{-1} D$. This gives position corrections $J \cdot F \cdot E$ (added to $K$) and velocity corrections $J \cdot (E + F^2)$ (added to $D$).
+
+\subsubsection{Constraint Acceleration Terms}
+\label{sec:modal-constraint-accel}
+
+Constraint equations may contain acceleration operators on dynamical fields (e.g., \texttt{mixed\_T2\_S1x(t\_3)} = $ik_x \cdot \ddot{t}_3$ in the $h_1$ constraint). After mass-matrix inversion, $\ddot{t}_3 = \sum_j E_{t_3,j} x_j + F_{t_3,j} \dot{x}_j$. Substituting into the constraint converts acceleration terms to position and velocity terms, after which the standard Schur complement applies.
+
+\subsubsection{Complete Elimination Hierarchy}
+\label{sec:modal-elimination-hierarchy}
+
+The generalized modal solver performs elimination in stages:
+\begin{enumerate}
+  \item \textbf{Mass-matrix Schur}: Eigendecompose $M$, eliminate zero-eigenvalue directions
+  \item \textbf{Jerk substitution}: Replace $\dddot{x}$ terms using the (now-invertible) dynamical equations
+  \item \textbf{Constraint acceleration substitution}: Replace $\ddot{x}$ in constraints using the inverted equations
+  \item \textbf{Constraint field Schur}: Eliminate \texttt{time\_order=0} fields (existing code)
+  \item \textbf{Eigendecomposition}: Standard per-mode eigendecomposition of the reduced $A(k)$
+\end{enumerate}
+
+For the PGT graviton-torsion system, this reduces 17 fields (after Ostrogradsky) to 14 dynamical slots (7 fields $\times$ 2 field+velocity), with 10 constraint fields and 2 mass-matrix constraints.
+
+\textbf{Implementation}: \texttt{\_build\_generalized\_evolution\_matrices()} in \texttt{modal.py}, called when any equation has time-derivative operators (\texttt{d2\_t}, \texttt{mixed\_T*}, etc.). Backward compatible: for systems without time-derivative operators, the existing code paths are used unchanged.
+
+\textbf{References}: Golub \& Van Loan (2013), \emph{Matrix Computations}, 4th ed., \S7.7; Hairer \& Lubich (2003), ZAMM 83(1); Ostrogradsky M.V.\ (1850), Mem.\ Acad.\ St.\ Petersbourg VI 4, 385.
+
 \subsection{Constraints and Limitations}
 \label{sec:modal-constraints-limitations}
 
