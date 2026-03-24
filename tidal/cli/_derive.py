@@ -4077,27 +4077,18 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
     # which zeros PD[{killedAxis,-chart}][...] terms BEFORE TraceBasisDummy.
     # This is implemented in ComponentDecompose.wl step 2.5.
 
-    # Batched decomposition: process multiple terms per DecomposeScalar-
-    # Expression call to leverage BatchedTraceBasisDummy efficiency.
-    # Single-term calls waste internal batching (50 terms/batch → 1 term).
-    # Batches of 20: 147 terms → 8 calls, ~15x faster.
-    # Memory-safe: 20 × dim^5 ≈ 5000 intermediates per batch (~5MB).
     lines.extend(
         [
             "lagComp = 0;",
-            "Module[{batchSz = 20, nB, bS, bE, bExpr, bComp, tB},",
-            "  nB = Ceiling[Length[lagTerms] / batchSz];",
-            "  Do[",
-            "    tB = AbsoluteTime[];",
-            "    bS = (b - 1) * batchSz + 1;",
-            "    bE = Min[b * batchSz, Length[lagTerms]];",
-            "    bExpr = Total[lagTerms[[bS ;; bE]]];",
-            f"    bComp = Quiet[DecomposeScalarExpression[bExpr, {ctx.chart}, {{{all_heads_str}}}, "
+            "Do[",
+            "  Module[{termComp, tTerm = AbsoluteTime[]},",
+            f"    termComp = Quiet[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
             f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}], Validate::repeated];',
         ]
     )
 
-    # Per-batch plane-wave reduction (linear rules → same result as per-term)
+    # Per-term plane-wave reduction: zero transverse Derivative patterns
+    # and apply coordinate_values (e.g. y→π/2) BEFORE accumulation.
     if ctx.reduction is not None:
         prop_axis = ctx.reduction["propagation_axis"]
         coords = ctx.coords
@@ -4109,25 +4100,27 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
                 f" && {{ords}}[[{slot}]] > 0 :> 0"
             )
-        lines.append(f"    bComp = bComp /. {{{','.join(deriv_rules)}}};")
+        lines.append(f"    termComp = termComp /. {{{','.join(deriv_rules)}}};")
 
         coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
         if coord_values:
             cv_rules = ", ".join(
                 f"{coord}[] -> {val}" for coord, val in coord_values.items()
             )
-            lines.append(f"    bComp = bComp /. {{{cv_rules}}};")
+            lines.append(f"    termComp = termComp /. {{{cv_rules}}};")
 
-        lines.append("    bComp = Expand[bComp];")
+        lines.append("    termComp = Expand[termComp];")
 
     lines.extend(
         [
-            "    lagComp += bComp;",
+            "    lagComp += termComp;",
             "    Share[];",
-            '    Print["  batch ", b, "/", nB, " (terms ", bS, "-", bE, "): ",',
-            '      Round[AbsoluteTime[] - tB, 0.1], "s, ",',
-            '      Round[MemoryInUse[]/1024.^2], " MB"];',
-            "  , {b, nB}];",
+            "    If[Mod[k, 10] == 0 || k == Length[lagTerms],",
+            '      Print["  term ", k, "/", Length[lagTerms], ": ",',
+            '        Round[AbsoluteTime[] - tTerm, 0.1], "s, ",',
+            '        Round[MemoryInUse[]/1024.^2], " MB"]];',
+            "  ],",
+            "  {k, Length[lagTerms]}",
             "];",
         ]
     )
@@ -4327,7 +4320,6 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "  (* to factor count in products. For R̃² with 5+ factors, depth >4096. *)",
             "  (* Explicit product rule: D[f1*f2*...*fn, t] = Σ_i (Π_{j≠i} fj)*D[fi,t] *)",
             "  Module[{restFactors, dRest},",
-            "    rest = Expand[rest];",
             "    dRest = If[Head[rest] === Plus,",
             "      Total[Function[{term},",
             "        restFactors = If[Head[term]===Times, List@@term, {term}];",
@@ -4841,7 +4833,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "    (* Resolve any remaining tensor refs created by D[] *)",
                     f"    Do[eqExpr = ReplaceTensorFieldComponents[eqExpr, afh, {ctx.chart}, coordSyms, nCoords],",
                     f"      {{afh, {{{', '.join(all_heads_str.split(', '))}}}}}];",
-                    "    eqExpr = Expand[eqExpr];",
                     "    AppendTo[fieldEquations, {fname, eqExpr}];",
                     "  ],",
                     "  {i, Length[fieldFuncsEL]}",
