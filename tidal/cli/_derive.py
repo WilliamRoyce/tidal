@@ -1277,26 +1277,33 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     p = ctx.prefix
     lines: list[str] = []
 
-    # For torsion R̃² theories: SKIP VarD entirely. The component E-L
+    # SKIP VarD for ALL theories with a Lagrangian. The component E-L
     # (ComponentEulerLagrange, after Phase A) computes equations directly
-    # from the component Lagrangian. VarD takes ~180s and produces junk
-    # equations that are overwritten. Profiling shows VarD is 90% of the
-    # 201s linearization time.
-    if ctx.torsion is not None and ctx.lagrangian_expr:
-        lines.extend(_wls_shorthand_cd_tensors(ctx, dyn_fields))
-        lines.extend(('Print["[TIMING] CD shorthand setup + pre-computation: ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];', "tSubPhase = AbsoluteTime[];"))
+    # from the component Lagrangian — faster and mathematically equivalent
+    # to VarD + DecomposeToComponents for flat spacetime.
+    # VarD is kept only for non-Lagrangian theories (pure equation input).
+    if ctx.lagrangian_expr:
+        if ctx.torsion is not None:
+            # Torsion: CD shorthand setup needed for Phase A decomposition
+            lines.extend(_wls_shorthand_cd_tensors(ctx, dyn_fields))
+            lines.extend(
+                [
+                    'Print["[TIMING] CD shorthand setup + pre-computation: ", '
+                    'Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+                    "tSubPhase = AbsoluteTime[];",
+                ]
+            )
         lines.extend(
             [
-                "(* VarD skipped for torsion — component E-L computes equations *)",
-                "(* from lagComp (Phase A) via ComponentEulerLagrange.          *)",
+                "(* VarD skipped — component E-L computes equations from lagComp *)",
                 "fieldEquations = {};",
                 "componentMetadata = <||>;",
-                'Print["VarD skipped (torsion R̃²): equations from component E-L"];',
+                'Print["VarD skipped: equations from component E-L (after Phase A)"];',
             ]
         )
         return lines
 
-    # VarD for each dynamical field (non-torsion theories)
+    # VarD for each dynamical field (non-Lagrangian theories only)
     riemann_cd = f"Riemann{ctx.cd}"
     einstein_cd = f"Einstein{ctx.cd}"
     for df in dyn_fields:
@@ -4818,11 +4825,11 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
         # --- Component-level E-L for torsion R̃² theories ---
         # After Phase A produces lagComp (the component Lagrangian),
-        # recompute fieldEquations via component E-L differentiation.
-        # This REPLACES the trivial equations from abstract VarD +
-        # DecomposeToComponents, which fail for R̃² due to contracted
-        # abstract indices (see issue #155 for full investigation).
-        if ctx.torsion is not None:
+        # Compute fieldEquations via component E-L differentiation.
+        # For ALL theories with a Lagrangian, ComponentEulerLagrange
+        # computes equations directly from lagComp (Phase A output).
+        # Faster and equivalent to VarD + DecomposeToComponents.
+        if ctx.lagrangian_expr:
             lines.extend(
                 [
                     "",
