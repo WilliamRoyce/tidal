@@ -256,29 +256,30 @@ Fields with 4th-order-in-time equations acquire auxiliary fields, expanding the 
 
 \begin{table}[htbp]
 \centering
-\caption{Torsion implementation status (as of v0.15.3).}
+\caption{Torsion implementation status (as of v0.16.1).}
 \label{tab:torsion-status}
 \begin{tabular}{@{}llp{7cm}@{}}
 \toprule
 Component & Status & Notes \\
 \midrule
-Symbolic derivation & Complete & Component E--L produces 15 correct equations in $\sim$5\,s (2+1D) \\
-JSON specification & Complete & 26 equations, 15 fields, correct operator/coefficient structure \\
-Ostrogradsky reduction & Complete & Automatic on JSON load; 15 $\to$ 17 fields, all $\leq$2nd order \\
-Hamiltonian terms & Complete & 14 terms with $b_5$ expressions, verified correct \\
-\textbf{Simulation} & \textbf{Blocked} & Implicit $\partial_t^2$/$\partial_t^3$/mixed operators on 2nd-order fields (\#165) \\
-Energy conservation & Not tested & Blocked by simulation \\
-Parameter sweeps & Not tested & Blocked by simulation \\
+Symbolic derivation & Complete & Component E--L: 15 equations in $\sim$5\,s (vs 77\,min VarD) \\
+JSON specification & Complete & 15 fields (6 graviton $h_{0\text{--}5}$ + 9 torsion $t_{0\text{--}8}$) \\
+Ostrogradsky reduction & Complete & $h_3, h_5$ (4th-order) $\to$ auxiliaries $w_{h_3}, w_{h_5}$; 17 fields \\
+Mass-matrix analysis & Complete & $M = [[1,1],[1,1]]$ for $\{t_3, t_7\}$: hidden constraint $t_3 = t_7$ \\
+Simulation (modal) & \textbf{Complete} & Generalized eigenvalue via QZ; $\max|dE/E| = 0$ at $t=100$ \\
+Energy conservation & \textbf{Pass} & Machine precision ($0$) for all tested $t_\text{end}$ \\
+Parameter sweeps & Not tested & Requires physical parameter selection \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The simulation blocker (\#165) arises because some equations contain implicit references to accelerations of other 2nd-order fields. For example, $\partial_t^2(t_3)$ appears in $t_7$'s equation---this means ``the acceleration of $t_3$'', which is itself defined by $t_3$'s own equation of motion. Resolving this requires either:
+The implicit acceleration coupling (\#165) was resolved by the generalized mass-matrix modal solver (v0.16.0). The key challenge: equations contain $\partial_t^2(t_7)$ on the RHS of $t_3$'s equation, creating a \emph{singular mass matrix} $M$ with implicit coupling $M \cdot \ddot{x} = K \cdot x + D \cdot \dot{x}$. The solution decomposes every operator as $\text{spatial\_multiplier}(k) \times \partial_t^n$ and applies three levels of constraint elimination:
 \begin{enumerate}
-  \item \textbf{IDA residual formulation:} Treat these as implicit DAE constraints.
-  \item \textbf{Explicit RHS substitution:} Replace $\partial_t^2(q_j)$ with $\text{RHS}_j$ during Ostrogradsky reduction.
-  \item \textbf{Extended Ostrogradsky:} Introduce auxiliaries for all cross-referenced fields.
+  \item \textbf{Mass-matrix Schur}: Eigendecompose $M$ to find zero eigenvalues (hidden constraints). For the graviton-torsion system, $M = \bigl[\begin{smallmatrix} 1 & 1 \\ 1 & 1 \end{smallmatrix}\bigr]$ for $\{t_3, t_7\}$ reveals the Poincar\'e gauge constraint $t_3 = t_7$.
+  \item \textbf{Constraint field Schur}: Standard Fourier Schur complement eliminates 10 algebraic constraint fields.
+  \item \textbf{Velocity coupling (QZ)}: Circular constraint velocity dependencies ($h_0 \leftrightarrow h_1$) create singular $(I - V_\text{coupling})$. Resolved via generalized eigenvalue (\texttt{scipy.linalg.eig(A, B)}, QZ decomposition). Infinite eigenvalues correspond to gauge DOF; finite eigenvalues govern physical wave dynamics.
 \end{enumerate}
+See \cref{sec:modal-mass-matrix} for the complete algorithm.
 
 \subsection{References}
 \label{sec:torsion-references}

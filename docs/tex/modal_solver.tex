@@ -589,21 +589,74 @@ where $E = M_{\text{dyn}}^{-1} K$ and $F = M_{\text{dyn}}^{-1} D$. This gives po
 
 Constraint equations may contain acceleration operators on dynamical fields (e.g., \texttt{mixed\_T2\_S1x(t\_3)} = $ik_x \cdot \ddot{t}_3$ in the $h_1$ constraint). After mass-matrix inversion, $\ddot{t}_3 = \sum_j E_{t_3,j} x_j + F_{t_3,j} \dot{x}_j$. Substituting into the constraint converts acceleration terms to position and velocity terms, after which the standard Schur complement applies.
 
+\subsubsection{Velocity Coupling Singularity (QZ Decomposition)}
+\label{sec:modal-qz-velocity}
+
+When constraint fields have \emph{circular velocity dependencies} --- e.g., the $h_1$ constraint references $v_{h_0}$ while the $h_0$ constraint references $v_{h_1}$ --- the implicit velocity coupling equation
+\begin{equation}
+  (I - V_\text{coupling}) \cdot d' = A_\text{rhs} \cdot d
+  \label{eq:vel-coupling-implicit}
+\end{equation}
+becomes singular ($\det(I - V_\text{coupling}) = 0$). This arises in PGT from Poincar\'e gauge symmetry, which creates hidden constraints between constraint field velocities. Na\"ive regularization (adding $\epsilon I$) produces spurious eigenvalues with $|\mathrm{Im}(\lambda)| \sim 10^8$, corrupting the evolution.
+
+\textbf{Solution}: Reformulate as a \emph{generalized eigenvalue problem} using QZ decomposition:
+\begin{equation}
+  B \cdot v = \lambda \cdot A_\text{rhs} \cdot v, \qquad B = I - V_\text{coupling}
+  \label{eq:qz-generalized}
+\end{equation}
+solved via \texttt{scipy.linalg.eig(A\_rhs, B)}. The QZ algorithm (Moler \& Stewart 1973) computes eigenvalues as ratios $\lambda_i = \alpha_i / \beta_i$:
+\begin{itemize}
+  \item $\beta_i \neq 0$: \textbf{Physical eigenvalue} $\lambda_i = \alpha_i/\beta_i$ --- finite, $O(1)$, governs wave dynamics
+  \item $\beta_i = 0$: \textbf{Gauge mode} ($\lambda_i = \infty$) --- constrained direction from gauge symmetry. Set to zero in the evolution ($e^{0 \cdot t} = 1$), freezing gauge DOF at their initial values
+\end{itemize}
+
+\textbf{Comparison with regularization}:
+\begin{center}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Metric & Regularization ($+\epsilon I$) & QZ decomposition \\
+\midrule
+$\max|A|$ & $\sim 10^{19}$ & $O(1)$ \\
+$\max|\mathrm{Im}(\lambda)|$ & $\sim 3.4 \times 10^8$ & $O(k^2)$ (physical) \\
+Energy conservation ($t=100$) & Overflow & $\max|dE/E| = 0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For the graviton-torsion system, circular dependencies $h_0 \leftrightarrow h_1$ and $t_0 \leftrightarrow t_8$ create gauge-constrained velocity directions at 32/33 Fourier modes. The QZ decomposition correctly identifies and filters these, producing clean $O(1)$ eigenvalues for the physical dynamics.
+
+\textbf{References}: Golub \& Van Loan (2013), \emph{Matrix Computations}, 4th ed., \S7.7.6; Moler, C.\ \& Stewart, G.W.\ (1973), ``An Algorithm for Generalized Matrix Eigenvalue Problems'', \emph{SIAM J.\ Numer.\ Anal.}\ 10(2).
+
 \subsubsection{Complete Elimination Hierarchy}
 \label{sec:modal-elimination-hierarchy}
 
-The generalized modal solver performs elimination in stages:
+The generalized modal solver performs a three-level elimination, each following the same mathematical pattern (detect singular directions via eigendecomposition, project out, Schur-eliminate):
+
 \begin{enumerate}
-  \item \textbf{Mass-matrix Schur}: Eigendecompose $M$, eliminate zero-eigenvalue directions
-  \item \textbf{Jerk substitution}: Replace $\dddot{x}$ terms using the (now-invertible) dynamical equations
-  \item \textbf{Constraint acceleration substitution}: Replace $\ddot{x}$ in constraints using the inverted equations
-  \item \textbf{Constraint field Schur}: Eliminate \texttt{time\_order=0} fields (existing code)
-  \item \textbf{Eigendecomposition}: Standard per-mode eigendecomposition of the reduced $A(k)$
+  \item \textbf{Level 1 --- Mass-matrix Schur}: Eigendecompose $M$ per mode. Zero eigenvalues reveal hidden constraints (e.g., $t_3 = t_7$ from Poincar\'e gauge symmetry). Schur-eliminate constrained directions; invert $M$ in dynamical subspace.
+  \item \textbf{Jerk substitution}: Replace $\dddot{x}$ terms using the (now-invertible) dynamical equations: $\dddot{x}_j = E_j \cdot \dot{x} + F_j \cdot (E \cdot x + F \cdot \dot{x})$.
+  \item \textbf{Constraint acceleration substitution}: Replace $\ddot{x}$ operators in constraint equations using the mass-inverted dynamics ($\ddot{x} = E \cdot x + F \cdot \dot{x}$).
+  \item \textbf{Level 2 --- Constraint field Schur}: Eliminate \texttt{time\_order=0} fields via Fourier Schur complement (existing code, \cref{sec:modal-constraint-elimination}).
+  \item \textbf{Level 3 --- Velocity coupling (QZ)}: Generalized eigenvalue via QZ decomposition (\cref{sec:modal-qz-velocity}). Infinite eigenvalues (gauge DOF) frozen; finite eigenvalues evolved.
 \end{enumerate}
 
-For the PGT graviton-torsion system, this reduces 17 fields (after Ostrogradsky) to 14 dynamical slots (7 fields $\times$ 2 field+velocity), with 10 constraint fields and 2 mass-matrix constraints.
+For the PGT graviton-torsion system, this reduces 17 fields (after Ostrogradsky) to 14 dynamical slots (7 fields $\times$ 2), with 10 constraint field eliminations, 2 mass-matrix constraints, and several velocity-coupling gauge modes:
 
-\textbf{Implementation}: \texttt{\_build\_generalized\_evolution\_matrices()} in \texttt{modal.py}, called when any equation has time-derivative operators (\texttt{d2\_t}, \texttt{mixed\_T*}, etc.). Backward compatible: for systems without time-derivative operators, the existing code paths are used unchanged.
+\begin{center}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Stage & Fields/slots & Eliminated \\
+\midrule
+After Ostrogradsky & 17 fields, 24 slots & --- \\
+Level 1 (mass-matrix) & 14 slots remain & $t_3 = t_7$, $w_{h_3}/w_{h_5}$ relation \\
+Level 2 (constraint Schur) & 14 dyn slots & 10 constraint fields \\
+Level 3 (QZ velocity) & Physical DOF & Gauge directions frozen \\
+Eigendecomposition & $\exp(\lambda \cdot t)$ & $O(1)$ time evolution \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Implementation}: \texttt{\_build\_generalized\_evolution\_matrices()} returns $A_\text{rhs}$ and optionally $B = I - V_\text{coupling}$. When $B$ is provided, \texttt{\_evolve\_per\_mode()} uses \texttt{scipy.linalg.eig(A, B)} instead of \texttt{np.linalg.eig(A)}. Backward compatible: for systems without time-derivative operators, the existing code paths are used unchanged.
 
 \textbf{References}: Golub \& Van Loan (2013), \emph{Matrix Computations}, 4th ed., \S7.7; Hairer \& Lubich (2003), ZAMM 83(1); Ostrogradsky M.V.\ (1850), Mem.\ Acad.\ St.\ Petersbourg VI 4, 385.
 

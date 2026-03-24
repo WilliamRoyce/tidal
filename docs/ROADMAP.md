@@ -235,7 +235,8 @@ Issues should be tagged with appropriate labels:
    - ✅ PGT Lagrangian support (T² invariants + R̃²) — COMPLETE
    - ✅ Component-level E-L derivation (5s vs 77min) — COMPLETE (now default for ALL theories)
    - ✅ Ostrogradsky reduction (4th→2nd order) — COMPLETE (automatic on JSON load)
-   - 🔄 Simulation blocked by implicit d2_t/d3_t cross-references (#165)
+   - ✅ Simulation via generalized mass-matrix modal solver (v0.16.0, #165 resolved)
+   - ✅ QZ generalized eigenvalue for velocity coupling singularity (v0.16.1, #166 resolved)
    - Parameter window scanning for viable mode configurations
 
 3. **Non-Abelian Gauge Theories**

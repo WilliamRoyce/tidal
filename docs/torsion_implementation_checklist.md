@@ -67,8 +67,9 @@ The original plan to use `ChangeCurvature + ChangeTorsion` was WRONG:
 - [x] 15 → 17 fields (2 auxiliary), all equations ≤ 2nd order
 
 ### 2e. Simulation & Validation
-- [ ] **BLOCKED** by implicit d2_t/d3_t/mixed_T operators on 2nd-order fields (#165)
-- [ ] Energy conservation
+- [x] Generalized mass-matrix modal solver (v0.16.0, #165 resolved)
+- [x] QZ generalized eigenvalue for velocity coupling (v0.16.1, #166 resolved)
+- [x] Energy conservation: max|dE/E| = 0 at t_end=100 (machine precision)
 - [ ] Conversion measurement between h and T components
 - [ ] Verify against analytical mixing matrix
 

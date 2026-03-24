@@ -410,5 +410,5 @@ The state vector expands from $(q, v_q)$ to $(q, v_q, w_q, v_{w_q})$ for each re
 \paragraph{Integration.}
 The reduction is transparent to users---it happens automatically in \texttt{ostrogradsky.py} during JSON loading. For the 2+1D graviton-torsion example, this converts 15 original fields to 17 fields (2 auxiliary), with all equations at time order $\leq 2$.
 
-\paragraph{Limitations.}
-After reduction, some equations may contain implicit references to accelerations of other fields (e.g., $\partial_t^2 q_j$ appearing in $q_i$'s equation where $q_j$ is itself a second-order field). Resolving these implicit cross-references requires either IDA's residual formulation or explicit RHS substitution during reduction. This is tracked in issue \#165.
+\paragraph{Implicit acceleration coupling.}
+After reduction, equations may contain implicit references to accelerations of other fields (e.g., $\partial_t^2 q_j$ in $q_i$'s equation). The generalized mass-matrix modal solver (v0.16.0) handles this via operator decomposition, singular mass-matrix eigendecomposition, and QZ generalized eigenvalue for velocity coupling. See \cref{sec:modal-mass-matrix} for the complete algorithm. Issue \#165 resolved.

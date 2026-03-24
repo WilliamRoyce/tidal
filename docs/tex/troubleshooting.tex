@@ -238,7 +238,7 @@ Print["Result: ", result];  (* Should be a number, not symbolic *)
 
 \textbf{Resolution:} Automatic Ostrogradsky reduction is applied on JSON load (v0.15.2+). The reducer introduces auxiliary fields to convert all equations to $\leq$2nd order. See \S\ref{sec:ostrogradsky} in the Architecture documentation.
 
-\textbf{Caveat:} After reduction, some equations may contain implicit cross-references to accelerations of other 2nd-order fields (e.g., $\partial_t^2 q_j$ in $q_i$'s equation). This requires further solver support (issue \#165).
+\textbf{Note:} After reduction, implicit acceleration cross-references ($\partial_t^2 q_j$ in $q_i$'s equation) are handled by the generalized mass-matrix modal solver (v0.16.0, issue \#165 resolved). See \cref{sec:modal-mass-matrix} and \cref{sec:troubleshoot-singular-mass}.
 
 \subsection{Common Python Solver Issues}
 \label{sec:python-solver-issues}
@@ -419,3 +419,44 @@ def check_rates(state):
   \item Cross-test: modify old example to use new feature
   \item Documentation: update \texttt{MEMORY.md} with new patterns
 \end{itemize}
+
+
+\subsection{Higher-Derivative Theory Issues}
+\label{sec:troubleshoot-higher-derivative}
+
+\subsubsection{Singular Mass Matrix}
+\label{sec:troubleshoot-singular-mass}
+
+\textbf{Symptom}: Modal solver logs ``Generalized mass matrix: singular M detected'' and produces large matrix entries ($\max|A| \gg 1$).
+
+\textbf{Cause}: Higher-derivative Lagrangians (e.g., $\tilde{R}^2$ in PGT) produce equations with implicit acceleration coupling: $\partial_t^2(q_j)$ appears on the RHS of $q_i$'s equation. After Ostrogradsky reduction, the mass matrix $M$ may be singular, indicating hidden algebraic constraints between fields.
+
+\textbf{Solution}: The modal solver handles this automatically via mass-matrix eigendecomposition (\cref{sec:modal-singular-mass}). Zero eigenvalues are detected and the corresponding directions are Schur-eliminated. No user action needed.
+
+\textbf{Example}: In graviton-torsion (PGT), $M = \bigl[\begin{smallmatrix} 1 & 1 \\ 1 & 1 \end{smallmatrix}\bigr]$ for $\{t_3, t_7\}$ reveals the constraint $t_3 = t_7$ from Poincar\'e gauge symmetry.
+
+\subsubsection{Velocity Coupling Singularity}
+\label{sec:troubleshoot-velocity-coupling}
+
+\textbf{Symptom}: Modal solver logs ``Generalized eigenvalue: N gauge modes zeroed'' during simulation.
+
+\textbf{Cause}: Constraint fields with circular velocity dependencies (e.g., $h_0$ references $v_{h_1}$ while $h_1$ references $v_{h_0}$) create a singular implicit velocity equation $(I - V_\text{coupling}) \cdot d' = A \cdot d$.
+
+\textbf{Solution}: Resolved automatically via QZ generalized eigenvalue decomposition (\cref{sec:modal-qz-velocity}). Infinite eigenvalues correspond to gauge degrees of freedom and are frozen at initial values.
+
+\textbf{History}: Prior to v0.16.1, this was handled by regularization ($+\epsilon I$), which produced spurious $O(10^8)$ oscillation frequencies. The QZ fix (commit \texttt{e2e9cc7}) eliminates these entirely.
+
+\subsubsection{Ghost Instability Warning}
+\label{sec:troubleshoot-ghost}
+
+\textbf{Symptom}: Modal solver warns ``eigenvalues with positive real parts (max Re($\lambda$)=...)'' and energy grows exponentially.
+
+\textbf{Cause}: The Ostrogradsky theorem states that non-degenerate Lagrangians with time derivatives $> 1$ generically propagate ghosts (unbounded Hamiltonian). Some PGT parameter windows are ghost-free (Barker 2024, arXiv:2406.12826).
+
+\textbf{Solution}: This is physical, not a bug. Check:
+\begin{itemize}
+  \item Whether the theory parameters are in a ghost-free window
+  \item Whether the growth rate is physical or numerical (compare with IDA/CVODE)
+  \item The $(-,+,+,+)$ metric convention: negative kinetic energy for timelike components is physical, not a ghost
+\end{itemize}
+See issue \#164 for full propagator analysis (future work).
