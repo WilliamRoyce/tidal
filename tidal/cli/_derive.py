@@ -1277,13 +1277,26 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     p = ctx.prefix
     lines: list[str] = []
 
-    # NOTE: For torsion R̃² theories, the abstract VarD + DecomposeToComponents
-    # below produces trivial equations (77 min timeout or all zeros with
-    # TermByTerm). The CORRECT equations are computed from the component
-    # Lagrangian via ComponentEulerLagrange, inserted AFTER Phase A
-    # produces lagComp (see _wls_canonical_phase_a_component_el).
+    # For torsion R̃² theories: SKIP VarD entirely. The component E-L
+    # (ComponentEulerLagrange, after Phase A) computes equations directly
+    # from the component Lagrangian. VarD takes ~180s and produces junk
+    # equations that are overwritten. Profiling shows VarD is 90% of the
+    # 201s linearization time.
+    if ctx.torsion is not None and ctx.lagrangian_expr:
+        lines.extend(_wls_shorthand_cd_tensors(ctx, dyn_fields))
+        lines.extend(('Print["[TIMING] CD shorthand setup + pre-computation: ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];', "tSubPhase = AbsoluteTime[];"))
+        lines.extend(
+            [
+                "(* VarD skipped for torsion — component E-L computes equations *)",
+                "(* from lagComp (Phase A) via ComponentEulerLagrange.          *)",
+                "fieldEquations = {};",
+                "componentMetadata = <||>;",
+                'Print["VarD skipped (torsion R̃²): equations from component E-L"];',
+            ]
+        )
+        return lines
 
-    # VarD for each dynamical field
+    # VarD for each dynamical field (non-torsion theories)
     riemann_cd = f"Riemann{ctx.cd}"
     einstein_cd = f"Einstein{ctx.cd}"
     for df in dyn_fields:
@@ -1340,6 +1353,13 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
 
     # Shorthand tensor substitution (supervisor's pattern, commit 4a89164).
     lines.extend(_wls_shorthand_cd_tensors(ctx, dyn_fields))
+
+    lines.extend(
+        (
+            'Print["[TIMING] CD shorthand setup + pre-computation: ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+            "tSubPhase = AbsoluteTime[];",
+        )
+    )
 
     # Build set of TT-gauged field names for SkipTuples optimization
     tt_fields = {entry["field"] for entry in ctx.gauge if entry["type"] == "tt"}
@@ -2052,6 +2072,8 @@ def _wls_torsion_curvature_decomposition(ctx: _WlsContext) -> list[str]:
         "  ];",
         '  Print["Decomposed Lagrangian: ", Short[lOriginal, 3]];',
         "];",
+        'Print["[TIMING] R̃ decomposition: ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+        "tSubPhase = AbsoluteTime[];",
         "",
     ]
 
@@ -2142,6 +2164,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "",
         "(* Save original nonlinear Lagrangian *)",
         _wls_timing_start("tLinearize"),
+        "tSubPhase = AbsoluteTime[];",
         f"lOriginal = {p}Lagrangian;",
         "",
     ]
@@ -2234,9 +2257,13 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* xPert natively perturbs Sqrt[-Detg[]], handling all orders.     *)",
             f"lDensity = Sqrt[-{det_sym}[]] * lOriginal;",
             "",
+            'Print["[TIMING] Pre-xPert setup: ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+            "tSubPhase = AbsoluteTime[];",
             "(* 2nd-order perturbation of the full Lagrangian density *)",
             "l2Raw = Perturbation[lDensity, 2];",
             "l2Raw = ExpandPerturbation[l2Raw];",
+            'Print["[TIMING] xPert Perturbation + ExpandPerturbation: ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+            "tSubPhase = AbsoluteTime[];",
             _wls_mem_print("L^(2) density expanded"),
             "",
             "(* Validate that xPert fully expanded *)",
@@ -2400,6 +2427,8 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* Memory cleanup: free perturbation intermediates *)",
             "Clear[l2Raw, lOriginal, lDensity];",
             "Share[];",
+            'Print["[TIMING] L^(2) cleanup (volume, LI, background, contortion): ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+            "tSubPhase = AbsoluteTime[];",
             _wls_mem_print("After perturbation cleanup"),
             "",
         ]
@@ -2600,6 +2629,13 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         # before DecomposeToComponents so ToBasis substitutes zeros during
         # expansion, reducing peak memory.
         lines.extend(_wls_pre_decomposition_tt_zeroing(ctx))
+
+        lines.extend(
+            (
+                'Print["[TIMING] L^(2) finalized (pre-VarD): ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+                "tSubPhase = AbsoluteTime[];",
+            )
+        )
 
         lines.extend(_wls_multi_field_eom(ctx, dyn_fields))
 
