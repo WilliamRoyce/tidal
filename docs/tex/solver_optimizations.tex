@@ -24,6 +24,10 @@ Rounds 1--6 & Python hot-path micro-optimizations & Leapfrog 1.66$\times$, scipy
 Phase 1 & \texttt{--fd-order 4|6} (higher-order FD stencils) & 500$\times$ spatial error reduction per order at same $N$ \\
 Phase 2 & \texttt{--leapfrog-order 4} (Yoshida + fused-kick) & 3$\times$ wall-clock at equal accuracy (Forest \& Ruth 1990) \\
 Phase 3 & \texttt{--spectral} (FFT pseudo-spectral operators) & Machine-precision accuracy, 8$\times$ fewer DOFs \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Derivation-side optimisations (v0.15.0+)}} \\
+Component E--L & Component-level Euler--Lagrange (default) & $>$900$\times$ for higher-derivative theories \\
+CD shorthand & Pre-computed covariant derivative expansions & 3$\times$ xPert linearisation speedup \\
 \bottomrule
 \end{tabular}
 \end{table}

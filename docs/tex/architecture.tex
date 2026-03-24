@@ -361,6 +361,54 @@ Operator & Min Dim & Description \\
 \texttt{first\_derivative\_t} & 1D & Time derivative (friction/damping terms) \\
 \texttt{biharmonic} & 1D & Fourth-order Laplacian \\
 \texttt{mixed\_T\_S1\_S2\_\ldots} & 1D & Mixed time-space operators (auto-extracted from Wolfram) \\
+\texttt{derivative\_N\_x} & 1D & $N$th-order spatial derivative (e.g., \texttt{derivative\_3\_x} for $\partial_x^3$) \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{Component-Level Euler--Lagrange}
+\label{sec:component-el}
+
+Since v0.15.0, the default derivation strategy for all theories is \textbf{component-level Euler--Lagrange}, which operates in two phases:
+
+\paragraph{Phase~A: Component decomposition.}
+The abstract Lagrangian $\lag(g_{\mu\nu}, \phi^A, \nabla_\mu \phi^A, \ldots)$ is decomposed to a scalar function of coordinate components:
+\begin{equation}
+  \lag_{\text{comp}} = \lag(g_{00}, g_{01}, \ldots, \phi_0, \phi_1, \ldots, \partial_t \phi_0, \partial_x \phi_0, \ldots)
+\end{equation}
+This reuses the existing xCoba basis projection (\texttt{ToBasis}), metric contraction, and Christoffel evaluation stages of the Wolfram pipeline. For a 2+1D theory, this typically completes in $\sim$4\,s.
+
+\paragraph{Phase~B: Standard calculus E--L.}
+The equations of motion are derived by direct differentiation of $\lag_{\text{comp}}$ using the multi-index Euler--Lagrange formula:
+\begin{equation}
+  \frac{\delta \lag}{\delta q_i} = \sum_{\alpha} (-1)^{|\alpha|}\, D^\alpha \frac{\partial \lag}{\partial (D^\alpha q_i)} = 0
+  \label{eq:component-el}
+\end{equation}
+where $D^\alpha = \partial_t^{n_t} \partial_x^{n_x} \cdots$ ranges over all derivative orders present in $\lag_{\text{comp}}$. This produces one equation per component field in under 1\,s per field.
+
+\paragraph{Motivation.}
+The previous approach---abstract \texttt{VarD} followed by \texttt{TraceBasisDummy} for index contraction---suffers from combinatorial explosion when the Lagrangian contains many contracted abstract indices. For example, the $\tilde{R}^2$ curvature-squared torsion Lagrangian has $\sim$45 contracted abstract indices, leading to $O(\text{dim}^{n})$ scaling in \texttt{TraceBasisDummy} ($>$77\,min for 2+1D, infeasible for 3+1D). Component-level E--L bypasses the abstract index machinery entirely, reducing the same derivation to $\sim$5\,s---a \textbf{900$\times$ speedup}. It is now the default for all theories, not only those with higher-curvature terms.
+
+\paragraph{Implementation.}
+\texttt{ComponentEulerLagrange} in \texttt{ComponentDecompose.wl} handles the Phase~B computation, including integration by parts and support for antisymmetric tensor field components via symmetry-permuted tuple replacement (\texttt{ReplaceHigherRankFieldComponents}).
+
+\subsection{Ostrogradsky Reduction}
+\label{sec:ostrogradsky}
+
+Higher-derivative Lagrangians (e.g., $R^2$, $\tilde{R}^2$ curvature-squared terms) produce equations of motion with time derivatives of order $>2$. Since all PDE solver backends (IDA, CVODE, modal, leapfrog) support at most second-order-in-time equations, an automatic \textbf{Ostrogradsky reduction} is applied when the JSON specification is loaded.
+
+\paragraph{Algorithm.}
+For each field $q$ whose equation has time order $n_t > 2$:
+\begin{enumerate}
+  \item Introduce an auxiliary field $w_q = d^2 q / dt^2$ (the acceleration).
+  \item The original equation $d^{n_t} q/dt^{n_t} = \text{RHS}[q, \ldots]$ becomes $d^{n_t - 2} w_q / dt^{n_t - 2} = \text{RHS}[q, \ldots]$.
+  \item Add a constraint linking the auxiliary: $d^2 q / dt^2 = w_q$.
+  \item Repeat until all equations have time order $\leq 2$.
+\end{enumerate}
+The state vector expands from $(q, v_q)$ to $(q, v_q, w_q, v_{w_q})$ for each reduced field.
+
+\paragraph{Integration.}
+The reduction is transparent to users---it happens automatically in \texttt{ostrogradsky.py} during JSON loading. For the 2+1D graviton-torsion example, this converts 15 original fields to 17 fields (2 auxiliary), with all equations at time order $\leq 2$.
+
+\paragraph{Limitations.}
+After reduction, some equations may contain implicit references to accelerations of other fields (e.g., $\partial_t^2 q_j$ appearing in $q_i$'s equation where $q_j$ is itself a second-order field). Resolving these implicit cross-references requires either IDA's residual formulation or explicit RHS substitution during reduction. This is tracked in issue \#165.

@@ -157,3 +157,31 @@ Ref: \texttt{ComponentDecompose.wl}, \texttt{BatchedTraceBasisDummyWithMetric} f
 \subsubsection{EOM vs Canonical Decomposition (No Caching Possible)}
 
 Investigation confirmed that the EOM pass decomposes the \textbf{equations of motion} (\texttt{VarD[L]}) via \texttt{DecomposeToComponents}, while the canonical path decomposes the \textbf{Lagrangian} itself via \texttt{DecomposeScalarExpression}. These are fundamentally different algebraic objects---the Legendre transform requires $L_\text{comp}$, not $\text{EOM}_\text{comp}$. The Wolfram kernel state (Christoffels, metric DownValues, background field DownValues) IS already reused between passes via \texttt{Share[]}.
+
+\subsection{Component-Level E--L Performance (v0.15.0+)}
+\label{sec:component-el-perf}
+
+The component-level Euler--Lagrange pipeline (see \S\ref{sec:component-el} in Architecture) eliminates the \texttt{VarD} + \texttt{TraceBasisDummy} bottleneck for theories with many contracted abstract indices.
+
+\begin{table}[htbp]
+\centering
+\caption{Derivation timing comparison for PGT torsion ($\torsion^2 + \tilde{R}^2$), 2+1D.}
+\label{tab:component-el-timing}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Phase & Abstract VarD & Component E--L & Speedup \\
+\midrule
+xPert linearisation & ${\sim}200$\,s & ${\sim}60$\,s (with CD shorthand) & 3$\times$ \\
+Phase A (component decomp) & --- & ${\sim}4$\,s & --- \\
+Phase B (E--L per field) & $>$77\,min & $<$1\,s/field ($\sim$5\,s total) & $>$900$\times$ \\
+\midrule
+\textbf{Total} & $>$80\,min & ${\sim}65$\,s & $>$70$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key insight:} The abstract VarD path scales with the number of \emph{contracted abstract indices} (for $\tilde{R}^2$: $\sim$45 indices, giving $O(\text{dim}^{n})$ scaling in \texttt{TraceBasisDummy}). The component E--L path operates on scalar expressions with no abstract indices, making it insensitive to the complexity of the original tensor structure.
+
+The CD shorthand optimisation (pre-computing covariant derivative expansions) further reduces xPert linearisation from ${\sim}200$\,s to ${\sim}60$\,s, and is now applied to ALL theories (not just torsion).
+
+\textbf{Note:} Component-level E--L is the default for all theories since v0.15.0. The abstract VarD path is still available as a fallback but is no longer used in the standard pipeline.

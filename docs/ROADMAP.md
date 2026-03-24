@@ -231,9 +231,11 @@ Issues should be tagged with appropriate labels:
    - Validation against analytical thin-magnet formula (Domcke & Garcia-Cely 2023)
    - Automated analytic benchmark tests
 
-2. **Linearized General Relativity Extensions**
-   - Linearized gravity already works (10-component, gauge-unfixed and gauge-fixed)
-   - Extend to Poincaré gauge theory (torsion modes, propagating degrees of freedom)
+2. **Poincaré Gauge Theory (Torsion)**
+   - ✅ PGT Lagrangian support (T² invariants + R̃²) — COMPLETE
+   - ✅ Component-level E-L derivation (5s vs 77min) — COMPLETE (now default for ALL theories)
+   - ✅ Ostrogradsky reduction (4th→2nd order) — COMPLETE (automatic on JSON load)
+   - 🔄 Simulation blocked by implicit d2_t/d3_t cross-references (#165)
    - Parameter window scanning for viable mode configurations
 
 3. **Non-Abelian Gauge Theories**

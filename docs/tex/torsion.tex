@@ -215,6 +215,71 @@ Investigation revealed:
 
 The decomposed-form Lagrangian avoids this issue entirely.
 
+\subsection{$\tilde{R}^2$ Curvature-Squared Term}
+\label{sec:rtilde-squared}
+
+The full PGT Lagrangian includes a curvature-squared term $b_5 \tilde{R}^2$ where $\tilde{R}$ is the Riemann-Cartan Ricci scalar (eq.~\ref{eq:riemann-cartan-identity}). This term is physically essential for several reasons:
+
+\begin{itemize}
+  \item \textbf{Graviton-torsion mixing:} $\tilde{R}^2$ introduces coupling between metric and torsion perturbations via 4th-order equations and cross-coupled spatial derivatives. Without it, the torsion sector decouples from gravity at linear order.
+  \item \textbf{4th-order equations:} The variation of $\tilde{R}^2$ produces equations with $\partial_t^4$ terms, requiring Ostrogradsky reduction (see \S\ref{sec:ostrogradsky} in Architecture).
+  \item \textbf{Higher-order spatial operators:} The derived equations contain \texttt{derivative\_3\_x} ($\partial_x^3$), \texttt{biharmonic} ($\nabla^4$), and mixed time-space operators (\texttt{mixed\_T2\_S2x}, \texttt{mixed\_T3\_S1x}).
+\end{itemize}
+
+\textbf{Key result:} Pure Einstein-Cartan ($\lag = R$ with torsion, no $\torsion^2$ or $\tilde{R}^2$ terms) gives non-propagating torsion and zero graviton-torsion mixing (a theorem, not an approximation). The $\torsion^2$ kinetic terms enable torsion propagation, while $\tilde{R}^2$ enables mixing with the graviton sector.
+
+The parameter $b_5$ controls the $\tilde{R}^2$ coupling strength. Its physical value is constrained by ghost-freedom and stability conditions (Nikiforova et al., 2009; Barker, 2023).
+
+\subsection{Derived Equations Summary}
+\label{sec:torsion-derived-equations}
+
+The 2+1D plane-wave reduction (propagation along $x$) produces 15 component fields and 26 equations:
+
+\begin{itemize}
+  \item \textbf{Graviton components:} $h_0, h_1, \ldots, h_5$ (6 components of the symmetric metric perturbation in 2+1D)
+  \item \textbf{Torsion components:} $t_0, t_1, \ldots, t_8$ (9 components of the rank-3 tensor with partial antisymmetry in 2+1D)
+\end{itemize}
+
+Example equation structure (schematic):
+\begin{equation}
+  \partial_t^2 h_0 = c_1\, \nabla_x^2 h_5 + c_2\, \partial_x^3 t_0 - c_3\, \partial_x^3 t_8 + c_4\, \nabla^4 h_0 + \cdots
+\end{equation}
+where the $\partial_x^3 t$ terms confirm graviton-torsion mixing, and the $\nabla^4 h$ terms arise from $\tilde{R}^2$.
+
+The canonical Hamiltonian contains 14 terms with $b_5$-dependent expressions, verified to be correct by comparison with the Lagrangian structure.
+
+\paragraph{After Ostrogradsky reduction.}
+Fields with 4th-order-in-time equations acquire auxiliary fields, expanding the state from 15 to 17 fields (2 auxiliary). All equations become $\leq$2nd order in time.
+
+\subsection{Current Status and Remaining Work}
+\label{sec:torsion-status}
+
+\begin{table}[htbp]
+\centering
+\caption{Torsion implementation status (as of v0.15.3).}
+\label{tab:torsion-status}
+\begin{tabular}{@{}llp{7cm}@{}}
+\toprule
+Component & Status & Notes \\
+\midrule
+Symbolic derivation & Complete & Component E--L produces 15 correct equations in $\sim$5\,s (2+1D) \\
+JSON specification & Complete & 26 equations, 15 fields, correct operator/coefficient structure \\
+Ostrogradsky reduction & Complete & Automatic on JSON load; 15 $\to$ 17 fields, all $\leq$2nd order \\
+Hamiltonian terms & Complete & 14 terms with $b_5$ expressions, verified correct \\
+\textbf{Simulation} & \textbf{Blocked} & Implicit $\partial_t^2$/$\partial_t^3$/mixed operators on 2nd-order fields (\#165) \\
+Energy conservation & Not tested & Blocked by simulation \\
+Parameter sweeps & Not tested & Blocked by simulation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The simulation blocker (\#165) arises because some equations contain implicit references to accelerations of other 2nd-order fields. For example, $\partial_t^2(t_3)$ appears in $t_7$'s equation---this means ``the acceleration of $t_3$'', which is itself defined by $t_3$'s own equation of motion. Resolving this requires either:
+\begin{enumerate}
+  \item \textbf{IDA residual formulation:} Treat these as implicit DAE constraints.
+  \item \textbf{Explicit RHS substitution:} Replace $\partial_t^2(q_j)$ with $\text{RHS}_j$ during Ostrogradsky reduction.
+  \item \textbf{Extended Ostrogradsky:} Introduce auxiliaries for all cross-referenced fields.
+\end{enumerate}
+
 \subsection{References}
 \label{sec:torsion-references}
 

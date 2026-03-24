@@ -218,6 +218,28 @@ Print["Result: ", result];  (* Should be a number, not symbolic *)
 \textbf{Workaround:} For now, the extra terms don't break simulation but may cause numerical artifacts.
 
 
+\subsubsection{Higher-Curvature / Many-Index Theories Timeout}
+\label{sec:higher-curvature-timeout}
+
+\textbf{Symptom:} Derivation takes $>$1 hour or times out for Lagrangians containing curvature-squared ($R^2$, $\tilde{R}^2$) or other higher-curvature terms.
+
+\textbf{Cause:} The legacy abstract \texttt{VarD} + \texttt{TraceBasisDummy} pipeline suffers from combinatorial explosion when the Lagrangian has many contracted abstract indices. For example, $\tilde{R}^2$ in PGT produces $\sim$45 contracted indices, leading to $O(\text{dim}^n)$ scaling ($>$77\,min for 2+1D, infeasible for 3+1D).
+
+\textbf{Resolution:} Component-level Euler--Lagrange (now the default since v0.15.0) bypasses the abstract index machinery entirely by differentiating the component Lagrangian directly. This reduces the same derivation to $\sim$5\,s. See \S\ref{sec:component-el} in the Architecture documentation.
+
+\textbf{Note:} If using TIDAL $<$ v0.15.0, upgrade to benefit from the component E--L pipeline.
+
+\subsubsection{4th-Order-in-Time Equations}
+\label{sec:4th-order-eom}
+
+\textbf{Symptom:} JSON specification contains equations with \texttt{d4\_t} or \texttt{d3\_t} on the LHS. Simulation fails because solvers only support $\leq$2nd-order-in-time equations.
+
+\textbf{Cause:} Curvature-squared Lagrangians ($R^2$, $\tilde{R}^2$) produce higher-derivative equations of motion.
+
+\textbf{Resolution:} Automatic Ostrogradsky reduction is applied on JSON load (v0.15.2+). The reducer introduces auxiliary fields to convert all equations to $\leq$2nd order. See \S\ref{sec:ostrogradsky} in the Architecture documentation.
+
+\textbf{Caveat:} After reduction, some equations may contain implicit cross-references to accelerations of other 2nd-order fields (e.g., $\partial_t^2 q_j$ in $q_i$'s equation). This requires further solver support (issue \#165).
+
 \subsection{Common Python Solver Issues}
 \label{sec:python-solver-issues}
 

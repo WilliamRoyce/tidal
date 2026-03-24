@@ -411,9 +411,12 @@ Pattern & Example & Description \\
 \texttt{derivative\_N\_y}   & \texttt{derivative\_5\_y}   & $N$th derivative along $y$: $\partial^5 f / \partial y^5$ \\
 \texttt{derivative\_N\_z}   & \texttt{derivative\_4\_z}   & $N$th derivative along $z$: $\partial^4 f / \partial z^4$ \\
 \texttt{derivative\_Nx\_My} & \texttt{derivative\_2x\_1y} & Mixed: $\partial^3 f / \partial x^2\, \partial y$ \\
+\texttt{mixed\_TN\_SM\{dir\}}  & \texttt{mixed\_T2\_S2x}     & Mixed time-space: $\partial^N_t \partial^M_x f$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\texttt{mixed\_T*\_S*} operators arise from higher-derivative Lagrangians (e.g., curvature-squared terms in PGT). They are auto-generated during derivation by \texttt{BuildMixedOperatorName} and combine time and spatial derivatives acting on a single field. Example: \texttt{mixed\_T2\_S2x} represents $\partial_t^2 \partial_x^2 f$.
 
 \subsubsection{Special: \texttt{first\_derivative\_t}}
 \label{sec:json-first-derivative-t}
