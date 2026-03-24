@@ -628,12 +628,21 @@ def _build_generalized_evolution_matrices(
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
 ) -> tuple[
-    NDArray[np.complex128],  # A_reduced (n_modes, n_dyn_slots, n_dyn_slots)
+    NDArray[np.complex128],  # A_rhs (n_modes, n_dyn_slots, n_dyn_slots)
+    NDArray[np.complex128] | None,  # B_lhs (n_modes, n_dyn, n_dyn) or None
     NDArray[np.complex128],  # recovery (n_modes, n_total_constraints, n_dyn_slots)
     list[str],  # all constraint field names
     dict[int, int],  # orig_to_reduced slot mapping
 ]:
-    """Build per-mode evolution matrices for systems with mass-matrix coupling.
+    """Build per-mode matrices for systems with mass-matrix coupling.
+
+    Returns A_rhs and optionally B_lhs for the generalized eigenvalue
+    problem B·d' = A·d, where B = I - vel_coupling may be singular
+    (gauge freedom from circular constraint velocity dependencies).
+
+    When B_lhs is not None, the caller should use scipy.linalg.eig(A, B)
+    (QZ decomposition) instead of np.linalg.eig(A) for eigendecomposition.
+    Infinite eigenvalues correspond to gauge-constrained directions.
 
     Handles the generalized second-order system:
 
@@ -1179,36 +1188,26 @@ def _build_generalized_evolution_matrices(
                 np.eye(n_dyn_slots, dtype=np.complex128),
                 (n_modes, n_dyn_slots, n_dyn_slots),
             ).copy()
-            lhs = eye - vel_coupling
-            # Regularize singular modes (gauge freedom at k=0, etc.)
-            lhs_dets = np.linalg.det(lhs)
-            singular_lhs = np.abs(lhs_dets) < 1e-12
-            if np.any(singular_lhs):
-                logger.info(
-                    "Velocity coupling LHS singular at %d modes — regularizing",
-                    int(np.sum(singular_lhs)),
-                )
-                lhs[singular_lhs] += 1e-12 * np.eye(n_dyn_slots, dtype=np.complex128)
-            A_reduced: NDArray[np.complex128] = np.asarray(
-                np.linalg.solve(lhs, A_rhs), dtype=np.complex128
-            )
+            B_lhs: NDArray[np.complex128] | None = eye - vel_coupling
         else:
-            A_reduced = A_rhs
+            B_lhs = None
     else:
         recovery = np.zeros((n_modes, 0, n_dyn_slots), dtype=np.complex128)
-        A_reduced = A_dd
+        A_rhs = A_dd
+        B_lhs = None
 
     n_mass_con_total = int(np.sum(con_mask))
     logger.info(
         "Generalized evolution: %d constraint fields, %d mass-matrix constraints, "
-        "%d dynamical slots, jerk=%s",
+        "%d dynamical slots, jerk=%s, vel_coupling=%s",
         n_c,
         n_mass_con_total,
         n_dyn_slots,
         "yes" if np.max(np.abs(J_mat)) > 1e-15 else "no",
+        "generalized_eig" if B_lhs is not None else "none",
     )
 
-    return A_reduced, recovery, constraint_field_names, orig_to_reduced
+    return A_rhs, B_lhs, recovery, constraint_field_names, orig_to_reduced
 
 
 # ---------------------------------------------------------------------------
@@ -1595,6 +1594,7 @@ def _evolve_per_mode(
     progress: SimulationProgress | None,
     *,
     return_fourier: bool = False,
+    B_modes: NDArray[np.complex128] | None = None,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.complex128] | None]:
     """Evolve system with per-mode independent matrices (constant coefficients).
 
@@ -1643,9 +1643,40 @@ def _evolve_per_mode(
         idx = np.array(block_slots)
         A_block = A_modes[:, idx[:, None], idx[None, :]]
 
-        # Batch eigendecomposition for this block
-        eig_vals, V = np.linalg.eig(A_block)
-        V_inv = np.linalg.inv(V)
+        if B_modes is not None:
+            # Generalized eigenvalue problem: B · d' = A · d
+            # Uses QZ decomposition via scipy.linalg.eig(A, B).
+            # Infinite eigenvalues (gauge DOF) are zeroed — they don't evolve.
+            # Ref: Golub & Van Loan (2013), Matrix Computations §7.7.6
+            import scipy.linalg as sla  # noqa: PLC0415
+
+            B_block = B_modes[:, idx[:, None], idx[None, :]]
+            bs = len(block_slots)
+            n_block_modes = A_block.shape[0]
+            eig_vals = np.zeros((n_block_modes, bs), dtype=np.complex128)
+            V = np.zeros((n_block_modes, bs, bs), dtype=np.complex128)
+            n_gauge_total = 0
+            for m in range(A_block.shape[0]):
+                ev_m, vr_m = sla.eig(A_block[m], B_block[m], right=True)
+                # Filter infinite/very-large eigenvalues (gauge modes)
+                gauge = ~np.isfinite(ev_m) | (np.abs(ev_m) > 1e12)
+                ev_m[gauge] = 0.0  # gauge modes frozen at IC
+                n_gauge_total += int(np.sum(gauge))
+                eig_vals[m] = ev_m
+                V[m] = vr_m
+            if n_gauge_total > 0:
+                import logging as _log  # noqa: PLC0415
+
+                _log.getLogger(__name__).info(
+                    "Generalized eigenvalue: %d gauge modes zeroed across %d modes",
+                    n_gauge_total,
+                    A_block.shape[0],
+                )
+            V_inv = np.linalg.inv(V)
+        else:
+            # Standard eigendecomposition (existing path)
+            eig_vals, V = np.linalg.eig(A_block)
+            V_inv = np.linalg.inv(V)
 
         # Warn about potential overflow
         _warn_eigenvalue_growth(eig_vals, dt_total, context="per-mode")
@@ -1945,15 +1976,17 @@ def solve_modal(
     # Determine which matrix builder to use
     use_generalized = has_time_ops and not has_pos_dep
     use_constraint = has_constraints and not has_pos_dep and not use_generalized
+    B_lhs_modes: NDArray[np.complex128] | None = None  # set by generalized path
 
     if use_generalized or use_constraint:
         # Both paths produce: A_reduced, recovery, constraint names, slot mapping
         if use_generalized:
             # Generalized mass-matrix system: M·ẍ = K·x + D·ẋ + J·x⃛
-            # Handles constraint fields, singular M, and jerk substitution.
+            # Returns A_rhs and optional B_lhs for generalized eigenvalue.
             # Ref: Golub & Van Loan (2013), Matrix Computations §7.7
             (
                 A_reduced,
+                _B_lhs_modes,
                 recovery_matrix,
                 c_names,
                 orig_to_reduced,
@@ -2020,6 +2053,7 @@ def solve_modal(
             None,
             progress,  # callback handled below with full state
             return_fourier=True,
+            B_modes=B_lhs_modes,  # generalized eigenvalue if vel coupling
         )
 
         # Reconstruct full state (including constraints) at each snapshot
