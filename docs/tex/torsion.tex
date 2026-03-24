@@ -281,6 +281,49 @@ The implicit acceleration coupling (\#165) was resolved by the generalized mass-
 \end{enumerate}
 See \cref{sec:modal-mass-matrix} for the complete algorithm.
 
+\subsection{Implementation History and Key Findings}
+\label{sec:torsion-implementation}
+
+\subsubsection{Pipeline Architecture}
+
+The torsion implementation required three major pipeline extensions:
+
+\begin{enumerate}
+  \item \textbf{Partial antisymmetry support}: The torsion tensor $\torsion^a{}_{bc}$ has antisymmetry only in the last two indices. \texttt{symmetry = "antisymmetric\_23"} generates \texttt{Antisymmetric[\{-b,-c\}]} in xAct (commit \texttt{419b758}).
+
+  \item \textbf{Torsion-full covariant derivative}: \texttt{torsion = true} in \texttt{[spacetime]} TOML creates a torsion-full CovD via \texttt{DefCovD[..., Torsion -> True]}. The Lagrangian uses the \emph{decomposed form} (Shapiro identity $\tilde{R} = R^{LC} - \frac{1}{4}T^2 - \frac{1}{2}T^2_{bac} + T^2_\text{trace} + \text{div}$) rather than automatic $\tilde{R}$ decomposition.
+
+  \item \textbf{Component-level Euler--Lagrange}: Standard calculus differentiation of the component Lagrangian, bypassing abstract VarD + DecomposeToComponents entirely. Performance: 5\,s vs 77\,min for the $\tilde{R}^2$ theory (900$\times$ speedup). Now default for ALL theories (commit \texttt{22e28a0}).
+\end{enumerate}
+
+\textbf{Critical finding}: The original plan to use \texttt{ChangeCurvature + ChangeTorsion} was incorrect --- \texttt{ChangeTorsion} converts $T \to K$ (contortion), the wrong direction for perturbation. The correct approach keeps \texttt{TorsionCDT} as the fundamental field and uses \texttt{DefTensorPerturbation} directly on it.
+
+\subsubsection{Field Structure}
+
+The 2+1D graviton-torsion system has 15 component fields:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Tensor & Components & Fields \\
+\midrule
+Metric perturbation $h_{\mu\nu}$ (symmetric) & 6 & $h_0{=}h_{00},\ h_1{=}h_{01},\ h_2{=}h_{02},\ h_3{=}h_{11},\ h_4{=}h_{12},\ h_5{=}h_{22}$ \\
+Torsion perturbation $t_{\alpha\mu\nu}$ (antisym. in $\mu\nu$) & 9 & $t_0{=}t_{001},\ t_1{=}t_{002},\ \ldots,\ t_8{=}t_{212}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+After Ostrogradsky reduction: $h_3, h_5$ (4th-order from $\tilde{R}^2$) $\to$ auxiliaries $w_{h_3}, w_{h_5}$, giving 17 fields total. 10 are constraints (time\_order=0), 5 are 2nd-order dynamical (after mass-matrix elimination), with 2 mass-matrix constraints ($t_3 = t_7$, $w_{h_3}/w_{h_5}$ relation).
+
+\subsubsection{Remaining Validation Tasks}
+
+\begin{itemize}
+  \item Conversion measurement between $h$ and $T$ components (no analytical formula exists; requires numerical sweep)
+  \item Dispersion relation $\omega(k)$ comparison with Nikiforova et al.\ (2009) stability analysis
+  \item Propagating mode count cross-check with PSALTer / Barker (2024) predictions
+  \item Background $B$ field parameter sweeps for graviton-torsion mixing (\#154)
+\end{itemize}
+
 \subsection{References}
 \label{sec:torsion-references}
 
