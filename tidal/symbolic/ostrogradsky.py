@@ -159,6 +159,9 @@ def apply_ostrogradsky_reduction(
         stacklevel=2,
     )
 
+    # Build time-order lookup for ALL fields (needed for mixed operator resolution)
+    {eq.field_name: eq.time_derivative_order for eq in spec.equations}
+
     # Pre-process: substitute d4_t cross-references
     # If d4_t(h_5) appears in h_3's RHS, and h_5 is also 4th-order,
     # then d4_t(h_5) = RHS_h5. Substitute RHS_h5 into h_3's equation.
@@ -238,12 +241,41 @@ def apply_ostrogradsky_reduction(
     new_mass = _expand_matrix(spec.mass_matrix, n_old, n_aux)
     new_coupling = _expand_matrix(spec.coupling_matrix, n_old, n_aux)
 
+    # Post-reduction: eliminate time-derivative operators on constraint fields.
+    # For constraint fields (time_order=0), ∂²_t(field) = 0 in the linearized
+    # theory. Any d2_t, d3_t, d4_t, or mixed_T* operator on a constraint
+    # field produces zero → drop the term.
+    constraint_fields = {
+        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+    }
+    TIME_OPS = {"d2_t", "d3_t", "d4_t", "first_derivative_t"}
+
+    cleaned_equations: list[ComponentEquation] = []
+    for eq in new_equations:
+        cleaned_terms = tuple(
+            t
+            for t in eq.rhs_terms
+            if not (
+                t.field in constraint_fields
+                and (t.operator in TIME_OPS or _MIXED_RE.match(t.operator))
+            )
+        )
+        if cleaned_terms != eq.rhs_terms:
+            n_dropped = len(eq.rhs_terms) - len(cleaned_terms)
+            logger.info(
+                "Ostrogradsky: dropped %d time-derivative terms on constraint "
+                "fields in %s equation",
+                n_dropped,
+                eq.field_name,
+            )
+        cleaned_equations.append(replace(eq, rhs_terms=cleaned_terms))
+
     # Reconstruct EquationSystem with reduced equations
     return replace(
         spec,
         n_components=n_new,
         component_names=tuple(new_names),
-        equations=tuple(new_equations),
+        equations=tuple(cleaned_equations),
         mass_matrix=new_mass,
         coupling_matrix=new_coupling,
     )
@@ -374,6 +406,14 @@ def _reduce_single_term(
                 coefficient=term.coefficient,
                 coefficient_symbolic=term.coefficient_symbolic,
             )
+
+    # Mixed operators on non-4th-order fields: check if resolvable.
+    # For constraint fields (time_order=0), ∂²_t(field) = 0 in the
+    # linearized theory → mixed_T2_S*(field) = ∂_x(∂²_t field) = 0.
+    # For 2nd-order dynamical fields, mixed_T2_S1x(field) = ∂_x(d²_t field)
+    # — this is a genuine RHS term that needs solver support.
+    if m and not field_has_aux:
+        return term
 
     # Pure spatial operators: pass through unchanged
     return term
