@@ -22,7 +22,7 @@ Read through key docs and compare against current codebase state:
 - `docs/NEXT_PHASES.md` — Are completed phases marked done? Are stats accurate?
 - `README.md` — Are test counts, example counts, feature lists accurate?
 - `CONTRIBUTING.md` — Are test counts accurate?
-- `docs/troubleshooting.md` — Are solved issues still listed as unresolved?
+- `docs/tex/troubleshooting.tex` — Are solved issues still listed as unresolved?
 - Active feature checklists — Are completed items marked done?
 
 ### Step 2 — Fix discrepancies

@@ -4,7 +4,7 @@ This directory contains living documentation in LaTeX format (`docs/tex/`) for e
 
 ## LaTeX Documentation (`docs/tex/`)
 
-All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file is self-contained (no `\documentclass`), starts with `\section{Title}\label{sec:slug}`, and uses macros from `preamble.tex`. To compile any fragment standalone:
+All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file is self-contained (no `\documentclass`), starts with `\section{Title}\label{sec:slug}`, and uses macros from `preamble.tex`. These `.tex` files are the primary documentation — update them directly. To compile any fragment standalone:
 
 ```latex
 \documentclass[11pt,a4paper]{article}
@@ -25,51 +25,51 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 
 ### Physics
 
-| File | Source | Content |
-| ---- | ------ | ------- |
-| `gertsenshtein.tex` | gertsenshtein.md | Gertsenshtein effect: physics background, validation targets |
-| `gertsenshtein_formula.tex` | gertsenshtein_formula.md | Conversion formula derivation, literature comparison |
-| `gertsenshtein_localized.tex` | gertsenshtein_localized.md | Boccaletti formula, localized B-field scattering |
-| `critical_field.tex` | critical_field.md | Critical field analysis, amplification factor |
-| `torsion.tex` | torsion.md | Poincare gauge theory, torsion implementation |
-| `chern_simons.tex` | chern-simons-notes.md | Chern-Simons 2+1D implementation |
+| File | Location | Content |
+| ---- | -------- | ------- |
+| `gertsenshtein.tex` | `docs/tex/gertsenshtein.tex` | Gertsenshtein effect: physics background, validation targets |
+| `gertsenshtein_formula.tex` | `docs/tex/gertsenshtein_formula.tex` | Conversion formula derivation, literature comparison |
+| `gertsenshtein_localized.tex` | `docs/tex/gertsenshtein_localized.tex` | Boccaletti formula, localized B-field scattering |
+| `critical_field.tex` | `docs/tex/critical_field.tex` | Critical field analysis, amplification factor |
+| `torsion.tex` | `docs/tex/torsion.tex` | Poincare gauge theory, torsion implementation |
+| `chern_simons.tex` | `docs/tex/chern_simons.tex` | Chern-Simons 2+1D implementation |
 
 ### Architecture
 
-| File | Source | Content |
-| ---- | ------ | ------- |
-| `architecture.tex` | architecture/README.md | Pipeline overview, module roles, TikZ figure refs |
-| `json_schema.tex` | JSON_SCHEMA_GUIDE.md | Complete JSON specification reference |
-| `solver_migration.tex` | solver_migration.md | py-pde to SUNDIALS migration |
-| `modal_solver.tex` | modal_solver.md | Fourier modal solver |
-| `solver_optimizations.tex` | solver_optimizations.md | FD stencils, Yoshida, spectral phases |
-| `adaptive_timestepping.tex` | adaptive_timestepping.md | Tolerance-controlled solvers |
-| `kinetic_matrix.tex` | kinetic_matrix_alternatives.md | Non-diagonal kinetic matrix handling |
+| File | Location | Content |
+| ---- | -------- | ------- |
+| `architecture.tex` | `docs/tex/architecture.tex` | Pipeline overview, module roles, component E-L, Ostrogradsky |
+| `json_schema.tex` | `docs/tex/json_schema.tex` | Complete JSON specification reference |
+| `solver_migration.tex` | `docs/tex/solver_migration.tex` | py-pde to SUNDIALS migration |
+| `modal_solver.tex` | `docs/tex/modal_solver.tex` | Fourier modal solver |
+| `solver_optimizations.tex` | `docs/tex/solver_optimizations.tex` | FD stencils, Yoshida, spectral, component E-L |
+| `adaptive_timestepping.tex` | `docs/tex/adaptive_timestepping.tex` | Tolerance-controlled solvers |
+| `kinetic_matrix.tex` | `docs/tex/kinetic_matrix.tex` | Non-diagonal kinetic matrix handling |
 
 ### Features
 
-| File | Source | Content |
-| ---- | ------ | ------- |
-| `background_fields.tex` | background_fields.md | Position-dependent coefficients |
-| `constraint_fields.tex` | constraint_fields.md | Mixed time-derivative orders, DAE handling |
-| `gauge_fixing.tex` | gauge_fixing.md | Per-field gauge presets |
-| `multi_field_perturbation.tex` | multi_field_perturbation.md | Multi-field linearization (xPert) |
+| File | Location | Content |
+| ---- | -------- | ------- |
+| `background_fields.tex` | `docs/tex/background_fields.tex` | Position-dependent coefficients |
+| `constraint_fields.tex` | `docs/tex/constraint_fields.tex` | Mixed time-derivative orders, DAE handling |
+| `gauge_fixing.tex` | `docs/tex/gauge_fixing.tex` | Per-field gauge presets |
+| `multi_field_perturbation.tex` | `docs/tex/multi_field_perturbation.tex` | Multi-field linearization (xPert) |
 
 ### Operational & User-Facing
 
-| File | Source | Content |
-| ---- | ------ | ------- |
-| `troubleshooting.tex` | troubleshooting.md | Error encyclopedia |
-| `cli_reference.tex` | source/cli.md | CLI subcommand reference |
-| `pipeline.tex` | source/pipeline.md | Two-stage data flow |
-| `examples.tex` | source/examples.md | Working examples catalog |
-| `derivation_performance.tex` | derivation_performance.md | Wolfram bottleneck analysis |
-| `adr_disk_storage.tex` | adr-disk-storage.md | ADR: mmap NumPy storage |
-| `volume_element_fix.tex` | volume-element-fix.md | sqrt|g| volume element fix |
+| File | Location | Content |
+| ---- | -------- | ------- |
+| `troubleshooting.tex` | `docs/tex/troubleshooting.tex` | Error encyclopedia |
+| `cli_reference.tex` | `docs/tex/cli_reference.tex` | CLI subcommand reference |
+| `pipeline.tex` | `docs/tex/pipeline.tex` | Two-stage data flow |
+| `examples.tex` | `docs/tex/examples.tex` | Working examples catalog |
+| `derivation_performance.tex` | `docs/tex/derivation_performance.tex` | Wolfram bottleneck analysis, component E-L timings |
+| `adr_disk_storage.tex` | `docs/tex/adr_disk_storage.tex` | ADR: mmap NumPy storage |
+| `volume_element_fix.tex` | `docs/tex/volume_element_fix.tex` | sqrt|g| volume element fix |
 
 ## TikZ Figures (`docs/figures/`)
 
-17 standalone TikZ diagrams (pipeline, solvers, constraints, etc.) with shared styles in `tidal-tikz-styles.sty`. Each compiles independently with `\documentclass[border=10pt]{standalone}`.
+18 standalone TikZ diagrams (pipeline, solvers, constraints, etc.) with shared styles in `tidal-tikz-styles.sty`. Each compiles independently with `\documentclass[border=10pt]{standalone}`.
 
 ## Project Management (Markdown)
 
@@ -95,4 +95,4 @@ Auto-generated API documentation via Sphinx (`.rst` files). Build with `make htm
 
 ---
 
-Last updated: 2026-03-21 (Migrated from Markdown to LaTeX)
+Last updated: 2026-03-23

@@ -18,7 +18,7 @@ description: Conventional commit with mandatory pre-commit testing and auto-form
 !`cd /workspaces/torsion-gertsenshtein && echo "v$(python3 -c "import re; print(re.search(r'^version\s*=\"([^\"]+)\"', open('pyproject.toml').read(), re.MULTILINE).group(1))" 2>/dev/null) — $(git log --oneline $(git log --all --grep='chore: bump version' --format='%H' -1 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD 2>/dev/null | wc -l) commits since last bump"`
 
 ## Docs mentioning changed components
-!`cd /workspaces/torsion-gertsenshtein && for f in $(git diff --name-only HEAD 2>/dev/null | head -5); do base=$(basename "$f" .py); grep -rl --include="*.md" "$base" docs/ 2>/dev/null; done | sort -u | head -10`
+!`cd /workspaces/torsion-gertsenshtein && for f in $(git diff --name-only HEAD 2>/dev/null | head -5); do base=$(basename "$f" .py); grep -rl --include="*.tex" --include="*.md" "$base" docs/ 2>/dev/null; done | sort -u | head -10`
 
 ## Related open issues
 !`cd /workspaces/torsion-gertsenshtein && gh issue list --limit 10 --json number,title --jq '.[] | "#\(.number): \(.title)"' 2>/dev/null`
@@ -80,14 +80,18 @@ grep -rl "keyword" docs/
 ```
 Also check the "Docs mentioning changed components" section above.
 
+**Documentation structure:**
+- Technical docs live in `docs/tex/*.tex` — these are the primary documentation
+- Project management (roadmaps, checklists) lives in `docs/*.md`
+- See `docs/README.md` for the full documentation index
+
 **Common patterns:**
 - Resolved an issue? → Update status in `docs/ROADMAP.md` or `docs/NEXT_PHASES.md`
 - Completed a checklist item? → Mark done in the relevant `docs/*checklist*.md`
-- Changed performance? → Update benchmark tables in whichever doc covers that subsystem
-- Discovered new error pattern? → Add to `docs/troubleshooting.md`
-- Changed algorithm/architecture? → Update the doc that describes that component
-
-See `docs/README.md` for the full documentation index.
+- Changed performance? → Update benchmark tables in whichever `docs/tex/*.tex` covers that subsystem
+- Discovered new error pattern? → Add to `docs/tex/troubleshooting.tex`
+- Changed algorithm/architecture? → Update the `docs/tex/*.tex` that describes that component
+- Run `/sync-docs` after major features to check for drift
 
 If docs need updating, make the changes and commit separately:
 ```bash
