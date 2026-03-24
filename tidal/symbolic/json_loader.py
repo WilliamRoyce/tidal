@@ -1165,7 +1165,7 @@ class EquationSystem:
         if canonical_data is not None:
             canonical = CanonicalStructure.from_dict(canonical_data)
 
-        return cls(
+        spec = cls(
             n_components=n_components,
             dimension=dimension,
             spatial_dimension=spatial_dimension,
@@ -1179,6 +1179,22 @@ class EquationSystem:
             coupling_matrix_symbolic=coupling_matrix_symbolic,
             canonical=canonical,
         )
+
+        # Ostrogradsky reduction: convert 4th-order-in-time equations to
+        # 2nd-order via auxiliary fields.  Ref: Ostrogradsky (1850),
+        # Woodard (2015, arXiv:1506.02210).  Applied in-memory only.
+        if any(eq.time_derivative_order > 2 for eq in spec.equations):  # noqa: PLR2004
+            from tidal.symbolic.ostrogradsky import (  # noqa: PLC0415
+                apply_ostrogradsky_reduction,
+            )
+
+            logger.info(
+                "Applying Ostrogradsky reduction for higher-derivative equations"
+            )
+            spec = apply_ostrogradsky_reduction(spec)
+            logger.info("Ostrogradsky: %d fields after reduction", spec.n_components)
+
+        return spec
 
 
 # --- JSON schema validation ---
