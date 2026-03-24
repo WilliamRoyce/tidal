@@ -71,7 +71,8 @@ The original plan to use `ChangeCurvature + ChangeTorsion` was WRONG:
 - [x] QZ generalized eigenvalue for velocity coupling (v0.16.1, #166 resolved)
 - [x] Energy conservation: max|dE/E| = 0 at t_end=100 (machine precision)
 - [ ] Conversion measurement between h and T components
-- [ ] Verify against analytical mixing matrix
+- [ ] Verify dispersion relation ω(k) against Nikiforova et al. (2009) stability analysis
+- [ ] Cross-check propagating mode count with PSALTer / Barker (2024) predictions
 
 ## Stage 3: Component-Level E-L (General Pipeline — from torsion work)
 
