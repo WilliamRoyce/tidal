@@ -330,7 +330,7 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
             ContainsOwnTimeDerivative[#, allFieldNames[[j]], 2] &];
           If[Length[d2tTerms] > 0,
             coeffList = ExtractLHSCoefficient /@ d2tTerms;
-            coeffSum = Simplify[Total[coeffList]];
+            coeffSum = If[LeafCount[Total[coeffList]] < 500, Simplify[Total[coeffList]], Total[coeffList]];
             Module[{isPhantom},
               isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
               If[!isPhantom,
@@ -400,6 +400,8 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
   (* Pass allFieldNames so cross-field references can be detected *)
   equations = {};
   Do[
+    Print["  JSON eq ", i, "/", nFields, ": ", workingEqs[[i, 1]],
+      " (LeafCount=", LeafCount[workingEqs[[i, 2]]], ")"];
     AppendTo[equations,
       EquationToJSONMultiField[
         workingEqs[[i, 2]],
@@ -496,7 +498,7 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   If[lhsTimeOrder > 0 && Length[timeDerivTerm] > 0,
     Module[{coeffSum, coeffList, isPhantom},
       coeffList = ExtractLHSCoefficient /@ timeDerivTerm;
-      coeffSum = Simplify[Total[coeffList]];
+      coeffSum = If[LeafCount[Total[coeffList]] < 500, Simplify[Total[coeffList]], Total[coeffList]];
       isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
       If[!isPhantom,
         Module[{syms, numVal},
@@ -532,8 +534,14 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
        separate linear terms into a single Times with multiple field heads.
        Without Expand, ParseMultiFieldRHS misidentifies these as bilinear
        (field-dependent) coefficients. This is critical for any multi-component
-       system where the LHS coefficient is ±1 (standard wave equations). *)
-    rhs = Expand[rhs]
+       system where the LHS coefficient is ±1 (standard wave equations).
+       NOTE: Skip Expand for large expressions (LeafCount > 1000) — R̃²
+       4th-order products in 4D exceed $RecursionLimit and crash the kernel
+       via TerminatedEvaluation (uncatchable). For such expressions the
+       component E-L already Expand'd each EOM term, so Plus structure holds. *)
+    If[LeafCount[rhs] < 1000,
+      rhs = Expand[rhs]
+    ]
   ];
 
   (* Parse RHS with cross-field detection *)
@@ -705,7 +713,9 @@ ExtractLHSCoefficient[term_] := Module[{derivParts, derivPart},
   ];
   derivPart = derivParts[[1]];
   If[term === derivPart, Return[1]];
-  Simplify[term / derivPart]
+  Module[{ratio = term / derivPart},
+    If[LeafCount[ratio] < 500, Simplify[ratio], ratio]
+  ]
 ];
 
 (* Check for mixed time-space derivatives that shouldn't be on RHS *)
@@ -978,7 +988,7 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     (* Replace field[args] with 1 *)
     f_Symbol[__] /; ToString[f] === fieldHead :> 1
   };
-  If[!NumericQ[rawCoeff], rawCoeff = Simplify[rawCoeff]];
+  If[!NumericQ[rawCoeff] && LeafCount[rawCoeff] < 500, rawCoeff = Simplify[rawCoeff]];
 
   (* Check for coordinate dependence in coefficient *)
   coordDeps = IsCoordinateDependentCoefficient[rawCoeff];
@@ -1530,8 +1540,12 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
   (* Ensure expression is fully expanded before splitting into Plus terms.
      The Legendre transform H = Sum pi*vel - L should produce an expanded
      expression, but defensive Expand prevents silent failures from
-     auto-factoring (same rationale as the Expand in EquationToJSONMultiField). *)
-  componentExpr = Expand[componentExpr];
+     auto-factoring (same rationale as the Expand in EquationToJSONMultiField).
+     NOTE: Skip Expand for large expressions — R̃² products exceed
+     $RecursionLimit and crash via TerminatedEvaluation (uncatchable). *)
+  If[LeafCount[componentExpr] < 1000,
+    componentExpr = Expand[componentExpr]
+  ];
 
   (* Split into additive terms *)
   terms = If[Head[componentExpr] === Plus, List @@ componentExpr, {componentExpr}];

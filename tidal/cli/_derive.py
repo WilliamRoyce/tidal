@@ -297,6 +297,11 @@ def _wls_header(ctx: _WlsContext) -> list[str]:
         "(* Prevent Wolfram from caching all In/Out expressions — reduces memory *)",
         "$HistoryLength = 0;",
         "",
+        "(* Increase recursion limit for complex tensor theories — xAct internal   *)",
+        "(* evaluation can exceed the default 1024 for expressions with many        *)",
+        "(* contracted index pairs (4D R̃² torsion, Einstein-Maxwell, etc.).       *)",
+        "$RecursionLimit = 16384;",
+        "",
         f'Print["=== {ctx.theory_name} ==="];',
         'Print[""];',
         "",
@@ -1047,25 +1052,28 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # Apply ALL shorthand rules to ALL EOM variables.
     # Also apply INSIDE Scalar wrappers — xPert's Scalar[eta^{ab} CD[-a][f[-b]]]
     # wraps CD operators that MakeRule can't see from the outside.
+    # SKIP when VarD is skipped (lagrangian_expr path) — EOM variables don't
+    # exist yet; they'll be created by Component E-L after Phase A decomposition.
     all_rules = " /. ".join(rule_vars) if rule_vars else ""
-    for df in dyn_fields:
-        eom_var = f"eom{df['name'].capitalize()}"
-        if all_rules:
+    if not ctx.lagrangian_expr:
+        for df in dyn_fields:
+            eom_var = f"eom{df['name'].capitalize()}"
+            if all_rules:
+                lines.extend(
+                    [
+                        "(* Apply shorthand rules to outer expression + inside Scalar wrappers *)",
+                        f"{eom_var} = {eom_var} /. {all_rules};",
+                        f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_rules}];",
+                    ]
+                )
             lines.extend(
                 [
-                    "(* Apply shorthand rules to outer expression + inside Scalar wrappers *)",
-                    f"{eom_var} = {eom_var} /. {all_rules};",
-                    f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_rules}];",
+                    f"{eom_var} //= ToCanonical;",
+                    f"{eom_var} //= ContractMetric;",
+                    f"{eom_var} //= ScreenDollarIndices;",
+                    f"{eom_var} //= CollectTensors;",
                 ]
             )
-        lines.extend(
-            [
-                f"{eom_var} //= ToCanonical;",
-                f"{eom_var} //= ContractMetric;",
-                f"{eom_var} //= ScreenDollarIndices;",
-                f"{eom_var} //= CollectTensors;",
-            ]
-        )
 
     # --- Second-order CD shorthands: CD2field = CD@CD1field ---
     # For R̃² torsion theories: the Lagrangian has ∇∇field terms (second covariant
@@ -1100,9 +1108,9 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
-    # Apply CD2 rules after CD1 rules
+    # Apply CD2 rules after CD1 rules (skip when VarD is skipped)
     all_cd2_rules = " /. ".join(cd2_rule_vars) if cd2_rule_vars else ""
-    if all_cd2_rules:
+    if all_cd2_rules and not ctx.lagrangian_expr:
         for df in dyn_fields:
             eom_var = f"eom{df['name'].capitalize()}"
             lines.extend(
@@ -1145,9 +1153,9 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
-    # Apply CD3 rules
+    # Apply CD3 rules (skip when VarD is skipped)
     all_cd3_rules = " /. ".join(cd3_rule_vars) if cd3_rule_vars else ""
-    if all_cd3_rules:
+    if all_cd3_rules and not ctx.lagrangian_expr:
         for df in dyn_fields:
             eom_var = f"eom{df['name'].capitalize()}"
             lines.extend(
@@ -1188,9 +1196,9 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
-    # Apply CD4 rules
+    # Apply CD4 rules (skip when VarD is skipped)
     all_cd4_rules = " /. ".join(cd4_rule_vars) if cd4_rule_vars else ""
-    if all_cd4_rules:
+    if all_cd4_rules and not ctx.lagrangian_expr:
         for df in dyn_fields:
             eom_var = f"eom{df['name'].capitalize()}"
             lines.extend(
@@ -3094,8 +3102,10 @@ def _wls_constraint_elimination() -> list[str]:
         "(* SkipTuples, so they never appear in fieldEquations.  But lagComp *)",
         "(* is decomposed from the full abstract Lagrangian and still has    *)",
         "(* these terms.  Zero them here so the Hamiltonian is clean.        *)",
+        "(* SKIP when VarD is skipped (fieldEquations = {}): all fields are  *)",
+        "(* alive — the Component E-L will determine which are dynamical.    *)",
         "Module[{eqNames, allNames, gaugeElim, gaugeRules},",
-        "  eqNames = fieldEquations[[All, 1]];",
+        "  eqNames = If[Length[fieldEquations] > 0, fieldEquations[[All, 1]], Keys[compToFunc]];",
         "  allNames = Keys[compToFunc];",
         "  gaugeElim = Complement[allNames, eqNames];",
         "  If[Length[gaugeElim] > 0,",
@@ -3373,7 +3383,7 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: PLR0914, PLR0915
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: PLR0914
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -3424,14 +3434,11 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         "(* Copy Lagrangian for canonical analysis *)",
         f"lagForCanon = {p}Lagrangian;",
         "",
-        "(* Apply CD shorthand rules to canonical Lagrangian (same as EOMs).     *)",
-        "(* Without this, raw CD[-a]@field[...] operators survive decomposition  *)",
-        "(* because the shorthand rules were only applied to EOM variables.      *)",
-        "If[ListQ[Global`$CDShorthandRules] && Length[Global`$CDShorthandRules] > 0,",
-        "  Do[lagForCanon = lagForCanon /. rule, {rule, Global`$CDShorthandRules}];",
-        "  lagForCanon = lagForCanon /. Scalar[x_] :> Scalar[",
-        "    Fold[ReplaceAll, x, Global`$CDShorthandRules]];",
-        "];",
+        "(* NOTE: CD shorthand rules are NOT applied to canonical Lagrangian.    *)",
+        "(* DecomposeScalarExpression handles raw CD[-a]@field[...] operators   *)",
+        "(* directly via ConvertCDToDerivatives (Step 9). Applying shorthand    *)",
+        "(* rules would convert CD ops to CDfield tensors that have no          *)",
+        "(* pre-computed values, causing TraceBasisDummy to leave them unevaluated. *)",
         "",
         "(* Re-introduce explicit metric tensors for correct sign handling.       *)",
         "(* When derived fields are expanded, ContractMetric absorbs the metric   *)",
@@ -3501,8 +3508,9 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "lagComp = 0;",
             "Do[",
             "  Module[{termComp, tTerm = AbsoluteTime[]},",
-            f"    termComp = Quiet[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
-            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}], Validate::repeated];',
+            f"    termComp = Quiet[Catch[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
+            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}]], {{Validate::repeated, Validate::inhom}}];',
+            "    If[termComp === Null, termComp = 0];",
         ]
     )
 
@@ -3528,7 +3536,10 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             )
             lines.append(f"    termComp = termComp /. {{{cv_rules}}};")
 
-        lines.append("    termComp = Expand[termComp];")
+        # NOTE: No Expand here — R̃² 4th-order products in 4D exceed
+        # $RecursionLimit in Expand (TerminatedEvaluation crashes the script).
+        # The unexpanded sum is mathematically identical; downstream IBP and
+        # Legendre transform handle unexpanded Plus forms correctly.
 
     lines.extend(
         [
@@ -3671,6 +3682,8 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
     lines.extend(
         [
             "",
+            'Print["Phase B: starting IBP (lagComp LeafCount=", LeafCount[lagComp], ", terms=", If[Head[lagComp]===Plus, Length[lagComp], 1], ")"];',
+            "",
             "(* --- Integration by parts: reduce second time derivatives ---          *)",
             "(* The Ricci scalar contains d^2 g, so L^(2) has f*d^2_t g terms.       *)",
             "(* The Legendre transform requires L = L(q, dq/dt) only.  IBP on the    *)",
@@ -3679,28 +3692,39 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "(* Ref: Gibbons & Hawking (1977, Phys. Rev. D 15, 2752)                 *)",
             "tVar = coordSyms[[1]];",
             "",
+            "(* Build O(1) lookup set for field functions — MemberQ on 34-element    *)",
+            "(* list causes O(n) per-call overhead; 321 terms x factors x MemberQ    *)",
+            "(* creates 10K+ evaluations that corrupt Wolfram's internal heap.       *)",
+            "fieldFuncSet = Association @@ Table[f -> True, {f, fieldFuncList}];",
+            "isFieldFunc[f_] := KeyExistsQ[fieldFuncSet, f];",
+            "",
             "(* IBP helper: for a single additive term, find the factor with          *)",
             "(* time-derivative order >= 2 and integrate by parts once.               *)",
+            "(* Uses explicit Head/Part checks instead of MatchQ with /; conditions  *)",
+            "(* to avoid Wolfram's recursive pattern evaluation (segfault on >300    *)",
+            "(* terms).                                                               *)",
+            "isPureTimeDerivGE2[expr_] := Module[{h = Head[expr], orders},",
+            "  If[Head[h] =!= Derivative, Return[False]];",
+            "  If[!isFieldFunc[h[[1]]], Return[False]];",
+            "  orders = List @@ h[[0]];",
+            "  orders[[1]] >= 2 && AllTrue[Rest[orders], # === 0 &]",
+            "];",
+            "",
             "ibpOneTerm[term_] := Module[",
             "  {factors, idx, highFactor, orders, newOrders, rest, head, args},",
             "  factors = If[Head[term] === Times, List @@ term, {term}];",
             "  (* Find first factor with PURE time-deriv order >= 2 (all spatial = 0) *)",
-            "  (* Mixed time-space like Derivative[2,2,0] are NOT pure time derivs —  *)",
-            "  (* they're spatial operators applied to time-evolved fields. IBP should *)",
-            "  (* only reduce pure d²_t terms (Gibbons-Hawking-York).                *)",
             "  idx = 0;",
             "  Do[",
-            "    If[MatchQ[factors[[i]],",
-            "         Derivative[n_, rest___][f_][___] /; n >= 2 && AllTrue[{rest}, # === 0 &] && MemberQ[fieldFuncList, f]],",
+            "    If[isPureTimeDerivGE2[factors[[i]]],",
             "      idx = i; Break[]",
             "    ],",
             "    {i, Length[factors]}",
             "  ];",
             "  If[idx == 0,",
-            "    (* Also check for Power[Derivative[...][f][...], 2] with n >= 2, pure time *)",
+            "    (* Also check for Power[Derivative[...][f][...], 2] *)",
             "    Do[",
-            "      If[MatchQ[factors[[i]],",
-            "           Power[Derivative[n_, rest___][f_][___], 2] /; n >= 2 && AllTrue[{rest}, # === 0 &] && MemberQ[fieldFuncList, f]],",
+            "      If[Head[factors[[i]]] === Power && factors[[i, 2]] == 2 && isPureTimeDerivGE2[factors[[i, 1]]],",
             "        idx = i; Break[]",
             "      ],",
             "      {i, Length[factors]}",
@@ -3764,11 +3788,19 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "Module[{oldLag, iter = 0, maxIter = 5},",
             "  While[iter < maxIter,",
             "    oldLag = lagComp;",
-            "    lagComp = Total[ibpOneTerm /@ ",
-            "      If[Head[lagComp] === Plus, List @@ lagComp, {lagComp}]];",
+            "    Module[{ibpTerms, ibpResult, nTerms},",
+            "      ibpTerms = If[Head[lagComp] === Plus, List @@ lagComp, {lagComp}];",
+            "      nTerms = Length[ibpTerms];",
+            '      Print["  IBP round ", iter+1, ": ", nTerms, " terms"];',
+            "      (* Use Table instead of AppendTo — AppendTo on growing lists is *)",
+            "      (* O(n²) in Wolfram and causes memory fragmentation/segfault.   *)",
+            "      (* Use Map for batch processing — safer than Table for kernel  *)",
+            "      ibpResult = ibpOneTerm /@ ibpTerms;",
+            "      lagComp = Total[ibpResult];",
+            "    ];",
             "    iter++;",
             "    If[FreeQ[lagComp, ",
-            "         Derivative[n_, rest___][f_][___] /; n >= 2 && AllTrue[{rest}, # === 0 &] && MemberQ[fieldFuncList, f]],",
+            "         x_ /; isPureTimeDerivGE2[x]],",
             "      Break[]",
             "    ];",
             "  ];",
@@ -4277,6 +4309,27 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # is constructed with proper labels by both single and multi-field paths.
     # fieldEquations now contains only surviving fields (constraints
     # eliminated by Phase A above), so the JSON is born correct.
+    #
+    # Substitute parameter values before export: R̃² 4th-order equations
+    # have symbolic coefficients (e.g. 5*b5/kappa^2) that cause Expand
+    # inside BuildMultiFieldJSONStructure to exceed $RecursionLimit.
+    # Numeric substitution collapses these to floats, avoiding deep recursion.
+    param_rules = []
+    if ctx.parameters:
+        for pname, pval in ctx.parameters.items():
+            # Constants are DefConstantSymbol (no prefix), not prefixed fields
+            param_rules.append(f"{pname} -> {pval}")
+    if param_rules:
+        ", ".join(param_rules)
+        lines.extend(
+            (
+                "(* NOTE: Parameter substitution deferred to after Phase B.           *)",
+                "(* Setting DefConstantSymbol values before IBP/Legendre crashes the   *)",
+                "(* Wolfram kernel (segfault) — xAct's evaluation engine conflicts     *)",
+                "(* with numeric constant symbols during pattern matching.              *)",
+                "",
+            )
+        )
     lines.extend(
         (
             "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];",
@@ -4294,6 +4347,26 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             )
         )
 
+    # --- Early JSON export (crash protection) ---
+    # Write JSON immediately after BuildMultiFieldJSONStructure, BEFORE
+    # canonical Hamiltonian and plane-wave remapping.  4D R̃² theories
+    # segfault during post-processing ($RecursionLimit overflow in
+    # ExtractMassCouplingFromEquations/canonical pipeline).  This early
+    # export ensures the equation data is saved to disk even if post-
+    # processing crashes.  The final export (below) overwrites this with
+    # the complete version including Hamiltonian + plane-wave remapping.
+    escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
+    lines.extend(
+        (
+            f'earlyOutputPath = "{escaped_output}";',
+            "earlyOutputDir = DirectoryName[earlyOutputPath];",
+            'If[earlyOutputDir =!= "" && !DirectoryQ[earlyOutputDir], CreateDirectory[earlyOutputDir]];',
+            'Export[earlyOutputPath, jsonStructure, "JSON"];',
+            'Print["Early JSON export complete (pre-canonical)."];',
+            "",
+        )
+    )
+
     # --- Canonical Phase B: IBP + Legendre transform + Hamiltonian ---
     # Must run AFTER BuildMultiFieldJSONStructure (injects canonical section
     # into jsonStructure).  Reads allCompNames from fieldEquations.
@@ -4309,6 +4382,22 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # Free fieldEquations now that both JSON structure and canonical
     # pipeline have finished using it.
     lines.extend(("Clear[fieldEquations]; Share[];", ""))
+
+    # --- Deferred parameter substitution (AFTER Phase B) ---
+    # Setting DefConstantSymbol values BEFORE IBP/Legendre crashes the
+    # Wolfram kernel — xAct's evaluation conflicts with numeric constants.
+    # Substitute parameters in the JSON structure AFTER canonical processing.
+    if ctx.parameters:
+        param_entries_wl = ", ".join(f"{k} -> {v}" for k, v in ctx.parameters.items())
+        lines.extend(
+            (
+                "(* Substitute parameter values in JSON structure *)",
+                f"paramRules = {{{param_entries_wl}}};",
+                "jsonStructure = jsonStructure /. paramRules;",
+                'Print["Parameter substitution applied to JSON structure."];',
+                "",
+            )
+        )
 
     # --- Plane-wave reduction: remap JSON to 1+1D ---
     # After BuildMultiFieldJSONStructure + canonical injection, the JSON
