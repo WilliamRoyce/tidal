@@ -16,7 +16,7 @@
 			"propagation_axis": "z",
 			"eliminated_fields": []
 		},
-		"derivation_hash": "f71cab5a800ecdfabedeeaabdbbe4316ae593004d5b50199ef4e355e6361d9d6"
+		"derivation_hash": "8b8b931ec41883911cb5225fa5b71fd74f39f907a4b34c249e33584d83991f5f"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -288,19 +288,19 @@
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_4",
 						"coefficient_symbolic": "2*b5"
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_7",
 						"coefficient_symbolic": "2*b5"
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_9",
 						"coefficient_symbolic": "2*b5"
 					}
@@ -423,43 +423,43 @@
 					},
 					{
 						"coefficient": -10.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_13",
 						"coefficient_symbolic": "-10*b5"
 					},
 					{
 						"coefficient": -10.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_20",
 						"coefficient_symbolic": "-10*b5"
 					},
 					{
 						"coefficient": -10.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_6",
 						"coefficient_symbolic": "-10*b5"
 					},
 					{
 						"coefficient": 8.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_3",
 						"coefficient_symbolic": "8*b5"
 					},
 					{
 						"coefficient": -4.0,
-						"operator": "mixed_T3_S1x",
+						"operator": "mixed_T3_S1z",
 						"field": "h_4",
 						"coefficient_symbolic": "-4*b5"
 					},
 					{
 						"coefficient": -4.0,
-						"operator": "mixed_T3_S1x",
+						"operator": "mixed_T3_S1z",
 						"field": "h_7",
 						"coefficient_symbolic": "-4*b5"
 					},
 					{
 						"coefficient": -4.0,
-						"operator": "mixed_T3_S1x",
+						"operator": "mixed_T3_S1z",
 						"field": "h_9",
 						"coefficient_symbolic": "-4*b5"
 					}
@@ -560,37 +560,37 @@
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_10"
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_17"
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_2"
 					},
 					{
 						"coefficient": -1.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_0"
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_4"
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_7"
 					},
 					{
 						"coefficient": 1.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_9"
 					},
 					{
@@ -610,7 +610,7 @@
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T3_S1x",
+						"operator": "mixed_T3_S1z",
 						"field": "h_3"
 					},
 					{
@@ -760,37 +760,37 @@
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_10"
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_17"
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_2"
 					},
 					{
 						"coefficient": -1.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_0"
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_4"
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_7"
 					},
 					{
 						"coefficient": 1.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_9"
 					},
 					{
@@ -810,7 +810,7 @@
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T3_S1x",
+						"operator": "mixed_T3_S1z",
 						"field": "h_3"
 					},
 					{
@@ -872,32 +872,32 @@
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_10"
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_17"
 					},
 					{
 						"coefficient": -2.5,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "t_2"
 					},
 					{
 						"coefficient": -1.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_0"
 					},
 					{
 						"coefficient": 1.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_4"
 					},
 					{
 						"coefficient": 1.0,
-						"operator": "mixed_T2_S2x",
+						"operator": "mixed_T2_S2z",
 						"field": "h_7"
 					},
 					{
@@ -917,7 +917,7 @@
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "mixed_T3_S1x",
+						"operator": "mixed_T3_S1z",
 						"field": "h_3"
 					},
 					{
@@ -1109,19 +1109,19 @@
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_4",
 						"coefficient_symbolic": "-5*b5"
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_7",
 						"coefficient_symbolic": "-5*b5"
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_9",
 						"coefficient_symbolic": "-5*b5"
 					}
@@ -1284,7 +1284,7 @@
 					},
 					{
 						"coefficient": 0.8,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_3"
 					},
 					{
@@ -1520,19 +1520,19 @@
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_4",
 						"coefficient_symbolic": "-5*b5"
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_7",
 						"coefficient_symbolic": "-5*b5"
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_9",
 						"coefficient_symbolic": "-5*b5"
 					}
@@ -1715,19 +1715,19 @@
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_4",
 						"coefficient_symbolic": "-5*b5"
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_7",
 						"coefficient_symbolic": "-5*b5"
 					},
 					{
 						"coefficient": -5.0,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_9",
 						"coefficient_symbolic": "-5*b5"
 					}
@@ -1812,7 +1812,7 @@
 					},
 					{
 						"coefficient": 0.8,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_3"
 					},
 					{
@@ -2145,7 +2145,7 @@
 					},
 					{
 						"coefficient": 0.8,
-						"operator": "mixed_T2_S1x",
+						"operator": "mixed_T2_S1z",
 						"field": "h_3"
 					},
 					{
