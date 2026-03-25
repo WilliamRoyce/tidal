@@ -10,7 +10,7 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: pyright](https://img.shields.io/badge/type%20checked-pyright-informational)](https://github.com/microsoft/pyright)
-[![Coverage](https://img.shields.io/badge/coverage-see%20CI-brightgreen)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/WilliamRoyce/torsion-gertsenshtein/branch/main/graph/badge.svg)](https://codecov.io/gh/WilliamRoyce/torsion-gertsenshtein)
 
 </p>
 
