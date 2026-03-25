@@ -532,7 +532,9 @@
     "manuscript/**",
     "research/**",
     "xCobaInspirationForClaude/**",
-    "Literature/**"
+    "Literature/**",
+    "*.svgz",
+    "*.svg"
   ],
   "noConfigSearch": true
 }
