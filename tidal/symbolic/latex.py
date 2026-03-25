@@ -16,6 +16,7 @@ Primary public entry point:
 from __future__ import annotations
 
 import re
+from fractions import Fraction
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -41,6 +42,7 @@ _GREEK_MAP: dict[str, str] = {
     "iota": r"\iota",
     "kappa": r"\kappa",
     "lambda": r"\lambda",
+    "lam": r"\lambda",
     "mu": r"\mu",
     "nu": r"\nu",
     "xi": r"\xi",
@@ -67,6 +69,66 @@ _GREEK_MAP: dict[str, str] = {
 _GREEK_RE = re.compile(
     r"\b(" + "|".join(sorted(_GREEK_MAP, key=len, reverse=True)) + r")\b"
 )
+
+# ---------------------------------------------------------------------------
+# Mathematica function → LaTeX mapping
+# (mirrors _FUNCTION_MAP in _eval_utils.py; Sqrt/Abs/Exp handled separately)
+# ---------------------------------------------------------------------------
+
+_MATH_FUNC_LATEX: dict[str, str] = {
+    # Trig
+    "Sin": r"\sin",
+    "Cos": r"\cos",
+    "Tan": r"\tan",
+    "Cot": r"\cot",
+    "Sec": r"\sec",
+    "Csc": r"\csc",
+    # Inverse trig
+    "ArcSin": r"\arcsin",
+    "ArcCos": r"\arccos",
+    "ArcTan": r"\arctan",
+    # Hyperbolic
+    "Sinh": r"\sinh",
+    "Cosh": r"\cosh",
+    "Tanh": r"\tanh",
+    # Inverse hyperbolic
+    "ArcSinh": r"\operatorname{arcsinh}",
+    "ArcCosh": r"\operatorname{arccosh}",
+    "ArcTanh": r"\operatorname{arctanh}",
+    # Logarithmic
+    "Log": r"\ln",
+    # Special
+    "Erf": r"\operatorname{erf}",
+    "Sign": r"\operatorname{sgn}",
+    "UnitStep": r"\Theta",
+    "HeavisideTheta": r"\Theta",
+}
+
+# Regex: FuncName[expr] → \funcname(expr)   (sorted longest-first)
+_RE_MATH_FUNC = re.compile(
+    r"\b("
+    + "|".join(sorted(_MATH_FUNC_LATEX, key=len, reverse=True))
+    + r")\[([^\[\]]+)\]"
+)
+
+# Sqrt[expr] → \sqrt{expr}  (separate: uses braces not parens)
+_RE_SQRT = re.compile(r"\bSqrt\[([^\[\]]+)\]")
+
+# Abs[expr] → \left| expr \right|
+_RE_ABS = re.compile(r"\bAbs\[([^\[\]]+)\]")
+
+
+def _convert_math_functions(s: str) -> str:
+    """Convert Mathematica math functions to LaTeX equivalents."""
+    # Sqrt → \sqrt{} (must come before general func replacement)
+    s = _RE_SQRT.sub(r"\\sqrt{\1}", s)
+    # Abs → |...|
+    s = _RE_ABS.sub(r"\\left| \1 \\right|", s)
+    # General functions: FuncName[expr] → \funcname(expr)
+    return _RE_MATH_FUNC.sub(
+        lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})", s
+    )
+
 
 # ---------------------------------------------------------------------------
 # Operator → LaTeX mapping
@@ -182,6 +244,10 @@ def coefficient_to_latex(expr: str) -> str:
     # Step 5: Coordinate calls x[] → x
     s = _RE_COORD_CALL.sub(r"\1", s)
 
+    # Step 5b: Math functions: Tanh[x] → \tanh(x), Abs[x] → |x|, etc.
+    s = _RE_ABS.sub(r"\\left| \1 \\right|", s)
+    s = _RE_MATH_FUNC.sub(lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})", s)
+
     # Step 6: Numeric prefix fraction: -1/2*(rest) or 1/2*(rest) → -\frac{1}{2}(rest)
     prefix_frac = re.match(r"^(-?)(\d+)/(\d+)\*(.+)$", s)
     if prefix_frac:
@@ -215,6 +281,13 @@ def _coefficient_inner(s: str) -> str:
     """Apply Greek, subscript, and power transforms to an expression fragment."""
     # Strip outer parens for cleaner output
     s = _strip_outer_parens(s)
+
+    # Convert Mathematica functions before any other processing
+    s = _convert_math_functions(s)
+
+    # Greek prefix extraction: omegaP2 → omega P2 (before Greek substitution)
+    for greek in sorted(_GREEK_MAP, key=len, reverse=True):
+        s = re.sub(rf"\b{greek}([A-Z])", rf"{greek} \1", s)
 
     # Greek letter substitution
     s = _GREEK_RE.sub(lambda m: _GREEK_MAP[m.group(1)], s)
@@ -496,6 +569,21 @@ def equation_to_latex(
 _COEFF_TOL = 1e-12
 
 
+_FRAC_TOL = 1e-12  # tolerance for fraction approximation
+
+
+def _format_numeric_coeff(value: float) -> str:
+    """Format a numeric coefficient, using fractions when exact."""
+    frac = Fraction(value).limit_denominator(10000)
+    # Check if the fraction is a good approximation
+    if abs(float(frac) - value) < _FRAC_TOL:
+        if frac.denominator == 1:
+            return str(frac.numerator)
+        sign = "-" if frac.numerator < 0 else ""
+        return rf"{sign}\frac{{{abs(frac.numerator)}}}{{{frac.denominator}}}"
+    return f"{value:g}"
+
+
 def _render_term_coefficient(
     numeric: float, symbolic: str | None, *, is_first: bool
 ) -> str:
@@ -505,17 +593,22 @@ def _render_term_coefficient(
     or "+" sign-only otherwise.
     """
     if symbolic is not None:
-        tex = coefficient_to_latex(symbolic)
-        if not is_first and not tex.lstrip().startswith("-"):
-            return f"+ {tex}"
-        return tex
+        # If symbolic contains unresolvable Mathematica (e.g., Derivative[...]),
+        # fall back to the numeric value rendered as a fraction.
+        if re.search(r"Derivative\[|PD\w+\[", symbolic):
+            symbolic = None  # fall through to numeric path below
+        else:
+            tex = coefficient_to_latex(symbolic)
+            if not is_first and not tex.lstrip().startswith("-"):
+                return f"+ {tex}"
+            return tex
 
-    # Numeric only
+    # Numeric only — try to render as fraction if possible
     if abs(numeric - 1.0) < _COEFF_TOL:
         return "" if is_first else "+"
     if abs(numeric + 1.0) < _COEFF_TOL:
         return "-"
-    formatted = f"{numeric:g}"
+    formatted = _format_numeric_coeff(numeric)
     if not is_first and numeric > 0:
         formatted = f"+ {formatted}"
     return formatted
@@ -686,6 +779,8 @@ _RE_GREEK_NO_BACKSLASH = re.compile(
 
 def _lagrangian_cleanup(s: str) -> str:
     """Apply final cleanup to Lagrangian LaTeX output."""
+    # Convert Mathematica functions before any other processing
+    s = _convert_math_functions(s)
     s = s.replace("*", r" \, ")
     # Parenthesized fractions: (A/B) → \frac{A}{B} (before Greek, so names stay intact)
     s = re.sub(r"\(([^()]+/[^()]+)\)", _paren_frac, s)
@@ -695,6 +790,10 @@ def _lagrangian_cleanup(s: str) -> str:
         lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}",
         s,
     )
+    # Greek prefix extraction: omegaP2 → omega P2, so Greek + subscript work
+    # Inserts a space between a Greek name and a trailing uppercase letter.
+    for greek in sorted(_GREEK_MAP, key=len, reverse=True):
+        s = re.sub(rf"\b{greek}([A-Z])", rf"{greek} \1", s)
     # Subscript splitting BEFORE Greek so that alpha1 → alpha_{1} → \alpha_{1}
     # (Greek regex uses \b which fails on alpha1 since 1 is a word char)
     s = re.sub(

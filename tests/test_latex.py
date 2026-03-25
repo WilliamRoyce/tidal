@@ -102,6 +102,29 @@ class TestCoefficientToLatex:
         result = coefficient_to_latex("Pi")
         assert r"\pi" in result
 
+    def test_tanh(self) -> None:
+        result = coefficient_to_latex("Tanh[x/W]")
+        assert r"\tanh" in result
+        assert "x/W" in result
+
+    def test_sin(self) -> None:
+        result = coefficient_to_latex("Sin[2*x]")
+        assert r"\sin" in result
+
+    def test_abs(self) -> None:
+        result = coefficient_to_latex("Abs[x]")
+        assert r"\left|" in result
+        assert r"\right|" in result
+
+    def test_lam_as_lambda(self) -> None:
+        result = coefficient_to_latex("lam")
+        assert r"\lambda" in result
+
+    def test_greek_prefix_split(self) -> None:
+        """omegaP2 should split Greek prefix from trailing label."""
+        result = coefficient_to_latex("omegaP2")
+        assert r"\omega" in result
+
 
 # ---------------------------------------------------------------------------
 # field_to_latex
