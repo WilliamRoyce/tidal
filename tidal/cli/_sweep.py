@@ -1134,7 +1134,7 @@ def _execute_parallel(  # noqa: PLR0913, PLR0914, PLR0917
 
     if tasks:
         print(f"  Running {len(tasks)} simulations with {n_workers} workers...")
-        with Pool(processes=n_workers) as pool:
+        with Pool(processes=n_workers, initializer=_set_single_thread_blas) as pool:
             for result in pool.imap_unordered(_run_single_wrapper, tasks):
                 idx = result["index"]
                 metrics = result["metrics"]
@@ -2011,6 +2011,18 @@ def _report_convergence(  # noqa: C901
 # ------------------------------------------------------------------
 # Parallel execution
 # ------------------------------------------------------------------
+
+
+def _set_single_thread_blas() -> None:
+    """Set BLAS/LAPACK thread count to 1 in worker processes.
+
+    Prevents thread oversubscription when running N parallel simulations,
+    each of which would otherwise spawn its own BLAS thread pool.
+    """
+    import os
+
+    for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
+        os.environ[var] = "1"
 
 
 def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
