@@ -938,6 +938,50 @@ The $O(\epsilon)$ term is a source for torsion proportional to $B_0$,
 and the $O(\epsilon^2)$ term is torsion--photon kinetic mixing.
 No cubic terms are needed for this channel.
 
+\subsection{Why Cubic Parameters Are Independent of Quadratic Ones}
+\label{sec:cubic_independence}
+
+One might ask: since cubic terms, once linearized, produce
+$O(\epsilon^2)$ bilinear operators in the perturbation fields ---
+just like quadratic terms --- can they be ``absorbed'' into
+effective quadratic couplings with $B_0$-dependent coefficients?
+
+\paragraph{For constant $\bar{B}_0$: partially.}
+With uniform $\bar{B}_0$, all cubic contributions shift the
+coefficients of the perturbation Lagrangian by constants
+$\propto \bar{B}_0$. However, different cubic contractions
+produce \emph{different operator structures}: the 4 terms in
+$\Rt \times F^2$ couple the \emph{full 4-index Riemann}
+$\Rt_{\mu\nu\rho\sigma}[h]$ to $\bar{F}^{\rho\sigma} f^{\mu\nu}$,
+while the quadratic $\Rt \times F$ couples only the
+\emph{antisymmetric Ricci} $\Rt_{[\mu\nu]}[h]$ to $f^{\mu\nu}$.
+These are distinct differential operators acting on $h_{\mu\nu}$,
+so they are not interchangeable even in the constant-$B_0$ limit.
+
+\paragraph{For spatially varying $\bar{B}_0(\mathbf{x})$: fully independent.}
+In realistic scenarios (localized magnetic fields, astrophysical
+environments), $\bar{B}_0$ varies in space. Each cubic contraction
+then generates a \emph{different position-dependent coefficient}
+$C_I(\bar{B}_0(\mathbf{x}))$ in the linearized PDE. These cannot
+be absorbed into the quadratic parameters, which produce
+position-\emph{independent} coefficients (or different spatial
+profiles through metric expansion). Additionally, gradients
+$\pd_\mu \bar{F}_{\alpha\beta}(\mathbf{x})$ appear, generating
+structures with no quadratic analog at all.
+
+\paragraph{For parameter sweeps: must remain separate.}
+The quadratic and cubic Lagrangian coefficients are
+\textbf{independent coupling constants} of the full theory ---
+separate ``knobs'' in the parameter space. Absorbing cubics into
+effective quadratic couplings would destroy the ability to
+independently explore their physical effects. The parameter sweep
+varies the full-theory couplings ($\alpha_I$, $\beta_I$, $\lambda_I$,
+$\kappa_I$, etc.)\ \emph{independently}, on top of a chosen
+background $\bar{B}_0(\mathbf{x})$ profile. The TIDAL pipeline
+handles this naturally: \texttt{xPert} linearizes the full
+Lagrangian, and the solver tracks all resulting position-dependent
+coefficients.
+
 \subsection{TIDAL Pipeline}
 
 In the TIDAL pipeline, both quadratic and cubic contributions are
