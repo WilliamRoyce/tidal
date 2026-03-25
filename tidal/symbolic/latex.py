@@ -563,6 +563,7 @@ _TENSOR_NAME_MAP: dict[str, str] = {
     "bg": r"\bar{g}",
     "epsiloneta": r"\epsilon",
     "TorsionCDT": "T",
+    "RicciScalarCDT": r"\tilde{R}",
     "RicciScalarCD": "R",
 }
 
@@ -719,7 +720,8 @@ def lagrangian_to_latex(expr: str) -> str:
         prev = s
         s = _RE_CD_ABSTRACT.sub(_replace_cd_abstract, s)
 
-    # Pass 3: Named special objects
+    # Pass 3: Named special objects (longer names first to avoid prefix match)
+    s = re.sub(r"\bRicciScalarCDT\[\]", r"\\tilde{R}", s)
     s = re.sub(r"\bRicciScalarCD\[\]", "R", s)
 
     # Pass 4: Tensor objects with indices
