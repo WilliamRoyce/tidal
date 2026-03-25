@@ -74,16 +74,20 @@ The \texttt{perturbation\_name} must not collide with field names, constant name
 \subsubsection{Writing the Lagrangian}
 \label{sec:torsion-lagrangian}
 
-The Lagrangian must be written in \textbf{decomposed form} using \texttt{RicciScalarCD[]} (Levi-Civita, NOT \texttt{RicciScalarCDT[]}) plus explicit \texttt{TorsionCDT[...]} terms:
+The full general quadratic PGT Lagrangian uses \texttt{RicciScalarCDT[]} (Riemann-Cartan Ricci scalar, auto-decomposed via the Shapiro identity) plus explicit \texttt{TorsionCDT[...]} terms for the three independent $\torsion^2$ invariants:
 
 \begin{lstlisting}[style=toml]
 [lagrangian]
-expression = "(1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d]"
+expression = "((1/kappa^2) RicciScalarCDT[]
+  + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f]
+  + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f]
+  + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d]
+  + b5 RicciScalarCDT[]^2)"
 \end{lstlisting}
 
-\paragraph{Why decomposed form?}
-\label{par:decomposed-form}
-xPert's built-in perturbation formulas assume the Levi-Civita connection. Using \texttt{RicciScalarCDT[]} directly would require decomposing it via \texttt{ChangeCurvature}, but \texttt{ChangeTorsion} converts torsion $\to$ contortion (a derived quantity that \texttt{DefTensorPerturbation} cannot perturb). The decomposed form avoids this issue entirely.
+\paragraph{R̃ decomposition.}
+\label{par:rtilde-decomposition}
+The pipeline automatically decomposes \texttt{RicciScalarCDT[]} $= \tilde{R}$ into the Levi-Civita Ricci scalar $R$ plus torsion contributions via the Shapiro identity (eq.~\ref{eq:riemann-cartan-identity}). This allows xPert to perturb $R$ using its built-in formulas while \texttt{TorsionCDT} is perturbed via \texttt{DefTensorPerturbation}.
 
 The three $\torsion^2$ invariants correspond to the three irreducible pieces of torsion under $\mathrm{SO}(1,3)$:
 \begin{itemize}
@@ -272,7 +276,7 @@ Constraint & $h_0, h_1, h_2, h_3$; remaining $t_i$ & 25 & Algebraically determin
 \end{tabular}
 \end{table}
 
-The canonical Hamiltonian contains \textbf{291 terms}, computed via the full Legendre transform in Wolfram.
+The canonical Hamiltonian contains \textbf{339 terms} (with all three $\torsion^2$ invariants), computed via the full Legendre transform in Wolfram.
 
 \paragraph{Coupling structure.}
 The $\tilde{R}^2$ term produces rich graviton-torsion coupling.  For example, the auxiliary field $w_{h_4}$'s equation has 23 RHS terms coupling to 15 distinct fields including all three propagating torsion modes ($t_6, t_{13}, t_{20}$) and their velocities.  The torsion equations contain implicit acceleration coupling ($\partial_t^2$ of other fields on the RHS), handled by the generalized mass-matrix modal solver (\S\ref{sec:modal-mass-matrix}).
@@ -285,20 +289,18 @@ The 4D derivation completes in $\sim$15\,s: 7\,s for Lagrangian decomposition (D
 
 \begin{table}[htbp]
 \centering
-\caption{Torsion implementation status (as of v0.17.0).}
+\caption{Torsion implementation status (as of v0.18.0).}
 \label{tab:torsion-status}
 \begin{tabular}{@{}llp{7cm}@{}}
 \toprule
 Component & Status & Notes \\
 \midrule
-Symbolic derivation (2+1D) & Complete & 15 equations in $\sim$5\,s \\
-Symbolic derivation (4D) & \textbf{Complete} & 34 equations in $\sim$15\,s (v0.17.0) \\
-Ostrogradsky reduction & Complete & 2+1D: 17 fields; 4D: 37 fields \\
-Canonical Hamiltonian & \textbf{Complete} & 2+1D: 147 terms; 4D: 291 terms \\
-Mass-matrix analysis (2+1D) & Complete & $M = [[1,1],[1,1]]$ for $\{t_3, t_7\}$: hidden constraint \\
-Simulation (2+1D, modal) & Complete & QZ eigenvalue; $\max|dE/E| = 0$ at $t=100$ \\
-Simulation (4D, modal) & \textbf{Pending} & Requires validation \\
-Parameter sweeps & Not tested & Requires EM field addition for Gertsenshtein comparison \\
+Full PGT Lagrangian & \textbf{Complete} & $\alpha_1 I_1 + \alpha_2 I_2 + \alpha_3 I_3 + b_5 \tilde{R}^2$ (v0.18.0) \\
+Symbolic derivation (4D) & \textbf{Complete} & 34 equations in $\sim$15\,s \\
+Ostrogradsky reduction & Complete & 37 fields (3 auxiliaries for $h_4, h_7, h_9$) \\
+Canonical Hamiltonian & \textbf{Complete} & 339 terms (full Legendre transform) \\
+Simulation (4D, modal) & \textbf{Complete} & $\max|dE/E| = 0$ (machine precision) \\
+Parameter sweeps & Not tested & Requires EM field addition (\#154) \\
 \bottomrule
 \end{tabular}
 \end{table}
