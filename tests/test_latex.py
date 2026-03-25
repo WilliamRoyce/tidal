@@ -271,15 +271,15 @@ class TestLagrangianToLatex:
 
     def test_ricci_scalar(self) -> None:
         result = lagrangian_to_latex("RicciScalarCD[]")
-        assert result == "R"
+        assert result == r"\mathcal{R}"
 
     def test_ricci_scalar_torsion(self) -> None:
         result = lagrangian_to_latex("RicciScalarCDT[]")
-        assert r"\tilde{R}" in result
+        assert r"\tilde{\mathcal{R}}" in result
 
     def test_ricci_scalar_torsion_squared(self) -> None:
         result = lagrangian_to_latex("b5 RicciScalarCDT[]^2")
-        assert r"\tilde{R}" in result
+        assert r"\tilde{\mathcal{R}}" in result
         assert "b_{5}" in result
 
     def test_parameter_subscript_splitting(self) -> None:
