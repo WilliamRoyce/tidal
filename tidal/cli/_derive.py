@@ -4062,7 +4062,9 @@ def _wls_json_plane_wave_reduction(ctx: _WlsContext) -> list[str]:
         "Do[",
         "  AppendTo[pwStringRules,",
         '    pfx <> "_" <> pwPropAxis -> pfx <> "_x"],',
-        '  {pfx, {"laplacian", "gradient", "first_derivative"}}',
+        '  {pfx, {"laplacian", "gradient", "first_derivative", "derivative_3",',
+        '         "cross_derivative", "mixed_T1_S1", "mixed_T2_S1", "mixed_T2_S2",',
+        '         "mixed_T3_S1"}}',
         "];",
         "",
         "(* Coordinate references in symbolic expressions: prop[] → x[] *)",
@@ -4320,7 +4322,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             # Constants are DefConstantSymbol (no prefix), not prefixed fields
             param_rules.append(f"{pname} -> {pval}")
     if param_rules:
-        ", ".join(param_rules)
         lines.extend(
             (
                 "(* NOTE: Parameter substitution deferred to after Phase B.           *)",

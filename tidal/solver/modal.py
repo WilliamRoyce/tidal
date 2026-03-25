@@ -40,7 +40,7 @@ References
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from numpy.typing import NDArray
@@ -69,9 +69,7 @@ if TYPE_CHECKING:
 # mode (gradient → ik, laplacian → -k²).  NOT the modified-wavenumber
 # convention from constraint_solve.py which matches FD stencils.
 
-_ExactMultFn = Callable[
-    [list[NDArray[np.float64]]], NDArray[np.complex128] | NDArray[np.float64] | int
-]
+_ExactMultFn = Callable[[list[NDArray[np.float64]]], NDArray[Any] | int]
 
 # ---------------------------------------------------------------------------
 # Operator decomposition: (spatial Fourier multiplier, time derivative order)
