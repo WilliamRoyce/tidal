@@ -1,40 +1,35 @@
-# Graviton-Torsion Mixing in Poincaré Gauge Theory
+# Graviton-Torsion Mixing in Poincaré Gauge Theory (4D)
 #
-# Lagrangian: L = (1/kappa^2) R + alpha1 T_{abc}T^{abc}
-#                              + alpha2 T_{abc}T^{bac}
-#                              + alpha3 T^a_{ab}T^{cb}_c
+# Lagrangian: L = (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc} + b5 R̃²
 #
-# This is the most general quadratic PGT Lagrangian for torsion, written
-# in decomposed form: R is the Levi-Civita Ricci scalar (via RicciScalarCD[]),
-# and the T^2 terms use the torsion tensor TorsionCDT[a,-b,-c] which is
-# auto-created by DefCovD[CDT, Torsion -> True].
+# where R̃ = RicciScalarCDT[] is the Riemann-Cartan Ricci scalar.
 #
-# The full Riemann-Cartan Ricci scalar is R_tilde = R + T^2 terms (identity),
-# so the T^2 coefficients here include both the explicit PGT coupling and
-# the contributions from the R_tilde decomposition.
+# The R̃² curvature-squared term is essential for:
+#   - Graviton-torsion mixing (cross-coupling between metric and torsion)
+#   - Propagating torsion modes with kinetic (∇T)² terms
+#   - 4th-order equations → Ostrogradsky reduction to 2nd-order
 #
-# The three T^2 invariants are:
-#   I1 = T_{abc}T^{abc}     (tensor sector)
-#   I2 = T_{abc}T^{bac}     (mixed contraction)
-#   I3 = T^a_{ab}T^{cb}_c   (trace sector)
+# Without b5: in 4D with TT gauge, torsion is non-propagating
+# (Einstein-Cartan, all torsion fields = 0). The R̃² kinetic terms
+# are what give torsion its own wave-like dynamics.
 #
-# Physical content:
-# - At alpha_I = 0: pure Einstein-Cartan (torsion non-propagating, vanishes)
-# - At alpha_I != 0: torsion propagates, mixes with graviton
-# - Torsion mass and kinetic terms determined by alpha_I values
+# The T^2 invariant I1 = T_{abc}T^{abc} provides torsion mass terms.
+# Additional invariants (I2 = T_{abc}T^{bac}, I3 = T_a T^a) can be
+# added for the full general PGT Lagrangian.
 #
 # Plane-wave reduction: propagation along z-axis (∂_x = ∂_y = 0)
 # TT gauge: applied to graviton h only (not torsion)
 #
 # Refs:
-#   Shapiro (2002), hep-th/0103093 — torsion phenomenology
+#   Shapiro (2002), hep-th/0103093 — torsion phenomenology, R̃ decomposition
 #   Hayashi & Shirafuji (1979) — PGT propagating modes
 #   Hehl et al. (1976), Rev. Mod. Phys. 48:393 — Einstein-Cartan foundations
-#   Blagojevic & Hehl (2013) — Gauge Theories of Gravitation
+#   Sezgin & van Nieuwenhuizen (1980), Phys.Rev.D 21:3269 — linearized PGT
+#   Nikiforova et al. (2009), arXiv:0905.4007 — massive torsion stability
 
 [theory]
-name = "Graviton-Torsion (PGT)"
-description = "Quadratic Poincaré gauge theory: Einstein-Hilbert + torsion kinetic terms"
+name = "Graviton-Torsion 4D (PGT, R̃²)"
+description = "Quadratic PGT with curvature-squared: R̃ + T² + R̃² in 4D"
 
 [spacetime]
 dimension = 4
@@ -51,29 +46,24 @@ rank = 2
 symmetry = "symmetric"
 
 [constants]
-names = ["kappa", "alpha1"]
+names = ["kappa", "alpha1", "b5"]
 
-# PGT Lagrangian in decomposed form:
-# R^{LC}(CD) + alpha1 * T_{abc}T^{abc}  (simplest torsion invariant)
+# PGT Lagrangian with curvature-squared term:
+#   (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc} + b5 R̃²
 #
-# Starting with only the I1 = T_{abc}T^{abc} invariant for initial testing.
-# The other two invariants (I2 = T_{abc}T^{bac}, I3 = T_a T^a) can be
-# added once this derivation is verified.
-#
-# Index contraction:
-#   I1 = TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f]
+# Using RicciScalarCDT[] (Riemann-Cartan Ricci scalar) which
+# auto-decomposes to R^{LC} + torsion contributions via the
+# Shapiro identity.
 [lagrangian]
-expression = "((1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f])"
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + b5 RicciScalarCDT[]^2)"
 
 [linearization]
 perturbation_field = "h"
 
-# TT gauge for graviton (traceless-transverse)
-# Reduces 10 h-components to 2 (h_+ and h_x polarizations)
-# Does NOT apply to torsion — torsion components are unconstrained by TT
-[[gauge]]
-field = "h"
-type = "tt"
+# No gauge fixing applied — preserves all graviton components including
+# the trace h^a_a, which is essential for graviton-torsion mixing via R̃²
+# (the coupling goes through the Ricci scalar). TT gauge kills this channel.
+# De Donder gauge can be added later to simplify the equations.
 
 # Plane-wave reduction: propagation along z-axis
 # Zeros ∂_x and ∂_y derivatives but keeps ALL field components
@@ -84,6 +74,7 @@ propagation_axis = "z"
 [parameters]
 kappa = 1.0
 alpha1 = 0.5
+b5 = 0.1
 
 [output]
 path = "../data/graviton_torsion.json"
