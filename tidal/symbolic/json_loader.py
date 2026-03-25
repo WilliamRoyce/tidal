@@ -612,20 +612,7 @@ class CanonicalStructure:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
-        """Parse from JSON ``canonical`` section.
-
-        Raises
-        ------
-        ValueError
-            If the JSON contains ``field_rates`` (old Hamilton form).
-            Re-derive with ``tidal derive`` to get E-L velocity form.
-        """
-        if "field_rates" in data:
-            msg = (
-                "JSON contains 'field_rates' (old Hamilton form). "
-                "Re-derive with 'tidal derive' to get E-L velocity form."
-            )
-            raise ValueError(msg)
+        """Parse from JSON ``canonical`` section."""
         h_terms = tuple(HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"])
         vol_elem = data.get("volume_element")  # None for flat spacetimes
         return cls(

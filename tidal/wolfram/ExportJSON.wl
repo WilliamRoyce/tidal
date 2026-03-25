@@ -305,75 +305,8 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
      the yy-component equation has d²_t(h_xx). Detect this and reassign so each
      field gets the equation that actually evolves it.
 
-     Uses coefficient-sum detection: d²_t COEFFICIENTS are summed per field.
-     If the sum is zero, the d²_t terms are phantom (cancel under simplification)
-     and the field is not truly evolved by that equation. *)
-  (* Skip swap for component E-L equations — each equation is already    *)
-  (* correctly assigned to its field by construction (∂L/∂q_i → EOM_i). *)
-  If[TrueQ[metadata["component_el"]],
-    Print["  Skipping equation swap (component E-L: assignment is explicit)"]
-  ,
-  Module[{evolvedFieldIndex, assignmentMap, needsSwap = False, newEqs},
-    evolvedFieldIndex = Table[
-      Module[{result = 0, terms, d2tTerms, coeffSum, coeffList},
-        terms = If[Head[workingEqs[[i, 2]]] === Plus,
-                   List @@ workingEqs[[i, 2]],
-                   {workingEqs[[i, 2]]}];
-        (* Check own field (j=i) first: if equation i already evolves its own
-           field i, no reassignment is needed even if d²_t of other fields also
-           appears (e.g. h_{φφ} → -(g1·h_{rr} + g2·h_{θθ}) traceless sub injects
-           d²_t(h_rr) into h_{θθ}'s equation, but h_{θθ}'s equation also contains
-           d²_t(h_{θθ}) and must stay with h_{θθ}).  Scanning j = {i, 1..nFields∖i}
-           ensures the own-field test happens before any cross-field candidate. *)
-        Do[
-          d2tTerms = Select[terms,
-            ContainsOwnTimeDerivative[#, allFieldNames[[j]], 2] &];
-          If[Length[d2tTerms] > 0,
-            coeffList = ExtractLHSCoefficient /@ d2tTerms;
-            coeffSum = If[LeafCount[Total[coeffList]] < 500, Simplify[Total[coeffList]], Total[coeffList]];
-            Module[{isPhantom},
-              isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
-              If[!isPhantom,
-                Module[{syms, numVal},
-                  syms = DeleteDuplicates[Cases[coeffSum, _Symbol, {0, Infinity}]];
-                  numVal = Quiet[N[coeffSum /. Thread[syms -> Table[Prime[k]*E/7, {k, Length[syms]}]]]];
-                  If[NumericQ[numVal] && Abs[numVal] < 1e-10, isPhantom = True]
-                ]
-              ];
-              If[!isPhantom,
-                result = j; Break[]
-              ]
-            ]
-          ],
-          {j, Join[{i}, DeleteCases[Range[nFields], i]]}];
-        result],
-      {i, nFields}];
-
-    (* Build reverse map: field_j -> equation_i that evolves it *)
-    assignmentMap = Table[j, {j, nFields}];  (* identity by default *)
-    Do[
-      If[evolvedFieldIndex[[i]] > 0 && evolvedFieldIndex[[i]] != i,
-        If[assignmentMap[[evolvedFieldIndex[[i]]]] != evolvedFieldIndex[[i]],
-          Print["WARNING: Multiple equations claim to evolve field " <>
-                allFieldNames[[evolvedFieldIndex[[i]]]] <>
-                ". Keeping first assignment."],
-          assignmentMap[[evolvedFieldIndex[[i]]]] = i;
-          needsSwap = True
-        ]],
-      {i, nFields}];
-
-    If[needsSwap,
-      newEqs = Table[
-        {allFieldNames[[j]], workingEqs[[assignmentMap[[j]], 2]]},
-        {j, nFields}];
-      Do[
-        If[assignmentMap[[j]] != j,
-          Print["  SWAP: Field " <> allFieldNames[[j]] <> " gets equation from " <>
-                allFieldNames[[assignmentMap[[j]]]] <>
-                " (contains d2_t(" <> allFieldNames[[j]] <> "))"]],
-        {j, nFields}];
-      workingEqs = newEqs]
-  ]];  (* Close Module + If[!component_el] *)
+     Component E-L guarantees correct field→equation assignment by
+     construction (∂L/∂q_i → EOM_i), so no swap logic is needed. *)
 
   (* Build fields list — enrich with tensor metadata when available *)
   fields = Table[

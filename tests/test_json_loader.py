@@ -1570,21 +1570,6 @@ class TestCanonicalStructure:
         assert cs.hamiltonian_terms[0].factor_a.operator == "time_derivative"
         assert cs.hamiltonian_terms[2].coefficient_symbolic == "m2"
 
-    def test_field_rates_rejected(self) -> None:
-        """Old JSON with field_rates must raise ValueError (force re-derive)."""
-        from tidal.symbolic.json_loader import CanonicalStructure
-
-        data: dict[str, Any] = {
-            "hamiltonian_terms": [],
-            "field_rates": {
-                "phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
-                ]
-            },
-        }
-        with pytest.raises(ValueError, match="field_rates"):
-            CanonicalStructure.from_dict(data)
-
     def test_empty_terms_allowed(self) -> None:
         """Empty hamiltonian_terms is valid (EOM-based fast path for high-rank tensors)."""
         from tidal.symbolic.json_loader import CanonicalStructure

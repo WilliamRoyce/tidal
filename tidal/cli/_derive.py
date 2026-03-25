@@ -980,7 +980,7 @@ def _wls_component_metadata(
     ]
 
 
-def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1049,31 +1049,10 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
-    # Apply ALL shorthand rules to ALL EOM variables.
-    # Also apply INSIDE Scalar wrappers — xPert's Scalar[eta^{ab} CD[-a][f[-b]]]
-    # wraps CD operators that MakeRule can't see from the outside.
-    # SKIP when VarD is skipped (lagrangian_expr path) — EOM variables don't
-    # exist yet; they'll be created by Component E-L after Phase A decomposition.
-    all_rules = " /. ".join(rule_vars) if rule_vars else ""
-    if not ctx.lagrangian_expr:
-        for df in dyn_fields:
-            eom_var = f"eom{df['name'].capitalize()}"
-            if all_rules:
-                lines.extend(
-                    [
-                        "(* Apply shorthand rules to outer expression + inside Scalar wrappers *)",
-                        f"{eom_var} = {eom_var} /. {all_rules};",
-                        f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_rules}];",
-                    ]
-                )
-            lines.extend(
-                [
-                    f"{eom_var} //= ToCanonical;",
-                    f"{eom_var} //= ContractMetric;",
-                    f"{eom_var} //= ScreenDollarIndices;",
-                    f"{eom_var} //= CollectTensors;",
-                ]
-            )
+    # CD shorthand rules are stored in $CDShorthandRules for use by
+    # DecomposeScalarExpression during canonical Lagrangian decomposition.
+    # EOM application was removed — Component E-L builds equations from
+    # the decomposed Lagrangian, not from abstract EOM variables.
 
     # --- Second-order CD shorthands: CD2field = CD@CD1field ---
     # For R̃² torsion theories: the Lagrangian has ∇∇field terms (second covariant
@@ -1108,22 +1087,6 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
-    # Apply CD2 rules after CD1 rules (skip when VarD is skipped)
-    all_cd2_rules = " /. ".join(cd2_rule_vars) if cd2_rule_vars else ""
-    if all_cd2_rules and not ctx.lagrangian_expr:
-        for df in dyn_fields:
-            eom_var = f"eom{df['name'].capitalize()}"
-            lines.extend(
-                [
-                    f"{eom_var} = {eom_var} /. {all_cd2_rules};",
-                    f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_cd2_rules}];",
-                    f"{eom_var} //= ToCanonical;",
-                    f"{eom_var} //= ContractMetric;",
-                    f"{eom_var} //= ScreenDollarIndices;",
-                    f"{eom_var} //= CollectTensors;",
-                ]
-            )
-
     # --- Third-order CD shorthands: CD3field = CD@CD2field ---
     # For R̃² terms with three nested covariant derivatives.
     cd3_rule_vars: list[str] = []
@@ -1153,20 +1116,8 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
-    # Apply CD3 rules (skip when VarD is skipped)
-    all_cd3_rules = " /. ".join(cd3_rule_vars) if cd3_rule_vars else ""
-    if all_cd3_rules and not ctx.lagrangian_expr:
-        for df in dyn_fields:
-            eom_var = f"eom{df['name'].capitalize()}"
-            lines.extend(
-                [
-                    f"{eom_var} = {eom_var} /. {all_cd3_rules};",
-                    f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_cd3_rules}];",
-                ]
-            )
-
     # --- Fourth-order CD shorthands: CD4field = CD@CD3field ---
-    # For R̃² VarD terms with four nested covariant derivatives (b5 ∇⁴h).
+    # For R̃² terms with four nested covariant derivatives (b5 ∇⁴h).
     # Only natural-placement ComponentValues computed (flat Minkowski: SeparateMetric
     # handles raising via explicit eta factors, so ToValues only needs natural).
     cd4_rule_vars: list[str] = []
@@ -1195,18 +1146,6 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "",
             ]
         )
-
-    # Apply CD4 rules (skip when VarD is skipped)
-    all_cd4_rules = " /. ".join(cd4_rule_vars) if cd4_rule_vars else ""
-    if all_cd4_rules and not ctx.lagrangian_expr:
-        for df in dyn_fields:
-            eom_var = f"eom{df['name'].capitalize()}"
-            lines.extend(
-                [
-                    f"{eom_var} = {eom_var} /. {all_cd4_rules};",
-                    f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_cd4_rules}];",
-                ]
-            )
 
     # Store ALL rules in global $CDShorthandRules for reuse in ComponentDecompose.wl
     # (after ExpandScalarWrappers introduces new CD operators from Scalar contents)
@@ -1270,25 +1209,15 @@ def _wls_multi_field_eom(
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str] | None:
-    """Generate VarD + DecomposeToComponents + fieldEquations for multiple fields.
+    """Initialize empty fieldEquations and set up CD shorthand tensors.
 
-    For torsion R̃² theories: uses **component-level Euler-Lagrange** instead
-    of abstract VarD + DecomposeToComponents.  The component Lagrangian is
-    decomposed first (via DecomposeScalarExpression, ~5s), then standard
-    variational calculus (D[L, field] with integration by parts) produces
-    the component EOM directly.  This bypasses the O(dim^{2K}) abstract-index
-    bottleneck entirely (~250x speedup: seconds vs 77 min).
-
-    Ref: mathematically equivalent — E-L commutes with basis decomposition
-    for complete bases.  See ComponentEulerLagrange in ComponentDecompose.wl.
+    The actual equations are computed later by ComponentEulerLagrange
+    (after Phase A decomposes the Lagrangian to component form).
+    This function sets up the CD shorthand tensors (CD1field, CD2field, etc.)
+    whose $CDShorthandRules are used by DecomposeScalarExpression.
     """
     lines: list[str] = []
 
-    # SKIP VarD for ALL theories with a Lagrangian. The component E-L
-    # (ComponentEulerLagrange, after Phase A) computes equations directly
-    # from the component Lagrangian — faster and mathematically equivalent
-    # to VarD + DecomposeToComponents for flat spacetime.
-    # VarD is kept only for non-Lagrangian theories (pure equation input).
     if ctx.lagrangian_expr:
         # CD shorthand setup: pre-compute ComponentValues for CD[field]
         # tensors. Speeds up Phase A decomposition by enabling O(1)
@@ -1304,10 +1233,10 @@ def _wls_multi_field_eom(
         )
         lines.extend(
             [
-                "(* VarD skipped — component E-L computes equations from lagComp *)",
+                "(* Initialize empty — Component E-L builds equations after Phase A *)",
                 "fieldEquations = {};",
                 "componentMetadata = <||>;",
-                'Print["VarD skipped: equations from component E-L (after Phase A)"];',
+                'Print["Equations from component E-L (after Phase A decomposition)"];',
             ]
         )
         return lines
@@ -2021,7 +1950,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
         lines.extend(
             (
-                'Print["[TIMING] L^(2) finalized (pre-VarD): ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+                'Print["[TIMING] L^(2) finalized: ", Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
                 "tSubPhase = AbsoluteTime[];",
             )
         )
@@ -4250,8 +4179,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "(* which fail for R̃² torsion theories.                        *)",
                     "(* ============================================================ *)",
                     _wls_timing_start("tCompEL"),
-                    "(* Flag for BuildMultiFieldJSONStructure: skip swap logic *)",
-                    'metadata["component_el"] = True;',
                     'Print["Component E-L: computing equations from component Lagrangian..."];',
                     'Print["  lagComp LeafCount: ", LeafCount[lagComp]];',
                     "",
@@ -4347,26 +4274,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "",
             )
         )
-
-    # --- Early JSON export (crash protection) ---
-    # Write JSON immediately after BuildMultiFieldJSONStructure, BEFORE
-    # canonical Hamiltonian and plane-wave remapping.  4D R̃² theories
-    # segfault during post-processing ($RecursionLimit overflow in
-    # ExtractMassCouplingFromEquations/canonical pipeline).  This early
-    # export ensures the equation data is saved to disk even if post-
-    # processing crashes.  The final export (below) overwrites this with
-    # the complete version including Hamiltonian + plane-wave remapping.
-    escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
-    lines.extend(
-        (
-            f'earlyOutputPath = "{escaped_output}";',
-            "earlyOutputDir = DirectoryName[earlyOutputPath];",
-            'If[earlyOutputDir =!= "" && !DirectoryQ[earlyOutputDir], CreateDirectory[earlyOutputDir]];',
-            'Export[earlyOutputPath, jsonStructure, "JSON"];',
-            'Print["Early JSON export complete (pre-canonical)."];',
-            "",
-        )
-    )
 
     # --- Canonical Phase B: IBP + Legendre transform + Hamiltonian ---
     # Must run AFTER BuildMultiFieldJSONStructure (injects canonical section
