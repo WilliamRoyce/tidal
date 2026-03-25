@@ -451,6 +451,12 @@
     "xscale",
     "yerr",
     "arange",
+    "cdiff",
+    "fname",
+    "Nikiforova",
+    "pterms",
+    "shtab",
+    "Uncatched",
     "Acad",
     "bmins",
     "CDCDT",
@@ -522,7 +528,11 @@
     "build/**",
     "docs/**",
     "*.egg-info/**",
-    "uv.lock"
+    "uv.lock",
+    "manuscript/**",
+    "research/**",
+    "xCobaInspirationForClaude/**",
+    "Literature/**"
   ],
   "noConfigSearch": true
 }
