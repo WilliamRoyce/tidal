@@ -8,8 +8,8 @@
 		"parameters": {
 			"kappa": 1.0,
 			"alpha1": 0.5,
-			"alpha2": 0.0,
-			"alpha3": 0.0,
+			"alpha2": 0.3,
+			"alpha3": 0.2,
 			"b5": 0.1
 		},
 		"reduction": {
@@ -18,7 +18,7 @@
 			"propagation_axis": "z",
 			"eliminated_fields": []
 		},
-		"derivation_hash": "f032445c9baebb4e9c51c23de2a3004388063e170d3711fd99863bd7b4e465dc"
+		"derivation_hash": "5d470cf2f4c06d44772d02d51a3bd09ae1de0aa6f4d1d8c089c6ef22e50f1082"
 	},
 	"spacetime": {
 		"dimension": 2,
