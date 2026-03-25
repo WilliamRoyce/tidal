@@ -1,0 +1,229 @@
+
+%% === eps R x R (13 terms) ===
+% [ 1] \eps_{cdef}\,\Rt_{ab}{}^{ef}\,\Rt{}^{abcd}
+% [ 2] \eps_{bdef}\,\Rt_{ac}{}^{ef}\,\Rt{}^{abcd}
+% [ 3] \eps_{bdef}\,\Rt_{a}{}^{e}_{c}{}^{f}\,\Rt{}^{abcd}
+% [ 4] \eps_{cdef}\,\Rt{}^{ab}_{a}{}^{c}\,\Rt_{b}{}^{def}
+% [ 5] \eps_{abef}\,\Rt{}^{abcd}\,\Rt_{cd}{}^{ef}
+% [ 6] \eps_{bdef}\,\Rt{}^{ab}_{a}{}^{c}\,\Rt_{c}{}^{def}
+% [ 7] \eps_{bdef}\,\Rt{}^{abcd}\,\Rt_{c}{}^{e}_{a}{}^{f}
+% [ 8] \eps_{abef}\,\Rt{}^{abcd}\,\Rt_{c}{}^{e}_{d}{}^{f}
+% [ 9] \eps_{cdef}\,\Rt{}^{ab}_{ab}\,\Rt{}^{cdef}
+% [10] \eps_{cdef}\,\Rt{}^{ab}_{a}{}^{c}\,\Rt{}^{de}_{b}{}^{f}
+% [11] \eps_{bdef}\,\Rt{}^{ab}_{a}{}^{c}\,\Rt{}^{de}_{c}{}^{f}
+% [12] \eps_{bcef}\,\Rt{}^{ab}_{a}{}^{c}\,\Rt{}^{de}_{d}{}^{f}
+% [13] \eps_{abef}\,\Rt{}^{abcd}\,\Rt{}^{ef}_{cd}
+
+%% === eps T x T (4 terms) ===
+% [ 1] \eps_{bcde}\,T_{a}{}^{de}\,T{}^{abc}
+% [ 2] \eps_{acde}\,T{}^{abc}\,T_{b}{}^{de}
+% [ 3] \eps_{bcde}\,T{}^{a}_{a}{}^{b}\,T{}^{cde}
+% [ 4] \eps_{acde}\,T{}^{abc}\,T{}^{d}_{b}{}^{e}
+
+%% === eps F x F (1 terms) ===
+% [ 1] \eps_{abcd}\,F{}^{ab}\,F{}^{cd}
+
+%% === eps R x F (3 terms) ===
+% [ 1] \eps_{bcde}\,F{}^{ab}\,\Rt_{a}{}^{cde}
+% [ 2] \eps_{bcde}\,F{}^{ab}\,\Rt{}^{cd}_{a}{}^{e}
+% [ 3] \eps_{abde}\,F{}^{ab}\,\Rt{}^{cd}_{c}{}^{e}
+
+%% === DT x F (3 terms) ===
+% [ 1] (\del T){}^{ab}_{b}{}^{c}\,F_{ac}
+% [ 2] (\del T){}^{a}_{a}{}^{bc}\,F_{bc}
+% [ 3] (\del T){}^{ab}_{a}{}^{c}\,F_{bc}
+
+%% === R x DT (10 terms) ===
+% [ 1] (\del T){}^{abcd}\,\Rt_{abcd}
+% [ 2] (\del T){}^{abcd}\,\Rt_{acbd}
+% [ 3] (\del T){}^{ab}_{b}{}^{c}\,\Rt_{a}{}^{d}_{cd}
+% [ 4] (\del T){}^{abcd}\,\Rt_{bcad}
+% [ 5] (\del T){}^{a}_{a}{}^{bc}\,\Rt_{b}{}^{d}_{cd}
+% [ 6] (\del T){}^{ab}_{a}{}^{c}\,\Rt_{b}{}^{d}_{cd}
+% [ 7] (\del T){}^{abcd}\,\Rt_{cdab}
+% [ 8] (\del T){}^{ab}_{b}{}^{c}\,\Rt_{c}{}^{d}_{ad}
+% [ 9] (\del T){}^{ab}_{a}{}^{c}\,\Rt_{c}{}^{d}_{bd}
+% [10] (\del T){}^{ab}_{ab}\,\Rt{}^{cd}_{cd}
+
+%% === DT x DT (16 terms) ===
+% [ 1] (\del T)_{a}{}^{d}_{cd}\,(\del T){}^{ab}_{b}{}^{c}
+% [ 2] (\del T)_{abcd}\,(\del T){}^{abcd}
+% [ 3] (\del T)_{acbd}\,(\del T){}^{abcd}
+% [ 4] (\del T){}^{abcd}\,(\del T)_{bacd}
+% [ 5] (\del T){}^{abcd}\,(\del T)_{bcad}
+% [ 6] (\del T){}^{a}_{a}{}^{bc}\,(\del T)_{b}{}^{d}_{cd}
+% [ 7] (\del T){}^{ab}_{a}{}^{c}\,(\del T)_{b}{}^{d}_{cd}
+% [ 8] (\del T){}^{abcd}\,(\del T)_{cbad}
+% [ 9] (\del T){}^{abcd}\,(\del T)_{cdab}
+% [10] (\del T){}^{ab}_{b}{}^{c}\,(\del T)_{c}{}^{d}_{ad}
+% [11] (\del T){}^{ab}_{a}{}^{c}\,(\del T)_{c}{}^{d}_{bd}
+% [12] (\del T){}^{ab}_{ab}\,(\del T){}^{cd}_{cd}
+% [13] (\del T){}^{a}_{a}{}^{bc}\,(\del T){}^{d}_{bcd}
+% [14] (\del T){}^{ab}_{a}{}^{c}\,(\del T){}^{d}_{bcd}
+% [15] (\del T){}^{ab}_{a}{}^{c}\,(\del T){}^{d}_{cbd}
+% [16] (\del T){}^{a}_{a}{}^{bc}\,(\del T){}^{d}_{dbc}
+
+%% === eps DT x F (6 terms) ===
+% [ 1] (\del T){}^{abcd}\,\eps_{bcde}\,F_{a}{}^{e}
+% [ 2] (\del T){}^{abcd}\,\eps_{acde}\,F_{b}{}^{e}
+% [ 3] (\del T){}^{abcd}\,\eps_{abde}\,F_{c}{}^{e}
+% [ 4] (\del T){}^{ab}_{b}{}^{c}\,\eps_{acde}\,F{}^{de}
+% [ 5] (\del T){}^{a}_{a}{}^{bc}\,\eps_{bcde}\,F{}^{de}
+% [ 6] (\del T){}^{ab}_{a}{}^{c}\,\eps_{bcde}\,F{}^{de}
+
+%% === eps R x DT (36 terms) ===
+% [ 1] (\del T){}^{abcd}\,\eps_{cdef}\,\Rt_{ab}{}^{ef}
+% [ 2] (\del T){}^{abcd}\,\eps_{bdef}\,\Rt_{ac}{}^{ef}
+% [ 3] (\del T){}^{ab}_{b}{}^{c}\,\eps_{cdef}\,\Rt_{a}{}^{def}
+% [ 4] (\del T){}^{abcd}\,\eps_{cdef}\,\Rt_{a}{}^{e}_{b}{}^{f}
+% [ 5] (\del T){}^{abcd}\,\eps_{bdef}\,\Rt_{a}{}^{e}_{c}{}^{f}
+% [ 6] (\del T){}^{abcd}\,\eps_{bcdf}\,\Rt_{a}{}^{e}_{e}{}^{f}
+% [ 7] (\del T){}^{abcd}\,\eps_{adef}\,\Rt_{bc}{}^{ef}
+% [ 8] (\del T){}^{a}_{a}{}^{bc}\,\eps_{cdef}\,\Rt_{b}{}^{def}
+% [ 9] (\del T){}^{ab}_{a}{}^{c}\,\eps_{cdef}\,\Rt_{b}{}^{def}
+% [10] (\del T){}^{abcd}\,\eps_{cdef}\,\Rt_{b}{}^{e}_{a}{}^{f}
+% [11] (\del T){}^{abcd}\,\eps_{adef}\,\Rt_{b}{}^{e}_{c}{}^{f}
+% [12] (\del T){}^{abcd}\,\eps_{acdf}\,\Rt_{b}{}^{e}_{e}{}^{f}
+% [13] (\del T){}^{abcd}\,\eps_{abef}\,\Rt_{cd}{}^{ef}
+% [14] (\del T){}^{ab}_{b}{}^{c}\,\eps_{adef}\,\Rt_{c}{}^{def}
+% [15] (\del T){}^{ab}_{a}{}^{c}\,\eps_{bdef}\,\Rt_{c}{}^{def}
+% [16] (\del T){}^{abcd}\,\eps_{bdef}\,\Rt_{c}{}^{e}_{a}{}^{f}
+% [17] (\del T){}^{abcd}\,\eps_{adef}\,\Rt_{c}{}^{e}_{b}{}^{f}
+% [18] (\del T){}^{abcd}\,\eps_{abef}\,\Rt_{c}{}^{e}_{d}{}^{f}
+% [19] (\del T){}^{abcd}\,\eps_{abdf}\,\Rt_{c}{}^{e}_{e}{}^{f}
+% [20] (\del T){}^{ab}_{ab}\,\eps_{cdef}\,\Rt{}^{cdef}
+% [21] (\del T){}^{ab}_{b}{}^{c}\,\eps_{cdef}\,\Rt{}^{de}_{a}{}^{f}
+% [22] (\del T){}^{a}_{a}{}^{bc}\,\eps_{cdef}\,\Rt{}^{de}_{b}{}^{f}
+% [23] (\del T){}^{ab}_{a}{}^{c}\,\eps_{cdef}\,\Rt{}^{de}_{b}{}^{f}
+% [24] (\del T){}^{ab}_{b}{}^{c}\,\eps_{adef}\,\Rt{}^{de}_{c}{}^{f}
+% [25] (\del T){}^{ab}_{a}{}^{c}\,\eps_{bdef}\,\Rt{}^{de}_{c}{}^{f}
+% [26] (\del T){}^{ab}_{b}{}^{c}\,\eps_{acef}\,\Rt{}^{de}_{d}{}^{f}
+% [27] (\del T){}^{a}_{a}{}^{bc}\,\eps_{bcef}\,\Rt{}^{de}_{d}{}^{f}
+% [28] (\del T){}^{ab}_{a}{}^{c}\,\eps_{bcef}\,\Rt{}^{de}_{d}{}^{f}
+% [29] (\del T){}^{abcd}\,\eps_{cdef}\,\Rt{}^{ef}_{ab}
+% [30] (\del T){}^{abcd}\,\eps_{bdef}\,\Rt{}^{ef}_{ac}
+% [31] (\del T){}^{abcd}\,\eps_{bcdf}\,\Rt{}^{ef}_{ae}
+% [32] (\del T){}^{abcd}\,\eps_{adef}\,\Rt{}^{ef}_{bc}
+% [33] (\del T){}^{abcd}\,\eps_{acdf}\,\Rt{}^{ef}_{be}
+% [34] (\del T){}^{abcd}\,\eps_{abef}\,\Rt{}^{ef}_{cd}
+% [35] (\del T){}^{abcd}\,\eps_{abdf}\,\Rt{}^{ef}_{ce}
+% [36] (\del T){}^{abcd}\,\eps_{abcd}\,\Rt{}^{ef}_{ef}
+
+%% === eps DT x DT (38 terms) ===
+% [ 1] (\del T){}^{abcd}\,(\del T)_{cd}{}^{ef}\,\eps_{abef}
+% [ 2] (\del T){}^{abcd}\,(\del T)_{c}{}^{e}_{d}{}^{f}\,\eps_{abef}
+% [ 3] (\del T){}^{abcd}\,(\del T){}^{e}_{cd}{}^{f}\,\eps_{abef}
+% [ 4] (\del T){}^{abcd}\,(\del T){}^{ef}_{cd}\,\eps_{abef}
+% [ 5] (\del T){}^{ab}_{b}{}^{c}\,(\del T){}^{de}_{e}{}^{f}\,\eps_{acdf}
+% [ 6] (\del T){}^{abcd}\,(\del T)_{bc}{}^{ef}\,\eps_{adef}
+% [ 7] (\del T){}^{abcd}\,(\del T)_{b}{}^{e}_{c}{}^{f}\,\eps_{adef}
+% [ 8] (\del T){}^{abcd}\,(\del T)_{cb}{}^{ef}\,\eps_{adef}
+% [ 9] (\del T){}^{ab}_{b}{}^{c}\,(\del T)_{c}{}^{def}\,\eps_{adef}
+% [10] (\del T){}^{abcd}\,(\del T)_{c}{}^{e}_{b}{}^{f}\,\eps_{adef}
+% [11] (\del T){}^{ab}_{b}{}^{c}\,(\del T){}^{d}_{c}{}^{ef}\,\eps_{adef}
+% [12] (\del T){}^{ab}_{b}{}^{c}\,(\del T){}^{de}_{c}{}^{f}\,\eps_{adef}
+% [13] (\del T){}^{abcd}\,(\del T){}^{e}_{bc}{}^{f}\,\eps_{adef}
+% [14] (\del T){}^{abcd}\,(\del T){}^{e}_{cb}{}^{f}\,\eps_{adef}
+% [15] (\del T){}^{a}_{a}{}^{bc}\,(\del T){}^{de}_{e}{}^{f}\,\eps_{bcdf}
+% [16] (\del T){}^{ab}_{a}{}^{c}\,(\del T){}^{de}_{e}{}^{f}\,\eps_{bcdf}
+% [17] (\del T){}^{a}_{a}{}^{bc}\,(\del T){}^{d}_{d}{}^{ef}\,\eps_{bcef}
+% [18] (\del T){}^{a}_{a}{}^{bc}\,(\del T){}^{de}_{d}{}^{f}\,\eps_{bcef}
+% [19] (\del T){}^{ab}_{a}{}^{c}\,(\del T){}^{de}_{d}{}^{f}\,\eps_{bcef}
+% [20] (\del T)_{ac}{}^{ef}\,(\del T){}^{abcd}\,\eps_{bdef}
+% [21] (\del T)_{a}{}^{e}_{c}{}^{f}\,(\del T){}^{abcd}\,\eps_{bdef}
+% [22] (\del T){}^{ab}_{a}{}^{c}\,(\del T)_{c}{}^{def}\,\eps_{bdef}
+% [23] (\del T){}^{abcd}\,(\del T)_{c}{}^{e}_{a}{}^{f}\,\eps_{bdef}
+% [24] (\del T){}^{ab}_{a}{}^{c}\,(\del T){}^{d}_{c}{}^{ef}\,\eps_{bdef}
+% [25] (\del T){}^{ab}_{a}{}^{c}\,(\del T){}^{de}_{c}{}^{f}\,\eps_{bdef}
+% [26] (\del T)_{a}{}^{def}\,(\del T){}^{ab}_{b}{}^{c}\,\eps_{cdef}
+% [27] (\del T)_{ab}{}^{ef}\,(\del T){}^{abcd}\,\eps_{cdef}
+% [28] (\del T){}^{abcd}\,(\del T)_{ba}{}^{ef}\,\eps_{cdef}
+% [29] (\del T){}^{a}_{a}{}^{bc}\,(\del T)_{b}{}^{def}\,\eps_{cdef}
+% [30] (\del T){}^{ab}_{a}{}^{c}\,(\del T)_{b}{}^{def}\,\eps_{cdef}
+% [31] (\del T){}^{abcd}\,(\del T)_{b}{}^{e}_{a}{}^{f}\,\eps_{cdef}
+% [32] (\del T){}^{ab}_{ab}\,(\del T){}^{cdef}\,\eps_{cdef}
+% [33] (\del T){}^{ab}_{b}{}^{c}\,(\del T){}^{d}_{a}{}^{ef}\,\eps_{cdef}
+% [34] (\del T){}^{a}_{a}{}^{bc}\,(\del T){}^{d}_{b}{}^{ef}\,\eps_{cdef}
+% [35] (\del T){}^{ab}_{a}{}^{c}\,(\del T){}^{d}_{b}{}^{ef}\,\eps_{cdef}
+% [36] (\del T){}^{ab}_{b}{}^{c}\,(\del T){}^{de}_{a}{}^{f}\,\eps_{cdef}
+% [37] (\del T){}^{a}_{a}{}^{bc}\,(\del T){}^{de}_{b}{}^{f}\,\eps_{cdef}
+% [38] (\del T){}^{ab}_{a}{}^{c}\,(\del T){}^{de}_{b}{}^{f}\,\eps_{cdef}
+
+%% === R x F x F (4 terms) ===
+% [ 1] F{}^{ab}\,F{}^{cd}\,\Rt_{abcd}
+% [ 2] F{}^{ab}\,F{}^{cd}\,\Rt_{acbd}
+% [ 3] F_{a}{}^{c}\,F{}^{ab}\,\Rt_{b}{}^{d}_{cd}
+% [ 4] F_{ab}\,F{}^{ab}\,\Rt{}^{cd}_{cd}
+
+%% === T x T x F (3 terms) ===
+% [ 1] F{}^{ab}\,T_{a}{}^{cd}\,T_{cbd}
+% [ 2] F{}^{ab}\,T_{ab}{}^{c}\,T{}^{d}_{cd}
+% [ 3] F{}^{ab}\,T{}^{c}_{ab}\,T{}^{d}_{cd}
+
+%% === R x R x F (8 terms) ===
+% [ 1] F{}^{ab}\,\Rt_{a}{}^{cde}\,\Rt_{cdbe}
+% [ 2] F{}^{ab}\,\Rt_{ab}{}^{cd}\,\Rt_{c}{}^{e}_{de}
+% [ 3] F{}^{ab}\,\Rt_{a}{}^{c}_{b}{}^{d}\,\Rt_{c}{}^{e}_{de}
+% [ 4] F{}^{ab}\,\Rt_{c}{}^{e}_{de}\,\Rt{}^{cd}_{ab}
+% [ 5] F{}^{ab}\,\Rt_{a}{}^{cde}\,\Rt_{debc}
+% [ 6] F{}^{ab}\,\Rt_{a}{}^{c}_{c}{}^{d}\,\Rt_{d}{}^{e}_{be}
+% [ 7] F{}^{ab}\,\Rt_{a}{}^{c}_{b}{}^{d}\,\Rt_{d}{}^{e}_{ce}
+% [ 8] F{}^{ab}\,\Rt_{a}{}^{c}_{bc}\,\Rt{}^{de}_{de}
+
+%% === DT x F x F (5 terms) ===
+% [ 1] (\del T){}^{abcd}\,F_{ac}\,F_{bd}
+% [ 2] (\del T){}^{abcd}\,F_{ab}\,F_{cd}
+% [ 3] (\del T){}^{ab}_{b}{}^{c}\,F_{a}{}^{d}\,F_{cd}
+% [ 4] (\del T){}^{ab}_{a}{}^{c}\,F_{b}{}^{d}\,F_{cd}
+% [ 5] (\del T){}^{ab}_{ab}\,F_{cd}\,F{}^{cd}
+
+%% === eps R x F x F (12 terms) ===
+% [ 1] \eps_{cdef}\,F{}^{ab}\,F{}^{cd}\,\Rt_{ab}{}^{ef}
+% [ 2] \eps_{bdef}\,F{}^{ab}\,F{}^{cd}\,\Rt_{ac}{}^{ef}
+% [ 3] \eps_{cdef}\,F{}^{ab}\,F{}^{cd}\,\Rt_{a}{}^{e}_{b}{}^{f}
+% [ 4] \eps_{bdef}\,F{}^{ab}\,F{}^{cd}\,\Rt_{a}{}^{e}_{c}{}^{f}
+% [ 5] \eps_{bcdf}\,F{}^{ab}\,F{}^{cd}\,\Rt_{a}{}^{e}_{e}{}^{f}
+% [ 6] \eps_{cdef}\,F_{a}{}^{c}\,F{}^{ab}\,\Rt_{b}{}^{def}
+% [ 7] \eps_{cdef}\,F_{ab}\,F{}^{ab}\,\Rt{}^{cdef}
+% [ 8] \eps_{cdef}\,F_{a}{}^{c}\,F{}^{ab}\,\Rt{}^{de}_{b}{}^{f}
+% [ 9] \eps_{cdef}\,F{}^{ab}\,F{}^{cd}\,\Rt{}^{ef}_{ab}
+% [10] \eps_{bdef}\,F{}^{ab}\,F{}^{cd}\,\Rt{}^{ef}_{ac}
+% [11] \eps_{bcdf}\,F{}^{ab}\,F{}^{cd}\,\Rt{}^{ef}_{ae}
+% [12] \eps_{abcd}\,F{}^{ab}\,F{}^{cd}\,\Rt{}^{ef}_{ef}
+
+%% === eps T x T x F (15 terms) ===
+% [ 1] \eps_{bdef}\,F{}^{ab}\,T_{a}{}^{cd}\,T_{c}{}^{ef}
+% [ 2] \eps_{bdef}\,F{}^{ab}\,T_{c}{}^{ef}\,T{}^{c}_{a}{}^{d}
+% [ 3] \eps_{abcf}\,F{}^{ab}\,T{}^{cde}\,T_{de}{}^{f}
+% [ 4] \eps_{bcef}\,F{}^{ab}\,T{}^{c}_{a}{}^{d}\,T_{d}{}^{ef}
+% [ 5] \eps_{abef}\,F{}^{ab}\,T{}^{c}_{c}{}^{d}\,T_{d}{}^{ef}
+% [ 6] \eps_{cdef}\,F{}^{ab}\,T_{ab}{}^{c}\,T{}^{def}
+% [ 7] \eps_{cdef}\,F{}^{ab}\,T{}^{c}_{ab}\,T{}^{def}
+% [ 8] \eps_{bdef}\,F{}^{ab}\,T{}^{c}_{ac}\,T{}^{def}
+% [ 9] \eps_{cdef}\,F{}^{ab}\,T_{a}{}^{cd}\,T{}^{e}_{b}{}^{f}
+% [10] \eps_{bdef}\,F{}^{ab}\,T_{a}{}^{cd}\,T{}^{e}_{c}{}^{f}
+% [11] \eps_{bdef}\,F{}^{ab}\,T{}^{c}_{a}{}^{d}\,T{}^{e}_{c}{}^{f}
+% [12] \eps_{bcef}\,F{}^{ab}\,T{}^{c}_{a}{}^{d}\,T{}^{e}_{d}{}^{f}
+% [13] \eps_{abef}\,F{}^{ab}\,T{}^{c}_{c}{}^{d}\,T{}^{e}_{d}{}^{f}
+% [14] \eps_{bcdf}\,F{}^{ab}\,T_{a}{}^{cd}\,T{}^{e}_{e}{}^{f}
+% [15] \eps_{bcdf}\,F{}^{ab}\,T{}^{c}_{a}{}^{d}\,T{}^{e}_{e}{}^{f}
+
+%% === eps F x F x DT (18 terms) ===
+% [ 1] (\del T){}^{abcd}\,\eps_{cdef}\,F_{a}{}^{e}\,F_{b}{}^{f}
+% [ 2] (\del T){}^{abcd}\,\eps_{bdef}\,F_{a}{}^{e}\,F_{c}{}^{f}
+% [ 3] (\del T){}^{abcd}\,\eps_{adef}\,F_{b}{}^{e}\,F_{c}{}^{f}
+% [ 4] (\del T){}^{abcd}\,\eps_{abef}\,F_{c}{}^{e}\,F_{d}{}^{f}
+% [ 5] (\del T){}^{abcd}\,\eps_{bcdf}\,F_{a}{}^{e}\,F_{e}{}^{f}
+% [ 6] (\del T){}^{abcd}\,\eps_{acdf}\,F_{b}{}^{e}\,F_{e}{}^{f}
+% [ 7] (\del T){}^{abcd}\,\eps_{abdf}\,F_{c}{}^{e}\,F_{e}{}^{f}
+% [ 8] (\del T){}^{abcd}\,\eps_{cdef}\,F_{ab}\,F{}^{ef}
+% [ 9] (\del T){}^{abcd}\,\eps_{bdef}\,F_{ac}\,F{}^{ef}
+% [10] (\del T){}^{ab}_{b}{}^{c}\,\eps_{cdef}\,F_{a}{}^{d}\,F{}^{ef}
+% [11] (\del T){}^{abcd}\,\eps_{adef}\,F_{bc}\,F{}^{ef}
+% [12] (\del T){}^{a}_{a}{}^{bc}\,\eps_{cdef}\,F_{b}{}^{d}\,F{}^{ef}
+% [13] (\del T){}^{ab}_{a}{}^{c}\,\eps_{cdef}\,F_{b}{}^{d}\,F{}^{ef}
+% [14] (\del T){}^{abcd}\,\eps_{abef}\,F_{cd}\,F{}^{ef}
+% [15] (\del T){}^{ab}_{b}{}^{c}\,\eps_{adef}\,F_{c}{}^{d}\,F{}^{ef}
+% [16] (\del T){}^{ab}_{a}{}^{c}\,\eps_{bdef}\,F_{c}{}^{d}\,F{}^{ef}
+% [17] (\del T){}^{ab}_{ab}\,\eps_{cdef}\,F{}^{cd}\,F{}^{ef}
+% [18] (\del T){}^{abcd}\,\eps_{abcd}\,F_{ef}\,F{}^{ef}

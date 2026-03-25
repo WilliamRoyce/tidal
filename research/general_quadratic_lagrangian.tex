@@ -289,19 +289,31 @@ convincing theoretical grounds for excluding them.''
 
 \subsubsection{Pontryagin-type: $\eps \cdot \Rt^2$ (13 terms)}
 
-\begin{equation}
-\boxed{
-  \mathcal{L}_{\eps\Rt^2}
-  = \sum_{I=1}^{13}\, d_I\, \bigl(\eps \cdot \Rt \cdot \Rt\bigr)_I
-}
+\begin{align}
+  \mathcal{L}_{\eps\Rt^2} &=
+    d_1\, \eps_{cdef}\,\Rt_{ab}{}^{ef}\,\Rt^{abcd}
+  + d_2\, \eps_{bdef}\,\Rt_{ac}{}^{ef}\,\Rt^{abcd}
+  + d_3\, \eps_{bdef}\,\Rt_{a}{}^{e}{}_{c}{}^{f}\,\Rt^{abcd}
+  \notag\\&\quad
+  + d_4\, \eps_{cdef}\,\Rt^{ab}{}_{a}{}^{c}\,\Rt_{b}{}^{def}
+  + d_5\, \eps_{abef}\,\Rt^{abcd}\,\Rt_{cd}{}^{ef}
+  + d_6\, \eps_{bdef}\,\Rt^{ab}{}_{a}{}^{c}\,\Rt_{c}{}^{def}
+  \notag\\&\quad
+  + d_7\, \eps_{bdef}\,\Rt^{abcd}\,\Rt_{c}{}^{e}{}_{a}{}^{f}
+  + d_8\, \eps_{abef}\,\Rt^{abcd}\,\Rt_{c}{}^{e}{}_{d}{}^{f}
+  + d_9\, \eps_{cdef}\,\Rt^{ab}{}_{ab}\,\Rt^{cdef}
+  \notag\\&\quad
+  + d_{10}\, \eps_{cdef}\,\Rt^{ab}{}_{a}{}^{c}\,\Rt^{de}{}_{b}{}^{f}
+  + d_{11}\, \eps_{bdef}\,\Rt^{ab}{}_{a}{}^{c}\,\Rt^{de}{}_{c}{}^{f}
+  \notag\\&\quad
+  + d_{12}\, \eps_{bcef}\,\Rt^{ab}{}_{a}{}^{c}\,\Rt^{de}{}_{d}{}^{f}
+  + d_{13}\, \eps_{abef}\,\Rt^{abcd}\,\Rt^{ef}{}_{cd}
   \label{eq:eps_curv_squared}
-\end{equation}
-These include the generalized Pontryagin density
-$\eps^{\mu\nu\rho\sigma}\Rt_{\mu\nu}{}^{\alpha\beta}\Rt_{\rho\sigma\alpha\beta}$
-and 12 further contractions. In the torsion-free limit, all 13
-reduce to the single topological Pontryagin density. With torsion,
-the lack of pair-exchange symmetry makes them generically independent
-and dynamical.
+\end{align}
+The $d_5$ term is the generalized Pontryagin density. In the
+torsion-free limit, pair-exchange symmetry makes all 13 proportional
+to a single topological invariant. With torsion, they are generically
+independent and dynamical.
 
 \subsubsection{Nieh--Yan-type: $\eps \cdot T^2$ (4 terms)}
 
@@ -357,17 +369,26 @@ ghost-free (Section~\ref{sec:ghosts}).
 
 \begin{itemize}
   \item \textbf{$\del T \times F$} (3 terms, $\zeta_{1,2,3}$):
-    Torsion--EM cross-coupling. Absent from both standard PGT and
-    Barker's eWGT. Mapped to Shapiro's $\theta_{2,5,6}$~\cite{Shapiro:2001rz}.
+    \begin{equation}
+      \mathcal{L}_{\del T \cdot F}
+      = \zeta_1\, (\del T)^{ab}{}_{b}{}^{c}\, F_{ac}
+      + \zeta_2\, (\del T)^{a}{}_{a}{}^{bc}\, F_{bc}
+      + \zeta_3\, (\del T)^{ab}{}_{a}{}^{c}\, F_{bc}
+      \label{eq:dt_f}
+    \end{equation}
+    Torsion--EM cross-coupling, absent from both standard PGT and
+    Barker's eWGT. Maps to Shapiro's $\theta_{2,5,6}$~\cite{Shapiro:2001rz}.
   \item \textbf{$\Rt \times \del T$} ($\leq 10$ terms$^\dagger$,
-    $\chi, \chi_2 \ldots \chi_{10}$):
-    Includes Barker's $\chi$ term~\cite{Barker:2024ydb}:
+    $\chi_1 \ldots \chi_{10}$):
+    All 10 contractions are listed in Appendix~\ref{sec:explicit_terms}.
+    Barker's $\chi$ term~\cite{Barker:2024ydb} is the special case
     $\chi\, \Rt_{[\mu\nu]}\, \pd^{[\mu} T^{\nu]}$.
   \item \textbf{$(\del T)^2$} ($\leq 16$ terms$^\dagger$,
-    $\xi, \xi_2 \ldots \xi_{16}$):
-    Includes Barker's $\xi$ term (``Maxwell torsion''):
-    $-\frac{\xi}{12}\, \pd_{[\mu} T_{\nu]}\, \pd^{[\mu} T^{\nu]}$.
-    This is the kinetic term that enables propagating vector
+    $\xi_1 \ldots \xi_{16}$):
+    All 16 contractions are listed in Appendix~\ref{sec:explicit_terms}.
+    Barker's $\xi$ term (``Maxwell torsion'') is the special case
+    $-\frac{\xi}{12}\, \pd_{[\mu} T_{\nu]}\, \pd^{[\mu} T^{\nu]}$,
+    the kinetic term enabling propagating vector
     torsion~\cite{Barker:2024ydb}.
 \end{itemize}
 \noindent${}^\dagger$Upper bounds before Bianchi reduction
@@ -409,15 +430,44 @@ PDE when $\bar{B}_0(\mathbf{x})$ varies in space
 \subsubsection{Parity-even cubic (safe, $n_\epsilon \leq 2$)}
 
 \begin{itemize}
-  \item \textbf{$\Rt \times F^2$} (4 terms, $\lambda_{1\text{--}4}$):
-    Graviton--photon mixing $\propto B_0$ (Gertsenshtein mechanism).
-  \item \textbf{$T^2 \times F$} (3 terms, $\kappa_{1\text{--}3}$):
-    Torsion mass correction $\propto B_0$
-    (both $T$ factors are perturbations when $\bar{T}=0$).
+  \item \textbf{$\Rt \times F^2$} (4 terms, $\lambda_{1\text{--}4}$) ---
+    Gertsenshtein mechanism:
+    \begin{align}
+      \mathcal{L}_{\Rt FF} &=
+        \lambda_1\, F^{ab} F^{cd} \Rt_{abcd}
+      + \lambda_2\, F^{ab} F^{cd} \Rt_{acbd}
+      \notag\\&\quad
+      + \lambda_3\, F_{a}{}^{c} F^{ab} \Rt_{b}{}^{d}{}_{cd}
+      + \lambda_4\, F_{ab} F^{ab} \Rt^{cd}{}_{cd}
+      \label{eq:curv_ff}
+    \end{align}
+
+  \item \textbf{$T^2 \times F$} (3 terms, $\kappa_{1\text{--}3}$) ---
+    torsion mass correction $\propto B_0$:
+    \begin{equation}
+      \mathcal{L}_{TTF} =
+        \kappa_1\, F^{ab} T_{a}{}^{cd} T_{cbd}
+      + \kappa_2\, F^{ab} T_{ab}{}^{c} T^{d}{}_{cd}
+      + \kappa_3\, F^{ab} T^{c}{}_{ab} T^{d}{}_{cd}
+      \label{eq:ttf}
+    \end{equation}
+
   \item \textbf{$\Rt^2 \times F$} (8 terms, $\rho_{1\text{--}8}$):
-    Graviton self-interaction modified by $B_0$.
-  \item \textbf{$\del T \times F^2$} (5 terms, $\mu_{1\text{--}5}$):
-    Torsion--photon conversion $\propto B_0$.
+    graviton self-interaction modified by $B_0$.
+    All 8 listed in Appendix~\ref{sec:explicit_terms}.
+
+  \item \textbf{$\del T \times F^2$} (5 terms, $\mu_{1\text{--}5}$) ---
+    torsion--photon conversion $\propto B_0$:
+    \begin{align}
+      \mathcal{L}_{\del T\cdot FF} &=
+        \mu_1\, (\del T)^{abcd} F_{ac} F_{bd}
+      + \mu_2\, (\del T)^{abcd} F_{ab} F_{cd}
+      + \mu_3\, (\del T)^{ab}{}_{b}{}^{c} F_{a}{}^{d} F_{cd}
+      \notag\\&\quad
+      + \mu_4\, (\del T)^{ab}{}_{a}{}^{c} F_{b}{}^{d} F_{cd}
+      + \mu_5\, (\del T)^{ab}{}_{ab} F_{cd} F^{cd}
+      \label{eq:dtff}
+    \end{align}
 \end{itemize}
 
 \subsubsection{Parity-odd cubic (safe, $n_\epsilon \leq 2$)}
@@ -902,6 +952,76 @@ checks index parity (even $\Rightarrow$ contractible), and calls
 sectors} with \textbf{5,612 total} independent contractions.
 The full sector-by-sector results are in
 \texttt{enumeration\_classified.json}.
+
+
+%% ================================================================
+\section{Complete Explicit Contractions}
+\label{sec:explicit_terms}
+%% ================================================================
+
+All contractions listed below are produced by
+\texttt{AllContractions} from \texttt{xTras} and represent the
+canonical forms in 4D. The raw Mathematica output is in
+\texttt{explicit\_terms\_raw.txt}.
+
+\subsection{$\Rt \times \del T$ (10 terms)}
+\begin{align}
+  \chi_1&\, (\del T)^{abcd}\, \Rt_{abcd}  &
+  \chi_2&\, (\del T)^{abcd}\, \Rt_{acbd}  \notag\\
+  \chi_3&\, (\del T)^{ab}{}_{b}{}^{c}\, \Rt_{a}{}^{d}{}_{cd}  &
+  \chi_4&\, (\del T)^{abcd}\, \Rt_{bcad}  \notag\\
+  \chi_5&\, (\del T)^{a}{}_{a}{}^{bc}\, \Rt_{b}{}^{d}{}_{cd}  &
+  \chi_6&\, (\del T)^{ab}{}_{a}{}^{c}\, \Rt_{b}{}^{d}{}_{cd}  \notag\\
+  \chi_7&\, (\del T)^{abcd}\, \Rt_{cdab}  &
+  \chi_8&\, (\del T)^{ab}{}_{b}{}^{c}\, \Rt_{c}{}^{d}{}_{ad}  \notag\\
+  \chi_9&\, (\del T)^{ab}{}_{a}{}^{c}\, \Rt_{c}{}^{d}{}_{bd}  &
+  \chi_{10}&\, (\del T)^{ab}{}_{ab}\, \Rt^{cd}{}_{cd}
+  \label{eq:r_dt_explicit}
+\end{align}
+
+\subsection{$(\del T)^2$ (16 terms)}
+\begin{align}
+  \xi_1&\, (\del T)_{a}{}^{d}{}_{cd}\, (\del T)^{ab}{}_{b}{}^{c}  &
+  \xi_2&\, (\del T)_{abcd}\, (\del T)^{abcd}  \notag\\
+  \xi_3&\, (\del T)_{acbd}\, (\del T)^{abcd}  &
+  \xi_4&\, (\del T)^{abcd}\, (\del T)_{bacd}  \notag\\
+  \xi_5&\, (\del T)^{abcd}\, (\del T)_{bcad}  &
+  \xi_6&\, (\del T)^{a}{}_{a}{}^{bc}\, (\del T)_{b}{}^{d}{}_{cd}  \notag\\
+  \xi_7&\, (\del T)^{ab}{}_{a}{}^{c}\, (\del T)_{b}{}^{d}{}_{cd}  &
+  \xi_8&\, (\del T)^{abcd}\, (\del T)_{cbad}  \notag\\
+  \xi_9&\, (\del T)^{abcd}\, (\del T)_{cdab}  &
+  \xi_{10}&\, (\del T)^{ab}{}_{b}{}^{c}\, (\del T)_{c}{}^{d}{}_{ad}  \notag\\
+  \xi_{11}&\, (\del T)^{ab}{}_{a}{}^{c}\, (\del T)_{c}{}^{d}{}_{bd}  &
+  \xi_{12}&\, (\del T)^{ab}{}_{ab}\, (\del T)^{cd}{}_{cd}  \notag\\
+  \xi_{13}&\, (\del T)^{a}{}_{a}{}^{bc}\, (\del T)^{d}{}_{bcd}  &
+  \xi_{14}&\, (\del T)^{ab}{}_{a}{}^{c}\, (\del T)^{d}{}_{bcd}  \notag\\
+  \xi_{15}&\, (\del T)^{ab}{}_{a}{}^{c}\, (\del T)^{d}{}_{cbd}  &
+  \xi_{16}&\, (\del T)^{a}{}_{a}{}^{bc}\, (\del T)^{d}{}_{dbc}
+  \label{eq:dt_dt_explicit}
+\end{align}
+
+\subsection{$\Rt^2 \times F$ (8 terms)}
+\begin{align}
+  \rho_1&\, F^{ab}\, \Rt_{a}{}^{cde}\, \Rt_{cdbe}  &
+  \rho_2&\, F^{ab}\, \Rt_{ab}{}^{cd}\, \Rt_{c}{}^{e}{}_{de}  \notag\\
+  \rho_3&\, F^{ab}\, \Rt_{a}{}^{c}{}_{b}{}^{d}\, \Rt_{c}{}^{e}{}_{de}  &
+  \rho_4&\, F^{ab}\, \Rt_{c}{}^{e}{}_{de}\, \Rt^{cd}{}_{ab}  \notag\\
+  \rho_5&\, F^{ab}\, \Rt_{a}{}^{cde}\, \Rt_{debc}  &
+  \rho_6&\, F^{ab}\, \Rt_{a}{}^{c}{}_{c}{}^{d}\, \Rt_{d}{}^{e}{}_{be}  \notag\\
+  \rho_7&\, F^{ab}\, \Rt_{a}{}^{c}{}_{b}{}^{d}\, \Rt_{d}{}^{e}{}_{ce}  &
+  \rho_8&\, F^{ab}\, \Rt_{a}{}^{c}{}_{bc}\, \Rt^{de}{}_{de}
+  \label{eq:rrf_explicit}
+\end{align}
+
+\noindent The parity-odd derivative sectors
+($\eps \cdot \del T \times F$: 6 terms,
+$\eps \cdot \Rt \times \del T$: 36 terms,
+$\eps \cdot (\del T)^2$: 38 terms) and parity-odd cubic sectors
+($\eps \cdot \Rt \times F^2$: 12 terms,
+$\eps \cdot T^2 \times F$: 15 terms,
+$\eps \cdot F^2 \times \del T$: 18 terms)
+are provided in the supplementary data file
+\texttt{explicit\_terms\_tex.txt} (195 terms total).
 
 
 %% ================================================================
