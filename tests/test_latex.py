@@ -22,6 +22,17 @@ from tidal.symbolic.latex import (
 
 _EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "data"
 
+# Derived JSON files live in gitignored examples/data/ — only present after
+# running `tidal derive`.  Skip integration tests when absent.
+_KG_JSON = _EXAMPLES / "klein_gordon_1d.json"
+_CS_JSON = _EXAMPLES / "coupled_scalars.json"
+_needs_kg = pytest.mark.skipif(
+    not _KG_JSON.exists(), reason="klein_gordon_1d.json not derived"
+)
+_needs_cs = pytest.mark.skipif(
+    not _CS_JSON.exists(), reason="coupled_scalars.json not derived"
+)
+
 
 # ---------------------------------------------------------------------------
 # coefficient_to_latex
@@ -297,6 +308,7 @@ class TestLagrangianToLatex:
 class TestEquationToLatex:
     """Integration tests for equation rendering with real JSON specs."""
 
+    @_needs_kg
     def test_klein_gordon(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
@@ -307,6 +319,7 @@ class TestEquationToLatex:
         assert r"\partial_x" in result
         assert "&=" in result
 
+    @_needs_cs
     def test_coupled_scalars(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
@@ -327,6 +340,7 @@ class TestEquationToLatex:
 class TestHamiltonianToLatex:
     """Integration tests for Hamiltonian rendering."""
 
+    @_needs_kg
     def test_klein_gordon_hamiltonian(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
@@ -336,6 +350,7 @@ class TestHamiltonianToLatex:
         assert r"\mathscr{H}" in result
         assert "&=" in result
 
+    @_needs_cs
     def test_coupled_scalars_hamiltonian(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
@@ -350,6 +365,7 @@ class TestHamiltonianToLatex:
 # ---------------------------------------------------------------------------
 
 
+@_needs_kg
 class TestSystemToLatex:
     """Tests for full system rendering and output formats."""
 
@@ -410,6 +426,7 @@ class TestSystemToLatex:
 # ---------------------------------------------------------------------------
 
 
+@_needs_kg
 class TestCLIIntegration:
     """Tests that the CLI --latex flag works end-to-end."""
 

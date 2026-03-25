@@ -621,12 +621,19 @@ class TestProcaScalarBackground:
 # ===========================================================================
 
 
+_VECTOR_BG_TOML = (
+    Path(__file__).parent.parent / "examples" / "vector_background" / "theory.toml"
+)
+
+
+@pytest.mark.skipif(
+    not _VECTOR_BG_TOML.exists(),
+    reason="vector_background example removed (e4738b0)",
+)
 class TestVectorBackground:
     """Tests for scalar-vector coupling with tanh domain wall vector background."""
 
-    TOML_PATH = (
-        Path(__file__).parent.parent / "examples" / "vector_background" / "theory.toml"
-    )
+    TOML_PATH = _VECTOR_BG_TOML
 
     def test_vector_background_wls_dry_run(self) -> None:
         """WLS generation succeeds and contains ComponentValue lines."""

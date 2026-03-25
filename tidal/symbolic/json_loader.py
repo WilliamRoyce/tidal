@@ -86,9 +86,12 @@ def is_known_operator(name: str) -> bool:
         return True
     if _GENERIC_SINGLE_AXIS_RE.match(name) or _GENERIC_MULTI_AXIS_RE.match(name):
         return True
-    # Mixed time-space operators: mixed_T[n]_S[n][axis]_...
-    # E.g., mixed_T2_S2x (time²-space²_x), mixed_T_S1x (time¹-space¹_x)
+    # Mixed time-space operators:
+    #   Wolfram format: mixed_T[n]_S[n][axis]_... (e.g., mixed_T2_S2x)
+    #   Numeric format: mixed_[time]_[s1]_[s2]_... (e.g., mixed_1_0_0_1)
     if name.startswith("mixed_T"):
+        return True
+    if re.match(r"^mixed_\d+(_\d+)+$", name):
         return True
     # Pure time derivative operators on RHS: d2_t, d3_t, d4_t
     return bool(re.match(r"^d\d+_t$", name))
