@@ -1,35 +1,37 @@
 # Graviton-Torsion Mixing in Poincaré Gauge Theory (4D)
 #
-# Lagrangian: L = (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc} + b5 R̃²
+# Most general quadratic PGT Lagrangian with curvature-squared coupling:
 #
-# where R̃ = RicciScalarCDT[] is the Riemann-Cartan Ricci scalar.
+#   L = (1/kappa^2) R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3 + b5 R̃²
 #
-# The R̃² curvature-squared term is essential for:
-#   - Graviton-torsion mixing (cross-coupling between metric and torsion)
-#   - Propagating torsion modes with kinetic (∇T)² terms
-#   - 4th-order equations → Ostrogradsky reduction to 2nd-order
+# where R̃ = RicciScalarCDT[] is the Riemann-Cartan Ricci scalar and
+# the three independent T² invariants are:
 #
-# Without b5: in 4D with TT gauge, torsion is non-propagating
-# (Einstein-Cartan, all torsion fields = 0). The R̃² kinetic terms
-# are what give torsion its own wave-like dynamics.
+#   I1 = T_{abc} T^{abc}     (tensor sector)
+#   I2 = T_{abc} T^{bac}     (mixed contraction — a↔b swap in second T)
+#   I3 = T^a_{ab} T^{cb}_{c} (trace sector — torsion trace vector squared)
 #
-# The T^2 invariant I1 = T_{abc}T^{abc} provides torsion mass terms.
-# Additional invariants (I2 = T_{abc}T^{bac}, I3 = T_a T^a) can be
-# added for the full general PGT Lagrangian.
+# Physical content:
+#   - alpha1, alpha2, alpha3 control torsion mass terms for each
+#     irreducible sector (tentor, trator, axitor)
+#   - b5 R̃² provides kinetic (∇T)² terms for propagating torsion
+#     and graviton-torsion cross-coupling via the Ricci scalar
+#   - Without b5: torsion is non-propagating (Einstein-Cartan)
+#   - Without alpha_I: pure R̃ + R̃² (no torsion mass)
 #
 # Plane-wave reduction: propagation along z-axis (∂_x = ∂_y = 0)
-# TT gauge: applied to graviton h only (not torsion)
+# No gauge fixing: preserves trace h^a_a essential for R̃² mixing
 #
 # Refs:
-#   Shapiro (2002), hep-th/0103093 — torsion phenomenology, R̃ decomposition
+#   Shapiro (2002), hep-th/0103093 — torsion phenomenology, R̃ identity
 #   Hayashi & Shirafuji (1979) — PGT propagating modes
-#   Hehl et al. (1976), Rev. Mod. Phys. 48:393 — Einstein-Cartan foundations
+#   Hehl et al. (1976), Rev. Mod. Phys. 48:393 — Einstein-Cartan
 #   Sezgin & van Nieuwenhuizen (1980), Phys.Rev.D 21:3269 — linearized PGT
 #   Nikiforova et al. (2009), arXiv:0905.4007 — massive torsion stability
 
 [theory]
-name = "Graviton-Torsion 4D (PGT, R̃²)"
-description = "Quadratic PGT with curvature-squared: R̃ + T² + R̃² in 4D"
+name = "Graviton-Torsion 4D (PGT, full quadratic)"
+description = "General quadratic PGT: R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3 + b5 R̃²"
 
 [spacetime]
 dimension = 4
@@ -46,16 +48,17 @@ rank = 2
 symmetry = "symmetric"
 
 [constants]
-names = ["kappa", "alpha1", "b5"]
+names = ["kappa", "alpha1", "alpha2", "alpha3", "b5"]
 
-# PGT Lagrangian with curvature-squared term:
-#   (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc} + b5 R̃²
+# Full general quadratic PGT Lagrangian:
+#   (1/kappa^2) R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3 + b5 R̃²
 #
-# Using RicciScalarCDT[] (Riemann-Cartan Ricci scalar) which
-# auto-decomposes to R^{LC} + torsion contributions via the
-# Shapiro identity.
+# Index contractions:
+#   I1 = T[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] T[-d,-e,-f]
+#   I2 = T[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] T[-d,-e,-f]  (a↔b swap)
+#   I3 = T[b,-b,-a] eta[a,d] T[c,-c,-d]                       (trace)
 [lagrangian]
-expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + b5 RicciScalarCDT[]^2)"
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] + b5 RicciScalarCDT[]^2)"
 
 [linearization]
 perturbation_field = "h"
@@ -63,7 +66,6 @@ perturbation_field = "h"
 # No gauge fixing applied — preserves all graviton components including
 # the trace h^a_a, which is essential for graviton-torsion mixing via R̃²
 # (the coupling goes through the Ricci scalar). TT gauge kills this channel.
-# De Donder gauge can be added later to simplify the equations.
 
 # Plane-wave reduction: propagation along z-axis
 # Zeros ∂_x and ∂_y derivatives but keeps ALL field components
@@ -74,6 +76,8 @@ propagation_axis = "z"
 [parameters]
 kappa = 1.0
 alpha1 = 0.5
+alpha2 = 0.3
+alpha3 = 0.2
 b5 = 0.1
 
 [output]
