@@ -964,6 +964,18 @@ All contractions listed below are produced by
 canonical forms in 4D. The raw Mathematica output is in
 \texttt{explicit\_terms\_raw.txt}.
 
+\paragraph{Index notation.}
+The torsion tensor always carries three indices
+$T^\lambda{}_{\mu\nu}$. Where a pair is contracted
+(e.g., $T^d{}_{cd}$), this denotes the \emph{torsion trace}
+$T_c \equiv T^\lambda{}_{\lambda c}$. Likewise,
+$(\del T)^{ab}{}_{a}{}^{c}$ denotes the trace
+$(\del_d T^{db}{}^c) = \del_d T^{dbc}$ (with one index of the
+derivative--torsion pair contracted). Where two
+such contractions appear in a single term (e.g.,
+$T^d{}_{cd}\, T^e{}_{ae}$), both factors are torsion traces
+$T_c\, T_a$.
+
 \subsection{$\Rt \times \del T$ (10 terms)}
 \begin{align}
   \chi_1&\, (\del T)^{abcd}\, \Rt_{abcd}  &
@@ -978,6 +990,17 @@ canonical forms in 4D. The raw Mathematica output is in
   \chi_{10}&\, (\del T)^{ab}{}_{ab}\, \Rt^{cd}{}_{cd}
   \label{eq:r_dt_explicit}
 \end{align}
+\noindent\textbf{Barker's $\chi$ term.}
+$\chi\, \Rt_{[\mu\nu]}\, \pd^{[\mu} T^{\nu]}$
+involves only the antisymmetric Ricci
+$\Rt_{[\mu\nu]} = \Rt^\lambda{}_{[\mu|\lambda|\nu]}$ and the
+torsion-trace field strength $\pd_{[\mu} T_{\nu]}$.
+In our canonical basis, these are the \emph{trace-involving} terms:
+$\chi_5$ ($(\del T)^a{}_{a}{}^{bc}\, \Rt_{b}{}^d{}_{cd}$),
+$\chi_6$ ($(\del T)^{ab}{}_{a}{}^{c}\, \Rt_{b}{}^d{}_{cd}$),
+$\chi_9$ ($(\del T)^{ab}{}_{a}{}^{c}\, \Rt_{c}{}^d{}_{bd}$), and
+$\chi_{10}$ ($(\del T)^{ab}{}_{ab}\, \Rt^{cd}{}_{cd}$).
+Barker's $\chi$ is a specific linear combination of these four.
 
 \subsection{$(\del T)^2$ (16 terms)}
 \begin{align}
@@ -999,6 +1022,14 @@ canonical forms in 4D. The raw Mathematica output is in
   \xi_{16}&\, (\del T)^{a}{}_{a}{}^{bc}\, (\del T)^{d}{}_{dbc}
   \label{eq:dt_dt_explicit}
 \end{align}
+\noindent\textbf{Barker's $\xi$ term.}
+$-\frac{\xi}{12}\, \pd_{[\mu} T_{\nu]}\, \pd^{[\mu} T^{\nu]}$
+involves only the torsion-trace field strength
+$H_{\mu\nu} = 2\pd_{[\mu}(T_{\nu]}/3)$.
+In our canonical basis, these are the \emph{double-trace} terms
+where both $(\del T)$ factors have a contracted pair:
+$\xi_6$, $\xi_7$, $\xi_{12}$, and $\xi_{16}$.
+Barker's $\xi$ is a specific linear combination of these four.
 
 \subsection{$\Rt^2 \times F$ (8 terms)}
 \begin{align}
