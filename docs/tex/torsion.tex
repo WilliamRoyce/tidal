@@ -233,6 +233,8 @@ The parameter $b_5$ controls the $\tilde{R}^2$ coupling strength. Its physical v
 \subsection{Derived Equations Summary}
 \label{sec:torsion-derived-equations}
 
+\subsubsection{2+1D System (3D $\to$ 1+1D)}
+
 The 2+1D plane-wave reduction (propagation along $x$) produces 15 component fields and 26 equations:
 
 \begin{itemize}
@@ -240,35 +242,63 @@ The 2+1D plane-wave reduction (propagation along $x$) produces 15 component fiel
   \item \textbf{Torsion components:} $t_0, t_1, \ldots, t_8$ (9 components of the rank-3 tensor with partial antisymmetry in 2+1D)
 \end{itemize}
 
-Example equation structure (schematic):
-\begin{equation}
-  \partial_t^2 h_0 = c_1\, \nabla_x^2 h_5 + c_2\, \partial_x^3 t_0 - c_3\, \partial_x^3 t_8 + c_4\, \nabla^4 h_0 + \cdots
-\end{equation}
-where the $\partial_x^3 t$ terms confirm graviton-torsion mixing, and the $\nabla^4 h$ terms arise from $\tilde{R}^2$.
+After Ostrogradsky reduction: $h_3, h_5$ (4th-order from $\tilde{R}^2$) $\to$ auxiliaries $w_{h_3}, w_{h_5}$, giving 17 fields total.  10 constraints, 5 dynamical (2nd-order), with 2 mass-matrix constraints ($t_3 = t_7$).  The canonical Hamiltonian contains 147 terms.
 
-The canonical Hamiltonian contains 14 terms with $b_5$-dependent expressions, verified to be correct by comparison with the Lagrangian structure.
+\subsubsection{4D System (4D $\to$ 1+1D)}
+\label{sec:torsion-4d}
 
-\paragraph{After Ostrogradsky reduction.}
-Fields with 4th-order-in-time equations acquire auxiliary fields, expanding the state from 15 to 17 fields (2 auxiliary). All equations become $\leq$2nd order in time.
+The full 4D theory (no gauge fixing, plane-wave reduction along $z$) produces 34 component fields:
+
+\begin{itemize}
+  \item \textbf{Graviton components:} $h_0, h_1, \ldots, h_9$ (10 components of the symmetric metric perturbation in 4D)
+  \item \textbf{Torsion components:} $t_0, t_1, \ldots, t_{23}$ (24 components of the rank-3 tensor $T^a{}_{bc}$ with antisymmetry in $bc$, in 4D)
+\end{itemize}
+
+After Ostrogradsky reduction: $h_4, h_7, h_9$ (4th-order from $\tilde{R}^2$) $\to$ auxiliaries $w_{h_4}, w_{h_7}, w_{h_9}$, giving \textbf{37 fields} total.
+
+\begin{table}[htbp]
+\centering
+\caption{4D graviton-torsion field classification (37 components after Ostrogradsky).}
+\label{tab:torsion-4d-fields}
+\begin{tabular}{@{}llcl@{}}
+\toprule
+Category & Fields & Count & Notes \\
+\midrule
+Dynamical graviton & $h_4, h_5, h_6, h_7, h_8, h_9$ & 6 & 2nd-order (3 reduced from 4th via Ostrogradsky) \\
+Dynamical torsion & $t_6, t_{13}, t_{20}$ & 3 & 2nd-order, propagating (from $\tilde{R}^2$ kinetic terms) \\
+Ostrogradsky auxiliary & $w_{h_4}, w_{h_7}, w_{h_9}$ & 3 & $w = \partial_t^2 h$ (kinematic + dynamics) \\
+Constraint & $h_0, h_1, h_2, h_3$; remaining $t_i$ & 25 & Algebraically determined (time\_order=0) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The canonical Hamiltonian contains \textbf{291 terms}, computed via the full Legendre transform in Wolfram.
+
+\paragraph{Coupling structure.}
+The $\tilde{R}^2$ term produces rich graviton-torsion coupling.  For example, the auxiliary field $w_{h_4}$'s equation has 23 RHS terms coupling to 15 distinct fields including all three propagating torsion modes ($t_6, t_{13}, t_{20}$) and their velocities.  The torsion equations contain implicit acceleration coupling ($\partial_t^2$ of other fields on the RHS), handled by the generalized mass-matrix modal solver (\S\ref{sec:modal-mass-matrix}).
+
+\paragraph{Derivation performance.}
+The 4D derivation completes in $\sim$15\,s: 7\,s for Lagrangian decomposition (DecomposeScalarExpression), 0.3\,s for component E--L (34 equations), and $\sim$7\,s for canonical pipeline (IBP + Legendre + Hamiltonian parsing).
 
 \subsection{Current Status and Remaining Work}
 \label{sec:torsion-status}
 
 \begin{table}[htbp]
 \centering
-\caption{Torsion implementation status (as of v0.16.1).}
+\caption{Torsion implementation status (as of v0.17.0).}
 \label{tab:torsion-status}
 \begin{tabular}{@{}llp{7cm}@{}}
 \toprule
 Component & Status & Notes \\
 \midrule
-Symbolic derivation & Complete & Component E--L: 15 equations in $\sim$5\,s (vs 77\,min VarD) \\
-JSON specification & Complete & 15 fields (6 graviton $h_{0\text{--}5}$ + 9 torsion $t_{0\text{--}8}$) \\
-Ostrogradsky reduction & Complete & $h_3, h_5$ (4th-order) $\to$ auxiliaries $w_{h_3}, w_{h_5}$; 17 fields \\
-Mass-matrix analysis & Complete & $M = [[1,1],[1,1]]$ for $\{t_3, t_7\}$: hidden constraint $t_3 = t_7$ \\
-Simulation (modal) & \textbf{Complete} & Generalized eigenvalue via QZ; $\max|dE/E| = 0$ at $t=100$ \\
-Energy conservation & \textbf{Pass} & Machine precision ($0$) for all tested $t_\text{end}$ \\
-Parameter sweeps & Not tested & Requires physical parameter selection \\
+Symbolic derivation (2+1D) & Complete & 15 equations in $\sim$5\,s \\
+Symbolic derivation (4D) & \textbf{Complete} & 34 equations in $\sim$15\,s (v0.17.0) \\
+Ostrogradsky reduction & Complete & 2+1D: 17 fields; 4D: 37 fields \\
+Canonical Hamiltonian & \textbf{Complete} & 2+1D: 147 terms; 4D: 291 terms \\
+Mass-matrix analysis (2+1D) & Complete & $M = [[1,1],[1,1]]$ for $\{t_3, t_7\}$: hidden constraint \\
+Simulation (2+1D, modal) & Complete & QZ eigenvalue; $\max|dE/E| = 0$ at $t=100$ \\
+Simulation (4D, modal) & \textbf{Pending} & Requires validation \\
+Parameter sweeps & Not tested & Requires EM field addition for Gertsenshtein comparison \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -300,28 +330,45 @@ The torsion implementation required three major pipeline extensions:
 
 \subsubsection{Field Structure}
 
-The 2+1D graviton-torsion system has 15 component fields:
+\paragraph{2+1D (3D spacetime, plane-wave along $x$).}
+15 component fields: 6 graviton $h_{\mu\nu}$ (symmetric) + 9 torsion $t_{\alpha\mu\nu}$ (antisymmetric in $\mu\nu$).
+After Ostrogradsky: 17 fields ($h_3, h_5 \to w_{h_3}, w_{h_5}$).  10 constraints, 5 dynamical, 2 mass-matrix constraints ($t_3 = t_7$).
 
-\begin{center}
-\begin{tabular}{@{}lll@{}}
-\toprule
-Tensor & Components & Fields \\
-\midrule
-Metric perturbation $h_{\mu\nu}$ (symmetric) & 6 & $h_0{=}h_{00},\ h_1{=}h_{01},\ h_2{=}h_{02},\ h_3{=}h_{11},\ h_4{=}h_{12},\ h_5{=}h_{22}$ \\
-Torsion perturbation $t_{\alpha\mu\nu}$ (antisym. in $\mu\nu$) & 9 & $t_0{=}t_{001},\ t_1{=}t_{002},\ \ldots,\ t_8{=}t_{212}$ \\
-\bottomrule
-\end{tabular}
-\end{center}
+\paragraph{4D (4D spacetime, plane-wave along $z$, no gauge).}
+34 component fields: 10 graviton $h_{\mu\nu}$ + 24 torsion $t_{\alpha\mu\nu}$.
+After Ostrogradsky: 37 fields ($h_4, h_7, h_9 \to w_{h_4}, w_{h_7}, w_{h_9}$).  25 constraints, 9 dynamical (6 graviton + 3 torsion), 3 Ostrogradsky auxiliaries.
 
-After Ostrogradsky reduction: $h_3, h_5$ (4th-order from $\tilde{R}^2$) $\to$ auxiliaries $w_{h_3}, w_{h_5}$, giving 17 fields total. 10 are constraints (time\_order=0), 5 are 2nd-order dynamical (after mass-matrix elimination), with 2 mass-matrix constraints ($t_3 = t_7$, $w_{h_3}/w_{h_5}$ relation).
+\paragraph{Why no TT gauge for the 4D theory.}
+The $\tilde{R}^2$ graviton-torsion mixing goes through the Ricci scalar, which involves the trace $h^a{}_a$.  TT gauge imposes tracelessness ($h^a{}_a = 0$), killing the mixing channel.  With TT gauge, all 24 torsion fields reduce to $t_i = 0$ (algebraic constraint).  The 4D theory therefore uses \emph{no gauge fixing}, preserving all 10 graviton components including the trace.  This is consistent: the mixing is gauge-\emph{independent} (physical observable), but TT gauge eliminates the trace DOF that mediates it---the remaining 2 TT polarisations have no direct $\tilde{R}^2$ coupling to torsion.
+
+Note that in the full nonlinear theory the trace mode is pure gauge; at linear order it appears as a dynamical field whose mixing with torsion is an artefact of the linearised approximation.  A gauge-invariant treatment (e.g.\ Bardeen variables) would isolate the physical mixing, but is beyond the current implementation.
+
+\subsubsection{4D Derivation Pipeline Fixes (v0.17.0)}
+
+The 4D theory required six pipeline fixes beyond the 2+1D architecture:
+
+\begin{enumerate}
+  \item \textbf{VarD-skip EOM guard}: CD shorthand rules were applied to undefined \texttt{eomH}/\texttt{eomT} variables when VarD was skipped (component E--L path).  Guarded with \texttt{ctx.lagrangian\_expr} check.
+
+  \item \textbf{Gauge-elimination fix}: With VarD skipped, \texttt{fieldEquations = \{\}}.  The gauge-elimination logic treated \emph{all} fields as gauge-eliminated ($\text{gaugeElim} = \text{Complement}(\text{allNames}, \{\})$), zeroing the entire Lagrangian.  Fixed by falling back to \texttt{Keys[compToFunc]} when equations are empty.
+
+  \item \textbf{CD shorthand canonical skip}: CD shorthand rules (\texttt{toCD1grH}, etc.) were applied to the canonical Lagrangian, converting \texttt{CD[-a]@field[...]} to \texttt{CD1field[idx, args]}.  But \texttt{CD1field} has no pre-computed ComponentValues, so \texttt{TraceBasisDummy} left them unresolved.  Fixed by skipping shorthand application; \texttt{DecomposeScalarExpression} handles raw CD operators directly via \texttt{ConvertCDToDerivatives}.
+
+  \item \textbf{IBP pattern matching}: \texttt{MatchQ} with \texttt{/;} conditional predicates (\texttt{AllTrue[\{rest\}, \# === 0 \&]}) caused Wolfram kernel heap corruption after $\sim$285 iterations on 321 terms.  Replaced with explicit \texttt{isPureTimeDerivGE2} function using \texttt{Part}-based checks (no pattern evaluation).
+
+  \item \textbf{O(1) field lookup}: \texttt{MemberQ[fieldFuncList, f]} (O($n$) linear scan, $n{=}34$) replaced with \texttt{Association}-based \texttt{isFieldFunc[f]} (O(1) hash lookup).
+
+  \item \textbf{Expand/Simplify guards}: \texttt{Expand[rhs]} and \texttt{Simplify[coeffSum]} in \texttt{ExportJSON.wl} exceed \$RecursionLimit on complex 4D expressions.  Guarded with \texttt{LeafCount < 500} / \texttt{LeafCount < 1000} thresholds.
+\end{enumerate}
 
 \subsubsection{Remaining Validation Tasks}
 
 \begin{itemize}
-  \item Conversion measurement between $h$ and $T$ components (no analytical formula exists; requires numerical sweep)
-  \item Dispersion relation $\omega(k)$ comparison with Nikiforova et al.\ (2009) stability analysis
-  \item Propagating mode count cross-check with PSALTer / Barker (2024) predictions
-  \item Background $B$ field parameter sweeps for graviton-torsion mixing (\#154)
+  \item 4D simulation with modal solver (pending; 2+1D verified)
+  \item Dispersion relation $\omega(k)$ comparison with Nikiforova et al.\ (2009) stability analysis (\#169)
+  \item Propagating mode count cross-check with PSALTer / Barker (2024) predictions (\#169)
+  \item Add EM field ($F^2$) to Lagrangian for graviton-photon-torsion triple mixing
+  \item Background $B$ field parameter sweeps for Gertsenshtein comparison (\#154)
 \end{itemize}
 
 \subsection{References}
