@@ -42,14 +42,15 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | Issue                                                      | Priority    | Type    | Status       |
 | ---------------------------------------------------------- | ----------- | ------- | ------------ |
 | [#TBD] Add Animation Module Test Coverage                  | 🟠 High     | Testing | 🔄 Remaining |
-| [#TBD] Add Code Coverage Reporting to CI                   | 🟠 High     | CI/CD   | ⚡ Partial   |
+| [#74] Add Code Coverage Reporting to CI                    | 🟠 High     | CI/CD   | ✅ Done      |
 | [#TBD] Add Wolfram Tests to GitHub Actions CI              | 🔴 Critical | CI/CD   | 🔄 Remaining |
 | [#TBD] Add Tests for Observers, Profiling, Runners Modules | 🟡 Medium   | Testing | 🔄 Remaining |
 
 **Delivered so far:**
 
 - Coverage runs in CI (`--cov=tidal --cov-report=term-missing --cov-report=xml`)
-- Coverage badge in README (links to CI workflow)
+- Coverage uploaded to Codecov via `codecov/codecov-action@v5` (PR #74)
+- Codecov badge in README (links to Codecov dashboard)
 - Root Makefile with `make test-coverage` target
 
 **Still needed:**
