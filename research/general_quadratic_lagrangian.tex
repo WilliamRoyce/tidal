@@ -604,6 +604,40 @@ reducing the parity-odd count: $13 + 4 + 3 = 20$ physical
 
 
 %% ------------------------------------------------------------------
+\subsection{Dimensional-Dependent Identities (DDIs)}
+\label{sec:ddis}
+
+In $D=4$ dimensions, antisymmetrization over $D{+}1 = 5$ or more
+indices of the metric vanishes identically. This generates
+\emph{additional} linear relations among tensor contractions that
+hold only in specific dimensions, beyond the tensor symmetries used
+by \texttt{AllContractions}. The \texttt{xTras} function
+\texttt{ConstructDDIs} identifies these.
+
+The core parity-even sectors ($\Rt^2$, $T^2$, $F^2$, $\Rt \times F$)
+have $\leq 8$ pre-contraction indices and are \textbf{not affected}
+by DDIs in 4D --- their counts (6, 3, 1, 1) are exact, as confirmed
+both by \texttt{ConstructDDIs} (returning 0 identities) and by the
+standard PGT literature~\cite{Barker:2024ydb,HayashiShirafuji}.
+
+The parity-odd sectors involving $\eps$ have $10$--$12$
+pre-contraction indices and \textbf{are subject to DDIs}:
+\texttt{ConstructDDIs} returns non-trivial identities for
+$\eps \cdot \Rt^2$, $\eps \cdot T^2$, $\eps \cdot \Rt \times F$,
+and all parity-odd derivative sectors. The raw DDI counts are large
+(often exceeding the contraction counts), indicating extensive
+linear dependencies among the DDIs themselves. The
+\emph{actual reduction} per sector requires computing the rank of
+the DDI system when expressed in the basis of
+\texttt{AllContractions} --- an open computation.
+
+Consequently, our parity-odd counts (\textbf{13, 4, 3} for the
+core; \textbf{6, 36, 38} for derivatives) are confirmed as
+\textbf{upper bounds} that may decrease once DDIs are fully resolved.
+The parity-even counts (\textbf{6, 3, 1, 1}) are \textbf{exact}.
+
+
+%% ------------------------------------------------------------------
 \subsection{Bianchi Identities}
 \label{sec:bianchi}
 
@@ -631,6 +665,37 @@ and $T \times \del F$). In the ghost-free theory, only the
 member built from safe building blocks survives (e.g.,
 $\del T \times F$ rather than $T \times \del F$).
 The classification identifies \textbf{10 IBP-redundant sectors}.
+
+
+%% ------------------------------------------------------------------
+\subsection{Projective Invariance (Optional)}
+\label{sec:projective}
+
+The connection $\Gamma^\lambda{}_{\mu\nu}$ has a projective freedom:
+$\Gamma^\lambda{}_{\mu\nu} \to \Gamma^\lambda{}_{\mu\nu}
++ \delta^\lambda_\mu\, \xi_\nu$ for arbitrary $\xi_\nu$. Under this,
+the torsion trace shifts:
+$T_\mu \to T_\mu + (D{-}1)\,\xi_\mu$, while the axial ($S_\mu$)
+and tensor ($q_{\alpha\beta\gamma}$) parts are invariant.
+
+If the action is required to be \textbf{projective-invariant}, then
+the torsion trace $T_\mu$ is pure gauge and must decouple. In the
+irreducible basis, this means the coefficient $c$ of $T_\mu T^\mu$
+must vanish:
+\begin{equation}
+  c = \beta_3 + \tfrac{1}{3}(2\beta_1 + \beta_2) = 0\,,
+  \label{eq:projective}
+\end{equation}
+reducing the torsion sector from 3 to \textbf{2 independent
+parameters} (tensor $a$ and axial $b$ only). Similarly, all
+derivative and cubic sectors involving the torsion trace would
+be constrained.
+
+Projective invariance is \emph{not} a universal requirement ---
+it is a symmetry choice. Many physically interesting theories
+(including Barker's vector torsion propagation via $\xi$) break
+projective invariance explicitly. We include it as an \emph{optional}
+constraint for theories where only tensor and axial torsion are desired.
 
 Shapiro~\cite{Shapiro:2001rz} shows that
 $A_\mu \to A_\mu + \eta_2 T_\mu$ absorbs one torsion--EM coupling
