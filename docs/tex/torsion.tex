@@ -85,20 +85,45 @@ expression = "((1/kappa^2) RicciScalarCDT[]
   + b5 RicciScalarCDT[]^2)"
 \end{lstlisting}
 
-\paragraph{R̃ decomposition.}
+\paragraph{$\tilde{R}$ decomposition.}
 \label{par:rtilde-decomposition}
-The pipeline automatically decomposes \texttt{RicciScalarCDT[]} $= \tilde{R}$ into the Levi-Civita Ricci scalar $R$ plus torsion contributions via the Shapiro identity (eq.~\ref{eq:riemann-cartan-identity}). This allows xPert to perturb $R$ using its built-in formulas while \texttt{TorsionCDT} is perturbed via \texttt{DefTensorPerturbation}.
+The pipeline automatically decomposes \texttt{RicciScalarCDT[]} $= \tilde{R}$ into the Levi-Civita Ricci scalar $R$ plus torsion contributions via the Shapiro identity (eq.~\ref{eq:riemann-cartan-identity}).  The two-step decomposition is:
+\begin{enumerate}
+  \item \texttt{ChangeCurvature[L, CDT, CD]}: xAct's built-in function decomposes torsionful Riemann into LC Riemann + contortion $\contorsion$ terms (exact, not approximate).
+  \item Contortion $\to$ torsion substitution: $\contorsion^a{}_{bc} = \tfrac{1}{2}(\torsion^a{}_{bc} + \torsion_b{}^a{}_c - \torsion_{bc}{}^a)$, applied via xAct pattern matching with proper dummy index handling.
+\end{enumerate}
+The result: only \texttt{RicciScalarCD[]}, \texttt{TorsionCDT[]}, and their derivatives remain --- all perturbable by xPert.
 
-The three $\torsion^2$ invariants correspond to the three irreducible pieces of torsion under $\mathrm{SO}(1,3)$:
-\begin{itemize}
-  \item $I_1 = \torsion_{abc}\,\torsion^{abc}$: tensor sector (\emph{tentor}, 16 components) --- couples to all three irreducible parts
-  \item $I_2 = \torsion_{abc}\,\torsion^{bac}$: mixed contraction ($a \leftrightarrow b$ swap) --- couples tensor and trace sectors
-  \item $I_3 = \torsion^a{}_{ab}\,\torsion^{cb}{}_{c}$: trace sector (\emph{trator}, 4 components) --- torsion trace vector squared
-\end{itemize}
+\paragraph{Torsion invariant basis.}
+\label{par:torsion-invariant-basis}
+The three independent $\torsion^2$ invariants are written in the \emph{direct basis}:
+\begin{align}
+  I_1 &= \torsion_{abc}\,\torsion^{abc}  &\text{(full contraction)} \label{eq:I1} \\
+  I_2 &= \torsion_{abc}\,\torsion^{bac}  &\text{($a \leftrightarrow b$ swap in second $\torsion$)} \label{eq:I2} \\
+  I_3 &= \torsion^a{}_{ab}\,\torsion^{cb}{}_{c} = T_b T^b  &\text{(trace vector squared)} \label{eq:I3}
+\end{align}
+where $T_\mu \equiv \torsion^\lambda{}_{\lambda\mu}$ is the torsion trace vector (4 components in 4D).
 
-The coupling constants $\alpha_1$, $\alpha_2$, $\alpha_3$ independently control mass terms for each irreducible sector, while $b_5$ provides kinetic $(\nabla \torsion)^2$ terms via $\tilde{R}^2$ that enable torsion propagation and graviton-torsion cross-coupling. No pipeline code changes were required to add $I_2$ and $I_3$ (v0.18.0) --- all three contractions use existing \texttt{TorsionCDT} and $\eta$ tensors that xAct handles natively, demonstrating the generality of the TIDAL pipeline.
+This basis is related to the \emph{irreducible basis} $\{q^2, T^2, S^2\}$ (where $q_{\alpha\beta\gamma}$ is the traceless tensor part and $S^\mu = \varepsilon^{\alpha\beta\gamma\mu} \torsion_{\alpha\beta\gamma}$ is the axial vector) by an invertible linear transformation (Shapiro~\cite{shapiro2002torsion}, \S2.3):
+\begin{equation}
+  \begin{pmatrix} I_1 \\ I_2 \\ I_3 \end{pmatrix}
+  = \begin{pmatrix}
+    1 & \tfrac{2}{3} & \tfrac{1}{12} \\
+    -1 & \tfrac{2}{3} & -\tfrac{1}{12} \\
+    0 & 1 & 0
+  \end{pmatrix}
+  \begin{pmatrix} q^2 \\ T^2 \\ S^2 \end{pmatrix}.
+  \label{eq:basis-transform}
+\end{equation}
+Both bases are complete --- any parity-even quadratic torsion invariant is a linear combination of three independent contractions.  The direct basis is used in the TOML because each $I_i$ is a single index contraction of \texttt{TorsionCDT} with $\eta$ metrics, directly expressible in xAct.
 
-Setting $\alpha_2 = \alpha_3 = 0$ recovers the single-invariant baseline, verified to produce identical results (37 components, $\max|dE/E| = 0$). With $\alpha_2 = 0.3$, $\alpha_3 = 0.2$: machine-precision energy conservation confirmed.
+\paragraph{$\tilde{R}^2$ and graviton-torsion mixing.}
+The curvature-squared term $b_5 \tilde{R}^2$ is essential for graviton-torsion mixing and torsion propagation.  Since $\tilde{R} = R + \text{(torsion terms)}$, the square $\tilde{R}^2 = R^2 + 2R \cdot \text{(torsion)} + \text{(torsion)}^2$ produces cross-terms $R \cdot \torsion$ that couple graviton and torsion perturbations.  This is verified empirically: with $\alpha_1 = \alpha_2 = \alpha_3 = 0$ and $b_5 \neq 0$, the derived equations contain 117 graviton-torsion cross-coupling terms (out of 339 total Hamiltonian terms), all proportional to $b_5$.
+
+Note: the full PGT curvature-squared sector has 6 independent invariants ($\tilde{R}_{abcd}\tilde{R}^{abcd}$, $\tilde{R}_{acbd}\tilde{R}^{abcd}$, ..., $\tilde{R}^2$).  We implement only $c_6 = b_5 \tilde{R}^2$ (the scalar-scalar contraction), which is the simplest invariant that enables propagating torsion.  The remaining five would add additional propagating modes and are tracked for future implementation.
+
+\paragraph{Coupling constants.}
+$\alpha_1$, $\alpha_2$, $\alpha_3$ independently control torsion mass terms for each irreducible sector, while $b_5$ provides kinetic $(\nabla \torsion)^2$ terms via $\tilde{R}^2$ that enable torsion propagation.  Setting $\alpha_2 = \alpha_3 = 0$ recovers the single-invariant baseline, verified to produce identical results (37 components, $\max|dE/E| = 0$).  With $\alpha_2 = 0.3$, $\alpha_3 = 0.2$: machine-precision energy conservation confirmed.
 
 \subsubsection{Linearization}
 \label{sec:torsion-linearization}
