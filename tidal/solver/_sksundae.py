@@ -12,10 +12,22 @@ overhead on the solver's internal computation.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+# sksundae >= 1.1.2 emits a UserWarning when both ``sparsity`` and ``jacfn``
+# are provided: "Sparse Jacobian approximation will be ignored in favor of
+# 'jacfn'".  This is expected — we *want* the analytical jacfn to take
+# precedence over FD.  Suppress globally for this module.
+warnings.filterwarnings(
+    "ignore",
+    message="Sparse Jacobian approximation will be ignored",
+    category=UserWarning,
+    module=r"sksundae\.",
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable

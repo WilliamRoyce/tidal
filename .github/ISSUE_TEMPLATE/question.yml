@@ -24,9 +24,11 @@ body:
       options:
         - Getting Started
         - Lagrangian Derivation (Wolfram/xAct)
-        - PDE Simulation (py-pde)
+        - PDE Simulation (SUNDIALS + numpy)
         - JSON Schema / Format
         - Example Usage
+        - Parameter Sweeps & Measurements
+        - Solver Selection & Performance
         - Dev Container Setup
         - Other
     validations:

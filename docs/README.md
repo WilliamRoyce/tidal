@@ -1,130 +1,98 @@
 # Documentation Directory
 
-This directory contains living documentation that captures the project's evolution, design decisions, and hard-won lessons.
+This directory contains living documentation in LaTeX format (`docs/tex/`) for easy inclusion in the project's Overleaf report, plus project management files in Markdown.
 
-## 📚 Documentation Files
+## LaTeX Documentation (`docs/tex/`)
 
-### [MEMORY.md](MEMORY.md)
+All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file is self-contained (no `\documentclass`), starts with `\section{Title}\label{sec:slug}`, and uses macros from `preamble.tex`. These `.tex` files are the primary documentation — update them directly. To compile any fragment standalone:
 
-**The main reference guide** - Start here for architecture, patterns, and critical decisions.
-
-**Contents:**
-
-- Critical architecture decisions (multi-field coupling, dimension handling)
-- xAct/Wolfram patterns and best practices
-- Pipeline module integration patterns
-- Known issues and solutions
-- Example implementations and their key features
-- Quick reference (file locations, key functions)
-
-**Use when:** Planning new features, debugging architectural issues, onboarding to the codebase
-
----
-
-### [troubleshooting.md](troubleshooting.md)
-
-**Error encyclopedia** - Look here when something breaks.
-
-**Contents:**
-
-- Common Wolfram/xAct errors and fixes
-- Python solver issues (operators, grids, state)
-- Debugging techniques for both sides
-- Verification checklists after changes
-
-**Use when:** Debugging errors, after hitting a new issue (add it!), before making risky changes
-
----
-
-### [chern-simons-notes.md](chern-simons-notes.md)
-
-**Example-specific deep dive** - Reference for complex implementation patterns.
-
-**Contents:**
-
-- Physics background for Chern-Simons theory
-- Implementation status (symbolic vs manual approaches)
-- Wolfram hybrid approach details
-- JSON structure for topological terms
-- Python simulation specifics
-- Future automation roadmap
-
-**Use as template for:** New complex examples, topological theories, gauge theories, any case requiring hybrid symbolic+manual approaches
-
----
-
-## 🔄 Maintenance Philosophy
-
-These documents are **living references** that must evolve with the codebase:
-
-1. **Update immediately** when solving non-trivial bugs
-2. **Add patterns** after implementing new features
-3. **Refine sections** when better approaches are discovered
-4. **Create new example notes** for complex implementations
-5. **Prune obsolete info** when code changes eliminate old issues
-
-## 🎯 Document Relationships
-
-```
-MEMORY.md (Architecture & Patterns)
-    ↓
-    ├─→ troubleshooting.md (Error Solutions)
-    └─→ chern-simons-notes.md (Example Details)
-         └─→ [future: yang-mills-notes.md, etc.]
+```latex
+\documentclass[11pt,a4paper]{article}
+\input{preamble}
+\begin{document}
+\input{fragment_name}
+\bibliographystyle{unsrt}
+\bibliography{references}
+\end{document}
 ```
 
-- **MEMORY.md** provides the "what and why" (design decisions, patterns)
-- **troubleshooting.md** provides the "when it breaks" (error resolution)
-- **Example notes** provide the "how for this case" (implementation specifics)
+### Infrastructure
 
-## 📝 Creating New Documentation
+| File | Purpose |
+| ---- | ------- |
+| `preamble.tex` | Shared packages and macros (amsmath, physics, tensor, listings, booktabs, siunitx) |
+| `references.bib` | BibTeX database (Gertsenshtein, torsion, numerical methods, xAct) |
 
-### When to create a new example-notes file:
+### Physics
 
-Create `docs/{example-name}-notes.md` when:
+| File | Location | Content |
+| ---- | -------- | ------- |
+| `gertsenshtein.tex` | `docs/tex/gertsenshtein.tex` | Gertsenshtein effect: physics background, validation targets |
+| `gertsenshtein_formula.tex` | `docs/tex/gertsenshtein_formula.tex` | Conversion formula derivation, literature comparison |
+| `gertsenshtein_localized.tex` | `docs/tex/gertsenshtein_localized.tex` | Boccaletti formula, localized B-field scattering |
+| `critical_field.tex` | `docs/tex/critical_field.tex` | Critical field analysis, amplification factor |
+| `torsion.tex` | `docs/tex/torsion.tex` | Poincare gauge theory, torsion implementation |
+| `chern_simons.tex` | `docs/tex/chern_simons.tex` | Chern-Simons 2+1D implementation |
 
-- The example requires hybrid symbolic/manual approaches
-- Special tensor structures need careful handling (epsilon, field strength, etc.)
-- The implementation has interesting physics or mathematical subtleties
-- You want to document a roadmap for future automation
+### Architecture
 
-Use `chern-simons-notes.md` as a template.
+| File | Location | Content |
+| ---- | -------- | ------- |
+| `architecture.tex` | `docs/tex/architecture.tex` | Pipeline overview, module roles, component E-L, Ostrogradsky |
+| `json_schema.tex` | `docs/tex/json_schema.tex` | Complete JSON specification reference |
+| `solver_migration.tex` | `docs/tex/solver_migration.tex` | py-pde to SUNDIALS migration |
+| `modal_solver.tex` | `docs/tex/modal_solver.tex` | Fourier modal solver |
+| `solver_optimizations.tex` | `docs/tex/solver_optimizations.tex` | FD stencils, Yoshida, spectral, component E-L |
+| `adaptive_timestepping.tex` | `docs/tex/adaptive_timestepping.tex` | Tolerance-controlled solvers |
+| `kinetic_matrix.tex` | `docs/tex/kinetic_matrix.tex` | Non-diagonal kinetic matrix handling |
 
-### What belongs where:
+### Features
 
-| Content Type          | Destination                                 |
-| --------------------- | ------------------------------------------- |
-| Architecture decision | MEMORY.md → Critical Architecture Decisions |
-| General xAct pattern  | MEMORY.md → xAct/Wolfram Patterns           |
-| Error you solved      | troubleshooting.md → Appropriate section    |
-| Example physics       | {example}-notes.md → Physics Background     |
-| Example-specific code | {example}-notes.md → Implementation Pattern |
-| New file location     | MEMORY.md → Quick Reference                 |
-| New function purpose  | MEMORY.md → Quick Reference                 |
+| File | Location | Content |
+| ---- | -------- | ------- |
+| `background_fields.tex` | `docs/tex/background_fields.tex` | Position-dependent coefficients |
+| `constraint_fields.tex` | `docs/tex/constraint_fields.tex` | Mixed time-derivative orders, DAE handling |
+| `gauge_fixing.tex` | `docs/tex/gauge_fixing.tex` | Per-field gauge presets |
+| `multi_field_perturbation.tex` | `docs/tex/multi_field_perturbation.tex` | Multi-field linearization (xPert) |
+
+### Operational & User-Facing
+
+| File | Location | Content |
+| ---- | -------- | ------- |
+| `troubleshooting.tex` | `docs/tex/troubleshooting.tex` | Error encyclopedia |
+| `cli_reference.tex` | `docs/tex/cli_reference.tex` | CLI subcommand reference |
+| `pipeline.tex` | `docs/tex/pipeline.tex` | Two-stage data flow |
+| `examples.tex` | `docs/tex/examples.tex` | Working examples catalog |
+| `derivation_performance.tex` | `docs/tex/derivation_performance.tex` | Wolfram bottleneck analysis, component E-L timings |
+| `adr_disk_storage.tex` | `docs/tex/adr_disk_storage.tex` | ADR: mmap NumPy storage |
+| `volume_element_fix.tex` | `docs/tex/volume_element_fix.tex` | sqrt|g| volume element fix |
+
+## TikZ Figures (`docs/figures/`)
+
+18 standalone TikZ diagrams (pipeline, solvers, constraints, etc.) with shared styles in `tidal-tikz-styles.sty`. Each compiles independently with `\documentclass[border=10pt]{standalone}`.
+
+## Project Management (Markdown)
+
+| File | Purpose |
+| ---- | ------- |
+| `ROADMAP.md` | Feature roadmap |
+| `NEXT_PHASES.md` | Implementation phases A-I |
+| `COMMUNITY.md` | Support channels |
+| `references.md` | Curated bibliography (browsable) |
+| `next-features.md` | Sweep framework features |
+| `torsion_implementation_checklist.md` | PGT implementation tracking |
+
+## Sphinx API Docs (`docs/source/`)
+
+Auto-generated API documentation via Sphinx (`.rst` files). Build with `make html` from `docs/`.
+
+## Maintenance
+
+- **Update immediately** when solving non-trivial bugs
+- **Add patterns** after implementing new features
+- New `.tex` files: follow `gertsenshtein_formula.tex` as template
+- New example-specific docs: use `chern_simons.tex` as template
 
 ---
 
-## 🚀 Quick Start
-
-**New to the project?** Read in this order:
-
-1. Project README.md (root)
-2. MEMORY.md (architecture overview)
-3. Run an example: `examples/scalar_field/` or `examples/coupled_scalars/`
-4. Skim troubleshooting.md to know what to watch for
-
-**Implementing something new?**
-
-1. Check MEMORY.md for existing patterns
-2. Look at similar examples (scalar → coupled scalars → electromagnetic → chern-simons)
-3. Add your findings back to these docs when done
-
-**Hit an error?**
-
-1. Search troubleshooting.md for symptoms
-2. If not found, debug and **add your solution** to troubleshooting.md
-3. If it reveals an architectural insight, update MEMORY.md too
-
----
-
-Last updated: 2026-02-09 (Documentation comprehensive review and update)
+Last updated: 2026-03-23

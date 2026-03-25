@@ -305,78 +305,27 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
      the yy-component equation has d²_t(h_xx). Detect this and reassign so each
      field gets the equation that actually evolves it.
 
-     Uses coefficient-sum detection: d²_t COEFFICIENTS are summed per field.
-     If the sum is zero, the d²_t terms are phantom (cancel under simplification)
-     and the field is not truly evolved by that equation. *)
-  Module[{evolvedFieldIndex, assignmentMap, needsSwap = False, newEqs},
-    evolvedFieldIndex = Table[
-      Module[{result = 0, terms, d2tTerms, coeffSum, coeffList},
-        terms = If[Head[workingEqs[[i, 2]]] === Plus,
-                   List @@ workingEqs[[i, 2]],
-                   {workingEqs[[i, 2]]}];
-        (* Check own field (j=i) first: if equation i already evolves its own
-           field i, no reassignment is needed even if d²_t of other fields also
-           appears (e.g. h_{φφ} → -(g1·h_{rr} + g2·h_{θθ}) traceless sub injects
-           d²_t(h_rr) into h_{θθ}'s equation, but h_{θθ}'s equation also contains
-           d²_t(h_{θθ}) and must stay with h_{θθ}).  Scanning j = {i, 1..nFields∖i}
-           ensures the own-field test happens before any cross-field candidate. *)
-        Do[
-          d2tTerms = Select[terms,
-            ContainsOwnTimeDerivative[#, allFieldNames[[j]], 2] &];
-          If[Length[d2tTerms] > 0,
-            coeffList = ExtractLHSCoefficient /@ d2tTerms;
-            coeffSum = Simplify[Total[coeffList]];
-            Module[{isPhantom},
-              isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
-              If[!isPhantom,
-                Module[{syms, numVal},
-                  syms = DeleteDuplicates[Cases[coeffSum, _Symbol, {0, Infinity}]];
-                  numVal = Quiet[N[coeffSum /. Thread[syms -> Table[Prime[k]*E/7, {k, Length[syms]}]]]];
-                  If[NumericQ[numVal] && Abs[numVal] < 1e-10, isPhantom = True]
-                ]
-              ];
-              If[!isPhantom,
-                result = j; Break[]
-              ]
-            ]
-          ],
-          {j, Join[{i}, DeleteCases[Range[nFields], i]]}];
-        result],
-      {i, nFields}];
+     Component E-L guarantees correct field→equation assignment by
+     construction (∂L/∂q_i → EOM_i), so no swap logic is needed. *)
 
-    (* Build reverse map: field_j -> equation_i that evolves it *)
-    assignmentMap = Table[j, {j, nFields}];  (* identity by default *)
-    Do[
-      If[evolvedFieldIndex[[i]] > 0 && evolvedFieldIndex[[i]] != i,
-        If[assignmentMap[[evolvedFieldIndex[[i]]]] != evolvedFieldIndex[[i]],
-          Print["WARNING: Multiple equations claim to evolve field " <>
-                allFieldNames[[evolvedFieldIndex[[i]]]] <>
-                ". Keeping first assignment."],
-          assignmentMap[[evolvedFieldIndex[[i]]]] = i;
-          needsSwap = True
-        ]],
-      {i, nFields}];
-
-    If[needsSwap,
-      newEqs = Table[
-        {allFieldNames[[j]], workingEqs[[assignmentMap[[j]], 2]]},
-        {j, nFields}];
-      Do[
-        If[assignmentMap[[j]] != j,
-          Print["  SWAP: Field " <> allFieldNames[[j]] <> " gets equation from " <>
-                allFieldNames[[assignmentMap[[j]]]] <>
-                " (contains d2_t(" <> allFieldNames[[j]] <> "))"]],
-        {j, nFields}];
-      workingEqs = newEqs]
-  ];
-
-  (* Build fields list *)
+  (* Build fields list — enrich with tensor metadata when available *)
   fields = Table[
-    <|
-      "name" -> workingEqs[[i, 1]],
-      "index" -> i - 1,
-      "is_dynamical" -> True
-    |>,
+    Module[{entry, fname, tensorMeta},
+      fname = workingEqs[[i, 1]];
+      entry = <|
+        "name" -> fname,
+        "index" -> i - 1,
+        "is_dynamical" -> True
+      |>;
+      (* Inject tensor component metadata if supplied by derive pipeline *)
+      tensorMeta = Lookup[Lookup[metadata, "component_metadata", <||>], fname, Null];
+      If[tensorMeta =!= Null,
+        entry["tensor_head"] = tensorMeta["head"];
+        entry["tensor_rank"] = tensorMeta["rank"];
+        entry["tensor_indices"] = tensorMeta["indices"];
+      ];
+      entry
+    ],
     {i, nFields}
   ];
 
@@ -384,6 +333,8 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
   (* Pass allFieldNames so cross-field references can be detected *)
   equations = {};
   Do[
+    Print["  JSON eq ", i, "/", nFields, ": ", workingEqs[[i, 1]],
+      " (LeafCount=", LeafCount[workingEqs[[i, 2]]], ")"];
     AppendTo[equations,
       EquationToJSONMultiField[
         workingEqs[[i, 2]],
@@ -480,7 +431,7 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   If[lhsTimeOrder > 0 && Length[timeDerivTerm] > 0,
     Module[{coeffSum, coeffList, isPhantom},
       coeffList = ExtractLHSCoefficient /@ timeDerivTerm;
-      coeffSum = Simplify[Total[coeffList]];
+      coeffSum = If[LeafCount[Total[coeffList]] < 500, Simplify[Total[coeffList]], Total[coeffList]];
       isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
       If[!isPhantom,
         Module[{syms, numVal},
@@ -516,8 +467,14 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
        separate linear terms into a single Times with multiple field heads.
        Without Expand, ParseMultiFieldRHS misidentifies these as bilinear
        (field-dependent) coefficients. This is critical for any multi-component
-       system where the LHS coefficient is ±1 (standard wave equations). *)
-    rhs = Expand[rhs]
+       system where the LHS coefficient is ±1 (standard wave equations).
+       NOTE: Skip Expand for large expressions (LeafCount > 1000) — R̃²
+       4th-order products in 4D exceed $RecursionLimit and crash the kernel
+       via TerminatedEvaluation (uncatchable). For such expressions the
+       component E-L already Expand'd each EOM term, so Plus structure holds. *)
+    If[LeafCount[rhs] < 1000,
+      rhs = Expand[rhs]
+    ]
   ];
 
   (* Parse RHS with cross-field detection *)
@@ -620,8 +577,13 @@ DetectLHSTimeOrder[equation_, fieldName_String] := Module[
   (* For each term, get time derivative order ONLY if it applies to the current field *)
   fieldTermOrders = Map[
     Function[term, Module[{derivs},
+      (* Only match PURE time derivatives (all spatial orders = 0).         *)
+      (* Mixed time-space like Derivative[2,2,0] must stay on RHS —        *)
+      (* they represent ∂²_t ∂²_x terms from R̃², not pure ∂²_t.         *)
       derivs = Cases[term,
-        Derivative[n_, ___][f_][___] /; FunctionMatchesField[ToString[f], fieldName] :> n,
+        Derivative[n_, rest___][f_][___] /;
+          n > 0 && AllTrue[{rest}, # === 0 &] &&
+          FunctionMatchesField[ToString[f], fieldName] :> n,
         {0, Infinity}];
       If[Length[derivs] == 0, 0, Max[derivs]]
     ]],
@@ -659,8 +621,13 @@ ContainsTimeDerivative[term_, minOrder_:2] := Module[{profile},
 (* Example: ContainsOwnTimeDerivative[-Derivative[2,0,0,0][gwH0][t,x,y,z], "h_0", 2] -> True *)
 ContainsOwnTimeDerivative[term_, fieldName_String, minOrder_Integer] := Module[
   {matchingDerivs},
+  (* Only match PURE time derivatives (all spatial orders = 0).           *)
+  (* Mixed time-space like Derivative[2,2,0] are spatial operators, not   *)
+  (* LHS time derivatives. They stay on RHS for ParseMultiFieldRHS.      *)
   matchingDerivs = Cases[term,
-    Derivative[n_, ___][f_][___] /; n >= minOrder && FunctionMatchesField[ToString[f], fieldName],
+    Derivative[n_, rest___][f_][___] /;
+      n >= minOrder && AllTrue[{rest}, # === 0 &] &&
+      FunctionMatchesField[ToString[f], fieldName],
     {0, Infinity}];
   Length[matchingDerivs] > 0
 ];
@@ -679,7 +646,9 @@ ExtractLHSCoefficient[term_] := Module[{derivParts, derivPart},
   ];
   derivPart = derivParts[[1]];
   If[term === derivPart, Return[1]];
-  Simplify[term / derivPart]
+  Module[{ratio = term / derivPart},
+    If[LeafCount[ratio] < 500, Simplify[ratio], ratio]
+  ]
 ];
 
 (* Check for mixed time-space derivatives that shouldn't be on RHS *)
@@ -687,7 +656,10 @@ ExtractLHSCoefficient[term_] := Module[{derivParts, derivPart},
 (* Dimension-agnostic: delegates to ExtractDerivativeProfile *)
 IsMixedTimeSpaceDerivative[term_] := Module[{profile},
   profile = ExtractDerivativeProfile[term];
-  Length[profile] >= 2 && First[profile] > 0 && Max[Rest[profile]] > 0
+  (* Only first-order time + spatial qualifies as mixed (d_t f = v_f).    *)
+  (* Higher-order time (d²_t d_x, d²_t d²_x) are genuine higher-order   *)
+  (* mixed operators from R̃² Lagrangians, not velocity conversions.     *)
+  Length[profile] >= 2 && First[profile] === 1 && Max[Rest[profile]] > 0
 ];
 
 (* Identify gradient direction from derivative structure *)
@@ -949,7 +921,7 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     (* Replace field[args] with 1 *)
     f_Symbol[__] /; ToString[f] === fieldHead :> 1
   };
-  If[!NumericQ[rawCoeff], rawCoeff = Simplify[rawCoeff]];
+  If[!NumericQ[rawCoeff] && LeafCount[rawCoeff] < 500, rawCoeff = Simplify[rawCoeff]];
 
   (* Check for coordinate dependence in coefficient *)
   coordDeps = IsCoordinateDependentCoefficient[rawCoeff];
@@ -997,7 +969,11 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
 (* Delegates to ExtractDerivativeProfile to avoid duplicating extraction logic *)
 CountDerivativeOrder[term_] := Module[{profile},
   profile = ExtractDerivativeProfile[term];
-  If[Length[profile] == 0, 0, Total[profile]]
+  (* Count SPATIAL derivative order only (exclude time slot = first).     *)
+  (* Mixed time-space terms (time ≥ 2) are handled by BuildMixed-       *)
+  (* OperatorName BEFORE this function is called. The terms reaching     *)
+  (* here have time order 0 (pure spatial) or 1 (handled by IsMixed).   *)
+  If[Length[profile] <= 1, 0, Total[Rest[profile]]]
 ];
 
 (* === Generic Derivative Order Support === *)
@@ -1108,6 +1084,33 @@ ClassifySpatialProfile[spatialOrders_List] := Module[
   ]
 ];
 
+(* Build operator name for mixed time-space derivatives.                 *)
+(* Encodes the full profile: {2,2,0} → "mixed_T_S2_S0" (T=time²,      *)
+(* S2=spatial order 2 in x, S0=spatial order 0 in y).                    *)
+(* The solver's RHSEvaluator resolves "mixed_T_S..." operator names by  *)
+(* applying the indicated spatial derivatives to the field and its       *)
+(* time derivatives. For now, these terms contribute to the JSON but    *)
+(* may need solver-side support for proper time integration.            *)
+BuildMixedOperatorName[fullProfile_List] := Module[
+  {timeOrder, spatialOrders, axisNames = {"x", "y", "z", "w"},
+   parts},
+  timeOrder = First[fullProfile];
+  spatialOrders = Rest[fullProfile];
+  parts = {"mixed_T" <> If[timeOrder > 1, ToString[timeOrder], ""]};
+  Do[
+    If[i <= Length[spatialOrders] && spatialOrders[[i]] > 0,
+      AppendTo[parts, "S" <> ToString[spatialOrders[[i]]] <>
+        If[i <= Length[axisNames], axisNames[[i]], "d" <> ToString[i]]]
+    ],
+    {i, Length[spatialOrders]}
+  ];
+  (* Pure time derivative on RHS (cross-field d²_t): name "d2_t" etc. *)
+  If[Total[spatialOrders] === 0,
+    "d" <> ToString[timeOrder] <> "_t",
+    StringJoin[Riffle[parts, "_"]]
+  ]
+];
+
 (* Classify operator type based on derivative structure *)
 (* Returns {operatorName, shouldConvertToMomentum} *)
 ClassifyOperatorType[term_] := Module[
@@ -1125,10 +1128,19 @@ ClassifyOperatorType[term_] := Module[
     Return[{"first_derivative_t", False}]
   ];
 
-  (* Check for mixed time-space derivatives *)
-  (* Mixed derivatives like d_t d_x A become gradient_x(pi) since d_t A = pi *)
+  (* Check for mixed time-space derivatives (first-order time only).      *)
+  (* d_t d_x A becomes gradient_x(pi) since d_t A = pi (velocity form). *)
   If[IsMixedTimeSpaceDerivative[term],
     Return[{ExtractSpatialOperatorFromMixed[term], True}]
+  ];
+
+  (* Higher-order time derivatives on the RHS (cross-field or mixed).    *)
+  (* These arise from R̃² Lagrangians: d²_t d²_x h, d²_t h (cross-field).*)
+  (* Build a generic operator name encoding the full derivative profile. *)
+  Module[{fullProfile = ExtractDerivativeProfile[term]},
+    If[Length[fullProfile] >= 1 && First[fullProfile] >= 2,
+      Return[{BuildMixedOperatorName[fullProfile], False}]
+    ]
   ];
 
   (* Check derivative order for pure spatial derivatives *)
@@ -1174,6 +1186,12 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
   {functionHeads, matchResult, targetField, foundFieldHead,
    coeffResult, coefficient, symbolicCoeff, isTimeDependent, coordDeps,
    operatorResult, operator, isMixedTimeSpace},
+
+  (* Skip zero terms — they arise from plane-wave reduction or vanishing *)
+  (* components. Without this check, ClassifyOperatorType[0] returns     *)
+  (* {"identity", False} and ExtractTermCoefficient returns 1.0,         *)
+  (* producing the trivial equation field = 1.0 * identity(field).       *)
+  If[term === 0 || term === 0., Return[Nothing]];
 
   (* Step 1: Extract function heads from term *)
   functionHeads = ExtractFunctionHeads[term];
@@ -1455,8 +1473,12 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
   (* Ensure expression is fully expanded before splitting into Plus terms.
      The Legendre transform H = Sum pi*vel - L should produce an expanded
      expression, but defensive Expand prevents silent failures from
-     auto-factoring (same rationale as the Expand in EquationToJSONMultiField). *)
-  componentExpr = Expand[componentExpr];
+     auto-factoring (same rationale as the Expand in EquationToJSONMultiField).
+     NOTE: Skip Expand for large expressions — R̃² products exceed
+     $RecursionLimit and crash via TerminatedEvaluation (uncatchable). *)
+  If[LeafCount[componentExpr] < 1000,
+    componentExpr = Expand[componentExpr]
+  ];
 
   (* Split into additive terms *)
   terms = If[Head[componentExpr] === Plus, List @@ componentExpr, {componentExpr}];

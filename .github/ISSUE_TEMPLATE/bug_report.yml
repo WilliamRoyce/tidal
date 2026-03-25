@@ -68,7 +68,7 @@ body:
     attributes:
       label: Wolfram Engine Version
       description: If relevant, what version of Wolfram Engine?
-      placeholder: "14.0.0"
+      placeholder: "14.3"
 
   - type: dropdown
     id: os

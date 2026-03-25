@@ -18,18 +18,31 @@ description: Run tidal derive with safety checks. Blocks parallel wolframscript.
    - Verify the TOML file exists
 
 ### Run derivation
+Run in background so you can continue other work while it executes:
 ```bash
 uv run tidal derive $ARGUMENTS
 ```
+Set `run_in_background: true` and `timeout: 600000` on the Bash tool call. The default 10-minute timeout (`--timeout 600`) applies automatically. You will be notified when the derivation completes — do NOT poll or sleep. Continue with other tasks the user has requested while waiting.
+
+If derivation times out: **do NOT increase the timeout or change the physics.** Instead, investigate how to optimize the Wolfram pipeline code itself — identify which stage is the bottleneck (decomposition, basis transformation, canonical pipeline) and optimize the algorithm, caching, or code path.
 
 ### Post-flight
 1. Verify JSON output was created in `examples/data/`
-2. Run a quick smoke simulation to confirm the JSON is valid:
+2. **Validate JSON structure** — check operators, field references, parameters, and stability:
+```bash
+uv run tidal validate <json_path> --stability
+```
+3. **Check canonical.hamiltonian_terms exists** — this is CRITICAL. Without hamiltonian_terms, ALL energy conservation measurements and energy-based analyses silently fail. Check with:
+```bash
+python3 -c "import json; d=json.load(open('<json_path>')); h=d.get('canonical',{}).get('hamiltonian_terms',[]); print(f'{len(h)} hamiltonian terms'); assert len(h)>0, 'MISSING hamiltonian_terms — canonical pipeline failed or was skipped!'"
+```
+If missing, the derivation's canonical pipeline likely failed — do NOT proceed to simulation.
+4. Run a quick smoke simulation to confirm the JSON runs:
 ```bash
 uv run tidal simulate <json_path> --grid-shape 64 --bounds 0:10 --periodic \
   --ic gaussian --t-end 1.0 --output /tmp/tidal_derive_smoke
 ```
-3. Report: derivation time, JSON file path, number of fields found, solver auto-selected
+5. Report: derivation time, JSON file path, number of fields, hamiltonian terms count, solver auto-selected
 
 ### Multiple TOMLs
-If the user asks to derive multiple examples, run them SEQUENTIALLY in a loop. Never use parallel execution or background processes for wolframscript.
+If the user asks to derive multiple examples, run them SEQUENTIALLY (one at a time). The wolfram-guard hook enforces this — only ONE wolframscript session can run at a time (single license). Each derivation can run in background, but wait for it to complete before starting the next.

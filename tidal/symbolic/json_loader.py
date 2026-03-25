@@ -79,17 +79,22 @@ def is_known_operator(name: str) -> bool:
     user-registered custom operators (via ``register_operator``),
     dynamic patterns for generic Nth-order derivatives
     (derivative_3_x, derivative_5_y, derivative_2x_1y, ...),
-    and mixed time-space derivative operators (mixed_T_S1_S2_...).
+    mixed time-space derivative operators (mixed_T2_S2x, mixed_T_S1x, ...),
+    and pure higher-order time operators on RHS (d2_t, d3_t, d4_t).
     """
     if name in _STATIC_OPERATORS or name in _CUSTOM_OPERATORS:
         return True
     if _GENERIC_SINGLE_AXIS_RE.match(name) or _GENERIC_MULTI_AXIS_RE.match(name):
         return True
-    # Mixed time-space operators: mixed_T_S1_S2_... (all parts are digits)
-    if name.startswith("mixed_"):
-        parts = name.split("_")[1:]
-        return len(parts) >= 2 and all(p.isdigit() for p in parts)  # noqa: PLR2004
-    return False
+    # Mixed time-space operators:
+    #   Wolfram format: mixed_T[n]_S[n][axis]_... (e.g., mixed_T2_S2x)
+    #   Numeric format: mixed_[time]_[s1]_[s2]_... (e.g., mixed_1_0_0_1)
+    if name.startswith("mixed_T"):
+        return True
+    if re.match(r"^mixed_\d+(_\d+)+$", name):
+        return True
+    # Pure time derivative operators on RHS: d2_t, d3_t, d4_t
+    return bool(re.match(r"^d\d+_t$", name))
 
 
 # --- LHS structure ---
@@ -610,20 +615,7 @@ class CanonicalStructure:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
-        """Parse from JSON ``canonical`` section.
-
-        Raises
-        ------
-        ValueError
-            If the JSON contains ``field_rates`` (old Hamilton form).
-            Re-derive with ``tidal derive`` to get E-L velocity form.
-        """
-        if "field_rates" in data:
-            msg = (
-                "JSON contains 'field_rates' (old Hamilton form). "
-                "Re-derive with 'tidal derive' to get E-L velocity form."
-            )
-            raise ValueError(msg)
+        """Parse from JSON ``canonical`` section."""
         h_terms = tuple(HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"])
         vol_elem = data.get("volume_element")  # None for flat spacetimes
         return cls(
@@ -1067,7 +1059,7 @@ class EquationSystem:
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914
+    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, PLR0912, C901
         """Create an EquationSystem from a dictionary (parsed JSON).
 
         Raises
@@ -1101,6 +1093,16 @@ class EquationSystem:
         # Build field name -> index lookup
         fields_lookup = {f["name"]: f["index"] for f in fields_data}
 
+        # Extract tensor metadata (optional, from enriched JSON export)
+        tensor_metadata: dict[str, dict[str, Any]] = {}
+        for f in fields_data:
+            if "tensor_head" in f:
+                tensor_metadata[f["name"]] = {
+                    "tensor_head": f["tensor_head"],
+                    "tensor_rank": f.get("tensor_rank", 0),
+                    "tensor_indices": f.get("tensor_indices", []),
+                }
+
         # Parse equations
         equations = tuple(
             ComponentEquation.from_dict(eq_data, fields_lookup)
@@ -1109,6 +1111,10 @@ class EquationSystem:
 
         # Extract metadata (needed early for parameter-aware matrix computation)
         metadata = dict(data.get("metadata", {}))
+
+        # Inject tensor metadata into metadata dict for LaTeX rendering
+        if tensor_metadata:
+            metadata["tensor_metadata"] = tensor_metadata
 
         # Extract default parameters from metadata (if available) so that
         # numeric matrices reflect actual parameter values, not just ±1.0
@@ -1149,7 +1155,7 @@ class EquationSystem:
         if canonical_data is not None:
             canonical = CanonicalStructure.from_dict(canonical_data)
 
-        return cls(
+        spec = cls(
             n_components=n_components,
             dimension=dimension,
             spatial_dimension=spatial_dimension,
@@ -1163,6 +1169,22 @@ class EquationSystem:
             coupling_matrix_symbolic=coupling_matrix_symbolic,
             canonical=canonical,
         )
+
+        # Ostrogradsky reduction: convert 4th-order-in-time equations to
+        # 2nd-order via auxiliary fields.  Ref: Ostrogradsky (1850),
+        # Woodard (2015, arXiv:1506.02210).  Applied in-memory only.
+        if any(eq.time_derivative_order > 2 for eq in spec.equations):  # noqa: PLR2004
+            from tidal.symbolic.ostrogradsky import (  # noqa: PLC0415
+                apply_ostrogradsky_reduction,
+            )
+
+            logger.info(
+                "Applying Ostrogradsky reduction for higher-derivative equations"
+            )
+            spec = apply_ostrogradsky_reduction(spec)
+            logger.info("Ostrogradsky: %d fields after reduction", spec.n_components)
+
+        return spec
 
 
 # --- JSON schema validation ---

@@ -1,0 +1,414 @@
+% Architecture: Visual Guide to the TIDAL Lagrangian-to-PDE Pipeline
+% Source: docs/architecture/README.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Architecture}
+\label{sec:architecture}
+
+Visual guide to the TIDAL Lagrangian-to-PDE pipeline.
+All PDEs derive from a Lagrangian via symbolic computation --- no physics is hardcoded in Python.
+
+\subsection{Data Flow Pipeline}
+\label{sec:data-flow-pipeline}
+
+The pipeline has two stages separated by a JSON specification file.
+
+\textbf{Stage~1 (Mathematica/xAct)} derives field equations symbolically from a Lagrangian.
+\textbf{Stage~2 (Python/SUNDIALS + numpy)} loads the specification and runs a numerical simulation.
+
+\begin{figure}[htbp]
+\centering
+\input{../figures/pipeline_overview}
+\caption{TIDAL data flow pipeline. Stage~1 (Mathematica/xAct) derives field equations symbolically from the Lagrangian; the JSON specification bridges the two stages; Stage~2 (Python/SUNDIALS + numpy) loads the spec and runs numerical simulation.}
+\label{fig:pipeline-overview}
+\end{figure}
+
+\subsubsection{Wolfram Module Roles}
+\label{sec:wolfram-module-roles}
+
+\begin{table}[htbp]
+\centering
+\caption{Wolfram pipeline modules and their roles.}
+\label{tab:wolfram-modules}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Module & Purpose & Key Export \\
+\midrule
+\texttt{CommonUtilities.wl} & Shared helpers: CD$\to$Derivative conversion, Christoffel/epsilon evaluation, metric components & \texttt{ConvertCDToDerivatives}, \texttt{EvaluateChristoffelComponents} \\
+\texttt{EulerLagrange.wl} & Derive equations of motion from a Lagrangian & \texttt{EulerLagrangeEquation[L, field, cd]} \\
+\texttt{ComponentDecompose.wl} & Convert tensor EOM to scalar component equations & \texttt{DecomposeToComponents[eom, field, chart, additionalFields]} \\
+\texttt{ExportJSON.wl} & Serialize component equations to JSON & \texttt{BuildMultiFieldJSONStructure[fieldEquations, metadata]} \\
+\texttt{GaugeFix.wl} & Gauge fixing presets and custom expressions & \texttt{AddGaugeFixingTerm}, \texttt{BuildLorenzGaugeTerm}, \texttt{BuildDeDonderGaugeTerm} \\
+\texttt{Linearize.wl} & Perturbation theory (xPert) for linearized gravity & \texttt{LinearizeTensorExpression[expr]} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{JSON Specification Structure}
+\label{sec:json-spec-structure}
+
+\begin{lstlisting}[style=json]
+{
+  "spacetime": { "dimension": 3, "signature": [-1, 1, 1],
+                 "coordinates": ["t", "x", "y"] },
+  "fields":    [{ "name": "phi_0", "slot_kind": "field",
+                   "time_derivative_order": 2 }],
+  "equations": [{
+    "field_name": "phi_0",
+    "lhs": { "expression": "...", "order": { "time": 2 } },
+    "rhs": [{ "coefficient": -1.0,
+              "coefficient_symbolic": "-m2",
+              "operator": "identity", "field": "phi_0",
+              "time_dependent": false,
+              "coordinate_dependent": false }]
+  }],
+  "hamiltonian_terms": [{ "coefficient": 0.5,
+    "operator": "identity",
+    "fields": ["v_phi_0", "v_phi_0"] }],
+  "coupling":  { "mass_matrix": [[1.0]],
+                 "coupling_matrix": [[0.0]] },
+  "metadata":  { "lagrangian": "...", "gauge": null,
+                 "linearized": false }
+}
+\end{lstlisting}
+
+\subsection{Python Module Dependencies}
+\label{sec:python-module-deps}
+
+The \texttt{symbolic/} subpackage loads JSON specs into \texttt{EquationSystem} dataclasses.
+The \texttt{solver/} subpackage provides the numerical engine: state management, spatial operators, RHS evaluation, and four time-integration backends.
+The \texttt{cli/} subpackage provides the \texttt{tidal} command-line interface with 9 subcommands (derive, simulate, inspect, measure, list, validate, plot, sweep, analyze).
+The \texttt{measurement/} subpackage provides 13 post-hoc analysis types (energy, conversion, mixing, spectrum, spectral\_conversion, dispersion, conservation, effective\_mass, asymptotic, peak\_conversion, velocity, resonance, summary).
+
+\paragraph{Symbolic subpackage.}
+\label{par:symbolic}
+\begin{itemize}
+  \item \texttt{json\_loader.py} --- \emph{EquationSystem, OperatorTerm, ComponentEquation, LHSStructure}
+  \item \texttt{reduction.py} --- \emph{Plane-wave dimensional reduction}
+\end{itemize}
+
+\paragraph{Solver subpackage.}
+\label{par:solver}
+\begin{itemize}
+  \item \texttt{ida.py} --- \emph{SUNDIALS IDA (DAE)}
+  \item \texttt{cvode.py} --- \emph{SUNDIALS CVODE (BDF)}
+  \item \texttt{leapfrog.py} --- \emph{St\"ormer-Verlet symplectic}
+  \item \texttt{scipy\_solver.py} --- \emph{solve\_ivp wrapper}
+  \item \texttt{fields.py} --- \emph{FieldSet (typed container)}
+  \item \texttt{state.py} --- \emph{StateLayout (frozen dataclass)}
+  \item \texttt{grid.py} --- \emph{GridInfo}
+  \item \texttt{operators.py} --- \emph{numpy spatial operators}
+  \item \texttt{coefficients.py} --- \emph{CoefficientEvaluator (4-level cache)}
+  \item \texttt{rhs.py} --- \emph{RHSEvaluator}
+  \item \texttt{constraint\_solve.py} --- \emph{Three-tier constraint pre-solve}
+\end{itemize}
+
+\paragraph{CLI subpackage.}
+\label{par:cli}
+\begin{itemize}
+  \item \texttt{\_\_init\_\_.py} --- \emph{9 subcommands}
+  \item \texttt{\_derive.py} --- \emph{TOML $\to$ .wls $\to$ JSON}
+  \item \texttt{\_simulate.py} --- \emph{JSON $\to$ solver $\to$ output}
+  \item \texttt{\_measure.py} --- \emph{Measurement dispatcher}
+  \item \texttt{\_sweep.py} --- \emph{Parameter sweeps}
+  \item \texttt{\_analyze.py} --- \emph{Sensitivity analysis}
+\end{itemize}
+
+\paragraph{Measurement subpackage.}
+\label{par:measurement}
+\begin{itemize}
+  \item \texttt{\_energy.py} --- \emph{Hamiltonian energy}
+  \item \texttt{\_conversion.py} --- \emph{Conversion $P(t)$}
+  \item \texttt{\_spectral.py} --- \emph{Power spectrum}
+  \item \texttt{\_diagnostics.py} --- \emph{Conservation checks}
+  \item \texttt{\_velocity.py} --- \emph{Group/phase velocity}
+  \item \texttt{\_sensitivity.py} --- \emph{Sobol/Morris}
+\end{itemize}
+
+\paragraph{External libraries.}
+\label{par:external}
+\begin{itemize}
+  \item SUNDIALS~\cite{hindmarsh2005sundials} --- IDA, CVODE (via scikit-sundae)
+  \item numpy / scipy
+\end{itemize}
+
+\subsection{State Structure (StateLayout + FieldSet)}
+\label{sec:state-structure}
+
+The simulation state is managed by two classes:
+
+\begin{itemize}
+  \item \textbf{\texttt{StateLayout}} (frozen dataclass in \texttt{state.py}): maps field names to slot indices, slot kinds, and time derivative orders. Computed once from the JSON spec.
+  \item \textbf{\texttt{FieldSet}} (typed container in \texttt{fields.py}): a contiguous flat numpy array with zero-copy named views for each field.
+\end{itemize}
+
+The layout depends on each component's \textbf{time derivative order} in the JSON specification:
+
+\begin{table}[htbp]
+\centering
+\caption{State slot allocation by time derivative order.}
+\label{tab:state-slots}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Time Order & Slots Used & Slot Kinds & Rate Computation \\
+\midrule
+2 (wave-like) & field + velocity & \texttt{"field"} + \texttt{"velocity"} & $\mathrm{d}/\mathrm{d}t\;\text{field} = \text{velocity}$; $\mathrm{d}/\mathrm{d}t\;\text{velocity} = \text{RHS}$ \\
+1 (first-order) & field only & \texttt{"field"} & $\mathrm{d}/\mathrm{d}t\;\text{field} = \text{RHS}$ \\
+0 (constraint) & field only & \texttt{"constraint"} & Algebraic: solved by \texttt{constraint\_solve.py} or IDA \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Example: Chern--Simons ($A_0$ Constraint, $A_1$ and $A_2$ First-Order)}
+\label{sec:state-example-cs}
+
+\begin{figure}[htbp]
+\centering
+\input{../figures/state_layout}
+\caption{State layout for the Chern--Simons example: $A_0$ is a constraint (solved algebraically), while $A_1$ and $A_2$ are first-order fields with rates computed by \texttt{RHSEvaluator}.}
+\label{fig:state-layout}
+\end{figure}
+
+The layout maps field names to contiguous slots:
+\begin{itemize}
+  \item $A_0$: \texttt{order=0} $\to$ constraint --- 1 slot, solved algebraically
+  \item $A_1$: \texttt{order=1} $\to$ first-order --- 1 slot, rate $= \text{RHS}$
+  \item $A_2$: \texttt{order=1} $\to$ first-order --- 1 slot, rate $= \text{RHS}$
+\end{itemize}
+
+The \texttt{RHSEvaluator} output:
+\begin{itemize}
+  \item $A_0$: residual $= 0$ (IDA algebraic)
+  \item $\mathrm{d}/\mathrm{d}t\;A_1 = \text{RHS}_1$
+  \item $\mathrm{d}/\mathrm{d}t\;A_2 = \text{RHS}_2$
+\end{itemize}
+
+\subsubsection{Example: Coupled Scalars (Two Second-Order Fields)}
+\label{sec:state-example-coupled}
+
+For two second-order fields, the state vector contains four slots:
+\begin{itemize}
+  \item Slot~0: $\phi_0$ (field)
+  \item Slot~1: $v_{\phi_0}$ (velocity)
+  \item Slot~2: $\chi_0$ (field)
+  \item Slot~3: $v_{\chi_0}$ (velocity)
+\end{itemize}
+
+The \texttt{RHSEvaluator} output:
+\begin{itemize}
+  \item $\mathrm{d}/\mathrm{d}t\;\phi_0 = v_{\phi_0}$
+  \item $\mathrm{d}/\mathrm{d}t\;v_{\phi_0} = \sum \text{coeff} \times \text{op}(\phi, \chi)$
+  \item $\mathrm{d}/\mathrm{d}t\;\chi_0 = v_{\chi_0}$
+  \item $\mathrm{d}/\mathrm{d}t\;v_{\chi_0} = \sum \text{coeff} \times \text{op}(\phi, \chi)$
+\end{itemize}
+
+Cross-field coupling: a term in the $\phi$ equation can reference $\chi_0$ via \texttt{\{"operator": "laplacian", "field": "chi\_0"\}}.
+
+Velocity naming convention: \texttt{v\_\{field\_name\}} (e.g., \texttt{v\_phi\_0}, \texttt{v\_A\_1}) --- Euler--Lagrange velocity form, not canonical momenta.
+
+\subsection{Execution Flow: \texttt{RHSEvaluator.evaluate()}}
+\label{sec:rhs-evaluator}
+
+Called by the solver backend at every timestep. Iterates over field equations and accumulates RHS terms.
+
+\begin{figure}[htbp]
+\centering
+\input{../figures/solver_flowchart}
+\caption{Execution flow of \texttt{RHSEvaluator.evaluate()}: for each field equation, resolve the target field, apply the spatial operator, resolve the coefficient via \texttt{CoefficientEvaluator}, and accumulate.}
+\label{fig:solver-flowchart}
+\end{figure}
+
+The evaluation loop for each field equation:
+\begin{enumerate}
+  \item Initialize accumulator $= 0$.
+  \item For each RHS term:
+  \begin{enumerate}
+    \item Resolve target field from \texttt{FieldSet} (zero-copy view).
+    \item Apply spatial operator (numpy: laplacian, gradient, etc.).
+    \item Resolve coefficient via \texttt{CoefficientEvaluator}.
+    \item $\text{accumulator} \mathrel{+}= \text{coefficient} \times \text{operated}$.
+  \end{enumerate}
+  \item Return numpy array of RHS values.
+\end{enumerate}
+
+\subsubsection{Solver Backends}
+\label{sec:solver-backends}
+
+Each backend calls \texttt{RHSEvaluator.evaluate()} with different integration strategies:
+
+\begin{table}[htbp]
+\centering
+\caption{Solver backends and their integration methods.}
+\label{tab:solver-backends}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Backend & Entry Point & Integration Method \\
+\midrule
+\textbf{IDA} & \texttt{ida.py} & Implicit Newton iteration for DAE systems. Residual form: $F(t, y, y') = 0$. Supports sparse Jacobian and analytical Jacobian (precomputed $\mathrm{d}F/\mathrm{d}y + \mathrm{d}F/\mathrm{d}y'$). \\
+\textbf{CVODE} & \texttt{cvode.py} & BDF adaptive ODE. Tolerance-controlled (\texttt{--rtol}/\texttt{--atol}). Automatic step size selection. \\
+\textbf{Leapfrog} & \texttt{leapfrog.py} & St\"ormer-Verlet symplectic. KDK splitting with force caching (halves force evaluations). \\
+\textbf{scipy} & \texttt{scipy\_solver.py} & \texttt{solve\_ivp} wrapper with DOP853/Radau/BDF methods. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Automatic solver selection: systems with algebraic constraints $\to$ IDA; pure wave equations $\to$ CVODE or leapfrog.
+
+\subsubsection{Analytical Jacobian (\texttt{analytical\_jacobian.py})}
+\label{sec:analytical-jacobian}
+
+For time-independent linear systems, the Jacobian $J = \mathrm{d}F/\mathrm{d}y + c_j \cdot \mathrm{d}F/\mathrm{d}y'$
+is precomputed once and supplied analytically via three delivery tiers:
+
+\begin{table}[htbp]
+\centering
+\caption{Analytical Jacobian delivery tiers.}
+\label{tab:jacobian-tiers}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Tier & Size Range & Method & Speedup vs FD \\
+\midrule
+Dense & $N \leq 2{,}000$ & 2D \texttt{jacfn} callback & $5.3\times$ \\
+Sparse & $2\text{K} < N \leq 200\text{K}$ & 1D CSC \texttt{jacfn} + SuperLU\_MT & IDA: $2.5\times$, CVODE: $1.2$--$1.4\times$ \\
+GMRES & $N > 200\text{K}$ & \texttt{jactimes} mat-vec product & Eliminates $O(n_\text{colors})$ evals \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Construction uses COO triple accumulation (\texttt{\_COOAccumulator}) with a single
+CSC conversion --- $O(\text{nnz})$ total instead of $O(N^2)$ LIL block-assignment.
+Operator matrices use $O(\text{nnz})$ circulant construction for periodic BCs.
+Falls through to FD tiers for time-dependent systems. Requires sksundae $\geq 1.1.2$.
+
+\subsubsection{Coefficient Resolution Hierarchy (4-Level Cache)}
+\label{sec:coefficient-cache}
+
+Each RHS term has a coefficient that may be constant, time-dependent, or position-dependent.
+\texttt{CoefficientEvaluator} (in \texttt{coefficients.py}) resolves coefficients via a fast-path hierarchy:
+
+\begin{description}
+  \item[L0: Pre-resolved constants] Computed once at \texttt{\_\_init\_\_}, stored as float.
+  \item[L1: Expression string cache] Mathematica$\to$Python conversion, computed once.
+  \item[L2: Spatial grid arrays] Position-dependent but time-independent, computed once per grid.
+  \item[L3: Per-timestep dedup] Time+position dependent, deduplicated within each timestep.
+  \begin{itemize}
+    \item Constant: parameter lookup $\to$ float.
+    \item Time-only: \texttt{eval(expr, \{t=t, params\})} $\to$ float.
+    \item Position-dependent: \texttt{eval(expr, \{t, x, y, z\})} $\to$ ndarray (grid-shaped).
+  \end{itemize}
+\end{description}
+
+\subsection{Working Examples (27 Total)}
+\label{sec:working-examples}
+
+\begin{table}[htbp]
+\centering
+\caption{Complete list of TIDAL example implementations.}
+\label{tab:examples}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Example & Dim & Fields & Key Features \\
+\midrule
+\texttt{scalar\_field/} & 1+1D & phi\_0 & Basic scalar wave, mass term \\
+\texttt{electromagnetic/} & 1+1D & A\_0, A\_1 & Maxwell equations, Lorenz gauge \\
+\texttt{proca/} & 1+1D & A\_0, A\_1 & Massive vector field (Proca mass) \\
+\texttt{coupled\_scalars/} & 1+1D & phi\_0, chi\_0 & Cross-field coupling, mass matrix \\
+\texttt{scalar\_potential\_well/} & 1+1D & phi\_0 & Background potential well, bound states \\
+\texttt{cylindrical\_kg\_1d/} & 1+1D & phi\_0 & Cylindrical coordinates, plane-wave 1D reduction \\
+\texttt{gravitational\_waves\_1d/} & 1+1D & h\_ij & Linearized gravity, plane-wave 1D reduction \\
+\texttt{spherical\_kg\_1d/} & 1+1D & phi\_0 & Spherical coordinates, plane-wave 1D reduction \\
+\texttt{chern\_simons/} & 2+1D & A\_0, A\_1, A\_2 & Epsilon tensor, constraint equation \\
+\texttt{elasticity/} & 2+1D & u\_0, u\_1 & Anisotropic Laplacian, cross derivatives \\
+\texttt{curved\_spacetime/} & 2+1D & phi\_0 & De Sitter Hubble friction, time-dependent coefficients \\
+\texttt{sphere\_kg/} & 2+1D & phi\_0 & Stereographic $S^2$, position-dependent coefficients \\
+\texttt{polar\_kg/} & 2+1D & phi\_0 & Polar coordinates, $1/r$ Christoffel correction \\
+\texttt{electrostatics/} & 2+1D & phi\_0 & Poisson equation, constraint solver \\
+\texttt{scalar\_vector\_coupling/} & 2+1D & phi\_0, A\_i & Mixed-rank cross-field (scalar+vector), 4 constants \\
+\texttt{massive\_gravity/} & 2+1D & h\_ij & Linearized massive gravity, Fierz--Pauli, xPert~\cite{brizuela2009xpert} \\
+\texttt{coupled\_proca/} & 2+1D & A\_i, B\_i & Two massive vectors, coupled Helmholtz constraints \\
+\texttt{coupled\_scattering/} & 2+1D & phi\_0, chi\_0 & Position-dependent Gaussian coupling, background fields \\
+\texttt{proca\_background/} & 2+1D & A\_i, B\_i & Lorentzian scalar background, constraint+BG integration \\
+\texttt{vector\_background/} & 2+1D & phi\_0, A\_i & Tanh domain wall vector background, sign-changing coupling \\
+\texttt{scalar\_field\_3d/} & 3+1D & phi\_0 & Full 4D Klein--Gordon, $32^3$ grid \\
+\texttt{spherical\_kg/} & 3+1D & phi\_0 & Spherical coordinates, trig coefficients (Cot, Csc) \\
+\texttt{cylindrical\_kg/} & 3+1D & phi\_0 & Mixed curved $(r,\theta)$ and flat $(z)$ directions \\
+\texttt{gravitational\_waves/} & 3+1D & h\_ij & xPert~\cite{brizuela2009xpert} linearization, TT gauge, rank-2 tensor \\
+\texttt{massive\_3form/} & 3+1D & C\_ijk & Rank-3 antisymmetric tensor, symmetry reduction $64 \to 4$ \\
+\texttt{gertsenshtein/} & 1+1D & h\_5, gea\_1 & Einstein--Maxwell graviton-photon conversion, multi-field perturbation \\
+\texttt{maxwell\_perturbation/} & 1+1D & gea\_0, gea\_1 & Matter-only Proca perturbation, lightweight CI test \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Supported Operators}
+\label{sec:supported-operators}
+
+Operators map JSON terms to numpy spatial operations (2nd-order finite-difference stencils). All support cross-field references and periodic/Dirichlet/Neumann boundary conditions.
+
+\begin{table}[htbp]
+\centering
+\caption{Supported spatial operators.}
+\label{tab:operators}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Operator & Min Dim & Description \\
+\midrule
+\texttt{identity} & 1D & Field itself (mass terms) \\
+\texttt{laplacian} & 1D & Full spatial Laplacian \\
+\texttt{laplacian\_x}, \texttt{\_y}, \texttt{\_z} & 1D/2D/3D & Directional second derivative \\
+\texttt{gradient\_x}, \texttt{\_y}, \texttt{\_z} & 1D/2D/3D & Directional first derivative \\
+\texttt{cross\_derivative\_xy}, \texttt{\_xz}, \texttt{\_yz} & 2D/3D & Mixed partial derivative \\
+\texttt{first\_derivative\_t} & 1D & Time derivative (friction/damping terms) \\
+\texttt{biharmonic} & 1D & Fourth-order Laplacian \\
+\texttt{mixed\_T\_S1\_S2\_\ldots} & 1D & Mixed time-space operators (auto-extracted from Wolfram) \\
+\texttt{derivative\_N\_x} & 1D & $N$th-order spatial derivative (e.g., \texttt{derivative\_3\_x} for $\partial_x^3$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Component-Level Euler--Lagrange}
+\label{sec:component-el}
+
+Since v0.15.0, the default derivation strategy for all theories is \textbf{component-level Euler--Lagrange}, which operates in two phases:
+
+\paragraph{Phase~A: Component decomposition.}
+The abstract Lagrangian $\lag(g_{\mu\nu}, \phi^A, \nabla_\mu \phi^A, \ldots)$ is decomposed to a scalar function of coordinate components:
+\begin{equation}
+  \lag_{\text{comp}} = \lag(g_{00}, g_{01}, \ldots, \phi_0, \phi_1, \ldots, \partial_t \phi_0, \partial_x \phi_0, \ldots)
+\end{equation}
+This reuses the existing xCoba basis projection (\texttt{ToBasis}), metric contraction, and Christoffel evaluation stages of the Wolfram pipeline. For a 2+1D theory, this typically completes in $\sim$4\,s.
+
+\paragraph{Phase~B: Standard calculus E--L.}
+The equations of motion are derived by direct differentiation of $\lag_{\text{comp}}$ using the multi-index Euler--Lagrange formula:
+\begin{equation}
+  \frac{\delta \lag}{\delta q_i} = \sum_{\alpha} (-1)^{|\alpha|}\, D^\alpha \frac{\partial \lag}{\partial (D^\alpha q_i)} = 0
+  \label{eq:component-el}
+\end{equation}
+where $D^\alpha = \partial_t^{n_t} \partial_x^{n_x} \cdots$ ranges over all derivative orders present in $\lag_{\text{comp}}$. This produces one equation per component field in under 1\,s per field.
+
+\paragraph{Motivation.}
+The previous approach---abstract \texttt{VarD} followed by \texttt{TraceBasisDummy} for index contraction---suffers from combinatorial explosion when the Lagrangian contains many contracted abstract indices. For example, the $\tilde{R}^2$ curvature-squared torsion Lagrangian has $\sim$45 contracted abstract indices, leading to $O(\text{dim}^{n})$ scaling in \texttt{TraceBasisDummy} ($>$77\,min for 2+1D, infeasible for 3+1D). Component-level E--L bypasses the abstract index machinery entirely, reducing the same derivation to $\sim$5\,s---a \textbf{900$\times$ speedup}. It is now the default for all theories, not only those with higher-curvature terms.
+
+\paragraph{Implementation.}
+\texttt{ComponentEulerLagrange} in \texttt{ComponentDecompose.wl} handles the Phase~B computation, including integration by parts and support for antisymmetric tensor field components via symmetry-permuted tuple replacement (\texttt{ReplaceHigherRankFieldComponents}).
+
+\subsection{Ostrogradsky Reduction}
+\label{sec:ostrogradsky}
+
+Higher-derivative Lagrangians (e.g., $R^2$, $\tilde{R}^2$ curvature-squared terms) produce equations of motion with time derivatives of order $>2$. Since all PDE solver backends (IDA, CVODE, modal, leapfrog) support at most second-order-in-time equations, an automatic \textbf{Ostrogradsky reduction} is applied when the JSON specification is loaded.
+
+\paragraph{Algorithm.}
+For each field $q$ whose equation has time order $n_t > 2$:
+\begin{enumerate}
+  \item Introduce an auxiliary field $w_q = d^2 q / dt^2$ (the acceleration).
+  \item The original equation $d^{n_t} q/dt^{n_t} = \text{RHS}[q, \ldots]$ becomes $d^{n_t - 2} w_q / dt^{n_t - 2} = \text{RHS}[q, \ldots]$.
+  \item Add a constraint linking the auxiliary: $d^2 q / dt^2 = w_q$.
+  \item Repeat until all equations have time order $\leq 2$.
+\end{enumerate}
+The state vector expands from $(q, v_q)$ to $(q, v_q, w_q, v_{w_q})$ for each reduced field.
+
+\paragraph{Integration.}
+The reduction is transparent to users---it happens automatically in \texttt{ostrogradsky.py} during JSON loading. For the 2+1D graviton-torsion example, this converts 15 original fields to 17 fields (2 auxiliary), with all equations at time order $\leq 2$.
+
+\paragraph{Implicit acceleration coupling.}
+After reduction, equations may contain implicit references to accelerations of other fields (e.g., $\partial_t^2 q_j$ in $q_i$'s equation). The generalized mass-matrix modal solver (v0.16.0) handles this via operator decomposition, singular mass-matrix eigendecomposition, and QZ generalized eigenvalue for velocity coupling. See \cref{sec:modal-mass-matrix} for the complete algorithm. Issue \#165 resolved.

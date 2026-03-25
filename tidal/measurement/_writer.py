@@ -19,6 +19,7 @@ Directory structure::
 
 from __future__ import annotations
 
+import contextlib
 import json
 import warnings
 from pathlib import Path
@@ -35,6 +36,20 @@ if TYPE_CHECKING:
 
 # Current format version.  Increment when the metadata schema changes.
 _FORMAT_VERSION = 1
+
+
+def _environment_fingerprint() -> dict[str, str]:
+    """Collect software versions for reproducibility tracking."""
+    import sys as _sys  # noqa: PLC0415
+    from importlib.metadata import PackageNotFoundError  # noqa: PLC0415
+    from importlib.metadata import version as _pkg_version  # noqa: PLC0415
+
+    env: dict[str, str] = {"python": _sys.version.split()[0]}
+    for pkg in ("tidal", "numpy", "scipy", "scikit-sundae", "matplotlib"):
+        with contextlib.suppress(PackageNotFoundError):
+            env[pkg] = _pkg_version(pkg)
+    return env
+
 
 _DEFAULT_DTYPE: np.dtype[np.float64] = np.dtype(np.float64)
 
@@ -335,6 +350,9 @@ class SnapshotWriter:
             metadata["fd_order"] = fd_order
         if get_spectral():
             metadata["spectral"] = True
+
+        # Environment fingerprint for reproducibility
+        metadata["environment"] = _environment_fingerprint()
 
         metadata_path = self._output_dir / "metadata.json"
         # Atomic write: temp file + rename to avoid corrupt JSON on crash

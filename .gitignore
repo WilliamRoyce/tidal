@@ -2,17 +2,17 @@
 .ruff_cache
 __pycache__/
 *.egg-info/
+third_party/
+
+phd-application-context.md
+
+/examples/data/*
 *.png
 /outputs/
+
 importtime.log
-third_party/
-.claude-memory-backup/
-phd-application-context.md
 wolfram_test_output.txt
 .coverage
-/examples/data/**/*.npy
-/examples/data/**/*.json
-/examples/data/**/*.csv
 
 .claude-memory-backup/
 .claude-plans-backup/
@@ -33,3 +33,6 @@ Wolfram*.tgz
 *.mathpass
 .Wolfram*
 .WolframEngine*
+
+# Literature — local arXiv TeX sources (large, not for VCS)
+literature/*

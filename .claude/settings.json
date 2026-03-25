@@ -1,5 +1,11 @@
 {
+  "includeCoAuthoredBy": false,
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(uv run pytest:*)",
       "Bash(uv run tidal:*)",
@@ -52,6 +58,17 @@
           {
             "type": "command",
             "command": ".claude/hooks/memory-size-check.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/pre-compact.sh",
             "timeout": 5
           }
         ]

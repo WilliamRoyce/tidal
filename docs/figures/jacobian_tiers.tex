@@ -1,75 +1,43 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc}
-
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
-    decision/.style={
-        diamond, aspect=2.2, minimum width=1.6cm,
-        draw=black!70, fill=white, font=\footnotesize,
-        align=center, inner sep=2pt, text width=2.0cm
-    },
-    tier/.style={
-        rectangle, rounded corners=2pt, minimum width=3.6cm,
-        minimum height=0.9cm, draw=#1, line width=0.7pt,
-        fill=#1!20, font=\footnotesize, align=center,
-        text opacity=1, text=black
-    },
-    tier/.default={black!70},
-    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=center,
-                  text width=3.0cm},
-    arr/.style={-{Stealth[length=5pt, width=4pt]}, thick, black!70},
-    yeslbl/.style={font=\scriptsize\bfseries, text=black!70},
-    nolbl/.style={font=\scriptsize\bfseries, text=black!70},
-    node distance=0.8cm and 2.4cm
+    node distance=0.4cm and 1.2cm
 ]
 
 % Entry
-\node[tier=GrayLine, fill=GrayFill, fill opacity=0.4] (entry)
+\node[stage=Gray] (entry)
     {\textbf{Analytical Jacobian}\\[1pt]
      \scriptsize precomputed $dF/dy + dF/dy'$\\
      \scriptsize (time-independent systems only)};
 
 % D1: size check
-\node[decision, below=0.9cm of entry] (d1)
+\node[decision, below=of entry] (d1)
     {$N \leq 2000$?};
 
 % Dense tier
-\node[tier=GreenLine, right=2.4cm of d1] (dense)
+\node[stage=Green, right=of d1] (dense)
     {\textbf{Dense tier}\\[1pt]
-     \scriptsize 2D \texttt{jacfn} callback\\
+     \scriptsize dense Jacobian callback\\
      \scriptsize \textbf{5.3$\times$ speedup}};
 
 % D2
-\node[decision, below=0.9cm of d1] (d2)
+\node[decision, below=of d1] (d2)
     {$N \leq 200\text{K}$?};
 
 % Sparse tier
-\node[tier=PurpleLine, right=2.4cm of d2] (sparse)
+\node[stage=Purple, right=of d2] (sparse)
     {\textbf{Sparse tier}\\[1pt]
-     \scriptsize falls through to FD\\
-     \scriptsize (sksundae bug)};
+     \scriptsize CSC sparse Jacobian + SuperLU\\
+     \scriptsize \textbf{IDA 2.5$\times$ / CVODE 1.2--1.4$\times$}};
 \node[annot, below=0.15cm of sparse]
-    {blocked assembly\\works but callback\\not supported};
+    {coordinate-format assembly\\(415$\times$ faster than dense)};
 
 % GMRES tier
-\node[tier=BlueLine, below=0.9cm of d2] (gmres)
+\node[stage=Blue, below=of d2] (gmres)
     {\textbf{GMRES tier}\\[1pt]
-     \scriptsize analytical JVP (\texttt{jactimes})\\
+     \scriptsize analytical Jacobian-vector product\\
      \scriptsize matrix-free};
 
 % Arrows

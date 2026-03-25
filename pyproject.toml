@@ -1,6 +1,6 @@
 [project]
 name = "tidal"
-version = "0.5.0"
+version = "0.17.7"
 description = "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -40,13 +40,15 @@ dependencies = [
     "matplotlib>=3.1,<4.0",
     "numpy>=1.22,<3.0",
     "scipy>=1.10,<2.0",
-    "scikit-sundae>=1.0,<2.0",
+    "scikit-sundae>=1.1.2,<2.0",
     "tqdm>=4.60",
 ]
 
 [project.optional-dependencies]
 wolfram = ["wolframclient>=1.4.0,<2.0"]
 sensitivity = ["SALib>=1.4"]
+completion = ["shtab>=1.5"]
+color = ["rich-argparse>=1.4"]
 
 [project.scripts]
 tidal = "tidal.cli:main"

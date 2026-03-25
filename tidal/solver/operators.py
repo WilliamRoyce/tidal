@@ -1100,6 +1100,19 @@ def _make_cross_derivative(ax1: int, ax2: int):  # noqa: ANN202
     return _op
 
 
+def _make_third_derivative(ax: int):  # noqa: ANN202
+    """Third-order spatial derivative ∂³f/∂x³ = ∂_x(∂²_x f).
+
+    FD: applies gradient to directional laplacian (composition).
+    Spectral: uses ik³_x multiplier (odd order → imaginary).
+    """
+
+    def _op(data: np.ndarray, grid: GridInfo, bc: BCSpec | None = None) -> np.ndarray:
+        return gradient(directional_laplacian(data, ax, grid, bc), ax, grid, bc)
+
+    return _op
+
+
 OPERATOR_REGISTRY: dict[str, Any] = {
     "identity": identity,
     "laplacian": laplacian,
@@ -1113,6 +1126,9 @@ OPERATOR_REGISTRY: dict[str, Any] = {
     "cross_derivative_xz": _make_cross_derivative(0, 2),
     "cross_derivative_yz": _make_cross_derivative(1, 2),
     "biharmonic": biharmonic,
+    "derivative_3_x": _make_third_derivative(0),
+    "derivative_3_y": _make_third_derivative(1),
+    "derivative_3_z": _make_third_derivative(2),
 }
 
 
@@ -1130,6 +1146,9 @@ _OPERATOR_MIN_DIM: dict[str, int] = {
     "cross_derivative_xz": 3,
     "cross_derivative_yz": 3,
     "biharmonic": 1,
+    "derivative_3_x": 1,
+    "derivative_3_y": 2,
+    "derivative_3_z": 3,
     "first_derivative_t": 1,
 }
 

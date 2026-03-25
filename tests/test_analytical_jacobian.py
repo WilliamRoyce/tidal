@@ -631,8 +631,8 @@ class TestJacobianDelivery:
         expected = dF_dy.toarray() + cj * dF_dyp.toarray()
         np.testing.assert_allclose(JJ, expected, atol=1e-12)
 
-    def test_sparse_tier_falls_through(self) -> None:
-        """Systems in sparse tier (DENSE < N <= SPARSE) fall through to FD."""
+    def test_sparse_tier_configures_sparse_jacfn(self) -> None:
+        """Sparse tier should configure 1D CSC jacfn + sparsity pattern."""
         from unittest.mock import patch
 
         spec = _make_kg_1d_spec()
@@ -646,10 +646,341 @@ class TestJacobianDelivery:
                 options, spec, layout, grid, "periodic", {}
             )
 
-        # Sparse tier falls through to FD (returns False)
-        assert result is False
+        assert result is True
+        assert options["linsolver"] == "sparse"
+        assert "jacfn" in options
+        assert callable(options["jacfn"])
+        assert "sparsity" in options
+        assert issparse(options["sparsity"])
+
+    def test_sparse_jacfn_fills_1d_array(self) -> None:
+        """Sparse jacfn callback should fill 1D CSC data array correctly."""
+        from tidal.solver.analytical_jacobian import _create_sparse_jacfn
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        jacfn, sparsity = _create_sparse_jacfn(dF_dy, dF_dyp)
+
+        # Test for several cj values
+        for cj in [0.0, 1.0, math.pi, 100.0]:
+            JJ = np.zeros(sparsity.nnz)
+            n = layout.total_size
+            jacfn(0.0, np.zeros(n), np.zeros(n), np.zeros(n), cj, JJ)
+
+            # Build reference: full J = dF_dy + cj * dF_dyp, extract CSC data
+            J_ref = (dF_dy + cj * dF_dyp).tocsc()
+            from tidal.solver.analytical_jacobian import _extract_aligned_data
+
+            ref_data = _extract_aligned_data(J_ref, sparsity)
+            np.testing.assert_allclose(JJ, ref_data, atol=1e-14)
+
+    def test_sparse_jacfn_csc_alignment(self) -> None:
+        """Sparsity pattern should have CSC structure matching union of matrices."""
+        from tidal.solver.analytical_jacobian import _create_sparse_jacfn
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        _, sparsity = _create_sparse_jacfn(dF_dy, dF_dyp)
+
+        # Union pattern should cover all nonzeros from both matrices
+        union_ref = (abs(dF_dy) + abs(dF_dyp)).tocsc()
+        union_ref.eliminate_zeros()
+        np.testing.assert_array_equal(sparsity.indptr, union_ref.indptr)
+        np.testing.assert_array_equal(sparsity.indices, union_ref.indices)
+        assert sparsity.nnz == union_ref.nnz
+
+    def test_sparse_tier_superlu_nnz_limit_fallback(self) -> None:
+        """Sparse tier should fall through to GMRES when nnz > SUPERLU_NNZ_LIMIT."""
+        from unittest.mock import patch
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        with (
+            patch("tidal.solver._types.DENSE_THRESHOLD", 1),
+            patch("tidal.solver._types.SUPERLU_NNZ_LIMIT", 1),
+        ):
+            result = try_analytical_jacobian(
+                options, spec, layout, grid, "periodic", {}
+            )
+
+        assert result is True
+        assert options["linsolver"] == "gmres"
+        assert "jactimes" in options
         assert "jacfn" not in options
-        assert "jactimes" not in options
+
+    def test_cvode_sparse_jacfn(self) -> None:
+        """CVODE sparse jacfn should produce ODE Jacobian -dF_dy."""
+        from tidal.solver.analytical_jacobian import _create_cvode_sparse_jacfn
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, _ = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        jacfn, sparsity = _create_cvode_sparse_jacfn(dF_dy)
+
+        JJ = np.zeros(sparsity.nnz)
+        n = layout.total_size
+        jacfn(0.0, np.zeros(n), np.zeros(n), JJ)
+
+        neg_dy = (-dF_dy).tocsc()
+        neg_dy.eliminate_zeros()
+        np.testing.assert_allclose(JJ, neg_dy.data, atol=1e-14)
+
+
+# ---------------------------------------------------------------------------
+# Circulant operator matrix construction
+# ---------------------------------------------------------------------------
+
+
+class TestCirculantOperatorMatrix:
+    """Verify circulant fast-path matches probing for all operator types."""
+
+    @staticmethod
+    def _build_probing(operator: str, grid: GridInfo, bc: str | tuple[str, ...]) -> Any:  # noqa: ANN401
+        """Build operator matrix via O(N²) probing (reference)."""
+        from tidal.solver.operators import apply_operator
+
+        n = grid.num_points
+        from tidal.solver._scipy_types import lil_matrix as _lil
+
+        mat = _lil((n, n))
+        e_j = np.zeros(grid.shape)
+        for j in range(n):
+            e_j.flat[:] = 0.0
+            e_j.flat[j] = 1.0
+            col = apply_operator(operator, e_j, grid, bc)
+            col_flat = col.ravel()
+            nz = np.nonzero(col_flat)[0]
+            for row in nz:
+                mat[row, j] = col_flat[row]
+        return mat.tocsc()
+
+    def test_laplacian_x_2d(self) -> None:
+        """laplacian_x on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("laplacian_x", grid, "periodic")
+        ref = self._build_probing("laplacian_x", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_laplacian_y_2d(self) -> None:
+        """laplacian_y on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("laplacian_y", grid, "periodic")
+        ref = self._build_probing("laplacian_y", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_gradient_x_2d(self) -> None:
+        """gradient_x on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("gradient_x", grid, "periodic")
+        ref = self._build_probing("gradient_x", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_gradient_y_2d(self) -> None:
+        """gradient_y on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("gradient_y", grid, "periodic")
+        ref = self._build_probing("gradient_y", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_cross_derivative_xy_2d(self) -> None:
+        """cross_derivative_xy on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("cross_derivative_xy", grid, "periodic")
+        ref = self._build_probing("cross_derivative_xy", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_laplacian_full_2d(self) -> None:
+        """Full laplacian (sum of directional) on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("laplacian", grid, "periodic")
+        ref = self._build_probing("laplacian", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_biharmonic_1d(self) -> None:
+        """Biharmonic on 1D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
+        mat = build_operator_matrix("biharmonic", grid, "periodic")
+        ref = self._build_probing("biharmonic", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_3d_operators(self) -> None:
+        """laplacian_z, gradient_z, cross_derivative_xz, cross_derivative_yz on 3D."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10), (0, 10)),
+            shape=(4, 4, 4),
+            periodic=(True, True, True),
+        )
+        for op in [
+            "laplacian_z",
+            "gradient_z",
+            "cross_derivative_xz",
+            "cross_derivative_yz",
+        ]:
+            mat = build_operator_matrix(op, grid, ("periodic", "periodic", "periodic"))
+            ref = self._build_probing(op, grid, ("periodic", "periodic", "periodic"))
+            np.testing.assert_allclose(
+                mat.toarray(), ref.toarray(), atol=1e-14, err_msg=f"{op} mismatch"
+            )
+
+    def test_identity_uses_probing_fallback(self) -> None:
+        """Identity operator should NOT use circulant (trivially sparse eye)."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        mat = build_operator_matrix("identity", grid, "periodic")
+        expected = np.eye(8)
+        np.testing.assert_allclose(mat.toarray(), expected, atol=1e-14)
+
+    def test_nonperiodic_uses_probing_fallback(self) -> None:
+        """Non-periodic BCs should fall back to probing."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(False,))
+        mat = build_operator_matrix("laplacian_x", grid, "neumann")
+        ref = self._build_probing("laplacian_x", grid, "neumann")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_tuple_bc_periodic(self) -> None:
+        """Tuple BC ('periodic', 'periodic') should use circulant path."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("laplacian_x", grid, ("periodic", "periodic"))
+        ref = self._build_probing("laplacian_x", grid, ("periodic", "periodic"))
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+
+# ---------------------------------------------------------------------------
+# Multi-theory sparse Jacobian integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestMultiTheorySparseJacobian:
+    """Test sparse analytical Jacobian across real example theories.
+
+    These tests load real JSON specs and verify that the sparse jacfn
+    callback produces values matching the reference dense Jacobian.
+    """
+
+    @staticmethod
+    def _test_theory(json_name: str, params: dict[str, float]) -> None:
+        """Load a theory JSON and verify sparse jacfn matches dense Jacobian."""
+        import json
+        from pathlib import Path
+
+        from tidal.solver.analytical_jacobian import (
+            _create_sparse_jacfn,
+            _extract_aligned_data,
+        )
+
+        json_path = Path("examples/data") / json_name
+        if not json_path.exists():
+            return  # skip if example not available
+        spec_data = json.loads(json_path.read_text(encoding="utf-8"))
+        spec = EquationSystem.from_dict(spec_data)
+
+        # Use small grid to keep test fast
+        ndim = spec_data["spacetime"]["dimension"] - 1
+        if ndim == 1:
+            grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
+        elif ndim == 2:
+            grid = GridInfo(
+                bounds=((0, 10), (0, 10)), shape=(6, 6), periodic=(True, True)
+            )
+        else:
+            grid = GridInfo(
+                bounds=((0, 10), (0, 10), (0, 10)),
+                shape=(4, 4, 4),
+                periodic=(True, True, True),
+            )
+        bc = "periodic"
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        # Build analytical Jacobian matrices
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, bc, params)
+
+        # Create sparse jacfn
+        jacfn, sparsity = _create_sparse_jacfn(dF_dy, dF_dyp)
+
+        # Test for several cj values
+        n = layout.total_size
+        for cj in [0.0, 1.0, math.pi]:
+            JJ = np.zeros(sparsity.nnz)
+            jacfn(0.0, np.zeros(n), np.zeros(n), np.zeros(n), cj, JJ)
+
+            # Reference
+            J_ref = (dF_dy + cj * dF_dyp).tocsc()
+            ref_data = _extract_aligned_data(J_ref, sparsity)
+            np.testing.assert_allclose(
+                JJ,
+                ref_data,
+                atol=1e-12,
+                err_msg=f"{json_name} cj={cj}",
+            )
+
+    def test_klein_gordon_1d(self) -> None:
+        """1D scalar: identity + laplacian_x."""
+        self._test_theory("klein_gordon_1d.json", {"m2": 1.0})
+
+    def test_coupled_scalars(self) -> None:
+        """2-field coupled: identity + laplacian_x + gradient coupling."""
+        self._test_theory(
+            "coupled_scalars.json",
+            {"B0": 1.0, "kappa": 0.1, "mg2": 1.0, "omegaP2": 1.0},
+        )
+
+    def test_proca_1d(self) -> None:
+        """1D Proca: identity + laplacian_x + gradient_x."""
+        self._test_theory("proca_1d.json", {"procaMassSquared": 1.0})
+
+    def test_em_3d(self) -> None:
+        """3D EM with constraints: laplacian + gradient + cross_derivative."""
+        self._test_theory("em_3d.json", {})
+
+    def test_navier_cauchy_2d(self) -> None:
+        """2D Navier-Cauchy: laplacian_x/y + cross_derivative_xy."""
+        self._test_theory("navier_cauchy_2d.json", {"lam": 1.0, "mu": 1.0, "rho": 1.0})
+
+    def test_scalar_vector_coupling(self) -> None:
+        """4-field with constraints + first_derivative_t."""
+        self._test_theory(
+            "scalar_vector_coupling.json",
+            {"Am2": 1.0, "phim2": 1.0, "gSV": 0.5, "kCS": 0.1},
+        )
+
+    def test_coupled_scattering(self) -> None:
+        """Position-dependent (Gaussian) coefficients."""
+        self._test_theory(
+            "coupled_scattering.json",
+            {"g0": 0.5, "R": 2.0, "mPhi2": 1.0, "mChi2": 1.0},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1263,8 +1594,45 @@ class TestCVODEDelivery:
 # ---------------------------------------------------------------------------
 
 
+def _make_time_dependent_spec() -> EquationSystem:
+    """KG with time-dependent coefficient — bypasses analytical Jacobian."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [{"name": "phi_0", "index": 0}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi_0",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "identity",
+                            "field": "phi_0",
+                            "coefficient_symbolic": "E^(2*H*t[])",
+                            "time_dependent": True,
+                        },
+                    ],
+                },
+            },
+        ],
+        "canonical": {"hamiltonian_terms": []},
+    }
+    return EquationSystem.from_dict(data)
+
+
 class TestSuperLUNnzFallback:
-    """Tests for nnz-based GMRES fallback in configure_linear_solver."""
+    """Tests for nnz-based GMRES fallback in configure_linear_solver.
+
+    Uses a time-dependent spec so the analytical Jacobian path is bypassed
+    and the FD sparse tier in configure_linear_solver is exercised.
+    """
 
     def test_falls_back_to_gmres_when_nnz_exceeds_limit(self) -> None:
         """When nnz exceeds SUPERLU_NNZ_LIMIT, configure_linear_solver selects GMRES."""
@@ -1273,14 +1641,11 @@ class TestSuperLUNnzFallback:
 
         from tidal.solver._setup import configure_linear_solver
 
-        spec = _make_kg_1d_spec()
-        # Use a grid large enough to be in the sparse tier (N > DENSE_THRESHOLD)
-        # but use patch to force nnz check to fail.
+        spec = _make_time_dependent_spec()
         n_pts = 64
         grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
 
-        # Patch SUPERLU_NNZ_LIMIT to 1 so any nnz triggers the fallback.
         options: dict[str, Any] = {}
         with (
             patch("tidal.solver._types.DENSE_THRESHOLD", 1),
@@ -1288,7 +1653,9 @@ class TestSuperLUNnzFallback:
             warnings.catch_warnings(record=True) as caught,
         ):
             warnings.simplefilter("always")
-            configure_linear_solver(options, layout, spec, grid, "periodic")
+            configure_linear_solver(
+                options, layout, spec, grid, "periodic", parameters={"H": 1.0}
+            )
 
         assert options["linsolver"] == "gmres"
         assert "sparsity" not in options
@@ -1302,19 +1669,20 @@ class TestSuperLUNnzFallback:
 
     def test_uses_superlu_when_nnz_under_limit(self) -> None:
         """When nnz is under SUPERLU_NNZ_LIMIT, SuperLU is selected normally."""
+        from unittest.mock import patch
+
         from tidal.solver._setup import configure_linear_solver
 
-        spec = _make_kg_1d_spec()
-        # Small grid: nnz will be well under 100_000
+        spec = _make_time_dependent_spec()
         n_pts = 8
         grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
 
         options: dict[str, Any] = {}
-        from unittest.mock import patch
-
         with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
-            configure_linear_solver(options, layout, spec, grid, "periodic")
+            configure_linear_solver(
+                options, layout, spec, grid, "periodic", parameters={"H": 1.0}
+            )
 
         assert options["linsolver"] == "sparse"
         assert "sparsity" in options
@@ -1326,7 +1694,7 @@ class TestSuperLUNnzFallback:
 
         from tidal.solver._setup import configure_linear_solver
 
-        spec = _make_kg_1d_spec()
+        spec = _make_time_dependent_spec()
         n_pts = 64
         grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
@@ -1338,7 +1706,9 @@ class TestSuperLUNnzFallback:
             warnings.catch_warnings(record=True) as caught,
         ):
             warnings.simplefilter("always")
-            configure_linear_solver(options, layout, spec, grid, "periodic")
+            configure_linear_solver(
+                options, layout, spec, grid, "periodic", parameters={"H": 1.0}
+            )
 
         user_warnings = [
             str(w.message) for w in caught if issubclass(w.category, UserWarning)

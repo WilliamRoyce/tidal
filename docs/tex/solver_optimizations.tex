@@ -1,0 +1,556 @@
+% Solver Performance Optimizations
+% Source: docs/solver_optimizations.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Solver Performance Optimizations}
+\label{sec:solver-optimizations}
+
+This document describes the solver-level performance optimizations in TIDAL,
+covering both Python micro-optimizations (Rounds 1--6) and algorithmic
+improvements (higher-order FD stencils, Yoshida integrator).
+
+\subsection{Summary of Optimizations}
+\label{sec:opt-summary}
+
+\begin{table}[htbp]
+\centering
+\caption{Overview of solver optimization phases.}
+\label{tab:opt-summary}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Phase & Feature & Key Benefit \\
+\midrule
+Rounds 1--6 & Python hot-path micro-optimizations & Leapfrog 1.66$\times$, scipy 1.29$\times$ \\
+Phase 1 & \texttt{--fd-order 4|6} (higher-order FD stencils) & 500$\times$ spatial error reduction per order at same $N$ \\
+Phase 2 & \texttt{--leapfrog-order 4} (Yoshida + fused-kick) & 3$\times$ wall-clock at equal accuracy (Forest \& Ruth 1990) \\
+Phase 3 & \texttt{--spectral} (FFT pseudo-spectral operators) & Machine-precision accuracy, 8$\times$ fewer DOFs \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Derivation-side optimisations (v0.15.0+)}} \\
+Component E--L & Component-level Euler--Lagrange (default) & $>$900$\times$ for higher-derivative theories \\
+CD shorthand & Pre-computed covariant derivative expansions & 3$\times$ xPert linearisation speedup \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Auto-detection}
+\label{sec:auto-detection}
+
+Spatial operators and leapfrog order are automatically selected based on
+equation properties and boundary conditions when not explicitly specified:
+
+\begin{table}[htbp]
+\centering
+\caption{Auto-detection rules for spatial operator and integrator settings.}
+\label{tab:auto-detection}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Setting & Auto-detection rule & Override \\
+\midrule
+\texttt{--spectral} & Enabled when all BCs are periodic (disabled for IDA) & \texttt{--no-spectral} forces FD \\
+\texttt{--leapfrog-order} & 4 (Yoshida) when time-independent and non-dissipative; 2 otherwise & \texttt{--leapfrog-order 2} forces Verlet \\
+\texttt{--fd-order} & Default: 4 (no auto-detection, user selects) & \texttt{--fd-order 2|6} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The auto-detection runs after grid/BC construction and scheme resolution, so
+all relevant information is available. Explicit flags always take precedence.
+
+\subsection{Phase 1: Higher-Order Finite Difference Stencils}
+\label{sec:fd-stencils}
+
+\textbf{CLI flag}: \texttt{--fd-order 2|4|6} (default: 4)
+
+4th and 6th-order central-difference stencils for all spatial operators
+(gradient, Laplacian, cross-derivative, biharmonic). Higher orders use
+wider stencils and more ghost cells, but dramatically improve spatial
+accuracy --- typically enabling halving $N$ for the same accuracy.
+
+\subsubsection{Stencil Coefficients}
+\label{sec:stencil-coefficients}
+
+\paragraph{1st derivative (central):}
+\label{par:grad-stencils}
+
+\begin{table}[htbp]
+\centering
+\caption{Central first-derivative stencil coefficients ($\times\, 1/\Delta x$).}
+\label{tab:grad-stencils}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Order & Points & Coefficients \\
+\midrule
+2 & 3 & $-1/2,\; 0,\; +1/2$ \\
+4 & 5 & $1/12,\; -2/3,\; 0,\; 2/3,\; -1/12$ \\
+6 & 7 & $-1/60,\; 3/20,\; -3/4,\; 0,\; 3/4,\; -3/20,\; 1/60$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{2nd derivative (central):}
+\label{par:lapl-stencils}
+
+\begin{table}[htbp]
+\centering
+\caption{Central second-derivative stencil coefficients ($\times\, 1/\Delta x^2$).}
+\label{tab:lapl-stencils}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Order & Points & Coefficients \\
+\midrule
+2 & 3 & $1,\; -2,\; 1$ \\
+4 & 5 & $-1/12,\; 4/3,\; -5/2,\; 4/3,\; -1/12$ \\
+6 & 7 & $1/90,\; -3/20,\; 3/2,\; -49/18,\; 3/2,\; -3/20,\; 1/90$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Ref: Fornberg (1988), Mathematics of Computation 51(184), pp.\ 699--706.
+
+\subsubsection{Spatial Accuracy ($N=64$, Gradient of $\sin(x)$)}
+\label{sec:spatial-accuracy}
+
+\begin{table}[htbp]
+\centering
+\caption{Spatial accuracy of FD stencils for gradient of $\sin(x)$ at $N=64$.}
+\label{tab:spatial-accuracy}
+\begin{tabular}{@{}lll@{}}
+\toprule
+FD Order & Max Error & Improvement vs order 2 \\
+\midrule
+2 & $1.6 \times 10^{-3}$ & baseline \\
+4 & $3.1 \times 10^{-6}$ & 500$\times$ \\
+6 & $6.4 \times 10^{-9}$ & 500$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Architecture}
+\label{sec:fd-architecture}
+
+\begin{itemize}
+  \item Module-level state: \texttt{\_fd\_order}, \texttt{\_n\_ghost}, \texttt{set\_fd\_order()}, \texttt{get\_fd\_order()}
+  \item Variable-width ghost cells: 1/2/3 per side for orders 2/4/6
+  \item All ghost-cell slice tuples pre-cached in \texttt{\_PadEntry.\_\_init\_\_} for zero
+    per-call allocation overhead
+  \item Cross-derivative via successive \texttt{gradient()} calls --- automatically inherits FD order
+  \item Biharmonic = \texttt{laplacian(laplacian(data))} --- inherits order automatically
+  \item Recursive ghost fill for non-periodic BCs (layer-by-layer from interior outward)
+\end{itemize}
+
+\subsubsection{Energy Measurement Consistency}
+\label{sec:energy-consistency}
+
+The energy measurement module (\texttt{\_energy.py}) delegates all spatial operators
+to \texttt{operators.py} instead of maintaining independent duplicate stencils. This
+ensures energy measurement tracks the discrete (shadow) Hamiltonian exactly
+when FD order changes --- critical for conservation diagnostics.
+
+Ref: Hairer, Lubich \& Wanner (2006), ``Geometric Numerical Integration'',
+Ch.~VI, Springer --- stencil-measurement consistency.
+
+\subsubsection{Constraint Solver FFT Multipliers}
+\label{sec:fft-multipliers}
+
+The FFT constraint solver (\texttt{constraint\_solve.py}) uses FD-order-aware modified
+wavenumber Fourier symbols:
+
+\begin{itemize}
+  \item Order 2: $k_\mathrm{eff}^2 = -(2/h^2)(1 - \cos(kh))$
+  \item Order 4: $k_\mathrm{eff}^2 = (1/h^2)(-\cos(2kh)/6 + 8\cos(kh)/3 - 5/2)$
+  \item Order 6: $k_\mathrm{eff}^2 = (1/h^2)(\cos(3kh)/45 - 3\cos(2kh)/10 + 3\cos(kh) - 49/18)$
+\end{itemize}
+
+This ensures the constraint IC solution is spectrally consistent with the
+FD stencils used during time evolution.
+
+\subsubsection{Sparsity Pattern}
+\label{sec:sparsity-fd}
+
+\texttt{sparsity.py} returns wider offset sets based on \texttt{get\_n\_ghost()}:
+
+\begin{itemize}
+  \item Order 2: $[-1, 0, +1]$
+  \item Order 4: $[-2, -1, 0, +1, +2]$
+  \item Order 6: $[-3, -2, -1, 0, +1, +2, +3]$
+\end{itemize}
+
+\subsubsection{Persistence}
+\label{sec:fd-persistence}
+
+FD order is saved in \texttt{metadata.json} via \texttt{\_writer.py} and restored by \texttt{\_io.py}
+on load, so that measurement tools use the correct stencils.
+
+\subsubsection{CLI Default}
+\label{sec:fd-cli-default}
+
+The CLI default is \texttt{--fd-order 4} (5-point Fornberg stencil), which provides
+$O(\Delta x^4)$ convergence at $\sim$10\% per-step overhead vs order 2. The module-level
+default stays at 2 for backward compatibility with library/test code.
+
+\subsubsection{Files Modified}
+\label{sec:fd-files}
+
+\texttt{operators.py}, \texttt{sparsity.py}, \texttt{\_energy.py}, \texttt{\_writer.py}, \texttt{\_io.py},
+\texttt{\_simulate.py}, \texttt{cli/\_\_init\_\_.py}, \texttt{constraint\_solve.py},
+\texttt{tests/test\_fd\_order.py} (18 tests), \texttt{tests/test\_measurement.py} (3 tests updated).
+
+\subsubsection{References}
+\label{sec:fd-references}
+
+\begin{itemize}
+  \item Fornberg, B.\ (1988). ``Generation of Finite Difference Formulas on Arbitrarily
+    Spaced Grids''. Mathematics of Computation 51(184), pp.\ 699--706.
+  \item LeVeque, R.J.\ (2007). ``Finite Difference Methods for Ordinary and Partial
+    Differential Equations''. SIAM. Ch.\ 1--3.
+  \item Hairer, E., Lubich, C.\ \& Wanner, G.\ (2006). ``Geometric Numerical Integration''.
+    Springer. Ch.\ VI.
+\end{itemize}
+
+\subsection{Phase 2: Yoshida 4th-Order Symplectic Leapfrog}
+\label{sec:yoshida}
+
+\textbf{CLI flag}: \texttt{--leapfrog-order 2|4} (default: auto-detect)
+
+\textbf{Auto-detection}: When \texttt{--leapfrog-order} is not specified and \texttt{--scheme leapfrog}
+is used, the integrator order is auto-selected based on equation properties:
+
+\begin{itemize}
+  \item \textbf{Order 4 (Yoshida)}: time-independent coefficients AND no dissipative terms
+    (\texttt{first\_derivative\_t}). These are the conditions under which the symplectic
+    structure is preserved and the negative middle sub-step is safe.
+  \item \textbf{Order 2 (St\"ormer--Verlet)}: dissipative terms or time-dependent coefficients
+    detected. A warning is issued if the user explicitly requests \texttt{--leapfrog-order 4}
+    with incompatible systems.
+\end{itemize}
+
+Yoshida triple-composition of St\"ormer--Verlet sub-steps~\cite{yoshida1990symplectic}:
+\begin{equation}
+  S_4(\Delta t) = S_2(w_1 \Delta t) \circ S_2(w_2 \Delta t) \circ S_2(w_3 \Delta t)
+  \label{eq:yoshida-composition}
+\end{equation}
+where $w_1 = w_3 = 1/(2 - 2^{1/3}) \approx 1.3512$, $w_2 = -2^{1/3}/(2 - 2^{1/3}) \approx -1.7024$.
+
+The negative middle weight $w_2$ causes a backward sub-step that cancels the
+leading $O(\Delta t^2)$ error term, achieving $O(\Delta t^4)$ accuracy.
+
+\subsubsection{Key Insight: Speedup Comes from Accuracy, Not Per-Step Cost}
+\label{sec:yoshida-speedup}
+
+Each individual Yoshida step is approximately 3$\times$ more expensive than a
+St\"ormer--Verlet step (3 force evaluations vs 1, using the fused-kick
+optimization below). However, the $O(\Delta t^4)$ accuracy means far fewer total
+steps are needed to reach a given error target. The speedup is realized
+when comparing wall-clock time at \textbf{equal accuracy}, not equal step count:
+
+\begin{table}[htbp]
+\centering
+\caption{Yoshida vs St\"ormer--Verlet: wall-clock comparison at equal accuracy.}
+\label{tab:yoshida-benchmark}
+\begin{tabular}{@{}llllll@{}}
+\toprule
+Integrator & $\Delta t$ & Steps & Force evals & Wall-clock & Error \\
+\midrule
+Verlet & 0.020 & 1000 & 2001 & 0.071\,s & $7.5 \times 10^{-5}$ \\
+Verlet & 0.010 & 2000 & 4001 & 0.118\,s & $1.9 \times 10^{-5}$ \\
+Verlet & 0.005 & 4000 & 8001 & 0.224\,s & $4.5 \times 10^{-6}$ \\
+Yoshida & 0.050 & 400 & 2400 & 0.117\,s & $7.8 \times 10^{-6}$ \\
+Yoshida & 0.040 & 500 & 3000 & 0.147\,s & $3.3 \times 10^{-6}$ \\
+Yoshida & 0.020 & 1000 & 6000 & 0.280\,s & $3.8 \times 10^{-7}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Equal-accuracy comparison ($\sim 4 \times 10^{-6}$ error):}
+\begin{itemize}
+  \item Verlet $\Delta t=0.005$: 4000 steps, 8001 force evals, 0.21\,s
+  \item Yoshida $\Delta t=0.040$: 500 steps, 3000 force evals, 0.14\,s
+  \item \textbf{Speedup: 1.5$\times$ wall-clock, 2.7$\times$ fewer force evaluations}
+\end{itemize}
+
+Benchmark: coupled scalars, $N=256$, \texttt{fd\_order=4}, $t_\mathrm{end}=20$.
+
+\subsubsection{Convergence Order Verification}
+\label{sec:convergence-verification}
+
+Temporal convergence measured by comparing to a fine-$\Delta t$ reference solution
+on the same spatial grid (eliminating spatial error):
+
+\begin{itemize}
+  \item \textbf{Verlet slopes: $\sim$2.0} ($O(\Delta t^2)$) --- confirmed
+  \item \textbf{Yoshida slopes: $\sim$4.0} ($O(\Delta t^4)$) --- confirmed
+\end{itemize}
+
+\subsubsection{Energy Conservation}
+\label{sec:yoshida-energy}
+
+Both integrators preserve a shadow Hamiltonian to machine precision (zero
+secular drift). The shadow Hamiltonian error scales with the integrator order:
+
+\begin{itemize}
+  \item Verlet: $|\mathrm{d}E/E| < 10^{-4}$ at $\Delta t=0.01$ over $t=10$
+  \item Yoshida: $|\mathrm{d}E/E| < 10^{-6}$ at $\Delta t=0.01$ over $t=10$ (100$\times$ tighter)
+\end{itemize}
+
+\subsubsection{Architecture}
+\label{sec:yoshida-architecture}
+
+\begin{itemize}
+  \item Module constants: \texttt{\_W1}, \texttt{\_W2}, \texttt{YOSHIDA\_WEIGHTS} (exported)
+  \item \texttt{solve\_leapfrog()} accepts \texttt{order=2|4} keyword argument (default 2)
+  \item Order 2 path unchanged (KDK with force caching, 1 force eval/step)
+  \item Order 4: fused-kick scheme (Forest \& Ruth, 1990; Hairer et al., 2006
+    II.4) merges adjacent half-kicks between sub-steps, reducing 6 $\to$ 3
+    force evaluations per step (plus 1 initial). Benchmarked 1.7--2.0$\times$
+    speedup over naive 6-eval implementation. Mathematically identical
+    (max diff $< 10^{-12}$ vs unfused).
+  \item Sub-step time tracked via \texttt{t\_sub} variable for correct handling of
+    time-dependent coefficients (background fields, time-varying sources).
+    This makes the implementation general --- not limited to time-independent
+    systems like Klein--Gordon.
+\end{itemize}
+
+\subsubsection{CFL Auto-Adjustment}
+\label{sec:cfl-adjustment}
+
+The effective CFL limit for Yoshida is reduced by $\max(|w_i|) \approx 1.70$ because
+the middle sub-step has $|w_2| > 1$. The CLI (\texttt{\_simulate.py}) auto-adjusts $\Delta t$
+by this factor when \texttt{--leapfrog-order 4} is specified, before snapshot
+configuration to ensure correct writer pre-allocation.
+
+\subsubsection{Files Modified}
+\label{sec:yoshida-files}
+
+\texttt{leapfrog.py}, \texttt{cli/\_\_init\_\_.py}, \texttt{cli/\_simulate.py},
+\texttt{tests/test\_solver\_leapfrog.py} (17 tests total, 9 new Yoshida tests).
+
+\subsubsection{References}
+\label{sec:yoshida-references}
+
+\begin{itemize}
+  \item Yoshida, H.\ (1990). ``Construction of higher order symplectic integrators''.
+    Physics Letters A, 150(5--7), pp.\ 262--268~\cite{yoshida1990symplectic}.
+  \item Forest, E.\ \& Ruth, R.D.\ (1990). ``Fourth-order symplectic integration''.
+    Physica D, 43(1), pp.\ 105--117. (Fused-kick composition method.)
+  \item Hairer, E., Lubich, C.\ \& Wanner, G.\ (2006). ``Geometric Numerical Integration''.
+    Springer. Ch.\ VI: Symplectic Integration of Hamiltonian Systems;
+    Ch.\ II.4: Composition Methods.
+\end{itemize}
+
+\subsection{Python Micro-Optimizations (Rounds 1--6)}
+\label{sec:micro-optimizations}
+
+These optimizations target the Python hot path in the solver loop. IDA and
+CVODE spend $\sim$78\% of wall time in C code (SUNDIALS), so Python-side gains
+are limited for those backends. Leapfrog (pure Python) benefits the most.
+
+\subsubsection{Round 1: Operator Caching in CoefficientEvaluator}
+\label{sec:round1}
+
+Precompute L0-resolved coefficients at spec load time.
+
+\subsubsection{Round 2: Grid-Shape Buffer Reuse}
+\label{sec:round2}
+
+Pre-allocated output buffers for spatial operators in \texttt{operators.py}.
+
+\subsubsection{Round 3: Slot Groups, FieldSet Reuse, RHS Buffers, Regex}
+\label{sec:round3}
+
+\begin{itemize}
+  \item \texttt{StateLayout} slot groups: 4 \texttt{@cached\_property} methods returning tuples
+    of \texttt{(int, slice, str)} --- eliminates per-timestep branching in all 4 solvers
+  \item \texttt{FieldSet.rebind()}: zero-allocation flat array swap, replaces
+    \texttt{FieldSet.from\_flat()} per timestep
+  \item RHS term buffer: \texttt{np.multiply(coeff, operated, out=temp)} eliminates
+    $N-1$ temporary arrays per \texttt{evaluate()}
+  \item Pre-compiled regex patterns in \texttt{\_eval\_utils.py}
+\end{itemize}
+
+\subsubsection{Round 4: Hot-Path Operator Optimizations}
+\label{sec:round4}
+
+\begin{itemize}
+  \item \texttt{np.roll} replaced by ghost-cell padding via \texttt{\_pad\_axis()} + slice views
+    (1.7--2.4$\times$ per operator)
+  \item \texttt{grid.dx} as \texttt{@cached\_property} (13.4$\times$ faster access)
+  \item Pre-resolved operator dispatch in \texttt{RHSEvaluator.\_\_init\_\_}
+  \item Fused \texttt{laplacian()} normalizes BCs once for all axes
+\end{itemize}
+
+IDA speedup: 1.13--1.40$\times$.
+
+\subsubsection{Round 5: Per-Call Allocation Elimination}
+\label{sec:round5}
+
+\begin{itemize}
+  \item \texttt{\_str\_to\_axis\_bc} singleton cache (6.1$\times$ faster)
+  \item \texttt{\_PadEntry} + \texttt{\_PadBufferCache}: pre-allocated padded buffers + cached
+    slice tuples per (shape, axis)
+  \item In-place stencil arithmetic eliminates 2 temporaries per Laplacian
+\end{itemize}
+
+Scipy end-to-end: 1.29$\times$ (22.4\% faster).
+
+\subsubsection{Round 6: Inner Solver Hot-Path}
+\label{sec:round6}
+
+\begin{itemize}
+  \item KDK force caching in leapfrog: halves force evaluations ($2N \to N+1$)
+  \item Yoshida fused-kick: halves force evaluations ($6N \to 3N+1$), 1.7--2.0$\times$ speedup
+  \item Zero-copy drift via \texttt{StateLayout.drift\_slot\_pairs}
+  \item IDA \texttt{begin\_timestep} dedup
+  \item \texttt{FieldSet} pre-computed offsets
+  \item \texttt{CoefficientEvaluator.resolve()} fast path
+\end{itemize}
+
+Leapfrog speedup: 1.66$\times$.
+
+\subsection{Phase 3: FFT Spectral Operators}
+\label{sec:spectral}
+
+\textbf{CLI flag}: \texttt{--spectral} / \texttt{--no-spectral} (default: auto-detect)
+
+FFT-based pseudo-spectral operators for periodic domains. Achieves
+exponential convergence for smooth problems --- typically $N=64$--$128$ instead
+of $N=512$--$1024$ for equivalent accuracy. Band-limited functions (e.g.\
+single Fourier modes) are differentiated \textbf{exactly} to machine precision.
+
+\textbf{Auto-detection}: When neither \texttt{--spectral} nor \texttt{--no-spectral} is passed,
+spectral mode is automatically enabled when all BCs are periodic. If IDA
+is auto-selected (e.g.\ for constraint/dissipative systems), spectral is
+silently disabled since IDA requires sparse Jacobians. Explicit \texttt{--spectral}
+with IDA auto-selection switches to CVODE; explicit \texttt{--spectral --scheme ida}
+returns an error.
+
+\subsubsection{Architecture}
+\label{sec:spectral-architecture}
+
+\begin{itemize}
+  \item \textbf{Module state}: \texttt{\_use\_spectral: bool}, \texttt{set\_spectral()}, \texttt{get\_spectral()}
+    in \texttt{operators.py} --- analogous to \texttt{set\_fd\_order()}.
+  \item \textbf{Wavenumber cache}: \texttt{\_wavenum\_cache: dict[(n, dx), ndarray]} --- pre-computed
+    $k = 2\pi\,\texttt{rfftfreq}(n, d=\Delta x)$, cached per $(N, \Delta x)$ pair.
+  \item \textbf{Spectral operators}: \texttt{\_spectral\_gradient()}, \texttt{\_spectral\_directional\_laplacian()},
+    \texttt{\_spectral\_laplacian()}, \texttt{\_spectral\_cross\_derivative()}, \texttt{\_spectral\_biharmonic()}.
+\end{itemize}
+
+All spectral operators follow the same pattern:
+\begin{enumerate}
+  \item \texttt{rfft(f, axis=axis)} --- transform to frequency space (half-complex)
+  \item Multiply by spectral symbol ($ik$ for gradient, $-k^2$ for Laplacian)
+  \item \texttt{irfft(f\_hat, n=n, axis=axis)} --- transform back to physical space
+\end{enumerate}
+
+Uses \texttt{np.fft.rfft}/\texttt{irfft} for real-valued fields (half the storage of
+complex FFT).
+
+\subsubsection{Dispatch}
+\label{sec:spectral-dispatch}
+
+When \texttt{\_use\_spectral} is \texttt{True}, all spatial operator functions (\texttt{gradient},
+\texttt{directional\_laplacian}, \texttt{laplacian}, \texttt{cross\_derivative}, \texttt{biharmonic})
+dispatch to spectral versions at the top of the function body, before any
+FD stencil logic. The \texttt{identity} operator is unchanged in both modes.
+
+The \texttt{OPERATOR\_REGISTRY} closures (\texttt{\_make\_directional\_laplacian}, etc.) call
+through the top-level functions, so spectral dispatch happens automatically
+for all callers including \texttt{RHSEvaluator}.
+
+\subsubsection{Position-Dependent Coefficients}
+\label{sec:spectral-pos-dep}
+
+Fully compatible. The pseudo-spectral approach computes the derivative in
+Fourier space and returns to physical space. Position-dependent coefficients
+are then applied element-wise in physical space by \texttt{RHSEvaluator}:
+
+\begin{lstlisting}[style=python]
+result = coeff(x) * operator(field)  # operator returns physical-space array
+\end{lstlisting}
+
+This is the standard pseudo-spectral approach used by Dedalus, py-pde, etc.
+
+\subsubsection{Solver Compatibility}
+\label{sec:spectral-compatibility}
+
+Spectral operators produce \textbf{dense coupling} (every grid point depends on
+every other), incompatible with IDA's sparse Jacobian infrastructure.
+The CLI handles this automatically:
+
+\begin{itemize}
+  \item \textbf{Auto-selected IDA}: switches to CVODE with a warning
+  \item \textbf{Explicit \texttt{--scheme ida}}: returns error
+  \item \textbf{leapfrog, scipy, cvode}: work normally (no Jacobian needed for explicit
+    solvers; CVODE uses its own internal Newton iteration)
+\end{itemize}
+
+\subsubsection{Sparsity Pattern}
+\label{sec:spectral-sparsity}
+
+When \texttt{get\_spectral()} is \texttt{True}, \texttt{operator\_stencil\_offsets()} returns a
+dense offset pattern (all-to-all coupling). Since the CLI blocks
+IDA+spectral, this code path should not be reached in practice.
+
+\subsubsection{Accuracy (Gradient of $\sin(x)$, Periodic $[0, 2\pi]$)}
+\label{sec:spectral-accuracy}
+
+\begin{table}[htbp]
+\centering
+\caption{Spatial accuracy: FD vs spectral for gradient of $\sin(x)$.}
+\label{tab:spectral-accuracy}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Mode & $N$ & Max Error & Notes \\
+\midrule
+FD order 2 & 64 & $1.6 \times 10^{-3}$ & $O(\Delta x^2)$ algebraic \\
+FD order 4 & 64 & $3.1 \times 10^{-6}$ & $O(\Delta x^4)$ algebraic \\
+FD order 6 & 64 & $6.4 \times 10^{-9}$ & $O(\Delta x^6)$ algebraic \\
+Spectral & 8 & $< 10^{-13}$ & \textbf{Exact} (machine precision) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{End-to-End Integration (1D Klein--Gordon, Leapfrog, $\Delta t=0.005$, $t=2$)}
+\label{sec:spectral-e2e}
+
+\begin{table}[htbp]
+\centering
+\caption{End-to-end integration accuracy: FD vs spectral.}
+\label{tab:spectral-e2e}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Mode & $N$ & Error vs analytic & Notes \\
+\midrule
+FD order 2 & 512 & $9.2 \times 10^{-7}$ & temporal error dominates \\
+\textbf{Spectral} & 64 & $1.8 \times 10^{-6}$ & 8$\times$ fewer DOFs, same order of accuracy \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Both errors are $O(\Delta t^2)$ temporal --- spectral eliminates spatial error entirely,
+so the only error source is the time integrator.
+
+\subsubsection{Persistence}
+\label{sec:spectral-persistence}
+
+Spectral flag saved as \texttt{"spectral": true} in \texttt{metadata.json} via \texttt{\_writer.py}
+and restored by \texttt{\_io.py} on load, so measurement tools use the correct
+operators for energy computation.
+
+\subsubsection{Files Modified}
+\label{sec:spectral-files}
+
+\texttt{operators.py}, \texttt{sparsity.py}, \texttt{cli/\_\_init\_\_.py}, \texttt{cli/\_simulate.py},
+\texttt{\_writer.py}, \texttt{\_io.py}, \texttt{conftest.py}, \texttt{tests/test\_spectral.py} (29 tests).
+
+\subsubsection{References}
+\label{sec:spectral-references}
+
+\begin{itemize}
+  \item Burns, K.J., Vasil, G.M., Oishi, J.S., Lecoanet, D.\ \& Brown, B.P.\
+    (2020). ``Dedalus: A flexible framework for numerical simulations with
+    spectral methods''. Physical Review Research 2:023068.
+  \item Gottlieb, D.\ \& Orszag, S.A.\ (1977). ``Numerical Analysis of Spectral
+    Methods''. SIAM. Ch.\ 1--3.
+  \item Boyd, J.P.\ (2001). ``Chebyshev and Fourier Spectral Methods''. Dover. Ch.\ 2.
+\end{itemize}

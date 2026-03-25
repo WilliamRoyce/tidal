@@ -1,0 +1,98 @@
+% TIDAL Documentation — Shared LaTeX Preamble
+% Include via \input{preamble} at the top of each .tex doc
+% These packages and macros are available to all docs and
+% can be directly \input{} into the project report.
+
+% --- Packages ---
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{physics}       % \nabla, \partial, \dd, \bra, \ket, etc.
+\usepackage{tensor}        % \tensor{h}{_\mu_\nu} for index placement
+\usepackage{bm}            % bold math (\bm{k}, \bm{B})
+\usepackage{mathrsfs}      % \mathscr for Lagrangian, Hamiltonian density
+\usepackage{hyperref}
+\usepackage{cleveref}      % \cref{eq:mixing} -> "Eq. (1)"
+\usepackage{booktabs}      % professional tables
+\usepackage{siunitx}       % SI units: \SI{10}{\giga\hertz}
+\usepackage{tikz}
+\usepackage{xcolor}
+
+% --- Code listings ---
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  xleftmargin=1em,
+  framexleftmargin=0.5em,
+  numbers=none,
+  tabsize=2,
+  captionpos=b,
+}
+\lstdefinestyle{python}{
+  language=Python,
+  keywordstyle=\bfseries\color{blue!70!black},
+  stringstyle=\color{red!60!black},
+  commentstyle=\itshape\color{green!40!black},
+}
+\lstdefinestyle{bash}{
+  language=bash,
+  keywordstyle=\bfseries\color{green!40!black},
+  commentstyle=\itshape\color{gray},
+}
+\lstdefinestyle{json}{
+  string=[s]{"}{"},
+  stringstyle=\color{blue!70!black},
+  comment=[l]{//},
+  commentstyle=\itshape\color{gray},
+}
+\lstdefinestyle{toml}{
+  comment=[l]{\#},
+  commentstyle=\itshape\color{gray},
+  keywordstyle=\bfseries,
+  morestring=[b]",
+  stringstyle=\color{red!60!black},
+}
+\lstdefinestyle{mathematica}{
+  keywordstyle=\bfseries\color{purple!70!black},
+  commentstyle=\itshape\color{gray},
+  morecomment=[s]{(*}{*)},
+  morestring=[b]",
+  stringstyle=\color{red!60!black},
+}
+
+% --- TikZ figure style (reuse existing project styles) ---
+% When compiling standalone, uncomment:
+% \input{../figures/tidal-tikz-styles.sty}
+
+% --- Custom macros ---
+
+% Fields
+\newcommand{\lag}{\mathscr{L}}           % Lagrangian density
+\newcommand{\ham}{\mathscr{H}}           % Hamiltonian density
+\newcommand{\field}[1]{\mathcal{#1}}     % field components: \field{H}_{xy}
+
+% Operators
+\newcommand{\lapl}{\nabla^2}             % Laplacian
+\newcommand{\ddt}{\partial_t}            % time derivative
+\newcommand{\ddx}{\partial_x}            % spatial derivatives
+\newcommand{\ddy}{\partial_y}
+\newcommand{\ddz}{\partial_z}
+
+% Metrics
+\newcommand{\gmunu}{g_{\mu\nu}}          % metric tensor
+\newcommand{\etamunu}{\eta_{\mu\nu}}     % Minkowski metric
+\newcommand{\sqrtg}{\sqrt{|g|}}          % metric determinant
+
+% Perturbation theory
+\newcommand{\pert}[1]{\delta #1}         % linear perturbation
+\newcommand{\bg}[1]{\bar{#1}}            % background value
+
+% Gertsenshtein
+\newcommand{\Bzero}{B_0}                 % background magnetic field
+\newcommand{\kappa}{\varkappa}           % graviton-photon coupling
+\newcommand{\Pconv}{P_\mathrm{conv}}     % conversion probability
+
+% Torsion
+\newcommand{\torsion}{T}                 % torsion tensor
+\newcommand{\contorsion}{K}              % contorsion tensor
+\newcommand{\ricci}{\tilde{R}}           % Ricci scalar with torsion

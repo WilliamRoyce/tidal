@@ -63,7 +63,7 @@ body:
       options:
         - Beginners / New users
         - xAct/Wolfram users
-        - Python/py-pde users
+        - Python solver users
         - Contributors
         - All users
     validations:

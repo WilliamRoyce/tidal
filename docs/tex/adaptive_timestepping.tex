@@ -1,0 +1,408 @@
+% Adaptive Time-Stepping
+% Source: docs/adaptive_timestepping.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Adaptive Time-Stepping}
+\label{sec:adaptive-timestepping}
+
+\textbf{Status:} Implemented (CVODE + scipy + IDA + leapfrog) \\
+\textbf{Date:} 2026-02-23
+
+Tolerance-controlled adaptive time-stepping replaces manual $\Delta t$ selection
+with error-controlled solvers that automatically choose step sizes. Users
+specify accuracy targets (via \texttt{--rtol}/\texttt{--atol}) instead of guessing a
+stable $\Delta t$.
+
+\subsection{Problem Statement}
+\label{sec:at-problem}
+
+Fixed-step integrators (leapfrog) require the user to manually satisfy the
+CFL condition: $\Delta t < \Delta x / c_\mathrm{max}$. This has three problems:
+
+\begin{enumerate}
+  \item \textbf{Fragility.} A $\Delta t$ that works for one parameter set can be unstable
+    for another. Getting it wrong produces garbage output that can look
+    plausible.
+
+  \item \textbf{Inefficiency.} A $\Delta t$ chosen for the fastest mode wastes compute on
+    slow phases. Resonant mixing (the Gertsenshtein effect) has beat
+    frequencies much slower than the carrier --- fixed steps resolve every
+    carrier cycle even when nothing interesting is happening. Berlin et al.\
+    (2024)~\cite{berlin2024axionphoton} document these numerical challenges.
+
+  \item \textbf{No accuracy guarantee.} Leapfrog energy error is $O(\Delta t^2)$ --- the
+    shadow Hamiltonian drifts by an amount proportional to $\Delta t^2$. There is no
+    built-in error control to bound this.
+\end{enumerate}
+
+\subsection{Four Solver Paths}
+\label{sec:solver-paths}
+
+\subsubsection{\texttt{--scheme auto} (Default): Intelligent Selection}
+\label{sec:scheme-auto}
+
+Auto-selection \textbf{always} picks a tolerance-controlled adaptive solver.
+Leapfrog is opt-in only via \texttt{--scheme leapfrog}.
+
+Detection algorithm:
+
+\begin{table}[htbp]
+\centering
+\caption{Auto-selection priority for solver schemes.}
+\label{tab:auto-selection}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Priority & Condition & Solver & Reason \\
+\midrule
+1 & Modal eligible (flat metric + periodic BCs + time-independent + supported operators) & \textbf{Modal} & Machine-precision eigendecomposition, $O(1)$ in $t_\mathrm{end}$. See \cref{sec:scheme-modal} \\
+2 & Constraint equations (\texttt{time\_order=0}) not modal-eligible & IDA & Algebraic constraints need DAE residual form \\
+3 & First-order equations (\texttt{time\_order=1}) & IDA & Diffusion/transport need implicit handling \\
+4 & Dissipation (\texttt{first\_derivative\_t} in RHS) & IDA & Friction breaks symplecticity, BDF handles well \\
+5 & No canonical Hamiltonian & CVODE (warning) & Missing canonical section --- likely hand-crafted JSON \\
+6 & Pure wave (2nd-order, Hamiltonian) & CVODE & Adaptive BDF, no DAE overhead \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{\texttt{--scheme cvode}: SUNDIALS CVODE (Adaptive ODE)}
+\label{sec:scheme-cvode}
+
+Pure ODE solver using SUNDIALS CVODE via scikit-sundae. Supports BDF
+(stiff, order 1--5) and Adams (non-stiff, order 1--12).
+
+\begin{lstlisting}[style=bash]
+tidal simulate spec.json --scheme cvode                 # BDF default
+tidal simulate spec.json --scheme cvode --method Adams   # Non-stiff
+tidal simulate spec.json --scheme cvode --rtol 1e-6      # Custom tolerance
+\end{lstlisting}
+
+\textbf{Best for:} Wave systems (the auto-selected default for pure wave
+equations). BDF handles the mild stiffness from spatial discretization
+(eigenvalues scale with $1/\Delta x^2$). In-place RHS evaluation avoids
+per-call allocation.
+
+Reference: Hindmarsh et al.~\cite{hindmarsh2005sundials}, ``SUNDIALS: Suite of Nonlinear and
+Differential/Algebraic Equation Solvers'', ACM TOMS 31(3).
+
+\subsubsection{\texttt{--scheme modal}: Fourier Modal Solver (Exact Eigendecomposition)}
+\label{sec:scheme-modal}
+
+Transforms spatial grid to Fourier space, builds per-mode evolution matrix,
+and eigendecomposes for exact $y(t) = \exp(A \cdot t) \cdot y_0$ solutions. No time-stepping,
+no CFL condition, no tolerance parameter needed.
+
+\begin{lstlisting}[style=bash]
+tidal simulate spec.json --scheme modal                  # Auto for eligible
+\end{lstlisting}
+
+\textbf{Best for:} Periodic-domain wave systems with time-independent coefficients
+(the auto-selected default for eligible systems). Machine-precision accuracy
+($\sim 10^{-16}$ error). Cost is $O(1)$ in simulation time --- eigendecomposition is done
+once, evaluation at any $t$ is just $\exp(\lambda \cdot \Delta t)$. Speedup over CVODE: 57--1451$\times$
+on \texttt{coupled\_scalars} ($N=64$--$256$), 3.4--7.7$\times$ on Gertsenshtein ($N=256$, $t=50$--$500$).
+Constraint systems (e.g., Proca $A_0$) are handled via Fourier Schur complement
+elimination --- 9.5$\times$ speedup over IDA on \texttt{coupled\_proca\_3d}.
+
+\textbf{Requires:} Flat metric, all-periodic BCs, time-independent coefficients,
+supported Fourier operators. Position-dependent coefficients are handled via
+$k$-space convolution.
+
+\subsubsection{\texttt{--scheme ida}: SUNDIALS IDA (Adaptive DAE)}
+\label{sec:scheme-ida}
+
+DAE solver using SUNDIALS IDA. Handles algebraic constraints via residual
+form $F(t, y, y') = 0$.
+
+\begin{lstlisting}[style=bash]
+tidal simulate spec.json --scheme ida                    # Auto for DAE
+tidal simulate spec.json --scheme ida --rtol 1e-6        # Custom tolerance
+\end{lstlisting}
+
+\textbf{Best for:} Constraint systems (Chern--Simons, coupled Proca), dissipative
+systems (Hubble friction), and any system with mixed time-derivative orders.
+
+\subsubsection{\texttt{--scheme scipy}: scipy \texttt{solve\_ivp} (Adaptive ODE)}
+\label{sec:scheme-scipy}
+
+Wraps \texttt{scipy.integrate.solve\_ivp}. Default method is DOP853 (8th-order
+Dormand--Prince), an explicit one-step method with excellent accuracy per
+function evaluation.
+
+\begin{lstlisting}[style=bash]
+tidal simulate spec.json --scheme scipy                  # DOP853 default
+tidal simulate spec.json --scheme scipy --method RK45    # Lower-order explicit
+tidal simulate spec.json --scheme scipy --method Radau   # Implicit (stiff)
+tidal simulate spec.json --scheme scipy --method BDF     # Implicit multi-step
+\end{lstlisting}
+
+\textbf{Best for:} Smooth non-stiff wave problems where explicit high-order
+methods outperform implicit BDF (fewer function evaluations per accuracy
+unit). Also useful when scipy's Radau is preferred over SUNDIALS.
+
+Reference: Dormand \& Prince (1980), ``A family of embedded Runge--Kutta
+formulae'', J.\ Comp.\ Appl.\ Math.\ 6, 19--26.
+
+\subsubsection{\texttt{--scheme leapfrog}: Symplectic (Opt-In, Fixed $\Delta t$)}
+\label{sec:scheme-leapfrog}
+
+St\"ormer--Verlet symplectic integrator. Preserves a shadow Hamiltonian to
+machine precision --- zero secular energy drift.
+
+\begin{lstlisting}[style=bash]
+tidal simulate spec.json --scheme leapfrog               # CFL-auto dt
+tidal simulate spec.json --scheme leapfrog --dt 0.01     # Manual dt
+\end{lstlisting}
+
+\textbf{Best for:} Long-time Hamiltonian evolution where zero energy drift
+matters more than per-step accuracy. Not suitable for dissipative systems,
+constraints, or when tolerance control is needed.
+
+Reference: Hairer, Lubich \& Wanner (2006), ``Geometric Numerical
+Integration'', Springer, Chapter~VI.
+
+\subsubsection{Choosing a Solver}
+\label{sec:choosing-solver}
+
+\begin{table}[htbp]
+\centering
+\caption{Solver recommendation by scenario.}
+\label{tab:solver-recommendation}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Scenario & Recommended \\
+\midrule
+Default (any system) & \texttt{--scheme auto} (always adaptive) \\
+Wave equation, production accuracy & \texttt{--scheme cvode --rtol 1e-8} \\
+Constraint system ($A_0$, gauge fields) & \texttt{--scheme ida} (auto-selected) \\
+Dissipative system (friction, damping) & \texttt{--scheme ida} (auto-selected) \\
+Smooth non-stiff, high accuracy & \texttt{--scheme scipy --rtol 1e-10} \\
+Long-time energy conservation & \texttt{--scheme leapfrog} \\
+Stiff system ($m^2 \Delta x^2 \gg 1$) & \texttt{--scheme scipy --method Radau} \\
+Convergence study & \texttt{--scheme cvode --rtol 1e-12 --atol 1e-14} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{CLI Reference}
+\label{sec:cli-reference}
+
+\begin{table}[htbp]
+\centering
+\caption{CLI flags for adaptive time-stepping.}
+\label{tab:cli-flags}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Flag & Type & Default & Description \\
+\midrule
+\texttt{--scheme} & \texttt{\{auto,ida,leapfrog,cvode,scipy\}} & \texttt{auto} & Solver selection \\
+\texttt{--rtol} & float & \texttt{1e-8} & Relative tolerance (adaptive solvers) \\
+\texttt{--atol} & float & \texttt{1e-10} & Absolute tolerance (adaptive solvers) \\
+\texttt{--method} & str & auto & Integration method (cvode: BDF/Adams; scipy: DOP853/RK45/Radau/BDF) \\
+\texttt{--max-step} & float & auto & Maximum step size \\
+\texttt{--dt} & float & CFL & Fixed time step (leapfrog only) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Default Tolerances}
+\label{sec:default-tolerances}
+
+All adaptive solvers use \texttt{rtol=1e-8}, \texttt{atol=1e-10} by default. These are
+production-quality defaults that bound the temporal integration error well
+below spatial discretization error for typical grid resolutions (32--256
+points).
+
+\subsubsection{Validation Rules}
+\label{sec:validation-rules}
+
+\begin{itemize}
+  \item \texttt{--rtol} must be positive
+  \item \texttt{--atol} must be positive
+  \item \texttt{--max-step} must be positive
+  \item \texttt{--method} is only meaningful with \texttt{--scheme cvode} or \texttt{--scheme scipy}
+\end{itemize}
+
+\subsection{Architecture}
+\label{sec:at-architecture}
+
+\subsubsection{Shared Infrastructure}
+\label{sec:shared-infrastructure}
+
+All four solvers share core infrastructure, minimizing code duplication:
+
+\begin{itemize}
+  \item \textbf{\texttt{compute\_force()}} (\texttt{leapfrog.py}): Evaluates $\mathrm{d}\pi/\mathrm{d}t = F(q)$ for all
+    momentum slots. Used by leapfrog, CVODE, and scipy.
+  \item \textbf{\texttt{compute\_velocity()}} (\texttt{leapfrog.py}): Evaluates $\mathrm{d}q/\mathrm{d}t = K^{-1}(\pi - S)$
+    for all field slots. Used by leapfrog, CVODE, and scipy.
+  \item \textbf{\texttt{RHSEvaluator}} (\texttt{rhs.py}): Unified operator + coefficient application.
+    Used by all four solvers.
+  \item \textbf{\texttt{CoefficientEvaluator}} (\texttt{coefficients.py}): 4-level cache (L0--L3).
+    Used by all adaptive solvers.
+  \item \textbf{\texttt{build\_jacobian\_sparsity()}} (\texttt{sparsity.py}): Jacobian sparsity pattern
+    for implicit solvers. Used by IDA, CVODE (sparse linsolver), and scipy
+    (Radau/BDF).
+  \item \textbf{\texttt{StateLayout}}, \textbf{\texttt{FieldSet}}, \textbf{\texttt{GridInfo}}: State management shared
+    by all solvers.
+\end{itemize}
+
+\subsubsection{Result Format}
+\label{sec:result-format}
+
+All solvers return the same dictionary:
+
+\begin{lstlisting}[style=python]
+{
+    "t": np.ndarray,     # (num_snapshots,) time points
+    "y": np.ndarray,     # (num_snapshots, total_size) state snapshots
+    "success": bool,     # True if integration completed
+    "message": str,      # Human-readable status
+}
+\end{lstlisting}
+
+\subsubsection{Linear Solver Selection (SUNDIALS)}
+\label{sec:linear-solver}
+
+Both CVODE and IDA use the same thresholds for automatic linear solver
+selection based on system size:
+
+\begin{table}[htbp]
+\centering
+\caption{Automatic linear solver selection by system size.}
+\label{tab:linear-solver}
+\begin{tabular}{@{}lll@{}}
+\toprule
+System Size & Linear Solver & Rationale \\
+\midrule
+$N \leq 2{,}000$ & Dense & Direct solve, minimal overhead \\
+$2{,}000 < N \leq 200{,}000$ & Sparse (SuperLU) & Exploits sparsity pattern \\
+$N > 200{,}000$ & GMRES (iterative) & Avoids $O(N^2)$ memory \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Sparsity Reuse}
+\label{sec:sparsity-reuse}
+
+The IDA sparsity builder (\texttt{build\_jacobian\_sparsity()}) produces a pattern
+for $J = \mathrm{d}F/\mathrm{d}y + c_j \cdot \mathrm{d}F/\mathrm{d}y'$. For CVODE (ODE form), the needed pattern
+is $J = \mathrm{d}f/\mathrm{d}y$. The IDA pattern is a \textbf{superset} of CVODE's true pattern:
+extra diagonal entries from $c_j \cdot I$ are always nonzero anyway. This means
+the same sparsity builder works for both solvers --- a key simplification.
+
+For scipy's implicit methods (Radau, BDF), the same pattern is passed as
+\texttt{jac\_sparsity} to \texttt{solve\_ivp}.
+
+\subsection{Design Decisions}
+\label{sec:design-decisions}
+
+\subsubsection{Why CVODE as Default for Wave Systems (Not Leapfrog)?}
+\label{sec:why-cvode}
+
+\begin{itemize}
+  \item \textbf{Tolerance-controlled:} Energy error bounded by rtol, not $O(\Delta t^2)$
+  \item \textbf{Adaptive:} Automatically picks step sizes, no CFL tuning
+  \item \textbf{Safe default:} Works correctly for all wave systems out of the box
+  \item \textbf{Stiffness handling:} BDF handles mild stiffness from $1/\Delta x^2$ eigenvalues
+  \item Leapfrog remains available for users who need symplectic integration
+\end{itemize}
+
+\subsubsection{Why CVODE over scipy as Default?}
+\label{sec:cvode-vs-scipy}
+
+\begin{itemize}
+  \item Method-of-lines PDE discretization is mildly stiff (eigenvalues near
+    imaginary axis scale with $1/\Delta x^2$). BDF handles this robustly.
+  \item DOP853 would need a CFL-like \texttt{max\_step} guard to prevent instability
+    during quiescent phases.
+  \item Same SUNDIALS ecosystem as IDA --- consistent tolerance semantics.
+  \item In-place RHS (\texttt{rhsfn(t, y, yp)}) avoids allocation per call.
+\end{itemize}
+
+\subsubsection{Why Also Provide scipy?}
+\label{sec:why-scipy}
+
+\begin{itemize}
+  \item DOP853 (8th-order explicit) excels for smooth non-stiff waves --- fewer
+    function evaluations than BDF for the same accuracy.
+  \item One-step method = no startup cost (relevant for short simulations).
+  \item Good option when implicit BDF is overkill.
+\end{itemize}
+
+\subsubsection{Why Four Solvers?}
+\label{sec:why-four}
+
+Each has a unique, irreplaceable strength:
+
+\begin{table}[htbp]
+\centering
+\caption{Unique capability of each solver backend.}
+\label{tab:unique-capabilities}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Solver & Unique Capability \\
+\midrule
+Leapfrog & Symplectic --- zero secular energy drift \\
+CVODE & Implicit adaptive ODE --- mildly stiff, tolerance-controlled \\
+IDA & DAE --- algebraic constraints (irreplaceable for Chern--Simons) \\
+scipy & Explicit adaptive --- DOP853 8th-order for smooth problems \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Usage Examples}
+\label{sec:usage-examples}
+
+\begin{lstlisting}[style=bash]
+# Default -- auto-selects best adaptive solver
+tidal simulate spec.json
+
+# Custom tolerances
+tidal simulate spec.json --rtol 1e-6 --atol 1e-8
+
+# CVODE with Adams (non-stiff, high-order)
+tidal simulate spec.json --scheme cvode --method Adams
+
+# High-accuracy explicit (DOP853)
+tidal simulate spec.json --scheme scipy --rtol 1e-10
+
+# IDA with custom tolerances
+tidal simulate spec.json --scheme ida --rtol 1e-6
+
+# Symplectic (opt-in, no tolerance control)
+tidal simulate spec.json --scheme leapfrog
+\end{lstlisting}
+
+\subsection{References}
+\label{sec:at-references}
+
+\begin{itemize}
+  \item \textbf{Hindmarsh et al.\ (2005)}~\cite{hindmarsh2005sundials}, ``SUNDIALS: Suite of Nonlinear and
+    Differential/Algebraic Equation Solvers'', ACM TOMS 31(3). --- CVODE and
+    IDA algorithms, BDF/Adams methods, SUNDIALS architecture.
+
+  \item \textbf{Hairer, N\o rsett \& Wanner (1993)}, \emph{Solving Ordinary Differential
+    Equations I: Nonstiff Problems}, Springer. --- DOP853, embedded Runge--Kutta
+    theory, error estimation.
+
+  \item \textbf{Hairer \& Wanner (1996)}, \emph{Solving Ordinary Differential Equations II:
+    Stiff and Differential-Algebraic Problems}, Springer. --- BDF, Radau,
+    stiffness theory, DAE index theory.
+
+  \item \textbf{Dormand \& Prince (1980)}, ``A family of embedded Runge--Kutta formulae'',
+    J.\ Comp.\ Appl.\ Math.\ 6, 19--26. --- The RK method family underlying DOP853.
+
+  \item \textbf{Hairer, Lubich \& Wanner (2006)}, \emph{Geometric Numerical Integration},
+    Springer. --- Symplectic integrators (St\"ormer--Verlet/leapfrog).
+
+  \item \textbf{Berlin et al.\ (2024)}~\cite{berlin2024axionphoton}, ``Numerical analysis of resonant axion-photon
+    mixing'', arXiv:2405.08865. --- Numerical challenges in resonant wave mixing
+    analogous to TIDAL's Gertsenshtein simulation.
+
+  \item \textbf{Courant, Friedrichs \& Lewy (1928)}, ``\"Uber die partiellen
+    Differenzengleichungen der mathematischen Physik'', Math.\ Ann.\ 100, 32--74.
+    --- The CFL stability condition.
+
+  \item \textbf{scikit-sundae} (NREL, BSD-3 license) --- Python wrapper for SUNDIALS
+    CVODE and IDA solvers.
+\end{itemize}

@@ -24,6 +24,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
+    from matplotlib.colors import Normalize
     from matplotlib.figure import Figure
     from numpy.typing import NDArray
 
@@ -91,6 +92,86 @@ def _evaluate_sweep_overlay(
         msg = f"Error evaluating overlay formula {formula!r}: {exc}"
         raise ValueError(msg) from exc
     return np.asarray(result, dtype=np.float64)
+
+
+# ------------------------------------------------------------------
+# Colour norm and quality overlay helpers
+# ------------------------------------------------------------------
+
+
+def _build_norm(
+    values: NDArray[np.float64],
+    *,
+    log_scale: bool = False,
+) -> Normalize:
+    """Build a matplotlib Normalize (linear) or LogNorm for colour mapping.
+
+    Returns a ``Normalize`` or ``LogNorm`` instance.  Returns a default
+    linear ``Normalize(0, 1)`` if *values* is empty or all-zero with
+    ``log_scale=True``.
+    """
+    from matplotlib.colors import LogNorm, Normalize
+
+    if len(values) == 0:
+        return Normalize(0, 1)
+    vmin, vmax = float(np.nanmin(values)), float(np.nanmax(values))
+    if log_scale:
+        # Clamp vmin to smallest positive value
+        pos = values[values > 0]
+        if len(pos) == 0:
+            return Normalize(0, 1)
+        vmin = float(pos.min())
+        vmax = max(vmax, vmin * 1.01)  # avoid vmin == vmax
+        return LogNorm(vmin=vmin, vmax=vmax)
+    return Normalize(vmin=vmin, vmax=vmax)
+
+
+def _overlay_quality_hatching(
+    ax: Axes,
+    p1_vals: NDArray[np.float64],
+    p2_vals: NDArray[np.float64],
+    quality_grid: NDArray[np.object_],
+) -> None:
+    """Overlay hatching on 2D grid cells with non-'good' crossing quality.
+
+    Hatching patterns:
+    - ``"coarse"`` — light diagonal hatching (``"/"``)
+    - ``"edge"``   — cross hatching (``"x"``)
+    - ``"none"``   — dense diagonal (``"///"``)
+    """
+    import matplotlib.patches as mpatches
+
+    n2, n1 = quality_grid.shape
+    if n1 < 2 or n2 < 2:  # noqa: PLR2004
+        return
+
+    # Cell widths (use spacing between sorted unique values)
+    dp1 = np.diff(p1_vals)
+    dp2 = np.diff(p2_vals)
+
+    hatch_map = {"coarse": "/", "edge": "x", "none": "///"}
+
+    for i2 in range(n2):
+        for i1 in range(n1):
+            q = str(quality_grid[i2, i1])
+            if q not in hatch_map:
+                continue
+            # Cell bounds: nearest shading means centred on (p1[i1], p2[i2])
+            w = float(dp1[min(i1, len(dp1) - 1)])
+            h = float(dp2[min(i2, len(dp2) - 1)])
+            x0 = float(p1_vals[i1]) - w / 2
+            y0 = float(p2_vals[i2]) - h / 2
+            rect = mpatches.Rectangle(
+                (x0, y0),
+                w,
+                h,
+                hatch=hatch_map[q],
+                fill=False,
+                edgecolor="gray",
+                linewidth=0.3,
+                zorder=2,
+            )
+            ax.add_patch(rect)
 
 
 def render_sweep_1d(
@@ -256,6 +337,8 @@ def render_sweep_2d(
     ax: Axes,
     results: SweepResults,
     metric: str,
+    *,
+    log_scale: bool = False,
 ) -> None:
     """Plot a scalar metric over two swept parameters.
 
@@ -271,6 +354,8 @@ def render_sweep_2d(
         Loaded sweep data.
     metric : str
         Column name for the color values.
+    log_scale : bool
+        Use logarithmic colorbar (useful for ``inv_B_min``).
 
     Raises
     ------
@@ -288,17 +373,19 @@ def render_sweep_2d(
     p1_name, p2_name = param_names
 
     if _is_scattered_data(results):
-        _render_2d_scattered(ax, results, p1_name, p2_name, metric)
+        _render_2d_scattered(ax, results, p1_name, p2_name, metric, log_scale=log_scale)
     else:
-        _render_2d_grid(ax, results, p1_name, p2_name, metric)
+        _render_2d_grid(ax, results, p1_name, p2_name, metric, log_scale=log_scale)
 
 
-def _render_2d_scattered(
+def _render_2d_scattered(  # noqa: PLR0913
     ax: Axes,
     results: SweepResults,
     p1_name: str,
     p2_name: str,
     metric: str,
+    *,
+    log_scale: bool = False,
 ) -> None:
     """Render 2D sweep as scatter + interpolation background."""
     p1 = np.array(results.column(p1_name), dtype=np.float64)
@@ -306,6 +393,8 @@ def _render_2d_scattered(
     metric_vals = np.array(results.column(metric), dtype=np.float64)
 
     valid = np.isfinite(metric_vals)
+    if log_scale:
+        valid &= metric_vals > 0
     p1, p2, metric_vals = p1[valid], p2[valid], metric_vals[valid]
 
     if len(metric_vals) == 0:
@@ -314,7 +403,7 @@ def _render_2d_scattered(
         )
         return
 
-    vmin, vmax = float(metric_vals.min()), float(metric_vals.max())
+    norm = _build_norm(metric_vals, log_scale=log_scale)
 
     # Interpolation background (if enough points)
     if len(metric_vals) >= 10:  # noqa: PLR2004
@@ -341,8 +430,7 @@ def _render_2d_scattered(
                 shading="auto",
                 cmap="viridis",
                 alpha=0.3,
-                vmin=vmin,
-                vmax=vmax,
+                norm=norm,
             )
         except (ValueError, ImportError):
             pass  # Fall back to scatter-only
@@ -355,8 +443,7 @@ def _render_2d_scattered(
         s=60,
         edgecolors="k",
         linewidths=0.5,
-        vmin=vmin,
-        vmax=vmax,
+        norm=norm,
         zorder=5,
     )
     ax.set_xlabel(p1_name)
@@ -365,12 +452,14 @@ def _render_2d_scattered(
     ax.figure.colorbar(sc, ax=ax, label=metric)  # type: ignore[union-attr]
 
 
-def _render_2d_grid(
+def _render_2d_grid(  # noqa: PLR0913
     ax: Axes,
     results: SweepResults,
     p1_name: str,
     p2_name: str,
     metric: str,
+    *,
+    log_scale: bool = False,
 ) -> None:
     """Render 2D sweep as pcolormesh heatmap (for grid-aligned data)."""
     p1_vals = np.sort(results.swept_params[p1_name])
@@ -378,6 +467,12 @@ def _render_2d_grid(
 
     n1, n2 = len(p1_vals), len(p2_vals)
     grid = np.full((n2, n1), np.nan)
+    quality_grid: NDArray[np.object_] | None = None
+
+    # Check for crossing_quality column (critical field results)
+    has_quality = results.rows and "crossing_quality" in results.rows[0]
+    if has_quality:
+        quality_grid = np.full((n2, n1), "", dtype=object)
 
     for row in results.rows:
         v1 = row.get(p1_name)
@@ -388,6 +483,14 @@ def _render_2d_grid(
         i1 = min(int(np.searchsorted(p1_vals, float(v1))), n1 - 1)
         i2 = min(int(np.searchsorted(p2_vals, float(v2))), n2 - 1)
         grid[i2, i1] = float(val)
+        if quality_grid is not None:
+            quality_grid[i2, i1] = row.get("crossing_quality", "")
+
+    # Build norm (linear or log)
+    valid_vals = grid[np.isfinite(grid)]
+    if log_scale:
+        valid_vals = valid_vals[valid_vals > 0]
+    norm = _build_norm(valid_vals, log_scale=log_scale) if len(valid_vals) > 0 else None
 
     im = ax.pcolormesh(
         p1_vals,
@@ -395,11 +498,16 @@ def _render_2d_grid(
         grid,
         shading="nearest",
         cmap="viridis",
+        norm=norm,
     )
     ax.set_xlabel(p1_name)
     ax.set_ylabel(p2_name)
     ax.set_title(metric)
     ax.figure.colorbar(im, ax=ax, label=metric)  # type: ignore[union-attr]
+
+    # Quality-flag hatching overlay for critical field results
+    if quality_grid is not None:
+        _overlay_quality_hatching(ax, p1_vals, p2_vals, quality_grid)
 
 
 def render_sweep_2d_with_overlay(  # noqa: PLR0914
@@ -407,6 +515,8 @@ def render_sweep_2d_with_overlay(  # noqa: PLR0914
     results: SweepResults,
     metric: str,
     overlay: str,
+    *,
+    log_scale: bool = False,
 ) -> None:
     """3-panel comparison: TIDAL numerical | analytical formula | absolute error.
 
@@ -428,6 +538,8 @@ def render_sweep_2d_with_overlay(  # noqa: PLR0914
         parameters.  Fixed parameters and numeric sim settings are available
         as scalar variables.  Example:
         ``'sin(kappa * Bpeak * R * sqrt(pi/2))**2'``.
+    log_scale : bool
+        Use logarithmic colour scale for numerical and analytical panels.
 
     Raises
     ------
@@ -469,15 +581,16 @@ def render_sweep_2d_with_overlay(  # noqa: PLR0914
 
     # Shared colour scale for numerical + analytical panels
     valid = z_num[np.isfinite(z_num)]
-    vmin = float(valid.min()) if len(valid) else 0.0
-    vmax = float(valid.max()) if len(valid) else 1.0
+    if log_scale:
+        valid = valid[valid > 0]
+    norm = _build_norm(valid, log_scale=log_scale) if len(valid) > 0 else None
 
     axes = fig.subplots(1, 3)
 
     # Panel 0: TIDAL numerical
     ax0 = axes[0]
     im0 = ax0.pcolormesh(
-        p1_vals, p2_vals, z_num, shading="nearest", cmap="viridis", vmin=vmin, vmax=vmax
+        p1_vals, p2_vals, z_num, shading="nearest", cmap="viridis", norm=norm
     )
     ax0.set_xlabel(p1_name)
     ax0.set_ylabel(p2_name)
@@ -492,8 +605,7 @@ def render_sweep_2d_with_overlay(  # noqa: PLR0914
         z_anal,
         shading="nearest",
         cmap="viridis",
-        vmin=vmin,
-        vmax=vmax,
+        norm=norm,
     )
     ax1.set_xlabel(p1_name)
     ax1.set_ylabel(p2_name)

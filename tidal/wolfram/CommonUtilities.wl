@@ -835,28 +835,36 @@ GetChartDimension[chart_] := GetChartDimension[chart] = Module[{coords, dim},
 ];
 
 (* === Dynamic CD Rule Generation === *)
+(* === CD-Like Operator Predicate (shared) === *)
+(* Tests whether a symbol represents an unconverted covariant derivative  *)
+(* operator.  Used by both GenerateCDRules and ConvertCDToDerivatives.   *)
+(* Returns True for CD, CDT, and other CovD operators.                   *)
+(* Returns False for: Christoffel symbols, PD (flat partial derivative), *)
+(* curvature tensors (Ricci, Riemann, Einstein, Weyl, etc.), and torsion *)
+(* tensors (TorsionCDT) — all of which carry the CovD name suffix but   *)
+(* are NOT derivative operators.                                         *)
+isCDlikeQ[x_] := Module[{h = Head[x], hStr},
+  If[IsChristoffelSymbol[h], Return[False]];
+  hStr = ToString[h];
+  If[StringMatchQ[hStr, "*Christoffel*"], Return[False]];
+  If[StringMatchQ[hStr, "PD*"], Return[False]];
+  If[IsCurvatureTensor[h] || IsCurvatureTensor[x], Return[False]];
+  If[StringContainsQ[hStr, "Torsion"], Return[False]];
+  (* Exclude CD1/CD2 shorthand tensors — they have "CD" in the name but *)
+  (* are pre-computed tensors, not derivative operators.                 *)
+  If[StringMatchQ[hStr, "CD" ~~ DigitCharacter ~~ "*"], Return[False]];
+  IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
+];
+
+
 (* Generates CD→Derivative rules dynamically for any dimension up to $MaxSupportedDimension *)
 (* This eliminates the 80+ hardcoded rules and enables easy extension to higher dimensions *)
 
 GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
-  {rules, isCDlike},
+  {rules},
 
   (* Validate dimension *)
   If[!ValidateDimension[dim], Return[{}]];
-
-  (* CD-like operator check using xAct introspection *)
-  (* Falls back to string matching for edge cases xAct doesn't handle *)
-  (* Excludes: Christoffel symbols, PD (flat partial derivative), and xAct    *)
-  (* curvature tensors (Ricci, Riemann, Einstein, Weyl, etc.) which carry the *)
-  (* CovD name suffix but are NOT derivative operators.                       *)
-  isCDlike[x_] := Module[{h = Head[x], hStr},
-    If[IsChristoffelSymbol[h], Return[False]];
-    hStr = ToString[h];
-    If[StringMatchQ[hStr, "*Christoffel*"], Return[False]];
-    If[StringMatchQ[hStr, "PD*"], Return[False]];
-    If[IsCurvatureTensor[h] || IsCurvatureTensor[x], Return[False]];
-    IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
-  ];
 
   (* Generate rules for all combinations:
      - Each coordinate index: 0 to dim-1
@@ -869,7 +877,7 @@ GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
         (* Rule for applying CD to bare symbol: f[{idx, chartSign*chart}][g_Symbol[args]] *)
         (* Only generate when idx < arity, otherwise idx+1 exceeds array bounds *)
         If[idx < arity,
-          f_[{idx, chartSign*chart}][g_Symbol[args__]] /; isCDlike[f[{idx, chartSign*chart}]] :>
+          f_[{idx, chartSign*chart}][g_Symbol[args__]] /; isCDlikeQ[f[{idx, chartSign*chart}]] :>
             With[{newOrders = ReplacePart[ConstantArray[0, arity], idx + 1 -> 1]},
               Derivative[Sequence @@ newOrders][g][args]
             ],
@@ -880,7 +888,7 @@ GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
         (* Only generate when idx < arity *)
         If[idx < arity,
           f_[{idx, chartSign*chart}][Derivative[orders__][g_][args__]] /;
-            isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] == arity :>
+            isCDlikeQ[f[{idx, chartSign*chart}]] && Length[{orders}] == arity :>
             With[{newOrders = ReplacePart[{orders}, idx + 1 -> {orders}[[idx + 1]] + 1]},
               Derivative[Sequence @@ newOrders][g][args]
             ],
@@ -896,7 +904,7 @@ GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
            derivatives create lower-arity Derivative wrappers. *)
         If[idx < dim,
           f_[{idx, chartSign*chart}][Derivative[orders__][g_][args__]] /;
-            isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] < dim :>
+            isCDlikeQ[f[{idx, chartSign*chart}]] && Length[{orders}] < dim :>
             With[{paddedOrders = PadRight[{orders}, dim, 0]},
               With[{newOrders = ReplacePart[paddedOrders, idx + 1 -> paddedOrders[[idx + 1]] + 1]},
                 Derivative[Sequence @@ newOrders][g][args]
@@ -921,7 +929,7 @@ GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
 (* Supports any dimension up to $MaxSupportedDimension *)
 
 ConvertCDToDerivatives[expr_, chart_] := Module[
-  {dim, rules, result, maxIter = 20, isCDlike},
+  {dim, rules, result, maxIter = 20},
 
   (* Get dimension from chart *)
   dim = GetChartDimension[chart];
@@ -929,39 +937,24 @@ ConvertCDToDerivatives[expr_, chart_] := Module[
   (* Generate rules dynamically for this dimension *)
   rules = GenerateCDRules[dim, chart];
 
-  (* CD-like operator check for convergence validation using xAct introspection *)
-  (* Falls back to string matching for edge cases xAct doesn't handle *)
-  (* Excludes: Christoffel symbols, and PD (partial derivative — already in target form). *)
-  (* PD is registered as a CovD in xAct (flat connection, zero Christoffels) but should *)
-  (* NOT be flagged as unconverted, since PD[{i,-chart}][expr] IS explicit derivative form. *)
-  (* PD acting on metric components (PD[{i,-chart}][g[{j,-chart},{k,-chart}]]) arises in *)
-  (* curved-metric Hamiltonians after DecomposeScalarExpression; these are legitimate and *)
-  (* will be evaluated by EvaluatePDMetric or numerically at grid points. *)
-  isCDlike[x_] := Module[{h = Head[x], hStr},
-    If[IsChristoffelSymbol[h], Return[False]];
-    hStr = ToString[h];
-    If[StringMatchQ[hStr, "*Christoffel*"], Return[False]];
-    (* PD is the flat partial derivative — not an unconverted CD *)
-    If[StringMatchQ[hStr, "PD*"], Return[False]];
-    (* xAct curvature tensors carry the CovD name suffix (e.g. RicciScalarCD, *)
-    (* RicciCD, RiemannCD, EinsteinCD, WeylCD, SchoutenCD, CottonCD) but are  *)
-    (* NOT derivative operators.  Use the shared IsCurvatureTensor predicate   *)
-    (* to exclude all of them — avoids maintaining a parallel exclusion list.  *)
-    If[IsCurvatureTensor[h] || IsCurvatureTensor[x], Return[False]];
-    IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
-  ];
-
   (* Apply rules repeatedly until fixed point *)
   result = FixedPoint[# /. rules &, expr, maxIter];
 
-  (* Fail if CD-like operators remain after conversion *)
-  If[!FreeQ[result, f_ /; isCDlike[f]],
-    Message[ConvertCDToDerivatives::incomplete, maxIter];
-    Throw[StringJoin[
-      "ConvertCDToDerivatives: Conversion did not fully converge after ",
-      ToString[maxIter], " iterations. Unconverted CD operators remain in expression. ",
-      "This may indicate unsupported derivative patterns or missing conversion rules."
-    ]]
+  (* Fail if CD-like operators remain after conversion.                    *)
+  (* Uses the shared isCDlikeQ predicate (defined above GenerateCDRules). *)
+  If[!FreeQ[result, f_ /; isCDlikeQ[f]],
+    Module[{remaining},
+      remaining = Cases[result, x_ /; isCDlikeQ[x] :> ToString[Short[x, 2]], {0, Infinity}];
+      remaining = DeleteDuplicates[remaining];
+      Print["  Remaining CD-like operators (", Length[remaining], "): ",
+        remaining[[;; Min[5, Length[remaining]]]]];
+      Message[ConvertCDToDerivatives::incomplete, maxIter];
+      Throw[StringJoin[
+        "ConvertCDToDerivatives: CD conversion did not converge after ",
+        ToString[maxIter], " iterations. Remaining: ",
+        StringRiffle[remaining[[;; Min[3, Length[remaining]]]], ", "]
+      ]]
+    ]
   ];
 
   result

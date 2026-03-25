@@ -37,9 +37,26 @@ uv run pytest tests/ -x -q
 If any test fails: analyze the root cause, fix it, and re-run. Continue until all tests pass.
 The test suite includes 80+ simulation integration tests with conservation checks at 1e-6 threshold — no separate smoke simulation needed.
 
-### Step 5 — Report
+### Step 5 — Documentation accuracy
+Check key documentation for obvious staleness:
+```bash
+echo "Actual tests: $(uv run pytest tests/ --collect-only -q 2>&1 | tail -1)"
+echo "Actual examples: $(ls examples/*/theory.toml 2>/dev/null | wc -l)"
+grep -n "Python tests" README.md docs/ROADMAP.md docs/NEXT_PHASES.md 2>/dev/null
+```
+If discrepancies found, warn and suggest running `/sync-docs`.
+
+### Step 6 — Report
 Summary table of everything found and fixed:
 - Lint: N issues auto-fixed, M remaining
 - Types: N errors fixed
 - Spelling: N words added to dictionary, M typos fixed
 - Tests: N passed, M failed (with details)
+- Docs: in sync / N discrepancies found
+
+### Step 7 — File issues for problems found
+If validation revealed notable problems (whether fixed or not), create GitHub issues to build a trail:
+- Issues you fixed during validation → create and close immediately with the fix details
+- Issues that couldn't be auto-fixed (architectural, design, persistent failures) → create and leave open
+Check for duplicates first: `gh issue list -S "keyword"`.
+**NEVER include any "Generated with Claude Code" footer or attribution in issue bodies.**

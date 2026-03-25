@@ -1,0 +1,282 @@
+% Gauge Fixing: Optional Per-Field Toolkit
+% Source: docs/gauge_fixing.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Gauge Fixing: Optional Per-Field Toolkit}
+\label{sec:gauge-fixing}
+
+Gauge fixing simplifies equation structure for theories with gauge symmetry
+(massless vectors, linearized gravity). It is \textbf{never required} --- TIDAL's
+existing pipeline handles gauge-invariant theories correctly, and all
+measurement quantities (energy, conversion, mixing) are gauge-invariant.
+
+\subsection{Quick Start}
+\label{sec:gauge-quick-start}
+
+Add a \texttt{[[gauge]]} section to your \texttt{theory.toml}:
+
+\begin{lstlisting}[style=toml]
+[[fields]]
+name = "A"
+type = "vector"
+
+[[gauge]]
+field = "A"
+type = "lorenz"
+xi = 1.0              # optional, default 1.0 (Feynman gauge)
+\end{lstlisting}
+
+This adds the Lorenz gauge-fixing term $-(1/2\xi)(\partial_\mu A^\mu)^2$ to the
+Lagrangian before Euler--Lagrange derivation. For Maxwell equations, this
+reduces coupled equations to uncoupled wave equations for each component.
+
+No \texttt{[[gauge]]} section means no gauge fixing (the default). Existing
+examples continue to work unchanged.
+
+\subsection{Named Presets}
+\label{sec:gauge-presets}
+
+\subsubsection{Type A --- Lagrangian Term (Added to $\lag$ Before EL Derivation)}
+\label{sec:gauge-type-a}
+
+\begin{table}[htbp]
+\centering
+\caption{Type A gauge-fixing presets (Lagrangian term).}
+\label{tab:gauge-type-a}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Preset & Fields & Expression & Effect \\
+\midrule
+\texttt{lorenz} & vector & $-(1/2\xi)(\partial_\mu A^\mu)^2$ & Maxwell $\to$ uncoupled wave eqs. \\
+\texttt{de\_donder} & sym.\ rank-2 & $-(1/2\xi)(\partial_a h^a{}_b - \tfrac{1}{2}\partial_b h)^2$ & Lin.\ Einstein $\to$ uncoupled waves \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Type B --- Constraint (Applied After EOM Derivation)}
+\label{sec:gauge-type-b}
+
+\begin{table}[htbp]
+\centering
+\caption{Type B gauge-fixing presets (constraint).}
+\label{tab:gauge-type-b}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Preset & Fields & Constraint & Effect \\
+\midrule
+\texttt{temporal} & vector & $A_0 = 0$ & Zeroes temporal component in all eqs. \\
+\texttt{coulomb} & vector & $\nabla \cdot \mathbf{A}_\text{spatial} = 0$ & Adds transversality constraint eq. \\
+\texttt{axial} & vector & $A_n = 0$ & Zeroes last spatial component in all eqs. \\
+\texttt{tt} & sym.\ rank-2 & $h_{0,\mu}=0$, $h^i{}_i=0$, $\partial^i h_{ij}=0$ & TT gauge: temporal + traceless + transverse \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Type A presets use Wolfram builder functions in \texttt{GaugeFix.wl}.
+Type B presets operate at the component level after \texttt{DecomposeToComponents},
+modifying or augmenting the equation system directly.
+
+\subsection{Custom Gauge Terms}
+\label{sec:gauge-custom}
+
+For full flexibility, use \texttt{type = "custom"} with an arbitrary Wolfram
+expression and \texttt{mechanism = "lagrangian\_term"}:
+
+\begin{lstlisting}[style=toml]
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "lagrangian_term"
+expression = "-(1/(2*xi)) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]"
+\end{lstlisting}
+
+The \texttt{expression} field uses the same syntax as \texttt{[lagrangian].expression} and
+\texttt{[[derived\_fields]].definition} --- field names, \texttt{eta}, \texttt{CD}, and chart
+placeholders are all substituted automatically.
+
+\paragraph{Note.}
+Custom constraint gauges (\texttt{mechanism = "constraint"}) are not yet
+supported. Use a named preset (\texttt{temporal}, \texttt{coulomb}, \texttt{axial}) for
+constraint-based gauge fixing.
+
+\subsubsection{Worked Example: Lorenz Gauge Two Ways}
+\label{sec:gauge-lorenz-example}
+
+\textbf{Using the preset:}
+
+\begin{lstlisting}[style=toml]
+[[gauge]]
+field = "A"
+type = "lorenz"
+xi = 1.0
+\end{lstlisting}
+
+\textbf{Equivalent custom expression:}
+
+\begin{lstlisting}[style=toml]
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "lagrangian_term"
+expression = "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]"
+\end{lstlisting}
+
+Both produce the same gauge-fixed Lagrangian. The preset is more readable;
+the custom form shows the underlying mechanism and serves as a template for
+non-standard gauge choices.
+
+\subsection{Two Mechanisms}
+\label{sec:gauge-mechanisms}
+
+\textbf{Type A --- Lagrangian term} (\texttt{mechanism = "lagrangian\_term"}):
+
+\begin{itemize}
+  \item An expression is added to $\lag$ \emph{before} Euler--Lagrange derivation
+  \item Changes the structure of the equations of motion
+  \item The gauge-fixed Lagrangian is canonicalized (\texttt{ToCanonical} + \texttt{ContractMetric})
+    before EL derivation
+  \item Example: Lorenz gauge adds $-(1/2\xi)(\nabla \cdot A)^2$, turning Maxwell into wave equations
+  \item Presets: \texttt{lorenz}, \texttt{de\_donder}
+\end{itemize}
+
+\textbf{Type B --- Constraint} (\texttt{mechanism = "constraint"}):
+
+\begin{itemize}
+  \item Applied \emph{after} EOM derivation and component decomposition
+  \item For \texttt{temporal} and \texttt{axial}: substitutes the constrained component (and all its
+    derivatives) with zero via \texttt{ReplaceAll} on the component equations
+  \item For \texttt{coulomb}: appends a spatial divergence constraint equation
+    ($\nabla \cdot \mathbf{A}_\text{spatial} = 0$) to the equation system as a \texttt{time\_order=0} equation
+  \item The original EOM structure is preserved; constraints modify or augment it
+  \item For \texttt{tt} (symmetric rank-2 tensors): applies three conditions ---
+    (1)~temporal: zero all $h_{0,\mu}$ components,
+    (2)~traceless: substitute last spatial diagonal $h_{d-1,d-1} = -(\text{sum of other spatial diagonals})$,
+    (3)~transverse: append $\partial^i h_{ij} = 0$ constraint equations for each spatial direction $j$
+  \item Presets: \texttt{temporal}, \texttt{coulomb}, \texttt{axial}, \texttt{tt}
+\end{itemize}
+
+For named presets, the mechanism is inferred automatically (e.g., \texttt{lorenz}
+is always \texttt{lagrangian\_term}, \texttt{temporal} is always \texttt{constraint}).
+
+\subsection{Multi-Field Example}
+\label{sec:gauge-multi-field}
+
+Different fields can have different gauge choices, or no gauge at all:
+
+\begin{lstlisting}[style=toml]
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "B"
+type = "vector"
+
+# Lorenz gauge on A only
+[[gauge]]
+field = "A"
+type = "lorenz"
+
+# B has no gauge fixing (default)
+\end{lstlisting}
+
+\subsection{Adding New Presets (Developer Guide)}
+\label{sec:gauge-developer}
+
+The process depends on the gauge mechanism.
+
+\subsubsection{Type A (Lagrangian Term) --- 3 Steps}
+\label{sec:gauge-dev-type-a}
+
+\paragraph{Step 1:} Write a builder function in \texttt{tidal/wolfram/GaugeFix.wl}:
+
+\begin{lstlisting}[style=mathematica]
+BuildMyGaugeTerm[field_, metric_, covd_, xi_:1] := Module[
+  {gaugeTerm},
+
+  If[!NumericQ[xi] || xi <= 0,
+    Throw["BuildMyGaugeTerm: xi must be positive, got " <> ToString[xi]]
+  ];
+
+  (* Your gauge-fixing expression here *)
+  gaugeTerm = (* ... *);
+
+  gaugeTerm
+];
+\end{lstlisting}
+
+The function must return an \emph{expression} (a Wolfram symbolic expression),
+not perform an action. The pipeline calls \texttt{AddGaugeFixingTerm[L, yourTerm]}
+to inject it into the Lagrangian.
+
+\paragraph{Step 2:} Add a registry entry in \texttt{tidal/cli/\_derive.py}:
+
+\begin{lstlisting}[style=python]
+_GAUGE_PRESETS["my_gauge"] = {
+    "mechanism": "lagrangian_term",
+    "builder": "BuildMyGaugeTerm",    # Wolfram function name
+    "requires": "vector",             # or "tensor"
+}
+\end{lstlisting}
+
+\paragraph{Step 3:} (Optional) Add validation rules in \texttt{\_validate\_gauge()}.
+
+\subsubsection{Type B (Constraint) --- 2 Steps}
+\label{sec:gauge-dev-type-b}
+
+Type B presets operate at the component level in Python --- no Wolfram builder
+function needed.
+
+\paragraph{Step 1:} Add a registry entry (no \texttt{builder} key):
+
+\begin{lstlisting}[style=python]
+_GAUGE_PRESETS["my_constraint"] = {
+    "mechanism": "constraint",
+    "requires": "vector",
+}
+\end{lstlisting}
+
+\paragraph{Step 2:} Add a handler in \texttt{\_wls\_gauge\_fixing\_type\_b()} in \texttt{\_derive.py}.
+Use \texttt{\_type\_b\_zero\_component()} for substitution-type constraints or
+\texttt{\_type\_b\_coulomb\_constraint()} as a template for differential constraints.
+
+\subsection{FAQ}
+\label{sec:gauge-faq}
+
+\paragraph{Do I need gauge fixing?}
+No. All existing TIDAL examples work without it. Gauge fixing is a
+computational convenience --- it simplifies equation structure but doesn't
+change the physics. Massless vectors already get implicit constraint
+structure ($A_0$ becomes \texttt{time\_order=0}). Massive vectors have no gauge
+freedom at all.
+
+\paragraph{Are measurements affected by gauge choice?}
+No. Energy density, conversion probability, mixing length, and spectral
+quantities are all gauge-invariant physical observables.
+
+\paragraph{Can I mix presets and custom gauges?}
+Yes. Each \texttt{[[gauge]]} entry is independent. You can use \texttt{type = "lorenz"}
+on one field and \texttt{type = "custom"} on another.
+
+\paragraph{Can I mix Type A and Type B gauges?}
+Yes. For example, \texttt{lorenz} on field A (Type~A) and \texttt{temporal} on field B
+(Type~B) is valid. Type~A modifies the Lagrangian before EL; Type~B
+modifies the component equations after decomposition.
+
+\paragraph{Can I use gauge fixing with linearized theories?}
+Yes. When \texttt{[lagrangian]} and \texttt{[linearization]} are both present, the pipeline
+applies gauge fixing in the Lagrangian-first linearization path:
+
+\begin{itemize}
+  \item Type~A terms are added to $\lag^{(2)}$ after xPert expansion
+  \item Type~B constraints are applied after component decomposition
+\end{itemize}
+
+This requires \texttt{[lagrangian]} --- legacy \texttt{[linearization]} without \texttt{[lagrangian]}
+does not support \texttt{[[gauge]]}.
+
+\paragraph{What happens if I gauge-fix a field that has no gauge symmetry?}
+For massive fields (Proca), the mass term already breaks gauge symmetry.
+Adding a gauge-fixing term is mathematically valid but physically
+unnecessary and may produce unexpected equations. Validation prevents
+gauge-fixing scalar fields (which never have gauge symmetry).

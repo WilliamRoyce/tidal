@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,7 +44,12 @@ def list_command(args: Namespace) -> int:
     scan_dir = Path(args.dir) if args.dir else _find_examples_dir()
 
     if not scan_dir.is_dir():
-        print(f"Error: directory not found: {scan_dir}", file=sys.stderr)
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            f"directory not found: {scan_dir}",
+            hints=["Default: examples/data/. Override with positional arg."],
+        )
         return 1
 
     json_files = sorted(scan_dir.glob("*.json"))
@@ -78,13 +82,15 @@ def list_command(args: Namespace) -> int:
 
         entries.append((jf.name, dim_label, field_str, param_str))
 
-    # Print aligned
-    name_w = max(len(e[0]) for e in entries) + 2
-    dim_w = max(len(e[1]) for e in entries) + 2
-    field_w = max(len(e[2]) for e in entries) + 2
+    # Print aligned table
+    from tidal.cli._console import table as _table
 
-    for name, dim, fields, params in entries:
-        print(f"  {name:<{name_w}} {dim:<{dim_w}} {fields:<{field_w}} {params}")
+    print(
+        _table(
+            ["Name", "Dim", "Fields", "Parameters"],
+            [list(e) for e in entries],
+        )
+    )
 
     print()
     print(f"{len(entries)} specification{'s' if len(entries) != 1 else ''} found.")

@@ -1,0 +1,80 @@
+# Graviton-Torsion Mixing in Poincaré Gauge Theory (4D)
+#
+# Lagrangian: L = (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc} + b5 R̃²
+#
+# where R̃ = RicciScalarCDT[] is the Riemann-Cartan Ricci scalar.
+#
+# The R̃² curvature-squared term is essential for:
+#   - Graviton-torsion mixing (cross-coupling between metric and torsion)
+#   - Propagating torsion modes with kinetic (∇T)² terms
+#   - 4th-order equations → Ostrogradsky reduction to 2nd-order
+#
+# Without b5: in 4D with TT gauge, torsion is non-propagating
+# (Einstein-Cartan, all torsion fields = 0). The R̃² kinetic terms
+# are what give torsion its own wave-like dynamics.
+#
+# The T^2 invariant I1 = T_{abc}T^{abc} provides torsion mass terms.
+# Additional invariants (I2 = T_{abc}T^{bac}, I3 = T_a T^a) can be
+# added for the full general PGT Lagrangian.
+#
+# Plane-wave reduction: propagation along z-axis (∂_x = ∂_y = 0)
+# TT gauge: applied to graviton h only (not torsion)
+#
+# Refs:
+#   Shapiro (2002), hep-th/0103093 — torsion phenomenology, R̃ decomposition
+#   Hayashi & Shirafuji (1979) — PGT propagating modes
+#   Hehl et al. (1976), Rev. Mod. Phys. 48:393 — Einstein-Cartan foundations
+#   Sezgin & van Nieuwenhuizen (1980), Phys.Rev.D 21:3269 — linearized PGT
+#   Nikiforova et al. (2009), arXiv:0905.4007 — massive torsion stability
+
+[theory]
+name = "Graviton-Torsion 4D (PGT, R̃²)"
+description = "Quadratic PGT with curvature-squared: R̃ + T² + R̃² in 4D"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+# Metric perturbation h_{ab} (graviton, rank-2 symmetric)
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[constants]
+names = ["kappa", "alpha1", "b5"]
+
+# PGT Lagrangian with curvature-squared term:
+#   (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc} + b5 R̃²
+#
+# Using RicciScalarCDT[] (Riemann-Cartan Ricci scalar) which
+# auto-decomposes to R^{LC} + torsion contributions via the
+# Shapiro identity.
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + b5 RicciScalarCDT[]^2)"
+
+[linearization]
+perturbation_field = "h"
+
+# No gauge fixing applied — preserves all graviton components including
+# the trace h^a_a, which is essential for graviton-torsion mixing via R̃²
+# (the coupling goes through the Ricci scalar). TT gauge kills this channel.
+# De Donder gauge can be added later to simplify the equations.
+
+# Plane-wave reduction: propagation along z-axis
+# Zeros ∂_x and ∂_y derivatives but keeps ALL field components
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[parameters]
+kappa = 1.0
+alpha1 = 0.5
+b5 = 0.1
+
+[output]
+path = "../data/graviton_torsion.json"

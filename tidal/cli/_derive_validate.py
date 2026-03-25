@@ -24,6 +24,36 @@ _MIN_DIM = 2
 _MAX_DIM = 7
 _MIN_PREFIX_LEN = 2
 
+# Names reserved for built-in operators and xAct auto-created tensors.
+# Field, constant, and perturbation names must not collide with these.
+# The substitution logic in _substitute_field_names replaces these globally,
+# so a field named "CD" would be double-prefixed or corrupted.
+_RESERVED_NAMES: frozenset[str] = frozenset(
+    {
+        # Covariant derivatives
+        "CD",
+        "CDT",
+        # Metric and chart
+        "eta",
+        "bg",
+        "chart",
+        # xAct auto-created curvature/torsion tensors (case-insensitive first letter)
+        "Riemann",
+        "Ricci",
+        "RicciScalar",
+        "Einstein",
+        "Weyl",
+        "Schouten",
+        "Cotton",
+        "Kretschner",
+        "Torsion",
+        "TorsionCDT",
+        # Other reserved
+        "PD",
+        "Christoffel",
+    }
+)
+
 # Gauge-fixing preset registry.  Each entry maps a preset name to its
 # mechanism ("lagrangian_term" or "constraint"), and the required field type.
 # Type A (lagrangian_term) presets also have a "builder" key naming the
@@ -91,6 +121,25 @@ def _validate_spacetime(config: dict[str, Any]) -> None:
         raise ValueError(msg)
 
 
+def _check_name_valid(name: str, context: str) -> None:
+    """Check that a name is a valid identifier and not reserved.
+
+    Raises
+    ------
+    ValueError
+        If the name is not alphanumeric or is reserved.
+    """
+    if not _VALID_FIELD_NAME.match(name):
+        msg = f"{context} '{name}' must be alphanumeric starting with a letter"
+        raise ValueError(msg)
+    if name in _RESERVED_NAMES:
+        msg = (
+            f"{context} '{name}' is reserved (collides with built-in operator). "
+            f"Reserved names: {sorted(_RESERVED_NAMES)}"
+        )
+        raise ValueError(msg)
+
+
 def _validate_single_field(field: dict[str, Any], index: int, dim: int) -> None:
     """Validate a single [[fields]] entry.
 
@@ -103,9 +152,7 @@ def _validate_single_field(field: dict[str, Any], index: int, dim: int) -> None:
         msg = f"[[fields]] entry {index} missing 'name'"
         raise ValueError(msg)
     fname = field["name"]
-    if not _VALID_FIELD_NAME.match(fname):
-        msg = f"Field name '{fname}' must be alphanumeric starting with a letter"
-        raise ValueError(msg)
+    _check_name_valid(fname, "Field name")
     if "type" not in field:
         msg = f"[[fields]] entry {index} ('{fname}') missing 'type'"
         raise ValueError(msg)
@@ -153,20 +200,10 @@ def _validate_constants(config: dict[str, Any]) -> None:
     calls, so they must be valid Wolfram identifiers (alphanumeric,
     starting with a letter, no underscores).
 
-    Raises
-    ------
-    ValueError
-        If a constant name is not a valid identifier.
     """
     names: list[str] = config.get("constants", {}).get("names", [])
     for name in names:
-        if not _VALID_FIELD_NAME.match(name):
-            msg = (
-                f"Constant name '{name}' must be alphanumeric starting with "
-                f"a letter (no underscores — Mathematica parses X_Y as "
-                f"Pattern[X, Blank[Y]])"
-            )
-            raise ValueError(msg)
+        _check_name_valid(name, "Constant name")
 
 
 def _validate_lagrangian(config: dict[str, Any]) -> None:
@@ -777,3 +814,53 @@ def _validate_config(config: dict[str, Any]) -> None:  # type: ignore[reportUnus
     _validate_gauge(config)
     _validate_reduction(config)
     _validate_parameters(config)
+    if "torsion" in config:
+        _validate_torsion(config)
+
+
+def _validate_torsion(config: dict[str, Any]) -> None:
+    """Validate optional [torsion] section.
+
+    The [torsion] section extends the spacetime connection to include torsion
+    (Poincaré gauge theory).  It requires a ``perturbation_name`` for the
+    linearized torsion field, which must be a valid identifier and not collide
+    with reserved names or existing field/constant names.
+
+    Raises
+    ------
+    ValueError
+        If perturbation_name is missing, invalid, or collides with other names.
+    """
+    torsion = config["torsion"]
+    pert_name = torsion.get("perturbation_name")
+    if not pert_name:
+        msg = "[torsion] requires 'perturbation_name' (e.g., perturbation_name = \"t\")"
+        raise ValueError(msg)
+    if not _VALID_FIELD_NAME.match(pert_name):
+        msg = (
+            f"[torsion].perturbation_name '{pert_name}' must be alphanumeric "
+            f"starting with a letter"
+        )
+        raise ValueError(msg)
+    if pert_name in _RESERVED_NAMES:
+        msg = (
+            f"[torsion].perturbation_name '{pert_name}' is reserved. "
+            f"Reserved names: {sorted(_RESERVED_NAMES)}"
+        )
+        raise ValueError(msg)
+
+    # Check for collision with field or constant names
+    field_names = {f["name"] for f in config.get("fields", [])}
+    const_names = set(config.get("constants", {}).get("names", []))
+    if pert_name in field_names:
+        msg = (
+            f"[torsion].perturbation_name '{pert_name}' collides with "
+            f"a [[fields]] entry. Use a different name."
+        )
+        raise ValueError(msg)
+    if pert_name in const_names:
+        msg = (
+            f"[torsion].perturbation_name '{pert_name}' collides with "
+            f"a [constants] entry. Use a different name."
+        )
+        raise ValueError(msg)

@@ -238,8 +238,8 @@ class TestModalEligibility:
     def test_constraints_rejected_unsupported_operator(self) -> None:
         """Constraint with unsupported operator → not eligible."""
         spec_data: dict[str, Any] = copy.deepcopy(dict(_CONSTRAINT_SPEC))
-        # Change constraint operator to something not in _EXACT_MULTIPLIERS
-        spec_data["equations"][0]["rhs"]["terms"][0]["operator"] = "derivative_3_x"
+        # Change constraint operator to something truly unknown
+        spec_data["equations"][0]["rhs"]["terms"][0]["operator"] = "derivative_5_x"
         spec = _make_spec(spec_data)
         grid = GridInfo(
             shape=(32, 32),
@@ -248,25 +248,21 @@ class TestModalEligibility:
         )
         assert can_use_modal(spec, grid, None) is False
 
-    def test_dissipation_rejected(self) -> None:
-        """first_derivative_t operator → not eligible."""
+    def test_dissipation_accepted(self) -> None:
+        """first_derivative_t operator → eligible (generalized mass-matrix path)."""
         spec_data = copy.deepcopy(_KG_1D_SPEC)
         spec_data["equations"][0]["rhs"]["terms"].append(  # type: ignore[index]
             {"coefficient": -0.1, "operator": "first_derivative_t", "field": "phi_0"}
         )
         spec = _make_spec(spec_data)
         grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
-        assert can_use_modal(spec, grid, None) is False
+        assert can_use_modal(spec, grid, None) is True
 
     def test_unsupported_operator_rejected(self) -> None:
-        """Operator not in modal multiplier registry → not eligible.
-
-        Uses 'derivative_3_x' (valid in json_loader as dynamic pattern,
-        but not in _EXACT_MULTIPLIERS).
-        """
+        """Operator not in modal decomposition registry → not eligible."""
         spec_data = copy.deepcopy(_KG_1D_SPEC)
         spec_data["equations"][0]["rhs"]["terms"].append(  # type: ignore[index]
-            {"coefficient": 1.0, "operator": "derivative_3_x", "field": "phi_0"}
+            {"coefficient": 1.0, "operator": "derivative_5_x", "field": "phi_0"}
         )
         spec = _make_spec(spec_data)
         grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))

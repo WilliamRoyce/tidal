@@ -1,26 +1,5 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
-                 decorations.pathreplacing}
-
-% ---------------------------------------------------------------
-% Colour palette (matches solver_flowchart.tex)
-% ---------------------------------------------------------------
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -29,12 +8,10 @@
         draw=black!60, line width=0.6pt, font=\footnotesize,
         align=center, text opacity=1, text=black
     },
-    fieldslot/.style={slot, fill=BlueFill, fill opacity=0.4},
-    velslot/.style={slot, fill=PurpleFill, fill opacity=0.3},
-    conslot/.style={slot, fill=OrangeFill, fill opacity=0.4, draw=OrangeLine, dashed},
+    fieldslot/.style={slot},
+    velslot/.style={slot},
+    conslot/.style={slot, draw=OrangeLine, dashed},
     lbl/.style={font=\footnotesize\bfseries, text=black},
-    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=center},
-    arr/.style={-{Stealth[length=4pt, width=3pt]}, semithick, black!70},
     node distance=0cm
 ]
 
@@ -67,7 +44,7 @@
     e.g.\ TT gauge: $10 \to 2$ (3+1D GW)\\[4pt]
     Metric signature $\eta^{00}{=}{-}1$:\\
     temporal components $\to$ constraint\\
-    (no $\partial^2_t$, time\_order${}=0$)};
+    (no $\partial^2_t$, algebraic)};
 
 % ===================================================================
 % PART B: State vector examples (bottom)
@@ -90,11 +67,6 @@
     (s1a.south west) -- (s1a.south east)
     node[midway, below=5pt, font=\scriptsize, text=GrayLine] {$N$};
 
-% Slot indices
-\node[font=\scriptsize, text=GrayLine, above=1pt of s1a] {slot 0};
-\node[font=\scriptsize, text=GrayLine, above=1pt of s1b] {slot 1};
-\node[font=\scriptsize, text=GrayLine, above=1pt of s1c] {slot 2};
-\node[font=\scriptsize, text=GrayLine, above=1pt of s1d] {slot 3};
 
 % --- Example 2: Proca 2+1D ---
 \node[lbl, below=1.0cm of s1a.south west, anchor=west] (ex2lbl)
@@ -109,9 +81,6 @@
 % Constraint annotation
 \node[annot, below=0.25cm of s2a] {constraint\\(no velocity)};
 
-\node[font=\scriptsize, text=GrayLine, above=1pt of s2a] {slot 0};
-\node[font=\scriptsize, text=GrayLine, above=1pt of s2c] {slot 2};
-\node[font=\scriptsize, text=GrayLine, above=1pt of s2e] {slot 4};
 
 % --- Example 3: Gertsenshtein 1+1D ---
 \node[lbl, below=1.3cm of s2a.south west, anchor=west] (ex3lbl)
@@ -139,11 +108,11 @@
 \begin{tabular}{@{}l l@{}}
     \textbf{Slot types} \\[3pt]
     \tikz\fill[BlueFill, fill opacity=0.4, draw=black!60]
-        (0,0) rectangle (0.5,0.25); & Field ($q$): time\_order $\geq 1$ \\[2pt]
+        (0,0) rectangle (0.5,0.25); & Field ($q$): $\partial_t^{\geq 1}$ (dynamical) \\[2pt]
     \tikz\fill[PurpleFill, fill opacity=0.3, draw=black!60]
-        (0,0) rectangle (0.5,0.25); & Velocity ($v = dq/dt$): time\_order $\geq 2$ \\[2pt]
+        (0,0) rectangle (0.5,0.25); & Velocity ($v = dq/dt$): $\partial_t^{\geq 2}$ (wave equation) \\[2pt]
     \tikz\fill[OrangeFill, fill opacity=0.4, draw=OrangeLine, dashed]
-        (0,0) rectangle (0.5,0.25); & Constraint: time\_order $= 0$ (no velocity slot) \\
+        (0,0) rectangle (0.5,0.25); & Constraint: $\partial_t^{0}$ (no velocity, algebraic) \\
 \end{tabular}};
 
 \end{tikzpicture}

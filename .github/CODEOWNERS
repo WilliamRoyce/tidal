@@ -11,6 +11,15 @@
 # Python PDE builders and symbolic processing
 /tidal/symbolic/  @WilliamRoyce
 
+# Solver backends (IDA, CVODE, leapfrog, modal, scipy)
+/tidal/solver/    @WilliamRoyce
+
+# CLI (9 subcommands)
+/tidal/cli/       @WilliamRoyce
+
+# Measurement module (energy, conversion, spectra)
+/tidal/measurement/  @WilliamRoyce
+
 # Examples (physics demonstrations)
 /examples/                        @WilliamRoyce
 

@@ -9,6 +9,12 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
+from tidal.cli._console import debug as _cdebug
+from tidal.cli._console import error as _cerror
+from tidal.cli._console import error_with_hint as _cerror_hint
+from tidal.cli._console import log as _clog
+from tidal.cli._console import warn as _cwarn
+
 if TYPE_CHECKING:
     from argparse import Namespace
     from collections.abc import Callable
@@ -49,10 +55,6 @@ _ZERO_RATE_THRESHOLD = 1e-14
 # Visualization defaults
 DPI = 150
 VMAX_FLOOR = 0.01
-
-
-def _noop(*_a: object, **_kw: object) -> None:
-    """No-op callback for quiet mode."""
 
 
 # Curated namespace for --ic-formula eval().
@@ -1340,15 +1342,20 @@ def _check_mass_stability(
     stability = check_pointwise_mass_stability(coeff_eval, spec, grid_info)
     require_stable: bool = getattr(args, "require_stable", False)
     # Informational notes (e.g. asymmetric matrix) — suppressed in --quiet mode
-    if not getattr(args, "quiet", False):
-        for note in stability.notes:
-            print(f"  Note: {note}", file=sys.stderr)
+    for note in stability.notes:
+        _clog(f"  Note: {note}")
     # Stability errors (negative eigenvalues) — fatal with --require-stable
     for msg in stability.errors:
         if require_stable:
-            print(f"Error: {msg}", file=sys.stderr)
+            _cerror_hint(
+                msg,
+                [
+                    "Reduce `--ic-amplitude` or adjust `--param` values",
+                    "Remove `--require-stable` to run anyway (may diverge)",
+                ],
+            )
         else:
-            print(f"  Warning: {msg}", file=sys.stderr)
+            _cwarn(msg)
     if require_stable and stability.errors:
         sys.exit(1)
 
@@ -1540,7 +1547,13 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
     )
 
     if not result["success"]:
-        print(f"Error: constraint solve failed: {result['message']}", file=sys.stderr)
+        _cerror_hint(
+            f"constraint solve failed: {result['message']}",
+            [
+                "Check `--bc` for consistency with constraint equations",
+                "Try `--allow-inconsistent-ic`",
+            ],
+        )
         return 1
 
     log_fn("  Constraint solve complete.")
@@ -1749,7 +1762,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     from tidal.measurement._io import SimulationData
     from tidal.solver.operators import set_fd_order, set_spectral
 
-    log = _noop if args.quiet else print
+    log = _clog
 
     # 0a. FD order — must be set before any operator evaluation.
     # CLI default is 4 (5-point Fornberg stencil); module default is 2
@@ -1766,6 +1779,8 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}"
     )
 
+    _cdebug(f"periodic={grid_info.periodic}, dx={grid_info.dx}")
+
     # 2. BC (stored in GridInfo, derive tuple for solver calls)
     bc = grid_info.effective_bc
 
@@ -1780,7 +1795,13 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 f"Grid too small for --fd-order {fd_order}: minimum axis has "
                 f"{min_n} points but stencil width requires >= {required_n}."
             )
-            print(f"Error: {msg}", file=sys.stderr)
+            _cerror_hint(
+                msg,
+                [
+                    f"Increase `--grid-shape` (need >= {required_n} points per axis)",
+                    "Or use `--fd-order 2` for coarse grids",
+                ],
+            )
             return 1
         # Default fd-order 4 on a tiny grid — fall back to order 2
         fd_order = 2
@@ -1806,10 +1827,15 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             non_periodic = [i for i, p in enumerate(grid_info.periodic) if not p]
             msg = (
                 f"--spectral requires all boundary conditions to be periodic. "
-                f"Non-periodic axes: {non_periodic}. "
-                f"Use --periodic or ensure all --bc entries are 'periodic'."
+                f"Non-periodic axes: {non_periodic}."
             )
-            print(f"Error: {msg}", file=sys.stderr)
+            _cerror_hint(
+                msg,
+                [
+                    "Use `--periodic` for all axes",
+                    "Or remove `--spectral` to use FD stencils",
+                ],
+            )
             return 1
     else:
         # User explicitly passed --no-spectral: force FD stencils
@@ -1857,10 +1883,12 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     # Validate t_end > t_start for resumed simulations
     if resume_state is not None and args.t_end <= t_start:
-        print(
-            f"Error: --t-end ({args.t_end}) must be greater than "
-            f"checkpoint time ({t_start})",
-            file=sys.stderr,
+        _cerror_hint(
+            f"--t-end ({args.t_end}) must be greater than checkpoint time ({t_start})",
+            [
+                f"Checkpoint is at t={t_start}. Use a larger `--t-end`",
+                "Or use `--t-additional T` to extend by T time units",
+            ],
         )
         return 1
 
@@ -1871,6 +1899,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     scheme = _resolve_scheme(args.scheme, spec, grid_info, bc)
     if args.scheme == "auto":
         log(f"  Auto-selected solver: {scheme}")
+    _cdebug(f"solver={scheme}, fd_order={fd_order}, spectral={use_spectral}")
 
     # Spectral + IDA incompatibility: spectral operators produce dense
     # coupling (every grid point depends on every other), incompatible
@@ -1893,7 +1922,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 "(spectral operators produce dense coupling). "
                 "Use --scheme cvode, scipy, or leapfrog instead."
             )
-            print(f"Error: {msg}", file=sys.stderr)
+            _cerror(msg)
             return 1
     # Modal solver operates in pure k-space — spectral operators are not
     # used during time evolution.  However, keep spectral=True so that
@@ -1905,11 +1934,53 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         log("  Note: modal solver uses k-space natively; spectral auto-disabled")
     log(f"  Scheme: {scheme}")
 
+    # --- Dry-run: preview setup and exit ---
+    if getattr(args, "dry_run", False):
+        n_fields = spec.n_components
+        n_eqs = len(spec.equations)
+        grid_pts = 1
+        for s in grid_info.shape:
+            grid_pts *= s
+        # Rough memory estimate: state vector + snapshots
+        n_snapshots = max(int((args.t_end - t_start) / (args.t_end / 100.0)) + 1, 2)
+        mem_bytes = (
+            grid_pts * n_fields * 2 * 8 * n_snapshots
+        )  # fields + velocities, float64
+        if mem_bytes < 1024 * 1024:
+            mem_str = f"{mem_bytes / 1024:.0f} KB"
+        else:
+            mem_str = f"{mem_bytes / (1024 * 1024):.1f} MB"
+        spec_name = getattr(args, "json_path", "unknown")
+        print(
+            f"  Spec:     {Path(spec_name).name} ({n_fields} fields, {n_eqs} equations)"
+        )
+        print(
+            f"  Grid:     {'x'.join(str(s) for s in grid_info.shape)} points, "
+            f"bounds {grid_info.bounds}, "
+            f"{'periodic' if all(grid_info.periodic) else 'mixed BCs'}"
+        )
+        print(
+            f"  Solver:   {scheme} (auto-selected)"
+            if args.scheme == "auto"
+            else f"  Solver:   {scheme}"
+        )
+        print(f"  FD order: {fd_order}")
+        print(f"  Steps:    ~{n_snapshots} snapshots, t={t_start}→{args.t_end}")
+        print(f"  Est. memory: ~{mem_str}")
+        return 0
+
     # Constraint-only mode: solve algebraic equations via IDA, no time evolution
     if args.mode == "constraint":
         return _constraint_mode(args, spec, grid_info, y0, params, bc, log)
 
-    _warn_zero_evolution(spec, grid_info, y0, params, bc)
+    import contextlib
+
+    with contextlib.suppress(ValueError):
+        # May raise ValueError for systems with time-derivative operators
+        # (d2_t, mixed_T2_S1x, etc.) that the physical-space RHS evaluator
+        # cannot handle. These are simulated by the modal solver's
+        # generalized mass-matrix path which works directly in Fourier space.
+        _warn_zero_evolution(spec, grid_info, y0, params, bc)
     _check_mass_stability(args, spec, grid_info, params)
 
     # 5. Compute dt for leapfrog (needed before snapshot configuration)
@@ -1967,6 +2038,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         dt = args.dt
         if dt is None:
             dt = _compute_cfl_dt(spec, grid_info, params)
+            _cdebug(f"CFL dt={dt:.6e} (safety={_CFL_FACTOR})")
         # Yoshida CFL correction: the effective CFL limit is reduced by
         # max(|wᵢ|) ≈ 1.70 because the middle sub-step has |w₂| > 1.
         # Must happen before snapshot configuration so the writer
@@ -2152,7 +2224,14 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         )
 
     if not result["success"]:
-        print(f"Error: solver failed: {result['message']}", file=sys.stderr)
+        _cerror_hint(
+            f"solver failed: {result['message']}",
+            [
+                "Try coarser grid (`--grid-shape 32`)",
+                "Increase tolerances (`--rtol 1e-5`)",
+                "Try different solver (`--scheme scipy`)",
+            ],
+        )
         return 1
 
     # Post-simulation divergence check: verify final state is finite.
@@ -2173,6 +2252,22 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     # 9. Output
     _generate_output(args, sim_data, grid_info)
+
+    # 10. HTML report (optional)
+    report_path = getattr(args, "report", None)
+    if report_path:
+        from tidal.cli._report import generate_report
+
+        generate_report(
+            sim_data=sim_data,
+            spec=spec,
+            params=params,
+            grid_info=grid_info,
+            scheme=scheme,
+            report_path=report_path,
+        )
+        log(f"  Report saved to: {Path(report_path).resolve()}")
+
     return 0
 
 
@@ -2209,7 +2304,7 @@ def _validate_solver_params(args: Namespace) -> None:
         raise ValueError(msg)
 
 
-def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
+def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Execute the simulate command.
 
     Parameters
@@ -2222,14 +2317,34 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
     int
         Exit code.
     """
+    if getattr(args, "list_schemes", False):
+        print("Available solver schemes:")
+        print("  auto      Auto-select based on equation structure (default)")
+        print("  modal     Fourier modal solver (periodic, time-independent)")
+        print("  cvode     SUNDIALS CVODE (adaptive ODE, tolerance-controlled)")
+        print("  ida       SUNDIALS IDA (DAE, algebraic constraints)")
+        print("  leapfrog  Symplectic leapfrog (exact energy conservation)")
+        print("  scipy     SciPy solve_ivp (DOP853, Radau, BDF)")
+        return 0
+
+    if args.json_path is None:
+        _cerror("json_path is required")
+        return 1
+
     from tidal.symbolic import load_equation_system
 
     json_path = Path(args.json_path)
     if not json_path.exists():
-        print(f"Error: file not found: {json_path}", file=sys.stderr)
+        _cerror_hint(
+            f"file not found: {json_path}",
+            [
+                "Run 'tidal list' to see available specifications.",
+                "Run 'tidal derive <theory.toml>' to generate from a Lagrangian.",
+            ],
+        )
         return 1
 
-    log = _noop if args.quiet else print
+    log = _clog
 
     # Step 1: Load spec
     log("Loading equation specification...")
@@ -2246,13 +2361,21 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
         resume_dir = Path(args.resume)
         if not resume_dir.is_dir():
-            print(f"Error: resume directory not found: {resume_dir}", file=sys.stderr)
+            _cerror_hint(
+                f"resume directory not found: {resume_dir}",
+                [
+                    "Create output with `tidal simulate ... --output DIR`, then `--resume DIR`",
+                ],
+            )
             return 1
 
         # --resume and --ic are mutually exclusive.  argparse default is
         # "gaussian", so a non-gaussian value means the user explicitly set --ic.
         if args.ic != "gaussian":
-            print("Error: --resume and --ic cannot be used together", file=sys.stderr)
+            _cerror_hint(
+                "--resume and --ic cannot be used together",
+                ["`--resume` loads IC from checkpoint. Omit `--ic` to resume."],
+            )
             return 1
 
         meta_path = resume_dir / "metadata.json"
@@ -2274,7 +2397,10 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
             log(f"  Resuming from: {resume_dir}")
 
     if args.snapshot is not None and args.resume is None:
-        print("Error: --snapshot requires --resume", file=sys.stderr)
+        _cerror_hint(
+            "--snapshot requires --resume",
+            ["Usage: `--resume DIR --snapshot 3`"],
+        )
         return 1
 
     # Step 3: Parse parameters (merge with checkpoint metadata if resuming)
@@ -2286,6 +2412,14 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
     if params:
         log(f"  Parameters: {params}")
 
+    # Check output directory collision
+    if args.output and Path(args.output).exists() and not getattr(args, "force", False):
+        _cerror_hint(
+            f"output directory already exists: {args.output}",
+            ["Use --force to overwrite", "Or choose a different --output path"],
+        )
+        return 1
+
     # All simulation goes through the native IDA/leapfrog path
     try:
         return _simulate(args, spec, params)
@@ -2293,6 +2427,13 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
         from tidal.solver._exceptions import SimulationDivergedError
 
         if isinstance(exc, SimulationDivergedError):
-            print(f"Error: {exc}", file=sys.stderr)
+            _cerror_hint(
+                str(exc),
+                [
+                    "Try `--require-stable` to validate before running",
+                    "Reduce `--ic-amplitude` or check `--param` values",
+                    "Try smaller timestep with `--dt`",
+                ],
+            )
             return 1
         raise

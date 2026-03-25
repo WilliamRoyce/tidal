@@ -2,8 +2,8 @@
 # PostToolUse hook: warn if MEMORY.md exceeds 200-line limit
 INPUT=$(cat)
 FILE=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty')
-[[ "$FILE" == *"/memory/"* ]] || exit 0
-MEMFILE="/home/vscode/.claude/projects/-workspaces-torsion-gertsenshtein/memory/MEMORY.md"
+[[ "$FILE" == */MEMORY.md ]] || exit 0
+MEMFILE="$HOME/.claude/projects/-workspaces-torsion-gertsenshtein/memory/MEMORY.md"
 [ -f "$MEMFILE" ] || exit 0
 LINES=$(wc -l < "$MEMFILE" 2>/dev/null) || LINES=0
 if [ "$LINES" -gt 200 ]; then

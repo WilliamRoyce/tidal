@@ -3,11 +3,11 @@
 **Created:** February 2026
 **Last Updated:** March 2026
 **Status:** Phases A, B, C, E (FFT), F, J complete; Phase D in progress; Phases G–I planned
-**Version:** 0.5.0 | **Tests:** 1,484 collected | **Examples:** 27 working (1+1D to 3+1D)
+**Version:** 0.17.7 | **Tests:** 1,700 collected | **Examples:** 20 working (1+1D to 3+1D)
 
 ## Context
 
-TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 27 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
+TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 20 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
 
 The project's core research motivation is the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion in external magnetic fields). The project operates exclusively in the **linearised regime** — all Lagrangians are quadratic, producing linear PDEs. The phases below are ordered by their impact toward enabling realistic Gertsenshtein simulations, while also broadening TIDAL's general utility as a linearised field theory simulation framework.
 
@@ -29,7 +29,7 @@ Background fields allow non-dynamical tensors (e.g., an external magnetic field 
 - Python: 3-level caching (L0 preresolved → L1 expression → L2 spatial grid → L3 per-call)
 - 3 working examples: `coupled_scattering/`, `proca_background/`, `vector_background/`
 
-See `docs/background_fields.md` for the full architecture documentation.
+See `docs/tex/background_fields.tex` for the full architecture documentation.
 
 ---
 
@@ -91,7 +91,7 @@ expression = "eta[a,b] CD[-a][A[-b]]"   # set to zero
 | `coulomb`   | constraint      | vector      | `∇·A = 0`                      | Transversality constraint          |
 | `axial`     | constraint      | vector      | `A_n = 0`                      | Eliminates one spatial component   |
 
-New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix.wl` + add one entry to `_GAUGE_PRESETS` in `_derive.py`. See `docs/gauge_fixing.md` for a full tutorial and developer guide.
+New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix.wl` + add one entry to `_GAUGE_PRESETS` in `_derive.py`. See `docs/tex/gauge_fixing.tex` for a full tutorial and developer guide.
 
 ### Implementation Sub-Phases
 
@@ -105,7 +105,7 @@ New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix
 - Custom expression path reuses `_substitute_field_names()` (existing infrastructure)
 - Dynamic gauge metadata in `_wls_metadata_and_export()`
 - Tests: validation, WLS generation, custom expression handling, Wolfram unit tests
-- Tutorial: `docs/gauge_fixing.md` — quick start, preset reference, custom expression walkthrough, "adding new presets" developer guide (includes inline TOML examples for Lorenz preset and custom expressions)
+- Tutorial: `docs/tex/gauge_fixing.tex` — quick start, preset reference, custom expression walkthrough, "adding new presets" developer guide (includes inline TOML examples for Lorenz preset and custom expressions)
 
 **B2: Additional presets + constraint mechanism** (~3–5 days)
 
@@ -118,7 +118,7 @@ New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix
 ### Key Files
 
 - **NEW** `tidal/wolfram/GaugeFix.wl` — Core primitive + preset builder functions
-- **NEW** `docs/gauge_fixing.md` — Tutorial, preset reference, custom expression guide, developer recipe
+- **NEW** `docs/tex/gauge_fixing.tex` — Tutorial, preset reference, custom expression guide, developer recipe
 - `tidal/cli/_derive.py` — `_GAUGE_PRESETS` registry, TOML validation, WLS generation
 - `tidal/wolfram/ExportJSON.wl` — gauge metadata passthrough (already works)
 
@@ -245,7 +245,7 @@ Tolerance-controlled adaptive time-stepping via SUNDIALS CVODE (BDF) and IDA (DA
 - Smart CFL estimation for leapfrog; tolerance control for CVODE/IDA
 - Sparse Jacobian computation for IDA to prevent out-of-memory on large systems
 
-See `docs/adaptive_timestepping.md` for the full architecture documentation.
+See `docs/tex/adaptive_timestepping.tex` for the full architecture documentation.
 
 ### References
 

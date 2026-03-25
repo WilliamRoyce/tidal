@@ -30,7 +30,6 @@ ISO 5725-2:1994 — Accuracy of measurement methods and results.
 from __future__ import annotations
 
 import itertools
-import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -41,6 +40,7 @@ import numpy as np
 if TYPE_CHECKING:
     from argparse import Namespace
 
+    from tidal.measurement._sweep_results import SweepResults
     from tidal.symbolic.json_loader import EquationSystem
 
 # Measurement types supported by sweep (subset of tidal measure)
@@ -102,11 +102,12 @@ def _warn_high_cv(
                 param_info = ", ".join(
                     f"{p}={agg_row.get(p, '?')}" for p in swept_params
                 )
-                print(
-                    f"  Warning: high variability for {base} "
+                from tidal.cli._console import warn as _cwarn
+
+                _cwarn(
+                    f"high variability for {base} "
                     f"(CV={cv:.2f}) at {param_info} "
-                    f"— consider more replicates.",
-                    file=sys.stderr,
+                    f"— consider more replicates."
                 )
 
 
@@ -780,18 +781,31 @@ def _measure_existing(  # noqa: PLR0913, PLR0917
     source: tuple[str, ...] | None,
     target: tuple[str, ...] | None,
     threshold: float,
+    spec: EquationSystem | None = None,
 ) -> dict[str, Any]:
     """Measure an existing run directory with error handling.
 
     Used by resume logic in sequential, parallel, and adaptive execution
     paths. Wraps ``_measure_run()`` with status tracking and error capture.
 
+    Parameters
+    ----------
+    spec : EquationSystem or None
+        Pre-loaded equation system.  When supplied the JSON is not re-parsed,
+        avoiding redundant I/O on sweep resume (one parse instead of N).
+
     Returns metrics dict with ``run_status``, ``error_message``, and
     ``solver_exit_code`` always set.
     """
     try:
         metrics = _measure_run(
-            run_dir, spec_path, measurements, source, target, threshold
+            run_dir,
+            spec_path,
+            measurements,
+            source,
+            target,
+            threshold,
+            spec=spec,
         )
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         return {
@@ -887,6 +901,11 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
     run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
     sweep_start = time.monotonic()
 
+    # Pre-load spec once for measurement reuse (avoids N re-parses on resume)
+    from tidal.symbolic import load_equation_system
+
+    cached_spec = load_equation_system(spec_path)
+
     for rp in run_plans:
         i = rp["index"]
         run_dir: Path = rp["run_dir"]
@@ -907,7 +926,13 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
                 flush=True,
             )
             metrics = _measure_existing(
-                run_dir, spec_path, measurements, source, target, threshold
+                run_dir,
+                spec_path,
+                measurements,
+                source,
+                target,
+                threshold,
+                spec=cached_spec,
             )
             if metrics.get("run_status") == "measurement_error":
                 print(f" measure error: {metrics.get('error_message', '')}")
@@ -1012,7 +1037,7 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
     return rows
 
 
-def _execute_parallel(  # noqa: PLR0913, PLR0917
+def _execute_parallel(  # noqa: PLR0913, PLR0914, PLR0917
     args: Namespace,
     spec_path: Path,
     run_plans: list[dict[str, Any]],
@@ -1041,6 +1066,11 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
     completed: set[int] = set()
     sweep_start = time.monotonic()
 
+    # Pre-load spec once for measurement reuse (avoids N re-parses on resume)
+    from tidal.symbolic import load_equation_system
+
+    cached_spec = load_equation_system(spec_path)
+
     for rp in run_plans:
         i = rp["index"]
         run_dir: Path = rp["run_dir"]
@@ -1056,7 +1086,13 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 flush=True,
             )
             metrics = _measure_existing(
-                run_dir, spec_path, measurements, source, target, threshold
+                run_dir,
+                spec_path,
+                measurements,
+                source,
+                target,
+                threshold,
+                spec=cached_spec,
             )
             if metrics.get("run_status") == "measurement_error":
                 print(f" measure error: {metrics.get('error_message', '')}")
@@ -1183,6 +1219,7 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
     run_dirs: list[Path],
     *,
     resume: bool,
+    cached_spec: EquationSystem | None = None,
 ) -> dict[str, Any]:
     """Run a single adaptive point and return the results row."""
     swept_vals = {param_name: val}
@@ -1196,7 +1233,13 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
     if resume and (run_dir / "metadata.json").exists():
         print(f"  [adaptive] {subdir} — measuring existing...", end="", flush=True)
         metrics = _measure_existing(
-            run_dir, spec_path, measurements, source, target, energy_threshold
+            run_dir,
+            spec_path,
+            measurements,
+            source,
+            target,
+            energy_threshold,
+            spec=cached_spec,
         )
         if metrics.get("run_status") == "measurement_error":
             print(f" measure error: {metrics.get('error_message', '')}")
@@ -1269,6 +1312,11 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
     rows: list[dict[str, Any]] = []
     run_dirs: list[Path] = []
 
+    # Pre-load spec once for measurement reuse (avoids N re-parses on resume)
+    from tidal.symbolic import load_equation_system
+
+    cached_spec = load_equation_system(spec_path)
+
     # Phase 1: Run initial grid
     print(f"  Adaptive: initial grid ({len(points)} points)")
     for val in points:
@@ -1288,6 +1336,7 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
                 output_dir=output_dir,
                 run_dirs=run_dirs,
                 resume=resume,
+                cached_spec=cached_spec,
             )
         )
 
@@ -1346,6 +1395,7 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
             output_dir=output_dir,
             run_dirs=run_dirs,
             resume=resume,
+            cached_spec=cached_spec,
         )
         points.insert(idx + 1, midpoint)
         rows.insert(idx + 1, row)
@@ -1427,6 +1477,51 @@ def _print_eta(completed: int, total: int, start_time: float) -> None:
         print(f"    ETA: ~{eta_s / 60:.1f}min remaining")
 
 
+def _run_critical_field_post_sweep(
+    results: SweepResults,
+    args: Namespace,
+    output_dir: Path,
+) -> None:
+    """Run critical field extraction after sweep and save to subdirectory."""
+    from tidal.cli._analyze import (
+        _print_critical_field_summary,  # pyright: ignore[reportPrivateUsage]
+    )
+    from tidal.measurement._critical_field import (
+        compute_critical_field,
+        critical_field_to_sweep_results,
+    )
+
+    field_param: str = args.critical_field
+    metric = getattr(args, "cf_metric", None) or "P_final"
+    threshold: float = getattr(args, "cf_threshold", 0.99)
+    interpolate: bool = not getattr(args, "no_interpolate", False)
+
+    try:
+        cf_result = compute_critical_field(
+            results,
+            field_param,
+            metric=metric,
+            threshold=threshold,
+            interpolate=interpolate,
+        )
+    except ValueError as exc:
+        from tidal.cli._console import warn as _cwarn
+
+        _cwarn(f"critical field extraction skipped: {exc}")
+        return
+
+    reduced = critical_field_to_sweep_results(cf_result, results)
+
+    cf_dir = output_dir / "critical_field"
+    cf_dir.mkdir(parents=True, exist_ok=True)
+    reduced.to_csv(cf_dir / "results.csv")
+    reduced.to_json(cf_dir / "results.json")
+    reduced.save_sweep_json(cf_dir / "sweep.json")
+
+    print(f"\n  critical_field/: {cf_dir.resolve()}")
+    _print_critical_field_summary(cf_result)
+
+
 def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     args: Namespace,
     swept_params: dict[str, list[float]],
@@ -1475,9 +1570,10 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         if isinstance(meta_params_raw, dict):
             known_params |= set(cast("dict[str, Any]", meta_params_raw).keys())
         for name in sorted(set(swept_params.keys()) - known_params):
-            print(
-                f"  Warning: swept parameter '{name}' not found in equation spec. Possible typo?",
-                file=sys.stderr,
+            from tidal.cli._console import warn as _cwarn
+
+            _cwarn(
+                f"swept parameter '{name}' not found in equation spec. Possible typo?"
             )
 
     measurements: set[str] = set()
@@ -1486,10 +1582,14 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         measurements = {s.strip() for s in raw_measure.split(",")}
         unknown = measurements - _SWEEP_MEASUREMENTS
         if unknown:
-            print(
-                f"Error: unknown measurement(s): {', '.join(sorted(unknown))}. "
+            from tidal.cli._console import error_with_hint
+
+            error_with_hint(
+                f"unknown measurement(s): {', '.join(sorted(unknown))}. "
                 f"Valid: {', '.join(sorted(_SWEEP_MEASUREMENTS))}",
-                file=sys.stderr,
+                [
+                    "Check spelling. Available: energy, conversion, mixing, spectrum, conservation"
+                ],
             )
             return 1
     if not measurements:
@@ -1536,17 +1636,21 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # Safety limit for large sweeps
     force_large = getattr(args, "force_large_sweep", False)
     if total_runs > _MAX_SWEEP_SIZE and not force_large:
-        print(
-            f"Error: sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            f"sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
             f"Use --force-large-sweep to override.",
-            file=sys.stderr,
+            [
+                "Reduce parameter ranges or grid points",
+                "Override with `--force-large-sweep`",
+            ],
         )
         return 1
     if total_runs > _WARN_SWEEP_SIZE:
-        print(
-            f"  Warning: {total_runs} runs scheduled. This may take a long time.",
-            file=sys.stderr,
-        )
+        from tidal.cli._console import warn as _cwarn
+
+        _cwarn(f"{total_runs} runs scheduled. This may take a long time.")
 
     resume = getattr(args, "resume", False)
 
@@ -1591,10 +1695,11 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
             known_noise_targets |= set(meta_params.keys())  # type: ignore[reportUnknownArgumentType]
         for pn_name in sorted(param_noise.keys()):
             if pn_name not in known_noise_targets:
-                print(
-                    f"  Warning: --param-noise parameter '{pn_name}' not found "
-                    f"in spec or swept params. Noise will have no effect.",
-                    file=sys.stderr,
+                from tidal.cli._console import warn as _cwarn
+
+                _cwarn(
+                    f"--param-noise parameter '{pn_name}' not found "
+                    f"in spec or swept params. Noise will have no effect."
                 )
 
     if n_replicates > 1:
@@ -1613,19 +1718,25 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         # Warn if replicates with no variation source
         ic_type = getattr(args, "ic", "gaussian")
         if ic_type != "noise" and ic_perturbation is None and not param_noise:
-            print(
-                "  Warning: --n-replicates > 1 with deterministic ICs and no "
-                "--ic-perturbation or --param-noise — all replicates will be identical.",
-                file=sys.stderr,
+            from tidal.cli._console import warn as _cwarn
+
+            _cwarn(
+                "--n-replicates > 1 with deterministic ICs and no "
+                "--ic-perturbation or --param-noise — all replicates will be identical."
             )
 
         # Re-check safety limit after expansion
         force_large = getattr(args, "force_large_sweep", False)
         if total_runs > _MAX_SWEEP_SIZE and not force_large:
-            print(
-                f"Error: sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
+            from tidal.cli._console import error_with_hint
+
+            error_with_hint(
+                f"sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
                 f"Use --force-large-sweep to override.",
-                file=sys.stderr,
+                [
+                    "Reduce parameter ranges or grid points",
+                    "Override with `--force-large-sweep`",
+                ],
             )
             return 1
 
@@ -1680,10 +1791,11 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     if adaptive_param is not None:
         if n_replicates > 1:
-            print(
-                "  Warning: adaptive refinement does not yet support --n-replicates. "
-                "Running single realization per point.",
-                file=sys.stderr,
+            from tidal.cli._console import warn as _cwarn
+
+            _cwarn(
+                "adaptive refinement does not yet support --n-replicates. "
+                "Running single realization per point."
             )
         initial_values = swept_params[adaptive_param]
         rows, run_dirs, swept_params = _execute_adaptive(
@@ -1797,6 +1909,11 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # Convergence order estimation
     if converge_sizes is not None and len(rows) >= 3:  # noqa: PLR2004
         _report_convergence(rows, converge_sizes)
+
+    # Critical field extraction (if requested)
+    critical_field_param = getattr(args, "critical_field", None)
+    if critical_field_param and results.n_runs > 0:
+        _run_critical_field_post_sweep(results, args, output_dir)
 
     return 0
 
@@ -1957,22 +2074,43 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
             config = load_sweep_config(Path(config_path))
             config_swept, config_converge = apply_config_to_args(config, args)
         except (FileNotFoundError, ValueError) as exc:
-            print(f"Error: {exc}", file=sys.stderr)
+            from tidal.cli._console import error as _cerror
+
+            _cerror(str(exc))
             return 1
+
+    from tidal.cli._console import error as _cerror
+    from tidal.cli._console import error_with_hint
 
     spec_path = Path(args.json_path) if getattr(args, "json_path", None) else None
     if spec_path is None:
-        print(
-            "Error: json_path is required (via positional arg or TOML spec)",
-            file=sys.stderr,
+        error_with_hint(
+            "json_path is required (via positional arg or TOML spec)",
+            [
+                "Example: `tidal sweep spec.json --sweep 'm2=0.1:1:10' --output results/`"
+            ],
         )
         return 1
     if not spec_path.exists():
-        print(f"Error: file not found: {spec_path}", file=sys.stderr)
+        error_with_hint(
+            f"file not found: {spec_path}",
+            ["Use `tidal list` to find specs, or `tidal derive` to generate"],
+        )
         return 1
 
     if not getattr(args, "output", None):
-        print("Error: --output is required for sweep", file=sys.stderr)
+        error_with_hint(
+            "--output is required for sweep",
+            ["Required: `--output results/`"],
+        )
+        return 1
+
+    # Check output directory collision
+    if Path(args.output).exists() and not getattr(args, "force", False):
+        error_with_hint(
+            f"output directory already exists: {args.output}",
+            ["Use --force to overwrite", "Or choose a different --output path"],
+        )
         return 1
 
     # Parse sweep specs from CLI (these override/extend TOML)
@@ -1983,7 +2121,12 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
     converge_spec: str | None = getattr(args, "converge", None)
 
     if converge_spec and (sweep_specs or swept_params):
-        print("Error: --sweep and --converge are mutually exclusive", file=sys.stderr)
+        error_with_hint(
+            "--sweep and --converge are mutually exclusive",
+            [
+                "Choose one: parameter sweep (`--sweep`) or convergence study (`--converge`)"
+            ],
+        )
         return 1
 
     try:
@@ -1995,13 +2138,20 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
                 name, values = parse_sweep_spec(raw)
                 swept_params[name] = values  # CLI overrides TOML for same param
     except ValueError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        error_with_hint(
+            str(exc),
+            [
+                "Range: `--sweep 'm2=0.1:10:5'`",
+                "List: `--sweep 'm2=0.1,1,10'`",
+                "Log: `--sweep 'm2=0.01:10:5:log'`",
+            ],
+        )
         return 1
 
     if not swept_params and converge_sizes is None:
-        print(
-            "Error: provide --sweep, --converge, or --config with [sweep.*] sections",
-            file=sys.stderr,
+        error_with_hint(
+            "provide --sweep, --converge, or --config with [sweep.*] sections",
+            ["Specify `--sweep 'param=start:stop:N'` or `--converge '32,64,128'`"],
         )
         return 1
 

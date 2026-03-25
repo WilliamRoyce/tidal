@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -350,7 +349,12 @@ def inspect_command(args: Namespace) -> int:
 
     json_path = Path(args.json_path)
     if not json_path.exists():
-        print(f"Error: file not found: {json_path}", file=sys.stderr)
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            f"file not found: {json_path}",
+            hints=["Use `tidal list` to find specs, or `tidal derive` to generate"],
+        )
         return 1
 
     spec = load_equation_system(json_path)
@@ -358,6 +362,12 @@ def inspect_command(args: Namespace) -> int:
     if args.json_output:
         data = _build_json_output(spec, show_params=args.params)
         print(json.dumps(data, indent=2))
+        return 0
+
+    if args.latex:
+        from tidal.symbolic.latex import system_to_latex
+
+        print(system_to_latex(spec, output_format=args.latex_format))
         return 0
 
     _print_header(spec)

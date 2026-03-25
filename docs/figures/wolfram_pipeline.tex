@@ -1,40 +1,9 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
-                 decorations.pathreplacing}
-
-% ---------------------------------------------------------------
-% Colour palette (matches solver_flowchart.tex)
-% ---------------------------------------------------------------
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{LimeFill}{YellowGreen}
-\colorlet{LimeLine}{YellowGreen!30!Olive}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
-    % --- Node styles ---
-    stage/.style={
-        rectangle, rounded corners=2pt, minimum width=3.6cm,
-        minimum height=0.7cm, draw=PurpleLine, line width=0.7pt,
-        fill=PurpleFill, fill opacity=0.3, font=\footnotesize,
-        align=center, text opacity=1, text=black
-    },
-    wlmod/.style={
-        font=\scriptsize\ttfamily, text=PinkLine, anchor=west
-    },
+    % File-specific styles
     cache/.style={
         rectangle, rounded corners=2pt, draw=BlueLine, dashed,
         fill=BlueFill, fill opacity=0.25, font=\scriptsize,
@@ -45,91 +14,62 @@
         fill=GreenFill, fill opacity=0.2, font=\scriptsize,
         align=center, text opacity=1, inner sep=4pt
     },
-    check/.style={
-        rectangle, rounded corners=1pt, draw=OrangeLine,
-        fill=OrangeFill, fill opacity=0.25, font=\scriptsize,
-        align=center, text opacity=1, inner sep=3pt
-    },
-    annot/.style={
-        font=\scriptsize\itshape, text=GrayLine, align=left
-    },
-    arr/.style={
-        -{Stealth[length=4pt, width=3pt]}, semithick, black!70
-    },
-    cachearr/.style={
-        -{Stealth[length=4pt, width=3pt]}, semithick, BlueLine,
-        densely dashed
-    },
-    node distance=0.55cm
+    node distance=0.4cm
 ]
 
 % ===================================================================
 % MAIN PIPELINE (vertical, top to bottom)
 % ===================================================================
 
-\node[stage, draw=GrayLine, fill=GrayFill, fill opacity=0.4] (toml)
+\node[stage=Gray] (toml)
     {\textbf{TOML config}\\[-1pt]
      \scriptsize fields, Lagrangian, constants};
 
-\node[check, right=0.3cm of toml] (chk0)
-    {\texttt{\_validate\_config()}};
+\node[stage=Purple, below=of toml] (wls)
+    {\textbf{Generate Wolfram script}\\[-1pt]
+     \scriptsize from configuration};
 
-\node[stage, below=of toml] (wls)
-    {\textbf{WLS code generation}\\[-1pt]
-     \scriptsize Python $\to$ Wolfram script};
+\node[stage=Purple, below=of wls] (manifold)
+    {Define manifold \& tensor fields\\[-1pt]
+     \scriptsize \texttt{DefManifold}, \texttt{DefTensor}};
 
-\node[stage, below=of wls] (manifold)
-    {\texttt{DefManifold} + \texttt{DefTensor}};
-\node[check, right=0.3cm of manifold] (chk1)
-    {\texttt{If[!xTensorQ[...],}\\
-     \texttt{DefTensor[...]]}};
-
-\node[stage, below=of manifold] (lagr)
+\node[stage=Purple, below=of manifold] (lagr)
     {\textbf{Lagrangian construction}\\[-1pt]
      \scriptsize constants, gauge terms};
 
-\node[check, right=0.3cm of lagr] (chk2)
-    {\texttt{\_validate\_lagrangian()}\\
-     gradient check};
+\node[stage=Purple, below=of lagr] (vard)
+    {Euler--Lagrange variation\\[-1pt]
+     \scriptsize \texttt{VarD}: $\delta\mathcal{L}/\delta\phi^A = 0$};
 
-\node[stage, below=of lagr] (vard)
-    {\texttt{VarD} (Euler--Lagrange)};
-\node[wlmod, right=0.3cm of vard] {EulerLagrange.wl};
+\node[stage=Purple, below=of vard] (sep)
+    {Separate metric from matter fields};
 
-\node[stage, below=of vard] (sep)
-    {\texttt{SeparateFieldMetrics}};
-\node[wlmod, right=0.3cm of sep] {ComponentDecompose.wl};
+\node[stage=Purple, below=of sep] (tobasis)
+    {Project to coordinate basis\\[-1pt]
+     \scriptsize \texttt{ToBasis}};
 
-\node[stage, below=of sep] (tobasis)
-    {\texttt{ToBasis}};
+\node[stage=Purple, below=of tobasis] (batch)
+    {Evaluate metric contractions \& traces\\[-1pt]
+     \scriptsize batched expansion ($\sim$50 terms)};
 
-\node[stage, below=of tobasis] (batch)
-    {\textbf{BatchedTraceBasisDummy}\\[-1pt]
-     \scriptsize fused: trace + expand + metric eval\\[-1pt]
-     \scriptsize adaptive batch size ($\sim$50 terms)};
+\node[stage=Purple, below=of batch] (christoffel)
+    {Compute Christoffel symbols $\Gamma^a_{\ bc}$\\[-1pt]
+     \scriptsize auto-detected for non-constant metrics};
 
-\node[stage, below=of batch] (christoffel)
-    {\texttt{EvaluateChristoffelComponents}};
-\node[annot, right=0.3cm of christoffel.east, anchor=west]
-    {\texttt{IsNonConstantMetric}\\auto-detects need};
+\node[stage=Purple, below=of christoffel] (replace)
+    {Decompose tensors $\to$ scalar components\\[-1pt]
+     \scriptsize $T_{ab} \to T_0, T_1, \ldots$
+     (symmetry $\to$ canonical reps)};
 
-\node[stage, below=of christoffel] (replace)
-    {\texttt{ReplaceTensorFieldComponents}\\[-1pt]
-     \scriptsize $T_{ab} \to$ scalar functions $T_0, T_1, \ldots$};
-\node[annot, right=0.3cm of replace.east, anchor=west]
-    {\texttt{EnumerateComponentTuples}\\
-     symmetry $\to$ canonical reps};
-
-\node[stage, below=of replace] (convert)
-    {\texttt{ConvertCDToDerivatives}\\[-1pt]
+\node[stage=Purple, below=of replace] (convert)
+    {Covariant $\to$ partial derivatives\\[-1pt]
      \scriptsize $\nabla_a \to \partial_t, \partial_x, \ldots$};
 
-\node[stage, below=of convert, draw=GreenLine, fill=GreenFill, fill opacity=0.3] (export)
-    {\textbf{ExportJSON}\\[-1pt]
+\node[stage=Green, below=of convert] (export)
+    {\textbf{Export to intermediate representation}\\[-1pt]
      \scriptsize coefficients, operators, fields};
-\node[wlmod, right=0.3cm of export] {ExportJSON.wl};
 
-\node[stage, below=of export, draw=BlueLine, fill=BlueFill, fill opacity=0.3] (json)
+\node[stage=Blue, below=of export] (json)
     {\textbf{\texttt{spec.json}}};
 
 % ===================================================================
@@ -151,22 +91,19 @@
 % ===================================================================
 % CACHE BOX (left side)
 % ===================================================================
-\node[cache, left=2.8cm of batch, anchor=north east,
+\node[cache, left=1.8cm of christoffel, anchor=east,
       text width=4.8cm] (cachebox) {%
-    \textbf{\$TIDALGeometricCache}\\[3pt]
-    \textbullet\ Inverse metric: \texttt{Simplify[Inverse[g]]}\\
-    \textbullet\ Christoffels: $\Gamma^a_{\ bc}$ (3D array)\\
-    \textbullet\ Riemann: $R^a_{\ bcd}$ (4D array)\\
-    \textbullet\ Metric rules: 32 \texttt{With[]} blocks\\[3pt]
-    \textbullet\ \texttt{SetMetricDownValues}:\\
-    \quad direct \texttt{Set[]} (auto-evaluating)\\
-    \textbullet\ \texttt{SetBackgroundFieldDownValues}:\\
+    \textbf{Geometric cache}\\[3pt]
+    \textbullet\ Inverse metric: $g^{ab}$\\
+    \textbullet\ Christoffel symbols: $\Gamma^a_{\ bc}$\\
+    \textbullet\ Riemann tensor: $R^a_{\ bcd}$\\
+    \textbullet\ Metric evaluation rules\\[3pt]
+    \textbullet\ Background field components:\\
     \quad $\bar{A}_\mu \to$ coordinate functions};
 
 % Cache arrows: compute → cache, cache → reuse
 % Christoffel computed at christoffel stage
-\draw[cachearr] (christoffel.west) -- +(-0.6,0)
-    |- ([yshift=-0.2cm]cachebox.east)
+\draw[cachearr] (christoffel.west) -- (cachebox.east)
     node[midway, above, font=\scriptsize, text=BlueLine] {};
 
 % Cache reused by batch (metric eval) and replace (metric weights)
@@ -175,8 +112,8 @@
 \draw[cachearr] ([yshift=-0.6cm]cachebox.east) -|
     ([xshift=-0.6cm]replace.west) -- (replace.west);
 
-% SetMetricDownValues set at manifold stage
-\draw[cachearr] (manifold.west) -- +(-0.4,0)
+% Metric rules set at manifold stage
+\draw[cachearr] (manifold.west) -- ++(-0.8,0)
     |- ([yshift=0.8cm]cachebox.east);
 
 % ===================================================================
@@ -203,7 +140,7 @@
 \node[optbranch, right=4.0cm of batch] (bgfield)
     {Background fields\\[1pt]
      \scriptsize $\bar{A}_\mu(x)$ evaluation\\
-     \scriptsize via \texttt{DownValues}};
+     \scriptsize auto-substituted into equations};
 \draw[arr, densely dashed, GreenLine]
     (bgfield.west) -- (batch.east);
 

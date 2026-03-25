@@ -15,6 +15,7 @@ Entry point: ``tidal`` command with subcommands:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
@@ -24,20 +25,55 @@ __all__ = ["main"]
 
 def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     """Build the top-level argument parser with subcommands."""
+    # Use rich-argparse for colored help if available, fallback to default
+    try:
+        from rich_argparse import RichHelpFormatter
+
+        formatter = RichHelpFormatter
+    except ImportError:
+        formatter = argparse.HelpFormatter
+
     parser = argparse.ArgumentParser(
         prog="tidal",
         description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, plot, sweep, list.",
+        formatter_class=formatter,
     )
     parser.add_argument(
         "--version",
         action="version",
         version=f"%(prog)s {_get_version()}",
     )
+    parser.add_argument(
+        "--no-banner",
+        action="store_true",
+        default=False,
+        help="Suppress the startup banner",
+    )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        default=False,
+        help="Show detailed diagnostic output (solver selection, CFL, Jacobian tier)",
+    )
+    parser.add_argument(
+        "--cite",
+        action="store_true",
+        default=False,
+        help="Print citation information for TIDAL and its dependencies",
+    )
+    parser.add_argument(
+        "--time",
+        action="store_true",
+        default=False,
+        help="Show wall-clock elapsed time after command completes",
+    )
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
     # --- derive ---
     derive_parser = sub.add_parser(
         "derive",
+        aliases=["der"],
         help="Derive equations from Lagrangian via Wolfram/xAct",
         description=(
             "Generate equations of motion from a Lagrangian. "
@@ -78,10 +114,22 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         help="Override output JSON path from config",
     )
+    derive_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=600,
+        metavar="SECONDS",
+        help=(
+            "Maximum time (seconds) for wolframscript execution. "
+            "Default: 600 (10 min). If exceeded, investigate which pipeline "
+            "stage is the bottleneck and optimize. Use 0 for no timeout."
+        ),
+    )
 
     # --- inspect ---
     inspect_parser = sub.add_parser(
         "inspect",
+        aliases=["insp"],
         help="Display equation system information from JSON",
         description="Load a JSON specification and display its contents.",
         epilog=(
@@ -106,10 +154,23 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         dest="json_output",
         help="Output machine-readable JSON instead of human-readable text",
     )
+    inspect_parser.add_argument(
+        "--latex",
+        action="store_true",
+        help="Output equations as LaTeX math",
+    )
+    inspect_parser.add_argument(
+        "--latex-format",
+        choices=["align", "document", "raw"],
+        default="align",
+        dest="latex_format",
+        help="LaTeX output format (default: align). 'document' wraps in standalone .tex",
+    )
 
     # --- simulate ---
     sim_parser = sub.add_parser(
         "simulate",
+        aliases=["sim"],
         help="Run PDE simulation from JSON specification",
         description="Build and run a PDE simulation from a JSON equation specification.",
         epilog=(
@@ -123,6 +184,8 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "json_path",
+        nargs="?",
+        default=None,
         help="Path to the JSON equation specification",
     )
     # Parameters
@@ -367,6 +430,31 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Print summary only, skip visualization",
     )
     sim_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Preview simulation setup without running (grid, solver, IC, memory estimate)",
+    )
+    sim_parser.add_argument(
+        "--list-schemes",
+        action="store_true",
+        default=False,
+        help="List available solver schemes and exit",
+    )
+    sim_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite existing --output directory without prompting",
+    )
+    sim_parser.add_argument(
+        "--report",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Generate self-contained HTML summary report at PATH",
+    )
+    sim_parser.add_argument(
         "--quiet",
         "-q",
         action="store_true",
@@ -423,6 +511,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- list ---
     list_parser = sub.add_parser(
         "list",
+        aliases=["ls"],
         help="List available JSON specifications",
         description="Scan a directory for JSON equation specifications and display summaries.",
         epilog=(
@@ -442,6 +531,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- validate ---
     validate_parser = sub.add_parser(
         "validate",
+        aliases=["val"],
         help="Validate a JSON equation specification",
         description="Check a JSON specification for errors (unknown operators, bad references, etc.).",
         epilog=(
@@ -477,6 +567,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- measure ---
     measure_parser = sub.add_parser(
         "measure",
+        aliases=["meas"],
         help="Extract physics measurements from simulation output",
         description=(
             "Load simulation output from 'tidal simulate --output' and run "
@@ -494,7 +585,15 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     measure_parser.add_argument(
         "data_path",
+        nargs="?",
+        default=None,
         help="Path to the simulation output directory",
+    )
+    measure_parser.add_argument(
+        "--list-types",
+        action="store_true",
+        default=False,
+        help="List available measurement types and exit",
     )
     measure_parser.add_argument(
         "--spec",
@@ -688,6 +787,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="NAME",
         help="Colormap for heatmap/snapshot (default: RdBu_r)",
     )
+    plot_parser.add_argument(
+        "--log-scale",
+        dest="log_scale",
+        action="store_true",
+        help="Use logarithmic colorbar for heatmaps (useful for inv_B_min)",
+    )
     # Sweep-specific options
     plot_parser.add_argument(
         "--metric",
@@ -724,6 +829,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- sweep ---
     sweep_parser = sub.add_parser(
         "sweep",
+        aliases=["sw"],
         help="Run parameter sweeps and convergence studies",
         description=(
             "Run simulate + measure across a parameter grid and aggregate "
@@ -1031,6 +1137,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Print sweep plan (grid size, parameter combos) without running",
     )
     sweep_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite existing --output directory without prompting",
+    )
+    sweep_parser.add_argument(
         "--config",
         default=None,
         metavar="TOML",
@@ -1111,10 +1223,42 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Number of samples for latin_hypercube/sobol strategies",
     )
 
+    # Critical field extraction (post-sweep)
+    sweep_parser.add_argument(
+        "--critical-field",
+        dest="critical_field",
+        metavar="PARAM",
+        help=(
+            "After sweep, extract minimum field strength for full conversion. "
+            "Collapses the named swept parameter by finding the first value "
+            "where --metric >= --cf-threshold (default: P_final >= 0.99). "
+            "Results saved to OUTPUT/critical_field/"
+        ),
+    )
+    sweep_parser.add_argument(
+        "--cf-threshold",
+        dest="cf_threshold",
+        type=float,
+        default=0.99,
+        metavar="T",
+        help="Conversion threshold for --critical-field (default: 0.99)",
+    )
+    sweep_parser.add_argument(
+        "--no-interpolate",
+        dest="no_interpolate",
+        action="store_true",
+        help="Disable interpolation between sweep grid points for --critical-field",
+    )
+
     # --- analyze ---
     analyze_parser = sub.add_parser(
         "analyze",
-        help="Post-hoc analysis of sweep results (sensitivity analysis)",
+        help="Post-hoc analysis of sweep results (sensitivity, critical field)",
+        epilog="""Examples:
+  tidal analyze sweep_results/ --sensitivity sobol --metric P_max
+  tidal analyze sweep_results/ --critical-field B0 --metric P_final --threshold 0.99
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     analyze_parser.add_argument(
         "data_path",
@@ -1128,7 +1272,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     analyze_parser.add_argument(
         "--metric",
-        help="Metric to analyze (e.g. P_max, max_energy_error)",
+        help="Metric to analyze (e.g. P_final, P_max, max_energy_error)",
     )
     analyze_parser.add_argument(
         "--bootstrap",
@@ -1136,6 +1280,69 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=100,
         help="Bootstrap resamples for Sobol confidence intervals (default: 100)",
     )
+    # Critical field analysis
+    analyze_parser.add_argument(
+        "--critical-field",
+        dest="critical_field",
+        metavar="PARAM",
+        help=(
+            "Extract minimum field strength for full conversion. "
+            "Collapses the named swept parameter by finding the first "
+            "value where --metric >= --threshold (default: P_final >= 0.99)"
+        ),
+    )
+    analyze_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.99,
+        help="Metric threshold for full conversion (default: 0.99)",
+    )
+    analyze_parser.add_argument(
+        "--output",
+        help="Output directory for critical field results (required with --critical-field)",
+    )
+    analyze_parser.add_argument(
+        "--no-interpolate",
+        dest="no_interpolate",
+        action="store_true",
+        help="Disable interpolation between sweep grid points",
+    )
+    analyze_parser.add_argument(
+        "--reference-formula",
+        dest="reference_formula",
+        choices=["boccaletti", "uniform"],
+        help=(
+            "Compute threshold from analytical E-M formula. "
+            "'boccaletti': localized Gaussian B-field, "
+            "'uniform': uniform B periodic domain. "
+            "Overrides --threshold."
+        ),
+    )
+    analyze_parser.add_argument(
+        "--reference-B",
+        dest="reference_B",
+        type=float,
+        help="Reference B value for analytical formula (required with --reference-formula)",
+    )
+
+    # --- doctor ---
+    sub.add_parser(
+        "doctor",
+        aliases=["doc"],
+        help="Check environment health (Python, dependencies, Wolfram, xAct)",
+        epilog="""Examples:
+  tidal doctor              # Full environment check
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+
+    # Shell completion (optional dependency: shtab)
+    try:
+        import shtab
+
+        shtab.add_argument_to(parser)
+    except ImportError:
+        pass
 
     return parser
 
@@ -1155,7 +1362,19 @@ def _get_version() -> str:
         return "unknown"
 
 
-def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911
+_COMMAND_ALIASES: dict[str, str] = {
+    "der": "derive",
+    "insp": "inspect",
+    "sim": "simulate",
+    "ls": "list",
+    "val": "validate",
+    "meas": "measure",
+    "sw": "sweep",
+    "doc": "doctor",
+}
+
+
+def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911, C901
     """Lazily import and run the appropriate command handler.
 
     Parameters
@@ -1173,43 +1392,48 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911
     ValueError
         If ``args.command`` is not a recognized subcommand.
     """
-    if args.command == "derive":
+    cmd = _COMMAND_ALIASES.get(args.command, args.command)
+    if cmd == "derive":
         from tidal.cli._derive import derive_command
 
         return derive_command(args)
-    if args.command == "inspect":
+    if cmd == "inspect":
         from tidal.cli._inspect import inspect_command
 
         return inspect_command(args)
-    if args.command == "simulate":
+    if cmd == "simulate":
         from tidal.cli._simulate import simulate_command
 
         return simulate_command(args)
-    if args.command == "list":
+    if cmd == "list":
         from tidal.cli._list import list_command
 
         return list_command(args)
-    if args.command == "validate":
+    if cmd == "validate":
         from tidal.cli._validate import validate_command
 
         return validate_command(args)
-    if args.command == "measure":
+    if cmd == "measure":
         from tidal.cli._measure import measure_command
 
         return measure_command(args)
-    if args.command == "plot":
+    if cmd == "plot":
         from tidal.cli._plot_command import plot_command
 
         return plot_command(args)
-    if args.command == "sweep":
+    if cmd == "sweep":
         from tidal.cli._sweep import sweep_command
 
         return sweep_command(args)
-    if args.command == "analyze":
+    if cmd == "analyze":
         from tidal.cli._analyze import analyze_command
 
         return analyze_command(args)
-    msg = f"Unknown command: {args.command}"
+    if cmd == "doctor":
+        from tidal.cli._doctor import doctor_command
+
+        return doctor_command(args)
+    msg = f"Unknown command: {cmd}"
     raise ValueError(msg)
 
 
@@ -1229,20 +1453,82 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    # Show banner for long-running commands and bare `tidal` (no subcommand).
+    # Quick commands (list, validate, inspect, measure, plot, analyze) skip it.
+    # Skip for --cite (info-only flag).
+    if (
+        not args.no_banner
+        and not os.environ.get("TIDAL_NO_BANNER")
+        and not args.cite
+        and _COMMAND_ALIASES.get(args.command, args.command)
+        in {None, "simulate", "derive", "sweep"}
+    ):
+        from tidal.banner import print_banner
+
+        banner_theme = os.environ.get("TIDAL_BANNER_THEME", "ocean")
+        banner_layout = os.environ.get("TIDAL_BANNER_LAYOUT", "auto")
+        print_banner(
+            theme=banner_theme,
+            layout=banner_layout,
+            version=_get_version(),
+        )
+
+    if args.cite:
+        from tidal.cli._cite import print_citation
+
+        print_citation()
+        return 0
+
     if args.command is None:
         parser.print_help()
         return 0
 
+    from tidal.cli._console import configure as _configure_console
+    from tidal.cli._console import error as _console_error
+
+    _configure_console(
+        verbose=getattr(args, "verbose", False),
+        quiet=getattr(args, "quiet", False),
+    )
+
+    import time
+
+    t0 = time.perf_counter()
     try:
-        return _dispatch(args)
+        rc = _dispatch(args)
     except KeyboardInterrupt:
-        print("\nInterrupted.")
-        return 130
-    except (ValueError, FileNotFoundError, TypeError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+        print("\nInterrupted.", file=sys.stderr)
+        rc = 130
+    except FileNotFoundError as exc:
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            str(exc),
+            [
+                "Run 'tidal list' to see available specifications.",
+                "Run 'tidal derive <theory.toml>' to generate from a Lagrangian.",
+            ],
+        )
+        rc = 1
+    except (ValueError, TypeError) as exc:
+        _console_error(str(exc))
+        rc = 1
     except RuntimeError:
         import traceback
 
         traceback.print_exc()
-        return 1
+        rc = 1
+
+    if args.time:
+        elapsed = time.perf_counter() - t0
+        if elapsed >= 60:  # noqa: PLR2004
+            mins = int(elapsed // 60)
+            secs = elapsed % 60
+            print(
+                f"[TIME] {args.command} completed in {mins}m {secs:.1f}s",
+                file=sys.stderr,
+            )
+        else:
+            print(f"[TIME] {args.command} completed in {elapsed:.2f}s", file=sys.stderr)
+
+    return rc

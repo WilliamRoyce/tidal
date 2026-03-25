@@ -608,15 +608,16 @@ def _format_json(results: dict[str, Any], data: SimulationData) -> str:
 
 def _format_text_section_conservation(lines: list[str], cons: dict[str, Any]) -> None:
     """Append conservation section to *lines*."""
+    from tidal.cli._console import key_value, pass_fail
+
     if "error" in cons:
         lines.append(f"Energy Conservation: ERROR ({cons['error']})")
     else:
-        status = "PASS" if cons["is_conserved"] else "FAIL"
         lines.extend(
             [
-                f"Energy Conservation: {status}",
-                f"  max |dE/E| = {cons['max_relative_error']:.2e}",
-                f"  threshold  = {cons['threshold']:.0e}",
+                pass_fail("Energy Conservation", passed=cons["is_conserved"]),
+                key_value("max |dE/E|", f"{cons['max_relative_error']:.2e}"),
+                key_value("threshold", f"{cons['threshold']:.0e}"),
             ]
         )
     lines.append("")
@@ -624,34 +625,38 @@ def _format_text_section_conservation(lines: list[str], cons: dict[str, Any]) ->
 
 def _format_text_section_energy(lines: list[str], eng: dict[str, Any]) -> None:
     """Append energy section to *lines*."""
+    from tidal.cli._console import key_value
+
     if "error" in eng:
         lines.append(f"Energy: ERROR ({eng['error']})")
     else:
         lines.append("Per-Field Energy (final):")
         for name, series in eng["per_field"].items():
-            lines.append(f"  {name}: {series[-1]:.6f}")
+            lines.append(key_value(name, f"{series[-1]:.6f}"))
         lines.extend(
-            [
-                f"  interaction: {eng['interaction'][-1]:.6f}",
-                f"  total:       {eng['total'][-1]:.6f}",
-            ]
+            (
+                key_value("interaction", f"{eng['interaction'][-1]:.6f}"),
+                key_value("total", f"{eng['total'][-1]:.6f}"),
+            )
         )
     lines.append("")
 
 
 def _format_text_section_conversion(lines: list[str], conv: dict[str, Any]) -> None:
     """Append conversion section to *lines*."""
+    from tidal.cli._console import key_value
+
     if "error" in conv:
         lines.append(f"Conversion: ERROR ({conv['error']})")
     else:
         src = ", ".join(conv["source"])
         tgt = ", ".join(conv["target"])
         lines.extend(
-            [
+            (
                 f"Conversion ({src} -> {tgt}):",
-                f"  Peak P(t) = {conv['peak_probability']:.6f}",
-                f"  at t = {conv['peak_time']:.2f}",
-            ]
+                key_value("Peak P(t)", f"{conv['peak_probability']:.6f}"),
+                key_value("at t", f"{conv['peak_time']:.2f}"),
+            )
         )
     lines.append("")
 
@@ -792,14 +797,13 @@ def _format_text_section_peak_conversion(
 
 def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa: C901
     """Produce human-readable aligned text output."""
-    lines: list[str] = []
-    sep = "=" * 64
+    from tidal.cli._console import header as _header
 
+    lines: list[str] = []
+
+    lines.append(_header(f"Measurement: {', '.join(data.fields.keys())}"))
     lines.extend(
         [
-            sep,
-            f"Measurement: {', '.join(data.fields.keys())}",
-            sep,
             "",
             "Simulation:",
             f"  Time range: {float(data.times[0]):.1f} -> {float(data.times[-1]):.1f}"
@@ -833,7 +837,7 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa:
     if "peak_conversion" in results:
         _format_text_section_peak_conversion(lines, results["peak_conversion"])
 
-    lines.append(sep)
+    lines.append("=" * 64)
     return "\n".join(lines)
 
 
@@ -889,11 +893,13 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     }
     needs_source = measurements & require_source
     if needs_source and source is None:
+        from tidal.cli._console import error_with_hint
+
         names = ", ".join(sorted(needs_source))
-        print(
-            f"Error: --source required for --what={names} "
+        error_with_hint(
+            f"--source required for --what={names} "
             f"(or use --what=summary for auto-detection)",
-            file=sys.stderr,
+            ["Example: `--what conversion --source phi --target psi`"],
         )
         return 1
 
@@ -929,7 +935,12 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     if "dispersion" in measurements:
         dyn_in_source = _filter_to_dynamical(source, data, "dispersion")
         if not dyn_in_source:
-            print("Error: no dynamical fields for dispersion", file=sys.stderr)
+            from tidal.cli._console import error_with_hint
+
+            error_with_hint(
+                "no dynamical fields for dispersion",
+                ["Check spec with `tidal inspect <json>`"],
+            )
             return 1
         results["dispersion"] = _run_measurement_safe(
             _run_dispersion, data, dyn_in_source
@@ -967,7 +978,7 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     return results
 
 
-def measure_command(args: Namespace) -> int:
+def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Run ``tidal measure`` subcommand.
 
     Flow:
@@ -980,13 +991,62 @@ def measure_command(args: Namespace) -> int:
 
     Returns 0 on success, 1 on error.
     """
-    data_path = Path(args.data_path)
-    if not data_path.exists():
-        print(f"Error: data path not found: {data_path}", file=sys.stderr)
+    if getattr(args, "list_types", False):
+        print("Available measurement types:")
+        print("  summary              Overview of all measurements")
+        print("  energy               Per-field and total energy")
+        print("  conservation         Energy conservation check (PASS/FAIL)")
+        print("  conversion           Field conversion probability")
+        print("  mixing               Mixing length and dominant frequency")
+        print("  spectrum             Power spectrum analysis")
+        print("  spectral_conversion  Per-mode conversion in Fourier space")
+        print("  dispersion           Dispersion relation extraction")
+        print("  effective_mass       Effective mass from dispersion")
+        print("  asymptotic           Late-time asymptotic behavior")
+        print("  peak_conversion      Peak conversion probability")
+        print("  velocity             Group/phase velocity measurement")
+        print("  resonance            Resonance detection")
+        return 0
+
+    from tidal.cli._console import error_with_hint
+
+    if args.data_path is None:
+        from tidal.cli._console import error as _error
+
+        _error("data_path is required")
         return 1
 
-    spec_path = _resolve_spec_path(data_path, getattr(args, "spec", None))
-    measurements = _parse_measurements(getattr(args, "what", None))
+    data_path = Path(args.data_path)
+    if not data_path.exists():
+        error_with_hint(
+            f"data path not found: {data_path}",
+            ["Run `tidal simulate ... --output DIR` first, then `tidal measure DIR`"],
+        )
+        return 1
+
+    try:
+        spec_path = _resolve_spec_path(data_path, getattr(args, "spec", None))
+    except FileNotFoundError:
+        error_with_hint(
+            f"spec file not found for {data_path.name}",
+            ["Use `tidal list` to find specs"],
+        )
+        return 1
+    except ValueError:
+        error_with_hint(
+            f"cannot determine spec for {data_path.name}",
+            ["Provide explicitly: `tidal measure DIR --spec spec.json`"],
+        )
+        return 1
+
+    try:
+        measurements = _parse_measurements(getattr(args, "what", None))
+    except ValueError:
+        error_with_hint(
+            f"unknown measurement type in --what={getattr(args, 'what', '')}",
+            ["Available: energy, conversion, mixing, spectrum, conservation, etc."],
+        )
+        return 1
     quiet: bool = getattr(args, "quiet", False)
 
     if not quiet:

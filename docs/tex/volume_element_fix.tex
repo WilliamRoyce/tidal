@@ -1,0 +1,83 @@
+% Volume Element Fix: sqrt|g| in Lagrangian Linearization
+% Source: docs/volume-element-fix.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Volume Element Fix: \sqrtg{} in Lagrangian Linearization}
+\label{sec:volume-element-fix}
+
+\subsection{Problem (2026-03-04)}
+\label{sec:vol-problem}
+
+Massive gravity (Fierz--Pauli) simulation was unstable --- all fields grew exponentially. Root cause: the linearization pipeline computed $\text{Perturbation}[\lag, 2]$ instead of $\text{Perturbation}[\sqrtg \cdot \lag, 2]$.
+
+The action integral is $S = \int \sqrtg\, \lag\, \mathrm{d}^n x$. The second-order perturbation of the integrand is $\delta^2(\sqrtg\, \lag)$, not just $\delta^2(\lag)$. The missing volume element contribution means VarD gives $R^{(1)}_{ab}$ (linearized Ricci) instead of the full Einstein tensor $G^{(1)}_{ab} = R^{(1)}_{ab} - \tfrac{1}{2}\etamunu R^{(1)}$.
+
+\textbf{Why gravitational\_waves was unaffected}: TT gauge imposes $h = 0$ (traceless), so the missing trace term $h \cdot R^{(1)}$ vanishes.
+
+\textbf{Only 3 theories use linearization path}: gravitational\_waves, gravitational\_waves\_1d, massive\_gravity.
+
+
+\subsection{Solution: Native xPert Detg[] Perturbation}
+\label{sec:vol-solution}
+
+\subsubsection{Research Findings}
+
+\begin{itemize}
+  \item xPert natively supports \texttt{Perturbation[Sqrt[-Detg[]], n]} --- the metric determinant symbol created by \texttt{DefMetric}.
+  \item xPert paper~\cite{brizuela2009xpert} and example notebook \texttt{Lagrangian-variation-xPert-VarD.nb} confirm the canonical approach:
+
+\begin{lstlisting}[style=mathematica]
+LGR = Sqrt[-Detg[]] * RicciScalarCD[];
+l2Raw = Perturbation[LGR, 2] // ExpandPerturbation;
+eom = 1/Sqrt[-Detg[]] * VarD[h[LI[1], a, b], CD] @ l2Raw;
+\end{lstlisting}
+
+  \item $\nabla_i(\sqrtg) = 0$ (covariantly constant for Levi-Civita connection), so $\sqrt{|g_0|}$ passes through VarD as a constant.
+  \item xAct naming convention: \texttt{DefMetric[-1, mgEta[-a,-b], mgCD]} creates \texttt{DetmgEta[]}. Pattern: \texttt{Det} + metric symbol name.
+\end{itemize}
+
+\subsubsection{Implementation (commit ca256cb)}
+
+In \texttt{\_wls\_linearize\_from\_lagrangian()} in \texttt{tidal/cli/\_derive.py}:
+
+\begin{enumerate}
+  \item \textbf{Multiply by $\sqrt{-g}$}: \texttt{lDensity = Sqrt[-DetmgEta[]] * lOriginal}
+  \item \textbf{Perturb density}: \texttt{l2Raw = Perturbation[lDensity, 2]; l2Raw = ExpandPerturbation[l2Raw]}
+  \item \textbf{Divide out background}: \texttt{l2Raw = l2Raw / Sqrt[-DetmgEta[]]}
+  \item \textbf{Evaluate determinant}: \texttt{l2Raw = l2Raw /. DetmgEta[] -> Det[mgMetricMatrix]; l2Raw = Simplify[l2Raw]}
+\end{enumerate}
+
+The \texttt{det\_sym = f"Det\{ctx.metric\}"} gives the correct symbol for any prefix.
+
+\subsubsection{Why This Works for All Backgrounds}
+
+\begin{itemize}
+  \item \textbf{Minkowski}: $\text{Det}[\text{MetricMatrix}] = -1$, $\sqrt{-(-1)} = 1$ --- factor vanishes.
+  \item \textbf{Curved} (polar, spherical, etc.): $\sqrt{|g_0|}$ factor correctly captured by xPert and divided out.
+  \item \textbf{TT gauge}: $h = 0$ $\to$ determinant perturbation vanishes $\to$ GW results unchanged.
+  \item \textbf{Non-curvature Lagrangians}: If $\lag_0 = 0$ (all terms $O(h)$), correction vanishes naturally.
+\end{itemize}
+
+\subsubsection{Previous Approaches (Superseded)}
+
+\begin{enumerate}
+  \item \textbf{Handmade formula} (commit 4d7c317): $\delta^2 \lag + h \cdot \delta\lag$ where $h = \eta^{ab} h_{ab}$. Only correct for flat Minkowski with $\sqrt{|g_0|} = 1$ and $\lag_0 = 0$. Replaced by native approach.
+  \item \textbf{Phantom $\ddt^2$ detection} (commits a8ccf29, 45fb7df): Elaborate code in \texttt{ComponentDecompose.wl} to cancel ``phantom'' $\ddt^2$ terms. Wrong hypothesis --- the terms were genuinely non-zero because of the missing volume element.
+\end{enumerate}
+
+\subsubsection{Related Files Changed}
+
+\begin{itemize}
+  \item \texttt{tidal/cli/\_derive.py} --- Core fix: native \texttt{Detg[]} perturbation.
+  \item \texttt{tidal/wolfram/ComponentDecompose.wl} --- Reverted phantom $\ddt^2$ detection to \texttt{Expand[Simplify[componentEq]]} (commit 4d7c317).
+  \item \texttt{tidal/wolfram/ExportJSON.wl} --- Cleaned up DIAG prints, kept equation reassignment logic (commit 4d7c317).
+\end{itemize}
+
+\subsubsection{Key References}
+
+\begin{itemize}
+  \item xPert paper: arXiv:0807.0824~\cite{brizuela2009xpert} (Brizuela, Mart\'in-Garc\'ia, Mena Marug\'an 2009).
+  \item xPert example: \texttt{Lagrangian-variation-xPert-VarD.nb} (xAct-contrib/examples on GitHub).
+  \item xPert docs: \texttt{xact.es/Documentation/HTML/HTMLLinks/xPertDoc.nb\_5.html}.
+  \item VarL (xTras): \texttt{xact.es/xTras/documentation/ref/VarL.html} --- alternative approach (not used).
+\end{itemize}

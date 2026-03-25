@@ -1,0 +1,323 @@
+% Chern-Simons Implementation Notes
+% Source: docs/chern-simons-notes.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Chern-Simons Implementation Notes}
+\label{sec:chern-simons}
+
+\subsection{About This File}
+
+This is an \textbf{example-specific} implementation guide for the Chern-Simons 2+1D case.
+
+\paragraph{When to create similar files.}
+\label{par:cs-when-to-create}
+\begin{itemize}
+  \item For any complex example requiring hybrid approaches (symbolic + manual)
+  \item When implementing topological field theories with special tensor structures
+  \item For examples with gauge symmetries or constraint equations
+  \item When exploring new physics domains (Yang-Mills, BF theory, supergravity, etc.)
+\end{itemize}
+
+\paragraph{Template for new example notes.}
+\label{par:cs-template}
+\begin{enumerate}
+  \item Physics Background (Lagrangian, EOM, physical interpretation)
+  \item Implementation Status (what works, what doesn't, current limitations)
+  \item Wolfram Implementation Pattern (specific approaches for this example)
+  \item JSON Structure (how the equations are represented)
+  \item Python Simulation (grid setup, initial conditions, expected physics)
+  \item Future Automation Plan (steps to fully automate if currently hybrid)
+  \item References (scripts, JSON files, related examples)
+\end{enumerate}
+
+\paragraph{Integration with main docs.}
+\label{par:cs-integration}
+\begin{itemize}
+  \item Reference this file from \texttt{MEMORY.md} under ``Example Implementations''
+  \item Add error patterns to \texttt{troubleshooting.md} if they're general enough
+  \item Link back to main docs for general patterns (this file is for specifics)
+\end{itemize}
+
+\subsection{Physics Background}
+\label{sec:cs-physics}
+
+Chern-Simons theory in 2+1D:
+\begin{equation}
+  \lag = -\tfrac{1}{4}\, F_{\mu\nu}\, F^{\mu\nu}
+       + \frac{\kappa}{2}\, \varepsilon^{\mu\nu\rho}\, A_\mu\, \partial_\nu A_\rho
+  \label{eq:cs-lagrangian}
+\end{equation}
+
+Equations of motion:
+\begin{equation}
+  \partial_\mu F^{\mu\nu} + \kappa\, \varepsilon^{\nu\alpha\beta}\, \partial_\alpha A_\beta = 0
+  \label{eq:cs-eom}
+\end{equation}
+
+In Lorenz gauge ($\partial^\mu A_\mu = 0$):
+\begin{align}
+  \ddt^2 A_0 &= \lapl A_0 + \kappa\bigl(\ddx A_2 - \ddy A_1\bigr) \label{eq:cs-lorenz-A0} \\
+  \ddt^2 A_1 &= \lapl A_1 + \kappa\,\ddy A_0 \quad\text{[time term $-\kappa\,\ddt A_2$ moves to LHS]} \label{eq:cs-lorenz-A1} \\
+  \ddt^2 A_2 &= \lapl A_2 - \kappa\,\ddx A_0 \quad\text{[time term $+\kappa\,\ddt A_1$ moves to LHS]} \label{eq:cs-lorenz-A2}
+\end{align}
+
+\subsection{Implementation Status}
+\label{sec:cs-status}
+
+\subsubsection{What Works (Fully Automated)}
+\label{sec:cs-works}
+
+\begin{itemize}
+  \item 3D manifold setup (M3, 2+1D spacetime)
+  \item Full Maxwell-Chern-Simons Lagrangian symbolic derivation
+  \item \textbf{Automatic epsilon tensor evaluation} (\texttt{EvaluateEpsilonComponents})
+  \item Component decomposition for vector fields in 3D
+  \item \textbf{Automatic gradient direction detection} (\texttt{gradient\_x} vs \texttt{gradient\_y})
+  \item \textbf{Cross-field reference detection} ($A_0 \to A_1 \to A_2$)
+  \item Python simulation with gradient operators
+  \item Energy transfer between components (CS coupling effect)
+\end{itemize}
+
+\subsubsection{Known Limitations}
+\label{sec:cs-limitations}
+
+\begin{itemize}
+  \item Mixed time-space derivatives ($\ddt\,\ddx$) classified as ``laplacian'' in JSON
+  \item Extra cross-Laplacian terms appear (from unsimplified gauge terms)
+  \item Time derivative separation pattern needs 2+1D update for cleaner JSON
+\end{itemize}
+
+\subsection{Wolfram Implementation Pattern}
+\label{sec:cs-wolfram}
+
+\subsubsection{Fully Automated Approach (Current)}
+\label{sec:cs-automated}
+
+\begin{lstlisting}[style=mathematica]
+(* 1. Build full Lagrangian with epsilon tensor *)
+MaxwellLagrangian = -1/2 CD3[-a][csA[-b]] eta3[a,c] eta3[b,d] CD3[-c][csA[-d]]
+CSLagrangian = (kappa/2) * epsiloneta3[a, b, c] * csA[-a] * CD3[-b][csA[-c]]
+FullLagrangian = MaxwellLagrangian + CSLagrangian
+
+(* 2. Derive EOM - includes both Maxwell and CS contributions *)
+eomFull = VarD[csA[-a], CD3][FullLagrangian]
+
+(* 3. Decompose - EvaluateEpsilonComponents handles epsilon automatically *)
+componentEqs = DecomposeToComponents[eomFull, csA[-a], cart3]
+
+(* 4. Export - IdentifyGradientDirection detects x/y correctly *)
+jsonStructure = BuildMultiFieldJSONStructure[fullEquations, metadata]
+\end{lstlisting}
+
+\subsubsection{Previous Hybrid Approach (No Longer Needed)}
+\label{sec:cs-hybrid}
+
+The old approach required manual CS term addition after decomposition.
+This is no longer necessary with the automated epsilon evaluation.
+
+\subsubsection{Why Automation Now Works}
+\label{sec:cs-why-automation}
+
+The epsilon tensor $\varepsilon^{\mu\nu\rho}$ creates complex index structures:
+
+\begin{itemize}
+  \item xAct's \texttt{epsiloneta3[-a,-b,-c]} exists but component evaluation is non-trivial
+  \item \texttt{ToBasis[chart][epsilon[...]]} produces symbolic basis components
+  \item Need explicit rules for all index permutations with metric signature factors
+  \item Simpler to compute CS terms from known structure than fully automate
+\end{itemize}
+
+\subsubsection{Attempted (Failed) Approaches}
+\label{sec:cs-failed}
+
+\paragraph{Direct epsilon in Lagrangian.}
+\label{par:cs-direct-epsilon}
+\begin{lstlisting}[style=mathematica]
+(* Symbolic epsilon remains after decomposition *)
+CSTerm = epsilon[a,b,c] A[-a] CD[-b][A[-c]]
+(* Result: eps[{0,-cart3},{1,-cart3},{0,cart3}] ... *)
+(* Replacement rules complex and error-prone *)
+\end{lstlisting}
+
+\paragraph{Field strength substitution.}
+\label{par:cs-field-strength}
+\begin{lstlisting}[style=mathematica]
+(* Index mismatch - doesn't apply reliably *)
+F[-a,-b] -> CD[-a][A[-b]] - CD[-b][A[-a]]
+\end{lstlisting}
+
+\subsection{JSON Structure}
+\label{sec:cs-json}
+
+\subsubsection{Manual JSON (Current)}
+\label{sec:cs-json-current}
+
+File: \texttt{examples/data/chern\_simons\_3d.json}
+
+\begin{lstlisting}[style=json]
+{
+  "field": "A_0",
+  "rhs": {
+    "terms": [
+      { "coefficient": 1.0, "operator": "laplacian", "field": "A_0" },
+      { "coefficient": 0.5, "operator": "gradient_x", "field": "A_2" },
+      { "coefficient": -0.5, "operator": "gradient_y", "field": "A_1" }
+    ]
+  }
+}
+\end{lstlisting}
+
+\paragraph{Key points.}
+\label{par:cs-json-key-points}
+\begin{itemize}
+  \item CS term decomposed into gradient operators (not a composite ``curl'')
+  \item Cross-field references: $A_0$ couples to $A_1$ and $A_2$
+  \item Python handles this naturally via existing gradient operators
+\end{itemize}
+
+\subsubsection{Why Manual JSON}
+\label{sec:cs-why-manual}
+
+\texttt{ExportJSON.wl} operator detection issues with 3D:
+
+\begin{itemize}
+  \item Mixed \texttt{Derivative[n,m]} and \texttt{Derivative[n,m,p]} forms confuse parser
+  \item Epsilon remnants in symbolic equations
+  \item Cross-field detection works but coefficient extraction needs refinement
+\end{itemize}
+
+\subsection{Python Simulation}
+\label{sec:cs-python}
+
+\subsubsection{Grid Setup (2D Spatial)}
+\label{sec:cs-grid}
+
+\begin{lstlisting}[style=python]
+grid = CartesianGrid(
+    bounds=[(0, 50), (0, 50)],  # x and y spatial domain
+    shape=[64, 64],
+    periodic=True
+)
+\end{lstlisting}
+
+\subsubsection{State Structure (6 Fields)}
+\label{sec:cs-state}
+
+\begin{lstlisting}[style=python]
+# 3 vector components * (field + momentum)
+state = FieldCollection([
+    A_0, pi_0,  # Temporal component
+    A_1, pi_1,  # x-spatial component
+    A_2, pi_2   # y-spatial component
+])
+\end{lstlisting}
+
+\subsubsection{Observed Physics}
+\label{sec:cs-observed-physics}
+
+\begin{itemize}
+  \item \textbf{Initial}: Gaussian in $A_1$, others zero
+  \item \textbf{Evolution}: Energy transfers to $A_0$ and $A_2$ via CS coupling
+  \item \textbf{Effect}: Topological mass gives helical propagation patterns
+  \item \textbf{Verification}: $\max|A_0|$ and $\max|A_2|$ grow from 0 as simulation runs
+\end{itemize}
+
+\subsection{Epsilon Tensor Component Values}
+\label{sec:cs-epsilon}
+
+For Minkowski signature $(-,+,+)$ in 2+1D:
+
+\paragraph{Lower indices (covariant).}
+\label{par:cs-lower-epsilon}
+\begin{align}
+  \varepsilon_{012} &= -1 \quad\text{(includes $\sqrt{|\det(g)|} = 1$ factor)} \notag \\
+  \varepsilon_{021} &= +1 \notag \\
+  \varepsilon_{120} &= -1 \notag \\
+  &\;\;\vdots \quad\text{(all permutations with sign)} \notag
+\end{align}
+
+\paragraph{Upper indices (contravariant).}
+\label{par:cs-upper-epsilon}
+\begin{align}
+  \varepsilon^{012} &= +1 \quad\text{(raised with metric $\eta^{\mu\nu}$)} \notag \\
+  \varepsilon^{021} &= -1 \notag \\
+  &\;\;\vdots \notag
+\end{align}
+
+\textbf{Critical:} Sign convention depends on metric signature. The built-in \texttt{epsiloneta3} from xAct uses standard conventions.
+
+\subsection{Future Automation Plan}
+\label{sec:cs-future}
+
+To fully automate CS term derivation:
+
+\subsubsection{Define Epsilon Component Rules}
+\label{sec:cs-future-epsilon}
+
+\begin{lstlisting}[style=mathematica]
+epsilonRules = {
+  epsiloneta3[{0,-cart3},{1,-cart3},{2,-cart3}] -> -1,
+  (* ... all 6 permutations ... *)
+};
+\end{lstlisting}
+
+\subsubsection{Apply After ToBasis}
+\label{sec:cs-future-tobasis}
+
+\begin{lstlisting}[style=mathematica]
+componentEq = ToBasis[chart][eom]
+componentEq = componentEq /. epsilonRules
+componentEq = Expand[componentEq]
+\end{lstlisting}
+
+\subsubsection{Enhance ExportJSON.wl}
+\label{sec:cs-future-export}
+
+\begin{itemize}
+  \item Detect curl patterns: $\ddx A_y - \ddy A_x$
+  \item Handle 3-arg Derivatives consistently
+  \item Map cross-derivative terms to gradient operators
+\end{itemize}
+
+\subsubsection{Test with Full Pipeline}
+\label{sec:cs-future-test}
+
+\begin{itemize}
+  \item Build CS Lagrangian with epsilon
+  \item \texttt{VarD} derives full EOM
+  \item Decompose and export to JSON
+  \item Verify coefficients and cross-field refs
+\end{itemize}
+
+\subsection{Related Examples}
+\label{sec:cs-related}
+
+\begin{itemize}
+  \item \textbf{1+1D EM}: Maxwell without CS term (vector field baseline)
+  \item \textbf{Coupled scalars}: Cross-field coupling pattern (scalar fields)
+  \item \textbf{Chern-Simons}: Combines both: vector fields + cross-coupling + 2+1D
+\end{itemize}
+
+\subsection{References}
+\label{sec:cs-references}
+
+\subsubsection{Project Files}
+\label{sec:cs-project-files}
+
+\begin{itemize}
+  \item TOML: \texttt{examples/chern\_simons/theory.toml} (derive via \texttt{tidal derive})
+  \item JSON: \texttt{examples/data/chern\_simons\_3d.json}
+  \item Run: \texttt{cd examples/chern\_simons \&\& bash run.sh}
+\end{itemize}
+
+\subsubsection{Physics \& Software}
+\label{sec:cs-physics-refs}
+
+\begin{description}
+  \item[Deser, Jackiw \& Templeton (1982)] ``Topologically massive gauge theories.'' \emph{Annals of Physics}\ 140, 372--411. Original formulation of topologically massive gauge theory in 2+1D.
+  \item[Dunne (1999)] ``Aspects of Chern-Simons Theory.'' arXiv: \href{https://arxiv.org/abs/hep-th/9902115}{hep-th/9902115}. Pedagogical review of Chern-Simons field theory.
+  \item[Mart\'in-Garc\'ia et al.~\cite{martingarcia2007xact}] ``xAct: Efficient tensor computer algebra for Mathematica.'' \url{http://www.xact.es}. Symbolic tensor algebra used for the derivation pipeline.
+  \item[Zwicker (2020)] ``py-pde: A Python package for solving partial differential equations.'' \emph{JOSS}\ 5(48), 2158. Original PDE backend; FD stencil conventions retained in TIDAL's native operators.
+\end{description}
+
+See \cref{sec:torsion-references} and the project's \texttt{references.bib} for the full citation list.

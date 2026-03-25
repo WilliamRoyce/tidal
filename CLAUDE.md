@@ -9,8 +9,8 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `tidal/symbolic/` -- Python symbolic pipeline (_derive.py, json_loader.py)
 - `tidal/cli/` -- CLI entry points (9 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze)
 - `tidal/measurement/` -- Physics measurements (energy, conversion, mixing, spectra)
-- `examples/` -- 27 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
-- `tests/` -- ~1,484 Python tests + ~115 Wolfram tests
+- `examples/` -- 20 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
+- `tests/` -- ~1,700 Python tests + ~115 Wolfram tests
 - `docs/` -- Architecture docs (MEMORY.md is the main reference)
 
 ## Key Commands
@@ -35,6 +35,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - Background fields declared via `[[background_fields]]` TOML section
 - Gauge fixing via `[[gauge]]` TOML section (presets: Lorenz, de Donder, Coulomb, temporal, axial)
 - Velocity naming: v_{field_name} (e.g., v_phi_0, v_A_1) — E-L velocity form, not canonical momenta
+- **User-facing errors must include hints**: Use `error_with_hint(msg, hints)` from `tidal.cli._console` instead of bare `error()` for all CLI error messages. Each hint should be an actionable suggestion (example syntax, available options, related commands, troubleshooting steps). See existing ~60 error sites across CLI modules for the pattern.
 
 ## Workflow Rules
 
@@ -42,10 +43,23 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **After completing a feature/fix**, commit promptly with conventional format (feat:/fix:/refactor:/test:/docs:). No Co-Authored-By trailer. Separate unrelated changes into distinct commits.
 - **Fix lint/type/spell errors immediately** — `uv run ruff check --fix && uv run ruff format` after code changes. Fix pyright errors. Add domain terms to `.cspell.json`, fix genuine typos.
 - **Wolfram pipeline integrity**: ALL symbolic processing stays in Wolfram — never post-process equations in Python. Never skip/bypass the canonical pipeline; fix root causes.
+- **Run long commands in background**: Use `run_in_background: true` on the Bash tool for any command that takes more than a few seconds — derivations (`tidal derive`), simulations (`tidal simulate`), sweeps (`tidal sweep`), and full test suites (`pytest tests/`). Continue other work while waiting; you'll be notified on completion. Do NOT poll or sleep.
 - **Only ONE wolframscript at a time** — single engine license. NEVER run `tidal derive` in parallel.
 - **Use minimal test theories** (scalar_field, coupled_scalars) before expensive derivations.
 - **Negative energies** may be physical with (-,+,+,+) metric convention — don't "fix" without understanding the physics.
 - **Before context compaction**, update all relevant docs and memory files.
+- **Version bump after completing work**: After committing a completed feature/fix (all tests pass, no remaining tasks), bump the version: `--patch` for fixes/small changes, `--minor` for new features. Skip if mid-feature or WIP. NEVER bump the major version automatically. Use `python scripts/bump_version.py --{level} --commit --allow-dirty`. Default to bumping — only skip if you are about to make another commit immediately in the same sitting.
+- **Update documentation after completing work**: After committing a feature/fix, identify and update relevant docs. Technical docs live in `docs/tex/*.tex` (the primary documentation). Project management (roadmaps, checklists) lives in `docs/*.md`. To find affected docs: `grep -rl "keyword" docs/tex/ docs/*.md`. Common update patterns: phase/issue status changes → `docs/ROADMAP.md`, `docs/NEXT_PHASES.md`; implementation substep done → active checklist in `docs/`; performance changed → whichever `docs/tex/*.tex` has benchmark tables for that subsystem; new error pattern → `docs/tex/troubleshooting.tex`; algorithm/architecture changed → whichever `docs/tex/*.tex` describes that component. See `docs/README.md` for the full documentation index. The `/sync-docs` skill checks for drift — run it after major features. Commit doc updates separately: `docs: update {topic} documentation`.
+- **Only commit YOUR changes**: Before staging files, verify each file's diff contains changes YOU made in THIS session. Never stage files modified by parallel agent sessions or other worktrees. If `git status` shows unexpected modified files, check `git diff <file>` before staging.
+- **Create GitHub issues proactively**: When you encounter bugs, improvement opportunities, technical debt, or notable discoveries during work, create a GitHub issue via `gh issue create` to build a searchable trail. This applies even for things you fix immediately — create the issue, then close it with the fix commit (`gh issue close N -c "Fixed in <commit>"`) so there's a record of what was found and how it was resolved. Always check for duplicates first: `gh issue list -S "keyword"`. Use appropriate labels from the existing set (bug, enhancement, documentation, validation, etc.). Include: clear title, context, relevant file paths, and why it matters. Skip only if: truly trivial (typo, formatting) or a duplicate already exists. **NEVER include any "Generated with Claude Code" footer or attribution in issue bodies.**
+
+## Physics Coding Patterns
+
+- **Specify success criteria before coding**: "Modal solver must agree with CVODE to RMS < 1%" — not just "implement modal solver". Include quantitative thresholds.
+- **Wolfram derivations**: Read an existing .wls template first, generate new by modifying template, review diff against template before running wolframscript
+- **After derivation**: Verify JSON has `canonical.hamiltonian_terms` — without this, all energy measurements fail silently. Run `tidal validate <json> --stability`.
+- **Convergence testing**: After solver changes, verify error decreases at expected rate with resolution (4x for 2nd-order FD, 16x for 4th-order, machine-precision for spectral)
+- **Regression detection**: Map changed files to relevant physics tests (see `/validate-physics` skill). Run those tests, not the full suite, for fast feedback.
 
 ## Common Pitfalls
 
@@ -62,12 +76,19 @@ Custom commands in `.claude/skills/` (main conversation only, not available to s
 - `/validate` — Full pipeline validation with auto-fix (lint → types → spell → tests → simulate)
 - `/backup` — Memory backup and MEMORY.md health check
 - `/commit [message]` — Conventional commit with mandatory pre-commit testing
+- `/validate-physics` — Physics regression detection (maps changed solver/measurement files to relevant tests)
+- `/bump [patch|minor]` — Version bump with commit analysis (suggests level, dry-run preview, git tag)
+- `/sync-docs` — Review and update all documentation for accuracy (stats, phase status, resolved issues)
+
+## Local Literature
+
+`Literature/` contains arXiv TeX sources for frequently-cited papers (Gertsenshtein, torsion, axion-photon mixing). **Always check `Literature/` before searching online.** Read the TeX source directly — it's faster and more reliable than web fetches. For new frequently-cited papers, download TeX via arXiv and add to `Literature/<arxiv-id>/`.
 
 ## Architecture Reference
 
 See `docs/MEMORY.md` for the complete architecture reference covering: solver backends, E-L velocity form, mass/coupling matrices, Christoffel computation, background fields, gauge fixing, xAct patterns, operators, examples, and known issues.
 
-See also: `docs/troubleshooting.md`, `docs/background_fields.md`, `docs/constraint_fields.md`, `docs/solver_migration.md`, `docs/gauge_fixing.md`, `docs/adaptive_timestepping.md`, `docs/architecture/README.md`.
+See also: `docs/tex/troubleshooting.tex`, `docs/tex/background_fields.tex`, `docs/tex/constraint_fields.tex`, `docs/tex/solver_migration.tex`, `docs/tex/gauge_fixing.tex`, `docs/tex/adaptive_timestepping.tex`, `docs/tex/architecture.tex`.
 
 ## Memory Backup
 

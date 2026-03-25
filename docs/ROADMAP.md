@@ -3,7 +3,7 @@
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
 **Last Updated:** March 2026
-**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration + parameter sweeps done (1,484 Python tests + ~115 Wolfram tests)
+**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration + parameter sweeps done (1,700 Python tests + ~115 Wolfram tests)
 
 ## Overview
 
@@ -75,7 +75,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 **Delivered:**
 
 - 3+1D Klein-Gordon example (Issue #71), plus spherical_kg, cylindrical_kg, gravitational_waves, massive_3form
-- `docs/JSON_SCHEMA_GUIDE.md` with complete field reference
+- `docs/tex/json_schema.tex` with complete field reference
 - Unified `_resolve_coefficient_at_point` evaluator (Phase 10b)
 
 ---
@@ -203,7 +203,7 @@ Issues should be tagged with appropriate labels:
 
 ## Current Focus
 
-**As of v0.5.0:**
+**As of v0.6.0:**
 
 - ✅ Phase 13+ completed: All core pipeline features implemented
 - ✅ Solver migration: SUNDIALS IDA/CVODE + leapfrog + scipy replaces py-pde
@@ -214,8 +214,8 @@ Issues should be tagged with appropriate labels:
 - ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 13 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
 - ✅ CLI (`tidal` command) implemented: 9 subcommands, zero new dependencies
 - ✅ Measurement module: 13 types (energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
-- ✅ 27 working examples spanning 1+1D through 3+1D
-- ✅ 1,484 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- ✅ 20 working examples spanning 1+1D through 3+1D
+- ✅ 1,700 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
 - ✅ 21 of 25 original issues resolved (84%)
 - 🔄 **Primary remaining focus:** Phase D (Gertsenshtein example — the project's raison d'être)
 - 🔄 **Secondary:** Phase 2 (Wolfram CI)
@@ -231,9 +231,12 @@ Issues should be tagged with appropriate labels:
    - Validation against analytical thin-magnet formula (Domcke & Garcia-Cely 2023)
    - Automated analytic benchmark tests
 
-2. **Linearized General Relativity Extensions**
-   - Linearized gravity already works (10-component, gauge-unfixed and gauge-fixed)
-   - Extend to Poincaré gauge theory (torsion modes, propagating degrees of freedom)
+2. **Poincaré Gauge Theory (Torsion)**
+   - ✅ PGT Lagrangian support (T² invariants + R̃²) — COMPLETE
+   - ✅ Component-level E-L derivation (5s vs 77min) — COMPLETE (now default for ALL theories)
+   - ✅ Ostrogradsky reduction (4th→2nd order) — COMPLETE (automatic on JSON load)
+   - ✅ Simulation via generalized mass-matrix modal solver (v0.16.0, #165 resolved)
+   - ✅ QZ generalized eigenvalue for velocity coupling singularity (v0.16.1, #166 resolved)
    - Parameter window scanning for viable mode configurations
 
 3. **Non-Abelian Gauge Theories**
@@ -277,7 +280,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **MINOR** (0.X.0): New features (3+1D examples, JSON schema extensions)
 - **PATCH** (0.0.X): Bug fixes, documentation improvements
 
-**Current Version:** 0.5.0
+**Current Version:** 0.17.7
 **Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve; 0.5.0 delivered parameter sweep framework (Phase C) with 13 measurements, sensitivity analysis, and advanced visualization
 **Next Major Release (1.0.0):** Phase D (Gertsenshtein example) + Wolfram CI
 
