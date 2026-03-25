@@ -407,8 +407,36 @@ For each field $q$ whose equation has time order $n_t > 2$:
 \end{enumerate}
 The state vector expands from $(q, v_q)$ to $(q, v_q, w_q, v_{w_q})$ for each reduced field.
 
+\paragraph{Operator reduction map.}
+Each higher-derivative operator acting on the original field $q$ is mapped to a lower-order operator acting on the auxiliary $w_q = \partial_t^2 q$:
+
+\begin{table}[htbp]
+\centering
+\caption{Ostrogradsky operator reduction: original operators on $q$ are rewritten as operators on auxiliary $w_q$.}
+\label{tab:ostrogradsky-operator-map}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Original on $q$ & Reduced on $w_q$ & Meaning \\
+\midrule
+$\partial_t^4 q$ & $\partial_t^2 w$ & $\partial_t^4 q = \partial_t^2(\partial_t^2 q) = \partial_t^2 w$ \\
+$\partial_t^3 q$ & $\partial_t w$ & $\partial_t^3 q = \partial_t(\partial_t^2 q) = \dot{w}$ \\
+$\partial_t^2 q$ & $w$ & $\partial_t^2 q = w$ (defining relation) \\
+$\partial_t^2 \partial_x q$ & $\partial_x w$ & spatial derivative passes through \\
+$\partial_t^3 \partial_x q$ & $\partial_t \partial_x w$ & combined: reduce time order by 2 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The general rule: time order decreases by 2, spatial derivatives are preserved unchanged.
+
+\paragraph{Cross-field substitution.}
+When $\partial_t^2(q_j)$ appears on the RHS of $q_i$'s equation and $q_j$ is itself a 4th-order field, the reference is rewritten as $w_{q_j}$ (the identity operator on the auxiliary). This resolves implicit acceleration cross-references \emph{before} the modal solver's mass-matrix analysis. For terms where the referenced field is 2nd-order (not reduced), the $\partial_t^2$ operator remains and contributes to the off-diagonal mass matrix $M$.
+
+\paragraph{Ghost stability.}
+Ostrogradsky's theorem (1850): non-degenerate higher-derivative Lagrangians generically produce unbounded Hamiltonians. The auxiliary field $w$ carries opposite-sign kinetic energy, creating \emph{ghost instabilities} with exponentially growing modes. For PGT, ghost-free parameter windows exist where the Hamiltonian remains bounded (Nikiforova et al.\ 2009; Barker 2024, arXiv:2406.12826). TIDAL does not enforce these constraints automatically; a runtime warning is emitted about potential ghost instability. Full ghost propagator analysis is tracked in issue \#164.
+
 \paragraph{Integration.}
-The reduction is transparent to users---it happens automatically in \texttt{ostrogradsky.py} during JSON loading. For the 2+1D graviton-torsion example, this converts 15 original fields to 17 fields (2 auxiliary), with all equations at time order $\leq 2$.
+The reduction is transparent to users---it happens automatically during JSON loading. For the 4D graviton-torsion example (v0.18.0), this converts 34 original fields to 37 fields (3 auxiliary: $w_{h_4}$, $w_{h_7}$, $w_{h_9}$), with all equations at time order $\leq 2$.
 
 \paragraph{Implicit acceleration coupling.}
-After reduction, equations may contain implicit references to accelerations of other fields (e.g., $\partial_t^2 q_j$ in $q_i$'s equation). The generalized mass-matrix modal solver (v0.16.0) handles this via operator decomposition, singular mass-matrix eigendecomposition, and QZ generalized eigenvalue for velocity coupling. See \cref{sec:modal-mass-matrix} for the complete algorithm. Issue \#165 resolved.
+After reduction, the off-diagonal mass matrix $M$ may be \emph{singular} (e.g., PGT Poincar\'e gauge symmetry creates $M = \bigl[\begin{smallmatrix} 1 & 1 \\ 1 & 1 \end{smallmatrix}\bigr]$ for coupled torsion components). The generalized mass-matrix modal solver (v0.16.0) handles this via eigendecomposition of $M$ to detect hidden constraints, jerk ($\dddot{x}$) substitution, and QZ generalized eigenvalue for circular velocity coupling. See \cref{sec:modal-mass-matrix} for the complete three-level elimination algorithm.

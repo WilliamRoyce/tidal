@@ -91,10 +91,14 @@ The pipeline automatically decomposes \texttt{RicciScalarCDT[]} $= \tilde{R}$ in
 
 The three $\torsion^2$ invariants correspond to the three irreducible pieces of torsion under $\mathrm{SO}(1,3)$:
 \begin{itemize}
-  \item $\torsion_{abc}\,\torsion^{abc}$: couples to all three irreducible sectors
-  \item $\torsion_{abc}\,\torsion^{bac}$: the ``mixed'' contraction
-  \item $\torsion^a{}_{ab}\,\torsion^{cb}{}_{c}$: the trace sector
+  \item $I_1 = \torsion_{abc}\,\torsion^{abc}$: tensor sector (\emph{tentor}, 16 components) --- couples to all three irreducible parts
+  \item $I_2 = \torsion_{abc}\,\torsion^{bac}$: mixed contraction ($a \leftrightarrow b$ swap) --- couples tensor and trace sectors
+  \item $I_3 = \torsion^a{}_{ab}\,\torsion^{cb}{}_{c}$: trace sector (\emph{trator}, 4 components) --- torsion trace vector squared
 \end{itemize}
+
+The coupling constants $\alpha_1$, $\alpha_2$, $\alpha_3$ independently control mass terms for each irreducible sector, while $b_5$ provides kinetic $(\nabla \torsion)^2$ terms via $\tilde{R}^2$ that enable torsion propagation and graviton-torsion cross-coupling. No pipeline code changes were required to add $I_2$ and $I_3$ (v0.18.0) --- all three contractions use existing \texttt{TorsionCDT} and $\eta$ tensors that xAct handles natively, demonstrating the generality of the TIDAL pipeline.
+
+Setting $\alpha_2 = \alpha_3 = 0$ recovers the single-invariant baseline, verified to produce identical results (37 components, $\max|dE/E| = 0$). With $\alpha_2 = 0.3$, $\alpha_3 = 0.2$: machine-precision energy conservation confirmed.
 
 \subsubsection{Linearization}
 \label{sec:torsion-linearization}
@@ -332,7 +336,8 @@ The torsion implementation required three major pipeline extensions:
 
 \subsubsection{Field Structure}
 
-\paragraph{2+1D (3D spacetime, plane-wave along $x$).}
+\paragraph{2+1D (3D spacetime, plane-wave along $x$) --- historical.}
+The 2+1D theory was used during development and removed in v0.18.0 (superseded by the 4D theory at comparable derivation time).
 15 component fields: 6 graviton $h_{\mu\nu}$ (symmetric) + 9 torsion $t_{\alpha\mu\nu}$ (antisymmetric in $\mu\nu$).
 After Ostrogradsky: 17 fields ($h_3, h_5 \to w_{h_3}, w_{h_5}$).  10 constraints, 5 dynamical, 2 mass-matrix constraints ($t_3 = t_7$).
 
@@ -366,9 +371,9 @@ The 4D theory required six pipeline fixes beyond the 2+1D architecture:
 \subsubsection{Remaining Validation Tasks}
 
 \begin{itemize}
-  \item 4D simulation with modal solver (pending; 2+1D verified)
   \item Dispersion relation $\omega(k)$ comparison with Nikiforova et al.\ (2009) stability analysis (\#169)
   \item Propagating mode count cross-check with PSALTer / Barker (2024) predictions (\#169)
+  \item Ghost propagator analysis for Ostrogradsky stability (\#164)
   \item Add EM field ($F^2$) to Lagrangian for graviton-photon-torsion triple mixing
   \item Background $B$ field parameter sweeps for Gertsenshtein comparison (\#154)
 \end{itemize}

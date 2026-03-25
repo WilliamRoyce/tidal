@@ -231,12 +231,17 @@ Issues should be tagged with appropriate labels:
    - Validation against analytical thin-magnet formula (Domcke & Garcia-Cely 2023)
    - Automated analytic benchmark tests
 
-2. **Poincaré Gauge Theory (Torsion)**
+2. **Poincaré Gauge Theory (Torsion)** — ✅ COMPLETE (v0.18.0)
    - ✅ PGT Lagrangian support (T² invariants + R̃²) — COMPLETE
    - ✅ Component-level E-L derivation (5s vs 77min) — COMPLETE (now default for ALL theories)
    - ✅ Ostrogradsky reduction (4th→2nd order) — COMPLETE (automatic on JSON load)
    - ✅ Simulation via generalized mass-matrix modal solver (v0.16.0, #165 resolved)
    - ✅ QZ generalized eigenvalue for velocity coupling singularity (v0.16.1, #166 resolved)
+   - ✅ 4D R̃² derivation pipeline with canonical Hamiltonian (v0.17.0, #170)
+   - ✅ Full general quadratic Lagrangian (α₁I₁ + α₂I₂ + α₃I₃ + b₅R̃²) — COMPLETE (v0.18.0)
+   - ✅ Machine-precision energy conservation (max|dE/E| = 0) for all parameter values tested
+   - 🔄 Dispersion relation validation against Nikiforova/Barker predictions (#169)
+   - 🔄 Ghost propagator analysis for Ostrogradsky stability (#164)
    - Parameter window scanning for viable mode configurations
 
 3. **Non-Abelian Gauge Theories**
