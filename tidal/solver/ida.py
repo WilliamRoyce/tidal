@@ -346,13 +346,14 @@ class _ResidualCtx:
 # ---------------------------------------------------------------------------
 
 
-def build_residual_fn(
+def build_residual_fn(  # noqa: PLR0913
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
     bc: BCSpec | None = None,
     *,
     parameters: dict[str, float] | None = None,
+    rtol: float | None = None,
 ) -> Callable[[float, np.ndarray, np.ndarray, np.ndarray], None]:
     """Build an IDA-compatible residual function from a TIDAL equation spec.
 
@@ -393,6 +394,11 @@ def build_residual_fn(
         from tidal.solver.rhs import RHSEvaluator as _RHSEvaluator  # noqa: PLC0415
 
         coeff_eval = CoefficientEvaluator(spec, grid, parameters)
+        if bc is not None:
+            from tidal.solver.operators import is_periodic_bc  # noqa: PLC0415
+
+            periodic = tuple(is_periodic_bc(b) for b in bc)
+            coeff_eval.check_periodic_coefficient_continuity(periodic, rtol=rtol)
         rhs_eval = _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
 
     ctx = _ResidualCtx(
@@ -513,7 +519,7 @@ def solve_ida(  # noqa: PLR0913
             strict=not allow_inconsistent_ic,
         )
 
-    resfn = build_residual_fn(spec, layout, grid, bc, parameters=parameters)
+    resfn = build_residual_fn(spec, layout, grid, bc, parameters=parameters, rtol=rtol)
 
     # Initial yp0 — estimate from residual (IDA will correct via calc_initcond)
     yp0 = np.zeros_like(y0)

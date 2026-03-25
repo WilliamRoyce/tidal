@@ -357,6 +357,8 @@ class CoefficientEvaluator:
     def check_periodic_coefficient_continuity(
         self,
         periodic: tuple[bool, ...],
+        *,
+        rtol: float | None = None,
     ) -> None:
         """Warn if position-dependent coefficients are discontinuous at periodic boundaries.
 
@@ -381,14 +383,40 @@ class CoefficientEvaluator:
         ----------
         periodic : tuple[bool, ...]
             Per-axis periodicity flags.
+        rtol : float, optional
+            Solver relative tolerance.  When provided, the warn and error
+            thresholds scale as ``sqrt(rtol)`` — stricter for machine-precision
+            solvers (modal, leapfrog) and more lenient for coarse exploratory
+            runs.  When *None*, the default thresholds (warn=0.01, error=0.25)
+            are used.
 
         Raises
         ------
         ValueError
-            If the leak metric exceeds ``_LEAK_ERROR_THRESHOLD`` (0.25).
+            If the leak metric exceeds the error threshold.
         """
         if not any(periodic):
             return  # no periodic axes → no check needed
+
+        # Scale thresholds with sqrt(rtol) when the solver tolerance is known.
+        # sqrt balances: leak accumulates over O(1/rtol) steps but each step's
+        # contribution is proportional to the leak metric.  For rtol=1e-8
+        # (CVODE default) this gives warn~1e-4, error~2.5e-3.  For machine-
+        # precision solvers (rtol~1e-15) it gives warn~3e-8, error~8e-7.
+        # Scale thresholds with sqrt(rtol) when the solver tolerance is known.
+        # sqrt balances: leak accumulates over O(1/rtol) steps but each step's
+        # contribution is proportional to the leak metric.  For rtol=1e-8
+        # (CVODE default) this gives warn~1e-4, error~2.5e-3.  For machine-
+        # precision solvers (rtol~1e-15) it gives warn~3e-8, error~8e-7.
+        if rtol is not None:
+            import math  # noqa: PLC0415
+
+            sf = math.sqrt(rtol / 1e-8)  # normalised to CVODE default
+            thresh_warn = _LEAK_WARN_THRESHOLD * sf
+            thresh_error = _LEAK_ERROR_THRESHOLD * sf
+        else:
+            thresh_warn = _LEAK_WARN_THRESHOLD
+            thresh_error = _LEAK_ERROR_THRESHOLD
 
         for (eq_idx, term_idx), arr in self._spatial_cache.items():
             # Check each periodic axis for boundary discontinuity
@@ -426,7 +454,7 @@ class CoefficientEvaluator:
                 boundary_fraction = boundary_magnitude / scale
                 leak_metric = rel_jump * boundary_fraction
 
-                if leak_metric > _LEAK_WARN_THRESHOLD:
+                if leak_metric > thresh_warn:
                     term = self._spec.equations[eq_idx].rhs_terms[term_idx]
                     field = self._spec.equations[eq_idx].field_name
                     axis_name = (
@@ -447,6 +475,6 @@ class CoefficientEvaluator:
                         f"Use a larger domain, non-periodic BCs, or a "
                         f"localized coefficient profile."
                     )
-                    if leak_metric > _LEAK_ERROR_THRESHOLD:
+                    if leak_metric > thresh_error:
                         raise ValueError(msg)
                     warnings.warn(msg, UserWarning, stacklevel=2)
