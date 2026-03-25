@@ -20,7 +20,7 @@
 				"h_4"
 			]
 		},
-		"derivation_hash": "218000446df837486fcc5311cd8bebccd4dcaf686bcf6a0b3a747372214d8721"
+		"derivation_hash": "5df79c6908a9cd07e209aefff01e402e0f372bf46acb8bae58bcd4b7cea554de"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -486,7 +486,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "-3/(2*kappa^2)"
+				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
@@ -499,33 +499,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "-3/(2*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_5",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_5",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "2/kappa^2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "2/kappa^2"
+				"coefficient_symbolic": "1/(2*kappa^2)"
 			}
 		],
 		"wolfram_constraint_elimination": true,
