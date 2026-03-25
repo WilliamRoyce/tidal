@@ -87,12 +87,19 @@ _OPERATOR_LATEX: dict[str, str] = {
     "first_derivative_t": r"\partial_t",
     "biharmonic": r"\nabla^4",
     "time_derivative": "dot",  # sentinel for Hamiltonian factors
+    # Ostrogradsky higher time derivatives
+    "d2_t": r"\partial_t^2",
+    "d3_t": r"\partial_t^{3}",
+    "d4_t": r"\partial_t^{4}",
 }
 
 # Dynamic operator patterns (from json_loader.py)
 _RE_SINGLE_AXIS = re.compile(r"^derivative_(\d+)_([xyzwvu])$")
 _RE_MULTI_AXIS = re.compile(r"^derivative_((?:\d+[xyzwvu])+)$")
-_RE_MIXED = re.compile(r"^mixed_(\d+)_((?:\d+_?)*)$")
+# New format from rhs.py: mixed_T{n}_S{m}{axis}
+_RE_MIXED_NEW = re.compile(r"^mixed_T(\d+)_S(\d+)([xyzwvu])$")
+# Old format from energy.py: mixed_{T}_{S1}_{S2}_... (positional spatial orders)
+_RE_MIXED_OLD = re.compile(r"^mixed_(\d+(?:_\d+)+)$")
 
 # ---------------------------------------------------------------------------
 # Coefficient rendering helpers
@@ -358,15 +365,29 @@ def _operator_dynamic(operator: str, field_latex: str) -> str | None:
         ]
         return " ".join(parts) + f" {field_latex}"
 
-    # mixed_T_S1_S2_... → \partial_t^T \partial_x^S1 ...
-    m = _RE_MIXED.match(operator)
+    # New format: mixed_T{n}_S{m}{axis} → \partial_t^n \partial_{axis}^m
+    m = _RE_MIXED_NEW.match(operator)
     if m:
+        t_order, s_order, axis = m.group(1), m.group(2), m.group(3)
         parts_list: list[str] = []
-        if m.group(1) != "0":
-            parts_list.append(_partial_order("t", m.group(1)))
-        for i, s_order in enumerate(m.group(2).rstrip("_").split("_")):
-            if s_order and s_order != "0":
-                parts_list.append(_partial_order(chr(ord("x") + i), s_order))
+        if t_order != "0":
+            parts_list.append(_partial_order("t", t_order))
+        if s_order != "0":
+            parts_list.append(_partial_order(axis, s_order))
+        return " ".join(parts_list) + f" {field_latex}"
+
+    # Old format: mixed_{T}_{S1}_{S2}_{S3} → \partial_t^T \partial_x^S1 ...
+    m = _RE_MIXED_OLD.match(operator)
+    if m:
+        nums = operator.split("_")[1:]  # strip "mixed" prefix
+        t_order = nums[0]
+        parts_list = []
+        if t_order != "0":
+            parts_list.append(_partial_order("t", t_order))
+        axes = "xyzwvu"
+        for i, s_order in enumerate(nums[1:]):
+            if s_order != "0" and i < len(axes):
+                parts_list.append(_partial_order(axes[i], s_order))
         return " ".join(parts_list) + f" {field_latex}"
 
     return None
@@ -674,8 +695,23 @@ def _lagrangian_cleanup(s: str) -> str:
         lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}",
         s,
     )
-    # Greek substitution for remaining parameter names (skip already-escaped)
-    s = _RE_GREEK_NO_BACKSLASH.sub(lambda m: _GREEK_MAP[m.group(1)], s)
+    # Subscript splitting BEFORE Greek so that alpha1 → alpha_{1} → \alpha_{1}
+    # (Greek regex uses \b which fails on alpha1 since 1 is a word char)
+    s = re.sub(
+        r"(?<!\\)\b([A-Za-z]+?)(\d+)\b",
+        lambda m: rf"{m.group(1)}_{{{m.group(2)}}}",
+        s,
+    )
+    # Greek substitution for remaining parameter names (skip already-escaped).
+    # After subscript splitting, alpha_{1} has _ after alpha, which is a word char,
+    # so the standard \b boundary fails. Use lookahead for \b OR _ OR {.
+    s = re.sub(
+        r"(?<!\\)\b("
+        + "|".join(sorted(_GREEK_MAP, key=len, reverse=True))
+        + r")(?=\b|[_{])",
+        lambda m: _GREEK_MAP[m.group(1)],
+        s,
+    )
     # Powers: ^(expr) → ^{expr}
     s = _RE_POWER_PAREN.sub(lambda m: f"^{{{m.group(1)}}}", s)
     # Clean up double spaces
