@@ -966,10 +966,10 @@ def _build_generalized_evolution_matrices(
                         K_cc_reg[singular] += 1e-14 * np.eye(
                             n_mass_con, dtype=np.complex128
                         )
-                    K_cc_inv = np.linalg.inv(K_cc_reg)
+                    K_cc_inv = np.linalg.inv(K_cc_reg)  # pyright: ignore[reportUnknownVariableType]
 
                     # Recovery: z_c = -K_cc⁻¹·K_cd·z_d
-                    mass_recovery = -np.einsum("mij,mjk->mik", K_cc_inv, K_cd)
+                    mass_recovery = -np.einsum("mij,mjk->mik", K_cc_inv, K_cd)  # pyright: ignore[reportUnknownArgumentType]
 
                     # Substitute into dynamical equations:
                     # Λ_d·z̈_d = K_dd·z_d + K_dc·z_c + D_dd·ż_d + D_dc·ż_c
@@ -1041,28 +1041,28 @@ def _build_generalized_evolution_matrices(
                         A_dd[:, vel_i, vel_j] += D_orig[:, i, j]
             else:
                 # No singular directions — M is invertible
-                M_inv = np.linalg.inv(M_mat)
-                E = np.einsum("mij,mjk->mik", M_inv, K_mat)
-                F = np.einsum("mij,mjk->mik", M_inv, D_mat)
+                m_inv = np.linalg.inv(M_mat)
+                eff_k = np.einsum("mij,mjk->mik", m_inv, K_mat)
+                eff_d = np.einsum("mij,mjk->mik", m_inv, D_mat)
 
                 # Jerk substitution
-                J_inv = np.einsum("mij,mjk->mik", M_inv, J_mat)
-                has_jerk = np.max(np.abs(J_inv)) > 1e-15
+                j_inv = np.einsum("mij,mjk->mik", m_inv, J_mat)
+                has_jerk = np.max(np.abs(j_inv)) > 1e-15
                 if has_jerk:
-                    FE = np.einsum("mij,mjk->mik", F, E)
-                    K_jerk = np.einsum("mij,mjk->mik", J_inv, FE)
-                    FF = np.einsum("mij,mjk->mik", F, F)
-                    D_jerk = np.einsum("mij,mjk->mik", J_inv, E + FF)
-                    E += K_jerk
-                    F += D_jerk
+                    fd_k = np.einsum("mij,mjk->mik", eff_d, eff_k)
+                    k_jerk = np.einsum("mij,mjk->mik", j_inv, fd_k)
+                    fd_d = np.einsum("mij,mjk->mik", eff_d, eff_d)
+                    d_jerk = np.einsum("mij,mjk->mik", j_inv, eff_k + fd_d)
+                    eff_k += k_jerk
+                    eff_d += d_jerk
 
                 for i, fname_i in enumerate(dyn_field_names):
                     vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
                     for j, fname_j in enumerate(dyn_field_names):
                         field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
                         vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                        A_dd[:, vel_i, field_j] += E[:, i, j]
-                        A_dd[:, vel_i, vel_j] += F[:, i, j]
+                        A_dd[:, vel_i, field_j] += eff_k[:, i, j]
+                        A_dd[:, vel_i, vel_j] += eff_d[:, i, j]
         else:
             # M is k-dependent — process per mode
             # For now, treat each mode independently
@@ -1073,59 +1073,59 @@ def _build_generalized_evolution_matrices(
                 dyn_m = np.abs(eigvals_m) > tol
                 if np.all(dyn_m):
                     # Invertible for this mode
-                    M_inv_m = np.linalg.inv(M_m)
-                    E_m = M_inv_m @ K_mat[m]
-                    F_m = M_inv_m @ D_mat[m]
-                    J_inv_m = M_inv_m @ J_mat[m]
-                    if np.max(np.abs(J_inv_m)) > 1e-15:
-                        FE_m = F_m @ E_m
-                        E_m += J_inv_m @ FE_m
-                        F_m += J_inv_m @ (E_m + F_m @ F_m)
+                    m_inv_m = np.linalg.inv(M_m)  # pyright: ignore[reportUnknownVariableType]
+                    ek_m = m_inv_m @ K_mat[m]  # pyright: ignore[reportUnknownVariableType]
+                    ed_m = m_inv_m @ D_mat[m]  # pyright: ignore[reportUnknownVariableType]
+                    j_inv_m = m_inv_m @ J_mat[m]  # pyright: ignore[reportUnknownVariableType]
+                    if np.max(np.abs(j_inv_m)) > 1e-15:  # pyright: ignore[reportUnknownArgumentType]
+                        fd_k_m = ed_m @ ek_m  # pyright: ignore[reportUnknownVariableType]
+                        ek_m += j_inv_m @ fd_k_m  # pyright: ignore[reportUnknownVariableType]
+                        ed_m += j_inv_m @ (ek_m + ed_m @ ed_m)  # pyright: ignore[reportUnknownVariableType]
                     for i, fname_i in enumerate(dyn_field_names):
                         vi = orig_to_reduced[layout.velocity_slot_map[fname_i]]
                         for j, fname_j in enumerate(dyn_field_names):
                             fj = orig_to_reduced[layout.field_slot_map[fname_j]]
                             vj = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                            A_dd[m, vi, fj] += E_m[i, j]
-                            A_dd[m, vi, vj] += F_m[i, j]
+                            A_dd[m, vi, fj] += ek_m[i, j]
+                            A_dd[m, vi, vj] += ed_m[i, j]
                 else:
                     # Singular mode — would need per-mode Schur elimination
                     # This is rare for k-dependent M; log and use pseudoinverse
-                    M_pinv = np.linalg.pinv(M_m)
-                    E_m = M_pinv @ K_mat[m]
-                    F_m = M_pinv @ D_mat[m]
+                    m_pinv = np.linalg.pinv(M_m)  # pyright: ignore[reportUnknownVariableType]
+                    ek_m2 = m_pinv @ K_mat[m]  # pyright: ignore[reportUnknownVariableType]
+                    ed_m2 = m_pinv @ D_mat[m]  # pyright: ignore[reportUnknownVariableType]
                     for i, fname_i in enumerate(dyn_field_names):
                         vi = orig_to_reduced[layout.velocity_slot_map[fname_i]]
                         for j, fname_j in enumerate(dyn_field_names):
                             fj = orig_to_reduced[layout.field_slot_map[fname_j]]
                             vj = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                            A_dd[m, vi, fj] += E_m[i, j]
-                            A_dd[m, vi, vj] += F_m[i, j]
+                            A_dd[m, vi, fj] += ek_m2[i, j]
+                            A_dd[m, vi, vj] += ed_m2[i, j]
     else:
         # M is invertible for all modes — standard path
-        M_inv = np.linalg.inv(M_mat)
-        E = np.einsum("mij,mjk->mik", M_inv, K_mat)
-        F = np.einsum("mij,mjk->mik", M_inv, D_mat)
+        m_inv = np.linalg.inv(M_mat)
+        eff_k = np.einsum("mij,mjk->mik", m_inv, K_mat)
+        eff_d = np.einsum("mij,mjk->mik", m_inv, D_mat)
 
         # Jerk substitution
-        J_inv = np.einsum("mij,mjk->mik", M_inv, J_mat)
-        has_jerk = np.max(np.abs(J_inv)) > 1e-15
+        j_inv = np.einsum("mij,mjk->mik", m_inv, J_mat)
+        has_jerk = np.max(np.abs(j_inv)) > 1e-15
         if has_jerk:
             logger.info("Jerk substitution: applying d3_t elimination")
-            FE = np.einsum("mij,mjk->mik", F, E)
-            K_jerk = np.einsum("mij,mjk->mik", J_inv, FE)
-            FF = np.einsum("mij,mjk->mik", F, F)
-            D_jerk = np.einsum("mij,mjk->mik", J_inv, E + FF)
-            E += K_jerk
-            F += D_jerk
+            fd_k = np.einsum("mij,mjk->mik", eff_d, eff_k)
+            k_jerk = np.einsum("mij,mjk->mik", j_inv, fd_k)
+            fd_d = np.einsum("mij,mjk->mik", eff_d, eff_d)
+            d_jerk = np.einsum("mij,mjk->mik", j_inv, eff_k + fd_d)
+            eff_k += k_jerk
+            eff_d += d_jerk
 
         for i, fname_i in enumerate(dyn_field_names):
             vel_i = orig_to_reduced[layout.velocity_slot_map[fname_i]]
             for j, fname_j in enumerate(dyn_field_names):
                 field_j = orig_to_reduced[layout.field_slot_map[fname_j]]
                 vel_j = orig_to_reduced[layout.velocity_slot_map[fname_j]]
-                A_dd[:, vel_i, field_j] += E[:, i, j]
-                A_dd[:, vel_i, vel_j] += F[:, i, j]
+                A_dd[:, vel_i, field_j] += eff_k[:, i, j]
+                A_dd[:, vel_i, vel_j] += eff_d[:, i, j]
 
     # ---- Substitute deferred constraint acceleration/velocity terms ----
     # Constraints may contain time_order>=2 operators on dynamical fields
@@ -1650,22 +1650,24 @@ def _evolve_per_mode(
             # Uses QZ decomposition via scipy.linalg.eig(A, B).
             # Infinite eigenvalues (gauge DOF) are zeroed — they don't evolve.
             # Ref: Golub & Van Loan (2013), Matrix Computations §7.7.6
-            import scipy.linalg as sla  # noqa: PLC0415
+            import scipy.linalg as sla  # type: ignore[import-untyped]  # noqa: PLC0415
 
             B_block = B_modes[:, idx[:, None], idx[None, :]]
             bs = len(block_slots)
             n_block_modes = A_block.shape[0]
             eig_vals = np.zeros((n_block_modes, bs), dtype=np.complex128)
-            V = np.zeros((n_block_modes, bs, bs), dtype=np.complex128)
+            v_mat = np.zeros((n_block_modes, bs, bs), dtype=np.complex128)
             n_gauge_total = 0
             for m in range(A_block.shape[0]):
-                ev_m, vr_m = sla.eig(A_block[m], B_block[m], right=True)
+                eig_result = sla.eig(A_block[m], B_block[m], right=True)  # pyright: ignore[reportUnknownVariableType]
+                ev_m = eig_result[0]  # pyright: ignore[reportUnknownVariableType]
+                vr_m = eig_result[1]  # pyright: ignore[reportUnknownVariableType]
                 # Filter infinite/very-large eigenvalues (gauge modes)
-                gauge = ~np.isfinite(ev_m) | (np.abs(ev_m) > 1e12)
+                gauge = ~np.isfinite(ev_m) | (np.abs(ev_m) > 1e12)  # pyright: ignore[reportUnknownArgumentType]
                 ev_m[gauge] = 0.0  # gauge modes frozen at IC
                 n_gauge_total += int(np.sum(gauge))
-                eig_vals[m] = ev_m
-                V[m] = vr_m
+                eig_vals[m] = ev_m  # pyright: ignore[reportUnknownArgumentType]
+                v_mat[m] = vr_m
             if n_gauge_total > 0:
                 import logging as _log  # noqa: PLC0415
 
@@ -1674,19 +1676,19 @@ def _evolve_per_mode(
                     n_gauge_total,
                     A_block.shape[0],
                 )
-            V_inv = np.linalg.inv(V)
+            v_inv = np.linalg.inv(v_mat)
         else:
             # Standard eigendecomposition (existing path)
-            eig_vals, V = np.linalg.eig(A_block)
-            V_inv = np.linalg.inv(V)
+            eig_vals, v_mat = np.linalg.eig(A_block)
+            v_inv = np.linalg.inv(v_mat)
 
         # Warn about potential overflow
         _warn_eigenvalue_growth(eig_vals, dt_total, context="per-mode")
 
         # Transform IC to eigenbasis
-        y0_eigen = np.einsum("mij,mj->mi", V_inv, y0_block.T)
+        y0_eigen = np.einsum("mij,mj->mi", v_inv, y0_block.T)
 
-        block_data.append((block_slots, eig_vals, V, y0_eigen))
+        block_data.append((block_slots, eig_vals, v_mat, y0_eigen))
 
     # Evolve at each time point.
     # Pre-multiply V @ diag(y0_eigen) for each block so the inner loop only
