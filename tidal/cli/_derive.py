@@ -1962,8 +1962,15 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # ------------------------------------------------------------------
     # Step 3: Type B gauge fixing (if any) — constraints on fieldEquations
     # ------------------------------------------------------------------
-    if ctx.gauge and any(
-        _resolve_gauge_mechanism(g) == "constraint" for g in ctx.gauge
+    # For the Lagrangian path (ctx.lagrangian_expr), fieldEquations is empty
+    # here — Component E-L fills it later (after Phase A decomposition).
+    # Type B gauge is deferred to the post-Component-E-L block in
+    # _wls_metadata_and_export.  Only apply here for the legacy (non-
+    # Lagrangian) linearization path where VarD already filled fieldEquations.
+    if (
+        not ctx.lagrangian_expr
+        and ctx.gauge
+        and any(_resolve_gauge_mechanism(g) == "constraint" for g in ctx.gauge)
     ):
         lines.extend(_wls_gauge_fixing_type_b(ctx))
 
@@ -3572,12 +3579,11 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         ]
     )
 
-    # --- Constraint elimination in Lagrangian ---
-    # Detect gradient-zero and degenerate algebraic constraints in
-    # fieldEquations, and substitute into lagComp using Mathematica's
-    # exact symbolic algebra.  This replaces the fragile Python
-    # string-algebra post-processing in reduction.py.
-    lines.extend(_wls_constraint_elimination())
+    # NOTE: Constraint elimination was previously called here, but for the
+    # Lagrangian path fieldEquations is empty at this point (Component E-L
+    # fills it later).  Constraint elimination is now deferred to the
+    # post-Component-E-L block in _wls_metadata_and_export where it runs
+    # on populated fieldEquations.
 
     return lines
 
@@ -4193,10 +4199,18 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "(* Components handles all symmetry permutations and Derivative    *)",
                     "(* forms since the symmetry-aware rewrite.                        *)",
                     "",
-                    "(* Build field function list from lagComp *)",
-                    "fieldFuncsEL = Cases[lagComp,",
-                    "  (f_Symbol)[__] /; MemberQ[fieldFuncList, f] :> f,",
-                    "  {0, Infinity}] // DeleteDuplicates // Sort;",
+                    "(* Build field function list from lagComp.                     *)",
+                    "(* Match BOTH bare f[args] AND Derivative[...][f][args] forms.  *)",
+                    "(* Fields that appear only in derivatives (e.g. photon in F²)   *)",
+                    "(* would be missed by the bare pattern alone.                    *)",
+                    "fieldFuncsEL = Join[",
+                    "  Cases[lagComp,",
+                    "    (f_Symbol)[__] /; MemberQ[fieldFuncList, f] :> f,",
+                    "    {0, Infinity}],",
+                    "  Cases[lagComp,",
+                    "    Derivative[__][f_Symbol][__] /; MemberQ[fieldFuncList, f] :> f,",
+                    "    {0, Infinity}]",
+                    "] // DeleteDuplicates // Sort;",
                     'Print["  Field functions: ", Length[fieldFuncsEL], " — ", fieldFuncsEL];',
                     "",
                     "(* Compute Euler-Lagrange equations *)",
@@ -4229,6 +4243,29 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "",
                 ]
             )
+
+    # --- Post-Component-E-L pipeline for linearization+Lagrangian path ---
+    # Type B gauge, plane-wave reduction, and constraint elimination MUST
+    # run AFTER Component E-L fills fieldEquations.  Previously these ran
+    # inside _wls_linearize_from_lagrangian (on empty fieldEquations) or
+    # inside _wls_canonical_phase_a (also empty).  Now deferred to here.
+    #
+    # Ordering:
+    #   1. Type B gauge — creates TT constraint eqs for constraint elimination
+    #   2. Plane-wave reduction — zeros transverse derivs, eliminates zero fields
+    #   3. Constraint elimination — detects/removes constraint fields from both
+    #      fieldEquations and lagComp
+    if ctx.lagrangian_expr and ctx.linearization is not None:
+        has_type_b_post = bool(ctx.gauge) and any(
+            _resolve_gauge_mechanism(g) == "constraint" for g in ctx.gauge
+        )
+        if has_type_b_post:
+            lines.extend(_wls_gauge_fixing_type_b(ctx))
+        if ctx.reduction is not None:
+            lines.extend(_wls_plane_wave_reduction_equations(ctx))
+            lines.extend(_wls_plane_wave_field_elimination(ctx))
+            lines.extend(_wls_plane_wave_coordinate_evaluation(ctx))
+        lines.extend(_wls_constraint_elimination())
 
     # Build JSON — always use multi-field builder since fieldEquations
     # Inject tensor component metadata into metadata for LaTeX export
@@ -4479,10 +4516,13 @@ def generate_wls(
         if has_type_b:
             lines.extend(_wls_gauge_fixing_type_b(ctx))
 
-    # Plane-wave reduction: zero transverse derivatives in fieldEquations
-    # (essential for linearization path where abstract L uses CD, not Derivative;
-    #  defense-in-depth for non-linearization path where Lagrangian was already reduced)
-    if ctx.reduction is not None:
+    # Plane-wave reduction: zero transverse derivatives in fieldEquations.
+    # For the linearization+Lagrangian path, fieldEquations is empty here
+    # (Component E-L fills it later inside _wls_metadata_and_export).
+    # Defer plane-wave reduction to the post-Component-E-L block.
+    # For the non-linearization path, fieldEquations is already populated
+    # by VarD + DecomposeToComponents, so run it here.
+    if ctx.reduction is not None and not (is_linearization and ctx.lagrangian_expr):
         lines.extend(_wls_plane_wave_reduction_equations(ctx))
         lines.extend(_wls_plane_wave_field_elimination(ctx))
         lines.extend(_wls_plane_wave_coordinate_evaluation(ctx))
