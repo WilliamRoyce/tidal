@@ -4714,7 +4714,7 @@ path = "/tmp/torsion_pert_test.json"
         # DefTensorPerturbation for TorsionCDT
         assert "DefTensorPerturbation" in wls_text
         assert "tPert" in wls_text  # perturbation label uses configured name
-        # Physical field for VarD uses capitalised perturbation_name
+        # Physical field for VarD uses capitalized perturbation_name
         assert "pptT[" in wls_text  # {prefix}T[a, -b, -c]
         # TorsionCDT correctly prefixed in Lagrangian
         assert "Torsion" in wls_text

@@ -3915,7 +3915,7 @@ def _wls_json_plane_wave_reduction(ctx: _WlsContext) -> list[str]:
 
     All replacement logic is self-contained in Wolfram — Python only passes
     the propagation axis name and spatial coordinate list.  Coordinate-dependent
-    arrays are remapped at the Association level (before serialisation).
+    arrays are remapped at the Association level (before serialization).
     Operator names and symbolic coordinate references are remapped via
     ``ExportString → StringReplace`` on the JSON string.
     """

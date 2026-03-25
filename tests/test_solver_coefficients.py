@@ -566,7 +566,7 @@ class TestPeriodicCoefficientContinuity:
             ev.check_periodic_coefficient_continuity((True,))
 
     def test_centered_dipolar_no_warning(self) -> None:
-        """Centered dipolar B²·x²: localised with small boundary values.
+        """Centered dipolar B²·x²: localized with small boundary values.
 
         Models the Gertsenshtein false-positive scenario.  The coefficient
         peaks at ~10 in the centre but boundary values are ~0.02.  The old

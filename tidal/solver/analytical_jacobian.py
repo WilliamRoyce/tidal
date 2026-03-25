@@ -19,7 +19,7 @@ Three delivery modes depending on system size:
   using sparse matrix-vector products, eliminating finite-difference
   residual evaluations per GMRES iteration.
 
-Performance optimisations:
+Performance optimizations:
 
 - **COO accumulation**: ``build_jacobian_matrices()`` uses
   ``_COOAccumulator`` to append block triples and do a single CSC

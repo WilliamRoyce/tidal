@@ -43,7 +43,7 @@ _MISSING = object()  # sentinel for dict.get() fast path
 
 # Thresholds for periodic boundary discontinuity checks.
 # The leak metric = (jump/scale) * (boundary_magnitude/scale) estimates the
-# IBP energy leak: dE/dt ~ |β(L)-β(0)| * |f(L)|².  For localised problems
+# IBP energy leak: dE/dt ~ |β(L)-β(0)| * |f(L)|².  For localized problems
 # both the coefficient jump AND the boundary significance are small, so the
 # product naturally suppresses false positives without a hardcoded skip.
 _LEAK_WARN_THRESHOLD = 0.01  # leak metric > 1% → warning
@@ -374,7 +374,7 @@ class CoefficientEvaluator:
         where *jump* is ``|coeff(L) - coeff(0)|``, *scale* is the peak
         ``|coeff|``, and *boundary_magnitude* is the larger of ``|coeff(0)|``
         and ``|coeff(L)|``.  This product naturally suppresses false positives
-        for localised coefficients (both factors small at boundaries) while
+        for localized coefficients (both factors small at boundaries) while
         preserving detection of genuine discontinuities.
 
         Parameters
@@ -414,12 +414,12 @@ class CoefficientEvaluator:
                     continue
 
                 # Leak metric: product of relative jump and boundary significance.
-                # IBP leak ~ |β(L)-β(0)| * |f(L)|².  For localised problems both
+                # IBP leak ~ |β(L)-β(0)| * |f(L)|².  For localized problems both
                 # the coefficient jump and field amplitude are small at boundaries.
                 # We use boundary_magnitude/scale as a proxy for field localisation
-                # (localised coefficients ↔ localised fields), giving:
+                # (localized coefficients ↔ localized fields), giving:
                 #   leak ~ (jump/scale) * (boundary_magnitude/scale)
-                # This naturally suppresses false positives for localised
+                # This naturally suppresses false positives for localized
                 # coefficients while preserving detection of genuine
                 # discontinuities where boundary values are significant.
                 rel_jump = jump / scale
