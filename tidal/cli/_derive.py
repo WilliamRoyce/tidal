@@ -1261,7 +1261,7 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
 def _wls_multi_field_eom(
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
-) -> list[str]:
+) -> list[str] | None:
     """Generate VarD + DecomposeToComponents + fieldEquations for multiple fields.
 
     For torsion R̃² theories: uses **component-level Euler-Lagrange** instead
@@ -2018,7 +2018,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             )
         )
 
-        lines.extend(_wls_multi_field_eom(ctx, dyn_fields))
+        eom_lines = _wls_multi_field_eom(ctx, dyn_fields)
+        if eom_lines is not None:
+            lines.extend(eom_lines)
 
     # ------------------------------------------------------------------
     # Step 3: Type B gauge fixing (if any) — constraints on fieldEquations

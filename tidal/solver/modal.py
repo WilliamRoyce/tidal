@@ -31,7 +31,7 @@ References
 # ruff: noqa: PLR0913, PLR0917, PLR0914, PLR0912, PLR0911, PLR0915, PLR2004
 #   — numerical code inherently requires many arguments, local variables,
 #   return statements, statements, and literal comparisons.
-# ruff: noqa: C901, RUF001, RUF002, RUF003 — complexity and Unicode math symbols.
+# ruff: noqa: C901 — complexity and Unicode math symbols.
 # ruff: noqa: ERA001, ARG001 — commented-out code serves as documentation;
 #   unused args (bc, grid) kept for interface consistency with other solvers.
 # ruff: noqa: B903, PLR1702 — _OperatorDecomp uses __slots__ for memory efficiency;
@@ -69,12 +69,14 @@ if TYPE_CHECKING:
 # mode (gradient → ik, laplacian → -k²).  NOT the modified-wavenumber
 # convention from constraint_solve.py which matches FD stencils.
 
-_ExactMultFn = Callable[[list[NDArray[np.float64]]], NDArray[np.complex128]]
+_ExactMultFn = Callable[
+    [list[NDArray[np.float64]]], NDArray[np.complex128] | NDArray[np.float64] | int
+]
 
 # ---------------------------------------------------------------------------
 # Operator decomposition: (spatial Fourier multiplier, time derivative order)
 # ---------------------------------------------------------------------------
-# Every operator in flat spacetime decomposes as spatial_multiplier(k) × ∂ⁿ_t.
+# Every operator in flat spacetime decomposes as spatial_multiplier(k) x ∂ⁿ_t.
 # Derivatives commute in Minkowski: ∂²_t ∂_x = ∂_x ∂²_t.
 #
 # Time order classification:
@@ -103,7 +105,7 @@ _OPERATOR_DECOMP: dict[str, _OperatorDecomp] = {
     "identity": _OperatorDecomp(lambda k_axes: np.ones_like(k_axes[0]), 0),
     "laplacian": _OperatorDecomp(
         lambda k_axes: -sum(ki**2 for ki in k_axes),
-        0,  # type: ignore[return-value]
+        0,
     ),
     "laplacian_x": _OperatorDecomp(lambda k_axes: -(k_axes[0] ** 2), 0),
     "laplacian_y": _OperatorDecomp(lambda k_axes: -(k_axes[1] ** 2), 0),
@@ -116,7 +118,7 @@ _OPERATOR_DECOMP: dict[str, _OperatorDecomp] = {
     "cross_derivative_yz": _OperatorDecomp(lambda k_axes: -(k_axes[1] * k_axes[2]), 0),
     "biharmonic": _OperatorDecomp(
         lambda k_axes: sum(ki**2 for ki in k_axes) ** 2,
-        0,  # type: ignore[return-value]
+        0,
     ),
     "derivative_3_x": _OperatorDecomp(lambda k_axes: -1j * k_axes[0] ** 3, 0),
     "derivative_3_y": _OperatorDecomp(lambda k_axes: -1j * k_axes[1] ** 3, 0),
@@ -342,7 +344,7 @@ def _constraints_fourier_eliminable(
     """Check if all constraint equations can be eliminated in Fourier space.
 
     Requirements:
-    - Each constraint operator must be decomposable (spatial × time)
+    - Each constraint operator must be decomposable (spatial x time)
     - No time-dependent coefficients in constraints
 
     Constraints may contain acceleration operators (mixed_T2_S1x, d2_t)
@@ -722,7 +724,7 @@ def _build_generalized_evolution_matrices(
             dyn_field_names.append(eq.field_name)
     n_f = len(dyn_field_names)  # number of dynamical FIELDS (not slots)
 
-    # ---- Build M, D, K matrices for dynamical fields (n_f × n_f) ----
+    # ---- Build M, D, K matrices for dynamical fields (n_f x n_f) ----
     # These are the FIELD-level matrices, not slot-level.
     # M·ẍ = K·x + D·ẋ where x is the vector of field values.
     M_mat = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
@@ -1129,7 +1131,7 @@ def _build_generalized_evolution_matrices(
 
     # ---- Substitute deferred constraint acceleration/velocity terms ----
     # Constraints may contain time_order>=2 operators on dynamical fields
-    # (e.g., mixed_T2_S1x(t_3) = ik_x × ẍ_{t_3}).  After mass-matrix
+    # (e.g., mixed_T2_S1x(t_3) = ik_x x ẍ_{t_3}).  After mass-matrix
     # inversion, ẍ_j = Σ_k E[j,k]·field_k + F[j,k]·vel_k.  Substitute
     # this into the constraint's S_cd matrix.
     if deferred_constraint_terms:
@@ -1152,9 +1154,9 @@ def _build_generalized_evolution_matrices(
                 for k, fname_k in enumerate(dyn_field_names):
                     fk_slot = orig_to_reduced[layout.field_slot_map[fname_k]]
                     vk_slot = orig_to_reduced[layout.velocity_slot_map[fname_k]]
-                    # Position contribution: coeff × spatial × K_eff[fj, k]
+                    # Position contribution: coeff x spatial x K_eff[fj, k]
                     S_cd[:, ci, fk_slot] += coeff_val * spatial_mult * K_eff[:, fj, k]
-                    # Velocity contribution: coeff × spatial × D_eff[fj, k]
+                    # Velocity contribution: coeff x spatial x D_eff[fj, k]
                     S_cd[:, ci, vk_slot] += coeff_val * spatial_mult * D_eff[:, fj, k]
             # time_order=3 in constraints is very rare; log and skip
             elif t_order >= 3:
@@ -1325,8 +1327,8 @@ def _build_convolution_matrix(
 
     Position-dependent coefficients c(x) create convolution coupling in
     k-space: FFT[c(x)·u(x)] = ĉ * û (convolution).  This couples
-    different k-modes, producing a full (n_total × n_total) matrix where
-    n_total = n_slots × n_modes.
+    different k-modes, producing a full (n_total x n_total) matrix where
+    n_total = n_slots x n_modes.
 
     For localized c(x) (e.g. Gaussian B₀), the convolution kernel ĉ(q)
     decays exponentially, making the matrix effectively banded.  The
@@ -1758,7 +1760,7 @@ def _evolve_full_matrix(
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Evolve system with full coupled matrix (position-dependent coefficients).
 
-    A_full has shape (n_total, n_total) where n_total = n_slots × n_modes.
+    A_full has shape (n_total, n_total) where n_total = n_slots x n_modes.
     y0_hat has shape (n_slots, n_modes).
 
     Uses ``scipy.sparse.linalg.expm_multiply`` to compute exp(A·t)·y₀ at each
@@ -1777,7 +1779,7 @@ def _evolve_full_matrix(
 
     **Sparse optimization:** For localized coefficients (e.g. Gaussian B₀), the
     convolution kernel ĉ(q) decays exponentially, making the matrix effectively
-    banded.  Entries below a relative threshold (1e-14 × max|A|) are zeroed, and
+    banded.  Entries below a relative threshold (1e-14 x max|A|) are zeroed, and
     if density < 30% the matrix is converted to sparse CSC format.  This
     accelerates expm_multiply's internal matrix-vector products.
 
@@ -2144,7 +2146,7 @@ def solve_modal(
             progress,
         )
         n_total = A_full.shape[0]
-        method_desc = f"expm_multiply ({n_total}×{n_total}, position-dependent)"
+        method_desc = f"expm_multiply ({n_total}x{n_total}, position-dependent)"
 
     if progress is not None:
         progress.finish()

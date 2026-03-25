@@ -57,10 +57,6 @@ DPI = 150
 VMAX_FLOOR = 0.01
 
 
-def _noop(*_a: object, **_kw: object) -> None:
-    """No-op callback for quiet mode."""
-
-
 # Curated namespace for --ic-formula eval().
 # Includes np for backward compatibility (e.g. np.exp(...) in formulas)
 # plus named math functions for convenience.

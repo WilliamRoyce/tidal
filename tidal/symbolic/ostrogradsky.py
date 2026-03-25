@@ -235,10 +235,10 @@ def apply_ostrogradsky_reduction(  # noqa: C901, PLR0914
     n_aux = n_new - n_old
 
     def _expand_matrix(
-        mat: tuple | np.ndarray | None,
+        mat: tuple[tuple[float, ...], ...] | np.ndarray | None,
         n_old: int,
         n_aux: int,
-    ) -> tuple | np.ndarray | None:
+    ) -> tuple[tuple[float, ...], ...] | np.ndarray | None:
         if mat is None:
             return None
         arr = np.array(mat, dtype=float)

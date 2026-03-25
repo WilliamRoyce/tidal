@@ -72,17 +72,17 @@ _LAYOUT_MINIMAL = r"""
 
 def _build_compact() -> list[str]:
     """Icon left, text right — pre-composed."""
-    return _LAYOUT_COMPACT.split("\n")
+    return list(_LAYOUT_COMPACT.split("\n"))
 
 
 def _build_stacked() -> list[str]:
     """Icon on top, text below — pre-composed."""
-    return _LAYOUT_STACKED.split("\n")
+    return list(_LAYOUT_STACKED.split("\n"))
 
 
 def _build_minimal() -> list[str]:
     """Icon + small text — pre-composed."""
-    return _LAYOUT_MINIMAL.split("\n")
+    return list(_LAYOUT_MINIMAL.split("\n"))
 
 
 # ────────────────────────────────────────────────────────────

@@ -163,9 +163,9 @@ def table(
     hdr = pad + "  ".join(h.ljust(widths[i]) for i, h in enumerate(headers))
     sep = pad + "  ".join("-" * widths[i] for i in range(n_cols))
     # Data rows
-    data_lines = []
+    data_lines: list[str] = []
     for row in rows:
-        cells = [
+        cells: list[str] = [
             (row[i] if i < len(row) else "").ljust(widths[i]) for i in range(n_cols)
         ]
         data_lines.append(pad + "  ".join(cells))

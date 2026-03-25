@@ -121,7 +121,11 @@ class TestFieldToLatex:
         assert r"\chi" in field_to_latex("chi_0")
 
     def test_with_tensor_meta_scalar(self) -> None:
-        meta = {"tensor_head": "phi", "tensor_rank": 0, "tensor_indices": []}
+        meta: dict[str, str | int | list[int]] = {
+            "tensor_head": "phi",
+            "tensor_rank": 0,
+            "tensor_indices": [],
+        }
         result = field_to_latex("phi_0", tensor_meta=meta)
         assert r"\phi" in result
 
