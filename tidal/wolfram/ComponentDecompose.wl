@@ -467,6 +467,15 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
     e = ToValues[e]
   ];
 
+  (* NOTE: Supervisor's EuclideanSplinter calls ToValues BEFORE             *)
+  (* TraceBasisDummy, but that only helps for rank>0 expressions where      *)
+  (* ComponentArray pre-resolves free indices. For scalar expressions       *)
+  (* (canonical Lagrangian), ALL indices are contracted — ToValues cannot   *)
+  (* resolve contracted pairs (only TraceBasisDummy can enumerate them).    *)
+  (* Tested: Expand+ToValues×2 before TraceBasisDummy → no improvement     *)
+  (* (42.7s unchanged). TraceBasisDummy's O(dim^{2K}) cost is fundamental  *)
+  (* for K~4 contracted pairs per EH Ricci scalar product term.            *)
+
   (* TraceBasisDummy: per-term to prevent O(dim^{2K}) explosion.         *)
   (* The full expression may have K=45 contracted dummy pairs across all *)
   (* additive terms, but each individual term has only ~3 pairs.         *)
@@ -478,8 +487,8 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
   ];
   e = Expand[e];
 
-  (* ToValues: substitute ALL pre-computed ComponentValues *)
-  (* (metrics, Christoffels, fields, background fields) *)
+  (* ToValues: substitute remaining pre-computed ComponentValues *)
+  (* (fields, background fields, any not resolved by first pass) *)
   e = ToValues[e];
   e = ToValues[e];  (* Double ToValues: some expressions need two passes *)
 
