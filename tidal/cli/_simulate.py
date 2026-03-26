@@ -2242,6 +2242,18 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         writer.close()
         log(f"  {writer.count} snapshots streamed to: {writer.output_dir.resolve()}")
 
+        # Save constraint velocities from modal solver (exact ∂_t for constraints).
+        # "Constraint" is a solver concept — constraint fields have physical
+        # velocities determined by coupling to dynamical fields.
+        cv = result.get("constraint_velocities")
+        if cv:
+            for c_name, c_vel_arr in cv.items():
+                np.save(
+                    str(writer.output_dir / f"v_{c_name}.npy"),
+                    np.asarray(c_vel_arr, dtype=np.float64),
+                )
+            log(f"  {len(cv)} constraint velocity arrays saved")
+
     # 8. Build SimulationData — use memory-mapped directory reader when
     # snapshots were already streamed to disk (avoids double-buffering).
     if writer is not None:

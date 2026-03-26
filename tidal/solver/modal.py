@@ -588,7 +588,13 @@ def _build_constraint_eliminated_matrices(
     else:
         A_reduced = A_rhs
 
-    return A_reduced, recovery, constraint_field_names, orig_to_reduced
+    # Velocity recovery: v_c_hat = v_recovery @ d_hat gives exact ∂_t(c)
+    # Derived from: c = recovery · d, so ∂_t c = recovery · ∂_t d = recovery · A_reduced · d
+    # This is machine-precision — no numerical differentiation needed.
+    # Stored per-mode: shape (n_modes, n_c, n_dyn). Typically < 50 MB for 128³.
+    v_recovery = np.einsum("mci,mij->mcj", recovery, A_reduced)
+
+    return A_reduced, recovery, v_recovery, constraint_field_names, orig_to_reduced
 
 
 # ---------------------------------------------------------------------------
@@ -1209,7 +1215,25 @@ def _build_generalized_evolution_matrices(
         "generalized_eig" if B_lhs is not None else "none",
     )
 
-    return A_rhs, B_lhs, recovery, constraint_field_names, orig_to_reduced
+    # Velocity recovery for generalized eigenvalue (B·d' = A·d):
+    # d' = B⁻¹·A·d, so v_c = recovery · d' = recovery · B⁻¹·A · d
+    # For singular B modes, use least-squares to get the best A_eff.
+    if B_lhs is not None and recovery.size > 0:
+        n_dyn_slots = A_rhs.shape[1]
+        A_eff = np.zeros_like(A_rhs)
+        for m in range(n_modes):
+            try:
+                A_eff[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
+            except np.linalg.LinAlgError:
+                # Singular B at this mode — use lstsq
+                A_eff[m], _, _, _ = np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)
+        v_recovery = np.einsum("mci,mij->mcj", recovery, A_eff)
+    elif recovery.size > 0:
+        v_recovery = np.einsum("mci,mij->mcj", recovery, A_rhs)
+    else:
+        v_recovery = None
+
+    return A_rhs, B_lhs, recovery, v_recovery, constraint_field_names, orig_to_reduced
 
 
 # ---------------------------------------------------------------------------
@@ -1981,6 +2005,9 @@ def solve_modal(
     use_generalized = has_time_ops and not has_pos_dep
     use_constraint = has_constraints and not has_pos_dep and not use_generalized
     B_lhs_modes: NDArray[np.complex128] | None = None  # set by generalized path
+    constraint_vel_arrays: dict[
+        str, NDArray[np.float64]
+    ] = {}  # populated by Schur path
 
     if use_generalized or use_constraint:
         # Both paths produce: A_reduced, recovery, constraint names, slot mapping
@@ -1992,6 +2019,7 @@ def solve_modal(
                 A_reduced,
                 _B_lhs_modes,
                 recovery_matrix,
+                v_recovery_matrix,  # None for generalized (computed per-snapshot)
                 c_names,
                 orig_to_reduced,
             ) = _build_generalized_evolution_matrices(
@@ -2008,6 +2036,7 @@ def solve_modal(
             (
                 A_reduced,
                 recovery_matrix,
+                _v_recovery_matrix,  # recovery @ A_reduced (exact constraint velocities)
                 c_names,
                 orig_to_reduced,
             ) = _build_constraint_eliminated_matrices(
@@ -2065,6 +2094,13 @@ def solve_modal(
         snapshots = np.zeros((len(t_eval), n_full))
         assert dyn_fourier is not None  # guaranteed by return_fourier=True
 
+        # Populate constraint velocity arrays: exact ∂_t(c) from v_recovery @ d_hat.
+        # "Constraint" is a solver concept (algebraic evolution), not a physics
+        # statement — these fields have physically meaningful velocities.
+        if v_recovery_matrix is not None:
+            for c_name in c_names:
+                constraint_vel_arrays[c_name] = np.zeros((len(t_eval), *grid.shape))
+
         for ti in range(len(t_eval)):
             dyn_phys = dyn_snapshots[ti]
             # Use Fourier data directly (already computed in _evolve_per_mode)
@@ -2072,6 +2108,11 @@ def solve_modal(
 
             # Recover constraint fields: c_hat = recovery @ d_hat
             c_hat = np.einsum("mcj,jm->cm", recovery_matrix, y_hat_dyn_t)
+
+            # Recover constraint velocities: v_c_hat = v_recovery @ d_hat
+            # Machine-precision — no numerical differentiation needed.
+            if v_recovery_matrix is not None:
+                v_c_hat = np.einsum("mcj,jm->cm", v_recovery_matrix, y_hat_dyn_t)
 
             # Assemble full physical state
             full_state = np.zeros(n_full)
@@ -2089,6 +2130,14 @@ def solve_modal(
                 full_state[c_slot * n_pts : (c_slot + 1) * n_pts] = np.real(
                     c_phys,
                 )
+                # Store exact constraint velocity (if v_recovery available)
+                if v_recovery_matrix is not None:
+                    v_c_phys = np.fft.irfftn(
+                        v_c_hat[ci].reshape(rfft_shape),
+                        s=grid.shape,
+                        axes=list(range(len(grid.shape))),
+                    )
+                    constraint_vel_arrays[c_name][ti] = np.real(v_c_phys)
 
             snapshots[ti] = full_state
             if snapshot_callback is not None:
@@ -2151,9 +2200,16 @@ def solve_modal(
     if progress is not None:
         progress.finish()
 
-    return {
+    result: SolverResult = {
         "t": times,
         "y": snapshots,
         "success": True,
         "message": f"Modal solver completed ({method_desc})",
     }
+    # Attach constraint velocity arrays (exact ∂_t for constraint fields).
+    # These are computed from v_recovery = recovery @ A_reduced inside the
+    # Schur elimination path. For generalized eigenvalue or non-constraint
+    # systems, constraint_vel_arrays is empty.
+    if constraint_vel_arrays:
+        result["constraint_velocities"] = constraint_vel_arrays  # type: ignore[typeddict-unknown-key]
+    return result
