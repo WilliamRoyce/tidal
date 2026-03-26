@@ -2005,6 +2005,7 @@ def solve_modal(
     use_generalized = has_time_ops and not has_pos_dep
     use_constraint = has_constraints and not has_pos_dep and not use_generalized
     B_lhs_modes: NDArray[np.complex128] | None = None  # set by generalized path
+    v_recovery_matrix: NDArray[np.complex128] | None = None  # set by Schur/generalized
     constraint_vel_arrays: dict[
         str, NDArray[np.float64]
     ] = {}  # populated by Schur path
