@@ -4497,23 +4497,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
         lines.extend(_wls_json_plane_wave_reduction(ctx))
 
     if ctx.lagrangian_expr:
-        # Early export: persist pre-IBP Hamiltonian before Phase B.
-        # MUST run AFTER plane-wave reduction + parameter substitution
-        # so the JSON has the correct reduced structure.
-        # Phase B may segfault on R̃² theories; this ensures the
-        # constraint-excluded Hamiltonian is saved regardless.
-        escaped_out = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
-        lines.extend(
-            [
-                f'Module[{{earlyPath = "{escaped_out}", earlyDir}},',
-                "  earlyDir = DirectoryName[earlyPath];",
-                '  If[earlyDir =!= "" && !DirectoryQ[earlyDir], CreateDirectory[earlyDir]];',
-                '  Export[earlyPath, jsonStructure, "JSON"];',
-                '  Print["Pre-IBP JSON exported to: ", earlyPath];',
-                "];",
-                "",
-            ]
-        )
         lines.extend(_wls_canonical_phase_b(ctx, all_heads_str))
         # Phase B overwrites hamiltonianTerms; re-inject the improved version.
         lines.extend(_wls_canonical_injection(ctx))
