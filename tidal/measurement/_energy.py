@@ -1220,11 +1220,11 @@ def compute_system_energy(
         import warnings  # noqa: PLC0415
 
         warnings.warn(
-            "Hamiltonian contains time_derivative terms for constraint fields "
-            "(time_derivative_order=0). The Legendre transform treated these "
-            "velocities as independent momenta, but they are algebraically "
-            "determined by the constraint equations. Energy measurements from "
-            "this Hamiltonian are invalid for constrained systems. "
+            "Hamiltonian contains kinetic coupling between constraint fields "
+            "(time_derivative_order=0). The naive Legendre transform "
+            "H = sum(pi_i * v_i) - L is not the correct conserved quantity "
+            "for theories with non-trivial constraints (Dirac-Bergmann "
+            "theory). Energy measurements may show systematic drift. "
             "See: https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/178",
             stacklevel=2,
         )

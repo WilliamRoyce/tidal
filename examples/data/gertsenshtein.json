@@ -20,7 +20,7 @@
 				"h_4"
 			]
 		},
-		"derivation_hash": "5e26ce58474c5270f7c7c6c96af824fc003cfdaa2bace454008eab292c56b4a7"
+		"derivation_hash": "40860e43422c94d572278b0984ef516abb9c806e0bf79109c413e206e706e9b9"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -404,43 +404,67 @@
 				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
+				"coefficient": -1.0,
+				"factor_a": {
+					"field": "a_3",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "a_0",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "a_0",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "a_0",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "a_1",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "a_1",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "a_2",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "a_2",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "a_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "a_3",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			},
+			{
 				"coefficient": -0.5,
-				"factor_a": {
-					"field": "a_0",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "a_0",
-					"operator": "time_derivative"
-				},
-				"term_class": "self"
-			},
-			{
-				"coefficient": 0.5,
-				"factor_a": {
-					"field": "a_1",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "a_1",
-					"operator": "time_derivative"
-				},
-				"term_class": "self"
-			},
-			{
-				"coefficient": 0.5,
-				"factor_a": {
-					"field": "a_2",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "a_2",
-					"operator": "time_derivative"
-				},
-				"term_class": "self"
-			},
-			{
-				"coefficient": 0.5,
 				"factor_a": {
 					"field": "a_3",
 					"operator": "time_derivative"

@@ -1055,17 +1055,12 @@ class EquationSystem:
 
     @cached_property
     def has_constraint_velocity_terms(self) -> bool:
-        """True if the Hamiltonian has spurious diagonal kinetic terms for constraint fields.
+        """True if the Hamiltonian has kinetic coupling between constraint fields.
 
-        Detects whether the Legendre transform incorrectly included constraint
-        fields (time_derivative_order == 0) by checking for **diagonal kinetic
-        terms**: ``time_derivative(C) x time_derivative(C)`` where C is a
-        constraint field.  These can only arise from the spurious ``π_c · v_c``
-        contribution of the Legendre transform — they never appear in ``-L``.
-
-        Cross-terms like ``time_derivative(C) x identity(D)`` come from ``-L``
-        (the Lagrangian's kinetic coupling) and are physically valid.  These
-        are NOT flagged.
+        Detects ``time_derivative(C_i) x time_derivative(C_j)`` terms where
+        both C_i and C_j are constraint fields (time_derivative_order == 0).
+        These indicate the naive Hamiltonian H = sum(pi * v) - L is not the
+        correct conserved quantity for this theory (Dirac-Bergmann theory).
 
         See GitHub issue #178 for details.
         """

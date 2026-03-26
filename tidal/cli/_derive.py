@@ -3771,79 +3771,14 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
     lines.extend(
         [
             "",
-            "(* Compute canonical momenta: pi_i = dL/d(d_t q_i)                *)",
-            "(* CRITICAL: Only include DYNAMICAL fields (time_order >= 2) in the *)",
-            "(* Legendre transform.  Constraint fields (time_order = 0) have     *)",
-            "(* velocities algebraically determined by constraint equations —    *)",
-            "(* including them produces a wrong Hamiltonian (issue #178).         *)",
-            "(* The constraint field contributions to -L are retained correctly.  *)",
+            "(* Compute canonical momenta: pi_i = dL/d(d_t q_i) *)",
             _wls_timing_start("tLegendre"),
             "allCompNames = fieldEquations[[All, 1]];",
-            "",
-            "(* Classify fields by time derivative order on LHS *)",
-            'Print["Classifying ", Length[allCompNames], " fields for Legendre transform..."];',
-            "constraintCompNames = {};",
-            "dynamicalCompNames = {};",
-            "Do[",
-            "  Module[{name, eq, tOrd},",
-            "    name = fieldEquations[[k, 1]];",
-            "    eq = fieldEquations[[k, 2]];",
-            "    tOrd = DetectLHSTimeOrder[eq, name];",
-            "    If[tOrd == 0,",
-            "      AppendTo[constraintCompNames, name],",
-            "      AppendTo[dynamicalCompNames, name]",
-            "    ]",
-            "  ],",
-            "  {k, Length[fieldEquations]}",
-            "];",
-            "If[Length[constraintCompNames] > 0,",
-            '  Print["Constraint fields excluded from Legendre transform: ",',
-            "    constraintCompNames];",
-            '  Print["Dynamical fields in Legendre transform: ",',
-            "    dynamicalCompNames];",
-            "];",
-            "",
-            "(* === Symbolic mass matrix rank detection (issue #181) ===           *)",
-            "(* For dynamical fields, build the generalized mass matrix M where    *)",
-            "(* M[i,j] = coefficient of d^2_t(field_j) in equation_i.  If M has   *)",
-            "(* a non-trivial null space, those directions are hidden constraints  *)",
-            "(* (degenerate kinetic structure, related to Ostrogradsky ghost       *)",
-            "(* avoidance in higher-derivative theories).  Report but do not       *)",
-            "(* eliminate — the modal solver handles these numerically.            *)",
-            "Module[{dynEqs, nDyn, massMat, ns},",
-            "  dynEqs = Select[fieldEquations,",
-            "    MemberQ[dynamicalCompNames, #[[1]]] &];",
-            "  nDyn = Length[dynEqs];",
-            "  If[nDyn >= 2,",
-            "    massMat = Table[",
-            "      Module[{eq, targetFunc},",
-            "        eq = dynEqs[[i, 2]];",
-            "        targetFunc = compToFunc[dynEqs[[j, 1]]];",
-            "        Coefficient[eq,",
-            "          Derivative[Sequence @@ ReplacePart[",
-            "            Table[0, {Length[coordSyms]}], 1 -> 2",
-            "          ]][targetFunc][Sequence @@ coordSyms]]",
-            "      ],",
-            "      {i, nDyn}, {j, nDyn}",
-            "    ];",
-            "    ns = NullSpace[massMat];",
-            "    If[Length[ns] > 0,",
-            '      Print["WARNING: Generalized mass matrix has ",',
-            '        Length[ns], " null-space vector(s) — hidden constraints:"];',
-            '      Print["  Mass matrix M = ", MatrixForm[massMat]];',
-            '      Print["  NullSpace = ", ns];',
-            '      Print["  Fields: ", dynEqs[[All, 1]]];',
-            '      Print["  These hidden constraints are handled by the modal ",',
-            '        "solver eigendecomposition at runtime."];',
-            "    ]",
-            "  ]",
-            "];",
-            "",
             "piCompList = {};",
             "canonicalH = 0;",
             "Do[",
             "  Module[{compName, compFunc, vel, piComp},",
-            "    compName = dynamicalCompNames[[k]];",
+            "    compName = allCompNames[[k]];",
             "    compFunc = compToFunc[compName];",
             "    vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
             "    piComp = D[lagComp, vel];",
@@ -3851,16 +3786,12 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "    canonicalH += piComp * vel;",
             '    Print["pi(", compName, "): ", piComp];',
             "  ],",
-            "  {k, Length[dynamicalCompNames]}",
+            "  {k, Length[allCompNames]}",
             "];",
             "",
             "(* Legendre transform: H = Sigma pi_i * vel_i - L *)",
-            "(* Only dynamical momenta contribute; constraint terms in -L are    *)",
-            "(* retained as V_constraint_self (correct negative sign from g^00). *)",
-            "(* Expand the kinetic sum (pi*v) so ParseHamiltonianExpression can  *)",
-            "(* parse individual bilinear terms.  The -L part is NOT expanded to *)",
-            "(* avoid $RecursionLimit issues with R̃² 4th-order products.        *)",
-            "canonicalH = Expand[canonicalH] - lagComp;",
+            "(* No Expand: R̃² 4th-order products exceed $RecursionLimit in Expand *)",
+            "canonicalH = canonicalH - lagComp;",
             _wls_timing_end("tLegendre", "Legendre transform (momenta + H)"),
             _wls_mem_print("After Legendre transform"),
             'Print["H (components): ", Short[canonicalH, 5]];',
@@ -4348,61 +4279,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             lines.extend(_wls_plane_wave_coordinate_evaluation(ctx))
         lines.extend(_wls_constraint_elimination())
 
-        # --- Pre-IBP Hamiltonian: constraint-excluded Legendre transform ---
-        # Construct the Hamiltonian BEFORE Phase B's IBP, excluding constraint
-        # fields from the Legendre transform.  Phase B may overwrite this with
-        # an IBP-improved version, but if Phase B segfaults (R̃² theories),
-        # this provides a correct constraint-excluded Hamiltonian.
-        lines.extend(
-            [
-                "",
-                "(* === Pre-IBP Hamiltonian (constraint-excluded) === *)",
-                "(* Classify fields and construct H excluding constraint velocities. *)",
-                "(* Phase B's IBP + Legendre will overwrite if it succeeds.          *)",
-                'Print["Pre-IBP Hamiltonian: classifying fields..."];',
-                "Module[{dynNames, conNames, tVar, preH, preKinetic},",
-                "  tVar = coordSyms[[1]];",
-                "  dynNames = {};",
-                "  conNames = {};",
-                "  Do[",
-                "    Module[{name, eq, tOrd},",
-                "      name = fieldEquations[[k, 1]];",
-                "      eq = fieldEquations[[k, 2]];",
-                "      tOrd = DetectLHSTimeOrder[eq, name];",
-                "      If[tOrd == 0,",
-                "        AppendTo[conNames, name],",
-                "        AppendTo[dynNames, name]",
-                "      ]",
-                "    ],",
-                "    {k, Length[fieldEquations]}",
-                "  ];",
-                "  If[Length[conNames] > 0,",
-                '    Print["  Constraint fields (excluded from H): ", conNames];',
-                '    Print["  Dynamical fields (in H): ", dynNames];',
-                "  ];",
-                "",
-                "  (* Legendre transform on dynamical fields only *)",
-                "  preKinetic = 0;",
-                "  Do[",
-                "    Module[{compFunc, vel, piComp},",
-                "      compFunc = compToFunc[dynNames[[j]]];",
-                "      vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
-                "      piComp = D[lagComp, vel];",
-                "      preKinetic += piComp * vel;",
-                "    ],",
-                "    {j, Length[dynNames]}",
-                "  ];",
-                "  preH = Expand[preKinetic] - lagComp;",
-                "",
-                "  (* Parse pre-IBP Hamiltonian *)",
-                "  hamiltonianTerms = ParseHamiltonianExpression[preH,",
-                "    fieldEquations[[All, 1]]];",
-                '  Print["Pre-IBP Hamiltonian: ", Length[hamiltonianTerms], " terms"];',
-                "];",
-                "",
-            ]
-        )
-
     # Build JSON — always use multi-field builder since fieldEquations
     # Inject tensor component metadata into metadata for LaTeX export
     lines.extend(
@@ -4464,9 +4340,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # is sufficient for energy measurements. Full canonical Hamiltonian
     # (Ostrogradsky-reduced) is tracked in issue #158.
     if ctx.lagrangian_expr:
-        # Inject pre-IBP Hamiltonian (constraint-excluded) BEFORE Phase B.
-        # Export JSON immediately so it persists even if Phase B segfaults
-        # (R̃² theories crash during IBP on mixed d²_t d²_x terms).
+        lines.extend(_wls_canonical_phase_b(ctx, all_heads_str))
         lines.extend(_wls_canonical_injection(ctx))
 
     # Free fieldEquations now that both JSON structure and canonical
@@ -4495,11 +4369,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # Remap to 1+1D: surviving axis → "x", killed axes removed.
     if ctx.reduction:
         lines.extend(_wls_json_plane_wave_reduction(ctx))
-
-    if ctx.lagrangian_expr:
-        lines.extend(_wls_canonical_phase_b(ctx, all_heads_str))
-        # Phase B overwrites hamiltonianTerms; re-inject the improved version.
-        lines.extend(_wls_canonical_injection(ctx))
 
     # Export
     escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
@@ -4755,7 +4624,7 @@ def _run_wolframscript(script_path: Path, *, timeout: int = 0) -> int:
     return result.returncode
 
 
-def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0915
     """Run derivation from a TOML config file.
 
     Parameters
@@ -4840,40 +4709,12 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         try:
             probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
             if probe.get("equations") and len(probe["equations"]) > 0:
-                has_canonical = bool(
-                    probe.get("canonical", {}).get("hamiltonian_terms")
+                print(
+                    f"\nNote: wolframscript exited with code {ret} but "
+                    f"JSON was exported successfully — proceeding with "
+                    f"post-processing.",
+                    file=sys.stderr,
                 )
-                if ret in {139, 143}:
-                    # Segfault (139) or killed (143) — likely Phase B IBP crash
-                    # for R̃² theories.  The pre-IBP Hamiltonian was exported
-                    # before Phase B attempted IBP.
-                    print(
-                        f"\nNote: wolframscript crashed (exit code {ret}), "
-                        f"likely during Phase B IBP on higher-derivative terms.",
-                        file=sys.stderr,
-                    )
-                    if has_canonical:
-                        print(
-                            "  Pre-IBP Hamiltonian was exported successfully. "
-                            "This is mathematically equivalent to the post-IBP "
-                            "version (exact in Fourier space; the energy "
-                            "measurement code applies its own spatial IBP for "
-                            "finite-difference backends).",
-                            file=sys.stderr,
-                        )
-                    else:
-                        print(
-                            "  WARNING: No Hamiltonian was exported. Energy "
-                            "measurements will not be available for this theory.",
-                            file=sys.stderr,
-                        )
-                else:
-                    print(
-                        f"\nNote: wolframscript exited with code {ret} but "
-                        f"JSON was exported successfully — proceeding with "
-                        f"post-processing.",
-                        file=sys.stderr,
-                    )
                 ret = 0
         except Exception:  # noqa: BLE001, S110
             pass  # JSON missing or corrupt — honour the non-zero exit code
