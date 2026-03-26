@@ -6,7 +6,7 @@ abstract: "A symbolic physics pipeline for deriving PDEs from Lagrangians using 
 authors:
 - family-names: "Royce"
   given-names: "William"
-version: 0.19.0
+version: 0.20.0
 date-released: "2026-03-26"
 license: MIT
 repository-code: "https://github.com/WilliamRoyce/torsion-gertsenshtein"
