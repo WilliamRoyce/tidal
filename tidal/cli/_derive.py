@@ -4348,6 +4348,61 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             lines.extend(_wls_plane_wave_coordinate_evaluation(ctx))
         lines.extend(_wls_constraint_elimination())
 
+        # --- Pre-IBP Hamiltonian: constraint-excluded Legendre transform ---
+        # Construct the Hamiltonian BEFORE Phase B's IBP, excluding constraint
+        # fields from the Legendre transform.  Phase B may overwrite this with
+        # an IBP-improved version, but if Phase B segfaults (R̃² theories),
+        # this provides a correct constraint-excluded Hamiltonian.
+        lines.extend(
+            [
+                "",
+                "(* === Pre-IBP Hamiltonian (constraint-excluded) === *)",
+                "(* Classify fields and construct H excluding constraint velocities. *)",
+                "(* Phase B's IBP + Legendre will overwrite if it succeeds.          *)",
+                'Print["Pre-IBP Hamiltonian: classifying fields..."];',
+                "Module[{dynNames, conNames, tVar, preH, preKinetic},",
+                "  tVar = coordSyms[[1]];",
+                "  dynNames = {};",
+                "  conNames = {};",
+                "  Do[",
+                "    Module[{name, eq, tOrd},",
+                "      name = fieldEquations[[k, 1]];",
+                "      eq = fieldEquations[[k, 2]];",
+                "      tOrd = DetectLHSTimeOrder[eq, name];",
+                "      If[tOrd == 0,",
+                "        AppendTo[conNames, name],",
+                "        AppendTo[dynNames, name]",
+                "      ]",
+                "    ],",
+                "    {k, Length[fieldEquations]}",
+                "  ];",
+                "  If[Length[conNames] > 0,",
+                '    Print["  Constraint fields (excluded from H): ", conNames];',
+                '    Print["  Dynamical fields (in H): ", dynNames];',
+                "  ];",
+                "",
+                "  (* Legendre transform on dynamical fields only *)",
+                "  preKinetic = 0;",
+                "  Do[",
+                "    Module[{compFunc, vel, piComp},",
+                "      compFunc = compToFunc[dynNames[[j]]];",
+                "      vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
+                "      piComp = D[lagComp, vel];",
+                "      preKinetic += piComp * vel;",
+                "    ],",
+                "    {j, Length[dynNames]}",
+                "  ];",
+                "  preH = Expand[preKinetic] - lagComp;",
+                "",
+                "  (* Parse pre-IBP Hamiltonian *)",
+                "  hamiltonianTerms = ParseHamiltonianExpression[preH,",
+                "    fieldEquations[[All, 1]]];",
+                '  Print["Pre-IBP Hamiltonian: ", Length[hamiltonianTerms], " terms"];',
+                "];",
+                "",
+            ]
+        )
+
     # Build JSON — always use multi-field builder since fieldEquations
     # Inject tensor component metadata into metadata for LaTeX export
     lines.extend(
@@ -4409,7 +4464,27 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # is sufficient for energy measurements. Full canonical Hamiltonian
     # (Ostrogradsky-reduced) is tracked in issue #158.
     if ctx.lagrangian_expr:
+        # Inject pre-IBP Hamiltonian (constraint-excluded) BEFORE Phase B.
+        # Export JSON immediately so it persists even if Phase B segfaults
+        # (R̃² theories crash during IBP on mixed d²_t d²_x terms).
+        lines.extend(_wls_canonical_injection(ctx))
+        escaped_out = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
+        lines.extend(
+            [
+                "(* Early export: persist pre-IBP Hamiltonian before Phase B *)",
+                "(* Phase B may segfault on R̃² theories; this ensures the    *)",
+                "(* constraint-excluded Hamiltonian is saved regardless.      *)",
+                f'Module[{{earlyPath = "{escaped_out}", earlyDir}},',
+                "  earlyDir = DirectoryName[earlyPath];",
+                '  If[earlyDir =!= "" && !DirectoryQ[earlyDir], CreateDirectory[earlyDir]];',
+                '  Export[earlyPath, jsonStructure, "JSON"];',
+                '  Print["Pre-IBP JSON exported to: ", earlyPath];',
+                "];",
+                "",
+            ]
+        )
         lines.extend(_wls_canonical_phase_b(ctx, all_heads_str))
+        # Phase B overwrites hamiltonianTerms; re-inject the improved version.
         lines.extend(_wls_canonical_injection(ctx))
 
     # Free fieldEquations now that both JSON structure and canonical
