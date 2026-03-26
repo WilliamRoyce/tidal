@@ -4768,7 +4768,7 @@ def _run_wolframscript(script_path: Path, *, timeout: int = 0) -> int:
     return result.returncode
 
 
-def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0915
+def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PLR0915
     """Run derivation from a TOML config file.
 
     Parameters
@@ -4853,12 +4853,40 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         try:
             probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
             if probe.get("equations") and len(probe["equations"]) > 0:
-                print(
-                    f"\nNote: wolframscript exited with code {ret} but "
-                    f"JSON was exported successfully — proceeding with "
-                    f"post-processing.",
-                    file=sys.stderr,
+                has_canonical = bool(
+                    probe.get("canonical", {}).get("hamiltonian_terms")
                 )
+                if ret in {139, 143}:
+                    # Segfault (139) or killed (143) — likely Phase B IBP crash
+                    # for R̃² theories.  The pre-IBP Hamiltonian was exported
+                    # before Phase B attempted IBP.
+                    print(
+                        f"\nNote: wolframscript crashed (exit code {ret}), "
+                        f"likely during Phase B IBP on higher-derivative terms.",
+                        file=sys.stderr,
+                    )
+                    if has_canonical:
+                        print(
+                            "  Pre-IBP Hamiltonian was exported successfully. "
+                            "This is mathematically equivalent to the post-IBP "
+                            "version (exact in Fourier space; the energy "
+                            "measurement code applies its own spatial IBP for "
+                            "finite-difference backends).",
+                            file=sys.stderr,
+                        )
+                    else:
+                        print(
+                            "  WARNING: No Hamiltonian was exported. Energy "
+                            "measurements will not be available for this theory.",
+                            file=sys.stderr,
+                        )
+                else:
+                    print(
+                        f"\nNote: wolframscript exited with code {ret} but "
+                        f"JSON was exported successfully — proceeding with "
+                        f"post-processing.",
+                        file=sys.stderr,
+                    )
                 ret = 0
         except Exception:  # noqa: BLE001, S110
             pass  # JSON missing or corrupt — honour the non-zero exit code

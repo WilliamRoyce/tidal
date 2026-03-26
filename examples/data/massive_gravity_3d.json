@@ -1,0 +1,882 @@
+{
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "(RicciScalarCD[] - m2/2 * ((eta[-a, -b] - bg[-a, -b]) eta[a, c] eta[b, d] (eta[-c, -d] - bg[-c, -d]) - eta[a, b] (eta[-a, -b] - bg[-a, -b]) eta[e, f] (eta[-e, -f] - bg[-e, -f])))",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": true,
+		"parameters": {
+			"m2": 1.0
+		},
+		"derivation_hash": "218f171d5841c206d1660627dfdf590ac8a34451d4bade8d6455850e227ac0e2"
+	},
+	"spacetime": {
+		"dimension": 3,
+		"signature": [
+			-1,
+			1,
+			1
+		],
+		"coordinates": [
+			"t",
+			"x",
+			"y"
+		]
+	},
+	"fields": [
+		{
+			"name": "h_0",
+			"index": 0,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				0,
+				0
+			]
+		},
+		{
+			"name": "h_1",
+			"index": 1,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				0,
+				1
+			]
+		},
+		{
+			"name": "h_2",
+			"index": 2,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				0,
+				2
+			]
+		},
+		{
+			"name": "h_3",
+			"index": 3,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				1,
+				1
+			]
+		},
+		{
+			"name": "h_4",
+			"index": 4,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				1,
+				2
+			]
+		},
+		{
+			"name": "h_5",
+			"index": 5,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				2,
+				2
+			]
+		}
+	],
+	"equations": [
+		{
+			"field": "h_0",
+			"lhs": {
+				"expression": "h_0",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "h_3",
+						"coefficient_symbolic": "-m2"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "h_5",
+						"coefficient_symbolic": "-m2"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "laplacian_y",
+						"field": "h_3"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xy",
+						"field": "h_4"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "laplacian_x",
+						"field": "h_5"
+					}
+				]
+			},
+			"constraint_solver": {
+				"enabled": true,
+				"method": "auto",
+				"max_iterations": 30,
+				"tolerance": 1e-10,
+				"boundary_conditions": {
+					"x": {
+						"type": "periodic"
+					},
+					"y": {
+						"type": "periodic"
+					}
+				}
+			}
+		},
+		{
+			"field": "h_1",
+			"lhs": {
+				"expression": "h_1",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "h_1",
+						"coefficient_symbolic": "2*m2"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_1"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "cross_derivative_xy",
+						"field": "h_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "v_h_4"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_h_5"
+					}
+				]
+			},
+			"constraint_solver": {
+				"enabled": true,
+				"method": "auto",
+				"max_iterations": 30,
+				"tolerance": 1e-10,
+				"boundary_conditions": {
+					"x": {
+						"type": "periodic"
+					},
+					"y": {
+						"type": "periodic"
+					}
+				}
+			}
+		},
+		{
+			"field": "h_2",
+			"lhs": {
+				"expression": "h_2",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "h_2",
+						"coefficient_symbolic": "2*m2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "cross_derivative_xy",
+						"field": "h_1"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_2"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_y",
+						"field": "v_h_3"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_h_4"
+					}
+				]
+			},
+			"constraint_solver": {
+				"enabled": true,
+				"method": "auto",
+				"max_iterations": 30,
+				"tolerance": 1e-10,
+				"boundary_conditions": {
+					"x": {
+						"type": "periodic"
+					},
+					"y": {
+						"type": "periodic"
+					}
+				}
+			}
+		},
+		{
+			"field": "h_3",
+			"lhs": {
+				"expression": "h_3",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "h_0",
+						"coefficient_symbolic": "-m2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "h_5",
+						"coefficient_symbolic": "m2"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "laplacian_y",
+						"field": "h_0"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_y",
+						"field": "v_h_2"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "d2_t",
+						"field": "h_5"
+					}
+				]
+			},
+			"constraint_solver": {
+				"enabled": true,
+				"method": "auto",
+				"max_iterations": 30,
+				"tolerance": 1e-10,
+				"boundary_conditions": {
+					"x": {
+						"type": "periodic"
+					},
+					"y": {
+						"type": "periodic"
+					}
+				}
+			}
+		},
+		{
+			"field": "h_4",
+			"lhs": {
+				"expression": "d2_t(h_4)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -2.0,
+						"operator": "identity",
+						"field": "h_4",
+						"coefficient_symbolic": "-2*m2"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xy",
+						"field": "h_0"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "v_h_1"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_h_2"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_5",
+			"lhs": {
+				"expression": "h_5",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "h_0",
+						"coefficient_symbolic": "-m2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "h_3",
+						"coefficient_symbolic": "m2"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "laplacian_x",
+						"field": "h_0"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_h_1"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "d2_t",
+						"field": "h_3"
+					}
+				]
+			},
+			"constraint_solver": {
+				"enabled": true,
+				"method": "auto",
+				"max_iterations": 30,
+				"tolerance": 1e-10,
+				"boundary_conditions": {
+					"x": {
+						"type": "periodic"
+					},
+					"y": {
+						"type": "periodic"
+					}
+				}
+			}
+		}
+	],
+	"coupling": {
+		"mass_matrix_symbolic": [
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				"2*m2",
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				"2*m2",
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				"-2*m2",
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			]
+		],
+		"coupling_matrix_symbolic": [
+			[
+				null,
+				null,
+				null,
+				"-m2",
+				null,
+				"-m2"
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				"-m2",
+				null,
+				null,
+				null,
+				null,
+				"m2"
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				"-m2",
+				null,
+				null,
+				"m2",
+				null,
+				null
+			]
+		]
+	},
+	"canonical": {
+		"hamiltonian_terms": [
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-m2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-m2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_3",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "m2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "m2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "m2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-m2"
+			},
+			{
+				"coefficient": -0.5,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "gradient_y"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_3",
+					"operator": "gradient_y"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -2.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -0.5,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "gradient_x"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_3",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 2.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "cross_derivative_xy"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -2.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "cross_derivative_xy"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -2.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "cross_derivative_xy"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "cross_derivative_xy"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "cross_derivative_xy"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "cross_derivative_xy"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": -1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_3",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction"
+			}
+		]
+	}
+}

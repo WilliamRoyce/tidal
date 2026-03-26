@@ -1055,13 +1055,17 @@ class EquationSystem:
 
     @cached_property
     def has_constraint_velocity_terms(self) -> bool:
-        """True if the Hamiltonian contains time_derivative terms for constraint fields.
+        """True if the Hamiltonian has spurious diagonal kinetic terms for constraint fields.
 
-        When constraint fields (time_derivative_order == 0) appear with a
-        ``time_derivative`` operator in any Hamiltonian term, the Legendre
-        transform treated their velocities as independent momenta.  These
-        velocities are in fact algebraically determined by the constraint
-        equations, making the Hamiltonian invalid for energy measurement.
+        Detects whether the Legendre transform incorrectly included constraint
+        fields (time_derivative_order == 0) by checking for **diagonal kinetic
+        terms**: ``time_derivative(C) x time_derivative(C)`` where C is a
+        constraint field.  These can only arise from the spurious ``π_c · v_c``
+        contribution of the Legendre transform — they never appear in ``-L``.
+
+        Cross-terms like ``time_derivative(C) x identity(D)`` come from ``-L``
+        (the Lagrangian's kinetic coupling) and are physically valid.  These
+        are NOT flagged.
 
         See GitHub issue #178 for details.
         """
@@ -1073,12 +1077,18 @@ class EquationSystem:
         if not constraint_fields:
             return False
         for term in self.canonical.hamiltonian_terms:
-            for factor in (term.factor_a, term.factor_b):
-                if (
-                    factor.operator == "time_derivative"
-                    and factor.field in constraint_fields
-                ):
-                    return True
+            a, b = term.factor_a, term.factor_b
+            # Kinetic constraint term: time_derivative(C_i) x time_derivative(C_j)
+            # where both fields are constraints.  These arise from π_c · v_c
+            # in the Legendre transform (spurious).  Cross-terms like
+            # time_derivative(C) x identity(D) come from -L and are valid.
+            if (
+                a.operator == "time_derivative"
+                and b.operator == "time_derivative"
+                and a.field in constraint_fields
+                and b.field in constraint_fields
+            ):
+                return True
         return False
 
     @cached_property
