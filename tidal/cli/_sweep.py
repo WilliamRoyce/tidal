@@ -58,7 +58,6 @@ _SWEEP_MEASUREMENTS = frozenset(
         "velocity",
         "resonance",
         "spectrum",
-        "spectral_conversion",
     }
 )
 
@@ -545,7 +544,6 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         _run_mixing,  # pyright: ignore[reportPrivateUsage]
         _run_peak_conversion,  # pyright: ignore[reportPrivateUsage]
         _run_resonance,  # pyright: ignore[reportPrivateUsage]
-        _run_spectral_conversion,  # pyright: ignore[reportPrivateUsage]
         _run_spectrum,  # pyright: ignore[reportPrivateUsage]
         _run_velocity,  # pyright: ignore[reportPrivateUsage]
     )
@@ -689,31 +687,6 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
                         )
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             metrics["spectrum_error"] = str(exc)
-
-    if "spectral_conversion" in measurements:
-        try:
-            sc = _run_spectral_conversion(data, source, target)
-            result_obj = sc["_result_obj"]
-            final_p_k = result_obj.probability[-1]
-            if len(final_p_k) > 0 and np.any(final_p_k > 0):
-                metrics["P_k_max"] = float(final_p_k.max())
-                peak_idx = int(np.argmax(final_p_k))
-                metrics["k_max_conversion"] = float(result_obj.wavenumbers[peak_idx])
-                half_max = final_p_k.max() / 2.0
-                above_half = final_p_k > half_max
-                if np.any(above_half):
-                    k_range = result_obj.wavenumbers[above_half]
-                    metrics["spectral_conversion_bandwidth"] = float(
-                        k_range[-1] - k_range[0]
-                    )
-                else:
-                    metrics["spectral_conversion_bandwidth"] = 0.0
-            else:
-                metrics["P_k_max"] = 0.0
-                metrics["k_max_conversion"] = 0.0
-                metrics["spectral_conversion_bandwidth"] = 0.0
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
-            metrics["spectral_conversion_error"] = str(exc)
 
     return metrics
 

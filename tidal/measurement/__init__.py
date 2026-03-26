@@ -113,15 +113,6 @@ from tidal.measurement._spectral import (
 from tidal.measurement._spectral import (
     compute_spectrum as compute_spectrum,
 )
-from tidal.measurement._spectral_conversion import (
-    SpectralConversion as SpectralConversion,
-)
-from tidal.measurement._spectral_conversion import (
-    compute_group_spectral_conversion as compute_group_spectral_conversion,
-)
-from tidal.measurement._spectral_conversion import (
-    compute_spectral_conversion as compute_spectral_conversion,
-)
 from tidal.measurement._velocity import (
     VelocityMismatchResult as VelocityMismatchResult,
 )
@@ -157,7 +148,6 @@ __all__ = [
     "ResonanceResult",
     "SimulationData",
     "SnapshotWriter",
-    "SpectralConversion",
     "SpectralPeak",
     "SpectralSnapshot",
     "SystemEnergy",
@@ -171,14 +161,12 @@ __all__ = [
     "compute_effective_mass",
     "compute_energy_timeseries",
     "compute_group_conversion",
-    "compute_group_spectral_conversion",
     "compute_mixing_length",
     "compute_mixing_spectrum",
     "compute_mode_amplitudes",
     "compute_reference_threshold",
     "compute_resonance_analysis",
     "compute_snapshot_count",
-    "compute_spectral_conversion",
     "compute_spectral_energy",
     "compute_spectrum",
     "compute_system_energy",

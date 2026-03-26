@@ -35,17 +35,13 @@
 #   uv run tidal measure ../data/scalar_vector_coupling_output \
 #     --what conversion,mixing --source phi_0 --target A_0,A_1,A_2
 #
-#   # Step 5: Spectral conversion P(k,t) — per-mode energy transfer
-#   uv run tidal measure ../data/scalar_vector_coupling_output \
-#     --what spectral_conversion --source phi_0 --target A_1,A_2
-#
-#   # Step 6: Dispersion relation omega(k) for phi
+#   # Step 5: Dispersion relation omega(k) for phi
 #   uv run tidal measure ../data/scalar_vector_coupling_output \
 #     --what dispersion --source phi_0
 #
-#   # Step 7: Combined plot with all measurements
+#   # Step 6: Combined plot with all measurements
 #   uv run tidal measure ../data/scalar_vector_coupling_output \
-#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
+#     --what energy,conservation,conversion,mixing,dispersion \
 #     --source phi_0 --target A_0,A_1,A_2 \
 #     --output ../data/scalar_vector_coupling_output/measurement.png
 
@@ -79,24 +75,18 @@ tidal measure ../data/scalar_vector_coupling_output \
   --what conversion,mixing \
   --source phi_0 --target A_0,A_1,A_2
 
-# Step 5: Spectral conversion P(k,t)
-# Shows which Fourier modes participate in scalar-to-vector energy transfer
-tidal measure ../data/scalar_vector_coupling_output \
-  --what spectral_conversion \
-  --source phi_0 --target A_1,A_2
-
-# Step 6: Dispersion relation omega(k) for the scalar field
+# Step 5: Dispersion relation omega(k) for the scalar field
 tidal measure ../data/scalar_vector_coupling_output \
   --what dispersion \
   --source phi_0
 
-# Step 7: Combined measurement plot (all panels in one figure)
+# Step 6: Combined measurement plot (all panels in one figure)
 tidal measure ../data/scalar_vector_coupling_output \
-  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
+  --what energy,conservation,conversion,mixing,dispersion \
   --source phi_0 --target A_0,A_1,A_2 \
   --output ../data/scalar_vector_coupling_output/measurement.png
 
-# Step 8: Individual plots (saved into the simulation output directory)
+# Step 7: Individual plots (saved into the simulation output directory)
 tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index 0 --quiet
 tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index -1 --quiet
 tidal plot ../data/scalar_vector_coupling_output --type amplitude --quiet

@@ -135,7 +135,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | Feature                                                                                     | Status      |
 | ------------------------------------------------------------------------------------------- | ----------- |
 | CLI (`tidal` command) — 9 subcommands (derive, inspect, simulate, measure, list, validate, plot, sweep, analyze) | ✅ Complete |
-| Measurement module — 13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary | ✅ Complete |
+| Measurement module — 12 types: energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary | ✅ Complete |
 | Parameter Sweep Framework (Phase C) — `tidal sweep` + `tidal analyze`, TOML config, adaptive/LHS/Sobol sampling, sensitivity analysis, convergence mode, 6 plot types, parallel execution | ✅ Complete |
 | `theory.toml` configuration with `[[derived_fields]]`                                       | ✅ Complete |
 | Scalar-vector coupling stress test (mixed-rank cross-field)                                 | ✅ Complete |
@@ -212,9 +212,9 @@ Issues should be tagged with appropriate labels:
 - ✅ Background fields: position-dependent coefficients (Phase A)
 - ✅ Gauge fixing: optional per-field Lorenz/de Donder/Coulomb/temporal/axial (Phase B)
 - ✅ Constraint pre-solve: FFT/sparse three-tier solver (Phase J)
-- ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 13 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
+- ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 12 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
 - ✅ CLI (`tidal` command) implemented: 9 subcommands, zero new dependencies
-- ✅ Measurement module: 13 types (energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
+- ✅ Measurement module: 12 types (energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
 - ✅ 20 working examples spanning 1+1D through 3+1D
 - ✅ 1,700 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
 - ✅ 21 of 25 original issues resolved (84%)
@@ -287,7 +287,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **PATCH** (0.0.X): Bug fixes, documentation improvements
 
 **Current Version:** 0.21.0
-**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve; 0.5.0 delivered parameter sweep framework (Phase C) with 13 measurements, sensitivity analysis, and advanced visualization
+**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve; 0.5.0 delivered parameter sweep framework (Phase C) with 12 measurements, sensitivity analysis, and advanced visualization
 **Next Major Release (1.0.0):** Phase D (Gertsenshtein example) + Wolfram CI
 
 ---

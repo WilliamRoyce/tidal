@@ -354,32 +354,6 @@ class TestMeasurementFFTGuards:
         with pytest.raises(TypeError, match="spatially uniform mass"):
             compute_spectral_energy(field, mom, mass_array, (0.5, 0.5), (True, True))
 
-    def test_spectral_conversion_rejects_position_dependent_mass(self) -> None:
-        """Spectral conversion P(k,t) rejects position-dependent mass."""
-        from tidal.measurement._spectral_conversion import compute_spectral_conversion
-
-        data = _make_position_dependent_sim_data(position_dependent_mass=True)
-        with pytest.raises(ValueError, match="position-dependent"):
-            compute_spectral_conversion(data, "phi_0", "chi_0")
-
-    def test_spectral_conversion_rejects_position_dependent_coupling(self) -> None:
-        """Spectral conversion P(k,t) rejects position-dependent coupling."""
-        from tidal.measurement._spectral_conversion import compute_spectral_conversion
-
-        data = _make_position_dependent_sim_data(position_dependent_coupling=True)
-        with pytest.raises(ValueError, match="position-dependent"):
-            compute_spectral_conversion(data, "phi_0", "chi_0")
-
-    def test_group_spectral_conversion_rejects_position_dependent(self) -> None:
-        """Group spectral conversion also rejects position-dependent terms."""
-        from tidal.measurement._spectral_conversion import (
-            compute_group_spectral_conversion,
-        )
-
-        data = _make_position_dependent_sim_data(position_dependent_coupling=True)
-        with pytest.raises(ValueError, match="position-dependent"):
-            compute_group_spectral_conversion(data, "phi_0", "chi_0")
-
     def test_dispersion_rejects_position_dependent_coupling(self) -> None:
         """Dispersion relation omega(k) rejects position-dependent coupling."""
         from tidal.measurement._dispersion import compute_dispersion

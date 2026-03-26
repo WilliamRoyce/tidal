@@ -1348,16 +1348,6 @@ class TestMeasurePlotEmptyPanels:
         _plot_spectrum(ax, {})
         assert not ax.get_visible()
 
-    def test_spectral_conversion_panel_hidden_on_error(self) -> None:
-        from tidal.cli._measure_plot import _plot_spectral_conversion
-
-        ax = self._make_ax()
-        results: dict[str, Any] = {
-            "spectral_conversion": {"error": "requires spatially uniform system"}
-        }
-        _plot_spectral_conversion(ax, results)
-        assert not ax.get_visible()
-
     def test_dispersion_panel_hidden_on_error(self) -> None:
         from tidal.cli._measure_plot import _plot_dispersion
 

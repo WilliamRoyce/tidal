@@ -32,7 +32,6 @@ tidal/measurement/
     _conversion.py             Conversion probability P(t) = E_target(t) / E_source(0)
     _mixing.py                 Mixing length extraction and mixing spectrum
     _spectral.py               FFT spectral decomposition, mode tracking
-    _spectral_conversion.py    Per-mode spectral conversion P(k,t)
     _dispersion.py             Dispersion relation omega(k) extraction
     _diagnostics.py            Energy conservation checks, summary statistics
     _utils.py                  Shared utilities (_normalize_group)
@@ -46,11 +45,11 @@ MemoryStorage / Snapshot directory
         v
   SimulationData          <-- _io.py: extracts full time history
         |
-   +------+-------+-------+---------+-------------+----------+-----------+
-   |      |       |       |         |             |          |           |
-   v      v       v       v         v             v          v           v
- Energy  Conv   Mixing  Spectral  SpectralConv  Dispersion  Diagnostics
- (_energy)      (_mix)  (_spec)   (_spec_conv)  (_disp)     (_diagnostics)
+   +------+-------+-------+---------+----------+-----------+
+   |      |       |       |         |          |           |
+   v      v       v       v         v          v           v
+ Energy  Conv   Mixing  Spectral  Dispersion  Diagnostics
+ (_energy)      (_mix)  (_spec)   (_disp)     (_diagnostics)
 ```
 
 ## Quick Start
@@ -210,22 +209,6 @@ Fourier decomposition of a field at one time.
 |-------|-------------|
 | `wavenumbers` | Radially binned `|k|` values |
 | `power_spectrum` | `|phi_hat(k)|^2` averaged over shells of constant `|k|` |
-
-### SpectralConversion
-
-Per-mode spectral conversion probability P(k,t).  Tracks which Fourier
-modes participate in energy conversion between source and target fields.
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `times` | `ndarray (n,)` | Snapshot times |
-| `wavenumbers` | `ndarray (n_modes,)` | Radially binned `|k|` values |
-| `probability` | `ndarray (n, n_modes)` | `P(k,t) = E_target(k,t) / E_source(k,0)` |
-| `source_spectral_energy` | `ndarray (n, n_modes)` | Source spectral energy per mode over time |
-| `target_spectral_energy` | `ndarray (n, n_modes)` | Target spectral energy per mode over time |
-| `active_modes` | `ndarray (n_modes,)` bool | `True` for k-bins with nonzero initial source energy |
-| `source_field` | `str` | Source field name (or comma-joined group) |
-| `target_field` | `str` | Target field name (or comma-joined group) |
 
 ### DispersionResult
 
@@ -395,19 +378,6 @@ E(k) = 1/2 [ |pi_hat_k|^2 + (k^2 + m^2) |phi_hat_k|^2 ]
 For non-periodic axes, a Hann window is applied before the FFT (with a
 `UserWarning` noting that amplitudes are approximate).
 
-### Spectral Conversion P(k,t)
-
-The per-mode spectral conversion probability decomposes the scalar
-conversion `P(t)` into a 2D array `P(k,t) = E_target(k,t) / E_source(k, t=0)`,
-revealing which Fourier modes participate in energy conversion.
-
-For systems with derivative coupling (gradient/cross-derivative cross-field
-terms), the mixing angle `theta(k)` is k-dependent, so different modes have
-different oscillation amplitudes — not just different frequencies. The
-spectral conversion makes this k-dependence visible.
-
-CLI: `tidal measure result_dir/ --what spectral_conversion --source phi_0 --target chi_0`
-
 ### Dispersion Relation
 
 The dispersion relation `omega(k)` maps wavenumber to oscillation frequency,
@@ -550,8 +520,6 @@ The directory contains:
 | `compute_mixing_spectrum(conversion)` | `MixingSpectrum` | Temporal FFT of P(t) — all mixing frequencies |
 | `compute_spectrum(field, spacing, periodic)` | `SpectralSnapshot` | Radially-averaged power spectrum |
 | `compute_spectral_energy(field, momentum, m2, spacing, periodic)` | `(wavenumbers, energy)` | Per-mode energy `E(k)` |
-| `compute_spectral_conversion(data, source, target)` | `SpectralConversion` | Per-mode conversion `P(k,t) = E_target(k,t) / E_source(k,0)` |
-| `compute_group_spectral_conversion(data, source_fields, target_fields)` | `SpectralConversion` | Multi-field group spectral conversion |
 | `compute_mode_amplitudes(data, field_name)` | `(times, k, amplitudes)` | Track `|phi_hat(k)|` over time |
 | `compute_dispersion(data, field_name, min_amplitude=1e-12)` | `DispersionResult` | Dispersion relation `omega(k)` via spacetime FFT |
 | `check_energy_conservation(data, threshold)` | `EnergyDiagnostics` | Conservation check with threshold |

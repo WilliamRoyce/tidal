@@ -36,17 +36,13 @@
 #     --what conversion,mixing \
 #     --source A_0,A_1,A_2 --target B_0,B_1,B_2
 #
-#   # Step 5: Spectral conversion P(k,t) — per-mode A->B transfer
-#   uv run tidal measure ../data/coupled_proca_output \
-#     --what spectral_conversion --source A_1 --target B_1,B_2
-#
-#   # Step 6: Dispersion relation omega(k) for A_1
+#   # Step 5: Dispersion relation omega(k) for A_1
 #   uv run tidal measure ../data/coupled_proca_output \
 #     --what dispersion --source A_1
 #
-#   # Step 7: Combined plot with all measurements
+#   # Step 6: Combined plot with all measurements
 #   uv run tidal measure ../data/coupled_proca_output \
-#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
+#     --what energy,conservation,conversion,mixing,dispersion \
 #     --source A_0,A_1,A_2 --target B_0,B_1,B_2 \
 #     --output ../data/coupled_proca_output/measurement.png
 
@@ -78,22 +74,17 @@ tidal measure ../data/coupled_proca_output \
   --what conversion,mixing \
   --source A_0,A_1,A_2 --target B_0,B_1,B_2
 
-# Step 5: Spectral conversion P(k,t) — per-mode A->B energy transfer
-tidal measure ../data/coupled_proca_output \
-  --what spectral_conversion \
-  --source A_1 --target B_1,B_2
-
-# Step 6: Dispersion relation omega(k) for A_1
+# Step 5: Dispersion relation omega(k) for A_1
 tidal measure ../data/coupled_proca_output \
   --what dispersion \
   --source A_1
 
-# Step 7: Combined measurement plot (all panels in one figure)
+# Step 6: Combined measurement plot (all panels in one figure)
 tidal measure ../data/coupled_proca_output \
-  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
+  --what energy,conservation,conversion,mixing,dispersion \
   --source A_0,A_1,A_2 --target B_0,B_1,B_2 \
   --output ../data/coupled_proca_output/measurement.png
 
-# Step 8: Individual plots (saved into the simulation output directory)
+# Step 7: Individual plots (saved into the simulation output directory)
 tidal plot ../data/coupled_proca_output --type snapshot --field A_1 --time-index -1 --quiet
 tidal plot ../data/coupled_proca_output --type amplitude --quiet

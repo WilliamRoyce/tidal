@@ -45,7 +45,6 @@ _VALID_MEASUREMENTS = frozenset(
         "conversion",
         "mixing",
         "spectrum",
-        "spectral_conversion",
         "dispersion",
         "conservation",
         "effective_mass",
@@ -346,42 +345,6 @@ def _run_spectrum(data: SimulationData) -> dict[str, Any]:
             },
         }
     return result
-
-
-def _run_spectral_conversion(
-    data: SimulationData,
-    source: tuple[str, ...] | None,
-    target: tuple[str, ...] | None,
-) -> dict[str, Any]:
-    """Compute per-mode spectral conversion P(k,t)."""
-    from tidal.measurement import (
-        compute_group_spectral_conversion,
-        compute_spectral_conversion,
-    )
-
-    source, target = _resolve_source_target(
-        data, source, target, measurement_name="spectral conversion"
-    )
-
-    if len(source) == 1 and len(target) == 1:
-        result = compute_spectral_conversion(data, source[0], target[0])
-    else:
-        result = compute_group_spectral_conversion(data, list(source), list(target))
-
-    n_active = int(result.active_modes.sum())
-    peak_k_idx = int(np.argmax(result.probability[-1])) if n_active > 0 else 0
-
-    return {
-        "source": list(source),
-        "target": list(target),
-        "n_modes": len(result.wavenumbers),
-        "n_active_modes": n_active,
-        "peak_mode_k": float(result.wavenumbers[peak_k_idx]) if n_active > 0 else None,
-        "peak_mode_P": float(result.probability[-1, peak_k_idx])
-        if n_active > 0
-        else None,
-        "_result_obj": result,
-    }
 
 
 def _run_dispersion(
@@ -691,32 +654,6 @@ def _format_text_section_spectrum(lines: list[str], spec: dict[str, Any]) -> Non
     lines.append("")
 
 
-def _format_text_section_spectral_conversion(
-    lines: list[str],
-    sc: dict[str, Any],
-) -> None:
-    """Append spectral conversion section to *lines*."""
-    if "error" in sc:
-        lines.append(f"Spectral Conversion: ERROR ({sc['error']})")
-    else:
-        src = ", ".join(sc["source"])
-        tgt = ", ".join(sc["target"])
-        lines.extend(
-            [
-                f"Spectral Conversion ({src} -> {tgt}):",
-                f"  Active k-modes: {sc['n_active_modes']} / {sc['n_modes']}",
-            ]
-        )
-        if sc["peak_mode_k"] is not None:
-            lines.extend(
-                [
-                    f"  Peak P(k, t_final) at |k| = {sc['peak_mode_k']:.4f}",
-                    f"    P(k) = {sc['peak_mode_P']:.6f}",
-                ]
-            )
-    lines.append("")
-
-
 def _format_text_section_dispersion(
     lines: list[str],
     disp: dict[str, Any],
@@ -826,8 +763,6 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa:
         _format_text_section_mixing(lines, results["mixing"])
     if "spectrum" in results:
         _format_text_section_spectrum(lines, results["spectrum"])
-    if "spectral_conversion" in results:
-        _format_text_section_spectral_conversion(lines, results["spectral_conversion"])
     if "dispersion" in results:
         _format_text_section_dispersion(lines, results["dispersion"])
     if "effective_mass" in results:
@@ -886,7 +821,6 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     # Measurements that require --source (error if missing).
     require_source = {
         "conversion",
-        "spectral_conversion",
         "asymptotic",
         "peak_conversion",
         "resonance",
@@ -926,11 +860,6 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
 
     if "spectrum" in measurements:
         results["spectrum"] = _run_measurement_safe(_run_spectrum, data)
-
-    if "spectral_conversion" in measurements:
-        results["spectral_conversion"] = _run_measurement_safe(
-            _run_spectral_conversion, data, source, target
-        )
 
     if "dispersion" in measurements:
         dyn_in_source = _filter_to_dynamical(source, data, "dispersion")
@@ -999,7 +928,6 @@ def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PL
         print("  conversion           Field conversion probability")
         print("  mixing               Mixing length and dominant frequency")
         print("  spectrum             Power spectrum analysis")
-        print("  spectral_conversion  Per-mode conversion in Fourier space")
         print("  dispersion           Dispersion relation extraction")
         print("  effective_mass       Effective mass from dispersion")
         print("  asymptotic           Late-time asymptotic behavior")

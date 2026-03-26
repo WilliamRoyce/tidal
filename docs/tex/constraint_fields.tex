@@ -368,6 +368,121 @@ cross-constraint coupling without any theory-specific knowledge.
     (No current example has this case.)
 \end{itemize}
 
+\subsection{Hamiltonian Validity for Constrained Systems}
+\label{sec:cf-hamiltonian}
+
+\subsubsection{The Problem: Naive Legendre Transform Fails}
+\label{sec:cf-hamiltonian-problem}
+
+The standard Hamiltonian is constructed via the Legendre transform:
+\begin{equation}
+  H = \sum_i p_i \dot{q}_i - L
+  \label{eq:cf-naive-legendre}
+\end{equation}
+This formula assumes that all velocities $\dot{q}_i$ are independent
+degrees of freedom with conjugate momenta $p_i = \partial L / \partial \dot{q}_i$.
+When the system contains constraint fields, this assumption is \textbf{violated}:
+constraint velocities are algebraically determined by the dynamical fields, not
+independent momenta. The naive Legendre transform over the full field space
+produces a Hamiltonian that is not gauge-invariant and does not correctly
+generate the equations of motion.
+
+Concretely, for \texttt{massive\_gravity} the naive Hamiltonian (constructed from
+all \texttt{hamiltonian\_terms} in the JSON spec without eliminating constraints)
+yields $\max |dE/E| = 1.37$ --- order-unity violation of energy conservation,
+confirming that the computed ``energy'' is not a conserved quantity. This was
+identified in Issue~\#178.
+
+\subsubsection{Correct Approach: Constraint Elimination Before Legendre Transform}
+\label{sec:cf-hamiltonian-correct}
+
+The correct procedure is to eliminate all constraint degrees of freedom from the
+Lagrangian \textbf{before} performing the Legendre transform. The resulting
+\emph{reduced Hamiltonian} lives on the constraint-eliminated phase space and
+is gauge-invariant. This is the standard result of the Dirac--Bergmann
+algorithm for constrained Hamiltonian systems (Henneaux \& Teitelboim, 1992).
+
+In the Dirac classification:
+\begin{itemize}
+  \item \textbf{Primary constraints} arise from the definition of momenta
+    (e.g., $p_0 = \partial L / \partial \dot{A}_0 \approx 0$ for the temporal
+    component of a gauge field).
+  \item \textbf{Secondary constraints} follow from consistency conditions
+    ($\dot{p}_0 \approx 0$, yielding Gauss's law).
+  \item The naive Hamiltonian must be augmented with all constraints via
+    Lagrange multipliers; the physical Hamiltonian is obtained only after
+    fixing the gauge and solving for the multipliers.
+\end{itemize}
+
+\subsubsection{Two Classes of Constraints}
+\label{sec:cf-hamiltonian-classes}
+
+Constraint degrees of freedom in TIDAL arise through two mechanisms:
+
+\begin{table}[htbp]
+\centering
+\caption{Two classes of constraints affecting the Hamiltonian.}
+\label{tab:cf-constraint-classes}
+\begin{tabular}{@{}lp{4.5cm}p{5cm}@{}}
+\toprule
+Class & Detection method & Examples \\
+\midrule
+\textbf{Explicit} (\texttt{time\_derivative\_order = 0}) &
+  Detected by the Wolfram pipeline: the EOM for the field has no $\ddt^2$
+  term on the LHS. &
+  Proca $A_0$, gravitational wave lapse/shift, gauge-fixed temporal
+  components. \\
+\textbf{Hidden} (singular mass matrix $M$) &
+  Detected by $\mathrm{NullSpace}(M) \neq \emptyset$: the mass matrix
+  (second time-derivative coefficient matrix) is singular, so not all
+  accelerations can be solved for. &
+  Massive gravity (4 null vectors out of 10 fields), graviton--torsion
+  coupled system. Connected to Ostrogradsky ghost avoidance in DHOST
+  theories. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Explicit constraints are already identified and handled by the solver
+(Section~\ref{sec:cf-solver}). Hidden constraints, however, are not currently
+detected or eliminated by the pipeline. The singular mass matrix means that the
+system is really a DAE even though all equations appear to be second-order ---
+some linear combinations of accelerations are algebraically determined.
+
+\subsubsection{Current Status and Limitations}
+\label{sec:cf-hamiltonian-status}
+
+The Wolfram pipeline currently eliminates only simple algebraic constraints
+(explicit type with a clear self-term). Complex coupled constraints --- such as
+those in \texttt{massive\_gravity} (4 hidden constraints from a rank-6 mass matrix
+over 10 fields) and \texttt{graviton\_torsion} (coupled PGT system) --- are
+\textbf{not} eliminated before the Hamiltonian terms are constructed. This causes
+incorrect energy measurements for these theories (Issue~\#180).
+
+The required fix involves:
+\begin{enumerate}
+  \item Computing $\mathrm{NullSpace}(M)$ in the Wolfram pipeline to detect
+    hidden constraints.
+  \item Projecting the Lagrangian onto the dynamical subspace (the column space
+    of $M$) to eliminate the constrained combinations.
+  \item Performing the Legendre transform only on the reduced Lagrangian.
+  \item Exporting the reduced Hamiltonian terms to JSON.
+\end{enumerate}
+
+Until this is implemented, energy measurements for theories with hidden
+constraints should be interpreted with caution.
+
+\subsubsection{Spectral Conversion Measurement Removed}
+\label{sec:cf-spectral-conversion}
+
+The \texttt{compute\_spectral\_conversion()} measurement was removed because it
+hardcoded a free-field energy formula $E(k) = \tfrac{1}{2}(k^2 + m^2)|\hat{\varphi}(k)|^2$
+that excludes all cross-field coupling terms. For any theory with field mixing
+(which is precisely the case where conversion is interesting), this formula
+gives incorrect per-field energies, making the resulting conversion fraction
+meaningless. The real-space energy measurement with correct Hamiltonian terms
+should be used instead (Issue~\#179).
+
 \subsection{References}
 \label{sec:cf-references}
 
@@ -386,4 +501,14 @@ cross-constraint coupling without any theory-specific knowledge.
   \item Ruehl, W.\ \& Yurov, V.\ P.\ (2004). ``Proca equations derived from first
     principles.'' arXiv:hep-th/0412059.
     --- Structure of Proca EOM and constraint analysis.
+
+  \item Henneaux, M.\ \& Teitelboim, C.\ (1992). \emph{Quantization of Gauge Systems}.
+    Princeton University Press.
+    --- Chapters 1--4: Dirac--Bergmann algorithm, primary/secondary constraints,
+    reduced phase space and gauge-invariant Hamiltonian.
+
+  \item Dirac, P.\ A.\ M.\ (1964). \emph{Lectures on Quantum Mechanics}. Belfer Graduate
+    School of Science, Yeshiva University.
+    --- Original treatment of constrained Hamiltonian dynamics and the classification
+    of first-class vs.\ second-class constraints.
 \end{enumerate}

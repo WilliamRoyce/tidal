@@ -7,7 +7,7 @@
 
 ## Context
 
-TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 20 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
+TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 20 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (12 types: energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
 
 The project's core research motivation is the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion in external magnetic fields). The project operates exclusively in the **linearised regime** — all Lagrangians are quadratic, producing linear PDEs. The phases below are ordered by their impact toward enabling realistic Gertsenshtein simulations, while also broadening TIDAL's general utility as a linearised field theory simulation framework.
 
@@ -150,12 +150,12 @@ A comprehensive parameter sweep framework implemented as two CLI commands (`tida
 - **F3: Velocity + resonance analysis** — group/phase velocity mismatch and resonance condition detection
 - **F4: Sobol/Morris sensitivity analysis** — first-order, total-order, and interaction indices via SALib
 - **F5: SweepResults query methods** — programmatic access to sweep data with filtering and aggregation
-- **F6: Spectrum scalar aggregation** — all 13 measurement types supported in sweeps (including spectrum and spectral_conversion via scalar summaries)
+- **F6: Spectrum scalar aggregation** — all 12 measurement types supported in sweeps (including spectrum via scalar summaries)
 - **F7: Run status tracking + resume** — `--resume` for interrupted sweeps, failure classification
 - **F8: Advanced visualization** — 6 plot types: sweep (auto 1D/2D/multi), sweep-compare, convergence, sweep-parallel, sweep-tornado, sweep-scatter
 - **Convergence mode** — Richardson extrapolation for convergence order estimation
 
-**13 measurement types in sweeps:** summary, energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance
+**12 measurement types in sweeps:** summary, energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance
 
 **7 working example scripts** in `coupled_scattering/`, `coupled_scalars/`, `scalar_field/`
 

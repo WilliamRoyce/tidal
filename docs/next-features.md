@@ -29,7 +29,7 @@ This document tracks proposed features for TIDAL's parameter sweep framework and
 
 The `tidal sweep` command is fully operational with:
 
-- **13 measurement types**: summary, energy, conversion, mixing, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, spectrum, spectral_conversion
+- **12 measurement types**: summary, energy, conversion, mixing, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, spectrum
 - **Sampling**: linspace, logspace, explicit values, Cartesian product of multiple parameters
 - **Execution**: sequential, parallel (`multiprocessing.Pool`), resume from interruption
 - **Output**: `results.csv`, `results.json`, `sweep.json` (provenance)
@@ -51,7 +51,6 @@ The `tidal sweep` command is fully operational with:
 | `tidal/measurement/_dispersion.py`          | Dispersion relation omega(k)                   |
 | `tidal/measurement/_effective_mass.py`      | Effective mass m2_eff                          |
 | `tidal/measurement/_spectral.py`            | Spatial power spectrum                         |
-| `tidal/measurement/_spectral_conversion.py` | Per-mode spectral conversion P(k,t)            |
 | `tidal/cli/_sweep_config.py`                | TOML sweep config parser (~475 lines)          |
 | `tests/test_sweep.py`                       | Sweep tests (~1200 lines)                      |
 | `tests/test_sweep_config.py`                | TOML config tests (~300 lines)                 |
@@ -87,7 +86,7 @@ These modules use spatial FFT, which requires translation invariance (constant c
 | `_dispersion.py`          | omega(k) via space-time FFT requires global Fourier eigenmodes |
 | `_effective_mass.py`      | Wraps dispersion: m2_eff = omega^2 - k^2                       |
 | `_spectral.py`            | Power spectrum                                                 | phi_hat(k) | ^2 requires spatial FFT |
-| `_spectral_conversion.py` | Per-mode P(k,t) requires spectral energy decomposition         |
+
 
 ### Impact on New Features
 
@@ -685,13 +684,13 @@ def summary(self) -> str:
 ## F6: Spectrum Scalar Aggregation in Sweeps
 
 **Priority:** 6
-**Generality:** [FLAT+HOMOGENEOUS] — inherits FFT constraints from `_spectral.py` and `_spectral_conversion.py`
+**Generality:** [FLAT+HOMOGENEOUS] — inherits FFT constraints from `_spectral.py`
 **Status:** Complete (Phase C, commit `2a6f04e`)
 **Depends on:** Nothing
 
 ### Motivation
 
-`spectrum` and `spectral_conversion` are the two measurement types available in `tidal measure` but not in `tidal sweep` (11 out of 13 types are supported). They produce 2D arrays, which don't fit sweep's scalar-row format. But useful scalar summaries can be extracted.
+`spectrum` is a measurement type that produces 2D arrays, which don't fit sweep's scalar-row format. But useful scalar summaries can be extracted.
 
 ### Specification
 
@@ -707,38 +706,20 @@ metrics["peak_k"] = float(spec_result.wavenumbers[np.argmax(spec_result.power)])
 metrics["peak_power"] = float(spec_result.power.max())
 ```
 
-**For `spectral_conversion`:**
-
-```python
-# Extract scalar summaries from per-mode conversion
-sc_result = compute_spectral_conversion(data, source_field, target_field)
-final_P_k = sc_result.conversion[-1]  # P(k) at final time
-metrics["P_k_max"] = float(final_P_k.max())
-metrics["k_max_conversion"] = float(sc_result.wavenumbers[np.argmax(final_P_k)])
-# Conversion bandwidth: FWHM of P(k) at final time
-half_max = final_P_k.max() / 2
-above_half = final_P_k > half_max
-if np.any(above_half):
-    k_range = sc_result.wavenumbers[above_half]
-    metrics["conversion_bandwidth"] = float(k_range[-1] - k_range[0])
-else:
-    metrics["conversion_bandwidth"] = 0.0
-```
-
 ### Modified Files
 
 | File                    | Change                                                                                                          |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `tidal/cli/_sweep.py`   | Add `"spectrum"` and `"spectral_conversion"` to `_SWEEP_MEASUREMENTS`, add extraction logic to `_measure_run()` |
+| `tidal/cli/_sweep.py`   | Add `"spectrum"` to `_SWEEP_MEASUREMENTS`, add extraction logic to `_measure_run()` |
 | `tidal/cli/__init__.py` | Update help text to list 13 measurement types                                                                   |
-| `tests/test_sweep.py`   | Test spectrum/spectral_conversion scalar extraction                                                             |
+| `tests/test_sweep.py`   | Test spectrum scalar extraction                                                             |
 
 ### Acceptance Criteria
 
 - [x] `--measure spectrum` in sweep produces `n_active_modes`, `peak_k`, `peak_power` columns
-- [x] `--measure spectral_conversion` produces `P_k_max`, `k_max_conversion`, `spectral_conversion_bandwidth`
+
 - [x] Clear error for curved-spacetime systems (inherits from `_check_no_position_dependent_terms()`)
-- [x] 13 measurement types now supported in sweeps (was 9, now includes velocity, resonance, spectrum, spectral_conversion)
+- [x] 12 measurement types now supported in sweeps (was 9, now includes velocity, resonance, spectrum)
 
 ---
 

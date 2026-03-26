@@ -643,7 +643,7 @@ def _resolve_term_target(
 
 
 # ------------------------------------------------------------------
-# Mass resolution (used by _spectral_conversion.py)
+# Mass resolution
 # ------------------------------------------------------------------
 
 
@@ -1215,6 +1215,19 @@ def compute_system_energy(
             "measurement). Run: uv run tidal derive <theory.toml>"
         )
         raise ValueError(msg)
+
+    if data.spec.has_constraint_velocity_terms:
+        import warnings  # noqa: PLC0415
+
+        warnings.warn(
+            "Hamiltonian contains time_derivative terms for constraint fields "
+            "(time_derivative_order=0). The Legendre transform treated these "
+            "velocities as independent momenta, but they are algebraically "
+            "determined by the constraint equations. Energy measurements from "
+            "this Hamiltonian are invalid for constrained systems. "
+            "See: https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/178",
+            stacklevel=2,
+        )
 
     per_field_totals, interaction = _compute_hamiltonian_per_field(
         data, t_idx, ctx=_ctx

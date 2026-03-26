@@ -1054,6 +1054,34 @@ class EquationSystem:
         return self.effective_coordinates[1:]
 
     @cached_property
+    def has_constraint_velocity_terms(self) -> bool:
+        """True if the Hamiltonian contains time_derivative terms for constraint fields.
+
+        When constraint fields (time_derivative_order == 0) appear with a
+        ``time_derivative`` operator in any Hamiltonian term, the Legendre
+        transform treated their velocities as independent momenta.  These
+        velocities are in fact algebraically determined by the constraint
+        equations, making the Hamiltonian invalid for energy measurement.
+
+        See GitHub issue #178 for details.
+        """
+        if self.canonical is None:
+            return False
+        constraint_fields = frozenset(
+            eq.field_name for eq in self.equations if eq.time_derivative_order == 0
+        )
+        if not constraint_fields:
+            return False
+        for term in self.canonical.hamiltonian_terms:
+            for factor in (term.factor_a, term.factor_b):
+                if (
+                    factor.operator == "time_derivative"
+                    and factor.field in constraint_fields
+                ):
+                    return True
+        return False
+
+    @cached_property
     def equation_map(self) -> dict[str, int]:
         """Map from field name to equation index. Cached on frozen dataclass."""
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
