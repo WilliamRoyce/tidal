@@ -24,6 +24,7 @@ from tidal.cli._derive_validate import (  # noqa: F401
     _validate_reduction,  # type: ignore[reportPrivateUsage, reportUnusedImport]
 )
 from tidal.cli._wls_helpers import (
+    validate_wls_brackets,
     wl_bg_rule_entry,
     wl_component_value,
     wl_diag_matrix,
@@ -4573,7 +4574,23 @@ def generate_wls(
 
     lines.extend(_wls_metadata_and_export(config, ctx))
 
-    return "\n".join(lines) + "\n"
+    script = "\n".join(lines) + "\n"
+
+    # Pre-execution bracket validation (#191): catch codegen errors before
+    # the 30-min wolframscript execution.  Unbalanced brackets from f-string
+    # quoting bugs are the most common codegen failure mode.
+    bracket_errors = validate_wls_brackets(script)
+    if bracket_errors:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            "Generated .wls script has %d bracket error(s):\n  %s",
+            len(bracket_errors),
+            "\n  ".join(bracket_errors[:10]),
+        )
+
+    return script
 
 
 # --- Execution ---

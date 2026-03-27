@@ -92,16 +92,54 @@ def wl_diag_matrix(entries: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _skip_wl_string(script: str, i: int) -> int:
+    """Advance past a Wolfram string literal starting at ``script[i] == '"'``."""
+    n = len(script)
+    i += 1  # skip opening quote
+    while i < n and script[i] != '"':
+        if script[i] == "\\" and i + 1 < n:
+            i += 2  # skip escaped char
+        else:
+            i += 1
+    return i + 1  # skip closing quote
+
+
+def _skip_wl_comment(script: str, i: int) -> int:
+    """Advance past a (possibly nested) Wolfram comment starting at ``(*``."""
+    n = len(script)
+    depth = 1
+    i += 2  # skip opening (*
+    while i + 1 < n and depth > 0:
+        if script[i] == "(" and script[i + 1] == "*":
+            depth += 1
+            i += 2
+        elif script[i] == "*" and script[i + 1] == ")":
+            depth -= 1
+            i += 2
+        else:
+            i += 1
+    return i
+
+
+def _skip_wl_char_escape(script: str, i: int) -> int:
+    r"""Advance past a ``\[Name]`` character escape (e.g. ``\[Alpha]``)."""
+    n = len(script)
+    i += 2  # skip \[
+    while i < n and script[i] != "]":
+        i += 1
+    return i + 1  # skip closing ]
+
+
 def validate_wls_brackets(script: str) -> list[str]:
     r"""Check balanced ``[]``, ``{}``, ``()`` in a generated Wolfram script.
 
     Skips string literals (``"..."``), Wolfram comments (``(* ... *)``),
-    and ``\\[...]`` character escapes (e.g. ``\\[Alpha]``).
+    and ``\[...]`` character escapes (e.g. ``\[Alpha]``).
 
     Returns a list of human-readable error strings.  Empty list means valid.
     """
     errors: list[str] = []
-    stack: list[tuple[str, int]] = []  # (open_char, position)
+    stack: list[tuple[str, int]] = []
     pairs = {"}": "{", "]": "[", ")": "("}
     i = 0
     n = len(script)
@@ -109,41 +147,16 @@ def validate_wls_brackets(script: str) -> list[str]:
     while i < n:
         c = script[i]
 
-        # Skip string literals
         if c == '"':
-            i += 1
-            while i < n and script[i] != '"':
-                if script[i] == "\\" and i + 1 < n:
-                    i += 2  # skip escaped char
-                else:
-                    i += 1
-            i += 1  # skip closing quote
+            i = _skip_wl_string(script, i)
             continue
-
-        # Skip Wolfram comments (* ... *) — may nest
         if c == "(" and i + 1 < n and script[i + 1] == "*":
-            depth = 1
-            i += 2
-            while i + 1 < n and depth > 0:
-                if script[i] == "(" and script[i + 1] == "*":
-                    depth += 1
-                    i += 2
-                elif script[i] == "*" and script[i + 1] == ")":
-                    depth -= 1
-                    i += 2
-                else:
-                    i += 1
+            i = _skip_wl_comment(script, i)
             continue
-
-        # Skip \[Name] character escapes (e.g. \[Alpha])
         if c == "\\" and i + 1 < n and script[i + 1] == "[":
-            i += 2
-            while i < n and script[i] != "]":
-                i += 1
-            i += 1  # skip closing ]
+            i = _skip_wl_char_escape(script, i)
             continue
 
-        # Track brackets
         if c in "{[(":
             stack.append((c, i))
         elif c in "}])":
@@ -159,7 +172,6 @@ def validate_wls_brackets(script: str) -> list[str]:
                         f"line {close_line}: '{c}' closes '{open_char}' "
                         f"opened at line {open_line}"
                     )
-
         i += 1
 
     for open_char, pos in stack:
