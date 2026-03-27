@@ -172,7 +172,7 @@ def compute_conversion_probability(
     )
 
 
-def compute_group_conversion(  # noqa: C901
+def compute_group_conversion(  # noqa: C901, PLR0914
     data: SimulationData,
     source_fields: str | Sequence[str],
     target_fields: str | Sequence[str] | None = None,
@@ -237,6 +237,26 @@ def compute_group_conversion(  # noqa: C901
             "Target group is empty — no dynamical fields remain after excluding source"
         )
         raise ValueError(msg)
+
+    # Warn if source/target includes constraint fields (time_order=0).
+    # Per-field self-energy for constraint fields may be unreliable since the
+    # naive Hamiltonian is not the correct conserved quantity for constrained
+    # systems (Dirac-Bergmann theory, issue #178).
+    constraint_fields = frozenset(
+        eq.field_name for eq in data.spec.equations if eq.time_derivative_order == 0
+    )
+    user_constraints = (set(src) | set(tgt)) & constraint_fields
+    if user_constraints:
+        import warnings  # noqa: PLC0415
+
+        warnings.warn(
+            f"Conversion measurement includes constraint field(s): "
+            f"{sorted(user_constraints)}. Per-field energy for constraint "
+            f"fields may be unreliable (see issue #178). Consider using "
+            f"only dynamical fields (time_derivative_order >= 2) for "
+            f"source and target.",
+            stacklevel=2,
+        )
 
     # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes)
     times, per_field = _per_field_energy_timeseries(data)
