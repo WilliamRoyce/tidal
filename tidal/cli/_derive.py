@@ -2061,20 +2061,6 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
     return lines
 
 
-def wl_zero_component(comp_name: str, field_name: str, gauge_type: str) -> list[str]:
-    """Generate WLS to substitute a component and its derivatives with zero.
-
-    Used by temporal gauge (``A_0 = 0``) and axial gauge (``A_n = 0``).
-    Applied to the ``fieldEquations`` variable after component decomposition.
-    """
-    return [
-        f"(* {gauge_type.capitalize()} gauge: {field_name} component {comp_name} = 0 *)",
-        f"fieldEquations = fieldEquations /. {wl_list(f'{comp_name}[args___] :> 0, Derivative[ders__][{comp_name}][args___] :> 0')};",
-        f'Print["Applied {gauge_type} gauge: {comp_name} = 0"];',
-        "",
-    ]
-
-
 def _type_b_coulomb_constraint(
     ctx: _WlsContext,
     field_name: str,

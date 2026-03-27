@@ -1,8 +1,11 @@
-"""Helper functions for generating Wolfram Language code strings.
+"""Helper functions for generating and validating Wolfram Language code strings.
 
 Eliminates fragile triple-brace f-string patterns (``f"{{{x}}}"`` → ``wl_list(x)``)
 when constructing .wls scripts in ``_derive.py``.  All functions return plain
 strings — no Wolfram execution, no side effects.
+
+Also provides :func:`validate_wls_brackets` for pre-execution syntax checking
+of generated scripts (#191).
 """
 
 from __future__ import annotations
@@ -82,6 +85,88 @@ def wl_flatten_list(items_str: str) -> str:
 def wl_diag_matrix(entries: str) -> str:
     """``DiagonalMatrix[{entries}]``."""
     return f"DiagonalMatrix[{{{entries}}}]"
+
+
+# ---------------------------------------------------------------------------
+# Bracket validation (#191)
+# ---------------------------------------------------------------------------
+
+
+def validate_wls_brackets(script: str) -> list[str]:
+    r"""Check balanced ``[]``, ``{}``, ``()`` in a generated Wolfram script.
+
+    Skips string literals (``"..."``), Wolfram comments (``(* ... *)``),
+    and ``\\[...]`` character escapes (e.g. ``\\[Alpha]``).
+
+    Returns a list of human-readable error strings.  Empty list means valid.
+    """
+    errors: list[str] = []
+    stack: list[tuple[str, int]] = []  # (open_char, position)
+    pairs = {"}": "{", "]": "[", ")": "("}
+    i = 0
+    n = len(script)
+
+    while i < n:
+        c = script[i]
+
+        # Skip string literals
+        if c == '"':
+            i += 1
+            while i < n and script[i] != '"':
+                if script[i] == "\\" and i + 1 < n:
+                    i += 2  # skip escaped char
+                else:
+                    i += 1
+            i += 1  # skip closing quote
+            continue
+
+        # Skip Wolfram comments (* ... *) — may nest
+        if c == "(" and i + 1 < n and script[i + 1] == "*":
+            depth = 1
+            i += 2
+            while i + 1 < n and depth > 0:
+                if script[i] == "(" and script[i + 1] == "*":
+                    depth += 1
+                    i += 2
+                elif script[i] == "*" and script[i + 1] == ")":
+                    depth -= 1
+                    i += 2
+                else:
+                    i += 1
+            continue
+
+        # Skip \[Name] character escapes (e.g. \[Alpha])
+        if c == "\\" and i + 1 < n and script[i + 1] == "[":
+            i += 2
+            while i < n and script[i] != "]":
+                i += 1
+            i += 1  # skip closing ]
+            continue
+
+        # Track brackets
+        if c in "{[(":
+            stack.append((c, i))
+        elif c in "}])":
+            if not stack:
+                line = script[:i].count("\n") + 1
+                errors.append(f"line {line}: unmatched closing '{c}'")
+            else:
+                open_char, open_pos = stack.pop()
+                if pairs[c] != open_char:
+                    open_line = script[:open_pos].count("\n") + 1
+                    close_line = script[:i].count("\n") + 1
+                    errors.append(
+                        f"line {close_line}: '{c}' closes '{open_char}' "
+                        f"opened at line {open_line}"
+                    )
+
+        i += 1
+
+    for open_char, pos in stack:
+        line = script[:pos].count("\n") + 1
+        errors.append(f"line {line}: unclosed '{open_char}'")
+
+    return errors
 
 
 def wl_zero_component(comp_name: str, field_name: str, gauge_type: str) -> list[str]:
