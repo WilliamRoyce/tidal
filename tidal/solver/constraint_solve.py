@@ -70,6 +70,22 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
+# Temporal operator detection
+# ---------------------------------------------------------------------------
+
+# Operators with time_order >= 2 (accelerations, jerks) are not part of the IC
+# state vector and must be skipped during constraint IC solving.  The exact set
+# mirrors modal._TIME_OPERATORS with time_order >= 2.
+_ACCEL_AND_HIGHER_OPS: frozenset[str] = frozenset(
+    {
+        "d2_t",
+        "d3_t",
+        *(f"mixed_T2_S{s}{ax}" for s in (1, 2) for ax in "xyz"),
+        *(f"mixed_T3_S{s}{ax}" for s in (1,) for ax in "xyz"),
+    }
+)
+
+# ---------------------------------------------------------------------------
 # Term classification
 # ---------------------------------------------------------------------------
 
@@ -111,6 +127,10 @@ def _classify_terms(  # noqa: PLR0913, PLR0917
         # Resolve to identity(v_X) since this is not a spatial operator.
         if term.operator == "first_derivative_t":
             source_terms.append((coeff, "identity", f"v_{term.field}"))
+        elif term.operator in _ACCEL_AND_HIGHER_OPS:
+            # Acceleration/jerk terms (d2_t, mixed_T2_*, d3_t, mixed_T3_*)
+            # are not part of the IC state vector — skip them.
+            continue
         elif term.field == constraint_field:
             self_terms.append((coeff, term.operator))
             if isinstance(coeff, np.ndarray):
@@ -882,8 +902,10 @@ def _find_target_field(  # noqa: PLR0913, PLR0917
     - **Cascade ordering**: ``identity(h_4) + identity(h_7) + identity(h_9) = 0``
       waits until h_7 is determined before solving for h_9.
     """
-    # Collect all field names referenced by this equation
-    all_referenced: set[str] = {term.field for term in rhs_terms}
+    # Collect all field names referenced by this equation (skip accel/jerk ops)
+    all_referenced: set[str] = {
+        term.field for term in rhs_terms if term.operator not in _ACCEL_AND_HIGHER_OPS
+    }
 
     # Find free (undetermined) fields
     free_fields: list[str] = [f for f in all_referenced if f not in determined]
@@ -1132,6 +1154,8 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
     for _eq_idx, eq in remaining_eqs:
         mapped_refs: set[str] = set()
         for term in eq.rhs_terms:
+            if term.operator in _ACCEL_AND_HIGHER_OPS:
+                continue
             ref = term.field
             if term.operator == "first_derivative_t":
                 ref = f"v_{ref}"
@@ -1174,6 +1198,11 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
     # Phase 3: Final verification of ALL constraint equations
     violations: list[tuple[str, float, list[str]]] = []
     for eq_idx, eq in constraint_eqs:
+        # Skip verification for equations containing acceleration/jerk
+        # operators — the residual is incomplete without those terms.
+        if any(t.operator in _ACCEL_AND_HIGHER_OPS for t in eq.rhs_terms):
+            continue
+
         rhs = np.zeros(grid.shape)
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = coeff_eval.resolve(
