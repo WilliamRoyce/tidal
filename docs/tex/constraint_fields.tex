@@ -483,6 +483,61 @@ gives incorrect per-field energies, making the resulting conversion fraction
 meaningless. The real-space energy measurement with correct Hamiltonian terms
 should be used instead (Issue~\#179).
 
+\subsection{Modal Solver as Primary Constraint Handler}
+\label{sec:cf-modal-constraint}
+
+The constraint IC solver (\texttt{ensure\_consistent\_ic()} in
+\texttt{constraint\_solve.py}) described in Section~\ref{sec:cf-unified-ic} has
+two important limitations: (1)~it does not support \texttt{d2\_t} (acceleration)
+operators in constraint equations, which arise in PGT and other higher-derivative
+theories; and (2)~complex coupled constraints may not be auto-enabled unless the
+JSON spec explicitly sets \texttt{constraint\_solver.enabled = true}. These
+limitations mean that non-modal solvers (IDA, CVODE, scipy) can fail to produce
+consistent initial conditions for theories with intricate constraint structure.
+
+The \textbf{modal solver} avoids both limitations by handling constraint initial
+conditions \emph{internally} via the Fourier Schur complement (see
+Section~\ref{sec:modal-constraint-elimination} of \texttt{modal\_solver.tex}).
+In \texttt{\_build\_constraint\_eliminated\_matrices()}, the constraint block is
+eliminated algebraically at each Fourier mode:
+\begin{equation}
+  c(\bm{k}) = -S_{cc}^{-1}(\bm{k}) \cdot S_{cd}(\bm{k}) \cdot d(\bm{k})
+  \label{eq:cf-modal-schur}
+\end{equation}
+This computes constraint field values directly from the dynamical field
+amplitudes, ensuring exact constraint satisfaction at every mode --- including
+modes involving \texttt{d2\_t} operators, which are first converted to position
+and velocity terms via mass-matrix inversion before the Schur complement is
+applied. No separate IC solver call is needed; the constraints are satisfied by
+construction.
+
+For theories with periodic boundary conditions and constant (position-independent)
+coefficients --- such as PGT (\texttt{graviton\_torsion}) --- the modal solver is
+the \textbf{correct and complete} constraint handler. It is auto-selected with
+highest priority when its eligibility criteria are met.
+
+Non-modal solvers (IDA, CVODE, leapfrog, scipy) instead rely on the separate
+\texttt{ensure\_consistent\_ic()} path, which requires
+\texttt{constraint\_solver.enabled = true} in the JSON spec and is subject to the
+\texttt{d2\_t} limitation described above.
+
+\begin{table}[htbp]
+\centering
+\caption{Constraint handling path by theory and solver.}
+\label{tab:cf-constraint-paths}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Theory & Constraint type & Modal path & Non-modal path \\
+\midrule
+\texttt{coupled\_proca} & Explicit ($A_0$, $B_0$) & Schur complement & \texttt{ensure\_consistent\_ic()} (FFT tier) \\
+\texttt{massive\_gravity} & Explicit + hidden & Schur complement + mass-matrix Schur & \texttt{ensure\_consistent\_ic()} (partial) \\
+\texttt{graviton\_torsion} & Explicit + hidden + \texttt{d2\_t} & Full 3-level Schur & Not supported (\texttt{d2\_t} limitation) \\
+\texttt{scalar\_field} & None & Direct eigendecomp. & N/A \\
+\texttt{proca\_background} & Explicit ($A_0$) & Schur complement & \texttt{ensure\_consistent\_ic()} (FFT tier) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{References}
 \label{sec:cf-references}
 

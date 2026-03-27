@@ -523,6 +523,8 @@ At each output time, constraint fields are reconstructed directly from the saved
 
 \textbf{Performance}: On coupled\_proca\_3d ($16^3$, $t=5$, 51 snapshots): modal 0.08\,s vs IDA 19.0\,s --- $\mathbf{{\sim}238\times}$ \textbf{speedup}. IDA fails entirely at $32\times 32$ (convergence issues), while modal runs at any grid size.
 
+\textbf{Automatic constraint IC satisfaction}: Unlike non-modal solvers, which rely on a separate \texttt{ensure\_consistent\_ic()} call in \texttt{constraint\_solve.py} to pre-solve constraint fields before time integration, the modal solver's Schur complement provides automatic constraint IC satisfaction as part of the elimination step. Constraint field values are reconstructed algebraically from the dynamical amplitudes ($c = -S_{cc}^{-1} \cdot S_{cd} \cdot d$) at every output time, so the initial conditions are consistent by construction --- no separate constraint solver invocation is needed.
+
 \textbf{References}: Hairer \& Wanner (1996), \emph{Solving ODEs II}, Ch.\ VII; Ascher \& Petzold (1998), \emph{Computer Methods for ODEs/DAEs}, \S10.2.
 
 \subsection{Generalized Mass Matrix (Higher-Derivative Theories)}

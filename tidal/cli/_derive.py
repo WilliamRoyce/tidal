@@ -30,6 +30,7 @@ from tidal.cli._wls_helpers import (
     wl_flatten_list,
     wl_index,
     wl_list,
+    wl_zero_component,
 )
 
 # Coordinates per spacetime dimension
@@ -2060,9 +2061,7 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
     return lines
 
 
-def _type_b_zero_component(
-    comp_name: str, field_name: str, gauge_type: str
-) -> list[str]:
+def wl_zero_component(comp_name: str, field_name: str, gauge_type: str) -> list[str]:
     """Generate WLS to substitute a component and its derivatives with zero.
 
     Used by temporal gauge (``A_0 = 0``) and axial gauge (``A_n = 0``).
@@ -2331,9 +2330,7 @@ def _type_b_tt_gauge(
     # --- 1. Temporal: zero h_{0,mu} for mu = 0 .. dim-1 ---
     for mu in range(dim):
         idx = _sym_flat_index(0, mu, dim)
-        lines.extend(
-            _type_b_zero_component(f"{comp_pfx}{idx}", field_name, "TT-temporal")
-        )
+        lines.extend(wl_zero_component(f"{comp_pfx}{idx}", field_name, "TT-temporal"))
 
     # --- 2. Transverse: d^i h_{i,j} = 0 per spatial j ---
     # Uses propagation axis so constraints are self-referencing after reduction.
@@ -2405,13 +2402,11 @@ def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
         comp_pfx = f"{ctx.prefix}{field_name.capitalize()}"
 
         if gauge_type == "temporal":
-            lines.extend(_type_b_zero_component(f"{comp_pfx}0", field_name, "temporal"))
+            lines.extend(wl_zero_component(f"{comp_pfx}0", field_name, "temporal"))
         elif gauge_type == "axial":
             last_spatial = ctx.dim - 1
             lines.extend(
-                _type_b_zero_component(
-                    f"{comp_pfx}{last_spatial}", field_name, "axial"
-                ),
+                wl_zero_component(f"{comp_pfx}{last_spatial}", field_name, "axial"),
             )
         elif gauge_type == "coulomb":
             lines.extend(_type_b_coulomb_constraint(ctx, field_name, comp_pfx))
