@@ -1,0 +1,148 @@
+# Torsion-Gertsenshtein Effect: Graviton-Photon Conversion in PGT + Background B-Field
+#
+# Combined Poincaré Gauge Theory (PGT) + Einstein-Maxwell Lagrangian:
+#
+#   L = (1/kappa^2) R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3 + b5 R̃²
+#       - (1/4) F_{ab} F^{ab}
+#
+# where R̃ = RicciScalarCDT[] is the Riemann-Cartan Ricci scalar,
+# the three independent T² invariants are:
+#
+#   I1 = T_{abc} T^{abc}     (tensor sector — "tentor")
+#   I2 = T_{abc} T^{bac}     (mixed contraction — "trator")
+#   I3 = T^a_{ab} T^{cb}_{c} (trace sector — "axitor")
+#
+# and F is the electromagnetic field strength.
+#
+# Physical content:
+#   - alpha1, alpha2, alpha3 control torsion mass terms for each
+#     irreducible sector (tentor, trator, axitor)
+#   - b5 R̃² provides kinetic (∇T)² terms for propagating torsion
+#     and graviton-torsion cross-coupling via the Ricci scalar
+#   - Without b5: torsion is non-propagating (Einstein-Cartan limit)
+#   - Without alpha_I: pure R̃ + R̃² + F² (no torsion mass)
+#   - The F² term couples graviton to photon via background B-field
+#     (standard Gertsenshtein mechanism)
+#
+# Coupling mechanism:
+#   The torsion-photon coupling is INDIRECT, mediated through the
+#   graviton h via R̃². The chain is: torsion ↔ graviton ↔ photon.
+#   Direct T-F coupling would require more general Lagrangians with
+#   explicit torsion-EM cross terms (e.g., T·F or T·(*F)).
+#
+# Gauge choices:
+#   - NO TT gauge on graviton h — preserves trace h^a_a essential
+#     for R̃² graviton-torsion mixing (TT kills this channel).
+#     Per issue #167, TT is invalid for GWs through matter anyway.
+#   - Lorenz gauge on photon perturbation a — standard, safe,
+#     decouples EM constraint equations.
+#
+# Initial conditions: TT-compliant wavepacket (only h_+ excited),
+# matching a vacuum GW entering the B-field region.
+#
+# Plane-wave reduction: propagation along z-axis (∂_x = ∂_y = 0)
+#
+# Key observable: conversion probability P(graviton → photon)
+#   Amplification metric: B_min(EM-only) / B_min(torsion+EM)
+#   If > 1, torsion enhances the Gertsenshtein effect.
+#
+# Refs:
+#   Gertsenshtein (1962), JETP 14:84 — original effect
+#   Shapiro (2002), hep-th/0103093 — torsion phenomenology
+#   Dandoy, Lella et al. (2024), arXiv:2406.17853 — GW constraints
+#   Hayashi & Shirafuji (1979) — PGT propagating modes
+
+[theory]
+name = "Torsion-Gertsenshtein (PGT + Einstein-Maxwell)"
+description = "Graviton-photon conversion with PGT torsion: R̃ + T² + R̃² + F²"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+# Metric perturbation h_{ab} (graviton, rank-2 symmetric)
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+# Full EM 4-potential (fundamental field for perturbation)
+[[fields]]
+name = "A"
+type = "vector"
+
+# EM perturbation (photon), the dynamical 1st-order variable
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA (derived from A)
+# Expanded via MakeRule BEFORE xPert perturbation
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Background EM 4-potential: Abar_y = -B0*z generates B_x = B0
+# (Coulomb gauge, uniform magnetic field along x-axis)
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "alpha1", "alpha2", "alpha3", "b5"]
+
+# Full combined Lagrangian: PGT gravity-torsion + Maxwell EM
+#
+# The RicciScalarCDT terms (R̃, R̃²) use the torsionful connection CDT.
+# The F² term uses the Levi-Civita connection CD (torsion-free), which
+# is correct for the EM sector in minimal coupling.
+#
+# Index contractions for the torsion invariants:
+#   I1 = T[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] T[-d,-e,-f]
+#   I2 = T[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] T[-d,-e,-f]  (a↔b swap)
+#   I3 = T[b,-b,-a] eta[a,d] T[c,-c,-d]                       (trace)
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] + b5 RicciScalarCDT[]^2 - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# NO TT gauge on h — preserves trace for R̃² graviton-torsion mixing
+# Lorenz gauge on photon a only
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: propagation along z-axis
+# Zeros ∂_x and ∂_y derivatives but keeps ALL field components
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+# Default parameters
+# kappa = 1.0 (natural units; physical ~1.15e-18 GeV^-1)
+# B0 = 0.3 (background magnetic field strength)
+# alpha1-3 = torsion mass terms, b5 = R̃² coupling
+[parameters]
+kappa = 1.0
+B0 = 0.3
+alpha1 = 0.5
+alpha2 = 0.3
+alpha3 = 0.2
+b5 = 0.1
+
+[output]
+path = "../data/torsion_gertsenshtein.json"

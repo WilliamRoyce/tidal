@@ -1,0 +1,82 @@
+# Gertsenshtein Effect: Ungauged Graviton (No TT Gauge)
+#
+# Identical to theory.toml except TT gauge on h is REMOVED.
+# This preserves all 10 metric perturbation components, allowing
+# the system to develop non-TT components through matter interaction.
+#
+# Purpose: validate gauge-independence of conversion probability P.
+# With TT-compliant ICs (only h_+ excited), the conversion probability
+# must match the TT-gauged result: P = sin^2(kappa * B0 * D / 2).
+#
+# This test is a prerequisite for the combined torsion+EM theory,
+# which cannot use TT gauge (it kills the R̃² channel).
+#
+# Per issue #167: TT gauge is not valid for GWs propagating through
+# matter — the correct approach is TT ICs + unconstrained evolution.
+#
+# Ref: Gertsenshtein (1962), JETP 14:84
+
+[theory]
+name = "Gertsenshtein Effect (Einstein-Maxwell, ungauged graviton)"
+description = "Graviton-photon conversion without TT gauge — gauge-independence test"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0"]
+
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# NO TT gauge on h — all 10 metric components survive
+# Lorenz gauge on a only
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[parameters]
+kappa = 1.0
+B0 = 0.3
+
+[output]
+path = "../data/gertsenshtein_ungauged.json"
