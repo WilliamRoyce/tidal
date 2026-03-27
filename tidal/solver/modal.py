@@ -368,6 +368,7 @@ def _build_constraint_eliminated_matrices(
 ) -> tuple[
     NDArray[np.complex128],  # A_reduced (n_modes, n_dyn, n_dyn)
     NDArray[np.complex128],  # recovery (n_modes, n_constraints, n_dyn)
+    NDArray[np.complex128],  # v_recovery (n_modes, n_constraints, n_dyn)
     list[str],  # constraint_field_names
     dict[int, int],  # orig_to_reduced slot mapping
 ]:
@@ -639,6 +640,7 @@ def _build_generalized_evolution_matrices(
     NDArray[np.complex128],  # A_rhs (n_modes, n_dyn_slots, n_dyn_slots)
     NDArray[np.complex128] | None,  # B_lhs (n_modes, n_dyn, n_dyn) or None
     NDArray[np.complex128],  # recovery (n_modes, n_total_constraints, n_dyn_slots)
+    NDArray[np.complex128] | None,  # v_recovery (n_modes, n_c, n_dyn) or None
     list[str],  # all constraint field names
     dict[int, int],  # orig_to_reduced slot mapping
 ]:
@@ -1226,7 +1228,10 @@ def _build_generalized_evolution_matrices(
                 A_eff[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
             except np.linalg.LinAlgError:
                 # Singular B at this mode — use lstsq
-                A_eff[m], _, _, _ = np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)
+                A_eff[m] = np.asarray(
+                    np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)[0],  # type: ignore[reportUnknownMemberType]
+                    dtype=np.complex128,
+                )
         v_recovery = np.einsum("mci,mij->mcj", recovery, A_eff)
     elif recovery.size > 0:
         v_recovery = np.einsum("mci,mij->mcj", recovery, A_rhs)
@@ -1727,6 +1732,7 @@ def _evolve_per_mode(
         tuple[
             list[int],  # slot indices
             NDArray[np.complex128],  # V_y0: V * y0_eigen, (n_modes, bs, bs)
+            NDArray[np.complex128] | None,  # V_y0_deriv (n_modes, bs, bs) or None
             NDArray[np.complex128],  # eigenvalues (n_modes, bs)
         ]
     ] = []
