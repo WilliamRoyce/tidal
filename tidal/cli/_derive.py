@@ -23,6 +23,14 @@ from tidal.cli._derive_validate import (  # noqa: F401
     _validate_config,  # type: ignore[reportPrivateUsage]
     _validate_reduction,  # type: ignore[reportPrivateUsage, reportUnusedImport]
 )
+from tidal.cli._wls_helpers import (
+    wl_bg_rule_entry,
+    wl_component_value,
+    wl_diag_matrix,
+    wl_flatten_list,
+    wl_index,
+    wl_list,
+)
 
 # Coordinates per spacetime dimension
 _COORDS: dict[int, list[str]] = {
@@ -77,7 +85,7 @@ def _generate_metric_code(config: dict[str, Any], prefix: str) -> str:
         if sig is None:
             sig = [-1] + [1] * (dim - 1)
         diag_str = ", ".join(str(s) for s in sig)
-        return f"{prefix}MetricMatrix = DiagonalMatrix[{{{diag_str}}}];"
+        return f"{prefix}MetricMatrix = {wl_diag_matrix(diag_str)};"
 
     if metric_type == "diagonal":
         entries = config["spacetime"].get("diagonal", [])
@@ -86,7 +94,7 @@ def _generate_metric_code(config: dict[str, Any], prefix: str) -> str:
             raise ValueError(msg)
         # Entries can be numbers or strings (for coordinate-dependent)
         parts = [str(e) for e in entries]
-        return f"{prefix}MetricMatrix = DiagonalMatrix[{{{', '.join(parts)}}}];"
+        return f"{prefix}MetricMatrix = {wl_diag_matrix(', '.join(parts))};"
 
     if metric_type == "matrix":
         matrix = config["spacetime"].get("matrix", [])
@@ -98,8 +106,8 @@ def _generate_metric_code(config: dict[str, Any], prefix: str) -> str:
             if len(row) != dim:
                 msg = f"[spacetime].matrix rows must have {dim} entries"
                 raise ValueError(msg)
-            rows.append("{" + ", ".join(str(e) for e in row) + "}")
-        return f"{prefix}MetricMatrix = {{{', '.join(rows)}}};"
+            rows.append(wl_list(*(str(e) for e in row)))
+        return f"{prefix}MetricMatrix = {wl_list(*rows)};"
 
     msg = f"Unknown metric type: '{metric_type}'. Use: minkowski, diagonal, matrix"
     raise ValueError(msg)
@@ -129,20 +137,20 @@ def _generate_field_def(
     indices = ", ".join(f"-{_INDEX_LETTERS[i]}" for i in range(rank))
 
     if symmetry == "antisymmetric":
-        sym_spec = f", Antisymmetric[{{{indices}}}]"
+        sym_spec = f", Antisymmetric[{wl_list(indices)}]"
     elif symmetry == "symmetric":
-        sym_spec = f", Symmetric[{{{indices}}}]"
+        sym_spec = f", Symmetric[{wl_list(indices)}]"
     elif symmetry.startswith("antisymmetric_"):
         # Partial antisymmetry: "antisymmetric_23" → antisymmetric in slots 2,3
         # xAct syntax: Antisymmetric[{-b, -c}] for rank-3 T[-a,-b,-c]
         slot_digits = symmetry.split("_", 1)[1]
         slot_indices = ", ".join(f"-{_INDEX_LETTERS[int(s) - 1]}" for s in slot_digits)
-        sym_spec = f", Antisymmetric[{{{slot_indices}}}]"
+        sym_spec = f", Antisymmetric[{wl_list(slot_indices)}]"
     elif symmetry.startswith("symmetric_"):
         # Partial symmetry: "symmetric_12" → symmetric in slots 1,2
         slot_digits = symmetry.split("_", 1)[1]
         slot_indices = ", ".join(f"-{_INDEX_LETTERS[int(s) - 1]}" for s in slot_digits)
-        sym_spec = f", Symmetric[{{{slot_indices}}}]"
+        sym_spec = f", Symmetric[{wl_list(slot_indices)}]"
     else:
         sym_spec = ""
 
@@ -407,7 +415,7 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
     lines = [
         f"(* Step 1: Define {ctx.dim}D spacetime *)",
         f"If[!xTensorQ[{ctx.manifold}],",
-        f"  DefManifold[{ctx.manifold}, {ctx.dim}, {{{idx_str}}}]",
+        f"  DefManifold[{ctx.manifold}, {ctx.dim}, {wl_list(idx_str)}]",
         "];",
         "",
         f"If[!MetricQ[{ctx.metric}],",
@@ -417,7 +425,7 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
         "];",
         "",
         f"If[!ChartQ[{ctx.chart}],",
-        f"  DefChart[{ctx.chart}, {ctx.manifold}, {{{indices}}}, {{{coord_funcs}}}]",
+        f"  DefChart[{ctx.chart}, {ctx.manifold}, {wl_list(indices)}, {wl_list(coord_funcs)}]",
         "];",
         "",
         _generate_metric_code(config, ctx.prefix),
@@ -507,7 +515,7 @@ def _wls_background_component_values(
         lines.append(f"ComponentValue[{prefixed}[], {comps[0]}];")
     elif ftype == "vector":
         for idx, val in enumerate(comps):
-            lines.append(f"ComponentValue[{prefixed}[{{{idx}, -{chart}}}], {val}];")
+            lines.append(f"ComponentValue[{prefixed}[{wl_index(idx, chart)}], {val}];")
     else:
         # Tensor rank 2+: iterate over all index tuples
         rank = field.get("rank", 2)
@@ -518,7 +526,7 @@ def _wls_background_component_values(
                 multi_idx.append(remaining % dim)
                 remaining //= dim
             multi_idx.reverse()
-            idx_str = ", ".join(f"{{{k}, -{chart}}}" for k in multi_idx)
+            idx_str = ", ".join(wl_index(k, chart) for k in multi_idx)
             lines.append(f"ComponentValue[{prefixed}[{idx_str}], {val}];")
 
     return lines
@@ -546,7 +554,7 @@ def _wls_validate_backgrounds_after_decompose(
     )
     return [
         "(* Validate background field substitution succeeded *)",
-        f"ValidateNoUnresolvedBackgrounds[{comp_var}, {{{bg_heads}}}];",
+        f"ValidateNoUnresolvedBackgrounds[{comp_var}, {wl_list(bg_heads)}];",
     ]
 
 
@@ -575,7 +583,7 @@ def _wls_scalar_background_substitution(
         lines.extend(
             (
                 f"(* Substitute scalar background {field['name']} -> {value} *)",
-                f"{eom_var} = {eom_var} /. {{{prefixed}[] -> {value}}};",
+                f"{eom_var} = {eom_var} /. {wl_list(f'{prefixed}[] -> {value}')};",
             )
         )
     return lines
@@ -652,8 +660,8 @@ def _wls_vector_background_substitution(  # noqa: PLR0914
                     contra_val = val_str
                 rules.extend(
                     (
-                        f"{prefixed}[{{{idx}, -{ctx.chart}}}] -> {val_str}",
-                        f"{prefixed}[{{{idx}, {ctx.chart}}}] -> {contra_val}",
+                        f"{prefixed}[{wl_index(idx, ctx.chart)}] -> {val_str}",
+                        f"{prefixed}[{wl_index(idx, ctx.chart, contra=True)}] -> {contra_val}",
                         # Component function form (after ReplaceTensorFieldComponents
                         # converts vbdB[{i, -chart}] -> vbdBi[t, x, y])
                         f"{prefixed}{idx}[__] -> {val_str}",
@@ -672,8 +680,10 @@ def _wls_vector_background_substitution(  # noqa: PLR0914
                     multi_idx.append(remaining % ctx.dim)
                     remaining //= ctx.dim
                 multi_idx.reverse()
-                idx_down = ", ".join(f"{{{k}, -{ctx.chart}}}" for k in multi_idx)
-                idx_up = ", ".join(f"{{{k}, {ctx.chart}}}" for k in multi_idx)
+                idx_down = ", ".join(wl_index(k, ctx.chart) for k in multi_idx)
+                idx_up = ", ".join(
+                    wl_index(k, ctx.chart, contra=True) for k in multi_idx
+                )
                 # Component function name: head + concatenated index digits
                 comp_name = "".join(str(k) for k in multi_idx)
                 val_str = str(val)
@@ -698,7 +708,7 @@ def _wls_vector_background_substitution(  # noqa: PLR0914
         lines.extend(
             [
                 f"(* Substitute vector/tensor background {field['name']} *)",
-                f"{comp_var} = {comp_var} /. {{{rules_str}}};",
+                f"{comp_var} = {comp_var} /. {wl_list(rules_str)};",
             ]
         )
 
@@ -739,7 +749,7 @@ def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
                 contra_str = ", ".join(contra_comps)
                 lines.append(
                     f"SetBackgroundFieldDownValues[{bg_prefixed}, {ctx.chart},"
-                    f" {{{comps_str}}}, {{{contra_str}}}];"
+                    f" {wl_list(comps_str)}, {wl_list(contra_str)}];"
                 )
             lines.append("")
         lines.append("")
@@ -786,7 +796,7 @@ def _wls_derived_fields(ctx: _WlsContext) -> list[str]:
         rule_var = f"{ctx.prefix}{field['name'].capitalize()}Rules"
         lines.extend(
             (
-                f"{rule_var} = MakeRule[{{{fexpr}, {defn}}}, MetricOn -> All, ContractMetrics -> True];",
+                f"{rule_var} = MakeRule[{wl_list(f'{fexpr}, {defn}')}, MetricOn -> All, ContractMetrics -> True];",
                 "",
             )
         )
@@ -1152,7 +1162,7 @@ def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
     all_rule_vars = rule_vars + cd2_rule_vars + cd3_rule_vars + cd4_rule_vars
     if all_rule_vars:
         rules_list = ", ".join(all_rule_vars)
-        lines.append(f"$CDShorthandRules = Flatten[{{{rules_list}}}];")
+        lines.append(f"$CDShorthandRules = {wl_flatten_list(rules_list)};")
     else:
         lines.append("$CDShorthandRules = {};")
 
@@ -1188,7 +1198,7 @@ def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
             )
     if reverse_rules:
         rev_list = ", ".join(reverse_rules)
-        lines.append(f"$CDShorthandReverseRules = Flatten[{{{rev_list}}}];")
+        lines.append(f"$CDShorthandReverseRules = {wl_flatten_list(rev_list)};")
     else:
         lines.append("$CDShorthandReverseRules = {};")
 
@@ -1688,7 +1698,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* Riemann[__]:>0 catches curvature-coupling terms R^{abcd}h_ac h_bd from xPert. *)",
             "(* Without this, spherical metrics leave symbolic RiemannCD unevaluated, *)",
             "(* corrupting equations for tensor components (h_theta_theta etc.). *)",
-            f"l2Raw = l2Raw /. {{{riemann_sym}[__] :> 0, {ricci_sym}[__] :> 0, {ricci_scalar_sym}[] :> 0, {einstein_sym}[__] :> 0}};",
+            f"l2Raw = l2Raw /. {wl_list(f'{riemann_sym}[__] :> 0, {ricci_sym}[__] :> 0, {ricci_scalar_sym}[] :> 0, {einstein_sym}[__] :> 0')};",
         ]
     )
 
@@ -2060,7 +2070,7 @@ def _type_b_zero_component(
     """
     return [
         f"(* {gauge_type.capitalize()} gauge: {field_name} component {comp_name} = 0 *)",
-        f"fieldEquations = fieldEquations /. {{{comp_name}[args___] :> 0, Derivative[ders__][{comp_name}][args___] :> 0}};",
+        f"fieldEquations = fieldEquations /. {wl_list(f'{comp_name}[args___] :> 0, Derivative[ders__][{comp_name}][args___] :> 0')};",
         f'Print["Applied {gauge_type} gauge: {comp_name} = 0"];',
         "",
     ]
@@ -2364,13 +2374,9 @@ def _wls_pre_decomposition_tt_zeroing(ctx: _WlsContext) -> list[str]:
         chart = ctx.chart
         head = f"{p}{field_name.capitalize()}"
         for mu in range(ctx.dim):
-            lines.append(
-                f"ComponentValue[{head}[{{0, -{chart}}}, {{{mu}, -{chart}}}], 0];"
-            )
+            lines.append(wl_component_value(head, [(0, chart), (mu, chart)], "0"))
             if mu > 0:  # symmetric: also set (mu, 0)
-                lines.append(
-                    f"ComponentValue[{head}[{{{mu}, -{chart}}}, {{0, -{chart}}}], 0];"
-                )
+                lines.append(wl_component_value(head, [(mu, chart), (0, chart)], "0"))
     if lines:
         lines.insert(
             0,
@@ -2624,7 +2630,7 @@ def _wls_plane_wave_coordinate_evaluation(ctx: _WlsContext) -> list[str]:
         "   Expand when coordinate values are known numeric constants. *)",
         f'Print["Evaluating killed coordinates: {coord_values}"];',
         "",
-        f"fieldEquations = fieldEquations /. {{{rules}}};",
+        f"fieldEquations = fieldEquations /. {wl_list(rules)};",
         "fieldEquations = Table[",
         "  {fieldEquations[[k, 1]], Expand[fieldEquations[[k, 2]]]},",
         "  {k, Length[fieldEquations]}",
@@ -3316,52 +3322,7 @@ def _wls_constraint_elimination() -> list[str]:
         '  Print["No constraint fields detected."];',
         "];",
         "",
-        "(* === EOM substitution for d2_t in constraint equations (#183) ===    *)",
-        "(* Constraint equations (time_order=0) may reference d2_t of other     *)",
-        "(* fields from the un-IBP'd Lagrangian.  The constraint solver only    *)",
-        "(* handles spatial operators.  Substitute d2_t(f_j) -> RHS_j from the  *)",
-        "(* field's own EOM, converting acceleration to spatial operators.       *)",
-        "Module[{d2tOrders, nSubs = 0},",
-        "  d2tOrders = ReplacePart[Table[0, {Length[coordSyms]}], 1 -> 2];",
-        "  Do[",
-        "    Module[{name, eq, tOrd},",
-        "      name = fieldEquations[[k, 1]];",
-        "      eq = fieldEquations[[k, 2]];",
-        "      tOrd = DetectLHSTimeOrder[eq, name];",
-        "      If[tOrd == 0,",
-        "        (* Scan for d2_t references to other fields *)",
-        "        Do[",
-        "          Module[{otherName, otherEq, otherFunc, d2tExpr},",
-        "            otherName = fieldEquations[[j, 1]];",
-        "            otherEq = fieldEquations[[j, 2]];",
-        "            otherFunc = compToFunc[otherName];",
-        "            If[otherName =!= name,  (* skip self-reference *)",
-        "              (* Match both Derivative[...] and D[...] notations *)",
-        "              d2tExpr = Derivative[Sequence @@ d2tOrders][otherFunc][",
-        "                Sequence @@ coordSyms];",
-        "              (* Also construct D-notation form as fallback *)",
-        "              d2tExprD = D[otherFunc[Sequence @@ coordSyms],",
-        "                {coordSyms[[1]], 2}];",
-        "              If[!FreeQ[eq, d2tExpr] || !FreeQ[eq, d2tExprD],",
-        "                eq = eq /. {d2tExpr -> otherEq, d2tExprD -> otherEq};",
-        "                nSubs++;",
-        '                Print["  EOM substitution: d2_t(", otherName,',
-        '                  ") in constraint ", name];',
-        "              ]",
-        "            ]",
-        "          ],",
-        "          {j, Length[fieldEquations]}",
-        "        ];",
-        "        fieldEquations[[k, 2]] = eq;",
-        "      ]",
-        "    ],",
-        "    {k, Length[fieldEquations]}",
-        "  ];",
-        "  If[nSubs > 0,",
-        '    Print["EOM substitution: replaced ", nSubs,',
-        '      " d2_t reference(s) in constraint equations"];',
-        "  ];",
-        "];",
+        "(* EOM substitution for d2_t: DISABLED (issue #195).                  *)",
         "",
     ]
 
@@ -3394,11 +3355,11 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 bf["components"], ctx.metric_diagonal
             )
             contra_str = ", ".join(contra_comps)
-            bg_rules_entries.append(f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}")
+            bg_rules_entries.append(wl_bg_rule_entry(bg_head, comps_str, contra_str))
     bg_rules_opt = ""
     if bg_rules_entries:
         bg_rules_str = ", ".join(bg_rules_entries)
-        bg_rules_opt = f', "BackgroundFieldRules" -> {{{bg_rules_str}}}'
+        bg_rules_opt = f', "BackgroundFieldRules" -> {wl_list(bg_rules_str)}'
 
     # NOTE: ComponentValue PD zeroing was attempted for the canonical path but
     # REMOVED.  For scalar Lagrangians, all indices are dummy — TraceBasisDummy
@@ -3454,7 +3415,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             '  Print["Pre-resolving Scalar wrappers in canonical Lagrangian..."];',
             "  lagForCanon = lagForCanon /. Scalar[x_] :> Module[{resolved},",
             "    resolved = Quiet[Catch[",
-            f"      DecomposeScalarExpression[x, {ctx.chart}, {{{all_heads_str}}},",
+            f"      DecomposeScalarExpression[x, {ctx.chart}, {wl_list(all_heads_str)},",
             f'        "MetricMatrix" -> {p}MetricMatrix]',
             "    ], {Validate::repeated, Validate::inhom}];",
             "    If[StringQ[resolved] || resolved === Null, Scalar[x], resolved]",
@@ -3491,7 +3452,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "lagComp = 0;",
             "Do[",
             "  Module[{termComp, tTerm = AbsoluteTime[]},",
-            f"    termComp = Quiet[Catch[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
+            f"    termComp = Quiet[Catch[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {wl_list(all_heads_str)}, "
             f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}]], {{Validate::repeated, Validate::inhom}}];',
             "    If[termComp === Null, termComp = 0];",
         ]
@@ -3510,14 +3471,14 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
                 f" && {{ords}}[[{slot}]] > 0 :> 0"
             )
-        lines.append(f"    termComp = termComp /. {{{','.join(deriv_rules)}}};")
+        lines.append(f"    termComp = termComp /. {wl_list(','.join(deriv_rules))};")
 
         coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
         if coord_values:
             cv_rules = ", ".join(
                 f"{coord}[] -> {val}" for coord, val in coord_values.items()
             )
-            lines.append(f"    termComp = termComp /. {{{cv_rules}}};")
+            lines.append(f"    termComp = termComp /. {wl_list(cv_rules)};")
 
         # NOTE: No Expand here — R̃² 4th-order products in 4D exceed
         # $RecursionLimit in Expand (TerminatedEvaluation crashes the script).
@@ -3992,7 +3953,7 @@ def _wls_volume_element_code(ctx: _WlsContext) -> list[str]:
         "(* Compute REDUCED volume element for plane-wave reduction *)",
         "(* For each diagonal metric entry, drop factors depending on killed coordinates *)",
         f"spatialMetric = {p}MetricMatrix[[2;;, 2;;]];",
-        f"killedVars = {{{killed_vars}}};",
+        f"killedVars = {wl_list(killed_vars)};",
         "reducedDet = 1;",
         "Do[",
         "  gii = spatialMetric[[k, k]];",
@@ -4335,7 +4296,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "    eqExpr = eomListEL[[i]];",
                     "    (* Resolve any remaining tensor refs created by D[] *)",
                     f"    Do[eqExpr = ReplaceTensorFieldComponents[eqExpr, afh, {ctx.chart}, coordSyms, nCoords],",
-                    f"      {{afh, {{{', '.join(all_heads_str.split(', '))}}}}}];",
+                    f"      {wl_list(f'afh, {wl_list(all_heads_str)}')}];",
                     "    AppendTo[fieldEquations, {fname, eqExpr}];",
                     "  ],",
                     "  {i, Length[fieldFuncsEL]}",
@@ -4446,7 +4407,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
         lines.extend(
             (
                 "(* Substitute parameter values in JSON structure *)",
-                f"paramRules = {{{param_entries_wl}}};",
+                f"paramRules = {wl_list(param_entries_wl)};",
                 "jsonStructure = jsonStructure /. paramRules;",
                 'Print["Parameter substitution applied to JSON structure."];',
                 "",
