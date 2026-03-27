@@ -180,6 +180,15 @@ class SimulationData:
             else:
                 fields[slot.name] = arr
 
+        # Merge exact constraint velocities from modal solver (if available).
+        # "Constraint" is a solver concept (algebraic evolution), not a physics
+        # statement — constraint fields have physically meaningful velocities
+        # computed from v_recovery = recovery @ A_reduced.
+        cv = result.get("constraint_velocities")
+        if cv is not None:
+            for c_name, c_vel_arr in cv.items():
+                velocities[c_name] = np.asarray(c_vel_arr, dtype=np.float64)
+
         return cls(
             times=times,
             fields=fields,
@@ -287,6 +296,16 @@ class SimulationData:
             npy = p / f"v_{name}.npy"
             if npy.exists():
                 velocities[name] = np.load(str(npy), mmap_mode="r")[:n]
+
+        # Load constraint velocities (saved by modal solver).
+        # Constraint fields (time_order=0) have physical velocities
+        # determined by coupling to dynamical fields.  The modal solver
+        # computes exact ∂_t via v_recovery = recovery @ A_reduced.
+        for eq in spec.equations:
+            if eq.time_derivative_order == 0 and eq.field_name not in velocities:
+                npy = p / f"v_{eq.field_name}.npy"
+                if npy.exists():
+                    velocities[eq.field_name] = np.load(str(npy), mmap_mode="r")[:n]
 
         # Grid metadata — from metadata.json or spec defaults
         grid_spacing: tuple[float, ...]

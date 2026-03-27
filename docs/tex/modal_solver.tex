@@ -523,6 +523,8 @@ At each output time, constraint fields are reconstructed directly from the saved
 
 \textbf{Performance}: On coupled\_proca\_3d ($16^3$, $t=5$, 51 snapshots): modal 0.08\,s vs IDA 19.0\,s --- $\mathbf{{\sim}238\times}$ \textbf{speedup}. IDA fails entirely at $32\times 32$ (convergence issues), while modal runs at any grid size.
 
+\textbf{Automatic constraint IC satisfaction}: Unlike non-modal solvers, which rely on a separate \texttt{ensure\_consistent\_ic()} call in \texttt{constraint\_solve.py} to pre-solve constraint fields before time integration, the modal solver's Schur complement provides automatic constraint IC satisfaction as part of the elimination step. Constraint field values are reconstructed algebraically from the dynamical amplitudes ($c = -S_{cc}^{-1} \cdot S_{cd} \cdot d$) at every output time, so the initial conditions are consistent by construction --- no separate constraint solver invocation is needed.
+
 \textbf{References}: Hairer \& Wanner (1996), \emph{Solving ODEs II}, Ch.\ VII; Ascher \& Petzold (1998), \emph{Computer Methods for ODEs/DAEs}, \S10.2.
 
 \subsection{Generalized Mass Matrix (Higher-Derivative Theories)}
@@ -545,21 +547,37 @@ Every operator in flat spacetime decomposes as $\text{spatial\_multiplier}(k) \t
 \label{tab:operator-decomposition}
 \begin{tabular}{@{}llcl@{}}
 \toprule
-Operator & Spatial mult.\ & Time order & Matrix \\
+Operator & Spatial mult.\ $\hat{O}(k)$ & Time order $n$ & Matrix \\
 \midrule
+\multicolumn{4}{@{}l}{\emph{Position operators ($n=0$): contribute to $K(k)$}} \\
 \texttt{identity} & $1$ & 0 & $K$ \\
-\texttt{laplacian\_x} & $-k_x^2$ & 0 & $K$ \\
-\texttt{gradient\_x} & $ik_x$ & 0 & $K$ \\
+\texttt{laplacian} / \texttt{laplacian\_x/y/z} & $-k_x^2$ (or $-|\mathbf{k}|^2$) & 0 & $K$ \\
+\texttt{gradient\_x/y/z} & $ik_x$ & 0 & $K$ \\
+\texttt{cross\_derivative\_xy/xz/yz} & $-k_x k_y$ & 0 & $K$ \\
+\texttt{biharmonic} & $|\mathbf{k}|^4$ & 0 & $K$ \\
+\texttt{derivative\_3\_x/y/z} & $-ik_x^3$ & 0 & $K$ \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Velocity operators ($n=1$): contribute to $D(k)$}} \\
 \texttt{first\_derivative\_t} & $1$ & 1 & $D$ \\
-\texttt{mixed\_T1\_S1x} & $ik_x$ & 1 & $D$ \\
+\texttt{mixed\_T1\_S1x/y/z} & $ik_x$ & 1 & $D$ \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Acceleration operators ($n=2$): contribute to $M(k)$}} \\
 \texttt{d2\_t} & $1$ & 2 & $M$ \\
-\texttt{mixed\_T2\_S1x} & $ik_x$ & 2 & $M$ \\
-\texttt{mixed\_T2\_S2x} & $-k_x^2$ & 2 & $M$ \\
+\texttt{mixed\_T2\_S1x/y/z} & $ik_x$ & 2 & $M$ \\
+\texttt{mixed\_T2\_S2x/y/z} & $-k_x^2$ & 2 & $M$ \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Jerk operators ($n=3$): contribute to $J(k)$, eliminated via EOM}} \\
 \texttt{d3\_t} & $1$ & 3 & $J$ \\
-\texttt{mixed\_T3\_S1x} & $ik_x$ & 3 & $J$ \\
+\texttt{mixed\_T3\_S1x/y/z} & $ik_x$ & 3 & $J$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+The registry contains 35 operators total (including axis variants $x/y/z$).  Each operator $\mathcal{O}$ acting on a field $\phi$ in Fourier space becomes:
+\begin{equation}
+  \widehat{\mathcal{O}[\phi]}(k) = \hat{O}(k) \cdot \partial_t^n \hat{\phi}(k)
+\end{equation}
+where $\hat{O}(k)$ is the spatial multiplier from the table and $n$ is the time order.  The sign convention follows from the Fourier derivative property: $\widehat{\partial_x \phi} = ik_x \hat\phi$, $\widehat{\partial_x^2 \phi} = -k_x^2 \hat\phi$, $\widehat{\partial_x^3 \phi} = -ik_x^3 \hat\phi$.  Mixed time-space operators (e.g., $\partial_t^2 \partial_x$) decompose as $ik_x \times \partial_t^2$: the spatial part enters the multiplier, the temporal part determines which matrix ($M$, $D$, $K$, or $J$) receives the contribution.
 
 \subsubsection{Singular Mass Matrix}
 \label{sec:modal-singular-mass}
@@ -578,11 +596,26 @@ The algorithm eigendecomposes $M$ per mode:
 \subsubsection{Jerk Substitution}
 \label{sec:modal-jerk}
 
-After mass-matrix elimination, the jerk coupling $J \cdot \dddot{x}$ remains. Since $\dddot{x}_j = \mathrm{d}/\mathrm{d}t(\ddot{x}_j)$ and $\ddot{x}_j$ is now expressed in terms of $x$ and $\dot{x}$:
+After mass-matrix elimination, jerk coupling $J(k) \cdot \dddot{x}$ may remain (from \texttt{d3\_t} and \texttt{mixed\_T3\_S*} operators).  These arise in $\tilde{R}^2$ theories where the Ostrogradsky-reduced equations still contain third time derivatives of certain fields.  The jerk is eliminated algebraically by differentiating the (now-invertible) dynamical equations.
+
+\paragraph{Algorithm.}
+Define the mass-inverted dynamics matrices:
 \begin{equation}
-  \dddot{x}_j = E_j \cdot \dot{x} + F_j \cdot \ddot{x} = E_j \cdot \dot{x} + F_j \cdot (E \cdot x + F \cdot \dot{x})
+  E = M_{\text{dyn}}^{-1} \cdot K, \qquad F = M_{\text{dyn}}^{-1} \cdot D
 \end{equation}
-where $E = M_{\text{dyn}}^{-1} K$ and $F = M_{\text{dyn}}^{-1} D$. This gives position corrections $J \cdot F \cdot E$ (added to $K$) and velocity corrections $J \cdot (E + F^2)$ (added to $D$).
+so that $\ddot{x} = E \cdot x + F \cdot \dot{x}$.  Then $\dddot{x} = \dot{(\ddot{x})} = E \cdot \dot{x} + F \cdot \ddot{x} = E \cdot \dot{x} + F \cdot (E \cdot x + F \cdot \dot{x})$, giving:
+\begin{equation}
+  \dddot{x} = F \cdot E \cdot x + (E + F^2) \cdot \dot{x}
+\end{equation}
+Substituting into the original system $M\ddot{x} = K x + D \dot{x} + J \dddot{x}$:
+\begin{align}
+  K_{\text{eff}} &= K + J \cdot F \cdot E  &\text{(position correction)} \\
+  D_{\text{eff}} &= D + J \cdot (E + F^2)  &\text{(velocity correction)}
+\end{align}
+The implementation checks $\max|J| > 10^{-15}$ before applying the substitution; if no jerk terms are present, no correction is needed.
+
+\paragraph{Constraint acceleration jerk.}
+Constraint equations may also contain jerk operators on dynamical fields (e.g., \texttt{mixed\_T3\_S1x(t\_3)}).  These are handled separately: after mass inversion, the constraint's jerk term $\hat{O}(k) \cdot \dddot{t}_3$ is replaced using the same substitution formula, converting it to effective position and velocity terms in the constraint matrix $S_{cd}$ before the standard Schur complement.
 
 \subsubsection{Constraint Acceleration Terms}
 \label{sec:modal-constraint-accel}
@@ -640,21 +673,25 @@ The generalized modal solver performs a three-level elimination, each following 
   \item \textbf{Level 3 --- Velocity coupling (QZ)}: Generalized eigenvalue via QZ decomposition (\cref{sec:modal-qz-velocity}). Infinite eigenvalues (gauge DOF) frozen; finite eigenvalues evolved.
 \end{enumerate}
 
-For the PGT graviton-torsion system, this reduces 17 fields (after Ostrogradsky) to 14 dynamical slots (7 fields $\times$ 2), with 10 constraint field eliminations, 2 mass-matrix constraints, and several velocity-coupling gauge modes:
+For the 4D PGT graviton-torsion system (v0.18.0, full quadratic Lagrangian), this reduces 37 fields (34 original + 3 Ostrogradsky auxiliaries) through three elimination stages:
 
 \begin{center}
 \begin{tabular}{@{}lrl@{}}
 \toprule
-Stage & Fields/slots & Eliminated \\
+Stage & State & Eliminated \\
 \midrule
-After Ostrogradsky & 17 fields, 24 slots & --- \\
-Level 1 (mass-matrix) & 14 slots remain & $t_3 = t_7$, $w_{h_3}/w_{h_5}$ relation \\
-Level 2 (constraint Schur) & 14 dyn slots & 10 constraint fields \\
-Level 3 (QZ velocity) & Physical DOF & Gauge directions frozen \\
+After Ostrogradsky & 37 fields, 24 dyn slots & 25 constraint fields identified \\
+Level 1 (mass-matrix) & $\leq 24$ dyn slots & Hidden gauge constraints from $\det M = 0$ \\
+Jerk substitution & Same dim & $\dddot{x}$ operators $\to$ $K_\text{eff}, D_\text{eff}$ \\
+Constraint accel.\ sub. & Same dim & $\ddot{x}$ in constraints $\to$ $K, D$ terms \\
+Level 2 (constraint Schur) & $\leq 24$ dyn slots & 25 constraint fields eliminated \\
+Level 3 (QZ velocity) & Physical DOF & Gauge directions (infinite $\lambda$) frozen \\
 Eigendecomposition & $\exp(\lambda \cdot t)$ & $O(1)$ time evolution \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+Energy conservation after all three levels: $\max|dE/E| = 0$ (machine precision) at $t_\text{end} = 1.0$ for $\alpha_1 = 0.5$, $\alpha_2 = 0.3$, $\alpha_3 = 0.2$, $b_5 = 0.1$.
 
 \textbf{Implementation}: \texttt{\_build\_generalized\_evolution\_matrices()} returns $A_\text{rhs}$ and optionally $B = I - V_\text{coupling}$. When $B$ is provided, \texttt{\_evolve\_per\_mode()} uses \texttt{scipy.linalg.eig(A, B)} instead of \texttt{np.linalg.eig(A)}. Backward compatible: for systems without time-derivative operators, the existing code paths are used unchanged.
 

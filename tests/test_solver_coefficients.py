@@ -677,3 +677,71 @@ class TestPeriodicCoefficientContinuity:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             ev.check_periodic_coefficient_continuity((True,))
+
+    # ------------------------------------------------------------------
+    # rtol-aware threshold scaling
+    # ------------------------------------------------------------------
+
+    def test_rtol_none_uses_default_thresholds(self) -> None:
+        """Without rtol, the default thresholds apply (same as before)."""
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Sin[x[]]",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(32)
+        ev = CoefficientEvaluator(spec, grid)
+        # Sin[x] on [0, 2π] has ~20% boundary jump → warns at default threshold
+        with pytest.warns(UserWarning, match="jump at the periodic boundary"):
+            ev.check_periodic_coefficient_continuity((True,), rtol=None)
+
+    def test_rtol_lenient_suppresses_warning(self) -> None:
+        """Large rtol (coarse run) raises the threshold, suppressing warnings."""
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Sin[x[]]",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(32)
+        ev = CoefficientEvaluator(spec, grid)
+        # With rtol=1e-4 (very coarse), threshold scales up by sqrt(1e-4/1e-8)=100
+        # so warn_threshold = 0.01 * 100 = 1.0 — the ~20% leak passes silently
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            ev.check_periodic_coefficient_continuity((True,), rtol=1e-4)
+
+    def test_rtol_strict_escalates_to_error(self) -> None:
+        """Small rtol (machine precision) lowers the threshold, escalating to error."""
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Sin[x[]]",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(32)
+        ev = CoefficientEvaluator(spec, grid)
+        # With rtol=1e-15 (machine precision), threshold scales down by
+        # sqrt(1e-15/1e-8) ≈ 3.16e-4, so error_threshold = 0.25 * 3.16e-4 ≈ 7.9e-5.
+        # The ~20% leak_metric far exceeds this → ValueError
+        with pytest.raises(ValueError, match="jump at the periodic boundary"):
+            ev.check_periodic_coefficient_continuity((True,), rtol=1e-15)

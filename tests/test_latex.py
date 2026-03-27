@@ -102,6 +102,29 @@ class TestCoefficientToLatex:
         result = coefficient_to_latex("Pi")
         assert r"\pi" in result
 
+    def test_tanh(self) -> None:
+        result = coefficient_to_latex("Tanh[x/W]")
+        assert r"\tanh" in result
+        assert "x/W" in result
+
+    def test_sin(self) -> None:
+        result = coefficient_to_latex("Sin[2*x]")
+        assert r"\sin" in result
+
+    def test_abs(self) -> None:
+        result = coefficient_to_latex("Abs[x]")
+        assert r"\left|" in result
+        assert r"\right|" in result
+
+    def test_lam_as_lambda(self) -> None:
+        result = coefficient_to_latex("lam")
+        assert r"\lambda" in result
+
+    def test_greek_prefix_split(self) -> None:
+        """omegaP2 should split Greek prefix from trailing label."""
+        result = coefficient_to_latex("omegaP2")
+        assert r"\omega" in result
+
 
 # ---------------------------------------------------------------------------
 # field_to_latex
@@ -210,6 +233,30 @@ class TestOperatorToLatex:
         result = operator_to_latex("time_derivative", r"\phi")
         assert r"\dot" in result
 
+    def test_d2_t(self) -> None:
+        result = operator_to_latex("d2_t", r"\phi")
+        assert r"\partial_t^2" in result
+
+    def test_d3_t(self) -> None:
+        result = operator_to_latex("d3_t", r"\phi")
+        assert r"\partial_t^{3}" in result
+
+    def test_mixed_new_format(self) -> None:
+        result = operator_to_latex("mixed_T2_S1x", r"\phi")
+        assert r"\partial_t" in result
+        assert r"\partial_x" in result
+
+    def test_mixed_old_format(self) -> None:
+        result = operator_to_latex("mixed_1_0_0_1", r"\phi")
+        assert r"\partial_t" in result
+        assert r"\partial_z" in result
+
+    def test_mixed_old_time_only(self) -> None:
+        """mixed_2_0_0_0 = pure second time derivative."""
+        result = operator_to_latex("mixed_2_0_0_0", r"\phi")
+        assert r"\partial_t" in result
+        assert "2" in result
+
     def test_dynamic_single_axis(self) -> None:
         result = operator_to_latex("derivative_3_x", r"\phi")
         assert r"\partial_x" in result
@@ -247,7 +294,21 @@ class TestLagrangianToLatex:
 
     def test_ricci_scalar(self) -> None:
         result = lagrangian_to_latex("RicciScalarCD[]")
-        assert result == "R"
+        assert result == r"\mathcal{R}"
+
+    def test_ricci_scalar_torsion(self) -> None:
+        result = lagrangian_to_latex("RicciScalarCDT[]")
+        assert r"\tilde{\mathcal{R}}" in result
+
+    def test_ricci_scalar_torsion_squared(self) -> None:
+        result = lagrangian_to_latex("b5 RicciScalarCDT[]^2")
+        assert r"\tilde{\mathcal{R}}" in result
+        assert "b_{5}" in result
+
+    def test_parameter_subscript_splitting(self) -> None:
+        result = lagrangian_to_latex("alpha1 * phi[]^2")
+        assert r"\alpha_{1}" in result
+        assert r"\phi" in result
 
     def test_levi_civita(self) -> None:
         expr = "epsiloneta[a, b, c] * A[-a] * CD[-b][A[-c]]"

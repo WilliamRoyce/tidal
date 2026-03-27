@@ -368,6 +368,7 @@ def _build_constraint_eliminated_matrices(
 ) -> tuple[
     NDArray[np.complex128],  # A_reduced (n_modes, n_dyn, n_dyn)
     NDArray[np.complex128],  # recovery (n_modes, n_constraints, n_dyn)
+    NDArray[np.complex128],  # v_recovery (n_modes, n_constraints, n_dyn)
     list[str],  # constraint_field_names
     dict[int, int],  # orig_to_reduced slot mapping
 ]:
@@ -588,7 +589,13 @@ def _build_constraint_eliminated_matrices(
     else:
         A_reduced = A_rhs
 
-    return A_reduced, recovery, constraint_field_names, orig_to_reduced
+    # Velocity recovery: v_c_hat = v_recovery @ d_hat gives exact ∂_t(c)
+    # Derived from: c = recovery · d, so ∂_t c = recovery · ∂_t d = recovery · A_reduced · d
+    # This is machine-precision — no numerical differentiation needed.
+    # Stored per-mode: shape (n_modes, n_c, n_dyn). Typically < 50 MB for 128³.
+    v_recovery = np.einsum("mci,mij->mcj", recovery, A_reduced)
+
+    return A_reduced, recovery, v_recovery, constraint_field_names, orig_to_reduced
 
 
 # ---------------------------------------------------------------------------
@@ -633,6 +640,7 @@ def _build_generalized_evolution_matrices(
     NDArray[np.complex128],  # A_rhs (n_modes, n_dyn_slots, n_dyn_slots)
     NDArray[np.complex128] | None,  # B_lhs (n_modes, n_dyn, n_dyn) or None
     NDArray[np.complex128],  # recovery (n_modes, n_total_constraints, n_dyn_slots)
+    NDArray[np.complex128] | None,  # v_recovery (n_modes, n_c, n_dyn) or None
     list[str],  # all constraint field names
     dict[int, int],  # orig_to_reduced slot mapping
 ]:
@@ -1209,7 +1217,28 @@ def _build_generalized_evolution_matrices(
         "generalized_eig" if B_lhs is not None else "none",
     )
 
-    return A_rhs, B_lhs, recovery, constraint_field_names, orig_to_reduced
+    # Velocity recovery for generalized eigenvalue (B·d' = A·d):
+    # d' = B⁻¹·A·d, so v_c = recovery · d' = recovery · B⁻¹·A · d
+    # For singular B modes, use least-squares to get the best A_eff.
+    if B_lhs is not None and recovery.size > 0:
+        n_dyn_slots = A_rhs.shape[1]
+        A_eff = np.zeros_like(A_rhs)
+        for m in range(n_modes):
+            try:
+                A_eff[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
+            except np.linalg.LinAlgError:
+                # Singular B at this mode — use lstsq
+                A_eff[m] = np.asarray(
+                    np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)[0],  # type: ignore[reportUnknownMemberType]
+                    dtype=np.complex128,
+                )
+        v_recovery = np.einsum("mci,mij->mcj", recovery, A_eff)
+    elif recovery.size > 0:
+        v_recovery = np.einsum("mci,mij->mcj", recovery, A_rhs)
+    else:
+        v_recovery = None
+
+    return A_rhs, B_lhs, recovery, v_recovery, constraint_field_names, orig_to_reduced
 
 
 # ---------------------------------------------------------------------------
@@ -1596,8 +1625,14 @@ def _evolve_per_mode(
     progress: SimulationProgress | None,
     *,
     return_fourier: bool = False,
+    return_derivative_fourier: bool = False,
     B_modes: NDArray[np.complex128] | None = None,
-) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.complex128] | None]:
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.complex128] | None,
+    NDArray[np.complex128] | None,
+]:
     """Evolve system with per-mode independent matrices (constant coefficients).
 
     A_modes has shape (n_modes, n_slots, n_slots).
@@ -1697,6 +1732,7 @@ def _evolve_per_mode(
         tuple[
             list[int],  # slot indices
             NDArray[np.complex128],  # V_y0: V * y0_eigen, (n_modes, bs, bs)
+            NDArray[np.complex128] | None,  # V_y0_deriv (n_modes, bs, bs) or None
             NDArray[np.complex128],  # eigenvalues (n_modes, bs)
         ]
     ] = []
@@ -1704,7 +1740,12 @@ def _evolve_per_mode(
         # V_y0[m, i, j] = v_mat[m, i, j] * y0_eigen[m, j]
         # so y(t) = V_y0 @ exp(λ*dt) is just a matvec
         V_y0 = v_mat * y0_eigen[:, np.newaxis, :]  # (n_modes, bs, bs)
-        block_evolved.append((block_slots, V_y0, eig_vals))
+        # V_y0_deriv[m, i, j] = V_y0[m, i, j] * λ[m, j]
+        # so y'(t) = V_y0_deriv @ exp(λ*dt) gives exact time derivative
+        V_y0_deriv = (
+            V_y0 * eig_vals[:, np.newaxis, :] if return_derivative_fourier else None
+        )
+        block_evolved.append((block_slots, V_y0, V_y0_deriv, eig_vals))
 
     snapshots = np.zeros((n_snapshots, n_slots * n_pts))
     times = np.zeros(n_snapshots)
@@ -1719,22 +1760,43 @@ def _evolve_per_mode(
             dtype=np.complex128,
         )
 
+    # Optionally collect Fourier-space TIME DERIVATIVE snapshots.
+    # d'(t) = V · diag(λ · exp(λt)) · y0_eigen — exact, no numerical diff.
+    # Used for machine-precision constraint velocity: v_c = recovery · d'.
+    deriv_fourier_snaps: NDArray[np.complex128] | None = None
+    dy_hat_t: NDArray[np.complex128] | None = None
+    if return_derivative_fourier:
+        deriv_fourier_snaps = np.zeros(
+            (n_snapshots, n_slots, n_modes),
+            dtype=np.complex128,
+        )
+        dy_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
+
     # Pre-allocate buffer reused each timestep (avoids n_snapshots allocations)
     y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
 
     for ti, t in enumerate(t_eval):
         dt = t - t0
         y_hat_t[:] = 0.0
+        if dy_hat_t is not None:
+            dy_hat_t[:] = 0.0
 
-        for block_slots, V_y0, eig_vals in block_evolved:
+        for block_slots, V_y0, V_y0_deriv, eig_vals in block_evolved:
             # exp_lambda shape: (n_modes, block_size)
             exp_lambda = np.exp(eig_vals * dt)
             # y_evolved[m, i] = Σ_j V_y0[m, i, j] * exp(λ_j * dt)
             y_evolved = np.einsum("mij,mj->mi", V_y0, exp_lambda)
             y_hat_t[block_slots, :] = y_evolved.T
 
+            # Exact time derivative: dy[m,i] = Σ_j V_y0_deriv[m,i,j] * exp(λ_j*dt)
+            if V_y0_deriv is not None and dy_hat_t is not None:
+                dy_evolved = np.einsum("mij,mj->mi", V_y0_deriv, exp_lambda)
+                dy_hat_t[block_slots, :] = dy_evolved.T
+
         if fourier_snaps is not None:
             fourier_snaps[ti] = y_hat_t
+        if deriv_fourier_snaps is not None and dy_hat_t is not None:
+            deriv_fourier_snaps[ti] = dy_hat_t
 
         y_physical = _ifft_slots(y_hat_t, layout, grid)
         snapshots[ti] = y_physical
@@ -1746,7 +1808,7 @@ def _evolve_per_mode(
         if progress is not None:
             progress.update(t)
 
-    return times, snapshots, fourier_snaps
+    return times, snapshots, fourier_snaps, deriv_fourier_snaps
 
 
 def _evolve_full_matrix(
@@ -1981,6 +2043,9 @@ def solve_modal(
     use_generalized = has_time_ops and not has_pos_dep
     use_constraint = has_constraints and not has_pos_dep and not use_generalized
     B_lhs_modes: NDArray[np.complex128] | None = None  # set by generalized path
+    constraint_vel_arrays: dict[
+        str, NDArray[np.float64]
+    ] = {}  # populated by Schur path
 
     if use_generalized or use_constraint:
         # Both paths produce: A_reduced, recovery, constraint names, slot mapping
@@ -1990,8 +2055,9 @@ def solve_modal(
             # Ref: Golub & Van Loan (2013), Matrix Computations §7.7
             (
                 A_reduced,
-                _B_lhs_modes,
+                B_lhs_modes,  # CRITICAL: was _B_lhs_modes (discarded) — #177
                 recovery_matrix,
+                _v_recovery_gen,  # unused — constraint vel from eigendata
                 c_names,
                 orig_to_reduced,
             ) = _build_generalized_evolution_matrices(
@@ -2008,6 +2074,7 @@ def solve_modal(
             (
                 A_reduced,
                 recovery_matrix,
+                _v_recovery_matrix,  # recovery @ A_reduced (exact constraint velocities)
                 c_names,
                 orig_to_reduced,
             ) = _build_constraint_eliminated_matrices(
@@ -2047,8 +2114,8 @@ def solve_modal(
             dynamical_fields=layout.dynamical_fields,
         )
 
-        # Evolve dynamical fields (return Fourier data to avoid re-FFT)
-        times, dyn_snapshots, dyn_fourier = _evolve_per_mode(
+        # Evolve dynamical fields (return Fourier + derivative data)
+        times, dyn_snapshots, dyn_fourier, dyn_deriv_fourier = _evolve_per_mode(
             A_reduced,
             y0_hat_dyn,
             t_eval,
@@ -2057,6 +2124,7 @@ def solve_modal(
             None,
             progress,  # callback handled below with full state
             return_fourier=True,
+            return_derivative_fourier=True,  # for exact constraint velocities
             B_modes=B_lhs_modes,  # generalized eigenvalue if vel coupling
         )
 
@@ -2065,6 +2133,14 @@ def solve_modal(
         snapshots = np.zeros((len(t_eval), n_full))
         assert dyn_fourier is not None  # guaranteed by return_fourier=True
 
+        # Populate constraint velocity arrays: exact ∂_t(c) from eigendata.
+        # "Constraint" is a solver concept (algebraic evolution), not a physics
+        # statement — these fields have physically meaningful velocities.
+        # v_c(t) = recovery · d'(t), where d'(t) is computed from eigendata
+        # inside _evolve_per_mode (V·diag(λ·exp(λt))·y0_eigen — exact).
+        for c_name in c_names:
+            constraint_vel_arrays[c_name] = np.zeros((len(t_eval), *grid.shape))
+
         for ti in range(len(t_eval)):
             dyn_phys = dyn_snapshots[ti]
             # Use Fourier data directly (already computed in _evolve_per_mode)
@@ -2072,6 +2148,12 @@ def solve_modal(
 
             # Recover constraint fields: c_hat = recovery @ d_hat
             c_hat = np.einsum("mcj,jm->cm", recovery_matrix, y_hat_dyn_t)
+
+            # Recover constraint velocities: v_c_hat = recovery @ d'_hat
+            # d'_hat comes from eigendata — exact, no numerical differentiation.
+            assert dyn_deriv_fourier is not None
+            dy_hat_dyn_t = dyn_deriv_fourier[ti]  # (n_dyn, n_modes)
+            v_c_hat = np.einsum("mcj,jm->cm", recovery_matrix, dy_hat_dyn_t)
 
             # Assemble full physical state
             full_state = np.zeros(n_full)
@@ -2089,6 +2171,13 @@ def solve_modal(
                 full_state[c_slot * n_pts : (c_slot + 1) * n_pts] = np.real(
                     c_phys,
                 )
+                # Store exact constraint velocity (from eigendata d')
+                v_c_phys = np.fft.irfftn(
+                    v_c_hat[ci].reshape(rfft_shape),
+                    s=grid.shape,
+                    axes=list(range(len(grid.shape))),
+                )
+                constraint_vel_arrays[c_name][ti] = np.real(v_c_phys)
 
             snapshots[ti] = full_state
             if snapshot_callback is not None:
@@ -2116,7 +2205,7 @@ def solve_modal(
             k_grid,
             rfft_shape,
         )
-        times, snapshots, _ = _evolve_per_mode(
+        times, snapshots, _, _ = _evolve_per_mode(
             A_modes,
             y0_hat,
             t_eval,
@@ -2151,9 +2240,16 @@ def solve_modal(
     if progress is not None:
         progress.finish()
 
-    return {
+    result: SolverResult = {
         "t": times,
         "y": snapshots,
         "success": True,
         "message": f"Modal solver completed ({method_desc})",
     }
+    # Attach constraint velocity arrays (exact ∂_t for constraint fields).
+    # These are computed from v_recovery = recovery @ A_reduced inside the
+    # Schur elimination path. For generalized eigenvalue or non-constraint
+    # systems, constraint_vel_arrays is empty.
+    if constraint_vel_arrays:
+        result["constraint_velocities"] = constraint_vel_arrays  # type: ignore[typeddict-unknown-key]
+    return result

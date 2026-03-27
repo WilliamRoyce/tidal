@@ -137,59 +137,7 @@ def _plot_spectrum(ax: Axes, results: dict[str, Any]) -> None:
     ax.legend(fontsize=7)
 
 
-def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
-    """[1,0] Per-mode spectral conversion P(k,t) heatmap."""
-    import numpy as np
-
-    if (
-        "spectral_conversion" not in results
-        or "error" in results["spectral_conversion"]
-    ):
-        ax.set_visible(False)
-        return
-
-    sc = results["spectral_conversion"]
-    result = sc.get("_result_obj")
-    if result is None:
-        ax.set_visible(False)
-        return
-
-    # Create meshgrid for pcolormesh
-    times = result.times
-    wn = result.wavenumbers
-    prob = result.probability
-
-    # Only show active modes
-    active = result.active_modes
-    if not np.any(active):
-        ax.text(0.5, 0.5, "No active modes", transform=ax.transAxes, ha="center")
-        return
-
-    mesh = ax.pcolormesh(
-        wn,
-        times,
-        prob,
-        shading="nearest",
-        cmap="inferno",
-    )
-    ax.figure.colorbar(mesh, ax=ax, label=r"$P(k,t)$", pad=0.02)  # pyright: ignore[reportOptionalMemberAccess]
-
-    # Crop x-axis to active k-range (data-driven)
-    if np.any(active):
-        k_active_max = float(wn[active].max())
-        ax.set_xlim(0, k_active_max * 1.15)
-
-    src = sc["source"]
-    tgt = sc["target"]
-    ax.set_xlabel(r"$|k|$")
-    ax.set_ylabel("Time")
-    ax.set_title(
-        f"Spectral Conversion ({', '.join(src)} -> {', '.join(tgt)})",
-        fontsize=10,
-    )
-
-
-def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
+def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:
     """[1,0] Dispersion relation S(k, omega) heatmap with peak curve overlay."""
     import numpy as np
 
@@ -240,15 +188,7 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
         ax.legend(fontsize=8, loc="upper left")
 
     # Data-driven axis cropping
-    # k-axis: match spectral conversion's active_modes range when available
-    sc_obj = None
-    if "spectral_conversion" in results and "error" not in results.get(
-        "spectral_conversion", {}
-    ):
-        sc_obj = results["spectral_conversion"].get("_result_obj")
-    if sc_obj is not None and np.any(sc_obj.active_modes):
-        ax.set_xlim(0, float(sc_obj.wavenumbers[sc_obj.active_modes].max()) * 1.15)
-    elif np.any(active):
+    if np.any(active):
         max_peak = float(np.max(result.peak_powers))
         if max_peak > 0:
             strong = result.peak_powers >= max_peak * 1e-3
@@ -390,13 +330,9 @@ def save_measurement_plot(
     axes[0, 2].set_title("Energy Conservation")
     axes[0, 2].grid(visible=True, alpha=0.3)
 
-    # Row 1 — priority: dispersion > spectral_conversion > spectrum
+    # Row 1 — priority: dispersion > spectrum
     if "dispersion" in results and "error" not in results.get("dispersion", {}):
         _plot_dispersion(axes[1, 0], results)
-    elif "spectral_conversion" in results and "error" not in results.get(
-        "spectral_conversion", {}
-    ):
-        _plot_spectral_conversion(axes[1, 0], results)
     else:
         _plot_spectrum(axes[1, 0], results)
         axes[1, 0].set_xlabel(r"$|k|$")

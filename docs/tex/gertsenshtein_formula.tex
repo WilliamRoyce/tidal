@@ -179,6 +179,41 @@ $\Bzero$ & $P_\text{max}$ (TIDAL) & $k^2/(k^2+\kappa^2\Bzero^2)$ & Difference \\
 
 All measurements agree with the corrected formula to $< 0.4\%$.
 
+\subsubsection{Scope: $P_\text{max}$ vs.\ $P_\text{final}$}
+
+The corrected formula~\cref{eq:P-corrected} applies to the \emph{peak envelope}
+$P_\text{max}$ of the Rabi oscillation---the maximum conversion probability
+reachable via energy transfer.  It does \textbf{not} apply to $P_\text{final}
+= P(t_\text{end})$, the instantaneous conversion at the end of the simulation.
+
+For $P_\text{final}$ at any specific time $D$, the \emph{bare} formula is exact:
+\begin{equation}
+  P_\text{final}(D) = \sin^2\!\left(\frac{\kappa\,\Bzero\, D}{2}\right)
+  \label{eq:P-final-bare}
+\end{equation}
+This is because the beat frequency $\Delta\omega = \kappa\Bzero$ is independent
+of the effective mass $m_\text{eff}^2 = \kappa^2\Bzero^2$ (the mass shifts both
+eigenfrequencies equally, leaving their difference unchanged).
+
+The $P_\text{max}$ correction arises from \emph{energy accounting}: the initial
+graviton energy includes the mass contribution $\kappa^2\Bzero^2 A^2/(2\kappa^2)$
+which is not transferable to the massless photon.  At peak conversion, the
+photon captures only the kinetic + gradient fraction of the source energy.
+
+\begin{table}[htbp]
+\centering
+\caption{When to use each formula.}
+\label{tab:formula-scope}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Formula & Measures & Sweep metric \\
+\midrule
+$\sin^2(\kappa\Bzero D/2)$ & Conversion at time $D$ & \texttt{P\_final} \\
+$\sin^2(\kappa\Bzero D/2) \times k^2/(k^2 + \kappa^2\Bzero^2)$ & Peak envelope & \texttt{P\_max} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 
 \subsection{Numerical Dispersion}
 \label{sec:numerical-dispersion}

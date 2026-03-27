@@ -74,23 +74,56 @@ The \texttt{perturbation\_name} must not collide with field names, constant name
 \subsubsection{Writing the Lagrangian}
 \label{sec:torsion-lagrangian}
 
-The Lagrangian must be written in \textbf{decomposed form} using \texttt{RicciScalarCD[]} (Levi-Civita, NOT \texttt{RicciScalarCDT[]}) plus explicit \texttt{TorsionCDT[...]} terms:
+The full general quadratic PGT Lagrangian uses \texttt{RicciScalarCDT[]} (Riemann-Cartan Ricci scalar, auto-decomposed via the Shapiro identity) plus explicit \texttt{TorsionCDT[...]} terms for the three independent $\torsion^2$ invariants:
 
 \begin{lstlisting}[style=toml]
 [lagrangian]
-expression = "(1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d]"
+expression = "((1/kappa^2) RicciScalarCDT[]
+  + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f]
+  + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f]
+  + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d]
+  + b5 RicciScalarCDT[]^2)"
 \end{lstlisting}
 
-\paragraph{Why decomposed form?}
-\label{par:decomposed-form}
-xPert's built-in perturbation formulas assume the Levi-Civita connection. Using \texttt{RicciScalarCDT[]} directly would require decomposing it via \texttt{ChangeCurvature}, but \texttt{ChangeTorsion} converts torsion $\to$ contortion (a derived quantity that \texttt{DefTensorPerturbation} cannot perturb). The decomposed form avoids this issue entirely.
+\paragraph{$\tilde{R}$ decomposition.}
+\label{par:rtilde-decomposition}
+The pipeline automatically decomposes \texttt{RicciScalarCDT[]} $= \tilde{R}$ into the Levi-Civita Ricci scalar $R$ plus torsion contributions via the Shapiro identity (eq.~\ref{eq:riemann-cartan-identity}).  The two-step decomposition is:
+\begin{enumerate}
+  \item \texttt{ChangeCurvature[L, CDT, CD]}: xAct's built-in function decomposes torsionful Riemann into LC Riemann + contortion $\contorsion$ terms (exact, not approximate).
+  \item Contortion $\to$ torsion substitution: $\contorsion^a{}_{bc} = \tfrac{1}{2}(\torsion^a{}_{bc} + \torsion_b{}^a{}_c - \torsion_{bc}{}^a)$, applied via xAct pattern matching with proper dummy index handling.
+\end{enumerate}
+The result: only \texttt{RicciScalarCD[]}, \texttt{TorsionCDT[]}, and their derivatives remain --- all perturbable by xPert.
 
-The three $\torsion^2$ invariants correspond to the three irreducible pieces of torsion under $\mathrm{SO}(1,3)$:
-\begin{itemize}
-  \item $\torsion_{abc}\,\torsion^{abc}$: couples to all three irreducible sectors
-  \item $\torsion_{abc}\,\torsion^{bac}$: the ``mixed'' contraction
-  \item $\torsion^a{}_{ab}\,\torsion^{cb}{}_{c}$: the trace sector
-\end{itemize}
+\paragraph{Torsion invariant basis.}
+\label{par:torsion-invariant-basis}
+The three independent $\torsion^2$ invariants are written in the \emph{direct basis}:
+\begin{align}
+  I_1 &= \torsion_{abc}\,\torsion^{abc}  &\text{(full contraction)} \label{eq:I1} \\
+  I_2 &= \torsion_{abc}\,\torsion^{bac}  &\text{($a \leftrightarrow b$ swap in second $\torsion$)} \label{eq:I2} \\
+  I_3 &= \torsion^a{}_{ab}\,\torsion^{cb}{}_{c} = T_b T^b  &\text{(trace vector squared)} \label{eq:I3}
+\end{align}
+where $T_\mu \equiv \torsion^\lambda{}_{\lambda\mu}$ is the torsion trace vector (4 components in 4D).
+
+This basis is related to the \emph{irreducible basis} $\{q^2, T^2, S^2\}$ (where $q_{\alpha\beta\gamma}$ is the traceless tensor part and $S^\mu = \varepsilon^{\alpha\beta\gamma\mu} \torsion_{\alpha\beta\gamma}$ is the axial vector) by an invertible linear transformation (Shapiro~\cite{shapiro2002torsion}, \S2.3):
+\begin{equation}
+  \begin{pmatrix} I_1 \\ I_2 \\ I_3 \end{pmatrix}
+  = \begin{pmatrix}
+    1 & \tfrac{2}{3} & \tfrac{1}{12} \\
+    -1 & \tfrac{2}{3} & -\tfrac{1}{12} \\
+    0 & 1 & 0
+  \end{pmatrix}
+  \begin{pmatrix} q^2 \\ T^2 \\ S^2 \end{pmatrix}.
+  \label{eq:basis-transform}
+\end{equation}
+Both bases are complete --- any parity-even quadratic torsion invariant is a linear combination of three independent contractions.  The direct basis is used in the TOML because each $I_i$ is a single index contraction of \texttt{TorsionCDT} with $\eta$ metrics, directly expressible in xAct.
+
+\paragraph{$\tilde{R}^2$ and graviton-torsion mixing.}
+The curvature-squared term $b_5 \tilde{R}^2$ is essential for graviton-torsion mixing and torsion propagation.  Since $\tilde{R} = R + \text{(torsion terms)}$, the square $\tilde{R}^2 = R^2 + 2R \cdot \text{(torsion)} + \text{(torsion)}^2$ produces cross-terms $R \cdot \torsion$ that couple graviton and torsion perturbations.  This is verified empirically: with $\alpha_1 = \alpha_2 = \alpha_3 = 0$ and $b_5 \neq 0$, the derived equations contain 117 graviton-torsion cross-coupling terms (out of 339 total Hamiltonian terms), all proportional to $b_5$.
+
+Note: the full PGT curvature-squared sector has 6 independent invariants ($\tilde{R}_{abcd}\tilde{R}^{abcd}$, $\tilde{R}_{acbd}\tilde{R}^{abcd}$, ..., $\tilde{R}^2$).  We implement only $c_6 = b_5 \tilde{R}^2$ (the scalar-scalar contraction), which is the simplest invariant that enables propagating torsion.  The remaining five would add additional propagating modes and are tracked for future implementation.
+
+\paragraph{Coupling constants.}
+$\alpha_1$, $\alpha_2$, $\alpha_3$ independently control torsion mass terms for each irreducible sector, while $b_5$ provides kinetic $(\nabla \torsion)^2$ terms via $\tilde{R}^2$ that enable torsion propagation.  Setting $\alpha_2 = \alpha_3 = 0$ recovers the single-invariant baseline, verified to produce identical results (37 components, $\max|dE/E| = 0$).  With $\alpha_2 = 0.3$, $\alpha_3 = 0.2$: machine-precision energy conservation confirmed.
 
 \subsubsection{Linearization}
 \label{sec:torsion-linearization}
@@ -272,7 +305,7 @@ Constraint & $h_0, h_1, h_2, h_3$; remaining $t_i$ & 25 & Algebraically determin
 \end{tabular}
 \end{table}
 
-The canonical Hamiltonian contains \textbf{291 terms}, computed via the full Legendre transform in Wolfram.
+The canonical Hamiltonian contains \textbf{339 terms} (with all three $\torsion^2$ invariants), computed via the full Legendre transform in Wolfram.
 
 \paragraph{Coupling structure.}
 The $\tilde{R}^2$ term produces rich graviton-torsion coupling.  For example, the auxiliary field $w_{h_4}$'s equation has 23 RHS terms coupling to 15 distinct fields including all three propagating torsion modes ($t_6, t_{13}, t_{20}$) and their velocities.  The torsion equations contain implicit acceleration coupling ($\partial_t^2$ of other fields on the RHS), handled by the generalized mass-matrix modal solver (\S\ref{sec:modal-mass-matrix}).
@@ -285,20 +318,18 @@ The 4D derivation completes in $\sim$15\,s: 7\,s for Lagrangian decomposition (D
 
 \begin{table}[htbp]
 \centering
-\caption{Torsion implementation status (as of v0.17.0).}
+\caption{Torsion implementation status (as of v0.18.0).}
 \label{tab:torsion-status}
 \begin{tabular}{@{}llp{7cm}@{}}
 \toprule
 Component & Status & Notes \\
 \midrule
-Symbolic derivation (2+1D) & Complete & 15 equations in $\sim$5\,s \\
-Symbolic derivation (4D) & \textbf{Complete} & 34 equations in $\sim$15\,s (v0.17.0) \\
-Ostrogradsky reduction & Complete & 2+1D: 17 fields; 4D: 37 fields \\
-Canonical Hamiltonian & \textbf{Complete} & 2+1D: 147 terms; 4D: 291 terms \\
-Mass-matrix analysis (2+1D) & Complete & $M = [[1,1],[1,1]]$ for $\{t_3, t_7\}$: hidden constraint \\
-Simulation (2+1D, modal) & Complete & QZ eigenvalue; $\max|dE/E| = 0$ at $t=100$ \\
-Simulation (4D, modal) & \textbf{Pending} & Requires validation \\
-Parameter sweeps & Not tested & Requires EM field addition for Gertsenshtein comparison \\
+Full PGT Lagrangian & \textbf{Complete} & $\alpha_1 I_1 + \alpha_2 I_2 + \alpha_3 I_3 + b_5 \tilde{R}^2$ (v0.18.0) \\
+Symbolic derivation (4D) & \textbf{Complete} & 34 equations in $\sim$15\,s \\
+Ostrogradsky reduction & Complete & 37 fields (3 auxiliaries for $h_4, h_7, h_9$) \\
+Canonical Hamiltonian & \textbf{Complete} & 339 terms (full Legendre transform) \\
+Simulation (4D, modal) & \textbf{Complete} & $\max|dE/E| = 0$ (machine precision) \\
+Parameter sweeps & Not tested & Requires EM field addition (\#154) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -330,7 +361,8 @@ The torsion implementation required three major pipeline extensions:
 
 \subsubsection{Field Structure}
 
-\paragraph{2+1D (3D spacetime, plane-wave along $x$).}
+\paragraph{2+1D (3D spacetime, plane-wave along $x$) --- historical.}
+The 2+1D theory was used during development and removed in v0.18.0 (superseded by the 4D theory at comparable derivation time).
 15 component fields: 6 graviton $h_{\mu\nu}$ (symmetric) + 9 torsion $t_{\alpha\mu\nu}$ (antisymmetric in $\mu\nu$).
 After Ostrogradsky: 17 fields ($h_3, h_5 \to w_{h_3}, w_{h_5}$).  10 constraints, 5 dynamical, 2 mass-matrix constraints ($t_3 = t_7$).
 
@@ -364,9 +396,9 @@ The 4D theory required six pipeline fixes beyond the 2+1D architecture:
 \subsubsection{Remaining Validation Tasks}
 
 \begin{itemize}
-  \item 4D simulation with modal solver (pending; 2+1D verified)
   \item Dispersion relation $\omega(k)$ comparison with Nikiforova et al.\ (2009) stability analysis (\#169)
   \item Propagating mode count cross-check with PSALTer / Barker (2024) predictions (\#169)
+  \item Ghost propagator analysis for Ostrogradsky stability (\#164)
   \item Add EM field ($F^2$) to Lagrangian for graviton-photon-torsion triple mixing
   \item Background $B$ field parameter sweeps for Gertsenshtein comparison (\#154)
 \end{itemize}

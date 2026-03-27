@@ -64,7 +64,7 @@ tidal plot ../data/gertsenshtein_sweep_B0 --type sweep \
   --overlay 'sin(kappa * B0 * t_end / 2)**2' \
   --output ../data/gertsenshtein_sweep_B0/sweep.png --quiet
 
-# Plot 2: P(B0) vs corrected formula including graviton effective mass term
+# Plot 2: P_max(B0) vs corrected formula including graviton effective mass term
 #
 # The h_7 graviton has effective mass m^2_eff = kappa^2 * B0^2 from the background
 # EM stress-energy. This contributes an extra kappa^2*B0^2*h_7^2/2 term to the
@@ -77,14 +77,19 @@ tidal plot ../data/gertsenshtein_sweep_B0 --type sweep \
 #
 # where k = 2*pi*32/100 = 2.0106 (k^2 = 4.0425) for 32 wavelengths in [0,100].
 #
-# Full corrected formula:
-#   P_corrected = sin^2(kappa * B0 * t_end / 2) * 4.0425 / (4.0425 + kappa^2 * B0^2)
+# Full corrected formula (for P_max, the peak Rabi envelope):
+#   P_max_theory = sin^2(kappa * B0 * t_end / 2) * 4.0425 / (4.0425 + kappa^2 * B0^2)
 #
-# This matches TIDAL to < 0.4% at all tested B0 values. The correction grows as
-# B0^2/k^2 and reaches ~1% at B0 = 0.2 (confirmed by targeted simulations).
+# IMPORTANT: This correction applies to P_max (peak conversion envelope), NOT to
+# P_final (conversion at t=t_end). The bare sin^2 formula is exact for P_final
+# at any time; the k^2/(k^2+kappa^2*B0^2) factor caps the energy-based measurement
+# because the graviton's mass energy is not transferred to the massless photon.
+#
+# This matches TIDAL P_max to < 0.4% at all tested B0 values. The correction grows
+# as B0^2/k^2 and reaches ~1% at B0 = 0.2 (confirmed by targeted simulations).
 tidal plot ../data/gertsenshtein_sweep_B0 --type sweep \
-  --metric P_final \
-  --title "Gertsenshtein P(B0) — corrected for graviton effective mass" \
+  --metric P_max \
+  --title "Gertsenshtein P_max(B0) — corrected for graviton effective mass" \
   --overlay 'sin(kappa * B0 * t_end / 2)**2 * 4.0425 / (4.0425 + kappa**2 * B0**2)' \
   --output ../data/gertsenshtein_sweep_B0/sweep_corrected.png --quiet
 
@@ -92,4 +97,4 @@ echo ""
 echo "=== Sweep complete ==="
 echo "Results: examples/data/gertsenshtein_sweep_B0/"
 echo "Plot 1: examples/data/gertsenshtein_sweep_B0/sweep.png            [bare sin^2]"
-echo "Plot 2: examples/data/gertsenshtein_sweep_B0/sweep_corrected.png  [corrected]"
+echo "Plot 2: examples/data/gertsenshtein_sweep_B0/sweep_corrected.png  [P_max corrected]"

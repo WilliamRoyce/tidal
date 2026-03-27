@@ -1054,6 +1054,39 @@ class EquationSystem:
         return self.effective_coordinates[1:]
 
     @cached_property
+    def has_constraint_velocity_terms(self) -> bool:
+        """True if the Hamiltonian has kinetic coupling between constraint fields.
+
+        Detects ``time_derivative(C_i) x time_derivative(C_j)`` terms where
+        both C_i and C_j are constraint fields (time_derivative_order == 0).
+        These indicate the naive Hamiltonian H = sum(pi * v) - L is not the
+        correct conserved quantity for this theory (Dirac-Bergmann theory).
+
+        See GitHub issue #178 for details.
+        """
+        if self.canonical is None:
+            return False
+        constraint_fields = frozenset(
+            eq.field_name for eq in self.equations if eq.time_derivative_order == 0
+        )
+        if not constraint_fields:
+            return False
+        for term in self.canonical.hamiltonian_terms:
+            a, b = term.factor_a, term.factor_b
+            # Kinetic constraint term: time_derivative(C_i) x time_derivative(C_j)
+            # where both fields are constraints.  These arise from π_c · v_c
+            # in the Legendre transform (spurious).  Cross-terms like
+            # time_derivative(C) x identity(D) come from -L and are valid.
+            if (
+                a.operator == "time_derivative"
+                and b.operator == "time_derivative"
+                and a.field in constraint_fields
+                and b.field in constraint_fields
+            ):
+                return True
+        return False
+
+    @cached_property
     def equation_map(self) -> dict[str, int]:
         """Map from field name to equation index. Cached on frozen dataclass."""
         return {eq.field_name: i for i, eq in enumerate(self.equations)}

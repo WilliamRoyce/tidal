@@ -24,18 +24,15 @@ from tidal.measurement import (
     MixingResult,
     MixingSpectrum,
     SimulationData,
-    SpectralConversion,
     SystemEnergy,
     check_energy_conservation,
     compute_conversion_probability,
     compute_dispersion,
     compute_energy_timeseries,
     compute_group_conversion,
-    compute_group_spectral_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
     compute_mode_amplitudes,
-    compute_spectral_conversion,
     compute_spectral_energy,
     compute_spectrum,
     compute_system_energy,
@@ -2701,112 +2698,6 @@ class TestMixingSpectrum:
 # ============================================================
 # Spectral conversion tests
 # ============================================================
-
-
-class TestSpectralConversion:
-    """Test compute_spectral_conversion for per-mode P(k,t)."""
-
-    def test_shapes(self) -> None:
-        """Output arrays have correct shapes."""
-        data = _make_sim_data_two_fields(n_snapshots=11)
-        result = compute_spectral_conversion(data, "phi_0", "chi_0")
-
-        assert isinstance(result, SpectralConversion)
-        n_snap = data.n_snapshots
-        n_modes = len(result.wavenumbers)
-        assert result.probability.shape == (n_snap, n_modes)
-        assert result.source_spectral_energy.shape == (n_snap, n_modes)
-        assert result.target_spectral_energy.shape == (n_snap, n_modes)
-        assert result.active_modes.shape == (n_modes,)
-        assert len(result.times) == n_snap
-
-    def test_field_names(self) -> None:
-        """Source and target field names are stored correctly."""
-        data = _make_sim_data_two_fields(n_snapshots=5)
-        result = compute_spectral_conversion(data, "phi_0", "chi_0")
-        assert result.source_field == "phi_0"
-        assert result.target_field == "chi_0"
-
-    def test_same_field_raises(self) -> None:
-        """Same source and target raises ValueError."""
-        data = _make_sim_data_two_fields(n_snapshots=5)
-        with pytest.raises(ValueError, match="different"):
-            compute_spectral_conversion(data, "phi_0", "phi_0")
-
-    def test_invalid_field_raises(self) -> None:
-        """Invalid field name raises ValueError."""
-        data = _make_sim_data_two_fields(n_snapshots=5)
-        with pytest.raises(ValueError, match="not in spec"):
-            compute_spectral_conversion(data, "phi_0", "nonexistent")
-
-    def test_zero_source_energy_raises(self) -> None:
-        """Zero source energy raises ValueError."""
-        data = _make_sim_data_two_fields(n_snapshots=5, amplitude=0.0)
-        with pytest.raises(ValueError, match="no modes above energy floor"):
-            compute_spectral_conversion(data, "phi_0", "chi_0")
-
-    def test_zero_target_gives_zero_probability(self) -> None:
-        """Target at zero → P(k,t=0) = 0 everywhere."""
-        data = _make_sim_data_two_fields(n_snapshots=5)
-        result = compute_spectral_conversion(data, "phi_0", "chi_0")
-        # chi starts at zero, so P(k, t=0) should be ~0
-        np.testing.assert_allclose(result.probability[0], 0.0, atol=1e-10)
-
-    def test_energy_floor_masks_inactive(self) -> None:
-        """Inactive modes (below energy floor) have P=0 and active_modes=False."""
-        data = _make_sim_data_two_fields(n_snapshots=11)
-        # Very high floor raises (all modes below threshold)
-        with pytest.raises(ValueError, match="no modes above energy floor"):
-            compute_spectral_conversion(
-                data,
-                "phi_0",
-                "chi_0",
-                energy_floor=1e10,
-            )
-        # Normal case: inactive modes have P=0
-        result = compute_spectral_conversion(data, "phi_0", "chi_0")
-        inactive = ~result.active_modes
-        if np.any(inactive):
-            assert np.all(result.probability[:, inactive] == 0.0)
-
-    def test_p_nonzero_at_later_times(self) -> None:
-        """P(k,t) should grow above zero as coupling transfers energy."""
-        data = _make_sim_data_two_fields(n_snapshots=51)
-        result = compute_spectral_conversion(data, "phi_0", "chi_0")
-        # At final time, there should be nonzero conversion in active modes
-        active_p_final = result.probability[-1, result.active_modes]
-        assert np.max(active_p_final) > 0.01
-
-
-class TestGroupSpectralConversion:
-    """Test compute_group_spectral_conversion."""
-
-    def test_single_field_matches_pairwise(self) -> None:
-        """Single-field groups should match pairwise spectral conversion."""
-        data = _make_sim_data_two_fields(n_snapshots=11)
-        pairwise = compute_spectral_conversion(data, "phi_0", "chi_0")
-        group = compute_group_spectral_conversion(data, "phi_0", "chi_0")
-        np.testing.assert_allclose(
-            group.probability,
-            pairwise.probability,
-            atol=1e-15,
-        )
-
-    def test_overlap_raises(self) -> None:
-        """Source and target groups must not overlap."""
-        data = _make_sim_data_two_fields(n_snapshots=5)
-        with pytest.raises(ValueError, match="overlap"):
-            compute_group_spectral_conversion(
-                data,
-                "phi_0",
-                ["phi_0", "chi_0"],
-            )
-
-    def test_none_target_auto_selects(self) -> None:
-        """target_fields=None auto-selects remaining dynamical fields."""
-        data = _make_sim_data_two_fields(n_snapshots=5)
-        result = compute_group_spectral_conversion(data, "phi_0")
-        assert result.target_field == "chi_0"
 
 
 # ============================================================

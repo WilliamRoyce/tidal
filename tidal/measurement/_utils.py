@@ -1,6 +1,6 @@
 """Shared private utilities for the measurement package.
 
-Functions here are used by sibling modules (_conversion, _spectral_conversion,
+Functions here are used by sibling modules (_conversion,
 _dispersion) within the measurement package.
 """
 

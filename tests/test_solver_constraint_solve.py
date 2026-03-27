@@ -2887,12 +2887,12 @@ class TestEnsureConsistentICRealJSON:
         assert float(np.max(np.abs(h0_data))) < 1e-10
 
     def test_gw_3d_with_complete_tt_ic(self) -> None:
-        """GW 3+1D: complete TT gauge IC (h_4 + h_7 = -h_4) passes all constraints.
+        """GW 3+1D: TT-reduced fields (h_5, h_7) accept IC without modification.
 
-        Setting both h_4 (h_xx) and h_7 (h_yy) = -h_4 for z-propagating
-        + polarization satisfies the traceless constraint and allows the
-        cascade to determine h_9 = 0. Transverse constraints are trivially
-        satisfied since h_4/h_7 depend only on z.
+        After TT gauge reduction during derivation, linearized_gravity.json
+        contains only the 2 physical polarizations (h_5 = h_xz, h_7 = h_yy).
+        No TT constraints remain — ensure_consistent_ic should pass through
+        the IC unchanged.
         """
         import json
         from pathlib import Path
@@ -2914,29 +2914,22 @@ class TestEnsureConsistentICRealJSON:
         n = grid.num_points
 
         y0 = np.zeros(layout.total_size)
-        # z-dependent wave packet for h_4 (h_xx)
+        # z-dependent wave packet for h_5 (h_xz)
         _, _, z_arr = grid.coord_arrays()
         wave = np.exp(-((z_arr - 5) ** 2) / 2) * np.cos(0.63 * (z_arr - 5))
 
-        h4_slot = layout.field_slot_map["h_4"]
-        y0[h4_slot * n : (h4_slot + 1) * n] = wave.ravel()
+        h5_slot = layout.field_slot_map["h_5"]
+        y0[h5_slot * n : (h5_slot + 1) * n] = wave.ravel()
 
-        # TT gauge: h_7 (h_yy) = -h_4 (traceless for z-propagation)
+        # h_7 (h_yy) with opposite-sign IC
         h7_slot = layout.field_slot_map["h_7"]
         y0[h7_slot * n : (h7_slot + 1) * n] = (-wave).ravel()
 
-        # Should succeed: h_9 = -(h_4 + h_7) = 0, transverse trivially OK
+        # No constraints to solve — IC should pass through unchanged
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
-        # h_4 and h_7 should be preserved exactly (user-provided IC)
-        h4_data = result[h4_slot * n : (h4_slot + 1) * n]
-        np.testing.assert_allclose(h4_data, wave.ravel(), atol=1e-14)
+        # Both fields should be preserved exactly (no constraints to modify them)
+        h5_data = result[h5_slot * n : (h5_slot + 1) * n]
+        np.testing.assert_allclose(h5_data, wave.ravel(), atol=1e-14)
         h7_data = result[h7_slot * n : (h7_slot + 1) * n]
         np.testing.assert_allclose(h7_data, (-wave).ravel(), atol=1e-14)
-
-        # h_9 should be solved to ≈ 0 (traceless: h_4 + h_7 + h_9 = 0)
-        h9_slot = layout.field_slot_map["h_9"]
-        h9_data = result[h9_slot * n : (h9_slot + 1) * n]
-        assert np.allclose(h9_data, 0.0, atol=1e-10), (
-            f"h_9 should be ≈ 0 for TT gauge, got max={np.max(np.abs(h9_data)):.2e}"
-        )

@@ -42,14 +42,15 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | Issue                                                      | Priority    | Type    | Status       |
 | ---------------------------------------------------------- | ----------- | ------- | ------------ |
 | [#TBD] Add Animation Module Test Coverage                  | 🟠 High     | Testing | 🔄 Remaining |
-| [#TBD] Add Code Coverage Reporting to CI                   | 🟠 High     | CI/CD   | ⚡ Partial   |
+| [#74] Add Code Coverage Reporting to CI                    | 🟠 High     | CI/CD   | ✅ Done      |
 | [#TBD] Add Wolfram Tests to GitHub Actions CI              | 🔴 Critical | CI/CD   | 🔄 Remaining |
 | [#TBD] Add Tests for Observers, Profiling, Runners Modules | 🟡 Medium   | Testing | 🔄 Remaining |
 
 **Delivered so far:**
 
 - Coverage runs in CI (`--cov=tidal --cov-report=term-missing --cov-report=xml`)
-- Coverage badge in README (links to CI workflow)
+- Coverage uploaded to Codecov via `codecov/codecov-action@v5` (PR #74)
+- Codecov badge in README (links to Codecov dashboard)
 - Root Makefile with `make test-coverage` target
 
 **Still needed:**
@@ -134,7 +135,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | Feature                                                                                     | Status      |
 | ------------------------------------------------------------------------------------------- | ----------- |
 | CLI (`tidal` command) — 9 subcommands (derive, inspect, simulate, measure, list, validate, plot, sweep, analyze) | ✅ Complete |
-| Measurement module — 13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary | ✅ Complete |
+| Measurement module — 12 types: energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary | ✅ Complete |
 | Parameter Sweep Framework (Phase C) — `tidal sweep` + `tidal analyze`, TOML config, adaptive/LHS/Sobol sampling, sensitivity analysis, convergence mode, 6 plot types, parallel execution | ✅ Complete |
 | `theory.toml` configuration with `[[derived_fields]]`                                       | ✅ Complete |
 | Scalar-vector coupling stress test (mixed-rank cross-field)                                 | ✅ Complete |
@@ -211,9 +212,9 @@ Issues should be tagged with appropriate labels:
 - ✅ Background fields: position-dependent coefficients (Phase A)
 - ✅ Gauge fixing: optional per-field Lorenz/de Donder/Coulomb/temporal/axial (Phase B)
 - ✅ Constraint pre-solve: FFT/sparse three-tier solver (Phase J)
-- ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 13 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
+- ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 12 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
 - ✅ CLI (`tidal` command) implemented: 9 subcommands, zero new dependencies
-- ✅ Measurement module: 13 types (energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
+- ✅ Measurement module: 12 types (energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
 - ✅ 20 working examples spanning 1+1D through 3+1D
 - ✅ 1,700 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
 - ✅ 21 of 25 original issues resolved (84%)
@@ -231,12 +232,17 @@ Issues should be tagged with appropriate labels:
    - Validation against analytical thin-magnet formula (Domcke & Garcia-Cely 2023)
    - Automated analytic benchmark tests
 
-2. **Poincaré Gauge Theory (Torsion)**
+2. **Poincaré Gauge Theory (Torsion)** — ✅ COMPLETE (v0.18.0)
    - ✅ PGT Lagrangian support (T² invariants + R̃²) — COMPLETE
    - ✅ Component-level E-L derivation (5s vs 77min) — COMPLETE (now default for ALL theories)
    - ✅ Ostrogradsky reduction (4th→2nd order) — COMPLETE (automatic on JSON load)
    - ✅ Simulation via generalized mass-matrix modal solver (v0.16.0, #165 resolved)
    - ✅ QZ generalized eigenvalue for velocity coupling singularity (v0.16.1, #166 resolved)
+   - ✅ 4D R̃² derivation pipeline with canonical Hamiltonian (v0.17.0, #170)
+   - ✅ Full general quadratic Lagrangian (α₁I₁ + α₂I₂ + α₃I₃ + b₅R̃²) — COMPLETE (v0.18.0)
+   - ✅ Machine-precision energy conservation (max|dE/E| = 0) for all parameter values tested
+   - 🔄 Dispersion relation validation against Nikiforova/Barker predictions (#169)
+   - 🔄 Ghost propagator analysis for Ostrogradsky stability (#164)
    - Parameter window scanning for viable mode configurations
 
 3. **Non-Abelian Gauge Theories**
@@ -280,8 +286,8 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **MINOR** (0.X.0): New features (3+1D examples, JSON schema extensions)
 - **PATCH** (0.0.X): Bug fixes, documentation improvements
 
-**Current Version:** 0.17.7
-**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve; 0.5.0 delivered parameter sweep framework (Phase C) with 13 measurements, sensitivity analysis, and advanced visualization
+**Current Version:** 0.22.7
+**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve; 0.5.0 delivered parameter sweep framework (Phase C) with 12 measurements, sensitivity analysis, and advanced visualization
 **Next Major Release (1.0.0):** Phase D (Gertsenshtein example) + Wolfram CI
 
 ---

@@ -1,0 +1,283 @@
+------------------------------------------------------------
+Package xAct`xPerm`  version 1.2.4, {2025, 12, 29}
+CopyRight (C) 2003-2026, Jose M. Martin-Garcia, under the General Public License.
+Connecting to external linux executable...
+Connection established.
+------------------------------------------------------------
+Package xAct`xTensor` version 1.3.0, {2025, 12, 29}
+CopyRight (C) 2002-2026, Jose M. Martin-Garcia, under the General Public License.
+------------------------------------------------------------
+These packages come with ABSOLUTELY NO WARRANTY; for details type Disclaimer[]. This is free software, and you are welcome to redistribute it under certain conditions. See the General Public License for details.
+------------------------------------------------------------
+------------------------------------------------------------
+Package xAct`xPert`  version 1.0.6, {2018, 2, 28}
+CopyRight (C) 2005-2026, David Brizuela, Jose M. Martin-Garcia and Guillermo A. Mena Marugan, under the General Public License.
+** Variable $PrePrint assigned value ScreenDollarIndices
+** Variable $CovDFormat changed from Prefix to Postfix
+** Option AllowUpperDerivatives of ContractMetric changed from False to True
+** Option MetricOn of MakeRule changed from None to All
+** Option ContractMetrics of MakeRule changed from False to True
+------------------------------------------------------------
+Package xAct`Invar`  version 2.0.5, {2014, 2, 15}
+CopyRight (C) 2006-2026, J. M. Martin-Garcia, D. Yllanes and R. Portugal, under the General Public License.
+** DefConstantSymbol: Defining constant symbol sigma. 
+** DefConstantSymbol: Defining constant symbol dim. 
+** Option CurvatureRelations of DefCovD changed from True to False
+** Variable $CommuteCovDsOnScalars changed from True to False
+------------------------------------------------------------
+Package xAct`xCoba`  version 0.8.6, {2021, 2, 28}
+CopyRight (C) 2005-2026, David Yllanes and Jose M. Martin-Garcia, under the General Public License.
+------------------------------------------------------------
+Package xAct`SymManipulator`  version 0.9.6, {2024, 4, 30}
+CopyRight (C) 2011-2026, Thomas Ba"ckdahl, under the General Public License.
+------------------------------------------------------------
+Package xAct`xTras`  version 1.4.2, {2014, 10, 30}
+CopyRight (C) 2012-2014, Teake Nutma, under the General Public License.
+** Variable $CovDFormat changed from Postfix to Prefix
+** Option CurvatureRelations of DefCovD changed from False to True
+------------------------------------------------------------
+These packages come with ABSOLUTELY NO WARRANTY; for details type Disclaimer[]. This is free software, and you are welcome to redistribute it under certain conditions. See the General Public License for details.
+------------------------------------------------------------
+=== Extracting ALL explicit contractions ===
+
+=== CORE PARITY-ODD QUADRATIC ===
+
+--- eps R x R: 13 terms ---
+  [1] InputForm[eps[-c, -d, -e, -f]*R[-a, -b, e, f]*R[a, b, c, d]]
+  [2] InputForm[eps[-b, -d, -e, -f]*R[-a, -c, e, f]*R[a, b, c, d]]
+  [3] InputForm[eps[-b, -d, -e, -f]*R[-a, e, -c, f]*R[a, b, c, d]]
+  [4] InputForm[eps[-c, -d, -e, -f]*R[a, b, -a, c]*R[-b, d, e, f]]
+  [5] InputForm[eps[-a, -b, -e, -f]*R[a, b, c, d]*R[-c, -d, e, f]]
+  [6] InputForm[eps[-b, -d, -e, -f]*R[a, b, -a, c]*R[-c, d, e, f]]
+  [7] InputForm[eps[-b, -d, -e, -f]*R[a, b, c, d]*R[-c, e, -a, f]]
+  [8] InputForm[eps[-a, -b, -e, -f]*R[a, b, c, d]*R[-c, e, -d, f]]
+  [9] InputForm[eps[-c, -d, -e, -f]*R[a, b, -a, -b]*R[c, d, e, f]]
+  [10] InputForm[eps[-c, -d, -e, -f]*R[a, b, -a, c]*R[d, e, -b, f]]
+  [11] InputForm[eps[-b, -d, -e, -f]*R[a, b, -a, c]*R[d, e, -c, f]]
+  [12] InputForm[eps[-b, -c, -e, -f]*R[a, b, -a, c]*R[d, e, -d, f]]
+  [13] InputForm[eps[-a, -b, -e, -f]*R[a, b, c, d]*R[e, f, -c, -d]]
+
+--- eps T x T: 4 terms ---
+  [1] InputForm[eps[-b, -c, -d, -e]*T[-a, d, e]*T[a, b, c]]
+  [2] InputForm[eps[-a, -c, -d, -e]*T[a, b, c]*T[-b, d, e]]
+  [3] InputForm[eps[-b, -c, -d, -e]*T[a, -a, b]*T[c, d, e]]
+  [4] InputForm[eps[-a, -c, -d, -e]*T[a, b, c]*T[d, -b, e]]
+
+--- eps F x F: 1 terms ---
+  [1] InputForm[eps[-a, -b, -c, -d]*F[a, b]*F[c, d]]
+
+--- eps R x F: 3 terms ---
+  [1] InputForm[eps[-b, -c, -d, -e]*F[a, b]*R[-a, c, d, e]]
+  [2] InputForm[eps[-b, -c, -d, -e]*F[a, b]*R[c, d, -a, e]]
+  [3] InputForm[eps[-a, -b, -d, -e]*F[a, b]*R[c, d, -c, e]]
+
+=== DERIVATIVE EXTENSIONS (parity-even) ===
+
+--- DT x F: 3 terms ---
+  [1] InputForm[DT[a, b, -b, c]*F[-a, -c]]
+  [2] InputForm[DT[a, -a, b, c]*F[-b, -c]]
+  [3] InputForm[DT[a, b, -a, c]*F[-b, -c]]
+
+--- R x DT: 10 terms ---
+  [1] InputForm[DT[a, b, c, d]*R[-a, -b, -c, -d]]
+  [2] InputForm[DT[a, b, c, d]*R[-a, -c, -b, -d]]
+  [3] InputForm[DT[a, b, -b, c]*R[-a, d, -c, -d]]
+  [4] InputForm[DT[a, b, c, d]*R[-b, -c, -a, -d]]
+  [5] InputForm[DT[a, -a, b, c]*R[-b, d, -c, -d]]
+  [6] InputForm[DT[a, b, -a, c]*R[-b, d, -c, -d]]
+  [7] InputForm[DT[a, b, c, d]*R[-c, -d, -a, -b]]
+  [8] InputForm[DT[a, b, -b, c]*R[-c, d, -a, -d]]
+  [9] InputForm[DT[a, b, -a, c]*R[-c, d, -b, -d]]
+  [10] InputForm[DT[a, b, -a, -b]*R[c, d, -c, -d]]
+
+--- DT x DT: 16 terms ---
+  [1] InputForm[DT[-a, d, -c, -d]*DT[a, b, -b, c]]
+  [2] InputForm[DT[-a, -b, -c, -d]*DT[a, b, c, d]]
+  [3] InputForm[DT[-a, -c, -b, -d]*DT[a, b, c, d]]
+  [4] InputForm[DT[a, b, c, d]*DT[-b, -a, -c, -d]]
+  [5] InputForm[DT[a, b, c, d]*DT[-b, -c, -a, -d]]
+  [6] InputForm[DT[a, -a, b, c]*DT[-b, d, -c, -d]]
+  [7] InputForm[DT[a, b, -a, c]*DT[-b, d, -c, -d]]
+  [8] InputForm[DT[a, b, c, d]*DT[-c, -b, -a, -d]]
+  [9] InputForm[DT[a, b, c, d]*DT[-c, -d, -a, -b]]
+  [10] InputForm[DT[a, b, -b, c]*DT[-c, d, -a, -d]]
+  [11] InputForm[DT[a, b, -a, c]*DT[-c, d, -b, -d]]
+  [12] InputForm[DT[a, b, -a, -b]*DT[c, d, -c, -d]]
+  [13] InputForm[DT[a, -a, b, c]*DT[d, -b, -c, -d]]
+  [14] InputForm[DT[a, b, -a, c]*DT[d, -b, -c, -d]]
+  [15] InputForm[DT[a, b, -a, c]*DT[d, -c, -b, -d]]
+  [16] InputForm[DT[a, -a, b, c]*DT[d, -d, -b, -c]]
+
+=== DERIVATIVE EXTENSIONS (parity-odd) ===
+
+--- eps DT x F: 6 terms ---
+  [1] InputForm[DT[a, b, c, d]*eps[-b, -c, -d, -e]*F[-a, e]]
+  [2] InputForm[DT[a, b, c, d]*eps[-a, -c, -d, -e]*F[-b, e]]
+  [3] InputForm[DT[a, b, c, d]*eps[-a, -b, -d, -e]*F[-c, e]]
+  [4] InputForm[DT[a, b, -b, c]*eps[-a, -c, -d, -e]*F[d, e]]
+  [5] InputForm[DT[a, -a, b, c]*eps[-b, -c, -d, -e]*F[d, e]]
+  [6] InputForm[DT[a, b, -a, c]*eps[-b, -c, -d, -e]*F[d, e]]
+
+--- eps R x DT: 36 terms ---
+  [1] InputForm[DT[a, b, c, d]*eps[-c, -d, -e, -f]*R[-a, -b, e, f]]
+  [2] InputForm[DT[a, b, c, d]*eps[-b, -d, -e, -f]*R[-a, -c, e, f]]
+  [3] InputForm[DT[a, b, -b, c]*eps[-c, -d, -e, -f]*R[-a, d, e, f]]
+  [4] InputForm[DT[a, b, c, d]*eps[-c, -d, -e, -f]*R[-a, e, -b, f]]
+  [5] InputForm[DT[a, b, c, d]*eps[-b, -d, -e, -f]*R[-a, e, -c, f]]
+  [6] InputForm[DT[a, b, c, d]*eps[-b, -c, -d, -f]*R[-a, e, -e, f]]
+  [7] InputForm[DT[a, b, c, d]*eps[-a, -d, -e, -f]*R[-b, -c, e, f]]
+  [8] InputForm[DT[a, -a, b, c]*eps[-c, -d, -e, -f]*R[-b, d, e, f]]
+  [9] InputForm[DT[a, b, -a, c]*eps[-c, -d, -e, -f]*R[-b, d, e, f]]
+  [10] InputForm[DT[a, b, c, d]*eps[-c, -d, -e, -f]*R[-b, e, -a, f]]
+  [11] InputForm[DT[a, b, c, d]*eps[-a, -d, -e, -f]*R[-b, e, -c, f]]
+  [12] InputForm[DT[a, b, c, d]*eps[-a, -c, -d, -f]*R[-b, e, -e, f]]
+  [13] InputForm[DT[a, b, c, d]*eps[-a, -b, -e, -f]*R[-c, -d, e, f]]
+  [14] InputForm[DT[a, b, -b, c]*eps[-a, -d, -e, -f]*R[-c, d, e, f]]
+  [15] InputForm[DT[a, b, -a, c]*eps[-b, -d, -e, -f]*R[-c, d, e, f]]
+  [16] InputForm[DT[a, b, c, d]*eps[-b, -d, -e, -f]*R[-c, e, -a, f]]
+  [17] InputForm[DT[a, b, c, d]*eps[-a, -d, -e, -f]*R[-c, e, -b, f]]
+  [18] InputForm[DT[a, b, c, d]*eps[-a, -b, -e, -f]*R[-c, e, -d, f]]
+  [19] InputForm[DT[a, b, c, d]*eps[-a, -b, -d, -f]*R[-c, e, -e, f]]
+  [20] InputForm[DT[a, b, -a, -b]*eps[-c, -d, -e, -f]*R[c, d, e, f]]
+  [21] InputForm[DT[a, b, -b, c]*eps[-c, -d, -e, -f]*R[d, e, -a, f]]
+  [22] InputForm[DT[a, -a, b, c]*eps[-c, -d, -e, -f]*R[d, e, -b, f]]
+  [23] InputForm[DT[a, b, -a, c]*eps[-c, -d, -e, -f]*R[d, e, -b, f]]
+  [24] InputForm[DT[a, b, -b, c]*eps[-a, -d, -e, -f]*R[d, e, -c, f]]
+  [25] InputForm[DT[a, b, -a, c]*eps[-b, -d, -e, -f]*R[d, e, -c, f]]
+  [26] InputForm[DT[a, b, -b, c]*eps[-a, -c, -e, -f]*R[d, e, -d, f]]
+  [27] InputForm[DT[a, -a, b, c]*eps[-b, -c, -e, -f]*R[d, e, -d, f]]
+  [28] InputForm[DT[a, b, -a, c]*eps[-b, -c, -e, -f]*R[d, e, -d, f]]
+  [29] InputForm[DT[a, b, c, d]*eps[-c, -d, -e, -f]*R[e, f, -a, -b]]
+  [30] InputForm[DT[a, b, c, d]*eps[-b, -d, -e, -f]*R[e, f, -a, -c]]
+  [31] InputForm[DT[a, b, c, d]*eps[-b, -c, -d, -f]*R[e, f, -a, -e]]
+  [32] InputForm[DT[a, b, c, d]*eps[-a, -d, -e, -f]*R[e, f, -b, -c]]
+  [33] InputForm[DT[a, b, c, d]*eps[-a, -c, -d, -f]*R[e, f, -b, -e]]
+  [34] InputForm[DT[a, b, c, d]*eps[-a, -b, -e, -f]*R[e, f, -c, -d]]
+  [35] InputForm[DT[a, b, c, d]*eps[-a, -b, -d, -f]*R[e, f, -c, -e]]
+  [36] InputForm[DT[a, b, c, d]*eps[-a, -b, -c, -d]*R[e, f, -e, -f]]
+
+--- eps DT x DT: 38 terms ---
+  [1] InputForm[DT[a, b, c, d]*DT[-c, -d, e, f]*eps[-a, -b, -e, -f]]
+  [2] InputForm[DT[a, b, c, d]*DT[-c, e, -d, f]*eps[-a, -b, -e, -f]]
+  [3] InputForm[DT[a, b, c, d]*DT[e, -c, -d, f]*eps[-a, -b, -e, -f]]
+  [4] InputForm[DT[a, b, c, d]*DT[e, f, -c, -d]*eps[-a, -b, -e, -f]]
+  [5] InputForm[DT[a, b, -b, c]*DT[d, e, -e, f]*eps[-a, -c, -d, -f]]
+  [6] InputForm[DT[a, b, c, d]*DT[-b, -c, e, f]*eps[-a, -d, -e, -f]]
+  [7] InputForm[DT[a, b, c, d]*DT[-b, e, -c, f]*eps[-a, -d, -e, -f]]
+  [8] InputForm[DT[a, b, c, d]*DT[-c, -b, e, f]*eps[-a, -d, -e, -f]]
+  [9] InputForm[DT[a, b, -b, c]*DT[-c, d, e, f]*eps[-a, -d, -e, -f]]
+  [10] InputForm[DT[a, b, c, d]*DT[-c, e, -b, f]*eps[-a, -d, -e, -f]]
+  [11] InputForm[DT[a, b, -b, c]*DT[d, -c, e, f]*eps[-a, -d, -e, -f]]
+  [12] InputForm[DT[a, b, -b, c]*DT[d, e, -c, f]*eps[-a, -d, -e, -f]]
+  [13] InputForm[DT[a, b, c, d]*DT[e, -b, -c, f]*eps[-a, -d, -e, -f]]
+  [14] InputForm[DT[a, b, c, d]*DT[e, -c, -b, f]*eps[-a, -d, -e, -f]]
+  [15] InputForm[DT[a, -a, b, c]*DT[d, e, -e, f]*eps[-b, -c, -d, -f]]
+  [16] InputForm[DT[a, b, -a, c]*DT[d, e, -e, f]*eps[-b, -c, -d, -f]]
+  [17] InputForm[DT[a, -a, b, c]*DT[d, -d, e, f]*eps[-b, -c, -e, -f]]
+  [18] InputForm[DT[a, -a, b, c]*DT[d, e, -d, f]*eps[-b, -c, -e, -f]]
+  [19] InputForm[DT[a, b, -a, c]*DT[d, e, -d, f]*eps[-b, -c, -e, -f]]
+  [20] InputForm[DT[-a, -c, e, f]*DT[a, b, c, d]*eps[-b, -d, -e, -f]]
+  [21] InputForm[DT[-a, e, -c, f]*DT[a, b, c, d]*eps[-b, -d, -e, -f]]
+  [22] InputForm[DT[a, b, -a, c]*DT[-c, d, e, f]*eps[-b, -d, -e, -f]]
+  [23] InputForm[DT[a, b, c, d]*DT[-c, e, -a, f]*eps[-b, -d, -e, -f]]
+  [24] InputForm[DT[a, b, -a, c]*DT[d, -c, e, f]*eps[-b, -d, -e, -f]]
+  [25] InputForm[DT[a, b, -a, c]*DT[d, e, -c, f]*eps[-b, -d, -e, -f]]
+  [26] InputForm[DT[-a, d, e, f]*DT[a, b, -b, c]*eps[-c, -d, -e, -f]]
+  [27] InputForm[DT[-a, -b, e, f]*DT[a, b, c, d]*eps[-c, -d, -e, -f]]
+  [28] InputForm[DT[a, b, c, d]*DT[-b, -a, e, f]*eps[-c, -d, -e, -f]]
+  [29] InputForm[DT[a, -a, b, c]*DT[-b, d, e, f]*eps[-c, -d, -e, -f]]
+  [30] InputForm[DT[a, b, -a, c]*DT[-b, d, e, f]*eps[-c, -d, -e, -f]]
+  [31] InputForm[DT[a, b, c, d]*DT[-b, e, -a, f]*eps[-c, -d, -e, -f]]
+  [32] InputForm[DT[a, b, -a, -b]*DT[c, d, e, f]*eps[-c, -d, -e, -f]]
+  [33] InputForm[DT[a, b, -b, c]*DT[d, -a, e, f]*eps[-c, -d, -e, -f]]
+  [34] InputForm[DT[a, -a, b, c]*DT[d, -b, e, f]*eps[-c, -d, -e, -f]]
+  [35] InputForm[DT[a, b, -a, c]*DT[d, -b, e, f]*eps[-c, -d, -e, -f]]
+  [36] InputForm[DT[a, b, -b, c]*DT[d, e, -a, f]*eps[-c, -d, -e, -f]]
+  [37] InputForm[DT[a, -a, b, c]*DT[d, e, -b, f]*eps[-c, -d, -e, -f]]
+  [38] InputForm[DT[a, b, -a, c]*DT[d, e, -b, f]*eps[-c, -d, -e, -f]]
+
+=== CUBIC TERMS ===
+
+--- R x F x F: 4 terms ---
+  [1] InputForm[F[a, b]*F[c, d]*R[-a, -b, -c, -d]]
+  [2] InputForm[F[a, b]*F[c, d]*R[-a, -c, -b, -d]]
+  [3] InputForm[F[-a, c]*F[a, b]*R[-b, d, -c, -d]]
+  [4] InputForm[F[-a, -b]*F[a, b]*R[c, d, -c, -d]]
+
+--- T x T x F: 3 terms ---
+  [1] InputForm[F[a, b]*T[-a, c, d]*T[-c, -b, -d]]
+  [2] InputForm[F[a, b]*T[-a, -b, c]*T[d, -c, -d]]
+  [3] InputForm[F[a, b]*T[c, -a, -b]*T[d, -c, -d]]
+
+--- R x R x F: 8 terms ---
+  [1] InputForm[F[a, b]*R[-a, c, d, e]*R[-c, -d, -b, -e]]
+  [2] InputForm[F[a, b]*R[-a, -b, c, d]*R[-c, e, -d, -e]]
+  [3] InputForm[F[a, b]*R[-a, c, -b, d]*R[-c, e, -d, -e]]
+  [4] InputForm[F[a, b]*R[-c, e, -d, -e]*R[c, d, -a, -b]]
+  [5] InputForm[F[a, b]*R[-a, c, d, e]*R[-d, -e, -b, -c]]
+  [6] InputForm[F[a, b]*R[-a, c, -c, d]*R[-d, e, -b, -e]]
+  [7] InputForm[F[a, b]*R[-a, c, -b, d]*R[-d, e, -c, -e]]
+  [8] InputForm[F[a, b]*R[-a, c, -b, -c]*R[d, e, -d, -e]]
+
+--- DT x F x F: 5 terms ---
+  [1] InputForm[DT[a, b, c, d]*F[-a, -c]*F[-b, -d]]
+  [2] InputForm[DT[a, b, c, d]*F[-a, -b]*F[-c, -d]]
+  [3] InputForm[DT[a, b, -b, c]*F[-a, d]*F[-c, -d]]
+  [4] InputForm[DT[a, b, -a, c]*F[-b, d]*F[-c, -d]]
+  [5] InputForm[DT[a, b, -a, -b]*F[-c, -d]*F[c, d]]
+
+=== CUBIC PARITY-ODD ===
+
+--- eps R x F x F: 12 terms ---
+  [1] InputForm[eps[-c, -d, -e, -f]*F[a, b]*F[c, d]*R[-a, -b, e, f]]
+  [2] InputForm[eps[-b, -d, -e, -f]*F[a, b]*F[c, d]*R[-a, -c, e, f]]
+  [3] InputForm[eps[-c, -d, -e, -f]*F[a, b]*F[c, d]*R[-a, e, -b, f]]
+  [4] InputForm[eps[-b, -d, -e, -f]*F[a, b]*F[c, d]*R[-a, e, -c, f]]
+  [5] InputForm[eps[-b, -c, -d, -f]*F[a, b]*F[c, d]*R[-a, e, -e, f]]
+  [6] InputForm[eps[-c, -d, -e, -f]*F[-a, c]*F[a, b]*R[-b, d, e, f]]
+  [7] InputForm[eps[-c, -d, -e, -f]*F[-a, -b]*F[a, b]*R[c, d, e, f]]
+  [8] InputForm[eps[-c, -d, -e, -f]*F[-a, c]*F[a, b]*R[d, e, -b, f]]
+  [9] InputForm[eps[-c, -d, -e, -f]*F[a, b]*F[c, d]*R[e, f, -a, -b]]
+  [10] InputForm[eps[-b, -d, -e, -f]*F[a, b]*F[c, d]*R[e, f, -a, -c]]
+  [11] InputForm[eps[-b, -c, -d, -f]*F[a, b]*F[c, d]*R[e, f, -a, -e]]
+  [12] InputForm[eps[-a, -b, -c, -d]*F[a, b]*F[c, d]*R[e, f, -e, -f]]
+
+--- eps T x T x F: 15 terms ---
+  [1] InputForm[eps[-b, -d, -e, -f]*F[a, b]*T[-a, c, d]*T[-c, e, f]]
+  [2] InputForm[eps[-b, -d, -e, -f]*F[a, b]*T[-c, e, f]*T[c, -a, d]]
+  [3] InputForm[eps[-a, -b, -c, -f]*F[a, b]*T[c, d, e]*T[-d, -e, f]]
+  [4] InputForm[eps[-b, -c, -e, -f]*F[a, b]*T[c, -a, d]*T[-d, e, f]]
+  [5] InputForm[eps[-a, -b, -e, -f]*F[a, b]*T[c, -c, d]*T[-d, e, f]]
+  [6] InputForm[eps[-c, -d, -e, -f]*F[a, b]*T[-a, -b, c]*T[d, e, f]]
+  [7] InputForm[eps[-c, -d, -e, -f]*F[a, b]*T[c, -a, -b]*T[d, e, f]]
+  [8] InputForm[eps[-b, -d, -e, -f]*F[a, b]*T[c, -a, -c]*T[d, e, f]]
+  [9] InputForm[eps[-c, -d, -e, -f]*F[a, b]*T[-a, c, d]*T[e, -b, f]]
+  [10] InputForm[eps[-b, -d, -e, -f]*F[a, b]*T[-a, c, d]*T[e, -c, f]]
+  [11] InputForm[eps[-b, -d, -e, -f]*F[a, b]*T[c, -a, d]*T[e, -c, f]]
+  [12] InputForm[eps[-b, -c, -e, -f]*F[a, b]*T[c, -a, d]*T[e, -d, f]]
+  [13] InputForm[eps[-a, -b, -e, -f]*F[a, b]*T[c, -c, d]*T[e, -d, f]]
+  [14] InputForm[eps[-b, -c, -d, -f]*F[a, b]*T[-a, c, d]*T[e, -e, f]]
+  [15] InputForm[eps[-b, -c, -d, -f]*F[a, b]*T[c, -a, d]*T[e, -e, f]]
+
+--- eps F x F x DT: 18 terms ---
+  [1] InputForm[DT[a, b, c, d]*eps[-c, -d, -e, -f]*F[-a, e]*F[-b, f]]
+  [2] InputForm[DT[a, b, c, d]*eps[-b, -d, -e, -f]*F[-a, e]*F[-c, f]]
+  [3] InputForm[DT[a, b, c, d]*eps[-a, -d, -e, -f]*F[-b, e]*F[-c, f]]
+  [4] InputForm[DT[a, b, c, d]*eps[-a, -b, -e, -f]*F[-c, e]*F[-d, f]]
+  [5] InputForm[DT[a, b, c, d]*eps[-b, -c, -d, -f]*F[-a, e]*F[-e, f]]
+  [6] InputForm[DT[a, b, c, d]*eps[-a, -c, -d, -f]*F[-b, e]*F[-e, f]]
+  [7] InputForm[DT[a, b, c, d]*eps[-a, -b, -d, -f]*F[-c, e]*F[-e, f]]
+  [8] InputForm[DT[a, b, c, d]*eps[-c, -d, -e, -f]*F[-a, -b]*F[e, f]]
+  [9] InputForm[DT[a, b, c, d]*eps[-b, -d, -e, -f]*F[-a, -c]*F[e, f]]
+  [10] InputForm[DT[a, b, -b, c]*eps[-c, -d, -e, -f]*F[-a, d]*F[e, f]]
+  [11] InputForm[DT[a, b, c, d]*eps[-a, -d, -e, -f]*F[-b, -c]*F[e, f]]
+  [12] InputForm[DT[a, -a, b, c]*eps[-c, -d, -e, -f]*F[-b, d]*F[e, f]]
+  [13] InputForm[DT[a, b, -a, c]*eps[-c, -d, -e, -f]*F[-b, d]*F[e, f]]
+  [14] InputForm[DT[a, b, c, d]*eps[-a, -b, -e, -f]*F[-c, -d]*F[e, f]]
+  [15] InputForm[DT[a, b, -b, c]*eps[-a, -d, -e, -f]*F[-c, d]*F[e, f]]
+  [16] InputForm[DT[a, b, -a, c]*eps[-b, -d, -e, -f]*F[-c, d]*F[e, f]]
+  [17] InputForm[DT[a, b, -a, -b]*eps[-c, -d, -e, -f]*F[c, d]*F[e, f]]
+  [18] InputForm[DT[a, b, c, d]*eps[-a, -b, -c, -d]*F[-e, -f]*F[e, f]]
+
+
+=== DONE ===

@@ -42,10 +42,20 @@ def build_rhs_evaluator(
     grid: GridInfo,
     parameters: dict[str, float] | None,
     bc: BCSpec | None,
+    *,
+    rtol: float | None = None,
 ) -> RHSEvaluator:
     """Build CoefficientEvaluator + RHSEvaluator from spec.
 
     Handles the lazy import to avoid circular dependencies.
+
+    Parameters
+    ----------
+    rtol : float, optional
+        Solver relative tolerance.  When provided, the periodic-coefficient
+        continuity check scales its warn/error thresholds with ``sqrt(rtol)``
+        so that machine-precision solvers are stricter and coarse exploratory
+        runs are more lenient.
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
     from tidal.solver.rhs import RHSEvaluator as _RHSEvaluator  # noqa: PLC0415
@@ -58,7 +68,7 @@ def build_rhs_evaluator(
         from tidal.solver.operators import is_periodic_bc  # noqa: PLC0415
 
         periodic = tuple(is_periodic_bc(b) for b in bc)
-        coeff_eval.check_periodic_coefficient_continuity(periodic)
+        coeff_eval.check_periodic_coefficient_continuity(periodic, rtol=rtol)
 
     return _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
 

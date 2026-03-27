@@ -288,6 +288,142 @@ class TestHigherOrder2D:
 
 
 # ---------------------------------------------------------------------------
+# Convergence stress tests (issue #82)
+# ---------------------------------------------------------------------------
+
+
+class TestCrossDerivativeConvergenceOrder:
+    """Verify cross-derivative convergence rate matches FD order.
+
+    Uses sin(x)·sin(y) on 2D periodic domain: ∂²f/∂x∂y = cos(x)·cos(y).
+    """
+
+    grid_sizes: ClassVar[list[int]] = [16, 32, 64, 128]
+
+    def _compute_cross_errors(self, order: int) -> dict[int, float]:
+        set_fd_order(order)
+        errors: dict[int, float] = {}
+        for n in self.grid_sizes:
+            grid = GridInfo(
+                bounds=((0.0, 2 * np.pi), (0.0, 2 * np.pi)),
+                shape=(n, n),
+                periodic=(True, True),
+            )
+            x = grid.cell_coords[..., 0]
+            y = grid.cell_coords[..., 1]
+            f = np.sin(x) * np.sin(y)
+            exact = np.cos(x) * np.cos(y)
+            cd = cross_derivative(f, 0, 1, grid)
+            errors[n] = float(np.max(np.abs(cd - exact)))
+        return errors
+
+    def test_order_2(self) -> None:
+        """2nd-order cross derivative converges as O(dx²)."""
+        errors = self._compute_cross_errors(2)
+        slope = _convergence_slope(errors, self.grid_sizes)
+        assert slope == pytest.approx(2.0, abs=0.3), (
+            f"Expected slope ~2, got {slope:.2f}"
+        )
+
+    def test_order_4(self) -> None:
+        """4th-order cross derivative converges as O(dx⁴)."""
+        errors = self._compute_cross_errors(4)
+        slope = _convergence_slope(errors, self.grid_sizes)
+        assert slope == pytest.approx(4.0, abs=0.3), (
+            f"Expected slope ~4, got {slope:.2f}"
+        )
+
+    def test_order_6(self) -> None:
+        """6th-order cross derivative converges as O(dx⁶)."""
+        errors = self._compute_cross_errors(6)
+        slope = _convergence_slope(errors, self.grid_sizes)
+        assert slope == pytest.approx(6.0, abs=0.4), (
+            f"Expected slope ~6, got {slope:.2f}"
+        )
+
+
+class TestDirectionalLaplacianConvergenceOrder2D:
+    """Verify directional Laplacian convergence in 2D.
+
+    Uses sin(2x)·cos(y): ∂²f/∂x² = -4·sin(2x)·cos(y).
+    Tests that per-axis Laplacian converges correctly even
+    when the other axis has nontrivial structure.
+    """
+
+    grid_sizes: ClassVar[list[int]] = [16, 32, 64, 128]
+
+    def _compute_dir_lap_errors(self, order: int) -> dict[int, float]:
+        set_fd_order(order)
+        errors: dict[int, float] = {}
+        for n in self.grid_sizes:
+            grid = GridInfo(
+                bounds=((0.0, 2 * np.pi), (0.0, 2 * np.pi)),
+                shape=(n, n),
+                periodic=(True, True),
+            )
+            x = grid.cell_coords[..., 0]
+            y = grid.cell_coords[..., 1]
+            f = np.sin(2 * x) * np.cos(y)
+            exact = -4.0 * np.sin(2 * x) * np.cos(y)
+            lap_x = directional_laplacian(f, 0, grid)
+            errors[n] = float(np.max(np.abs(lap_x - exact)))
+        return errors
+
+    def test_order_2(self) -> None:
+        """2nd-order directional Laplacian in 2D converges as O(dx²)."""
+        errors = self._compute_dir_lap_errors(2)
+        slope = _convergence_slope(errors, self.grid_sizes)
+        assert slope == pytest.approx(2.0, abs=0.2), (
+            f"Expected slope ~2, got {slope:.2f}"
+        )
+
+    def test_order_4(self) -> None:
+        """4th-order directional Laplacian in 2D converges as O(dx⁴)."""
+        errors = self._compute_dir_lap_errors(4)
+        slope = _convergence_slope(errors, self.grid_sizes)
+        assert slope == pytest.approx(4.0, abs=0.3), (
+            f"Expected slope ~4, got {slope:.2f}"
+        )
+
+
+class TestHighWavenumberStress:
+    """Stress test: high-wavenumber functions near the Nyquist limit.
+
+    Uses sin(k·x) with k = N/4, which is half the Nyquist frequency.
+    This tests the regime where FD errors are largest and numerical
+    dispersion is most pronounced.
+    """
+
+    def test_gradient_high_k(self) -> None:
+        """Gradient of high-k sine at N=256 with order 6 has reasonable error."""
+        n = 256
+        k = n // 4
+        grid = GridInfo(bounds=((0.0, 2 * np.pi),), shape=(n,), periodic=(True,))
+        x = grid.cell_coords[..., 0]
+        f = np.sin(k * x)
+        set_fd_order(6)
+        g = gradient(f, 0, grid)
+        exact = k * np.cos(k * x)
+        rel_err = float(np.max(np.abs(g - exact))) / k
+        # At k = N/4, order-6 FD should still achieve < 5% relative error
+        assert rel_err < 0.05, f"Relative error {rel_err:.4f} too large"
+
+    def test_laplacian_high_k(self) -> None:
+        """Laplacian of high-k sine at N=256 with order 6."""
+        n = 256
+        k = n // 4
+        grid = GridInfo(bounds=((0.0, 2 * np.pi),), shape=(n,), periodic=(True,))
+        x = grid.cell_coords[..., 0]
+        f = np.sin(k * x)
+        set_fd_order(6)
+        lap = directional_laplacian(f, 0, grid)
+        exact = -(k**2) * np.sin(k * x)
+        rel_err = float(np.max(np.abs(lap - exact))) / (k**2)
+        # Laplacian is harder at high k; allow 15% relative error
+        assert rel_err < 0.15, f"Relative error {rel_err:.4f} too large"
+
+
+# ---------------------------------------------------------------------------
 # State management tests
 # ---------------------------------------------------------------------------
 

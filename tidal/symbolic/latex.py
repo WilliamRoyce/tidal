@@ -16,6 +16,7 @@ Primary public entry point:
 from __future__ import annotations
 
 import re
+from fractions import Fraction
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -41,6 +42,7 @@ _GREEK_MAP: dict[str, str] = {
     "iota": r"\iota",
     "kappa": r"\kappa",
     "lambda": r"\lambda",
+    "lam": r"\lambda",
     "mu": r"\mu",
     "nu": r"\nu",
     "xi": r"\xi",
@@ -69,6 +71,66 @@ _GREEK_RE = re.compile(
 )
 
 # ---------------------------------------------------------------------------
+# Mathematica function → LaTeX mapping
+# (mirrors _FUNCTION_MAP in _eval_utils.py; Sqrt/Abs/Exp handled separately)
+# ---------------------------------------------------------------------------
+
+_MATH_FUNC_LATEX: dict[str, str] = {
+    # Trig
+    "Sin": r"\sin",
+    "Cos": r"\cos",
+    "Tan": r"\tan",
+    "Cot": r"\cot",
+    "Sec": r"\sec",
+    "Csc": r"\csc",
+    # Inverse trig
+    "ArcSin": r"\arcsin",
+    "ArcCos": r"\arccos",
+    "ArcTan": r"\arctan",
+    # Hyperbolic
+    "Sinh": r"\sinh",
+    "Cosh": r"\cosh",
+    "Tanh": r"\tanh",
+    # Inverse hyperbolic
+    "ArcSinh": r"\operatorname{arcsinh}",
+    "ArcCosh": r"\operatorname{arccosh}",
+    "ArcTanh": r"\operatorname{arctanh}",
+    # Logarithmic
+    "Log": r"\ln",
+    # Special
+    "Erf": r"\operatorname{erf}",
+    "Sign": r"\operatorname{sgn}",
+    "UnitStep": r"\Theta",
+    "HeavisideTheta": r"\Theta",
+}
+
+# Regex: FuncName[expr] → \funcname(expr)   (sorted longest-first)
+_RE_MATH_FUNC = re.compile(
+    r"\b("
+    + "|".join(sorted(_MATH_FUNC_LATEX, key=len, reverse=True))
+    + r")\[([^\[\]]+)\]"
+)
+
+# Sqrt[expr] → \sqrt{expr}  (separate: uses braces not parens)
+_RE_SQRT = re.compile(r"\bSqrt\[([^\[\]]+)\]")
+
+# Abs[expr] → \left| expr \right|
+_RE_ABS = re.compile(r"\bAbs\[([^\[\]]+)\]")
+
+
+def _convert_math_functions(s: str) -> str:
+    """Convert Mathematica math functions to LaTeX equivalents."""
+    # Sqrt → \sqrt{} (must come before general func replacement)
+    s = _RE_SQRT.sub(r"\\sqrt{\1}", s)
+    # Abs → |...|
+    s = _RE_ABS.sub(r"\\left| \1 \\right|", s)
+    # General functions: FuncName[expr] → \funcname(expr)
+    return _RE_MATH_FUNC.sub(
+        lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})", s
+    )
+
+
+# ---------------------------------------------------------------------------
 # Operator → LaTeX mapping
 # ---------------------------------------------------------------------------
 
@@ -87,12 +149,19 @@ _OPERATOR_LATEX: dict[str, str] = {
     "first_derivative_t": r"\partial_t",
     "biharmonic": r"\nabla^4",
     "time_derivative": "dot",  # sentinel for Hamiltonian factors
+    # Ostrogradsky higher time derivatives
+    "d2_t": r"\partial_t^2",
+    "d3_t": r"\partial_t^{3}",
+    "d4_t": r"\partial_t^{4}",
 }
 
 # Dynamic operator patterns (from json_loader.py)
 _RE_SINGLE_AXIS = re.compile(r"^derivative_(\d+)_([xyzwvu])$")
 _RE_MULTI_AXIS = re.compile(r"^derivative_((?:\d+[xyzwvu])+)$")
-_RE_MIXED = re.compile(r"^mixed_(\d+)_((?:\d+_?)*)$")
+# New format from rhs.py: mixed_T{n}_S{m}{axis}
+_RE_MIXED_NEW = re.compile(r"^mixed_T(\d+)_S(\d+)([xyzwvu])$")
+# Old format from energy.py: mixed_{T}_{S1}_{S2}_... (positional spatial orders)
+_RE_MIXED_OLD = re.compile(r"^mixed_(\d+(?:_\d+)+)$")
 
 # ---------------------------------------------------------------------------
 # Coefficient rendering helpers
@@ -101,7 +170,6 @@ _RE_MIXED = re.compile(r"^mixed_(\d+)_((?:\d+_?)*)$")
 _RE_E_POWER = re.compile(r"\bE\^")
 _RE_RATIONAL = re.compile(r"Rational\[([^,\]]+),\s*([^,\]]+)\]")
 _RE_PI = re.compile(r"\bPi\b")
-_RE_SQRT = re.compile(r"Sqrt\[([^\[\]]+)\]")
 _RE_COORD_CALL = re.compile(r"\b([xyzwvut])\s*\[\s*\]")
 _RE_DIGIT_SUFFIX = re.compile(r"^([A-Za-z]+?)(\d+)$")
 _RE_POWER_PAREN = re.compile(r"\^\(([^)]+)\)")
@@ -175,6 +243,10 @@ def coefficient_to_latex(expr: str) -> str:
     # Step 5: Coordinate calls x[] → x
     s = _RE_COORD_CALL.sub(r"\1", s)
 
+    # Step 5b: Math functions: Tanh[x] → \tanh(x), Abs[x] → |x|, etc.
+    s = _RE_ABS.sub(r"\\left| \1 \\right|", s)
+    s = _RE_MATH_FUNC.sub(lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})", s)
+
     # Step 6: Numeric prefix fraction: -1/2*(rest) or 1/2*(rest) → -\frac{1}{2}(rest)
     prefix_frac = re.match(r"^(-?)(\d+)/(\d+)\*(.+)$", s)
     if prefix_frac:
@@ -208,6 +280,13 @@ def _coefficient_inner(s: str) -> str:
     """Apply Greek, subscript, and power transforms to an expression fragment."""
     # Strip outer parens for cleaner output
     s = _strip_outer_parens(s)
+
+    # Convert Mathematica functions before any other processing
+    s = _convert_math_functions(s)
+
+    # Greek prefix extraction: omegaP2 → omega P2 (before Greek substitution)
+    for greek in sorted(_GREEK_MAP, key=len, reverse=True):
+        s = re.sub(rf"\b{greek}([A-Z])", rf"{greek} \1", s)
 
     # Greek letter substitution
     s = _GREEK_RE.sub(lambda m: _GREEK_MAP[m.group(1)], s)
@@ -358,15 +437,29 @@ def _operator_dynamic(operator: str, field_latex: str) -> str | None:
         ]
         return " ".join(parts) + f" {field_latex}"
 
-    # mixed_T_S1_S2_... → \partial_t^T \partial_x^S1 ...
-    m = _RE_MIXED.match(operator)
+    # New format: mixed_T{n}_S{m}{axis} → \partial_t^n \partial_{axis}^m
+    m = _RE_MIXED_NEW.match(operator)
     if m:
+        t_order, s_order, axis = m.group(1), m.group(2), m.group(3)
         parts_list: list[str] = []
-        if m.group(1) != "0":
-            parts_list.append(_partial_order("t", m.group(1)))
-        for i, s_order in enumerate(m.group(2).rstrip("_").split("_")):
-            if s_order and s_order != "0":
-                parts_list.append(_partial_order(chr(ord("x") + i), s_order))
+        if t_order != "0":
+            parts_list.append(_partial_order("t", t_order))
+        if s_order != "0":
+            parts_list.append(_partial_order(axis, s_order))
+        return " ".join(parts_list) + f" {field_latex}"
+
+    # Old format: mixed_{T}_{S1}_{S2}_{S3} → \partial_t^T \partial_x^S1 ...
+    m = _RE_MIXED_OLD.match(operator)
+    if m:
+        nums = operator.split("_")[1:]  # strip "mixed" prefix
+        t_order = nums[0]
+        parts_list = []
+        if t_order != "0":
+            parts_list.append(_partial_order("t", t_order))
+        axes = "xyzwvu"
+        for i, s_order in enumerate(nums[1:]):
+            if s_order != "0" and i < len(axes):
+                parts_list.append(_partial_order(axes[i], s_order))
         return " ".join(parts_list) + f" {field_latex}"
 
     return None
@@ -475,6 +568,21 @@ def equation_to_latex(
 _COEFF_TOL = 1e-12
 
 
+_FRAC_TOL = 1e-12  # tolerance for fraction approximation
+
+
+def _format_numeric_coeff(value: float) -> str:
+    """Format a numeric coefficient, using fractions when exact."""
+    frac = Fraction(value).limit_denominator(10000)
+    # Check if the fraction is a good approximation
+    if abs(float(frac) - value) < _FRAC_TOL:
+        if frac.denominator == 1:
+            return str(frac.numerator)
+        sign = "-" if frac.numerator < 0 else ""
+        return rf"{sign}\frac{{{abs(frac.numerator)}}}{{{frac.denominator}}}"
+    return f"{value:g}"
+
+
 def _render_term_coefficient(
     numeric: float, symbolic: str | None, *, is_first: bool
 ) -> str:
@@ -484,17 +592,22 @@ def _render_term_coefficient(
     or "+" sign-only otherwise.
     """
     if symbolic is not None:
-        tex = coefficient_to_latex(symbolic)
-        if not is_first and not tex.lstrip().startswith("-"):
-            return f"+ {tex}"
-        return tex
+        # If symbolic contains unresolvable Mathematica (e.g., Derivative[...]),
+        # fall back to the numeric value rendered as a fraction.
+        if re.search(r"Derivative\[|PD\w+\[", symbolic):
+            symbolic = None  # fall through to numeric path below
+        else:
+            tex = coefficient_to_latex(symbolic)
+            if not is_first and not tex.lstrip().startswith("-"):
+                return f"+ {tex}"
+            return tex
 
-    # Numeric only
+    # Numeric only — try to render as fraction if possible
     if abs(numeric - 1.0) < _COEFF_TOL:
         return "" if is_first else "+"
     if abs(numeric + 1.0) < _COEFF_TOL:
         return "-"
-    formatted = f"{numeric:g}"
+    formatted = _format_numeric_coeff(numeric)
     if not is_first and numeric > 0:
         formatted = f"+ {formatted}"
     return formatted
@@ -563,7 +676,8 @@ _TENSOR_NAME_MAP: dict[str, str] = {
     "bg": r"\bar{g}",
     "epsiloneta": r"\epsilon",
     "TorsionCDT": "T",
-    "RicciScalarCD": "R",
+    "RicciScalarCDT": r"\tilde{\mathcal{R}}",
+    "RicciScalarCD": r"\mathcal{R}",
 }
 
 # Module-level metric symbol for the current render pass.
@@ -664,6 +778,8 @@ _RE_GREEK_NO_BACKSLASH = re.compile(
 
 def _lagrangian_cleanup(s: str) -> str:
     """Apply final cleanup to Lagrangian LaTeX output."""
+    # Convert Mathematica functions before any other processing
+    s = _convert_math_functions(s)
     s = s.replace("*", r" \, ")
     # Parenthesized fractions: (A/B) → \frac{A}{B} (before Greek, so names stay intact)
     s = re.sub(r"\(([^()]+/[^()]+)\)", _paren_frac, s)
@@ -673,8 +789,27 @@ def _lagrangian_cleanup(s: str) -> str:
         lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}",
         s,
     )
-    # Greek substitution for remaining parameter names (skip already-escaped)
-    s = _RE_GREEK_NO_BACKSLASH.sub(lambda m: _GREEK_MAP[m.group(1)], s)
+    # Greek prefix extraction: omegaP2 → omega P2, so Greek + subscript work
+    # Inserts a space between a Greek name and a trailing uppercase letter.
+    for greek in sorted(_GREEK_MAP, key=len, reverse=True):
+        s = re.sub(rf"\b{greek}([A-Z])", rf"{greek} \1", s)
+    # Subscript splitting BEFORE Greek so that alpha1 → alpha_{1} → \alpha_{1}
+    # (Greek regex uses \b which fails on alpha1 since 1 is a word char)
+    s = re.sub(
+        r"(?<!\\)\b([A-Za-z]+?)(\d+)\b",
+        lambda m: rf"{m.group(1)}_{{{m.group(2)}}}",
+        s,
+    )
+    # Greek substitution for remaining parameter names (skip already-escaped).
+    # After subscript splitting, alpha_{1} has _ after alpha, which is a word char,
+    # so the standard \b boundary fails. Use lookahead for \b OR _ OR {.
+    s = re.sub(
+        r"(?<!\\)\b("
+        + "|".join(sorted(_GREEK_MAP, key=len, reverse=True))
+        + r")(?=\b|[_{])",
+        lambda m: _GREEK_MAP[m.group(1)],
+        s,
+    )
     # Powers: ^(expr) → ^{expr}
     s = _RE_POWER_PAREN.sub(lambda m: f"^{{{m.group(1)}}}", s)
     # Clean up double spaces
@@ -719,8 +854,9 @@ def lagrangian_to_latex(expr: str) -> str:
         prev = s
         s = _RE_CD_ABSTRACT.sub(_replace_cd_abstract, s)
 
-    # Pass 3: Named special objects
-    s = re.sub(r"\bRicciScalarCD\[\]", "R", s)
+    # Pass 3: Named special objects (longer names first to avoid prefix match)
+    s = re.sub(r"\bRicciScalarCDT\[\]", r"\\tilde{\\mathcal{R}}", s)
+    s = re.sub(r"\bRicciScalarCD\[\]", r"\\mathcal{R}", s)
 
     # Pass 4: Tensor objects with indices
     s = _RE_TENSOR_INDICES.sub(_replace_tensor_match, s)

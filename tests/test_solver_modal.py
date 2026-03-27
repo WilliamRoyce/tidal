@@ -1126,7 +1126,7 @@ class TestConstraintElimination:
         k_grid = _build_k_grid(k_axes)
         rfft_shape = (17,)
 
-        A_red, _, _, _ = _build_constraint_eliminated_matrices(
+        A_red, _, _, _, _ = _build_constraint_eliminated_matrices(
             spec,
             StateLayout.from_spec(spec, grid.num_points),
             grid,

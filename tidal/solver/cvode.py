@@ -159,7 +159,7 @@ def solve_cvode(  # noqa: PLR0913
     layout = StateLayout.from_spec(spec, grid.num_points)
 
     warn_frozen_constraints(layout, "CVODE")
-    rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
+    rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc, rtol=rtol)
 
     # Build RHS closure
     rhsfn = _build_rhsfn(spec, layout, grid, bc, rhs_eval)
