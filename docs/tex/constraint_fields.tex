@@ -538,6 +538,43 @@ Theory & Constraint type & Modal path & Non-modal path \\
 \end{tabular}
 \end{table}
 
+\subsection{Origin of \texttt{d2\_t} Operators in Constraint Equations}
+\label{sec:cf-d2t-origin}
+
+Constraint equations (time derivative order $= 0$) may contain second
+time derivative (\texttt{d2\_t}) operators applied to \emph{other} fields.
+This is physically correct and arises from two distinct mechanisms:
+
+\paragraph{Fierz--Pauli trace coupling (massive gravity).}
+The Fierz--Pauli mass term $m^2(h_{ab}h^{ab} - h^2)$ contains the
+trace-squared term $h^2 = (h^a{}_a)^2$, which mixes all diagonal metric
+components.  When computing the linearised Einstein tensor $G^{(1)}_{xx}$,
+the Ricci scalar contribution $R^{(1)} \propto \partial^2_t(h_{xx} + h_{yy})
++ \text{spatial}$ introduces $\partial^2_t h_{yy}$ into the $xx$ equation
+and vice versa.  The pipeline's cross-field equation reassignment assigns each
+equation to the field whose own $\partial^2_t$ it \emph{lacks}, producing
+constraint-like equations ($\text{time order} = 0$) that reference other
+fields' accelerations.  This structure is \textbf{specific to the Fierz--Pauli
+mass term} and does not appear in PGT torsion theories.
+
+\paragraph{$\tilde{R}^2$ curvature-squared coupling (PGT with $b_5 \neq 0$).}
+The $b_5 \tilde{R}^2$ term in the PGT Lagrangian produces fourth-order
+derivatives.  After linearisation and plane-wave reduction, constraint
+equations acquire \texttt{mixed\_T2\_S1x} operators (e.g.\
+$\partial^2_t \partial_x$) applied to torsion fields.  These operators
+have symbolic coefficients proportional to $b_5$; with $b_5 = 0$
+(Einstein--Cartan limit), \textbf{all constraint equations are clean} ---
+no \texttt{d2\_t} or \texttt{mixed\_T2} operators appear.
+
+\paragraph{PGT torsion mass terms.}
+The quadratic torsion invariants $\alpha_1 I_1 + \alpha_2 I_2 + \alpha_3 I_3$
+are purely algebraic in the torsion field (no derivatives of torsion, since
+$T^a{}_{bc}$ is already a first derivative of the tetrad).  They act as mass
+terms for torsion modes and \textbf{never} produce higher-order time
+derivative coupling in constraint equations.  Parameter sweeps over
+$\alpha_1, \alpha_2, \alpha_3$ with $b_5 = 0$ are therefore entirely free
+of \texttt{d2\_t} complications.
+
 \subsection{References}
 \label{sec:cf-references}
 
