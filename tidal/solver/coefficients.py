@@ -411,7 +411,7 @@ class CoefficientEvaluator:
         if rtol is not None:
             import math  # noqa: PLC0415
 
-            sf = math.sqrt(rtol / 1e-8)  # normalised to CVODE default
+            sf = math.sqrt(rtol / 1e-8)  # normalized to CVODE default
             thresh_warn = _LEAK_WARN_THRESHOLD * sf
             thresh_error = _LEAK_ERROR_THRESHOLD * sf
         else:
