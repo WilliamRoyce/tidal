@@ -1291,20 +1291,21 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
     (* Release batch memory *)
     batch =.; traced =.;
 
-    (* After the first batch, adapt batch size based on observed expansion.  *)
-    (* Only DECREASE — never increase above default. Expand[] is super-     *)
-    (* linear: doubling batch size can 10-20x the cost due to cross-term    *)
-    (* interactions during simplification. The default batchSize=50 is      *)
-    (* empirically optimal for most theories.                               *)
-    If[batchStart == 1 && peakTerms > 0,
+    (* Continuous adaptive batching: re-measure expansion factor EVERY batch. *)
+    (* Previous approach sampled only the first batch, which fails when      *)
+    (* later batches have different coupling structure (e.g., cross-field    *)
+    (* terms with higher K). Only DECREASE — never increase above default.  *)
+    (* Expand[] is super-linear: 2x batch → 10-20x time.                   *)
+    (* Ref: issue #198 — first-batch sampling breaks for multi-field theories. *)
+    If[peakTerms > 0,
       expansionFactor = N[peakTerms / (batchEnd - batchStart + 1)];
       If[expansionFactor > 0,
         currentBatchSize = Max[5, Floor[targetPeak / expansionFactor]];
         (* Never increase above default — Expand cost is super-linear *)
         currentBatchSize = Min[currentBatchSize, batchSize];
-        If[currentBatchSize != batchSize,
+        If[currentBatchSize != (batchEnd - batchStart + 1),
           Print["    adaptive batch: expansion=",
-                Round[expansionFactor, 0.1], "x, reducing batch to ", currentBatchSize,
+                Round[expansionFactor, 0.1], "x, batch -> ", currentBatchSize,
                 " (target peak=", targetPeak, ")"]
         ]
       ]
@@ -1913,11 +1914,42 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
 
   (* Step 2: Staggered ToBasis + ToValues + TraceBasisDummy                *)
   (* Ref: supervisor's EuclideanSplinter (commit 4a89164).                 *)
-  (* Replaces the old single-ToBasis + BatchedTraceBasisDummy + steps 4-7  *)
-  (* with a unified pipeline that pre-evaluates ComponentValues BEFORE     *)
-  (* TraceBasisDummy, dramatically reducing the dummy-index enumeration.   *)
-  componentExpr = StaggeredToBasis[componentExpr, chart, computeChristoffels];
-  componentExpr = Expand[componentExpr];
+  (* With pre-computed CD shorthand ComponentValues, ToValues resolves     *)
+  (* CDN-field tensors in O(1), reducing TraceBasisDummy dummy pairs.      *)
+  (*                                                                        *)
+  (* Batched processing for large expressions (>50 terms): process in      *)
+  (* adaptive batches through StaggeredToBasis to prevent O(dim^{2K})     *)
+  (* blowup when cross-field coupling creates high-K terms.               *)
+  (* Continuous adaptive: re-measure each batch, not just the first.       *)
+  (* Ref: issue #198 — single-pass fails for multi-field theories.        *)
+  If[Head[componentExpr] === Plus && Length[componentExpr] > 50,
+    Module[{terms, scalarResult = 0, scalarBatch, scalarBatchResult,
+            scalarBatchN = 50, tScalarBatch, scalarBatchTime},
+      terms = List @@ componentExpr;
+      Print["    [scalar] batched Splinter: ", Length[terms], " terms"];
+      Do[
+        scalarBatch = Total[terms[[i ;; Min[i + scalarBatchN - 1, Length[terms]]]]];
+        tScalarBatch = AbsoluteTime[];
+        scalarBatchResult = StaggeredToBasis[scalarBatch, chart, computeChristoffels];
+        scalarBatchResult = Expand[scalarBatchResult];
+        scalarBatchTime = AbsoluteTime[] - tScalarBatch;
+        Print["      batch[", i, ":", Min[i + scalarBatchN - 1, Length[terms]],
+              "/", Length[terms], "]: ",
+              If[Head[scalarBatchResult]===Plus, Length[scalarBatchResult], 1],
+              " terms (", Round[scalarBatchTime, 0.1], "s)"];
+        (* Continuous adaptive: halve batch if slow, double if fast *)
+        If[scalarBatchTime > 10.0, scalarBatchN = Max[5, Floor[scalarBatchN / 2]]];
+        If[scalarBatchTime < 1.0 && scalarBatchN < 50,
+          scalarBatchN = Min[50, scalarBatchN * 2]];
+        scalarResult += scalarBatchResult;
+        Share[];,
+        {i, 1, Length[terms], scalarBatchN}
+      ];
+      componentExpr = scalarResult;
+    ],
+    componentExpr = StaggeredToBasis[componentExpr, chart, computeChristoffels];
+    componentExpr = Expand[componentExpr];
+  ];
   Print["    [scalar] step2-Splinter: ", Round[MemoryInUse[]/1024.^2], " MB, ",
         If[Head[componentExpr]===Plus, Length[componentExpr], 1], " terms"];
   (* Diagnostic: check for residual abstract indices *)
