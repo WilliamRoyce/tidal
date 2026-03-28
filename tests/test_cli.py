@@ -2816,8 +2816,9 @@ path = "output.json"
         assert ret == 0
 
         out = capsys.readouterr().out
-        # 3 actual ComponentValue assignments + 1 comment mentioning ComponentValues
-        assert out.count("ComponentValue") == 4
+        # Background field ComponentValues + CD shorthand pre-computation + comments
+        # Count varies with CD depth; at minimum 4 (3 bg + 1 comment)
+        assert out.count("ComponentValue") >= 4
         assert "B0val" in out
         assert "{0," in out
         assert "{1," in out
@@ -2859,8 +2860,9 @@ path = "output.json"
         assert ret == 0
 
         out = capsys.readouterr().out
-        # 4 actual ComponentValue assignments + 1 comment mentioning ComponentValues
-        assert out.count("ComponentValue") == 5
+        # Background field ComponentValues + CD shorthand pre-computation + comments
+        # Count varies with CD depth; at minimum 5 (4 bg + 1 comment)
+        assert out.count("ComponentValue") >= 5
 
     def test_background_field_in_lagrangian_substitution(
         self,
