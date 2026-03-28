@@ -158,6 +158,70 @@ MSW resonance    & $\omega_p^2 = m_g^2$ (at some position)    & Enhanced        
 \end{tabular}
 \end{table}
 
+\subsubsection{Torsion-Independence of the Gertsenshtein Effect}
+\label{subsec:torsion-independence}
+
+A key result of this project (issue~\#199, \#200) is that the standard
+Gertsenshtein conversion channel is \emph{algebraically independent} of torsion
+for the most general quadratic Poincar\'{e} Gauge Theory (PGT) Lagrangian with
+minimal electromagnetic coupling:
+\begin{equation}
+  \mathcal{L} = \frac{1}{\kappa^2}\widetilde{R}
+    + \alpha_1 I_1 + \alpha_2 I_2 + \alpha_3 I_3
+    + b_5 \widetilde{R}^2
+    - \tfrac{1}{4} F_{ab} F^{ab}
+  \label{eq:pgt-em-lagrangian}
+\end{equation}
+where $\widetilde{R}$ is the Riemann--Cartan Ricci scalar, $I_1, I_2, I_3$ are
+the three independent torsion-squared invariants, and $b_5\widetilde{R}^2$
+provides torsion kinetic terms.
+
+\paragraph{Polarisation block-diagonal structure.}
+After plane-wave reduction ($\partial_x = \partial_y = 0$, propagation along~$z$),
+the 23-component field equations decompose into two completely decoupled
+polarisation channels with \emph{zero cross-talk}:
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Channel & Fields & Torsion-dependent? & Stable? \\
+\midrule
+$h_\times \leftrightarrow a_x$ & $h_5 \leftrightarrow a_1$ & No & Yes \\
+trace $\leftrightarrow a_y$ & $h_4/h_7/h_9 \leftrightarrow a_2 \leftrightarrow$ torsion & Yes & No (ghost) \\
+\bottomrule
+\end{tabular}
+\end{center}
+The photon $a_1$ depends only on $\{a_1, h_5\}$ and the photon $a_2$ depends
+only on $\{a_2, h_0, h_3, h_4, h_7, h_9\}$.  There is no coupling path between
+the two channels; the structure is exact and algebraic.
+
+\paragraph{Double inaccessibility of torsion coupling.}
+The torsion-sensitive trace channel is inaccessible from physical initial conditions:
+\begin{enumerate}
+  \item \textbf{Algebraic decoupling:} TT initial conditions (valid for any vacuum
+    GW) excite only $h_5$.  There is no path from $h_5$ to the trace sector
+    ($h_4, h_7, h_9$) in the plane-wave reduced theory.
+  \item \textbf{Ghost instability:} The $b_5\widetilde{R}^2$ term introduces
+    Ostrogradsky 4th-order time derivatives, creating ghost modes.  The trace
+    channel exhibits exponential blowup ($\sim 10^{30}$ at $t{=}50$).
+\end{enumerate}
+
+\paragraph{Coupling--instability tension.}
+The $b_5\widetilde{R}^2$ term simultaneously enables propagating torsion modes
+(without it, torsion is non-propagating in Einstein--Cartan) and introduces
+Ostrogradsky ghosts.  The very term needed for torsion-mediated conversion also
+destroys it.  This is a structural consequence of Ostrogradsky's theorem for
+non-degenerate higher-derivative theories.
+
+\paragraph{Implication.}
+For minimal PGT coupling, torsion cannot amplify the Gertsenshtein effect for
+\emph{any} vacuum gravitational wave.  Torsion amplification requires either
+non-minimal torsion--EM coupling terms (e.g.\ $T \cdot F$, $T \cdot {*F}$) or a
+formulation that avoids Ostrogradsky instability.
+
+Theory files: \texttt{examples/torsion\_gertsenshtein/theory.toml} (combined
+PGT+EM), \texttt{examples/gertsenshtein/theory\_ungauged.toml} (gauge-independence
+baseline).  See also \texttt{docs/tex/torsion.tex} for the PGT framework.
+
 \subsection{References}
 \label{subsec:gertsenshtein-references}
 

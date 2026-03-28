@@ -313,6 +313,47 @@ The $\tilde{R}^2$ term produces rich graviton-torsion coupling.  For example, th
 \paragraph{Derivation performance.}
 The 4D derivation completes in $\sim$15\,s: 7\,s for Lagrangian decomposition (DecomposeScalarExpression), 0.3\,s for component E--L (34 equations), and $\sim$7\,s for canonical pipeline (IBP + Legendre + Hamiltonian parsing).
 
+\subsubsection{Combined PGT + Einstein--Maxwell System}
+\label{sec:torsion-em-combined}
+
+Adding the Maxwell term $-\tfrac{1}{4}F_{ab}F^{ab}$ with a background magnetic
+field ($\bar{A}_y = -B_0 z$, Coulomb gauge) to the general quadratic PGT
+Lagrangian and deriving via the multi-field perturbation pipeline produces a
+\textbf{23-component} system after Ostrogradsky reduction (issue~\#154).
+
+Theory: \texttt{examples/torsion\_gertsenshtein/theory.toml}.  Derivation takes
+$\sim$915\,s due to the canonical decomposition of the large combined expression
+(issue~\#198).
+
+\paragraph{Field structure (23 components).}
+\begin{itemize}
+  \item \textbf{Dynamical:} $a_0$--$a_3$ (photon), $h_4$--$h_9$ (graviton),
+    $w_{h_4}, w_{h_7}, w_{h_9}$ (Ostrogradsky), $t_6, t_{13}, t_{20}$ (torsion)
+    --- 17 fields
+  \item \textbf{Constraint:} $h_0$--$h_3$ (graviton), $t_2, t_{10}, t_{17}$
+    (torsion) --- 6 fields
+\end{itemize}
+
+\paragraph{Polarisation block-diagonal structure (issue~\#200).}
+The equations decompose into two completely decoupled channels:
+\begin{enumerate}
+  \item \textbf{Cross-polarisation:} $h_5 \leftrightarrow a_1$ ($h_\times
+    \leftrightarrow a_x$).  Equations identical to ungauged EM-only
+    Gertsenshtein --- \emph{no torsion parameters appear}.  Conversion
+    probability $P = \sin^2(\kappa B_0 D/2)$ confirmed numerically
+    ($P_\mathrm{peak} = 0.997$).
+  \item \textbf{Trace sector:} $h_4/h_7/h_9 \leftrightarrow a_2
+    \leftrightarrow$ torsion.  \emph{IS} torsion-dependent (torsion fields
+    excited to amplitude $\sim$3.2 with trace ICs), but ghost-unstable
+    (Ostrogradsky) and algebraically unreachable from TT initial conditions.
+\end{enumerate}
+
+\paragraph{Implication.}
+For minimal PGT coupling (no $T{\cdot}F$ cross terms), torsion is invisible to
+the Gertsenshtein effect for any vacuum gravitational wave.  See
+\texttt{docs/tex/gertsenshtein.tex} \S\ref{subsec:torsion-independence} for the
+full analysis.
+
 \subsection{Current Status and Remaining Work}
 \label{sec:torsion-status}
 
@@ -399,8 +440,11 @@ The 4D theory required six pipeline fixes beyond the 2+1D architecture:
   \item Dispersion relation $\omega(k)$ comparison with Nikiforova et al.\ (2009) stability analysis (\#169)
   \item Propagating mode count cross-check with PSALTer / Barker (2024) predictions (\#169)
   \item Ghost propagator analysis for Ostrogradsky stability (\#164)
-  \item Add EM field ($F^2$) to Lagrangian for graviton-photon-torsion triple mixing
-  \item Background $B$ field parameter sweeps for Gertsenshtein comparison (\#154)
+  \item[{[DONE]}] \textbf{Add EM field} (v0.22.8): Combined PGT+EM theory derived (23 components).
+    Finding: standard Gertsenshtein $h_\times \leftrightarrow a_x$ channel is torsion-independent;
+    trace channel is ghost-unstable and algebraically inaccessible from TT ICs (\#199, \#200).
+  \item Non-minimal torsion--EM coupling ($T{\cdot}F$, $T{\cdot}{*F}$) for direct photon--torsion interaction
+  \item Ghost-free parameter conditions for trace channel stability (Sezgin \& van Nieuwenhuizen 1980)
 \end{itemize}
 
 \subsection{References}

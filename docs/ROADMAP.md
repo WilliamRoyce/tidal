@@ -155,7 +155,8 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | TT gauge constraint elimination — transverse constraints replace constrained EOM in-place (Wolfram-side) | ✅ Complete |
 | Simulation progress bar — tqdm-based `SimulationProgress` class, auto-suppressed in sweep inner runs | ✅ Complete |
 | Simulation resume — `--resume DIR [--snapshot N] [--t-additional T]` checkpoint loading | ✅ Complete |
-| Gertsenshtein effect (Phase D) — graviton-photon conversion validated: uniform B₀ (sin²(κB₀t/2)), localized Gaussian (Boccaletti formula), radial dipolar (in progress) | 🔄 In Progress |
+| Gertsenshtein effect (Phase D) — graviton-photon conversion validated: uniform B₀ (sin²(κB₀t/2)), localized Gaussian (Boccaletti formula). **Torsion-independence proven**: minimal PGT coupling cannot amplify Gertsenshtein for any vacuum GW (#199, #200) | ✅ Complete |
+| Torsion-Gertsenshtein investigation — combined PGT+EM theory (23 components), polarisation block-diagonal structure, field-filtered energy measurement for Ostrogradsky theories | ✅ Complete |
 
 ---
 
@@ -218,8 +219,9 @@ Issues should be tagged with appropriate labels:
 - ✅ 20 working examples spanning 1+1D through 3+1D
 - ✅ 1,700 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
 - ✅ 21 of 25 original issues resolved (84%)
-- 🔄 **Primary remaining focus:** Phase D (Gertsenshtein example — the project's raison d'être)
-- 🔄 **Secondary:** Phase 2 (Wolfram CI)
+- ✅ **Phase D (Gertsenshtein):** Complete — all physical regimes validated, torsion-independence proven for minimal PGT
+- 🔄 **Primary remaining focus:** Non-minimal torsion-EM coupling investigation (T·F terms), ghost-free parameter conditions
+- 🔄 **Secondary:** Phase 2 (Wolfram CI), Phase G (Absorbing Boundaries)
 
 ---
 
