@@ -165,6 +165,8 @@ a unified iterative framework:
     \texttt{--allow-inconsistent-ic}, issues a warning instead.
 \end{enumerate}
 
+\textbf{Temporal operator handling:} Constraint equations in higher-derivative theories may contain acceleration and jerk operators (\texttt{d2\_t}, \texttt{d3\_t}, \texttt{mixed\_T2\_*}, \texttt{mixed\_T3\_*}) that cannot be evaluated at $t=0$ without acceleration data. Since v0.22.7, the IC solver skips these operators during term classification, target field identification, and residual verification. Equations containing only temporal operators are excluded from Phase~3 verification.
+
 \textbf{Solver tiers} (used in both phases 1 and 2):
 \begin{enumerate}
   \item \textbf{Tier 1 (FFT)} --- periodic BCs, constant coefficients ($O(N \log N)$)
@@ -471,6 +473,9 @@ The required fix involves:
 
 Until this is implemented, energy measurements for theories with hidden
 constraints should be interpreted with caution.
+
+\paragraph{Field-filtered energy (v0.22.8).}
+As a practical workaround, \texttt{compute\_energy\_timeseries()} accepts an optional \texttt{fields} parameter that restricts the Hamiltonian evaluation to terms involving only the specified base fields. This is critical for Ostrogradsky theories where some fields' equations contain unresolvable $\partial_t^2$/$\partial_t^3$ coupled acceleration terms. For example, measuring conversion between $h_\times$ and $a_y$ on the combined PGT+EM system succeeds ($P = 0.997$) by passing \texttt{fields=\{h\_5, gea\_1\}}, even though the full 23-field Hamiltonian is ill-conditioned.
 
 \subsubsection{Spectral Conversion Measurement Removed}
 \label{sec:cf-spectral-conversion}

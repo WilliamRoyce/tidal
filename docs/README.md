@@ -95,4 +95,4 @@ Auto-generated API documentation via Sphinx (`.rst` files). Build with `make htm
 
 ---
 
-Last updated: 2026-03-23
+Last updated: 2026-03-28

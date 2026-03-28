@@ -185,3 +185,22 @@ Phase B (E--L per field) & $>$77\,min & $<$1\,s/field ($\sim$5\,s total) & $>$90
 The CD shorthand optimisation (pre-computing covariant derivative expansions) further reduces xPert linearisation from ${\sim}200$\,s to ${\sim}60$\,s, and is now applied to ALL theories (not just torsion).
 
 \textbf{Note:} Component-level E--L is the default for all theories since v0.15.0. The abstract VarD path is still available as a fallback but is no longer used in the standard pipeline.
+
+\subsection{Canonical Decomposition Optimisations (v0.18.6+)}
+\label{sec:canonical-decomp-perf}
+
+Two further optimisations reduce canonical Lagrangian decomposition time:
+
+\paragraph{Single-term processing (v0.18.6).}
+The previous approach split the second-order Lagrangian $\mathcal{L}^{(2)}$ into individual additive terms and processed each through \texttt{DecomposeScalarExpression} separately. The per-call overhead of $\sim$34 separate invocations exceeded the single-pass cost. Processing the full expression as one term reduces Gertsenshtein canonical decomposition from 66\,s to 43\,s (35\% faster). Torsion is unchanged ($\sim$9\,s) because \texttt{ExpandScalarWrappers} already pre-resolves Scalar wrappers individually.
+
+\textbf{Bottleneck identified:} \texttt{TraceBasisDummy} dominates at 42.7\,s of 43\,s total, with $O(\text{dim}^{2K})$ scaling for $K \sim 4$ contracted index pairs per Einstein--Hilbert Ricci scalar product term.
+
+\paragraph{Multi-field pipeline optimisations (v0.22.8).}
+For combined multi-field theories (e.g.\ PGT + Einstein--Maxwell with 23 components), four extensible optimisations address a 15-minute derivation bottleneck:
+\begin{enumerate}
+  \item \textbf{Progressive $\mathcal{L}^{(2)}$ cleanup:} Interleaved \texttt{Expand} after each background-zeroing step, with adaptive per-term batched canonicalisation.
+  \item \textbf{CD shorthand ComponentValue pre-computation:} Compute component arrays for CD1--CD4 shorthand tensors via \texttt{StaggeredToBasis}, reducing \texttt{TraceBasisDummy} dummy pairs from $K \sim 4$ to $\sim$0.
+  \item \textbf{Continuous adaptive batching:} \texttt{DecomposeScalarExpression} batches large expressions with per-batch adaptive sizing, preventing blowup when later batches have different coupling structure.
+  \item \textbf{Sector-aware splitting:} Automatically classify expanded Lagrangian terms by field content (graviton-only, torsion-only, EM-only, cross-sector), processing each sector independently.
+\end{enumerate}

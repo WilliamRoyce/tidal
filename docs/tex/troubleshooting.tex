@@ -240,6 +240,28 @@ Print["Result: ", result];  (* Should be a number, not symbolic *)
 
 \textbf{Note:} After reduction, implicit acceleration cross-references ($\partial_t^2 q_j$ in $q_i$'s equation) are handled by the generalized mass-matrix modal solver (v0.16.0, issue \#165 resolved). See \cref{sec:modal-mass-matrix} and \cref{sec:troubleshoot-singular-mass}.
 
+\subsubsection{IBP Failures for Curvature-Squared Theories}
+\label{sec:ibp-curvature-squared}
+
+\textbf{Symptom:} Derivation crashes (segfault, stack overflow, or infinite loop) during the canonical pipeline's integration-by-parts (IBP) step for Lagrangians containing $R^2$ or $\tilde{R}^2$ terms.
+
+\textbf{Causes and fixes} (resolved across v0.18.5--v0.22.4):
+\begin{itemize}
+  \item \textbf{Detection bug:} \texttt{isPureTimeDerivGE2} checked \texttt{Head[Head[expr]]} but for \texttt{Derivative[2,0,0,0][f][t,x,y,z]}, this returns \texttt{Derivative[2,0,0,0]} not \texttt{Derivative}. Fixed to check \texttt{Head[Head[Head[expr]]]}.
+  \item \textbf{Mixed derivatives:} IBP incorrectly flagged mixed first-time+spatial derivatives ($\partial_t \partial_x f$) as needing IBP. Changed to require pure $\partial_t^2$ (time order $\geq 2$). Mixed derivatives like $(\partial_t \partial_z h)^2$ caused unbounded recursion.
+  \item \textbf{Stack overflow:} \texttt{FreeQ[lagComp, x\_ /; hasHighTimeDerivative[x]]} tested every subexpression against a condition function, causing C-level stack overflow on $>$200-term Lagrangians. Replaced with structural \texttt{Cases} extraction followed by \texttt{AnyTrue} check.
+  \item \textbf{Squared powers:} $(\partial_t^2 f)^2$ terms cannot be IBP'd (would introduce $\partial_t^3$). Now skipped instead of recursively expanded.
+\end{itemize}
+
+\subsubsection{Bracket Errors in Generated Wolfram Scripts}
+\label{sec:bracket-validation}
+
+\textbf{Symptom:} \texttt{wolframscript} crashes or gives syntax errors after a long derivation run ($>$30 minutes).
+
+\textbf{Cause:} The generated \texttt{.wls} script has unbalanced brackets --- typically from Python f-string quoting bugs where curly braces are not properly escaped.
+
+\textbf{Resolution:} Since v0.22.6, \texttt{validate\_wls\_brackets()} automatically checks bracket balance (\texttt{[]}, \texttt{\{\}}, \texttt{()}) in generated scripts before execution, catching f-string bugs immediately. The validator handles Wolfram string literals, nested comments \texttt{(* ... *)}, and \texttt{\textbackslash[Name]} character escapes.
+
 \subsection{Common Python Solver Issues}
 \label{sec:python-solver-issues}
 
