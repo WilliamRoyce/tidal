@@ -21,7 +21,7 @@ A symbolic-to-numerical framework for **linearized field theory** — define a L
 - A **symbolic derivation pipeline** (Mathematica/xAct) that derives linearized field equations from any Lagrangian and exports them as JSON specifications — zero hardcoded physics.
 - **Five solver backends** (SUNDIALS IDA/CVODE, Fourier modal, leapfrog, scipy) with analytical Jacobians, FFT spectral operators, and 2nd/4th/6th-order FD stencils.
 - **20 working examples** spanning 1+1D to 3+1D: scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, curved spacetimes, background-field scattering, graviton-photon conversion, and graviton-torsion mixing.
-- **1,701 Python tests + ~121 Wolfram tests**, 0 ruff violations, 0 pyright errors (strict mode).
+- **1,721 Python tests + ~115 Wolfram tests**, 0 ruff violations, 0 pyright errors (strict mode).
 
 > Define a Lagrangian in TOML → derive linearized PDEs symbolically → simulate with adaptive solvers → measure conversion, spectra, and scattering.
 
@@ -215,7 +215,7 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-The project includes a comprehensive test suite with **1,701 Python tests + ~121 Wolfram tests**.
+The project includes a comprehensive test suite with **1,721 Python tests + ~115 Wolfram tests**.
 
 ### Python Tests (1,701 tests)
 
