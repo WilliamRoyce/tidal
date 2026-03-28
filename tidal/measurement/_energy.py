@@ -1118,6 +1118,7 @@ def _compute_hamiltonian_per_field(
     data: SimulationData,
     t_idx: int,
     ctx: _HamiltonianContext | None = None,
+    fields: set[str] | None = None,
 ) -> tuple[dict[str, float], float]:
     """Decompose Hamiltonian into per-field self-energy and interaction.
 
@@ -1131,6 +1132,13 @@ def _compute_hamiltonian_per_field(
         Snapshot index.
     ctx : _HamiltonianContext or None
         Pre-computed context (for timeseries path).
+    fields : set[str] or None
+        If given, only evaluate Hamiltonian terms involving these base field
+        names.  Self-energy terms are skipped if the base field is not in the
+        set; interaction terms are skipped if *neither* base field is in the
+        set.  This avoids evaluating operators on irrelevant fields — critical
+        for Ostrogradsky theories where some fields' EOM contain unresolvable
+        ``d2_t``/``d3_t`` operators (#196).
 
     Returns
     -------
@@ -1162,6 +1170,14 @@ def _compute_hamiltonian_per_field(
     interaction = 0.0
 
     for term_idx, term in enumerate(canonical.hamiltonian_terms):
+        # --- field filter: skip terms not involving requested fields ---
+        if fields is not None:
+            if term.is_self_energy:
+                if term.base_field_a not in fields:
+                    continue
+            elif term.base_field_a not in fields and term.base_field_b not in fields:
+                continue
+
         contrib = _evaluate_single_hamiltonian_term(
             term,
             ctx.term_coeffs[term_idx],
@@ -1183,6 +1199,7 @@ def compute_system_energy(
     data: SimulationData,
     t_idx: int,
     _ctx: _HamiltonianContext | None = None,
+    fields: set[str] | None = None,
 ) -> SystemEnergy:
     """Compute Hamiltonian energy density at snapshot *t_idx*.
 
@@ -1197,6 +1214,9 @@ def compute_system_energy(
     data : SimulationData
     t_idx : int
         Snapshot index.
+    fields : set[str] or None
+        If given, only evaluate Hamiltonian terms involving these base
+        field names.  Passed through to ``_compute_hamiltonian_per_field``.
 
     Raises
     ------
@@ -1230,7 +1250,7 @@ def compute_system_energy(
         )
 
     per_field_totals, interaction = _compute_hamiltonian_per_field(
-        data, t_idx, ctx=_ctx
+        data, t_idx, ctx=_ctx, fields=fields
     )
     per_field = {
         name: FieldEnergy(kinetic=0.0, gradient=0.0, mass=0.0, total=total)
@@ -1242,6 +1262,7 @@ def compute_system_energy(
 
 def compute_energy_timeseries(
     data: SimulationData,
+    fields: set[str] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     dict[str, NDArray[np.float64]],
@@ -1249,6 +1270,13 @@ def compute_energy_timeseries(
     NDArray[np.float64],
 ]:
     """Compute energy density for every snapshot in the simulation.
+
+    Parameters
+    ----------
+    data : SimulationData
+    fields : set[str] or None
+        If given, only evaluate Hamiltonian terms involving these base field
+        names.  Passed through to ``compute_system_energy``.
 
     Returns
     -------
@@ -1267,7 +1295,7 @@ def compute_energy_timeseries(
         ctx = _prepare_hamiltonian_context(data)
 
     # Compute first snapshot to discover field names, then pre-allocate.
-    se0 = compute_system_energy(data, 0, _ctx=ctx)
+    se0 = compute_system_energy(data, 0, _ctx=ctx, fields=fields)
     field_names = list(se0.per_field.keys())
     per_field_np: dict[str, NDArray[np.float64]] = {
         name: np.empty(n, dtype=np.float64) for name in field_names
@@ -1283,7 +1311,7 @@ def compute_energy_timeseries(
 
     # Fill remaining snapshots
     for t_idx in range(1, n):
-        se = compute_system_energy(data, t_idx, _ctx=ctx)
+        se = compute_system_energy(data, t_idx, _ctx=ctx, fields=fields)
         for name, fe in se.per_field.items():
             per_field_np[name][t_idx] = fe.total
         interaction[t_idx] = se.interaction
