@@ -117,6 +117,9 @@ This basis is related to the \emph{irreducible basis} $\{q^2, T^2, S^2\}$ (where
 \end{equation}
 Both bases are complete --- any parity-even quadratic torsion invariant is a linear combination of three independent contractions.  The direct basis is used in the TOML because each $I_i$ is a single index contraction of \texttt{TorsionCDT} with $\eta$ metrics, directly expressible in xAct.
 
+\paragraph{Beyond three invariants.}
+The three $\torsion^2$ invariants and $\tilde{R}^2$ are a subset of the most general quadratic PGT+EM Lagrangian, which contains \textbf{35 independent coupling constants} (11 parity-even + 20 parity-odd quadratic + 3 linear + 1 topological).  The complete enumeration, performed using \texttt{MakeContractionAnsatz} from the \texttt{xTras} package with guaranteed completeness, is documented in \texttt{research/general\_quadratic\_lagrangian.tex} together with ghost/parity/mixing-channel classification for all sectors.
+
 \paragraph{$\tilde{R}^2$ and graviton-torsion mixing.}
 The curvature-squared term $b_5 \tilde{R}^2$ is essential for graviton-torsion mixing and torsion propagation.  Since $\tilde{R} = R + \text{(torsion terms)}$, the square $\tilde{R}^2 = R^2 + 2R \cdot \text{(torsion)} + \text{(torsion)}^2$ produces cross-terms $R \cdot \torsion$ that couple graviton and torsion perturbations.  This is verified empirically: with $\alpha_1 = \alpha_2 = \alpha_3 = 0$ and $b_5 \neq 0$, the derived equations contain 117 graviton-torsion cross-coupling terms (out of 339 total Hamiltonian terms), all proportional to $b_5$.
 
