@@ -1474,9 +1474,13 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
      The Legendre transform H = Sum pi*vel - L should produce an expanded
      expression, but defensive Expand prevents silent failures from
      auto-factoring (same rationale as the Expand in EquationToJSONMultiField).
-     NOTE: Skip Expand for large expressions — R̃² products exceed
-     $RecursionLimit and crash via TerminatedEvaluation (uncatchable). *)
-  If[LeafCount[componentExpr] < 1000,
+     NOTE: Skip Expand for very large expressions — R̃² 4th-order products
+     exceed $RecursionLimit and crash via TerminatedEvaluation (uncatchable).
+     Threshold increased from 1000 to 100000: the self-energy Hamiltonian
+     for non-minimal torsion theories can have LeafCount ~5000-50000 and
+     MUST be expanded for correct quadratic-term parsing. Only R̃²
+     theories with 4th-order products (LeafCount >>100K) need to skip. *)
+  If[LeafCount[componentExpr] < 100000,
     componentExpr = Expand[componentExpr]
   ];
 

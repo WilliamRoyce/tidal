@@ -4393,7 +4393,7 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
     return lines
 
 
-def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
+def _wls_canonical_phase_b(ctx: _WlsContext, all_heads_str: str) -> list[str]:
     """Generate WLS code for canonical Phase B: IBP + Legendre transform + Hamiltonian.
 
     Integrates by parts on the time variable to remove second-time-derivative
@@ -4710,6 +4710,17 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "  ];",
             "];",
             'Print["H after spatial IBP: ", If[Head[canonicalH]===Plus, Length[canonicalH], 1], " terms"];',
+            "",
+            "(* Resolve any remaining abstract tensor traces in H (e.g., η^{ab}h_{ab}) *)",
+            "(* These arise from EH sector trace terms that survived decomposition.    *)",
+            "(* Replace abstract field tensor references with component sums.          *)",
+            "If[!FreeQ[canonicalH, _?xTensorQ],",
+            '  Print["Resolving ", Length[Cases[canonicalH, _?xTensorQ, {0,Infinity}]], " abstract tensor refs in H"];',
+            f"  Do[canonicalH = ReplaceTensorFieldComponents[canonicalH, afh, {ctx.chart}, coordSyms, nCoords],",
+            f"    {{afh, {wl_list(all_heads_str)}}}];",
+            "  canonicalH = Expand[canonicalH];",
+            '  Print["H after trace resolution: ", If[Head[canonicalH]===Plus, Length[canonicalH], 1], " terms"];',
+            "];",
             "",
             "(* Parse H into structured quadratic terms *)",
             _wls_timing_start("tParseH"),
