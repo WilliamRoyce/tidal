@@ -4856,17 +4856,17 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             lines.extend(
                 [
                     "(* === Runtime dispatch: Phase A vs VarD based on L^(2) complexity === *)",
-                    "(* Dispatch heuristic: count additive terms in expanded L^(2).        *)",
-                    "(* Theories with many terms (>100) have expensive canonical decomp.   *)",
+                    "(* Heuristic: LeafCount of unexpanded L^(2) + whether L^(2) has many *)",
+                    "(* top-level additive terms. Large LeafCount indicates complex tensor *)",
+                    "(* products that Phase A DecomposeScalarExpression handles slowly.    *)",
                     "(* VarD projects rank-N EOM (not scalar L) — fundamentally faster.    *)",
-                    "(* Small theories (<=100 terms) use Phase A (correct lagComp form).   *)",
-                    f"Module[{{l2Expanded = Expand[{ctx.prefix}Lagrangian],",
-                    "         l2TermCount, l2LC}},",
-                    "  l2TermCount = If[Head[l2Expanded] === Plus, Length[l2Expanded], 1];",
-                    f"  l2LC = LeafCount[{ctx.prefix}Lagrangian];",
-                    '  Print["L^(2) canonical dispatch: ", l2TermCount, " terms, LeafCount=", l2LC];',
-                    "  If[l2TermCount > 100,",
-                    '    Print["Many terms — using VarD EOM path"];',
+                    "(* No Expand needed for dispatch — just Length + LeafCount.           *)",
+                    f"Module[{{l2LC = LeafCount[{ctx.prefix}Lagrangian],",
+                    f"         l2TopTerms = If[Head[{ctx.prefix}Lagrangian] === Plus,",
+                    f"           Length[{ctx.prefix}Lagrangian], 1]}},",
+                    '  Print["L^(2) canonical dispatch: ", l2TopTerms, " top terms, LeafCount=", l2LC];',
+                    "  If[l2TopTerms > 30 || l2LC > 2000,",
+                    '    Print["Complex L^(2) — using VarD EOM path"];',
                 ]
             )
             # VarD path (for large expressions)

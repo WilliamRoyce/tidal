@@ -212,11 +212,37 @@ Ostrogradsky ghosts.  The very term needed for torsion-mediated conversion also
 destroys it.  This is a structural consequence of Ostrogradsky's theorem for
 non-degenerate higher-derivative theories.
 
+However, Blagojevi\'{c} \& Cvetkovi\'{c}~\cite{blagojevic2018ghost} show that
+$\widetilde{R}^2$ is \emph{not} the only route to propagating torsion: the $0^-$
+(pseudoscalar) tordion propagates ghost-free with just a Riemann-squared coupling
+($r_2 R^{ABCD}R_{ABCD}$, with $r_2 < 0$, $t_2 > 0$), requiring no Ricci scalar
+squared at all.  Of 1918 critical parameter cases they identify, 450 are
+ghost-and-tachyon free, including cases with propagating $0^+$ and $0^-$ torsion
+modes.  Nikiforova et~al.~\cite{nikiforova2009torsion} provide explicit ghost-free
+conditions for the massive torsion spectrum around Minkowski and de~Sitter backgrounds.
+Aoki~\cite{aoki2020ghostfree} shows that PGT can be made non-linearly ghost-free
+via equivalence to ghost-free massive bigravity, though the $4D$ completion requires
+non-polynomial curvature terms.
+
 \paragraph{Implication.}
 For minimal PGT coupling, torsion cannot amplify the Gertsenshtein effect for
-\emph{any} vacuum gravitational wave.  Torsion amplification requires either
-non-minimal torsion--EM coupling terms (e.g.\ $T \cdot F$, $T \cdot {*F}$) or a
-formulation that avoids Ostrogradsky instability.
+\emph{any} vacuum gravitational wave.  Three paths to torsion-mediated conversion
+have been identified in the literature:
+\begin{enumerate}
+  \item \textbf{Non-minimal torsion--EM coupling:} Lagrangian terms of the form
+    $F^{\mu\nu}\widetilde{R}_{[\mu\nu]}$~\cite{bahamonde2025torsion} or
+    $F^2 T^2$~\cite{itin2003maxwell,rubilar2003torsion} break the block-diagonal
+    polarisation structure and create direct torsion--photon conversion channels.
+    Itin classifies 17 independent $F^2 T^2$ coupling structures, two of which
+    produce vacuum birefringence and an induced axion field from the torsion
+    background.
+  \item \textbf{Alternative ghost-free kinetic terms:} Replace $b_5\widetilde{R}^2$
+    with Riemann-squared or Weyl-squared couplings that propagate torsion without
+    Ostrogradsky instability~\cite{blagojevic2018ghost}.
+  \item \textbf{Higher-order (cubic) PGT:} Cubic $R \cdot T \cdot T$ invariants
+    eliminate ghost pathologies in the axial and vector torsion
+    sectors~\cite{bahamonde2025cubic}.
+\end{enumerate}
 
 Theory files: \texttt{examples/torsion\_gertsenshtein/theory.toml} (combined
 PGT+EM), \texttt{examples/gertsenshtein/theory\_ungauged.toml} (gauge-independence
