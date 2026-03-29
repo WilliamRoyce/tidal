@@ -1357,6 +1357,9 @@ def _wls_precompute_cd_component_values(
                     f"    prevDownIdxs = Table[-DummyIn[Tangent{manifold}], {{Length[prevSlots]}}];",
                     f"    cdExpr = {cd}[-a][{prev_head} @@ prevDownIdxs];",
                     f"    compDown = tidalSplinter[cdExpr, {chart}];",
+                    "    (* Simplify components immediately after projection (supervisor's pattern). *)",
+                    "    (* Removes algebraic junk before components feed into every downstream term. *)",
+                    f"    compDown = Map[Simplify, compDown, {{Length[SlotsOfTensor[{cd_head}]]}}];",
                 ]
             )
             # Apply plane-wave reduction to CD pre-computed components:
@@ -1390,6 +1393,7 @@ def _wls_precompute_cd_component_values(
                     f"    Module[{{upIdxs = Table[{{IndexRange[a, z][[i]], {chart}}}, "
                     f"{{i, Length[SlotsOfTensor[{cd_head}]]}}]}},",
                     f"      compUp = tidalSplinter[{cd_head} @@ upIdxs, {chart}];",
+                    f"      compUp = Map[Simplify, compUp, {{Length[SlotsOfTensor[{cd_head}]]}}];",
                 ]
             )
             if ctx.reduction is not None:
@@ -3735,12 +3739,10 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             '  Print["After CD shorthand: ", If[Head[lagForCanon]===Plus, Length[lagForCanon], 1], " terms"];',
             "];",
             "",
-            "(* Re-introduce explicit metric tensors for correct sign handling.       *)",
-            "(* When derived fields are expanded, ContractMetric absorbs the metric   *)",
-            "(* into index positions (raised/lowered). DecomposeScalarExpression needs *)",
-            "(* explicit metric tensors to correctly apply the Minkowski signature     *)",
-            "(* (or any user-supplied metric) during component evaluation.             *)",
-            f"lagForCanon = SeparateMetric[{ctx.metric}][lagForCanon];",
+            "(* NOTE: SeparateMetric is NOT applied here — it's applied inside         *)",
+            "(* DecomposeScalarExpression (via SeparateFieldMetrics at line 1913 and  *)",
+            "(* SeparateMetric in StaggeredToBasis at line 458). Applying it here too *)",
+            "(* was a triple application that added 2-5s per term * N terms overhead. *)",
         ]
     )
 
@@ -3887,8 +3889,11 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "lagComp = 0;",
             "Do[",
             "  Module[{termComp, tTerm = AbsoluteTime[]},",
-            f"    termComp = Quiet[Catch[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {wl_list(all_heads_str)}, "
-            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}]], {{Validate::repeated, Validate::inhom}}];',
+            "    (* Block[{Print=Null}]: suppress xAct internal prints during         *)",
+            "    (* decomposition. Output buffering overhead adds ~1-2s per term.    *)",
+            "    (* Supervisor wraps all expensive ops this way (SphericalEuclidean). *)",
+            f"    termComp = Block[{{Print = Null}}, Quiet[Catch[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {wl_list(all_heads_str)}, "
+            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}]], {{Validate::repeated, Validate::inhom}}]];',
             "    If[termComp === Null, termComp = 0];",
         ]
     )
