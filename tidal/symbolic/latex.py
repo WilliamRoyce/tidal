@@ -269,6 +269,10 @@ def coefficient_to_latex(expr: str) -> str:
             numer = numer[1:].strip()
         numer = _strip_outer_parens(numer)
         denom = _strip_outer_parens(denom)
+        # Extract leading negative from numerator: -3 → sign="-", numer="3"
+        if not sign and numer.startswith("-"):
+            sign = "-"
+            numer = numer[1:].strip()
         numer_tex = _coefficient_inner(numer)
         denom_tex = _coefficient_inner(denom)
         return rf"{sign}\frac{{{numer_tex}}}{{{denom_tex}}}"
@@ -315,6 +319,9 @@ def _coefficient_inner(s: str) -> str:
     s = _RE_POWER_SIMPLE.sub(
         lambda m: f"^{{{m.group(1)}}}" if len(m.group(1)) > 1 else f"^{m.group(1)}", s
     )
+
+    # 1/(expr) → \frac{1}{expr}
+    s = re.sub(r"\b1/\(([^)]+)\)", lambda m: rf"\frac{{1}}{{{m.group(1)}}}", s)
 
     # Multiplication: * → \, (thin space, implicit multiplication)
     return s.replace("*", r" \, ")
@@ -592,9 +599,12 @@ def _render_term_coefficient(
     or "+" sign-only otherwise.
     """
     if symbolic is not None:
+        # Unit coefficient "1" → suppress (same as numeric 1.0)
+        if symbolic.strip() == "1":
+            symbolic = None  # fall through to numeric path
         # If symbolic contains unresolvable Mathematica (e.g., Derivative[...]),
         # fall back to the numeric value rendered as a fraction.
-        if re.search(r"Derivative\[|PD\w+\[", symbolic):
+        elif re.search(r"Derivative\[|PD\w+\[", symbolic):
             symbolic = None  # fall through to numeric path below
         else:
             tex = coefficient_to_latex(symbolic)
