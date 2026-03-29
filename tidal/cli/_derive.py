@@ -1319,12 +1319,25 @@ def _wls_precompute_cd_component_values(
         )
         return lines
 
-    max_cd_precompute = 1
+    max_cd_precompute = 2
     for df in dyn_fields:
         head = df["head"]
         field_name = df["name"]
+        # Field rank determines CD shorthand tensor rank: CD_N has rank = base_rank + N
+        # Limit pre-computation to avoid dim^rank blowup in ComponentArray:
+        # rank ≤ 4 → ≤ 256 entries (4D), fast; rank 5 → 1024 entries, slow
+        field_dict = df.get("field", {})
+        ftype = field_dict.get("type", df.get("type", "scalar"))
+        if ftype == "scalar":
+            base_rank = 0
+        elif ftype == "vector":
+            base_rank = 1
+        else:
+            base_rank = field_dict.get("rank", 2)
+        # For this field, limit CD level so CDN tensor rank ≤ 4 (≤ 256 entries in 4D)
+        field_max_cd = min(max_cd_precompute, max(1, 4 - base_rank))
 
-        for cd_level in range(1, max_cd_precompute + 1):
+        for cd_level in range(1, field_max_cd + 1):
             prev_head = f"CD{cd_level - 1}{head}" if cd_level > 1 else head
             cd_head = f"CD{cd_level}{head}"
 
@@ -4173,6 +4186,17 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "lagComp = Expand[lagComp / 2];",
             'Print["lagComp (reconstructed): ", LeafCount[lagComp], " leaves, ",',
             '  If[Head[lagComp]===Plus, Length[lagComp], 1], " terms"];',
+            "(* Diagnostic: check lagComp has velocity terms for Legendre transform *)",
+            "Module[{d2tHeads, d1tHeads, fieldHeads},",
+            "  d2tHeads = Cases[lagComp, Derivative[n_,__][f_][__] /; n>=2 :> f, {0,Infinity}] // DeleteDuplicates;",
+            "  d1tHeads = Cases[lagComp, Derivative[1,___][f_][__] :> f, {0,Infinity}] // DeleteDuplicates;",
+            "  fieldHeads = Cases[lagComp, (f_Symbol)[__] /; MemberQ[fieldFuncList, f] :> f, {0,Infinity}] // DeleteDuplicates;",
+            '  Print["  d^2_t field heads: ", d2tHeads];',
+            '  Print["  d_t (velocity) heads: ", d1tHeads];',
+            '  Print["  field heads in lagComp: ", fieldHeads];',
+            '  Print["  fieldFuncList: ", fieldFuncList];',
+            '  Print["  Sample term: ", Short[If[Head[lagComp]===Plus, lagComp[[1]], lagComp], 2]];',
+            "];",
             "lagComp = lagComp /. Derivative[orders__][g_][args__] /;",
             "  Length[{orders}] < nCoords :>",
             "  Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
