@@ -23,6 +23,10 @@ These references inform design decisions and should be cited where appropriate i
 | **Hwang & Noh (2023)** — "On graviton-photon conversions in magnetic environments", [arXiv:2310.04150](https://arxiv.org/abs/2310.04150)                                                                              | Proper EM field definitions in curved spacetime; formulation-dependent graviton mass; critique of ad-hoc derivations |
 | **Berlin et al. (2024)** — "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865)                                                                                | Numerical methods for resonant graviton-photon / axion-photon mixing — directly analogous to TIDAL's use case |
 | **Ejlli et al. (2019)** — "Upper limits on the amplitude of ultra-high-frequency gravitational waves", Eur. Phys. J. C 79, 1032 (2019). [Springer](https://link.springer.com/article/10.1140/epjc/s10052-019-7542-5) | Experimental bounds on Gertsenshtein conversion                                                               |
+| **Ejlli (2020)** — "Graviton-photon mixing: exact solution in a constant magnetic field", [arXiv:2004.02714](https://arxiv.org/abs/2004.02714) | First exact (non-perturbative) Gertsenshtein solution |
+| **Palessandro (2024)** — "Graviton-Photon Oscillations as a Probe of Quantum Gravity", [arXiv:2405.01407](https://arxiv.org/abs/2405.01407) | Extended Gertsenshtein treatment (**contains normalisation error** corrected by TIDAL) |
+| **Hwang & Noh (2024)** — "Graviton-photon conversions in Euler-Heisenberg nonlinear electrodynamics", [arXiv:2405.11786](https://arxiv.org/abs/2405.11786) | Nonlinear QED corrections to Gertsenshtein; chiral GW propagation |
+| **Graviton-photon oscillation in general modified gravity (2023)** — [arXiv:2302.08186](https://arxiv.org/abs/2302.08186) | Gertsenshtein in Horndeski, massive gravity, cosmic backgrounds |
 
 ## Torsion in Gauge Gravity
 
@@ -35,6 +39,18 @@ These references inform design decisions and should be cited where appropriate i
 | **Nikiforova et al. (2009)** — "Stability of the Massive Torsion Modes", [arXiv:0905.4007](https://arxiv.org/abs/0905.4007) | Ghost-free windows, dispersion relations for torsion |
 | **Barker (2024)** — "Every Poincaré gauge theory is conformal", [arXiv:2406.12826](https://arxiv.org/abs/2406.12826) | Particle spectra, no-ghost condition β₃ > 0 |
 | **Obukhov & Trukhanova (2024)** — "Electrodynamics in Poincaré Gauge Theory", [arXiv:2410.01355](https://arxiv.org/abs/2410.01355) | Spin-torsion coupling to electrodynamics |
+| **Blagojević & Cvetković (2018)** — "Ghost and tachyon free Poincaré gauge theories", [arXiv:1812.02675](https://arxiv.org/abs/1812.02675) | 450 ghost-and-tachyon-free PGT critical cases; systematic catalog |
+| **Aoki (2020)** — "Non-linearly ghost-free higher curvature gravity", [arXiv:2009.11739](https://arxiv.org/abs/2009.11739) | Ghost-free PGT via equivalence to ghost-free massive bigravity |
+| **Bahamonde et al. (2025)** — "Cosmology of Cubic Poincaré Gauge gravity", [arXiv:2506.17017](https://arxiv.org/abs/2506.17017) | Cubic torsion invariants eliminate ghost pathologies in axial/vector sectors |
+| **Bahamonde et al. (2026)** — "Coupling Electromagnetism to Torsion", [arXiv:2507.02362](https://arxiv.org/abs/2507.02362) | Non-minimal torsion-EM coupling; black holes with spin-charge interactions |
+
+## Non-Minimal Torsion-EM Coupling
+
+| Reference | Relevance |
+| --- | --- |
+| **Hehl & Obukhov (2000)** — "How does the EM field couple to gravity?", [arXiv:gr-qc/0001010](https://arxiv.org/abs/gr-qc/0001010) | Canonical classification of all EM-gravity coupling structures in metric-affine geometry |
+| **Rubilar et al. (2003)** — "Torsion nonminimally coupled to the EM field and birefringence", [arXiv:gr-qc/0305049](https://arxiv.org/abs/gr-qc/0305049) | Proves T²F² couplings make light sensitive to torsion; vacuum birefringence |
+| **Itin (2003)** — "Maxwell's field coupled nonminimally to quadratic torsion", [arXiv:gr-qc/0307063](https://arxiv.org/abs/gr-qc/0307063) | Two families: F·T² (modifies Maxwell) and F²·T² (modifies constitutive tensor); induced axion field |
 
 ## Verification & Validation Methodology
 

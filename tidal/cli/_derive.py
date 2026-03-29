@@ -4856,10 +4856,17 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             lines.extend(
                 [
                     "(* === Runtime dispatch: Phase A vs VarD based on L^(2) complexity === *)",
-                    f"Module[{{l2LeafCount = LeafCount[{ctx.prefix}Lagrangian]}},",
-                    '  Print["L^(2) LeafCount for canonical dispatch: ", l2LeafCount];',
-                    "  If[l2LeafCount > 50000,",
-                    '    Print["Large L^(2) — using VarD EOM path (avoids decomposition timeout)"];',
+                    "(* Dispatch heuristic: count additive terms in expanded L^(2).        *)",
+                    "(* Theories with many terms (>100) have expensive canonical decomp.   *)",
+                    "(* VarD projects rank-N EOM (not scalar L) — fundamentally faster.    *)",
+                    "(* Small theories (<=100 terms) use Phase A (correct lagComp form).   *)",
+                    f"Module[{{l2Expanded = Expand[{ctx.prefix}Lagrangian],",
+                    "         l2TermCount, l2LC}},",
+                    "  l2TermCount = If[Head[l2Expanded] === Plus, Length[l2Expanded], 1];",
+                    f"  l2LC = LeafCount[{ctx.prefix}Lagrangian];",
+                    '  Print["L^(2) canonical dispatch: ", l2TermCount, " terms, LeafCount=", l2LC];',
+                    "  If[l2TermCount > 100,",
+                    '    Print["Many terms — using VarD EOM path"];',
                 ]
             )
             # VarD path (for large expressions)
@@ -4869,7 +4876,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 [
                     "    $tidalVarDSuccess = True,",
                     "",
-                    '    Print["Small L^(2) — using Phase A (Lagrangian decomposition)"];',
+                    '    Print["Few terms — using Phase A (Lagrangian decomposition)"];',
                 ]
             )
             # Phase A (for small expressions)
