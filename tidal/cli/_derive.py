@@ -1353,6 +1353,27 @@ def _wls_precompute_cd_component_values(
                     f"    prevDownIdxs = Table[-DummyIn[Tangent{manifold}], {{Length[prevSlots]}}];",
                     f"    cdExpr = {cd}[-a][{prev_head} @@ prevDownIdxs];",
                     f"    compDown = tidalSplinter[cdExpr, {chart}];",
+                ]
+            )
+            # Apply plane-wave reduction to CD pre-computed components:
+            # Zero entries where the FIRST index (the CD derivative direction)
+            # is a killed (transverse) coordinate. This makes transverse-derivative
+            # terms resolve to 0 immediately via ToValues during decomposition.
+            if ctx.reduction is not None:
+                killed_slots = [
+                    ctx.coords.index(c)
+                    for c in ctx.coords[1:]
+                    if c != ctx.reduction["propagation_axis"]
+                ]
+                lines.extend(
+                    f"    compDown[[{ks + 1}]] = 0 * compDown[[{ks + 1}]];"
+                    for ks in killed_slots
+                )
+                lines.append(
+                    '    Print["    plane-wave: zeroed transverse CD components"];'
+                )
+            lines.extend(
+                [
                     "    (* Assign natural-down ComponentValues *)",
                     f"    Module[{{downIdxs = Table[-{{IndexRange[a, z][[i]], {chart}}}, "
                     f"{{i, Length[SlotsOfTensor[{cd_head}]]}}]}},",
@@ -1365,6 +1386,20 @@ def _wls_precompute_cd_component_values(
                     f"    Module[{{upIdxs = Table[{{IndexRange[a, z][[i]], {chart}}}, "
                     f"{{i, Length[SlotsOfTensor[{cd_head}]]}}]}},",
                     f"      compUp = tidalSplinter[{cd_head} @@ upIdxs, {chart}];",
+                ]
+            )
+            if ctx.reduction is not None:
+                killed_slots = [
+                    ctx.coords.index(c)
+                    for c in ctx.coords[1:]
+                    if c != ctx.reduction["propagation_axis"]
+                ]
+                lines.extend(
+                    f"      compUp[[{ks + 1}]] = 0 * compUp[[{ks + 1}]];"
+                    for ks in killed_slots
+                )
+            lines.extend(
+                [
                     "      Block[{Print = Null},",
                     f"        ComponentValue[ComponentArray[{cd_head} @@ upIdxs], compUp]",
                     "      ]",
@@ -2644,6 +2679,28 @@ def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
 # --- WLS: Plane-wave reduction ---
 
 
+def _build_plane_wave_deriv_rules(ctx: _WlsContext) -> list[str]:
+    """Build Wolfram substitution rules to zero transverse Derivative patterns.
+
+    Returns a list of rule strings for killed (transverse) axes. Each rule
+    zeros ``Derivative[ords__][f_][args___]`` where a transverse slot has
+    order > 0.  Reused by Lagrangian reduction and VarD EOM reduction.
+    """
+    if ctx.reduction is None:
+        return []
+    prop_axis = ctx.reduction["propagation_axis"]
+    coords = ctx.coords
+    killed = [c for c in coords[1:] if c != prop_axis]
+    rules: list[str] = []
+    for c in killed:
+        slot = coords.index(c) + 1
+        rules.append(
+            f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
+            f" && {{ords}}[[{slot}]] > 0 :> 0"
+        )
+    return rules
+
+
 def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
     """Generate Wolfram code to zero transverse derivatives in the Lagrangian.
 
@@ -2658,18 +2715,8 @@ def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
         return []
 
     prop_axis = ctx.reduction["propagation_axis"]
-    coords = ctx.coords  # e.g. ["t", "x", "y", "z"]
-    spatial = coords[1:]  # e.g. ["x", "y", "z"]
-    killed = [c for c in spatial if c != prop_axis]
-
-    # Build the substitution rules: for each killed axis, zero derivatives
-    # Derivative slots are 1-indexed: slot 1 = t, slot 2 = x, slot 3 = y, ...
-    rules: list[str] = []
-    for c in killed:
-        slot = coords.index(c) + 1  # 1-indexed Wolfram slot
-        rules.append(
-            f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot} && {{ords}}[[{slot}]] > 0 :> 0"
-        )
+    killed = [c for c in ctx.coords[1:] if c != prop_axis]
+    rules = _build_plane_wave_deriv_rules(ctx)
 
     p = ctx.prefix
     lines: list[str] = [
@@ -3911,7 +3958,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
 
 def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ctx: _WlsContext,
-    all_heads_str: str,
+    _all_heads_str: str,
 ) -> list[str]:
     """VarD-based canonical path: abstract EOM → per-term component projection.
 
@@ -3972,7 +4019,6 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
     )
 
     # --- Build the list of fields to VarD ---
-    heads_str = all_heads_str  # includes background fields
     _, _field_heads_str = _canonical_field_heads(ctx)
 
     # --- Build VarD expressions for each dynamical field ---
@@ -4039,8 +4085,44 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
         ]
     )
 
+    # Build BackgroundFieldRules for DecomposeToComponents
+    bg_rules_entries: list[str] = []
+    for bf in ctx.background_fields:
+        if bf["type"] != "scalar" and bf.get("components"):
+            bg_head = f"{p}{bf['name'].capitalize()}"
+            comps_str = ", ".join(str(c) for c in bf["components"])
+            contra_comps = _compute_contra_components(
+                bf["components"], ctx.metric_diagonal
+            )
+            contra_str = ", ".join(contra_comps)
+            bg_rules_entries.append(wl_bg_rule_entry(bg_head, comps_str, contra_str))
+    bg_rules_opt = ""
+    if bg_rules_entries:
+        bg_rules_str = ", ".join(bg_rules_entries)
+        bg_rules_opt = f', "BackgroundFieldRules" -> {wl_list(bg_rules_str)}'
+
     # Apply scalar BG substitutions before VarD
     lines.extend(_wls_scalar_background_substitution(ctx, "lagForCanon"))
+
+    # Apply plane-wave Derivative zeroing to L^(2) BEFORE VarD.
+    # This zeros transverse Derivative[...] patterns that exist in
+    # pre-resolved Scalar[] wrappers and CD shorthand expansions.
+    # VarD on the reduced L^(2) produces fewer EOM terms.
+    pw_rules = _build_plane_wave_deriv_rules(ctx)
+    if pw_rules:
+        lines.extend(
+            [
+                "",
+                "(* Plane-wave reduction on L^(2) before VarD — zero transverse derivatives *)",
+                "lagForCanon = lagForCanon /. {",
+                ",\n".join(pw_rules),
+                "};",
+                "lagForCanon = Expand[lagForCanon];",
+                'Print["L^(2) after plane-wave reduction: ",',
+                '  If[Head[lagForCanon]===Plus, Length[lagForCanon], 1], " terms"];',
+                "",
+            ]
+        )
 
     # For each dynamical field, generate VarD + projection code
     for dfi in dyn_field_info:
@@ -4065,68 +4147,71 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "    Do[eomAbs = eomAbs /. rule, {rule, Reverse[$CDShorthandRules]}]",
                 "  ];",
                 "",
-                "  (* Split into terms and project per-term via SplinterToArray *)",
-                "  eomTerms = If[Head[eomAbs] === Plus, List @@ eomAbs, {eomAbs}];",
-                "  nTerms = Length[eomTerms];",
-                '  Print["    ", nTerms, " abstract EOM terms"];',
+                '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " abstract EOM terms (pre-reduction)"];',
+            ]
+        )
+
+        # Zero transverse Derivative patterns in abstract EOM
+        if pw_rules:
+            lines.extend(
+                [
+                    "  (* Plane-wave: zero transverse Derivative patterns in EOM *)",
+                    "  eomAbs = eomAbs /. {",
+                    ",\n".join(f"  {r}" for r in pw_rules),
+                    "  };",
+                    "  eomAbs = Expand[eomAbs];",
+                    '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " EOM terms (after plane-wave)"];',
+                ]
+            )
+
+        lines.extend(
+            [
                 "",
             ]
         )
 
-        # Build the component extraction code based on field type
-        if ftype == "scalar":
-            # Scalar: SplinterToArray returns a scalar, directly
-            lines.extend(
-                [
-                    "  Module[{eomComp = 0},",
-                    "    Do[",
-                    f"      eomComp += SplinterToArray[eomTerms[[k]], {ctx.chart}, False];,",
-                    "      {k, nTerms}",
-                    "    ];",
-                    "    (* Field replacement + CD→Derivative *)",
-                    f"    Do[eomComp = ReplaceTensorFieldComponents[eomComp, afh, {ctx.chart}, coordSyms, nCoords],",
-                    f"      {{afh, {wl_list(heads_str)}}}];",
-                    "    eomComp = eomComp /. Derivative[orders__][g_][args__] /;",
-                    "      Length[{orders}] < nCoords :>",
-                    "      Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
-                    f'    AppendTo[fieldEquations, {{"{fname}_0", eomComp}}];',
-                    "  ];",
-                ]
-            )
-        else:
-            # Tensor: SplinterToArray returns a component array
-            lines.extend(
-                [
-                    "  Module[{eomComp, compTuples, compExpr},",
-                    f"    compTuples = EnumerateComponentTuples[{head}, nCoords];",
-                    '    Print["    ", Length[compTuples], " independent components"];',
-                    "    eomComp = ConstantArray[0, Table[nCoords, {Length[SlotsOfTensor["
-                    + head
-                    + "]]}]];",
-                    "    Do[",
-                    "      Module[{termResult},",
-                    f"        termResult = SplinterToArray[eomTerms[[k]], {ctx.chart}, False];",
-                    "        eomComp += termResult;",
-                    "      ];,",
-                    "      {k, nTerms}",
-                    "    ];",
-                    "    (* Extract each independent component and add to fieldEquations *)",
-                    "    Do[",
-                    "      Module[{tuple = compTuples[[idx]], compVal, flatIdx},",
-                    "        compVal = eomComp[[Sequence @@ (tuple + 1)]];",
-                    "        (* Field replacement + CD→Derivative *)",
-                    f"        Do[compVal = ReplaceTensorFieldComponents[compVal, afh, {ctx.chart}, coordSyms, nCoords],",
-                    f"          {{afh, {wl_list(heads_str)}}}];",
-                    "        compVal = compVal /. Derivative[orders__][g_][args__] /;",
-                    "          Length[{orders}] < nCoords :>",
-                    "          Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
-                    f'        AppendTo[fieldEquations, {{"{fname}_" <> ToString[idx - 1], compVal}}];',
-                    "      ];,",
-                    "      {idx, Length[compTuples]}",
-                    "    ];",
-                    "  ];",
-                ]
-            )
+        # Build additionalFields list: all OTHER dynamical fields + background fields
+        other_fexprs = [d["fexpr"] for d in dyn_field_info if d["name"] != fname]
+        # Add background field expressions
+        for bf in ctx.background_fields:
+            bf_head = f"{ctx.prefix}{bf['name'].capitalize()}"
+            if bf["type"] == "scalar":
+                other_fexprs.append(f"{bf_head}[]")
+            elif bf["type"] == "vector":
+                other_fexprs.append(f"{bf_head}[-a]")
+            else:
+                bf_rank = bf.get("rank", 2)
+                bf_idx = ", ".join(f"-{chr(97 + i)}" for i in range(bf_rank))
+                other_fexprs.append(f"{bf_head}[{bf_idx}]")
+        additional_str = ", ".join(other_fexprs) if other_fexprs else ""
+
+        # Use DecomposeToComponents with TermByTerm for per-term projection
+        # This is the tested, complete pipeline (ComponentDecompose.wl:1020-1154)
+        lines.extend(
+            [
+                "  (* Decompose EOM to components via DecomposeToComponents TermByTerm *)",
+                "  (* Uses the tested pipeline: SplinterToArray per-term + post-processing *)",
+                "  Module[{componentEqs},",
+                f"    componentEqs = DecomposeToComponents[eomAbs, {fexpr}, {ctx.chart},",
+                f"      {wl_list(additional_str)},",
+                '      "TermByTerm" -> True,',
+                f'      "MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}];',
+                '    Print["    ", Length[componentEqs], " component equations"];',
+                "    Do[",
+                "      Module[{compName, compEq},",
+                "        compName = componentEqs[[k, 1]];",
+                "        compEq = componentEqs[[k, 2]];",
+                "        (* Normalize derivative arity *)",
+                "        compEq = compEq /. Derivative[orders__][g_][args__] /;",
+                "          Length[{orders}] < nCoords :>",
+                "          Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
+                f'        AppendTo[fieldEquations, {{"{fname}_" <> ToString[compName], compEq}}];',
+                "      ];,",
+                "      {k, Length[componentEqs]}",
+                "    ];",
+                "  ];",
+            ]
+        )
 
         # Plane-wave reduction on field equations (if applicable)
         if ctx.reduction is not None:
