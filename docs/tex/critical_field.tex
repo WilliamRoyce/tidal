@@ -77,9 +77,25 @@ at the same threshold ($P_\text{final} \geq 0.99$). If:
 \label{sec:threshold}
 
 The default threshold is $0.99$ (full conversion within numerical tolerance).
-This is a physics-defined target, not an arbitrary number. Regions of
-parameter space where no $B$ field achieves $P_\text{final} \geq 0.99$ produce $B_\text{min} =
-\text{NaN}$, shown as blank spots on heatmaps --- which is itself informative.
+Regions of parameter space where no $B$ field achieves $P_\text{final} \geq 0.99$
+produce $B_\text{min} = \text{NaN}$, shown as blank spots on heatmaps --- which is
+itself informative.
+
+\paragraph{Regime validity caveat.}
+For the Gertsenshtein effect, $P_\text{final} = 0.99$ is \textbf{unphysical}: the
+mixing length $L_\text{mix} \approx 2\,\text{Mpc}/B_0\,[\text{G}]$ ensures that no
+astrophysical or laboratory configuration achieves $P \sim 1$
+(see~\S\ref{subsec:physical-regime} of \texttt{gertsenshtein.tex}).
+Moreover, Hwang \& Noh~\cite{hwangnoh2023graviton} show that the flat-background
+approximation becomes borderline when $P \sim 1$.
+
+For Gertsenshtein-type sweeps, use $P_0 \leq 0.01$ to remain in the physically
+relevant weak-coupling regime.  The amplification factor
+$A = B_\text{min}(\text{EM})/B_\text{min}(\text{torsion})$ is
+\textbf{threshold-independent} at leading order, since $P \propto B_0^2$ in the
+linearized regime (see eq.~\eqref{eq:amplification} in \texttt{gertsenshtein.tex}).
+The same amplification can be obtained from the conversion coefficient
+$C = P/B_0^2$ without a threshold at all.
 
 \subsection{Algorithm}
 \label{sec:cf-algorithm}
