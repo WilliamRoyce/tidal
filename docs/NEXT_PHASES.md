@@ -213,7 +213,7 @@ Combined PGT + Einstein-Maxwell theory derived (`examples/torsion_gertsenshtein/
 
 - Gertsenshtein (1962), "Wave resonance of light and gravitational waves", JETP 14, 84
 - Domcke & Garcia-Cely (2023), "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072) — thin-magnet formula
-- Domcke & Garcia-Cely (2023), "On graviton-photon conversions in magnetic environments", [arXiv:2310.04150](https://arxiv.org/abs/2310.04150)
+- Hwang & Noh (2023), "On graviton-photon conversions in magnetic environments", [arXiv:2310.04150](https://arxiv.org/abs/2310.04150) — proper EM field definitions, graviton mass term
 - Dandoy & Lella (2024), "Graviton-photon oscillations", [arXiv:2406.17853](https://arxiv.org/abs/2406.17853) — confirms correct coupling normalization
 - Berlin et al. (2024), "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865)
 - Sezgin & van Nieuwenhuizen (1980), "New ghost-free gravity Lagrangians", Phys. Rev. D 21:3269 — linearised PGT ghost conditions

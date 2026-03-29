@@ -81,11 +81,11 @@ For GW propagating along $z$-axis with $\Bzero$ along $x$-axis:
 
 The coupled equations from our Lagrangian $(1/\kappa^2)R - (1/4)F^2$ are (after TT + Lorenz gauge, plane-wave reduction, and dividing by kinetic coefficients):
 \begin{align}
-  \ddt^2 h_+ &= \ddz^2 h_+ - \Bzero^2 \kappa^2\, h_+ - \Bzero \kappa^2\, \ddz a_y \label{eq:gert-eom-h} \\
+  \ddt^2 h_+ &= \ddz^2 h_+ - \tfrac{1}{2}\kappa^2 \Bzero^2\, h_+ - \Bzero \kappa^2\, \ddz a_y \label{eq:gert-eom-h} \\
   \ddt^2 a_y &= \ddz^2 a_y + \Bzero\, \ddz h_+ \label{eq:gert-eom-a}
 \end{align}
 
-The coupling is asymmetric: $\Bzero\kappa^2$ on $h$ (from dividing by $1/\kappa^2$ kinetic prefactor) vs $\Bzero$ on $a$ (unit kinetic prefactor). The eigenmode analysis gives beat frequency $\Delta\omega = \Bzero\kappa$ (geometric mean of couplings), yielding:
+The coupling is asymmetric: $\Bzero\kappa^2$ on $h$ (from dividing by $1/(2\kappa^2)$ kinetic prefactor) vs $\Bzero$ on $a$ (unit kinetic prefactor). The eigenmode analysis gives beat frequency $\Delta\omega = \Bzero\kappa$ (geometric mean of couplings), yielding:
 \begin{equation}
   P(\text{graviton} \to \text{photon}) = \sin^2\!\left(\frac{\kappa\,\Bzero\, D}{2}\right)
   \label{eq:gert-P-vacuum}
@@ -96,14 +96,14 @@ This is confirmed numerically (RMS error $< 0.015$ across a 40-point $\Bzero$ sw
 \paragraph{Note on P\&R error.}
 \label{par:pr-error}
 
-Palessandro \& Rothman~(2023, Eq.~26; 2024, arXiv:2405.01407) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument. They fail to properly account for the $1/(16\pi G)$ kinetic prefactor when extracting the mixing frequency from their non-canonically-normalised system. Domcke \& Garcia-Cely~\cite{domcke2023magnetic} independently criticise P\&R's linearisation. Our formula is confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}, who use canonical normalisation and obtain $\Delta_{g,\gamma} = \sqrt{4\pi G}\,\Bzero$, matching $\kappa\Bzero/2$ exactly. See \cref{sec:gertsenshtein-formula} for the full derivation and literature comparison.
+Palessandro \& Rothman~(2023, Eq.~26; 2024, arXiv:2405.01407) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument. They fail to properly account for the $1/(16\pi G)$ kinetic prefactor when extracting the mixing frequency from their non-canonically-normalised system. Hwang \& Noh~\cite{hwangnoh2023graviton} independently criticise P\&R's linearisation. Our formula is confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}, who use canonical normalisation and obtain $\Delta_{g,\gamma} = \sqrt{4\pi G}\,\Bzero$, matching $\kappa\Bzero/2$ exactly. See \cref{sec:gertsenshtein-formula} for the full derivation and literature comparison.
 
 \paragraph{Graviton effective mass from background EM field.}
 \label{par:graviton-mass}
 
-The graviton equation includes a mass-like term $-\Bzero^2\kappa^2\, h_+$ from the interaction of the metric perturbation with the background EM stress-energy. This gives an effective graviton mass $m_g^2 = \kappa^2\Bzero^2/2$. The photon remains massless (in vacuum). This mass detuning limits the peak conversion for each $k$-mode:
+The graviton equation includes a mass-like term $-\tfrac{1}{2}\kappa^2\Bzero^2\, h_+$ from the interaction of the metric perturbation with the background EM stress-energy. This gives an effective graviton mass $m_g^2 = \kappa^2\Bzero^2/2$. The photon remains massless (in vacuum). This mass detuning limits the peak conversion for each $k$-mode:
 \begin{equation}
-  P_\mathrm{max}(k) = \frac{k^2}{k^2 + \kappa^2 \Bzero^2}
+  P_\mathrm{max}(k) = \frac{k^2}{k^2 + \kappa^2 \Bzero^2 / 2}
   \label{eq:gert-Pmax-k}
 \end{equation}
 
@@ -222,6 +222,56 @@ Theory files: \texttt{examples/torsion\_gertsenshtein/theory.toml} (combined
 PGT+EM), \texttt{examples/gertsenshtein/theory\_ungauged.toml} (gauge-independence
 baseline).  See also \texttt{docs/tex/torsion.tex} for the PGT framework.
 
+\paragraph{Related literature.}
+The torsion-independence result is consistent with several independent analyses:
+Obukhov \& Trukhanova~\cite{obukhov2024electrodynamics} find that the spin-torsion--EM
+coupling constant $\chi \propto \ell_\mathrm{Pl}/\ell_\rho$ with $\ell_\rho \gg
+\ell_\mathrm{Pl}$, making minimal torsion--photon coupling negligibly small.
+Shapiro~\cite{shapiro2002torsion} shows that propagating torsion faces unitarity and
+renormalization obstacles, requiring torsion masses above all coupled fermion masses for
+quantum consistency.
+Barker~\cite{barker2024poincare} finds that ghost-free conditions in PGT particle
+spectra are sector-specific with no universal closed-form constraint for general
+$(\alpha_1, \alpha_2, \alpha_3, b_5)$.
+
+\subsubsection{Metric Dependence of EM Fields (Hwang \& Noh)}
+\label{subsec:hwang-noh}
+
+Hwang \& Noh~\cite{hwangnoh2023graviton} show that the covariant decomposition
+$F_{ij} = \eta_{ijk}(B^k - h^{k\ell}B_\ell)$ involves the metric perturbation, whereas
+ad-hoc approaches that write $F_{ij} = \eta_{ijk}\hat{B}^k$ without the metric give
+incorrect Maxwell equations.  The incorrect equations happen to give correct results
+\emph{only} for uniform constant~$B$, planar gravitational waves, and TT gauge; for
+non-uniform or time-varying backgrounds, the two approaches diverge.
+
+\paragraph{Two formulations, two graviton mass terms.}
+Hwang \& Noh derive the graviton equation in both the \textbf{EM-field} and
+\textbf{potential} formulations:
+\begin{itemize}
+  \item \textbf{EM-field formulation:} $(\partial_0^2 - \partial_z^2 - \tfrac{1}{2}\kappa^2 B^2)\,h_+ = \text{source}$
+    --- the $+\tfrac{1}{2}\kappa^2 B^2$ term (tachyonic for $\lambda > \lambda_B$)
+    comes from including $h_{ij}$ in the stress-energy tensor $T_{ab}$.
+  \item \textbf{Potential formulation:}
+    $[\partial_0^2 - \partial_z^2 - \tfrac{1}{2}\kappa^2(B_\parallel^2 - B_\perp^2)]\,h_+ = \text{source}$
+    --- the sign depends on the angle between $\vec{B}$ and the propagation direction.
+    For $\vec{B}$ transverse to propagation ($B_\parallel = 0$), this becomes a
+    \emph{stabilising} mass term $-\tfrac{1}{2}\kappa^2 B_\perp^2$.
+\end{itemize}
+The two formulations are physically equivalent; the sign difference arises because the
+relation between EM fields and potentials itself involves the metric:
+$b^i = \eta^{ijk}\partial_j A_k + h^i_j B^j$.
+
+\paragraph{TIDAL's equations match the potential formulation.}
+TIDAL derives equations from the Lagrangian $\lag = (1/\kappa^2)R - \tfrac{1}{4}F_{\mu\nu}F^{\mu\nu}$,
+written in terms of the four-potential~$A_\mu$.  The xPert pipeline expands
+$\sqrt{-g}\,\lag$ to second order, automatically capturing all metric-dependent
+quantities ($\sqrt{-g}$, $g^{\mu\alpha}g^{\nu\beta}$ in index raising, Christoffel
+connections).  No manual EM field identification is performed.  The resulting graviton
+mass coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ matches Hwang \& Noh's potential-formulation
+result for transverse~$B$ exactly (their Eq.~\eqref{eq:gert-eom-h}).  For non-uniform
+$B$-fields (e.g.\ the Gaussian scattering example), the Lagrangian approach remains
+correct, whereas ad-hoc methods would give different (incorrect) equations.
+
 \subsection{References}
 \label{subsec:gertsenshtein-references}
 
@@ -245,7 +295,7 @@ Ejlli~(2020) & 2020 & First exact (non-perturbative) solution \\
 % NOTE: ejlli2020first key needs adding to references.bib
 Palessandro \& Rothman~(2023) & 2023 & Lagrangian derivation (\textbf{contains normalisation error}) \\
 % NOTE: palessandro2023 key needs adding to references.bib
-Domcke \& Garcia-Cely~\cite{domcke2023magnetic} & 2023 & Criticises P\&R linearisation; inhomogeneous $B$-field calculation \\
+Hwang \& Noh~\cite{hwangnoh2023graviton} & 2023 & Proper EM field definitions in curved spacetime; formulation-dependent graviton mass \\
 \textbf{Dandoy, Lella et al.}~\cite{dandoy2024constraining} & \textbf{2024} & \textbf{4-component mixing, canonical graviton --- confirms our formula} \\
 Palessandro~(2024) & 2024 & Extended treatment (same normalisation error as 2023) \\
 % NOTE: palessandro2024 key needs adding to references.bib
