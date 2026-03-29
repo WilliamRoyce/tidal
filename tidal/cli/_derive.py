@@ -3599,7 +3599,7 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: PLR0914
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0912, PLR0914, PLR0915
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -3650,38 +3650,100 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         "(* Copy Lagrangian for canonical analysis *)",
         f"lagForCanon = {p}Lagrangian;",
         "",
-        "(* Apply CD shorthand rules to canonical Lagrangian.                     *)",
-        "(* ComponentValues are pre-computed (supervisor's pattern) — ToValues    *)",
-        "(* resolves CDN-field tensors in O(1) during StaggeredToBasis, reducing *)",
-        "(* TraceBasisDummy K from ~4+ contracted pairs to ~0.                   *)",
-        "(* Apply highest-order first for correct nesting:                       *)",
-        "(*   CD[-a]@CD[-b]@field → CD[-a]@CD1field → CD2field                 *)",
-        "If[ListQ[$CDShorthandRules] && Length[$CDShorthandRules] > 0,",
-        '  Print["Applying CD shorthand rules to canonical Lagrangian..."];',
-        "  Do[lagForCanon = lagForCanon /. rule, {rule, Reverse[$CDShorthandRules]}];",
-        "  (* Canonicalize only if affordable — same bypass as L^(2) cleanup *)",
-        "  Module[{tCanonTest, canonCost, canonSample},",
-        "    canonSample = If[Head[lagForCanon]===Plus,",
-        "      Total[(List @@ lagForCanon)[[1 ;; Min[20, Length[lagForCanon]]]]],",
-        "      lagForCanon];",
-        "    tCanonTest = AbsoluteTime[];",
-        f"    ContractMetric[ToCanonical[canonSample], {ctx.metric}];",
-        "    canonCost = AbsoluteTime[] - tCanonTest;",
-        "    If[canonCost < 5.0,",
-        f"      lagForCanon = ContractMetric[ToCanonical[lagForCanon], {ctx.metric}],",
-        '      Print["  Phase K ToCanonical bypassed (", Round[canonCost, 0.1], "s for sample)"]',
-        "    ];",
-        "  ];",
-        '  Print["After CD shorthand: ", If[Head[lagForCanon]===Plus, Length[lagForCanon], 1], " terms"];',
-        "];",
-        "",
-        "(* Re-introduce explicit metric tensors for correct sign handling.       *)",
-        "(* When derived fields are expanded, ContractMetric absorbs the metric   *)",
-        "(* into index positions (raised/lowered). DecomposeScalarExpression needs *)",
-        "(* explicit metric tensors to correctly apply the Minkowski signature     *)",
-        "(* (or any user-supplied metric) during component evaluation.             *)",
-        f"lagForCanon = SeparateMetric[{ctx.metric}][lagForCanon];",
     ]
+
+    # --- Self-energy sector filtering for multi-field theories with torsion ---
+    # For theories where full decomposition would timeout, filter L^(2) to
+    # contain only single-perturbation-field self-energy terms (h-only, a-only).
+    # Background fields (Ābar) are KEPT as they are coefficients, not dynamical.
+    # Cross-coupling (h*a, h*T, a*T) and torsion self-energy (T*T) are removed.
+    # This produces the correct self-energy Hamiltonian for each field sector.
+    if ctx.torsion is not None and len(ctx.fields) > 1:
+        # Build list of perturbation field heads (NOT background fields)
+        pert_heads = _matter_pert_head_map(ctx)
+        originals = _matter_pert_originals(ctx)
+        pert_field_heads: list[str] = []
+        for f in ctx.fields:
+            fname = f["name"]
+            if fname in originals:
+                continue
+            head = pert_heads.get(fname, f"{p}{fname.capitalize()}")
+            pert_field_heads.append(head)
+        if ctx.torsion:
+            torsion_head = f"{p}{ctx.torsion['perturbation_name'].capitalize()}"
+            pert_field_heads.append(torsion_head)
+
+        # Generate Wolfram code to filter L^(2) by perturbation field content
+        heads_wl = ", ".join(pert_field_heads)
+        lines.extend(
+            [
+                "(* === Self-energy sector filtering ===                                 *)",
+                "(* For multi-field torsion theories: keep ONLY single-perturbation-field *)",
+                "(* self-energy terms. Background fields (Abar) are coefficients, kept.  *)",
+                "(* Cross-coupling (h*a), torsion interactions (h*T, a*T), and torsion   *)",
+                "(* self-energy (T*T, zero for non-propagating) are filtered out.        *)",
+                "(* This produces correct self-energy H_hh + H_aa for conversion         *)",
+                "(* measurements without the expensive torsion contraction terms.         *)",
+                f"Module[{{pertHeads = {wl_list(heads_wl)}, lagTerms, selfTerms}},",
+                "  lagTerms = If[Head[lagForCanon] === Plus, List @@ lagForCanon, {lagForCanon}];",
+                '  Print["L^(2) before self-energy filter: ", Length[lagTerms], " terms"];',
+                "",
+                "  (* Keep only h-self and a-self sectors: terms with exactly 1 perturbation *)",
+                "  (* field that is NOT the torsion field. Background fields (Abar) are NOT  *)",
+                "  (* perturbation fields and do NOT affect this classification.              *)",
+                f"  Module[{{torsionHead = {torsion_head}}},",
+                "    selfTerms = Select[lagTerms, Function[{term},",
+                "      Module[{presentPerts = Select[pertHeads, !FreeQ[term, #]&]},",
+                "        (* Keep: terms with 0 pert fields (pure constant) or 1 non-torsion pert field *)",
+                "        Length[presentPerts] == 0 ||",
+                "        (Length[presentPerts] == 1 && presentPerts[[1]] =!= torsionHead)",
+                "      ]",
+                "    ]];",
+                "  ];",
+                "",
+                "  lagForCanon = Total[selfTerms];",
+                '  Print["L^(2) after self-energy filter: ", Length[selfTerms], " terms",',
+                '    " (removed ", Length[lagTerms] - Length[selfTerms], " cross-coupling/torsion terms)"];',
+                "];",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            "(* Apply CD shorthand rules to canonical Lagrangian.                     *)",
+            "(* ComponentValues are pre-computed (supervisor's pattern) — ToValues    *)",
+            "(* resolves CDN-field tensors in O(1) during StaggeredToBasis, reducing *)",
+            "(* TraceBasisDummy K from ~4+ contracted pairs to ~0.                   *)",
+            "(* Apply highest-order first for correct nesting:                       *)",
+            "(*   CD[-a]@CD[-b]@field -> CD[-a]@CD1field -> CD2field                *)",
+            "If[ListQ[$CDShorthandRules] && Length[$CDShorthandRules] > 0,",
+            '  Print["Applying CD shorthand rules to canonical Lagrangian..."];',
+            "  Do[lagForCanon = lagForCanon /. rule, {rule, Reverse[$CDShorthandRules]}];",
+            "  (* Canonicalize only if affordable — same bypass as L^(2) cleanup *)",
+            "  Module[{tCanonTest, canonCost, canonSample},",
+            "    canonSample = If[Head[lagForCanon]===Plus,",
+            "      Total[(List @@ lagForCanon)[[1 ;; Min[20, Length[lagForCanon]]]]],",
+            "      lagForCanon];",
+            "    tCanonTest = AbsoluteTime[];",
+            f"    ContractMetric[ToCanonical[canonSample], {ctx.metric}];",
+            "    canonCost = AbsoluteTime[] - tCanonTest;",
+            "    If[canonCost < 5.0,",
+            f"      lagForCanon = ContractMetric[ToCanonical[lagForCanon], {ctx.metric}],",
+            '      Print["  Phase K ToCanonical bypassed (", Round[canonCost, 0.1], "s for sample)"]',
+            "    ];",
+            "  ];",
+            '  Print["After CD shorthand: ", If[Head[lagForCanon]===Plus, Length[lagForCanon], 1], " terms"];',
+            "];",
+            "",
+            "(* Re-introduce explicit metric tensors for correct sign handling.       *)",
+            "(* When derived fields are expanded, ContractMetric absorbs the metric   *)",
+            "(* into index positions (raised/lowered). DecomposeScalarExpression needs *)",
+            "(* explicit metric tensors to correctly apply the Minkowski signature     *)",
+            "(* (or any user-supplied metric) during component evaluation.             *)",
+            f"lagForCanon = SeparateMetric[{ctx.metric}][lagForCanon];",
+        ]
+    )
 
     # Apply scalar BG substitutions before decomposition
     lines.extend(_wls_scalar_background_substitution(ctx, "lagForCanon"))
@@ -4150,25 +4212,19 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "    ToCanonical[eomAbs]];",
                 f"  eomAbs = ContractMetric[eomAbs, {ctx.metric}];",
                 "",
-                "  (* ScreenDollarIndices: unify xAct's internal dollar-indexed dummies. *)",
-                "  (* Without this, duplicate terms differing only in $-index naming    *)",
-                "  (* don't collapse. Supervisor applies this 2-3 times (lines 134,149,152). *)",
-                "  eomAbs = ScreenDollarIndices[eomAbs];",
+                "  (* NOTE: ScreenDollarIndices and CollectTensors were benchmarked here   *)",
+                "  (* but REVERTED. ScreenDollarIndices reduces term count (194→87) but    *)",
+                "  (* INCREASES per-term cost (5.5s→16.7s avg) by creating denser terms.  *)",
+                "  (* CollectTensors is even worse (12-35s/term). All term-density-        *)",
+                "  (* reducing approaches backfire because TraceBasisDummy is O(dim^{2K})  *)",
+                "  (* in contraction depth K, not in term count.                           *)",
                 "",
                 "  (* Apply CD shorthand rules *)",
                 "  If[ListQ[$CDShorthandRules] && Length[$CDShorthandRules] > 0,",
                 "    Do[eomAbs = eomAbs /. rule, {rule, Reverse[$CDShorthandRules]}]",
                 "  ];",
                 "",
-                "  (* Screen again after CD shorthand (new dummies may be generated) *)",
-                "  eomAbs = ScreenDollarIndices[eomAbs];",
-                "",
-                "  (* NOTE: CollectTensors tested here but REVERTED — it collapses the     *)",
-                "  (* EOM to 1 dense term that re-expands to terms with HIGHER contraction *)",
-                "  (* complexity (35s/term vs 1.8s/term). ScreenDollarIndices alone is     *)",
-                "  (* sufficient for dummy-index unification.                              *)",
-                "",
-                '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " abstract EOM terms (after simplification)"];',
+                '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " abstract EOM terms"];',
             ]
         )
 
@@ -4995,7 +5051,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     f"         l2TopTerms = If[Head[{ctx.prefix}Lagrangian] === Plus,",
                     f"           Length[{ctx.prefix}Lagrangian], 1]}},",
                     '  Print["L^(2) canonical dispatch: ", l2TopTerms, " top terms, LeafCount=", l2LC];',
-                    "  If[l2TopTerms > 30 || l2LC > 2000,",
+                    "  If[l2TopTerms > 500 || l2LC > 50000,",
                     '    Print["Complex L^(2) — using VarD EOM path"];',
                 ]
             )
