@@ -100,7 +100,7 @@ See `docs/tex/gertsenshtein.tex`, `docs/tex/gertsenshtein_formula.tex`, and `doc
 The combined PGT + Einstein-Maxwell system (R̃ + α_I T² + b₅R̃² − ¼F²) has been derived and simulated with 23 component fields, yielding the project's central physics result:
 
 - **Torsion-independence of standard Gertsenshtein**: The h× ↔ a_x (graviton-photon) conversion channel contains NO torsion parameters — algebraically identical to the EM-only case for any vacuum gravitational wave initial conditions.
-- **Polarisation block-diagonal structure**: The system decomposes into two completely decoupled channels: (1) h× ↔ a_x (torsion-free, stable), (2) trace ↔ a_y ↔ torsion (torsion-dependent, ghost-unstable from Ostrogradsky).
+- **Polarization block-diagonal structure**: The system decomposes into two completely decoupled channels: (1) h× ↔ a_x (torsion-free, stable), (2) trace ↔ a_y ↔ torsion (torsion-dependent, ghost-unstable from Ostrogradsky).
 - **Coupling-instability tension**: The b₅R̃² term simultaneously enables torsion propagation AND creates ghost instabilities — a structural consequence of Ostrogradsky's theorem.
 
 See `docs/tex/gertsenshtein.tex` §Torsion-Independence and `docs/tex/torsion.tex` §Combined PGT+EM System for the full analysis.
@@ -111,7 +111,7 @@ The `research/` directory contains a systematic enumeration of all independent s
 
 ### Current Research Frontier
 
-- **Non-minimal torsion-EM coupling** (T·F, T·(*F)): Required to break the polarisation block-diagonal structure; direct photon-torsion interaction bypasses the decoupled channels. Prototype theory exists (`examples/torsion_gertsenshtein/theory_nonminimal.toml`).
+- **Non-minimal torsion-EM coupling** (T·F, T·(*F)): Required to break the polarization block-diagonal structure; direct photon-torsion interaction bypasses the decoupled channels. Prototype theory exists (`examples/torsion_gertsenshtein/theory_nonminimal.toml`).
 - **Ghost-free parameter conditions**: Identify parameter windows where the trace channel is stable (Sezgin & van Nieuwenhuizen 1980, Barker 2024).
 - **Magnetar/FRB scattering** (Phase F3): Dipolar B(r) ∝ 1/r³ in radial coordinates.
 
