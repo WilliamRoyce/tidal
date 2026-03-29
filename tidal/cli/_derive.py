@@ -3599,7 +3599,7 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0914, PLR0915
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -3669,9 +3669,8 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 continue
             head = pert_heads.get(fname, f"{p}{fname.capitalize()}")
             pert_field_heads.append(head)
-        if ctx.torsion:
-            torsion_head = f"{p}{ctx.torsion['perturbation_name'].capitalize()}"
-            pert_field_heads.append(torsion_head)
+        torsion_head = f"{p}{ctx.torsion['perturbation_name'].capitalize()}"
+        pert_field_heads.append(torsion_head)
 
         # Generate Wolfram code to filter L^(2) by perturbation field content
         heads_wl = ", ".join(pert_field_heads)
