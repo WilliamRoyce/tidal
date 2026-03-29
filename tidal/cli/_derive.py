@@ -1335,8 +1335,10 @@ def _wls_precompute_cd_component_values(
         else:
             base_rank = field_dict.get("rank", 2)
         # For this field, limit CD level so CDN tensor rank ≤ 4 (≤ 256 entries in 4D).
-        # CD2 for rank-3 torsion (rank 5 = 1024 entries) costs ~35s to pre-compute
-        # and increases abstract EOM terms from 160→194, offsetting the per-term savings.
+        # CD2 for rank-3 torsion (rank 5 = 1024 entries) tested: costs 55s precompute
+        # AND makes per-term SplinterToArray slower (41-67s vs 12-34s without).
+        # The dense CD2T ComponentValues cause TraceBasisDummy to enumerate MORE
+        # combinations, not fewer. Only CD1 is beneficial for torsion.
         field_max_cd = min(max_cd_precompute, max(1, 4 - base_rank))
 
         for cd_level in range(1, field_max_cd + 1):
