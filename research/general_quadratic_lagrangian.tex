@@ -642,6 +642,43 @@ The coefficient of $(\pd_\mu S^\mu)^2$ must vanish ($b = 0$),
 leaving only transverse (Maxwell-like) torsion propagation.
 
 
+\paragraph{Blagojevi\'{c}--Cvetkovi\'{c} ghost-free catalog.}
+Blagojevi\'{c} \& Cvetkovi\'{c}~\cite{Blagojevic:2018dpz} provide a
+systematic computer-aided classification of the full 10-parameter
+parity-preserving PGT (parameters $\lambda, r_{1\text{--}5}, t_{1\text{--}3}$
+in their notation, mapping to our $\Mpl, \alpha_{1\text{--}6}, \beta_{1\text{--}3}$).
+Of 1918 critical parameter cases (submanifolds with enhanced gauge symmetry),
+\textbf{450 are ghost-and-tachyon free}, including 10 that are power-counting
+renormalizable. Key results for sweep constraints:
+\begin{itemize}
+  \item \textbf{Propagating $0^-$ (pseudoscalar) tordion:} ghost-free with
+    $r_2 < 0$, $t_2 > 0$, $\lambda > 0$; requires Riemann-squared coupling
+    ($r_2 R^{ABCD}R_{ABCD}$ type, mapping to $\alpha_4$), \emph{not} $\Ric^2$.
+    Mass: $m_{0^-}^2 = -t_2/r_2$.
+  \item \textbf{Propagating $0^+$ (scalar) tordion:} ghost-free in critical cases
+    e.g.\ $r_1 = 0$, $2r_3 = r_4 = -r_5$, with $r_3 > 0$, $r_2 < 0$, $t_2 > 0$,
+    $t_3(\lambda - t_3) < 0$.
+  \item \textbf{Propagating $0^-$ without $\Ric^2$:} all curvature-squared
+    couplings except $r_2$ can be zero. This avoids the Ostrogradsky ghost from
+    $b_5 \widetilde{R}^2$ entirely.
+\end{itemize}
+Nikiforova et~al.~\cite{Nikiforova:2009qr} provide complementary stability
+conditions around Minkowski: $c_1 > 0$, $c_5 < 0$, $c_6 > 0$, $\alpha < 0$,
+$\tilde{\alpha} > 0$, with standard massive Klein--Gordon dispersion for both
+spin-0 and spin-2 torsion modes.
+
+\paragraph{Linearised regime and ghost onset.}
+Aoki~\cite{Aoki:2019snr} shows that PGT is equivalent to ghost-free massive
+bigravity at the linearised level; ghosts enter only at cubic order in perturbations,
+with cutoff $\Lambda_4 = (M_{\text{Pl}} m^3)^{1/4}$. For TIDAL's linearised
+simulations, the quadratic PGT is therefore \textbf{healthy} even with $R^2$ terms
+--- the Ostrogradsky ghost is a \emph{non-linear} artefact.
+
+These results should be encoded as constraint sets in \texttt{tidal sweep}
+to restrict parameter scans to ghost-free windows (see Priority Parameters,
+\S\ref{sec:priority}).
+
+
 %% ------------------------------------------------------------------
 \subsection{Topological Terms}
 \label{sec:topological}
@@ -907,6 +944,9 @@ For initial parameter sweeps with magnetic background $\bar{B}_0$:
     Ghost/tachyon-free windows for the 20 parity-odd parameters
     require propagator analysis (PSALTer).
     Partial results exist~\cite{Karananas:2014pxa,Blagojevic:2018dpz}.
+    For the parity-even sector, Blagojevi\'{c} \& Cvetkovi\'{c}'s
+    450 ghost-free cases (\S\ref{sec:propagator}) provide concrete
+    constraint sets for parameter sweeps.
 
   \item \textbf{Nieh--Yan/Holst interplay:}
     $d_{14}$ and $\gamma_{\text{BI}}$ are not simultaneously
@@ -918,7 +958,17 @@ For initial parameter sweeps with magnetic background $\bar{B}_0$:
 
   \item \textbf{Quartic terms:}
     Terms $O(\text{field}^4)$ could contribute at $O(\epsilon^2)$ when
-    two factors take background values. Beyond current scope.
+    two factors take background values. Beyond current scope for
+    $\bar{T} = 0$ (quartic $F^2 T^2$ terms vanish identically).
+    If background torsion $\bar{T} \neq 0$ is considered, the 17
+    independent $F^2 T^2$ structures classified by
+    Itin~\cite{Itin:2003hr} become relevant.
+    Separately, Bahamonde et~al.~\cite{Bahamonde:2024sqo} show that
+    cubic $R \cdot T \cdot T$ invariants (26~terms, 6~constrained)
+    eliminate ghost pathologies in the axial and vector torsion sectors
+    around arbitrary (non-flat) backgrounds. These are beyond the
+    linearised flat-background regime but relevant if TIDAL extends
+    to curved-background simulations.
 \end{enumerate}
 
 
@@ -1261,6 +1311,31 @@ T.~Nutma,
 ``\texttt{xTras}: A field-theory inspired \texttt{xAct} package for
 Mathematica,'' Comput.\ Phys.\ Commun.\ \textbf{185}, 1719 (2014),
 arXiv:1308.3493.
+
+\bibitem{Nikiforova:2009qr}
+V.~Nikiforova, S.~Randjbar-Daemi and V.~Rubakov,
+``Infrared Modified Gravity with Dynamical Torsion,''
+Phys.\ Rev.\ D \textbf{80}, 124050 (2009),
+arXiv:0905.3732.
+
+\bibitem{Aoki:2019snr}
+K.~Aoki and K.~Shimada,
+``Galileon and generalized Galileon with projective invariance
+in a metric-affine formalism,''
+Phys.\ Rev.\ D \textbf{101}, 124023 (2020),
+arXiv:2009.11739.
+
+\bibitem{Itin:2003hr}
+Y.~Itin,
+``Maxwell's field coupled nonminimally to quadratic torsion:
+induced axion field and birefringence of the vacuum,''
+Phys.\ Rev.\ D \textbf{68}, 127701 (2003),
+arXiv:gr-qc/0307063.
+
+\bibitem{Bahamonde:2024sqo}
+S.~Bahamonde et~al.,
+``Cosmology of Cubic Poincar\'{e} Gauge gravity,''
+arXiv:2506.17017 (2025).
 
 \end{thebibliography}
 

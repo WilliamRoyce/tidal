@@ -4161,9 +4161,10 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "  (* Screen again after CD shorthand (new dummies may be generated) *)",
                 "  eomAbs = ScreenDollarIndices[eomAbs];",
                 "",
-                "  (* CollectTensors: group common tensor structures (supervisor's pattern). *)",
-                "  (* MUST come AFTER ScreenDollarIndices — fails without unified dummies.  *)",
-                "  eomAbs = CollectTensors[eomAbs];",
+                "  (* NOTE: CollectTensors tested here but REVERTED — it collapses the     *)",
+                "  (* EOM to 1 dense term that re-expands to terms with HIGHER contraction *)",
+                "  (* complexity (35s/term vs 1.8s/term). ScreenDollarIndices alone is     *)",
+                "  (* sufficient for dummy-index unification.                              *)",
                 "",
                 '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " abstract EOM terms (after simplification)"];',
             ]
