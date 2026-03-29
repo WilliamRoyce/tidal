@@ -298,7 +298,7 @@ Each RHS term has a coefficient that may be constant, time-dependent, or positio
   \end{itemize}
 \end{description}
 
-\subsection{Working Examples (27 Total)}
+\subsection{Working Examples (20 Total)}
 \label{sec:working-examples}
 
 \begin{table}[htbp]
@@ -309,33 +309,33 @@ Each RHS term has a coefficient that may be constant, time-dependent, or positio
 \toprule
 Example & Dim & Fields & Key Features \\
 \midrule
-\texttt{scalar\_field/} & 1+1D & phi\_0 & Basic scalar wave, mass term \\
-\texttt{electromagnetic/} & 1+1D & A\_0, A\_1 & Maxwell equations, Lorenz gauge \\
-\texttt{proca/} & 1+1D & A\_0, A\_1 & Massive vector field (Proca mass) \\
-\texttt{coupled\_scalars/} & 1+1D & phi\_0, chi\_0 & Cross-field coupling, mass matrix \\
-\texttt{scalar\_potential\_well/} & 1+1D & phi\_0 & Background potential well, bound states \\
-\texttt{cylindrical\_kg\_1d/} & 1+1D & phi\_0 & Cylindrical coordinates, plane-wave 1D reduction \\
-\texttt{gravitational\_waves\_1d/} & 1+1D & h\_ij & Linearized gravity, plane-wave 1D reduction \\
-\texttt{spherical\_kg\_1d/} & 1+1D & phi\_0 & Spherical coordinates, plane-wave 1D reduction \\
-\texttt{chern\_simons/} & 2+1D & A\_0, A\_1, A\_2 & Epsilon tensor, constraint equation \\
-\texttt{elasticity/} & 2+1D & u\_0, u\_1 & Anisotropic Laplacian, cross derivatives \\
-\texttt{curved\_spacetime/} & 2+1D & phi\_0 & De Sitter Hubble friction, time-dependent coefficients \\
-\texttt{sphere\_kg/} & 2+1D & phi\_0 & Stereographic $S^2$, position-dependent coefficients \\
-\texttt{polar\_kg/} & 2+1D & phi\_0 & Polar coordinates, $1/r$ Christoffel correction \\
-\texttt{electrostatics/} & 2+1D & phi\_0 & Poisson equation, constraint solver \\
-\texttt{scalar\_vector\_coupling/} & 2+1D & phi\_0, A\_i & Mixed-rank cross-field (scalar+vector), 4 constants \\
-\texttt{massive\_gravity/} & 2+1D & h\_ij & Linearized massive gravity, Fierz--Pauli, xPert~\cite{brizuela2009xpert} \\
-\texttt{coupled\_proca/} & 2+1D & A\_i, B\_i & Two massive vectors, coupled Helmholtz constraints \\
-\texttt{coupled\_scattering/} & 2+1D & phi\_0, chi\_0 & Position-dependent Gaussian coupling, background fields \\
-\texttt{proca\_background/} & 2+1D & A\_i, B\_i & Lorentzian scalar background, constraint+BG integration \\
-\texttt{vector\_background/} & 2+1D & phi\_0, A\_i & Tanh domain wall vector background, sign-changing coupling \\
-\texttt{scalar\_field\_3d/} & 3+1D & phi\_0 & Full 4D Klein--Gordon, $32^3$ grid \\
-\texttt{spherical\_kg/} & 3+1D & phi\_0 & Spherical coordinates, trig coefficients (Cot, Csc) \\
-\texttt{cylindrical\_kg/} & 3+1D & phi\_0 & Mixed curved $(r,\theta)$ and flat $(z)$ directions \\
-\texttt{gravitational\_waves/} & 3+1D & h\_ij & xPert~\cite{brizuela2009xpert} linearization, TT gauge, rank-2 tensor \\
-\texttt{massive\_3form/} & 3+1D & C\_ijk & Rank-3 antisymmetric tensor, symmetry reduction $64 \to 4$ \\
-\texttt{gertsenshtein/} & 1+1D & h\_5, gea\_1 & Einstein--Maxwell graviton-photon conversion, multi-field perturbation \\
-\texttt{maxwell\_perturbation/} & 1+1D & gea\_0, gea\_1 & Matter-only Proca perturbation, lightweight CI test \\
+\multicolumn{4}{@{}l}{\emph{Scalar and vector (flat spacetime)}} \\
+\texttt{coupled\_scalars/} & 1+1D & $\varphi$, $\chi$ & Cross-field gradient coupling, Rabi conversion \\
+\texttt{coupled\_scattering/} & 1+1D & $\varphi$, $\chi$ & Position-dependent Gaussian coupling, wave scattering \\
+\texttt{scalar\_potential\_well/} & 1+1D & $\varphi$ & Background potential well, bound states \\
+\texttt{chern\_simons/} & 2+1D & $A_\mu$ & Maxwell + topological term, $\varepsilon$ tensor, constraint \\
+\texttt{elasticity/} & 2+1D & $u_x$, $u_y$ & Navier--Cauchy, anisotropic Laplacian, cross derivatives \\
+\texttt{coupled\_proca/} & 2+1D & $A_\mu$, $B_\mu$ & Two massive vectors, coupled Helmholtz constraints \\
+\texttt{scalar\_vector\_coupling/} & 2+1D & $\varphi$, $A_\mu$ & Mixed-rank cross-field (scalar+vector), 4 constants \\
+\texttt{proca\_background/} & 2+1D & $A_\mu$, $B_\mu$ & Lorentzian background, constraint+BG integration \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Curved spacetime}} \\
+\texttt{sphere\_kg/} & 2+1D & $\varphi$ & Stereographic $S^2$, position-dependent coefficients \\
+\texttt{cylindrical\_kg/} & 3+1D & $\varphi$ & Mixed curved $(r,\theta)$ and flat $(z)$ directions \\
+\texttt{cylindrical\_kg\_1d/} & 1+1D & $\varphi$ & Cylindrical coordinates, plane-wave 1D reduction \\
+\texttt{spherical\_kg\_1d/} & 1+1D & $\varphi$ & Spherical coordinates, plane-wave 1D reduction \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Linearized gravity and tensor fields}} \\
+\texttt{gravitational\_waves/} & 3+1D & $h_{\mu\nu}$ & xPert~\cite{brizuela2009xpert} linearization, TT gauge, rank-2 tensor \\
+\texttt{gravitational\_waves\_1d/} & 1+1D & $h_{\mu\nu}$ & TT gauge + plane-wave reduction \\
+\texttt{massive\_gravity/} & 2+1D & $h_{\mu\nu}$ & Fierz--Pauli mass, xPert~\cite{brizuela2009xpert}, 5 constraints \\
+\texttt{massive\_3form/} & 3+1D & $C_{\mu\nu\rho}$ & Rank-3 antisymmetric, symmetry reduction $64 \to 4$ \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Multi-field perturbation and Gertsenshtein}} \\
+\texttt{gertsenshtein/} & 1+1D & $h_\times$, $a_y$ & Einstein--Maxwell graviton-photon conversion \\
+\texttt{torsion\_gertsenshtein/} & 3+1D & $h_{\mu\nu}$, $t_{\alpha\mu\nu}$, $a_\mu$ & Combined PGT+EM, torsion-independence proven \\
+\texttt{graviton\_torsion/} & 3+1D & $h_{\mu\nu}$, $t_{\alpha\mu\nu}$ & Full quadratic PGT ($\alpha_I T^2 + b_5 \tilde{R}^2$), 37 fields \\
+\texttt{test\_ibp/} & 1+1D & $\varphi$ & Box Lagrangian, validates IBP in canonical pipeline \\
 \bottomrule
 \end{tabular}
 \end{table}

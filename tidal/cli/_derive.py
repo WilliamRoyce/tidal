@@ -1217,6 +1217,219 @@ def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
     return lines
 
 
+def _wls_precompute_cd_component_values(
+    ctx: _WlsContext,
+    dyn_fields: list[dict[str, Any]],
+) -> list[str]:
+    """Pre-compute ComponentValues for CD shorthand tensors (supervisor's pattern).
+
+    Follows the approach in ``SphericalEuclidean.m`` (lines 265-395): for each
+    CD shorthand tensor (CD1field through CD4field), compute component arrays
+    via ``StaggeredToBasis`` and assign them as ``ComponentValue`` entries so
+    that ``ToValues`` resolves them in O(1) during Phase A decomposition.
+
+    Each level builds iteratively on the previous level's ComponentValues:
+    CD1field from base field → CD2field from CD1field → etc.  This means the
+    cost is O(dim^2) per level, not O(dim^{2K}) for K nested CDs.
+
+    Uses xAct introspection (``SlotsOfTensor``, ``ComponentArray``) throughout,
+    making it theory-agnostic: works for any tensor rank, any field count, any
+    coupling structure.
+
+    References
+    ----------
+    - Supervisor's ``SphericalEuclidean.m``, lines 265-395 (commit 4a89164)
+    - Supervisor's ``VerifyComponents`` helper, line 253-263
+    """
+    chart = ctx.chart
+    manifold = ctx.manifold
+    cd = ctx.cd
+    lines: list[str] = [
+        "",
+        "(* === Pre-compute CD shorthand ComponentValues (supervisor's pattern) ===  *)",
+        "(* For each CDN-field tensor, compute component arrays via StaggeredToBasis *)",
+        "(* and assign as ComponentValue entries.  ToValues then resolves them O(1)  *)",
+        "(* during Phase A canonical decomposition, reducing TraceBasisDummy K from  *)",
+        "(* ~4+ contracted pairs to ~0.  Each level builds on the previous.         *)",
+        "(* Ref: supervisor's SphericalEuclidean.m lines 265-395.                   *)",
+        "(* Theory-agnostic: uses SlotsOfTensor introspection for any field rank.   *)",
+        "Off[Validate::repeated]; Off[Validate::inhom];",
+        _wls_timing_start("tCDPrecomp"),
+        "",
+        "(* Helper: Splinter pipeline for rank-N tensors (supervisor's pattern).    *)",
+        "(* Unlike StaggeredToBasis (designed for scalar expressions), this         *)",
+        "(* inserts ComponentArray BETWEEN ToBasis and ToValues to produce a        *)",
+        "(* component ARRAY for rank-N tensors with free indices.                  *)",
+        "(* Ref: supervisor's EuclideanSplinter (SphericalEuclidean.m:239-250).    *)",
+        "tidalSplinter[expr_, chart2_] := Module[{e = expr, metric2, covd2, christPD2},",
+        "  Module[{manifold2, tb2, ms2},",
+        "    manifold2 = ManifoldOfChart[chart2];",
+        '    tb2 = Symbol["Tangent" <> ToString[manifold2]];',
+        "    ms2 = MetricsOfVBundle[tb2];",
+        "    metric2 = First[ms2]; covd2 = CovDOfMetric[metric2];",
+        "  ];",
+        '  christPD2 = Symbol["Christoffel" <> ToString[covd2] <> "PD" <> ToString[chart2]];',
+        "  (* Staggered ToBasis: peel covariant derivative layers *)",
+        "  e = ToBasis[chart2][e];",
+        "  e = e /. christPD2 -> Zero;",
+        "  e = ToBasis[chart2][e];",
+        "  e = e /. christPD2 -> Zero;",
+        "  e = SeparateMetric[metric2][e];",
+        "  e = ToBasis[chart2][e];",
+        "  e = e /. christPD2 -> Zero;",
+        "  (* ComponentArray: expand free basis indices into array *)",
+        "  e = ComponentArray[e];",
+        "  (* ToValues: substitute pre-computed ComponentValues *)",
+        "  e = ToValues[e];",
+        "  e = TraceBasisDummy[e];",
+        "  e = ToValues[e];",
+        "  e",
+        "];",
+        "",
+    ]
+
+    # Only pre-compute ComponentValues for MULTI-FIELD theories.
+    # Single-field theories (graviton_torsion, scalar_field) don't have
+    # cross-field coupling → StaggeredToBasis handles them efficiently.
+    # Multi-field theories (torsion+EM) have cross-coupling that creates
+    # O(dim^{2K}) blowup in TraceBasisDummy — pre-computation prevents this.
+    #
+    # Limit to CD1 only: each CD level adds a rank to the tensor, making
+    # the ComponentArray exponentially larger (4^rank). CD1 resolves first
+    # covariant derivatives (the most common), giving the best cost/benefit.
+    # Higher levels are handled by StaggeredToBasis fallback during Phase A.
+    min_fields_for_precompute = 2
+    if len(dyn_fields) < min_fields_for_precompute:
+        lines.extend(
+            [
+                "",
+                "(* Single-field theory — skip CD pre-computation (already fast) *)",
+                'Print["CD pre-computation: skipped (single dynamical field)"];',
+            ]
+        )
+        lines.extend(
+            [
+                "",
+                "On[Validate::repeated]; On[Validate::inhom];",
+                _wls_timing_end(
+                    "tCDPrecomp", "CD shorthand ComponentValue pre-computation"
+                ),
+                "",
+            ]
+        )
+        return lines
+
+    max_cd_precompute = 2
+    for df in dyn_fields:
+        head = df["head"]
+        field_name = df["name"]
+        # Field rank determines CD shorthand tensor rank: CD_N has rank = base_rank + N
+        # Limit pre-computation to avoid dim^rank blowup in ComponentArray:
+        # rank ≤ 4 → ≤ 256 entries (4D), fast; rank 5 → 1024 entries, slow
+        field_dict = df.get("field", {})
+        ftype = field_dict.get("type", df.get("type", "scalar"))
+        if ftype == "scalar":
+            base_rank = 0
+        elif ftype == "vector":
+            base_rank = 1
+        else:
+            base_rank = field_dict.get("rank", 2)
+        # For this field, limit CD level so CDN tensor rank ≤ 4 (≤ 256 entries in 4D).
+        # CD2 for rank-3 torsion (rank 5 = 1024 entries) tested: costs 55s precompute
+        # AND makes per-term SplinterToArray slower (41-67s vs 12-34s without).
+        # The dense CD2T ComponentValues cause TraceBasisDummy to enumerate MORE
+        # combinations, not fewer. Only CD1 is beneficial for torsion.
+        field_max_cd = min(max_cd_precompute, max(1, 4 - base_rank))
+
+        for cd_level in range(1, field_max_cd + 1):
+            prev_head = f"CD{cd_level - 1}{head}" if cd_level > 1 else head
+            cd_head = f"CD{cd_level}{head}"
+
+            lines.extend(
+                [
+                    "",
+                    f"(* Pre-compute CD{cd_level}{field_name} ComponentValues *)",
+                    f"If[xTensorQ[{cd_head}],",
+                    "  Module[{prevSlots, prevDownIdxs, cdExpr, compDown, compUp},",
+                    f"    prevSlots = SlotsOfTensor[{prev_head}];",
+                    "",
+                    "    (* Compute natural-down via tidalSplinter (produces component ARRAY) *)",
+                    f"    prevDownIdxs = Table[-DummyIn[Tangent{manifold}], {{Length[prevSlots]}}];",
+                    f"    cdExpr = {cd}[-a][{prev_head} @@ prevDownIdxs];",
+                    f"    compDown = tidalSplinter[cdExpr, {chart}];",
+                ]
+            )
+            # Apply plane-wave reduction to CD pre-computed components:
+            # Zero entries where the FIRST index (the CD derivative direction)
+            # is a killed (transverse) coordinate. This makes transverse-derivative
+            # terms resolve to 0 immediately via ToValues during decomposition.
+            if ctx.reduction is not None:
+                killed_slots = [
+                    ctx.coords.index(c)
+                    for c in ctx.coords[1:]
+                    if c != ctx.reduction["propagation_axis"]
+                ]
+                lines.extend(
+                    f"    compDown[[{ks + 1}]] = 0 * compDown[[{ks + 1}]];"
+                    for ks in killed_slots
+                )
+                lines.append(
+                    '    Print["    plane-wave: zeroed transverse CD components"];'
+                )
+            lines.extend(
+                [
+                    "    (* Assign natural-down ComponentValues *)",
+                    f"    Module[{{downIdxs = Table[-{{IndexRange[a, z][[i]], {chart}}}, "
+                    f"{{i, Length[SlotsOfTensor[{cd_head}]]}}]}},",
+                    "      Block[{Print = Null},",
+                    f"        ComponentValue[ComponentArray[{cd_head} @@ downIdxs], compDown]",
+                    "      ]",
+                    "    ];",
+                    "",
+                    "    (* Compute all-up by raising (uses metric ComponentValues) *)",
+                    f"    Module[{{upIdxs = Table[{{IndexRange[a, z][[i]], {chart}}}, "
+                    f"{{i, Length[SlotsOfTensor[{cd_head}]]}}]}},",
+                    f"      compUp = tidalSplinter[{cd_head} @@ upIdxs, {chart}];",
+                ]
+            )
+            if ctx.reduction is not None:
+                killed_slots = [
+                    ctx.coords.index(c)
+                    for c in ctx.coords[1:]
+                    if c != ctx.reduction["propagation_axis"]
+                ]
+                lines.extend(
+                    f"      compUp[[{ks + 1}]] = 0 * compUp[[{ks + 1}]];"
+                    for ks in killed_slots
+                )
+            lines.extend(
+                [
+                    "      Block[{Print = Null},",
+                    f"        ComponentValue[ComponentArray[{cd_head} @@ upIdxs], compUp]",
+                    "      ]",
+                    "    ];",
+                    "",
+                    f'    Print["  {cd_head}: ", Length[SlotsOfTensor[{cd_head}]], '
+                    f'" indices, ComponentValues assigned"];',
+                    "  ],",
+                    f"  Null (* {cd_head} not defined for this theory *)",
+                    "];",
+                ]
+            )
+
+    lines.extend(
+        [
+            "",
+            "On[Validate::repeated]; On[Validate::inhom];",
+            _wls_timing_end(
+                "tCDPrecomp", "CD shorthand ComponentValue pre-computation"
+            ),
+            "",
+        ]
+    )
+    return lines
+
+
 def _wls_multi_field_eom(
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
@@ -1231,11 +1444,13 @@ def _wls_multi_field_eom(
     lines: list[str] = []
 
     if ctx.lagrangian_expr:
-        # CD shorthand setup: pre-compute ComponentValues for CD[field]
-        # tensors. Speeds up Phase A decomposition by enabling O(1)
-        # ToValues lookups instead of per-term ToBasis + TraceBasisDummy.
-        # Ref: supervisor's EuclideanSplinter pattern (commit 4a89164).
+        # CD shorthand setup: define CDN-field tensors and substitution rules.
+        # Ref: supervisor's ApplyShorthand pattern (commit 4a89164).
         lines.extend(_wls_shorthand_cd_tensors(ctx, dyn_fields))
+        # Pre-compute ComponentValues for all CD shorthand tensors so that
+        # ToValues resolves them in O(1) during Phase A decomposition.
+        # This is the key optimization from the supervisor's pattern.
+        lines.extend(_wls_precompute_cd_component_values(ctx, dyn_fields))
         lines.extend(
             [
                 'Print["[TIMING] CD shorthand setup + pre-computation: ", '
@@ -1607,10 +1822,19 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "",
             "(* Replace background metric determinant with evaluated value       *)",
             f"l2Raw = l2Raw /. {det_sym}[] -> Det[{p}MetricMatrix];",
-            "(* Use Expand (not Simplify) to avoid Validate::repeated errors from *)",
-            "(* nested Scalar[] wrappers in R̃-decomposed torsion expressions.    *)",
-            "l2Raw = Expand[l2Raw];",
-            'Print["L^(2) (volume element resolved): ", Short[l2Raw, 3]];',
+            "(* Expand to distribute volume element — deferred for large expressions.*)",
+            "(* For theories with rank-2 R̃ coupling (non-minimal), l2Raw has     *)",
+            "(* 5000+ deeply nested tensor products; Expand takes minutes.        *)",
+            "(* Use LeafCount as a size proxy: large expressions skip Expand and  *)",
+            "(* rely on downstream pattern-matching to propagate zeros.           *)",
+            "Module[{lc = LeafCount[l2Raw]},",
+            '  Print["L^(2) LeafCount: ", lc];',
+            "  If[lc > 50000,",
+            '    Print["L^(2) volume Expand: SKIPPED (LeafCount=", lc, " > 50000)"],',
+            "    l2Raw = Expand[l2Raw];",
+            '    Print["L^(2) volume Expand: ", If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"]',
+            "  ]",
+            "];",
             "",
         ]
     )
@@ -1640,6 +1864,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             [
                 "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
                 f"l2Raw = l2Raw /. {pert_sym}[LI[2], idx__] :> 0;",
+                "(* Expand eagerly for small expressions; skip for large (LeafCount>50000) *)",
+                "If[LeafCount[l2Raw] <= 50000, l2Raw = Expand[l2Raw]];",
+                'Print["After LI[2] drop: ", If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
                 "",
                 "(* Replace xPert metric notation with declared field tensor *)",
                 f"l2Raw = l2Raw /. {pert_sym}[LI[1], idx__] :> {field_head}[idx];",
@@ -1677,6 +1904,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 f"l2Raw = l2Raw /. {torsion_pert_label}[LI[1], idx__] :> {torsion_field_head}[idx];",
                 "(* Background torsion = 0 (flat Minkowski, no torsion source) *)",
                 f"l2Raw = l2Raw /. {torsion_xact_head}[__] :> 0;",
+                "(* Expand eagerly for small expressions; skip for large (LeafCount>50000) *)",
+                "If[LeafCount[l2Raw] <= 50000, l2Raw = Expand[l2Raw]];",
+                'Print["After torsion truncation: ", If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
             ]
         )
 
@@ -1701,6 +1931,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* Without this, spherical metrics leave symbolic RiemannCD unevaluated, *)",
             "(* corrupting equations for tensor components (h_theta_theta etc.). *)",
             f"l2Raw = l2Raw /. {wl_list(f'{riemann_sym}[__] :> 0, {ricci_sym}[__] :> 0, {ricci_scalar_sym}[] :> 0, {einstein_sym}[__] :> 0')};",
+            "(* Expand eagerly for small expressions; skip for large (>500 terms) *)",
+            "If[!Head[l2Raw] === Plus || Length[l2Raw] <= 500, l2Raw = Expand[l2Raw]];",
+            'Print["After background curvature zeroing: ", If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
         ]
     )
 
@@ -1746,13 +1979,58 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     lines.extend(
         [
             "",
-            "(* Canonical simplifications *)",
-            "l2Raw = ToCanonical[l2Raw];",
-            f"l2Raw = ContractMetric[l2Raw, {ctx.metric}];",
+            "(* === Adaptive canonicalization with cost-based bypass ===               *)",
+            "(* ToCanonical + ContractMetric scale super-linearly with expression     *)",
+            "(* size. Measure first-batch cost; if >= 5s, SKIP canonicalization       *)",
+            "(* entirely — downstream DecomposeScalarExpression handles non-canonical *)",
+            "(* expressions correctly via ToBasis + TraceBasisDummy at component      *)",
+            "(* level where per-component expressions are much smaller.               *)",
+            "(* Ref: issue #201 — non-minimal R̃[μν]F coupling: 5000+ terms, 467s.   *)",
+            "Module[{l2Terms, nTerms, canonBatchSize, tFirstBatch,",
+            "         firstBatchTime, canonResult, batchStart, batchEnd},",
+            "  l2Terms = If[Head[l2Raw] === Plus, List @@ l2Raw, {l2Raw}];",
+            "  nTerms = Length[l2Terms];",
+            '  Print["Canonicalizing ", nTerms, " L^(2) terms..."];',
+            "",
+            "  (* Measure first batch cost to decide: canonicalize or bypass *)",
+            "  canonBatchSize = Min[20, nTerms];",
+            "  tFirstBatch = AbsoluteTime[];",
+            f"  canonResult = ContractMetric[ToCanonical[Total[l2Terms[[1 ;; canonBatchSize]]]], {ctx.metric}];",
+            "  firstBatchTime = AbsoluteTime[] - tFirstBatch;",
+            '  Print["  first batch (", canonBatchSize, " terms): ", Round[firstBatchTime, 0.1], "s"];',
+            "",
+            "  If[firstBatchTime >= 5.0,",
+            "    (* BYPASS: ToCanonical too expensive for this theory.                *)",
+            "    (* Component decomposition will handle simplification per-component. *)",
+            '    Print["ToCanonical too expensive (", Round[firstBatchTime, 0.1],',
+            '      "s for ", canonBatchSize, " terms) — bypassing"];',
+            '    Print["  Estimated full cost: ",',
+            '      Round[firstBatchTime * nTerms / canonBatchSize, 1], "s"];',
+            '    Print["  Component-level decomposition will handle simplification"];',
+            "    l2Raw = Expand[l2Raw],",
+            "",
+            "    (* NORMAL: adaptive per-term canonicalization *)",
+            "    If[firstBatchTime > 2.0 && canonBatchSize > 5,",
+            "      canonBatchSize = Max[5, Floor[canonBatchSize * 2.0 / firstBatchTime]]",
+            "    ];",
+            "    If[firstBatchTime < 0.5 && canonBatchSize < nTerms,",
+            "      canonBatchSize = Min[100, Floor[canonBatchSize * 2.0 / Max[firstBatchTime, 0.01]]]",
+            "    ];",
+            '    Print["  adaptive batch size: ", canonBatchSize];',
+            "    batchStart = canonBatchSize + 1;",
+            "    While[batchStart <= nTerms,",
+            "      batchEnd = Min[batchStart + canonBatchSize - 1, nTerms];",
+            f"      canonResult += ContractMetric[ToCanonical[Total[l2Terms[[batchStart ;; batchEnd]]]], {ctx.metric}];",
+            "      batchStart = batchEnd + 1;",
+            "    ];",
+            "    l2Raw = canonResult;",
+            "  ];",
+            "  Clear[l2Terms, canonResult];",
+            "];",
             "",
             "(* L^(2) = delta^2(sqrt|g| L) / (2 sqrt|g0|) *)",
             f"{p}Lagrangian = l2Raw / 2;",
-            f'Print["L^(2) set: ", Short[{p}Lagrangian, 5]];',
+            f'Print["L^(2) set: ", If[Head[{p}Lagrangian]===Plus, Length[{p}Lagrangian], 1], " terms"];',
             "",
             "(* Memory cleanup: free perturbation intermediates *)",
             "Clear[l2Raw, lOriginal, lDensity];",
@@ -2405,6 +2683,28 @@ def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
 # --- WLS: Plane-wave reduction ---
 
 
+def _build_plane_wave_deriv_rules(ctx: _WlsContext) -> list[str]:
+    """Build Wolfram substitution rules to zero transverse Derivative patterns.
+
+    Returns a list of rule strings for killed (transverse) axes. Each rule
+    zeros ``Derivative[ords__][f_][args___]`` where a transverse slot has
+    order > 0.  Reused by Lagrangian reduction and VarD EOM reduction.
+    """
+    if ctx.reduction is None:
+        return []
+    prop_axis = ctx.reduction["propagation_axis"]
+    coords = ctx.coords
+    killed = [c for c in coords[1:] if c != prop_axis]
+    rules: list[str] = []
+    for c in killed:
+        slot = coords.index(c) + 1
+        rules.append(
+            f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
+            f" && {{ords}}[[{slot}]] > 0 :> 0"
+        )
+    return rules
+
+
 def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
     """Generate Wolfram code to zero transverse derivatives in the Lagrangian.
 
@@ -2419,18 +2719,8 @@ def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
         return []
 
     prop_axis = ctx.reduction["propagation_axis"]
-    coords = ctx.coords  # e.g. ["t", "x", "y", "z"]
-    spatial = coords[1:]  # e.g. ["x", "y", "z"]
-    killed = [c for c in spatial if c != prop_axis]
-
-    # Build the substitution rules: for each killed axis, zero derivatives
-    # Derivative slots are 1-indexed: slot 1 = t, slot 2 = x, slot 3 = y, ...
-    rules: list[str] = []
-    for c in killed:
-        slot = coords.index(c) + 1  # 1-indexed Wolfram slot
-        rules.append(
-            f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot} && {{ords}}[[{slot}]] > 0 :> 0"
-        )
+    killed = [c for c in ctx.coords[1:] if c != prop_axis]
+    rules = _build_plane_wave_deriv_rules(ctx)
 
     p = ctx.prefix
     lines: list[str] = [
@@ -3309,7 +3599,7 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: PLR0914
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0914, PLR0915
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -3360,19 +3650,99 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         "(* Copy Lagrangian for canonical analysis *)",
         f"lagForCanon = {p}Lagrangian;",
         "",
-        "(* NOTE: CD shorthand rules are NOT applied to canonical Lagrangian.    *)",
-        "(* DecomposeScalarExpression handles raw CD[-a]@field[...] operators   *)",
-        "(* directly via ConvertCDToDerivatives (Step 9). Applying shorthand    *)",
-        "(* rules would convert CD ops to CDfield tensors that have no          *)",
-        "(* pre-computed values, causing TraceBasisDummy to leave them unevaluated. *)",
-        "",
-        "(* Re-introduce explicit metric tensors for correct sign handling.       *)",
-        "(* When derived fields are expanded, ContractMetric absorbs the metric   *)",
-        "(* into index positions (raised/lowered). DecomposeScalarExpression needs *)",
-        "(* explicit metric tensors to correctly apply the Minkowski signature     *)",
-        "(* (or any user-supplied metric) during component evaluation.             *)",
-        f"lagForCanon = SeparateMetric[{ctx.metric}][lagForCanon];",
     ]
+
+    # --- Self-energy sector filtering for multi-field theories with torsion ---
+    # For theories where full decomposition would timeout, filter L^(2) to
+    # contain only single-perturbation-field self-energy terms (h-only, a-only).
+    # Background fields (Ābar) are KEPT as they are coefficients, not dynamical.
+    # Cross-coupling (h*a, h*T, a*T) and torsion self-energy (T*T) are removed.
+    # This produces the correct self-energy Hamiltonian for each field sector.
+    if ctx.torsion is not None and len(ctx.fields) > 1:
+        # Build list of perturbation field heads (NOT background fields)
+        pert_heads = _matter_pert_head_map(ctx)
+        originals = _matter_pert_originals(ctx)
+        pert_field_heads: list[str] = []
+        for f in ctx.fields:
+            fname = f["name"]
+            if fname in originals:
+                continue
+            head = pert_heads.get(fname, f"{p}{fname.capitalize()}")
+            pert_field_heads.append(head)
+        torsion_head = f"{p}{ctx.torsion['perturbation_name'].capitalize()}"
+        pert_field_heads.append(torsion_head)
+
+        # Generate Wolfram code to filter L^(2) by perturbation field content
+        heads_wl = ", ".join(pert_field_heads)
+        lines.extend(
+            [
+                "(* === Self-energy sector filtering ===                                 *)",
+                "(* For multi-field torsion theories: keep ONLY single-perturbation-field *)",
+                "(* self-energy terms. Background fields (Abar) are coefficients, kept.  *)",
+                "(* Cross-coupling (h*a), torsion interactions (h*T, a*T), and torsion   *)",
+                "(* self-energy (T*T, zero for non-propagating) are filtered out.        *)",
+                "(* This produces correct self-energy H_hh + H_aa for conversion         *)",
+                "(* measurements without the expensive torsion contraction terms.         *)",
+                f"Module[{{pertHeads = {wl_list(heads_wl)}, lagTerms, selfTerms}},",
+                "  lagTerms = If[Head[lagForCanon] === Plus, List @@ lagForCanon, {lagForCanon}];",
+                '  Print["L^(2) before self-energy filter: ", Length[lagTerms], " terms"];',
+                "",
+                "  (* Keep only h-self and a-self sectors: terms with exactly 1 perturbation *)",
+                "  (* field that is NOT the torsion field. Background fields (Abar) are NOT  *)",
+                "  (* perturbation fields and do NOT affect this classification.              *)",
+                f"  Module[{{torsionHead = {torsion_head}}},",
+                "    selfTerms = Select[lagTerms, Function[{term},",
+                "      Module[{presentPerts = Select[pertHeads, !FreeQ[term, #]&]},",
+                "        (* Keep: terms with 0 pert fields (pure constant) or 1 non-torsion pert field *)",
+                "        Length[presentPerts] == 0 ||",
+                "        (Length[presentPerts] == 1 && presentPerts[[1]] =!= torsionHead)",
+                "      ]",
+                "    ]];",
+                "  ];",
+                "",
+                "  lagForCanon = Total[selfTerms];",
+                '  Print["L^(2) after self-energy filter: ", Length[selfTerms], " terms",',
+                '    " (removed ", Length[lagTerms] - Length[selfTerms], " cross-coupling/torsion terms)"];',
+                "];",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
+            "(* Apply CD shorthand rules to canonical Lagrangian.                     *)",
+            "(* ComponentValues are pre-computed (supervisor's pattern) — ToValues    *)",
+            "(* resolves CDN-field tensors in O(1) during StaggeredToBasis, reducing *)",
+            "(* TraceBasisDummy K from ~4+ contracted pairs to ~0.                   *)",
+            "(* Apply highest-order first for correct nesting:                       *)",
+            "(*   CD[-a]@CD[-b]@field -> CD[-a]@CD1field -> CD2field                *)",
+            "If[ListQ[$CDShorthandRules] && Length[$CDShorthandRules] > 0,",
+            '  Print["Applying CD shorthand rules to canonical Lagrangian..."];',
+            "  Do[lagForCanon = lagForCanon /. rule, {rule, Reverse[$CDShorthandRules]}];",
+            "  (* Canonicalize only if affordable — same bypass as L^(2) cleanup *)",
+            "  Module[{tCanonTest, canonCost, canonSample},",
+            "    canonSample = If[Head[lagForCanon]===Plus,",
+            "      Total[(List @@ lagForCanon)[[1 ;; Min[20, Length[lagForCanon]]]]],",
+            "      lagForCanon];",
+            "    tCanonTest = AbsoluteTime[];",
+            f"    ContractMetric[ToCanonical[canonSample], {ctx.metric}];",
+            "    canonCost = AbsoluteTime[] - tCanonTest;",
+            "    If[canonCost < 5.0,",
+            f"      lagForCanon = ContractMetric[ToCanonical[lagForCanon], {ctx.metric}],",
+            '      Print["  Phase K ToCanonical bypassed (", Round[canonCost, 0.1], "s for sample)"]',
+            "    ];",
+            "  ];",
+            '  Print["After CD shorthand: ", If[Head[lagForCanon]===Plus, Length[lagForCanon], 1], " terms"];',
+            "];",
+            "",
+            "(* Re-introduce explicit metric tensors for correct sign handling.       *)",
+            "(* When derived fields are expanded, ContractMetric absorbs the metric   *)",
+            "(* into index positions (raised/lowered). DecomposeScalarExpression needs *)",
+            "(* explicit metric tensors to correctly apply the Minkowski signature     *)",
+            "(* (or any user-supplied metric) during component evaluation.             *)",
+            f"lagForCanon = SeparateMetric[{ctx.metric}][lagForCanon];",
+        ]
+    )
 
     # Apply scalar BG substitutions before decomposition
     lines.extend(_wls_scalar_background_substitution(ctx, "lagForCanon"))
@@ -3406,14 +3776,86 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             '    If[FreeQ[lagForCanon, Scalar], "all resolved", "some remain"]];',
             "];",
             "",
-            "(* Decompose Lagrangian to component form.                             *)",
-            "(* Process as a SINGLE expression via DecomposeScalarExpression.        *)",
-            "(* StaggeredToBasis (supervisor's pattern) handles memory efficiently   *)",
-            "(* via iterative ToBasis + TraceBasisDummy — no O(dim^{2K}) blowup.    *)",
-            "(* Per-term splitting was tested (34 terms → 68s) but is slower than   *)",
-            "(* single-pass (43s) due to per-call DecomposeScalarExpression overhead.*)",
-            "lagTerms = {lagForCanon};",
-            'Print["Decomposing Lagrangian: ", Length[lagTerms], " additive terms"];',
+            "(* === Sector-aware Lagrangian splitting (theory-agnostic) ===          *)",
+            "(* Split expanded Lagrangian by field content: single-field terms are  *)",
+            "(* fast (low K), cross-field terms are the expensive part. Processing  *)",
+            "(* each sector independently reduces per-term dummy pair count.        *)",
+            "(* GatherBy uses actual field head presence, not hardcoded categories. *)",
+            "(* For single-field theories: 1 group (no overhead).                  *)",
+            "(* Ref: issue #198 — combined torsion+EM 10x slower than sum of parts.*)",
+            f"Module[{{lagExp, lagList, allDynHeads = {wl_list(all_heads_str)},",
+            "         termSectors, sectorGroups, sectorTerms, validationSum},",
+            "  lagExp = Expand[lagForCanon];",
+            "  lagList = If[Head[lagExp] === Plus, List @@ lagExp, {lagExp}];",
+            '  Print["Expanded Lagrangian: ", Length[lagList], " additive terms"];',
+            "",
+            "  (* Build extended head list: base heads + CD shorthand heads *)",
+            "  (* After CD shorthand substitution, CD[-a]@H[...] becomes CD1H[...], *)",
+            "  (* so FreeQ[term, H] returns True even for H-containing terms.       *)",
+            "  (* Include CD1-CD4 prefixed heads in the detection.                  *)",
+            "  Module[{allExtHeads},",
+            "    allExtHeads = Flatten[Map[Function[{h}, Join[{h},",
+            '      Select[{Symbol["CD1" <> ToString[h]], Symbol["CD2" <> ToString[h]],',
+            '              Symbol["CD3" <> ToString[h]], Symbol["CD4" <> ToString[h]]},',
+            "        xTensorQ]]",
+            "    ], allDynHeads]];",
+            "",
+            "    (* Classify each term by which BASE field heads it contains *)",
+            "    (* A term matches head H if it contains H OR any of CD1H..CD4H *)",
+            "    termSectors = Map[Function[{term},",
+            "      Select[allDynHeads, Function[{h},",
+            "        Module[{extH = Select[allExtHeads, StringMatchQ[ToString[#],",
+            "          __ ~~ ToString[h]] &]},",
+            "          !AllTrue[extH, FreeQ[term, #]&]",
+            "        ]",
+            "      ]]",
+            "    ], lagList];",
+            "  ];",
+            "",
+            "  (* Group terms by sector signature *)",
+            "  sectorGroups = GatherBy[",
+            "    Transpose[{lagList, termSectors}], Last];",
+            "",
+            "  (* Separate already-decomposed terms (empty sector = no tensor heads). *)",
+            "  (* These arise from Scalar[] pre-resolution and are already in         *)",
+            "  (* component form — skip DecomposeScalarExpression entirely.           *)",
+            "  Module[{emptyPos, nonEmptyGroups},",
+            "    emptyPos = Position[sectorGroups, g_ /; g[[1, 2]] === {}, {1}];",
+            "    If[Length[emptyPos] > 0,",
+            "      $tidalPreDecomposed = Total[sectorGroups[[emptyPos[[1, 1]], All, 1]]];",
+            '      Print["  ", Length[sectorGroups[[emptyPos[[1, 1]]]]],'
+            '        " terms already in component form (skipping decomposition)"];',
+            "      nonEmptyGroups = Delete[sectorGroups, emptyPos];",
+            "      sectorGroups = nonEmptyGroups,",
+            "      $tidalPreDecomposed = 0",
+            "    ];",
+            "  ];",
+            "",
+            "  (* Flatten sectors into individual terms (not sector sums).          *)",
+            "  (* Processing individual terms bounds per-term TraceBasisDummy cost  *)",
+            "  (* to each term's own contraction depth K, rather than K of the sum.*)",
+            "  (* Benchmarked: sector sums take 464s for 9-term tnrH group;       *)",
+            "  (* individual terms take ~5-12s each = ~45-108s total.             *)",
+            "  lagTerms = Flatten[Map[#[[All, 1]]&, sectorGroups]];",
+            "  lagTerms = Select[lagTerms, # =!= 0 &];",
+            "",
+            "  (* Validate: sector sum must equal original *)",
+            "  validationSum = Total[lagTerms] + $tidalPreDecomposed - lagExp // Expand;",
+            "  If[validationSum =!= 0,",
+            '    Print["WARNING: sector split validation failed — falling back to single term"];',
+            "    lagTerms = {lagForCanon}; $tidalPreDecomposed = 0,",
+            '    Print["Sector split: ", Length[lagTerms], " groups from ",',
+            '      Length[lagList], " terms"];',
+            "    Do[",
+            '      Print["  sector ", k, ": ", ',
+            '        sectorGroups[[k, 1, 2]], " (",',
+            '        Length[sectorGroups[[k]]], " terms)"],',
+            "      {k, Min[Length[sectorGroups], Length[lagTerms]]}",
+            "    ]",
+            "  ];",
+            "];",
+            "",
+            'Print["Decomposing Lagrangian: ", Length[lagTerms], " sector groups"];',
             _wls_timing_start("tCanonDecomp"),
         ]
     )
@@ -3483,7 +3925,13 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
 
     lines.extend(
         [
-            "Clear[lagTerms];",
+            "(* Add pre-decomposed terms (already in component form from Scalar resolution) *)",
+            "If[$tidalPreDecomposed =!= 0,",
+            '  Print["Adding ", If[Head[$tidalPreDecomposed]===Plus, Length[$tidalPreDecomposed], 1],',
+            '    " pre-decomposed terms to lagComp"];',
+            "  lagComp += $tidalPreDecomposed;",
+            "];",
+            "Clear[lagTerms, $tidalPreDecomposed];",
             _wls_timing_end("tCanonDecomp", "Canonical Lagrangian decomposition"),
             "",
             "(* Free abstract Lagrangian — only component form needed from here *)",
@@ -3574,6 +4022,362 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
     # fills it later).  Constraint elimination is now deferred to the
     # post-Component-E-L block in _wls_metadata_and_export where it runs
     # on populated fieldEquations.
+
+    return lines
+
+
+def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    ctx: _WlsContext,
+    _all_heads_str: str,
+) -> list[str]:
+    """VarD-based canonical path: abstract EOM → per-term component projection.
+
+    Alternative to ``_wls_canonical_phase_a`` that avoids the scalar Lagrangian
+    decomposition bottleneck by:
+    1. Computing abstract EOM via ``VarD[field, CD][L^(2)]`` (fast, O(N))
+    2. Projecting each EOM term to components via ``SplinterToArray``
+       (rank-N tensors → ``ComponentArray`` expands free indices)
+    3. Reconstructing ``lagComp`` from bilinear identity: L = 1/2 Sum q_i * EOM_i
+
+    This follows the supervisor's pattern (SphericalEuclidean.m lines 131-428):
+    VarD at abstract level → shorthand substitution → per-term projection.
+
+    Sets up the SAME WLS variables as ``_wls_canonical_phase_a``:
+    ``lagComp``, ``compToFunc``, ``fieldFuncList``, ``velOrders``,
+    ``coordSyms``, ``nCoords``, ``eliminatedFromCanonical``.
+    """
+    p = ctx.prefix
+
+    # --- Build compToFunc mapping (same as Phase A lines 3841-3888) ---
+    # Needed BEFORE the VarD loop for lagComp reconstruction.
+    pert_heads = _matter_pert_head_map(ctx)
+    originals = _matter_pert_originals(ctx)
+
+    comp_to_func_lines: list[str] = [
+        "compToFunc = <||>;",
+    ]
+    for field in ctx.fields:
+        fname = field["name"]
+        if fname in originals:
+            continue
+        head = pert_heads[fname] if fname in pert_heads else f"{p}{fname.capitalize()}"
+        n_comps = _field_component_count(field, ctx.dim)
+        comp_to_func_lines.extend(
+            f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps)
+        )
+    if ctx.torsion is not None:
+        torsion_pert_name = ctx.torsion["perturbation_name"]
+        thead = f"{p}{torsion_pert_name.capitalize()}"
+        torsion_field = {
+            "name": torsion_pert_name,
+            "type": "tensor",
+            "rank": 3,
+            "symmetry": "antisymmetric_23",
+        }
+        t_ncomps = _field_component_count(torsion_field, ctx.dim)
+        comp_to_func_lines.extend(
+            f'compToFunc["{torsion_pert_name}_{j}"] = {thead}{j};'
+            for j in range(t_ncomps)
+        )
+    comp_to_func_lines.extend(
+        [
+            "fieldFuncList = Values[compToFunc];",
+            f"coordSyms = ScalarsOfChart[{ctx.chart}];",
+            "nCoords = Length[coordSyms];",
+            "velOrders = Table[If[i == 1, 1, 0], {i, nCoords}];",
+        ]
+    )
+
+    # --- Build the list of fields to VarD ---
+    _, _field_heads_str = _canonical_field_heads(ctx)
+
+    # --- Build VarD expressions for each dynamical field ---
+    # Reuses the pattern from _wls_linearize_from_lagrangian lines 2068-2098
+    dyn_field_info: list[dict[str, str]] = []
+
+    for field in ctx.fields:
+        fname = field["name"]
+        if fname in originals:
+            continue
+        head = pert_heads[fname] if fname in pert_heads else f"{p}{fname.capitalize()}"
+        ftype = field["type"]
+        if ftype == "scalar":
+            fexpr = f"{head}[]"
+        elif ftype == "vector":
+            fexpr = f"{head}[-a]"
+        elif ftype == "tensor":
+            rank = field.get("rank", 2)
+            idx = ", ".join(["-a", "-b", "-c", "-d", "-e", "-f"][:rank])
+            fexpr = f"{head}[{idx}]"
+        else:
+            fexpr = f"{head}[-a, -b]"
+
+        dyn_field_info.append(
+            {"name": fname, "head": head, "fexpr": fexpr, "type": ftype}
+        )
+
+    # Also include torsion field
+    if ctx.torsion is not None:
+        tname = ctx.torsion["perturbation_name"]
+        thead = f"{p}{tname.capitalize()}"
+        dyn_field_info.append(
+            {
+                "name": tname,
+                "head": thead,
+                "fexpr": f"{thead}[a, -b, -c]",
+                "type": "tensor",
+            }
+        )
+
+    # --- Generate the VarD EOM path ---
+    lines: list[str] = [
+        "",
+        "(* === VarD EOM canonical path (supervisor's pattern) ===               *)",
+        "(* Abstract VarD → per-term SplinterToArray projection → lagComp       *)",
+        "(* reconstruction. Avoids scalar Lagrangian decomposition bottleneck.  *)",
+        "(* Ref: supervisor's SphericalEuclidean.m lines 131-428.              *)",
+        'Print[""];',
+        'Print["VarD canonical path: abstract EOM → component projection"];',
+        "",
+        "(* Setup: coordinate symbols, compToFunc, fieldFuncList *)",
+    ]
+    lines.extend(comp_to_func_lines)
+    lines.extend(
+        [
+            "",
+            f"lagForCanon = {p}Lagrangian;",
+            "(* Apply SeparateMetric before VarD.                                   *)",
+            "(* Tested: removing SeparateMetric reduces term count (194→148) but   *)",
+            "(* creates denser terms where individual SplinterToArray calls take    *)",
+            "(* >7 minutes (vs <2s with SeparateMetric). The metric distribution   *)",
+            "(* across terms keeps each term's contraction complexity bounded.     *)",
+            f"lagForCanon = SeparateMetric[{ctx.metric}][lagForCanon];",
+            "",
+            _wls_timing_start("tVarDCanon"),
+            "fieldEquations = {};",
+            "",
+        ]
+    )
+
+    # Build BackgroundFieldRules for DecomposeToComponents
+    bg_rules_entries: list[str] = []
+    for bf in ctx.background_fields:
+        if bf["type"] != "scalar" and bf.get("components"):
+            bg_head = f"{p}{bf['name'].capitalize()}"
+            comps_str = ", ".join(str(c) for c in bf["components"])
+            contra_comps = _compute_contra_components(
+                bf["components"], ctx.metric_diagonal
+            )
+            contra_str = ", ".join(contra_comps)
+            bg_rules_entries.append(wl_bg_rule_entry(bg_head, comps_str, contra_str))
+    bg_rules_opt = ""
+    if bg_rules_entries:
+        bg_rules_str = ", ".join(bg_rules_entries)
+        bg_rules_opt = f', "BackgroundFieldRules" -> {wl_list(bg_rules_str)}'
+
+    # Apply scalar BG substitutions before VarD
+    lines.extend(_wls_scalar_background_substitution(ctx, "lagForCanon"))
+
+    # Apply plane-wave Derivative zeroing to L^(2) BEFORE VarD.
+    # This zeros transverse Derivative[...] patterns that exist in
+    # pre-resolved Scalar[] wrappers and CD shorthand expansions.
+    # VarD on the reduced L^(2) produces fewer EOM terms.
+    pw_rules = _build_plane_wave_deriv_rules(ctx)
+    if pw_rules:
+        lines.extend(
+            [
+                "",
+                "(* Plane-wave reduction on L^(2) before VarD — zero transverse derivatives *)",
+                "lagForCanon = lagForCanon /. {",
+                ",\n".join(pw_rules),
+                "};",
+                "lagForCanon = Expand[lagForCanon];",
+                'Print["L^(2) after plane-wave reduction: ",',
+                '  If[Head[lagForCanon]===Plus, Length[lagForCanon], 1], " terms"];',
+                "",
+            ]
+        )
+
+    # For each dynamical field, generate VarD + projection code
+    for dfi in dyn_field_info:
+        head = dfi["head"]
+        fexpr = dfi["fexpr"]
+        fname = dfi["name"]
+        ftype = dfi["type"]
+
+        lines.extend(
+            [
+                f'Print["  VarD w.r.t. {fname} ({fexpr})..."];',
+                "Module[{eomAbs, eomTerms, nTerms, tField = AbsoluteTime[]},",
+                f"  eomAbs = VarD[{fexpr}, {ctx.cd}][lagForCanon];",
+                "  (* Per-term ToCanonical: avoids xperm segfault on large sums *)",
+                "  eomAbs = If[Head[eomAbs] === Plus,",
+                "    Total[ToCanonical /@ List @@ eomAbs],",
+                "    ToCanonical[eomAbs]];",
+                f"  eomAbs = ContractMetric[eomAbs, {ctx.metric}];",
+                "",
+                "  (* NOTE: ScreenDollarIndices and CollectTensors were benchmarked here   *)",
+                "  (* but REVERTED. ScreenDollarIndices reduces term count (194→87) but    *)",
+                "  (* INCREASES per-term cost (5.5s→16.7s avg) by creating denser terms.  *)",
+                "  (* CollectTensors is even worse (12-35s/term). All term-density-        *)",
+                "  (* reducing approaches backfire because TraceBasisDummy is O(dim^{2K})  *)",
+                "  (* in contraction depth K, not in term count.                           *)",
+                "",
+                "  (* Apply CD shorthand rules *)",
+                "  If[ListQ[$CDShorthandRules] && Length[$CDShorthandRules] > 0,",
+                "    Do[eomAbs = eomAbs /. rule, {rule, Reverse[$CDShorthandRules]}]",
+                "  ];",
+                "",
+                '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " abstract EOM terms"];',
+            ]
+        )
+
+        # Zero transverse Derivative patterns in abstract EOM
+        if pw_rules:
+            lines.extend(
+                [
+                    "  (* Plane-wave: zero transverse Derivative patterns in EOM *)",
+                    "  eomAbs = eomAbs /. {",
+                    ",\n".join(f"  {r}" for r in pw_rules),
+                    "  };",
+                    "  eomAbs = Expand[eomAbs];",
+                    '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " EOM terms (after plane-wave)"];',
+                ]
+            )
+
+        lines.extend(
+            [
+                "",
+            ]
+        )
+
+        # Build additionalFields list: all OTHER dynamical fields + background fields
+        other_fexprs = [d["fexpr"] for d in dyn_field_info if d["name"] != fname]
+        # Add background field expressions
+        for bf in ctx.background_fields:
+            bf_head = f"{ctx.prefix}{bf['name'].capitalize()}"
+            if bf["type"] == "scalar":
+                other_fexprs.append(f"{bf_head}[]")
+            elif bf["type"] == "vector":
+                other_fexprs.append(f"{bf_head}[-a]")
+            else:
+                bf_rank = bf.get("rank", 2)
+                bf_idx = ", ".join(f"-{chr(97 + i)}" for i in range(bf_rank))
+                other_fexprs.append(f"{bf_head}[{bf_idx}]")
+        additional_str = ", ".join(other_fexprs) if other_fexprs else ""
+
+        # Use DecomposeToComponents with TermByTerm for per-term projection
+        # This is the tested, complete pipeline (ComponentDecompose.wl:1020-1154)
+        lines.extend(
+            [
+                "  (* Decompose EOM to components via DecomposeToComponents TermByTerm *)",
+                "  (* Uses the tested pipeline: SplinterToArray per-term + post-processing *)",
+                "  Module[{componentEqs},",
+                f"    componentEqs = DecomposeToComponents[eomAbs, {fexpr}, {ctx.chart},",
+                f"      {wl_list(additional_str)},",
+                '      "TermByTerm" -> True,',
+                f'      "MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}];',
+                '    Print["    ", Length[componentEqs], " component equations"];',
+                "    Do[",
+                "      Module[{compName, compEq},",
+                "        compName = componentEqs[[k, 1]];",
+                "        compEq = componentEqs[[k, 2]];",
+                "        (* Normalize derivative arity *)",
+                "        compEq = compEq /. Derivative[orders__][g_][args__] /;",
+                "          Length[{orders}] < nCoords :>",
+                "          Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
+                f'        AppendTo[fieldEquations, {{"{fname}_" <> ToString[compName], compEq}}];',
+                "      ];,",
+                "      {k, Length[componentEqs]}",
+                "    ];",
+                "  ];",
+            ]
+        )
+
+        # Plane-wave reduction on field equations (if applicable)
+        if ctx.reduction is not None:
+            prop_axis = ctx.reduction["propagation_axis"]
+            coords = ctx.coords
+            killed = [c for c in coords[1:] if c != prop_axis]
+            deriv_rules: list[str] = []
+            for c in killed:
+                slot = coords.index(c) + 1
+                deriv_rules.append(
+                    f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
+                    f" && {{ords}}[[{slot}]] > 0 :> 0"
+                )
+            if deriv_rules:
+                lines.extend(
+                    (
+                        "  (* Plane-wave reduction: zero transverse derivatives *)",
+                        "  fieldEquations = Map[Function[{eq},",
+                        f"    {{eq[[1]], eq[[2]] /. {wl_list(','.join(deriv_rules))}}}],",
+                        "    fieldEquations];",
+                    )
+                )
+            coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
+            if coord_values:
+                cv_rules = ", ".join(
+                    f"{coord}[] -> {val}" for coord, val in coord_values.items()
+                )
+                lines.append(
+                    f"  fieldEquations = fieldEquations /. {wl_list(cv_rules)};",
+                )
+
+        lines.extend(
+            [
+                '  Print["    done in ", Round[AbsoluteTime[] - tField, 0.1], "s"];',
+                "];",
+                "",
+            ]
+        )
+
+    # --- lagComp reconstruction from bilinear identity ---
+    lines.extend(
+        [
+            "(* === Reconstruct lagComp from bilinear identity ===                  *)",
+            "(* For quadratic L^(2) = 1/2 q^T M q, EOM = Mq, so L = 1/2 Sum q_i*EOM_i *)",
+            "(* Exact for linearized (quadratic) Lagrangians.                       *)",
+            "lagComp = 0;",
+            "Do[",
+            "  Module[{name, eom, func},",
+            "    {name, eom} = fieldEquations[[k]];",
+            "    If[KeyExistsQ[compToFunc, name],",
+            "      func = compToFunc[name];",
+            "      lagComp += func[Sequence @@ coordSyms] * eom",
+            "    ];",
+            "  ],",
+            "  {k, Length[fieldEquations]}",
+            "];",
+            "lagComp = Expand[lagComp / 2];",
+            'Print["lagComp (reconstructed): ", LeafCount[lagComp], " leaves, ",',
+            '  If[Head[lagComp]===Plus, Length[lagComp], 1], " terms"];',
+            "(* Diagnostic: check lagComp has velocity terms for Legendre transform *)",
+            "Module[{d2tHeads, d1tHeads, fieldHeads},",
+            "  d2tHeads = Cases[lagComp, Derivative[n_,__][f_][__] /; n>=2 :> f, {0,Infinity}] // DeleteDuplicates;",
+            "  d1tHeads = Cases[lagComp, Derivative[1,___][f_][__] :> f, {0,Infinity}] // DeleteDuplicates;",
+            "  fieldHeads = Cases[lagComp, (f_Symbol)[__] /; MemberQ[fieldFuncList, f] :> f, {0,Infinity}] // DeleteDuplicates;",
+            '  Print["  d^2_t field heads: ", d2tHeads];',
+            '  Print["  d_t (velocity) heads: ", d1tHeads];',
+            '  Print["  field heads in lagComp: ", fieldHeads];',
+            '  Print["  fieldFuncList: ", fieldFuncList];',
+            '  Print["  Sample term: ", Short[If[Head[lagComp]===Plus, lagComp[[1]], lagComp], 2]];',
+            "];",
+            "lagComp = lagComp /. Derivative[orders__][g_][args__] /;",
+            "  Length[{orders}] < nCoords :>",
+            "  Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
+            "",
+            f"Clear[lagForCanon, {p}Lagrangian]; Share[];",
+            _wls_timing_end("tVarDCanon", "VarD canonical path (EOM + lagComp)"),
+            _wls_mem_print("After VarD canonical path"),
+            "",
+            "eliminatedFromCanonical = {};",
+            "",
+        ]
+    )
+
+    # Apply vector BG substitutions after decomposition
+    lines.extend(_wls_vector_background_substitution(ctx, "lagComp"))
 
     return lines
 
@@ -4218,17 +5022,76 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "",
             )
         )
-        lines.extend(_wls_canonical_phase_a(ctx, all_heads_str))
+        # --- Dual-path canonical pipeline: VarD EOM (fast) with Phase A fallback ---
+        # The VarD path projects rank-N EOM to components (supervisor's pattern).
+        # Phase A decomposes scalar L to components (slower for complex theories).
+        # Both paths produce the same WLS variables: lagComp, fieldEquations,
+        # compToFunc, fieldFuncList, velOrders, coordSyms, nCoords.
+        # Runtime dispatch: try VarD first, fall back to Phase A if it fails.
+        has_tensor = (
+            any(
+                f["type"] != "scalar"
+                for f in ctx.fields
+                if f["name"] not in _matter_pert_originals(ctx)
+            )
+            or ctx.torsion is not None
+        )
 
-        # --- Component-level E-L for torsion R̃² theories ---
-        # After Phase A produces lagComp (the component Lagrangian),
-        # Compute fieldEquations via component E-L differentiation.
-        # For ALL theories with a Lagrangian, ComponentEulerLagrange
-        # computes equations directly from lagComp (Phase A output).
-        # Faster and equivalent to VarD + DecomposeToComponents.
+        if has_tensor:
+            # Generate both VarD path and Phase A, with runtime LeafCount dispatch.
+            # Small L^(2) → Phase A (fast, produces correct lagComp for Hamiltonian).
+            # Large L^(2) → VarD path (avoids timeout on expensive decomposition).
+            # Threshold: LeafCount > 50000 indicates complex theory where Phase A
+            # would timeout (e.g., non-minimal R̃[μν]F coupling: LeafCount ~119K).
+            lines.extend(
+                [
+                    "(* === Runtime dispatch: Phase A vs VarD based on L^(2) complexity === *)",
+                    "(* Heuristic: LeafCount of unexpanded L^(2) + whether L^(2) has many *)",
+                    "(* top-level additive terms. Large LeafCount indicates complex tensor *)",
+                    "(* products that Phase A DecomposeScalarExpression handles slowly.    *)",
+                    "(* VarD projects rank-N EOM (not scalar L) — fundamentally faster.    *)",
+                    "(* No Expand needed for dispatch — just Length + LeafCount.           *)",
+                    f"Module[{{l2LC = LeafCount[{ctx.prefix}Lagrangian],",
+                    f"         l2TopTerms = If[Head[{ctx.prefix}Lagrangian] === Plus,",
+                    f"           Length[{ctx.prefix}Lagrangian], 1]}},",
+                    '  Print["L^(2) canonical dispatch: ", l2TopTerms, " top terms, LeafCount=", l2LC];',
+                    "  If[l2TopTerms > 500 || l2LC > 50000,",
+                    '    Print["Complex L^(2) — using VarD EOM path"];',
+                ]
+            )
+            # VarD path (for large expressions)
+            vard_lines = _wls_canonical_vard_eom_path(ctx, all_heads_str)
+            lines.extend(f"    {line}" for line in vard_lines)
+            lines.extend(
+                [
+                    "    $tidalVarDSuccess = True,",
+                    "",
+                    '    Print["Few terms — using Phase A (Lagrangian decomposition)"];',
+                ]
+            )
+            # Phase A (for small expressions)
+            phase_a_lines = _wls_canonical_phase_a(ctx, all_heads_str)
+            lines.extend(f"    {line}" for line in phase_a_lines)
+            lines.extend(
+                [
+                    "    $tidalVarDSuccess = False",
+                    "  ];",
+                    "];",
+                    "",
+                ]
+            )
+        else:
+            # Scalar-only: use Phase A directly
+            lines.extend(_wls_canonical_phase_a(ctx, all_heads_str))
+
+        # --- Component-level E-L (only needed for Phase A fallback path) ---
+        # VarD path produces fieldEquations directly; Phase A needs Component E-L.
         if ctx.lagrangian_expr:
             lines.extend(
                 [
+                    "",
+                    "(* Skip Component E-L if VarD path already produced fieldEquations *)",
+                    "If[!TrueQ[$tidalVarDSuccess],",
                     "",
                     "(* ============================================================ *)",
                     "(* Component-level Euler-Lagrange: recompute fieldEquations     *)",
@@ -4285,6 +5148,8 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "];",
                     _wls_timing_end("tCompEL", "Component E-L (differentiate lagComp)"),
                     'Print["Component E-L: ", Length[fieldEquations], " equations"];',
+                    "",
+                    "]; (* End If[!TrueQ[$tidalVarDSuccess]] *)",
                     "",
                 ]
             )

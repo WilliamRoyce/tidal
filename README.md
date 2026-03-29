@@ -21,7 +21,7 @@ A symbolic-to-numerical framework for **linearized field theory** — define a L
 - A **symbolic derivation pipeline** (Mathematica/xAct) that derives linearized field equations from any Lagrangian and exports them as JSON specifications — zero hardcoded physics.
 - **Five solver backends** (SUNDIALS IDA/CVODE, Fourier modal, leapfrog, scipy) with analytical Jacobians, FFT spectral operators, and 2nd/4th/6th-order FD stencils.
 - **20 working examples** spanning 1+1D to 3+1D: scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, curved spacetimes, background-field scattering, graviton-photon conversion, and graviton-torsion mixing.
-- **1,701 Python tests + ~121 Wolfram tests**, 0 ruff violations, 0 pyright errors (strict mode).
+- **1,721 Python tests + ~115 Wolfram tests**, 0 ruff violations, 0 pyright errors (strict mode).
 
 > Define a Lagrangian in TOML → derive linearized PDEs symbolically → simulate with adaptive solvers → measure conversion, spectra, and scattering.
 
@@ -95,15 +95,25 @@ The standard graviton-photon conversion has been derived from the Einstein-Maxwe
 
 See `docs/tex/gertsenshtein.tex`, `docs/tex/gertsenshtein_formula.tex`, and `docs/tex/gertsenshtein_localized.tex` for the full physics, derivation, and validation.
 
-### Torsion (In Progress)
+### Torsion-Gertsenshtein Investigation (Complete, v0.22.8)
 
-Poincare gauge theory with propagating torsion via `[torsion]` TOML section. The `graviton_torsion/` example derives the full 3+1D PGT Lagrangian (R + α₁T² + α₂T² + α₃T²) with torsion perturbations alongside metric perturbations. See `docs/tex/torsion.tex`.
+The combined PGT + Einstein-Maxwell system (R̃ + α_I T² + b₅R̃² − ¼F²) has been derived and simulated with 23 component fields, yielding the project's central physics result:
 
-### Remaining Research Targets
+- **Torsion-independence of standard Gertsenshtein**: The h× ↔ a_x (graviton-photon) conversion channel contains NO torsion parameters — algebraically identical to the EM-only case for any vacuum gravitational wave initial conditions.
+- **Polarization block-diagonal structure**: The system decomposes into two completely decoupled channels: (1) h× ↔ a_x (torsion-free, stable), (2) trace ↔ a_y ↔ torsion (torsion-dependent, ghost-unstable from Ostrogradsky).
+- **Coupling-instability tension**: The b₅R̃² term simultaneously enables torsion propagation AND creates ghost instabilities — a structural consequence of Ostrogradsky's theorem.
 
-- **Magnetar/FRB scattering** (Phase F3): Dipolar B(r) ∝ 1/r³ in radial coordinates
-- **Absorbing boundaries** (Phase G): Sponge layers and PML for finite-magnet interaction regions
-- **Torsion-EM mixing**: Full graviton-torsion-photon conversion in background magnetic field — the project's ultimate goal
+See `docs/tex/gertsenshtein.tex` §Torsion-Independence and `docs/tex/torsion.tex` §Combined PGT+EM System for the full analysis.
+
+### General Quadratic Lagrangian Enumeration
+
+The `research/` directory contains a systematic enumeration of all independent scalar invariants in the most general quadratic PGT+EM Lagrangian using xAct/xTras: **35 core coupling constants** (11 parity-even quadratic + 20 parity-odd quadratic + 3 linear + 1 topological), with derivative extensions adding up to ~109 further terms. All terms classified by ghost status, parity, and mixing channel. See `research/general_quadratic_lagrangian.tex`.
+
+### Current Research Frontier
+
+- **Non-minimal torsion-EM coupling** (T·F, T·(*F)): Required to break the polarization block-diagonal structure; direct photon-torsion interaction bypasses the decoupled channels. Prototype theory exists (`examples/torsion_gertsenshtein/theory_nonminimal.toml`).
+- **Ghost-free parameter conditions**: Identify parameter windows where the trace channel is stable (Sezgin & van Nieuwenhuizen 1980, Barker 2024).
+- **Magnetar/FRB scattering** (Phase F3): Dipolar B(r) ∝ 1/r³ in radial coordinates.
 
 ---
 
@@ -205,7 +215,7 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-The project includes a comprehensive test suite with **1,701 Python tests + ~121 Wolfram tests**.
+The project includes a comprehensive test suite with **1,721 Python tests + ~115 Wolfram tests**.
 
 ### Python Tests (1,701 tests)
 

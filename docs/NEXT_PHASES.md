@@ -2,8 +2,8 @@
 
 **Created:** February 2026
 **Last Updated:** March 2026
-**Status:** Phases A, B, C, E (FFT), F, J complete; Phase D in progress; Torsion (PGT) complete (v0.18.0); Phases G–I planned
-**Version:** 0.22.7 | **Tests:** 1,700 collected | **Examples:** 20 working (1+1D to 3+1D)
+**Status:** Phases A, B, C, D, E (FFT), F, J complete; Torsion (PGT) complete (v0.18.0); Torsion-Gertsenshtein investigated (v0.22.8); Phases G–I planned
+**Version:** 0.22.12 | **Tests:** 1,700 collected | **Examples:** 20 working (1+1D to 3+1D)
 
 ## Context
 
@@ -172,10 +172,10 @@ A comprehensive parameter sweep framework implemented as two CLI commands (`tida
 
 ---
 
-## Phase D: Coupled EM-Gravity Gertsenshtein Example 🔄
+## Phase D: Coupled EM-Gravity Gertsenshtein Example ✓
 
 **Priority: HIGH — the culmination of the project's research goal**
-**Status:** In Progress (Phases A–F2 complete, F3a in progress)
+**Status:** Complete (v0.22.8). Torsion-independence proven for minimal PGT.
 
 ### What and Why
 
@@ -187,16 +187,38 @@ This is the integration example that combines Phase A (and optionally Phase B) i
 - **End-to-end simulation** from `examples/gertsenshtein/theory.toml` — graviton-photon conversion via Einstein-Maxwell Lagrangian
 - **Uniform B₀ validation (Phase E)**: P = sin²(κB₀t/2) confirmed via 40-point B₀ sweep (N=1024, RMS < 0.012). Corrected P&R (2023) error: missing √(4π) in coupling. Confirmed by Dandoy/Lella (arXiv:2406.17853).
 - **Localized B-field validation (Phase F2)**: Gaussian B_x(z) via `theory_localized.toml`. Boccaletti formula P = sin²(κ/2 × ∫B dz) validated: P_numerical = 0.3436 vs P_Boccaletti = 0.3432 (0.04% agreement). 48-point sweep max error < 0.003.
-- **Radial dipolar (Phase F3a)**: `theory_radial.toml` derived (spherical coords, 6 surviving fields after TT gauge). In progress — WKB normalization needed for quantitative comparison.
-- **Plasma detuning (Phase F1)**: BLOCKED — xPert treats standalone background 4-potential as having non-zero background, generating spurious z²-terms.
+- **Gauge-independence validation**: Ungauged EM-only theory (`theory_ungauged.toml`, 14 components) confirms P_peak = 0.997, identical to TT-gauged result. Active channel: h_5 ↔ a_1 (h× ↔ a_x).
+
+### Torsion-Gertsenshtein Investigation (v0.22.8)
+
+Combined PGT + Einstein-Maxwell theory derived (`examples/torsion_gertsenshtein/theory.toml`, 23 components after Ostrogradsky reduction). Key findings:
+
+- **Polarisation block-diagonal structure (#200):** The plane-wave reduced equations decompose into two completely decoupled channels with zero cross-talk:
+  - **h× ↔ a_x** (h_5 ↔ a_1): torsion-independent, stable, P = sin²(κB₀D/2) unchanged
+  - **trace ↔ a_y** (h_4/h_7/h_9 ↔ a_2 ↔ torsion): torsion-dependent, but ghost-unstable (Ostrogradsky from R̃²)
+- **Torsion-independence of standard Gertsenshtein (#199):** The h× ↔ a_x equations contain NO torsion parameters (α₁, α₂, α₃, b₅). Algebraically identical to EM-only.
+- **Double inaccessibility:** The torsion-sensitive trace channel is both (1) algebraically unreachable from TT initial conditions and (2) ghost-unstable from Ostrogradsky.
+- **Coupling-instability tension:** The b₅R̃² term simultaneously enables propagating torsion AND introduces Ostrogradsky ghosts — a structural consequence of Ostrogradsky's theorem.
+- **Field-filtered energy measurement:** Added `fields` parameter to energy computation chain, allowing conversion measurement on Ostrogradsky theories by evaluating only source/target field Hamiltonian terms.
+- **PGT formulation verified correct:** TIDAL varies L independently w.r.t. h, a, and t via VarD — the standard metric-affine/Palatini approach for the torsion sector.
+
+### Remaining / Blocked
+
+- **Radial dipolar (Phase F3a)**: `theory_radial.toml` derived (spherical coords). BLOCKED on compute.
+- **Plasma detuning (Phase F1)**: BLOCKED — xPert spurious z²-terms from background 4-potential.
+- **Non-minimal torsion-EM coupling:** Required to break the polarisation block-diagonal structure. T·F, T·(*F) terms would create direct photon-torsion interaction. Future work.
+- **Ghost-free parameter conditions:** Literature (Sezgin & van Nieuwenhuizen 1980, Nikiforova et al. 2009, Barker 2024) provides sector-specific conditions. No universal closed-form for general (α₁, α₂, α₃, b₅).
 
 ### References
 
 - Gertsenshtein (1962), "Wave resonance of light and gravitational waves", JETP 14, 84
 - Domcke & Garcia-Cely (2023), "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072) — thin-magnet formula
-- Domcke & Garcia-Cely (2023), "On graviton-photon conversions in magnetic environments", [arXiv:2310.04150](https://arxiv.org/abs/2310.04150)
+- Hwang & Noh (2023), "On graviton-photon conversions in magnetic environments", [arXiv:2310.04150](https://arxiv.org/abs/2310.04150) — proper EM field definitions, graviton mass term
 - Dandoy & Lella (2024), "Graviton-photon oscillations", [arXiv:2406.17853](https://arxiv.org/abs/2406.17853) — confirms correct coupling normalization
 - Berlin et al. (2024), "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865)
+- Sezgin & van Nieuwenhuizen (1980), "New ghost-free gravity Lagrangians", Phys. Rev. D 21:3269 — linearised PGT ghost conditions
+- Nikiforova et al. (2009), "Stability of the massive torsion modes", [arXiv:0905.4007](https://arxiv.org/abs/0905.4007)
+- Barker (2024), "Every Poincaré gauge theory is conformal", [arXiv:2406.12826](https://arxiv.org/abs/2406.12826) — no-ghost β₃ > 0
 
 ### Dependencies: Phase A (complete) required; Phase B (complete) simplifies EM and gravity equations
 

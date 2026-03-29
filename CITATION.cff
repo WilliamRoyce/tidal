@@ -2,12 +2,12 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
 abstract: "A symbolic physics pipeline for deriving PDEs from Lagrangians using xAct/Mathematica
-  and simulating them with py-pde."
+  and solving them with SUNDIALS (IDA/CVODE), Fourier modal, leapfrog, and scipy backends."
 authors:
 - family-names: "Royce"
   given-names: "William"
-version: 0.22.7
-date-released: "2026-03-27"
+version: 0.22.12
+date-released: "2026-03-29"
 license: MIT
 repository-code: "https://github.com/WilliamRoyce/torsion-gertsenshtein"
 keywords:

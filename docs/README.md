@@ -82,6 +82,21 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | `next-features.md` | Sweep framework features |
 | `torsion_implementation_checklist.md` | PGT implementation tracking |
 
+## Research (`research/`)
+
+Systematic enumeration of the most general quadratic PGT+EM Lagrangian using xAct/xTras.
+
+| File | Content |
+| ---- | ------- |
+| `general_quadratic_lagrangian.tex` | Complete enumeration: 35 core couplings + derivative extensions |
+| `general_quadratic_lagrangian.wls` | xTras `MakeContractionAnsatz` enumeration script |
+| `make_ansatz.wls` | Core quadratic ansatz generation |
+| `classify_sectors.wls` | Ghost/parity/mixing classification |
+| `check_constraints.wls` | DDI analysis and projective invariance |
+| `enumeration_physical.json` | Sector classification with physics metadata |
+| `enumeration_classified.json` | Full classification with ghost analysis |
+| `enumeration_results.json` | Term counts by interaction type |
+
 ## Sphinx API Docs (`docs/source/`)
 
 Auto-generated API documentation via Sphinx (`.rst` files). Build with `make html` from `docs/`.
@@ -95,4 +110,4 @@ Auto-generated API documentation via Sphinx (`.rst` files). Build with `make htm
 
 ---
 
-Last updated: 2026-03-23
+Last updated: 2026-03-28

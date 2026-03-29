@@ -65,6 +65,7 @@ class ConversionResult:
 
 def _per_field_energy_timeseries(
     data: SimulationData,
+    fields: set[str] | None = None,
 ) -> tuple[NDArray[np.float64], dict[str, NDArray[np.float64]]]:
     """Compute per-field Hamiltonian energy timeseries.
 
@@ -73,8 +74,18 @@ def _per_field_energy_timeseries(
     position-dependent masses.  This ensures the conversion measurement is
     physically correct for curved spacetimes (e.g. spherical coordinates
     with r² volume element).
+
+    Parameters
+    ----------
+    fields : set[str] or None
+        If given, only evaluate Hamiltonian terms involving these base field
+        names.  Avoids evaluating operators on irrelevant fields — critical
+        for Ostrogradsky theories where some fields' EOM contain unresolvable
+        ``d2_t``/``d3_t`` operators.
     """
-    times, per_field, _interaction, _total = compute_energy_timeseries(data)
+    times, per_field, _interaction, _total = compute_energy_timeseries(
+        data, fields=fields
+    )
     return times, per_field
 
 
@@ -124,8 +135,12 @@ def compute_conversion_probability(
         msg = f"Source and target must be different fields, got '{source_field}'"
         raise ValueError(msg)
 
-    # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes)
-    times, per_field = _per_field_energy_timeseries(data)
+    # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes).
+    # Filter to source/target fields only — avoids evaluating operators on
+    # irrelevant fields that may have unresolvable d2_t/d3_t terms (#196).
+    times, per_field = _per_field_energy_timeseries(
+        data, fields={source_field, target_field}
+    )
 
     if source_field not in per_field:
         msg = (
@@ -258,8 +273,11 @@ def compute_group_conversion(  # noqa: C901, PLR0914
             stacklevel=2,
         )
 
-    # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes)
-    times, per_field = _per_field_energy_timeseries(data)
+    # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes).
+    # Filter to source/target fields only — avoids evaluating operators on
+    # irrelevant fields that may have unresolvable d2_t/d3_t terms (#196).
+    all_group_fields = set(src) | set(tgt)
+    times, per_field = _per_field_energy_timeseries(data, fields=all_group_fields)
 
     # Validate all fields are dynamical
     for name in (*src, *tgt):

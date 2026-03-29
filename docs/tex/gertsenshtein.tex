@@ -81,11 +81,11 @@ For GW propagating along $z$-axis with $\Bzero$ along $x$-axis:
 
 The coupled equations from our Lagrangian $(1/\kappa^2)R - (1/4)F^2$ are (after TT + Lorenz gauge, plane-wave reduction, and dividing by kinetic coefficients):
 \begin{align}
-  \ddt^2 h_+ &= \ddz^2 h_+ - \Bzero^2 \kappa^2\, h_+ - \Bzero \kappa^2\, \ddz a_y \label{eq:gert-eom-h} \\
+  \ddt^2 h_+ &= \ddz^2 h_+ - \tfrac{1}{2}\kappa^2 \Bzero^2\, h_+ - \Bzero \kappa^2\, \ddz a_y \label{eq:gert-eom-h} \\
   \ddt^2 a_y &= \ddz^2 a_y + \Bzero\, \ddz h_+ \label{eq:gert-eom-a}
 \end{align}
 
-The coupling is asymmetric: $\Bzero\kappa^2$ on $h$ (from dividing by $1/\kappa^2$ kinetic prefactor) vs $\Bzero$ on $a$ (unit kinetic prefactor). The eigenmode analysis gives beat frequency $\Delta\omega = \Bzero\kappa$ (geometric mean of couplings), yielding:
+The coupling is asymmetric: $\Bzero\kappa^2$ on $h$ (from dividing by $1/(2\kappa^2)$ kinetic prefactor) vs $\Bzero$ on $a$ (unit kinetic prefactor). The eigenmode analysis gives beat frequency $\Delta\omega = \Bzero\kappa$ (geometric mean of couplings), yielding:
 \begin{equation}
   P(\text{graviton} \to \text{photon}) = \sin^2\!\left(\frac{\kappa\,\Bzero\, D}{2}\right)
   \label{eq:gert-P-vacuum}
@@ -96,14 +96,14 @@ This is confirmed numerically (RMS error $< 0.015$ across a 40-point $\Bzero$ sw
 \paragraph{Note on P\&R error.}
 \label{par:pr-error}
 
-Palessandro \& Rothman~(2023, Eq.~26; 2024, arXiv:2405.01407) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument. They fail to properly account for the $1/(16\pi G)$ kinetic prefactor when extracting the mixing frequency from their non-canonically-normalised system. Domcke \& Garcia-Cely~\cite{domcke2023magnetic} independently criticise P\&R's linearisation. Our formula is confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}, who use canonical normalisation and obtain $\Delta_{g,\gamma} = \sqrt{4\pi G}\,\Bzero$, matching $\kappa\Bzero/2$ exactly. See \cref{sec:gertsenshtein-formula} for the full derivation and literature comparison.
+Palessandro \& Rothman~(2023, Eq.~26; 2024, arXiv:2405.01407) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument. They fail to properly account for the $1/(16\pi G)$ kinetic prefactor when extracting the mixing frequency from their non-canonically-normalised system. Hwang \& Noh~\cite{hwangnoh2023graviton} independently criticise P\&R's linearisation. Our formula is confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}, who use canonical normalisation and obtain $\Delta_{g,\gamma} = \sqrt{4\pi G}\,\Bzero$, matching $\kappa\Bzero/2$ exactly. See \cref{sec:gertsenshtein-formula} for the full derivation and literature comparison.
 
 \paragraph{Graviton effective mass from background EM field.}
 \label{par:graviton-mass}
 
-The graviton equation includes a mass-like term $-\Bzero^2\kappa^2\, h_+$ from the interaction of the metric perturbation with the background EM stress-energy. This gives an effective graviton mass $m_g^2 = \kappa^2\Bzero^2/2$. The photon remains massless (in vacuum). This mass detuning limits the peak conversion for each $k$-mode:
+The graviton equation includes a mass-like term $-\tfrac{1}{2}\kappa^2\Bzero^2\, h_+$ from the interaction of the metric perturbation with the background EM stress-energy. This gives an effective graviton mass $m_g^2 = \kappa^2\Bzero^2/2$. The photon remains massless (in vacuum). This mass detuning limits the peak conversion for each $k$-mode:
 \begin{equation}
-  P_\mathrm{max}(k) = \frac{k^2}{k^2 + \kappa^2 \Bzero^2}
+  P_\mathrm{max}(k) = \frac{k^2}{k^2 + \kappa^2 \Bzero^2 / 2}
   \label{eq:gert-Pmax-k}
 \end{equation}
 
@@ -158,6 +158,255 @@ MSW resonance    & $\omega_p^2 = m_g^2$ (at some position)    & Enhanced        
 \end{tabular}
 \end{table}
 
+\subsubsection{Torsion-Independence of the Gertsenshtein Effect}
+\label{subsec:torsion-independence}
+
+A key result of this project (issue~\#199, \#200) is that the standard
+Gertsenshtein conversion channel is \emph{algebraically independent} of torsion
+for the most general quadratic Poincar\'{e} Gauge Theory (PGT) Lagrangian with
+minimal electromagnetic coupling:
+\begin{equation}
+  \mathcal{L} = \frac{1}{\kappa^2}\widetilde{R}
+    + \alpha_1 I_1 + \alpha_2 I_2 + \alpha_3 I_3
+    + b_5 \widetilde{R}^2
+    - \tfrac{1}{4} F_{ab} F^{ab}
+  \label{eq:pgt-em-lagrangian}
+\end{equation}
+where $\widetilde{R}$ is the Riemann--Cartan Ricci scalar, $I_1, I_2, I_3$ are
+the three independent torsion-squared invariants, and $b_5\widetilde{R}^2$
+provides torsion kinetic terms.
+
+\paragraph{Polarisation block-diagonal structure.}
+After plane-wave reduction ($\partial_x = \partial_y = 0$, propagation along~$z$),
+the 23-component field equations decompose into two completely decoupled
+polarisation channels with \emph{zero cross-talk}:
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Channel & Fields & Torsion-dependent? & Stable? \\
+\midrule
+$h_\times \leftrightarrow a_x$ & $h_5 \leftrightarrow a_1$ & No & Yes \\
+trace $\leftrightarrow a_y$ & $h_4/h_7/h_9 \leftrightarrow a_2 \leftrightarrow$ torsion & Yes & No (ghost) \\
+\bottomrule
+\end{tabular}
+\end{center}
+The photon $a_1$ depends only on $\{a_1, h_5\}$ and the photon $a_2$ depends
+only on $\{a_2, h_0, h_3, h_4, h_7, h_9\}$.  There is no coupling path between
+the two channels; the structure is exact and algebraic.
+
+\paragraph{Double inaccessibility of torsion coupling.}
+The torsion-sensitive trace channel is inaccessible from physical initial conditions:
+\begin{enumerate}
+  \item \textbf{Algebraic decoupling:} TT initial conditions (valid for any vacuum
+    GW) excite only $h_5$.  There is no path from $h_5$ to the trace sector
+    ($h_4, h_7, h_9$) in the plane-wave reduced theory.
+  \item \textbf{Ghost instability:} The $b_5\widetilde{R}^2$ term introduces
+    Ostrogradsky 4th-order time derivatives, creating ghost modes.  The trace
+    channel exhibits exponential blowup ($\sim 10^{30}$ at $t{=}50$).
+\end{enumerate}
+
+\paragraph{Coupling--instability tension.}
+The $b_5\widetilde{R}^2$ term simultaneously enables propagating torsion modes
+(without it, torsion is non-propagating in Einstein--Cartan) and introduces
+Ostrogradsky ghosts.  The very term needed for torsion-mediated conversion also
+destroys it.  This is a structural consequence of Ostrogradsky's theorem for
+non-degenerate higher-derivative theories.
+
+However, Blagojevi\'{c} \& Cvetkovi\'{c}~\cite{blagojevic2018ghost} show that
+$\widetilde{R}^2$ is \emph{not} the only route to propagating torsion: the $0^-$
+(pseudoscalar) tordion propagates ghost-free with just a Riemann-squared coupling
+($r_2 R^{ABCD}R_{ABCD}$, with $r_2 < 0$, $t_2 > 0$), requiring no Ricci scalar
+squared at all.  Of 1918 critical parameter cases they identify, 450 are
+ghost-and-tachyon free, including cases with propagating $0^+$ and $0^-$ torsion
+modes.  Nikiforova et~al.~\cite{nikiforova2009torsion} provide explicit ghost-free
+conditions for the massive torsion spectrum around Minkowski and de~Sitter backgrounds.
+Aoki~\cite{aoki2020ghostfree} shows that PGT can be made non-linearly ghost-free
+via equivalence to ghost-free massive bigravity, though the $4D$ completion requires
+non-polynomial curvature terms.
+
+\paragraph{Implication.}
+For minimal PGT coupling, torsion cannot amplify the Gertsenshtein effect for
+\emph{any} vacuum gravitational wave.  Three paths to torsion-mediated conversion
+have been identified in the literature:
+\begin{enumerate}
+  \item \textbf{Non-minimal torsion--EM coupling:} Lagrangian terms of the form
+    $F^{\mu\nu}\widetilde{R}_{[\mu\nu]}$~\cite{bahamonde2025torsion} or
+    $F^2 T^2$~\cite{itin2003maxwell,rubilar2003torsion} break the block-diagonal
+    polarisation structure and create direct torsion--photon conversion channels.
+    Itin classifies 17 independent $F^2 T^2$ coupling structures, two of which
+    produce vacuum birefringence and an induced axion field from the torsion
+    background.
+  \item \textbf{Alternative ghost-free kinetic terms:} Replace $b_5\widetilde{R}^2$
+    with Riemann-squared or Weyl-squared couplings that propagate torsion without
+    Ostrogradsky instability~\cite{blagojevic2018ghost}.
+  \item \textbf{Higher-order (cubic) PGT:} Cubic $R \cdot T \cdot T$ invariants
+    eliminate ghost pathologies in the axial and vector torsion
+    sectors~\cite{bahamonde2025cubic}.
+\end{enumerate}
+
+Theory files: \texttt{examples/torsion\_gertsenshtein/theory.toml} (combined
+PGT+EM), \texttt{examples/gertsenshtein/theory\_ungauged.toml} (gauge-independence
+baseline).  See also \texttt{docs/tex/torsion.tex} for the PGT framework.
+
+\paragraph{Related literature.}
+The torsion-independence result is consistent with several independent analyses:
+Obukhov \& Trukhanova~\cite{obukhov2024electrodynamics} find that the spin-torsion--EM
+coupling constant $\chi \propto \ell_\mathrm{Pl}/\ell_\rho$ with $\ell_\rho \gg
+\ell_\mathrm{Pl}$, making minimal torsion--photon coupling negligibly small.
+Shapiro~\cite{shapiro2002torsion} shows that propagating torsion faces unitarity and
+renormalization obstacles, requiring torsion masses above all coupled fermion masses for
+quantum consistency.
+Barker~\cite{barker2024poincare} finds that ghost-free conditions in PGT particle
+spectra are sector-specific with no universal closed-form constraint for general
+$(\alpha_1, \alpha_2, \alpha_3, b_5)$.
+
+\subsubsection{Metric Dependence of EM Fields (Hwang \& Noh)}
+\label{subsec:hwang-noh}
+
+Hwang \& Noh~\cite{hwangnoh2023graviton} show that the covariant decomposition
+$F_{ij} = \eta_{ijk}(B^k - h^{k\ell}B_\ell)$ involves the metric perturbation, whereas
+ad-hoc approaches that write $F_{ij} = \eta_{ijk}\hat{B}^k$ without the metric give
+incorrect Maxwell equations.  The incorrect equations happen to give correct results
+\emph{only} for uniform constant~$B$, planar gravitational waves, and TT gauge; for
+non-uniform or time-varying backgrounds, the two approaches diverge.
+
+\paragraph{Two formulations, two graviton mass terms.}
+Hwang \& Noh derive the graviton equation in both the \textbf{EM-field} and
+\textbf{potential} formulations:
+\begin{itemize}
+  \item \textbf{EM-field formulation:} $(\partial_0^2 - \partial_z^2 - \tfrac{1}{2}\kappa^2 B^2)\,h_+ = \text{source}$
+    --- the $+\tfrac{1}{2}\kappa^2 B^2$ term (tachyonic for $\lambda > \lambda_B$)
+    comes from including $h_{ij}$ in the stress-energy tensor $T_{ab}$.
+  \item \textbf{Potential formulation:}
+    $[\partial_0^2 - \partial_z^2 - \tfrac{1}{2}\kappa^2(B_\parallel^2 - B_\perp^2)]\,h_+ = \text{source}$
+    --- the sign depends on the angle between $\vec{B}$ and the propagation direction.
+    For $\vec{B}$ transverse to propagation ($B_\parallel = 0$), this becomes a
+    \emph{stabilising} mass term $-\tfrac{1}{2}\kappa^2 B_\perp^2$.
+\end{itemize}
+The two formulations are physically equivalent; the sign difference arises because the
+relation between EM fields and potentials itself involves the metric:
+$b^i = \eta^{ijk}\partial_j A_k + h^i_j B^j$.
+
+\paragraph{TIDAL's equations match the potential formulation.}
+TIDAL derives equations from the Lagrangian $\lag = (1/\kappa^2)R - \tfrac{1}{4}F_{\mu\nu}F^{\mu\nu}$,
+written in terms of the four-potential~$A_\mu$.  The xPert pipeline expands
+$\sqrt{-g}\,\lag$ to second order, automatically capturing all metric-dependent
+quantities ($\sqrt{-g}$, $g^{\mu\alpha}g^{\nu\beta}$ in index raising, Christoffel
+connections).  No manual EM field identification is performed.  The resulting graviton
+mass coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ matches Hwang \& Noh's potential-formulation
+result for transverse~$B$ exactly (their Eq.~\eqref{eq:gert-eom-h}).  For non-uniform
+$B$-fields (e.g.\ the Gaussian scattering example), the Lagrangian approach remains
+correct, whereas ad-hoc methods would give different (incorrect) equations.
+
+\subsection{Backreaction and Regime Validity}
+\label{subsec:backreaction}
+
+\subsubsection{Separation of Scales: Flat-Background Validity}
+\label{subsec:separation-of-scales}
+
+When computing the Gertsenshtein effect, we linearize around flat Minkowski plus a
+uniform background~$\Bzero$.  However, $\Bzero$ has nonzero stress-energy
+$T_{\mu\nu} \sim \Bzero^2/2$, which sources curvature via Einstein's equations.
+The true background should satisfy the full nonlinear Einstein--Maxwell system;
+using flat Minkowski is valid only if the metric correction~$\delta g$ sourced
+by~$\Bzero$ is negligible.
+
+Hwang \& Noh~\cite{hwangnoh2023graviton} provide the key argument (\S\,III.A,
+eqs.~22--31).  They define the critical wavenumber
+$k_B \equiv \sqrt{8\pi G}\,B_0/c^2$ and show that the backreaction parameter is:
+\begin{equation}
+  \frac{L^2}{\lambda_B^2} = \frac{2}{\pi}\,\frac{G\,B_0^2\,L^2}{c^4}
+  \sim \frac{G M}{L c^2}\,\frac{B_0^2}{\varrho c^2}
+  \label{eq:backreaction-param}
+\end{equation}
+where $L$ is the domain size, $M \sim \varrho L^3$ is the characteristic mass,
+and the two factors are respectively the compactness and the magnetic energy
+fraction.  Crucially, $L^2/\lambda_B^2 \sim P/(2\pi^2)$ where $P$ is the
+conversion probability.  So \textbf{backreaction is negligible whenever
+$P \ll 1$}, which is always the case for physical magnetic fields:
+\begin{center}
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+System & $B_0$ (G) & $L$ (cm) & $(L/\lambda_B)^2$ \\
+\midrule
+Lab magnet      & $10^5$    & $10^2$  & $5.2 \times 10^{-35}$ \\
+Neutron star    & $10^{13}$ & $10^7$  & $5.2 \times 10^{-9}$ \\
+Magnetar        & $10^{15}$ & $10^7$  & $5.2 \times 10^{-5}$ \\
+Extreme magnetar& $10^{16}$ & $10^7$  & $5.2 \times 10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+Even for the most extreme astrophysical scenarios, the backreaction is at most
+$\sim 10^{-3}$.  The local mixing-rate correction from backreaction is
+$(\kappa B_0)^2 = 16\pi G B_0^2/c^4$, negligible for all physical fields.
+
+\subsubsection{Physical Regime: $P \ll 1$ Always}
+\label{subsec:physical-regime}
+
+The conversion probability in the Gertsenshtein effect is always small in physical
+systems.  The mixing length is~\cite{palessandro2023simple}:
+\begin{equation}
+  L_\text{mix} = \frac{2c^2}{\sqrt{G}\,B_0}
+    \approx 2\,\text{Mpc}\,\left(\frac{1\,\text{G}}{B_0}\right)
+  \label{eq:mixing-length-phys}
+\end{equation}
+For a magnetar ($B_0 \sim 10^{14}\,$G, field extent $D \sim 10\,$km):
+$D/L_\text{mix} \sim 10^{-5}$ and $P \sim 10^{-10}$.  Full Rabi oscillations
+($P \sim 1$) require $D \sim L_\text{mix}$, which never occurs for any
+astrophysical or laboratory configuration.
+
+\textbf{Implication for simulations:} TIDAL simulations with $\kappa = 1$,
+$B_0 = 0.3$ operate in the Rabi regime ($P \sim 88\%$) for numerical convenience.
+This is a valid mathematical solution of the linearized equations, but does not
+correspond to any physical system.  The physically meaningful quantity is the
+\emph{conversion coefficient} $C = P/B_0^2$, which is $B_0$-independent at
+leading order and determines conversion for any physical $B_0$.
+
+\subsubsection{Sweep Measurement Methodology}
+\label{subsec:sweep-methodology}
+
+For torsion parameter sweeps, the primary metric is the \textbf{conversion
+coefficient}:
+\begin{equation}
+  C(\delta_1, \alpha, \omega_0) \equiv \frac{P}{B_0^2}
+    \approx \frac{\kappa_\text{eff}^2\,t_\text{end}^2}{4}
+  \label{eq:conversion-coeff}
+\end{equation}
+valid in the early-time quadratic regime ($\kappa_\text{eff}\,B_0\,t_\text{end} \ll 1$).
+The \textbf{amplification factor} is:
+\begin{equation}
+  A = \frac{\kappa_\text{eff}}{\kappa}
+    = \sqrt{\frac{C_\text{torsion}}{C_\text{EM}}}
+    = \frac{B_\text{min}(\text{EM})}{B_\text{min}(\text{torsion})}
+  \label{eq:amplification}
+\end{equation}
+The last equality shows that $A$ is identical to the B-field lowering factor from
+the critical field analysis (\S\ref{sec:critical-field}): ``torsion reduces the
+required $B$-field by factor~$A$ for the same conversion.''
+
+In the linearized regime, $P = c_2\,B_0^2 + c_4\,B_0^4 + \cdots$, where $c_4$
+corrections arise from $B_0$-dependent eigenfrequencies (graviton mass term
+$-\tfrac{1}{2}\kappa^2 B_0^2$, torsion-induced detuning).  At $B_0 = 0.01$,
+these corrections are $\mathcal{O}(10^{-4})$; the leading-order extraction of~$C$
+is robust.
+
+\paragraph{Simulation conventions.}
+Natural units $\hbar = c = 1$, $\kappa = 1$.  Plane-wave graviton IC in periodic
+domain with uniform~$\Bzero$:
+\texttt{--ic plane-wave --ic-wavevector k\_0 --ic-amplitude 0.1 --ic-component h\_7}.
+Source $h_7$ ($h_+$~polarisation), target $a_2$ ($a_y$ transverse photon),
+$k_0 \gg B_0$ (massless dispersion limit).
+
+\paragraph{Frequency-dependent diagnostics.}
+For propagating torsion with mass $\mu = \sqrt{\alpha/b_5}$, the conversion
+coefficient $C(\omega_0)$ depends on the initial GW frequency relative to~$\mu$.
+Scanning $k_0$ (and hence $\omega_0 = k_0$) maps the torsion mass detuning:
+$C(\omega_0 \gg \mu)$ is enhanced (torsion responds fully),
+$C(\omega_0 \ll \mu)$ reduces to $C_\text{EM}$ (torsion frozen out),
+$C(\omega_0 \sim \mu)$ reveals the resonance structure.
+This frequency scan is the key diagnostic for distinguishing propagating from
+non-propagating torsion.
+
 \subsection{References}
 \label{subsec:gertsenshtein-references}
 
@@ -181,7 +430,7 @@ Ejlli~(2020) & 2020 & First exact (non-perturbative) solution \\
 % NOTE: ejlli2020first key needs adding to references.bib
 Palessandro \& Rothman~(2023) & 2023 & Lagrangian derivation (\textbf{contains normalisation error}) \\
 % NOTE: palessandro2023 key needs adding to references.bib
-Domcke \& Garcia-Cely~\cite{domcke2023magnetic} & 2023 & Criticises P\&R linearisation; inhomogeneous $B$-field calculation \\
+Hwang \& Noh~\cite{hwangnoh2023graviton} & 2023 & Proper EM field definitions in curved spacetime; formulation-dependent graviton mass \\
 \textbf{Dandoy, Lella et al.}~\cite{dandoy2024constraining} & \textbf{2024} & \textbf{4-component mixing, canonical graviton --- confirms our formula} \\
 Palessandro~(2024) & 2024 & Extended treatment (same normalisation error as 2023) \\
 % NOTE: palessandro2024 key needs adding to references.bib
