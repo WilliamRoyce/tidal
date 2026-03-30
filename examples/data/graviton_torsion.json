@@ -37,7 +37,7 @@
 				"t_9"
 			]
 		},
-		"derivation_hash": "e2060bad6a97e833d6505927e043d1fe4295043be026f76a2f0e26a2c0b5039f"
+		"derivation_hash": "5d434fb0d4afc9cd72e73b8f813cf9cd48085ac18b6f83380099f16879109871"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -194,6 +194,30 @@
 						"coefficient_symbolic": "-2*b5"
 					},
 					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_8",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "biharmonic",
+						"field": "h_8",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_6",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "biharmonic",
+						"field": "h_6",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
 						"coefficient": 5.0,
 						"operator": "laplacian_x",
 						"field": "v_t_13",
@@ -216,6 +240,30 @@
 						"operator": "derivative_3_x",
 						"field": "v_h_3",
 						"coefficient_symbolic": "-4*b5"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_y",
+						"field": "v_h_2",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_1y_2z",
+						"field": "v_h_2",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_h_1",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_1x_2z",
+						"field": "v_h_1",
+						"coefficient_symbolic": "-2*b5"
 					},
 					{
 						"coefficient": 2.0,
@@ -257,10 +305,148 @@
 						"coefficient_symbolic": "-kappa^(-2)"
 					},
 					{
+						"coefficient": 2.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_3",
+						"coefficient_symbolic": "2/kappa^2"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "v_h_6",
 						"coefficient_symbolic": "kappa^(-2)"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_y",
+						"field": "v_h_5",
+						"coefficient_symbolic": "2/kappa^2"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_h_0",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_h_4",
+						"coefficient_symbolic": "kappa^(-2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_h_7",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_h_9",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_t_10",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_t_17",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_t_2",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_1x_2z",
+						"field": "v_h_0",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "derivative_1x_2z",
+						"field": "v_h_4",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "derivative_1x_2z",
+						"field": "v_h_7",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_1x_1y_1z",
+						"field": "v_h_8",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_2x_1z",
+						"field": "v_h_6",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "mixed_T2_S1x",
+						"field": "t_13",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "mixed_T2_S1x",
+						"field": "t_20",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "mixed_T2_S1x",
+						"field": "t_6",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": 4.0,
+						"operator": "mixed_T2_S1x_S1z",
+						"field": "h_3",
+						"coefficient_symbolic": "4*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S1x_S1y",
+						"field": "h_2",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S2x",
+						"field": "h_1",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "mixed_T3_S1x",
+						"field": "h_4",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "mixed_T3_S1x",
+						"field": "h_7",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "mixed_T3_S1x",
+						"field": "h_9",
+						"coefficient_symbolic": "-2*b5"
 					}
 				]
 			}
@@ -284,10 +470,148 @@
 						"coefficient_symbolic": "-kappa^(-2)"
 					},
 					{
+						"coefficient": 2.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_3",
+						"coefficient_symbolic": "2/kappa^2"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "v_h_8",
 						"coefficient_symbolic": "kappa^(-2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_y",
+						"field": "v_h_0",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_y",
+						"field": "v_h_4",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "v_h_7",
+						"coefficient_symbolic": "kappa^(-2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_y",
+						"field": "v_h_9",
+						"coefficient_symbolic": "-kappa^(-2)"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_t_10",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_t_17",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_t_2",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_1y_2z",
+						"field": "v_h_0",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "derivative_1y_2z",
+						"field": "v_h_4",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "derivative_1y_2z",
+						"field": "v_h_7",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_2y_1z",
+						"field": "v_h_8",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_h_5",
+						"coefficient_symbolic": "2/kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_1x_1y_1z",
+						"field": "v_h_6",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "mixed_T2_S1y",
+						"field": "t_13",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "mixed_T2_S1y",
+						"field": "t_20",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "mixed_T2_S1y",
+						"field": "t_6",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": 4.0,
+						"operator": "mixed_T2_S1y_S1z",
+						"field": "h_3",
+						"coefficient_symbolic": "4*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S2y",
+						"field": "h_2",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S1x_S1y",
+						"field": "h_1",
+						"coefficient_symbolic": "2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "mixed_T3_S1y",
+						"field": "h_4",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "mixed_T3_S1y",
+						"field": "h_7",
+						"coefficient_symbolic": "-2*b5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "mixed_T3_S1y",
+						"field": "h_9",
+						"coefficient_symbolic": "-2*b5"
 					}
 				]
 			}
@@ -304,6 +628,18 @@
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_2",
+						"coefficient_symbolic": "2/kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_1",
+						"coefficient_symbolic": "2/kappa^2"
+					},
 					{
 						"coefficient": -1.0,
 						"operator": "gradient_x",
@@ -353,6 +689,30 @@
 						"coefficient_symbolic": "4*b5"
 					},
 					{
+						"coefficient": 2.0,
+						"operator": "gradient_y",
+						"field": "v_h_8",
+						"coefficient_symbolic": "2/kappa^2"
+					},
+					{
+						"coefficient": -4.0,
+						"operator": "derivative_1y_2z",
+						"field": "v_h_8",
+						"coefficient_symbolic": "-4*b5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_h_6",
+						"coefficient_symbolic": "2/kappa^2"
+					},
+					{
+						"coefficient": -4.0,
+						"operator": "derivative_1x_2z",
+						"field": "v_h_6",
+						"coefficient_symbolic": "-4*b5"
+					},
+					{
 						"coefficient": -10.0,
 						"operator": "mixed_T2_S1x",
 						"field": "t_13",
@@ -375,6 +735,18 @@
 						"operator": "mixed_T2_S2x",
 						"field": "h_3",
 						"coefficient_symbolic": "8*b5"
+					},
+					{
+						"coefficient": 4.0,
+						"operator": "mixed_T2_S1y_S1z",
+						"field": "h_2",
+						"coefficient_symbolic": "4*b5"
+					},
+					{
+						"coefficient": 4.0,
+						"operator": "mixed_T2_S1x_S1z",
+						"field": "h_1",
+						"coefficient_symbolic": "4*b5"
 					},
 					{
 						"coefficient": -4.0,
@@ -452,6 +824,28 @@
 						"field": "h_7"
 					},
 					{
+						"coefficient": -0.5,
+						"operator": "cross_derivative_yz",
+						"field": "h_8",
+						"coefficient_symbolic": "-1/2*1/(b5*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "biharmonic",
+						"field": "h_8"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "cross_derivative_xz",
+						"field": "h_6",
+						"coefficient_symbolic": "1/(2*b5*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "biharmonic",
+						"field": "h_6"
+					},
+					{
 						"coefficient": 0.5,
 						"operator": "gradient_x",
 						"field": "v_h_3",
@@ -476,6 +870,28 @@
 						"coefficient": -2.0,
 						"operator": "derivative_3_x",
 						"field": "v_h_3"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "gradient_y",
+						"field": "v_h_2",
+						"coefficient_symbolic": "1/(2*b5*kappa^2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "derivative_1y_2z",
+						"field": "v_h_2"
+					},
+					{
+						"coefficient": -0.5,
+						"operator": "gradient_x",
+						"field": "v_h_1",
+						"coefficient_symbolic": "-1/2*1/(b5*kappa^2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "derivative_1x_2z",
+						"field": "v_h_1"
 					},
 					{
 						"coefficient": -0.25,
@@ -525,6 +941,16 @@
 						"field": "h_9"
 					},
 					{
+						"coefficient": -1.0,
+						"operator": "mixed_T2_S1y_S1z",
+						"field": "h_8"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "mixed_T2_S1x_S1z",
+						"field": "h_6"
+					},
+					{
 						"coefficient": -2.5,
 						"operator": "d3_t",
 						"field": "t_13"
@@ -543,6 +969,16 @@
 						"coefficient": 2.0,
 						"operator": "mixed_T3_S1x",
 						"field": "h_3"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "mixed_T3_S1y",
+						"field": "h_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "mixed_T3_S1x",
+						"field": "h_1"
 					},
 					{
 						"coefficient": -1.0,
@@ -573,6 +1009,26 @@
 						"coefficient": 1.0,
 						"operator": "laplacian_x",
 						"field": "h_5"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_6"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_8"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_y",
+						"field": "v_h_1"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_h_2"
 					}
 				]
 			}
@@ -590,9 +1046,141 @@
 				"type": "linear_combination",
 				"terms": [
 					{
+						"coefficient": -2.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_5"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_0"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_4"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_7"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_9"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "derivative_1x_2z",
+						"field": "t_10",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "derivative_1x_2z",
+						"field": "t_17",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "derivative_1x_2z",
+						"field": "t_2",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "biharmonic",
+						"field": "h_0",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "biharmonic",
+						"field": "h_4",
+						"coefficient_symbolic": "-2*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "biharmonic",
+						"field": "h_7",
+						"coefficient_symbolic": "-2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "biharmonic",
+						"field": "h_8",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "biharmonic",
+						"field": "h_6",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "v_h_1"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_h_3"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_t_13",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_t_20",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_t_6",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": -4.0,
+						"operator": "derivative_1x_2z",
+						"field": "v_h_3",
+						"coefficient_symbolic": "-4*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_1x_1y_1z",
+						"field": "v_h_2",
+						"coefficient_symbolic": "-2*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_2x_1z",
+						"field": "v_h_1",
+						"coefficient_symbolic": "-2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S1x_S1z",
+						"field": "h_4",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S1x_S1z",
+						"field": "h_7",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S1x_S1z",
+						"field": "h_9",
+						"coefficient_symbolic": "2*b5*kappa^2"
 					}
 				]
 			}
@@ -653,6 +1241,28 @@
 					},
 					{
 						"coefficient": 0.5,
+						"operator": "cross_derivative_yz",
+						"field": "h_8",
+						"coefficient_symbolic": "1/(2*b5*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "biharmonic",
+						"field": "h_8"
+					},
+					{
+						"coefficient": -0.5,
+						"operator": "cross_derivative_xz",
+						"field": "h_6",
+						"coefficient_symbolic": "-1/2*1/(b5*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "biharmonic",
+						"field": "h_6"
+					},
+					{
+						"coefficient": 0.5,
 						"operator": "gradient_x",
 						"field": "v_h_3",
 						"coefficient_symbolic": "1/(2*b5*kappa^2)"
@@ -676,6 +1286,28 @@
 						"coefficient": -2.0,
 						"operator": "derivative_3_x",
 						"field": "v_h_3"
+					},
+					{
+						"coefficient": -0.5,
+						"operator": "gradient_y",
+						"field": "v_h_2",
+						"coefficient_symbolic": "-1/2*1/(b5*kappa^2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "derivative_1y_2z",
+						"field": "v_h_2"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "gradient_x",
+						"field": "v_h_1",
+						"coefficient_symbolic": "1/(2*b5*kappa^2)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "derivative_1x_2z",
+						"field": "v_h_1"
 					},
 					{
 						"coefficient": -0.25,
@@ -725,6 +1357,16 @@
 						"field": "h_9"
 					},
 					{
+						"coefficient": -1.0,
+						"operator": "mixed_T2_S1y_S1z",
+						"field": "h_8"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "mixed_T2_S1x_S1z",
+						"field": "h_6"
+					},
+					{
 						"coefficient": -2.5,
 						"operator": "d3_t",
 						"field": "t_13"
@@ -743,6 +1385,16 @@
 						"coefficient": 2.0,
 						"operator": "mixed_T3_S1x",
 						"field": "h_3"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "mixed_T3_S1y",
+						"field": "h_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "mixed_T3_S1x",
+						"field": "h_1"
 					},
 					{
 						"coefficient": -1.0,
@@ -770,9 +1422,141 @@
 				"type": "linear_combination",
 				"terms": [
 					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_0"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_4"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_7"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_9"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "derivative_1y_2z",
+						"field": "t_10",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "derivative_1y_2z",
+						"field": "t_17",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "derivative_1y_2z",
+						"field": "t_2",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "biharmonic",
+						"field": "h_0",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "biharmonic",
+						"field": "h_4",
+						"coefficient_symbolic": "-2*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "biharmonic",
+						"field": "h_7",
+						"coefficient_symbolic": "-2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "biharmonic",
+						"field": "h_8",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_5"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "biharmonic",
+						"field": "h_6",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "v_h_2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_y",
+						"field": "v_h_3"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_t_13",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_t_20",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_t_6",
+						"coefficient_symbolic": "5*b5*kappa^2"
+					},
+					{
+						"coefficient": -4.0,
+						"operator": "derivative_1y_2z",
+						"field": "v_h_3",
+						"coefficient_symbolic": "-4*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_2y_1z",
+						"field": "v_h_2",
+						"coefficient_symbolic": "-2*b5*kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "derivative_1x_1y_1z",
+						"field": "v_h_1",
+						"coefficient_symbolic": "-2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S1y_S1z",
+						"field": "h_4",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S1y_S1z",
+						"field": "h_7",
+						"coefficient_symbolic": "2*b5*kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "mixed_T2_S1y_S1z",
+						"field": "h_9",
+						"coefficient_symbolic": "2*b5*kappa^2"
 					}
 				]
 			}
@@ -789,6 +1573,30 @@
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
+					{
+						"coefficient": 0.5,
+						"operator": "cross_derivative_yz",
+						"field": "h_8",
+						"coefficient_symbolic": "1/(2*b5*kappa^2)"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "cross_derivative_xz",
+						"field": "h_6",
+						"coefficient_symbolic": "1/(2*b5*kappa^2)"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "gradient_y",
+						"field": "v_h_2",
+						"coefficient_symbolic": "1/(2*b5*kappa^2)"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "gradient_x",
+						"field": "v_h_1",
+						"coefficient_symbolic": "1/(2*b5*kappa^2)"
+					},
 					{
 						"coefficient": -0.25,
 						"operator": "d2_t",
@@ -832,6 +1640,16 @@
 						"field": "h_7"
 					},
 					{
+						"coefficient": -1.0,
+						"operator": "mixed_T2_S1y_S1z",
+						"field": "h_8"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "mixed_T2_S1x_S1z",
+						"field": "h_6"
+					},
+					{
 						"coefficient": -2.5,
 						"operator": "d3_t",
 						"field": "t_13"
@@ -850,6 +1668,16 @@
 						"coefficient": 2.0,
 						"operator": "mixed_T3_S1x",
 						"field": "h_3"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "mixed_T3_S1y",
+						"field": "h_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "mixed_T3_S1x",
+						"field": "h_1"
 					},
 					{
 						"coefficient": -1.0,
@@ -961,6 +1789,18 @@
 						"coefficient_symbolic": "5*b5"
 					},
 					{
+						"coefficient": -5.0,
+						"operator": "derivative_1y_2z",
+						"field": "h_8",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "derivative_1x_2z",
+						"field": "h_6",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
 						"coefficient": -12.5,
 						"operator": "gradient_x",
 						"field": "v_t_13",
@@ -983,6 +1823,18 @@
 						"operator": "laplacian_x",
 						"field": "v_h_3",
 						"coefficient_symbolic": "10*b5"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_h_2",
+						"coefficient_symbolic": "5*b5"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_h_1",
+						"coefficient_symbolic": "5*b5"
 					},
 					{
 						"coefficient": -5.0,
@@ -1096,6 +1948,16 @@
 						"field": "v_h_7"
 					},
 					{
+						"coefficient": -0.4,
+						"operator": "cross_derivative_yz",
+						"field": "v_h_8"
+					},
+					{
+						"coefficient": -0.4,
+						"operator": "cross_derivative_xz",
+						"field": "v_h_6"
+					},
+					{
 						"coefficient": -1.0,
 						"operator": "d2_t",
 						"field": "t_20"
@@ -1109,6 +1971,16 @@
 						"coefficient": 0.8,
 						"operator": "mixed_T2_S1x",
 						"field": "h_3"
+					},
+					{
+						"coefficient": 0.4,
+						"operator": "mixed_T2_S1y",
+						"field": "h_2"
+					},
+					{
+						"coefficient": 0.4,
+						"operator": "mixed_T2_S1x",
+						"field": "h_1"
 					},
 					{
 						"coefficient": -0.4,
@@ -1225,6 +2097,18 @@
 						"coefficient_symbolic": "5*b5"
 					},
 					{
+						"coefficient": -5.0,
+						"operator": "derivative_1y_2z",
+						"field": "h_8",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "derivative_1x_2z",
+						"field": "h_6",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
 						"coefficient": -12.5,
 						"operator": "gradient_x",
 						"field": "v_t_13",
@@ -1247,6 +2131,18 @@
 						"operator": "laplacian_x",
 						"field": "v_h_3",
 						"coefficient_symbolic": "10*b5"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_h_2",
+						"coefficient_symbolic": "5*b5"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_h_1",
+						"coefficient_symbolic": "5*b5"
 					},
 					{
 						"coefficient": -5.0,
@@ -1366,6 +2262,18 @@
 						"coefficient_symbolic": "5*b5"
 					},
 					{
+						"coefficient": -5.0,
+						"operator": "derivative_1y_2z",
+						"field": "h_8",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
+						"coefficient": -5.0,
+						"operator": "derivative_1x_2z",
+						"field": "h_6",
+						"coefficient_symbolic": "-5*b5"
+					},
+					{
 						"coefficient": -12.5,
 						"operator": "gradient_x",
 						"field": "v_t_13",
@@ -1388,6 +2296,18 @@
 						"operator": "laplacian_x",
 						"field": "v_h_3",
 						"coefficient_symbolic": "10*b5"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_yz",
+						"field": "v_h_2",
+						"coefficient_symbolic": "5*b5"
+					},
+					{
+						"coefficient": 5.0,
+						"operator": "cross_derivative_xz",
+						"field": "v_h_1",
+						"coefficient_symbolic": "5*b5"
 					},
 					{
 						"coefficient": -5.0,
@@ -1501,6 +2421,16 @@
 						"field": "v_h_7"
 					},
 					{
+						"coefficient": -0.4,
+						"operator": "cross_derivative_yz",
+						"field": "v_h_8"
+					},
+					{
+						"coefficient": -0.4,
+						"operator": "cross_derivative_xz",
+						"field": "v_h_6"
+					},
+					{
 						"coefficient": -1.0,
 						"operator": "d2_t",
 						"field": "t_13"
@@ -1514,6 +2444,16 @@
 						"coefficient": 0.8,
 						"operator": "mixed_T2_S1x",
 						"field": "h_3"
+					},
+					{
+						"coefficient": 0.4,
+						"operator": "mixed_T2_S1y",
+						"field": "h_2"
+					},
+					{
+						"coefficient": 0.4,
+						"operator": "mixed_T2_S1x",
+						"field": "h_1"
 					},
 					{
 						"coefficient": -0.4,
@@ -1624,6 +2564,16 @@
 						"field": "v_h_7"
 					},
 					{
+						"coefficient": -0.4,
+						"operator": "cross_derivative_yz",
+						"field": "v_h_8"
+					},
+					{
+						"coefficient": -0.4,
+						"operator": "cross_derivative_xz",
+						"field": "v_h_6"
+					},
+					{
 						"coefficient": -1.0,
 						"operator": "d2_t",
 						"field": "t_13"
@@ -1637,6 +2587,16 @@
 						"coefficient": 0.8,
 						"operator": "mixed_T2_S1x",
 						"field": "h_3"
+					},
+					{
+						"coefficient": 0.4,
+						"operator": "mixed_T2_S1y",
+						"field": "h_2"
+					},
+					{
+						"coefficient": 0.4,
+						"operator": "mixed_T2_S1x",
+						"field": "h_1"
 					},
 					{
 						"coefficient": -0.4,
@@ -3453,51 +4413,12 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "t_13",
+					"field": "h_8",
 					"operator": "identity"
 				},
 				"factor_b": {
 					"field": "h_0",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_20",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_0",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_6",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_0",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_3",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "h_0",
-					"operator": "time_derivative"
+					"operator": "cross_derivative_yz"
 				},
 				"term_class": "interaction",
 				"coefficient_symbolic": "kappa^(-2)"
@@ -3505,246 +4426,25 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "t_10",
+					"field": "h_3",
 					"operator": "identity"
 				},
 				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(2*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_17",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(2*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_2",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(2*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "kappa^(-2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "kappa^(-2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
+					"field": "h_2",
+					"operator": "cross_derivative_yz"
 				},
 				"term_class": "interaction",
 				"coefficient_symbolic": "-kappa^(-2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_13",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_20",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_6",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_3",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "kappa^(-2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_5",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_5",
-					"operator": "time_derivative"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "1/(2*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_1",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "h_6",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-kappa^(-2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_6",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_6",
-					"operator": "time_derivative"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "-1/2*1/kappa^2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_13",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_20",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_6",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_3",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "kappa^(-2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_2",
-					"operator": "gradient_x"
+					"operator": "identity"
 				},
 				"factor_b": {
-					"field": "h_8",
-					"operator": "time_derivative"
+					"field": "h_3",
+					"operator": "cross_derivative_yz"
 				},
 				"term_class": "interaction",
 				"coefficient_symbolic": "-kappa^(-2)"
@@ -3753,6 +4453,409 @@
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_8",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_9",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_10",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_17",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_2",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "laplacian_x"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "laplacian_x"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "laplacian_x"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_3",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_8",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_9",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_10",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_17",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_2",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "laplacian_x"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "laplacian_x"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "laplacian_x"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "cross_derivative_xz"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "1/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "1/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-1/2*1/kappa^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_8",
 					"operator": "time_derivative"
 				},
 				"factor_b": {
@@ -3760,63 +4863,24 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
+				"coefficient_symbolic": "1/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_9",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction",
 				"coefficient_symbolic": "-1/2*1/kappa^2"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "t_13",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_20",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_6",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "1/(2*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
 					"field": "h_7",
 					"operator": "time_derivative"
 				},
@@ -3825,98 +4889,46 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "1/(2*kappa^2)"
+				"coefficient_symbolic": "-1/2*1/kappa^2"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_0",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_13",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
+				"coefficient_symbolic": "5*b5"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_4",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_13",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
+				"coefficient_symbolic": "-5*b5"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_7",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_13",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "t_13",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_10",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_13",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_17",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_13",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_2",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_13",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
+				"coefficient_symbolic": "-5*b5"
 			},
 			{
 				"coefficient": 1.0,
@@ -3929,98 +4941,46 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "(-25*b5)/4"
+				"coefficient_symbolic": "(25*b5)/4"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_0",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_20",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
+				"coefficient_symbolic": "5*b5"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_4",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_20",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
+				"coefficient_symbolic": "-5*b5"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_7",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_20",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "t_20",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_10",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_20",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_17",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_20",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_2",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_20",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
+				"coefficient_symbolic": "-5*b5"
 			},
 			{
 				"coefficient": 1.0,
@@ -4033,7 +4993,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
+				"coefficient_symbolic": "(25*b5)/2"
 			},
 			{
 				"coefficient": 1.0,
@@ -4046,98 +5006,46 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "(-25*b5)/4"
+				"coefficient_symbolic": "(25*b5)/4"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_0",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_6",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
+				"coefficient_symbolic": "5*b5"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_4",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_6",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
+				"coefficient_symbolic": "-5*b5"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_7",
-					"operator": "identity"
+					"operator": "laplacian_x"
 				},
 				"factor_b": {
 					"field": "t_6",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "t_6",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-5/(4*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_10",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_6",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_17",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_6",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_2",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "t_6",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
+				"coefficient_symbolic": "-5*b5"
 			},
 			{
 				"coefficient": 1.0,
@@ -4150,7 +5058,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
+				"coefficient_symbolic": "(25*b5)/2"
 			},
 			{
 				"coefficient": 1.0,
@@ -4163,7 +5071,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "(-25*b5)/2"
+				"coefficient_symbolic": "(25*b5)/2"
 			},
 			{
 				"coefficient": 1.0,
@@ -4176,7 +5084,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "(-25*b5)/4"
+				"coefficient_symbolic": "(25*b5)/4"
 			},
 			{
 				"coefficient": 1.0,
@@ -4337,41 +5245,28 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "t_13",
-					"operator": "time_derivative"
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
 				},
 				"factor_b": {
 					"field": "h_3",
 					"operator": "mixed_1_0_0_1"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "10*b5"
+				"coefficient_symbolic": "4*b5"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "t_20",
-					"operator": "time_derivative"
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
 				},
 				"factor_b": {
 					"field": "h_3",
 					"operator": "mixed_1_0_0_1"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "10*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "t_6",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "10*b5"
+				"coefficient_symbolic": "4*b5"
 			},
 			{
 				"coefficient": 1.0,
@@ -4545,45 +5440,6 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_10",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_10",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_10",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
 					"field": "h_0",
 					"operator": "gradient_x"
 				},
@@ -4619,84 +5475,6 @@
 				},
 				"term_class": "interaction",
 				"coefficient_symbolic": "-5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_17",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_17",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_17",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_2",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_2",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_2",
-					"operator": "mixed_1_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
 			},
 			{
 				"coefficient": 1.0,
@@ -4780,6 +5558,604 @@
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_9",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_9",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_9",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "mixed_1_0_0_2"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_10",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_17",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_2",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "mixed_1_0_0_1"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-4*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_8",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_3",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_9",
+					"operator": "mixed_1_0_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_1"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_1"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_1"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_10",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_17",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "t_2",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "5*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_8",
+					"operator": "cross_derivative_yz"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "cross_derivative_xz"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "mixed_1_0_0_1"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-4*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "mixed_1_0_1_0"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_3",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_9",
+					"operator": "mixed_1_1_0_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_1"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_1"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0_1"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2*b5"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
 					"operator": "mixed_2_0_0_0"
 				},
 				"factor_b": {
@@ -4814,201 +6190,6 @@
 				},
 				"term_class": "self",
 				"coefficient_symbolic": "-b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_13",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_13",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_13",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_20",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_20",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_20",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_6",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_6",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "t_6",
-					"operator": "mixed_2_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "5*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "mixed_2_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-4*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "mixed_2_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-4*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_9",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "mixed_2_0_0_1"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-4*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "mixed_3_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "2*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_9",
-					"operator": "mixed_3_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "2*b5"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_9",
-					"operator": "mixed_3_0_0_0"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "2*b5"
 			}
 		],
 		"wolfram_constraint_elimination": true,
