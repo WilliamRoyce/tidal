@@ -3661,13 +3661,12 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         bg_rules_str = ", ".join(bg_rules_entries)
         bg_rules_opt = f', "BackgroundFieldRules" -> {wl_list(bg_rules_str)}'
 
-    # NOTE: ComponentValue PD zeroing was attempted for the canonical path but
-    # REMOVED.  For scalar Lagrangians, all indices are dummy — TraceBasisDummy
-    # must enumerate all combinations regardless.  Extra xAct rules add
-    # pattern-matching overhead that outweighs any benefit.
-    # Measured: 8 rules +56% slower, 40 rules +9% slower on batch[1:50/82].
-    # The per-term plane-wave reduction (after ConvertCDToDerivatives) is the
-    # correct and effective approach for the canonical path.
+    # NOTE: PW-PD zeroing (pre-TraceBasisDummy PD zeroing for plane-wave
+    # theories) was investigated but proved ineffective.  After ToBasis +
+    # Christoffel zeroing, there are NO PD operators remaining — xAct resolves
+    # all PD into basis-indexed contractions that TraceBasisDummy must enumerate.
+    # TraceBasisDummy's O(dim^{2K}) is fundamental for K~3 torsion contractions.
+    # See also: DownValues approach failed +9-66% (lines below).
 
     lines: list[str] = [
         "",
