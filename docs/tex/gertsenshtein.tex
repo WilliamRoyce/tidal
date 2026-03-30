@@ -298,114 +298,38 @@ result for transverse~$B$ exactly (their Eq.~\eqref{eq:gert-eom-h}).  For non-un
 $B$-fields (e.g.\ the Gaussian scattering example), the Lagrangian approach remains
 correct, whereas ad-hoc methods would give different (incorrect) equations.
 
-\subsection{Backreaction and Regime Validity}
+\subsection{Backreaction, Regime Validity, and Sweep Methodology}
 \label{subsec:backreaction}
 
-\subsubsection{Separation of Scales: Flat-Background Validity}
-\label{subsec:separation-of-scales}
+The flat-background approximation for the Gertsenshtein effect --- and its
+generalisation to PGT+EM theories with non-minimal couplings --- is analysed in
+detail in \texttt{docs/tex/background\_validity.tex}.  Key results are summarised
+here.
 
-When computing the Gertsenshtein effect, we linearize around flat Minkowski plus a
-uniform background~$\Bzero$.  However, $\Bzero$ has nonzero stress-energy
-$T_{\mu\nu} \sim \Bzero^2/2$, which sources curvature via Einstein's equations.
-The true background should satisfy the full nonlinear Einstein--Maxwell system;
-using flat Minkowski is valid only if the metric correction~$\delta g$ sourced
-by~$\Bzero$ is negligible.
+\paragraph{Hwang \& Noh separation of scales.}
+For Einstein--Maxwell, Hwang \& Noh~\cite{hwangnoh2023graviton} show that the
+backreaction parameter $(L/\lambda_B)^2 \sim P/(2\pi^2)$, so backreaction is
+negligible whenever $P \ll 1$.  Physical conversion is always small:
+$L_\text{mix} \approx 2\,$Mpc/G gives $P \sim 10^{-10}$ even for magnetars.
 
-Hwang \& Noh~\cite{hwangnoh2023graviton} provide the key argument (\S\,III.A,
-eqs.~22--31).  They define the critical wavenumber
-$k_B \equiv \sqrt{8\pi G}\,B_0/c^2$ and show that the backreaction parameter is:
-\begin{equation}
-  \frac{L^2}{\lambda_B^2} = \frac{2}{\pi}\,\frac{G\,B_0^2\,L^2}{c^4}
-  \sim \frac{G M}{L c^2}\,\frac{B_0^2}{\varrho c^2}
-  \label{eq:backreaction-param}
-\end{equation}
-where $L$ is the domain size, $M \sim \varrho L^3$ is the characteristic mass,
-and the two factors are respectively the compactness and the magnetic energy
-fraction.  Crucially, $L^2/\lambda_B^2 \sim P/(2\pi^2)$ where $P$ is the
-conversion probability.  So \textbf{backreaction is negligible whenever
-$P \ll 1$}, which is always the case for physical magnetic fields:
-\begin{center}
-\begin{tabular}{@{}lrrl@{}}
-\toprule
-System & $B_0$ (G) & $L$ (cm) & $(L/\lambda_B)^2$ \\
-\midrule
-Lab magnet      & $10^5$    & $10^2$  & $5.2 \times 10^{-35}$ \\
-Neutron star    & $10^{13}$ & $10^7$  & $5.2 \times 10^{-9}$ \\
-Magnetar        & $10^{15}$ & $10^7$  & $5.2 \times 10^{-5}$ \\
-Extreme magnetar& $10^{16}$ & $10^7$  & $5.2 \times 10^{-3}$ \\
-\bottomrule
-\end{tabular}
-\end{center}
-Even for the most extreme astrophysical scenarios, the backreaction is at most
-$\sim 10^{-3}$.  The local mixing-rate correction from backreaction is
-$(\kappa B_0)^2 = 16\pi G B_0^2/c^4$, negligible for all physical fields.
+\paragraph{Theory-independent generalisation (the $B_0 \to 0$ argument).}
+For \emph{any} PGT+EM theory, the conversion coefficient
+$C_0 = \lim_{B_0 \to 0} P/B_0^2$ is finite, computed on an exactly
+self-consistent background ($\eta$, $A{=}0$, $T{=}0$), and free from all
+backreaction effects.  The torsion-mediated signal ($\delta_1^2/\alpha$) and
+the direct Gertsenshtein coupling ($\kappa^2$) both enter $C_0$ at $O(1)$,
+while all complications (metric backreaction, torsion background $\bar{T} \neq 0$,
+dimension-6 EFT corrections) enter at $O(B_0)$ or higher in $C$ and vanish in
+the limit.  See \texttt{background\_validity.tex},
+\S\ref{sec:bv-b0-argument} for the formal argument.
 
-\subsubsection{Physical Regime: $P \ll 1$ Always}
-\label{subsec:physical-regime}
-
-The conversion probability in the Gertsenshtein effect is always small in physical
-systems.  The mixing length is~\cite{palessandro2023simple}:
-\begin{equation}
-  L_\text{mix} = \frac{2c^2}{\sqrt{G}\,B_0}
-    \approx 2\,\text{Mpc}\,\left(\frac{1\,\text{G}}{B_0}\right)
-  \label{eq:mixing-length-phys}
-\end{equation}
-For a magnetar ($B_0 \sim 10^{14}\,$G, field extent $D \sim 10\,$km):
-$D/L_\text{mix} \sim 10^{-5}$ and $P \sim 10^{-10}$.  Full Rabi oscillations
-($P \sim 1$) require $D \sim L_\text{mix}$, which never occurs for any
-astrophysical or laboratory configuration.
-
-\textbf{Implication for simulations:} TIDAL simulations with $\kappa = 1$,
-$B_0 = 0.3$ operate in the Rabi regime ($P \sim 88\%$) for numerical convenience.
-This is a valid mathematical solution of the linearized equations, but does not
-correspond to any physical system.  The physically meaningful quantity is the
-\emph{conversion coefficient} $C = P/B_0^2$, which is $B_0$-independent at
-leading order and determines conversion for any physical $B_0$.
-
-\subsubsection{Sweep Measurement Methodology}
-\label{subsec:sweep-methodology}
-
-For torsion parameter sweeps, the primary metric is the \textbf{conversion
-coefficient}:
-\begin{equation}
-  C(\delta_1, \alpha, \omega_0) \equiv \frac{P}{B_0^2}
-    \approx \frac{\kappa_\text{eff}^2\,t_\text{end}^2}{4}
-  \label{eq:conversion-coeff}
-\end{equation}
-valid in the early-time quadratic regime ($\kappa_\text{eff}\,B_0\,t_\text{end} \ll 1$).
-The \textbf{amplification factor} is:
-\begin{equation}
-  A = \frac{\kappa_\text{eff}}{\kappa}
-    = \sqrt{\frac{C_\text{torsion}}{C_\text{EM}}}
-    = \frac{B_\text{min}(\text{EM})}{B_\text{min}(\text{torsion})}
-  \label{eq:amplification}
-\end{equation}
-The last equality shows that $A$ is identical to the B-field lowering factor from
-the critical field analysis (\S\ref{sec:critical-field}): ``torsion reduces the
-required $B$-field by factor~$A$ for the same conversion.''
-
-In the linearized regime, $P = c_2\,B_0^2 + c_4\,B_0^4 + \cdots$, where $c_4$
-corrections arise from $B_0$-dependent eigenfrequencies (graviton mass term
-$-\tfrac{1}{2}\kappa^2 B_0^2$, torsion-induced detuning).  At $B_0 = 0.01$,
-these corrections are $\mathcal{O}(10^{-4})$; the leading-order extraction of~$C$
-is robust.
-
-\paragraph{Simulation conventions.}
-Natural units $\hbar = c = 1$, $\kappa = 1$.  Plane-wave graviton IC in periodic
-domain with uniform~$\Bzero$:
-\texttt{--ic plane-wave --ic-wavevector k\_0 --ic-amplitude 0.1 --ic-component h\_7}.
-Source $h_7$ ($h_+$~polarisation), target $a_2$ ($a_y$ transverse photon),
-$k_0 \gg B_0$ (massless dispersion limit).
-
-\paragraph{Frequency-dependent diagnostics.}
-For propagating torsion with mass $\mu = \sqrt{\alpha/b_5}$, the conversion
-coefficient $C(\omega_0)$ depends on the initial GW frequency relative to~$\mu$.
-Scanning $k_0$ (and hence $\omega_0 = k_0$) maps the torsion mass detuning:
-$C(\omega_0 \gg \mu)$ is enhanced (torsion responds fully),
-$C(\omega_0 \ll \mu)$ reduces to $C_\text{EM}$ (torsion frozen out),
-$C(\omega_0 \sim \mu)$ reveals the resonance structure.
-This frequency scan is the key diagnostic for distinguishing propagating from
-non-propagating torsion.
+\paragraph{Sweep measurement.}
+The amplification factor
+$A = \kappa_\text{eff}/\kappa = \sqrt{C_{0,\text{torsion}}/C_{0,\text{EM}}}
+= B_\text{min}(\text{EM})/B_\text{min}(\text{torsion})$
+is the primary sweep output.  Simulation conventions: $\kappa = 1$,
+$B_0 \sim 10^{-3}$ to $10^{-5}$ (small $P$, converged $C_0$), plane-wave IC.
+See \texttt{background\_validity.tex}, \S\ref{sec:bv-sweep-implications}.
 
 \subsection{References}
 \label{subsec:gertsenshtein-references}

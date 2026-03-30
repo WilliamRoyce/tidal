@@ -1,0 +1,403 @@
+% Background Validity and the B₀→0 Argument
+% Central theoretical document for the torsion-Gertsenshtein sweep programme.
+% Extends Hwang & Noh (2310.04150) to arbitrary PGT+EM theories.
+
+\section{Background Validity for Gertsenshtein-Type Linearisation}
+\label{sec:background-validity}
+
+\subsection{Problem Statement}
+\label{sec:bv-problem}
+
+The Gertsenshtein effect is computed by linearising about a background
+consisting of flat Minkowski spacetime, a uniform magnetic field~$B_0$,
+and zero torsion:
+\begin{equation}
+  g_{\mu\nu} = \eta_{\mu\nu} + \epsilon\, h_{\mu\nu}, \qquad
+  A_\mu = \bar{A}_\mu + \epsilon\, a_\mu, \qquad
+  T^\lambda{}_{\mu\nu} = 0 + \epsilon\, t^\lambda{}_{\mu\nu}\,.
+  \label{eq:bv-background}
+\end{equation}
+This background is \textbf{not} an exact solution of the full nonlinear
+field equations: the magnetic field carries stress-energy
+$T_{\mu\nu}^{(\mathrm{EM})} \sim B_0^2/2$ that sources curvature, and
+non-minimal couplings can source background torsion from~$B_0$.
+
+Two questions arise:
+\begin{enumerate}
+  \item \textbf{Backreaction:} How large are the errors from using an
+    inconsistent background?
+  \item \textbf{Completeness:} Which Lagrangian terms contribute at
+    $O(\epsilon^2)$ when expanding around $\bar{F} \neq 0$?
+\end{enumerate}
+
+For Einstein--Maxwell, Hwang \& Noh~\cite{hwangnoh2023graviton}
+(\S\,III.A, eqs.~22--31) show that the backreaction parameter
+$(L/\lambda_B)^2 \sim P/(2\pi^2)$ is proportional to the conversion
+probability~$P$ itself, hence negligible whenever $P \ll 1$.  However,
+their analysis is specific to Einstein--Maxwell and does not address
+torsion, non-minimal couplings, or higher-order EFT operators.  This
+document provides a \textbf{theory-independent} generalisation.
+
+
+%% ================================================================
+\subsection{EFT Structure of PGT+EM}
+\label{sec:bv-eft}
+
+\subsubsection{Mass Dimension as the Organising Principle}
+\label{sec:bv-mass-dim}
+
+The most general PGT+EM Lagrangian consistent with local Lorentz and
+$U(1)$ gauge symmetry is organised by the \textbf{mass dimension} of each
+operator in 4D natural units ($\hbar = c = 1$, Lagrangian density~$[M^4]$).
+The fundamental field strengths have dimensions:
+\begin{equation}
+  [\widetilde{R}_{\mu\nu\rho\sigma}] = [M^2], \qquad
+  [T^\lambda{}_{\mu\nu}] = [M^1], \qquad
+  [F_{\mu\nu}] = [M^2], \qquad
+  [\nabla T] = [M^2]\,.
+  \label{eq:bv-dimensions}
+\end{equation}
+where torsion has $[M^1]$ because it is an antisymmetric part of the
+connection $\Gamma \sim [M^1]$.
+
+\paragraph{Dimension-4 operators (unsuppressed).}
+All operators whose contractions sum to mass dimension~4 in the Lagrangian
+density have \textbf{dimensionless} coupling constants and are not
+suppressed by any UV scale.  These include:
+\begin{itemize}
+  \item \textbf{Quadratic field-strength:} $\widetilde{R}^2$, $T^2$,
+    $F^2$, $\widetilde{R} \times F$, $T \times F$, $\nabla T \times F$,
+    $\widetilde{R} \times \nabla T$, $(\nabla T)^2$
+    --- the standard PGT+EM action (see
+    \texttt{research/general\_quadratic\_lagrangian.tex}, \S\S\,2--3).
+  \item \textbf{``Cubic'' field-count, dimension-4:}
+    $T^2 \times F$ (3 parity-even + 15 parity-odd contractions),
+    $T^2 \times \widetilde{R}$, $T^4$
+    --- these have \textbf{the same mass dimension} as the quadratic sector
+    because $T$ has $[M^1]$, not $[M^2]$.  They are equally unsuppressed
+    and should be included in the general theory enumeration.
+\end{itemize}
+
+\paragraph{Dimension-6 operators (suppressed by $1/\Lambda^2$).}
+Operators with Lagrangian dimension~$[M^6]$ require coupling constants
+with $[M^{-2}]$, parametrised as $\lambda/\Lambda^2$ where $\lambda$
+is $O(1)$ and $\Lambda$ is the UV cutoff:
+\begin{itemize}
+  \item $\widetilde{R} \times F^2$ (4~contractions),
+    $\widetilde{R}^2 \times F$ (8),
+    $\nabla T \times F^2$ (5), plus parity-odd counterparts.
+\end{itemize}
+
+\paragraph{Dimension-8+ operators (doubly suppressed).}
+$F^4$ (Euler--Heisenberg, coupling $\sim \alpha^2/m_e^4$),
+higher-curvature terms, etc.  Always negligible for $B_0 \ll B_\mathrm{Schwinger}
+\approx 4.4 \times 10^{13}\,$G.
+
+\subsubsection{The UV Cutoff $\Lambda_4$}
+\label{sec:bv-cutoff}
+
+Aoki~\cite{aoki2020ghostfree} identifies the PGT cutoff scale:
+\begin{equation}
+  \Lambda_4 = (M_\mathrm{Pl}\, m^3)^{1/4}\,,
+  \label{eq:bv-cutoff}
+\end{equation}
+where $m$ is the torsion mass (from $\alpha$ parameters).  For
+$m \sim 1\,$GeV: $\Lambda_4 \sim 30\,$TeV.  Dimension-6 corrections
+scale as $(E/\Lambda_4)^2 \lesssim 10^{-9}$ for gravitational-wave
+physics --- entirely negligible.
+
+\subsubsection{``How Do We Know When to Stop?''}
+\label{sec:bv-truncation}
+
+The EFT expansion answers this: enumerate all operators at mass
+dimension~$\leq 4$ (a finite, calculable set).  Operators at dimension~6
+are suppressed by $1/\Lambda^2$ with a \emph{known} cutoff scale.
+Higher dimensions are progressively more suppressed.  This replaces the
+ambiguous ``quadratic/cubic'' field-count classification with a
+principled, convergent hierarchy.
+
+The research document
+(\texttt{research/general\_quadratic\_lagrangian.tex}) enumerates
+$\sim 35$ quadratic terms and $\sim 18$ unsuppressed (dimension-4)
+``cubic'' terms ($T^2 F$, $T^2 \widetilde{R}$, $T^4$).  An additional
+$\sim 65$ dimension-6 cubic terms are suppressed by $1/\Lambda^2$ and
+constitute a future extension.
+
+
+%% ================================================================
+\subsection{The $B_0 \to 0$ Argument}
+\label{sec:bv-b0-argument}
+
+\subsubsection{Statement}
+
+\begin{quote}
+\textbf{Theorem (informal).}\;
+For any PGT+EM theory with Lagrangian of mass dimension~$\leq 4$,
+linearised around flat Minkowski with uniform $B_0$ and $\bar{T} = 0$,
+the conversion coefficient
+$C_0 \equiv \lim_{B_0 \to 0} P(B_0)/B_0^2$
+is (i)~finite and well-defined, (ii)~computed on an exactly
+self-consistent background, and (iii)~free from all backreaction
+and higher-order EFT corrections.
+\end{quote}
+
+\subsubsection{Proof Structure}
+
+\paragraph{(i) Graviton--photon conversion requires $B_0$.}
+The mixing coefficient $g$ in the equations of motion vanishes at
+$B_0 = 0$.  Physical reason: conversion of a helicity-2 graviton to a
+helicity-1 photon requires a background helicity-1 field to absorb the
+angular momentum difference.  In the Lagrangian, every graviton--photon
+coupling term involves at least one background factor~$\bar{F} \propto B_0$.
+For the non-minimal coupling $\delta_1 \widetilde{R}_{[\mu\nu]} F^{\mu\nu}$:
+the torsion-mediated chain $h \to t \to a$ uses one~$\bar{F}$ leg in the
+$h \to t$ step (source $\sim \delta_1 \bar{F} \cdot \partial^2 h$);
+the $t \to a$ step proceeds at perturbation level (no $\bar{F}$ needed).
+Total: one power of~$B_0$.
+
+Verified numerically: issues~\#199 and \#200 confirm zero conversion at
+$B_0 = 0$ for both minimal and non-minimal PGT theories.
+
+\paragraph{(ii) $P$ is analytic in $B_0$.}
+The linearised equations of motion have polynomial dependence on $B_0$
+(it enters as a coefficient in the coupling and mass terms).  The
+evolution operator $M(t; B_0)$ is therefore analytic in $B_0$.  Since
+$M(t; 0) = 0$ (no mixing), $P = |M|^2$ has a Taylor expansion
+$P = c_2\, B_0^2 + c_4\, B_0^4 + \cdots$ with $c_2$ finite.
+
+\paragraph{(iii) The $B_0 = 0$ background is exactly self-consistent.}
+At $B_0 = 0$: $\bar{A} = 0$, $\bar{T} = 0$, $g = \eta$.  This
+configuration satisfies the full nonlinear field equations of
+\emph{any} PGT+EM theory trivially (all field strengths and their
+stress-energy vanish).  There is no metric backreaction, no torsion
+sourcing, no self-consistency error.
+
+\paragraph{(iv) $C_0 = c_2$ is computed on the exact background.}
+The coefficient $c_2 = \lim_{B_0 \to 0} P/B_0^2$ is obtained by
+evaluating the linearised coupling at $B_0 = 0$.  Since the background
+is exact at $B_0 = 0$, the xPert computation of $L^{(2)}$ involves
+no approximation.  $C_0$ is exact.
+
+\paragraph{(v) Complications vanish faster than the signal.}
+The graviton--photon coupling in the equations of motion is
+\begin{equation}
+  g = \bigl[\kappa^2 + \delta_1^2/\alpha + \cdots\bigr] \times B_0
+    + \text{corrections}\,.
+  \label{eq:bv-coupling}
+\end{equation}
+The signal (square bracket) is $O(1)$ per unit $B_0$.  Each correction
+carries at least one \emph{additional} power of $B_0$ beyond the signal:
+
+\begin{table}[htbp]
+\centering
+\caption{$B_0$~scaling of signal vs.\ complications.}
+\label{tab:bv-scaling}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Contribution & In $g/B_0$ & In $C = P/B_0^2$ & Origin \\
+\midrule
+\textbf{Signal} ($\kappa^2 + \delta_1^2/\alpha$)
+  & $O(1)$ & $O(1)$ & Direct + torsion-mediated coupling \\
+Torsion mass correction ($\bar{T} \neq 0$)
+  & $O(\delta_1^3 B_0/\alpha^3)$ & $O(B_0)$ & $\alpha_\mathrm{eff} = \alpha + O(\bar{T})$ \\
+Dim-6 EFT correction
+  & $O(B_0/\Lambda^2)$ & $O(B_0)$ & Suppressed operators \\
+Metric backreaction
+  & $O(\kappa^2 B_0^2 D^2)$ & $O(B_0^2)$ & Hwang--Noh: $(L/\lambda_B)^2$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At $B_0 = 0.01$ with $\delta_1/\alpha \sim 1$: the leading correction is
+$\sim 1\%$ of $C_0$.  At $B_0 = 10^{-5}$: $\sim 10^{-5}$ of $C_0$.
+
+\paragraph{(vi) Linearisation holds throughout.}
+\begin{table}[htbp]
+\centering
+\caption{Perturbation amplitude constraints and their $B_0$~dependence.}
+\label{tab:bv-linearisation}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Condition & Requirement & $B_0$~dep. & Satisfied? \\
+\midrule
+$h \ll 1$ (metric pert.) & $A \ll 1$ & Independent & $\checkmark$ ($A = 0.1$) \\
+$P \ll 1$ (conversion) & $\kappa_\mathrm{eff} B_0 D \ll 1$ & $\propto B_0$ & $\checkmark$ (small $B_0$) \\
+$|t| \ll \alpha$ (torsion NL) & $\delta_1 B_0 A \ll \alpha^2$ & $\propto B_0$ & $\checkmark$ (small $B_0$) \\
+$|a|/|\bar{A}| \ll 1$ (EM pert./bg) & $\kappa_\mathrm{eff} D A / L \ll 1$ & Independent & $\checkmark$ (reasonable $D/L$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Conditions on $h$ and $|a|/|\bar{A}|$ are $B_0$-independent (set by the
+initial amplitude $A$ and geometry $D/L$).  Conditions on $P$ and torsion
+nonlinearity are proportional to $B_0$ and automatically satisfied in the
+$B_0 \to 0$ limit.
+
+The amplification ratio $C_{0,\text{torsion}}/C_{0,\text{EM}}$ is computed
+at the same initial amplitude~$A$, so $O(A^2)$ nonlinear corrections cancel
+in the ratio.
+
+
+%% ================================================================
+\subsection{Physical $B_0$ Scales in Simulation Units}
+\label{sec:bv-physical-scales}
+
+Simulations use natural units with $\kappa \equiv \sqrt{16\pi G} = 1$.
+The physically relevant $B_0$ values in these units are:
+
+\begin{table}[htbp]
+\centering
+\caption{Physical magnetic fields mapped to simulation units ($\kappa = 1$).}
+\label{tab:bv-physical-b0}
+\begin{tabular}{@{}lrrl@{}}
+\toprule
+System & $B_0$ (physical) & $B_{0,\text{sim}}$ ($\kappa = 1$) & Regime \\
+\midrule
+Lab magnet          & $10\,$T ($10^4\,$G)     & $\sim 10^{-18}$ & Far below all corrections \\
+Neutron star        & $10^{13}\,$G            & $\sim 10^{-10}$ & Far below all corrections \\
+Extreme magnetar    & $10^{15}\,$G            & $\sim 3 \times 10^{-9}$ & Below all corrections \\
+\midrule
+Simulation (small)  & ---                     & $10^{-5}$       & $10^4 \times$ magnetar \\
+Simulation (medium) & ---                     & $10^{-3}$       & $10^6 \times$ magnetar \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Our simulation values ($B_0 \sim 10^{-3}$ to $10^{-5}$) are
+$10^4$--$10^6$ times larger than any physical magnetic field.  This means:
+\begin{itemize}
+  \item They are ``small'' for backreaction purposes: corrections
+    $\sim B_0 \times \delta_1/\alpha \ll 1$.
+  \item But orders of magnitude above any real field --- we are solidly
+    in the regime where $C = P/B_0^2$ has converged to~$C_0$.
+  \item The multi-$B_0$ convergence check (verifying $C$ is constant
+    across $B_0$ values) confirms this quantitatively.
+\end{itemize}
+
+
+%% ================================================================
+\subsection{Background Torsion: $\bar{T} \neq 0$ for Non-Minimal Theories}
+\label{sec:bv-background-torsion}
+
+For the non-minimal coupling $\delta_1 \widetilde{R}_{[\mu\nu]} F^{\mu\nu}$,
+the torsion field equation at zeroth order gives:
+\begin{equation}
+  \alpha\, \bar{T} = -\delta_1 \times f(\bar{F})\,,
+  \label{eq:bv-tbar}
+\end{equation}
+so $\bar{T} \neq 0$ when $B_0 \neq 0$.  Setting $\bar{T} = 0$
+(as the current pipeline does) introduces an error.
+
+The error modifies the effective torsion mass:
+$\alpha_\mathrm{eff} = \alpha + O(\bar{T}) = \alpha + O(\delta_1 B_0/\alpha)$.
+This changes the torsion-mediated coupling from $\delta_1^2/\alpha$ to
+$\delta_1^2/\alpha_\mathrm{eff} \approx \delta_1^2/\alpha \times
+(1 - \delta_1 B_0/\alpha^2 + \cdots)$.  The correction enters
+$g/B_0$ at $O(B_0)$, hence $C = P/B_0^2$ at $O(B_0)$.
+
+\textbf{Resolution:} in the $B_0 \to 0$ limit, $\bar{T} \to 0$
+and the background becomes exactly self-consistent.  No need to solve
+for~$\bar{T}$.  The conversion coefficient $C_0$ is computed correctly
+with $\bar{T} = 0$.
+
+For other non-minimal couplings ($T^2 \times F$, $\nabla T \times F$):
+similar sourcing analysis applies.  Each sources $\bar{T}$ at $O(B_0)$,
+contributing corrections to $C$ at $O(B_0)$ that vanish in the limit.
+
+
+%% ================================================================
+\subsection{Comparison with Hwang \& Noh}
+\label{sec:bv-hwang-noh}
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of backreaction arguments.}
+\label{tab:bv-comparison}
+\begin{tabular}{@{}lll@{}}
+\toprule
+& Hwang \& Noh (2310.04150) & This work \\
+\midrule
+Scope & Einstein--Maxwell only & Any PGT+EM theory \\
+Regime & Finite $B_0$, bounds error & $B_0 \to 0$ limit, eliminates error \\
+Key result & $(L/\lambda_B)^2 \sim P/(2\pi^2)$ & $C_0 = \lim P/B_0^2$ exact \\
+Background & Approximate (flat + $B_0$) & Exact (flat, no fields) \\
+Torsion & Not considered & Included (non-minimal, algebraic) \\
+EFT & Not discussed & Dimension-4 complete, dim-6 suppressed \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The two arguments are complementary: Hwang--Noh bounds the error at finite
+$B_0$ for Einstein--Maxwell; our argument eliminates it entirely in the
+$B_0 \to 0$ limit for any PGT+EM theory.
+
+
+%% ================================================================
+\subsection{Verification Protocol}
+\label{sec:bv-verification}
+
+For each new theory added to the sweep programme:
+
+\begin{enumerate}
+  \item \textbf{Zero-$B_0$ sanity check:} Run at $B_0 = 0$.
+    Confirm $P = 0$ identically (no background-independent conversion).
+    If $P \neq 0$: the measurement $C = P/B_0^2$ is not valid for this
+    theory; investigate the $B_0$-independent channel separately.
+
+  \item \textbf{Multi-$B_0$ convergence:} Run at
+    $B_0 \in \{10^{-3}, 10^{-4}, 10^{-5}\}$.
+    Compute $C = P/B_0^2$ at each value.  Confirm convergence to $C_0$
+    within machine precision (modal solver) or solver tolerance.
+    The convergence rate should be $|C(B_0) - C_0| \lesssim
+    (\delta_1/\alpha)\, B_0$ (linear in $B_0$).
+
+  \item \textbf{Analytical cross-check} (where available):
+    For non-propagating torsion with algebraic constraint:
+    $C_0 = (\kappa^2 + \delta_1^2/\alpha)^2 \times D^2/4$.
+    Compare numerical $C_0$ against this formula.
+
+  \item \textbf{Linearisation check:} Verify $P \ll 1$ at the chosen
+    $B_0$.  If $P > 0.01$, reduce $B_0$ or shorten simulation time.
+\end{enumerate}
+
+
+%% ================================================================
+\subsection{Implications for the Sweep Programme}
+\label{sec:bv-sweep-implications}
+
+\subsubsection{Primary Metric}
+
+The conversion coefficient $C_0 = \lim_{B_0 \to 0} P/B_0^2$ is the
+universal observable for torsion parameter sweeps.  It captures the
+intrinsic coupling strength of the theory, independent of the specific
+$B_0$ value or background geometry.
+
+\subsubsection{Amplification Factor}
+
+\begin{equation}
+  A = \frac{\kappa_\mathrm{eff}}{\kappa}
+    = \sqrt{\frac{C_{0,\text{torsion}}}{C_{0,\text{EM}}}}
+    = \frac{B_\mathrm{min}(\text{EM})}{B_\mathrm{min}(\text{torsion})}\,.
+  \label{eq:bv-amplification}
+\end{equation}
+The last equality shows that $A$ is identical to the $B$-field lowering
+factor: ``torsion reduces the required magnetic field by factor~$A$ for
+the same conversion probability.''
+
+\subsubsection{Frequency Scan for Propagating Torsion}
+
+For propagating torsion with mass $\mu = \sqrt{\alpha/b_5}$, the
+conversion coefficient $C_0(\omega_0)$ depends on the initial
+gravitational-wave frequency~$\omega_0$ relative to~$\mu$.  Scanning
+$k_0$ (setting $\omega_0 = k_0$) maps the torsion mass detuning and
+distinguishes propagating from non-propagating torsion.
+
+\subsubsection{Simulation Conventions}
+
+Natural units $\hbar = c = 1$, $\kappa = 1$.  Plane-wave graviton IC
+in periodic domain with uniform~$B_0$:
+\begin{verbatim}
+  --ic plane-wave --ic-wavevector k0 --ic-amplitude 0.1 --ic-component h_7
+\end{verbatim}
+Source~$h_7$ ($h_+$ polarisation), target~$a_2$ ($a_y$ transverse photon),
+$k_0 \gg B_0$ (massless dispersion limit), $B_0 \sim 10^{-3}$ to $10^{-5}$.
