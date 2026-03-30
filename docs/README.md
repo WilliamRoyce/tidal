@@ -30,6 +30,7 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | `gertsenshtein.tex` | `docs/tex/gertsenshtein.tex` | Gertsenshtein effect: physics background, validation targets |
 | `gertsenshtein_formula.tex` | `docs/tex/gertsenshtein_formula.tex` | Conversion formula derivation, literature comparison |
 | `gertsenshtein_localized.tex` | `docs/tex/gertsenshtein_localized.tex` | Boccaletti formula, localized B-field scattering |
+| `background_validity.tex` | `docs/tex/background_validity.tex` | Background validity, B₀→0 argument, EFT structure, sweep methodology |
 | `critical_field.tex` | `docs/tex/critical_field.tex` | Critical field analysis, amplification factor |
 | `torsion.tex` | `docs/tex/torsion.tex` | Poincare gauge theory, torsion implementation |
 | `chern_simons.tex` | `docs/tex/chern_simons.tex` | Chern-Simons 2+1D implementation |
