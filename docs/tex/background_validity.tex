@@ -40,88 +40,82 @@ document provides a \textbf{theory-independent} generalisation.
 
 
 %% ================================================================
-\subsection{EFT Structure of PGT+EM}
-\label{sec:bv-eft}
+\subsection{Theory Structure and Linearisation Procedure}
+\label{sec:bv-theory}
 
-\subsubsection{Mass Dimension as the Organising Principle}
-\label{sec:bv-mass-dim}
+\subsubsection{The Linearisation Procedure}
+\label{sec:bv-procedure}
 
-The most general PGT+EM Lagrangian consistent with local Lorentz and
-$U(1)$ gauge symmetry is organised by the \textbf{mass dimension} of each
-operator in 4D natural units ($\hbar = c = 1$, Lagrangian density~$[M^4]$).
-The fundamental field strengths have dimensions:
-\begin{equation}
-  [\widetilde{R}_{\mu\nu\rho\sigma}] = [M^2], \qquad
-  [T^\lambda{}_{\mu\nu}] = [M^1], \qquad
-  [F_{\mu\nu}] = [M^2], \qquad
-  [\nabla T] = [M^2]\,.
-  \label{eq:bv-dimensions}
-\end{equation}
-where torsion has $[M^1]$ because it is an antisymmetric part of the
-connection $\Gamma \sim [M^1]$.
+The correct approach to computing the Gertsenshtein effect in any
+gravitational theory is the following four-step procedure:
+\begin{enumerate}
+  \item Express the full nonlinear Lagrangian in fundamental fields
+    (metric, connection/torsion, EM potential).
+  \item Expand each fundamental field about its background value.
+  \item Shift each field by that background value.
+  \item Retain only the quadratic terms in the shifted (perturbation) fields.
+\end{enumerate}
+The coupling constants of the theory are treated as \emph{given} --- the
+Lagrangian defines the theory, and the procedure is exact for that theory.
+This is what TIDAL's xPert pipeline implements automatically.
 
-\paragraph{Dimension-4 operators (unsuppressed).}
-All operators whose contractions sum to mass dimension~4 in the Lagrangian
-density have \textbf{dimensionless} coupling constants and are not
-suppressed by any UV scale.  These include:
-\begin{itemize}
-  \item \textbf{Quadratic field-strength:} $\widetilde{R}^2$, $T^2$,
-    $F^2$, $\widetilde{R} \times F$, $T \times F$, $\nabla T \times F$,
-    $\widetilde{R} \times \nabla T$, $(\nabla T)^2$
-    --- the standard PGT+EM action (see
-    \texttt{research/general\_quadratic\_lagrangian.tex}, \S\S\,2--3).
-  \item \textbf{``Cubic'' field-count, dimension-4:}
-    $T^2 \times F$ (3 parity-even + 15 parity-odd contractions),
-    $T^2 \times \widetilde{R}$, $T^4$
-    --- these have \textbf{the same mass dimension} as the quadratic sector
-    because $T$ has $[M^1]$, not $[M^2]$.  They are equally unsuppressed
-    and should be included in the general theory enumeration.
-\end{itemize}
+\subsubsection{Which Terms Appear in the Lagrangian?}
+\label{sec:bv-which-terms}
 
-\paragraph{Dimension-6 operators (suppressed by $1/\Lambda^2$).}
-Operators with Lagrangian dimension~$[M^6]$ require coupling constants
-with $[M^{-2}]$, parametrised as $\lambda/\Lambda^2$ where $\lambda$
-is $O(1)$ and $\Lambda$ is the UV cutoff:
-\begin{itemize}
-  \item $\widetilde{R} \times F^2$ (4~contractions),
-    $\widetilde{R}^2 \times F$ (8),
-    $\nabla T \times F^2$ (5), plus parity-odd counterparts.
-\end{itemize}
+The PGT+EM Lagrangian is constructed from the gauge field strengths:
+the Riemann--Cartan curvature~$\widetilde{R}$, torsion~$T$, the EM
+field strength~$F$, and the covariant derivative of torsion~$\nabla T$.
+The key physical constraint is the \textbf{Ostrogradsky criterion}:
+only terms producing at most second-order equations of motion are
+allowed, to avoid ghost instabilities.
 
-\paragraph{Dimension-8+ operators (doubly suppressed).}
-$F^4$ (Euler--Heisenberg, coupling $\sim \alpha^2/m_e^4$),
-higher-curvature terms, etc.  Always negligible for $B_0 \ll B_\mathrm{Schwinger}
-\approx 4.4 \times 10^{13}\,$G.
+\paragraph{What is excluded.}
+Products involving $\nabla\widetilde{R} \sim \partial^2\Gamma$ or
+$\nabla F \sim \partial^2 A$ produce fourth-order equations of motion
+and are excluded on physical grounds~\cite{blagojevic2018ghost}.
 
-\subsubsection{The UV Cutoff $\Lambda_4$}
-\label{sec:bv-cutoff}
+\paragraph{What is allowed.}
+Products of $\{\widetilde{R},\, T,\, F,\, \nabla T\}$ produce at most
+second-order equations --- ``Yang--Mills type'', safe from Ostrogradsky
+ghosts.  The standard PGT+EM action is \textbf{quadratic} in these
+field strengths, following the Yang--Mills analogy.
 
-Aoki~\cite{aoki2020ghostfree} identifies the PGT cutoff scale:
-\begin{equation}
-  \Lambda_4 = (M_\mathrm{Pl}\, m^3)^{1/4}\,,
-  \label{eq:bv-cutoff}
-\end{equation}
-where $m$ is the torsion mass (from $\alpha$ parameters).  For
-$m \sim 1\,$GeV: $\Lambda_4 \sim 30\,$TeV.  Dimension-6 corrections
-scale as $(E/\Lambda_4)^2 \lesssim 10^{-9}$ for gravitational-wave
-physics --- entirely negligible.
+\paragraph{Cubic and higher terms.}
+Cubic terms such as $T^2 \times F$, $\widetilde{R} \times F^2$,
+$T^2 \times \widetilde{R}$ are also ghost-safe and contribute at
+$O(\epsilon^2)$ when linearised around a background with
+$\bar{F} \neq 0$ (one $F$~leg set to the background).  The research
+document (\texttt{research/general\_quadratic\_lagrangian.tex}) catalogs
+these up to cubic field-strength count.
 
-\subsubsection{``How Do We Know When to Stop?''}
-\label{sec:bv-truncation}
+Note that terms with arbitrarily many factors of~$T$ (e.g.\ $T^4$,
+$T^6$) also produce $\leq$2nd-order equations (since $T$ carries no
+additional derivatives of the connection).  These are ghost-safe but are
+\textbf{not enumerated} in the current catalog, following the standard
+PGT convention of restricting to quadratic field-strength
+actions~\cite{blagojevic2018ghost,shapiro2002torsion}.  Whether higher
+$T$-powers are physically relevant is an open question.
 
-The EFT expansion answers this: enumerate all operators at mass
-dimension~$\leq 4$ (a finite, calculable set).  Operators at dimension~6
-are suppressed by $1/\Lambda^2$ with a \emph{known} cutoff scale.
-Higher dimensions are progressively more suppressed.  This replaces the
-ambiguous ``quadratic/cubic'' field-count classification with a
-principled, convergent hierarchy.
+\subsubsection{EFT Ordering: Deferred}
+\label{sec:bv-eft-deferred}
 
-The research document
-(\texttt{research/general\_quadratic\_lagrangian.tex}) enumerates
-$\sim 35$ quadratic terms and $\sim 18$ unsuppressed (dimension-4)
-``cubic'' terms ($T^2 F$, $T^2 \widetilde{R}$, $T^4$).  An additional
-$\sim 65$ dimension-6 cubic terms are suppressed by $1/\Lambda^2$ and
-constitute a future extension.
+A proper effective field theory (EFT) analysis would assign mass
+dimensions to the field strengths and organise operators by their
+dimension, identifying which are ``suppressed'' by powers of a UV cutoff
+$\Lambda$.  However, assigning mass dimensions to PGT fields requires
+first solving for the \textbf{propagating mass spectrum} of the specific
+theory.  In PGT, the propagating content depends on the theory
+parameters: different parameter regions give different particle spectra
+(see Blagojevi\'{c} \& Cvetkovi\'{c}~\cite{blagojevic2018ghost},
+450~ghost-free cases).  In Stueckelberg formulations, fields can acquire
+non-standard mass dimensions (e.g.\ $[M^0]$ for the scalar mode in
+massive gravity~\cite{aoki2020ghostfree}).
+
+\textbf{Until the mass spectrum is solved for each theory under study,
+EFT power counting cannot be applied.}  The operator hierarchy based on
+mass dimension is deferred to future work.  For now, we follow the
+supervisor's prescription: write down the specific theory with given
+parameters and apply the four-step linearisation procedure.
 
 
 %% ================================================================
@@ -132,7 +126,7 @@ constitute a future extension.
 
 \begin{quote}
 \textbf{Theorem (informal).}\;
-For any PGT+EM theory with Lagrangian of mass dimension~$\leq 4$,
+For any PGT+EM theory (with a given, fixed Lagrangian),
 linearised around flat Minkowski with uniform $B_0$ and $\bar{T} = 0$,
 the conversion coefficient
 $C_0 \equiv \lim_{B_0 \to 0} P(B_0)/B_0^2$
@@ -198,18 +192,17 @@ Contribution & In $g/B_0$ & In $C = P/B_0^2$ & Origin \\
 \midrule
 \textbf{Signal} ($\kappa^2 + \delta_1^2/\alpha$)
   & $O(1)$ & $O(1)$ & Direct + torsion-mediated coupling \\
-Torsion mass correction ($\bar{T} \neq 0$)
-  & $O(\delta_1^3 B_0/\alpha^3)$ & $O(B_0)$ & $\alpha_\mathrm{eff} = \alpha + O(\bar{T})$ \\
-Dim-6 EFT correction
-  & $O(B_0/\Lambda^2)$ & $O(B_0)$ & Suppressed operators \\
 Metric backreaction
-  & $O(\kappa^2 B_0^2 D^2)$ & $O(B_0^2)$ & Hwang--Noh: $(L/\lambda_B)^2$ \\
+  & $O(B_0^2/M_\mathrm{Pl}^2)$ & $O(B_0^2)$ & $B_0$ gravitates: $\delta g \sim B_0^2/M_\mathrm{Pl}^2$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-At $B_0 = 0.01$ with $\delta_1/\alpha \sim 1$: the leading correction is
-$\sim 1\%$ of $C_0$.  At $B_0 = 10^{-5}$: $\sim 10^{-5}$ of $C_0$.
+The leading correction is $O(B_0^2)$ in $C$, from metric backreaction
+(the $B$-field's gravitational self-energy curving spacetime).
+At $B_0 = 0.01$: correction $\sim 10^{-4}$ of $C_0$.
+At $B_0 = 10^{-5}$: correction $\sim 10^{-10}$ of $C_0$.
+Two powers of $B_0$ separate signal from noise.
 
 \paragraph{(vi) Linearisation holds throughout.}
 \begin{table}[htbp]
@@ -267,7 +260,7 @@ Our simulation values ($B_0 \sim 10^{-3}$ to $10^{-5}$) are
 $10^4$--$10^6$ times larger than any physical magnetic field.  This means:
 \begin{itemize}
   \item They are ``small'' for backreaction purposes: corrections
-    $\sim B_0 \times \delta_1/\alpha \ll 1$.
+    $\sim B_0^2/M_\mathrm{Pl}^2 \ll 1$.
   \item But orders of magnitude above any real field --- we are solidly
     in the regime where $C = P/B_0^2$ has converged to~$C_0$.
   \item The multi-$B_0$ convergence check (verifying $C$ is constant
@@ -276,33 +269,30 @@ $10^4$--$10^6$ times larger than any physical magnetic field.  This means:
 
 
 %% ================================================================
-\subsection{Background Torsion: $\bar{T} \neq 0$ for Non-Minimal Theories}
+\subsection{Background Torsion: $\bar{T} = 0$ Is Exact}
 \label{sec:bv-background-torsion}
 
-For the non-minimal coupling $\delta_1 \widetilde{R}_{[\mu\nu]} F^{\mu\nu}$,
-the torsion field equation at zeroth order gives:
-\begin{equation}
-  \alpha\, \bar{T} = -\delta_1 \times f(\bar{F})\,,
-  \label{eq:bv-tbar}
-\end{equation}
-so $\bar{T} \neq 0$ when $B_0 \neq 0$.  Setting $\bar{T} = 0$
-(as the current pipeline does) introduces an error.
+For uniform~$B_0$ on flat Minkowski, $\bar{T} = 0$ is a
+\textbf{self-consistent} background for all PGT+EM theories with
+non-minimal couplings.  The torsion field equation (Cartan equation)
+evaluated at $T = 0$ on flat spacetime with constant~$\bar{F}$ gives
+$0 = 0$ (trivially satisfied), because:
+\begin{itemize}
+  \item $\widetilde{R}_{[\mu\nu]}\big|_{T=0,\,\text{flat}} = 0$
+    (antisymmetric Ricci vanishes in GR);
+  \item $\nabla_\mu \bar{F}_{\alpha\beta} = 0$ for uniform fields;
+  \item all torsion-dependent source terms vanish at $T = 0$.
+\end{itemize}
+This was verified in Bahamonde et al.~\cite{bahamonde2025torsion},
+who find non-trivial $\bar{T}$ only for non-constant field configurations
+(curved spacetime, spatially varying~$B$, charged sources).
 
-The error modifies the effective torsion mass:
-$\alpha_\mathrm{eff} = \alpha + O(\bar{T}) = \alpha + O(\delta_1 B_0/\alpha)$.
-This changes the torsion-mediated coupling from $\delta_1^2/\alpha$ to
-$\delta_1^2/\alpha_\mathrm{eff} \approx \delta_1^2/\alpha \times
-(1 - \delta_1 B_0/\alpha^2 + \cdots)$.  The correction enters
-$g/B_0$ at $O(B_0)$, hence $C = P/B_0^2$ at $O(B_0)$.
-
-\textbf{Resolution:} in the $B_0 \to 0$ limit, $\bar{T} \to 0$
-and the background becomes exactly self-consistent.  No need to solve
-for~$\bar{T}$.  The conversion coefficient $C_0$ is computed correctly
-with $\bar{T} = 0$.
-
-For other non-minimal couplings ($T^2 \times F$, $\nabla T \times F$):
-similar sourcing analysis applies.  Each sources $\bar{T}$ at $O(B_0)$,
-contributing corrections to $C$ at $O(B_0)$ that vanish in the limit.
+The \textbf{perturbation} torsion~$t$ is a distinct quantity: it is
+sourced at $O(\epsilon)$ by the perturbation fields~$(h, a)$ through the
+non-minimal coupling $\delta_1 \widetilde{R}_{[\mu\nu]} F^{\mu\nu}$,
+with the background~$\bar{F}$ as a coefficient.  This perturbation
+torsion is the mechanism for torsion-mediated Gertsenshtein conversion
+and is fully captured by the xPert pipeline.
 
 
 %% ================================================================
@@ -321,8 +311,8 @@ Scope & Einstein--Maxwell only & Any PGT+EM theory \\
 Regime & Finite $B_0$, bounds error & $B_0 \to 0$ limit, eliminates error \\
 Key result & $(L/\lambda_B)^2 \sim P/(2\pi^2)$ & $C_0 = \lim P/B_0^2$ exact \\
 Background & Approximate (flat + $B_0$) & Exact (flat, no fields) \\
-Torsion & Not considered & Included (non-minimal, algebraic) \\
-EFT & Not discussed & Dimension-4 complete, dim-6 suppressed \\
+Torsion & Not considered & $\bar{T} = 0$ exact; perturbation $t$ sourced \\
+Suppression & $(L/\lambda_B)^2 \sim P$ & $\delta g \sim B_0^2 / M_\mathrm{Pl}^2$ \\
 \bottomrule
 \end{tabular}
 \end{table}

@@ -490,28 +490,38 @@ PDE when $\bar{B}_0(\mathbf{x})$ varies in space
   around $\bar{B}_0 \neq 0$, $\bar{T} = 0$.}
 \label{tab:cubic_mixing}
 \small
-\begin{tabular}{@{}llcll@{}}
+\begin{tabular}{@{}llcl@{}}
 \toprule
-\textbf{Sector} & \textbf{Count} & \textbf{Mixing type} & \textbf{Mechanism} & \textbf{Mass dim} \\
+\textbf{Sector} & \textbf{Count} & \textbf{Mixing type} & \textbf{Mechanism} \\
 \midrule
-$\Rt \times F^2$ & 4 & $h \leftrightarrow f$ & One $F \to \bar{F}$ & $[M^6]$, suppressed \\
-$\Rt^2 \times F$ & 8 & $h$ self-int.\ mod $B_0$ & One $F \to \bar{F}$ & $[M^6]$, suppressed \\
-$T^2 \times F$ & 3 & $t$ mass corr.\ $\propto B_0$ & Both $T \to \epsilon t$ & $[M^4]$, \textbf{unsuppressed} \\
-$\del T \times F^2$ & 5 & $t \leftrightarrow f$ & One $F \to \bar{F}$ & $[M^6]$, suppressed \\
+$\Rt \times F^2$ & 4 & $h \leftrightarrow f$ & One $F \to \bar{F}$ \\
+$\Rt^2 \times F$ & 8 & $h$ self-int.\ mod $B_0$ & One $F \to \bar{F}$ \\
+$T^2 \times F$ & 3 & $t$ mass corr.\ $\propto B_0$ & Both $T \to \epsilon t$ \\
+$\del T \times F^2$ & 5 & $t \leftrightarrow f$ & One $F \to \bar{F}$ \\
 \bottomrule
 \end{tabular}
 
-\paragraph{EFT mass-dimension classification.}
-The ``cubic'' sectors split by mass dimension: $T^2 \times F$ has
-Lagrangian dimension~$[M^4]$ (since $[T] = [M^1]$) and requires a
-\textbf{dimensionless} coupling --- it is on equal footing with the
-quadratic sector and should be included in parameter sweeps.  All other
-cubic sectors ($\Rt \times F^2$, $\Rt^2 \times F$, $\del T \times F^2$)
-have dimension~$[M^6]$ and are suppressed by $1/\Lambda^2$ where
-$\Lambda \sim \Lambda_4 = (M_\mathrm{Pl}\, m^3)^{1/4}$ is the PGT
-cutoff~\cite{aoki2020ghostfree}.  See
-\texttt{docs/tex/background\_validity.tex}, \S\ref{sec:bv-eft} for the
-full EFT analysis.
+\paragraph{Scope of the enumeration.}
+This catalog covers terms up to \textbf{cubic field-strength count},
+following the standard PGT convention of restricting to actions at most
+quadratic in field strengths~\cite{blagojevic2018ghost,shapiro2002torsion}.
+All cubic terms listed here are ghost-safe (they produce $\leq$2nd-order
+equations of motion).  Note, however, that the ghost-safety criterion
+alone does \emph{not} give a finite set of allowed operators: terms with
+higher powers of~$T$ (e.g.\ $T^4$, $T^6$) also produce $\leq$2nd-order
+equations because $T$ carries no additional derivatives of the connection.
+These higher-$T$ terms are excluded by convention, not by ghost safety.
+Whether they are physically relevant is an open question.
+
+\paragraph{Note on EFT ordering.}
+A proper effective field theory classification would assign mass
+dimensions to the fields and organise operators by their dimension.
+However, assigning mass dimensions requires first solving the
+propagating mass spectrum of the specific theory (Stückelberg
+decomposition, propagating mode identification), which depends on the
+theory parameters~\cite{aoki2020ghostfree}.  EFT ordering is deferred
+to future work.  See
+\texttt{docs/tex/background\_validity.tex}, \S\ref{sec:bv-eft-deferred}.
 \end{table}
 
 
