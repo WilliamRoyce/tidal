@@ -160,4 +160,36 @@
     % --- Edge labels ---
     yeslbl/.style={font=\scriptsize\bfseries, text=black!70},
     nolbl/.style={font=\scriptsize\bfseries, text=black!70},
+    % --- Algorithm-level styles (for detailed code flowcharts) ---
+    % Function call box: monospaced name, compact, with optional line ref.
+    % Usage: funcbox=Purple, funcbox=Pink, etc.
+    funcbox/.style={
+        rectangle, rounded corners=1.5pt, minimum width=2.4cm,
+        minimum height=0.6cm, draw=#1Line, line width=0.5pt,
+        fill=#1Fill!25, font=\scriptsize\ttfamily,
+        align=center, text=black
+    },
+    funcbox/.default={Purple},
+    % Line-number reference annotation (right-margin code pointers).
+    lineref/.style={
+        font=\sffamily\tiny, text=GrayLine, anchor=west, align=left
+    },
+    % Iteration / fixed-point loop background region (applied via fit).
+    % Usage: \node[loopregion, fit=(a)(b)(c)] {};
+    loopregion/.style={
+        rectangle, rounded corners=4pt, draw=BlueLine, densely dashed,
+        fill=BlueFill, fill opacity=0.08, inner sep=8pt,
+        line width=0.6pt
+    },
+    % Fixed-point convergence check (smaller diamond than decision).
+    fpcheck/.style={
+        diamond, aspect=2.0, minimum width=1.2cm,
+        draw=OrangeLine, fill=OrangeFill!20, font=\tiny,
+        align=center, inner sep=1pt, text width=1.6cm
+    },
+    % Code-reference annotation arrow (thin, gray, dashed).
+    codearr/.style={
+        -{Stealth[length=3pt, width=2pt]}, thin, GrayLine,
+        densely dashed
+    },
 }
