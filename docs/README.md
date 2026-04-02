@@ -60,6 +60,7 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 
 | File | Location | Content |
 | ---- | -------- | ------- |
+| `inference.tex` | `docs/tex/inference.tex` | Bayesian inference: priors, constraints, MC and nested sampling, posterior analysis |
 | `troubleshooting.tex` | `docs/tex/troubleshooting.tex` | Error encyclopedia |
 | `cli_reference.tex` | `docs/tex/cli_reference.tex` | CLI subcommand reference |
 | `pipeline.tex` | `docs/tex/pipeline.tex` | Two-stage data flow |
@@ -111,4 +112,4 @@ Auto-generated API documentation via Sphinx (`.rst` files). Build with `make htm
 
 ---
 
-Last updated: 2026-03-28
+Last updated: 2026-04-02

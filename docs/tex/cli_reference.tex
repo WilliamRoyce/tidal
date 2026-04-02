@@ -5,7 +5,7 @@
 \section{CLI Reference}
 \label{sec:cli-reference}
 
-TIDAL provides the \texttt{tidal} command-line tool with nine subcommands for the full derive-to-measure workflow.
+TIDAL provides the \texttt{tidal} command-line tool with ten subcommands for the full derive-to-measure workflow.
 \textbf{Zero additional dependencies} --- uses only \texttt{argparse} and \texttt{tomllib} from the Python standard library.
 
 \subsection{Installation}
@@ -342,6 +342,81 @@ Flag & Default & Description \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsubsection{\texttt{tidal sample} --- Bayesian parameter estimation}
+
+Runs Bayesian inference (Monte Carlo or nested sampling) to estimate posterior
+distributions over parameters and compute Bayesian evidence.  Wraps the same
+simulate + measure pipeline as \texttt{tidal sweep} but samples intelligently
+from prior distributions rather than evaluating a fixed grid.  See
+\cref{sec:inference} for the full description.
+
+\begin{lstlisting}[style=bash]
+# Monte Carlo: find largest conversion probability
+tidal sample examples/data/coupled_scattering.json \
+  --prior "g0=uniform:0.01:0.9" \
+  --likelihood "P_max:maximize" \
+  --method mc --n-samples 500 --parallel 4 \
+  --corner --output results_mc/
+
+# Nested sampling: evidence + posterior with ghost-freedom constraints
+tidal sample examples/data/torsion_dark_photon.json \
+  --prior "alpha=uniform:0.01:10" \
+  --prior "xi=log_uniform:0.001:1.0" \
+  --prior "deltam=arctan_uniform:0:0" \
+  --constraint "xi > 0" \
+  --constraint "deltam**2 < 2*alpha*xi" \
+  --likelihood "P_max:maximize" \
+  --method nested --nlive 200 --sampler dynesty \
+  --parallel 8 --corner --output results_ns/
+\end{lstlisting}
+
+\paragraph{Options}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+Flag & Type & Default & Description \\
+\midrule
+\texttt{--prior SPEC}       & str (repeatable) & (required) & \texttt{NAME=DIST:A:B} \\
+\texttt{--constraint EXPR}  & str (repeatable) & none       & Inequality constraint expression \\
+\texttt{--likelihood SPEC}  & str              & (required) & \texttt{METRIC:TYPE[:ARGS]} \\
+\texttt{--method}           & \texttt{\{mc,nested\}}        & \texttt{mc}      & Sampling method \\
+\texttt{--sampler}          & \texttt{\{dynesty,polychord\}} & \texttt{dynesty} & Nested backend \\
+\texttt{--n-samples N}      & int              & 1000       & Monte Carlo sample count \\
+\texttt{--nlive N}          & int              & 100        & Nested sampling live points \\
+\texttt{--dlogz F}          & float            & 0.01       & Evidence stopping tolerance \\
+\texttt{--dynamic}          & flag             & off        & Dynamic nested sampling \\
+\texttt{--seed N}           & int              & 42         & RNG seed \\
+\texttt{--parallel N}       & int              & 1          & Parallel workers \\
+\texttt{--corner}           & flag             & off        & Generate corner plot \\
+\texttt{--trace}            & flag             & off        & Generate trace plot \\
+\texttt{--output DIR}       & path             & (required) & Output directory \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All \texttt{tidal simulate} flags (\texttt{--param}, \texttt{--grid-shape},
+\texttt{--bounds}, \texttt{--ic}, \texttt{--t-end}, etc.)\ are passed through
+unchanged.
+
+\paragraph{Output structure}
+
+\begin{lstlisting}
+output_dir/
+|- results.csv       # parameter + metric table (one row per sample)
+|- results.json      # same data in JSON
+|- inference.json    # log Z, ESS, MAP estimate, credible intervals
+|- corner.png        # if --corner was passed
+|- trace.png         # if --trace was passed
+\end{lstlisting}
+
+\paragraph{Install inference dependencies}
+
+\begin{lstlisting}[style=bash]
+pip install "tidal[inference]"   # adds dynesty >= 2.1 and anesthetic >= 2.0
+\end{lstlisting}
 
 \subsection{TOML Configuration (\texttt{theory.toml})}
 
