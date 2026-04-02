@@ -3679,30 +3679,23 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         "",
     ]
 
-    # --- Self-energy sector filtering for multi-field theories with torsion ---
-    # For theories where torsion is NON-PROPAGATING (no kinetic terms), filter
-    # L^(2) to contain only single-perturbation-field self-energy terms.
-    # Background fields (Ābar) are KEPT as they are coefficients, not dynamical.
-    # Cross-coupling (h*a, h*T, a*T) and torsion self-energy (T*T) are removed.
-    # This produces the correct self-energy Hamiltonian for each field sector.
+    # --- Hamiltonian sector filtering for multi-field theories with torsion ---
+    # For torsion theories, filter the Hamiltonian (NOT the EOM) to exclude
+    # torsion self-energy and cross-coupling terms. This is a MEASUREMENT
+    # filter — we only want GW→EM conversion energy, not torsion energy.
     #
-    # IMPORTANT: Skip this filter when torsion is PROPAGATING (has kinetic
-    # terms like ξ Ftorsion²). Detect propagating torsion by checking if any
-    # derived field references TorsionCDT with covariant derivatives, OR if
-    # the Lagrangian expression contains CD applied to TorsionCDT.
-    torsion_has_kinetic = False
-    if ctx.torsion is not None:
-        lag_expr = ctx.lagrangian_expr or ""
-        # Check if any derived field references TorsionCDT (e.g. Ftorsion)
-        for df in ctx.derived_fields or []:
-            defn = df.get("definition", "")
-            if "TorsionCDT" in defn and ("CD[" in defn or "CD[-" in defn):
-                torsion_has_kinetic = True
-                break
-        # Also check if the Lagrangian directly contains CD[...TorsionCDT...]
-        if "CD[" in lag_expr and "TorsionCDT" in lag_expr:
-            torsion_has_kinetic = True
-    if ctx.torsion is not None and len(ctx.fields) > 1 and not torsion_has_kinetic:
+    # CRITICAL: The filter must NOT modify lagForCanon, which is used for
+    # BOTH the Hamiltonian AND the equations of motion (via Component E-L).
+    # Filtering lagForCanon would corrupt the EOM, producing incorrect
+    # constraint equations for dynamical fields (e.g. photons losing d2_t).
+    #
+    # Instead, the filter is applied AFTER Phase A decomposition, to
+    # lagComp, and ONLY for the Legendre transform (Hamiltonian construction).
+    # The Component E-L always uses the unfiltered lagComp.
+    #
+    # The filter variable is set here and consumed later in the Legendre step.
+    apply_hamiltonian_filter = ctx.torsion is not None and len(ctx.fields) > 1
+    if apply_hamiltonian_filter:
         # Build list of perturbation field heads (NOT background fields)
         pert_heads = _matter_pert_head_map(ctx)
         originals = _matter_pert_originals(ctx)
@@ -3717,43 +3710,24 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         pert_field_heads.append(torsion_head)
 
         # Generate Wolfram code to filter L^(2) by perturbation field content
-        heads_wl = ", ".join(pert_field_heads)
+        ", ".join(pert_field_heads)
         lines.extend(
             [
-                "(* === Self-energy sector filtering ===                                 *)",
-                "(* For multi-field torsion theories: keep ONLY single-perturbation-field *)",
-                "(* self-energy terms. Background fields (Abar) are coefficients, kept.  *)",
-                "(* Cross-coupling (h*a), torsion interactions (h*T, a*T), and torsion   *)",
-                "(* self-energy (T*T, zero for non-propagating) are filtered out.        *)",
-                "(* This produces correct self-energy H_hh + H_aa for conversion         *)",
-                "(* measurements without the expensive torsion contraction terms.         *)",
-                f"Module[{{pertHeads = {wl_list(heads_wl)}, lagTerms, selfTerms}},",
-                "  lagTerms = If[Head[lagForCanon] === Plus, List @@ lagForCanon, {lagForCanon}];",
-                '  Print["L^(2) before self-energy filter: ", Length[lagTerms], " terms"];',
-                "",
-                "  (* Keep only h-self and a-self sectors: terms with exactly 1 perturbation *)",
-                "  (* field that is NOT the torsion field. Background fields (Abar) are NOT  *)",
-                "  (* perturbation fields and do NOT affect this classification.              *)",
-                f"  Module[{{torsionHead = {torsion_head}}},",
-                "    selfTerms = Select[lagTerms, Function[{term},",
-                "      Module[{presentPerts = Select[pertHeads, !FreeQ[term, #]&]},",
-                "        (* Keep: terms with 0 pert fields (pure constant) or 1 non-torsion pert field *)",
-                "        Length[presentPerts] == 0 ||",
-                "        (Length[presentPerts] == 1 && presentPerts[[1]] =!= torsionHead)",
-                "      ]",
-                "    ]];",
-                "  ];",
-                "",
-                "  lagForCanon = Total[selfTerms];",
-                '  Print["L^(2) after self-energy filter: ", Length[selfTerms], " terms",',
-                '    " (removed ", Length[lagTerms] - Length[selfTerms], " cross-coupling/torsion terms)"];',
-                "];",
+                "(* === Hamiltonian sector filter (deferred) ===                        *)",
+                "(* Mark torsion head for Hamiltonian filtering in Legendre transform.  *)",
+                "(* lagForCanon is NOT modified — full L^(2) needed for correct EOM.   *)",
+                f"$tidalTorsionHead = {torsion_head};",
+                "$tidalHamiltonianFilter = True;",
+                f'Print["Hamiltonian filter: will exclude torsion ({torsion_head}) from H terms"];',
                 "",
             ]
         )
 
     lines.extend(
         [
+            "(* Default: no Hamiltonian filter *)",
+            "If[!ValueQ[$tidalHamiltonianFilter], $tidalHamiltonianFilter = False];",
+            "",
             "(* Apply CD shorthand rules to canonical Lagrangian.                     *)",
             "(* ComponentValues are pre-computed (supervisor's pattern) — ToValues    *)",
             "(* resolves CDN-field tensors in O(1) during StaggeredToBasis, reducing *)",
@@ -5248,9 +5222,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             # to identify transverse axes, not the reduced coordinates.
             if ctx.reduction is not None:
                 # Use the FULL spacetime coordinates (before reduction)
-                ["t", "x", "y", "z"][
-                    : ctx.dim + len(ctx.coords) - len(ctx.coords)
-                ]
+                ["t", "x", "y", "z"][: ctx.dim + len(ctx.coords) - len(ctx.coords)]
                 # Actually: ctx.coords is already the REDUCED set. The original
                 # coordinates are always [t, x, y, z] for 4D → 2D reduction.
                 # The killed axes in the ORIGINAL basis were everything except
