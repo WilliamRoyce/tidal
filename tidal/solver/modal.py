@@ -1266,6 +1266,14 @@ def _build_per_mode_matrices(
     n_slots = layout.num_slots
     n_modes = int(np.prod(rfft_shape))
 
+    def _resolve_target_slot(field_ref: str) -> int | None:
+        """Resolve a field/velocity reference to a slot index."""
+        if field_ref in layout.field_slot_map:
+            return layout.field_slot_map[field_ref]
+        if field_ref.startswith("v_") and field_ref[2:] in layout.velocity_slot_map:
+            return layout.velocity_slot_map[field_ref[2:]]
+        return None
+
     # Evaluate Fourier multipliers on the k-grid
     multiplier_cache: dict[str, NDArray[np.complex128]] = {}
     for eq in spec.equations:
@@ -1295,7 +1303,9 @@ def _build_per_mode_matrices(
 
             # dv/dt = Σ coeff * operator(target_field)
             for _term_idx, term in enumerate(eq.rhs_terms):
-                target_slot = layout.field_slot_map[term.field]
+                target_slot = _resolve_target_slot(term.field)
+                if target_slot is None:
+                    continue
                 coeff = _resolve_constant_coeff(
                     term,
                     coeff_eval,
@@ -1309,7 +1319,9 @@ def _build_per_mode_matrices(
             # First-order: du/dt = Σ coeff * operator(target_field)
             this_slot = layout.field_slot_map[field_name]
             for _term_idx, term in enumerate(eq.rhs_terms):
-                target_slot = layout.field_slot_map[term.field]
+                target_slot = _resolve_target_slot(term.field)
+                if target_slot is None:
+                    continue
                 coeff = _resolve_constant_coeff(
                     term,
                     coeff_eval,
@@ -1368,6 +1380,14 @@ def _build_convolution_matrix(
     n_modes = int(np.prod(rfft_shape))
     n_total = n_slots * n_modes
 
+    def _resolve_target_slot(field_ref: str) -> int | None:
+        """Resolve a field/velocity reference to a slot index."""
+        if field_ref in layout.field_slot_map:
+            return layout.field_slot_map[field_ref]
+        if field_ref.startswith("v_") and field_ref[2:] in layout.velocity_slot_map:
+            return layout.velocity_slot_map[field_ref[2:]]
+        return None
+
     # Evaluate Fourier multipliers on the k-grid (for constant terms)
     multiplier_cache: dict[str, NDArray[np.complex128]] = {}
     for eq in spec.equations:
@@ -1397,7 +1417,9 @@ def _build_convolution_matrix(
 
             # dv/dt = Σ coeff(x) * operator(target_field)
             for _term_idx, term in enumerate(eq.rhs_terms):
-                target_slot = layout.field_slot_map[term.field]
+                target_slot = _resolve_target_slot(term.field)
+                if target_slot is None:
+                    continue
                 mult = multiplier_cache[term.operator]
 
                 if not term.position_dependent:
@@ -1431,7 +1453,9 @@ def _build_convolution_matrix(
             # First-order
             this_slot = layout.field_slot_map[field_name]
             for _term_idx, term in enumerate(eq.rhs_terms):
-                target_slot = layout.field_slot_map[term.field]
+                target_slot = _resolve_target_slot(term.field)
+                if target_slot is None:
+                    continue
                 mult = multiplier_cache[term.operator]
 
                 if not term.position_dependent:
