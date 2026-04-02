@@ -788,10 +788,46 @@ def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
     return lines
 
 
+def _deferred_derived_fields(ctx: _WlsContext) -> list[dict[str, Any]]:
+    """Return derived fields to keep abstract through xPert (deferred expansion).
+
+    An antisymmetric derived field is deferred when its definition references
+    a field being perturbed via ``[[linearization.matter_perturbations]]``.
+    Keeping these fields abstract prevents ``ToCanonical`` from merging the
+    two independent Maxwell-type contractions that arise when
+    ``F[-a,-b]*F[a,b]`` is expanded as ``(CD[A]-CD[A])^2`` before xPert.
+    The diagonal and off-diagonal contractions are topologically distinct but
+    share the same canonical form when expressed with explicit metric indices,
+    causing ``ToCanonical`` to erroneously cancel them.
+
+    Fix: keep ``F`` abstract (antisymmetric tensor) through xPert so
+    ``L^(2)`` contains ``f[-a,-b]*f[a,b]`` as a single scalar invariant.
+    ``ToCanonical`` handles this correctly.  The CD expansion is applied
+    *after* ``ToCanonical``, once the antisymmetric structure is preserved.
+    """
+    if not ctx.derived_fields or not ctx.linearization:
+        return []
+    matter_field_names = {
+        mp["field"] for mp in ctx.linearization.get("matter_perturbations", [])
+    }
+    if not matter_field_names:
+        return []
+    deferred = []
+    for field in ctx.derived_fields:
+        if field.get("symmetry") != "antisymmetric":
+            continue
+        defn = field.get("definition", "")
+        if any(mf in defn for mf in matter_field_names):
+            deferred.append(field)
+    return deferred
+
+
 def _wls_derived_fields(ctx: _WlsContext) -> list[str]:
     """Generate DefTensor and MakeRule for each derived field."""
     if not ctx.derived_fields:
         return []
+
+    deferred_names = {f["name"] for f in _deferred_derived_fields(ctx)}
 
     lines: list[str] = ["(* Derived field definitions *)"]
     for field in ctx.derived_fields:
@@ -816,6 +852,27 @@ def _wls_derived_fields(ctx: _WlsContext) -> list[str]:
             )
         )
 
+        if field["name"] in deferred_names:
+            # Register the abstract derived field with xPert so it can
+            # expand Perturbation[F,n] → FPert[LI[n],...] correctly.
+            # The symmetry is inherited from the field definition (antisymmetric).
+            pert_sym = f"{ctx.prefix}{field['name'].capitalize()}Pert"
+            pert_idx, full_idx = _xpert_index_pattern(
+                pert_sym,
+                f"{ctx.prefix}{field['name'].capitalize()}",
+                field,
+            )
+            lines.extend(
+                [
+                    f"(* Deferred derived field: keep {field['name']} abstract through xPert *)",
+                    f"(* xPert can perturb it as: Perturbation[{full_idx}, n] → {pert_sym}[LI[n],...] *)",
+                    f"DefTensorPerturbation[{pert_idx}, {full_idx}, {ctx.manifold}];",
+                    f'Print["Deferred derived field {field["name"]}: abstract through xPert, '
+                    f'CD expansion applied post-ToCanonical"];',
+                    "",
+                ]
+            )
+
     return lines
 
 
@@ -837,11 +894,20 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
     ]
 
     if ctx.derived_fields:
-        lines.append("(* Expand derived field definitions *)")
-        for field in ctx.derived_fields:
+        deferred_names = {f["name"] for f in _deferred_derived_fields(ctx)}
+        non_deferred = [
+            f for f in ctx.derived_fields if f["name"] not in deferred_names
+        ]
+        lines.append("(* Expand derived field definitions (pre-xPert) *)")
+        for field in non_deferred:
             rule_var = f"{ctx.prefix}{field['name'].capitalize()}Rules"
             lines.append(
                 f"{ctx.prefix}Lagrangian = {ctx.prefix}Lagrangian /. {rule_var};"
+            )
+        if deferred_names:
+            names_str = ", ".join(sorted(deferred_names))
+            lines.append(
+                f"(* Deferred fields ({names_str}) kept abstract — substituted after L^(2) ToCanonical *)"
             )
         lines.extend(
             (
@@ -1543,6 +1609,151 @@ def _wls_matter_pert_truncation(mpi: dict[str, str]) -> list[str]:
     return lines
 
 
+def _wls_deferred_field_li_sub(
+    ctx: _WlsContext,
+    matter_perts: list[dict[str, Any]],
+    matter_pert_info: list[dict[str, str]],
+) -> list[str]:
+    """Generate WLS for deferred derived-field LI-level substitution.
+
+    Called after ``ExpandPerturbation`` and all standard LI truncations
+    (metric/matter/torsion), but **before** the batch ``ToCanonical``.
+
+    For each deferred derived field ``F`` (antisymmetric, definition
+    references a matter field being perturbed):
+
+    1. Drop ``FPert[LI[2], ...]`` — second-order perturbation, not needed.
+    2. Substitute ``FPert[LI[0], aa_, bb_]`` with the background value
+       ``CD[aa][BGfield[bb]] - CD[bb][BGfield[aa]]``, where ``BGfield`` is
+       the background of the referenced matter field.
+    3. Replace ``FPert[LI[1], aa_, bb_]`` with the abstract field head
+       ``F[aa, bb]``.  This preserves the antisymmetric structure through
+       ``ToCanonical``.
+    """
+    deferred = _deferred_derived_fields(ctx)
+    if not deferred:
+        return []
+
+    lines: list[str] = [
+        "",
+        "(* === Deferred derived-field LI substitution (pre-ToCanonical) ===  *)",
+        "(* Antisymmetric derived fields kept abstract through xPert.         *)",
+        "(* Replace xPert LI levels before batch ToCanonical so the abstract  *)",
+        "(* antisymmetric tensor f[-a,-b]*f[a,b] is seen as a single scalar.  *)",
+    ]
+
+    for field in deferred:
+        fname = field["name"]
+        pert_sym = f"{ctx.prefix}{fname.capitalize()}Pert"
+        abstract_head = f"{ctx.prefix}{fname.capitalize()}"
+        cd = ctx.cd
+
+        # Find the background head for the LI[0] substitution
+        bg_head = ""
+        for mp, mpi in zip(matter_perts, matter_pert_info, strict=False):
+            if mp["field"] in field.get("definition", ""):
+                bg_head = mpi.get("bg_head", "")
+                break
+
+        lines.extend(
+            (
+                f"(* Deferred field: {fname} *)",
+                f"l2Raw = l2Raw /. {pert_sym}[LI[2], __] :> 0;",
+            )
+        )
+        if bg_head:
+            lines.extend(
+                [
+                    f"(* LI[0] → background {fname} = CD[bg] - CD[bg] *)",
+                    f"l2Raw = l2Raw /. {pert_sym}[LI[0], aa_, bb_] :> "
+                    f"({cd}[aa][{bg_head}[bb]] - {cd}[bb][{bg_head}[aa]]);",
+                ]
+            )
+        else:
+            lines.extend(
+                (
+                    f"(* LI[0] → 0 (no background for {fname}) *)",
+                    f"l2Raw = l2Raw /. {pert_sym}[LI[0], __] :> 0;",
+                )
+            )
+        lines.extend(
+            [
+                f"(* LI[1] → abstract {fname} symbol (antisymmetric, ToCanonical-safe) *)",
+                f"l2Raw = l2Raw /. {pert_sym}[LI[1], aa_, bb_] :> {abstract_head}[aa, bb];",
+                f'Print["After deferred {fname} LI substitution: "'
+                f', If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
+                "",
+            ]
+        )
+
+    return lines
+
+
+def _wls_deferred_field_expand(
+    ctx: _WlsContext,
+    matter_perts: list[dict[str, Any]],
+    matter_pert_info: list[dict[str, str]],
+) -> list[str]:
+    """Generate WLS to expand deferred derived fields after batch ToCanonical.
+
+    Called **after** the batch ``ToCanonical`` and **before**
+    ``dptLagrangian = l2Raw / 2``.
+
+    For each deferred derived field ``F`` with abstract symbol ``f[-a,-b]``
+    (the first-order perturbation), substitute:
+        ``F[-a,-b] → CD[-a][a[-b]] - CD[-b][a[-a]]``
+    where ``a`` is the perturbation field of the referenced matter field.
+
+    This is identical to the original derived-field rules except that the
+    full field head (e.g., ``A``) is replaced with the perturbation head
+    (e.g., ``a``), reflecting that ``f = δF = d(δA) - d(δA)``.
+    """
+    deferred = _deferred_derived_fields(ctx)
+    if not deferred:
+        return []
+
+    lines: list[str] = [
+        "",
+        "(* === Deferred derived-field expansion (post-ToCanonical) ===       *)",
+        "(* Apply F → d(a) - d(a) using the perturbation field a, not A.     *)",
+        "(* ToCanonical has already simplified f[-a,-b]*f[a,b] correctly.     *)",
+    ]
+
+    for field in deferred:
+        fname = field["name"]
+        rule_var = f"{ctx.prefix}{fname.capitalize()}Rules"
+        # Find the field head and pert head for the substitution
+        field_head = ""
+        pert_head = ""
+        for mp, mpi in zip(matter_perts, matter_pert_info, strict=False):
+            if mp["field"] in field.get("definition", ""):
+                field_head = mpi["field_head"]
+                pert_head = mpi["pert_head"]
+                break
+
+        lines.append(f"(* Expand deferred {fname}: abstract F → d(a) - d(a) *)")
+        if field_head and pert_head:
+            lines.extend(
+                [
+                    f"dpt{fname.capitalize()}DeferredRules = {rule_var} /. {field_head} -> {pert_head};",
+                    f"l2Raw = l2Raw /. dpt{fname.capitalize()}DeferredRules;",
+                    f'Print["After deferred {fname} expansion: "'
+                    f', If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
+                    "",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    f"(* WARNING: no matching matter perturbation found for deferred {fname} *)",
+                    f"l2Raw = l2Raw /. {rule_var};",
+                    "",
+                ]
+            )
+
+    return lines
+
+
 def _wls_torsion_curvature_decomposition(ctx: _WlsContext) -> list[str]:
     """Decompose Riemann-Cartan curvature tensors into LC curvature + torsion.
 
@@ -2004,6 +2215,11 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
+    # Deferred derived-field LI substitution: before ToCanonical so the
+    # abstract antisymmetric tensors are visible to ToCanonical as single
+    # scalar invariants (f[-a,-b]*f[a,b]), preventing incorrect merging.
+    lines.extend(_wls_deferred_field_li_sub(ctx, matter_perts, matter_pert_info))
+
     lines.extend(
         [
             "",
@@ -2056,6 +2272,15 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "  Clear[l2Terms, canonResult];",
             "];",
             "",
+        ]
+    )
+
+    # Deferred derived-field expansion: after ToCanonical has simplified the
+    # abstract f[-a,-b]*f[a,b] invariants correctly, expand F → d(a) - d(a).
+    lines.extend(_wls_deferred_field_expand(ctx, matter_perts, matter_pert_info))
+
+    lines.extend(
+        [
             "(* L^(2) = delta^2(sqrt|g| L) / (2 sqrt|g0|) *)",
             f"{p}Lagrangian = l2Raw / 2;",
             f'Print["L^(2) set: ", If[Head[{p}Lagrangian]===Plus, Length[{p}Lagrangian], 1], " terms"];',
