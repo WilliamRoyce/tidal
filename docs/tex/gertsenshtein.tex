@@ -573,6 +573,94 @@ theory.toml -> _derive.py generates .wls with:
 -> JSON spec -> simulate -> measure conversion
 \end{lstlisting}
 
+\subsection{Dark Photon Torsion Model}
+\label{subsec:dark-photon-torsion}
+
+The torsion-independence result of Section~\ref{subsec:torsion-independence} applies
+to minimal PGT with no non-minimal torsion-EM coupling.
+The \emph{dark photon torsion model} breaks this independence by introducing a
+Yang-Mills kinetic term for the torsion trace vector $T_\mu \equiv T^\lambda{}_{\lambda\mu}$
+together with an EM--torsion kinetic mixing term, yielding a theory where torsion
+propagates as a massive vector boson (dark photon analogue) and couples directly to
+the photon sector~\cite{barker2024ewgt}.
+
+\subsubsection{Lagrangian}
+
+\begin{equation}
+  \mathcal{L}
+  = \frac{1}{\kappa^2}\,\widetilde{R}
+  + \alpha\, I_3
+  - \frac{\xi}{4}\, (F_T)_{ab}(F_T)^{ab}
+  + \delta\, F_{ab}(F_T)^{ab}
+  - \frac{1}{4}\, F_{ab}F^{ab},
+  \label{eq:dark-photon-lagrangian}
+\end{equation}
+where $F_T{}_{ab} = \partial_a T_b - \partial_b T_a$ is the torsion trace field
+strength and $I_3 = T^\mu{}_{\mu\nu} T^{\lambda\nu}{}_\lambda$ is the trace-sector
+torsion mass invariant.
+The parameters are: $\alpha$ (torsion mass, $\text{dim}^2$), $\xi$ (kinetic strength;
+$\xi = 1$ matches Maxwell normalisation), $\delta$ (kinetic mixing between EM and
+torsion), $\kappa$ (gravitational coupling).  The $\xi F_T^2$ term gives the torsion
+trace vector a propagating kinetic term, breaking the block-diagonal polarisation
+structure responsible for torsion independence in the minimal model.
+
+Only $I_3$ (the trace sector) receives a mass --- not $I_1$ or $I_2$ --- because the
+Yang-Mills kinetic $\xi F_T^2$ only propagates the trace vector $T_\mu$; adding
+$I_1, I_2$ would give mass to the tentor/trator sectors without kinetic terms,
+introducing ghost instabilities.
+
+\subsubsection{Gertsenshtein Channel}
+
+Plane-wave analysis (propagation along $z$) yields a three-field mixing system.
+The active Gertsenshtein channel is
+\begin{equation}
+  h_5\;(\text{$\times$ graviton, $h_{xy}$})
+  \;\longleftrightarrow\;
+  a_1\;(\text{$x$-polarised photon, $a_x$}),
+\end{equation}
+with coupling $-\kappa^2 B_0\, \partial_z a_1$ in the $h_5$ equation of motion
+(identical to the minimal Einstein-Maxwell channel --- the torsion sector enters only
+through the photon equation via $\delta$).
+Simulation: \texttt{--source h\_5 --target a\_1}.
+
+\subsubsection{Results (v0.24.3)}
+
+\begin{table}[htbp]
+\centering
+\caption{Dark photon torsion model: conversion coefficient $C_0 = P/B_0^2$ at
+  $t = 5$, $B_0 = 0.01$, $\kappa = 1$.}
+\label{tab:dark-photon-results}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Scenario & Parameters & $C_0$ & Notes \\
+\midrule
+Standard Gertsenshtein & $\xi = 0$, $\delta = 0$ & $6.25 \times 10^{-4}$  & Exact formula $P = \sin^2(\kappa B_0 t/2)$ \\
+Nominal torsion model & $\alpha=0.5$, $\xi=0.1$, $\delta=0.1$ & $7.24 \times 10^{-4}$ & +16\% amplification \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{$\xi = 0$ recovery:} At $\xi = 0$ the torsion kinetic term vanishes;
+    the torsion fields become algebraic constraints; the conversion probability
+    exactly recovers the standard Gertsenshtein formula.  This is the primary
+    control check for the model (verified, commit~\texttt{6627b21}).
+  \item \textbf{$B_0$ scaling:} $C_0 = P/B_0^2$ verified constant to $<1\%$ across
+    $B_0 \in \{0.003,\, 0.01,\, 0.03\}$, confirming the linear regime.
+  \item \textbf{Energy conservation:} $\max |dE/E| = 1.07 \times 10^{-15}$
+    (machine precision, Fourier modal solver).
+\end{itemize}
+
+\subsubsection{Implementation}
+
+Example: \texttt{examples/torsion\_dark\_photon/theory.toml}.
+Derived JSON: \texttt{examples/data/torsion\_dark\_photon.json}
+(26 components, 214 Hamiltonian terms).
+The derivation uses the \emph{deferred derived-field} mechanism
+(Section~\ref{sec:mfp-deferred}) to keep $F_{ab}$ abstract through xPert,
+and the \emph{kinetic-coefficient} mechanism (Section~\ref{sec:json-lhs-kinetic-coeff})
+so that $\xi = 0$ is handled at simulation time rather than derivation time.
+
 \subsection{Future Extensions}
 \label{subsec:future-extensions}
 
