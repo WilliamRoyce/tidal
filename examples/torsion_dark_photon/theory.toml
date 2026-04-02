@@ -1,7 +1,7 @@
 # Dark Photon Torsion: Graviton-Photon-Torsion Conversion via Kinetic Mixing
 #
 # Lagrangian:
-#   L = (1/κ²) R̃ + α(I₁+I₂+I₃) - ¼ξ Ftorsion² + δ F·Ftorsion - ¼F²
+#   L = (1/κ²) R̃ + α I₃ - ¼ξ Ftorsion² + δ F·Ftorsion - ¼F²
 #
 # where:
 #   R̃ = RicciScalarCDT[] (torsionful Ricci scalar)
@@ -11,7 +11,7 @@
 #   F_{μν} = ∂_μ A_ν - ∂_ν A_μ (EM field strength)
 #
 # Physical content:
-#   - α(I₁+I₂+I₃): unified torsion mass (α₁=α₂=α₃=α, Barker β₁=β₂=β₃=α)
+#   - α I₃: trace-sector torsion mass only (Barker β₃=α, β₁=β₂=0)
 #   - -¼ξ Ftorsion²: Yang-Mills-type kinetic term for torsion trace vector
 #     → torsion propagates as a massive vector boson (dark photon analogue)
 #   - δ F·Ftorsion: kinetic mixing between EM and torsion (dark photon ε)
@@ -102,18 +102,19 @@ components = ["0", "0", "-B0 * z[]", "0"]
 [constants]
 names = ["kappa", "B0", "alpha", "xi", "deltam"]
 
-# Lagrangian: (1/κ²)R̃ + α(I₁+I₂+I₃) - ¼ξ Ftorsion² + δ F·Ftorsion - ¼F²
+# Lagrangian: (1/κ²)R̃ + α I₃ - ¼ξ Ftorsion² + δ F·Ftorsion - ¼F²
 #
 # Terms:
 #   1. (1/κ²)R̃ — Einstein-Cartan gravity (torsionful Ricci scalar)
-#   2. α I₁ — tentor torsion mass: T_{abc} T^{abc}
-#   3. α I₂ — trator torsion mass: T_{abc} T^{bac}
-#   4. α I₃ — axitor torsion mass: T^a_{ab} T^{cb}_{c}
-#   5. -¼ξ Ftorsion² — torsion kinetic (Yang-Mills for torsion trace)
-#   6. δ F·Ftorsion — EM-torsion kinetic mixing (dark photon ε)
-#   7. -¼F² — Maxwell
+#   2. α I₃ — trace torsion mass: T^a_{ab} T^{cb}_{c} (dark photon mass²)
+#      NOTE: Only I₃ (trace sector), NOT I₁+I₂+I₃. The kinetic term ξ Ftorsion²
+#      only gives dynamics to the trace vector T_μ. Including I₁,I₂ would give
+#      mass to tentor/trator sectors without kinetic terms → ghost instability.
+#   3. -¼ξ Ftorsion² — torsion kinetic (Yang-Mills for torsion trace)
+#   4. δ F·Ftorsion — EM-torsion kinetic mixing (dark photon ε)
+#   5. -¼F² — Maxwell
 [lagrangian]
-expression = "((1/kappa^2) RicciScalarCDT[] + alpha TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
 
 [linearization]
 perturbation_field = "h"

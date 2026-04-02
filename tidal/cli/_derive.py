@@ -5241,23 +5241,49 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 ]
             )
             # Plane-wave reduction on lagComp: zero transverse Derivative terms
-            # that may survive from Scalar pre-resolution (issue #215).
+            # from pre-decomposed Scalar-resolved terms (issue #215).
+            # IMPORTANT: After plane-wave reduction, coords are reduced (e.g.
+            # ['t','x'] for 1+1D). The surviving spatial axis IS the propagation
+            # axis (z→x after reduction). We must use the ORIGINAL 4D coordinates
+            # to identify transverse axes, not the reduced coordinates.
             if ctx.reduction is not None:
+                # Use the FULL spacetime coordinates (before reduction)
+                ["t", "x", "y", "z"][
+                    : ctx.dim + len(ctx.coords) - len(ctx.coords)
+                ]
+                # Actually: ctx.coords is already the REDUCED set. The original
+                # coordinates are always [t, x, y, z] for 4D → 2D reduction.
+                # The killed axes in the ORIGINAL basis were everything except
+                # t and the propagation axis.
                 prop_axis = ctx.reduction["propagation_axis"]
-                coords = ctx.coords
-                killed = [c for c in coords[1:] if c != prop_axis]
-                if killed:
-                    pw_rules: list[str] = []
-                    for c in killed:
-                        slot = coords.index(c) + 1
-                        pw_rules.append(
-                            f"Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
-                            f" && {{ords}}[[{slot}]] > 0 :> 0"
-                        )
+                orig_spatial = ["x", "y", "z"]
+                killed_original = [c for c in orig_spatial if c != prop_axis]
+                # Map killed original axes to their slot in the REDUCED coordinate
+                # system. After plane-wave reduction, the Derivative pattern uses
+                # the REDUCED dimensions. For 4D→2D reduction (plane-wave z),
+                # the coordinate array is [t, z_renamed_to_x]. So Derivative[a,b]
+                # means ∂_t^a ∂_x^b. Transverse derivatives (∂_x_orig, ∂_y) have
+                # been mapped to specific slots in the ORIGINAL system but DON'T
+                # EXIST in the reduced system. However, pre-decomposed terms from
+                # Scalar resolution may still contain Derivative patterns with
+                # arities from the ORIGINAL 4D system (e.g. Derivative[0,1,0,0]
+                # for ∂_x_orig).
+                # Zero Derivative patterns where slots 2 or 3 (original y,z or
+                # x,y depending on propagation axis) have nonzero order.
+                orig_coords_full = ["t", "x", "y", "z"]
+                pw_rules: list[str] = []
+                for c in killed_original:
+                    slot = orig_coords_full.index(c) + 1  # 1-indexed in Mathematica
+                    pw_rules.append(
+                        f"Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
+                        f" && {{ords}}[[{slot}]] > 0 :> 0"
+                    )
+                if pw_rules:
                     lines.extend(
                         [
                             "(* Plane-wave reduction on lagComp: zero transverse Derivative   *)",
-                            "(* terms that may survive from Scalar pre-resolution (#215).     *)",
+                            "(* terms from Scalar pre-resolution. Uses ORIGINAL coordinate    *)",
+                            "(* slots to identify transverse axes (#215).                     *)",
                             f"lagComp = lagComp /. {{{', '.join(pw_rules)}}};",
                             "lagComp = Expand[lagComp];",
                             '  Print["  lagComp after plane-wave reduction: ", LeafCount[lagComp]];',
