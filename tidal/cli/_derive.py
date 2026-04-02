@@ -3680,12 +3680,29 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
     ]
 
     # --- Self-energy sector filtering for multi-field theories with torsion ---
-    # For theories where full decomposition would timeout, filter L^(2) to
-    # contain only single-perturbation-field self-energy terms (h-only, a-only).
+    # For theories where torsion is NON-PROPAGATING (no kinetic terms), filter
+    # L^(2) to contain only single-perturbation-field self-energy terms.
     # Background fields (Ābar) are KEPT as they are coefficients, not dynamical.
     # Cross-coupling (h*a, h*T, a*T) and torsion self-energy (T*T) are removed.
     # This produces the correct self-energy Hamiltonian for each field sector.
-    if ctx.torsion is not None and len(ctx.fields) > 1:
+    #
+    # IMPORTANT: Skip this filter when torsion is PROPAGATING (has kinetic
+    # terms like ξ Ftorsion²). Detect propagating torsion by checking if any
+    # derived field references TorsionCDT with covariant derivatives, OR if
+    # the Lagrangian expression contains CD applied to TorsionCDT.
+    torsion_has_kinetic = False
+    if ctx.torsion is not None:
+        lag_expr = ctx.lagrangian_expr or ""
+        # Check if any derived field references TorsionCDT (e.g. Ftorsion)
+        for df in ctx.derived_fields or []:
+            defn = df.get("definition", "")
+            if "TorsionCDT" in defn and ("CD[" in defn or "CD[-" in defn):
+                torsion_has_kinetic = True
+                break
+        # Also check if the Lagrangian directly contains CD[...TorsionCDT...]
+        if "CD[" in lag_expr and "TorsionCDT" in lag_expr:
+            torsion_has_kinetic = True
+    if ctx.torsion is not None and len(ctx.fields) > 1 and not torsion_has_kinetic:
         # Build list of perturbation field heads (NOT background fields)
         pert_heads = _matter_pert_head_map(ctx)
         originals = _matter_pert_originals(ctx)
@@ -3892,6 +3909,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "  (* Group terms by sector signature *)",
             "  sectorGroups = GatherBy[",
             "    Transpose[{lagList, termSectors}], Last];",
+            "",
             "",
             "  (* Separate already-decomposed terms (empty sector = no tensor heads). *)",
             "  (* These arise from Scalar[] pre-resolution and are already in         *)",
