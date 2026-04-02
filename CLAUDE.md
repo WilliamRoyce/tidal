@@ -7,7 +7,8 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `tidal/wolfram/` -- Wolfram pipeline modules (EulerLagrange.wl, ComponentDecompose.wl, ExportJSON.wl, CommonUtilities.wl, GaugeFix.wl)
 - `tidal/solver/` -- PDE solver backends (ida.py, cvode.py, leapfrog.py, fields.py, operators.py, grid.py, coefficients.py, rhs.py, state.py, constraint_solve.py)
 - `tidal/symbolic/` -- Python symbolic pipeline (_derive.py, json_loader.py)
-- `tidal/cli/` -- CLI entry points (9 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze)
+- `tidal/cli/` -- CLI entry points (10 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze, sample)
+- `tidal/inference/` -- Bayesian inference (priors, likelihood, constraints, MC, nested sampling via dynesty/PolyChord)
 - `tidal/measurement/` -- Physics measurements (energy, conversion, mixing, spectra)
 - `examples/` -- 20 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
 - `research/` -- General quadratic PGT+EM Lagrangian enumeration (xAct/xTras scripts, TeX document, classification JSONs)
@@ -21,6 +22,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `uv run tidal derive examples/<name>/theory.toml` -- Derive PDEs from Lagrangian
 - `uv run tidal simulate examples/data/<name>.json` -- Run simulation
 - `uv run tidal sweep examples/data/<name>.json --sweep "param=start:stop:N" --measure conversion --output sweep_out` -- Run parameter sweep
+- `uv run tidal sample examples/data/<name>.json --prior "param=uniform:lo:hi" --likelihood "P_max:maximize" --method mc --n-samples 100 --output sample_out` -- Bayesian inference (MC or nested sampling)
 - `uv run ruff check` / `uv run ruff format` -- Lint / format
 - `uv run pyright` -- Type checking
 

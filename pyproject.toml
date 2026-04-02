@@ -47,6 +47,7 @@ dependencies = [
 [project.optional-dependencies]
 wolfram = ["wolframclient>=1.4.0,<2.0"]
 sensitivity = ["SALib>=1.4"]
+inference = ["dynesty>=2.1", "anesthetic>=2.0"]
 completion = ["shtab>=1.5"]
 color = ["rich-argparse>=1.4"]
 
@@ -124,6 +125,7 @@ unfixable = ["T201"]
 ]
 "examples/**/*" = ["INP001", "T201", "E402", "PLR0913", "PLR0917"]
 "tidal/cli/**/*" = ["T201", "PLC0415"]
+"tidal/inference/**/*" = ["T201", "PLC0415", "PLR0913", "PLR0917", "PLR0911", "PLR0912", "PLR0914", "C901", "ANN401", "ANN001", "ANN202", "SLF001", "DOC501", "PLR2004", "D401", "ARG001"]
 "tidal/cli/_derive.py" = ["T201", "PLC0415", "S404", "S603", "S607"]
 "scripts/**/*" = [
     "INP001",

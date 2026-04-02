@@ -1,0 +1,288 @@
+"""``tidal sample`` — Bayesian inference via Monte Carlo and nested sampling.
+
+Wraps the simulation + measurement pipeline as a likelihood function
+for parameter estimation and model comparison.
+
+Supports:
+- Simple Monte Carlo: ``--method mc --n-samples 100``
+- Nested sampling (dynesty): ``--method nested --nlive 100``
+- User-specifiable priors: ``--prior "alpha=uniform:0.01:10"``
+- Hard constraints: ``--constraint "xi > 0"``
+- Parallel evaluation: ``--parallel N``
+
+References
+----------
+Speagle, J.S. (2020) "dynesty", MNRAS 493(3).
+Handley, W. (2019) "anesthetic", JOSS 4(37).
+Skilling, J. (2004) "Nested Sampling", AIP Conference Proceedings 735.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from argparse import Namespace
+
+    from tidal.inference._results import InferenceResult
+
+
+def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+    """Entry point for ``tidal sample``."""
+    from pathlib import Path
+
+    from tidal.cli._console import error_with_hint
+
+    # --- Validate required arguments ---
+    json_path = getattr(args, "json_path", None)
+    if not json_path:
+        error_with_hint(
+            "No JSON specification provided.",
+            ["Usage: tidal sample <spec.json> --prior 'NAME=DIST:ARGS' ..."],
+        )
+        return 1
+
+    spec_path = Path(json_path)
+    if not spec_path.exists():
+        error_with_hint(
+            f"File not found: {spec_path}",
+            ["Check the path to the JSON equation specification."],
+        )
+        return 1
+
+    # --- Parse priors ---
+    prior_specs: list[str] = getattr(args, "prior", []) or []
+    if not prior_specs:
+        error_with_hint(
+            "No priors specified.",
+            [
+                "Use --prior 'NAME=DIST:LOW:HIGH' (repeatable)",
+                "Distributions: uniform, log_uniform, normal, arctan_uniform",
+                "Example: --prior 'alpha=uniform:0.01:10'",
+            ],
+        )
+        return 1
+
+    from tidal.inference._prior import parse_prior
+
+    try:
+        priors = [parse_prior(s) for s in prior_specs]
+    except ValueError as e:
+        error_with_hint(str(e), ["Check --prior format: NAME=DIST:ARG1:ARG2"])
+        return 1
+
+    # --- Parse constraints ---
+    constraint_specs: list[str] = getattr(args, "constraint", []) or []
+    from tidal.inference._constraints import ConstraintError, ConstraintSet
+
+    try:
+        constraints = ConstraintSet.from_strings(constraint_specs)
+    except ConstraintError as e:
+        error_with_hint(str(e), ["Check --constraint syntax: 'xi > 0'"])
+        return 1
+
+    # --- Parse likelihood ---
+    likelihood_spec: str | None = getattr(args, "likelihood", None)
+    if not likelihood_spec:
+        error_with_hint(
+            "No likelihood specified.",
+            [
+                "Use --likelihood 'METRIC:TYPE[:ARGS]'",
+                "Types: maximize, gaussian:TARGET:SIGMA, threshold:MIN_VALUE",
+                "Example: --likelihood 'P_max:maximize'",
+            ],
+        )
+        return 1
+
+    from tidal.inference._likelihood import parse_likelihood
+
+    try:
+        likelihood_config = parse_likelihood(likelihood_spec)
+    except ValueError as e:
+        error_with_hint(str(e), ["Check --likelihood format: METRIC:TYPE[:ARGS]"])
+        return 1
+
+    # --- Parse measurements ---
+    measure_str: str | None = getattr(args, "measure", None)
+    if measure_str:
+        measurements = set(measure_str.split(","))
+    else:
+        # Auto-detect from likelihood metric
+        metric = likelihood_config.metric
+        if metric.startswith("P_") or metric in {"P_max", "P_final"}:
+            measurements = {"conversion", "peak_conversion"}
+        elif metric.startswith("E_") or metric == "max_energy_error":
+            measurements = {"energy", "conservation"}
+        elif metric == "L_mix":
+            measurements = {"mixing"}
+        else:
+            measurements = {"summary"}
+
+    source = tuple(args.source.split(",")) if getattr(args, "source", None) else None
+    target = tuple(args.target.split(",")) if getattr(args, "target", None) else None
+    threshold = getattr(args, "energy_threshold", 1e-3)
+
+    # --- Validate output ---
+    output_dir = getattr(args, "output", None)
+    if not output_dir:
+        error_with_hint(
+            "No output directory specified.",
+            ["Use --output DIR to specify where results are saved."],
+        )
+        return 1
+    output_path = Path(output_dir)
+
+    # --- Common settings ---
+    method: str = getattr(args, "method", "mc")
+    n_workers: int | None = getattr(args, "parallel", None)
+    seed: int = getattr(args, "seed", 42)
+    quiet: bool = getattr(args, "quiet", False)
+
+    param_names = [p.name for p in priors]
+
+    # --- Print summary ---
+    if not quiet:
+        print(f"=== tidal sample ({method}) ===")
+        print(f"  Spec: {spec_path}")
+        print(f"  Parameters: {', '.join(param_names)}")
+        for p in priors:
+            print(f"    {p.name} ~ {p.distribution}({p.low}, {p.high})")
+        if constraints:
+            print(f"  Constraints: {len(constraints)}")
+            for expr in constraints.expressions:
+                print(f"    {expr}")
+        print(
+            f"  Likelihood: {likelihood_config.metric} ({likelihood_config.likelihood_type})"
+        )
+        print(f"  Measurements: {', '.join(sorted(measurements))}")
+        print(f"  Output: {output_path}")
+
+    # --- Run inference ---
+    if method == "mc":
+        n_samples = getattr(args, "n_samples", 100)
+        if not quiet:
+            print(f"  Samples: {n_samples}")
+            if n_workers:
+                print(f"  Workers: {n_workers}")
+            print()
+
+        from tidal.inference._mc import run_monte_carlo
+
+        result = run_monte_carlo(
+            priors=priors,
+            likelihood_config=likelihood_config,
+            base_args=args,
+            spec_path=spec_path,
+            measurements=measurements,
+            source=source,
+            target=target,
+            threshold=threshold,
+            n_samples=n_samples,
+            constraints=constraints,
+            n_workers=n_workers,
+            seed=seed,
+            temp_dir=output_path / "_runs",
+            quiet=quiet,
+        )
+
+    elif method == "nested":
+        nlive = getattr(args, "nlive", 100)
+        dlogz = getattr(args, "dlogz", 0.01)
+        sampler_backend = getattr(args, "sampler", "dynesty")
+        dynamic = getattr(args, "dynamic", False)
+
+        if not quiet:
+            print(f"  Live points: {nlive}")
+            print(f"  dlogz: {dlogz}")
+            print(f"  Sampler: {sampler_backend}")
+            if n_workers:
+                print(f"  Workers: {n_workers}")
+            print()
+
+        from tidal.inference._likelihood import SimulationLikelihood
+        from tidal.inference._nested import run_nested_sampling
+        from tidal.inference._prior import build_prior_transform
+
+        likelihood_fn = SimulationLikelihood(
+            base_args=args,
+            spec_path=spec_path,
+            param_names=param_names,
+            measurements=measurements,
+            source=source,
+            target=target,
+            threshold=threshold,
+            likelihood_config=likelihood_config,
+            temp_dir=output_path / "_runs",
+        )
+
+        result = run_nested_sampling(
+            log_likelihood=likelihood_fn,
+            prior_transform=build_prior_transform(priors),
+            ndim=len(priors),
+            param_names=param_names,
+            sampler=sampler_backend,
+            nlive=nlive,
+            dlogz=dlogz,
+            n_workers=n_workers,
+            seed=seed,
+            dynamic=dynamic,
+            quiet=quiet,
+        )
+
+    else:
+        error_with_hint(
+            f"Unknown method '{method}'.",
+            ["Use --method mc or --method nested"],
+        )
+        return 1
+
+    # --- Save results ---
+    result.save(output_path)
+    if not quiet:
+        print()
+        _print_summary(result)
+        print(f"\nResults saved to: {output_path}")
+
+    # --- Optional plots ---
+    if getattr(args, "corner", False):
+        from tidal.inference._visualize import plot_corner
+
+        corner_path = output_path / "corner.png"
+        plot_corner(result, corner_path)
+        if not quiet:
+            print(f"Corner plot: {corner_path}")
+
+    if getattr(args, "trace", False):
+        from tidal.inference._visualize import plot_trace
+
+        trace_path = output_path / "trace.png"
+        plot_trace(result, trace_path)
+        if not quiet:
+            print(f"Trace plot: {trace_path}")
+
+    return 0
+
+
+def _print_summary(result: InferenceResult) -> None:
+    """Print inference summary statistics."""
+    r = result
+
+    print(f"  Method: {r.method}")
+    print(f"  Samples: {r.n_samples}")
+    print(f"  ESS: {r.effective_sample_size():.0f}")
+
+    if r.log_evidence is not None:
+        print(f"  log Z = {r.log_evidence:.2f} +/- {r.log_evidence_err:.2f}")
+
+    print("  MAP estimate:")
+    for name, val in r.best().items():
+        print(f"    {name} = {val:.6g}")
+
+    print("  Posterior mean:")
+    for name, val in r.posterior_mean().items():
+        print(f"    {name} = {val:.6g}")
+
+    ci = r.credible_interval(0.95)
+    print("  95% credible intervals:")
+    for name, (lo, hi) in ci.items():
+        print(f"    {name}: [{lo:.6g}, {hi:.6g}]")
