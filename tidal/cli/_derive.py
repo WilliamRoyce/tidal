@@ -5238,6 +5238,34 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "(* Components handles all symmetry permutations and Derivative    *)",
                     "(* forms since the symmetry-aware rewrite.                        *)",
                     "",
+                ]
+            )
+            # Plane-wave reduction on lagComp: zero transverse Derivative terms
+            # that may survive from Scalar pre-resolution (issue #215).
+            if ctx.reduction is not None:
+                prop_axis = ctx.reduction["propagation_axis"]
+                coords = ctx.coords
+                killed = [c for c in coords[1:] if c != prop_axis]
+                if killed:
+                    pw_rules: list[str] = []
+                    for c in killed:
+                        slot = coords.index(c) + 1
+                        pw_rules.append(
+                            f"Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
+                            f" && {{ords}}[[{slot}]] > 0 :> 0"
+                        )
+                    lines.extend(
+                        [
+                            "(* Plane-wave reduction on lagComp: zero transverse Derivative   *)",
+                            "(* terms that may survive from Scalar pre-resolution (#215).     *)",
+                            f"lagComp = lagComp /. {{{', '.join(pw_rules)}}};",
+                            "lagComp = Expand[lagComp];",
+                            '  Print["  lagComp after plane-wave reduction: ", LeafCount[lagComp]];',
+                        ]
+                    )
+            lines.extend(
+                [
+                    "",
                     "(* Build field function list from lagComp.                     *)",
                     "(* Match BOTH bare f[args] AND Derivative[...][f][args] forms.  *)",
                     "(* Fields that appear only in derivatives (e.g. photon in F²)   *)",
