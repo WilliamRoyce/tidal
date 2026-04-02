@@ -22,6 +22,7 @@
 \textrm{\textbf{Operator}} & \textbf{Math} & \textbf{Fourier multiplier}
     & \textbf{Modal} & \textbf{FD} \\
 \midrule
+\multicolumn{5}{l}{\itshape Pure spatial (time order = 0)} \\[2pt]
 identity         & $1$                    & $1$                          & \yes & \yes \\
 laplacian        & $\nabla^2$             & $-\sum_i k_i^2$             & \yes & \yes \\
 laplacian\_x     & $\partial_x^2$         & $-k_x^2$                    & \yes & \yes \\
@@ -34,10 +35,30 @@ cross\_deriv\_xy & $\partial_x\partial_y$ & $-k_x k_y$                  & \yes &
 cross\_deriv\_xz & $\partial_x\partial_z$ & $-k_x k_z$                  & \yes & \yes \\
 cross\_deriv\_yz & $\partial_y\partial_z$ & $-k_y k_z$                  & \yes & \yes \\
 biharmonic       & $\nabla^4$             & $(\sum_i k_i^2)^2$          & \yes & \yes \\
+derivative\_3\_x & $\partial_x^3$         & $-ik_x^3$                   & \yes & \yes \\
+derivative\_3\_y & $\partial_y^3$         & $-ik_y^3$                   & \yes & \yes \\
+derivative\_3\_z & $\partial_z^3$         & $-ik_z^3$                   & \yes & \yes \\
 \midrule
-first\_deriv\_t  & $\partial_t$           & \textit{n/a (time operator)} & \no  & \yes \\
-derivative\_N\_x & $\partial_x^N$         & $(ik_x)^N$                  & \no  & \yes \\
-mixed\_T\_S1\_\ldots & mixed               & \textit{varies}             & \no  & \yes \\
+\multicolumn{5}{l}{\itshape Velocity (time order = 1)} \\[2pt]
+first\_deriv\_t  & $\partial_t$           & $1$ (velocity coupling)      & \yes & \yes \\
+mixed\_T1\_S1x   & $\partial_t\partial_x$ & $ik_x$ (velocity $\times$ gradient) & \yes & \yes \\
+mixed\_T1\_S1y   & $\partial_t\partial_y$ & $ik_y$                      & \yes & \yes \\
+mixed\_T1\_S1z   & $\partial_t\partial_z$ & $ik_z$                      & \yes & \yes \\
+\midrule
+\multicolumn{5}{l}{\itshape Acceleration (time order = 2) --- mass matrix coupling} \\[2pt]
+d2\_t            & $\partial_t^2$         & $1$ (mass matrix)            & \yes & \yes \\
+mixed\_T2\_S1x   & $\partial_t^2\partial_x$ & $ik_x$                   & \yes & \yes \\
+mixed\_T2\_S1y   & $\partial_t^2\partial_y$ & $ik_y$                   & \yes & \yes \\
+mixed\_T2\_S1z   & $\partial_t^2\partial_z$ & $ik_z$                   & \yes & \yes \\
+mixed\_T2\_S2x   & $\partial_t^2\partial_x^2$ & $-k_x^2$              & \yes & \yes \\
+mixed\_T2\_S2y   & $\partial_t^2\partial_y^2$ & $-k_y^2$              & \yes & \yes \\
+mixed\_T2\_S2z   & $\partial_t^2\partial_z^2$ & $-k_z^2$              & \yes & \yes \\
+\midrule
+\multicolumn{5}{l}{\itshape Jerk (time order = 3) --- eliminated via EOM substitution} \\[2pt]
+d3\_t            & $\partial_t^3$         & $1$                          & \yes & \yes \\
+mixed\_T3\_S1x   & $\partial_t^3\partial_x$ & $ik_x$                   & \yes & \yes \\
+mixed\_T3\_S1y   & $\partial_t^3\partial_y$ & $ik_y$                   & \yes & \yes \\
+mixed\_T3\_S1z   & $\partial_t^3\partial_z$ & $ik_z$                   & \yes & \yes \\
 \bottomrule
 \end{tabular}
 };
@@ -45,11 +66,13 @@ mixed\_T\_S1\_\ldots & mixed               & \textit{varies}             & \no  
 % Legend annotation
 \node[below=0.3cm of current bounding box.south, font=\scriptsize\itshape,
       text=GrayLine, align=center] {%
-    \yes\ = supported (exact Fourier multiplier for modal;
-    FD stencils for all solvers) \qquad
-    \no\ = not available (modal ineligible if present)\\[2pt]
+    \yes\ = supported with exact Fourier multiplier (modal) or
+    FD stencils (all solvers). \quad
+    All 31 operators are modal-eligible.\\[2pt]
     Finite-difference orders 2/4/6 available. \quad
-    Spectral mode uses exact multipliers for all-periodic BCs.};
+    Spectral mode uses exact multipliers for all-periodic BCs.\\[2pt]
+    Acceleration/jerk operators arise in higher-derivative theories
+    (Ostrogradsky reduction via generalised mass matrix).};
 
 \end{tikzpicture}
 \end{document}
