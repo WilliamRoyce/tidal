@@ -2432,6 +2432,13 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
         )
         return 1
 
+    # Step 3b: Normalize kinetic coefficients (e.g. xi in dark photon torsion).
+    # ExportJSON emits RHS un-divided when the kinetic coeff is param-based.
+    # At xi=0 the torsion fields become constraints; at xi≠0 divide through.
+    from tidal.symbolic.json_loader import normalize_kinetic_coefficients
+
+    spec = normalize_kinetic_coefficients(spec, params)
+
     # All simulation goes through the native IDA/leapfrog path
     try:
         return _simulate(args, spec, params)

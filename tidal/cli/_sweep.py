@@ -512,6 +512,10 @@ def _simulate_run(  # noqa: PLR0913
         spec = load_equation_system(spec_path)
     params = _parse_params(sim_args.param, spec)
 
+    from tidal.symbolic.json_loader import normalize_kinetic_coefficients
+
+    spec = normalize_kinetic_coefficients(spec, params)
+
     t0 = time.monotonic()
     exit_code = _simulate(sim_args, spec, params)
     wall_time = time.monotonic() - t0

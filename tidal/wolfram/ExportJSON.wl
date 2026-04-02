@@ -399,7 +399,8 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
 (* Equation conversion for multi-field systems *)
 (* Phase 2, Issue 6: Now supports parabolic (d_t), elliptic (no time), and hyperbolic (d2_t) PDEs *)
 EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, metadata_] := Module[
-  {terms, rhsTerms, rhs, timeDerivTerm, lhsTimeOrder, lhsStructure},
+  {terms, rhsTerms, rhs, timeDerivTerm, lhsTimeOrder, lhsStructure, kineticCoeffStr},
+  kineticCoeffStr = None;
 
   (* Same logic as EquationToJSON but with cross-field awareness *)
   terms = If[Head[componentEq] === Plus, List @@ componentEq, {componentEq}];
@@ -450,17 +451,28 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     ]
   ];
 
-  (* LHS normalization: extract time-derivative coefficient and normalize RHS *)
-  (* For |lhsCoeff| = 1: rhs = non-time terms as-is (handles both VarD and direct construction) *)
-  (* For non-unit lhsCoeff (curved spacetime): rhs = -non_time_terms / lhsCoeff *)
-  (*   Example: lhsCoeff = -Omega^{-2} gives rhs = Omega^2 * non_time_terms *)
+  (* LHS normalization: extract time-derivative coefficient and normalize RHS        *)
+  (* For |lhsCoeff| = 1: rhs = non-time terms as-is                                *)
+  (* For non-unit lhsCoeff with coord dependence (e.g. 1/Omega[r[]]): divide here  *)
+  (* For non-unit lhsCoeff that is a pure parameter (e.g. xi, kappa^2):            *)
+  (*   DO NOT divide — keep RHS unnormalized and record kinetic_coefficient_symbolic *)
+  (*   so Python can handle the xi=0 degenerate case (field becomes constraint).    *)
+  (*   Discrimination: FreeQ[lhsCoeff, _[]] is True for pure parameters,           *)
+  (*   False for metric/coordinate-dependent expressions like Omega[r[]].           *)
   Module[{lhsCoeff},
     lhsCoeff = If[Length[timeDerivTerm] > 0,
       ExtractLHSCoefficient[timeDerivTerm[[1]]],
       -1
     ];
     If[Abs[lhsCoeff] =!= 1,
-      rhs = -rhs / lhsCoeff
+      If[!NumericQ[lhsCoeff] && FreeQ[lhsCoeff, _[]],
+        (* Pure-parameter kinetic coeff (e.g., xi): keep RHS unnormalized.           *)
+        (* Python normalizes at runtime so xi=0 can be handled as a constraint.     *)
+        rhs = -rhs;
+        kineticCoeffStr = ToString[lhsCoeff, InputForm],
+        (* Coordinate-dependent (e.g., 1/Omega^2) or numeric: divide here as before *)
+        rhs = -rhs / lhsCoeff
+      ]
     ];
     (* ALWAYS Expand the RHS to ensure Plus structure for ParseMultiFieldRHS.
        Total[] (line 395) may trigger Mathematica's auto-factoring, collapsing
@@ -488,6 +500,12 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
 
   (* Build structured LHS for flexible PDE types *)
   lhsStructure = BuildLHSStructure[fieldName, lhsTimeOrder];
+
+  (* Annotate LHS with kinetic coefficient when RHS was left unnormalized       *)
+  (* (param-based kinetic coeff). Python uses this to normalize at runtime.    *)
+  If[kineticCoeffStr =!= None,
+    lhsStructure["kinetic_coefficient_symbolic"] = kineticCoeffStr
+  ];
 
   Module[{result, constraintHints},
     result = <|
