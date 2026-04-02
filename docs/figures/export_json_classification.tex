@@ -1,0 +1,231 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tidal-tikz-styles}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.45cm and 0.6cm,
+    every node/.append style={text opacity=1},
+    % Operator name terminal
+    opname/.style={
+        preset, minimum width=2.4cm, minimum height=0.5cm,
+        font=\scriptsize\ttfamily\bfseries, text=GreenLine
+    },
+]
+
+% ===================================================================
+%  TITLE
+% ===================================================================
+\node[font=\normalsize\bfseries, text=black] (title)
+    {JSON Export and Operator Classification};
+\node[below=0.02cm of title, font=\tiny\sffamily, text=GrayLine]
+    {Scalar PDEs $\to$ structured JSON with classified operators};
+
+% ===================================================================
+%  TOP-LEVEL FLOW
+% ===================================================================
+
+\node[stage=Purple, below=0.5cm of title, text width=4.0cm] (bmfjs)
+    {\textbf{BuildMultiFieldJSONStructure}\\[-1pt]
+     \scriptsize all component equations $\to$ JSON};
+
+\node[stage=Purple, below=0.5cm of bmfjs] (eqloop)
+    {\textbf{For each} field equation};
+
+\node[funcbox=Purple, below=of eqloop] (etjm)
+    {Parse equation into\\LHS + RHS terms};
+
+\draw[arr] (bmfjs) -- (eqloop);
+\draw[arr] (eqloop) -- (etjm);
+
+% --- LHS: detect time order ---
+\node[funcbox=Pink, below left=0.7cm and 3.0cm of etjm] (dtlo)
+    {\textbf{DetectLHSTimeOrder}\\[-1pt]
+     \scriptsize max $\partial_t$ order of own field};
+
+\node[detail=Pink, below=0.3cm of dtlo, text width=3.0cm]
+    {Determines PDE type:\\
+     0 = constraint (elliptic)\\
+     1 = parabolic\\
+     2 = hyperbolic (wave)\\[2pt]
+     Drives solver selection:\\
+     order 0 $\to$ IDA (DAE)\\
+     order 2 $\to$ CVODE or modal};
+
+\draw[arr] (etjm.south) -| (dtlo.north)
+    node[pos=0.25, above, font=\tiny] {LHS};
+
+% --- RHS: parse terms ---
+\node[funcbox=Pink, below right=0.7cm and 3.0cm of etjm] (pmrhs)
+    {\textbf{ParseMultiFieldRHS}\\[-1pt]
+     \scriptsize split into additive terms};
+
+\draw[arr] (etjm.south) -| (pmrhs.north)
+    node[pos=0.25, above, font=\tiny] {RHS};
+
+% --- Per-term identification ---
+\node[stage=Pink, below=0.5cm of pmrhs] (termloop)
+    {\textbf{For each} RHS term};
+
+\node[funcbox=Pink, below=of termloop] (imft)
+    {Identify: coefficient,\\operator, target field};
+
+\draw[arr] (pmrhs) -- (termloop);
+\draw[arr] (termloop) -- (imft);
+
+% ===================================================================
+%  CLASSIFY OPERATOR TYPE: Decision cascade
+% ===================================================================
+
+\node[stage=Orange, below=0.7cm of imft, text width=3.6cm] (cot_title)
+    {\textbf{ClassifyOperatorType}\\[-1pt]
+     \scriptsize derivative pattern $\to$ canonical name};
+\draw[arr] (imft) -- (cot_title);
+
+% --- Decision 1: no Derivative? ---
+\node[decision, below=0.6cm of cot_title, text width=1.8cm] (d1)
+    {contains\\derivatives?};
+\draw[arr] (cot_title) -- (d1);
+
+\node[opname, right=2.5cm of d1] (op_id) {"identity"};
+\draw[arr] (d1.east) -- (op_id)
+    node[midway, above, font=\tiny] {no};
+
+% --- Decision 2: pure time derivative? ---
+\node[decision, below=0.7cm of d1, text width=2.0cm] (d2)
+    {pure time\\derivative?};
+\draw[arr] (d1.south) -- (d2)
+    node[midway, right, font=\tiny] {yes};
+
+\node[opname, right=2.5cm of d2] (op_fdt) {"first\_derivative\_t"};
+\draw[arr] (d2.east) -- (op_fdt)
+    node[midway, above, font=\tiny] {yes};
+
+% --- Decision 3: mixed time-space? ---
+\node[decision, below=0.7cm of d2, text width=2.0cm] (d3)
+    {mixed\\time + space?};
+\draw[arr] (d2.south) -- (d3)
+    node[midway, right, font=\tiny] {no};
+
+\node[opname, right=2.5cm of d3, text width=3.2cm] (op_mg)
+    {"mixed\_T$n$\_S$m$dir"};
+\node[annot, below=0.1cm of op_mg, text width=3.2cm]
+    {e.g.\ $\partial_t \partial_x A$\\$\to$ \texttt{mixed\_T1\_S1x}\\[2pt]
+     $\partial_t^2 \partial_x^2 A$\\$\to$ \texttt{mixed\_T2\_S2x}};
+\draw[arr] (d3.east) -- (op_mg)
+    node[midway, above, font=\tiny] {yes};
+
+% --- Decision 4: spatial order? ---
+\node[decision, below=0.7cm of d3, text width=2.0cm] (d5)
+    {spatial\\order?};
+\draw[arr] (d3.south) -- (d5)
+    node[midway, right, font=\tiny] {no};
+
+% --- Spatial order sub-tree ---
+
+% Order 1
+\node[decision, below left=0.8cm and 2.0cm of d5, text width=1.4cm] (d5a)
+    {order\\= 1?};
+\draw[arr] (d5.south) -- (d5a);
+
+\node[opname, left=1.5cm of d5a] (op_grad) {"gradient\_dir"};
+\node[annot, below=0.1cm of op_grad, text width=2.2cm]
+    {$\partial_x \to$ \texttt{gradient\_x}\\
+     $\partial_y \to$ \texttt{gradient\_y}};
+\draw[arr] (d5a.west) -- (op_grad)
+    node[midway, above, font=\tiny] {yes};
+
+% Order 2
+\node[decision, below=0.7cm of d5a, text width=1.4cm] (d5b)
+    {order\\= 2?};
+\draw[arr] (d5a.south) -- (d5b)
+    node[midway, right, font=\tiny] {no};
+
+% Sub-classification of order 2
+\node[decision, left=2.0cm of d5b, text width=1.8cm] (d5b_sub)
+    {single axis\\or cross?};
+\draw[arr] (d5b.west) -- (d5b_sub)
+    node[midway, above, font=\tiny] {yes};
+
+\node[opname, above left=0.6cm and 0.5cm of d5b_sub] (op_lap)
+    {"laplacian\_dir"};
+\node[opname, below left=0.6cm and 0.5cm of d5b_sub] (op_cross)
+    {"cross\_derivative\_xy"};
+\draw[arr] (d5b_sub.north) -| (op_lap.south)
+    node[pos=0.25, right, font=\tiny] {single};
+\draw[arr] (d5b_sub.south) -| (op_cross.north)
+    node[pos=0.25, right, font=\tiny] {cross};
+
+% Order 4
+\node[decision, below=0.7cm of d5b, text width=1.4cm] (d5c)
+    {order\\= 4?};
+\draw[arr] (d5b.south) -- (d5c)
+    node[midway, right, font=\tiny] {no};
+
+\node[opname, left=1.5cm of d5c] (op_bih) {"biharmonic"};
+\draw[arr] (d5c.west) -- (op_bih)
+    node[midway, above, font=\tiny] {yes};
+
+% Fallback
+\node[funcbox=Gray, below=0.7cm of d5c] (fallback)
+    {Generic name from\\derivative profile};
+\draw[arr] (d5c.south) -- (fallback)
+    node[midway, right, font=\tiny] {no};
+
+\node[opname, left=1.5cm of fallback] (op_gen) {"derivative\_N\_dir"};
+\node[annot, below=0.1cm of op_gen, text width=2.4cm]
+    {e.g.\ \texttt{derivative\_3\_x}\\
+     \texttt{derivative\_2x\_1y}};
+\draw[arr] (fallback.west) -- (op_gen);
+
+% ===================================================================
+%  MASS/COUPLING MATRIX EXTRACTION
+% ===================================================================
+
+\node[stage=Purple, below=2.5cm of d5, text width=3.8cm] (emce)
+    {\textbf{Mass/Coupling Matrix Extraction}\\[-1pt]
+     \scriptsize scan identity-operator terms};
+
+\node[detail=Purple, below=0.3cm of emce, text width=3.8cm]
+    {\textbf{Convention}:\\
+     $M_{ij} = -($coefficient of\\
+     \texttt{identity}$(f_j)$ in equation$_i)$\\[3pt]
+     Diagonal $\to$ mass terms\\
+     Off-diagonal $\to$ coupling terms\\[3pt]
+     Used by modal solver for\\
+     eigendecomposition and by\\
+     energy measurement};
+
+\draw[dotarr] ([xshift=1.0cm]eqloop.south) |- (emce.east)
+    node[pos=0.85, above, font=\tiny] {after all eqs};
+
+% ===================================================================
+%  OUTPUT
+% ===================================================================
+
+\node[stage=Blue, below=2.0cm of emce] (jsonout)
+    {\textbf{spec.json}\\[-1pt]
+     \scriptsize metadata, spacetime, fields,\\
+     \scriptsize equations, mass/coupling matrices};
+
+\draw[arr] (emce) -- (jsonout);
+\draw[dotarr] (dtlo.south) |- ([yshift=0.3cm]jsonout.west) -- (jsonout.west);
+
+% ===================================================================
+%  ClassifySpatialProfile reference (annotation)
+% ===================================================================
+
+\node[detail=Pink, right=1.5cm of d5, text width=4.2cm] (csp)
+    {\textbf{Spatial profile mapping}\\[3pt]
+     $\{1,0,0\} \to$ \texttt{gradient\_x}\\
+     $\{2,0,0\} \to$ \texttt{laplacian\_x}\\
+     $\{0,2,0\} \to$ \texttt{laplacian\_y}\\
+     $\{1,1,0\} \to$ \texttt{cross\_derivative\_xy}\\
+     $\{2,2,0\} \to$ \texttt{laplacian} (full)\\
+     $\{4,0,0\} \to$ \texttt{biharmonic}\\
+     $\{3,0,0\} \to$ \texttt{derivative\_3\_x}\\
+     else $\to$ generic from profile};
+
+\draw[codearr] (d5.east) -- (csp.west);
+
+\end{tikzpicture}
+\end{document}
