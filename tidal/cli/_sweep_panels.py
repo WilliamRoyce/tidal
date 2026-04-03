@@ -91,7 +91,13 @@ def _evaluate_sweep_overlay(
     except Exception as exc:
         msg = f"Error evaluating overlay formula {formula!r}: {exc}"
         raise ValueError(msg) from exc
-    return np.asarray(result, dtype=np.float64)
+    out = np.asarray(result, dtype=np.float64)
+    # Broadcast scalar result (e.g. formula is constant, doesn't reference swept param)
+    # to match the shape of the first swept-parameter array.
+    if out.ndim == 0 and param_arrays:
+        ref = next(iter(param_arrays.values()))
+        out = np.broadcast_to(out, np.asarray(ref).shape).copy()
+    return out
 
 
 # ------------------------------------------------------------------

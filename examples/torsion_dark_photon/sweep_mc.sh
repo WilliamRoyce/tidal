@@ -5,7 +5,11 @@
 # sampling with arctan parameterisation to cover (-∞, +∞) uniformly.
 #
 # Physics:
-#   L = (1/κ²)R̃ + α(I₁+I₂+I₃) - ¼ξ Ftorsion² + δ F·Ftorsion - ¼F²
+#   L = (1/κ²)R̃ + α I₃ - ¼ξ Ftorsion² + δ F·Ftorsion - ¼F²
+#
+# NOTE: Only the trace-sector torsion mass I₃ is included (not I₁+I₂+I₃).
+# Including I₁/I₂ would add mass to tentor/trator sectors without kinetic terms
+# → ghost instability. Only T_μ (trace) is made dynamical by ξ Ftorsion².
 #
 #   alpha = unified torsion mass (β₁=β₂=β₃)
 #   xi = torsion kinetic strength (ξ=1 = Maxwell strength)
@@ -65,20 +69,45 @@ uv run tidal sweep "${SPEC}" \
   --sweep-strategy latin_hypercube \
   --n-samples "${N_SAMPLES}" \
   --measure conversion,peak_conversion,conservation \
-  --source h_7 --target a_2 \
+  --source h_5 --target a_1 \
   --grid-shape "${GRID}" --bounds "${BOUNDS}" --periodic \
-  --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_7 \
+  --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" \
   --parallel 4 --resume \
   --output "${OUTPUT}"
 
 echo ""
+echo "--- Generating plots ---"
+
+# Sensitivity: which of (alpha, xi, deltam) drives conversion?
+uv run tidal plot "${OUTPUT}" --type sweep-tornado \
+  --metric P_max \
+  --title "Dark photon torsion: parameter sensitivity (P_max)" \
+  --output "${OUTPUT}/plot_tornado.png" --quiet
+
+# Scatter matrix: all parameter pairs coloured by P_max
+uv run tidal plot "${OUTPUT}" --type sweep-scatter \
+  --metric P_max \
+  --title "Dark photon torsion: parameter space (coloured by P_max)" \
+  --output "${OUTPUT}/plot_scatter.png" --quiet
+
+# Energy conservation quality across parameter space
+uv run tidal plot "${OUTPUT}" --type sweep-scatter \
+  --metric max_energy_error \
+  --title "Dark photon torsion: energy conservation across parameter space" \
+  --output "${OUTPUT}/plot_conservation.png" --quiet
+
+echo ""
 echo "=== Sweep complete ==="
 echo "Results: ${OUTPUT}"
+echo "Plots:"
+echo "  ${OUTPUT}/plot_tornado.png     [parameter sensitivity ranking]"
+echo "  ${OUTPUT}/plot_scatter.png     [pairwise scatter, coloured by P_max]"
+echo "  ${OUTPUT}/plot_conservation.png [energy conservation quality]"
 echo ""
-echo "Post-analysis:"
+echo "Sensitivity analysis:"
 echo "  uv run tidal analyze ${OUTPUT} --sensitivity morris --metric P_max"
 echo ""
 echo "Conversion coefficient: C₀ = P_max / B₀² = P_max / ${B0}²"
-echo "Amplification: A = √(C₀ / C₀_EM) relative to δ=ξ=0 baseline"
+echo "Amplification: A = √(C₀ / C₀_EM) relative to ξ=δ=0 baseline"
