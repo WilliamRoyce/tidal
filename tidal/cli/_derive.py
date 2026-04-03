@@ -5594,6 +5594,44 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "",
             )
         )
+    # Evaluate any remaining abstract background field derivative products
+    # in the field equations.  After Component E-L, equation coefficients
+    # may contain contracted products like CD[-a][Abar[-b]]*CD[b][Abar[a]]
+    # that weren't resolved during Lagrangian decomposition (they appear
+    # as scalar factors that pass through DecomposeScalarExpression unchanged).
+    # Fix: expand to coordinate basis using TraceBasisDummy + EvaluatePDBackgroundField.
+    if ctx.background_fields:
+        bg_heads = [
+            f"{ctx.prefix}{bf['name'].capitalize()}"
+            for bf in ctx.background_fields
+            if bf["type"] != "scalar"
+        ]
+        if bg_heads:
+            bg_pattern = " | ".join(f"__{h}" for h in bg_heads)
+            lines.extend(
+                (
+                    "(* Evaluate remaining abstract background field derivatives       *)",
+                    "(* in equation coefficients (e.g., F-bar^2 = B0^2 products).     *)",
+                    "(* These arise when Component E-L produces coefficients with      *)",
+                    "(* contracted CD[Abar] products that weren't ToBasis-decomposed. *)",
+                    f"Module[{{bgPattern = {bg_pattern}, fld, eq, resolved}},",
+                    "  Do[",
+                    "    eq = fieldEquations[fld];",
+                    "    If[!FreeQ[eq, bgPattern],",
+                    "      resolved = eq /. coeff_ /; (!FreeQ[coeff, bgPattern] && FreeQ[coeff, Derivative]) :>",
+                    f"        Quiet[TraceBasisDummy[ToBasis[{ctx.chart}][coeff]]];",
+                    "      If[FreeQ[resolved, bgPattern],",
+                    '        Print["  Resolved background field products in ", fld];',
+                    "        fieldEquations[fld] = resolved,",
+                    '        Print["  WARNING: Could not resolve all background products in ", fld]',
+                    "      ]",
+                    "    ];",
+                    "  , {fld, Keys[fieldEquations]}]",
+                    "];",
+                    "",
+                )
+            )
+
     lines.extend(
         (
             "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];",
