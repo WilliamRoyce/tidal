@@ -71,15 +71,11 @@ uv run tidal sweep "${SPEC}" \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" --param "xi=${XI}" \
-  --parallel 4 --resume \
-  --no-require-stable \
+  --parallel 4 --no-require-stable --resume \
   --output "${OUTPUT}"
-# --no-require-stable: torsion mass matrix entries appear negative by TIDAL
-# sign convention even for stable physics. Ghost-free region is xi > deltam^2:
-# with xi=0.1 and |deltam| <= 0.3, all 56 points satisfy 0.1 > 0.09 (xi>0.1,
-# marginally; note |deltam|=0.3 gives deltam^2=0.09 < 0.1). Runs with
-# |deltam| > sqrt(xi)=0.316 enter the ghost region and may diverge (NaN);
-# these will be flagged as run_status=diverged in the output.
+# --no-require-stable: pre-simulation mass check flags R̃ tensor/axial eigenvalues
+# as tachyonic, but these have zero physical coupling. The modal solver's
+# _suppress_tachyonic_noise() (#222) handles them during evolution.
 
 echo ""
 echo "--- Generating plots ---"

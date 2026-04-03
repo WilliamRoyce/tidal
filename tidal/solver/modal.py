@@ -1617,6 +1617,74 @@ def _has_position_dependent_terms(spec: EquationSystem) -> bool:
     return False
 
 
+def _suppress_tachyonic_noise(
+    eig_vals: NDArray[np.complex128],
+    y0_eigen: NDArray[np.complex128],
+    *,
+    growth_threshold: float = 1e-8,
+    coupling_threshold: float = 1e-12,
+) -> tuple[NDArray[np.complex128], int]:
+    """Suppress tachyonic eigenvectors with zero physical coupling.
+
+    In theories like PGT with R̃, the mass matrix can have tachyonic eigenvalues
+    (positive real part) corresponding to tensor/axial torsion sectors.  These
+    modes may have **zero physical coupling** — the source terms project entirely
+    onto the stable (trace) eigenvector.  However, machine-precision noise
+    (~10⁻¹⁶) in these uncoupled modes grows as exp(Re(λ)·t), overwhelming the
+    physical solution.
+
+    This function identifies modes that are:
+
+    1. Tachyonic: ``Re(λ) > growth_threshold`` (exponentially growing)
+    2. Uncoupled: ``|IC projection| < coupling_threshold * max(|IC|)``
+       (zero physical coupling within numerical precision)
+
+    For such modes, the eigenvalue is set to zero (freezing the mode at its
+    initial noise level) instead of allowing exponential amplification.
+
+    This is a **numerical noise fix**, not a physics change: if the IC genuinely
+    projects onto a tachyonic eigenvector, the mode is kept.  The threshold
+    scales with IC magnitude to be robust across different amplitudes.
+
+    Follows the existing gauge-mode suppression pattern (infinite eigenvalues
+    set to zero for gauge degrees of freedom).
+
+    Parameters
+    ----------
+    eig_vals : ndarray, shape (n_modes, block_size)
+        Eigenvalues per k-mode and eigenvector.
+    y0_eigen : ndarray, shape (n_modes, block_size)
+        IC amplitude projected onto each eigenvector.
+    growth_threshold : float
+        Minimum positive real part to classify as tachyonic.
+    coupling_threshold : float
+        Relative threshold for "zero coupling" (fraction of max IC).
+
+    Returns
+    -------
+    eig_vals : ndarray
+        Modified eigenvalues (tachyonic uncoupled modes set to 0).
+    n_suppressed : int
+        Number of suppressed mode-components.
+    """
+    max_ic = np.max(np.abs(y0_eigen))
+    if max_ic == 0:
+        return eig_vals, 0
+
+    noise_floor = coupling_threshold * max_ic
+
+    tachyonic = np.real(eig_vals) > growth_threshold
+    uncoupled = np.abs(y0_eigen) < noise_floor
+    suppress_mask = tachyonic & uncoupled
+
+    n_suppressed = int(np.sum(suppress_mask))
+    if n_suppressed > 0:
+        eig_vals = eig_vals.copy()
+        eig_vals[suppress_mask] = 0.0
+
+    return eig_vals, n_suppressed
+
+
 def _warn_eigenvalue_growth(
     eigenvalues: NDArray[np.complex128],
     dt_total: float,
@@ -1746,6 +1814,18 @@ def _evolve_per_mode(
 
         # Transform IC to eigenbasis
         y0_eigen = np.einsum("mij,mj->mi", v_inv, y0_block.T)
+
+        # Suppress tachyonic modes with zero physical coupling.
+        # These are numerical noise amplifiers, not physics — see #222.
+        eig_vals, n_suppressed = _suppress_tachyonic_noise(eig_vals, y0_eigen)
+        if n_suppressed > 0:
+            import logging as _log_tach  # noqa: PLC0415
+
+            _log_tach.getLogger(__name__).info(
+                "Suppressed %d tachyonic modes with zero IC coupling "
+                "(numerical noise prevention)",
+                n_suppressed,
+            )
 
         block_data.append((block_slots, eig_vals, v_mat, y0_eigen))
 

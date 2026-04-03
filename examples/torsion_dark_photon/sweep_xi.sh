@@ -76,12 +76,10 @@ uv run tidal sweep "${SPEC}" \
   --no-require-stable \
   --resume \
   --output "${OUTPUT}"
-# --no-require-stable: the dark photon torsion equations have torsion fields
-# whose mass matrix entries appear negative by TIDAL's sign convention
-# (mass[i,j] = -(coeff of identity(j) in EOM_i)), even when the physics
-# is stable. Ghost-free condition xi > deltam^2 is satisfied for all points
-# in this sweep (xi >= 0.01 > deltam^2 = 0.01). The stability check is
-# overly conservative here and would block valid, convergent simulations.
+# --no-require-stable: the pre-simulation mass check flags R̃ tensor/axial
+# eigenvalues as tachyonic, but these modes have ZERO physical coupling
+# (100% trace-aligned). The modal solver's _suppress_tachyonic_noise() (#222)
+# freezes these modes during evolution, preventing numerical noise growth.
 
 echo ""
 echo "--- Generating plots ---"
