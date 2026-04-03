@@ -97,7 +97,9 @@ field = "A"
 perturbation_name = "a"
 background = "Abar"
 
-# NO TT gauge on h — torsion coupling may modify all graviton channels
+# NO TT gauge on h — torsion coupling may modify all graviton channels.
+# The h↔a Gertsenshtein coupling is extracted by Component E-L after
+# background field derivatives are evaluated to B₀ components.
 # Lorenz gauge on photon a only
 [[gauge]]
 field = "a"

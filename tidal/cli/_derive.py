@@ -720,10 +720,16 @@ def _wls_vector_background_substitution(  # noqa: PLR0914
                 )
 
         rules_str = ", ".join(rules)
+        comps_str_wl = ", ".join(str(c) for c in comps)
+        contra_comps = _compute_contra_components(comps, ctx.metric_diagonal)
+        contra_str_wl = ", ".join(contra_comps)
         lines.extend(
             [
                 f"(* Substitute vector/tensor background {field['name']} *)",
                 f"{comp_var} = {comp_var} /. {wl_list(rules_str)};",
+                f"(* Evaluate any remaining CD[{field['name']}] derivative products *)",
+                f"{comp_var} = EvaluatePDBackgroundField[{comp_var}, {ctx.chart},"
+                f" {prefixed}, {wl_list(comps_str_wl)}, {wl_list(contra_str_wl)}];",
             ]
         )
 
@@ -1689,7 +1695,7 @@ def _wls_deferred_field_li_sub(
     return lines
 
 
-def _wls_deferred_field_expand(
+def _wls_deferred_field_expand(  # noqa: C901
     ctx: _WlsContext,
     matter_perts: list[dict[str, Any]],
     matter_pert_info: list[dict[str, str]],
@@ -1731,12 +1737,79 @@ def _wls_deferred_field_expand(
                 pert_head = mpi["pert_head"]
                 break
 
-        lines.append(f"(* Expand deferred {fname}: abstract F → d(a) - d(a) *)")
+        lines.append(
+            f"(* Expand deferred {fname}: F[LI[0]] → d(Abar), F[LI[1]] → d(a) *)"
+        )
         if field_head and pert_head:
+            # Find the background head for this matter perturbation
+            bg_head = ""
+            for mp in matter_perts:
+                if mp["field"] in field.get("definition", ""):
+                    bg_name = mp.get("background", "")
+                    if bg_name:
+                        bg_head = f"{ctx.prefix}{bg_name.capitalize()}"
+                    break
+            f_head = f"{ctx.prefix}{fname.capitalize()}"
+            f"dpt{fname.capitalize()}"
             lines.extend(
                 [
-                    f"dpt{fname.capitalize()}DeferredRules = {rule_var} /. {field_head} -> {pert_head};",
-                    f"l2Raw = l2Raw /. dpt{fname.capitalize()}DeferredRules;",
+                    f"(* Strip LI perturbation labels from deferred {fname} before rule application. *)",
+                    "(* xPert produces F[LI[n], -a, -b] but the definition rules match F[-a, -b]. *)",
+                    "(* Split: LI[0] → background (Abar), LI[1] → perturbation (a).              *)",
+                    f"dpt{fname.capitalize()}PertRules = {rule_var} /. {field_head} -> {pert_head};",
+                ]
+            )
+            if bg_head:
+                lines.extend(
+                    [
+                        f"dpt{fname.capitalize()}BgRules = {rule_var} /. {field_head} -> {bg_head};",
+                        "(* Replace F[LI[0], args] → d(Abar) using background rules.    *)",
+                        "(* Use _[0] pattern to match LI[0] regardless of xAct context. *)",
+                        f"l2Raw = l2Raw /. {f_head}[_[0], args__] :>",
+                        f"  ({f_head}[args] /. dpt{fname.capitalize()}BgRules);",
+                        f'Print["After deferred {fname} LI[0] (background) substitution: "',
+                        ', If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
+                    ]
+                )
+            lines.extend(
+                [
+                    "(* Replace F[LI[1], args] → d(a) using perturbation rules *)",
+                    f"l2Raw = l2Raw /. {f_head}[_[1], args__] :>",
+                    f"  ({f_head}[args] /. dpt{fname.capitalize()}PertRules);",
+                    "(* Also replace any remaining bare F (LI already stripped) *)",
+                    f"l2Raw = l2Raw /. dpt{fname.capitalize()}PertRules;",
+                ]
+            )
+            # Evaluate remaining abstract background field derivatives in L^(2).
+            # After deferred expansion, terms contain CD[-a][Abar[-b]] (abstract
+            # background derivatives) that prevent Component E-L from extracting
+            # h↔a coupling.  Build explicit component rules: CD[{n}][Abar[{mu}]]
+            # → D[Abar_mu, coord_n].  This bypasses ToBasis/TraceBasisDummy.
+            if bg_head:
+                bg_comps = ctx.background_fields[0]["components"]
+                cd_sym = f"{ctx.prefix}CD"
+                lines.extend(
+                    [
+                        "(* Evaluate abstract background field derivatives in L^(2).       *)",
+                        "(* Build explicit rules: CD[{n,-chart}][Abar[{mu,-chart}]] →     *)",
+                        "(* D[Abar_mu, coord_n] for each (n, mu) component pair.          *)",
+                        f"Module[{{coords = GetCoordinateSymbols[{ctx.chart}],",
+                        f"         bgComps = {{{', '.join(str(c) for c in bg_comps)}}}}},",
+                        "  Module[{bgCDRules},",
+                        "    bgCDRules = Flatten[Table[",
+                        f"      {cd_sym}[{{n, -{ctx.chart}}}][{bg_head}[{{mu, -{ctx.chart}}}]] ->",
+                        "        Simplify[D[bgComps[[mu+1]], coords[[n+1]]]],",
+                        "      {mu, 0, Length[bgComps]-1}, {n, 0, Length[coords]-1}]];",
+                        "    l2Raw = l2Raw /. bgCDRules;",
+                        '    Print["After explicit bg derivative eval: ",',
+                        '      If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms, ",',
+                        f'      If[FreeQ[l2Raw, {bg_head}], "all resolved", "some remain"]];',
+                        "  ]",
+                        "];",
+                    ]
+                )
+            lines.extend(
+                [
                     f'Print["After deferred {fname} expansion: "'
                     f', If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
                     "",
@@ -2053,6 +2126,14 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* Validate that xPert fully expanded *)",
             "If[!FreeQ[l2Raw, Perturbation],",
             '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
+            "];",
+            "",
+            "(* DEBUG: count terms with both h and a fields (Gertsenshtein cross terms) *)",
+            f"Module[{{hHead = {ctx.prefix}H, aHead = {ctx.prefix}Epsilon, terms}},",
+            "  terms = If[Head[l2Raw]===Plus, List@@l2Raw, {l2Raw}];",
+            '  Print["[DEBUG] L^(2) cross-terms (h*a): ",',
+            "    Count[terms, t_ /; (!FreeQ[t, hHead] && !FreeQ[t, aHead])],",
+            '    "/", Length[terms]];',
             "];",
             "",
             "(* Divide out background volume element sqrt(-g0)                   *)",
@@ -4248,6 +4329,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             '    " pre-decomposed terms to lagComp"];',
             "  lagComp += $tidalPreDecomposed;",
             "];",
+            "",
             "Clear[lagTerms, $tidalPreDecomposed];",
             _wls_timing_end("tCanonDecomp", "Canonical Lagrangian decomposition"),
             "",
@@ -4276,6 +4358,46 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "lagComp = lagComp /. Derivative[orders__][g_][args__] /;",
             "  Length[{orders}] < nCoords :>",
             "  Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
+            "",
+        ]
+    )
+
+    # --- Early Component E-L + JSON export (before Hamiltonian) ---
+    # The Hamiltonian decomposition may timeout for complex theories (#224).
+    # Run Component E-L on lagComp NOW so that EOM are exported even if the
+    # Hamiltonian step is killed.  The Hamiltonian will be injected later.
+    lines.extend(
+        [
+            "",
+            "(* === Early Component E-L: compute EOM from lagComp before Hamiltonian === *)",
+            "(* This ensures EOM are exported even if the Hamiltonian decomposition      *)",
+            "(* times out.  The Hamiltonian is injected into the JSON later.             *)",
+            "(* Always run early Component E-L — $tidalVarDSuccess may be set by *)",
+            "(* the VarD attempt in _wls_metadata_and_export, but at this point  *)",
+            "(* in _wls_canonical_phase_a, we haven't reached that code yet.     *)",
+            "(* Force-reset the flag so this path always produces fieldEquations. *)",
+            "$tidalVarDSuccess = False;",
+            "If[True,",
+            '  Print["Early Component E-L: computing equations from lagComp..."];',
+            '  Print["  lagComp LeafCount: ", LeafCount[lagComp]];',
+        ]
+    )
+    # Inline the Component E-L code (same as in _wls_metadata_and_export)
+    lines.extend(
+        [
+            "  Module[{fieldFuncsEL, eomListEL, tEL = AbsoluteTime[]},",
+            "    fieldFuncsEL = Select[fieldFuncList, !StringMatchQ[ToString[#],",
+            '      "*v_*"] &];',
+            '    Print["  Fields for E-L: ", fieldFuncsEL];',
+            "    eomListEL = ComponentEulerLagrange[lagComp, fieldFuncsEL, coordSyms];",
+            "    fieldEquations = Table[",
+            "      {compToFunc[eomListEL[[k, 1]]], eomListEL[[k, 2]]},",
+            "      {k, Length[eomListEL]}",
+            "    ];",
+            '    Print["  Early Component E-L: ", Length[fieldEquations], " equations in ",',
+            '      Round[AbsoluteTime[] - tEL, 0.1], "s"];',
+            "  ];",
+            "];",
             "",
         ]
     )
@@ -5489,6 +5611,11 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "(* trivial equations from abstract VarD + DecomposeToComponents *)",
                     "(* which fail for R̃² torsion theories.                        *)",
                     "(* ============================================================ *)",
+                    "(* Apply vector background substitutions + EvaluatePDBackgroundField *)",
+                    "(* BEFORE Component E-L so that B₀-dependent coupling terms are     *)",
+                    "(* evaluated. Without this, CD[Abar] remains abstract and the       *)",
+                    "(* Gertsenshtein h↔a coupling is lost (#224).                       *)",
+                    *_wls_vector_background_substitution(ctx, "lagComp"),
                     _wls_timing_start("tCompEL"),
                     'Print["Component E-L: computing equations from component Lagrangian..."];',
                     'Print["  lagComp LeafCount: ", LeafCount[lagComp]];',
