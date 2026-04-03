@@ -92,8 +92,12 @@ uv run tidal plot "${OUTPUT}" --type sweep \
   --title "Torsion amplification map: P_max(alpha, deltam) at xi=${XI}" \
   --output "${OUTPUT}/sweep_2d.png" --quiet
 
+# C₀ = P/B₀² analysis (primary metric per project_sweep_measurement_strategy.md)
+uv run python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
+
 echo ""
 echo "=== Sweep complete ==="
 echo "Results: ${OUTPUT}"
 echo "Plots:"
-echo "  ${OUTPUT}/sweep_2d.png  [P_max heatmap over (alpha, deltam)]"
+echo "  ${OUTPUT}/sweep_2d.png     [raw P_max heatmap, log scale]"
+echo "  ${OUTPUT}/analysis_C0.png  [C₀ = P/B₀² for stable runs]"

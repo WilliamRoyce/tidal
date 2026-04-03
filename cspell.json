@@ -482,6 +482,7 @@
     "cerror",
     "cwarn",
     "dets",
+    "Ftorsion",
     "inhom",
     "interp",
     "lerp",

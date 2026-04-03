@@ -623,32 +623,81 @@ with coupling $-\kappa^2 B_0\, \partial_z a_1$ in the $h_5$ equation of motion
 through the photon equation via $\delta$).
 Simulation: \texttt{--source h\_5 --target a\_1}.
 
-\subsubsection{Results (v0.24.3)}
+\subsubsection{Results and Tachyon Instability (v0.25, \#222)}
+
+\paragraph{Tachyonic torsion mass.}
+The three dynamical torsion trace fields $(t_0, t_{15}, t_{22})$ have a coupled
+identity-operator (mass) matrix.  After normalisation by the kinetic coefficient
+$k_c = -\xi$, the eigenvalues are
+\[
+  \lambda \in \{+35,\; +35,\; -25\}
+  \quad\text{at } (\alpha=0.5,\; \xi=0.1,\; \kappa=1).
+\]
+Two positive eigenvalues imply a \emph{tachyonic} mass: the corresponding torsion
+modes grow as $\exp(\sqrt{35}\,t) \approx \exp(5.92\,t)$.
+At $t = 50$: $\exp(296) \approx 10^{128}$ --- matching the observed simulation
+divergence exactly.
+
+\paragraph{Root cause: $\widetilde R$ contorsion, not $\alpha$.}
+The tachyonic eigenvalue $+35$ is \textbf{independent of $\alpha$}.
+Setting $\alpha = 0$ gives eigenvalues $\{+35, +35, -55\}$; flipping $\alpha \to -\alpha$
+gives $\{+35, +35, -85\}$.  The tachyon comes from the $-3/\kappa^2$ off-diagonal
+terms in the raw identity matrix, originating from the $(1/\kappa^2)\widetilde R$
+torsionful Ricci scalar's contorsion decomposition (the $K \cdot K$ terms in the
+Shapiro identity $\widetilde R = R - 2\nabla_\alpha T^\alpha - \tfrac{4}{3}T_\alpha T^\alpha
++ \ldots$).  After division by $-\xi = -0.1$, these become $+30$ off-diagonal entries
+that dominate the tachyonic eigenvalues.
+
+The $I_3$-only model gives the trace sector a controllable mass ($\alpha$), but
+leaves the tensor/axial sectors with \emph{uncontrolled} $\widetilde R$-derived mass
+that is tachyonic.  After plane-wave reduction, the trace mixes with these sectors,
+inheriting the instability.
+
+\paragraph{Torsion is either unstable or transparent.}
+Parameter sweeps over $(\alpha, \xi, \delta)$ at $B_0 = 0.01$, $t_\text{end} = 50$,
+$\kappa = 1$ show two regimes:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+$\delta$ & Behaviour & $C_0 = P/B_0^2$ \\
+\midrule
+$0$ & Stable, exact Gertsenshtein & $612.1$ ($= C_\text{EM}$) \\
+$\pm 0.1$ & \textbf{Tachyon divergence} (all $\alpha$) & $10^{59}$ -- $10^{144}$ \\
+$\pm 0.3$ & Stable, exact Gertsenshtein & $612.1$ ($= C_\text{EM}$) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All stable runs give $C_0 = C_\text{EM}$ to 5 significant figures:
+\emph{no torsion amplification whatsoever}.  The amplification $A = 1.000$.
+
+\paragraph{Retraction of earlier +16\% result.}
+The previously reported $C_0 = 7.24 \times 10^{-4}$ at $t = 5$ (Table~\ref{tab:dark-photon-results-retracted})
+was the \emph{early onset} of the tachyonic instability, not a stable enhancement.
+At longer interaction times the same parameters diverge exponentially.
 
 \begin{table}[htbp]
 \centering
-\caption{Dark photon torsion model: conversion coefficient $C_0 = P/B_0^2$ at
-  $t = 5$, $B_0 = 0.01$, $\kappa = 1$.}
-\label{tab:dark-photon-results}
+\caption{Dark photon torsion model: original short-time measurement (\textbf{retracted}).
+  The apparent $+16\%$ enhancement was early-onset tachyon growth, not stable
+  amplification.}
+\label{tab:dark-photon-results-retracted}
 \begin{tabular}{@{}llll@{}}
 \toprule
-Scenario & Parameters & $C_0$ & Notes \\
+Scenario & Parameters & $C_0$ ($t{=}5$) & Status \\
 \midrule
-Standard Gertsenshtein & $\xi = 0$, $\delta = 0$ & $6.25 \times 10^{-4}$  & Exact formula $P = \sin^2(\kappa B_0 t/2)$ \\
-Nominal torsion model & $\alpha=0.5$, $\xi=0.1$, $\delta=0.1$ & $7.24 \times 10^{-4}$ & +16\% amplification \\
+Gertsenshtein & $\xi = 0$, $\delta = 0$ & $6.25 \times 10^{-4}$ & Correct \\
+Nominal torsion & $\alpha=0.5$, $\xi=0.1$, $\delta=0.1$ & $7.24 \times 10^{-4}$ & \textbf{Retracted} (tachyon onset) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{itemize}
-  \item \textbf{$\xi = 0$ recovery:} At $\xi = 0$ the torsion kinetic term vanishes;
-    the torsion fields become algebraic constraints; the conversion probability
-    exactly recovers the standard Gertsenshtein formula.  This is the primary
-    control check for the model (verified, commit~\texttt{6627b21}).
-  \item \textbf{$B_0$ scaling:} $C_0 = P/B_0^2$ verified constant to $<1\%$ across
-    $B_0 \in \{0.003,\, 0.01,\, 0.03\}$, confirming the linear regime.
-  \item \textbf{Energy conservation:} $\max |dE/E| = 1.07 \times 10^{-15}$
-    (machine precision, Fourier modal solver).
+  \item \textbf{$\xi = 0$ recovery:} Exact Gertsenshtein confirmed
+    (commit~\texttt{6627b21}).
+  \item \textbf{Tachyon tracked in \#222:} Investigation of compensating mass terms
+    or alternative gravity sectors is ongoing.
 \end{itemize}
 
 \subsubsection{Implementation}

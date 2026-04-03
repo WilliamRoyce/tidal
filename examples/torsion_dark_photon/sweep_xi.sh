@@ -94,9 +94,12 @@ uv run tidal plot "${OUTPUT}" --type sweep \
   --overlay 'sin(kappa * B0 * t_end / 2)**2' \
   --output "${OUTPUT}/sweep_xi.png" --quiet
 
+# C₀ = P/B₀² analysis (primary metric per project_sweep_measurement_strategy.md)
+uv run python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
+
 echo ""
 echo "=== Sweep complete ==="
 echo "Results: ${OUTPUT}"
-echo "Plot: ${OUTPUT}/sweep_xi.png"
-echo "  Dashed line = pure Gertsenshtein sin^2(kappa*B0*t_end/2) ~ 0.0617"
-echo "  Points above = torsion enhancement via kinetic mixing deltam=${DELTAM}"
+echo "Plots:"
+echo "  ${OUTPUT}/sweep_xi.png     [raw P_max vs xi]"
+echo "  ${OUTPUT}/analysis_C0.png  [C₀ = P/B₀² with Gertsenshtein baseline]"
