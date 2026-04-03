@@ -4147,6 +4147,27 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "      {k, Min[Length[sectorGroups], Length[lagTerms]]}",
             "    ]",
             "  ];",
+            "",
+            "  (* AFTER validation: filter out sectors that won't contribute to the *)",
+            "  (* Hamiltonian. This skips expensive decomposition of terms that get *)",
+            "  (* discarded (torsion) or contribute only a constant (background).  *)",
+            "  Module[{hamHeads, nBefore, excludePatterns},",
+            '    excludePatterns = {__ ~~ "bar", __ ~~ "Bar"'
+            + (
+                ', "' + ctx.prefix + ctx.torsion["perturbation_name"].capitalize() + '"'
+                if ctx.torsion
+                else ""
+            )
+            + "};",
+            "    hamHeads = Select[allDynHeads, Function[hd,",
+            "      !AnyTrue[excludePatterns, StringMatchQ[ToString[hd], #] &]]];",
+            "    nBefore = Length[lagTerms];",
+            "    lagTerms = Select[lagTerms, Function[term,",
+            "      AnyTrue[hamHeads, !FreeQ[term, #] &]]];",
+            '    If[Length[lagTerms] < nBefore, Print["  Hamiltonian sector filter: ",',
+            '      nBefore - Length[lagTerms], "/", nBefore,',
+            '      " terms skipped (torsion/background-only)"]];',
+            "  ];",
             "];",
             "",
             'Print["Decomposing Lagrangian: ", Length[lagTerms], " sector groups"];',
