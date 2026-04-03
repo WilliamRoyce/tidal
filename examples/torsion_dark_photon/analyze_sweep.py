@@ -182,6 +182,113 @@ def plot_2d(rows: list[dict], params: list[str], output: Path, c_em: float) -> N
     print(f"  Plot saved: {output}")
 
 
+def _arctan_ticks() -> tuple[list[float], list[str]]:
+    """Tick positions and labels for arctan-mapped axes."""
+    vals = [-30, -10, -1, 0, 1, 10, 30]
+    positions = [np.arctan(v) for v in vals]
+    labels = [str(v) for v in vals]
+    return positions, labels
+
+
+def plot_mc_scatter(  # noqa: PLR0914
+    rows: list[dict], params: list[str], output: Path, c_em: float
+) -> None:
+    """Generate arctan-mapped pairwise scatter plots for 3D+ MC sweeps.
+
+    Each panel shows a pair of swept parameters (arctan-mapped to show the full
+    (-inf, +inf) range), with points coloured by relative C0 deviation from the
+    Gertsenshtein baseline.
+    """
+    from itertools import combinations  # noqa: PLC0415
+
+    from scipy.interpolate import griddata  # noqa: PLC0415
+
+    n_params = len(params)
+    pairs = list(combinations(range(n_params), 2))
+    n_pairs = len(pairs)
+
+    # Compute relative deviation (percent)
+    c0_arr = np.array([float(r["C_0"]) for r in rows])
+    c0_pct = (c0_arr - c_em) / c_em * 100  # percent deviation from Gertsenshtein
+
+    # Determine color limits (symmetric around 0)
+    vmax = max(np.max(np.abs(c0_pct)), 1e-10)  # avoid zero range
+
+    fig, axes = plt.subplots(1, n_pairs, figsize=(5 * n_pairs, 4.5), squeeze=False)
+
+    tick_pos, tick_labels = _arctan_ticks()
+
+    for ax_idx, (i, j) in enumerate(pairs):
+        ax = axes[0, ax_idx]
+        p1, p2 = params[i], params[j]
+
+        x_raw = np.array([float(r[p1]) for r in rows])
+        y_raw = np.array([float(r[p2]) for r in rows])
+        x_at = np.arctan(x_raw)
+        y_at = np.arctan(y_raw)
+
+        # Try contour interpolation if enough points
+        contour_ok = len(rows) >= 15  # noqa: PLR2004
+        if contour_ok:
+            xi_grid = np.linspace(x_at.min(), x_at.max(), 80)
+            yi_grid = np.linspace(y_at.min(), y_at.max(), 80)
+            xi_mesh, yi_mesh = np.meshgrid(xi_grid, yi_grid)
+            try:
+                zi = griddata((x_at, y_at), c0_pct, (xi_mesh, yi_mesh), method="linear")
+                ax.contourf(
+                    xi_mesh,
+                    yi_mesh,
+                    zi,
+                    levels=15,
+                    cmap="RdBu_r",
+                    vmin=-vmax,
+                    vmax=vmax,
+                    alpha=0.5,
+                )
+            except Exception:  # noqa: BLE001
+                contour_ok = False
+
+        sc = ax.scatter(
+            x_at,
+            y_at,
+            c=c0_pct,
+            cmap="RdBu_r",
+            vmin=-vmax,
+            vmax=vmax,
+            s=20,
+            edgecolors="k",
+            linewidths=0.3,
+        )
+        ax.set_xlabel(f"arctan({p1})")
+        ax.set_ylabel(f"arctan({p2})")
+        ax.set_xticks(tick_pos)
+        ax.set_xticklabels(tick_labels, fontsize=7)
+        ax.set_yticks(tick_pos)
+        ax.set_yticklabels(tick_labels, fontsize=7)
+
+    cbar = fig.colorbar(sc, ax=axes.ravel().tolist(), label="(C₀ - C_EM)/C_EM  [%]")
+    cbar.ax.axhline(0, color="black", linewidth=0.5)
+
+    fig.suptitle(
+        f"Dark photon torsion: relative amplification ({len(rows)} stable runs)",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(output, dpi=150)
+    plt.close(fig)
+    print(f"  Plot saved: {output}")
+
+    # Print summary stats
+    print(f"  Relative deviation range: [{c0_pct.min():.2e}%, {c0_pct.max():.2e}%]")
+    adiabatic_threshold_pct = 0.01
+    if np.max(np.abs(c0_pct)) < adiabatic_threshold_pct:
+        print("  >>> Deviations below 0.01%: consistent with adiabatic decoupling")
+        print(
+            f"  >>> Expected: dP/P ~ delta^2 * (wG/mT)^2 ~ "
+            f"{0.01 * (0.005 / 7.4) ** 2:.1e} (R-tilde mass floor)"
+        )
+
+
 def print_summary(rows: list[dict], all_rows: list[dict], c_em: float) -> None:
     """Print analysis summary."""
     n_total = len(all_rows)
@@ -247,12 +354,11 @@ def main() -> None:  # noqa: D103
             plot_2d(good_rows, swept, output, c_em)
         else:
             print("  No stable runs to plot.")
+    # 3D+ MC sweep: arctan-mapped pairwise scatter plots
+    elif good_rows:
+        plot_mc_scatter(good_rows, swept, output, c_em)
     else:
-        print(f"  {len(swept)} swept params ({swept}) — use scatter matrix for >2D")
-        # Still print C₀ values for each run
-        for r in good_rows[:10]:
-            vals = ", ".join(f"{p}={r[p]:.3g}" for p in swept)
-            print(f"    {vals}: C₀={r['C_0']:.2f}, A={r['A']:.4f}")
+        print("  No stable runs to plot.")
 
 
 if __name__ == "__main__":

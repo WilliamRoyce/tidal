@@ -37,7 +37,7 @@ SPEC="${SCRIPT_DIR}/../data/torsion_dark_photon.json"
 OUTPUT="${SCRIPT_DIR}/../data/torsion_dark_photon_mc"
 
 # Number of Monte Carlo samples
-N_SAMPLES="${1:-100}"
+N_SAMPLES="${1:-200}"
 
 # Fixed physics parameters
 KAPPA=1.0
@@ -81,8 +81,13 @@ uv run tidal sweep "${SPEC}" \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" \
-  --parallel 4 --resume \
+  --parallel 4 --no-require-stable --resume \
   --output "${OUTPUT}"
+# --no-require-stable: R-tilde tensor/axial torsion sectors have tachyonic mass
+# eigenvalues, but these modes have ZERO physical coupling (100% trace-aligned).
+# The modal solver's _suppress_tachyonic_noise() (#222) freezes them.
+# Some parameter combinations (alpha > 0.917 at xi=0.1) are genuinely unstable
+# — these will be flagged as diverged in the output.
 
 echo ""
 echo "--- Generating plots ---"
@@ -99,15 +104,29 @@ uv run tidal plot "${OUTPUT}" --type sweep-scatter \
   --title "Dark photon torsion: parameter space (coloured by P_max)" \
   --output "${OUTPUT}/plot_scatter.png" --quiet
 
+# C₀ = P/B₀² analysis with arctan-mapped scatter plots
+# Shows relative amplification (C₀ - C_EM)/C_EM in percent
+uv run python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
+
+# Parallel coordinates: multi-parameter trends
+uv run tidal plot "${OUTPUT}" --type sweep-parallel \
+  --metric P_max \
+  --title "Dark photon torsion: parallel coordinates (P_max)" \
+  --output "${OUTPUT}/plot_parallel.png" --quiet
+
 echo ""
 echo "=== Sweep complete ==="
 echo "Results: ${OUTPUT}"
 echo "Plots:"
-echo "  ${OUTPUT}/plot_tornado.png  [parameter sensitivity ranking]"
-echo "  ${OUTPUT}/plot_scatter.png  [pairwise scatter, coloured by P_max]"
+echo "  ${OUTPUT}/plot_tornado.png   [parameter sensitivity ranking]"
+echo "  ${OUTPUT}/plot_scatter.png   [pairwise scatter, coloured by P_max]"
+echo "  ${OUTPUT}/plot_parallel.png  [parallel coordinates]"
+echo "  ${OUTPUT}/analysis_C0.png    [C₀ relative deviation with arctan axes]"
 echo ""
 echo "Sensitivity analysis:"
 echo "  uv run tidal analyze ${OUTPUT} --sensitivity morris --metric P_max"
 echo ""
-echo "Conversion coefficient: C₀ = P_max / B₀² = P_max / ${B0}²"
-echo "Amplification: A = √(C₀ / C₀_EM) relative to ξ=δ=0 baseline"
+echo "Physics note (adiabatic decoupling):"
+echo "  R-tilde mass floor: m_T >= sqrt(55) ~ 7.4 (from contorsion)"
+echo "  Gertsenshtein frequency: omega_G = kappa*B0/2 = ${KAPPA}*${B0}/2"
+echo "  Expected correction: dP/P ~ delta^2 * (omega_G/m_T)^2 ~ 5e-9"
