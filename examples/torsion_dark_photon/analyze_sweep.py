@@ -37,7 +37,13 @@ def load_results(sweep_dir: Path) -> list[dict[str, float | str]]:
     rows: list[dict[str, float | str]] = []
     with csv_path.open() as f:
         reader = csv.DictReader(f)
+        header_fields = reader.fieldnames or []
         for row in reader:
+            # Skip duplicate header rows or completely empty rows
+            if row.get(header_fields[0]) == header_fields[0]:
+                continue
+            if all(v == "" for v in row.values()):
+                continue
             parsed: dict[str, float | str] = {}
             for k, v in row.items():
                 try:
@@ -51,9 +57,12 @@ def load_results(sweep_dir: Path) -> list[dict[str, float | str]]:
 def compute_c0(rows: list[dict]) -> list[dict]:
     """Add C_0 and A columns to each row."""
     for row in rows:
-        b0 = float(row.get("B0", 0.01))
-        kappa = float(row.get("kappa", 1.0))
-        t_end = float(row.get("t_end", 50.0))
+        try:
+            b0 = float(row.get("B0", 0.01))
+            kappa = float(row.get("kappa", 1.0))
+            t_end = float(row.get("t_end", 50.0))
+        except (ValueError, TypeError):
+            b0, kappa, t_end = 0.01, 1.0, 50.0
 
         # P_final is the physics measurement at fixed interaction length D = t_end
         p_final = row.get("P_final")
