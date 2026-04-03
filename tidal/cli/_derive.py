@@ -4016,7 +4016,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "  lagForCanon = lagForCanon /. Scalar[x_] :> Module[{resolved},",
             "    resolved = Quiet[Catch[",
             f"      DecomposeScalarExpression[x, {ctx.chart}, {wl_list(all_heads_str)},",
-            f'        "MetricMatrix" -> {p}MetricMatrix]',
+            f'        "MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}]',
             "    ], {Validate::repeated, Validate::inhom}];",
             "    If[StringQ[resolved] || resolved === Null, Scalar[x], resolved]",
             "  ];",
