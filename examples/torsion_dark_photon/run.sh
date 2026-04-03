@@ -65,10 +65,10 @@ uv run tidal simulate "${SPEC}" \
 echo ""
 
 # Step 2: Measure
+# Note: no --what conservation. Total Hamiltonian is NOT a valid diagnostic for
+# this constrained gauge theory (Dirac-Bergmann: gauge/constraint fields are not
+# independent DOFs). Measure conversion on the physical h_5↔a_1 sector only.
 echo "--- Step 2: Measure ---"
-uv run tidal measure "${OUT}" --what conservation \
-  --param "kappa=${KAPPA}" --param "B0=${B0}" \
-  --param "alpha=${ALPHA}" --param "xi=${XI}" --param "deltam=${DELTAM}"
 uv run tidal measure "${OUT}" --what conversion \
   --source h_5 --target a_1 \
   --param "kappa=${KAPPA}" --param "B0=${B0}" \

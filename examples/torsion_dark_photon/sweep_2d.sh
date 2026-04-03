@@ -58,10 +58,14 @@ echo "Total runs: 56"
 echo "Output: ${OUTPUT}"
 echo ""
 
+# Note: --measure peak_conversion only (no conservation).
+# Total Hamiltonian conservation is NOT a valid check for this constrained gauge theory.
+# Diverged (ghost/unstable) runs are identified by P_max >> P_Gertsenshtein or
+# run_status != "success" in the output CSV.
 uv run tidal sweep "${SPEC}" \
   --sweep "alpha=0.1:2.0:8" \
   --sweep "deltam=-0.3:0.3:7" \
-  --measure peak_conversion,conservation \
+  --measure peak_conversion \
   --source h_5 --target a_1 \
   --grid-shape "${GRID}" --bounds "${BOUNDS}" --periodic \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
@@ -84,19 +88,12 @@ echo "--- Generating plots ---"
 # Colours show amplification; dashed contour at P = sin^2(0.25) ~ 0.0617
 # shows the Gertsenshtein baseline (amplification boundary).
 uv run tidal plot "${OUTPUT}" --type sweep \
-  --metric P_max \
+  --metric P_max --log-scale \
   --title "Torsion amplification map: P_max(alpha, deltam) at xi=${XI}" \
   --output "${OUTPUT}/sweep_2d.png" --quiet
-
-# Same map for energy conservation: identifies ghost/unstable regions
-uv run tidal plot "${OUTPUT}" --type sweep \
-  --metric max_energy_error \
-  --title "Energy conservation: |dE/E|(alpha, deltam) at xi=${XI}" \
-  --output "${OUTPUT}/sweep_2d_conservation.png" --quiet
 
 echo ""
 echo "=== Sweep complete ==="
 echo "Results: ${OUTPUT}"
 echo "Plots:"
-echo "  ${OUTPUT}/sweep_2d.png              [P_max heatmap over (alpha, deltam)]"
-echo "  ${OUTPUT}/sweep_2d_conservation.png [energy error heatmap — identifies unstable regions]"
+echo "  ${OUTPUT}/sweep_2d.png  [P_max heatmap over (alpha, deltam)]"

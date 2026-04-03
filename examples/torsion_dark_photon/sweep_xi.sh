@@ -60,9 +60,13 @@ echo "Gertsenshtein baseline: P = sin^2(kappa * B0 * t_end / 2) = sin^2(0.25) ~ 
 echo "Output: ${OUTPUT}"
 echo ""
 
+# Note: --measure peak_conversion only (no conservation).
+# The total Hamiltonian is NOT a valid conservation diagnostic for this constrained
+# gauge theory (Dirac-Bergmann). Only the h_5↔a_1 physical sector has a
+# well-defined conserved energy. Use P_max convergence and run_status instead.
 uv run tidal sweep "${SPEC}" \
   --sweep "xi=0.01:0.5:20" \
-  --measure peak_conversion,conservation \
+  --measure peak_conversion \
   --source h_5 --target a_1 \
   --grid-shape "${GRID}" --bounds "${BOUNDS}" --periodic \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \

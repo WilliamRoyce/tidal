@@ -62,13 +62,20 @@ echo "Fixed: kappa=${KAPPA}, B0=${B0}, k0=${K0}"
 echo "Output: ${OUTPUT}"
 echo ""
 
+# NOTE: --measure conversion,peak_conversion only (no conservation).
+# The total Hamiltonian is NOT a valid conservation check for this model.
+# Dirac-Bergmann analysis: the gauge and constraint fields (a_0, a_3,
+# unphysical h and t components) are not independent DOFs. Their contributions
+# to the Hamiltonian are spurious — the constrained Hamiltonian is only
+# well-defined on the physical h_5↔a_1 sector. Use P(t) from conversion
+# as the primary quality metric. Diverged runs show up as P_max >> P_Gertsenshtein.
 uv run tidal sweep "${SPEC}" \
   --sweep "alpha=${ALPHA_BOUNDS}" \
   --sweep "xi=${XI_BOUNDS}" \
   --sweep "deltam=${DELTA_BOUNDS}" \
   --sweep-strategy latin_hypercube \
   --n-samples "${N_SAMPLES}" \
-  --measure conversion,peak_conversion,conservation \
+  --measure conversion,peak_conversion \
   --source h_5 --target a_1 \
   --grid-shape "${GRID}" --bounds "${BOUNDS}" --periodic \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
@@ -92,19 +99,12 @@ uv run tidal plot "${OUTPUT}" --type sweep-scatter \
   --title "Dark photon torsion: parameter space (coloured by P_max)" \
   --output "${OUTPUT}/plot_scatter.png" --quiet
 
-# Energy conservation quality across parameter space
-uv run tidal plot "${OUTPUT}" --type sweep-scatter \
-  --metric max_energy_error \
-  --title "Dark photon torsion: energy conservation across parameter space" \
-  --output "${OUTPUT}/plot_conservation.png" --quiet
-
 echo ""
 echo "=== Sweep complete ==="
 echo "Results: ${OUTPUT}"
 echo "Plots:"
-echo "  ${OUTPUT}/plot_tornado.png     [parameter sensitivity ranking]"
-echo "  ${OUTPUT}/plot_scatter.png     [pairwise scatter, coloured by P_max]"
-echo "  ${OUTPUT}/plot_conservation.png [energy conservation quality]"
+echo "  ${OUTPUT}/plot_tornado.png  [parameter sensitivity ranking]"
+echo "  ${OUTPUT}/plot_scatter.png  [pairwise scatter, coloured by P_max]"
 echo ""
 echo "Sensitivity analysis:"
 echo "  uv run tidal analyze ${OUTPUT} --sensitivity morris --metric P_max"
