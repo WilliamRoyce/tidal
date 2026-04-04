@@ -1735,7 +1735,15 @@ def _evolve_per_mode(
     Blocks with all-zero initial conditions are skipped entirely.
 
     Ref: Golub & Van Loan (1996), Matrix Computations, §4.8.
+
+    Raises
+    ------
+    SimulationDivergedError
+        If field amplitudes grow beyond the divergence threshold (1e8 x
+        initial amplitude), indicating physical instability.
     """
+    from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
+
     n_slots = layout.num_slots
     n_pts = layout.num_points
     n_snapshots = len(t_eval)
@@ -1879,6 +1887,11 @@ def _evolve_per_mode(
     # Pre-allocate buffer reused each timestep (avoids n_snapshots allocations)
     y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
 
+    # Divergence guard: track initial amplitude for early-stop detection (#226).
+    # Floor at 1e-15 for fields starting at zero (compared to machine epsilon).
+    initial_max_amp: float = 0.0
+    divergence_threshold: float = 1e8  # amplitude ratio that triggers early stop
+
     for ti, t in enumerate(t_eval):
         dt = t - t0
         y_hat_t[:] = 0.0
@@ -1905,6 +1918,30 @@ def _evolve_per_mode(
         y_physical = _ifft_slots(y_hat_t, layout, grid)
         snapshots[ti] = y_physical
         times[ti] = t
+
+        # Divergence guard: check amplitude ratio against GLOBAL max of
+        # initial state.  Uses the peak across ALL fields and ALL spatial
+        # points, so localized ICs (Gaussians) with small tails don't
+        # trigger false positives when the wave packet propagates.
+        # Threshold 1e8 catches exponential growth well before overflow;
+        # the linearized regime breaks down much earlier (ratio > ~100).
+        max_amp = float(np.max(np.abs(y_physical)))
+        if ti == 0:
+            initial_max_amp = max(max_amp, 1e-15)
+        elif (
+            not np.isfinite(max_amp) or max_amp / initial_max_amp > divergence_threshold
+        ):
+            msg = (
+                f"Simulation diverged at t={t:.4g}: amplitude ratio "
+                f"{max_amp / initial_max_amp:.2e} exceeds threshold "
+                f"{divergence_threshold:.0e}. The system is physically "
+                f"unstable (linearized regime violated)."
+            )
+            # Fill remaining snapshots so partial results are usable
+            for tj in range(ti + 1, n_snapshots):
+                snapshots[tj] = y_physical
+                times[tj] = t_eval[tj]
+            raise SimulationDivergedError(msg)
 
         if snapshot_callback is not None:
             snapshot_callback(t, y_physical)
