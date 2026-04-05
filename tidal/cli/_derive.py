@@ -276,7 +276,7 @@ class _WlsContext:
     metric_diagonal: list[str]
     metric_type: str  # "minkowski", "diagonal", or "matrix"
     eom_cache_dir: str  # absolute path to .eom_cache/<theory_name>/
-    eom_cache_keys: dict[str, str]  # field_name -> cache_key hex string
+    eom_cache_key: str  # cache key for fieldEquations (structural_hash + version)
 
 
 def _wls_mem_print(label: str) -> str:
@@ -4366,451 +4366,16 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
     return lines
 
 
-def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
-    ctx: _WlsContext,
-    _all_heads_str: str,
-) -> list[str]:
-    """VarD-based canonical path: abstract EOM → per-term component projection.
+# NOTE: _wls_canonical_vard_eom_path was removed (v0.25.10). It was dead code —
+# the runtime dispatch threshold (l2TopTerms > 500 || l2LC > 50000) was never
+# met by any theory. All theories use Phase A + Component E-L, which is 70x+
+# faster than abstract VarD for torsion theories. See #230, #229 for context.
 
-    Alternative to ``_wls_canonical_phase_a`` that avoids the scalar Lagrangian
-    decomposition bottleneck by:
-    1. Computing abstract EOM via ``VarD[field, CD][L^(2)]`` (fast, O(N))
-    2. Projecting each EOM term to components via ``SplinterToArray``
-       (rank-N tensors → ``ComponentArray`` expands free indices)
-    3. Reconstructing ``lagComp`` from bilinear identity: L = 1/2 Sum q_i * EOM_i
 
-    This follows the supervisor's pattern (SphericalEuclidean.m lines 131-428):
-    VarD at abstract level → shorthand substitution → per-term projection.
-
-    Sets up the SAME WLS variables as ``_wls_canonical_phase_a``:
-    ``lagComp``, ``compToFunc``, ``fieldFuncList``, ``velOrders``,
-    ``coordSyms``, ``nCoords``, ``eliminatedFromCanonical``.
-    """
-    p = ctx.prefix
-
-    # --- Build compToFunc mapping (same as Phase A lines 3841-3888) ---
-    # Needed BEFORE the VarD loop for lagComp reconstruction.
-    pert_heads = _matter_pert_head_map(ctx)
-    originals = _matter_pert_originals(ctx)
-
-    comp_to_func_lines: list[str] = [
-        "compToFunc = <||>;",
-    ]
-    for field in ctx.fields:
-        fname = field["name"]
-        if fname in originals:
-            continue
-        head = pert_heads[fname] if fname in pert_heads else f"{p}{fname.capitalize()}"
-        n_comps = _field_component_count(field, ctx.dim)
-        comp_to_func_lines.extend(
-            f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps)
-        )
-    if ctx.torsion is not None:
-        torsion_pert_name = ctx.torsion["perturbation_name"]
-        thead = f"{p}{torsion_pert_name.capitalize()}"
-        torsion_field = {
-            "name": torsion_pert_name,
-            "type": "tensor",
-            "rank": 3,
-            "symmetry": "antisymmetric_23",
-        }
-        t_ncomps = _field_component_count(torsion_field, ctx.dim)
-        comp_to_func_lines.extend(
-            f'compToFunc["{torsion_pert_name}_{j}"] = {thead}{j};'
-            for j in range(t_ncomps)
-        )
-    comp_to_func_lines.extend(
-        [
-            "fieldFuncList = Values[compToFunc];",
-            f"coordSyms = ScalarsOfChart[{ctx.chart}];",
-            "nCoords = Length[coordSyms];",
-            "velOrders = Table[If[i == 1, 1, 0], {i, nCoords}];",
-        ]
-    )
-
-    # --- Build the list of fields to VarD ---
-    _, _field_heads_str = _canonical_field_heads(ctx)
-
-    # --- Build VarD expressions for each dynamical field ---
-    # Reuses the pattern from _wls_linearize_from_lagrangian lines 2068-2098
-    dyn_field_info: list[dict[str, str]] = []
-
-    for field in ctx.fields:
-        fname = field["name"]
-        if fname in originals:
-            continue
-        head = pert_heads[fname] if fname in pert_heads else f"{p}{fname.capitalize()}"
-        ftype = field["type"]
-        if ftype == "scalar":
-            fexpr = f"{head}[]"
-        elif ftype == "vector":
-            fexpr = f"{head}[-a]"
-        elif ftype == "tensor":
-            rank = field.get("rank", 2)
-            idx = ", ".join(["-a", "-b", "-c", "-d", "-e", "-f"][:rank])
-            fexpr = f"{head}[{idx}]"
-        else:
-            fexpr = f"{head}[-a, -b]"
-
-        dyn_field_info.append(
-            {"name": fname, "head": head, "fexpr": fexpr, "type": ftype}
-        )
-
-    # Also include torsion field
-    if ctx.torsion is not None:
-        tname = ctx.torsion["perturbation_name"]
-        thead = f"{p}{tname.capitalize()}"
-        dyn_field_info.append(
-            {
-                "name": tname,
-                "head": thead,
-                "fexpr": f"{thead}[a, -b, -c]",
-                "type": "tensor",
-            }
-        )
-
-    # --- Generate the VarD EOM path ---
-    lines: list[str] = [
-        "",
-        "(* === VarD EOM canonical path (supervisor's pattern) ===               *)",
-        "(* Abstract VarD → per-term SplinterToArray projection → lagComp       *)",
-        "(* reconstruction. Avoids scalar Lagrangian decomposition bottleneck.  *)",
-        "(* Ref: supervisor's SphericalEuclidean.m lines 131-428.              *)",
-        'Print[""];',
-        'Print["VarD canonical path: abstract EOM → component projection"];',
-        "",
-        "(* Setup: coordinate symbols, compToFunc, fieldFuncList *)",
-    ]
-    lines.extend(comp_to_func_lines)
-    lines.extend(
-        [
-            "",
-            f"lagForCanon = {p}Lagrangian;",
-            "(* Apply SeparateMetric before VarD.                                   *)",
-            "(* Tested: removing SeparateMetric reduces term count (194→148) but   *)",
-            "(* creates denser terms where individual SplinterToArray calls take    *)",
-            "(* >7 minutes (vs <2s with SeparateMetric). The metric distribution   *)",
-            "(* across terms keeps each term's contraction complexity bounded.     *)",
-            f"lagForCanon = SeparateMetric[{ctx.metric}][lagForCanon];",
-            "",
-            _wls_timing_start("tVarDCanon"),
-            "fieldEquations = {};",
-            "",
-        ]
-    )
-
-    # Build BackgroundFieldRules for DecomposeToComponents
-    bg_rules_entries: list[str] = []
-    for bf in ctx.background_fields:
-        if bf["type"] != "scalar" and bf.get("components"):
-            bg_head = f"{p}{bf['name'].capitalize()}"
-            comps_str = ", ".join(str(c) for c in bf["components"])
-            contra_comps = _compute_contra_components(
-                bf["components"], ctx.metric_diagonal
-            )
-            contra_str = ", ".join(contra_comps)
-            bg_rules_entries.append(wl_bg_rule_entry(bg_head, comps_str, contra_str))
-    bg_rules_opt = ""
-    if bg_rules_entries:
-        bg_rules_str = ", ".join(bg_rules_entries)
-        bg_rules_opt = f', "BackgroundFieldRules" -> {wl_list(bg_rules_str)}'
-
-    # Apply scalar BG substitutions before VarD
-    lines.extend(_wls_scalar_background_substitution(ctx, "lagForCanon"))
-
-    # Apply plane-wave Derivative zeroing to L^(2) BEFORE VarD.
-    # This zeros transverse Derivative[...] patterns that exist in
-    # pre-resolved Scalar[] wrappers and CD shorthand expansions.
-    # VarD on the reduced L^(2) produces fewer EOM terms.
-    pw_rules = _build_plane_wave_deriv_rules(ctx)
-    if pw_rules:
-        lines.extend(
-            [
-                "",
-                "(* Plane-wave reduction on L^(2) before VarD — zero transverse derivatives *)",
-                "lagForCanon = lagForCanon /. {",
-                ",\n".join(pw_rules),
-                "};",
-                "lagForCanon = Expand[lagForCanon];",
-                'Print["L^(2) after plane-wave reduction: ",',
-                '  If[Head[lagForCanon]===Plus, Length[lagForCanon], 1], " terms"];',
-                "",
-            ]
-        )
-
-    # --- Per-field EOM cache setup ---
-    # Cache component equations (output of DecomposeToComponents) per field.
-    # Component equations are pure algebraic (no xAct heads) and serialisable.
-    # Ref: #230, inspired by HiGGS .mx pre-compilation (Barker, arXiv:2206.00658).
-    escaped_eom_cache_dir = ctx.eom_cache_dir.replace("\\", "\\\\").replace('"', '\\"')
-    lines.extend(
-        [
-            "",
-            "(* === Per-field EOM cache (component equations) ===                   *)",
-            "(* Cache DecomposeToComponents results per field. Component equations  *)",
-            "(* are pure algebraic (no xAct heads) and safely serialisable.         *)",
-            "(* Ref: HiGGS .mx pre-compilation (Barker, arXiv:2206.00658).         *)",
-            f'$tidalEOMCacheDir = "{escaped_eom_cache_dir}";',
-            "If[!DirectoryQ[$tidalEOMCacheDir],",
-            "  CreateDirectory[$tidalEOMCacheDir, CreateIntermediateDirectories -> True]];",
-            "$tidalEOMCacheHits = 0; $tidalEOMCacheMisses = 0;",
-            "",
-        ]
-    )
-
-    # For each dynamical field, generate VarD + projection code
-    for dfi in dyn_field_info:
-        head = dfi["head"]
-        fexpr = dfi["fexpr"]
-        fname = dfi["name"]
-        ftype = dfi["type"]
-
-        # Per-field cache key (computed in Python, injected as string literal)
-        field_cache_key = ctx.eom_cache_keys.get(fname, "")
-        has_cache = bool(field_cache_key)
-
-        lines.extend(
-            [
-                f'Print["  VarD w.r.t. {fname} ({fexpr})..."];',
-                "Module[{eomAbs, eomTerms, nTerms, tField = AbsoluteTime[],",
-                "        eomCacheHit = False},",
-            ]
-        )
-
-        # Cache check: load component equations from JSON if cache file exists
-        if has_cache:
-            lines.extend(
-                [
-                    f'  Module[{{cacheFile = FileNameJoin[{{$tidalEOMCacheDir, "{field_cache_key}.json"}}],',
-                    "          cachedData},",
-                    "    If[FileExistsQ[cacheFile],",
-                    '      cachedData = Quiet[Import[cacheFile, "RawJSON"]];',
-                    '      If[AssociationQ[cachedData] && KeyExistsQ[cachedData, "equations"],',
-                    '        Module[{eqs = cachedData["equations"], restored},',
-                    '          restored = Map[{#["name"], ToExpression[#["expr"]]} &, eqs];',
-                    "          If[AllTrue[restored, ListQ[#] && Length[#] == 2 &],",
-                    "            Do[AppendTo[fieldEquations, restored[[k]]],",
-                    "              {k, Length[restored]}];",
-                    "            eomCacheHit = True;",
-                    "            $tidalEOMCacheHits++;",
-                    '            Print["    CACHE HIT (", Length[restored], " equations)"]',
-                    "          ]",
-                    "        ]",
-                    "      ]",
-                    "    ]",
-                    "  ];",
-                    "",
-                ]
-            )
-
-        # Cache miss: full VarD + DecomposeToComponents pipeline
-        lines.extend(
-            [
-                "  If[!eomCacheHit,",
-                "  Module[{nEqsBefore = Length[fieldEquations]},",
-                f"  eomAbs = VarD[{fexpr}, {ctx.cd}][lagForCanon];",
-                "  (* Per-term ToCanonical: avoids xperm segfault on large sums *)",
-                "  eomAbs = If[Head[eomAbs] === Plus,",
-                "    Total[ToCanonical /@ List @@ eomAbs],",
-                "    ToCanonical[eomAbs]];",
-                f"  eomAbs = ContractMetric[eomAbs, {ctx.metric}];",
-                "",
-                "  (* NOTE: ScreenDollarIndices and CollectTensors were benchmarked here   *)",
-                "  (* but REVERTED. ScreenDollarIndices reduces term count (194→87) but    *)",
-                "  (* INCREASES per-term cost (5.5s→16.7s avg) by creating denser terms.  *)",
-                "  (* CollectTensors is even worse (12-35s/term). All term-density-        *)",
-                "  (* reducing approaches backfire because TraceBasisDummy is O(dim^{2K})  *)",
-                "  (* in contraction depth K, not in term count.                           *)",
-                "",
-                "  (* Apply CD shorthand rules *)",
-                "  If[ListQ[$CDShorthandRules] && Length[$CDShorthandRules] > 0,",
-                "    Do[eomAbs = eomAbs /. rule, {rule, Reverse[$CDShorthandRules]}]",
-                "  ];",
-                "",
-                '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " abstract EOM terms"];',
-            ]
-        )
-
-        # Zero transverse Derivative patterns in abstract EOM
-        if pw_rules:
-            lines.extend(
-                [
-                    "  (* Plane-wave: zero transverse Derivative patterns in EOM *)",
-                    "  eomAbs = eomAbs /. {",
-                    ",\n".join(f"  {r}" for r in pw_rules),
-                    "  };",
-                    "  eomAbs = Expand[eomAbs];",
-                    '  Print["    ", If[Head[eomAbs]===Plus, Length[eomAbs], 1], " EOM terms (after plane-wave)"];',
-                ]
-            )
-
-        lines.extend(
-            [
-                "",
-            ]
-        )
-
-        # Build additionalFields list: all OTHER dynamical fields + background fields
-        other_fexprs = [d["fexpr"] for d in dyn_field_info if d["name"] != fname]
-        # Add background field expressions
-        for bf in ctx.background_fields:
-            bf_head = f"{ctx.prefix}{bf['name'].capitalize()}"
-            if bf["type"] == "scalar":
-                other_fexprs.append(f"{bf_head}[]")
-            elif bf["type"] == "vector":
-                other_fexprs.append(f"{bf_head}[-a]")
-            else:
-                bf_rank = bf.get("rank", 2)
-                bf_idx = ", ".join(f"-{chr(97 + i)}" for i in range(bf_rank))
-                other_fexprs.append(f"{bf_head}[{bf_idx}]")
-        additional_str = ", ".join(other_fexprs) if other_fexprs else ""
-
-        # Use DecomposeToComponents with TermByTerm for per-term projection
-        # This is the tested, complete pipeline (ComponentDecompose.wl:1020-1154)
-        lines.extend(
-            [
-                "  (* Decompose EOM to components via DecomposeToComponents TermByTerm *)",
-                "  (* Uses the tested pipeline: SplinterToArray per-term + post-processing *)",
-                "  Module[{componentEqs},",
-                f"    componentEqs = DecomposeToComponents[eomAbs, {fexpr}, {ctx.chart},",
-                f"      {wl_list(additional_str)},",
-                '      "TermByTerm" -> True,',
-                f'      "MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}];',
-                '    Print["    ", Length[componentEqs], " component equations"];',
-                "    Do[",
-                "      Module[{compName, compEq},",
-                "        compName = componentEqs[[k, 1]];",
-                "        compEq = componentEqs[[k, 2]];",
-                "        (* Normalize derivative arity *)",
-                "        compEq = compEq /. Derivative[orders__][g_][args__] /;",
-                "          Length[{orders}] < nCoords :>",
-                "          Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
-                f'        AppendTo[fieldEquations, {{"{fname}_" <> ToString[compName], compEq}}];',
-                "      ];,",
-                "      {k, Length[componentEqs]}",
-                "    ];",
-                "  ];",
-            ]
-        )
-
-        # Plane-wave reduction on field equations (if applicable)
-        if ctx.reduction is not None:
-            prop_axis = ctx.reduction["propagation_axis"]
-            coords = ctx.coords
-            killed = [c for c in coords[1:] if c != prop_axis]
-            deriv_rules: list[str] = []
-            for c in killed:
-                slot = coords.index(c) + 1
-                deriv_rules.append(
-                    f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
-                    f" && {{ords}}[[{slot}]] > 0 :> 0"
-                )
-            if deriv_rules:
-                lines.extend(
-                    (
-                        "  (* Plane-wave reduction: zero transverse derivatives *)",
-                        "  fieldEquations = Map[Function[{eq},",
-                        f"    {{eq[[1]], eq[[2]] /. {wl_list(','.join(deriv_rules))}}}],",
-                        "    fieldEquations];",
-                    )
-                )
-            coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
-            if coord_values:
-                cv_rules = ", ".join(
-                    f"{coord}[] -> {val}" for coord, val in coord_values.items()
-                )
-                lines.append(
-                    f"  fieldEquations = fieldEquations /. {wl_list(cv_rules)};",
-                )
-
-        # Write cache for this field's new equations (cache miss path)
-        if has_cache:
-            lines.extend(
-                [
-                    "",
-                    "  (* Write per-field EOM cache *)",
-                    "  Module[{eqsForCache, newEqs},",
-                    "    newEqs = fieldEquations[[nEqsBefore + 1 ;;]];",
-                    "    eqsForCache = Map[",
-                    '      <|"name" -> #[[1]], "expr" -> ToString[#[[2]], InputForm]|> &,',
-                    "      newEqs];",
-                    f'    Quiet[Export[FileNameJoin[{{$tidalEOMCacheDir, "{field_cache_key}.json"}}],',
-                    f'      <|"field" -> "{fname}", "equations" -> eqsForCache|>,',
-                    '      "RawJSON"]];',
-                    '    Print["    cached ", Length[newEqs], " equations"];',
-                    "  ];",
-                    "  $tidalEOMCacheMisses++;",
-                ]
-            )
-
-        # Close cache-miss If + Module
-        lines.extend(
-            [
-                "  ];  (* end Module nEqsBefore *)",
-                "  ];  (* end If !eomCacheHit *)",
-                '  Print["    done in ", Round[AbsoluteTime[] - tField, 0.1], "s"];',
-                "];",
-                "",
-            ]
-        )
-
-    # Print cache summary
-    lines.extend(
-        [
-            'Print["EOM cache: ", $tidalEOMCacheHits, " hits, ",',
-            '  $tidalEOMCacheMisses, " misses"];',
-            "",
-        ]
-    )
-
-    # --- lagComp reconstruction from bilinear identity ---
-    lines.extend(
-        [
-            "(* === Reconstruct lagComp from bilinear identity ===                  *)",
-            "(* For quadratic L^(2) = 1/2 q^T M q, EOM = Mq, so L = 1/2 Sum q_i*EOM_i *)",
-            "(* Exact for linearized (quadratic) Lagrangians.                       *)",
-            "lagComp = 0;",
-            "Do[",
-            "  Module[{name, eom, func},",
-            "    {name, eom} = fieldEquations[[k]];",
-            "    If[KeyExistsQ[compToFunc, name],",
-            "      func = compToFunc[name];",
-            "      lagComp += func[Sequence @@ coordSyms] * eom",
-            "    ];",
-            "  ],",
-            "  {k, Length[fieldEquations]}",
-            "];",
-            "lagComp = Expand[lagComp / 2];",
-            'Print["lagComp (reconstructed): ", LeafCount[lagComp], " leaves, ",',
-            '  If[Head[lagComp]===Plus, Length[lagComp], 1], " terms"];',
-            "(* Diagnostic: check lagComp has velocity terms for Legendre transform *)",
-            "Module[{d2tHeads, d1tHeads, fieldHeads},",
-            "  d2tHeads = Cases[lagComp, Derivative[n_,__][f_][__] /; n>=2 :> f, {0,Infinity}] // DeleteDuplicates;",
-            "  d1tHeads = Cases[lagComp, Derivative[1,___][f_][__] :> f, {0,Infinity}] // DeleteDuplicates;",
-            "  fieldHeads = Cases[lagComp, (f_Symbol)[__] /; MemberQ[fieldFuncList, f] :> f, {0,Infinity}] // DeleteDuplicates;",
-            '  Print["  d^2_t field heads: ", d2tHeads];',
-            '  Print["  d_t (velocity) heads: ", d1tHeads];',
-            '  Print["  field heads in lagComp: ", fieldHeads];',
-            '  Print["  fieldFuncList: ", fieldFuncList];',
-            '  Print["  Sample term: ", Short[If[Head[lagComp]===Plus, lagComp[[1]], lagComp], 2]];',
-            "];",
-            "lagComp = lagComp /. Derivative[orders__][g_][args__] /;",
-            "  Length[{orders}] < nCoords :>",
-            "  Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
-            "",
-            f"Clear[lagForCanon, {p}Lagrangian]; Share[];",
-            _wls_timing_end("tVarDCanon", "VarD canonical path (EOM + lagComp)"),
-            _wls_mem_print("After VarD canonical path"),
-            "",
-            "eliminatedFromCanonical = {};",
-            "",
-        ]
-    )
-
-    # Apply vector BG substitutions after decomposition
-    lines.extend(_wls_vector_background_substitution(ctx, "lagComp"))
-
-    return lines
+# NOTE: _wls_canonical_vard_eom_path was removed (v0.25.10). It was dead code —
+# the runtime dispatch threshold (l2TopTerms > 500 || l2LC > 50000) was never
+# met by any theory. All theories use Phase A + Component E-L, which is 70x+
+# faster than abstract VarD for torsion theories. See #230, #229 for context.
 
 
 def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
@@ -5582,82 +5147,59 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
-        # --- Dual-path canonical pipeline: VarD EOM (fast) with Phase A fallback ---
-        # The VarD path projects rank-N EOM to components (supervisor's pattern).
-        # Phase A decomposes scalar L to components (slower for complex theories).
-        # Both paths produce the same WLS variables: lagComp, fieldEquations,
-        # compToFunc, fieldFuncList, velOrders, coordSyms, nCoords.
-        # Runtime dispatch: try VarD first, fall back to Phase A if it fails.
-        has_tensor = (
-            any(
-                f["type"] != "scalar"
-                for f in ctx.fields
-                if f["name"] not in _matter_pert_originals(ctx)
-            )
-            or ctx.torsion is not None
+        # --- EOM cache: skip Phase A + Component E-L if cached ---
+        # Cache the final fieldEquations (after constraint elimination and
+        # plane-wave reduction) keyed by structural TOML hash + version.
+        # Component equations are pure algebraic — no xAct heads (#230).
+        escaped_cache_dir = ctx.eom_cache_dir.replace("\\", "\\\\").replace('"', '\\"')
+        lines.extend(
+            [
+                "",
+                "(* === EOM cache check ===                                             *)",
+                "(* Cache fieldEquations (component-form, no xAct heads) to skip the   *)",
+                "(* expensive Phase A + Component E-L on re-derivation.                 *)",
+                "(* Ref: HiGGS .mx pre-compilation (Barker, arXiv:2206.00658).         *)",
+                f'$tidalEOMCacheDir = "{escaped_cache_dir}";',
+                f'$tidalEOMCacheFile = FileNameJoin[{{$tidalEOMCacheDir, "{ctx.eom_cache_key}.json"}}];',
+                "$tidalEOMCacheHit = False;",
+                "If[FileExistsQ[$tidalEOMCacheFile],",
+                "  Module[{cachedData, restored},",
+                '    cachedData = Quiet[Import[$tidalEOMCacheFile, "RawJSON"]];',
+                '    If[AssociationQ[cachedData] && KeyExistsQ[cachedData, "equations"],',
+                '      restored = Map[{#["name"], ToExpression[#["expr"]]} &,',
+                '        cachedData["equations"]];',
+                "      If[AllTrue[restored, ListQ[#] && Length[#] == 2 &],",
+                "        fieldEquations = restored;",
+                "        $tidalEOMCacheHit = True;",
+                '        Print["EOM cache HIT: loaded ", Length[restored], " equations"];',
+                "      ]",
+                "    ]",
+                "  ]",
+                "];",
+                "",
+                "If[!$tidalEOMCacheHit,",
+                "",
+            ]
         )
 
-        if has_tensor:
-            # Generate both VarD path and Phase A, with runtime LeafCount dispatch.
-            # Small L^(2) → Phase A (fast, produces correct lagComp for Hamiltonian).
-            # Large L^(2) → VarD path (avoids timeout on expensive decomposition).
-            # Threshold: LeafCount > 50000 indicates complex theory where Phase A
-            # would timeout (e.g., non-minimal R̃[μν]F coupling: LeafCount ~119K).
-            lines.extend(
-                [
-                    "(* === Runtime dispatch: Phase A vs VarD based on L^(2) complexity === *)",
-                    "(* Heuristic: LeafCount of unexpanded L^(2) + whether L^(2) has many *)",
-                    "(* top-level additive terms. Large LeafCount indicates complex tensor *)",
-                    "(* products that Phase A DecomposeScalarExpression handles slowly.    *)",
-                    "(* VarD projects rank-N EOM (not scalar L) — fundamentally faster.    *)",
-                    "(* No Expand needed for dispatch — just Length + LeafCount.           *)",
-                    f"Module[{{l2LC = LeafCount[{ctx.prefix}Lagrangian],",
-                    f"         l2TopTerms = If[Head[{ctx.prefix}Lagrangian] === Plus,",
-                    f"           Length[{ctx.prefix}Lagrangian], 1]}},",
-                    '  Print["L^(2) canonical dispatch: ", l2TopTerms, " top terms, LeafCount=", l2LC];',
-                    "  If[l2TopTerms > 500 || l2LC > 50000,",
-                    '    Print["Complex L^(2) — using VarD EOM path"];',
-                ]
-            )
-            # VarD path (for large expressions)
-            vard_lines = _wls_canonical_vard_eom_path(ctx, all_heads_str)
-            lines.extend(f"    {line}" for line in vard_lines)
-            lines.extend(
-                [
-                    "    $tidalVarDSuccess = True,",
-                    "",
-                    '    Print["Few terms — using Phase A (Lagrangian decomposition)"];',
-                ]
-            )
-            # Phase A (for small expressions)
-            phase_a_lines = _wls_canonical_phase_a(ctx, all_heads_str)
-            lines.extend(f"    {line}" for line in phase_a_lines)
-            lines.extend(
-                [
-                    "    $tidalVarDSuccess = False",
-                    "  ];",
-                    "];",
-                    "",
-                ]
-            )
-        else:
-            # Scalar-only: use Phase A directly
-            lines.extend(_wls_canonical_phase_a(ctx, all_heads_str))
+        # --- Canonical pipeline: Phase A → Component E-L ---
+        # Phase A decomposes the abstract Lagrangian L^(2) to component form
+        # (lagComp) via DecomposeScalarExpression. Component E-L then derives
+        # field equations from lagComp via standard variational calculus.
+        # This is the sole derivation path — 70x+ faster than the former
+        # abstract VarD approach for torsion theories (see #230).
+        lines.extend(_wls_canonical_phase_a(ctx, all_heads_str))
 
-        # --- Component-level E-L (only needed for Phase A fallback path) ---
-        # VarD path produces fieldEquations directly; Phase A needs Component E-L.
+        # --- Component-level Euler-Lagrange ---
         if ctx.lagrangian_expr:
             lines.extend(
                 [
                     "",
-                    "(* Skip Component E-L if VarD path already produced fieldEquations *)",
-                    "If[!TrueQ[$tidalVarDSuccess],",
                     "",
                     "(* ============================================================ *)",
-                    "(* Component-level Euler-Lagrange: recompute fieldEquations     *)",
-                    "(* from lagComp (component Lagrangian). This replaces the       *)",
-                    "(* trivial equations from abstract VarD + DecomposeToComponents *)",
-                    "(* which fail for R̃² torsion theories.                        *)",
+                    "(* Component-level Euler-Lagrange: compute fieldEquations from  *)",
+                    "(* lagComp (component Lagrangian) via standard variational      *)",
+                    "(* calculus. 70x+ faster than abstract VarD for torsion (#230). *)",
                     "(* ============================================================ *)",
                     _wls_timing_start("tCompEL"),
                     'Print["Component E-L: computing equations from component Lagrangian..."];',
@@ -5761,7 +5303,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     _wls_timing_end("tCompEL", "Component E-L (differentiate lagComp)"),
                     'Print["Component E-L: ", Length[fieldEquations], " equations"];',
                     "",
-                    "]; (* End If[!TrueQ[$tidalVarDSuccess]] *)",
+                    "",
                     "",
                 ]
             )
@@ -5788,6 +5330,28 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             lines.extend(_wls_plane_wave_field_elimination(ctx))
             lines.extend(_wls_plane_wave_coordinate_evaluation(ctx))
         lines.extend(_wls_constraint_elimination())
+
+    # --- EOM cache write + close cache-miss block ---
+    if ctx.lagrangian_expr:
+        lines.extend(
+            [
+                "",
+                "(* === EOM cache write ===                                             *)",
+                "If[!DirectoryQ[$tidalEOMCacheDir],",
+                "  CreateDirectory[$tidalEOMCacheDir, CreateIntermediateDirectories -> True]];",
+                "Module[{eqsForCache},",
+                "  eqsForCache = Map[",
+                '    <|"name" -> #[[1]], "expr" -> ToString[#[[2]], InputForm]|> &,',
+                "    fieldEquations];",
+                "  Quiet[Export[$tidalEOMCacheFile,",
+                '    <|"equations" -> eqsForCache|>, "RawJSON"]];',
+                '  Print["EOM cache: stored ", Length[fieldEquations], " equations"];',
+                "];",
+                "",
+                "];  (* end If !$tidalEOMCacheHit *)",
+                "",
+            ]
+        )
 
     # Build JSON — always use multi-field builder since fieldEquations
     # Inject tensor component metadata into metadata for LaTeX export
@@ -5950,7 +5514,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
 # --- WLS assembly & execution ---
 
 
-def generate_wls(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def generate_wls(  # noqa: PLR0914, PLR0915
     config: dict[str, Any],
     output_override: str | None = None,
     *,
@@ -5989,7 +5553,7 @@ def generate_wls(  # noqa: C901, PLR0912, PLR0914, PLR0915
         base = config_dir if config_dir is not None else Path.cwd()
         resolved_output = (base / resolved_output).resolve()
 
-    # --- Per-field EOM cache keys ---
+    # --- EOM cache key ---
     # Hash structural TOML config (excluding [parameters] and [output] which
     # don't affect the symbolic derivation — parameter values are substituted
     # after Phase B, not during the Wolfram pipeline).
@@ -6005,17 +5569,9 @@ def generate_wls(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     theory_name = config.get("theory", {}).get("name", "Custom Theory")
     eom_cache_dir = str(resolved_output.parent / ".eom_cache" / theory_name)
-    eom_cache_keys: dict[str, str] = {}
-    for f in config.get("fields", []):
-        fname = f["name"]
-        eom_cache_keys[fname] = hashlib.sha256(
-            f"{structural_hash}:{_tidal_version}:{fname}".encode()
-        ).hexdigest()[:16]
-    if config.get("torsion"):
-        tname = config["torsion"]["perturbation_name"]
-        eom_cache_keys[tname] = hashlib.sha256(
-            f"{structural_hash}:{_tidal_version}:{tname}".encode()
-        ).hexdigest()[:16]
+    eom_cache_key = hashlib.sha256(
+        f"{structural_hash}:{_tidal_version}".encode()
+    ).hexdigest()[:16]
 
     ctx = _WlsContext(
         prefix=prefix,
@@ -6047,7 +5603,7 @@ def generate_wls(  # noqa: C901, PLR0912, PLR0914, PLR0915
         ),
         metric_type=config["spacetime"].get("metric", "minkowski"),
         eom_cache_dir=eom_cache_dir,
-        eom_cache_keys=eom_cache_keys,
+        eom_cache_key=eom_cache_key,
     )
 
     is_linearization = ctx.linearization is not None

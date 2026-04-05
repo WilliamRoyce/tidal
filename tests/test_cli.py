@@ -3948,8 +3948,8 @@ path = "output.json"
         assert "SetupMetricPerturbation" in wls
         # Should have VarD for at least two fields
         assert wls.count("VarD[") >= 2
-        # Should have DecomposeToComponents
-        assert "DecomposeToComponents" in wls
+        # Should have Component E-L (Phase A + ComponentEulerLagrange)
+        assert "ComponentEulerLagrange" in wls
         # Should have MakeRule for derived field F
         assert "MakeRule" in wls
         # Background ComponentValue for A
