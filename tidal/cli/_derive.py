@@ -3976,8 +3976,9 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 "(* Mark torsion head for Hamiltonian filtering in Legendre transform.  *)",
                 "(* lagForCanon is NOT modified — full L^(2) needed for correct EOM.   *)",
                 f"$tidalTorsionHead = {torsion_head};",
+                f'$tidalTorsionPertName = "{ctx.torsion["perturbation_name"]}";',
                 "$tidalHamiltonianFilter = True;",
-                f'Print["Hamiltonian filter: will exclude torsion ({torsion_head}) from H terms"];',
+                f'Print["Hamiltonian filter: will exclude torsion ({torsion_head} / {ctx.torsion["perturbation_name"]}_*) from H terms"];',
                 "",
             ]
         )

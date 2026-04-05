@@ -1509,6 +1509,32 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
   result = Map[ParseSingleHamiltonianTerm[#, fieldHeads, allFieldNames] &, terms];
   result = DeleteCases[result, Nothing];
 
+  (* Hamiltonian sector filter: exclude terms referencing torsion fields.
+     $tidalHamiltonianFilter and $tidalTorsionHead are set in the WLS by
+     _derive.py for torsion theories. This keeps only GW+EM self-energy
+     and interaction terms — torsion self-energy and torsion cross-terms
+     are dropped since they don't contribute to the conversion measurement
+     C₀ = P/B₀² (which uses per-field self-energy only).
+     See: hamiltonian_filter_design.md *)
+  If[TrueQ[$tidalHamiltonianFilter] && ValueQ[$tidalTorsionPertName],
+    Module[{nBefore = Length[result], tPert},
+      tPert = $tidalTorsionPertName;
+      result = Select[result, Function[term,
+        Module[{fieldA, fieldB},
+          fieldA = term[["factor_a", "field"]];
+          fieldB = term[["factor_b", "field"]];
+          (* Keep only terms where NEITHER field is a torsion field.
+             Torsion field names are "t_0", "t_15", etc. where "t" is
+             the perturbation name from [torsion] in the TOML. *)
+          !StringMatchQ[fieldA, tPert ~~ "_" ~~ __] &&
+          !StringMatchQ[fieldB, tPert ~~ "_" ~~ __]
+        ]
+      ]];
+      Print["  Hamiltonian torsion filter: ", nBefore, " -> ",
+        Length[result], " terms (torsion fields excluded)"];
+    ]
+  ];
+
   If[Length[result] == 0,
     Throw[StringJoin[
       "ParseHamiltonianExpression: No quadratic terms found. ",
