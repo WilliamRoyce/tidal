@@ -1463,7 +1463,7 @@ ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module
 
 
 (* Parse the full expanded Hamiltonian expression into structured quadratic terms *)
-ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
+ParseHamiltonianExpression[componentExpr_, allFieldNames_List, torsionPertName_String:""] := Module[
   {terms, fieldHeads, result},
 
   (* Discover all function heads that correspond to known fields *)
@@ -1516,9 +1516,11 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
      are dropped since they don't contribute to the conversion measurement
      C₀ = P/B₀² (which uses per-field self-energy only).
      See: hamiltonian_filter_design.md *)
-  If[TrueQ[$tidalHamiltonianFilter] && ValueQ[$tidalTorsionPertName],
+  (* Torsion filter: passed as explicit argument to avoid Wolfram package
+     scoping issues with global $-prefixed variables. *)
+  If[StringLength[torsionPertName] > 0,
     Module[{nBefore = Length[result], tPert, nAfter},
-      tPert = $tidalTorsionPertName;
+      tPert = torsionPertName;
       (* Filter torsion terms from parsed Hamiltonian *)
       result = Select[result, Function[term,
         Module[{fieldA, fieldB, keep},

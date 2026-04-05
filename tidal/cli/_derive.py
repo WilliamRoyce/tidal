@@ -5144,7 +5144,8 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "",
             "(* Parse H into structured quadratic terms *)",
             _wls_timing_start("tParseH"),
-            "hamiltonianTerms = ParseHamiltonianExpression[canonicalH, allCompNames];",
+            "hamiltonianTerms = ParseHamiltonianExpression[canonicalH, allCompNames,"
+            f' If[TrueQ[$tidalHamiltonianFilter], "{ctx.torsion["perturbation_name"] if ctx.torsion else ""}", ""]];',
             _wls_timing_end("tParseH", "ParseHamiltonianExpression"),
             'Print["Hamiltonian terms: ", Length[hamiltonianTerms]];',
             "",
