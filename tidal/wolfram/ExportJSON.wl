@@ -1516,8 +1516,6 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
      are dropped since they don't contribute to the conversion measurement
      C₀ = P/B₀² (which uses per-field self-energy only).
      See: hamiltonian_filter_design.md *)
-  Print["[DEBUG ExportJSON] $tidalHamiltonianFilter=", TrueQ[$tidalHamiltonianFilter],
-    ", $tidalTorsionPertName=", If[ValueQ[$tidalTorsionPertName], $tidalTorsionPertName, "UNSET"]];
   If[TrueQ[$tidalHamiltonianFilter] && ValueQ[$tidalTorsionPertName],
     Module[{nBefore = Length[result], tPert},
       tPert = $tidalTorsionPertName;
