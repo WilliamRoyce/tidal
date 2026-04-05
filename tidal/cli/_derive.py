@@ -275,6 +275,8 @@ class _WlsContext:
     reduction: dict[str, Any] | None
     metric_diagonal: list[str]
     metric_type: str  # "minkowski", "diagonal", or "matrix"
+    eom_cache_dir: str  # absolute path to .eom_cache/<theory_name>/
+    eom_cache_keys: dict[str, str]  # field_name -> cache_key hex string
 
 
 def _wls_mem_print(label: str) -> str:
@@ -4536,6 +4538,26 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
+    # --- Per-field EOM cache setup ---
+    # Cache component equations (output of DecomposeToComponents) per field.
+    # Component equations are pure algebraic (no xAct heads) and serialisable.
+    # Ref: #230, inspired by HiGGS .mx pre-compilation (Barker, arXiv:2206.00658).
+    escaped_eom_cache_dir = ctx.eom_cache_dir.replace("\\", "\\\\").replace('"', '\\"')
+    lines.extend(
+        [
+            "",
+            "(* === Per-field EOM cache (component equations) ===                   *)",
+            "(* Cache DecomposeToComponents results per field. Component equations  *)",
+            "(* are pure algebraic (no xAct heads) and safely serialisable.         *)",
+            "(* Ref: HiGGS .mx pre-compilation (Barker, arXiv:2206.00658).         *)",
+            f'$tidalEOMCacheDir = "{escaped_eom_cache_dir}";',
+            "If[!DirectoryQ[$tidalEOMCacheDir],",
+            "  CreateDirectory[$tidalEOMCacheDir, CreateIntermediateDirectories -> True]];",
+            "$tidalEOMCacheHits = 0; $tidalEOMCacheMisses = 0;",
+            "",
+        ]
+    )
+
     # For each dynamical field, generate VarD + projection code
     for dfi in dyn_field_info:
         head = dfi["head"]
@@ -4543,10 +4565,49 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
         fname = dfi["name"]
         ftype = dfi["type"]
 
+        # Per-field cache key (computed in Python, injected as string literal)
+        field_cache_key = ctx.eom_cache_keys.get(fname, "")
+        has_cache = bool(field_cache_key)
+
         lines.extend(
             [
                 f'Print["  VarD w.r.t. {fname} ({fexpr})..."];',
-                "Module[{eomAbs, eomTerms, nTerms, tField = AbsoluteTime[]},",
+                "Module[{eomAbs, eomTerms, nTerms, tField = AbsoluteTime[],",
+                "        eomCacheHit = False},",
+            ]
+        )
+
+        # Cache check: load component equations from JSON if cache file exists
+        if has_cache:
+            lines.extend(
+                [
+                    f'  Module[{{cacheFile = FileNameJoin[{{$tidalEOMCacheDir, "{field_cache_key}.json"}}],',
+                    "          cachedData},",
+                    "    If[FileExistsQ[cacheFile],",
+                    '      cachedData = Quiet[Import[cacheFile, "RawJSON"]];',
+                    '      If[AssociationQ[cachedData] && KeyExistsQ[cachedData, "equations"],',
+                    '        Module[{eqs = cachedData["equations"], restored},',
+                    '          restored = Map[{#["name"], ToExpression[#["expr"]]} &, eqs];',
+                    "          If[AllTrue[restored, ListQ[#] && Length[#] == 2 &],",
+                    "            Do[AppendTo[fieldEquations, restored[[k]]],",
+                    "              {k, Length[restored]}];",
+                    "            eomCacheHit = True;",
+                    "            $tidalEOMCacheHits++;",
+                    '            Print["    CACHE HIT (", Length[restored], " equations)"]',
+                    "          ]",
+                    "        ]",
+                    "      ]",
+                    "    ]",
+                    "  ];",
+                    "",
+                ]
+            )
+
+        # Cache miss: full VarD + DecomposeToComponents pipeline
+        lines.extend(
+            [
+                "  If[!eomCacheHit,",
+                "  Module[{nEqsBefore = Length[fieldEquations]},",
                 f"  eomAbs = VarD[{fexpr}, {ctx.cd}][lagForCanon];",
                 "  (* Per-term ToCanonical: avoids xperm segfault on large sums *)",
                 "  eomAbs = If[Head[eomAbs] === Plus,",
@@ -4662,13 +4723,45 @@ def _wls_canonical_vard_eom_path(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     f"  fieldEquations = fieldEquations /. {wl_list(cv_rules)};",
                 )
 
+        # Write cache for this field's new equations (cache miss path)
+        if has_cache:
+            lines.extend(
+                [
+                    "",
+                    "  (* Write per-field EOM cache *)",
+                    "  Module[{eqsForCache, newEqs},",
+                    "    newEqs = fieldEquations[[nEqsBefore + 1 ;;]];",
+                    "    eqsForCache = Map[",
+                    '      <|"name" -> #[[1]], "expr" -> ToString[#[[2]], InputForm]|> &,',
+                    "      newEqs];",
+                    f'    Quiet[Export[FileNameJoin[{{$tidalEOMCacheDir, "{field_cache_key}.json"}}],',
+                    f'      <|"field" -> "{fname}", "equations" -> eqsForCache|>,',
+                    '      "RawJSON"]];',
+                    '    Print["    cached ", Length[newEqs], " equations"];',
+                    "  ];",
+                    "  $tidalEOMCacheMisses++;",
+                ]
+            )
+
+        # Close cache-miss If + Module
         lines.extend(
             [
+                "  ];  (* end Module nEqsBefore *)",
+                "  ];  (* end If !eomCacheHit *)",
                 '  Print["    done in ", Round[AbsoluteTime[] - tField, 0.1], "s"];',
                 "];",
                 "",
             ]
         )
+
+    # Print cache summary
+    lines.extend(
+        [
+            'Print["EOM cache: ", $tidalEOMCacheHits, " hits, ",',
+            '  $tidalEOMCacheMisses, " misses"];',
+            "",
+        ]
+    )
 
     # --- lagComp reconstruction from bilinear identity ---
     lines.extend(
@@ -5857,7 +5950,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
 # --- WLS assembly & execution ---
 
 
-def generate_wls(
+def generate_wls(  # noqa: C901, PLR0912, PLR0914, PLR0915
     config: dict[str, Any],
     output_override: str | None = None,
     *,
@@ -5896,6 +5989,34 @@ def generate_wls(
         base = config_dir if config_dir is not None else Path.cwd()
         resolved_output = (base / resolved_output).resolve()
 
+    # --- Per-field EOM cache keys ---
+    # Hash structural TOML config (excluding [parameters] and [output] which
+    # don't affect the symbolic derivation — parameter values are substituted
+    # after Phase B, not during the Wolfram pipeline).
+    # Ref: #230, inspired by HiGGS .mx pre-compilation (Barker, arXiv:2206.00658).
+    from tidal import __version__ as _tidal_version
+
+    structural_config = {
+        k: v for k, v in config.items() if k not in {"parameters", "output"}
+    }
+    structural_hash = hashlib.sha256(
+        _json_mod.dumps(structural_config, sort_keys=True, default=str).encode()
+    ).hexdigest()[:16]
+
+    theory_name = config.get("theory", {}).get("name", "Custom Theory")
+    eom_cache_dir = str(resolved_output.parent / ".eom_cache" / theory_name)
+    eom_cache_keys: dict[str, str] = {}
+    for f in config.get("fields", []):
+        fname = f["name"]
+        eom_cache_keys[fname] = hashlib.sha256(
+            f"{structural_hash}:{_tidal_version}:{fname}".encode()
+        ).hexdigest()[:16]
+    if config.get("torsion"):
+        tname = config["torsion"]["perturbation_name"]
+        eom_cache_keys[tname] = hashlib.sha256(
+            f"{structural_hash}:{_tidal_version}:{tname}".encode()
+        ).hexdigest()[:16]
+
     ctx = _WlsContext(
         prefix=prefix,
         dim=dim,
@@ -5925,6 +6046,8 @@ def generate_wls(
             config.get("reduction", {}).get("coordinate_values", {}),
         ),
         metric_type=config["spacetime"].get("metric", "minkowski"),
+        eom_cache_dir=eom_cache_dir,
+        eom_cache_keys=eom_cache_keys,
     )
 
     is_linearization = ctx.linearization is not None
