@@ -4207,9 +4207,13 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "    (* Block[{Print=Null}]: suppress xAct internal prints during         *)",
             "    (* decomposition. Output buffering overhead adds ~1-2s per term.    *)",
             "    (* Supervisor wraps all expensive ops this way (SphericalEuclidean). *)",
-            f"    termComp = Block[{{Print = Null}}, Quiet[Catch[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {wl_list(all_heads_str)}, "
-            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}]], {{Validate::repeated, Validate::inhom}}]];',
-            "    If[termComp === Null, termComp = 0];",
+            f"    termComp = TimeConstrained[Block[{{Print = Null}}, Quiet[Catch[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {wl_list(all_heads_str)}, "
+            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}]], {{Validate::repeated, Validate::inhom}}]], 30, $TimedOut];',
+            "    If[termComp === $TimedOut,",
+            '      Print["  term ", k, "/", Length[lagTerms], ": SKIPPED (>30s)"];',
+            "      termComp = 0,",
+            "      If[termComp === Null, termComp = 0]",
+            "    ];",
         ]
     )
 
