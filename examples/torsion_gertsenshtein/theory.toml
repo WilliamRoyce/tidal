@@ -51,6 +51,9 @@
 #   Shapiro (2002), hep-th/0103093 — torsion phenomenology
 #   Dandoy, Lella et al. (2024), arXiv:2406.17853 — GW constraints
 #   Hayashi & Shirafuji (1979) — PGT propagating modes
+#
+# Derivation timing: ~20 min wall (requires --timeout 0; exceeds default 600s)
+# Last verified: 2026-04-05 (20 fields, 147 H terms, v0.25.6)
 
 [theory]
 name = "Torsion-Gertsenshtein (PGT + Einstein-Maxwell)"

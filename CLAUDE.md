@@ -61,6 +61,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Specify success criteria before coding**: "Modal solver must agree with CVODE to RMS < 1%" — not just "implement modal solver". Include quantitative thresholds.
 - **Wolfram derivations**: Read an existing .wls template first, generate new by modifying template, review diff against template before running wolframscript
 - **After derivation**: Verify JSON has `canonical.hamiltonian_terms` — without this, all energy measurements fail silently. Run `tidal validate <json> --stability`.
+- **Record derivation timing**: After a successful `tidal derive`, update the theory TOML header comment with `# Derivation timing: ~Xm wall (last verified: YYYY-MM-DD, N fields, M H terms, vX.Y.Z)`. This tracks regressions and sets expectations. Use `--timeout 0` for theories that exceed the default 600s.
 - **Convergence testing**: After solver changes, verify error decreases at expected rate with resolution (4x for 2nd-order FD, 16x for 4th-order, machine-precision for spectral)
 - **Regression detection**: Map changed files to relevant physics tests (see `/validate-physics` skill). Run those tests, not the full suite, for fast feedback.
 
