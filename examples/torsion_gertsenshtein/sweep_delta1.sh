@@ -46,13 +46,13 @@ K0=2.0
 
 echo "=== Nonminimal R̃[μν]F: Delta1 Sweep ==="
 echo "Fixed: kappa=${KAPPA}, B0=${B0}, alpha1=${ALPHA1}, alpha2=${ALPHA2}, alpha3=${ALPHA3}"
-echo "Sweep: delta1 = -1.0 .. 1.0 (20 points)"
+echo "Sweep: delta1 = 0.01 .. 1.0 (20 points, avoiding delta1=0 singularity)"
 echo "Gertsenshtein baseline: P = sin^2(kappa * B0 * t_end / 2) = sin^2(0.25) ~ 0.0612"
 echo "Output: ${OUTPUT}"
 echo ""
 
 uv run tidal sweep "${SPEC}" \
-  --sweep "delta1=-1.0:1.0:20" \
+  --sweep "delta1=0.01:1.0:20" \
   --measure peak_conversion \
   --source h_5 --target a_1 \
   --grid-shape "${GRID}" --bounds "${BOUNDS}" --periodic \
