@@ -204,3 +204,19 @@ For combined multi-field theories (e.g.\ PGT + Einstein--Maxwell with 23 compone
   \item \textbf{Continuous adaptive batching:} \texttt{DecomposeScalarExpression} batches large expressions with per-batch adaptive sizing, preventing blowup when later batches have different coupling structure.
   \item \textbf{Sector-aware splitting:} Automatically classify expanded Lagrangian terms by field content (graviton-only, torsion-only, EM-only, cross-sector), processing each sector independently.
 \end{enumerate}
+
+\subsection{Hamiltonian Phase Optimisations (v0.25.7+)}
+\label{sec:hamiltonian-phase-perf}
+
+For torsion theories with non-minimal couplings, the canonical Hamiltonian computation is the dominant bottleneck (Phase~B: IBP + Legendre transform). Two optimisations target Phase~B:
+
+\paragraph{Pre-IBP torsion filter (Phase~B).}
+Before the time-variable integration-by-parts loop, terms containing \emph{only} torsion component functions (no GW or EM field content) are removed from \texttt{lagComp}. These terms contribute zero to both canonical momenta ($\pi_h$, $\pi_a$) and the filtered Legendre subtraction ($-L$), so their removal is exact. For the \texttt{torsion\_gertsenshtein} theory, this eliminates ${\sim}40$--60\% of IBP work.
+
+Ref: inspired by irreducible sector decomposition in HiGGS~\cite{Barker:2022kdk} (github.com/wevbarker/HiGGS), which computes constraints only for physically relevant torsion sectors. See also Hamilcar (github.com/wevbarker/Hamilcar) for index-free canonical analysis.
+
+\paragraph{Collect before Legendre transform (Phase~B).}
+\texttt{Collect[lagComp, fieldFuncList, Identity]} combines terms with identical field-function structure before the momentum computation loop. This reduces the number of \texttt{D[lagComp, vel]} evaluations by ${\sim}15$--25\%.
+
+\paragraph{Phase~A caching (under investigation, \#228).}
+Caching \texttt{DecomposeScalarExpression} results on abstract tensor expressions was tested but caused severe regression (${\sim}131$\,s $\to$ $>600$\,s timeout) due to expensive \texttt{Hash}/\texttt{SeparateScalarCoefficient} calls on deeply nested xAct expressions. Alternative caching strategies targeting post-decomposition (component scalar) expressions are being investigated; see \#228 for details.

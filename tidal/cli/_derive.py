@@ -4903,6 +4903,32 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "  ]",
             "];",
             "",
+            "(* --- Pre-IBP torsion filter: remove torsion-only terms ---           *)",
+            "(* Terms containing ONLY torsion component functions (no GW/EM        *)",
+            "(* content) contribute nothing to the final Hamiltonian:              *)",
+            "(*   1. D[torsion_term, vel_h] = D[torsion_term, vel_a] = 0          *)",
+            "(*   2. Stage 3 filter would remove them from -L anyway              *)",
+            "(* Removing them before IBP saves N_torsion x 5 rounds of work.      *)",
+            "(* Ref: Barker's irreducible sector decomposition in HiGGS           *)",
+            "(*      (arXiv:2206.00658) — compute only physically relevant sectors.*)",
+            "If[TrueQ[$tidalHamiltonianFilter],",
+            "  Module[{lagTerms, gwemCompNames, gwemFuncs, nBefore, nAfter},",
+            "    lagTerms = If[Head[lagComp] === Plus, List @@ lagComp, {lagComp}];",
+            "    nBefore = Length[lagTerms];",
+            "    (* Build GW/EM function list: all non-torsion component functions *)",
+            "    gwemCompNames = Select[fieldEquations[[All, 1]], Function[cn,",
+            f'      !StringMatchQ[cn, "{ctx.torsion["perturbation_name"] if ctx.torsion else "NOTORSION"}_" ~~ __]',
+            "    ]];",
+            "    gwemFuncs = compToFunc /@ gwemCompNames;",
+            "    (* Keep terms containing at least one GW/EM field function *)",
+            "    lagComp = Total[Select[lagTerms,",
+            "      !FreeQ[#, Alternatives @@ gwemFuncs] &]];",
+            "    nAfter = If[Head[lagComp] === Plus, Length[lagComp], 1];",
+            '    Print["Pre-IBP torsion filter: ", nBefore, " -> ", nAfter,',
+            '      " terms (", nBefore - nAfter, " torsion-only removed)"];',
+            "  ]",
+            "];",
+            "",
             "(* Apply IBP to full Lagrangian (iterate until no pure d²_t terms)    *)",
             "(* No Expand inside loop — terms stay factored. FreeQ works on any    *)",
             "(* expression structure. Post-loop Expand is safe (lower order).      *)",
@@ -4960,6 +4986,19 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
 
     lines.extend(
         [
+            "",
+            "(* --- Collect like terms before Legendre transform ---                *)",
+            "(* Algebraic identity: combine terms with identical field-function     *)",
+            "(* structure to reduce the number of D[] evaluations in pi = dL/dv.   *)",
+            "(* Use Identity (not Simplify) as coefficient function — fast.         *)",
+            "Module[{nBefore, nAfter},",
+            "  nBefore = If[Head[lagComp]===Plus, Length[lagComp], 1];",
+            "  lagComp = Collect[lagComp, fieldFuncList, Identity];",
+            "  nAfter = If[Head[lagComp]===Plus, Length[lagComp], 1];",
+            "  If[nAfter < nBefore,",
+            '    Print["Collect before Legendre: ", nBefore, " -> ", nAfter, " terms"]',
+            "  ];",
+            "];",
             "",
             "(* Compute canonical momenta: pi_i = dL/d(d_t q_i)                    *)",
             "(* Skip constraint fields (time_order=0) — they have no velocity,      *)",
@@ -5453,6 +5492,30 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "",
             )
         )
+        # --- Set Hamiltonian filter variables BEFORE the VarD/Phase A dispatch ---
+        # These must be set regardless of which code path is taken, because
+        # ParseHamiltonianExpression (in ExportJSON.wl) reads them later.
+        if ctx.torsion is not None and len(ctx.fields) > 1:
+            torsion_head = (
+                f"{ctx.prefix}{ctx.torsion['perturbation_name'].capitalize()}"
+            )
+            lines.extend(
+                [
+                    f"$tidalTorsionHead = {torsion_head};",
+                    f'$tidalTorsionPertName = "{ctx.torsion["perturbation_name"]}";',
+                    "$tidalHamiltonianFilter = True;",
+                    f'Print["Hamiltonian filter: will exclude torsion ({torsion_head} / '
+                    f'{ctx.torsion["perturbation_name"]}_*) from H terms"];',
+                    "",
+                ]
+            )
+        lines.extend(
+            [
+                "If[!ValueQ[$tidalHamiltonianFilter], $tidalHamiltonianFilter = False];",
+                "",
+            ]
+        )
+
         # --- Dual-path canonical pipeline: VarD EOM (fast) with Phase A fallback ---
         # The VarD path projects rank-N EOM to components (supervisor's pattern).
         # Phase A decomposes scalar L to components (slower for complex theories).
