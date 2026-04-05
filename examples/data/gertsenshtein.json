@@ -14,13 +14,12 @@
 			"original_dimension": 4,
 			"propagation_axis": "z",
 			"eliminated_fields": [
-				"h_6",
+				"h_4",
 				"h_8",
-				"h_9",
-				"h_4"
+				"h_9"
 			]
 		},
-		"derivation_hash": "40860e43422c94d572278b0984ef516abb9c806e0bf79109c413e206e706e9b9"
+		"derivation_hash": "b9aa4264fb82556535dcbaeacc464de649504f540980d90eb1e3fcc11c54ee85"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -125,10 +124,10 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 1.0,
+						"coefficient": 0.5,
 						"operator": "gradient_x",
 						"field": "h_7",
-						"coefficient_symbolic": "B0"
+						"coefficient_symbolic": "B0/2"
 					},
 					{
 						"coefficient": 1.0,
@@ -161,9 +160,9 @@
 		{
 			"field": "h_5",
 			"lhs": {
-				"expression": "d2_t(h_5)",
+				"expression": "h_5",
 				"order": {
-					"time": 2,
+					"time": 0,
 					"space": 0
 				}
 			},
@@ -171,21 +170,10 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -0.5,
-						"operator": "identity",
-						"field": "h_5",
-						"coefficient_symbolic": "-1/2*(B0^2*kappa^2)"
-					},
-					{
 						"coefficient": -1.0,
 						"operator": "gradient_x",
 						"field": "a_1",
-						"coefficient_symbolic": "-(B0*kappa^2)"
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "laplacian_x",
-						"field": "h_5"
+						"coefficient_symbolic": "-B0"
 					}
 				]
 			}
@@ -197,27 +185,29 @@
 				"order": {
 					"time": 2,
 					"space": 0
-				}
+				},
+				"kinetic_coefficient_symbolic": "kappa^(-2)"
 			},
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -0.5,
+						"coefficient": -0.125,
 						"operator": "identity",
 						"field": "h_7",
-						"coefficient_symbolic": "-1/2*(B0^2*kappa^2)"
+						"coefficient_symbolic": "-1/8*B0^2"
 					},
 					{
-						"coefficient": -1.0,
+						"coefficient": 0.5,
 						"operator": "gradient_x",
 						"field": "a_2",
-						"coefficient_symbolic": "-(B0*kappa^2)"
+						"coefficient_symbolic": "B0/2"
 					},
 					{
 						"coefficient": 1.0,
 						"operator": "laplacian_x",
-						"field": "h_7"
+						"field": "h_7",
+						"coefficient_symbolic": "kappa^(-2)"
 					}
 				]
 			}
@@ -262,7 +252,7 @@
 				null,
 				null,
 				null,
-				"-1/2*(B0^2*kappa^2)",
+				null,
 				null
 			],
 			[
@@ -271,7 +261,7 @@
 				null,
 				null,
 				null,
-				"-1/2*(B0^2*kappa^2)"
+				"-1/8*B0^2"
 			]
 		]
 	},
@@ -280,19 +270,6 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_5",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_5",
-					"operator": "identity"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "B0^2/4"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
 					"field": "h_7",
 					"operator": "identity"
 				},
@@ -301,7 +278,7 @@
 					"operator": "identity"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "B0^2/4"
+				"coefficient_symbolic": "-1/16*B0^2"
 			},
 			{
 				"coefficient": -0.5,
@@ -351,7 +328,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "B0"
+				"coefficient_symbolic": "B0/2"
 			},
 			{
 				"coefficient": 0.5,
@@ -376,19 +353,6 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_5",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "h_5",
-					"operator": "gradient_x"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
@@ -401,71 +365,47 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "1/(2*kappa^2)"
-			},
-			{
-				"coefficient": -1.0,
-				"factor_a": {
-					"field": "a_3",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "a_0",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction"
-			},
-			{
-				"coefficient": 0.5,
-				"factor_a": {
-					"field": "a_0",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "a_0",
-					"operator": "time_derivative"
-				},
-				"term_class": "self"
-			},
-			{
-				"coefficient": 0.5,
-				"factor_a": {
-					"field": "a_1",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "a_1",
-					"operator": "time_derivative"
-				},
-				"term_class": "self"
-			},
-			{
-				"coefficient": 0.5,
-				"factor_a": {
-					"field": "a_2",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "a_2",
-					"operator": "time_derivative"
-				},
-				"term_class": "self"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "a_0",
-					"operator": "gradient_x"
-				},
-				"factor_b": {
-					"field": "a_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction"
+				"coefficient_symbolic": "-1/2*1/kappa^2"
 			},
 			{
 				"coefficient": -0.5,
 				"factor_a": {
+					"field": "a_0",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "a_0",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "a_1",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "a_1",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "a_2",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "a_2",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
 					"field": "a_3",
 					"operator": "time_derivative"
 				},
@@ -478,19 +418,6 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_5",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_5",
-					"operator": "time_derivative"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "1/(2*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
 					"field": "h_7",
 					"operator": "time_derivative"
 				},
@@ -499,15 +426,14 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "1/(2*kappa^2)"
+				"coefficient_symbolic": "-1/2*1/kappa^2"
 			}
 		],
 		"wolfram_constraint_elimination": true,
 		"eliminated_from_canonical": [
-			"h_6",
+			"h_4",
 			"h_8",
-			"h_9",
-			"h_4"
+			"h_9"
 		]
 	}
 }

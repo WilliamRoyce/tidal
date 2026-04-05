@@ -3,7 +3,7 @@
 **Created:** February 2026
 **Last Updated:** March 2026
 **Status:** Phases A, B, C, D, E (FFT), F, J complete; Torsion (PGT) complete (v0.18.0); Torsion-Gertsenshtein investigated (v0.22.8); Phases G–I planned
-**Version:** 0.25.6 | **Tests:** 1,700 collected | **Examples:** 20 working (1+1D to 3+1D)
+**Version:** 0.25.7 | **Tests:** 1,700 collected | **Examples:** 20 working (1+1D to 3+1D)
 
 ## Context
 
