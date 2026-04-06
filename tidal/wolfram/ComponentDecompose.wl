@@ -456,6 +456,16 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
 
   (* SeparateMetric: resolve any metric contractions introduced by ToBasis *)
   e = SeparateMetric[metric][e];
+
+  (* Re-contract metric-metric products: g^{ab} g_{bc} → δ^a_c.          *)
+  (* SeparateMetric introduces explicit metric factors that may multiply  *)
+  (* existing metrics from the original expression, creating g×g pairs   *)
+  (* that TraceBasisDummy would enumerate at O(dim^2) per pair. Absorbing *)
+  (* them back reduces the contracted dummy pair count K, giving up to   *)
+  (* 16x speedup per eliminated pair.                                     *)
+  (* Ref: TraceBasisDummy O(4^{2K}) bottleneck investigation (#229).     *)
+  e = ContractMetric[e, metric];
+
   (* Final ToBasis pass for metric-separated terms *)
   If[Head[e] === Plus,
     e = Total[ToBasis[chart] /@ List @@ e],
