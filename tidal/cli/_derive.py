@@ -5407,6 +5407,13 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             'Print["Exported to: ", outputPath];',
             "",
             f'Print["*** {ctx.theory_name} derivation complete! ***"];',
+            "",
+            "(* Clean kernel shutdown: release memory, clear caches, exit.         *)",
+            "(* Without Quit[], WolframKernel persists after wolframscript returns, *)",
+            "(* causing state accumulation and timing degradation across runs.     *)",
+            "Share[];",
+            "ClearSystemCache[];",
+            "Quit[];",
         )
     )
 
