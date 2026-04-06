@@ -48,8 +48,6 @@ expression = "(RicciScalarCD[] - m2/2 * ((eta[-a, -b] - bg[-a, -b]) eta[a, c] et
 [linearization]
 perturbation_field = "h"
 
-[parameters]
-m2 = 1.0
 
 [constraint_solver]
 enabled = true

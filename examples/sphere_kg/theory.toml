@@ -18,9 +18,6 @@ names = ["sphR", "sphm2"]
 [lagrangian]
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - sphm2/2 phi[]^2"
 
-[parameters]
-sphR = 1.0
-sphm2 = 0.0
 
 [output]
 path = "../data/sphere_kg.json"

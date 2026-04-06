@@ -1225,8 +1225,9 @@ path = "output.json"
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 0
         out = capsys.readouterr().out
-        assert '"m2" -> 1.0' in out
-        assert "parameters" in out.lower()
+        # Parameter substitution removed (#232) — coefficients stay symbolic
+        # The script should NOT contain parameter value substitution rules
+        assert '"m2" -> 1.0' not in out
 
     def test_derive_toml_save_script(self, tmp_path: Path) -> None:
         config = tmp_path / "theory.toml"
@@ -1616,8 +1617,8 @@ path = "output.json"
         assert '"linearized" -> True' in out
         # No Euler-Lagrange path
         assert "VarD" not in out
-        # Parameter default value in metadata
-        assert '"m2" -> 1.0' in out
+        # Parameter substitution removed (#232) — no numeric values in script
+        assert '"m2" -> 1.0' not in out
 
 
 class TestGaugeFixing:
@@ -3144,7 +3145,8 @@ path = "output.json"
         assert "DecomposeToComponents" in out
         assert "bcPsi[]" in out
         assert "bcChi[]" in out
-        assert '"Bval" -> 1.0' in out
+        # Parameter substitution removed (#232) — no numeric values in script
+        assert '"Bval" -> 1.0' not in out
 
     def test_background_localized_unitstep_dry_run(
         self,

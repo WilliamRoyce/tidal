@@ -57,11 +57,6 @@ expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - 1/2 CD[-a][chi[]] eta
 # positive.  For this example the condition is mPhi2 * mChi2 > g0^2 (from
 # det(M) > 0 at the coupling peak where G = g0).
 # With these defaults: det = 1*1 - 0.5^2 = 0.75 > 0.  Minimum stable g0 = sqrt(mPhi2*mChi2) = 1.0.
-[parameters]
-mPhi2 = 1.0
-mChi2 = 1.0
-g0 = 0.5
-R = 5.0
 
 [reduction]
 type = "plane_wave"

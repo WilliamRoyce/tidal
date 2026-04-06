@@ -139,13 +139,6 @@ propagation_axis = "z"
 # kappa = 1.0 (natural units; physical ~1.15e-18 GeV^-1)
 # B0 = 0.3 (background magnetic field strength)
 # alpha1-3 = torsion mass terms, b5 = R̃² coupling
-[parameters]
-kappa = 1.0
-B0 = 0.3
-alpha1 = 0.5
-alpha2 = 0.3
-alpha3 = 0.2
-b5 = 0.1
 
 [output]
 path = "../data/torsion_gertsenshtein.json"

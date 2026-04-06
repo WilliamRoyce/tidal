@@ -18,8 +18,6 @@ names = ["cylm2"]
 [lagrangian]
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - cylm2/2 phi[]^2"
 
-[parameters]
-cylm2 = 0.0
 
 [output]
 path = "../data/cylindrical_kg.json"

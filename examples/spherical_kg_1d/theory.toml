@@ -18,8 +18,6 @@ names = ["spm2"]
 [lagrangian]
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - spm2/2 phi[]^2"
 
-[parameters]
-spm2 = 0.0
 
 [reduction]
 type = "plane_wave"

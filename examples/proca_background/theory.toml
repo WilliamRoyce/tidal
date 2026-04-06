@@ -47,12 +47,6 @@ expression = "(-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] + 1/2 CD[-a][A
 # Stability: mA2 * mB2 > (g0 * gcoup)^2 at the origin.
 # At origin G(0,0) = g0, so effective coupling = g0*gcoup = 0.5.
 # det = 1*2 - 0.25 = 1.75 > 0.
-[parameters]
-mA2 = 1.0
-mB2 = 2.0
-gcoup = 0.5
-g0 = 1.0
-R = 8.0
 
 [constraint_solver]
 enabled = true

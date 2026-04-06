@@ -129,13 +129,6 @@ propagation_axis = "z"
 # alpha2 = -0.6 (I₂ mass: compensates R̃ tensor tachyon)
 # alpha3 = 0.5 (I₃ mass: trace sector)
 # delta1 = 0.1 (non-minimal R̃[μν]F coupling)
-[parameters]
-kappa = 1.0
-B0 = 0.01
-alpha1 = 0
-alpha2 = -0.6
-alpha3 = 0.5
-delta1 = 0.1
 
 [output]
 path = "../data/torsion_gertsenshtein_nonminimal.json"

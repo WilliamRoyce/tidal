@@ -40,8 +40,6 @@ components = ["V0 * UnitStep[x[] - 30] * UnitStep[60 - x[]]"]
 [lagrangian]
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - V[]/2 * phi[]^2"
 
-[parameters]
-V0 = 4.0
 
 [output]
 path = "../data/scalar_potential_well.json"

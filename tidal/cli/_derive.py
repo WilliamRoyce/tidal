@@ -266,7 +266,7 @@ class _WlsContext:
     lagrangian_expr: str
     is_multi: bool
     pipeline_path: str
-    parameters: dict[str, float]
+    parameters: dict[str, float]  # kept for metadata; substitution removed (#232)
     derived_fields: list[dict[str, Any]]
     background_fields: list[dict[str, Any]]
     linearization: dict[str, Any] | None
@@ -5310,25 +5310,9 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # fieldEquations now contains only surviving fields (constraints
     # eliminated by Phase A above), so the JSON is born correct.
     #
-    # Substitute parameter values before export: R̃² 4th-order equations
-    # have symbolic coefficients (e.g. 5*b5/kappa^2) that cause Expand
-    # inside BuildMultiFieldJSONStructure to exceed $RecursionLimit.
-    # Numeric substitution collapses these to floats, avoiding deep recursion.
-    param_rules = []
-    if ctx.parameters:
-        for pname, pval in ctx.parameters.items():
-            # Constants are DefConstantSymbol (no prefix), not prefixed fields
-            param_rules.append(f"{pname} -> {pval}")
-    if param_rules:
-        lines.extend(
-            (
-                "(* NOTE: Parameter substitution deferred to after Phase B.           *)",
-                "(* Setting DefConstantSymbol values before IBP/Legendre crashes the   *)",
-                "(* Wolfram kernel (segfault) — xAct's evaluation engine conflicts     *)",
-                "(* with numeric constant symbols during pattern matching.              *)",
-                "",
-            )
-        )
+    # Coefficients remain symbolic (e.g. "alpha1/kappa^2") — parameter
+    # values are resolved at simulation time via --param (#232).
+
     # Evaluate any remaining abstract background field derivative products
     # in the field equations.  After Component E-L, equation coefficients
     # may contain contracted products like CD[-a][Abar[-b]]*CD[b][Abar[a]]
@@ -5374,16 +5358,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
     )
 
-    # Inject runtime parameter defaults into JSON metadata
-    if ctx.parameters:
-        param_entries = ", ".join(f'"{k}" -> {v}' for k, v in ctx.parameters.items())
-        lines.extend(
-            (
-                f'jsonStructure["metadata", "parameters"] = <|{param_entries}|>;',
-                "",
-            )
-        )
-
     # --- Canonical Phase B: IBP + Legendre transform + Hamiltonian ---
     # Must run AFTER BuildMultiFieldJSONStructure (injects canonical section
     # into jsonStructure).  Reads allCompNames from fieldEquations.
@@ -5400,21 +5374,8 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # pipeline have finished using it.
     lines.extend(("Clear[fieldEquations]; Share[];", ""))
 
-    # --- Deferred parameter substitution (AFTER Phase B) ---
-    # Setting DefConstantSymbol values BEFORE IBP/Legendre crashes the
-    # Wolfram kernel — xAct's evaluation conflicts with numeric constants.
-    # Substitute parameters in the JSON structure AFTER canonical processing.
-    if ctx.parameters:
-        param_entries_wl = ", ".join(f"{k} -> {v}" for k, v in ctx.parameters.items())
-        lines.extend(
-            (
-                "(* Substitute parameter values in JSON structure *)",
-                f"paramRules = {wl_list(param_entries_wl)};",
-                "jsonStructure = jsonStructure /. paramRules;",
-                'Print["Parameter substitution applied to JSON structure."];',
-                "",
-            )
-        )
+    # NOTE: No parameter substitution — JSON coefficients remain symbolic
+    # (e.g. "alpha1/kappa^2"). Values resolved at simulation time via --param (#232).
 
     # --- Plane-wave reduction: remap JSON to 1+1D ---
     # After BuildMultiFieldJSONStructure + canonical injection, the JSON

@@ -40,10 +40,6 @@ rho/2 * (CD[{0, -chart}][ux[]]^2 + CD[{0, -chart}][uy[]]^2)
 + 1/2 * (CD[{2, -chart}][ux[]] + CD[{1, -chart}][uy[]])^2)
 """
 
-[parameters]
-rho = 1.0
-lam = 1.0
-mu = 1.0
 
 [output]
 path = "../data/navier_cauchy_2d.json"

@@ -104,10 +104,6 @@ type = "lorenz"
 type = "plane_wave"
 propagation_axis = "z"
 
-[parameters]
-kappa = 1.0
-Bpeak = 0.1
-z0 = 1.0
 
 [output]
 path = "../data/gertsenshtein_dipolar.json"
