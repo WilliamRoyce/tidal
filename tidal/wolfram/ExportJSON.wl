@@ -495,7 +495,12 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
      separate coefficients).  Collect groups them into single terms with
      summed coefficients, reducing JSON bloat and preserving symbolic forms.
      Ref: #231 — uncombined duplicates from constraint elimination. *)
-  Module[{fHeads},
+  (* Group like field-derivative terms by extracting each term's
+     "field shape" (which field head + which derivative orders) and
+     summing terms with the same shape.  Uses GatherBy instead of
+     Collect because Mathematica's Collect uses structural template
+     matching that fails for Derivative[__][f][__] patterns. *)
+  Module[{fHeads, termList, getShape, grouped},
     fHeads = Union[
       Cases[rhs, f_Symbol[__] :> f, {0, Infinity}, Heads -> False],
       Cases[rhs, Derivative[__][f_][__] :> f, {0, Infinity}, Heads -> False]
@@ -506,11 +511,18 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
         match[[1]] =!= ""
       ]
     ]];
-    If[Length[fHeads] > 0 && LeafCount[rhs] < 50000,
-      rhs = Collect[rhs, Flatten[{
-        Map[#[__] &, fHeads],
-        Map[Derivative[__][#][__] &, fHeads]
-      }]];
+    If[Length[fHeads] > 0 && LeafCount[rhs] < 50000 && Head[rhs] === Plus,
+      termList = List @@ rhs;
+      (* Extract field-derivative shape: {fieldHead, derivativeOrders} *)
+      getShape[term_] := Module[{shapes},
+        shapes = Join[
+          Cases[term, f_Symbol[args__] /; MemberQ[fHeads, f] :> {f, {}}, {0, Infinity}],
+          Cases[term, Derivative[orders__][f_][args__] /; MemberQ[fHeads, f] :> {f, {orders}}, {0, Infinity}]
+        ];
+        Sort[shapes]
+      ];
+      grouped = GatherBy[termList, getShape];
+      rhs = Total[Total /@ grouped];
     ]
   ];
 
