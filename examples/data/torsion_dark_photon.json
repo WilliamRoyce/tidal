@@ -5,28 +5,18 @@
 		"derived_from": "Euler-Lagrange",
 		"gauge": "lorenz(a)",
 		"linearized": true,
-		"parameters": {
-			"kappa": 1.0,
-			"B0": 0.01,
-			"alpha": 0.5,
-			"xi": 0.1,
-			"deltam": 0.1
-		},
 		"reduction": {
 			"type": "plane_wave",
 			"original_dimension": 4,
 			"propagation_axis": "z",
 			"eliminated_fields": [
-				"t_0",
 				"t_11",
 				"t_12",
 				"t_14",
-				"t_15",
 				"t_16",
 				"t_18",
 				"t_19",
 				"t_21",
-				"t_22",
 				"t_3",
 				"t_4",
 				"t_5",
@@ -34,7 +24,7 @@
 				"t_8"
 			]
 		},
-		"derivation_hash": "b6f5f0bf413096bd2fb4ee227381fdbdde74eb0d3daf168192fec3eced5733ef"
+		"derivation_hash": "bbaac61da0d5e819dec03b115711ae4895be31eec450b7d343f27043efc86e5a"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -119,48 +109,63 @@
 			"is_dynamical": true
 		},
 		{
-			"name": "t_1",
+			"name": "t_0",
 			"index": 14,
 			"is_dynamical": true
 		},
 		{
-			"name": "t_10",
+			"name": "t_1",
 			"index": 15,
 			"is_dynamical": true
 		},
 		{
-			"name": "t_13",
+			"name": "t_10",
 			"index": 16,
 			"is_dynamical": true
 		},
 		{
-			"name": "t_17",
+			"name": "t_13",
 			"index": 17,
 			"is_dynamical": true
 		},
 		{
-			"name": "t_2",
+			"name": "t_15",
 			"index": 18,
 			"is_dynamical": true
 		},
 		{
-			"name": "t_20",
+			"name": "t_17",
 			"index": 19,
 			"is_dynamical": true
 		},
 		{
-			"name": "t_23",
+			"name": "t_2",
 			"index": 20,
 			"is_dynamical": true
 		},
 		{
-			"name": "t_6",
+			"name": "t_20",
 			"index": 21,
 			"is_dynamical": true
 		},
 		{
-			"name": "t_9",
+			"name": "t_22",
 			"index": 22,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_23",
+			"index": 23,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_6",
+			"index": 24,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_9",
+			"index": 25,
 			"is_dynamical": true
 		}
 	],
@@ -187,6 +192,42 @@
 						"coefficient": -1.0,
 						"operator": "laplacian_x",
 						"field": "a_0"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "t_13",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "t_20",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "t_6",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "v_t_10",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "v_t_17",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "v_t_2",
+						"coefficient_symbolic": "-2*deltam"
 					}
 				]
 			}
@@ -213,6 +254,42 @@
 						"coefficient": 1.0,
 						"operator": "laplacian_x",
 						"field": "a_1"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "t_0",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "laplacian_x",
+						"field": "t_15",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "laplacian_x",
+						"field": "t_22",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "t_0",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "t_15",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "t_22",
+						"coefficient_symbolic": "-2*deltam"
 					}
 				]
 			}
@@ -259,10 +336,46 @@
 						"field": "a_2"
 					},
 					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "t_1",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "laplacian_x",
+						"field": "t_23",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "t_9",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
 						"coefficient": -1.0,
 						"operator": "first_derivative_t",
 						"field": "h_3",
 						"coefficient_symbolic": "-B0"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "t_1",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "t_23",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "t_9",
+						"coefficient_symbolic": "2*deltam"
 					}
 				]
 			}
@@ -289,6 +402,42 @@
 						"operator": "first_derivative_t",
 						"field": "h_2",
 						"coefficient_symbolic": "B0"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_t_13",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_t_20",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_t_6",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "t_10",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "t_17",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "t_2",
+						"coefficient_symbolic": "2*deltam"
 					}
 				]
 			}
@@ -414,10 +563,34 @@
 				"type": "linear_combination",
 				"terms": [
 					{
+						"coefficient": 0.5,
+						"operator": "identity",
+						"field": "h_2",
+						"coefficient_symbolic": "B0^2/2"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "a_0",
 						"coefficient_symbolic": "B0"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "t_13",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "t_20",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "t_6",
+						"coefficient_symbolic": "2*B0*deltam"
 					},
 					{
 						"coefficient": -1.0,
@@ -430,6 +603,24 @@
 						"operator": "first_derivative_t",
 						"field": "a_3",
 						"coefficient_symbolic": "-B0"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "first_derivative_t",
+						"field": "t_10",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "first_derivative_t",
+						"field": "t_17",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "first_derivative_t",
+						"field": "t_2",
+						"coefficient_symbolic": "2*B0*deltam"
 					},
 					{
 						"coefficient": 1.0,
@@ -453,10 +644,34 @@
 				"type": "linear_combination",
 				"terms": [
 					{
+						"coefficient": 0.5,
+						"operator": "identity",
+						"field": "h_3",
+						"coefficient_symbolic": "B0^2/2"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "first_derivative_t",
 						"field": "a_2",
 						"coefficient_symbolic": "B0"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "first_derivative_t",
+						"field": "t_1",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "first_derivative_t",
+						"field": "t_23",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "first_derivative_t",
+						"field": "t_9",
+						"coefficient_symbolic": "-2*B0*deltam"
 					},
 					{
 						"coefficient": -1.0,
@@ -580,10 +795,34 @@
 				"type": "linear_combination",
 				"terms": [
 					{
+						"coefficient": 0.5,
+						"operator": "identity",
+						"field": "h_5",
+						"coefficient_symbolic": "B0^2/2"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "a_1",
 						"coefficient_symbolic": "B0"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "t_0",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "t_15",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "t_22",
+						"coefficient_symbolic": "2*B0*deltam"
 					},
 					{
 						"coefficient": -1.0,
@@ -607,6 +846,12 @@
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
+					{
+						"coefficient": 0.5,
+						"operator": "identity",
+						"field": "h_6",
+						"coefficient_symbolic": "B0^2/2"
+					},
 					{
 						"coefficient": -1.0,
 						"operator": "gradient_x",
@@ -641,10 +886,10 @@
 						"coefficient_symbolic": "B0^2/8"
 					},
 					{
-						"coefficient": 0.125,
+						"coefficient": -0.375,
 						"operator": "identity",
 						"field": "h_7",
-						"coefficient_symbolic": "B0^2/8"
+						"coefficient_symbolic": "(-3*B0^2)/8"
 					},
 					{
 						"coefficient": -0.125,
@@ -659,22 +904,22 @@
 						"coefficient_symbolic": "-1/2*B0"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "t_1",
-						"coefficient_symbolic": "-(B0*deltam)"
-					},
-					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
-						"field": "t_23",
+						"field": "t_1",
 						"coefficient_symbolic": "B0*deltam"
 					},
 					{
 						"coefficient": -1.0,
 						"operator": "gradient_x",
-						"field": "t_9",
+						"field": "t_23",
 						"coefficient_symbolic": "-(B0*deltam)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "t_9",
+						"coefficient_symbolic": "B0*deltam"
 					},
 					{
 						"coefficient": 0.5,
@@ -723,10 +968,10 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -0.5,
+						"coefficient": 0.5,
 						"operator": "identity",
 						"field": "h_8",
-						"coefficient_symbolic": "-1/2*B0^2"
+						"coefficient_symbolic": "B0^2/2"
 					},
 					{
 						"coefficient": -1.0,
@@ -768,10 +1013,10 @@
 						"coefficient_symbolic": "-1/8*B0^2"
 					},
 					{
-						"coefficient": 0.125,
+						"coefficient": -0.375,
 						"operator": "identity",
 						"field": "h_9",
-						"coefficient_symbolic": "B0^2/8"
+						"coefficient_symbolic": "(-3*B0^2)/8"
 					},
 					{
 						"coefficient": -0.5,
@@ -780,22 +1025,22 @@
 						"coefficient_symbolic": "-1/2*B0"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "t_1",
-						"coefficient_symbolic": "-(B0*deltam)"
-					},
-					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
-						"field": "t_23",
+						"field": "t_1",
 						"coefficient_symbolic": "B0*deltam"
 					},
 					{
 						"coefficient": -1.0,
 						"operator": "gradient_x",
-						"field": "t_9",
+						"field": "t_23",
 						"coefficient_symbolic": "-(B0*deltam)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "t_9",
+						"coefficient_symbolic": "B0*deltam"
 					},
 					{
 						"coefficient": 0.5,
@@ -813,64 +1058,129 @@
 			}
 		},
 		{
-			"field": "t_1",
+			"field": "t_0",
 			"lhs": {
-				"expression": "t_1",
+				"expression": "d2_t(t_0)",
 				"order": {
-					"time": 0,
+					"time": 2,
 					"space": 0
-				}
+				},
+				"kinetic_coefficient_symbolic": "-xi"
 			},
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 2.0,
+						"coefficient": 1.0,
 						"operator": "identity",
-						"field": "t_1",
-						"coefficient_symbolic": "2*alpha"
+						"field": "t_0",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
 					},
 					{
-						"coefficient": 0.5,
+						"coefficient": 1.0,
 						"operator": "identity",
-						"field": "t_1",
-						"coefficient_symbolic": "1/(2*kappa^2)"
+						"field": "t_15",
+						"coefficient_symbolic": "2*alpha - 3/kappa^2"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 1.0,
 						"operator": "identity",
-						"field": "t_23",
-						"coefficient_symbolic": "-2*alpha"
-					},
-					{
-						"coefficient": 3.0,
-						"operator": "identity",
-						"field": "t_23",
-						"coefficient_symbolic": "3/kappa^2"
+						"field": "t_22",
+						"coefficient_symbolic": "2*alpha - 3/kappa^2"
 					},
 					{
 						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_9",
-						"coefficient_symbolic": "2*alpha"
+						"operator": "gradient_x",
+						"field": "h_5",
+						"coefficient_symbolic": "2*B0*deltam"
 					},
 					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_9",
-						"coefficient_symbolic": "-3/kappa^2"
+						"coefficient": 2.0,
+						"operator": "laplacian_x",
+						"field": "a_1",
+						"coefficient_symbolic": "2*deltam"
 					},
 					{
 						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "h_0",
-						"coefficient_symbolic": "-(B0*deltam)"
+						"operator": "laplacian_x",
+						"field": "t_0",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "t_15",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "t_22",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "a_1",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "d2_t",
+						"field": "t_15",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "d2_t",
+						"field": "t_22",
+						"coefficient_symbolic": "-xi"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_1",
+			"lhs": {
+				"expression": "d2_t(t_1)",
+				"order": {
+					"time": 2,
+					"space": 0
+				},
+				"kinetic_coefficient_symbolic": "-xi"
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_1",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_23",
+						"coefficient_symbolic": "2*alpha - 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_9",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
 					},
 					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
-						"field": "h_4",
+						"field": "h_0",
 						"coefficient_symbolic": "B0*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "h_4",
+						"coefficient_symbolic": "-(B0*deltam)"
 					},
 					{
 						"coefficient": 1.0,
@@ -883,6 +1193,54 @@
 						"operator": "gradient_x",
 						"field": "h_9",
 						"coefficient_symbolic": "B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "laplacian_x",
+						"field": "a_2",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_1",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "t_23",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_9",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "first_derivative_t",
+						"field": "h_3",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "a_2",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "d2_t",
+						"field": "t_23",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "d2_t",
+						"field": "t_9",
+						"coefficient_symbolic": "xi"
 					}
 				]
 			}
@@ -890,94 +1248,7 @@
 		{
 			"field": "t_10",
 			"lhs": {
-				"expression": "t_10",
-				"order": {
-					"time": 0,
-					"space": 0
-				}
-			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_10",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": 0.5,
-						"operator": "identity",
-						"field": "t_10",
-						"coefficient_symbolic": "1/(2*kappa^2)"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_17",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_17",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_2",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_2",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_10",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_17",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_2",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_13",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_20",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_6",
-						"coefficient_symbolic": "-xi"
-					}
-				]
-			}
-		},
-		{
-			"field": "t_13",
-			"lhs": {
-				"expression": "d2_t(t_13)",
+				"expression": "d2_t(t_10)",
 				"order": {
 					"time": 2,
 					"space": 0
@@ -988,69 +1259,238 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 2.0,
+						"coefficient": 1.0,
 						"operator": "identity",
-						"field": "t_13",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": 0.5,
-						"operator": "identity",
-						"field": "t_13",
-						"coefficient_symbolic": "1/(2*kappa^2)"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_20",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_20",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_6",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_6",
-						"coefficient_symbolic": "-3/kappa^2"
+						"field": "t_10",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
 					},
 					{
 						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_17",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_2",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "first_derivative_t",
+						"field": "h_2",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_a_0",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_13",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_20",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_6",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "a_3",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "d2_t",
+						"field": "t_17",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "d2_t",
+						"field": "t_2",
+						"coefficient_symbolic": "xi"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_13",
+			"lhs": {
+				"expression": "t_13",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_13",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_20",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_6",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "h_2",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "a_0",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_13",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_20",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_6",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_a_3",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -1.0,
 						"operator": "gradient_x",
 						"field": "v_t_10",
-						"coefficient_symbolic": "xi"
+						"coefficient_symbolic": "-xi"
 					},
 					{
-						"coefficient": 1.0,
+						"coefficient": -1.0,
 						"operator": "gradient_x",
 						"field": "v_t_17",
-						"coefficient_symbolic": "xi"
+						"coefficient_symbolic": "-xi"
 					},
 					{
-						"coefficient": 1.0,
+						"coefficient": -1.0,
 						"operator": "gradient_x",
 						"field": "v_t_2",
+						"coefficient_symbolic": "-xi"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_15",
+			"lhs": {
+				"expression": "d2_t(t_15)",
+				"order": {
+					"time": 2,
+					"space": 0
+				},
+				"kinetic_coefficient_symbolic": "-xi"
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_0",
+						"coefficient_symbolic": "2*alpha - 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_15",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_22",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "h_5",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "a_1",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "t_0",
 						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_15",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_22",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "a_1",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "d2_t",
+						"field": "t_0",
+						"coefficient_symbolic": "-xi"
 					},
 					{
 						"coefficient": 1.0,
 						"operator": "d2_t",
-						"field": "t_20",
-						"coefficient_symbolic": "xi"
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "d2_t",
-						"field": "t_6",
+						"field": "t_22",
 						"coefficient_symbolic": "xi"
 					}
 				]
@@ -1059,181 +1499,7 @@
 		{
 			"field": "t_17",
 			"lhs": {
-				"expression": "t_17",
-				"order": {
-					"time": 0,
-					"space": 0
-				}
-			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_10",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_10",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_17",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": 0.5,
-						"operator": "identity",
-						"field": "t_17",
-						"coefficient_symbolic": "1/(2*kappa^2)"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_2",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_2",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_10",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_17",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_2",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_13",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_20",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_6",
-						"coefficient_symbolic": "-xi"
-					}
-				]
-			}
-		},
-		{
-			"field": "t_2",
-			"lhs": {
-				"expression": "t_2",
-				"order": {
-					"time": 0,
-					"space": 0
-				}
-			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_10",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_10",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_17",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_17",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_2",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": 0.5,
-						"operator": "identity",
-						"field": "t_2",
-						"coefficient_symbolic": "1/(2*kappa^2)"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_10",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_17",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "t_2",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_13",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_20",
-						"coefficient_symbolic": "-xi"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "v_t_6",
-						"coefficient_symbolic": "-xi"
-					}
-				]
-			}
-		},
-		{
-			"field": "t_20",
-			"lhs": {
-				"expression": "d2_t(t_20)",
+				"expression": "d2_t(t_17)",
 				"order": {
 					"time": 2,
 					"space": 0
@@ -1244,69 +1510,320 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 2.0,
+						"coefficient": 1.0,
 						"operator": "identity",
-						"field": "t_13",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_13",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_20",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": 0.5,
-						"operator": "identity",
-						"field": "t_20",
-						"coefficient_symbolic": "1/(2*kappa^2)"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_6",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_6",
-						"coefficient_symbolic": "-3/kappa^2"
+						"field": "t_10",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
 					},
 					{
 						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_17",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_2",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "first_derivative_t",
+						"field": "h_2",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_a_0",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_13",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_20",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_6",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "a_3",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "d2_t",
+						"field": "t_10",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "d2_t",
+						"field": "t_2",
+						"coefficient_symbolic": "xi"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_2",
+			"lhs": {
+				"expression": "d2_t(t_2)",
+				"order": {
+					"time": 2,
+					"space": 0
+				},
+				"kinetic_coefficient_symbolic": "-xi"
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_10",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_17",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_2",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "first_derivative_t",
+						"field": "h_2",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_a_0",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_13",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_20",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_t_6",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "a_3",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "d2_t",
+						"field": "t_10",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "d2_t",
+						"field": "t_17",
+						"coefficient_symbolic": "xi"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_20",
+			"lhs": {
+				"expression": "t_20",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_13",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_20",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_6",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "h_2",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "a_0",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_13",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_20",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_6",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_a_3",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -1.0,
 						"operator": "gradient_x",
 						"field": "v_t_10",
-						"coefficient_symbolic": "xi"
+						"coefficient_symbolic": "-xi"
 					},
 					{
-						"coefficient": 1.0,
+						"coefficient": -1.0,
 						"operator": "gradient_x",
 						"field": "v_t_17",
-						"coefficient_symbolic": "xi"
+						"coefficient_symbolic": "-xi"
 					},
 					{
-						"coefficient": 1.0,
+						"coefficient": -1.0,
 						"operator": "gradient_x",
 						"field": "v_t_2",
+						"coefficient_symbolic": "-xi"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_22",
+			"lhs": {
+				"expression": "d2_t(t_22)",
+				"order": {
+					"time": 2,
+					"space": 0
+				},
+				"kinetic_coefficient_symbolic": "-xi"
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_0",
+						"coefficient_symbolic": "2*alpha - 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_15",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_22",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "h_5",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "a_1",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "t_0",
 						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_15",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_22",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "a_1",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "d2_t",
+						"field": "t_0",
+						"coefficient_symbolic": "-xi"
 					},
 					{
 						"coefficient": 1.0,
 						"operator": "d2_t",
-						"field": "t_13",
-						"coefficient_symbolic": "xi"
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "d2_t",
-						"field": "t_6",
+						"field": "t_15",
 						"coefficient_symbolic": "xi"
 					}
 				]
@@ -1315,82 +1832,7 @@
 		{
 			"field": "t_23",
 			"lhs": {
-				"expression": "t_23",
-				"order": {
-					"time": 0,
-					"space": 0
-				}
-			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
-					{
-						"coefficient": -2.0,
-						"operator": "identity",
-						"field": "t_1",
-						"coefficient_symbolic": "-2*alpha"
-					},
-					{
-						"coefficient": 3.0,
-						"operator": "identity",
-						"field": "t_1",
-						"coefficient_symbolic": "3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_23",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": 0.5,
-						"operator": "identity",
-						"field": "t_23",
-						"coefficient_symbolic": "1/(2*kappa^2)"
-					},
-					{
-						"coefficient": -2.0,
-						"operator": "identity",
-						"field": "t_9",
-						"coefficient_symbolic": "-2*alpha"
-					},
-					{
-						"coefficient": 3.0,
-						"operator": "identity",
-						"field": "t_9",
-						"coefficient_symbolic": "3/kappa^2"
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "gradient_x",
-						"field": "h_0",
-						"coefficient_symbolic": "B0*deltam"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "h_4",
-						"coefficient_symbolic": "-(B0*deltam)"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "h_7",
-						"coefficient_symbolic": "-(B0*deltam)"
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "h_9",
-						"coefficient_symbolic": "-(B0*deltam)"
-					}
-				]
-			}
-		},
-		{
-			"field": "t_6",
-			"lhs": {
-				"expression": "d2_t(t_6)",
+				"expression": "d2_t(t_23)",
 				"order": {
 					"time": 2,
 					"space": 0
@@ -1401,121 +1843,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_13",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_13",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_20",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_20",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_6",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": 0.5,
-						"operator": "identity",
-						"field": "t_6",
-						"coefficient_symbolic": "1/(2*kappa^2)"
-					},
-					{
 						"coefficient": 1.0,
-						"operator": "gradient_x",
-						"field": "v_t_10",
-						"coefficient_symbolic": "xi"
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "gradient_x",
-						"field": "v_t_17",
-						"coefficient_symbolic": "xi"
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "gradient_x",
-						"field": "v_t_2",
-						"coefficient_symbolic": "xi"
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "d2_t",
-						"field": "t_13",
-						"coefficient_symbolic": "xi"
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "d2_t",
-						"field": "t_20",
-						"coefficient_symbolic": "xi"
-					}
-				]
-			}
-		},
-		{
-			"field": "t_9",
-			"lhs": {
-				"expression": "t_9",
-				"order": {
-					"time": 0,
-					"space": 0
-				}
-			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
-					{
-						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_1",
-						"coefficient_symbolic": "2*alpha"
+						"coefficient_symbolic": "2*alpha - 3/kappa^2"
 					},
 					{
-						"coefficient": -3.0,
-						"operator": "identity",
-						"field": "t_1",
-						"coefficient_symbolic": "-3/kappa^2"
-					},
-					{
-						"coefficient": -2.0,
+						"coefficient": 1.0,
 						"operator": "identity",
 						"field": "t_23",
-						"coefficient_symbolic": "-2*alpha"
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
 					},
 					{
-						"coefficient": 3.0,
-						"operator": "identity",
-						"field": "t_23",
-						"coefficient_symbolic": "3/kappa^2"
-					},
-					{
-						"coefficient": 2.0,
+						"coefficient": 1.0,
 						"operator": "identity",
 						"field": "t_9",
-						"coefficient_symbolic": "2*alpha"
-					},
-					{
-						"coefficient": 0.5,
-						"operator": "identity",
-						"field": "t_9",
-						"coefficient_symbolic": "1/(2*kappa^2)"
+						"coefficient_symbolic": "2*alpha - 3/kappa^2"
 					},
 					{
 						"coefficient": -1.0,
@@ -1530,6 +1873,199 @@
 						"coefficient_symbolic": "B0*deltam"
 					},
 					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "h_7",
+						"coefficient_symbolic": "-(B0*deltam)"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "h_9",
+						"coefficient_symbolic": "-(B0*deltam)"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "a_2",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "t_1",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_23",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "t_9",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "first_derivative_t",
+						"field": "h_3",
+						"coefficient_symbolic": "2*B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "d2_t",
+						"field": "a_2",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "d2_t",
+						"field": "t_1",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "d2_t",
+						"field": "t_9",
+						"coefficient_symbolic": "-xi"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_6",
+			"lhs": {
+				"expression": "t_6",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_13",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_20",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_6",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "h_2",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "a_0",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_13",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_20",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_6",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_a_3",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_t_10",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_t_17",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "v_t_2",
+						"coefficient_symbolic": "-xi"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_9",
+			"lhs": {
+				"expression": "d2_t(t_9)",
+				"order": {
+					"time": 2,
+					"space": 0
+				},
+				"kinetic_coefficient_symbolic": "-xi"
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_1",
+						"coefficient_symbolic": "-2*alpha + 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_23",
+						"coefficient_symbolic": "2*alpha - 3/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_9",
+						"coefficient_symbolic": "-2*alpha - 1/(2*kappa^2)"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "h_0",
+						"coefficient_symbolic": "B0*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "h_4",
+						"coefficient_symbolic": "-(B0*deltam)"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "h_7",
@@ -1540,6 +2076,54 @@
 						"operator": "gradient_x",
 						"field": "h_9",
 						"coefficient_symbolic": "B0*deltam"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "laplacian_x",
+						"field": "a_2",
+						"coefficient_symbolic": "2*deltam"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_1",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "t_23",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "t_9",
+						"coefficient_symbolic": "-xi"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "first_derivative_t",
+						"field": "h_3",
+						"coefficient_symbolic": "-2*B0*deltam"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "d2_t",
+						"field": "a_2",
+						"coefficient_symbolic": "-2*deltam"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "d2_t",
+						"field": "t_1",
+						"coefficient_symbolic": "xi"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "d2_t",
+						"field": "t_23",
+						"coefficient_symbolic": "-xi"
 					}
 				]
 			}
@@ -1570,28 +2154,6 @@
 				null,
 				null,
 				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
 				null,
 				null,
 				null,
@@ -1620,9 +2182,43 @@
 				null,
 				null,
 				null,
+				null,
+				null,
+				null,
 				null
 			],
 			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -1653,6 +2249,9 @@
 				null,
 				null,
 				"B0^2/8",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -1695,28 +2294,6 @@
 				null,
 				null,
 				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
 				null,
 				null,
 				null,
@@ -1728,6 +2305,37 @@
 				null,
 				null,
 				null,
+				null,
+				"B0^2/2",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"B0^2/2",
 				null,
 				null,
 				null,
@@ -1770,28 +2378,6 @@
 				null,
 				null,
 				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
 				null,
 				null,
 				null,
@@ -1805,6 +2391,9 @@
 				null,
 				null,
 				null,
+				null,
+				null,
+				"B0^2/2",
 				null,
 				null,
 				null,
@@ -1833,8 +2422,39 @@
 				null,
 				null,
 				null,
+				"B0^2/2",
 				null,
-				"B0^2/8",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"(-3*B0^2)/8",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -1860,7 +2480,10 @@
 				null,
 				null,
 				null,
-				"-1/2*B0^2",
+				"B0^2/2",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -1886,7 +2509,10 @@
 				null,
 				null,
 				null,
-				"B0^2/8",
+				"(-3*B0^2)/8",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -1912,7 +2538,10 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)",
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -1938,7 +2567,10 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)",
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -1964,7 +2596,10 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)",
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -1990,7 +2625,10 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)",
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -2016,7 +2654,10 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)",
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -2042,7 +2683,10 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)",
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null
@@ -2068,7 +2712,10 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)",
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null,
 				null,
 				null
 			],
@@ -2094,7 +2741,10 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)",
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null,
 				null
 			],
 			[
@@ -2120,7 +2770,94 @@
 				null,
 				null,
 				null,
-				"1/(2*kappa^2)"
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha - 1/(2*kappa^2)",
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha - 1/(2*kappa^2)",
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha - 1/(2*kappa^2)"
 			]
 		],
 		"coupling_matrix_symbolic": [
@@ -2147,28 +2884,6 @@
 				null,
 				null,
 				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
 				null,
 				null,
 				null,
@@ -2197,9 +2912,43 @@
 				null,
 				null,
 				null,
+				null,
+				null,
+				null,
 				null
 			],
 			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -2247,28 +2996,6 @@
 				null,
 				null,
 				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
 				null,
 				null,
 				null,
@@ -2297,9 +3024,43 @@
 				null,
 				null,
 				null,
+				null,
+				null,
+				null,
 				null
 			],
 			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -2347,34 +3108,43 @@
 				null,
 				null,
 				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
 				null,
 				null,
 				null,
 				null
 			],
 			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -2422,9 +3192,15 @@
 				null,
 				null,
 				null,
+				null,
+				null,
+				null,
 				null
 			],
 			[
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -2472,53 +3248,6 @@
 				null,
 				null,
 				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"3/kappa^2",
-				null,
-				"-3/kappa^2"
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-3/kappa^2",
-				"-3/kappa^2",
 				null,
 				null,
 				null,
@@ -2543,58 +3272,11 @@
 				null,
 				null,
 				null,
-				null,
-				"-3/kappa^2",
-				null,
-				"-3/kappa^2",
-				null
-			],
-			[
+				"2*alpha - 3/kappa^2",
 				null,
 				null,
 				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-3/kappa^2",
-				null,
-				null,
-				"-3/kappa^2",
-				null,
-				null,
-				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-3/kappa^2",
-				null,
-				"-3/kappa^2",
-				null,
-				null,
+				"2*alpha - 3/kappa^2",
 				null,
 				null,
 				null
@@ -2616,15 +3298,6 @@
 				null,
 				null,
 				null,
-				"-3/kappa^2",
-				null,
-				null,
-				null,
-				null,
-				"-3/kappa^2",
-				null
-			],
-			[
 				null,
 				null,
 				null,
@@ -2632,22 +3305,9 @@
 				null,
 				null,
 				null,
+				"2*alpha - 3/kappa^2",
 				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"3/kappa^2",
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"3/kappa^2"
+				"-2*alpha + 3/kappa^2"
 			],
 			[
 				null,
@@ -2666,10 +3326,13 @@
 				null,
 				null,
 				null,
-				"-3/kappa^2",
 				null,
 				null,
-				"-3/kappa^2",
+				null,
+				"-2*alpha + 3/kappa^2",
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
 				null,
 				null,
 				null
@@ -2689,13 +3352,240 @@
 				null,
 				null,
 				null,
-				"-3/kappa^2",
 				null,
 				null,
 				null,
 				null,
 				null,
-				"3/kappa^2",
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha - 3/kappa^2",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha - 3/kappa^2",
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha - 3/kappa^2",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha - 3/kappa^2"
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha + 3/kappa^2",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha - 3/kappa^2",
 				null,
 				null
 			]
@@ -2732,76 +3622,24 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_0",
+					"field": "h_2",
 					"operator": "identity"
 				},
 				"factor_b": {
-					"field": "h_4",
-					"operator": "identity"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-1/8*B0^2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_4",
+					"field": "h_2",
 					"operator": "identity"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "-1/16*B0^2"
+				"coefficient_symbolic": "-1/4*B0^2"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_0",
+					"field": "h_3",
 					"operator": "identity"
 				},
 				"factor_b": {
-					"field": "h_7",
-					"operator": "identity"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "B0^2/8"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "identity"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-1/8*B0^2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_7",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_7",
-					"operator": "identity"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "-1/16*B0^2"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_8",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_8",
+					"field": "h_3",
 					"operator": "identity"
 				},
 				"term_class": "self",
@@ -2814,6 +3652,110 @@
 					"operator": "identity"
 				},
 				"factor_b": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-1/8*B0^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-1/16*B0^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "B0^2/4"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_6",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_6",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "B0^2/4"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "B0^2/8"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-1/8*B0^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "(3*B0^2)/16"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_8",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_8",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "B0^2/4"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
 					"field": "h_9",
 					"operator": "identity"
 				},
@@ -2857,7 +3799,7 @@
 					"operator": "identity"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "-1/16*B0^2"
+				"coefficient_symbolic": "(3*B0^2)/16"
 			},
 			{
 				"coefficient": -0.5,
@@ -3270,16 +4212,13 @@
 		],
 		"wolfram_constraint_elimination": true,
 		"eliminated_from_canonical": [
-			"t_0",
 			"t_11",
 			"t_12",
 			"t_14",
-			"t_15",
 			"t_16",
 			"t_18",
 			"t_19",
 			"t_21",
-			"t_22",
 			"t_3",
 			"t_4",
 			"t_5",
