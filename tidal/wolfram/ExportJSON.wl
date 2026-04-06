@@ -489,6 +489,31 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     ]
   ];
 
+  (* Collect like field-derivative terms before parsing.
+     After constraint substitution + Expand, the same operator-field pair
+     may appear in multiple additive terms (e.g., 9 x laplacian(a_1) with
+     separate coefficients).  Collect groups them into single terms with
+     summed coefficients, reducing JSON bloat and preserving symbolic forms.
+     Ref: #231 — uncombined duplicates from constraint elimination. *)
+  Module[{fHeads},
+    fHeads = Union[
+      Cases[rhs, f_Symbol[__] :> f, {0, Infinity}, Heads -> False],
+      Cases[rhs, Derivative[__][f_][__] :> f, {0, Infinity}, Heads -> False]
+    ];
+    fHeads = Select[fHeads, Function[h,
+      Module[{match},
+        match = MatchFieldToHeads[{ToString[h]}, allFieldNames, ""];
+        match[[1]] =!= ""
+      ]
+    ]];
+    If[Length[fHeads] > 0 && LeafCount[rhs] < 50000,
+      rhs = Collect[rhs, Flatten[{
+        Map[#[__] &, fHeads],
+        Map[Derivative[__][#][__] &, fHeads]
+      }]];
+    ]
+  ];
+
   (* Parse RHS with cross-field detection *)
   rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames];
 
