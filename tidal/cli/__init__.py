@@ -793,6 +793,22 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         help="Use logarithmic colorbar for heatmaps (useful for inv_B_min)",
     )
+    plot_parser.add_argument(
+        "--log-y",
+        dest="log_y",
+        action="store_true",
+        help="Use logarithmic y-axis for 1D sweep plots",
+    )
+    plot_parser.add_argument(
+        "--hline",
+        action="append",
+        default=[],
+        metavar="VALUE[:LABEL[:COLOR]]",
+        help=(
+            "Add horizontal reference line to 1D sweep plots (repeatable). "
+            "E.g. --hline 1.0:P=1:red --hline 0.1::orange"
+        ),
+    )
     # Sweep-specific options
     plot_parser.add_argument(
         "--metric",

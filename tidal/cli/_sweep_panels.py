@@ -186,6 +186,8 @@ def render_sweep_1d(
     metric: str,
     *,
     overlay: str | None = None,
+    log_y: bool = False,
+    thresholds: list[str] | None = None,
 ) -> None:
     """Plot a scalar metric vs a single swept parameter.
 
@@ -204,6 +206,11 @@ def render_sweep_1d(
         (e.g. ``t_end``).  Standard math functions (``sin``, ``cos``,
         ``sqrt``, ``pi``, ``exp``) are available.
         Example: ``'sin(kappa * B0 * t_end / 2)**2'``.
+    log_y : bool
+        Use logarithmic y-axis scale.
+    thresholds : list[str] or None
+        Horizontal threshold lines in ``"VALUE[:LABEL[:COLOR]]"`` format.
+        Example: ``["1.0:P=1:red", "0.1::orange"]``.
 
     Raises
     ------
@@ -267,10 +274,25 @@ def render_sweep_1d(
         )
         ax.legend(fontsize="small")
 
+    # Threshold lines
+    if thresholds:
+        for spec in thresholds:
+            parts = spec.split(":")
+            val = float(parts[0])
+            label = parts[1] if len(parts) > 1 and parts[1] else None
+            color = parts[2] if len(parts) > 2 and parts[2] else "red"
+            ax.axhline(val, color=color, linestyle=":", alpha=0.7, label=label)
+
+    if overlay or thresholds:
+        ax.legend(fontsize="small")
+
     ax.set_xlabel(param_name)
     ax.set_ylabel(metric)
     ax.set_title(f"{metric} vs {param_name}")
     ax.grid(visible=True, alpha=0.3)
+
+    if log_y:
+        ax.set_yscale("log")
 
 
 def _plot_1d_metric(
@@ -279,6 +301,8 @@ def _plot_1d_metric(
     param_name: str,
     metric: str,
     color: str,
+    *,
+    log_y: bool = False,
 ) -> None:
     """Plot a single metric on an axis, with error bands if replicates exist."""
     if results.has_replicates:
@@ -292,12 +316,16 @@ def _plot_1d_metric(
         x = results.column(param_name)
         y = results.column(metric)
         ax.plot(x, y, "o-", color=color, linewidth=1.5, markersize=5)
+    if log_y:
+        ax.set_yscale("log")
 
 
 def render_sweep_1d_multi(
     fig: Figure,
     results: SweepResults,
     metrics: list[str],
+    *,
+    log_y: bool = False,
 ) -> None:
     """Plot multiple metrics vs a single swept parameter.
 
@@ -312,6 +340,8 @@ def render_sweep_1d_multi(
         Loaded sweep data.
     metrics : list[str]
         Column names to plot.
+    log_y : bool
+        Use logarithmic y-axis scale on all subplots.
 
     Raises
     ------
@@ -331,7 +361,9 @@ def render_sweep_1d_multi(
 
     for i, metric in enumerate(metrics):
         ax = axes[i, 0]
-        _plot_1d_metric(ax, results, param_name, metric, colors[i % len(colors)])
+        _plot_1d_metric(
+            ax, results, param_name, metric, colors[i % len(colors)], log_y=log_y
+        )
         ax.set_ylabel(metric)
         ax.grid(visible=True, alpha=0.3)
 
