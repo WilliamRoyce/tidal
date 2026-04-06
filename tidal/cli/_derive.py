@@ -275,8 +275,6 @@ class _WlsContext:
     reduction: dict[str, Any] | None
     metric_diagonal: list[str]
     metric_type: str  # "minkowski", "diagonal", or "matrix"
-    eom_cache_dir: str  # absolute path to .eom_cache/<theory_name>/
-    eom_cache_key: str  # cache key for fieldEquations (structural_hash + version)
 
 
 def _wls_mem_print(label: str) -> str:
@@ -5147,41 +5145,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
 
-        # --- EOM cache: skip Phase A + Component E-L if cached ---
-        # Cache the final fieldEquations (after constraint elimination and
-        # plane-wave reduction) keyed by structural TOML hash + version.
-        # Component equations are pure algebraic — no xAct heads (#230).
-        escaped_cache_dir = ctx.eom_cache_dir.replace("\\", "\\\\").replace('"', '\\"')
-        lines.extend(
-            [
-                "",
-                "(* === EOM cache check ===                                             *)",
-                "(* Cache fieldEquations (component-form, no xAct heads) to skip the   *)",
-                "(* expensive Phase A + Component E-L on re-derivation.                 *)",
-                "(* Ref: HiGGS .mx pre-compilation (Barker, arXiv:2206.00658).         *)",
-                f'$tidalEOMCacheDir = "{escaped_cache_dir}";',
-                f'$tidalEOMCacheFile = FileNameJoin[{{$tidalEOMCacheDir, "{ctx.eom_cache_key}.json"}}];',
-                "$tidalEOMCacheHit = False;",
-                "If[FileExistsQ[$tidalEOMCacheFile],",
-                "  Module[{cachedData, restored},",
-                '    cachedData = Quiet[Import[$tidalEOMCacheFile, "RawJSON"]];',
-                '    If[AssociationQ[cachedData] && KeyExistsQ[cachedData, "equations"],',
-                '      restored = Map[{#["name"], ToExpression[#["expr"]]} &,',
-                '        cachedData["equations"]];',
-                "      If[AllTrue[restored, ListQ[#] && Length[#] == 2 &],",
-                "        fieldEquations = restored;",
-                "        $tidalEOMCacheHit = True;",
-                '        Print["EOM cache HIT: loaded ", Length[restored], " equations"];',
-                "      ]",
-                "    ]",
-                "  ]",
-                "];",
-                "",
-                "If[!$tidalEOMCacheHit,",
-                "",
-            ]
-        )
-
         # --- Canonical pipeline: Phase A → Component E-L ---
         # Phase A decomposes the abstract Lagrangian L^(2) to component form
         # (lagComp) via DecomposeScalarExpression. Component E-L then derives
@@ -5330,28 +5293,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             lines.extend(_wls_plane_wave_field_elimination(ctx))
             lines.extend(_wls_plane_wave_coordinate_evaluation(ctx))
         lines.extend(_wls_constraint_elimination())
-
-    # --- EOM cache write + close cache-miss block ---
-    if ctx.lagrangian_expr:
-        lines.extend(
-            [
-                "",
-                "(* === EOM cache write ===                                             *)",
-                "If[!DirectoryQ[$tidalEOMCacheDir],",
-                "  CreateDirectory[$tidalEOMCacheDir, CreateIntermediateDirectories -> True]];",
-                "Module[{eqsForCache},",
-                "  eqsForCache = Map[",
-                '    <|"name" -> #[[1]], "expr" -> ToString[#[[2]], InputForm]|> &,',
-                "    fieldEquations];",
-                "  Quiet[Export[$tidalEOMCacheFile,",
-                '    <|"equations" -> eqsForCache|>, "RawJSON"]];',
-                '  Print["EOM cache: stored ", Length[fieldEquations], " equations"];',
-                "];",
-                "",
-                "];  (* end If !$tidalEOMCacheHit *)",
-                "",
-            ]
-        )
 
     # Build JSON — always use multi-field builder since fieldEquations
     # Inject tensor component metadata into metadata for LaTeX export
@@ -5514,7 +5455,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
 # --- WLS assembly & execution ---
 
 
-def generate_wls(  # noqa: PLR0914, PLR0915
+def generate_wls(
     config: dict[str, Any],
     output_override: str | None = None,
     *,
@@ -5553,26 +5494,6 @@ def generate_wls(  # noqa: PLR0914, PLR0915
         base = config_dir if config_dir is not None else Path.cwd()
         resolved_output = (base / resolved_output).resolve()
 
-    # --- EOM cache key ---
-    # Hash structural TOML config (excluding [parameters] and [output] which
-    # don't affect the symbolic derivation — parameter values are substituted
-    # after Phase B, not during the Wolfram pipeline).
-    # Ref: #230, inspired by HiGGS .mx pre-compilation (Barker, arXiv:2206.00658).
-    from tidal import __version__ as _tidal_version
-
-    structural_config = {
-        k: v for k, v in config.items() if k not in {"parameters", "output"}
-    }
-    structural_hash = hashlib.sha256(
-        _json_mod.dumps(structural_config, sort_keys=True, default=str).encode()
-    ).hexdigest()[:16]
-
-    theory_name = config.get("theory", {}).get("name", "Custom Theory")
-    eom_cache_dir = str(resolved_output.parent / ".eom_cache" / theory_name)
-    eom_cache_key = hashlib.sha256(
-        f"{structural_hash}:{_tidal_version}".encode()
-    ).hexdigest()[:16]
-
     ctx = _WlsContext(
         prefix=prefix,
         dim=dim,
@@ -5602,8 +5523,6 @@ def generate_wls(  # noqa: PLR0914, PLR0915
             config.get("reduction", {}).get("coordinate_values", {}),
         ),
         metric_type=config["spacetime"].get("metric", "minkowski"),
-        eom_cache_dir=eom_cache_dir,
-        eom_cache_key=eom_cache_key,
     )
 
     is_linearization = ctx.linearization is not None
