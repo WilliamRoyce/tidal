@@ -3559,7 +3559,9 @@ def _field_component_count(field: dict[str, Any], dim: int) -> int:
     return dim**rank
 
 
-def _wls_constraint_elimination() -> list[str]:
+def _wls_constraint_elimination(
+    constants: list[str] | None = None,
+) -> list[str]:
     """Generate Wolfram code to detect and eliminate constraint fields.
 
     Detects two constraint types in ``fieldEquations``:
@@ -3572,17 +3574,25 @@ def _wls_constraint_elimination() -> list[str]:
     2. **Degenerate algebraic**: equation with ``lhsTimeOrder = 0`` where
        the identity coefficient of the self-field sums to ≈ 1.0, meaning
        the field cancels from both sides.  The residual constraint
-       ``0 = Σ c_i * other_i`` is solved for the field with largest
-       |coefficient| (dep_field), and both the equation's own field
-       AND dep_field are eliminated.
+       ``0 = Σ c_i * other_i`` is solved for the dep field and both the
+       equation's own field AND dep_field are eliminated.
 
-    Substitutes detected constraints into ``lagComp`` using Mathematica's
-    exact symbolic algebra — replacing the fragile Python string-algebra
-    post-processing in ``reduction.py``.  Also filters ``fieldEquations``
-    to exclude eliminated fields (affects ``allCompNames`` downstream).
+    **Smart depField selection** (avoids 1/parameter singularities):
+    when ``constants`` is provided, the dep field is chosen as the field
+    with the largest |coefficient| whose coefficient is purely numeric
+    (free of all declared constant symbols).  This prevents denominators
+    like ``1/delta1`` that become singular when the parameter is zero.
+    If ALL coefficients contain symbolic parameters, the constraint is
+    skipped (left as ``time_order=0`` for the modal solver's Fourier
+    Schur complement to handle at runtime).
 
-    Emits a warning if a nonlinear constraint is detected (cannot happen
-    in the linearized regime but aids debugging for pipeline extensions).
+    Parameters
+    ----------
+    constants : list[str] | None
+        Theory constant names (from ``[constants]`` TOML section).
+        Used to identify symbolic vs numeric coefficients in the
+        depField selection.  When ``None``, all coefficients are
+        considered (original behavior).
 
     Requires ``compToFunc``, ``fieldFuncList``, ``coordSyms``, and
     ``lagComp`` to be defined in the Wolfram session.  Sets
@@ -3649,11 +3659,17 @@ def _wls_constraint_elimination() -> list[str]:
         "(* Phase 2: Degenerate algebraic constraints *)",
         "(* When selfCoeff ~ 1.0, the equation's own field cancels from    *)",
         "(* both sides, leaving a residual constraint among OTHER fields.   *)",
-        "(* Solve for the dep field with largest |coefficient| and          *)",
-        "(* eliminate both the equation field AND the dep field.            *)",
+        "(* Solve for the dep field with largest |coefficient| whose coeff *)",
+        "(* is purely NUMERIC (free of constant symbols).  This avoids     *)",
+        "(* 1/parameter singularities when depCoeff contains e.g. delta1.  *)",
+        "(* If ALL coefficients are parameter-dependent, skip constraint   *)",
+        "(* (left for runtime Fourier Schur complement in modal solver).   *)",
         "(* Example: h_9 = h_4 + h_7 + h_9 => 0 = h_4 + h_7 => h_4=-h_7 *)",
         "(* Warns if nonlinear constraint detected (cannot happen in       *)",
         "(* linearized regime — quadratic L => linear PDEs).               *)",
+        f"constantSymbols = {{{', '.join(constants)}}};"
+        if constants
+        else "constantSymbols = {};",
         "degenerateEqFields = {};",
         "algebraicDepFields = <||>;",
         "Do[",
@@ -3710,12 +3726,28 @@ def _wls_constraint_elimination() -> list[str]:
         "      !FreeQ[otherExpr, #] && # =!= ownHead &];",
         "    If[Length[otherHeads] == 0, Continue[]];",
         "",
-        "    (* Pick dep field: largest |coefficient| for stability *)",
-        "    depHead = First[SortBy[otherHeads,",
-        "      -Abs[Coefficient[otherExpr,",
-        "        #[Sequence @@ coordSyms]]] &]];",
-        "    depCoeff = Coefficient[otherExpr,",
-        "      depHead[Sequence @@ coordSyms]];",
+        "    (* Pick dep field: largest |coefficient| with NUMERIC coeff.    *)",
+        "    (* Avoids 1/parameter singularity when depCoeff contains consts. *)",
+        "    (* If all coefficients are parameter-dependent, skip constraint  *)",
+        "    (* — the modal solver handles it via Fourier Schur complement.   *)",
+        "    Module[{numericHeads, coeffOf},",
+        "      coeffOf[h_] := Coefficient[otherExpr, h[Sequence @@ coordSyms]];",
+        "      numericHeads = If[Length[constantSymbols] > 0,",
+        "        Select[otherHeads,",
+        "          FreeQ[coeffOf[#], Alternatives @@ constantSymbols] &],",
+        "        otherHeads  (* no constants declared — all coefficients ok *)",
+        "      ];",
+        "      If[Length[numericHeads] == 0,",
+        '        Print["  Skipping constraint for ", name,',
+        '          ": all dep coefficients contain parameters ",',
+        '          "(would create 1/parameter singularity). ",',
+        '          "Left for runtime Schur complement."];',
+        "        Continue[]",
+        "      ];",
+        "      depHead = First[SortBy[numericHeads,",
+        "        -Abs[N[coeffOf[#]]] &]];",
+        "      depCoeff = coeffOf[depHead]",
+        "    ];",
         "    If[Abs[N[depCoeff]] < 10^-12, Continue[]];",
         "",
         "    (* Find the component name for depHead *)",
@@ -5292,7 +5324,7 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             lines.extend(_wls_plane_wave_reduction_equations(ctx))
             lines.extend(_wls_plane_wave_field_elimination(ctx))
             lines.extend(_wls_plane_wave_coordinate_evaluation(ctx))
-        lines.extend(_wls_constraint_elimination())
+        lines.extend(_wls_constraint_elimination(constants=ctx.constants))
 
     # Build JSON — always use multi-field builder since fieldEquations
     # Inject tensor component metadata into metadata for LaTeX export
