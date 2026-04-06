@@ -4,12 +4,18 @@
 # Sweeps delta1 (nonminimal torsion-EM coupling) from -1.0 to 1.0 with fixed
 # all-sector-stable torsion mass parameters (alpha1=0, alpha2=-0.6, alpha3=0.5).
 #
+# Uses the NONMINIMAL model (non-propagating torsion) which is stable across
+# the full delta1 range. The propagating model (with Ftorsion² kinetics) is
+# unstable at delta1≠0 due to tachyonic mass eigenvalues excited by the
+# R̃[μν]F coupling — documented separately.
+#
 # Physics:
 #   L = (1/κ²) R̃ + α₁I₁ + α₂I₂ + α₃I₃ + δ₁ R̃_{[μν]} F^{μν} − ¼F²
 #
 #   delta1 = 0: standard Gertsenshtein (no torsion coupling)
-#   delta1 > 0: suppression observed at delta1=0.1 (P=0.032 vs P_EM=0.061)
-#   delta1 < 0: to be determined (possibly amplification or also suppression)
+#              P = sin²(κB₀D/2) = sin²(0.25) ≈ 0.0612
+#   delta1 = 0.1: P ≈ 0.012 (80% suppression)
+#   delta1 < 0: swept to map full landscape
 #
 # Mass stability (all sectors negative = Proca-like):
 #   Tensor: (1/2)/κ² + (α₁+α₂) = 0.5 + (-0.6) = -0.1  ✓
@@ -46,13 +52,13 @@ K0=2.0
 
 echo "=== Nonminimal R̃[μν]F: Delta1 Sweep ==="
 echo "Fixed: kappa=${KAPPA}, B0=${B0}, alpha1=${ALPHA1}, alpha2=${ALPHA2}, alpha3=${ALPHA3}"
-echo "Sweep: delta1 = 0.01 .. 1.0 (20 points, avoiding delta1=0 singularity)"
+echo "Sweep: delta1 = -1.0 .. 1.0 (40 points)"
 echo "Gertsenshtein baseline: P = sin^2(kappa * B0 * t_end / 2) = sin^2(0.25) ~ 0.0612"
 echo "Output: ${OUTPUT}"
 echo ""
 
 uv run tidal sweep "${SPEC}" \
-  --sweep "delta1=0.01:1.0:20" \
+  --sweep "delta1=-1.0:1.0:40" \
   --measure peak_conversion \
   --source h_5 --target a_1 \
   --grid-shape "${GRID}" --bounds "${BOUNDS}" --periodic \
