@@ -145,6 +145,26 @@ h_5 to appear with wrong-sign mass (+k^2 instead of -k^2). After fixing:
 - No more spurious exponential growth
 - Coupling ratios and zero-crossing location unchanged (sign-independent)
 
+### 2026-04-07: Heatmap contamination from pre-guard tachyonic modes
+
+CRITICAL FINDING: The heatmap sweep (v0.25.19) was generated BEFORE the eigenvalue
+pre-check divergence guard (commit 2b94172). The "valid" high-amplification points
+(A ~ 5000-8000) at delta1=1.0 were contaminated by tachyonic modes that escaped
+detection. With the current divergence guard, ALL Gaussian-IC runs at delta1=1.0
+diverge — including alpha2=-0.5 which appeared "valid" in the heatmap.
+
+Plane-wave IC simulations still succeed because the narrow Fourier support avoids
+projecting onto tachyonic high-k modes. The B0 scaling result (A=48.3 for plane-wave
+IC at delta1=1.0, alpha2=-0.82) remains valid.
+
+IMPLICATION: The large amplification factors (A >> 100) in the heatmap are artifacts.
+The genuine torsion amplification (plane-wave IC) is A ~ 48 at this parameter point.
+The heatmap must be regenerated with the current divergence guard to establish
+trustworthy amplification values for Gaussian IC.
+
+ALSO FIXED: sweep parallel worker crash on SimulationDivergedError (commit 923ac8a).
+_run_single_wrapper() now catches diverged runs and records them as status='diverged'.
+
 ### 2026-04-07: Two instability regions confirmed
 
 Eigenvalue analysis with baseline-relative criterion reveals two instability regions:
