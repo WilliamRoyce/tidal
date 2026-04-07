@@ -125,6 +125,24 @@ give the amplification factor A. The full eigenvalue structure (including growth
 must be accounted for. The correct approach to predict A is to evolve the 4x4 block
 with identical ICs for both GR and torsion cases, then take the ratio of P_max values.
 
+### 2026-04-07: B0 scaling verification PASSED
+
+C0 = P/B0^2 is constant to 4 significant figures across B0 = 1e-6 to 1e-4:
+  C0 = 30,204 (torsion-modified, delta1=1.0, alpha2=-0.82)
+  C0_EM = 625 (Gertsenshtein baseline)
+  A = C0/C0_EM = 48.3 (amplification factor at this parameter point)
+
+Deviations at B0=1e-3 (+0.03%) and B0=1e-2 (-3.3%) from nonlinear backreaction.
+This confirms the amplification is a coupling modification, NOT a nonlinear effect.
+
+### 2026-04-07: Kinetic normalization bug found and fixed
+
+The schur_complement_analysis.py was missing normalize_kinetic_coefficients(), causing
+h_5 to appear with wrong-sign mass (+k^2 instead of -k^2). After fixing:
+- GR baseline eigenvalues are purely imaginary (oscillatory)
+- No more spurious exponential growth
+- Coupling ratios and zero-crossing location unchanged (sign-independent)
+
 ### 2026-04-07: Two instability regions confirmed
 
 Eigenvalue analysis with baseline-relative criterion reveals two instability regions:
