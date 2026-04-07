@@ -1122,10 +1122,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sweep_parser.add_argument(
         "--require-stable",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help=(
-            "Abort unstable runs whose mass matrix has a negative eigenvalue "
-            "(default: True for sweeps; use --no-require-stable to override)"
+            "Abort runs whose mass matrix fails a simplified stability check. "
+            "Default: False (the modal solver's eigenvalue pre-check provides "
+            "more accurate instability detection). Enable for quick rejection "
+            "of obviously unstable parameter points."
         ),
     )
     sweep_parser.add_argument(
