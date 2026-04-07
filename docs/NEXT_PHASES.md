@@ -215,11 +215,28 @@ Key results:
 - **Energy conservation**: |dE/E| = 1.07×10⁻¹⁵ (machine precision, modal solver)
 - **Parameter sweep**: Pending — xi=0 limit now works (fix #220), enabling full (α, ξ, δ) space exploration
 
+### Nonminimal R̃[μν]F Torsion-EM Coupling (active — v0.25)
+
+Nonminimal torsion-EM theory with R̃[μν]F coupling derived (`examples/torsion_gertsenshtein/theory_nonminimal.toml`, 34 fields). Independent torsion mass parameters (α₁, α₂, α₃) with all-sector stability.
+
+Lagrangian: L = (1/κ²)R̃ + α₁I₁ + α₂I₂ + α₃I₃ + δ₁R̃[μν]Fμν − ¼F²
+
+Key results (see #235):
+- **Light-mediator enhancement**: Amplification of Gertsenshtein effect up to A ≈ 8000× near the stability boundary where torsion mass → 0. Analogous to axion-photon mixing enhancement (Raffelt & Stodolsky 1988).
+- **Suppression valley**: At intermediate |δ₁| ≈ 0.7, destructive interference between torsion and GR channels suppresses conversion by up to 10⁸×.
+- **2D heatmap** (δ₁ × α₂): maps the full amplification landscape at 50×40 resolution. Amplification stripe at the stability boundary, deep suppression in the interior.
+- **Stability-amplification tension**: Maximum amplification requires torsion masses near zero (stability boundary) — fundamental trade-off.
+- **C₀ = P/B₀² verified B₀-independent** (linear regime confirmed between B₀=0.01 and B₀=0.001).
+- **Smart constraint elimination** (#234): Fixed 1/parameter singularity in Wolfram constraint solver. Symbolic coefficients preserved.
+- **Eigenvalue pre-check**: Modal solver catches unstable runs at t=0 before evolution (no escaped diverged runs).
+
+Propagating model (Ftorsion² + R̃[μν]F, #236): gradient instability at δ₁≠0 (k-dependent growth rate). Stability scan in progress over (xi, δ₁, α₂, α₃) to determine if any parameter combination stabilises propagating torsion with R̃[μν]F.
+
 ### Remaining / Blocked
 
 - **Radial dipolar (Phase F3a)**: `theory_radial.toml` derived (spherical coords). BLOCKED on compute.
 - **Plasma detuning (Phase F1)**: BLOCKED — xPert spurious z²-terms from background 4-potential.
-- **Non-minimal torsion-EM coupling (active — dark photon analogue):** T_μ kinetic mixing implemented in dark photon model above. T·F, T·(*F) variants remain for future work.
+- **Propagating torsion + R̃[μν]F**: Gradient instability found (#236). Stability scan over (xi, α₂, α₃, δ₁) in progress. May require additional Lagrangian terms (cubic operators, higher-derivative corrections) for stabilisation.
 - **Ghost-free parameter conditions:** Literature (Sezgin & van Nieuwenhuizen 1980, Nikiforova et al. 2009, Barker 2024) provides sector-specific conditions. No universal closed-form for general (α₁, α₂, α₃, b₅). xi=0 limit now provides exact control check.
 
 ### References
