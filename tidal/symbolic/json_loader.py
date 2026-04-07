@@ -837,6 +837,7 @@ class EquationSystem:
     coupling_matrix: tuple[tuple[float, ...], ...]
     metadata: dict[str, Any]
     coordinates: tuple[str, ...] = ()
+    signature: tuple[int, ...] = ()
     mass_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
     coupling_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
     canonical: CanonicalStructure | None = None
@@ -1209,8 +1210,9 @@ class EquationSystem:
             equations, component_names, parameters=default_params or None
         )
 
-        # Extract coordinate names
+        # Extract coordinate names and metric signature
         coordinates = tuple(str(c) for c in spacetime.get("coordinates", []))
+        signature = tuple(int(s) for s in spacetime.get("signature", []))
 
         # Parse canonical structure (Phase K) — optional for backward compat
         canonical_data = data.get("canonical")
@@ -1228,6 +1230,7 @@ class EquationSystem:
             coupling_matrix=coupling_matrix,
             metadata=metadata,
             coordinates=coordinates,
+            signature=signature,
             mass_matrix_symbolic=mass_matrix_symbolic,
             coupling_matrix_symbolic=coupling_matrix_symbolic,
             canonical=canonical,
