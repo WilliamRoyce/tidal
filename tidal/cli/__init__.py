@@ -460,15 +460,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         help="Suppress progress messages (results and errors still shown)",
     )
-    sim_parser.add_argument(
-        "--require-stable",
-        action="store_true",
-        default=False,
-        help=(
-            "Abort if the pre-simulation stability check detects an unstable "
-            "mass matrix (negative eigenvalue). Default: warn only."
-        ),
-    )
+    # Note: --require-stable removed. The modal solver's eigenvalue pre-check
+    # in _evolve_per_mode provides accurate instability detection using the
+    # full evolution matrix. The old mass-only check produced false positives
+    # for theories with non-unit kinetic coefficients (e.g., PGT torsion).
     sim_parser.add_argument(
         "--allow-inconsistent-ic",
         action="store_true",
@@ -1120,17 +1115,6 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Simulation mode (default: evolve)",
     )
     sweep_parser.add_argument(
-        "--require-stable",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help=(
-            "Abort runs whose mass matrix fails a simplified stability check. "
-            "Default: False (the modal solver's eigenvalue pre-check provides "
-            "more accurate instability detection). Enable for quick rejection "
-            "of obviously unstable parameter points."
-        ),
-    )
-    sweep_parser.add_argument(
         "--allow-inconsistent-ic",
         action="store_true",
         default=False,
@@ -1561,11 +1545,6 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sample_parser.add_argument(
         "--mode", choices=["evolve", "constraint"], default="evolve"
-    )
-    sample_parser.add_argument(
-        "--require-stable",
-        action=argparse.BooleanOptionalAction,
-        default=True,
     )
     sample_parser.add_argument(
         "--allow-inconsistent-ic", action="store_true", default=False

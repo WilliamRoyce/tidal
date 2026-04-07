@@ -12,7 +12,6 @@ from tidal.solver.validation import (
     StabilityResult,
     check_cfl_stability,
     check_mass_sign,
-    check_pointwise_mass_stability,
     validate_field_references,
     validate_operator_dimensions,
 )
@@ -30,7 +29,6 @@ __all__ = [
     "apply_operator",
     "check_cfl_stability",
     "check_mass_sign",
-    "check_pointwise_mass_stability",
     "operator_min_dim",
     "validate_field_references",
     "validate_operator_dimensions",
