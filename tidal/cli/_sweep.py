@@ -565,7 +565,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             cons = _run_conservation(data, threshold)
             metrics["max_energy_error"] = cons["max_relative_error"]
             metrics["energy_conserved"] = cons["is_conserved"]
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["max_energy_error"] = None
             metrics["conservation_error"] = str(exc)
 
@@ -578,7 +585,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             result_obj = conv["_result_obj"]
             metrics["P_final"] = float(result_obj.probability[-1])
             conv_result = result_obj
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["P_max"] = None
             metrics["conversion_error"] = str(exc)
 
@@ -589,7 +603,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             mix = _run_mixing(conv_result)
             metrics["L_mix"] = mix["mixing_length"]
             metrics["L_mix_uncertainty"] = mix["mixing_length_uncertainty"]
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["L_mix"] = None
             metrics["mixing_error"] = str(exc)
 
@@ -598,7 +619,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             eng = _run_energy(data)
             metrics["E_total_final"] = eng["total"][-1]
             metrics["E_total_initial"] = eng["total"][0]
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["energy_error"] = str(exc)
 
     if "dispersion" in measurements:
@@ -616,7 +644,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
                     freq[active] ** 2 - wn[active] ** 2
                 )
                 metrics["m2_eff"] = float(np.median(m2_vals))
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["dispersion_error"] = str(exc)
 
     if "effective_mass" in measurements:
@@ -625,7 +660,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             em = _run_effective_mass(data, dyn)
             metrics["m2_eff"] = em["m2_eff"]
             metrics["m2_eff_std"] = em["m2_eff_std"]
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["effective_mass_error"] = str(exc)
 
     if "asymptotic" in measurements:
@@ -634,7 +676,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             metrics["P_asymptotic"] = asym["P_final"]
             metrics["P_transmitted"] = asym["P_transmitted"]
             metrics["P_reflected"] = asym["P_reflected"]
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["asymptotic_error"] = str(exc)
 
     if "peak_conversion" in measurements:
@@ -650,7 +699,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
                 metrics["P_max"] = pc["P_max"]
                 metrics["P_max_time"] = pc["P_max_time"]
                 metrics["P_final"] = pc["P_final"]
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["peak_conversion_error"] = str(exc)
 
     if "velocity" in measurements:
@@ -659,7 +715,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             vel = _run_velocity(data, dyn)
             metrics["v_group_mean"] = vel["v_group_mean"]
             metrics["v_phase_mean"] = vel["v_phase_mean"]
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["velocity_error"] = str(exc)
 
     if "resonance" in measurements:
@@ -668,7 +731,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             metrics["n_resonant_modes"] = res["n_resonant_modes"]
             metrics["conversion_bandwidth"] = res["conversion_bandwidth"]
             metrics["peak_conversion_k"] = res["peak_conversion_k"]
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["resonance_error"] = str(exc)
 
     if "spectrum" in measurements:
@@ -689,7 +759,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
                         metrics[f"n_active_modes_{fname}"] = int(
                             np.sum(power > threshold_val)
                         )
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             metrics["spectrum_error"] = str(exc)
 
     return metrics
@@ -784,7 +861,7 @@ def _measure_existing(  # noqa: PLR0913, PLR0917
             threshold,
             spec=spec,
         )
-    except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+    except (ValueError, TypeError, KeyError, OSError, RuntimeError, SystemExit) as exc:
         return {
             "error": f"resume_measure_failed: {exc}",
             "run_status": "measurement_error",
@@ -971,7 +1048,14 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
                 )
             )
             _print_status(metrics)
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             print(f" ERROR: {exc}")
             rows.append(
                 _build_row(
@@ -1251,7 +1335,14 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
                 energy_threshold,
             )
             _print_status(metrics)
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        except (
+            ValueError,
+            TypeError,
+            KeyError,
+            OSError,
+            RuntimeError,
+            SystemExit,
+        ) as exc:
             print(f" ERROR: {exc}")
             metrics = {
                 "error": str(exc),

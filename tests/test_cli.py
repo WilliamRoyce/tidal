@@ -1051,7 +1051,7 @@ class TestRequireStable:
     def test_require_stable_aborts_on_unstable_spec(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Unstable coupled spec + --require-stable should sys.exit(1)."""
+        """Unstable coupled spec + --require-stable should return rc=1."""
         import json
 
         # g0^2 = 25 > mPhi2 * mChi2 = 0.01  =>  strongly unstable
@@ -1119,18 +1119,17 @@ class TestRequireStable:
         spec_path = tmp_path / "unstable.json"
         spec_path.write_text(json.dumps(spec_data, indent=2))
 
-        with pytest.raises(SystemExit) as exc_info:
-            main(
-                [
-                    "simulate",
-                    str(spec_path),
-                    "--t-end",
-                    "0.5",
-                    "--no-plot",
-                    "--require-stable",
-                ]
-            )
-        assert exc_info.value.code == 1
+        rc = main(
+            [
+                "simulate",
+                str(spec_path),
+                "--t-end",
+                "0.5",
+                "--no-plot",
+                "--require-stable",
+            ]
+        )
+        assert rc == 1
 
         err = capsys.readouterr().err
         assert "eigenvalue" in err.lower()

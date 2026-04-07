@@ -1357,7 +1357,14 @@ def _check_mass_stability(
         else:
             _cwarn(msg)
     if require_stable and stability.errors:
-        sys.exit(1)
+        msg = "; ".join(stability.errors)
+        msg = (
+            f"Mass matrix stability check failed: {msg}. "
+            "Use --no-require-stable to override."
+        )
+        raise RuntimeError(
+            msg
+        )
 
 
 def _check_result_finite(result: SolverResult) -> None:
