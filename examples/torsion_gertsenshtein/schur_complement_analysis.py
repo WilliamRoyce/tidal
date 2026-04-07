@@ -320,6 +320,142 @@ def find_zero_crossing(
     return None
 
 
+def mini_solver_amplification(
+    spec,
+    layout: StateLayout,
+    grid: GridInfo,
+    k_grid: list[np.ndarray],
+    rfft_shape: tuple[int, ...],
+    base_params: dict[str, float],
+    delta1: float,
+    alpha2: float,
+    *,
+    ic_type: str = "gaussian",
+    ic_amplitude: float = 0.1,
+    ic_width: float = 5.0,
+    ic_center: float = 50.0,
+    t_end: float = 50.0,
+    n_snapshots: int = 201,
+) -> dict:
+    """Compute amplification factor A by evolving the 4x4 h5+a1 block analytically.
+
+    Matches the actual modal solver evolution:
+    1. Build A_reduced for all k modes
+    2. Extract 4x4 {a1, va1, h5, vh5} block at each mode
+    3. Eigendecompose each block
+    4. Construct IC matching the sweep (Gaussian or plane-wave)
+    5. Evolve via exp(lambda*t)
+    6. Compute P(t) = E_a1(t) / E_h5(0), take P_max
+    7. Compare delta1>0 vs delta1=0 baseline
+
+    Returns dict with P_max_torsion, P_max_GR, A = P_max_torsion/P_max_GR.
+    """
+    k_vals = k_grid[0]
+    n_modes = len(k_vals)
+    grid.dx[0]
+    N = grid.shape[0]
+
+    # h5=slot 8, vh5=slot 9, a1=slot 2, va1=slot 3 in reduced system
+    np.array([2, 3, 8, 9])  # a1, va1, h5, vh5
+
+    def get_full_system(params):
+        """Get the full 14x14 reduced system and slot mapping."""
+        coeff_eval = CoefficientEvaluator(spec, grid, params)
+        A_red, _, _, _, mapping = _build_constraint_eliminated_matrices(
+            spec, layout, grid, coeff_eval, k_grid, rfft_shape
+        )
+        return A_red, mapping
+
+    # Build IC in Fourier space for the FULL 14-slot system
+    x = np.linspace(0, grid.bounds[0][1], N, endpoint=False)
+    if ic_type == "gaussian":
+        h5_x = ic_amplitude * np.exp(-((x - ic_center) ** 2) / (2 * ic_width**2))
+        vh5_x = np.zeros(N)
+    elif ic_type == "plane-wave":
+        k0 = 2 * np.pi / (grid.bounds[0][1] - grid.bounds[0][0])
+        h5_x = ic_amplitude * np.cos(k0 * x)
+        vh5_x = ic_amplitude * k0 * np.sin(k0 * x)
+    else:
+        msg = f"Unknown IC type: {ic_type}"
+        raise ValueError(msg)
+
+    h5_hat = np.fft.rfft(h5_x) / N
+    vh5_hat = np.fft.rfft(vh5_x) / N
+
+    def evolve_and_measure(params):
+        """Evolve full 14x14 reduced system, measure h5->a1 conversion."""
+        A_red, mapping = get_full_system(params)
+        n_slots = A_red.shape[1]  # 14
+        t_eval = np.linspace(0, t_end, n_snapshots)
+
+        # Map field names to reduced slots
+        h5_r = mapping[layout.field_slot_map["h_5"]]
+        vh5_r = mapping[layout.velocity_slot_map["h_5"]]
+        a1_r = mapping[layout.field_slot_map["a_1"]]
+
+        # IC per mode: only h5 and vh5 are nonzero
+        ic_per_mode = np.zeros((n_modes, n_slots), dtype=complex)
+        ic_per_mode[:, h5_r] = h5_hat
+        ic_per_mode[:, vh5_r] = vh5_hat
+
+        # Initial h5 energy (Parseval)
+        e_h5_0 = np.sum(np.abs(h5_hat) ** 2) * N
+
+        # Eigendecompose all modes with tachyonic suppression
+        all_V_y0 = []
+        all_eig_vals = []
+        for m in range(n_modes):
+            eigs, V = np.linalg.eig(A_red[m])
+            Vinv = np.linalg.inv(V)
+            c = Vinv @ ic_per_mode[m]
+
+            # Tachyonic suppression
+            max_c = np.max(np.abs(c))
+            noise_floor = 1e-12 * max_c if max_c > 0 else 1e-30
+            for j in range(n_slots):
+                if eigs[j].real > 1e-8 and abs(c[j]) < noise_floor:
+                    eigs[j] = 0.0
+
+            all_eig_vals.append(eigs)
+            all_V_y0.append(V * c[np.newaxis, :])
+
+        all_eig_vals = np.array(all_eig_vals)  # (n_modes, n_slots)
+
+        # Track a1 energy over time
+        p_max = 0.0
+        for t in t_eval:
+            exp_lt = np.exp(all_eig_vals * t)  # (n_modes, n_slots)
+            a1_hat_t = np.zeros(n_modes, dtype=complex)
+            for m in range(n_modes):
+                y_t = all_V_y0[m] @ exp_lt[m]
+                a1_hat_t[m] = y_t[a1_r]
+
+            e_a1_t = np.sum(np.abs(a1_hat_t) ** 2) * N
+            p_t = e_a1_t / e_h5_0 if e_h5_0 > 1e-30 else 0.0
+            p_max = max(p_max, p_t)
+
+        return p_max
+
+    # Run for both GR and torsion
+    params_gr = {**base_params, "delta1": 0.0, "alpha2": alpha2}
+    params_t = {**base_params, "delta1": delta1, "alpha2": alpha2}
+
+    p_max_gr = evolve_and_measure(params_gr)
+    p_max_t = evolve_and_measure(params_t)
+
+    A = p_max_t / p_max_gr if p_max_gr > 1e-30 else float("nan")
+
+    return {
+        "delta1": delta1,
+        "alpha2": alpha2,
+        "P_max_GR": p_max_gr,
+        "P_max_torsion": p_max_t,
+        "A": A,
+        "log10_A": np.log10(A) if A > 0 else float("nan"),
+        "ic_type": ic_type,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -331,7 +467,14 @@ def main() -> None:
     parser.add_argument("--k-idx", type=int, default=8, help="Fourier mode index")
     parser.add_argument(
         "--mode",
-        choices=["point", "sweep", "boundary", "zero-crossing", "validate"],
+        choices=[
+            "point",
+            "sweep",
+            "boundary",
+            "zero-crossing",
+            "validate",
+            "mini-solver",
+        ],
         default="sweep",
         help="Analysis mode",
     )
@@ -495,6 +638,21 @@ def main() -> None:
             print(f"  Median relative error: {np.median(errors):.1%}")
             print(f"  Mean relative error: {np.mean(errors):.1%}")
             print(f"  Max relative error: {max(errors):.1%}")
+
+    elif args.mode == "mini-solver":
+        print(f"\nMini-solver: delta1={args.delta1}, alpha2={args.alpha2}")
+        r = mini_solver_amplification(
+            spec,
+            layout,
+            grid,
+            k_grid,
+            rfft_shape,
+            base_params,
+            args.delta1,
+            args.alpha2,
+        )
+        for key, val in r.items():
+            print(f"  {key}: {val}")
 
 
 if __name__ == "__main__":

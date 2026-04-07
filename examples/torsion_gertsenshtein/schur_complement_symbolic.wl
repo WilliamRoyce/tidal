@@ -154,7 +154,15 @@ AdcA = Table[
   {i, 2}, {j, 3}
 ];
 
-Print["\nA_dc (Block A, {h_5,a_1} <- {t_0,t_15,t_22}):"];
+(* CRITICAL: Normalize h_5 row by kinetic coefficient.
+   The h_5 equation in JSON has kinetic_coefficient_symbolic = -1/kappa^2,
+   meaning the actual equation is (-1/kappa^2) d2_t h5 = RHS.
+   To get d2_t h5 = normalized_RHS, divide RHS by -1/kappa^2 = multiply by -kappa^2.
+   Row 1 of AdcA is the h_5 row; row 2 is a_1 (no kinetic coeff, stays unchanged). *)
+kineticH5 = -1/kappa^2;
+AdcA[[1]] = AdcA[[1]] / kineticH5;
+
+Print["\nA_dc (Block A, {h_5,a_1} <- {t_0,t_15,t_22}), kinetic-normalized:"];
 Print[MatrixForm[AdcA // Simplify]];
 
 (* --- 6. Compute Block A Schur Complement --- *)
@@ -236,6 +244,9 @@ adcBfromH5 = Table[
   ],
   {j, 5}
 ];
+
+(* Normalize h5 coupling by kinetic coefficient *)
+adcBfromH5 = adcBfromH5 / kineticH5;
 
 (* a1 equation: coupling to Block B torsion VELOCITIES *)
 (* The a_1 equation references v_t_4 and v_t_18 *)
@@ -339,11 +350,14 @@ Print["v_a1 <- h_5:    ", corrBa1vel[[1]] // Simplify];
 Print["v_a1 <- v_a_1:  ", corrBa1vel[[2]] // Simplify];
 
 (* The baseline Gertsenshtein h_5<->a_1 coupling:
-   v_h5 equation has: B0 * gradient_x(a_1) = B0 * I*k * a_1
-   v_a1 equation has: B0 * gradient_x(h_5) = B0 * I*k * h_5 *)
+   BEFORE normalization: v_h5 eq has B0 * I*k * a_1
+   AFTER normalization: v_h5 eq has (-kappa^2) * B0 * I*k * a_1 = -B0*kappa^2 * I*k * a_1
+   For v_a1: no kinetic coeff on a_1, so stays B0 * I*k * h_5 *)
 Print["\n--- Combined effective coupling ---"];
-muGR = B0 * I * k;
-Print["mu_GR (h5<->a1 baseline) = ", muGR];
+muGRh5 = -kappa^2 * B0 * I * k; (* h5<-a1 coupling AFTER normalization *)
+muGRa1 = B0 * I * k;             (* a1<-h5 coupling (no normalization needed) *)
+Print["mu_GR(h5<-a1) = ", muGRh5, " (after kinetic normalization)"];
+Print["mu_GR(a1<-h5) = ", muGRa1];
 
 (* Total coupling shift h5<-a1: Block A (cols h_5,a_1) + Block B (no a_1 col) *)
 dmuH5fromA1 = correctionA[[1,2]];
@@ -365,16 +379,24 @@ Print["\nDelta_m2(h5) from Block A + B = ", dm2H5 // Simplify];
 dmuA1fromH5 = correctionA[[2,1]] + corrBa1vel[[1]];
 Print["Delta_mu(a1<-h5) from Block A + B = ", dmuA1fromH5 // Simplify];
 
-(* Effective coupling = GR + corrections *)
-muEffH5 = muGR - dmuH5fromA1;
-muEffA1 = muGR - dmuA1fromH5;
+(* Effective coupling = GR baseline + Schur correction.
+   The Schur complement SUBTRACTS the correction from the system matrix: A_eff = A - A_dc.Scc^-1.S_cd
+   So the effective coupling element becomes: mu_GR - correction *)
+muEffH5 = muGRh5 - dmuH5fromA1;
+muEffA1 = muGRa1 - dmuA1fromH5;
 Print["\nmu_eff(h5<-a1) = ", muEffH5 // Simplify];
 Print["mu_eff(a1<-h5) = ", muEffA1 // Simplify];
+Print["mu_ratio(h5<-a1) = mu_eff/mu_GR = ", Simplify[muEffH5/muGRh5]];
+Print["mu_ratio(a1<-h5) = mu_eff/mu_GR = ", Simplify[muEffA1/muGRa1]];
 
-(* Effective masses *)
-m2H5eff = B0^2/2 + k^2/kappa^2 - dm2H5;
+(* Effective masses.
+   After kinetic normalization (dividing h5 RHS by -1/kappa^2 = multiplying by -kappa^2):
+   h5 baseline: d2_t h5 = 1*laplacian(h5) + (-kappa^2*B0^2/2)*h5 + coupling*a1
+   In Fourier: m2(h5)_baseline = -k^2 - kappa^2*B0^2/2  (NEGATIVE = oscillatory)
+   The Schur correction dm2H5 has already been normalized (AdcA row 1 was divided by kineticH5). *)
+m2H5eff = -k^2 - kappa^2*B0^2/2 - dm2H5;
 m2A1eff = -k^2 - dm2A1;
-Print["\nm2_eff(h5) = B0^2/2 + k^2/kappa^2 - Delta = ", m2H5eff // Simplify];
+Print["\nm2_eff(h5) = -k^2 - kappa^2*B0^2/2 - Delta = ", m2H5eff // Simplify];
 Print["m2_eff(a1) = -k^2 - Delta_A = ", m2A1eff // Simplify];
 Print["Implicit LHS factor for a1: 1 - ", dm2A1implB // Simplify];
 
