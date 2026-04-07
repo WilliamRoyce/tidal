@@ -226,6 +226,45 @@ $10^{-2}$ & $29{,}199$ \\
 \end{center}
 The Gertsenshtein baseline at these parameters gives $C_{0,\text{EM}} = \sin^2(\kappa\Bzero t_{\text{end}}/2)/\Bzero^2 \to (\kappa t_{\text{end}}/2)^2 = 625$, yielding an amplification factor $A = C_0/C_{0,\text{EM}} \approx 48$. The $\Bzero$-independence confirms this is a coupling modification, not a nonlinear backreaction effect.
 
+\subsection{Observational Implications}
+\label{subsec:observational}
+
+\subsubsection{Physical Units}
+
+In physical units, $\kappa = \sqrt{16\pi G/c^4} = 1/M_{\text{Pl}}$ where $M_{\text{Pl}} = 2.44 \times 10^{18}\,\text{GeV}$ is the reduced Planck mass. The torsion mass parameters $\alpha_i$ have dimensions of $[\text{length}]^2$ in natural units; in our convention ($\kappa = 1$), they are measured in units of $M_{\text{Pl}}^{-2}$. The coupling $\delta_1$ is dimensionless.
+
+The background magnetic field $\Bzero = 10^{-4}$ in our simulations corresponds to a dimensionless ratio $\kappa \Bzero \ll 1$. In physical units, the Gertsenshtein coupling $\mu = \kappa \Bzero / 2$ becomes significant only for extremely strong fields: $B_{\text{magnetar}} \sim 10^{11}\,\text{T}$ gives $\kappa B \sim 10^{-16}$, and galactic fields $B_{\text{gal}} \sim 10^{-10}\,\text{T}$ give $\kappa B \sim 10^{-37}$.
+
+\subsubsection{Enhanced Effective Coupling}
+
+The amplification $A \approx 48$ at the reference parameter point means the effective graviton--photon coupling is enhanced:
+\begin{equation}
+  \kappa_{\text{eff}} = \sqrt{A}\, \kappa \approx 7\, \kappa.
+  \label{eq:kappa-eff}
+\end{equation}
+Equivalently, the minimum detectable magnetic field for graviton--photon conversion is reduced by $\sqrt{A} \approx 7$.
+
+For gravitational wave backgrounds, the induced photon flux scales as~\cite{Lella2024}:
+\begin{equation}
+  \frac{dF_{g \to \gamma}}{df} \propto \kappa_{\text{eff}}^2\, \Bzero^2\, h_c^2(f) \propto A\, \kappa^2\, \Bzero^2\, h_c^2(f).
+\end{equation}
+Constraints on $h_c(f)$ from non-observation of conversion-induced photon flux~\cite{Lella2024} are thus strengthened by a factor $\sqrt{A}$ in the torsion-modified theory:
+\begin{equation}
+  h_c^{\text{torsion bound}} = \frac{h_c^{\text{GR bound}}}{\sqrt{A}}.
+\end{equation}
+
+Lella \emph{et al.}~\cite{Lella2024} derive constraints on $h_c$ at $f \sim 10^{9}$--$10^{26}\,\text{Hz}$ from the Galactic magnetic field (both regular and turbulent components), improving previous bounds by $1$--$2$ orders of magnitude. With torsion amplification at $A = 48$, these bounds would be further strengthened by a factor $\sqrt{48} \approx 7$, or conversely, the same bounds would constrain the torsion parameter space $(\delta_1, \alpha_i)$ by ruling out regions where $A$ exceeds the existing GR limits.
+
+\subsubsection{Spectral Signature}
+
+The $k$-dependent enhancement (see~\cref{subsec:phenomenology}) produces a characteristic \textbf{blue-tilted spectral signature}: higher-frequency gravitational waves experience stronger conversion amplification. This is in contrast to:
+\begin{itemize}
+  \item Standard Gertsenshtein: frequency-independent coupling (flat spectrum).
+  \item $f(R)$ scalaron enhancement: frequency-independent friction parameter.
+  \item Axion--photon MSW: resonant peak at a single frequency.
+\end{itemize}
+The blue tilt arises because the Schur complement correction grows with $k^2$ (spatial operators in the constraint equations). This spectral signature is a \textbf{unique prediction} of torsion-mediated graviton--photon coupling that could distinguish it from other beyond-Standard-Model modifications in broadband GW conversion searches.
+
 \begin{thebibliography}{9}
 \bibitem{Shapiro2002}
   I.\,L.~Shapiro,

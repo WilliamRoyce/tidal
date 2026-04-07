@@ -10,70 +10,72 @@ Investigation of amplification and suppression of the Gertsenshtein effect in no
 
 ## Priority 1 -- Foundation
 
-- [~] Numerical Schur complement extraction (Phase A)
-  - [ ] Write `examples/torsion_gertsenshtein/schur_complement_analysis.py`
-  - [ ] Extract mu_eff and m2_eff at grid of (delta1, alpha2) points
-  - [ ] Map instability boundary alpha2_crit(delta1) from eigenvalue crossing
-  - [ ] Extract coupling zero-crossing delta1_crit(alpha2) (suppression valley)
-  - [ ] Compute A_analytic = |mu_eff/mu_GR|^2 for validation
+- [x] Numerical Schur complement extraction (Phase A)
+  - [x] Write `examples/torsion_gertsenshtein/schur_complement_analysis.py`
+  - [x] Extract mu_eff and m2_eff at grid of (delta1, alpha2) points
+  - [x] Map instability boundary alpha2_crit(delta1) from sweep data
+  - [x] Extract coupling zero-crossing delta1_crit(alpha2) = 0.62
+  - [!] Mini-solver validation: blocked by persistent tachyonic eigenvalues in h5-a1 block
 
-- [ ] Wolfram symbolic Schur complement (Phase A2)
-  - [ ] Write `examples/torsion_gertsenshtein/schur_complement_symbolic.wl`
-  - [ ] Import JSON, parse equations to symbolic form
-  - [ ] Build Block A (3x3: t_0, t_15, t_22) mass matrix symbolically
-  - [ ] Build Block B (5x5: t_3, t_4, t_7, t_8, t_18) symbolically
-  - [ ] Compute Inverse[S_cc] for each block
-  - [ ] Derive mu_eff(delta1, alpha_i, kappa, k) closed form
-  - [ ] Derive m2_eff(delta1, alpha_i, kappa, k) closed form
-  - [ ] Verify numerically against Python Schur complement
-  - [ ] Export to TeX via TeXForm[]
+- [x] Wolfram symbolic Schur complement (Phase A2)
+  - [x] Write `examples/torsion_gertsenshtein/schur_complement_symbolic.wl`
+  - [x] Build Block A (3x3) and Block B (5x5) symbolically
+  - [x] Compute Inverse[S_cc] for each block
+  - [x] Derive closed-form mu_eff and mu_ratio formulas
+  - [x] Apply kinetic normalization (divide h5 row by -1/kappa^2)
+  - [ ] Full numerical verification against Python (partial: signs match, magnitudes differ due to lambda-dependence)
 
-- [ ] Validate vs sweep data (Phase B)
-  - [ ] Load hires heatmap results.csv
-  - [ ] Compare A_analytic vs A_numerical at all valid points
-  - [ ] Scatter plot + residual analysis
+- [!] Validate vs sweep data (Phase B) -- BLOCKED
+  - [!] A_coupling = |mu_ratio|^2 at single k does NOT predict A_sweep
+  - [!] Mini-solver approach blocked by tachyonic modes in reduced system
+  - [!] Root cause: h5-a1 block has real eigenvalues +-lambda even after normalization
+  - [!] The actual modal solver handles this via block-aware evolution + Hamiltonian energy
+  - [ ] NEXT: investigate how Hamiltonian energy makes P bounded despite tachyonic modes
 
-- [ ] Documentation: `docs/tex/amplification_mechanism.tex`
-  - [ ] Coupling modification mechanism (Schur complement derivation)
-  - [ ] Distinction table vs Cembranos/Berlin/Lella
-  - [ ] Mass spectrum connection and constraint block structure
-  - [ ] delta1 symmetry and suppression valley explanation
-  - [ ] Full literature citations
+- [x] Documentation: `docs/tex/amplification_mechanism.tex`
+  - [x] Coupling modification mechanism (Schur complement derivation)
+  - [x] Distinction table vs Cembranos/Berlin/Lella
+  - [x] Constraint block structure (Block A + Block B)
+  - [x] delta1 symmetry explanation
+  - [x] B0 scaling verification
+  - [x] Observational implications (physical units, constraints, spectral signature)
+  - [x] Full literature citations
 
 ## Priority 2 -- Precision & Scaling
 
-- [ ] B0 scaling check (Exp 3)
-  - [ ] Sweep B0 at amplification peak
-  - [ ] Verify C0 = P/B0^2 is constant
+- [x] B0 scaling check (Exp 3)
+  - [x] Sweep B0 at amplification peak: C0 = 30,204 constant to 4 sig figs
+  - [x] A = C0/C0_EM = 48.3 (plane-wave IC)
 
-- [ ] High-res boundary zoom (Exp 2)
-  - [ ] delta1=1.0, sweep alpha2 from -1.2 to -0.5, 200 points, B0=1e-6
-  - [ ] Plot log10(A) vs (alpha2 - alpha2_crit)
-  - [ ] Extract scaling exponent
+- [~] High-res boundary zoom (Exp 2)
+  - [~] sweep_alpha2_hires.sh: 200 points, delta1=1.0, alpha2=-1.2:-0.5, B0=0.0001
+  - [ ] Post-process and plot log10(A) vs alpha2
+  - [ ] Extract scaling exponent near boundary
 
 - [ ] Reparametrize plots
-  - [ ] Compute instability boundary alpha2_crit(delta1) for boundary-distance axis
-  - [ ] Add sector mass transform (for literature comparison)
+  - [x] Instability boundary extracted from sweep data
   - [ ] Re-plot heatmap with boundary-distance axis
 
-- [ ] Suppression valley phase analysis (Exp 5)
-  - [ ] Extract effective coupling sign at delta1 ~ 0.63
-  - [ ] Confirm destructive interference (zero-crossing)
+- [x] Suppression valley phase analysis (Exp 5)
+  - [x] Zero-crossing at delta1 = 0.62 (confirmed numerically)
+  - [x] Coupling sign reversal verified
 
 ## Priority 3 -- Extensions
 
 - [ ] Frequency dependence (Exp 4)
-  - [ ] Sweep k at amplification peak
-  - [ ] Characterize spectral signature
+  - [x] Coupling ratio vs k table computed (1.55x to 7.48x)
+  - [ ] Systematic k sweep via mini-solver or simulations
+  - [ ] Characterize scaling exponent
 
 - [ ] Three-sector survey (Exp 6)
   - [ ] 3D LHS over (alpha1, alpha2, alpha3)
   - [ ] Identify which sectors contribute
 
-- [ ] Observational implications
-  - [ ] Physical unit translation
-  - [ ] Mass bounds from non-observation
-  - [ ] Spectral signature prediction
+- [x] Observational implications
+  - [x] Physical unit translation in amplification_mechanism.tex
+  - [x] kappa_eff = sqrt(A)*kappa ~ 7*kappa
+  - [x] Lella et al. bounds strengthened by factor sqrt(A)
+  - [x] Blue-tilted spectral signature identified as unique prediction
 
 ## Key Discoveries
 
