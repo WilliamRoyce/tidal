@@ -1892,6 +1892,34 @@ def _evolve_per_mode(
     initial_max_amp: float = 0.0
     divergence_threshold: float = 1e8  # amplitude ratio that triggers early stop
 
+    # Pre-check: scan eigenvalues for unstable modes with physical IC coupling.
+    # Catches exponential growth that would escape per-snapshot monitoring
+    # (e.g., exp(8*50) ≈ 1e173 but only checked at 101 snapshots).
+    total_dt = float(t_eval[-1] - t_eval[0])
+    log_threshold = float(np.log(divergence_threshold))
+    for block_slots, V_y0, _V_deriv, eig_vals in block_evolved:
+        max_re = float(np.max(np.real(eig_vals)))
+        if max_re * total_dt > log_threshold:
+            # Find modes whose individual growth exceeds the threshold
+            for m in range(eig_vals.shape[0]):  # per k-mode
+                re_vals = np.real(eig_vals[m])
+                growing = re_vals * total_dt > log_threshold
+                if not np.any(growing):
+                    continue
+                # IC projection: V_y0[m, i, j] for growing j
+                ic_proj = np.abs(V_y0[m, :, growing])
+                if np.max(ic_proj) > 1e-12:
+                    worst_re = float(np.max(re_vals[growing]))
+                    growth = np.exp(min(worst_re * total_dt, 700))
+                    msg = (
+                        f"Simulation diverged at t={t_eval[0]:.4g}: "
+                        f"eigenvalue Re(λ)={worst_re:.3e} predicts growth "
+                        f"factor {growth:.2e} over Δt={total_dt:.1f}, "
+                        f"exceeding threshold {divergence_threshold:.0e}. "
+                        f"The system is physically unstable."
+                    )
+                    raise SimulationDivergedError(msg)
+
     for ti, t in enumerate(t_eval):
         dt = t - t0
         y_hat_t[:] = 0.0
