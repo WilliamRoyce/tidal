@@ -2117,22 +2117,32 @@ def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
     """Wrap _run_single for multiprocessing Pool.map dispatch.
 
     Must be a module-level function (picklable) for Pool.map.
+    Catches all simulation errors to prevent crashing the entire sweep
+    when a single parameter point diverges.
     """
     from pathlib import Path
 
-    metrics = _run_single(
-        task["base_args"],
-        Path(task["spec_path"]),
-        task["param_overrides"],
-        Path(task["output_dir"]),
-        task["measurements"],
-        task["source"],
-        task["target"],
-        task["threshold"],
-        grid_shape_override=task.get("grid_override"),
-        replicate_seed=task.get("seed"),
-        ic_perturbation=task.get("ic_perturbation"),
-    )
+    try:
+        metrics = _run_single(
+            task["base_args"],
+            Path(task["spec_path"]),
+            task["param_overrides"],
+            Path(task["output_dir"]),
+            task["measurements"],
+            task["source"],
+            task["target"],
+            task["threshold"],
+            grid_shape_override=task.get("grid_override"),
+            replicate_seed=task.get("seed"),
+            ic_perturbation=task.get("ic_perturbation"),
+        )
+    except (RuntimeError, SystemExit) as exc:
+        metrics = {
+            "error": str(exc)[:500],
+            "run_status": "diverged",
+            "error_message": str(exc)[:200],
+            "solver_exit_code": -1,
+        }
     return {
         "index": task["index"],
         "swept_vals": task["swept_vals"],
