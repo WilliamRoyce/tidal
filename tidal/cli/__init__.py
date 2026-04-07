@@ -809,6 +809,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "E.g. --hline 1.0:P=1:red --hline 0.1::orange"
         ),
     )
+    plot_parser.add_argument(
+        "--divergent-center",
+        type=float,
+        default=None,
+        metavar="VALUE",
+        help=(
+            "Center colormap at VALUE using TwoSlopeNorm "
+            "(e.g. P_EM baseline for amplification plots). "
+            "Implies --cmap RdBu_r unless --cmap is set."
+        ),
+    )
     # Sweep-specific options
     plot_parser.add_argument(
         "--metric",
@@ -1157,6 +1168,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         default=False,
         help="Overwrite existing --output directory without prompting",
+    )
+    sweep_parser.add_argument(
+        "--keep-runs",
+        action="store_true",
+        help=(
+            "Keep per-run snapshot directories after measurement "
+            "(default: deleted to save disk). Required for "
+            "`tidal plot --type sweep-compare` overlays. "
+            "Warning: ~11 MB per run."
+        ),
     )
     sweep_parser.add_argument(
         "--config",

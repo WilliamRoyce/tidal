@@ -493,8 +493,16 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     ["Example: `--metric P_max`"],
                 )
                 return 1
+            dc: float | None = getattr(args, "divergent_center", None)
+            cmap_name = args.cmap or ("RdBu_r" if dc is not None else "viridis")
             fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 6))
-            render_sweep_parallel(ax, results, raw_metric)
+            render_sweep_parallel(
+                ax,
+                results,
+                raw_metric,
+                cmap_name=cmap_name,
+                divergent_center=dc,
+            )
 
         elif plot_type == "sweep-tornado":
             if raw_metric is None:
@@ -513,9 +521,17 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     ["Example: `--metric P_max`"],
                 )
                 return 1
+            dc = getattr(args, "divergent_center", None)
+            cmap_name = args.cmap or ("RdBu_r" if dc is not None else "viridis")
             n_params = len(results.swept_params)
             fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
-            render_sweep_scatter(fig, results, raw_metric)
+            render_sweep_scatter(
+                fig,
+                results,
+                raw_metric,
+                cmap_name=cmap_name,
+                divergent_center=dc,
+            )
 
         elif plot_type == "replicate-convergence":
             if raw_metric is None:

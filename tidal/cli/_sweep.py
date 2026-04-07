@@ -1011,6 +1011,13 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
                 converge_sizes,
             )
 
+        # Cleanup per-run snapshot data unless --keep-runs is set.
+        # After measurement, only results.csv is needed for analysis.
+        if not getattr(args, "keep_runs", False) and run_dir.exists():
+            import shutil
+
+            shutil.rmtree(run_dir, ignore_errors=True)
+
     return rows
 
 
@@ -1145,6 +1152,14 @@ def _execute_parallel(  # noqa: PLR0913, PLR0914, PLR0917
                     spec_path,
                     converge_sizes,
                 )
+
+                # Cleanup per-run snapshot data
+                if not getattr(args, "keep_runs", False):
+                    import shutil
+
+                    rd = run_dirs[idx]
+                    if rd.exists():
+                        shutil.rmtree(rd, ignore_errors=True)
 
     return list(rows)
 
@@ -1763,6 +1778,11 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         adaptive_threshold = getattr(args, "adaptive_threshold", 0.01)
 
     # Execute runs
+    if not getattr(args, "keep_runs", False):
+        print(
+            "  Per-run data deleted after measurement "
+            "(use --keep-runs to retain for sweep-compare overlays)"
+        )
     rows: list[dict[str, Any]] = []
     run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
 
