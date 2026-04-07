@@ -421,6 +421,8 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             log_scale: bool = getattr(args, "log_scale", False)
             log_y: bool = getattr(args, "log_y", False)
             thresholds: list[str] = getattr(args, "hline", []) or []
+            dc: float | None = getattr(args, "divergent_center", None)
+            cmap_name: str = args.cmap or ("RdBu_r" if dc is not None else "viridis")
 
             if n_swept == 1:
                 if len(metrics) == 1:
@@ -462,7 +464,14 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                         return 1
                 else:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
-                    render_sweep_2d(ax, results, metrics[0], log_scale=log_scale)
+                    render_sweep_2d(
+                        ax,
+                        results,
+                        metrics[0],
+                        log_scale=log_scale,
+                        divergent_center=dc,
+                        cmap_name=cmap_name,
+                    )
             else:
                 error_with_hint(
                     f"sweep plot supports 1 or 2 swept parameters, got {n_swept}",
@@ -493,8 +502,6 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     ["Example: `--metric P_max`"],
                 )
                 return 1
-            dc: float | None = getattr(args, "divergent_center", None)
-            cmap_name = args.cmap or ("RdBu_r" if dc is not None else "viridis")
             fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 6))
             render_sweep_parallel(
                 ax,
@@ -521,8 +528,6 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     ["Example: `--metric P_max`"],
                 )
                 return 1
-            dc = getattr(args, "divergent_center", None)
-            cmap_name = args.cmap or ("RdBu_r" if dc is not None else "viridis")
             n_params = len(results.swept_params)
             fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
             render_sweep_scatter(

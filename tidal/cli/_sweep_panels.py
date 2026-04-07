@@ -387,6 +387,8 @@ def render_sweep_2d(
     metric: str,
     *,
     log_scale: bool = False,
+    divergent_center: float | None = None,
+    cmap_name: str = "viridis",
 ) -> None:
     """Plot a scalar metric over two swept parameters.
 
@@ -404,6 +406,8 @@ def render_sweep_2d(
         Column name for the color values.
     log_scale : bool
         Use logarithmic colorbar (useful for ``inv_B_min``).
+    divergent_center : float or None
+        Center colormap at this value using ``TwoSlopeNorm``.
 
     Raises
     ------
@@ -421,9 +425,27 @@ def render_sweep_2d(
     p1_name, p2_name = param_names
 
     if _is_scattered_data(results):
-        _render_2d_scattered(ax, results, p1_name, p2_name, metric, log_scale=log_scale)
+        _render_2d_scattered(
+            ax,
+            results,
+            p1_name,
+            p2_name,
+            metric,
+            log_scale=log_scale,
+            divergent_center=divergent_center,
+            cmap_name=cmap_name,
+        )
     else:
-        _render_2d_grid(ax, results, p1_name, p2_name, metric, log_scale=log_scale)
+        _render_2d_grid(
+            ax,
+            results,
+            p1_name,
+            p2_name,
+            metric,
+            log_scale=log_scale,
+            divergent_center=divergent_center,
+            cmap_name=cmap_name,
+        )
 
 
 def _render_2d_scattered(  # noqa: PLR0913
@@ -434,6 +456,8 @@ def _render_2d_scattered(  # noqa: PLR0913
     metric: str,
     *,
     log_scale: bool = False,
+    divergent_center: float | None = None,
+    cmap_name: str = "viridis",
 ) -> None:
     """Render 2D sweep as scatter + interpolation background."""
     p1 = np.array(results.column(p1_name), dtype=np.float64)
@@ -451,7 +475,9 @@ def _render_2d_scattered(  # noqa: PLR0913
         )
         return
 
-    norm = _build_norm(metric_vals, log_scale=log_scale)
+    norm = _build_norm(
+        metric_vals, log_scale=log_scale, divergent_center=divergent_center
+    )
 
     # Interpolation background (if enough points)
     if len(metric_vals) >= 10:  # noqa: PLR2004
@@ -476,7 +502,7 @@ def _render_2d_scattered(  # noqa: PLR0913
                 p2g,
                 z,
                 shading="auto",
-                cmap="viridis",
+                cmap=cmap_name,
                 alpha=0.3,
                 norm=norm,
             )
@@ -487,7 +513,7 @@ def _render_2d_scattered(  # noqa: PLR0913
         p1,
         p2,
         c=metric_vals,
-        cmap="viridis",
+        cmap=cmap_name,
         s=60,
         edgecolors="k",
         linewidths=0.5,
@@ -508,6 +534,8 @@ def _render_2d_grid(  # noqa: PLR0913
     metric: str,
     *,
     log_scale: bool = False,
+    divergent_center: float | None = None,
+    cmap_name: str = "viridis",
 ) -> None:
     """Render 2D sweep as pcolormesh heatmap (for grid-aligned data)."""
     p1_vals = np.sort(results.swept_params[p1_name])
@@ -538,14 +566,18 @@ def _render_2d_grid(  # noqa: PLR0913
     valid_vals = grid[np.isfinite(grid)]
     if log_scale:
         valid_vals = valid_vals[valid_vals > 0]
-    norm = _build_norm(valid_vals, log_scale=log_scale) if len(valid_vals) > 0 else None
+    norm = (
+        _build_norm(valid_vals, log_scale=log_scale, divergent_center=divergent_center)
+        if len(valid_vals) > 0
+        else None
+    )
 
     im = ax.pcolormesh(
         p1_vals,
         p2_vals,
         grid,
         shading="nearest",
-        cmap="viridis",
+        cmap=cmap_name,
         norm=norm,
     )
     ax.set_xlabel(p1_name)
