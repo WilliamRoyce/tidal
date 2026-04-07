@@ -422,7 +422,9 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             log_y: bool = getattr(args, "log_y", False)
             thresholds: list[str] = getattr(args, "hline", []) or []
             dc: float | None = getattr(args, "divergent_center", None)
-            cmap_name: str = args.cmap or ("RdBu_r" if dc is not None else "viridis")
+            cmap_name: str = getattr(args, "cmap", None) or (
+                "RdBu_r" if dc is not None else "viridis"
+            )
 
             if n_swept == 1:
                 if len(metrics) == 1:
