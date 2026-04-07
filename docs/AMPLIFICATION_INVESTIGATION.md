@@ -106,3 +106,28 @@ Numerical Schur complement analysis of the h5-a1 block reveals:
 
 6. **Suppression valley** = exact destructive interference where mu_eff = 0.
    Zero-crossing mapped: at alpha2=-0.95, delta1_crit = 0.63.
+
+### 2026-04-07: Exponential h5 growth and measurement normalization
+
+The h5 graviton equation in the PGT nonminimal model has POSITIVE effective mass:
+  d2_t h5 = +k^2/kappa^2 * h5 + B0^2/2 * h5 + coupling*a1
+This gives exponential growth h5(t) ~ cosh(kt), NOT oscillatory wave propagation.
+The 4x4 h5+a1 block from A_reduced shows P growing to ~0.56 at t=10, while the
+actual simulation gives P=0.005.
+
+The resolution: the conversion measurement normalizes P(t) = E_target(t)/E_source(0),
+which uses the initial source energy, not the instantaneous. The modal solver correctly
+handles the exponentially growing modes. The amplification factor A = P_torsion/P_GR
+is well-defined because BOTH numerator and denominator have the same h5 growth.
+
+**Consequence**: The Schur complement coupling ratio mu_eff/mu_GR does NOT directly
+give the amplification factor A. The full eigenvalue structure (including growth rates)
+must be accounted for. The correct approach to predict A is to evolve the 4x4 block
+with identical ICs for both GR and torsion cases, then take the ratio of P_max values.
+
+### 2026-04-07: Two instability regions confirmed
+
+Eigenvalue analysis with baseline-relative criterion reveals two instability regions:
+- Lower boundary (Block A denominator pole): alpha2 -> -7/(4*kappa^2) = -1.75 at kappa=1
+- Upper boundary (tachyonic photon): alpha2 varies with delta1 (~-0.80 at delta1=1)
+- Stable window at delta1=1: approximately -1.14 < alpha2 < -0.76

@@ -35,11 +35,16 @@ import numpy as np
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+import operator
+
 from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.grid import GridInfo
 from tidal.solver.modal import _build_constraint_eliminated_matrices
 from tidal.solver.state import StateLayout
-from tidal.symbolic.json_loader import load_equation_system
+from tidal.symbolic.json_loader import (
+    load_equation_system,
+    normalize_kinetic_coefficients,
+)
 
 
 def build_grid(N: int = 256, L: float = 100.0) -> GridInfo:
@@ -128,15 +133,25 @@ def analyze_point(
 
     # Eigenvalues of full 4x4 block (all modes)
     all_eigs = np.linalg.eigvals(B_eff)
+    all_eigs_gr = np.linalg.eigvals(B_gr)
     max_re = np.max(np.real(all_eigs), axis=1)
+    max_re_gr = np.max(np.real(all_eigs_gr), axis=1)
 
-    # Growth threshold for stability (matching modal solver)
+    # Excess growth: how much faster do torsion-modified modes grow
+    # compared to the GR baseline? The baseline already has Re(eig)=k
+    # from wave propagation, so only the EXCESS matters.
+    excess = max_re - max_re_gr
+
+    # Growth threshold: the modal solver diverges when
+    # exp(Re(lambda)*t_end) > 1e8, i.e., Re(lambda) > 0.37
+    # But we want the excess over GR baseline
     t_end = base_params.get("t_end", 50.0)
     growth_threshold = np.log(1e8) / t_end  # ~0.37
 
-    # Find most unstable mode
-    most_unstable_k = np.argmax(max_re)
+    # Find most unstable mode (by excess over baseline)
+    most_unstable_k = np.argmax(excess)
     max_re_eig = max_re[most_unstable_k]
+    max_excess = float(excess[most_unstable_k])
 
     mu_ratio = mu_eff / mu_gr if abs(mu_gr) > 1e-30 else float("nan")
 
@@ -151,8 +166,9 @@ def analyze_point(
         "m2_a1_eff": m2_a1_eff,
         "m2_shift": m2_a1_eff - m2_a1_gr,
         "max_re_eig": max_re_eig,
+        "max_excess": max_excess,
         "most_unstable_k": k_vals[most_unstable_k],
-        "stable": bool(max_re_eig < growth_threshold),
+        "stable": bool(max_excess < growth_threshold),
         "A_coupling": mu_ratio**2,
     }
 
@@ -191,48 +207,79 @@ def sweep_coupling(
     return results
 
 
-def find_instability_boundary(
-    spec,
-    layout: StateLayout,
-    grid: GridInfo,
-    k_grid: list[np.ndarray],
-    rfft_shape: tuple[int, ...],
-    base_params: dict[str, float],
-    delta1_values: np.ndarray,
-    alpha2_range: tuple[float, float] = (-3.0, -0.3),
-    n_alpha2: int = 100,
-    k_idx: int = 8,
+def find_instability_boundary_from_sweep(
+    sweep_csv: str | Path,
 ) -> list[dict]:
-    """Find the instability boundary alpha2_crit(delta1)."""
-    alpha2_vals = np.linspace(*alpha2_range, n_alpha2)
+    """Extract instability boundary from sweep results.
+
+    The boundary is defined empirically: for each positive delta1 value,
+    the highest alpha2 where the sweep diverged. This uses the modal
+    solver's IC-projection-aware divergence guard, which is the correct
+    criterion (simple eigenvalue thresholds fail because the GR baseline
+    already has large real eigenvalues from wave propagation).
+
+    Returns list of dicts with delta1, alpha2_crit (upper boundary),
+    alpha2_lower (lower boundary if exists), and alpha2_first_valid.
+    """
+    sweep_csv = Path(sweep_csv)
+    with sweep_csv.open(encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+
+    from collections import defaultdict
+
+    by_d1: dict[float, list[tuple[float, str, str]]] = defaultdict(list)
+    for r in rows:
+        d1 = float(r["delta1"])
+        a2 = float(r["alpha2"])
+        status = r.get("run_status", "success")
+        pmax = r.get("P_max", "")
+        by_d1[d1].append((a2, status, pmax))
+
     results = []
-    for d1 in delta1_values:
-        prev_stable = None
-        boundary_a2 = None
-        for a2 in alpha2_vals:
-            r = analyze_point(
-                spec,
-                layout,
-                grid,
-                k_grid,
-                rfft_shape,
-                base_params,
-                d1,
-                a2,
-                k_idx,
-            )
-            if prev_stable is not None and not prev_stable and r["stable"]:
-                boundary_a2 = a2
-                break
-            prev_stable = r["stable"]
+    for d1 in sorted(by_d1.keys()):
+        if d1 < 0:
+            continue  # use delta1 -> -delta1 symmetry
+        pts = sorted(by_d1[d1], key=operator.itemgetter(0))
+
+        # Classify each alpha2 as diverged or valid
+        diverged_a2 = []
+        valid_a2 = []
+        for a2, st, pmax in pts:
+            if st == "diverged":
+                diverged_a2.append(a2)
+            elif pmax:
+                try:
+                    p = float(pmax)
+                    if 0 < p < 0.1:
+                        valid_a2.append(a2)
+                except (ValueError, TypeError):
+                    pass
+
+        # Upper boundary: highest diverged alpha2 that is below a valid point
+        # Lower boundary: lowest diverged alpha2 that is above a valid point
+        upper_crit = float("nan")
+        lower_crit = float("nan")
+        first_valid = valid_a2[0] if valid_a2 else float("nan")
+
+        if diverged_a2 and valid_a2:
+            # Find upper boundary (stable window upper edge)
+            candidates = [a for a in diverged_a2 if a > min(valid_a2)]
+            if candidates:
+                upper_crit = min(candidates)
+
+            # Find lower boundary (stable window lower edge)
+            candidates = [a for a in diverged_a2 if a < max(valid_a2)]
+            if candidates:
+                lower_crit = max(candidates)
 
         results.append(
             {
                 "delta1": d1,
-                "alpha2_crit": boundary_a2 if boundary_a2 is not None else float("nan"),
+                "alpha2_upper": upper_crit,
+                "alpha2_lower": lower_crit,
+                "alpha2_first_valid": first_valid,
             }
         )
-        print(f"  delta1={d1:.3f}: boundary at alpha2={boundary_a2}")
     return results
 
 
@@ -292,19 +339,23 @@ def main() -> None:
     parser.add_argument("--alpha2", type=float, default=-0.6)
     args = parser.parse_args()
 
-    print("Loading spec...")
-    spec = load_equation_system(args.spec)
-    grid = build_grid()
-    layout = StateLayout.from_spec(spec, grid.num_points)
-    k_grid, rfft_shape = get_k_grid(grid)
-    k_vals = k_grid[0]
-
     base_params = {
         "B0": 0.0001,
         "kappa": 1.0,
         "alpha1": 0.0,
         "alpha3": 1.0,
     }
+
+    print("Loading spec...")
+    spec_raw = load_equation_system(args.spec)
+    # CRITICAL: normalize kinetic coefficients (divide RHS by LHS kinetic coeff).
+    # Without this, h_5 appears to have wrong-sign mass (+k^2 instead of -k^2).
+    # The simulation/sweep code does this automatically; we must do it explicitly.
+    spec = normalize_kinetic_coefficients(spec_raw, base_params)
+    grid = build_grid()
+    layout = StateLayout.from_spec(spec, grid.num_points)
+    k_grid, rfft_shape = get_k_grid(grid)
+    k_vals = k_grid[0]
 
     if args.mode == "point":
         print(
@@ -354,21 +405,31 @@ def main() -> None:
         print(f"\nSaved {len(results)} points to {out_dir / 'schur_results.csv'}")
 
     elif args.mode == "boundary":
-        print("\nFinding instability boundary alpha2_crit(delta1)...")
-        d1_vals = np.linspace(0.05, 1.0, 20)
-        results = find_instability_boundary(
-            spec,
-            layout,
-            grid,
-            k_grid,
-            rfft_shape,
-            base_params,
-            d1_vals,
-            k_idx=args.k_idx,
-        )
-        print("\nInstability boundary:")
+        print("\nExtracting instability boundary from sweep data...")
+        sweep_csv = Path("examples/data/nonminimal_heatmap_d1_a2_hires/results.csv")
+        if not sweep_csv.exists():
+            print(f"  Sweep data not found: {sweep_csv}")
+            return
+        results = find_instability_boundary_from_sweep(sweep_csv)
+        print("\nInstability boundary (stable window edges):")
+        print(f"  {'delta1':>7} {'upper':>8} {'lower':>8} {'first_valid':>12}")
         for r in results:
-            print(f"  delta1={r['delta1']:.3f}: alpha2_crit={r['alpha2_crit']:.4f}")
+            u = (
+                f"{r['alpha2_upper']:.3f}"
+                if np.isfinite(r["alpha2_upper"])
+                else "  none"
+            )
+            lo = (
+                f"{r['alpha2_lower']:.3f}"
+                if np.isfinite(r["alpha2_lower"])
+                else "  none"
+            )
+            fv = (
+                f"{r['alpha2_first_valid']:.3f}"
+                if np.isfinite(r["alpha2_first_valid"])
+                else "  none"
+            )
+            print(f"  {r['delta1']:+7.3f} {u:>8} {lo:>8} {fv:>12}")
 
     elif args.mode == "zero-crossing":
         print(f"\nFinding coupling zero-crossing at alpha2={args.alpha2}...")

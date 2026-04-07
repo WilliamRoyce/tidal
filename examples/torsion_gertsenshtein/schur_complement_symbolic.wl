@@ -226,7 +226,7 @@ Print[MatrixForm[ScdB // Simplify]];
 (* and from a_1 to v_t_4, v_t_18 (via gradient_x) *)
 
 (* h5 equation: coupling to Block B torsion fields *)
-AdcB_h5 = Table[
+adcBfromH5 = Table[
   Module[{field},
     field = blockBFields[[j]];
     If[KeyExistsQ[h5Couplings, field],
@@ -239,23 +239,23 @@ AdcB_h5 = Table[
 
 (* a1 equation: coupling to Block B torsion VELOCITIES *)
 (* The a_1 equation references v_t_4 and v_t_18 *)
-a1VelCouplings = Association[];
+velCoupA1 = Association[];
 Do[
   Module[{parsed},
     parsed = parseTerm[term];
     If[StringMatchQ[parsed[[1]], "v_t_*"],
-      a1VelCouplings[parsed[[1]]] = parsed[[2]];
+      velCoupA1[parsed[[1]]] = parsed[[2]];
     ];
   ],
   {term, eqMap["a_1"]["rhs"]["terms"]}
 ];
 
 (* Map velocity names to constraint field indices *)
-AdcB_a1_vel = Table[
+adcBvelFromA1 = Table[
   Module[{velName},
     velName = "v_" <> blockBFields[[j]];
-    If[KeyExistsQ[a1VelCouplings, velName],
-      a1VelCouplings[velName],
+    If[KeyExistsQ[velCoupA1, velName],
+      velCoupA1[velName],
       0
     ]
   ],
@@ -263,86 +263,153 @@ AdcB_a1_vel = Table[
 ];
 
 Print["\nA_dc (h_5 <- Block B torsion fields):"];
-Print[AdcB_h5 // Simplify];
+Print[adcBfromH5 // Simplify];
 Print["\nA_dc (a_1 <- Block B torsion VELOCITIES):"];
-Print[AdcB_a1_vel // Simplify];
+Print[adcBvelFromA1 // Simplify];
 
 (* --- 8. Compute Block B Schur Complement --- *)
 Print["\n=== BLOCK B SCHUR COMPLEMENT ==="];
 
 SccBInv = Inverse[SccB] // Simplify;
+Print["\nInverse(S_cc_B):"];
+Print[MatrixForm[SccBInv]];
 
-(* Block B correction to h_5 equation (via field coupling) *)
-(* h_5 correction from Block B: AdcB_h5 . SccBInv . ScdB *)
-correctionB_h5 = AdcB_h5 . SccBInv . ScdB // Simplify;
+(* Block B constraint recovery: t_B = -SccBInv . ScdB . {h_5, v_a_1} *)
+recoveryB = -SccBInv . ScdB // Simplify;
+Print["\nRecovery matrix (5x2, rows=Block B fields, cols={h_5, v_a_1}):"];
+Print[MatrixForm[recoveryB]];
 
-Print["\nBlock B correction to h_5 (row vector, cols={h_5, v_a_1}):"];
-Print[correctionB_h5];
+(* Block B correction to h_5 equation (via field coupling):
+   h_5 gets terms from t_4, t_8 (via first_derivative_t=lambda and gradient_x)
+   These are FIELD-POSITION couplings, so correction = adcBfromH5 . (-SccBInv) . ScdB *)
+corrBh5 = adcBfromH5 . (-SccBInv) . ScdB // Simplify;
 
-(* Block B correction to a_1 equation (via velocity coupling) *)
-(* This is more complex: a_1 couples to torsion VELOCITIES, which require
-   the recovery matrix and A_reduced to evaluate. For now, report the
-   raw velocity coupling. *)
-correctionB_a1_vel = AdcB_a1_vel . SccBInv . ScdB // Simplify;
+Print["\nBlock B field correction to h_5 eq (row, cols={h_5, v_a_1}):"];
+Print[corrBh5];
 
-Print["\nBlock B correction to a_1 via velocities (row, cols={h_5, v_a_1}):"];
-Print[correctionB_a1_vel];
+(* Block B correction to a_1 equation (via VELOCITY coupling):
+   a_1 gets terms from v_t_4, v_t_18 (via gradient_x)
+   Constraint velocity: v_c = d/dt[c] = d/dt[-SccBInv . ScdB . d]
+   At eigenvalue lambda: v_c = lambda * recovery . d
+   So the velocity contribution is: adcBvelFromA1 . (lambda * recovery) . d
+   = lambda * adcBvelFromA1 . (-SccBInv . ScdB) . d *)
+corrBa1vel = \[Lambda] * adcBvelFromA1 . (-SccBInv) . ScdB // Simplify;
+
+Print["\nBlock B velocity correction to a_1 eq (row, cols={h_5, v_a_1}):"];
+Print[corrBa1vel];
+
+(* Combined Block B correction to the 2x2 {h_5, a_1} block:
+   Row 1 (h_5 / v_h_5 equation): gets field correction from Block B
+   Row 2 (a_1 / v_a_1 equation): gets velocity correction from Block B
+   But note: ScdB has cols {h_5, v_a_1}, not {h_5, a_1}.
+   The v_a_1 column couples to the velocity slot, not the field slot.
+   This creates a non-standard matrix structure.
+
+   For the 4x4 block [h_5, v_h_5, a_1, v_a_1]:
+   - corrBh5 contributes to the v_h_5 row (acceleration equation)
+   - corrBa1vel contributes to the v_a_1 row (acceleration equation)
+   But the column indices are {h_5, v_a_1} not {h_5, a_1}.
+
+   So Block B creates coupling: v_h_5 <- h_5 and v_h_5 <- v_a_1
+   And: v_a_1 <- h_5 and v_a_1 <- v_a_1 (via lambda)
+
+   The v_a_1 <- v_a_1 term is an IMPLICIT coupling (modifies the LHS). *)
+
+correctionB = {{corrBh5[[1]], corrBh5[[2]]}, {corrBa1vel[[1]], corrBa1vel[[2]]}};
+Print["\nBlock B combined correction (2x2, rows={v_h_5, v_a_1}, cols={h_5, v_a_1}):"];
+Print[MatrixForm[correctionB // Simplify]];
 
 (* --- 9. Combined Effective Coupling --- *)
 Print["\n=== COMBINED EFFECTIVE COUPLING ==="];
 
-(* Block A contributes to the v_h5 equation (h_5 row of correction)
-   and v_a1 equation (a_1 row of correction).
+(* Block A correction (rows={v_h5, v_a1}, cols={h_5, a_1}):
+   These modify the acceleration equations for h_5 and a_1 *)
+Print["\n--- From Block A (cols={h_5, a_1}) ---"];
+Print["v_h5 <- h_5 (mass shift):  ", correctionA[[1,1]] // Simplify];
+Print["v_h5 <- a_1 (coupling):    ", correctionA[[1,2]] // Simplify];
+Print["v_a1 <- h_5 (coupling):    ", correctionA[[2,1]] // Simplify];
+Print["v_a1 <- a_1 (mass shift):  ", correctionA[[2,2]] // Simplify];
 
-   The 2x2 correction from Block A:
-     correctionA[[1,1]] : correction to (v_h5 <- h_5) [h_5 mass shift]
-     correctionA[[1,2]] : correction to (v_h5 <- a_1) [h_5<-a_1 coupling shift]
-     correctionA[[2,1]] : correction to (v_a1 <- h_5) [a_1<-h_5 coupling shift]
-     correctionA[[2,2]] : correction to (v_a1 <- a_1) [a_1 mass shift]
-*)
+(* Block B correction (rows={v_h5, v_a1}, cols={h_5, v_a_1}):
+   NOTE: Block B couples to v_a_1, not a_1! This creates implicit LHS. *)
+Print["\n--- From Block B (cols={h_5, v_a_1}) ---"];
+Print["v_h5 <- h_5:    ", corrBh5[[1]] // Simplify];
+Print["v_h5 <- v_a_1:  ", corrBh5[[2]] // Simplify];
+Print["v_a1 <- h_5:    ", corrBa1vel[[1]] // Simplify];
+Print["v_a1 <- v_a_1:  ", corrBa1vel[[2]] // Simplify];
 
-Print["\n--- From Block A ---"];
-Print["h_5 mass shift (v_h5 <- h_5):    ", correctionA[[1,1]] // Simplify];
-Print["h_5<-a_1 coupling shift:          ", correctionA[[1,2]] // Simplify];
-Print["a_1<-h_5 coupling shift:          ", correctionA[[2,1]] // Simplify];
-Print["a_1 mass shift (v_a1 <- a_1):    ", correctionA[[2,2]] // Simplify];
-
-(* The baseline Gertsenshtein coupling is: B0 * I * k (from gradient_x) *)
-Print["\n--- Effective coupling formula ---"];
+(* The baseline Gertsenshtein h_5<->a_1 coupling:
+   v_h5 equation has: B0 * gradient_x(a_1) = B0 * I*k * a_1
+   v_a1 equation has: B0 * gradient_x(h_5) = B0 * I*k * h_5 *)
+Print["\n--- Combined effective coupling ---"];
 muGR = B0 * I * k;
-Print["mu_GR (baseline) = ", muGR];
+Print["mu_GR (h5<->a1 baseline) = ", muGR];
 
-(* The coupling shift from Block A *)
-dmuA = correctionA[[1,2]];
-Print["Delta_mu from Block A = ", dmuA // Simplify];
+(* Total coupling shift h5<-a1: Block A (cols h_5,a_1) + Block B (no a_1 col) *)
+dmuH5fromA1 = correctionA[[1,2]];
+Print["Delta_mu(h5<-a1) from Block A = ", dmuH5fromA1 // Simplify];
+(* Block B contributes to h5 only via h_5 column, not a_1 *)
 
-(* Effective coupling *)
-muEff = muGR - dmuA;  (* Schur complement SUBTRACTS the correction *)
-Print["mu_eff = mu_GR - Delta_mu_A = ", muEff // Simplify];
+(* Total a1 mass shift: Block A + Block B implicit *)
+dm2A1 = correctionA[[2,2]];
+dm2A1implB = corrBa1vel[[2]]; (* implicit: modifies LHS, lambda-dependent *)
+Print["\nDelta_m2(a1) from Block A = ", dm2A1 // Simplify];
+Print["Delta_implicit(v_a1<-v_a1) from Block B = ", dm2A1implB // Simplify];
+Print["  (This is a LHS modification: (1 - D)*v_a1' = RHS)"];
 
-(* a_1 mass shift from Block A *)
-dm2A = correctionA[[2,2]];
-Print["\nDelta_m2 from Block A = ", dm2A // Simplify];
+(* Total h5 mass shift: Block A + Block B *)
+dm2H5 = correctionA[[1,1]] + corrBh5[[1]];
+Print["\nDelta_m2(h5) from Block A + B = ", dm2H5 // Simplify];
 
-(* Effective a_1 mass (baseline is -k^2 from laplacian) *)
-m2GR = -k^2;
-m2Eff = m2GR - dm2A;  (* Schur complement subtracts *)
-Print["m2_eff(a_1) = -k^2 - Delta_m2_A = ", m2Eff // Simplify];
+(* Total coupling h5->a1 shift (in v_a1 equation): Block A + Block B *)
+dmuA1fromH5 = correctionA[[2,1]] + corrBa1vel[[1]];
+Print["Delta_mu(a1<-h5) from Block A + B = ", dmuA1fromH5 // Simplify];
+
+(* Effective coupling = GR + corrections *)
+muEffH5 = muGR - dmuH5fromA1;
+muEffA1 = muGR - dmuA1fromH5;
+Print["\nmu_eff(h5<-a1) = ", muEffH5 // Simplify];
+Print["mu_eff(a1<-h5) = ", muEffA1 // Simplify];
+
+(* Effective masses *)
+m2H5eff = B0^2/2 + k^2/kappa^2 - dm2H5;
+m2A1eff = -k^2 - dm2A1;
+Print["\nm2_eff(h5) = B0^2/2 + k^2/kappa^2 - Delta = ", m2H5eff // Simplify];
+Print["m2_eff(a1) = -k^2 - Delta_A = ", m2A1eff // Simplify];
+Print["Implicit LHS factor for a1: 1 - ", dm2A1implB // Simplify];
 
 (* --- 10. TeX Export --- *)
 Print["\n=== TEX EXPORT ==="];
 
-Print["\n% Effective coupling (Block A contribution):"];
-Print["\\mu_{\\text{eff}} = ", TeXForm[muEff // Simplify]];
+Print["\n% Block A mass matrix S_cc:"];
+Print["S_{cc,A} = ", TeXForm[SccA // Simplify]];
 
-Print["\n% Effective a_1 mass^2 (Block A contribution):"];
-Print["m^2_{\\text{eff}}(a_1) = ", TeXForm[m2Eff // Simplify]];
-
-Print["\n% Block A Schur complement correction matrix:"];
-Print["\\Delta_{\\text{A}} = ", TeXForm[correctionA // Simplify]];
-
-Print["\n% Inverse of Block A mass matrix:"];
+Print["\n% Block A inverse:"];
 Print["S_{cc,A}^{-1} = ", TeXForm[SccAInv // Simplify]];
+
+Print["\n% Block A correction matrix (rows={v_h5,v_a1}, cols={h_5,a_1}):"];
+Print["\\Delta_A = ", TeXForm[correctionA // Simplify]];
+
+Print["\n% Block B mass matrix S_cc:"];
+Print["S_{cc,B} = ", TeXForm[SccB // Simplify]];
+
+Print["\n% Block B field correction to v_h5 (cols={h_5, v_a_1}):"];
+Print["\\Delta_{B,h5} = ", TeXForm[corrBh5 // Simplify]];
+
+Print["\n% Block B velocity correction to v_a1 (cols={h_5, v_a_1}):"];
+Print["\\Delta_{B,a1} = ", TeXForm[corrBa1vel // Simplify]];
+
+Print["\n% Effective coupling h5<-a1:"];
+Print["\\mu_{\\text{eff}}^{h_5 \\leftarrow a_1} = ", TeXForm[muEffH5 // Simplify]];
+
+Print["\n% Effective coupling a1<-h5:"];
+Print["\\mu_{\\text{eff}}^{a_1 \\leftarrow h_5} = ", TeXForm[muEffA1 // Simplify]];
+
+Print["\n% Effective h5 mass^2:"];
+Print["m^2_{\\text{eff}}(h_5) = ", TeXForm[m2H5eff // Simplify]];
+
+Print["\n% Effective a1 mass^2:"];
+Print["m^2_{\\text{eff}}(a_1) = ", TeXForm[m2A1eff // Simplify]];
 
 (* --- 11. Numerical Verification --- *)
 Print["\n=== NUMERICAL VERIFICATION ==="];
@@ -350,22 +417,42 @@ Print["Evaluating at alpha1=0, alpha2=-0.6, alpha3=1.0, kappa=1, B0=0.0001, delt
 
 testRules = {
   alpha1 -> 0, alpha2 -> -0.6, alpha3 -> 1.0,
-  kappa -> 1, B0 -> 0.0001, delta1 -> 0.5, k -> 0.5027
+  kappa -> 1, B0 -> 0.0001, delta1 -> 0.5, k -> 0.5027,
+  \[Lambda] -> 0.5027  (* eigenvalue ~ k for the dominant mode *)
 };
 
+Print["\n--- Block A ---"];
 Print["  SccA = ", SccA /. testRules // N];
-Print["  SccAInv = ", SccAInv /. testRules // N];
 Print["  correctionA = ", correctionA /. testRules // N];
-Print["  mu_GR = ", muGR /. testRules // N];
-Print["  mu_eff = ", muEff /. testRules // N];
-Print["  m2_eff = ", m2Eff /. testRules // N];
 
-(* Compare with Python: at alpha2=-0.6, delta1=0.5, k=0.503:
-   coupling shift = -5.32e-5 (imaginary part)
-   mass shift = +0.81 *)
+Print["\n--- Block B ---"];
+Print["  SccB = ", SccB /. testRules // N];
+Print["  corrBh5 = ", corrBh5 /. testRules // N];
+Print["  corrBa1vel = ", corrBa1vel /. testRules // N];
+
+Print["\n--- Combined ---"];
+Print["  mu_eff(h5<-a1) = ", muEffH5 /. testRules // N];
+Print["  mu_eff(a1<-h5) = ", muEffA1 /. testRules // N];
+Print["  m2_eff(h5) = ", m2H5eff /. testRules // N];
+Print["  m2_eff(a1) = ", m2A1eff /. testRules // N];
+
+(* Expected from Python Schur complement at (d1=0.5, a2=-0.6, k=0.503):
+   coupling shift (Im) ~ -5.3e-5  (this includes BOTH blocks)
+   mass shift ~ +0.81 *)
 Print["\n  Expected from Python:"];
-Print["    coupling shift (Im) ~ -5.3e-5"];
-Print["    mass shift ~ +0.81"];
+Print["    coupling shift (Im of v_h5<-a1) ~ -5.3e-5"];
+Print["    a1 mass shift ~ +0.81"];
+
+(* Also test at amplification peak *)
+Print["\n--- Amplification peak: alpha2=-0.82, delta1=1.0 ---"];
+peakRules = {
+  alpha1 -> 0, alpha2 -> -0.82, alpha3 -> 1.0,
+  kappa -> 1, B0 -> 0.0001, delta1 -> 1.0, k -> 0.5027,
+  \[Lambda] -> 0.5027
+};
+Print["  mu_eff(h5<-a1) = ", muEffH5 /. peakRules // N];
+Print["  mu_eff(a1<-h5) = ", muEffA1 /. peakRules // N];
+Print["  Python: mu_eff/mu_GR ~ -1.92"];
 
 Print["\nDone."];
 

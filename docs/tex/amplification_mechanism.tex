@@ -1,0 +1,249 @@
+% Torsion-Mediated Amplification of the Gertsenshtein Effect
+% via Algebraic Constraint Elimination (Schur Complement)
+%
+% Self-contained section for inclusion in a manuscript.
+% Uses macros from preamble.tex
+
+\section{Torsion-Mediated Amplification of the Gertsenshtein Effect}
+\label{sec:amplification}
+
+\subsection{The Nonminimal PGT+EM Model}
+\label{subsec:nonminimal-model}
+
+We consider the quadratic Poincar\'e gauge theory (PGT) Lagrangian with a non-minimal torsion--electromagnetic coupling:
+\begin{equation}
+  \lag = \frac{1}{\kappa^2}\,\ricci
+    + \alpha_1 I_1 + \alpha_2 I_2 + \alpha_3 I_3
+    + \delta_1\, \ricci_{[\mu\nu]}\, F^{\mu\nu}
+    - \frac{1}{4}\, F_{\mu\nu}\, F^{\mu\nu},
+  \label{eq:nonminimal-lagrangian}
+\end{equation}
+where $\ricci$ is the Ricci scalar of the Riemann--Cartan connection, $I_1 = T_{\lambda\mu\nu} T^{\lambda\mu\nu}$, $I_2 = T_{\lambda\mu\nu} T^{\mu\lambda\nu}$, $I_3 = T_\mu T^\mu$ are the irreducible torsion-squared invariants, $\ricci_{[\mu\nu]}$ is the antisymmetric part of the Ricci--Cartan tensor (which vanishes identically without torsion), and $\delta_1$ is the non-minimal coupling constant.
+
+This model has several key features:
+\begin{itemize}
+  \item No $\ricci^2$ term --- avoids Ostrogradsky ghosts and 4th-order time derivatives.
+  \item Torsion is \textbf{non-propagating}: all 20 torsion components satisfy algebraic constraint equations (time derivative order zero).
+  \item The $\delta_1$ coupling is the simplest non-minimal torsion--EM interaction from the general PGT+EM enumeration~\cite{Shapiro2002,Bahamonde2025}.
+  \item Ghost-safe: Yang--Mills type coupling, $\ricci_{[\mu\nu]} F^{\mu\nu} \sim \mathcal{O}(\partial\Gamma) \times \mathcal{O}(\partial A)$.
+\end{itemize}
+
+After linearisation about flat Minkowski with a uniform background magnetic field $\Bzero$ along $\hat{x}$, plane-wave reduction along $\hat{z}$, and Lorenz gauge on the photon, the system has 34 fields: 10 graviton ($h_0$--$h_9$), 4 photon ($a_0$--$a_3$), and 20 torsion ($t_0$--$t_{23}$, with gaps). Of these, 7 are dynamical (second-order in time) and 27 are algebraic constraints.
+
+\subsection{Constraint Block Structure}
+\label{subsec:constraint-blocks}
+
+The 27 constraint fields decompose into independent blocks. Two blocks mediate the coupling between the active Gertsenshtein channel $h_5 \leftrightarrow a_1$ (cross-polarisation graviton $\leftrightarrow$ $x$-polarisation photon):
+
+\paragraph{Block~A} ($3\times3$): fields $\{t_0, t_{15}, t_{22}\}$. Self-coupled via identity operators only, with sources from $h_5$ (via $\partial_x$) and $a_1$ (via $\partial_x^2$ and $\partial_t^2$). All source terms are proportional to $\delta_1$. The constraint mass matrix is:
+\begin{equation}
+  S_{cc}^{(A)} = \begin{pmatrix}
+    D & \sigma & \sigma \\
+    \sigma & D & -\sigma \\
+    \sigma & -\sigma & D
+  \end{pmatrix},
+  \quad
+  D = 4\alpha_1 + 2\alpha_2 + 2\alpha_3 + \frac{1}{2\kappa^2},
+  \quad
+  \sigma = -2\alpha_3 + \frac{3}{\kappa^2}.
+  \label{eq:block-a-mass}
+\end{equation}
+This matrix is $\delta_1$-independent. Its eigenvalues are $D - 2|\sigma|$ (singlet) and $D + |\sigma|$ (doublet). It is invertible whenever:
+\begin{equation}
+  D_A^{(1)} \equiv 7 + 8\alpha_1\kappa^2 + 4\alpha_2\kappa^2 \neq 0,
+  \qquad
+  D_A^{(2)} \equiv -11 + 8\alpha_1\kappa^2 + 4\alpha_2\kappa^2 + 12\alpha_3\kappa^2 \neq 0.
+  \label{eq:block-a-denominators}
+\end{equation}
+
+\paragraph{Block~B} ($5\times5$): fields $\{t_3, t_4, t_7, t_8, t_{18}\}$. Couples to $h_5$ via $\partial_t$ (first time derivative) and to $\dot{a}_1$ (velocity) via $\partial_x$. This block introduces implicit left-hand-side modifications (velocity coupling) that the modal solver handles via the $(I - V)^{-1}$ factor.
+
+The remaining 19 constraint fields decouple from the $h_5 \leftrightarrow a_1$ channel and do not contribute to the effective coupling.
+
+\subsection{Schur Complement Elimination}
+\label{subsec:schur-complement}
+
+Each constraint block satisfies $S_{cc}\, \mathbf{t} = S_{cd}\, \mathbf{d}$, where $\mathbf{d}$ contains the dynamical fields. Solving for $\mathbf{t} = S_{cc}^{-1}\, S_{cd}\, \mathbf{d}$ and substituting back into the dynamical equations yields the Schur complement correction:
+\begin{equation}
+  A_{\text{eff}}(k) = A_{\text{GR}}(k) - A_{dc}\, S_{cc}^{-1}\, S_{cd}.
+  \label{eq:schur-complement}
+\end{equation}
+
+For Block~A, all coupling vectors are proportional to $\delta_1$, so the correction is $\propto \delta_1^2$, immediately explaining the $\delta_1 \to -\delta_1$ symmetry observed in sweeps: $P(\delta_1) = P(-\delta_1)$.
+
+\subsubsection{Effective Coupling (Block~A)}
+\label{subsec:effective-coupling-a}
+
+The correction to the $h_5 \leftarrow a_1$ coupling element of the acceleration equation is:
+\begin{equation}
+  \Delta\mu^{(A)}_{h_5 \leftarrow a_1} = \frac{-i\,\Bzero\,\delta_1^2\,k\,\kappa^2}{2\, D_A^{(1)}\, D_A^{(2)}}
+  \Bigl[
+    k^2\, \mathcal{P}
+    + \lambda^2\, \mathcal{Q}
+  \Bigr],
+  \label{eq:coupling-shift-a}
+\end{equation}
+where $\lambda$ is the eigenvalue parameter (from the first-order system), and:
+\begin{align}
+  \mathcal{P} &= 29 + 88\alpha_1\kappa^2 + 44\alpha_2\kappa^2 + 32\alpha_3\kappa^2, \\
+  \mathcal{Q} &= 117 + 24\alpha_1\kappa^2 + 12\alpha_2\kappa^2 - 64\alpha_3\kappa^2.
+\end{align}
+The effective coupling is $\mu_{\text{eff}} = \mu_{\text{GR}} - \Delta\mu^{(A)}$, giving:
+\begin{equation}
+  \mu_{\text{eff}}^{h_5 \leftarrow a_1} = \frac{i\,\Bzero\,k}{2}
+  \left(
+    2 + \frac{\delta_1^2\,\kappa^2\,(k^2\,\mathcal{P} + \lambda^2\,\mathcal{Q})}{D_A^{(1)}\, D_A^{(2)}}
+  \right).
+  \label{eq:mu-eff-h5a1}
+\end{equation}
+
+\subsubsection{Effective Photon Mass (Block~A)}
+\label{subsec:effective-mass-a}
+
+The correction to the $a_1$ self-coupling (effective photon mass) is:
+\begin{equation}
+  \Delta m^2_{a_1} = \frac{\delta_1^2\,\kappa^2}{2\, D_A^{(1)}\, D_A^{(2)}}
+  \Bigl[
+    k^4\, \mathcal{R}
+    + 2 k^2 \lambda^2\, \mathcal{Q}
+    + \lambda^4\, \mathcal{R}
+  \Bigr],
+  \label{eq:mass-shift-a}
+\end{equation}
+where $\mathcal{R} = -59 + 152\alpha_1\kappa^2 + 76\alpha_2\kappa^2 + 128\alpha_3\kappa^2$, yielding:
+\begin{equation}
+  m^2_{\text{eff}}(a_1) = -k^2 - \Delta m^2_{a_1}.
+  \label{eq:m2-eff-a1}
+\end{equation}
+
+\subsubsection{Block~B Contributions}
+\label{subsec:block-b}
+
+Block~B contributes through time-derivative coupling. The field correction to $h_5$ is:
+\begin{equation}
+  \Delta^{(B)}_{h_5 \leftarrow h_5} = \frac{4\,\Bzero^2\,\delta_1^2\,\kappa^2\,\lambda^2}{D_A^{(1)}},
+  \qquad
+  \Delta^{(B)}_{h_5 \leftarrow \dot{a}_1} = \frac{4i\,\Bzero\,\delta_1^2\,k\,\kappa^2\,\lambda}{D_A^{(1)}}.
+  \label{eq:block-b-h5}
+\end{equation}
+The velocity correction to $a_1$ (which modifies the LHS of the equation of motion) is:
+\begin{equation}
+  \Delta^{(B)}_{\dot{a}_1 \leftarrow h_5} = \frac{4i\,\Bzero\,\delta_1^2\,k\,\kappa^2\,\lambda^2}{D_A^{(1)}},
+  \label{eq:block-b-a1-h5}
+\end{equation}
+plus an implicit self-coupling $\Delta^{(B)}_{\dot{a}_1 \leftarrow \dot{a}_1}$ involving the full Block~B determinant.
+
+Note that Block~B contributions share the denominator $D_A^{(1)} = 7 + 8\alpha_1\kappa^2 + 4\alpha_2\kappa^2$, which is the \emph{same} as one of the Block~A denominators. This means both blocks become singular at the same critical surface.
+
+\subsection{Two Instability Regions}
+\label{subsec:instabilities}
+
+The effective system has two instability regions in $(\delta_1, \alpha_2)$ space:
+\begin{enumerate}
+  \item \textbf{Lower boundary} (Block~A denominator): $D_A^{(1)} \to 0$, i.e.\ $\alpha_2 \to -7/(4\kappa^2)$ at $\alpha_1 = 0$. This creates a pole in both blocks' Schur complement. At $\kappa = 1$, this is $\alpha_2 = -1.75$. The boundary shifts slightly with $\delta_1$ due to the Block~B implicit coupling.
+  \item \textbf{Upper boundary} (tachyonic photon): the mass shift $\Delta m^2_{a_1}$ makes the photon effective mass positive (tachyonic), driving exponential growth. This boundary depends on $\delta_1^2$ and shifts from $\alpha_2 \approx -0.85$ at $\delta_1 = 1$ to no upper boundary at small $\delta_1$.
+\end{enumerate}
+
+The \textbf{stable window} lies between these boundaries. At $\delta_1 = 1.0$, $\alpha_1 = 0$, $\alpha_3 = 1.0$, $\kappa = 1$: the window is approximately $-1.14 \lesssim \alpha_2 \lesssim -0.76$ (from sweep data).
+
+\subsection{Amplification and Suppression Phenomenology}
+\label{subsec:phenomenology}
+
+\subsubsection{Coupling Reversal}
+
+The torsion Schur complement correction in \cref{eq:mu-eff-h5a1} adds a $\delta_1^2$-dependent term to the baseline Gertsenshtein coupling. This correction has \textbf{opposite sign} to the baseline for the parameter ranges studied, leading to:
+\begin{itemize}
+  \item \textbf{Small $\delta_1$}: negligible correction, $A \approx 1$.
+  \item \textbf{Intermediate $\delta_1 \approx \delta_{1,\text{crit}}$}: the correction exactly cancels the baseline coupling ($\mu_{\text{eff}} = 0$), producing a \textbf{suppression valley} with $A \to 0$.
+  \item \textbf{Large $\delta_1 > \delta_{1,\text{crit}}$}: the coupling reverses sign and $|\mu_{\text{eff}}| > |\mu_{\text{GR}}|$, giving amplification $A > 1$.
+\end{itemize}
+
+At $\alpha_2 = -0.95$, the coupling zero-crossing occurs at $\delta_{1,\text{crit}} \approx 0.62$ (numerically verified).
+
+\subsubsection{Wavenumber Dependence}
+
+The effective coupling depends on $k$ through the spatial operators in the coupling vectors. At the amplification peak ($\alpha_2 = -0.82$, $\delta_1 = 1.0$):
+\begin{center}
+\begin{tabular}{ccc}
+\toprule
+$k$ & $\mu_{\text{eff}}/\mu_{\text{GR}}$ & $A_\mu = |\mu_{\text{eff}}/\mu_{\text{GR}}|^2$ \\
+\midrule
+0.063 & $-1.55$ & 2.4 \\
+0.251 & $-1.64$ & 2.7 \\
+0.503 & $-1.92$ & 3.7 \\
+1.005 & $-3.03$ & 9.2 \\
+2.011 & $-7.48$ & 56 \\
+\bottomrule
+\end{tabular}
+\end{center}
+The enhancement grows with $k$, producing a characteristic \textbf{blue-tilted spectral signature} distinguishable from frequency-independent mechanisms.
+
+\subsection{Distinction from Other Enhancement Mechanisms}
+\label{subsec:comparison}
+
+\begin{center}
+\begin{tabular}{llll}
+\toprule
+Mechanism & What changes & Where & Reference \\
+\midrule
+\textbf{PGT torsion (this work)} & Coupling reverses sign & $\delta_1 > \delta_{1,\text{crit}}$ & --- \\
+Light mediator ($1/m^2$) & Propagator diverges & $m \to 0$ & General \\
+$f(R)$ scalaron & Graviton amplitude grows & $\nu \to -1$ & \cite{Cembranos2023} \\
+Axion--photon MSW & Conversion width diverges & $m_a = \omega_p$ & \cite{Berlin2024} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The PGT mechanism is distinct: the torsion mass matrix $S_{cc}$ is \textbf{well-conditioned} at all amplified points (smallest eigenvalue $-0.5$ to $-3.5$, far from singular). What changes is the \emph{effective coupling strength}, not the mediator propagator. This is specific to algebraically constrained (non-propagating) torsion --- a propagating torsion mediator would give standard $1/m^2$ behaviour instead.
+
+\subsection{Numerical Results}
+\label{subsec:numerical-results}
+
+Parameter sweeps of the nonminimal model confirm:
+\begin{itemize}
+  \item \textbf{1D sweep} ($\delta_1 \in [-1, 1]$): symmetric $P(\delta_1) = P(-\delta_1)$, suppression valley at $|\delta_1| \approx 0.6$--$0.8$, amplification up to $113\times$ at $|\delta_1| = 1$.
+  \item \textbf{2D heatmap} ($\delta_1 \times \alpha_2$, $50 \times 40$ grid, $\Bzero = 10^{-4}$): maximum amplification $A \approx 7{,}900$, minimum $A \approx 10^{-10}$, with 780 valid points and 1220 diverged/invalid.
+  \item \textbf{4D Monte Carlo} ($\alpha_1, \alpha_2, \alpha_3, \delta_1$, 500 samples): stable pockets are sparse but achievable with proper $\alpha_i$ tuning.
+\end{itemize}
+
+The amplification concentrates near the upper edge of the stable window, where the torsion-modified coupling is largest but the photon mass shift has not yet triggered tachyonic instability.
+
+\begin{thebibliography}{9}
+\bibitem{Shapiro2002}
+  I.\,L.~Shapiro,
+  \emph{Physical aspects of the space-time torsion},
+  Phys.\ Rep.\ \textbf{357}, 113 (2002),
+  \texttt{hep-th/0103093}.
+
+\bibitem{Bahamonde2025}
+  S.~Bahamonde \emph{et al.},
+  \emph{Non-minimal torsion--matter coupling in Poincar\'e gauge gravity},
+  (2025), \texttt{arXiv:2507.02362}.
+
+\bibitem{Cembranos2023}
+  J.\,A.\,R.~Cembranos, L.\,J.~Garay, and J.\,M.~S\'anchez Vel\'azquez,
+  \emph{Graviton--photon conversion in curved spacetime},
+  Phys.\ Rev.\ D \textbf{107}, 044060 (2023),
+  \texttt{arXiv:2302.08186}.
+
+\bibitem{Berlin2024}
+  A.~Berlin, D.~Blas, and R.\,A.~Porto,
+  \emph{Resonant axion--photon conversion},
+  (2024), \texttt{arXiv:2405.08865}.
+
+\bibitem{Blagojevic2019}
+  M.~Blagojevi\'c and B.~Cvetkovi\'c,
+  \emph{General Poincar\'e gauge theory: Hamiltonian structure and particle spectrum},
+  Phys.\ Rev.\ D \textbf{98}, 024014 (2018),
+  \texttt{arXiv:1812.02675}.
+
+\bibitem{Barker2024}
+  W.\,E.\,V.~Barker,
+  \emph{Every Poincar\'e gauge theory is conformal},
+  (2024), \texttt{arXiv:2406.12826}.
+
+\bibitem{Lella2024}
+  L.~Lella \emph{et al.},
+  \emph{Graviton--photon conversion in the galactic magnetic field},
+  (2024), \texttt{arXiv:2406.17853}.
+\end{thebibliography}
