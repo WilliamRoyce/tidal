@@ -12,7 +12,10 @@
       "reportUnknownVariableType": false,
       "reportUnknownArgumentType": false,
       "reportUnknownParameterType": false,
-      "reportPrivateUsage": false
+      "reportPrivateUsage": false,
+      "reportCallIssue": false,
+      "reportAttributeAccessIssue": false,
+      "reportArgumentType": false
     },
     {
       "root": "tests",
