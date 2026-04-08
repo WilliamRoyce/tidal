@@ -39,7 +39,7 @@ import operator
 
 from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.grid import GridInfo
-from tidal.solver.modal import _build_constraint_eliminated_matrices
+from tidal.solver.modal import build_constraint_eliminated_matrices
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import (
     load_equation_system,
@@ -75,7 +75,7 @@ def extract_h5_a1_block(
         Block matrix of shape (n_modes, 4, 4) with rows/cols [h5, vh5, a1, va1].
     """
     coeff_eval = CoefficientEvaluator(spec, grid, params)
-    A_reduced, _, _, _, mapping = _build_constraint_eliminated_matrices(
+    A_reduced, _, _, _, mapping = build_constraint_eliminated_matrices(
         spec, layout, grid, coeff_eval, k_grid, rfft_shape
     )
 
@@ -361,7 +361,7 @@ def mini_solver_amplification(
     def get_full_system(params):
         """Get the full 14x14 reduced system and slot mapping."""
         coeff_eval = CoefficientEvaluator(spec, grid, params)
-        A_red, _, _, _, mapping = _build_constraint_eliminated_matrices(
+        A_red, _, _, _, mapping = build_constraint_eliminated_matrices(
             spec, layout, grid, coeff_eval, k_grid, rfft_shape
         )
         return A_red, mapping

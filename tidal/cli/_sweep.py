@@ -887,13 +887,10 @@ def _run_single(  # noqa: PLR0913, PLR0917
                 normalize_kinetic_coefficients,
             )
 
-            spec_ = normalize_kinetic_coefficients(
-                _load_spec(spec_path),
-                _parse_params(base_args.param, _load_spec(spec_path)),
-            )
-            # Merge param_overrides into the parsed params
-            params = {**_parse_params(base_args.param, spec_), **param_overrides}
-            spec_ = normalize_kinetic_coefficients(_load_spec(spec_path), params)
+            raw_spec = _load_spec(spec_path)
+            base_p = _parse_params(base_args.param, raw_spec)
+            params = {**base_p, **param_overrides}
+            spec_ = normalize_kinetic_coefficients(raw_spec, params)
 
             grid_n = grid_shape_override or int(getattr(base_args, "grid_shape", 256))
             bounds = getattr(base_args, "bounds", "0:100")

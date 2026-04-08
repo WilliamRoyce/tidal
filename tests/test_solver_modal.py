@@ -963,9 +963,9 @@ class TestModalBlockIsolation:
         modal_warnings = [x for x in w if "positive real parts" in str(x.message)]
         assert len(modal_warnings) > 0, "No eigenvalue growth warning issued for t=500"
 
-    def test_find_independent_blocks_utility(self) -> None:
-        """Verify _find_independent_blocks correctly detects block structure."""
-        from tidal.solver.modal import _find_independent_blocks
+    def testfind_independent_blocks_utility(self) -> None:
+        """Verify find_independent_blocks correctly detects block structure."""
+        from tidal.solver.modal import find_independent_blocks
 
         # 4×4 block-diagonal: [[A, 0], [0, B]]
         M = np.zeros((4, 4), dtype=np.complex128)
@@ -973,20 +973,20 @@ class TestModalBlockIsolation:
         M[1, 0] = -1.0
         M[2, 3] = 1.0
         M[3, 2] = -2.0
-        blocks = _find_independent_blocks(M)
+        blocks = find_independent_blocks(M)
         assert len(blocks) == 2
         assert sorted(blocks[0]) in ([0, 1], [2, 3])
         assert sorted(blocks[1]) in ([0, 1], [2, 3])
 
         # Fully coupled 4×4
         M2 = np.ones((4, 4), dtype=np.complex128)
-        blocks2 = _find_independent_blocks(M2)
+        blocks2 = find_independent_blocks(M2)
         assert len(blocks2) == 1
         assert sorted(blocks2[0]) == [0, 1, 2, 3]
 
         # Diagonal (all independent)
         M3 = np.diag([1.0, 2.0, 3.0]).astype(np.complex128)
-        blocks3 = _find_independent_blocks(M3)
+        blocks3 = find_independent_blocks(M3)
         assert len(blocks3) == 3
 
 
@@ -1117,9 +1117,9 @@ class TestConstraintElimination:
         """Reduced system eigenvalues are purely imaginary (Hamiltonian)."""
         from tidal.solver.coefficients import CoefficientEvaluator
         from tidal.solver.modal import (
-            _build_constraint_eliminated_matrices,
             _build_k_axes,
             _build_k_grid,
+            build_constraint_eliminated_matrices,
         )
 
         spec = _make_spec(_PROCA_1D_CONSTRAINT_SPEC)
@@ -1130,7 +1130,7 @@ class TestConstraintElimination:
         k_grid = _build_k_grid(k_axes)
         rfft_shape = (17,)
 
-        A_red, _, _, _, _ = _build_constraint_eliminated_matrices(
+        A_red, _, _, _, _ = build_constraint_eliminated_matrices(
             spec,
             StateLayout.from_spec(spec, grid.num_points),
             grid,

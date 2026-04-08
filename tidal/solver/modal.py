@@ -358,7 +358,7 @@ def _constraints_fourier_eliminable(
     return True
 
 
-def _build_constraint_eliminated_matrices(
+def build_constraint_eliminated_matrices(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
@@ -669,7 +669,7 @@ def _build_generalized_evolution_matrices(
     5. Substitutes jerk terms using the (now-invertible) dynamical equations
     6. Combines both constraint levels and builds the first-order evolution matrix
 
-    Returns the same tuple as ``_build_constraint_eliminated_matrices``.
+    Returns the same tuple as ``build_constraint_eliminated_matrices``.
     """
     import logging  # noqa: PLC0415
 
@@ -1553,7 +1553,7 @@ def _add_convolution_coupling(
 # ---------------------------------------------------------------------------
 
 
-def _find_independent_blocks(
+def find_independent_blocks(
     A: NDArray[np.complex128],
     threshold: float = 1e-14,
 ) -> list[list[int]]:
@@ -1756,7 +1756,7 @@ def _evolve_per_mode(
     # robustness against accidental zeros at specific k).
     n_check = min(3, A_modes.shape[0])
     combined = np.max(np.abs(A_modes[:n_check]), axis=0)
-    blocks = _find_independent_blocks(combined)
+    blocks = find_independent_blocks(combined)
 
     # Pre-compute eigendecomposition for each active block
     block_data: list[
@@ -2236,7 +2236,7 @@ def solve_modal(
                 _v_recovery_matrix,  # recovery @ A_reduced (exact constraint velocities)
                 c_names,
                 orig_to_reduced,
-            ) = _build_constraint_eliminated_matrices(
+            ) = build_constraint_eliminated_matrices(
                 spec,
                 layout,
                 grid,
