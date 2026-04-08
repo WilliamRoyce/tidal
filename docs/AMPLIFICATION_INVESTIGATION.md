@@ -145,9 +145,55 @@ h_5 to appear with wrong-sign mass (+k^2 instead of -k^2). After fixing:
 - No more spurious exponential growth
 - Coupling ratios and zero-crossing location unchanged (sign-independent)
 
-### 2026-04-08: Clean plane-wave alpha2 sweep — genuine A=665x
+### 2026-04-08: DEFINITIVE — Large amplification factors are tachyonic instability artifacts
 
-First physically valid high-res amplification profile (plane-wave IC, delta1=1.0):
+**ALL amplification factors A >> 2 are tachyonic onset instability, NOT genuine 
+physical amplification of the Gertsenshtein effect.**
+
+Evidence (t_end independence test at delta1=1.0, alpha2=-0.909, plane-wave IC):
+
+| t_end | P_GR     | P_torsion | A = P_t/P_GR |
+|-------|----------|-----------|--------------|
+| 20    | 2e-6     | 1.3e-5    | 6.5          |
+| 30    | 3e-6     | 9.6e-5    | 32           |
+| 40    | 4e-6     | 6.8e-4    | 170          |
+| 50    | 6e-6     | 4.85e-3   | 808          |
+
+A grows exponentially with t_end: this is exp(gamma*t)/t^2 (tachyonic photon growth
+vs quadratic GR growth). At alpha2=-0.82 (B0 scaling point): P=441,663 at t=25 
+(explosively diverged).
+
+**The B0 scaling test does NOT distinguish amplification from instability** because 
+the tachyonic growth rate gamma is B0-independent. Both give C0 = P/B0^2 = const.
+
+**Genuine effects (time-independent)**:
+- Coupling modification: A_coupling = |mu_eff/mu_GR|^2 ≈ 1.9 (modest, from Schur complement)
+- Suppression: A ≈ 0.001 at alpha2=-1.0 (1000x suppression, genuine destructive interference)
+  - P_torsion ≈ 0 at both t=25 and t=50 (confirmed time-independent)
+
+**Root cause**: The delta1 R_tilde_{[mu nu]} F^{mu nu} coupling shifts the effective
+photon mass m^2_eff(a1) through zero via the Schur complement. At the tachyonic
+boundary (m^2_eff = 0), conversion grows exponentially, mimicking amplification.
+The boundary is k-dependent: the plane-wave mode (k ~ 0.063) crosses tachyonic
+at alpha2 ~ -0.913 (for delta1=1.0, alpha1=0, alpha3=1.0, kappa=1).
+
+**Conclusion**: The nonminimal PGT model produces SUPPRESSION of Gertsenshtein 
+conversion in the stable parameter region, and tachyonic instability near the 
+stability boundary. There is no genuine amplification > ~2x.
+
+**Action items**:
+- [x] Document this finding (this entry)
+- [ ] Revise amplification_mechanism.tex (retitle, reframe as instability)
+- [ ] Add t_end independence test to prevent future recurrence
+- [ ] Create GitHub issue for the record
+- [ ] Update memory files
+
+### 2026-04-08: ~~Clean plane-wave alpha2 sweep — "A=665x"~~ (RETRACTED — tachyonic artifact)
+
+**NOTE**: The A=665 value below was later identified as tachyonic onset instability,
+not genuine amplification. See "DEFINITIVE" entry above.
+
+Original analysis (plane-wave IC, delta1=1.0):
 - 100 points, alpha2 from -1.2 to -0.4
 - 37 valid (P<0.1), 54 diverged, 9 outside linear regime
 - Max amplification: A = 665x at alpha2 = -0.909 (stability boundary)
