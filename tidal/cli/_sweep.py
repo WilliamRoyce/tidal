@@ -209,14 +209,40 @@ def _expand_replicates(
 # ------------------------------------------------------------------
 
 
-def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
-    """Parse a ``--sweep`` argument into ``(param_name, values)``.
+def _arctan_values(n: int, eps: float = 0.01) -> list[float]:
+    """Generate N values spanning (-∞, +∞) via arctan mapping.
+
+    Maps N uniformly-spaced points in [-π/2+ε, π/2-ε] through tan()
+    to cover the entire real line. The density is highest near zero
+    (where tan changes slowly) and thins toward ±∞.
+
+    The boundary guard ε prevents singularities at ±π/2.
+    Default ε=0.01 gives coverage to ±100; smaller ε extends further:
+    ε=0.005 → ±200, ε=0.001 → ±1000.
+    """
+    import math
+
+    theta_lo = -math.pi / 2 + eps
+    theta_hi = math.pi / 2 - eps
+    thetas = np.linspace(theta_lo, theta_hi, n)
+    return cast("list[float]", np.tan(thetas).tolist())
+
+
+def parse_sweep_spec(raw: str) -> tuple[str, list[float], str]:  # noqa: C901
+    """Parse a ``--sweep`` argument into ``(param_name, values, scale)``.
 
     Supported formats:
 
     - ``NAME=START:STOP:N``       — N linearly-spaced points
     - ``NAME=START:STOP:N:log``   — N log-spaced points
+    - ``NAME=N:arctan``           — N arctan-mapped points spanning (-∞, +∞)
+    - ``NAME=START:STOP:N:arctan``— N arctan-mapped with custom unit-interval bounds
     - ``NAME=V1,V2,V3,...``       — explicit values
+
+    The ``arctan`` scale maps N uniformly-spaced angles through tan()
+    to cover the entire real line, with density concentrated near zero.
+    Useful for parameter surveys that should not restrict the range
+    arbitrarily (e.g., torsion mass parameters that can be any sign).
 
     Parameters
     ----------
@@ -225,8 +251,9 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
 
     Returns
     -------
-    tuple[str, list[float]]
-        Parameter name and list of values.
+    tuple[str, list[float], str]
+        Parameter name, list of values, and scale type
+        (``"linear"``, ``"log"``, or ``"arctan"``).
 
     Raises
     ------
@@ -248,39 +275,67 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
         raise ValueError(msg)
 
     # Check if this is a range spec (contains colons)
+    detected_scale = "linear"
     if ":" in rhs:
         parts = rhs.split(":")
-        if len(parts) == 3:  # noqa: PLR2004
+        if len(parts) == 2 and parts[1].lower() == "arctan":  # noqa: PLR2004
+            # N:arctan — N points spanning (-∞, +∞)
+            n = int(parts[0])
+            if n < 2:  # noqa: PLR2004
+                msg = f"Sweep count must be >= 2, got {n}"
+                raise ValueError(msg)
+            values: list[float] = _arctan_values(n)
+            detected_scale = "arctan"
+        elif len(parts) == 3:  # noqa: PLR2004
             # START:STOP:N (linear)
             start, stop, n_str = parts
             n = int(n_str)
             if n < 2:  # noqa: PLR2004
                 msg = f"Sweep count must be >= 2, got {n}"
                 raise ValueError(msg)
-            values: list[float] = cast(
+            values = cast(
                 "list[float]", np.linspace(float(start), float(stop), n).tolist()
             )
         elif len(parts) == 4:  # noqa: PLR2004
-            # START:STOP:N:log
-            start, stop, n_str, scale = parts
+            # START:STOP:N:log or START:STOP:N:arctan
+            start, stop, n_str, scale_str = parts
             n = int(n_str)
             if n < 2:  # noqa: PLR2004
                 msg = f"Sweep count must be >= 2, got {n}"
                 raise ValueError(msg)
-            if scale.lower() != "log":
-                msg = f"Unknown scale '{scale}' (expected 'log')"
+            if scale_str.lower() == "log":
+                s, e = float(start), float(stop)
+                if s <= 0 or e <= 0:
+                    msg = f"Log-scale requires positive bounds, got {s}:{e}"
+                    raise ValueError(msg)
+                values = cast(
+                    "list[float]",
+                    np.logspace(np.log10(s), np.log10(e), n).tolist(),
+                )
+                detected_scale = "log"
+            elif scale_str.lower() == "arctan":
+                # START:STOP:N:arctan — arctan-mapped with custom bounds
+                # START/STOP are in arctan-space: mapped through tan(x * π/2)
+                s, e = float(start), float(stop)
+                if abs(s) >= 1 or abs(e) >= 1:
+                    msg = (
+                        f"Arctan bounds must be in (-1, 1), got {s}:{e}. "
+                        f"Values are mapped through tan(x·π/2) to (-∞,+∞)."
+                    )
+                    raise ValueError(msg)
+                import math
+
+                thetas = np.linspace(s * math.pi / 2, e * math.pi / 2, n)
+                values = cast("list[float]", np.tan(thetas).tolist())
+                detected_scale = "arctan"
+            else:
+                msg = f"Unknown scale '{scale_str}' (expected 'log' or 'arctan')"
                 raise ValueError(msg)
-            s, e = float(start), float(stop)
-            if s <= 0 or e <= 0:
-                msg = f"Log-scale requires positive bounds, got {s}:{e}"
-                raise ValueError(msg)
-            values = cast(
-                "list[float]", np.logspace(np.log10(s), np.log10(e), n).tolist()
-            )
         else:
             msg = (
                 f"Invalid range spec: '{rhs}'. "
-                f"Expected START:STOP:N or START:STOP:N:log"
+                f"Expected START:STOP:N, START:STOP:N:log, "
+                f"START:STOP:N:arctan, or N:arctan"
             )
             raise ValueError(msg)
     else:
@@ -290,7 +345,7 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
             msg = f"Sweep needs at least 2 values, got {len(values)}"
             raise ValueError(msg)
 
-    return name, values
+    return name, values, detected_scale
 
 
 def parse_converge_spec(raw: str) -> list[int]:
@@ -332,6 +387,7 @@ def _generate_samples(
     strategy: str,
     *,
     seed: int | None = None,
+    param_scales: dict[str, str] | None = None,
 ) -> list[dict[str, float]]:
     """Generate parameter samples using space-filling designs.
 
@@ -345,6 +401,11 @@ def _generate_samples(
         ``"latin_hypercube"`` or ``"sobol"``.
     seed : int or None
         Random seed for reproducibility.
+    param_scales : dict[str, str] or None
+        Optional per-parameter scale mapping. Supported values:
+        ``"linear"`` (default), ``"log"``, ``"arctan"``.
+        For ``"arctan"``, the bounds are in the unit interval and the
+        mapping u → tan(u·π/2) covers (−∞, +∞).
 
     Returns
     -------
@@ -356,6 +417,8 @@ def _generate_samples(
     ValueError
         If *strategy* is unknown or *n_samples* < 1.
     """
+    import math
+
     from scipy.stats.qmc import LatinHypercube, Sobol  # type: ignore[import-untyped]
 
     names = list(param_bounds.keys())
@@ -375,8 +438,25 @@ def _generate_samples(
         )
         raise ValueError(msg)
 
-    # Scale from [0, 1]^d to parameter bounds
-    scaled = lower + unit_samples * (upper - lower)
+    # Scale from [0, 1]^d to parameter values, respecting per-parameter scales
+    scales = param_scales or {}
+    scaled = np.zeros_like(unit_samples)
+    for i, name in enumerate(names):
+        scale = scales.get(name, "linear")
+        u = unit_samples[:, i]
+        if scale == "arctan":
+            # Map u ∈ [0,1] → θ ∈ [-π/2+ε, π/2-ε] → tan(θ) ∈ (-∞, +∞)
+            eps = 0.01  # ±100 coverage (0.005→±200, 0.001→±1000)
+            theta = (-math.pi / 2 + eps) + u * (math.pi - 2 * eps)
+            scaled[:, i] = np.tan(theta)
+        elif scale == "log":
+            # Map u ∈ [0,1] → log-spaced between lower and upper
+            scaled[:, i] = np.power(
+                10, np.log10(lower[i]) + u * (np.log10(upper[i]) - np.log10(lower[i]))
+            )
+        else:
+            # Linear (default)
+            scaled[:, i] = lower[i] + u * (upper[i] - lower[i])
 
     return [dict(zip(names, row, strict=True)) for row in scaled]
 
@@ -1667,6 +1747,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     args: Namespace,
     swept_params: dict[str, list[float]],
     converge_sizes: list[int] | None,
+    sweep_scales: dict[str, str] | None = None,
 ) -> int:
     """Execute the parameter sweep or convergence study.
 
@@ -1760,7 +1841,12 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         param_bounds = {
             name: (min(vals), max(vals)) for name, vals in swept_params.items()
         }
-        samples = _generate_samples(param_bounds, n_samples, sweep_strategy)
+        samples = _generate_samples(
+            param_bounds,
+            n_samples,
+            sweep_strategy,
+            param_scales=sweep_scales or None,
+        )
         runs.extend(dict(sample) for sample in samples)
     else:
         # Cartesian product of swept parameters
@@ -2284,6 +2370,7 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
     # Parse sweep specs from CLI (these override/extend TOML)
     swept_params: dict[str, list[float]] = dict(config_swept)
     converge_sizes: list[int] | None = config_converge
+    sweep_scales: dict[str, str] = {}  # param_name -> "arctan" or "log"
 
     sweep_specs: list[str] = getattr(args, "sweep", None) or []
     converge_spec: str | None = getattr(args, "converge", None)
@@ -2303,8 +2390,10 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
             swept_params = {}  # converge overrides TOML sweeps
         elif sweep_specs:
             for raw in sweep_specs:
-                name, values = parse_sweep_spec(raw)
+                name, values, scale = parse_sweep_spec(raw)
                 swept_params[name] = values  # CLI overrides TOML for same param
+                if scale != "linear":
+                    sweep_scales[name] = scale
     except ValueError as exc:
         error_with_hint(
             str(exc),
@@ -2312,6 +2401,7 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
                 "Range: `--sweep 'm2=0.1:10:5'`",
                 "List: `--sweep 'm2=0.1,1,10'`",
                 "Log: `--sweep 'm2=0.01:10:5:log'`",
+                "Arctan: `--sweep 'm2=20:arctan'` (covers ±∞)",
             ],
         )
         return 1
@@ -2323,4 +2413,4 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
         )
         return 1
 
-    return _run_sweep(args, swept_params, converge_sizes)
+    return _run_sweep(args, swept_params, converge_sizes, sweep_scales)
