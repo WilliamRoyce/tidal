@@ -19,7 +19,7 @@
 #
 # The null result holds because:
 #   - Ftorsion² only gives dynamics to the trace sector (T_μ)
-#   - The h_× graviton (TT polarisation) is algebraically independent of T_μ
+#   - The h_× graviton (TT polarization) is algebraically independent of T_μ
 #   - No term in the Lagrangian couples the h_× channel to torsion
 #   - Breaking this decoupling requires beyond-minimal terms: δ₁R̃_{[μν]}F^{μν},
 #     cubic T²F, or derivative ζ∇T·F couplings

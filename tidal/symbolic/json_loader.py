@@ -1412,20 +1412,20 @@ def normalize_kinetic_coefficients(
       energy and its EOM degenerates to an algebraic condition.
 
     Equations without ``kinetic_coefficient_symbolic`` are returned unchanged.
-    The function is idempotent: calling it on an already-normalised spec (all
+    The function is idempotent: calling it on an already-normalized spec (all
     ``kinetic_coefficient_symbolic`` are None) is a no-op.
 
     Parameters
     ----------
     spec : EquationSystem
-        The equation system as loaded from JSON (pre-normalisation).
+        The equation system as loaded from JSON (pre-normalization).
     params : dict[str, float]
         User-provided parameter values (e.g. ``{"xi": 0.1, "alpha": 0.5}``).
 
     Returns
     -------
     EquationSystem
-        A new ``EquationSystem`` with all kinetic coefficients normalised.
+        A new ``EquationSystem`` with all kinetic coefficients normalized.
     """
     new_eqs: list[ComponentEquation] = []
     changed = False
@@ -1440,7 +1440,7 @@ def normalize_kinetic_coefficients(
         try:
             kc_value = evaluate_coefficient(kc_sym, params, spec.effective_coordinates)
         except Exception:  # noqa: BLE001
-            # If evaluation fails (e.g. symbol not in params), skip normalisation
+            # If evaluation fails (e.g. symbol not in params), skip normalization
             new_eqs.append(eq)
             continue
 

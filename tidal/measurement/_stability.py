@@ -74,7 +74,7 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
     Parameters
     ----------
     spec : EquationSystem
-        The equation system (must be kinetic-normalised).
+        The equation system (must be kinetic-normalized).
     grid : GridInfo
         Grid configuration.
     parameters : dict
@@ -245,7 +245,7 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
     Parameters
     ----------
     spec : EquationSystem
-        The equation system (must be kinetic-normalised).
+        The equation system (must be kinetic-normalized).
     grid : GridInfo
         Grid configuration.
     parameters : dict

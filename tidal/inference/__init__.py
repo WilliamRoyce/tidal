@@ -12,7 +12,7 @@ References
 Skilling, J. (2004) "Nested Sampling", AIP Conference Proceedings 735.
 Speagle, J.S. (2020) "dynesty: a dynamic nested sampling package", MNRAS 493.
 Handley, W. et al. (2015) "PolyChord: next-generation nested sampling", MNRAS 453.
-Handley, W. (2019) "anesthetic: nested sampling visualisation", JOSS 4.
+Handley, W. (2019) "anesthetic: nested sampling visualization", JOSS 4.
 """
 
 from __future__ import annotations

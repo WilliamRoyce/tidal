@@ -6,7 +6,7 @@ Falls back to matplotlib for basic visualization.
 
 References
 ----------
-Handley, W. (2019) "anesthetic: nested sampling visualisation",
+Handley, W. (2019) "anesthetic: nested sampling visualization",
 JOSS 4(37), 1414. https://doi.org/10.21105/joss.01414
 """
 

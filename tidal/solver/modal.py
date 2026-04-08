@@ -2197,7 +2197,7 @@ def solve_modal(
     # path constructs B_lhs = I - vel_coupling which can be near-singular
     # (det ≈ 0, cond > 1e7) for PGT models with d2_t constraint operators,
     # producing spurious large eigenvalues that trigger the divergence guard.
-    # The constraint-eliminated path handles the same physics via a regularised
+    # The constraint-eliminated path handles the same physics via a regularized
     # (I - V)^{-1} implicit solve that is numerically stable.
     use_constraint = has_constraints and not has_pos_dep
     use_generalized = has_time_ops and not has_pos_dep and not use_constraint

@@ -106,7 +106,7 @@ class Prior:
             )
         if self.distribution == "arctan_uniform":
             # p(x) = (1/pi) * 1/(1+x^2)  (Cauchy/arctan distribution)
-            # Normalised over the truncated range
+            # Normalized over the truncated range
             theta_lo = -math.pi / 2 + _ARCTAN_EPS
             theta_hi = math.pi / 2 - _ARCTAN_EPS
             if x < math.tan(theta_lo) or x > math.tan(theta_hi):
