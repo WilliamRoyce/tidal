@@ -145,6 +145,21 @@ h_5 to appear with wrong-sign mass (+k^2 instead of -k^2). After fixing:
 - No more spurious exponential growth
 - Coupling ratios and zero-crossing location unchanged (sign-independent)
 
+### 2026-04-08: IC amplitude must be << B0 for valid linearization
+
+CRITICAL: The default IC amplitude (1.0) violates linearization when B0=0.0001:
+the perturbation is 10,000x larger than the background field. ALL heatmap results
+with default amplitude were generated in the nonlinear regime where the linearized
+theory is invalid.
+
+For valid linearized physics: amplitude << B0. E.g., amplitude = 1e-6 for B0=0.0001.
+The B0 scaling sweep (amplitude=0.1) was also suspect: 0.1/0.0001 = 1000x ratio.
+
+The divergence guard fires at small amplitudes because the amplitude ratio threshold
+(1e8) is reached faster when the initial amplitude is small. This explains why the
+old heatmap (amplitude=1.0) "succeeded" while physically-correct small amplitudes
+trigger the guard — the large IC masks the exponential growth in the ratio metric.
+
 ### 2026-04-07: Heatmap contamination from pre-guard tachyonic modes
 
 CRITICAL FINDING: The heatmap sweep (v0.25.19) was generated BEFORE the eigenvalue
