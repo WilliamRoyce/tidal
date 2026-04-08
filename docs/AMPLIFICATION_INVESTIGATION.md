@@ -145,6 +145,20 @@ h_5 to appear with wrong-sign mass (+k^2 instead of -k^2). After fixing:
 - No more spurious exponential growth
 - Coupling ratios and zero-crossing location unchanged (sign-independent)
 
+### 2026-04-08: NULL RESULT — Minimal PGT with propagating torsion does not modify Gertsenshtein
+
+Model: L = R̃/κ² + β₁I₁ + β₂I₂ + β₃I₃ − (ξ/4)Ftorsion² − ¼F²
+
+200-point LHS sweep across β₁,β₂,β₃ ∈ [-10,10], ξ ∈ [0.01,100]:
+  ALL 200 runs: P_max = 6.249987e-06 (= GR baseline to machine precision)
+  Max relative deviation from GR: 2.3e-13
+  Block-diagonal structure verified analytically in derived JSON
+
+The h₅↔a₁ Gertsenshtein channel is completely independent of ALL torsion
+parameters. Barker's torsion kinetic term (Ftorsion²) gives ghost-free
+propagating vector torsion but does NOT break the block-diagonal structure.
+Any torsion-Gertsenshtein coupling requires beyond-minimal terms.
+
 ### 2026-04-08: DEFINITIVE — Large amplification factors are tachyonic instability artifacts
 
 **ALL amplification factors A >> 2 are tachyonic onset instability, NOT genuine 
