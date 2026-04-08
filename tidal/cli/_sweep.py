@@ -228,7 +228,7 @@ def _arctan_values(n: int, eps: float = 0.01) -> list[float]:
     return cast("list[float]", np.tan(thetas).tolist())
 
 
-def parse_sweep_spec(raw: str) -> tuple[str, list[float], str]:  # noqa: C901
+def parse_sweep_spec(raw: str) -> tuple[str, list[float], str]:  # noqa: C901, PLR0912, PLR0915
     """Parse a ``--sweep`` argument into ``(param_name, values, scale)``.
 
     Supported formats:
@@ -2309,7 +2309,7 @@ def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
 # ------------------------------------------------------------------
 
 
-def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
+def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912
     """Execute the sweep command.
 
     Parameters

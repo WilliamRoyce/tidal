@@ -199,7 +199,7 @@ def _arctan_ticks() -> tuple[list[float], list[str]]:
     return positions, labels
 
 
-def plot_mc_scatter(  # noqa: PLR0914
+def plot_mc_scatter(
     rows: list[dict], params: list[str], output: Path, c_em: float
 ) -> None:
     """Generate arctan-mapped pairwise scatter plots for 3D+ MC sweeps.
@@ -208,9 +208,9 @@ def plot_mc_scatter(  # noqa: PLR0914
     (-inf, +inf) range), with points coloured by relative C0 deviation from the
     Gertsenshtein baseline.
     """
-    from itertools import combinations  # noqa: PLC0415
+    from itertools import combinations
 
-    from scipy.interpolate import griddata  # noqa: PLC0415
+    from scipy.interpolate import griddata
 
     n_params = len(params)
     pairs = list(combinations(range(n_params), 2))
@@ -237,7 +237,7 @@ def plot_mc_scatter(  # noqa: PLR0914
         y_at = np.arctan(y_raw)
 
         # Try contour interpolation if enough points
-        contour_ok = len(rows) >= 15  # noqa: PLR2004
+        contour_ok = len(rows) >= 15
         if contour_ok:
             xi_grid = np.linspace(x_at.min(), x_at.max(), 80)
             yi_grid = np.linspace(y_at.min(), y_at.max(), 80)
@@ -254,7 +254,7 @@ def plot_mc_scatter(  # noqa: PLR0914
                     vmax=vmax,
                     alpha=0.5,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 contour_ok = False
 
         sc = ax.scatter(
@@ -322,7 +322,7 @@ def print_summary(rows: list[dict], all_rows: list[dict], c_em: float) -> None:
         print("  >>> No amplification: all C₀ ≈ C_EM (torsion is transparent)")
 
 
-def main() -> None:  # noqa: D103
+def main() -> None:
     parser = argparse.ArgumentParser(
         description="Analyze torsion sweep results using C₀ = P/B₀² metric"
     )
@@ -358,7 +358,7 @@ def main() -> None:  # noqa: D103
             plot_1d(good_rows, swept[0], output, c_em)
         else:
             print("  No stable runs to plot.")
-    elif len(swept) == 2:  # noqa: PLR2004
+    elif len(swept) == 2:
         if good_rows:
             plot_2d(good_rows, swept, output, c_em)
         else:

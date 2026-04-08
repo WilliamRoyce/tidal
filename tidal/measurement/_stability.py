@@ -51,7 +51,7 @@ class ConversionStabilityResult:
     """Human-readable diagnostic message."""
 
 
-def check_conversion_stability(
+def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
     spec: EquationSystem,
     grid: GridInfo,
     parameters: dict[str, float],
@@ -223,7 +223,7 @@ class FullStabilityResult:
     """Human-readable diagnostic."""
 
 
-def check_full_stability(
+def check_full_stability(  # noqa: PLR0913, PLR0914
     spec: EquationSystem,
     grid: GridInfo,
     parameters: dict[str, float],

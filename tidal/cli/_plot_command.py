@@ -342,7 +342,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
 # ------------------------------------------------------------------
 
 
-def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
+def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     """Handle sweep-specific plot types.
 
     Loads ``SweepResults`` from *data_path* and dispatches to the

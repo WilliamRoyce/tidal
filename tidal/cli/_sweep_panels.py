@@ -190,7 +190,7 @@ def _overlay_quality_hatching(
             ax.add_patch(rect)
 
 
-def render_sweep_1d(
+def render_sweep_1d(  # noqa: PLR0913, PLR0914
     ax: Axes,
     results: SweepResults,
     metric: str,
@@ -290,7 +290,7 @@ def render_sweep_1d(
             parts = spec.split(":")
             val = float(parts[0])
             label = parts[1] if len(parts) > 1 and parts[1] else None
-            color = parts[2] if len(parts) > 2 and parts[2] else "red"
+            color = parts[2] if len(parts) > 2 and parts[2] else "red"  # noqa: PLR2004
             ax.axhline(val, color=color, linestyle=":", alpha=0.7, label=label)
 
     if overlay or thresholds:
@@ -305,7 +305,7 @@ def render_sweep_1d(
         ax.set_yscale("log")
 
 
-def _plot_1d_metric(
+def _plot_1d_metric(  # noqa: PLR0913
     ax: Axes,
     results: SweepResults,
     param_name: str,
@@ -381,7 +381,7 @@ def render_sweep_1d_multi(
     fig.suptitle(f"Sweep: {', '.join(metrics)} vs {param_name}")
 
 
-def render_sweep_2d(
+def render_sweep_2d(  # noqa: PLR0913
     ax: Axes,
     results: SweepResults,
     metric: str,
@@ -945,7 +945,7 @@ def _is_scattered_data(results: SweepResults) -> bool:
 # -- Advanced visualization (F8) ---------------------------------------------
 
 
-def render_sweep_parallel(
+def render_sweep_parallel(  # noqa: PLR0914
     ax: Axes,
     results: SweepResults,
     metric: str,
@@ -1196,7 +1196,7 @@ def _render_tornado_range(
     ax.invert_yaxis()
 
 
-def render_sweep_scatter(
+def render_sweep_scatter(  # noqa: C901, PLR0912
     fig: Figure,
     results: SweepResults,
     metric: str,

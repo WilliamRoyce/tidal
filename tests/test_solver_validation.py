@@ -347,6 +347,5 @@ def _make_coupled_spec(m_phi2: float, m_chi2: float, g0: float) -> EquationSyste
     return EquationSystem.from_dict(data)
 
 
-
 # TestPointwiseMassStability removed: check_pointwise_mass_stability
 # was deleted. The modal solver eigenvalue pre-check is authoritative.

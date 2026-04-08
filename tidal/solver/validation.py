@@ -178,7 +178,7 @@ class StabilityResult:
         self.notes: list[str] = []
 
 
-def check_pointwise_mass_stability(  # noqa: PLR0914
+def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914
     coeff_eval: CoefficientEvaluator,
     spec: EquationSystem,
     grid: GridInfo,
