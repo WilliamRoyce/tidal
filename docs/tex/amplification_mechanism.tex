@@ -1,11 +1,17 @@
-% Torsion-Mediated Amplification of the Gertsenshtein Effect
+% Torsion-Mediated Modification and Instability of the Gertsenshtein Effect
 % via Algebraic Constraint Elimination (Schur Complement)
 %
 % Self-contained section for inclusion in a manuscript.
 % Uses macros from preamble.tex
+%
+% KEY FINDING: The nonminimal delta1 R_tilde_{[mu nu]} F^{mu nu} coupling
+% produces SUPPRESSION (up to 1000x) in the stable region, and TACHYONIC
+% INSTABILITY near the stability boundary. Large "amplification" factors
+% (A >> 2) are tachyonic onset artifacts, not genuine physical enhancement.
+% See issue #238.
 
-\section{Torsion-Mediated Amplification of the Gertsenshtein Effect}
-\label{sec:amplification}
+\section{Torsion-Mediated Modification of the Gertsenshtein Effect}
+\label{sec:torsion-modification}
 
 \subsection{The Nonminimal PGT+EM Model}
 \label{subsec:nonminimal-model}
@@ -196,47 +202,51 @@ Axion--photon MSW & Conversion width diverges & $m_a = \omega_p$ & \cite{Berlin2
 
 The PGT mechanism is distinct: the torsion mass matrix $S_{cc}$ is \textbf{well-conditioned} at all amplified points (smallest eigenvalue $-0.5$ to $-3.5$, far from singular). What changes is the \emph{effective coupling strength}, not the mediator propagator. This is specific to algebraically constrained (non-propagating) torsion --- a propagating torsion mediator would give standard $1/m^2$ behaviour instead.
 
-\subsubsection{Tachyonic Photon Transition}
+\subsection{Tachyonic Onset Instability}
+\label{subsec:tachyonic-instability}
 
-The sharp amplification peak at the stability boundary is driven by the \textbf{effective photon mass transition}: the torsion Schur complement shifts the photon effective mass $m^2_{\text{eff}}(a_1)$ from negative (oscillatory) to positive (tachyonic). At the transition point ($m^2_{\text{eff}} = 0$), the system satisfies the resonance condition for maximal conversion.
+\textbf{Warning}: Large conversion ratios $P_{\text{torsion}}/P_{\text{GR}} \gg 1$ observed near the stability boundary are \textbf{not} genuine amplification of the Gertsenshtein effect. They are tachyonic onset instabilities where the effective photon mass crosses zero.
 
-At $\delta_1 = 1.0$, the transition occurs at $\alpha_2 \approx -0.912$:
+\subsubsection{The Instability Mechanism}
+
+The torsion Schur complement shifts the photon effective mass $m^2_{\text{eff}}(a_1)$ from negative (oscillatory) to positive (tachyonic) as $\alpha_2$ approaches the stability boundary. At $\delta_1 = 1.0$, this transition occurs at $\alpha_2 \approx -0.913$ for the plane-wave mode ($k \approx 0.063$):
 \begin{itemize}
-  \item $\alpha_2 < -0.912$: $m^2_{\text{eff}}(a_1) < 0$ (stable), coupling reversed ($\mu_{\text{eff}}/\mu_{\text{GR}} \approx -1.37$), conversion suppressed by detuning.
-  \item $\alpha_2 \approx -0.909$: $m^2_{\text{eff}} \approx 0$ (resonance), maximum conversion $A \approx 665$.
-  \item $\alpha_2 > -0.909$: $m^2_{\text{eff}} > 0$ (tachyonic), exponential photon growth $\to$ divergence.
+  \item $\alpha_2 < -0.913$: $m^2_{\text{eff}}(a_1) < 0$ (stable photon), conversion suppressed.
+  \item $\alpha_2 \approx -0.913$: $m^2_{\text{eff}} = 0$ (transition), photon marginally tachyonic.
+  \item $\alpha_2 > -0.913$: $m^2_{\text{eff}} > 0$ (tachyonic), $P_{\text{torsion}} \propto e^{\gamma t}$ where $\gamma = \sqrt{m^2_{\text{eff}}}$.
 \end{itemize}
 
-The transition is extremely sharp: $A$ jumps from $0.19$ to $665$ over $\Delta\alpha_2 \approx 0.008$, consistent with a resonance-width scaling near the mass-zero crossing.
+\subsubsection{The $t_{\text{end}}$ Independence Test}
 
-\subsection{Numerical Results}
-\label{subsec:numerical-results}
-
-Parameter sweeps with plane-wave initial conditions ($\Bzero = 10^{-4}$) give the following validated results:
-\begin{itemize}
-  \item \textbf{$\alpha_2$ high-resolution sweep} ($\delta_1 = 1.0$, 100 points): 37 valid ($P < 0.1$), 54 diverged. Maximum amplification $A = 665\times$ at $\alpha_2 = -0.909$. Suppression valley $A \approx 0.001$ across most of the stable range.
-  \item \textbf{$\Bzero$ scaling} ($\delta_1 = 1.0$, $\alpha_2 = -0.82$): $C_0 = P/\Bzero^2 = 30{,}204$ constant to 4 significant figures over $\Bzero = 10^{-6}$ to $10^{-4}$, confirming coupling modification ($A = 48$ at this parameter point).
-\end{itemize}
-
-The amplification concentrates near the upper edge of the stable window, where the torsion-modified coupling is largest but the photon mass shift has not yet triggered tachyonic instability.
-
-\subsubsection{$\Bzero$ Scaling Verification}
-
-At the amplification peak ($\delta_1 = 1.0$, $\alpha_2 = -0.82$), the conversion coefficient $C_0 = P/\Bzero^2$ is constant to four significant figures across four orders of magnitude in $\Bzero$:
+Genuine amplification produces a time-independent ratio $A = P_{\text{torsion}}/P_{\text{GR}}$. Tachyonic instability produces $A(t) \propto e^{\gamma t}/t^2$ (exponential growth vs quadratic baseline). At $\delta_1 = 1.0$, $\alpha_2 = -0.909$ (plane-wave IC, $\Bzero = 10^{-4}$):
 \begin{center}
 \begin{tabular}{cc}
 \toprule
-$\Bzero$ & $C_0 = P_{\max}/\Bzero^2$ \\
+$t_{\text{end}}$ & $A = P_{\text{torsion}}/P_{\text{GR}}$ \\
 \midrule
-$10^{-6}$ & $30{,}204$ \\
-$10^{-5}$ & $30{,}204$ \\
-$10^{-4}$ & $30{,}203$ \\
-$10^{-3}$ & $30{,}193$ \\
-$10^{-2}$ & $29{,}199$ \\
+20 & 6.5 \\
+30 & 32 \\
+40 & 170 \\
+50 & 808 \\
 \bottomrule
 \end{tabular}
 \end{center}
-The Gertsenshtein baseline at these parameters gives $C_{0,\text{EM}} = \sin^2(\kappa\Bzero t_{\text{end}}/2)/\Bzero^2 \to (\kappa t_{\text{end}}/2)^2 = 625$, yielding an amplification factor $A = C_0/C_{0,\text{EM}} \approx 48$. The $\Bzero$-independence confirms this is a coupling modification, not a nonlinear backreaction effect.
+The exponential growth confirms this is \textbf{tachyonic onset, not amplification}. All previously reported ``amplification factors'' $A \gg 2$ were instability artifacts.
+
+\subsubsection{Why $\Bzero$ Scaling Does Not Distinguish}
+
+The $\Bzero$ scaling test (constant $C_0 = P/\Bzero^2$) does not distinguish genuine amplification from tachyonic instability because the growth rate $\gamma$ is $\Bzero$-independent. Both give $P \propto \Bzero^2 \times f(t)$, yielding constant $C_0$ regardless of whether $f(t) \propto t^2$ (genuine) or $f(t) \propto e^{\gamma t}$ (instability).
+
+\subsection{Genuine Physical Effects}
+\label{subsec:genuine-effects}
+
+In the stable parameter region ($m^2_{\text{eff}} < 0$), the torsion coupling produces two genuine, time-independent effects:
+\begin{enumerate}
+  \item \textbf{Coupling modification}: the Schur complement shifts $\mu_{\text{eff}}/\mu_{\text{GR}} \approx -1.37$ at $(\delta_1 = 1,\, \alpha_2 = -0.95)$, giving $A_{\text{coupling}} = |\mu_{\text{eff}}/\mu_{\text{GR}}|^2 \approx 1.9$. This is a modest modification of the graviton--photon coupling strength.
+  \item \textbf{Suppression}: destructive interference between the direct Gertsenshtein coupling and the torsion-mediated feedback produces $A \approx 0.001$ (1000$\times$ suppression) in the stable region. This is verified to be time-independent ($P_{\text{torsion}} \approx 0$ at both $t = 25$ and $t = 50$).
+\end{enumerate}
+
+The coupling zero-crossing (where $\mu_{\text{eff}} = 0$) occurs at $\delta_{1,\text{crit}} \approx 0.62$ for $\alpha_2 = -0.95$.
 
 \subsection{Observational Implications}
 \label{subsec:observational}
@@ -247,35 +257,30 @@ In physical units, $\kappa = \sqrt{16\pi G/c^4} = 1/M_{\text{Pl}}$ where $M_{\te
 
 The background magnetic field $\Bzero = 10^{-4}$ in our simulations corresponds to a dimensionless ratio $\kappa \Bzero \ll 1$. In physical units, the Gertsenshtein coupling $\mu = \kappa \Bzero / 2$ becomes significant only for extremely strong fields: $B_{\text{magnetar}} \sim 10^{11}\,\text{T}$ gives $\kappa B \sim 10^{-16}$, and galactic fields $B_{\text{gal}} \sim 10^{-10}\,\text{T}$ give $\kappa B \sim 10^{-37}$.
 
-\subsubsection{Enhanced Effective Coupling}
+\subsubsection{Suppression of Graviton--Photon Conversion}
 
-The peak amplification $A \approx 665$ at the stability boundary ($\delta_1 = 1$, $\alpha_2 = -0.909$) means the effective graviton--photon coupling is enhanced:
-\begin{equation}
-  \kappa_{\text{eff}} = \sqrt{A}\, \kappa \approx 26\, \kappa.
-  \label{eq:kappa-eff}
-\end{equation}
-Equivalently, the minimum detectable magnetic field for graviton--photon conversion is reduced by $\sqrt{A} \approx 26$. Away from the boundary ($\alpha_2 = -0.82$), the amplification is more modest: $A \approx 48$, $\kappa_{\text{eff}} \approx 7\kappa$.
+In the stable parameter region, the torsion coupling \textbf{suppresses} the Gertsenshtein conversion by up to $1000\times$. The effective coupling is modified by $A_{\text{coupling}} \approx 1.9$ (modest), but the combined effect of coupling reversal and detuning produces near-complete destructive interference, reducing $P$ to $\sim 10^{-3}$ of the GR baseline.
 
-For gravitational wave backgrounds, the induced photon flux scales as~\cite{Lella2024}:
+For gravitational wave backgrounds, the suppression means graviton--photon conversion in torsion-modified gravity is \textbf{weaker} than in GR:
 \begin{equation}
-  \frac{dF_{g \to \gamma}}{df} \propto \kappa_{\text{eff}}^2\, \Bzero^2\, h_c^2(f) \propto A\, \kappa^2\, \Bzero^2\, h_c^2(f).
+  \frac{dF_{g \to \gamma}^{\text{torsion}}}{df} \approx A_{\text{suppression}} \times \frac{dF_{g \to \gamma}^{\text{GR}}}{df}, \qquad A_{\text{suppression}} \approx 10^{-3}.
 \end{equation}
-Constraints on $h_c(f)$ from non-observation of conversion-induced photon flux~\cite{Lella2024} are thus strengthened by a factor $\sqrt{A}$ in the torsion-modified theory:
-\begin{equation}
-  h_c^{\text{torsion bound}} = \frac{h_c^{\text{GR bound}}}{\sqrt{A}}.
+Existing bounds on $h_c(f)$ from non-observation of conversion-induced photon flux~\cite{Lella2024} are therefore \textbf{not strengthened} by torsion in this model --- in fact, the reduced conversion makes the GR bounds more conservative than necessary.
 \end{equation}
 
-Lella \emph{et al.}~\cite{Lella2024} derive constraints on $h_c$ at $f \sim 10^{9}$--$10^{26}\,\text{Hz}$ from the Galactic magnetic field (both regular and turbulent components), improving previous bounds by $1$--$2$ orders of magnitude. With torsion amplification at $A = 665$ (peak) or $A = 48$ (moderate coupling), these bounds would be further strengthened by a factor $\sqrt{A} \approx 7$--$26$, or conversely, the same bounds would constrain the torsion parameter space $(\delta_1, \alpha_i)$ by ruling out regions where $A$ exceeds the existing GR limits.
+Lella \emph{et al.}~\cite{Lella2024} derive constraints on $h_c$ at $f \sim 10^{9}$--$10^{26}\,\text{Hz}$ from the Galactic magnetic field (both regular and turbulent components), improving previous bounds by $1$--$2$ orders of magnitude. Previously reported amplification factors ($A = 48$--$665$) were identified as tachyonic instability artifacts (see \cref{subsec:tachyonic-instability}). The genuine effect in the stable region is suppression ($A \approx 10^{-3}$), or conversely, the same bounds would constrain the torsion parameter space $(\delta_1, \alpha_i)$ by ruling out regions where $A$ exceeds the existing GR limits.
 
 \subsubsection{Spectral Signature}
 
-The $k$-dependent enhancement (see~\cref{subsec:phenomenology}) produces a characteristic \textbf{blue-tilted spectral signature}: higher-frequency gravitational waves experience stronger conversion amplification. This is in contrast to:
+The $k$-dependent coupling modification (see~\cref{subsec:phenomenology}) produces a characteristic \textbf{spectral signature}: the torsion-mediated suppression is frequency-dependent. This is in contrast to:
 \begin{itemize}
   \item Standard Gertsenshtein: frequency-independent coupling (flat spectrum).
   \item $f(R)$ scalaron enhancement: frequency-independent friction parameter.
   \item Axion--photon MSW: resonant peak at a single frequency.
 \end{itemize}
-The blue tilt arises because the Schur complement correction grows with $k^2$ (spatial operators in the constraint equations). This spectral signature is a \textbf{unique prediction} of torsion-mediated graviton--photon coupling that could distinguish it from other beyond-Standard-Model modifications in broadband GW conversion searches.
+The frequency dependence arises because the Schur complement correction grows with $k^2$ (spatial operators in the constraint equations). The suppression is stronger at higher frequencies, producing a \textbf{red-tilted} conversion spectrum relative to GR. This spectral signature, combined with the suppression itself, is a unique prediction of torsion-mediated graviton--photon coupling in this model.
+
+\textbf{Note}: the tachyonic instability boundary is also $k$-dependent (different modes become tachyonic at different $\alpha_2$), making the instability onset frequency-selective. However, this instability is a pathology of the parameter region, not a physical prediction for stable theories.
 
 \begin{thebibliography}{9}
 \bibitem{Shapiro2002}
