@@ -791,6 +791,64 @@ def _run_single(  # noqa: PLR0913, PLR0917
     Returns a dict of scalar metrics for one row of the results table.
     Always includes ``run_status``, ``error_message``, and ``solver_exit_code``.
     """
+    # 0. Pre-flight tachyonic check (zero-cost eigenvalue analysis)
+    # Skips simulation if the conversion channel has tachyonic modes (#238).
+    conversion_measurements = {"peak_conversion", "conversion"} & measurements
+    if conversion_measurements and source and target:
+        try:
+            from tidal.cli._simulate import (
+                _parse_params,  # pyright: ignore[reportPrivateUsage]
+            )
+            from tidal.measurement._stability import check_conversion_stability
+            from tidal.solver.grid import GridInfo
+            from tidal.symbolic.json_loader import (
+                load_equation_system as _load_spec,
+            )
+            from tidal.symbolic.json_loader import (
+                normalize_kinetic_coefficients,
+            )
+
+            spec_ = normalize_kinetic_coefficients(
+                _load_spec(spec_path),
+                _parse_params(base_args.param, _load_spec(spec_path)),
+            )
+            # Merge param_overrides into the parsed params
+            params = {**_parse_params(base_args.param, spec_), **param_overrides}
+            spec_ = normalize_kinetic_coefficients(_load_spec(spec_path), params)
+
+            grid_n = grid_shape_override or int(getattr(base_args, "grid_shape", 256))
+            bounds = getattr(base_args, "bounds", "0:100")
+            if isinstance(bounds, str):
+                parts = bounds.split(":")
+                bounds_tuple = ((float(parts[0]), float(parts[1])),)
+            else:
+                bounds_tuple = bounds
+            grid = GridInfo(
+                shape=(grid_n,),
+                bounds=bounds_tuple,
+                periodic=(True,),
+            )
+
+            stability = check_conversion_stability(
+                spec_,
+                grid,
+                params,
+                source=source[0],
+                target=target[0],
+                n_extra_k=0,  # plane-wave IC: only check IC mode
+            )
+            if not stability.stable:
+                return {
+                    "run_status": "tachyonic",
+                    "error_message": stability.message[:200],
+                    "solver_exit_code": 0,
+                    "wall_time_s": 0.0,
+                    "error": stability.message,
+                    "tachyonic_growth_rate": stability.max_excess,
+                }
+        except Exception:  # noqa: BLE001
+            pass  # Non-critical: fall through to simulation
+
     # 1. Simulate
     exit_code, wall_time, spec = _simulate_run(
         base_args,
