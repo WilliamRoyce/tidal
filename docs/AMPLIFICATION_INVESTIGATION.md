@@ -145,6 +145,20 @@ h_5 to appear with wrong-sign mass (+k^2 instead of -k^2). After fixing:
 - No more spurious exponential growth
 - Coupling ratios and zero-crossing location unchanged (sign-independent)
 
+### 2026-04-08: Clean plane-wave alpha2 sweep — genuine A=665x
+
+First physically valid high-res amplification profile (plane-wave IC, delta1=1.0):
+- 100 points, alpha2 from -1.2 to -0.4
+- 37 valid (P<0.1), 54 diverged, 9 outside linear regime
+- Max amplification: A = 665x at alpha2 = -0.909 (stability boundary)
+- Suppression valley: A ~ 0.001 (log10_A ~ -3) across most stable range
+- Sharp transition from suppression to 665x amplification at alpha2 = -0.91
+- B0 scaling A=48.3 at alpha2=-0.82 is consistent (different alpha2 point)
+
+The genuine torsion amplification is ~665x at the stability boundary, not
+8000x as the old Gaussian-IC heatmap suggested. The old data was contaminated
+by (a) tachyonic modes from broad Fourier support and (b) IC amplitude >> B0.
+
 ### 2026-04-08: IC amplitude must be << B0 for valid linearization
 
 CRITICAL: The default IC amplitude (1.0) violates linearization when B0=0.0001:
