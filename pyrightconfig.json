@@ -1,7 +1,7 @@
 {
   "typeCheckingMode": "strict",
   "include": ["tests", "tidal"],
-  "exclude": ["examples"],
+  "exclude": ["examples", "**/node_modules", "**/__pycache__", "**/.venv", "**/.*"],
   "reportImplicitOverride": true,
   "reportUnknownMemberType": false,
   "executionEnvironments": [
