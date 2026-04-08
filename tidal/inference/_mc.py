@@ -170,7 +170,7 @@ def run_monte_carlo(
         )
         log_likelihoods_valid = np.zeros(n_valid)
         for k, sample in enumerate(valid_samples):
-            likelihood_fn._call_count = k
+            likelihood_fn._call_count = k  # pyright: ignore[reportPrivateUsage]
             log_likelihoods_valid[k] = likelihood_fn(sample)
             if not quiet and (k + 1) % max(1, n_valid // 10) == 0:
                 print(f"  MC progress: {k + 1}/{n_valid} simulations")
@@ -221,8 +221,8 @@ def _run_parallel(
     from multiprocessing import Pool
 
     from tidal.inference._likelihood import (
-        _likelihood_worker,
-        _likelihood_worker_init,
+        _likelihood_worker,  # pyright: ignore[reportPrivateUsage]
+        _likelihood_worker_init,  # pyright: ignore[reportPrivateUsage]
     )
 
     config: dict[str, Any] = {

@@ -412,6 +412,12 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
     figsize = _parse_figsize(getattr(args, "figsize", None))
     dpi = getattr(args, "dpi", None) or DPI_DEFAULT
 
+    # Colormap / divergent-center options (used by sweep, sweep-parallel, sweep-scatter)
+    dc: float | None = getattr(args, "divergent_center", None)
+    cmap_name: str = getattr(args, "cmap", None) or (
+        "RdBu_r" if dc is not None else "viridis"
+    )
+
     try:
         if plot_type == "sweep":
             metrics = [s.strip() for s in raw_metric.split(",")]  # type: ignore[union-attr]
@@ -421,10 +427,6 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             log_scale: bool = getattr(args, "log_scale", False)
             log_y: bool = getattr(args, "log_y", False)
             thresholds: list[str] = getattr(args, "hline", []) or []
-            dc: float | None = getattr(args, "divergent_center", None)
-            cmap_name: str = getattr(args, "cmap", None) or (
-                "RdBu_r" if dc is not None else "viridis"
-            )
 
             if n_swept == 1:
                 if len(metrics) == 1:

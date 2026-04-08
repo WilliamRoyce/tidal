@@ -1,9 +1,19 @@
 {
   "typeCheckingMode": "strict",
-  "include": ["tests", "tidal", "examples"],
+  "include": ["tests", "tidal"],
+  "exclude": ["examples"],
   "reportImplicitOverride": true,
   "reportUnknownMemberType": false,
   "executionEnvironments": [
+    {
+      "root": "tidal/inference",
+      "reportMissingImports": false,
+      "reportMissingTypeStubs": false,
+      "reportUnknownVariableType": false,
+      "reportUnknownArgumentType": false,
+      "reportUnknownParameterType": false,
+      "reportPrivateUsage": false
+    },
     {
       "root": "tests",
       "reportPrivateUsage": false

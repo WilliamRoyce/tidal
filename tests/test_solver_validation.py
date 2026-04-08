@@ -306,46 +306,5 @@ class TestCheckRobinStability:
 # ---------------------------------------------------------------------------
 
 
-def _make_coupled_spec(m_phi2: float, m_chi2: float, g0: float) -> EquationSystem:
-    """Two coupled scalar fields with constant cross-coupling."""
-    data: dict[str, Any] = {
-        "spacetime": {"dimension": 2, "signature": [-1, 1]},
-        "fields": [{"name": "phi_0", "index": 0}, {"name": "chi_0", "index": 1}],
-        "equations": [
-            {
-                "field": "phi_0",
-                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {
-                            "coefficient": -m_phi2,
-                            "operator": "identity",
-                            "field": "phi_0",
-                        },
-                        {"coefficient": -g0, "operator": "identity", "field": "chi_0"},
-                    ],
-                },
-            },
-            {
-                "field": "chi_0",
-                "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {
-                            "coefficient": -m_chi2,
-                            "operator": "identity",
-                            "field": "chi_0",
-                        },
-                        {"coefficient": -g0, "operator": "identity", "field": "phi_0"},
-                    ],
-                },
-            },
-        ],
-    }
-    return EquationSystem.from_dict(data)
-
-
 # TestPointwiseMassStability removed: check_pointwise_mass_stability
 # was deleted. The modal solver eigenvalue pre-check is authoritative.

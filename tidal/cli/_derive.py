@@ -818,7 +818,7 @@ def _deferred_derived_fields(ctx: _WlsContext) -> list[dict[str, Any]]:
     }
     if not matter_field_names:
         return []
-    deferred = []
+    deferred: list[dict[str, Any]] = []
     for field in ctx.derived_fields:
         if field.get("symmetry") != "antisymmetric":
             continue
@@ -3985,8 +3985,9 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
     # The Component E-L always uses the unfiltered lagComp.
     #
     # The filter variable is set here and consumed later in the Legendre step.
-    apply_hamiltonian_filter = ctx.torsion is not None and len(ctx.fields) > 1
-    if apply_hamiltonian_filter:
+    torsion = ctx.torsion
+    apply_hamiltonian_filter = torsion is not None and len(ctx.fields) > 1
+    if apply_hamiltonian_filter and torsion is not None:
         # Build list of perturbation field heads (NOT background fields)
         pert_heads = _matter_pert_head_map(ctx)
         originals = _matter_pert_originals(ctx)
@@ -3997,7 +3998,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 continue
             head = pert_heads.get(fname, f"{p}{fname.capitalize()}")
             pert_field_heads.append(head)
-        torsion_head = f"{p}{ctx.torsion['perturbation_name'].capitalize()}"
+        torsion_head = f"{p}{torsion['perturbation_name'].capitalize()}"
         pert_field_heads.append(torsion_head)
 
         # Generate Wolfram code to filter L^(2) by perturbation field content
@@ -4008,9 +4009,9 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 "(* Mark torsion head for Hamiltonian filtering in Legendre transform.  *)",
                 "(* lagForCanon is NOT modified — full L^(2) needed for correct EOM.   *)",
                 f"$tidalTorsionHead = {torsion_head};",
-                f'$tidalTorsionPertName = "{ctx.torsion["perturbation_name"]}";',
+                f'$tidalTorsionPertName = "{torsion["perturbation_name"]}";',
                 "$tidalHamiltonianFilter = True;",
-                f'Print["Hamiltonian filter: will exclude torsion ({torsion_head} / {ctx.torsion["perturbation_name"]}_*) from H terms"];',
+                f'Print["Hamiltonian filter: will exclude torsion ({torsion_head} / {torsion["perturbation_name"]}_*) from H terms"];',
                 "",
             ]
         )

@@ -185,7 +185,7 @@ class SimulationLikelihood:
         self.keep_sims = keep_sims
         self._call_count = 0
 
-    def __call__(self, theta) -> float:
+    def __call__(self, theta: Any) -> float:
         """Evaluate log-likelihood at parameter vector theta.
 
         Parameters
@@ -216,7 +216,7 @@ class SimulationLikelihood:
 
 def _evaluate_likelihood(
     *,
-    theta,
+    theta: Any,
     base_args: Namespace,
     spec_path: Path,
     param_names: list[str],
@@ -289,7 +289,7 @@ def _evaluate_likelihood(
 _LIKELIHOOD_CONFIG: dict[str, Any] = {}
 
 
-def _likelihood_worker_init(config: dict[str, Any]) -> None:
+def _likelihood_worker_init(config: dict[str, Any]) -> None:  # pyright: ignore[reportUnusedFunction]
     """Initialize worker process with likelihood config."""
     from tidal.cli._sweep import (
         _set_single_thread_blas,  # pyright: ignore[reportPrivateUsage]
@@ -299,7 +299,7 @@ def _likelihood_worker_init(config: dict[str, Any]) -> None:
     _LIKELIHOOD_CONFIG.update(config)
 
 
-def _likelihood_worker(theta) -> float:
+def _likelihood_worker(theta: Any) -> float:  # pyright: ignore[reportUnusedFunction]
     """Evaluate likelihood in worker process (picklable module-level function)."""
     import threading
 

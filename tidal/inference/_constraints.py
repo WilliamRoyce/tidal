@@ -18,13 +18,13 @@ import ast
 import math
 import operator
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 # Safe operators for constraint evaluation
-_SAFE_OPS: dict[type, Callable] = {
+_SAFE_OPS: dict[type, Callable[..., Any]] = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
     ast.Mult: operator.mul,
@@ -35,7 +35,7 @@ _SAFE_OPS: dict[type, Callable] = {
 }
 
 # Safe comparison operators
-_SAFE_CMPS: dict[type, Callable] = {
+_SAFE_CMPS: dict[type, Callable[..., bool]] = {
     ast.Gt: operator.gt,
     ast.GtE: operator.ge,
     ast.Lt: operator.lt,
@@ -44,7 +44,7 @@ _SAFE_CMPS: dict[type, Callable] = {
 }
 
 # Safe functions available in constraint expressions
-_SAFE_FUNCS: dict[str, Callable] = {
+_SAFE_FUNCS: dict[str, Callable[..., Any]] = {
     "abs": abs,
     "sqrt": math.sqrt,
     "log": math.log,
@@ -79,19 +79,19 @@ def _eval_node(node: ast.AST, params: dict[str, float]) -> float:
         )
         raise ConstraintError(msg)
     if isinstance(node, ast.BinOp):
-        op_fn = _SAFE_OPS.get(type(node.op))
-        if op_fn is None:
+        bin_fn = _SAFE_OPS.get(type(node.op))
+        if bin_fn is None:
             msg = f"Unsupported operator: {type(node.op).__name__}"
             raise ConstraintError(msg)
         left = _eval_node(node.left, params)
         right = _eval_node(node.right, params)
-        return op_fn(left, right)
+        return float(bin_fn(left, right))
     if isinstance(node, ast.UnaryOp):
-        op_fn = _SAFE_OPS.get(type(node.op))
-        if op_fn is None:
+        unary_fn = _SAFE_OPS.get(type(node.op))
+        if unary_fn is None:
             msg = f"Unsupported unary operator: {type(node.op).__name__}"
             raise ConstraintError(msg)
-        return op_fn(_eval_node(node.operand, params))
+        return float(unary_fn(_eval_node(node.operand, params)))
     if isinstance(node, ast.Call):
         if not isinstance(node.func, ast.Name):
             msg = "Only simple function calls supported (e.g. sqrt(x))"
@@ -104,7 +104,8 @@ def _eval_node(node: ast.AST, params: dict[str, float]) -> float:
             msg = f"Function '{func_name}' takes exactly 1 positional argument"
             raise ConstraintError(msg)
         arg = _eval_node(node.args[0], params)
-        return _SAFE_FUNCS[func_name](arg)
+        func = _SAFE_FUNCS[func_name]
+        return float(func(arg))
     msg = f"Unsupported expression node: {type(node).__name__}"
     raise ConstraintError(msg)
 
@@ -119,12 +120,12 @@ def _eval_comparison(node: ast.Compare, params: dict[str, float]) -> bool:
     """
     left = _eval_node(node.left, params)
     for cmp_op, comparator in zip(node.ops, node.comparators, strict=False):
-        cmp_fn = _SAFE_CMPS.get(type(cmp_op))
-        if cmp_fn is None:
+        compare_fn = _SAFE_CMPS.get(type(cmp_op))
+        if compare_fn is None:
             msg = f"Unsupported comparison: {type(cmp_op).__name__}"
             raise ConstraintError(msg)
         right = _eval_node(comparator, params)
-        if not cmp_fn(left, right):
+        if not compare_fn(left, right):
             return False
         left = right
     return True
@@ -184,8 +185,10 @@ class ConstraintSet:
         The original expression strings (for display/serialization).
     """
 
-    constraints: list[Callable[[dict[str, float]], bool]] = field(default_factory=list)
-    expressions: list[str] = field(default_factory=list)
+    constraints: list[Callable[[dict[str, float]], bool]] = field(  # pyright: ignore[reportUnknownVariableType]
+        default_factory=list
+    )
+    expressions: list[str] = field(default_factory=list)  # pyright: ignore[reportUnknownVariableType]
 
     @classmethod
     def from_strings(cls, exprs: list[str]) -> ConstraintSet:

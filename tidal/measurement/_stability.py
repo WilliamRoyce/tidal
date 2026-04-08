@@ -22,11 +22,13 @@ from __future__ import annotations
 
 import dataclasses
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
 if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -95,7 +97,9 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
         Contains stable flag, growth rate, and diagnostic message.
     """
     from tidal.solver.coefficients import CoefficientEvaluator
-    from tidal.solver.modal import _build_constraint_eliminated_matrices
+    from tidal.solver.modal import (
+        _build_constraint_eliminated_matrices,  # pyright: ignore[reportPrivateUsage]
+    )
     from tidal.solver.state import StateLayout
 
     if baseline_overrides is None:
@@ -106,8 +110,8 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
     # Build Fourier wavenumber grid
     N = grid.shape[0]
     dx = grid.dx[0]
-    k_vals = 2 * math.pi * np.fft.rfftfreq(N, dx)
-    k_grid = [k_vals]
+    k_vals = np.asarray(2 * math.pi * np.fft.rfftfreq(N, dx), dtype=np.float64)
+    k_grid: list[np.ndarray[tuple[int], np.dtype[np.float64]]] = [k_vals]
     rfft_shape = (N // 2 + 1,)
 
     # Determine IC wavenumber index
@@ -165,8 +169,8 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
         block_test = A_test[ki][idx[:, None], idx[None, :]]
         block_bl = A_baseline[ki][idx[:, None], idx[None, :]]
 
-        eigs_test = np.linalg.eigvals(block_test)
-        eigs_bl = np.linalg.eigvals(block_bl)
+        eigs_test = cast("NDArray[np.complexfloating]", np.linalg.eigvals(block_test))
+        eigs_bl = cast("NDArray[np.complexfloating]", np.linalg.eigvals(block_bl))
 
         max_re_test = float(np.max(np.real(eigs_test)))
         max_re_bl = float(np.max(np.real(eigs_bl)))
@@ -260,8 +264,8 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
     """
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
-        _build_constraint_eliminated_matrices,
-        _find_independent_blocks,
+        _build_constraint_eliminated_matrices,  # pyright: ignore[reportPrivateUsage]
+        _find_independent_blocks,  # pyright: ignore[reportPrivateUsage]
     )
     from tidal.solver.state import StateLayout
 
@@ -275,8 +279,8 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
 
     layout = StateLayout.from_spec(spec, grid.num_points)
     N = grid.shape[0]
-    k_vals = 2 * math.pi * np.fft.rfftfreq(N, grid.dx[0])
-    k_grid = [k_vals]
+    k_vals = np.asarray(2 * math.pi * np.fft.rfftfreq(N, grid.dx[0]), dtype=np.float64)
+    k_grid: list[np.ndarray[tuple[int], np.dtype[np.float64]]] = [k_vals]
     rfft_shape = (N // 2 + 1,)
     n_modes = len(k_vals)
 
@@ -325,8 +329,10 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
             block_test = A_test[ki][idx[:, None], idx[None, :]]
             block_bl = A_bl[ki][idx[:, None], idx[None, :]]
 
-            eigs_test = np.linalg.eigvals(block_test)
-            eigs_bl = np.linalg.eigvals(block_bl)
+            eigs_test = cast(
+                "NDArray[np.complexfloating]", np.linalg.eigvals(block_test)
+            )
+            eigs_bl = cast("NDArray[np.complexfloating]", np.linalg.eigvals(block_bl))
 
             max_re_test = float(np.max(np.real(eigs_test)))
             max_re_bl = float(np.max(np.real(eigs_bl)))

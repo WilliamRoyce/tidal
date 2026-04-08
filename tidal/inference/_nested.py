@@ -31,8 +31,8 @@ if TYPE_CHECKING:
 
 
 def run_nested_sampling(
-    log_likelihood: Callable,
-    prior_transform: Callable,
+    log_likelihood: Callable[..., float],
+    prior_transform: Callable[..., Any],
     ndim: int,
     param_names: list[str],
     sampler: str = "dynesty",
@@ -106,8 +106,8 @@ def run_nested_sampling(
 
 def _run_dynesty(
     *,
-    log_likelihood: Callable,
-    prior_transform: Callable,
+    log_likelihood: Callable[..., float],
+    prior_transform: Callable[..., Any],
     ndim: int,
     param_names: list[str],
     nlive: int,
@@ -212,8 +212,8 @@ def _run_dynesty(
 
 def _run_polychord(
     *,
-    log_likelihood: Callable,
-    prior_transform: Callable,
+    log_likelihood: Callable[..., float],
+    prior_transform: Callable[..., Any],
     ndim: int,
     param_names: list[str],
     nlive: int,
@@ -250,11 +250,11 @@ def _run_polychord(
     settings.feedback = 0 if quiet else 1
 
     # PolyChord expects (theta, ndim, nderived) -> (logL, [derived])
-    def polychord_loglike(theta):
+    def polychord_loglike(theta: list[float]) -> tuple[float, list[float]]:
         logl = log_likelihood(theta)
         return logl, []
 
-    def polychord_prior(hypercube):
+    def polychord_prior(hypercube: list[float]) -> list[float]:
         return prior_transform(hypercube)
 
     output = run_polychord(polychord_loglike, ndim, 0, settings, polychord_prior)
