@@ -182,8 +182,8 @@ def check_conversion_stability(
         msg = (
             f"Tachyonic mode detected: {n_tachyonic}/{len(k_indices)} k-modes "
             f"have excess growth rate > {threshold}. "
-            f"Worst: γ={max_excess:.4f} at k={worst_k:.4f}. "
-            f"Conversion P will grow as exp(2γt), not oscillate. "
+            f"Worst: gamma={max_excess:.4f} at k={worst_k:.4f}. "
+            f"Conversion P will grow as exp(2gammat), not oscillate. "
             f"Any measured 'amplification' A >> 1 is instability, not physics."
         )
         return ConversionStabilityResult(
@@ -348,7 +348,7 @@ def check_full_stability(
         ]
         msg = (
             f"{n_tachyonic_blocks}/{len(blocks)} blocks tachyonic "
-            f"(max γ={max_growth:.4f}). "
+            f"(max gamma={max_growth:.4f}). "
             f"Unstable: {'; '.join(unstable_names)}"
         )
 

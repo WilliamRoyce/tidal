@@ -405,7 +405,7 @@ def _generate_samples(
         Optional per-parameter scale mapping. Supported values:
         ``"linear"`` (default), ``"log"``, ``"arctan"``.
         For ``"arctan"``, the bounds are in the unit interval and the
-        mapping u → tan(u·π/2) covers (−∞, +∞).
+        mapping u -> tan(u * pi/2) covers (-inf, +inf).
 
     Returns
     -------
@@ -455,7 +455,6 @@ def _generate_samples(
                 10, np.log10(lower[i]) + u * (np.log10(upper[i]) - np.log10(lower[i]))
             )
         else:
-            # Linear (default)
             scaled[:, i] = lower[i] + u * (upper[i] - lower[i])
 
     return [dict(zip(names, row, strict=True)) for row in scaled]
@@ -927,7 +926,13 @@ def _run_single(  # noqa: PLR0913, PLR0917
                     "tachyonic_growth_rate": stability.max_excess,
                 }
         except Exception:  # noqa: BLE001
-            pass  # Non-critical: fall through to simulation
+            import logging as _log_tach
+
+            _log_tach.getLogger(__name__).debug(
+                "Pre-flight tachyonic check failed (non-critical), "
+                "falling through to simulation",
+                exc_info=True,
+            )
 
     # 1. Simulate
     exit_code, wall_time, spec = _simulate_run(
