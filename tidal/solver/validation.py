@@ -178,7 +178,7 @@ class StabilityResult:
         self.notes: list[str] = []
 
 
-def check_pointwise_mass_stability(  # noqa: PLR0914
+def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914
     coeff_eval: CoefficientEvaluator,
     spec: EquationSystem,
     grid: GridInfo,
@@ -266,14 +266,36 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
         eigenvalues = np.linalg.eigvalsh(pot_flat)  # faster, guaranteed real
 
     min_per_point = eigenvalues.min(axis=1)  # (n_grid,) minimum eigenvalue per point
+    max_per_point = eigenvalues.max(axis=1)
     global_min = float(min_per_point.min())
+    global_max = float(max_per_point.max())
 
     tolerance = 1e-10
-    if global_min >= -tolerance:
+
+    # Metric-convention-aware stability check.
+    # The sign of the mass matrix that indicates stability depends on the
+    # metric signature: for (-,+,+,+) the EOM is d²φ/dt² = -M·φ, so M
+    # must be positive-definite.  For (+,-,-,-), M must be negative-definite.
+    g_tt = spec.signature[0] if spec.signature else -1  # default (-,+,+,+)
+
+    if g_tt < 0:
+        # (-,+,+,+): stability requires M positive-definite (min eigenvalue ≥ 0)
+        if global_min >= -tolerance:
+            return result
+    # (+,-,-,-): stability requires M negative-definite (max eigenvalue ≤ 0)
+    elif global_max <= tolerance:
         return result
 
     # Find the worst grid point for a diagnostic message
-    worst_flat = int(min_per_point.argmin())
+    if g_tt < 0:
+        worst_flat = int(min_per_point.argmin())
+        worst_val = global_min
+        requirement = "positive-definite"
+    else:
+        worst_flat = int(max_per_point.argmax())
+        worst_val = global_max
+        requirement = "negative-definite"
+
     worst_idx = np.unravel_index(worst_flat, grid_shape)
     # spatial coordinates = effective_coordinates[1:] (skip the time coordinate)
     spatial_coords = spec.effective_coordinates[1:]
@@ -281,12 +303,15 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
         f"{spatial_coords[d]}={grid.axes_coords(d)[worst_idx[d]]:.4g}"
         for d in range(len(grid_shape))
     ]
+    sig_str = (
+        ",".join(f"{s:+d}" for s in spec.signature) if spec.signature else "-,+,..."
+    )
     result.errors.append(
-        f"Coupled mass matrix has minimum eigenvalue {global_min:.4g} at "
-        f"({', '.join(coord_strs)}). The system has exponentially growing "
-        f"modes -- it will be unstable. "
-        f"Check that the mass matrix is positive-definite at all grid points "
-        f"(e.g. for Gaussian-coupled scalars: mPhi2 * mChi2 > g0^2)."
+        f"Coupled mass matrix has {'minimum' if g_tt < 0 else 'maximum'} "
+        f"eigenvalue {worst_val:.4g} at ({', '.join(coord_strs)}). "
+        f"The system has exponentially growing modes -- it will be unstable. "
+        f"With signature ({sig_str}), mass matrix must be {requirement} "
+        f"at all grid points."
     )
     return result
 

@@ -35,7 +35,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
 
     parser = argparse.ArgumentParser(
         prog="tidal",
-        description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, plot, sweep, list.",
+        description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, plot, sweep, sample, list.",
         formatter_class=formatter,
     )
     parser.add_argument(
@@ -460,15 +460,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         help="Suppress progress messages (results and errors still shown)",
     )
-    sim_parser.add_argument(
-        "--require-stable",
-        action="store_true",
-        default=False,
-        help=(
-            "Abort if the pre-simulation stability check detects an unstable "
-            "mass matrix (negative eigenvalue). Default: warn only."
-        ),
-    )
+    # Note: --require-stable removed. The modal solver's eigenvalue pre-check
+    # in _evolve_per_mode provides accurate instability detection using the
+    # full evolution matrix. The old mass-only check produced false positives
+    # for theories with non-unit kinetic coefficients (e.g., PGT torsion).
     sim_parser.add_argument(
         "--allow-inconsistent-ic",
         action="store_true",
@@ -793,6 +788,33 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         help="Use logarithmic colorbar for heatmaps (useful for inv_B_min)",
     )
+    plot_parser.add_argument(
+        "--log-y",
+        dest="log_y",
+        action="store_true",
+        help="Use logarithmic y-axis for 1D sweep plots",
+    )
+    plot_parser.add_argument(
+        "--hline",
+        action="append",
+        default=[],
+        metavar="VALUE[:LABEL[:COLOR]]",
+        help=(
+            "Add horizontal reference line to 1D sweep plots (repeatable). "
+            "E.g. --hline 1.0:P=1:red --hline 0.1::orange"
+        ),
+    )
+    plot_parser.add_argument(
+        "--divergent-center",
+        type=float,
+        default=None,
+        metavar="VALUE",
+        help=(
+            "Center colormap at VALUE using TwoSlopeNorm "
+            "(e.g. P_EM baseline for amplification plots). "
+            "Implies --cmap RdBu_r unless --cmap is set."
+        ),
+    )
     # Sweep-specific options
     plot_parser.add_argument(
         "--metric",
@@ -1093,15 +1115,6 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Simulation mode (default: evolve)",
     )
     sweep_parser.add_argument(
-        "--require-stable",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-        help=(
-            "Abort unstable runs whose mass matrix has a negative eigenvalue "
-            "(default: True for sweeps; use --no-require-stable to override)"
-        ),
-    )
-    sweep_parser.add_argument(
         "--allow-inconsistent-ic",
         action="store_true",
         default=False,
@@ -1141,6 +1154,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         default=False,
         help="Overwrite existing --output directory without prompting",
+    )
+    sweep_parser.add_argument(
+        "--keep-runs",
+        action="store_true",
+        help=(
+            "Keep per-run snapshot directories after measurement "
+            "(default: deleted to save disk). Required for "
+            "`tidal plot --type sweep-compare` overlays. "
+            "Warning: ~11 MB per run."
+        ),
     )
     sweep_parser.add_argument(
         "--config",
@@ -1325,6 +1348,239 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Reference B value for analytical formula (required with --reference-formula)",
     )
 
+    # --- sample (Bayesian inference) ---
+    sample_parser = sub.add_parser(
+        "sample",
+        aliases=["samp"],
+        help="Bayesian inference via Monte Carlo and nested sampling",
+        description=(
+            "Run Bayesian parameter estimation using simulation-based "
+            "likelihood evaluation.  Supports simple Monte Carlo and "
+            "nested sampling (dynesty/PolyChord) with anesthetic visualization."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  tidal sample spec.json --prior 'g0=uniform:0.01:0.5' "
+            "--likelihood 'P_max:maximize' --method mc --n-samples 50 --output mc_out/\n"
+            "  tidal sample spec.json --prior 'alpha=uniform:0:10' "
+            "--prior 'xi=log_uniform:0.01:10' --constraint 'xi > 0' "
+            "--likelihood 'P_max:gaussian:0.3:0.1' --method nested --output ns_out/"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sample_parser.add_argument(
+        "json_path",
+        help="Path to JSON equation specification",
+    )
+    # Priors
+    sample_parser.add_argument(
+        "--prior",
+        action="append",
+        default=[],
+        metavar="SPEC",
+        help=(
+            "Parameter prior (repeatable). "
+            "Format: NAME=DIST:ARG1:ARG2. "
+            "Distributions: uniform, log_uniform, normal, arctan_uniform. "
+            "Example: --prior 'alpha=uniform:0.01:10'"
+        ),
+    )
+    # Constraints
+    sample_parser.add_argument(
+        "--constraint",
+        action="append",
+        default=[],
+        metavar="EXPR",
+        help=(
+            "Hard prior constraint (repeatable). "
+            "Rejects parameter combinations before simulation. "
+            "Example: --constraint 'xi > 0'"
+        ),
+    )
+    # Likelihood
+    sample_parser.add_argument(
+        "--likelihood",
+        default=None,
+        metavar="SPEC",
+        help=(
+            "Likelihood specification: METRIC:TYPE[:ARGS]. "
+            "Types: maximize, gaussian:TARGET:SIGMA, threshold:MIN_VALUE. "
+            "Example: --likelihood 'P_max:maximize'"
+        ),
+    )
+    # Sampling method
+    sample_parser.add_argument(
+        "--method",
+        choices=["mc", "nested"],
+        default="mc",
+        help="Sampling method (default: mc)",
+    )
+    sample_parser.add_argument(
+        "--sampler",
+        choices=["dynesty", "polychord"],
+        default="dynesty",
+        help="Nested sampling backend (default: dynesty)",
+    )
+    sample_parser.add_argument(
+        "--n-samples",
+        type=int,
+        default=100,
+        metavar="N",
+        help="Number of Monte Carlo samples (default: 100)",
+    )
+    sample_parser.add_argument(
+        "--nlive",
+        type=int,
+        default=100,
+        metavar="N",
+        help="Number of live points for nested sampling (default: 100)",
+    )
+    sample_parser.add_argument(
+        "--dlogz",
+        type=float,
+        default=0.01,
+        help="Evidence tolerance for nested sampling (default: 0.01)",
+    )
+    sample_parser.add_argument(
+        "--dynamic",
+        action="store_true",
+        default=False,
+        help="Use dynamic nested sampling (dynesty only)",
+    )
+    sample_parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed (default: 42)",
+    )
+    # Measurement
+    sample_parser.add_argument(
+        "--measure",
+        default=None,
+        metavar="TYPE[,TYPE,...]",
+        help="Measurements to run (auto-detected from --likelihood if omitted)",
+    )
+    sample_parser.add_argument(
+        "--source",
+        default=None,
+        metavar="FIELD[,FIELD,...]",
+        help="Source field(s) for conversion measurement",
+    )
+    sample_parser.add_argument(
+        "--target",
+        default=None,
+        metavar="FIELD[,FIELD,...]",
+        help="Target field(s) for conversion measurement",
+    )
+    sample_parser.add_argument(
+        "--energy-threshold",
+        type=float,
+        default=1e-3,
+        metavar="T",
+        help="Energy conservation threshold (default: 1e-3)",
+    )
+    # Simulation passthrough (same as sweep)
+    sample_parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VAL",
+        help="Set fixed parameter (repeatable)",
+    )
+    sample_parser.add_argument(
+        "--grid-shape",
+        default=None,
+        metavar="N[,N,N]",
+        help="Grid points per axis",
+    )
+    sample_parser.add_argument(
+        "--bounds",
+        default=None,
+        metavar="LO:HI[,...]",
+        help="Domain bounds per axis",
+    )
+    sample_parser.add_argument(
+        "--periodic",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use periodic boundary conditions (default: True)",
+    )
+    sample_parser.add_argument("--bc", default=None, metavar="BC[,BC,BC]")
+    sample_parser.add_argument(
+        "--ic",
+        choices=["gaussian", "plane-wave", "zero", "formula", "file", "noise"],
+        default="gaussian",
+        help="Initial condition type (default: gaussian)",
+    )
+    sample_parser.add_argument("--ic-formula", default=None)
+    sample_parser.add_argument("--ic-center", default=None)
+    sample_parser.add_argument("--ic-width", type=float, default=None)
+    sample_parser.add_argument("--ic-amplitude", type=float, default=1.0)
+    sample_parser.add_argument("--ic-component", default=None)
+    sample_parser.add_argument("--ic-wavevector", default=None)
+    sample_parser.add_argument("--ic-formula-velocity", default=None)
+    sample_parser.add_argument("--ic-field", action="append", default=[])
+    sample_parser.add_argument("--ic-file", default=None)
+    sample_parser.add_argument("--ic-noise-seed", type=int, default=None)
+    sample_parser.add_argument("--t-end", type=float, default=10.0)
+    sample_parser.add_argument("--dt", type=float, default=None)
+    sample_parser.add_argument(
+        "--scheme",
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
+        default="auto",
+    )
+    sample_parser.add_argument("--rtol", type=float, default=DEFAULT_RTOL)
+    sample_parser.add_argument("--atol", type=float, default=DEFAULT_ATOL)
+    sample_parser.add_argument(
+        "--method-solver", type=str, default=None, dest="method_solver"
+    )
+    sample_parser.add_argument("--max-step", type=float, default=None)
+    sample_parser.add_argument("--snapshots", type=float, default=None)
+    sample_parser.add_argument("--fd-order", type=int, choices=[2, 4, 6], default=4)
+    sample_parser.add_argument(
+        "--leapfrog-order", type=int, choices=[2, 4], default=None
+    )
+    sample_parser.add_argument(
+        "--spectral", action=argparse.BooleanOptionalAction, default=None
+    )
+    sample_parser.add_argument(
+        "--mode", choices=["evolve", "constraint"], default="evolve"
+    )
+    sample_parser.add_argument(
+        "--allow-inconsistent-ic", action="store_true", default=False
+    )
+    # Execution
+    sample_parser.add_argument(
+        "--output",
+        default=None,
+        metavar="DIR",
+        help="Output directory for inference results (required)",
+    )
+    sample_parser.add_argument(
+        "--parallel",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Number of parallel workers",
+    )
+    # Plots
+    sample_parser.add_argument(
+        "--corner",
+        action="store_true",
+        default=False,
+        help="Generate corner plot",
+    )
+    sample_parser.add_argument(
+        "--trace",
+        action="store_true",
+        default=False,
+        help="Generate trace plot",
+    )
+    # Resume fields needed by _build_sim_args
+    sample_parser.add_argument("--resume", default=None)
+    sample_parser.add_argument("--snapshot", default=None)
+    sample_parser.add_argument("--t-additional", default=None)
+
     # --- doctor ---
     sub.add_parser(
         "doctor",
@@ -1370,6 +1626,7 @@ _COMMAND_ALIASES: dict[str, str] = {
     "val": "validate",
     "meas": "measure",
     "sw": "sweep",
+    "samp": "sample",
     "doc": "doctor",
 }
 
@@ -1429,6 +1686,10 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911, C901
         from tidal.cli._analyze import analyze_command
 
         return analyze_command(args)
+    if cmd == "sample":
+        from tidal.cli._sample import sample_command
+
+        return sample_command(args)
     if cmd == "doctor":
         from tidal.cli._doctor import doctor_command
 

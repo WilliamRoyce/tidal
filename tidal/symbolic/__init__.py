@@ -14,6 +14,7 @@ from tidal.symbolic.json_loader import (
     EquationSystem,
     OperatorTerm,
     load_equation_system,
+    normalize_kinetic_coefficients,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "EquationSystem",
     "OperatorTerm",
     "load_equation_system",
+    "normalize_kinetic_coefficients",
 ]

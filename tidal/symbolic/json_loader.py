@@ -6,6 +6,7 @@ field equations that were derived symbolically from Lagrangians.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import math
@@ -15,6 +16,8 @@ from dataclasses import field as dataclass_field
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from tidal.symbolic._eval_utils import evaluate_coefficient
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -123,12 +126,24 @@ class LHSStructure:
     expression: str
     time_order: int
     space_order: int = 0
+    kinetic_coefficient_symbolic: str | None = None
+    """Symbolic expression for the kinetic coefficient when ExportJSON left RHS unnormalized.
+
+    When non-None, the RHS terms are stored WITHOUT the kinetic coefficient divisor.
+    Python must multiply RHS terms by ``1/kinetic_coefficient`` at runtime.
+    If this evaluates to zero for the given parameters, the field is a constraint
+    (the kinetic term vanishes and the EOM becomes algebraic).
+
+    Example: for a torsion theory with ``L ⊃ ½ξ(∂T)²``, the torsion EOM kinetic
+    coefficient is ``xi``.  At ``xi=0`` torsion becomes algebraically constrained.
+    """
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> LHSStructure:
         """Create LHSStructure from structured JSON data.
 
         Expected format: {"expression": "...", "order": {"time": N, "space": 0}}
+        Optional: ``"kinetic_coefficient_symbolic"`` — see class docstring.
 
         Parameters
         ----------
@@ -155,8 +170,12 @@ class LHSStructure:
             raise ValueError(msg)
         time_order = int(order["time"])
         space_order = int(order.get("space", 0))
+        kc_sym = data.get("kinetic_coefficient_symbolic") or None
         return cls(
-            expression=expression, time_order=time_order, space_order=space_order
+            expression=expression,
+            time_order=time_order,
+            space_order=space_order,
+            kinetic_coefficient_symbolic=kc_sym,
         )
 
 
@@ -656,6 +675,16 @@ class ComponentEquation:
     constraint_solver: ConstraintSolverConfig = dataclass_field(
         default_factory=ConstraintSolverConfig
     )
+    kinetic_coefficient_symbolic: str | None = None
+    """Symbolic kinetic coefficient when ExportJSON left RHS unnormalized.
+
+    Non-None only for equations derived with a parameter-based kinetic coefficient
+    (e.g., ``xi`` in the dark photon torsion model).  The RHS terms are stored
+    WITHOUT the 1/kinetic_coefficient divisor.  Use
+    ``normalize_kinetic_coefficients(spec, params)`` to apply the normalization
+    before passing the spec to a solver.  If this evaluates to zero at the given
+    parameters, the field becomes a constraint (kinetic term vanishes).
+    """
 
     def __post_init__(self) -> None:
         """Validate constraint_solver is only enabled for time_order=0.
@@ -723,6 +752,7 @@ class ComponentEquation:
             time_derivative_order=time_derivative_order,
             rhs_terms=rhs_terms,
             constraint_solver=constraint_solver,
+            kinetic_coefficient_symbolic=lhs_structure.kinetic_coefficient_symbolic,
         )
 
 
@@ -807,6 +837,7 @@ class EquationSystem:
     coupling_matrix: tuple[tuple[float, ...], ...]
     metadata: dict[str, Any]
     coordinates: tuple[str, ...] = ()
+    signature: tuple[int, ...] = ()
     mass_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
     coupling_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
     canonical: CanonicalStructure | None = None
@@ -1179,8 +1210,9 @@ class EquationSystem:
             equations, component_names, parameters=default_params or None
         )
 
-        # Extract coordinate names
+        # Extract coordinate names and metric signature
         coordinates = tuple(str(c) for c in spacetime.get("coordinates", []))
+        signature = tuple(int(s) for s in spacetime.get("signature", []))
 
         # Parse canonical structure (Phase K) — optional for backward compat
         canonical_data = data.get("canonical")
@@ -1198,6 +1230,7 @@ class EquationSystem:
             coupling_matrix=coupling_matrix,
             metadata=metadata,
             coordinates=coordinates,
+            signature=signature,
             mass_matrix_symbolic=mass_matrix_symbolic,
             coupling_matrix_symbolic=coupling_matrix_symbolic,
             canonical=canonical,
@@ -1355,3 +1388,101 @@ def load_equation_system(json_path: Path | str) -> EquationSystem:
 
     validate_json_schema(data)
     return EquationSystem.from_dict(data)
+
+
+def normalize_kinetic_coefficients(
+    spec: EquationSystem, params: dict[str, float]
+) -> EquationSystem:
+    """Apply symbolic kinetic-coefficient normalization to an equation system.
+
+    ExportJSON.wl emits equations with a parameter-based kinetic coefficient
+    (e.g. ``xi``) **un-divided** when the coefficient cannot be safely divided
+    symbolically (to avoid Wolfram producing ``f/xi`` in the JSON which
+    becomes a ZeroDivisionError at xi=0).  The kinetic coefficient is stored
+    in ``ComponentEquation.kinetic_coefficient_symbolic``.
+
+    This function evaluates those coefficients at ``params`` and:
+
+    * **K ≠ 0** — divides each RHS term by K (numeric ``coefficient / K``;
+      symbolic ``coefficient_symbolic`` wrapped as ``(expr) / (kc_sym)`` so
+      that subsequent ``CoefficientEvaluator`` calls remain correct).
+    * **K = 0** — the kinetic term vanishes; the field becomes a constraint
+      (``time_derivative_order=0``, empty ``rhs_terms``).  This is the
+      physical xi=0 limit where a formerly dynamical field loses its kinetic
+      energy and its EOM degenerates to an algebraic condition.
+
+    Equations without ``kinetic_coefficient_symbolic`` are returned unchanged.
+    The function is idempotent: calling it on an already-normalized spec (all
+    ``kinetic_coefficient_symbolic`` are None) is a no-op.
+
+    Parameters
+    ----------
+    spec : EquationSystem
+        The equation system as loaded from JSON (pre-normalization).
+    params : dict[str, float]
+        User-provided parameter values (e.g. ``{"xi": 0.1, "alpha": 0.5}``).
+
+    Returns
+    -------
+    EquationSystem
+        A new ``EquationSystem`` with all kinetic coefficients normalized.
+    """
+    new_eqs: list[ComponentEquation] = []
+    changed = False
+
+    for eq in spec.equations:
+        kc_sym = eq.kinetic_coefficient_symbolic
+        if kc_sym is None:
+            new_eqs.append(eq)
+            continue
+
+        # Evaluate kinetic coefficient at current params
+        try:
+            kc_value = evaluate_coefficient(kc_sym, params, spec.effective_coordinates)
+        except Exception:  # noqa: BLE001
+            # If evaluation fails (e.g. symbol not in params), skip normalization
+            new_eqs.append(eq)
+            continue
+
+        if not isinstance(kc_value, float):
+            kc_value = float(kc_value)  # type: ignore[arg-type]
+
+        changed = True
+
+        if kc_value == 0.0:
+            # Kinetic coefficient vanishes → field becomes a constraint
+            # (time_derivative_order=0, no RHS — algebraic zero constraint)
+            new_eq = dataclasses.replace(
+                eq,
+                time_derivative_order=0,
+                rhs_terms=(),
+                kinetic_coefficient_symbolic=None,
+            )
+        else:
+            # Divide each RHS term by kc_value
+            new_terms: list[OperatorTerm] = []
+            for term in eq.rhs_terms:
+                new_coeff = term.coefficient / kc_value
+                if term.coefficient_symbolic is not None:
+                    new_cs = f"({term.coefficient_symbolic}) / ({kc_sym})"
+                else:
+                    new_cs = term.coefficient_symbolic
+                new_terms.append(
+                    dataclasses.replace(
+                        term,
+                        coefficient=new_coeff,
+                        coefficient_symbolic=new_cs,
+                    )
+                )
+            new_eq = dataclasses.replace(
+                eq,
+                rhs_terms=tuple(new_terms),
+                kinetic_coefficient_symbolic=None,
+            )
+
+        new_eqs.append(new_eq)
+
+    if not changed:
+        return spec
+
+    return dataclasses.replace(spec, equations=tuple(new_eqs))

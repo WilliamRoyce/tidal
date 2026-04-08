@@ -342,7 +342,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
 # ------------------------------------------------------------------
 
 
-def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
+def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     """Handle sweep-specific plot types.
 
     Loads ``SweepResults`` from *data_path* and dispatches to the
@@ -412,6 +412,12 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
     figsize = _parse_figsize(getattr(args, "figsize", None))
     dpi = getattr(args, "dpi", None) or DPI_DEFAULT
 
+    # Colormap / divergent-center options (used by sweep, sweep-parallel, sweep-scatter)
+    dc: float | None = getattr(args, "divergent_center", None)
+    cmap_name: str = getattr(args, "cmap", None) or (
+        "RdBu_r" if dc is not None else "viridis"
+    )
+
     try:
         if plot_type == "sweep":
             metrics = [s.strip() for s in raw_metric.split(",")]  # type: ignore[union-attr]
@@ -419,12 +425,21 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             overlay: str | None = getattr(args, "overlay", None)
 
             log_scale: bool = getattr(args, "log_scale", False)
+            log_y: bool = getattr(args, "log_y", False)
+            thresholds: list[str] = getattr(args, "hline", []) or []
 
             if n_swept == 1:
                 if len(metrics) == 1:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
                     try:
-                        render_sweep_1d(ax, results, metrics[0], overlay=overlay)
+                        render_sweep_1d(
+                            ax,
+                            results,
+                            metrics[0],
+                            overlay=overlay,
+                            log_y=log_y,
+                            thresholds=thresholds,
+                        )
                     except ValueError as exc:
                         error_with_hint(
                             f"in --overlay formula: {exc}",
@@ -433,7 +448,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                         return 1
                 else:
                     fig = plt.figure(figsize=figsize or (8, 3 * len(metrics)))
-                    render_sweep_1d_multi(fig, results, metrics)
+                    render_sweep_1d_multi(fig, results, metrics, log_y=log_y)
             elif n_swept == 2:  # noqa: PLR2004
                 if overlay:
                     fig = plt.figure(figsize=figsize or (15, 5))
@@ -453,7 +468,14 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                         return 1
                 else:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
-                    render_sweep_2d(ax, results, metrics[0], log_scale=log_scale)
+                    render_sweep_2d(
+                        ax,
+                        results,
+                        metrics[0],
+                        log_scale=log_scale,
+                        divergent_center=dc,
+                        cmap_name=cmap_name,
+                    )
             else:
                 error_with_hint(
                     f"sweep plot supports 1 or 2 swept parameters, got {n_swept}",
@@ -485,7 +507,13 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 )
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 6))
-            render_sweep_parallel(ax, results, raw_metric)
+            render_sweep_parallel(
+                ax,
+                results,
+                raw_metric,
+                cmap_name=cmap_name,
+                divergent_center=dc,
+            )
 
         elif plot_type == "sweep-tornado":
             if raw_metric is None:
@@ -506,7 +534,13 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 return 1
             n_params = len(results.swept_params)
             fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
-            render_sweep_scatter(fig, results, raw_metric)
+            render_sweep_scatter(
+                fig,
+                results,
+                raw_metric,
+                cmap_name=cmap_name,
+                divergent_center=dc,
+            )
 
         elif plot_type == "replicate-convergence":
             if raw_metric is None:

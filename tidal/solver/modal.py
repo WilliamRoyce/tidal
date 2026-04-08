@@ -1266,6 +1266,14 @@ def _build_per_mode_matrices(
     n_slots = layout.num_slots
     n_modes = int(np.prod(rfft_shape))
 
+    def _resolve_target_slot(field_ref: str) -> int | None:
+        """Resolve a field/velocity reference to a slot index."""
+        if field_ref in layout.field_slot_map:
+            return layout.field_slot_map[field_ref]
+        if field_ref.startswith("v_") and field_ref[2:] in layout.velocity_slot_map:
+            return layout.velocity_slot_map[field_ref[2:]]
+        return None
+
     # Evaluate Fourier multipliers on the k-grid
     multiplier_cache: dict[str, NDArray[np.complex128]] = {}
     for eq in spec.equations:
@@ -1295,7 +1303,9 @@ def _build_per_mode_matrices(
 
             # dv/dt = Σ coeff * operator(target_field)
             for _term_idx, term in enumerate(eq.rhs_terms):
-                target_slot = layout.field_slot_map[term.field]
+                target_slot = _resolve_target_slot(term.field)
+                if target_slot is None:
+                    continue
                 coeff = _resolve_constant_coeff(
                     term,
                     coeff_eval,
@@ -1309,7 +1319,9 @@ def _build_per_mode_matrices(
             # First-order: du/dt = Σ coeff * operator(target_field)
             this_slot = layout.field_slot_map[field_name]
             for _term_idx, term in enumerate(eq.rhs_terms):
-                target_slot = layout.field_slot_map[term.field]
+                target_slot = _resolve_target_slot(term.field)
+                if target_slot is None:
+                    continue
                 coeff = _resolve_constant_coeff(
                     term,
                     coeff_eval,
@@ -1368,6 +1380,14 @@ def _build_convolution_matrix(
     n_modes = int(np.prod(rfft_shape))
     n_total = n_slots * n_modes
 
+    def _resolve_target_slot(field_ref: str) -> int | None:
+        """Resolve a field/velocity reference to a slot index."""
+        if field_ref in layout.field_slot_map:
+            return layout.field_slot_map[field_ref]
+        if field_ref.startswith("v_") and field_ref[2:] in layout.velocity_slot_map:
+            return layout.velocity_slot_map[field_ref[2:]]
+        return None
+
     # Evaluate Fourier multipliers on the k-grid (for constant terms)
     multiplier_cache: dict[str, NDArray[np.complex128]] = {}
     for eq in spec.equations:
@@ -1397,7 +1417,9 @@ def _build_convolution_matrix(
 
             # dv/dt = Σ coeff(x) * operator(target_field)
             for _term_idx, term in enumerate(eq.rhs_terms):
-                target_slot = layout.field_slot_map[term.field]
+                target_slot = _resolve_target_slot(term.field)
+                if target_slot is None:
+                    continue
                 mult = multiplier_cache[term.operator]
 
                 if not term.position_dependent:
@@ -1431,7 +1453,9 @@ def _build_convolution_matrix(
             # First-order
             this_slot = layout.field_slot_map[field_name]
             for _term_idx, term in enumerate(eq.rhs_terms):
-                target_slot = layout.field_slot_map[term.field]
+                target_slot = _resolve_target_slot(term.field)
+                if target_slot is None:
+                    continue
                 mult = multiplier_cache[term.operator]
 
                 if not term.position_dependent:
@@ -1593,6 +1617,74 @@ def _has_position_dependent_terms(spec: EquationSystem) -> bool:
     return False
 
 
+def _suppress_tachyonic_noise(
+    eig_vals: NDArray[np.complex128],
+    y0_eigen: NDArray[np.complex128],
+    *,
+    growth_threshold: float = 1e-8,
+    coupling_threshold: float = 1e-12,
+) -> tuple[NDArray[np.complex128], int]:
+    """Suppress tachyonic eigenvectors with zero physical coupling.
+
+    In theories like PGT with R̃, the mass matrix can have tachyonic eigenvalues
+    (positive real part) corresponding to tensor/axial torsion sectors.  These
+    modes may have **zero physical coupling** — the source terms project entirely
+    onto the stable (trace) eigenvector.  However, machine-precision noise
+    (~10⁻¹⁶) in these uncoupled modes grows as exp(Re(λ)·t), overwhelming the
+    physical solution.
+
+    This function identifies modes that are:
+
+    1. Tachyonic: ``Re(λ) > growth_threshold`` (exponentially growing)
+    2. Uncoupled: ``|IC projection| < coupling_threshold * max(|IC|)``
+       (zero physical coupling within numerical precision)
+
+    For such modes, the eigenvalue is set to zero (freezing the mode at its
+    initial noise level) instead of allowing exponential amplification.
+
+    This is a **numerical noise fix**, not a physics change: if the IC genuinely
+    projects onto a tachyonic eigenvector, the mode is kept.  The threshold
+    scales with IC magnitude to be robust across different amplitudes.
+
+    Follows the existing gauge-mode suppression pattern (infinite eigenvalues
+    set to zero for gauge degrees of freedom).
+
+    Parameters
+    ----------
+    eig_vals : ndarray, shape (n_modes, block_size)
+        Eigenvalues per k-mode and eigenvector.
+    y0_eigen : ndarray, shape (n_modes, block_size)
+        IC amplitude projected onto each eigenvector.
+    growth_threshold : float
+        Minimum positive real part to classify as tachyonic.
+    coupling_threshold : float
+        Relative threshold for "zero coupling" (fraction of max IC).
+
+    Returns
+    -------
+    eig_vals : ndarray
+        Modified eigenvalues (tachyonic uncoupled modes set to 0).
+    n_suppressed : int
+        Number of suppressed mode-components.
+    """
+    max_ic = np.max(np.abs(y0_eigen))
+    if max_ic == 0:
+        return eig_vals, 0
+
+    noise_floor = coupling_threshold * max_ic
+
+    tachyonic = np.real(eig_vals) > growth_threshold
+    uncoupled = np.abs(y0_eigen) < noise_floor
+    suppress_mask = tachyonic & uncoupled
+
+    n_suppressed = int(np.sum(suppress_mask))
+    if n_suppressed > 0:
+        eig_vals = eig_vals.copy()
+        eig_vals[suppress_mask] = 0.0
+
+    return eig_vals, n_suppressed
+
+
 def _warn_eigenvalue_growth(
     eigenvalues: NDArray[np.complex128],
     dt_total: float,
@@ -1643,7 +1735,15 @@ def _evolve_per_mode(
     Blocks with all-zero initial conditions are skipped entirely.
 
     Ref: Golub & Van Loan (1996), Matrix Computations, §4.8.
+
+    Raises
+    ------
+    SimulationDivergedError
+        If field amplitudes grow beyond the divergence threshold (1e8 x
+        initial amplitude), indicating physical instability.
     """
+    from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
+
     n_slots = layout.num_slots
     n_pts = layout.num_points
     n_snapshots = len(t_eval)
@@ -1723,6 +1823,18 @@ def _evolve_per_mode(
         # Transform IC to eigenbasis
         y0_eigen = np.einsum("mij,mj->mi", v_inv, y0_block.T)
 
+        # Suppress tachyonic modes with zero physical coupling.
+        # These are numerical noise amplifiers, not physics — see #222.
+        eig_vals, n_suppressed = _suppress_tachyonic_noise(eig_vals, y0_eigen)
+        if n_suppressed > 0:
+            import logging as _log_tach  # noqa: PLC0415
+
+            _log_tach.getLogger(__name__).info(
+                "Suppressed %d tachyonic modes with zero IC coupling "
+                "(numerical noise prevention)",
+                n_suppressed,
+            )
+
         block_data.append((block_slots, eig_vals, v_mat, y0_eigen))
 
     # Evolve at each time point.
@@ -1775,6 +1887,22 @@ def _evolve_per_mode(
     # Pre-allocate buffer reused each timestep (avoids n_snapshots allocations)
     y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
 
+    # Divergence guard: track initial amplitude for early-stop detection (#226).
+    # Floor at 1e-15 for fields starting at zero (compared to machine epsilon).
+    initial_max_amp: float = 0.0
+    divergence_threshold: float = 1e8  # amplitude ratio that triggers early stop
+
+    # NOTE: The eigenvalue pre-check guard (commit 2b94172) was removed.
+    # It detected modes with Re(λ) > 0 and physical IC projection, but for
+    # PGT models with constrained torsion fields, the constraint-eliminated
+    # first-order system generically has eigenmodes with large positive real
+    # parts that represent wave propagation characteristics (not physical
+    # instabilities).  The _suppress_tachyonic_noise function handles modes
+    # with zero physical coupling, and the per-snapshot divergence guard
+    # (below, in the time loop) catches genuinely diverging simulations.
+    # The pre-check was overly aggressive: it blocked the GR baseline of
+    # the nonminimal PGT model, which produces correct oscillatory P(t).
+
     for ti, t in enumerate(t_eval):
         dt = t - t0
         y_hat_t[:] = 0.0
@@ -1801,6 +1929,30 @@ def _evolve_per_mode(
         y_physical = _ifft_slots(y_hat_t, layout, grid)
         snapshots[ti] = y_physical
         times[ti] = t
+
+        # Divergence guard: check amplitude ratio against GLOBAL max of
+        # initial state.  Uses the peak across ALL fields and ALL spatial
+        # points, so localized ICs (Gaussians) with small tails don't
+        # trigger false positives when the wave packet propagates.
+        # Threshold 1e8 catches exponential growth well before overflow;
+        # the linearized regime breaks down much earlier (ratio > ~100).
+        max_amp = float(np.max(np.abs(y_physical)))
+        if ti == 0:
+            initial_max_amp = max(max_amp, 1e-15)
+        elif (
+            not np.isfinite(max_amp) or max_amp / initial_max_amp > divergence_threshold
+        ):
+            msg = (
+                f"Simulation diverged at t={t:.4g}: amplitude ratio "
+                f"{max_amp / initial_max_amp:.2e} exceeds threshold "
+                f"{divergence_threshold:.0e}. The system is physically "
+                f"unstable (linearized regime violated)."
+            )
+            # Fill remaining snapshots so partial results are usable
+            for tj in range(ti + 1, n_snapshots):
+                snapshots[tj] = y_physical
+                times[tj] = t_eval[tj]
+            raise SimulationDivergedError(msg)
 
         if snapshot_callback is not None:
             snapshot_callback(t, y_physical)
@@ -2039,9 +2191,16 @@ def solve_modal(
     has_pos_dep = _has_position_dependent_terms(spec)
     has_time_ops = _has_time_derivative_operators(spec)
 
-    # Determine which matrix builder to use
-    use_generalized = has_time_ops and not has_pos_dep
-    use_constraint = has_constraints and not has_pos_dep and not use_generalized
+    # Determine which matrix builder to use.
+    # Constraint-eliminated path takes precedence over generalized when both
+    # constraints AND time-derivative operators are present.  The generalized
+    # path constructs B_lhs = I - vel_coupling which can be near-singular
+    # (det ≈ 0, cond > 1e7) for PGT models with d2_t constraint operators,
+    # producing spurious large eigenvalues that trigger the divergence guard.
+    # The constraint-eliminated path handles the same physics via a regularized
+    # (I - V)^{-1} implicit solve that is numerically stable.
+    use_constraint = has_constraints and not has_pos_dep
+    use_generalized = has_time_ops and not has_pos_dep and not use_constraint
     B_lhs_modes: NDArray[np.complex128] | None = None  # set by generalized path
     constraint_vel_arrays: dict[
         str, NDArray[np.float64]

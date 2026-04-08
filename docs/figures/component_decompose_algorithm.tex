@@ -1,0 +1,330 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tidal-tikz-styles}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.45cm and 1.0cm,
+    every node/.append style={text opacity=1},
+]
+
+% ===================================================================
+%  TITLE
+% ===================================================================
+\node[font=\normalsize\bfseries, text=black] (maintitle)
+    {Component Decomposition Algorithm};
+\node[below=0.02cm of maintitle, font=\tiny\sffamily, text=GrayLine]
+    {Tensor EOM $\to$ scalar component PDEs via xAct/xCoba};
+
+% ===================================================================
+%  MAIN ENTRY
+% ===================================================================
+
+\node[stage=Gray, below=0.5cm of maintitle] (entry)
+    {\textbf{DecomposeToComponents}\\[-1pt]
+     \scriptsize tensor EOM, field, chart, options};
+
+\node[funcbox=Purple, below=0.5cm of entry] (setup)
+    {Determine field rank\\via \texttt{SlotsOfTensor}};
+
+\node[decision, below=0.5cm of setup] (rankcheck)
+    {field\\rank?};
+
+\draw[arr] (entry) -- (setup);
+\draw[arr] (setup) -- (rankcheck);
+
+% ===================================================================
+%  LEFT BRANCH: Scalar fields (rank = 0)
+% ===================================================================
+
+\node[stage=Purple, below left=0.8cm and 3.5cm of rankcheck] (christexp)
+    {Expand Christoffel symbols\\[-1pt]
+     \scriptsize $\nabla_a \to \partial_a + \Gamma^c_{ab}$\\
+     \scriptsize (curved spacetimes only)};
+
+\node[funcbox=Purple, below=of christexp] (sepmet)
+    {\texttt{SeparateMetric}\\[-1pt]
+     \scriptsize undo ContractMetric:\\
+     \scriptsize $V^a \to g^{ab}V_b$};
+
+\node[funcbox=Pink, below=of sepmet] (escalar)
+    {\texttt{ExpandScalarWrappers}\\[-1pt]
+     \scriptsize resolve nested CovD\\
+     \scriptsize inside xAct Scalar[]};
+
+\node[funcbox=Pink, below=of escalar] (stag)
+    {\texttt{StaggeredToBasis}\\[-1pt]
+     \scriptsize iterative abstract $\to$\\
+     \scriptsize coordinate basis};
+
+\node[funcbox=Purple, below=of stag] (bgeval)
+    {Evaluate background\\field components};
+
+\node[funcbox=Purple, below=of bgeval] (reptensor)
+    {Replace tensor fields\\with named scalars\\[-1pt]
+     \scriptsize $A_\mu \to A_0(t,x), A_1(t,x), \ldots$};
+
+\node[funcbox=Purple, below=of reptensor] (cdconv)
+    {Convert $\nabla_a \to \partial_\mu$\\[-1pt]
+     \scriptsize covariant $\to$ partial derivatives};
+
+\node[stage=Green, below=0.5cm of cdconv] (scalarout)
+    {\textbf{Scalar PDE output}};
+
+% Scalar path arrows
+\draw[arr] (rankcheck.west) -| (christexp.north)
+    node[pos=0.25, above, font=\scriptsize] {rank\,=\,0};
+\draw[arr] (christexp) -- (sepmet);
+\draw[arr] (sepmet) -- (escalar);
+\draw[arr] (escalar) -- (stag);
+\draw[arr] (stag) -- (bgeval);
+\draw[arr] (bgeval) -- (reptensor);
+\draw[arr] (reptensor) -- (cdconv);
+\draw[arr] (cdconv) -- (scalarout);
+
+% ===================================================================
+%  RIGHT BRANCH: Tensor fields (rank >= 1)
+% ===================================================================
+
+\node[funcbox=Purple, below right=0.8cm and 3.5cm of rankcheck] (enumtup)
+    {Enumerate independent\\component tuples\\[-1pt]
+     \scriptsize respects symmetries:\\
+     \scriptsize symmetric $\to$ upper triangle};
+
+\node[funcbox=Purple, below=0.5cm of enumtup] (hoistscalar)
+    {Hoist common work\\[-1pt]
+     \scriptsize \texttt{SeparateMetric} +\\
+     \scriptsize \texttt{ExpandScalarWrappers}\\
+     \scriptsize (once, before loop)};
+
+% --- Per-component loop ---
+\node[stage=Pink, below=0.6cm of hoistscalar] (loopstart)
+    {\textbf{For each} component tuple $(i_1, \ldots, i_n)$};
+
+\node[funcbox=Pink, below=of loopstart] (fixidx)
+    {Fix free indices\\to basis values\\[-1pt]
+     \scriptsize e.g.\ $T_{ab} \to T_{01}$};
+
+\node[funcbox=Pink, below=of fixidx] (stag2)
+    {\texttt{StaggeredToBasis}};
+
+\node[funcbox=Blue, below=of stag2] (batchtrace)
+    {Batched metric trace\\[-1pt]
+     \scriptsize memory-bounded:\\
+     \scriptsize $\sim$50 terms per batch};
+
+\node[funcbox=Pink, below=of batchtrace] (reptensor2)
+    {Replace tensor fields\\with named scalars};
+
+\node[funcbox=Pink, below=of reptensor2] (cdconv2)
+    {Convert $\nabla_a \to \partial_\mu$};
+
+\node[funcbox=Gray, below=of cdconv2] (share)
+    {\texttt{Share[]} memory reclaim};
+
+% Loop feedback arrow
+\node[fpcheck, below=0.4cm of share] (morecomp)
+    {more\\tuples?};
+\draw[arr] (morecomp.east) -- ++(1.2,0) |- (loopstart.east)
+    node[pos=0.25, right, font=\tiny] {yes};
+
+\node[stage=Green, below=0.5cm of morecomp] (tensorout)
+    {\textbf{Component PDE list}\\[-1pt]
+     \scriptsize \{index, equation\} pairs};
+\draw[arr] (morecomp.south) -- (tensorout)
+    node[midway, right, font=\tiny] {no};
+
+% Tensor path arrows
+\draw[arr] (rankcheck.east) -| (enumtup.north)
+    node[pos=0.25, above, font=\scriptsize] {rank\,$\geq$\,1};
+\draw[arr] (enumtup) -- (hoistscalar);
+\draw[arr] (hoistscalar) -- (loopstart);
+\draw[arr] (loopstart) -- (fixidx);
+\draw[arr] (fixidx) -- (stag2);
+\draw[arr] (stag2) -- (batchtrace);
+\draw[arr] (batchtrace) -- (reptensor2);
+\draw[arr] (reptensor2) -- (cdconv2);
+\draw[arr] (cdconv2) -- (share);
+\draw[arr] (share) -- (morecomp);
+
+% --- Loop region background ---
+\begin{scope}[on background layer]
+    \node[loopregion, fit=(loopstart)(fixidx)(stag2)(batchtrace)
+          (reptensor2)(cdconv2)(share)(morecomp),
+          label={[font=\tiny\sffamily, text=BlueLine]
+          above right:per-component loop}] {};
+\end{scope}
+
+% ===================================================================
+%  SUB-DIAGRAM A: StaggeredToBasis (bottom-left)
+% ===================================================================
+
+\begin{scope}[shift={(-3.5,-17.0)}]
+    \node[stage=Pink, font=\footnotesize\bfseries] (stb_title)
+        {StaggeredToBasis};
+    \node[below=0.02cm of stb_title, font=\tiny\sffamily, text=GrayLine]
+        {Prevents $O(\dim^{2K})$ dummy index explosion};
+
+    \node[funcbox=Purple, below=0.4cm of stb_title] (stb_tobasis)
+        {\texttt{ToBasis[chart]}\\[-1pt]
+         \scriptsize term-by-term};
+
+    \node[decision, below=0.5cm of stb_tobasis, text width=1.4cm] (stb_curved)
+        {curved\\metric?};
+
+    \node[funcbox=Purple, right=1.0cm of stb_curved] (stb_christzero)
+        {Zero Christoffel\\substitutions};
+    \node[funcbox=Purple, left=1.0cm of stb_curved] (stb_christeval)
+        {Evaluate Christoffel\\via \texttt{ToValues}};
+
+    \node[fpcheck, below=0.8cm of stb_curved] (stb_fp)
+        {fixed\\point?};
+
+    \draw[arr] (stb_title) -- (stb_tobasis);
+    \draw[arr] (stb_tobasis) -- (stb_curved);
+    \draw[arr] (stb_curved.east) -- (stb_christzero)
+        node[midway, above, font=\tiny] {no};
+    \draw[arr] (stb_curved.west) -- (stb_christeval)
+        node[midway, above, font=\tiny] {yes};
+    \draw[arr] (stb_christzero.south) |- (stb_fp);
+    \draw[arr] (stb_christeval.south) |- (stb_fp);
+
+    % Loop back
+    \draw[arr] (stb_fp.west) -- ++(-2.0,0) |- (stb_tobasis.west)
+        node[pos=0.25, left, font=\tiny] {no (max 4 iter)};
+
+    % Post-loop
+    \node[funcbox=Purple, below=0.6cm of stb_fp] (stb_sep)
+        {\texttt{SeparateMetric}\\+ final \texttt{ToBasis}};
+    \node[funcbox=Purple, below=of stb_sep] (stb_trace)
+        {\texttt{TraceBasisDummy}\\[-1pt]
+         \scriptsize contract surviving\\
+         \scriptsize dummy index pairs};
+
+    \draw[arr] (stb_fp.south) -- (stb_sep)
+        node[midway, right, font=\tiny] {yes};
+    \draw[arr] (stb_sep) -- (stb_trace);
+
+    % Loop background
+    \begin{scope}[on background layer]
+        \node[loopregion, fit=(stb_tobasis)(stb_curved)
+              (stb_christzero)(stb_christeval)(stb_fp),
+              label={[font=\tiny\sffamily, text=BlueLine]
+              above right:fixed-point iteration}] {};
+    \end{scope}
+\end{scope}
+
+% ===================================================================
+%  SUB-DIAGRAM B: ExpandScalarWrappers (bottom-center)
+% ===================================================================
+
+\begin{scope}[shift={(3.5,-17.0)}]
+    \node[stage=Pink, font=\footnotesize\bfseries] (esw_title)
+        {ExpandScalarWrappers};
+    \node[below=0.02cm of esw_title, font=\tiny\sffamily, text=GrayLine]
+        {Resolves xAct \texttt{Scalar[]} wrappers around CovD};
+
+    \node[decision, below=0.5cm of esw_title, text width=1.6cm] (esw_gate)
+        {CovD inside\\Scalar[]?};
+
+    \node[stage=Green, right=1.5cm of esw_gate] (esw_skip)
+        {return unchanged};
+    \draw[arr] (esw_gate.east) -- (esw_skip)
+        node[midway, above, font=\tiny] {no};
+
+    \node[funcbox=Pink, below=0.6cm of esw_gate] (esw_p1)
+        {Phase 1: record\\abstract dummy pairs};
+    \node[annot, right=0.3cm of esw_p1, text width=2.2cm]
+        {\texttt{IndicesOf[expr]}\\to identify paired dummies};
+
+    \node[funcbox=Pink, below=of esw_p1] (esw_p2)
+        {Phase 2: staggered\\ToBasis on inner expr};
+    \node[annot, right=0.3cm of esw_p2, text width=2.2cm]
+        {iterative basis\\conversion (max 5 passes)};
+
+    \node[funcbox=Pink, below=of esw_p2] (esw_p3)
+        {Phase 3: sum-trace\\surviving pairs};
+    \node[annot, right=0.3cm of esw_p3, text width=2.2cm]
+        {$\sum_{a} f_{a}\, g^{a}$\\explicit summation};
+
+    \node[stage=Green, below=0.5cm of esw_p3] (esw_out)
+        {Scalar-free expression};
+
+    \draw[arr] (esw_title) -- (esw_gate);
+    \draw[arr] (esw_gate.south) -- (esw_p1)
+        node[midway, right, font=\tiny] {yes};
+    \draw[arr] (esw_p1) -- (esw_p2);
+    \draw[arr] (esw_p2) -- (esw_p3);
+    \draw[arr] (esw_p3) -- (esw_out);
+\end{scope}
+
+% ===================================================================
+%  SUB-DIAGRAM C: BatchedTraceBasisDummy (far right)
+% ===================================================================
+
+\begin{scope}[shift={(10.5,-17.0)}]
+    \node[stage=Blue, font=\footnotesize\bfseries] (bt_title)
+        {Batched Metric Trace};
+    \node[below=0.02cm of bt_title, font=\tiny\sffamily, text=GrayLine]
+        {Memory-bounded: $<$1\,GB vs 7\,GB unbatched};
+
+    \node[funcbox=Blue, below=0.4cm of bt_title] (bt_split)
+        {Split expression into\\batches ($\sim$50 terms)};
+
+    \node[stage=Pink, below=0.5cm of bt_split] (bt_loop)
+        {\textbf{For each} batch};
+
+    \node[funcbox=Blue, below=of bt_loop] (bt_trace)
+        {\texttt{TraceBasisDummy}};
+    \node[funcbox=Blue, below=of bt_trace] (bt_expand)
+        {\texttt{Expand}};
+    \node[funcbox=Blue, below=of bt_expand] (bt_meteval)
+        {Metric evaluation\\+ background eval};
+    \node[funcbox=Gray, below=of bt_meteval] (bt_measure)
+        {Measure term\\expansion factor};
+
+    \node[fpcheck, below=0.4cm of bt_measure] (bt_adapt)
+        {expansion\\too large?};
+
+    \node[funcbox=Gray, right=1.0cm of bt_adapt] (bt_reduce)
+        {Reduce batch\\size};
+
+    \node[funcbox=Blue, below=0.6cm of bt_adapt] (bt_accum)
+        {Accumulate result};
+
+    \draw[arr] (bt_title) -- (bt_split);
+    \draw[arr] (bt_split) -- (bt_loop);
+    \draw[arr] (bt_loop) -- (bt_trace);
+    \draw[arr] (bt_trace) -- (bt_expand);
+    \draw[arr] (bt_expand) -- (bt_meteval);
+    \draw[arr] (bt_meteval) -- (bt_measure);
+    \draw[arr] (bt_measure) -- (bt_adapt);
+    \draw[arr] (bt_adapt.east) -- (bt_reduce)
+        node[midway, above, font=\tiny] {yes};
+    \draw[arr] (bt_reduce.north) |- (bt_loop.east);
+    \draw[arr] (bt_adapt.south) -- (bt_accum)
+        node[midway, right, font=\tiny] {no};
+
+    \begin{scope}[on background layer]
+        \node[loopregion, fit=(bt_loop)(bt_trace)(bt_expand)
+              (bt_meteval)(bt_measure)(bt_adapt)(bt_reduce),
+              label={[font=\tiny\sffamily, text=BlueLine]
+              above right:adaptive batch loop}] {};
+    \end{scope}
+\end{scope}
+
+% ===================================================================
+%  DESIGN RATIONALE ANNOTATIONS
+% ===================================================================
+
+% Why hoisting matters
+\node[annot, left=1.0cm of hoistscalar, text width=3.0cm, anchor=east]
+    {Key optimisation: metric\\separation and Scalar expansion\\
+     done \emph{once} on full EOM,\\not per-component};
+
+% Why batching matters
+\node[annot, left=1.0cm of batchtrace, text width=3.0cm, anchor=east]
+    {Einstein--Maxwell without\\batching: 7\,GB peak memory.\\
+     With batching: $<$1\,GB};
+
+\end{tikzpicture}
+\end{document}

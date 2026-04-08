@@ -285,3 +285,77 @@ File & Change & Status \\
   \item \textbf{Backward-compatible}: No changes when \texttt{matter\_perturbations} is absent
   \item \textbf{Composable}: Works with existing gauge fixing, plane-wave reduction, background fields
 \end{enumerate}
+
+\subsection{Deferred Derived Fields}
+\label{sec:mfp-deferred}
+
+\subsubsection{Problem}
+
+Antisymmetric derived fields such as the electromagnetic field strength
+$F_{ab} = \nabla_a A_b - \nabla_b A_a$ must be handled carefully when the
+gauge field $A$ is a matter perturbation field.  If $F$ is expanded into its
+covariant-derivative form \emph{before} \texttt{xPert} processes the Lagrangian,
+\texttt{ToCanonical} merges the resulting contractions to zero --- because
+$\nabla_{[a}A_{b]} \nabla^{[a}A^{b]}$ contracts to zero in flat space before
+perturbation indices are assigned.  The effect is that all Maxwell kinetic terms
+vanish, and the photon equations emerge with \texttt{time\_order = 0}
+(non-dynamical, constraint fields).
+
+\subsubsection{Fix: Deferral Mechanism (v0.22.9, commit a50b11f)}
+
+The function \texttt{\_deferred\_derived\_fields(ctx)} in
+\texttt{tidal/cli/\_derive.py} identifies which derived fields should remain
+abstract during xPert expansion.
+
+\textbf{Detection rule:} A derived field is deferred when:
+\begin{enumerate}
+  \item It has \texttt{symmetry = "antisymmetric"} in the TOML.
+  \item Its \texttt{definition} string references at least one matter perturbation
+    field name (from \texttt{[[linearization.matter\_perturbations]]}).
+\end{enumerate}
+
+\textbf{Mechanism in WLS generation:}
+\begin{enumerate}
+  \item A \texttt{DefTensorPerturbation} is registered for the abstract $F$ tensor
+    so xPert can perturb it symbolically.
+  \item The concrete expansion ($F \to \nabla A - \nabla A$) is \emph{skipped}
+    before \texttt{xPert}.
+  \item After \texttt{ExpandPerturbation}, a substitution block replaces the
+    abstract perturbation-level $F^{(1)}$ with the concrete expression
+    $\nabla_a a_b - \nabla_b a_a$ (background level $F^{(0)}$ uses the background
+    field $\bar{A}$).
+  \item \textbf{Then} \texttt{ToCanonical} and \texttt{ContractMetric} run on the
+    fully expanded $\mathcal{L}^{(2)}$, correctly simplifying the kinetic terms
+    without zeroing them.
+\end{enumerate}
+
+\textbf{Generality:} The canonical example is the EM field strength $F = dA$ with $A$
+a matter perturbation.  The same mechanism applies to any antisymmetric derived
+field whose definition depends on a perturbation field; TOML entries with
+\texttt{symmetry = "antisymmetric"} and a \texttt{definition} referencing a
+perturbation field name are automatically deferred.
+
+\textbf{Example (dark photon torsion model):}
+
+\begin{lstlisting}[style=toml]
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+\end{lstlisting}
+
+Because \texttt{F}'s definition contains \texttt{A} and \texttt{A} is a matter
+perturbation field, \texttt{F} is automatically deferred.  Also, since \texttt{Ftorsion}
+references only the torsion trace (not a matter perturbation field), it is expanded
+immediately as before.
+
+\textbf{Impact:} Without deferral, all four photon equations had
+\texttt{time\_order = 0}.  With deferral, they correctly have \texttt{time\_order = 2}
+and carry non-zero RHS terms (laplacians, coupling gradients).

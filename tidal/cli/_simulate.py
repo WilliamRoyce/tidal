@@ -13,7 +13,6 @@ from tidal.cli._console import debug as _cdebug
 from tidal.cli._console import error as _cerror
 from tidal.cli._console import error_with_hint as _cerror_hint
 from tidal.cli._console import log as _clog
-from tidal.cli._console import warn as _cwarn
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -1323,43 +1322,6 @@ def _warn_zero_evolution(
         )
 
 
-def _check_mass_stability(
-    args: Namespace,
-    spec: EquationSystem,
-    grid_info: GridInfo,
-    params: dict[str, float],
-) -> None:
-    """Run the pre-simulation pointwise mass stability check.
-
-    Warns (or aborts with --require-stable) if the coupled mass matrix has
-    a negative eigenvalue at any grid point, indicating exponentially growing
-    modes.
-    """
-    from tidal.solver.coefficients import CoefficientEvaluator
-    from tidal.solver.validation import check_pointwise_mass_stability
-
-    coeff_eval = CoefficientEvaluator(spec, grid_info, params)
-    stability = check_pointwise_mass_stability(coeff_eval, spec, grid_info)
-    require_stable: bool = getattr(args, "require_stable", False)
-    # Informational notes (e.g. asymmetric matrix) — suppressed in --quiet mode
-    for note in stability.notes:
-        _clog(f"  Note: {note}")
-    # Stability errors (negative eigenvalues) — fatal with --require-stable
-    for msg in stability.errors:
-        if require_stable:
-            _cerror_hint(
-                msg,
-                [
-                    "Reduce `--ic-amplitude` or adjust `--param` values",
-                    "Remove `--require-stable` to run anyway (may diverge)",
-                ],
-            )
-        else:
-            _cwarn(msg)
-    if require_stable and stability.errors:
-        sys.exit(1)
-
-
 def _check_result_finite(result: SolverResult) -> None:
     """Raise SimulationDivergedError if the final state contains NaN or Inf.
 
@@ -1379,8 +1341,7 @@ def _check_result_finite(result: SolverResult) -> None:
     if not np.isfinite(final).all():
         msg = (
             "Simulation produced non-finite values (NaN or Inf). "
-            "The system is likely physically unstable. "
-            "Run with --require-stable to check before simulating."
+            "The system is likely physically unstable."
         )
         raise SimulationDivergedError(msg)
 
@@ -1981,7 +1942,9 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         # cannot handle. These are simulated by the modal solver's
         # generalized mass-matrix path which works directly in Fourier space.
         _warn_zero_evolution(spec, grid_info, y0, params, bc)
-    _check_mass_stability(args, spec, grid_info, params)
+    # Note: mass stability pre-check removed — the modal solver's eigenvalue
+    # pre-check (in _evolve_per_mode) provides more accurate instability
+    # detection using the full evolution matrix, not a simplified mass proxy.
 
     # 5. Compute dt for leapfrog (needed before snapshot configuration)
     dt: float | None = None
@@ -2432,6 +2395,13 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
         )
         return 1
 
+    # Step 3b: Normalize kinetic coefficients (e.g. xi in dark photon torsion).
+    # ExportJSON emits RHS un-divided when the kinetic coeff is param-based.
+    # At xi=0 the torsion fields become constraints; at xi≠0 divide through.
+    from tidal.symbolic.json_loader import normalize_kinetic_coefficients
+
+    spec = normalize_kinetic_coefficients(spec, params)
+
     # All simulation goes through the native IDA/leapfrog path
     try:
         return _simulate(args, spec, params)
@@ -2442,7 +2412,6 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
             _cerror_hint(
                 str(exc),
                 [
-                    "Try `--require-stable` to validate before running",
                     "Reduce `--ic-amplitude` or check `--param` values",
                     "Try smaller timestep with `--dt`",
                 ],

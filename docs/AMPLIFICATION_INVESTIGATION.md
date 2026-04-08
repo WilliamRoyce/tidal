@@ -1,0 +1,262 @@
+# Amplification Investigation Tracker
+
+Investigation of amplification and suppression of the Gertsenshtein effect in nonminimal PGT+EM models. See `docs/tex/amplification_mechanism.tex` for the physics documentation.
+
+## Status Key
+- [ ] Not started
+- [~] In progress
+- [x] Complete
+- [!] Blocked / needs discussion
+
+## Priority 1 -- Foundation
+
+- [x] Numerical Schur complement extraction (Phase A)
+  - [x] Write `examples/torsion_gertsenshtein/schur_complement_analysis.py`
+  - [x] Extract mu_eff and m2_eff at grid of (delta1, alpha2) points
+  - [x] Map instability boundary alpha2_crit(delta1) from sweep data
+  - [x] Extract coupling zero-crossing delta1_crit(alpha2) = 0.62
+  - [!] Mini-solver validation: blocked by persistent tachyonic eigenvalues in h5-a1 block
+
+- [x] Wolfram symbolic Schur complement (Phase A2)
+  - [x] Write `examples/torsion_gertsenshtein/schur_complement_symbolic.wl`
+  - [x] Build Block A (3x3) and Block B (5x5) symbolically
+  - [x] Compute Inverse[S_cc] for each block
+  - [x] Derive closed-form mu_eff and mu_ratio formulas
+  - [x] Apply kinetic normalization (divide h5 row by -1/kappa^2)
+  - [ ] Full numerical verification against Python (partial: signs match, magnitudes differ due to lambda-dependence)
+
+- [!] Validate vs sweep data (Phase B) -- BLOCKED
+  - [!] A_coupling = |mu_ratio|^2 at single k does NOT predict A_sweep
+  - [!] Mini-solver approach blocked by tachyonic modes in reduced system
+  - [!] Root cause: h5-a1 block has real eigenvalues +-lambda even after normalization
+  - [!] The actual modal solver handles this via block-aware evolution + Hamiltonian energy
+  - [ ] NEXT: investigate how Hamiltonian energy makes P bounded despite tachyonic modes
+
+- [x] Documentation: `docs/tex/amplification_mechanism.tex`
+  - [x] Coupling modification mechanism (Schur complement derivation)
+  - [x] Distinction table vs Cembranos/Berlin/Lella
+  - [x] Constraint block structure (Block A + Block B)
+  - [x] delta1 symmetry explanation
+  - [x] B0 scaling verification
+  - [x] Observational implications (physical units, constraints, spectral signature)
+  - [x] Full literature citations
+
+## Priority 2 -- Precision & Scaling
+
+- [x] B0 scaling check (Exp 3)
+  - [x] Sweep B0 at amplification peak: C0 = 30,204 constant to 4 sig figs
+  - [x] A = C0/C0_EM = 48.3 (plane-wave IC)
+
+- [~] High-res boundary zoom (Exp 2)
+  - [~] sweep_alpha2_hires.sh: 200 points, delta1=1.0, alpha2=-1.2:-0.5, B0=0.0001
+  - [ ] Post-process and plot log10(A) vs alpha2
+  - [ ] Extract scaling exponent near boundary
+
+- [ ] Reparametrize plots
+  - [x] Instability boundary extracted from sweep data
+  - [ ] Re-plot heatmap with boundary-distance axis
+
+- [x] Suppression valley phase analysis (Exp 5)
+  - [x] Zero-crossing at delta1 = 0.62 (confirmed numerically)
+  - [x] Coupling sign reversal verified
+
+## Priority 3 -- Extensions
+
+- [ ] Frequency dependence (Exp 4)
+  - [x] Coupling ratio vs k table computed (1.55x to 7.48x)
+  - [ ] Systematic k sweep via mini-solver or simulations
+  - [ ] Characterize scaling exponent
+
+- [ ] Three-sector survey (Exp 6)
+  - [ ] 3D LHS over (alpha1, alpha2, alpha3)
+  - [ ] Identify which sectors contribute
+
+- [x] Observational implications
+  - [x] Physical unit translation in amplification_mechanism.tex
+  - [x] kappa_eff = sqrt(A)*kappa ~ 7*kappa
+  - [x] Lella et al. bounds strengthened by factor sqrt(A)
+  - [x] Blue-tilted spectral signature identified as unique prediction
+
+## Key Discoveries
+
+### 2026-04-07: Coupling reversal mechanism identified
+
+Numerical Schur complement analysis of the h5-a1 block reveals:
+
+1. **Not light-mediator 1/m^2**: The torsion mass matrix M_torsion is well-conditioned
+   (smallest eigenvalue -0.5 to -3.5) at all amplified points. The M_torsion singularity
+   is at alpha2=-0.25, far from the instability boundary (alpha2 ~ -1.1 to -1.8).
+
+2. **Coupling reversal**: The primary amplification mechanism is SIGN REVERSAL of the
+   effective h5-a1 coupling. At alpha2=-0.95, the coupling crosses zero at delta1 ~ 0.63.
+   Below: slight suppression. Above: coupling reverses sign and grows.
+
+3. **Quantitative coupling ratios** (alpha2=-0.82, delta1=1.0):
+   - k=0.063: mu_eff/mu_GR = -1.55
+   - k=0.503: mu_eff/mu_GR = -1.92
+   - k=2.011: mu_eff/mu_GR = -7.48
+   Enhancement is k-dependent (grows with wavenumber).
+
+4. **Mass shift**: Torsion feedback also shifts the photon effective mass:
+   m2_eff(a1) = -k^2 + shift(delta1^2, alpha_i, k). When shift > k^2,
+   the photon becomes tachyonic (instability). The instability boundary
+   shifts with delta1 (from alpha2=-1.78 at small delta1 to -1.14 at delta1=1).
+
+5. **Two independent constraint blocks mediate the coupling**:
+   - Block A (3x3): {t_0, t_15, t_22} -- spatial coupling
+   - Block B (5x5): {t_3, t_4, t_7, t_8, t_18} -- time-derivative coupling
+
+6. **Suppression valley** = exact destructive interference where mu_eff = 0.
+   Zero-crossing mapped: at alpha2=-0.95, delta1_crit = 0.63.
+
+### 2026-04-07: Exponential h5 growth and measurement normalization
+
+The h5 graviton equation in the PGT nonminimal model has POSITIVE effective mass:
+  d2_t h5 = +k^2/kappa^2 * h5 + B0^2/2 * h5 + coupling*a1
+This gives exponential growth h5(t) ~ cosh(kt), NOT oscillatory wave propagation.
+The 4x4 h5+a1 block from A_reduced shows P growing to ~0.56 at t=10, while the
+actual simulation gives P=0.005.
+
+The resolution: the conversion measurement normalizes P(t) = E_target(t)/E_source(0),
+which uses the initial source energy, not the instantaneous. The modal solver correctly
+handles the exponentially growing modes. The amplification factor A = P_torsion/P_GR
+is well-defined because BOTH numerator and denominator have the same h5 growth.
+
+**Consequence**: The Schur complement coupling ratio mu_eff/mu_GR does NOT directly
+give the amplification factor A. The full eigenvalue structure (including growth rates)
+must be accounted for. The correct approach to predict A is to evolve the 4x4 block
+with identical ICs for both GR and torsion cases, then take the ratio of P_max values.
+
+### 2026-04-07: B0 scaling verification PASSED
+
+C0 = P/B0^2 is constant to 4 significant figures across B0 = 1e-6 to 1e-4:
+  C0 = 30,204 (torsion-modified, delta1=1.0, alpha2=-0.82)
+  C0_EM = 625 (Gertsenshtein baseline)
+  A = C0/C0_EM = 48.3 (amplification factor at this parameter point)
+
+Deviations at B0=1e-3 (+0.03%) and B0=1e-2 (-3.3%) from nonlinear backreaction.
+This confirms the amplification is a coupling modification, NOT a nonlinear effect.
+
+### 2026-04-07: Kinetic normalization bug found and fixed
+
+The schur_complement_analysis.py was missing normalize_kinetic_coefficients(), causing
+h_5 to appear with wrong-sign mass (+k^2 instead of -k^2). After fixing:
+- GR baseline eigenvalues are purely imaginary (oscillatory)
+- No more spurious exponential growth
+- Coupling ratios and zero-crossing location unchanged (sign-independent)
+
+### 2026-04-08: NULL RESULT — Minimal PGT with propagating torsion does not modify Gertsenshtein
+
+Model: L = R̃/κ² + β₁I₁ + β₂I₂ + β₃I₃ − (ξ/4)Ftorsion² − ¼F²
+
+200-point LHS sweep across β₁,β₂,β₃ ∈ [-10,10], ξ ∈ [0.01,100]:
+  ALL 200 runs: P_max = 6.249987e-06 (= GR baseline to machine precision)
+  Max relative deviation from GR: 2.3e-13
+  Block-diagonal structure verified analytically in derived JSON
+
+The h₅↔a₁ Gertsenshtein channel is completely independent of ALL torsion
+parameters. Barker's torsion kinetic term (Ftorsion²) gives ghost-free
+propagating vector torsion but does NOT break the block-diagonal structure.
+Any torsion-Gertsenshtein coupling requires beyond-minimal terms.
+
+### 2026-04-08: DEFINITIVE — Large amplification factors are tachyonic instability artifacts
+
+**ALL amplification factors A >> 2 are tachyonic onset instability, NOT genuine 
+physical amplification of the Gertsenshtein effect.**
+
+Evidence (t_end independence test at delta1=1.0, alpha2=-0.909, plane-wave IC):
+
+| t_end | P_GR     | P_torsion | A = P_t/P_GR |
+|-------|----------|-----------|--------------|
+| 20    | 2e-6     | 1.3e-5    | 6.5          |
+| 30    | 3e-6     | 9.6e-5    | 32           |
+| 40    | 4e-6     | 6.8e-4    | 170          |
+| 50    | 6e-6     | 4.85e-3   | 808          |
+
+A grows exponentially with t_end: this is exp(gamma*t)/t^2 (tachyonic photon growth
+vs quadratic GR growth). At alpha2=-0.82 (B0 scaling point): P=441,663 at t=25 
+(explosively diverged).
+
+**The B0 scaling test does NOT distinguish amplification from instability** because 
+the tachyonic growth rate gamma is B0-independent. Both give C0 = P/B0^2 = const.
+
+**Genuine effects (time-independent)**:
+- Coupling modification: A_coupling = |mu_eff/mu_GR|^2 ≈ 1.9 (modest, from Schur complement)
+- Suppression: A ≈ 0.001 at alpha2=-1.0 (1000x suppression, genuine destructive interference)
+  - P_torsion ≈ 0 at both t=25 and t=50 (confirmed time-independent)
+
+**Root cause**: The delta1 R_tilde_{[mu nu]} F^{mu nu} coupling shifts the effective
+photon mass m^2_eff(a1) through zero via the Schur complement. At the tachyonic
+boundary (m^2_eff = 0), conversion grows exponentially, mimicking amplification.
+The boundary is k-dependent: the plane-wave mode (k ~ 0.063) crosses tachyonic
+at alpha2 ~ -0.913 (for delta1=1.0, alpha1=0, alpha3=1.0, kappa=1).
+
+**Conclusion**: The nonminimal PGT model produces SUPPRESSION of Gertsenshtein 
+conversion in the stable parameter region, and tachyonic instability near the 
+stability boundary. There is no genuine amplification > ~2x.
+
+**Action items**:
+- [x] Document this finding (this entry)
+- [ ] Revise amplification_mechanism.tex (retitle, reframe as instability)
+- [ ] Add t_end independence test to prevent future recurrence
+- [ ] Create GitHub issue for the record
+- [ ] Update memory files
+
+### 2026-04-08: ~~Clean plane-wave alpha2 sweep — "A=665x"~~ (RETRACTED — tachyonic artifact)
+
+**NOTE**: The A=665 value below was later identified as tachyonic onset instability,
+not genuine amplification. See "DEFINITIVE" entry above.
+
+Original analysis (plane-wave IC, delta1=1.0):
+- 100 points, alpha2 from -1.2 to -0.4
+- 37 valid (P<0.1), 54 diverged, 9 outside linear regime
+- Max amplification: A = 665x at alpha2 = -0.909 (stability boundary)
+- Suppression valley: A ~ 0.001 (log10_A ~ -3) across most stable range
+- Sharp transition from suppression to 665x amplification at alpha2 = -0.91
+- B0 scaling A=48.3 at alpha2=-0.82 is consistent (different alpha2 point)
+
+The genuine torsion amplification is ~665x at the stability boundary, not
+8000x as the old Gaussian-IC heatmap suggested. The old data was contaminated
+by (a) tachyonic modes from broad Fourier support and (b) IC amplitude >> B0.
+
+### 2026-04-08: IC amplitude must be << B0 for valid linearization
+
+CRITICAL: The default IC amplitude (1.0) violates linearization when B0=0.0001:
+the perturbation is 10,000x larger than the background field. ALL heatmap results
+with default amplitude were generated in the nonlinear regime where the linearized
+theory is invalid.
+
+For valid linearized physics: amplitude << B0. E.g., amplitude = 1e-6 for B0=0.0001.
+The B0 scaling sweep (amplitude=0.1) was also suspect: 0.1/0.0001 = 1000x ratio.
+
+The divergence guard fires at small amplitudes because the amplitude ratio threshold
+(1e8) is reached faster when the initial amplitude is small. This explains why the
+old heatmap (amplitude=1.0) "succeeded" while physically-correct small amplitudes
+trigger the guard — the large IC masks the exponential growth in the ratio metric.
+
+### 2026-04-07: Heatmap contamination from pre-guard tachyonic modes
+
+CRITICAL FINDING: The heatmap sweep (v0.25.19) was generated BEFORE the eigenvalue
+pre-check divergence guard (commit 2b94172). The "valid" high-amplification points
+(A ~ 5000-8000) at delta1=1.0 were contaminated by tachyonic modes that escaped
+detection. With the current divergence guard, ALL Gaussian-IC runs at delta1=1.0
+diverge — including alpha2=-0.5 which appeared "valid" in the heatmap.
+
+Plane-wave IC simulations still succeed because the narrow Fourier support avoids
+projecting onto tachyonic high-k modes. The B0 scaling result (A=48.3 for plane-wave
+IC at delta1=1.0, alpha2=-0.82) remains valid.
+
+IMPLICATION: The large amplification factors (A >> 100) in the heatmap are artifacts.
+The genuine torsion amplification (plane-wave IC) is A ~ 48 at this parameter point.
+The heatmap must be regenerated with the current divergence guard to establish
+trustworthy amplification values for Gaussian IC.
+
+ALSO FIXED: sweep parallel worker crash on SimulationDivergedError (commit 923ac8a).
+_run_single_wrapper() now catches diverged runs and records them as status='diverged'.
+
+### 2026-04-07: Two instability regions confirmed
+
+Eigenvalue analysis with baseline-relative criterion reveals two instability regions:
+- Lower boundary (Block A denominator pole): alpha2 -> -7/(4*kappa^2) = -1.75 at kappa=1
+- Upper boundary (tachyonic photon): alpha2 varies with delta1 (~-0.80 at delta1=1)
+- Stable window at delta1=1: approximately -1.14 < alpha2 < -0.76

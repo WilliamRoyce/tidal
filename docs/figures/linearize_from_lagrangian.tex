@@ -1,0 +1,226 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tidal-tikz-styles}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.45cm and 0.8cm,
+    every node/.append style={text opacity=1},
+]
+
+% ===================================================================
+%  TITLE
+% ===================================================================
+\node[font=\normalsize\bfseries, text=black] (title)
+    {Lagrangian Linearisation Pipeline};
+\node[below=0.02cm of title, font=\tiny\sffamily, text=GrayLine]
+    {Full nonlinear $\mathcal{L}$ $\to$ linearised EOM via xPert};
+
+% ===================================================================
+%  ENTRY
+% ===================================================================
+
+\node[stage=Gray, below=0.5cm of title] (entry)
+    {\textbf{Input}: full Lagrangian $\mathcal{L}(g, \phi, A, \ldots)$\\[-1pt]
+     \scriptsize metric + matter fields, constants, background config};
+
+% ===================================================================
+%  STEP 1: Second-order perturbation
+% ===================================================================
+
+\node[stage=Purple, below=0.5cm of entry, text width=4.6cm] (step1)
+    {\textbf{Step 1}: Quadratic Lagrangian\\[-1pt]
+     \scriptsize $\mathcal{L}^{(2)} =
+     \frac{1}{2}\frac{\delta^2(\sqrt{|g|}\,\mathcal{L})}
+     {\sqrt{|g_0|}}$};
+
+\node[annot, right=2.0cm of step1, text width=3.8cm]
+    {xPert: \texttt{Perturbation[L, 2]}\\
+     $\to$ \texttt{ExpandPerturbation}\\
+     $\to$ truncate $O(\varepsilon^{3+})$\\
+     $\to$ divide by background $\sqrt{|g_0|}$\\[3pt]
+     Result: quadratic in perturbations\\
+     $\to$ linear EOM after variation};
+
+\draw[arr] (entry) -- (step1);
+
+% ===================================================================
+%  STEP 2: Matter perturbation (conditional)
+% ===================================================================
+
+\node[check, below=0.5cm of step1, text width=4.6cm] (step2)
+    {\textbf{Step 2}: Matter field perturbations\\[-1pt]
+     \scriptsize $A_\mu \to \bar{A}_\mu + \varepsilon\, a_\mu$, \quad
+     $\phi \to \bar{\phi} + \varepsilon\, \varphi$};
+
+\node[annot, right=2.0cm of step2, text width=3.8cm]
+    {xPert's \texttt{DefTensorPerturbation}\\
+     for each matter field declared\\
+     in \texttt{[[linearization.}\\
+     \texttt{matter\_perturbations]]} TOML.\\[3pt]
+     Metric perturbation $h_{\mu\nu}$\\
+     always included automatically.};
+
+\draw[arr] (step1) -- (step2);
+
+% ===================================================================
+%  STEP 3: Fierz-Pauli fix
+% ===================================================================
+
+\node[funcbox=Purple, below=0.5cm of step2, text width=4.6cm] (step3)
+    {\textbf{Step 3}: Scalar wrapper expansion\\[-1pt]
+     \scriptsize Expand \texttt{Scalar[x]\^{}n} $\to$ product of renamed copies};
+
+\node[annot, right=2.0cm of step3, text width=3.8cm]
+    {Fierz--Pauli fix: prevents xPert\\
+     from conflating dummy index\\
+     pairs in products of Scalar[]\\
+     wrappers.  Essential for correct\\
+     multi-index contractions.};
+
+\draw[arr] (step2) -- (step3);
+
+% ===================================================================
+%  STEP 4: Background substitution cascade
+% ===================================================================
+
+\node[stage=Purple, below=0.5cm of step3, text width=4.6cm] (step4)
+    {\textbf{Step 4}: Background substitution};
+
+\node[funcbox=Purple, below=0.3cm of step4, text width=3.4cm] (bg_met)
+    {Metric: $g_{\mu\nu} \to \bar{g}_{\mu\nu}$};
+
+\node[funcbox=Purple, below=of bg_met, text width=3.4cm] (bg_scalar)
+    {Scalars: $\phi \to \bar{\phi}(x)$};
+
+\node[funcbox=Purple, below=of bg_scalar, text width=3.4cm] (bg_vector)
+    {Vectors: $A_\mu \to \bar{A}_\mu(x)$\\[-1pt]
+     \scriptsize position-dependent profiles};
+
+\node[annot, right=2.0cm of bg_scalar, text width=3.8cm]
+    {Backgrounds must be substituted\\
+     \emph{before} variation, so that\\
+     VarD only varies perturbations.\\[3pt]
+     Position-dependent backgrounds\\
+     (e.g.\ $\bar{B}_\mu(x)$) create\\
+     coordinate-dependent coefficients.};
+
+\draw[arr] (step3) -- (step4);
+\draw[arr] (step4) -- (bg_met);
+\draw[arr] (bg_met) -- (bg_scalar);
+\draw[arr] (bg_scalar) -- (bg_vector);
+
+% ===================================================================
+%  STEP 5: Plane-wave reduction (conditional)
+% ===================================================================
+
+\node[check, below=0.5cm of bg_vector, text width=4.6cm] (step5)
+    {\textbf{Step 5}: Plane-wave reduction on $\mathcal{L}^{(2)}$\\[-1pt]
+     \scriptsize zero transverse spatial derivatives\\
+     \scriptsize $\to$ effective 1+1D from 3+1D};
+
+\draw[arr] (bg_vector) -- (step5);
+
+% ===================================================================
+%  STEP 6: Torsion decomposition (conditional)
+% ===================================================================
+
+\node[check, below=0.5cm of step5, text width=4.6cm] (step6)
+    {\textbf{Step 6}: Torsion curvature decomposition\\[-1pt]
+     \scriptsize Riemann--Cartan $\tilde{R}_{abcd}$ $\to$\\
+     \scriptsize Riemannian $R_{abcd}$ + torsion contractions};
+
+\node[annot, right=2.0cm of step6, text width=3.8cm]
+    {For Poincar\'{e} gauge theories:\\
+     decompose the full curvature\\
+     into GR Riemann + contorsion.\\
+     Enables torsion-specific coupling\\
+     analysis.};
+
+\draw[arr] (step5) -- (step6);
+
+% ===================================================================
+%  STEP 7: Euler-Lagrange per field
+% ===================================================================
+
+\node[stage=Purple, below=0.6cm of step6, text width=4.6cm] (step7)
+    {\textbf{Step 7}: Euler--Lagrange per field};
+
+\node[stage=Pink, below=0.4cm of step7] (varloop)
+    {\textbf{For each} dynamical perturbation $\delta\phi^A$};
+
+\node[funcbox=Purple, below=of varloop] (vard)
+    {\texttt{VarD[$\delta\phi^A$, CD][$\mathcal{L}^{(2)}$]}\\[-1pt]
+     \scriptsize functional derivative (xAct)};
+
+\node[funcbox=Purple, below=of vard] (canon)
+    {\texttt{ToCanonical} + \texttt{ContractMetric}\\[-1pt]
+     \scriptsize canonicalise abstract index form};
+
+\draw[arr] (step6) -- (step7);
+\draw[arr] (step7) -- (varloop);
+\draw[arr] (varloop) -- (vard);
+\draw[arr] (vard) -- (canon);
+
+% Loop
+\node[fpcheck, below=0.4cm of canon] (morefields)
+    {more\\fields?};
+\draw[arr] (canon) -- (morefields);
+\draw[arr] (morefields.east) -- ++(1.5,0) |- (varloop.east)
+    node[pos=0.25, right, font=\tiny] {yes};
+
+% Loop background
+\begin{scope}[on background layer]
+    \node[loopregion, fit=(varloop)(vard)(canon)(morefields),
+          label={[font=\tiny\sffamily, text=BlueLine]
+          above right:per-field loop}] {};
+\end{scope}
+
+% ===================================================================
+%  STEP 8: Gauge + assembly
+% ===================================================================
+
+\node[check, below=0.6cm of morefields, text width=4.6cm] (gauge)
+    {\textbf{Step 8}: Gauge substitutions\\[-1pt]
+     \scriptsize apply constraints (TT, Coulomb, etc.)\\
+     \scriptsize to eliminate redundant components};
+\draw[arr] (morefields.south) -- (gauge)
+    node[midway, right, font=\tiny] {no};
+
+\node[stage=Green, below=0.5cm of gauge] (output)
+    {\textbf{Output}: \texttt{fieldEquations}\\[-1pt]
+     \scriptsize list of (field, tensor EOM) pairs\\
+     \scriptsize linearised, gauge-fixed};
+
+\draw[arr] (gauge) -- (output);
+
+% ===================================================================
+%  PHASE ANNOTATIONS (left side)
+% ===================================================================
+
+\node[annot, left=3.5cm of step1, text width=2.2cm, anchor=east]
+    {\textbf{Perturbation}\\theory (xPert)};
+\node[annot, left=3.5cm of step4, text width=2.2cm, anchor=east]
+    {\textbf{Background}\\substitution};
+\node[annot, left=3.5cm of step7, text width=2.2cm, anchor=east]
+    {\textbf{Variational}\\calculus (VarD)};
+
+% Decorative brace: xPert phase
+\draw[decorate, decoration={brace, amplitude=6pt, mirror},
+      thick, GrayLine]
+    ([xshift=-3.0cm]step1.north west) --
+    ([xshift=-3.0cm]step3.south west);
+
+% Decorative brace: background phase
+\draw[decorate, decoration={brace, amplitude=6pt, mirror},
+      thick, GrayLine]
+    ([xshift=-3.0cm]step4.north west) --
+    ([xshift=-3.0cm]step6.south west);
+
+% Decorative brace: VarD phase
+\draw[decorate, decoration={brace, amplitude=6pt, mirror},
+      thick, GrayLine]
+    ([xshift=-3.0cm]step7.north west) --
+    ([xshift=-3.0cm]gauge.south west);
+
+\end{tikzpicture}
+\end{document}

@@ -156,6 +156,21 @@ wheels = [
 ]
 
 [[package]]
+name = "anesthetic"
+version = "2.13.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9f/e8/8af4c3e79972cfa56b6dcf494fad2bbf4fb66c2986c5dc782d3e532fd7ad/anesthetic-2.13.5.tar.gz", hash = "sha256:37dc6243c9ee0f38bdbf61283bc486b48a80cf2e0a17568584408c5844e11c57", size = 116183, upload-time = "2026-03-20T12:07:30.471Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/50/bf82cc634850b9b350691c15a0ae56226ad32e89cbd782764365e5ab0fe8/anesthetic-2.13.5-py3-none-any.whl", hash = "sha256:d4c048ff2ea16f126179ee8b97e327827f41379d1e9fdda3e224360f7bf5e785", size = 84480, upload-time = "2026-03-20T12:07:29.055Z" },
+]
+
+[[package]]
 name = "attrs"
 version = "25.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -546,6 +561,20 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ae/ed/aefcc8cd0ba62a0560c3c18c33925362d46c6075480bfa4df87b28e169a9/docutils-0.21.2.tar.gz", hash = "sha256:3a6b18732edf182daa3cd12775bbb338cf5691468f91eeeb109deff6ebfa986f", size = 2204444, upload-time = "2024-04-23T18:57:18.24Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8f/d7/9322c609343d929e75e7e5e6255e614fcc67572cfd083959cdef3b7aad79/docutils-0.21.2-py3-none-any.whl", hash = "sha256:dafca5b9e384f0e419294eb4d2ff9fa826435bf15f15b7bd45723e8ad76811b2", size = 587408, upload-time = "2024-04-23T18:57:14.835Z" },
+]
+
+[[package]]
+name = "dynesty"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/56/90/b538da9a03522e91252acc36dceb9e38538db0303f2dc314e0e417404d2c/dynesty-3.0.0.tar.gz", hash = "sha256:806c83b21904cf7df73c2478a9e0e8a2b7d811cd0d613109f3f810a7111d12b0", size = 35559700, upload-time = "2025-10-04T21:34:19.578Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4a/45/68f4ab90f889abbeec5932751643f055bb811a33ef7361ac849426dcc38a/dynesty-3.0.0-py3-none-any.whl", hash = "sha256:4cdbbb39c61158f4d882445b064b742fcdc4d03ba9b2ba845801cd2ca6fcb761", size = 102885, upload-time = "2025-10-04T21:34:12.006Z" },
 ]
 
 [[package]]
@@ -2111,7 +2140,7 @@ wheels = [
 
 [[package]]
 name = "tidal"
-version = "0.22.12"
+version = "0.26.4"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -2127,6 +2156,10 @@ color = [
 ]
 completion = [
     { name = "shtab" },
+]
+inference = [
+    { name = "anesthetic" },
+    { name = "dynesty" },
 ]
 sensitivity = [
     { name = "salib" },
@@ -2149,6 +2182,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anesthetic", marker = "extra == 'inference'", specifier = ">=2.0" },
+    { name = "dynesty", marker = "extra == 'inference'", specifier = ">=2.1" },
     { name = "matplotlib", specifier = ">=3.1,<4.0" },
     { name = "numpy", specifier = ">=1.22,<3.0" },
     { name = "rich-argparse", marker = "extra == 'color'", specifier = ">=1.4" },
@@ -2159,7 +2194,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.60" },
     { name = "wolframclient", marker = "extra == 'wolfram'", specifier = ">=1.4.0,<2.0" },
 ]
-provides-extras = ["wolfram", "sensitivity", "completion", "color"]
+provides-extras = ["wolfram", "sensitivity", "inference", "completion", "color"]
 
 [package.metadata.requires-dev]
 dev = [

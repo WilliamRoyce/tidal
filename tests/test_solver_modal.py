@@ -944,17 +944,21 @@ class TestModalBlockIsolation:
         x = np.linspace(0.0, 100.0, 64, endpoint=False)
         y0[: grid.num_points] = 0.1 * np.exp(-((x - 50.0) ** 2) / (2 * 5.0**2))
 
-        # Long time → growth factor > exp(30) should trigger warning
+        # Long time → growth factor > exp(30) should trigger warning,
+        # and the divergence guard should raise SimulationDivergedError.
+        from tidal.solver._exceptions import SimulationDivergedError
+
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            solve_modal(
-                spec,
-                grid,
-                y0,
-                (0.0, 500.0),
-                parameters={"B0": 0.3, "kappa2": 1.0},
-                num_snapshots=6,
-            )
+            with pytest.raises(SimulationDivergedError, match="diverged"):
+                solve_modal(
+                    spec,
+                    grid,
+                    y0,
+                    (0.0, 500.0),
+                    parameters={"B0": 0.3, "kappa2": 1.0},
+                    num_snapshots=6,
+                )
 
         modal_warnings = [x for x in w if "positive real parts" in str(x.message)]
         assert len(modal_warnings) > 0, "No eigenvalue growth warning issued for t=500"

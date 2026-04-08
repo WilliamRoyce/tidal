@@ -92,7 +92,6 @@ _SIM_KEY_MAP: dict[str, str] = {
     "max_step": "max_step",
     "snapshots": "snapshots",
     "mode": "mode",
-    "require_stable": "require_stable",
     "allow_inconsistent_ic": "allow_inconsistent_ic",
 }
 

@@ -1,8 +1,7 @@
 # Manuscript
 
-This directory contains the masters project report/article. All contents except
-this README and `.gitignore` are git-ignored to prevent the manuscript from
-appearing in the public repository (plagiarism detection protection).
+Masters project report/article, based on the supervisor's
+[LaTeX template](https://wevbarker.co.uk/graduate/).
 
 ## Structure
 
@@ -14,7 +13,6 @@ sections/
   abstract.tex      Abstract
   introduction.tex  Introduction
   theory.tex        Theory
-  methods.tex       Methods
   results.tex       Results
   discussion.tex    Concluding remarks
   acknowledgements.tex

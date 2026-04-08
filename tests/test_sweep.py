@@ -43,25 +43,39 @@ class TestParseSweepSpec:
     """Test sweep specification parsing."""
 
     def test_linear_range(self) -> None:
-        name, vals = parse_sweep_spec("g0=0.1:1.0:5")
+        name, vals, scale = parse_sweep_spec("g0=0.1:1.0:5")
         assert name == "g0"
         assert len(vals) == 5
         assert vals[0] == pytest.approx(0.1)
         assert vals[-1] == pytest.approx(1.0)
+        assert scale == "linear"
 
     def test_log_range(self) -> None:
-        name, vals = parse_sweep_spec("m2=0.01:100.0:5:log")
+        name, vals, scale = parse_sweep_spec("m2=0.01:100.0:5:log")
         assert name == "m2"
         assert len(vals) == 5
         assert vals[0] == pytest.approx(0.01)
         assert vals[-1] == pytest.approx(100.0)
         # Log-spaced: middle value should be geometric mean
         assert vals[2] == pytest.approx(1.0, rel=0.01)
+        assert scale == "log"
+
+    def test_arctan_range(self) -> None:
+        name, vals, scale = parse_sweep_spec("beta1=10:arctan")
+        assert name == "beta1"
+        assert len(vals) == 10
+        assert scale == "arctan"
+        # Symmetric around zero
+        assert vals[len(vals) // 2 - 1] == pytest.approx(-vals[len(vals) // 2], abs=0.1)
+        # Covers wide range (±~100 with default eps=0.01)
+        assert vals[0] < -10
+        assert vals[-1] > 10
 
     def test_explicit_values(self) -> None:
-        name, vals = parse_sweep_spec("g0=0.1,0.5,1.0,2.0")
+        name, vals, scale = parse_sweep_spec("g0=0.1,0.5,1.0,2.0")
         assert name == "g0"
         assert vals == [0.1, 0.5, 1.0, 2.0]
+        assert scale == "linear"
 
     def test_invalid_no_equals(self) -> None:
         with pytest.raises(ValueError, match="Invalid sweep spec"):
@@ -92,7 +106,7 @@ class TestParseSweepSpec:
             parse_sweep_spec("g0=0.5")
 
     def test_whitespace_handling(self) -> None:
-        name, vals = parse_sweep_spec("  g0  =  0.1 , 0.5 , 1.0  ")
+        name, vals, _scale = parse_sweep_spec("  g0  =  0.1 , 0.5 , 1.0  ")
         assert name == "g0"
         assert len(vals) == 3
 

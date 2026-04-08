@@ -24,6 +24,8 @@
 \node[stage=Gray] (toml)
     {\textbf{TOML config}\\[-1pt]
      \scriptsize fields, Lagrangian, constants};
+\node[annot, left=0.15cm of toml, anchor=east]
+    {see \emph{derive\_orchestration}};
 
 \node[stage=Purple, below=of toml] (wls)
     {\textbf{Generate Wolfram script}\\[-1pt]
@@ -51,6 +53,8 @@
 \node[stage=Purple, below=of tobasis] (batch)
     {Evaluate metric contractions \& traces\\[-1pt]
      \scriptsize batched expansion ($\sim$50 terms)};
+\node[annot, left=0.15cm of batch, anchor=east]
+    {see \emph{metric\_evaluation\_pipeline}};
 
 \node[stage=Purple, below=of batch] (christoffel)
     {Compute Christoffel symbols $\Gamma^a_{\ bc}$\\[-1pt]
@@ -60,6 +64,8 @@
     {Decompose tensors $\to$ scalar components\\[-1pt]
      \scriptsize $T_{ab} \to T_0, T_1, \ldots$
      (symmetry $\to$ canonical reps)};
+\node[annot, left=0.15cm of replace, anchor=east]
+    {see \emph{component\_decompose\_algorithm}};
 
 \node[stage=Purple, below=of replace] (convert)
     {Covariant $\to$ partial derivatives\\[-1pt]
@@ -68,6 +74,8 @@
 \node[stage=Green, below=of convert] (export)
     {\textbf{Export to intermediate representation}\\[-1pt]
      \scriptsize coefficients, operators, fields};
+\node[annot, left=0.15cm of export, anchor=east]
+    {see \emph{export\_json\_classification}};
 
 \node[stage=Blue, below=of export] (json)
     {\textbf{\texttt{spec.json}}};
@@ -133,6 +141,8 @@
     {xPert perturbation\\[1pt]
      \scriptsize $g \to \bar{g} + \varepsilon h$\\
      \scriptsize $A \to \bar{A} + \varepsilon a$};
+\node[annot, below=0.05cm of xpert]
+    {see \emph{linearise\_from\_lagrangian}};
 \draw[arr, densely dashed, GreenLine]
     (xpert.west) -- (vard.east);
 

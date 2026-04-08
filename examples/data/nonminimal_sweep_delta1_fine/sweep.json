@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "spec_path": "examples/data/torsion_gertsenshtein_nonminimal.json",
+  "swept_parameters": {
+    "delta1": [
+      0.85,
+      0.8551724137931034,
+      0.8603448275862069,
+      0.8655172413793103,
+      0.8706896551724138,
+      0.8758620689655172,
+      0.8810344827586207,
+      0.8862068965517241,
+      0.8913793103448275,
+      0.896551724137931,
+      0.9017241379310345,
+      0.906896551724138,
+      0.9120689655172414,
+      0.9172413793103448,
+      0.9224137931034483,
+      0.9275862068965517,
+      0.9327586206896552,
+      0.9379310344827586,
+      0.943103448275862,
+      0.9482758620689655,
+      0.9534482758620689,
+      0.9586206896551724,
+      0.9637931034482758,
+      0.9689655172413794,
+      0.9741379310344828,
+      0.9793103448275862,
+      0.9844827586206897,
+      0.9896551724137931,
+      0.9948275862068965,
+      1.0
+    ]
+  },
+  "fixed_parameters": {
+    "kappa": 1.0,
+    "B0": 0.001,
+    "alpha1": 0.0,
+    "alpha2": -0.6,
+    "alpha3": 0.5
+  },
+  "sim_settings": {
+    "grid_shape": "256",
+    "t_end": 50.0,
+    "dt": "auto",
+    "scheme": "auto",
+    "bc": "periodic"
+  },
+  "measurements": [
+    "peak_conversion"
+  ],
+  "source": [
+    "h_5"
+  ],
+  "target": [
+    "a_1"
+  ],
+  "run_dirs": [
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.85",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.855172",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.860345",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.865517",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.87069",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.875862",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.881034",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.886207",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.891379",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.896552",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.901724",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.906897",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.912069",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.917241",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.922414",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.927586",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.932759",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.937931",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.943103",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.948276",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.953448",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.958621",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.963793",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.968966",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.974138",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.97931",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.984483",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.989655",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_0.994828",
+    "examples/data/nonminimal_sweep_delta1_fine/delta1_1"
+  ],
+  "timestamp": "2026-04-06T19:10:02.832068+00:00",
+  "total_runs": 30,
+  "sampling_strategy": "grid",
+  "hostname": "01f52c360ddd",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+  "tidal_version": "0.25.18",
+  "git_hash": "e2dcd49",
+  "completed_runs": 30
+}

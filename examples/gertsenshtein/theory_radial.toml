@@ -123,10 +123,6 @@ type = "plane_wave"
 propagation_axis = "x"
 coordinate_values = {y = "Pi/2"}
 
-[parameters]
-kappa = 1.0
-Bpeak = 0.1
-z0 = 1.0
 
 [output]
 path = "../data/gertsenshtein_radial.json"

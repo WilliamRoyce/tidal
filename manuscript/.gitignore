@@ -1,7 +1,20 @@
-# Ignore all manuscript contents to prevent the report appearing on GitHub
-# (plagiarism detection protection). Only this .gitignore and README.md are tracked.
-*
-!/figures/
-!/sections/
-!.gitignore
-!README.md
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.nav
+*.snm
+*.vrb
+*.pdf
+*.dvi
+*.ps
+*.bak
+*-blx.bib

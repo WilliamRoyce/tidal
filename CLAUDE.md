@@ -7,7 +7,8 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `tidal/wolfram/` -- Wolfram pipeline modules (EulerLagrange.wl, ComponentDecompose.wl, ExportJSON.wl, CommonUtilities.wl, GaugeFix.wl)
 - `tidal/solver/` -- PDE solver backends (ida.py, cvode.py, leapfrog.py, fields.py, operators.py, grid.py, coefficients.py, rhs.py, state.py, constraint_solve.py)
 - `tidal/symbolic/` -- Python symbolic pipeline (_derive.py, json_loader.py)
-- `tidal/cli/` -- CLI entry points (9 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze)
+- `tidal/cli/` -- CLI entry points (10 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze, sample)
+- `tidal/inference/` -- Bayesian inference (priors, likelihood, constraints, MC, nested sampling via dynesty/PolyChord)
 - `tidal/measurement/` -- Physics measurements (energy, conversion, mixing, spectra)
 - `examples/` -- 20 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
 - `research/` -- General quadratic PGT+EM Lagrangian enumeration (xAct/xTras scripts, TeX document, classification JSONs)
@@ -21,6 +22,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `uv run tidal derive examples/<name>/theory.toml` -- Derive PDEs from Lagrangian
 - `uv run tidal simulate examples/data/<name>.json` -- Run simulation
 - `uv run tidal sweep examples/data/<name>.json --sweep "param=start:stop:N" --measure conversion --output sweep_out` -- Run parameter sweep
+- `uv run tidal sample examples/data/<name>.json --prior "param=uniform:lo:hi" --likelihood "P_max:maximize" --method mc --n-samples 100 --output sample_out` -- Bayesian inference (MC or nested sampling)
 - `uv run ruff check` / `uv run ruff format` -- Lint / format
 - `uv run pyright` -- Type checking
 
@@ -59,8 +61,10 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Specify success criteria before coding**: "Modal solver must agree with CVODE to RMS < 1%" — not just "implement modal solver". Include quantitative thresholds.
 - **Wolfram derivations**: Read an existing .wls template first, generate new by modifying template, review diff against template before running wolframscript
 - **After derivation**: Verify JSON has `canonical.hamiltonian_terms` — without this, all energy measurements fail silently. Run `tidal validate <json> --stability`.
+- **Record derivation timing**: After a successful `tidal derive`, update the theory TOML header comment with `# Derivation timing: ~Xm wall (last verified: YYYY-MM-DD, N fields, M H terms, vX.Y.Z)`. This tracks regressions and sets expectations. Use `--timeout 0` for theories that exceed the default 600s.
 - **Convergence testing**: After solver changes, verify error decreases at expected rate with resolution (4x for 2nd-order FD, 16x for 4th-order, machine-precision for spectral)
 - **Regression detection**: Map changed files to relevant physics tests (see `/validate-physics` skill). Run those tests, not the full suite, for fast feedback.
+- **t_end independence test for conversion amplification**: After measuring P_torsion/P_GR, ALWAYS verify at two different t_end values (e.g., t and 2t). If A(2t)/A(t) ≈ 1 → genuine amplification. If A(2t)/A(t) >> 1 → tachyonic instability artifact (see #238). B₀ scaling does NOT distinguish amplification from instability (growth rate is B₀-independent). IC amplitude must be ≪ B₀ for valid linearization.
 
 ## Common Pitfalls
 

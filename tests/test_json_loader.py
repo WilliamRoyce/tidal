@@ -14,6 +14,7 @@ from tidal.symbolic.json_loader import (
     OperatorTerm,
     _resolve_symbolic_coeff,
     load_equation_system,
+    normalize_kinetic_coefficients,
     validate_json_schema,
 )
 
@@ -1636,6 +1637,130 @@ class TestCanonicalStructure:
         }
         spec = EquationSystem.from_dict(data)
         assert spec.canonical is None
+
+
+# ==================== normalize_kinetic_coefficients ====================
+
+
+def _make_spec_with_kinetic_coeff(
+    kc_sym: str, coeff: float = 2.0, coeff_sym: str | None = "alpha"
+) -> EquationSystem:
+    """Build a minimal EquationSystem with one unnormalized kinetic eq and one normal eq."""
+    eq_with_kc = ComponentEquation(
+        field_name="t_0",
+        field_index=0,
+        time_derivative_order=2,
+        rhs_terms=(
+            OperatorTerm(
+                coefficient=coeff,
+                operator="identity",
+                field="t_0",
+                coefficient_symbolic=coeff_sym,
+            ),
+        ),
+        kinetic_coefficient_symbolic=kc_sym,
+    )
+    eq_normal = ComponentEquation(
+        field_name="a_0",
+        field_index=1,
+        time_derivative_order=2,
+        rhs_terms=(OperatorTerm(coefficient=-1.0, operator="laplacian", field="a_0"),),
+    )
+    return EquationSystem(
+        n_components=2,
+        dimension=2,
+        spatial_dimension=1,
+        component_names=("t_0", "a_0"),
+        equations=(eq_with_kc, eq_normal),
+        mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+        coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+        metadata={},
+    )
+
+
+class TestNormalizeKineticCoefficients:
+    """Tests for normalize_kinetic_coefficients()."""
+
+    def test_no_kinetic_coeff_is_noop(self) -> None:
+        """Spec with no kinetic_coefficient_symbolic is returned unchanged (same object)."""
+        eq = ComponentEquation("phi", 0, 2, (OperatorTerm(-1.0, "identity", "phi"),))
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(eq,),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        result = normalize_kinetic_coefficients(spec, {})
+        assert result is spec  # identical object — no copy made
+
+    def test_nonzero_kinetic_coeff_divides_rhs(self) -> None:
+        """With xi=0.5, RHS numeric coefficient is halved and symbolic wrapped."""
+        spec = _make_spec_with_kinetic_coeff("xi")
+        result = normalize_kinetic_coefficients(spec, {"xi": 0.5, "alpha": 1.0})
+
+        t0_eq = result.equations[0]
+        assert t0_eq.kinetic_coefficient_symbolic is None  # cleared
+        assert t0_eq.time_derivative_order == 2  # still dynamic
+        term = t0_eq.rhs_terms[0]
+        assert abs(term.coefficient - 4.0) < 1e-12  # 2.0 / 0.5 = 4.0
+        assert term.coefficient_symbolic == "(alpha) / (xi)"
+
+    def test_zero_kinetic_coeff_becomes_constraint(self) -> None:
+        """With xi=0, the equation degenerates to a constraint (time_order=0, no RHS)."""
+        spec = _make_spec_with_kinetic_coeff("xi")
+        result = normalize_kinetic_coefficients(spec, {"xi": 0.0, "alpha": 1.0})
+
+        t0_eq = result.equations[0]
+        assert t0_eq.time_derivative_order == 0
+        assert t0_eq.rhs_terms == ()
+        assert t0_eq.kinetic_coefficient_symbolic is None
+
+    def test_normal_equations_unchanged(self) -> None:
+        """Equations without kinetic_coefficient_symbolic pass through unmodified."""
+        spec = _make_spec_with_kinetic_coeff("xi")
+        result = normalize_kinetic_coefficients(spec, {"xi": 2.0, "alpha": 1.0})
+
+        a0_orig = spec.equations[1]
+        a0_result = result.equations[1]
+        assert a0_result is a0_orig  # identical object
+
+    def test_no_symbolic_coeff_on_term(self) -> None:
+        """Term without coefficient_symbolic: numeric division only, no symbolic wrapping."""
+        eq = ComponentEquation(
+            field_name="t_0",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=4.0, operator="laplacian", field="t_0"),
+            ),
+            kinetic_coefficient_symbolic="xi",
+        )
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("t_0",),
+            equations=(eq,),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        result = normalize_kinetic_coefficients(spec, {"xi": 2.0})
+        term = result.equations[0].rhs_terms[0]
+        assert abs(term.coefficient - 2.0) < 1e-12  # 4.0 / 2.0
+        assert term.coefficient_symbolic is None  # no symbolic form → stays None
+
+    def test_idempotent(self) -> None:
+        """Calling normalize twice is idempotent (second call is a no-op)."""
+        spec = _make_spec_with_kinetic_coeff("xi")
+        params = {"xi": 0.5, "alpha": 1.0}
+        result1 = normalize_kinetic_coefficients(spec, params)
+        result2 = normalize_kinetic_coefficients(result1, params)
+        assert result2 is result1  # second call returns same object
 
 
 # ==================== BoundaryCondition.to_side_bc ====================

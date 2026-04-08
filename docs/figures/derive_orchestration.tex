@@ -1,0 +1,204 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tidal-tikz-styles}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.45cm and 0.8cm,
+    every node/.append style={text opacity=1},
+]
+
+% ===================================================================
+%  TITLE
+% ===================================================================
+\node[font=\normalsize\bfseries, text=black] (title)
+    {Derivation Orchestration};
+\node[below=0.02cm of title, font=\tiny\sffamily, text=GrayLine]
+    {Python code generation $\to$ Wolfram script $\to$ JSON spec};
+
+% ===================================================================
+%  ENTRY
+% ===================================================================
+\node[stage=Gray, below=0.4cm of title] (entry)
+    {\textbf{TOML configuration}\\[-1pt]
+     \scriptsize fields, Lagrangian, constants, gauge, etc.};
+
+% ===================================================================
+%  COMMON HEADER (shared by all branches)
+% ===================================================================
+\node[funcbox=Purple, below=0.5cm of entry] (header)
+    {Load xAct packages\\[-1pt]
+     \scriptsize xTensor, xCoba, xPert (if linearising)};
+
+\node[funcbox=Purple, below=of header] (spacetime)
+    {Define spacetime\\[-1pt]
+     \scriptsize \texttt{DefManifold}, metric, chart, CovD};
+
+\node[funcbox=Purple, below=of spacetime] (fields)
+    {Define tensor fields\\[-1pt]
+     \scriptsize \texttt{DefTensor} for each physical field};
+
+\node[funcbox=Purple, below=of fields] (derived)
+    {Derived quantities\\[-1pt]
+     \scriptsize field strength $F_{\mu\nu}$, stress-energy, etc.};
+
+\draw[arr] (entry) -- (header);
+\draw[arr] (header) -- (spacetime);
+\draw[arr] (spacetime) -- (fields);
+\draw[arr] (fields) -- (derived);
+
+% ===================================================================
+%  MAJOR BRANCH: linearisation?
+% ===================================================================
+\node[decision, below=0.6cm of derived, text width=2.4cm] (linbranch)
+    {linearisation\\mode?};
+
+\draw[arr] (derived) -- (linbranch);
+
+% ===================================================================
+%  LEFT LANE: Lagrangian linearisation (Purple)
+% ===================================================================
+
+\node[funcbox=Purple, below left=1.0cm and 5.0cm of linbranch] (lin_lagr)
+    {Construct Lagrangian $\mathcal{L}$};
+
+\node[stage=Purple, below=of lin_lagr, text width=3.4cm] (lin_main)
+    {\textbf{Lagrangian linearisation}\\[-1pt]
+     \scriptsize xPert: $\mathcal{L} \to \mathcal{L}^{(2)}$\\
+     \scriptsize VarD per field $\to$ EOM\\[2pt]
+     \scriptsize see \emph{linearise\_from\_lagrangian}\\
+     \scriptsize diagram for detail};
+
+\draw[arr] (linbranch.south) -| (lin_lagr.north)
+    node[pos=0.25, above, font=\scriptsize\bfseries, text=PurpleLine] {yes + $\mathcal{L}$};
+\draw[arr] (lin_lagr) -- (lin_main);
+
+% ===================================================================
+%  RIGHT LANE: Full nonlinear (Green)
+% ===================================================================
+
+\node[funcbox=Green, below right=1.0cm and 5.0cm of linbranch] (nl_lagr)
+    {Construct Lagrangian $\mathcal{L}$};
+
+\draw[arr] (linbranch.east) -| (nl_lagr.north)
+    node[pos=0.25, above, font=\scriptsize\bfseries, text=GreenLine] {no};
+
+% Optional: plane-wave reduction on Lagrangian
+\node[check, below=of nl_lagr] (nl_pwl)
+    {Plane-wave reduction?\\[-1pt]
+     \scriptsize zero transverse derivatives};
+\draw[arr] (nl_lagr) -- (nl_pwl);
+
+% Optional: gauge Type A
+\node[check, below=0.4cm of nl_pwl] (nl_ga)
+    {Gauge Type A?\\[-1pt]
+     \scriptsize $\mathcal{L} \to \mathcal{L} + \mathcal{L}_\mathrm{gf}$\\
+     \scriptsize (Lorenz, de Donder)};
+\draw[arr] (nl_pwl) -- (nl_ga);
+
+% Multi vs single field
+\node[decision, below=0.5cm of nl_ga, text width=1.8cm] (nl_multi)
+    {multi\\field?};
+\draw[arr] (nl_ga) -- (nl_multi);
+
+\node[funcbox=Green, below left=0.6cm and 1.2cm of nl_multi] (nl_elm)
+    {Euler--Lagrange\\per field\\[-1pt]
+     \scriptsize \texttt{VarD} loop};
+
+\node[funcbox=Green, below right=0.6cm and 1.2cm of nl_multi] (nl_els)
+    {Euler--Lagrange\\single field\\[-1pt]
+     \scriptsize \texttt{VarD[$\phi$, CD]}};
+
+\draw[arr] (nl_multi.west) -| (nl_elm.north)
+    node[pos=0.25, above, font=\tiny] {yes};
+\draw[arr] (nl_multi.east) -| (nl_els.north)
+    node[pos=0.25, above, font=\tiny] {no};
+
+% Gauge Type B (post-EL)
+\node[check, below=1.2cm of nl_multi] (nl_gb)
+    {Gauge Type B?\\[-1pt]
+     \scriptsize constraint elimination\\
+     \scriptsize (Coulomb, temporal, axial, TT)};
+
+\draw[arr] (nl_elm.south) |- (nl_gb);
+\draw[arr] (nl_els.south) |- (nl_gb);
+
+% ===================================================================
+%  POST-BRANCH: Optional plane-wave reduction on EOM
+% ===================================================================
+
+\node[check, below=3.0cm of linbranch, text width=3.6cm] (pw_eqs)
+    {Plane-wave reduction on EOM?\\[-1pt]
+     \scriptsize zero transverse derivatives\\
+     \scriptsize eliminate redundant fields\\
+     \scriptsize remap coordinates};
+
+% Convergence arrows
+\draw[arr] (lin_main.south) |- ([yshift=0.5cm]pw_eqs.west) -- (pw_eqs.west);
+\draw[arr] (nl_gb.south) |- ([yshift=0.5cm]pw_eqs.east) -- (pw_eqs.east);
+
+% ===================================================================
+%  COMPONENT DECOMPOSITION + EXPORT
+% ===================================================================
+
+\node[stage=Purple, below=0.6cm of pw_eqs, text width=4.0cm] (decompose)
+    {\textbf{Component decomposition}\\[-1pt]
+     \scriptsize tensor EOM $\to$ scalar PDEs\\
+     \scriptsize see \emph{component\_decompose\_algorithm}};
+\draw[arr] (pw_eqs) -- (decompose);
+
+\node[stage=Green, below=of decompose, text width=4.0cm] (export)
+    {\textbf{JSON export}\\[-1pt]
+     \scriptsize operator classification, mass/coupling\\
+     \scriptsize matrices; see \emph{export\_json\_classification}};
+\draw[arr] (decompose) -- (export);
+
+\node[stage=Blue, below=of export] (json)
+    {\textbf{\texttt{spec.json}}\\[-1pt]
+     \scriptsize portable contract between\\
+     \scriptsize symbolic and numerical stages};
+\draw[arr] (export) -- (json);
+
+% ===================================================================
+%  EXECUTION SIDEBAR
+% ===================================================================
+
+\node[detail=Gray, right=2.5cm of json, text width=3.6cm] (exec)
+    {\textbf{Execution pipeline}\\[3pt]
+     1.\ Hash-based derivation cache\\
+     \quad (skip if unchanged)\\
+     2.\ Run \texttt{wolframscript}\\
+     3.\ Validate JSON output\\
+     4.\ Inject derivation hash};
+
+\draw[dotarr] (json.east) -- (exec.west);
+
+% ===================================================================
+%  LANE BACKGROUNDS
+% ===================================================================
+\begin{scope}[on background layer]
+    \node[rectangle, rounded corners=4pt, fill=PurpleFill,
+          fill opacity=0.06, inner sep=10pt,
+          fit=(lin_lagr)(lin_main),
+          label={[font=\scriptsize\bfseries, text=PurpleLine]
+          above:Lagrangian linearisation}] {};
+    \node[rectangle, rounded corners=4pt, fill=GreenFill,
+          fill opacity=0.06, inner sep=10pt,
+          fit=(nl_lagr)(nl_pwl)(nl_ga)(nl_multi)
+          (nl_elm)(nl_els)(nl_gb),
+          label={[font=\scriptsize\bfseries, text=GreenLine]
+          above:Full nonlinear}] {};
+\end{scope}
+
+% ===================================================================
+%  GAUGE STRATEGY ANNOTATION
+% ===================================================================
+\node[annot, left=1.5cm of nl_ga, text width=3.2cm, anchor=east]
+    {\textbf{Gauge strategy}:\\
+     Type A adds a term to $\mathcal{L}$\\
+     \emph{before} Euler--Lagrange.\\[3pt]
+     Type B eliminates field\\
+     components \emph{after} EOM\\
+     via constraint substitution.};
+
+\end{tikzpicture}
+\end{document}

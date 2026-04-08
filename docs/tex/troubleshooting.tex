@@ -339,6 +339,50 @@ The check uses a \emph{leak metric} = $(\text{rel\_jump}) \times (\text{boundary
 \end{enumerate}
 
 
+\subsubsection{ZeroDivisionError: \texttt{float division by zero} in coefficient evaluation}
+\label{sec:troubleshooting-zerodiv-kinetic}
+
+\textbf{Symptom:}
+\begin{lstlisting}[style=python]
+Cannot evaluate symbolic coefficient '(2*alpha)/xi': float division by zero
+\end{lstlisting}
+when running \texttt{tidal simulate} or \texttt{tidal sweep} with a parameter set to
+zero (commonly \texttt{xi=0} in the dark photon torsion model).
+
+\textbf{Root cause:} Old JSON files (pre-v0.24.3) had \texttt{ExportJSON.wl} divide
+the RHS symbolically by the kinetic coefficient at derivation time.  When that
+coefficient evaluates to zero the stored expression (e.g.\ \texttt{(2*alpha)/xi}) is
+undefined.
+
+\textbf{Fix:} Re-derive the theory with the current pipeline
+(\texttt{tidal derive theory.toml}).  Since v0.24.3, \texttt{ExportJSON.wl} detects
+parameter-based kinetic coefficients and emits them in the LHS as
+\texttt{kinetic\_coefficient\_symbolic} rather than dividing.  The Python function
+\texttt{normalize\_kinetic\_coefficients(spec, params)} in
+\texttt{tidal.symbolic.json\_loader} then handles normalisation at runtime:
+\begin{itemize}
+  \item $K \neq 0$: divides through correctly.
+  \item $K = 0$: transitions the field to a constraint (\texttt{time\_order = 0}).
+\end{itemize}
+
+\textbf{Diagnostic:} Check whether the offending equation's LHS has
+\texttt{kinetic\_coefficient\_symbolic} in the JSON:
+\begin{lstlisting}[style=python]
+import json
+d = json.load(open("examples/data/my_theory.json"))
+for eq in d["equations"]:
+    kc = eq.get("lhs", {}).get("kinetic_coefficient_symbolic")
+    if kc:
+        print(eq["field"], "->", kc)
+\end{lstlisting}
+If the field is absent, the JSON pre-dates v0.24.3 --- re-derive.
+
+\textbf{Physics note:} Setting $\xi = 0$ in the dark photon torsion model removes the
+torsion kinetic term; the torsion fields become algebraic constraints and the system
+reduces to the standard Einstein-Maxwell Gertsenshtein model.  This is a useful
+control check: the conversion probability should recover $P = \sin^2(\kappa B_0 D/2)$.
+
+
 \subsection{Debugging Techniques}
 \label{sec:debugging-techniques}
 

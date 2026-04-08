@@ -264,6 +264,67 @@ Key & Type & Required & Default & Description \\
 {"lhs": {"expression": "A_0",         "order": {"time": 0, "space": 0}}}
 \end{lstlisting}
 
+\paragraph{Optional field: \texttt{kinetic\_coefficient\_symbolic}}
+\label{sec:json-lhs-kinetic-coeff}
+
+\begin{table}[htbp]
+\centering
+\caption{Optional LHS kinetic coefficient field (v0.24.3+).}
+\label{tab:json-lhs-kinetic}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Key & Type & Required & Default & Description \\
+\midrule
+\texttt{kinetic\_coefficient\_symbolic} & string & No & absent & Wolfram \texttt{InputForm} expression for the LHS kinetic coefficient \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+When a field equation has a parameter-based kinetic coefficient (e.g.\ $\xi$ in a
+Yang-Mills kinetic term, or $\kappa^{-2}$ in Einstein-Cartan gravity), the
+\texttt{ExportJSON.wl} pipeline does \emph{not} divide the RHS symbolically by that
+coefficient.  Instead it records the coefficient expression here and stores the RHS
+terms un-normalised.  This avoids a \texttt{ZeroDivisionError} when the coefficient
+parameter evaluates to zero (e.g.\ $\xi = 0$, which switches off the kinetic term
+and demotes the field to a constraint).
+
+\textbf{Detection rule:} a kinetic coefficient is treated as parameter-based when
+it is a pure symbolic expression with no coordinate calls
+(\texttt{FreeQ[lhsCoeff, \_[]]} in Wolfram).  Numeric constants and
+position-/time-dependent expressions (e.g.\ $1/\Omega(r)$ in a curved background)
+are divided through immediately as before.
+
+\textbf{Python normalisation:}
+\texttt{normalize\_kinetic\_coefficients(spec, params)} in
+\texttt{tidal.symbolic.json\_loader} applies the normalisation at runtime:
+\begin{itemize}
+  \item $K \neq 0$: divides each RHS term by $K$; updates \texttt{coefficient} and
+    wraps \texttt{coefficient\_symbolic} as \texttt{(expr) / (kc\_sym)}.
+  \item $K = 0$: reclassifies the equation as a constraint
+    (\texttt{time\_derivative\_order = 0}, empty \texttt{rhs\_terms}).
+\end{itemize}
+This function is called automatically by \texttt{tidal simulate} and
+\texttt{tidal sweep} after parameter resolution; it is exported from
+\texttt{tidal.symbolic}.
+
+\textbf{Example} (dark photon torsion model, \texttt{torsion\_dark\_photon.json}):
+
+\begin{lstlisting}[style=json]
+{
+  "field": "t_0",
+  "lhs": {
+    "expression": "d2_t(t_0)",
+    "order": {"time": 2, "space": 0},
+    "kinetic_coefficient_symbolic": "-xi"
+  },
+  "rhs": { "type": "linear_combination", "terms": [...] }
+}
+\end{lstlisting}
+
+At $\xi = 0.1$ the torsion field propagates normally.
+At $\xi = 0$ it becomes a constraint, reproducing the standard
+Gertsenshtein result without torsion ($C_0 = 6.25 \times 10^{-4}$, exact).
+
 \subsubsection{RHS Structure}
 \label{sec:json-rhs}
 

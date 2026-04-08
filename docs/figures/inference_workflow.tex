@@ -1,0 +1,164 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tidal-tikz-styles}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.6cm and 1.4cm
+]
+
+% ===================================================================
+% ROW 1: Inputs
+% ===================================================================
+\node[data, minimum width=3.2cm] (input)
+    {\texttt{spec.json} + priors\\[-1pt]
+     \scriptsize constraints, likelihood, \texttt{--method}};
+
+% ===================================================================
+% ROW 2: Sampling method split
+% ===================================================================
+\node[stage=Pink, below left=0.9cm and 1.6cm of input,
+      minimum width=2.4cm] (mc)
+    {\textbf{Monte Carlo}\\[1pt]
+     \scriptsize draw $N$ samples from prior};
+
+\node[stage=Blue, below right=0.9cm and 1.6cm of input,
+      minimum width=2.4cm] (nested)
+    {\textbf{Nested sampling}\\[1pt]
+     \scriptsize $N_\mathrm{live}$ live points; dynesty / PolyChord};
+
+\draw[arr] (input.south) -- ++(0,-0.35) -| (mc.north);
+\draw[arr] (input.south) -- ++(0,-0.35) -| (nested.north);
+
+% Method labels
+\node[annot, left=0.25cm of mc, font=\scriptsize\ttfamily] {\texttt{--method mc}};
+\node[annot, right=0.25cm of nested, font=\scriptsize\ttfamily] {\texttt{--method nested}};
+
+% ===================================================================
+% ROW 3: Per-sample pipeline (shared by both methods)
+% ===================================================================
+
+% Constraint check (cheap, no simulation)
+\node[check, below=1.6cm of input, minimum width=3.8cm,
+      text width=3.6cm] (ccheck)
+    {\textbf{Constraint filter}\\[2pt]
+     \scriptsize evaluate \texttt{EXPR} via safe AST\\
+     \scriptsize reject instantly if violated ($\log\pi = -\infty$)};
+
+% Arrows from both branches into constraint check
+\draw[arr] (mc.south) -- ++(0,-0.3) -| (ccheck.north west);
+\draw[arr] (nested.south) -- ++(0,-0.3) -| (ccheck.north east);
+
+% Reject annotation (right side)
+\node[annot, right=1.4cm of ccheck, text width=2.0cm, align=left] (reject)
+    {\scriptsize\textit{rejected:}\\
+     \scriptsize no simulation\\
+     \scriptsize wasted};
+\draw[dotarr, OrangeLine] (ccheck.east) -- (reject.west)
+    node[midway, above, font=\scriptsize, text=OrangeLine] {fail};
+
+% Per-sample dashed box (simulate + measure + log L)
+\node[stage=Purple, below=0.7cm of ccheck, minimum width=3.2cm] (sim)
+    {Simulate};
+\node[stage=Green, below=0.5cm of sim, minimum width=3.2cm] (meas)
+    {Measure};
+\node[stage=Blue, below=0.5cm of meas, minimum width=3.2cm] (loglik)
+    {\textbf{Log-likelihood}\\[1pt]
+     \scriptsize maximize / gaussian / threshold};
+
+\draw[arr] (ccheck.south) -- (sim) node[midway, right, font=\scriptsize] {pass};
+\draw[arr] (sim) -- (meas);
+\draw[arr] (meas) -- (loglik);
+
+% Parallel workers annotation
+\node[annot, right=1.4cm of sim, text width=2.2cm, align=left] (par)
+    {\scriptsize\textbf{parallel workers}\\
+     \scriptsize \texttt{--parallel N}\\
+     \scriptsize via \texttt{Pool.map}};
+\draw[dotarr, OrangeLine] (sim.east) -- (par.west);
+
+% Dashed box around per-sample work
+\node[fit=(ccheck)(sim)(meas)(loglik),
+      draw=GrayLine, dashed, rounded corners=3pt,
+      inner sep=8pt,
+      label={[font=\scriptsize\itshape, text=GrayLine]
+      above:per sample}] (persample) {};
+
+% ===================================================================
+% ROW 4: Path-specific accumulation
+% ===================================================================
+\node[stage=Pink, below left=0.9cm and 1.6cm of loglik,
+      minimum width=2.4cm] (mcacc)
+    {\textbf{Accumulate}\\[1pt]
+     \scriptsize store $(\theta,\,\log\mathcal{L},\,\log\pi)$\\
+     \scriptsize uniform weights};
+
+\node[stage=Blue, below right=0.9cm and 1.6cm of loglik,
+      minimum width=2.4cm] (nsacc)
+    {\textbf{Evidence integral}\\[1pt]
+     \scriptsize $\log\mathcal{Z} \mathrel{+}= \mathcal{L}\,\Delta X$\\
+     \scriptsize shrink prior volume $X$};
+
+\draw[arr] (loglik.south) -- ++(0,-0.35) -| (mcacc.north);
+\draw[arr] (loglik.south) -- ++(0,-0.35) -| (nsacc.north);
+
+% ===================================================================
+% ROW 5: Convergence
+% ===================================================================
+\node[fpcheck, below=0.6cm of mcacc] (mcdone)
+    {$N$\\done?};
+\node[fpcheck, below=0.6cm of nsacc] (nsdone)
+    {$\Delta\log\mathcal{Z}$\\$< $ tol?};
+
+\draw[arr] (mcacc) -- (mcdone);
+\draw[arr] (nsacc) -- (nsdone);
+
+% Loop back arrows
+\draw[arr, rounded corners=4pt]
+    (mcdone.west) -- ++(-0.6,0) |- (mc.west)
+    node[pos=0.15, below, font=\scriptsize] {no};
+\draw[arr, rounded corners=4pt]
+    (nsdone.east) -- ++(0.6,0) |- (nested.east)
+    node[pos=0.15, below, font=\scriptsize] {no};
+
+% ===================================================================
+% ROW 6: InferenceResult
+% ===================================================================
+\node[stage=Lime, below=2.6cm of loglik, minimum width=3.4cm] (ir)
+    {\textbf{InferenceResult}\\[1pt]
+     \scriptsize samples, $\log\mathcal{L}$, weights, $\log\mathcal{Z}$ (nested)\\
+     \scriptsize ESS, MAP, credible intervals};
+
+\draw[arr] (mcdone.south) -- ++(0,-0.2) -| (ir.north west)
+    node[pos=0.0, right, font=\scriptsize] {yes};
+\draw[arr] (nsdone.south) -- ++(0,-0.2) -| (ir.north east)
+    node[pos=0.0, left, font=\scriptsize] {yes};
+
+% ===================================================================
+% ROW 7: Outputs
+% ===================================================================
+\node[data, below left=0.8cm and 1.4cm of ir,
+      minimum width=2.2cm] (csv)
+    {\texttt{results.csv}\\[-1pt]
+     \scriptsize \texttt{results.json}};
+
+\node[data, below=0.8cm of ir,
+      minimum width=2.0cm,
+      draw=BlueLine, fill=BlueFill, fill opacity=0.35] (ijson)
+    {\texttt{inference.json}\\[-1pt]
+     \scriptsize $\log\mathcal{Z}$, ESS, MAP, CIs};
+
+\node[stage=Lime, below right=0.8cm and 1.4cm of ir,
+      minimum width=2.2cm] (viz)
+    {\textbf{Visualisation}\\[1pt]
+     \scriptsize corner / trace plots};
+
+\draw[arr] (ir) -- (csv);
+\draw[arr] (ir) -- (ijson);
+\draw[arr] (ir) -- (viz);
+
+% Viz annotation
+\node[annot, below=0.15cm of viz, text width=2.4cm, align=center]
+    {\scriptsize anesthetic or\\matplotlib fallback};
+
+\end{tikzpicture}
+\end{document}

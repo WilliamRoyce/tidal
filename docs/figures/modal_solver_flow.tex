@@ -49,7 +49,14 @@
     {Eigendecompose\\[-1pt]\scriptsize $A = V \Lambda V^{-1}$};
 
 \node[stage=Pink,
-      below=0.4cm of eigen] (evolve_eig)
+      below=0.4cm of eigen] (filter)
+    {Filter problematic modes\\[-1pt]
+     \scriptsize \textbullet\ gauge modes ($|\lambda| \to \infty$): freeze at IC\\
+     \scriptsize \textbullet\ tachyonic + zero IC coupling:\\
+     \scriptsize \quad $\mathrm{Re}(\lambda)>0$ \emph{and} $|\langle\psi|y_0\rangle|\approx 0$: freeze at IC};
+
+\node[stage=Pink,
+      below=0.4cm of filter] (evolve_eig)
     {Evolve\\[-1pt]\scriptsize $e^{\Lambda \Delta t}$ (all $\Delta t$ at once)};
 
 % ===================================================================
@@ -88,7 +95,8 @@
 % Path A (upper): No position-dependent → per-mode eigendecomp
 \draw[arr] (branch.east) -| node[yeslbl, below left] {No} (matrix_pm.north);
 \draw[arr] (matrix_pm) -- (eigen);
-\draw[arr] (eigen) -- (evolve_eig);
+\draw[arr] (eigen) -- (filter);
+\draw[arr] (filter) -- (evolve_eig);
 \draw[arr, rounded corners=3pt]
     (evolve_eig.south) |- (ifft.east);
 
@@ -106,10 +114,12 @@
 % ===================================================================
 % BLOCK-AWARE CHECK (above per-mode matrix, Path A only)
 % ===================================================================
-\node[check, above =1.2cm of matrix_pm.north east, text width=4.2cm] (blocks)
+\node[check, above =1.2cm of matrix_pm.north east, text width=4.4cm] (blocks)
     {Detect decoupled field blocks\\[1pt]
-     skip blocks with zero initial data\\
-     warn on unstable eigenvalues};
+     skip blocks with zero initial data\\[1pt]
+     check $\mathrm{Re}(\lambda)>0$: warn if large growth;\\
+     suppress if zero IC coupling\\
+     \scriptsize (not a physics change --- genuine coupling kept)};
 \draw[arr, densely dotted, OrangeLine] ([xshift=-0.8cm]blocks.south) -- ([xshift=-0.8cm]matrix_pm.north east);
 
 % ===================================================================
@@ -128,6 +138,22 @@
     (matrix_pm.east) -- ([yshift=0.6cm]schur.west);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
     ([yshift=-0.63cm]schur.west) -- (eigen.east);
+
+% Tachyonic suppression annotation (right of filter node)
+\node[detail=Orange, text width=3.4cm, right=0.5cm of filter, anchor=west] (tachyon_note)
+    {\textbf{Tachyonic suppression}\\[2pt]
+     Arises in e.g.\ PGT with $\tilde{R}^2$:\\
+     wrong-sign mass eigenvalues in\\
+     unphysical (axial/tensor) sector.\\[2pt]
+     Machine-precision noise in\\
+     uncoupled direction grows as\\
+     $\sim 10^{-16} e^{+5.9\,t} \to 10^{128}$.\\[2pt]
+     Two conditions to suppress:\\
+     \textbullet\ $\mathrm{Re}(\lambda) > 0$ (tachyonic)\\
+     \textbullet\ $|\langle\psi|y_0\rangle| \approx 0$ (uncoupled)};
+
+\draw[arr, OrangeLine, densely dashed, rounded corners=3pt]
+    (filter.east) -- (tachyon_note.west);
 
 % Recovery arrow from evolve_eig down to reconstruction
 \node[detail=Pink, text width=3.0cm, below right=0.2cm and -0.6cm of evolve_eig, text width=2.8cm] (recover)
@@ -148,7 +174,7 @@
     % Physical space zone (blue tint)
     \node[fit=(input)(output), inner sep=12pt, fill=GrayFill, densely dashed, draw=GrayLine, fill opacity=0.2, rounded corners=5pt] {};
     % Fourier space zone (purple tint) — encompasses both branches
-    \node[fit=(fft)(ifft)(matrix_pm)(evolve_eig)(matrix_full)(sparsify)(expm),
+    \node[fit=(fft)(ifft)(matrix_pm)(filter)(evolve_eig)(matrix_full)(sparsify)(expm),
           inner sep=4pt, fill=PurpleFill, draw=PurpleLine, densely dashed,
           fill opacity=0.08, rounded corners=5pt] {};
 \end{scope}

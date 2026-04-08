@@ -1,0 +1,112 @@
+% === Packages ===
+
+% Input & encoding
+\usepackage[utf8]{inputenc}
+\usepackage{parskip}
+
+% Mathematics
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{stix}
+\usepackage{mathrsfs}
+\usepackage{tensor}
+\usepackage{accents}
+
+% Tables & layout
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{hhline}
+\usepackage{siunitx}
+
+% Graphics
+\usepackage{graphicx}
+\usepackage{tikz}
+
+% Text processing
+\usepackage{xstring}
+\usepackage{etoolbox}
+\usepackage{xcolor}
+\usepackage{xspace}
+\usepackage{listings}
+
+% References
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\usepackage{cleveref}
+\usepackage{notoccite}
+
+% Line numbering (comment out for final version)
+\usepackage{lineno}
+% \linenumbers
+
+% === Formatting ===
+
+\setlength{\parskip}{1mm}
+\setlength{\parindent}{2mm}
+
+% === Supervisor's physics macros ===
+
+% Planck mass
+\newcommand{\Planck}{M_{\text{Pl}}}
+
+% Covariant derivatives
+\newcommand{\rD}[1]{\accentset{\circ}{\nabla}_{#1}}   % Riemannian
+\newcommand{\rcD}[1]{\nabla_{#1}}                       % Riemann-Cartan
+
+% Curvature tensors
+\newcommand{\rR}[1]{\accentset{\circ}{R}_{#1}}         % Riemann
+\newcommand{\rcR}[1]{R_{#1}}                             % Riemann-Cartan
+
+% Torsion components (use \T[1]{indices}, \T[2]{indices}, \T[3]{indices})
+\newcommand{\T}[2][]{%
+  \IfEqCase{#1}{%
+    {1}{\accentset{(1)}{T}_{#2}}%
+    {2}{\accentset{(2)}{T}_{#2}}%
+    {3}{\accentset{(3)}{T}_{#2}}%
+    {}{{T}_{#2}}%
+  }[\PackageError{macros}{Invalid torsion index: #1}{}]%
+}
+
+% Multiplier components
+\newcommand{\TLambda}[2][]{%
+  \IfEqCase{#1}{%
+    {1}{\accentset{(1)}{\Lambda}_{#2}}%
+    {2}{\accentset{(2)}{\Lambda}_{#2}}%
+    {3}{\accentset{(3)}{\Lambda}_{#2}}%
+    {}{\Lambda_{#2}}%
+  }[\PackageError{macros}{Invalid multiplier index: #1}{}]%
+}
+
+% === TIDAL-specific macros ===
+% (from docs/tex/preamble.tex — project notation)
+
+% Fields
+\newcommand{\lag}{\mathscr{L}}           % Lagrangian density
+\newcommand{\ham}{\mathscr{H}}           % Hamiltonian density
+\newcommand{\field}[1]{\mathcal{#1}}     % field components
+
+% Operators
+\newcommand{\lapl}{\nabla^2}             % Laplacian
+\newcommand{\ddt}{\partial_t}            % time derivative
+\newcommand{\ddx}{\partial_x}            % spatial derivatives
+\newcommand{\ddy}{\partial_y}
+\newcommand{\ddz}{\partial_z}
+
+% Metrics
+\newcommand{\gmunu}{g_{\mu\nu}}
+\newcommand{\etamunu}{\eta_{\mu\nu}}
+\newcommand{\sqrtg}{\sqrt{|g|}}
+
+% Perturbation theory
+\newcommand{\pert}[1]{\delta #1}         % linear perturbation
+\newcommand{\bg}[1]{\bar{#1}}            % background value
+
+% Gertsenshtein
+\newcommand{\Bzero}{B_0}                 % background magnetic field
+\renewcommand{\kappa}{\varkappa}         % graviton-photon coupling
+\newcommand{\Pconv}{P_\mathrm{conv}}     % conversion probability
+
+% Torsion (TIDAL notation)
+\newcommand{\torsionT}{T}               % torsion tensor
+\newcommand{\contorsion}{K}              % contorsion tensor
+\newcommand{\ricciT}{\tilde{R}}          % Ricci scalar with torsion

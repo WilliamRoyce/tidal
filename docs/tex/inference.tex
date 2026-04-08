@@ -1,0 +1,443 @@
+% Bayesian Inference for Parameter Estimation
+% Covers: prior distributions, constraints, MC sampling, nested sampling,
+%         results analysis, and integration with the sweep pipeline.
+% Uses macros from preamble.tex
+
+\section{Bayesian Inference for Parameter Estimation}
+\label{sec:inference}
+
+\textbf{Status:} Implemented (Monte Carlo + nested sampling via dynesty/PolyChord) \\
+\textbf{Date:} 2026-04-02
+
+Parameter sweeps (\cref{sec:cli-reference}) explore a fixed grid, which scales
+exponentially with the number of parameters and does not produce posterior
+distributions or evidence estimates.  The \texttt{tidal sample} subcommand adds
+a proper Bayesian inference layer: it draws samples from prior distributions,
+evaluates each point by running a full PDE simulation, and returns weighted
+posterior samples together with Bayesian evidence.
+
+\subsection{Problem Statement}
+\label{sec:inference-problem}
+
+Grid sweeps are effective for 1--2 parameters but scale poorly: a
+$10\times10\times10$ grid over three coupling constants requires $10^3 =
+1{,}000$ simulations, many of which land in unphysical or uninformative
+regions.  Bayesian inference solves both problems:
+
+\begin{enumerate}
+  \item \textbf{Posterior analysis.}  Monte Carlo sampling assigns probability
+    mass according to the prior and likelihood, so the posterior identifies
+    which parameter combinations are consistent with observations.
+
+  \item \textbf{Model comparison.}  Nested sampling computes the Bayesian
+    evidence $\mathcal{Z} = \int \mathcal{L}(\theta)\,\pi(\theta)\,\mathrm{d}\theta$,
+    enabling rigorous model selection via the Bayes factor
+    $B_{12} = \mathcal{Z}_1/\mathcal{Z}_2$.
+\end{enumerate}
+
+\subsection{Prior Distributions}
+\label{sec:inference-priors}
+
+Each parameter requires exactly one prior specified via
+\texttt{--prior "NAME=DIST:ARG1:ARG2"}.  Four families are supported:
+
+\begin{table}[htbp]
+\centering
+\caption{Prior distribution families.}
+\label{tab:priors}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Distribution & CLI name & Parameters & Support \\
+\midrule
+Uniform              & \texttt{uniform}         & $a$, $b$     & $[a,\, b]$ \\
+Log-uniform          & \texttt{log\_uniform}    & $a$, $b$ ($a>0$) & $[a,\, b]$ \\
+Normal               & \texttt{normal}          & $\mu$, $\sigma$  & $(-\infty,+\infty)$ \\
+Arctan-uniform       & \texttt{arctan\_uniform} & (none used) & $(-\infty,+\infty)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Arctan-uniform prior}
+The \texttt{arctan\_uniform} distribution covers the full real line including
+sign changes --- useful for coupling constants where the sign is physically
+significant.  It draws $\theta$ uniformly in
+$(-\pi/2 + \epsilon,\, \pi/2 - \epsilon)$ and returns $x = \tan(\theta)$,
+which maps to approximately $(-30, +30)$ with $\epsilon = 0.05$.  The
+log-probability is the truncated Cauchy density $-\log(1+x^2) - \log(\Delta\theta)$.
+
+Each prior implements three operations required by the sampling pipeline:
+\texttt{sample(rng, n)} for Monte Carlo, \texttt{log\_prob(x)} for posterior
+weighting, and \texttt{transform(u)} for nested sampling's unit-cube protocol.
+
+\begin{lstlisting}[style=bash]
+# Uniform coupling constant
+--prior "alpha=uniform:0.01:10"
+
+# Log-uniform mass ratio (positive, varies over orders of magnitude)
+--prior "xi=log_uniform:0.001:1.0"
+
+# Normal near known value
+--prior "delta=normal:0.0:1.0"
+
+# Full real line including sign changes
+--prior "g=arctan_uniform:0:0"   # args unused for this family
+\end{lstlisting}
+
+\subsection{Hard Constraints}
+\label{sec:inference-constraints}
+
+Physical consistency conditions (ghost-freedom, stability bounds, positivity)
+can be enforced as hard priors via \texttt{--constraint "EXPR"}.  Points that
+violate a constraint are assigned $\log\pi = -\infty$ immediately, with no
+simulation wasted.
+
+Constraint expressions use Python's \texttt{ast} module for safe evaluation ---
+there is no call to \texttt{eval()} and no risk of arbitrary code execution.
+Supported operations:
+
+\begin{table}[htbp]
+\centering
+\caption{Operators and functions available in constraint expressions.}
+\label{tab:constraint-ops}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Category & Available \\
+\midrule
+Comparison & \texttt{>}, \texttt{>=}, \texttt{<}, \texttt{<=}, \texttt{==} \\
+Arithmetic & \texttt{+}, \texttt{-}, \texttt{*}, \texttt{/}, \texttt{**} \\
+Functions  & \texttt{abs()}, \texttt{sqrt()}, \texttt{log()}, \texttt{exp()}, \texttt{sin()}, \texttt{cos()} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{lstlisting}[style=bash]
+--constraint "xi > 0"
+--constraint "alpha > 0"
+--constraint "deltam**2 < 2*alpha*xi"   # ghost-freedom condition
+\end{lstlisting}
+
+Multiple \texttt{--constraint} flags are combined as logical AND.
+Constraints can also be placed in a TOML sweep configuration:
+
+\begin{lstlisting}[style=toml]
+[constraints]
+expressions = ["xi > 0", "alpha > 0", "deltam**2 < 2*alpha*xi"]
+\end{lstlisting}
+
+\subsection{Likelihood Functions}
+\label{sec:inference-likelihood}
+
+The likelihood wraps the existing \texttt{\_simulate\_run()} +
+\texttt{\_measure\_run()} pipeline from \texttt{tidal/cli/\_sweep.py}.
+Simulation failures (solver divergence, NaN) are mapped to
+$\log\mathcal{L} = -\infty$.  Three likelihood modes are available:
+
+\begin{table}[htbp]
+\centering
+\caption{Likelihood modes.}
+\label{tab:likelihood}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Mode        & CLI name     & Formula & Use case \\
+\midrule
+Maximize    & \texttt{maximize}   & $\log\mathcal{L} = $ metric      & Exploratory: find the largest conversion region \\
+Gaussian    & \texttt{gaussian}   & $-\tfrac{1}{2}\!\left(\frac{x-\mu}{\sigma}\right)^{\!2}$ & Comparison to data or theoretical prediction \\
+Threshold   & \texttt{threshold}  & $0$ if $x \geq x_\mathrm{min}$, else $-\infty$ & Feasibility: is the target observable? \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+CLI syntax: \texttt{--likelihood "METRIC:TYPE:ARGS"}:
+
+\begin{lstlisting}[style=bash]
+# Find largest conversion probability (no target)
+--likelihood "P_max:maximize"
+
+# Compare to target 0.5 with uncertainty 0.1
+--likelihood "P_max:gaussian:0.5:0.1"
+
+# Require minimum conversion (feasibility scan)
+--likelihood "P_max:threshold:0.01"
+\end{lstlisting}
+
+\subsection{Sampling Methods}
+\label{sec:inference-sampling}
+
+\subsubsection{Simple Monte Carlo (\texttt{--method mc})}
+\label{sec:inference-mc}
+
+\begin{enumerate}
+  \item Draw \texttt{--n-samples} $N$ parameter vectors from the joint prior.
+  \item Reject any vector violating a hard constraint (no simulation).
+  \item Run a full simulation for each surviving sample and evaluate the log-likelihood.
+  \item Return all $N$ samples with their $\log\mathcal{L}$ and $\log\pi$ values.
+\end{enumerate}
+
+Monte Carlo is the natural first step: it produces the full joint posterior
+$\log p(\theta) = \log\mathcal{L}(\theta) + \log\pi(\theta)$, histograms readily,
+and parallelises trivially over samples.  Use it before committing to
+nested sampling.
+
+Parallel evaluation uses \texttt{multiprocessing.Pool} with the same
+picklable worker pattern as \texttt{tidal sweep --parallel}.
+
+\subsubsection{Nested Sampling (\texttt{--method nested})}
+\label{sec:inference-nested}
+
+Nested sampling~\cite{skilling2004nested} is an algorithm that evaluates the
+evidence integral $\mathcal{Z} = \int \mathcal{L}(\theta)\,\pi(\theta)\,\mathrm{d}\theta$
+by maintaining a set of $N_\mathrm{live}$ live points and iteratively
+replacing the lowest-likelihood point with a new draw from the constrained
+prior.  The evidence is accumulated as the prior volume shrinks.
+
+\textbf{Two backends} are supported via \texttt{--sampler}:
+
+\begin{table}[htbp]
+\centering
+\caption{Nested sampling backends.}
+\label{tab:nested-backends}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Backend     & \texttt{--sampler} & Install & Environment & Parallelism \\
+\midrule
+\textbf{dynesty}~\cite{speagle2020dynesty} & \texttt{dynesty}   & \texttt{pip install tidal[inference]} & Development & \texttt{pool.map} \\
+\textbf{PolyChord} & \texttt{polychord} & GitHub + gfortran & HPC (Newton/CSD3) & MPI + OpenMP \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{dynesty} is a pure-Python nested sampler installable with a single
+\texttt{pip} command and is the recommended backend for development and
+testing.  Dynamic nested sampling (\texttt{--dynamic}) allocates additional
+live points to regions of high posterior mass, improving parameter estimation
+at modest extra cost.
+
+\textbf{PolyChord} (Handley et al.) uses slice sampling with excellent
+performance in high-dimensional curved posteriors and full MPI parallelism
+on HPC clusters.  It is reserved for production runs on the Newton server
+or CSD3 because it requires a Fortran compiler (\texttt{gfortran}).
+
+\textbf{anesthetic}~\cite{handley2019anesthetic} (Handley 2019) handles all
+posterior visualization and is backend-agnostic: switching from dynesty to
+PolyChord requires only changing \texttt{--sampler} with no change to any
+analysis code.
+
+Key stopping parameters:
+\begin{itemize}
+  \item \texttt{--nlive N} --- number of live points (default 100; increase for multimodal posteriors)
+  \item \texttt{--dlogz F} --- stop when estimated remaining evidence $\Delta\log\mathcal{Z} < F$ (default 0.01)
+\end{itemize}
+
+\subsection{Results Analysis}
+\label{sec:inference-results}
+
+All sampling methods return an \texttt{InferenceResult} dataclass stored in
+\texttt{tidal/inference/\_results.py}:
+
+\begin{lstlisting}[style=python]
+@dataclass
+class InferenceResult:
+    samples: NDArray        # (n_samples, n_params)  parameter vectors
+    log_likelihood: NDArray # (n_samples,)            log L for each sample
+    log_prior: NDArray      # (n_samples,)            log pi for each sample
+    param_names: list[str]  # parameter names
+    method: str             # "mc" or "nested"
+    log_evidence: float | None       # nested sampling only
+    log_evidence_err: float | None   # 1-sigma uncertainty on log Z
+    weights: NDArray | None          # importance weights
+    metadata: dict                   # seed, wall time, n_rejected, ...
+\end{lstlisting}
+
+Key analysis methods:
+
+\begin{table}[htbp]
+\centering
+\caption{\texttt{InferenceResult} analysis methods.}
+\label{tab:inference-methods}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Method & Returns \\
+\midrule
+\texttt{effective\_sample\_size()} & Kish ESS $= (\sum w_i)^2 / \sum w_i^2$ \\
+\texttt{best()}                    & MAP estimate $\argmax_\theta\, p(\theta)$ \\
+\texttt{posterior\_mean()}         & Weighted posterior mean \\
+\texttt{credible\_interval(0.95)}  & Per-parameter 95\% credible intervals \\
+\texttt{to\_sweep\_results()}      & Converts to \texttt{SweepResults} for CSV/JSON export \\
+\texttt{save(output\_dir)}         & Writes \texttt{results.csv}, \texttt{results.json}, \texttt{inference.json} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Output structure:
+
+\begin{lstlisting}
+output_dir/
+|- results.csv       # self-contained parameter + metric table (via SweepResults)
+|- results.json      # same data in JSON
+|- inference.json    # evidence log Z, ESS, MAP estimate, credible intervals
+|- corner.png        # if --corner was passed
+|- trace.png         # if --trace was passed
+\end{lstlisting}
+
+\paragraph{Visualization}
+\texttt{plot\_corner()} uses anesthetic's \texttt{NestedSamples.plot\_2d()} when
+anesthetic is installed, producing publication-quality corner plots with
+1-D histograms and 2-D kernel-density marginals.  If anesthetic is absent,
+a matplotlib fallback produces a basic scatter corner plot.
+\texttt{plot\_trace()} always uses matplotlib.
+
+\subsection{CLI Reference}
+\label{sec:inference-cli}
+
+\begin{lstlisting}[style=bash]
+tidal sample <json_path> [options]
+\end{lstlisting}
+
+\begin{table}[htbp]
+\centering
+\caption{CLI flags for \texttt{tidal sample}.}
+\label{tab:sample-cli}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Flag & Type & Default & Description \\
+\midrule
+\texttt{--prior SPEC}       & str (repeatable) & (required) & Prior specification \texttt{NAME=DIST:A:B} \\
+\texttt{--constraint EXPR}  & str (repeatable) & none       & Hard constraint expression \\
+\texttt{--likelihood SPEC}  & str              & (required) & Likelihood \texttt{METRIC:TYPE[:ARGS]} \\
+\texttt{--method}           & \texttt{\{mc,nested\}}    & \texttt{mc}    & Sampling method \\
+\texttt{--sampler}          & \texttt{\{dynesty,polychord\}} & \texttt{dynesty} & Nested sampling backend \\
+\texttt{--n-samples N}      & int              & 1000       & MC sample count \\
+\texttt{--nlive N}          & int              & 100        & Nested sampling live points \\
+\texttt{--dlogz F}          & float            & 0.01       & Evidence tolerance \\
+\texttt{--dynamic}          & flag             & off        & Dynamic nested sampling \\
+\texttt{--seed N}           & int              & 42         & RNG seed \\
+\texttt{--parallel N}       & int              & 1          & Parallel workers \\
+\texttt{--corner}           & flag             & off        & Generate corner plot \\
+\texttt{--trace}            & flag             & off        & Generate trace plot \\
+\texttt{--output DIR}       & path             & (required) & Output directory \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All \texttt{tidal simulate} flags (\texttt{--param}, \texttt{--grid-shape},
+\texttt{--bounds}, \texttt{--ic}, \texttt{--t-end}, etc.)\ are accepted and
+passed through to each simulation run unchanged.
+
+\subsection{Integration with Existing Infrastructure}
+\label{sec:inference-integration}
+
+The inference pipeline reuses the sweep framework's simulation machinery
+with zero duplication:
+
+\begin{itemize}
+  \item \textbf{Simulation:} \texttt{SimulationLikelihood} in
+    \texttt{tidal/inference/\_likelihood.py} calls \texttt{\_simulate\_run()} and
+    \texttt{\_measure\_run()} directly from \texttt{tidal/cli/\_sweep.py}.
+  \item \textbf{Output:} \texttt{InferenceResult.to\_sweep\_results()} converts
+    posterior samples to a \texttt{SweepResults} object, enabling CSV/JSON
+    export via the same serialization path as \texttt{tidal sweep}.
+  \item \textbf{Parallelism:} The same picklable module-level worker pattern as
+    \texttt{\_sweep.py}'s \texttt{\_run\_single\_wrapper} is used for \texttt{Pool}-safe
+    likelihood evaluation.
+\end{itemize}
+
+Install the optional inference dependencies:
+
+\begin{lstlisting}[style=bash]
+pip install "tidal[inference]"   # adds dynesty >= 2.1 and anesthetic >= 2.0
+\end{lstlisting}
+
+\subsection{Usage Examples}
+\label{sec:inference-examples}
+
+\subsubsection{Exploratory Monte Carlo (no target)}
+
+\begin{lstlisting}[style=bash]
+tidal sample examples/data/coupled_scattering.json \
+  --prior "g0=uniform:0.01:0.9" \
+  --prior "mChi2=log_uniform:0.1:10.0" \
+  --likelihood "P_max:maximize" \
+  --method mc --n-samples 500 --parallel 4 \
+  --corner --output results_mc/
+\end{lstlisting}
+
+\subsubsection{Gaussian likelihood (comparison to target)}
+
+\begin{lstlisting}[style=bash]
+tidal sample examples/data/coupled_scattering.json \
+  --prior "g0=uniform:0.01:0.9" \
+  --likelihood "P_max:gaussian:0.5:0.05" \
+  --method mc --n-samples 1000 \
+  --output results_mc_gauss/
+\end{lstlisting}
+
+\subsubsection{Nested sampling with ghost-freedom constraints}
+
+\begin{lstlisting}[style=bash]
+tidal sample examples/data/torsion_dark_photon.json \
+  --prior "alpha=uniform:0.01:10" \
+  --prior "xi=log_uniform:0.001:1.0" \
+  --prior "deltam=arctan_uniform:0:0" \
+  --constraint "xi > 0" \
+  --constraint "deltam**2 < 2*alpha*xi" \
+  --likelihood "P_max:maximize" \
+  --method nested --nlive 200 --dlogz 0.01 \
+  --sampler dynesty --parallel 8 --corner \
+  --output results_nested/
+\end{lstlisting}
+
+Evidence and parameter constraints are written to
+\texttt{results\_nested/inference.json}.
+
+\subsection{Design Decisions}
+\label{sec:inference-design}
+
+\subsubsection{Why dynesty first, not PolyChord?}
+
+PolyChord is the eventual production target for HPC runs (Newton server,
+CSD3) and is Handley's own tool.  However it requires a Fortran compiler
+(\texttt{gfortran}) and is currently unavailable via PyPI.
+dynesty is a pure-Python drop-in with identical \texttt{prior\_transform} +
+\texttt{log\_likelihood} interface, installs with a single \texttt{pip} command,
+and works identically in the dev container.  The \texttt{--sampler} flag
+makes switching a one-line change when PolyChord returns to PyPI.
+
+\subsubsection{Why anesthetic for visualization?}
+
+anesthetic (Handley 2019)~\cite{handley2019anesthetic} reads posterior samples
+from both dynesty and PolyChord natively.  Using it for all visualization
+means the analysis layer is backend-agnostic: switching the sampler from
+dynesty to PolyChord requires no change to plotting code.
+
+\subsubsection{Why safe AST evaluation for constraints?}
+
+Using \texttt{eval()} for user-supplied constraint strings would allow arbitrary
+Python code execution.  The \texttt{ast} module approach parses expressions into
+a syntax tree and evaluates only recognized node types (comparisons, arithmetic,
+a fixed set of math functions).  Unknown nodes raise \texttt{ConstraintError}
+immediately.  This preserves the flexibility of user-specified expressions
+without any security risk.
+
+\subsection{References}
+\label{sec:inference-references}
+
+\begin{itemize}
+  \item \textbf{Skilling (2004)}~\cite{skilling2004nested}, ``Nested Sampling'',
+    AIP Conference Proceedings 735, 395--405. --- Original nested sampling
+    algorithm, evidence integral decomposition, convergence criteria.
+
+  \item \textbf{Speagle (2020)}~\cite{speagle2020dynesty}, ``dynesty: a dynamic
+    nested sampling package'', MNRAS 493(3), 3132--3158.
+    \url{https://github.com/joshspeagle/dynesty} --- The dynesty library
+    used as the default development backend; dynamic nested sampling extension.
+
+  \item \textbf{Handley (2019)}~\cite{handley2019anesthetic}, ``anesthetic:
+    nested sampling visualisation'', JOSS 4(37), 1414.
+    \url{https://github.com/handley-lab/anesthetic} --- Posterior
+    visualization library; backend-agnostic, native PolyChord and dynesty support.
+
+  \item \textbf{Barker (2024)}~\cite{barker2024poincare}, ``Poincar\'e gauge
+    theory of gravity'', arXiv:2406.12826. --- Identifies Bayesian inference
+    of PGT parameters from CMB observations as a natural next step
+    (Section~VI.C); the present framework is that future work.
+\end{itemize}

@@ -51,6 +51,9 @@
 #   Shapiro (2002), hep-th/0103093 — torsion phenomenology
 #   Dandoy, Lella et al. (2024), arXiv:2406.17853 — GW constraints
 #   Hayashi & Shirafuji (1979) — PGT propagating modes
+#
+# Derivation timing: ~20 min wall (requires --timeout 0; exceeds default 600s)
+# Last verified: 2026-04-05 (20 fields, 147 H terms, v0.25.6)
 
 [theory]
 name = "Torsion-Gertsenshtein (PGT + Einstein-Maxwell)"
@@ -136,13 +139,6 @@ propagation_axis = "z"
 # kappa = 1.0 (natural units; physical ~1.15e-18 GeV^-1)
 # B0 = 0.3 (background magnetic field strength)
 # alpha1-3 = torsion mass terms, b5 = R̃² coupling
-[parameters]
-kappa = 1.0
-B0 = 0.3
-alpha1 = 0.5
-alpha2 = 0.3
-alpha3 = 0.2
-b5 = 0.1
 
 [output]
 path = "../data/torsion_gertsenshtein.json"

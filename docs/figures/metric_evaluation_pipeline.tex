@@ -1,0 +1,214 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tidal-tikz-styles}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.45cm and 0.8cm,
+    every node/.append style={text opacity=1},
+]
+
+% ===================================================================
+%  TITLE
+% ===================================================================
+\node[font=\normalsize\bfseries, text=black] (title)
+    {Metric Evaluation Pipeline};
+\node[below=0.02cm of title, font=\tiny\sffamily, text=GrayLine]
+    {Abstract tensor indices $\to$ explicit numeric metric factors};
+
+% ===================================================================
+%  INPUT
+% ===================================================================
+
+\node[stage=Gray, below=0.5cm of title] (input)
+    {\textbf{Input}: tensor expression\\[-1pt]
+     \scriptsize abstract indices, CovD operators, Christoffels};
+
+% ===================================================================
+%  METRIC SETUP
+% ===================================================================
+
+\node[funcbox=Purple, below=0.5cm of input] (setdv)
+    {\texttt{SetMetricDownValues}\\[-1pt]
+     \scriptsize pre-define $g_{\mu\nu}$ basis components\\
+     \scriptsize via direct Mathematica \texttt{Set}};
+\node[annot, right=2.5cm of setdv, text width=3.6cm]
+    {Bypasses xCoba rule system\\
+     for performance.  75\% of entries\\
+     are off-diagonal zeros --- eliminated\\
+     early, preventing trace blowup.};
+
+\draw[arr] (input) -- (setdv);
+
+% ===================================================================
+%  CHRISTOFFEL CASCADE
+% ===================================================================
+
+\node[decision, below=0.6cm of setdv, text width=2.0cm] (isflat)
+    {non-constant\\metric?};
+\draw[arr] (setdv) -- (isflat);
+
+\node[annot, right=2.5cm of isflat, text width=3.6cm]
+    {\texttt{IsNonConstantMetric}: checks\\
+     whether any $g_{\mu\nu}$ depends on\\
+     coordinates (auto-detected)};
+
+% Flat: zero Christoffels
+\node[funcbox=Gray, left=2.5cm of isflat] (flatzero)
+    {Set all $\Gamma^a_{bc} = 0$\\[-1pt]
+     \scriptsize (flat spacetime)};
+\draw[arr] (isflat.west) -- (flatzero)
+    node[midway, above, font=\tiny] {no};
+
+% Curved: compute Christoffels
+\node[funcbox=Purple, below=0.7cm of isflat] (evalchrist)
+    {Compute Christoffels\\[-1pt]
+     \scriptsize $\Gamma^\lambda_{\mu\nu} = \tfrac{1}{2} g^{\lambda\rho}
+     (\partial_\mu g_{\nu\rho} + \partial_\nu g_{\mu\rho}
+     - \partial_\rho g_{\mu\nu})$};
+\draw[arr] (isflat.south) -- (evalchrist)
+    node[midway, right, font=\tiny] {yes};
+
+% Sub-decision: cached?
+\node[decision, below=0.5cm of evalchrist, text width=1.8cm] (cached)
+    {in geometric\\cache?};
+
+\node[funcbox=Blue, right=2.5cm of cached] (getcached)
+    {Return cached result};
+\draw[arr] (cached.east) -- (getcached)
+    node[midway, above, font=\tiny] {hit};
+
+\node[funcbox=Purple, below=0.5cm of cached] (computechrist)
+    {Evaluate from metric matrix\\[-1pt]
+     \scriptsize $O(\dim^3)$ operations};
+\draw[arr] (cached.south) -- (computechrist)
+    node[midway, right, font=\tiny] {miss};
+
+% ===================================================================
+%  MAIN PIPELINE: EvaluatePDMetric (fixed-point)
+% ===================================================================
+
+\node[stage=Purple, below=1.0cm of computechrist, text width=4.0cm] (epm_title)
+    {\textbf{EvaluatePDMetric}\\[-1pt]
+     \scriptsize fixed-point metric evaluation cycle};
+
+% Connect from both paths
+\draw[arr] (flatzero.south) |- ([yshift=0.3cm]epm_title.west) -- (epm_title.west);
+\draw[arr] (getcached.south) |- ([yshift=0.3cm]epm_title.east)
+    -- (epm_title.east);
+\draw[arr] (computechrist) -- (epm_title);
+
+% Fixed-point loop steps
+\node[funcbox=Purple, below=0.5cm of epm_title] (fp_sep)
+    {\texttt{SeparateMetric}\\[-1pt]
+     \scriptsize undo contractions: $V^a \to g^{ab} V_b$};
+
+\node[funcbox=Purple, below=of fp_sep] (fp_tobasis)
+    {\texttt{ToBasis}\\[-1pt]
+     \scriptsize abstract indices $\to$ chart components};
+
+\node[funcbox=Purple, below=of fp_tobasis] (fp_toval)
+    {\texttt{ToValues}\\[-1pt]
+     \scriptsize substitute numeric metric entries};
+
+\node[funcbox=Purple, below=of fp_toval] (fp_expand)
+    {\texttt{Expand}\\[-1pt]
+     \scriptsize flatten symbolic products};
+
+\node[fpcheck, below=0.5cm of fp_expand] (fp_check)
+    {stable?};
+
+\draw[arr] (epm_title) -- (fp_sep);
+\draw[arr] (fp_sep) -- (fp_tobasis);
+\draw[arr] (fp_tobasis) -- (fp_toval);
+\draw[arr] (fp_toval) -- (fp_expand);
+\draw[arr] (fp_expand) -- (fp_check);
+
+% Loop back
+\draw[arr] (fp_check.west) -- ++(-2.0,0) |- (fp_sep.west)
+    node[pos=0.25, left, font=\tiny] {no (repeat)};
+
+% Loop background
+\begin{scope}[on background layer]
+    \node[loopregion, fit=(fp_sep)(fp_tobasis)(fp_toval)
+          (fp_expand)(fp_check),
+          label={[font=\tiny\sffamily, text=BlueLine]
+          above right:repeat until fixed point}] {};
+\end{scope}
+
+\node[annot, right=2.0cm of fp_check, text width=3.4cm]
+    {Each \texttt{SeparateMetric} may\\
+     expose new abstract indices\\
+     that need further \texttt{ToBasis}.\\
+     Converges in 2--3 cycles\\
+     for typical theories.};
+
+% ===================================================================
+%  COVARIANT -> PARTIAL DERIVATIVE CONVERSION
+% ===================================================================
+
+\node[funcbox=Purple, below=0.7cm of fp_check] (gencd)
+    {\texttt{GenerateCDRules}\\[-1pt]
+     \scriptsize pattern-match CovD $\to$ partial deriv};
+\draw[arr] (fp_check.south) -- (gencd)
+    node[midway, right, font=\tiny] {yes};
+
+\node[funcbox=Purple, below=of gencd] (convcd)
+    {\texttt{ConvertCDToDerivatives}\\[-1pt]
+     \scriptsize $\nabla_a f_{b} \to \partial_\mu f_\nu$};
+\node[annot, right=2.5cm of convcd, text width=3.4cm]
+    {Fixed-point application\\
+     (max 20 iterations).\\
+     Errors if abstract indices\\
+     remain after conversion.};
+
+\draw[arr] (gencd) -- (convcd);
+
+% ===================================================================
+%  OPTIONAL: Epsilon tensors
+% ===================================================================
+
+\node[check, below=0.6cm of convcd] (eps)
+    {Levi-Civita tensors present?\\[-1pt]
+     \scriptsize $\epsilon^{\mu\nu\rho\sigma}$ evaluation};
+\draw[arr] (convcd) -- (eps);
+
+\node[annot, right=2.5cm of eps, text width=3.2cm]
+    {Volume factor $\sqrt{|\det g|}$,\\
+     inverse metric for index\\
+     raising, sign conventions};
+
+% ===================================================================
+%  OUTPUT
+% ===================================================================
+
+\node[stage=Green, below=0.6cm of eps] (output)
+    {\textbf{Output}: scalar expression\\[-1pt]
+     \scriptsize explicit numeric factors, partial derivatives only};
+\draw[arr] (eps) -- (output);
+
+% ===================================================================
+%  CACHE BOX (left side)
+% ===================================================================
+
+\node[rectangle, rounded corners=2pt, draw=BlueLine, dashed,
+      fill=BlueFill, fill opacity=0.15, inner sep=6pt,
+      text opacity=1, font=\scriptsize, align=left,
+      text width=3.4cm,
+      left=3.5cm of evalchrist, anchor=east] (cachebox) {%
+    \textbf{Geometric Cache}\\[3pt]
+    Keyed by \texttt{Hash[metricMatrix]}\\[3pt]
+    \textbullet\ Inverse metric $g^{ab}$\\
+    \textbullet\ Christoffel arrays $\Gamma^a_{bc}$\\
+    \textbullet\ Metric substitution rules\\
+    \textbullet\ Riemann tensor $R^a_{\ bcd}$\\[3pt]
+    Eliminates 200--1500$\times$\\
+    redundant matrix inversions};
+
+% Cache arrows
+\draw[cachearr] (computechrist.west) -| (cachebox.south)
+    node[pos=0.5, below, font=\tiny, text=BlueLine] {store};
+\draw[cachearr] (cachebox.north) |- (cached.west)
+    node[pos=0.85, above, font=\tiny, text=BlueLine] {lookup};
+
+\end{tikzpicture}
+\end{document}

@@ -20,10 +20,6 @@ names = ["mA2", "mB2", "gcoup"]
 [lagrangian]
 expression = "(-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] + 1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-d][A[-c]] - mA2/2 A[-a] eta[a,b] A[-b] - 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]] + 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-d][B[-c]] - mB2/2 B[-a] eta[a,b] B[-b] + gcoup A[-a] eta[a,b] B[-b])"
 
-[parameters]
-mA2 = 1.0
-mB2 = 2.0
-gcoup = 0.5
 
 [constraint_solver]
 enabled = true

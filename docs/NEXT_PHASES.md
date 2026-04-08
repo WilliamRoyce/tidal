@@ -3,7 +3,7 @@
 **Created:** February 2026
 **Last Updated:** March 2026
 **Status:** Phases A, B, C, D, E (FFT), F, J complete; Torsion (PGT) complete (v0.18.0); Torsion-Gertsenshtein investigated (v0.22.8); Phases G–I planned
-**Version:** 0.22.12 | **Tests:** 1,700 collected | **Examples:** 20 working (1+1D to 3+1D)
+**Version:** 0.26.4 | **Tests:** 1,700 collected | **Examples:** 20 working (1+1D to 3+1D)
 
 ## Context
 
@@ -202,12 +202,42 @@ Combined PGT + Einstein-Maxwell theory derived (`examples/torsion_gertsenshtein/
 - **Field-filtered energy measurement:** Added `fields` parameter to energy computation chain, allowing conversion measurement on Ostrogradsky theories by evaluating only source/target field Hamiltonian terms.
 - **PGT formulation verified correct:** TIDAL varies L independently w.r.t. h, a, and t via VarD — the standard metric-affine/Palatini approach for the torsion sector.
 
+### Dark Photon Torsion Model (active — v0.24)
+
+Non-minimal torsion-EM theory derived (`examples/torsion_dark_photon/theory.toml`). Torsion trace T_μ treated as dark photon; kinetic mixing δ F·F_T breaks the polarisation block-diagonal structure found in minimal PGT.
+
+Lagrangian: L = (1/κ²)R̃ + αI₃ − (ξ/4)F_T² + δ F·F_T − (1/4)F²
+
+Key results:
+- **Active channel**: h_5 ↔ a_1 (h× ↔ a_x photon), coupling `-B₀κ²∂_z`. Same channel as standard Gertsenshtein.
+- **Torsion enhancement**: C₀ = 7.24×10⁻⁴ at (α=0.5, ξ=0.1, δ=0.1) vs 6.25×10⁻⁴ standard → **+16% amplification**
+- **xi=0 recovery**: Torsion fields become algebraic constraints; exact Gertsenshtein P = 6.25×10⁻⁴ reproduced (fix #220)
+- **Energy conservation**: |dE/E| = 1.07×10⁻¹⁵ (machine precision, modal solver)
+- **Parameter sweep**: Pending — xi=0 limit now works (fix #220), enabling full (α, ξ, δ) space exploration
+
+### Nonminimal R̃[μν]F Torsion-EM Coupling (active — v0.25)
+
+Nonminimal torsion-EM theory with R̃[μν]F coupling derived (`examples/torsion_gertsenshtein/theory_nonminimal.toml`, 34 fields). Independent torsion mass parameters (α₁, α₂, α₃) with all-sector stability.
+
+Lagrangian: L = (1/κ²)R̃ + α₁I₁ + α₂I₂ + α₃I₃ + δ₁R̃[μν]Fμν − ¼F²
+
+Key results (see #235):
+- **Light-mediator enhancement**: Amplification of Gertsenshtein effect up to A ≈ 8000× near the stability boundary where torsion mass → 0. Analogous to axion-photon mixing enhancement (Raffelt & Stodolsky 1988).
+- **Suppression valley**: At intermediate |δ₁| ≈ 0.7, destructive interference between torsion and GR channels suppresses conversion by up to 10⁸×.
+- **2D heatmap** (δ₁ × α₂): maps the full amplification landscape at 50×40 resolution. Amplification stripe at the stability boundary, deep suppression in the interior.
+- **Stability-amplification tension**: Maximum amplification requires torsion masses near zero (stability boundary) — fundamental trade-off.
+- **C₀ = P/B₀² verified B₀-independent** (linear regime confirmed between B₀=0.01 and B₀=0.001).
+- **Smart constraint elimination** (#234): Fixed 1/parameter singularity in Wolfram constraint solver. Symbolic coefficients preserved.
+- **Eigenvalue pre-check**: Modal solver catches unstable runs at t=0 before evolution (no escaped diverged runs).
+
+Propagating model (Ftorsion² + R̃[μν]F, #236): gradient instability at δ₁≠0 (k-dependent growth rate). Stability scan in progress over (xi, δ₁, α₂, α₃) to determine if any parameter combination stabilises propagating torsion with R̃[μν]F.
+
 ### Remaining / Blocked
 
 - **Radial dipolar (Phase F3a)**: `theory_radial.toml` derived (spherical coords). BLOCKED on compute.
 - **Plasma detuning (Phase F1)**: BLOCKED — xPert spurious z²-terms from background 4-potential.
-- **Non-minimal torsion-EM coupling:** Required to break the polarisation block-diagonal structure. T·F, T·(*F) terms would create direct photon-torsion interaction. Future work.
-- **Ghost-free parameter conditions:** Literature (Sezgin & van Nieuwenhuizen 1980, Nikiforova et al. 2009, Barker 2024) provides sector-specific conditions. No universal closed-form for general (α₁, α₂, α₃, b₅).
+- **Propagating torsion + R̃[μν]F**: Gradient instability found (#236). Stability scan over (xi, α₂, α₃, δ₁) in progress. May require additional Lagrangian terms (cubic operators, higher-derivative corrections) for stabilisation.
+- **Ghost-free parameter conditions:** Literature (Sezgin & van Nieuwenhuizen 1980, Nikiforova et al. 2009, Barker 2024) provides sector-specific conditions. No universal closed-form for general (α₁, α₂, α₃, b₅). xi=0 limit now provides exact control check.
 
 ### References
 

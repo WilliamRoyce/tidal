@@ -111,10 +111,6 @@ propagation_axis = "z"
 # kappa = 1.0 (natural units; physical value ~ 1.15e-18 GeV^-1)
 # Bpeak = 0.1 (peak magnetic field strength; "B0_peak" not used — underscores are Mathematica patterns)
 # R = 5.0 (Gaussian half-width; integral = Bpeak * R * sqrt(2*pi))
-[parameters]
-kappa = 1.0
-Bpeak = 0.1
-R = 5.0
 
 [output]
 path = "../data/gertsenshtein_localized.json"

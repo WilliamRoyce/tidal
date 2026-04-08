@@ -91,7 +91,13 @@ def _evaluate_sweep_overlay(
     except Exception as exc:
         msg = f"Error evaluating overlay formula {formula!r}: {exc}"
         raise ValueError(msg) from exc
-    return np.asarray(result, dtype=np.float64)
+    out = np.asarray(result, dtype=np.float64)
+    # Broadcast scalar result (e.g. formula is constant, doesn't reference swept param)
+    # to match the shape of the first swept-parameter array.
+    if out.ndim == 0 and param_arrays:
+        ref = next(iter(param_arrays.values()))
+        out = np.broadcast_to(out, np.asarray(ref).shape).copy()
+    return out
 
 
 # ------------------------------------------------------------------
@@ -103,14 +109,22 @@ def _build_norm(
     values: NDArray[np.float64],
     *,
     log_scale: bool = False,
+    divergent_center: float | None = None,
 ) -> Normalize:
-    """Build a matplotlib Normalize (linear) or LogNorm for colour mapping.
+    """Build a matplotlib Normalize, LogNorm, or TwoSlopeNorm.
 
-    Returns a ``Normalize`` or ``LogNorm`` instance.  Returns a default
-    linear ``Normalize(0, 1)`` if *values* is empty or all-zero with
-    ``log_scale=True``.
+    Returns a ``Normalize``, ``LogNorm``, or ``TwoSlopeNorm`` instance.
+    Returns a default linear ``Normalize(0, 1)`` if *values* is empty or
+    all-zero with ``log_scale=True``.
+
+    Parameters
+    ----------
+    divergent_center : float or None
+        If provided, use ``TwoSlopeNorm`` centered at this value.
+        Useful for colormaps where a physical baseline (e.g. P_EM)
+        should map to the colormap midpoint.
     """
-    from matplotlib.colors import LogNorm, Normalize
+    from matplotlib.colors import LogNorm, Normalize, TwoSlopeNorm
 
     if len(values) == 0:
         return Normalize(0, 1)
@@ -123,6 +137,8 @@ def _build_norm(
         vmin = float(pos.min())
         vmax = max(vmax, vmin * 1.01)  # avoid vmin == vmax
         return LogNorm(vmin=vmin, vmax=vmax)
+    if divergent_center is not None and vmin < divergent_center < vmax:
+        return TwoSlopeNorm(vcenter=divergent_center, vmin=vmin, vmax=vmax)
     return Normalize(vmin=vmin, vmax=vmax)
 
 
@@ -174,12 +190,14 @@ def _overlay_quality_hatching(
             ax.add_patch(rect)
 
 
-def render_sweep_1d(
+def render_sweep_1d(  # noqa: PLR0913, PLR0914
     ax: Axes,
     results: SweepResults,
     metric: str,
     *,
     overlay: str | None = None,
+    log_y: bool = False,
+    thresholds: list[str] | None = None,
 ) -> None:
     """Plot a scalar metric vs a single swept parameter.
 
@@ -198,6 +216,11 @@ def render_sweep_1d(
         (e.g. ``t_end``).  Standard math functions (``sin``, ``cos``,
         ``sqrt``, ``pi``, ``exp``) are available.
         Example: ``'sin(kappa * B0 * t_end / 2)**2'``.
+    log_y : bool
+        Use logarithmic y-axis scale.
+    thresholds : list[str] or None
+        Horizontal threshold lines in ``"VALUE[:LABEL[:COLOR]]"`` format.
+        Example: ``["1.0:P=1:red", "0.1::orange"]``.
 
     Raises
     ------
@@ -261,18 +284,35 @@ def render_sweep_1d(
         )
         ax.legend(fontsize="small")
 
+    # Threshold lines
+    if thresholds:
+        for spec in thresholds:
+            parts = spec.split(":")
+            val = float(parts[0])
+            label = parts[1] if len(parts) > 1 and parts[1] else None
+            color = parts[2] if len(parts) > 2 and parts[2] else "red"  # noqa: PLR2004
+            ax.axhline(val, color=color, linestyle=":", alpha=0.7, label=label)
+
+    if overlay or thresholds:
+        ax.legend(fontsize="small")
+
     ax.set_xlabel(param_name)
     ax.set_ylabel(metric)
     ax.set_title(f"{metric} vs {param_name}")
     ax.grid(visible=True, alpha=0.3)
 
+    if log_y:
+        ax.set_yscale("log")
 
-def _plot_1d_metric(
+
+def _plot_1d_metric(  # noqa: PLR0913
     ax: Axes,
     results: SweepResults,
     param_name: str,
     metric: str,
     color: str,
+    *,
+    log_y: bool = False,
 ) -> None:
     """Plot a single metric on an axis, with error bands if replicates exist."""
     if results.has_replicates:
@@ -286,12 +326,16 @@ def _plot_1d_metric(
         x = results.column(param_name)
         y = results.column(metric)
         ax.plot(x, y, "o-", color=color, linewidth=1.5, markersize=5)
+    if log_y:
+        ax.set_yscale("log")
 
 
 def render_sweep_1d_multi(
     fig: Figure,
     results: SweepResults,
     metrics: list[str],
+    *,
+    log_y: bool = False,
 ) -> None:
     """Plot multiple metrics vs a single swept parameter.
 
@@ -306,6 +350,8 @@ def render_sweep_1d_multi(
         Loaded sweep data.
     metrics : list[str]
         Column names to plot.
+    log_y : bool
+        Use logarithmic y-axis scale on all subplots.
 
     Raises
     ------
@@ -325,7 +371,9 @@ def render_sweep_1d_multi(
 
     for i, metric in enumerate(metrics):
         ax = axes[i, 0]
-        _plot_1d_metric(ax, results, param_name, metric, colors[i % len(colors)])
+        _plot_1d_metric(
+            ax, results, param_name, metric, colors[i % len(colors)], log_y=log_y
+        )
         ax.set_ylabel(metric)
         ax.grid(visible=True, alpha=0.3)
 
@@ -333,12 +381,14 @@ def render_sweep_1d_multi(
     fig.suptitle(f"Sweep: {', '.join(metrics)} vs {param_name}")
 
 
-def render_sweep_2d(
+def render_sweep_2d(  # noqa: PLR0913
     ax: Axes,
     results: SweepResults,
     metric: str,
     *,
     log_scale: bool = False,
+    divergent_center: float | None = None,
+    cmap_name: str = "viridis",
 ) -> None:
     """Plot a scalar metric over two swept parameters.
 
@@ -356,6 +406,8 @@ def render_sweep_2d(
         Column name for the color values.
     log_scale : bool
         Use logarithmic colorbar (useful for ``inv_B_min``).
+    divergent_center : float or None
+        Center colormap at this value using ``TwoSlopeNorm``.
 
     Raises
     ------
@@ -373,9 +425,27 @@ def render_sweep_2d(
     p1_name, p2_name = param_names
 
     if _is_scattered_data(results):
-        _render_2d_scattered(ax, results, p1_name, p2_name, metric, log_scale=log_scale)
+        _render_2d_scattered(
+            ax,
+            results,
+            p1_name,
+            p2_name,
+            metric,
+            log_scale=log_scale,
+            divergent_center=divergent_center,
+            cmap_name=cmap_name,
+        )
     else:
-        _render_2d_grid(ax, results, p1_name, p2_name, metric, log_scale=log_scale)
+        _render_2d_grid(
+            ax,
+            results,
+            p1_name,
+            p2_name,
+            metric,
+            log_scale=log_scale,
+            divergent_center=divergent_center,
+            cmap_name=cmap_name,
+        )
 
 
 def _render_2d_scattered(  # noqa: PLR0913
@@ -386,6 +456,8 @@ def _render_2d_scattered(  # noqa: PLR0913
     metric: str,
     *,
     log_scale: bool = False,
+    divergent_center: float | None = None,
+    cmap_name: str = "viridis",
 ) -> None:
     """Render 2D sweep as scatter + interpolation background."""
     p1 = np.array(results.column(p1_name), dtype=np.float64)
@@ -403,7 +475,9 @@ def _render_2d_scattered(  # noqa: PLR0913
         )
         return
 
-    norm = _build_norm(metric_vals, log_scale=log_scale)
+    norm = _build_norm(
+        metric_vals, log_scale=log_scale, divergent_center=divergent_center
+    )
 
     # Interpolation background (if enough points)
     if len(metric_vals) >= 10:  # noqa: PLR2004
@@ -428,7 +502,7 @@ def _render_2d_scattered(  # noqa: PLR0913
                 p2g,
                 z,
                 shading="auto",
-                cmap="viridis",
+                cmap=cmap_name,
                 alpha=0.3,
                 norm=norm,
             )
@@ -439,7 +513,7 @@ def _render_2d_scattered(  # noqa: PLR0913
         p1,
         p2,
         c=metric_vals,
-        cmap="viridis",
+        cmap=cmap_name,
         s=60,
         edgecolors="k",
         linewidths=0.5,
@@ -460,6 +534,8 @@ def _render_2d_grid(  # noqa: PLR0913
     metric: str,
     *,
     log_scale: bool = False,
+    divergent_center: float | None = None,
+    cmap_name: str = "viridis",
 ) -> None:
     """Render 2D sweep as pcolormesh heatmap (for grid-aligned data)."""
     p1_vals = np.sort(results.swept_params[p1_name])
@@ -490,14 +566,18 @@ def _render_2d_grid(  # noqa: PLR0913
     valid_vals = grid[np.isfinite(grid)]
     if log_scale:
         valid_vals = valid_vals[valid_vals > 0]
-    norm = _build_norm(valid_vals, log_scale=log_scale) if len(valid_vals) > 0 else None
+    norm = (
+        _build_norm(valid_vals, log_scale=log_scale, divergent_center=divergent_center)
+        if len(valid_vals) > 0
+        else None
+    )
 
     im = ax.pcolormesh(
         p1_vals,
         p2_vals,
         grid,
         shading="nearest",
-        cmap="viridis",
+        cmap=cmap_name,
         norm=norm,
     )
     ax.set_xlabel(p1_name)
@@ -830,8 +910,14 @@ def render_convergence(
 
 
 def _safe_normalize(values: NDArray[np.float64]) -> NDArray[np.float64]:
-    """Normalize values to [0, 1] range for colormap mapping."""
-    vmin, vmax = values.min(), values.max()
+    """Normalize values to [0, 1] range for colormap mapping.
+
+    NaN values are preserved (not included in min/max computation).
+    Returns 0.5 for all-NaN or constant arrays.
+    """
+    if len(values) == 0 or np.all(np.isnan(values)):
+        return np.full_like(values, 0.5)
+    vmin, vmax = float(np.nanmin(values)), float(np.nanmax(values))
     if vmax == vmin:
         return np.full_like(values, 0.5)
     return (values - vmin) / (vmax - vmin)
@@ -859,16 +945,22 @@ def _is_scattered_data(results: SweepResults) -> bool:
 # -- Advanced visualization (F8) ---------------------------------------------
 
 
-def render_sweep_parallel(
+def render_sweep_parallel(  # noqa: PLR0914
     ax: Axes,
     results: SweepResults,
     metric: str,
+    *,
+    cmap_name: str = "viridis",
+    divergent_center: float | None = None,
 ) -> None:
     """Parallel coordinates: each axis is a parameter + metric, color = metric.
 
     Lines are sorted by metric value (low-to-high) so high-metric runs
     draw on top.  Alpha and linewidth scale with distance from median to
     emphasize extreme (most interesting) values.
+
+    Diverged runs (NaN metric) are drawn as dashed grey lines so they
+    still show which parameter regions are unstable.
 
     Parameters
     ----------
@@ -878,6 +970,10 @@ def render_sweep_parallel(
         Sweep data with 2+ swept parameters.
     metric : str
         Metric for coloring the polylines.
+    cmap_name : str
+        Matplotlib colormap name (default ``"viridis"``).
+    divergent_center : float or None
+        Center colormap at this value using ``TwoSlopeNorm``.
 
     Raises
     ------
@@ -892,8 +988,15 @@ def render_sweep_parallel(
         raise ValueError(msg)
 
     metric_vals = np.array(results.column(metric), dtype=np.float64)
-    norm = _safe_normalize(metric_vals)
-    cmap = plt.colormaps["viridis"]
+    ok_mask = np.isfinite(metric_vals)
+
+    # Normalize only successful runs for color mapping
+    ok_metric = metric_vals[ok_mask]
+    norm_vals = np.full_like(metric_vals, np.nan)
+    if len(ok_metric) > 0:
+        norm_vals[ok_mask] = _safe_normalize(ok_metric)
+
+    cmap = plt.colormaps[cmap_name]
 
     # Include metric as the final axis
     axis_names = [*param_names, metric]
@@ -904,14 +1007,30 @@ def render_sweep_parallel(
         raw = np.array(results.column(name), dtype=np.float64)
         axis_data.append(_safe_normalize(raw))
 
-    # Sort by metric: draw low values first, high values on top
-    for idx in np.argsort(metric_vals):
-        coords = [axis_data[a][idx] for a in range(len(axis_names))]
-        emphasis = abs(float(norm[idx]) - 0.5) * 2  # 0 at median, 1 at extremes
+    # Draw diverged runs first (background, dashed grey)
+    for idx in np.where(~ok_mask)[0]:
+        coords = [float(axis_data[a][idx]) for a in range(len(axis_names))]
+        # Replace NaN coordinate (metric axis) with 0 so line is visible
+        coords = [0.0 if np.isnan(c) else c for c in coords]
         ax.plot(
             range(len(axis_names)),
             coords,
-            color=cmap(norm[idx]),
+            color="0.6",
+            alpha=0.3,
+            linewidth=0.6,
+            linestyle="--",
+        )
+
+    # Draw successful runs sorted by metric (low first, high on top)
+    ok_indices = np.where(ok_mask)[0]
+    for idx in ok_indices[np.argsort(metric_vals[ok_mask])]:
+        coords = [float(axis_data[a][idx]) for a in range(len(axis_names))]
+        nv = float(norm_vals[idx])
+        emphasis = abs(nv - 0.5) * 2  # 0 at median, 1 at extremes
+        ax.plot(
+            range(len(axis_names)),
+            coords,
+            color=cmap(nv),
             alpha=0.15 + 0.6 * emphasis,
             linewidth=0.8 + 0.8 * emphasis,
         )
@@ -922,13 +1041,15 @@ def render_sweep_parallel(
     ax.set_title(f"Parallel Coordinates (color = {metric})")
 
     from matplotlib.cm import ScalarMappable
-    from matplotlib.colors import Normalize
 
-    sm = ScalarMappable(
-        cmap=cmap,
-        norm=Normalize(vmin=float(metric_vals.min()), vmax=float(metric_vals.max())),
-    )
-    sm.set_array(metric_vals)
+    if len(ok_metric) > 0:
+        cb_norm = _build_norm(ok_metric, divergent_center=divergent_center)
+    else:
+        from matplotlib.colors import Normalize
+
+        cb_norm = Normalize(0, 1)
+    sm = ScalarMappable(cmap=cmap, norm=cb_norm)
+    sm.set_array(ok_metric)
     ax.figure.colorbar(sm, ax=ax, label=metric)  # type: ignore[union-attr]
 
 
@@ -1075,15 +1196,21 @@ def _render_tornado_range(
     ax.invert_yaxis()
 
 
-def render_sweep_scatter(
+def render_sweep_scatter(  # noqa: C901, PLR0912
     fig: Figure,
     results: SweepResults,
     metric: str,
+    *,
+    cmap_name: str = "viridis",
+    divergent_center: float | None = None,
 ) -> None:
     """Pairwise scatter matrix with marginal param-vs-metric on diagonal.
 
     Diagonal cells show each parameter vs the metric (marginal relationship).
     Off-diagonal cells show pairwise parameter scatter, colored by metric.
+
+    Diverged runs (NaN metric) are plotted as grey 'x' markers so they
+    still map the instability boundary without dominating the color scale.
 
     Parameters
     ----------
@@ -1093,6 +1220,10 @@ def render_sweep_scatter(
         Sweep data with 2+ swept parameters.
     metric : str
         Metric for coloring.
+    cmap_name : str
+        Matplotlib colormap name (default ``"viridis"``).
+    divergent_center : float or None
+        Center colormap at this value using ``TwoSlopeNorm``.
 
     Raises
     ------
@@ -1100,6 +1231,7 @@ def render_sweep_scatter(
         If fewer than 2 swept parameters.
     """
     import matplotlib.pyplot as plt
+    from matplotlib.cm import ScalarMappable
 
     param_names = list(results.swept_params.keys())
     n = len(param_names)
@@ -1108,8 +1240,19 @@ def render_sweep_scatter(
         raise ValueError(msg)
 
     metric_vals = np.array(results.column(metric), dtype=np.float64)
-    cmap = plt.colormaps["viridis"]
-    vmin, vmax = float(np.nanmin(metric_vals)), float(np.nanmax(metric_vals))
+    ok_mask = np.isfinite(metric_vals)
+    ok_metric = metric_vals[ok_mask]
+
+    cmap = plt.colormaps[cmap_name]
+    if len(ok_metric) > 0:
+        norm = _build_norm(ok_metric, divergent_center=divergent_center)
+    else:
+        from matplotlib.colors import Normalize
+
+        norm = Normalize(0, 1)
+
+    # Pre-extract all parameter arrays
+    param_data = {p: np.array(results.column(p), dtype=np.float64) for p in param_names}
 
     axes = fig.subplots(n, n, squeeze=False)
 
@@ -1118,32 +1261,56 @@ def render_sweep_scatter(
             ax = axes[i][j]
             if i == j:
                 # Diagonal: marginal scatter (param vs metric)
-                vals = np.array(results.column(param_names[i]), dtype=np.float64)
-                ax.scatter(
-                    vals,
-                    metric_vals,
-                    c=metric_vals,
-                    cmap=cmap,
-                    s=12,
-                    alpha=0.7,
-                    vmin=vmin,
-                    vmax=vmax,
-                )
+                vals = param_data[param_names[i]]
+                # Successful runs: colored by metric
+                if np.any(ok_mask):
+                    ax.scatter(
+                        vals[ok_mask],
+                        metric_vals[ok_mask],
+                        c=metric_vals[ok_mask],
+                        cmap=cmap,
+                        norm=norm,
+                        s=12,
+                        alpha=0.7,
+                    )
+                # Diverged runs: grey x markers
+                if np.any(~ok_mask):
+                    ax.scatter(
+                        vals[~ok_mask],
+                        np.zeros(np.sum(~ok_mask)),
+                        marker="x",
+                        c="0.6",
+                        s=15,
+                        alpha=0.5,
+                        zorder=5,
+                    )
                 ax.set_ylabel(metric, fontsize=7)
             else:
                 # Off-diagonal: pairwise parameter scatter
-                x = np.array(results.column(param_names[j]), dtype=np.float64)
-                y = np.array(results.column(param_names[i]), dtype=np.float64)
-                ax.scatter(
-                    x,
-                    y,
-                    c=metric_vals,
-                    cmap=cmap,
-                    s=10,
-                    alpha=0.7,
-                    vmin=vmin,
-                    vmax=vmax,
-                )
+                x = param_data[param_names[j]]
+                y = param_data[param_names[i]]
+                # Successful runs: colored by metric
+                if np.any(ok_mask):
+                    ax.scatter(
+                        x[ok_mask],
+                        y[ok_mask],
+                        c=metric_vals[ok_mask],
+                        cmap=cmap,
+                        norm=norm,
+                        s=10,
+                        alpha=0.7,
+                    )
+                # Diverged runs: grey x markers
+                if np.any(~ok_mask):
+                    ax.scatter(
+                        x[~ok_mask],
+                        y[~ok_mask],
+                        marker="x",
+                        c="0.6",
+                        s=15,
+                        alpha=0.5,
+                        zorder=5,
+                    )
 
             if i == n - 1:
                 ax.set_xlabel(param_names[j], fontsize=8)
@@ -1156,15 +1323,8 @@ def render_sweep_scatter(
 
     fig.suptitle(f"Scatter Matrix (color = {metric})", fontsize=12)
 
-    # Colorbar beside rightmost column only (avoids overlap)
-    from matplotlib.cm import ScalarMappable
-    from matplotlib.colors import Normalize
-
-    sm = ScalarMappable(
-        cmap=cmap,
-        norm=Normalize(vmin=vmin, vmax=vmax),
-    )
-    sm.set_array(metric_vals)
+    sm = ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array(ok_metric)
     fig.colorbar(sm, ax=axes[:, -1].ravel().tolist(), label=metric, shrink=0.8)
 
 

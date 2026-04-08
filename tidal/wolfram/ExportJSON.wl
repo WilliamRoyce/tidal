@@ -399,7 +399,8 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
 (* Equation conversion for multi-field systems *)
 (* Phase 2, Issue 6: Now supports parabolic (d_t), elliptic (no time), and hyperbolic (d2_t) PDEs *)
 EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, metadata_] := Module[
-  {terms, rhsTerms, rhs, timeDerivTerm, lhsTimeOrder, lhsStructure},
+  {terms, rhsTerms, rhs, timeDerivTerm, lhsTimeOrder, lhsStructure, kineticCoeffStr},
+  kineticCoeffStr = None;
 
   (* Same logic as EquationToJSON but with cross-field awareness *)
   terms = If[Head[componentEq] === Plus, List @@ componentEq, {componentEq}];
@@ -450,17 +451,28 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     ]
   ];
 
-  (* LHS normalization: extract time-derivative coefficient and normalize RHS *)
-  (* For |lhsCoeff| = 1: rhs = non-time terms as-is (handles both VarD and direct construction) *)
-  (* For non-unit lhsCoeff (curved spacetime): rhs = -non_time_terms / lhsCoeff *)
-  (*   Example: lhsCoeff = -Omega^{-2} gives rhs = Omega^2 * non_time_terms *)
+  (* LHS normalization: extract time-derivative coefficient and normalize RHS        *)
+  (* For |lhsCoeff| = 1: rhs = non-time terms as-is                                *)
+  (* For non-unit lhsCoeff with coord dependence (e.g. 1/Omega[r[]]): divide here  *)
+  (* For non-unit lhsCoeff that is a pure parameter (e.g. xi, kappa^2):            *)
+  (*   DO NOT divide — keep RHS unnormalized and record kinetic_coefficient_symbolic *)
+  (*   so Python can handle the xi=0 degenerate case (field becomes constraint).    *)
+  (*   Discrimination: FreeQ[lhsCoeff, _[]] is True for pure parameters,           *)
+  (*   False for metric/coordinate-dependent expressions like Omega[r[]].           *)
   Module[{lhsCoeff},
     lhsCoeff = If[Length[timeDerivTerm] > 0,
       ExtractLHSCoefficient[timeDerivTerm[[1]]],
       -1
     ];
     If[Abs[lhsCoeff] =!= 1,
-      rhs = -rhs / lhsCoeff
+      If[!NumericQ[lhsCoeff] && FreeQ[lhsCoeff, _[]],
+        (* Pure-parameter kinetic coeff (e.g., xi): keep RHS unnormalized.           *)
+        (* Python normalizes at runtime so xi=0 can be handled as a constraint.     *)
+        rhs = -rhs;
+        kineticCoeffStr = ToString[lhsCoeff, InputForm],
+        (* Coordinate-dependent (e.g., 1/Omega^2) or numeric: divide here as before *)
+        rhs = -rhs / lhsCoeff
+      ]
     ];
     (* ALWAYS Expand the RHS to ensure Plus structure for ParseMultiFieldRHS.
        Total[] (line 395) may trigger Mathematica's auto-factoring, collapsing
@@ -477,6 +489,43 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     ]
   ];
 
+  (* Collect like field-derivative terms before parsing.
+     After constraint substitution + Expand, the same operator-field pair
+     may appear in multiple additive terms (e.g., 9 x laplacian(a_1) with
+     separate coefficients).  Collect groups them into single terms with
+     summed coefficients, reducing JSON bloat and preserving symbolic forms.
+     Ref: #231 — uncombined duplicates from constraint elimination. *)
+  (* Group like field-derivative terms by extracting each term's
+     "field shape" (which field head + which derivative orders) and
+     summing terms with the same shape.  Uses GatherBy instead of
+     Collect because Mathematica's Collect uses structural template
+     matching that fails for Derivative[__][f][__] patterns. *)
+  Module[{fHeads, termList, getShape, grouped},
+    fHeads = Union[
+      Cases[rhs, f_Symbol[__] :> f, {0, Infinity}, Heads -> False],
+      Cases[rhs, Derivative[__][f_][__] :> f, {0, Infinity}, Heads -> False]
+    ];
+    fHeads = Select[fHeads, Function[h,
+      Module[{match},
+        match = MatchFieldToHeads[{ToString[h]}, allFieldNames, ""];
+        match[[1]] =!= ""
+      ]
+    ]];
+    If[Length[fHeads] > 0 && LeafCount[rhs] < 50000 && Head[rhs] === Plus,
+      termList = List @@ rhs;
+      (* Extract field-derivative shape: {fieldHead, derivativeOrders} *)
+      getShape[term_] := Module[{shapes},
+        shapes = Join[
+          Cases[term, f_Symbol[args__] /; MemberQ[fHeads, f] :> {f, {}}, {0, Infinity}],
+          Cases[term, Derivative[orders__][f_][args__] /; MemberQ[fHeads, f] :> {f, {orders}}, {0, Infinity}]
+        ];
+        Sort[shapes]
+      ];
+      grouped = GatherBy[termList, getShape];
+      rhs = Total[Total /@ grouped];
+    ]
+  ];
+
   (* Parse RHS with cross-field detection *)
   rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames];
 
@@ -488,6 +537,12 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
 
   (* Build structured LHS for flexible PDE types *)
   lhsStructure = BuildLHSStructure[fieldName, lhsTimeOrder];
+
+  (* Annotate LHS with kinetic coefficient when RHS was left unnormalized       *)
+  (* (param-based kinetic coeff). Python uses this to normalize at runtime.    *)
+  If[kineticCoeffStr =!= None,
+    lhsStructure["kinetic_coefficient_symbolic"] = kineticCoeffStr
+  ];
 
   Module[{result, constraintHints},
     result = <|
@@ -1445,7 +1500,7 @@ ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module
 
 
 (* Parse the full expanded Hamiltonian expression into structured quadratic terms *)
-ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
+ParseHamiltonianExpression[componentExpr_, allFieldNames_List, torsionPertName_String:""] := Module[
   {terms, fieldHeads, result},
 
   (* Discover all function heads that correspond to known fields *)
@@ -1474,9 +1529,13 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
      The Legendre transform H = Sum pi*vel - L should produce an expanded
      expression, but defensive Expand prevents silent failures from
      auto-factoring (same rationale as the Expand in EquationToJSONMultiField).
-     NOTE: Skip Expand for large expressions — R̃² products exceed
-     $RecursionLimit and crash via TerminatedEvaluation (uncatchable). *)
-  If[LeafCount[componentExpr] < 1000,
+     NOTE: Skip Expand for very large expressions — R̃² 4th-order products
+     exceed $RecursionLimit and crash via TerminatedEvaluation (uncatchable).
+     Threshold increased from 1000 to 100000: the self-energy Hamiltonian
+     for non-minimal torsion theories can have LeafCount ~5000-50000 and
+     MUST be expanded for correct quadratic-term parsing. Only R̃²
+     theories with 4th-order products (LeafCount >>100K) need to skip. *)
+  If[LeafCount[componentExpr] < 100000,
     componentExpr = Expand[componentExpr]
   ];
 
@@ -1486,6 +1545,34 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
   (* Parse each term *)
   result = Map[ParseSingleHamiltonianTerm[#, fieldHeads, allFieldNames] &, terms];
   result = DeleteCases[result, Nothing];
+
+  (* Hamiltonian sector filter: exclude terms referencing torsion fields.
+     $tidalHamiltonianFilter and $tidalTorsionHead are set in the WLS by
+     _derive.py for torsion theories. This keeps only GW+EM self-energy
+     and interaction terms — torsion self-energy and torsion cross-terms
+     are dropped since they don't contribute to the conversion measurement
+     C₀ = P/B₀² (which uses per-field self-energy only).
+     See: hamiltonian_filter_design.md *)
+  (* Torsion filter: passed as explicit argument to avoid Wolfram package
+     scoping issues with global $-prefixed variables. *)
+  If[StringLength[torsionPertName] > 0,
+    Module[{nBefore = Length[result], tPert, nAfter},
+      tPert = torsionPertName;
+      (* Filter torsion terms from parsed Hamiltonian *)
+      result = Select[result, Function[term,
+        Module[{fieldA, fieldB, keep},
+          fieldA = term[["factor_a", "field"]];
+          fieldB = term[["factor_b", "field"]];
+          keep = !StringMatchQ[fieldA, tPert ~~ "_" ~~ __] &&
+                 !StringMatchQ[fieldB, tPert ~~ "_" ~~ __];
+          keep
+        ]
+      ]];
+      nAfter = Length[result];
+      Print["  Hamiltonian torsion filter: ", nBefore, " -> ",
+        nAfter, " terms (torsion fields excluded)"];
+    ]
+  ];
 
   If[Length[result] == 0,
     Throw[StringJoin[

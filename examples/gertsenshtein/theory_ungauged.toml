@@ -74,9 +74,6 @@ type = "lorenz"
 type = "plane_wave"
 propagation_axis = "z"
 
-[parameters]
-kappa = 1.0
-B0 = 0.3
 
 [output]
 path = "../data/gertsenshtein_ungauged.json"
