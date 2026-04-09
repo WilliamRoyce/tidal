@@ -36,9 +36,9 @@ from scipy.stats import spearmanr
 
 # --- Constants ---
 KAPPA = 1.0
-B0 = 0.01
+B0 = 0.001
 T_END = 50.0
-P_GR = math.sin(KAPPA * B0 * T_END / 2) ** 2  # 0.06121
+P_GR = math.sin(KAPPA * B0 * T_END / 2) ** 2  # 6.25e-4
 
 PARAMS = ["beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3"]
 ACTIVE_PARAMS = ["delta1", "zeta2", "zeta3"]
@@ -57,7 +57,7 @@ PARAM_LABELS = {
     "zeta3": r"$\zeta_3$",
 }
 
-DATA_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/tmp/tidal_sweeps")  # noqa: S108
+DATA_DIR = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("/tmp/tidal_sweeps_v2")  # noqa: S108
 OUT_DIR = Path(sys.argv[2]) if len(sys.argv) > 2 else DATA_DIR / "figures"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -85,7 +85,7 @@ def load_phase2(pair_name: str) -> list[dict]:
 
 
 def load_phase3() -> list[dict]:
-    p = DATA_DIR / "phase3" / "lhs1000_nochi" / "results.csv"
+    p = DATA_DIR / "phase3" / "lhs1000" / "results.csv"
     if not p.exists():
         return []
     with p.open(encoding="utf-8") as f:
@@ -659,9 +659,9 @@ def fig7_frequency_modification() -> None:
 
     # Load simulation data
     sims = [
-        ("d1_0_full", r"$\delta_1 = 0$ (GR)", "#2E7D32", "-"),
-        ("d1_11p5_full", r"$\delta_1 = 11.5$", "#1565C0", "-"),
-        ("d1_64_full", r"$\delta_1 = 64.5$", "#D84315", "-"),
+        ("v2_ts_d1_0", r"$\delta_1 = 0$ (GR)", "#2E7D32", "-"),
+        ("v2_d1_11p5", r"$\delta_1 = 11.5$", "#1565C0", "-"),
+        ("v2_d1_64p5", r"$\delta_1 = 64.5$", "#D84315", "-"),
     ]
 
     # Panel A: P(t)
@@ -695,11 +695,11 @@ def fig7_frequency_modification() -> None:
     ax_pt.set_title("Conversion Probability P(t)", fontsize=12, fontweight="bold")
     ax_pt.legend(fontsize=9, loc="upper left")
     ax_pt.set_xlim(0, 200)
-    ax_pt.set_ylim(-0.05, 1.15)
+    ax_pt.set_ylim(-0.005, None)
 
     # Annotate first max for delta1=64.5
     try:
-        times64, p64 = compute_p_from_sim("d1_64_full")
+        times64, p64 = compute_p_from_sim("v2_d1_64p5")
         from scipy.signal import argrelmax
 
         maxima = argrelmax(p64, order=3)[0]
