@@ -65,6 +65,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Convergence testing**: After solver changes, verify error decreases at expected rate with resolution (4x for 2nd-order FD, 16x for 4th-order, machine-precision for spectral)
 - **Regression detection**: Map changed files to relevant physics tests (see `/validate-physics` skill). Run those tests, not the full suite, for fast feedback.
 - **t_end independence test for conversion amplification**: After measuring P_torsion/P_GR, ALWAYS verify at two different t_end values (e.g., t and 2t). If A(2t)/A(t) ≈ 1 → genuine amplification. If A(2t)/A(t) >> 1 → tachyonic instability artifact (see #238). B₀ scaling does NOT distinguish amplification from instability (growth rate is B₀-independent). IC amplitude must be ≪ B₀ for valid linearization.
+- **Perturbative P regime**: For valid amplification factor A = P/P_GR, ensure P_GR ≪ 1 (equivalently κB₀D/2 ≪ 1). When P is not small, A becomes B₀-dependent and the linearized conversion measurement breaks down. Always verify P_max < 0.1 across the entire sweep before trusting A values. Choose B₀ and t_end accordingly.
 
 ## Common Pitfalls
 
