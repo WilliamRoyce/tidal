@@ -467,14 +467,15 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
     e = ToValues[e]
   ];
 
-  (* NOTE: Supervisor's EuclideanSplinter calls ToValues BEFORE             *)
-  (* TraceBasisDummy, but that only helps for rank>0 expressions where      *)
-  (* ComponentArray pre-resolves free indices. For scalar expressions       *)
-  (* (canonical Lagrangian), ALL indices are contracted — ToValues cannot   *)
-  (* resolve contracted pairs (only TraceBasisDummy can enumerate them).    *)
-  (* Tested: Expand+ToValues×2 before TraceBasisDummy → no improvement     *)
-  (* (42.7s unchanged). TraceBasisDummy's O(dim^{2K}) cost is fundamental  *)
-  (* for K~4 contracted pairs per EH Ricci scalar product term.            *)
+  (* Evaluate epsilon (Levi-Civita) tensor to numeric ±1 BEFORE            *)
+  (* TraceBasisDummy.  At this point ToBasis has converted abstract indices *)
+  (* to basis tuples {i, -chart}, so EvaluateEpsilonComponents can resolve *)
+  (* ε to ±1.  Without this, each epsilon-containing term carries 4 extra  *)
+  (* contracted dummy pairs, inflating TraceBasisDummy cost from O(dim^8)  *)
+  (* to O(dim^16) per term — a 256× slowdown that causes OOM for          *)
+  (* parity-odd Lagrangians.  See issue #246.                              *)
+  e = EvaluateEpsilonComponents[e, chart];
+  e = Expand[e];
 
   (* TraceBasisDummy: per-term to prevent O(dim^{2K}) explosion.         *)
   (* The full expression may have K=45 contracted dummy pairs across all *)
@@ -868,6 +869,8 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
     componentEq = ExpandScalarWrappers[componentEq, chart, computeChristoffels =!= False];
 
     (* Staggered ToBasis pipeline (replaces old ToBasis + TBD + steps 4-7) *)
+    (* Epsilon evaluation now happens INSIDE StaggeredToBasis, before        *)
+    (* TraceBasisDummy, to prevent O(dim^16) dummy pair explosion. #246      *)
     componentEq = StaggeredToBasis[componentEq, chart, computeChristoffels =!= False];
     componentEq = Expand[componentEq];
 
@@ -1911,6 +1914,18 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   (* Separate metric contractions before ToBasis *)
   (* Ensures all field tensor indices are in canonical (covariant) form *)
   componentExpr = SeparateFieldMetrics[componentExpr, chart];
+
+  (* Apply CD shorthand rules (CD[-a][T[...]] → CD1T[-a,...]) so that      *)
+  (* pre-computed ComponentValues can be resolved by ToValues in O(1)       *)
+  (* inside StaggeredToBasis.  Without this, raw CD[T] expressions from    *)
+  (* the contortion expansion carry 4+ extra contracted dummy pairs,       *)
+  (* inflating TraceBasisDummy cost by O(dim^8) per term.  See #246.       *)
+  (* NOTE: The top-level Lagrangian already has CD shorthands applied      *)
+  (* (_derive.py line 4075), but sector splitting + Expand can reintroduce *)
+  (* raw CD[T] forms that weren't in the pre-split expression.             *)
+  If[ListQ[Global`$CDShorthandRules] && Length[Global`$CDShorthandRules] > 0,
+    Do[componentExpr = componentExpr /. rule, {rule, Global`$CDShorthandRules}]
+  ];
 
   (* Step 2: Staggered ToBasis + ToValues + TraceBasisDummy                *)
   (* Ref: supervisor's EuclideanSplinter (commit 4a89164).                 *)
