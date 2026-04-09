@@ -161,21 +161,42 @@ Physical interpretation: the nonminimal R~F coupling modifies the effective
 graviton-photon mixing angle, increasing the oscillation frequency. For large
 delta1, the conversion reaches its first maximum in ~1/20th of the GR time.
 
-## Summary of Physics Results
+## Summary of Physics Results (Corrected, B₀=0.001)
 
 1. **Only 3 of 11 theory parameters affect graviton-photon conversion**: delta1, zeta2, zeta3
 2. **6 parameters have provably zero effect**: beta1, beta2, beta3, xi, chi, zeta1
-3. **The effect is frequency modification**, not energy amplification — P_max ~ 1 for both
-4. **chi destabilizes the system** when combined with active couplings (99%+ divergence)
-5. **68% of stable 8D parameter space gives A ~ 1** (near-GR conversion)
-6. **12% gives A > 2**, 5% gives A > 10 (strongly modified frequency)
-7. **Sensitivity ranking**: zeta2 > delta1 > zeta3 (all p < 1e-4 in 8D survey)
-8. **99.5% simulation success rate** when chi=0 (5 diverged out of 1000)
+3. **delta1 and zeta2 are exactly degenerate**: A(delta1=x) = A(zeta2=x) to 6 sig figs (#243)
+4. **Suppression floor A=0.966 (3.4%)**: universal across ALL stable parameter combinations (#241)
+5. **Near stability boundary**: A diverges (tachyonic), does NOT deepen suppression
+6. **Sensitivity ranking (8D, 978 valid points)**: zeta2 > delta1 > zeta3 (all p < 1e-4)
+7. **45% of parameter space shows suppression** (A < 1), 67% gives A ~ 1
+8. **100% simulation success rate** at valid B₀ (1000/1000)
 
-## Data Locations
+## Perturbative Validity Note
 
-- Phase 1: `/tmp/tidal_sweeps/phase1/{param}/results.csv`
-- Phase 2: `/tmp/tidal_sweeps/phase2/{pair}/results.csv`
-- Phase 3: `/tmp/tidal_sweeps/phase3/lhs1000_nochi/results.csv`
-- Plots: `/tmp/tidal_sweeps/phase{1,2}/phase{1,2}_*.png`
-- t_end tests: `/tmp/tidal_tests/tend_*` and `/tmp/tidal_tests/d1_64_full/`
+Previous sweeps at B₀=0.01 were in a non-perturbative regime (P_GR=0.06, coupled
+P>1). A values were B₀-dependent and quantitatively wrong (#242). All results above
+use corrected B₀=0.001, amp=1e-4 where P < 0.05 throughout (firmly perturbative).
+
+## R̃² Curvature-Squared Investigation (#240)
+
+The original model (b₅R̃²) was swept at valid B₀: **A ≡ 1.000 for all 600 points**.
+R̃² curvature-squared does NOT break the h₅↔a₁ block-diagonal structure by itself.
+
+Combined model (R̃² + cross-couplings) derivation in progress — tests whether R̃²
+modifies the torsion mediator properties that cross-couplings couple through.
+
+## Data Locations (v2, corrected B₀=0.001)
+
+- Phase 1: `/tmp/tidal_sweeps_v2/phase1/{param}/results.csv`
+- Phase 2: `/tmp/tidal_sweeps_v2/phase2/{pair}/results.csv`
+- Phase 3: `/tmp/tidal_sweeps_v2/phase3/lhs1000/results.csv`
+- R̃² model: `/tmp/tidal_sweeps_v2/original/{b5,alpha2,b5_alpha2}/results.csv`
+- Figures: `/tmp/tidal_sweeps_v2/figures/`
+
+## GitHub Issues
+
+- #240: R̃² curvature-squared terms missing from general model (OPEN)
+- #241: Cross-coupling suppression floor A=0.966 (OPEN)
+- #242: Perturbative P validity fix (CLOSED)
+- #243: delta1 ≡ zeta2 degeneracy (OPEN)
