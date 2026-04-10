@@ -1341,6 +1341,14 @@ def _wls_precompute_cd_component_values(
         "Off[Validate::repeated]; Off[Validate::inhom];",
         _wls_timing_start("tCDPrecomp"),
         "",
+        "(* === Pre-compute BASE field ComponentValues (supervisor's pattern) ===    *)",
+        "(* Register ComponentValues for perturbation tensors (T, H, a) so that     *)",
+        "(* ToValues resolves them BEFORE TraceBasisDummy, eliminating 2-4 dummy    *)",
+        "(* pairs per tensor.  Without this, parity-odd models have K=5-7 per term *)",
+        "(* from unresolved tensor indices.  With it, K drops to 1-3.  See #246.   *)",
+        "(* Uses the same component mapping as ReplaceTensorFieldComponents.        *)",
+        "(* Ref: supervisor's SphericalEuclidean.m (ComponentValue registrations).  *)",
+        "",
         "(* Helper: Splinter pipeline for rank-N tensors (supervisor's pattern).    *)",
         "(* Unlike StaggeredToBasis (designed for scalar expressions), this         *)",
         "(* inserts ComponentArray BETWEEN ToBasis and ToValues to produce a        *)",
@@ -1403,6 +1411,61 @@ def _wls_precompute_cd_component_values(
             ]
         )
         return lines
+
+    # --- Pre-register BASE field ComponentValues (supervisor's pattern) ---
+    # For each perturbation tensor (h, a, t), compute component values via
+    # tidalSplinter (already defined above) and register them so ToValues
+    # resolves them BEFORE TraceBasisDummy in StaggeredToBasis. See #246.
+    # Pattern: supervisor's SphericalEuclidean.m lines 235, 270, 299.
+    for df in dyn_fields:
+        head = df["head"]
+        field_name = df["name"]
+        field_dict = df.get("field", {})
+        ftype = field_dict.get("type", df.get("type", "scalar"))
+        if ftype == "scalar":
+            base_rank = 0
+        elif ftype == "vector":
+            base_rank = 1
+        else:
+            base_rank = field_dict.get("rank", 2)
+        # Rank 3 (torsion): 4^3 = 64 entries, manageable. The supervisor
+        # pre-computes rank-3 DDDClockField ComponentValues (line 330).
+        # Skip only rank > 3 (4^4 = 256 entries → expensive tidalSplinter).
+        if base_rank > 3:
+            lines.extend(
+                [
+                    "",
+                    f"(* Skip ComponentValue pre-registration for {field_name} "
+                    f"(rank {base_rank} > 3, too many entries) *)",
+                ]
+            )
+            continue
+        # Use EnumerateComponentTuples + direct ComponentValue registration.
+        # This avoids tidalSplinter/ComponentArray which can Throw on DummyIn.
+        lines.extend(
+            [
+                "",
+                f"(* Pre-register ComponentValues for {field_name} (rank {base_rank}) *)",
+                f"Module[{{rank = {base_rank}, canonTuples, allTuples, nReg = 0,",
+                f"         coordSyms2 = GetCoordinateSymbols[{chart}],",
+                f"         dim2 = GetChartDimension[{chart}], ch = {chart}}},",
+                f"  canonTuples = EnumerateComponentTuples[{head}, dim2];",
+                "  allTuples = Tuples[Range[0, dim2 - 1], rank];",
+                "  (* Register each component: canonical tuples → named function,",
+                "     non-canonical → ±canonical (via symmetry), zero → 0 *)",
+                "  Do[Module[{tup = allTuples[[j]], pat, idx},",
+                "    pat = Table[{tup[[n]], -ch}, {n, rank}];",
+                "    idx = FirstPosition[canonTuples, tup, {0}][[1]];",
+                "    If[idx > 0,",
+                f"      ComponentValue[{head} @@ pat,",
+                f"        Symbol[ToString[{head}] <> ToString[idx - 1]][Sequence @@ coordSyms2]];",
+                "      nReg++",
+                "    ]",
+                "  ], {j, Length[allTuples]}];",
+                f'  Print["  Registered ", nReg, " ComponentValues for {field_name} (rank ", rank, ")"];',
+                "];",
+            ]
+        )
 
     max_cd_precompute = 2
     for df in dyn_fields:

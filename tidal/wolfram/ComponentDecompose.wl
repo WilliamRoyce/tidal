@@ -477,6 +477,15 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
   e = EvaluateEpsilonComponents[e, chart];
   e = Expand[e];
 
+  (* Resolve pre-computed ComponentValues for perturbation tensors        *)
+  (* BEFORE TraceBasisDummy.  With base field CVs registered (#246),     *)
+  (* ToValues converts T[{0,-ch},{1,-ch},{2,-ch}] → t_N[coords] in O(1),*)
+  (* eliminating 2-4 dummy pairs per tensor.  For parity-odd models this*)
+  (* drops K from 5-7 to 1-3, reducing TBD cost from O(4^{14}) to O(4^6).*)
+  (* Ref: supervisor's EuclideanSplinter (ToValues before TraceBasisDummy). *)
+  e = ToValues[e];
+  e = Expand[e];
+
   (* TraceBasisDummy: per-term to prevent O(dim^{2K}) explosion.         *)
   (* The full expression may have K=45 contracted dummy pairs across all *)
   (* additive terms, but each individual term has only ~3 pairs.         *)
