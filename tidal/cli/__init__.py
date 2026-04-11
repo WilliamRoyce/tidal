@@ -820,12 +820,70 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--metric",
         default=None,
         metavar="NAME[,NAME,...]",
-        help="Metric column(s) for sweep plots (e.g. P_max, L_mix, max_energy_error)",
+        help=(
+            "Metric column(s) for sweep plots (e.g. P_max, L_mix, max_energy_error). "
+            "Derived metrics A, log10_A, C0, P_EM, P_valid are auto-computed "
+            "from --baseline-formula when requested."
+        ),
+    )
+    plot_parser.add_argument(
+        "--baseline-formula",
+        dest="baseline_formula",
+        default=None,
+        metavar="EXPR",
+        help=(
+            "Analytical baseline formula for derived metrics (A, C0, log10_A). "
+            "Default: 'sin(kappa * B0 * t_end / 2)**2' (Gertsenshtein). "
+            "Uses swept/fixed param names and sim settings as variables."
+        ),
     )
     plot_parser.add_argument(
         "--title",
         default=None,
         help="Custom figure title",
+    )
+    # Scatter matrix options
+    plot_parser.add_argument(
+        "--params",
+        default=None,
+        metavar="P1,P2,...",
+        help="Subset of swept parameters for sweep-scatter (comma-separated)",
+    )
+    plot_parser.add_argument(
+        "--log-diagonal",
+        dest="log_diagonal",
+        action="store_true",
+        help="Use log y-axis on scatter matrix diagonal panels",
+    )
+    # 1D sweep options
+    plot_parser.add_argument(
+        "--scatter",
+        action="store_true",
+        help="Use scatter plot instead of line plot for 1D sweep",
+    )
+    plot_parser.add_argument(
+        "--annotate-extremes",
+        dest="annotate_extremes",
+        action="store_true",
+        help="Annotate max/min values with arrows on 1D sweep",
+    )
+    # Axis transform options
+    plot_parser.add_argument(
+        "--arctan-axes",
+        dest="arctan_axes",
+        action="store_true",
+        help=(
+            "Apply arctan transform to parameter axes (compresses ±∞ to bounded range). "
+            "Tick labels show actual parameter values."
+        ),
+    )
+    # 2D heatmap options
+    plot_parser.add_argument(
+        "--clamp-color",
+        dest="clamp_color",
+        default=None,
+        metavar="MIN:MAX",
+        help="Clamp colorbar range (e.g. --clamp-color=-8:5)",
     )
     # Metadata
     plot_parser.add_argument(
@@ -846,6 +904,22 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "-q",
         action="store_true",
         help="Suppress progress messages",
+    )
+    # Campaign-specific options
+    plot_parser.add_argument(
+        "--layout",
+        default=None,
+        metavar="RxC",
+        help="Grid layout for campaign plots (e.g. 3x3). Auto-detected if omitted.",
+    )
+    plot_parser.add_argument(
+        "--classify",
+        default=None,
+        metavar="RULE",
+        help=(
+            "Classify campaign subplots (e.g. 'active:A>1.01'). "
+            "Active panels get warm background, null panels get grey."
+        ),
     )
 
     # --- sweep ---

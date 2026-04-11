@@ -30,6 +30,9 @@ _VALID_TYPES = frozenset(
         "sweep-parallel",
         "sweep-tornado",
         "sweep-scatter",
+        "sweep-histogram",
+        "sweep-divergence",
+        "campaign",
         "convergence",
         "replicate-convergence",
     }
@@ -42,6 +45,9 @@ _SWEEP_TYPES = frozenset(
         "sweep-parallel",
         "sweep-tornado",
         "sweep-scatter",
+        "sweep-histogram",
+        "sweep-divergence",
+        "campaign",
         "convergence",
         "replicate-convergence",
     }
@@ -224,6 +230,12 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         )
         return 1
 
+    # Campaign: multi-directory composition (handled separately)
+    if plot_type == "campaign":
+        from tidal.cli._campaign import render_campaign
+
+        return render_campaign(args)
+
     # Sweep plot types: dispatch to sweep-specific handler
     if plot_type in _SWEEP_TYPES:
         return _sweep_plot(args, data_path, plot_type)
@@ -363,6 +375,8 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         render_sweep_2d,
         render_sweep_2d_with_overlay,
         render_sweep_compare,
+        render_sweep_divergence,
+        render_sweep_histogram,
         render_sweep_parallel,
         render_sweep_scatter,
         render_sweep_tornado,
@@ -384,14 +398,23 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         _cerror(f"loading sweep data: {exc}")
         return 1
 
-    # Parse metric(s)
+    # Auto-derive amplification columns when a derived metric is requested
     raw_metric: str | None = getattr(args, "metric", None)
+    derived_metrics = {"A", "log10_A", "C0", "P_EM", "P_valid"}
+    if raw_metric is not None:
+        requested = {s.strip() for s in raw_metric.split(",")}
+        if requested & derived_metrics:
+            baseline = getattr(args, "baseline_formula", None)
+            results.add_derived_columns(
+                baseline_formula=baseline or "sin(kappa * B0 * t_end / 2)**2",
+            )
     if raw_metric is None and plot_type in {
         "sweep",
         "convergence",
         "sweep-parallel",
         "sweep-tornado",
         "sweep-scatter",
+        "sweep-histogram",
         "replicate-convergence",
     }:
         # Try to auto-detect a sensible metric
@@ -431,6 +454,9 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             if n_swept == 1:
                 if len(metrics) == 1:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
+                    use_scatter: bool = getattr(args, "scatter", False)
+                    ann_extremes: bool = getattr(args, "annotate_extremes", False)
+                    use_arctan: bool = getattr(args, "arctan_axes", False)
                     try:
                         render_sweep_1d(
                             ax,
@@ -439,6 +465,9 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                             overlay=overlay,
                             log_y=log_y,
                             thresholds=thresholds,
+                            scatter=use_scatter,
+                            annotate_extremes=ann_extremes,
+                            arctan_axes=use_arctan,
                         )
                     except ValueError as exc:
                         error_with_hint(
@@ -467,6 +496,11 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                         )
                         return 1
                 else:
+                    clamp_raw: str | None = getattr(args, "clamp_color", None)
+                    clamp: tuple[float, float] | None = None
+                    if clamp_raw:
+                        parts = clamp_raw.split(":")
+                        clamp = (float(parts[0]), float(parts[1]))
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
                     render_sweep_2d(
                         ax,
@@ -475,6 +509,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                         log_scale=log_scale,
                         divergent_center=dc,
                         cmap_name=cmap_name,
+                        clamp_color=clamp,
                     )
             else:
                 error_with_hint(
@@ -532,7 +567,14 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     ["Example: `--metric P_max`"],
                 )
                 return 1
-            n_params = len(results.swept_params)
+            scatter_params_raw: str | None = getattr(args, "params", None)
+            scatter_params: list[str] | None = (
+                [s.strip() for s in scatter_params_raw.split(",")]
+                if scatter_params_raw
+                else None
+            )
+            log_diag: bool = getattr(args, "log_diagonal", False)
+            n_params = len(scatter_params or list(results.swept_params.keys()))
             fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
             render_sweep_scatter(
                 fig,
@@ -540,7 +582,23 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 raw_metric,
                 cmap_name=cmap_name,
                 divergent_center=dc,
+                log_diagonal=log_diag,
+                params=scatter_params,
             )
+
+        elif plot_type == "sweep-histogram":
+            if raw_metric is None:
+                error_with_hint(
+                    "--metric is required for sweep-histogram plots",
+                    ["Example: `--metric log10_A`"],
+                )
+                return 1
+            fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
+            render_sweep_histogram(ax, results, raw_metric)
+
+        elif plot_type == "sweep-divergence":
+            fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 6))
+            render_sweep_divergence(ax, results)
 
         elif plot_type == "replicate-convergence":
             if raw_metric is None:

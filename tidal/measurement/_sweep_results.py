@@ -20,6 +20,7 @@ Chapman & Hall. Ch. 12-14 (non-parametric bootstrap confidence intervals).
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import json
@@ -599,6 +600,88 @@ class SweepResults:
             boot_rows.append(row)
 
         return self._with_rows(boot_rows)
+
+    # ------------------------------------------------------------------
+    # Derived metrics
+    # ------------------------------------------------------------------
+
+    def add_derived_columns(
+        self,
+        baseline_formula: str = "sin(kappa * B0 * t_end / 2)**2",
+        *,
+        metric: str = "P_max",
+        validity_threshold: float = 0.1,
+    ) -> None:
+        """Add amplification-related derived columns in place.
+
+        Computes for each row:
+        - ``P_EM``: baseline conversion probability from *baseline_formula*
+        - ``C0``: conversion coefficient ``P / B0**2``
+        - ``A``: amplification factor ``P / P_EM``
+        - ``log10_A``: ``log10(A)`` (useful for divergent colormaps)
+        - ``P_valid``: ``True`` if ``0 < P < validity_threshold``
+
+        Parameters
+        ----------
+        baseline_formula : str
+            Python expression for the GR baseline probability.  May
+            reference any fixed or swept parameter name plus standard
+            math functions (``sin``, ``cos``, ``sqrt``, ``pi``, etc.)
+            and simulation settings (``t_end``, ``grid_shape``).
+        metric : str
+            Column name for the measured conversion probability.
+        validity_threshold : float
+            Maximum *P* for the linear regime (default 0.1).
+        """
+        import math as _math  # noqa: PLC0415
+
+        from tidal.cli._simulate import (  # noqa: PLC0415
+            FORMULA_NAMESPACE,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        for row in self.rows:
+            p_val = row.get(metric)
+            status = row.get("run_status", "success")
+
+            # Build namespace from fixed params, sim settings, and this row
+            ns: dict[str, object] = {**FORMULA_NAMESPACE}
+            ns.update(self.fixed_params)
+            for k, v in self.sim_settings.items():
+                with contextlib.suppress(TypeError, ValueError):
+                    ns[k] = float(v)
+            # Swept params from row override fixed
+            for pname in self.swept_params:
+                val = row.get(pname)
+                if val is not None:
+                    with contextlib.suppress(TypeError, ValueError):
+                        ns[pname] = float(val)
+
+            # Evaluate baseline
+            try:
+                p_em = float(
+                    eval(baseline_formula, {"__builtins__": {}}, ns)  # noqa: S307
+                )
+            except Exception:  # noqa: BLE001
+                p_em = _math.nan
+
+            # Compute derived values
+            try:
+                p = float(p_val)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                p = _math.nan
+
+            valid = status == "success" and 0 < p < validity_threshold
+            b0 = float(ns.get("B0", 0) or 0)  # type: ignore[arg-type]
+
+            row["P_EM"] = p_em if _math.isfinite(p_em) else None
+            row["C0"] = p / b0**2 if b0 > 0 and _math.isfinite(p) else None
+            row["A"] = p / p_em if p_em > 0 and valid and _math.isfinite(p) else None
+            row["log10_A"] = (
+                _math.log10(p / p_em)
+                if p_em > 0 and valid and p > 0 and _math.isfinite(p)
+                else None
+            )
+            row["P_valid"] = valid
 
     # ------------------------------------------------------------------
     # Serialization

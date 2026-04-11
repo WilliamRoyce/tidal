@@ -33,6 +33,100 @@ if TYPE_CHECKING:
 
 
 # ------------------------------------------------------------------
+# Greek parameter label mapping
+# ------------------------------------------------------------------
+
+_GREEK_LABEL_MAP: dict[str, str] = {
+    "alpha": r"$\alpha$",
+    "alpha1": r"$\alpha_1$",
+    "alpha2": r"$\alpha_2$",
+    "alpha3": r"$\alpha_3$",
+    "beta1": r"$\beta_1$",
+    "beta2": r"$\beta_2$",
+    "beta3": r"$\beta_3$",
+    "gamma": r"$\gamma$",
+    "delta1": r"$\delta_1$",
+    "delta2": r"$\delta_2$",
+    "deltam": r"$\delta_m$",
+    "xi": r"$\xi$",
+    "chi": r"$\chi$",
+    "zeta1": r"$\zeta_1$",
+    "zeta2": r"$\zeta_2$",
+    "zeta3": r"$\zeta_3$",
+    "kappa": r"$\kappa$",
+    "lambda": r"$\lambda$",
+    "mu": r"$\mu$",
+    "sigma": r"$\sigma$",
+    "omega": r"$\omega$",
+    "phi": r"$\phi$",
+    "psi": r"$\psi$",
+    "epsilon": r"$\epsilon$",
+    "eta": r"$\eta$",
+    "theta": r"$\theta$",
+    "B0": r"$B_0$",
+    "mPhi2": r"$m_\phi^2$",
+}
+
+
+def _greek_label(name: str) -> str:
+    """Return a LaTeX label for a parameter name, or the name unchanged."""
+    return _GREEK_LABEL_MAP.get(name, name)
+
+
+# ------------------------------------------------------------------
+# Arctan axis transform helpers
+# ------------------------------------------------------------------
+
+
+def _apply_arctan_axis(ax: Axes, axis: str = "x") -> None:
+    """Apply arctan transform to an axis for unbounded parameter display.
+
+    Compresses (-∞, +∞) into a bounded range while showing actual
+    parameter values as tick labels at human-readable positions.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes to transform.
+    axis : str
+        ``"x"`` or ``"y"`` — which axis to transform.
+    """
+    from matplotlib.ticker import FuncFormatter
+
+    # Tick positions in real-parameter space
+    tick_values = [-100, -30, -10, -3, -1, 0, 1, 3, 10, 30, 100]
+
+    def _fmt(val: float, _pos: object) -> str:
+        """Format arctan-space tick as the original parameter value."""
+        # Inverse arctan: val in arctan space → original value
+        original = np.tan(val)
+        if abs(original) < 0.01:  # noqa: PLR2004
+            return "0"
+        if abs(original) >= 100:  # noqa: PLR2004
+            return f"{original:.0f}"
+        if abs(original) >= 1:
+            return f"{original:.1f}"
+        return f"{original:.2f}"
+
+    formatter = FuncFormatter(_fmt)
+    arctan_ticks = [float(np.arctan(v)) for v in tick_values]
+
+    if axis == "x":
+        ax.set_xticks(arctan_ticks)
+        ax.xaxis.set_major_formatter(formatter)
+    else:
+        ax.set_yticks(arctan_ticks)
+        ax.yaxis.set_major_formatter(formatter)
+
+
+def _arctan_transform_data(
+    values: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """Transform parameter values to arctan space."""
+    return np.arctan(values)
+
+
+# ------------------------------------------------------------------
 # Analytical overlay helpers
 # ------------------------------------------------------------------
 
@@ -190,7 +284,7 @@ def _overlay_quality_hatching(
             ax.add_patch(rect)
 
 
-def render_sweep_1d(  # noqa: PLR0913, PLR0914
+def render_sweep_1d(  # noqa: PLR0913, PLR0914, PLR0912, PLR0915, C901
     ax: Axes,
     results: SweepResults,
     metric: str,
@@ -198,6 +292,9 @@ def render_sweep_1d(  # noqa: PLR0913, PLR0914
     overlay: str | None = None,
     log_y: bool = False,
     thresholds: list[str] | None = None,
+    scatter: bool = False,
+    annotate_extremes: bool = False,
+    arctan_axes: bool = False,
 ) -> None:
     """Plot a scalar metric vs a single swept parameter.
 
@@ -221,6 +318,10 @@ def render_sweep_1d(  # noqa: PLR0913, PLR0914
     thresholds : list[str] or None
         Horizontal threshold lines in ``"VALUE[:LABEL[:COLOR]]"`` format.
         Example: ``["1.0:P=1:red", "0.1::orange"]``.
+    scatter : bool
+        Use scatter plot instead of connected line plot.
+    annotate_extremes : bool
+        Annotate max/min values with arrows and labels.
 
     Raises
     ------
@@ -240,18 +341,32 @@ def render_sweep_1d(  # noqa: PLR0913, PLR0914
     if results.has_replicates:
         agg = results.aggregate()
         x = agg.column(param_name)
+        if arctan_axes:
+            x = _arctan_transform_data(np.asarray(x, dtype=np.float64))
         y_mean = agg.column(f"{metric}_mean")
         y_std = agg.column(f"{metric}_std")
         num_label = "TIDAL" if overlay else None
-        ax.plot(
-            x,
-            y_mean,
-            "o-",
-            color="tab:blue",
-            linewidth=1.5,
-            markersize=5,
-            label=num_label,
-        )
+        if scatter:
+            ax.scatter(
+                x,
+                y_mean,
+                c="tab:blue",
+                s=20,
+                alpha=0.8,
+                zorder=3,
+                edgecolors="none",
+                label=num_label,
+            )
+        else:
+            ax.plot(
+                x,
+                y_mean,
+                "o-",
+                color="tab:blue",
+                linewidth=1.5,
+                markersize=5,
+                label=num_label,
+            )
         ax.fill_between(
             x,
             y_mean - y_std,
@@ -260,13 +375,64 @@ def render_sweep_1d(  # noqa: PLR0913, PLR0914
             color="tab:blue",
             label=r"$\pm 1\sigma$",
         )
+        y_for_annotate = y_mean
     else:
         x = results.column(param_name)
+        if arctan_axes:
+            x = _arctan_transform_data(np.asarray(x, dtype=np.float64))
         y = results.column(metric)
         num_label = "TIDAL" if overlay else None
-        ax.plot(
-            x, y, "o-", color="tab:blue", linewidth=1.5, markersize=5, label=num_label
-        )
+        if scatter:
+            ax.scatter(
+                x,
+                y,
+                c="tab:blue",
+                s=20,
+                alpha=0.8,
+                zorder=3,
+                edgecolors="none",
+                label=num_label,
+            )
+        else:
+            ax.plot(
+                x,
+                y,
+                "o-",
+                color="tab:blue",
+                linewidth=1.5,
+                markersize=5,
+                label=num_label,
+            )
+        y_for_annotate = y
+
+    # Annotate max/min values
+    if annotate_extremes and len(y_for_annotate) > 0:
+        y_arr = np.asarray(y_for_annotate, dtype=np.float64)
+        x_arr = np.asarray(x, dtype=np.float64)
+        valid = np.isfinite(y_arr)
+        if np.any(valid):
+            i_max = int(np.nanargmax(y_arr))
+            i_min = int(np.nanargmin(y_arr))
+            ax.annotate(
+                f"max={y_arr[i_max]:.3g}",
+                (x_arr[i_max], y_arr[i_max]),
+                textcoords="offset points",
+                xytext=(8, -12),
+                fontsize=8,
+                color="#B71C1C",
+                fontweight="bold",
+                arrowprops={"arrowstyle": "->", "color": "#B71C1C", "lw": 0.8},
+            )
+            if i_min != i_max:
+                ax.annotate(
+                    f"min={y_arr[i_min]:.3g}",
+                    (x_arr[i_min], y_arr[i_min]),
+                    textcoords="offset points",
+                    xytext=(8, 8),
+                    fontsize=8,
+                    color="#1565C0",
+                    arrowprops={"arrowstyle": "->", "color": "#1565C0", "lw": 0.8},
+                )
 
     # Analytical overlay curve
     if overlay is not None:
@@ -296,13 +462,16 @@ def render_sweep_1d(  # noqa: PLR0913, PLR0914
     if overlay or thresholds:
         ax.legend(fontsize="small")
 
-    ax.set_xlabel(param_name)
+    ax.set_xlabel(_greek_label(param_name))
     ax.set_ylabel(metric)
-    ax.set_title(f"{metric} vs {param_name}")
+    ax.set_title(f"{metric} vs {_greek_label(param_name)}")
     ax.grid(visible=True, alpha=0.3)
 
     if log_y:
         ax.set_yscale("log")
+
+    if arctan_axes:
+        _apply_arctan_axis(ax, "x")
 
 
 def _plot_1d_metric(  # noqa: PLR0913
@@ -389,6 +558,7 @@ def render_sweep_2d(  # noqa: PLR0913
     log_scale: bool = False,
     divergent_center: float | None = None,
     cmap_name: str = "viridis",
+    clamp_color: tuple[float, float] | None = None,
 ) -> None:
     """Plot a scalar metric over two swept parameters.
 
@@ -408,6 +578,8 @@ def render_sweep_2d(  # noqa: PLR0913
         Use logarithmic colorbar (useful for ``inv_B_min``).
     divergent_center : float or None
         Center colormap at this value using ``TwoSlopeNorm``.
+    clamp_color : tuple[float, float] or None
+        Clamp colorbar range to ``(vmin, vmax)``.
 
     Raises
     ------
@@ -445,6 +617,7 @@ def render_sweep_2d(  # noqa: PLR0913
             log_scale=log_scale,
             divergent_center=divergent_center,
             cmap_name=cmap_name,
+            clamp_color=clamp_color,
         )
 
 
@@ -526,7 +699,7 @@ def _render_2d_scattered(  # noqa: PLR0913
     ax.figure.colorbar(sc, ax=ax, label=metric)  # type: ignore[union-attr]
 
 
-def _render_2d_grid(  # noqa: PLR0913
+def _render_2d_grid(  # noqa: PLR0913, PLR0914, C901
     ax: Axes,
     results: SweepResults,
     p1_name: str,
@@ -536,13 +709,18 @@ def _render_2d_grid(  # noqa: PLR0913
     log_scale: bool = False,
     divergent_center: float | None = None,
     cmap_name: str = "viridis",
+    clamp_color: tuple[float, float] | None = None,
 ) -> None:
-    """Render 2D sweep as pcolormesh heatmap (for grid-aligned data)."""
+    """Render 2D sweep as pcolormesh heatmap (for grid-aligned data).
+
+    Diverged or invalid runs are overlaid with cross-hatching.
+    """
     p1_vals = np.sort(results.swept_params[p1_name])
     p2_vals = np.sort(results.swept_params[p2_name])
 
     n1, n2 = len(p1_vals), len(p2_vals)
     grid = np.full((n2, n1), np.nan)
+    diverged_grid = np.zeros((n2, n1), dtype=bool)
     quality_grid: NDArray[np.object_] | None = None
 
     # Check for crossing_quality column (critical field results)
@@ -554,18 +732,34 @@ def _render_2d_grid(  # noqa: PLR0913
         v1 = row.get(p1_name)
         v2 = row.get(p2_name)
         val = row.get(metric)
-        if v1 is None or v2 is None or val is None:
+        if v1 is None or v2 is None:
             continue
         i1 = min(int(np.searchsorted(p1_vals, float(v1))), n1 - 1)
         i2 = min(int(np.searchsorted(p2_vals, float(v2))), n2 - 1)
-        grid[i2, i1] = float(val)
+
+        status = row.get("run_status", "success")
+        if status != "success" or val is None:
+            diverged_grid[i2, i1] = True
+            continue
+
+        try:
+            grid[i2, i1] = float(val)
+        except (TypeError, ValueError):
+            diverged_grid[i2, i1] = True
+
         if quality_grid is not None:
             quality_grid[i2, i1] = row.get("crossing_quality", "")
 
-    # Build norm (linear or log)
+    # Build norm (linear or log), with optional clamping
     valid_vals = grid[np.isfinite(grid)]
     if log_scale:
         valid_vals = valid_vals[valid_vals > 0]
+
+    if clamp_color is not None and len(valid_vals) > 0:
+        vmin_c, vmax_c = clamp_color
+        valid_vals = np.clip(valid_vals, vmin_c, vmax_c)
+        grid = np.where(np.isfinite(grid), np.clip(grid, vmin_c, vmax_c), grid)
+
     norm = (
         _build_norm(valid_vals, log_scale=log_scale, divergent_center=divergent_center)
         if len(valid_vals) > 0
@@ -580,10 +774,41 @@ def _render_2d_grid(  # noqa: PLR0913
         cmap=cmap_name,
         norm=norm,
     )
-    ax.set_xlabel(p1_name)
-    ax.set_ylabel(p2_name)
+    ax.set_xlabel(_greek_label(p1_name))
+    ax.set_ylabel(_greek_label(p2_name))
     ax.set_title(metric)
-    ax.figure.colorbar(im, ax=ax, label=metric)  # type: ignore[union-attr]
+    cb = ax.figure.colorbar(im, ax=ax, label=metric)  # type: ignore[union-attr]
+
+    # Reference line on colorbar at divergent center
+    if divergent_center is not None:
+        cb.ax.axhline(divergent_center, color="k", linewidth=0.8)
+
+    # Diverged-run hatching overlay
+    if np.any(diverged_grid) and n1 >= 2 and n2 >= 2:  # noqa: PLR2004
+        from matplotlib.patches import Patch
+
+        p1m, p2m = np.meshgrid(p1_vals, p2_vals)
+        ax.contourf(
+            p1m,
+            p2m,
+            diverged_grid.astype(float),
+            levels=[0.5, 1.5],
+            colors="none",
+            hatches=["///"],
+        )
+        ax.legend(
+            handles=[
+                Patch(
+                    facecolor="white",
+                    edgecolor="grey",
+                    hatch="///",
+                    label="Diverged / invalid",
+                ),
+            ],
+            loc="lower left",
+            fontsize=8,
+            framealpha=0.9,
+        )
 
     # Quality-flag hatching overlay for critical field results
     if quality_grid is not None:
@@ -1097,42 +1322,83 @@ def _render_tornado_correlation(
     metric_vals: NDArray[np.float64],
     metric: str,
 ) -> None:
-    """Tornado chart using Spearman rank correlation (for scattered data)."""
+    """Tornado chart using Spearman rank correlation (for scattered data).
+
+    Bars are colored by statistical significance:
+    - Deep red (p < 0.001): highly significant
+    - Orange (p < 0.05): significant
+    - Grey: not significant
+
+    Significance stars are shown next to bar labels.
+    """
     from scipy.stats import spearmanr  # type: ignore[import-untyped]
 
-    impacts: list[tuple[str, float, float]] = []  # (name, |corr|, sign)
+    # (name, |corr|, sign, p-value)
+    impacts: list[tuple[str, float, float, float]] = []
     for name in param_names:
         param_vals = np.array(results.column(name), dtype=np.float64)
         valid = np.isfinite(param_vals) & np.isfinite(metric_vals)
         if valid.sum() < 3:  # noqa: PLR2004
-            impacts.append((name, 0.0, 0.0))
+            impacts.append((name, 0.0, 0.0, 1.0))
             continue
         result = spearmanr(param_vals[valid], metric_vals[valid])
         corr = float(result.statistic)  # type: ignore[union-attr]
-        impacts.append((name, abs(corr), float(np.sign(corr))))
+        pval = float(result.pvalue)  # type: ignore[union-attr]
+        impacts.append((name, abs(corr), float(np.sign(corr)), pval))
 
     impacts.sort(key=lambda t: t[1], reverse=True)  # noqa: FURB118
 
     names = [t[0] for t in impacts]
     abs_corrs = [t[1] for t in impacts]
     signs = [t[2] for t in impacts]
+    pvals = [t[3] for t in impacts]
     y_pos = np.arange(len(names))
 
-    colors = ["tab:blue" if s >= 0 else "tab:red" for s in signs]
-    bar_container = ax.barh(y_pos, abs_corrs, color=colors, alpha=0.7, height=0.6)
+    # Color by p-value significance level
+    colors = [
+        "#D84315" if p < 0.001 else "#FFA726" if p < 0.05 else "#BDBDBD"  # noqa: PLR2004
+        for p in pvals
+    ]
+    bar_container = ax.barh(
+        y_pos,
+        abs_corrs,
+        color=colors,
+        alpha=0.85,
+        height=0.6,
+        edgecolor="white",
+        linewidth=0.5,
+    )
 
-    for rect, corr, sign in zip(bar_container.patches, abs_corrs, signs, strict=True):
-        label = f"{corr * sign:+.2f}"
+    for rect, corr, sign, pval in zip(
+        bar_container.patches,
+        abs_corrs,
+        signs,
+        pvals,
+        strict=True,
+    ):
+        # Significance stars
+        sig = (
+            "***"
+            if pval < 0.001  # noqa: PLR2004
+            else "**"
+            if pval < 0.01  # noqa: PLR2004
+            else "*"
+            if pval < 0.05  # noqa: PLR2004
+            else ""
+        )
+        label = f"{corr * sign:+.2f}{sig}"
         ax.text(
             float(rect.get_width()) + 0.02,
             float(rect.get_y()) + float(rect.get_height()) / 2,
             label,
             va="center",
             fontsize=8,
+            fontweight="bold" if sig else "normal",
+            color="#D84315" if sig else "#666666",
         )
 
     ax.set_yticks(y_pos)
-    ax.set_yticklabels(names)
+    ax.set_yticklabels([_greek_label(n) for n in names])
     ax.set_xlabel(f"|Spearman r| with {metric}")
     ax.set_xlim(0, 1.15)
     ax.set_title(f"Parameter Sensitivity ({metric})")
@@ -1142,8 +1408,9 @@ def _render_tornado_correlation(
 
     ax.legend(
         handles=[
-            Patch(facecolor="tab:blue", alpha=0.7, label="positive"),
-            Patch(facecolor="tab:red", alpha=0.7, label="negative"),
+            Patch(facecolor="#D84315", label="p < 0.001"),
+            Patch(facecolor="#FFA726", label="p < 0.05"),
+            Patch(facecolor="#BDBDBD", label="not significant"),
         ],
         loc="lower right",
         fontsize=8,
@@ -1196,13 +1463,15 @@ def _render_tornado_range(
     ax.invert_yaxis()
 
 
-def render_sweep_scatter(  # noqa: C901, PLR0912
+def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
     fig: Figure,
     results: SweepResults,
     metric: str,
     *,
     cmap_name: str = "viridis",
     divergent_center: float | None = None,
+    log_diagonal: bool = False,
+    params: list[str] | None = None,
 ) -> None:
     """Pairwise scatter matrix with marginal param-vs-metric on diagonal.
 
@@ -1224,16 +1493,23 @@ def render_sweep_scatter(  # noqa: C901, PLR0912
         Matplotlib colormap name (default ``"viridis"``).
     divergent_center : float or None
         Center colormap at this value using ``TwoSlopeNorm``.
+    log_diagonal : bool
+        Use logarithmic y-axis on diagonal panels.
+    params : list[str] or None
+        Subset of swept parameters to include.  If *None*, use all.
 
     Raises
     ------
     ValueError
-        If fewer than 2 swept parameters.
+        If fewer than 2 (selected) swept parameters.
     """
     import matplotlib.pyplot as plt
     from matplotlib.cm import ScalarMappable
 
-    param_names = list(results.swept_params.keys())
+    all_param_names = list(results.swept_params.keys())
+    param_names = (
+        [p for p in params if p in all_param_names] if params else all_param_names
+    )
     n = len(param_names)
     if n < 2:  # noqa: PLR2004
         msg = f"sweep-scatter requires 2+ swept parameters, got {n}"
@@ -1272,6 +1548,7 @@ def render_sweep_scatter(  # noqa: C901, PLR0912
                         norm=norm,
                         s=12,
                         alpha=0.7,
+                        edgecolors="none",
                     )
                 # Diverged runs: grey x markers
                 if np.any(~ok_mask):
@@ -1283,6 +1560,18 @@ def render_sweep_scatter(  # noqa: C901, PLR0912
                         s=15,
                         alpha=0.5,
                         zorder=5,
+                    )
+                if log_diagonal:
+                    ax.set_yscale("log")
+                # GR baseline for amplification-like metrics
+                if metric in {"A", "log10_A", "P_max"}:
+                    baseline = 0.0 if metric == "log10_A" else 1.0
+                    ax.axhline(
+                        baseline,
+                        color="#2E7D32",
+                        linestyle="--",
+                        alpha=0.5,
+                        linewidth=1,
                     )
                 ax.set_ylabel(metric, fontsize=7)
             else:
@@ -1299,6 +1588,7 @@ def render_sweep_scatter(  # noqa: C901, PLR0912
                         norm=norm,
                         s=10,
                         alpha=0.7,
+                        edgecolors="none",
                     )
                 # Diverged runs: grey x markers
                 if np.any(~ok_mask):
@@ -1313,11 +1603,11 @@ def render_sweep_scatter(  # noqa: C901, PLR0912
                     )
 
             if i == n - 1:
-                ax.set_xlabel(param_names[j], fontsize=8)
+                ax.set_xlabel(_greek_label(param_names[j]), fontsize=8)
             else:
                 ax.set_xticklabels([])
             if j == 0 and i != j:
-                ax.set_ylabel(param_names[i], fontsize=8)
+                ax.set_ylabel(_greek_label(param_names[i]), fontsize=8)
             elif j != 0:
                 ax.set_yticklabels([])
 
@@ -1443,3 +1733,190 @@ def render_replicate_convergence(  # noqa: PLR0914
     ax.set_title(f"Replicate Convergence — {metric}")
     ax.legend(fontsize=7, loc="best")
     ax.grid(visible=True, alpha=0.3)
+
+
+# -- Histogram / distribution -------------------------------------------------
+
+
+def render_sweep_histogram(
+    ax: Axes,
+    results: SweepResults,
+    metric: str,
+) -> None:
+    """Histogram of metric values with summary statistics.
+
+    Shows distribution of the metric across all successful runs,
+    with a GR baseline reference line and a statistics annotation box.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes.
+    results : SweepResults
+        Sweep data.
+    metric : str
+        Metric column to histogram.
+    """
+    metric_vals = np.array(results.column(metric), dtype=np.float64)
+    valid = metric_vals[np.isfinite(metric_vals)]
+
+    if len(valid) == 0:
+        ax.text(
+            0.5,
+            0.5,
+            f"No valid data for {metric}",
+            transform=ax.transAxes,
+            ha="center",
+        )
+        return
+
+    ax.hist(
+        valid,
+        bins=40,
+        color="#1976D2",
+        alpha=0.8,
+        edgecolor="white",
+        linewidth=0.5,
+    )
+
+    # GR baseline reference
+    if metric == "log10_A":
+        ax.axvline(0, color="#2E7D32", linestyle="--", linewidth=2, label="A = 1 (GR)")
+    elif metric == "A":
+        ax.axvline(1, color="#2E7D32", linestyle="--", linewidth=2, label="A = 1 (GR)")
+
+    ax.set_xlabel(metric)
+    ax.set_ylabel("Count")
+    ax.set_title(f"Distribution of {metric} (n={len(valid)})")
+
+    # Statistics box
+    n_total = len(valid)
+    if metric in {"A", "log10_A"}:
+        a_vals = 10.0**valid if metric == "log10_A" else valid
+        n_near_gr = int(np.sum((a_vals > 0.9) & (a_vals < 1.1)))  # noqa: PLR2004
+        n_gt2 = int(np.sum(a_vals > 2))  # noqa: PLR2004
+        n_gt10 = int(np.sum(a_vals > 10))  # noqa: PLR2004
+        stats_text = (
+            f"Near GR: {n_near_gr} ({100 * n_near_gr / n_total:.0f}%)\n"
+            f"A > 2: {n_gt2} ({100 * n_gt2 / n_total:.0f}%)\n"
+            f"A > 10: {n_gt10} ({100 * n_gt10 / n_total:.0f}%)"
+        )
+    else:
+        stats_text = (
+            f"median: {np.median(valid):.3g}\n"
+            f"mean: {np.mean(valid):.3g}\n"
+            f"std: {np.std(valid):.3g}"
+        )
+    ax.text(
+        0.97,
+        0.95,
+        stats_text,
+        transform=ax.transAxes,
+        ha="right",
+        va="top",
+        fontsize=9,
+        bbox={"boxstyle": "round,pad=0.3", "facecolor": "#E3F2FD", "alpha": 0.8},
+    )
+
+    ax.legend(fontsize=10)
+
+
+# -- Divergence rate -----------------------------------------------------------
+
+
+def render_sweep_divergence(  # noqa: C901
+    ax: Axes,
+    results: SweepResults,
+) -> None:
+    """Horizontal bar chart of divergence rate per swept parameter.
+
+    For each swept parameter, computes the fraction of runs that
+    diverged when that parameter was non-zero (or varied).
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes.
+    results : SweepResults
+        Sweep data.
+    """
+    param_names = list(results.swept_params.keys())
+    if not param_names:
+        ax.text(0.5, 0.5, "No swept parameters", transform=ax.transAxes, ha="center")
+        return
+
+    names: list[str] = []
+    diverge_rates: list[float] = []
+
+    for name in param_names:
+        param_vals = np.array(results.column(name), dtype=np.float64)
+        unique_vals = np.unique(param_vals[np.isfinite(param_vals)])
+        if len(unique_vals) < 2:  # noqa: PLR2004
+            continue
+
+        n_total = 0
+        n_diverged = 0
+        for row in results.rows:
+            val = row.get(name)
+            if val is None:
+                continue
+            n_total += 1
+            if row.get("run_status", "success") != "success":
+                n_diverged += 1
+
+        rate = 100.0 * n_diverged / n_total if n_total > 0 else 0.0
+        names.append(_greek_label(name))
+        diverge_rates.append(rate)
+
+    if not names:
+        ax.text(0.5, 0.5, "No varying parameters", transform=ax.transAxes, ha="center")
+        return
+
+    # Sort by divergence rate
+    order = sorted(range(len(names)), key=lambda i: diverge_rates[i])
+    names = [names[i] for i in order]
+    diverge_rates = [diverge_rates[i] for i in order]
+
+    y_pos = np.arange(len(names))
+    colors = [
+        "#D32F2F" if r > 50 else "#FFA726" if r > 10 else "#1976D2"  # noqa: PLR2004
+        for r in diverge_rates
+    ]
+
+    bars = ax.barh(
+        y_pos,
+        diverge_rates,
+        color=colors,
+        alpha=0.85,
+        edgecolor="white",
+        linewidth=0.5,
+    )
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(names, fontsize=9)
+    ax.set_xlabel("Divergence Rate (%)")
+    ax.set_xlim(0, max(105, max(diverge_rates) * 1.1))
+    ax.set_title("Divergence Rate by Parameter")
+
+    # Add percentage labels
+    for bar, rate in zip(bars, diverge_rates, strict=False):
+        if rate > 5:  # noqa: PLR2004
+            ax.text(
+                bar.get_width() - 3,
+                bar.get_y() + bar.get_height() / 2,
+                f"{rate:.0f}%",
+                ha="right",
+                va="center",
+                fontsize=8,
+                color="white",
+                fontweight="bold",
+            )
+        elif rate > 0:
+            ax.text(
+                bar.get_width() + 1,
+                bar.get_y() + bar.get_height() / 2,
+                f"{rate:.1f}%",
+                ha="left",
+                va="center",
+                fontsize=7,
+                color="#333",
+            )
