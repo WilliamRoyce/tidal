@@ -9,6 +9,9 @@
 # No R̃² terms (avoids Ostrogradsky, see #244).
 # Chern-Simons (cs1-cs3) deferred — require bare A_μ, special handling.
 #
+# Derivation timing: ~24m wall (last verified: 2026-04-11, 38 fields, v0.27.0)
+# Requires --timeout 0 (exceeds default 600s)
+#
 # Parity-odd terms from research/general_quadratic_lagrangian.tex:
 #
 # d14 = ε^{μνρσ} T^α_{μν} T_{αρσ}     (Nieh-Yan form)
