@@ -1,55 +1,43 @@
-# Dark Photon Torsion: R + Torsion with Non-Minimal Coupling
+# Dark Photon Torsion: R + Kinetic Mixing (BSM Dark Photon Model)
 #
 # Lagrangian:
-#   L = (1/kappa^2) R + alpha1 I1 + alpha2 I2 + alpha3 I3
-#       - 1/4 xi Ftorsion^2 + delta1 Ric_CDT * F - 1/4 F^2
+#   L = (1/kappa^2) R + alpha I3 - 1/4 xi Ftorsion^2
+#       + deltam F*Ftorsion - 1/4 F^2
 #
 # where:
 #   R = RicciScalarCD[] (Levi-Civita Ricci scalar, torsion-free)
-#   I1 = T_{abc} T^{abc}, I2 = T_{abc} T^{bac}, I3 = T^a_{ab} T^{cb}_{c}
+#   I3 = T^a_{ab} T^{cb}_{c} (torsion trace mass invariant)
 #   Ftorsion = dT (torsion trace field strength)
-#   Ric_CDT = RicciCDT (Riemann-Cartan Ricci tensor, includes torsion)
 #   F = dA (EM field strength)
+#
+# This is a pure BSM dark photon model in Einstein-Maxwell theory.
+# The torsion trace vector T_mu acts as a dark photon with:
+#   - Mass from alpha I3
+#   - Yang-Mills kinetic term from xi Ftorsion^2
+#   - Kinetic mixing with the photon from deltam F*Ftorsion
 #
 # KEY DESIGN CHOICES:
 #
-#   1. R instead of R-tilde: Previous versions used (1/kappa^2) R-tilde
-#      (RicciScalarCDT[]), which after ChangeCurvature decomposition
-#      gives R + (1/kappa^2) * torsion terms, creating an unavoidable
-#      mass floor m_T ~ 1/kappa >> omega_G. Using plain R eliminates
-#      these implicit torsion mass contributions, allowing the explicit
-#      alpha parameters to set the torsion mass at any desired scale.
+#   R instead of R-tilde: Previous versions used (1/kappa^2) R-tilde
+#   (RicciScalarCDT[]), creating an unavoidable torsion mass floor
+#   m_T ~ 1/kappa >> omega_G via ChangeCurvature decomposition.
+#   Using plain R eliminates these implicit contributions.
 #
-#   2. delta1 RicciCDT*F coupling: The kinetic mixing F*Ftorsion
-#      produces linearized terms proportional to h^a_a (graviton trace),
-#      which are killed by TT gauge. The non-minimal RicciCDT*F coupling
-#      survives TT gauge because the antisymmetric Ricci is purely
-#      torsion-dependent (it vanishes without torsion). After
-#      ChangeCurvature, it decomposes into nabla(T)*F cross-terms
-#      that produce direct torsion-photon mixing at quadratic level.
+#   No TT gauge on h: TT gauge would constrain the coupling structure.
+#   Instead, use TT-compatible ICs for physical graviton modes.
 #
-#   3. Ftorsion^2 kinetic term: Makes the torsion trace propagating
-#      (Yang-Mills kinetic structure for the trace vector).
-#
-# Stability (without R-tilde cross-terms):
-#   With R instead of R-tilde, the torsion mass eigenvalues are set
-#   entirely by alpha1, alpha2, alpha3. The R-tilde contributions
-#   (tensor +1/(2kappa^2), axial +1/(24kappa^2), trace -4/(3kappa^2))
-#   are absent. Stability requires all effective mass^2 > 0.
-#
-# Resonance condition:
-#   omega_G = kappa * B0 / 2 (Gertsenshtein frequency)
-#   m_T ~ sqrt(|alpha|) (torsion mass from I terms)
-#   Resonance when m_T ~ omega_G
+#   Only I3 (trace sector): The kinetic term Ftorsion^2 only gives
+#   dynamics to the trace vector. Including I1, I2 would give mass
+#   to tentor/trator without kinetic terms -> ghost instability.
 #
 # Refs:
-#   Shapiro (2002), hep-th/0103093 -- non-minimal EM-torsion coupling
-#   Barker et al. (2024), arXiv:2406.12826 -- PGT particle spectra
-#   research/general_quadratic_lagrangian.tex -- complete enumeration
+#   Barker et al. (2024), arXiv:2406.12826 -- eWGT, dark photon analogy
+#   Berlin et al. (2024), arXiv:2405.08865 -- dark photon mixing
+#   Nikiforova et al. (2009), arXiv:0905.3732 -- ghost-free massive torsion
 
 [theory]
-name = "Dark Photon Torsion (R + Non-Minimal Coupling)"
-description = "GR + propagating torsion with non-minimal delta1 RicciCDT*F coupling, no R-tilde mass floor"
+name = "Dark Photon Torsion (R + Kinetic Mixing + Non-Minimal)"
+description = "GR + propagating torsion with kinetic mixing and non-minimal coupling, no R-tilde mass floor"
 
 [spacetime]
 dimension = 4
@@ -98,16 +86,15 @@ type = "vector"
 components = ["0", "0", "-B0 * z[]", "0"]
 
 [constants]
-names = ["kappa", "B0", "alpha1", "alpha2", "alpha3", "xi", "delta1"]
+names = ["kappa", "B0", "alpha", "xi", "deltam"]
 
-# Lagrangian: (1/kappa^2) R + alpha1 I1 + alpha2 I2 + alpha3 I3
-#             - 1/4 xi Ftorsion^2 + delta1 RicciCDT*F - 1/4 F^2
+# Lagrangian: (1/kappa^2) R + alpha I3 - 1/4 xi Ftorsion^2
+#             + deltam F*Ftorsion - 1/4 F^2
 #
-# Note: ChangeCurvature will decompose RicciCDT -> RicciCD + torsion terms.
-# The antisymmetric part of RicciCDT is purely torsion-dependent.
-# RicciScalarCD[] passes through unchanged.
+# RicciScalarCD[] — plain Levi-Civita, no torsion mass floor.
+# No ChangeCurvature needed — pure Einstein-Maxwell + dark photon.
 [lagrangian]
-expression = "((1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+expression = "((1/kappa^2) RicciScalarCD[] + alpha TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
 
 [linearization]
 perturbation_field = "h"
@@ -117,9 +104,9 @@ field = "A"
 perturbation_name = "a"
 background = "Abar"
 
-# TT gauge on h -- with plain R, graviton sector is standard GR.
-# The delta1 RicciCDT*F coupling involves the antisymmetric Ricci
-# (pure torsion), so it survives TT gauge.
+# TT gauge on h — stabilizes graviton sector.
+# With the Ftorsion deferral pipeline fix, the direct da·dt kinetic
+# mixing survives TT gauge (it doesn't involve h-trace).
 [[gauge]]
 field = "h"
 type = "tt"
@@ -137,11 +124,9 @@ propagation_axis = "z"
 # Default parameters:
 # kappa = 1.0 (gravitational coupling)
 # B0 = 0.01 (background magnetic field, small-P regime)
-# alpha1 = -0.01 (I1 mass: tensor sector)
-# alpha2 = -0.01 (I2 mass: mixed sector)
-# alpha3 = -0.01 (I3 mass: trace sector -- tunable for resonance)
+# alpha = 2.5e-5 (torsion trace mass ~ Gertsenshtein frequency)
 # xi = 1.0 (torsion kinetic strength)
-# delta1 = 0.1 (non-minimal RicciCDT*F coupling)
+# deltam = 0.1 (kinetic mixing F*Ftorsion)
 
 [output]
 path = "../data/torsion_dark_photon.json"

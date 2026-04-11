@@ -798,7 +798,9 @@ def _deferred_derived_fields(ctx: _WlsContext) -> list[dict[str, Any]]:
     """Return derived fields to keep abstract through xPert (deferred expansion).
 
     An antisymmetric derived field is deferred when its definition references
-    a field being perturbed via ``[[linearization.matter_perturbations]]``.
+    a field being perturbed via ``[[linearization.matter_perturbations]]``
+    or via torsion (``TorsionCDT``).
+
     Keeping these fields abstract prevents ``ToCanonical`` from merging the
     two independent Maxwell-type contractions that arise when
     ``F[-a,-b]*F[a,b]`` is expanded as ``(CD[A]-CD[A])^2`` before xPert.
@@ -810,20 +812,28 @@ def _deferred_derived_fields(ctx: _WlsContext) -> list[dict[str, Any]]:
     ``L^(2)`` contains ``f[-a,-b]*f[a,b]`` as a single scalar invariant.
     ``ToCanonical`` handles this correctly.  The CD expansion is applied
     *after* ``ToCanonical``, once the antisymmetric structure is preserved.
+
+    Torsion deferral: derived fields referencing ``TorsionCDT`` (e.g.,
+    ``Ftorsion = d(T_trace)``) must also be deferred.  Without deferral,
+    the torsion field strength is expanded to ``CD[TorsionCDT]`` before
+    xPert, and since background torsion is zero, the ``F·Ftorsion``
+    kinetic mixing cross-term loses its bilinear structure — only
+    h-trace-mediated terms survive.  Deferring preserves the pure
+    ``f·ft`` coupling that standard dark-photon kinetic mixing relies on.
     """
     if not ctx.derived_fields or not ctx.linearization:
         return []
     matter_field_names = {
         mp["field"] for mp in ctx.linearization.get("matter_perturbations", [])
     }
-    if not matter_field_names:
-        return []
     deferred: list[dict[str, Any]] = []
     for field in ctx.derived_fields:
         if field.get("symmetry") != "antisymmetric":
             continue
         defn = field.get("definition", "")
-        if any(mf in defn for mf in matter_field_names):
+        if any(mf in defn for mf in matter_field_names) or (
+            ctx.torsion and "TorsionCDT" in defn
+        ):
             deferred.append(field)
     return deferred
 
@@ -1689,7 +1699,7 @@ def _wls_deferred_field_li_sub(
     (metric/matter/torsion), but **before** the batch ``ToCanonical``.
 
     For each deferred derived field ``F`` (antisymmetric, definition
-    references a matter field being perturbed):
+    references a matter field or torsion being perturbed):
 
     1. Drop ``FPert[LI[2], ...]`` — second-order perturbation, not needed.
     2. Substitute ``FPert[LI[0], aa_, bb_]`` with the background value
@@ -1839,10 +1849,34 @@ def _wls_deferred_field_expand(
                     "",
                 ]
             )
+        elif ctx.torsion and "TorsionCDT" in field.get("definition", ""):
+            # Torsion-based deferred field (e.g., Ftorsion = d(T_trace)).
+            # Background torsion is zero → LI[0] already set to 0 in _li_sub.
+            # For LI[1], substitute the perturbation torsion head.
+            torsion_pert_name = ctx.torsion["perturbation_name"]
+            torsion_head = f"{ctx.prefix}{torsion_pert_name.capitalize()}"
+            # Build perturbation rules: replace TorsionCDT with perturbation t
+            torsion_cdt = f"Torsion{ctx.prefix}CDT"
+            lines.extend(
+                [
+                    f"(* Torsion-based deferred field: expand {fname} with torsion pert *)",
+                    f"dpt{fname.capitalize()}TorsionPertRules = {rule_var} /. {torsion_cdt} -> {torsion_head};",
+                    "(* LI[0] → 0 (background torsion vanishes) *)",
+                    f"l2Raw = l2Raw /. {f_head}[_[0], __] :> 0;",
+                    "(* LI[1] → d(t) using torsion perturbation rules *)",
+                    f"l2Raw = l2Raw /. {f_head}[_[1], args__] :>",
+                    f"  ({f_head}[args] /. dpt{fname.capitalize()}TorsionPertRules);",
+                    f"(* Also replace any remaining bare {fname} (LI already stripped) *)",
+                    f"l2Raw = l2Raw /. dpt{fname.capitalize()}TorsionPertRules;",
+                    f'Print["After deferred {fname} expansion (torsion): "'
+                    f', If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
+                    "",
+                ]
+            )
         else:
             lines.extend(
                 [
-                    f"(* WARNING: no matching matter perturbation found for deferred {fname} *)",
+                    f"(* WARNING: no matching perturbation found for deferred {fname} *)",
                     f"l2Raw = l2Raw /. {rule_var};",
                     "",
                 ]
