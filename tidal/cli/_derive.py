@@ -1412,60 +1412,60 @@ def _wls_precompute_cd_component_values(
         )
         return lines
 
-    # --- Pre-register BASE field ComponentValues (supervisor's pattern) ---
-    # For each perturbation tensor (h, a, t), compute component values via
-    # tidalSplinter (already defined above) and register them so ToValues
-    # resolves them BEFORE TraceBasisDummy in StaggeredToBasis. See #246.
-    # Pattern: supervisor's SphericalEuclidean.m lines 235, 270, 299.
-    for df in dyn_fields:
-        head = df["head"]
-        field_name = df["name"]
-        field_dict = df.get("field", {})
-        ftype = field_dict.get("type", df.get("type", "scalar"))
-        if ftype == "scalar":
-            base_rank = 0
-        elif ftype == "vector":
-            base_rank = 1
-        else:
-            base_rank = field_dict.get("rank", 2)
-        # Rank 3 (torsion): 4^3 = 64 entries, manageable. The supervisor
-        # pre-computes rank-3 DDDClockField ComponentValues (line 330).
-        # Skip only rank > 3 (4^4 = 256 entries → expensive tidalSplinter).
-        if base_rank > 3:
+    # --- Pre-register BASE field ComponentValues (DISABLED — causes Scalar' artifacts) ---
+    # See #246: field ComponentValues don't help for scalar Lagrangian decomposition
+    # because tensors never reach basis-indexed form before TraceBasisDummy.
+    # The per-pair projection in StaggeredToBasis is the actual fix.
+    if False:
+        for df in dyn_fields:
+            head = df["head"]
+            field_name = df["name"]
+            field_dict = df.get("field", {})
+            ftype = field_dict.get("type", df.get("type", "scalar"))
+            if ftype == "scalar":
+                base_rank = 0
+            elif ftype == "vector":
+                base_rank = 1
+            else:
+                base_rank = field_dict.get("rank", 2)
+            # Rank 3 (torsion): 4^3 = 64 entries, manageable. The supervisor
+            # pre-computes rank-3 DDDClockField ComponentValues (line 330).
+            # Skip only rank > 3 (4^4 = 256 entries → expensive tidalSplinter).
+            if base_rank > 3:
+                lines.extend(
+                    [
+                        "",
+                        f"(* Skip ComponentValue pre-registration for {field_name} "
+                        f"(rank {base_rank} > 3, too many entries) *)",
+                    ]
+                )
+                continue
+            # Use EnumerateComponentTuples + direct ComponentValue registration.
+            # This avoids tidalSplinter/ComponentArray which can Throw on DummyIn.
             lines.extend(
                 [
                     "",
-                    f"(* Skip ComponentValue pre-registration for {field_name} "
-                    f"(rank {base_rank} > 3, too many entries) *)",
+                    f"(* Pre-register ComponentValues for {field_name} (rank {base_rank}) *)",
+                    f"Module[{{rank = {base_rank}, canonTuples, allTuples, nReg = 0,",
+                    f"         coordSyms2 = GetCoordinateSymbols[{chart}],",
+                    f"         dim2 = GetChartDimension[{chart}], ch = {chart}}},",
+                    f"  canonTuples = EnumerateComponentTuples[{head}, dim2];",
+                    "  allTuples = Tuples[Range[0, dim2 - 1], rank];",
+                    "  (* Register each component: canonical tuples → named function,",
+                    "     non-canonical → ±canonical (via symmetry), zero → 0 *)",
+                    "  Do[Module[{tup = allTuples[[j]], pat, idx},",
+                    "    pat = Table[{tup[[n]], -ch}, {n, rank}];",
+                    "    idx = FirstPosition[canonTuples, tup, {0}][[1]];",
+                    "    If[idx > 0,",
+                    f"      ComponentValue[{head} @@ pat,",
+                    f"        Symbol[ToString[{head}] <> ToString[idx - 1]][Sequence @@ coordSyms2]];",
+                    "      nReg++",
+                    "    ]",
+                    "  ], {j, Length[allTuples]}];",
+                    f'  Print["  Registered ", nReg, " ComponentValues for {field_name} (rank ", rank, ")"];',
+                    "];",
                 ]
             )
-            continue
-        # Use EnumerateComponentTuples + direct ComponentValue registration.
-        # This avoids tidalSplinter/ComponentArray which can Throw on DummyIn.
-        lines.extend(
-            [
-                "",
-                f"(* Pre-register ComponentValues for {field_name} (rank {base_rank}) *)",
-                f"Module[{{rank = {base_rank}, canonTuples, allTuples, nReg = 0,",
-                f"         coordSyms2 = GetCoordinateSymbols[{chart}],",
-                f"         dim2 = GetChartDimension[{chart}], ch = {chart}}},",
-                f"  canonTuples = EnumerateComponentTuples[{head}, dim2];",
-                "  allTuples = Tuples[Range[0, dim2 - 1], rank];",
-                "  (* Register each component: canonical tuples → named function,",
-                "     non-canonical → ±canonical (via symmetry), zero → 0 *)",
-                "  Do[Module[{tup = allTuples[[j]], pat, idx},",
-                "    pat = Table[{tup[[n]], -ch}, {n, rank}];",
-                "    idx = FirstPosition[canonTuples, tup, {0}][[1]];",
-                "    If[idx > 0,",
-                f"      ComponentValue[{head} @@ pat,",
-                f"        Symbol[ToString[{head}] <> ToString[idx - 1]][Sequence @@ coordSyms2]];",
-                "      nReg++",
-                "    ]",
-                "  ], {j, Length[allTuples]}];",
-                f'  Print["  Registered ", nReg, " ComponentValues for {field_name} (rank ", rank, ")"];',
-                "];",
-            ]
-        )
 
     max_cd_precompute = 2
     for df in dyn_fields:
@@ -4116,7 +4116,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             f"    canonResult = Quiet[TimeConstrained[ContractMetric[ToCanonical[lagForCanon], {ctx.metric}], 30, $Failed], ToCanonical::noident];",
             "    If[canonResult =!= $Failed,",
             "      nAfter = If[Head[canonResult]===Plus, Length[canonResult], 1];",
-            "      If[nAfter <= 4 * nBefore,",
+            "      If[nAfter <= nBefore,",
             "        lagForCanon = canonResult;",
             '        Print["  ToCanonical+ContractMetric: ", nBefore, " -> ", nAfter, " terms (",',
             '          Round[AbsoluteTime[] - tCanon, 0.1], "s, ratio=", Round[N[nAfter/nBefore], 0.1], "x)"],',
@@ -4186,7 +4186,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             f"      canon2Result = Quiet[TimeConstrained[ContractMetric[ToCanonical[lagForCanon], {ctx.metric}], 30, $Failed], ToCanonical::noident];",
             "      If[canon2Result =!= $Failed,",
             "        n2After = If[Head[canon2Result]===Plus, Length[canon2Result], 1];",
-            "        If[n2After <= 4 * n2Before,",
+            "        If[n2After <= n2Before,",
             "          lagForCanon = canon2Result;",
             '          Print["  2nd-pass ToCanonical: ", n2Before, " -> ", n2After, " terms (",',
             '            Round[AbsoluteTime[] - t2Canon, 0.1], "s, ratio=", Round[N[n2After/n2Before], 0.1], "x)"],',

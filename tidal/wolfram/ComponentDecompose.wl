@@ -477,23 +477,38 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
   e = EvaluateEpsilonComponents[e, chart];
   e = Expand[e];
 
-  (* Resolve pre-computed ComponentValues for perturbation tensors        *)
-  (* BEFORE TraceBasisDummy.  With base field CVs registered (#246),     *)
-  (* ToValues converts T[{0,-ch},{1,-ch},{2,-ch}] → t_N[coords] in O(1),*)
-  (* eliminating 2-4 dummy pairs per tensor.  For parity-odd models this*)
-  (* drops K from 5-7 to 1-3, reducing TBD cost from O(4^{14}) to O(4^6).*)
-  (* Ref: supervisor's EuclideanSplinter (ToValues before TraceBasisDummy). *)
-  e = ToValues[e];
-  e = Expand[e];
-
-  (* TraceBasisDummy: per-term to prevent O(dim^{2K}) explosion.         *)
-  (* The full expression may have K=45 contracted dummy pairs across all *)
-  (* additive terms, but each individual term has only ~3 pairs.         *)
-  (* Per-term: O(N × dim^6) instead of O(dim^90). Same pattern as       *)
-  (* BatchedTraceBasisDummyWithMetric (line 1195).                       *)
-  If[Head[e] === Plus,
-    e = Total[TraceBasisDummy /@ List @@ e],
-    e = TraceBasisDummy[e]
+  (* TraceBasisDummy: per-term, with sequential per-pair tracing for     *)
+  (* high-K terms.  TraceBasisDummy[expr] traces ALL pairs at once:     *)
+  (* O(4^{2K}).  For K>4 (parity-odd epsilon terms), this is too slow.  *)
+  (* Instead: TraceBasisDummy[expr, {idx, basis}] traces ONE pair at a  *)
+  (* time (O(4) per call), with Expand+ToValues between calls to        *)
+  (* collapse zeros early (epsilon antisymmetry, diagonal metric).      *)
+  (* Effective cost: O(4^K × branch_factor) where branch_factor ≈ 1-2  *)
+  (* due to early elimination.  See #246.                                *)
+  Module[{traceOneTerm},
+    traceOneTerm[term_] := Module[{dummies, result = term},
+      (* Find basis dummy symbols: abstract symbols in {sym, ±chart} form *)
+      dummies = Cases[result, {s_Symbol, chart} /; AbstractIndexQ[s] :> s,
+        {0, Infinity}] // DeleteDuplicates;
+      If[Length[dummies] <= 4,
+        (* Low K: standard TraceBasisDummy (fast) *)
+        TraceBasisDummy[result],
+        (* High K: sequential per-pair tracing with intermediate cleanup *)
+        Do[
+          result = TraceBasisDummy[result, {d, chart}];
+          result = Expand[result];
+          result = EvaluateEpsilonComponents[result, chart];
+          result = ToValues[result];
+          result = Expand[result],
+          {d, dummies}
+        ];
+        result
+      ]
+    ];
+    If[Head[e] === Plus,
+      e = Total[traceOneTerm /@ List @@ e],
+      e = traceOneTerm[e]
+    ];
   ];
   e = Expand[e];
 
