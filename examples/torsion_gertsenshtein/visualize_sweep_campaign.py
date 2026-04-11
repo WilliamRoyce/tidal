@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Comprehensive visualization of the PGT nonminimal sweep campaign.
+r"""Comprehensive visualization of the PGT nonminimal sweep campaign.
 
 Generates 7 publication-quality figures from Phase 1-4 sweep results:
   Fig 1: Phase 1 overview (3x3 grid, which parameters matter)
@@ -9,6 +9,20 @@ Generates 7 publication-quality figures from Phase 1-4 sweep results:
   Fig 5: Phase 3 tornado + distribution
   Fig 6: Phase 3 scatter matrix (active parameters)
   Fig 7: Frequency modification P(t) time series
+
+.. note::
+   The core plotting features used here (tornado with p-value significance,
+   scatter matrix with log diagonal, divergence rate charts, histograms,
+   Greek labels, arctan axes, derived metrics) have been integrated into the
+   CLI via ``tidal plot``. For new campaigns, prefer CLI commands:
+
+     tidal plot campaign phase1/ --metric log10_A --layout 3x3
+     tidal plot phase3/lhs1000 --type sweep-tornado --metric log10_A
+     tidal plot phase3/lhs1000 --type sweep-histogram --metric log10_A
+     tidal plot phase3/lhs1000 --type sweep-scatter --metric log10_A \\
+         --params delta1,zeta2,zeta3 --log-diagonal --divergent-center 0
+
+   This script is retained for reproducing the exact publication figures.
 
 Usage:
   python visualize_sweep_campaign.py [DATA_DIR] [OUTPUT_DIR]
