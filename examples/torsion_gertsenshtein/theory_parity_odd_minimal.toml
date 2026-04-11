@@ -4,6 +4,9 @@
 # d21 = ε^{μνρσ} R̃^α_{μαν} F_{ρσ} (uses Ricci, simpler than Riemann)
 #
 # If this works, add remaining terms incrementally.
+#
+# Derivation timing: ~3m23s wall (last verified: 2026-04-11, 34 fields, v0.27.0)
+# Previous: 50+ min (OOM crash) before per-pair TraceBasisDummy fix (#246)
 
 [theory]
 name = "Parity-Odd Test (d21 only)"
