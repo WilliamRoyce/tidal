@@ -4,17 +4,17 @@
 #   - d14..d17: parity-odd torsion mass (ε·T²)
 #   - d19..d21: parity-odd curvature-EM coupling (ε·R̃×F)
 #   - zt1..zt6: parity-odd derivative torsion-EM (ε·∇T×F)
-#   - cs1..cs3: Chern-Simons torsion-EM (ε·T·A·F)
 #
 # All terms are Yang-Mills type (≤ 2nd order), ghost-free.
 # No R̃² terms (avoids Ostrogradsky, see #244).
+# Chern-Simons (cs1-cs3) deferred — require bare A_μ, special handling.
 #
 # Parity-odd terms from research/general_quadratic_lagrangian.tex:
 #
 # d14 = ε^{μνρσ} T^α_{μν} T_{αρσ}     (Nieh-Yan form)
 # d15 = ε^{μνρσ} T^α_{μρ} T_{ανσ}
-# d16 = ε^{μνρσ} T_μ T_{νρσ}           (trace × tensor)
-# d17 = ε^{μνρσ} T^α_{μα} T_{νρσ}     (trace contraction)
+# d16 = ε^{μνρσ} T_μ T_{νρσ}           (η trace: T_μ = η^{αβ}T_{μαβ})
+# d17 = ε^{μνρσ} T^α_{μα} T_{νρσ}     (natural trace: T^α_{μα})
 #
 # d19 = ε^{μνρσ} R̃_{μνρ}^α F_{σα}
 # d20 = ε^{μνρσ} R̃_{μρν}^α F_{σα}     (index swap on Riemann)
@@ -27,13 +27,8 @@
 # ζ̃₅ = (∇T)^{a}_{a}^{bc} ε_{bcde} F^{de}
 # ζ̃₆ = (∇T)^{ab}_{a}^{c} ε_{bcde} F^{de}
 #
-# Chern-Simons (using bare A_μ, gauge-invariant with ε·T·A·F structure):
-# cs1 = ε^{μνρσ} T_μ A_ν F_{ρσ}          (trace torsion)
-# cs2 = ε^{μνρσ} S_μ A_ν F_{ρσ}          (axial torsion)
-# cs3 = ε^{μνρσ} q^λ_{μα} g^α_ν A_λ F_{ρσ}  (tensor torsion)
-#
-# 25 parameters total: kappa, B0, beta1-3, xi, delta1, chi, zeta1-3,
-#                       d14-d17, d19-d21, zt1-zt6, cs1-cs3
+# 24 parameters total: kappa, B0, beta1-3, xi, delta1, chi, zeta1-3,
+#                       d14-d17, d19-d21, zt1-zt6
 #
 # Refs:
 #   research/general_quadratic_lagrangian.tex — complete enumeration
@@ -86,48 +81,26 @@ type = "vector"
 components = ["0", "0", "-B0 * z[]", "0"]
 
 [constants]
-names = ["kappa", "B0", "beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3", "d14", "d15", "d16", "d17", "d19", "d20", "d21", "zt1", "zt2", "zt3", "zt4", "zt5", "zt6", "cs1", "cs2", "cs3"]
+names = ["kappa", "B0", "beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3", "d14", "d15", "d16", "d17", "d19", "d20", "d21", "zt1", "zt2", "zt3", "zt4", "zt5", "zt6"]
 
-# Lagrangian expression (xAct notation):
+# xAct Lagrangian expression:
 #
-# Parity-even sector (same as general nonminimal):
-#   (1/kappa^2) R̃ + beta1 I1 + beta2 I2 + beta3 I3 - (xi/4) Ftorsion^2
-#   + delta1 R̃_{[μν]} F^{μν} + chi R̃_{[μν]} Ftorsion^{μν}
-#   + zeta1..3 ∇T·F - 1/4 F^2
+# Epsilon indices are ALL UP (ε^{abcd}) — directly contracts with DOWN
+# tensor indices. No eta raisings needed. Matches the working pattern
+# from theory_parity_odd_minimal.toml.
 #
-# Parity-odd torsion mass (d14..d17):
-#   d14 epsiloneta[-a,-b,-c,-d] eta[a,e] TorsionCDT[f,-e,-b] eta[f,g] TorsionCDT[-g,-c,-d]
-#   d15 epsiloneta[-a,-b,-c,-d] eta[a,e] TorsionCDT[f,-e,-c] eta[f,g] TorsionCDT[-g,-b,-d]
-#   d16 epsiloneta[-a,-b,-c,-d] eta[a,e] TorsionCDT[f,-e,-f] TorsionCDT[-b,-c,-d]
-#   d17 epsiloneta[-a,-b,-c,-d] TorsionCDT[e,-a,-e] TorsionCDT[-b,-c,-d]
-#
-# Parity-odd curvature-EM (d19..d21):
-#   d19 epsiloneta[-a,-b,-c,-d] eta[d,e] RiemannCDT[-a,-b,-c,f] eta[f,g] F[-e,-g]
-#   d20 epsiloneta[-a,-b,-c,-d] eta[d,e] RiemannCDT[-a,-c,-b,f] eta[f,g] F[-e,-g]
-#   d21 epsiloneta[-a,-b,-c,-d] RicciCDT[e,-a,-e,-b] eta[c,f] eta[d,g] F[-f,-g]
-#     ... wait, d21 uses Ricci = R̃^α_{μαν}, which is a Riemann contraction.
-#     In xAct: RicciCDT[-a,-b] = RiemannCDT[c,-a,-c,-b] (auto-contracted)
-#     d21 = epsiloneta[-a,-b,-c,-d] eta[a,e] RicciCDT[-e,-b] eta[c,f] eta[d,g] F[-f,-g]
-#
-# Parity-odd derivative ∇T×F (zt1..zt6):
-#   zt1 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[b,c,d,e] eta[a,f] F[-f,-e]
-#   zt2 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,c,d,e] eta[b,f] F[-f,-e]
-#   zt3 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,b,d,e] eta[c,f] F[-f,-e]
-#   zt4 CD[-a][TorsionCDT[b,-b,-c]] epsiloneta[a,c,d,e] F[-d,-e]
-#   zt5 CD[-a][TorsionCDT[a,-b,-c]] epsiloneta[b,c,d,e] F[-d,-e]
-#   zt6 CD[-a][TorsionCDT[-b,a,-c]] epsiloneta[b,c,d,e] F[-d,-e]
-#
-# Chern-Simons (cs1..cs3):
-#   cs1 epsiloneta[-a,-b,-c,-d] TorsionCDT[e,-a,-e] eta[b,f] A[-f] eta[c,g] eta[d,h] F[-g,-h]
-#   cs2 ... (axial torsion S_μ = ε_{μνρσ}T^{νρσ}/6 — requires explicit construction)
-#   cs3 ... (tensor torsion — complex contraction)
-#
-# For this first derivation, include d14-d17, d19-d21, zt1-zt6.
-# Chern-Simons cs1-cs3 deferred (require bare A_μ in Lagrangian with mixed
-# torsion-EM gauge structure — may need special handling).
+# xAct notation for each parity-odd term:
+#   d14: epsiloneta[a,b,c,d] TorsionCDT[e,-a,-b] TorsionCDT[-e,-c,-d]
+#   d15: epsiloneta[a,b,c,d] TorsionCDT[e,-a,-c] TorsionCDT[-e,-b,-d]
+#   d16: epsiloneta[a,b,c,d] eta[e,f] TorsionCDT[-a,-e,-f] TorsionCDT[-b,-c,-d]
+#   d17: epsiloneta[a,b,c,d] TorsionCDT[e,-a,-e] TorsionCDT[-b,-c,-d]
+#   d19: epsiloneta[a,b,c,d] RiemannCDT[-a,-b,-c,e] F[-d,-e]
+#   d20: epsiloneta[a,b,c,d] RiemannCDT[-a,-c,-b,e] F[-d,-e]
+#   d21: epsiloneta[a,b,c,d] RicciCDT[-a,-b] F[-c,-d]
+#   zt1-zt6: already use UP epsilon indices (unchanged from original)
 
 [lagrangian]
-expression = "((1/kappa^2) RicciScalarCDT[] + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + chi RicciCDT[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + zeta1 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e] + zeta2 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e] + zeta3 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e] + d14 epsiloneta[-a,-b,-c,-d] eta[a,e] TorsionCDT[f,-e,-b] eta[f,g] TorsionCDT[-g,-c,-d] + d15 epsiloneta[-a,-b,-c,-d] eta[a,e] TorsionCDT[f,-e,-c] eta[f,g] TorsionCDT[-g,-b,-d] + d16 epsiloneta[-a,-b,-c,-d] eta[a,e] TorsionCDT[f,-e,-f] TorsionCDT[-b,-c,-d] + d17 epsiloneta[-a,-b,-c,-d] TorsionCDT[e,-a,-e] TorsionCDT[-b,-c,-d] + d19 epsiloneta[-a,-b,-c,-d] eta[d,e] RiemannCDT[-a,-b,-c,f] eta[f,g] F[-e,-g] + d20 epsiloneta[-a,-b,-c,-d] eta[d,e] RiemannCDT[-a,-c,-b,f] eta[f,g] F[-e,-g] + d21 epsiloneta[-a,-b,-c,-d] eta[a,e] RicciCDT[-e,-b] eta[c,f] eta[d,g] F[-f,-g] + zt1 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[b,c,d,e] eta[a,f] F[-f,-e] + zt2 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,c,d,e] eta[b,f] F[-f,-e] + zt3 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,b,d,e] eta[c,f] F[-f,-e] + zt4 CD[-a][TorsionCDT[b,-b,-c]] epsiloneta[a,c,d,e] F[-d,-e] + zt5 CD[-a][TorsionCDT[a,-b,-c]] epsiloneta[b,c,d,e] F[-d,-e] + zt6 CD[-a][TorsionCDT[-b,a,-c]] epsiloneta[b,c,d,e] F[-d,-e] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+expression = "((1/kappa^2) RicciScalarCDT[] + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + chi RicciCDT[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + zeta1 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e] + zeta2 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e] + zeta3 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e] + d14 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-b] TorsionCDT[-e,-c,-d] + d15 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-c] TorsionCDT[-e,-b,-d] + d16 epsiloneta[a,b,c,d] eta[e,f] TorsionCDT[-a,-e,-f] TorsionCDT[-b,-c,-d] + d17 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-e] TorsionCDT[-b,-c,-d] + d19 epsiloneta[a,b,c,d] RiemannCDT[-a,-b,-c,e] F[-d,-e] + d20 epsiloneta[a,b,c,d] RiemannCDT[-a,-c,-b,e] F[-d,-e] + d21 epsiloneta[a,b,c,d] RicciCDT[-a,-b] F[-c,-d] + zt1 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[b,c,d,e] eta[a,f] F[-f,-e] + zt2 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,c,d,e] eta[b,f] F[-f,-e] + zt3 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,b,d,e] eta[c,f] F[-f,-e] + zt4 CD[-a][TorsionCDT[b,-b,-c]] epsiloneta[a,c,d,e] F[-d,-e] + zt5 CD[-a][TorsionCDT[a,-b,-c]] epsiloneta[b,c,d,e] F[-d,-e] + zt6 CD[-a][TorsionCDT[-b,a,-c]] epsiloneta[b,c,d,e] F[-d,-e] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
 
 [linearization]
 perturbation_field = "h"
