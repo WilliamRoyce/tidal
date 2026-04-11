@@ -37,6 +37,7 @@ def render_campaign(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PL
     from tidal.cli._sweep_panels import (
         _greek_label,  # pyright: ignore[reportPrivateUsage]
         render_sweep_1d,
+        render_sweep_2d,
     )
     from tidal.measurement._sweep_results import SweepResults
 
@@ -162,17 +163,43 @@ def render_campaign(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PL
                 arctan_axes=use_arctan,
                 thresholds=thresholds,
             )
+        elif n_swept == 2:  # noqa: PLR2004
+            dc: float | None = getattr(args, "divergent_center", None)
+            cmap_name: str = getattr(args, "cmap", None) or (
+                "RdBu_r" if dc is not None else "viridis"
+            )
+            clamp_raw: str | None = getattr(args, "clamp_color", None)
+            clamp: tuple[float, float] | None = None
+            if clamp_raw:
+                parts = clamp_raw.split(":")
+                clamp = (float(parts[0]), float(parts[1]))
+            render_sweep_2d(
+                ax,
+                results,
+                raw_metric,
+                divergent_center=dc,
+                cmap_name=cmap_name,
+                clamp_color=clamp,
+            )
         else:
             ax.text(
                 0.5,
                 0.5,
-                f"{n_swept}D sweep\n(use tidal plot sweep)",
+                f"{n_swept}D sweep\n(unsupported in campaign)",
                 transform=ax.transAxes,
                 ha="center",
             )
 
+        # Title: show all swept param names
+        if n_swept == 1:
+            title_label = _greek_label(param_name)
+        elif n_swept >= 2:  # noqa: PLR2004
+            pnames = list(results.swept_params.keys())
+            title_label = " x ".join(_greek_label(p) for p in pnames)
+        else:
+            title_label = subdir.name
         ax.set_title(
-            _greek_label(param_name),
+            title_label,
             fontsize=11,
             fontweight="bold"
             if ax.get_facecolor()[:3] != (0.96, 0.96, 0.96)
