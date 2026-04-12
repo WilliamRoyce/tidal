@@ -160,18 +160,18 @@ def compute_conversion_probability(
     total_arr = source_arr + target_arr
 
     e_source_0 = source_arr[0]
-    if e_source_0 < _ENERGY_FLOOR:
+    if abs(e_source_0) < _ENERGY_FLOOR:
         msg = (
             f"Source field '{source_field}' has zero initial energy — "
             f"cannot compute conversion probability"
         )
         raise ValueError(msg)
 
-    probability = target_arr / e_source_0
+    probability = target_arr / abs(e_source_0)
     e_total_0 = total_arr[0]
     relative_error = (
-        (total_arr - e_total_0) / e_total_0
-        if e_total_0 >= _ENERGY_FLOOR
+        (total_arr - e_total_0) / abs(e_total_0)
+        if abs(e_total_0) >= _ENERGY_FLOOR
         else np.zeros_like(total_arr)
     )
 
@@ -295,18 +295,18 @@ def compute_group_conversion(  # noqa: C901, PLR0914
     total_arr = source_arr + target_arr
 
     e_source_0 = float(source_arr[0])
-    if e_source_0 < _ENERGY_FLOOR:
+    if abs(e_source_0) < _ENERGY_FLOOR:
         msg = (
             f"Source group {src} has zero initial energy — "
             f"cannot compute conversion probability"
         )
         raise ValueError(msg)
 
-    probability = target_arr / e_source_0
+    probability = target_arr / abs(e_source_0)
     e_total_0 = float(total_arr[0])
     relative_error: NDArray[np.float64] = (
-        (total_arr - e_total_0) / e_total_0
-        if e_total_0 >= _ENERGY_FLOOR
+        (total_arr - e_total_0) / abs(e_total_0)
+        if abs(e_total_0) >= _ENERGY_FLOOR
         else np.zeros_like(total_arr)
     )
 
