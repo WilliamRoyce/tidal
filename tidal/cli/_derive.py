@@ -191,6 +191,7 @@ def _substitute_field_names(
     *,
     derived_fields: list[dict[str, Any]] | None = None,
     background_fields: list[dict[str, Any]] | None = None,
+    linearization: dict[str, Any] | None = None,
 ) -> str:
     """Replace user field names with prefixed xAct names in the Lagrangian."""
     result = expression
@@ -212,6 +213,21 @@ def _substitute_field_names(
     # e.g., CD[{0, -chart}][ux[]] → {prefix}CD[{0, -{prefix}Cart}][...]
     result = result.replace("-chart}", f"-{prefix}Cart}}")
 
+    # Build collision-aware perturbation head map: when a matter perturbation
+    # field name and its parent field name have the same capitalization
+    # (e.g., "a" and "A" both capitalize to "A"), use the uncapitalized
+    # perturbation name to match the DefTensor symbol in Wolfram
+    # (e.g., "gewa" not "gewA").
+    pert_head_override: dict[str, str] = {}
+    if linearization:
+        for mp in linearization.get("matter_perturbations", []):
+            mf_name = mp["field"]
+            mp_name = mp["perturbation_name"]
+            mf_head = f"{prefix}{mf_name.capitalize()}"
+            mp_head_candidate = f"{prefix}{mp_name.capitalize()}"
+            if mp_head_candidate == mf_head:
+                pert_head_override[mp_name] = f"{prefix}{mp_name}"
+
     # Merge fundamental, derived, and background fields for substitution
     all_fields = list(fields)
     if derived_fields:
@@ -224,7 +240,7 @@ def _substitute_field_names(
 
     for field in sorted_fields:
         name = field["name"]
-        prefixed_name = f"{prefix}{name.capitalize()}"
+        prefixed_name = pert_head_override.get(name, f"{prefix}{name.capitalize()}")
         # Replace field name references using word-boundary-aware regex.
         # Field names appear after non-alphanumeric chars or at start of string.
         # Must match "name[" or "name " but NOT "eta[" matching "a[" inside it.
@@ -900,9 +916,72 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
         ctx.prefix,
         derived_fields=ctx.derived_fields,
         background_fields=ctx.background_fields,
+        linearization=ctx.linearization,
     )
+
+    # Detect perturbation-level terms in the Lagrangian.
+    # Terms that directly reference perturbation field symbols (e.g. gewa)
+    # cannot be processed by xPert's Perturbation[] operator because they
+    # are ALREADY at the perturbation level.  We split them out, define the
+    # tensor early, and defer injection into L^(2) after xPert expansion.
+    # This is analogous to how gauge-fixing terms are added.
+    pert_heads_in_lag: list[tuple[str, str, dict[str, Any]]] = []
+    if ctx.linearization:
+        p = ctx.prefix
+        for mp in ctx.linearization.get("matter_perturbations", []):
+            mf_name = mp["field"]
+            mp_name = mp["perturbation_name"]
+            mf_head = f"{p}{mf_name.capitalize()}"
+            mp_candidate = f"{p}{mp_name.capitalize()}"
+            mp_head = f"{p}{mp_name}" if mp_candidate == mf_head else mp_candidate
+            if f"{mp_head}[" in prefixed:
+                mp_field = next((f for f in ctx.fields if f["name"] == mp_name), None)
+                if mp_field is not None:
+                    pert_heads_in_lag.append((mp_name, mp_head, mp_field))
+
+    early_defs: list[str] = []
+    split_lines: list[str] = []
+    if pert_heads_in_lag:
+        # Emit early DefTensor so xAct recognizes the symbol
+        for mp_name, mp_head, mp_field in pert_heads_in_lag:
+            early_defs.extend(
+                (
+                    f"(* Early DefTensor for perturbation field {mp_name} used in Lagrangian *)",
+                    _generate_field_def(
+                        mp_field, ctx.prefix, ctx.manifold, head_override=mp_head
+                    ),
+                    "",
+                )
+            )
+
+        # After the Lagrangian is set, extract perturbation-level terms
+        # into a separate variable and remove them from the main Lagrangian.
+        # xPert will process only the nonlinear terms; the perturbation-level
+        # terms are added back to L^(2) after expansion.
+        pert_head_names = [h for _, h, _ in pert_heads_in_lag]
+        " && ".join(f"FreeQ[#, {h}]" for h in pert_head_names)
+        not_free_q_checks = " || ".join(f"!FreeQ[#, {h}]" for h in pert_head_names)
+        p = ctx.prefix
+        split_lines.extend(
+            [
+                "(* Split: extract perturbation-level terms from the Lagrangian. *)",
+                "(* These terms directly reference perturbation fields and cannot *)",
+                "(* be processed by xPert — they are already at the perturbation *)",
+                "(* level. They will be added to L^(2) after xPert expansion.    *)",
+                f"{p}PertLagTerms = If[Head[{p}Lagrangian] === Plus,",
+                f"  Select[{p}Lagrangian, ({not_free_q_checks}) &],",
+                f"  If[{not_free_q_checks.replace('#', f'{p}Lagrangian')},",
+                f"    {p}Lagrangian, 0]",
+                "];",
+                f"{p}Lagrangian = {p}Lagrangian - {p}PertLagTerms;",
+                f'Print["Deferred perturbation-level terms: ", {p}PertLagTerms];',
+                "",
+            ]
+        )
+
     lines = [
         "(* Step 3: Lagrangian *)",
+        *early_defs,
         f"{ctx.prefix}Lagrangian = (",
         f"  {prefixed}",
         ");",
@@ -941,6 +1020,10 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
                 "",
             )
         )
+
+    # After the Lagrangian is fully formed and canonicalized, split out
+    # perturbation-level terms (if any) so xPert doesn't see them.
+    lines.extend(split_lines)
 
     return lines
 
@@ -2447,6 +2530,25 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         lines.extend(_wls_gauge_fixing_type_a(ctx))
 
     # ------------------------------------------------------------------
+    # Step 1c: Inject deferred perturbation-level terms into L^(2)
+    # Terms written directly on perturbation fields (e.g. -mA2/2 a·a
+    # for a photon mass) were extracted from the Lagrangian before xPert.
+    # They are already quadratic in perturbation fields, so we add them
+    # to L^(2) directly — same pattern as gauge-fixing terms above.
+    # ------------------------------------------------------------------
+    lines.extend(
+        [
+            f"If[ValueQ[{p}PertLagTerms] && {p}PertLagTerms =!= 0,",
+            f'  Print["Injecting deferred perturbation-level terms into L^(2): ", {p}PertLagTerms];',
+            f"  {p}Lagrangian = {p}Lagrangian + {p}PertLagTerms;",
+            f"  {p}Lagrangian = ToCanonical[{p}Lagrangian];",
+            f"  {p}Lagrangian = ContractMetric[{p}Lagrangian, {ctx.metric}];",
+            "];",
+            "",
+        ]
+    )
+
+    # ------------------------------------------------------------------
     # Step 2: EOM via VarD for each dynamical field
     # ------------------------------------------------------------------
     lines.extend(
@@ -3761,6 +3863,7 @@ def _wls_constraint_elimination(
         "  ],",
         "  {k, Length[fieldEquations]}",
         "];",
+        'If[Length[gradZeroFields] > 0, Print["  Gradient-zero fields: ", gradZeroFields]];',
         "",
         "(* Phase 2: Degenerate algebraic constraints *)",
         "(* When selfCoeff ~ 1.0, the equation's own field cancels from    *)",
@@ -3819,13 +3922,19 @@ def _wls_constraint_elimination(
         "",
         "    (* Extract coefficient of identity(self) *)",
         "    selfCoeff = Coefficient[eq, ownHead[Sequence @@ coordSyms]];",
-        "    If[Abs[N[selfCoeff] - 1.0] > 10^-12, Continue[]];",
+        "    (* Guard: selfCoeff must be numeric AND ≈ 1.  Without NumericQ,   *)",
+        "    (* symbolic coefficients (e.g. B0^2/2) produce unevaluated        *)",
+        "    (* Abs[...] > 10^-12 which If treats as non-True, incorrectly     *)",
+        "    (* passing the check.  This caused wrong constraint elimination   *)",
+        "    (* for h_5 in torsion models.                                     *)",
+        "    If[!NumericQ[N[selfCoeff]] || Abs[N[selfCoeff] - 1.0] > 10^-12, Continue[]];",
         "",
         "    (* Self cancels.  Residual constraint: 0 = otherExpr *)",
         "    otherExpr = eq - selfCoeff * ownHead[Sequence @@ coordSyms];",
         "    If[otherExpr === 0, Continue[]];  (* trivial identity *)",
         "",
         "    AppendTo[degenerateEqFields, name];",
+        '    Print["  Degenerate algebraic: ", name, " (selfCoeff=", selfCoeff, ")"];',
         "",
         "    (* Find field heads in the residual constraint *)",
         "    otherHeads = Select[fieldFuncList,",
@@ -3854,7 +3963,7 @@ def _wls_constraint_elimination(
         "        -Abs[N[coeffOf[#]]] &]];",
         "      depCoeff = coeffOf[depHead]",
         "    ];",
-        "    If[Abs[N[depCoeff]] < 10^-12, Continue[]];",
+        "    If[!NumericQ[N[depCoeff]] || Abs[N[depCoeff]] < 10^-12, Continue[]];",
         "",
         "    (* Find the component name for depHead *)",
         "    depName = First[Select[Keys[compToFunc],",
@@ -3869,7 +3978,8 @@ def _wls_constraint_elimination(
         '        " already targeted by another constraint. Skipping."];',
         "      Continue[]",
         "    ];",
-        "    algebraicDepFields[depName] = -remainExpr / depCoeff",
+        "    algebraicDepFields[depName] = -remainExpr / depCoeff;",
+        '    Print["    -> depField: ", depName, " (depCoeff=", depCoeff, ")"]',
         "  ],",
         "  {k, Length[fieldEquations]}",
         "];",
