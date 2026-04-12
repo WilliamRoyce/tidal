@@ -2454,6 +2454,68 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         for f in _deferred_derived_fields(ctx)
     )
 
+    # --- Full-expand copy for canonical pipeline (issue #250) ---
+    # When derived fields (F) are deferred, ToCanonical on abstract F·F
+    # produces a canonical form where graviton kinetic terms are trace-only.
+    # The expanded form (dA)² allows ToCanonical to produce the full
+    # non-trace structure (∂h_{ij}∂h^{ij}) needed for off-diagonal
+    # graviton components like h_5 = h_{xy}.
+    # Save a copy of l2Raw with F expanded + canonicalized BEFORE the main
+    # ToCanonical (which processes the deferred form).
+    deferred = _deferred_derived_fields(ctx)
+    if deferred and matter_pert_info:
+        lines.extend(
+            (
+                "(* === Full-expand L^(2) copy for canonical pipeline (#250) ===    *)",
+                "Module[{l2Copy = l2Raw, fRules},",
+            )
+        )
+        # Apply the same deferred expansion as _wls_deferred_field_expand
+        # but BEFORE ToCanonical.
+        for field in deferred:
+            fname = field["name"]
+            rule_var = f"{p}{fname.capitalize()}Rules"
+            f_head = f"{p}{fname.capitalize()}"
+            for mpi in matter_pert_info:
+                if mpi["pert_name"] in [
+                    mp["perturbation_name"]
+                    for mp in ctx.linearization.get("matter_perturbations", [])
+                    if mp["field"] in field.get("definition", "")
+                ]:
+                    pert_head = mpi["pert_head"]
+                    bg_head = ""
+                    for mp in ctx.linearization.get("matter_perturbations", []):
+                        if mp["field"] in field.get("definition", ""):
+                            bg_name = mp.get("background", "")
+                            if bg_name:
+                                bg_head = f"{p}{bg_name.capitalize()}"
+                    lines.extend(
+                        (
+                            f"  fRules = {rule_var} /. {mpi['field_head']} -> {pert_head};",
+                            "  l2Copy = l2Copy /. fRules;",
+                        )
+                    )
+                    if bg_head:
+                        lines.extend(
+                            (
+                                f"  fRules = {rule_var} /. {mpi['field_head']} -> {bg_head};",
+                                f"  l2Copy = l2Copy /. {f_head}[_[0], args__] :> ({f_head}[args] /. fRules);",
+                            )
+                        )
+                    break
+        lines.extend(
+            [
+                f"  l2Copy = ContractMetric[ToCanonical[l2Copy], {ctx.metric}];",
+                f"  {p}LagrangianFullExpand = l2Copy / 2;",
+                f'  Print["L^(2) full-expand for canonical: ",'
+                f" If[Head[{p}LagrangianFullExpand]===Plus,"
+                f" Length[{p}LagrangianFullExpand], 1],"
+                f' " terms"];',
+                "];",
+                "",
+            ]
+        )
+
     lines.extend(
         [
             "",
@@ -2560,6 +2622,12 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             f"  {p}Lagrangian = {p}Lagrangian + {p}PertLagTerms;",
             f"  {p}Lagrangian = ToCanonical[{p}Lagrangian];",
             f"  {p}Lagrangian = ContractMetric[{p}Lagrangian, {ctx.metric}];",
+            # Also inject into the full-expand copy used by canonical pipeline (#250)
+            f"  If[ValueQ[{p}LagrangianFullExpand],",
+            f"    {p}LagrangianFullExpand = {p}LagrangianFullExpand + {p}PertLagTerms;",
+            f"    {p}LagrangianFullExpand = ToCanonical[{p}LagrangianFullExpand];",
+            f"    {p}LagrangianFullExpand = ContractMetric[{p}LagrangianFullExpand, {ctx.metric}];",
+            "  ];",
             "];",
             "",
         ]
@@ -2846,6 +2914,13 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
                 f"{ctx.prefix}Lagrangian = ContractMetric[{ctx.prefix}Lagrangian, {ctx.metric}];",
                 f'Print["Gauge-fixed Lagrangian '
                 f'({entry["type"]} on {field_name}): ", {ctx.prefix}Lagrangian];',
+                # Also apply gauge term to the full-expand copy used by canonical pipeline (#250)
+                f"If[ValueQ[{ctx.prefix}LagrangianFullExpand],",
+                f"  {ctx.prefix}LagrangianFullExpand = AddGaugeFixingTerm["
+                f"{ctx.prefix}LagrangianFullExpand, {ctx.prefix}GaugeTerm];",
+                f"  {ctx.prefix}LagrangianFullExpand = ToCanonical[{ctx.prefix}LagrangianFullExpand];",
+                f"  {ctx.prefix}LagrangianFullExpand = ContractMetric[{ctx.prefix}LagrangianFullExpand, {ctx.metric}];",
+                "];",
                 "",
             )
         )
@@ -4214,11 +4289,24 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         'Print[""];',
         'Print["Computing canonical momenta and Hamiltonian..."];',
         "",
-        "(* Copy Lagrangian for canonical analysis *)",
-        f"lagForCanon = {p}Lagrangian;",
+        "(* Copy Lagrangian for canonical analysis.                              *)",
+        "(* Use the fully-expanded copy (all derived fields expanded before      *)",
+        "(* ToCanonical) if available — this gives the component decomposition   *)",
+        "(* the full non-trace graviton kinetic structure needed for h_5.        *)",
+        "(* Ref: issue #250.                                                     *)",
+        f"lagForCanon = If[ValueQ[{p}LagrangianFullExpand],",
+        f"  {p}LagrangianFullExpand, {p}Lagrangian];",
         "",
     ]
 
+    # --- Re-expand deferred derived fields in lagForCanon ---
+    # Deferred fields (e.g. F kept abstract through xPert) were expanded in
+    # L^(2) AFTER ToCanonical.  The canonical form Tr(h)×∂²Tr(h) preserves
+    # the antisymmetric invariant f·f but loses non-trace graviton kinetic
+    # structure (∂h_{ij}∂h^{ij}) that the explicit (CD[A])² form provides.
+    # Re-expanding F rules in lagForCanon and re-canonicalizing restores the
+    # full kinetic structure needed for Component E-L to produce correct
+    # wave equations for off-diagonal graviton components (e.g. h_5 = h_{xy}).
     # --- Hamiltonian sector filtering for multi-field theories with torsion ---
     # For torsion theories, filter the Hamiltonian (NOT the EOM) to exclude
     # torsion self-energy and cross-coupling terms. This is a MEASUREMENT
