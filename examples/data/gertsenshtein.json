@@ -5,10 +5,6 @@
 		"derived_from": "Euler-Lagrange",
 		"gauge": "tt(h)+lorenz(a)",
 		"linearized": true,
-		"parameters": {
-			"kappa": 1.0,
-			"B0": 0.3
-		},
 		"reduction": {
 			"type": "plane_wave",
 			"original_dimension": 4,
@@ -19,7 +15,7 @@
 				"h_9"
 			]
 		},
-		"derivation_hash": "b9aa4264fb82556535dcbaeacc464de649504f540980d90eb1e3fcc11c54ee85"
+		"derivation_hash": "2407906c8a7791a9db6c3bb59bd3d1ed2e5fa80582521bbb1c1c0de8c13ce0e2"
 	},
 	"spacetime": {
 		"dimension": 2,
