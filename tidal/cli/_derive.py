@@ -2443,6 +2443,17 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # scalar invariants (f[-a,-b]*f[a,b]), preventing incorrect merging.
     lines.extend(_wls_deferred_field_li_sub(ctx, matter_perts, matter_pert_info))
 
+    # Check if torsion-deferred fields exist — if so, bypass ToCanonical entirely.
+    # When abstract torsion field strengths (e.g. Ftorsion) are present alongside
+    # matter field strengths (F), ToCanonical changes GR coupling coefficients
+    # by applying global tensor symmetries across heterogeneous sectors (#255).
+    # The component-level decomposition handles simplification correctly
+    # per-component without this cross-sector interference.
+    has_torsion_deferred = any(
+        ctx.torsion is not None and "TorsionCDT" in f.get("definition", "")
+        for f in _deferred_derived_fields(ctx)
+    )
+
     lines.extend(
         [
             "",
@@ -2452,6 +2463,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* entirely — downstream DecomposeScalarExpression handles non-canonical *)",
             "(* expressions correctly via ToBasis + TraceBasisDummy at component      *)",
             "(* level where per-component expressions are much smaller.               *)",
+            "(* Also bypass when torsion field strengths are deferred (#255):          *)",
+            "(* ToCanonical with mixed GR+torsion abstract tensors changes GR         *)",
+            "(* coupling coefficients.                                                *)",
             "(* Ref: issue #201 — non-minimal R̃[μν]F coupling: 5000+ terms, 467s.   *)",
             "Module[{l2Terms, nTerms, canonBatchSize, tFirstBatch,",
             "         firstBatchTime, canonResult, batchStart, batchEnd},",
@@ -2459,21 +2473,24 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "  nTerms = Length[l2Terms];",
             '  Print["Canonicalizing ", nTerms, " L^(2) terms..."];',
             "",
-            "  (* Measure first batch cost to decide: canonicalize or bypass *)",
-            "  canonBatchSize = Min[20, nTerms];",
-            "  tFirstBatch = AbsoluteTime[];",
-            f"  canonResult = ContractMetric[ToCanonical[Total[l2Terms[[1 ;; canonBatchSize]]]], {ctx.metric}];",
-            "  firstBatchTime = AbsoluteTime[] - tFirstBatch;",
-            '  Print["  first batch (", canonBatchSize, " terms): ", Round[firstBatchTime, 0.1], "s"];',
+            *(
+                [
+                    '  Print["  Bypassing ToCanonical: torsion field strengths present (#255)"];',
+                    '  Print["  Component-level decomposition will handle simplification"];',
+                ]
+                if has_torsion_deferred
+                else [
+                    "  (* Measure first batch cost to decide: canonicalize or bypass *)",
+                    "  canonBatchSize = Min[20, nTerms];",
+                    "  tFirstBatch = AbsoluteTime[];",
+                    f"  canonResult = ContractMetric[ToCanonical[Total[l2Terms[[1 ;; canonBatchSize]]]], {ctx.metric}];",
+                    "  firstBatchTime = AbsoluteTime[] - tFirstBatch;",
+                    '  Print["  first batch (", canonBatchSize, " terms): ", Round[firstBatchTime, 0.1], "s"];',
+                ]
+            ),
             "",
-            "  If[firstBatchTime >= 5.0,",
-            "    (* BYPASS: ToCanonical too expensive for this theory.                *)",
-            "    (* Component decomposition will handle simplification per-component. *)",
-            '    Print["ToCanonical too expensive (", Round[firstBatchTime, 0.1],',
-            '      "s for ", canonBatchSize, " terms) — bypassing"];',
-            '    Print["  Estimated full cost: ",',
-            '      Round[firstBatchTime * nTerms / canonBatchSize, 1], "s"];',
-            '    Print["  Component-level decomposition will handle simplification"];',
+            f"  If[{'True' if has_torsion_deferred else 'firstBatchTime >= 5.0'},",
+            "    (* BYPASS: component decomposition handles simplification per-component *)",
             "    l2Raw = Expand[l2Raw],",
             "",
             "    (* NORMAL: adaptive per-term canonicalization *)",
