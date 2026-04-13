@@ -43,6 +43,108 @@ Module & Purpose & Key Function \\
 \end{tabular}
 \end{table}
 
+\subsection{Canonicalization of Deferred Derived Fields}
+\label{subsec:canonicalization}
+
+Multi-field theories that use \emph{derived tensors} such as the Maxwell
+field strength $F_{\mu\nu} = \partial_\mu A_\nu - \partial_\nu A_\mu$ or
+the torsion field strength $F^{\text{tor}}_{\mu\nu\rho} = \partial T$
+require special handling in the linearization pipeline. TIDAL's approach
+is to keep these abstract through \texttt{xPert} (issue \#218) and only
+expand them once the perturbation expansion is complete. This
+\emph{deferred-field} pattern avoids a cancellation pathology that
+otherwise corrupts photon equations of motion when $F$ is expanded before
+\texttt{xPert} (a50b11f).
+
+The deferred fields must then be canonicalized before component
+decomposition. From v0.29.3 to v0.29.4 this step was guarded by three
+increasingly layered workarounds, all collapsed into a single uniform
+path in v0.30.0 (commit \texttt{4fef016}). The history is documented
+here because future maintainers working on the canonical pipeline need
+to understand why it looks the way it does.
+
+\paragraph{Historical pathology.} The pre-v0.30.0 pipeline applied
+\texttt{ContractMetric[ToCanonical[Total[batch]], metric]} per batch of
+$\sim 20$ terms from $L^{(2)}$, accumulating the results. This is
+semantically unsafe for any expression where tensor contractions span
+multiple \texttt{Plus}-terms:
+
+\begin{itemize}
+  \item \textbf{\#218 — photon EOM merge.} With $F$ still abstract,
+    \texttt{ToCanonical} merged antisymmetric Maxwell contractions across
+    batches and collapsed the four-component photon into a constraint.
+    Fixed in \texttt{a50b11f} by deferring $F$ upstream of \texttt{xPert}.
+  \item \textbf{\#250 — h\textunderscore 5 fragment.} The graviton
+    kinetic contraction $\partial h_{ij} \partial h^{ij}$ spans many
+    \texttt{Plus}-terms. Batched \texttt{ToCanonical} saw only trace-like
+    fragments in each batch and collapsed $h_5 = h_{xy}$
+    off-diagonal polarization into the constraint set. Fixed in
+    \texttt{9f496ef} by building a parallel \texttt{LagrangianFullExpand}
+    copy with $F$ pre-expanded and canonicalized in a single pass.
+  \item \textbf{\#255 — torsion cross-sector interference.} When abstract
+    $F^{\text{tor}}$ and $F$ both appeared, \texttt{ToCanonical}'s global
+    tensor symmetries halved non-trace $h_{ab}$ coefficients. Fixed in
+    \texttt{51a36fd} by bypassing \texttt{ToCanonical} entirely for
+    torsion-deferred theories.
+\end{itemize}
+
+\paragraph{Root cause.} All three symptoms share a single root: running
+\texttt{ToCanonical} on $L^{(2)}$ while abstract deferred tensors are
+still present. Per-term batching is structurally unsafe for any
+cross-term kinetic structure. The batching existed only as a performance
+optimization against the super-linear cost of \texttt{ToCanonical}; it
+traded correctness for throughput.
+
+\paragraph{v0.30.0 unified pipeline.} The fix has two steps:
+
+\begin{enumerate}
+  \item \textbf{Expand deferred fields before canonicalization.}
+    \texttt{\_wls\_deferred\_field\_expand} runs first, substituting
+    $F \to d(a)$, $F^{\text{tor}} \to d(t)$. All tensors are then
+    concrete derivative products with no abstract antisymmetric
+    structure.
+  \item \textbf{Single-pass canonicalization with cost-based fallback.}
+\begin{verbatim}
+Module[{nTerms, tStart, canonical},
+  nTerms = If[Head[l2Raw] === Plus, Length[l2Raw], 1];
+  tStart = AbsoluteTime[];
+  canonical = TimeConstrained[
+    ContractMetric[ToCanonical[l2Raw], metric],
+    15.0,
+    $Aborted
+  ];
+  If[canonical === $Aborted,
+    (* #201-class theories: fall back to Expand-only.  Downstream
+       DecomposeScalarExpression canonicalizes per-component. *)
+    l2Raw = Expand[l2Raw],
+    l2Raw = canonical;
+  ];
+];
+\end{verbatim}
+\end{enumerate}
+
+\paragraph{Why the Expand-only fallback is safe.} The downstream
+\texttt{ComponentDecompose} step runs \texttt{ToBasis} and
+\texttt{TraceBasisDummy} at per-component scalar level. Scalar
+expressions are much smaller than the full $L^{(2)}$ and
+\texttt{ToCanonical} there is cheap. The non-canonical \texttt{Expand}
+output is then canonicalized per-component before Hamiltonian extraction,
+preserving correctness. Issue \#201 (non-minimal $\tilde R_{\mu\nu} F^{\mu\nu}$
+coupling, 5000+ terms, 467s under the old code) uses this fallback in
+production and produces a correct Hamiltonian.
+
+\paragraph{Scope of the fix.} All three workarounds
+(\texttt{LagrangianFullExpand}, \texttt{has\_torsion\_deferred} bypass,
+\texttt{lagForCanon} conditional) and the batching loop itself were
+deleted in v0.30.0 — $\sim 175$ lines of code removed. The
+\texttt{a50b11f} F-deferral upstream of \texttt{xPert} remains in place
+as an orthogonal xPert-layer concern. Verification: all four tracked
+deferred-field JSONs (\texttt{gertsenshtein}, \texttt{torsion\_dark\_photon},
+\texttt{graviton\_torsion}, \texttt{torsion\_gertsenshtein\_propagating})
+re-derive with bitwise-identical coefficients to v0.29.4 — only
+\texttt{derivation\_hash} changes. See \texttt{CHANGELOG.md} entry
+\textbf{0.30.0} for the full trail.
+
 \subsection{JSON Specification}
 
 The JSON file is the contract between symbolic and numerical layers:
