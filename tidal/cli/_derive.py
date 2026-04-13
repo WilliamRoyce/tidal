@@ -875,6 +875,7 @@ def _wls_derived_fields(ctx: _WlsContext) -> list[str]:
             ctx.prefix,
             derived_fields=ctx.derived_fields,
             background_fields=ctx.background_fields,
+            linearization=ctx.linearization,
         )
         rule_var = f"{ctx.prefix}{field['name'].capitalize()}Rules"
         lines.extend(
@@ -934,7 +935,10 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
             mf_head = f"{p}{mf_name.capitalize()}"
             mp_candidate = f"{p}{mp_name.capitalize()}"
             mp_head = f"{p}{mp_name}" if mp_candidate == mf_head else mp_candidate
-            if f"{mp_head}[" in prefixed:
+            # Word-boundary regex avoids false positives when one prefixed
+            # head is a substring of another (e.g., gewa[ should NOT match
+            # inside gewab[). All field heads in xAct appear with brackets.
+            if re.search(rf"(?<![A-Za-z0-9]){re.escape(mp_head)}\[", prefixed):
                 mp_field = next((f for f in ctx.fields if f["name"] == mp_name), None)
                 if mp_field is not None:
                     pert_heads_in_lag.append((mp_name, mp_head, mp_field))
@@ -959,7 +963,6 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
         # xPert will process only the nonlinear terms; the perturbation-level
         # terms are added back to L^(2) after expansion.
         pert_head_names = [h for _, h, _ in pert_heads_in_lag]
-        " && ".join(f"FreeQ[#, {h}]" for h in pert_head_names)
         not_free_q_checks = " || ".join(f"!FreeQ[#, {h}]" for h in pert_head_names)
         p = ctx.prefix
         split_lines.extend(
@@ -2462,47 +2465,73 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # graviton components like h_5 = h_{xy}.
     # Save a copy of l2Raw with F expanded + canonicalized BEFORE the main
     # ToCanonical (which processes the deferred form).
+    #
+    # Restricted to NON-torsion theories: torsion theories use the
+    # ToCanonical bypass (51a36fd, #255) which preserves the full kinetic
+    # structure via the pre-canonical l2Raw form. Running ToCanonical on
+    # an expanded copy of l2Raw for torsion theories would produce a
+    # different canonical structure that doesn't match the bypass path.
+    # The two paths remain disjoint until a future theory needs both
+    # TT-gauged graviton (#250 fix) AND torsion (#255 bypass).
     deferred = _deferred_derived_fields(ctx)
-    if deferred and matter_pert_info:
+    has_torsion_deferred_for_full_expand = any(
+        ctx.torsion is not None and "TorsionCDT" in f.get("definition", "")
+        for f in deferred
+    )
+    if deferred and matter_pert_info and not has_torsion_deferred_for_full_expand:
         lines.extend(
             (
                 "(* === Full-expand L^(2) copy for canonical pipeline (#250) ===    *)",
+                "(* Substitute deferred derived fields (e.g. F = dA) with concrete *)",
+                "(* d(a)-d(a) form BEFORE ToCanonical, so the canonical pipeline   *)",
+                "(* sees the full non-trace graviton kinetic structure (h_5).      *)",
                 "Module[{l2Copy = l2Raw, fRules},",
             )
         )
-        # Apply the same deferred expansion as _wls_deferred_field_expand
-        # but BEFORE ToCanonical.
+
         for field in deferred:
             fname = field["name"]
             rule_var = f"{p}{fname.capitalize()}Rules"
             f_head = f"{p}{fname.capitalize()}"
-            for mpi in matter_pert_info:
-                if mpi["pert_name"] in [
-                    mp["perturbation_name"]
-                    for mp in ctx.linearization.get("matter_perturbations", [])
-                    if mp["field"] in field.get("definition", "")
-                ]:
-                    pert_head = mpi["pert_head"]
-                    bg_head = ""
-                    for mp in ctx.linearization.get("matter_perturbations", []):
-                        if mp["field"] in field.get("definition", ""):
-                            bg_name = mp.get("background", "")
-                            if bg_name:
-                                bg_head = f"{p}{bg_name.capitalize()}"
-                    lines.extend(
-                        (
-                            f"  fRules = {rule_var} /. {mpi['field_head']} -> {pert_head};",
-                            "  l2Copy = l2Copy /. fRules;",
-                        )
-                    )
-                    if bg_head:
-                        lines.extend(
-                            (
-                                f"  fRules = {rule_var} /. {mpi['field_head']} -> {bg_head};",
-                                f"  l2Copy = l2Copy /. {f_head}[_[0], args__] :> ({f_head}[args] /. fRules);",
-                            )
-                        )
+            definition = field.get("definition", "")
+
+            # Single-loop matching with break inside the conditional —
+            # mirrors _wls_deferred_field_expand convention. Processes the
+            # FIRST matching matter field (consistent with that function).
+            matched_mpi = None
+            matched_bg_head = ""
+            for mp, mpi in zip(matter_perts, matter_pert_info, strict=False):
+                if mp["field"] in definition:
+                    matched_mpi = mpi
+                    bg_name = mp.get("background", "")
+                    if bg_name:
+                        matched_bg_head = f"{p}{bg_name.capitalize()}"
                     break
+
+            if matched_mpi is None:
+                # No matter field match — could be a torsion-deferred field
+                # or other case. Skip silently (the restriction above ensures
+                # we only enter this branch for non-torsion theories).
+                continue
+
+            pert_head = matched_mpi["pert_head"]
+            field_head = matched_mpi["field_head"]
+            lines.extend(
+                (
+                    f"  (* Matter-deferred {fname}: substitute F → d({pert_head}) *)",
+                    f"  fRules = {rule_var} /. {field_head} -> {pert_head};",
+                    "  l2Copy = l2Copy /. fRules;",
+                )
+            )
+            if matched_bg_head:
+                lines.extend(
+                    (
+                        f"  (* Background substitution for {fname}[LI[0]] *)",
+                        f"  fRules = {rule_var} /. {field_head} -> {matched_bg_head};",
+                        f"  l2Copy = l2Copy /. {f_head}[_[0], args__] :> ({f_head}[args] /. fRules);",
+                    )
+                )
+
         lines.extend(
             [
                 f"  l2Copy = ContractMetric[ToCanonical[l2Copy], {ctx.metric}];",
@@ -2899,6 +2928,7 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
                 ctx.prefix,
                 derived_fields=ctx.derived_fields,
                 background_fields=ctx.background_fields,
+                linearization=ctx.linearization,
             )
             lines.append(f"{ctx.prefix}GaugeTerm = ({expr});")
         else:
@@ -3651,6 +3681,7 @@ def _wls_linearization(ctx: _WlsContext, *, include_bg: bool = False) -> list[st
         ctx.prefix,
         derived_fields=ctx.derived_fields,
         background_fields=ctx.background_fields,
+        linearization=ctx.linearization,
     )
 
     bg_name = f"{ctx.prefix}Bg"
