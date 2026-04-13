@@ -28,6 +28,88 @@ These references inform design decisions and should be cited where appropriate i
 | **Hwang & Noh (2024)** — "Graviton-photon conversions in Euler-Heisenberg nonlinear electrodynamics", [arXiv:2405.11786](https://arxiv.org/abs/2405.11786) | Nonlinear QED corrections to Gertsenshtein; chiral GW propagation |
 | **Graviton-photon oscillation in general modified gravity (2023)** — [arXiv:2302.08186](https://arxiv.org/abs/2302.08186) | Gertsenshtein in Horndeski, massive gravity, cosmic backgrounds |
 
+## Primary Classical References (pre-arXiv)
+
+These papers establish the foundational theory used by TIDAL's Gertsenshtein
+and plasma-Gertsenshtein examples. They predate arXiv and are not stored in
+`Literature/`; the key formulas are transcribed here with cross-references
+to the TIDAL files that implement them.
+
+### Gertsenshtein 1962 — original graviton-photon conversion
+
+**Citation:** M. E. Gertsenshtein, "Wave resonance of light and gravitational
+waves", Sov. Phys. JETP **14**, 84 (1962). Russian original: ZhETF **41**, 113.
+
+**Key result:** A gravitational wave propagating through a static magnetic
+field `B₀` coherently converts into an electromagnetic wave (and vice versa)
+with probability
+
+```
+P(D) = sin²(κ · B₀ · D / 2)     [κ = √(8πG), D = propagation distance]
+```
+
+**Implemented in:** [examples/gertsenshtein/theory.toml](examples/gertsenshtein/theory.toml)
+and validated by [sweep_B0.sh](examples/gertsenshtein/sweep_B0.sh) (RMS < 0.015
+vs analytical).
+
+**Canonical normalization:** The √(8πG) factor is often mis-stated in the
+literature (see Palessandro 2024 critique in arXiv:2405.01407). Dandoy et al.
+2024 ([Literature/2406.17853](Literature/2406.17853)) reproduces the correct
+normalization independently, which TIDAL uses.
+
+### Boccaletti et al. 1970 — localized B-field integral form
+
+**Citation:** D. Boccaletti, V. De Sabbata, P. Fortini, C. Gualdi, "Conversion
+of photons into gravitons and vice versa in a static electromagnetic field",
+Nuovo Cimento B **70**, 129 (1970).
+
+**Key result:** For a magnetic field profile `B(z)` localized in space, the
+massless-vacuum conversion probability generalizes from the uniform-field
+`sin²(κB₀D/2)` to
+
+```
+P = sin²((κ/2) · ∫ B(z) dz)     [integral over propagation path]
+```
+
+**Implemented in:** [docs/tex/gertsenshtein_localized.tex](docs/tex/gertsenshtein_localized.tex)
+and [examples/gertsenshtein/run_localized.sh](examples/gertsenshtein/run_localized.sh).
+Cross-reference: Domcke, Garcia-Cely & Lee 2025 ([Literature/2507.16609](Literature/2507.16609))
+extends the formula to full 3D scattering with Born approximation.
+
+### Raffelt & Stodolsky 1988 — two-state mixing & Lorentzian resonance
+
+**Citation:** G. Raffelt & L. Stodolsky, "Mixing of the photon with low-mass
+particles", Phys. Rev. D **37**, 1237 (1988).
+
+**Key result:** For a photon mixing with a second state carrying effective
+mass `mA²`, the coherent conversion probability has a Lorentzian resonance
+in the detuning `Δm² = mA² - m_g²_eff`:
+
+```
+P_max = (2·κ·B₀·k)² / [(2·κ·B₀·k)² + Δm²²]     [HWHM at Δm² = 2·κ·B₀·k]
+```
+
+where `m_g²_eff = κ²B₀²/2` is the graviton effective mass from background
+EM stress-energy. On resonance (`Δm² = 0`) the mixing is maximal; off by
+the HWHM `2·κ·B₀·k` the amplitude is suppressed by a factor of 2.
+
+**Implemented in:** [examples/gertsenshtein_proca/theory.toml](examples/gertsenshtein_proca/theory.toml)
+which adds a perturbation-level Proca mass `-(mA²/2) a·a` to Einstein-Maxwell.
+Validated end-to-end by [sweep_resonance_1d.sh](examples/gertsenshtein_proca/sweep_resonance_1d.sh)
+(observed HWHM = 0.405 vs theory 0.402 at B₀=0.10, commit `1526d77`) and
+[sweep_resonance.sh](examples/gertsenshtein_proca/sweep_resonance.sh) (2D
+resonance map, HWHM tracks theory within 9% across B₀ ∈ [0.09, 0.25]).
+
+**Why perturbation-level Proca, not full-field:** effective photon mass in
+plasma is a dispersion modification, not a Lorentz-invariant Lagrangian mass.
+Placing the mass on the full field `A_μ A^μ` contaminates the graviton EOM
+with spurious position-dependent `|Ā|²` terms (issue #142). By writing it on
+`a[LI[1]]` only, xPert correctly injects the mass into the O(ε²) Lagrangian
+without polluting the background. This is equivalent to Domcke, Garcia-Cely
+& Lee 2025's EOM-level treatment `[☐ - μ²]A_h = -j_eff` via variational
+calculus, and uses the curved-spacetime Maxwell conventions of Hwang & Noh
+2023 ([Literature/2310.04150](Literature/2310.04150)).
+
 ## Torsion in Gauge Gravity
 
 | Reference | Relevance |
