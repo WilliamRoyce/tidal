@@ -2446,169 +2446,46 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # scalar invariants (f[-a,-b]*f[a,b]), preventing incorrect merging.
     lines.extend(_wls_deferred_field_li_sub(ctx, matter_perts, matter_pert_info))
 
-    # Check if torsion-deferred fields exist — if so, bypass ToCanonical entirely.
-    # When abstract torsion field strengths (e.g. Ftorsion) are present alongside
-    # matter field strengths (F), ToCanonical changes GR coupling coefficients
-    # by applying global tensor symmetries across heterogeneous sectors (#255).
-    # The component-level decomposition handles simplification correctly
-    # per-component without this cross-sector interference.
-    has_torsion_deferred = any(
-        ctx.torsion is not None and "TorsionCDT" in f.get("definition", "")
-        for f in _deferred_derived_fields(ctx)
-    )
-
-    # --- Full-expand copy for canonical pipeline (issue #250) ---
-    # When derived fields (F) are deferred, ToCanonical on abstract F·F
-    # produces a canonical form where graviton kinetic terms are trace-only.
-    # The expanded form (dA)² allows ToCanonical to produce the full
-    # non-trace structure (∂h_{ij}∂h^{ij}) needed for off-diagonal
-    # graviton components like h_5 = h_{xy}.
-    # Save a copy of l2Raw with F expanded + canonicalized BEFORE the main
-    # ToCanonical (which processes the deferred form).
-    #
-    # Restricted to NON-torsion theories: torsion theories use the
-    # ToCanonical bypass (51a36fd, #255) which preserves the full kinetic
-    # structure via the pre-canonical l2Raw form. Running ToCanonical on
-    # an expanded copy of l2Raw for torsion theories would produce a
-    # different canonical structure that doesn't match the bypass path.
-    # The two paths remain disjoint until a future theory needs both
-    # TT-gauged graviton (#250 fix) AND torsion (#255 bypass).
-    deferred = _deferred_derived_fields(ctx)
-    has_torsion_deferred_for_full_expand = any(
-        ctx.torsion is not None and "TorsionCDT" in f.get("definition", "")
-        for f in deferred
-    )
-    if deferred and matter_pert_info and not has_torsion_deferred_for_full_expand:
-        lines.extend(
-            (
-                "(* === Full-expand L^(2) copy for canonical pipeline (#250) ===    *)",
-                "(* Substitute deferred derived fields (e.g. F = dA) with concrete *)",
-                "(* d(a)-d(a) form BEFORE ToCanonical, so the canonical pipeline   *)",
-                "(* sees the full non-trace graviton kinetic structure (h_5).      *)",
-                "Module[{l2Copy = l2Raw, fRules},",
-            )
-        )
-
-        for field in deferred:
-            fname = field["name"]
-            rule_var = f"{p}{fname.capitalize()}Rules"
-            f_head = f"{p}{fname.capitalize()}"
-            definition = field.get("definition", "")
-
-            # Single-loop matching with break inside the conditional —
-            # mirrors _wls_deferred_field_expand convention. Processes the
-            # FIRST matching matter field (consistent with that function).
-            matched_mpi = None
-            matched_bg_head = ""
-            for mp, mpi in zip(matter_perts, matter_pert_info, strict=False):
-                if mp["field"] in definition:
-                    matched_mpi = mpi
-                    bg_name = mp.get("background", "")
-                    if bg_name:
-                        matched_bg_head = f"{p}{bg_name.capitalize()}"
-                    break
-
-            if matched_mpi is None:
-                # No matter field match — could be a torsion-deferred field
-                # or other case. Skip silently (the restriction above ensures
-                # we only enter this branch for non-torsion theories).
-                continue
-
-            pert_head = matched_mpi["pert_head"]
-            field_head = matched_mpi["field_head"]
-            lines.extend(
-                (
-                    f"  (* Matter-deferred {fname}: substitute F → d({pert_head}) *)",
-                    f"  fRules = {rule_var} /. {field_head} -> {pert_head};",
-                    "  l2Copy = l2Copy /. fRules;",
-                )
-            )
-            if matched_bg_head:
-                lines.extend(
-                    (
-                        f"  (* Background substitution for {fname}[LI[0]] *)",
-                        f"  fRules = {rule_var} /. {field_head} -> {matched_bg_head};",
-                        f"  l2Copy = l2Copy /. {f_head}[_[0], args__] :> ({f_head}[args] /. fRules);",
-                    )
-                )
-
-        lines.extend(
-            [
-                f"  l2Copy = ContractMetric[ToCanonical[l2Copy], {ctx.metric}];",
-                f"  {p}LagrangianFullExpand = l2Copy / 2;",
-                f'  Print["L^(2) full-expand for canonical: ",'
-                f" If[Head[{p}LagrangianFullExpand]===Plus,"
-                f" Length[{p}LagrangianFullExpand], 1],"
-                f' " terms"];',
-                "];",
-                "",
-            ]
-        )
+    # Expand deferred derived fields (F → d(a), Ftorsion → d(t)) BEFORE
+    # canonicalization. Working on concrete derivative products (not abstract
+    # antisymmetric tensors) avoids two pathologies of the prior pipeline:
+    #   #218 — abstract F·F merged across antisymmetric contractions
+    #   #255 — abstract Ftorsion + F triggered global cross-sector symmetries
+    # The a50b11f F-deferral (kept upstream of xPert) remains necessary to
+    # avoid pre-xPert cancellation; that is an xPert-layer concern.
+    lines.extend(_wls_deferred_field_expand(ctx, matter_perts, matter_pert_info))
 
     lines.extend(
         [
             "",
-            "(* === Adaptive canonicalization with cost-based bypass ===               *)",
+            "(* === Single-pass canonicalization with cost-based bypass ===           *)",
             "(* ToCanonical + ContractMetric scale super-linearly with expression     *)",
-            "(* size. Measure first-batch cost; if >= 5s, SKIP canonicalization       *)",
-            "(* entirely — downstream DecomposeScalarExpression handles non-canonical *)",
-            "(* expressions correctly via ToBasis + TraceBasisDummy at component      *)",
-            "(* level where per-component expressions are much smaller.               *)",
-            "(* Also bypass when torsion field strengths are deferred (#255):          *)",
-            "(* ToCanonical with mixed GR+torsion abstract tensors changes GR         *)",
-            "(* coupling coefficients.                                                *)",
-            "(* Ref: issue #201 — non-minimal R̃[μν]F coupling: 5000+ terms, 467s.   *)",
-            "Module[{l2Terms, nTerms, canonBatchSize, tFirstBatch,",
-            "         firstBatchTime, canonResult, batchStart, batchEnd},",
-            "  l2Terms = If[Head[l2Raw] === Plus, List @@ l2Raw, {l2Raw}];",
-            "  nTerms = Length[l2Terms];",
-            '  Print["Canonicalizing ", nTerms, " L^(2) terms..."];',
-            "",
-            *(
-                [
-                    '  Print["  Bypassing ToCanonical: torsion field strengths present (#255)"];',
-                    '  Print["  Component-level decomposition will handle simplification"];',
-                ]
-                if has_torsion_deferred
-                else [
-                    "  (* Measure first batch cost to decide: canonicalize or bypass *)",
-                    "  canonBatchSize = Min[20, nTerms];",
-                    "  tFirstBatch = AbsoluteTime[];",
-                    f"  canonResult = ContractMetric[ToCanonical[Total[l2Terms[[1 ;; canonBatchSize]]]], {ctx.metric}];",
-                    "  firstBatchTime = AbsoluteTime[] - tFirstBatch;",
-                    '  Print["  first batch (", canonBatchSize, " terms): ", Round[firstBatchTime, 0.1], "s"];',
-                ]
-            ),
-            "",
-            f"  If[{'True' if has_torsion_deferred else 'firstBatchTime >= 5.0'},",
-            "    (* BYPASS: component decomposition handles simplification per-component *)",
-            "    l2Raw = Expand[l2Raw],",
-            "",
-            "    (* NORMAL: adaptive per-term canonicalization *)",
-            "    If[firstBatchTime > 2.0 && canonBatchSize > 5,",
-            "      canonBatchSize = Max[5, Floor[canonBatchSize * 2.0 / firstBatchTime]]",
-            "    ];",
-            "    If[firstBatchTime < 0.5 && canonBatchSize < nTerms,",
-            "      canonBatchSize = Min[100, Floor[canonBatchSize * 2.0 / Max[firstBatchTime, 0.01]]]",
-            "    ];",
-            '    Print["  adaptive batch size: ", canonBatchSize];',
-            "    batchStart = canonBatchSize + 1;",
-            "    While[batchStart <= nTerms,",
-            "      batchEnd = Min[batchStart + canonBatchSize - 1, nTerms];",
-            f"      canonResult += ContractMetric[ToCanonical[Total[l2Terms[[batchStart ;; batchEnd]]]], {ctx.metric}];",
-            "      batchStart = batchEnd + 1;",
-            "    ];",
-            "    l2Raw = canonResult;",
+            "(* size. We canonicalize l2Raw in a single pass (no per-term batching,   *)",
+            "(* which previously fragmented cross-term graviton kinetic structure —   *)",
+            "(* see issue #250). For very large theories where single-pass exceeds    *)",
+            "(* 15s (e.g. issue #201 non-minimal R̃[μν]F: 5000+ terms), fall back to   *)",
+            "(* Expand-only: downstream DecomposeScalarExpression then canonicalizes  *)",
+            "(* per-component via ToBasis + TraceBasisDummy at much smaller scale.    *)",
+            "Module[{nTerms, tStart, canonical},",
+            "  nTerms = If[Head[l2Raw] === Plus, Length[l2Raw], 1];",
+            '  Print["Canonicalizing ", nTerms, " L^(2) terms (single-pass)..."];',
+            "  tStart = AbsoluteTime[];",
+            "  canonical = TimeConstrained[",
+            f"    ContractMetric[ToCanonical[l2Raw], {ctx.metric}],",
+            "    15.0,",
+            "    $Aborted",
             "  ];",
-            "  Clear[l2Terms, canonResult];",
+            "  If[canonical === $Aborted,",
+            '    Print["  ToCanonical exceeded 15s budget — bypassing to Expand"];',
+            '    Print["  Component-level decomposition will canonicalize per-component"];',
+            "    l2Raw = Expand[l2Raw],",
+            "    l2Raw = canonical;",
+            '    Print["  canonicalization: ", Round[AbsoluteTime[] - tStart, 0.1], "s"];',
+            "  ];",
             "];",
             "",
         ]
     )
-
-    # Deferred derived-field expansion: after ToCanonical has simplified the
-    # abstract f[-a,-b]*f[a,b] invariants correctly, expand F → d(a) - d(a).
-    lines.extend(_wls_deferred_field_expand(ctx, matter_perts, matter_pert_info))
 
     lines.extend(
         [
@@ -2651,12 +2528,6 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             f"  {p}Lagrangian = {p}Lagrangian + {p}PertLagTerms;",
             f"  {p}Lagrangian = ToCanonical[{p}Lagrangian];",
             f"  {p}Lagrangian = ContractMetric[{p}Lagrangian, {ctx.metric}];",
-            # Also inject into the full-expand copy used by canonical pipeline (#250)
-            f"  If[ValueQ[{p}LagrangianFullExpand],",
-            f"    {p}LagrangianFullExpand = {p}LagrangianFullExpand + {p}PertLagTerms;",
-            f"    {p}LagrangianFullExpand = ToCanonical[{p}LagrangianFullExpand];",
-            f"    {p}LagrangianFullExpand = ContractMetric[{p}LagrangianFullExpand, {ctx.metric}];",
-            "  ];",
             "];",
             "",
         ]
@@ -2944,13 +2815,6 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
                 f"{ctx.prefix}Lagrangian = ContractMetric[{ctx.prefix}Lagrangian, {ctx.metric}];",
                 f'Print["Gauge-fixed Lagrangian '
                 f'({entry["type"]} on {field_name}): ", {ctx.prefix}Lagrangian];',
-                # Also apply gauge term to the full-expand copy used by canonical pipeline (#250)
-                f"If[ValueQ[{ctx.prefix}LagrangianFullExpand],",
-                f"  {ctx.prefix}LagrangianFullExpand = AddGaugeFixingTerm["
-                f"{ctx.prefix}LagrangianFullExpand, {ctx.prefix}GaugeTerm];",
-                f"  {ctx.prefix}LagrangianFullExpand = ToCanonical[{ctx.prefix}LagrangianFullExpand];",
-                f"  {ctx.prefix}LagrangianFullExpand = ContractMetric[{ctx.prefix}LagrangianFullExpand, {ctx.metric}];",
-                "];",
                 "",
             )
         )
@@ -4321,23 +4185,10 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         'Print["Computing canonical momenta and Hamiltonian..."];',
         "",
         "(* Copy Lagrangian for canonical analysis.                              *)",
-        "(* Use the fully-expanded copy (all derived fields expanded before      *)",
-        "(* ToCanonical) if available — this gives the component decomposition   *)",
-        "(* the full non-trace graviton kinetic structure needed for h_5.        *)",
-        "(* Ref: issue #250.                                                     *)",
-        f"lagForCanon = If[ValueQ[{p}LagrangianFullExpand],",
-        f"  {p}LagrangianFullExpand, {p}Lagrangian];",
+        f"lagForCanon = {p}Lagrangian;",
         "",
     ]
 
-    # --- Re-expand deferred derived fields in lagForCanon ---
-    # Deferred fields (e.g. F kept abstract through xPert) were expanded in
-    # L^(2) AFTER ToCanonical.  The canonical form Tr(h)×∂²Tr(h) preserves
-    # the antisymmetric invariant f·f but loses non-trace graviton kinetic
-    # structure (∂h_{ij}∂h^{ij}) that the explicit (CD[A])² form provides.
-    # Re-expanding F rules in lagForCanon and re-canonicalizing restores the
-    # full kinetic structure needed for Component E-L to produce correct
-    # wave equations for off-diagonal graviton components (e.g. h_5 = h_{xy}).
     # --- Hamiltonian sector filtering for multi-field theories with torsion ---
     # For torsion theories, filter the Hamiltonian (NOT the EOM) to exclude
     # torsion self-energy and cross-coupling terms. This is a MEASUREMENT
