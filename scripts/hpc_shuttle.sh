@@ -186,9 +186,32 @@ cmd_htop() {
 
 cmd_pull() {
   check_master
-  local jobid="${1:?jobid required}"
-  local all="${2:-}"
-  local src="${REMOTE_ROOT}/results/${jobid}/"
+  local jobid="" all="" src=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --all)  all="--all"; shift ;;
+      --src)  src="$2"; shift 2 ;;
+      *)      jobid="$1"; shift ;;
+    esac
+  done
+  [[ -n "$jobid" ]] || die "jobid required"
+
+  if [[ -z "$src" ]]; then
+    # Parse the --output PATH recorded for this jobid in .hpc_jobs.
+    # Records are space-separated: <iso-date> <jobid> <name> <template> <full-cmd>
+    # The full-cmd contains "--output <path>" which we extract.
+    if [[ -f "$JOBS_FILE" ]]; then
+      local line
+      line="$(awk -v j="$jobid" '$2==j' "$JOBS_FILE" | tail -1)"
+      if [[ -n "$line" ]]; then
+        src="$(sed -n 's/.*--output \([^ ]*\).*/\1/p' <<<"$line")"
+      fi
+    fi
+    [[ -n "$src" ]] || die "could not resolve remote output path for job $jobid; pass --src PATH explicitly"
+    note "resolved remote src: $src"
+  fi
+  src="${src%/}/"  # ensure trailing slash for rsync
+
   local dst="${REPO_ROOT}/hpc_results/${jobid}/"
   mkdir -p "$dst"
   if [[ "$all" == "--all" ]]; then
@@ -233,7 +256,9 @@ Subcommands:
   status [jobid]                    one-shot squeue
   tail <jobid> [--follow|-f]        tail remote slurm log
   htop <jobid>                      attach htop on the compute node
-  pull <jobid> [--all]              rsync lightweight artefacts back (--all for raw data)
+  pull <jobid> [--all] [--src PATH] rsync lightweight artefacts back (--all for raw data).
+                                    Source path auto-parsed from --output in .hpc_jobs;
+                                    override with --src for ad-hoc jobs.
   cancel <jobid>                    scancel
   shell                             interactive ssh into remote tidal dir
 
