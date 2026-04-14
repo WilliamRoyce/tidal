@@ -49,12 +49,23 @@ GRID=256
 BOUNDS="0:100"
 T_END=50.0
 
-# Generate arctan-mapped sweep values for each parameter
-# θ ∈ (-π/2+0.05, π/2-0.05) → x = tan(θ) ∈ (~-30, ~+30)
-# Two values define the bounds for Latin Hypercube sampling
-ALPHA_BOUNDS="-30:30:2"
-XI_BOUNDS="-30:30:2"
-DELTA_BOUNDS="-30:30:2"
+# Physical parameter bounds for the Latin-hypercube sweep.
+#
+# These supersede the earlier arctan-mapped [-30, 30] ranges, which
+# included extreme values (e.g. xi < 0, xi → 0) that triggered singular
+# mass matrices in the modal solver and aborted the whole sweep. The
+# new bounds stay in the physically sensible region explored by the 2D
+# sweep (sweep_2d.sh) where all 56 points are stable and well-defined:
+#   - alpha ∈ [0.1, 2.0]  — trace-sector torsion mass, positive
+#   - xi    ∈ [0.1, 2.0]  — kinetic coefficient, positive (ghost-free)
+#   - delta ∈ [-0.3, 0.3] — kinetic mixing, both signs
+#
+# Points outside these bounds hit the rank-deficient / zero-kinetic
+# edge of the theory and are not physically meaningful for
+# amplification characterization.
+ALPHA_BOUNDS="0.1:2.0:2"
+XI_BOUNDS="0.1:2.0:2"
+DELTA_BOUNDS="-0.3:0.3:2"
 
 echo "=== Dark Photon Torsion: Monte Carlo Sweep ==="
 echo "Samples: ${N_SAMPLES}"
