@@ -6,7 +6,7 @@ from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.fields import FieldSet
 from tidal.solver.grid import GridInfo
 from tidal.solver.modal import (
-    build_constraint_eliminated_matrices,
+    _build_evolution_matrices,
     find_independent_blocks,
 )
 from tidal.solver.operators import OPERATOR_REGISTRY, apply_operator, operator_min_dim
@@ -30,8 +30,8 @@ __all__ = [
     "SolverResult",
     "StabilityResult",
     "StateLayout",
+    "_build_evolution_matrices",
     "apply_operator",
-    "build_constraint_eliminated_matrices",
     "check_cfl_stability",
     "check_mass_sign",
     "find_independent_blocks",

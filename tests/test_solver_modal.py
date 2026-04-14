@@ -1117,9 +1117,9 @@ class TestConstraintElimination:
         """Reduced system eigenvalues are purely imaginary (Hamiltonian)."""
         from tidal.solver.coefficients import CoefficientEvaluator
         from tidal.solver.modal import (
+            _build_evolution_matrices,
             _build_k_axes,
             _build_k_grid,
-            build_constraint_eliminated_matrices,
         )
 
         spec = _make_spec(_PROCA_1D_CONSTRAINT_SPEC)
@@ -1130,7 +1130,7 @@ class TestConstraintElimination:
         k_grid = _build_k_grid(k_axes)
         rfft_shape = (17,)
 
-        A_red, _, _, _, _ = build_constraint_eliminated_matrices(
+        A_red, _, _, _, _, _ = _build_evolution_matrices(
             spec,
             StateLayout.from_spec(spec, grid.num_points),
             grid,

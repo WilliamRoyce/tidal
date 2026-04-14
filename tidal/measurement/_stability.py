@@ -130,13 +130,13 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
 
     # Build constraint-eliminated system for both test and baseline
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, _, _, _, mapping = build_constraint_eliminated_matrices(
+    A_test, _, _, _, _, mapping = _build_evolution_matrices(
         spec, layout, grid, ce, k_grid, rfft_shape
     )
 
     baseline_params = {**parameters, **baseline_overrides}
     ce_bl = CoefficientEvaluator(spec, grid, baseline_params)
-    A_baseline, _, _, _, _ = build_constraint_eliminated_matrices(
+    A_baseline, _, _, _, _, _ = _build_evolution_matrices(
         spec, layout, grid, ce_bl, k_grid, rfft_shape
     )
 
@@ -261,6 +261,7 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
     """
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
+        _build_evolution_matrices,
         find_independent_blocks,
     )
     from tidal.solver.state import StateLayout
@@ -282,13 +283,13 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
 
     # Build systems
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, _, _, _, mapping = build_constraint_eliminated_matrices(
+    A_test, _, _, _, _, mapping = _build_evolution_matrices(
         spec, layout, grid, ce, k_grid, rfft_shape
     )
 
     baseline_params = {**parameters, **baseline_overrides}
     ce_bl = CoefficientEvaluator(spec, grid, baseline_params)
-    A_bl, _, _, _, _ = build_constraint_eliminated_matrices(
+    A_bl, _, _, _, _, _ = _build_evolution_matrices(
         spec, layout, grid, ce_bl, k_grid, rfft_shape
     )
 

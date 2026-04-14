@@ -358,246 +358,6 @@ def _constraints_fourier_eliminable(
     return True
 
 
-def build_constraint_eliminated_matrices(
-    spec: EquationSystem,
-    layout: StateLayout,
-    grid: GridInfo,
-    coeff_eval: object,  # CoefficientEvaluator
-    k_grid: list[NDArray[np.float64]],
-    rfft_shape: tuple[int, ...],
-) -> tuple[
-    NDArray[np.complex128],  # A_reduced (n_modes, n_dyn, n_dyn)
-    NDArray[np.complex128],  # recovery (n_modes, n_constraints, n_dyn)
-    NDArray[np.complex128],  # v_recovery (n_modes, n_constraints, n_dyn)
-    list[str],  # constraint_field_names
-    dict[int, int],  # orig_to_reduced slot mapping
-]:
-    """Build reduced per-mode matrices with constraints algebraically eliminated.
-
-    For a mixed system with dynamical (d) and constraint (c) fields:
-
-        d/dt[d] = A_dd·d + A_dc·c     (dynamical equations)
-        0       = S_cd·d + S_cc·c      (constraint: solve for c)
-
-    The constraint gives c = -S_cc⁻¹·S_cd·d. Substituting:
-
-        d/dt[d] = (A_dd - A_dc·S_cc⁻¹·S_cd)·d
-
-    This handles v_A₀ references in dynamical equations by recognizing that
-    v_A₀ = dA₀/dt = d/dt[-S_cc⁻¹·S_cd·d] = -S_cc⁻¹·S_cd·d', creating an
-    implicit equation (I - A_dc_v·S_cc⁻¹·S_cd)·d' = (A_dd + A_dc_f·f)·d
-    which is resolved by matrix inversion of the LHS factor.
-
-    All operations are purely numeric (CoefficientEvaluator returns floats).
-    S_cc⁻¹ in Fourier space is diagonal per mode — just 1/(m²+k²).
-
-    Returns
-    -------
-    A_reduced : ndarray
-        Per-mode matrices (n_modes, n_dyn, n_dyn) for dynamical fields only.
-    recovery : ndarray
-        Per-mode recovery (n_modes, n_constraints, n_dyn) for reconstructing
-        constraint fields from dynamical state.
-    constraint_field_names : list[str]
-        Names of eliminated constraint fields.
-    orig_to_reduced : dict
-        Mapping from original layout slot index to reduced slot index.
-    """
-    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
-
-    assert isinstance(coeff_eval, CoefficientEvaluator)
-
-    n_modes = int(np.prod(rfft_shape))
-
-    # Identify constraint and dynamical fields
-    constraint_field_names: list[str] = []
-    constraint_eq_map: dict[str, int] = {}  # field_name → eq_idx
-    for eq_idx, eq in enumerate(spec.equations):
-        if eq.time_derivative_order == 0:
-            constraint_field_names.append(eq.field_name)
-            constraint_eq_map[eq.field_name] = eq_idx
-    n_c = len(constraint_field_names)
-
-    # Build dynamical-only slot mapping (excluding constraint field slots)
-    orig_to_reduced: dict[int, int] = {}
-    red_idx = 0
-    for si, slot in enumerate(layout.slots):
-        if slot.kind == "constraint":
-            continue
-        orig_to_reduced[si] = red_idx
-        red_idx += 1
-    n_dyn = red_idx
-
-    # Map field names to slot indices in the REDUCED layout
-    dyn_slot_map: dict[str, int] = {}
-    for si, slot in enumerate(layout.slots):
-        if si in orig_to_reduced:
-            dyn_slot_map[slot.name] = orig_to_reduced[si]
-    # Also map velocity names v_X for dynamical fields
-    for fname, si in layout.velocity_slot_map.items():
-        v_name = f"v_{fname}"
-        if si in orig_to_reduced:
-            dyn_slot_map[v_name] = orig_to_reduced[si]
-
-    # Constraint slot map (constraint field names → constraint index 0..n_c-1)
-    c_idx_map: dict[str, int] = {
-        name: i for i, name in enumerate(constraint_field_names)
-    }
-
-    # Evaluate Fourier multipliers
-    multiplier_cache: dict[str, NDArray[np.complex128]] = {}
-    for eq in spec.equations:
-        for term in eq.rhs_terms:
-            op = term.operator
-            if op not in multiplier_cache:
-                mult_fn = _EXACT_MULTIPLIERS[op]
-                mult_val = mult_fn(k_grid)
-                mult_full = np.broadcast_to(mult_val, rfft_shape)
-                multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
-
-    # --- Build the four coupling matrices per mode ---
-
-    # A_dd: dynamical → dynamical (n_modes, n_dyn, n_dyn)
-    A_dd = np.zeros((n_modes, n_dyn, n_dyn), dtype=np.complex128)
-    # A_dc: constraint → dynamical via FIELD references (n_modes, n_dyn, n_c)
-    A_dc_field = np.zeros((n_modes, n_dyn, n_c), dtype=np.complex128)
-    # A_dc_vel: constraint VELOCITY → dynamical (n_modes, n_dyn, n_c)
-    A_dc_vel = np.zeros((n_modes, n_dyn, n_c), dtype=np.complex128)
-    # S_cd: dynamical → constraint source (n_modes, n_c, n_dyn)
-    S_cd = np.zeros((n_modes, n_c, n_dyn), dtype=np.complex128)
-    # S_cc: constraint self-coupling (n_modes, n_c, n_c)
-    S_cc = np.zeros((n_modes, n_c, n_c), dtype=np.complex128)
-
-    for eq_idx, eq in enumerate(spec.equations):
-        is_constraint = eq.time_derivative_order == 0
-        is_second_order = eq.time_derivative_order >= 2
-
-        if is_constraint:
-            # Constraint equation: 0 = Σ coeff·op(target)
-            ci = c_idx_map[eq.field_name]
-            for term_idx, term in enumerate(eq.rhs_terms):
-                coeff = _resolve_constant_coeff(
-                    term,
-                    coeff_eval,
-                    eq_idx=eq_idx,
-                    term_idx=term_idx,
-                )
-                mult = multiplier_cache[term.operator]
-
-                if term.field in c_idx_map:
-                    # Self/cross constraint coupling
-                    cj = c_idx_map[term.field]
-                    S_cc[:, ci, cj] += coeff * mult
-                elif term.field in dyn_slot_map:
-                    # Source coupling to dynamical state
-                    dj = dyn_slot_map[term.field]
-                    S_cd[:, ci, dj] += coeff * mult
-
-        elif is_second_order:
-            field_slot = orig_to_reduced[layout.field_slot_map[eq.field_name]]
-            vel_slot = orig_to_reduced[layout.velocity_slot_map[eq.field_name]]
-
-            # Kinematic: dq/dt = v
-            A_dd[:, field_slot, vel_slot] = 1.0
-
-            # RHS terms: dv/dt = Σ coeff·op(target)
-            for term_idx, term in enumerate(eq.rhs_terms):
-                coeff = _resolve_constant_coeff(
-                    term,
-                    coeff_eval,
-                    eq_idx=eq_idx,
-                    term_idx=term_idx,
-                )
-                mult = multiplier_cache[term.operator]
-
-                if term.field in c_idx_map:
-                    # References constraint field directly
-                    cj = c_idx_map[term.field]
-                    A_dc_field[:, vel_slot, cj] += coeff * mult
-                elif term.field.startswith("v_") and term.field[2:] in c_idx_map:
-                    # References constraint velocity v_A₀
-                    cj = c_idx_map[term.field[2:]]
-                    A_dc_vel[:, vel_slot, cj] += coeff * mult
-                elif term.field in dyn_slot_map:
-                    # Normal dynamical reference
-                    dj = dyn_slot_map[term.field]
-                    A_dd[:, vel_slot, dj] += coeff * mult
-
-        else:
-            # First-order: du/dt = Σ coeff·op(target)
-            this_slot = orig_to_reduced[layout.field_slot_map[eq.field_name]]
-            for term_idx, term in enumerate(eq.rhs_terms):
-                coeff = _resolve_constant_coeff(
-                    term,
-                    coeff_eval,
-                    eq_idx=eq_idx,
-                    term_idx=term_idx,
-                )
-                mult = multiplier_cache[term.operator]
-
-                if term.field in c_idx_map:
-                    cj = c_idx_map[term.field]
-                    A_dc_field[:, this_slot, cj] += coeff * mult
-                elif term.field in dyn_slot_map:
-                    dj = dyn_slot_map[term.field]
-                    A_dd[:, this_slot, dj] += coeff * mult
-
-    # --- Compute Schur complement ---
-
-    # Batch-invert S_cc across all modes (small matrices, typically 1x1 or 2x2)
-    # Detect and regularize singular modes (e.g. k=0 gauge freedom)
-    dets = np.linalg.det(S_cc) if n_c > 0 else np.ones(n_modes)
-    singular_mask = np.abs(dets) < 1e-14
-    S_cc_reg = S_cc.copy()
-    if np.any(singular_mask):
-        S_cc_reg[singular_mask] += 1e-14 * np.eye(n_c, dtype=np.complex128)
-    S_cc_inv = np.linalg.inv(S_cc_reg)  # (n_modes, n_c, n_c)
-
-    # Recovery: c = -S_cc⁻¹ · S_cd · d
-    # recovery[m, ci, dj] = -Σ_cj S_cc_inv[m,ci,cj] · S_cd[m,cj,dj]
-    recovery = -np.einsum("mij,mjk->mik", S_cc_inv, S_cd)
-
-    # Substitution: A_dc_field · c = A_dc_field · recovery · d
-    # field_correction[m] = A_dc_field[m] @ recovery[m]
-    field_correction = np.einsum("mij,mjk->mik", A_dc_field, recovery)
-
-    # For constraint velocity: v_c = d/dt[c] = recovery · d'
-    # where d' = A_reduced · d. So A_dc_vel · v_c = A_dc_vel · recovery · d'.
-    # This creates implicit coupling:
-    #   d' = A_dd · d + field_correction · d + A_dc_vel · recovery · d'
-    #   (I - A_dc_vel · recovery) · d' = (A_dd + field_correction) · d
-    #   d' = (I - A_dc_vel · recovery)⁻¹ · (A_dd + field_correction) · d
-    vel_coupling = np.einsum("mij,mjk->mik", A_dc_vel, recovery)
-
-    # Check if vel_coupling is nonzero (constraint velocity referenced)
-    has_vel_coupling = np.max(np.abs(vel_coupling)) > 1e-15
-
-    A_rhs = A_dd + field_correction
-
-    if has_vel_coupling:
-        # Implicit solve: (I - vel_coupling) · d' = A_rhs · d
-        eye = np.broadcast_to(
-            np.eye(n_dyn, dtype=np.complex128),
-            (n_modes, n_dyn, n_dyn),
-        ).copy()
-        lhs = eye - vel_coupling
-        # Batch solve: A_reduced = lhs⁻¹ · A_rhs (all modes at once)
-        A_reduced: NDArray[np.complex128] = np.asarray(
-            np.linalg.solve(lhs, A_rhs),
-            dtype=np.complex128,
-        )
-    else:
-        A_reduced = A_rhs
-
-    # Velocity recovery: v_c_hat = v_recovery @ d_hat gives exact ∂_t(c)
-    # Derived from: c = recovery · d, so ∂_t c = recovery · ∂_t d = recovery · A_reduced · d
-    # This is machine-precision — no numerical differentiation needed.
-    # Stored per-mode: shape (n_modes, n_c, n_dyn). Typically < 50 MB for 128³.
-    v_recovery = np.einsum("mci,mij->mcj", recovery, A_reduced)
-
-    return A_reduced, recovery, v_recovery, constraint_field_names, orig_to_reduced
-
-
 # ---------------------------------------------------------------------------
 # Generalized mass-matrix evolution (M·ẍ = K·x + D·ẋ + J·x⃛)
 # ---------------------------------------------------------------------------
@@ -629,7 +389,7 @@ def _has_time_derivative_operators(spec: EquationSystem) -> bool:
     return False
 
 
-def _build_generalized_evolution_matrices(
+def _build_evolution_matrices(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
@@ -668,8 +428,25 @@ def _build_generalized_evolution_matrices(
     4. Treats zero-eigenvalue directions as additional constraints (Schur)
     5. Substitutes jerk terms using the (now-invertible) dynamical equations
     6. Combines both constraint levels and builds the first-order evolution matrix
+    7. Pre-solves ``B_lhs · A_final = A_rhs`` via ``np.linalg.solve`` + ``lstsq``
+       fallback, returning a single first-order evolution matrix (``B_lhs=None``).
+       This replaces the old generalized-eigenvalue output after #256.
 
-    Returns the same tuple as ``build_constraint_eliminated_matrices``.
+    Returns
+    -------
+    A_final : ndarray, shape (n_modes, n_dyn, n_dyn)
+        First-order evolution matrix (pre-solved, no separate ``B_lhs``).
+    B_lhs : None
+        Always ``None`` after #256; retained in the tuple for API compat
+        with callers that destructure all six return values.
+    recovery : ndarray
+        Schur-recovery matrix for algebraic constraint fields.
+    v_recovery : ndarray or None
+        Exact constraint-velocity recovery (``recovery @ A_final``).
+    constraint_field_names : list[str]
+        Names of the algebraic constraint fields.
+    orig_to_reduced : dict[int, int]
+        Original → reduced slot index mapping.
     """
     import logging  # noqa: PLC0415
 
@@ -1803,7 +1580,7 @@ def _evolve_per_mode(
         A_block = A_modes[:, idx[:, None], idx[None, :]]
 
         # Standard per-block eigendecomposition.  The upstream builder
-        # (_build_generalized_evolution_matrices) pre-solves B_lhs·A=A_final
+        # (_build_evolution_matrices) pre-solves B_lhs·A=A_final
         # when vel_coupling is present, so we always have a first-order
         # matrix here — no generalized eigenvalue path needed (#256).
         eig_vals, v_mat = np.linalg.eig(A_block)
@@ -2206,7 +1983,7 @@ def solve_modal(
             _v_recovery_gen,  # unused — constraint vel from eigendata
             c_names,
             orig_to_reduced,
-        ) = _build_generalized_evolution_matrices(
+        ) = _build_evolution_matrices(
             spec,
             layout,
             grid,

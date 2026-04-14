@@ -2,7 +2,7 @@
 
 Pins the failure mode and the correct behaviour before and after the
 unification of `build_constraint_eliminated_matrices` and
-`_build_generalized_evolution_matrices` into one path.
+`_build_evolution_matrices` into one path.
 
 The core failure: a theory with algebraic constraint fields **and**
 cross-`d2_t` couplings on dynamical equations (e.g. the TorsionCDT-trace
@@ -13,7 +13,7 @@ part, `ones_like(k) = 1` for `d2_t`). The resulting evolution matrix has
 an implicit diagonal mass matrix instead of the actual rank-deficient
 pattern, producing spurious tachyons.
 
-The correct path is `_build_generalized_evolution_matrices`, which
+The correct path is `_build_evolution_matrices`, which
 classifies terms by `_OPERATOR_DECOMP[op].time_order` and handles
 rank-deficient mass matrices via per-mode eigendecomposition.
 
@@ -32,10 +32,9 @@ import numpy as np
 from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.grid import GridInfo
 from tidal.solver.modal import (
-    _build_generalized_evolution_matrices,  # type: ignore[attr-defined]
+    _build_evolution_matrices,  # type: ignore[attr-defined]
     _build_k_axes,  # type: ignore[attr-defined]
     _build_k_grid,  # type: ignore[attr-defined]
-    build_constraint_eliminated_matrices,
 )
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import EquationSystem
@@ -122,78 +121,21 @@ def _build_eval_context(
 
 
 # ---------------------------------------------------------------------------
-# Test 1: constraint path misclassifies d2_t as identity
+# Historical note (test 1 removed): previously this file contained
+# `test_constraint_path_misclassifies_d2_t_cross_couplings`, which pinned
+# the #256 silent bug in `build_constraint_eliminated_matrices` — namely
+# that it used `_EXACT_MULTIPLIERS` (spatial part only) and silently
+# reinterpreted `d2_t(t_j)` RHS terms as `identity(field_j)` stiffness
+# couplings. That function has now been deleted from the solver, so the
+# test is no longer reachable. The unified path tests below replace it.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Test 1: unified builder correctly eliminates the mass-null subspace
 # ---------------------------------------------------------------------------
 
 
-def test_constraint_path_misclassifies_d2_t_cross_couplings() -> None:
-    """Pins the #256 bug: constraint path treats d2_t as identity on the field slot.
-
-    After normalization, each equation's RHS has two `d2_t(t_j)` terms
-    with coefficient `-1` (from +1 moved to LHS, divided by -1 LHS kin).
-    The constraint path's iteration at modal.py:521 does:
-
-        dj = dyn_slot_map[term.field]
-        A_dd[:, vel_slot, dj] += coeff * mult
-
-    With `mult = _EXACT_MULTIPLIERS["d2_t"](k) = ones_like(k) = 1`, this
-    adds `-1 * 1 = -1` to `A_dd[vel_i, field_j]` — i.e., treats `d2_t(t_j)`
-    as if it were `identity(t_j)` and puts it in the stiffness block.
-
-    The correct treatment would put `-1` into a mass matrix `M[i, j]`,
-    not the stiffness, and then invert M to get the true evolution.
-    """
-    spec = _make_rank_deficient_spec()
-    layout, grid, coeff_eval, k_grid, rfft_shape = _build_eval_context(spec)
-
-    A_reduced, _, _, _, _ = build_constraint_eliminated_matrices(
-        spec,
-        layout,
-        grid,
-        coeff_eval,
-        k_grid,
-        rfft_shape,
-    )
-
-    # A_reduced is (n_modes, 6, 6) for 3 fields × 2 (field+velocity).
-    # The constraint path's mis-classification shows up as:
-    #   A_dd[vel_i, field_j] = -1  for j != i   (silently wrong)
-    # Whereas a correct handling would have A_reduced dependent on
-    # M_inv · K, which for M = [[1,1,1],[1,1,1],[1,1,1]] and K = diag(-k^2)
-    # would NOT produce these cross-field entries.
-    #
-    # Specifically: the velocity rows of A_reduced should couple to
-    # field_j only through a mass-inverted stiffness matrix. Let's check
-    # mode 2 (k != 0):
-    m_idx = 2  # first non-DC mode
-
-    # Find the velocity slot indices
-    vel_slots = sorted(layout.velocity_slot_map.values())
-    field_slots = sorted(layout.field_slot_map.values())
-    assert len(vel_slots) == 3, f"expected 3 velocity slots, got {len(vel_slots)}"
-    assert len(field_slots) == 3, f"expected 3 field slots, got {len(field_slots)}"
-
-    # The (vel_0, field_1) entry carries the cross-d2_t coupling.
-    # In the silently-wrong constraint path, this should be exactly -1
-    # (the normalized coefficient of the d2_t RHS term treated as identity).
-    cross = A_reduced[m_idx, vel_slots[0], field_slots[1]]
-    # The silent bug produces exactly -1 at this entry. A correct
-    # mass-inverted handling would produce a k^2-dependent value.
-    assert np.isclose(cross.real, -1.0, atol=1e-12), (
-        f"Expected silently-misclassified cross-coupling = -1 "
-        f"(the #256 bug), got {cross.real:.6f}. "
-        f"If this test fails, either the bug has been fixed (good — "
-        f"delete this xfail) or the constraint path's iteration "
-        f"behaviour has changed in an unexpected way."
-    )
-
-
-# ---------------------------------------------------------------------------
-# Test 2: generalized path correctly eliminates the mass-null subspace
-# ---------------------------------------------------------------------------
-
-
-def test_generalized_path_handles_rank_deficient_mass() -> None:
+def test_unified_builder_handles_rank_deficient_mass() -> None:
     """The generalized path detects rank-deficient M and eliminates null subspace.
 
     For M = [[1,1,1],[1,1,1],[1,1,1]], eigenvalues are (3, 0, 0). The
@@ -208,7 +150,7 @@ def test_generalized_path_handles_rank_deficient_mass() -> None:
     spec = _make_rank_deficient_spec()
     layout, grid, coeff_eval, k_grid, rfft_shape = _build_eval_context(spec)
 
-    A_rhs, B_lhs, _, _, _, _ = _build_generalized_evolution_matrices(
+    A_rhs, B_lhs, _, _, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,
@@ -259,7 +201,7 @@ def test_presolved_unified_matrix_is_tachyon_free() -> None:
     spec = _make_rank_deficient_spec()
     layout, grid, coeff_eval, k_grid, rfft_shape = _build_eval_context(spec)
 
-    A_rhs, B_lhs, _, _, _, _ = _build_generalized_evolution_matrices(
+    A_rhs, B_lhs, _, _, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,
