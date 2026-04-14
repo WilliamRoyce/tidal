@@ -512,6 +512,26 @@ def check_rates(state):
 
 \textbf{History}: Prior to v0.16.1, this was handled by regularization ($+\epsilon I$), which produced spurious $O(10^8)$ oscillation frequencies. The QZ fix (commit \texttt{e2e9cc7}) eliminates these entirely.
 
+\subsubsection{Rank-Deficient Kinetic from Trace-Projection Lagrangians}
+\label{sec:troubleshooting-rank-deficient-kinetic}
+
+\textbf{Symptom}: Simulation of a PGT-style model diverges with ``\texttt{Simulation diverged at t=\ldots: amplitude ratio \ldots exceeds threshold 1e+08}'' and the per-mode warning ``\texttt{max Re($\lambda$)$\approx$1}'' even at physically benign parameters. Typically surfaces for theories that linearize a higher-rank tensor (e.g. the 24-component PGT torsion \texttt{TorsionCDT[a,-b,-c]} perturbation) but only use a low-rank projection (e.g. the trace vector $T_a = T^b{}_{ba}$) in the Lagrangian.
+
+\textbf{Cause}: After xPert linearization, the JSON contains all components of the rank-3 perturbation, but the Lagrangian terms $\xi\,\mathrm{Ftorsion}^2$ and $\alpha\,I_3$ only place kinetic and mass on the 4-dim trace subspace. The resulting dynamical block has a \emph{rank-deficient mass matrix} $M$ --- for example a 3-component trace triple $(t_2, t_{10}, t_{17})$ gives $M = \bigl[\begin{smallmatrix} 1 & 1 & 1 \\ 1 & 1 & 1 \\ 1 & 1 & 1 \end{smallmatrix}\bigr]$ with eigenvalues $(3, 0, 0)$ --- two null directions that represent gauge/non-propagating degrees of freedom rather than physical modes. Prior to \#256 the modal solver routed such theories through a separate constraint-elimination builder (\texttt{build\_constraint\_eliminated\_matrices}) that silently mis-classified \texttt{d2\_t} cross-couplings as stiffness operators (uses \texttt{\_EXACT\_MULTIPLIERS}, which returns only the spatial part of the operator; for \texttt{d2\_t} this is $\mathtt{ones\_like}(k)=1$), producing spurious tachyonic modes with $\mathrm{Re}(\lambda) \approx 1$ that blew up over long evolutions.
+
+\textbf{Resolution}: The unified builder \texttt{\_build\_evolution\_matrices} detects singular $M$ at line~$\sim$860 of \texttt{tidal/solver/modal.py} via \texttt{np.linalg.det(M) < 1e-12}, eigendecomposes $M$, partitions into dynamical ($\lambda \neq 0$) and mass-constrained ($\lambda = 0$) blocks, and Schur-eliminates the null subspace. Model authors see a benign INFO log line:
+\begin{verbatim}
+Generalized mass matrix: singular M detected — applying
+mass-matrix Schur elimination
+Mass matrix eigenvalues: [0, 0, ..., 3, 3, 3, ...]
+(dynamical: N, constrained: M)
+\end{verbatim}
+This is normal and expected --- no user action needed.
+
+\textbf{Example}: The \texttt{torsion\_dark\_photon} model with Lagrangian $(1/\kappa^2) R + \alpha I_3 - \frac{1}{4}\xi\,\mathrm{Ftorsion}^2 + \delta_m\,F\cdot\mathrm{Ftorsion} - \frac{1}{4}F^2$ at $(\alpha{=}0.5,\xi{=}1,\delta_m{=}0.1)$ used to diverge at $t \approx 34$ with amplitude ratio $10^{8}$. After the \#256 unification it runs to $t_\mathrm{end}=50$ producing $P_\mathrm{max}(h_5\to a_1) = 0.061197$, matching $\sin^2(\kappa B_0 t/2) = \sin^2(0.25) = 0.061209$ to four digits. Ratio $P(50)/P(25) = 4.05$ confirms $\sin^2$ growth in the linearized regime.
+
+\textbf{Related}: \#256 (solver unification), \#166 (near-singular velocity coupling), \#175 (massive-gravity energy conservation), \#222 (\texttt{\_suppress\_tachyonic\_noise} for zero-coupling tachyons). See also \cref{sec:troubleshoot-singular-mass} above for the singular-$M$ path that \#256 unified.
+
 \subsubsection{Ghost Instability Warning}
 \label{sec:troubleshoot-ghost}
 
