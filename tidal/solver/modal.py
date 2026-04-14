@@ -1741,7 +1741,6 @@ def _evolve_per_mode(
     *,
     return_fourier: bool = False,
     return_derivative_fourier: bool = False,
-    B_modes: NDArray[np.complex128] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -1803,42 +1802,12 @@ def _evolve_per_mode(
         idx = np.array(block_slots)
         A_block = A_modes[:, idx[:, None], idx[None, :]]
 
-        if B_modes is not None:
-            # Generalized eigenvalue problem: B · d' = A · d
-            # Uses QZ decomposition via scipy.linalg.eig(A, B).
-            # Infinite eigenvalues (gauge DOF) are zeroed — they don't evolve.
-            # Ref: Golub & Van Loan (2013), Matrix Computations §7.7.6
-            import scipy.linalg as sla  # type: ignore[import-untyped]  # noqa: PLC0415
-
-            B_block = B_modes[:, idx[:, None], idx[None, :]]
-            bs = len(block_slots)
-            n_block_modes = A_block.shape[0]
-            eig_vals = np.zeros((n_block_modes, bs), dtype=np.complex128)
-            v_mat = np.zeros((n_block_modes, bs, bs), dtype=np.complex128)
-            n_gauge_total = 0
-            for m in range(A_block.shape[0]):
-                eig_result = sla.eig(A_block[m], B_block[m], right=True)  # pyright: ignore[reportUnknownVariableType]
-                ev_m = eig_result[0]  # pyright: ignore[reportUnknownVariableType]
-                vr_m = eig_result[1]  # pyright: ignore[reportUnknownVariableType]
-                # Filter infinite/very-large eigenvalues (gauge modes)
-                gauge = ~np.isfinite(ev_m) | (np.abs(ev_m) > 1e12)  # pyright: ignore[reportUnknownArgumentType]
-                ev_m[gauge] = 0.0  # gauge modes frozen at IC
-                n_gauge_total += int(np.sum(gauge))
-                eig_vals[m] = ev_m  # pyright: ignore[reportUnknownArgumentType]
-                v_mat[m] = vr_m
-            if n_gauge_total > 0:
-                import logging as _log  # noqa: PLC0415
-
-                _log.getLogger(__name__).info(
-                    "Generalized eigenvalue: %d gauge modes zeroed across %d modes",
-                    n_gauge_total,
-                    A_block.shape[0],
-                )
-            v_inv = np.linalg.inv(v_mat)
-        else:
-            # Standard eigendecomposition (existing path)
-            eig_vals, v_mat = np.linalg.eig(A_block)
-            v_inv = np.linalg.inv(v_mat)
+        # Standard per-block eigendecomposition.  The upstream builder
+        # (_build_generalized_evolution_matrices) pre-solves B_lhs·A=A_final
+        # when vel_coupling is present, so we always have a first-order
+        # matrix here — no generalized eigenvalue path needed (#256).
+        eig_vals, v_mat = np.linalg.eig(A_block)
+        v_inv = np.linalg.inv(v_mat)
 
         # Warn about potential overflow
         _warn_eigenvalue_growth(eig_vals, dt_total, context="per-mode")
@@ -2214,59 +2183,37 @@ def solve_modal(
     has_pos_dep = _has_position_dependent_terms(spec)
     has_time_ops = _has_time_derivative_operators(spec)
 
-    # Determine which matrix builder to use.
-    # Constraint-eliminated path takes precedence over generalized when both
-    # constraints AND time-derivative operators are present.  The generalized
-    # path constructs B_lhs = I - vel_coupling which can be near-singular
-    # (det ≈ 0, cond > 1e7) for PGT models with d2_t constraint operators,
-    # producing spurious large eigenvalues that trigger the divergence guard.
-    # The constraint-eliminated path handles the same physics via a regularized
-    # (I - V)^{-1} implicit solve that is numerically stable.
-    use_constraint = has_constraints and not has_pos_dep
-    use_generalized = has_time_ops and not has_pos_dep and not use_constraint
-    B_lhs_modes: NDArray[np.complex128] | None = None  # set by generalized path
-    constraint_vel_arrays: dict[
-        str, NDArray[np.float64]
-    ] = {}  # populated by Schur path
+    # Single evolution-matrix builder handles:
+    #   - algebraic constraint fields (time_derivative_order=0) via Schur
+    #   - rank-deficient mass matrices (cross d2_t couplings) via mass-
+    #     eigendecomposition Schur
+    #   - near-singular velocity-coupling (#166/#175) via np.linalg.solve
+    #     with lstsq fallback (LU+partial-pivot stable up to cond~1e15,
+    #     unlike the generalized-eig QZ path that used to produce spurious
+    #     large finite eigenvalues)
+    #
+    # The builder pre-solves B_lhs · d' = A_rhs · d and returns a single
+    # first-order evolution matrix (B_lhs=None).  Downstream always uses
+    # np.linalg.eig (regular, not generalized).
+    needs_reduction = (has_constraints or has_time_ops) and not has_pos_dep
+    constraint_vel_arrays: dict[str, NDArray[np.float64]] = {}  # populated below
 
-    if use_generalized or use_constraint:
-        # Both paths produce: A_reduced, recovery, constraint names, slot mapping
-        if use_generalized:
-            # Generalized mass-matrix system: M·ẍ = K·x + D·ẋ + J·x⃛
-            # Returns A_rhs and optional B_lhs for generalized eigenvalue.
-            # Ref: Golub & Van Loan (2013), Matrix Computations §7.7
-            (
-                A_reduced,
-                B_lhs_modes,  # CRITICAL: was _B_lhs_modes (discarded) — #177
-                recovery_matrix,
-                _v_recovery_gen,  # unused — constraint vel from eigendata
-                c_names,
-                orig_to_reduced,
-            ) = _build_generalized_evolution_matrices(
-                spec,
-                layout,
-                grid,
-                coeff_eval,
-                k_grid,
-                rfft_shape,
-            )
-        else:
-            # Constraint elimination via Fourier Schur complement
-            # Ref: Hairer & Wanner (1996), Solving ODEs II, Ch. VII
-            (
-                A_reduced,
-                recovery_matrix,
-                _v_recovery_matrix,  # recovery @ A_reduced (exact constraint velocities)
-                c_names,
-                orig_to_reduced,
-            ) = build_constraint_eliminated_matrices(
-                spec,
-                layout,
-                grid,
-                coeff_eval,
-                k_grid,
-                rfft_shape,
-            )
+    if needs_reduction:
+        (
+            A_reduced,
+            _B_unused,  # always None after unified pre-solve (#256)
+            recovery_matrix,
+            _v_recovery_gen,  # unused — constraint vel from eigendata
+            c_names,
+            orig_to_reduced,
+        ) = _build_generalized_evolution_matrices(
+            spec,
+            layout,
+            grid,
+            coeff_eval,
+            k_grid,
+            rfft_shape,
+        )
 
         n_dyn = A_reduced.shape[1]
         n_modes = y0_hat.shape[1]
@@ -2307,7 +2254,6 @@ def solve_modal(
             progress,  # callback handled below with full state
             return_fourier=True,
             return_derivative_fourier=True,  # for exact constraint velocities
-            B_modes=B_lhs_modes,  # generalized eigenvalue if vel coupling
         )
 
         # Reconstruct full state (including constraints) at each snapshot
@@ -2366,16 +2312,10 @@ def solve_modal(
                 snapshot_callback(t_eval[ti], full_state)
 
         n_c = len(c_names)
-        if use_generalized:
-            method_desc = (
-                f"per-mode eigendecomposition with generalized Schur elimination "
-                f"({n_c} constraints, {n_dyn} dynamical slots, mass-matrix)"
-            )
-        else:
-            method_desc = (
-                f"per-mode eigendecomposition with Schur constraint elimination "
-                f"({n_c} constraints, {n_dyn} dynamical slots)"
-            )
+        method_desc = (
+            f"per-mode eigendecomposition with unified Schur elimination "
+            f"({n_c} constraint fields, {n_dyn} dynamical slots, mass-matrix)"
+        )
 
     elif not has_pos_dep:
         # All-constant coefficients: per-mode independent evolution
