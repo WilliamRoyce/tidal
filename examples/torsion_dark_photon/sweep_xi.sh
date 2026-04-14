@@ -73,13 +73,14 @@ uv run tidal sweep "${SPEC}" \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" \
   --param "alpha=${ALPHA}" --param "deltam=${DELTAM}" \
-  --no-require-stable \
+  --parallel "${TIDAL_PARALLEL:-4}" \
   --resume \
   --output "${OUTPUT}"
-# --no-require-stable: the pre-simulation mass check flags R̃ tensor/axial
-# eigenvalues as tachyonic, but these modes have ZERO physical coupling
-# (100% trace-aligned). The modal solver's _suppress_tachyonic_noise() (#222)
-# freezes these modes during evolution, preventing numerical noise growth.
+# Rank-deficient mass matrix from the trace-projection Lagrangian is
+# handled automatically by the unified _build_evolution_matrices
+# (see #256 and docs/tex/troubleshooting.tex §"Rank-Deficient Kinetic
+# from Trace-Projection Lagrangians"). No --no-require-stable needed.
+# TIDAL_PARALLEL env override: default 4 for local runs, 112 for sapphire.
 
 echo ""
 echo "--- Generating plots ---"

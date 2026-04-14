@@ -71,11 +71,11 @@ uv run tidal sweep "${SPEC}" \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" --param "xi=${XI}" \
-  --parallel 4 --no-require-stable --resume \
+  --parallel "${TIDAL_PARALLEL:-4}" --resume \
   --output "${OUTPUT}"
-# --no-require-stable: pre-simulation mass check flags R̃ tensor/axial eigenvalues
-# as tachyonic, but these have zero physical coupling. The modal solver's
-# _suppress_tachyonic_noise() (#222) handles them during evolution.
+# Rank-deficient mass matrix from the trace projection is handled by
+# the unified _build_evolution_matrices (#256); no --no-require-stable
+# bypass needed. TIDAL_PARALLEL env override: default 4 local, 112 sapphire.
 
 echo ""
 echo "--- Generating plots ---"
