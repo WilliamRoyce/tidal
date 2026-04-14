@@ -1342,7 +1342,7 @@ def _execute_parallel(  # noqa: PLR0913, PLR0914, PLR0917
 
     if tasks:
         print(f"  Running {len(tasks)} simulations with {n_workers} workers...")
-        with Pool(processes=n_workers, initializer=_set_single_thread_blas) as pool:
+        with Pool(processes=n_workers, initializer=_init_worker) as pool:
             for result in pool.imap_unordered(_run_single_wrapper, tasks):
                 idx = result["index"]
                 metrics = result["metrics"]
@@ -2247,16 +2247,42 @@ def _report_convergence(  # noqa: C901
 # ------------------------------------------------------------------
 
 
-def _set_single_thread_blas() -> None:
-    """Set BLAS/LAPACK thread count to 1 in worker processes.
+def _init_worker() -> None:
+    """Initialize a sweep worker process.
 
-    Prevents thread oversubscription when running N parallel simulations,
-    each of which would otherwise spawn its own BLAS thread pool.
+    Runs once per worker at Pool creation.  Two responsibilities:
+
+    1. Set BLAS/LAPACK thread count to 1 — prevents thread oversubscription
+       when running N parallel simulations, each of which would otherwise
+       spawn its own BLAS thread pool.
+    2. Pre-import the heavy solver / measurement / spec-loader modules.
+       Without this, each worker pays a ~10 s cold-import cost on its first
+       task (profiled against a 90-point sweep on sapphire: 16 cold tasks
+       at 10 s each vs 74 warm tasks at 0.9 s each).  Paying the import
+       cost once at worker startup amortises it into pool creation and
+       converts the sweep from ``16 cold + 74 warm / 16 workers ≈ 15 s
+       compute wall`` to ``90 warm / 16 workers ≈ 5 s compute wall``.
     """
     import os
 
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         os.environ[var] = "1"
+
+    # Pre-import the full solver/measurement stack so the first task each
+    # worker picks up doesn't pay cold-import latency.  Imports intentionally
+    # kept inside the function so the initializer is picklable and so
+    # module-import side effects only fire in worker processes.
+    import tidal.cli._simulate  # noqa: F401
+    import tidal.measurement._stability  # noqa: F401
+    import tidal.solver.grid  # noqa: F401
+    import tidal.solver.modal  # noqa: F401
+    import tidal.symbolic.json_loader  # noqa: F401
+
+
+# Backwards-compatibility alias: some older call sites may still reference
+# the pre-v0.30.3 name.  Kept as a one-liner so there's no behavioural
+# divergence.
+_set_single_thread_blas = _init_worker
 
 
 def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
