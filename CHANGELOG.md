@@ -10,6 +10,74 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
+## [0.31.0] — 2026-04-14
+
+### Fixed
+
+- **#256 — Modal solver unified; rank-deficient mass matrices handled
+  correctly**. The modal solver previously had two competing matrix
+  builders: a `build_constraint_eliminated_matrices` (constraint path)
+  that silently mis-classified `d2_t` RHS cross-couplings as spatial
+  identity operators (because it used `_EXACT_MULTIPLIERS[op]`, which
+  returns only the spatial part — `ones_like(k) = 1` for `d2_t`), and
+  a `_build_generalized_evolution_matrices` (generalized path) that
+  correctly classified RHS terms by `time_order` and handled rank-
+  deficient mass matrices via per-mode eigendecomposition Schur
+  elimination. The router preferred the buggy constraint path for any
+  spec with `has_constraints=True`. Result: PGT-style models that
+  linearize a higher-rank tensor but only use a low-rank projection in
+  the Lagrangian (e.g. `torsion_dark_photon` with the `TorsionCDT`
+  trace) produced spurious tachyonic modes with `Re(λ) ≈ 1` and
+  diverged at long `t_end`. Unified the two builders into a single
+  `_build_evolution_matrices` that handles algebraic constraints,
+  rank-deficient mass matrices, and near-singular `I − vel_coupling`
+  all in one pass; `_evolve_per_mode` dispatches between
+  `np.linalg.eig(A)` and `scipy.linalg.eig(A, B)` (QZ decomposition)
+  based on whether the builder produced a `B_lhs` matrix. Pinning
+  regression tests in `tests/test_solver_modal_unified.py`. See
+  `docs/tex/troubleshooting.tex` §"Rank-Deficient Kinetic from
+  Trace-Projection Lagrangians" for the diagnostic pattern and
+  resolution.
+
+### Changed
+
+- `solve_modal` router simplified to a single unconditional reduction
+  branch (`needs_reduction = has_constraints or has_time_ops`) when
+  either algebraic constraints or time-derivative operators are
+  present.
+- `tidal/measurement/_stability.py::check_conversion_stability` now
+  imports `_build_evolution_matrices` (fixes a pre-existing latent
+  NameError — the old code referenced `build_constraint_eliminated_matrices`
+  without importing it).
+- `docs/tex/modal_solver.tex` function reference table, algorithm
+  routing table, and implementation paragraph updated to reflect the
+  unified builder. Cross-reference added to the new troubleshooting
+  section.
+
+### Removed
+
+- `build_constraint_eliminated_matrices` and its export from
+  `tidal/solver/__init__.py` — replaced by the unified
+  `_build_evolution_matrices`. ~240 lines of dead code deleted.
+- Fundamental-vector rewrite of `examples/torsion_dark_photon/theory.toml`
+  and `examples/data/torsion_dark_photon.json` reverted (commits
+  `cfaa655`, `f3f242a`, `e41b288`); the canonical `TorsionCDT`-trace
+  Lagrangian `(1/κ²) R + α I₃ − ¼ ξ Ftorsion² + δₘ F·Ftorsion − ¼ F²`
+  is restored and now works natively through the unified path.
+  `examples/torsion_dark_photon/sweep_xi.sh`, `sweep_2d.sh`, and
+  `sweep_mc.sh` are the canonical sweep scripts again;
+  `sweep_mT2.sh` (from the reverted fundamental-vector rewrite) is
+  gone.
+
+### Migration
+
+- Downstream code that imported `build_constraint_eliminated_matrices`
+  should switch to `_build_evolution_matrices` and destructure a
+  6-tuple `(A_rhs, B_lhs, recovery, v_recovery, c_names,
+  orig_to_reduced)` instead of the 5-tuple produced by the old
+  function. The only internal caller
+  (`tidal/measurement/_stability.py`) was updated.
+
 ## [0.30.2] — 2026-04-13
 
 ### Documentation
