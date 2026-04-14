@@ -1217,28 +1217,51 @@ def _build_generalized_evolution_matrices(
         "generalized_eig" if B_lhs is not None else "none",
     )
 
-    # Velocity recovery for generalized eigenvalue (B·d' = A·d):
-    # d' = B⁻¹·A·d, so v_c = recovery · d' = recovery · B⁻¹·A · d
-    # For singular B modes, use least-squares to get the best A_eff.
-    if B_lhs is not None and recovery.size > 0:
-        n_dyn_slots = A_rhs.shape[1]
-        A_eff = np.zeros_like(A_rhs)
+    # Pre-solve B_lhs · d' = A_rhs · d → d' = B⁻¹·A · d, returning a
+    # single first-order evolution matrix.
+    #
+    # Why here, not in _evolve_per_mode via scipy.linalg.eig(A, B):
+    #   np.linalg.solve (LAPACK gesv: LU with partial pivoting) is
+    #   numerically stable up to cond(B) ~ 1e15 and degrades gracefully
+    #   for near-singular B.  The generalized-eig QZ path used to
+    #   produce spurious finite-but-huge eigenvalues from cond ~ 1e7-1e12
+    #   near-singular B_lhs that escaped the |λ| > 1e12 gauge filter,
+    #   which is exactly the #166 / #175 / old router-comment concern.
+    #   Pre-solving up front eliminates this.
+    #
+    # For exactly-singular modes we fall back to least-squares.  This
+    # is the same pattern used for v_recovery in the previous version;
+    # now the single computation serves both main evolution and
+    # v_recovery.
+    if B_lhs is not None:
+        A_final = np.zeros_like(A_rhs)
+        fallback_count = 0
         for m in range(n_modes):
             try:
-                A_eff[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
+                A_final[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
             except np.linalg.LinAlgError:
-                # Singular B at this mode — use lstsq
-                A_eff[m] = np.asarray(
+                A_final[m] = np.asarray(
                     np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)[0],  # type: ignore[reportUnknownMemberType]
                     dtype=np.complex128,
                 )
-        v_recovery = np.einsum("mci,mij->mcj", recovery, A_eff)
-    elif recovery.size > 0:
-        v_recovery = np.einsum("mci,mij->mcj", recovery, A_rhs)
+                fallback_count += 1
+        if fallback_count > 0:
+            logger.info(
+                "Modal evolution: %d/%d modes used lstsq fallback for singular B_lhs",
+                fallback_count,
+                n_modes,
+            )
+    else:
+        A_final = A_rhs
+
+    # Velocity recovery: v_c = recovery · d' = recovery · A_final · d
+    if recovery.size > 0:
+        v_recovery = np.einsum("mci,mij->mcj", recovery, A_final)
     else:
         v_recovery = None
 
-    return A_rhs, B_lhs, recovery, v_recovery, constraint_field_names, orig_to_reduced
+    # Return single matrix; B_lhs is None so downstream uses np.linalg.eig
+    return A_final, None, recovery, v_recovery, constraint_field_names, orig_to_reduced
 
 
 # ---------------------------------------------------------------------------
