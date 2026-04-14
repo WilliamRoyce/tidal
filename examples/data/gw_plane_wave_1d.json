@@ -1,0 +1,158 @@
+{
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "RicciScalarCD[]",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "tt(h)",
+		"linearized": true,
+		"reduction": {
+			"type": "plane_wave",
+			"original_dimension": 4,
+			"propagation_axis": "z",
+			"eliminated_fields": [
+				"h_6",
+				"h_8",
+				"h_9",
+				"h_4"
+			]
+		},
+		"derivation_hash": "d986e33c73c93496f42b809a8cc7d8c23ce07860cfd043d2d3e97fd0ef1b8055"
+	},
+	"spacetime": {
+		"dimension": 2,
+		"signature": [
+			-1,
+			1
+		],
+		"coordinates": [
+			"t",
+			"x"
+		]
+	},
+	"fields": [
+		{
+			"name": "h_5",
+			"index": 0,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				1,
+				2
+			]
+		},
+		{
+			"name": "h_7",
+			"index": 1,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				2,
+				2
+			]
+		}
+	],
+	"equations": [
+		{
+			"field": "h_5",
+			"lhs": {
+				"expression": "d2_t(h_5)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "h_5"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_7",
+			"lhs": {
+				"expression": "d2_t(h_7)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "h_7"
+					}
+				]
+			}
+		}
+	],
+	"coupling": {},
+	"canonical": {
+		"hamiltonian_terms": [
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "gradient_x"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "gradient_x"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			}
+		],
+		"wolfram_constraint_elimination": true,
+		"eliminated_from_canonical": [
+			"h_6",
+			"h_8",
+			"h_9",
+			"h_4"
+		]
+	}
+}

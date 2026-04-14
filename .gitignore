@@ -6,7 +6,11 @@ third_party/
 
 phd-application-context.md
 
+# examples/data: ignore sim output subdirs but keep theory JSONs
 /examples/data/*
+!/examples/data/*.json
+!/examples/data/README.md
+
 *.png
 /outputs/
 

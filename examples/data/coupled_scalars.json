@@ -1,0 +1,231 @@
+{
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "(  -1/(2*kappa^2) CD[-a][h[]] eta[a, b] CD[-b][h[]] - (B0^2 + mg2/kappa^2)/2 * h[]^2 - 1/2 CD[-a][a[]] eta[a, b] CD[-b][a[]] - omegaP2/2 * a[]^2 - B0 * h[] * n[a] * CD[-a][a[]]  )",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": false,
+		"derivation_hash": "8e3742790175a8b05e07d7a61774b1dbdf85eb5c6cb99e2987d60fb81d9bd604"
+	},
+	"spacetime": {
+		"dimension": 2,
+		"signature": [
+			-1,
+			1
+		],
+		"coordinates": [
+			"t",
+			"x"
+		]
+	},
+	"fields": [
+		{
+			"name": "a_0",
+			"index": 0,
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 0,
+			"tensor_indices": []
+		},
+		{
+			"name": "h_0",
+			"index": 1,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 0,
+			"tensor_indices": []
+		}
+	],
+	"equations": [
+		{
+			"field": "a_0",
+			"lhs": {
+				"expression": "d2_t(a_0)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "a_0",
+						"coefficient_symbolic": "-omegaP2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "h_0",
+						"coefficient_symbolic": "B0"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "a_0"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_0",
+			"lhs": {
+				"expression": "d2_t(h_0)",
+				"order": {
+					"time": 2,
+					"space": 0
+				},
+				"kinetic_coefficient_symbolic": "-kappa^(-2)"
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "h_0",
+						"coefficient_symbolic": "B0^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "h_0",
+						"coefficient_symbolic": "mg2/kappa^2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "a_0",
+						"coefficient_symbolic": "B0"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_0",
+						"coefficient_symbolic": "-kappa^(-2)"
+					}
+				]
+			}
+		}
+	],
+	"coupling": {
+		"mass_matrix_symbolic": [
+			[
+				"-omegaP2",
+				null
+			],
+			[
+				null,
+				"mg2/kappa^2"
+			]
+		]
+	},
+	"canonical": {
+		"hamiltonian_terms": [
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "a_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "a_0",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "omegaP2/2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "B0^2/2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "mg2/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "a_0",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "B0"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "a_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "a_0",
+					"operator": "gradient_x"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "1/(2*kappa^2)"
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "a_0",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "a_0",
+					"operator": "time_derivative"
+				},
+				"term_class": "self"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "1/(2*kappa^2)"
+			}
+		]
+	}
+}
