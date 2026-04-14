@@ -64,7 +64,7 @@ echo ""
 # The total Hamiltonian is NOT a valid conservation diagnostic for this constrained
 # gauge theory (Dirac-Bergmann). Only the h_5↔a_1 physical sector has a
 # well-defined conserved energy. Use P_max convergence and run_status instead.
-uv run tidal sweep "${SPEC}" \
+tidal sweep "${SPEC}" \
   --sweep "xi=0.01:0.5:20" \
   --measure peak_conversion \
   --source h_5 --target a_1 \
@@ -87,14 +87,14 @@ echo "--- Generating plots ---"
 
 # P_max vs xi with sin^2(kappa*B0*t_end/2) as the xi=0 Gertsenshtein baseline.
 # Points above the dashed line = torsion amplification.
-uv run tidal plot "${OUTPUT}" --type sweep \
+tidal plot "${OUTPUT}" --type sweep \
   --metric P_max \
   --title "Torsion amplification vs xi (alpha=${ALPHA}, deltam=${DELTAM}, B0=${B0})" \
   --overlay 'sin(kappa * B0 * t_end / 2)**2' \
   --output "${OUTPUT}/sweep_xi.png" --quiet
 
 # C₀ = P/B₀² analysis (primary metric per project_sweep_measurement_strategy.md)
-uv run python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
+python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
 
 echo ""
 echo "=== Sweep complete ==="

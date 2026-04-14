@@ -180,8 +180,6 @@ def main() -> None:
     # handles divergent runs gracefully by dropping them).
     output = args.output or f"{sweep_dir}/analysis_C0.png"
     cmd = [
-        "uv",
-        "run",
         "tidal",
         "plot",
         str(sweep_dir),

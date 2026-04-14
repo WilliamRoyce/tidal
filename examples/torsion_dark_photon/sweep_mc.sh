@@ -69,7 +69,7 @@ echo ""
 # to the Hamiltonian are spurious — the constrained Hamiltonian is only
 # well-defined on the physical h_5↔a_1 sector. Use P(t) from conversion
 # as the primary quality metric. Diverged runs show up as P_max >> P_Gertsenshtein.
-uv run tidal sweep "${SPEC}" \
+tidal sweep "${SPEC}" \
   --sweep "alpha=${ALPHA_BOUNDS}" \
   --sweep "xi=${XI_BOUNDS}" \
   --sweep "deltam=${DELTA_BOUNDS}" \
@@ -94,23 +94,23 @@ echo ""
 echo "--- Generating plots ---"
 
 # Sensitivity: which of (alpha, xi, deltam) drives conversion?
-uv run tidal plot "${OUTPUT}" --type sweep-tornado \
+tidal plot "${OUTPUT}" --type sweep-tornado \
   --metric P_max \
   --title "Dark photon torsion: parameter sensitivity (P_max)" \
   --output "${OUTPUT}/plot_tornado.png" --quiet
 
 # Scatter matrix: all parameter pairs coloured by P_max
-uv run tidal plot "${OUTPUT}" --type sweep-scatter \
+tidal plot "${OUTPUT}" --type sweep-scatter \
   --metric P_max \
   --title "Dark photon torsion: parameter space (coloured by P_max)" \
   --output "${OUTPUT}/plot_scatter.png" --quiet
 
 # C₀ = P/B₀² analysis with arctan-mapped scatter plots
 # Shows relative amplification (C₀ - C_EM)/C_EM in percent
-uv run python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
+python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
 
 # Parallel coordinates: multi-parameter trends
-uv run tidal plot "${OUTPUT}" --type sweep-parallel \
+tidal plot "${OUTPUT}" --type sweep-parallel \
   --metric P_max \
   --title "Dark photon torsion: parallel coordinates (P_max)" \
   --output "${OUTPUT}/plot_parallel.png" --quiet
@@ -125,7 +125,7 @@ echo "  ${OUTPUT}/plot_parallel.png  [parallel coordinates]"
 echo "  ${OUTPUT}/analysis_C0.png    [C₀ relative deviation with arctan axes]"
 echo ""
 echo "Sensitivity analysis:"
-echo "  uv run tidal analyze ${OUTPUT} --sensitivity morris --metric P_max"
+echo "  tidal analyze ${OUTPUT} --sensitivity morris --metric P_max"
 echo ""
 echo "Physics note (adiabatic decoupling):"
 echo "  R-tilde mass floor: m_T >= sqrt(55) ~ 7.4 (from contorsion)"
