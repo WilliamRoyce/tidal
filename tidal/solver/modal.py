@@ -994,51 +994,45 @@ def _build_evolution_matrices(
         "generalized_eig" if B_lhs is not None else "none",
     )
 
-    # Pre-solve B_lhs · d' = A_rhs · d → d' = B⁻¹·A · d, returning a
-    # single first-order evolution matrix.
+    # Velocity recovery for constraint fields: v_c = recovery · d' where
+    # d' = B_lhs⁻¹ · A_rhs · d (computed per mode with lstsq fallback for
+    # near-singular B).  This is needed only for the constraint-velocity
+    # measurement; the main evolution uses generalized eig(A, B) in
+    # _evolve_per_mode when B_lhs is not None, which handles rank-deficient
+    # or near-singular B correctly via QZ decomposition.
     #
-    # Why here, not in _evolve_per_mode via scipy.linalg.eig(A, B):
-    #   np.linalg.solve (LAPACK gesv: LU with partial pivoting) is
-    #   numerically stable up to cond(B) ~ 1e15 and degrades gracefully
-    #   for near-singular B.  The generalized-eig QZ path used to
-    #   produce spurious finite-but-huge eigenvalues from cond ~ 1e7-1e12
-    #   near-singular B_lhs that escaped the |λ| > 1e12 gauge filter,
-    #   which is exactly the #166 / #175 / old router-comment concern.
-    #   Pre-solving up front eliminates this.
-    #
-    # For exactly-singular modes we fall back to least-squares.  This
-    # is the same pattern used for v_recovery in the previous version;
-    # now the single computation serves both main evolution and
-    # v_recovery.
-    if B_lhs is not None:
-        A_final = np.zeros_like(A_rhs)
+    # Why NOT pre-solve A_final = B⁻¹·A here and return a single first-order
+    # matrix: for systems with rank-deficient mass matrix (d2_t cross-
+    # couplings), the pre-solved A_final has nearly-degenerate eigenvalues
+    # which make the eigendecomposition V ill-conditioned (cond(V) > 1e9).
+    # Passing (A, B) to scipy.linalg.eig uses QZ decomposition, which
+    # handles rank-deficiency cleanly via the Schur form without requiring
+    # V to be well-conditioned.  See #256 for the empirical test case.
+    if B_lhs is not None and recovery.size > 0:
+        A_eff = np.zeros_like(A_rhs)
         fallback_count = 0
         for m in range(n_modes):
             try:
-                A_final[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
+                A_eff[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
             except np.linalg.LinAlgError:
-                A_final[m] = np.asarray(
+                A_eff[m] = np.asarray(
                     np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)[0],  # type: ignore[reportUnknownMemberType]
                     dtype=np.complex128,
                 )
                 fallback_count += 1
         if fallback_count > 0:
             logger.info(
-                "Modal evolution: %d/%d modes used lstsq fallback for singular B_lhs",
+                "Constraint-velocity recovery: %d/%d modes used lstsq fallback",
                 fallback_count,
                 n_modes,
             )
-    else:
-        A_final = A_rhs
-
-    # Velocity recovery: v_c = recovery · d' = recovery · A_final · d
-    if recovery.size > 0:
-        v_recovery = np.einsum("mci,mij->mcj", recovery, A_final)
+        v_recovery = np.einsum("mci,mij->mcj", recovery, A_eff)
+    elif recovery.size > 0:
+        v_recovery = np.einsum("mci,mij->mcj", recovery, A_rhs)
     else:
         v_recovery = None
 
-    # Return single matrix; B_lhs is None so downstream uses np.linalg.eig
-    return A_final, None, recovery, v_recovery, constraint_field_names, orig_to_reduced
+    return A_rhs, B_lhs, recovery, v_recovery, constraint_field_names, orig_to_reduced
 
 
 # ---------------------------------------------------------------------------
@@ -1518,6 +1512,7 @@ def _evolve_per_mode(
     *,
     return_fourier: bool = False,
     return_derivative_fourier: bool = False,
+    B_modes: NDArray[np.complex128] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -1579,12 +1574,46 @@ def _evolve_per_mode(
         idx = np.array(block_slots)
         A_block = A_modes[:, idx[:, None], idx[None, :]]
 
-        # Standard per-block eigendecomposition.  The upstream builder
-        # (_build_evolution_matrices) pre-solves B_lhs·A=A_final
-        # when vel_coupling is present, so we always have a first-order
-        # matrix here — no generalized eigenvalue path needed (#256).
-        eig_vals, v_mat = np.linalg.eig(A_block)
-        v_inv = np.linalg.inv(v_mat)
+        if B_modes is not None:
+            # Generalized eigenvalue problem: B · d' = A · d
+            # Uses QZ decomposition via scipy.linalg.eig(A, B).
+            # Infinite eigenvalues (gauge DOF) are zeroed — they don't evolve.
+            # Essential for rank-deficient M: pre-solving via np.linalg.solve
+            # produces ill-conditioned eigenvectors (cond(V) > 1e9), whereas
+            # QZ handles rank-deficiency via the Schur form without requiring
+            # V to be well-conditioned.
+            # Ref: Golub & Van Loan (2013), Matrix Computations §7.7.6
+            import scipy.linalg as sla  # type: ignore[import-untyped]  # noqa: PLC0415
+
+            B_block = B_modes[:, idx[:, None], idx[None, :]]
+            bs = len(block_slots)
+            n_block_modes = A_block.shape[0]
+            eig_vals = np.zeros((n_block_modes, bs), dtype=np.complex128)
+            v_mat = np.zeros((n_block_modes, bs, bs), dtype=np.complex128)
+            n_gauge_total = 0
+            for m in range(A_block.shape[0]):
+                eig_result = sla.eig(A_block[m], B_block[m], right=True)  # pyright: ignore[reportUnknownVariableType]
+                ev_m = eig_result[0]  # pyright: ignore[reportUnknownVariableType]
+                vr_m = eig_result[1]  # pyright: ignore[reportUnknownVariableType]
+                # Filter infinite/very-large eigenvalues (gauge modes)
+                gauge = ~np.isfinite(ev_m) | (np.abs(ev_m) > 1e12)  # pyright: ignore[reportUnknownArgumentType]
+                ev_m[gauge] = 0.0  # gauge modes frozen at IC
+                n_gauge_total += int(np.sum(gauge))
+                eig_vals[m] = ev_m  # pyright: ignore[reportUnknownArgumentType]
+                v_mat[m] = vr_m
+            if n_gauge_total > 0:
+                import logging as _log  # noqa: PLC0415
+
+                _log.getLogger(__name__).info(
+                    "Generalized eigenvalue: %d gauge modes zeroed across %d modes",
+                    n_gauge_total,
+                    A_block.shape[0],
+                )
+            v_inv = np.linalg.inv(v_mat)
+        else:
+            # Regular eigendecomposition for non-generalized systems.
+            eig_vals, v_mat = np.linalg.eig(A_block)
+            v_inv = np.linalg.inv(v_mat)
 
         # Warn about potential overflow
         _warn_eigenvalue_growth(eig_vals, dt_total, context="per-mode")
@@ -1969,16 +1998,19 @@ def solve_modal(
     #     unlike the generalized-eig QZ path that used to produce spurious
     #     large finite eigenvalues)
     #
-    # The builder pre-solves B_lhs · d' = A_rhs · d and returns a single
-    # first-order evolution matrix (B_lhs=None).  Downstream always uses
-    # np.linalg.eig (regular, not generalized).
+    # The builder returns (A_rhs, B_lhs).  If vel_coupling is present,
+    # B_lhs is non-None and the downstream eigendecomposition uses
+    # scipy.linalg.eig(A, B) (QZ decomposition), which handles
+    # rank-deficient M and near-singular (I - vel_coupling) correctly
+    # via the Schur form — pre-solving via np.linalg.solve produces
+    # ill-conditioned V (cond > 1e9) for rank-deficient M and was rejected.
     needs_reduction = (has_constraints or has_time_ops) and not has_pos_dep
     constraint_vel_arrays: dict[str, NDArray[np.float64]] = {}  # populated below
 
     if needs_reduction:
         (
             A_reduced,
-            _B_unused,  # always None after unified pre-solve (#256)
+            B_lhs_modes,
             recovery_matrix,
             _v_recovery_gen,  # unused — constraint vel from eigendata
             c_names,
@@ -2031,6 +2063,7 @@ def solve_modal(
             progress,  # callback handled below with full state
             return_fourier=True,
             return_derivative_fourier=True,  # for exact constraint velocities
+            B_modes=B_lhs_modes,  # generalized eig(A, B) when vel_coupling present
         )
 
         # Reconstruct full state (including constraints) at each snapshot
