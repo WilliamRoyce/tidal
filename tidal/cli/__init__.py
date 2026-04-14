@@ -695,6 +695,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "sweep-parallel",
             "sweep-tornado",
             "sweep-scatter",
+            "sweep-grouped",
             "sweep-histogram",
             "sweep-divergence",
             "campaign",
@@ -796,6 +797,29 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         dest="log_y",
         action="store_true",
         help="Use logarithmic y-axis for 1D sweep plots",
+    )
+    plot_parser.add_argument(
+        "--log-x",
+        dest="log_x",
+        action="store_true",
+        help="Use logarithmic x-axis for 1D sweep plots",
+    )
+    plot_parser.add_argument(
+        "--x-param",
+        dest="x_param",
+        default=None,
+        metavar="PARAM",
+        help="Swept parameter for the x-axis (required for --type sweep-grouped)",
+    )
+    plot_parser.add_argument(
+        "--group-by",
+        dest="group_by",
+        default=None,
+        metavar="PARAM",
+        help=(
+            "Swept parameter to group 1D lines by (required for --type sweep-grouped). "
+            "Produces one connected line per unique value of the grouping parameter."
+        ),
     )
     plot_parser.add_argument(
         "--hline",

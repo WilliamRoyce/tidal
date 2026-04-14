@@ -225,6 +225,92 @@ class TestRenderSweep1dUpgrades:
         plt.close(fig)
 
 
+class TestRenderSweep1dGrouped:
+    """Tests for the multi-curve 1D plot for 2-param sweeps."""
+
+    def test_produces_one_line_per_group_value(self) -> None:
+        from tidal.cli._sweep_panels import render_sweep_1d_grouped
+
+        results = _make_sweep_results(n_points=5, n_params=2)
+        fig, ax = plt.subplots()
+        render_sweep_1d_grouped(
+            ax, results, "P_max", x_param="param1", group_param="param0"
+        )
+        # One line per unique value of param0 (the group parameter).
+        # The _make_sweep_results fixture uses linspace(-1, 1, 5) so
+        # there are 5 unique group values → 5 grouped lines.
+        grouped_lines = [
+            ln for ln in ax.get_lines() if "analytical" not in (ln.get_label() or "")
+        ]
+        assert len(grouped_lines) == 5
+        # All lines should be connected (have at least 2 points each).
+        for line in grouped_lines:
+            xdata = line.get_xdata()
+            assert len(xdata) >= 2, "grouped line should have multiple points"
+        # Legend should be present
+        assert ax.get_legend() is not None
+        plt.close(fig)
+
+    def test_requires_exactly_two_swept_params(self) -> None:
+        import pytest
+
+        from tidal.cli._sweep_panels import render_sweep_1d_grouped
+
+        # 1-param sweep should raise
+        results_1d = _make_sweep_results(n_points=5, n_params=1)
+        fig, ax = plt.subplots()
+        with pytest.raises(ValueError, match="exactly 2 swept parameters"):
+            render_sweep_1d_grouped(
+                ax, results_1d, "P_max", x_param="param0", group_param="param0"
+            )
+        plt.close(fig)
+
+        # 3-param sweep should also raise
+        results_3d = _make_sweep_results(n_points=5, n_params=3)
+        fig, ax = plt.subplots()
+        with pytest.raises(ValueError, match="exactly 2 swept parameters"):
+            render_sweep_1d_grouped(
+                ax, results_3d, "P_max", x_param="param0", group_param="param1"
+            )
+        plt.close(fig)
+
+    def test_rejects_param_mismatch(self) -> None:
+        import pytest
+
+        from tidal.cli._sweep_panels import render_sweep_1d_grouped
+
+        results = _make_sweep_results(n_points=5, n_params=2)
+        fig, ax = plt.subplots()
+        with pytest.raises(ValueError, match="must match the swept parameters"):
+            render_sweep_1d_grouped(
+                ax,
+                results,
+                "P_max",
+                x_param="not_a_param",
+                group_param="param0",
+            )
+        plt.close(fig)
+
+    def test_overlay_adds_analytical_curve(self) -> None:
+        from tidal.cli._sweep_panels import render_sweep_1d_grouped
+
+        results = _make_sweep_results(n_points=5, n_params=2)
+        fig, ax = plt.subplots()
+        # Overlay a trivial formula in the x_param (param1)
+        render_sweep_1d_grouped(
+            ax,
+            results,
+            "P_max",
+            x_param="param1",
+            group_param="param0",
+            overlay="param1 * 0 + 0.002",
+        )
+        # Find the line labeled "analytical"
+        analytical = [ln for ln in ax.get_lines() if ln.get_label() == "analytical"]
+        assert len(analytical) == 1
+        plt.close(fig)
+
+
 class TestRenderSweepScatterUpgrades:
     def test_log_diagonal(self) -> None:
         from tidal.cli._sweep_panels import render_sweep_scatter

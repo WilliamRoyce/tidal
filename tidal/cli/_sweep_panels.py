@@ -3,6 +3,7 @@
 Provides:
 
 - ``render_sweep_1d``   — metric vs single swept parameter (line plot)
+- ``render_sweep_1d_grouped`` — 2-param sweep, one line per group value
 - ``render_sweep_2d``   — metric vs two swept parameters (heatmap)
 - ``render_sweep_2d_with_overlay`` — 3-panel comparison: TIDAL | analytical | |error|
 - ``render_sweep_compare`` — overlay timeseries from multiple runs
@@ -548,6 +549,137 @@ def render_sweep_1d_multi(
 
     axes[-1, 0].set_xlabel(param_name)
     fig.suptitle(f"Sweep: {', '.join(metrics)} vs {param_name}")
+
+
+def render_sweep_1d_grouped(  # noqa: PLR0913, PLR0914
+    ax: Axes,
+    results: SweepResults,
+    metric: str,
+    *,
+    x_param: str,
+    group_param: str,
+    overlay: str | None = None,
+    log_y: bool = False,
+    log_x: bool = False,
+) -> None:
+    """Plot a scalar metric vs one swept parameter, one line per value of another.
+
+    For a 2-parameter sweep, group rows by ``group_param`` and draw one
+    connected line (markers + line) per unique group value, sharing a
+    common x-axis ``x_param``.  This is the canonical figure for
+    "collapse across B₀" tests of linearized-regime validity.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes to draw on.
+    results : SweepResults
+        Loaded sweep data with **exactly 2** swept parameters.
+    metric : str
+        Column name in ``results.rows`` for the y-values.
+    x_param : str
+        Swept parameter name for the x-axis.
+    group_param : str
+        Swept parameter name to group lines by.
+    overlay : str or None
+        Optional analytical formula in ``x_param`` (and fixed params /
+        sim settings).  Drawn as a single dashed black reference curve
+        — assumed to be independent of ``group_param``.
+    log_y : bool
+        Use logarithmic y-axis scale.
+    log_x : bool
+        Use logarithmic x-axis scale.
+
+    Raises
+    ------
+    ValueError
+        If the sweep does not have exactly 2 swept parameters, or if
+        ``{x_param, group_param}`` is not the set of swept parameters.
+    """
+    import matplotlib.pyplot as plt
+
+    param_names = list(results.swept_params.keys())
+    if len(param_names) != 2:  # noqa: PLR2004
+        msg = (
+            f"render_sweep_1d_grouped expects exactly 2 swept parameters, "
+            f"got {len(param_names)}: {param_names}"
+        )
+        raise ValueError(msg)
+    if {x_param, group_param} != set(param_names):
+        msg = (
+            f"x_param={x_param!r} and group_param={group_param!r} must match "
+            f"the swept parameters {param_names}"
+        )
+        raise ValueError(msg)
+
+    # Extract all rows as parallel arrays
+    x_all = np.asarray(results.column(x_param), dtype=np.float64)
+    g_all = np.asarray(results.column(group_param), dtype=np.float64)
+    y_all = np.asarray(results.column(metric), dtype=np.float64)
+
+    # Unique group values, sorted numerically
+    group_vals = np.unique(g_all[np.isfinite(g_all)])
+    n_groups = len(group_vals)
+    if n_groups == 0:
+        msg = f"no finite values found for group_param={group_param!r}"
+        raise ValueError(msg)
+
+    cmap = plt.colormaps["viridis"]
+    # Span [0.1, 0.9] to avoid the lightest/darkest extremes
+    color_positions = np.linspace(0.1, 0.9, max(n_groups, 1))
+
+    for idx, gv in enumerate(group_vals):
+        mask = np.isclose(g_all, gv) & np.isfinite(y_all)
+        if not np.any(mask):
+            continue
+        xs = x_all[mask]
+        ys = y_all[mask]
+        # Sort by x for a clean connected line
+        order = np.argsort(xs)
+        xs, ys = xs[order], ys[order]
+        label = f"{_greek_label(group_param)} = {gv:.3g}"
+        ax.plot(
+            xs,
+            ys,
+            "o-",
+            color=cmap(color_positions[idx]),
+            linewidth=1.5,
+            markersize=5,
+            label=label,
+            zorder=3,
+        )
+
+    # Analytical overlay (single curve, group-independent)
+    if overlay is not None:
+        x_sorted = np.sort(np.unique(x_all[np.isfinite(x_all)]))
+        scalar_ns = _build_overlay_scalars(results)
+        try:
+            y_ref = _evaluate_sweep_overlay(overlay, {x_param: x_sorted}, scalar_ns)
+        except ValueError:
+            # Re-raise with context so CLI users get a useful error
+            raise
+        ax.plot(
+            x_sorted,
+            y_ref,
+            "--",
+            color="black",
+            linewidth=1.5,
+            label="analytical",
+            zorder=4,
+        )
+
+    ax.set_xlabel(_greek_label(x_param))
+    ax.set_ylabel(metric)
+    ax.set_title(
+        f"{metric} vs {_greek_label(x_param)} (grouped by {_greek_label(group_param)})"
+    )
+    ax.grid(visible=True, alpha=0.3)
+    ax.legend(fontsize="small", loc="best")
+
+    if log_y:
+        ax.set_yscale("log")
+    if log_x:
+        ax.set_xscale("log")
 
 
 def render_sweep_2d(  # noqa: PLR0913

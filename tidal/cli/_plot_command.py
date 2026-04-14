@@ -30,6 +30,7 @@ _VALID_TYPES = frozenset(
         "sweep-parallel",
         "sweep-tornado",
         "sweep-scatter",
+        "sweep-grouped",
         "sweep-histogram",
         "sweep-divergence",
         "campaign",
@@ -45,6 +46,7 @@ _SWEEP_TYPES = frozenset(
         "sweep-parallel",
         "sweep-tornado",
         "sweep-scatter",
+        "sweep-grouped",
         "sweep-histogram",
         "sweep-divergence",
         "campaign",
@@ -371,6 +373,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         render_convergence,
         render_replicate_convergence,
         render_sweep_1d,
+        render_sweep_1d_grouped,
         render_sweep_1d_multi,
         render_sweep_2d,
         render_sweep_2d_with_overlay,
@@ -414,6 +417,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         "sweep-parallel",
         "sweep-tornado",
         "sweep-scatter",
+        "sweep-grouped",
         "sweep-histogram",
         "replicate-convergence",
     }:
@@ -575,7 +579,12 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             )
             log_diag: bool = getattr(args, "log_diagonal", False)
             n_params = len(scatter_params or list(results.swept_params.keys()))
-            fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
+            # constrained_layout handles the colorbar placement cleanly,
+            # avoiding the overlap we used to get with tight_layout.
+            fig = plt.figure(
+                figsize=figsize or (3 * n_params, 3 * n_params),
+                constrained_layout=True,
+            )
             render_sweep_scatter(
                 fig,
                 results,
@@ -584,6 +593,32 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 divergent_center=dc,
                 log_diagonal=log_diag,
                 params=scatter_params,
+            )
+
+        elif plot_type == "sweep-grouped":
+            x_param = getattr(args, "x_param", None)
+            group_by = getattr(args, "group_by", None)
+            if x_param is None or group_by is None:
+                error_with_hint(
+                    "--x-param and --group-by are required for sweep-grouped plots",
+                    [
+                        "Example: `--type sweep-grouped --metric C0 "
+                        "--x-param mA2 --group-by B0`",
+                    ],
+                )
+                return 1
+            fig, ax = plt.subplots(
+                1, 1, figsize=figsize or (9, 6), constrained_layout=True
+            )
+            render_sweep_1d_grouped(
+                ax,
+                results,
+                raw_metric,
+                x_param=x_param,
+                group_param=group_by,
+                overlay=getattr(args, "overlay", None),
+                log_y=getattr(args, "log_y", False),
+                log_x=getattr(args, "log_x", False),
             )
 
         elif plot_type == "sweep-histogram":
@@ -633,7 +668,12 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
     output_path = Path(args.output) if args.output else data_path / f"{plot_type}.png"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    plt.tight_layout()
+    # sweep-scatter and sweep-grouped manage their own layout via
+    # constrained_layout; calling tight_layout on them produces warnings
+    # and overlapping colorbars. Skip those cases.
+    manual_layout = {"sweep-scatter", "sweep-grouped"}
+    if plot_type not in manual_layout:
+        plt.tight_layout()
     fig.savefig(str(output_path), dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
