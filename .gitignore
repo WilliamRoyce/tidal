@@ -36,3 +36,7 @@ Wolfram*.tgz
 
 # Literature — local arXiv TeX sources (large, not for VCS)
 literature/*
+
+# HPC shuttle
+scripts/.hpc_jobs
+hpc_results/
