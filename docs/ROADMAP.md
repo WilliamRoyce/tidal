@@ -288,7 +288,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **MINOR** (0.X.0): New features (3+1D examples, JSON schema extensions)
 - **PATCH** (0.0.X): Bug fixes, documentation improvements
 
-**Current Version:** 0.30.2
+**Current Version:** 0.31.0
 **Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve; 0.5.0 delivered parameter sweep framework (Phase C) with 12 measurements, sensitivity analysis, and advanced visualization
 **Next Major Release (1.0.0):** Phase D (Gertsenshtein example) + Wolfram CI
 

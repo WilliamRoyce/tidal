@@ -2140,7 +2140,7 @@ wheels = [
 
 [[package]]
 name = "tidal"
-version = "0.30.2"
+version = "0.31.0"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -2148,6 +2148,7 @@ dependencies = [
     { name = "scikit-sundae" },
     { name = "scipy" },
     { name = "tqdm" },
+    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
 ]
 
 [package.optional-dependencies]
@@ -2192,6 +2193,7 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.10,<2.0" },
     { name = "shtab", marker = "extra == 'completion'", specifier = ">=1.5" },
     { name = "tqdm", specifier = ">=4.60" },
+    { name = "typing-extensions", marker = "python_full_version < '3.12'", specifier = ">=4.0" },
     { name = "wolframclient", marker = "extra == 'wolfram'", specifier = ">=1.4.0,<2.0" },
 ]
 provides-extras = ["wolfram", "sensitivity", "inference", "completion", "color"]
