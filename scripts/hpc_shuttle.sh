@@ -195,11 +195,13 @@ cmd_pull() {
     note "WARNING: --all pulls raw sim data; may be large"
     rsync -az -e ssh "${HOST}:${src}" "$dst"
   else
-    note "pulling lightweight artefacts only (figures, *.csv, *_summary.json)"
+    note "pulling lightweight artefacts only (figures, csvs, summary/result/sweep jsons)"
     rsync -az -e ssh \
       --include='*/' \
       --include='figures/***' \
       --include='*.csv' \
+      --include='results.json' \
+      --include='sweep.json' \
       --include='*_summary.json' \
       --include='SWEEP_RESULTS.md' \
       --exclude='*' \
