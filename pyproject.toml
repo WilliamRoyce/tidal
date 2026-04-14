@@ -42,6 +42,7 @@ dependencies = [
     "scipy>=1.10,<2.0",
     "scikit-sundae>=1.1.2,<2.0",
     "tqdm>=4.60",
+    "typing-extensions>=4.0 ; python_version < '3.12'",
 ]
 
 [project.optional-dependencies]
