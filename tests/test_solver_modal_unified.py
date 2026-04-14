@@ -186,18 +186,21 @@ def test_unified_builder_handles_rank_deficient_mass() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Test 3: pre-solved evolution matrix is stable across all modes
+# Test 3: unified builder produces stable generalized eigenvalues across all modes
 # ---------------------------------------------------------------------------
 
 
-def test_presolved_unified_matrix_is_tachyon_free() -> None:
-    """The unified builder (D.2) will pre-solve B_lhs · A = A_final.
+def test_unified_builder_generalized_eig_tachyon_free() -> None:
+    """The unified builder's (A_rhs, B_lhs) pair yields tachyon-free generalized eig.
 
-    Verify that the pre-solved form, which is what D.2 will return from
-    the unified builder, produces a first-order evolution matrix whose
-    eigenvalues are tachyon-free across every mode. This locks in the
-    behaviour that D.2 will make the default across all specs.
+    The builder returns A_rhs and B_lhs separately so downstream can use
+    scipy.linalg.eig(A, B) (QZ decomposition), which handles rank-deficient
+    mass matrices via the Schur form.  This test verifies that every mode's
+    generalized eigenvalue spectrum is tachyon-free (max Re(lambda) ~ 0)
+    for the synthetic rank-deficient spec.
     """
+    import scipy.linalg as sla
+
     spec = _make_rank_deficient_spec()
     layout, grid, coeff_eval, k_grid, rfft_shape = _build_eval_context(spec)
 
@@ -210,33 +213,29 @@ def test_presolved_unified_matrix_is_tachyon_free() -> None:
         rfft_shape,
     )
 
-    # Pre-solve B_lhs · d' = A_rhs · d, mirroring D.2.
-    if B_lhs is not None:
-        A_final = np.zeros_like(A_rhs)
-        for m in range(A_rhs.shape[0]):
-            try:
-                A_final[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
-            except np.linalg.LinAlgError:
-                A_final[m] = cast(
-                    "np.ndarray[Any, Any]",
-                    np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)[0],
-                )
-    else:
-        A_final = A_rhs
-
-    # Scan every mode for spurious tachyons (positive Re part).
+    # Scan every mode for spurious tachyons (positive Re part) in the
+    # generalized-eigenvalue spectrum.  Infinite/large eigenvalues are
+    # filtered out — they correspond to gauge/null directions that the
+    # downstream modal evolution freezes at IC.
     max_re_across_modes = 0.0
-    for m in range(A_final.shape[0]):
-        w = cast(
-            "np.ndarray[Any, Any]",
-            np.linalg.eigvals(A_final[m]),
-        )
-        w_finite = w[np.isfinite(w)]
-        if len(w_finite) > 0:
-            max_re_across_modes = max(max_re_across_modes, float(np.max(w_finite.real)))
+    for m in range(A_rhs.shape[0]):
+        if B_lhs is not None:
+            w = cast(
+                "np.ndarray[Any, Any]",
+                sla.eig(A_rhs[m], B_lhs[m], right=False),
+            )
+        else:
+            w = cast(
+                "np.ndarray[Any, Any]",
+                np.linalg.eigvals(A_rhs[m]),
+            )
+        # Filter |λ| > 1e12 (gauge modes, zeroed downstream) and infinite
+        w_phys = w[np.isfinite(w) & (np.abs(w) < 1e12)]
+        if len(w_phys) > 0:
+            max_re_across_modes = max(max_re_across_modes, float(np.max(w_phys.real)))
 
     assert max_re_across_modes < 1e-6, (
-        f"Pre-solved unified matrix has a tachyonic eigenvalue "
+        f"Unified builder produced a tachyonic eigenvalue "
         f"(max Re(λ) = {max_re_across_modes:.3e}) across all modes. "
-        f"The unified builder (D.2) must produce tachyon-free dynamics."
+        f"The generalized eig(A, B) dispatch must handle rank-deficient M."
     )
