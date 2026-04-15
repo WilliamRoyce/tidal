@@ -134,6 +134,17 @@ calculus, and uses the curved-spacetime Maxwell conventions of Hwang & Noh
 | **Rubilar et al. (2003)** — "Torsion nonminimally coupled to the EM field and birefringence", [arXiv:gr-qc/0305049](https://arxiv.org/abs/gr-qc/0305049) | Proves T²F² couplings make light sensitive to torsion; vacuum birefringence |
 | **Itin (2003)** — "Maxwell's field coupled nonminimally to quadratic torsion", [arXiv:gr-qc/0307063](https://arxiv.org/abs/gr-qc/0307063) | Two families: F·T² (modifies Maxwell) and F²·T² (modifies constitutive tensor); induced axion field |
 
+## Dark Photon / Kinetic Mixing Portal
+
+| Reference | Relevance |
+| --- | --- |
+| **Holdom (1986)** — "Two U(1)'s and ε charge shifts", Phys. Lett. B 166, 196 | Original theorem: pure kinetic mixing between two U(1) gauge fields is equivalent to a field redefinition for matter-free sectors. Establishes that kinetic mixing alone is observable only via coupling to charged matter (millicharges). |
+| **Pospelov (2008)** — "Secluded U(1) below the weak scale", [arXiv:0811.1030](https://arxiv.org/abs/0811.1030) | Canonical dark-photon-portal Lagrangian `L ⊃ -¼V² + ½κ V_{μν}F^Y_{μν} + ½m_V² V²` with positive-sign kinetic mixing convention. Effective coupling to EM current after diagonalisation. |
+| **Redondo (2008)** — "Helioscope bounds on hidden sector photons", [arXiv:0801.1527](https://arxiv.org/abs/0801.1527) | Explicit `P(γ→γ') = 4ε² · sin²((m² − ω_p²)·L/4ω)` formula including plasma frequency; rule of thumb for in-medium vs vacuum conversion. |
+| **An, Pospelov, Pradler (2013)** — "New stellar constraints on dark photons", [arXiv:1302.3884](https://arxiv.org/abs/1302.3884) | Stellar dark-photon bounds; eq. (2.4)–(2.6): vacuum and in-medium conversion formulas. |
+| **Fabbrichesi, Gabrielli, Lanfranchi (2020)** — "The Dark Photon", [arXiv:2005.01515](https://arxiv.org/abs/2005.01515) | Comprehensive review of dark-photon phenomenology, conventions, and experimental constraints. |
+| **Caputo, Millar, O'Hare, Vitagliano (2021)** — "Dark photon limits: a cookbook", [arXiv:2105.04565](https://arxiv.org/abs/2105.04565) | Practical oscillation formulae for dark-photon experiments including haloscope / DM-radio analyses. |
+
 ## Verification & Validation Methodology
 
 | Reference                                                                                                                             | Relevance                                                                                                       |
