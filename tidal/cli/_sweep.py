@@ -591,10 +591,9 @@ def _simulate_run(  # noqa: PLR0913
         spec = load_equation_system(spec_path)
     params = _parse_params(sim_args.param, spec)
 
-    from tidal.symbolic.json_loader import normalize_kinetic_coefficients
-
-    spec = normalize_kinetic_coefficients(spec, params)
-
+    # normalize_kinetic_coefficients band-aid removed: the modal solver
+    # now reads `kinetic_coefficient_symbolic` directly into the M
+    # diagonal (see tidal/solver/modal.py _build_evolution_matrices).
     t0 = time.monotonic()
     exit_code = _simulate(sim_args, spec, params)
     wall_time = time.monotonic() - t0
@@ -883,14 +882,13 @@ def _run_single(  # noqa: PLR0913, PLR0917
             from tidal.symbolic.json_loader import (
                 load_equation_system as _load_spec,
             )
-            from tidal.symbolic.json_loader import (
-                normalize_kinetic_coefficients,
-            )
 
             raw_spec = _load_spec(spec_path)
             base_p = _parse_params(base_args.param, raw_spec)
             params = {**base_p, **param_overrides}
-            spec_ = normalize_kinetic_coefficients(raw_spec, params)
+            # normalize_kinetic_coefficients band-aid removed — root fix
+            # in _build_evolution_matrices reads kin coeff into M diag.
+            spec_ = raw_spec
 
             grid_n = grid_shape_override or int(getattr(base_args, "grid_shape", 256))
             bounds = getattr(base_args, "bounds", "0:100")

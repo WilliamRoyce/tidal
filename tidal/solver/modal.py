@@ -515,9 +515,46 @@ def _build_evolution_matrices(
     K_mat = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
     J_mat = np.zeros((n_modes, n_f, n_f), dtype=np.complex128)
 
-    # Diagonal of M: each 2nd-order field has ẍ_i on the LHS
-    for fi in range(n_f):
-        M_mat[:, fi, fi] = 1.0
+    # Diagonal of M: each 2nd-order equation has kinetic_coefficient · ẍ_i
+    # on the LHS.  Previously hardcoded to 1.0, which was wrong for equations
+    # whose Wolfram-exported kinetic coefficient is symbolic (e.g. -kappa^(-2)
+    # for gravitons, -xi for massive vector torsion).  The CLI workaround
+    # `normalize_kinetic_coefficients` divided each RHS by its own kinetic
+    # coefficient so the assumption `diagonal=1` held, but that introduced
+    # asymmetric off-diagonals under any Schur elimination that assumes
+    # symmetric M (np.linalg.eigh).  Root fix: read the kinetic coefficient
+    # directly into the diagonal, and handle asymmetry via SVD below.
+    from tidal.symbolic._eval_utils import (  # noqa: PLC0415
+        evaluate_coefficient,
+    )
+
+    eq_for_field: dict[str, object] = {
+        eq.field_name: eq for eq in spec.equations if eq.time_derivative_order > 0
+    }
+    for fi, fname in enumerate(dyn_field_names):
+        eq_f = eq_for_field[fname]
+        kin_sym = getattr(eq_f, "kinetic_coefficient_symbolic", None)
+        if kin_sym is None:
+            M_mat[:, fi, fi] = 1.0
+        else:
+            try:
+                kin_val = evaluate_coefficient(
+                    kin_sym,
+                    coeff_eval._parameters,  # noqa: SLF001
+                    spec.effective_coordinates,
+                )
+            except Exception:  # noqa: BLE001
+                # Fall back to the old hardcoded value if resolution fails.
+                # Matches the behaviour of normalize_kinetic_coefficients
+                # which skips normalisation in this case.
+                M_mat[:, fi, fi] = 1.0
+                continue
+            if isinstance(kin_val, np.ndarray):
+                # Position-dependent kinetic — broadcast to per-mode shape.
+                # (Rare; most theories have constant kin coefficients.)
+                M_mat[:, fi, fi] = complex(kin_val.ravel()[0])
+            else:
+                M_mat[:, fi, fi] = complex(float(kin_val))
 
     # Constraint matrices — built in two phases:
     #   Phase 1: collect terms from constraint equations
@@ -683,138 +720,139 @@ def _build_evolution_matrices(
         m_k_independent = M_spread < 1e-14
 
         if m_k_independent:
-            # M is the same for all modes — single eigendecomposition
+            # M is the same for all modes — single SVD-based Schur.
+            #
+            # The system is M·ẍ = K·x + D·ẋ + J·x⃛.  When M is singular
+            # (rank-deficient), the naive Moore-Penrose pseudoinverse
+            # M⁺ · (K·x + D·ẋ) gives the minimum-norm ẍ but misses the
+            # **algebraic constraints** encoded in the left null space
+            # of M.  For the torsion dark-photon model, the rank-3
+            # tensor produces a rank-deficient M where multiple equations
+            # share the same mass-matrix row up to sign; these rows
+            # impose algebraic constraints on x (and ẋ) via their
+            # non-proportional K and D rows.
+            #
+            # Full Schur elimination via SVD:
+            #   M = U·Σ·Vᵀ  (asymmetric-safe, unlike eigh)
+            #   Left null space = columns of U with σ=0 — row constraints
+            #   Right null space = columns of V with σ=0 — gauge modes
+            #   Rotate K, D, J as K̃ = Uᵀ·K·V, etc.
+            #   Partition by dyn/con masks: dynamical rows (σ>0)
+            #     evolve, constraint rows (σ=0) give algebraic
+            #     constraints on the gauge column variables.
+            #   Solve K̃_cc·z_c = -K̃_cd·z_d for the gauge modes.
+            #   Substitute back into the dynamical block to get
+            #     K_eff, D_eff, then diagonal inversion by Σ_d.
+            #   Back-project via V_d to the original basis.
+            #
+            # This replaces the previous np.linalg.eigh-based approach,
+            # which assumed M was real-symmetric.  The derived-JSON M
+            # is NOT symmetric in general (each equation has its own
+            # LHS kinetic coefficient, and the off-diagonal d2_t
+            # cross-couplings between distinct fields don't
+            # antisymmetrise), so eigh silently symmetrised via
+            # (M + Mᵀ)/2 and gave a wrong eigenbasis for rank-deficient
+            # cases (leading to the torsion dark-photon null result).
+            #
+            # Ref: Golub & Van Loan (2013), Matrix Computations §5.5
+            # (generalised Schur decomposition for DAE systems).
             M0 = M_mat[0]
-            eigvals, Q = np.linalg.eigh(M0.real)  # M is real symmetric
-            # Threshold for zero eigenvalue
-            tol = 1e-10 * max(1.0, np.max(np.abs(eigvals)))
-            dyn_mask = np.abs(eigvals) > tol
+            U_svd, S_svd, Vh_svd = np.linalg.svd(M0)
+            tol = 1e-10 * max(1.0, float(np.max(S_svd)) if S_svd.size else 1.0)
+            dyn_mask = S_svd > tol
             con_mask = ~dyn_mask
             n_mass_con = int(np.sum(con_mask))
             n_mass_dyn = int(np.sum(dyn_mask))
 
             logger.info(
-                "Mass matrix eigenvalues: %s (dynamical: %d, constrained: %d)",
-                eigvals,
+                "Mass matrix singular values: %s (dynamical: %d, constrained: %d)",
+                S_svd,
                 n_mass_dyn,
                 n_mass_con,
             )
 
             if n_mass_con > 0:
-                # Rotate K, D, J into eigenspace
-                Q[:, con_mask]  # (n_f, n_mass_con)
-                Q_d = Q[:, dyn_mask]  # (n_f, n_mass_dyn)
-                np.diag(eigvals[dyn_mask])  # (n_mass_dyn, n_mass_dyn)
-                Lambda_d_inv = np.diag(
-                    1.0 / eigvals[dyn_mask]
-                )  # (n_mass_dyn, n_mass_dyn)
+                # U = left singular vectors (rows of M -> row basis)
+                # V = right singular vectors (columns of M -> col basis)
+                # Σ_d = diag of positive singular values
+                V_full = Vh_svd.conj().T  # (n_f, n_f)
+                U_full = U_svd  # (n_f, n_f)
+                U_full[:, dyn_mask]  # (n_f, n_mass_dyn)
+                V_d = V_full[:, dyn_mask]  # (n_f, n_mass_dyn)
+                Sigma_d_inv = np.diag(1.0 / S_svd[dyn_mask])  # (n_mass_dyn, n_mass_dyn)
 
-                # Rotate per-mode matrices
-                # K̃ = QᵀKQ, D̃ = QᵀDQ, J̃ = QᵀJQ
-                K_rot = np.einsum("ij,mjk,kl->mil", Q.T, K_mat, Q)
-                D_rot = np.einsum("ij,mjk,kl->mil", Q.T, D_mat, Q)
-                J_rot = np.einsum("ij,mjk,kl->mil", Q.T, J_mat, Q)
+                # Rotate K, D, J: K̃ = Uᵀ · K · V
+                K_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, K_mat, V_full)
+                D_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, D_mat, V_full)
+                J_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, J_mat, V_full)
 
-                # Partition into dynamical (d) and constrained (c) blocks
+                # Partition into dyn/con blocks
                 d_idx = np.where(dyn_mask)[0]
                 c_idx = np.where(con_mask)[0]
-
                 K_dd = K_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
                 K_dc = K_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
                 K_cd = K_rot[:, np.ix_(c_idx, d_idx)[0], np.ix_(c_idx, d_idx)[1]]
                 K_cc = K_rot[:, np.ix_(c_idx, c_idx)[0], np.ix_(c_idx, c_idx)[1]]
-
                 D_dd = D_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
                 D_dc = D_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
-                D_rot[:, np.ix_(c_idx, d_idx)[0], np.ix_(c_idx, d_idx)[1]]
-                D_rot[:, np.ix_(c_idx, c_idx)[0], np.ix_(c_idx, c_idx)[1]]
-
                 J_dd = J_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
                 J_dc = J_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
-                J_rot[:, np.ix_(c_idx, d_idx)[0], np.ix_(c_idx, d_idx)[1]]
-                J_rot[:, np.ix_(c_idx, c_idx)[0], np.ix_(c_idx, c_idx)[1]]
 
-                # Constraint rows: 0 = K_cd·z_d + K_cc·z_c + D_cd·ż_d + D_cc·ż_c
-                # Solve for z_c (position-only constraint, ignoring velocity for now):
-                # If K_cc is invertible: z_c = -K_cc⁻¹·K_cd·z_d
-                # If velocity terms are present, handle as implicit coupling.
-
-                # Check if constraint is purely positional (K_cc invertible, D_cc ~ 0)
+                # Constraint rows (σ=0): 0 = K_cd·z_d + K_cc·z_c + D_cd·ż_d + ...
+                # Solve K_cc · z_c = -K_cd · z_d (position-only constraints).
                 K_cc_det = np.linalg.det(K_cc) if n_mass_con > 0 else np.ones(n_modes)
                 has_k_con = np.any(np.abs(K_cc_det) > 1e-14)
 
                 if has_k_con:
-                    # Standard case: K_cc invertible → z_c = -K_cc⁻¹·K_cd·z_d
                     K_cc_reg = K_cc.copy()
                     singular = np.abs(K_cc_det) < 1e-14
                     if np.any(singular):
                         K_cc_reg[singular] += 1e-14 * np.eye(
                             n_mass_con, dtype=np.complex128
                         )
-                    K_cc_inv = np.linalg.inv(K_cc_reg)  # pyright: ignore[reportUnknownVariableType]
-
-                    # Recovery: z_c = -K_cc⁻¹·K_cd·z_d
-                    mass_recovery = -np.einsum("mij,mjk->mik", K_cc_inv, K_cd)  # pyright: ignore[reportUnknownArgumentType]
-
-                    # Substitute into dynamical equations:
-                    # Λ_d·z̈_d = K_dd·z_d + K_dc·z_c + D_dd·ż_d + D_dc·ż_c
-                    # z_c = mass_recovery·z_d → ż_c = mass_recovery·ż_d
+                    K_cc_inv = np.linalg.inv(K_cc_reg)
+                    mass_recovery = -np.einsum("mij,mjk->mik", K_cc_inv, K_cd)
                     K_eff = K_dd + np.einsum("mij,mjk->mik", K_dc, mass_recovery)
                     D_eff = D_dd + np.einsum("mij,mjk->mik", D_dc, mass_recovery)
                     J_eff = J_dd + np.einsum("mij,mjk->mik", J_dc, mass_recovery)
                 else:
-                    # No positional constraint coupling — mass constraint
-                    # modes decouple trivially (zero rows)
+                    # Null-space decouples trivially from the rest —
+                    # keep only the dyn/dyn block.
                     K_eff = K_dd
                     D_eff = D_dd
                     J_eff = J_dd
-                    mass_recovery = np.zeros(
-                        (n_modes, n_mass_con, n_mass_dyn), dtype=np.complex128
-                    )
 
-                # Now invert Λ_d (diagonal, all nonzero)
-                # E = Λ_d⁻¹·K_eff, F = Λ_d⁻¹·D_eff
-                E = np.einsum("ij,mjk->mik", Lambda_d_inv, K_eff)
-                F = np.einsum("ij,mjk->mik", Lambda_d_inv, D_eff)
+                # Invert Σ_d (diagonal): E = Σ_d⁻¹·K_eff, F = Σ_d⁻¹·D_eff
+                E = np.einsum("ij,mjk->mik", Sigma_d_inv, K_eff)
+                F = np.einsum("ij,mjk->mik", Sigma_d_inv, D_eff)
 
-                # Jerk substitution:
-                # d3_t(z_j) = E_j·ẋ + F_j·(E·x + F·ẋ) = F_j·E·x + (E_j + F_j·F)·ẋ
-                J_eff_inv = np.einsum("ij,mjk->mik", Lambda_d_inv, J_eff)
-                has_jerk = np.max(np.abs(J_eff_inv)) > 1e-15
+                # Jerk substitution: when J ≠ 0, the d3_t(x_j) term on
+                # the RHS couples third-order time derivatives. Reduce
+                # to second-order by iterating the ẍ expression once.
+                J_eff_inv = np.einsum("ij,mjk->mik", Sigma_d_inv, J_eff)
+                has_jerk = float(np.max(np.abs(J_eff_inv))) > 1e-15
                 if has_jerk:
                     logger.info("Jerk substitution: applying d3_t elimination")
-                    # K_final += J_eff_inv · F · E (position correction from jerk)
                     FE = np.einsum("mij,mjk->mik", F, E)
                     K_jerk = np.einsum("mij,mjk->mik", J_eff_inv, FE)
-                    # D_final += J_eff_inv · (E + F²) (velocity correction from jerk)
                     FF = np.einsum("mij,mjk->mik", F, F)
                     D_jerk = np.einsum("mij,mjk->mik", J_eff_inv, E + FF)
-
                     E_final = E + K_jerk
                     F_final = F + D_jerk
                 else:
                     E_final = E
                     F_final = F
 
-                # Build evolution matrix in the ROTATED field basis
-                # State vector in rotated basis: (z_d, ż_d)
-                # dz_d/dt = ż_d
-                # dż_d/dt = E_final·z_d + F_final·ż_d
-
-                # Now map back to the ORIGINAL slot-level evolution matrix A_dd.
-                # The rotation Q maps field-level indices to slot-level indices.
-                # For each dynamical field, there's a field_slot and vel_slot.
-
-                # Build the Q_d mapping: original field index → rotated dynamical index
-                # Q_d[original_i, rotated_j] = transformation coefficient
-
-                # For the velocity-slot rows (dynamics), fill in:
-                # dv_i/dt = Σ_j Q_d[i,a] · E_final[a,b] · Q_d[j,b] · field_j
-                #         + Σ_j Q_d[i,a] · F_final[a,b] · Q_d[j,b] · vel_j
-
-                # Effective K and D in original field basis:
-                K_orig = np.einsum("ia,mab,jb->mij", Q_d, E_final, Q_d)
-                D_orig = np.einsum("ia,mab,jb->mij", Q_d, F_final, Q_d)
+                # Back-project to original basis via right singular
+                # vectors V_d. The rotated dynamical mode z_d is
+                # related to the original x via z_d = V_dᵀ · x (right
+                # singular vectors span the physical subspace of x).
+                # ẍ_physical = V_d · z̈_d, so the effective K and D in
+                # original field basis are:
+                #   K_orig = V_d · E_final · V_dᵀ
+                #   D_orig = V_d · F_final · V_dᵀ
+                K_orig = np.einsum("ia,mab,jb->mij", V_d, E_final, V_d.conj())
+                D_orig = np.einsum("ia,mab,jb->mij", V_d, F_final, V_d.conj())
 
                 # Fill A_dd velocity rows
                 for i, fname_i in enumerate(dyn_field_names):
@@ -853,9 +891,12 @@ def _build_evolution_matrices(
             # For now, treat each mode independently
             for m in range(n_modes):
                 M_m = M_mat[m]
-                eigvals_m, _Q_m = np.linalg.eigh(M_m.real)
-                tol = 1e-10 * max(1.0, np.max(np.abs(eigvals_m)))
-                dyn_m = np.abs(eigvals_m) > tol
+                # Use SVD (not eigh) for rank detection since M may be
+                # asymmetric per the non-uniform kinetic-coefficient
+                # convention; eigh would silently symmetrise it.
+                sv_m = np.linalg.svd(M_m, compute_uv=False)
+                tol = 1e-10 * max(1.0, float(np.max(sv_m)) if sv_m.size else 1.0)
+                dyn_m = sv_m > tol
                 if np.all(dyn_m):
                     # Invertible for this mode
                     m_inv_m = np.linalg.inv(M_m)  # pyright: ignore[reportUnknownVariableType]
