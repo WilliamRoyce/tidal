@@ -1,0 +1,162 @@
+# Dark Photon (BSM, fundamental vector formulation)
+#
+# Lagrangian:
+#   L = (1/kappa^2) R
+#       - 1/4 F^2                                  (Maxwell)
+#       - 1/4 xi Ft^2 - 1/2 mT2 t_mu t^mu          (Proca dark photon)
+#       + deltam F_{ab} Ft^{ab}                    (kinetic mixing)
+#
+# Fields:
+#   h_{ab} : graviton perturbation (TT gauge)
+#   A_mu   : EM 4-potential, perturbed about Abar (B0 background)
+#   a_mu   : EM perturbation (photon)
+#   T_mu   : full dark-photon vector (zero background)
+#   t_mu   : dark-photon perturbation (the dynamical Proca mode)
+#
+# Multi-field perturbation (analogous to gertsenshtein_proca):
+#   g  = eta + epsilon * h
+#   A  = Abar + epsilon * a   (Abar gives the B0 background field)
+#   T  = 0    + epsilon * t   (no background dark photon)
+#
+# Mass term is on the PERTURBATION field t (not full T), exactly as in
+# gertsenshtein_proca where the photon mass uses a*a rather than A*A.
+# Reason: the kinetic term -1/4 Ft^2 is on the full field via xPert
+# linearization of the derived F_t curl, but the Proca mass on the
+# perturbation field is the only way xPert recognizes t as O(epsilon).
+#
+# Why fundamental vector (not TorsionCDT trace):
+#   The previous formulation used [torsion] perturbation_name = "t"
+#   together with a derived field Ftorsion built from TorsionCDT[c,-c,-b]
+#   (the trace of the auto-created rank-3 torsion tensor).  xPert
+#   linearizes the FULL rank-3 perturbation t[a,-b,-c] (24 components,
+#   12 surviving plane-wave reduction), but the Lagrangian only places
+#   kinetic and mass on the 4-dim trace subspace.  The resulting JSON
+#   kinetic matrix is rank-deficient embedded in a 9-dim dynamical
+#   block, and the constraint elimination injected spurious wrong-sign
+#   modes — observed as a tachyonic eigenvalue omega^2 = -1.008 in the
+#   (a_3, t_2, t_10, t_17) subsector even at deltam=0.  A fundamental
+#   4-vector has full-rank kinetic on 4 components, no rank-deficiency,
+#   no ghost injection.
+#
+# Refs:
+#   Holdom (1986), Phys. Lett. B 166, 196 — kinetic mixing
+#   Pospelov (2008), arXiv:0811.1030 — dark photon constraints
+#   Fabbrichesi, Gabrielli, Lanfranchi (2020), arXiv:2005.01515 — review
+#   Berlin et al. (2024), arXiv:2405.08865 — dark photon mixing methods
+
+[theory]
+name = "Dark Photon (BSM, fundamental vector)"
+description = "Einstein-Maxwell + massive Proca dark photon with kinetic mixing"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# Metric perturbation h_{ab} (graviton, rank-2 symmetric)
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+# Full EM 4-potential (fundamental field for perturbation)
+[[fields]]
+name = "A"
+type = "vector"
+
+# EM perturbation (photon)
+[[fields]]
+name = "a"
+type = "vector"
+
+# Full dark-photon 4-potential (fundamental, perturbed below)
+[[fields]]
+name = "T"
+type = "vector"
+
+# Dark-photon perturbation (the Proca dynamical field)
+[[fields]]
+name = "t"
+type = "vector"
+
+# Electromagnetic field strength F = dA
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Dark-photon field strength Ft = dT (Maxwell-like curl on the full field)
+[[derived_fields]]
+name = "Ft"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][T[-b]] - CD[-b][T[-a]]"
+
+# Background EM 4-potential: Abar_y = -B0*z -> B_x = B0
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+# Background dark photon: zero (purely perturbative dynamical field)
+[[background_fields]]
+name = "Tbar"
+type = "vector"
+components = ["0", "0", "0", "0"]
+
+[constants]
+names = ["kappa", "B0", "mT2", "xi", "deltam"]
+
+# Lagrangian: Einstein + Maxwell + massive Proca dark photon + kinetic mixing.
+# The Proca mass uses the PERTURBATION field t (not full T), mirroring
+# gertsenshtein_proca's photon-mass approach.
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/4 xi Ft[-a,-b] eta[a,c] eta[b,d] Ft[-c,-d] - 1/2 mT2 t[-a] eta[a,b] t[-b] + deltam F[-a,-b] eta[a,c] eta[b,d] Ft[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[linearization.matter_perturbations]]
+field = "T"
+perturbation_name = "t"
+background = "Tbar"
+
+# TT gauge on h — physical graviton polarizations only.
+[[gauge]]
+field = "h"
+type = "tt"
+
+# Lorenz gauge on photon a.
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Lorenz gauge on dark photon perturbation t.
+# For massive Proca, divergence vanishing is also enforced by the EOM,
+# but adding the Lorenz term keeps the kinetic operator full-rank.
+[[gauge]]
+field = "t"
+type = "lorenz"
+
+# Plane-wave reduction: propagation along z-axis
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+# Default parameters:
+# kappa  = 1.0  (gravitational coupling; kappa^2 = 16 pi G)
+# B0     = 0.01 (background magnetic field, small-P regime)
+# mT2    = 2.5e-5 (Proca mass squared, near Gertsenshtein resonance ~ B0^2)
+# xi     = 1.0  (Ft^2 kinetic prefactor)
+# deltam = 0.1  (kinetic mixing strength)
+
+[output]
+path = "../data/torsion_dark_photon_fv.json"
