@@ -239,3 +239,154 @@ def test_unified_builder_generalized_eig_tachyon_free() -> None:
         f"(max Re(λ) = {max_re_across_modes:.3e}) across all modes. "
         f"The generalized eig(A, B) dispatch must handle rank-deficient M."
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 3: SVD Schur back-projection continuity through critical point (#260)
+# ---------------------------------------------------------------------------
+
+
+def _make_asymmetric_m_spec(deltam: float, xi: float = 1.0) -> EquationSystem:
+    """Build a 2-field spec with asymmetric mass matrix.
+
+    Models the FV dark-photon kinetic-mixing system:
+      d2_t(a) + 2*deltam * d2_t(t) = -k^2 * a     (photon)
+      -2*deltam * d2_t(a) + (-xi) * d2_t(t) = -k^2 * t   (dark photon)
+
+    After normalizing by LHS kinetic coefficient:
+      M = [[1, 2*deltam], [-2*deltam/xi, 1]]
+    (pre-normalization: M = [[1, 2*deltam], [+2*deltam, -xi]])
+
+    det(M) = -xi + 4*deltam^2.  Critical point: deltam = sqrt(xi)/2.
+    """
+    from tidal.symbolic.json_loader import normalize_kinetic_coefficients
+
+    spec_dict: dict[str, object] = {
+        "metadata": {"source": "inline-test"},
+        "spacetime": {
+            "dimension": 2,
+            "signature": [-1, 1],
+            "coordinates": ["t", "x"],
+        },
+        "fields": [
+            {"name": "a_1", "index": 0, "is_dynamical": True},
+            {"name": "t_1", "index": 1, "is_dynamical": True},
+        ],
+        "equations": [
+            {
+                "field": "a_1",
+                "lhs": {
+                    "expression": "d2_t(a_1)",
+                    "order": {"time": 2, "space": 0},
+                    "kinetic_coefficient_symbolic": "-1",
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 2 * deltam,
+                            "operator": "d2_t",
+                            "field": "t_1",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "laplacian_x",
+                            "field": "a_1",
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "t_1",
+                "lhs": {
+                    "expression": "d2_t(t_1)",
+                    "order": {"time": 2, "space": 0},
+                    "kinetic_coefficient_symbolic": str(-xi),
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -2 * deltam,
+                            "operator": "d2_t",
+                            "field": "a_1",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "laplacian_x",
+                            "field": "t_1",
+                        },
+                    ],
+                },
+            },
+        ],
+    }
+    spec = cast(
+        "EquationSystem",
+        EquationSystem.from_dict(spec_dict),  # type: ignore[arg-type]
+    )
+    return normalize_kinetic_coefficients(spec, {})
+
+
+def test_svd_schur_continuity_through_critical_point() -> None:
+    """Eigenvalues of A are continuous through the mass-matrix critical point.
+
+    At deltam = sqrt(xi)/2, det(M) = 0 and the solver switches from
+    M^{-1}*K (invertible) to SVD Schur elimination (rank-deficient).
+    The physical eigenvalues must be continuous across this boundary.
+
+    Regression test for #260: previously the SVD Schur back-projection
+    dropped the constraint recovery term, producing discontinuous eigenvalues.
+    """
+    xi = 1.0
+    dm_crit = np.sqrt(xi) / 2.0  # = 0.5
+    dm_near = dm_crit - 0.01  # 0.49, invertible M
+
+    spec_near = _make_asymmetric_m_spec(dm_near, xi)
+    spec_crit = _make_asymmetric_m_spec(dm_crit, xi)
+
+    layout_n, grid_n, ce_n, kg_n, rs_n = _build_eval_context(spec_near)
+    layout_c, grid_c, ce_c, kg_c, rs_c = _build_eval_context(spec_crit)
+
+    A_near, _, _, _, _, _ = _build_evolution_matrices(
+        spec_near, layout_n, grid_n, ce_n, kg_n, rs_n
+    )
+    A_crit, _, _, _, _, _ = _build_evolution_matrices(
+        spec_crit, layout_c, grid_c, ce_c, kg_c, rs_c
+    )
+
+    # Compare eigenvalues at a representative non-DC mode
+    m_idx = 2
+    w_near = np.sort_complex(np.linalg.eigvals(A_near[m_idx]))
+    w_crit = np.sort_complex(np.linalg.eigvals(A_crit[m_idx]))
+
+    # At the critical point, one DOF is eliminated, so A_crit may have
+    # some zero eigenvalues.  Compare the non-zero eigenvalues.
+    mag_near = np.abs(w_near)
+    mag_crit = np.abs(w_crit)
+
+    # Physical modes: eigenvalues with |λ| > 0.01
+    phys_near = sorted(w_near[mag_near > 0.01], key=lambda z: -abs(z.imag))
+    phys_crit = sorted(w_crit[mag_crit > 0.01], key=lambda z: -abs(z.imag))
+
+    # Both should have the same number of physical modes (the critical
+    # point eliminates one field DOF = 2 eigenvalues from the first-order
+    # system, but the remaining physical modes should persist).
+    assert len(phys_crit) >= 2, (
+        f"Critical point should retain at least one physical oscillation mode "
+        f"(2 eigenvalues ±iω), got {len(phys_crit)} non-zero eigenvalues. "
+        f"All eigenvalues: {w_crit}"
+    )
+
+    # The largest physical eigenvalue magnitudes should be close
+    # (continuity check).  Allow 20% relative tolerance for the
+    # discrete dm step.
+    max_imag_near = max(abs(z.imag) for z in phys_near)
+    max_imag_crit = max(abs(z.imag) for z in phys_crit)
+    rel_diff = abs(max_imag_near - max_imag_crit) / max(max_imag_near, 1e-15)
+    assert rel_diff < 0.2, (
+        f"Eigenvalue discontinuity at critical point: "
+        f"|ω_near| = {max_imag_near:.6f}, |ω_crit| = {max_imag_crit:.6f}, "
+        f"relative diff = {rel_diff:.3f}. "
+        f"SVD Schur back-projection may be incorrect (#260)."
+    )

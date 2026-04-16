@@ -750,12 +750,12 @@ def _build_evolution_matrices(
             # is NOT symmetric in general (each equation has its own
             # LHS kinetic coefficient, and the off-diagonal d2_t
             # cross-couplings between distinct fields don't
-            # antisymmetrise), so eigh silently symmetrised via
+            # antisymmetrise), so eigh silently symmetrized via
             # (M + Mᵀ)/2 and gave a wrong eigenbasis for rank-deficient
             # cases (leading to the torsion dark-photon null result).
             #
             # Ref: Golub & Van Loan (2013), Matrix Computations §5.5
-            # (generalised Schur decomposition for DAE systems).
+            # (generalized Schur decomposition for DAE systems).
             M0 = M_mat[0]
             U_svd, S_svd, Vh_svd = np.linalg.svd(M0)
             tol = 1e-10 * max(1.0, float(np.max(S_svd)) if S_svd.size else 1.0)
@@ -777,8 +777,8 @@ def _build_evolution_matrices(
                 # Σ_d = diag of positive singular values
                 V_full = Vh_svd.conj().T  # (n_f, n_f)
                 U_full = U_svd  # (n_f, n_f)
-                U_full[:, dyn_mask]  # (n_f, n_mass_dyn)
                 V_d = V_full[:, dyn_mask]  # (n_f, n_mass_dyn)
+                V_c = V_full[:, con_mask]  # (n_f, n_mass_con)
                 Sigma_d_inv = np.diag(1.0 / S_svd[dyn_mask])  # (n_mass_dyn, n_mass_dyn)
 
                 # Rotate K, D, J: K̃ = Uᵀ · K · V
@@ -843,16 +843,36 @@ def _build_evolution_matrices(
                     E_final = E
                     F_final = F
 
-                # Back-project to original basis via right singular
-                # vectors V_d. The rotated dynamical mode z_d is
-                # related to the original x via z_d = V_dᵀ · x (right
-                # singular vectors span the physical subspace of x).
-                # ẍ_physical = V_d · z̈_d, so the effective K and D in
-                # original field basis are:
-                #   K_orig = V_d · E_final · V_dᵀ
-                #   D_orig = V_d · F_final · V_dᵀ
-                K_orig = np.einsum("ia,mab,jb->mij", V_d, E_final, V_d.conj())
-                D_orig = np.einsum("ia,mab,jb->mij", V_d, F_final, V_d.conj())
+                # Back-project to original basis.  After Schur
+                # elimination, z_c = recovery · z_d, so the original
+                # coordinates are:
+                #   x = V_d · z_d + V_c · z_c
+                #     = (V_d + V_c · recovery) · z_d  =  V_eff · z_d
+                # The effective operators in original field space are:
+                #   K_orig = V_eff · E_final · V_eff⁺
+                #   D_orig = V_eff · F_final · V_eff⁺
+                # where V_eff⁺ = (V_effᴴ V_eff)⁻¹ V_effᴴ is the
+                # left pseudoinverse.  When recovery = 0 (trivially
+                # decoupled constraints), V_eff = V_d and V_eff⁺ = V_dᴴ,
+                # recovering the previous formula.
+                if has_k_con:
+                    # mass_recovery: (n_modes, n_mass_con, n_mass_dyn)
+                    V_eff = V_d[np.newaxis, :, :] + np.einsum(
+                        "ic,mcj->mij", V_c, mass_recovery
+                    )  # (n_modes, n_f, n_mass_dyn)
+                    VHV = np.einsum(
+                        "mji,mjk->mik", V_eff.conj(), V_eff
+                    )  # (n_modes, n_mass_dyn, n_mass_dyn)
+                    VHV_inv = np.linalg.inv(VHV)
+                    V_eff_pinv = np.einsum(
+                        "mij,mkj->mik", VHV_inv, V_eff.conj()
+                    )  # (n_modes, n_mass_dyn, n_f)
+                    K_orig = np.einsum("mia,mab,mbj->mij", V_eff, E_final, V_eff_pinv)
+                    D_orig = np.einsum("mia,mab,mbj->mij", V_eff, F_final, V_eff_pinv)
+                else:
+                    # Trivially decoupled: V_eff = V_d, V_eff⁺ = V_dᴴ
+                    K_orig = np.einsum("ia,mab,jb->mij", V_d, E_final, V_d.conj())
+                    D_orig = np.einsum("ia,mab,jb->mij", V_d, F_final, V_d.conj())
 
                 # Fill A_dd velocity rows
                 for i, fname_i in enumerate(dyn_field_names):
