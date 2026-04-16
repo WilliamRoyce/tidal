@@ -1,0 +1,155 @@
+\documentclass[11pt,a4paper]{article}
+
+% standalone: lets \input{../figures/...} work even though those files
+% begin with \documentclass{standalone} — strips their preamble on inclusion.
+\usepackage{standalone}
+
+% Pre-load xcolor with [svgnames] before preamble.tex (which loads plain xcolor)
+% and tidal-tikz-styles.sty (which loads xcolor[svgnames]).
+% LaTeX only loads each package once; declaring options here first avoids the clash.
+\usepackage[svgnames]{xcolor}
+
+% --- Shared preamble (packages + macros) ---
+\input{preamble}
+
+% --- TikZ figure styles (shared palette + tikzset styles for \input'd figures) ---
+% TEXINPUTS in the Makefile adds ../figures to the search path.
+\usepackage{tidal-tikz-styles}
+
+% --- Additional macros needed by section files ---
+\usepackage[normalem]{ulem}       % \sout (strikethrough), normalem preserves \emph
+\DeclareMathOperator*{\argmax}{arg\,max}  % MAP estimate in inference.tex
+
+% --- Layout ---
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{parskip}
+
+% --- Table of contents depth ---
+\setcounter{tocdepth}{2}
+
+\title{TIDAL: Technical Documentation}
+\author{William Royce \\ Cavendish Astrophysics, University of Cambridge}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+% ================================================================
+% Physics
+% ================================================================
+
+\input{gertsenshtein}
+\newpage
+
+\input{gertsenshtein_formula}
+\newpage
+
+\input{gertsenshtein_localized}
+\newpage
+
+\input{background_validity}
+\newpage
+
+\input{critical_field}
+\newpage
+
+\input{torsion}
+\newpage
+
+\input{chern_simons}
+\newpage
+
+\input{amplification_mechanism}
+\newpage
+
+\input{dark_photon_torsion}
+\newpage
+
+\input{multi_field_perturbation}
+\newpage
+
+% ================================================================
+% Architecture
+% ================================================================
+
+\input{architecture}
+\newpage
+
+\input{pipeline}
+\newpage
+
+\input{json_schema}
+\newpage
+
+\input{modal_solver}
+\newpage
+
+\input{kinetic_matrix}
+\newpage
+
+\input{constraint_fields}
+\newpage
+
+\input{background_fields}
+\newpage
+
+\input{gauge_fixing}
+\newpage
+
+% ================================================================
+% Solver features
+% ================================================================
+
+\input{solver_optimizations}
+\newpage
+
+\input{adaptive_timestepping}
+\newpage
+
+\input{solver_migration}
+\newpage
+
+\input{volume_element_fix}
+\newpage
+
+% ================================================================
+% Inference & analysis
+% ================================================================
+
+\input{inference}
+\newpage
+
+% ================================================================
+% Operational
+% ================================================================
+
+\input{cli_reference}
+\newpage
+
+\input{examples}
+\newpage
+
+\input{troubleshooting}
+\newpage
+
+\input{derivation_performance}
+\newpage
+
+\input{adr_disk_storage}
+\newpage
+
+\input{gertsenshtein_proca}
+\newpage
+
+% ================================================================
+% Bibliography
+% ================================================================
+
+\bibliographystyle{unsrt}
+\bibliography{references}
+
+\end{document}
