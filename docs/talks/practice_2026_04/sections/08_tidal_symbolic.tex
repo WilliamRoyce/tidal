@@ -1,0 +1,30 @@
+\begin{frame}{\textsc{tidal}: symbolic side}
+  \note{\textasciitilde 10 min mark. Don't get bogged down in xAct internals.}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.52\textwidth}
+      \textbf{Input:} a TOML file listing
+      \begin{itemize}\small
+        \item fields + Lagrangian terms,
+        \item background fields,
+        \item gauge fixing,
+        \item linearisation directives.
+      \end{itemize}
+      \vspace{0.4em}
+      \textbf{Processing} (Mathematica + xAct / xTras):
+      \begin{itemize}\small
+        \item \texttt{xPert} perturbation around arbitrary backgrounds.
+        \item Euler--Lagrange w.r.t.\ each field independently (tetrad, spin connection, matter).
+        \item Component decomposition, gauge fixing, mass / coupling matrix extraction.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \placeholder{Screenshot of a small \texttt{theory.toml}, annotated.}
+      \vspace{0.8em}
+
+      \textbf{Output:} JSON spec fully describing the linearised system --- field list, operator library, coefficient tables, background fields, Hamiltonian.
+
+      \vspace{0.5em}
+      \emph{Not a lookup table of hand-coded theories --- a symbolic compiler.}
+    \end{column}
+  \end{columns}
+\end{frame}
