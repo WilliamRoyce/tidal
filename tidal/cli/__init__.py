@@ -1240,11 +1240,13 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="N",
         help=(
             "Number of parallel worker processes (default: sequential). "
-            "On HPC, set to ~min(n_points, n_cores/3) for best efficiency — "
-            "e.g. for a 90-point sweep on a 112-core sapphire node, "
-            "--parallel 32 gives ~98%% efficiency, parallel=16 gives ~127%%"
-            " (super-linear from BLAS cache effects) in 6 s wall vs. 123 s"
-            " serial. Past n_points/3 the pool-startup overhead dominates."
+            "Always set this on HPC — sequential default costs 20-50x wall time. "
+            "Rule of thumb on a 112-core sapphire node: "
+            "< 5 s/point -> min(N,32) (pool startup ~40%% of run time above P=32); "
+            "5-30 s/point -> min(N,56); "
+            "> 30 s/point -> min(N,112) (startup <1%%, use the full node). "
+            "Super-linear speedup at P in {8,16} from BLAS cache effects on short runs. "
+            "Run scripts/hpc_scaling_sweep.sh to profile a new workload."
         ),
     )
     sweep_parser.add_argument(

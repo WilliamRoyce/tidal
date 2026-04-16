@@ -113,7 +113,7 @@ Claude auto-memory files, plans, and project settings are backed up to `.claude-
 - **Never poll `squeue`/`sinfo` in loops** — shared controller. One-shot `status` per user request only. No background watch processes.
 - **On SSH auth failure, STOP and ask the user.** Do NOT retry. Fail2Ban blocks the IP for 20 min after repeated failures.
 - **Diagnose parallel scaling** with `scripts/hpc_shuttle.sh htop <jobid>` (jumps to the compute node). This is the primary diagnostic.
-- **Sweep parallelism sweet spot:** for N-point sweeps on sapphire (112 cores), `--parallel min(N, 32)` is the efficiency sweet spot (~98% of ideal on the 90-point plasma-Gertsenshtein benchmark). Going higher gives diminishing returns because pool startup (~2 s) becomes Amdahl-dominant for small N. Never submit a sweep without `--parallel` — the sequential default will cost you 20-50× wall time. Super-linear speedup is expected at `P ∈ {8, 16}` from BLAS cache locality.
+- **Sweep parallelism — always specify `--parallel`** (sequential default costs 20-50× wall time). Choose based on estimated per-point run time on sapphire (112 cores): < 5 s/point (smoke tests, scalar models) → `--parallel min(N, 32)` (pool startup ~40% of run time above P=32); 5–30 s/point → `--parallel min(N, 56)`; > 30 s/point (PGT coupling space, large grids) → `--parallel min(N, 112)` (startup < 1%, use the full node). Super-linear speedup at `P ∈ {8, 16}` from BLAS cache locality on short runs. For new workload types, profile first with `scripts/hpc_scaling_sweep.sh`.
 - **Pull only lightweight artefacts** by default (figures, summary JSONs, CSVs). Do all plotting and analysis remotely. `--all` is opt-in and warns.
 
 ## Session Persistence Workaround
