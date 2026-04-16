@@ -36,8 +36,9 @@ BOUNDS="0:100"
 T_END=50.0
 
 # Same mass bounds as sweep_mc.sh, but deltam FIXED at 0
-MA2_BOUNDS="0.01:5.0:2"
-MT2_BOUNDS="0.01:5.0:2"
+# Grid matching Sweep A (50×50) for paired A_dark computation
+MA2_BOUNDS="0.01:5.0:50"
+MT2_BOUNDS="0.01:5.0:50"
 
 echo "=== Plasma Dark Photon: Paired Baseline (δ_m = 0) ==="
 echo "Samples: ${N_SAMPLES}"

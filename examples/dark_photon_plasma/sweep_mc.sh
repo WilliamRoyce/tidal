@@ -63,11 +63,13 @@ T_END=50.0
 MA2_BOUNDS="0.01:5.0:2"
 MT2_BOUNDS="0.01:5.0:2"
 DELTA_BOUNDS="-2.0:2.0:2"
+XI_BOUNDS="0.1:5.0:2"
 
-echo "=== Plasma Dark Photon: Monte Carlo Sweep ==="
+echo "=== Plasma Dark Photon: 4D Monte Carlo Sweep ==="
 echo "Samples: ${N_SAMPLES}"
-echo "Fixed: kappa=${KAPPA}, B0=${B0}, xi=${XI}, k0=${K0}"
-echo "Sweep: mA2 ∈ [0.001, 500], mT2 ∈ [0.001, 500], deltam ∈ [-50, 50]"
+echo "Fixed: kappa=${KAPPA}, B0=${B0}, k0=${K0}"
+echo "Sweep: mA2 ∈ [0.01, 5], mT2 ∈ [0.01, 5], deltam ∈ [-2, 2], xi ∈ [0.1, 5]"
+echo "Ghost boundary: |deltam| < sqrt(xi)/2"
 echo "Output: ${OUTPUT}"
 echo ""
 
@@ -75,6 +77,7 @@ tidal sweep "${SPEC}" \
   --sweep "mA2=${MA2_BOUNDS}" \
   --sweep "mT2=${MT2_BOUNDS}" \
   --sweep "deltam=${DELTA_BOUNDS}" \
+  --sweep "xi=${XI_BOUNDS}" \
   --sweep-strategy latin_hypercube \
   --n-samples "${N_SAMPLES}" \
   --measure conversion,peak_conversion \
@@ -82,14 +85,14 @@ tidal sweep "${SPEC}" \
   --grid-shape "${GRID}" --bounds "${BOUNDS}" --periodic \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
-  --param "kappa=${KAPPA}" --param "B0=${B0}" --param "xi=${XI}" \
+  --param "kappa=${KAPPA}" --param "B0=${B0}" \
   --parallel "${TIDAL_PARALLEL:-4}" --resume \
   --output "${OUTPUT}"
 
 echo ""
 echo "--- Generating plots ---"
 
-# Sensitivity: which of (mA2, mT2, deltam) drives conversion?
+# Sensitivity: which of (mA2, mT2, deltam, xi) drives conversion?
 tidal plot "${OUTPUT}" --type sweep-tornado \
   --metric P_max \
   --title "Plasma dark photon: parameter sensitivity (P_max)" \
