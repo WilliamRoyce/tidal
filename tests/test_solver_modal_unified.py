@@ -390,3 +390,183 @@ def test_svd_schur_continuity_through_critical_point() -> None:
         f"relative diff = {rel_diff:.3f}. "
         f"SVD Schur back-projection may be incorrect (#260)."
     )
+
+
+# ---------------------------------------------------------------------------
+# Test 4: rank-deficient K_cc handled by pseudoinverse (#260, CDT case)
+# ---------------------------------------------------------------------------
+
+
+def _make_cdt_like_spec(deltam: float, xi: float = 1.0) -> EquationSystem:
+    """Build a 4-field spec mimicking the CDT dark-photon rank structure.
+
+    Four fields: a (photon), t0, t1, t2 (torsion trace components).
+    Each torsion field has d2_t cross-couplings to a and to each other,
+    producing a 4×4 mass matrix with rank that drops at deltam = √ξ/2.
+
+    At generic deltam, M has rank 3 (1 null direction from the trace
+    structure).  At deltam = √ξ/2, M drops to rank 2 (additional null
+    direction from the kinetic-mixing critical point), making K_cc
+    expand from 1×1 to 2×2 and potentially rank-deficient.
+
+    This tests the np.linalg.pinv(K_cc) path that handles rank-deficient
+    constraint stiffness blocks.
+    """
+    from tidal.symbolic.json_loader import normalize_kinetic_coefficients
+
+    # Trace coupling: each torsion field has d2_t to both other torsion fields
+    # and to the photon.  M structure:
+    #   M[a, t_i] = -2*deltam   (kinetic mixing)
+    #   M[t_i, a] = +2*deltam   (antisymmetric)
+    #   M[t_i, t_j] = -xi       (trace structure, i≠j)
+    #   M[a, a] = 1, M[t_i, t_i] = -xi
+    fields = [
+        {"name": "a", "index": 0, "is_dynamical": True},
+        {"name": "t0", "index": 1, "is_dynamical": True},
+        {"name": "t1", "index": 2, "is_dynamical": True},
+        {"name": "t2", "index": 3, "is_dynamical": True},
+    ]
+
+    equations = []
+
+    # Photon equation: d2_t(a) + sum_i 2*deltam * d2_t(t_i) = -k^2 * a
+    equations.append(
+        {
+            "field": "a",
+            "lhs": {
+                "expression": "d2_t(a)",
+                "order": {"time": 2, "space": 0},
+                "kinetic_coefficient_symbolic": "-1",
+            },
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    *[
+                        {
+                            "coefficient": 2 * deltam,
+                            "operator": "d2_t",
+                            "field": f"t{i}",
+                        }
+                        for i in range(3)
+                    ],
+                    {
+                        "coefficient": -1.0,
+                        "operator": "laplacian_x",
+                        "field": "a",
+                    },
+                ],
+            },
+        }
+    )
+
+    # Torsion equations: (-xi)*d2_t(t_i) - 2*deltam*d2_t(a)
+    #   + sum_{j≠i} (-xi)*d2_t(t_j) = -k^2 * t_i
+    for i in range(3):
+        terms = [
+            {
+                "coefficient": -2 * deltam,
+                "operator": "d2_t",
+                "field": "a",
+            },
+            *[
+                {
+                    "coefficient": -xi,
+                    "operator": "d2_t",
+                    "field": f"t{j}",
+                }
+                for j in range(3)
+                if j != i
+            ],
+            {
+                "coefficient": -1.0,
+                "operator": "laplacian_x",
+                "field": f"t{i}",
+            },
+        ]
+        equations.append(
+            {
+                "field": f"t{i}",
+                "lhs": {
+                    "expression": f"d2_t(t{i})",
+                    "order": {"time": 2, "space": 0},
+                    "kinetic_coefficient_symbolic": str(-xi),
+                },
+                "rhs": {"type": "linear_combination", "terms": terms},
+            }
+        )
+
+    spec_dict: dict[str, object] = {
+        "metadata": {"source": "inline-test"},
+        "spacetime": {
+            "dimension": 2,
+            "signature": [-1, 1],
+            "coordinates": ["t", "x"],
+        },
+        "fields": fields,
+        "equations": equations,
+    }
+    spec = cast(
+        "EquationSystem",
+        EquationSystem.from_dict(spec_dict),  # type: ignore[arg-type]
+    )
+    return normalize_kinetic_coefficients(spec, {})
+
+
+def test_kcc_rank_deficient_pinv_continuity() -> None:
+    """K_cc pseudoinverse maintains continuity when K_cc becomes rank-deficient.
+
+    The CDT dark-photon model's mass matrix has a null space that expands
+    at the kinetic-mixing critical point (deltam = sqrt(xi)/2).  At this
+    point, the rotated stiffness constraint block K_cc becomes rank-deficient.
+    The pseudoinverse (np.linalg.pinv) must correctly handle undetermined
+    constraint modes to produce continuous eigenvalues.
+
+    Regression test for #260 (CDT case): previously, 1e-14*I regularization
+    of K_cc corrupted the constraint recovery for undetermined modes.
+    """
+    xi = 1.0
+    dm_crit = np.sqrt(xi) / 2.0
+    dm_near = dm_crit - 0.01
+
+    spec_near = _make_cdt_like_spec(dm_near, xi)
+    spec_crit = _make_cdt_like_spec(dm_crit, xi)
+
+    layout_n, grid_n, ce_n, kg_n, rs_n = _build_eval_context(spec_near)
+    layout_c, grid_c, ce_c, kg_c, rs_c = _build_eval_context(spec_crit)
+
+    A_near, _, _, _, _, _ = _build_evolution_matrices(
+        spec_near, layout_n, grid_n, ce_n, kg_n, rs_n
+    )
+    A_crit, _, _, _, _, _ = _build_evolution_matrices(
+        spec_crit, layout_c, grid_c, ce_c, kg_c, rs_c
+    )
+
+    m_idx = 2
+    w_near = np.linalg.eigvals(A_near[m_idx])
+    w_crit = np.linalg.eigvals(A_crit[m_idx])
+
+    # No tachyonic eigenvalues at either parameter point
+    max_re_near = float(np.max(np.abs(w_near.real)))
+    max_re_crit = float(np.max(np.abs(w_crit.real)))
+    assert max_re_near < 1.0, (
+        f"Near-critical point has tachyonic eigenvalue: max |Re(λ)| = {max_re_near:.3e}"
+    )
+    assert max_re_crit < 1.0, (
+        f"Critical point has tachyonic eigenvalue: max |Re(λ)| = {max_re_crit:.3e}. "
+        f"K_cc pseudoinverse may not be handling rank-deficient constraint stiffness."
+    )
+
+    # Physical eigenvalues (|λ| > 0.01) should be continuous
+    phys_near = sorted(w_near[np.abs(w_near) > 0.01], key=lambda z: -abs(z.imag))
+    phys_crit = sorted(w_crit[np.abs(w_crit) > 0.01], key=lambda z: -abs(z.imag))
+
+    if phys_near and phys_crit:
+        max_imag_near = max(abs(z.imag) for z in phys_near)
+        max_imag_crit = max(abs(z.imag) for z in phys_crit)
+        rel_diff = abs(max_imag_near - max_imag_crit) / max(max_imag_near, 1e-15)
+        assert rel_diff < 0.5, (
+            f"Eigenvalue discontinuity at K_cc rank-deficient critical point: "
+            f"|ω_near| = {max_imag_near:.6f}, |ω_crit| = {max_imag_crit:.6f}, "
+            f"relative diff = {rel_diff:.3f}. "
+            f"K_cc pseudoinverse may be incorrect (#260, CDT case)."
+        )

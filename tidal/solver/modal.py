@@ -424,11 +424,19 @@ def _build_evolution_matrices(
     The algorithm:
     1. Separates constraint (time_order=0) and dynamical fields
     2. Builds M, D, K matrices for dynamical fields from operator decomposition
-    3. Eigendecomposes M per mode to detect singular directions
-    4. Treats zero-eigenvalue directions as additional constraints (Schur)
-    5. Substitutes jerk terms using the (now-invertible) dynamical equations
-    6. Combines both constraint levels and builds the first-order evolution matrix
-    7. Pre-solves ``B_lhs · A_final = A_rhs`` via ``np.linalg.solve`` + ``lstsq``
+    3. SVD of M to detect singular directions (rank-deficient mass matrix)
+    4. Schur-eliminates mass-null directions: solves K_cc · z_c = -K_cd · z_d
+       for determinable constraint modes.  When K_cc is itself rank-deficient
+       (e.g. CDT dark photon at critical kinetic-mixing point), uses
+       ``np.linalg.pinv(K_cc)`` to give the minimum-norm solution — determinable
+       modes are solved exactly, undetermined modes are frozen at zero.
+    5. Back-projects to original field basis via V_eff = V_d + V_c · recovery,
+       where V_d, V_c are right singular vectors of M and recovery is the Schur
+       constraint-recovery matrix.  The effective operators are
+       K_orig = V_eff · E · V_eff⁺ (pseudoinverse), not V_d · E · V_dᴴ (#260).
+    6. Substitutes jerk terms using the (now-invertible) dynamical equations
+    7. Combines both constraint levels and builds the first-order evolution matrix
+    8. Pre-solves ``B_lhs · A_final = A_rhs`` via ``np.linalg.solve`` + ``lstsq``
        fallback, returning a single first-order evolution matrix (``B_lhs=None``).
        This replaces the old generalized-eigenvalue output after #256.
 
