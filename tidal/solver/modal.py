@@ -800,18 +800,18 @@ def _build_evolution_matrices(
 
                 # Constraint rows (σ=0): 0 = K_cd·z_d + K_cc·z_c + D_cd·ż_d + ...
                 # Solve K_cc · z_c = -K_cd · z_d (position-only constraints).
-                K_cc_det = np.linalg.det(K_cc) if n_mass_con > 0 else np.ones(n_modes)
-                has_k_con = np.any(np.abs(K_cc_det) > 1e-14)
+                #
+                # K_cc may itself be rank-deficient (e.g. CDT dark photon at
+                # dm = √ξ/2 where extra mass-matrix null directions open).
+                # Use pseudoinverse instead of regularized inverse: pinv gives
+                # the minimum-norm solution for determinable constraint modes
+                # and zeroes undetermined ones.  For full-rank K_cc, pinv ≡ inv.
+                K_cc_norms = np.linalg.norm(K_cc, axis=(1, 2))
+                has_k_con = np.any(K_cc_norms > 1e-14)
 
                 if has_k_con:
-                    K_cc_reg = K_cc.copy()
-                    singular = np.abs(K_cc_det) < 1e-14
-                    if np.any(singular):
-                        K_cc_reg[singular] += 1e-14 * np.eye(
-                            n_mass_con, dtype=np.complex128
-                        )
-                    K_cc_inv = np.linalg.inv(K_cc_reg)
-                    mass_recovery = -np.einsum("mij,mjk->mik", K_cc_inv, K_cd)
+                    K_cc_pinv = np.linalg.pinv(K_cc)
+                    mass_recovery = -np.einsum("mij,mjk->mik", K_cc_pinv, K_cd)
                     K_eff = K_dd + np.einsum("mij,mjk->mik", K_dc, mass_recovery)
                     D_eff = D_dd + np.einsum("mij,mjk->mik", D_dc, mass_recovery)
                     J_eff = J_dd + np.einsum("mij,mjk->mik", J_dc, mass_recovery)
