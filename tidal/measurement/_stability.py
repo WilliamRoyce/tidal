@@ -53,23 +53,43 @@ class ConversionStabilityResult:
     """Human-readable diagnostic message."""
 
 
-def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
+def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
     spec: EquationSystem,
     grid: GridInfo,
     parameters: dict[str, float],
     *,
     source: str = "h_5",
-    target: str = "a_1",
-    baseline_overrides: dict[str, float] | None = None,
+    target: str = "a_1",  # noqa: ARG001
+    baseline_overrides: dict[str, float] | None = None,  # noqa: ARG001
     ic_wavevector: float | None = None,
-    threshold: float = 0.01,
+    threshold: float = 0.3,
     n_extra_k: int = 4,
 ) -> ConversionStabilityResult:
-    """Check for tachyonic modes in a source→target conversion channel.
+    """Check for tachyonic modes in the block containing the source field.
 
-    Builds the Schur complement at the IC wavenumber and a few surrounding
-    k values, extracts the source+target field block eigenvalues, and
-    compares with the GR baseline to detect tachyonic onset.
+    Builds the constraint-eliminated first-order system at k=0 and near
+    the IC wavenumber, finds the independent block containing the source
+    field, and checks its maximum real eigenvalue against an absolute
+    threshold.  Uses the generalized eigenvalue problem (A, B) as in the
+    modal solver, giving the same eigenvalues the solver would use.
+
+    The check always includes k=0 (DC mode) because plane-wave ICs on a
+    finite grid have a non-trivial DC component (sinc leakage when k₀ is
+    not an exact grid frequency), which can excite k=0 tachyonic modes
+    and cause divergence even for ghost-free parameter points.
+
+    The full source-containing block (not just the 4x4 {source, target}
+    sub-matrix) is checked because CDT/PGT torsion models have non-trace
+    torsion components that share a block with the source field and carry
+    the instability; the 4x4 sub-matrix is always stable regardless.
+
+    Tachyonic modes with negligible IC coupling to the source field are
+    excluded from the tachyonic count.  These modes cannot be excited by
+    a source-field IC and are suppressed by the solver's
+    ``_suppress_tachyonic_noise``.  The coupling is measured via the
+    inverse right-eigenvector matrix V⁻¹; a relative coupling
+    ``|V⁻¹[i, src_slot]| / max|V⁻¹[:, src_slot]| < 1e-3`` is treated
+    as IC-decoupled and does not contribute to ``n_tachyonic_modes``.
 
     Parameters
     ----------
@@ -82,12 +102,15 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
     source, target : str
         Source and target field names for the conversion channel.
     baseline_overrides : dict, optional
-        Parameters to override for the GR baseline comparison.
-        Default: {"delta1": 0.0} (standard for torsion models).
+        Unused; kept for API compatibility.  The check now uses an
+        absolute threshold on Re(λ) rather than an excess over a baseline.
     ic_wavevector : float, optional
         IC wavenumber to check. Default: 2π/L (fundamental mode).
     threshold : float
-        Minimum excess growth rate to flag as tachyonic (default: 0.01).
+        Maximum Re(λ) in the source-containing block before the run is
+        classified as tachyonic (default: 0.3).  Physical oscillatory
+        modes have Re(λ) ≈ 0; values above ~0.3 indicate genuine
+        exponential growth from a k=0, small-k, or k=k₀ IC projection.
     n_extra_k : int
         Number of extra k values to check around the IC mode (default: 4).
 
@@ -96,11 +119,14 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
     ConversionStabilityResult
         Contains stable flag, growth rate, and diagnostic message.
     """
-    from tidal.solver.coefficients import CoefficientEvaluator
-    from tidal.solver.state import StateLayout
+    import scipy.linalg as sla
 
-    if baseline_overrides is None:
-        baseline_overrides = {"delta1": 0.0}
+    from tidal.solver.coefficients import CoefficientEvaluator
+    from tidal.solver.modal import (
+        _build_evolution_matrices,
+        find_independent_blocks,
+    )
+    from tidal.solver.state import StateLayout
 
     layout = StateLayout.from_spec(spec, grid.num_points)
 
@@ -119,73 +145,127 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
         ic_k = ic_wavevector
     ic_k_idx = int(np.argmin(np.abs(k_vals - ic_k)))
 
-    # Build k indices to check: IC mode + surrounding modes
-    k_indices = [ic_k_idx]
+    # Build k indices: always include k=0 (DC), a small-k band (indices
+    # 1…n_extra_k), k=k₀, and neighbours around k₀.
+    #
+    # k=0 and the small-k band are included because:
+    # (a) plane-wave ICs on a finite grid have a non-trivial DC component
+    #     (k₀ not exactly on grid → sinc leakage), and
+    # (b) ghost instabilities and CDT tachyonic modes frequently peak at
+    #     k ~ 0.06 to 0.25 (indices 1 to 4) where the IC projection is non-zero.
+    k_indices_set = {0, ic_k_idx}
+    # Small-k band: cover first 2xn_extra_k non-zero modes.
+    # CDT tachyonic modes and ghost instabilities peak at k ~ 0.06 to 0.5 (a
+    # wider range than the IC-mode neighbours), so the small-k band needs
+    # to be twice as wide as the IC neighbour band.
+    k_indices_set.update(range(1, min(2 * n_extra_k + 1, len(k_vals))))
+    # IC-mode neighbours
     for i in range(1, n_extra_k + 1):
         if ic_k_idx + i < len(k_vals):
-            k_indices.append(ic_k_idx + i)
+            k_indices_set.add(ic_k_idx + i)
         if ic_k_idx - i >= 0:
-            k_indices.append(ic_k_idx - i)
-    k_indices = sorted(set(k_indices))
+            k_indices_set.add(ic_k_idx - i)
+    k_indices = sorted(k_indices_set)
 
-    # Build constraint-eliminated system for both test and baseline
+    # Build constraint-eliminated system (with B for generalized eig)
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, _, _, _, _, mapping = _build_evolution_matrices(
+    A_test, B_test, _, _, _, _ = _build_evolution_matrices(
         spec, layout, grid, ce, k_grid, rfft_shape
     )
 
-    baseline_params = {**parameters, **baseline_overrides}
-    ce_bl = CoefficientEvaluator(spec, grid, baseline_params)
-    A_baseline, _, _, _, _, _ = _build_evolution_matrices(
-        spec, layout, grid, ce_bl, k_grid, rfft_shape
-    )
+    # Find independent blocks; use low-k modes for coupling detection
+    combined = np.max(np.abs(A_test[:3]), axis=0)
+    blocks = find_independent_blocks(combined, threshold=1e-14)
 
-    # Extract source+target block indices
+    # Identify the block containing the source field
     try:
-        src_r = mapping[layout.field_slot_map[source]]
-        vsrc_r = mapping[layout.velocity_slot_map[source]]
-        tgt_r = mapping[layout.field_slot_map[target]]
-        vtgt_r = mapping[layout.velocity_slot_map[target]]
-    except KeyError as exc:
+        src_slot = layout.field_slot_map[source]
+    except KeyError:
         return ConversionStabilityResult(
             stable=True,
             max_excess=0.0,
             k_tachyonic=None,
             n_tachyonic_modes=0,
-            message=f"Could not find source/target fields in reduced system: {exc}",
+            message=f"Source field '{source}' not found in reduced system.",
         )
 
-    idx = np.array([src_r, vsrc_r, tgt_r, vtgt_r])
+    src_block: list[int] | None = None
+    for block_slots in blocks:
+        if src_slot in block_slots:
+            src_block = list(block_slots)
+            break
 
-    # Check eigenvalues at each k
+    if src_block is None:
+        return ConversionStabilityResult(
+            stable=True,
+            max_excess=0.0,
+            k_tachyonic=None,
+            n_tachyonic_modes=0,
+            message=f"Source field '{source}' not in any coupled block.",
+        )
+
+    idx = np.array(src_block)
+
+    # Check the full source-containing block at each k.
+    # For each k where max Re(λ) > threshold, also verify that at least one
+    # tachyonic mode has significant IC coupling to the source field.  Modes
+    # that are decoupled from the source IC are suppressed by the solver's
+    # _suppress_tachyonic_noise and never cause divergence.
     max_excess = 0.0
     worst_k = None
     n_tachyonic = 0
+    src_slot_in_block = list(idx).index(src_slot)
 
     for ki in k_indices:
-        block_test = A_test[ki][idx[:, None], idx[None, :]]
-        block_bl = A_baseline[ki][idx[:, None], idx[None, :]]
+        Ak = A_test[ki][idx[:, None], idx[None, :]]
+        if B_test is not None:
+            Bk = B_test[ki][idx[:, None], idx[None, :]]
+            ev, VR = cast(
+                "tuple[NDArray[np.complexfloating], NDArray[np.complexfloating]]",
+                sla.eig(Ak, Bk),  # type: ignore[arg-type]
+            )
+            # Zero out gauge/infinite eigenvalues (unphysical DOF)
+            gauge = ~np.isfinite(ev) | (np.abs(ev) > 1e12)  # noqa: PLR2004
+            ev = ev.copy()
+            ev[gauge] = 0.0
+        else:
+            ev, VR = cast(
+                "tuple[NDArray[np.complexfloating], NDArray[np.complexfloating]]",
+                np.linalg.eig(Ak),  # type: ignore[assignment]
+            )
 
-        eigs_test = cast("NDArray[np.complexfloating]", np.linalg.eigvals(block_test))
-        eigs_bl = cast("NDArray[np.complexfloating]", np.linalg.eigvals(block_bl))
+        max_re = float(np.max(np.real(ev)))
 
-        max_re_test = float(np.max(np.real(eigs_test)))
-        max_re_bl = float(np.max(np.real(eigs_bl)))
+        if max_re > threshold:
+            # IC coupling check: of the tachyonic modes (Re(λ) > threshold),
+            # does any one project significantly onto the source field?
+            # V_inv[i, j] = how much mode i is excited by a unit IC in slot j.
+            tach_mask = np.real(ev) > threshold
+            V_inv = np.linalg.pinv(VR)
+            src_col = np.abs(V_inv[:, src_slot_in_block])
+            max_col = float(np.max(src_col))
+            if max_col > 1e-20:  # noqa: PLR2004
+                rel_coupling = float(np.max(src_col[tach_mask])) / max_col
+            else:
+                rel_coupling = 0.0
 
-        excess = max_re_test - max_re_bl
-        if excess > threshold:
+            if rel_coupling < 1e-3:  # noqa: PLR2004
+                # All tachyonic modes are IC-decoupled from source field.
+                # The solver's _suppress_tachyonic_noise will silence them.
+                continue
+
             n_tachyonic += 1
-            if excess > max_excess:
-                max_excess = excess
+            if max_re > max_excess:
+                max_excess = max_re
                 worst_k = float(k_vals[ki])
 
     if n_tachyonic > 0:
         msg = (
-            f"Tachyonic mode detected: {n_tachyonic}/{len(k_indices)} k-modes "
-            f"have excess growth rate > {threshold}. "
-            f"Worst: gamma={max_excess:.4f} at k={worst_k:.4f}. "
-            f"Conversion P will grow as exp(2gammat), not oscillate. "
-            f"Any measured 'amplification' A >> 1 is instability, not physics."
+            f"Tachyonic mode in source-block: {n_tachyonic}/{len(k_indices)} "
+            f"k-modes have max Re(λ) > {threshold}. "
+            f"Worst: max_Re={max_excess:.4f} at k={worst_k:.4f} "
+            f"(block size {len(src_block)} fields). "
+            f"System will diverge exponentially; any P_max is an artefact."
         )
         return ConversionStabilityResult(
             stable=False,
@@ -200,7 +280,7 @@ def check_conversion_stability(  # noqa: C901, PLR0913, PLR0914, PLR0915
         max_excess=max_excess,
         k_tachyonic=None,
         n_tachyonic_modes=0,
-        message="Stable: no tachyonic modes in conversion channel.",
+        message="Stable: max Re(λ) in source-block within tolerance.",
     )
 
 

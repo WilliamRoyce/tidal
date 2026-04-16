@@ -909,7 +909,6 @@ def _run_single(  # noqa: PLR0913, PLR0917
                 params,
                 source=source[0],
                 target=target[0],
-                n_extra_k=0,  # plane-wave IC: only check IC mode
             )
             if not stability.stable:
                 return {
