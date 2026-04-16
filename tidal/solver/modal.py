@@ -742,11 +742,11 @@ def _build_evolution_matrices(
             #
             # Full Schur elimination via SVD:
             #   M = U·Σ·Vᵀ  (asymmetric-safe, unlike eigh)
-            #   Left null space = columns of U with σ=0 — row constraints
-            #   Right null space = columns of V with σ=0 — gauge modes
-            #   Rotate K, D, J as K̃ = Uᵀ·K·V, etc.
-            #   Partition by dyn/con masks: dynamical rows (σ>0)
-            #     evolve, constraint rows (σ=0) give algebraic
+            #   Left null space = columns of U with s=0 -- row constraints
+            #   Right null space = columns of V with s=0 -- gauge modes
+            #   Rotate K, D, J as K~ = Ut*K*V, etc.
+            #   Partition by dyn/con masks: dynamical rows (s>0)
+            #     evolve, constraint rows (s=0) give algebraic
             #     constraints on the gauge column variables.
             #   Solve K̃_cc·z_c = -K̃_cd·z_d for the gauge modes.
             #   Substitute back into the dynamical block to get
@@ -806,7 +806,7 @@ def _build_evolution_matrices(
                 J_dd = J_rot[:, np.ix_(d_idx, d_idx)[0], np.ix_(d_idx, d_idx)[1]]
                 J_dc = J_rot[:, np.ix_(d_idx, c_idx)[0], np.ix_(d_idx, c_idx)[1]]
 
-                # Constraint rows (σ=0): 0 = K_cd·z_d + K_cc·z_c + D_cd·ż_d + ...
+                # Constraint rows (s=0): 0 = K_cd*z_d + K_cc*z_c + D_cd*dz_d/dt + ...
                 # Solve K_cc · z_c = -K_cd · z_d (position-only constraints).
                 #
                 # K_cc may itself be rank-deficient (e.g. CDT dark photon at
@@ -868,13 +868,13 @@ def _build_evolution_matrices(
                     V_eff = V_d[np.newaxis, :, :] + np.einsum(
                         "ic,mcj->mij", V_c, mass_recovery
                     )  # (n_modes, n_f, n_mass_dyn)
-                    VHV = np.einsum(
-                        "mji,mjk->mik", V_eff.conj(), V_eff
-                    )  # (n_modes, n_mass_dyn, n_mass_dyn)
-                    VHV_inv = np.linalg.inv(VHV)
-                    V_eff_pinv = np.einsum(
-                        "mij,mkj->mik", VHV_inv, V_eff.conj()
-                    )  # (n_modes, n_mass_dyn, n_f)
+                    # V_eff^+ = pinv(V_eff) handles rank-deficient cases
+                    # (e.g. mA2 near zero where mass modes become degenerate).
+                    # Using pinv(V_eff) directly is more numerically stable than
+                    # the two-step (V_eff^H V_eff)^{-1} V_eff^H formula, which
+                    # requires inv(V_eff^H V_eff) and fails when V_eff has
+                    # linearly-dependent columns.
+                    V_eff_pinv = np.linalg.pinv(V_eff)  # (n_modes, n_mass_dyn, n_f)
                     K_orig = np.einsum("mia,mab,mbj->mij", V_eff, E_final, V_eff_pinv)
                     D_orig = np.einsum("mia,mab,mbj->mij", V_eff, F_final, V_eff_pinv)
                 else:

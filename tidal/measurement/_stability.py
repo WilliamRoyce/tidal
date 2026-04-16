@@ -63,7 +63,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     baseline_overrides: dict[str, float] | None = None,  # noqa: ARG001
     ic_wavevector: float | None = None,
     threshold: float = 0.3,
-    n_extra_k: int = 4,
+    n_extra_k: int = 4,  # noqa: ARG001
 ) -> ConversionStabilityResult:
     """Check for tachyonic modes in the block containing the source field.
 
@@ -88,8 +88,10 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     a source-field IC and are suppressed by the solver's
     ``_suppress_tachyonic_noise``.  The coupling is measured via the
     inverse right-eigenvector matrix V⁻¹; a relative coupling
-    ``|V⁻¹[i, src_slot]| / max|V⁻¹[:, src_slot]| < 1e-3`` is treated
-    as IC-decoupled and does not contribute to ``n_tachyonic_modes``.
+    ``|V⁻¹[i, src_slot]| / max|V⁻¹[:, src_slot]| < 1e-10`` is treated
+    as IC-decoupled (matching the solver's ``coupling_threshold=1e-12``,
+    with a 100x safety margin).  Values between 1e-10 and 1 will cause
+    genuine exponential growth that the solver will not suppress.
 
     Parameters
     ----------
@@ -105,14 +107,17 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         Unused; kept for API compatibility.  The check now uses an
         absolute threshold on Re(λ) rather than an excess over a baseline.
     ic_wavevector : float, optional
-        IC wavenumber to check. Default: 2π/L (fundamental mode).
+        IC wavenumber (used only for documentation; all k modes are
+        checked regardless).  Default: 2π/L (fundamental mode).
     threshold : float
         Maximum Re(λ) in the source-containing block before the run is
         classified as tachyonic (default: 0.3).  Physical oscillatory
         modes have Re(λ) ≈ 0; values above ~0.3 indicate genuine
-        exponential growth from a k=0, small-k, or k=k₀ IC projection.
+        exponential growth.
     n_extra_k : int
-        Number of extra k values to check around the IC mode (default: 4).
+        Deprecated.  Previously controlled the k-neighbourhood scan
+        width; now all k modes are checked and this parameter is
+        ignored.
 
     Returns
     -------
@@ -143,29 +148,17 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         ic_k = 2 * math.pi / L
     else:
         ic_k = ic_wavevector
-    ic_k_idx = int(np.argmin(np.abs(k_vals - ic_k)))
+    int(np.argmin(np.abs(k_vals - ic_k)))
 
-    # Build k indices: always include k=0 (DC), a small-k band (indices
-    # 1…n_extra_k), k=k₀, and neighbours around k₀.
+    # Check ALL k modes.
     #
-    # k=0 and the small-k band are included because:
-    # (a) plane-wave ICs on a finite grid have a non-trivial DC component
-    #     (k₀ not exactly on grid → sinc leakage), and
-    # (b) ghost instabilities and CDT tachyonic modes frequently peak at
-    #     k ~ 0.06 to 0.25 (indices 1 to 4) where the IC projection is non-zero.
-    k_indices_set = {0, ic_k_idx}
-    # Small-k band: cover first 2xn_extra_k non-zero modes.
-    # CDT tachyonic modes and ghost instabilities peak at k ~ 0.06 to 0.5 (a
-    # wider range than the IC-mode neighbours), so the small-k band needs
-    # to be twice as wide as the IC neighbour band.
-    k_indices_set.update(range(1, min(2 * n_extra_k + 1, len(k_vals))))
-    # IC-mode neighbours
-    for i in range(1, n_extra_k + 1):
-        if ic_k_idx + i < len(k_vals):
-            k_indices_set.add(ic_k_idx + i)
-        if ic_k_idx - i >= 0:
-            k_indices_set.add(ic_k_idx - i)
-    k_indices = sorted(k_indices_set)
+    # CDT/PGT tachyonic modes can peak at any wavenumber depending on the
+    # parameter combination — restricting to a small-k band + IC neighbourhood
+    # leaves a gap (e.g. k ~ 0.57-1.70 for N=256, L=100) where instabilities
+    # are missed, causing runs to slip through the guard and diverge at runtime.
+    # With N=256 there are 129 modes; each eigenvalue problem is <=20x20 so the
+    # full scan costs only microseconds per sweep point.
+    k_indices = list(range(len(k_vals)))
 
     # Build constraint-eliminated system (with B for generalized eig)
     ce = CoefficientEvaluator(spec, grid, parameters)
@@ -249,9 +242,12 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             else:
                 rel_coupling = 0.0
 
-            if rel_coupling < 1e-3:  # noqa: PLR2004
-                # All tachyonic modes are IC-decoupled from source field.
-                # The solver's _suppress_tachyonic_noise will silence them.
+            if rel_coupling < 1e-10:  # noqa: PLR2004
+                # All tachyonic modes are IC-decoupled from source field
+                # (coupling < 1e-10, matching _suppress_tachyonic_noise's
+                # coupling_threshold=1e-12 with a 100x safety margin).
+                # Modes with coupling ≥ 1e-10 will NOT be suppressed by the
+                # solver and will cause genuine exponential divergence.
                 continue
 
             n_tachyonic += 1
