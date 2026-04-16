@@ -37,19 +37,20 @@ T_END=50.0
 
 # Same mass bounds as sweep_mc.sh, but deltam FIXED at 0
 # Grid matching Sweep A (50×50) for paired A_dark computation
+# alpha3 ∈ [0.005, 2.5] ≡ mT2 ∈ [0.01, 5] in old FV model (mass^2 = 2*alpha3)
 MA2_BOUNDS="0.01:5.0:50"
-MT2_BOUNDS="0.01:5.0:50"
+ALPHA3_BOUNDS="0.005:2.5:50"
 
 echo "=== Plasma Dark Photon: Paired Baseline (δ_m = 0) ==="
 echo "Samples: ${N_SAMPLES}"
 echo "Fixed: kappa=${KAPPA}, B0=${B0}, xi=${XI}, deltam=0 (no mixing)"
-echo "Sweep: mA2 ∈ [0.01, 5], mT2 ∈ [0.01, 5]"
+echo "Sweep: mA2 ∈ [0.01, 5], alpha3 ∈ [0.005, 2.5] (mass^2=2*alpha3 ∈ [0.01, 5])"
 echo "Output: ${OUTPUT}"
 echo ""
 
 tidal sweep "${SPEC}" \
   --sweep "mA2=${MA2_BOUNDS}" \
-  --sweep "mT2=${MT2_BOUNDS}" \
+  --sweep "alpha3=${ALPHA3_BOUNDS}" \
   --sweep-strategy latin_hypercube \
   --n-samples "${N_SAMPLES}" \
   --measure peak_conversion \
@@ -58,7 +59,7 @@ tidal sweep "${SPEC}" \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" --param "xi=${XI}" \
-  --param "deltam=0" --param "mT2=1.0" \
+  --param "deltam=0" \
   --parallel "${TIDAL_PARALLEL:-4}" --resume \
   --output "${OUTPUT}"
 

@@ -27,11 +27,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SPEC="${SCRIPT_DIR}/../data/dark_photon_plasma.json"
 OUTPUT="${SCRIPT_DIR}/../data/dp_plasma_heatmap_dxi"
 
-# Fixed physics (on resonance)
+# Fixed physics (on resonance: mA2 = mass^2 = 2*alpha3 → alpha3 = mA2/2)
 KAPPA=1.0
 B0=0.01
 MA2=0.5
-MT2=0.5
+ALPHA3=0.25    # alpha3 = MA2/2 = 0.25 → mass^2 = 2*alpha3 = 0.5 = mA2 (resonance)
 K0=2.0
 
 # Grid and simulation settings
@@ -40,7 +40,7 @@ BOUNDS="0:100"
 T_END=50.0
 
 echo "=== Sweep B: δ vs ξ heatmap (50×50) ==="
-echo "Fixed: κ=${KAPPA}, B₀=${B0}, mA²=${MA2}, mT²=${MT2} (on resonance)"
+echo "Fixed: κ=${KAPPA}, B₀=${B0}, mA²=${MA2}, alpha3=${ALPHA3} (on resonance: mass^2=2*alpha3=mA2)"
 echo "Ghost boundary: |δ| = √ξ/2"
 echo "Output: ${OUTPUT}"
 echo ""
@@ -54,7 +54,7 @@ tidal sweep "${SPEC}" \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" \
-  --param "mA2=${MA2}" --param "mT2=${MT2}" \
+  --param "mA2=${MA2}" --param "alpha3=${ALPHA3}" \
   --parallel "${TIDAL_PARALLEL:-4}" --resume \
   --output "${OUTPUT}"
 
@@ -65,7 +65,7 @@ echo "--- Generating plots ---"
 tidal plot "${OUTPUT}" --type sweep \
   --metric A \
   --baseline-formula "sin(kappa * B0 * ${T_END} / 2)**2" \
-  --title "Plasma dark photon: A(δ, ξ) at resonance mA²=mT²=${MA2}" \
+  --title "Plasma dark photon: A(δ, ξ) at resonance mA²=${MA2}, mass²=2·alpha3=${MA2}" \
   --output "${OUTPUT}/heatmap_A_dxi.png" --quiet
 
 # Stability filter

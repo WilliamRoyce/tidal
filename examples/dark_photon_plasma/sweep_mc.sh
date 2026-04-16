@@ -48,34 +48,31 @@ BOUNDS="0:100"
 T_END=50.0
 
 # Sweep parameter bounds (arctan-mapped for wide coverage):
-#   mA2    ∈ [0.001, 500]  — photon effective mass (plasma frequency)
-#   mT2    ∈ [0.001, 500]  — dark-photon Proca mass
-#   deltam ∈ [-50, 50]     — kinetic mixing (both signs, full range)
+#   mA2    ∈ [0.01, 5]    — photon effective mass (plasma frequency)
+#   alpha3 ∈ [0.005, 2.5] — PGT I3 coefficient; mass^2 = 2*alpha3 ∈ [0.01, 5]
+#                            (equiv. to old mT2 ∈ [0.01, 5] in FV model)
+#   deltam ∈ [-2, 2]      — kinetic mixing (both signs)
+#   xi     ∈ [0.1, 5]     — torsion kinetic strength
 #
-# Focused bounds for the physically interesting regime:
-#   mA² ∈ [0.01, 5] — covers plasma frequencies relevant for
-#     astrophysical environments and the resonance condition mA² ≈ mT².
-#   mT² ∈ [0.01, 5] — matched to mA² so resonance falls within range.
-#   δ ∈ [-2, 2] — covers weak mixing (|δ| ≪ 1), the Holdom critical
-#     point (|δ| = √ξ/2 = 0.5 for ξ=1), and the strong-mixing regime
-#     (|δ| > 1 where δ² > ξ → kinetic matrix becomes ghost-like).
+# Resonance condition: 2*alpha3 ≈ mA2 (dark-photon mass² ≈ photon plasma mass²).
+# Ghost boundary: |δ| < √ξ/2 (kinetic matrix K_kin = [[1,-2δ],[-2δ,ξ]] positive-definite).
 # Arctan mapping: ~50% of samples in [0, 1], ~50% in [1, 5].
 MA2_BOUNDS="0.01:5.0:2"
-MT2_BOUNDS="0.01:5.0:2"
+ALPHA3_BOUNDS="0.005:2.5:2"
 DELTA_BOUNDS="-2.0:2.0:2"
 XI_BOUNDS="0.1:5.0:2"
 
 echo "=== Plasma Dark Photon: 4D Monte Carlo Sweep ==="
 echo "Samples: ${N_SAMPLES}"
 echo "Fixed: kappa=${KAPPA}, B0=${B0}, k0=${K0}"
-echo "Sweep: mA2 ∈ [0.01, 5], mT2 ∈ [0.01, 5], deltam ∈ [-2, 2], xi ∈ [0.1, 5]"
+echo "Sweep: mA2 ∈ [0.01, 5], alpha3 ∈ [0.005, 2.5] (mass^2=2*alpha3), deltam ∈ [-2, 2], xi ∈ [0.1, 5]"
 echo "Ghost boundary: |deltam| < sqrt(xi)/2"
 echo "Output: ${OUTPUT}"
 echo ""
 
 tidal sweep "${SPEC}" \
   --sweep "mA2=${MA2_BOUNDS}" \
-  --sweep "mT2=${MT2_BOUNDS}" \
+  --sweep "alpha3=${ALPHA3_BOUNDS}" \
   --sweep "deltam=${DELTA_BOUNDS}" \
   --sweep "xi=${XI_BOUNDS}" \
   --sweep-strategy latin_hypercube \
@@ -122,6 +119,6 @@ echo "  ${OUTPUT}/plot_scatter.png   [pairwise scatter, coloured by P_max]"
 echo "  ${OUTPUT}/plot_parallel.png  [parallel coordinates]"
 echo ""
 echo "Physics notes:"
-echo "  Resonance condition: mA² ≈ mT² (matched photon/dark-photon dispersions)"
+echo "  Resonance condition: 2*alpha3 ≈ mA2 (dark-photon mass² = photon plasma mass²)"
 echo "  Holdom triviality: E[t,a] = -2·deltam·mA²/(4·deltam²-xi)"
-echo "  Expected P(h→t) ∝ deltam² · mA² at weak mixing"
+echo "  Expected P(h→a) ∝ deltam² · mA² at weak mixing"

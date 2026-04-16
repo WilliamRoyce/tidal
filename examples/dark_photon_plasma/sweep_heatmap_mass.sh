@@ -30,6 +30,7 @@ KAPPA=1.0
 B0=0.01
 XI=1.0
 DELTAM=0.3
+ALPHA3=0.15    # alpha3 = mT2/2; alpha3=0.15 → mass^2=0.30, near mA2 resonance
 K0=2.0
 
 # Grid and simulation settings
@@ -37,14 +38,15 @@ GRID=256
 BOUNDS="0:100"
 T_END=50.0
 
-echo "=== Sweep A: mA² vs mT² heatmap (50×50) ==="
-echo "Fixed: κ=${KAPPA}, B₀=${B0}, ξ=${XI}, δ=${DELTAM}"
+echo "=== Sweep A: mA² vs alpha3 heatmap (50×50) ==="
+echo "Fixed: κ=${KAPPA}, B₀=${B0}, ξ=${XI}, δ=${DELTAM}, alpha3=${ALPHA3}"
+echo "Note: mass^2 = 2*alpha3; alpha3 ∈ [0.005, 2.5] ≡ mT2 ∈ [0.01, 5] in FV model"
 echo "Output: ${OUTPUT}"
 echo ""
 
 tidal sweep "${SPEC}" \
   --sweep "mA2=0.01:5.0:50" \
-  --sweep "mT2=0.01:5.0:50" \
+  --sweep "alpha3=0.005:2.5:50" \
   --measure peak_conversion \
   --source h_5 --target a_1 \
   --grid-shape "${GRID}" --bounds "${BOUNDS}" --periodic \
@@ -62,13 +64,13 @@ echo "--- Generating plots ---"
 tidal plot "${OUTPUT}" --type sweep \
   --metric A \
   --baseline-formula "sin(kappa * B0 * ${T_END} / 2)**2" \
-  --title "Plasma dark photon: amplification A(mA², mT²) at δ=${DELTAM}, ξ=${XI}" \
+  --title "Plasma dark photon: amplification A(mA², alpha3) at δ=${DELTAM}, ξ=${XI}" \
   --output "${OUTPUT}/heatmap_A.png" --quiet
 
 # Also plot raw P_max for comparison
 tidal plot "${OUTPUT}" --type sweep \
   --metric P_max --log-scale \
-  --title "Plasma dark photon: P_max(mA², mT²)" \
+  --title "Plasma dark photon: P_max(mA², alpha3)" \
   --output "${OUTPUT}/heatmap_Pmax.png" --quiet
 
 # Stability filter
