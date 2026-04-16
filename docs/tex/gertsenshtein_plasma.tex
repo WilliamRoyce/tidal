@@ -40,9 +40,13 @@ analytical Lorentzian resonance.
     exact non-perturbative graviton-photon mixing in a constant $B$-field.
   \item \textbf{Domcke, Garcia-Cely \& Lee 2025},
     \href{https://arxiv.org/abs/2507.16609}{arXiv:2507.16609} ---
-    3D scattering treatment with medium effects at the EOM level
-    $[\Box - \mu^2]A_h = -j_{\mathrm{eff}}$, equivalent to the
-    Lagrangian approach used here via variational calculus.
+    3D scattering treatment with medium effects at the EOM level.
+    Eq.~(216): massless graviton-sourced wave equation
+    $\Box A_h^\mu = -j_{\mathrm{eff}}^\mu$ ($j_{\mathrm{eff}}^\mu$ defined
+    in their Eq.~(187)). Eq.~(1484) in \S``Towards including Medium
+    Effects'': $[\Box - \mu^2(x)]A_h^\mu = -j_{\mathrm{eff}}^\mu$ with
+    plasma mass $\mu^2$ --- the EOM-level counterpart of the Lagrangian
+    approach used here (equivalent via variational calculus).
   \item \textbf{Hwang \& Noh 2023},
     \href{https://arxiv.org/abs/2310.04150}{arXiv:2310.04150} ---
     canonical EM field definitions in curved spacetime, underpinning
@@ -126,8 +130,14 @@ with \texttt{xPert} recognising $a$ as $O(\varepsilon)$ via
 \texttt{DefTensorPerturbation}. This cleanly injects the mass into the
 $O(\varepsilon^2)$ Lagrangian without contaminating the background. The
 result is equivalent to Domcke, Garcia-Cely \& Lee 2025's EOM-level
-treatment via variational calculus, and uses the curved-spacetime Maxwell
-field conventions of Hwang \& Noh 2023.
+treatment $[\Box - \mu^2(x)]A_h^\mu = -j_{\mathrm{eff}}^\mu$
+(their Eq.~(1484), \S``Towards including Medium Effects''), obtained
+from the massless graviton-sourced equation $\Box A_h^\mu =
+-j_{\mathrm{eff}}^\mu$ (their Eq.~(216); $j_{\mathrm{eff}}^\mu$
+defined in Eq.~(187)) by adding the medium correction $-\mu^2 A_h^\mu$
+to the LHS --- precisely the same modification our Lagrangian term
+$-(m_A^2/2)a_\mu a^\mu$ produces via the Euler-Lagrange equation. The
+field conventions follow Hwang \& Noh 2023.
 
 \subsection{TIDAL Implementation}
 \label{subsec:proca-implementation}
@@ -244,6 +254,11 @@ Use \texttt{--fresh} to force re-running the sweeps.
     already implemented.
   \item \textbf{Axion-photon-graviton mixing} (Berlin et al.\ 2024,
     \href{https://arxiv.org/abs/2405.08865}{arXiv:2405.08865}): extend
-    the two-state mixing matrix to three states. The numerical methods
-    in Berlin et al.\ are directly analogous to TIDAL's approach.
+    the two-state mixing matrix to three states. Their Eq.~(309) gives
+    the Schrödinger-like two-state mixing equation
+    $2ik_a\,\partial_y\tilde{E}_x \simeq -(m_a^2-\omega_p^2)\tilde{E}_x
+    - \mathrm{coupling}$, directly analogous to the Raffelt-Stodolsky
+    Hamiltonian \eqref{eq:mixing-hamiltonian}; Eq.~(335) gives the
+    resonant conversion probability (recovered from Raffelt \& Stodolsky
+    1988 on resonance).
 \end{enumerate}
