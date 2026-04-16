@@ -1,7 +1,7 @@
 {
 	"metadata": {
 		"source": "xAct",
-		"lagrangian_expr": "((1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/4 xi Ft[-a,-b] eta[a,c] eta[b,d] Ft[-c,-d] - 1/2 mT2 t[-a] eta[a,b] t[-b] + deltam F[-a,-b] eta[a,c] eta[b,d] Ft[-c,-d])",
+		"lagrangian_expr": "((1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/4 xi Ft[-a,-b] eta[a,c] eta[b,d] Ft[-c,-d] - 1/2 mT2 t[-a] eta[a,b] t[-b] + deltam F[-a,-b] eta[a,c] eta[b,d] Ft[-c,-d] - 1/2 mA2 a[-a] eta[a,b] a[-b])",
 		"derived_from": "Euler-Lagrange",
 		"gauge": "tt(h)+lorenz(a)+lorenz(t)",
 		"linearized": true,
@@ -16,7 +16,7 @@
 				"h_4"
 			]
 		},
-		"derivation_hash": "eaba3b0084fa1d3e8fdc446bb23f1eb9b6df963554f7d3160ee508d56fe7792f"
+		"derivation_hash": "7e026318d6bba2eb7cfb55f4b115126f5b466a4a494dfcd8d6ebe1a7cae65f86"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -95,6 +95,12 @@
 				"type": "linear_combination",
 				"terms": [
 					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "a_0",
+						"coefficient_symbolic": "mA2"
+					},
+					{
 						"coefficient": -1.0,
 						"operator": "laplacian_x",
 						"field": "a_0"
@@ -126,6 +132,12 @@
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "a_1",
+						"coefficient_symbolic": "-mA2"
+					},
 					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
@@ -165,6 +177,12 @@
 				"type": "linear_combination",
 				"terms": [
 					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "a_2",
+						"coefficient_symbolic": "-mA2"
+					},
+					{
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "h_7",
@@ -202,6 +220,12 @@
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "a_3",
+						"coefficient_symbolic": "-mA2"
+					},
 					{
 						"coefficient": 1.0,
 						"operator": "laplacian_x",
@@ -498,19 +522,7 @@
 	"coupling": {
 		"mass_matrix_symbolic": [
 			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null
-			],
-			[
-				null,
+				"mA2",
 				null,
 				null,
 				null,
@@ -523,7 +535,7 @@
 			],
 			[
 				null,
-				null,
+				"-mA2",
 				null,
 				null,
 				null,
@@ -536,8 +548,20 @@
 			[
 				null,
 				null,
+				"-mA2",
 				null,
 				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				"-mA2",
 				null,
 				null,
 				null,
@@ -621,6 +645,58 @@
 	},
 	"canonical": {
 		"hamiltonian_terms": [
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "a_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "a_0",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-1/2*mA2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "a_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "a_1",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "mA2/2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "a_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "a_2",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "mA2/2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "a_3",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "a_3",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "mA2/2"
+			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {

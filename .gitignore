@@ -43,4 +43,4 @@ literature/*
 
 # HPC shuttle
 scripts/.hpc_jobs
-hpc_results/
+hpc_results/*
