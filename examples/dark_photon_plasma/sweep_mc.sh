@@ -52,14 +52,17 @@ T_END=50.0
 #   mT2    ∈ [0.001, 500]  — dark-photon Proca mass
 #   deltam ∈ [-50, 50]     — kinetic mixing (both signs, full range)
 #
-# Arctan mapping gives ~40% of samples in [0, 1], ~40% in [1, 50],
-# and ~20% in [50, 500], with dense coverage near zero where the
-# perturbative regime and resonance condition mA² ≈ mT² are most
-# interesting.  Large-|δ| regime probes δ² ≫ ξ (strong mixing) and
-# δ² ≫ mA², mT² (masses negligible vs coupling).
-MA2_BOUNDS="0.001:500:2"
-MT2_BOUNDS="0.001:500:2"
-DELTA_BOUNDS="-50:50:2"
+# Focused bounds for the physically interesting regime:
+#   mA² ∈ [0.01, 5] — covers plasma frequencies relevant for
+#     astrophysical environments and the resonance condition mA² ≈ mT².
+#   mT² ∈ [0.01, 5] — matched to mA² so resonance falls within range.
+#   δ ∈ [-2, 2] — covers weak mixing (|δ| ≪ 1), the Holdom critical
+#     point (|δ| = √ξ/2 = 0.5 for ξ=1), and the strong-mixing regime
+#     (|δ| > 1 where δ² > ξ → kinetic matrix becomes ghost-like).
+# Arctan mapping: ~50% of samples in [0, 1], ~50% in [1, 5].
+MA2_BOUNDS="0.01:5.0:2"
+MT2_BOUNDS="0.01:5.0:2"
+DELTA_BOUNDS="-2.0:2.0:2"
 
 echo "=== Plasma Dark Photon: Monte Carlo Sweep ==="
 echo "Samples: ${N_SAMPLES}"
