@@ -56,9 +56,13 @@ hpc_results/*
 *.synctex.gz
 *.toc
 *.vrb
-# Scoped to docs/ to avoid conflicts with other project *.log/*.out usage
+# Scoped to docs/ and research/ to avoid conflicts with other project *.log/*.out usage
 docs/**/*.log
 docs/**/*.out
-# LaTeX-generated PDFs in docs/ (theme PDFs in theme/ are source files, already tracked)
+research/*.log
+research/*.out
+# LaTeX-generated PDFs (theme PDFs in docs/talks/.../theme/ are source files, already tracked)
 docs/tex/*.pdf
 docs/talks/*/*.pdf
+docs/figures/*.pdf
+research/*.pdf
