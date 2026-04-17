@@ -1661,14 +1661,47 @@ def _evolve_per_mode(
             v_mat = np.zeros((n_block_modes, bs, bs), dtype=np.complex128)
             n_gauge_total = 0
             for m in range(A_block.shape[0]):
-                eig_result = sla.eig(A_block[m], B_block[m], right=True)  # pyright: ignore[reportUnknownVariableType]
-                ev_m = eig_result[0]  # pyright: ignore[reportUnknownVariableType]
-                vr_m = eig_result[1]  # pyright: ignore[reportUnknownVariableType]
-                # Filter infinite/very-large eigenvalues (gauge modes)
-                gauge = ~np.isfinite(ev_m) | (np.abs(ev_m) > 1e12)  # pyright: ignore[reportUnknownArgumentType]
+                A_m = A_block[m]
+                B_m = B_block[m]
+                # Null-space projection before QZ: rank-deficient B (e.g. CDT
+                # rank-3 PGT torsion where only the trace subspace has kinetic
+                # terms) causes scipy.linalg.eig to return FINITE spurious
+                # eigenvalues not caught by the |λ|>1e12 filter.  Project A
+                # and B onto range(B) first; null directions get eigenvalue 0
+                # (frozen at IC).  See issue #257.
+                _, s_b, Vt_b = np.linalg.svd(B_m)
+                null_thresh_b = s_b[0] * 1e-10 if s_b[0] > 0 else 1e-14
+                rank_b = int(np.sum(s_b > null_thresh_b))
+                null_dim_b = bs - rank_b
+                if null_dim_b > 0:
+                    Vphys = Vt_b[:rank_b].T  # (bs, rank_b) — physical subspace
+                    Vnull = Vt_b[rank_b:].T  # (bs, null_dim_b) — null(B)
+                    eig_r = sla.eig(  # pyright: ignore[reportUnknownVariableType]
+                        Vphys.T @ A_m @ Vphys,
+                        Vphys.T @ B_m @ Vphys,
+                        right=True,
+                    )
+                    ev_red = np.asarray(eig_r[0], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
+                    vr_red = np.asarray(eig_r[1], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
+                    # Lift eigenvectors to full space; null modes frozen at IC
+                    ev_m: NDArray[np.complex128] = np.concatenate(
+                        [ev_red, np.zeros(null_dim_b, dtype=np.complex128)]
+                    )
+                    # V_full = [Vphys @ vr_red | Vnull] is always invertible:
+                    # physical cols live in range(Vphys), null cols in null(B),
+                    # and SVD guarantees these two subspaces are orthogonal.
+                    vr_m: NDArray[np.complex128] = np.hstack([Vphys @ vr_red, Vnull])
+                    n_gauge_total += null_dim_b
+                else:
+                    eig_r2 = sla.eig(A_m, B_m, right=True)  # pyright: ignore[reportUnknownVariableType]
+                    ev_m = np.asarray(eig_r2[0], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
+                    vr_m = np.asarray(eig_r2[1], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
+                # Filter any remaining infinite/very-large eigenvalues
+                # (gauge modes not caught by null-space projection).
+                gauge = ~np.isfinite(ev_m) | (np.abs(ev_m) > 1e12)
                 ev_m[gauge] = 0.0  # gauge modes frozen at IC
                 n_gauge_total += int(np.sum(gauge))
-                eig_vals[m] = ev_m  # pyright: ignore[reportUnknownArgumentType]
+                eig_vals[m] = ev_m
                 v_mat[m] = vr_m
             if n_gauge_total > 0:
                 import logging as _log  # noqa: PLC0415

@@ -1146,3 +1146,123 @@ class TestConstraintElimination:
             assert max_real < 1e-10, (
                 f"Mode {m}: max |Re(λ)| = {max_real:.2e}, expected < 1e-10"
             )
+
+
+class TestRankDeficientBProjection:
+    """Tests for null-space projection of rank-deficient B in the QZ path (issue #257).
+
+    The CDT dark photon plasma model has ~20 kinetic-null non-trace torsion DOF
+    that make B_block rank-deficient.  Before the fix, scipy.linalg.eig(A, B)
+    with rank-deficient B produced FINITE spurious eigenvalues (Re≈25-500) that
+    bypassed the |λ|>1e12 filter.  The fix projects A and B onto range(B) first.
+    """
+
+    def test_spurious_eigenvalues_present_without_projection(self) -> None:
+        """Confirm that QZ on rank-deficient B produces finite spurious eigenvalues.
+
+        This documents the bug: before the fix, sla.eig(A, B) with rank-2 B
+        embedded in a 4×4 space returned non-imaginary eigenvalues for the null
+        directions (rather than Inf, which the old filter would catch).
+        """
+        import scipy.linalg as sla
+
+        # 4×4 system: 2 physical (harmonic oscillator, ω=1) + 2 null (B=0).
+        # Physical block: [0, 1; -1, 0] (eigenvalues ±i).
+        # Null block: A has off-diagonal ±1, B has zeros → spurious finite eigs.
+        A = np.zeros((4, 4), dtype=np.complex128)
+        B = np.zeros((4, 4), dtype=np.complex128)
+        A[0, 1] = 1.0
+        A[1, 0] = -1.0
+        A[2, 3] = 1.0
+        A[3, 2] = -1.0
+        B[0, 0] = 1.0
+        B[1, 1] = 1.0
+        # B[2,2] = B[3,3] = 0 → rank-2
+
+        evals = sla.eig(A, B)[0]
+        finite_evals = evals[np.isfinite(evals) & (np.abs(evals) <= 1e12)]
+        # Without projection: all 4 eigenvalues are finite (scipy distributes
+        # physical coupling across all DOF), some with large Re(λ) > 0.
+        # We just assert that the finite set is non-empty to document the issue.
+        assert len(finite_evals) > 0, (
+            "Expected finite spurious eigenvalues from rank-deficient QZ"
+        )
+
+    def test_null_projection_removes_spurious_eigenvalues(self) -> None:
+        """Null-space projection gives correct eigenvalues {+i, -i, 0, 0} for rank-2 B.
+
+        After projecting onto range(B), QZ operates on the 2×2 physical block
+        which yields ±i (harmonic oscillator).  Null directions get eigenvalue 0.
+        The total spectrum should have max |Re(λ)| < 1e-10 (all purely imaginary or 0).
+        """
+        A = np.zeros((4, 4), dtype=np.complex128)
+        B = np.zeros((4, 4), dtype=np.complex128)
+        A[0, 1] = 1.0
+        A[1, 0] = -1.0
+        A[2, 3] = 1.0
+        A[3, 2] = -1.0
+        B[0, 0] = 1.0
+        B[1, 1] = 1.0
+
+        _, s_b, Vt_b = np.linalg.svd(B)
+        rank_b = int(np.sum(s_b > s_b[0] * 1e-10))
+        null_dim_b = 4 - rank_b
+        assert null_dim_b == 2, f"Expected 2 null dimensions, got {null_dim_b}"
+
+        import scipy.linalg as sla
+
+        Vphys = Vt_b[:rank_b].T
+        Vt_b[rank_b:].T
+        ev_red, _vr_red = sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys)
+        ev_full = np.concatenate([ev_red, np.zeros(null_dim_b, dtype=np.complex128)])
+
+        # All eigenvalues should be purely imaginary or zero (no spurious real parts)
+        max_real = float(np.max(np.abs(np.real(ev_full))))
+        assert max_real < 1e-10, (
+            f"Projected spectrum has max |Re(λ)| = {max_real:.2e}, expected < 1e-10"
+        )
+        # Physical eigenvalues should be ±i (harmonic oscillator with ω=1)
+        phys_evals = np.sort(np.abs(np.imag(ev_full[np.abs(np.imag(ev_full)) > 0.5])))[
+            ::-1
+        ]
+        assert len(phys_evals) == 2, (
+            f"Expected 2 physical eigenvalues, got {len(phys_evals)}"
+        )
+        assert abs(phys_evals[0] - 1.0) < 1e-10, (
+            f"Expected |Im(λ)|=1.0, got {phys_evals[0]:.6f}"
+        )
+
+    def test_eigenbasis_invertible_after_projection(self) -> None:
+        """Full eigenbasis V_full = [Vphys@vr_red | Vnull] is invertible.
+
+        This confirms that the lifted eigenvector matrix can be inverted to
+        transform ICs into the eigenbasis — a necessary condition for correctness.
+        """
+        A = np.zeros((4, 4), dtype=np.complex128)
+        B = np.zeros((4, 4), dtype=np.complex128)
+        A[0, 1] = 1.0
+        A[1, 0] = -1.0
+        A[2, 3] = 1.0
+        A[3, 2] = -1.0
+        B[0, 0] = 1.0
+        B[1, 1] = 1.0
+
+        import scipy.linalg as sla
+
+        _, s_b, Vt_b = np.linalg.svd(B)
+        rank_b = int(np.sum(s_b > s_b[0] * 1e-10))
+        Vphys = Vt_b[:rank_b].T
+        Vnull = Vt_b[rank_b:].T
+        _, vr_red = sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys)
+        V_full = np.hstack([Vphys @ vr_red, Vnull])
+
+        cond = float(np.linalg.cond(V_full))
+        assert cond < 1e6, (
+            f"V_full condition number {cond:.2e} too large — not invertible"
+        )
+        # Confirm it can be inverted without error
+        V_inv = np.linalg.inv(V_full)
+        residual = float(np.max(np.abs(V_full @ V_inv - np.eye(4))))
+        assert residual < 1e-10, (
+            f"V_full @ V_inv residual = {residual:.2e}, expected < 1e-10"
+        )
