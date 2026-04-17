@@ -9,19 +9,18 @@
 
 Three workstreams this week:
 
-1. **Plasma Gertsenshtein** — completed `gertsenshtein_proca` with Raffelt-Stodolsky validation
-2. **Dark photon** — understood the 276-run null result (eigenvalue structure); built plasma extension with 5 HPC sweep scripts
-3. **Practice talk** — 13-section Beamer deck with speaker notes
+1. **Plasma Gertsenshtein** — completed `gertsenshtein_plasma` with Raffelt-Stodolsky validation
+2. **Dark photon** — understood the null result (eigenvalue structure); built plasma extension with HPC sweep scripts
 
 ---
 
-## 1. Plasma Gertsenshtein (`gertsenshtein_proca`)
+## 1. Plasma Gertsenshtein (`gertsenshtein_plasma`)
 
-**Theory**: `examples/gertsenshtein_proca/theory.toml`
+**Theory**: `examples/gertsenshtein_plasma/theory.toml`
 
 ### Lagrangian
 
-$$\mathcal{L} = \frac{1}{\kappa^2}R - \frac{1}{4}F_{\mu\nu}F^{\mu\nu} - \frac{m_A^2}{2}a_\mu a^\mu$$
+$$\mathcal{L} = \frac{1}{\kappa^2}R - \frac{1}{4}F_{\mu\nu}F^{\mu\nu} + \alpha\, T^\lambda{}_{\lambda\mu}\, T^{\nu\mu}{}_\nu - \frac{m_A^2}{2}a_\mu a^\mu$$
 
 Einstein-Maxwell with an effective photon mass $m_A^2$ representing the plasma frequency $\omega_p^2$. The mass is applied to the perturbation field $a_\mu$ (not the full background $A_\mu$), following Domcke et al. (2025).
 
@@ -121,11 +120,21 @@ $A_{\mathrm{dark}} > 1$ means the dark photon enhances total conversion above th
 
 ---
 
-## Questions for Supervisor
+## Questions
 
 ### Dark photon model
 
 - [ ] **Model extensions**: the vacuum null is clean — any thoughts on the most physically motivated next term to add? Our current thinking is this model stays as a pure dark photon sweep, separate from the PGT torsion geometry sweeps.
+
+### Presenting multi-dimensional sweep results
+
+The plasma dark photon model has 4 sweep parameters ($\alpha_3$, $\xi$, $\delta_m$, $m_A^2$). This raises a methodological question I'd like your advice on:
+
+- [ ] **2D heatmaps are arbitrary**: a heatmap of e.g. $m_A^2$ vs $\alpha_3$ requires fixing $\xi$ and $\delta_m$, but the choice of those fixed values is ad hoc and can hide or fabricate structure.
+
+- [ ] **MC sampling finds points but not structure**: 1000-point over all 4 parameters can identify that high-$A_{\mathrm{dark}}$ points exist, but a scatter of points in 4D doesn't reveal _why_ — is it a surface, a curve, an isolated peak? What's the right way to present what a 4D MC sweep actually tells us?
+
+- [ ] **What do we actually report?** For a paper, is it sufficient to report: (1) the global max $A_{\mathrm{dark}}$ and where it occurs, (2) sensitivity analysis showing which parameters matter most, (3) a few representative 2D slices through the maximum?
 
 ### PhD applications
 
