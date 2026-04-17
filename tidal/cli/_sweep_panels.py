@@ -1604,6 +1604,7 @@ def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
     divergent_center: float | None = None,
     log_diagonal: bool = False,
     params: list[str] | None = None,
+    clamp_color: tuple[float, float] | None = None,
 ) -> None:
     """Pairwise scatter matrix with marginal param-vs-metric on diagonal.
 
@@ -1625,6 +1626,8 @@ def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
         Matplotlib colormap name (default ``"viridis"``).
     divergent_center : float or None
         Center colormap at this value using ``TwoSlopeNorm``.
+    clamp_color : tuple of (vmin, vmax) or None
+        Clamp metric values to this range for coloring.
     log_diagonal : bool
         Use logarithmic y-axis on diagonal panels.
     params : list[str] or None
@@ -1649,6 +1652,16 @@ def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
 
     metric_vals = np.array(results.column(metric), dtype=np.float64)
     ok_mask = np.isfinite(metric_vals)
+    # Clamp metric values before norm computation so outliers don't
+    # dominate the colorbar (e.g. a single divergent A=250 washes out
+    # the 0.5-1.1 range where the physics lives).
+    if clamp_color is not None:
+        vmin_c, vmax_c = clamp_color
+        metric_vals = np.where(
+            np.isfinite(metric_vals),
+            np.clip(metric_vals, vmin_c, vmax_c),
+            metric_vals,
+        )
     ok_metric = metric_vals[ok_mask]
 
     cmap = plt.colormaps[cmap_name]
@@ -1696,7 +1709,7 @@ def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
                 if log_diagonal:
                     ax.set_yscale("log")
                 # GR baseline for amplification-like metrics
-                if metric in {"A", "log10_A", "P_max"}:
+                if metric in {"A", "log10_A", "A_paired", "log10_A_paired", "P_max"}:
                     baseline = 0.0 if metric == "log10_A" else 1.0
                     ax.axhline(
                         baseline,

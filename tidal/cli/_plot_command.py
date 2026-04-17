@@ -606,6 +606,11 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 figsize=figsize or (3 * n_params, 3 * n_params),
                 constrained_layout=True,
             )
+            scatter_clamp_raw: str | None = getattr(args, "clamp_color", None)
+            scatter_clamp: tuple[float, float] | None = None
+            if scatter_clamp_raw:
+                sc_parts = scatter_clamp_raw.split(":")
+                scatter_clamp = (float(sc_parts[0]), float(sc_parts[1]))
             render_sweep_scatter(
                 fig,
                 results,
@@ -614,6 +619,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 divergent_center=dc,
                 log_diagonal=log_diag,
                 params=scatter_params,
+                clamp_color=scatter_clamp,
             )
 
         elif plot_type == "sweep-grouped":
