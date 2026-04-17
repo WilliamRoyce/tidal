@@ -285,6 +285,8 @@ class SimulationLikelihood:
         float
             Log-likelihood value. Returns ``-inf`` for failed simulations.
         """
+        call_idx = self._call_count
+        self._call_count += 1
         return _evaluate_likelihood(
             theta=theta,
             base_args=self.base_args,
@@ -297,7 +299,7 @@ class SimulationLikelihood:
             likelihood_config=self.likelihood_config,
             temp_dir=self.temp_dir,
             keep_sims=self.keep_sims,
-            call_index=self._call_count,
+            call_index=call_idx,
         )
 
 
