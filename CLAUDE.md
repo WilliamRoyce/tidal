@@ -114,7 +114,8 @@ Claude auto-memory files, plans, and project settings are backed up to `.claude-
 - **On SSH auth failure, STOP and ask the user.** Do NOT retry. Fail2Ban blocks the IP for 20 min after repeated failures.
 - **Diagnose parallel scaling** with `scripts/hpc_shuttle.sh htop <jobid>` (jumps to the compute node). This is the primary diagnostic.
 - **Sweep parallelism — always specify `--parallel`** (sequential default costs 20-50× wall time). Choose based on estimated per-point run time on sapphire (112 cores): < 5 s/point (smoke tests, scalar models) → `--parallel min(N, 32)` (pool startup ~40% of run time above P=32); 5–30 s/point → `--parallel min(N, 56)`; > 30 s/point (PGT coupling space, large grids) → `--parallel min(N, 112)` (startup < 1%, use the full node). Super-linear speedup at `P ∈ {8, 16}` from BLAS cache locality on short runs. For new workload types, profile first with `scripts/hpc_scaling_sweep.sh`.
-- **Pull only lightweight artefacts** by default (figures, summary JSONs, CSVs). Do all plotting and analysis remotely. `--all` is opt-in and warns.
+- **Do as much compute HPC-side as possible** — including plotting and analysis. Chain the full pipeline in `--cmd`: `tidal sweep ... && tidal plot ... && tidal analyze ...`. Then pull only the final lightweight artefacts (figures, summary JSONs, CSVs). `--all` is opt-in and warns.
+- **Never abuse login nodes.** Light testing (e.g. `tidal --version`, quick import checks) is tolerable; anything compute-intensive must go through `sbatch` to a compute node. Admin will intervene if login nodes are overloaded.
 
 ## Session Persistence Workaround
 
