@@ -96,8 +96,11 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
     from tidal.inference._likelihood import parse_likelihood
 
+    baseline_formula: str | None = getattr(args, "baseline_formula", None)
     try:
-        likelihood_config = parse_likelihood(likelihood_spec)
+        likelihood_config = parse_likelihood(
+            likelihood_spec, baseline_formula=baseline_formula
+        )
     except ValueError as e:
         error_with_hint(str(e), ["Check --likelihood format: METRIC:TYPE[:ARGS]"])
         return 1
@@ -188,8 +191,17 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     elif method == "nested":
         nlive = getattr(args, "nlive", 100)
         dlogz = getattr(args, "dlogz", 0.01)
-        sampler_backend = getattr(args, "sampler", "dynesty")
+        sampler_backend = getattr(args, "sampler", "polychord")
         dynamic = getattr(args, "dynamic", False)
+
+        # Auto-scale nlive if requested
+        nlive_auto = getattr(args, "nlive_auto", None)
+        if nlive_auto is not None:
+            from tidal.inference._nested import recommend_nlive
+
+            nlive = recommend_nlive(len(priors), nlive_auto)
+            if not quiet:
+                print(f"  nlive auto ({nlive_auto}): {nlive}")
 
         if not quiet:
             print(f"  Live points: {nlive}")
@@ -227,6 +239,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             seed=seed,
             dynamic=dynamic,
             quiet=quiet,
+            output_dir=str(output_path / "_chains"),
         )
 
     else:
@@ -259,6 +272,31 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         plot_trace(result, trace_path)
         if not quiet:
             print(f"Trace plot: {trace_path}")
+
+    if getattr(args, "importance", False):
+        from tidal.inference._visualize import plot_importance
+
+        importance_path = output_path / "importance.png"
+        try:
+            imp = result.parameter_importance()
+            plot_importance(imp, importance_path)
+            if not quiet:
+                print(f"Importance plot: {importance_path}")
+        except (ImportError, ValueError) as e:
+            if not quiet:
+                print(f"  (importance plot skipped: {e})")
+
+    # --- Optional analysis ---
+    if getattr(args, "analyze", False) and result.method == "nested":
+        try:
+            from tidal.inference._importance import format_importance_table
+
+            imp = result.parameter_importance()
+            if not quiet:
+                print(format_importance_table(imp))
+        except (ImportError, ValueError) as e:
+            if not quiet:
+                print(f"  (importance analysis skipped: {e})")
 
     return 0
 

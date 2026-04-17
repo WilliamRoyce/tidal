@@ -29,13 +29,18 @@ class LikelihoodConfig:
     metric : str
         Name of the metric to extract (e.g. ``"P_max"``, ``"L_mix"``).
     likelihood_type : str
-        One of ``"gaussian"``, ``"threshold"``, ``"maximize"``.
+        One of ``"maximize"``, ``"minimize"``, ``"extremize"``,
+        ``"gaussian"``, ``"threshold"``.
     target : float
         Target value for gaussian likelihood.
     sigma : float
         Uncertainty for gaussian likelihood.
     min_value : float
         Minimum value for threshold likelihood.
+    baseline_formula : str | None
+        Baseline formula for ``extremize`` type.  Evaluated per-point
+        using the current parameter values + math functions.  Example:
+        ``"sin(kappa * B0 * t_end / 2)**2"``.
     """
 
     metric: str
@@ -43,18 +48,27 @@ class LikelihoodConfig:
     target: float = 0.0
     sigma: float = 1.0
     min_value: float = 0.0
+    baseline_formula: str | None = None
 
     def __post_init__(self) -> None:
-        valid = {"gaussian", "threshold", "maximize"}
+        valid = {"gaussian", "threshold", "maximize", "minimize", "extremize"}
         if self.likelihood_type not in valid:
             msg = f"Unknown likelihood type '{self.likelihood_type}'. Must be one of {sorted(valid)}."
             raise ValueError(msg)
         if self.likelihood_type == "gaussian" and self.sigma <= 0:
             msg = f"Gaussian sigma must be positive, got {self.sigma}"
             raise ValueError(msg)
+        if self.likelihood_type == "extremize" and not self.baseline_formula:
+            msg = (
+                "extremize likelihood requires --baseline-formula "
+                '(e.g. "sin(kappa * B0 * t_end / 2)**2")'
+            )
+            raise ValueError(msg)
 
 
-def parse_likelihood(spec: str) -> LikelihoodConfig:
+def parse_likelihood(
+    spec: str, *, baseline_formula: str | None = None
+) -> LikelihoodConfig:
     """Parse a CLI likelihood specification string.
 
     Format: ``METRIC:TYPE[:ARGS]``
@@ -62,8 +76,18 @@ def parse_likelihood(spec: str) -> LikelihoodConfig:
     Examples::
 
         "P_max:maximize"
+        "P_max:minimize"
+        "P_max:extremize"          # requires baseline_formula
         "P_max:gaussian:0.5:0.1"
         "P_max:threshold:0.01"
+
+    Parameters
+    ----------
+    spec : str
+        Likelihood specification string.
+    baseline_formula : str | None
+        Baseline formula for ``extremize`` type (passed separately via
+        ``--baseline-formula`` CLI flag).
 
     Raises
     ------
@@ -101,12 +125,27 @@ def parse_likelihood(spec: str) -> LikelihoodConfig:
         )
     if ltype == "maximize":
         return LikelihoodConfig(metric=metric, likelihood_type="maximize")
+    if ltype == "minimize":
+        return LikelihoodConfig(metric=metric, likelihood_type="minimize")
+    if ltype == "extremize":
+        return LikelihoodConfig(
+            metric=metric,
+            likelihood_type="extremize",
+            baseline_formula=baseline_formula,
+        )
 
-    msg = f"Unknown likelihood type '{ltype}'. Use: gaussian, threshold, maximize."
+    msg = (
+        f"Unknown likelihood type '{ltype}'. "
+        "Use: maximize, minimize, extremize, gaussian, threshold."
+    )
     raise ValueError(msg)
 
 
-def compute_log_likelihood(metric_value: float, config: LikelihoodConfig) -> float:
+def compute_log_likelihood(
+    metric_value: float,
+    config: LikelihoodConfig,
+    eval_params: dict[str, float] | None = None,
+) -> float:
     """Compute log-likelihood from a metric value and config.
 
     Parameters
@@ -115,6 +154,9 @@ def compute_log_likelihood(metric_value: float, config: LikelihoodConfig) -> flo
         The measured value of the metric from simulation.
     config : LikelihoodConfig
         Likelihood configuration.
+    eval_params : dict | None
+        Current parameter values for formula evaluation (needed by
+        ``extremize`` type to compute the per-point baseline).
     """
     if math.isnan(metric_value) or math.isinf(metric_value):
         return -math.inf
@@ -125,8 +167,45 @@ def compute_log_likelihood(metric_value: float, config: LikelihoodConfig) -> flo
     if config.likelihood_type == "threshold":
         return 0.0 if metric_value >= config.min_value else -math.inf
 
+    if config.likelihood_type == "minimize":
+        return -metric_value
+
+    if config.likelihood_type == "extremize":
+        baseline = _eval_baseline(config.baseline_formula, eval_params)
+        if baseline is None or baseline <= 0 or metric_value <= 0:
+            return -math.inf
+        # |log(A)| where A = metric / baseline
+        return abs(math.log(metric_value / baseline))
+
     # maximize: use metric value directly as log-likelihood
     return metric_value
+
+
+def _eval_baseline(
+    formula: str | None, params: dict[str, float] | None
+) -> float | None:
+    """Evaluate a baseline formula with the given parameter values.
+
+    Reuses the same ``FORMULA_NAMESPACE`` (sin, cos, sqrt, pi, etc.)
+    as the sweep-results derived-columns computation.
+    """
+    if formula is None:
+        return None
+
+    from tidal.cli._simulate import (
+        FORMULA_NAMESPACE,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    ns: dict[str, object] = {**FORMULA_NAMESPACE}
+    if params:
+        ns.update(params)
+
+    try:
+        return float(
+            eval(formula, {"__builtins__": {}}, ns)  # noqa: S307
+        )
+    except Exception:  # noqa: BLE001
+        return None
 
 
 class SimulationLikelihood:
@@ -274,7 +353,19 @@ def _evaluate_likelihood(
         if metric_value is None:
             return -math.inf
 
-        return compute_log_likelihood(float(metric_value), likelihood_config)
+        # Build eval_params for formula-based likelihoods (extremize)
+        eval_params: dict[str, float] | None = None
+        if likelihood_config.baseline_formula:
+            eval_params = dict(param_overrides)
+            # Include simulation settings (t_end, etc.)
+            for attr in ("t_end", "dt"):
+                val = getattr(base_args, attr, None)
+                if val is not None:
+                    eval_params[attr] = float(val)
+
+        return compute_log_likelihood(
+            float(metric_value), likelihood_config, eval_params
+        )
 
     except Exception:  # noqa: BLE001
         return -math.inf

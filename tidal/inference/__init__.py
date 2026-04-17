@@ -18,12 +18,14 @@ Handley, W. (2019) "anesthetic: nested sampling visualization", JOSS 4.
 from __future__ import annotations
 
 from tidal.inference._constraints import ConstraintSet, parse_constraint
+from tidal.inference._importance import ParameterImportanceResult
 from tidal.inference._prior import Prior
 from tidal.inference._results import InferenceResult
 
 __all__ = [
     "ConstraintSet",
     "InferenceResult",
+    "ParameterImportanceResult",
     "Prior",
     "parse_constraint",
 ]

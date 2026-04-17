@@ -455,3 +455,246 @@ class TestSampleCLIHelp:
         assert args.likelihood == "P_max:maximize"
         assert args.method == "mc"
         assert args.n_samples == 10
+
+    def test_parse_new_flags(self) -> None:
+        """Verify new CLI flags (analyze, nlive-auto, importance, extremize)."""
+        from tidal.cli import (
+            _build_parser as build_parser,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "sample",
+                "spec.json",
+                "--prior",
+                "g0=uniform:0.01:0.5",
+                "--likelihood",
+                "P_max:extremize",
+                "--baseline-formula",
+                "sin(kappa * B0 * t_end / 2)**2",
+                "--method",
+                "nested",
+                "--sampler",
+                "polychord",
+                "--nlive-auto",
+                "production",
+                "--analyze",
+                "--importance",
+                "--output",
+                "/tmp/test",
+            ]
+        )
+        assert args.likelihood == "P_max:extremize"
+        assert args.baseline_formula == "sin(kappa * B0 * t_end / 2)**2"
+        assert args.sampler == "polychord"
+        assert args.nlive_auto == "production"
+        assert args.analyze is True
+        assert args.importance is True
+
+
+# ===================================================================
+# New likelihood types
+# ===================================================================
+
+
+class TestNewLikelihoodTypes:
+    """Test minimize and extremize likelihood types."""
+
+    def test_parse_minimize(self) -> None:
+        from tidal.inference._likelihood import parse_likelihood
+
+        lc = parse_likelihood("P_max:minimize")
+        assert lc.likelihood_type == "minimize"
+
+    def test_parse_extremize(self) -> None:
+        from tidal.inference._likelihood import parse_likelihood
+
+        lc = parse_likelihood(
+            "P_max:extremize",
+            baseline_formula="sin(kappa * B0 * t_end / 2)**2",
+        )
+        assert lc.likelihood_type == "extremize"
+        assert lc.baseline_formula is not None
+
+    def test_extremize_requires_formula(self) -> None:
+        from tidal.inference._likelihood import LikelihoodConfig
+
+        with pytest.raises(ValueError, match="baseline-formula"):
+            LikelihoodConfig(metric="P_max", likelihood_type="extremize")
+
+    def test_compute_minimize(self) -> None:
+        from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
+
+        lc = LikelihoodConfig(metric="P_max", likelihood_type="minimize")
+        assert compute_log_likelihood(0.5, lc) == -0.5
+        assert compute_log_likelihood(2.0, lc) == -2.0
+
+    def test_compute_extremize(self) -> None:
+        from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
+
+        lc = LikelihoodConfig(
+            metric="P_max",
+            likelihood_type="extremize",
+            baseline_formula="sin(kappa * B0 * t_end / 2)**2",
+        )
+        params = {"kappa": 1.0, "B0": 0.01, "t_end": 50.0}
+        baseline = math.sin(1.0 * 0.01 * 50.0 / 2) ** 2
+
+        # At baseline: logL = |log(1)| = 0
+        assert compute_log_likelihood(baseline, lc, params) == pytest.approx(0.0)
+
+        # 2x amplification: logL = log(2) ≈ 0.693
+        assert compute_log_likelihood(2 * baseline, lc, params) == pytest.approx(
+            math.log(2)
+        )
+
+        # 0.5x suppression: logL = |log(0.5)| = log(2) (symmetric)
+        assert compute_log_likelihood(0.5 * baseline, lc, params) == pytest.approx(
+            math.log(2)
+        )
+
+
+# ===================================================================
+# recommend_nlive
+# ===================================================================
+
+
+class TestRecommendNlive:
+    """Test nlive auto-scaling."""
+
+    def test_fast(self) -> None:
+        from tidal.inference._nested import recommend_nlive
+
+        assert recommend_nlive(4, "fast") == 100
+        assert recommend_nlive(1, "fast") == 50
+
+    def test_standard(self) -> None:
+        from tidal.inference._nested import recommend_nlive
+
+        assert recommend_nlive(4, "standard") == 100
+        assert recommend_nlive(10, "standard") == 250
+
+    def test_production(self) -> None:
+        from tidal.inference._nested import recommend_nlive
+
+        assert recommend_nlive(4, "production") == 250
+        assert recommend_nlive(10, "production") == 500
+
+
+# ===================================================================
+# Parameter importance
+# ===================================================================
+
+
+class TestParameterImportance:
+    """Test parameter importance analysis via anesthetic."""
+
+    @pytest.fixture
+    def nested_result(self) -> InferenceResult:
+        """Synthetic nested sampling result with one constrained and one
+        unconstrained parameter.
+        """
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(42)
+        n = 300
+        nlive = 50
+
+        # x is tightly constrained (narrow posterior), y is broad
+        x = rng.normal(0, 0.1, n)
+        y = rng.uniform(-5, 5, n)
+        samples = np.column_stack([x, y])
+        log_l = -0.5 * (x / 0.1) ** 2  # only depends on x
+
+        # Build approximate logL_birth for anesthetic
+        sorted_idx = np.argsort(log_l)
+        logl_birth = np.full(n, -np.inf)
+        sorted_logl = log_l[sorted_idx]
+        for i in range(nlive, n):
+            logl_birth[sorted_idx[i]] = sorted_logl[i - nlive]
+
+        return InferenceResult(
+            samples=samples,
+            log_likelihood=log_l,
+            log_prior=np.zeros(n),
+            param_names=["x_constrained", "y_unconstrained"],
+            method="nested",
+            log_evidence=-1.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={"sampler": "test", "nlive": nlive},
+        )
+
+    def test_to_anesthetic(self, nested_result: InferenceResult) -> None:
+        pytest.importorskip("anesthetic")
+        ns = nested_result.to_anesthetic()
+        assert hasattr(ns, "D_KL")
+        assert hasattr(ns, "d_G")
+        assert hasattr(ns, "logZ")
+
+    def test_importance_computes(self, nested_result: InferenceResult) -> None:
+        """Parameter importance metrics are finite and sensible."""
+        pytest.importorskip("anesthetic")
+        imp = nested_result.parameter_importance(n_bootstrap=10)
+
+        assert math.isfinite(imp.d_kl)
+        assert imp.d_kl >= 0
+        assert math.isfinite(imp.d_g)
+        assert imp.d_g >= 0
+        assert len(imp.marginal_d_kl) == 2
+        for dkl in imp.marginal_d_kl.values():
+            assert math.isfinite(dkl)
+
+    def test_format_table(self, nested_result: InferenceResult) -> None:
+        pytest.importorskip("anesthetic")
+        from tidal.inference._importance import format_importance_table
+
+        imp = nested_result.parameter_importance(n_bootstrap=10)
+        table = format_importance_table(imp)
+        assert "x_constrained" in table
+        assert "D_KL" in table
+        assert "d_G" in table
+
+    def test_from_directory_roundtrip(
+        self, nested_result: InferenceResult, tmp_path: Path
+    ) -> None:
+        from tidal.inference._results import InferenceResult
+
+        out = tmp_path / "ns_out"
+        nested_result.save(out)
+
+        loaded = InferenceResult.from_directory(out)
+        assert loaded.n_samples == nested_result.n_samples
+        assert loaded.param_names == nested_result.param_names
+        assert loaded.log_evidence == nested_result.log_evidence
+        np.testing.assert_allclose(loaded.samples, nested_result.samples)
+
+
+# ===================================================================
+# Analyze CLI (inference path)
+# ===================================================================
+
+
+class TestAnalyzeInference:
+    """Test tidal analyze --inference --importance."""
+
+    def test_parse_analyze_inference_flags(self) -> None:
+        from tidal.cli import (
+            _build_parser as build_parser,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "analyze",
+                "/tmp/test",
+                "--inference",
+                "--importance",
+                "--n-bootstrap",
+                "50",
+            ]
+        )
+        assert args.inference is True
+        assert args.importance is True
+        assert args.n_bootstrap_importance == 50

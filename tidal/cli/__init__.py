@@ -1397,10 +1397,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- analyze ---
     analyze_parser = sub.add_parser(
         "analyze",
-        help="Post-hoc analysis of sweep results (sensitivity, critical field)",
+        help="Post-hoc analysis of sweep or inference results",
         epilog="""Examples:
   tidal analyze sweep_results/ --sensitivity sobol --metric P_max
   tidal analyze sweep_results/ --critical-field B0 --metric P_final --threshold 0.99
+  tidal analyze ns_output/ --inference --importance
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -1468,6 +1469,26 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         type=float,
         help="Reference B value for analytical formula (required with --reference-formula)",
     )
+    # Inference analysis
+    analyze_parser.add_argument(
+        "--inference",
+        action="store_true",
+        default=False,
+        help="Treat data as nested sampling output (loads InferenceResult)",
+    )
+    analyze_parser.add_argument(
+        "--importance",
+        action="store_true",
+        default=False,
+        help="Compute parameter importance via KL divergence (requires --inference)",
+    )
+    analyze_parser.add_argument(
+        "--n-bootstrap",
+        type=int,
+        default=100,
+        dest="n_bootstrap_importance",
+        help="Bootstrap samples for importance uncertainties (default: 100)",
+    )
 
     # --- sample (Bayesian inference) ---
     sample_parser = sub.add_parser(
@@ -1525,8 +1546,20 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="SPEC",
         help=(
             "Likelihood specification: METRIC:TYPE[:ARGS]. "
-            "Types: maximize, gaussian:TARGET:SIGMA, threshold:MIN_VALUE. "
+            "Types: maximize, minimize, extremize, gaussian:TARGET:SIGMA, "
+            "threshold:MIN_VALUE. "
             "Example: --likelihood 'P_max:maximize'"
+        ),
+    )
+    sample_parser.add_argument(
+        "--baseline-formula",
+        default=None,
+        metavar="FORMULA",
+        dest="baseline_formula",
+        help=(
+            "Baseline formula for extremize likelihood. "
+            "Evaluated per-point with current parameter values. "
+            'Example: --baseline-formula "sin(kappa * B0 * t_end / 2)**2"'
         ),
     )
     # Sampling method
@@ -1538,9 +1571,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sample_parser.add_argument(
         "--sampler",
-        choices=["dynesty", "polychord"],
-        default="dynesty",
-        help="Nested sampling backend (default: dynesty)",
+        choices=["polychord", "dynesty"],
+        default="polychord",
+        help="Nested sampling backend (default: polychord)",
     )
     sample_parser.add_argument(
         "--n-samples",
@@ -1696,6 +1729,31 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         default=False,
         help="Generate trace plot",
+    )
+    sample_parser.add_argument(
+        "--importance",
+        action="store_true",
+        default=False,
+        help="Generate parameter importance bar chart",
+    )
+    # Analysis
+    sample_parser.add_argument(
+        "--analyze",
+        action="store_true",
+        default=False,
+        help="Run parameter importance analysis after sampling (nested only)",
+    )
+    sample_parser.add_argument(
+        "--nlive-auto",
+        nargs="?",
+        const="standard",
+        default=None,
+        choices=["fast", "standard", "production"],
+        metavar="PRECISION",
+        help=(
+            "Auto-scale nlive based on number of parameters. "
+            "Overrides --nlive. Levels: fast, standard (default), production"
+        ),
     )
     # Resume fields needed by _build_sim_args
     sample_parser.add_argument("--resume", default=None)
