@@ -401,8 +401,19 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         _cerror(f"loading sweep data: {exc}")
         return 1
 
+    # Load paired baseline sweep if requested
+    baseline_sweep_dir = getattr(args, "baseline_sweep", None)
+    if baseline_sweep_dir is not None:
+        try:
+            baseline_results = SweepResults.from_directory(Path(baseline_sweep_dir))
+            results.add_paired_baseline(baseline_results)
+        except (FileNotFoundError, ValueError) as exc:
+            _cerror(f"loading baseline sweep: {exc}")
+            return 1
+
     # Auto-derive amplification columns when a derived metric is requested
     raw_metric: str | None = getattr(args, "metric", None)
+    paired_metrics = {"A_paired", "log10_A_paired", "P_baseline"}
     derived_metrics = {"A", "log10_A", "C0", "P_EM", "P_valid"}
     if raw_metric is not None:
         requested = {s.strip() for s in raw_metric.split(",")}
@@ -411,6 +422,16 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             results.add_derived_columns(
                 baseline_formula=baseline or "sin(kappa * B0 * t_end / 2)**2",
             )
+        if (requested & paired_metrics) and baseline_sweep_dir is None:
+            error_with_hint(
+                f"Metric '{raw_metric}' requires --baseline-sweep",
+                [
+                    "Run a baseline sweep with deltam=0 on the same parameter grid",
+                    "Then: tidal plot <signal> --type sweep --metric A_paired "
+                    "--baseline-sweep <baseline>",
+                ],
+            )
+            return 1
     if raw_metric is None and plot_type in {
         "sweep",
         "convergence",

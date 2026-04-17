@@ -865,6 +865,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         ),
     )
     plot_parser.add_argument(
+        "--baseline-sweep",
+        dest="baseline_sweep",
+        default=None,
+        metavar="DIR",
+        help=(
+            "Path to baseline sweep directory for paired amplification. "
+            "Computes A_paired = P(signal)/P(baseline) by matching "
+            "parameter values. Use with --metric A_paired."
+        ),
+    )
+    plot_parser.add_argument(
         "--title",
         default=None,
         help="Custom figure title",

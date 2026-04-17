@@ -683,6 +683,101 @@ class SweepResults:
             )
             row["P_valid"] = valid
 
+    def add_paired_baseline(
+        self,
+        baseline: SweepResults,
+        *,
+        metric: str = "P_max",
+        match_tolerance: float = 1e-6,
+    ) -> None:
+        """Add amplification relative to a paired baseline sweep.
+
+        Matches each signal row with the baseline row whose parameter
+        values are closest (within *match_tolerance*).  Adds columns:
+
+        - ``P_baseline``: matched baseline metric value
+        - ``A_paired``: ``signal_metric / P_baseline``
+        - ``log10_A_paired``: ``log10(A_paired)``
+
+        The baseline sweep must cover the same parameter grid for all
+        shared swept parameters.  Unmatched rows get ``None``.
+
+        Parameters
+        ----------
+        baseline : SweepResults
+            Baseline sweep (typically at deltam=0).
+        metric : str
+            Column name for the conversion probability.
+        match_tolerance : float
+            Maximum absolute difference for parameter matching.
+        """
+        import math as _math  # noqa: PLC0415
+
+        # Identify shared swept parameters between signal and baseline
+        base_params = set(baseline.swept_params.keys())
+        sig_params = set(self.swept_params.keys())
+        shared = base_params & sig_params
+
+        # Also include baseline fixed params that are signal swept params
+        # (e.g., baseline has deltam=0 fixed, signal sweeps deltam)
+        # → don't match on those
+        match_params = sorted(shared) if shared else sorted(base_params)
+
+        # Build lookup: tuple of rounded param values → baseline P_max
+        base_lookup: dict[tuple[float, ...], float] = {}
+        for row in baseline.rows:
+            if row.get("run_status") != "success":
+                continue
+            key = tuple(
+                round(float(row.get(p, 0)), 6)
+                for p in match_params  # type: ignore[arg-type]
+            )
+            val = row.get(metric)
+            if val is not None:
+                base_lookup[key] = float(val)
+
+        n_matched = 0
+        for row in self.rows:
+            key = tuple(
+                round(float(row.get(p, 0)), 6)
+                for p in match_params  # type: ignore[arg-type]
+            )
+            p_base = base_lookup.get(key)
+
+            if p_base is None:
+                # Try fuzzy match within tolerance
+                for bkey, bval in base_lookup.items():
+                    if all(abs(a - b) <= match_tolerance for a, b in zip(key, bkey, strict=False)):
+                        p_base = bval
+                        break
+
+            p_val = row.get(metric)
+            try:
+                p = float(p_val)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                p = _math.nan
+
+            if p_base is not None and p_base > 0 and _math.isfinite(p):
+                a = p / p_base
+                row["P_baseline"] = p_base
+                row["A_paired"] = a
+                row["log10_A_paired"] = _math.log10(a) if a > 0 else None
+                n_matched += 1
+            else:
+                row["P_baseline"] = p_base
+                row["A_paired"] = None
+                row["log10_A_paired"] = None
+
+        import logging  # noqa: PLC0415
+
+        logging.getLogger(__name__).info(
+            "Paired baseline: %d/%d rows matched (%d baseline points, matching on %s)",
+            n_matched,
+            len(self.rows),
+            len(base_lookup),
+            match_params,
+        )
+
     # ------------------------------------------------------------------
     # Serialization
     # ------------------------------------------------------------------
