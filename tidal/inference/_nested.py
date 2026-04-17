@@ -145,7 +145,7 @@ def run_nested_sampling(
 # ---------------------------------------------------------------------------
 
 
-def _run_polychord(
+def _run_polychord(  # noqa: PLR0915
     *,
     log_likelihood: Callable[..., float],
     prior_transform: Callable[..., Any],
@@ -224,9 +224,9 @@ def _run_polychord(
     # --- Read results via anesthetic (native PolyChord integration) ---
     chain_root = f"{output_dir}/{file_root}"
     try:
-        from anesthetic import NestedSamples
+        from anesthetic import read_chains
 
-        ns = NestedSamples(root=chain_root)
+        ns = read_chains(chain_root)
         samples = ns.to_numpy()[:, :ndim]
         logl = ns.logL.to_numpy()
         weights = ns.get_weights().to_numpy()
@@ -235,7 +235,14 @@ def _run_polychord(
     except ImportError:
         # Fallback: read PolyChord output files directly
         ns = None
-        data = np.loadtxt(f"{chain_root}_equal_weights.txt")
+        eq_file = f"{chain_root}_equal_weights.txt"
+        data = np.loadtxt(eq_file)
+        if data.ndim != 2 or data.shape[1] < ndim + 1:
+            msg = (
+                f"Unexpected PolyChord output shape {data.shape} in {eq_file}; "
+                f"expected at least {ndim + 1} columns"
+            )
+            raise ValueError(msg) from None
         samples = data[:, :ndim]
         logl = data[:, -1]
         weights = None

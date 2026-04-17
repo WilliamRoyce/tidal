@@ -117,12 +117,18 @@ def to_anesthetic_samples(result: InferenceResult) -> Any:
     # Manual construction from arrays (dynesty or loaded results)
     import numpy as np
 
+    n = len(result.log_likelihood)
+
     # Try to reconstruct logl_birth from dynesty's logvol
     logvol = result.metadata.get("logvol")
     if logvol is not None:
-        logvol_arr = np.array(logvol)
-        n = len(logvol_arr)
         nlive = result.metadata.get("nlive") or 100
+        if nlive >= n:
+            msg = (
+                f"Cannot reconstruct logl_birth: nlive ({nlive}) >= "
+                f"n_samples ({n}). Need more dead points than live points."
+            )
+            raise ValueError(msg)
         logl_birth = np.full(n, -np.inf)
         for i in range(nlive, n):
             logl_birth[i] = float(result.log_likelihood[i - nlive])
@@ -134,9 +140,15 @@ def to_anesthetic_samples(result: InferenceResult) -> Any:
             columns=result.param_names,
         )
 
-    # Last resort: construct with estimated logl_birth from nlive
+    # Last resort: construct with estimated logl_birth from nlive.
+    # Sort by logL and assign births assuming constant nlive.
     nlive = result.metadata.get("nlive") or 100
-    n = len(result.log_likelihood)
+    if nlive >= n:
+        msg = (
+            f"Cannot reconstruct logl_birth: nlive ({nlive}) >= "
+            f"n_samples ({n}). Need more dead points than live points."
+        )
+        raise ValueError(msg)
     logl_birth = np.full(n, -np.inf)
     sorted_idx = np.argsort(result.log_likelihood)
     sorted_logl = result.log_likelihood[sorted_idx]
@@ -208,7 +220,7 @@ def compute_parameter_importance(
             )
             try:
                 marginal_d_kl[name] = float(marginal.D_KL())
-            except Exception:  # noqa: BLE001
+            except (ValueError, ZeroDivisionError, AttributeError):
                 marginal_d_kl[name] = float("nan")
         else:
             marginal_d_kl[name] = float("nan")

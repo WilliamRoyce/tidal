@@ -213,6 +213,15 @@ class InferenceResult:
 
         weights = np.array(weights_list) if weights_list else None
 
+        # Reconstruct metadata from saved inference.json fields
+        loaded_metadata: dict[str, Any] = {
+            "loaded_from": str(path),
+        }
+        for key in ("nlive", "sampler", "n_iterations", "n_calls"):
+            val = meta.get(key)
+            if val is not None:
+                loaded_metadata[key] = val
+
         return cls(
             samples=samples,
             log_likelihood=log_likelihood,
@@ -222,10 +231,7 @@ class InferenceResult:
             log_evidence=meta.get("log_evidence"),
             log_evidence_err=meta.get("log_evidence_err"),
             weights=weights,
-            metadata={
-                "nlive": meta.get("nlive"),
-                "loaded_from": str(path),
-            },
+            metadata=loaded_metadata,
         )
 
     def to_sweep_results(self) -> SweepResults:
@@ -321,6 +327,14 @@ class InferenceResult:
             summary["log_evidence"] = self.log_evidence
             summary["log_evidence_err"] = self.log_evidence_err
 
+        # Preserve sampler metadata for round-trip loading
+        nlive = self.metadata.get("nlive")
+        if nlive is not None:
+            summary["nlive"] = nlive
+        sampler = self.metadata.get("sampler")
+        if sampler is not None:
+            summary["sampler"] = sampler
+
         # Compute parameter importance for nested sampling results
         if self.method == "nested":
             try:
@@ -348,8 +362,13 @@ class InferenceResult:
                         f,
                         indent=2,
                     )
-            except Exception:  # noqa: BLE001, S110
-                pass  # anesthetic not available or computation failed
+            except Exception:  # noqa: BLE001
+                import logging
+
+                logging.getLogger("tidal.inference").debug(
+                    "Parameter importance computation skipped during save",
+                    exc_info=True,
+                )
 
         with (output_dir / "inference.json").open("w") as f:
             json.dump(summary, f, indent=2)

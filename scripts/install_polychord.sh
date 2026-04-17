@@ -36,7 +36,7 @@ fi
 cd "$CLONE_DIR"
 
 # Ensure setuptools is available for the build
-uv pip install setuptools 2>/dev/null || true
+uv pip install setuptools
 
 # Install with appropriate MPI setting
 if [[ -n "$MPI_FLAG" ]]; then
@@ -45,6 +45,12 @@ else
     uv pip install --no-build-isolation .
 fi
 
+# Verify installation
 echo ""
-echo "PolyChord installed successfully. Verify with:"
-echo "  uv run python -c 'from pypolychord import run_polychord; print(\"OK\")'"
+echo "Verifying installation..."
+if uv run python -c 'from pypolychord import run_polychord; print("pypolychord OK")'; then
+    echo "PolyChord installed successfully."
+else
+    echo "ERROR: PolyChord installation failed — import check did not pass."
+    exit 1
+fi

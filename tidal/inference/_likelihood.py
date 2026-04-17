@@ -204,7 +204,15 @@ def _eval_baseline(
         return float(
             eval(formula, {"__builtins__": {}}, ns)  # noqa: S307
         )
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger("tidal.inference").warning(
+            "Baseline formula '%s' failed: %s (params: %s)",
+            formula,
+            exc,
+            sorted(ns.keys()) if params else "none",
+        )
         return None
 
 
@@ -320,9 +328,13 @@ def _evaluate_likelihood(
     # Build parameter overrides
     param_overrides = {name: float(theta[i]) for i, name in enumerate(param_names)}
 
-    # Create a temp directory for this evaluation
+    # Create a unique temp directory for this evaluation.
+    # Include PID to avoid collisions between multiprocessing workers
+    # (each fork gets its own counter starting at 0).
+    import os
+
     base = temp_dir or Path(tempfile.gettempdir())
-    run_dir = base / f"inference_run_{call_index:06d}"
+    run_dir = base / f"inference_run_{os.getpid()}_{call_index:06d}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -368,6 +380,11 @@ def _evaluate_likelihood(
         )
 
     except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger("tidal.inference").debug(
+            "Likelihood evaluation failed at theta=%s", theta, exc_info=True
+        )
         return -math.inf
 
     finally:
