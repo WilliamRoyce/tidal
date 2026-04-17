@@ -3,7 +3,7 @@
 #SBATCH -A {{ACCOUNT}}
 #SBATCH -p sapphire
 #SBATCH --qos=intr
-#SBATCH --nodes=1
+#SBATCH --nodes={{NODES}}
 #SBATCH --ntasks={{NTASKS}}
 #SBATCH --time={{TIME}}
 #SBATCH --exclude=cpu-r-11

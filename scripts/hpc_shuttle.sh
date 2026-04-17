@@ -129,7 +129,10 @@ cmd_submit() {
   [[ -n "$cmd" ]] || die "--cmd required"
   [[ -n "$account" ]] || account="$(cmd_resolve_account)"
 
-  # Default ntasks to 112 * nodes (sapphire cores/node); override with --ntasks.
+  # Default ntasks to 112 * nodes (sapphire cores/node).
+  # NB: tidal sweep uses multiprocessing.Pool (single-node shared-memory), so
+  # --nodes=1 is always correct for sweeps.  Multi-node allocations waste SLURM
+  # slots unless you add MPI/distributed dispatch.
   local ntasks=$(( nodes * 112 ))
   local rendered
   rendered="$(sed \

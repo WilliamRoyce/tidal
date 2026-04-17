@@ -5,6 +5,7 @@
 #SBATCH --nodes={{NODES}}
 #SBATCH --ntasks={{NTASKS}}
 #SBATCH --time={{TIME}}
+#SBATCH --exclude=cpu-r-11
 #SBATCH -o {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
 #SBATCH -e {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
 
