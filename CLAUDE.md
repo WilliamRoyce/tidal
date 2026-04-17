@@ -108,7 +108,7 @@ Claude auto-memory files, plans, and project settings are backed up to `.claude-
 - **Use `scripts/hpc_shuttle.sh`** for every interaction: `push`, `setup`, `submit`, `status`, `tail`, `htop`, `pull`, `cancel`. Never ssh/rsync ad-hoc.
 - **Storage discipline:** all job I/O and the tidal venv live in `~/rds/hpc-work/tidal/`, never `/home/` (NFS I/O from jobs causes global system issues per CSD3 admin).
 - **Partitions:** prefer `sapphire` > `icelake` > `cclake` for CPU. Build for sapphire/icelake on `login-icelake` (there is no `login-sapphire`); for cclake on `login-cascadelake`.
-- **Smoke-test with `--qos=INTR`** (1 h whole-node, queue-free) before any long submission. Supervisor expects most of our scale to fit here.
+- **Default to `--qos=INTR`** (1 h, queue-free, up to 3 nodes, `MaxSubmitPU=1`) for any job whose estimated wall time is under 1 hour — not just smoke tests. INTR skips the queue entirely, giving immediate scheduling. Fall back to standard QOS (via `sapphire_cpu.sbatch`) only for jobs exceeding the 1-hour limit. Note: `tidal sweep --parallel` uses `multiprocessing.Pool` (single-node only), so `--nodes=1` is always correct for sweeps.
 - **Billing order:** DiRAC > SL2 > SL3. `submit` reads `mybalance` and surfaces the choice; never silently default to SL3.
 - **Never poll `squeue`/`sinfo` in loops** — shared controller. One-shot `status` per user request only. No background watch processes.
 - **On SSH auth failure, STOP and ask the user.** Do NOT retry. Fail2Ban blocks the IP for 20 min after repeated failures.
