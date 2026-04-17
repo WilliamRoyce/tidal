@@ -213,10 +213,27 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         Ak = A_test[ki][idx[:, None], idx[None, :]]
         if B_test is not None:
             Bk = B_test[ki][idx[:, None], idx[None, :]]
-            ev, VR = cast(
-                "tuple[NDArray[np.complexfloating], NDArray[np.complexfloating]]",
-                sla.eig(Ak, Bk),  # type: ignore[arg-type]
-            )
+            # Null-space projection for rank-deficient B (issue #264).
+            # Must match the fix in _evolve_per_mode: project A and B
+            # onto range(B) before QZ to avoid finite spurious eigenvalues
+            # from kinetic-null DOF (e.g. non-trace CDT torsion components).
+            _, s_bk, Vt_bk = np.linalg.svd(Bk)
+            null_thresh = s_bk[0] * 1e-10 if s_bk[0] > 0 else 1e-14
+            rank_bk = int(np.sum(s_bk > null_thresh))
+            null_dim = len(s_bk) - rank_bk
+            if null_dim > 0:
+                Vphys = Vt_bk[:rank_bk].T
+                Vnull = Vt_bk[rank_bk:].T
+                eig_r = sla.eig(Vphys.T @ Ak @ Vphys, Vphys.T @ Bk @ Vphys)
+                ev_red = np.asarray(eig_r[0], dtype=np.complex128)
+                vr_red = np.asarray(eig_r[1], dtype=np.complex128)
+                ev = np.concatenate([ev_red, np.zeros(null_dim, dtype=np.complex128)])
+                VR = np.hstack([Vphys @ vr_red, Vnull])
+            else:
+                ev, VR = cast(
+                    "tuple[NDArray[np.complexfloating], NDArray[np.complexfloating]]",
+                    sla.eig(Ak, Bk),  # type: ignore[arg-type]
+                )
             # Zero out gauge/infinite eigenvalues (unphysical DOF)
             gauge = ~np.isfinite(ev) | (np.abs(ev) > 1e12)  # noqa: PLR2004
             ev = ev.copy()
@@ -242,12 +259,22 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             else:
                 rel_coupling = 0.0
 
-            if rel_coupling < 1e-10:  # noqa: PLR2004
-                # All tachyonic modes are IC-decoupled from source field
-                # (coupling < 1e-10, matching _suppress_tachyonic_noise's
-                # coupling_threshold=1e-12 with a 100x safety margin).
-                # Modes with coupling ≥ 1e-10 will NOT be suppressed by the
-                # solver and will cause genuine exponential divergence.
+            # Condition-aware coupling threshold.  When VR is
+            # ill-conditioned (e.g. CDT non-trace torsion DOF at large ξ),
+            # pinv(VR) entries are unreliable: numerical noise of order
+            # 1/cond(VR) contaminates the coupling column, making truly
+            # IC-decoupled tachyonic modes appear coupled.  The solver's
+            # _suppress_tachyonic_noise uses the actual IC vector and
+            # correctly finds ~1e-16 for these modes; the guard must
+            # account for the conditioning to avoid false rejections.
+            # See issue #266.
+            cond_VR = float(np.linalg.cond(VR))
+            # Floor: entries of pinv(VR) have noise ~cond(VR)*eps, so
+            # rel_coupling has noise ~cond(VR)*eps / max_col.  With
+            # max_col ~ O(1), noise floor ~ cond(VR) * eps.  Use a
+            # conservative 100x margin on machine epsilon (1e-16).
+            coupling_floor = max(1e-10, min(1.0, cond_VR * 1e-14))
+            if rel_coupling < coupling_floor:
                 continue
 
             n_tachyonic += 1
