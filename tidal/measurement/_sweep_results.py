@@ -683,7 +683,7 @@ class SweepResults:
             )
             row["P_valid"] = valid
 
-    def add_paired_baseline(
+    def add_paired_baseline(  # noqa: C901
         self,
         baseline: SweepResults,
         *,
@@ -736,26 +736,47 @@ class SweepResults:
             if val is not None:
                 base_lookup[key] = float(val)
 
+        # 1D baseline with interpolation: when matching on a single parameter,
+        # use np.interp so that LHC/MC samples at arbitrary values can be paired
+        # with a 1D baseline curve.  This avoids requiring exact grid matches.
+        use_interp = len(match_params) == 1 and len(base_lookup) >= 2
+        if use_interp:
+            base_xs = np.array(sorted(k[0] for k in base_lookup))
+            base_ys = np.array([base_lookup[x,] for x in base_xs])
+
         n_matched = 0
         for row in self.rows:
-            key = tuple(
-                round(float(row.get(p, 0)), 6)
-                for p in match_params  # type: ignore[arg-type]
-            )
-            p_base = base_lookup.get(key)
-
-            if p_base is None:
-                # Try fuzzy match within tolerance
-                for bkey, bval in base_lookup.items():
-                    if all(abs(a - b) <= match_tolerance for a, b in zip(key, bkey, strict=False)):
-                        p_base = bval
-                        break
-
             p_val = row.get(metric)
             try:
                 p = float(p_val)  # type: ignore[arg-type]
             except (TypeError, ValueError):
                 p = _math.nan
+
+            p_base: float | None = None
+            if use_interp:
+                # Interpolate baseline for 1D case
+                param_name = match_params[0]
+                try:
+                    x_val = float(row.get(param_name, _math.nan))  # type: ignore[arg-type]
+                except (TypeError, ValueError):
+                    x_val = _math.nan
+                if _math.isfinite(x_val) and base_xs[0] <= x_val <= base_xs[-1]:
+                    p_base = float(np.interp(x_val, base_xs, base_ys))
+            else:
+                # Multi-param: exact + fuzzy matching
+                key = tuple(
+                    round(float(row.get(p_name, 0)), 6)
+                    for p_name in match_params  # type: ignore[arg-type]
+                )
+                p_base = base_lookup.get(key)
+                if p_base is None:
+                    for bkey, bval in base_lookup.items():
+                        if all(
+                            abs(a - b) <= match_tolerance
+                            for a, b in zip(key, bkey, strict=False)
+                        ):
+                            p_base = bval
+                            break
 
             if p_base is not None and p_base > 0 and _math.isfinite(p):
                 a = p / p_base
