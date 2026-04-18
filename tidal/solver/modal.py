@@ -1820,6 +1820,44 @@ def _evolve_per_mode(
     initial_max_amp: float = 0.0
     divergence_threshold: float = 100.0
 
+    # Pre-check: predict amplitude at t_end using the already-computed
+    # eigendecomposition and reject fast-diverging sims before entering
+    # the time loop.  This uses the SAME evolution math as the loop
+    # (not a heuristic on Re(λ)), so it's mathematically exact and
+    # immune to pseudospectral false positives that plagued the
+    # removed eigenvalue pre-check.  For pathologically unstable runs
+    # this is ~1000x faster than running to the guard trigger time.
+    #
+    # Check t_end only: for exponential growth (Re(λ) > 0), max is at
+    # t_end.  For non-normal matrices the intermediate max could be
+    # larger, but the runtime loop guard below catches that case.
+    t_end_rel = float(t_eval[-1] - t0)
+    if t_end_rel > 0:
+        initial_physical = _ifft_slots(y0_hat, layout, grid)
+        initial_max_amp = max(float(np.max(np.abs(initial_physical))), 1e-15)
+        y_hat_predict = np.zeros((n_slots, n_modes), dtype=np.complex128)
+        for block_slots, V_y0, _V_y0_deriv, eig_vals in block_evolved:
+            exp_lambda_end = np.exp(eig_vals * t_end_rel)
+            y_hat_predict[block_slots, :] = np.einsum(
+                "mij,mj->mi",
+                V_y0,
+                exp_lambda_end,
+            ).T
+        predicted_physical = _ifft_slots(y_hat_predict, layout, grid)
+        predicted_max = float(np.max(np.abs(predicted_physical)))
+        if (
+            not np.isfinite(predicted_max)
+            or predicted_max / initial_max_amp > divergence_threshold
+        ):
+            msg = (
+                f"Simulation predicted to diverge: amplitude at t={t_eval[-1]:.4g} "
+                f"would reach ratio {predicted_max / initial_max_amp:.2e} "
+                f"(threshold {divergence_threshold:.0e}). Fields would leave "
+                f"the perturbative regime (linearized approximation invalid). "
+                f"Rejecting pre-evolution based on eigendecomposition."
+            )
+            raise SimulationDivergedError(msg)
+
     # NOTE: The eigenvalue pre-check guard (commit 2b94172) was removed.
     # It detected modes with Re(λ) > 0 and physical IC projection, but for
     # PGT models with constrained torsion fields, the constraint-eliminated

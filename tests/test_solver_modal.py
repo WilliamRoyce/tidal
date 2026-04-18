@@ -950,7 +950,9 @@ class TestModalBlockIsolation:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            with pytest.raises(SimulationDivergedError, match="diverged"):
+            # Either runtime guard ("diverged at t=...") or pre-check
+            # ("predicted to diverge") is an acceptable detection.
+            with pytest.raises(SimulationDivergedError, match="diverge"):
                 solve_modal(
                     spec,
                     grid,
