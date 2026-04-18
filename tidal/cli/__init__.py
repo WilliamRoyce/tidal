@@ -1602,6 +1602,21 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Use dynamic nested sampling (dynesty only)",
     )
     sample_parser.add_argument(
+        "--num-repeats",
+        type=int,
+        default=None,
+        dest="num_repeats",
+        metavar="N",
+        help="PolyChord slice-sampling repeats per dim (default: 5*ndim)",
+    )
+    sample_parser.add_argument(
+        "--precision-criterion",
+        type=float,
+        default=None,
+        dest="precision_criterion",
+        help="PolyChord evidence precision stopping criterion (default: 0.001)",
+    )
+    sample_parser.add_argument(
         "--seed",
         type=int,
         default=42,
