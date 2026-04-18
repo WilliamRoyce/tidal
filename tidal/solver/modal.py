@@ -1602,8 +1602,9 @@ def _evolve_per_mode(
     Raises
     ------
     SimulationDivergedError
-        If field amplitudes grow beyond the divergence threshold (1e4 x
-        initial amplitude), indicating physical instability.
+        If field amplitudes grow beyond 100x the initial maximum, which
+        indicates the simulation has left the perturbative regime where
+        the linearized equations are valid.
     """
     from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
 
@@ -1787,16 +1788,37 @@ def _evolve_per_mode(
     # Pre-allocate buffer reused each timestep (avoids n_snapshots allocations)
     y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
 
-    # Divergence guard: track initial amplitude for early-stop detection (#226).
-    # Floor at 1e-15 for fields starting at zero (compared to machine epsilon).
+    # Divergence guard: perturbation-theory validity check.
+    #
+    # Physics reasoning: the solver operates on LINEARIZED equations,
+    # derived by expanding to first order in a small perturbation
+    # parameter epsilon ~ IC amplitude.  Higher-order terms (F^4, R*F^2,
+    # torsion * F^2, ...) were dropped.  The linearized evolution is only
+    # physical while all fields remain O(epsilon) — once any field grows
+    # to O(100 * epsilon), the dropped terms become comparable to the
+    # retained ones and the physics is unreliable regardless of numerical
+    # stability.
+    #
+    # We therefore enforce: max(|y(t)|) / max(|y(0)|) <= divergence_threshold.
+    # This is a ratio check (not absolute) so it scales with IC amplitude.
+    # The threshold 100 puts us at the boundary of the perturbative regime
+    # (well before overflow).
+    #
+    # Discrimination properties:
+    #   - Normal evolution: ratio ~ O(1), passes.
+    #   - Legitimate amplification A up to ~10^5: target field grows to
+    #     sqrt(A * P_GR) * epsilon ~ a few * epsilon, ratio < 100, passes.
+    #   - Tachyonic instability: source field itself grows exponentially,
+    #     ratio rapidly exceeds 100, rejected.
+    #   - Partial blow-up (target blows up, source stays bounded): target
+    #     reaches ~100 * epsilon meaning perturbation theory has broken,
+    #     ratio exceeds 100, rejected.
+    #
+    # The threshold is chosen for physics (perturbation-theory validity),
+    # not numerics — it errs on the side of being strict about "is this
+    # still a linearized simulation" rather than "will this overflow".
     initial_max_amp: float = 0.0
-    # Threshold rationale: linearized regime breaks down around ratio ~100,
-    # so 1e4 is two orders of magnitude above that — still well within pre-
-    # overflow territory but catches pathological partial blow-ups (e.g.
-    # target field grows to ~10^4 x IC scale while the IC field stays near
-    # its initial value).  The old 1e8 threshold let through simulations
-    # producing unphysical P_max > 10^6 when only target fields grew.
-    divergence_threshold: float = 1e4  # amplitude ratio that triggers early stop
+    divergence_threshold: float = 100.0
 
     # NOTE: The eigenvalue pre-check guard (commit 2b94172) was removed.
     # It detected modes with Re(λ) > 0 and physical IC projection, but for
@@ -1836,12 +1858,8 @@ def _evolve_per_mode(
         snapshots[ti] = y_physical
         times[ti] = t
 
-        # Divergence guard: check amplitude ratio against GLOBAL max of
-        # initial state.  Uses the peak across ALL fields and ALL spatial
-        # points, so localized ICs (Gaussians) with small tails don't
-        # trigger false positives when the wave packet propagates.
-        # Threshold 1e8 catches exponential growth well before overflow;
-        # the linearized regime breaks down much earlier (ratio > ~100).
+        # Divergence guard: enforce perturbation-theory validity via
+        # global amplitude ratio.  See declaration comment for physics.
         max_amp = float(np.max(np.abs(y_physical)))
         if ti == 0:
             initial_max_amp = max(max_amp, 1e-15)
@@ -1851,8 +1869,8 @@ def _evolve_per_mode(
             msg = (
                 f"Simulation diverged at t={t:.4g}: amplitude ratio "
                 f"{max_amp / initial_max_amp:.2e} exceeds threshold "
-                f"{divergence_threshold:.0e}. The system is physically "
-                f"unstable (linearized regime violated)."
+                f"{divergence_threshold:.0e}. Fields have left the "
+                f"perturbative regime (linearized approximation invalid)."
             )
             # Fill remaining snapshots so partial results are usable
             for tj in range(ti + 1, n_snapshots):
