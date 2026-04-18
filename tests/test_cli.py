@@ -218,6 +218,8 @@ class TestSimulateCommand:
                 "8",
                 "--t-end",
                 "0.2",
+                "--param",
+                "kappa=1.0",
                 "--output",
                 str(output),
             ]
@@ -312,6 +314,8 @@ class TestSimulateCommand:
                 "0.5",
                 "--grid-shape",
                 "8",
+                "--param",
+                "kappa=1.0",
                 "--no-plot",
             ]
         )
