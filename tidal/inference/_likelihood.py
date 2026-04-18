@@ -167,15 +167,32 @@ def compute_log_likelihood(
     if config.likelihood_type == "threshold":
         return 0.0 if metric_value >= config.min_value else -math.inf
 
+    # If a baseline formula is provided, use the log-amplification
+    # log(A) = log(metric / baseline) as the physics quantity.  This is
+    # the Gertsenshtein-normalized conversion (dimensionless, centered
+    # on 0 for no-amplification, positive for enhancement, negative for
+    # suppression).  Using log-ratio tames the dynamic range so evidence
+    # isn't dominated by a few large outliers.
+    if config.baseline_formula:
+        baseline = _eval_baseline(config.baseline_formula, eval_params)
+        if baseline is None or baseline <= 0 or metric_value <= 0:
+            return -math.inf
+        log_amplification = math.log(metric_value / baseline)
+        if config.likelihood_type == "maximize":
+            return log_amplification  # find max amplification
+        if config.likelihood_type == "minimize":
+            return -log_amplification  # find max suppression
+        if config.likelihood_type == "extremize":
+            return abs(log_amplification)  # find max deviation (both sides)
+        # gaussian/threshold fall through to raw-metric branches below
+
     if config.likelihood_type == "minimize":
         return -metric_value
 
     if config.likelihood_type == "extremize":
-        baseline = _eval_baseline(config.baseline_formula, eval_params)
-        if baseline is None or baseline <= 0 or metric_value <= 0:
-            return -math.inf
-        # |log(A)| where A = metric / baseline
-        return abs(math.log(metric_value / baseline))
+        # extremize requires a baseline (enforced by __post_init__);
+        # this branch is unreachable but kept for safety.
+        return -math.inf
 
     # maximize: use metric value directly as log-likelihood
     return metric_value
