@@ -1,22 +1,18 @@
-"""Nested sampling backends for Bayesian evidence computation.
+"""Nested sampling backend for Bayesian evidence computation.
 
-Supports two backends via the ``--sampler`` flag:
+Uses **PolyChord** (Will Handley et al., 2015) — Fortran-compiled,
+slice-sampling, scales to high dimensions, native anesthetic integration.
 
-- **polychord** (default): Fortran-compiled, slice sampling, scales to high
-  dimensions.  Recommended for production and HPC.
-- **dynesty**: Pure Python, pip-installable, fallback for environments
-  without gfortran.
+Install via ``bash scripts/install_polychord.sh`` (requires gfortran).
 
-Both use the same interface: ``log_likelihood(theta) -> float`` and
-``prior_transform(u) -> theta``.  Visualization uses **anesthetic**
-(Handley 2019) for both backends.
+Visualization uses **anesthetic** (Handley 2019).
 
 References
 ----------
 Handley, W. et al. (2015) "PolyChord: next-generation nested sampling",
     MNRAS 453(4), 4384-4398.
-Speagle, J.S. (2020) "dynesty: a dynamic nested sampling package",
-    MNRAS 493(3), 3132-3158.
+Handley, W. (2019) "anesthetic: nested sampling visualization",
+    JOSS 4(37), 1414.
 Skilling, J. (2004) "Nested Sampling", AIP Conference Proceedings 735, 395-405.
 """
 
@@ -73,15 +69,12 @@ def run_nested_sampling(
     param_names: list[str],
     sampler: str = "polychord",
     nlive: int = 100,
-    dlogz: float = 0.01,
     n_workers: int | None = None,
-    seed: int | None = None,
     *,
-    dynamic: bool = False,
     quiet: bool = False,
     **kwargs: Any,
 ) -> InferenceResult:
-    """Run nested sampling with the specified backend.
+    """Run nested sampling with PolyChord.
 
     Parameters
     ----------
@@ -95,53 +88,36 @@ def run_nested_sampling(
     param_names : list[str]
         Parameter names.
     sampler : str
-        Backend: ``"polychord"`` (default) or ``"dynesty"``.
+        Backend — only ``"polychord"`` supported (validated for clarity).
     nlive : int
         Number of live points.
-    dlogz : float
-        Evidence tolerance (stopping criterion).
     n_workers : int | None
-        Number of parallel workers. None = sequential.
-    seed : int | None
-        Random seed.
-    dynamic : bool
-        Use dynamic nested sampling (dynesty only).
+        Number of parallel workers (unused by PolyChord's serial binding;
+        retained for future MPI path).
     quiet : bool
         Suppress progress output.
     **kwargs
-        Additional backend-specific options.
+        PolyChord-specific settings: ``num_repeats``, ``precision_criterion``,
+        ``do_clustering``, ``output_dir``, ``file_root``, etc.
     """
-    if sampler == "polychord":
-        return _run_polychord(
-            log_likelihood=log_likelihood,
-            prior_transform=prior_transform,
-            ndim=ndim,
-            param_names=param_names,
-            nlive=nlive,
-            n_workers=n_workers,
-            quiet=quiet,
-            **kwargs,
-        )
-    if sampler == "dynesty":
-        return _run_dynesty(
-            log_likelihood=log_likelihood,
-            prior_transform=prior_transform,
-            ndim=ndim,
-            param_names=param_names,
-            nlive=nlive,
-            dlogz=dlogz,
-            n_workers=n_workers,
-            seed=seed,
-            dynamic=dynamic,
-            quiet=quiet,
-            **kwargs,
-        )
-    msg = f"Unknown sampler '{sampler}'. Use 'polychord' or 'dynesty'."
-    raise ValueError(msg)
+    if sampler != "polychord":
+        msg = f"Unknown sampler '{sampler}'. Only 'polychord' is supported."
+        raise ValueError(msg)
+
+    return _run_polychord(
+        log_likelihood=log_likelihood,
+        prior_transform=prior_transform,
+        ndim=ndim,
+        param_names=param_names,
+        nlive=nlive,
+        n_workers=n_workers,
+        quiet=quiet,
+        **kwargs,
+    )
 
 
 # ---------------------------------------------------------------------------
-# PolyChord backend (primary)
+# PolyChord backend
 # ---------------------------------------------------------------------------
 
 
@@ -152,7 +128,7 @@ def _run_polychord(  # noqa: PLR0915
     ndim: int,
     param_names: list[str],
     nlive: int,
-    n_workers: int | None,
+    n_workers: int | None,  # PolyChord uses MPI, not Pool
     quiet: bool,
     **kwargs: Any,
 ) -> InferenceResult:
@@ -166,10 +142,9 @@ def _run_polychord(  # noqa: PLR0915
         from pypolychord.settings import PolyChordSettings
     except ImportError:
         msg = (
-            "pypolychord is required for the PolyChord backend. "
+            "pypolychord is required for nested sampling. "
             "Install with: bash scripts/install_polychord.sh "
-            "(requires gfortran). For a pure-Python fallback, "
-            "use --sampler dynesty instead."
+            "(requires gfortran)."
         )
         raise ImportError(msg) from None
 
@@ -266,115 +241,3 @@ def _run_polychord(  # noqa: PLR0915
             "_anesthetic_samples": ns,
         },
     )
-
-
-# ---------------------------------------------------------------------------
-# dynesty backend (fallback)
-# ---------------------------------------------------------------------------
-
-
-def _run_dynesty(
-    *,
-    log_likelihood: Callable[..., float],
-    prior_transform: Callable[..., Any],
-    ndim: int,
-    param_names: list[str],
-    nlive: int,
-    dlogz: float,
-    n_workers: int | None,
-    seed: int | None,
-    dynamic: bool,
-    quiet: bool,
-    **kwargs: Any,
-) -> InferenceResult:
-    """Run nested sampling with dynesty (pure-Python fallback)."""
-    try:
-        import dynesty
-    except ImportError:
-        msg = (
-            "dynesty is required for the dynesty backend. "
-            "Install with: pip install tidal[inference]"
-        )
-        raise ImportError(msg) from None
-
-    from tidal.inference._results import InferenceResult
-
-    pool = None
-    queue_size = 1
-
-    if n_workers and n_workers > 1:
-        from multiprocessing import Pool
-
-        from tidal.cli._sweep import (
-            _set_single_thread_blas,  # pyright: ignore[reportPrivateUsage]
-        )
-
-        pool = Pool(n_workers, initializer=_set_single_thread_blas)
-        queue_size = n_workers
-
-    rstate = np.random.default_rng(seed) if seed is not None else None
-
-    try:
-        if dynamic:
-            sampler = dynesty.DynamicNestedSampler(
-                log_likelihood,
-                prior_transform,
-                ndim,
-                pool=pool,
-                queue_size=queue_size,
-                rstate=rstate,
-            )
-            sampler.run_nested(
-                dlogz_init=dlogz,
-                print_progress=not quiet,
-                **kwargs,
-            )
-        else:
-            sampler = dynesty.NestedSampler(
-                log_likelihood,
-                prior_transform,
-                ndim,
-                nlive=nlive,
-                bound="multi",
-                pool=pool,
-                queue_size=queue_size,
-                rstate=rstate,
-            )
-            sampler.run_nested(
-                dlogz=dlogz,
-                print_progress=not quiet,
-                **kwargs,
-            )
-
-        results = sampler.results
-
-        # Extract importance weights
-        try:
-            weights = np.exp(results.logwt - results.logz[-1])
-            weights /= weights.sum()
-        except (AttributeError, IndexError):
-            weights = None
-
-        return InferenceResult(
-            samples=results.samples,
-            log_likelihood=results.logl,
-            log_prior=np.zeros(len(results.logl)),  # uniform in unit cube
-            param_names=param_names,
-            method="nested",
-            log_evidence=float(results.logz[-1]),
-            log_evidence_err=float(results.logzerr[-1]),
-            weights=weights,
-            metadata={
-                "sampler": "dynesty",
-                "nlive": nlive,
-                "dlogz": dlogz,
-                "dynamic": dynamic,
-                "n_iterations": results.niter,
-                "n_calls": sum(results.ncall),
-                "logvol": results.logvol.tolist(),
-            },
-        )
-    finally:
-        if pool is not None:
-            pool.close()
-            pool.join()

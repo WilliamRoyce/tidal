@@ -1498,7 +1498,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         description=(
             "Run Bayesian parameter estimation using simulation-based "
             "likelihood evaluation.  Supports simple Monte Carlo and "
-            "nested sampling (dynesty/PolyChord) with anesthetic visualization."
+            "nested sampling (PolyChord) with anesthetic visualization."
         ),
         epilog=(
             "Examples:\n"
@@ -1571,9 +1571,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sample_parser.add_argument(
         "--sampler",
-        choices=["polychord", "dynesty"],
+        choices=["polychord"],
         default="polychord",
-        help="Nested sampling backend (default: polychord)",
+        help="Nested sampling backend (only polychord supported)",
     )
     sample_parser.add_argument(
         "--n-samples",
@@ -1588,18 +1588,6 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=100,
         metavar="N",
         help="Number of live points for nested sampling (default: 100)",
-    )
-    sample_parser.add_argument(
-        "--dlogz",
-        type=float,
-        default=0.01,
-        help="Evidence tolerance for nested sampling (default: 0.01)",
-    )
-    sample_parser.add_argument(
-        "--dynamic",
-        action="store_true",
-        default=False,
-        help="Use dynamic nested sampling (dynesty only)",
     )
     sample_parser.add_argument(
         "--num-repeats",

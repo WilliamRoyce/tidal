@@ -5,14 +5,14 @@ for parameter estimation and model comparison.
 
 Supports:
 - Simple Monte Carlo: ``--method mc --n-samples 100``
-- Nested sampling (dynesty): ``--method nested --nlive 100``
+- Nested sampling (PolyChord): ``--method nested --nlive 100``
 - User-specifiable priors: ``--prior "alpha=uniform:0.01:10"``
 - Hard constraints: ``--constraint "xi > 0"``
 - Parallel evaluation: ``--parallel N``
 
 References
 ----------
-Speagle, J.S. (2020) "dynesty", MNRAS 493(3).
+Handley, W. et al. (2015) "PolyChord", MNRAS 453(4).
 Handley, W. (2019) "anesthetic", JOSS 4(37).
 Skilling, J. (2004) "Nested Sampling", AIP Conference Proceedings 735.
 """
@@ -190,9 +190,6 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
     elif method == "nested":
         nlive = getattr(args, "nlive", 100)
-        dlogz = getattr(args, "dlogz", 0.01)
-        sampler_backend = getattr(args, "sampler", "polychord")
-        dynamic = getattr(args, "dynamic", False)
 
         # Auto-scale nlive if requested
         nlive_auto = getattr(args, "nlive_auto", None)
@@ -205,8 +202,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
         if not quiet:
             print(f"  Live points: {nlive}")
-            print(f"  dlogz: {dlogz}")
-            print(f"  Sampler: {sampler_backend}")
+            print("  Sampler: polychord")
             if n_workers:
                 print(f"  Workers: {n_workers}")
             print()
@@ -243,12 +239,9 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             prior_transform=build_prior_transform(priors),
             ndim=len(priors),
             param_names=param_names,
-            sampler=sampler_backend,
+            sampler="polychord",
             nlive=nlive,
-            dlogz=dlogz,
             n_workers=n_workers,
-            seed=seed,
-            dynamic=dynamic,
             quiet=quiet,
             **ns_kwargs,
         )

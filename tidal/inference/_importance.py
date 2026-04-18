@@ -65,8 +65,9 @@ def to_anesthetic_samples(result: InferenceResult) -> Any:
 
     For PolyChord results, returns the cached ``NestedSamples`` object
     that was read from the chain files (preserving full dead-birth
-    information).  For dynesty or manually constructed results, builds
-    a ``NestedSamples`` from the sample arrays.
+    information).  When the cache is unavailable (e.g. a result loaded
+    from CSV via ``InferenceResult.from_directory``) a ``NestedSamples``
+    object is reconstructed from the sample arrays.
 
     Parameters
     ----------
@@ -114,34 +115,11 @@ def to_anesthetic_samples(result: InferenceResult) -> Any:
         except (FileNotFoundError, OSError):
             pass  # Fall through to manual construction
 
-    # Manual construction from arrays (dynesty or loaded results)
+    # Reconstruct from sample arrays (e.g. loaded from CSV).
+    # Sort by logL and assign births assuming constant nlive.
     import numpy as np
 
     n = len(result.log_likelihood)
-
-    # Try to reconstruct logl_birth from dynesty's logvol
-    logvol = result.metadata.get("logvol")
-    if logvol is not None:
-        nlive = result.metadata.get("nlive") or 100
-        if nlive >= n:
-            msg = (
-                f"Cannot reconstruct logl_birth: nlive ({nlive}) >= "
-                f"n_samples ({n}). Need more dead points than live points."
-            )
-            raise ValueError(msg)
-        logl_birth = np.full(n, -np.inf)
-        for i in range(nlive, n):
-            logl_birth[i] = float(result.log_likelihood[i - nlive])
-
-        return NestedSamples(
-            data=result.samples,
-            logL=result.log_likelihood,
-            logL_birth=logl_birth,
-            columns=result.param_names,
-        )
-
-    # Last resort: construct with estimated logl_birth from nlive.
-    # Sort by logL and assign births assuming constant nlive.
     nlive = result.metadata.get("nlive") or 100
     if nlive >= n:
         msg = (
