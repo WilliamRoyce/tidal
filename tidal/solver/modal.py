@@ -1602,7 +1602,7 @@ def _evolve_per_mode(
     Raises
     ------
     SimulationDivergedError
-        If field amplitudes grow beyond the divergence threshold (1e8 x
+        If field amplitudes grow beyond the divergence threshold (1e4 x
         initial amplitude), indicating physical instability.
     """
     from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
@@ -1790,7 +1790,13 @@ def _evolve_per_mode(
     # Divergence guard: track initial amplitude for early-stop detection (#226).
     # Floor at 1e-15 for fields starting at zero (compared to machine epsilon).
     initial_max_amp: float = 0.0
-    divergence_threshold: float = 1e8  # amplitude ratio that triggers early stop
+    # Threshold rationale: linearized regime breaks down around ratio ~100,
+    # so 1e4 is two orders of magnitude above that — still well within pre-
+    # overflow territory but catches pathological partial blow-ups (e.g.
+    # target field grows to ~10^4 x IC scale while the IC field stays near
+    # its initial value).  The old 1e8 threshold let through simulations
+    # producing unphysical P_max > 10^6 when only target fields grew.
+    divergence_threshold: float = 1e4  # amplitude ratio that triggers early stop
 
     # NOTE: The eigenvalue pre-check guard (commit 2b94172) was removed.
     # It detected modes with Re(λ) > 0 and physical IC projection, but for
