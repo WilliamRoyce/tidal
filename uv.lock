@@ -564,20 +564,6 @@ wheels = [
 ]
 
 [[package]]
-name = "dynesty"
-version = "3.0.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/56/90/b538da9a03522e91252acc36dceb9e38538db0303f2dc314e0e417404d2c/dynesty-3.0.0.tar.gz", hash = "sha256:806c83b21904cf7df73c2478a9e0e8a2b7d811cd0d613109f3f810a7111d12b0", size = 35559700, upload-time = "2025-10-04T21:34:19.578Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/4a/45/68f4ab90f889abbeec5932751643f055bb811a33ef7361ac849426dcc38a/dynesty-3.0.0-py3-none-any.whl", hash = "sha256:4cdbbb39c61158f4d882445b064b742fcdc4d03ba9b2ba845801cd2ca6fcb761", size = 102885, upload-time = "2025-10-04T21:34:12.006Z" },
-]
-
-[[package]]
 name = "fonttools"
 version = "4.60.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1029,6 +1015,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", hash = "sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba", size = 8729, upload-time = "2022-08-14T12:40:10.846Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", hash = "sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8", size = 9979, upload-time = "2022-08-14T12:40:09.779Z" },
+]
+
+[[package]]
+name = "mpmath"
+version = "1.4.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c5/b0/6de8e78014ff1842a90cc9a56da6ccfb598a5390ed0257fcdb7d9680c18b/mpmath-1.4.1.tar.gz", hash = "sha256:efd6d1b75f09d69524a67609949812668b28e81ecbfe0ab449ced8c13e92642e", size = 2093211, upload-time = "2026-03-15T01:17:38.245Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/f2/abeec3db71d221ccd3cd89d206be1fabf5a3ee7178862f5fba23a59607e0/mpmath-1.4.1-py3-none-any.whl", hash = "sha256:dc4f0ea2304480d4a9a48a94c1020571558ade522b44a6912efac63a586e140f", size = 567787, upload-time = "2026-03-15T01:17:36.392Z" },
 ]
 
 [[package]]
@@ -2160,7 +2155,6 @@ completion = [
 ]
 inference = [
     { name = "anesthetic" },
-    { name = "dynesty" },
 ]
 sensitivity = [
     { name = "salib" },
@@ -2171,6 +2165,7 @@ wolfram = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "mpmath" },
     { name = "myst-parser" },
     { name = "pydata-sphinx-theme" },
     { name = "pyright" },
@@ -2184,7 +2179,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anesthetic", marker = "extra == 'inference'", specifier = ">=2.0" },
-    { name = "dynesty", marker = "extra == 'inference'", specifier = ">=2.1" },
     { name = "matplotlib", specifier = ">=3.1,<4.0" },
     { name = "numpy", specifier = ">=1.22,<3.0" },
     { name = "rich-argparse", marker = "extra == 'color'", specifier = ">=1.4" },
@@ -2200,6 +2194,7 @@ provides-extras = ["wolfram", "sensitivity", "inference", "completion", "color"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "mpmath", specifier = ">=1.4.1" },
     { name = "myst-parser", specifier = ">=4.0.0,<5.0.0" },
     { name = "pydata-sphinx-theme", specifier = ">=0.16.0,<0.17.0" },
     { name = "pyright", specifier = "==1.1.403" },

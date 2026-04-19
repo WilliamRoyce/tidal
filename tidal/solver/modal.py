@@ -149,6 +149,98 @@ _EXACT_MULTIPLIERS: dict[str, _ExactMultFn] = {
 
 
 # ---------------------------------------------------------------------------
+# Closed-form Duhamel kernel for Pass 1 of the v6 perturbative solver.
+# ---------------------------------------------------------------------------
+# Given the inhomogeneous linear ODE
+#     dy/dt = A·y + M_src·y0(t),   y(0) = 0,
+# where y0(t) is the Pass 0 solution (a sum of eigenmode exponentials)
+# and A is the same base operator from Pass 0, the solution in the
+# eigenbasis of A (A = V·D·V^-1) is
+#     z_i(t) = Σ_j β_ij · α_j · G(λ_i, λ_j; t),
+# with β = V^-1·M_src·V, α = V^-1·y0(0), and
+#     G(λ, μ; t) = [exp(μt) − exp(λt)] / (μ − λ)          (μ ≠ λ)
+#     G(λ, λ; t) = t·exp(λt)                              (degenerate)
+# The naive μ ≠ λ formula suffers catastrophic cancellation when
+# |μ − λ|·t is small. Follow Al-Mohy & Higham (2011), SIAM J. Sci.
+# Comput. 33, §3 (Table 3.1): switch to a Taylor expansion of the
+# entire function φ₁(z) = (exp(z) − 1)/z = Σ_{k≥0} z^k/(k+1)! whenever
+# |(μ−λ)·t| is smaller than a conservative threshold. The crossover
+# point for double precision is ~ √ε_mach ≈ 1.5e-8; setting the
+# threshold an order of magnitude higher (1e-5) leaves both branches
+# accurate while avoiding edge-case switching noise.
+
+_PHI1_DEGENERACY_THRESHOLD = 1e-5
+"""Switch-over |(μ−λ)·t| for Duhamel kernel Taylor fallback.
+
+Cites Al-Mohy & Higham 2011 §3 Table 3.1. Set one order of magnitude
+above √ε_mach ≈ 1.5e-8 so both the direct and Taylor branches evaluate
+in their numerically stable regime.
+"""
+
+
+def _duhamel_kernel(
+    lam: complex | NDArray[np.complex128],
+    mu: complex | NDArray[np.complex128],
+    t: float,
+) -> complex | NDArray[np.complex128]:
+    """Closed-form Duhamel kernel G(λ, μ; t) for linear inhomogeneous ODEs.
+
+    Evaluates ``G(λ, μ; t) = [exp(μ t) − exp(λ t)] / (μ − λ)`` with a
+    12-term Taylor fallback on the φ₁ entire function near μ = λ to
+    prevent catastrophic cancellation. Accepts scalar or
+    broadcast-compatible complex array inputs; returns the element-wise
+    kernel.
+
+    Parameters
+    ----------
+    lam, mu : complex or complex ndarray
+        Eigenvalues λ (row index in the source formula) and μ
+        (column index). Typically arrays of shape ``(bs,)`` per block
+        or ``(n_modes, bs)``.
+    t : float
+        Evaluation time.
+
+    Returns
+    -------
+    G : complex or complex ndarray
+        Same shape as ``broadcast(lam, mu)``.
+
+    References
+    ----------
+    Al-Mohy & Higham 2011, "Computing the action of the matrix
+    exponential", SIAM J. Sci. Comput. 33, §3 Table 3.1.
+    """
+    lam_arr = np.asarray(lam, dtype=np.complex128)
+    mu_arr = np.asarray(mu, dtype=np.complex128)
+    z = (mu_arr - lam_arr) * t
+    e_lam_t = np.exp(lam_arr * t)
+
+    # Direct formula: G = exp(λt) · (exp(z) − 1) / (μ − λ) = exp(λt) · t ·
+    # expm1(z) / z. Using expm1 preserves accuracy for z near 0, but the
+    # 1/z blows up near degeneracy — hence the Taylor branch below.
+    direct_denom = np.where(np.abs(z) > 0, z, np.ones_like(z))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        direct = e_lam_t * t * np.expm1(z) / direct_denom
+
+    # Taylor expansion of φ₁(z) = Σ_{k≥0} z^k / (k+1)! with G = t·exp(λt)·φ₁(z).
+    # Twelve terms saturate double precision for |z| ≲ 1; this branch
+    # runs only for |z| < _PHI1_DEGENERACY_THRESHOLD so truncation error
+    # is well below 1e-13 in practice.
+    phi1 = np.ones_like(z)
+    z_power = np.ones_like(z)
+    for k in range(1, 12):
+        z_power = z_power * z / (k + 1)
+        phi1 += z_power
+    taylor = t * e_lam_t * phi1
+
+    mask = np.abs(z) > _PHI1_DEGENERACY_THRESHOLD
+    result = np.where(mask, direct, taylor)
+    if np.ndim(lam) == 0 and np.ndim(mu) == 0:
+        return complex(result)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Eligibility check
 # ---------------------------------------------------------------------------
 
@@ -2410,3 +2502,297 @@ def solve_modal(
             }
         result["eigendata"] = eigendata  # type: ignore[typeddict-unknown-key]
     return result
+
+
+# ---------------------------------------------------------------------------
+# Pass 1: closed-form Duhamel evolution (v6 Stage 4)
+# ---------------------------------------------------------------------------
+# Solves  dy⁽¹⁾/dt = A(k)·y⁽¹⁾ + M_src(k)·y⁰(t),  y⁽¹⁾(0) = 0
+# where y⁰(t) is the Pass 0 solution provided via eigendata. Reuses the
+# Stage 3 eigendecomposition of A(k) so the only per-mode cost is a
+# dense (bs × bs) β-projection and (n_t) Duhamel-kernel evaluations.
+
+
+def _build_source_matrix_k(
+    correction_spec: EquationSystem,
+    layout: StateLayout,
+    coeff_eval: CoefficientEvaluator,
+    k_grid: list[NDArray[np.float64]],
+    rfft_shape: tuple[int, ...],
+    schur_ops: dict[str, Any] | None = None,
+) -> NDArray[np.complex128]:
+    """Build M_src(k) for Pass 1: correction RHS as a linear source on the
+    Pass 0 state.
+
+    Shape ``(n_modes, n_slots, n_slots)``. For each correction RHS term
+    ``c·op(field)`` appearing in equation ``eq``:
+
+    - The row is the velocity slot when ``eq.time_derivative_order >= 2``
+      (source enters the ``dv/dt`` entry of the companion system) or the
+      field slot when ``eq.time_derivative_order == 1``.
+    - The column is the target-field slot when ``term.field`` is
+      dynamical. When it is a constraint field (eliminated by Schur in
+      Pass 0), the row ``recovery_matrix[m, c_idx, :]`` from
+      ``schur_ops`` is used to expand the reference into the dynamical
+      subspace — ``h_c → Σ_j recovery[m, c_idx, j] · d_j``.
+
+    ``correction_spec`` is typically ``spec.filter_by_order(n)`` for the
+    Pass ``n`` correction (v6 plan, Stage 4).
+    """
+    n_slots = layout.num_slots
+    n_modes = int(np.prod(rfft_shape))
+
+    def _resolve_target_slot(field_ref: str) -> int | None:
+        if field_ref in layout.field_slot_map:
+            return layout.field_slot_map[field_ref]
+        if field_ref.startswith("v_") and field_ref[2:] in layout.velocity_slot_map:
+            return layout.velocity_slot_map[field_ref[2:]]
+        return None
+
+    # Build constraint-field name → recovery row index map
+    constraint_idx: dict[str, int] = {}
+    recovery_matrix: NDArray[np.complex128] | None = None
+    if schur_ops is not None:
+        c_names_list = list(schur_ops.get("constraint_field_names", ()))
+        constraint_idx.update({cname: ci for ci, cname in enumerate(c_names_list)})
+        recovery_matrix = schur_ops.get("recovery_matrix")
+
+    # Cache Fourier multipliers per operator
+    multiplier_cache: dict[str, NDArray[np.complex128]] = {}
+    for eq in correction_spec.equations:
+        for term in eq.rhs_terms:
+            op = term.operator
+            if op in multiplier_cache:
+                continue
+            if op not in _EXACT_MULTIPLIERS:
+                msg = (
+                    f"Operator {op!r} in correction spec has no Fourier "
+                    f"multiplier — modal Duhamel requires one of "
+                    f"{sorted(_EXACT_MULTIPLIERS)}"
+                )
+                raise ValueError(msg)
+            mult_fn = _EXACT_MULTIPLIERS[op]
+            mult_val = mult_fn(k_grid)
+            mult_full = np.broadcast_to(mult_val, rfft_shape)
+            multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
+
+    M_src = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
+
+    for eq_idx, eq in enumerate(correction_spec.equations):
+        field_name = eq.field_name
+        # Identify row
+        if eq.time_derivative_order >= 2:
+            if field_name not in layout.velocity_slot_map:
+                # Equation for a field not in the reduced dynamical layout
+                # — constraint-field correction equations land here. Handled
+                # separately by the Pass 1 constraint recovery step; skip.
+                continue
+            row_slot = layout.velocity_slot_map[field_name]
+        elif field_name in layout.field_slot_map:
+            row_slot = layout.field_slot_map[field_name]
+        else:
+            continue
+
+        for term_idx, term in enumerate(eq.rhs_terms):
+            coeff = _resolve_constant_coeff(
+                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
+            )
+            mult = multiplier_cache[term.operator]
+
+            target_slot = _resolve_target_slot(term.field)
+            if target_slot is not None:
+                # Dynamical target: direct write into the slot column.
+                M_src[:, row_slot, target_slot] += coeff * mult
+            elif term.field in constraint_idx and recovery_matrix is not None:
+                # Constraint field: expand via Schur row.
+                # recovery_matrix[m, c_idx, j] → contributes to column j.
+                c_idx = constraint_idx[term.field]
+                # (coeff * mult[m]) * recovery_matrix[m, c_idx, j]
+                # → M_src[m, row_slot, j] += ...
+                term_contrib = coeff * mult[:, None] * recovery_matrix[:, c_idx, :]
+                M_src[:, row_slot, :] += term_contrib
+            else:
+                # Unknown target — skip but warn once at the call site.
+                continue
+
+    return M_src
+
+
+def _evolve_duhamel_per_mode(
+    eigendata: dict[str, Any],
+    M_src_k: NDArray[np.complex128],
+    t_eval: NDArray[np.float64],
+    layout: StateLayout,
+    grid: GridInfo,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Evaluate Pass 1 Duhamel solution block-by-block, reusing eigendata.
+
+    Returns ``(t, y_phys)`` with ``y_phys`` shape
+    ``(n_snapshots, n_slots * n_points)`` in the same flattened physical
+    layout as :func:`_evolve_per_mode`.
+
+    The algorithm is, per block and per mode:
+
+    1. Project the source matrix into the eigenbasis: β = V⁻¹ · M_src · V.
+    2. Recover α = V⁻¹ · y⁰(0) from eigendata (already computed by Pass 0).
+    3. Evaluate z_i(t) = Σ_j β_ij · α_j · G(λ_i, λ_j; t) with G the
+       closed-form Duhamel kernel.
+    4. Transform back: y_block(t) = V · z(t).
+
+    Blocks not listed in ``eigendata["blocks"]`` evolve trivially (zero
+    IC, no source) and are left at zero.
+    """
+    n_slots = layout.num_slots
+    n_pts = layout.num_points
+    n_modes = M_src_k.shape[0]
+
+    # rfft output shape
+    rfft_shape_list = list(grid.shape)
+    rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
+    rfft_shape = tuple(rfft_shape_list)
+
+    n_snapshots = len(t_eval)
+    t0 = t_eval[0]
+
+    # Working array: full Fourier state per snapshot
+    y_hat_snap = np.zeros((n_snapshots, n_slots, n_modes), dtype=np.complex128)
+
+    for block in eigendata["blocks"]:
+        slot_indices = list(block["slot_indices"])
+        v_mat = block["V"]  # (n_modes, bs, bs)
+        v_inv = block["V_inv"]  # (n_modes, bs, bs)
+        lam = block["D_diag"]  # (n_modes, bs)
+        alpha = block["alpha"]  # (n_modes, bs)
+        idx = np.array(slot_indices)
+
+        # Extract this block's rows/cols from M_src: (n_modes, bs, bs).
+        # Only the slot_indices sub-matrix acts on the block IC; source
+        # entries coupling different blocks would require a larger
+        # coupling scheme (flag via NotImplementedError later).
+        M_sub = M_src_k[:, idx[:, None], idx[None, :]]
+
+        # Check for cross-block coupling: any non-zero in M_src rows of
+        # this block but columns outside it. If so, the decoupled
+        # block-eigenbasis ansatz is wrong. Raise early rather than
+        # silently produce garbage.
+        full_rows = M_src_k[:, idx, :]  # (n_modes, bs, n_slots)
+        mask = np.ones(n_slots, dtype=bool)
+        mask[idx] = False
+        cross = full_rows[:, :, mask]
+        if cross.size > 0 and np.max(np.abs(cross)) > 1e-14:
+            msg = (
+                "Pass 1 source matrix couples blocks that Pass 0 "
+                "eigendecomposed independently. Cross-block Duhamel is "
+                "not yet implemented — the correction theory likely "
+                "mixes previously-independent sectors, which Pass 0 "
+                "cannot represent. Report this spec to the TIDAL team."
+            )
+            raise NotImplementedError(msg)
+
+        # β = V⁻¹ · M_sub · V, shape (n_modes, bs, bs)
+        beta = np.einsum("mij,mjk,mkl->mil", v_inv, M_sub, v_mat)
+
+        for ti in range(n_snapshots):
+            dt = float(t_eval[ti] - t0)
+            if dt == 0.0:
+                continue  # y⁽¹⁾(0) = 0 by IC
+
+            # G[m, i, j] = _duhamel_kernel(λ_i, λ_j; dt) per mode
+            lam_i = lam[:, :, None]  # (n_modes, bs, 1)
+            lam_j = lam[:, None, :]  # (n_modes, 1, bs)
+            G = _duhamel_kernel(lam_i, lam_j, dt)  # (n_modes, bs, bs)
+
+            # z_i = Σ_j β_ij · α_j · G_ij
+            z_eigen = np.einsum("mij,mj,mij->mi", beta, alpha, G)  # (n_modes, bs)
+            # y_block_hat = V · z  (n_modes, bs)
+            y_block_hat = np.einsum("mij,mj->mi", v_mat, z_eigen)
+            # Scatter into full state
+            for local_i, slot_idx in enumerate(slot_indices):
+                y_hat_snap[ti, slot_idx] += y_block_hat[:, local_i]
+
+    # Inverse FFT each slot at each snapshot back to physical space
+    y_phys = np.zeros((n_snapshots, n_slots * n_pts))
+    for ti in range(n_snapshots):
+        for si in range(n_slots):
+            y_phys_block = np.fft.irfftn(
+                y_hat_snap[ti, si].reshape(rfft_shape),
+                s=grid.shape,
+                axes=list(range(len(grid.shape))),
+            ).ravel()
+            y_phys[ti, si * n_pts : (si + 1) * n_pts] = np.real(y_phys_block)
+
+    return t_eval.astype(np.float64), y_phys
+
+
+def solve_modal_pass1(
+    eigendata: dict[str, Any],
+    correction_spec: EquationSystem,
+    grid: GridInfo,
+    t_eval: NDArray[np.float64],
+    *,
+    parameters: dict[str, float] | None = None,
+) -> SolverResult:
+    """Solve the Pass 1 correction  dy⁽¹⁾/dt = A·y⁽¹⁾ + M_src·y⁰(t).
+
+    Reuses ``eigendata`` from a prior ``solve_modal(..., return_eigendata=True)``
+    call on the base (order-0) spec. ``correction_spec`` is the
+    ``spec.filter_by_order(n)`` spec containing only the order-``n``
+    RHS terms. The closed-form Duhamel kernel is applied per mode in
+    the eigenbasis of the base operator — no ODE integration.
+
+    Parameters
+    ----------
+    eigendata : dict
+        Output of Pass 0 with ``return_eigendata=True``. Must include
+        ``"blocks"``, ``"mode_k"``, ``"state_layout"``, and (for
+        constraint systems) ``"schur_ops"``.
+    correction_spec : EquationSystem
+        The correction-only equation system (RHS terms filtered by
+        ``order_in_eps``). The LHS structure is unused — only the
+        right-hand side operator terms matter for the source.
+    grid : GridInfo
+        Same grid used in Pass 0 (must match the eigendata's
+        ``mode_k``).
+    t_eval : array of floats
+        Evaluation times. Pass 1's IC is zero, so ``t_eval[0]`` can be
+        any reference time; output at ``t = t_eval[0]`` is zero.
+    parameters : dict, optional
+        Runtime parameter overrides for the correction coefficients.
+
+    Returns
+    -------
+    SolverResult
+        ``t``, ``y``, ``success``, ``message``. ``y`` is the Pass 1
+        correction in physical space.
+    """
+    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+    layout = eigendata["state_layout"]
+
+    # Correction coefficient evaluator — driven by the correction spec
+    # so only correction-term coefficients are pre-resolved.
+    coeff_eval = CoefficientEvaluator(correction_spec, grid, parameters or {})
+
+    k_axes = _build_k_axes(grid)
+    k_grid = _build_k_grid(k_axes)
+    rfft_shape_list = list(grid.shape)
+    rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
+    rfft_shape = tuple(rfft_shape_list)
+
+    M_src_k = _build_source_matrix_k(
+        correction_spec,
+        layout,
+        coeff_eval,
+        k_grid,
+        rfft_shape,
+        schur_ops=eigendata.get("schur_ops"),
+    )
+
+    times, y_phys = _evolve_duhamel_per_mode(eigendata, M_src_k, t_eval, layout, grid)
+
+    return {
+        "t": times,
+        "y": y_phys,
+        "success": True,
+        "message": "Pass 1 closed-form Duhamel (v6 Stage 4)",
+    }

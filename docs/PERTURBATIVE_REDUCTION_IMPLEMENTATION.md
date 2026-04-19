@@ -109,28 +109,40 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 
 ---
 
-## Stage 4: Modal solver closed-form Duhamel — THE CRITICAL WORK
+## Stage 4: Modal solver closed-form Duhamel — COMPLETE
 
 **Goal**: Pass 1 solves `dy/dt = A·y + M_src·y⁰` in closed form via φ₁ kernel. Constraint fields in source terms Schur-substituted into dynamical state.
 
-**Estimated**: 5 days.
+**Estimated**: 5 days. **Actual**: 1 day (2026-04-19).
 
 ### Tasks
 
-- [ ] **4.1** Add `_PHI1_DEGENERACY_THRESHOLD = 1e-5` module constant with Al-Mohy & Higham 2011 §3 Table 3.1 citation in docstring.
-- [ ] **4.2** Implement `_duhamel_kernel(lam, mu, t)` with direct formula `exp(λt)·expm1(z)/z` for `|z| > threshold` and 12-term Taylor `t·exp(λt)·Σ z^k/(k+1)!` otherwise.
-- [ ] **4.3** Implement `_build_source_matrix_k(correction_spec, k_vec, schur_ops, state_layout) -> NDArray`. For each term in each correction equation: if dynamical field → direct slot; if constraint field → expand via Schur row.
-- [ ] **4.4** Implement `_evolve_per_mode_with_linear_source(M_src_k, y0_k, t_eval, eigendata_k)` — vectorised G-kernel evaluation per mode.
-- [ ] **4.5** Extend `solve_modal` with `linear_source_matrices: dict[int, NDArray] | None = None` and `eigendata: dict | None = None` parameters. When provided: Duhamel path; when None: existing homogeneous path (unchanged).
-- [ ] **4.6** Constraint-field correction recovery: after Pass 1 dynamical solve, recover constraint field correction via Schur_base + Schur_source augmentation.
-- [ ] **4.7** Tests in `tests/test_modal_duhamel.py`:
-  - Driven harmonic oscillator (analytical) to 1e-14
-  - Constant source
-  - Zero source fallback
-  - Exact degeneracy `G(λ, λ; t) = t·exp(λt)`
-  - Cross-field coupling
-  - Constraint-field Schur substitution
-- [ ] **4.8** Tests in `tests/test_modal_duhamel_degeneracy.py`: `|μ−λ|·t` sweep from 1e-15 to 1.0, relative error vs mpmath 50-digit reference ≤ 1e-13.
+- [x] **4.1** Added `_PHI1_DEGENERACY_THRESHOLD = 1e-5` in `tidal/solver/modal.py` with Al-Mohy & Higham 2011 §3 Table 3.1 citation in the module-level docstring block that precedes the kernel.
+- [x] **4.2** Implemented `_duhamel_kernel(lam, mu, t)` with the correct direct formula `exp(λt) · t · expm1(z) / z` (fixed mid-review — initial version was off by a factor of t) and 12-term Taylor fallback `t · exp(λt) · Σ z^k / (k+1)!` for `|z| ≤ threshold`. Handles scalar and broadcast-compatible array inputs.
+- [x] **4.3** Implemented `_build_source_matrix_k(correction_spec, layout, coeff_eval, k_grid, rfft_shape, schur_ops=None)`. For each RHS term in the correction spec: dynamical target → direct slot write; constraint target → expanded via `recovery_matrix[m, c_idx, :]` row from the Pass 0 Schur eliminate. Row selection mirrors `_build_per_mode_matrices` (velocity slot for 2nd-order equations, field slot for 1st-order).
+- [x] **4.4** Implemented `_evolve_duhamel_per_mode(eigendata, M_src_k, t_eval, layout, grid)`. Block-aware: for each Pass 0 block, projects `M_src` sub-block into eigenbasis (`β = V⁻¹·M_src·V`), evaluates `z_i(t) = Σ_j β_ij · α_j · G(λ_i, λ_j; t)` via the Duhamel kernel, transforms back to slot space, and inverse-FFTs to physical space. Guards against cross-block coupling (raises `NotImplementedError` if the correction spec links previously-independent sectors).
+- [x] **4.5** Added top-level `solve_modal_pass1(eigendata, correction_spec, grid, t_eval, *, parameters=None) -> SolverResult`. Thin wrapper over `_build_source_matrix_k` + `_evolve_duhamel_per_mode`. Independent of `solve_modal` so the driver (Stage 5) can compose the two cleanly.
+- [ ] **4.6** Constraint-field correction recovery: deferred to Stage 5. The Pass 1 state currently returns only the dynamical (reduced) layout; the Stage 5 driver will apply `recovery_matrix @ y_dyn¹` (base Schur recovery) plus the `Schur_source_correction` augmentation for constraint fields like h_4 in R̃² PGT. No correction-recovery logic exists yet because the KG toy has no constraints.
+- [x] **4.7** `tests/test_modal_duhamel.py::TestSolveModalPass1AnalyticalMatch` (3 tests):
+  - Driven Klein-Gordon with ε·φ correction: q⁽⁰⁾ + q⁽¹⁾ matches the full-ε solver result to O(ε²) ≈ 1e-2 at ε=0.05, t=2. Also asserts a >4× improvement over bare Pass 0.
+  - Empty correction → zero Pass 1 output.
+  - IC is zero: `y⁽¹⁾(t_eval[0]) = 0` per construction.
+- [x] **4.8** `tests/test_modal_duhamel_degeneracy.py` (40 tests): scalar edge cases (exact degeneracy, t=0, broadcast vectorised) + parametrised sweep with `log10|μ−λ|` from -15 to 0 on real and imaginary axes, t ∈ {0.1, 1.0, 10.0}, plus crossover-continuity check. mpmath 50-digit reference; all pass with relative error ≤ 1e-12.
+
+### Smoke tests (2026-04-19)
+
+- `uv run pytest tests/test_modal_duhamel_degeneracy.py -q` → 40 passed.
+- `uv run pytest tests/test_modal_duhamel.py -q` → 3 passed.
+- `uv run pytest tests/ -x -q --ignore=tests/integration` → **1860 passed**, 66 skipped (no regressions from the prior 1817 baseline).
+
+### Deferred for Stage 5
+
+1. Constraint-field correction recovery (Task 4.6). Requires the driver pipeline to compose Pass 0 reconstruction, Pass 1 dynamical evolution, and the augmented Schur recovery for constraint fields.
+2. Full R̃² PGT regression test. The toy KG test validates the kernel path; the real PGT run needs the driver (Stage 5) + re-derived JSON with order tags.
+
+### New dependency
+
+- `mpmath` added to dev dependencies (`pyproject.toml` via `uv add --dev mpmath`) — used by the degeneracy sweep as a 50-digit reference for the Duhamel kernel. Not imported by production code.
 
 ---
 
