@@ -347,37 +347,58 @@ def _evaluate_likelihood(
     # Build parameter overrides
     param_overrides = {name: float(theta[i]) for i, name in enumerate(param_names)}
 
-    # Create a unique temp directory for this evaluation.
-    # Include PID to avoid collisions between multiprocessing workers
-    # (each fork gets its own counter starting at 0).
-    import os
+    # Backend selection: in-memory default (fast path), fall back to disk
+    # when the user explicitly requests --likelihood-backend=disk.  The
+    # disk path is kept for bisectability / rollback (see issue #269).
+    backend = getattr(base_args, "likelihood_backend", "memory")
 
-    base = temp_dir or Path(tempfile.gettempdir())
-    run_dir = base / f"inference_run_{os.getpid()}_{call_index:06d}"
-    run_dir.mkdir(parents=True, exist_ok=True)
+    # The disk backend still needs a temp dir; in-memory does not.
+    run_dir: Path | None = None
+    if backend == "disk":
+        # Create a unique temp directory for this evaluation.
+        # Include PID to avoid collisions between multiprocessing workers
+        # (each fork gets its own counter starting at 0).
+        import os
+
+        base = temp_dir or Path(tempfile.gettempdir())
+        run_dir = base / f"inference_run_{os.getpid()}_{call_index:06d}"
+        run_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Run simulation
-        exit_code, _wall_time, spec = _simulate_run(
-            base_args,
-            spec_path,
-            param_overrides,
-            run_dir,
-        )
+        if backend == "memory":
+            from tidal.cli._sweep import (
+                _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
+                run_inference_step,
+            )
 
-        if exit_code != 0:
-            return -math.inf
+            sim_data = run_inference_step(base_args, spec_path, param_overrides)
+            spec = sim_data.spec
+            metrics = _measure_from_sim_data(
+                sim_data, measurements, source, target, threshold
+            )
+        else:
+            # Run simulation (disk path — preserved for rollback)
+            assert run_dir is not None  # set when backend == "disk"
+            exit_code, _wall_time, spec = _simulate_run(
+                base_args,
+                spec_path,
+                param_overrides,
+                run_dir,
+            )
 
-        # Extract metrics
-        metrics = _measure_run(
-            run_dir,
-            spec_path,
-            measurements,
-            source,
-            target,
-            threshold,
-            spec=spec,
-        )
+            if exit_code != 0:
+                return -math.inf
+
+            # Extract metrics
+            metrics = _measure_run(
+                run_dir,
+                spec_path,
+                measurements,
+                source,
+                target,
+                threshold,
+                spec=spec,
+            )
 
         # Get the target metric
         metric_value = metrics.get(likelihood_config.metric)
@@ -418,7 +439,7 @@ def _evaluate_likelihood(
         return -math.inf
 
     finally:
-        if not keep_sims and run_dir.exists():
+        if run_dir is not None and not keep_sims and run_dir.exists():
             shutil.rmtree(run_dir, ignore_errors=True)
 
 

@@ -643,6 +643,127 @@ class TestPolyChordGuard:
             )
 
 
+class TestLikelihoodBackendEquivalence:
+    """Memory and disk backends must produce identical metrics (#269).
+
+    If these ever diverge, the in-memory fast path has drifted from the
+    disk-writer reference semantics and callers could get wrong science.
+    """
+
+    @pytest.mark.parametrize("metric", ["P_max", "P_final"])
+    def test_backends_agree(self, metric: str, tmp_path: Path) -> None:
+        import sys
+
+        spec_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "data"
+            / "dark_photon_plasma.json"
+        )
+        if not spec_path.exists():
+            pytest.skip(f"dark_photon_plasma spec not found at {spec_path}")
+
+        # Build a real Namespace via the tidal argument parser so every
+        # simulate-facing attribute gets the correct type/default.
+        import tidal.cli
+
+        argv = [
+            "tidal",
+            "sample",
+            str(spec_path),
+            "--param",
+            "kappa=1.0",
+            "--param",
+            "B0=0.01",
+            "--param",
+            "alpha3=0.25",
+            "--param",
+            "xi=1.0",
+            "--param",
+            "deltam=0.3",
+            "--prior",
+            "mA2=uniform:0.4:0.5",  # single point we evaluate manually
+            "--likelihood",
+            "P_max:maximize",
+            "--method",
+            "nested",
+            "--sampler",
+            "polychord",
+            "--grid-shape",
+            "32",
+            "--bounds",
+            "0:50",
+            "--periodic",
+            "--ic",
+            "plane-wave",
+            "--ic-component",
+            "h_5",
+            "--ic-wavevector",
+            "2.0",
+            "--ic-amplitude",
+            "1e-2",
+            "--source",
+            "h_5",
+            "--target",
+            "a_1",
+            "--snapshots",
+            "3",
+            "--t-end",
+            "10.0",
+            "--output",
+            str(tmp_path / "ns"),
+        ]
+        old_argv = sys.argv
+        try:
+            sys.argv = argv
+            parser = tidal.cli._build_parser()  # pyright: ignore[reportPrivateUsage]
+            args = parser.parse_args(argv[1:])
+        finally:
+            sys.argv = old_argv
+
+        from tidal.cli._sweep import (
+            _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
+            _measure_run,  # pyright: ignore[reportPrivateUsage]
+            _simulate_run,  # pyright: ignore[reportPrivateUsage]
+            run_inference_step,
+        )
+        from tidal.symbolic import load_equation_system
+
+        spec = load_equation_system(spec_path)
+        overrides = {"mA2": 0.45}
+
+        # Memory path
+        sim_data = run_inference_step(args, spec_path, overrides, spec=spec)
+        mem_metrics = _measure_from_sim_data(
+            sim_data,
+            {"conversion", "peak_conversion"},
+            ("h_5",),
+            ("a_1",),
+            0.5,
+        )
+
+        # Disk path — uses the same fixed config.
+        disk_dir = tmp_path / "disk_run"
+        disk_dir.mkdir()
+        exit_code, _, _ = _simulate_run(args, spec_path, overrides, disk_dir, spec=spec)
+        assert exit_code == 0
+        disk_metrics = _measure_run(
+            disk_dir,
+            spec_path,
+            {"conversion", "peak_conversion"},
+            ("h_5",),
+            ("a_1",),
+            0.5,
+            spec=spec,
+        )
+
+        mem_val = mem_metrics.get(metric)
+        disk_val = disk_metrics.get(metric)
+        assert mem_val is not None
+        assert disk_val is not None
+        assert mem_val == pytest.approx(disk_val, rel=1e-12, abs=1e-15)
+
+
 # ===================================================================
 # recommend_nlive
 # ===================================================================

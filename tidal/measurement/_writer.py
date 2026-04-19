@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
+    from tidal.measurement._io import SimulationData
     from tidal.symbolic.json_loader import EquationSystem
 
 # Current format version.  Increment when the metadata schema changes.
@@ -383,6 +384,177 @@ class SnapshotWriter:
             mmap.flush()
         for mmap in self._velocity_mmaps.values():
             mmap.flush()
+
+
+class InMemoryAccumulator:
+    """Accumulate simulation snapshots in RAM, same callback API as SnapshotWriter.
+
+    Used by the Bayesian-inference likelihood path to skip the disk
+    round-trip that dominates per-evaluation wall time (~700 ms on a
+    typical tidal run — see issue #269).
+
+    The :meth:`append` signature matches :class:`SnapshotWriter` so the
+    existing snapshot-callback plumbing in ``_simulate`` works unchanged
+    when an accumulator is wired in place of the writer.  Call
+    :meth:`to_sim_data` after the solver finishes to materialise a
+    :class:`tidal.measurement._io.SimulationData`.
+
+    Memory bound: ``n_snapshots * grid_size * (n_fields + n_velocities) *
+    8 bytes``.  For the modal inference path (≤ 64-point 1D, ≤ 5
+    snapshots, ~18 components) this is a few kB per evaluation.  A
+    256-point * 101-snapshot * 18-component run is ~7 MB; still well
+    below any realistic concern for nested-sampling workloads.
+    """
+
+    def __init__(  # noqa: PLR0913, PLR0917
+        self,
+        field_names: list[str],
+        velocity_names: list[str],
+        grid_shape: tuple[int, ...],
+        n_snapshots: int,
+        grid_spacing: tuple[float, ...],
+        grid_bounds: tuple[tuple[float, float], ...],
+        periodic: tuple[bool, ...],
+        parameters: dict[str, float] | None = None,
+        bc_types: tuple[str, ...] | None = None,
+        dt: float | None = None,
+    ) -> None:
+        if n_snapshots < 1:
+            msg = f"n_snapshots must be >= 1, got {n_snapshots}"
+            raise ValueError(msg)
+        if not field_names:
+            msg = "field_names must be non-empty"
+            raise ValueError(msg)
+
+        self._field_names = list(field_names)
+        self._velocity_names = list(velocity_names)
+        self._grid_shape = tuple(grid_shape)
+        self._n_snapshots = n_snapshots
+        self._grid_spacing = tuple(grid_spacing)
+        self._grid_bounds = tuple(grid_bounds)
+        self._periodic = tuple(periodic)
+        self._parameters = dict(parameters) if parameters else {}
+        self._bc_types = bc_types
+        self._dt = dt
+
+        snapshot_shape = (n_snapshots, *self._grid_shape)
+        self._times: NDArray[np.float64] = np.empty(n_snapshots, dtype=np.float64)
+        self._fields: dict[str, NDArray[np.float64]] = {
+            name: np.empty(snapshot_shape, dtype=np.float64) for name in field_names
+        }
+        self._velocities: dict[str, NDArray[np.float64]] = {
+            name: np.empty(snapshot_shape, dtype=np.float64) for name in velocity_names
+        }
+        self._count = 0
+        self._closed = False
+
+    def append(  # noqa: C901
+        self,
+        t: float,
+        fields: dict[str, NDArray[np.float64]],
+        velocities: dict[str, NDArray[np.float64]],
+    ) -> None:
+        """Record one snapshot.  Same semantics as SnapshotWriter.append.
+
+        Raises
+        ------
+        ValueError
+            If the accumulator is closed, the snapshot count is exceeded,
+            the time is non-finite or non-monotonic, or a field/velocity
+            array has the wrong shape.
+        """
+        if self._closed:
+            msg = "InMemoryAccumulator is closed"
+            raise ValueError(msg)
+        if self._count >= self._n_snapshots:
+            msg = (
+                f"Cannot append snapshot {self._count}: "
+                f"pre-allocated for {self._n_snapshots}"
+            )
+            raise ValueError(msg)
+
+        if not np.isfinite(t):
+            msg = f"Time must be finite, got {t}"
+            raise ValueError(msg)
+        if self._count > 0 and t < float(self._times[self._count - 1]):
+            prev = float(self._times[self._count - 1])
+            msg = (
+                f"Times must be non-decreasing: snapshot {self._count - 1} at t={prev}, "
+                f"snapshot {self._count} at t={t}"
+            )
+            raise ValueError(msg)
+
+        idx = self._count
+        self._times[idx] = t
+        for name in self._field_names:
+            if name not in fields:
+                msg = f"Missing field '{name}' in snapshot {idx}"
+                raise ValueError(msg)
+            arr = fields[name]
+            if arr.shape != self._grid_shape:
+                msg = (
+                    f"Field '{name}' has shape {arr.shape}, expected {self._grid_shape}"
+                )
+                raise ValueError(msg)
+            self._fields[name][idx] = arr
+        for name in self._velocity_names:
+            if name not in velocities:
+                msg = f"Missing velocity '{name}' in snapshot {idx}"
+                raise ValueError(msg)
+            arr = velocities[name]
+            if arr.shape != self._grid_shape:
+                msg = (
+                    f"Velocity '{name}' has shape {arr.shape}, "
+                    f"expected {self._grid_shape}"
+                )
+                raise ValueError(msg)
+            self._velocities[name][idx] = arr
+
+        self._count += 1
+
+    @property
+    def count(self) -> int:
+        return self._count
+
+    @property
+    def n_snapshots(self) -> int:
+        return self._n_snapshots
+
+    def close(self) -> None:
+        """Mark the accumulator as complete.  No-op for memory-backed storage."""
+        self._closed = True
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.close()
+
+    def to_sim_data(self, spec: EquationSystem) -> SimulationData:
+        """Materialise a :class:`SimulationData` from the accumulated arrays.
+
+        Slices arrays to the actual count in case the solver finished
+        early, then hands the slices (which are views, not copies) to
+        ``SimulationData``.
+        """
+        from tidal.measurement._io import SimulationData  # noqa: PLC0415
+
+        n = self._count
+        times = self._times[:n]
+        fields = {k: v[:n] for k, v in self._fields.items()}
+        velocities = {k: v[:n] for k, v in self._velocities.items()}
+        return SimulationData(
+            times=times,
+            fields=fields,
+            velocities=velocities,
+            grid_spacing=self._grid_spacing,
+            grid_bounds=self._grid_bounds,
+            periodic=self._periodic,
+            spec=spec,
+            parameters=self._parameters,
+            bc_types=self._bc_types,
+            dt=self._dt,
+        )
 
 
 def compute_snapshot_count(t_end: float, snapshot_interval: float) -> int:

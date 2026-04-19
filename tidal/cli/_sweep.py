@@ -40,6 +40,7 @@ import numpy as np
 if TYPE_CHECKING:
     from argparse import Namespace
 
+    from tidal.measurement._io import SimulationData
     from tidal.measurement._sweep_results import SweepResults
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -600,7 +601,52 @@ def _simulate_run(  # noqa: PLR0913
     return exit_code, wall_time, spec
 
 
-def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
+def run_inference_step(
+    base_args: Namespace,
+    spec_path: Path,
+    param_overrides: dict[str, float],
+    spec: EquationSystem | None = None,
+) -> SimulationData:
+    """Run one simulation in-memory for the inference likelihood path.
+
+    Same setup as :func:`_simulate_run` but wires an
+    :class:`InMemoryAccumulator` (via ``_simulate(..., in_memory_out=...)``)
+    in place of the :class:`SnapshotWriter`, returning the resulting
+    ``SimulationData`` directly without any disk round-trip.  This skips
+    the ~600-800 ms/eval penalty documented in issue #269.
+
+    Raises
+    ------
+    RuntimeError
+        If the underlying ``_simulate`` call fails.
+    """
+    from tidal.cli._simulate import (
+        _parse_params,  # pyright: ignore[reportPrivateUsage]
+        _simulate,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    # output_dir is unused in memory mode, but _build_sim_args writes it
+    # into sim_args.output.  Use a sentinel path that won't be touched.
+    sim_args = _build_sim_args(
+        base_args,
+        param_overrides,
+        Path("/dev/null"),
+    )
+    if spec is None:
+        from tidal.symbolic import load_equation_system
+
+        spec = load_equation_system(spec_path)
+    params = _parse_params(sim_args.param, spec)
+
+    sim_data_out: list[SimulationData] = []
+    exit_code = _simulate(sim_args, spec, params, in_memory_out=sim_data_out)
+    if exit_code != 0 or not sim_data_out:
+        msg = f"in-memory simulate failed (exit code {exit_code})"
+        raise RuntimeError(msg)
+    return sim_data_out[0]
+
+
+def _measure_run(  # noqa: PLR0913, PLR0917
     run_dir: Path,
     spec_path: Path,
     measurements: set[str],
@@ -616,6 +662,29 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
 
     Returns a dict of scalar metrics.
     """
+    from tidal.measurement._io import SimulationData
+
+    if spec is None:
+        from tidal.symbolic import load_equation_system
+
+        spec = load_equation_system(spec_path)
+    data = SimulationData.load(run_dir, spec)
+    return _measure_from_sim_data(data, measurements, source, target, threshold)
+
+
+def _measure_from_sim_data(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    data: SimulationData,
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+) -> dict[str, Any]:
+    """Dispatch measurement functions against an in-memory SimulationData.
+
+    Same logic as :func:`_measure_run` minus the disk load.  Used by the
+    Bayesian-inference likelihood path to skip the disk round-trip that
+    dominates per-evaluation wall time (see issue #269).
+    """
     from tidal.cli._measure import (
         _run_asymptotic,  # pyright: ignore[reportPrivateUsage]
         _run_conservation,  # pyright: ignore[reportPrivateUsage]
@@ -629,13 +698,7 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         _run_spectrum,  # pyright: ignore[reportPrivateUsage]
         _run_velocity,  # pyright: ignore[reportPrivateUsage]
     )
-    from tidal.measurement._io import SimulationData
 
-    if spec is None:
-        from tidal.symbolic import load_equation_system
-
-        spec = load_equation_system(spec_path)
-    data = SimulationData.load(run_dir, spec)
     metrics: dict[str, Any] = {}
 
     if "conservation" in measurements or "summary" in measurements:

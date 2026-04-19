@@ -227,9 +227,11 @@ def _run_polychord(  # noqa: PLR0915
         from anesthetic import read_chains
 
         ns = read_chains(chain_root)
-        samples = ns.to_numpy()[:, :ndim]
-        logl = ns.logL.to_numpy()
-        weights = ns.get_weights().to_numpy()
+        samples = np.asarray(ns.to_numpy())[:, :ndim]
+        logl = np.asarray(ns.logL)
+        # `get_weights()` returns a numpy array in anesthetic>=2.0 and a
+        # pandas Series in earlier versions; np.asarray handles both.
+        weights = np.asarray(ns.get_weights())
         logz = float(ns.logZ())
         logz_err = float(ns.logZ(100).std())
     except ImportError:

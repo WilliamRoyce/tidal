@@ -1621,6 +1621,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="PolyChord evidence precision stopping criterion (default: 0.001)",
     )
     sample_parser.add_argument(
+        "--likelihood-backend",
+        choices=("memory", "disk"),
+        default="memory",
+        dest="likelihood_backend",
+        help=(
+            "Per-evaluation pipeline: 'memory' skips the simulate/measure disk "
+            "round-trip (default, ~2x faster for nested sampling — see #269); "
+            "'disk' preserves the legacy behaviour for bisectability."
+        ),
+    )
+    sample_parser.add_argument(
         "--seed",
         type=int,
         default=42,

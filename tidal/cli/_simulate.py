@@ -1443,6 +1443,99 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     return writer, _disk_callback
 
 
+def _setup_memory_accumulator_native(  # noqa: PLR0913, PLR0917
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    params: dict[str, float],
+    snapshot_interval: float,
+    dt: float | None = None,
+    num_snapshots: int | None = None,
+) -> tuple[Any, Callable[..., None]]:
+    """In-memory twin of :func:`_setup_disk_writer_native`.
+
+    Produces an :class:`InMemoryAccumulator` and a ``(t, y_flat, yp_flat)``
+    callback that writes to it.  Intended for the inference likelihood
+    path: the accumulator is materialised into a ``SimulationData`` at
+    the end of ``_simulate`` and never touches disk.
+    """
+    from tidal.measurement._writer import InMemoryAccumulator, compute_snapshot_count
+    from tidal.solver.state import StateLayout
+
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+    n_snaps = num_snapshots or compute_snapshot_count(
+        snapshot_interval * 10,  # placeholder; caller already computed num_snapshots
+        snapshot_interval,
+    )
+    if num_snapshots is not None:
+        n_snaps = num_snapshots
+
+    field_names = [s.name for s in layout.slots if s.kind != "velocity"]
+    velocity_names = [s.field_name for s in layout.slots if s.kind == "velocity"]
+
+    # Constraint fields whose velocities we may want in the output.
+    constraint_names = [
+        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+    ]
+    constraint_slot_map: dict[str, int] = {
+        cname: layout.field_slot_map[cname]
+        for cname in constraint_names
+        if cname in layout.field_slot_map
+    }
+
+    all_velocity_names = velocity_names + list(constraint_slot_map.keys())
+
+    accumulator = InMemoryAccumulator(
+        field_names=field_names,
+        velocity_names=all_velocity_names,
+        grid_shape=grid_info.shape,
+        n_snapshots=n_snaps,
+        grid_spacing=tuple(float(d) for d in grid_info.dx),
+        grid_bounds=grid_info.bounds,
+        periodic=grid_info.periodic,
+        parameters=params,
+        bc_types=grid_info.bc_types,
+        dt=dt,
+    )
+
+    n_pts = grid_info.num_points
+    shape = grid_info.shape
+    field_set = set(field_names)
+    velocity_set = set(velocity_names)
+
+    field_slots_map: dict[str, int] = {}
+    velocity_slots_map: dict[str, int] = {}
+    for i, slot in enumerate(layout.slots):
+        if slot.kind == "velocity":
+            velocity_slots_map[slot.field_name] = i
+        elif slot.name in field_set:
+            field_slots_map[slot.name] = i
+
+    def _memory_callback(
+        t: float,
+        y_flat: np.ndarray,
+        yp_flat: np.ndarray | None = None,
+    ) -> None:
+        fields_d = {
+            name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
+            for name, idx in field_slots_map.items()
+        }
+        vels_d = {
+            name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
+            for name, idx in velocity_slots_map.items()
+            if name in velocity_set
+        }
+        for cname, slot_idx in constraint_slot_map.items():
+            if yp_flat is not None:
+                vels_d[cname] = yp_flat[
+                    slot_idx * n_pts : (slot_idx + 1) * n_pts
+                ].reshape(shape)
+            else:
+                vels_d[cname] = np.zeros(shape)
+        accumulator.append(t, fields_d, vels_d)
+
+    return accumulator, _memory_callback
+
+
 def _extract_constraint_bc(
     spec: EquationSystem,
 ) -> tuple[str, ...] | None:
@@ -1732,11 +1825,22 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     args: Namespace,
     spec: EquationSystem,
     params: dict[str, float],
+    *,
+    in_memory_out: list[Any] | None = None,
 ) -> int:
     """Run simulation via native TIDAL solver.
 
     Self-contained flow: GridInfo -> IC -> solve -> SimulationData -> output.
     Handles IDA, CVODE, scipy, and leapfrog schemes.
+
+    Parameters
+    ----------
+    in_memory_out : list[SimulationData] | None
+        If provided, skip all disk output (writer, plots, constraint .npy
+        files, HTML report) and append the resulting ``SimulationData`` to
+        the list instead.  Used by the Bayesian-inference likelihood path
+        to avoid the disk round-trip that dominates per-evaluation wall
+        time (issue #269).
     """
     from tidal.measurement._io import SimulationData
     from tidal.solver.operators import set_fd_order, set_spectral
@@ -2056,12 +2160,23 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         n_steps_est = max(1, math.ceil(duration / dt - 1e-10))
         num_snapshots = max(num_snapshots, n_steps_est + 2)
 
-    # 7. Disk writer (if directory output)
+    # 7. Disk writer (if directory output) or in-memory accumulator
+    # (inference path: skip disk entirely, see issue #269).
     fmt = _infer_output_format(args)
     writer: SnapshotWriter | None = None
+    accumulator: Any = None
     snapshot_cb: Callable[[float, np.ndarray], None] | None = None
 
-    if fmt == "directory":
+    if in_memory_out is not None:
+        accumulator, snapshot_cb = _setup_memory_accumulator_native(
+            spec,
+            grid_info,
+            params,
+            snapshot_interval,
+            dt=dt,
+            num_snapshots=num_snapshots,
+        )
+    elif fmt == "directory":
         writer, snapshot_cb = _setup_disk_writer_native(
             args,
             spec,
@@ -2301,11 +2416,29 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     # snapshots were already streamed to disk (avoids double-buffering).
     if writer is not None:
         sim_data = SimulationData.from_directory(writer.output_dir, spec)
+    elif accumulator is not None:
+        accumulator.close()
+        # Inject constraint velocities from modal solver (same semantics as
+        # the disk path's `np.save` block above, but into the in-memory
+        # SimulationData.velocities dict).
+        cv = result.get("constraint_velocities")
+        if cv:
+            for c_name, c_vel_arr in cv.items():
+                accumulator._velocities[c_name] = np.asarray(  # noqa: SLF001
+                    c_vel_arr, dtype=np.float64
+                )
+        sim_data = accumulator.to_sim_data(spec)
     else:
         sim_data = SimulationData.from_result(result, spec, grid_info, params, dt=dt)
     log(f"  {sim_data.n_snapshots} snapshots stored")
 
-    # 9. Output
+    # 9. Output — in-memory mode skips plotting, report generation, and
+    # the output dispatch entirely.  Caller consumes sim_data via
+    # in_memory_out.
+    if in_memory_out is not None:
+        in_memory_out.append(sim_data)
+        return 0
+
     _generate_output(args, sim_data, grid_info)
 
     # 10. HTML report (optional)
