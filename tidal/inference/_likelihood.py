@@ -384,11 +384,22 @@ def _evaluate_likelihood(
         if metric_value is None:
             return -math.inf
 
-        # Build eval_params for formula-based likelihoods (extremize)
+        # Build eval_params for formula-based likelihoods.
+        # Merge order (same as _simulate_run): spec.metadata["parameters"]
+        # defaults -> CLI --param overrides -> swept theta.  Without the
+        # first two, formulas like "sin(kappa * B0 * t_end / 2)**2" fail
+        # with NameError, _eval_baseline returns None, and every logL
+        # collapses to -inf (see #270).
         eval_params: dict[str, float] | None = None
         if likelihood_config.baseline_formula:
-            eval_params = dict(param_overrides)
-            # Include simulation settings (t_end, etc.)
+            from tidal.cli._simulate import (
+                _parse_params,  # pyright: ignore[reportPrivateUsage]
+            )
+
+            eval_params = _parse_params(
+                list(getattr(base_args, "param", []) or []), spec
+            )
+            eval_params.update(param_overrides)
             for attr in ("t_end", "dt"):
                 val = getattr(base_args, attr, None)
                 if val is not None:

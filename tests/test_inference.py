@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from tidal.inference._results import InferenceResult
 
 # ===================================================================
@@ -553,6 +552,95 @@ class TestNewLikelihoodTypes:
         assert compute_log_likelihood(0.5 * baseline, lc, params) == pytest.approx(
             math.log(2)
         )
+
+
+class TestBaselineFormulaSpecParams:
+    """Regression for #270: baseline-formula must see spec-level params.
+
+    Before the fix, ``_evaluate_likelihood`` built ``eval_params`` only
+    from the swept theta + t_end/dt.  A formula like
+    ``sin(kappa * B0 * t_end / 2)**2`` then raised NameError on
+    ``kappa``, ``_eval_baseline`` silently returned ``None``, and every
+    likelihood collapsed to ``-inf``.  PolyChord then spun forever.
+    """
+
+    def test_parse_params_merges_cli_overrides(self) -> None:
+        # `_parse_params` is the canonical merge used by both the
+        # simulator and (after #270) the likelihood.  Verify it surfaces
+        # CLI --param values so baseline formulas can resolve them.
+        from tidal.cli._simulate import (  # pyright: ignore[reportPrivateUsage]
+            _parse_params,
+        )
+        from tidal.symbolic import load_equation_system
+
+        repo_root = Path(__file__).resolve().parents[1]
+        spec = load_equation_system(
+            repo_root / "examples" / "data" / "dark_photon_plasma.json"
+        )
+        params = _parse_params(["kappa=1.0", "B0=0.1"], spec)
+        assert params["kappa"] == 1.0
+        assert params["B0"] == 0.1
+
+    def test_baseline_formula_resolves_with_spec_params(self) -> None:
+        # Direct test of the formula-eval namespace the fix assembles.
+        from tidal.inference._likelihood import (
+            LikelihoodConfig,
+            _eval_baseline,  # pyright: ignore[reportPrivateUsage]
+            compute_log_likelihood,
+        )
+
+        cfg = LikelihoodConfig(
+            metric="P_max",
+            likelihood_type="maximize",
+            baseline_formula="sin(kappa * B0 * t_end / 2)**2",
+        )
+        # After #270: eval_params contains spec/CLI params + swept theta.
+        eval_params = {
+            "kappa": 1.0,
+            "B0": 0.1,
+            "t_end": 10.0,
+            "mA2": 0.5,
+            "deltam": 0.0,
+        }
+        baseline = _eval_baseline(cfg.baseline_formula, eval_params)
+        assert baseline is not None
+        assert baseline == pytest.approx(math.sin(0.5) ** 2)
+
+        # logL should be finite (not -inf) — this is the regression check.
+        logl = compute_log_likelihood(0.01, cfg, eval_params)
+        assert math.isfinite(logl)
+
+
+class TestPolyChordGuard:
+    """Regression for #270: PolyChord must fail fast on all-(-inf) likelihoods.
+
+    Without the pre-flight guard, PolyChord spins indefinitely trying to
+    build its initial live-point pool.  Job 28002101 hit the 1-hour wall
+    with zero chain output because of this.
+    """
+
+    def test_all_inf_raises_runtime_error(self) -> None:
+        from tidal.inference._nested import (
+            _run_polychord,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        def always_inf(_theta: list[float]) -> float:
+            return float("-inf")
+
+        def unit_prior(hypercube: list[float]) -> list[float]:
+            return list(hypercube)
+
+        with pytest.raises(RuntimeError, match="non-finite logL"):
+            _run_polychord(
+                log_likelihood=always_inf,
+                prior_transform=unit_prior,
+                ndim=2,
+                param_names=["a", "b"],
+                nlive=25,
+                n_workers=None,
+                quiet=True,
+                n_probe=5,
+            )
 
 
 # ===================================================================

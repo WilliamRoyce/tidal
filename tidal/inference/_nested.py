@@ -18,6 +18,7 @@ Skilling, J. (2004) "Nested Sampling", AIP Conference Proceedings 735, 395-405.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -137,16 +138,40 @@ def _run_polychord(  # noqa: PLR0915
     Requires ``pypolychord`` to be installed (Fortran-compiled).
     Install via: ``bash scripts/install_polychord.sh``
     """
+    # --- Pre-flight: detect all-(-inf) likelihoods before PolyChord hangs.
+    # PolyChord rejects non-finite initial draws and will spin forever if
+    # the likelihood is uniformly -inf (see #270 for the original silent
+    # 60-minute hang this guards against).  Runs before the pypolychord
+    # import so it still fires in environments without Fortran.
+    n_probe = int(kwargs.pop("n_probe", 10))
+    probe_rng = np.random.default_rng(0)
+    probe_logls = [
+        float(log_likelihood(list(prior_transform(list(probe_rng.random(ndim))))))
+        for _ in range(n_probe)
+    ]
+    if all(not math.isfinite(x) for x in probe_logls):
+        msg = (
+            f"All {n_probe} prior-sample likelihoods returned non-finite logL. "
+            "PolyChord cannot build live points. Check: "
+            "(a) --baseline-formula references only parameters in the spec or "
+            "--param/--prior; (b) simulations succeed across the prior range; "
+            "(c) --constraint isn't over-restrictive."
+        )
+        raise RuntimeError(msg)
+
     try:
         from pypolychord import run_polychord
-        from pypolychord.settings import PolyChordSettings
-    except ImportError:
+    except ImportError as e:
         msg = (
             "pypolychord is required for nested sampling. "
             "Install with: bash scripts/install_polychord.sh "
-            "(requires gfortran)."
+            f"(requires gfortran). Original error: {e}"
         )
-        raise ImportError(msg) from None
+        raise ImportError(msg) from e
+    try:
+        from pypolychord import PolyChordSettings
+    except ImportError:
+        from pypolychord.settings import PolyChordSettings
 
     from tidal.inference._results import InferenceResult
 
