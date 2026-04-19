@@ -287,3 +287,88 @@ v6 iterative-numerical approach:
 - Sharp error bound `C·ε²·ω²·t` for linear theories (beats FKY's nonlinear `C·ε²·(t·M_UV)³`)
 
 Supersession date: 2026-04-19. PerturbativeReduction.wl to be deleted in Stage 1.
+
+---
+
+## Post-Audit Remediation (v0.33.x, 2026-04-19)
+
+After v0.33.0 shipped, a two-pass critical audit identified 14 issues
+(#272–#286, plus the pre-existing xAct blocker #271) ranging from silent-drop
+correctness bugs (#272, #273) to validity-monitor science errors (#284, #285).
+The remediation plan (`.claude/plans/flickering-gathering-orbit.md`, approved
+2026-04-19) landed across R1–R7 commits:
+
+- **R1 (correctness)** e4c1d1c: `_build_source_matrix_k` drops logged and
+  surfaced on `PerturbativeResult.validity["correction_drops"]` (#272);
+  `order >= 2` raises `NotImplementedError` with #273 reference;
+  `base_spec`/`filter_by_order`/`normalize_kinetic_coefficients` recompute
+  mass/coupling matrices (#274); cross-block threshold is scale-relative
+  `max(1e-14, max|M|·1e-10)` (#275).
+- **R2 (typed contracts)** bd8f3ae: `PerturbativePass1Result` TypedDict
+  replaces `# type: ignore` smuggling (#279); `PerturbativeResult` carries
+  `spec` + `full_spec`, CLI reads `pert_result.spec` instead of rebinding
+  (#276).
+- **R3 (runtime invariants)** bd8f3ae: silent `except ValueError` in
+  `_resolve_scheme` dropped (#277); `solve_modal` rejects `time_order > 2`
+  with actionable error (#278).
+- **R4 (validity monitor)** bd8f3ae: formula corrected to `ε·ω·t` (#284);
+  base-theory tachyon check added as separate `base_level` diagnostic
+  (#285).
+- **R5 (physics tests)** a6e5dd5: R̃² regression rewritten around non-gauge
+  channels + drop-category assertions (#280); new baseline file with
+  structural + synthetic-spec checks (#281, trajectory-level regression
+  deferred to #289 pending derivation of a proper b5=0 reference JSON);
+  Taylor-branch crossover pipeline-level test against mpmath 50-dps
+  (#282); constraint-IC projection + JSON round-trip variants of the
+  trivially-true / unreachable-path tests (#283).
+- **R7 (rendering)** /tmp/fix_issues.py: unicode batch-fix of issue
+  titles and bodies (ε / ω / φ / λ etc. now render properly in #272–#286).
+
+### Phase 6B.5 retrospective (R6.1 / #286)
+
+Retrospective check that the Ostrogradsky-removal commit (`ceb6e63`) did not
+silently loosen live test coverage:
+
+- Only two test files were modified in `ceb6e63`:
+  - `tests/test_json_loader.py`: **added** 42 lines — new
+    `test_high_order_without_perturbation_raises` verifying the migration
+    error fires on synthetic `time_order=4` JSON without `[perturbation]`.
+    No existing assertions touched.
+  - `tests/test_latex.py`: **added** 25 lines — three theories marked
+    `@pytest.mark.xfail(strict=True)` pending Phase 6B.3/6B.4 re-derivation.
+    `strict=True` means XPASS becomes FAILED, so the marker would have
+    auto-flipped the moment the migrations landed. Post-migration, the
+    `_PENDING_V6_REDERIVATION` set has been emptied (the three theories
+    now load cleanly through the post-Ostrogradsky loader). Verified by
+    running `test_latex.py::TestAllExamplesRender::test_no_crash` —
+    25/25 pass, 0 xfailed.
+- **No assertions loosened**; no tests deleted outside of the
+  `tidal/symbolic/ostrogradsky.py` deletion itself (which carried no
+  standalone test file).
+- **Hamiltonian consistency check (#178 still wired)**: all three
+  re-derived JSONs (`torsion_gertsenshtein`, `graviton_torsion`,
+  `torsion_gertsenshtein_combined`) carry `canonical.hamiltonian_terms`
+  (78, 256, 237 entries respectively). The constrained-Hamiltonian logic
+  referenced in `json_loader.py:1106` (`#178`) still fires at load time;
+  the shipped JSONs pass the consistency check without the legacy
+  `fields=` kwarg that was removed alongside Ostrogradsky in `ceb6e63`.
+- **Pre-v6 vs post-v6 measurement regression**: not executed in-session
+  because no pre-v6 archived `tidal measure` output exists in the repo
+  to compare against. Documented as a backlog item rather than blocking
+  — the theory-level invariants (all three JSONs load, run, and respect
+  the iterative-perturbative split) plus the structural R5.2 baseline
+  checks cover the migration correctness without needing a byte-for-byte
+  pre/post measurement comparison.
+
+### Follow-up issues carried forward
+
+- **#271** — Euler-Heisenberg xAct blocker (`Validate::repeated` on
+  `(F·F)²`). Out of scope for R1–R7 remediation; Wolfram-pipeline
+  investigation.
+- **#273** — order ≥ 2 Pass 2 Duhamel against `q¹` is now gated with
+  `NotImplementedError`; proper implementation needs a new IC-amplitude
+  contract.
+- **#289** — Derive `torsion_gertsenshtein_b5_zero.json` so R5.2's
+  trajectory-level baseline regression can be activated (the shipped
+  `torsion_gertsenshtein_minimal_propagating.json` uses a different
+  Lagrangian; not a b5=0 variant).

@@ -10,6 +10,85 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
+## [Unreleased] — v0.33.1 post-audit remediation
+
+### Fixed
+
+- **Silent drop of correction terms (#272)**. `_build_source_matrix_k`
+  now returns a drops list; unroutable correction terms surface as
+  structured records on `PerturbativeResult.validity["correction_drops"]`
+  and log a WARN per drop. The R̃² PGT regression test asserts every
+  drop is of category `"row-missing"` (legitimate O(ε²) augmentation);
+  any `"column-missing"` drop is a bug.
+- **order ≥ 2 silently reused Pass 0 eigendata (#273)**. Now raises
+  `NotImplementedError` with a reference to the tracking issue. The
+  docstring no longer claims Pass 2 is API-accepted.
+- **Stale mass/coupling matrices after `base_spec` (#274)**. `base_spec`,
+  `filter_by_order`, and `normalize_kinetic_coefficients` now recompute
+  the matrices from their filtered equations. `EquationSystem.__post_init__`
+  no longer fires a UserWarning on every call.
+- **Cross-block threshold false-triggers on ill-conditioned Schur (#275)**.
+  The guard uses a scale-relative threshold
+  `max(1e-14, max|M_src| · 1e-10)` instead of absolute 1e-14.
+- **CLI spec-rebind workaround (#276)**. `PerturbativeResult` carries
+  `spec` (base_spec) and `full_spec` attributes; CLI reads
+  `pert_result.spec` instead of rebinding.
+- **Silent `except ValueError` in `_resolve_scheme` (#277)**. Removed.
+  `base_spec`'s actionable error now propagates to the user instead
+  of being masked by modal-ineligibility fallback.
+- **`solve_modal` time_order > 2 silent acceptance (#278)**. Rejected
+  with actionable error pointing at `PerturbativeSolver` + the docs.
+- **`PerturbativePass1Result` TypedDict (#279)**. Replaces the `# type:
+  ignore` smuggling of `y_hat_dyn` and `correction_drops` into
+  `SolverResult`. Driver's defensive `None`-skip on `y_hat_dyn` becomes
+  an explicit `assert` (required field, not optional).
+- **Validity monitor formula `ε·ω²·t` → `ε·ω·t` (#284)**. The secular
+  phase-error bound. The old formula was conservative at ω > 1 but
+  dangerously permissive at ω < 1.
+- **Validity monitor blind to base-theory tachyons (#285)**. Adds a
+  separate `base_level` / `base_stability_param` diagnostic (from
+  `max Re(λ) · t_end`); the overall `warn_level` is now the worse of
+  correction-side and base-stability-side bands.
+
+### Changed
+
+- **R̃² PGT regression rewritten around physics (#280)**. The prior
+  test only asserted `isfinite + len==2 + warn=='ok'`. Replaced with
+  non-gauge-channel assertions: photon IC excites Gertsenshtein
+  h-constraint mixing, drops are all row-missing (no column-missing
+  bugs), Pass 1 is identically zero on dynamical fields (theory-level
+  O(ε) invariant of the shipped JSON — all b5 couplings live on
+  constraint rows), Pass 1 amplitude scales linearly in b5 where
+  non-zero, Pass 0 is b5-independent per-field.
+- **Taylor-branch crossover pipeline-level test (#282)**. The previous
+  `TestPass1NearDegeneracy` tested resonance, not near-degeneracy.
+  Renamed to `TestPass1Resonance`; new `TestPass1NearDegeneracy`
+  sweeps `|Δλ|·t` across {2e-11, 1e-5, 1e-2, 1} and asserts agreement
+  with an mpmath 50-dps reference to rel_err < 1e-10 through
+  `_evolve_duhamel_per_mode`.
+
+### Added
+
+- **Structural `base_spec` baseline checks (#281)**. New
+  `tests/test_perturbative_rtilde_baseline.py` validates the full
+  theory's `base_spec(['b5'])` against structural invariants
+  (no order > 0 RHS terms, no b5 in any `coefficient_symbolic`,
+  time_orders ≤ 2, idempotent under re-application, Pass 0 trajectory
+  b5-independent across every common dynamical field). Trajectory-
+  level regression against a true b5=0 reference JSON tracked in #289
+  (the shipped `minimal_propagating` JSON is a different Lagrangian,
+  not a b5→0 limit).
+- **Constraint-IC projection test + JSON round-trip post-check test
+  (#283)**. Replaces the prior trivially-true and unreachable-path
+  unit tests with realistic user-facing flows.
+
+### Tracked
+
+- **#271** Euler-Heisenberg xAct `Validate::repeated` blocker (Wolfram
+  pipeline; out of scope for R1–R7).
+- **#289** Derive `torsion_gertsenshtein_b5_zero.json` so R5.2's
+  trajectory-level baseline regression can be activated.
+
 ## [0.33.0] — 2026-04-19
 
 ### Added
