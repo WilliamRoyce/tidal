@@ -128,65 +128,115 @@ def _compute_validity(
     }
 
 
-def _apply_constraint_recovery(
-    pass1_reduced: NDArray[np.float64],
+def _assemble_full_state_pass_n(
+    pass_n_result: dict[str, Any],
     eigendata: dict[str, Any],
     full_state_size: int,
-    num_points: int,
+    full_layout: Any,
+    grid: GridInfo,
 ) -> NDArray[np.float64]:
-    """Expand Pass 1's reduced-layout output back to the full state layout.
+    """Assemble the Pass-n full-layout state from the reduced-layout output.
 
-    Pass 1 evolves only the dynamical (Schur-reduced) subspace. To combine
-    it with Pass 0 — which is returned in the full layout including
-    recovered constraint fields — each snapshot is padded so that
-    dynamical slot positions hold the Pass 1 values and constraint slot
-    positions hold zero (the O(ε¹) *source* contribution to constraint
-    fields is deferred to Stage 6 per the plan; the Schur-base piece
-    ``recovery @ y_dyn¹`` is the other half and is what this routine
-    could add in a later extension).
+    Pass n evolves only the dynamical (Schur-reduced) subspace. This
+    function reconstructs the full-layout state in physical space:
+
+    * Dynamical slots are mapped from the reduced layout back to their
+      original slot indices using ``eigendata["schur_ops"]
+      ["orig_to_reduced"]``.
+    * Constraint slots are populated via Schur recovery on the
+      *Fourier-space* dynamical Pass n output: ``c_hat = recovery_matrix
+      @ y_hat_dyn``. This is the O(ε¹) Schur-base recovery. The
+      O(ε²) augmentation from the correction's contribution to the
+      constraint equation itself (``S_cc^{-1} · source_c(y⁰)``) is
+      dropped at order 1.
 
     Parameters
     ----------
-    pass1_reduced : (n_snap, n_dyn · n_pts) array
-        Pass 1 output in the reduced layout.
+    pass_n_result : dict
+        Output of :func:`tidal.solver.modal.solve_modal_pass1`. Must
+        contain ``"y"`` (reduced-layout physical state, shape
+        ``(n_snap, n_dyn · n_points)``) and ``"y_hat_dyn"``
+        (Fourier-space dynamical state, shape
+        ``(n_snap, n_dyn, n_modes)``).
     eigendata : dict
-        Pass 0 eigendata; ``eigendata["schur_ops"]["orig_to_reduced"]``
-        maps full-layout slot indices to reduced-layout positions.
+        Pass 0 eigendata. Must include ``"schur_ops"`` when the base
+        spec had constraints.
     full_state_size : int
-        ``layout.num_slots * layout.num_points`` for the full layout.
-    num_points : int
-        Grid size per slot.
+        Target flat size ``full_layout.num_slots * full_layout.num_points``.
+    full_layout : StateLayout
+        The Pass 0 full state layout (not the reduced dynamical one).
+        Used to look up the slot index of each constraint field.
+    grid : GridInfo
+        Spatial grid (for inverse FFT shape).
 
     Returns
     -------
-    pass1_full : (n_snap, full_state_size) array
-        Padded state with dynamical slots populated from
-        ``pass1_reduced`` and constraint slots left at zero.
+    pass_n_full : NDArray[float64]
+        Shape ``(n_snap, full_state_size)``. Dynamical and constraint
+        slots populated in the full layout.
 
     Raises
     ------
     ValueError
-        If ``pass1_reduced`` has a shape that cannot be mapped to
-        ``full_state_size`` and no ``schur_ops`` slot map is available.
+        If the shapes are inconsistent and no ``schur_ops`` is present
+        for expansion.
     """
+    pass_n_reduced = pass_n_result["y"]
     schur_ops = eigendata.get("schur_ops")
+
     if schur_ops is None:
-        # No constraints: shapes already match.
-        if pass1_reduced.shape[1] == full_state_size:
-            return pass1_reduced
+        # No constraints: reduced layout == full layout.
+        if pass_n_reduced.shape[1] == full_state_size:
+            return np.asarray(pass_n_reduced)
         msg = (
-            "Pass 1 output has shape that does not match the expected full "
+            "Pass n output has shape that does not match the expected full "
             "state size and no schur_ops are available for expansion"
         )
         raise ValueError(msg)
 
+    num_points = grid.num_points
     orig_to_reduced: dict[int, int] = schur_ops["orig_to_reduced"]
-    n_snap = pass1_reduced.shape[0]
-    pass1_full = np.zeros((n_snap, full_state_size))
+    c_names: tuple[str, ...] = schur_ops["constraint_field_names"]
+    recovery_matrix = schur_ops["recovery_matrix"]  # (n_modes, n_c, n_dyn)
+
+    n_snap = pass_n_reduced.shape[0]
+    pass_n_full = np.zeros((n_snap, full_state_size))
+
+    # --- dynamical slots: direct transfer from reduced layout ---
     for orig_si, red_pos in orig_to_reduced.items():
-        src = pass1_reduced[:, red_pos * num_points : (red_pos + 1) * num_points]
-        pass1_full[:, orig_si * num_points : (orig_si + 1) * num_points] = src
-    return pass1_full
+        src = pass_n_reduced[:, red_pos * num_points : (red_pos + 1) * num_points]
+        pass_n_full[:, orig_si * num_points : (orig_si + 1) * num_points] = src
+
+    # --- constraint slots: Schur-base recovery from y_hat_dyn ---
+    y_hat_dyn = pass_n_result.get("y_hat_dyn")
+    if y_hat_dyn is None or not c_names:
+        # Nothing to recover; constraint slots stay at zero. This is
+        # only a valid state when the correction spec leaves all
+        # constraint fields untouched (rare).
+        return pass_n_full
+
+    # rfft output shape
+    rfft_shape_list = list(grid.shape)
+    rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
+    rfft_shape = tuple(rfft_shape_list)
+
+    for ti in range(n_snap):
+        # y_hat_dyn[ti] is (n_dyn, n_modes)
+        # recovery_matrix is (n_modes, n_c, n_dyn)
+        # c_hat[c_idx, m] = sum_j recovery_matrix[m, c_idx, j] * y_hat_dyn[j, m]
+        c_hat = np.einsum("mcj,jm->cm", recovery_matrix, y_hat_dyn[ti])
+        for ci, c_name in enumerate(c_names):
+            c_slot = full_layout.field_slot_map[c_name]
+            c_phys = np.fft.irfftn(
+                c_hat[ci].reshape(rfft_shape),
+                s=grid.shape,
+                axes=list(range(len(grid.shape))),
+            ).ravel()
+            pass_n_full[ti, c_slot * num_points : (c_slot + 1) * num_points] = np.real(
+                c_phys
+            )
+
+    return pass_n_full
 
 
 class PerturbativeSolver:
@@ -297,17 +347,19 @@ class PerturbativeSolver:
         total_y = pass0["y"].copy()
 
         if order >= 1 and self.has_corrections():
+            from tidal.solver.state import StateLayout  # noqa: PLC0415
+
             eigendata = pass0["eigendata"]
             full_state_size = pass0["y"].shape[1]
-            num_points = grid.num_points
+            # Pass 0's output is in the layout of base_spec (post-Gap-B
+            # demotion). Build that layout once so Pass n's constraint
+            # recovery can look up constraint slot indices in the same
+            # layout the combined solution lives in.
+            full_layout = StateLayout.from_spec(self.base_spec, grid.num_points)
 
             for n in range(1, order + 1):
                 correction_spec = self.full_spec.filter_by_order(n)
-                if not correction_spec.has_corrections() and not any(
-                    t.order_in_eps == n
-                    for eq in correction_spec.equations
-                    for t in eq.rhs_terms
-                ):
+                if not correction_spec.has_corrections():
                     # No terms at this order; append a zero contribution
                     # for shape consistency.
                     zero_result = {
@@ -326,12 +378,15 @@ class PerturbativeSolver:
                     pass0["t"],
                     parameters=parameters,
                 )
-                # Expand reduced-layout output to full-layout state.
-                pass_n_full = _apply_constraint_recovery(
-                    pass_n["y"],
+                # Assemble the full-layout state by mapping dynamical
+                # slots directly and recovering constraint slots via the
+                # Pass 0 Schur operator applied to y_hat_dyn.
+                pass_n_full = _assemble_full_state_pass_n(
+                    pass_n,
                     eigendata,
                     full_state_size=full_state_size,
-                    num_points=num_points,
+                    full_layout=full_layout,
+                    grid=grid,
                 )
                 pass_n["y"] = pass_n_full
                 orders.append(pass_n)

@@ -2624,12 +2624,22 @@ def _evolve_duhamel_per_mode(
     t_eval: NDArray[np.float64],
     layout: StateLayout,
     grid: GridInfo,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.complex128],
+]:
     """Evaluate Pass 1 Duhamel solution block-by-block, reusing eigendata.
 
-    Returns ``(t, y_phys)`` with ``y_phys`` shape
-    ``(n_snapshots, n_slots * n_points)`` in the same flattened physical
-    layout as :func:`_evolve_per_mode`.
+    Returns ``(t, y_phys, y_hat_snap)`` where:
+
+    * ``y_phys`` has shape ``(n_snapshots, n_slots * n_points)`` — the
+      flattened physical-space dynamical output in the reduced layout.
+    * ``y_hat_snap`` has shape ``(n_snapshots, n_slots, n_modes)`` — the
+      Fourier-space dynamical output. The Pass 1 constraint recovery
+      step (v6 Gap C) consumes this directly via
+      ``recovery_matrix @ y_hat_snap``, avoiding a round trip through
+      rFFT/irFFT.
 
     The algorithm is, per block and per mode:
 
@@ -2721,7 +2731,7 @@ def _evolve_duhamel_per_mode(
             ).ravel()
             y_phys[ti, si * n_pts : (si + 1) * n_pts] = np.real(y_phys_block)
 
-    return t_eval.astype(np.float64), y_phys
+    return t_eval.astype(np.float64), y_phys, y_hat_snap
 
 
 def solve_modal_pass1(
@@ -2763,7 +2773,11 @@ def solve_modal_pass1(
     -------
     SolverResult
         ``t``, ``y``, ``success``, ``message``. ``y`` is the Pass 1
-        correction in physical space.
+        correction in physical space (reduced/dynamical layout). An
+        additional ``"y_hat_dyn"`` key carries the Fourier-space
+        dynamical output with shape ``(n_snapshots, n_slots, n_modes)``
+        — consumed by :func:`PerturbativeSolver` to recover constraint
+        fields via Schur (v6 Gap C).
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
 
@@ -2788,11 +2802,16 @@ def solve_modal_pass1(
         schur_ops=eigendata.get("schur_ops"),
     )
 
-    times, y_phys = _evolve_duhamel_per_mode(eigendata, M_src_k, t_eval, layout, grid)
+    times, y_phys, y_hat_dyn = _evolve_duhamel_per_mode(
+        eigendata, M_src_k, t_eval, layout, grid
+    )
 
-    return {
+    result: SolverResult = {
         "t": times,
         "y": y_phys,
         "success": True,
         "message": "Pass 1 closed-form Duhamel (v6 Stage 4)",
     }
+    # Fourier-space dynamical output (for Gap C constraint recovery).
+    result["y_hat_dyn"] = y_hat_dyn  # type: ignore[typeddict-unknown-key]
+    return result
