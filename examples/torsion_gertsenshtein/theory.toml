@@ -135,6 +135,17 @@ type = "lorenz"
 type = "plane_wave"
 propagation_axis = "z"
 
+# v6 perturbative reduction — treat b5 as the small parameter.  At
+# b5=0 this theory is pure Einstein-Maxwell-torsion (algebraic h_4/
+# h_7/h_9 constraints); the b5*R̃² term promotes those components to
+# time_order=4 with kinetic "2*b5", which the PerturbativeSolver
+# handles iteratively.  order=1 gives a closed-form Duhamel correction
+# reusing the Pass 0 eigendata; for validity we need b5·ω²·t_end << 0.1
+# (see docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md).
+[perturbation]
+small_parameters = ["b5"]
+order = 1
+
 # Default parameters
 # kappa = 1.0 (natural units; physical ~1.15e-18 GeV^-1)
 # B0 = 0.3 (background magnetic field strength)

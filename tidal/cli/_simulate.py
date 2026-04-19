@@ -1651,12 +1651,29 @@ def _resolve_scheme(  # noqa: C901
         Hindmarsh et al., "SUNDIALS", ACM TOMS, 2005.
         Moler & Van Loan (2003), SIAM Review 45(1):3-49 (modal solver).
     """
+    # When a perturbation-tagged spec will be routed through the
+    # PerturbativeSolver, the relevant eligibility check is on the
+    # base_spec (post-Gap-B demotion), not the full spec. The correction
+    # RHS terms carry higher-order operators (d3_t, d4_t, mixed_T3_S1x)
+    # that Pass 0 never sees — they only appear as Duhamel source
+    # coefficients. Build the base spec once here for both explicit and
+    # auto paths.
+    eligibility_spec = spec
+    if spec.has_corrections():
+        try:
+            eligibility_spec = spec.base_spec()
+        except ValueError:
+            # If base_spec raises (e.g. 3rd-order residual), fall back
+            # to the full spec so the error surfaces through normal
+            # dispatch paths rather than being hidden here.
+            eligibility_spec = spec
+
     if scheme != "auto":
         if scheme == "modal" and grid is not None:
             # Validate modal eligibility when explicitly requested
             from tidal.solver.modal import can_use_modal
 
-            if not can_use_modal(spec, grid, bc):
+            if not can_use_modal(eligibility_spec, grid, bc):
                 msg = (
                     "--scheme modal requested but system is not eligible. "
                     "Modal solver requires: flat metric, all-periodic BCs, "
@@ -1673,7 +1690,7 @@ def _resolve_scheme(  # noqa: C901
     if grid is not None:
         from tidal.solver.modal import can_use_modal
 
-        if can_use_modal(spec, grid, bc):
+        if can_use_modal(eligibility_spec, grid, bc):
             return "modal"
 
     # 1b. Constraint equations not modal-eligible → IDA (DAE solver required)
@@ -2178,6 +2195,13 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 small_parameters=list(pert_meta.get("small_parameters") or []),
             )
             result = pert_result.total
+            # Pass 0 / Pass 1 outputs live in base_spec's layout (h_4/h_7/h_9
+            # demoted to algebraic constraints at ε=0).  Replace `spec`
+            # downstream so SimulationData / measurement use the matching
+            # layout.  The full original spec is preserved on
+            # pert_solver.full_spec for callers that need it (e.g. the
+            # validity monitor references the FULL perturbation metadata).
+            spec = pert_solver.base_spec
             validity = pert_result.validity
             if validity.get("warn_level") == "warn":
                 _cwarn(

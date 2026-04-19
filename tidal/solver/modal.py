@@ -139,6 +139,18 @@ _OPERATOR_DECOMP: dict[str, _OperatorDecomp] = {
     "mixed_T3_S1x": _OperatorDecomp(lambda k_axes: 1j * k_axes[0], 3),
     "mixed_T3_S1y": _OperatorDecomp(lambda k_axes: 1j * k_axes[1], 3),
     "mixed_T3_S1z": _OperatorDecomp(lambda k_axes: 1j * k_axes[2], 3),
+    # --- Fourth-time-derivative operators (only valid as correction
+    # sources in the v6 perturbative pipeline — never in the base
+    # system, which base_spec demotes to time_order <= 2).  Spatial
+    # Fourier multiplier is 1 for the pure-time d4_t and the usual
+    # ik/−k² factors for the mixed variants. ---
+    "d4_t": _OperatorDecomp(lambda k_axes: np.ones_like(k_axes[0]), 4),
+    "mixed_T4_S1x": _OperatorDecomp(lambda k_axes: 1j * k_axes[0], 4),
+    "mixed_T4_S1y": _OperatorDecomp(lambda k_axes: 1j * k_axes[1], 4),
+    "mixed_T4_S1z": _OperatorDecomp(lambda k_axes: 1j * k_axes[2], 4),
+    "mixed_T4_S2x": _OperatorDecomp(lambda k_axes: -(k_axes[0] ** 2), 4),
+    "mixed_T4_S2y": _OperatorDecomp(lambda k_axes: -(k_axes[1] ** 2), 4),
+    "mixed_T4_S2z": _OperatorDecomp(lambda k_axes: -(k_axes[2] ** 2), 4),
 }
 
 # Backward-compatible mapping: operator name → spatial multiplier function.
