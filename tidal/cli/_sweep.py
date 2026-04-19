@@ -491,7 +491,7 @@ def _run_subdir_name(
 def _build_sim_args(  # noqa: PLR0913
     base_args: Namespace,
     param_overrides: dict[str, float],
-    output_dir: Path,
+    output_dir: Path | None,
     grid_shape_override: int | None = None,
     *,
     replicate_seed: int | None = None,
@@ -504,6 +504,10 @@ def _build_sim_args(  # noqa: PLR0913
 
     Parameters
     ----------
+    output_dir : Path | None
+        Directory to write snapshots to.  Pass ``None`` for the in-memory
+        inference path (``run_inference_step``) — the returned Namespace
+        will have ``output=None`` and no disk-writer will be set up.
     replicate_seed : int, optional
         If set, overrides ``ic_noise_seed`` and ``ic_perturbation_seed``
         for ensemble variation across replicates.
@@ -529,13 +533,21 @@ def _build_sim_args(  # noqa: PLR0913
         base_params.append(f"{k}={v}")
     sim_args.param = base_params
 
-    # Output to subdirectory (force directory format for disk-backed streaming)
-    # Note: no_plot must be False because _infer_output_format checks it first
-    # and would return "summary" (skipping disk write). Instead, set
-    # output_format="directory" which gets checked after no_plot.
-    sim_args.output = str(output_dir)
-    sim_args.output_format = "directory"
-    sim_args.no_plot = False
+    if output_dir is None:
+        # In-memory path (inference): no disk writer, no plot.  _simulate
+        # sees output=None and skips both _setup_disk_writer_native and
+        # _generate_output (gated on in_memory_out is not None).
+        sim_args.output = None
+        sim_args.output_format = None
+        sim_args.no_plot = True
+    else:
+        # Output to subdirectory (force directory format for disk-backed streaming)
+        # Note: no_plot must be False because _infer_output_format checks it first
+        # and would return "summary" (skipping disk write). Instead, set
+        # output_format="directory" which gets checked after no_plot.
+        sim_args.output = str(output_dir)
+        sim_args.output_format = "directory"
+        sim_args.no_plot = False
     sim_args.quiet = True
 
     # Grid shape override for convergence mode
@@ -625,13 +637,10 @@ def run_inference_step(
         _simulate,  # pyright: ignore[reportPrivateUsage]
     )
 
-    # output_dir is unused in memory mode, but _build_sim_args writes it
-    # into sim_args.output.  Use a sentinel path that won't be touched.
-    sim_args = _build_sim_args(
-        base_args,
-        param_overrides,
-        Path("/dev/null"),
-    )
+    # output_dir=None: _build_sim_args clears sim_args.output and disables
+    # both the disk writer and plot dispatch.  _simulate still sees
+    # in_memory_out != None and populates the SimulationData.
+    sim_args = _build_sim_args(base_args, param_overrides, output_dir=None)
     if spec is None:
         from tidal.symbolic import load_equation_system
 

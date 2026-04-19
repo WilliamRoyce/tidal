@@ -520,6 +520,36 @@ class InMemoryAccumulator:
     def n_snapshots(self) -> int:
         return self._n_snapshots
 
+    def set_velocity(self, name: str, array: NDArray[np.float64]) -> None:
+        """Set the full time-history for a velocity slot.
+
+        Used by the modal solver's post-solve hook to inject exact
+        constraint velocities (``result["constraint_velocities"]``) that
+        the per-snapshot callback didn't compute.  Shape validated as
+        ``(n_snapshots, *grid_shape)`` to match what :meth:`to_sim_data`
+        will slice.
+
+        Raises
+        ------
+        ValueError
+            If ``name`` isn't a registered velocity slot or ``array``
+            has the wrong shape.
+        """
+        if name not in self._velocities:
+            msg = (
+                f"Unknown velocity slot '{name}'; "
+                f"registered: {sorted(self._velocities.keys())}"
+            )
+            raise ValueError(msg)
+        expected_shape = (self._n_snapshots, *self._grid_shape)
+        if array.shape != expected_shape:
+            msg = (
+                f"set_velocity('{name}', ...): shape {array.shape} does "
+                f"not match expected {expected_shape}"
+            )
+            raise ValueError(msg)
+        self._velocities[name] = np.asarray(array, dtype=np.float64)
+
     def close(self) -> None:
         """Mark the accumulator as complete.  No-op for memory-backed storage."""
         self._closed = True

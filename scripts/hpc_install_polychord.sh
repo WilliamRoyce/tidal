@@ -81,9 +81,12 @@ echo "--- make all MPI=0 ---"
 make all MPI=0 2>&1 | tail -3
 echo "libchord.so: \$(ls -lh lib/libchord.so)"
 
-# 4. Build _pypolychord.*.so via gcc (CC override required — see header).
+# 4. Build _pypolychord.*.so via distutils.  The 'intel' module export
+#    of CC=icx breaks distutils introspection ('icx -v' exits non-zero),
+#    so unset CC/CXX in a subshell and let sysconfig's default (gcc)
+#    drive the build.
 echo "--- setup.py build_ext --inplace ---"
-CC=gcc python setup.py build_ext --inplace 2>&1 | tail -3
+( unset CC CXX; python setup.py build_ext --inplace ) 2>&1 | tail -3
 echo "_pypolychord: \$(ls _pypolychord*.so)"
 
 # 5. Inject into the venv's site-packages.  Layout matches what

@@ -182,25 +182,43 @@ def compute_parameter_importance(
     log_evidence_err = float(logz_samples.std())
 
     # --- Per-parameter marginal D_KL ---
+    # Anesthetic's `read_chains` returns integer-indexed parameter columns
+    # (``[0, 1, 'logL', ...]``) in v2.0+, while the manual-reconstruction
+    # fallback in to_anesthetic_samples uses named columns.  Index by
+    # POSITION to work for both paths — the column order is guaranteed
+    # by both the read_chains reader and the reconstruction (see #287).
+    import logging
+
+    import numpy as np
+
     marginal_d_kl: dict[str, float] = {}
-    for name in result.param_names:
-        # Construct 1D NestedSamples for this parameter
-        if name in ns.columns:
+    logl_arr = np.asarray(
+        ns.logL.to_numpy() if hasattr(ns.logL, "to_numpy") else ns.logL
+    )
+    logl_birth_arr = None
+    if hasattr(ns, "logL_birth"):
+        logl_birth_arr = np.asarray(
+            ns.logL_birth.to_numpy()
+            if hasattr(ns.logL_birth, "to_numpy")
+            else ns.logL_birth
+        )
+    for i, name in enumerate(result.param_names):
+        try:
+            # ns.iloc[:, i] raises IndexError if out of range; let it
+            # propagate to the except below so the warning names the
+            # offending column.
+            col = np.asarray(ns.iloc[:, i])
             marginal = NestedSamples(
-                data=ns[[name]].to_numpy(),
-                logL=ns.logL.to_numpy()
-                if hasattr(ns, "logL")
-                else ns["logL"].to_numpy(),
-                logL_birth=ns.logL_birth.to_numpy()
-                if hasattr(ns, "logL_birth")
-                else None,
+                data=col.reshape(-1, 1),
+                logL=logl_arr,
+                logL_birth=logl_birth_arr,
                 columns=[name],
             )
-            try:
-                marginal_d_kl[name] = float(marginal.D_KL())
-            except (ValueError, ZeroDivisionError, AttributeError):
-                marginal_d_kl[name] = float("nan")
-        else:
+            marginal_d_kl[name] = float(marginal.D_KL())
+        except (ValueError, ZeroDivisionError, AttributeError, IndexError) as exc:
+            logging.getLogger("tidal.inference").warning(
+                "marginal D_KL failed for '%s' (col %d): %s", name, i, exc
+            )
             marginal_d_kl[name] = float("nan")
 
     return ParameterImportanceResult(

@@ -2453,8 +2453,8 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         cv = result.get("constraint_velocities")
         if cv:
             for c_name, c_vel_arr in cv.items():
-                accumulator._velocities[c_name] = np.asarray(  # noqa: SLF001
-                    c_vel_arr, dtype=np.float64
+                accumulator.set_velocity(
+                    c_name, np.asarray(c_vel_arr, dtype=np.float64)
                 )
         sim_data = accumulator.to_sim_data(spec)
     else:

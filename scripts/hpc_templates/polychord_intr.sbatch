@@ -9,27 +9,30 @@
 #SBATCH --output={{REMOTE_ROOT}}/logs/{{JOB_NAME}}_%j.log
 #SBATCH --exclude=cpu-r-10,cpu-r-15
 
-# Reusable template for PolyChord nested-sampling jobs on CSD3.  Expects
-# the caller to have pushed tidal with `hpc_shuttle.sh push` and to have
-# PolyChordLite cloned at ${REMOTE_ROOT}/PolyChordLite.
+# Reusable template for PolyChord nested-sampling jobs on CSD3.
 #
-# The heavy lifting in this template is the "build PolyChord + inject
-# into site-packages" dance we need because (a) pypolychord is yanked
-# from PyPI so we compile from source, and (b) tidal runs against a
-# /tmp-extracted site-packages copy (avoids /rds Lustre hangs — see
-# issue #269 and session log 2026-04-19).
+# Preconditions (caller must have done these once, not per-job):
+#   1. bash scripts/hpc_shuttle.sh push             # tidal source on HPC
+#   2. bash scripts/hpc_install_polychord.sh        # pypolychord built & in venv
+#   3. bash scripts/hpc_refresh_venv_tar.sh         # /home/wr286/venv_site.tar regenerated
+#
+# Per-job steps:
+#   1. Extract the prebuilt site-packages tarball from /home (NFS) to
+#      /tmp on the compute node, sidestepping /rds Lustre hangs that
+#      were observed on some compute nodes (see issue #269).
+#   2. Sanity-check that pypolychord is importable from the extracted
+#      copy — fail loudly if the tarball is stale.
+#   3. Run the caller-supplied {{COMMAND}} (tidal sample ...).
 
 set -euo pipefail
 
 TIDAL_ROOT="{{REMOTE_ROOT}}"
-POLYDIR="${TIDAL_ROOT}/PolyChordLite"
 LOCAL_SP="/tmp/site_packages_${SLURM_JOB_ID}"
 
 echo "=== Job ${SLURM_JOB_ID} on $(hostname) ==="
 date
 
-# 1. Extract the pre-built venv tarball from /home (NFS, avoids /rds Lustre
-#    hangs observed on some compute nodes — cpu-r-10/cpu-r-15 excluded above).
+# 1. Extract the pre-built venv tarball from /home to local /tmp.
 echo "--- Extracting site-packages tarball ---"
 mkdir -p "${LOCAL_SP}"
 tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
@@ -37,35 +40,31 @@ tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
 source "${TIDAL_ROOT}/.venv/bin/activate"
 export PYTHONPATH="${LOCAL_SP}/site-packages:${PYTHONPATH:-}"
 
-# 2. Build PolyChord.  `intel` module provides ifort for libchord.so;
-#    `setup.py build_ext` needs CC=gcc because the intel module pollutes
-#    CC with icx, which distutils can't introspect (fails with "icx -v"
-#    non-zero exit).
-echo "--- Building PolyChord ---"
-cd "${POLYDIR}"
-module load intel/2019.3.199 2>/dev/null || true
-make all MPI=0 2>&1 | tail -2
-CC=gcc python setup.py build_ext --inplace 2>&1 | tail -3
+# 2. Staleness check.  The tarball is expected to contain pypolychord
+#    (see Preconditions above).  If it doesn't, the rest of the job
+#    will either crash or fall through to a disk-heavy path — surface
+#    the root cause immediately instead.
+echo "--- Checking venv freshness ---"
+if ! python -c "from pypolychord import run_polychord; import anesthetic" 2>&1; then
+    cat >&2 <<EOF
+error: pypolychord or anesthetic missing from the extracted venv.
+The tarball at /home/wr286/venv_site.tar is stale.
 
-# 3. Inject compiled extension into local site-packages.  Layout matters:
-#    - site-packages/pypolychord/                  — Python package
-#    - site-packages/_pypolychord.*.so             — top-level (the
-#      package does `import _pypolychord`, NOT relative)
-#    - site-packages/pypolychord/lib/libchord.so   — matches the compiled
-#      rpath `$ORIGIN/pypolychord/lib`
-echo "--- Installing pypolychord into local site-packages ---"
-SP_DIR="${LOCAL_SP}/site-packages"
-rm -rf "${SP_DIR}/pypolychord" "${SP_DIR}"/_pypolychord*.so
-cp -r "${POLYDIR}/pypolychord" "${SP_DIR}/"
-cp "${POLYDIR}"/_pypolychord*.so "${SP_DIR}/"
-mkdir -p "${SP_DIR}/pypolychord/lib"
-cp "${POLYDIR}/lib/libchord.so" "${SP_DIR}/pypolychord/lib/"
-python -c "from pypolychord import run_polychord; import anesthetic; print('imports OK')"
+Refresh it from the local workstation:
 
-# 4. Run the caller's tidal command.  Use --likelihood-backend memory
-#    (default since v0.33.x) for ~10x per-eval speedup and
-#    --no-clustering / --num-repeats=N*ndim / --precision-criterion=0.01
-#    for Handley-recommended exploration settings on unimodal posteriors.
+    bash scripts/hpc_install_polychord.sh     # (if pypolychord itself needs rebuilding)
+    bash scripts/hpc_refresh_venv_tar.sh
+
+Then resubmit this job.
+EOF
+    exit 3
+fi
+
+# 3. Run the caller's tidal command.  Defaults worth remembering:
+#      --likelihood-backend memory  (default in v0.33+, ~10x speedup)
+#      --num-repeats 2*ndim         (Handley's own run_pypolychord.py)
+#      --precision-criterion 0.01   (Cobaya's expensive-likelihood rec)
+#      --no-clustering              (safe for unimodal posteriors)
 echo "--- Running tidal command ---"
 cd "${TIDAL_ROOT}"
 {{COMMAND}}

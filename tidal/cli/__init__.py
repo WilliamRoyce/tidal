@@ -717,6 +717,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "campaign",
             "convergence",
             "replicate-convergence",
+            "corner",
         ],
         help="Plot type to generate",
     )

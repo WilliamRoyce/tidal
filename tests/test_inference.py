@@ -879,6 +879,64 @@ class TestParameterImportance:
         assert loaded.log_evidence == nested_result.log_evidence
         np.testing.assert_allclose(loaded.samples, nested_result.samples)
 
+    def test_marginal_dkl_with_integer_indexed_columns(
+        self, nested_result: InferenceResult
+    ) -> None:
+        """Regression for #287: anesthetic's read_chains returns integer-
+        indexed parameter columns in v2.0+ (``[0, 1, 'logL', ...]``), but
+        our importance loop previously indexed by parameter name, silently
+        NaN'ing the marginal D_KL for every parameter.  Verify both
+        integer- and name-indexed anesthetic samples give the same
+        finite D_KL.
+        """
+        pytest.importorskip("anesthetic")
+        from anesthetic import NestedSamples
+
+        from tidal.inference._importance import compute_parameter_importance
+
+        # Named-column path (manual reconstruction — matches
+        # to_anesthetic_samples when chain_root is absent).
+        imp_named = compute_parameter_importance(nested_result, n_bootstrap=10)
+        for dkl in imp_named.marginal_d_kl.values():
+            assert math.isfinite(dkl), "named-column path regressed"
+
+        # Integer-indexed path — simulate what read_chains returns in
+        # v2.0+ and monkeypatch to_anesthetic_samples to return it.
+        n = nested_result.n_samples
+        nlive = int(nested_result.metadata["nlive"])
+        sorted_idx = np.argsort(nested_result.log_likelihood)
+        sorted_logl = nested_result.log_likelihood[sorted_idx]
+        logl_birth = np.full(n, -np.inf)
+        for i in range(nlive, n):
+            logl_birth[sorted_idx[i]] = sorted_logl[i - nlive]
+
+        ns_int = NestedSamples(
+            data=nested_result.samples,
+            logL=nested_result.log_likelihood,
+            logL_birth=logl_birth,
+            columns=[0, 1],  # integer-indexed, mimics read_chains
+        )
+        import tidal.inference._importance as imp_mod
+
+        original = imp_mod.to_anesthetic_samples
+        try:
+            imp_mod.to_anesthetic_samples = lambda _r: ns_int  # type: ignore[assignment]
+            imp_int = compute_parameter_importance(nested_result, n_bootstrap=10)
+        finally:
+            imp_mod.to_anesthetic_samples = original
+
+        for name, dkl in imp_int.marginal_d_kl.items():
+            assert math.isfinite(dkl), (
+                f"integer-column path regressed for '{name}' (got NaN)"
+            )
+
+        # Both paths should agree on the per-parameter ranking to within
+        # ~50% (bootstrap noise is large at n_bootstrap=10).
+        for name in nested_result.param_names:
+            assert imp_named.marginal_d_kl[name] == pytest.approx(
+                imp_int.marginal_d_kl[name], rel=0.5, abs=0.1
+            )
+
 
 # ===================================================================
 # Analyze CLI (inference path)

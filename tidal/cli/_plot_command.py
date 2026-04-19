@@ -36,6 +36,7 @@ _VALID_TYPES = frozenset(
         "campaign",
         "convergence",
         "replicate-convergence",
+        "corner",
     }
 )
 
@@ -182,6 +183,38 @@ def _default_filename(plot_type: str, args: Namespace) -> str:
     return "_".join(parts) + ".png"
 
 
+def _corner_plot(data_path: Path, args: Namespace) -> int:
+    """Render a post-hoc corner plot from a pulled ``tidal sample`` output.
+
+    Loads via :meth:`InferenceResult.from_directory` (reads
+    ``inference.json`` + ``results.csv``) and delegates to
+    :func:`plot_corner` which handles anesthetic version drift.
+    Resolves issue #288.
+    """
+    from tidal.cli._console import error_with_hint
+    from tidal.inference._results import InferenceResult
+    from tidal.inference._visualize import plot_corner
+
+    try:
+        result = InferenceResult.from_directory(data_path)
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        error_with_hint(
+            f"loading inference result from {data_path}: {exc}",
+            [
+                "Directory must contain inference.json + results.csv "
+                "(produced by `tidal sample`)",
+                "For raw PolyChord chain dirs, use `anesthetic.read_chains` directly",
+            ],
+        )
+        return 1
+
+    out_path = Path(args.output) if args.output else data_path / "corner.png"
+    plot_corner(result, out_path)
+    if not args.quiet:
+        print(f"Saved corner plot to: {out_path}")
+    return 0
+
+
 # ------------------------------------------------------------------
 # Main command
 # ------------------------------------------------------------------
@@ -241,6 +274,13 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     # Sweep plot types: dispatch to sweep-specific handler
     if plot_type in _SWEEP_TYPES:
         return _sweep_plot(args, data_path, plot_type)
+
+    # Corner plot: load an InferenceResult (not SimulationData) and
+    # render via anesthetic.  Accepts the pulled HPC artefact dir
+    # directly (the one that contains inference.json + results.csv +
+    # _chains/).
+    if plot_type == "corner":
+        return _corner_plot(data_path, args)
 
     # Parse options
     try:
