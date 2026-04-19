@@ -182,7 +182,16 @@ def _plot_corner_anesthetic(
             columns=result.param_names,
         )
 
-    fig, _axes = samples.plot_2d(result.param_names)
+    # anesthetic >= 2.0: plot_2d returns an AxesDataFrame whose cells
+    # expose .get_figure().  Older versions returned (fig, axes).  Handle
+    # both without version-gating.
+    ret = samples.plot_2d(result.param_names)
+    if isinstance(ret, tuple) and len(ret) == 2:
+        fig = ret[0]
+    else:
+        # AxesDataFrame (or similar): pick any cell, grab its figure.
+        cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
+        fig = cell.get_figure()
     fig.suptitle(
         f"Posterior ({result.method}, n={result.n_samples}, "
         f"ESS={result.effective_sample_size():.0f})",
