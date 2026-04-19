@@ -188,6 +188,13 @@ def _run_polychord(  # noqa: PLR0915
     settings.do_clustering = kwargs.pop("do_clustering", True)
     settings.read_resume = kwargs.pop("read_resume", False)
     settings.feedback = 0 if quiet else 1
+    # Anesthetic's polychord reader needs <root>_dead-birth.txt and
+    # <root>_phys_live-birth.txt (the latter is soft-optional, wrapped in
+    # try/except IOError).  `_prior.txt` is never touched — safe to skip,
+    # shaving a small fraction of wall time on shared filesystems (see
+    # issue #269 P4).  Expose both so advanced users can re-enable if
+    # they need every file.
+    settings.write_prior = kwargs.pop("write_prior", False)
 
     # Slice sampling repetitions (default 5*ndim per PolyChord convention)
     num_repeats = kwargs.pop("num_repeats", None)

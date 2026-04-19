@@ -233,6 +233,8 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         precision_criterion = getattr(args, "precision_criterion", None)
         if precision_criterion is not None:
             ns_kwargs["precision_criterion"] = precision_criterion
+        if getattr(args, "no_clustering", False):
+            ns_kwargs["do_clustering"] = False
 
         result = run_nested_sampling(
             log_likelihood=likelihood_fn,

@@ -1632,6 +1632,15 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         ),
     )
     sample_parser.add_argument(
+        "--no-clustering",
+        action="store_true",
+        dest="no_clustering",
+        help=(
+            "Disable PolyChord's mode-detection clustering.  Safe for "
+            "unimodal posteriors; saves ~5-10%% of likelihood evaluations."
+        ),
+    )
+    sample_parser.add_argument(
         "--seed",
         type=int,
         default=42,
