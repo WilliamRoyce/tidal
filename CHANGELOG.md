@@ -10,6 +10,79 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
+## [0.33.0] — 2026-04-19
+
+### Added
+
+- **v6 iterative perturbative reduction** (issue #267). Higher-
+  derivative theories declaring `[perturbation] small_parameters=[...]`
+  in their `theory.toml` are now evolved by a Parker-Simon iterative
+  scheme instead of the legacy mechanical Ostrogradsky reduction.
+  - `PerturbativeSolver` class in `tidal/solver/perturbative_driver.py`
+    orchestrates Pass 0 (base, ε=0) + Pass 1 (closed-form Duhamel
+    correction) using shared eigendata.
+  - `tidal simulate --perturbative-order N` flag. Defaults to 1 when
+    the JSON metadata carries a `perturbation` block, 0 otherwise.
+  - `EquationSystem.base_spec(small_parameters)` demotes LHS kinetic
+    coefficients that vanish at ε=0 to algebraic constraints, giving
+    a ghost-free 2nd-order base system (Gap B).
+  - `tidal/solver/modal.py::solve_modal_pass1` evaluates the closed-
+    form φ₁-kernel Duhamel integral with Al-Mohy-Higham (2011) Taylor
+    fallback near degenerate eigenvalues; validated against 50-digit
+    mpmath reference to relative error < 1e-13 across |μ−λ|·t ∈
+    [1e-15, 1].
+  - Constraint fields recovered at Pass 1 via the existing Schur
+    operator applied to the Pass 1 dynamical Fourier output
+    (`c_hat = recovery_matrix @ y_hat_dyn`) — Gap C.
+  - Validity monitor: flags `ε · ω² · t_end > 0.1` as "warn" and
+    `> 1.0` as "error" (EFT regime breakdown).
+
+### Changed
+
+- **Three shipped PGT theories re-derived under `[perturbation]`**:
+  `torsion_gertsenshtein.json`, `graviton_torsion.json`, and
+  `torsion_gertsenshtein_combined.json`. Their loaders now flow
+  through the v6 iterative path; `base_spec` demotes the previously-
+  4th-order fields `h_4/h_7/h_9` to algebraic constraints at ε=0.
+- `tidal simulate --scheme modal` eligibility check now uses
+  `spec.base_spec()` when the JSON has corrections, so operators
+  that appear only in correction sources (d4_t, mixed_T4_*) do not
+  cause auto-selection to reject modal.
+- `ExportJSON.wl` emits `order_in_eps` on each OperatorTerm and a
+  `perturbation` sub-dict in the JSON metadata when
+  `[perturbation]` is configured in the theory.toml.
+
+### Removed
+
+- **`tidal/symbolic/ostrogradsky.py`** (547 lines) — legacy
+  auxiliary-field reduction. Closes issues #195, #196.
+- **`tidal/wolfram/PerturbativeReduction.wl`** (525 lines) — v5 JLM
+  symbolic reducer, superseded by order-tagging.
+- **`fields=` kwarg** on `compute_system_energy`,
+  `compute_energy_timeseries`, `compute_conversion_probability`,
+  `compute_group_conversion`. Only existed to work around the
+  Ostrogradsky auxiliary-field layout; no longer needed.
+
+### Breaking
+
+- JSONs derived from theories with `time_order > 2` but without a
+  `[perturbation]` section in `theory.toml` now raise on load with
+  a clear migration hint. Users must add `[perturbation]` and
+  re-derive.
+
+### Fixed
+
+- `solve_modal` with `return_eigendata=True` now exposes per-block
+  V / D / V⁻¹ / α plus the Schur recovery operator so the Pass 1
+  Duhamel can reuse Pass 0's eigendecomposition (no re-work).
+- `_compute_validity` uses `max(|λ|)` instead of `max(|Im(λ)|)` so
+  damped/tachyonic eigenvalues register at their full magnitude.
+
+### Deferred
+
+- Euler-Heisenberg example (Phase 6C.2) blocked by xAct
+  `Validate::repeated` on (F·F)² — tracked in issue #271.
+
 ## [0.31.0] — 2026-04-14
 
 ### Fixed

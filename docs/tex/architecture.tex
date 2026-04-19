@@ -392,51 +392,22 @@ The previous approach---abstract \texttt{VarD} followed by \texttt{TraceBasisDum
 \paragraph{Implementation.}
 \texttt{ComponentEulerLagrange} in \texttt{ComponentDecompose.wl} handles the Phase~B computation, including integration by parts and support for antisymmetric tensor field components via symmetry-permuted tuple replacement (\texttt{ReplaceHigherRankFieldComponents}).
 
-\subsection{Ostrogradsky Reduction}
+\subsection{Perturbative Reduction (v6)}
 \label{sec:ostrogradsky}
 
-Higher-derivative Lagrangians (e.g., $R^2$, $\tilde{R}^2$ curvature-squared terms) produce equations of motion with time derivatives of order $>2$. Since all PDE solver backends (IDA, CVODE, modal, leapfrog) support at most second-order-in-time equations, an automatic \textbf{Ostrogradsky reduction} is applied when the JSON specification is loaded.
+Higher-derivative Lagrangians (e.g., $R^2$, $\tilde{R}^2$ curvature-squared terms) produce equations of motion with time derivatives of order $>2$. Since all PDE solver backends support at most second-order-in-time equations, TIDAL applies the iterative \textbf{perturbative reduction} pipeline introduced in v6 to evolve only the physical (ghost-free) solution branch.
 
-\paragraph{Algorithm.}
-For each field $q$ whose equation has time order $n_t > 2$:
+The complete mathematical and implementation treatment lives in \cref{sec:perturbative-reduction} (\texttt{perturbative\_reduction.tex}). A summary follows for architectural context.
+
+\paragraph{Pipeline.} Theories that contain higher-derivative terms declare a \verb|[perturbation]| section in their \verb|theory.toml| naming the small parameters (e.g. \verb|small_parameters = ["b5"]|). At derive time, each emitted \verb|OperatorTerm| is tagged with \verb|order_in_eps| = total exponent of those small parameters in its symbolic coefficient. At simulate time the \verb|PerturbativeSolver| orchestrates:
 \begin{enumerate}
-  \item Introduce an auxiliary field $w_q = d^2 q / dt^2$ (the acceleration).
-  \item The original equation $d^{n_t} q/dt^{n_t} = \text{RHS}[q, \ldots]$ becomes $d^{n_t - 2} w_q / dt^{n_t - 2} = \text{RHS}[q, \ldots]$.
-  \item Add a constraint linking the auxiliary: $d^2 q / dt^2 = w_q$.
-  \item Repeat until all equations have time order $\leq 2$.
+  \item \textbf{Pass 0.} \verb|EquationSystem.base_spec(small_parameters)| sets every small parameter to zero, demoting any equation whose kinetic coefficient then vanishes to an algebraic constraint (time order 0). The resulting ghost-free second-order system is solved by the standard modal solver with \verb|return_eigendata=True|.
+  \item \textbf{Pass 1.} The order-1 correction source $M_{\mathrm{src}}(\mathbf{k}) \cdot y^{(0)}(t)$ is evolved by a closed-form Duhamel integral that reuses the Pass 0 eigendecomposition. Constraint fields are recovered at both orders via the existing Schur operator $\mathsf{S} = -\mathsf{S}_{cc}^{-1} \mathsf{S}_{cd}$.
+  \item \textbf{Combined.} $q_{\mathrm{total}} = \sum_n q^{(n)}$ returned alongside a validity diagnostic $\max(\varepsilon \cdot |\lambda|^2 \cdot t_{\mathrm{end}})$ that flags approaching EFT breakdown.
 \end{enumerate}
-The state vector expands from $(q, v_q)$ to $(q, v_q, w_q, v_{w_q})$ for each reduced field.
 
-\paragraph{Operator reduction map.}
-Each higher-derivative operator acting on the original field $q$ is mapped to a lower-order operator acting on the auxiliary $w_q = \partial_t^2 q$:
+\paragraph{CLI.} The flag \verb|--perturbative-order N| defaults to~$1$ when the JSON carries a \verb|perturbation| metadata block and~$0$ otherwise. Theories without the metadata block simulate through the plain modal path unchanged. The flag is silent about orders beyond~$1$; see the scope limits in \cref{sec:pr-v6}.
 
-\begin{table}[htbp]
-\centering
-\caption{Ostrogradsky operator reduction: original operators on $q$ are rewritten as operators on auxiliary $w_q$.}
-\label{tab:ostrogradsky-operator-map}
-\begin{tabular}{@{}lll@{}}
-\toprule
-Original on $q$ & Reduced on $w_q$ & Meaning \\
-\midrule
-$\partial_t^4 q$ & $\partial_t^2 w$ & $\partial_t^4 q = \partial_t^2(\partial_t^2 q) = \partial_t^2 w$ \\
-$\partial_t^3 q$ & $\partial_t w$ & $\partial_t^3 q = \partial_t(\partial_t^2 q) = \dot{w}$ \\
-$\partial_t^2 q$ & $w$ & $\partial_t^2 q = w$ (defining relation) \\
-$\partial_t^2 \partial_x q$ & $\partial_x w$ & spatial derivative passes through \\
-$\partial_t^3 \partial_x q$ & $\partial_t \partial_x w$ & combined: reduce time order by 2 \\
-\bottomrule
-\end{tabular}
-\end{table}
+\paragraph{Ghost-free by construction.} The Pass 0 evolution operator is always the second-order base; the higher-derivative terms appear only as sources on the right-hand side. No ghost modes propagate because they are not part of the solution ansatz. This is the central architectural guarantee of the v6 path.
 
-The general rule: time order decreases by 2, spatial derivatives are preserved unchanged.
-
-\paragraph{Cross-field substitution.}
-When $\partial_t^2(q_j)$ appears on the RHS of $q_i$'s equation and $q_j$ is itself a 4th-order field, the reference is rewritten as $w_{q_j}$ (the identity operator on the auxiliary). This resolves implicit acceleration cross-references \emph{before} the modal solver's mass-matrix analysis. For terms where the referenced field is 2nd-order (not reduced), the $\partial_t^2$ operator remains and contributes to the off-diagonal mass matrix $M$.
-
-\paragraph{Ghost stability.}
-Ostrogradsky's theorem (1850): non-degenerate higher-derivative Lagrangians generically produce unbounded Hamiltonians. The auxiliary field $w$ carries opposite-sign kinetic energy, creating \emph{ghost instabilities} with exponentially growing modes. For PGT, ghost-free parameter windows exist where the Hamiltonian remains bounded (Nikiforova et al.\ 2009; Barker 2024, arXiv:2406.12826). TIDAL does not enforce these constraints automatically; a runtime warning is emitted about potential ghost instability. Full ghost propagator analysis is tracked in issue \#164.
-
-\paragraph{Integration.}
-The reduction is transparent to users---it happens automatically during JSON loading. For the 4D graviton-torsion example (v0.18.0), this converts 34 original fields to 37 fields (3 auxiliary: $w_{h_4}$, $w_{h_7}$, $w_{h_9}$), with all equations at time order $\leq 2$.
-
-\paragraph{Implicit acceleration coupling.}
-After reduction, the off-diagonal mass matrix $M$ may be \emph{singular} (e.g., PGT Poincar\'e gauge symmetry creates $M = \bigl[\begin{smallmatrix} 1 & 1 \\ 1 & 1 \end{smallmatrix}\bigr]$ for coupled torsion components). The generalized mass-matrix modal solver (v0.16.0) handles this via eigendecomposition of $M$ to detect hidden constraints, jerk ($\dddot{x}$) substitution, and QZ generalized eigenvalue for circular velocity coupling. See \cref{sec:modal-mass-matrix} for the complete three-level elimination algorithm.
+\paragraph{Historical note.} Before v6, TIDAL used a mechanical Ostrogradsky reduction that introduced auxiliary fields $w_q = \partial_t^2 q$ to flatten higher-order equations into coupled second-order ones. The reduction was theoretically sound but produced ghost modes whose long-time growth corrupted simulations. It was replaced by the iterative path in v6 (\cref{sec:pr-v6}) and the \verb|tidal/symbolic/ostrogradsky.py| module was removed.

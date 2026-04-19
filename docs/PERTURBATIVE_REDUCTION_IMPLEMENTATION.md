@@ -1,5 +1,22 @@
 # Perturbative Reduction Implementation Tracking (v6)
 
+**Status (2026-04-19): COMPLETE.** All 19 sub-tasks across 6 phases done (6C.2 Euler-Heisenberg example deferred to issue #271 — xAct `Validate::repeated` on quartic `(F·F)²` contraction). Full Python suite: **1920 passed, 66 skipped**. v0.33.0 release.
+
+Commit trail (branch `feature/torsion-sweeps`):
+
+| Phase | Commit | Summary |
+|-------|--------|---------|
+| 6A.1 | `d30c42f` | Gap B — AST-based LHS demotion for base_spec |
+| 6A.2 | `65cac69` | Gap C — Pass 1 constraint-field Schur recovery |
+| 6A.3 | `54aab3a` | Algebraic-constraint toy theory (validates B+C) |
+| 6B.1+6B.2 | `ceb6e63` | Delete ostrogradsky.py + migration error + fields= kwarg |
+| 6B.3 | `689b182` | Re-derive torsion_gertsenshtein with [perturbation] |
+| 6B.4 (part 1) | `86f9087` | Re-derive graviton_torsion |
+| 6B.4 (part 2) | `7ab47a5` | Re-derive torsion_gertsenshtein_combined |
+| 6C.1 | `e567157` | R̃² PGT regression test |
+| 6C.3+6C.4 | `2e3d297` | Near-degeneracy + cross-block + review cleanup |
+| Stage 7 | _(in progress)_ | Docs, CHANGELOG, version bump |
+
 Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM symbolic reduction approach (deleted). Full plan: `/home/vscode/.claude/plans/flickering-gathering-orbit.md`. GitHub issue: [#267](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/267).
 
 **Architecture (v6, 2026-04-19)**: Treat small-parameter corrections (b₅R̃², ρ·EH, etc.) as sources for a second solver pass atop the unmodified base equations. Theory-agnostic, ghost-free, no classification needed. Phase C in Wolfram reduces to order-tagging in JSON; all perturbative work happens at simulate time in Python.

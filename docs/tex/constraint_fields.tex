@@ -474,8 +474,8 @@ The required fix involves:
 Until this is implemented, energy measurements for theories with hidden
 constraints should be interpreted with caution.
 
-\paragraph{Field-filtered energy (v0.22.8).}
-As a practical workaround, \texttt{compute\_energy\_timeseries()} accepts an optional \texttt{fields} parameter that restricts the Hamiltonian evaluation to terms involving only the specified base fields. This is critical for Ostrogradsky theories where some fields' equations contain unresolvable $\partial_t^2$/$\partial_t^3$ coupled acceleration terms. For example, measuring conversion between $h_\times$ and $a_y$ on the combined PGT+EM system succeeds ($P = 0.997$) by passing \texttt{fields=\{h\_5, gea\_1\}}, even though the full 23-field Hamiltonian is ill-conditioned.
+\paragraph{Field-filtered energy (removed in v6).}
+A \texttt{fields=} kwarg on \texttt{compute\_energy\_timeseries()} previously allowed evaluating the Hamiltonian on a restricted field set; this was needed because the legacy Ostrogradsky reduction produced auxiliary $w_q$ fields whose equations contained unresolvable $\partial_t^2$/$\partial_t^3$ coupled acceleration terms. With Ostrogradsky removed in v6 (replaced by the iterative \verb|PerturbativeSolver| that keeps the evolution operator second-order, see \cref{sec:pr-v6}), the workaround is no longer necessary and the kwarg was deleted. Conversion measurements on the re-derived \verb|torsion_gertsenshtein_combined| and sibling JSONs now operate on the full field layout without filtering.
 
 \subsubsection{Spectral Conversion Measurement Removed}
 \label{sec:cf-spectral-conversion}
