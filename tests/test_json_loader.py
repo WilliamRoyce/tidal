@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -614,20 +615,18 @@ class TestEquationSystemBaseSpec:
         h_eq = next(eq for eq in base.equations if eq.field_name == "h")
         assert h_eq.time_derivative_order == 0
 
-    def test_base_spec_rejects_third_order_residual(self) -> None:
-        """Time-order=3 that's independent of small params must error out.
+    def test_base_spec_rejects_third_order_residual_direct(self) -> None:
+        """Direct-construction unit test of the base_spec post-check.
 
-        We construct the EquationSystem directly to bypass
-        ``from_dict``'s load-time Ostrogradsky reduction — which would
-        otherwise reject odd-order equations before ``base_spec``
-        could examine them. The post-check in ``base_spec`` is what
-        this test actually exercises.
+        R5.4 / #283 notes this path is unreachable through normal JSON
+        loading (``from_dict`` rejects time_order > 2 without a
+        [perturbation] block before base_spec runs). Kept here as a
+        lower-level unit test anchoring the post-check logic; the
+        realistic-round-trip variant lives in
+        :func:`test_base_spec_rejects_third_order_residual_roundtrip`.
         """
         from tidal.symbolic.json_loader import ComponentEquation
 
-        # Synthesize a minimal spec with a single time_order=3 field and
-        # no perturbation metadata (so base_spec([]) is a no-op on the
-        # kinetic coefficient and the post-check fires).
         eq = ComponentEquation(
             field_name="h",
             field_index=0,
@@ -645,6 +644,74 @@ class TestEquationSystemBaseSpec:
             coupling_matrix=((0.0,),),
             metadata={"perturbation": {"small_parameters": ["b5"], "order": 1}},
         )
+        with pytest.raises(ValueError, match="time_order > 2"):
+            spec.base_spec()
+
+    def test_base_spec_rejects_third_order_residual_roundtrip(
+        self, tmp_path: Path
+    ) -> None:
+        """R5.4 / #283 realistic path: JSON with a [perturbation] block
+        whose small_parameters list does NOT cover the kinetic
+        coefficient of a 3rd-order field. ``from_dict`` loads the JSON
+        (migration error suppressed because [perturbation] is present);
+        ``base_spec`` then fires the post-check with its actionable
+        message.
+
+        Pre-R5.4 only the direct-construction test above existed, which
+        bypasses the load-time gate and therefore cannot fail for the
+        reason the post-check is designed to detect. This round-trip
+        confirms the end-to-end user-facing error surface.
+        """
+        # time_order=3 field with a kinetic that DOES NOT contain the
+        # declared small parameter (b5). base_spec(['b5']) won't demote
+        # it, so the post-check fires with the "missing small parameter"
+        # message.
+        data: dict[str, Any] = {
+            "metadata": {
+                "source": "roundtrip-test",
+                "parameters": {"b5": 0.01, "kappa": 1.0},
+                "perturbation": {"small_parameters": ["b5"], "order": 1},
+            },
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [
+                {"name": "h", "index": 0, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "h",
+                    "lhs": {
+                        "expression": "d3_t(h)",
+                        "order": {"time": 3, "space": 0},
+                        # Kinetic coefficient not collapsing at b5=0:
+                        # "kappa" is a base-theory parameter, not a
+                        # small one. base_spec(['b5']) keeps the LHS
+                        # intact and the post-check rejects.
+                        "kinetic_coefficient_symbolic": "kappa",
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "h",
+                                "coefficient_symbolic": "-1",
+                            }
+                        ],
+                    },
+                }
+            ],
+            "coupling": {},
+        }
+        json_path = tmp_path / "third_order_roundtrip.json"
+        json_path.write_text(json.dumps(data))
+
+        spec = load_equation_system(json_path)
+        # base_spec post-check fires with actionable message.
         with pytest.raises(ValueError, match="time_order > 2"):
             spec.base_spec()
 

@@ -235,25 +235,23 @@ class TestSolveModalPass1AnalyticalMatch:
         assert np.max(np.abs(pass1["y"][0])) < 1e-14
 
 
-class TestPass1NearDegeneracy:
-    """Phase 6C.3: Pass 1 kernel stability in the near-degenerate regime.
+class TestPass1Resonance:
+    """Phase 6C.3 (renamed R5.3 / #282): Pass 1 kernel stability when the
+    correction source resonates with the base eigenfrequency.
 
-    The closed-form Duhamel kernel G(λ, μ; t) has a removable
-    singularity at μ = λ (degenerate eigenvalues).  Near-degenerate
-    modes arise naturally in coupled systems where the base operator
-    eigenvalues cluster — the correction source then couples modes
-    whose frequencies nearly match.  The modal solver handles this
-    via a Taylor branch inside _duhamel_kernel; Phase 4 already
-    covers the scalar kernel sweep against mpmath to 1e-13.
+    Pre-R5.3 this class was mis-labelled ``TestPass1NearDegeneracy``,
+    but it actually tests *resonance* (correction sources a mode that
+    matches the base frequency), not *near-degeneracy* (two base
+    eigenvalues close to each other). They are unrelated in general.
+    The true Taylor-branch crossover is tested by
+    :class:`TestPass1NearDegeneracy` below (R5.3).
 
-    This test exercises the stability of the FULL pipeline
-    (_build_source_matrix_k → _evolve_duhamel_per_mode → Pass 1
-    output) when the source frequency matches the base eigenfrequency.
     The test uses a scalar KG system where the single-mode base
     frequency is ω₀ = √(m² + k²) and the correction re-introduces
     the same identity source at the same mode — effectively a
-    resonant (μ = λ) case.  The test asserts the output remains
-    finite and the Taylor branch did not produce NaN/Inf.
+    resonant (μ = λ) case. The Duhamel kernel ``G(λ, λ, t) = t·exp(λt)``
+    is trivially exact in both branches; this exercises the full
+    pipeline path but does NOT stress the Taylor-branch math.
     """
 
     def test_resonant_source_stays_finite(self) -> None:
@@ -542,3 +540,146 @@ class TestCrossBlockCouplingRaises:
         m_src[:, b0_idx, b1_idx] = 1e-3  # ratio 1e-2 > 1e-10 → must raise
         with pytest.raises(NotImplementedError, match="[Cc]ross-block"):
             _evolve_duhamel_per_mode(eigendata, m_src, t_eval, layout, grid)
+
+
+class TestPass1NearDegeneracy:
+    """R5.3 / #282: Pass 1 Duhamel kernel in the Taylor-branch regime.
+
+    ``_duhamel_kernel(λ, μ; t)`` has two numerical branches:
+
+    - Direct:  ``G = exp(λt) · (exp(z) - 1) / z``   with ``z = (μ-λ)·t``
+    - Taylor:  series expansion around ``z = 0`` to avoid catastrophic
+      cancellation when ``|z|`` is small.
+
+    The crossover window is ``|z| ∈ [1e-8, 1e-5]``. The existing
+    scalar-level sweep in ``test_modal_duhamel_degeneracy.py`` validates
+    the kernel math to 1e-13 in that window. This class adds the
+    missing **pipeline-level** check: construct crafted eigendata with
+    a block whose two eigenvalues are close (Δλ = 2e-11), sweep
+    ``t`` so ``|z|`` traverses the crossover, feed the inputs through
+    ``_evolve_duhamel_per_mode`` (the public Duhamel evolver), and
+    compare against a scalar mpmath reference.
+
+    Pre-R5.3 ``TestPass1NearDegeneracy`` tested resonance (μ = λ
+    exactly), not near-degeneracy. Renamed to :class:`TestPass1Resonance`.
+    """
+
+    @staticmethod
+    def _craft_eigendata(
+        lam_i: complex, lam_j: complex, alpha: np.ndarray, grid: GridInfo
+    ) -> tuple[dict[str, Any], StateLayout]:
+        """Build a minimal 2-slot eigendata + layout for direct use in
+        _evolve_duhamel_per_mode. The block has diagonal D = diag(λ_i,
+        λ_j), V = V⁻¹ = I, so the test drives the kernel math in
+        isolation from the spec loader / companion-matrix machinery.
+        """
+        from tidal.solver.state import SlotInfo
+
+        bs = 2
+        rfft_last = grid.shape[-1] // 2 + 1
+        n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
+        v_mat = np.broadcast_to(
+            np.eye(bs, dtype=np.complex128), (n_modes, bs, bs)
+        ).copy()
+        v_inv = v_mat.copy()
+        d_diag = np.broadcast_to(
+            np.array([lam_i, lam_j], dtype=np.complex128), (n_modes, bs)
+        ).copy()
+        alpha_full = np.broadcast_to(alpha, (n_modes, bs)).astype(np.complex128).copy()
+        block = {
+            "slot_indices": (0, 1),
+            "V": v_mat,
+            "V_inv": v_inv,
+            "D_diag": d_diag,
+            "alpha": alpha_full,
+        }
+        slot_a = SlotInfo(name="a", field_name="a", kind="field", time_order=2)
+        slot_b = SlotInfo(name="b", field_name="b", kind="field", time_order=2)
+        layout = StateLayout(
+            slots=(slot_a, slot_b),
+            num_points=grid.num_points,
+            field_slot_map={"a": 0, "b": 1},
+            velocity_slot_map={},
+            dynamical_fields=("a", "b"),
+        )
+        eigendata = {"blocks": [block], "state_layout": layout}
+        return eigendata, layout
+
+    @pytest.mark.parametrize(
+        ("lam_diff", "t_end"),
+        [
+            (2e-11, 1.0),  # |z| = 2e-11 → Taylor branch
+            (2e-7, 50.0),  # |z| = 1e-5  → Taylor/direct crossover
+            (2e-5, 500.0),  # |z| = 1e-2  → direct branch
+            (2e-3, 500.0),  # |z| = 1.0   → direct branch
+        ],
+    )
+    def test_pipeline_matches_mpmath_across_crossover(
+        self, lam_diff: float, t_end: float
+    ) -> None:
+        """Sweep |z| = |Δλ|·t across the Taylor-branch crossover and
+        assert ``_evolve_duhamel_per_mode`` agrees with an mpmath
+        scalar reference to 1e-10.
+
+        The math: for a single block with diagonal eigenvalues
+        ``diag(λ_i, λ_j)``, IC amplitudes ``α = (1, 0)``, and source
+        matrix ``β = [[0, 1], [0, 0]]`` (source into slot 0 from
+        slot 1), the Pass 1 amplitude at slot 0 is
+        ``z_0(t) = β_{01} · α_1 · G(λ_i, λ_j; t)``. With α_1 = 0 the
+        result is zero — useless. Flip: α = (0, 1), β = [[0, 1],[0, 0]]
+        → z_0(t) = G(λ_i, λ_j; t). That's the scalar we compare
+        against mpmath's direct evaluation of the kernel.
+        """
+        import mpmath
+
+        from tidal.solver.modal import (
+            _evolve_duhamel_per_mode,
+        )
+
+        # Closely-spaced real-part-zero eigenvalues (oscillatory).
+        lam_i = 1.0j
+        lam_j = lam_i + lam_diff  # purely real offset, keeps |Δλ| = lam_diff
+
+        # α = (0, 1) so only slot 1 is excited at t=0.
+        alpha0 = np.array([0.0, 1.0], dtype=np.complex128)
+        # Need at least shape=(2,) so rfft has ≥1 mode.
+        grid = GridInfo(shape=(2,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        eigendata, layout = self._craft_eigendata(lam_i, lam_j, alpha0, grid)
+
+        # M_src such that β = V⁻¹·M·V = [[0,1],[0,0]] (slot 0 <- slot 1).
+        # With V = I, β = M. Set M[0,1] = 1.
+        rfft_last = grid.shape[-1] // 2 + 1
+        n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
+        m_src = np.zeros((n_modes, 2, 2), dtype=np.complex128)
+        m_src[:, 0, 1] = 1.0
+
+        t_eval = np.array([0.0, t_end], dtype=np.float64)
+        _, _y_phys, y_hat_snap = _evolve_duhamel_per_mode(
+            eigendata, m_src, t_eval, layout, grid
+        )
+
+        # Pipeline output at snapshot 1, slot 0, mode 0:
+        # β_{01} · α_1 · G(λ_i, λ_j; t_end) → compare with scalar mpmath.
+        pipeline_z = complex(y_hat_snap[1, 0, 0])
+
+        # mpmath reference: G(λ_i, λ_j; t) = (exp(μt) - exp(λt)) / (μ - λ)
+        # (equivalent form with t factored out: exp(λt)·t·expm1(z)/z,
+        # matching the direct branch in _duhamel_kernel after the
+        # off-by-t fix committed in Stage 4).
+        mp = mpmath.mp
+        mp.dps = 50
+        z = (lam_j - lam_i) * t_end
+        # Primary reference: direct formula, arbitrary-precision.
+        num = mpmath.exp(lam_j * t_end) - mpmath.exp(lam_i * t_end)
+        den = mpmath.mpc(lam_j - lam_i)
+        G_ref_mp = num / den
+        G_ref_complex = complex(G_ref_mp.real, G_ref_mp.imag)
+        _ = z  # keep z in scope for the diagnostic message below
+
+        rel_err = abs(pipeline_z - G_ref_complex) / (abs(G_ref_complex) + 1e-30)
+        assert rel_err < 1e-10, (
+            f"lam_diff={lam_diff:.1e}, t_end={t_end:.1e}, "
+            f"|z|={abs(z):.3e}: pipeline={pipeline_z!r} vs "
+            f"mpmath={G_ref_complex!r}, rel_err={rel_err:.3e}. "
+            f"Taylor-branch crossover broken (#282)."
+        )

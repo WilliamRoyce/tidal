@@ -196,6 +196,52 @@ class TestPass0SchurRecovery:
             h = y[ti, h_slot * n_grid : (h_slot + 1) * n_grid]
             np.testing.assert_allclose(h, _G * phi, atol=1e-10)
 
+    def test_pass0_inconsistent_ic_is_projected_onto_constraint(self) -> None:
+        """R5.4 / #283: an IC that violates ``h = g·phi`` at t=0 must
+        either be rejected or projected onto the constraint manifold.
+        Silent violation (driver runs and h drifts from g·phi) would
+        be a bug.
+
+        The constraint IC solver is expected to project: it replaces
+        the user-provided h with ``g·phi`` at t=0 so the evolution
+        starts on the constraint manifold. This test documents that
+        behaviour as the observed contract.
+        """
+        _spec, solver, grid, y0, layout = _setup()
+        n_grid = grid.num_points
+        phi_slot = layout.field_slot_map["phi"]
+        h_slot = layout.field_slot_map["h"]
+        # Violate the constraint at t=0: h₀ = 0.3·sin(x), but g·phi₀ = 0.7·sin(x).
+        y0 = y0.copy()
+        y0[h_slot * n_grid : (h_slot + 1) * n_grid] = 0.3 * np.sin(
+            np.linspace(0.0, 2 * np.pi, n_grid, endpoint=False)
+        )
+
+        res = solver.solve(
+            y0,
+            grid,
+            (0.0, 1.0),
+            order=0,
+            parameters={"m2": _M2, "b5": 0.01, "g": _G},
+            num_snapshots=6,
+        )
+        y = res.total["y"]
+        # Assert constraint holds at every snapshot — inclusive of t=0,
+        # which documents that projection (not silent drift) is what
+        # the driver guarantees.
+        max_violation = 0.0
+        for ti in range(y.shape[0]):
+            phi = y[ti, phi_slot * n_grid : (phi_slot + 1) * n_grid]
+            h = y[ti, h_slot * n_grid : (h_slot + 1) * n_grid]
+            v = float(np.max(np.abs(h - _G * phi)))
+            max_violation = max(max_violation, v)
+        assert max_violation < 1e-10, (
+            f"Inconsistent IC: constraint h = g·phi violated by "
+            f"max |h − g·phi| = {max_violation:.3e}. The driver must "
+            f"either project onto the constraint manifold OR raise "
+            f"loudly; silent violation is a bug. See #283."
+        )
+
 
 class TestPass1ConstraintAndDynamicalAgree:
     """Pass 1 h¹(t) = g · φ¹(t) via Schur recovery (Gap C)."""
