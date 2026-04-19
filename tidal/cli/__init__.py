@@ -410,6 +410,22 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Ref: Burns et al. (2020), Phys. Rev. Research 2:023068."
         ),
     )
+    sim_parser.add_argument(
+        "--perturbative-order",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Iterative perturbative expansion order for theories with a "
+            "[perturbation] section (v6 plan). N=0 runs the base theory "
+            "only; N=1 adds the closed-form Duhamel correction using Pass 0 "
+            "eigendata. Default: 1 when the JSON metadata includes a "
+            "'perturbation' block (emitted by ExportJSON.wl when "
+            "[perturbation] is configured in theory.toml), 0 otherwise. "
+            "Requires the modal solver (--scheme modal or auto). "
+            "See docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md."
+        ),
+    )
     # Output
     sim_parser.add_argument(
         "--output",

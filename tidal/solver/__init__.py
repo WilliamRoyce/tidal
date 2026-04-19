@@ -8,8 +8,14 @@ from tidal.solver.grid import GridInfo
 from tidal.solver.modal import (
     _build_evolution_matrices,
     find_independent_blocks,
+    solve_modal,
+    solve_modal_pass1,
 )
 from tidal.solver.operators import OPERATOR_REGISTRY, apply_operator, operator_min_dim
+from tidal.solver.perturbative_driver import (
+    PerturbativeResult,
+    PerturbativeSolver,
+)
 from tidal.solver.rhs import RHSEvaluator
 from tidal.solver.state import StateLayout
 from tidal.solver.validation import (
@@ -25,6 +31,8 @@ __all__ = [
     "CoefficientEvaluator",
     "FieldSet",
     "GridInfo",
+    "PerturbativeResult",
+    "PerturbativeSolver",
     "RHSEvaluator",
     "SimulationDivergedError",
     "SolverResult",
@@ -36,6 +44,8 @@ __all__ = [
     "check_mass_sign",
     "find_independent_blocks",
     "operator_min_dim",
+    "solve_modal",
+    "solve_modal_pass1",
     "validate_field_references",
     "validate_operator_dimensions",
 ]

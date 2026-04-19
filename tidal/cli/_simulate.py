@@ -13,6 +13,7 @@ from tidal.cli._console import debug as _cdebug
 from tidal.cli._console import error as _cerror
 from tidal.cli._console import error_with_hint as _cerror_hint
 from tidal.cli._console import log as _clog
+from tidal.cli._console import warn as _cwarn
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -2147,25 +2148,73 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             progress=progress,
         )
     elif scheme == "modal":
-        from tidal.solver.modal import solve_modal
+        # Default --perturbative-order: 1 when the JSON declares a
+        # perturbation block, 0 otherwise. An explicit --perturbative-order
+        # flag on the CLI overrides this default.
+        pert_meta = spec.metadata.get("perturbation") or {}
+        if args.perturbative_order is not None:
+            pert_order = int(args.perturbative_order)
+        else:
+            pert_order = 1 if pert_meta.get("small_parameters") else 0
 
-        log(
-            f"Running modal solver (t={t_start} → {args.t_end}, "
-            f"{num_snapshots} snapshots)..."
-        )
-        result = solve_modal(
-            spec,
-            grid_info,
-            y0,
-            t_span=(t_start, args.t_end),
-            bc=bc,
-            parameters=params,
-            rtol=args.rtol,
-            atol=args.atol,
-            num_snapshots=num_snapshots,
-            snapshot_callback=snapshot_cb,
-            progress=progress,
-        )
+        if pert_order > 0 and spec.has_corrections():
+            from tidal.solver.modal import solve_modal
+            from tidal.solver.perturbative_driver import (
+                PerturbativeSolver,
+            )
+
+            log(
+                f"Running perturbative modal solver (order={pert_order}, "
+                f"t={t_start} → {args.t_end}, {num_snapshots} snapshots)..."
+            )
+            pert_solver = PerturbativeSolver(spec)
+            pert_result = pert_solver.solve(
+                y0,
+                grid_info,
+                t_span=(t_start, args.t_end),
+                order=pert_order,
+                parameters=params,
+                num_snapshots=num_snapshots,
+                small_parameters=list(pert_meta.get("small_parameters") or []),
+            )
+            result = pert_result.total
+            validity = pert_result.validity
+            if validity.get("warn_level") == "warn":
+                _cwarn(
+                    "Perturbative truncation validity: "
+                    f"ε·ω²·t_end ≈ {validity['validity_param']:.2g} > 0.1 "
+                    f"(dominant parameter: {validity['dominant_parameter']!r}). "
+                    "O(ε²) truncation error may exceed 10%. Consider a "
+                    "smaller small-parameter, shorter t_end, or coarser grid.",
+                )
+            elif validity.get("warn_level") == "error":
+                _cwarn(
+                    "Perturbative truncation validity: "
+                    f"ε·ω²·t_end ≈ {validity['validity_param']:.2g} > 1.0 — "
+                    "the EFT regime is violated for this configuration. "
+                    "Results should NOT be trusted. Reduce the small "
+                    "parameter or shrink t_end / k_max.",
+                )
+        else:
+            from tidal.solver.modal import solve_modal
+
+            log(
+                f"Running modal solver (t={t_start} → {args.t_end}, "
+                f"{num_snapshots} snapshots)..."
+            )
+            result = solve_modal(
+                spec,
+                grid_info,
+                y0,
+                t_span=(t_start, args.t_end),
+                bc=bc,
+                parameters=params,
+                rtol=args.rtol,
+                atol=args.atol,
+                num_snapshots=num_snapshots,
+                snapshot_callback=snapshot_cb,
+                progress=progress,
+            )
     else:  # leapfrog
         from tidal.solver.leapfrog import solve_leapfrog
 

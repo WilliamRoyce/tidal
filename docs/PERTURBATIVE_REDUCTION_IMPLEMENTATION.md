@@ -146,26 +146,36 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 
 ---
 
-## Stage 5: Perturbative solver driver + CLI
+## Stage 5: Perturbative solver driver + CLI — COMPLETE
 
 **Goal**: `PerturbativeSolver` orchestrates Pass 0, Pass 1, combines. CLI flag `--perturbative-order N`.
 
-**Estimated**: 5 days.
+**Estimated**: 5 days. **Actual**: 1 day (2026-04-19).
 
 ### Tasks
 
-- [ ] **5.1** Create `tidal/solver/perturbative_driver.py` with `PerturbativeSolver` class and `PerturbativeResult` dataclass.
-- [ ] **5.2** Implement `PerturbativeSolver.solve(ic, t_grid, order=1, params=None) -> PerturbativeResult`:
-  - No corrections path: delegate to ModalSolver directly
-  - Pass 0: `ModalSolver(base_spec).solve(..., return_eigendata=True)`
-  - Pass n: build source matrices from `full_spec.filter_by_order(n)`, call `solve_with_source`
-  - Combine via `total = Σ eps^n · q_n` evaluated at simulation params
-- [ ] **5.3** Implement `_compute_validity(eigendata, full_spec, params)`:
-  - `validity_param = max(ε_i · ω_max² · t_end)` across small params
-  - Return dict with `omega_max`, `m_scalaron_min`, `validity_param`, `warn_level`
-- [ ] **5.4** Add `--perturbative-order N` flag to `tidal simulate`. Default: 0 if `[perturbation]` absent; 1 if present. Reject `order > max_order_in_json`.
-- [ ] **5.5** Wire `PerturbativeSolver` into `_simulate.py` dispatch. Validity warnings routed through `error_with_hint`.
-- [ ] **5.6** Tests in `tests/test_perturbative_driver.py`: scalar toy (analytical match), synthetic 2-field with correction, validity warning firing/not firing.
+- [x] **5.1** Created `tidal/solver/perturbative_driver.py` with `PerturbativeResult` dataclass (per-order SolverResults, combined `total`, `validity` dict) and `PerturbativeSolver` class.
+- [x] **5.2** `PerturbativeSolver.solve(y0, grid, t_span, *, order, parameters, num_snapshots, small_parameters)` implemented. Pass 0 via `solve_modal(..., return_eigendata=True)`; Pass n via `solve_modal_pass1` for each order. No-correction path delegates cleanly; cross-block coupling detected in the Duhamel routine.
+- [x] **5.3** `_compute_validity(eigendata, small_parameters, parameters, t_end)` returns `{omega_max, eps_values, validity_param, dominant_parameter, warn_level}` with thresholds `_VALIDITY_WARN_THRESHOLD = 0.1` and `_VALIDITY_ERROR_THRESHOLD = 1.0`, referenced to the plan's "TIDAL's parameter space" table.
+- [x] **5.4** `--perturbative-order N` added to `tidal simulate`. Default rule: `1` when JSON metadata has a `perturbation` block; `0` otherwise. Explicit values override the default.
+- [x] **5.5** `tidal/cli/_simulate.py` modal branch splits: when `pert_order > 0 and spec.has_corrections()` it routes through `PerturbativeSolver`; otherwise the existing `solve_modal` path runs unchanged. Validity warnings surface via `_cwarn` in two bands (warn @ 0.1, error @ 1.0).
+- [x] **5.6** Tests:
+  - `tests/test_perturbative_driver.py::TestPerturbativeSolverAPI` — `max_order`, `has_corrections`, rejects over-order.
+  - `TestPerturbativeSolverSolve` — order=0 returns base-only; order=1 adds non-zero correction; validity monitor flags large ε·ω²·t at the error band.
+  - `TestPerturbativeSolverValidity` — small-ε stays in "ok"; parameter map populated correctly.
+  - `TestPerturbativeCLIFlag` — CLI invocations exercise explicit order=1, default order=1 (from metadata), and order=0 (bypass). 11 tests total.
+- Also exported `PerturbativeSolver`, `PerturbativeResult`, `solve_modal`, `solve_modal_pass1` from `tidal.solver`.
+
+### Smoke tests (2026-04-19)
+
+- `uv run pytest tests/test_perturbative_driver.py -q` → 11 passed.
+- `uv run pytest tests/ -q --ignore=tests/integration` → **1871 passed**, 66 skipped (no regressions from the 1860 baseline).
+- `uv run ruff check ...` on all Stage 5 files → clean.
+
+### Deferred to Stage 6
+
+- Full constraint-field correction recovery (augmented Schur step including source contribution for `h_4¹` etc.). Current driver zero-fills constraint slots in the Pass 1 output, which is correct when the correction source does not back-propagate into the constraint equations (true for the KG toy, not for R̃² PGT). Stage 6 adds the augmented recovery.
+- Real R̃² PGT re-derivation + regression test against the base b₅=0 baseline.
 
 ---
 
