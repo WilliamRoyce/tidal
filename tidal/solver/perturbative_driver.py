@@ -90,9 +90,11 @@ def _compute_validity(
     omega_max = 0.0
     for block in eigendata.get("blocks", []):
         lam = block["D_diag"]  # (n_modes, bs) complex
-        # Most eigenvalues are purely imaginary for Hamiltonian systems;
-        # use |Im(λ)| to avoid counting numerical Re(λ) noise.
-        omega_block = float(np.max(np.abs(np.imag(lam))))
+        # Use |λ| so damped/tachyonic modes (non-zero Re(λ)) register
+        # at their full magnitude.  Previously |Im(λ)| underestimated
+        # ω_max for theories with dissipation or with near-zero-mass
+        # fields where Re(λ) carries significant amplitude.
+        omega_block = float(np.max(np.abs(lam)))
         omega_max = max(omega_max, omega_block)
 
     params = dict(parameters or {})
@@ -359,6 +361,10 @@ class PerturbativeSolver:
 
             for n in range(1, order + 1):
                 correction_spec = self.full_spec.filter_by_order(n)
+                # filter_by_order(n) keeps terms whose order_in_eps is
+                # exactly n; if any survive, they are corrections by
+                # definition, so has_corrections() on the filtered spec
+                # is the right gate.
                 if not correction_spec.has_corrections():
                     # No terms at this order; append a zero contribution
                     # for shape consistency.

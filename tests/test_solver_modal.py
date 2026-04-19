@@ -1340,9 +1340,12 @@ class TestEigendataExport:
     def test_eigendata_alpha_matches_vinv_y0(self) -> None:
         """Alpha = V_inv @ y0_hat (by construction)."""
         result, y0, layout, grid = self._run_kg(return_eigendata=True)
-        from tidal.solver.modal import (
-            _fft_slots,
-        )
+        # The Fourier transform helper is intentionally private in
+        # modal.py; importing here is a deliberate whitebox check that
+        # eigendata.alpha matches V_inv @ rfft(y0) without going
+        # through the full Pass 0 evolution.  If _fft_slots is ever
+        # promoted to public, update this import.
+        from tidal.solver.modal import _fft_slots
 
         y0_hat = _fft_slots(y0, layout, grid)
         for block in result["eigendata"]["blocks"]:

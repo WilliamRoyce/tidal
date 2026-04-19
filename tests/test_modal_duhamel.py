@@ -233,3 +233,233 @@ class TestSolveModalPass1AnalyticalMatch:
         )
         # At t = t_eval[0], the Pass 1 correction is zero (IC).
         assert np.max(np.abs(pass1["y"][0])) < 1e-14
+
+
+class TestPass1NearDegeneracy:
+    """Phase 6C.3: Pass 1 kernel stability in the near-degenerate regime.
+
+    The closed-form Duhamel kernel G(λ, μ; t) has a removable
+    singularity at μ = λ (degenerate eigenvalues).  Near-degenerate
+    modes arise naturally in coupled systems where the base operator
+    eigenvalues cluster — the correction source then couples modes
+    whose frequencies nearly match.  The modal solver handles this
+    via a Taylor branch inside _duhamel_kernel; Phase 4 already
+    covers the scalar kernel sweep against mpmath to 1e-13.
+
+    This test exercises the stability of the FULL pipeline
+    (_build_source_matrix_k → _evolve_duhamel_per_mode → Pass 1
+    output) when the source frequency matches the base eigenfrequency.
+    The test uses a scalar KG system where the single-mode base
+    frequency is ω₀ = √(m² + k²) and the correction re-introduces
+    the same identity source at the same mode — effectively a
+    resonant (μ = λ) case.  The test asserts the output remains
+    finite and the Taylor branch did not produce NaN/Inf.
+    """
+
+    def test_resonant_source_stays_finite(self) -> None:
+        spec = _make_spec(_KG_BASE)
+        n_grid = 32
+        length = 2 * np.pi
+        grid = GridInfo(shape=(n_grid,), bounds=((0.0, length),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        # IC: phi = sin(x) — excites a single Fourier mode at k=1.
+        x = np.linspace(0.0, length, n_grid, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:n_grid] = np.sin(x)
+
+        base_spec = spec.filter_by_order(0)
+        correction_spec = spec.filter_by_order(1)
+
+        # Large t to stress the long-time behaviour.
+        t_end = 5.0
+        pass0 = cast(
+            "dict[str, Any]",
+            solve_modal(
+                base_spec,
+                grid,
+                y0,
+                t_span=(0.0, t_end),
+                parameters={"m2": 1.0, "eps": 0.1},
+                num_snapshots=11,
+                return_eigendata=True,
+            ),
+        )
+        pass1 = solve_modal_pass1(
+            pass0["eigendata"],
+            correction_spec,
+            grid,
+            pass0["t"],
+            parameters={"m2": 1.0, "eps": 0.1},
+        )
+
+        assert np.all(np.isfinite(pass1["y"])), (
+            "Pass 1 resonant output contains NaN/Inf — Taylor branch of "
+            "the Duhamel kernel failed on a near-degenerate source"
+        )
+        # The resonant correction grows ∝ t (secular), so amplitude
+        # should be bounded by (eps · ω² · t) × initial_amplitude.
+        max_amp = float(np.max(np.abs(pass1["y"])))
+        assert max_amp < 10.0, (
+            f"Resonant Pass 1 amplitude {max_amp:.3e} implausibly large; "
+            f"secular growth formula predicts ~eps*omega^2*t ≈ 0.1*2*5 = 1"
+        )
+
+    def test_very_large_t_remains_finite(self) -> None:
+        """At very large t, the secular growth eventually violates
+        validity but the numerics should still produce finite output,
+        letting the validity monitor flag the regime breakdown.
+        """
+        spec = _make_spec(_KG_BASE)
+        n_grid = 16
+        length = 2 * np.pi
+        grid = GridInfo(shape=(n_grid,), bounds=((0.0, length),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = np.linspace(0.0, length, n_grid, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:n_grid] = np.sin(x)
+
+        base_spec = spec.filter_by_order(0)
+        correction_spec = spec.filter_by_order(1)
+        pass0 = cast(
+            "dict[str, Any]",
+            solve_modal(
+                base_spec,
+                grid,
+                y0,
+                t_span=(0.0, 100.0),
+                parameters={"m2": 1.0, "eps": 0.01},
+                num_snapshots=3,
+                return_eigendata=True,
+            ),
+        )
+        pass1 = solve_modal_pass1(
+            pass0["eigendata"],
+            correction_spec,
+            grid,
+            pass0["t"],
+            parameters={"m2": 1.0, "eps": 0.01},
+        )
+        assert np.all(np.isfinite(pass1["y"]))
+
+
+# ---------------------------------------------------------------------------
+# Two-field spec whose base theory has two independent Pass 0 blocks
+# (phi and chi decoupled at ε=0) and whose correction links them.
+# The Pass 1 Duhamel path does not yet support cross-block source
+# coupling; the solver must refuse cleanly with NotImplementedError.
+# ---------------------------------------------------------------------------
+
+_CROSS_BLOCK_SPEC: dict[str, object] = {
+    "metadata": {
+        "source": "inline-test",
+        "parameters": {"mPhi2": 1.0, "mChi2": 2.0, "eps": 0.05},
+        "perturbation": {"small_parameters": ["eps"], "order": 1},
+    },
+    "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+    "fields": [
+        {"name": "phi_0", "index": 0, "is_dynamical": True},
+        {"name": "chi_0", "index": 1, "is_dynamical": True},
+    ],
+    "equations": [
+        # phi_0: Klein-Gordon with mass mPhi2 + order-1 coupling to chi_0.
+        {
+            "field": "phi_0",
+            "lhs": {
+                "expression": "d2_t(phi_0)",
+                "order": {"time": 2, "space": 0},
+            },
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {
+                        "coefficient": -1.0,
+                        "operator": "identity",
+                        "field": "phi_0",
+                        "coefficient_symbolic": "-mPhi2",
+                    },
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                    # Order-1 cross-coupling: eps·chi_0 on phi_0's RHS.
+                    # This links the previously-independent phi and chi
+                    # sectors via the correction.
+                    {
+                        "coefficient": -1.0,
+                        "operator": "identity",
+                        "field": "chi_0",
+                        "coefficient_symbolic": "-eps",
+                        "order_in_eps": 1,
+                    },
+                ],
+            },
+        },
+        {
+            "field": "chi_0",
+            "lhs": {
+                "expression": "d2_t(chi_0)",
+                "order": {"time": 2, "space": 0},
+            },
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {
+                        "coefficient": -1.0,
+                        "operator": "identity",
+                        "field": "chi_0",
+                        "coefficient_symbolic": "-mChi2",
+                    },
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "chi_0"},
+                ],
+            },
+        },
+    ],
+    "coupling": {},
+}
+
+
+class TestCrossBlockCouplingRaises:
+    """Phase 6C.4: Duhamel evolution refuses cross-block source coupling."""
+
+    def test_cross_block_correction_raises(self) -> None:
+        """A correction linking phi (block A) to chi (block B) must raise.
+
+        The Duhamel kernel operates per eigenblock; Pass 0
+        independently eigendecomposed phi and chi. A correction term
+        whose source references chi from inside phi's equation would
+        require a joint eigenbasis, which the current implementation
+        does not build. It should refuse with NotImplementedError and
+        a clear diagnostic message so users (or future maintainers)
+        know this is a documented limitation, not a silent failure.
+        """
+        spec = _make_spec(_CROSS_BLOCK_SPEC)
+        n_grid = 16
+        length = 2 * np.pi
+        grid = GridInfo(shape=(n_grid,), bounds=((0.0, length),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        x = np.linspace(0.0, length, n_grid, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:n_grid] = np.sin(x)
+
+        base_spec = spec.filter_by_order(0)
+        correction_spec = spec.filter_by_order(1)
+
+        pass0 = cast(
+            "dict[str, Any]",
+            solve_modal(
+                base_spec,
+                grid,
+                y0,
+                t_span=(0.0, 0.5),
+                parameters={"mPhi2": 1.0, "mChi2": 2.0, "eps": 0.05},
+                num_snapshots=3,
+                return_eigendata=True,
+            ),
+        )
+        with pytest.raises(NotImplementedError, match="[Cc]ross-block"):
+            solve_modal_pass1(
+                pass0["eigendata"],
+                correction_spec,
+                grid,
+                pass0["t"],
+                parameters={"mPhi2": 1.0, "mChi2": 2.0, "eps": 0.05},
+            )
