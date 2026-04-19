@@ -522,15 +522,11 @@ class TestCLIIntegration:
 class TestAllExamplesRender:
     """Ensure every example JSON renders without errors."""
 
-    # These ship with time_order>2 equations and currently lack a
-    # [perturbation] section in their theory.toml.  Phase 6B of the v6
-    # plan removed Ostrogradsky, so loading these JSONs raises with a
-    # migration hint until they are re-derived under
-    # [perturbation]=["b5"] (Phase 6B.4).  Mark as xfail until the
-    # re-derivation commits land.  (torsion_gertsenshtein was migrated
-    # in Phase 6B.3 — removed from this list.)
+    # v6 re-derivation migration tracking.
+    # torsion_gertsenshtein and graviton_torsion migrated in Phase 6B.3/6B.4.
+    # torsion_gertsenshtein_combined migration pending (large theory,
+    # wolframscript > 10 min).  Removed from xfail list as each lands.
     _PENDING_V6_REDERIVATION = {
-        "graviton_torsion",
         "torsion_gertsenshtein_combined",
     }
 
