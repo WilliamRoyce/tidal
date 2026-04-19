@@ -366,6 +366,91 @@ class TestPerturbativeSolverValidity:
         assert res.validity["eps_values"] == {"eps": 0.02}
         assert res.validity["omega_max"] > 0
 
+    def test_validity_formula_is_eps_times_omega_times_t(self) -> None:
+        """R4.1 / #284: validity_param = ε·ω·t_end, not ε·ω²·t_end.
+
+        The prior formula over-counted by a factor of ω: safe for ω>1
+        but dangerous at low frequencies. Validate the current formula
+        directly against omega_max and eps.
+        """
+        spec = _make_spec(_KG_WITH_EPS)
+        grid = GridInfo(shape=(16,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        y0 = _make_ic(spec, grid)
+        solver = PerturbativeSolver(spec)
+        t_end = 0.5
+        eps = 0.05
+        res = solver.solve(
+            y0,
+            grid,
+            (0.0, t_end),
+            order=1,
+            parameters={"m2": 1.0, "eps": eps},
+            num_snapshots=3,
+        )
+        omega_max = float(res.validity["omega_max"])
+        expected = eps * omega_max * t_end  # ε·ω·t (R4.1 formula)
+        assert res.validity["validity_param"] == pytest.approx(expected, rel=1e-12), (
+            f"validity_param={res.validity['validity_param']!r} "
+            f"must equal ε·ω·t_end={expected!r}. See #284."
+        )
+
+
+class TestPerturbativeBaseStability:
+    """R4.2 / #285: validity monitor detects base-theory tachyons."""
+
+    def test_base_theory_tachyon_detection(self) -> None:
+        """A wrong-sign mass (+m²·φ instead of −m²·φ) produces a
+        base-theory tachyon at k=0: Re(λ) = +m > 0. The validity
+        monitor must flag this at warn-level even when ε is tiny
+        (correction_level = ok).
+
+        We use a mild tachyon (m² = 0.1 → Re(λ) = √0.1 ≈ 0.316) and a
+        short t_end so the Pass 0 pre-evolution divergence guard does
+        not preempt the run. base_stability_param = 0.316 * 1.0 ≈
+        0.316 → warn-level (> 1e-10), not error (< 30).
+        """
+        data = copy.deepcopy(_KG_WITH_EPS)
+        # Flip the sign of the -m²·φ term → +m²·φ (wrong-sign mass).
+        terms = data["equations"][0]["rhs"]["terms"]  # type: ignore[index]
+        for t in terms:
+            if t.get("coefficient_symbolic") == "-m2":
+                t["coefficient"] = 1.0  # was -1.0
+                t["coefficient_symbolic"] = "m2"
+        spec = _make_spec(data)
+        grid = GridInfo(shape=(16,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        # Build IC with a DC component so the k=0 tachyonic mode is
+        # excited (modal solver prunes all-zero-IC blocks, which would
+        # otherwise hide the λ = +m eigenvalue at k=0).
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x = np.linspace(0.0, 2 * np.pi, n, endpoint=False)
+        y0 = np.zeros(layout.num_slots * n)
+        y0[:n] = 0.01 + np.sin(x)  # DC offset + sin
+        solver = PerturbativeSolver(spec)
+        res = solver.solve(
+            y0,
+            grid,
+            (0.0, 1.0),  # short t to stay under the divergence guard
+            order=1,
+            parameters={"m2": 0.1, "eps": 1e-6},
+            num_snapshots=3,
+        )
+        assert res.validity["max_real_lambda"] > 1e-3, (
+            "Wrong-sign mass should produce a positive Re(λ); "
+            f"got {res.validity['max_real_lambda']}."
+        )
+        assert res.validity["base_level"] == "warn", (
+            f"Tachyonic base with max Re(λ) = "
+            f"{res.validity['max_real_lambda']:.3e} should produce "
+            f"base_level='warn' (got {res.validity['base_level']!r}). See #285."
+        )
+        assert res.validity["warn_level"] == "warn", (
+            "Base-stability warn must escalate overall warn_level. See #285."
+        )
+        assert res.validity["dominant_tachyon_field"] is not None, (
+            "dominant_tachyon_field must name the offending slot. See #285."
+        )
+
 
 # --- Gap C: Pass 1 constraint recovery (v6 Phase 6A.2) -----------------
 
@@ -521,4 +606,50 @@ class TestPassOneConstraintRecovery:
         assert np.max(np.abs(a0_p1)) > 1e-10, (
             "Gap C recovery produced identically-zero A_0¹; expected "
             "non-trivial recovery from the A_1 correction."
+        )
+
+
+class TestPerturbativeResultLayoutConsistency:
+    """v6 R2.2 / #276: PerturbativeResult carries its own spec so the
+    CLI / measurement layer doesn't have to rebind to solver.base_spec.
+    """
+
+    def test_result_spec_is_base_spec_not_full(self) -> None:
+        spec = _make_spec(_KG_WITH_EPS)
+        solver = PerturbativeSolver(spec)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        y0 = _make_ic(spec, grid)
+        res = solver.solve(
+            y0, grid, (0.0, 0.5), order=1, parameters={"m2": 1.0, "eps": 0.05}
+        )
+        # The result must carry both the base_spec (matches y layout) and
+        # the full_spec (for diagnostics).
+        assert res.spec is not None
+        assert res.full_spec is not None
+        assert res.spec is solver.base_spec
+        assert res.full_spec is solver.full_spec
+
+    def test_result_layout_matches_total_state(self) -> None:
+        """The state vector width equals spec's slot count × grid.num_points.
+
+        Pre-R2.2 the CLI could silently pair total["y"] with the full spec
+        (larger slot count) and downstream measurements would read garbage
+        slot-by-slot. This confirms the layout invariant.
+        """
+        from tidal.solver.state import StateLayout
+
+        spec = _make_spec(_KG_WITH_EPS)
+        solver = PerturbativeSolver(spec)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        y0 = _make_ic(spec, grid)
+        res = solver.solve(
+            y0, grid, (0.0, 0.5), order=1, parameters={"m2": 1.0, "eps": 0.05}
+        )
+        assert res.spec is not None
+        base_layout = StateLayout.from_spec(res.spec, grid.num_points)
+        expected_width = base_layout.num_slots * grid.num_points
+        assert res.total["y"].shape[1] == expected_width, (
+            f"State width {res.total['y'].shape[1]} != "
+            f"spec.num_slots × grid.num_points = {expected_width}. "
+            f"See #276."
         )

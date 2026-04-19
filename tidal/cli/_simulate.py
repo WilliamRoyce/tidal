@@ -1751,15 +1751,13 @@ def _resolve_scheme(  # noqa: C901
     # that Pass 0 never sees — they only appear as Duhamel source
     # coefficients. Build the base spec once here for both explicit and
     # auto paths.
-    eligibility_spec = spec
-    if spec.has_corrections():
-        try:
-            eligibility_spec = spec.base_spec()
-        except ValueError:
-            # If base_spec raises (e.g. 3rd-order residual), fall back
-            # to the full spec so the error surfaces through normal
-            # dispatch paths rather than being hidden here.
-            eligibility_spec = spec
+    # If the user's [perturbation] config is malformed (missing small
+    # parameters, 3rd-order residual after demotion), base_spec's
+    # ValueError carries an actionable message — propagate it instead
+    # of silently falling back to the full spec, which would make the
+    # modal-eligibility check fail for an unrelated reason and mislead
+    # the user with "auto-selected: CVODE" (R3.1 / #277).
+    eligibility_spec = spec.base_spec() if spec.has_corrections() else spec
 
     if scheme != "auto":
         if scheme == "modal" and grid is not None:
@@ -2313,28 +2311,59 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             )
             result = pert_result.total
             # Pass 0 / Pass 1 outputs live in base_spec's layout (h_4/h_7/h_9
-            # demoted to algebraic constraints at ε=0).  Replace `spec`
-            # downstream so SimulationData / measurement use the matching
-            # layout.  The full original spec is preserved on
-            # pert_solver.full_spec for callers that need it (e.g. the
-            # validity monitor references the FULL perturbation metadata).
-            spec = pert_solver.base_spec
+            # demoted to algebraic constraints at ε=0). The solver now
+            # carries this layout on the result itself (R2.2 / #276), so
+            # downstream SimulationData / measurement callers pair the
+            # state vector with the correct spec without the prior
+            # `spec = pert_solver.base_spec` rebind workaround. The full
+            # original spec stays on pert_result.full_spec.
+            assert pert_result.spec is not None, (
+                "PerturbativeResult.spec must be populated. See #276."
+            )
+            spec = pert_result.spec
+            log(
+                f"Perturbative layout swap: full-spec fields={len(pert_result.full_spec.equations) if pert_result.full_spec else '?'} "
+                f"→ base-spec fields={len(spec.equations)} "
+                f"(demoted constraints: "
+                f"{sum(1 for e in spec.equations if e.time_derivative_order == 0)})"
+            )
             validity = pert_result.validity
-            if validity.get("warn_level") == "warn":
+            corr_level = validity.get("correction_level", validity.get("warn_level"))
+            base_level = validity.get("base_level", "ok")
+            if corr_level == "warn":
                 _cwarn(
                     "Perturbative truncation validity: "
-                    f"ε·ω²·t_end ≈ {validity['validity_param']:.2g} > 0.1 "
+                    f"ε·ω·t_end ≈ {validity['validity_param']:.2g} > 0.1 "
                     f"(dominant parameter: {validity['dominant_parameter']!r}). "
                     "O(ε²) truncation error may exceed 10%. Consider a "
                     "smaller small-parameter, shorter t_end, or coarser grid.",
                 )
-            elif validity.get("warn_level") == "error":
+            elif corr_level == "error":
                 _cwarn(
                     "Perturbative truncation validity: "
-                    f"ε·ω²·t_end ≈ {validity['validity_param']:.2g} > 1.0 — "
+                    f"ε·ω·t_end ≈ {validity['validity_param']:.2g} > 1.0 — "
                     "the EFT regime is violated for this configuration. "
                     "Results should NOT be trusted. Reduce the small "
                     "parameter or shrink t_end / k_max.",
+                )
+            # R4.2 / #285: separate base-theory stability diagnostic.
+            if base_level == "warn":
+                _cwarn(
+                    "Base-theory stability: "
+                    f"max Re(λ)·t_end ≈ {validity['base_stability_param']:.2g} > 0 "
+                    f"(dominant: {validity.get('dominant_tachyon_field')!r}). "
+                    "The Pass 0 solution contains an exponentially growing "
+                    "mode (tachyon / Jeans / ghost). Pass 1 corrections on "
+                    "top of a diverging Pass 0 are not physically meaningful.",
+                )
+            elif base_level == "error":
+                _cwarn(
+                    "Base-theory stability: "
+                    f"max Re(λ)·t_end ≈ {validity['base_stability_param']:.2g} > 30 "
+                    f"(dominant: {validity.get('dominant_tachyon_field')!r}). "
+                    "Pass 0 will overflow double precision within the "
+                    "simulation window. Shorten t_end or fix the base-"
+                    "theory mass spectrum before re-running.",
                 )
         else:
             from tidal.solver.modal import solve_modal

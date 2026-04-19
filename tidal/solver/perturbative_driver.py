@@ -57,12 +57,26 @@ class PerturbativeResult:
     validity : dict
         Diagnostic metrics from :func:`_compute_validity`:
 
-        * ``"validity_param"`` — max_k( ε · ω² · t_end ) across all
-          small parameters and simulated modes. < 0.1 is safe, 1 is
-          the EFT-breakdown boundary.
-        * ``"omega_max"`` — maximum simulated frequency.
-        * ``"warn_level"`` — ``"ok"``, ``"warn"`` (> 0.1), or ``"error"``
-          (> 1.0).
+        * ``"validity_param"`` — ``max_k( ε · ω · t_end )`` across all
+          small parameters and simulated modes. The dimensionless
+          secular-phase-error bound. < 0.1 is safe, > 1 breaks the EFT.
+          R4.1 / #284 corrected this from the previous (over-counting)
+          ``ε·ω²·t`` formula.
+        * ``"omega_max"`` — maximum simulated frequency ``max|λ|`` (so
+          damped/tachyonic modes register at their full magnitude).
+        * ``"warn_level"`` — ``"ok"``, ``"warn"``, or ``"error"``.
+          The overall level is the worse of ``correction_level`` and
+          ``base_level``.
+        * ``"correction_level"`` — warn band for the secular-error
+          side only (R4.1 thresholds: 0.1, 1.0).
+        * ``"base_stability_param"`` — ``max Re(λ) · t_end``. A
+          strictly-positive value means the base theory has an
+          unstable mode (tachyon, Jeans, ghost). > 30 → overflow;
+          > 1e-10 → warn-level R4.2 / #285.
+        * ``"base_level"`` — warn band for the base-stability side.
+        * ``"max_real_lambda"`` — ``max Re(λ)`` across all blocks.
+        * ``"dominant_tachyon_field"`` — field/velocity slot owning
+          the most-positive ``Re(λ)`` (or None if base is stable).
         * ``"correction_drops"`` — list of diagnostic records for any
           correction terms or equations that ``_build_source_matrix_k``
           could not route (e.g. target field has no dynamical slot,
@@ -70,11 +84,27 @@ class PerturbativeResult:
           Empty list on a correct pipeline for every shipped JSON at
           shipped parameters; any non-empty list is a signal to
           investigate before trusting Pass 1 magnitudes.
+    spec : EquationSystem | None
+        The **base spec** (post-Gap-B demotion) whose layout matches
+        ``total["y"]`` and each ``orders[n]["y"]``. Callers that hand
+        ``total`` to :meth:`SimulationData.from_solver_result` must use
+        this spec, NOT the unreduced full spec — the demoted layout
+        has a different slot ordering and a reduced component set.
+        Pre-R2.2 the CLI silently rebound ``spec = solver.base_spec``
+        after the solve; the explicit attribute removes that workaround
+        (#276).
+    full_spec : EquationSystem | None
+        The unreduced spec as loaded from JSON (pre-Gap-B). Kept for
+        diagnostic purposes — e.g. inspecting original ``order_in_eps``
+        tags or reconstructing the promoted field's kinetic
+        coefficient.
     """
 
     orders: list[dict[str, Any]] = field(default_factory=list)
     total: dict[str, Any] = field(default_factory=dict)
     validity: dict[str, Any] = field(default_factory=dict)
+    spec: EquationSystem | None = None
+    full_spec: EquationSystem | None = None
 
 
 def _compute_validity(
@@ -85,24 +115,53 @@ def _compute_validity(
 ) -> dict[str, Any]:
     """Compute the iterative-expansion validity parameter.
 
-    See plan §"Validity condition in detail". The dominant error of the
-    O(ε¹) truncation accumulates linearly in time for TIDAL's linear
-    regime, yielding the criterion ``max(ε · ω² · t_end) ≪ 1``.
+    Secular phase accumulation bound (R4.1 / #284). For a mass-shift
+    correction ``-ε·φ`` on a base oscillator ``ω₀² = m² + k²``:
 
-    The maximum simulation frequency ``ω_max`` is estimated from the
-    largest imaginary eigenvalue across all modes and blocks — this
-    captures both the dispersion relation and any cross-coupling
-    mass shifts present in the base theory.
+    * Fractional frequency shift: ``δω/ω ≈ ε/(2ω²)``.
+    * Accumulated phase error over N oscillations (N ≈ ω·t_end/2π):
+      ``Δφ ≈ δω · t_end = ε·t_end/(2ω)``.
+    * Scaled to a dimensionless "fraction of period" for threshold
+      comparison: the relevant bound is ``ε · ω · t_end``, NOT
+      ``ε · ω² · t_end``. Pre-R4.1 the driver used the wrong formula,
+      which was conservative (over-triggers) for ``ω > 1`` and
+      dangerous (under-triggers) for ``ω < 1`` — low-frequency modes
+      could see real ``ε·t`` ≈ 1 while the reported score stayed
+      below 0.1.
+
+    ``ω_max`` is estimated from the largest absolute eigenvalue across
+    all modes and blocks (so damped/tachyonic modes contribute their
+    full magnitude via ``|λ|`` rather than ``|Im(λ)|``). R4.2 / #285
+    also computes a base-stability diagnostic from ``max Re(λ) · t_end``.
     """
     omega_max = 0.0
-    for block in eigendata.get("blocks", []):
+    max_real_lambda = 0.0
+    dominant_tachyon_block: int | None = None
+    dominant_tachyon_slot: int | None = None
+    for block_idx, block in enumerate(eigendata.get("blocks", [])):
         lam = block["D_diag"]  # (n_modes, bs) complex
-        # Use |λ| so damped/tachyonic modes (non-zero Re(λ)) register
-        # at their full magnitude.  Previously |Im(λ)| underestimated
-        # ω_max for theories with dissipation or with near-zero-mass
-        # fields where Re(λ) carries significant amplitude.
+        # |λ| so damped/tachyonic modes (non-zero Re(λ)) register at
+        # their full magnitude.
         omega_block = float(np.max(np.abs(lam)))
         omega_max = max(omega_max, omega_block)
+
+        # R4.2 / #285: track max Re(λ) per block for base-theory
+        # stability. A positive Re(λ) means the base Pass 0 solution
+        # grows exponentially (tachyon / unstable mode); no Pass 1
+        # correction can be meaningful on top of it.
+        real_lam = np.real(lam)
+        block_max_real = float(np.max(real_lam))
+        if block_max_real > max_real_lambda:
+            max_real_lambda = block_max_real
+            # Locate the (mode, slot) where the growth lives.
+            flat_idx = int(np.argmax(real_lam))
+            n_modes_block = real_lam.shape[0]
+            bs = real_lam.shape[1]
+            dominant_tachyon_block = block_idx
+            dominant_tachyon_slot = int(
+                block["slot_indices"][flat_idx % bs]  # slot within this block
+            )
+            _ = n_modes_block  # silence unused-var lint; retained for clarity
 
     params = dict(parameters or {})
     eps_values: dict[str, float] = {}
@@ -113,20 +172,54 @@ def _compute_validity(
     validity_param = 0.0
     dominant: str | None = None
     for name, val in eps_values.items():
-        score = abs(val) * omega_max**2 * float(t_end)
+        # R4.1 / #284: ε·ω·t_end (secular phase-error bound), not
+        # ε·ω²·t_end.
+        score = abs(val) * omega_max * float(t_end)
         if score > validity_param:
             validity_param = score
             dominant = name
 
-    # Warning bands. Thresholds match the plan's §"TIDAL's parameter
-    # space" table: WARN_THRESHOLD = 10% accumulated error,
-    # ERROR_THRESHOLD = full EFT breakdown.
+    # R4.2 / #285: base-theory stability parameter. exp(30) ≈ 1e13 so
+    # any base_growth > 30 means Pass 0 has already overflowed double
+    # precision within the simulation window.
+    base_growth = max_real_lambda * float(t_end)
+    # Warning bands on the secular-error side.
     if validity_param > _VALIDITY_ERROR_THRESHOLD:
-        warn_level = "error"
+        correction_level = "error"
     elif validity_param > _VALIDITY_WARN_THRESHOLD:
-        warn_level = "warn"
+        correction_level = "warn"
     else:
-        warn_level = "ok"
+        correction_level = "ok"
+
+    # Base-theory stability side. Thresholds: 30 = double-precision
+    # overflow; 1e-10 = numerical noise (floating-point residue of a
+    # nominally zero eigenvalue). Anything in between is a real but
+    # possibly physical instability (e.g. Jeans, tachyonic torsion)
+    # that needs user review before trusting Pass 1.
+    if base_growth > 30.0:
+        base_level = "error"
+    elif max_real_lambda > 1e-10:
+        base_level = "warn"
+    else:
+        base_level = "ok"
+
+    # Overall level = worst of the two diagnostics.
+    level_rank = {"ok": 0, "warn": 1, "error": 2}
+    warn_level = max((correction_level, base_level), key=lambda s: level_rank[s])
+
+    # Locate the tachyonic field name if one was found.
+    dominant_tachyon_field: str | None = None
+    if dominant_tachyon_slot is not None:
+        layout = eigendata.get("state_layout")
+        if layout is not None:
+            slot_to_name: dict[int, str] = {}
+            for name, slot in layout.field_slot_map.items():
+                slot_to_name[slot] = f"{name} (field slot)"
+            for name, slot in layout.velocity_slot_map.items():
+                slot_to_name[slot] = f"v_{name} (velocity slot)"
+            dominant_tachyon_field = slot_to_name.get(
+                dominant_tachyon_slot, f"slot {dominant_tachyon_slot}"
+            )
 
     return {
         "omega_max": omega_max,
@@ -134,6 +227,12 @@ def _compute_validity(
         "validity_param": validity_param,
         "dominant_parameter": dominant,
         "warn_level": warn_level,
+        "base_stability_param": base_growth,
+        "max_real_lambda": max_real_lambda,
+        "dominant_tachyon_field": dominant_tachyon_field,
+        "dominant_tachyon_block": dominant_tachyon_block,
+        "correction_level": correction_level,
+        "base_level": base_level,
     }
 
 
@@ -217,11 +316,18 @@ def _assemble_full_state_pass_n(
         pass_n_full[:, orig_si * num_points : (orig_si + 1) * num_points] = src
 
     # --- constraint slots: Schur-base recovery from y_hat_dyn ---
-    y_hat_dyn = pass_n_result.get("y_hat_dyn")
-    if y_hat_dyn is None or not c_names:
-        # Nothing to recover; constraint slots stay at zero. This is
-        # only a valid state when the correction spec leaves all
-        # constraint fields untouched (rare).
+    # y_hat_dyn is a required field on PerturbativePass1Result (#279);
+    # its absence here is a programming error, not a runtime condition.
+    assert "y_hat_dyn" in pass_n_result, (
+        "PerturbativePass1Result missing required 'y_hat_dyn' key. "
+        "See #279: this is a contract violation by solve_modal_pass1, "
+        "not a runtime fallback."
+    )
+    y_hat_dyn = pass_n_result["y_hat_dyn"]
+    if not c_names:
+        # Legitimate case: the base spec has no constraint fields, so
+        # there is nothing to Schur-recover. Constraint slots stay at
+        # zero (there aren't any in the full layout either).
         return pass_n_full
 
     # rfft output shape
@@ -410,8 +516,12 @@ class PerturbativeSolver:
                     pass0["t"],
                     parameters=parameters,
                 )
-                pass_n_drops = pass_n.get("correction_drops", []) or []
-                correction_drops.extend({**d, "pass": n} for d in pass_n_drops)
+                # correction_drops is a required field on
+                # PerturbativePass1Result (#279); tag each drop with its
+                # pass index for downstream diagnostics.
+                correction_drops.extend(
+                    {**d, "pass": n} for d in pass_n["correction_drops"]
+                )
                 # Assemble the full-layout state by mapping dynamical
                 # slots directly and recovering constraint slots via the
                 # Pass 0 Schur operator applied to y_hat_dyn.
@@ -458,4 +568,10 @@ class PerturbativeSolver:
                 f"{validity['warn_level']})"
             ),
         }
-        return PerturbativeResult(orders=orders, total=total, validity=validity)
+        return PerturbativeResult(
+            orders=orders,
+            total=total,
+            validity=validity,
+            spec=self.base_spec,
+            full_spec=self.full_spec,
+        )

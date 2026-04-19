@@ -27,6 +27,21 @@ class SolverResult(TypedDict):
     message: str
 
 
+class PerturbativePass1Result(SolverResult):
+    """Typed result dict for :func:`solve_modal_pass1`.
+
+    Extends :class:`SolverResult` with the two additional keys required
+    by the v6 perturbative driver's Gap C constraint recovery and #272
+    silent-drop diagnostics. Using a dedicated TypedDict (rather than
+    a `# type: ignore` on key injection into SolverResult) lets
+    downstream callers typo-check field access and removes the silent
+    `result.get("y_hat_dyn")` defensive-None path.
+    """
+
+    y_hat_dyn: NDArray[np.complex128]
+    correction_drops: list[dict[str, object]]
+
+
 # System size thresholds for linear solver selection.
 # Dense Jacobian at N=2000: N^2 * 8 = 32 MB (safe for all environments).
 # Sparse (SuperLU_MT) scales well up to ~200K state variables.

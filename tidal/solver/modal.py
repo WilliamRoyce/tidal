@@ -2242,6 +2242,28 @@ def solve_modal(
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
 
+    # R3.2 / #278: solve_modal's companion-matrix builder assumes
+    # time_derivative_order <= 2 on every equation. The `d4_t` and
+    # `mixed_T4_*` operators in ``_EXACT_MULTIPLIERS`` exist for
+    # _build_source_matrix_k (correction spec only) and must never
+    # reach here in the base spec — if they do, the eigendecomposition
+    # would silently operate on a truncated system. Fail loudly.
+    max_to = max((eq.time_derivative_order for eq in spec.equations), default=0)
+    if max_to > 2:
+        high_fields = [
+            eq.field_name for eq in spec.equations if eq.time_derivative_order > 2
+        ]
+        msg = (
+            f"solve_modal requires time_derivative_order <= 2 on every "
+            f"equation; got max={max_to} on field(s) {high_fields}. Use "
+            f"PerturbativeSolver.solve() with a [perturbation] section "
+            f"in theory.toml so base_spec() demotes higher-derivative "
+            f"LHS kinetics to algebraic constraints before they reach "
+            f"the modal backend. See "
+            f"docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md."
+        )
+        raise ValueError(msg)
+
     layout = StateLayout.from_spec(spec, grid.num_points)
     coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
 
@@ -2821,7 +2843,7 @@ def solve_modal_pass1(
     t_eval: NDArray[np.float64],
     *,
     parameters: dict[str, float] | None = None,
-) -> SolverResult:
+) -> PerturbativePass1Result:
     """Solve the Pass 1 correction  dy⁽¹⁾/dt = A·y⁽¹⁾ + M_src·y⁰(t).
 
     Reuses ``eigendata`` from a prior ``solve_modal(..., return_eigendata=True)``
@@ -2851,13 +2873,16 @@ def solve_modal_pass1(
 
     Returns
     -------
-    SolverResult
-        ``t``, ``y``, ``success``, ``message``. ``y`` is the Pass 1
-        correction in physical space (reduced/dynamical layout). An
-        additional ``"y_hat_dyn"`` key carries the Fourier-space
-        dynamical output with shape ``(n_snapshots, n_slots, n_modes)``
-        — consumed by :func:`PerturbativeSolver` to recover constraint
-        fields via Schur (v6 Gap C).
+    PerturbativePass1Result
+        ``t``, ``y``, ``success``, ``message`` (from SolverResult) plus:
+
+        * ``y_hat_dyn`` — Fourier-space dynamical output with shape
+          ``(n_snapshots, n_slots, n_modes)``. Consumed by
+          :func:`PerturbativeSolver` to recover constraint fields via
+          Schur (v6 Gap C).
+        * ``correction_drops`` — diagnostic records for any correction
+          terms or equations that could not be routed. Aggregated by
+          the driver onto ``PerturbativeResult.validity`` (#272).
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
 
@@ -2901,15 +2926,12 @@ def solve_modal_pass1(
         eigendata, M_src_k, t_eval, layout, grid
     )
 
-    result: SolverResult = {
+    result: PerturbativePass1Result = {
         "t": times,
         "y": y_phys,
         "success": True,
         "message": "Pass 1 closed-form Duhamel (v6 Stage 4)",
+        "y_hat_dyn": y_hat_dyn,
+        "correction_drops": correction_drops,
     }
-    # Fourier-space dynamical output (for Gap C constraint recovery).
-    result["y_hat_dyn"] = y_hat_dyn  # type: ignore[typeddict-unknown-key]
-    # Diagnostic list of dropped correction terms (consumed by the
-    # PerturbativeSolver driver to populate validity["correction_drops"]).
-    result["correction_drops"] = correction_drops  # type: ignore[typeddict-unknown-key]
     return result

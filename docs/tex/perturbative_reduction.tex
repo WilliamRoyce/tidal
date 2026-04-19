@@ -41,9 +41,10 @@ The crucial property is that the LHS operator at every order is always the \emph
 \paragraph{Validity conditions.} Two complementary criteria, derived from the Parker--Simon analysis and the Figueras--Kovacs--Yao (2025)~\cite{FKY2025} rigorous error bound:
 \begin{enumerate}
   \item \textbf{Instantaneous}: $\omega \ll m_{\mathrm{scalaron}} \sim 1/\sqrt{\varepsilon}$. The heavy mode associated with the higher-derivative correction is not excited at simulation frequencies.
-  \item \textbf{Cumulative (secular growth)}: $\varepsilon \cdot \omega^2 \cdot t_{\mathrm{end}} \ll 1$. Controls the linear-in-time accumulation of the $O(\varepsilon^2)$ truncation error.
+  \item \textbf{Cumulative (secular growth)}: $\varepsilon \cdot \omega \cdot t_{\mathrm{end}} \ll 1$. The fractional frequency shift from a mass-shift correction $-\varepsilon \phi$ is $\delta\omega/\omega \approx \varepsilon/(2\omega^2)$; integrating over the run gives an accumulated phase error $\Delta\phi \approx \varepsilon \cdot t_{\mathrm{end}}/(2\omega)$, which becomes $\varepsilon \cdot \omega \cdot t_{\mathrm{end}}$ when scaled to a dimensionless fraction-of-period for threshold comparison. (Issue \#284 corrected the implementation from an earlier $\varepsilon \cdot \omega^2 \cdot t_{\mathrm{end}}$ over-counting that was safe at $\omega > 1$ but dangerously permissive at $\omega < 1$.)
+  \item \textbf{Base-theory stability}: $\max \operatorname{Re}(\lambda) \cdot t_{\mathrm{end}}$. Independent of the truncation error; if the base theory has an unstable mode (tachyon, Jeans, ghost), the Pass 0 solution itself diverges and no Pass 1 correction is physically meaningful. Issue \#285 added this as a separate diagnostic; thresholds $>\!10^{-10}$ (warn) and $>\!30$ (overflow).
 \end{enumerate}
-The TIDAL validity monitor computes $\max_{\mathrm{modes}}(\varepsilon \cdot |\lambda|^2 \cdot t_{\mathrm{end}})$ from the Pass 0 eigendata and warns when the result exceeds $0.1$ (10\% accumulated error) or $1.0$ (full EFT breakdown).
+The TIDAL validity monitor computes $\max_{\mathrm{modes}}(\varepsilon \cdot |\lambda| \cdot t_{\mathrm{end}})$ from the Pass 0 eigendata for the secular-error side, plus $\max \operatorname{Re}(\lambda) \cdot t_{\mathrm{end}}$ for the base-stability side. The overall \texttt{warn\_level} returned on \texttt{PerturbativeResult.validity} is the worse of the two. Thresholds are $0.1$ (10\% accumulated error) and $1.0$ (full EFT breakdown) on the correction side.
 
 \subsection{Constraint-Field Promotion and LHS Demotion}
 \label{sec:pr-gap-b}
