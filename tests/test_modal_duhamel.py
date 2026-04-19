@@ -463,3 +463,82 @@ class TestCrossBlockCouplingRaises:
                 pass0["t"],
                 parameters={"mPhi2": 1.0, "mChi2": 2.0, "eps": 0.05},
             )
+
+    def test_cross_block_guard_tolerates_schur_tail_noise(self) -> None:
+        """v6 R1.4 / #275: the guard uses a scale-relative threshold.
+
+        Absolute 1e-14 is below double-precision roundoff of compound
+        operations like ``coeff * mult[m] * recovery_matrix[m, c_idx, :]``.
+        Schur-recovering constraint fields on ill-conditioned S_cc can
+        legitimately produce O(1e-12) tail noise in off-block columns;
+        that should NOT raise. Only coupling magnitudes meaningfully
+        above roundoff (relative to max|M_src|) are genuine.
+
+        Direct unit test: craft an M_src matrix where the off-block
+        tail noise is below ``max|M_src| * 1e-10`` and verify the
+        guard stays silent.
+        """
+        from tidal.solver.modal import (
+            _evolve_duhamel_per_mode,
+        )
+
+        # Base spec: two independent KG fields → two eigenblocks.
+        base_data = copy.deepcopy(_CROSS_BLOCK_SPEC)
+        # Strip the order-1 coupling so the base spec is actually 2
+        # independent blocks.
+        phi_eq = base_data["equations"][0]  # type: ignore[index]
+        phi_eq["rhs"]["terms"] = [  # type: ignore[index]
+            t for t in phi_eq["rhs"]["terms"] if t.get("order_in_eps", 0) == 0
+        ]
+        base_spec = _make_spec(base_data)
+        n_grid = 16
+        length = 2 * np.pi
+        grid = GridInfo(shape=(n_grid,), bounds=((0.0, length),), periodic=(True,))
+        layout = StateLayout.from_spec(base_spec, grid.num_points)
+
+        x = np.linspace(0.0, length, n_grid, endpoint=False)
+        # Non-zero IC on BOTH fields so both blocks survive the zero-IC
+        # pruning in solve_modal (otherwise chi_0's block is dropped).
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:n_grid] = np.sin(x)  # phi_0
+        y0[2 * n_grid : 3 * n_grid] = 0.5 * np.sin(x)  # chi_0
+
+        pass0 = cast(
+            "dict[str, Any]",
+            solve_modal(
+                base_spec,
+                grid,
+                y0,
+                t_span=(0.0, 0.5),
+                parameters={"mPhi2": 1.0, "mChi2": 2.0},
+                num_snapshots=3,
+                return_eigendata=True,
+            ),
+        )
+
+        # Hand-craft M_src_k with legitimate in-block source + tiny
+        # off-block tail noise from a hypothetical Schur recovery.
+        eigendata = pass0["eigendata"]
+        n_slots = layout.num_slots
+        rfft_last = grid.shape[-1] // 2 + 1
+        n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
+        m_src = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
+        blocks = eigendata["blocks"]
+        assert len(blocks) >= 2, (
+            f"Need two independent blocks for this test; got {len(blocks)}"
+        )
+        b0_idx = int(blocks[0]["slot_indices"][0])
+        b1_idx = int(blocks[1]["slot_indices"][0])
+        m_src[:, b0_idx, b0_idx] = 0.1  # in-block source, magnitude 0.1
+        m_src[:, b0_idx, b1_idx] = 1e-13  # off-block tail noise
+        # max_scale = 0.1, atol = max(1e-14, 0.1 * 1e-10) = 1e-11.
+        # cross = 1e-13 < 1e-11 → guard must NOT raise.
+
+        t_eval = pass0["t"]
+        _ = _evolve_duhamel_per_mode(eigendata, m_src, t_eval, layout, grid)
+
+        # Regression: bumping the tail to well above the relative
+        # threshold re-triggers the guard.
+        m_src[:, b0_idx, b1_idx] = 1e-3  # ratio 1e-2 > 1e-10 → must raise
+        with pytest.raises(NotImplementedError, match="[Cc]ross-block"):
+            _evolve_duhamel_per_mode(eigendata, m_src, t_eval, layout, grid)

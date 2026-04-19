@@ -63,6 +63,13 @@ class PerturbativeResult:
         * ``"omega_max"`` — maximum simulated frequency.
         * ``"warn_level"`` — ``"ok"``, ``"warn"`` (> 0.1), or ``"error"``
           (> 1.0).
+        * ``"correction_drops"`` — list of diagnostic records for any
+          correction terms or equations that ``_build_source_matrix_k``
+          could not route (e.g. target field has no dynamical slot,
+          or equation is for a demoted constraint field — see #272).
+          Empty list on a correct pipeline for every shipped JSON at
+          shipped parameters; any non-empty list is a signal to
+          investigate before trusting Pass 1 magnitudes.
     """
 
     orders: list[dict[str, Any]] = field(default_factory=list)
@@ -322,6 +329,9 @@ class PerturbativeSolver:
         ValueError
             If ``order`` exceeds the maximum ``order_in_eps`` carried by
             the spec.
+        NotImplementedError
+            If ``order >= 2`` — Pass 2 against ``q¹(t)`` is not yet
+            implemented. See #273.
         """
         if order > self._max_order:
             msg = (
@@ -330,6 +340,21 @@ class PerturbativeSolver:
                 f"a larger truncation or lower --perturbative-order."
             )
             raise ValueError(msg)
+        if order >= 2:
+            # The current driver passes Pass 0 eigendata (and Pass 0
+            # amplitudes α) to solve_modal_pass1 at every iteration. For
+            # Pass 2 the Duhamel integral needs to act on q¹(t) as the
+            # IC-analogue — q¹ is itself a Duhamel integral, not an
+            # eigenmode superposition. Supporting order >= 2 requires
+            # a formal extension of the Pass 1 amplitude contract; see
+            # #273.
+            msg = (
+                "PerturbativeSolver.solve() currently supports order=0 "
+                "and order=1 only. order >= 2 requires Pass 2 Duhamel "
+                "against q¹(t), which needs a new IC-amplitude contract "
+                "and is not yet implemented. Tracked in #273."
+            )
+            raise NotImplementedError(msg)
 
         # Pass 0 — base evolution + eigendata capture for Pass 1.
         pass0 = cast(
@@ -347,6 +372,7 @@ class PerturbativeSolver:
 
         orders: list[dict[str, Any]] = [pass0]
         total_y = pass0["y"].copy()
+        correction_drops: list[dict[str, Any]] = []
 
         if order >= 1 and self.has_corrections():
             from tidal.solver.state import StateLayout  # noqa: PLC0415
@@ -384,6 +410,8 @@ class PerturbativeSolver:
                     pass0["t"],
                     parameters=parameters,
                 )
+                pass_n_drops = pass_n.get("correction_drops", []) or []
+                correction_drops.extend({**d, "pass": n} for d in pass_n_drops)
                 # Assemble the full-layout state by mapping dynamical
                 # slots directly and recovering constraint slots via the
                 # Pass 0 Schur operator applied to y_hat_dyn.
@@ -416,6 +444,9 @@ class PerturbativeSolver:
                 "dominant_parameter": None,
                 "warn_level": "ok",
             }
+        # v6 R1.1 (#272): surface all skipped correction terms so the
+        # CLI / caller can see when Pass 1 silently misses contributions.
+        validity["correction_drops"] = correction_drops
 
         total: dict[str, Any] = {
             "t": pass0["t"],

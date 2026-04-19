@@ -123,6 +123,42 @@ class TestPerturbativeSolverAPI:
                 y0, grid, (0.0, 1.0), order=2, parameters={"m2": 1.0, "eps": 0.05}
             )
 
+    def test_gate_order2_raises_not_implemented(self) -> None:
+        """Even when the spec carries order_in_eps=2 terms, order>=2 is not
+        yet implemented (Pass 2 Duhamel against q¹ missing — #273). We
+        must raise NotImplementedError loudly rather than silently reuse
+        Pass 0 eigendata at every iteration.
+        """
+        data = copy.deepcopy(_KG_WITH_EPS)
+        # Add an order_in_eps=2 term so max_order = 2.
+        terms = data["equations"][0]["rhs"]["terms"]  # type: ignore[index]
+        terms.append(
+            {
+                "coefficient": -1.0,
+                "operator": "identity",
+                "field": "phi_0",
+                "coefficient_symbolic": "-eps2",
+                "order_in_eps": 2,
+            }
+        )
+        data["metadata"]["perturbation"] = {  # type: ignore[index]
+            "small_parameters": ["eps", "eps2"],
+            "order": 2,
+        }
+        spec = _make_spec(data)
+        solver = PerturbativeSolver(spec)
+        assert solver.max_order == 2
+        grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        y0 = _make_ic(spec, grid)
+        with pytest.raises(NotImplementedError, match="#273"):
+            solver.solve(
+                y0,
+                grid,
+                (0.0, 1.0),
+                order=2,
+                parameters={"m2": 1.0, "eps": 0.01, "eps2": 0.001},
+            )
+
 
 class TestPerturbativeSolverSolve:
     @pytest.fixture

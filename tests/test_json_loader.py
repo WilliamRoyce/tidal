@@ -719,6 +719,37 @@ class TestEquationSystemBaseSpec:
         assert h_meta.time_derivative_order == 0
         assert h_expl.time_derivative_order == 0
 
+    def test_base_spec_recomputes_matrices(self) -> None:
+        """After demotion base_spec must return matrices matching its equations
+        (v6 R1.3 / #274). Without the recompute, __post_init__ fires a
+        UserWarning on every call because the cached matrices are stale,
+        and downstream consumers reading spec.mass_matrix get full-spec
+        values that no longer correspond to the demoted algebraic form.
+        """
+        import warnings
+
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+
+        # Demotion itself must not trigger __post_init__'s consistency
+        # warning — pre-R1.3 it always did because the cached matrices
+        # (computed from the full spec) didn't match the demoted
+        # equations with their prepended ``1 * identity(self)`` term.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            base = spec.base_spec(["b5"])
+
+        # The base_spec matrices must be internally consistent with the
+        # demoted equations.
+        expected_mass, expected_coupling, _, _ = base._compute_matrices_from_terms(
+            base.equations, base.component_names, parameters=None
+        )
+        assert base.mass_matrix == expected_mass
+        assert base.coupling_matrix == expected_coupling
+
+        # Confirm Gap B actually fired (h was demoted).
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 0
+
 
 # === Schema Validation Tests ===
 

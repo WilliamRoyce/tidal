@@ -2532,7 +2532,7 @@ def _build_source_matrix_k(
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
     schur_ops: dict[str, Any] | None = None,
-) -> NDArray[np.complex128]:
+) -> tuple[NDArray[np.complex128], list[dict[str, Any]]]:
     """Build M_src(k) for Pass 1: correction RHS as a linear source on the
     Pass 0 state.
 
@@ -2550,6 +2550,18 @@ def _build_source_matrix_k(
 
     ``correction_spec`` is typically ``spec.filter_by_order(n)`` for the
     Pass ``n`` correction (v6 plan, Stage 4).
+
+    Returns
+    -------
+    M_src : complex ndarray of shape ``(n_modes, n_slots, n_slots)``
+    drops : list of diagnostic records
+        Each entry describes a correction term or equation whose
+        contribution was NOT written into ``M_src`` because either
+        (a) the equation is for a demoted constraint field (row skip;
+        Gap C recovery does not cover source contributions to the
+        constraint's own equation — dropped at O(ε¹), see #272), or
+        (b) the target field reference could not be resolved to a
+        dynamical or Schur-recoverable slot (column skip).
     """
     n_slots = layout.num_slots
     n_modes = int(np.prod(rfft_shape))
@@ -2589,20 +2601,47 @@ def _build_source_matrix_k(
             multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
 
     M_src = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
+    drops: list[dict[str, Any]] = []
 
     for eq_idx, eq in enumerate(correction_spec.equations):
         field_name = eq.field_name
         # Identify row
         if eq.time_derivative_order >= 2:
             if field_name not in layout.velocity_slot_map:
-                # Equation for a field not in the reduced dynamical layout
-                # — constraint-field correction equations land here. Handled
-                # separately by the Pass 1 constraint recovery step; skip.
+                # Equation for a field not in the reduced dynamical layout.
+                # This is the "correction on a demoted constraint field"
+                # case: Gap C recovery reconstructs h_c = recovery @ y_dyn,
+                # but does NOT include source contributions to the
+                # constraint's own equation (that would be an O(ε²)
+                # augmentation, see v6 plan Stage 4). Log and drop.
+                drops.append(
+                    {
+                        "field": field_name,
+                        "operator": None,
+                        "reason": "row-missing: equation is for demoted constraint field; "
+                        "Gap C recovery does not cover source contributions to the "
+                        "constraint's own equation (O(ε²), dropped at order 1, see #272)",
+                        "eq_idx": eq_idx,
+                        "term_idx": None,
+                        "n_terms": len(eq.rhs_terms),
+                    }
+                )
                 continue
             row_slot = layout.velocity_slot_map[field_name]
         elif field_name in layout.field_slot_map:
             row_slot = layout.field_slot_map[field_name]
         else:
+            drops.append(
+                {
+                    "field": field_name,
+                    "operator": None,
+                    "reason": "row-missing: first-order equation for field not in "
+                    "base-spec dynamical layout",
+                    "eq_idx": eq_idx,
+                    "term_idx": None,
+                    "n_terms": len(eq.rhs_terms),
+                }
+            )
             continue
 
         for term_idx, term in enumerate(eq.rhs_terms):
@@ -2624,10 +2663,25 @@ def _build_source_matrix_k(
                 term_contrib = coeff * mult[:, None] * recovery_matrix[:, c_idx, :]
                 M_src[:, row_slot, :] += term_contrib
             else:
-                # Unknown target — skip but warn once at the call site.
+                # Target field reference cannot be resolved — either
+                # references a demoted field's velocity slot or an
+                # unknown name. Record it so the driver surfaces the
+                # drop on PerturbativeResult.validity (#272).
+                drops.append(
+                    {
+                        "field": term.field,
+                        "operator": term.operator,
+                        "reason": "column-missing: target field has no dynamical "
+                        "slot and is not a Schur-recoverable constraint (likely "
+                        "a demoted field's velocity slot, v_<field>)",
+                        "eq_idx": eq_idx,
+                        "term_idx": term_idx,
+                        "row_field": field_name,
+                    }
+                )
                 continue
 
-    return M_src
+    return M_src, drops
 
 
 def _evolve_duhamel_per_mode(
@@ -2697,19 +2751,33 @@ def _evolve_duhamel_per_mode(
         # this block but columns outside it. If so, the decoupled
         # block-eigenbasis ansatz is wrong. Raise early rather than
         # silently produce garbage.
+        #
+        # v6 R1.4 (#275): use a scale-relative threshold. Absolute 1e-14
+        # is below double-precision roundoff of compound operations like
+        # ``coeff * mult[m] * recovery_matrix[m, c_idx, :]``. An
+        # ill-conditioned Schur recovery on multi-constraint specs can
+        # legitimately write O(1e-12) tail noise into off-block
+        # columns. The guard should fire on genuinely non-zero
+        # cross-block contributions, not on numerical tail.
         full_rows = M_src_k[:, idx, :]  # (n_modes, bs, n_slots)
         mask = np.ones(n_slots, dtype=bool)
         mask[idx] = False
         cross = full_rows[:, :, mask]
-        if cross.size > 0 and np.max(np.abs(cross)) > 1e-14:
-            msg = (
-                "Pass 1 source matrix couples blocks that Pass 0 "
-                "eigendecomposed independently. Cross-block Duhamel is "
-                "not yet implemented — the correction theory likely "
-                "mixes previously-independent sectors, which Pass 0 "
-                "cannot represent. Report this spec to the TIDAL team."
-            )
-            raise NotImplementedError(msg)
+        if cross.size > 0:
+            m_scale = float(np.max(np.abs(M_src_k))) if M_src_k.size else 1.0
+            atol = max(1e-14, m_scale * 1e-10)
+            if np.max(np.abs(cross)) > atol:
+                msg = (
+                    f"Pass 1 source matrix couples blocks that Pass 0 "
+                    f"eigendecomposed independently "
+                    f"(max|cross|={np.max(np.abs(cross)):.3e} > "
+                    f"{atol:.3e}). Cross-block Duhamel is not yet "
+                    f"implemented — the correction theory likely mixes "
+                    f"previously-independent sectors, which Pass 0 "
+                    f"cannot represent. Report this spec to the TIDAL "
+                    f"team."
+                )
+                raise NotImplementedError(msg)
 
         # β = V⁻¹ · M_sub · V, shape (n_modes, bs, bs)
         beta = np.einsum("mij,mjk,mkl->mil", v_inv, M_sub, v_mat)
@@ -2805,7 +2873,7 @@ def solve_modal_pass1(
     rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
     rfft_shape = tuple(rfft_shape_list)
 
-    M_src_k = _build_source_matrix_k(
+    M_src_k, correction_drops = _build_source_matrix_k(
         correction_spec,
         layout,
         coeff_eval,
@@ -2813,6 +2881,21 @@ def solve_modal_pass1(
         rfft_shape,
         schur_ops=eigendata.get("schur_ops"),
     )
+
+    if correction_drops:
+        import logging  # noqa: PLC0415
+
+        logger = logging.getLogger(__name__)
+        for d in correction_drops:
+            logger.warning(
+                "Pass 1 correction drop: field=%r operator=%r reason=%s "
+                "(eq_idx=%s, term_idx=%s). See #272.",
+                d.get("field"),
+                d.get("operator"),
+                d.get("reason"),
+                d.get("eq_idx"),
+                d.get("term_idx"),
+            )
 
     times, y_phys, y_hat_dyn = _evolve_duhamel_per_mode(
         eigendata, M_src_k, t_eval, layout, grid
@@ -2826,4 +2909,7 @@ def solve_modal_pass1(
     }
     # Fourier-space dynamical output (for Gap C constraint recovery).
     result["y_hat_dyn"] = y_hat_dyn  # type: ignore[typeddict-unknown-key]
+    # Diagnostic list of dropped correction terms (consumed by the
+    # PerturbativeSolver driver to populate validity["correction_drops"]).
+    result["correction_drops"] = correction_drops  # type: ignore[typeddict-unknown-key]
     return result
