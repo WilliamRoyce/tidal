@@ -60,19 +60,25 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 
 ---
 
-## Stage 2: Python JSON-loader order_in_eps support
+## Stage 2: Python JSON-loader order_in_eps support — COMPLETE
 
 **Goal**: Propagate `order_in_eps` from JSON into `OperatorTerm` and provide filtering on `EquationSystem`.
 
-**Estimated**: 1 day.
+**Estimated**: 1 day. **Actual**: <1 day (2026-04-19).
 
 ### Tasks
 
-- [ ] **2.1** Add `order_in_eps: int = 0` field to `OperatorTerm` dataclass in `tidal/symbolic/json_loader.py`.
-- [ ] **2.2** Parse `order_in_eps` from JSON in `OperatorTerm.from_dict` (default 0 for backward compat).
-- [ ] **2.3** Add `EquationSystem.filter_by_order(n: int) -> EquationSystem` returning copy with only `order_in_eps == n` terms.
-- [ ] **2.4** Add `EquationSystem.max_order() -> int` and `has_corrections() -> bool`.
-- [ ] **2.5** Unit tests in `tests/test_json_loader.py` with synthetic mixed-order fixtures — verify round-trip, filter_by_order, has_corrections.
+- [x] **2.1** Added `order_in_eps: int = 0` field to `OperatorTerm` dataclass in `tidal/symbolic/json_loader.py:219`. Documented in the docstring.
+- [x] **2.2** `OperatorTerm.from_dict` parses `order_in_eps` with `.get("order_in_eps", 0)` default for backward compat with pre-v6 JSONs.
+- [x] **2.3** `EquationSystem.filter_by_order(n)` at `json_loader.py:1144`: returns a copy of the system with each equation's `rhs_terms` filtered to those matching `order_in_eps == n`. Preserves equations and LHS structure so the state layout is unaffected.
+- [x] **2.4** Added `EquationSystem.max_order() -> int` and `has_corrections() -> bool`.
+- [x] **2.5** Tests: `TestOperatorTerm::test_order_in_eps_{default_zero,parsed_from_json,second_order,direct_construction}` and `TestEquationSystemOrderInEps::{test_has_corrections_baseline_false, test_has_corrections_true_with_mixed_orders, test_filter_by_order_zero_keeps_base_terms_only, test_filter_by_order_one_keeps_correction_terms_only, test_filter_by_order_preserves_immutability, test_filter_by_order_empty_high_order}`. Synthetic `_mixed_order_spec_data()` fixture mirrors the R̃² PGT structure (base + b₅ correction source).
+- Side-fix: updated `tests/test_wls_helpers.py::TestWlZeroComponent` to match Stage 0 dual-application (lagComp block added to output).
+
+### Smoke tests (2026-04-19)
+
+- `uv run pytest tests/test_json_loader.py -x -q` → 105 passed.
+- `uv run pytest tests/ -x -q --ignore=tests/integration` → 1811 passed, 66 skipped (full Python suite, no regressions).
 
 ---
 

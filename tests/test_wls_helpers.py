@@ -107,11 +107,20 @@ class TestWlDiagMatrix:
 
 class TestWlZeroComponent:
     def test_produces_lines(self) -> None:
+        # Default (apply_to_lagrangian=True): emits the fieldEquations rule
+        # plus an If[ValueQ[lagComp], ...] block for Phase C / Phase D
+        # consistency.
         lines = wl_zero_component("geH0", "h", "temporal")
-        assert len(lines) == 4
-        assert "fieldEquations" in lines[1]
-        assert "geH0[args___] :> 0" in lines[1]
-        assert "Derivative[ders__][geH0][args___] :> 0" in lines[1]
+        assert any("fieldEquations" in L for L in lines)
+        assert any("geH0[args___] :> 0" in L for L in lines)
+        assert any("Derivative[ders__][geH0][args___] :> 0" in L for L in lines)
+        assert any("ValueQ[lagComp]" in L for L in lines)
+
+    def test_apply_to_lagrangian_false(self) -> None:
+        """When apply_to_lagrangian=False, no lagComp block is emitted."""
+        lines = wl_zero_component("geH0", "h", "temporal", apply_to_lagrangian=False)
+        assert not any("ValueQ[lagComp]" in L for L in lines)
+        assert any("fieldEquations" in L for L in lines)
 
 
 class TestValidateWlsBrackets:

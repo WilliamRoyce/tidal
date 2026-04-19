@@ -213,6 +213,45 @@ class TestOperatorTerm:
         term = OperatorTerm(1.0, "laplacian", "phi")
         assert not term.position_dependent
 
+    # === order_in_eps (v6 perturbative reduction, Stage 2) ===
+
+    def test_order_in_eps_default_zero(self) -> None:
+        """Omitted order_in_eps defaults to 0 (backward compat)."""
+        data = {"coefficient": 1.0, "operator": "laplacian", "field": "phi"}
+        term = OperatorTerm.from_dict(data)
+        assert term.order_in_eps == 0
+
+    def test_order_in_eps_parsed_from_json(self) -> None:
+        """Explicit order_in_eps in JSON round-trips as int."""
+        data = {
+            "coefficient": 2.0,
+            "operator": "laplacian",
+            "field": "phi",
+            "coefficient_symbolic": "2*b5",
+            "order_in_eps": 1,
+        }
+        term = OperatorTerm.from_dict(data)
+        assert term.order_in_eps == 1
+
+    def test_order_in_eps_second_order(self) -> None:
+        """Second-order terms carry order_in_eps=2 through the loader."""
+        data = {
+            "coefficient": 1.0,
+            "operator": "identity",
+            "field": "phi",
+            "coefficient_symbolic": "b5^2",
+            "order_in_eps": 2,
+        }
+        term = OperatorTerm.from_dict(data)
+        assert term.order_in_eps == 2
+
+    def test_order_in_eps_direct_construction(self) -> None:
+        """Direct constructor accepts order_in_eps with default 0."""
+        t0 = OperatorTerm(1.0, "identity", "phi")
+        assert t0.order_in_eps == 0
+        t1 = OperatorTerm(1.0, "identity", "phi", order_in_eps=1)
+        assert t1.order_in_eps == 1
+
 
 # === ComponentEquation Tests ===
 
@@ -347,6 +386,129 @@ class TestEquationSystem:
                 coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
                 metadata={},
             )
+
+
+# === Perturbative-order filtering (v6 plan, Stage 2) ===
+
+
+def _mixed_order_spec_data() -> dict[str, Any]:
+    """Synthetic 2-field JSON with mixed-order RHS terms.
+
+    phi has one order-0 term (laplacian) + one order-1 correction
+    (identity with coefficient b5).  chi has only order-0 terms.  This
+    mirrors the structure of the R̃² PGT after order tagging: base
+    dynamics + O(b5) correction source, across one dynamical and one
+    cross-coupled equation.
+    """
+    return {
+        "metadata": {"source": "xAct", "lagrangian_expr": "synthetic"},
+        "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+        "fields": [
+            {"name": "phi", "index": 0, "is_dynamical": True},
+            {"name": "chi", "index": 1, "is_dynamical": True},
+        ],
+        "equations": [
+            {
+                "field": "phi",
+                "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "identity",
+                            "field": "phi",
+                            "coefficient_symbolic": "-b5",
+                            "order_in_eps": 1,
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "chi",
+                "lhs": {"expression": "d2_t(chi)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "chi"},
+                    ],
+                },
+            },
+        ],
+        "coupling": {},
+    }
+
+
+class TestEquationSystemOrderInEps:
+    """Tests for filter_by_order / max_order / has_corrections (v6 Stage 2)."""
+
+    def test_has_corrections_baseline_false(self, kg_json_data: dict[str, Any]) -> None:
+        """A theory with no order-tagged terms reports no corrections."""
+        spec = EquationSystem.from_dict(kg_json_data)
+        assert spec.has_corrections() is False
+        assert spec.max_order() == 0
+
+    def test_has_corrections_true_with_mixed_orders(self) -> None:
+        """Mixed-order spec reports corrections and max_order."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        assert spec.has_corrections() is True
+        assert spec.max_order() == 1
+
+    def test_filter_by_order_zero_keeps_base_terms_only(self) -> None:
+        """filter_by_order(0) drops correction terms, keeps base."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        base = spec.filter_by_order(0)
+
+        # Structure preserved
+        assert base.n_components == spec.n_components
+        assert base.component_names == spec.component_names
+        assert len(base.equations) == 2
+
+        # phi equation: only laplacian survives
+        phi_eq = base.equations[0]
+        assert len(phi_eq.rhs_terms) == 1
+        assert phi_eq.rhs_terms[0].operator == "laplacian"
+        assert phi_eq.rhs_terms[0].order_in_eps == 0
+
+        # chi equation: both base terms retained
+        chi_eq = base.equations[1]
+        assert len(chi_eq.rhs_terms) == 1
+        assert chi_eq.rhs_terms[0].operator == "laplacian"
+
+        # Filtered spec reports no residual corrections
+        assert base.has_corrections() is False
+
+    def test_filter_by_order_one_keeps_correction_terms_only(self) -> None:
+        """filter_by_order(1) keeps only the b5-sourced correction."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        correction = spec.filter_by_order(1)
+
+        # phi equation: the b5 identity term survives
+        phi_eq = correction.equations[0]
+        assert len(phi_eq.rhs_terms) == 1
+        assert phi_eq.rhs_terms[0].operator == "identity"
+        assert phi_eq.rhs_terms[0].order_in_eps == 1
+        assert phi_eq.rhs_terms[0].coefficient_symbolic == "-b5"
+
+        # chi equation: no order-1 terms, rhs_terms is empty tuple
+        chi_eq = correction.equations[1]
+        assert chi_eq.rhs_terms == ()
+
+    def test_filter_by_order_preserves_immutability(self) -> None:
+        """filter_by_order returns a new EquationSystem without mutating."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        original_phi_term_count = len(spec.equations[0].rhs_terms)
+        _ = spec.filter_by_order(0)
+        assert len(spec.equations[0].rhs_terms) == original_phi_term_count
+
+    def test_filter_by_order_empty_high_order(self) -> None:
+        """filter_by_order(n) with no such terms returns empty-rhs spec."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        spec_n2 = spec.filter_by_order(2)
+        for eq in spec_n2.equations:
+            assert eq.rhs_terms == ()
+        assert spec_n2.has_corrections() is False
 
 
 # === Schema Validation Tests ===

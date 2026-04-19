@@ -208,6 +208,14 @@ class OperatorTerm:
         Coordinate names the coefficient depends on (e.g., ("x", "y") for
         position-dependent coefficients on curved spatial surfaces, or ("t",)
         for time-dependent). Empty tuple for constant coefficients.
+    order_in_eps : int
+        Order of this term in the small parameters configured by the theory's
+        ``[perturbation]`` section. 0 for the base (unperturbed) theory; 1 for
+        a first-order correction, etc. Set by the Wolfram ``ComputeOrderInEps``
+        helper and consumed by :class:`EquationSystem.filter_by_order` to
+        separate base from correction terms for the iterative perturbative
+        solver (v6 plan, Stage 2). Defaults to 0 for backward compatibility
+        with JSON files predating the field.
     """
 
     coefficient: float
@@ -216,6 +224,7 @@ class OperatorTerm:
     coefficient_symbolic: str | None = None
     time_dependent: bool = False
     coordinate_dependent: tuple[str, ...] = ()
+    order_in_eps: int = 0
 
     @property
     def position_dependent(self) -> bool:
@@ -280,6 +289,7 @@ class OperatorTerm:
             coefficient_symbolic=data.get("coefficient_symbolic"),
             time_dependent=bool(data.get("time_dependent", False)),
             coordinate_dependent=tuple(data.get("coordinate_dependent", ())),
+            order_in_eps=int(data.get("order_in_eps", 0)),
         )
 
 
@@ -1121,6 +1131,57 @@ class EquationSystem:
     def equation_map(self) -> dict[str, int]:
         """Map from field name to equation index. Cached on frozen dataclass."""
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
+
+    # ------------------------------------------------------------------ #
+    # Perturbative-order filtering (v6 plan, Stage 2)                    #
+    # ------------------------------------------------------------------ #
+    # These methods partition an EquationSystem by the ``order_in_eps``  #
+    # tag on each OperatorTerm, which is emitted by ExportJSON.wl when a #
+    # theory has a ``[perturbation]`` section. Used by                   #
+    # :class:`tidal.solver.perturbative_driver.PerturbativeSolver` to    #
+    # drive Pass 0 (base) and Pass 1+ (correction) solves from a single #
+    # derived theory file.                                               #
+
+    def filter_by_order(self, n: int) -> EquationSystem:
+        """Return a copy retaining only RHS terms with ``order_in_eps == n``.
+
+        The equations (and their LHS structures) are preserved unchanged;
+        only the ``rhs_terms`` tuple is filtered. Equations whose filtered
+        RHS becomes empty are kept — callers may need them for state
+        layout purposes (e.g., an evolution equation without a source in
+        this order still requires its slot in the integrator).
+
+        Use ``filter_by_order(0)`` for the Pass 0 base equations and
+        ``filter_by_order(1)`` for the Pass 1 source terms of a linear
+        perturbative expansion.
+        """
+        new_eqs = tuple(
+            dataclasses.replace(
+                eq,
+                rhs_terms=tuple(t for t in eq.rhs_terms if t.order_in_eps == n),
+            )
+            for eq in self.equations
+        )
+        return dataclasses.replace(self, equations=new_eqs)
+
+    def max_order(self) -> int:
+        """Return the maximum ``order_in_eps`` across all RHS terms.
+
+        Returns 0 for baseline theories (no ``[perturbation]`` section or
+        no terms with non-zero order). Use to gate ``--perturbative-order``
+        validation and to size the Pass loop in the driver.
+        """
+        orders = [t.order_in_eps for eq in self.equations for t in eq.rhs_terms]
+        return max(orders) if orders else 0
+
+    def has_corrections(self) -> bool:
+        """Return True if any RHS term has ``order_in_eps > 0``.
+
+        Cheap check used by the CLI to decide whether
+        ``PerturbativeSolver`` is needed or the plain modal path
+        suffices.
+        """
+        return any(t.order_in_eps > 0 for eq in self.equations for t in eq.rhs_terms)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, PLR0912, C901
