@@ -2167,10 +2167,12 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     elif scheme == "modal":
         # Default --perturbative-order: 1 when the JSON declares a
         # perturbation block, 0 otherwise. An explicit --perturbative-order
-        # flag on the CLI overrides this default.
+        # flag on the CLI overrides this default.  Use getattr so callers
+        # built from leaner parsers (e.g. `tidal sample`) still work.
         pert_meta = spec.metadata.get("perturbation") or {}
-        if args.perturbative_order is not None:
-            pert_order = int(args.perturbative_order)
+        pert_order_arg = getattr(args, "perturbative_order", None)
+        if pert_order_arg is not None:
+            pert_order = int(pert_order_arg)
         else:
             pert_order = 1 if pert_meta.get("small_parameters") else 0
 
