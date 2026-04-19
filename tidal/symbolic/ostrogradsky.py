@@ -93,6 +93,17 @@ def apply_ostrogradsky_reduction(  # noqa: C901, PLR0914
 ) -> EquationSystem:
     """Apply Ostrogradsky reduction to higher-derivative equations.
 
+    .. deprecated::
+        This Python post-processing path is being replaced by the Wolfram
+        ``PerturbativeReduction.wl`` module (Phase C of the derivation
+        pipeline). Theories with higher-derivative terms should declare a
+        ``[perturbation]`` section in their TOML; the Wolfram pipeline then
+        reduces equations and the Lagrangian at symbolic time, producing
+        JSON with ``time_derivative_order <= 2``. This function will be
+        removed once all example theories have been migrated.
+
+        Ref: https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/267
+
     For each equation with ``time_derivative_order > 2``, introduces
     auxiliary fields to reduce to 2nd-order.  The reduction is applied
     in-memory — the JSON on disk is unchanged.
@@ -131,6 +142,22 @@ def apply_ostrogradsky_reduction(  # noqa: C901, PLR0914
     ]
     if not fourth_order:
         return spec  # Nothing to reduce
+
+    # Deprecation instrumentation: Phase C (Wolfram PerturbativeReduction.wl)
+    # should be the exclusive path for higher-derivative theories going
+    # forward. This warning makes it visible when the legacy Python path is
+    # exercised so we can migrate the remaining theories and remove this
+    # module. See docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md Stage 5.
+
+    warnings.warn(
+        f"Ostrogradsky (Python path) exercised: {len(fourth_order)} equation(s) "
+        f"with time_derivative_order > 2 detected for field(s) "
+        f"{[eq.field_name for eq in fourth_order]}. This path is deprecated; "
+        f"re-derive with a [perturbation] TOML section to use the Wolfram "
+        f"PerturbativeReduction (Phase C). Ref: issue #267.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     # Validate: only even orders (from E-L equations)
     for eq in fourth_order:

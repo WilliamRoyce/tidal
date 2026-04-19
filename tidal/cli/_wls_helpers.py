@@ -181,15 +181,37 @@ def validate_wls_brackets(script: str) -> list[str]:
     return errors
 
 
-def wl_zero_component(comp_name: str, field_name: str, gauge_type: str) -> list[str]:
+def wl_zero_component(
+    comp_name: str,
+    field_name: str,
+    gauge_type: str,
+    *,
+    apply_to_lagrangian: bool = True,
+) -> list[str]:
     """Generate WLS to substitute a component and its derivatives with zero.
+
+    Applies the zero-component substitution to ``fieldEquations`` and,
+    when ``apply_to_lagrangian`` is True (default), also to ``lagComp``.
+    The latter keeps the component Lagrangian consistent with the
+    gauge-fixed equations so that downstream consumers (Phase C
+    perturbative reduction, Phase D Hamiltonian) see a unified state.
 
     Returns a list of WLS code lines (same contract as ``_wls_*`` functions).
     """
-    return [
+    rule_block = wl_list(
+        wl_rule(f"{comp_name}[args___]", "0", delayed=True),
+        wl_rule(f"Derivative[ders__][{comp_name}][args___]", "0", delayed=True),
+    )
+    lines = [
         f"(* {gauge_type.capitalize()} gauge: {field_name} component {comp_name} = 0 *)",
-        f"fieldEquations = fieldEquations /. "
-        f"{wl_list(wl_rule(f'{comp_name}[args___]', '0', delayed=True), wl_rule(f'Derivative[ders__][{comp_name}][args___]', '0', delayed=True))};",
-        f'Print["Applied {gauge_type} gauge: {comp_name} = 0"];',
-        "",
+        f"fieldEquations = fieldEquations /. {rule_block};",
     ]
+    if apply_to_lagrangian:
+        lines.append(f"If[ValueQ[lagComp], lagComp = lagComp /. {rule_block}];")
+    lines.extend(
+        (
+            f'Print["Applied {gauge_type} gauge: {comp_name} = 0"];',
+            "",
+        )
+    )
+    return lines

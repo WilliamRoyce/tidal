@@ -144,16 +144,23 @@ time derivative (no spatial derivatives). Used to detect Hubble friction terms l
 
 (* Term identification and building *)
 BuildTermResult::usage =
-  "BuildTermResult[coeff, operator, field, symbolicCoeff:None, timeDependent:False, coordDeps:{}] builds a term result \
+  "BuildTermResult[coeff, operator, field, symbolicCoeff:None, timeDependent:False, coordDeps:{}, orderInEps:0] builds a term result \
 Association with keys \"coefficient\", \"operator\", \"field\". Optionally includes \
 \"coefficient_symbolic\" when symbolicCoeff is not None, \"time_dependent\" when timeDependent is True, \
-and \"coordinate_dependent\" when coordDeps is non-empty.";
+\"coordinate_dependent\" when coordDeps is non-empty, and \"order_in_eps\" when orderInEps > 0.";
+
+ComputeOrderInEps::usage =
+  "ComputeOrderInEps[expr, paramsList] returns the maximum total exponent of the small-parameter \
+symbols across monomials of Expand[expr]. Returns 0 when paramsList is empty or expr has no \
+dependence on any small parameter. Used by the Phase C perturbative reduction (v6) to tag each \
+emitted operator term with its order in the small parameters of L = L0 + eps*L1 + eps^2*L2 + ...";
 
 IdentifyMultiFieldTerm::usage =
-  "IdentifyMultiFieldTerm[term, currentFieldName, allFieldNames] analyzes a \
+  "IdentifyMultiFieldTerm[term, currentFieldName, allFieldNames, smallParams:{}] analyzes a \
 single term and returns an Association with \"coefficient\", \"operator\", and \"field\" keys. \
-Detects: laplacian, directional laplacians, gradients, cross-derivatives, identity, and \
-momentum gradient terms from mixed time-space derivatives.";
+When smallParams is a non-empty list of Wolfram symbols, also tags the term with \"order_in_eps\" \
+computed from the symbolic coefficient. Detects: laplacian, directional laplacians, gradients, \
+cross-derivatives, identity, and momentum gradient terms from mixed time-space derivatives.";
 
 ConstraintSolverHints::usage =
   "ConstraintSolverHints[fieldName, timeOrder, metadata] builds a constraint_solver \
@@ -182,8 +189,10 @@ to known field names using case-insensitive and prefix matching. Returns an Asso
 with \"field\" and \"head\" keys, or uses defaultField if no match found.";
 
 ExtractTermCoefficient::usage =
-  "ExtractTermCoefficient[term, fieldHead, targetField] extracts the numeric coefficient \
-and optional symbolic coefficient from a term. Returns {numericCoeff, symbolicCoeff, isTimeDependent, coordDeps}.";
+  "ExtractTermCoefficient[term, fieldHead, targetField, smallParams:{}] extracts the numeric coefficient \
+and optional symbolic coefficient from a term. Returns {numericCoeff, symbolicCoeff, isTimeDependent, coordDeps, orderInEps}. \
+When smallParams is a non-empty list of Wolfram symbols, orderInEps is the total exponent of those symbols in the raw \
+(pre-ToString) coefficient expression; otherwise 0.";
 
 ExtractTermCoefficient::symbolic =
   "Symbolic (non-numeric) coefficient `1` found for field `2`. Storing as symbolic coefficient in JSON.";
@@ -214,10 +223,11 @@ skipped with a warning. Used by the canonical momentum pipeline (Phase K) to exp
 the Hamiltonian for Python-side energy evaluation.";
 
 ParseMultiFieldRHS::usage =
-  "ParseMultiFieldRHS[eq, currentFieldName, allFieldNames] parses a linear \
+  "ParseMultiFieldRHS[eq, currentFieldName, allFieldNames, smallParams:{}] parses a linear \
 combination of operators applied to fields into a list of term Associations. \
-Each term has keys \"coefficient\", \"operator\", and \"field\". Used by both \
-the equation export pipeline and the canonical field rate computation (Phase K).";
+Each term has keys \"coefficient\", \"operator\", and \"field\" (plus optional \
+\"order_in_eps\" when smallParams is supplied). Used by both the equation export \
+pipeline and the canonical field rate computation (Phase K).";
 
 
 Begin["`Private`"];
@@ -375,32 +385,49 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
   ];
 
   (* Build full JSON structure *)
-  json = <|
-    "metadata" -> <|
+  Module[{jsonMeta, smallParamsList},
+    jsonMeta = <|
       "source" -> "xAct",
       "lagrangian_expr" -> Lookup[metadata, "lagrangian_expr", ""],
       "derived_from" -> "Euler-Lagrange",
       "gauge" -> Lookup[metadata, "gauge", "none"],
       "linearized" -> Lookup[metadata, "linearized", True]
-    |>,
-    "spacetime" -> <|
-      "dimension" -> Lookup[metadata, "dimension", 2],
-      "signature" -> Lookup[metadata, "signature", {-1, 1}],
-      "coordinates" -> Lookup[metadata, "coordinates", {"t", "x"}]
-    |>,
-    "fields" -> fields,
-    "equations" -> equations,
-    "coupling" -> couplingSection
-  |>;
-
-  json
+    |>;
+    (* When [perturbation] is configured, emit the small-parameter names +    *)
+    (* truncation order so Python's PerturbativeSolver knows which symbols to *)
+    (* treat as small and the default --perturbative-order from the theory.   *)
+    smallParamsList = Lookup[metadata, "small_parameters", {}];
+    If[Length[smallParamsList] > 0,
+      jsonMeta["perturbation"] = <|
+        "small_parameters" -> Map[ToString[#, InputForm] &, smallParamsList],
+        "order" -> Lookup[metadata, "perturbation_order", 1]
+      |>
+    ];
+    json = <|
+      "metadata" -> jsonMeta,
+      "spacetime" -> <|
+        "dimension" -> Lookup[metadata, "dimension", 2],
+        "signature" -> Lookup[metadata, "signature", {-1, 1}],
+        "coordinates" -> Lookup[metadata, "coordinates", {"t", "x"}]
+      |>,
+      "fields" -> fields,
+      "equations" -> equations,
+      "coupling" -> couplingSection
+    |>;
+    json
+  ]
 ];
 
 (* Equation conversion for multi-field systems *)
 (* Phase 2, Issue 6: Now supports parabolic (d_t), elliptic (no time), and hyperbolic (d2_t) PDEs *)
 EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, metadata_] := Module[
-  {terms, rhsTerms, rhs, timeDerivTerm, lhsTimeOrder, lhsStructure, kineticCoeffStr},
+  {terms, rhsTerms, rhs, timeDerivTerm, lhsTimeOrder, lhsStructure, kineticCoeffStr, smallParams},
   kineticCoeffStr = None;
+  (* Small-parameter symbols for order-in-eps tagging. The metadata key       *)
+  (* "small_parameters" is a list of Wolfram symbols (e.g. {b5, rho})         *)
+  (* supplied by _derive.py from the [perturbation] TOML section. Empty by   *)
+  (* default for non-perturbative theories.                                   *)
+  smallParams = Lookup[metadata, "small_parameters", {}];
 
   (* Same logic as EquationToJSON but with cross-field awareness *)
   terms = If[Head[componentEq] === Plus, List @@ componentEq, {componentEq}];
@@ -527,7 +554,7 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   ];
 
   (* Parse RHS with cross-field detection *)
-  rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames];
+  rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames, smallParams];
 
   (* NOTE: The pi_ sign hack that was previously here (negating coefficients of
      momentum terms in wave equations) has been removed. The root cause — metric
@@ -567,11 +594,11 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
 (* === RHS Term Parsing === *)
 
 (* Parse RHS with cross-field reference detection *)
-ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_] := Module[
+ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_, smallParams_List:{}] := Module[
   {terms, parsedTerms},
 
   terms = If[Head[eq] === Plus, List @@ eq, {eq}];
-  parsedTerms = Map[IdentifyMultiFieldTerm[#, currentFieldName, allFieldNames] &, terms];
+  parsedTerms = Map[IdentifyMultiFieldTerm[#, currentFieldName, allFieldNames, smallParams] &, terms];
   parsedTerms = DeleteCases[parsedTerms, Nothing];
 
   (* Fail explicitly if no terms were parsed - do not inject ghost equations *)
@@ -859,7 +886,8 @@ IdentifyDirectionalLaplacian[term_] := Module[{profile, result},
 (* Only includes "coefficient_symbolic" key when symbolicCoeff is not None *)
 (* Only includes "time_dependent" key when timeDependent is True *)
 (* Only includes "coordinate_dependent" key when coordDeps is non-empty *)
-BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False, coordDeps_:{}] := Module[{result},
+(* Only includes "order_in_eps" key when orderInEps > 0 *)
+BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False, coordDeps_:{}, orderInEps_:0] := Module[{result},
   result = <|
     "coefficient" -> N[coeff],
     "operator" -> op,
@@ -874,7 +902,24 @@ BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False, coor
   If[Length[coordDeps] > 0,
     result["coordinate_dependent"] = coordDeps
   ];
+  If[IntegerQ[orderInEps] && orderInEps > 0,
+    result["order_in_eps"] = orderInEps
+  ];
   result
+];
+
+(* Compute total order of an expression in a list of small-parameter symbols. *)
+(* Returns the maximum total exponent across monomials of the Expand'd form.  *)
+(* Example: ComputeOrderInEps[b5^2 + eps*b5, {b5, eps}] returns 2.            *)
+(* Returns 0 when the params list is empty or the expression is independent   *)
+(* of all small parameters. Used by Phase C (perturbative reduction v6) to    *)
+(* tag each emitted OperatorTerm with its order in the small parameters.     *)
+ComputeOrderInEps[expr_, paramsList_List] := Module[{expanded, monomials, monomialOrder},
+  If[Length[paramsList] === 0, Return[0]];
+  expanded = Expand[expr];
+  monomials = If[Head[expanded] === Plus, List @@ expanded, {expanded}];
+  monomialOrder[m_] := Total[Max[Exponent[m, #], 0] & /@ paramsList];
+  Max[Append[monomialOrder /@ monomials, 0]]
 ];
 
 (* Return the list of coordinate names that a coefficient depends on *)
@@ -966,9 +1011,9 @@ MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] :
 (* Returns {numericCoeff, symbolicCoeff, isTimeDependent, coordDeps} *)
 (* where symbolicCoeff is None or a string, isTimeDependent is True/False, *)
 (* coordDeps is a list of coordinate name strings e.g. {"t"}, {"x", "y"} *)
-ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
+ExtractTermCoefficient[term_, fieldHead_String, targetField_String, smallParams_List:{}] := Module[
   {rawCoeff, coefficient = 1.0, symbolicCoeff = None,
-   isTimeDependent = False, coordDeps = {}},
+   isTimeDependent = False, coordDeps = {}, orderInEps = 0},
 
   rawCoeff = term /. {
     (* Replace Derivative[...][field][args] with 1 *)
@@ -977,6 +1022,10 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     f_Symbol[__] /; ToString[f] === fieldHead :> 1
   };
   If[!NumericQ[rawCoeff] && LeafCount[rawCoeff] < 500, rawCoeff = Simplify[rawCoeff]];
+
+  (* Compute total order in small parameters before string conversion         *)
+  (* (needs the raw symbolic expression, not its ToString representation).    *)
+  orderInEps = ComputeOrderInEps[rawCoeff, smallParams];
 
   (* Check for coordinate dependence in coefficient *)
   coordDeps = IsCoordinateDependentCoefficient[rawCoeff];
@@ -1016,7 +1065,7 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
       ]
   ];
 
-  {coefficient, symbolicCoeff, isTimeDependent, coordDeps}
+  {coefficient, symbolicCoeff, isTimeDependent, coordDeps, orderInEps}
 ];
 
 (* Count the total derivative order of a term *)
@@ -1237,9 +1286,9 @@ ClassifyOperatorType[term_] := Module[
 (* === Main Function: Identify operator and target field === *)
 (* Refactored to use helper functions above *)
 
-IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
+IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, smallParams_List:{}] := Module[
   {functionHeads, matchResult, targetField, foundFieldHead,
-   coeffResult, coefficient, symbolicCoeff, isTimeDependent, coordDeps,
+   coeffResult, coefficient, symbolicCoeff, isTimeDependent, coordDeps, orderInEps,
    operatorResult, operator, isMixedTimeSpace},
 
   (* Skip zero terms — they arise from plane-wave reduction or vanishing *)
@@ -1258,16 +1307,18 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
 
   (* Step 3: Extract coefficient (includes coordinate-dependence check) *)
   If[foundFieldHead =!= Null,
-    coeffResult = ExtractTermCoefficient[term, foundFieldHead, targetField];
+    coeffResult = ExtractTermCoefficient[term, foundFieldHead, targetField, smallParams];
     coefficient = coeffResult[[1]];
     symbolicCoeff = coeffResult[[2]];
     isTimeDependent = coeffResult[[3]];
-    coordDeps = coeffResult[[4]],
+    coordDeps = coeffResult[[4]];
+    orderInEps = coeffResult[[5]],
     (* Fallback if no field head found *)
     coefficient = 1.0;
     symbolicCoeff = None;
     isTimeDependent = False;
-    coordDeps = {}
+    coordDeps = {};
+    orderInEps = 0
   ];
 
   (* Step 4: Classify operator type *)
@@ -1291,7 +1342,7 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
     ]];
 
     (* Build term result *)
-    termResult = BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps];
+    termResult = BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps, orderInEps];
 
     (* Attach warning if nonlinear *)
     If[fieldOccurrences > 1,

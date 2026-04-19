@@ -289,6 +289,7 @@ class _WlsContext:
     constraint_solver: dict[str, Any] | None
     gauge: list[dict[str, Any]]
     reduction: dict[str, Any] | None
+    perturbative_reduction: dict[str, Any] | None  # [perturbation] TOML section
     metric_diagonal: list[str]
     metric_type: str  # "minkowski", "diagonal", or "matrix"
 
@@ -3013,17 +3014,24 @@ def _tt_traceless_substitution(
         + f" + {last_comp}[{coord_args}]"
     )
 
+    traceless_rules = (
+        f"{{{last_comp}[args___] :> -({repl_sum}), "
+        f"Derivative[d__][{last_comp}][args___] :> -({deriv_repl_sum})}}"
+    )
     return [
         f"(* TT traceless: substitute {last_comp} → -(metric-weighted sum of other diags) *)",
         "(* Condition: g^{ij} h_{ij} = 0  ⟹  h_last = -Σ (g_last/g_i) h_i *)",
-        f"fieldEquations = fieldEquations /. {{"
-        f"{last_comp}[args___] :> -({repl_sum}), "
-        f"Derivative[d__][{last_comp}][args___] :> -({deriv_repl_sum})}};",
+        f"fieldEquations = fieldEquations /. {traceless_rules};",
         "",
         "(* Expand all equations to simplify kinetic terms after traceless sub *)",
         "fieldEquations = Table[{fieldEquations[[k, 1]], "
         "Expand[fieldEquations[[k, 2]]]},"
         " {k, Length[fieldEquations]}];",
+        "",
+        "(* Apply same traceless substitution to lagComp (Phase C / Phase D consistency) *)",
+        "If[ValueQ[lagComp],",
+        f"  lagComp = Expand[lagComp /. {traceless_rules}];",
+        "];",
         "",
         f"(* Replace {last_comp} equation with algebraic traceless constraint *)",
         "(* Form: h_last_EOM = Σ w_i h_i + h_last  (self-coeff=1 for Python detector) *)",
@@ -3234,6 +3242,11 @@ def _wls_plane_wave_reduction_equations(ctx: _WlsContext) -> list[str]:
     when equations are in explicit ``Derivative[ords__][f_][args__]`` form.
 
     Also used as a fallback/defense-in-depth for the non-linearization path.
+
+    Applies the same zeroing to ``lagComp`` when it exists, so the
+    component Lagrangian stays consistent with the equations.  This is
+    required for Phase C perturbative reduction and Phase D Hamiltonian
+    to operate on matching objects.
     """
     if ctx.reduction is None:
         return []
@@ -3251,17 +3264,23 @@ def _wls_plane_wave_reduction_equations(ctx: _WlsContext) -> list[str]:
             f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot} && {{ords}}[[{slot}]] > 0 :> 0"
         )
 
+    rule_block = "{\n" + ",\n".join(rules) + "\n}"
+
     lines: list[str] = [
         "",
         "(* === Plane-wave reduction: zero transverse derivatives in fieldEquations === *)",
         f'Print["Zeroing transverse derivatives in component equations ({", ".join(killed)})"];',
         "",
-        "fieldEquations = fieldEquations /. {",
-        ",\n".join(rules),
-        "};",
+        f"fieldEquations = fieldEquations /. {rule_block};",
         "fieldEquations = Table[",
         "  {fieldEquations[[k, 1]], Expand[fieldEquations[[k, 2]]]},",
         "  {k, Length[fieldEquations]}",
+        "];",
+        "",
+        "(* Also apply to lagComp for consistency (required by Phase C / Phase D) *)",
+        "If[ValueQ[lagComp],",
+        f"  lagComp = Expand[lagComp /. {rule_block}];",
+        '  Print["  Applied to lagComp"];',
         "];",
         "",
     ]
@@ -3324,6 +3343,10 @@ def _wls_plane_wave_field_elimination(ctx: _WlsContext) -> list[str]:
         "    fieldEquations = Table[",
         "      {fieldEquations[[k, 1]], Expand[fieldEquations[[k, 2]]]},",
         "      {k, Length[fieldEquations]}",
+        "    ];",
+        "    (* Also eliminate zero fields from lagComp for Phase C/D consistency *)",
+        "    If[ValueQ[lagComp],",
+        "      lagComp = Expand[lagComp /. zeroRules];",
         "    ];",
         "  ]",
         "];",
@@ -3389,6 +3412,11 @@ def _wls_plane_wave_coordinate_evaluation(ctx: _WlsContext) -> list[str]:
         "  {k, Length[fieldEquations]}",
         "];",
         'Print["After coordinate evaluation: ", Length[fieldEquations], " equations"];',
+        "",
+        "(* Apply same coordinate evaluation to lagComp (Phase C / Phase D consistency) *)",
+        "If[ValueQ[lagComp],",
+        f"  lagComp = Expand[lagComp /. {wl_list(rules)}];",
+        "];",
         "",
     ]
 
@@ -4135,6 +4163,200 @@ def _wls_constraint_elimination(
         "(* EOM substitution for d2_t: DISABLED (issue #195).                  *)",
         "",
     ]
+
+
+# --- WLS: Phase C — Perturbative Reduction ---
+
+
+_HIGHER_DERIV_PATTERNS: tuple[tuple[str, str], ...] = (
+    # --- Ricci scalar squared: R^2, R̃^2 (pure scalar invariants) ---
+    # Written as RicciScalar[]^2 or RicciScalar[]**2 in TOML Lagrangians.
+    (r"RicciScalar\w*\s*\[[^\]]*\]\s*(\^|\*\*)\s*2", "RicciScalar[]^2 (R²)"),
+    (r"RicciCDT\s*\[[^\]]*\]\s*(\^|\*\*)\s*2", "RicciCDT[]^2 (R̃² on torsion-full CD)"),
+    (r"RicciSpinor\s*\[[^\]]*\]\s*(\^|\*\*)\s*2", "RicciSpinor[]^2"),
+    # --- Ricci tensor contractions: R_{μν} R^{μν}, R̃_{μν} R̃^{μν} ---
+    # Patterns like RicciCD[-a,-b] * RicciCD[a,b] or Ricci[a,b] * Ricci[-a,-b]
+    (
+        r"Ricci(?:CD|CDT|Spinor)?\s*\[[^\]]*-[a-z]\s*,\s*-[a-z][^\]]*\]"
+        r"\s*\*\s*Ricci(?:CD|CDT|Spinor)?\s*\[[^\]]*[a-z]\s*,\s*[a-z][^\]]*\]",
+        "Ricci_{μν} * Ricci^{μν} contraction",
+    ),
+    # --- Riemann tensor contractions: R_{μνρσ} R^{μνρσ} (Gauss-Bonnet piece) ---
+    # Patterns like Riemann[-a,-b,-c,-d] * Riemann[a,b,c,d]
+    (
+        r"Riemann(?:CD|CDT|Spinor)?\s*\[[^\]]*-[a-z]\s*,\s*-[a-z]\s*,\s*-[a-z]\s*,\s*-[a-z][^\]]*\]",
+        "Riemann tensor with 4 covariant indices (likely contracted square)",
+    ),
+    (
+        r"Riemann(?:CD|CDT|Spinor)?\s*\[[^\]]*\]\s*(\^|\*\*)\s*2",
+        "Riemann[]^2",
+    ),
+    # --- Standalone RiemannCDT/Spinor references (torsion-full Riemann) ---
+    # Most uses are in contracted squares; flag any occurrence for safety.
+    (r"\bRiemannCDT\b", "RiemannCDT (torsion-full Riemann; typically contracted)"),
+    (r"\bRiemannSpinor\b", "RiemannSpinor"),
+    # --- Weyl and torsion-squared tensor products ---
+    (r"Weyl(?:CD|CDT|Spinor)?\s*\[[^\]]*\]\s*(\^|\*\*)\s*2", "Weyl[]^2"),
+    (
+        r"Torsion(?:CD|CDT)?\s*\[[^\]]*\]\s*(\^|\*\*)\s*[2-9]",
+        "Torsion[]^n (n>=2) — possible higher-derivative contribution",
+    ),
+    # --- Euler-Heisenberg-like higher F powers ---
+    # F**4, (F.F)**2, (F F̃)**2 etc. Leading EH correction is F^4 ~ (F_{μν}F^{μν})^2.
+    (r"F\s*\[[^\]]*\]\s*(\^|\*\*)\s*[4-9]", "F[]^n with n>=4 (Euler-Heisenberg-like)"),
+    (
+        r"\(\s*F\s*\[[^\]]*\]\s*\*\s*F\s*\[[^\]]*\]\s*\)\s*(\^|\*\*)\s*2",
+        "(F·F)^2 (Euler-Heisenberg F^4 term)",
+    ),
+    (
+        r"FStrength\s*\[[^\]]*\]\s*\*\s*FStrength\s*\[[^\]]*\]\s*"
+        r"\*\s*FStrength\s*\[[^\]]*\]\s*\*\s*FStrength\s*\[[^\]]*\]",
+        "F^4 as product of four F tensors (Euler-Heisenberg)",
+    ),
+    (
+        r"FStrength\s*\[[^\]]*\]\s*(\^|\*\*)\s*[4-9]",
+        "FStrength[]^n with n>=4",
+    ),
+    # --- Dual field strength products (F F̃) squared — EH parity-odd term ---
+    (
+        r"FDual\s*\[[^\]]*\]\s*\*\s*F(?:Strength|Dual)?\s*\[[^\]]*\]\s*"
+        r"\*\s*FDual\s*\[[^\]]*\]",
+        "(F F̃)^2 (Euler-Heisenberg parity-odd)",
+    ),
+)
+
+
+_MAX_AUDIT_LABELS_SHOWN = 3
+
+
+def _audit_higher_derivative_lagrangian(config: dict[str, Any]) -> None:
+    """Warn when Lagrangian has higher-derivative terms without [perturbation].
+
+    Uses pattern matching on the Lagrangian expression for known
+    higher-derivative structures (R^2, R-tilde^2, curvature tensor squared,
+    Euler-Heisenberg F^4, etc.). The resulting equations from such a
+    Lagrangian are likely to have ``time_derivative_order > 2``, which the
+    JSON loader will reject with a migration-guidance error. Better to
+    warn at derive time so the user can fix the TOML immediately.
+    """
+    import re
+
+    perturbation = config.get("perturbation")
+    if perturbation is not None and perturbation.get("enabled", True):
+        # User has opted in to Phase C; no warning needed.
+        return
+
+    lag_expr = config.get("lagrangian", {}).get("expression", "")
+    if not lag_expr:
+        return
+
+    matches = [
+        label for pat, label in _HIGHER_DERIV_PATTERNS if re.search(pat, lag_expr)
+    ]
+    if not matches:
+        return
+
+    from tidal.cli._console import warn as _cwarn
+
+    # Show up to _MAX_AUDIT_LABELS_SHOWN distinct labels to keep concise.
+    shown = matches[:_MAX_AUDIT_LABELS_SHOWN]
+    suffix = (
+        f" (+ {len(matches) - _MAX_AUDIT_LABELS_SHOWN} more)"
+        if len(matches) > _MAX_AUDIT_LABELS_SHOWN
+        else ""
+    )
+    _cwarn(
+        f"Lagrangian contains higher-derivative patterns: {', '.join(shown)}{suffix}. "
+        "No [perturbation] section is configured, so the resulting equations may "
+        "have time_derivative_order > 2 and will be rejected at JSON load."
+    )
+    print("  Hint: add a [perturbation] section to the TOML to enable the")
+    print("  JLM order reduction (Wolfram Phase C):")
+    print()
+    print("      [perturbation]")
+    print('      small_parameters = ["<your small parameter symbol>"]')
+    print("      order = 1")
+    print()
+    print("  See docs/tex/perturbative_reduction.tex for details.")
+
+
+def _validate_perturbation_config(
+    cfg: dict[str, Any] | None,
+    declared_constants: list[str],
+) -> dict[str, Any] | None:
+    """Validate the ``[perturbation]`` TOML section and apply defaults.
+
+    Returns a normalised config dict, or ``None`` when the section is absent
+    or explicitly disabled.
+
+    Schema:
+        small_parameters : list[str] — names of small parameters (required)
+        order            : int      — truncation order (default 1)
+        enabled          : bool     — master switch (default True)
+        validity_warnings: bool     — emit truncation-error warnings (default True)
+
+    Raises
+    ------
+    ValueError
+        If the section is malformed (missing/empty ``small_parameters``,
+        non-positive ``order``, undeclared parameter name, or a name
+        containing an underscore that would corrupt Mathematica parsing).
+    TypeError
+        If a ``small_parameters`` entry is not a string.
+    """
+    if cfg is None:
+        return None
+
+    if not cfg.get("enabled", True):
+        return None
+
+    small_params = cfg.get("small_parameters")
+    if small_params is None:
+        msg = (
+            "[perturbation] section requires 'small_parameters' (a list of "
+            'small-parameter symbol names, e.g. ["b5"] or ["b1", "b5"]).'
+        )
+        raise ValueError(msg)
+    if not isinstance(small_params, list) or not small_params:
+        msg = (
+            f"[perturbation].small_parameters must be a non-empty list of "
+            f"strings; got {small_params!r}."
+        )
+        raise ValueError(msg)
+    for name in small_params:
+        if not isinstance(name, str):
+            msg = (
+                f"[perturbation].small_parameters entries must be strings; "
+                f"got {name!r}."
+            )
+            raise TypeError(msg)
+        if name not in declared_constants:
+            msg = (
+                f"Perturbation small_parameter '{name}' is not declared in "
+                f"[constants].names. Add it to the constants list so the "
+                f"Wolfram kernel recognises it as a parameter symbol."
+            )
+            raise ValueError(msg)
+        if "_" in name:
+            msg = (
+                f"Perturbation small_parameter '{name}' contains an "
+                f"underscore. Mathematica parses 'X_Y' as Pattern[X, Blank[Y]] "
+                f"which corrupts symbolic computation. Rename to a "
+                f"non-underscore form (e.g. 'bfive' instead of 'b_5')."
+            )
+            raise ValueError(msg)
+
+    order = cfg.get("order", 1)
+    if not isinstance(order, int) or order < 1:
+        msg = f"[perturbation].order must be a positive integer; got {order!r}."
+        raise ValueError(msg)
+
+    return {
+        "small_parameters": list(small_params),
+        "order": order,
+        "enabled": True,
+        "validity_warnings": bool(cfg.get("validity_warnings", True)),
+    }
 
 
 def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0914, PLR0915
@@ -5358,6 +5580,23 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
         # Strip trailing comma from last line to avoid Null in Association
         lines[-1] = lines[-1].removesuffix(",")
 
+    # Add perturbation metadata when [perturbation] is configured in TOML.
+    # ExportJSON.wl reads metadata["small_parameters"] to compute order_in_eps
+    # tags on each emitted OperatorTerm, and emits a "perturbation" sub-dict
+    # in the final JSON metadata so Python's PerturbativeSolver knows which
+    # symbols to treat as small and the default truncation order.
+    if ctx.perturbative_reduction is not None:
+        params = ctx.perturbative_reduction["small_parameters"]
+        order = ctx.perturbative_reduction["order"]
+        wl_params = "{" + ", ".join(params) + "}"
+        lines[-1] += ","
+        lines.extend(
+            [
+                f'  "small_parameters" -> {wl_params},',
+                f'  "perturbation_order" -> {order}',
+            ]
+        )
+
     lines.extend(["|>;", ""])
 
     # Ensure eliminatedFromCanonical is always defined — plane-wave reduction
@@ -5614,6 +5853,13 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 )
             )
 
+    # Phase C (perturbative reduction v6): order tagging happens inside
+    # ExportJSON.wl via ComputeOrderInEps, driven by the "small_parameters"
+    # key injected into metadata above. No separate WLS pipeline step is
+    # needed — each emitted OperatorTerm carries an order_in_eps tag and the
+    # Python-side PerturbativeSolver orchestrates Pass 0 / Pass 1 at
+    # simulate time. Legacy JLM symbolic reducer (PerturbativeReduction.wl)
+    # removed in Stage 1 of the v6 plan.
     lines.extend(
         (
             "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];",
@@ -5749,6 +5995,10 @@ def generate_wls(
         constraint_solver=config.get("constraint_solver"),
         gauge=config.get("gauge", []),
         reduction=config.get("reduction"),
+        perturbative_reduction=_validate_perturbation_config(
+            config.get("perturbation"),
+            config.get("constants", {}).get("names", []),
+        ),
         metric_diagonal=_apply_coord_values(
             [str(e) for e in config["spacetime"].get("diagonal", [])],
             config.get("reduction", {}).get("coordinate_values", {}),
@@ -5941,6 +6191,8 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     """
     with config_path.open("rb") as f:
         config = tomllib.load(f)
+
+    _audit_higher_derivative_lagrangian(config)
 
     script_content = generate_wls(
         config, output_override=args.output, config_dir=config_path.parent.resolve()
