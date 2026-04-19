@@ -118,5 +118,15 @@ type = "lorenz"
 type = "plane_wave"
 propagation_axis = "z"
 
+# v6 perturbative reduction — all six Riemann-Cartan curvature-squared
+# couplings (a1..a6) are treated as small.  Any of them promotes some
+# torsion/graviton component to time_order>2 via its kinetic structure;
+# PerturbativeSolver demotes them at Pass 0 and layers a closed-form
+# Duhamel correction at Pass 1.  See
+# docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md.
+[perturbation]
+small_parameters = ["a1", "a2", "a3", "a4", "a5", "a6"]
+order = 1
+
 [output]
 path = "../data/torsion_gertsenshtein_combined.json"

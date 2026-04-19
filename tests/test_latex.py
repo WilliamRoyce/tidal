@@ -522,13 +522,10 @@ class TestCLIIntegration:
 class TestAllExamplesRender:
     """Ensure every example JSON renders without errors."""
 
-    # v6 re-derivation migration tracking.
-    # torsion_gertsenshtein and graviton_torsion migrated in Phase 6B.3/6B.4.
-    # torsion_gertsenshtein_combined migration pending (large theory,
-    # wolframscript > 10 min).  Removed from xfail list as each lands.
-    _PENDING_V6_REDERIVATION = {
-        "torsion_gertsenshtein_combined",
-    }
+    # v6 re-derivation migration complete for all three shipped higher-
+    # derivative theories (Phase 6B.3/6B.4 of #267).  Kept as an empty
+    # class-level set for future migrations.
+    _PENDING_V6_REDERIVATION: set[str] = set()
 
     @pytest.mark.parametrize(
         "json_file",
