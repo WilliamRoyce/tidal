@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from tidal.symbolic._eval_utils import evaluate_coefficient
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
     from tidal.solver.operators import SideBCSpec
 
@@ -1182,6 +1182,115 @@ class EquationSystem:
         suffices.
         """
         return any(t.order_in_eps > 0 for eq in self.equations for t in eq.rhs_terms)
+
+    def base_spec(
+        self, small_parameters: Sequence[str] | None = None
+    ) -> EquationSystem:
+        """Return the Pass 0 base spec with LHS demoted where required.
+
+        This is the correct entry point for the iterative perturbative
+        driver (v6 plan, Gap B). It extends ``filter_by_order(0)`` with
+        a check on each equation's ``kinetic_coefficient_symbolic``:
+
+        * If the kinetic coefficient evaluates to literal zero when
+          every small parameter is set to zero, the LHS is promoted by
+          the correction. Demote it to an algebraic constraint:
+          ``time_derivative_order = 0``, ``kinetic_coefficient_symbolic
+          = None``. An ``identity`` self-term is prepended to the RHS
+          if one is not already present, so Schur elimination detects
+          the field as a proper constraint.
+        * Otherwise keep the LHS as-is (the kinetic coefficient
+          survives at ε=0 — this is a normal dynamical field or a
+          kinetic term that only depends on non-perturbative
+          parameters).
+
+        Parameters
+        ----------
+        small_parameters : sequence of str, optional
+            Small-parameter names. When absent, read from
+            ``self.metadata.get("perturbation", {}).get(
+            "small_parameters", [])``.
+
+        Returns
+        -------
+        EquationSystem
+            A new spec whose equations are the ε=0 base system. Every
+            surviving equation has ``time_derivative_order <= 2`` by
+            construction; a post-check raises ``ValueError`` if any
+            residual has order > 2, indicating the ``[perturbation]``
+            config misses some higher-derivative term.
+
+        Raises
+        ------
+        ValueError
+            If any ε=0 base equation still has ``time_derivative_order
+            > 2`` after demotion (corresponds to a third- or
+            higher-order term that isn't proportional to any declared
+            small parameter — spec / config mismatch).
+        """
+        from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
+            lhs_collapses_to_zero,
+        )
+
+        if small_parameters is None:
+            pert_meta = self.metadata.get("perturbation", {}) or {}
+            small_parameters = list(pert_meta.get("small_parameters", []))
+
+        new_eqs: list[ComponentEquation] = []
+        for eq in self.equations:
+            # Step 1: filter RHS to order-0 terms (existing logic).
+            filtered_rhs = tuple(t for t in eq.rhs_terms if t.order_in_eps == 0)
+
+            # Step 2: check whether the LHS itself is a correction.
+            demote = lhs_collapses_to_zero(
+                eq.kinetic_coefficient_symbolic, small_parameters
+            )
+
+            if demote:
+                # Ensure an identity self-term exists on the RHS so
+                # downstream Schur elimination recognises this as a
+                # proper algebraic constraint (``1 * field = ...``).
+                has_self_identity = any(
+                    t.operator == "identity" and t.field == eq.field_name
+                    for t in filtered_rhs
+                )
+                if not has_self_identity:
+                    filtered_rhs = (
+                        OperatorTerm(
+                            coefficient=1.0,
+                            operator="identity",
+                            field=eq.field_name,
+                        ),
+                        *filtered_rhs,
+                    )
+                new_eqs.append(
+                    dataclasses.replace(
+                        eq,
+                        time_derivative_order=0,
+                        rhs_terms=filtered_rhs,
+                        kinetic_coefficient_symbolic=None,
+                    )
+                )
+            else:
+                new_eqs.append(dataclasses.replace(eq, rhs_terms=filtered_rhs))
+
+        # Post-check: the base system must be 2nd-order at most.
+        high_order = [eq.field_name for eq in new_eqs if eq.time_derivative_order > 2]
+        if high_order:
+            msg = (
+                f"base_spec: after applying [perturbation]="
+                f"{list(small_parameters) if small_parameters else []}, "
+                f"fields {high_order} still have time_order > 2 in the "
+                f"base theory. The [perturbation] section must name "
+                f"every small parameter that appears in a higher-"
+                f"derivative kinetic coefficient, so the LHS collapses "
+                f"to zero when all small parameters vanish. Add the "
+                f"missing parameter(s) to [perturbation].small_parameters "
+                f"in your theory.toml and re-derive."
+            )
+            raise ValueError(msg)
+
+        return dataclasses.replace(self, equations=tuple(new_eqs))
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, PLR0912, C901

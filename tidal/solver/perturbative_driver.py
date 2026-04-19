@@ -206,7 +206,13 @@ class PerturbativeSolver:
 
     def __init__(self, spec: EquationSystem) -> None:
         self.full_spec = spec
-        self.base_spec = spec.filter_by_order(0)
+        # Use base_spec(...) so LHS kinetic coefficients that vanish at
+        # eps=0 trigger demotion to algebraic constraint (v6 Gap B).
+        # Small parameter names come from the metadata.perturbation block
+        # emitted by ExportJSON.wl when [perturbation] is configured.
+        pert_meta = spec.metadata.get("perturbation", {}) or {}
+        small_parameters = list(pert_meta.get("small_parameters", []))
+        self.base_spec = spec.base_spec(small_parameters)
         self._max_order = spec.max_order()
 
     @property

@@ -511,6 +511,173 @@ class TestEquationSystemOrderInEps:
         assert spec_n2.has_corrections() is False
 
 
+# === base_spec (Gap B: LHS demotion, v6 Phase 6A.1) ===
+
+
+def _spec_with_promoted_field(
+    kinetic_sym: str, extra_small: list[str] | None = None
+) -> dict[str, Any]:
+    """Spec where 'h' has a parameter-dependent kinetic coefficient.
+
+    At eps=0 (when ``kinetic_sym`` collapses), h becomes an algebraic
+    constraint; otherwise it stays dynamical.
+    """
+    small_params = ["b5"]
+    if extra_small:
+        small_params = [*small_params, *extra_small]
+    return {
+        "metadata": {
+            "source": "inline-test",
+            "perturbation": {"small_parameters": small_params, "order": 1},
+        },
+        "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+        "fields": [
+            {"name": "phi", "index": 0, "is_dynamical": True},
+            {"name": "h", "index": 1, "is_dynamical": True},
+        ],
+        "equations": [
+            {
+                "field": "phi",
+                "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "identity",
+                            "field": "phi",
+                            "coefficient_symbolic": "-m2",
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "h",
+                "lhs": {
+                    "expression": "d2_t(h)",
+                    "order": {"time": 2, "space": 0},
+                    "kinetic_coefficient_symbolic": kinetic_sym,
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -1.0,
+                            "operator": "identity",
+                            "field": "h",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "identity",
+                            "field": "phi",
+                            "coefficient_symbolic": "g",
+                        },
+                    ],
+                },
+            },
+        ],
+        "coupling": {},
+    }
+
+
+class TestEquationSystemBaseSpec:
+    """Tests for EquationSystem.base_spec() — LHS demotion at ε=0 (Gap B)."""
+
+    def test_base_spec_demotes_b5_kinetic(self) -> None:
+        """Kinetic '2*b5' → demote h to algebraic at b5=0."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+        base = spec.base_spec()
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 0
+        assert h_eq.kinetic_coefficient_symbolic is None
+        # Identity self-term must be present for Schur elimination.
+        has_self_identity = any(
+            t.operator == "identity" and t.field == "h" for t in h_eq.rhs_terms
+        )
+        assert has_self_identity
+
+    def test_base_spec_preserves_m2_kinetic(self) -> None:
+        """Kinetic 'm2' (independent of b5) → keep LHS unchanged."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("m2"))
+        base = spec.base_spec()
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 2
+        assert h_eq.kinetic_coefficient_symbolic == "m2"
+
+    def test_base_spec_handles_multi_small_param(self) -> None:
+        """Kinetic '2*b5 + 3*b1' with both small → demote."""
+        spec = EquationSystem.from_dict(
+            _spec_with_promoted_field("2*b5 + 3*b1", extra_small=["b1"])
+        )
+        base = spec.base_spec()
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 0
+
+    def test_base_spec_rejects_third_order_residual(self) -> None:
+        """Time-order=3 that's independent of small params must error out.
+
+        We construct the EquationSystem directly to bypass
+        ``from_dict``'s load-time Ostrogradsky reduction — which would
+        otherwise reject odd-order equations before ``base_spec``
+        could examine them. The post-check in ``base_spec`` is what
+        this test actually exercises.
+        """
+        from tidal.symbolic.json_loader import ComponentEquation
+
+        # Synthesize a minimal spec with a single time_order=3 field and
+        # no perturbation metadata (so base_spec([]) is a no-op on the
+        # kinetic coefficient and the post-check fires).
+        eq = ComponentEquation(
+            field_name="h",
+            field_index=0,
+            time_derivative_order=3,
+            rhs_terms=(OperatorTerm(coefficient=-1.0, operator="identity", field="h"),),
+            kinetic_coefficient_symbolic=None,
+        )
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("h",),
+            equations=(eq,),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={"perturbation": {"small_parameters": ["b5"], "order": 1}},
+        )
+        with pytest.raises(ValueError, match="time_order > 2"):
+            spec.base_spec()
+
+    def test_base_spec_preserves_other_equations(self) -> None:
+        """Non-promoted equations (phi) pass through unchanged."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+        base = spec.base_spec()
+        phi_eq = next(eq for eq in base.equations if eq.field_name == "phi")
+        assert phi_eq.time_derivative_order == 2
+        # phi RHS had no order_in_eps tags so all terms are kept.
+        assert len(phi_eq.rhs_terms) == 2
+
+    def test_base_spec_no_small_parameters_is_noop(self) -> None:
+        """When no small_parameters supplied, behaves as filter_by_order(0)."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+        base = spec.base_spec([])
+        # No demotion because no small parameters declared
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 2
+        assert h_eq.kinetic_coefficient_symbolic == "2*b5"
+
+    def test_base_spec_pulls_small_params_from_metadata(self) -> None:
+        """Default small_parameters read from metadata.perturbation."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+        base_from_meta = spec.base_spec()  # reads metadata
+        base_explicit = spec.base_spec(["b5"])
+        # Both routes demote h identically
+        h_meta = next(eq for eq in base_from_meta.equations if eq.field_name == "h")
+        h_expl = next(eq for eq in base_explicit.equations if eq.field_name == "h")
+        assert h_meta.time_derivative_order == 0
+        assert h_expl.time_derivative_order == 0
+
+
 # === Schema Validation Tests ===
 
 
