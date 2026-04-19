@@ -22,7 +22,8 @@
 #      were observed on some compute nodes (see issue #269).
 #   2. Sanity-check that pypolychord is importable from the extracted
 #      copy — fail loudly if the tarball is stale.
-#   3. Run the caller-supplied {{COMMAND}} (tidal sample ...).
+#   3. Run the caller-supplied command (tidal sample ...) substituted
+#      at render time for the {{COM}}MAND placeholder below.
 
 set -euo pipefail
 
