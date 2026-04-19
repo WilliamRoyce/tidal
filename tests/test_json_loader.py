@@ -657,6 +657,48 @@ class TestEquationSystemBaseSpec:
         # phi RHS had no order_in_eps tags so all terms are kept.
         assert len(phi_eq.rhs_terms) == 2
 
+    def test_high_order_without_perturbation_raises(self) -> None:
+        """time_order > 2 JSON without [perturbation] raises with migration hint.
+
+        Phase 6B removed Ostrogradsky; the loader now refuses rather
+        than introducing ghost modes.
+        """
+        n_grid = 32
+        # Synthesize a time_order=4 JSON without any perturbation metadata.
+        data: dict[str, Any] = {
+            "metadata": {"source": "inline-test"},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi",
+                    "lhs": {
+                        "expression": "d4_t(phi)",
+                        "order": {"time": 4, "space": 0},
+                        "kinetic_coefficient_symbolic": "2*b5",
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi",
+                            }
+                        ],
+                    },
+                }
+            ],
+            "coupling": {},
+        }
+        _ = n_grid  # silence ruff; kept for symmetry with other fixtures
+        with pytest.raises(ValueError, match=r"time_order > 2"):
+            EquationSystem.from_dict(data)
+
     def test_base_spec_no_small_parameters_is_noop(self) -> None:
         """When no small_parameters supplied, behaves as filter_by_order(0)."""
         spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))

@@ -522,12 +522,35 @@ class TestCLIIntegration:
 class TestAllExamplesRender:
     """Ensure every example JSON renders without errors."""
 
+    # These three ship with time_order>2 equations and currently lack
+    # a [perturbation] section in their theory.toml.  Phase 6B of the
+    # v6 plan removed Ostrogradsky, so loading these JSONs now raises
+    # with a migration hint until they are re-derived under
+    # [perturbation]=["b5"] (Phase 6B.3/6B.4).  Mark as xfail until
+    # the re-derivation commits land.
+    _PENDING_V6_REDERIVATION = {
+        "graviton_torsion",
+        "torsion_gertsenshtein",
+        "torsion_gertsenshtein_combined",
+    }
+
     @pytest.mark.parametrize(
         "json_file",
         sorted(_EXAMPLES.glob("*.json")),
         ids=lambda p: p.stem,
     )
-    def test_no_crash(self, json_file: Path) -> None:
+    def test_no_crash(self, json_file: Path, request: pytest.FixtureRequest) -> None:
+        if json_file.stem in self._PENDING_V6_REDERIVATION:
+            request.applymarker(
+                pytest.mark.xfail(
+                    reason=(
+                        "Pending Phase 6B.3/6B.4 re-derivation with "
+                        "[perturbation] section (v6 #267)."
+                    ),
+                    raises=ValueError,
+                    strict=True,
+                )
+            )
         from tidal.symbolic.json_loader import load_equation_system
 
         spec = load_equation_system(json_file)

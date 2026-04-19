@@ -1406,19 +1406,35 @@ class EquationSystem:
             canonical=canonical,
         )
 
-        # Ostrogradsky reduction: convert 4th-order-in-time equations to
-        # 2nd-order via auxiliary fields.  Ref: Ostrogradsky (1850),
-        # Woodard (2015, arXiv:1506.02210).  Applied in-memory only.
-        if any(eq.time_derivative_order > 2 for eq in spec.equations):  # noqa: PLR2004
-            from tidal.symbolic.ostrogradsky import (  # noqa: PLC0415
-                apply_ostrogradsky_reduction,
+        # v6 guard: time_order > 2 equations require a [perturbation]
+        # section.  Ostrogradsky reduction was deleted in v6 because it
+        # introduces ghost modes; the iterative PerturbativeSolver
+        # handles higher-derivative corrections without that cost.  When
+        # no [perturbation] is configured, the loader refuses with a
+        # migration hint rather than silently producing ghost-ful
+        # evolution.
+        has_pert = bool(metadata.get("perturbation", {}).get("small_parameters"))
+        if (
+            any(eq.time_derivative_order > 2 for eq in spec.equations)  # noqa: PLR2004
+            and not has_pert
+        ):
+            fields_with_high_order = [
+                eq.field_name
+                for eq in spec.equations
+                if eq.time_derivative_order > 2  # noqa: PLR2004
+            ]
+            msg = (
+                f"JSON has fields with time_order > 2 "
+                f"({fields_with_high_order}) but no [perturbation] section "
+                f"in theory.toml. Ostrogradsky reduction was removed in "
+                f"v6 because it introduces ghost modes.\n"
+                f"Migration: add\n"
+                f'    [perturbation]\n    small_parameters = ["<param>"]\n'
+                f"to your theory.toml and re-derive. Then `tidal simulate` "
+                f"will automatically use `--perturbative-order 1` by "
+                f"default.\nSee docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md."
             )
-
-            logger.info(
-                "Applying Ostrogradsky reduction for higher-derivative equations"
-            )
-            spec = apply_ostrogradsky_reduction(spec)
-            logger.info("Ostrogradsky: %d fields after reduction", spec.n_components)
+            raise ValueError(msg)
 
         return spec
 
