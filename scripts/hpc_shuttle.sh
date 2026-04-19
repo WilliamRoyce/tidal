@@ -57,6 +57,7 @@ cmd_push() {
     --exclude='*.egg-info/' \
     --exclude='tidal/wolfram/' \
     --exclude='*.wls' \
+    --exclude='/PolyChordLite/' \
     --exclude='/literature/' \
     --exclude='/third_party/' \
     --exclude='/xCobaInspirationForClaude/' \
