@@ -173,6 +173,9 @@ convention = "numpy"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: integration test with non-trivial compute (simulate, derive, etc.); runs in default lane but can be skipped with `-m 'not slow'`.",
+]
 
 [tool.coverage.run]
 source = ["tidal"]
