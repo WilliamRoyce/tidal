@@ -80,12 +80,18 @@ echo "  size:             \$(du -sh "\${TAR_PATH}" | cut -f1)"
 
 # Sanity check: the tar must contain pypolychord if install.sh has run.
 # Flag (don't hard-fail) so a fresh venv that legitimately lacks it can
-# still regenerate the tar.
-if tar tf "\${TAR_PATH}" | grep -q 'pypolychord/__init__.py'; then
+# still regenerate the tar.  Grep any entry under pypolychord/ since the
+# leaf name may be any of {__init__.py, settings.py, polychord.py}.
+# Disable pipefail for this check only: 'grep -q' closes the pipe as
+# soon as it matches, which gives 'tar' SIGPIPE and with pipefail would
+# fail the whole pipeline even on a successful match.
+set +o pipefail
+if tar tf "\${TAR_PATH}" | grep -q 'pypolychord/settings.py'; then
     echo "  pypolychord:      present (good)"
 else
     echo "  pypolychord:      MISSING — run scripts/hpc_install_polychord.sh if you need it"
 fi
+set -o pipefail
 REMOTE_EOF
 
 echo "==> tarball refreshed on ${HOST}"
