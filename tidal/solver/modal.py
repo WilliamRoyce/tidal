@@ -1582,6 +1582,7 @@ def _evolve_per_mode(
     return_fourier: bool = False,
     return_derivative_fourier: bool = False,
     B_modes: NDArray[np.complex128] | None = None,
+    collect_eigendata: list[dict[str, Any]] | None = None,
 ) -> tuple[
     NDArray[np.float64],
     NDArray[np.float64],
@@ -1737,6 +1738,21 @@ def _evolve_per_mode(
             )
 
         block_data.append((block_slots, eig_vals, v_mat, y0_eigen))
+
+        # Optional: expose eigendata for Pass 1 Duhamel solver (v6 Stage 3).
+        # alpha = V^-1 · y0_hat_block (eigenbasis amplitudes of the base IC).
+        # The Pass 1 solver reuses these to evaluate the closed-form Duhamel
+        # kernel without re-running the eigendecomposition.
+        if collect_eigendata is not None:
+            collect_eigendata.append(
+                {
+                    "slot_indices": list(block_slots),
+                    "V": v_mat.copy(),
+                    "D_diag": eig_vals.copy(),
+                    "V_inv": v_inv.copy(),
+                    "alpha": y0_eigen.copy(),
+                }
+            )
 
     # Evolve at each time point.
     # Pre-multiply V @ diag(y0_eigen) for each block so the inner loop only
@@ -2070,6 +2086,7 @@ def solve_modal(
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
     progress: SimulationProgress | None = None,
+    return_eigendata: bool = False,
 ) -> SolverResult:
     """Solve a TIDAL equation system using Fourier modal decomposition.
 
@@ -2100,11 +2117,24 @@ def solve_modal(
         Called as ``callback(t, y)`` at each output time.
     progress : SimulationProgress, optional
         Progress tracker for tqdm display.
+    return_eigendata : bool, optional
+        When True, attaches a ``"eigendata"`` key to the returned
+        ``SolverResult`` containing per-block eigendecomposition data
+        (``V``, ``D_diag``, ``V_inv``, ``alpha``), the ``mode_k`` grid,
+        the dynamical ``state_layout``, and (when constraints are
+        present) a ``schur_ops`` sub-dict with the recovery matrix and
+        the original → reduced slot map. Used by the v6 iterative
+        :class:`PerturbativeSolver` to drive a Pass 1 closed-form
+        Duhamel evaluation that reuses Pass 0's eigendecomposition.
+        Not supported for position-dependent coefficient systems (they
+        use ``expm_multiply`` without an explicit eigendecomposition);
+        attempting to combine the two raises ``NotImplementedError``.
 
     Returns
     -------
     SolverResult
-        Dict with keys: ``t``, ``y``, ``success``, ``message``.
+        Dict with keys: ``t``, ``y``, ``success``, ``message``. When
+        ``return_eigendata=True`` also has ``"eigendata"``.
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
 
@@ -2115,6 +2145,12 @@ def solve_modal(
     has_constraints = any(eq.time_derivative_order == 0 for eq in spec.equations)
     if not has_constraints:
         warn_frozen_constraints(layout, "modal")
+
+    # Pass 1 eigendata collector (v6 Stage 3). Populated per block by
+    # _evolve_per_mode when return_eigendata=True. Empty (and ignored) in
+    # the position-dependent expm_multiply path where there is no
+    # eigendecomposition to expose.
+    block_eigendata: list[dict[str, Any]] = []
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
@@ -2228,6 +2264,7 @@ def solve_modal(
             return_fourier=True,
             return_derivative_fourier=True,  # for exact constraint velocities
             B_modes=B_lhs_modes,  # generalized eig(A, B) when vel_coupling present
+            collect_eigendata=block_eigendata if return_eigendata else None,
         )
 
         # Reconstruct full state (including constraints) at each snapshot
@@ -2309,6 +2346,7 @@ def solve_modal(
             grid,
             snapshot_callback,
             progress,
+            collect_eigendata=block_eigendata if return_eigendata else None,
         )
         method_desc = "per-mode eigendecomposition (constant coefficients)"
     else:
@@ -2321,6 +2359,14 @@ def solve_modal(
             k_grid,
             rfft_shape,
         )
+        if return_eigendata:
+            msg = (
+                "return_eigendata=True is not supported for position-"
+                "dependent coefficient systems (expm_multiply Krylov path "
+                "has no explicit eigendecomposition). v6 Pass 1 Duhamel "
+                "requires constant coefficients."
+            )
+            raise NotImplementedError(msg)
         times, snapshots = _evolve_full_matrix(
             A_full,
             y0_hat,
@@ -2348,4 +2394,19 @@ def solve_modal(
     # systems, constraint_vel_arrays is empty.
     if constraint_vel_arrays:
         result["constraint_velocities"] = constraint_vel_arrays  # type: ignore[typeddict-unknown-key]
+
+    # Stage 3 (v6): expose Pass 0 eigendecomposition for Pass 1 Duhamel.
+    if return_eigendata:
+        eigendata: dict[str, Any] = {
+            "blocks": block_eigendata,
+            "mode_k": k_grid,
+            "state_layout": dyn_layout if needs_reduction else layout,
+        }
+        if needs_reduction:
+            eigendata["schur_ops"] = {
+                "recovery_matrix": recovery_matrix,
+                "constraint_field_names": tuple(c_names),
+                "orig_to_reduced": dict(orig_to_reduced),
+            }
+        result["eigendata"] = eigendata  # type: ignore[typeddict-unknown-key]
     return result

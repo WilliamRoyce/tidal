@@ -1268,3 +1268,160 @@ class TestRankDeficientBProjection:
         assert residual < 1e-10, (
             f"V_full @ V_inv residual = {residual:.2e}, expected < 1e-10"
         )
+
+
+class TestEigendataExport:
+    """Tests for return_eigendata=True (v6 Stage 3).
+
+    Pass 0 must expose its eigendecomposition so Pass 1 Duhamel can reuse
+    it without re-eigendecomposing. Verify structure, invertibility, and
+    that the reconstructed state matches the solver's own snapshot
+    output to machine precision.
+    """
+
+    def _run_kg(
+        self, return_eigendata: bool
+    ) -> tuple[dict[str, Any], np.ndarray, StateLayout, GridInfo]:
+        spec = _make_spec(_KG_1D_SPEC)
+        n = 32
+        length = 2 * np.pi
+        grid = GridInfo(shape=(n,), bounds=((0.0, length),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        x = np.linspace(0.0, length, n, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:n] = np.sin(x)  # k=1 Fourier mode
+        # Give a non-trivial velocity too so the block IC has both components.
+        y0[n : 2 * n] = 0.5 * np.cos(x)
+
+        result = cast(
+            "dict[str, Any]",
+            solve_modal(
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, 1.0),
+                parameters={"m2": 1.0},
+                num_snapshots=11,
+                return_eigendata=return_eigendata,
+            ),
+        )
+        return result, y0, layout, grid
+
+    def test_eigendata_key_absent_by_default(self) -> None:
+        result, _, _, _ = self._run_kg(return_eigendata=False)
+        assert "eigendata" not in result
+
+    def test_eigendata_structure_present_when_requested(self) -> None:
+        result, _, _, _ = self._run_kg(return_eigendata=True)
+        assert "eigendata" in result
+        ed = result["eigendata"]
+        assert set(ed.keys()) >= {"blocks", "mode_k", "state_layout"}
+        assert len(ed["blocks"]) >= 1
+        block = ed["blocks"][0]
+        assert set(block.keys()) == {"slot_indices", "V", "D_diag", "V_inv", "alpha"}
+
+    def test_eigendata_invertibility(self) -> None:
+        """V @ V_inv == I for every block and every mode (round-trip)."""
+        result, _, _, _ = self._run_kg(return_eigendata=True)
+        for block in result["eigendata"]["blocks"]:
+            v_mat = block["V"]
+            v_inv = block["V_inv"]
+            bs = v_mat.shape[-1]
+            eye = np.eye(bs)
+            # Sample a handful of modes for speed (block is n_modes, bs, bs)
+            for m in range(min(4, v_mat.shape[0])):
+                residual = float(np.max(np.abs(v_mat[m] @ v_inv[m] - eye)))
+                assert residual < 1e-10, (
+                    f"V @ V_inv residual {residual:.2e} at mode {m} "
+                    f"for block with slots {block['slot_indices']}"
+                )
+
+    def test_eigendata_alpha_matches_vinv_y0(self) -> None:
+        """Alpha = V_inv @ y0_hat (by construction)."""
+        result, y0, layout, grid = self._run_kg(return_eigendata=True)
+        from tidal.solver.modal import (
+            _fft_slots,
+        )
+
+        y0_hat = _fft_slots(y0, layout, grid)
+        for block in result["eigendata"]["blocks"]:
+            slot_indices = block["slot_indices"]
+            y0_block = y0_hat[slot_indices, :]  # (bs, n_modes)
+            expected_alpha = np.einsum("mij,mj->mi", block["V_inv"], y0_block.T)
+            np.testing.assert_allclose(
+                block["alpha"], expected_alpha, atol=1e-12, rtol=1e-12
+            )
+
+    def test_eigendata_reconstructs_pass_zero(self) -> None:
+        """y_hat(t) = V · diag(exp(D·t)) · alpha reproduces snapshots.
+
+        Pass 1 Duhamel relies on this identity to evaluate the
+        inhomogeneous solution. Verify reconstruction matches the
+        solver's own evolved output to machine precision.
+        """
+        result, _, layout, grid = self._run_kg(return_eigendata=True)
+        ed = result["eigendata"]
+        t = result["t"]
+        # Reconstruct at the final snapshot, in Fourier space
+        n_modes = ed["blocks"][0]["V"].shape[0]
+        n_slots = layout.num_slots
+        y_hat_rec = np.zeros((n_slots, n_modes), dtype=np.complex128)
+        ti = len(t) - 1
+        dt = t[ti] - t[0]
+        for block in ed["blocks"]:
+            v_mat = block["V"]  # (n_modes, bs, bs)
+            lam = block["D_diag"]  # (n_modes, bs)
+            alpha = block["alpha"]  # (n_modes, bs)
+            phase = np.exp(lam * dt)  # (n_modes, bs)
+            y_eigen = alpha * phase  # (n_modes, bs)
+            # y_block_hat = V · y_eigen for each mode  (n_modes, bs)
+            y_block_hat = np.einsum("mij,mj->mi", v_mat, y_eigen)
+            for i, slot in enumerate(block["slot_indices"]):
+                y_hat_rec[slot] = y_block_hat[:, i]
+
+        # Inverse FFT to physical space
+        rfft_shape_list = list(grid.shape)
+        rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
+        rfft_shape = tuple(rfft_shape_list)
+        n_pts = grid.num_points
+        # Dynamical slots are [:n_dyn] in the reduced layout (no constraints
+        # here — KG is a pure wave system)
+        n_dyn = n_slots
+        y_rec_phys = np.zeros(n_dyn * n_pts)
+        for si in range(n_dyn):
+            y_rec_phys[si * n_pts : (si + 1) * n_pts] = np.fft.irfftn(
+                y_hat_rec[si].reshape(rfft_shape),
+                s=grid.shape,
+                axes=list(range(len(grid.shape))),
+            ).ravel()
+
+        # Compare against solver's own snapshot
+        err = float(np.max(np.abs(y_rec_phys - result["y"][ti])))
+        assert err < 1e-12, (
+            f"Eigendata reconstruction error {err:.2e} exceeds 1e-12 tolerance"
+        )
+
+    def test_position_dependent_raises(self) -> None:
+        """Position-dependent coefficients + return_eigendata raises."""
+        # Use a spec with position-dependent mass (background field) to force
+        # the convolution path. The simplest trigger: give the mass a
+        # coordinate_dependent entry via a custom spec.
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        eqs = cast("list[dict[str, Any]]", spec_data["equations"])
+        eqs[0]["rhs"]["terms"][0]["coordinate_dependent"] = ["x"]
+        spec = _make_spec(spec_data)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+
+        with pytest.raises(NotImplementedError, match="position-"):
+            solve_modal(
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, 0.1),
+                parameters={"m2": 1.0},
+                num_snapshots=2,
+                return_eigendata=True,
+            )

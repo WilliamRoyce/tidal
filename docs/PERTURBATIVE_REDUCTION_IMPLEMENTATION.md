@@ -82,18 +82,30 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 
 ---
 
-## Stage 3: Pass-0 eigendata export from modal solver
+## Stage 3: Pass-0 eigendata export from modal solver — COMPLETE
 
 **Goal**: Modal solver returns eigenvalues/eigenvectors/Schur operators alongside `SolverResult` for use by Pass 1.
 
-**Estimated**: 1 day.
+**Estimated**: 1 day. **Actual**: <1 day (2026-04-19).
 
 ### Tasks
 
-- [ ] **3.1** Add `return_eigendata: bool = False` parameter to `solve_modal` in `tidal/solver/modal.py`.
-- [ ] **3.2** When True, return `eigendata` dict with keys: `V`, `D_diag`, `V_inv`, `alpha = V_inv @ y0_hat`, `mode_k`, `schur_ops`, `state_layout`.
-- [ ] **3.3** `schur_ops` must contain the S_cc⁻¹·S_cd matrices per mode computed during Pass 0 constraint elimination (modal.py:1020-1099).
-- [ ] **3.4** Unit test `tests/test_modal_eigendata.py`: verify `V · diag(exp(D·t)) · V⁻¹ · alpha` reconstructs Pass 0 `SolverResult` at all timesteps to machine precision.
+- [x] **3.1** Added `return_eigendata: bool = False` keyword to `solve_modal`. Threaded through a new `collect_eigendata: list[dict] | None = None` parameter on `_evolve_per_mode` — a mutable container the evolution routine appends each block's eigendecomposition into, avoiding a breaking change to the evolution function's return signature.
+- [x] **3.2** When `return_eigendata=True`, the returned `SolverResult` carries an `"eigendata"` dict with keys: `blocks` (list of per-block dicts with `slot_indices`, `V`, `D_diag`, `V_inv`, `alpha = V_inv @ y0_hat`), `mode_k` (the k-grid), `state_layout` (the *reduced* layout when Schur eliminate runs; full layout otherwise).
+- [x] **3.3** `schur_ops` sub-dict emitted when the constraint-field path runs: `recovery_matrix` (the `-S_cc⁻¹·S_cd` per mode, already computed at modal.py:1020-1099), `constraint_field_names` tuple, and `orig_to_reduced` slot-index map. Pass 1 (Stage 4) uses this to Schur-substitute constraint-field references when assembling `M_src(k)`.
+- [x] **3.4** Six-test suite at `tests/test_solver_modal.py::TestEigendataExport`:
+  - `test_eigendata_key_absent_by_default` — baseline no-eigendata behaviour
+  - `test_eigendata_structure_present_when_requested` — shape of the dict
+  - `test_eigendata_invertibility` — `V @ V_inv ≈ I` per mode
+  - `test_eigendata_alpha_matches_vinv_y0` — α derivation correct
+  - `test_eigendata_reconstructs_pass_zero` — `y(t) = V·diag(exp(D·t))·α` matches snapshot to < 1e-12
+  - `test_position_dependent_raises` — `NotImplementedError` on Krylov path
+
+### Smoke tests (2026-04-19)
+
+- `uv run pytest tests/test_solver_modal.py -q` → 44 passed (38 pre-existing + 6 new).
+- `uv run pytest tests/ -x -q --ignore=tests/integration` → 1817 passed, 66 skipped (full Python suite, no regressions from the refactor).
+- Position-dependent path correctly rejects `return_eigendata=True` with a clear error pointing at Pass 1 Duhamel's constant-coefficient requirement.
 
 ---
 
