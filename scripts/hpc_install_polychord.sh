@@ -54,6 +54,10 @@ module purge
 module load rhel8/default-icl
 module load python/3.11.0-icl
 module load intel/2019.3.199 2>/dev/null || true
+# MPI toolchain for PolyChord's --ntasks>1 runs via mpirun.  Required
+# for the #292 parallelism work; pypolychord auto-detects MPI.COMM_WORLD
+# and falls back to serial cleanly when mpi4py isn't importable.
+module load intel-oneapi-mpi 2>/dev/null || true
 
 REMOTE_ROOT="${REMOTE_ROOT}"
 POLYCHORD_DIR="\${REMOTE_ROOT}/PolyChordLite"
@@ -71,15 +75,30 @@ fi
 
 cd "\${POLYCHORD_DIR}"
 
-# 2. Activate venv + ensure setuptools is present
+# 2. Activate venv + ensure setuptools + mpi4py are present.  mpi4py is
+#    what lets pypolychord auto-detect MPI.COMM_WORLD at import time;
+#    without it the run falls back to serial single-process mode.
 source "\${REMOTE_ROOT}/.venv/bin/activate"
 pip install --quiet setuptools
+# Prefer the already-loaded intel-oneapi-mpi toolchain when building
+# mpi4py from source (pip wheel may be built against a different MPI
+# and segfault at MPI_Init — always compile against the cluster MPI).
+pip install --quiet --no-binary=mpi4py mpi4py
 
-# 3. Build libchord.so via ifort (MPI=0 for serial — MPI build is a
-#    separate future task, see issue #269).
-echo "--- make all MPI=0 ---"
-make all MPI=0 2>&1 | tail -3
+# 3. Build libchord.so via ifort, WITH MPI for #292 parallel runs.  The
+#    MPI=1 path picks up the intel-oneapi-mpi mpif90 wrapper from the
+#    module loaded above and links libchord.so against libmpi_*.so.
+echo "--- make all MPI=1 ---"
+# Wipe any previous MPI=0 build products to avoid mixing.
+make veryclean 2>&1 | tail -3 || true
+make all MPI=1 2>&1 | tail -3
 echo "libchord.so: \$(ls -lh lib/libchord.so)"
+# Confirm the library is actually MPI-linked.
+if ldd lib/libchord.so 2>/dev/null | grep -qi 'mpi'; then
+    echo "  MPI-linked: yes (good — ranks will talk to each other)"
+else
+    echo "  MPI-linked: NO — the mpirun launch will behave as serial.  Fix: reload intel-oneapi-mpi before rerunning."
+fi
 
 # 4. Build _pypolychord.*.so via distutils.  The 'intel' module export
 #    of CC=icx breaks distutils introspection ('icx -v' exits non-zero),

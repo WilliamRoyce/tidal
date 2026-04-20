@@ -114,12 +114,13 @@ cmd_resolve_account() {
 }
 
 cmd_submit() {
-  local template="" cmd="" nodes=1 time="01:00:00" name="tidal" account=""
+  local template="" cmd="" nodes=1 time="01:00:00" name="tidal" account="" ntasks=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --template) template="$2"; shift 2 ;;
       --cmd)      cmd="$2"; shift 2 ;;
       --nodes)    nodes="$2"; shift 2 ;;
+      --ntasks)   ntasks="$2"; shift 2 ;;
       --time)     time="$2"; shift 2 ;;
       --name)     name="$2"; shift 2 ;;
       --account)  account="$2"; shift 2 ;;
@@ -130,11 +131,14 @@ cmd_submit() {
   [[ -n "$cmd" ]] || die "--cmd required"
   [[ -n "$account" ]] || account="$(cmd_resolve_account)"
 
-  # Default ntasks to 112 * nodes (sapphire cores/node).
-  # NB: tidal sweep uses multiprocessing.Pool (single-node shared-memory), so
-  # --nodes=1 is always correct for sweeps.  Multi-node allocations waste SLURM
-  # slots unless you add MPI/distributed dispatch.
-  local ntasks=$(( nodes * 112 ))
+  # Default ntasks to 112 * nodes (sapphire cores/node) unless overridden.
+  # MPI templates (e.g. scripts/hpc_templates/polychord_intr.sbatch) need
+  # the caller to pass --ntasks N explicitly so ${MPIRUN_PREFIX} launches
+  # exactly N ranks.  tidal sweep uses multiprocessing.Pool
+  # (single-node shared-memory), so --nodes=1 is always correct for sweeps.
+  if [[ -z "$ntasks" ]]; then
+    ntasks=$(( nodes * 112 ))
+  fi
   local rendered
   rendered="$(sed \
     -e "s|{{JOB_NAME}}|${name}|g" \
@@ -263,7 +267,7 @@ Subcommands:
   push                              rsync local tidal tree -> remote (Python only, no Wolfram)
   setup                             one-time: harvest templates, create remote venv, install tidal
   submit --template T --cmd C [opts]  render sbatch template and submit via ssh
-         [--nodes N] [--time HH:MM:SS] [--name X] [--account P]
+         [--nodes N] [--ntasks N] [--time HH:MM:SS] [--name X] [--account P]
   status [jobid]                    one-shot squeue
   tail <jobid> [--follow|-f]        tail remote slurm log
   htop <jobid>                      attach htop on the compute node
