@@ -114,3 +114,6 @@ order = 1
 [parameters]
 B0 = 1.0
 rho = 0.01
+
+[output]
+path = "../data/euler_heisenberg.json"

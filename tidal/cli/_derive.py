@@ -1500,23 +1500,89 @@ def _wls_precompute_cd_component_values(
         "",
     ]
 
-    # Only pre-compute ComponentValues for MULTI-FIELD theories.
-    # Single-field theories (graviton_torsion, scalar_field) don't have
-    # cross-field coupling → StaggeredToBasis handles them efficiently.
-    # Multi-field theories (torsion+EM) have cross-coupling that creates
-    # O(dim^{2K}) blowup in TraceBasisDummy — pre-computation prevents this.
+    # CD ComponentValue pre-computation gate.
     #
-    # Limit to CD1 only: each CD level adds a rank to the tensor, making
-    # the ComponentArray exponentially larger (4^rank). CD1 resolves first
-    # covariant derivatives (the most common), giving the best cost/benefit.
-    # Higher levels are handled by StaggeredToBasis fallback during Phase A.
+    # Historical motivation (still valid for performance): multi-field theories
+    # (torsion+EM, graviton+photon) have cross-coupling that creates
+    # O(dim^{2K}) blowup in TraceBasisDummy — pre-computation of CD shorthand
+    # ComponentValues lets ToValues resolve them in O(1) and prevents the blowup.
+    # Single-field theories in which the field appears *directly* (bare, e.g.
+    # scalar_field's ``phi[]`` or massive_gravity's ``h[-a,-b] h^{ab}``) do
+    # not benefit from this pre-computation — StaggeredToBasis handles them
+    # efficiently on its own, and the skip is pure performance.
+    #
+    # Correctness motivation (added for #271 EH): a single-dyn-field theory
+    # whose Lagrangian contains the field *only* through covariant derivatives
+    # (e.g. Euler-Heisenberg where the photon appears only via F = dA, or any
+    # matter-only Maxwell-type theory) RELIES on the pre-computation for
+    # correctness, not just speed. Without it, ``CD1field[{i,-cart},{j,-cart}]``
+    # shorthand survives through DecomposeScalarExpression into lagComp, and
+    # Component E-L's field-function detection (which looks for bare field
+    # heads or Derivative[...][field_i][t,x,y,z]) returns zero fields.
+    #
+    # Gate: run the pre-computation whenever
+    #   (a) we have >= 2 dyn fields (existing behaviour), OR
+    #   (b) any dyn field appears as ``CD[...][name[...]]`` in the Lagrangian,
+    #       i.e. derivative-only dependence that needs ComponentValue resolution.
+    # Otherwise keep the fast-path skip (scalar/direct-tensor theories).
     min_fields_for_precompute = 2
-    if len(dyn_fields) < min_fields_for_precompute:
+
+    def _lagrangian_contains(name_pattern: str) -> bool:
+        """Return True if ``name[...]`` appears in the Lagrangian (directly or wrapped).
+
+        We do NOT require ``CD[...][name[...]]`` — for a derived field like
+        F whose definition already carries CD dependence, any usage of F
+        (as `F[-a,-b]`) ultimately expands to CD-wrapped source fields, so
+        the precompute is needed even if the user never wrote `CD[...][F[...]]`
+        directly. Simpler regex matches ``name[`` as a whole word boundary.
+        """
+        import re
+
+        lag_expr = ctx.lagrangian_expr or ""
+        pat = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(name_pattern)}\s*\[")
+        return bool(pat.search(lag_expr))
+
+    # Any field / derived field that carries CD dependence in its own
+    # definition — or any dyn field whose name appears in the Lagrangian —
+    # forces the correctness-required precompute. In particular:
+    #  * A derived field whose definition contains CD[ (e.g. F = dA style):
+    #    every use of that derived field in the Lagrangian expands to a
+    #    CD-wrapped source field after derived-field substitution.
+    #  * Matter-perturbation target fields (e.g. "A") that appear directly in
+    #    CD[...][A[...]] form in the Lagrangian.
+    needs_precompute_any = False
+    # Case 1: derived fields with CD in their definition, used anywhere in the Lagrangian
+    for derived in ctx.derived_fields or []:
+        definition = str(derived.get("definition", ""))
+        if "CD[" in definition and _lagrangian_contains(derived["name"]):
+            needs_precompute_any = True
+            break
+    # Case 2: dyn fields or matter-pert originals appearing as CD[...][name[...]]
+    if not needs_precompute_any:
+        import re
+
+        cd_candidate_names: list[str] = [df["name"] for df in dyn_fields]
+        if ctx.linearization is not None:
+            for mp in ctx.linearization.get("matter_perturbations", []) or []:
+                fname = mp.get("field")
+                if fname:
+                    cd_candidate_names.append(fname)
+        lag_expr = ctx.lagrangian_expr or ""
+        for name in cd_candidate_names:
+            if not name:
+                continue
+            cd_pat = re.compile(rf"CD\s*\[[^\[\]]*\]\s*\[\s*{re.escape(name)}\s*\[")
+            if cd_pat.search(lag_expr):
+                needs_precompute_any = True
+                break
+
+    if len(dyn_fields) < min_fields_for_precompute and not needs_precompute_any:
         lines.extend(
             [
                 "",
-                "(* Single-field theory — skip CD pre-computation (already fast) *)",
-                'Print["CD pre-computation: skipped (single dynamical field)"];',
+                "(* Single-field theory with direct field dependence —                *)",
+                "(* skip CD shorthand pre-computation (StaggeredToBasis handles it).  *)",
+                'Print["CD pre-computation: skipped (single field, no CD-only dependence)"];',
             ]
         )
         lines.extend(
@@ -5790,6 +5856,23 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     )
             lines.extend(
                 [
+                    "",
+                    "(* Safety net: apply CD shorthand REVERSE rules to lagComp before   *)",
+                    "(* field-function detection, but ONLY if a CDNfield shorthand atom  *)",
+                    "(* is actually still present.  $CDShorthandReverseRules is defined  *)",
+                    "(* alongside $CDShorthandRules (see _wls_shorthand_cd_tensors) and  *)",
+                    "(* reverses CDNfield[…] → CD@CD(N-1)field[…]. When the CD           *)",
+                    "(* ComponentValue pre-computation resolved everything (the common   *)",
+                    "(* case), this FreeQ gate keeps the safety net O(LeafCount[lagComp])*)",
+                    "(* instead of running //. over the full expression for no reason —  *)",
+                    "(* the gate matters for large gertsenshtein-scale Lagrangians.      *)",
+                    "(* Needed for #271 matter-only theories where the precompute path  *)",
+                    "(* could still leave residual CD4field[…] atoms above the          *)",
+                    "(* max_cd_precompute=2 cap.                                         *)",
+                    "If[ListQ[$CDShorthandReverseRules] && Length[$CDShorthandReverseRules] > 0",
+                    "    && !FreeQ[lagComp, _Symbol?(StringMatchQ[ToString[#], "
+                    '"CD" ~~ DigitCharacter ~~ __] &)],',
+                    "  lagComp = lagComp //. $CDShorthandReverseRules];",
                     "",
                     "(* Build field function list from lagComp.                     *)",
                     "(* Match BOTH bare f[args] AND Derivative[...][f][args] forms.  *)",
