@@ -169,15 +169,18 @@ def test_pass0_exhibits_gertsenshtein_mixing(rtilde_spec: Any) -> None:
 
 
 def test_pass1_has_no_column_missing_drops(rtilde_spec: Any) -> None:
-    """R1.1 / #272: every correction drop must be row-missing.
+    """R1.1 / #272 + R8 / #290: no column-missing or unclassified drops.
 
-    "column-missing" drops mean a correction term references a field
-    that has neither a dynamical slot nor a Schur-recoverable
-    constraint slot — that's a bug (typo or missing field). The
-    shipped R̃² PGT JSON has 31 legitimate row-missing drops
-    (O(ε²) augmentations on constraint equations) and zero
-    column-missing drops. Any regression introducing column-missing
-    drops must fail here.
+    After R8 augmented Schur recovery (#290), the 159 O(ε¹)
+    corrections on demoted constraint rows are routed to
+    ``_compute_constraint_source_hat`` and applied via the augmented
+    recovery — no longer dropped in the Pass 1 dynamical source
+    path. The remaining drop category is ``"row-routed-to-augmented"``
+    which is informational, not a bug.
+
+    A ``"column-missing"`` drop means a correction term's TARGET
+    field is neither dynamical nor a Schur-recoverable constraint —
+    that's always a bug.
     """
     n = 32
     grid = GridInfo(shape=(n,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
@@ -198,23 +201,31 @@ def test_pass1_has_no_column_missing_drops(rtilde_spec: Any) -> None:
         f"indicate a correction term references an unresolved field "
         f"(bug, #272). Records: {column_missing[:3]}"
     )
+    # All remaining drops should be the informational R8-routed kind.
+    unknown = [
+        d
+        for d in drops
+        if not (
+            d["reason"].startswith("row-routed-to-augmented")
+            or d["reason"].startswith("column-missing")
+        )
+    ]
+    assert not unknown, (
+        f"Found {len(unknown)} drops of unrecognised category; expected "
+        f"only row-routed-to-augmented (R8 / #290). First few: {unknown[:3]}"
+    )
 
 
-def test_pass1_identically_zero_on_dynamical_fields(rtilde_spec: Any) -> None:
-    """At O(ε¹) for the shipped R̃² PGT JSON, every b5 coupling lives
-    on a constraint-field row. All corrections legitimately row-drop
-    (see test_pass1_has_no_column_missing_drops), so Pass 1 on the
-    dynamical sector is exactly zero.
+def test_pass1_h_constraints_nonzero(rtilde_spec: Any) -> None:
+    """R8 / #290: augmented Schur recovery populates h_{4,7,9} Pass 1.
 
-    This is a **theory-level property** of R̃² PGT as tagged by the
-    ExportJSON pipeline: the b5 operator has no O(ε¹) channel into
-    linear photon or graviton waves. Observing non-zero Pass 1 on a
-    dynamical field would signal either (i) a regression in the
-    drop-detection logic or (ii) a change in how the Wolfram
-    pipeline tags b5 terms — either way, needs investigation.
+    With R8, the 159 O(ε¹) constraint-row corrections (plus the
+    LHS-feedback from the removed b5·d^n_t(h_c) kinetics) are
+    applied via ``_compute_constraint_source_hat`` + S_cc_inv. Pass 1
+    on the demoted constraint fields must now be non-trivial.
 
-    Captures the O(ε¹) truncation invariant so future refactors
-    don't silently expand it (#273 tracks the O(ε²) extension).
+    Pre-R8 Pass 1 was identically zero on these fields — the bug
+    that motivated the R8 remediation.
     """
     n = 32
     grid = GridInfo(shape=(n,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
@@ -229,29 +240,28 @@ def test_pass1_identically_zero_on_dynamical_fields(rtilde_spec: Any) -> None:
         num_snapshots=3,
     )
     pass1 = res.orders[1]
-    assert np.all(np.isfinite(pass1["y"]))
-    # Pass 1 dynamical output should be at roundoff level (numerically
-    # zero — it starts at zero and no source reaches a dynamical row).
-    assert np.max(np.abs(pass1["y"])) < 1e-14, (
-        f"Pass 1 output has max|y| = {np.max(np.abs(pass1['y'])):.3e}, "
-        f"expected ~1e-16 (all b5 corrections in the shipped JSON "
-        f"legitimately row-drop at O(ε¹)). Non-zero output suggests "
-        f"either a regression in #272 drop detection or a Wolfram "
-        f"tagging change that introduced a b5 term on a dynamical "
-        f"row. Investigate before trusting results."
-    )
+    from tidal.solver.state import StateLayout
+
+    layout = StateLayout.from_spec(solver.base_spec, grid.num_points)
+    for fname in ("h_4", "h_7", "h_9"):
+        slot = layout.field_slot_map[fname]
+        vals = pass1["y"][-1, slot * n : (slot + 1) * n]
+        assert np.all(np.isfinite(vals))
+        max_abs = float(np.max(np.abs(vals)))
+        assert max_abs > 1e-9, (
+            f"Pass 1 {fname}: max|y| = {max_abs:.3e}, expected "
+            f"> 1e-9 after R8 augmented recovery (#290). This was "
+            f"identically zero pre-R8 — regression check."
+        )
 
 
 def test_pass1_linear_in_b5_when_excited(rtilde_spec: Any) -> None:
-    """When Pass 1 IS non-zero (synthetic or future O(ε²) support),
-    it must scale linearly in b5. Doubling b5 doubles Pass 1.
+    """R8 / #290: Pass 1 amplitude scales linearly in b5.
 
-    On the current shipped JSON Pass 1 is identically zero
-    (see test_pass1_identically_zero_on_dynamical_fields), so this
-    test is a no-op but kept as the b5-scaling invariant check —
-    any future Wolfram change that introduces a b5 term on a
-    dynamical row will make this test meaningful without code
-    changes.
+    With the augmented Schur recovery landed, Pass 1 on demoted
+    constraint fields (h_{4,7,9}) is non-zero and proportional to
+    b5 (the small parameter). Doubling b5 doubles Pass 1 amplitude
+    to within the O(ε²) truncation error.
     """
     n = 32
     grid = GridInfo(shape=(n,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
@@ -277,14 +287,16 @@ def test_pass1_linear_in_b5_when_excited(rtilde_spec: Any) -> None:
     p1b = res_b.orders[1]["y"]
     scale_a = float(np.max(np.abs(p1a)))
     scale_b = float(np.max(np.abs(p1b)))
-    if scale_a > 1e-14:
-        ratio = scale_b / scale_a
-        assert abs(ratio - 2.0) < 0.1, (
-            f"Pass 1 amplitude ratio at 2×b5 / 1×b5 = {ratio:.3f}, "
-            f"expected 2.0 ± 0.1 for a linear O(ε) correction. "
-            f"Indicates non-linear or miscompiled b5 dependence."
-        )
-    # else: Pass 1 is the all-row-drop zero; no scaling check possible.
+    assert scale_a > 1e-9, (
+        f"Pass 1 at b5=1e-3 is essentially zero (max={scale_a:.3e}). "
+        f"R8 augmented recovery should produce non-trivial output."
+    )
+    ratio = scale_b / scale_a
+    assert abs(ratio - 2.0) < 0.1, (
+        f"Pass 1 amplitude ratio at 2×b5 / 1×b5 = {ratio:.3f}, "
+        f"expected 2.0 ± 0.1 for a linear O(ε) correction. "
+        f"Indicates non-linear or miscompiled b5 dependence."
+    )
 
 
 def test_pass0_insensitive_to_b5(rtilde_spec: Any) -> None:

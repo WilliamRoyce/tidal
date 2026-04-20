@@ -21,7 +21,9 @@ import pytest
 
 from tidal.symbolic._kinetic_eval import (
     KineticEvalError,
+    evaluate_at_one,
     evaluate_at_zero,
+    evaluate_with_substitutions,
     lhs_collapses_to_zero,
 )
 
@@ -148,3 +150,53 @@ class TestLhsCollapsesToZero:
         assert lhs_collapses_to_zero("2*b5 + 3*b1", ["b5", "b1"]) is True
         # Only b5 is small → 0 + 3*b1 = symbolic, does not collapse
         assert lhs_collapses_to_zero("2*b5 + 3*b1", ["b5"]) is False
+
+
+class TestEvaluateAtOne:
+    """v6 R8.2 / #290: extract numeric kinetic coefficients by
+    substituting every small parameter with 1.0.
+
+    Used by PerturbativeSolver.solve to recover ``K`` in the augmented
+    constraint recovery formula ``h_c¹ += S_cc_inv · K · d^n_t(h_c⁰)``.
+    """
+
+    def test_simple_monomial_2_times_b5(self) -> None:
+        assert evaluate_at_one("2*b5", {"b5"}) == 2.0
+
+    def test_signed_rational_minus_25_times_b5_over_2(self) -> None:
+        assert evaluate_at_one("(-25*b5)/2", {"b5"}) == -12.5
+
+    def test_bare_b5_evaluates_to_one(self) -> None:
+        assert evaluate_at_one("b5", {"b5"}) == 1.0
+
+    def test_negated_b5(self) -> None:
+        assert evaluate_at_one("-b5", {"b5"}) == -1.0
+
+    def test_still_symbolic_returns_none(self) -> None:
+        # kappa is not in the substitution set — still symbolic.
+        assert evaluate_at_one("kappa*b5", {"b5"}) is None
+
+    def test_pure_literal_unaffected(self) -> None:
+        # No substitution needed: literal 3.0 evaluates as-is.
+        assert evaluate_at_one("3.0", {"b5"}) == 3.0
+
+    def test_b5_squared_is_order_epsilon_squared(self) -> None:
+        # evaluate_at_one doesn't distinguish between O(ε) and O(ε²)
+        # kinetics; the caller must gate on this separately. But we
+        # document the raw numeric result here.
+        assert evaluate_at_one("b5**2", {"b5"}) == 1.0
+
+
+class TestEvaluateWithSubstitutions:
+    """Generalised evaluator used by the two thin wrappers above."""
+
+    def test_custom_value_map(self) -> None:
+        # Evaluating "2*b5 + 3*b1" at b5=0.5, b1=2 gives 2*0.5 + 3*2 = 7.
+        assert evaluate_with_substitutions("2*b5 + 3*b1", {"b5": 0.5, "b1": 2.0}) == 7.0
+
+    def test_unsubstituted_name_returns_none(self) -> None:
+        # Only b5 substituted; kappa still symbolic.
+        assert evaluate_with_substitutions("b5 + kappa", {"b5": 1.0}) is None
+
+    def test_caret_is_normalised_to_double_star(self) -> None:
+        assert evaluate_with_substitutions("b5^3", {"b5": 2.0}) == 8.0

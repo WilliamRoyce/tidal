@@ -242,8 +242,9 @@ def _assemble_full_state_pass_n(
     full_state_size: int,
     full_layout: Any,
     grid: GridInfo,
+    constraint_source_hat: NDArray[np.complex128] | None = None,
 ) -> NDArray[np.float64]:
-    """Assemble the Pass-n full-layout state from the reduced-layout output.
+    r"""Assemble the Pass-n full-layout state from the reduced-layout output.
 
     Pass n evolves only the dynamical (Schur-reduced) subspace. This
     function reconstructs the full-layout state in physical space:
@@ -251,12 +252,19 @@ def _assemble_full_state_pass_n(
     * Dynamical slots are mapped from the reduced layout back to their
       original slot indices using ``eigendata["schur_ops"]
       ["orig_to_reduced"]``.
-    * Constraint slots are populated via Schur recovery on the
-      *Fourier-space* dynamical Pass n output: ``c_hat = recovery_matrix
-      @ y_hat_dyn``. This is the O(ε¹) Schur-base recovery. The
-      O(ε²) augmentation from the correction's contribution to the
-      constraint equation itself (``S_cc^{-1} · source_c(y⁰)``) is
-      dropped at order 1.
+    * Constraint slots are populated via the **augmented** Schur
+      recovery (v6 R8 / #290):
+
+      .. math::
+
+        \\hat h_c^{(1)} = \\mathrm{recovery} \\cdot \\hat y_{dyn}^{(1)}
+                     + S_{cc}^{-1} \\cdot \\mathrm{source\\_hat}_c
+
+      where ``source_hat_c = K·d^n_t(h_c⁰) − corr_1(y⁰)`` (see
+      :func:`_compute_constraint_source_hat`). Pre-R8, only the
+      first term was applied — see #290 for the ~14-orders-of-
+      magnitude discrepancy this caused on the flagship R̃² PGT
+      theory.
 
     Parameters
     ----------
@@ -306,6 +314,8 @@ def _assemble_full_state_pass_n(
     orig_to_reduced: dict[int, int] = schur_ops["orig_to_reduced"]
     c_names: tuple[str, ...] = schur_ops["constraint_field_names"]
     recovery_matrix = schur_ops["recovery_matrix"]  # (n_modes, n_c, n_dyn)
+    # R8 / #290: S_cc_inv is required when augmentation is applied.
+    scc_inv: NDArray[np.complex128] | None = schur_ops.get("S_cc_inv")
 
     n_snap = pass_n_reduced.shape[0]
     pass_n_full = np.zeros((n_snap, full_state_size))
@@ -340,6 +350,21 @@ def _assemble_full_state_pass_n(
         # recovery_matrix is (n_modes, n_c, n_dyn)
         # c_hat[c_idx, m] = sum_j recovery_matrix[m, c_idx, j] * y_hat_dyn[j, m]
         c_hat = np.einsum("mcj,jm->cm", recovery_matrix, y_hat_dyn[ti])
+
+        # R8 / #290: augmented Schur recovery. Adds
+        # S_cc_inv · source_hat(ti) where source_hat encodes the
+        # LHS-feedback K·d^n_t(h_c⁰) and the order-1 RHS corrections
+        # on demoted constraint rows. Without this, Pass 1 for any
+        # theory where b5 corrections live on constraint rows
+        # (e.g. R̃² PGT) is identically zero on the physics-relevant
+        # fields — see #290 for the full derivation.
+        if constraint_source_hat is not None and scc_inv is not None:
+            # source_hat[ti]: (n_c, n_modes)
+            # scc_inv: (n_modes, n_c, n_c)
+            # augmented_hat[c_idx, m] = sum_c' S_cc_inv[m, c_idx, c'] · source_hat[ti, c', m]
+            augmented_hat = np.einsum("mij,jm->im", scc_inv, constraint_source_hat[ti])
+            c_hat += augmented_hat
+
         for ci, c_name in enumerate(c_names):
             c_slot = full_layout.field_slot_map[c_name]
             c_phys = np.fft.irfftn(
@@ -377,6 +402,7 @@ class PerturbativeSolver:
         # emitted by ExportJSON.wl when [perturbation] is configured.
         pert_meta = spec.metadata.get("perturbation", {}) or {}
         small_parameters = list(pert_meta.get("small_parameters", []))
+        self._small_parameters = small_parameters
         self.base_spec = spec.base_spec(small_parameters)
         self._max_order = spec.max_order()
 
@@ -447,13 +473,6 @@ class PerturbativeSolver:
             )
             raise ValueError(msg)
         if order >= 2:
-            # The current driver passes Pass 0 eigendata (and Pass 0
-            # amplitudes α) to solve_modal_pass1 at every iteration. For
-            # Pass 2 the Duhamel integral needs to act on q¹(t) as the
-            # IC-analogue — q¹ is itself a Duhamel integral, not an
-            # eigenmode superposition. Supporting order >= 2 requires
-            # a formal extension of the Pass 1 amplitude contract; see
-            # #273.
             msg = (
                 "PerturbativeSolver.solve() currently supports order=0 "
                 "and order=1 only. order >= 2 requires Pass 2 Duhamel "
@@ -485,21 +504,27 @@ class PerturbativeSolver:
 
             eigendata = pass0["eigendata"]
             full_state_size = pass0["y"].shape[1]
-            # Pass 0's output is in the layout of base_spec (post-Gap-B
-            # demotion). Build that layout once so Pass n's constraint
-            # recovery can look up constraint slot indices in the same
-            # layout the combined solution lives in.
             full_layout = StateLayout.from_spec(self.base_spec, grid.num_points)
+
+            # R8 / #290: compute once the constraint-row source
+            # (K · d^n_t(h_c⁰) − corr_1(y⁰)) that augments the Pass 1
+            # Schur recovery. Depends only on Pass 0 output + spec, so
+            # it's shared across all correction orders.
+            pre_demote = _pre_demote_info(
+                self.full_spec, self.base_spec, self._small_parameters
+            )
+            constraint_source_hat = _compute_constraint_source_hat(
+                full_spec=self.full_spec,
+                eigendata=eigendata,
+                pre_demote_info=pre_demote,
+                parameters=parameters,
+                pass0_t=pass0["t"],
+                grid=grid,
+            )
 
             for n in range(1, order + 1):
                 correction_spec = self.full_spec.filter_by_order(n)
-                # filter_by_order(n) keeps terms whose order_in_eps is
-                # exactly n; if any survive, they are corrections by
-                # definition, so has_corrections() on the filtered spec
-                # is the right gate.
                 if not correction_spec.has_corrections():
-                    # No terms at this order; append a zero contribution
-                    # for shape consistency.
                     zero_result = {
                         "t": pass0["t"].copy(),
                         "y": np.zeros_like(pass0["y"]),
@@ -516,21 +541,19 @@ class PerturbativeSolver:
                     pass0["t"],
                     parameters=parameters,
                 )
-                # correction_drops is a required field on
-                # PerturbativePass1Result (#279); tag each drop with its
-                # pass index for downstream diagnostics.
                 correction_drops.extend(
                     {**d, "pass": n} for d in pass_n["correction_drops"]
                 )
-                # Assemble the full-layout state by mapping dynamical
-                # slots directly and recovering constraint slots via the
-                # Pass 0 Schur operator applied to y_hat_dyn.
+                # Pass 1 (n=1) uses the augmented Schur recovery. Higher
+                # orders don't have an analogous augmentation derived yet
+                # (tracked in #273); current code gates order >= 2.
                 pass_n_full = _assemble_full_state_pass_n(
                     pass_n,
                     eigendata,
                     full_state_size=full_state_size,
                     full_layout=full_layout,
                     grid=grid,
+                    constraint_source_hat=constraint_source_hat if n == 1 else None,
                 )
                 pass_n["y"] = pass_n_full
                 orders.append(pass_n)
@@ -575,3 +598,287 @@ class PerturbativeSolver:
             spec=self.base_spec,
             full_spec=self.full_spec,
         )
+
+
+def _pre_demote_info(
+    full_spec: EquationSystem,
+    base_spec: EquationSystem,
+    small_parameters: list[str],
+) -> dict[str, tuple[str, int]]:
+    """Return per-demoted-field pre-demotion metadata.
+
+    v6 R8.2 / #290: the augmented Pass 1 constraint recovery needs the
+    symbolic kinetic coefficient and the original LHS time-derivative
+    order for every demoted field whose pre-demote kinetic is
+    non-zero (e.g. R̃² PGT's ``h_4`` with kinetic ``"2*b5"``).
+
+    Symbolic form (not pre-numeric) is retained because the correct
+    runtime contribution is ``evaluate(kinetic, runtime_params)``,
+    which naturally handles both linear (``"2*b5"`` → 2·ε) and
+    higher-order (``"b5**2"`` → ε², which is O(ε²) and therefore
+    vanishes at Pass 1) kinetics. The driver resolves at solve-time
+    using :func:`evaluate_with_substitutions`.
+
+    Returns
+    -------
+    dict[str, (kinetic_symbolic, n)]
+        Maps demoted field name → (kinetic coefficient symbolic
+        expression, pre-demote time-derivative order). Validation
+        (that the kinetic evaluates to 0 at small_params=0 i.e. is
+        actually small-parameter-dependent) happens at the call
+        site.
+    """
+    from tidal.symbolic._kinetic_eval import lhs_collapses_to_zero  # noqa: PLC0415
+
+    result: dict[str, tuple[str, int]] = {}
+    demoted_names = {
+        eq.field_name for eq in base_spec.equations if eq.time_derivative_order == 0
+    }
+    for eq in full_spec.equations:
+        if eq.field_name not in demoted_names:
+            continue
+        if eq.kinetic_coefficient_symbolic is None:
+            # Pre-existing algebraic constraint; no LHS feedback.
+            continue
+        if eq.time_derivative_order <= 0:
+            continue
+        # Gate: only fields whose kinetic actually collapses at
+        # small_params=0 contribute LHS feedback at O(ε¹). Non-
+        # collapsing kinetics stayed at time_order > 0 in base_spec
+        # anyway (not demoted) — so they wouldn't be in demoted_names.
+        if not lhs_collapses_to_zero(eq.kinetic_coefficient_symbolic, small_parameters):
+            continue
+        result[eq.field_name] = (
+            eq.kinetic_coefficient_symbolic,
+            int(eq.time_derivative_order),
+        )
+    return result
+
+
+def _compute_constraint_source_hat(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    *,
+    full_spec: EquationSystem,
+    eigendata: dict[str, Any],
+    pre_demote_info: dict[str, tuple[str, int]],
+    parameters: dict[str, float] | None,
+    pass0_t: NDArray[np.float64],
+    grid: GridInfo,
+) -> NDArray[np.complex128]:
+    """Compute the augmented constraint-source term for Pass 1 recovery.
+
+    v6 R8.3 / #290. The order-1 equation for a demoted constraint field
+    h_c (derived from ``ε·K·d^n_t(h_c) = S_cc·h_c + S_cd·y_dyn +
+    ε·corr_1(y)``) yields::
+
+        h_c¹ = recovery · y_dyn¹
+             + S_cc⁻¹ · [K · d^n_t(h_c⁰) − corr_1(y⁰)]
+
+    This helper produces the bracketed part (``source_hat`` below) per
+    snapshot, per constraint row, per Fourier mode. The caller applies
+    ``S_cc_inv`` and adds ``recovery · y_hat_dyn¹`` to get h_c¹.
+
+    Parameters
+    ----------
+    full_spec
+        Unreduced :class:`EquationSystem` (pre-Gap-B demotion). Carries
+        the original kinetic coefficients + the order-1 RHS corrections
+        on demoted rows.
+    eigendata
+        Output of :func:`solve_modal` with ``return_eigendata=True`` +
+        ``schur_ops`` populated. Must include ``recovery_matrix``.
+    pre_demote_info
+        Output of :func:`_pre_demote_info`. Maps demoted-field name →
+        ``(K_numeric, n)``.
+    parameters
+        Runtime parameter overrides for resolving coefficient symbols.
+    pass0_t
+        Snapshot times (shape ``(n_snapshots,)``).
+    grid
+        Spatial grid; used for Fourier-multiplier evaluation.
+
+    Returns
+    -------
+    source_hat : complex ndarray
+        Shape ``(n_snapshots, n_constraints, n_modes)``. Entry
+        ``[ti, c, m]`` carries ``K·d^n_t(h_c⁰)_m − corr_1(y⁰)_m`` at
+        time ``pass0_t[ti]``.
+    """
+    # pylint: disable=import-outside-toplevel
+    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+    from tidal.solver.modal import (  # noqa: PLC0415
+        _OPERATOR_DECOMP,
+        _build_k_axes,
+        _build_k_grid,
+        _resolve_constant_coeff,
+    )
+
+    schur_ops = eigendata.get("schur_ops")
+    if schur_ops is None or "recovery_matrix" not in schur_ops:
+        # No constraints → nothing to source. Caller should handle this
+        # earlier; return an empty-shape array as a defensive default.
+        n_snap = pass0_t.shape[0]
+        rfft_last = grid.shape[-1] // 2 + 1
+        n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
+        return np.zeros((n_snap, 0, n_modes), dtype=np.complex128)
+
+    c_names: tuple[str, ...] = schur_ops["constraint_field_names"]
+    recovery_matrix: NDArray[np.complex128] = schur_ops["recovery_matrix"]
+    # (n_modes, n_c, n_dyn)
+    n_modes = recovery_matrix.shape[0]
+    n_c = recovery_matrix.shape[1]
+    n_dyn = recovery_matrix.shape[2]
+    n_snap = pass0_t.shape[0]
+
+    c_idx_map: dict[str, int] = {name: i for i, name in enumerate(c_names)}
+
+    # Reduced dynamical layout (from eigendata).
+    dyn_layout = eigendata["state_layout"]
+
+    # --- Fourier k-grid and spatial-multiplier cache --------------------
+    k_axes = _build_k_axes(grid)
+    k_grid = _build_k_grid(k_axes)
+    rfft_shape_list = list(grid.shape)
+    rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
+    rfft_shape = tuple(rfft_shape_list)
+
+    spatial_cache: dict[str, NDArray[np.complex128]] = {}
+
+    def _spatial_multiplier(op: str) -> NDArray[np.complex128]:
+        if op in spatial_cache:
+            return spatial_cache[op]
+        decomp = _OPERATOR_DECOMP.get(op)
+        if decomp is None:
+            msg = (
+                f"_compute_constraint_source_hat: operator {op!r} has no "
+                f"spatial multiplier entry in _OPERATOR_DECOMP"
+            )
+            raise ValueError(msg)
+        mult_val = decomp.spatial_fn(k_grid)
+        mult_full = np.broadcast_to(mult_val, rfft_shape)
+        out = mult_full.ravel().astype(np.complex128)
+        spatial_cache[op] = out
+        return out
+
+    # --- d^n_t of Pass 0 dynamical state in Fourier space ---------------
+    # Collect the set of time-derivative orders that will actually be
+    # queried. This INCLUDES the per-demoted-field LHS-feedback orders
+    # (from pre_demote_info) AND every order-1 RHS term's operator
+    # time_order on demoted rows.
+    needed_orders: set[int] = {n for (_kin, n) in pre_demote_info.values()}
+    for eq in full_spec.equations:
+        if eq.field_name not in c_idx_map:
+            continue
+        for term in eq.rhs_terms:
+            if term.order_in_eps != 1:
+                continue
+            decomp = _OPERATOR_DECOMP.get(term.operator)
+            if decomp is None:
+                continue
+            needed_orders.add(int(decomp.time_order))
+
+    # Precompute d^n_t(y_dyn⁰)(snap, slot, mode) for every n needed.
+    # Shape: (n_snap, n_dyn, n_modes), per n.
+    y_hat_dyn_dnt: dict[int, NDArray[np.complex128]] = {}
+    for n in needed_orders:
+        arr = np.zeros((n_snap, n_dyn, n_modes), dtype=np.complex128)
+        for block in eigendata["blocks"]:
+            slots = list(block["slot_indices"])
+            V = block["V"]  # (n_modes, bs, bs)
+            lam = block["D_diag"]  # (n_modes, bs)
+            alpha = block["alpha"]  # (n_modes, bs)
+            # (n_modes, bs) — λ^n per mode, per eigenmode.
+            lam_pow_n = lam**n if n else np.ones_like(lam)
+            for ti, t in enumerate(pass0_t):
+                # exp_lt[m, i] = exp(λ_i · t) per mode.
+                exp_lt = np.exp(lam * float(t))
+                # coeff_i = λ_i^n · exp(λ_i·t) · α_i     (n_modes, bs)
+                coeff = lam_pow_n * exp_lt * alpha
+                # y_hat per slot = V · coeff   shape (n_modes, bs)
+                y_hat = np.einsum("mij,mj->mi", V, coeff)
+                # Scatter into the (n_dyn,)-indexed array.
+                for slot_local, slot_idx in enumerate(slots):
+                    arr[ti, slot_idx, :] += y_hat[:, slot_local]
+        y_hat_dyn_dnt[n] = arr
+
+    # Helper: d^n_t(h_c⁰)(ti, m) for a constraint target at time ti.
+    def _constraint_dnt_hat(n: int, c_idx: int, ti: int) -> NDArray[np.complex128]:
+        # h_c⁰_dnt = recovery[m, c_idx, :] · y_hat_dyn_dnt[n][ti, :, m]
+        # einsum: "mj, jm -> m"
+        return np.einsum("mj,jm->m", recovery_matrix[:, c_idx, :], y_hat_dyn_dnt[n][ti])
+
+    # --- Coefficient evaluator for symbolic corrections ------------------
+    coeff_eval = CoefficientEvaluator(full_spec, grid, parameters or {})
+
+    # --- Build source_hat ------------------------------------------------
+    source_hat = np.zeros((n_snap, n_c, n_modes), dtype=np.complex128)
+
+    # (a) LHS-feedback: source += +K_eff · d^n_t(h_c⁰) for each demoted
+    # field. K_eff is the kinetic evaluated at the RUNTIME parameter
+    # values (NOT at small_params=1), so the ε factor is correctly
+    # baked in for linear-in-ε kinetics and any higher-order kinetic
+    # naturally vanishes at O(ε¹).
+    from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
+        evaluate_with_substitutions,
+    )
+
+    param_values = {k: float(v) for k, v in (parameters or {}).items()}
+    for c_name, (kinetic_symbolic, n) in pre_demote_info.items():
+        c_idx = c_idx_map.get(c_name)
+        if c_idx is None:
+            continue
+        K_eff = evaluate_with_substitutions(kinetic_symbolic, param_values)
+        if K_eff is None or K_eff == 0.0:
+            # Missing small-parameter value at runtime or it's zero —
+            # no LHS feedback at this parameter point.
+            continue
+        for ti in range(n_snap):
+            source_hat[ti, c_idx, :] += float(K_eff) * _constraint_dnt_hat(n, c_idx, ti)
+
+    # (b) Explicit order-1 RHS corrections on demoted constraint rows.
+    # Sign: the derivation puts ``-corr_1(y⁰)`` on the source side. So
+    # we SUBTRACT each evaluated term from source_hat.
+    for eq_idx, eq in enumerate(full_spec.equations):
+        c_idx = c_idx_map.get(eq.field_name)
+        if c_idx is None:
+            continue  # row is dynamical, not demoted
+        for term_idx, term in enumerate(eq.rhs_terms):
+            if term.order_in_eps != 1:
+                continue
+            # Resolve numeric coefficient via modal's existing helper.
+            coeff = _resolve_constant_coeff(
+                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
+            )
+            mult = _spatial_multiplier(term.operator)  # (n_modes,)
+            decomp = _OPERATOR_DECOMP[term.operator]
+            n_op = int(decomp.time_order)
+
+            # Resolve target kind.
+            target_field = term.field
+            # Velocity reference (``v_<field>``): strip prefix for lookup.
+            is_velocity_ref = target_field.startswith("v_")
+            base_target = target_field[2:] if is_velocity_ref else target_field
+
+            if base_target in dyn_layout.field_slot_map and not is_velocity_ref:
+                slot_idx = dyn_layout.field_slot_map[base_target]
+                for ti in range(n_snap):
+                    source_hat[ti, c_idx, :] -= (
+                        coeff * mult * y_hat_dyn_dnt[n_op][ti, slot_idx, :]
+                    )
+            elif is_velocity_ref and base_target in dyn_layout.velocity_slot_map:
+                slot_idx = dyn_layout.velocity_slot_map[base_target]
+                for ti in range(n_snap):
+                    source_hat[ti, c_idx, :] -= (
+                        coeff * mult * y_hat_dyn_dnt[n_op][ti, slot_idx, :]
+                    )
+            elif base_target in c_idx_map:
+                # Constraint target: expand via base Schur.
+                target_c_idx = c_idx_map[base_target]
+                for ti in range(n_snap):
+                    source_hat[ti, c_idx, :] -= (
+                        coeff * mult * _constraint_dnt_hat(n_op, target_c_idx, ti)
+                    )
+            # else: unresolvable target — the driver's _build_source_matrix_k
+            # already logs this as a column-missing drop. Skip here; the
+            # existing diagnostic surfaces the issue.
+
+    return source_hat

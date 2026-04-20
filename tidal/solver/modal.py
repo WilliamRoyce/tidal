@@ -507,6 +507,8 @@ def _build_evolution_matrices(
     NDArray[np.complex128] | None,  # v_recovery (n_modes, n_c, n_dyn) or None
     list[str],  # all constraint field names
     dict[int, int],  # orig_to_reduced slot mapping
+    NDArray[np.complex128] | None,  # S_cc_inv (n_modes, n_c, n_c) or None
+    NDArray[np.bool_] | None,  # singular_mask (n_modes,) or None
 ]:
     """Build per-mode matrices for systems with mass-matrix coupling.
 
@@ -1131,6 +1133,14 @@ def _build_evolution_matrices(
             S_cc_reg[singular_mask] += 1e-14 * np.eye(n_c, dtype=np.complex128)
         S_cc_inv = np.linalg.inv(S_cc_reg)
 
+        # R8.1 / #290: expose S_cc_inv + singular_mask so the v6 Pass 1
+        # augmented constraint recovery can use them. Without these the
+        # driver only has ``recovery = -S_cc_inv · S_cd`` and cannot
+        # reconstruct h_c¹ = recovery·y_dyn¹ + S_cc_inv·[LHS-feedback +
+        # order-1 RHS corr].
+        Scc_inv_out: NDArray[np.complex128] | None = S_cc_inv
+        Scc_singular_mask_out: NDArray[np.bool_] | None = singular_mask
+
         # Recovery: c = -S_cc⁻¹ · S_cd · d
         recovery = -np.einsum("mij,mjk->mik", S_cc_inv, S_cd)
 
@@ -1155,6 +1165,8 @@ def _build_evolution_matrices(
         recovery = np.zeros((n_modes, 0, n_dyn_slots), dtype=np.complex128)
         A_rhs = A_dd
         B_lhs = None
+        Scc_inv_out = None
+        Scc_singular_mask_out = None
 
     n_mass_con_total = int(np.sum(con_mask))
     logger.info(
@@ -1205,7 +1217,16 @@ def _build_evolution_matrices(
     else:
         v_recovery = None
 
-    return A_rhs, B_lhs, recovery, v_recovery, constraint_field_names, orig_to_reduced
+    return (
+        A_rhs,
+        B_lhs,
+        recovery,
+        v_recovery,
+        constraint_field_names,
+        orig_to_reduced,
+        Scc_inv_out,
+        Scc_singular_mask_out,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2341,6 +2362,8 @@ def solve_modal(
             _v_recovery_gen,  # unused — constraint vel from eigendata
             c_names,
             orig_to_reduced,
+            Scc_inv_modes,
+            Scc_singular_mask_modes,
         ) = _build_evolution_matrices(
             spec,
             layout,
@@ -2529,11 +2552,19 @@ def solve_modal(
             "state_layout": dyn_layout if needs_reduction else layout,
         }
         if needs_reduction:
-            eigendata["schur_ops"] = {
+            schur_ops_out: dict[str, Any] = {
                 "recovery_matrix": recovery_matrix,
                 "constraint_field_names": tuple(c_names),
                 "orig_to_reduced": dict(orig_to_reduced),
             }
+            # R8.1 / #290: expose S_cc_inv + singular_mask so the
+            # augmented Pass 1 constraint recovery can apply
+            # ``h_c¹ += S_cc_inv · (K·d^n_t(h_c⁰) − corr_1(y⁰))``.
+            if Scc_inv_modes is not None:
+                schur_ops_out["S_cc_inv"] = Scc_inv_modes
+            if Scc_singular_mask_modes is not None:
+                schur_ops_out["S_cc_singular_mask"] = Scc_singular_mask_modes
+            eigendata["schur_ops"] = schur_ops_out
         result["eigendata"] = eigendata  # type: ignore[typeddict-unknown-key]
     return result
 
@@ -2632,17 +2663,20 @@ def _build_source_matrix_k(
             if field_name not in layout.velocity_slot_map:
                 # Equation for a field not in the reduced dynamical layout.
                 # This is the "correction on a demoted constraint field"
-                # case: Gap C recovery reconstructs h_c = recovery @ y_dyn,
-                # but does NOT include source contributions to the
-                # constraint's own equation (that would be an O(ε²)
-                # augmentation, see v6 plan Stage 4). Log and drop.
+                # case. The contribution is routed to
+                # ``_compute_constraint_source_hat`` (R8 / #290) and
+                # applied via augmented Schur recovery in
+                # ``_assemble_full_state_pass_n``; NOT actually lost.
+                # Record as "row-routed-to-augmented" so the caller can
+                # distinguish this from genuine column-missing bugs.
                 drops.append(
                     {
                         "field": field_name,
                         "operator": None,
-                        "reason": "row-missing: equation is for demoted constraint field; "
-                        "Gap C recovery does not cover source contributions to the "
-                        "constraint's own equation (O(ε²), dropped at order 1, see #272)",
+                        "reason": "row-routed-to-augmented: correction equation is "
+                        "on a demoted constraint field; O(ε¹) contribution is "
+                        "applied via R8 augmented Schur recovery (#290) in the "
+                        "driver, not via the Pass 1 dynamical source path",
                         "eq_idx": eq_idx,
                         "term_idx": None,
                         "n_terms": len(eq.rhs_terms),
@@ -2653,17 +2687,36 @@ def _build_source_matrix_k(
         elif field_name in layout.field_slot_map:
             row_slot = layout.field_slot_map[field_name]
         else:
-            drops.append(
-                {
-                    "field": field_name,
-                    "operator": None,
-                    "reason": "row-missing: first-order equation for field not in "
-                    "base-spec dynamical layout",
-                    "eq_idx": eq_idx,
-                    "term_idx": None,
-                    "n_terms": len(eq.rhs_terms),
-                }
-            )
+            # Time-order-1 equation on a demoted constraint field
+            # (no velocity slot, no field slot in reduced layout). R8
+            # augmented Schur recovery picks this up in the driver
+            # (#290).
+            if field_name in constraint_idx:
+                drops.append(
+                    {
+                        "field": field_name,
+                        "operator": None,
+                        "reason": "row-routed-to-augmented: correction equation is "
+                        "on a demoted constraint field; O(ε¹) contribution is "
+                        "applied via R8 augmented Schur recovery (#290) in the "
+                        "driver, not via the Pass 1 dynamical source path",
+                        "eq_idx": eq_idx,
+                        "term_idx": None,
+                        "n_terms": len(eq.rhs_terms),
+                    }
+                )
+            else:
+                drops.append(
+                    {
+                        "field": field_name,
+                        "operator": None,
+                        "reason": "row-missing: correction equation on field not in "
+                        "base-spec dynamical layout AND not a known constraint",
+                        "eq_idx": eq_idx,
+                        "term_idx": None,
+                        "n_terms": len(eq.rhs_terms),
+                    }
+                )
             continue
 
         for term_idx, term in enumerate(eq.rhs_terms):

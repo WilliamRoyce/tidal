@@ -270,11 +270,22 @@ class TestPass1ConstraintAndDynamicalAgree:
             "Pass 1 φ¹ identically zero — correction source not wired"
         )
 
-        # h¹ must track g·φ¹ to machine precision (Schur recovery).
+        # R8 / #290: the recovered h¹ now includes the LHS-feedback
+        # contribution. Analytical light-mode eigenvector:
+        #   h_total = g·phi·(1 - ε·ω²) + O(ε²)
+        # so pass1_h = g·pass1_phi + ε·g·(-ω²)·phi⁰, with ε = b5.
+        omega2 = _M2 + 1.0  # k=1, so ω² = m² + 1 = 2
+        b5 = 0.01
+        pass0_y = res.orders[0]["y"]
         for ti in range(pass1["y"].shape[0]):
             phi1 = pass1["y"][ti, phi_slot * n_grid : (phi_slot + 1) * n_grid]
             h1 = pass1["y"][ti, h_slot * n_grid : (h_slot + 1) * n_grid]
-            np.testing.assert_allclose(h1, _G * phi1, atol=1e-10)
+            phi0 = pass0_y[ti, phi_slot * n_grid : (phi_slot + 1) * n_grid]
+            expected_lhs_feedback = -b5 * omega2 * _G * phi0
+            actual_lhs_feedback = h1 - _G * phi1
+            np.testing.assert_allclose(
+                actual_lhs_feedback, expected_lhs_feedback, atol=1e-10
+            )
 
     def test_combined_total_includes_both_passes(self) -> None:
         """Total = Pass 0 + Pass 1 should differ from Pass 0 alone."""
