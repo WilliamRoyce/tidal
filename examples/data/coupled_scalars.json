@@ -5,7 +5,7 @@
 		"derived_from": "Euler-Lagrange",
 		"gauge": "none",
 		"linearized": false,
-		"derivation_hash": "8e3742790175a8b05e07d7a61774b1dbdf85eb5c6cb99e2987d60fb81d9bd604"
+		"derivation_hash": "914b258dd09d5bc4a1fbdaec0eef442fdbb33bce374d6a2dc34f3049fe59e023"
 	},
 	"spacetime": {
 		"dimension": 2,
