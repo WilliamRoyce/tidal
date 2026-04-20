@@ -10,7 +10,59 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
-## [Unreleased] — v0.33.1 post-audit remediation
+## [Unreleased] — v0.33.2 R8 augmented Schur constraint recovery
+
+### Fixed
+
+- **Pass 1 constraint recovery missing O(ε¹) contributions (#290)**.
+  The flagship R̃² PGT theory (`torsion_gertsenshtein.json`) produced
+  identically-zero Pass 1 output on `h_{4,7,9}` pre-R8 because all
+  159 O(ε¹) corrections live on constraint-field rows and were
+  silently dropped. The v6 plan explicitly anticipated this via
+  Stage 4.6's `Schur_source_correction` augmentation ("deferred to
+  Stage 5"), but the code was never written. R8 implements the
+  augmented recovery:
+  ```
+  h_c¹ = recovery · y_dyn¹ + S_cc⁻¹ · [K · d^n_t(h_c⁰) − corr_1(y⁰)]
+  ```
+  - `tidal/solver/modal.py`: `_build_evolution_matrices` returns
+    `S_cc_inv` and `singular_mask` alongside `recovery_matrix`;
+    `solve_modal` attaches both to `eigendata["schur_ops"]`.
+  - `tidal/symbolic/_kinetic_eval.py`: new `evaluate_at_one` and
+    `evaluate_with_substitutions`; driver resolves kinetics at
+    runtime so the ε factor is correctly baked in.
+  - `tidal/solver/perturbative_driver.py`: new `_pre_demote_info`
+    and `_compute_constraint_source_hat` compute the augmented
+    source from Pass 0 eigendata. `_assemble_full_state_pass_n`
+    applies `S_cc_inv @ source_hat` to the constraint slots.
+  - Drop-record label for constraint-row corrections updated from
+    `"row-missing"` to `"row-routed-to-augmented"` (no longer
+    actually dropped).
+- **Mpmath cross-check validation (R8.6)**. New
+  `TestAugmentedRecoveryMatchesMpmath` with 3 tests validating
+  the driver's h/phi ratio against the 2×2 dispersion light-mode
+  eigenvector at 50 dps. At ε=1e-3, O(ε¹) truncation matches to
+  rel_err < 1e-6; exact eigenvector to < 1e-5 (the O(ε²) gap).
+  At ε=1e-2, truncation matches to < 1e-4.
+- **Synthetic spec's `|h − g·phi|` now matches analytical
+  `−ε·g·ω²·phi⁰`** to rel_err 1.8e-14 (machine precision). Pre-R8
+  this was 2e-16, 14 orders of magnitude below the physics.
+
+### Tracked
+
+- **#273** order ≥ 2 Pass 2 Duhamel — unchanged; augmented
+  recovery at O(ε¹) is a prerequisite but Pass 2 against q¹(t)
+  remains a separate architectural extension.
+- **#289** b5=0 reference JSON — unchanged; activates the R5.2
+  trajectory-level baseline test.
+- **#293** latent time_order bug in `_build_source_matrix_k` —
+  uncovered during R8.7 investigation; doesn't affect shipped
+  theories (all O(ε¹) corrections route through the constraint-
+  row augmented path, where time_order IS handled correctly).
+
+---
+
+## [0.33.1] — 2026-04-19 post-audit remediation
 
 ### Fixed
 

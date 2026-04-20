@@ -60,15 +60,21 @@ with $\varepsilon$ set to zero in \emph{every} coefficient, including the kineti
   \hat{h}_4^{(0)}(\mathbf{k}) = \mathsf{S}(\mathbf{k})\, \hat{d}^{(0)}(\mathbf{k}), \qquad \mathsf{S}(\mathbf{k}) = -\mathsf{S}_{cc}^{-1}\, \mathsf{S}_{cd}.
 \end{equation}
 
-\paragraph{$O(\varepsilon^1)$ constraint recovery.} At Pass~1 the constraint equation is
+\paragraph{$O(\varepsilon^1)$ augmented constraint recovery (v6 R8 / \#290).} At Pass~1 the demoted constraint equation carries three coupled contributions: base Schur recovery from the Pass~1 dynamical state, LHS-feedback from the removed kinetic, and order-1 RHS corrections on the constraint's own row. Substituting $h_c = h_c^{(0)} + \varepsilon\, h_c^{(1)}$ into the pre-demotion equation
 \begin{equation}
-  \left.\frac{\partial E^{(0)}}{\partial h}\right|_{\varepsilon=0} \cdot h^{(1)} = -\mathrm{source}(b_5 \text{ corrections evaluated on } y^{(0)}),
+  \varepsilon\, K\, \partial_t^n h_c = S_{cc}\, h_c + S_{cd}\, y_{\mathrm{dyn}} + \varepsilon\, \mathrm{corr}_1(y)
 \end{equation}
-which remains \emph{algebraic} because $\partial E^{(0)}/\partial h = 1 \neq 0$. The Pass 1 constraint value is recovered from the Pass 1 dynamical Fourier state by the same Schur operator:
+and collecting at $O(\varepsilon^1)$ yields
 \begin{equation}
-  \hat{h}^{(1)}_\mathbf{k} = \mathsf{S}_\mathbf{k}\, \hat{y}^{(1)}_{\mathrm{dyn}, \mathbf{k}} + O(\varepsilon^2).
+  S_{cc}\, h_c^{(1)} = K\, \partial_t^n h_c^{(0)} - S_{cd}\, y_{\mathrm{dyn}}^{(1)} - \mathrm{corr}_1(y^{(0)}).
 \end{equation}
-The $O(\varepsilon^2)$ source-augmentation term is dropped at order~1. No propagating scalaron degree of freedom is introduced at this order; it would appear only at $O(\varepsilon^2)$, beyond the current truncation.
+Rearranging and using $\mathsf{S}_\mathbf{k} = -S_{cc}^{-1} S_{cd}$ (the existing base Schur operator):
+\begin{equation}
+  \boxed{\;\hat{h}_c^{(1)} = \mathsf{S}_\mathbf{k}\, \hat{y}_{\mathrm{dyn},\mathbf{k}}^{(1)} + S_{cc,\mathbf{k}}^{-1}\, \left[K\, \widehat{\partial_t^n h_c^{(0)}} - \widehat{\mathrm{corr}_1}\right].\;}
+\end{equation}
+The bracketed quantities are built from Pass~0 output alone: $\partial_t^n h_c^{(0)}$ via eigenvalue propagation $V \cdot \mathrm{diag}(\lambda^n e^{\lambda t}) \cdot \alpha$ applied to the base Schur recovery, and $\mathrm{corr}_1(y^{(0)})$ by evaluating the order-1 RHS on $y^{(0)}$ with nested Schur expansion for constraint-target references. The driver implements this in \texttt{tidal/solver/perturbative\_driver.py::\_compute\_constraint\_source\_hat}.
+
+Pre-v0.33.2 (issue~\#290) only the first term was computed, which produced \emph{identically zero} Pass~1 output for theories where every $O(\varepsilon^1)$ correction lives on a constraint-field row --- the flagship R̃$^2$ PGT case. The augmented recovery was explicitly anticipated in Stage~4.6 of the v6 plan (``deferred to Stage~5'') but never landed until v0.33.2. The synthetic algebraic-constraint regression (\verb|tests/test_perturbative_algebraic_constraint.py|) now matches the analytical light-mode eigenvector $h/\phi = g/(1 + \varepsilon\, \omega^2) \approx g\,(1 - \varepsilon\, \omega^2)$ to machine precision at $\varepsilon = 10^{-3}$; pre-R8 the output was $h/\phi \equiv g$ independent of $\varepsilon$ (14~orders of magnitude off).
 
 \subsection{Closed-Form Duhamel Kernel}
 \label{sec:pr-duhamel}
