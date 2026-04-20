@@ -255,7 +255,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         )
         return 1
 
-    # --- Save results ---
+    # --- Save results (rank 0 only — all MPI ranks reach here) ---
+    try:
+        from mpi4py import MPI  # type: ignore[import-untyped]
+
+        mpi_rank = MPI.COMM_WORLD.Get_rank()
+    except ImportError:
+        mpi_rank = 0
+    if mpi_rank != 0:
+        return 0
+
     result.save(output_path)
     if not quiet:
         print()
