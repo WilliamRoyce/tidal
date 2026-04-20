@@ -533,13 +533,16 @@ class TestCrossBlockCouplingRaises:
         # cross = 1e-13 < 1e-11 → guard must NOT raise.
 
         t_eval = pass0["t"]
-        _ = _evolve_duhamel_per_mode(eigendata, m_src, t_eval, layout, grid)
+        # #293: _evolve_duhamel_per_mode now takes a dict keyed by
+        # operator time-derivative order. Identity sources have order 0.
+        m_src_by_order = {0: m_src}
+        _ = _evolve_duhamel_per_mode(eigendata, m_src_by_order, t_eval, layout, grid)
 
         # Regression: bumping the tail to well above the relative
         # threshold re-triggers the guard.
         m_src[:, b0_idx, b1_idx] = 1e-3  # ratio 1e-2 > 1e-10 → must raise
         with pytest.raises(NotImplementedError, match="[Cc]ross-block"):
-            _evolve_duhamel_per_mode(eigendata, m_src, t_eval, layout, grid)
+            _evolve_duhamel_per_mode(eigendata, m_src_by_order, t_eval, layout, grid)
 
 
 class TestPass1NearDegeneracy:
@@ -654,8 +657,11 @@ class TestPass1NearDegeneracy:
         m_src[:, 0, 1] = 1.0
 
         t_eval = np.array([0.0, t_end], dtype=np.float64)
+        # #293: _evolve_duhamel_per_mode takes a dict keyed by operator
+        # time-derivative order. This test crafts a bare identity-form
+        # M_src representing a source at order 0.
         _, _y_phys, y_hat_snap = _evolve_duhamel_per_mode(
-            eigendata, m_src, t_eval, layout, grid
+            eigendata, {0: m_src}, t_eval, layout, grid
         )
 
         # Pipeline output at snapshot 1, slot 0, mode 0:
@@ -682,4 +688,173 @@ class TestPass1NearDegeneracy:
             f"|z|={abs(z):.3e}: pipeline={pipeline_z!r} vs "
             f"mpmath={G_ref_complex!r}, rel_err={rel_err:.3e}. "
             f"Taylor-branch crossover broken (#282)."
+        )
+
+
+class TestPass1TimeDerivativeTargetingDynamical:
+    """#293: correction operators with ``time_order > 0`` targeting a
+    dynamical field must carry the ``λⁿ`` eigenvalue factor when
+    projected into the Pass 1 source. The pre-fix
+    ``_build_source_matrix_k`` used only the spatial multiplier and
+    silently dropped ``time_order``, producing Pass 1 output that was
+    wrong by a factor of ``1 / λⁿ`` for any ``d^n_t(dyn_field)`` term.
+
+    Not triggered by any shipped theory (every O(ε¹) b5-coupled
+    correction targets a constraint field), but a latent bug for any
+    future theory.
+    """
+
+    _SPEC_WITH_DT_CORRECTION: dict[str, object] = {
+        "metadata": {
+            "source": "inline-test-293",
+            "parameters": {"m2": 1.0, "gamma": 0.05},
+            "perturbation": {"small_parameters": ["gamma"], "order": 1},
+        },
+        "spacetime": {
+            "dimension": 2,
+            "signature": [-1, 1],
+            "coordinates": ["t", "x"],
+        },
+        "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {
+                    "expression": "d2_t(phi_0)",
+                    "order": {"time": 2, "space": 0},
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        # Base Klein-Gordon: d²_t(phi) = ∇²phi − m²phi.
+                        {
+                            "coefficient": -1.0,
+                            "operator": "identity",
+                            "field": "phi_0",
+                            "coefficient_symbolic": "-m2",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi_0",
+                        },
+                        # Order-1 damping correction: −γ · ∂_t(phi). The
+                        # operator ``first_derivative_t`` has
+                        # ``_OperatorDecomp.time_order == 1``, so its
+                        # contribution must scale by ``λ`` in the
+                        # Pass 1 source matrix.
+                        {
+                            "coefficient": -1.0,
+                            "operator": "first_derivative_t",
+                            "field": "phi_0",
+                            "coefficient_symbolic": "-gamma",
+                            "order_in_eps": 1,
+                        },
+                    ],
+                },
+            }
+        ],
+        "coupling": {},
+    }
+
+    def test_first_derivative_t_on_dynamical_target_scales_by_lambda(
+        self,
+    ) -> None:
+        """Pass 0 + Pass 1 of a damped KG matches the analytical
+        first-order-in-γ eigenvalue shift.
+
+        Base: d²_t(phi) + m²phi − ∇²phi = 0. Eigenvalues per mode:
+        ``λ = ±i·ω_0`` with ``ω_0² = m² + k²``.
+
+        Correction: add ``-γ · ∂_t(phi)``. Full dispersion at O(γ¹):
+        ``λ = ±i·ω_0 − γ/2 + O(γ²)`` (damped oscillator). So the
+        Pass 0 + Pass 1 trajectory at small γ should decay like
+        ``exp(-γ·t/2) · cos(ω_0·t)`` up to O(γ²).
+
+        Without the λ factor (pre-fix), Pass 1 source would be the
+        identity operator scaled by γ, yielding ``λ = ±i·ω_0 · (1 -
+        γ/ω_0)`` — a DIFFERENT correction at O(γ).
+        """
+        import copy as _copy
+
+        spec = _make_spec(_copy.deepcopy(self._SPEC_WITH_DT_CORRECTION))
+        n_grid = 32
+        length = 2 * np.pi
+        grid = GridInfo(shape=(n_grid,), bounds=((0.0, length),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = np.linspace(0.0, length, n_grid, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        # IC: phi(x, 0) = sin(x), v_phi = 0 → k=1 mode only.
+        y0[:n_grid] = np.sin(x)
+
+        base_spec = spec.filter_by_order(0)
+        correction_spec = spec.filter_by_order(1)
+
+        m2 = 1.0
+        gamma = 1e-3  # small: stay well within O(γ²) truncation error
+        t_end = 1.0
+        params = {"m2": m2, "gamma": gamma}
+
+        pass0 = cast(
+            "dict[str, Any]",
+            solve_modal(
+                base_spec,
+                grid,
+                y0,
+                t_span=(0.0, t_end),
+                parameters=params,
+                num_snapshots=11,
+                return_eigendata=True,
+            ),
+        )
+        pass1 = solve_modal_pass1(
+            pass0["eigendata"],
+            correction_spec,
+            grid,
+            pass0["t"],
+            parameters=params,
+        )
+        pass0["y"] + pass1["y"]
+
+        omega0 = float(np.sqrt(m2 + 1.0))  # k=1
+        t_vals = pass0["t"]
+        # Analytical: damped oscillator d²Φ + ω₀²Φ = -γ·dΦ. With
+        # initial conditions Φ(0)=1, Φ̇(0)=0, the exact solution is
+        #   Φ(t) = exp(-γt/2) · [cos(Ωt) + (γ/2Ω)·sin(Ωt)]
+        # with Ω² = ω₀² - γ²/4 ≈ ω₀². Expanding to O(γ¹):
+        #   Φ(t) ≈ cos(ω₀t) + γ·[-t/2·cos(ω₀t) + 1/(2ω₀)·sin(ω₀t)] + O(γ²)
+        # Pass 0 alone yields sin(x)·cos(ω₀t); the O(γ¹) correction is
+        # the square bracket (times sin(x)). Both terms are required:
+        # the first is the amplitude damping, the second is the phase-
+        # lag/velocity-IC accommodation.
+        cos_term = np.cos(omega0 * t_vals)
+        sin_term = np.sin(omega0 * t_vals)
+        pass1_phi_factor = gamma * (
+            -0.5 * t_vals * cos_term + (1.0 / (2.0 * omega0)) * sin_term
+        )
+        pass1_expected = np.outer(pass1_phi_factor, np.sin(x))
+
+        # Extract phi slot (index 0) from the flattened state.
+        pass1_phi = pass1["y"][:, :n_grid]
+
+        max_analytic = float(np.max(np.abs(pass1_expected)))
+        max_diff = float(np.max(np.abs(pass1_phi - pass1_expected)))
+        rel_err = max_diff / (max_analytic + 1e-30)
+
+        # O(γ²) truncation error is ~gamma² = 1e-6 relative; allow 1e-3
+        # to tolerate the Duhamel snapshot discretisation.
+        assert rel_err < 1e-3, (
+            f"Pass 1 first_derivative_t correction does not match the "
+            f"damped-oscillator expansion. max_diff={max_diff:.3e}, "
+            f"max_analytic={max_analytic:.3e}, rel_err={rel_err:.3e}. "
+            f"Pre-fix (before #293) the Pass 1 source was missing the "
+            f"λ factor so this test would fail by O(1)."
+        )
+
+        # Sanity: verify the Pass 1 output is non-trivial. Without the
+        # fix applied, Pass 1 from a d_t source on an identity-only base
+        # would still be non-zero, so this is a weak check but at least
+        # catches a completely broken pipeline.
+        assert np.max(np.abs(pass1_phi)) > 1e-6, (
+            "Pass 1 output is essentially zero; source wiring is broken."
         )

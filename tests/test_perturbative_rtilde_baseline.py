@@ -292,3 +292,103 @@ def test_pass0_is_b5_independent_on_full_spec(full_spec: EquationSystem) -> None
             f"b5=0 and b5=1e-2 — base_spec must be b5-independent. "
             f"See #281."
         )
+
+
+_B5_ZERO_JSON = (
+    Path(__file__).parent.parent
+    / "examples"
+    / "data"
+    / "torsion_gertsenshtein_b5_zero.json"
+)
+
+
+@pytest.mark.skipif(
+    not _B5_ZERO_JSON.exists(),
+    reason="torsion_gertsenshtein_b5_zero.json not derived (run tidal derive)",
+)
+def test_pass0_matches_b5_zero_reference(full_spec: EquationSystem) -> None:
+    """The strongest Gap B regression: the full theory's Pass 0 at b5=0
+    reproduces the independently-derived b5=0 reference JSON's
+    trajectory field-for-field.
+
+    The reference JSON `torsion_gertsenshtein_b5_zero.json` is derived
+    from `theory_b5_zero.toml` (identical Lagrangian minus the b5·R̃²
+    term) — a byte-level b5 → 0 limit. Its equations load natively
+    with h_4/h_7/h_9 as algebraic constraints (no kinetic promotion
+    needed), so the solver's base_spec(['b5']) demotion path must
+    produce an equivalent system.
+
+    See #281 (original R5.2 gap), #289 (derivation of reference JSON).
+    """
+    from tidal.solver.modal import solve_modal
+
+    reference = load_equation_system(_B5_ZERO_JSON)
+
+    n = 32
+    grid = GridInfo(shape=(n,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+    solver = PerturbativeSolver(full_spec)
+    full_layout = StateLayout.from_spec(solver.base_spec, grid.num_points)
+    ref_layout = StateLayout.from_spec(reference, grid.num_points)
+
+    # Confirm field sets match before running the expensive solve.
+    assert set(solver.base_spec.component_names) == set(reference.component_names)
+
+    x = np.linspace(0.0, 2 * np.pi, n, endpoint=False)
+
+    # Build the same photon IC in each layout (slot indices may differ;
+    # map by field name).
+    def _ic_in(layout: StateLayout) -> np.ndarray:
+        y0 = np.zeros(layout.num_slots * n)
+        a2_slot = layout.field_slot_map["a_2"]
+        y0[a2_slot * n : (a2_slot + 1) * n] = 0.01 * np.sin(x)
+        return y0
+
+    y0_full = _ic_in(full_layout)
+    y0_ref = _ic_in(ref_layout)
+
+    params = {
+        "kappa": 1.0,
+        "B0": 0.1,
+        "alpha1": 0.1,
+        "alpha2": 0.1,
+        "alpha3": 0.1,
+    }
+    # Full theory Pass 0 at b5 = 0.
+    res_full = solver.solve(
+        y0_full,
+        grid,
+        t_span=(0.0, 0.5),
+        order=0,
+        parameters={**params, "b5": 0.0},
+        num_snapshots=11,
+    )
+    # Reference JSON: direct modal solve (no b5 parameter — it's not
+    # declared in that theory).
+    res_ref = solve_modal(
+        reference,
+        grid,
+        y0_ref,
+        t_span=(0.0, 0.5),
+        parameters=params,
+        num_snapshots=11,
+    )
+
+    # Compare per-field relative error across all snapshots.
+    # Use absolute+relative tolerance with floor 1e-12 to avoid
+    # dividing near-zero slots; physics-interesting fields sit at
+    # 1e-2 amplitude under this IC so the floor is safe.
+    tol_rel = 1e-6
+    for fname in solver.base_spec.component_names:
+        full_slot = full_layout.field_slot_map[fname]
+        ref_slot = ref_layout.field_slot_map[fname]
+        y_full = res_full.total["y"][:, full_slot * n : (full_slot + 1) * n]
+        y_ref = res_ref["y"][:, ref_slot * n : (ref_slot + 1) * n]
+        abs_diff = float(np.max(np.abs(y_full - y_ref)))
+        scale = float(np.max(np.abs(y_ref))) + 1e-12
+        rel_err = abs_diff / scale
+        assert rel_err < tol_rel, (
+            f"Field {fname!r}: abs_diff={abs_diff:.3e}, scale={scale:.3e}, "
+            f"rel_err={rel_err:.3e} exceeds {tol_rel}. "
+            f"base_spec(['b5']) trajectory differs from the independently-"
+            f"derived b5=0 reference. See #289, #281."
+        )

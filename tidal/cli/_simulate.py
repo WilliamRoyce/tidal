@@ -1756,7 +1756,7 @@ def _resolve_scheme(  # noqa: C901
     # ValueError carries an actionable message — propagate it instead
     # of silently falling back to the full spec, which would make the
     # modal-eligibility check fail for an unrelated reason and mislead
-    # the user with "auto-selected: CVODE" (R3.1 / #277).
+    # the user with "auto-selected: CVODE" (#277).
     eligibility_spec = spec.base_spec() if spec.has_corrections() else spec
 
     if scheme != "auto":
@@ -2318,7 +2318,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             result = pert_result.total
             # Pass 0 / Pass 1 outputs live in base_spec's layout (h_4/h_7/h_9
             # demoted to algebraic constraints at ε=0). The solver now
-            # carries this layout on the result itself (R2.2 / #276), so
+            # carries this layout on the result itself (#276), so
             # downstream SimulationData / measurement callers pair the
             # state vector with the correct spec without the prior
             # `spec = pert_solver.base_spec` rebind workaround. The full
@@ -2352,7 +2352,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                     "Results should NOT be trusted. Reduce the small "
                     "parameter or shrink t_end / k_max.",
                 )
-            # R4.2 / #285: separate base-theory stability diagnostic.
+            # #285: separate base-theory stability diagnostic.
             if base_level == "warn":
                 _cwarn(
                     "Base-theory stability: "

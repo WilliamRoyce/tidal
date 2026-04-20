@@ -1133,8 +1133,8 @@ def _build_evolution_matrices(
             S_cc_reg[singular_mask] += 1e-14 * np.eye(n_c, dtype=np.complex128)
         S_cc_inv = np.linalg.inv(S_cc_reg)
 
-        # R8.1 / #290: expose S_cc_inv + singular_mask so the v6 Pass 1
-        # augmented constraint recovery can use them. Without these the
+        # See #290: expose S_cc_inv + singular_mask so the augmented
+        # Pass 1 constraint recovery can use them. Without these the
         # driver only has ``recovery = -S_cc_inv · S_cd`` and cannot
         # reconstruct h_c¹ = recovery·y_dyn¹ + S_cc_inv·[LHS-feedback +
         # order-1 RHS corr].
@@ -2263,7 +2263,7 @@ def solve_modal(
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
 
-    # R3.2 / #278: solve_modal's companion-matrix builder assumes
+    # #278: solve_modal's companion-matrix builder assumes
     # time_derivative_order <= 2 on every equation. The `d4_t` and
     # `mixed_T4_*` operators in ``_EXACT_MULTIPLIERS`` exist for
     # _build_source_matrix_k (correction spec only) and must never
@@ -2557,7 +2557,7 @@ def solve_modal(
                 "constraint_field_names": tuple(c_names),
                 "orig_to_reduced": dict(orig_to_reduced),
             }
-            # R8.1 / #290: expose S_cc_inv + singular_mask so the
+            # #290: expose S_cc_inv + singular_mask so the
             # augmented Pass 1 constraint recovery can apply
             # ``h_c¹ += S_cc_inv · (K·d^n_t(h_c⁰) − corr_1(y⁰))``.
             if Scc_inv_modes is not None:
@@ -2585,7 +2585,7 @@ def _build_source_matrix_k(
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
     schur_ops: dict[str, Any] | None = None,
-) -> tuple[NDArray[np.complex128], list[dict[str, Any]]]:
+) -> tuple[dict[int, NDArray[np.complex128]], list[dict[str, Any]]]:
     """Build M_src(k) for Pass 1: correction RHS as a linear source on the
     Pass 0 state.
 
@@ -2604,17 +2604,32 @@ def _build_source_matrix_k(
     ``correction_spec`` is typically ``spec.filter_by_order(n)`` for the
     Pass ``n`` correction (v6 plan, Stage 4).
 
+    #293: returns a DICT keyed by operator time-derivative order
+    instead of a single matrix. For a correction term with
+    ``_OperatorDecomp.time_order == n``, the contribution goes into
+    ``M_src[n]``; :func:`_evolve_duhamel_per_mode` pre-multiplies each
+    order's source column by ``diag(λⁿ)`` before the Duhamel kernel so
+    the ``d^n_t(target)`` operator contributes the correct eigenvalue
+    power. The pre-fix code silently dropped ``time_order`` and any
+    correction term like ``d²_t(dyn_field)`` produced wrong Pass 1
+    output (latent bug, not triggered by shipped theories because
+    constraint-row corrections route through R8 augmented recovery).
+
     Returns
     -------
-    M_src : complex ndarray of shape ``(n_modes, n_slots, n_slots)``
+    M_src_by_order : dict[int, ndarray]
+        Maps time-derivative order ``n`` → ``(n_modes, n_slots,
+        n_slots)`` complex array holding the source contributions of
+        all correction terms whose operator has ``_OperatorDecomp.
+        time_order == n``. Non-present keys (no terms at that order)
+        are omitted. The empty dict represents "no sources".
     drops : list of diagnostic records
         Each entry describes a correction term or equation whose
-        contribution was NOT written into ``M_src`` because either
-        (a) the equation is for a demoted constraint field (row skip;
-        Gap C recovery does not cover source contributions to the
-        constraint's own equation — dropped at O(ε¹), see #272), or
-        (b) the target field reference could not be resolved to a
-        dynamical or Schur-recoverable slot (column skip).
+        contribution was NOT written into any ``M_src[n]`` because
+        either (a) the equation is for a demoted constraint field
+        (row skip; routed to R8 augmented recovery), or (b) the
+        target field reference could not be resolved to a dynamical
+        or Schur-recoverable slot (column skip).
     """
     n_slots = layout.num_slots
     n_modes = int(np.prod(rfft_shape))
@@ -2653,7 +2668,19 @@ def _build_source_matrix_k(
             mult_full = np.broadcast_to(mult_val, rfft_shape)
             multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
 
-    M_src = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
+    # #293: per-time-order matrices so correction terms with
+    # d^n_t operators scale by λⁿ in the Duhamel kernel. Key lookup is
+    # cheap (small int keys), and we only allocate n_modes×n_slots²
+    # arrays for orders that actually appear.
+    M_src_by_order: dict[int, NDArray[np.complex128]] = {}
+
+    def _get_m_src(n: int) -> NDArray[np.complex128]:
+        if n not in M_src_by_order:
+            M_src_by_order[n] = np.zeros(
+                (n_modes, n_slots, n_slots), dtype=np.complex128
+            )
+        return M_src_by_order[n]
+
     drops: list[dict[str, Any]] = []
 
     for eq_idx, eq in enumerate(correction_spec.equations):
@@ -2724,19 +2751,27 @@ def _build_source_matrix_k(
                 term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
             )
             mult = multiplier_cache[term.operator]
+            # #293: route the contribution to the matrix keyed
+            # by this operator's time-derivative order. ``d²_t(...)``
+            # has ``_OperatorDecomp.time_order == 2`` which makes
+            # ``_evolve_duhamel_per_mode`` scale the source column by
+            # ``λ²`` before the Duhamel kernel.
+            op_time_order = _OPERATOR_DECOMP[term.operator].time_order
 
             target_slot = _resolve_target_slot(term.field)
             if target_slot is not None:
                 # Dynamical target: direct write into the slot column.
-                M_src[:, row_slot, target_slot] += coeff * mult
+                M_n = _get_m_src(op_time_order)
+                M_n[:, row_slot, target_slot] += coeff * mult
             elif term.field in constraint_idx and recovery_matrix is not None:
                 # Constraint field: expand via Schur row.
                 # recovery_matrix[m, c_idx, j] → contributes to column j.
                 c_idx = constraint_idx[term.field]
                 # (coeff * mult[m]) * recovery_matrix[m, c_idx, j]
-                # → M_src[m, row_slot, j] += ...
+                # → M_src_n[m, row_slot, j] += ...
                 term_contrib = coeff * mult[:, None] * recovery_matrix[:, c_idx, :]
-                M_src[:, row_slot, :] += term_contrib
+                M_n = _get_m_src(op_time_order)
+                M_n[:, row_slot, :] += term_contrib
             else:
                 # Target field reference cannot be resolved — either
                 # references a demoted field's velocity slot or an
@@ -2756,12 +2791,12 @@ def _build_source_matrix_k(
                 )
                 continue
 
-    return M_src, drops
+    return M_src_by_order, drops
 
 
 def _evolve_duhamel_per_mode(
     eigendata: dict[str, Any],
-    M_src_k: NDArray[np.complex128],
+    M_src_k_by_order: dict[int, NDArray[np.complex128]],
     t_eval: NDArray[np.float64],
     layout: StateLayout,
     grid: GridInfo,
@@ -2778,24 +2813,34 @@ def _evolve_duhamel_per_mode(
       flattened physical-space dynamical output in the reduced layout.
     * ``y_hat_snap`` has shape ``(n_snapshots, n_slots, n_modes)`` — the
       Fourier-space dynamical output. The Pass 1 constraint recovery
-      step (v6 Gap C) consumes this directly via
-      ``recovery_matrix @ y_hat_snap``, avoiding a round trip through
-      rFFT/irFFT.
+      consumes this directly via ``recovery_matrix @ y_hat_snap``.
 
-    The algorithm is, per block and per mode:
+    ``M_src_k_by_order`` is the dict returned by
+    :func:`_build_source_matrix_k`. Each key is the time-derivative
+    order ``n`` of the correction-term operator; the per-mode source
+    contribution for that order is ``λⁿ``-scaled on the source column
+    (since ``d^n_t`` of an eigenmode ``exp(λ·τ)`` is ``λⁿ · exp(λ·τ)``).
+    See GitHub #293 for the pre-fix symptom (latent wrong Pass 1 output
+    for corrections using ``d^n_t`` on a dynamical target).
 
-    1. Project the source matrix into the eigenbasis: β = V⁻¹ · M_src · V.
-    2. Recover α = V⁻¹ · y⁰(0) from eigendata (already computed by Pass 0).
-    3. Evaluate z_i(t) = Σ_j β_ij · α_j · G(λ_i, λ_j; t) with G the
-       closed-form Duhamel kernel.
+    Algorithm, per block, per snapshot:
+
+    1. Project each per-order source matrix into the eigenbasis:
+       β_n = V⁻¹ · M_src_n · V.
+    2. Recover α = V⁻¹ · y⁰(0) from eigendata (already computed).
+    3. Evaluate ``z_i(t) = Σ_n Σ_j β_n,ij · (λ_j^n · α_j) ·
+       G(λ_i, λ_j; t)`` where G is the closed-form Duhamel kernel.
     4. Transform back: y_block(t) = V · z(t).
-
-    Blocks not listed in ``eigendata["blocks"]`` evolve trivially (zero
-    IC, no source) and are left at zero.
     """
     n_slots = layout.num_slots
     n_pts = layout.num_points
-    n_modes = M_src_k.shape[0]
+    # Empty dict = no sources; still need n_modes for allocation.
+    if M_src_k_by_order:
+        any_mat = next(iter(M_src_k_by_order.values()))
+        n_modes = any_mat.shape[0]
+    else:
+        rfft_last = grid.shape[-1] // 2 + 1
+        n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
 
     # rfft output shape
     rfft_shape_list = list(grid.shape)
@@ -2808,6 +2853,16 @@ def _evolve_duhamel_per_mode(
     # Working array: full Fourier state per snapshot
     y_hat_snap = np.zeros((n_snapshots, n_slots, n_modes), dtype=np.complex128)
 
+    # Aggregate norm used for the cross-block threshold check. Must
+    # span all orders so a small d2_t source doesn't escape detection
+    # behind a larger identity source (or vice versa).
+    m_scale_total = 0.0
+    for _M_n in M_src_k_by_order.values():
+        if _M_n.size:
+            m_scale_total = max(m_scale_total, float(np.max(np.abs(_M_n))))
+    if m_scale_total == 0.0:
+        m_scale_total = 1.0
+
     for block in eigendata["blocks"]:
         slot_indices = list(block["slot_indices"])
         v_mat = block["V"]  # (n_modes, bs, bs)
@@ -2816,59 +2871,62 @@ def _evolve_duhamel_per_mode(
         alpha = block["alpha"]  # (n_modes, bs)
         idx = np.array(slot_indices)
 
-        # Extract this block's rows/cols from M_src: (n_modes, bs, bs).
-        # Only the slot_indices sub-matrix acts on the block IC; source
-        # entries coupling different blocks would require a larger
-        # coupling scheme (flag via NotImplementedError later).
-        M_sub = M_src_k[:, idx[:, None], idx[None, :]]
-
-        # Check for cross-block coupling: any non-zero in M_src rows of
-        # this block but columns outside it. If so, the decoupled
-        # block-eigenbasis ansatz is wrong. Raise early rather than
-        # silently produce garbage.
-        #
-        # v6 R1.4 (#275): use a scale-relative threshold. Absolute 1e-14
-        # is below double-precision roundoff of compound operations like
-        # ``coeff * mult[m] * recovery_matrix[m, c_idx, :]``. An
-        # ill-conditioned Schur recovery on multi-constraint specs can
-        # legitimately write O(1e-12) tail noise into off-block
-        # columns. The guard should fire on genuinely non-zero
-        # cross-block contributions, not on numerical tail.
-        full_rows = M_src_k[:, idx, :]  # (n_modes, bs, n_slots)
+        # Check for cross-block coupling: any non-zero in ANY M_src_n's
+        # rows of this block but columns outside it. If so, the
+        # decoupled block-eigenbasis ansatz is wrong. Raise early.
+        # Threshold is scale-relative (see #275) to tolerate O(1e-12)
+        # Schur-recovery tail noise on ill-conditioned multi-constraint
+        # specs.
         mask = np.ones(n_slots, dtype=bool)
         mask[idx] = False
-        cross = full_rows[:, :, mask]
-        if cross.size > 0:
-            m_scale = float(np.max(np.abs(M_src_k))) if M_src_k.size else 1.0
-            atol = max(1e-14, m_scale * 1e-10)
-            if np.max(np.abs(cross)) > atol:
-                msg = (
-                    f"Pass 1 source matrix couples blocks that Pass 0 "
-                    f"eigendecomposed independently "
-                    f"(max|cross|={np.max(np.abs(cross)):.3e} > "
-                    f"{atol:.3e}). Cross-block Duhamel is not yet "
-                    f"implemented — the correction theory likely mixes "
-                    f"previously-independent sectors, which Pass 0 "
-                    f"cannot represent. Report this spec to the TIDAL "
-                    f"team."
-                )
-                raise NotImplementedError(msg)
+        cross_max = 0.0
+        for M_n in M_src_k_by_order.values():
+            if M_n.size == 0:
+                continue
+            full_rows_n = M_n[:, idx, :]  # (n_modes, bs, n_slots)
+            cross_n = full_rows_n[:, :, mask]
+            if cross_n.size > 0:
+                cross_max = max(cross_max, float(np.max(np.abs(cross_n))))
+        atol = max(1e-14, m_scale_total * 1e-10)
+        if cross_max > atol:
+            msg = (
+                f"Pass 1 source matrix couples blocks that Pass 0 "
+                f"eigendecomposed independently "
+                f"(max|cross|={cross_max:.3e} > {atol:.3e}). Cross-block "
+                f"Duhamel is not yet implemented — the correction theory "
+                f"likely mixes previously-independent sectors, which "
+                f"Pass 0 cannot represent. Report this spec to the TIDAL "
+                f"team."
+            )
+            raise NotImplementedError(msg)
 
-        # β = V⁻¹ · M_sub · V, shape (n_modes, bs, bs)
-        beta = np.einsum("mij,mjk,mkl->mil", v_inv, M_sub, v_mat)
+        # β_n = V⁻¹ · M_sub_n · V, one per time-derivative order.
+        beta_by_order: dict[int, NDArray[np.complex128]] = {}
+        for n, M_n in M_src_k_by_order.items():
+            M_sub_n = M_n[:, idx[:, None], idx[None, :]]
+            beta_by_order[n] = np.einsum("mij,mjk,mkl->mil", v_inv, M_sub_n, v_mat)
 
         for ti in range(n_snapshots):
             dt = float(t_eval[ti] - t0)
             if dt == 0.0:
-                continue  # y⁽¹⁾(0) = 0 by IC
+                continue  # y⁽¹⁾(0) = 0 by initial condition
 
             # G[m, i, j] = _duhamel_kernel(λ_i, λ_j; dt) per mode
             lam_i = lam[:, :, None]  # (n_modes, bs, 1)
             lam_j = lam[:, None, :]  # (n_modes, 1, bs)
             G = _duhamel_kernel(lam_i, lam_j, dt)  # (n_modes, bs, bs)
 
-            # z_i = Σ_j β_ij · α_j · G_ij
-            z_eigen = np.einsum("mij,mj,mij->mi", beta, alpha, G)  # (n_modes, bs)
+            # z_i = Σ_n Σ_j β_n,ij · (λ_j^n · α_j) · G_ij
+            # The λ_j^n factor is the exact d^n_t of the eigenmode
+            # exp(λ_j·τ) source, which the pre-fix code was missing
+            # (see #293).
+            z_eigen = np.zeros((n_modes, lam.shape[1]), dtype=np.complex128)
+            for n, beta_n in beta_by_order.items():
+                # λⁿ scaling on the source column (per-mode eigenvalue).
+                lam_pow = lam if n == 1 else (lam**n if n > 0 else np.ones_like(lam))
+                alpha_scaled = lam_pow * alpha  # (n_modes, bs)
+                z_eigen += np.einsum("mij,mj,mij->mi", beta_n, alpha_scaled, G)
+
             # y_block_hat = V · z  (n_modes, bs)
             y_block_hat = np.einsum("mij,mj->mi", v_mat, z_eigen)
             # Scatter into full state
@@ -2951,7 +3009,7 @@ def solve_modal_pass1(
     rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
     rfft_shape = tuple(rfft_shape_list)
 
-    M_src_k, correction_drops = _build_source_matrix_k(
+    M_src_k_by_order, correction_drops = _build_source_matrix_k(
         correction_spec,
         layout,
         coeff_eval,
@@ -2976,14 +3034,14 @@ def solve_modal_pass1(
             )
 
     times, y_phys, y_hat_dyn = _evolve_duhamel_per_mode(
-        eigendata, M_src_k, t_eval, layout, grid
+        eigendata, M_src_k_by_order, t_eval, layout, grid
     )
 
     result: PerturbativePass1Result = {
         "t": times,
         "y": y_phys,
         "success": True,
-        "message": "Pass 1 closed-form Duhamel (v6 Stage 4)",
+        "message": "Pass 1 closed-form Duhamel",
         "y_hat_dyn": y_hat_dyn,
         "correction_drops": correction_drops,
     }

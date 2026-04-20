@@ -60,7 +60,7 @@ class PerturbativeResult:
         * ``"validity_param"`` — ``max_k( ε · ω · t_end )`` across all
           small parameters and simulated modes. The dimensionless
           secular-phase-error bound. < 0.1 is safe, > 1 breaks the EFT.
-          R4.1 / #284 corrected this from the previous (over-counting)
+          #284 corrected this from the previous (over-counting)
           ``ε·ω²·t`` formula.
         * ``"omega_max"`` — maximum simulated frequency ``max|λ|`` (so
           damped/tachyonic modes register at their full magnitude).
@@ -68,11 +68,11 @@ class PerturbativeResult:
           The overall level is the worse of ``correction_level`` and
           ``base_level``.
         * ``"correction_level"`` — warn band for the secular-error
-          side only (R4.1 thresholds: 0.1, 1.0).
+          side only (thresholds: 0.1, 1.0).
         * ``"base_stability_param"`` — ``max Re(λ) · t_end``. A
           strictly-positive value means the base theory has an
           unstable mode (tachyon, Jeans, ghost). > 30 → overflow;
-          > 1e-10 → warn-level R4.2 / #285.
+          > 1e-10 → warn-level #285.
         * ``"base_level"`` — warn band for the base-stability side.
         * ``"max_real_lambda"`` — ``max Re(λ)`` across all blocks.
         * ``"dominant_tachyon_field"`` — field/velocity slot owning
@@ -90,7 +90,7 @@ class PerturbativeResult:
         ``total`` to :meth:`SimulationData.from_solver_result` must use
         this spec, NOT the unreduced full spec — the demoted layout
         has a different slot ordering and a reduced component set.
-        Pre-R2.2 the CLI silently rebound ``spec = solver.base_spec``
+        The CLI previously rebound ``spec = solver.base_spec``
         after the solve; the explicit attribute removes that workaround
         (#276).
     full_spec : EquationSystem | None
@@ -115,7 +115,7 @@ def _compute_validity(
 ) -> dict[str, Any]:
     """Compute the iterative-expansion validity parameter.
 
-    Secular phase accumulation bound (R4.1 / #284). For a mass-shift
+    Secular phase accumulation bound (#284). For a mass-shift
     correction ``-ε·φ`` on a base oscillator ``ω₀² = m² + k²``:
 
     * Fractional frequency shift: ``δω/ω ≈ ε/(2ω²)``.
@@ -123,7 +123,7 @@ def _compute_validity(
       ``Δφ ≈ δω · t_end = ε·t_end/(2ω)``.
     * Scaled to a dimensionless "fraction of period" for threshold
       comparison: the relevant bound is ``ε · ω · t_end``, NOT
-      ``ε · ω² · t_end``. Pre-R4.1 the driver used the wrong formula,
+      ``ε · ω² · t_end``. The driver previously used the wrong formula,
       which was conservative (over-triggers) for ``ω > 1`` and
       dangerous (under-triggers) for ``ω < 1`` — low-frequency modes
       could see real ``ε·t`` ≈ 1 while the reported score stayed
@@ -131,7 +131,7 @@ def _compute_validity(
 
     ``ω_max`` is estimated from the largest absolute eigenvalue across
     all modes and blocks (so damped/tachyonic modes contribute their
-    full magnitude via ``|λ|`` rather than ``|Im(λ)|``). R4.2 / #285
+    full magnitude via ``|λ|`` rather than ``|Im(λ)|``). #285
     also computes a base-stability diagnostic from ``max Re(λ) · t_end``.
     """
     omega_max = 0.0
@@ -145,7 +145,7 @@ def _compute_validity(
         omega_block = float(np.max(np.abs(lam)))
         omega_max = max(omega_max, omega_block)
 
-        # R4.2 / #285: track max Re(λ) per block for base-theory
+        # #285: track max Re(λ) per block for base-theory
         # stability. A positive Re(λ) means the base Pass 0 solution
         # grows exponentially (tachyon / unstable mode); no Pass 1
         # correction can be meaningful on top of it.
@@ -172,14 +172,14 @@ def _compute_validity(
     validity_param = 0.0
     dominant: str | None = None
     for name, val in eps_values.items():
-        # R4.1 / #284: ε·ω·t_end (secular phase-error bound), not
+        # #284: ε·ω·t_end (secular phase-error bound), not
         # ε·ω²·t_end.
         score = abs(val) * omega_max * float(t_end)
         if score > validity_param:
             validity_param = score
             dominant = name
 
-    # R4.2 / #285: base-theory stability parameter. exp(30) ≈ 1e13 so
+    # #285: base-theory stability parameter. exp(30) ≈ 1e13 so
     # any base_growth > 30 means Pass 0 has already overflowed double
     # precision within the simulation window.
     base_growth = max_real_lambda * float(t_end)
@@ -253,7 +253,7 @@ def _assemble_full_state_pass_n(
       original slot indices using ``eigendata["schur_ops"]
       ["orig_to_reduced"]``.
     * Constraint slots are populated via the **augmented** Schur
-      recovery (v6 R8 / #290):
+      recovery (#290):
 
       .. math::
 
@@ -261,7 +261,7 @@ def _assemble_full_state_pass_n(
                      + S_{cc}^{-1} \\cdot \\mathrm{source\\_hat}_c
 
       where ``source_hat_c = K·d^n_t(h_c⁰) − corr_1(y⁰)`` (see
-      :func:`_compute_constraint_source_hat`). Pre-R8, only the
+      :func:`_compute_constraint_source_hat`). Earlier implementations used only the
       first term was applied — see #290 for the ~14-orders-of-
       magnitude discrepancy this caused on the flagship R̃² PGT
       theory.
@@ -577,7 +577,7 @@ class PerturbativeSolver:
                 "dominant_parameter": None,
                 "warn_level": "ok",
             }
-        # v6 R1.1 (#272): surface all skipped correction terms so the
+        # #272: surface all skipped correction terms so the
         # CLI / caller can see when Pass 1 silently misses contributions.
         validity["correction_drops"] = correction_drops
 
@@ -607,7 +607,7 @@ def _pre_demote_info(
 ) -> dict[str, tuple[str, int]]:
     """Return per-demoted-field pre-demotion metadata.
 
-    v6 R8.2 / #290: the augmented Pass 1 constraint recovery needs the
+    See #290: the augmented Pass 1 constraint recovery needs the
     symbolic kinetic coefficient and the original LHS time-derivative
     order for every demoted field whose pre-demote kinetic is
     non-zero (e.g. R̃² PGT's ``h_4`` with kinetic ``"2*b5"``).
@@ -666,7 +666,7 @@ def _compute_constraint_source_hat(  # noqa: C901, PLR0912, PLR0914, PLR0915
 ) -> NDArray[np.complex128]:
     """Compute the augmented constraint-source term for Pass 1 recovery.
 
-    v6 R8.3 / #290. The order-1 equation for a demoted constraint field
+    See #290. The order-1 equation for a demoted constraint field
     h_c (derived from ``ε·K·d^n_t(h_c) = S_cc·h_c + S_cd·y_dyn +
     ε·corr_1(y)``) yields::
 

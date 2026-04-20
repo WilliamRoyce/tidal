@@ -59,7 +59,7 @@ def evaluate_at_one(expr: str, one_names: set[str] | frozenset[str]) -> float | 
     """Return the literal value of ``expr`` after substituting every name in
     ``one_names`` with ``1.0``.
 
-    v6 R8.2 / #290: used by :class:`PerturbativeSolver` to extract the
+    See #290: used by :class:`PerturbativeSolver` to extract the
     numeric kinetic coefficient for the augmented constraint recovery.
     For example, evaluating ``"2*b5"`` with ``{"b5"}`` returns ``2.0``.
 

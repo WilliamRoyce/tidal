@@ -1163,7 +1163,7 @@ class EquationSystem:
             for eq in self.equations
         )
         # Recompute mass/coupling matrices from the filtered equations
-        # (v6 R1.3 / #274). Filtering RHS terms changes the identity-
+        # (#274). Filtering RHS terms changes the identity-
         # operator structure from which the matrices are derived; the
         # cached matrices on self reflect the full-spec structure and
         # would trigger __post_init__'s inconsistency UserWarning if
@@ -1307,7 +1307,7 @@ class EquationSystem:
             raise ValueError(msg)
 
         # Recompute mass/coupling matrices from the demoted equations
-        # (v6 R1.3 / #274). The cached matrices on self reflect the
+        # (#274). The cached matrices on self reflect the
         # full spec's identity-term structure; after demotion the RHS
         # has a new ``1 * identity(self)`` term on each demoted
         # constraint, so mass_matrix[i][i] changes from its full-spec
@@ -1709,7 +1709,7 @@ def normalize_kinetic_coefficients(
         return spec
 
     # Recompute mass/coupling matrices from the normalized equations
-    # (v6 R1.3 / #274). Dividing every RHS term by the kinetic
+    # (#274). Dividing every RHS term by the kinetic
     # coefficient rescales the identity-operator coefficients, so the
     # cached matrices on spec no longer match.
     new_eqs_t = tuple(new_eqs)
