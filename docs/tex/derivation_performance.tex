@@ -89,12 +89,14 @@ With the v6 perturbative-reduction iterative architecture (Parker--Simon, see \S
 \toprule
 Theory & Wall-time & $n_{\mathrm{dyn}}$ & Components & Notes \\
 \midrule
-\texttt{coupled\_scalars}       & ${\sim}14$\,s   & 2 & 2  & 1+1D, minimal cross-coupling \\
-\texttt{euler\_heisenberg}      & ${\sim}19$\,s   & 1 & 4  & matter-only, $F^4$ correction (\#271) \\
-\texttt{scalar\_potential\_well}& ${\sim}10$\,s   & 1 & 1  & fast-path precompute skip \\
-\texttt{gertsenshtein}          & ${\sim}46$--$49$\,s & 2 & 6 & Einstein--Maxwell baseline \\
-\texttt{graviton\_torsion}      & ${\sim}6$--$8$\,min & 2 & 13 & PGT, \texttt{--timeout 0} \\
-\texttt{torsion\_gertsenshtein} & ${\sim}20$\,min & 3 & 20 & full PGT + EM + $\tilde{R}^2$ \\
+\texttt{coupled\_scalars}                     & ${\sim}14$\,s    & 2 & 2  & 1+1D, minimal cross-coupling \\
+\texttt{euler\_heisenberg}                    & ${\sim}19$\,s    & 1 & 4  & matter-only, $F^4$ correction (\#271) \\
+\texttt{scalar\_potential\_well}              & ${\sim}10$\,s    & 1 & 1  & fast-path precompute skip \\
+\texttt{gertsenshtein}                        & ${\sim}46$--$49$\,s & 2 & 6 & Einstein--Maxwell baseline \\
+\texttt{torsion\_gertsenshtein} (minimal $\tilde{R}^2$) & ${\sim}1$m\,53\,s  & 3 & 20 & post-\#246, was ${\sim}20$\,min \\
+\texttt{torsion\_gertsenshtein} (non-minimal) & ${\sim}2$m\,38\,s  & 3 & 20 & post-\#246, was ${\sim}6$\,min \\
+\texttt{torsion\_gertsenshtein} (propagating) & ${\sim}2$m\,50\,s  & 3 & 20 & post-\#246, was ${\sim}8$\,min \\
+\texttt{graviton\_torsion} (minimal propagating) & ${\sim}1$m\,23\,s  & 2 & 13 & post-\#246, was ${\sim}2$\,min \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -102,6 +104,14 @@ Theory & Wall-time & $n_{\mathrm{dyn}}$ & Components & Notes \\
 \paragraph{\texttt{euler\_heisenberg} commentary.} Before v0.33.9 this example could not derive at all --- first the \texttt{(F$\cdot$F)}$^2$ Power auto-distribution raised \verb|Validate::repeated + Throw[Null]|, and even with that fixed the CD ComponentValue precompute was skipped (the $\texttt{len(dyn\_fields)} \ge 2$ heuristic), leaving \verb|CD1eqca| shorthand unresolved in \verb|lagComp| so Component E--L found zero field functions. Both are fixed in commits 9d9e73f and 830a442; see \S\ref{sec:pr-eh-cd}. The $\approx 19$~s wall-time listed above is the first recorded measurement for this theory.
 
 \paragraph{\texttt{gertsenshtein} commentary.} The v0.33.9 safety-net \verb|//.| of \verb|$CDShorthandReverseRules| before Component-E--L field detection was initially a $+24\%$ regression (45.6~s $\rightarrow$ 56.6~s). Gating it on \verb|!FreeQ[lagComp, _Symbol?(StringMatchQ["CD" ~~ DigitCharacter ~~ __]&)]| --- a no-op whenever the precompute already resolved everything --- restored the timing to $\approx 49$~s, within run-to-run variance of the 46~s baseline.
+
+\paragraph{Known-stale headers --- do not trust at face value.} Several \texttt{examples/*/theory*.toml} files carry timing comments that predate the parity-odd / per-pair-TraceBasisDummy optimisation series (issue~\#246, commits \texttt{18dfa9a}--\texttt{a28a393}, 2026-04-11). Those optimisations dropped the R$^2$/\(\tilde{R}^2\) family by $3\text{--}11\times$. Until each of these headers is re-measured and rewritten, the \emph{header} number in the source file should be considered a \emph{ceiling}, not a current measurement:
+\begin{itemize}
+  \item \texttt{examples/torsion\_gertsenshtein/theory\_b5\_zero.toml} --- header claimed ``15--18 min''; post-\#246 the simpler $b_5 = 0$ limit is strictly faster than the full \texttt{theory.toml} ($\approx 2$ min post-\#246), so expect $\le 2$ min on first run.
+  \item \texttt{examples/torsion\_gertsenshtein/theory\_minimal\_propagating.toml} --- header updated in v0.33.9 to \texttt{a28a393}'s $\approx 1$ m $23$ s measurement.
+  \item \texttt{examples/euler\_heisenberg/theory.toml} --- header updated in v0.33.9 to the $\approx 19$~s measurement first recorded at v0.33.9 (the theory was unable to derive at all before that release; see \cref{sec:pr-eh-cd}).
+\end{itemize}
+Theories whose headers match the post-\#246 table above have been re-verified against the \texttt{a28a393} commit log or re-measured in the v0.33.9 regression suite. If a header is absent or says ``to be verified'', run the derivation once and annotate.
 
 \subsection{Wolfram License Constraint}
 \label{sec:license-constraint}

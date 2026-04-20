@@ -52,8 +52,10 @@
 #   Dandoy, Lella et al. (2024), arXiv:2406.17853 — GW constraints
 #   Hayashi & Shirafuji (1979) — PGT propagating modes
 #
-# Derivation timing: ~20 min wall (requires --timeout 0; exceeds default 600s)
-# Last verified: 2026-04-05 (20 fields, 147 H terms, v0.25.6)
+# Derivation timing: ~2 min wall (post-#246 per-pair TraceBasisDummy optimisation).
+# Pre-#246 this theory took ~20 min. Documented in docs/tex/derivation_performance.tex
+# §Post-v6 Reference Timings.
+# Last verified timing source: a28a393 commit log (2026-04-11, parity-odd #246 series).
 
 [theory]
 name = "Torsion-Gertsenshtein (PGT + Einstein-Maxwell)"

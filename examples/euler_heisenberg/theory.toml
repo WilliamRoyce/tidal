@@ -32,7 +32,7 @@
 # ComponentDecompose.wl fix for issue #271. The derivation is the first to use
 # a quartic EM invariant in TIDAL.
 #
-# Derivation timing: ~5 min wall (estimate; 4 fields, ~20 H terms)
+# Derivation timing: ~19 s wall (last verified: 2026-04-20, v0.33.9, 4 fields, matter-only F^4)
 
 [theory]
 name = "Euler-Heisenberg QED Correction"

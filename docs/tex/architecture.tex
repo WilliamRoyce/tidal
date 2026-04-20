@@ -408,6 +408,8 @@ The complete mathematical and implementation treatment lives in \cref{sec:pertur
 
 \paragraph{CLI.} The flag \verb|--perturbative-order N| defaults to~$1$ when the JSON carries a \verb|perturbation| metadata block and~$0$ otherwise. Theories without the metadata block simulate through the plain modal path unchanged. The flag is silent about orders beyond~$1$; see the scope limits in \cref{sec:pr-v6}.
 
+\paragraph{Quartic EM and matter-only derivative-only theories.} Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^2$ and any single-dynamical-field theory whose field enters only through covariant derivatives (e.g.\ a photon via $F = \mathrm{d}A$) are supported as of v0.33.9; see \cref{sec:pr-eh-cd} for the upstream (pre-xPert) Lagrangian-assignment fix (Hold + Scalar-wrapping against Power auto-distribution) and the correctness-aware CD ComponentValue precompute gate that unblocks these theories.
+
 \paragraph{Ghost-free by construction.} The Pass 0 evolution operator is always the second-order base; the higher-derivative terms appear only as sources on the right-hand side. No ghost modes propagate because they are not part of the solution ansatz. This is the central architectural guarantee of the v6 path.
 
 \paragraph{Historical note.} Before v6, TIDAL used a mechanical Ostrogradsky reduction that introduced auxiliary fields $w_q = \partial_t^2 q$ to flatten higher-order equations into coupled second-order ones. The reduction was theoretically sound but produced ghost modes whose long-time growth corrupted simulations. It was replaced by the iterative path in v6 (\cref{sec:pr-v6}) and the \verb|tidal/symbolic/ostrogradsky.py| module was removed.

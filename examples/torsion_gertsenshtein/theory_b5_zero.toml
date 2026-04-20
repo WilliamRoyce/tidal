@@ -31,16 +31,20 @@
 # background Abar. The derived JSON must map field-for-field against
 # ``base_spec(['b5'])`` applied to the full theory's JSON.
 #
-# Expected derivation: ~15-18 min wall (slightly faster than the full
-# theory because the R̃² cross-couplings in Euler-Lagrange expansion
-# are absent).
+# Expected derivation: STALE — the original estimate (~15-18 min) predated
+# the #246 per-pair TraceBasisDummy optimisation (commit a28a393, 2026-04-11)
+# which brought the full theory.toml from ~20 min down to ~2 min. The b5=0
+# variant is strictly simpler (no R̃² cross-couplings in Euler-Lagrange
+# expansion), so post-#246 it should derive in ≤ 2 min. Needs a fresh
+# measurement on first run; do NOT treat the 15-18 min number as current.
 #
 # Refs:
 #   theory.toml — the full b5 ≠ 0 parent theory.
 #   docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md — v6 perturbative
 #   infrastructure.
+#   docs/tex/derivation_performance.tex §Post-v6 Reference Timings.
 #
-# Derivation timing: TBD (measure on first run; annotate here)
+# Derivation timing: TBD (measure on first run; post-#246 expected ≤ 2 min)
 
 [theory]
 name = "Torsion-Gertsenshtein base (b5=0): PGT + Einstein-Maxwell without R̃²"

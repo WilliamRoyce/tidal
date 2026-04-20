@@ -30,7 +30,10 @@
 #   Obukhov & Trukhanova (2024), arXiv:2410.01355 — spin-torsion coupling suppression
 #   research/general_quadratic_lagrangian.tex — complete PGT+EM enumeration
 #
-# Derivation timing: ~15-20m wall (to be verified)
+# Derivation timing: ~1 m 23 s wall (post-#246 per-pair TraceBasisDummy optimisation,
+# from commit a28a393 log, 2026-04-11). Pre-#246 was ~2 min; the pre-#246 estimate
+# of ~15-20 m in this header was never verified and is now obsolete. See
+# docs/tex/derivation_performance.tex §Post-v6 Reference Timings.
 
 [theory]
 name = "Minimal PGT + Propagating Torsion (Barker)"
