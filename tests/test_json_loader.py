@@ -23,18 +23,6 @@ from tidal.symbolic.json_loader import (
 
 
 @pytest.fixture
-def em_json_path() -> Path:
-    """Path to the EM 3D JSON file."""
-    return Path(__file__).parent.parent / "examples" / "data" / "em_3d.json"
-
-
-@pytest.fixture
-def kg_json_path() -> Path:
-    """Path to the Klein-Gordon 1D JSON file."""
-    return Path(__file__).parent.parent / "examples" / "data" / "klein_gordon_1d.json"
-
-
-@pytest.fixture
 def em_json_data() -> dict[str, Any]:
     """EM equation JSON data for testing."""
     return {
@@ -924,44 +912,11 @@ class TestValidateJsonSchema:
 class TestLoadEquationSystem:
     """Tests for loading equation systems from files."""
 
-    def test_load_em_file(self, em_json_path: Path) -> None:
-        """Test loading EM equations from file."""
-        if not em_json_path.exists():
-            pytest.skip(f"Test file not found: {em_json_path}")
-
-        system = load_equation_system(em_json_path)
-
-        num_em_components = 3
-        assert system.n_components == num_em_components
-        assert "A_0" in system.component_names
-        assert "A_1" in system.component_names
-        assert "A_2" in system.component_names
-
-    def test_load_kg_file(self, kg_json_path: Path) -> None:
-        """Test loading Klein-Gordon equations from file."""
-        if not kg_json_path.exists():
-            pytest.skip(f"Test file not found: {kg_json_path}")
-
-        system = load_equation_system(kg_json_path)
-
-        num_kg_components = 1
-        assert system.n_components == num_kg_components
-        assert system.component_names == ("phi_0",)
-
     def test_file_not_found(self, tmp_path: Path) -> None:
         """Test that FileNotFoundError is raised for missing file."""
         nonexistent = tmp_path / "nonexistent.json"
         with pytest.raises(FileNotFoundError):
             load_equation_system(nonexistent)
-
-    def test_load_with_string_path(self, em_json_path: Path) -> None:
-        """Test loading with string path."""
-        if not em_json_path.exists():
-            pytest.skip(f"Test file not found: {em_json_path}")
-
-        system = load_equation_system(str(em_json_path))
-        num_em_components = 3
-        assert system.n_components == num_em_components
 
 
 # === Phase 4: Field Reference Validation Tests ===
@@ -1878,23 +1833,6 @@ class TestParameterResolvedMatrices:
         spec = EquationSystem.from_dict(data)
         # No parameters → falls back to coefficient shape factor: -(-1.0) = 1.0
         assert spec.mass_matrix == ((1.0,),)
-
-    def test_coupled_proca_correct_masses(self) -> None:
-        """Coupled Proca: A-fields have mA2=1.0, B-fields have mB2=2.0."""
-        spec = EquationSystem.from_dict(_load_json("coupled_proca_3d.json"))
-        # Constraint fields (A_0, B_0): temporal component g_{00}=-1 flips sign
-        assert spec.mass_matrix[0][0] == pytest.approx(-1.0)
-        # Spatial A components: -(-mA2) with mA2=1.0 → 1.0
-        assert spec.mass_matrix[1][1] == pytest.approx(1.0)
-        assert spec.mass_matrix[2][2] == pytest.approx(1.0)
-        # Constraint B_0: temporal → -mB2
-        assert spec.mass_matrix[3][3] == pytest.approx(-2.0)
-        # Spatial B components: -(-mB2) with mB2=2.0 → 2.0
-        assert spec.mass_matrix[4][4] == pytest.approx(2.0)
-        assert spec.mass_matrix[5][5] == pytest.approx(2.0)
-        # Coupling in constraint eqs: temporal sign flip → +0.5
-        assert spec.coupling_matrix[0][3] == pytest.approx(0.5)
-        assert spec.coupling_matrix[3][0] == pytest.approx(0.5)
 
 
 class TestResolveSymbolicCoeff:

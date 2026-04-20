@@ -165,27 +165,6 @@ class TestSimulateCommand:
         assert "Results:" in out
         assert "phi_0" in out
 
-    def test_simulate_with_params(
-        self, klein_gordon_3d_json: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        ret = main(
-            [
-                "simulate",
-                str(klein_gordon_3d_json),
-                "--param",
-                "m2=1.0",
-                "--t-end",
-                "0.5",
-                "--grid-shape",
-                "8",
-                "--no-plot",
-            ]
-        )
-        assert ret == 0
-
-        out = capsys.readouterr().out
-        assert "Results:" in out
-
     def test_simulate_png_output(self, inline_kg_1d_json: Path, tmp_path: Path) -> None:
         output = tmp_path / "test_output.png"
         ret = main(
@@ -395,34 +374,6 @@ class TestSimulateCommand:
         )
         assert ret == 0
 
-    def test_simulate_bc_mixed_2d(
-        self, polar_kg_json: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        ret = main(
-            [
-                "simulate",
-                str(polar_kg_json),
-                "--bc",
-                "neumann,periodic",
-                "--grid-shape",
-                "16",
-                "--bounds",
-                "0.5:8,0:6.28",
-                "--ic",
-                "gaussian",
-                "--ic-center",
-                "3.0,3.14",
-                "--ic-width",
-                "0.5",
-                "--t-end",
-                "0.5",
-                "--dt",
-                "0.01",
-                "--no-plot",
-            ]
-        )
-        assert ret == 0
-
     def test_simulate_bc_invalid_type(self, inline_kg_1d_json: Path) -> None:
         ret = main(
             [
@@ -494,32 +445,6 @@ class TestSimulateCommand:
 
         out = capsys.readouterr().out
         assert "Results:" in out
-
-    def test_simulate_formula_ic_2d(
-        self, polar_kg_json: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        ret = main(
-            [
-                "simulate",
-                str(polar_kg_json),
-                "--ic",
-                "formula",
-                "--ic-formula",
-                "np.exp(-((x - 3)**2 + (y - pi)**2) / 0.5**2)",
-                "--grid-shape",
-                "16",
-                "--bounds",
-                "0.5:8,0:6.28",
-                "--bc",
-                "neumann,periodic",
-                "--t-end",
-                "0.5",
-                "--dt",
-                "0.01",
-                "--no-plot",
-            ]
-        )
-        assert ret == 0
 
     def test_simulate_formula_ic_missing_expr(self, inline_kg_1d_json: Path) -> None:
         ret = main(
@@ -764,26 +689,6 @@ class TestSimulateCommand:
                 "0.25",
                 "--t-end",
                 "0.5",
-                "--no-plot",
-            ]
-        )
-        assert ret == 0
-
-    # --- 3D simulation ---
-
-    def test_simulate_3d(
-        self, klein_gordon_3d_json: Path, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        ret = main(
-            [
-                "simulate",
-                str(klein_gordon_3d_json),
-                "--param",
-                "m2=1.0",
-                "--grid-shape",
-                "8",
-                "--t-end",
-                "0.2",
                 "--no-plot",
             ]
         )

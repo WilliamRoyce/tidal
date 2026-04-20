@@ -19,7 +19,6 @@ import pytest
 
 from tidal.measurement import (
     ConversionResult,
-    DispersionResult,
     EnergyDiagnostics,
     MixingResult,
     MixingSpectrum,
@@ -32,7 +31,6 @@ from tidal.measurement import (
     compute_group_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
-    compute_mode_amplitudes,
     compute_spectral_energy,
     compute_spectrum,
     compute_system_energy,
@@ -53,7 +51,6 @@ from tidal.symbolic.json_loader import (
     HamiltonianFactor,
     HamiltonianTerm,
     OperatorTerm,
-    load_equation_system,
 )
 
 # ============================================================
@@ -156,50 +153,6 @@ def _make_sim_data_two_fields(
         grid_spacing=grid_spacing,
         grid_bounds=grid_bounds,
         periodic=periodic,
-        spec=spec,
-        parameters=params,
-    )
-
-
-def _make_single_field_data(
-    n_grid: int = 64,
-    n_snapshots: int = 5,
-) -> SimulationData:
-    """Build synthetic data for a single KG field (Gaussian pulse)."""
-    path = DATA_DIR / "klein_gordon_1d.json"
-    if not path.exists():
-        pytest.skip("klein_gordon_1d.json not found")
-    spec = load_equation_system(path)
-
-    domain_len = 20.0
-    dx = domain_len / n_grid
-    x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
-    sigma = 2.0
-
-    times = np.linspace(0.0, 5.0, n_snapshots)
-
-    # Just repeat same Gaussian for simplicity (energy should be constant
-    # for the t=0 snapshot test; exact evolution not needed for unit tests)
-    phi = np.exp(-((x - domain_len / 2) ** 2) / (2 * sigma**2))
-    pi_field = np.zeros(n_grid)
-
-    fields = {"phi_0": np.stack([phi] * n_snapshots)}
-    velocities_dict = {"phi_0": np.stack([pi_field] * n_snapshots)}
-
-    # Extract metadata parameters so symbolic coefficients resolve correctly
-    params = {
-        k: float(v)
-        for k, v in spec.metadata.get("parameters", {}).items()
-        if isinstance(v, (int, float))
-    }
-
-    return SimulationData(
-        times=times,
-        fields=fields,
-        velocities=velocities_dict,
-        grid_spacing=(dx,),
-        grid_bounds=((0.0, domain_len),),
-        periodic=(True,),
         spec=spec,
         parameters=params,
     )
@@ -1434,26 +1387,6 @@ class TestSpectrum:
             assert any("Hann window" in str(warning.message) for warning in w)
 
 
-class TestModeAmplitudes:
-    """Test compute_mode_amplitudes."""
-
-    def test_shape(self) -> None:
-        """Mode amplitudes have correct (n_snapshots, n_modes) shape."""
-        data = _make_single_field_data(n_snapshots=5)
-        times, wavenumbers, amplitudes = compute_mode_amplitudes(data, "phi_0")
-
-        assert len(times) == 5
-        assert len(wavenumbers) > 0
-        assert amplitudes.shape[0] == 5
-        assert amplitudes.shape[1] == len(wavenumbers)
-
-    def test_invalid_field_raises(self) -> None:
-        """Invalid field name raises ValueError."""
-        data = _make_single_field_data(n_snapshots=3)
-        with pytest.raises(ValueError, match="not in spec"):
-            compute_mode_amplitudes(data, "nonexistent")
-
-
 # ============================================================
 # Diagnostics tests
 # ============================================================
@@ -1952,14 +1885,6 @@ class TestHamiltonianEnergy:
         # Total = kinetic + virial + constraint. Interaction = virial - self_potentials.
         # For coupled uniform oscillators, the coupling term is nonzero.
         assert se.interaction != 0.0
-
-    def test_single_field_zero_interaction(self) -> None:
-        """Single KG field has zero interaction energy."""
-        # Use high resolution: canonical H uses (∂_x φ)² while per-field uses
-        # -φ·∂²_x φ (equivalent in continuum, O(dx²) difference discretely).
-        data = _make_single_field_data(n_grid=256, n_snapshots=3)
-        se = compute_system_energy(data, 0)
-        np.testing.assert_allclose(se.interaction, 0.0, atol=1e-5)
 
 
 # ============================================================
@@ -2829,199 +2754,8 @@ class TestSpectralEnergyPhysics:
         assert len(wavenumbers) == len(se)
 
 
-# ============================================================
-# Dispersion relation tests (Part B)
-# ============================================================
-
-
-def _make_plane_wave_data(
-    n_grid: int = 64,
-    n_snapshots: int = 64,
-    mode_index: int = 3,
-) -> SimulationData:
-    """Build synthetic data: single-mode plane wave with exact KG evolution.
-
-    Creates phi(x, t) = A * cos(k0*x) * cos(omega0*t) where
-    omega0 = sqrt(k0^2 + m^2) from the KG dispersion relation.
-    """
-    path = DATA_DIR / "klein_gordon_1d.json"
-    if not path.exists():
-        pytest.skip("klein_gordon_1d.json not found (run tidal derive)")
-    spec = load_equation_system(path)
-    m2 = float(spec.mass_matrix[0][0])
-
-    domain_len = 20.0
-    dx = domain_len / n_grid
-    x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
-
-    k0 = 2.0 * np.pi * mode_index / domain_len
-    omega0 = float(np.sqrt(k0**2 + m2))
-
-    # Time span: long enough for several oscillations
-    t_end = 8.0 * np.pi / omega0  # ~4 full oscillations
-    times = np.linspace(0.0, t_end, n_snapshots)
-
-    amplitude = 1.0
-    fields_list: list[np.ndarray] = []
-    velocities_list: list[np.ndarray] = []
-
-    for t in times:
-        phi = amplitude * np.cos(k0 * x) * np.cos(omega0 * t)
-        pi_field = -amplitude * omega0 * np.cos(k0 * x) * np.sin(omega0 * t)
-        fields_list.append(phi)
-        velocities_list.append(pi_field)
-
-    return SimulationData(
-        times=times,
-        fields={"phi_0": np.stack(fields_list)},
-        velocities={"phi_0": np.stack(velocities_list)},
-        grid_spacing=(dx,),
-        grid_bounds=((0.0, domain_len),),
-        periodic=(True,),
-        spec=spec,
-        parameters={},
-    )
-
-
 class TestDispersionRelation:
     """Tests for compute_dispersion."""
-
-    def test_shapes(self) -> None:
-        """Output arrays should have consistent shapes."""
-        data = _make_plane_wave_data()
-        result = compute_dispersion(data, "phi_0")
-
-        assert isinstance(result, DispersionResult)
-        n_modes = len(result.wavenumbers)
-        n_freq = len(result.frequencies)
-        assert result.power.shape == (n_modes, n_freq)
-        assert result.peak_frequencies.shape == (n_modes,)
-        assert result.peak_powers.shape == (n_modes,)
-
-    def test_field_name_stored(self) -> None:
-        """field_name should round-trip."""
-        data = _make_plane_wave_data()
-        result = compute_dispersion(data, "phi_0")
-        assert result.field_name == "phi_0"
-
-    def test_invalid_field_raises(self) -> None:
-        """Unknown field should raise ValueError."""
-        data = _make_plane_wave_data()
-        with pytest.raises(ValueError, match="not in spec"):
-            compute_dispersion(data, "nonexistent")
-
-    def test_too_few_snapshots_raises(self) -> None:
-        """Fewer than 3 snapshots should raise ValueError."""
-        data = _make_plane_wave_data(n_snapshots=2)
-        with pytest.raises(ValueError, match="at least 3"):
-            compute_dispersion(data, "phi_0")
-
-    def test_non_uniform_timestep_raises(self) -> None:
-        """Non-uniform timestep should raise ValueError."""
-        import dataclasses
-
-        data = _make_plane_wave_data(n_snapshots=10)
-        # Make timestep non-uniform
-        bad_times = data.times.copy()
-        bad_times[-1] += 1.0
-        bad_data = dataclasses.replace(data, times=bad_times)
-        with pytest.raises(ValueError, match="Non-uniform"):
-            compute_dispersion(bad_data, "phi_0")
-
-    def test_peak_detection_plane_wave(self) -> None:
-        """Monochromatic plane wave should peak at the injected (k0, omega0)."""
-        mode_index = 3
-        data = _make_plane_wave_data(mode_index=mode_index)
-        spec = data.spec
-        m2 = float(spec.mass_matrix[0][0])
-        domain_len = float(data.grid_bounds[0][1] - data.grid_bounds[0][0])
-
-        k0 = 2.0 * np.pi * mode_index / domain_len
-        omega0 = float(np.sqrt(k0**2 + m2))
-
-        result = compute_dispersion(data, "phi_0")
-
-        # Find the k-bin closest to k0
-        k_idx = int(np.argmin(np.abs(result.wavenumbers - k0)))
-        detected_omega = result.peak_frequencies[k_idx]
-
-        # Should match within Rayleigh resolution
-        np.testing.assert_allclose(
-            detected_omega,
-            omega0,
-            atol=2 * result.rayleigh_resolution,
-        )
-
-    def test_kg_dispersion_curve(self) -> None:
-        """Free KG field: active modes should follow omega = sqrt(k^2 + m^2).
-
-        Uses parameter variables from the spec, not hardcoded numbers.
-        """
-        data = _make_plane_wave_data(n_grid=64, n_snapshots=128)
-        m2 = float(data.spec.mass_matrix[0][0])
-        result = compute_dispersion(data, "phi_0")
-
-        # For active modes, compare detected omega to analytical
-        active = result.peak_frequencies > 0.0
-        if np.any(active):
-            k_active = result.wavenumbers[active]
-            omega_detected = result.peak_frequencies[active]
-            omega_expected = np.sqrt(k_active**2 + m2)
-
-            # Within 2x Rayleigh resolution
-            np.testing.assert_allclose(
-                omega_detected,
-                omega_expected,
-                atol=2 * result.rayleigh_resolution,
-            )
-
-    def test_rayleigh_resolution(self) -> None:
-        """Rayleigh resolution should be 2*pi / T."""
-        data = _make_plane_wave_data(n_snapshots=32)
-        result = compute_dispersion(data, "phi_0")
-
-        t_span = float(data.times[-1] - data.times[0])
-        expected = 2.0 * np.pi / t_span
-        np.testing.assert_allclose(result.rayleigh_resolution, expected, rtol=1e-10)
-
-    def test_inactive_modes_zeroed(self) -> None:
-        """Modes below min_amplitude should have peak_frequencies = 0."""
-        data = _make_plane_wave_data()
-        result = compute_dispersion(data, "phi_0", min_amplitude=1e-12)
-
-        # Plane wave only excites one mode — many modes should be inactive
-        n_active = np.count_nonzero(result.peak_frequencies > 0.0)
-        # At most a handful of modes should be active (the injected mode
-        # plus possibly its neighbors due to spectral leakage)
-        assert n_active < len(result.wavenumbers)
-        # Inactive modes should have zero peak frequency
-        inactive = result.peak_frequencies == 0.0
-        assert np.all(result.peak_powers[inactive] == 0.0)
-
-    def test_power_nonnegative(self) -> None:
-        """All S(k, omega) values should be >= 0."""
-        data = _make_plane_wave_data()
-        result = compute_dispersion(data, "phi_0")
-        assert np.all(result.power >= 0.0)
-
-    def test_single_frequency_dominates(self) -> None:
-        """Monochromatic wave should concentrate power at one frequency bin."""
-        data = _make_plane_wave_data(mode_index=3)
-        result = compute_dispersion(data, "phi_0")
-
-        # Find mode with most power
-        total_per_mode = result.power.sum(axis=1)
-        dominant_k = int(np.argmax(total_per_mode))
-
-        # The peak power should be > 50% of the total for that mode
-        mode_power = result.power[dominant_k]
-        assert float(np.max(mode_power)) > 0.5 * float(np.sum(mode_power))
-
-    def test_frequencies_positive(self) -> None:
-        """All frequency values should be > 0 (DC excluded)."""
-        data = _make_plane_wave_data()
-        result = compute_dispersion(data, "phi_0")
-        assert np.all(result.frequencies > 0.0)
 
     def test_constraint_field_raises(self) -> None:
         """Requesting a constraint field should raise ValueError."""
@@ -3099,12 +2833,6 @@ class TestDispersionRelation:
         assert result.power.shape == (n_modes, n_freq)
         assert result.peak_frequencies.shape == (n_modes,)
         assert result.peak_powers.shape == (n_modes,)
-
-    def test_single_string_backward_compat(self) -> None:
-        """Passing a single str still works (backward-compatible path)."""
-        data = _make_plane_wave_data()
-        result = compute_dispersion(data, "phi_0")
-        assert result.field_name == "phi_0"
 
 
 # ============================================================

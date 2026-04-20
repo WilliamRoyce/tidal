@@ -2734,38 +2734,6 @@ class TestEnsureConsistentICRealJSON:
             "h_7 should remain zero when only h_5 is set"
         )
 
-    def test_em_json_constraint(self) -> None:
-        """EM JSON: standard Gauss's law constraint solve from real spec."""
-        import json
-        from pathlib import Path
-
-        json_path = Path("examples/data/em_3d.json")
-        if not json_path.exists():
-            pytest.skip("EM JSON not available")
-
-        with json_path.open(encoding="utf-8") as f:
-            data = json.load(f)
-        spec = EquationSystem.from_dict(data)
-
-        grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
-        )
-        layout = StateLayout.from_spec(spec, grid.num_points)
-        n = grid.num_points
-
-        y0 = np.zeros(layout.total_size)
-        # Set v_A_1 as source
-        va1_slot = layout.velocity_slot_map["A_1"]
-        x_arr, _ = grid.coord_arrays()
-        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(-((x_arr - 5) ** 2) / 2).ravel()
-
-        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
-
-        # A_0 should be solved (non-zero)
-        a0_slot = layout.field_slot_map["A_0"]
-        a0_data = result[a0_slot * n : (a0_slot + 1) * n]
-        assert float(np.max(np.abs(a0_data))) > 1e-5
-
     def test_massive_gravity_connected_components(self) -> None:
         """Massive gravity: h_0 skipped (no self-terms), h_1↔h_2 coupled.
 

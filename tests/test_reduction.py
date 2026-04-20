@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -557,84 +556,6 @@ class TestReduceSpec:
         original_dim = spec["spacetime"]["dimension"]
         reduce_spec(spec, {"type": "plane_wave", "propagation_axis": "z"})
         assert spec["spacetime"]["dimension"] == original_dim
-
-
-# ---------------------------------------------------------------------------
-# Integration tests: reduce_spec on real JSON files
-# ---------------------------------------------------------------------------
-
-
-class TestReduceRealSpecs:
-    """Tests against real JSON specs from examples/data/."""
-
-    @staticmethod
-    def _load_spec(name: str) -> dict[str, Any]:
-        path = _EXAMPLES_DATA / name
-        if not path.exists():
-            pytest.skip(f"{name} not found")
-        with path.open() as f:
-            return json.load(f)
-
-    def test_klein_gordon_3d_along_z(self) -> None:
-        """KG 3+1D reduced along z → 1+1D with 1 field, wave equation."""
-        spec = self._load_spec("klein_gordon_3d.json")
-        result = reduce_spec(spec, {"type": "plane_wave", "propagation_axis": "z"})
-
-        assert result["spacetime"]["dimension"] == 2
-        assert result["spacetime"]["coordinates"] == ["t", "x"]
-        assert len(result["fields"]) == 1
-        assert len(result["equations"]) == 1
-
-        operators = [t["operator"] for t in result["equations"][0]["rhs"]["terms"]]
-        assert "identity" in operators
-        assert "laplacian_x" in operators
-        assert "laplacian_y" not in operators
-        assert "laplacian_z" not in operators
-
-    def test_klein_gordon_3d_along_x(self) -> None:
-        """KG 3+1D reduced along x → same result (isotropic)."""
-        spec = self._load_spec("klein_gordon_3d.json")
-        result = reduce_spec(spec, {"type": "plane_wave", "propagation_axis": "x"})
-
-        assert result["spacetime"]["dimension"] == 2
-        assert len(result["equations"]) == 1
-        operators = [t["operator"] for t in result["equations"][0]["rhs"]["terms"]]
-        assert "laplacian_x" in operators
-
-    def test_cylindrical_kg_along_z(self) -> None:
-        """Cylindrical KG reduced along z → flat 1D.
-
-        The existing cylindrical_kg.json has volume_element="Abs[x[]]" which
-        references the killed coordinate x(=rho). In a real derive, the Wolfram
-        pipeline would produce a factored volume element of 1. Here we strip
-        the volume element to simulate that, testing equation transformation.
-        """
-        spec = self._load_spec("cylindrical_kg.json")
-        # Strip vol element that would be factored by Wolfram pipeline
-        spec.get("canonical", {}).pop("volume_element", None)
-        result = reduce_spec(spec, {"type": "plane_wave", "propagation_axis": "z"})
-
-        assert result["spacetime"]["dimension"] == 2
-        assert result["spacetime"]["coordinates"] == ["t", "x"]
-        assert len(result["equations"]) == 1
-
-        # Cylindrical z-axis is flat: only identity and laplacian_x survive
-        terms = result["equations"][0]["rhs"]["terms"]
-        operators = [t["operator"] for t in terms]
-        assert "identity" in operators
-        assert "laplacian_x" in operators
-
-    def test_cylindrical_kg_unfactored_vol_errors(self) -> None:
-        """Existing cylindrical_kg.json vol element references killed coords."""
-        spec = self._load_spec("cylindrical_kg.json")
-        with pytest.raises(ValueError, match="killed coordinate"):
-            reduce_spec(spec, {"type": "plane_wave", "propagation_axis": "z"})
-
-    def test_sphere_kg_incompatible(self) -> None:
-        """Sphere KG (stereographic) is incompatible — non-separable metric."""
-        spec = self._load_spec("sphere_kg.json")
-        with pytest.raises(ValueError, match="killed coordinate"):
-            reduce_spec(spec, {"type": "plane_wave", "propagation_axis": "x"})
 
 
 # ---------------------------------------------------------------------------

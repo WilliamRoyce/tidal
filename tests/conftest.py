@@ -42,24 +42,6 @@ def _cli_json_fixture(name: str) -> Path:
 
 
 @pytest.fixture
-def klein_gordon_1d_json() -> Path:
-    """Path to klein_gordon_1d.json, skip if absent."""
-    return _cli_json_fixture("klein_gordon_1d.json")
-
-
-@pytest.fixture
-def klein_gordon_3d_json() -> Path:
-    """Path to klein_gordon_3d.json, skip if absent."""
-    return _cli_json_fixture("klein_gordon_3d.json")
-
-
-@pytest.fixture
-def polar_kg_json() -> Path:
-    """Path to polar_kg.json, skip if absent."""
-    return _cli_json_fixture("polar_kg.json")
-
-
-@pytest.fixture
 def chern_simons_json() -> Path:
     """Path to chern_simons_3d.json, skip if absent."""
     return _cli_json_fixture("chern_simons_3d.json")

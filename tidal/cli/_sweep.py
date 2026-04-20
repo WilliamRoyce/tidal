@@ -2457,10 +2457,19 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912
         return 1
 
     # Check output directory collision
-    if Path(args.output).exists() and not getattr(args, "force", False):
+    resume_mode = getattr(args, "resume", False)
+    if (
+        Path(args.output).exists()
+        and not getattr(args, "force", False)
+        and not resume_mode
+    ):
         error_with_hint(
             f"output directory already exists: {args.output}",
-            ["Use --force to overwrite", "Or choose a different --output path"],
+            [
+                "Use --force to overwrite",
+                "Use --resume to continue a partial sweep",
+                "Or choose a different --output path",
+            ],
         )
         return 1
 
