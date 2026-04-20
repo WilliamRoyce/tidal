@@ -92,6 +92,22 @@ where
 \end{equation}
 and $y^{(1)}(t) = V\, z^{(1)}(t)$. Near the degenerate limit $|(\mu - \lambda) t| \to 0$ the direct formula suffers catastrophic cancellation; TIDAL switches to the Taylor branch $G = t\, e^{\lambda t} \sum_{k \geq 0} z^k / (k+1)!$ (twelve terms, accurate to double precision) when $|(\mu - \lambda) t| < 10^{-5}$, following Al-Mohy \& Higham (2011)~\cite{AlMohyHigham2011}. The threshold is sampled from their Table~3.1 and validated against 50-digit \verb|mpmath| reference values across $|\mu - \lambda| t \in [10^{-15}, 1]$; the relative error stays below $10^{-13}$ everywhere.
 
+\paragraph{Operator time-derivative scaling.} Correction terms of the form $c \cdot \partial_t^n(\text{target})$ --- e.g.\ \verb|first_derivative_t|, \verb|d2_t|, \verb|d3_t|, \verb|d4_t|, mixed \verb|T1_S1x|, \verb|T2_S1x|, etc.\ --- carry an operator time-derivative order $n = \verb|_OperatorDecomp.time_order|$. When the target is a dynamical field whose Pass~0 trajectory is $y^{(0)}(\tau) = V\,e^{D\tau}\,\alpha$, its $n$-th time derivative in the eigenbasis is $V\,D^n\,e^{D\tau}\,\alpha$. The Pass~1 source matrix must therefore scale the source column by $\lambda_j^n$ before the Duhamel kernel:
+\begin{equation}
+  z^{(1)}_i(t) = \sum_n \sum_j \beta_{n,ij}\, (\lambda_j^n\, \alpha_j)\, G(\lambda_i, \lambda_j; t),
+\end{equation}
+where $\beta_n = V^{-1} M_{\mathrm{src},n} V$ and $M_{\mathrm{src},n}$ aggregates only correction terms whose operator has \verb|time_order == n|. The implementation returns a dict keyed by $n$ from \verb|_build_source_matrix_k|; the pre-fix code used a flat matrix that silently dropped the $\lambda^n$ factor (issue \#293, latent because all shipped corrections with $n > 0$ target constraint fields which are handled separately through the augmented Schur recovery).
+
+\paragraph{Pass~2 and higher orders.} Extending to $O(\varepsilon^2)$ requires integrating against $y^{(1)}(t)$ as well as $y^{(0)}(t)$: $\partial_t y^{(2)} = A\,y^{(2)} + M_{\mathrm{src},2}\,y^{(0)}(t) + M_{\mathrm{src},1}\,y^{(1)}(t)$. The first term reuses the existing Pass~1 Duhamel with the order-2 source matrix. The second term is a double-Duhamel nested kernel: expanding $y^{(1)}$ in its own eigenbasis sum $\sum_k \beta_{1,jk}\,\alpha_k\,G(\lambda_j, \lambda_k; \tau)$ yields
+\begin{equation}
+  z^{(2)}_{i, \text{indirect}}(t) = \sum_{j,k} \beta_{1,ij}\,\beta_{1,jk}\,\alpha_k\, K_2(\lambda_i, \lambda_j, \lambda_k; t)
+\end{equation}
+with the triple-eigenvalue kernel
+\begin{equation}
+  K_2(\lambda_i, \lambda_j, \lambda_k; t) = \int_0^t e^{\lambda_i(t-\tau)}\,G(\lambda_j, \lambda_k; \tau)\,d\tau = \frac{G(\lambda_i, \lambda_k; t) - G(\lambda_i, \lambda_j; t)}{\lambda_k - \lambda_j}
+\end{equation}
+for distinct $\lambda_j \neq \lambda_k$; degenerate cases ($\lambda_j = \lambda_k$, $\lambda_i = \lambda_j$, $\lambda_i = \lambda_k$, or all-equal) reduce to $\int_0^t e^{\lambda_i(t-\tau)}\,\tau\,e^{\lambda_j\tau}\,d\tau$ and its limits, involving polynomial-in-$t$ factors ($t\cdot e^{\lambda t}$, $(t^2/2)\cdot e^{\lambda t}$) that need Taylor-branch handling analogous to $G$'s degeneracy case. TIDAL currently gates $\mathrm{order} \geq 2$ with a \verb|NotImplementedError| (issue \#273); no shipped theory emits $\mathrm{order\_in\_eps} = 2$ tagged terms, so the implementation is deferred until a use case arrives.
+
 \subsection{Pipeline Architecture}
 \label{sec:pr-architecture}
 

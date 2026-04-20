@@ -10,7 +10,31 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
-## [Unreleased] — v0.33.3 time-order λⁿ scaling + b5=0 reference JSON
+## [Unreleased] — v0.33.4 Pass 2 math documented (#273)
+
+### Changed
+
+- **Upgraded `order >= 2` gate diagnostic (#273)**. The
+  `NotImplementedError` message now cites both the direct
+  (`M_src_2 · y⁰(t)`, reuses Pass 1 machinery via
+  `filter_by_order(2)`) and indirect (`M_src_1 · y¹(t)`, needs the
+  triple-eigenvalue nested kernel `K_2(λ_i, λ_j, λ_k; t) =
+  ∫₀ᵗ exp(λ_i(t-τ))·G(λ_j, λ_k; τ)dτ`) contributions.
+  Analytical derivation plus degenerate-case handling is documented
+  in `docs/tex/perturbative_reduction.tex` §Pass 2 and higher
+  orders. The gate is preferred over a partial implementation
+  because no shipped theory emits `order_in_eps=2` terms; the
+  untested code path would silently produce wrong results.
+
+### Added
+
+- `docs/tex/perturbative_reduction.tex` §"Operator time-derivative
+  scaling": documents the `λⁿ` factor applied per-time-order in
+  `_evolve_duhamel_per_mode` (fixing #293). §"Pass 2 and higher
+  orders" derives the analytical triple-eigenvalue kernel for
+  future implementation.
+
+## [0.33.3] — 2026-04-20 time-order λⁿ scaling + b5=0 reference JSON
 
 ### Fixed
 

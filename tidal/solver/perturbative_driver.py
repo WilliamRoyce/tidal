@@ -475,9 +475,20 @@ class PerturbativeSolver:
         if order >= 2:
             msg = (
                 "PerturbativeSolver.solve() currently supports order=0 "
-                "and order=1 only. order >= 2 requires Pass 2 Duhamel "
-                "against q¹(t), which needs a new IC-amplitude contract "
-                "and is not yet implemented. Tracked in #273."
+                "and order=1 only. order >= 2 needs two Pass 2 "
+                "contributions:\n"
+                "  (a) direct: Duhamel integral of M_src_2 · y⁰(t); "
+                "reuses the existing Pass 1 machinery via "
+                "filter_by_order(2).\n"
+                "  (b) indirect: Duhamel integral of M_src_1 · y¹(t) "
+                "— requires the triple-eigenvalue nested kernel "
+                "K_2(λ_i, λ_j, λ_k; t) = ∫₀ᵗ exp(λ_i(t-τ))·G(λ_j, λ_k; τ)dτ "
+                "with degenerate-case Taylor branches analogous to G. "
+                "The math is documented in docs/tex/"
+                "perturbative_reduction.tex §Pass 2 and higher orders.\n"
+                "No shipped theory emits order_in_eps=2 tags, so this "
+                "path is untested end-to-end and the gate is preferred "
+                "over a partial implementation. Tracked in #273."
             )
             raise NotImplementedError(msg)
 
