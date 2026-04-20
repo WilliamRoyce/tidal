@@ -886,17 +886,32 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       componentEq = eom
     ];
 
-    (* Separate metric contractions before ToBasis *)
-    componentEq = SeparateFieldMetrics[componentEq, chart];
+    (* Extend ValidateIndices suppression to the pre-loop scalar EOM pipeline.  *)
+    (* (F·F)^n Euler-Heisenberg terms produce Scalar wrapper contents where    *)
+    (* ExpandScalarWrappers reuses dummy index names across Power factors —    *)
+    (* false positives that ToBasis resolves immediately.                      *)
+    (* Off[::repeated] suppresses only the Message; ValidateIndices=(True &)  *)
+    (* prevents the accompanying Throw[Null] from killing the derivation.     *)
+    Off[Validate::repeated];
+    Module[{savedValidateScalar = xAct`xTensor`Private`ValidateIndices},
+      Unprotect[xAct`xTensor`Private`ValidateIndices];
+      xAct`xTensor`Private`ValidateIndices = (True &);
 
-    (* Expand Scalar[] wrappers before staggered ToBasis *)
-    componentEq = ExpandScalarWrappers[componentEq, chart, computeChristoffels =!= False];
+      (* Separate metric contractions before ToBasis *)
+      componentEq = SeparateFieldMetrics[componentEq, chart];
 
-    (* Staggered ToBasis pipeline (replaces old ToBasis + TBD + steps 4-7) *)
-    (* Epsilon evaluation now happens INSIDE StaggeredToBasis, before        *)
-    (* TraceBasisDummy, to prevent O(dim^16) dummy pair explosion. #246      *)
-    componentEq = StaggeredToBasis[componentEq, chart, computeChristoffels =!= False];
-    componentEq = Expand[componentEq];
+      (* Expand Scalar[] wrappers before staggered ToBasis *)
+      componentEq = ExpandScalarWrappers[componentEq, chart, computeChristoffels =!= False];
+
+      (* Staggered ToBasis pipeline (replaces old ToBasis + TBD + steps 4-7) *)
+      (* Epsilon evaluation now happens INSIDE StaggeredToBasis, before        *)
+      (* TraceBasisDummy, to prevent O(dim^16) dummy pair explosion. #246      *)
+      componentEq = StaggeredToBasis[componentEq, chart, computeChristoffels =!= False];
+      componentEq = Expand[componentEq];
+
+      xAct`xTensor`Private`ValidateIndices = savedValidateScalar;
+      Protect[xAct`xTensor`Private`ValidateIndices]
+    ];
 
     (* Background field evaluation — not handled by MetricCompute/ToValues *)
     If[backgroundFieldRules =!= {},
@@ -1008,19 +1023,31 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          causing index collisions. Let ExpandScalarWrappers run per-component
          inside ExtractTensorComponent (step 1.3), AFTER free indices are
          fixed to specific basis values. *)
-      If[!FreeQ[eomSep, Scalar],
-        (* Check if expression has Christoffel symbols from R̃ decomposition *)
-        Module[{hasTorsionScalars},
-          hasTorsionScalars = !FreeQ[eomSep, Scalar[x_ /; !FreeQ[x, _?CovDQ]]];
-          If[!hasTorsionScalars,
-            (* Safe to hoist: standard theory without CD inside Scalar *)
-            Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
-            eomSep = ExpandScalarWrappers[eomSep, chart, computeChristoffels];
-            Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]],
-            (* Torsion theory: skip hoisting, let per-component expansion handle it *)
-            Print["  Scalar[] wrappers detected with CD operators — expanding per-component"]
+      (* Extend ValidateIndices suppression to the hoisted call.               *)
+      (* (F·F)^n Euler-Heisenberg terms have no CDs in Scalar contents        *)
+      (* (hasTorsionScalars = False), so the hoist fires. ExpandScalarWrappers *)
+      (* then encounters repeated dummy index names — false positives.         *)
+      (* ValidateIndices=(True &) prevents Validate::repeated+Throw[Null].    *)
+      Off[Validate::repeated];
+      Module[{savedValidateHoist = xAct`xTensor`Private`ValidateIndices},
+        Unprotect[xAct`xTensor`Private`ValidateIndices];
+        xAct`xTensor`Private`ValidateIndices = (True &);
+        If[!FreeQ[eomSep, Scalar],
+          (* Check if expression has Christoffel symbols from R̃ decomposition *)
+          Module[{hasTorsionScalars},
+            hasTorsionScalars = !FreeQ[eomSep, Scalar[x_ /; !FreeQ[x, _?CovDQ]]];
+            If[!hasTorsionScalars,
+              (* Safe to hoist: standard theory without CD inside Scalar *)
+              Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
+              eomSep = ExpandScalarWrappers[eomSep, chart, computeChristoffels];
+              Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]],
+              (* Torsion theory: skip hoisting, let per-component expansion handle it *)
+              Print["  Scalar[] wrappers detected with CD operators — expanding per-component"]
+            ]
           ]
-        ]
+        ];
+        xAct`xTensor`Private`ValidateIndices = savedValidateHoist;
+        Protect[xAct`xTensor`Private`ValidateIndices]
       ];
 
       (* Suppress Validate::repeated AND its Throw through the component     *)
