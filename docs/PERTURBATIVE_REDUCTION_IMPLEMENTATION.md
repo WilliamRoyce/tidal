@@ -225,12 +225,35 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 
 ### Tasks
 
-- [ ] **7.1** Rewrite `docs/tex/perturbative_reduction.tex` to v6 iterative approach. Move JLM discussion to historical appendix.
-- [ ] **7.2** Create `docs/tex/perturbative_numerical.tex` — iterative driver, modal Duhamel derivation, constraint-field Schur substitution, validity monitoring.
-- [ ] **7.3** Update `docs/tex/architecture.tex` — Phase C is now order tagging + solver driver (not JLM).
-- [ ] **7.4** Update MEMORY.md / `perturbative_reduction_research.md` — mark v6 complete.
-- [ ] **7.5** CHANGELOG + minor version bump.
-- [ ] **7.6** Final validation: full test suite + re-derive all 20 examples + baseline match.
+- [x] **7.1** Rewrite `docs/tex/perturbative_reduction.tex` to v6 iterative approach. Move JLM discussion to historical appendix. (Completed 2026-04-19; extended 2026-04-20 with §Power-of-Contraction Normalisation and Matter-Only Derivative Dependence for issue #271.)
+- [x] **7.2** Create `docs/tex/perturbative_reduction_design.tex` — iterative driver, modal Duhamel derivation, constraint-field Schur substitution, validity monitoring. (Filename finalised as `perturbative_reduction_design.tex`; engineer-facing companion to §7.1. Both files wired into `main.tex` 2026-04-20.)
+- [x] **7.3** Update `docs/tex/architecture.tex` — Phase C is now order tagging + solver driver (not JLM).
+- [x] **7.4** Update MEMORY.md / `perturbative_reduction_research.md` — mark v6 complete.
+- [x] **7.5** CHANGELOG + minor version bump. (Version line reached v0.33.9 at session close.)
+- [x] **7.6** Final validation: full test suite + re-derive representative examples + baseline match. (1 991 Python tests green; `gertsenshtein` $\approx 49$~s, `coupled_scalars` $\approx 14$~s, `euler_heisenberg` $\approx 19$~s (newly derivable); only `derivation_hash` fields change on existing JSONs.)
+
+### Stage 7 Closure Entry — Issue #271 (2026-04-20, v0.33.9)
+
+**Problem.** Euler–Heisenberg $(F_{\mu\nu}F^{\mu\nu})^2$ refused to derive. Investigation during session identified two orthogonal root causes.
+
+**Root cause 1 — Power auto-distribution.** Mathematica's built-in rule `Power[Times[a,b,...], n] → a^n·b^n·...` fires at assignment time on the scalar contraction, producing repeated abstract indices ⇒ xAct `Validate::repeated + Throw[Null]`. Fix in `tidal/cli/_derive.py::_wls_lagrangian` (lines 986–1017): wrap user Lagrangian in `Hold[]`, apply ReplaceRepeated `Power[X, n] → Scalar[X]^n` (where `X` carries abstract indices and is not already a `Scalar`), then `ReleaseHold`. xAct treats `Scalar[...]^n` as opaque — distribution blocked, `DecomposeScalarExpression` visits each instance with a fresh index scope. Commit 9d9e73f.
+
+**Root cause 2 — Matter-only CD precompute gate.** `_wls_precompute_cd_component_values` skipped the CD ComponentValue precomputation for `len(dyn_fields) < 2`, a performance heuristic. For EH (single dynamical photon appearing only via `F = dA`) this left `CD1eqca[{i,-cart},{j,-cart}]` unresolved in `lagComp`, and Component E-L found zero field functions. Fix in `tidal/cli/_derive.py` (lines 1513–1620): correctness-aware gate runs precompute whenever `len(dyn_fields) ≥ 2` OR any derived_field with `"CD["` in its definition is used OR any dyn-field/matter-pert source field appears as `CD[...][name[...]]` in the user expression. Commit 830a442.
+
+**Supplementary fix — `$CDShorthandReverseRules` safety net.** These rules (generated at `_derive.py:1407` since v0.28) were never applied. Added application to `lagComp` before Component-E-L field-function detection (lines 5857–5869), FreeQ-gated to keep it O(LeafCount) when the precompute already resolved everything.
+
+**Documentation.** §Power-of-Contraction Normalisation and Matter-Only Derivative Dependence in [`docs/tex/perturbative_reduction.tex`](../docs/tex/perturbative_reduction.tex); engineer-facing counterpart §Power-of-Contraction Normalisation — Implementation Details in [`docs/tex/perturbative_reduction_design.tex`](../docs/tex/perturbative_reduction_design.tex); timing row in [`docs/tex/derivation_performance.tex`](../docs/tex/derivation_performance.tex) §Post-v6 Reference Timings.
+
+**Verification.**
+
+| Theory | Wall-time | Components | Notes |
+|---|---|---|---|
+| `euler_heisenberg` | ~19s | 4 | newly supported; `order_in_eps=1` with `2·B0²·ρ`, `-2·B0²·ρ`, `-6·B0²·ρ` |
+| `gertsenshtein` | ~49s | 6 | baseline 46s, +7% within variance (FreeQ-gated safety net) |
+| `coupled_scalars` | ~14s | 2 | unchanged |
+| `scalar_potential_well` | ~10s | 1 | fast-path precompute skip preserved |
+
+1,991 Python tests green. Existing JSON outputs change only in `derivation_hash`.
 
 ---
 

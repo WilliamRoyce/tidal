@@ -74,7 +74,7 @@ Rearranging and using $\mathsf{S}_\mathbf{k} = -S_{cc}^{-1} S_{cd}$ (the existin
 \end{equation}
 The bracketed quantities are built from Pass~0 output alone: $\partial_t^n h_c^{(0)}$ via eigenvalue propagation $V \cdot \mathrm{diag}(\lambda^n e^{\lambda t}) \cdot \alpha$ applied to the base Schur recovery, and $\mathrm{corr}_1(y^{(0)})$ by evaluating the order-1 RHS on $y^{(0)}$ with nested Schur expansion for constraint-target references. The driver implements this in \texttt{tidal/solver/perturbative\_driver.py::\_compute\_constraint\_source\_hat}.
 
-Pre-v0.33.2 (issue~\#290) only the first term was computed, which produced \emph{identically zero} Pass~1 output for theories where every $O(\varepsilon^1)$ correction lives on a constraint-field row --- the flagship R̃$^2$ PGT case. The augmented recovery was explicitly anticipated in Stage~4.6 of the v6 plan (``deferred to Stage~5'') but never landed until v0.33.2. The synthetic algebraic-constraint regression (\verb|tests/test_perturbative_algebraic_constraint.py|) now matches the analytical light-mode eigenvector $h/\phi = g/(1 + \varepsilon\, \omega^2) \approx g\,(1 - \varepsilon\, \omega^2)$ to machine precision at $\varepsilon = 10^{-3}$; pre-R8 the output was $h/\phi \equiv g$ independent of $\varepsilon$ (14~orders of magnitude off).
+Pre-v0.33.2 (issue~\#290) only the first term was computed, which produced \emph{identically zero} Pass~1 output for theories where every $O(\varepsilon^1)$ correction lives on a constraint-field row --- the flagship $\tilde{R}^2$ PGT case. The augmented recovery was explicitly anticipated in Stage~4.6 of the v6 plan (``deferred to Stage~5'') but never landed until v0.33.2. The synthetic algebraic-constraint regression (\verb|tests/test_perturbative_algebraic_constraint.py|) now matches the analytical light-mode eigenvector $h/\phi = g/(1 + \varepsilon\, \omega^2) \approx g\,(1 - \varepsilon\, \omega^2)$ to machine precision at $\varepsilon = 10^{-3}$; pre-R8 the output was $h/\phi \equiv g$ independent of $\varepsilon$ (14~orders of magnitude off).
 
 \subsection{Closed-Form Duhamel Kernel}
 \label{sec:pr-duhamel}
@@ -133,6 +133,7 @@ Pass 0 dominates the wall-clock cost: $O(N_{\mathrm{modes}} \cdot \mathrm{dof}^3
 For comparison, the retired mechanical Ostrogradsky path introduced auxiliary fields $w_q = \partial_t^2 q$ that doubled the state-vector size for every fourth-order field and required an implicit DAE solver (IDA) due to the constraint structure. End-to-end performance on the PGT torsion--Gertsenshtein theory was $\sim\!80\times$ slower than Pass~0 modal, \emph{and} produced ghost-mode growth artefacts in long-time simulations.
 
 \subsection{Scope and Limitations}
+\label{sec:pr-scope}
 
 The v6 iterative pipeline currently supports:
 \begin{itemize}
@@ -141,12 +142,48 @@ The v6 iterative pipeline currently supports:
   \item Constant-coefficient source matrices. Position-dependent Pass~1 sources (convolution-coupling case) raise \verb|NotImplementedError|.
   \item Source terms that respect the Pass 0 block structure. Cross-block coupling terms raise with a clear message pointing at the current limitation.
   \item Order $\leq 1$ only. \verb|order=2| raises \verb|NotImplementedError|; this is permanent — no shipped theory produces $\mathrm{order\_in\_eps} = 2$ terms under TIDAL's quadratic-Lagrangian constraint, and products of small parameters (e.g.\ $\varepsilon_1 \cdot \varepsilon_2$) or higher-power couplings ($\varepsilon^2$) are not supported. If a spec somehow carries such terms, the solver warns before proceeding at the requested order.
-  \item \textbf{Quartic EM invariants} (Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^2$): supported as of issue~\#271 fix. During component decomposition, \verb|ExpandScalarWrappers| internally expands \verb|Power[F·F, 2]| → \verb|F·F * F·F| reusing the same abstract dummy index names, triggering xAct's \verb|Validate::repeated + Throw[Null]|. The fix extends the existing \verb|ValidateIndices = (True &)| suppression (already used for the $\tilde{R}^2$ component loop) to also cover: (a)~the pre-loop scalar-field path (\verb|ComponentDecompose.wl| scalar branch), and (b)~the hoisted pre-loop tensor-field path. The suppression only prevents false-positive validation throws; it does not alter the algebra. The standard torsion path is unaffected because $\tilde{R}^2$ uses \verb|RicciScalarCDT[]^2|, a power of a named zero-rank scalar (no abstract indices), and their \verb|Scalar[...]| contents contain CDs, routing them to the per-component path instead of the hoisted path.
+  \item \textbf{Quartic EM invariants} (Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^2$) and \textbf{matter-only derivative-only theories} (any $\mathcal{L}$ whose only dynamical field enters through covariant derivatives, e.g.\ a photon via $F = \mathrm{d}A$): fully supported as of v0.33.9. See \S\ref{sec:pr-eh-cd} for the Hold $+$ \texttt{Scalar[X]\textasciicircum n} Power normalisation and the \texttt{CD}-ComponentValue precompute correctness gate (issue~\#271).
 \end{itemize}
 
 These limitations are tracked in GitHub issues and listed in \verb|docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md|.
 
+\subsection{Power-of-Contraction Normalisation and Matter-Only Derivative Dependence}
+\label{sec:pr-eh-cd}
+
+Two subtle, unrelated failure modes were exposed by the first Euler--Heisenberg theory to enter the pipeline (issue~\#271). Both turn out to sit upstream of the perturbative reduction itself and concern how the Lagrangian is presented to xAct. We document them here because the Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^2$ correction is the motivating physics~\cite{HeisenbergEuler1936,Dunne2004} and because the fixes extend the design invariants of the v6 pipeline.
+
+\paragraph{Failure mode 1 --- Power auto-distribution.} The user writes $\mathcal{L}_{\mathrm{EH}} \supset \tfrac{\rho}{8}(F_{\mu\nu}F^{\mu\nu})^2$, which enters the WLS input as \verb|Power[F[-a,-b] eta[a,c] eta[b,d] F[-c,-d], 2]|. Mathematica's built-in evaluation of \verb|Power[Times[a,b,...], n]| fires the rule $\mathrm{Times}[a,b,\dots]^n \rightarrow a^n \cdot b^n \cdots$ at \emph{assignment time}, before any TIDAL code has seen the expression. The result is a product of separately-squared tensor atoms with each abstract dummy index appearing four times instead of two. xAct's internal validator (\verb|xAct`xTensor`Private`ValidateIndices|) then raises \verb|Validate::repeated| and, critically, \verb|Throw[Null]|. The existing \verb|Off[Validate::repeated]| calls in \verb|ComponentDecompose.wl| suppress only the message, not the throw, so the derivation aborts.
+
+\paragraph{Fix 1 --- \texttt{Hold[]} $+$ opaque \texttt{Scalar[X]\textasciicircum n} rewrite.} The Lagrangian assignment in \verb|_derive.py| (\verb|_wls_lagrangian|, lines~986--1017) now reads schematically
+\begin{equation*}
+  \texttt{Lagrangian} \;=\; \texttt{ReleaseHold}\!\left[\, \texttt{Hold}\!\left[\mathcal{L}_{\mathrm{user}}\right] \;\texttt{//.}\; \mathcal{R} \,\right],
+\end{equation*}
+where the rewrite rule~$\mathcal{R}$ is
+\begin{equation*}
+  \texttt{HoldPattern}\!\left[\texttt{Power}[X, n]\right] \;/;\; \neg\texttt{AtomQ}[X] \,\wedge\, \neg\texttt{FreeQ}[X, \texttt{\_?AbstractIndexQ}] \,\wedge\, \texttt{FreeQ}[X, \texttt{Scalar}] \;:>\; \texttt{Scalar}[X]^{n}.
+\end{equation*}
+The \verb|Hold[]| is load-bearing: without it, Mathematica distributes before the rule can fire. The guard \verb|FreeQ[X, _?AbstractIndexQ]| is what makes the rewrite a no-op on $\tilde{R}^2$ PGT theories, whose bases (\verb|RicciScalarCDT[]|) are named zero-rank scalars with no abstract indices and do not need the wrapping. xAct treats \verb|Scalar[...]^n| as an opaque-scalar power; distribution is blocked, and downstream \verb|DecomposeScalarExpression| visits each of the $n$ instances with a fresh xAct index scope, so there is no residual index collision. The rejected alternative --- \verb|Scalar[X]^n \to \prod_{k=1}^{n} \texttt{Scalar}[\texttt{RenameDummies}[X]]| --- fails because \verb|RenameDummies| is deterministic: repeated calls on the same input return byte-identical output, so the product is $n$ identical factors, reproducing the original clash (retired alternative documented in \S\ref{sec:pr-superseded}).
+
+\paragraph{Failure mode 2 --- Matter-only CD shorthand survival.} After Fix~1 the $(F\cdot F)^2$ term reaches the canonical pipeline intact. In Phase~A the derivation uses CD-shorthand tensors \verb|CD1f, CD2f, ...| (generated at \verb|_derive.py:1199+|) to avoid catastrophic \verb|TraceBasisDummy| blow-up, and then resolves them in $\mathcal{O}(1)$ via pre-registered \verb|ComponentValue| entries (generated by \verb|_wls_precompute_cd_component_values|, \verb|_derive.py:1428+|). The legacy gate on the precompute was the heuristic $\texttt{len(dyn\_fields)} \ge 2$, justified as a performance optimisation for single-field theories where fields appear directly (e.g.\ \verb|scalar_field|'s \verb|phi[]| or \verb|massive_gravity|'s \verb|h[-a,-b]h^{ab}|). For a matter-only Maxwell-type theory the single dynamical field --- the photon perturbation $a$ --- appears only through \verb|CD[-a][A[-b]]|, i.e.\ the derived field $F$. With the precompute skipped, \verb|CD1eqca[{i,-\mathrm{cart}}, {j,-\mathrm{cart}}]| atoms survive into \verb|lagComp| and the Component-E--L pass reports ``Field functions: 0'' and produces no equations of motion.
+
+\paragraph{Fix 2 --- Correctness-aware precompute gate.} The heuristic is replaced by a correctness-aware gate (\verb|_derive.py:1513--1620|): the CD ComponentValue precompute runs whenever
+\begin{enumerate}
+  \item $\texttt{len(dyn\_fields)} \ge 2$ \emph{(unchanged, covers every multi-field theory)}, \emph{or}
+  \item any \texttt{derived\_field} whose TOML definition contains \texttt{CD[} is used in the Lagrangian --- covering $F = \mathrm{d}A$-style invariants, \emph{or}
+  \item any dynamical field or matter-perturbation source field appears as \verb|CD[...][name[...]]| directly in the user expression.
+\end{enumerate}
+The fast-path skip is preserved for \verb|scalar_field|/\verb|scalar_potential_well|/\verb|massive_gravity|-type direct-tensor Lagrangians, where the field has no derivative-only dependence and \verb|StaggeredToBasis| remains efficient on its own.
+
+\paragraph{Fix 2 (belt-and-braces) --- \texttt{\$CDShorthandReverseRules} safety net.} The reverse rules $\texttt{CDN}f[i, a] \to \texttt{CD}[i][\texttt{CD}(N{-}1)f[a]]$ have been generated at \verb|_derive.py:1407| since v0.28 but were never applied. The Component-E--L field-function detector now applies them to \verb|lagComp| (\verb|_derive.py:5857--5869|), gated by
+\begin{equation*}
+  \neg \texttt{FreeQ}\!\left[\texttt{lagComp},\; \texttt{\_Symbol}\!\mathbin{?}\!\bigl(\texttt{StringMatchQ}[\texttt{ToString}[\#], \texttt{"CD" \textasciitilde\textasciitilde\ DigitCharacter \textasciitilde\textasciitilde\ \_\_"}]\,\&\bigr)\right].
+\end{equation*}
+Without the \verb|FreeQ| pre-check, the \verb|//.| scan of a gertsenshtein-scale \verb|lagComp| costs $\approx 4$~s for no gain when the precompute already resolved everything. With it, the safety net is $\mathcal{O}(\texttt{LeafCount}(\texttt{lagComp}))$ in the common case and is a no-op whenever the precompute gate above did its job. It only activates when a future theory exceeds the \verb|max_cd_precompute=2| cap (\verb|_derive.py:1589|) and therefore still carries residual CD-4 shorthand.
+
+\paragraph{Verification.} With both fixes, \verb|examples/euler_heisenberg/theory.toml| derives in $\approx 19$~s, produces the four component field functions $\{\texttt{eqca0}, \texttt{eqca1}, \texttt{eqca2}, \texttt{eqca3}\}$, and emits the expected \verb|order_in_eps = 1| terms with symbolic coefficients $2 B_0^2 \rho$, $-2 B_0^2 \rho$, and $-6 B_0^2 \rho$ for the refractive-index correction $n^2 - 1 \propto \rho B_0^2$ (see \S\ref{sec:pr-scope} for the scope within which these coefficients are trusted). Full regression on 1\,991 Python tests and on \verb|gertsenshtein| ($\approx$46--49~s) and \verb|coupled_scalars| ($\approx$14~s) is green (commits 9d9e73f, 830a442).
+
 \subsection{Historical Note: Superseded Approaches}
+\label{sec:pr-superseded}
 
 Two earlier paths have been removed from TIDAL:
 
@@ -154,4 +191,6 @@ Two earlier paths have been removed from TIDAL:
 
 \paragraph{Jaen--Llosa--Molina (JLM) symbolic order reduction} (\verb|tidal/wolfram/PerturbativeReduction.wl|, 525~lines, deleted in v6 Stage~1) attempted to eliminate higher-derivative terms by substituting the base equation of motion into the correction. While elegant for scalar theories, it failed when a constraint field was promoted to dynamical by the correction (the $\tilde{R}^2$ PGT case) and required theory-specific rewriters to extend coverage. Replaced by the theory-agnostic iterative architecture documented above.
 
-\bibliographystyle{unsrt}
+\paragraph{Pre-VarD \texttt{Scalar[x]\textasciicircum n} expansion with \texttt{RenameDummies}.} An earlier version of the linearisation code expanded \texttt{Scalar[x]\textasciicircum n} into a product of \texttt{n} renamed copies before \texttt{VarD}. For the $\tilde{R}^2$ PGT theory this triggered index-inhomogeneity failures because xAct's \texttt{RenameDummies} is deterministic: repeated calls on the same expression return byte-identical output, so the ``product of renamed copies'' was really a product of $n$ identical factors, re-creating the repeated-index problem. The approach was retired and the comment at \texttt{tidal/cli/\_derive.py:2584--2589} explicitly warns against reinstating it. The modern fix for the same family of expressions is documented in \S\ref{sec:pr-eh-cd} below.
+
+\paragraph{Pass~2 numerical Duhamel (\texttt{order\_in\_eps = 2}).} Briefly planned as a natural extension of Pass~1, subsequently proven unreachable under TIDAL's design: Euler--Lagrange differentiation never squares a coupling, and \texttt{[perturbation]} forbids products of small parameters, so \texttt{ComputeOrderInEps} provably returns $\le 1$ for every term emitted by the pipeline. Issue~\#273 documents the closure; the \texttt{solve(order\textgreater{}1)} path raises \texttt{NotImplementedError} permanently, guarded by a warning in \texttt{PerturbativeSolver.solve} when a spec carries higher-order tags.

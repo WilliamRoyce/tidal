@@ -76,6 +76,33 @@ Legendre + parse & $<1$\,s & Trivial \\
 
 The canonical Lagrangian decomposition is the dominant cost (24 of 40\,min). This is intrinsic to the full Legendre transform---each of the 34 Lagrangian terms must be independently decomposed via \texttt{DecomposeScalarExpression}. Previously (${\sim}10$\,min) the canonical pipeline was skipped; now it is always computed for correct coordinate-invariant energy measurement.
 
+\subsection{Post-v6 Reference Timings (v0.33.9)}
+\label{sec:post-v6-timings}
+
+With the v6 perturbative-reduction iterative architecture (Parker--Simon, see \S\ref{sec:pr-v6}) and the accumulated optimisations below, representative derivation wall-times on a single-host devcontainer (single Wolfram license, cold shell, warm Mathematica cache) are:
+
+\begin{table}[htbp]
+\centering
+\caption{Representative post-v6 derivation wall-times measured with \texttt{time uv run tidal derive} on a single-host devcontainer. Numbers are from v0.33.9; run-to-run variance is $\pm 10\%$ dominated by Mathematica kernel initialisation.}
+\label{tab:post-v6-timings}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Theory & Wall-time & $n_{\mathrm{dyn}}$ & Components & Notes \\
+\midrule
+\texttt{coupled\_scalars}       & ${\sim}14$\,s   & 2 & 2  & 1+1D, minimal cross-coupling \\
+\texttt{euler\_heisenberg}      & ${\sim}19$\,s   & 1 & 4  & matter-only, $F^4$ correction (\#271) \\
+\texttt{scalar\_potential\_well}& ${\sim}10$\,s   & 1 & 1  & fast-path precompute skip \\
+\texttt{gertsenshtein}          & ${\sim}46$--$49$\,s & 2 & 6 & Einstein--Maxwell baseline \\
+\texttt{graviton\_torsion}      & ${\sim}6$--$8$\,min & 2 & 13 & PGT, \texttt{--timeout 0} \\
+\texttt{torsion\_gertsenshtein} & ${\sim}20$\,min & 3 & 20 & full PGT + EM + $\tilde{R}^2$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{\texttt{euler\_heisenberg} commentary.} Before v0.33.9 this example could not derive at all --- first the \texttt{(F$\cdot$F)}$^2$ Power auto-distribution raised \verb|Validate::repeated + Throw[Null]|, and even with that fixed the CD ComponentValue precompute was skipped (the $\texttt{len(dyn\_fields)} \ge 2$ heuristic), leaving \verb|CD1eqca| shorthand unresolved in \verb|lagComp| so Component E--L found zero field functions. Both are fixed in commits 9d9e73f and 830a442; see \S\ref{sec:pr-eh-cd}. The $\approx 19$~s wall-time listed above is the first recorded measurement for this theory.
+
+\paragraph{\texttt{gertsenshtein} commentary.} The v0.33.9 safety-net \verb|//.| of \verb|$CDShorthandReverseRules| before Component-E--L field detection was initially a $+24\%$ regression (45.6~s $\rightarrow$ 56.6~s). Gating it on \verb|!FreeQ[lagComp, _Symbol?(StringMatchQ["CD" ~~ DigitCharacter ~~ __]&)]| --- a no-op whenever the precompute already resolved everything --- restored the timing to $\approx 49$~s, within run-to-run variance of the 46~s baseline.
+
 \subsection{Wolfram License Constraint}
 \label{sec:license-constraint}
 

@@ -196,6 +196,92 @@ PerturbativeReduce::inconsistentReduction =
 
 \paragraph{Implementation size:} $\sim$200--400 lines of Wolfram code, comparable to existing phases. Detailed line-by-line structure follows the five steps above.
 
+\subsubsection{Power-of-Contraction Normalisation --- Implementation Details}
+\label{sec:prd-power-normalisation}
+
+This subsection is the engineer-facing counterpart to \S\ref{sec:pr-eh-cd} in the main perturbative-reduction document. It exists because the fix delivered in v0.33.9 (issue~\#271) changes two pre-xPert code paths that are not covered by the JLM Step~1--5 algorithm above.
+
+\paragraph{Location in \texttt{generate\_wls}.} The emitting functions are all in \verb|tidal/cli/_derive.py|:
+\begin{itemize}
+  \item \verb|_wls_lagrangian| (lines~913--1020): emits the user Lagrangian assignment and applies the \texttt{Hold}$+$\texttt{Scalar[X]\textasciicircum n} rewrite \emph{inside the \texttt{Hold}} before \texttt{ReleaseHold}.
+  \item \verb|_wls_precompute_cd_component_values| (lines~1423--1720): the correctness-aware gate replaces the legacy \verb|len(dyn_fields) < 2| skip.
+  \item \verb|_wls_canonical_phase_a| (lines~5820--5880): the Component-E--L field-function detector applies \verb|$CDShorthandReverseRules| to \verb|lagComp| behind a \verb|FreeQ|-gated safety check before building \verb|fieldFuncsEL|.
+\end{itemize}
+
+\paragraph{Pseudocode of the Lagrangian-assignment rewrite.} The emitted WLS, with irrelevant whitespace collapsed:
+\begin{verbatim}
+prefix*Lagrangian = ReleaseHold[
+  Hold[( <user_lagrangian_expr_with_prefix_substituted> )]
+  //. HoldPattern[Power[expr_, n_Integer /; n >= 2]] /;
+        !AtomQ[expr] && !FreeQ[expr, _?AbstractIndexQ]
+                     && FreeQ[expr, Scalar]
+      :> Scalar[expr]^n
+];
+prefix*Lagrangian = ToCanonical[prefix*Lagrangian];
+prefix*Lagrangian = ContractMetric[prefix*Lagrangian, prefix*Metric];
+\end{verbatim}
+
+The \texttt{Hold} wrapper is structural, not decorative: without it, Mathematica's built-in rule $\texttt{Power}[\texttt{Times}[a,b,\dots], n] \rightarrow a^n \cdot b^n \cdots$ fires \emph{before} the \texttt{//.} has a chance to see the unevaluated \texttt{Power[Times[\dots], n]}. Subsequent ToCanonical/ContractMetric calls operate on the wrapped \texttt{Scalar[X]\textasciicircum n} and therefore cannot redistribute the exponent onto individual tensor atoms.
+
+\paragraph{Pseudocode of the precompute gate.} In Python:
+\begin{verbatim}
+def _lagrangian_contains(head: str) -> bool:
+    # word-boundary match of `head[` in the rendered Lagrangian
+    return bool(re.search(rf"(?<![A-Za-z0-9_]){re.escape(head)}\s*\[",
+                          ctx.lagrangian_expr or ""))
+
+needs_precompute = False
+for derived in ctx.derived_fields or []:
+    if "CD[" in str(derived.get("definition", "")) \
+       and _lagrangian_contains(derived["name"]):
+        needs_precompute = True; break
+
+if not needs_precompute:
+    names = [df["name"] for df in dyn_fields]
+    for mp in ctx.linearization.get("matter_perturbations", []) or []:
+        if mp.get("field"): names.append(mp["field"])
+    for name in names:
+        if re.search(rf"CD\s*\[[^\[\]]*\]\s*\[\s*{re.escape(name)}\s*\[",
+                     ctx.lagrangian_expr or ""):
+            needs_precompute = True; break
+
+if len(dyn_fields) < 2 and not needs_precompute:
+    # Fast path: emit `CD pre-computation: skipped (...)` and return.
+    return lines
+# Otherwise fall through to the precompute emission.
+\end{verbatim}
+
+The three branches are deliberately conservative: a false positive costs a sub-second precompute for a single rank-1 field (16 entries of $\partial_{\mu} a_{\nu}$); a false negative would silently regress matter-only theories back to the ``Field functions: 0'' failure mode that motivated the fix.
+
+\paragraph{Regression-matrix per branch.}
+\begin{center}
+\begin{tabular}{lll}
+\hline
+Theory & Gate branch taken & Behaviour change \\
+\hline
+\texttt{scalar\_field}, \texttt{scalar\_potential\_well} & fast-path skip & unchanged \\
+\texttt{massive\_gravity}, \texttt{massive\_3form} & fast-path skip & unchanged \\
+\texttt{coupled\_scalars} & $n\ge 2$ & unchanged \\
+\texttt{gertsenshtein} & $n\ge 2$ & unchanged (derivation hash only) \\
+\texttt{torsion\_gertsenshtein} & $n\ge 2$ & unchanged (derivation hash only) \\
+\texttt{graviton\_torsion} & $n\ge 2$ & unchanged \\
+\texttt{chern\_simons} & $n\ge 2$ & unchanged \\
+\texttt{euler\_heisenberg} (new) & derived-field-with-CD branch & newly supported \\
+\hline
+\end{tabular}
+\end{center}
+
+\paragraph{Safety-net emission.} The Component-E--L field-function detector emits
+\begin{verbatim}
+If[ListQ[$CDShorthandReverseRules] && Length[$CDShorthandReverseRules] > 0
+   && !FreeQ[lagComp,
+             _Symbol?(StringMatchQ[ToString[#], "CD" ~~ DigitCharacter ~~ __] &)],
+  lagComp = lagComp //. $CDShorthandReverseRules];
+\end{verbatim}
+The \texttt{FreeQ} guard is the load-bearing piece: a naive unconditional \verb|//.| on gertsenshtein-scale \verb|lagComp| costs $\approx 4$~s (measured: 45.6~s $\rightarrow$ 56.6~s, recovered to 49.2~s with the guard). \verb|$CDShorthandReverseRules| itself is generated at \verb|_derive.py:1407| per the pattern $\texttt{CDN}f[i,a] \to \texttt{CD}[i][\texttt{CD}(N{-}1)f[a]]$ for each dynamical field and each $N \in \{1,2,3,4\}$.
+
+\paragraph{Interaction with the JLM-era design.} The \texttt{Scalar[X]\textasciicircum n} wrapping is orthogonal to JLM symbolic order reduction: the wrapping happens at Lagrangian assignment, long before any of the five JLM steps in \S\ref{sec:prd-algorithm}. The CD precompute gate sits upstream of Phase~C in the pipeline diagram above; everything downstream receives a component-form \verb|lagComp| regardless of which branch fired.
+
 \subsection{TOML Schema Extension}
 \label{sec:prd-toml}
 

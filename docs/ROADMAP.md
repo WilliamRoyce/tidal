@@ -2,8 +2,8 @@
 
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
-**Last Updated:** March 2026
-**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration + parameter sweeps done (1,700 Python tests + ~115 Wolfram tests)
+**Last Updated:** April 2026 (v0.33.9)
+**Project Status:** Phase 13+ Complete; perturbative reduction v6 complete (Stage 7 closed 2026-04-20, issue #271 resolved). Euler–Heisenberg quartic-EM path fully supported; matter-only derivative-only theories now unblocked. 1,991 Python tests + ~115 Wolfram tests.
 
 ## Overview
 
