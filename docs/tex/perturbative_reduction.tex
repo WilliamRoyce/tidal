@@ -106,7 +106,7 @@ with the triple-eigenvalue kernel
 \begin{equation}
   K_2(\lambda_i, \lambda_j, \lambda_k; t) = \int_0^t e^{\lambda_i(t-\tau)}\,G(\lambda_j, \lambda_k; \tau)\,d\tau = \frac{G(\lambda_i, \lambda_k; t) - G(\lambda_i, \lambda_j; t)}{\lambda_k - \lambda_j}
 \end{equation}
-for distinct $\lambda_j \neq \lambda_k$; degenerate cases ($\lambda_j = \lambda_k$, $\lambda_i = \lambda_j$, $\lambda_i = \lambda_k$, or all-equal) reduce to $\int_0^t e^{\lambda_i(t-\tau)}\,\tau\,e^{\lambda_j\tau}\,d\tau$ and its limits, involving polynomial-in-$t$ factors ($t\cdot e^{\lambda t}$, $(t^2/2)\cdot e^{\lambda t}$) that need Taylor-branch handling analogous to $G$'s degeneracy case. TIDAL currently gates $\mathrm{order} \geq 2$ with a \verb|NotImplementedError| (issue \#273); no shipped theory emits $\mathrm{order\_in\_eps} = 2$ tagged terms, so the implementation is deferred until a use case arrives.
+for distinct $\lambda_j \neq \lambda_k$; degenerate cases ($\lambda_j = \lambda_k$, $\lambda_i = \lambda_j$, $\lambda_i = \lambda_k$, or all-equal) reduce to $\int_0^t e^{\lambda_i(t-\tau)}\,\tau\,e^{\lambda_j\tau}\,d\tau$ and its limits, involving polynomial-in-$t$ factors ($t\cdot e^{\lambda t}$, $(t^2/2)\cdot e^{\lambda t}$) that need Taylor-branch handling analogous to $G$'s degeneracy case. TIDAL gates $\mathrm{order} \geq 2$ with a \verb|NotImplementedError| (issue \#273). This gate is \emph{permanent by architecture}: TIDAL operates with quadratic Lagrangians and linear PDEs, so a small parameter $\varepsilon$ appearing as a linear coupling (e.g.\ $b_5 \tilde{R}^2$ in the PGT example) produces EOM coefficients with at most one factor of $\varepsilon$ — hence $\mathrm{order\_in\_eps} \in \{0, 1\}$ always. Higher values would require either products of small parameters (e.g.\ $b_5 \rho$) or an explicit second-order Lagrangian piece ($b_5^2 \mathcal{L}_2$), neither of which is supported. No shipped theory emits $\mathrm{order\_in\_eps} = 2$ tagged terms and none is planned. If a future theory somehow produced such a tag, \verb|PerturbativeSolver| emits an explicit warning listing the dropped terms rather than proceeding silently.
 
 \subsection{Pipeline Architecture}
 \label{sec:pr-architecture}
@@ -140,7 +140,7 @@ The v6 iterative pipeline currently supports:
   \item Modal solver backend only. Non-modal backends (CVODE, IDA, leapfrog, scipy) fall back to the plain solve without Pass~1 corrections and emit a diagnostic.
   \item Constant-coefficient source matrices. Position-dependent Pass~1 sources (convolution-coupling case) raise \verb|NotImplementedError|.
   \item Source terms that respect the Pass 0 block structure. Cross-block coupling terms raise with a clear message pointing at the current limitation.
-  \item Order $\geq 1$ API present (\verb|order=2| accepted) but only Pass~1 validated end-to-end; higher orders require additional truncation-error diagnostics before routine use.
+  \item Order $\leq 1$ only. \verb|order=2| raises \verb|NotImplementedError|; this is permanent — no shipped theory produces $\mathrm{order\_in\_eps} = 2$ terms under TIDAL's quadratic-Lagrangian constraint, and products of small parameters (e.g.\ $\varepsilon_1 \cdot \varepsilon_2$) or higher-power couplings ($\varepsilon^2$) are not supported. If a spec somehow carries such terms, the solver warns before proceeding at the requested order.
 \end{itemize}
 
 These limitations are tracked in GitHub issues and listed in \verb|docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md|.

@@ -556,6 +556,27 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   (* Parse RHS with cross-field detection *)
   rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames, smallParams];
 
+  (* Validate that no emitted term exceeds the declared perturbation_order.
+     Under TIDAL's linearised-theory constraint, order_in_eps > 1 should
+     never occur: a quadratic Lagrangian with a single linear coupling ε
+     produces EOM coefficients with at most one factor of ε. A higher tag
+     means the Lagrangian contains products of small parameters (e.g. ε·δ)
+     or higher-power couplings (e.g. ε²) which are outside TIDAL's design
+     scope and will be silently dropped by PerturbativeSolver when solving
+     at order=1. *)
+  Module[{declaredOrder, highOrderTerms},
+    declaredOrder = Lookup[metadata, "perturbation_order", 1];
+    highOrderTerms = Select[rhsTerms, Lookup[#, "order_in_eps", 0] > declaredOrder &];
+    If[Length[highOrderTerms] > 0,
+      Print["  WARNING [" <> fieldName <> "]: " <> ToString[Length[highOrderTerms]] <>
+            " term(s) have order_in_eps > " <> ToString[declaredOrder] <>
+            " (declared perturbation_order). TIDAL's linearised-theory pipeline " <>
+            "only supports order_in_eps <= 1. These terms will be silently ignored " <>
+            "by PerturbativeSolver. Check your Lagrangian for products of small " <>
+            "parameters or higher-power couplings, which are not supported."]
+    ]
+  ];
+
   (* NOTE: The pi_ sign hack that was previously here (negating coefficients of
      momentum terms in wave equations) has been removed. The root cause — metric
      contractions absorbing into field tensors (V^a = g^{ab} V_b) and then mapping

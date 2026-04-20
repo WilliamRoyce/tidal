@@ -168,6 +168,15 @@ def _compute_validity(
     for name in small_parameters:
         if name in params:
             eps_values[name] = float(params[name])
+        else:
+            import logging  # noqa: PLC0415
+
+            logging.getLogger(__name__).warning(
+                "Validity monitor: small parameter %r is declared in "
+                "[perturbation] but was not found in the parameters dict. "
+                "Cannot check perturbative validity for this parameter.",
+                name,
+            )
 
     validity_param = 0.0
     dominant: str | None = None
@@ -491,6 +500,30 @@ class PerturbativeSolver:
                 "over a partial implementation. Tracked in #273."
             )
             raise NotImplementedError(msg)
+
+        spec_max = self.full_spec.max_order()
+        if spec_max > order:
+            import logging  # noqa: PLC0415
+
+            dropped = [
+                (eq.field_name, t.operator, t.order_in_eps)
+                for eq in self.full_spec.equations
+                for t in eq.rhs_terms
+                if t.order_in_eps > order
+            ]
+            logging.getLogger(__name__).warning(
+                "PerturbativeSolver: spec contains %d term(s) with "
+                "order_in_eps > %d (spec max=%d). These terms are not "
+                "included in the solve at order=%d. First dropped: %s. "
+                "If unexpected, check the [perturbation] section of your "
+                "theory TOML — TIDAL only supports order_in_eps ∈ {0, 1} "
+                "for linearised theories with a single linear coupling.",
+                len(dropped),
+                order,
+                spec_max,
+                order,
+                dropped[:3],
+            )
 
         # Pass 0 — base evolution + eigendata capture for Pass 1.
         pass0 = cast(

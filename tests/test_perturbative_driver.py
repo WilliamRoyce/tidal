@@ -653,3 +653,142 @@ class TestPerturbativeResultLayoutConsistency:
             f"spec.num_slots × grid.num_points = {expected_width}. "
             f"See #276."
         )
+
+
+class TestPerturbativeDefensiveHardening:
+    """Defensive diagnostics for unsupported pipeline inputs (#273 resolution)."""
+
+    def test_warns_when_spec_has_higher_order_terms_than_requested(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When a spec carries order_in_eps=2 terms but solve(order=1) is
+        requested, the solver must emit a warning listing the dropped terms
+        rather than silently ignoring them.  Under TIDAL's linearised-theory
+        constraint this path should never be reached in practice, but the
+        diagnostic prevents silent wrong physics if it ever is.
+        """
+        import logging
+
+        data = copy.deepcopy(_KG_WITH_EPS)
+        terms = data["equations"][0]["rhs"]["terms"]  # type: ignore[index]
+        terms.append(
+            {
+                "coefficient": -0.5,
+                "operator": "identity",
+                "field": "phi_0",
+                "coefficient_symbolic": "-eps2",
+                "order_in_eps": 2,
+            }
+        )
+        data["metadata"]["perturbation"] = {  # type: ignore[index]
+            "small_parameters": ["eps", "eps2"],
+            "order": 2,
+        }
+        spec = _make_spec(data)
+        solver = PerturbativeSolver(spec)
+        assert solver.max_order == 2
+
+        grid = GridInfo(shape=(16,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        y0 = _make_ic(spec, grid)
+
+        with caplog.at_level(
+            logging.WARNING, logger="tidal.solver.perturbative_driver"
+        ):
+            solver.solve(
+                y0,
+                grid,
+                (0.0, 0.5),
+                order=1,
+                parameters={"m2": 1.0, "eps": 0.01, "eps2": 0.001},
+                num_snapshots=3,
+            )
+
+        assert any("order_in_eps > 1" in record.message for record in caplog.records), (
+            "Expected a warning about dropped higher-order terms"
+        )
+
+    def test_validity_warns_when_small_parameter_missing_from_params(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """If a small parameter declared in [perturbation] is absent from the
+        runtime parameters dict, the validity monitor must emit a warning
+        rather than silently skipping the check.  A typo in the parameter
+        name could otherwise mask a non-small value passing unchecked.
+
+        The correction term uses a purely numeric coefficient so the solve can
+        complete even without 'eps' in the parameters dict — the warning fires
+        inside _compute_validity when it scans the declared small_parameters.
+        """
+        import logging
+
+        # Spec where the order-1 correction has a numeric-only coefficient so
+        # the modal solve can complete without 'eps' in the parameter dict.
+        data: dict[str, Any] = {
+            "metadata": {
+                "source": "inline-test",
+                "parameters": {"m2": 1.0},
+                "perturbation": {"small_parameters": ["eps"], "order": 1},
+            },
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
+                            {
+                                # Purely numeric — no symbolic form. The solver
+                                # can evaluate this without 'eps' being defined,
+                                # so the solve completes and _compute_validity runs.
+                                "coefficient": -0.01,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "order_in_eps": 1,
+                            },
+                        ],
+                    },
+                }
+            ],
+            "coupling": {},
+        }
+        spec = _make_spec(data)
+        solver = PerturbativeSolver(spec)
+        grid = GridInfo(shape=(16,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        y0 = _make_ic(spec, grid)
+
+        with caplog.at_level(
+            logging.WARNING, logger="tidal.solver.perturbative_driver"
+        ):
+            solver.solve(
+                y0,
+                grid,
+                (0.0, 0.5),
+                order=1,
+                parameters={"m2": 1.0},  # 'eps' intentionally omitted
+                num_snapshots=3,
+            )
+
+        assert any(
+            "small parameter" in record.message and "eps" in record.message
+            for record in caplog.records
+        ), "Expected a warning about missing small parameter 'eps'"
