@@ -650,6 +650,120 @@ class TestLikelihoodBackendEquivalence:
     disk-writer reference semantics and callers could get wrong science.
     """
 
+    def test_cache_warm_vs_cold_identical_metrics(self, tmp_path: Path) -> None:
+        """Regression for #291: solver-layer caches (parsed-Mathematica,
+        eval namespace) must NOT change numerical results whether the
+        cache is cold (first call) or warm (subsequent).
+        """
+        import sys
+
+        import tidal.cli
+
+        spec_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "data"
+            / "dark_photon_plasma.json"
+        )
+        if not spec_path.exists():
+            pytest.skip(f"dark_photon_plasma spec not found at {spec_path}")
+
+        argv = [
+            "tidal",
+            "sample",
+            str(spec_path),
+            "--param",
+            "kappa=1.0",
+            "--param",
+            "B0=0.01",
+            "--param",
+            "alpha3=0.25",
+            "--param",
+            "xi=1.0",
+            "--param",
+            "deltam=0.3",
+            "--prior",
+            "mA2=uniform:0.4:0.5",
+            "--likelihood",
+            "P_max:maximize",
+            "--method",
+            "nested",
+            "--sampler",
+            "polychord",
+            "--grid-shape",
+            "32",
+            "--bounds",
+            "0:50",
+            "--periodic",
+            "--ic",
+            "plane-wave",
+            "--ic-component",
+            "h_5",
+            "--ic-wavevector",
+            "2.0",
+            "--ic-amplitude",
+            "1e-2",
+            "--source",
+            "h_5",
+            "--target",
+            "a_1",
+            "--snapshots",
+            "3",
+            "--t-end",
+            "10.0",
+            "--output",
+            str(tmp_path / "ns"),
+        ]
+        old_argv = sys.argv
+        try:
+            sys.argv = argv
+            parser = tidal.cli._build_parser()  # pyright: ignore[reportPrivateUsage]
+            args = parser.parse_args(argv[1:])
+        finally:
+            sys.argv = old_argv
+
+        from tidal.cli._sweep import (
+            _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
+            run_inference_step,
+        )
+        from tidal.symbolic import load_equation_system
+        from tidal.symbolic._eval_utils import (
+            _PARSED_MATH_CACHE,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        spec = load_equation_system(spec_path)
+
+        # Cold run — explicitly clear the parsed-Mathematica cache so
+        # the first call exercises the miss path.
+        _PARSED_MATH_CACHE.clear()
+        overrides = {"mA2": 0.42}
+        sim_cold = run_inference_step(args, spec_path, overrides, spec=spec)
+        m_cold = _measure_from_sim_data(
+            sim_cold,
+            {"conversion", "peak_conversion"},
+            ("h_5",),
+            ("a_1",),
+            0.5,
+        )
+        assert len(_PARSED_MATH_CACHE) > 0, "cold run should populate the cache"
+
+        # Warm run at same theta — must produce identical metrics.
+        sim_warm = run_inference_step(args, spec_path, overrides, spec=spec)
+        m_warm = _measure_from_sim_data(
+            sim_warm,
+            {"conversion", "peak_conversion"},
+            ("h_5",),
+            ("a_1",),
+            0.5,
+        )
+
+        for key in ("P_max", "P_final"):
+            assert m_cold.get(key) is not None, f"cold run missing {key}"
+            assert m_warm.get(key) is not None, f"warm run missing {key}"
+            assert m_cold[key] == pytest.approx(m_warm[key], rel=0, abs=0), (
+                f"cache warmth changed {key}: cold={m_cold[key]}, warm={m_warm[key]}"
+            )
+
     @pytest.mark.parametrize("metric", ["P_max", "P_final"])
     def test_backends_agree(self, metric: str, tmp_path: Path) -> None:
         import sys

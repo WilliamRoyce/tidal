@@ -2056,12 +2056,18 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     import contextlib
 
-    with contextlib.suppress(ValueError):
-        # May raise ValueError for systems with time-derivative operators
-        # (d2_t, mixed_T2_S1x, etc.) that the physical-space RHS evaluator
-        # cannot handle. These are simulated by the modal solver's
-        # generalized mass-matrix path which works directly in Fourier space.
-        _warn_zero_evolution(spec, grid_info, y0, params, bc)
+    # Diagnostic warning that builds its own CoefficientEvaluator + runs
+    # one full RHS evaluation.  Useful for catching IC bugs in the
+    # `tidal simulate` user flow but pure overhead (~3ms/call) in the
+    # nested-sampling likelihood path — skip it when we're in-memory
+    # mode (see #269, #291).
+    if in_memory_out is None:
+        with contextlib.suppress(ValueError):
+            # May raise ValueError for systems with time-derivative operators
+            # (d2_t, mixed_T2_S1x, etc.) that the physical-space RHS evaluator
+            # cannot handle. These are simulated by the modal solver's
+            # generalized mass-matrix path which works directly in Fourier space.
+            _warn_zero_evolution(spec, grid_info, y0, params, bc)
     # Note: mass stability pre-check removed — the modal solver's eigenvalue
     # pre-check (in _evolve_per_mode) provides more accurate instability
     # detection using the full evolution matrix, not a simplified mass proxy.

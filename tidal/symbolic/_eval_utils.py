@@ -430,6 +430,17 @@ def _convert_piecewise(expr: str) -> str:
 # ------------------------------------------------------------------
 
 
+# Per-process cache of Mathematica→Python translations.  In nested
+# sampling the same ~14 coefficient strings are re-translated ~13k
+# times per likelihood evaluation (see #291 profiling), purely because
+# the translator is stateless and gets called fresh each time.  The
+# cache is keyed on (expression string, coordinate tuple) — deterministic
+# in both inputs — so it's safe to share across calls within a process.
+# Per-process (not shared) so MPI ranks / multiprocessing workers each
+# keep their own copy, matching the #143 BLAS-pinning convention.
+_PARSED_MATH_CACHE: dict[tuple[str, tuple[str, ...]], str] = {}
+
+
 def mathematica_to_python(
     expr: str,
     coordinates: tuple[str, ...] = ("t", "x", "y"),
@@ -449,6 +460,12 @@ def mathematica_to_python(
     str
         Python-evaluable expression string.
     """
+    # Coerce to hashable form and look up.
+    cache_coords: tuple[str, ...] = tuple(coordinates)
+    cached = _PARSED_MATH_CACHE.get((expr, cache_coords))
+    if cached is not None:
+        return cached
+
     result = expr
 
     # E^(...) → exp(...)
@@ -490,6 +507,7 @@ def mathematica_to_python(
     for coord in coordinates:
         result = result.replace(f"{coord}()", coord)
 
+    _PARSED_MATH_CACHE[expr, cache_coords] = result
     return result
 
 
@@ -498,48 +516,60 @@ def mathematica_to_python(
 # ------------------------------------------------------------------
 
 
+# Static math-function namespace, built once.  build_eval_namespace
+# used to allocate this 30-key dict on every call — in nested sampling
+# that's ~400 allocations per likelihood evaluation (see #291).  The
+# static entries don't depend on parameters, so we build them once and
+# shallow-copy per call.
+_STATIC_EVAL_NAMESPACE: dict[str, object] = {
+    "exp": np.exp,
+    "sin": np.sin,
+    "cos": np.cos,
+    "tan": np.tan,
+    "cot": lambda x: np.cos(x) / np.sin(x),
+    "sec": lambda x: 1.0 / np.cos(x),
+    "csc": lambda x: 1.0 / np.sin(x),
+    "arcsin": np.arcsin,
+    "arccos": np.arccos,
+    "arctan": np.arctan,
+    "arctan2": np.arctan2,
+    "sinh": np.sinh,
+    "cosh": np.cosh,
+    "tanh": np.tanh,
+    "arcsinh": np.arcsinh,
+    "arccosh": np.arccosh,
+    "arctanh": np.arctanh,
+    "log": np.log,
+    "sqrt": np.sqrt,
+    "abs": np.abs,
+    "sign": np.sign,
+    "maximum": np.maximum,
+    "minimum": np.minimum,
+    "heaviside": lambda x: np.heaviside(x, 0.5),
+    "piecewise": np.where,
+    "erf": special.erf,
+    "jv": special.jv,
+    "yv": special.yv,
+    "np": np,
+    "True": True,
+    "False": False,
+}
+
+
 def build_eval_namespace(parameters: dict[str, float]) -> dict[str, object]:
     """Build the evaluation namespace for ``eval()`` of converted expressions.
 
     Contains numpy/scipy math functions and user-provided parameters.
+    Math functions come from a module-level static dict; only the
+    parameter values are merged per call.
 
     Parameters
     ----------
     parameters : dict[str, float]
         User-provided parameter values (e.g. ``{"g0": 1.0, "R": 8.0}``).
     """
-    ns: dict[str, object] = dict(parameters)
-    ns["exp"] = np.exp
-    ns["sin"] = np.sin
-    ns["cos"] = np.cos
-    ns["tan"] = np.tan
-    ns["cot"] = lambda x: np.cos(x) / np.sin(x)  # type: ignore[reportUnknownLambdaType]
-    ns["sec"] = lambda x: 1.0 / np.cos(x)  # type: ignore[reportUnknownLambdaType]
-    ns["csc"] = lambda x: 1.0 / np.sin(x)  # type: ignore[reportUnknownLambdaType]
-    ns["arcsin"] = np.arcsin
-    ns["arccos"] = np.arccos
-    ns["arctan"] = np.arctan
-    ns["arctan2"] = np.arctan2
-    ns["sinh"] = np.sinh
-    ns["cosh"] = np.cosh
-    ns["tanh"] = np.tanh
-    ns["arcsinh"] = np.arcsinh
-    ns["arccosh"] = np.arccosh
-    ns["arctanh"] = np.arctanh
-    ns["log"] = np.log
-    ns["sqrt"] = np.sqrt
-    ns["abs"] = np.abs
-    ns["sign"] = np.sign
-    ns["maximum"] = np.maximum
-    ns["minimum"] = np.minimum
-    ns["heaviside"] = lambda x: np.heaviside(x, 0.5)  # type: ignore[reportUnknownLambdaType]
-    ns["piecewise"] = np.where
-    ns["erf"] = special.erf
-    ns["jv"] = special.jv
-    ns["yv"] = special.yv
-    ns["np"] = np
-    ns["True"] = True
-    ns["False"] = False
+    ns = _STATIC_EVAL_NAMESPACE.copy()
+    ns.update(parameters)
     return ns
 
 
