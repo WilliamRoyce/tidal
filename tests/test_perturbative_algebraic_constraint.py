@@ -311,3 +311,158 @@ class TestPass1ConstraintAndDynamicalAgree:
             "Pass 1 correction is identically zero; "
             "the driver is not actually applying the b5 source"
         )
+
+
+class TestAugmentedRecoveryMatchesMpmath:
+    """R8.6 / #290: validate augmented Schur recovery against an mpmath
+    50-dps eigenvector of the 2x2 dispersion on the synthetic spec.
+
+    The full EOM (before expansion):
+
+        b5 * d²_t(h) = h - g*phi
+        d²_t(phi) = (laplacian - m²)*phi + b5*g*h
+
+    At k=1 with plane-wave ansatz, the light-mode eigenvector has
+    ``h/phi = g/(1 + b5*omega²)``. Expanding in b5 gives the
+    analytical O(ε¹) correction ``h = g*phi*(1 - b5*omega²) + O(b5²)``.
+
+    We compute this ratio at arbitrary precision via mpmath and compare
+    against the driver's Pass 0 + Pass 1 output.
+    """
+
+    def test_light_mode_ratio_matches_analytical_at_eps_1e_3(self) -> None:
+        _spec, solver, grid, y0, layout = _setup()
+        params = {"m2": _M2, "b5": 1e-3, "g": _G}
+        res = solver.solve(
+            y0,
+            grid,
+            (0.0, 0.5),
+            order=1,
+            parameters=params,
+            num_snapshots=11,
+        )
+        n = grid.num_points
+        phi_slot = layout.field_slot_map["phi"]
+        h_slot = layout.field_slot_map["h"]
+        phi_tot = res.total["y"][:, phi_slot * n : (phi_slot + 1) * n]
+        h_tot = res.total["y"][:, h_slot * n : (h_slot + 1) * n]
+
+        import mpmath
+
+        mpmath.mp.dps = 50
+        b5 = mpmath.mpf(params["b5"])
+        m2 = mpmath.mpf(params["m2"])
+        g = mpmath.mpf(params["g"])
+        k2 = mpmath.mpf(1)
+        # Light-mode omega² from the 2x2 dispersion det: solve
+        #   b5*omega^4 - (1 + a*b5)*omega^2 + (a - b5*g^2) = 0  with a = m² + k².
+        # Take the smaller root (light mode).
+        a = m2 + k2
+        # Light-mode dispersion: ω² = a + ε·g² + O(ε²) from
+        # (a - ω²)·(1 + ε·ω²) + ε·g² = 0 (from det of 2x2 block).
+        # Exact eigenvector ratio: h/phi = g / (1 + ε·ω²).
+        # Driver Pass 0 + Pass 1 truncates at O(ε¹):
+        #   h/phi ≈ g·(1 − ε·ω²_0) = g·(1 − ε·a) + O(ε²)
+        ratio_truncated = g * (1 - b5 * a)
+        ratio_analytical = float(ratio_truncated)
+
+        # Driver output: sample ratio h_total / phi_total at the
+        # snapshot / grid point with largest |phi| (away from nodes).
+        max_idx = np.argmax(np.abs(phi_tot.ravel()))
+        ti_sample, xi_sample = np.unravel_index(max_idx, phi_tot.shape)
+        ratio_driver = h_tot[ti_sample, xi_sample] / phi_tot[ti_sample, xi_sample]
+        rel_err = abs(ratio_driver - ratio_analytical) / abs(ratio_analytical)
+        assert rel_err < 1e-6, (
+            f"driver h/phi ratio {ratio_driver:.8f}, mpmath-truncated "
+            f"{ratio_analytical:.8f}, rel_err {rel_err:.3e} exceeds 1e-6. "
+            f"R8 augmented recovery may be off. See #290."
+        )
+
+    def test_light_mode_ratio_matches_exact_at_eps_1e_3(self) -> None:
+        """At ε=1e-3, the EXACT light-mode eigenvector g/(1+ε·ω²)
+        differs from the O(ε¹) truncation by O(ε²) ≈ 4e-6. The driver's
+        output (truncated at O(ε)) should match the exact mpmath
+        eigenvector to within that O(ε²) tolerance.
+        """
+        _spec, solver, grid, y0, layout = _setup()
+        params = {"m2": _M2, "b5": 1e-3, "g": _G}
+        res = solver.solve(
+            y0, grid, (0.0, 0.5), order=1, parameters=params, num_snapshots=11
+        )
+        n = grid.num_points
+        phi_slot = layout.field_slot_map["phi"]
+        h_slot = layout.field_slot_map["h"]
+        phi_tot = res.total["y"][:, phi_slot * n : (phi_slot + 1) * n]
+        h_tot = res.total["y"][:, h_slot * n : (h_slot + 1) * n]
+
+        import mpmath
+
+        mpmath.mp.dps = 50
+        b5 = mpmath.mpf(params["b5"])
+        g = mpmath.mpf(params["g"])
+        a = mpmath.mpf(params["m2"]) + mpmath.mpf(1)
+        # Light-mode ω² from dispersion: (a - ω²)(1 + ε·ω²) + ε·g² = 0
+        # Solve exactly via quadratic: ε·ω⁴ + (1 - ε·a)·ω² - (a + ε·g²) = 0
+        A = b5
+        B = 1 - b5 * a
+        C = -(a + b5 * g * g)
+        disc = mpmath.sqrt(B * B - 4 * A * C)
+        # Light mode = smaller positive root.
+        roots = [(-B + disc) / (2 * A), (-B - disc) / (2 * A)]
+        omega2_light_mp = min((r for r in roots if r > 0), key=abs)
+        ratio_exact = g / (1 + b5 * omega2_light_mp)
+        ratio_analytical = float(ratio_exact)
+
+        max_idx = np.argmax(np.abs(phi_tot.ravel()))
+        ti_sample, xi_sample = np.unravel_index(max_idx, phi_tot.shape)
+        ratio_driver = h_tot[ti_sample, xi_sample] / phi_tot[ti_sample, xi_sample]
+        rel_err = abs(ratio_driver - ratio_analytical) / abs(ratio_analytical)
+        # O(ε²) truncation error ~ (ε·ω²)² = 4e-6 at ε=1e-3. Allow 1e-5.
+        assert rel_err < 1e-5, (
+            f"driver h/phi {ratio_driver:.10f}, mpmath exact "
+            f"{ratio_analytical:.10f}, rel_err {rel_err:.3e}. Expected "
+            f"O(ε²) agreement (~4e-6). See #290."
+        )
+
+    def test_light_mode_ratio_matches_truncation_at_eps_1e_2(self) -> None:
+        """Same check at ε=1e-2. Tolerance looser (1e-4) because O(ε²)
+        truncation error scales as (b5·ω²)² which is ~4e-4 at this ε.
+        """
+        _spec, solver, grid, y0, layout = _setup()
+        params = {"m2": _M2, "b5": 1e-2, "g": _G}
+        res = solver.solve(
+            y0,
+            grid,
+            (0.0, 0.5),
+            order=1,
+            parameters=params,
+            num_snapshots=11,
+        )
+        n = grid.num_points
+        phi_slot = layout.field_slot_map["phi"]
+        h_slot = layout.field_slot_map["h"]
+        phi_tot = res.total["y"][:, phi_slot * n : (phi_slot + 1) * n]
+        h_tot = res.total["y"][:, h_slot * n : (h_slot + 1) * n]
+
+        import mpmath
+
+        mpmath.mp.dps = 50
+        b5 = mpmath.mpf(params["b5"])
+        m2 = mpmath.mpf(params["m2"])
+        g = mpmath.mpf(params["g"])
+        k2 = mpmath.mpf(1)
+        a = m2 + k2
+        # Pass-0 + Pass-1 corresponds to h/phi ≈ g·(1 − b5·ω²_0) at
+        # O(ε¹), with ω²_0 = a (leading-order). Higher-order ω²
+        # corrections kick in at O(ε²) which are below our tolerance.
+        ratio_mp_truncated = g * (1 - b5 * a)
+        ratio_analytical = float(ratio_mp_truncated)
+
+        max_idx = np.argmax(np.abs(phi_tot.ravel()))
+        ti_sample, xi_sample = np.unravel_index(max_idx, phi_tot.shape)
+        ratio_driver = h_tot[ti_sample, xi_sample] / phi_tot[ti_sample, xi_sample]
+        rel_err = abs(ratio_driver - ratio_analytical) / abs(ratio_analytical)
+        assert rel_err < 1e-4, (
+            f"driver h/phi ratio {ratio_driver:.8f}, mpmath truncated "
+            f"{ratio_analytical:.8f}, rel_err {rel_err:.3e} exceeds 1e-4."
+        )
