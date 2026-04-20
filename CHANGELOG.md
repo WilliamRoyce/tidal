@@ -10,7 +10,40 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
-## [Unreleased] — v0.33.2 R8 augmented Schur constraint recovery
+## [Unreleased] — v0.33.3 time-order λⁿ scaling + b5=0 reference JSON
+
+### Fixed
+
+- **`_build_source_matrix_k` dropped operator time_order (#293)**.
+  Pass 1 correction terms with `d^n_t` operators targeting a
+  dynamical field silently lost the `λⁿ` eigenvalue factor because
+  `_EXACT_MULTIPLIERS` kept only the spatial multiplier. Latent
+  bug — no shipped theory has a b5-coupled d^n_t term on a
+  dynamical row (all route through the constraint augmented
+  recovery path where `λⁿ` was already handled). Fix:
+  - `_build_source_matrix_k` now returns `dict[int, ndarray]` keyed
+    by operator time_order.
+  - `_evolve_duhamel_per_mode` scales α by `λⁿ` per order before
+    the Duhamel kernel.
+  - New regression `TestPass1TimeDerivativeTargetingDynamical` in
+    `tests/test_modal_duhamel.py`: damped KG at O(γ¹) matches
+    `Φ = cos(ω₀t) + γ·[−t/2·cos(ω₀t) + 1/(2ω₀)·sin(ω₀t)] + O(γ²)`.
+    Pre-fix this would fail by O(1).
+
+### Added
+
+- **b5=0 reference JSON (#289)** for the R5.2 trajectory-level
+  regression. `examples/torsion_gertsenshtein/theory_b5_zero.toml`
+  is a byte-level b5 → 0 reduction of `theory.toml` (removes the
+  `b5·R̃²` Lagrangian term, the `b5` constant, and the
+  `[perturbation]` section). Derived to
+  `examples/data/torsion_gertsenshtein_b5_zero.json`: 38 fields, 0
+  `order_in_eps` tags, `h_4`/`h_7`/`h_9` natively algebraic.
+  New test `test_pass0_matches_b5_zero_reference` confirms the
+  full theory's Pass 0 at b5=0 reproduces this reference
+  field-for-field to rel_err < 1e-6.
+
+## [0.33.2] — 2026-04-20 R8 augmented Schur constraint recovery
 
 ### Fixed
 
