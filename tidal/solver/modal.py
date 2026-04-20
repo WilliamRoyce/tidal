@@ -31,7 +31,7 @@ References
 # ruff: noqa: PLR0913, PLR0917, PLR0914, PLR0912, PLR0911, PLR0915, PLR2004
 #   — numerical code inherently requires many arguments, local variables,
 #   return statements, statements, and literal comparisons.
-# ruff: noqa: C901 — complexity and Unicode math symbols.
+# ruff: noqa: C901, RUF001, RUF002, RUF003 — complexity and Unicode math symbols.
 # ruff: noqa: ERA001, ARG001 — commented-out code serves as documentation;
 #   unused args (bc, grid) kept for interface consistency with other solvers.
 # ruff: noqa: B903, PLR1702 — _OperatorDecomp uses __slots__ for memory efficiency;
@@ -51,7 +51,7 @@ from tidal.solver.operators import get_wavenumbers, is_periodic_bc
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
-    from tidal.solver._types import SolverResult
+    from tidal.solver._types import PerturbativePass1Result, SolverResult
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
@@ -2260,6 +2260,12 @@ def solve_modal(
     SolverResult
         Dict with keys: ``t``, ``y``, ``success``, ``message``. When
         ``return_eigendata=True`` also has ``"eigendata"``.
+
+    Raises
+    ------
+    ValueError
+        If ``spec`` contains time-derivative orders > 2, or incompatible
+        options are given for the position-dependent coefficient path.
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
 
@@ -2586,8 +2592,7 @@ def _build_source_matrix_k(
     rfft_shape: tuple[int, ...],
     schur_ops: dict[str, Any] | None = None,
 ) -> tuple[dict[int, NDArray[np.complex128]], list[dict[str, Any]]]:
-    """Build M_src(k) for Pass 1: correction RHS as a linear source on the
-    Pass 0 state.
+    """Build M_src(k) for Pass 1: correction RHS as a linear source on the Pass 0 state.
 
     Shape ``(n_modes, n_slots, n_slots)``. For each correction RHS term
     ``c·op(field)`` appearing in equation ``eq``:
@@ -2630,6 +2635,11 @@ def _build_source_matrix_k(
         (row skip; routed to R8 augmented recovery), or (b) the
         target field reference could not be resolved to a dynamical
         or Schur-recoverable slot (column skip).
+
+    Raises
+    ------
+    ValueError
+        If an operator string from the correction spec cannot be resolved.
     """
     n_slots = layout.num_slots
     n_modes = int(np.prod(rfft_shape))

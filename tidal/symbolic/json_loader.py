@@ -1291,7 +1291,7 @@ class EquationSystem:
                 new_eqs.append(dataclasses.replace(eq, rhs_terms=filtered_rhs))
 
         # Post-check: the base system must be 2nd-order at most.
-        high_order = [eq.field_name for eq in new_eqs if eq.time_derivative_order > 2]
+        high_order = [eq.field_name for eq in new_eqs if eq.time_derivative_order > 2]  # noqa: PLR2004
         if high_order:
             msg = (
                 f"base_spec: after applying [perturbation]="
@@ -1713,7 +1713,7 @@ def normalize_kinetic_coefficients(
     # coefficient rescales the identity-operator coefficients, so the
     # cached matrices on spec no longer match.
     new_eqs_t = tuple(new_eqs)
-    mass, coupling, mass_sym, coupling_sym = spec._compute_matrices_from_terms(
+    mass, coupling, mass_sym, coupling_sym = spec._compute_matrices_from_terms(  # noqa: SLF001
         new_eqs_t, spec.component_names, parameters=None
     )
     return dataclasses.replace(

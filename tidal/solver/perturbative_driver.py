@@ -18,6 +18,11 @@ for the full architecture. Key guarantees:
   added cost is ~1.5x a single Pass 0 at machine precision.
 """
 
+# ruff: noqa: RUF002, RUF003, ERA001 — Unicode math symbols; shape-annotation comments.
+# ruff: noqa: PLR0913, PLR0917, PLR0914, PLR0912, PLR0915, PLR2004, C901, N806, ANN401
+#   — numerical code inherently requires many arguments, local variables, and uppercase
+#   matrix names (V, K_eff follow standard linear-algebra notation).
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -424,7 +429,7 @@ class PerturbativeSolver:
         """Return True when the spec contains any ``order_in_eps > 0`` terms."""
         return self.full_spec.has_corrections()
 
-    def solve(  # noqa: PLR0913, PLR0914
+    def solve(
         self,
         y0: NDArray[np.float64],
         grid: GridInfo,
@@ -699,7 +704,7 @@ def _pre_demote_info(
     return result
 
 
-def _compute_constraint_source_hat(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _compute_constraint_source_hat(
     *,
     full_spec: EquationSystem,
     eigendata: dict[str, Any],

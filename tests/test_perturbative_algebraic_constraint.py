@@ -237,7 +237,7 @@ class TestPass0SchurRecovery:
             max_violation = max(max_violation, v)
         assert max_violation < 1e-10, (
             f"Inconsistent IC: constraint h = g·phi violated by "
-            f"max |h − g·phi| = {max_violation:.3e}. The driver must "
+            f"max |h - g*phi| = {max_violation:.3e}. The driver must "
             f"either project onto the constraint manifold OR raise "
             f"loudly; silent violation is a bug. See #283."
         )

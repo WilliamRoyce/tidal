@@ -653,11 +653,7 @@ def render_sweep_1d_grouped(  # noqa: PLR0913, PLR0914
     if overlay is not None:
         x_sorted = np.sort(np.unique(x_all[np.isfinite(x_all)]))
         scalar_ns = _build_overlay_scalars(results)
-        try:
-            y_ref = _evaluate_sweep_overlay(overlay, {x_param: x_sorted}, scalar_ns)
-        except ValueError:
-            # Re-raise with context so CLI users get a useful error
-            raise
+        y_ref = _evaluate_sweep_overlay(overlay, {x_param: x_sorted}, scalar_ns)
         ax.plot(
             x_sorted,
             y_ref,

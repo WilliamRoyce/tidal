@@ -46,8 +46,7 @@ class KineticEvalError(ValueError):
 
 
 def evaluate_at_zero(expr: str, zero_names: set[str] | frozenset[str]) -> float | None:
-    """Return the literal value of ``expr`` after substituting every name in
-    ``zero_names`` with ``0.0``.
+    """Return ``expr`` evaluated after substituting every name in ``zero_names`` with ``0.0``.
 
     Thin wrapper over :func:`evaluate_with_substitutions`; kept for its
     existing callers in ``json_loader.base_spec``.
@@ -56,8 +55,7 @@ def evaluate_at_zero(expr: str, zero_names: set[str] | frozenset[str]) -> float 
 
 
 def evaluate_at_one(expr: str, one_names: set[str] | frozenset[str]) -> float | None:
-    """Return the literal value of ``expr`` after substituting every name in
-    ``one_names`` with ``1.0``.
+    """Return ``expr`` evaluated after substituting every name in ``one_names`` with ``1.0``.
 
     See #290: used by :class:`PerturbativeSolver` to extract the
     numeric kinetic coefficient for the augmented constraint recovery.
@@ -72,8 +70,7 @@ def evaluate_at_one(expr: str, one_names: set[str] | frozenset[str]) -> float | 
 def evaluate_with_substitutions(
     expr: str, substitutions: dict[str, float]
 ) -> float | None:
-    """Return the literal value of ``expr`` after replacing each
-    ``name`` → ``substitutions[name]`` in the AST.
+    """Return ``expr`` evaluated after replacing each ``name`` → ``substitutions[name]`` in the AST.
 
     Returns
     -------
@@ -117,17 +114,23 @@ def evaluate_with_substitutions(
 
     try:
         return _eval_node(tree.body, substitutions)
-    except _StillSymbolic:
+    except _StillSymbolicError:
         return None
 
 
-class _StillSymbolic(Exception):
+class _StillSymbolicError(Exception):
     """Signal raised when evaluation encounters a surviving Name."""
 
 
-def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:
-    """Recursively evaluate a safe AST node; raise _StillSymbolic if a
-    Name outside ``substitutions`` is encountered.
+def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:  # noqa: C901
+    """Recursively evaluate a safe AST node.
+
+    Raises
+    ------
+    KineticEvalError
+        If an unsupported AST node kind is encountered.
+    _StillSymbolicError
+        If a Name outside ``substitutions`` is encountered.
     """
     if isinstance(node, ast.Constant):
         if isinstance(node.value, (int, float)):
@@ -141,7 +144,7 @@ def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:
     if isinstance(node, ast.Name):
         if node.id in substitutions:
             return substitutions[node.id]
-        raise _StillSymbolic
+        raise _StillSymbolicError
 
     if isinstance(node, ast.UnaryOp):
         op_fn = _UNARY_OPS.get(type(node.op))
@@ -184,8 +187,7 @@ def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:
 def lhs_collapses_to_zero(
     kinetic_symbolic: str | None, small_parameters: Sequence[str]
 ) -> bool:
-    """Return True iff the LHS kinetic coefficient evaluates to literal 0
-    when every small parameter is set to zero.
+    """Return True iff the LHS kinetic coefficient evaluates to literal 0 when every small parameter is set to zero.
 
     ``None`` kinetic coefficients are implicitly non-perturbative
     (e.g. ``kinetic == 1`` by convention); they never trigger demotion.

@@ -58,7 +58,7 @@ def _parse_float(s: str, default: float = 0.0) -> float:
 
 def stability_filter(
     sweep_dir: Path,
-    paired_dir: Path | None = None,
+    _paired_dir: Path | None = None,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]], dict[str, int]]:
     """Apply stability filter and optionally compute A_dark."""
     results_csv = sweep_dir / "results.csv"
@@ -115,7 +115,7 @@ def main() -> None:
 
     sweep_dir = Path(args.sweep_dir)
     paired_dir = Path(args.paired_dir) if args.paired_dir else None
-    stable, flagged, counts = stability_filter(sweep_dir, paired_dir=paired_dir)
+    stable, flagged, counts = stability_filter(sweep_dir, paired_dir)
 
     print(
         f"Stability filter: {counts['stable']} stable / {counts['total']} total; "

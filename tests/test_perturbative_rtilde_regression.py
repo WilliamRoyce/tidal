@@ -31,6 +31,8 @@ Marked ``@pytest.mark.slow`` because the full-grid simulate takes
 several seconds; not in the default fast lane.
 """
 
+# ruff: noqa: ANN401 — Any used for spec fixture typing.
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -293,7 +295,7 @@ def test_pass1_linear_in_b5_when_excited(rtilde_spec: Any) -> None:
     )
     ratio = scale_b / scale_a
     assert abs(ratio - 2.0) < 0.1, (
-        f"Pass 1 amplitude ratio at 2×b5 / 1×b5 = {ratio:.3f}, "
+        f"Pass 1 amplitude ratio at 2x b5 / 1x b5 = {ratio:.3f}, "
         f"expected 2.0 ± 0.1 for a linear O(ε) correction. "
         f"Indicates non-linear or miscompiled b5 dependence."
     )

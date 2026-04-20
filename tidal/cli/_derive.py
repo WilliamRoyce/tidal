@@ -184,7 +184,7 @@ def _field_expression(
     return f"{prefixed}[{indices}]"
 
 
-def _substitute_field_names(
+def _substitute_field_names(  # noqa: PLR0913
     expression: str,
     fields: list[dict[str, Any]],
     prefix: str,
@@ -1421,7 +1421,7 @@ def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
     return lines
 
 
-def _wls_precompute_cd_component_values(
+def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1616,7 +1616,7 @@ def _wls_precompute_cd_component_values(
             # Rank 3 (torsion): 4^3 = 64 entries, manageable. The supervisor
             # pre-computes rank-3 DDDClockField ComponentValues (line 330).
             # Skip only rank > 3 (4^4 = 256 entries → expensive tidalSplinter).
-            if base_rank > 3:
+            if base_rank > 3:  # noqa: PLR2004
                 lines.extend(
                     [
                         "",
@@ -4566,11 +4566,11 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "  (* Canonicalize with TimeConstrained — always attempt, revert if expansion. *)",
             "  (* The supervisor ALWAYS canonicalizes; old cost-bypass threshold could     *)",
             "  (* skip entirely, leaving consolidatable terms separate.                   *)",
-            "  (* Guard: keep result if term count within 4× of original.  Expansion    *)",
-            "  (* up to 4× is beneficial for parity-odd models where ContractMetric     *)",
+            "  (* Guard: keep result if term count within 4x of original.  Expansion    *)",
+            "  (* up to 4x is beneficial for parity-odd models where ContractMetric     *)",
             "  (* absorbs contortion metric dummies, splitting terms but reducing the    *)",
             "  (* contracted pair count K per term.  More terms with lower K is cheaper  *)",
-            "  (* for TraceBasisDummy: 260 terms×O(4^6) << 72 terms×O(4^14).  #246.    *)",
+            "  (* for TraceBasisDummy: 260 terms*O(4^6) << 72 terms*O(4^14).  #246.    *)",
             "  Module[{nBefore, tCanon, canonResult, nAfter},",
             "    nBefore = If[Head[lagForCanon]===Plus, Length[lagForCanon], 1];",
             "    tCanon = AbsoluteTime[];",
@@ -4691,7 +4691,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "",
             "(* NOTE: L^(2) epsilon evaluation was tested and REJECTED (#246).         *)",
             "(* ToBasis+TraceBasisDummy on 27 epsilon terms in L^(2) produced 93,833   *)",
-            "(* component-form terms (256× expansion per epsilon term), overwhelming   *)",
+            "(* component-form terms (256x expansion per epsilon term), overwhelming   *)",
             "(* the downstream sector splitter.  Epsilon must stay abstract through    *)",
             "(* the Lagrangian decomposition and be evaluated per-component in         *)",
             "(* StaggeredToBasis (Fix A, ComponentDecompose.wl).                       *)",

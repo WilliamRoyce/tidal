@@ -7,6 +7,8 @@ Tests cover:
 4. Cross-validation — modal vs CVODE agreement
 """
 
+# ruff: noqa: RUF002 — math symbols in docstrings.
+
 from __future__ import annotations
 
 import copy
@@ -1214,7 +1216,7 @@ class TestRankDeficientBProjection:
         import scipy.linalg as sla
 
         Vphys = Vt_b[:rank_b].T
-        Vt_b[rank_b:].T
+        _Vnull_b = Vt_b[rank_b:].T
         ev_red, _vr_red = sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys)
         ev_full = np.concatenate([ev_red, np.zeros(null_dim_b, dtype=np.complex128)])
 

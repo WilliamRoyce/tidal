@@ -5,6 +5,8 @@ validity-monitor thresholds, and robustness to baseline (no-correction)
 theories.
 """
 
+# ruff: noqa: RUF002 — math symbols in docstrings; commented stubs.
+
 from __future__ import annotations
 
 import copy
@@ -650,7 +652,7 @@ class TestPerturbativeResultLayoutConsistency:
         expected_width = base_layout.num_slots * grid.num_points
         assert res.total["y"].shape[1] == expected_width, (
             f"State width {res.total['y'].shape[1]} != "
-            f"spec.num_slots × grid.num_points = {expected_width}. "
+            f"spec.num_slots * grid.num_points = {expected_width}. "
             f"See #276."
         )
 

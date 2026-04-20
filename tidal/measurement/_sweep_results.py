@@ -683,7 +683,7 @@ class SweepResults:
             )
             row["P_valid"] = valid
 
-    def add_paired_baseline(  # noqa: C901
+    def add_paired_baseline(  # noqa: C901, PLR0912, PLR0914, PLR0915
         self,
         baseline: SweepResults,
         *,
@@ -739,7 +739,7 @@ class SweepResults:
         # 1D baseline with interpolation: when matching on a single parameter,
         # use np.interp so that LHC/MC samples at arbitrary values can be paired
         # with a 1D baseline curve.  This avoids requiring exact grid matches.
-        use_interp = len(match_params) == 1 and len(base_lookup) >= 2
+        use_interp = len(match_params) == 1 and len(base_lookup) >= 2  # noqa: PLR2004
         if use_interp:
             base_xs = np.array(sorted(k[0] for k in base_lookup))
             base_ys = np.array([base_lookup[x,] for x in base_xs])

@@ -36,7 +36,13 @@ def _load_spec(name: str) -> dict:
 
 
 def _equation_for(spec: dict, field_name: str) -> dict:
-    """Return the equation dict for a given field name."""
+    """Return the equation dict for a given field name.
+
+    Raises
+    ------
+    AssertionError
+        If field_name is not found in spec equations.
+    """
     for eq in spec["equations"]:
         if eq["field"] == field_name:
             return eq
@@ -214,7 +220,7 @@ class TestGertsenshteinProcaRegression:
                 f"{fname} should be dynamical: {eq['lhs']['expression']}"
             )
 
-    def test_photons_have_mA2_mass(self) -> None:
+    def test_photons_have_ma2_mass(self) -> None:
         """Every photon EOM must carry a mA²·identity mass term."""
         spec = _load_spec("gertsenshtein_proca")
         for i in range(4):

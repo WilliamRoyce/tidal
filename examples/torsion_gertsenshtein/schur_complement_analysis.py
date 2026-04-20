@@ -37,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import operator
 
+from tidal.solver import _build_evolution_matrices
 from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.grid import GridInfo
 from tidal.solver.state import StateLayout

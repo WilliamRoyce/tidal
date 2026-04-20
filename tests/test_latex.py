@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -520,7 +521,7 @@ class TestAllExamplesRender:
     # v6 re-derivation migration complete for all three shipped higher-
     # derivative theories (Phase 6B.3/6B.4 of #267).  Kept as an empty
     # class-level set for future migrations.
-    _PENDING_V6_REDERIVATION: set[str] = set()
+    _PENDING_V6_REDERIVATION: ClassVar[set[str]] = set()
 
     @pytest.mark.parametrize(
         "json_file",
