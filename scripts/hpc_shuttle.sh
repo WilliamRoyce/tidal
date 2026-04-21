@@ -104,9 +104,11 @@ cmd_resolve_account() {
   # Extract project names from typical mybalance columns.
   # Heuristic: pick first DiRAC project, else first SL2, else first SL3.
   local dirac sl2 sl3
-  dirac="$(awk '/[Dd]i[Rr][Aa][Cc]/ {print $1; exit}' <<<"$balance")"
-  sl2="$(awk '/SL2-CPU/ {print $1; exit}' <<<"$balance")"
-  sl3="$(awk '/SL3-CPU/ {print $1; exit}' <<<"$balance")"
+  # mybalance columns: user usage | ACCOUNT usage | limit available
+  # The account name is in column 4 (after the first '|' separator).
+  dirac="$(awk '/[Dd]i[Rr][Aa][Cc]/ {print $4; exit}' <<<"$balance")"
+  sl2="$(awk '/SL2-CPU/ {print $4; exit}' <<<"$balance")"
+  sl3="$(awk '/SL3-CPU/ {print $4; exit}' <<<"$balance")"
   local chosen="${dirac:-${sl2:-${sl3:-}}}"
   [[ -n "$chosen" ]] || die "could not parse any project from mybalance — pass --account explicitly"
   note "account resolved: $chosen (DiRAC=${dirac:-none} SL2=${sl2:-none} SL3=${sl3:-none})"
