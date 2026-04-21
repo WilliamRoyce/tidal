@@ -59,13 +59,16 @@ Lagrangian sector and at what parameters?
 - [ ] Analysis: D_KL(params) computed — threshold > 0.05 nats
 - Notes:
 
-### Stage B: Einstein-Cartan null (T2)
+### Stage B: Einstein-Cartan null (T2) — ✅ NULL CONFIRMED
 
 - [x] Stage 0 gate passed for T2
-- [x] HPC null job submitted (job ID: 28134415, standard QOS, queued)
-- [ ] Results pulled
-- [ ] Analysis: D_KL < 0.005 nats (null confirmed) or signal found
-- Notes:
+- [x] HPC null job submitted (job ID: 28134415, standard QOS, COMPLETED in 13s)
+- [x] Results pulled (hpc_results/28134415/)
+- [x] Analysis: **D_KL = 0.0031 ± 0.0020 nats** (all alphas at 0.0032) — below 0.005 threshold
+- **Finding:** Non-propagating torsion (alpha1-3 across their full priors ±2, log_uniform[0.01,4])
+  has ZERO effect on Gertsenshtein conversion. log(Z) = -0.0007 ± 0.0022 (posterior ≈ prior).
+  Completion in 13s reflects PolyChord finding a completely flat likelihood surface — no structure
+  to explore. This is the expected structural null for Einstein-Cartan minimal torsion coupling.
 
 ### Stage C: R²-PGT perturbative b5 (T3)
 
@@ -142,9 +145,9 @@ Lagrangian sector and at what parameters?
 | 28133656 | T1 Dark-Photon-Plasma | amplification | FAILED | 0:00 | sed & expansion bug (fixed) |
 | 28133932 | T1 Dark-Photon-Plasma | suppression | FAILED | 0:00 | sed & expansion bug (fixed) |
 | 28133933 | T2 Einstein-Cartan | null | FAILED | 0:00 | sed & expansion bug (fixed) |
-| 28134330 | T1 Dark-Photon-Plasma | amplification | RUNNING | ≤1h | INTR QOS, icelake cpu-q-580, 16 MPI |
-| 28134387 | T1 Dark-Photon-Plasma | suppression | RUNNING | ≤1h | standard QOS, icelake cpu-q-182, 16 MPI |
-| 28134415 | T2 Einstein-Cartan | null (amplification) | queued | ≤1h | standard QOS, icelake, 16 MPI, --no-clustering |
+| 28134330 | T1 Dark-Photon-Plasma | amplification | RUNNING (52min) | ≤1h | INTR QOS, cpu-q-580, ndead=5760 climbing |
+| 28134387 | T1 Dark-Photon-Plasma | suppression | COMPLETED | 2:43 | D_KL=0.017 (weak), log(Z)=-0.027 |
+| 28134415 | T2 Einstein-Cartan | null (amplification) | COMPLETED | 0:13 | D_KL=0.003 (NULL CONFIRMED), log(Z)=-0.001 |
 
 ---
 
@@ -152,8 +155,10 @@ Lagrangian sector and at what parameters?
 
 *(Filled in as results arrive)*
 
-- Stage A: (pending)
-- Stage B: (pending)
+- Stage A: T1 suppression D_KL=0.017 (weak signal, MAP at alpha3→0 boundary).
+  Amplification run still in progress (28134330, 52min).
+- Stage B: **Einstein-Cartan NULL CONFIRMED** — D_KL=0.003 nats for all alphas,
+  log(Z)≈0. Non-propagating torsion does not affect h↔a conversion. (hpc_results/28134415/)
 - Stage C: R̃² b5 term decouples from TT Gertsenshtein channel. With IC on h_5, all b5 corrections = 0 (torsion source fields zero in Pass 0). P_max identical to GR baseline for all b5. Expected D_KL(b5) ≈ 0.
 - Stage D1: 
 - Stage D2: 
