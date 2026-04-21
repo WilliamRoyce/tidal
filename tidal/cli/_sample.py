@@ -99,7 +99,8 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     baseline_formula: str | None = getattr(args, "baseline_formula", None)
     try:
         likelihood_config = parse_likelihood(
-            likelihood_spec, baseline_formula=baseline_formula,
+            likelihood_spec,
+            baseline_formula=baseline_formula,
         )
     except ValueError as e:
         error_with_hint(str(e), ["Check --likelihood format: METRIC:TYPE[:ARGS]"])
@@ -247,6 +248,18 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             quiet=quiet,
             **ns_kwargs,
         )
+        # Record priors in metadata so post-hoc analysis (e.g. correct
+        # marginal D_KL per parameter, #308) can transform each column
+        # into the space where its prior is uniform.
+        result.metadata["priors"] = [
+            {
+                "name": p.name,
+                "distribution": p.distribution,
+                "low": p.low,
+                "high": p.high,
+            }
+            for p in priors
+        ]
 
     else:
         error_with_hint(

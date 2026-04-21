@@ -167,10 +167,16 @@ Lagrangian sector and at what parameters?
 
 *(Filled in as results arrive)*
 
-- Stage A: **Dark-Photon-Plasma NULL CONFIRMED**. amp D_KL=0.0155 log(Z)=+0.022, supp D_KL=0.0057
-  log(Z)=-0.015. Torsion-CDT trace dark photon does not amplify Gertsenshtein conversion across
-  the 4D prior (mA2∈[0.001,1], δₘ∈[-0.5,0.5], ξ∈[0.05,20], α3∈[0.001,0.5]). Confirms v0.31
-  MC sweep finding. (hpc_results/28145377/, 28145425/)
+- Stage A: **Dark-Photon-Plasma NULL AMPLIFICATION** across the stability-allowed region.
+  Joint D_KL=0.015 (amp), 0.006 (supp); log(Z) ≈ 0 both. Per-parameter marginals (corrected
+  after #308 fix to tidal inference): **ξ=0.20 nats constrained** (stability cutoff at large ξ
+  ≳ 5), other params weak. MAP at (mA2=0.057, δₘ=-0.24, ξ=4.42, α3=0.143) is the centre of
+  the stability ridge, not an amplification peak. Confirms v0.31 MC sweep: P_max = GR baseline
+  everywhere the linearized sim is stable. (hpc_results/28145377/, 28145425/)
+- Stage B: Einstein-Cartan (T2). Joint D_KL=0.003, log(Z)≈0 — but **corrected marginals show
+  structure**: α1=0.11, α2=0.06, α3=0.07 (all informative). Joint ≪ sum because the posterior
+  is broad on a 2D stability ridge in 3D prior. P_max flat on ridge (null amplification) but
+  the ridge itself is smaller than the prior — stability guard excludes unstable α combinations.
 - Stage B: **Einstein-Cartan NULL CONFIRMED** — D_KL=0.003 nats for all alphas,
   log(Z)≈0. Non-propagating torsion does not affect h↔a conversion. (hpc_results/28134415/)
 - Stage C: R̃² b5 term decouples from TT Gertsenshtein channel. With IC on h_5, all b5 corrections = 0 (torsion source fields zero in Pass 0). P_max identical to GR baseline for all b5. Expected D_KL(b5) ≈ 0.
