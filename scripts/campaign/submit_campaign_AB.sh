@@ -12,17 +12,21 @@
 
 set -euo pipefail
 # INTR QOS has MaxSubmitPU=1 — at most 1 INTR job in queue at a time.
-# Use INTR for the first job (amplify, gets immediate scheduling) and
-# standard QOS for all others (they queue together without blocking each other).
+# Heuristic: match QOS to known runtime. Suppression runs typically
+# converge quickly (flat logL, easy for PolyChord), so they're the
+# natural fit for INTR's <1h limit and immediate scheduling.
+# Amplification runs can vary from fast (true null) to hours (strong
+# multi-modal posterior) — safer on standard QOS with longer wall.
 INTR="scripts/hpc_templates/polychord_intr.sbatch"
 STD="scripts/hpc_templates/polychord_standard.sbatch"
 
 echo "=== Stage A: Dark-Photon-Plasma (T1) — paired amplify + suppress ==="
 
-# Stage A amplification: posterior concentrated where P_max is largest
+# Stage A amplification: posterior concentrated where P_max is largest.
+# Uses standard QOS (can run >1h if the posterior is multi-modal).
 bash scripts/hpc_shuttle.sh submit \
-  --template "$INTR" \
-  --nodes 1 --ntasks 16 --time 01:00:00 --name "dp_amplify" \
+  --template "$STD" \
+  --nodes 1 --ntasks 16 --time 03:00:00 --name "dp_amplify" \
   --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/dp_amplify_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/dark_photon_plasma.json \
   --param kappa=1.0 --param B0=0.01 \
@@ -40,9 +44,10 @@ bash scripts/hpc_shuttle.sh submit \
   --output \${OUTPUT_DIR} --analyze && \
 tidal plot \${OUTPUT_DIR} --type corner --output \${OUTPUT_DIR}/corner_amplify.png"
 
-# Stage A suppression: posterior concentrated where P_max is smallest (logL = -P_max)
+# Stage A suppression: posterior concentrated where P_max is smallest (logL = -P_max).
+# Uses INTR QOS (suppression typically converges in minutes — flat logL surface).
 bash scripts/hpc_shuttle.sh submit \
-  --template "$STD" \
+  --template "$INTR" \
   --nodes 1 --ntasks 16 --time 01:00:00 --name "dp_suppress" \
   --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/dp_suppress_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/dark_photon_plasma.json \
