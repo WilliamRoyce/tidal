@@ -19,7 +19,7 @@ echo "=== Stage A: Dark-Photon-Plasma (T1) — paired amplify + suppress ==="
 bash scripts/hpc_shuttle.sh submit \
   --template "$TEMPLATE" \
   --nodes 1 --ntasks 16 --time 01:00:00 --name "dp_amplify" \
-  --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/dp_amplify_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+  --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/dp_amplify_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/dark_photon_plasma.json \
   --param kappa=1.0 --param B0=0.01 \
   --prior 'mA2=log_uniform:0.001:1.0' \
@@ -40,7 +40,7 @@ tidal plot \${OUTPUT_DIR} --type corner --output \${OUTPUT_DIR}/corner_amplify.p
 bash scripts/hpc_shuttle.sh submit \
   --template "$TEMPLATE" \
   --nodes 1 --ntasks 16 --time 01:00:00 --name "dp_suppress" \
-  --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/dp_suppress_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+  --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/dp_suppress_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/dark_photon_plasma.json \
   --param kappa=1.0 --param B0=0.01 \
   --prior 'mA2=log_uniform:0.001:1.0' \
@@ -64,7 +64,7 @@ echo "=== Stage B: Einstein-Cartan null (T2) ==="
 bash scripts/hpc_shuttle.sh submit \
   --template "$TEMPLATE" \
   --nodes 1 --ntasks 16 --time 01:00:00 --name "pgt_null" \
-  --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/pgt_null_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+  --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/pgt_null_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/torsion_gertsenshtein_b5_zero.json \
   --param kappa=1.0 --param B0=0.01 \
   --prior 'alpha1=uniform:-2:2' \

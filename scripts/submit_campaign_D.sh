@@ -18,7 +18,7 @@ submit_d1() {
     bash scripts/hpc_shuttle.sh submit \
       --template "$TEMPLATE" \
       --nodes 1 --ntasks 16 --time 01:00:00 --name "ricciem_${MODE}" \
-      --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/ricciem_${MODE}_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+      --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/ricciem_${MODE}_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/torsion_gertsenshtein_nonminimal.json \
   --param kappa=1.0 --param B0=0.01 \
   --prior 'alpha1=uniform:-2:2' \
@@ -46,7 +46,7 @@ submit_d2() {
     bash scripts/hpc_shuttle.sh submit \
       --template "$TEMPLATE" \
       --nodes 1 --ntasks 16 --time 01:00:00 --name "ympgt_${MODE}" \
-      --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/ympgt_${MODE}_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+      --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/ympgt_${MODE}_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/torsion_gertsenshtein_general_nonminimal.json \
   --param kappa=1.0 --param B0=0.01 \
   --prior 'beta1=uniform:-2:2' \
@@ -73,7 +73,7 @@ tidal plot \${OUTPUT_DIR} --type corner --output \${OUTPUT_DIR}/corner_${MODE}.p
   bash scripts/hpc_shuttle.sh submit \
     --template "$TEMPLATE" \
     --nodes 1 --ntasks 16 --time 01:00:00 --name "barker_amplify" \
-    --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/barker_amplify_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+    --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/barker_amplify_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/torsion_gertsenshtein_general_nonminimal.json \
   --param kappa=1.0 --param B0=0.01 \
   --param delta1=0 --param zeta1=0 --param zeta2=0 --param zeta3=0 \
@@ -96,7 +96,7 @@ tidal plot \${OUTPUT_DIR} --type corner --output \${OUTPUT_DIR}/corner_amplify.p
   bash scripts/hpc_shuttle.sh submit \
     --template "$TEMPLATE" \
     --nodes 1 --ntasks 16 --time 01:00:00 --name "shapiro_amplify" \
-    --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/shapiro_amplify_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+    --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/shapiro_amplify_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/torsion_gertsenshtein_general_nonminimal.json \
   --param kappa=1.0 --param B0=0.01 \
   --param xi=0 --param delta1=0 --param chi=0 \
@@ -125,7 +125,7 @@ submit_d3() {
     bash scripts/hpc_shuttle.sh submit \
       --template "$TEMPLATE" \
       --nodes 1 --ntasks 16 --time 03:00:00 --name "ympgtcp_${MODE}" \
-      --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/ympgtcp_${MODE}_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+      --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/ympgtcp_${MODE}_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/torsion_gertsenshtein_parity_odd.json \
   --param kappa=1.0 --param B0=0.01 \
   --prior 'beta1=uniform:-2:2' \

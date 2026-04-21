@@ -17,7 +17,7 @@ for ORDER in 0 1; do
   bash scripts/hpc_shuttle.sh submit \
     --template "$TEMPLATE" \
     --nodes 1 --ntasks 16 --time 01:00:00 --name "b5_ord${ORDER}" \
-    --cmd "OUTPUT_DIR=\${REMOTE_ROOT}/results/b5_ord${ORDER}_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
+    --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/b5_ord${ORDER}_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/torsion_gertsenshtein.json \
   --param kappa=1.0 --param B0=0.01 \
   --perturbative-order ${ORDER} \
