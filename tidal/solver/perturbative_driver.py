@@ -233,7 +233,8 @@ def _compute_validity(
             for name, slot in layout.velocity_slot_map.items():
                 slot_to_name[slot] = f"v_{name} (velocity slot)"
             dominant_tachyon_field = slot_to_name.get(
-                dominant_tachyon_slot, f"slot {dominant_tachyon_slot}",
+                dominant_tachyon_slot,
+                f"slot {dominant_tachyon_slot}",
             )
 
     return {
@@ -410,16 +411,21 @@ class PerturbativeSolver:
     """
 
     def __init__(self, spec: EquationSystem) -> None:
-        self.full_spec = spec
-        # Use base_spec(...) so LHS kinetic coefficients that vanish at
-        # eps=0 trigger demotion to algebraic constraint (v6 Gap B).
         # Small parameter names come from the metadata.perturbation block
         # emitted by ExportJSON.wl when [perturbation] is configured.
         pert_meta: dict[str, Any] = spec.metadata.get("perturbation", {}) or {}
         small_parameters: list[str] = list(pert_meta.get("small_parameters", []))
         self._small_parameters = small_parameters
-        self.base_spec = spec.base_spec(small_parameters)
-        self._max_order = spec.max_order()
+        # #301 Phase 3 / #303: translate kinetic-sector small-parameter
+        # dependence into equivalent Pass-1 RHS corrections so Pass 0 sees
+        # a truly ε=0 baseline. No-op for specs with no small parameters
+        # or no kinetic_coefficient_symbolic. Must run BEFORE base_spec so
+        # the derived base inherits the clean structure.
+        self.full_spec = spec.canonicalize_kinetic_for_perturbation(small_parameters)
+        # Use base_spec(...) so LHS kinetic coefficients that vanish at
+        # eps=0 trigger demotion to algebraic constraint (v6 Gap B).
+        self.base_spec = self.full_spec.base_spec(small_parameters)
+        self._max_order = self.full_spec.max_order()
 
     @property
     def max_order(self) -> int:
@@ -561,7 +567,9 @@ class PerturbativeSolver:
             # Schur recovery. Depends only on Pass 0 output + spec, so
             # it's shared across all correction orders.
             pre_demote = _pre_demote_info(
-                self.full_spec, self.base_spec, self._small_parameters,
+                self.full_spec,
+                self.base_spec,
+                self._small_parameters,
             )
             constraint_source_hat = _compute_constraint_source_hat(
                 full_spec=self.full_spec,
@@ -619,7 +627,10 @@ class PerturbativeSolver:
         t_end = float(t_span[1] - t_span[0])
         if order >= 1 and self.has_corrections() and "eigendata" in pass0:
             validity = _compute_validity(
-                pass0["eigendata"], small_parameters, parameters, t_end,
+                pass0["eigendata"],
+                small_parameters,
+                parameters,
+                t_end,
             )
         else:
             validity: dict[str, Any] = {
@@ -898,7 +909,10 @@ def _compute_constraint_source_hat(
                 continue
             # Resolve numeric coefficient via modal's existing helper.
             coeff = resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                term,
+                coeff_eval,
+                eq_idx=eq_idx,
+                term_idx=term_idx,
             )
             mult = _spatial_multiplier(term.operator)  # (n_modes,)
             decomp = OPERATOR_DECOMP[term.operator]

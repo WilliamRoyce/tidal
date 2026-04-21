@@ -1209,6 +1209,139 @@ class EquationSystem:
         """
         return any(t.order_in_eps > 0 for eq in self.equations for t in eq.rhs_terms)
 
+    def canonicalize_kinetic_for_perturbation(
+        self,
+        small_parameters: Sequence[str],
+    ) -> EquationSystem:
+        """Translate small-parameter kinetic dependence into order-1 RHS terms.
+
+        Uses the perturbative identity (see #301 Phase 3 / #303)::
+
+            (M₀ + εM₁)⁻¹ (K₀ + εK₁) ≈ M₀⁻¹ K₀ + ε M₀⁻¹ (K₁ − M₁·M₀⁻¹·K₀)
+
+        so the perturbative hierarchy stays clean even when a small parameter
+        ε enters the LHS kinetic coefficient. For each equation whose
+        ``kinetic_coefficient_symbolic`` mentions a small parameter, splits
+        M(ε) into M₀ (parameter-free) and per-parameter corrections c_p·p
+        via :func:`split_small_parameter_kinetic`, stores M₀ as the new
+        kinetic coefficient, and appends synthesized order-1 RHS terms
+        ``-c_p·p·K₀/M₀`` for each base (order-0) RHS term K₀. Pass 0 then
+        sees a truly ε=0 baseline; Pass 1's existing Duhamel kernel
+        integrates both the original K₁ terms and the synthesized
+        corrections identically.
+
+        No-op for equations with:
+
+        * ``kinetic_coefficient_symbolic is None`` (M = 1 implicitly)
+        * No small parameter present in the kinetic
+        * Empty ``small_parameters`` argument
+
+        Parameters
+        ----------
+        small_parameters
+            The names declared in ``[perturbation].small_parameters`` of
+            the TOML.
+
+        Returns
+        -------
+        A new :class:`EquationSystem` with the canonicalised equations. The
+        returned spec is idempotent under this transform; calling it twice
+        produces the same result. ``self`` is unchanged.
+
+        Raises
+        ------
+        tidal.symbolic._kinetic_eval.KineticEvalError
+            If any kinetic coefficient has structure outside the
+            perturbative contract (bilinear in two small parameters,
+            quadratic in one, small-parameter denominator, parenthesised
+            sub-sum). See :func:`split_small_parameter_kinetic`.
+        """
+        from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
+            split_small_parameter_kinetic,
+        )
+
+        if not small_parameters:
+            return self
+        small_params_tuple = tuple(small_parameters)
+
+        new_eqs: list[ComponentEquation] = []
+        for eq in self.equations:
+            kin_sym = eq.kinetic_coefficient_symbolic
+            if kin_sym is None:
+                new_eqs.append(eq)
+                continue
+
+            m0_expr, c_map = split_small_parameter_kinetic(
+                kin_sym,
+                small_params_tuple,
+            )
+            # No small-param dependence in the kinetic → pass through.
+            nontrivial = any(c != "0" for c in c_map.values())
+            if not nontrivial:
+                new_eqs.append(eq)
+                continue
+            # M₀ collapses to zero (kinetic contains ONLY small parameters,
+            # e.g., "b5" with b5 ∈ small_parameters). Such equations are
+            # Gap-B demotion candidates: base_spec will turn them into
+            # algebraic constraints via lhs_collapses_to_zero. Skip
+            # synthesis here — dividing by M₀ = 0 would raise — and pass
+            # the original equation through for base_spec to handle.
+            from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
+                evaluate_at_zero,
+            )
+
+            m0_at_zero = evaluate_at_zero(m0_expr, frozenset())
+            if m0_at_zero is not None and m0_at_zero == 0.0:
+                new_eqs.append(eq)
+                continue
+
+            # Synthesize Pass-1 RHS corrections from M₁·M₀⁻¹·K₀.
+            base_rhs = tuple(t for t in eq.rhs_terms if t.order_in_eps == 0)
+            synthesized: list[OperatorTerm] = []
+            for param_name, c_expr in c_map.items():
+                if c_expr == "0":
+                    continue
+                for base_term in base_rhs:
+                    base_sym = base_term.coefficient_symbolic or str(
+                        base_term.coefficient,
+                    )
+                    # coefficient_symbolic = -(c_p) * p * (a_k) / (M₀)
+                    #   which is the order-1 source -M₁·M₀⁻¹·K₀ after Wolfram
+                    #   sign-preservation conventions. Explicit parentheses
+                    #   preserve operator precedence under evaluate_coefficient.
+                    synth_sym = (
+                        f"-(({c_expr}) * ({param_name}) * ({base_sym})) / ({m0_expr})"
+                    )
+                    # Numeric coefficient: the value of synth_sym with every
+                    # parameter set to 1.0. The solver re-evaluates
+                    # coefficient_symbolic at real parameters; the numeric
+                    # value is a convenience for unit-test assertions and
+                    # validation plots, mirroring the convention in existing
+                    # Wolfram-emitted RHS terms.
+                    synth_coef = _evaluate_synth_coefficient(
+                        synth_sym,
+                        base_term,
+                    )
+                    synthesized.append(
+                        OperatorTerm(
+                            coefficient=synth_coef,
+                            operator=base_term.operator,
+                            field=base_term.field,
+                            coefficient_symbolic=synth_sym,
+                            order_in_eps=1,
+                        ),
+                    )
+
+            new_eqs.append(
+                dataclasses.replace(
+                    eq,
+                    kinetic_coefficient_symbolic=m0_expr,
+                    rhs_terms=(*eq.rhs_terms, *synthesized),
+                ),
+            )
+
+        return dataclasses.replace(self, equations=tuple(new_eqs))
+
     def base_spec(
         self,
         small_parameters: Sequence[str] | None = None,
@@ -1627,6 +1760,42 @@ def load_equation_system(json_path: Path | str) -> EquationSystem:
 
     validate_json_schema(data)
     return EquationSystem.from_dict(data)
+
+
+def _evaluate_synth_coefficient(
+    synth_sym: str,
+    base_term: OperatorTerm,
+) -> float:
+    """Return the numeric coefficient for a synthesized Phase-3 correction term.
+
+    Evaluates ``synth_sym`` with every free name substituted by 1.0, matching
+    the Wolfram-emitter convention that a JSON term's numeric ``coefficient``
+    equals ``evaluate(coefficient_symbolic, params={name: 1.0 for ...})``. The
+    actual runtime value comes from ``CoefficientEvaluator`` using the real
+    parameters; this numeric is a convenience for validation plots and for
+    matching the dataclass contract.
+
+    Falls back to ``-base_term.coefficient`` if evaluation raises — a safe
+    default (the synthesized term is −(...)·base_coef so ``-base_coef`` is
+    the leading-sign approximation when symbolic evaluation hits an
+    unsupported node).
+    """
+    from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+    try:
+        # Collect names by parsing; substitute each to 1.0.
+        import ast  # noqa: PLC0415
+
+        normalized = synth_sym.replace("^", "**")
+        tree = ast.parse(normalized, mode="eval")
+        names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+        params = dict.fromkeys(names, 1.0)
+        value = evaluate_coefficient(synth_sym, params, ())
+        if isinstance(value, float):
+            return value
+        return float(value)
+    except Exception:  # noqa: BLE001
+        return -float(base_term.coefficient)
 
 
 def normalize_kinetic_coefficients(

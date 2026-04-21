@@ -122,7 +122,11 @@ class TestPerturbativeSolverAPI:
         y0 = _make_ic(spec, grid)
         with pytest.raises(ValueError, match="order=2"):
             solver.solve(
-                y0, grid, (0.0, 1.0), order=2, parameters={"m2": 1.0, "eps": 0.05},
+                y0,
+                grid,
+                (0.0, 1.0),
+                order=2,
+                parameters={"m2": 1.0, "eps": 0.05},
             )
 
     def test_gate_order2_raises_not_implemented(self) -> None:
@@ -210,7 +214,8 @@ class TestPerturbativeSolverSolve:
         assert diff > 1e-6
 
     def test_validity_monitor_flags_strong_correction(
-        self, solver_setup: dict[str, Any],
+        self,
+        solver_setup: dict[str, Any],
     ) -> None:
         """Large ε·ω²·t triggers a warn/error band."""
         # ω_max ≈ √(m² + k_max²) ≈ √(1 + 31²) ≈ 31 (Nyquist for N=64, L=2π)
@@ -267,7 +272,9 @@ class TestPerturbativeCLIFlag:
         assert ret == 0
 
     def test_cli_default_when_perturbation_metadata_present(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """With [perturbation] metadata in JSON, default is order=1."""
         from tidal.cli import main
@@ -300,7 +307,9 @@ class TestPerturbativeCLIFlag:
         assert "perturbative modal solver" in combined or "order=1" in combined
 
     def test_cli_order_zero_skips_driver(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--perturbative-order 0 routes through plain solve_modal."""
         from tidal.cli import main
@@ -575,7 +584,9 @@ class TestPassOneConstraintRecovery:
         predicted_hat = np.einsum("mcj,jm->cm", recovery_matrix, y_hat_dyn[ti])[c_idx]
         predicted_phys = np.real(
             np.fft.irfftn(
-                predicted_hat.reshape(rfft_shape), s=grid.shape, axes=[0],
+                predicted_hat.reshape(rfft_shape),
+                s=grid.shape,
+                axes=[0],
             ).ravel(),
         )
         actual_phys = pass1["y"][ti, a0_slot * n_grid : (a0_slot + 1) * n_grid]
@@ -622,7 +633,11 @@ class TestPerturbativeResultLayoutConsistency:
         grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
         y0 = _make_ic(spec, grid)
         res = solver.solve(
-            y0, grid, (0.0, 0.5), order=1, parameters={"m2": 1.0, "eps": 0.05},
+            y0,
+            grid,
+            (0.0, 0.5),
+            order=1,
+            parameters={"m2": 1.0, "eps": 0.05},
         )
         # The result must carry both the base_spec (matches y layout) and
         # the full_spec (for diagnostics).
@@ -645,7 +660,11 @@ class TestPerturbativeResultLayoutConsistency:
         grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
         y0 = _make_ic(spec, grid)
         res = solver.solve(
-            y0, grid, (0.0, 0.5), order=1, parameters={"m2": 1.0, "eps": 0.05},
+            y0,
+            grid,
+            (0.0, 0.5),
+            order=1,
+            parameters={"m2": 1.0, "eps": 0.05},
         )
         assert res.spec is not None
         base_layout = StateLayout.from_spec(res.spec, grid.num_points)
@@ -661,7 +680,8 @@ class TestPerturbativeDefensiveHardening:
     """Defensive diagnostics for unsupported pipeline inputs (#273 resolution)."""
 
     def test_warns_when_spec_has_higher_order_terms_than_requested(
-        self, caplog: pytest.LogCaptureFixture,
+        self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """When a spec carries order_in_eps=2 terms but solve(order=1) is
         requested, the solver must emit a warning listing the dropped terms
@@ -694,7 +714,8 @@ class TestPerturbativeDefensiveHardening:
         y0 = _make_ic(spec, grid)
 
         with caplog.at_level(
-            logging.WARNING, logger="tidal.solver.perturbative_driver",
+            logging.WARNING,
+            logger="tidal.solver.perturbative_driver",
         ):
             solver.solve(
                 y0,
@@ -710,7 +731,8 @@ class TestPerturbativeDefensiveHardening:
         )
 
     def test_validity_warns_when_small_parameter_missing_from_params(
-        self, caplog: pytest.LogCaptureFixture,
+        self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """If a small parameter declared in [perturbation] is absent from the
         runtime parameters dict, the validity monitor must emit a warning
@@ -779,7 +801,8 @@ class TestPerturbativeDefensiveHardening:
         y0 = _make_ic(spec, grid)
 
         with caplog.at_level(
-            logging.WARNING, logger="tidal.solver.perturbative_driver",
+            logging.WARNING,
+            logger="tidal.solver.perturbative_driver",
         ):
             solver.solve(
                 y0,
@@ -794,3 +817,186 @@ class TestPerturbativeDefensiveHardening:
             "small parameter" in record.message and "eps" in record.message
             for record in caplog.records
         ), "Expected a warning about missing small parameter 'eps'"
+
+
+# ---------------------------------------------------------------------------
+# #301 Phase 3 / #303: Pass 0/Pass 1 hierarchy preservation when a small
+# parameter enters kinetic_coefficient_symbolic.
+# ---------------------------------------------------------------------------
+
+
+_KG_WITH_KINETIC_EPS: dict[str, object] = {
+    "metadata": {
+        "source": "inline-test",
+        "parameters": {"m2": 1.0, "alpha": 0.05},
+        "perturbation": {"small_parameters": ["alpha"], "order": 1},
+    },
+    "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+    "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+    "equations": [
+        {
+            "field": "phi_0",
+            "lhs": {
+                "expression": "d2_t(phi_0)",
+                "order": {"time": 2, "space": 0},
+                "kinetic_coefficient_symbolic": "1 + alpha",
+            },
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                ],
+            },
+        },
+    ],
+    "coupling": {},
+}
+
+
+class TestPhase3HierarchyPreservation:
+    """Canonicalizing a spec with a small parameter in the kinetic must leave
+    Pass 0 independent of that parameter and let Pass 1 recover the exact
+    dispersion. Litmus test for #303.
+    """
+
+    def _make_spec(self) -> EquationSystem:
+        return _make_spec(_KG_WITH_KINETIC_EPS)
+
+    def _make_ic_wave(self, grid: GridInfo) -> np.ndarray:
+        from tidal.solver.state import StateLayout
+
+        spec = self._make_spec()
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x = np.linspace(0.0, 2 * np.pi, n, endpoint=False)
+        y0 = np.zeros(layout.num_slots * n)
+        y0[:n] = np.cos(x)
+        return y0
+
+    def test_canonicalization_strips_small_params(self) -> None:
+        """After canonicalize_kinetic_for_perturbation, the kinetic must no
+        longer reference any small parameter.
+        """
+        spec = self._make_spec()
+        canon = spec.canonicalize_kinetic_for_perturbation(["alpha"])
+        kin = canon.equations[0].kinetic_coefficient_symbolic
+        assert kin is not None
+        assert "alpha" not in kin
+        assert kin.strip() in {"1", "1.0"}
+
+    def test_canonicalization_synthesizes_order1_correction(self) -> None:
+        """A synthesized order-1 RHS term must appear covering the
+        M₁·M₀⁻¹·K₀ contribution (here: ``-alpha·laplacian_x``).
+        """
+        spec = self._make_spec()
+        canon = spec.canonicalize_kinetic_for_perturbation(["alpha"])
+        order1_terms = [t for t in canon.equations[0].rhs_terms if t.order_in_eps == 1]
+        assert order1_terms, "expected at least one order-1 synthesized term"
+        # Synthesized term has coefficient -1 at unit params (−alpha·1·1/1)
+        assert any(
+            t.operator == "laplacian_x"
+            and t.field == "phi_0"
+            and abs(t.coefficient + 1.0) < 1e-12
+            for t in order1_terms
+        ), f"expected -1·laplacian_x(phi_0) synthesis; got {order1_terms!r}"
+
+    def test_canonicalization_is_idempotent(self) -> None:
+        """Running the transform twice must produce the same result — after
+        the first pass, the kinetic has no small-parameter dependence left,
+        so the second pass is a no-op.
+        """
+        spec = self._make_spec()
+        once = spec.canonicalize_kinetic_for_perturbation(["alpha"])
+        twice = once.canonicalize_kinetic_for_perturbation(["alpha"])
+        assert once.equations[0].kinetic_coefficient_symbolic == (
+            twice.equations[0].kinetic_coefficient_symbolic
+        )
+        assert len(once.equations[0].rhs_terms) == len(twice.equations[0].rhs_terms)
+
+    def test_pass0_independent_of_small_parameter(self) -> None:
+        """The heart of #303: ``solve(order=0, α=anything)`` must be identical
+        to ``solve(order=0, α=0)``. If α leaks into Pass 0 the two differ.
+        """
+        spec = self._make_spec()
+        solver = PerturbativeSolver(spec)
+        grid = GridInfo(
+            shape=(64,),
+            bounds=((0.0, 2 * np.pi),),
+            periodic=(True,),
+        )
+        y0 = self._make_ic_wave(grid)
+
+        r_alpha = solver.solve(
+            y0,
+            grid,
+            (0.0, 0.3),
+            order=0,
+            parameters={"m2": 1.0, "alpha": 0.05},
+            num_snapshots=4,
+        )
+        r_zero = solver.solve(
+            y0,
+            grid,
+            (0.0, 0.3),
+            order=0,
+            parameters={"m2": 1.0, "alpha": 0.0},
+            num_snapshots=4,
+        )
+        np.testing.assert_allclose(
+            r_alpha.orders[0]["y"],
+            r_zero.orders[0]["y"],
+            rtol=1e-10,
+            atol=1e-12,
+            err_msg=(
+                "Pass 0 differs at α=0.05 vs α=0 — the small parameter "
+                "has leaked into the baseline eigendecomposition (#303)."
+            ),
+        )
+
+    def test_pass1_recovers_exact_modal_dispersion(self) -> None:
+        """Pass 0 + Pass 1 at finite α should reproduce the exact dispersion
+        given by a direct modal solve on the un-canonicalized spec. Error
+        bound is O(α²): the Pass-1 expansion drops terms ≳ α²·(base scale).
+        """
+        from tidal.solver.modal import solve_modal
+
+        spec = self._make_spec()
+        solver = PerturbativeSolver(spec)
+        grid = GridInfo(
+            shape=(64,),
+            bounds=((0.0, 2 * np.pi),),
+            periodic=(True,),
+        )
+        y0 = self._make_ic_wave(grid)
+        t_span = (0.0, 0.3)
+        alpha = 0.05
+        params = {"m2": 1.0, "alpha": alpha}
+
+        r_pert = solver.solve(
+            y0,
+            grid,
+            t_span,
+            order=1,
+            parameters=params,
+            num_snapshots=4,
+        )
+        r_exact = solve_modal(
+            spec,
+            grid,
+            y0,
+            t_span,
+            parameters=params,
+            num_snapshots=4,
+        )
+
+        # Expected accuracy: leading omitted term is O(α²·k²·t_end²) per mode
+        # amplitude. Roughly: (0.05)² ≈ 2.5e-3. Use 3% to be safe.
+        final_pert = r_pert.total["y"][-1][: grid.num_points]
+        final_exact = r_exact["y"][-1][: grid.num_points]
+        norm = float(np.linalg.norm(final_exact))
+        assert norm > 1e-6
+        rel_err = float(np.linalg.norm(final_pert - final_exact) / norm)
+        assert rel_err < 3e-2, (
+            f"Pass-1 recovery error {rel_err:.2e} exceeds α² bound; "
+            "check synthesis formula or canonicalization sign convention."
+        )

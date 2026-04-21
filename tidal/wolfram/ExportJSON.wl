@@ -497,7 +497,12 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     lhsCoeff = If[Length[timeDerivTerm] > 0,
       Module[{rawSum},
         rawSum = Total[ExtractLHSCoefficient /@ timeDerivTerm];
-        If[LeafCount[rawSum] < 500, Simplify[rawSum], rawSum]
+        (* Expand rather than Simplify so the emitted string is a sum of
+           monomials (no parenthesised sub-sums). The Python-side
+           split_small_parameter_kinetic helper (#301 Phase 3) walks the
+           AST term-by-term and cannot handle (a + b)*c forms — Expand
+           distributes such structures up front. *)
+        If[LeafCount[rawSum] < 500, Expand[rawSum], rawSum]
       ],
       -1
     ];

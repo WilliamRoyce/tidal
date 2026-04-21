@@ -96,7 +96,7 @@
 					"time": 2,
 					"space": 0
 				},
-				"kinetic_coefficient_symbolic": "-1 + 2*B0^2*(rho - 8*sigma)"
+				"kinetic_coefficient_symbolic": "-1 + 2*B0^2*rho - 16*B0^2*sigma"
 			},
 			"rhs": {
 				"type": "linear_combination",
