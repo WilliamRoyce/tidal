@@ -486,9 +486,19 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   (*   so Python can handle the xi=0 degenerate case (field becomes constraint).    *)
   (*   Discrimination: FreeQ[lhsCoeff, _[]] is True for pure parameters,           *)
   (*   False for metric/coordinate-dependent expressions like Omega[r[]].           *)
+  (*                                                                                *)
+  (* #301 fix: lhsCoeff is the SUM of coefficients across every own-d²_t term, not  *)
+  (* just the first. Without this, asymmetric kinetic corrections (e.g.             *)
+  (* Euler-Heisenberg `(F·F̃)²` on a pure magnetic background) are silently dropped  *)
+  (* — ρ happens to survive because `(F·F)²` is Lorentz-covariant around B̄ and the  *)
+  (* correction rides on the spatial side too, but σ has no spatial partner. See    *)
+  (* GitHub issue #301 and docs/tex/perturbative_reduction.tex §Validation.         *)
   Module[{lhsCoeff},
     lhsCoeff = If[Length[timeDerivTerm] > 0,
-      ExtractLHSCoefficient[timeDerivTerm[[1]]],
+      Module[{rawSum},
+        rawSum = Total[ExtractLHSCoefficient /@ timeDerivTerm];
+        If[LeafCount[rawSum] < 500, Simplify[rawSum], rawSum]
+      ],
       -1
     ];
     If[Abs[lhsCoeff] =!= 1,

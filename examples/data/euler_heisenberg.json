@@ -1,13 +1,14 @@
 {
 	"metadata": {
 		"source": "xAct",
-		"lagrangian_expr": "(-1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + rho/8 (F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])^2)",
+		"lagrangian_expr": "(-1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + rho/8 (F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])^2 + sigma/8 (epsiloneta[a,b,c,d] F[-a,-b] F[-c,-d])^2)",
 		"derived_from": "Euler-Lagrange",
 		"gauge": "lorenz(a)",
 		"linearized": true,
 		"perturbation": {
 			"small_parameters": [
-				"rho"
+				"rho",
+				"sigma"
 			],
 			"order": 1
 		},
@@ -17,7 +18,7 @@
 			"propagation_axis": "z",
 			"eliminated_fields": []
 		},
-		"derivation_hash": "0cb09b6cb41f4dc0bc8ee044e8176b2785a3ddddea6a06058314a366e6156a81"
+		"derivation_hash": "223c7a4e736d577dc4a611c7c464fe733a34aa5deeee7910bf2c510f00aef1df"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -94,21 +95,22 @@
 				"order": {
 					"time": 2,
 					"space": 0
-				}
+				},
+				"kinetic_coefficient_symbolic": "-1 + 2*B0^2*(rho - 8*sigma)"
 			},
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 1.0,
+						"coefficient": -1.0,
 						"operator": "laplacian_x",
 						"field": "a_1"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "laplacian_x",
 						"field": "a_1",
-						"coefficient_symbolic": "-2*B0^2*rho",
+						"coefficient_symbolic": "2*B0^2*rho",
 						"order_in_eps": 1
 					}
 				]
@@ -121,21 +123,22 @@
 				"order": {
 					"time": 2,
 					"space": 0
-				}
+				},
+				"kinetic_coefficient_symbolic": "-1 + 2*B0^2*rho"
 			},
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 1.0,
+						"coefficient": -1.0,
 						"operator": "laplacian_x",
 						"field": "a_2"
 					},
 					{
-						"coefficient": -6.0,
+						"coefficient": 6.0,
 						"operator": "laplacian_x",
 						"field": "a_2",
-						"coefficient_symbolic": "-6*B0^2*rho",
+						"coefficient_symbolic": "6*B0^2*rho",
 						"order_in_eps": 1
 					}
 				]
@@ -148,21 +151,22 @@
 				"order": {
 					"time": 2,
 					"space": 0
-				}
+				},
+				"kinetic_coefficient_symbolic": "-1 + 2*B0^2*rho"
 			},
 			"rhs": {
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 1.0,
+						"coefficient": -1.0,
 						"operator": "laplacian_x",
 						"field": "a_3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "gradient_x",
 						"field": "v_a_0",
-						"coefficient_symbolic": "-2*B0^2*rho",
+						"coefficient_symbolic": "2*B0^2*rho",
 						"order_in_eps": 1
 					}
 				]
@@ -295,6 +299,19 @@
 				},
 				"term_class": "self",
 				"coefficient_symbolic": "-(B0^2*rho)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "a_1",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "a_1",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "8*B0^2*sigma"
 			},
 			{
 				"coefficient": 0.5,
