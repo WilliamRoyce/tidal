@@ -50,14 +50,22 @@ Lagrangian sector and at what parameters?
 
 **Note:** Conservation checks not valid for these theories (Dirac-Bergmann Hamiltonian issues, documented separately).
 
-### Stage A: Dark-Photon-Plasma 4D nested sampling
+### Stage A: Dark-Photon-Plasma 4D nested sampling — ✅ NULL CONFIRMED
 
 - [x] Stage 0 gate passed for T1
-- [x] HPC amplification job submitted (job ID: 28134330, INTR, RUNNING cpu-q-580)
-- [x] HPC suppression job submitted (job ID: 28134387, standard QOS, RUNNING cpu-q-182)
-- [ ] Results pulled
-- [ ] Analysis: D_KL(params) computed — threshold > 0.05 nats
-- Notes:
+- [x] HPC amplification job submitted (final: 28145377, INTR QOS, 28:16)
+- [x] HPC suppression job submitted (final: 28145425, std QOS, 3:52)
+- [x] Results pulled (hpc_results/28145377/, hpc_results/28145425/)
+- [x] Analysis: **Amplification D_KL=0.0155, Suppression D_KL=0.0057** — both below 0.05 threshold
+- **Finding (2026-04-21):** Dark photon plasma (mA2, deltam, xi, alpha3) shows NULL amplification
+  across the explored 4D prior space. log(Z)=+0.022 for amplify, -0.015 for suppress — both
+  essentially zero. MAP at (mA2=0.057, deltam=-0.24, xi=4.42, alpha3=0.143) is far from the
+  old tachyonic peak (xi=0.52, which the v0.31 pre-guard run falsely concentrated on). 95% CI
+  spans most of the prior for every parameter → posterior ≈ prior.
+- Consistent with v0.31 MC sweep (276 runs, P_max matched sin²(κB₀t/2) to 6.7e-6 precision).
+- **Lesson:** HPC pip metadata must match local source. Invalid pre-fix runs (28133218/516/517,
+  28134330) traced to v0.31.5 install predating the stability guard; fixed in this session by
+  `pip install -e .` reinstall + tarball refresh + version sync check in hpc_shuttle push.
 
 ### Stage B: Einstein-Cartan null (T2) — ✅ NULL CONFIRMED
 
@@ -150,8 +158,8 @@ Lagrangian sector and at what parameters?
 | 28134415 | T2 Einstein-Cartan | null (amplification) | COMPLETED | 0:13 | D_KL=0.003 (NULL CONFIRMED); valid — torsion decouples, no tachyonic region |
 | 28141098 | T1 Dark-Photon-Plasma | amplification (re) | CANCELLED | 3:20 | cancelled to reinstall HPC tidal properly |
 | 28145274 | (guard test) | verification | COMPLETED | 0:05 | v0.33.13 confirmed; stability guard fires on cpu-q-19 with ratio 1.26e+05 |
-| 28145377 | T1 Dark-Photon-Plasma | amplification (re²) | RUNNING (21:30) | ≤1h | INTR, v0.33.13; guard active, ndead=2041 |
-| 28145425 | T1 Dark-Photon-Plasma | suppression (re) | COMPLETED | 3:52 | D_KL=0.0057, log(Z)=-0.015 (cleaner null than pre-fix v0.31.5 run) |
+| 28145377 | T1 Dark-Photon-Plasma | amplification (re²) | COMPLETED | 28:16 | D_KL=0.0155, log(Z)=+0.022 (NULL) |
+| 28145425 | T1 Dark-Photon-Plasma | suppression (re) | COMPLETED | 3:52 | D_KL=0.0057, log(Z)=-0.015 (NULL) |
 
 ---
 
@@ -159,8 +167,10 @@ Lagrangian sector and at what parameters?
 
 *(Filled in as results arrive)*
 
-- Stage A: T1 suppression D_KL=0.017 (weak signal, MAP at alpha3→0 boundary).
-  Amplification run still in progress (28134330, 52min).
+- Stage A: **Dark-Photon-Plasma NULL CONFIRMED**. amp D_KL=0.0155 log(Z)=+0.022, supp D_KL=0.0057
+  log(Z)=-0.015. Torsion-CDT trace dark photon does not amplify Gertsenshtein conversion across
+  the 4D prior (mA2∈[0.001,1], δₘ∈[-0.5,0.5], ξ∈[0.05,20], α3∈[0.001,0.5]). Confirms v0.31
+  MC sweep finding. (hpc_results/28145377/, 28145425/)
 - Stage B: **Einstein-Cartan NULL CONFIRMED** — D_KL=0.003 nats for all alphas,
   log(Z)≈0. Non-propagating torsion does not affect h↔a conversion. (hpc_results/28134415/)
 - Stage C: R̃² b5 term decouples from TT Gertsenshtein channel. With IC on h_5, all b5 corrections = 0 (torsion source fields zero in Pass 0). P_max identical to GR baseline for all b5. Expected D_KL(b5) ≈ 0.
