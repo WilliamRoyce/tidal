@@ -170,14 +170,17 @@ cmd_submit() {
   if [[ -z "$ntasks" ]]; then
     ntasks=$(( nodes * 112 ))
   fi
-  # In sed replacement strings, '&' expands to the matched text.
-  # Escape it in user-supplied values to prevent e.g. '&&' in --cmd
-  # from becoming '{{COMMAND}}{{COMMAND}}' after substitution.
+  # In sed replacement strings, '&' expands to the matched text and
+  # the delimiter (here '|') terminates the replacement. Escape both
+  # in user-supplied values so '&&', 'tail|less', etc. in --cmd survive.
   local safe_cmd safe_root safe_account
-  safe_cmd="${cmd//\\/\\\\}"     # escape backslashes first
-  safe_cmd="${safe_cmd//&/\\&}"  # then escape ampersands
+  safe_cmd="${cmd//\\/\\\\}"      # escape backslashes first
+  safe_cmd="${safe_cmd//&/\\&}"   # then escape ampersands
+  safe_cmd="${safe_cmd//|/\\|}"   # then escape the sed delimiter
   safe_root="${REMOTE_ROOT//&/\\&}"
+  safe_root="${safe_root//|/\\|}"
   safe_account="${account//&/\\&}"
+  safe_account="${safe_account//|/\\|}"
 
   local rendered
   rendered="$(sed \
