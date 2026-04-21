@@ -35,7 +35,7 @@ def _make_spec(
                 "field": field_name,
                 "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
                 "rhs": {"type": "linear_combination", "terms": terms},
-            }
+            },
         ],
     }
     return EquationSystem.from_dict(data)
@@ -68,7 +68,7 @@ class TestRHSBasic:
         spec = _make_spec(
             [
                 {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-            ]
+            ],
         )
         n = 64
         grid = _make_grid(n)
@@ -89,7 +89,7 @@ class TestRHSBasic:
             [
                 {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
                 {"coefficient": -2.0, "operator": "identity", "field": "phi_0"},
-            ]
+            ],
         )
         n = 64
         grid = _make_grid(n)
@@ -172,7 +172,7 @@ class TestRHSBasic:
         spec = _make_spec(
             [
                 {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-            ]
+            ],
         )
         n = 16
         grid = _make_grid(n)
@@ -201,7 +201,7 @@ class TestRHSCoefficients:
                     "field": "phi_0",
                     "coefficient_symbolic": "-m2",
                 },
-            ]
+            ],
         )
         n = 16
         grid = _make_grid(n)
@@ -225,7 +225,7 @@ class TestRHSCoefficients:
                     "coefficient_symbolic": "Cos[x[]]",
                     "coordinate_dependent": ["x"],
                 },
-            ]
+            ],
         )
         n = 32
         grid = _make_grid(n)
@@ -251,7 +251,7 @@ class TestEvaluateByField:
         spec = _make_spec(
             [
                 {"coefficient": 2.0, "operator": "identity", "field": "phi_0"},
-            ]
+            ],
         )
         n = 8
         grid = _make_grid(n)
@@ -269,7 +269,7 @@ class TestEvaluateByField:
         spec = _make_spec(
             [
                 {"coefficient": 1.0, "operator": "identity", "field": "phi_0"},
-            ]
+            ],
         )
         grid = _make_grid(8)
         rhs_eval, _ = _make_evaluator(spec, grid)

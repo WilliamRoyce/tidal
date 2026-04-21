@@ -1,0 +1,140 @@
+# General Nonminimal PGT + Propagating Torsion + All Safe Torsion-EM Couplings
+#
+# Lagrangian:
+#   L = L_grav + L_coupling + L_EM
+#
+# L_grav = (1/κ²)R̃ + β₁I₁ + β₂I₂ + β₃I₃ − (ξ/4)Ftorsion²
+# L_coupling = δ₁R̃_{[μν]}F^{μν}
+#            + χ R̃_{[μν]}Ftorsion^{μν}    (Barker's kinetic mixing)
+#            + ζ₁(∇_a T^b_{bc})F^{ac}
+#            + ζ₂(∇^a T_{a}^{bc})F_{bc}
+#            + ζ₃(∇^a T_{a}^{b}_{c})F_{bc}
+# L_EM = − ¼F²
+#
+# 13 parameters: κ, B₀, β₁, β₂, β₃, ξ, δ₁, χ, ζ₁, ζ₂, ζ₃
+#
+# This is the most general parity-even, ghost-free (Yang-Mills type) quadratic
+# PGT Lagrangian with torsion-EM coupling and propagating vector torsion.
+# No curvature-squared R̃² terms (avoids Ostrogradsky ghosts).
+# No parity-odd terms (no CP violation).
+# No cubic terms (deferred).
+#
+# Setting all coupling params to zero (δ₁=ζ₁=ζ₂=ζ₃=0) recovers the
+# minimal model (null result, proven in v0.25.26).
+# Setting ξ=0 makes torsion non-propagating (algebraic constraints).
+#
+# Ghost safety: ALL terms are Yang-Mills type (≤ 2nd order in time).
+# The Ftorsion² kinetic term and the ζ derivative couplings are built
+# from {R̃, T, F, ∇T} which are all O(∂¹Γ) in the first-order formalism.
+#
+# Refs:
+#   Shapiro (2002), hep-th/0103093 — ζ maps to his θ₂,θ₅,θ₆
+#   Barker (2024), arXiv:2406.12826 — ξ (Maxwell torsion), χ (kinetic mixing)
+#   Bahamonde (2025), arXiv:2507.02362 — δ₁ R̃_{[μν]}F coupling
+#   research/general_quadratic_lagrangian.tex — complete enumeration
+
+[theory]
+name = "General Nonminimal PGT (all safe torsion-EM couplings)"
+description = "Propagating torsion + δ₁R̃F + ζ∇T·F derivative couplings"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+# Metric perturbation h_{ab} (graviton, rank-2 symmetric)
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+# Full EM 4-potential (fundamental field for perturbation)
+[[fields]]
+name = "A"
+type = "vector"
+
+# EM perturbation (photon)
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Torsion trace field strength: Ftorsion_{ab} = ∂_a T_b - ∂_b T_a
+[[derived_fields]]
+name = "Ftorsion"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][TorsionCDT[c,-c,-b]] - CD[-b][TorsionCDT[c,-c,-a]]"
+
+# Background EM 4-potential: Abar_y = -B0*z → B_x = B0
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3"]
+
+# Lagrangian expression (xAct notation):
+#
+# Term 1: (1/κ²)R̃ — Einstein-Cartan gravity
+# Term 2: β₁I₁ — tensor torsion mass (T_{λμν}T^{λμν})
+# Term 3: β₂I₂ — index-permuted torsion mass (T_{λμν}T^{μλν})
+# Term 4: β₃I₃ — trace torsion mass (T_μ T^μ)
+# Term 5: -(ξ/4)Ftorsion² — torsion trace kinetics (Barker's Maxwell term)
+# Term 6: δ₁R̃_{[μν]}F^{μν} — curvature-EM coupling (Bahamonde)
+# Term 7: ζ₁(∇_a T^b_{bc})F^{ac} — derivative torsion-EM coupling 1
+# Term 8: ζ₂(∇^a T_a^{bc})F_{bc} — derivative torsion-EM coupling 2
+# Term 9: ζ₃(∇_a T^{ab}_{c})F_b^c — derivative torsion-EM coupling 3
+# Term 10: -¼F² — standard Maxwell
+#
+# ζ₁ term: (∇T)^{ab}_{b}^{c} F_{ac} = ∇_a T^b_{bc} * F^{ac}
+#   xAct: CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e]
+#   = CD[-a][TorsionCDT[b,-b,-c]] * eta[a,d] * eta[c,e] * F[-d,-e]
+#   Trace over 2nd torsion index (b up, -b down), then contract with F
+#
+# ζ₂ term: (∇T)^{a}_{a}^{bc} F_{bc} = ∇_a T^a^{bc} * F_{bc}
+#   xAct: CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e]
+#   Trace over derivative and 1st torsion index (a), then contract with F
+#
+# ζ₃ term: (∇T)^{ab}_{a}^{c} F_{bc} = ∇_a T^{ab}_{c} * F_b^c
+#   xAct: CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e]
+#   Wait — this has the same contraction as ζ₂! Let me re-read...
+#   ζ₃: (∇T)^{ab}_{a}^{c} = ∇^a T^b_{ac} (trace on derivative-a and 2nd-a)
+#   = CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e]
+#   Actually: ∇^a T^b_{ac} * F_{bc} with 'a' contracted between ∇ and 2nd T index
+
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + chi RicciCDT[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + zeta1 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e] + zeta2 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e] + zeta3 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# Lorenz gauge on photon a only
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: propagation along z-axis
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_general_nonminimal.json"

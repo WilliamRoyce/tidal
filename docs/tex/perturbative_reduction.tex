@@ -1,0 +1,196 @@
+% Perturbative Reduction of Higher-Derivative Equations — v6 iterative
+% architecture (supersedes v5 JLM and mechanical Ostrogradsky paths).
+% Uses macros from preamble.tex
+
+\section{Perturbative Reduction of Higher-Derivative Equations}
+\label{sec:perturbative-reduction}
+
+\subsection{The Higher-Derivative Problem in Effective Field Theory}
+\label{sec:pr-problem}
+
+Lagrangians containing curvature-squared terms ($R^2$, $\tilde{R}^2$, $R_{\mu\nu}R^{\mu\nu}$), quartic field strengths (Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^2$ corrections to QED), or non-minimal couplings of the form $F^2 T^2$ produce Euler--Lagrange equations of motion with more than two time derivatives. An $R^2$ term yields contributions $\propto \partial_t^4 h_{ij}$; the one-loop QED correction to Maxwell's equations contains $\partial_t^2 F_{\mu\nu}$ terms multiplied by $F^2$.
+
+\paragraph{Physical regime.} Throughout this work we operate in the perturbative regime: the higher-derivative terms are always small corrections to a lower-order (second-order) base theory. The EFT expansion parameter~$\varepsilon$ is bounded above by observation:
+\begin{itemize}
+  \item $R^2$ gravity: $\varepsilon \sim (\ell_{\mathrm{Planck}}/L)^2 \lesssim 10^{-66}$ at laboratory scales
+  \item Euler--Heisenberg: $\varepsilon \sim \alpha (B/B_c)^2 \lesssim 10^{-20}$ at laboratory fields ($B \sim 10$\,T, $B_c \sim 4.4 \times 10^9$\,T)
+  \item PGT $b_5 \tilde{R}^2$: always small relative to $1/\kappa^2$ in the regimes we study
+\end{itemize}
+
+\paragraph{Ostrogradsky's theorem.} Non-degenerate Lagrangians containing time derivatives of order $\geq 2$ generically admit a Hamiltonian unbounded below~\cite{Ostrogradsky1850,Woodard2015}. The extra degrees of freedom carry opposite-sign kinetic energy and constitute \emph{ghosts}. In an EFT these ghosts are artefacts of treating the truncated effective Lagrangian as exact: their characteristic scale is set by the EFT cutoff~$M$, exactly where the truncation breaks down. A correct numerical pipeline must therefore evolve only the physical, low-energy solution branch while discarding the ghost branch.
+
+\subsection{v6 Iterative Approach}
+\label{sec:pr-v6}
+
+The v6 architecture adopts the iterative order-reduction method of Parker \& Simon~\cite{ParkerSimon1993}, generalised to the linearised-PDE regime where TIDAL operates. Given a Lagrangian
+\begin{equation}
+  \mathcal{L} = \mathcal{L}_0 + \varepsilon\, \mathcal{L}_1 + \varepsilon^2\, \mathcal{L}_2 + \ldots
+\end{equation}
+with a small parameter~$\varepsilon$ (symbolic; typically $b_5$, $\rho$, $\alpha^2/m_e^4$, etc.), we expand the solution
+\begin{equation}
+  q(t, x) = q^{(0)}(t, x) + \varepsilon\, q^{(1)}(t, x) + \varepsilon^2\, q^{(2)}(t, x) + \ldots
+\end{equation}
+Substituting into the full equation of motion $E[q; \varepsilon] = 0$ and collecting by power of $\varepsilon$:
+\begin{align}
+  O(\varepsilon^0) &: \quad E_{\mathrm{base}}\bigl[q^{(0)}\bigr] = 0, \\
+  O(\varepsilon^1) &: \quad E_{\mathrm{base}}\bigl[q^{(1)}\bigr] = -E_{\mathrm{corr}}\bigl[q^{(0)}\bigr], \\
+  O(\varepsilon^n) &: \quad E_{\mathrm{base}}\bigl[q^{(n)}\bigr] = -E_{\mathrm{corr}}\bigl[q^{(n-1)}\bigr].
+\end{align}
+The crucial property is that the LHS operator at every order is always the \emph{base} second-order operator~$E_{\mathrm{base}}$; higher-derivative terms from~$\mathcal{L}_1$ appear only as \emph{sources} evaluated on the previous-order solution. Ghost modes never arise because the evolution operator is always the ghost-free second-order base.
+
+\paragraph{Validity conditions.} Two complementary criteria, derived from the Parker--Simon analysis and the Figueras--Kovacs--Yao (2025)~\cite{FKY2025} rigorous error bound:
+\begin{enumerate}
+  \item \textbf{Instantaneous}: $\omega \ll m_{\mathrm{scalaron}} \sim 1/\sqrt{\varepsilon}$. The heavy mode associated with the higher-derivative correction is not excited at simulation frequencies.
+  \item \textbf{Cumulative (secular growth)}: $\varepsilon \cdot \omega \cdot t_{\mathrm{end}} \ll 1$. The fractional frequency shift from a mass-shift correction $-\varepsilon \phi$ is $\delta\omega/\omega \approx \varepsilon/(2\omega^2)$; integrating over the run gives an accumulated phase error $\Delta\phi \approx \varepsilon \cdot t_{\mathrm{end}}/(2\omega)$, which becomes $\varepsilon \cdot \omega \cdot t_{\mathrm{end}}$ when scaled to a dimensionless fraction-of-period for threshold comparison. (Issue \#284 corrected the implementation from an earlier $\varepsilon \cdot \omega^2 \cdot t_{\mathrm{end}}$ over-counting that was safe at $\omega > 1$ but dangerously permissive at $\omega < 1$.)
+  \item \textbf{Base-theory stability}: $\max \operatorname{Re}(\lambda) \cdot t_{\mathrm{end}}$. Independent of the truncation error; if the base theory has an unstable mode (tachyon, Jeans, ghost), the Pass 0 solution itself diverges and no Pass 1 correction is physically meaningful. Issue \#285 added this as a separate diagnostic; thresholds $>\!10^{-10}$ (warn) and $>\!30$ (overflow).
+\end{enumerate}
+The TIDAL validity monitor computes $\max_{\mathrm{modes}}(\varepsilon \cdot |\lambda| \cdot t_{\mathrm{end}})$ from the Pass 0 eigendata for the secular-error side, plus $\max \operatorname{Re}(\lambda) \cdot t_{\mathrm{end}}$ for the base-stability side. The overall \texttt{warn\_level} returned on \texttt{PerturbativeResult.validity} is the worse of the two. Thresholds are $0.1$ (10\% accumulated error) and $1.0$ (full EFT breakdown) on the correction side.
+
+\subsection{Constraint-Field Promotion and LHS Demotion}
+\label{sec:pr-gap-b}
+
+A subtle complication arises for theories where a correction term promotes an algebraic constraint field to a dynamical one. In the torsion--Gertsenshtein PGT theory the metric components $h_4, h_7, h_9$ are pure-gauge algebraic constraints at $b_5 = 0$ but acquire a kinetic term $2 b_5 \partial_t^4 h$ when the $b_5 \tilde{R}^2$ correction is turned on. The derivation pipeline, which keeps $b_5$ symbolic, emits these equations with \verb|time_order=4| and \verb|kinetic_coefficient_symbolic = "2*b5"|.
+
+The iterative approach remains consistent provided we correctly identify the base theory. Define
+\begin{equation}
+  E_{\mathrm{base}}[q] \equiv E[q; \varepsilon = 0],
+\end{equation}
+with $\varepsilon$ set to zero in \emph{every} coefficient, including the kinetic one. When the LHS kinetic coefficient evaluates to zero at $\varepsilon = 0$, the equation collapses from differential (time-order~$\geq 2$) to algebraic (time-order~$0$). TIDAL's \verb|EquationSystem.base_spec(small_parameters)| performs this demotion automatically by evaluating \verb|kinetic_coefficient_symbolic| on \verb|{name: 0.0 for name in small_parameters}| via a restricted AST walker (\verb|tidal/symbolic/_kinetic_eval.py|). The demoted equation uses the existing Schur-elimination path for time-order-zero constraints; Pass 0 recovers the constraint value~$h_4^{(0)}$ from the dynamical subspace via
+\begin{equation}
+  \hat{h}_4^{(0)}(\mathbf{k}) = \mathsf{S}(\mathbf{k})\, \hat{d}^{(0)}(\mathbf{k}), \qquad \mathsf{S}(\mathbf{k}) = -\mathsf{S}_{cc}^{-1}\, \mathsf{S}_{cd}.
+\end{equation}
+
+\paragraph{$O(\varepsilon^1)$ augmented constraint recovery (v6 R8 / \#290).} At Pass~1 the demoted constraint equation carries three coupled contributions: base Schur recovery from the Pass~1 dynamical state, LHS-feedback from the removed kinetic, and order-1 RHS corrections on the constraint's own row. Substituting $h_c = h_c^{(0)} + \varepsilon\, h_c^{(1)}$ into the pre-demotion equation
+\begin{equation}
+  \varepsilon\, K\, \partial_t^n h_c = S_{cc}\, h_c + S_{cd}\, y_{\mathrm{dyn}} + \varepsilon\, \mathrm{corr}_1(y)
+\end{equation}
+and collecting at $O(\varepsilon^1)$ yields
+\begin{equation}
+  S_{cc}\, h_c^{(1)} = K\, \partial_t^n h_c^{(0)} - S_{cd}\, y_{\mathrm{dyn}}^{(1)} - \mathrm{corr}_1(y^{(0)}).
+\end{equation}
+Rearranging and using $\mathsf{S}_\mathbf{k} = -S_{cc}^{-1} S_{cd}$ (the existing base Schur operator):
+\begin{equation}
+  \boxed{\;\hat{h}_c^{(1)} = \mathsf{S}_\mathbf{k}\, \hat{y}_{\mathrm{dyn},\mathbf{k}}^{(1)} + S_{cc,\mathbf{k}}^{-1}\, \left[K\, \widehat{\partial_t^n h_c^{(0)}} - \widehat{\mathrm{corr}_1}\right].\;}
+\end{equation}
+The bracketed quantities are built from Pass~0 output alone: $\partial_t^n h_c^{(0)}$ via eigenvalue propagation $V \cdot \mathrm{diag}(\lambda^n e^{\lambda t}) \cdot \alpha$ applied to the base Schur recovery, and $\mathrm{corr}_1(y^{(0)})$ by evaluating the order-1 RHS on $y^{(0)}$ with nested Schur expansion for constraint-target references. The driver implements this in \texttt{tidal/solver/perturbative\_driver.py::\_compute\_constraint\_source\_hat}.
+
+Pre-v0.33.2 (issue~\#290) only the first term was computed, which produced \emph{identically zero} Pass~1 output for theories where every $O(\varepsilon^1)$ correction lives on a constraint-field row --- the flagship $\tilde{R}^2$ PGT case. The augmented recovery was explicitly anticipated in Stage~4.6 of the v6 plan (``deferred to Stage~5'') but never landed until v0.33.2. The synthetic algebraic-constraint regression (\verb|tests/test_perturbative_algebraic_constraint.py|) now matches the analytical light-mode eigenvector $h/\phi = g/(1 + \varepsilon\, \omega^2) \approx g\,(1 - \varepsilon\, \omega^2)$ to machine precision at $\varepsilon = 10^{-3}$; pre-R8 the output was $h/\phi \equiv g$ independent of $\varepsilon$ (14~orders of magnitude off).
+
+\subsection{Closed-Form Duhamel Kernel}
+\label{sec:pr-duhamel}
+
+Pass 1's inhomogeneous equation $\partial_t y^{(1)} = A(\mathbf{k})\, y^{(1)} + M_{\mathrm{src}}(\mathbf{k}) \cdot y^{(0)}(t)$ with $y^{(1)}(0) = 0$ is solved in closed form via the $\varphi_1$-kernel Duhamel integral. In the eigenbasis of the base operator $A = V D V^{-1}$, with $\alpha = V^{-1} y^{(0)}(0)$ and $\beta = V^{-1} M_{\mathrm{src}} V$,
+\begin{equation}
+  z^{(1)}_i(t) = \sum_j \beta_{ij}\, \alpha_j\, G(\lambda_i, \lambda_j; t),
+\end{equation}
+where
+\begin{equation}
+  G(\lambda, \mu; t) = \begin{cases}
+    \dfrac{e^{\mu t} - e^{\lambda t}}{\mu - \lambda} & \mu \neq \lambda \\[4pt]
+    t\, e^{\lambda t} & \mu = \lambda
+  \end{cases}
+\end{equation}
+and $y^{(1)}(t) = V\, z^{(1)}(t)$. Near the degenerate limit $|(\mu - \lambda) t| \to 0$ the direct formula suffers catastrophic cancellation; TIDAL switches to the Taylor branch $G = t\, e^{\lambda t} \sum_{k \geq 0} z^k / (k+1)!$ (twelve terms, accurate to double precision) when $|(\mu - \lambda) t| < 10^{-5}$, following Al-Mohy \& Higham (2011)~\cite{AlMohyHigham2011}. The threshold is sampled from their Table~3.1 and validated against 50-digit \verb|mpmath| reference values across $|\mu - \lambda| t \in [10^{-15}, 1]$; the relative error stays below $10^{-13}$ everywhere.
+
+\paragraph{Operator time-derivative scaling.} Correction terms of the form $c \cdot \partial_t^n(\text{target})$ --- e.g.\ \verb|first_derivative_t|, \verb|d2_t|, \verb|d3_t|, \verb|d4_t|, mixed \verb|T1_S1x|, \verb|T2_S1x|, etc.\ --- carry an operator time-derivative order $n = \verb|_OperatorDecomp.time_order|$. When the target is a dynamical field whose Pass~0 trajectory is $y^{(0)}(\tau) = V\,e^{D\tau}\,\alpha$, its $n$-th time derivative in the eigenbasis is $V\,D^n\,e^{D\tau}\,\alpha$. The Pass~1 source matrix must therefore scale the source column by $\lambda_j^n$ before the Duhamel kernel:
+\begin{equation}
+  z^{(1)}_i(t) = \sum_n \sum_j \beta_{n,ij}\, (\lambda_j^n\, \alpha_j)\, G(\lambda_i, \lambda_j; t),
+\end{equation}
+where $\beta_n = V^{-1} M_{\mathrm{src},n} V$ and $M_{\mathrm{src},n}$ aggregates only correction terms whose operator has \verb|time_order == n|. The implementation returns a dict keyed by $n$ from \verb|_build_source_matrix_k|; the pre-fix code used a flat matrix that silently dropped the $\lambda^n$ factor (issue \#293, latent because all shipped corrections with $n > 0$ target constraint fields which are handled separately through the augmented Schur recovery).
+
+\paragraph{Pass~2 and higher orders.} Extending to $O(\varepsilon^2)$ requires integrating against $y^{(1)}(t)$ as well as $y^{(0)}(t)$: $\partial_t y^{(2)} = A\,y^{(2)} + M_{\mathrm{src},2}\,y^{(0)}(t) + M_{\mathrm{src},1}\,y^{(1)}(t)$. The first term reuses the existing Pass~1 Duhamel with the order-2 source matrix. The second term is a double-Duhamel nested kernel: expanding $y^{(1)}$ in its own eigenbasis sum $\sum_k \beta_{1,jk}\,\alpha_k\,G(\lambda_j, \lambda_k; \tau)$ yields
+\begin{equation}
+  z^{(2)}_{i, \text{indirect}}(t) = \sum_{j,k} \beta_{1,ij}\,\beta_{1,jk}\,\alpha_k\, K_2(\lambda_i, \lambda_j, \lambda_k; t)
+\end{equation}
+with the triple-eigenvalue kernel
+\begin{equation}
+  K_2(\lambda_i, \lambda_j, \lambda_k; t) = \int_0^t e^{\lambda_i(t-\tau)}\,G(\lambda_j, \lambda_k; \tau)\,d\tau = \frac{G(\lambda_i, \lambda_k; t) - G(\lambda_i, \lambda_j; t)}{\lambda_k - \lambda_j}
+\end{equation}
+for distinct $\lambda_j \neq \lambda_k$; degenerate cases ($\lambda_j = \lambda_k$, $\lambda_i = \lambda_j$, $\lambda_i = \lambda_k$, or all-equal) reduce to $\int_0^t e^{\lambda_i(t-\tau)}\,\tau\,e^{\lambda_j\tau}\,d\tau$ and its limits, involving polynomial-in-$t$ factors ($t\cdot e^{\lambda t}$, $(t^2/2)\cdot e^{\lambda t}$) that need Taylor-branch handling analogous to $G$'s degeneracy case. TIDAL gates $\mathrm{order} \geq 2$ with a \verb|NotImplementedError| (issue \#273). This gate is \emph{permanent by architecture}: TIDAL operates with quadratic Lagrangians and linear PDEs, so a small parameter $\varepsilon$ appearing as a linear coupling (e.g.\ $b_5 \tilde{R}^2$ in the PGT example) produces EOM coefficients with at most one factor of $\varepsilon$ — hence $\mathrm{order\_in\_eps} \in \{0, 1\}$ always. Higher values would require either products of small parameters (e.g.\ $b_5 \rho$) or an explicit second-order Lagrangian piece ($b_5^2 \mathcal{L}_2$), neither of which is supported. No shipped theory emits $\mathrm{order\_in\_eps} = 2$ tagged terms and none is planned. If a future theory somehow produced such a tag, \verb|PerturbativeSolver| emits an explicit warning listing the dropped terms rather than proceeding silently.
+
+\subsection{Pipeline Architecture}
+\label{sec:pr-architecture}
+
+The v6 pipeline runs in two stages:
+
+\paragraph{Derive time.} The Wolfram \verb|ExportJSON.wl| module tags each emitted \verb|OperatorTerm| with an \verb|order_in_eps| integer equal to the total exponent of the \verb|[perturbation]|-declared small parameters in its symbolic coefficient. Coefficients that are monomials in small parameters alone become Pass~1 sources; coefficients independent of small parameters remain base-theory terms. The JSON metadata carries the \verb|small_parameters| list and default truncation \verb|order|.
+
+\paragraph{Simulate time.} The \verb|PerturbativeSolver| class orchestrates Pass 0 and Pass $n$ through the existing modal solver:
+\begin{enumerate}
+  \item \verb|base_spec(small_parameters)| produces the ghost-free second-order base system (\S\ref{sec:pr-gap-b}).
+  \item \verb|solve_modal(..., return_eigendata=True)| runs Pass 0 and exposes the per-block eigendecomposition $(V, D, V^{-1}, \alpha)$ plus the Schur recovery operator.
+  \item For each requested order, \verb|solve_modal_pass1(eigendata, correction_spec, ...)| builds $M_{\mathrm{src}}(\mathbf{k})$ from the order-tagged correction RHS (Schur-substituting any constraint-field references) and evaluates the closed-form Duhamel kernel per eigenblock.
+  \item Constraint fields are recovered in physical space via inverse FFT of $\hat{h}^{(n)}_\mathbf{k} = \mathsf{S}_\mathbf{k}\, \hat{y}^{(n)}_{\mathrm{dyn}, \mathbf{k}}$.
+  \item The combined result $q_{\mathrm{total}} = \sum_n q^{(n)}$ is returned alongside per-order \verb|SolverResult| objects and the validity diagnostics.
+\end{enumerate}
+
+The CLI exposes the flag \verb|--perturbative-order N|, defaulting to~$1$ when the JSON carries a \verb|perturbation| metadata block and~$0$ otherwise. Theories without a \verb|[perturbation]| section simulate through the plain modal path unchanged.
+
+\subsection{Cost Scaling}
+
+Pass 0 dominates the wall-clock cost: $O(N_{\mathrm{modes}} \cdot \mathrm{dof}^3)$ eigendecomposition plus $O(N_{\mathrm{modes}} \cdot \mathrm{dof}^2 \cdot N_t)$ evolution. Pass~1 reuses the Pass~0 eigendecomposition and adds a one-time $\beta$-projection of $O(N_{\mathrm{modes}} \cdot \mathrm{dof}^3)$ plus $O(N_{\mathrm{modes}} \cdot \mathrm{dof}^2 \cdot N_t)$ kernel evaluations. Empirical overhead relative to Pass~0 is approximately $1.5\times$.
+
+For comparison, the retired mechanical Ostrogradsky path introduced auxiliary fields $w_q = \partial_t^2 q$ that doubled the state-vector size for every fourth-order field and required an implicit DAE solver (IDA) due to the constraint structure. End-to-end performance on the PGT torsion--Gertsenshtein theory was $\sim\!80\times$ slower than Pass~0 modal, \emph{and} produced ghost-mode growth artefacts in long-time simulations.
+
+\subsection{Scope and Limitations}
+\label{sec:pr-scope}
+
+The v6 iterative pipeline currently supports:
+\begin{itemize}
+  \item Linearised theories (quadratic Lagrangians, linear PDEs); quadratic-in-perturbation sources are excluded by construction.
+  \item Modal solver backend only. Non-modal backends (CVODE, IDA, leapfrog, scipy) fall back to the plain solve without Pass~1 corrections and emit a diagnostic.
+  \item Constant-coefficient source matrices. Position-dependent Pass~1 sources (convolution-coupling case) raise \verb|NotImplementedError|.
+  \item Source terms that respect the Pass 0 block structure. Cross-block coupling terms raise with a clear message pointing at the current limitation.
+  \item Order $\leq 1$ only. \verb|order=2| raises \verb|NotImplementedError|; this is permanent — no shipped theory produces $\mathrm{order\_in\_eps} = 2$ terms under TIDAL's quadratic-Lagrangian constraint, and products of small parameters (e.g.\ $\varepsilon_1 \cdot \varepsilon_2$) or higher-power couplings ($\varepsilon^2$) are not supported. If a spec somehow carries such terms, the solver warns before proceeding at the requested order.
+  \item \textbf{Quartic EM invariants} (Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^2$) and \textbf{matter-only derivative-only theories} (any $\mathcal{L}$ whose only dynamical field enters through covariant derivatives, e.g.\ a photon via $F = \mathrm{d}A$): fully supported as of v0.33.9. See \S\ref{sec:pr-eh-cd} for the Hold $+$ \texttt{Scalar[X]\textasciicircum n} Power normalisation and the \texttt{CD}-ComponentValue precompute correctness gate (issue~\#271).
+\end{itemize}
+
+These limitations are tracked in GitHub issues and listed in \verb|docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md|.
+
+\subsection{Power-of-Contraction Normalisation and Matter-Only Derivative Dependence}
+\label{sec:pr-eh-cd}
+
+Two subtle, unrelated failure modes were exposed by the first Euler--Heisenberg theory to enter the pipeline (issue~\#271). Both turn out to sit upstream of the perturbative reduction itself and concern how the Lagrangian is presented to xAct. We document them here because the Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^2$ correction is the motivating physics~\cite{HeisenbergEuler1936,Dunne2004} and because the fixes extend the design invariants of the v6 pipeline.
+
+\paragraph{Failure mode 1 --- Power auto-distribution.} The user writes $\mathcal{L}_{\mathrm{EH}} \supset \tfrac{\rho}{8}(F_{\mu\nu}F^{\mu\nu})^2$, which enters the WLS input as \verb|Power[F[-a,-b] eta[a,c] eta[b,d] F[-c,-d], 2]|. Mathematica's built-in evaluation of \verb|Power[Times[a,b,...], n]| fires the rule $\mathrm{Times}[a,b,\dots]^n \rightarrow a^n \cdot b^n \cdots$ at \emph{assignment time}, before any TIDAL code has seen the expression. The result is a product of separately-squared tensor atoms with each abstract dummy index appearing four times instead of two. xAct's internal validator (\verb|xAct`xTensor`Private`ValidateIndices|) then raises \verb|Validate::repeated| and, critically, \verb|Throw[Null]|. The existing \verb|Off[Validate::repeated]| calls in \verb|ComponentDecompose.wl| suppress only the message, not the throw, so the derivation aborts.
+
+\paragraph{Fix 1 --- \texttt{Hold[]} $+$ opaque \texttt{Scalar[X]\textasciicircum n} rewrite.} The Lagrangian assignment in \verb|_derive.py| (\verb|_wls_lagrangian|, lines~986--1017) now reads schematically
+\begin{equation*}
+  \texttt{Lagrangian} \;=\; \texttt{ReleaseHold}\!\left[\, \texttt{Hold}\!\left[\mathcal{L}_{\mathrm{user}}\right] \;\texttt{//.}\; \mathcal{R} \,\right],
+\end{equation*}
+where the rewrite rule~$\mathcal{R}$ is
+\begin{equation*}
+  \texttt{HoldPattern}\!\left[\texttt{Power}[X, n]\right] \;/;\; \neg\texttt{AtomQ}[X] \,\wedge\, \neg\texttt{FreeQ}[X, \texttt{\_?AbstractIndexQ}] \,\wedge\, \texttt{FreeQ}[X, \texttt{Scalar}] \;:>\; \texttt{Scalar}[X]^{n}.
+\end{equation*}
+The \verb|Hold[]| is load-bearing: without it, Mathematica distributes before the rule can fire. The guard \verb|FreeQ[X, _?AbstractIndexQ]| is what makes the rewrite a no-op on $\tilde{R}^2$ PGT theories, whose bases (\verb|RicciScalarCDT[]|) are named zero-rank scalars with no abstract indices and do not need the wrapping. xAct treats \verb|Scalar[...]^n| as an opaque-scalar power; distribution is blocked, and downstream \verb|DecomposeScalarExpression| visits each of the $n$ instances with a fresh xAct index scope, so there is no residual index collision. The rejected alternative --- \verb|Scalar[X]^n \to \prod_{k=1}^{n} \texttt{Scalar}[\texttt{RenameDummies}[X]]| --- fails because \verb|RenameDummies| is deterministic: repeated calls on the same input return byte-identical output, so the product is $n$ identical factors, reproducing the original clash (retired alternative documented in \S\ref{sec:pr-superseded}).
+
+\paragraph{Failure mode 2 --- Matter-only CD shorthand survival.} After Fix~1 the $(F\cdot F)^2$ term reaches the canonical pipeline intact. In Phase~A the derivation uses CD-shorthand tensors \verb|CD1f, CD2f, ...| (generated at \verb|_derive.py:1199+|) to avoid catastrophic \verb|TraceBasisDummy| blow-up, and then resolves them in $\mathcal{O}(1)$ via pre-registered \verb|ComponentValue| entries (generated by \verb|_wls_precompute_cd_component_values|, \verb|_derive.py:1428+|). The legacy gate on the precompute was the heuristic $\texttt{len(dyn\_fields)} \ge 2$, justified as a performance optimisation for single-field theories where fields appear directly (e.g.\ \verb|scalar_field|'s \verb|phi[]| or \verb|massive_gravity|'s \verb|h[-a,-b]h^{ab}|). For a matter-only Maxwell-type theory the single dynamical field --- the photon perturbation $a$ --- appears only through \verb|CD[-a][A[-b]]|, i.e.\ the derived field $F$. With the precompute skipped, \verb|CD1eqca[{i,-\mathrm{cart}}, {j,-\mathrm{cart}}]| atoms survive into \verb|lagComp| and the Component-E--L pass reports ``Field functions: 0'' and produces no equations of motion.
+
+\paragraph{Fix 2 --- Correctness-aware precompute gate.} The heuristic is replaced by a correctness-aware gate (\verb|_derive.py:1513--1620|): the CD ComponentValue precompute runs whenever
+\begin{enumerate}
+  \item $\texttt{len(dyn\_fields)} \ge 2$ \emph{(unchanged, covers every multi-field theory)}, \emph{or}
+  \item any \texttt{derived\_field} whose TOML definition contains \texttt{CD[} is used in the Lagrangian --- covering $F = \mathrm{d}A$-style invariants, \emph{or}
+  \item any dynamical field or matter-perturbation source field appears as \verb|CD[...][name[...]]| directly in the user expression.
+\end{enumerate}
+The fast-path skip is preserved for \verb|scalar_field|/\verb|scalar_potential_well|/\verb|massive_gravity|-type direct-tensor Lagrangians, where the field has no derivative-only dependence and \verb|StaggeredToBasis| remains efficient on its own.
+
+\paragraph{Fix 2 (belt-and-braces) --- \texttt{\$CDShorthandReverseRules} safety net.} The reverse rules $\texttt{CDN}f[i, a] \to \texttt{CD}[i][\texttt{CD}(N{-}1)f[a]]$ have been generated at \verb|_derive.py:1407| since v0.28 but were never applied. The Component-E--L field-function detector now applies them to \verb|lagComp| (\verb|_derive.py:5857--5869|), gated by
+\begin{equation*}
+  \neg \texttt{FreeQ}\!\left[\texttt{lagComp},\; \texttt{\_Symbol}\!\mathbin{?}\!\bigl(\texttt{StringMatchQ}[\texttt{ToString}[\#], \texttt{"CD" \textasciitilde\textasciitilde\ DigitCharacter \textasciitilde\textasciitilde\ \_\_"}]\,\&\bigr)\right].
+\end{equation*}
+Without the \verb|FreeQ| pre-check, the \verb|//.| scan of a gertsenshtein-scale \verb|lagComp| costs $\approx 4$~s for no gain when the precompute already resolved everything. With it, the safety net is $\mathcal{O}(\texttt{LeafCount}(\texttt{lagComp}))$ in the common case and is a no-op whenever the precompute gate above did its job. It only activates when a future theory exceeds the \verb|max_cd_precompute=2| cap (\verb|_derive.py:1589|) and therefore still carries residual CD-4 shorthand.
+
+\paragraph{Verification.} With both fixes, \verb|examples/euler_heisenberg/theory.toml| derives in $\approx 19$~s, produces the four component field functions $\{\texttt{eqca0}, \texttt{eqca1}, \texttt{eqca2}, \texttt{eqca3}\}$, and emits the expected \verb|order_in_eps = 1| terms with symbolic coefficients $2 B_0^2 \rho$, $-2 B_0^2 \rho$, and $-6 B_0^2 \rho$ for the refractive-index correction $n^2 - 1 \propto \rho B_0^2$ (see \S\ref{sec:pr-scope} for the scope within which these coefficients are trusted). Full regression on 1\,991 Python tests and on \verb|gertsenshtein| ($\approx$46--49~s) and \verb|coupled_scalars| ($\approx$14~s) is green (commits 9d9e73f, 830a442).
+
+\subsection{Historical Note: Superseded Approaches}
+\label{sec:pr-superseded}
+
+Two earlier paths have been removed from TIDAL:
+
+\paragraph{Mechanical Ostrogradsky reduction} (\verb|tidal/symbolic/ostrogradsky.py|, 547~lines, deleted in v6 Phase 6B) introduced auxiliary fields at load time; the resulting state vector carried ghost modes that produced unphysical long-time growth. Used by three shipped theories (\verb|torsion_gertsenshtein|, \verb|graviton_torsion|, \verb|torsion_gertsenshtein_combined|) before the v6 migration; all three are now re-derived under \verb|[perturbation]| and loaded through the ghost-free iterative path.
+
+\paragraph{Jaen--Llosa--Molina (JLM) symbolic order reduction} (\verb|tidal/wolfram/PerturbativeReduction.wl|, 525~lines, deleted in v6 Stage~1) attempted to eliminate higher-derivative terms by substituting the base equation of motion into the correction. While elegant for scalar theories, it failed when a constraint field was promoted to dynamical by the correction (the $\tilde{R}^2$ PGT case) and required theory-specific rewriters to extend coverage. Replaced by the theory-agnostic iterative architecture documented above.
+
+\paragraph{Pre-VarD \texttt{Scalar[x]\textasciicircum n} expansion with \texttt{RenameDummies}.} An earlier version of the linearisation code expanded \texttt{Scalar[x]\textasciicircum n} into a product of \texttt{n} renamed copies before \texttt{VarD}. For the $\tilde{R}^2$ PGT theory this triggered index-inhomogeneity failures because xAct's \texttt{RenameDummies} is deterministic: repeated calls on the same expression return byte-identical output, so the ``product of renamed copies'' was really a product of $n$ identical factors, re-creating the repeated-index problem. The approach was retired and the comment at \texttt{tidal/cli/\_derive.py:2584--2589} explicitly warns against reinstating it. The modern fix for the same family of expressions is documented in \S\ref{sec:pr-eh-cd} below.
+
+\paragraph{Pass~2 numerical Duhamel (\texttt{order\_in\_eps = 2}).} Briefly planned as a natural extension of Pass~1, subsequently proven unreachable under TIDAL's design: Euler--Lagrange differentiation never squares a coupling, and \texttt{[perturbation]} forbids products of small parameters, so \texttt{ComputeOrderInEps} provably returns $\le 1$ for every term emitted by the pipeline. Issue~\#273 documents the closure; the \texttt{solve(order\textgreater{}1)} path raises \texttt{NotImplementedError} permanently, guarded by a warning in \texttt{PerturbativeSolver.solve} when a spec carries higher-order tags.

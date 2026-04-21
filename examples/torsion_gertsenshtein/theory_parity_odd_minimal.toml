@@ -1,0 +1,76 @@
+# Minimal Parity-Odd Test: d21 ε·R̃·F only
+#
+# Add just ONE parity-odd curvature-EM coupling to the base model.
+# d21 = ε^{μνρσ} R̃^α_{μαν} F_{ρσ} (uses Ricci, simpler than Riemann)
+#
+# If this works, add remaining terms incrementally.
+#
+# Derivation timing: ~3m23s wall (last verified: 2026-04-11, 34 fields, v0.27.0)
+# Previous: 50+ min (OOM crash) before per-pair TraceBasisDummy fix (#246)
+
+[theory]
+name = "Parity-Odd Test (d21 only)"
+description = "Base PGT + single parity-odd ε·R̃·F coupling"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "beta1", "beta2", "beta3", "d21"]
+
+# Lagrangian: base PGT + d21 ε·Ricci·F
+# d21 term: ε^{μνρσ} R̃^α_{μαν} F_{ρσ}
+#   = epsiloneta[a,b,c,d] RicciCDT[-a,-b] F[-c,-d]
+# (RicciCDT already contracts the first Riemann index pair)
+
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] + d21 epsiloneta[a,b,c,d] RicciCDT[-a,-b] F[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_parity_odd_minimal.json"

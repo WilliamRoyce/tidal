@@ -389,18 +389,77 @@ tidal sample examples/data/torsion_dark_photon.json \
 Evidence and parameter constraints are written to
 \texttt{results\_nested/inference.json}.
 
+\subsection{Parameter Importance via KL Divergence}
+\label{sec:inference-importance}
+
+Nested sampling produces weighted posterior samples from which anesthetic
+computes three key diagnostics:
+
+\begin{description}
+  \item[$D_\mathrm{KL}$] Kullback--Leibler divergence from prior to
+    posterior (nats).  Measures total information gained.
+  \item[$d_G$] Bayesian model dimensionality: the effective number of
+    parameters constrained by the likelihood.  If $d_G \ll n_\mathrm{params}$,
+    most parameters are prior-dominated.
+  \item[Marginal $D_\mathrm{KL}$] Per-parameter KL divergence.  A
+    parameter with high marginal $D_\mathrm{KL}$ is strongly constrained;
+    one near zero is irrelevant to the likelihood.
+\end{description}
+
+\textbf{Usage:}
+\begin{verbatim}
+# Inline after sampling:
+tidal sample spec.json --method nested --analyze ...
+
+# Post-hoc on saved results:
+tidal analyze ns_output/ --inference --importance
+\end{verbatim}
+
+Interpretation thresholds: $D_\mathrm{KL} > 1$~nat = strong,
+$0.1$--$1$~nat = moderate, $< 0.1$~nat = weak.
+
+\subsection{Finding Extreme Physics}
+\label{sec:inference-extremize}
+
+Three likelihood types support directed exploration of amplification:
+
+\begin{description}
+  \item[\texttt{maximize}] $\log\mathcal{L} = P_\mathrm{max}$.
+    Concentrates samples where amplification $A$ is largest.
+  \item[\texttt{minimize}] $\log\mathcal{L} = -P_\mathrm{max}$.
+    Finds maximum suppression (smallest $A$).
+  \item[\texttt{extremize}] $\log\mathcal{L} = |\log(P / P_\mathrm{GR})|$
+    where $P_\mathrm{GR}$ is evaluated per-point from
+    \texttt{--baseline-formula}.  Finds both amplification \emph{and}
+    suppression simultaneously.
+\end{description}
+
+The baseline formula is evaluated with each point's own parameter values,
+correctly handling swept $B_0$, $\kappa$, and $t_\mathrm{end}$.
+
+\subsection{High-Dimensional Sampling}
+\label{sec:inference-highdim}
+
+The \texttt{--nlive-auto} flag scales live points with dimensionality
+following Handley et~al.\ (2015): \texttt{fast} = $\max(25d, 50)$,
+\texttt{standard} = $\max(25d, 100)$, \texttt{production} =
+$\max(50d, 250)$.  For the 4D dark-photon model this gives 100/100/200;
+for 10D non-minimal PGT, 250/250/500.
+
+PolyChord's slice sampling scales better than rejection-based methods
+(dynesty/MultiNest) above $\sim$10 dimensions, making it the default
+backend.
+
 \subsection{Design Decisions}
 \label{sec:inference-design}
 
-\subsubsection{Why dynesty first, not PolyChord?}
+\subsubsection{PolyChord as Default Backend}
 
-PolyChord is the eventual production target for HPC runs (Newton server,
-CSD3) and is Handley's own tool.  However it requires a Fortran compiler
-(\texttt{gfortran}) and is currently unavailable via PyPI.
-dynesty is a pure-Python drop-in with identical \texttt{prior\_transform} +
-\texttt{log\_likelihood} interface, installs with a single \texttt{pip} command,
-and works identically in the dev container.  The \texttt{--sampler} flag
-makes switching a one-line change when PolyChord returns to PyPI.
+PolyChord (Handley et~al.\ 2015) is the production nested sampler.
+It uses slice sampling (not rejection), handles multimodal distributions
+via clustering, and integrates natively with anesthetic.  It requires
+\texttt{gfortran}; install via \texttt{bash scripts/install\_polychord.sh}.
+dynesty remains available as a pure-Python fallback (\texttt{--sampler dynesty}).
 
 \subsubsection{Why anesthetic for visualization?}
 

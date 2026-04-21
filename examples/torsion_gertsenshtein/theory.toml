@@ -52,8 +52,10 @@
 #   Dandoy, Lella et al. (2024), arXiv:2406.17853 — GW constraints
 #   Hayashi & Shirafuji (1979) — PGT propagating modes
 #
-# Derivation timing: ~20 min wall (requires --timeout 0; exceeds default 600s)
-# Last verified: 2026-04-05 (20 fields, 147 H terms, v0.25.6)
+# Derivation timing: ~2 min wall (post-#246 per-pair TraceBasisDummy optimization).
+# Pre-#246 this theory took ~20 min. Documented in docs/tex/derivation_performance.tex
+# §Post-v6 Reference Timings.
+# Last verified timing source: a28a393 commit log (2026-04-11, parity-odd #246 series).
 
 [theory]
 name = "Torsion-Gertsenshtein (PGT + Einstein-Maxwell)"
@@ -134,6 +136,17 @@ type = "lorenz"
 [reduction]
 type = "plane_wave"
 propagation_axis = "z"
+
+# v6 perturbative reduction — treat b5 as the small parameter.  At
+# b5=0 this theory is pure Einstein-Maxwell-torsion (algebraic h_4/
+# h_7/h_9 constraints); the b5*R̃² term promotes those components to
+# time_order=4 with kinetic "2*b5", which the PerturbativeSolver
+# handles iteratively.  order=1 gives a closed-form Duhamel correction
+# reusing the Pass 0 eigendata; for validity we need b5·ω²·t_end << 0.1
+# (see docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md).
+[perturbation]
+small_parameters = ["b5"]
+order = 1
 
 # Default parameters
 # kappa = 1.0 (natural units; physical ~1.15e-18 GeV^-1)

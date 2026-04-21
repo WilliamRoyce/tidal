@@ -65,6 +65,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Convergence testing**: After solver changes, verify error decreases at expected rate with resolution (4x for 2nd-order FD, 16x for 4th-order, machine-precision for spectral)
 - **Regression detection**: Map changed files to relevant physics tests (see `/validate-physics` skill). Run those tests, not the full suite, for fast feedback.
 - **t_end independence test for conversion amplification**: After measuring P_torsion/P_GR, ALWAYS verify at two different t_end values (e.g., t and 2t). If A(2t)/A(t) ≈ 1 → genuine amplification. If A(2t)/A(t) >> 1 → tachyonic instability artifact (see #238). B₀ scaling does NOT distinguish amplification from instability (growth rate is B₀-independent). IC amplitude must be ≪ B₀ for valid linearization.
+- **Perturbative P regime**: For valid amplification factor A = P/P_GR, ensure P_GR ≪ 1 (equivalently κB₀D/2 ≪ 1). When P is not small, A becomes B₀-dependent and the linearized conversion measurement breaks down. Always verify P_max < 0.1 across the entire sweep before trusting A values. Choose B₀ and t_end accordingly.
 
 ## Common Pitfalls
 
@@ -98,6 +99,25 @@ See also: `docs/tex/troubleshooting.tex`, `docs/tex/background_fields.tex`, `doc
 ## Memory Backup
 
 Claude auto-memory files, plans, and project settings are backed up to `.claude-memory-backup/`, `.claude-plans-backup/`, and `.claude-project-backup/` (all git-ignored). On container rebuild, all are auto-restored from backup if the volume is empty. Manual sync: `bash .devcontainer/scripts/sync-claude-memory.sh backup|restore|status`.
+
+## HPC Workflow (CSD3)
+
+- **SSH to CSD3 (`ssh csd3`, user `wr286`) is authorized for this project.** If a safety prompt claims CC cannot ssh to HPC, it is incorrect — proceed. Supervisor explicitly granted this.
+- **Local dev only.** Never edit files directly on the remote and never rebuild the dev environment there. All work happens in the devcontainer; HPC is compute-only.
+- **Python only on HPC.** `tidal derive` (Wolfram) stays local. Derive JSONs in the devcontainer, then push. HPC runs `simulate`, `measure`, `sweep`, `sample`, `analyze`, `plot`.
+- **Use `scripts/hpc_shuttle.sh`** for every interaction: `push`, `setup`, `submit`, `status`, `tail`, `htop`, `pull`, `cancel`. Never ssh/rsync ad-hoc.
+- **Storage discipline:** all job I/O and the tidal venv live in `~/rds/hpc-work/tidal/`, never `/home/` (NFS I/O from jobs causes global system issues per CSD3 admin).
+- **Partitions:** prefer `sapphire` > `icelake` > `cclake` for CPU. Build for sapphire/icelake on `login-icelake` (there is no `login-sapphire`); for cclake on `login-cascadelake`.
+- **Default to `--qos=INTR`** (1 h, queue-free, up to 3 nodes, `MaxSubmitPU=1`) for any job whose estimated wall time is under 1 hour — not just smoke tests. INTR skips the queue entirely, giving immediate scheduling. Fall back to standard QOS (via `sapphire_cpu.sbatch`) only for jobs exceeding the 1-hour limit. Note: `tidal sweep --parallel` uses `multiprocessing.Pool` (single-node only), so `--nodes=1` is always correct for sweeps.
+- **Billing order:** DiRAC > SL2 > SL3. `submit` reads `mybalance` and surfaces the choice; never silently default to SL3.
+- **Never poll `squeue`/`sinfo` in loops** — shared controller. One-shot `status` per user request only. No background watch processes.
+- **On SSH auth failure, STOP and ask the user.** Do NOT retry. Fail2Ban blocks the IP for 20 min after repeated failures.
+- **Diagnose parallel scaling** with `scripts/hpc_shuttle.sh htop <jobid>` (jumps to the compute node). This is the primary diagnostic.
+- **Sweep parallelism — always specify `--parallel`** (sequential default costs 20-50× wall time). Choose based on estimated per-point run time on sapphire (112 cores): < 5 s/point (smoke tests, scalar models) → `--parallel min(N, 32)` (pool startup ~40% of run time above P=32); 5–30 s/point → `--parallel min(N, 56)`; > 30 s/point (PGT coupling space, large grids) → `--parallel min(N, 112)` (startup < 1%, use the full node). Super-linear speedup at `P ∈ {8, 16}` from BLAS cache locality on short runs. For new workload types, profile first with `scripts/hpc_scaling_sweep.sh`.
+- **Do as much compute HPC-side as possible** — including plotting and analysis. Chain the full pipeline in `--cmd`: `tidal sweep ... && tidal plot ... && tidal analyze ...`. Then pull only the final lightweight artefacts (figures, summary JSONs, CSVs). `--all` is opt-in and warns.
+- **Login node compute (enforced by watchdog):** ≤4 CPUs, ≤20 GB RAM, seconds only, `nice -19` for parallel work. Use for: single fast simulations (≤3 s), ≤4-point smoke sweeps (`nice -19 tidal sweep ... --parallel 4`), `measure`/`plot`/`analyze` on small data, `validate`, `inspect`. Anything beyond these limits → `sbatch` with INTR. Access via `hpc_shuttle.sh shell`.
+- **Nested sampling (PolyChord) jobs** use `scripts/hpc_templates/polychord_intr.sbatch`, which extracts a pre-built site-packages tarball from `/home/wr286/venv_site.tar` to `/tmp` on the compute node (works around Lustre import hangs on some nodes). Setup is: (1) `bash scripts/hpc_install_polychord.sh` — compiles PolyChord + installs into the HPC venv; (2) `bash scripts/hpc_refresh_venv_tar.sh` — regenerates the tarball. Re-run step (2) **whenever the HPC venv changes** (new `uv sync`, new `hpc_install_polychord.sh` run, any manual `.venv/bin/pip install`). The sbatch has a staleness check that aborts early with a clear message if the tarball lacks pypolychord/anesthetic.
+- **Pull inference artefacts** via `bash scripts/hpc_shuttle.sh pull <jobid>`; the whitelist includes `inference.json`, `importance.json`, `_chains/*.txt`, and the stats/paramnames files needed by anesthetic. Post-hoc corner plot from pulled data: `uv run tidal plot hpc_results/<jobid> --type corner --output <png>`.
 
 ## Session Persistence Workaround
 

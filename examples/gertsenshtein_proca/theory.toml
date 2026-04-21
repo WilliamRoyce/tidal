@@ -1,0 +1,134 @@
+# Gertsenshtein Effect with Massive Photon (Proca Mass / Plasma Detuning)
+#
+# Lagrangian: L = (1/kappa^2) R - (1/4) F_{ab} F^{ab} - (mA2/2) a_mu a^mu
+#   (Einstein-Hilbert gravity + Maxwell electrodynamics + perturbation-level photon mass)
+#
+# The metric AND EM field are both perturbed:
+#   g_{mu,nu} = eta_{mu,nu} + epsilon * h_{mu,nu}   (graviton)
+#   A_mu      = Abar_mu     + epsilon * a_mu         (photon)
+#
+# Background: uniform B-field along x-axis via Abar_y = -B0 * z (Coulomb gauge).
+#
+# PHOTON MASS APPROACH:
+#
+# The mass term is written on the perturbation field a, NOT the full field A.
+# This is physically correct for plasma / medium effects: the effective photon
+# mass from the plasma frequency modifies photon propagation (dispersion) but
+# does NOT contribute to the background EM energy density that gravitates.
+#
+# Writing -mA2/2 A_mu A^mu (full field) fails because xPert expands
+# A = Abar + eps*a, producing |Abar|^2 = B0^2 z^2 terms that contaminate
+# the graviton equation with position-dependent coefficients (Issue #142).
+# The uniform B-field background is also NOT a Proca solution: (nabla^2 - m^2)A != 0.
+#
+# Writing -mA2/2 a_mu a^mu (perturbation field) avoids this entirely:
+# xPert recognizes a as O(eps) via DefTensorPerturbation, so a^2 enters
+# L^(2) cleanly without any |Abar|^2 contamination.
+#
+# Ref: Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609, Sec. 6) treat
+# medium effects at the EOM level: [Box - mu^2] A_h = -j_eff.
+# Our Lagrangian approach on the perturbation is equivalent via VarD.
+#
+# ANALYTICAL FORMULAS:
+#
+#   Massless vacuum (mA2=0):
+#     P(graviton -> photon) = sin^2(kappa * B0 * D / 2)
+#   Ref: Gertsenshtein (1962), JETP 14:84.
+#
+#   With mass detuning (mA2 > 0):
+#     P = sin^2(2*theta) * sin^2(Delta_osc * D / 2)
+#     tan(2*theta) = kappa*B0 / |Delta|
+#     Delta = -mA2 / (2*omega)         [omega = k for plane wave]
+#     Delta_osc = sqrt(Delta^2 + (kappa*B0)^2)
+#   Ref: Raffelt & Stodolsky (1988), Phys. Rev. D 37:1237.
+
+[theory]
+name = "Gertsenshtein Effect with Massive Photon"
+description = "Graviton-photon conversion with photon effective mass (Proca/plasma)"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# h: metric perturbation (graviton), symmetric rank-2 tensor
+# A: full EM 4-potential (fundamental field for perturbation)
+# a: EM perturbation (photon), vector — the dynamical 1st-order variable
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA (derived from A)
+# Expanded via MakeRule BEFORE xPert perturbation
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Background EM 4-potential: Abar_y = -B0*z generates B_x = B0
+# (Coulomb gauge, uniform magnetic field along x-axis)
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "mA2"]
+
+# Einstein-Maxwell + perturbation-level photon mass
+# (1/kappa^2) R - (1/4) F_ab F^ab - (mA2/2) a_e a^e
+#
+# The mass term uses the perturbation field a (not the full field A)
+# to avoid |Abar|^2 = B0^2 z^2 contamination. See header for details.
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - mA2/2 a[-e] eta[e,f] a[-f])"
+
+# Multi-field perturbation:
+# - Metric: g = eta + epsilon*h  (via SetupMetricPerturbation)
+# - EM: A = Abar + epsilon*a     (via DefTensorPerturbation)
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# TT gauge for graviton (transverse-traceless)
+# Ref: Flanagan & Hughes (2005), §2; Maggiore (2008), §1.3
+[[gauge]]
+field = "h"
+type = "tt"
+
+# Lorenz gauge for photon perturbation (d_mu a^mu = 0)
+# For massive photons, this is a dynamical constraint (Proca equation),
+# not a gauge choice — but imposing it is still correct.
+# Ref: Palessandro & Rothman (2023) [arXiv:2301.02072]
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: d/dx = d/dy = 0
+# Reduces 3+1D to effective 1+1D along z (propagation direction)
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+# Default parameters:
+# kappa = 1.0 (natural units; physical value ~ 1.15e-18 GeV^-1)
+# B0 = 0.3 (background magnetic field strength)
+# mA2 = 0.0 (photon mass squared; =0 recovers standard Gertsenshtein)
+
+[output]
+path = "../data/gertsenshtein_proca.json"

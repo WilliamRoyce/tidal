@@ -132,6 +132,108 @@ class InferenceResult:
             result[name] = (lo, hi)
         return result
 
+    def to_anesthetic(self) -> Any:
+        """Convert to anesthetic ``NestedSamples`` for custom analysis.
+
+        Returns the native anesthetic object with ``.D_KL()``,
+        ``.d_G()``, ``.logZ()``, ``.plot_2d()`` etc.
+        """
+        from tidal.inference._importance import to_anesthetic_samples
+
+        return to_anesthetic_samples(self)
+
+    def parameter_importance(self, n_bootstrap: int = 100) -> Any:
+        """Compute parameter importance via KL divergence.
+
+        Uses anesthetic to compute total and per-parameter information
+        gain from prior to posterior, plus Bayesian model dimensionality.
+
+        Parameters
+        ----------
+        n_bootstrap : int
+            Number of bootstrap samples for uncertainty estimation.
+
+        Returns
+        -------
+        ParameterImportanceResult
+        """
+        from tidal.inference._importance import compute_parameter_importance
+
+        return compute_parameter_importance(self, n_bootstrap)
+
+    @classmethod
+    def from_directory(cls, path: Path) -> InferenceResult:
+        """Load inference results from a saved directory.
+
+        Expects ``inference.json`` and ``results.csv`` as written by
+        :meth:`save`.
+
+        Parameters
+        ----------
+        path : Path
+            Directory containing saved inference results.
+        """
+        import csv
+        import json
+        from pathlib import Path as _Path
+
+        path = _Path(path)
+
+        # Load inference metadata
+        with (path / "inference.json").open() as f:
+            meta = json.load(f)
+
+        # Load samples from CSV
+        rows: list[dict[str, str]] = []
+        with (path / "results.csv").open() as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        if not rows:
+            msg = f"No rows in {path / 'results.csv'}"
+            raise ValueError(msg)
+
+        param_names: list[str] = meta["param_names"]
+        n_samples = len(rows)
+        n_params = len(param_names)
+
+        samples = np.zeros((n_samples, n_params))
+        log_likelihood = np.zeros(n_samples)
+        log_prior = np.zeros(n_samples)
+        weights_list: list[float] = []
+
+        for i, row in enumerate(rows):
+            for j, name in enumerate(param_names):
+                samples[i, j] = float(row[name])
+            log_likelihood[i] = float(row.get("log_likelihood", 0))
+            log_prior[i] = float(row.get("log_prior", 0))
+            w = row.get("weight")
+            if w is not None:
+                weights_list.append(float(w))
+
+        weights = np.array(weights_list) if weights_list else None
+
+        # Reconstruct metadata from saved inference.json fields
+        loaded_metadata: dict[str, Any] = {
+            "loaded_from": str(path),
+        }
+        for key in ("nlive", "sampler", "n_iterations", "n_calls"):
+            val = meta.get(key)
+            if val is not None:
+                loaded_metadata[key] = val
+
+        return cls(
+            samples=samples,
+            log_likelihood=log_likelihood,
+            log_prior=log_prior,
+            param_names=param_names,
+            method=meta.get("method", "nested"),
+            log_evidence=meta.get("log_evidence"),
+            log_evidence_err=meta.get("log_evidence_err"),
+            weights=weights,
+            metadata=loaded_metadata,
+        )
+
     def to_sweep_results(self) -> SweepResults:
         """Convert to a :class:`~tidal.measurement._sweep_results.SweepResults`.
 
@@ -161,9 +263,16 @@ class InferenceResult:
             for i, name in enumerate(self.param_names)
         }
 
+        # Filter out non-serializable metadata (e.g. cached anesthetic objects)
+        serializable_meta = {
+            k: v
+            for k, v in self.metadata.items()
+            if not k.startswith("_")
+            and isinstance(v, (str, int, float, bool, list, dict, type(None)))
+        }
         meta: dict[str, Any] = {
             "inference_method": self.method,
-            **self.metadata,
+            **serializable_meta,
         }
         if self.log_evidence is not None:
             meta["log_evidence"] = self.log_evidence
@@ -217,6 +326,49 @@ class InferenceResult:
         if self.log_evidence is not None:
             summary["log_evidence"] = self.log_evidence
             summary["log_evidence_err"] = self.log_evidence_err
+
+        # Preserve sampler metadata for round-trip loading
+        nlive = self.metadata.get("nlive")
+        if nlive is not None:
+            summary["nlive"] = nlive
+        sampler = self.metadata.get("sampler")
+        if sampler is not None:
+            summary["sampler"] = sampler
+
+        # Compute parameter importance for nested sampling results
+        if self.method == "nested":
+            try:
+                importance = self.parameter_importance()
+                summary["parameter_importance"] = {
+                    "d_kl": importance.d_kl,
+                    "d_kl_err": importance.d_kl_err,
+                    "d_g": importance.d_g,
+                    "d_g_err": importance.d_g_err,
+                    "marginal_d_kl": importance.marginal_d_kl,
+                }
+                # Also save as standalone file
+                with (output_dir / "importance.json").open("w") as f:
+                    json.dump(
+                        {
+                            "param_names": importance.param_names,
+                            "d_kl": importance.d_kl,
+                            "d_kl_err": importance.d_kl_err,
+                            "d_g": importance.d_g,
+                            "d_g_err": importance.d_g_err,
+                            "marginal_d_kl": importance.marginal_d_kl,
+                            "log_evidence": importance.log_evidence,
+                            "log_evidence_err": importance.log_evidence_err,
+                        },
+                        f,
+                        indent=2,
+                    )
+            except Exception:  # noqa: BLE001
+                import logging
+
+                logging.getLogger("tidal.inference").debug(
+                    "Parameter importance computation skipped during save",
+                    exc_info=True,
+                )
 
         with (output_dir / "inference.json").open("w") as f:
             json.dump(summary, f, indent=2)

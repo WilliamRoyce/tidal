@@ -67,7 +67,7 @@ _GREEK_MAP: dict[str, str] = {
 # Pre-compiled patterns for Greek substitution (longest match first to avoid
 # partial replacement, e.g. "epsilon" before "eps")
 _GREEK_RE = re.compile(
-    r"\b(" + "|".join(sorted(_GREEK_MAP, key=len, reverse=True)) + r")\b"
+    r"\b(" + "|".join(sorted(_GREEK_MAP, key=len, reverse=True)) + r")\b",
 )
 
 # ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ _MATH_FUNC_LATEX: dict[str, str] = {
 _RE_MATH_FUNC = re.compile(
     r"\b("
     + "|".join(sorted(_MATH_FUNC_LATEX, key=len, reverse=True))
-    + r")\[([^\[\]]+)\]"
+    + r")\[([^\[\]]+)\]",
 )
 
 # Sqrt[expr] → \sqrt{expr}  (separate: uses braces not parens)
@@ -126,7 +126,7 @@ def _convert_math_functions(s: str) -> str:
     s = _RE_ABS.sub(r"\\left| \1 \\right|", s)
     # General functions: FuncName[expr] → \funcname(expr)
     return _RE_MATH_FUNC.sub(
-        lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})", s
+        lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})", s,
     )
 
 
@@ -228,7 +228,7 @@ def coefficient_to_latex(expr: str) -> str:
 
     # Step 1: Rational[p, q] → \frac{p}{q}
     s = _RE_RATIONAL.sub(
-        lambda m: rf"\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}", s
+        lambda m: rf"\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}", s,
     )
 
     # Step 2: Sqrt[expr] → \sqrt{expr}
@@ -317,7 +317,7 @@ def _coefficient_inner(s: str) -> str:
 
     # Simple powers: ^N (multi-digit) → ^{N}
     s = _RE_POWER_SIMPLE.sub(
-        lambda m: f"^{{{m.group(1)}}}" if len(m.group(1)) > 1 else f"^{m.group(1)}", s
+        lambda m: f"^{{{m.group(1)}}}" if len(m.group(1)) > 1 else f"^{m.group(1)}", s,
     )
 
     # 1/(expr) → \frac{1}{expr}
@@ -332,7 +332,7 @@ def _coefficient_inner(s: str) -> str:
 # ---------------------------------------------------------------------------
 
 _FIELD_GREEK: frozenset[str] = frozenset(
-    {"phi", "chi", "psi", "alpha", "beta", "gamma", "sigma", "omega", "theta"}
+    {"phi", "chi", "psi", "alpha", "beta", "gamma", "sigma", "omega", "theta"},
 )
 
 
@@ -374,7 +374,7 @@ def field_to_latex(
     # Velocity prefix: v_phi_0 → \dot{base}
     if name.startswith("v_"):
         base = field_to_latex(
-            name[2:], tensor_meta=tensor_meta, coordinates=coordinates
+            name[2:], tensor_meta=tensor_meta, coordinates=coordinates,
         )
         return rf"\dot{{{base}}}"
 
@@ -534,7 +534,7 @@ def equation_to_latex(
 
     # LHS
     field_tex = field_to_latex(
-        eq.field_name, tensor_meta=field_meta, coordinates=coords
+        eq.field_name, tensor_meta=field_meta, coordinates=coords,
     )
     t_order = eq.time_derivative_order
     if t_order == 0:
@@ -549,13 +549,13 @@ def equation_to_latex(
     for i, term in enumerate(eq.rhs_terms):
         term_field_meta = _get_field_meta(term.field, spec)
         tf_tex = field_to_latex(
-            term.field, tensor_meta=term_field_meta, coordinates=coords
+            term.field, tensor_meta=term_field_meta, coordinates=coords,
         )
         op_tex = operator_to_latex(term.operator, tf_tex)
 
         # Coefficient
         coeff_str = _render_term_coefficient(
-            term.coefficient, term.coefficient_symbolic, is_first=(i == 0)
+            term.coefficient, term.coefficient_symbolic, is_first=(i == 0),
         )
         if coeff_str:
             rhs_parts.append(f"{coeff_str} {op_tex}")
@@ -591,7 +591,7 @@ def _format_numeric_coeff(value: float) -> str:
 
 
 def _render_term_coefficient(
-    numeric: float, symbolic: str | None, *, is_first: bool
+    numeric: float, symbolic: str | None, *, is_first: bool,
 ) -> str:
     """Render a term's coefficient for display in an equation.
 
@@ -646,16 +646,16 @@ def hamiltonian_to_latex(
         fa_meta = _get_field_meta(term.factor_a.field, spec)
         fb_meta = _get_field_meta(term.factor_b.field, spec)
         fa_tex = field_to_latex(
-            term.factor_a.field, tensor_meta=fa_meta, coordinates=coords
+            term.factor_a.field, tensor_meta=fa_meta, coordinates=coords,
         )
         fb_tex = field_to_latex(
-            term.factor_b.field, tensor_meta=fb_meta, coordinates=coords
+            term.factor_b.field, tensor_meta=fb_meta, coordinates=coords,
         )
         fa_op = operator_to_latex(term.factor_a.operator, fa_tex)
         fb_op = operator_to_latex(term.factor_b.operator, fb_tex)
 
         coeff = _render_term_coefficient(
-            term.coefficient, term.coefficient_symbolic, is_first=(i == 0)
+            term.coefficient, term.coefficient_symbolic, is_first=(i == 0),
         )
         # Quadratic form: coeff * factor_a * factor_b
         term_tex = rf"{fa_op}^2" if fa_op == fb_op else rf"{fa_op} \, {fb_op}"
@@ -782,7 +782,7 @@ def _paren_frac(m: re.Match[str]) -> str:
 
 # Pre-compiled pattern for Greek in Lagrangian cleanup (negative lookbehind)
 _RE_GREEK_NO_BACKSLASH = re.compile(
-    r"(?<!\\)\b(" + "|".join(sorted(_GREEK_MAP, key=len, reverse=True)) + r")\b"
+    r"(?<!\\)\b(" + "|".join(sorted(_GREEK_MAP, key=len, reverse=True)) + r")\b",
 )
 
 
@@ -851,7 +851,7 @@ def lagrangian_to_latex(expr: str) -> str:
 
     # Pass 1: Bracket functions
     s = _RE_RATIONAL.sub(
-        lambda m: rf"\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}", s
+        lambda m: rf"\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}", s,
     )
     s = _RE_SQRT.sub(lambda m: rf"\sqrt{{{m.group(1)}}}", s)
     s = _RE_E_POWER.sub(r"e^", s)
@@ -952,7 +952,7 @@ def system_to_latex(
     # Hamiltonian
     if include_hamiltonian and spec.canonical and spec.canonical.hamiltonian_terms:
         sections.append(
-            hamiltonian_to_latex(list(spec.canonical.hamiltonian_terms), spec)
+            hamiltonian_to_latex(list(spec.canonical.hamiltonian_terms), spec),
         )
 
     if output_format == "raw":
@@ -989,7 +989,7 @@ def system_to_latex(
 
 
 def _get_field_meta(
-    field_name: str, spec: EquationSystem
+    field_name: str, spec: EquationSystem,
 ) -> dict[str, list[int] | int | str] | None:
     """Look up tensor metadata for a field from the EquationSystem.
 

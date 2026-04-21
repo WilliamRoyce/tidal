@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tidal.inference._importance import ParameterImportanceResult
     from tidal.inference._results import InferenceResult
 
 
@@ -93,6 +94,72 @@ def plot_trace(
     plt.close(fig)
 
 
+def plot_importance(
+    result: ParameterImportanceResult,
+    output_path: Path | None = None,
+    *,
+    show: bool = False,
+) -> None:
+    """Horizontal bar chart of per-parameter KL divergence.
+
+    Parameters ranked by marginal D_KL (most constrained first).
+    Color-coded: strong (red), moderate (orange), weak (blue).
+
+    Parameters
+    ----------
+    result : ParameterImportanceResult
+        Output from ``compute_parameter_importance``.
+    output_path : Path | None
+        If provided, save figure to this path.
+    show : bool
+        If True, display the figure interactively.
+    """
+    import math
+
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Rank by D_KL
+    ranked = sorted(
+        result.marginal_d_kl.items(),
+        key=lambda x: x[1] if math.isfinite(x[1]) else -1,
+    )
+    names = [name for name, _ in ranked]
+    values = [dkl if math.isfinite(dkl) else 0.0 for _, dkl in ranked]
+
+    # Color by importance
+    colors = []
+    for v in values:
+        if v > 1.0:
+            colors.append("#d62728")  # red = strong
+        elif v > 0.1:
+            colors.append("#ff7f0e")  # orange = moderate
+        else:
+            colors.append("#1f77b4")  # blue = weak
+
+    fig, ax = plt.subplots(figsize=(8, max(3, 0.6 * len(names))))
+    y_pos = np.arange(len(names))
+    ax.barh(y_pos, values, color=colors, edgecolor="none", height=0.6)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(names)
+    ax.set_xlabel("Marginal $D_{\\mathrm{KL}}$ (nats)")
+    ax.set_title(
+        f"Parameter Importance  ($d_G = {result.d_g:.1f}$ of {len(names)} params)",
+    )
+
+    # Threshold line
+    ax.axvline(0.1, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
+    ax.text(0.1, len(names) - 0.3, "weak", fontsize=8, color="gray", ha="left")
+
+    fig.tight_layout()
+
+    if output_path:
+        fig.savefig(output_path, dpi=150, bbox_inches="tight")
+    if show:
+        plt.show()
+    plt.close(fig)
+
+
 def _plot_corner_anesthetic(
     result: InferenceResult,
     output_path: Path | None = None,
@@ -101,21 +168,30 @@ def _plot_corner_anesthetic(
 ) -> None:
     """Corner plot using anesthetic (Handley 2019)."""
     import matplotlib.pyplot as plt
-    from anesthetic import MCMCSamples, NestedSamples
 
-    if result.method == "nested" and result.weights is not None:
-        samples = NestedSamples(
-            data=result.samples,
-            logL=result.log_likelihood,
-            columns=result.param_names,
-        )
-    else:
+    from tidal.inference._importance import to_anesthetic_samples
+
+    try:
+        samples = to_anesthetic_samples(result)
+    except ValueError:
+        # Fall back to MCMCSamples for non-nested results
+        from anesthetic import MCMCSamples
+
         samples = MCMCSamples(
             data=result.samples,
             columns=result.param_names,
         )
 
-    fig, _axes = samples.plot_2d(result.param_names)
+    # anesthetic >= 2.0: plot_2d returns an AxesDataFrame whose cells
+    # expose .get_figure().  Older versions returned (fig, axes).  Handle
+    # both without version-gating.
+    ret = samples.plot_2d(result.param_names)
+    if isinstance(ret, tuple) and len(ret) == 2:
+        fig = ret[0]
+    else:
+        # AxesDataFrame (or similar): pick any cell, grab its figure.
+        cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
+        fig = cell.get_figure()
     fig.suptitle(
         f"Posterior ({result.method}, n={result.n_samples}, "
         f"ESS={result.effective_sample_size():.0f})",
@@ -160,7 +236,7 @@ def _plot_corner_matplotlib(
                 continue
             if i == j:
                 ax.hist(
-                    samples[:, i], bins=30, weights=weights, density=True, alpha=0.7
+                    samples[:, i], bins=30, weights=weights, density=True, alpha=0.7,
                 )
                 ax.set_xlabel(result.param_names[i])
             else:
@@ -179,7 +255,7 @@ def _plot_corner_matplotlib(
 
     fig.suptitle(
         f"Posterior ({result.method}, n={result.n_samples}, "
-        f"ESS={result.effective_sample_size():.0f})"
+        f"ESS={result.effective_sample_size():.0f})",
     )
     fig.tight_layout()
 

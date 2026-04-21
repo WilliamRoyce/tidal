@@ -104,7 +104,7 @@ def _check_parameters(spec: object) -> list[str]:
     for param, fields in sorted(param_map.items()):
         if isinstance(defaults, dict) and param not in defaults:
             warnings.append(
-                f"Parameter '{param}' (used in: {', '.join(fields)}) has no default value"
+                f"Parameter '{param}' (used in: {', '.join(fields)}) has no default value",
             )
     return warnings
 
@@ -269,7 +269,7 @@ def validate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
                 error_with_hint(
                     err,
                     hints=[
-                        "Check JSON syntax. Validate with: `python -m json.tool <file>`"
+                        "Check JSON syntax. Validate with: `python -m json.tool <file>`",
                     ],
                 )
             elif err.startswith("Failed to load"):
@@ -312,7 +312,7 @@ def validate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
                 error_with_hint(
                     err,
                     hints=[
-                        "Run `tidal inspect <json>` to check field and operator names"
+                        "Run `tidal inspect <json>` to check field and operator names",
                     ],
                 )
             else:

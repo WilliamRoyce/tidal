@@ -1,25 +1,24 @@
-"""Nested sampling backends for Bayesian evidence computation.
+"""Nested sampling backend for Bayesian evidence computation.
 
-Supports two backends via the ``--sampler`` flag:
+Uses **PolyChord** (Will Handley et al., 2015) — Fortran-compiled,
+slice-sampling, scales to high dimensions, native anesthetic integration.
 
-- **dynesty** (default): Pure Python, pip-installable, good for development.
-- **polychord**: Fortran-compiled, MPI-parallel, better for HPC production.
+Install via ``bash scripts/install_polychord.sh`` (requires gfortran).
 
-Both use the same interface: ``log_likelihood(theta) -> float`` and
-``prior_transform(u) -> theta``.  Visualization uses **anesthetic**
-(Handley 2019) for both backends.
+Visualization uses **anesthetic** (Handley 2019).
 
 References
 ----------
-Speagle, J.S. (2020) "dynesty: a dynamic nested sampling package",
-    MNRAS 493(3), 3132-3158.
 Handley, W. et al. (2015) "PolyChord: next-generation nested sampling",
     MNRAS 453(4), 4384-4398.
+Handley, W. (2019) "anesthetic: nested sampling visualization",
+    JOSS 4(37), 1414.
 Skilling, J. (2004) "Nested Sampling", AIP Conference Proceedings 735, 395-405.
 """
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -30,22 +29,53 @@ if TYPE_CHECKING:
     from tidal.inference._results import InferenceResult
 
 
+# ---------------------------------------------------------------------------
+# nlive recommendation
+# ---------------------------------------------------------------------------
+
+
+def recommend_nlive(ndim: int, precision: str = "standard") -> int:
+    """Recommend number of live points for a given dimensionality.
+
+    Scaling follows Handley et al. (2015), Section 3.2.
+
+    Parameters
+    ----------
+    ndim : int
+        Number of parameters.
+    precision : str
+        One of ``"fast"``, ``"standard"``, ``"production"``.
+
+    Returns
+    -------
+    int
+        Recommended ``nlive``.
+    """
+    if precision == "fast":
+        return max(25 * ndim, 50)
+    if precision == "production":
+        return max(50 * ndim, 250)
+    return max(25 * ndim, 100)  # standard
+
+
+# ---------------------------------------------------------------------------
+# Dispatcher
+# ---------------------------------------------------------------------------
+
+
 def run_nested_sampling(
     log_likelihood: Callable[..., float],
     prior_transform: Callable[..., Any],
     ndim: int,
     param_names: list[str],
-    sampler: str = "dynesty",
+    sampler: str = "polychord",
     nlive: int = 100,
-    dlogz: float = 0.01,
     n_workers: int | None = None,
-    seed: int | None = None,
     *,
-    dynamic: bool = False,
     quiet: bool = False,
     **kwargs: Any,
 ) -> InferenceResult:
-    """Run nested sampling with the specified backend.
+    """Run nested sampling with PolyChord.
 
     Parameters
     ----------
@@ -59,220 +89,171 @@ def run_nested_sampling(
     param_names : list[str]
         Parameter names.
     sampler : str
-        Backend: ``"dynesty"`` or ``"polychord"``.
+        Backend — only ``"polychord"`` supported (validated for clarity).
     nlive : int
         Number of live points.
-    dlogz : float
-        Evidence tolerance (stopping criterion).
     n_workers : int | None
-        Number of parallel workers. None = sequential.
-    seed : int | None
-        Random seed.
-    dynamic : bool
-        Use dynamic nested sampling (dynesty only).
+        Number of parallel workers (unused by PolyChord's serial binding;
+        retained for future MPI path).
     quiet : bool
         Suppress progress output.
     **kwargs
-        Additional backend-specific options.
+        PolyChord-specific settings: ``num_repeats``, ``precision_criterion``,
+        ``do_clustering``, ``output_dir``, ``file_root``, etc.
     """
-    if sampler == "dynesty":
-        return _run_dynesty(
-            log_likelihood=log_likelihood,
-            prior_transform=prior_transform,
-            ndim=ndim,
-            param_names=param_names,
-            nlive=nlive,
-            dlogz=dlogz,
-            n_workers=n_workers,
-            seed=seed,
-            dynamic=dynamic,
-            quiet=quiet,
-            **kwargs,
-        )
-    if sampler == "polychord":
-        return _run_polychord(
-            log_likelihood=log_likelihood,
-            prior_transform=prior_transform,
-            ndim=ndim,
-            param_names=param_names,
-            nlive=nlive,
-            n_workers=n_workers,
-            quiet=quiet,
-            **kwargs,
-        )
-    msg = f"Unknown sampler '{sampler}'. Use 'dynesty' or 'polychord'."
-    raise ValueError(msg)
+    if sampler != "polychord":
+        msg = f"Unknown sampler '{sampler}'. Only 'polychord' is supported."
+        raise ValueError(msg)
+
+    return _run_polychord(
+        log_likelihood=log_likelihood,
+        prior_transform=prior_transform,
+        ndim=ndim,
+        param_names=param_names,
+        nlive=nlive,
+        n_workers=n_workers,
+        quiet=quiet,
+        **kwargs,
+    )
 
 
-def _run_dynesty(
+# ---------------------------------------------------------------------------
+# PolyChord backend
+# ---------------------------------------------------------------------------
+
+
+def _run_polychord(  # noqa: PLR0915
     *,
     log_likelihood: Callable[..., float],
     prior_transform: Callable[..., Any],
     ndim: int,
     param_names: list[str],
     nlive: int,
-    dlogz: float,
-    n_workers: int | None,
-    seed: int | None,
-    dynamic: bool,
+    n_workers: int | None,  # PolyChord uses MPI, not Pool
     quiet: bool,
     **kwargs: Any,
 ) -> InferenceResult:
-    """Run nested sampling with dynesty."""
-    try:
-        import dynesty
-    except ImportError:
-        msg = (
-            "dynesty is required for nested sampling. "
-            "Install with: pip install tidal[inference]"
-        )
-        raise ImportError(msg) from None
-
-    from tidal.inference._results import InferenceResult
-
-    pool = None
-    queue_size = 1
-
-    if n_workers and n_workers > 1:
-        from multiprocessing import Pool
-
-        from tidal.cli._sweep import (
-            _set_single_thread_blas,  # pyright: ignore[reportPrivateUsage]
-        )
-
-        pool = Pool(n_workers, initializer=_set_single_thread_blas)
-        queue_size = n_workers
-
-    rstate = np.random.default_rng(seed) if seed is not None else None
-
-    try:
-        if dynamic:
-            sampler = dynesty.DynamicNestedSampler(
-                log_likelihood,
-                prior_transform,
-                ndim,
-                pool=pool,
-                queue_size=queue_size,
-                rstate=rstate,
-            )
-            sampler.run_nested(
-                dlogz_init=dlogz,
-                print_progress=not quiet,
-                **kwargs,
-            )
-        else:
-            sampler = dynesty.NestedSampler(
-                log_likelihood,
-                prior_transform,
-                ndim,
-                nlive=nlive,
-                bound="multi",
-                pool=pool,
-                queue_size=queue_size,
-                rstate=rstate,
-            )
-            sampler.run_nested(
-                dlogz=dlogz,
-                print_progress=not quiet,
-                **kwargs,
-            )
-
-        results = sampler.results
-
-        # Extract importance weights
-        try:
-            weights = np.exp(results.logwt - results.logz[-1])
-            weights /= weights.sum()
-        except (AttributeError, IndexError):
-            weights = None
-
-        return InferenceResult(
-            samples=results.samples,
-            log_likelihood=results.logl,
-            log_prior=np.zeros(len(results.logl)),  # uniform in unit cube
-            param_names=param_names,
-            method="nested",
-            log_evidence=float(results.logz[-1]),
-            log_evidence_err=float(results.logzerr[-1]),
-            weights=weights,
-            metadata={
-                "sampler": "dynesty",
-                "nlive": nlive,
-                "dlogz": dlogz,
-                "dynamic": dynamic,
-                "n_iterations": results.niter,
-                "n_calls": sum(results.ncall),
-            },
-        )
-    finally:
-        if pool is not None:
-            pool.close()
-            pool.join()
-
-
-def _run_polychord(
-    *,
-    log_likelihood: Callable[..., float],
-    prior_transform: Callable[..., Any],
-    ndim: int,
-    param_names: list[str],
-    nlive: int,
-    n_workers: int | None,
-    quiet: bool,
-    **kwargs: Any,
-) -> InferenceResult:
-    """Run nested sampling with PolyChord.
+    """Run nested sampling with PolyChord (Handley et al. 2015).
 
     Requires ``pypolychord`` to be installed (Fortran-compiled).
-    Typically used on HPC systems (Newton server, CSD3).
+    Install via: ``bash scripts/install_polychord.sh``
     """
+    # --- Pre-flight: detect all-(-inf) likelihoods before PolyChord hangs.
+    # PolyChord rejects non-finite initial draws and will spin forever if
+    # the likelihood is uniformly -inf (see #270 for the original silent
+    # 60-minute hang this guards against).  Runs before the pypolychord
+    # import so it still fires in environments without Fortran.
+    n_probe = int(kwargs.pop("n_probe", 10))
+    probe_rng = np.random.default_rng(0)
+    probe_logls = [
+        float(log_likelihood(list(prior_transform(list(probe_rng.random(ndim))))))
+        for _ in range(n_probe)
+    ]
+    if all(not math.isfinite(x) for x in probe_logls):
+        msg = (
+            f"All {n_probe} prior-sample likelihoods returned non-finite logL. "
+            "PolyChord cannot build live points. Check: "
+            "(a) --baseline-formula references only parameters in the spec or "
+            "--param/--prior; (b) simulations succeed across the prior range; "
+            "(c) --constraint isn't over-restrictive."
+        )
+        raise RuntimeError(msg)
+
     try:
         from pypolychord import run_polychord
-        from pypolychord.settings import PolyChordSettings
-    except ImportError:
+    except ImportError as e:
         msg = (
-            "pypolychord is required for PolyChord backend. "
-            "Install from source: pip install git+https://github.com/PolyChord/PolyChordLite "
-            "(requires gfortran). For development, use --sampler dynesty instead."
+            "pypolychord is required for nested sampling. "
+            "Install with: bash scripts/install_polychord.sh "
+            f"(requires gfortran). Original error: {e}"
         )
-        raise ImportError(msg) from None
+        raise ImportError(msg) from e
+    try:
+        from pypolychord import PolyChordSettings
+    except ImportError:
+        from pypolychord.settings import PolyChordSettings
 
     from tidal.inference._results import InferenceResult
 
-    output_dir = kwargs.get("output_dir", "polychord_output")
+    # --- Output directory ---
+    output_dir = kwargs.pop("output_dir", "polychord_output")
+    file_root = kwargs.pop("file_root", "tidal")
 
-    settings = PolyChordSettings(ndim, 0)  # 0 derived parameters
+    # --- PolyChord settings ---
+    nderived = kwargs.pop("nderived", 0)
+    settings = PolyChordSettings(ndim, nderived)
     settings.nlive = nlive
     settings.base_dir = str(output_dir)
-    settings.file_root = "tidal"
-    settings.do_clustering = True
-    settings.read_resume = False
+    settings.file_root = file_root
+    settings.do_clustering = kwargs.pop("do_clustering", True)
+    settings.read_resume = kwargs.pop("read_resume", False)
     settings.feedback = 0 if quiet else 1
+    # Anesthetic's polychord reader needs <root>_dead-birth.txt and
+    # <root>_phys_live-birth.txt (the latter is soft-optional, wrapped in
+    # try/except IOError).  `_prior.txt` is never touched — safe to skip,
+    # shaving a small fraction of wall time on shared filesystems (see
+    # issue #269 P4).  Expose both so advanced users can re-enable if
+    # they need every file.
+    settings.write_prior = kwargs.pop("write_prior", False)
 
-    # PolyChord expects (theta, ndim, nderived) -> (logL, [derived])
+    # Slice sampling repetitions (default 5*ndim per PolyChord convention)
+    num_repeats = kwargs.pop("num_repeats", None)
+    if num_repeats is not None:
+        settings.num_repeats = num_repeats
+
+    # Evidence precision criterion
+    precision_criterion = kwargs.pop("precision_criterion", None)
+    if precision_criterion is not None:
+        settings.precision_criterion = precision_criterion
+
+    # Apply any remaining kwargs directly to settings
+    for key, val in kwargs.items():
+        if hasattr(settings, key):
+            setattr(settings, key, val)
+
+    # --- Wrap likelihood/prior for PolyChord interface ---
     def polychord_loglike(theta: list[float]) -> tuple[float, list[float]]:
         logl = log_likelihood(theta)
         return logl, []
 
     def polychord_prior(hypercube: list[float]) -> list[float]:
-        return prior_transform(hypercube)
+        return list(prior_transform(hypercube))
 
-    output = run_polychord(polychord_loglike, ndim, 0, settings, polychord_prior)
+    # --- Run ---
+    output = run_polychord(
+        polychord_loglike,
+        ndim,
+        nderived,
+        settings,
+        polychord_prior,
+    )
 
-    # Read results via anesthetic for consistent interface
+    # --- Read results via anesthetic (native PolyChord integration) ---
+    chain_root = f"{output_dir}/{file_root}"
     try:
-        from anesthetic import NestedSamples
+        from anesthetic import read_chains
 
-        ns = NestedSamples(root=f"{output_dir}/tidal")
-        samples = ns.to_numpy()[:, :ndim]
-        logl = ns.logL.to_numpy()
-        weights = ns.get_weights().to_numpy()
+        ns = read_chains(chain_root)
+        samples = np.asarray(ns.to_numpy())[:, :ndim]
+        logl = np.asarray(ns.logL)
+        # `get_weights()` returns a numpy array in anesthetic>=2.0 and a
+        # pandas Series in earlier versions; np.asarray handles both.
+        weights = np.asarray(ns.get_weights())
         logz = float(ns.logZ())
         logz_err = float(ns.logZ(100).std())
     except ImportError:
         # Fallback: read PolyChord output files directly
-        samples = np.loadtxt(f"{output_dir}/tidal_equal_weights.txt")[:, :ndim]
-        logl = np.loadtxt(f"{output_dir}/tidal_equal_weights.txt")[:, -1]
+        ns = None
+        eq_file = f"{chain_root}_equal_weights.txt"
+        data = np.loadtxt(eq_file)
+        if data.ndim != 2 or data.shape[1] < ndim + 1:
+            msg = (
+                f"Unexpected PolyChord output shape {data.shape} in {eq_file}; "
+                f"expected at least {ndim + 1} columns"
+            )
+            raise ValueError(msg) from None
+        samples = data[:, :ndim]
+        logl = data[:, -1]
         weights = None
         logz = float(output.logZ)
         logz_err = float(output.logZerr)
@@ -289,5 +270,8 @@ def _run_polychord(
         metadata={
             "sampler": "polychord",
             "nlive": nlive,
+            "chain_root": chain_root,
+            # Cache the anesthetic NestedSamples object for importance analysis
+            "_anesthetic_samples": ns,
         },
     )

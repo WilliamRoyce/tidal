@@ -99,21 +99,21 @@ class TestOperatorsPeriodic2D:
         return g, data, xs, ys
 
     def test_gradient_x(
-        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         g, data, xs, ys = setup
         result = gradient(data, 0, g)
         np.testing.assert_allclose(result, np.cos(xs) * np.cos(ys), atol=5e-3)
 
     def test_gradient_y(
-        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         g, data, xs, ys = setup
         result = gradient(data, 1, g)
         np.testing.assert_allclose(result, -np.sin(xs) * np.sin(ys), atol=5e-3)
 
     def test_laplacian(
-        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         g, data, _xs, _ys = setup
         result = laplacian(data, g)
@@ -121,14 +121,14 @@ class TestOperatorsPeriodic2D:
         np.testing.assert_allclose(result, -2 * data, atol=5e-2)
 
     def test_directional_laplacian_x(
-        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         g, data, xs, ys = setup
         result = directional_laplacian(data, 0, g)
         np.testing.assert_allclose(result, -np.sin(xs) * np.cos(ys), atol=5e-3)
 
     def test_cross_derivative(
-        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         g, data, xs, ys = setup
         result = cross_derivative(data, 0, 1, g)
@@ -136,7 +136,7 @@ class TestOperatorsPeriodic2D:
         np.testing.assert_allclose(result, -np.cos(xs) * np.sin(ys), atol=5e-2)
 
     def test_biharmonic(
-        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         g, data, _xs, _ys = setup
         result = biharmonic(data, g)
@@ -144,7 +144,7 @@ class TestOperatorsPeriodic2D:
         np.testing.assert_allclose(result, 4 * data, atol=0.5)
 
     def test_identity(
-        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         g, data, _, _ = setup
         result = identity(data, g)
@@ -543,7 +543,7 @@ class TestAxisBCSpecWithOperators:
         result_str = directional_laplacian(data, 0, g, bc="neumann")
         side = SideBCSpec(kind="neumann")
         result_spec = directional_laplacian(
-            data, 0, g, bc=(AxisBCSpec(periodic=False, low=side, high=side),)
+            data, 0, g, bc=(AxisBCSpec(periodic=False, low=side, high=side),),
         )
         np.testing.assert_allclose(result_spec, result_str, atol=1e-14)
 
@@ -556,7 +556,7 @@ class TestAxisBCSpecWithOperators:
         result_str = directional_laplacian(data, 0, g, bc="dirichlet")
         side = SideBCSpec(kind="dirichlet")
         result_spec = directional_laplacian(
-            data, 0, g, bc=(AxisBCSpec(periodic=False, low=side, high=side),)
+            data, 0, g, bc=(AxisBCSpec(periodic=False, low=side, high=side),),
         )
         np.testing.assert_allclose(result_spec, result_str, atol=1e-14)
 

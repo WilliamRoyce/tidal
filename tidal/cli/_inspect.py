@@ -199,7 +199,7 @@ def _print_header(spec: object) -> None:
     print(
         f"  Lagrangian: {lagrangian}"
         if lagrangian
-        else "  (no Lagrangian expression in metadata)"
+        else "  (no Lagrangian expression in metadata)",
     )
     source_parts = [s for s in [source, derived_from] if s]
     if source_parts:
@@ -231,7 +231,7 @@ def _print_equations(spec: object) -> None:
     if not isinstance(spec, EquationSystem):
         return
     print(
-        f"Fields ({spec.n_components} component{'s' if spec.n_components != 1 else ''}):"
+        f"Fields ({spec.n_components} component{'s' if spec.n_components != 1 else ''}):",
     )
     for eq in spec.equations:
         t_order = eq.time_derivative_order
@@ -294,7 +294,7 @@ def _build_json_output(spec: object, *, show_params: bool) -> dict[str, Any]:
                 "field_name": eq.field_name,
                 "time_derivative_order": eq.time_derivative_order,
                 "terms": terms,
-            }
+            },
         )
 
     result: dict[str, Any] = {
@@ -392,10 +392,10 @@ def inspect_command(args: Namespace) -> int:
 
     # Matrices
     print(
-        f"Mass matrix:    {_format_matrix(spec.mass_matrix, spec.mass_matrix_symbolic or None)}"
+        f"Mass matrix:    {_format_matrix(spec.mass_matrix, spec.mass_matrix_symbolic or None)}",
     )
     print(
-        f"Coupling matrix: {_format_matrix(spec.coupling_matrix, spec.coupling_matrix_symbolic or None)}"
+        f"Coupling matrix: {_format_matrix(spec.coupling_matrix, spec.coupling_matrix_symbolic or None)}",
     )
 
     return 0

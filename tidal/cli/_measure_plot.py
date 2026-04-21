@@ -80,7 +80,7 @@ def _plot_energy(ax: Axes, results: dict[str, Any]) -> None:
     for name, series in eng["per_field"].items():
         ax.plot(times, series, label=name, linewidth=1.2)
     ax.plot(
-        times, eng["interaction"], "--", label="interaction", linewidth=1.0, alpha=0.7
+        times, eng["interaction"], "--", label="interaction", linewidth=1.0, alpha=0.7,
     )
     ax.plot(times, eng["total"], "k-", label="total", linewidth=1.0, alpha=0.5)
     ax.legend(fontsize=7, ncol=2)
@@ -260,7 +260,7 @@ def _plot_summary_text(ax: Axes, data: SimulationData, results: dict[str, Any]) 
                 f"Conservation: {'PASS' if cons['is_conserved'] else 'FAIL'}",
                 f"  max |dE/E| = {cons['max_relative_error']:.2e}",
                 "",
-            ]
+            ],
         )
 
     if "conversion" in results and "error" not in results["conversion"]:
@@ -270,7 +270,7 @@ def _plot_summary_text(ax: Axes, data: SimulationData, results: dict[str, Any]) 
                 f"Peak P(t) = {conv['peak_probability']:.6f}",
                 f"  at t = {conv['peak_time']:.2f}",
                 "",
-            ]
+            ],
         )
 
     if "mixing" in results and "error" not in results["mixing"]:
@@ -281,7 +281,7 @@ def _plot_summary_text(ax: Axes, data: SimulationData, results: dict[str, Any]) 
                 f"  +/- {mix['mixing_length_uncertainty']:.4f}",
                 f"omega_dom = {mix['dominant_frequency']:.4f}",
                 "",
-            ]
+            ],
         )
 
     ax.text(

@@ -31,7 +31,7 @@ def _make_kg_spec() -> EquationSystem:
                         {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
                     ],
                 },
-            }
+            },
         ],
     }
     return EquationSystem.from_dict(data)
@@ -118,7 +118,7 @@ class TestFieldSetConstruction:
         spec = _make_kg_spec()
         layout = StateLayout.from_spec(spec, 8)
         fs = FieldSet.from_dict(
-            layout, (8,), {"phi_0": np.ones(8), "nonexistent": np.zeros(8)}
+            layout, (8,), {"phi_0": np.ones(8), "nonexistent": np.zeros(8)},
         )
         np.testing.assert_array_equal(fs["phi_0"], 1.0)
 

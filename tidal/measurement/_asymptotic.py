@@ -116,7 +116,7 @@ def _build_k_grids(
     for ax in range(ndim):
         n = field_shape[ax]
         k_ax: NDArray[np.float64] = np.asarray(
-            np.fft.fftfreq(n, d=grid_spacing[ax]) * (2.0 * np.pi), dtype=np.float64
+            np.fft.fftfreq(n, d=grid_spacing[ax]) * (2.0 * np.pi), dtype=np.float64,
         )
         k_arrays.append(k_ax)
     return [

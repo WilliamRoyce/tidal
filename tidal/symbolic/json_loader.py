@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 from tidal.symbolic._eval_utils import evaluate_coefficient
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
     from tidal.solver.operators import SideBCSpec
 
@@ -57,7 +57,7 @@ _STATIC_OPERATORS: frozenset[str] = frozenset(
         "cross_derivative_yz",
         "first_derivative_t",
         "biharmonic",
-    }
+    },
 )
 
 #: Pattern for generic single-axis Nth-order derivatives: derivative_3_x, derivative_5_y, etc.
@@ -65,7 +65,7 @@ _GENERIC_SINGLE_AXIS_RE = re.compile(r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r
 
 #: Pattern for generic multi-axis derivatives: derivative_2x_1y, derivative_3x_2z, etc.
 _GENERIC_MULTI_AXIS_RE = re.compile(
-    r"^derivative_(\d+" + _AXIS_RE_CLASS + r"(?:_\d+" + _AXIS_RE_CLASS + r")*)$"
+    r"^derivative_(\d+" + _AXIS_RE_CLASS + r"(?:_\d+" + _AXIS_RE_CLASS + r")*)$",
 )
 
 
@@ -208,6 +208,14 @@ class OperatorTerm:
         Coordinate names the coefficient depends on (e.g., ("x", "y") for
         position-dependent coefficients on curved spatial surfaces, or ("t",)
         for time-dependent). Empty tuple for constant coefficients.
+    order_in_eps : int
+        Order of this term in the small parameters configured by the theory's
+        ``[perturbation]`` section. 0 for the base (unperturbed) theory; 1 for
+        a first-order correction, etc. Set by the Wolfram ``ComputeOrderInEps``
+        helper and consumed by :class:`EquationSystem.filter_by_order` to
+        separate base from correction terms for the iterative perturbative
+        solver (v6 plan, Stage 2). Defaults to 0 for backward compatibility
+        with JSON files predating the field.
     """
 
     coefficient: float
@@ -216,6 +224,7 @@ class OperatorTerm:
     coefficient_symbolic: str | None = None
     time_dependent: bool = False
     coordinate_dependent: tuple[str, ...] = ()
+    order_in_eps: int = 0
 
     @property
     def position_dependent(self) -> bool:
@@ -280,13 +289,14 @@ class OperatorTerm:
             coefficient_symbolic=data.get("coefficient_symbolic"),
             time_dependent=bool(data.get("time_dependent", False)),
             coordinate_dependent=tuple(data.get("coordinate_dependent", ())),
+            order_in_eps=int(data.get("order_in_eps", 0)),
         )
 
 
 # --- Boundary conditions ---
 
 _VALID_BC_TYPES: frozenset[str] = frozenset(
-    {"periodic", "dirichlet", "neumann", "robin"}
+    {"periodic", "dirichlet", "neumann", "robin"},
 )
 
 
@@ -337,7 +347,7 @@ class BoundaryCondition:
         }
         if extra:
             logger.warning(
-                "%s BC ignores field(s): %s", bc_type, ", ".join(sorted(extra))
+                "%s BC ignores field(s): %s", bc_type, ", ".join(sorted(extra)),
             )
         return cls(
             type=bc_type,
@@ -423,7 +433,7 @@ class ConstraintSolverConfig:
     enabled: bool = False
     method: str = "auto"
     boundary_conditions: dict[str, BoundaryCondition] = dataclass_field(
-        default_factory=lambda: {}  # noqa: PIE807  # type: dict[str, BoundaryCondition]
+        default_factory=lambda: {},  # noqa: PIE807  # type: dict[str, BoundaryCondition]
     )
     max_iterations: int = 20
     tolerance: float = 1e-8
@@ -673,7 +683,7 @@ class ComponentEquation:
     time_derivative_order: int
     rhs_terms: tuple[OperatorTerm, ...]
     constraint_solver: ConstraintSolverConfig = dataclass_field(
-        default_factory=ConstraintSolverConfig
+        default_factory=ConstraintSolverConfig,
     )
     kinetic_coefficient_symbolic: str | None = None
     """Symbolic kinetic coefficient when ExportJSON left RHS unnormalized.
@@ -704,7 +714,7 @@ class ComponentEquation:
 
     @classmethod
     def from_dict(
-        cls, data: Mapping[str, Any], fields_lookup: dict[str, int]
+        cls, data: Mapping[str, Any], fields_lookup: dict[str, int],
     ) -> ComponentEquation:
         """Create a ComponentEquation from a dictionary.
 
@@ -743,7 +753,7 @@ class ComponentEquation:
 
         # Parse constraint solver config
         constraint_solver = ConstraintSolverConfig.from_dict(
-            data.get("constraint_solver")
+            data.get("constraint_solver"),
         )
 
         return cls(
@@ -876,7 +886,7 @@ class EquationSystem:
             k: float(v) for k, v in raw_params.items() if isinstance(v, (int, float))
         }
         expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
-            self.equations, self.component_names, parameters=check_params or None
+            self.equations, self.component_names, parameters=check_params or None,
         )
         if (
             self.mass_matrix != expected_mass
@@ -1015,7 +1025,7 @@ class EquationSystem:
                     effective_coeff = term.coefficient
                     if term.coefficient_symbolic is not None and parameters:
                         resolved = _resolve_symbolic_coeff(
-                            term.coefficient_symbolic, parameters
+                            term.coefficient_symbolic, parameters,
                         )
                         if resolved is not None:
                             effective_coeff = resolved
@@ -1122,6 +1132,203 @@ class EquationSystem:
         """Map from field name to equation index. Cached on frozen dataclass."""
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
 
+    # ------------------------------------------------------------------ #
+    # Perturbative-order filtering (v6 plan, Stage 2)                    #
+    # ------------------------------------------------------------------ #
+    # These methods partition an EquationSystem by the ``order_in_eps``  #
+    # tag on each OperatorTerm, which is emitted by ExportJSON.wl when a #
+    # theory has a ``[perturbation]`` section. Used by                   #
+    # :class:`tidal.solver.perturbative_driver.PerturbativeSolver` to    #
+    # drive Pass 0 (base) and Pass 1+ (correction) solves from a single #
+    # derived theory file.                                               #
+
+    def filter_by_order(self, n: int) -> EquationSystem:
+        """Return a copy retaining only RHS terms with ``order_in_eps == n``.
+
+        The equations (and their LHS structures) are preserved unchanged;
+        only the ``rhs_terms`` tuple is filtered. Equations whose filtered
+        RHS becomes empty are kept — callers may need them for state
+        layout purposes (e.g., an evolution equation without a source in
+        this order still requires its slot in the integrator).
+
+        Use ``filter_by_order(0)`` for the Pass 0 base equations and
+        ``filter_by_order(1)`` for the Pass 1 source terms of a linear
+        perturbative expansion.
+        """
+        new_eqs = tuple(
+            dataclasses.replace(
+                eq,
+                rhs_terms=tuple(t for t in eq.rhs_terms if t.order_in_eps == n),
+            )
+            for eq in self.equations
+        )
+        # Recompute mass/coupling matrices from the filtered equations
+        # (#274). Filtering RHS terms changes the identity-
+        # operator structure from which the matrices are derived; the
+        # cached matrices on self reflect the full-spec structure and
+        # would trigger __post_init__'s inconsistency UserWarning if
+        # passed through unchanged.
+        mass, coupling, mass_sym, coupling_sym = self._compute_matrices_from_terms(
+            new_eqs, self.component_names, parameters=None,
+        )
+        return dataclasses.replace(
+            self,
+            equations=new_eqs,
+            mass_matrix=mass,
+            coupling_matrix=coupling,
+            mass_matrix_symbolic=mass_sym,
+            coupling_matrix_symbolic=coupling_sym,
+        )
+
+    def max_order(self) -> int:
+        """Return the maximum ``order_in_eps`` across all RHS terms.
+
+        Returns 0 for baseline theories (no ``[perturbation]`` section or
+        no terms with non-zero order). Use to gate ``--perturbative-order``
+        validation and to size the Pass loop in the driver.
+        """
+        orders = [t.order_in_eps for eq in self.equations for t in eq.rhs_terms]
+        return max(orders) if orders else 0
+
+    def has_corrections(self) -> bool:
+        """Return True if any RHS term has ``order_in_eps > 0``.
+
+        Cheap check used by the CLI to decide whether
+        ``PerturbativeSolver`` is needed or the plain modal path
+        suffices.
+        """
+        return any(t.order_in_eps > 0 for eq in self.equations for t in eq.rhs_terms)
+
+    def base_spec(
+        self, small_parameters: Sequence[str] | None = None,
+    ) -> EquationSystem:
+        """Return the Pass 0 base spec with LHS demoted where required.
+
+        This is the correct entry point for the iterative perturbative
+        driver (v6 plan, Gap B). It extends ``filter_by_order(0)`` with
+        a check on each equation's ``kinetic_coefficient_symbolic``:
+
+        * If the kinetic coefficient evaluates to literal zero when
+          every small parameter is set to zero, the LHS is promoted by
+          the correction. Demote it to an algebraic constraint:
+          ``time_derivative_order = 0``, ``kinetic_coefficient_symbolic
+          = None``. An ``identity`` self-term is prepended to the RHS
+          if one is not already present, so Schur elimination detects
+          the field as a proper constraint.
+        * Otherwise keep the LHS as-is (the kinetic coefficient
+          survives at ε=0 — this is a normal dynamical field or a
+          kinetic term that only depends on non-perturbative
+          parameters).
+
+        Parameters
+        ----------
+        small_parameters : sequence of str, optional
+            Small-parameter names. When absent, read from
+            ``self.metadata.get("perturbation", {}).get(
+            "small_parameters", [])``.
+
+        Returns
+        -------
+        EquationSystem
+            A new spec whose equations are the ε=0 base system. Every
+            surviving equation has ``time_derivative_order <= 2`` by
+            construction; a post-check raises ``ValueError`` if any
+            residual has order > 2, indicating the ``[perturbation]``
+            config misses some higher-derivative term.
+
+        Raises
+        ------
+        ValueError
+            If any ε=0 base equation still has ``time_derivative_order
+            > 2`` after demotion (corresponds to a third- or
+            higher-order term that isn't proportional to any declared
+            small parameter — spec / config mismatch).
+        """
+        from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
+            lhs_collapses_to_zero,
+        )
+
+        if small_parameters is None:
+            pert_meta: dict[str, Any] = self.metadata.get("perturbation", {}) or {}
+            small_parameters = list(pert_meta.get("small_parameters", []))
+
+        new_eqs: list[ComponentEquation] = []
+        for eq in self.equations:
+            # Step 1: filter RHS to order-0 terms (existing logic).
+            filtered_rhs = tuple(t for t in eq.rhs_terms if t.order_in_eps == 0)
+
+            # Step 2: check whether the LHS itself is a correction.
+            demote = lhs_collapses_to_zero(
+                eq.kinetic_coefficient_symbolic, small_parameters,
+            )
+
+            if demote:
+                # Ensure an identity self-term exists on the RHS so
+                # downstream Schur elimination recognizes this as a
+                # proper algebraic constraint (``1 * field = ...``).
+                has_self_identity = any(
+                    t.operator == "identity" and t.field == eq.field_name
+                    for t in filtered_rhs
+                )
+                if not has_self_identity:
+                    filtered_rhs = (
+                        OperatorTerm(
+                            coefficient=1.0,
+                            operator="identity",
+                            field=eq.field_name,
+                        ),
+                        *filtered_rhs,
+                    )
+                new_eqs.append(
+                    dataclasses.replace(
+                        eq,
+                        time_derivative_order=0,
+                        rhs_terms=filtered_rhs,
+                        kinetic_coefficient_symbolic=None,
+                    ),
+                )
+            else:
+                new_eqs.append(dataclasses.replace(eq, rhs_terms=filtered_rhs))
+
+        # Post-check: the base system must be 2nd-order at most.
+        high_order = [eq.field_name for eq in new_eqs if eq.time_derivative_order > 2]  # noqa: PLR2004
+        if high_order:
+            msg = (
+                f"base_spec: after applying [perturbation]="
+                f"{list(small_parameters) if small_parameters else []}, "
+                f"fields {high_order} still have time_order > 2 in the "
+                f"base theory. The [perturbation] section must name "
+                f"every small parameter that appears in a higher-"
+                f"derivative kinetic coefficient, so the LHS collapses "
+                f"to zero when all small parameters vanish. Add the "
+                f"missing parameter(s) to [perturbation].small_parameters "
+                f"in your theory.toml and re-derive."
+            )
+            raise ValueError(msg)
+
+        # Recompute mass/coupling matrices from the demoted equations
+        # (#274). The cached matrices on self reflect the
+        # full spec's identity-term structure; after demotion the RHS
+        # has a new ``1 * identity(self)`` term on each demoted
+        # constraint, so mass_matrix[i][i] changes from its full-spec
+        # value to reflect the algebraic-constraint form. Without this
+        # recompute, ``__post_init__`` would raise UserWarning on every
+        # ``base_spec`` call and downstream consumers that read
+        # spec.mass_matrix get stale values.
+        new_eqs_t = tuple(new_eqs)
+        mass, coupling, mass_sym, coupling_sym = self._compute_matrices_from_terms(
+            new_eqs_t, self.component_names, parameters=None,
+        )
+
+        return dataclasses.replace(
+            self,
+            equations=new_eqs_t,
+            mass_matrix=mass,
+            coupling_matrix=coupling,
+            mass_matrix_symbolic=mass_sym,
+            coupling_matrix_symbolic=coupling_sym,
+        )
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, PLR0912, C901
         """Create an EquationSystem from a dictionary (parsed JSON).
@@ -1207,7 +1414,7 @@ class EquationSystem:
             mass_matrix_symbolic,
             coupling_matrix_symbolic,
         ) = cls._compute_matrices_from_terms(
-            equations, component_names, parameters=default_params or None
+            equations, component_names, parameters=default_params or None,
         )
 
         # Extract coordinate names and metric signature
@@ -1236,19 +1443,35 @@ class EquationSystem:
             canonical=canonical,
         )
 
-        # Ostrogradsky reduction: convert 4th-order-in-time equations to
-        # 2nd-order via auxiliary fields.  Ref: Ostrogradsky (1850),
-        # Woodard (2015, arXiv:1506.02210).  Applied in-memory only.
-        if any(eq.time_derivative_order > 2 for eq in spec.equations):  # noqa: PLR2004
-            from tidal.symbolic.ostrogradsky import (  # noqa: PLC0415
-                apply_ostrogradsky_reduction,
+        # v6 guard: time_order > 2 equations require a [perturbation]
+        # section.  Ostrogradsky reduction was deleted in v6 because it
+        # introduces ghost modes; the iterative PerturbativeSolver
+        # handles higher-derivative corrections without that cost.  When
+        # no [perturbation] is configured, the loader refuses with a
+        # migration hint rather than silently producing ghost-ful
+        # evolution.
+        has_pert = bool(metadata.get("perturbation", {}).get("small_parameters"))
+        if (
+            any(eq.time_derivative_order > 2 for eq in spec.equations)  # noqa: PLR2004
+            and not has_pert
+        ):
+            fields_with_high_order = [
+                eq.field_name
+                for eq in spec.equations
+                if eq.time_derivative_order > 2  # noqa: PLR2004
+            ]
+            msg = (
+                f"JSON has fields with time_order > 2 "
+                f"({fields_with_high_order}) but no [perturbation] section "
+                f"in theory.toml. Ostrogradsky reduction was removed in "
+                f"v6 because it introduces ghost modes.\n"
+                f"Migration: add\n"
+                f'    [perturbation]\n    small_parameters = ["<param>"]\n'
+                f"to your theory.toml and re-derive. Then `tidal simulate` "
+                f"will automatically use `--perturbative-order 1` by "
+                f"default.\nSee docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md."
             )
-
-            logger.info(
-                "Applying Ostrogradsky reduction for higher-derivative equations"
-            )
-            spec = apply_ostrogradsky_reduction(spec)
-            logger.info("Ostrogradsky: %d fields after reduction", spec.n_components)
+            raise ValueError(msg)
 
         return spec
 
@@ -1391,7 +1614,7 @@ def load_equation_system(json_path: Path | str) -> EquationSystem:
 
 
 def normalize_kinetic_coefficients(
-    spec: EquationSystem, params: dict[str, float]
+    spec: EquationSystem, params: dict[str, float],
 ) -> EquationSystem:
     """Apply symbolic kinetic-coefficient normalization to an equation system.
 
@@ -1472,7 +1695,7 @@ def normalize_kinetic_coefficients(
                         term,
                         coefficient=new_coeff,
                         coefficient_symbolic=new_cs,
-                    )
+                    ),
                 )
             new_eq = dataclasses.replace(
                 eq,
@@ -1485,4 +1708,19 @@ def normalize_kinetic_coefficients(
     if not changed:
         return spec
 
-    return dataclasses.replace(spec, equations=tuple(new_eqs))
+    # Recompute mass/coupling matrices from the normalized equations
+    # (#274). Dividing every RHS term by the kinetic
+    # coefficient rescales the identity-operator coefficients, so the
+    # cached matrices on spec no longer match.
+    new_eqs_t = tuple(new_eqs)
+    mass, coupling, mass_sym, coupling_sym = spec._compute_matrices_from_terms(  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+        new_eqs_t, spec.component_names, parameters=None,
+    )
+    return dataclasses.replace(
+        spec,
+        equations=new_eqs_t,
+        mass_matrix=mass,
+        coupling_matrix=coupling,
+        mass_matrix_symbolic=mass_sym,
+        coupling_matrix_symbolic=coupling_sym,
+    )

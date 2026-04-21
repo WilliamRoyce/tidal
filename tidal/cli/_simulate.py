@@ -13,6 +13,7 @@ from tidal.cli._console import debug as _cdebug
 from tidal.cli._console import error as _cerror
 from tidal.cli._console import error_with_hint as _cerror_hint
 from tidal.cli._console import log as _clog
+from tidal.cli._console import warn as _cwarn
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -45,7 +46,7 @@ _LAPLACIAN_OPS = frozenset(
         "laplacian_x",
         "laplacian_y",
         "laplacian_z",
-    }
+    },
 )
 
 # Threshold for zero-evolution diagnostic (effectively machine epsilon)
@@ -395,7 +396,7 @@ def _build_grid_info(
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
     periodic = _parse_periodic(
-        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension
+        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension,
     )
     axis_bcs = _parse_axis_bcs(args.bc, spatial_dim=spec.spatial_dimension)
 
@@ -970,7 +971,7 @@ def _validate_resume_grid(resume: ResumeState, grid_info: GridInfo) -> None:
     # Compare bounds with tolerance for float rounding
     bounds_tol = 1e-10
     for i, (saved, current) in enumerate(
-        zip(resume.grid_bounds, grid_info.bounds, strict=True)
+        zip(resume.grid_bounds, grid_info.bounds, strict=True),
     ):
         if (
             abs(saved[0] - current[0]) > bounds_tol
@@ -1155,7 +1156,7 @@ def _build_initial_y0(
     if ic_type == "zero":
         if args.ic_component is not None:
             print(
-                f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC"
+                f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC",
             )
         slot_data: dict[str, np.ndarray] = {}
 
@@ -1196,7 +1197,7 @@ def _print_summary(sim_data: SimulationData) -> None:
     print()
     print("Results:")
     print(
-        f"  Time range: {float(times[0]):.2f} → {float(times[-1]):.2f} ({len(times)} snapshots)"
+        f"  Time range: {float(times[0]):.2f} → {float(times[-1]):.2f} ({len(times)} snapshots)",
     )
     print(f"  Parameters: {sim_data.parameters}")
     print()
@@ -1209,7 +1210,7 @@ def _print_summary(sim_data: SimulationData) -> None:
         if init_peak > 0:
             ratio = final_peak / init_peak
             print(
-                f"  {name}: peak {init_peak:.4f} → {final_peak:.4f} (ratio: {ratio:.4f})"
+                f"  {name}: peak {init_peak:.4f} → {final_peak:.4f} (ratio: {ratio:.4f})",
             )
         else:
             print(f"  {name}: peak {init_peak:.4f} → {final_peak:.4f}")
@@ -1442,6 +1443,99 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     return writer, _disk_callback
 
 
+def _setup_memory_accumulator_native(  # noqa: PLR0913, PLR0917
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    params: dict[str, float],
+    snapshot_interval: float,
+    dt: float | None = None,
+    num_snapshots: int | None = None,
+) -> tuple[Any, Callable[..., None]]:
+    """In-memory twin of :func:`_setup_disk_writer_native`.
+
+    Produces an :class:`InMemoryAccumulator` and a ``(t, y_flat, yp_flat)``
+    callback that writes to it.  Intended for the inference likelihood
+    path: the accumulator is materialised into a ``SimulationData`` at
+    the end of ``_simulate`` and never touches disk.
+    """
+    from tidal.measurement._writer import InMemoryAccumulator, compute_snapshot_count
+    from tidal.solver.state import StateLayout
+
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+    n_snaps = num_snapshots or compute_snapshot_count(
+        snapshot_interval * 10,  # placeholder; caller already computed num_snapshots
+        snapshot_interval,
+    )
+    if num_snapshots is not None:
+        n_snaps = num_snapshots
+
+    field_names = [s.name for s in layout.slots if s.kind != "velocity"]
+    velocity_names = [s.field_name for s in layout.slots if s.kind == "velocity"]
+
+    # Constraint fields whose velocities we may want in the output.
+    constraint_names = [
+        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+    ]
+    constraint_slot_map: dict[str, int] = {
+        cname: layout.field_slot_map[cname]
+        for cname in constraint_names
+        if cname in layout.field_slot_map
+    }
+
+    all_velocity_names = velocity_names + list(constraint_slot_map.keys())
+
+    accumulator = InMemoryAccumulator(
+        field_names=field_names,
+        velocity_names=all_velocity_names,
+        grid_shape=grid_info.shape,
+        n_snapshots=n_snaps,
+        grid_spacing=tuple(float(d) for d in grid_info.dx),
+        grid_bounds=grid_info.bounds,
+        periodic=grid_info.periodic,
+        parameters=params,
+        bc_types=grid_info.bc_types,
+        dt=dt,
+    )
+
+    n_pts = grid_info.num_points
+    shape = grid_info.shape
+    field_set = set(field_names)
+    velocity_set = set(velocity_names)
+
+    field_slots_map: dict[str, int] = {}
+    velocity_slots_map: dict[str, int] = {}
+    for i, slot in enumerate(layout.slots):
+        if slot.kind == "velocity":
+            velocity_slots_map[slot.field_name] = i
+        elif slot.name in field_set:
+            field_slots_map[slot.name] = i
+
+    def _memory_callback(
+        t: float,
+        y_flat: np.ndarray,
+        yp_flat: np.ndarray | None = None,
+    ) -> None:
+        fields_d = {
+            name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
+            for name, idx in field_slots_map.items()
+        }
+        vels_d = {
+            name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
+            for name, idx in velocity_slots_map.items()
+            if name in velocity_set
+        }
+        for cname, slot_idx in constraint_slot_map.items():
+            if yp_flat is not None:
+                vels_d[cname] = yp_flat[
+                    slot_idx * n_pts : (slot_idx + 1) * n_pts
+                ].reshape(shape)
+            else:
+                vels_d[cname] = np.zeros(shape)
+        accumulator.append(t, fields_d, vels_d)
+
+    return accumulator, _memory_callback
+
+
 def _extract_constraint_bc(
     spec: EquationSystem,
 ) -> tuple[str, ...] | None:
@@ -1650,12 +1744,27 @@ def _resolve_scheme(  # noqa: C901
         Hindmarsh et al., "SUNDIALS", ACM TOMS, 2005.
         Moler & Van Loan (2003), SIAM Review 45(1):3-49 (modal solver).
     """
+    # When a perturbation-tagged spec will be routed through the
+    # PerturbativeSolver, the relevant eligibility check is on the
+    # base_spec (post-Gap-B demotion), not the full spec. The correction
+    # RHS terms carry higher-order operators (d3_t, d4_t, mixed_T3_S1x)
+    # that Pass 0 never sees — they only appear as Duhamel source
+    # coefficients. Build the base spec once here for both explicit and
+    # auto paths.
+    # If the user's [perturbation] config is malformed (missing small
+    # parameters, 3rd-order residual after demotion), base_spec's
+    # ValueError carries an actionable message — propagate it instead
+    # of silently falling back to the full spec, which would make the
+    # modal-eligibility check fail for an unrelated reason and mislead
+    # the user with "auto-selected: CVODE" (#277).
+    eligibility_spec = spec.base_spec() if spec.has_corrections() else spec
+
     if scheme != "auto":
         if scheme == "modal" and grid is not None:
             # Validate modal eligibility when explicitly requested
             from tidal.solver.modal import can_use_modal
 
-            if not can_use_modal(spec, grid, bc):
+            if not can_use_modal(eligibility_spec, grid, bc):
                 msg = (
                     "--scheme modal requested but system is not eligible. "
                     "Modal solver requires: flat metric, all-periodic BCs, "
@@ -1672,7 +1781,7 @@ def _resolve_scheme(  # noqa: C901
     if grid is not None:
         from tidal.solver.modal import can_use_modal
 
-        if can_use_modal(spec, grid, bc):
+        if can_use_modal(eligibility_spec, grid, bc):
             return "modal"
 
     # 1b. Constraint equations not modal-eligible → IDA (DAE solver required)
@@ -1714,11 +1823,22 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     args: Namespace,
     spec: EquationSystem,
     params: dict[str, float],
+    *,
+    in_memory_out: list[Any] | None = None,
 ) -> int:
     """Run simulation via native TIDAL solver.
 
     Self-contained flow: GridInfo -> IC -> solve -> SimulationData -> output.
     Handles IDA, CVODE, scipy, and leapfrog schemes.
+
+    Parameters
+    ----------
+    in_memory_out : list[SimulationData] | None
+        If provided, skip all disk output (writer, plots, constraint .npy
+        files, HTML report) and append the resulting ``SimulationData`` to
+        the list instead.  Used by the Bayesian-inference likelihood path
+        to avoid the disk round-trip that dominates per-evaluation wall
+        time (issue #269).
     """
     from tidal.measurement._io import SimulationData
     from tidal.solver.operators import set_fd_order, set_spectral
@@ -1737,7 +1857,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
     grid_info = _build_grid_info(args, spec, bounds)
     log(
-        f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}"
+        f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}",
     )
 
     _cdebug(f"periodic={grid_info.periodic}, dx={grid_info.dx}")
@@ -1814,14 +1934,14 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     # Distinguish from sweep's boolean --resume (which means "resume sweep")
     if isinstance(resume_path, str):
         resume_state = _load_resume_state(
-            Path(resume_path), spec, getattr(args, "snapshot", None)
+            Path(resume_path), spec, getattr(args, "snapshot", None),
         )
         _validate_resume_grid(resume_state, grid_info)
         y0 = resume_state.y0
         t_start = resume_state.t_start
         log(
             f"  IC: resume from {resume_path} "
-            f"(snapshot {resume_state.snapshot_index}, t={t_start:.4f})"
+            f"(snapshot {resume_state.snapshot_index}, t={t_start:.4f})",
         )
     else:
         y0 = _build_initial_y0(args, spec, grid_info, bounds)
@@ -1903,7 +2023,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         for s in grid_info.shape:
             grid_pts *= s
         # Rough memory estimate: state vector + snapshots
-        n_snapshots = max(int((args.t_end - t_start) / (args.t_end / 100.0)) + 1, 2)
+        n_snapshots = max(int((args.t_end - t_start) / (args.t_end / 20.0)) + 1, 2)
         mem_bytes = (
             grid_pts * n_fields * 2 * 8 * n_snapshots
         )  # fields + velocities, float64
@@ -1913,17 +2033,17 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             mem_str = f"{mem_bytes / (1024 * 1024):.1f} MB"
         spec_name = getattr(args, "json_path", "unknown")
         print(
-            f"  Spec:     {Path(spec_name).name} ({n_fields} fields, {n_eqs} equations)"
+            f"  Spec:     {Path(spec_name).name} ({n_fields} fields, {n_eqs} equations)",
         )
         print(
             f"  Grid:     {'x'.join(str(s) for s in grid_info.shape)} points, "
             f"bounds {grid_info.bounds}, "
-            f"{'periodic' if all(grid_info.periodic) else 'mixed BCs'}"
+            f"{'periodic' if all(grid_info.periodic) else 'mixed BCs'}",
         )
         print(
             f"  Solver:   {scheme} (auto-selected)"
             if args.scheme == "auto"
-            else f"  Solver:   {scheme}"
+            else f"  Solver:   {scheme}",
         )
         print(f"  FD order: {fd_order}")
         print(f"  Steps:    ~{n_snapshots} snapshots, t={t_start}→{args.t_end}")
@@ -1936,12 +2056,18 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     import contextlib
 
-    with contextlib.suppress(ValueError):
-        # May raise ValueError for systems with time-derivative operators
-        # (d2_t, mixed_T2_S1x, etc.) that the physical-space RHS evaluator
-        # cannot handle. These are simulated by the modal solver's
-        # generalized mass-matrix path which works directly in Fourier space.
-        _warn_zero_evolution(spec, grid_info, y0, params, bc)
+    # Diagnostic warning that builds its own CoefficientEvaluator + runs
+    # one full RHS evaluation.  Useful for catching IC bugs in the
+    # `tidal simulate` user flow but pure overhead (~3ms/call) in the
+    # nested-sampling likelihood path — skip it when we're in-memory
+    # mode (see #269, #291).
+    if in_memory_out is None:
+        with contextlib.suppress(ValueError):
+            # May raise ValueError for systems with time-derivative operators
+            # (d2_t, mixed_T2_S1x, etc.) that the physical-space RHS evaluator
+            # cannot handle. These are simulated by the modal solver's
+            # generalized mass-matrix path which works directly in Fourier space.
+            _warn_zero_evolution(spec, grid_info, y0, params, bc)
     # Note: mass stability pre-check removed — the modal solver's eigenvalue
     # pre-check (in _evolve_per_mode) provides more accurate instability
     # detection using the full evolution matrix, not a simplified mass proxy.
@@ -1962,7 +2088,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 lf_order = 4
                 log(
                     "  Auto-selected: Yoshida 4th-order leapfrog "
-                    "(time-independent, non-dissipative system)"
+                    "(time-independent, non-dissipative system)",
                 )
             else:
                 lf_order = 2
@@ -1973,7 +2099,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                     reasons.append("time-dependent coefficients")
                 log(
                     f"  Auto-selected: Störmer-Verlet 2nd-order leapfrog "
-                    f"({', '.join(reasons)} detected)"
+                    f"({', '.join(reasons)} detected)",
                 )
         elif lf_order_arg == 4:  # noqa: PLR2004
             # User explicitly requested Yoshida — warn if inappropriate.
@@ -2015,13 +2141,18 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     # 6. Snapshot configuration — clamp interval to dt for leapfrog,
     # since the solver can't save more often than once per timestep.
     duration = args.t_end - t_start
+    # Default to 20 snapshots across the duration. Empirically this resolves
+    # P_max and other peak-finding measurements to well under 0.1% for the
+    # physics of interest (e.g. dark photon conversion: P_max matches 100-
+    # snapshot runs to 4 significant figures).  Use --snapshots to specify
+    # a smaller interval when finer time resolution is needed.
     snapshot_interval = (
-        args.snapshots if args.snapshots is not None else duration / 100.0
+        args.snapshots if args.snapshots is not None else duration / 20.0
     )
     if dt is not None and snapshot_interval < dt:
         log(
             f"  Note: snapshot interval {snapshot_interval:.4f} < dt {dt:.4f}; "
-            f"saving every step"
+            f"saving every step",
         )
         snapshot_interval = dt
 
@@ -2033,12 +2164,23 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         n_steps_est = max(1, math.ceil(duration / dt - 1e-10))
         num_snapshots = max(num_snapshots, n_steps_est + 2)
 
-    # 7. Disk writer (if directory output)
+    # 7. Disk writer (if directory output) or in-memory accumulator
+    # (inference path: skip disk entirely, see issue #269).
     fmt = _infer_output_format(args)
     writer: SnapshotWriter | None = None
+    accumulator: Any = None
     snapshot_cb: Callable[[float, np.ndarray], None] | None = None
 
-    if fmt == "directory":
+    if in_memory_out is not None:
+        accumulator, snapshot_cb = _setup_memory_accumulator_native(
+            spec,
+            grid_info,
+            params,
+            snapshot_interval,
+            dt=dt,
+            num_snapshots=num_snapshots,
+        )
+    elif fmt == "directory":
         writer, snapshot_cb = _setup_disk_writer_native(
             args,
             spec,
@@ -2072,7 +2214,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
         log(
             f"Running IDA solver (t={t_start} → {args.t_end}, {num_snapshots} snapshots, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...",
         )
         # Skip constraint IC solving when resuming (state already consistent)
         allow_inconsistent = getattr(args, "allow_inconsistent_ic", False)
@@ -2099,7 +2241,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         max_step = args.max_step or 0.0
         log(
             f"Running CVODE solver ({method}, t={t_start} → {args.t_end}, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...",
         )
         result = solve_cvode(
             spec,
@@ -2124,7 +2266,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         max_step = args.max_step if args.max_step is not None else cfl_dt
         log(
             f"Running scipy solver ({method}, t={t_start} → {args.t_end}, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...",
         )
         result = solve_scipy(
             spec,
@@ -2142,25 +2284,113 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             progress=progress,
         )
     elif scheme == "modal":
-        from tidal.solver.modal import solve_modal
+        # Default --perturbative-order: 1 when the JSON declares a
+        # perturbation block, 0 otherwise. An explicit --perturbative-order
+        # flag on the CLI overrides this default.  Use getattr so callers
+        # built from leaner parsers (e.g. `tidal sample`) still work.
+        pert_meta: dict[str, Any] = spec.metadata.get("perturbation") or {}
+        pert_order_arg = getattr(args, "perturbative_order", None)
+        if pert_order_arg is not None:
+            pert_order = int(pert_order_arg)
+        else:
+            pert_order = 1 if pert_meta.get("small_parameters") else 0
 
-        log(
-            f"Running modal solver (t={t_start} → {args.t_end}, "
-            f"{num_snapshots} snapshots)..."
-        )
-        result = solve_modal(
-            spec,
-            grid_info,
-            y0,
-            t_span=(t_start, args.t_end),
-            bc=bc,
-            parameters=params,
-            rtol=args.rtol,
-            atol=args.atol,
-            num_snapshots=num_snapshots,
-            snapshot_callback=snapshot_cb,
-            progress=progress,
-        )
+        if pert_order > 0 and spec.has_corrections():
+            from tidal.solver.modal import solve_modal
+            from tidal.solver.perturbative_driver import (
+                PerturbativeSolver,
+            )
+
+            log(
+                f"Running perturbative modal solver (order={pert_order}, "
+                f"t={t_start} → {args.t_end}, {num_snapshots} snapshots)...",
+            )
+            pert_solver = PerturbativeSolver(spec)
+            pert_result = pert_solver.solve(
+                y0,
+                grid_info,
+                t_span=(t_start, args.t_end),
+                order=pert_order,
+                parameters=params,
+                num_snapshots=num_snapshots,
+                small_parameters=list(pert_meta.get("small_parameters") or []),
+            )
+            result = cast("SolverResult", pert_result.total)
+            # Pass 0 / Pass 1 outputs live in base_spec's layout (h_4/h_7/h_9
+            # demoted to algebraic constraints at ε=0). The solver now
+            # carries this layout on the result itself (#276), so
+            # downstream SimulationData / measurement callers pair the
+            # state vector with the correct spec without the prior
+            # `spec = pert_solver.base_spec` rebind workaround. The full
+            # original spec stays on pert_result.full_spec.
+            assert pert_result.spec is not None, (
+                "PerturbativeResult.spec must be populated. See #276."
+            )
+            spec = pert_result.spec
+            log(
+                f"Perturbative layout swap: full-spec fields={len(pert_result.full_spec.equations) if pert_result.full_spec else '?'} "
+                f"→ base-spec fields={len(spec.equations)} "
+                f"(demoted constraints: "
+                f"{sum(1 for e in spec.equations if e.time_derivative_order == 0)})",
+            )
+            validity = pert_result.validity
+            corr_level = validity.get("correction_level", validity.get("warn_level"))
+            base_level = validity.get("base_level", "ok")
+            if corr_level == "warn":
+                _cwarn(
+                    "Perturbative truncation validity: "
+                    f"ε·ω·t_end ≈ {validity['validity_param']:.2g} > 0.1 "
+                    f"(dominant parameter: {validity['dominant_parameter']!r}). "
+                    "O(ε²) truncation error may exceed 10%. Consider a "
+                    "smaller small-parameter, shorter t_end, or coarser grid.",
+                )
+            elif corr_level == "error":
+                _cwarn(
+                    "Perturbative truncation validity: "
+                    f"ε·ω·t_end ≈ {validity['validity_param']:.2g} > 1.0 — "
+                    "the EFT regime is violated for this configuration. "
+                    "Results should NOT be trusted. Reduce the small "
+                    "parameter or shrink t_end / k_max.",
+                )
+            # #285: separate base-theory stability diagnostic.
+            if base_level == "warn":
+                _cwarn(
+                    "Base-theory stability: "
+                    f"max Re(λ)·t_end ≈ {validity['base_stability_param']:.2g} > 0 "
+                    f"(dominant: {validity.get('dominant_tachyon_field')!r}). "
+                    "The Pass 0 solution contains an exponentially growing "
+                    "mode (tachyon / Jeans / ghost). Pass 1 corrections on "
+                    "top of a diverging Pass 0 are not physically meaningful.",
+                )
+            elif base_level == "error":
+                _cwarn(
+                    "Base-theory stability: "
+                    f"max Re(λ)·t_end ≈ {validity['base_stability_param']:.2g} > 30 "
+                    f"(dominant: {validity.get('dominant_tachyon_field')!r}). "
+                    "Pass 0 will overflow double precision within the "
+                    "simulation window. Shorten t_end or fix the base-"
+                    "theory mass spectrum before re-running.",
+                )
+        else:
+            from tidal.solver.modal import solve_modal
+
+            log(
+                f"Running modal solver (t={t_start} → {args.t_end}, "
+                f"{num_snapshots} snapshots)...",
+            )
+            result = solve_modal(
+                spec,
+                grid_info,
+                y0,
+                t_span=(t_start, args.t_end),
+                bc=bc,
+                parameters=params,
+                rtol=args.rtol,
+                atol=args.atol,
+                num_snapshots=num_snapshots,
+                snapshot_callback=snapshot_cb,
+                progress=progress,
+            )
     else:  # leapfrog
         from tidal.solver.leapfrog import solve_leapfrog
 
@@ -2168,7 +2398,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         if lf_order == 4:  # noqa: PLR2004
             log(
                 f"Running Yoshida 4th-order leapfrog "
-                f"(t={t_start} → {args.t_end}, dt={dt:.4f})..."
+                f"(t={t_start} → {args.t_end}, dt={dt:.4f})...",
             )
         else:
             log(f"Running leapfrog solver (t={t_start} → {args.t_end}, dt={dt:.4f})...")
@@ -2221,11 +2451,29 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     # snapshots were already streamed to disk (avoids double-buffering).
     if writer is not None:
         sim_data = SimulationData.from_directory(writer.output_dir, spec)
+    elif accumulator is not None:
+        accumulator.close()
+        # Inject constraint velocities from modal solver (same semantics as
+        # the disk path's `np.save` block above, but into the in-memory
+        # SimulationData.velocities dict).
+        cv = result.get("constraint_velocities")
+        if cv:
+            for c_name, c_vel_arr in cv.items():
+                accumulator.set_velocity(
+                    c_name, np.asarray(c_vel_arr, dtype=np.float64),
+                )
+        sim_data = accumulator.to_sim_data(spec)
     else:
         sim_data = SimulationData.from_result(result, spec, grid_info, params, dt=dt)
     log(f"  {sim_data.n_snapshots} snapshots stored")
 
-    # 9. Output
+    # 9. Output — in-memory mode skips plotting, report generation, and
+    # the output dispatch entirely.  Caller consumes sim_data via
+    # in_memory_out.
+    if in_memory_out is not None:
+        in_memory_out.append(sim_data)
+        return 0
+
     _generate_output(args, sim_data, grid_info)
 
     # 10. HTML report (optional)
@@ -2325,7 +2573,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
     log("Loading equation specification...")
     spec = load_equation_system(json_path)
     log(
-        f"  {spec.n_components} component(s), {spec.dimension}D ({spec.spatial_dimension}+1D)"
+        f"  {spec.n_components} component(s), {spec.dimension}D ({spec.spatial_dimension}+1D)",
     )
 
     # Step 2: Validate resume args and inherit config from checkpoint
@@ -2395,12 +2643,15 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
         )
         return 1
 
-    # Step 3b: Normalize kinetic coefficients (e.g. xi in dark photon torsion).
-    # ExportJSON emits RHS un-divided when the kinetic coeff is param-based.
-    # At xi=0 the torsion fields become constraints; at xi≠0 divide through.
-    from tidal.symbolic.json_loader import normalize_kinetic_coefficients
-
-    spec = normalize_kinetic_coefficients(spec, params)
+    # Step 3b: previously called `normalize_kinetic_coefficients` to work
+    # around the modal solver's hardcoded `M_mat[fi,fi]=1.0` assumption.
+    # That root cause is now fixed in `_build_evolution_matrices`, which
+    # reads `kinetic_coefficient_symbolic` directly into the M diagonal
+    # and uses SVD to handle asymmetric M.  The normalize step is
+    # therefore redundant and has been removed — keeping it would
+    # produce an equivalent but different-looking equation system that
+    # some downstream code (energy measurement, constraint IC solver)
+    # may not handle correctly.
 
     # All simulation goes through the native IDA/leapfrog path
     try:

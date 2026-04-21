@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from tidal.inference._results import InferenceResult
 
 # ===================================================================
@@ -285,7 +284,7 @@ class TestLikelihoodConfig:
         from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
 
         lc = LikelihoodConfig(
-            metric="P_max", likelihood_type="gaussian", target=1.0, sigma=0.1
+            metric="P_max", likelihood_type="gaussian", target=1.0, sigma=0.1,
         )
         # At target, log_L = 0
         assert compute_log_likelihood(1.0, lc) == pytest.approx(0.0)
@@ -296,7 +295,7 @@ class TestLikelihoodConfig:
         from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
 
         lc = LikelihoodConfig(
-            metric="P_max", likelihood_type="threshold", min_value=0.1
+            metric="P_max", likelihood_type="threshold", min_value=0.1,
         )
         assert compute_log_likelihood(0.5, lc) == 0.0
         assert compute_log_likelihood(0.05, lc) == -math.inf
@@ -447,7 +446,7 @@ class TestSampleCLIHelp:
                 "10",
                 "--output",
                 "/tmp/test",
-            ]
+            ],
         )
         assert args.command == "sample"
         assert args.json_path == "spec.json"
@@ -455,3 +454,628 @@ class TestSampleCLIHelp:
         assert args.likelihood == "P_max:maximize"
         assert args.method == "mc"
         assert args.n_samples == 10
+
+    def test_parse_new_flags(self) -> None:
+        """Verify new CLI flags (analyze, nlive-auto, importance, extremize)."""
+        from tidal.cli import (
+            _build_parser as build_parser,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "sample",
+                "spec.json",
+                "--prior",
+                "g0=uniform:0.01:0.5",
+                "--likelihood",
+                "P_max:extremize",
+                "--baseline-formula",
+                "sin(kappa * B0 * t_end / 2)**2",
+                "--method",
+                "nested",
+                "--sampler",
+                "polychord",
+                "--nlive-auto",
+                "production",
+                "--analyze",
+                "--importance",
+                "--output",
+                "/tmp/test",
+            ],
+        )
+        assert args.likelihood == "P_max:extremize"
+        assert args.baseline_formula == "sin(kappa * B0 * t_end / 2)**2"
+        assert args.sampler == "polychord"
+        assert args.nlive_auto == "production"
+        assert args.analyze is True
+        assert args.importance is True
+
+
+# ===================================================================
+# New likelihood types
+# ===================================================================
+
+
+class TestNewLikelihoodTypes:
+    """Test minimize and extremize likelihood types."""
+
+    def test_parse_minimize(self) -> None:
+        from tidal.inference._likelihood import parse_likelihood
+
+        lc = parse_likelihood("P_max:minimize")
+        assert lc.likelihood_type == "minimize"
+
+    def test_parse_extremize(self) -> None:
+        from tidal.inference._likelihood import parse_likelihood
+
+        lc = parse_likelihood(
+            "P_max:extremize",
+            baseline_formula="sin(kappa * B0 * t_end / 2)**2",
+        )
+        assert lc.likelihood_type == "extremize"
+        assert lc.baseline_formula is not None
+
+    def test_extremize_requires_formula(self) -> None:
+        from tidal.inference._likelihood import LikelihoodConfig
+
+        with pytest.raises(ValueError, match="baseline-formula"):
+            LikelihoodConfig(metric="P_max", likelihood_type="extremize")
+
+    def test_compute_minimize(self) -> None:
+        from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
+
+        lc = LikelihoodConfig(metric="P_max", likelihood_type="minimize")
+        assert compute_log_likelihood(0.5, lc) == -0.5
+        assert compute_log_likelihood(2.0, lc) == -2.0
+
+    def test_compute_extremize(self) -> None:
+        from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
+
+        lc = LikelihoodConfig(
+            metric="P_max",
+            likelihood_type="extremize",
+            baseline_formula="sin(kappa * B0 * t_end / 2)**2",
+        )
+        params = {"kappa": 1.0, "B0": 0.01, "t_end": 50.0}
+        baseline = math.sin(1.0 * 0.01 * 50.0 / 2) ** 2
+
+        # At baseline: logL = |log(1)| = 0
+        assert compute_log_likelihood(baseline, lc, params) == pytest.approx(0.0)
+
+        # 2x amplification: logL = log(2) ≈ 0.693
+        assert compute_log_likelihood(2 * baseline, lc, params) == pytest.approx(
+            math.log(2),
+        )
+
+        # 0.5x suppression: logL = |log(0.5)| = log(2) (symmetric)
+        assert compute_log_likelihood(0.5 * baseline, lc, params) == pytest.approx(
+            math.log(2),
+        )
+
+
+class TestBaselineFormulaSpecParams:
+    """Regression for #270: baseline-formula must see spec-level params.
+
+    Before the fix, ``_evaluate_likelihood`` built ``eval_params`` only
+    from the swept theta + t_end/dt.  A formula like
+    ``sin(kappa * B0 * t_end / 2)**2`` then raised NameError on
+    ``kappa``, ``_eval_baseline`` silently returned ``None``, and every
+    likelihood collapsed to ``-inf``.  PolyChord then spun forever.
+    """
+
+    def test_parse_params_merges_cli_overrides(self) -> None:
+        # `_parse_params` is the canonical merge used by both the
+        # simulator and (after #270) the likelihood.  Verify it surfaces
+        # CLI --param values so baseline formulas can resolve them.
+        from tidal.cli._simulate import (  # pyright: ignore[reportPrivateUsage]
+            _parse_params,
+        )
+        from tidal.symbolic import load_equation_system
+
+        repo_root = Path(__file__).resolve().parents[1]
+        spec = load_equation_system(
+            repo_root / "examples" / "data" / "dark_photon_plasma.json",
+        )
+        params = _parse_params(["kappa=1.0", "B0=0.1"], spec)
+        assert params["kappa"] == 1.0
+        assert params["B0"] == 0.1
+
+    def test_baseline_formula_resolves_with_spec_params(self) -> None:
+        # Direct test of the formula-eval namespace the fix assembles.
+        from tidal.inference._likelihood import (
+            LikelihoodConfig,
+            _eval_baseline,  # pyright: ignore[reportPrivateUsage]
+            compute_log_likelihood,
+        )
+
+        cfg = LikelihoodConfig(
+            metric="P_max",
+            likelihood_type="maximize",
+            baseline_formula="sin(kappa * B0 * t_end / 2)**2",
+        )
+        # After #270: eval_params contains spec/CLI params + swept theta.
+        eval_params = {
+            "kappa": 1.0,
+            "B0": 0.1,
+            "t_end": 10.0,
+            "mA2": 0.5,
+            "deltam": 0.0,
+        }
+        baseline = _eval_baseline(cfg.baseline_formula, eval_params)
+        assert baseline is not None
+        assert baseline == pytest.approx(math.sin(0.5) ** 2)
+
+        # logL should be finite (not -inf) — this is the regression check.
+        logl = compute_log_likelihood(0.01, cfg, eval_params)
+        assert math.isfinite(logl)
+
+
+class TestPolyChordGuard:
+    """Regression for #270: PolyChord must fail fast on all-(-inf) likelihoods.
+
+    Without the pre-flight guard, PolyChord spins indefinitely trying to
+    build its initial live-point pool.  Job 28002101 hit the 1-hour wall
+    with zero chain output because of this.
+    """
+
+    def test_all_inf_raises_runtime_error(self) -> None:
+        from tidal.inference._nested import (
+            _run_polychord,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        def always_inf(_theta: list[float]) -> float:
+            return float("-inf")
+
+        def unit_prior(hypercube: list[float]) -> list[float]:
+            return list(hypercube)
+
+        with pytest.raises(RuntimeError, match="non-finite logL"):
+            _run_polychord(
+                log_likelihood=always_inf,
+                prior_transform=unit_prior,
+                ndim=2,
+                param_names=["a", "b"],
+                nlive=25,
+                n_workers=None,
+                quiet=True,
+                n_probe=5,
+            )
+
+
+class TestLikelihoodBackendEquivalence:
+    """Memory and disk backends must produce identical metrics (#269).
+
+    If these ever diverge, the in-memory fast path has drifted from the
+    disk-writer reference semantics and callers could get wrong science.
+    """
+
+    def test_cache_warm_vs_cold_identical_metrics(self, tmp_path: Path) -> None:
+        """Regression for #291: solver-layer caches (parsed-Mathematica,
+        eval namespace) must NOT change numerical results whether the
+        cache is cold (first call) or warm (subsequent).
+        """
+        import sys
+
+        import tidal.cli
+
+        spec_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "data"
+            / "dark_photon_plasma.json"
+        )
+        if not spec_path.exists():
+            pytest.skip(f"dark_photon_plasma spec not found at {spec_path}")
+
+        argv = [
+            "tidal",
+            "sample",
+            str(spec_path),
+            "--param",
+            "kappa=1.0",
+            "--param",
+            "B0=0.01",
+            "--param",
+            "alpha3=0.25",
+            "--param",
+            "xi=1.0",
+            "--param",
+            "deltam=0.3",
+            "--prior",
+            "mA2=uniform:0.4:0.5",
+            "--likelihood",
+            "P_max:maximize",
+            "--method",
+            "nested",
+            "--sampler",
+            "polychord",
+            "--grid-shape",
+            "32",
+            "--bounds",
+            "0:50",
+            "--periodic",
+            "--ic",
+            "plane-wave",
+            "--ic-component",
+            "h_5",
+            "--ic-wavevector",
+            "2.0",
+            "--ic-amplitude",
+            "1e-2",
+            "--source",
+            "h_5",
+            "--target",
+            "a_1",
+            "--snapshots",
+            "3",
+            "--t-end",
+            "10.0",
+            "--output",
+            str(tmp_path / "ns"),
+        ]
+        old_argv = sys.argv
+        try:
+            sys.argv = argv
+            parser = tidal.cli._build_parser()  # pyright: ignore[reportPrivateUsage]
+            args = parser.parse_args(argv[1:])
+        finally:
+            sys.argv = old_argv
+
+        from tidal.cli._sweep import (
+            _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
+            run_inference_step,
+        )
+        from tidal.symbolic import load_equation_system
+        from tidal.symbolic._eval_utils import (
+            _PARSED_MATH_CACHE,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        spec = load_equation_system(spec_path)
+
+        # Cold run — explicitly clear the parsed-Mathematica cache so
+        # the first call exercises the miss path.
+        _PARSED_MATH_CACHE.clear()
+        overrides = {"mA2": 0.42}
+        sim_cold = run_inference_step(args, spec_path, overrides, spec=spec)
+        m_cold = _measure_from_sim_data(
+            sim_cold,
+            {"conversion", "peak_conversion"},
+            ("h_5",),
+            ("a_1",),
+            0.5,
+        )
+        assert len(_PARSED_MATH_CACHE) > 0, "cold run should populate the cache"
+
+        # Warm run at same theta — must produce identical metrics.
+        sim_warm = run_inference_step(args, spec_path, overrides, spec=spec)
+        m_warm = _measure_from_sim_data(
+            sim_warm,
+            {"conversion", "peak_conversion"},
+            ("h_5",),
+            ("a_1",),
+            0.5,
+        )
+
+        for key in ("P_max", "P_final"):
+            assert m_cold.get(key) is not None, f"cold run missing {key}"
+            assert m_warm.get(key) is not None, f"warm run missing {key}"
+            assert m_cold[key] == pytest.approx(m_warm[key], rel=0, abs=0), (
+                f"cache warmth changed {key}: cold={m_cold[key]}, warm={m_warm[key]}"
+            )
+
+    @pytest.mark.parametrize("metric", ["P_max", "P_final"])
+    def test_backends_agree(self, metric: str, tmp_path: Path) -> None:
+        import sys
+
+        spec_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "data"
+            / "dark_photon_plasma.json"
+        )
+        if not spec_path.exists():
+            pytest.skip(f"dark_photon_plasma spec not found at {spec_path}")
+
+        # Build a real Namespace via the tidal argument parser so every
+        # simulate-facing attribute gets the correct type/default.
+        import tidal.cli
+
+        argv = [
+            "tidal",
+            "sample",
+            str(spec_path),
+            "--param",
+            "kappa=1.0",
+            "--param",
+            "B0=0.01",
+            "--param",
+            "alpha3=0.25",
+            "--param",
+            "xi=1.0",
+            "--param",
+            "deltam=0.3",
+            "--prior",
+            "mA2=uniform:0.4:0.5",  # single point we evaluate manually
+            "--likelihood",
+            "P_max:maximize",
+            "--method",
+            "nested",
+            "--sampler",
+            "polychord",
+            "--grid-shape",
+            "32",
+            "--bounds",
+            "0:50",
+            "--periodic",
+            "--ic",
+            "plane-wave",
+            "--ic-component",
+            "h_5",
+            "--ic-wavevector",
+            "2.0",
+            "--ic-amplitude",
+            "1e-2",
+            "--source",
+            "h_5",
+            "--target",
+            "a_1",
+            "--snapshots",
+            "3",
+            "--t-end",
+            "10.0",
+            "--output",
+            str(tmp_path / "ns"),
+        ]
+        old_argv = sys.argv
+        try:
+            sys.argv = argv
+            parser = tidal.cli._build_parser()  # pyright: ignore[reportPrivateUsage]
+            args = parser.parse_args(argv[1:])
+        finally:
+            sys.argv = old_argv
+
+        from tidal.cli._sweep import (
+            _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
+            _measure_run,  # pyright: ignore[reportPrivateUsage]
+            _simulate_run,  # pyright: ignore[reportPrivateUsage]
+            run_inference_step,
+        )
+        from tidal.symbolic import load_equation_system
+
+        spec = load_equation_system(spec_path)
+        overrides = {"mA2": 0.45}
+
+        # Memory path
+        sim_data = run_inference_step(args, spec_path, overrides, spec=spec)
+        mem_metrics = _measure_from_sim_data(
+            sim_data,
+            {"conversion", "peak_conversion"},
+            ("h_5",),
+            ("a_1",),
+            0.5,
+        )
+
+        # Disk path — uses the same fixed config.
+        disk_dir = tmp_path / "disk_run"
+        disk_dir.mkdir()
+        exit_code, _, _ = _simulate_run(args, spec_path, overrides, disk_dir, spec=spec)
+        assert exit_code == 0
+        disk_metrics = _measure_run(
+            disk_dir,
+            spec_path,
+            {"conversion", "peak_conversion"},
+            ("h_5",),
+            ("a_1",),
+            0.5,
+            spec=spec,
+        )
+
+        mem_val = mem_metrics.get(metric)
+        disk_val = disk_metrics.get(metric)
+        assert mem_val is not None
+        assert disk_val is not None
+        assert mem_val == pytest.approx(disk_val, rel=1e-12, abs=1e-15)
+
+
+# ===================================================================
+# recommend_nlive
+# ===================================================================
+
+
+class TestRecommendNlive:
+    """Test nlive auto-scaling."""
+
+    def test_fast(self) -> None:
+        from tidal.inference._nested import recommend_nlive
+
+        assert recommend_nlive(4, "fast") == 100
+        assert recommend_nlive(1, "fast") == 50
+
+    def test_standard(self) -> None:
+        from tidal.inference._nested import recommend_nlive
+
+        assert recommend_nlive(4, "standard") == 100
+        assert recommend_nlive(10, "standard") == 250
+
+    def test_production(self) -> None:
+        from tidal.inference._nested import recommend_nlive
+
+        assert recommend_nlive(4, "production") == 250
+        assert recommend_nlive(10, "production") == 500
+
+
+# ===================================================================
+# Parameter importance
+# ===================================================================
+
+
+class TestParameterImportance:
+    """Test parameter importance analysis via anesthetic."""
+
+    @pytest.fixture
+    def nested_result(self) -> InferenceResult:
+        """Synthetic nested sampling result with one constrained and one
+        unconstrained parameter.
+        """
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(42)
+        n = 300
+        nlive = 50
+
+        # x is tightly constrained (narrow posterior), y is broad
+        x = rng.normal(0, 0.1, n)
+        y = rng.uniform(-5, 5, n)
+        samples = np.column_stack([x, y])
+        log_l = -0.5 * (x / 0.1) ** 2  # only depends on x
+
+        # Build approximate logL_birth for anesthetic
+        sorted_idx = np.argsort(log_l)
+        logl_birth = np.full(n, -np.inf)
+        sorted_logl = log_l[sorted_idx]
+        for i in range(nlive, n):
+            logl_birth[sorted_idx[i]] = sorted_logl[i - nlive]
+
+        return InferenceResult(
+            samples=samples,
+            log_likelihood=log_l,
+            log_prior=np.zeros(n),
+            param_names=["x_constrained", "y_unconstrained"],
+            method="nested",
+            log_evidence=-1.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={"sampler": "test", "nlive": nlive},
+        )
+
+    def test_to_anesthetic(self, nested_result: InferenceResult) -> None:
+        pytest.importorskip("anesthetic")
+        ns = nested_result.to_anesthetic()
+        assert hasattr(ns, "D_KL")
+        assert hasattr(ns, "d_G")
+        assert hasattr(ns, "logZ")
+
+    def test_importance_computes(self, nested_result: InferenceResult) -> None:
+        """Parameter importance metrics are finite and sensible."""
+        pytest.importorskip("anesthetic")
+        imp = nested_result.parameter_importance(n_bootstrap=10)
+
+        assert math.isfinite(imp.d_kl)
+        assert imp.d_kl >= 0
+        assert math.isfinite(imp.d_g)
+        assert imp.d_g >= 0
+        assert len(imp.marginal_d_kl) == 2
+        for dkl in imp.marginal_d_kl.values():
+            assert math.isfinite(dkl)
+
+    def test_format_table(self, nested_result: InferenceResult) -> None:
+        pytest.importorskip("anesthetic")
+        from tidal.inference._importance import format_importance_table
+
+        imp = nested_result.parameter_importance(n_bootstrap=10)
+        table = format_importance_table(imp)
+        assert "x_constrained" in table
+        assert "D_KL" in table
+        assert "d_G" in table
+
+    def test_from_directory_roundtrip(
+        self, nested_result: InferenceResult, tmp_path: Path,
+    ) -> None:
+        from tidal.inference._results import InferenceResult
+
+        out = tmp_path / "ns_out"
+        nested_result.save(out)
+
+        loaded = InferenceResult.from_directory(out)
+        assert loaded.n_samples == nested_result.n_samples
+        assert loaded.param_names == nested_result.param_names
+        assert loaded.log_evidence == nested_result.log_evidence
+        np.testing.assert_allclose(loaded.samples, nested_result.samples)
+
+    def test_marginal_dkl_with_integer_indexed_columns(
+        self, nested_result: InferenceResult,
+    ) -> None:
+        """Regression for #287: anesthetic's read_chains returns integer-
+        indexed parameter columns in v2.0+ (``[0, 1, 'logL', ...]``), but
+        our importance loop previously indexed by parameter name, silently
+        NaN'ing the marginal D_KL for every parameter.  Verify both
+        integer- and name-indexed anesthetic samples give the same
+        finite D_KL.
+        """
+        pytest.importorskip("anesthetic")
+        from anesthetic import NestedSamples  # type: ignore[import-untyped]
+
+        from tidal.inference._importance import compute_parameter_importance
+
+        # Named-column path (manual reconstruction — matches
+        # to_anesthetic_samples when chain_root is absent).
+        imp_named = compute_parameter_importance(nested_result, n_bootstrap=10)
+        for dkl in imp_named.marginal_d_kl.values():
+            assert math.isfinite(dkl), "named-column path regressed"
+
+        # Integer-indexed path — simulate what read_chains returns in
+        # v2.0+ and monkeypatch to_anesthetic_samples to return it.
+        n = nested_result.n_samples
+        nlive = int(nested_result.metadata["nlive"])
+        sorted_idx = np.argsort(nested_result.log_likelihood)
+        sorted_logl = nested_result.log_likelihood[sorted_idx]
+        logl_birth = np.full(n, -np.inf)
+        for i in range(nlive, n):
+            logl_birth[sorted_idx[i]] = sorted_logl[i - nlive]
+
+        ns_int = NestedSamples(
+            data=nested_result.samples,
+            logL=nested_result.log_likelihood,
+            logL_birth=logl_birth,
+            columns=[0, 1],  # integer-indexed, mimics read_chains
+        )
+        import tidal.inference._importance as imp_mod
+
+        original = imp_mod.to_anesthetic_samples
+        try:
+            imp_mod.to_anesthetic_samples = lambda _r: ns_int  # type: ignore[assignment]
+            imp_int = compute_parameter_importance(nested_result, n_bootstrap=10)
+        finally:
+            imp_mod.to_anesthetic_samples = original
+
+        for name, dkl in imp_int.marginal_d_kl.items():
+            assert math.isfinite(dkl), (
+                f"integer-column path regressed for '{name}' (got NaN)"
+            )
+
+        # Both paths should agree on the per-parameter ranking to within
+        # ~50% (bootstrap noise is large at n_bootstrap=10).
+        for name in nested_result.param_names:
+            assert imp_named.marginal_d_kl[name] == pytest.approx(
+                imp_int.marginal_d_kl[name], rel=0.5, abs=0.1,
+            )
+
+
+# ===================================================================
+# Analyze CLI (inference path)
+# ===================================================================
+
+
+class TestAnalyzeInference:
+    """Test tidal analyze --inference --importance."""
+
+    def test_parse_analyze_inference_flags(self) -> None:
+        from tidal.cli import (
+            _build_parser as build_parser,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "analyze",
+                "/tmp/test",
+                "--inference",
+                "--importance",
+                "--n-bootstrap",
+                "50",
+            ],
+        )
+        assert args.inference is True
+        assert args.importance is True
+        assert args.n_bootstrap_importance == 50

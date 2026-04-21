@@ -117,7 +117,7 @@ def _spacetime_fft(
 
     # Spatial rfftn per snapshot -> complex coefficients
     spatial_fft = np.stack(
-        [np.fft.rfftn(field_snapshots[t]) for t in range(n_snapshots)]
+        [np.fft.rfftn(field_snapshots[t]) for t in range(n_snapshots)],
     )
 
     # Temporal fft (complex input -> must use fft, not rfft).
@@ -144,7 +144,7 @@ def _bin_and_detect(  # noqa: PLR0913, PLR0917
     grid_spacing: tuple[float, ...],
     min_amplitude: float,
 ) -> tuple[
-    NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]
+    NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64],
 ]:
     """Radially bin S(k, omega) and detect peaks.
 
@@ -275,7 +275,7 @@ def compute_dispersion(  # noqa: PLR0914
     # First field: seed the accumulators
     first_snapshots = data.fields[names[0]]
     angular_freqs, first_sfft, spacetime_power_total = _spacetime_fft(
-        first_snapshots, dt
+        first_snapshots, dt,
     )
     spatial_amp_sum = np.abs(first_sfft)
     grid_shape = first_snapshots.shape[1:]

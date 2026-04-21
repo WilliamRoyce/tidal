@@ -126,7 +126,7 @@ class StateLayout:
                     kind=kind,
                     time_order=order,
                     dynamical_index=d_idx,
-                )
+                ),
             )
 
             if order >= SECOND_ORDER:
@@ -139,7 +139,7 @@ class StateLayout:
                         kind="velocity",
                         time_order=order,
                         dynamical_index=d_idx,
-                    )
+                    ),
                 )
 
         return cls(

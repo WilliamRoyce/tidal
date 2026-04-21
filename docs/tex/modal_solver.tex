@@ -160,7 +160,7 @@ Ref: Al-Mohy \& Higham (2011), ``Computing the Action of the Matrix Exponential'
 \subsubsection{Algorithm Selection (Dual-Path Design)}
 \label{sec:modal-algorithm-selection}
 
-The modal solver maintains two distinct time-evolution algorithms because they handle fundamentally different matrix structures. The routing is automatic --- \texttt{\_has\_position\_dependent\_terms()} determines which path is used at runtime.
+The modal solver maintains two distinct time-evolution algorithms because they handle fundamentally different matrix structures. The routing is automatic --- \texttt{\_has\_position\_dependent\_terms()} determines which path is used at runtime. When a system has algebraic constraints or time-derivative operators on the RHS, a third unified reduction step (\texttt{\_build\_evolution\_matrices}) runs upstream of both paths to produce a reduced first-order evolution matrix.
 
 \paragraph{Why two methods?}
 \label{par:modal-why-two}
@@ -184,7 +184,7 @@ Case & Coefficient type & Matrix structure & Algorithm & Time (Gertsenshtein, $N
 \midrule
 Constant & Uniform & Per-mode blocks ($12\times 12$) & Eigendecomposition & ${\sim}0.02$\,s \\
 Position-dep. & Spatially varying & Sparse convolution ($3084\times 3084$) & \texttt{expm\_multiply} (sparse CSC) & ${\sim}1.4$\,s \\
-Constraints + const. & Uniform with algebraic constraints & Reduced per-mode blocks & Schur complement + eigendecomp. & ${\sim}0.08$\,s \\
+Constraints + const. & Uniform with algebraic constraints \emph{and/or} rank-deficient $M$ & Reduced per-mode blocks via unified Schur & \texttt{scipy.linalg.eig(A, B)} (QZ) & ${\sim}0.08$\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -210,7 +210,7 @@ For localized coefficients (e.g.\ Gaussian $\Bzero(x)$), the Fourier convolution
 \centering
 \caption{Sparse vs.\ dense \texttt{expm\_multiply} for localized Gertsenshtein.}
 \label{tab:sparse-benchmark}
-\begin{tabular}{@{}lccccl@{}}
+\begin{tabular}{@{}lcccccl@{}}
 \toprule
 Grid $N$ & Matrix size & Density & Dense & Sparse & Speedup & Max diff \\
 \midrule
@@ -446,11 +446,11 @@ File & Purpose \\
 Function & Purpose \\
 \midrule
 \texttt{can\_use\_modal(spec, grid, bc)} & Eligibility check (shared with auto-selection) \\
-\texttt{solve\_modal(spec, grid, y0, \ldots)} & Main entry point --- routes to per-mode, full-matrix, or Schur path \\
+\texttt{solve\_modal(spec, grid, y0, \ldots)} & Main entry point --- routes to per-mode, full-matrix, or unified-reduction path \\
 \texttt{\_fft\_slots / \_ifft\_slots} & State $\leftrightarrow$ Fourier transforms (analytical shape computation) \\
-\texttt{\_build\_per\_mode\_matrices} & Per-mode evolution matrices (constant coefficients) \\
+\texttt{\_build\_per\_mode\_matrices} & Per-mode evolution matrices (constant coefficients, no constraints) \\
 \texttt{\_build\_convolution\_matrix} & Convolution matrix with vectorized coupling (position-dependent) \\
-\texttt{\_build\_constraint\_eliminated\_matrices} & Fourier Schur complement with batched inversion \\
+\texttt{\_build\_evolution\_matrices} & Unified builder: algebraic constraints (Schur) + rank-deficient mass-matrix (eigen-Schur) + near-singular vel\_coupling. Returns $(A_{\text{rhs}}, B_{\text{lhs}})$ for generalized eigenvalue solve \\
 \texttt{\_evolve\_per\_mode} & Block-aware eigendecomposition solver; optional Fourier snapshot return \\
 \texttt{\_evolve\_full\_matrix} & Sparse-aware \texttt{expm\_multiply} solver (auto-thresholds to CSC) \\
 \texttt{\_find\_independent\_blocks} & Union-find block detection for eigendecomposition \\
@@ -693,7 +693,7 @@ Eigendecomposition & $\exp(\lambda \cdot t)$ & $O(1)$ time evolution \\
 
 Energy conservation after all three levels: $\max|dE/E| = 0$ (machine precision) at $t_\text{end} = 1.0$ for $\alpha_1 = 0.5$, $\alpha_2 = 0.3$, $\alpha_3 = 0.2$, $b_5 = 0.1$.
 
-\textbf{Implementation}: \texttt{\_build\_generalized\_evolution\_matrices()} returns $A_\text{rhs}$ and optionally $B = I - V_\text{coupling}$. When $B$ is provided, \texttt{\_evolve\_per\_mode()} uses \texttt{scipy.linalg.eig(A, B)} instead of \texttt{np.linalg.eig(A)}. Backward compatible: for systems without time-derivative operators, the existing code paths are used unchanged.
+\textbf{Implementation}: \texttt{\_build\_evolution\_matrices()} is the single unified reduction builder --- it handles algebraic constraint fields (\texttt{time\_order=0}) via Fourier Schur complement, rank-deficient mass matrices $M$ (e.g.\ trace projections of higher-rank tensor perturbations) via per-mode mass eigendecomposition with null-space Schur elimination, and near-singular velocity coupling $B = I - V_\text{coupling}$ via the generalized eigenvalue problem. It returns $(A_\text{rhs}, B_\text{lhs})$; when $B_\text{lhs}$ is non-\texttt{None}, \texttt{\_evolve\_per\_mode()} uses \texttt{scipy.linalg.eig(A, B)} (QZ decomposition), which is numerically stable for rank-deficient and ill-conditioned $B$; otherwise it uses \texttt{np.linalg.eig(A)}. The gauge filter $|\lambda| > 10^{12}$ catches infinite eigenvalues from null directions and freezes them at IC. Prior to the \#256 unification two competing builders coexisted (constraint-eliminated and generalized); the constraint-eliminated builder silently mis-classified \texttt{d2\_t} cross-couplings as stiffness operators and was deleted --- see \cref{sec:troubleshooting-rank-deficient-kinetic} for the failure mode and its resolution.
 
 \textbf{References}: Golub \& Van Loan (2013), \emph{Matrix Computations}, 4th ed., \S7.7; Hairer \& Lubich (2003), ZAMM 83(1); Ostrogradsky M.V.\ (1850), Mem.\ Acad.\ St.\ Petersbourg VI 4, 385.
 

@@ -43,7 +43,7 @@ class SweepConfig:
     force_large_sweep: bool
     dry_run: bool
     adaptive_config: dict[str, dict[str, Any]] = field(
-        default_factory=lambda: cast("dict[str, dict[str, Any]]", {})
+        default_factory=lambda: cast("dict[str, dict[str, Any]]", {}),
     )
     sweep_strategy: str | None = None
     n_samples: int | None = None
@@ -64,7 +64,7 @@ _KNOWN_SECTIONS = frozenset(
         "execution",
         "convergence",
         "ensemble",
-    }
+    },
 )
 
 _SIM_KEY_MAP: dict[str, str] = {
@@ -207,7 +207,7 @@ def _parse_range(
             )
             raise ValueError(msg)
         return cast(
-            "list[float]", np.logspace(np.log10(start), np.log10(stop), count).tolist()
+            "list[float]", np.logspace(np.log10(start), np.log10(stop), count).tolist(),
         ), {}
     msg = f"[sweep.{name}] unknown scale '{scale}' (expected: linear, log, adaptive)"
     raise ValueError(msg)
@@ -243,7 +243,7 @@ def _parse_sweeps(
             if not isinstance(section, dict):
                 continue
             values, ac = _parse_sweep_section(
-                name, cast("dict[str, Any]", section), strategy=strategy
+                name, cast("dict[str, Any]", section), strategy=strategy,
             )
             swept[name] = values
             if ac:
@@ -413,7 +413,7 @@ def load_sweep_config(path: Path) -> SweepConfig:  # noqa: PLR0914
 
     meas, source, target, energy_threshold = _parse_measurement(data)
     parallel, resume, force_large, dry_run, n_replicates, base_seed = _parse_execution(
-        data
+        data,
     )
     ic_perturbation, param_noise = _parse_ensemble(data)
 

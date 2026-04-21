@@ -1,373 +1,198 @@
 #!/usr/bin/env python3
-"""Analyze dark photon torsion sweep results using C₀ = P/B₀² metric.
+r"""Analyze dark photon torsion sweep results using C₀ = P/B₀² metric.
 
-Reads results.csv from a sweep output directory, computes the conversion
-coefficient C₀ = P_final/B₀² and amplification A = √(C₀/C_EM), and
-generates a matplotlib plot with the Gertsenshtein baseline.
+Post-processes a `tidal sweep` output directory by:
+
+1. **Stability filter** — flag runs where
+   - ``run_status != "success"`` (divergence or solver error), or
+   - ``P_max > 0.5`` (unphysically large conversion; linearized regime broken), or
+   - ``P_max(t_end=50) > 4.1 · P_max(t_end=25)`` if a paired run at half
+     ``t_end`` is provided — indicates super-sin² growth (tachyonic
+     amplification artifact per issue #238).
+
+2. **Plot** — delegates to ``tidal plot`` with the ``C₀ = P/B₀²`` derived
+   metric, using a masked CSV when the filter rejects runs.
+
+3. **Reports** — prints a one-line summary
+   (``filtered: N stable / M total; X diverged; Y super-P; Z super-sin²``)
+   and writes ``flagged_runs.csv`` alongside the original ``results.csv``.
 
 Usage:
     python analyze_sweep.py <sweep_dir> [--output <png_path>]
+                            [--paired-dir <half-t_end sweep dir>]
 
-The primary metric is the conversion coefficient C₀, not raw P_max.
-See project_sweep_measurement_strategy.md (issue #206) for rationale.
+The ``--paired-dir`` argument enables the super-sin² check (condition 3);
+without it, only conditions 1 and 2 are applied.
 
 Refs:
     Hwang & Noh (2310.04150) — linearized regime validity
     Domcke & Garcia-Cely (2301.02072) — Gertsenshtein thin-magnet formula
+    Issue #238 — t_end independence requirement for amplification claims
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
-import math
+import subprocess  # noqa: S404
 import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-import numpy as np
+# Physical-regime thresholds
+_P_MAX_UNPHYSICAL = 0.5  # linearized regime broken
+_SIN_SQ_RATIO_EXPECTED = 4.0  # sin²(κB₀·t)/sin²(κB₀·t/2) in linear regime
+_SIN_SQ_RATIO_TOLERANCE = 1.025  # 2.5% slack → flag at > 4.1
 
 
-def load_results(sweep_dir: Path) -> list[dict[str, float | str]]:
-    """Load results.csv and parse numeric columns."""
-    csv_path = sweep_dir / "results.csv"
-    if not csv_path.exists():
-        print(f"ERROR: {csv_path} not found", file=sys.stderr)
-        sys.exit(1)
-    rows: list[dict[str, float | str]] = []
-    with csv_path.open() as f:
-        reader = csv.DictReader(f)
-        header_fields = reader.fieldnames or []
-        for row in reader:
-            # Skip duplicate header rows or completely empty rows
-            if row.get(header_fields[0]) == header_fields[0]:
-                continue
-            if all(v == "" for v in row.values()):
-                continue
-            parsed: dict[str, float | str] = {}
-            for k, v in row.items():
-                try:
-                    parsed[k] = float(v)
-                except (ValueError, TypeError):
-                    parsed[k] = v
-            rows.append(parsed)
-    return rows
+def _read_results_csv(path: Path) -> list[dict[str, str]]:
+    with path.open(encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
-def compute_c0(rows: list[dict]) -> list[dict]:
-    """Add C_0 and A columns to each row."""
-    for row in rows:
-        try:
-            b0 = float(row.get("B0", 0.01))
-            kappa = float(row.get("kappa", 1.0))
-            t_end = float(row.get("t_end", 50.0))
-        except (ValueError, TypeError):
-            b0, kappa, t_end = 0.01, 1.0, 50.0
-
-        # P_final is the physics measurement at fixed interaction length D = t_end
-        p_final = row.get("P_final")
-        try:
-            p_final = float(p_final)  # type: ignore[arg-type]
-        except (ValueError, TypeError):
-            # Fall back to P_max if P_final not available or empty
-            try:
-                p_final = float(row.get("P_max", "nan"))  # type: ignore[arg-type]
-            except (ValueError, TypeError):
-                p_final = float("nan")
-
-        # Conversion coefficient: C₀ = P / B₀²
-        c0 = p_final / b0**2 if b0 > 0 else float("nan")
-
-        # Gertsenshtein baseline: C_EM = sin²(κ B₀ t_end / 2) / B₀²
-        c_em = math.sin(kappa * b0 * t_end / 2) ** 2 / b0**2 if b0 > 0 else 0.0
-
-        # Amplification: A = √(C₀ / C_EM)
-        a_factor = math.sqrt(c0 / c_em) if c_em > 0 and c0 > 0 else float("nan")
-
-        row["C_0"] = c0
-        row["C_EM"] = c_em
-        row["A"] = a_factor
-        row["P_final_used"] = p_final
-
-    return rows
+def _parse_float(s: str, default: float = 0.0) -> float:
+    try:
+        return float(s)
+    except (ValueError, TypeError):
+        return default
 
 
-def filter_successful(rows: list[dict]) -> list[dict]:
-    """Keep only successful, non-diverged runs."""
-    good = []
-    for row in rows:
-        status = row.get("run_status", "success")
-        c0 = row.get("C_0", float("nan"))
-        # Filter: successful AND C0 within 100x baseline (exclude diverged)
-        c_em = row.get("C_EM", 1.0)
-        if status == "success" and isinstance(c0, float) and c0 < 100 * c_em:
-            good.append(row)
-    return good
+def _sweep_key(row: dict[str, str], known_cols: set[str]) -> tuple[str, ...]:
+    """Identify sweep-parameter columns (non-metadata) to join paired runs."""
+    metadata_cols = {
+        "P_max",
+        "P_max_time",
+        "P_final",
+        "wall_time_s",
+        "run_status",
+        "error_message",
+        "solver_exit_code",
+        "t_end",
+        "grid_shape",
+        "dt",
+        "scheme",
+        "bc",
+    }
+    return tuple(row[k] for k in sorted(known_cols - metadata_cols))
 
 
-def detect_swept_params(rows: list[dict]) -> list[str]:
-    """Identify which parameters were swept (have >1 unique value)."""
-    if not rows:
-        return []
-    # Check standard sweep parameters
-    candidates = ["alpha", "xi", "deltam", "B0", "kappa"]
-    swept = []
-    for p in candidates:
-        vals = {row.get(p) for row in rows if p in row}
-        if len(vals) > 1:
-            swept.append(p)
-    return swept
+def stability_filter(
+    sweep_dir: Path,
+    paired_dir: Path | None = None,
+) -> tuple[list[dict[str, str]], list[dict[str, str]], dict[str, int]]:
+    """Apply the stability filter to a sweep output.
 
-
-def plot_1d(rows: list[dict], param: str, output: Path, c_em: float) -> None:
-    """Generate 1D C₀ vs parameter plot."""
-    x = np.array([float(r[param]) for r in rows])
-    c0 = np.array([float(r["C_0"]) for r in rows])
-    a_vals = np.array([float(r["A"]) for r in rows])
-
-    sort_idx = np.argsort(x)
-    x, c0, a_vals = x[sort_idx], c0[sort_idx], a_vals[sort_idx]
-
-    fig, ax1 = plt.subplots(figsize=(8, 5))
-
-    ax1.plot(x, c0, "o-", color="tab:blue", label="C₀ = P/B₀² (TIDAL)")
-    ax1.axhline(
-        c_em,
-        color="tab:orange",
-        linestyle="--",
-        label=f"C_EM = {c_em:.1f} (Gertsenshtein)",
-    )
-    ax1.set_xlabel(param)
-    ax1.set_ylabel("C₀ = P_final / B₀²")
-    ax1.set_title(f"Conversion coefficient vs {param}")
-    ax1.legend(loc="upper left")
-
-    # Secondary y-axis: amplification A
-    ax2 = ax1.twinx()
-    ax2.plot(
-        x,
-        a_vals,
-        "s:",
-        color="tab:green",
-        alpha=0.6,
-        markersize=4,
-        label="A = √(C₀/C_EM)",
-    )
-    ax2.axhline(1.0, color="tab:green", linestyle=":", alpha=0.3)
-    ax2.set_ylabel("Amplification A = κ_eff / κ", color="tab:green")
-    ax2.tick_params(axis="y", labelcolor="tab:green")
-    ax2.legend(loc="upper right")
-
-    fig.tight_layout()
-    fig.savefig(output, dpi=150)
-    plt.close(fig)
-    print(f"  Plot saved: {output}")
-
-
-def plot_2d(rows: list[dict], params: list[str], output: Path, c_em: float) -> None:
-    """Generate 2D C₀ heatmap."""
-    p1, p2 = params[0], params[1]
-    x = sorted({float(r[p1]) for r in rows})
-    y = sorted({float(r[p2]) for r in rows})
-
-    grid = np.full((len(y), len(x)), np.nan)
-    for r in rows:
-        xi = x.index(float(r[p1]))
-        yi = y.index(float(r[p2]))
-        grid[yi, xi] = float(r["C_0"])
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    im = ax.pcolormesh(x, y, grid, shading="nearest", cmap="RdBu_r")
-    ax.set_xlabel(p1)
-    ax.set_ylabel(p2)
-    ax.set_title(f"C₀ = P/B₀² over ({p1}, {p2})")
-    cbar = fig.colorbar(im, ax=ax, label="C₀ = P_final / B₀²")
-    # Mark the Gertsenshtein baseline on the colorbar
-    cbar.ax.axhline(c_em, color="black", linestyle="--", linewidth=1.5)
-
-    fig.tight_layout()
-    fig.savefig(output, dpi=150)
-    plt.close(fig)
-    print(f"  Plot saved: {output}")
-
-
-def _arctan_ticks() -> tuple[list[float], list[str]]:
-    """Tick positions and labels for arctan-mapped axes."""
-    vals = [-30, -10, -1, 0, 1, 10, 30]
-    positions = [np.arctan(v) for v in vals]
-    labels = [str(v) for v in vals]
-    return positions, labels
-
-
-def plot_mc_scatter(
-    rows: list[dict], params: list[str], output: Path, c_em: float
-) -> None:
-    """Generate arctan-mapped pairwise scatter plots for 3D+ MC sweeps.
-
-    Each panel shows a pair of swept parameters (arctan-mapped to show the full
-    (-inf, +inf) range), with points coloured by relative C0 deviation from the
-    Gertsenshtein baseline.
+    Returns
+    -------
+    stable_rows, flagged_rows, counts
+        ``stable_rows`` contains the rows passing all checks.
+        ``flagged_rows`` contains the rejected rows with a new column
+        ``flag_reason``.
+        ``counts`` has keys ``total, stable, diverged, super_p, super_sin2``.
     """
-    from itertools import combinations
+    results_csv = sweep_dir / "results.csv"
+    if not results_csv.exists():
+        sys.exit(f"error: {results_csv} does not exist")
+    rows = _read_results_csv(results_csv)
+    known_cols = set(rows[0].keys()) if rows else set()
 
-    from scipy.interpolate import griddata
+    paired_lookup: dict[tuple[str, ...], float] = {}
+    if paired_dir is not None:
+        paired_csv = paired_dir / "results.csv"
+        if not paired_csv.exists():
+            sys.exit(f"error: paired {paired_csv} does not exist")
+        for r in _read_results_csv(paired_csv):
+            if r.get("run_status") != "success":
+                continue
+            paired_lookup[_sweep_key(r, known_cols)] = _parse_float(r.get("P_max", "0"))
 
-    n_params = len(params)
-    pairs = list(combinations(range(n_params), 2))
-    n_pairs = len(pairs)
+    stable: list[dict[str, str]] = []
+    flagged: list[dict[str, str]] = []
+    counts = {"total": 0, "stable": 0, "diverged": 0, "super_p": 0, "super_sin2": 0}
 
-    # Compute relative deviation (percent)
-    c0_arr = np.array([float(r["C_0"]) for r in rows])
-    c0_pct = (c0_arr - c_em) / c_em * 100  # percent deviation from Gertsenshtein
+    for row in rows:
+        counts["total"] += 1
+        status = row.get("run_status", "")
+        p_max = _parse_float(row.get("P_max", "0"))
+        flag: str | None = None
 
-    # Determine color limits (symmetric around 0)
-    vmax = max(np.max(np.abs(c0_pct)), 1e-10)  # avoid zero range
+        if status != "success":
+            flag = f"run_status={status}"
+            counts["diverged"] += 1
+        elif p_max > _P_MAX_UNPHYSICAL:
+            flag = f"P_max={p_max:.3f} > {_P_MAX_UNPHYSICAL} (linearized regime broken)"
+            counts["super_p"] += 1
+        elif paired_lookup:
+            p_paired = paired_lookup.get(_sweep_key(row, known_cols))
+            if p_paired is not None and p_paired > 0:
+                ratio = p_max / p_paired
+                if ratio > _SIN_SQ_RATIO_EXPECTED * _SIN_SQ_RATIO_TOLERANCE:
+                    flag = (
+                        f"P(t_end)/P(t_end/2) = {ratio:.2f} > {_SIN_SQ_RATIO_EXPECTED:.1f} "
+                        f"(super-sin² growth, likely tachyonic artifact; #238)"
+                    )
+                    counts["super_sin2"] += 1
 
-    fig, axes = plt.subplots(1, n_pairs, figsize=(5 * n_pairs, 4.5), squeeze=False)
+        if flag is None:
+            stable.append(row)
+            counts["stable"] += 1
+        else:
+            flagged.append({**row, "flag_reason": flag})
 
-    tick_pos, tick_labels = _arctan_ticks()
-
-    for ax_idx, (i, j) in enumerate(pairs):
-        ax = axes[0, ax_idx]
-        p1, p2 = params[i], params[j]
-
-        x_raw = np.array([float(r[p1]) for r in rows])
-        y_raw = np.array([float(r[p2]) for r in rows])
-        x_at = np.arctan(x_raw)
-        y_at = np.arctan(y_raw)
-
-        # Try contour interpolation if enough points
-        contour_ok = len(rows) >= 15
-        if contour_ok:
-            xi_grid = np.linspace(x_at.min(), x_at.max(), 80)
-            yi_grid = np.linspace(y_at.min(), y_at.max(), 80)
-            xi_mesh, yi_mesh = np.meshgrid(xi_grid, yi_grid)
-            try:
-                zi = griddata((x_at, y_at), c0_pct, (xi_mesh, yi_mesh), method="linear")
-                ax.contourf(
-                    xi_mesh,
-                    yi_mesh,
-                    zi,
-                    levels=15,
-                    cmap="RdBu_r",
-                    vmin=-vmax,
-                    vmax=vmax,
-                    alpha=0.5,
-                )
-            except Exception:
-                contour_ok = False
-
-        sc = ax.scatter(
-            x_at,
-            y_at,
-            c=c0_pct,
-            cmap="RdBu_r",
-            vmin=-vmax,
-            vmax=vmax,
-            s=20,
-            edgecolors="k",
-            linewidths=0.3,
-        )
-        ax.set_xlabel(f"arctan({p1})")
-        ax.set_ylabel(f"arctan({p2})")
-        ax.set_xticks(tick_pos)
-        ax.set_xticklabels(tick_labels, fontsize=7)
-        ax.set_yticks(tick_pos)
-        ax.set_yticklabels(tick_labels, fontsize=7)
-
-    cbar = fig.colorbar(sc, ax=axes.ravel().tolist(), label="(C₀ - C_EM)/C_EM  [%]")
-    cbar.ax.axhline(0, color="black", linewidth=0.5)
-
-    fig.suptitle(
-        f"Dark photon torsion: relative amplification ({len(rows)} stable runs)",
-        fontsize=11,
-    )
-    fig.tight_layout()
-    fig.savefig(output, dpi=150)
-    plt.close(fig)
-    print(f"  Plot saved: {output}")
-
-    # Print summary stats
-    print(f"  Relative deviation range: [{c0_pct.min():.2e}%, {c0_pct.max():.2e}%]")
-    adiabatic_threshold_pct = 0.01
-    if np.max(np.abs(c0_pct)) < adiabatic_threshold_pct:
-        print("  >>> Deviations below 0.01%: consistent with adiabatic decoupling")
-        print(
-            f"  >>> Expected: dP/P ~ delta^2 * (wG/mT)^2 ~ "
-            f"{0.01 * (0.005 / 7.4) ** 2:.1e} (R-tilde mass floor)"
-        )
-
-
-def print_summary(rows: list[dict], all_rows: list[dict], c_em: float) -> None:
-    """Print analysis summary."""
-    n_total = len(all_rows)
-    n_good = len(rows)
-    n_diverged = n_total - n_good
-
-    if not rows:
-        print(f"  All {n_total} runs diverged or failed — no stable results.")
-        return
-
-    c0_vals = [float(r["C_0"]) for r in rows]
-    a_vals = [float(r["A"]) for r in rows]
-
-    print(f"  Runs: {n_good}/{n_total} stable ({n_diverged} diverged/failed)")
-    print(f"  C_EM (Gertsenshtein baseline): {c_em:.2f}")
-    print(f"  C₀ range: [{min(c0_vals):.2f}, {max(c0_vals):.2f}]")
-    print(f"  A range:  [{min(a_vals):.4f}, {max(a_vals):.4f}]")
-    amplification_threshold = 1.01
-    if max(a_vals) > amplification_threshold:
-        print(f"  >>> Torsion amplification detected: A_max = {max(a_vals):.4f}")
-    elif n_good == n_total:
-        print("  >>> No amplification: all C₀ ≈ C_EM (torsion is transparent)")
+    return stable, flagged, counts
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Analyze torsion sweep results using C₀ = P/B₀² metric"
+        description="Analyze dark photon sweep with stability filter + C₀ plot",
     )
-    parser.add_argument("sweep_dir", type=Path, help="Sweep output directory")
-    parser.add_argument("--output", type=Path, default=None, help="Output PNG path")
+    parser.add_argument("sweep_dir", help="Sweep output directory")
+    parser.add_argument("--output", default=None, help="Output PNG path")
+    parser.add_argument(
+        "--paired-dir",
+        default=None,
+        help="Sweep output at half t_end for super-sin² check (#238)",
+    )
     args = parser.parse_args()
 
-    print(f"=== Conversion Coefficient Analysis: {args.sweep_dir.name} ===")
+    sweep_dir = Path(args.sweep_dir)
+    paired_dir = Path(args.paired_dir) if args.paired_dir else None
+    _stable, flagged, counts = stability_filter(sweep_dir, paired_dir=paired_dir)
 
-    # Load and process
-    all_rows = load_results(args.sweep_dir)
-    all_rows = compute_c0(all_rows)
-    good_rows = filter_successful(all_rows)
+    # Summary line
+    print(
+        f"Stability filter: {counts['stable']} stable / {counts['total']} total; "
+        f"{counts['diverged']} diverged; {counts['super_p']} super-P; "
+        f"{counts['super_sin2']} super-sin²",
+    )
 
-    # Baseline
-    c_em = float(good_rows[0]["C_EM"]) if good_rows else 612.0
-
-    # Summary
-    print_summary(good_rows, all_rows, c_em)
-
-    # Detect dimensionality
-    swept = detect_swept_params(all_rows)
-    if not swept:
-        print("  No swept parameters detected.")
-        return
-
-    # Determine output path
-    output = args.output or args.sweep_dir / "analysis_C0.png"
-
-    # Plot
-    if len(swept) == 1:
-        if good_rows:
-            plot_1d(good_rows, swept[0], output, c_em)
-        else:
-            print("  No stable runs to plot.")
-    elif len(swept) == 2:
-        if good_rows:
-            plot_2d(good_rows, swept, output, c_em)
-        else:
-            print("  No stable runs to plot.")
-    # 3D+ MC sweep: arctan-mapped pairwise scatter plots
-    elif good_rows:
-        plot_mc_scatter(good_rows, swept, output, c_em)
+    # Write flagged runs (if any) for inspection
+    if flagged:
+        flagged_csv = sweep_dir / "flagged_runs.csv"
+        with flagged_csv.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=list(flagged[0].keys()))
+            writer.writeheader()
+            writer.writerows(flagged)
+        print(f"Wrote {len(flagged)} flagged runs to {flagged_csv}")
     else:
-        print("  No stable runs to plot.")
+        print("No runs flagged; all points pass stability filter.")
+
+    # Delegate plot to `tidal plot` (operates on the full CSV; the C₀ metric
+    # handles divergent runs gracefully by dropping them).
+    output = args.output or f"{sweep_dir}/analysis_C0.png"
+    cmd = [
+        "tidal",
+        "plot",
+        str(sweep_dir),
+        "--type",
+        "sweep",
+        "--metric",
+        "C0",
+        "--log-y",
+        "--output",
+        output,
+    ]
+    print(f"Running: {' '.join(cmd)}")
+    subprocess.run(cmd, check=True)  # noqa: S603
 
 
 if __name__ == "__main__":

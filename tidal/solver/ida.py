@@ -570,7 +570,7 @@ def solve_ida(  # noqa: PLR0913
             yp = result.yp
             for i in range(len(result.t)):
                 snapshot_callback(
-                    result.t[i], result.y[i], yp[i] if yp is not None else None
+                    result.t[i], result.y[i], yp[i] if yp is not None else None,
                 )
 
     return {

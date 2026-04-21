@@ -49,12 +49,23 @@ GRID=256
 BOUNDS="0:100"
 T_END=50.0
 
-# Generate arctan-mapped sweep values for each parameter
-# θ ∈ (-π/2+0.05, π/2-0.05) → x = tan(θ) ∈ (~-30, ~+30)
-# Two values define the bounds for Latin Hypercube sampling
-ALPHA_BOUNDS="-30:30:2"
-XI_BOUNDS="-30:30:2"
-DELTA_BOUNDS="-30:30:2"
+# Physical parameter bounds for the Latin-hypercube sweep.
+#
+# These supersede the earlier arctan-mapped [-30, 30] ranges, which
+# included extreme values (e.g. xi < 0, xi → 0) that triggered singular
+# mass matrices in the modal solver and aborted the whole sweep. The
+# new bounds stay in the physically sensible region explored by the 2D
+# sweep (sweep_2d.sh) where all 56 points are stable and well-defined:
+#   - alpha ∈ [0.1, 2.0]  — trace-sector torsion mass, positive
+#   - xi    ∈ [0.1, 2.0]  — kinetic coefficient, positive (ghost-free)
+#   - delta ∈ [-0.3, 0.3] — kinetic mixing, both signs
+#
+# Points outside these bounds hit the rank-deficient / zero-kinetic
+# edge of the theory and are not physically meaningful for
+# amplification characterization.
+ALPHA_BOUNDS="0.1:2.0:2"
+XI_BOUNDS="0.1:2.0:2"
+DELTA_BOUNDS="-0.3:0.3:2"
 
 echo "=== Dark Photon Torsion: Monte Carlo Sweep ==="
 echo "Samples: ${N_SAMPLES}"
@@ -69,7 +80,7 @@ echo ""
 # to the Hamiltonian are spurious — the constrained Hamiltonian is only
 # well-defined on the physical h_5↔a_1 sector. Use P(t) from conversion
 # as the primary quality metric. Diverged runs show up as P_max >> P_Gertsenshtein.
-uv run tidal sweep "${SPEC}" \
+tidal sweep "${SPEC}" \
   --sweep "alpha=${ALPHA_BOUNDS}" \
   --sweep "xi=${XI_BOUNDS}" \
   --sweep "deltam=${DELTA_BOUNDS}" \
@@ -81,35 +92,36 @@ uv run tidal sweep "${SPEC}" \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" \
-  --parallel 4 --no-require-stable --resume \
+  --parallel "${TIDAL_PARALLEL:-4}" --resume \
   --output "${OUTPUT}"
-# --no-require-stable: R-tilde tensor/axial torsion sectors have tachyonic mass
-# eigenvalues, but these modes have ZERO physical coupling (100% trace-aligned).
-# The modal solver's _suppress_tachyonic_noise() (#222) freezes them.
-# Some parameter combinations (alpha > 0.917 at xi=0.1) are genuinely unstable
-# — these will be flagged as diverged in the output.
+# Rank-deficient mass matrix from trace projection is handled by the
+# unified _build_evolution_matrices (#256); no --no-require-stable
+# bypass needed. TIDAL_PARALLEL env override: default 4 local, 112 sapphire.
+# Genuinely unstable parameter points (e.g. alpha > 0.917 at xi=0.1)
+# are flagged post-hoc by analyze_sweep.py's stability filter
+# (run_status, P_max > 0.5, or super-sin² growth per #238).
 
 echo ""
 echo "--- Generating plots ---"
 
 # Sensitivity: which of (alpha, xi, deltam) drives conversion?
-uv run tidal plot "${OUTPUT}" --type sweep-tornado \
+tidal plot "${OUTPUT}" --type sweep-tornado \
   --metric P_max \
   --title "Dark photon torsion: parameter sensitivity (P_max)" \
   --output "${OUTPUT}/plot_tornado.png" --quiet
 
 # Scatter matrix: all parameter pairs coloured by P_max
-uv run tidal plot "${OUTPUT}" --type sweep-scatter \
+tidal plot "${OUTPUT}" --type sweep-scatter \
   --metric P_max \
   --title "Dark photon torsion: parameter space (coloured by P_max)" \
   --output "${OUTPUT}/plot_scatter.png" --quiet
 
 # C₀ = P/B₀² analysis with arctan-mapped scatter plots
 # Shows relative amplification (C₀ - C_EM)/C_EM in percent
-uv run python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
+python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
 
 # Parallel coordinates: multi-parameter trends
-uv run tidal plot "${OUTPUT}" --type sweep-parallel \
+tidal plot "${OUTPUT}" --type sweep-parallel \
   --metric P_max \
   --title "Dark photon torsion: parallel coordinates (P_max)" \
   --output "${OUTPUT}/plot_parallel.png" --quiet
@@ -124,7 +136,7 @@ echo "  ${OUTPUT}/plot_parallel.png  [parallel coordinates]"
 echo "  ${OUTPUT}/analysis_C0.png    [C₀ relative deviation with arctan axes]"
 echo ""
 echo "Sensitivity analysis:"
-echo "  uv run tidal analyze ${OUTPUT} --sensitivity morris --metric P_max"
+echo "  tidal analyze ${OUTPUT} --sensitivity morris --metric P_max"
 echo ""
 echo "Physics note (adiabatic decoupling):"
 echo "  R-tilde mass floor: m_T >= sqrt(55) ~ 7.4 (from contorsion)"

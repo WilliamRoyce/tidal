@@ -1,6 +1,6 @@
 [project]
 name = "tidal"
-version = "0.26.4"
+version = "0.33.12"
 description = "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -42,12 +42,17 @@ dependencies = [
     "scipy>=1.10,<2.0",
     "scikit-sundae>=1.1.2,<2.0",
     "tqdm>=4.60",
+    "typing-extensions>=4.0 ; python_version < '3.12'",
 ]
 
 [project.optional-dependencies]
 wolfram = ["wolframclient>=1.4.0,<2.0"]
 sensitivity = ["SALib>=1.4"]
-inference = ["dynesty>=2.1", "anesthetic>=2.0"]
+inference = ["anesthetic>=2.0"]
+# pypolychord: install manually (requires gfortran):
+#   git clone https://github.com/PolyChord/PolyChordLite /tmp/PolyChordLite
+#   cd /tmp/PolyChordLite && pip install --no-build-isolation --config-settings="--global-option=--no-mpi" .
+# On HPC with MPI: pip install . (no --no-mpi flag)
 completion = ["shtab>=1.5"]
 color = ["rich-argparse>=1.4"]
 
@@ -71,6 +76,7 @@ dev = [
     "pydata-sphinx-theme >=0.16.0,<0.17.0",
     "myst-parser >=4.0.0,<5.0.0",
     "ruamel.yaml >=0.18.0,<0.19.0",
+    "mpmath>=1.4.1",
 ]
 
 
@@ -167,6 +173,9 @@ convention = "numpy"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: integration test with non-trivial compute (simulate, derive, etc.); runs in default lane but can be skipped with `-m 'not slow'`.",
+]
 
 [tool.coverage.run]
 source = ["tidal"]

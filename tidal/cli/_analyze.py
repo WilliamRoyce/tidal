@@ -83,7 +83,7 @@ def _run_critical_field(results: SweepResults, args: Namespace) -> int:
         error_with_hint(
             "--output is required for critical field analysis",
             hints=[
-                "Example: `tidal analyze DIR --critical-field B0 --output results/`"
+                "Example: `tidal analyze DIR --critical-field B0 --output results/`",
             ],
         )
         return 1
@@ -98,7 +98,7 @@ def _run_critical_field(results: SweepResults, args: Namespace) -> int:
             return 1
         try:
             threshold = compute_reference_threshold(
-                ref_formula, ref_b, results.fixed_params, results.sim_settings
+                ref_formula, ref_b, results.fixed_params, results.sim_settings,
             )
         except ValueError as exc:
             _cerror(f"reference formula: {exc}")
@@ -165,22 +165,62 @@ def _print_critical_field_summary(result: CriticalFieldResult) -> None:
             print(f"1/B_min range: [{min(inv_bmins):.4g}, {max(inv_bmins):.4g}]")
 
 
-def analyze_command(args: Namespace) -> int:
+def _run_inference_importance(data_path: Path, args: Namespace) -> int:
+    """Run parameter importance analysis on nested sampling output."""
+    from tidal.cli._console import error as _cerror
+    from tidal.inference._importance import (
+        compute_parameter_importance,
+        format_importance_table,
+    )
+    from tidal.inference._results import InferenceResult
+
+    try:
+        result = InferenceResult.from_directory(data_path)
+    except (FileNotFoundError, ValueError, KeyError) as exc:
+        _cerror(f"loading inference data: {exc}")
+        return 1
+
+    n_bootstrap = getattr(args, "n_bootstrap_importance", 100)
+
+    try:
+        importance = compute_parameter_importance(result, n_bootstrap)
+    except (ImportError, ValueError) as exc:
+        _cerror(str(exc))
+        return 1
+
+    print(format_importance_table(importance))
+    return 0
+
+
+def analyze_command(args: Namespace) -> int:  # noqa: PLR0911
     """Run ``tidal analyze`` subcommand.
 
     Returns 0 on success, 1 on error.
     """
-    from tidal.measurement._sweep_results import SweepResults
-
     data_path = Path(args.data_path)
     if not data_path.exists():
         from tidal.cli._console import error_with_hint
 
         error_with_hint(
             f"path not found: {data_path}",
-            hints=["Use `tidal sweep --output` directory"],
+            hints=["Use `tidal sweep --output` or `tidal sample --output` directory"],
         )
         return 1
+
+    # --- Inference analysis path ---
+    if getattr(args, "inference", False):
+        if getattr(args, "importance", False):
+            return _run_inference_importance(data_path, args)
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            "--inference requires an analysis type.",
+            hints=["Use --importance for parameter importance via KL divergence."],
+        )
+        return 1
+
+    # --- Sweep analysis path ---
+    from tidal.measurement._sweep_results import SweepResults
 
     try:
         results = SweepResults.from_directory(data_path)
@@ -209,7 +249,7 @@ def analyze_command(args: Namespace) -> int:
             error_with_hint(
                 f"--metric is required. Available: {', '.join(results.metric_names)}",
                 hints=[
-                    "Example: `tidal analyze DIR --metric P_max --sensitivity sobol`"
+                    "Example: `tidal analyze DIR --metric P_max --sensitivity sobol`",
                 ],
             )
             return 1

@@ -146,7 +146,7 @@ class VersionBumper:
                 print("Next steps:")
                 print("  1. Review changes: git diff")
                 print(
-                    f'  2. Commit changes: git add -A && git commit -m "chore: bump version to {self.new_version}"'
+                    f'  2. Commit changes: git add -A && git commit -m "chore: bump version to {self.new_version}"',
                 )
                 print(f"  3. Create tag: git tag v{self.new_version}")
                 print("  4. Push: git push && git push --tags")
@@ -193,7 +193,7 @@ class VersionBumper:
                 print(f"  ✓ Found {file_path.relative_to(self.root)}")
             else:
                 print(
-                    f"  ⚠ Optional file not found: {file_path.relative_to(self.root)}"
+                    f"  ⚠ Optional file not found: {file_path.relative_to(self.root)}",
                 )
 
         # Check git status
@@ -210,7 +210,7 @@ class VersionBumper:
         print(
             "  ✓ Git working directory clean"
             if not self.allow_dirty
-            else "  ⚠ Skipping git check (--allow-dirty)"
+            else "  ⚠ Skipping git check (--allow-dirty)",
         )
 
         # Report current version inconsistencies

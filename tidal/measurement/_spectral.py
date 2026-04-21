@@ -93,7 +93,7 @@ def _build_k_grid(
         dx = grid_spacing[axis]
         if axis == ndim - 1:
             freq = np.asarray(
-                np.fft.rfftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64
+                np.fft.rfftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64,
             )
         else:
             freq = np.asarray(np.fft.fftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64)
@@ -141,7 +141,7 @@ def _radial_bin(
     bin_indices = np.clip(np.digitize(k_mag.ravel(), bin_edges) - 1, 0, n_bins - 1)
     v_flat = values.ravel()
     binned = np.bincount(bin_indices, weights=v_flat, minlength=n_bins).astype(
-        np.float64
+        np.float64,
     )
     return bin_centers, binned
 

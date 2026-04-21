@@ -1,0 +1,480 @@
+% Perturbative Reduction — Implementation Design Document
+% Technical specification for Wolfram Phase C module
+% Uses macros from preamble.tex
+
+\section{Perturbative Reduction: Implementation Design}
+\label{sec:prd-design}
+
+This document specifies the implementation of perturbative order reduction in TIDAL as a new Wolfram phase (Phase C) in the derivation pipeline. The physics motivation, method selection, and rejection of alternatives are covered in the companion research document (\cref{sec:perturbative-reduction}).
+
+\subsection{Pipeline Architecture}
+\label{sec:prd-architecture}
+
+\subsubsection{Current Phase Layout}
+
+TIDAL's derivation pipeline currently comprises the following Wolfram phases:
+\begin{enumerate}
+  \item[\textbf{A}] \textbf{Component decomposition} (\texttt{ComponentDecompose.wl::DecomposeToComponents}): projects the abstract-index Lagrangian $\mathcal{L}[g, \phi, A, T, \ldots]$ onto a vielbein basis, producing a component Lagrangian $\mathcal{L}_{\mathrm{comp}}[q_1, q_2, \ldots]$ in terms of scalar component fields with explicit spatial and temporal derivatives.
+  \item[\textbf{B}] \textbf{Component Euler--Lagrange} (\texttt{ComponentDecompose.wl::ComponentEulerLagrange}): applies the standard variational formula $\sum_\alpha (-1)^{|\alpha|} D^\alpha(\partial \mathcal{L}_{\mathrm{comp}}/\partial (D^\alpha q_i))$ to derive the component equations of motion $\mathcal{E}_i[q_1, q_2, \ldots]$.
+  \item[\textbf{D}] \textbf{Hamiltonian computation} (\texttt{ComponentDecompose.wl::BuildHamiltonianTerms}): performs the Legendre transform $\mathcal{H} = \sum_i \pi_i \dot{q}_i - \mathcal{L}_{\mathrm{comp}}$ with $\pi_i = \partial \mathcal{L}_{\mathrm{comp}}/\partial \dot{q}_i$, filtered for constraint fields.
+  \item[\textbf{E}] \textbf{JSON export} (\texttt{ExportJSON.wl::BuildMultiFieldJSONStructure}): serialises equations, mass/coupling matrices, and Hamiltonian terms to the JSON specification file consumed by Python.
+\end{enumerate}
+
+\subsubsection{New Phase C (Perturbative Reduction)}
+
+Phase C inserts between B and D:
+
+\begin{center}
+\begin{tabular}{@{}l@{\hspace{1em}}l@{\hspace{1em}}l@{}}
+Phase & Input & Output \\
+\midrule
+A & Lagrangian (abstract) & $\mathcal{L}_{\mathrm{comp}}$ (full, may contain higher derivatives) \\
+B & $\mathcal{L}_{\mathrm{comp}}$ & $\mathcal{E}_i$ (may be $\geq$~4th order in time) \\
+\textbf{C (new)} & $\mathcal{L}_{\mathrm{comp}}$, $\mathcal{E}_i$, $\varepsilon$, $N$ & $\mathcal{L}_{\mathrm{comp}}^{\mathrm{red}}$, $\mathcal{E}_i^{\mathrm{red}}$ (both $\leq$~2nd order) \\
+D & $\mathcal{L}_{\mathrm{comp}}^{\mathrm{red}}$ & $\mathcal{H}^{\mathrm{red}}$ (ghost-free Hamiltonian) \\
+E & $\mathcal{E}_i^{\mathrm{red}}$, $\mathcal{H}^{\mathrm{red}}$ & JSON spec for solver \\
+\end{tabular}
+\end{center}
+
+\paragraph{Critical: dual reduction.} Phase C applies the reduction to \emph{both} the equations and the Lagrangian using the same substitution rules. This is essential because Phase D computes the Hamiltonian from the Lagrangian, not from the equations. Reducing the equations alone would leave Phase D operating on the original higher-derivative Lagrangian, reintroducing Ostrogradsky momenta associated with the very ghost modes Phase C has eliminated from the dynamics. The existing field-filtered Hamiltonian workaround (issue~\#196) exists precisely because the current Python Ostrogradsky reduction is applied only at load time, after Wolfram has already computed the Hamiltonian from the full Lagrangian. Dual reduction in Phase C eliminates this inconsistency at the source.
+
+\paragraph{Backward compatibility.} Phase C is a no-op when the TOML does not declare a \texttt{[perturbation]} section. Existing theories without higher-derivative terms are unaffected.
+
+\subsection{The JLM Algorithm in Wolfram Primitives}
+\label{sec:prd-algorithm}
+
+The algorithm operates on symbolic expressions in the Wolfram kernel. Each step maps to standard primitives.
+
+\subsubsection{Step 1: Extract Base Equations}
+
+Input: $\mathcal{E}_i[q, \varepsilon]$ as a list of Wolfram expressions, and the small parameter symbol $\varepsilon$.
+
+\begin{verbatim}
+baseEquations = (# /. eps -> 0) & /@ equations;
+\end{verbatim}
+
+This produces the $\mathcal{O}(\varepsilon^0)$ equations $\mathcal{E}_i^{(0)}[q]$, which by hypothesis are second-order in time.
+
+\subsubsection{Step 2: Solve Base Equations for $\partial_t^2 q_i$}
+
+Each base equation is rearranged to isolate the highest time derivative:
+\begin{verbatim}
+baseEOMRules = Solve[baseEquations == 0,
+                      D[#, {t, 2}] & /@ fields,
+                      Method -> "CramerLikeLinearSolving"]
+               // First;
+(* baseEOMRules is a list of rules:
+   { D[q1, {t,2}] -> f1[q1, q2, ..., PD[q1, x], PD[q2, x], ...],
+     D[q2, {t,2}] -> f2[...],
+     ... }                                                     *)
+\end{verbatim}
+
+Implementation note: the mass matrix $M_{ij}$ (in TIDAL's coupled-field equations) may be non-diagonal; we solve the linear system simultaneously to invert it. When $M$ is singular (constraint-carrying systems), we fall back to \texttt{Reduce} with the kernel annotations identifying which rows are algebraic constraints rather than dynamical equations.
+
+\subsubsection{Step 3: Generate Higher-Derivative Substitutions}
+
+From the rules for $\partial_t^2 q_i$, compute substitution rules for $\partial_t^3 q_i$, $\partial_t^4 q_i$, and so on up to the maximum time-order appearing in the full equations:
+
+\begin{verbatim}
+buildTimeDerivativeRules[baseRules_, maxOrder_] := Module[{rules, n},
+  rules = <| 2 -> baseRules |>;
+  Do[
+    rules[n] = Module[{prevRules = rules[n-1]},
+      # -> (D[prevRules[[ First @ Position[prevRules[[All,1]], D[Head[#], {t, n-1}]] ]], t]
+            /. rules[n-1])
+      & /@ fields
+    ],
+    {n, 3, maxOrder}
+  ];
+  Flatten[Values[rules]]
+]
+\end{verbatim}
+
+Conceptually: having established $\partial_t^2 q = f(q, \partial q, \text{spatial})$, differentiate to get $\partial_t^3 q = \partial_t f$, then substitute $\partial_t^2 q$ on the RHS (avoiding circular reference), yielding $\partial_t^3 q$ in terms of $q, \partial_t q$, and spatial derivatives. Repeat for $\partial_t^4 q$ via another differentiation. At each step, spatial-operator composition produces terms like $\mathrm{laplacian}(\mathrm{laplacian}(q)) = \mathrm{biharmonic}(q)$.
+
+\subsubsection{Step 4a: Apply Substitutions to Equations}
+
+\begin{verbatim}
+reducedEquations = equations /. higherDerivRules;
+reducedEquations = Normal[Series[#, {eps, 0, order}]] & /@ reducedEquations;
+reducedEquations = reducedEquations // CollectTensors // Simplify;
+\end{verbatim}
+
+The \texttt{Series}/\texttt{Normal} truncation removes any $\mathcal{O}(\varepsilon^{n+1})$ terms introduced by substituting into already-$\mathcal{O}(\varepsilon)$ expressions (these are beyond our truncation order and must be dropped for consistency).
+
+\subsubsection{Step 4b: Apply Substitutions to Lagrangian}
+
+The same \texttt{higherDerivRules} are applied to the component Lagrangian:
+
+\begin{verbatim}
+reducedLagrangian = lagComp /. higherDerivRules;
+reducedLagrangian = Normal[Series[reducedLagrangian, {eps, 0, order}]];
+reducedLagrangian = reducedLagrangian // CollectTensors // Simplify;
+\end{verbatim}
+
+\paragraph{Why this is consistent.} The equation-level substitution $\partial_t^2 q_i \to f_i(q, \partial q, \text{spatial})$ is equivalent to a field redefinition $q_i \to q_i + \varepsilon\, \Delta q_i$ with $\Delta q_i$ chosen to absorb the $\mathcal{O}(\varepsilon)$ higher-derivative contributions to the action. Applying the same substitution to the Lagrangian performs this field redefinition implicitly: wherever $\partial_t^2 q_i$ appears in $\mathcal{L}_{\mathrm{comp}}$ (inside higher-derivative terms like $(\partial_t^2 q)^2$ or mixed $\partial_t^2 q \cdot \partial_t^2 q'$), it is replaced by its base-equation expression, and the Series truncation preserves only the leading $\mathcal{O}(\varepsilon^n)$ behaviour.
+
+The reduced Lagrangian is guaranteed to satisfy $\mathcal{E}_i^{\mathrm{red}} = \delta \mathcal{L}^{\mathrm{red}}/\delta q_i + \mathcal{O}(\varepsilon^{n+1})$, i.e., the reduced equations are the Euler--Lagrange equations of the reduced Lagrangian to the truncation order. This can be verified as a sanity check at the end of Phase C.
+
+\subsubsection{Step 5: Self-Check}
+
+Before returning, Phase C asserts that both outputs are second-order in time:
+\begin{verbatim}
+timeOrderCheck[expr_] := Module[{orders},
+  orders = Cases[expr, D[_, {t, n_}] /; n > 2 :> n, Infinity];
+  If[orders =!= {},
+    Message[PerturbativeReduce::higherOrderResidual, orders];
+    $Failed,
+    expr
+  ]
+]
+reducedLagrangian = timeOrderCheck[reducedLagrangian];
+reducedEquations  = timeOrderCheck /@ reducedEquations;
+\end{verbatim}
+
+If any higher-order residual is detected (e.g., a term $\mathcal{O}(\varepsilon)$ that contains $\partial_t^4 q$ because of a pathological base equation), the phase aborts with a diagnostic naming the field and derivative order. This catches Phase C bugs before they reach the JSON export.
+
+\subsection{Module Specification}
+\label{sec:prd-module}
+
+\paragraph{File:} \texttt{tidal/wolfram/PerturbativeReduction.wl}
+
+\paragraph{Package imports:}
+\begin{verbatim}
+Needs["xAct`xTensor`"]
+Needs["xAct`xPert`"]
+Needs["xAct`xCoba`"]
+Needs["tidal`CommonUtilities`"]
+Needs["tidal`ComponentDecompose`"]
+\end{verbatim}
+
+\paragraph{Public API:}
+\begin{verbatim}
+PerturbativeReduce::usage =
+  "PerturbativeReduce[lagComp, eqsComp, fields, smallParam, order] \
+   applies JLM order reduction at O(smallParam^order), returning \
+   { reducedLagrangian, reducedEquations }. Both outputs have time \
+   order <= 2.";
+
+PerturbativeReduceEquations::usage =
+  "PerturbativeReduceEquations[eqsComp, fields, smallParam, order] \
+   applies JLM only to equations (used when no Lagrangian reduction \
+   is needed, e.g., for diagnostic purposes). Prefer PerturbativeReduce \
+   for pipeline use.";
+
+BuildTimeDerivativeSubstitutions::usage =
+  "BuildTimeDerivativeSubstitutions[baseEquations, fields, maxOrder] \
+   returns a list of rules replacing D[q_i, {t, n}] (n = 2..maxOrder) \
+   with expressions in q_i, D[q_i, t], and spatial derivatives.";
+
+ExtractBaseEquations::usage =
+  "ExtractBaseEquations[equations, smallParam] returns the O(smallParam^0) \
+   part of each equation.";
+\end{verbatim}
+
+\paragraph{Error messages:}
+\begin{verbatim}
+PerturbativeReduce::higherOrderResidual =
+  "Phase C output contains residual time derivatives of order(s) ``. \
+   This indicates the base equations cannot close the substitution \
+   algebra; likely cause: the base theory itself produces >2nd order \
+   equations (ensure small parameter is correctly identified).";
+
+PerturbativeReduce::singularMass =
+  "Base mass matrix for field(s) `` is singular. Phase C requires the \
+   O(eps^0) theory to be a well-posed 2nd-order system. Check for \
+   gauge-fixing requirements or constraint field declarations.";
+
+PerturbativeReduce::noSmallParameter =
+  "Small parameter `` does not appear in the equations. Phase C is a \
+   no-op but this likely indicates a configuration error in the TOML.";
+
+PerturbativeReduce::inconsistentReduction =
+  "Reduced equations and reduced Lagrangian disagree beyond truncation \
+   order. Difference: ``. Indicates a bug in the substitution algebra.";
+\end{verbatim}
+
+\paragraph{Implementation size:} $\sim$200--400 lines of Wolfram code, comparable to existing phases. Detailed line-by-line structure follows the five steps above.
+
+\subsubsection{Power-of-Contraction Normalisation --- Implementation Details}
+\label{sec:prd-power-normalisation}
+
+This subsection is the engineer-facing counterpart to \S\ref{sec:pr-eh-cd} in the main perturbative-reduction document. It exists because the fix delivered in v0.33.9 (issue~\#271) changes two pre-xPert code paths that are not covered by the JLM Step~1--5 algorithm above.
+
+\paragraph{Location in \texttt{generate\_wls}.} The emitting functions are all in \verb|tidal/cli/_derive.py|:
+\begin{itemize}
+  \item \verb|_wls_lagrangian| (lines~913--1020): emits the user Lagrangian assignment and applies the \texttt{Hold}$+$\texttt{Scalar[X]\textasciicircum n} rewrite \emph{inside the \texttt{Hold}} before \texttt{ReleaseHold}.
+  \item \verb|_wls_precompute_cd_component_values| (lines~1423--1720): the correctness-aware gate replaces the legacy \verb|len(dyn_fields) < 2| skip.
+  \item \verb|_wls_canonical_phase_a| (lines~5820--5880): the Component-E--L field-function detector applies \verb|$CDShorthandReverseRules| to \verb|lagComp| behind a \verb|FreeQ|-gated safety check before building \verb|fieldFuncsEL|.
+\end{itemize}
+
+\paragraph{Pseudocode of the Lagrangian-assignment rewrite.} The emitted WLS, with irrelevant whitespace collapsed:
+\begin{verbatim}
+prefix*Lagrangian = ReleaseHold[
+  Hold[( <user_lagrangian_expr_with_prefix_substituted> )]
+  //. HoldPattern[Power[expr_, n_Integer /; n >= 2]] /;
+        !AtomQ[expr] && !FreeQ[expr, _?AbstractIndexQ]
+                     && FreeQ[expr, Scalar]
+      :> Scalar[expr]^n
+];
+prefix*Lagrangian = ToCanonical[prefix*Lagrangian];
+prefix*Lagrangian = ContractMetric[prefix*Lagrangian, prefix*Metric];
+\end{verbatim}
+
+The \texttt{Hold} wrapper is structural, not decorative: without it, Mathematica's built-in rule $\texttt{Power}[\texttt{Times}[a,b,\dots], n] \rightarrow a^n \cdot b^n \cdots$ fires \emph{before} the \texttt{//.} has a chance to see the unevaluated \texttt{Power[Times[\dots], n]}. Subsequent ToCanonical/ContractMetric calls operate on the wrapped \texttt{Scalar[X]\textasciicircum n} and therefore cannot redistribute the exponent onto individual tensor atoms.
+
+\paragraph{Pseudocode of the precompute gate.} In Python:
+\begin{verbatim}
+def _lagrangian_contains(head: str) -> bool:
+    # word-boundary match of `head[` in the rendered Lagrangian
+    return bool(re.search(rf"(?<![A-Za-z0-9_]){re.escape(head)}\s*\[",
+                          ctx.lagrangian_expr or ""))
+
+needs_precompute = False
+for derived in ctx.derived_fields or []:
+    if "CD[" in str(derived.get("definition", "")) \
+       and _lagrangian_contains(derived["name"]):
+        needs_precompute = True; break
+
+if not needs_precompute:
+    names = [df["name"] for df in dyn_fields]
+    for mp in ctx.linearization.get("matter_perturbations", []) or []:
+        if mp.get("field"): names.append(mp["field"])
+    for name in names:
+        if re.search(rf"CD\s*\[[^\[\]]*\]\s*\[\s*{re.escape(name)}\s*\[",
+                     ctx.lagrangian_expr or ""):
+            needs_precompute = True; break
+
+if len(dyn_fields) < 2 and not needs_precompute:
+    # Fast path: emit `CD pre-computation: skipped (...)` and return.
+    return lines
+# Otherwise fall through to the precompute emission.
+\end{verbatim}
+
+The three branches are deliberately conservative: a false positive costs a sub-second precompute for a single rank-1 field (16 entries of $\partial_{\mu} a_{\nu}$); a false negative would silently regress matter-only theories back to the ``Field functions: 0'' failure mode that motivated the fix.
+
+\paragraph{Regression-matrix per branch.}
+\begin{center}
+\begin{tabular}{lll}
+\hline
+Theory & Gate branch taken & Behaviour change \\
+\hline
+\texttt{scalar\_field}, \texttt{scalar\_potential\_well} & fast-path skip & unchanged \\
+\texttt{massive\_gravity}, \texttt{massive\_3form} & fast-path skip & unchanged \\
+\texttt{coupled\_scalars} & $n\ge 2$ & unchanged \\
+\texttt{gertsenshtein} & $n\ge 2$ & unchanged (derivation hash only) \\
+\texttt{torsion\_gertsenshtein} & $n\ge 2$ & unchanged (derivation hash only) \\
+\texttt{graviton\_torsion} & $n\ge 2$ & unchanged \\
+\texttt{chern\_simons} & $n\ge 2$ & unchanged \\
+\texttt{euler\_heisenberg} (new) & derived-field-with-CD branch & newly supported \\
+\hline
+\end{tabular}
+\end{center}
+
+\paragraph{Safety-net emission.} The Component-E--L field-function detector emits
+\begin{verbatim}
+If[ListQ[$CDShorthandReverseRules] && Length[$CDShorthandReverseRules] > 0
+   && !FreeQ[lagComp,
+             _Symbol?(StringMatchQ[ToString[#], "CD" ~~ DigitCharacter ~~ __] &)],
+  lagComp = lagComp //. $CDShorthandReverseRules];
+\end{verbatim}
+The \texttt{FreeQ} guard is the load-bearing piece: a naive unconditional \verb|//.| on gertsenshtein-scale \verb|lagComp| costs $\approx 4$~s (measured: 45.6~s $\rightarrow$ 56.6~s, recovered to 49.2~s with the guard). \verb|$CDShorthandReverseRules| itself is generated at \verb|_derive.py:1407| per the pattern $\texttt{CDN}f[i,a] \to \texttt{CD}[i][\texttt{CD}(N{-}1)f[a]]$ for each dynamical field and each $N \in \{1,2,3,4\}$.
+
+\paragraph{Interaction with the JLM-era design.} The \texttt{Scalar[X]\textasciicircum n} wrapping is orthogonal to JLM symbolic order reduction: the wrapping happens at Lagrangian assignment, long before any of the five JLM steps in \S\ref{sec:prd-algorithm}. The CD precompute gate sits upstream of Phase~C in the pipeline diagram above; everything downstream receives a component-form \verb|lagComp| regardless of which branch fired.
+
+\subsection{TOML Schema Extension}
+\label{sec:prd-toml}
+
+New top-level section \texttt{[perturbation]} in theory TOMLs:
+
+\begin{verbatim}
+[perturbation]
+small_parameter = "b5"    # Symbol to treat as epsilon; must be a
+                          # constant declared elsewhere in the TOML
+order = 1                 # Truncation order: keep terms to O(eps^order)
+enabled = true            # Optional; auto-true if small_parameter set
+\end{verbatim}
+
+\paragraph{Constraints:}
+\begin{itemize}
+  \item \texttt{small\_parameter} must be a constant name (declared in the theory's constant list or implicit from the Lagrangian); it must not contain underscores (standard TIDAL naming convention).
+  \item \texttt{order} must be a positive integer. Default: \texttt{1}.
+  \item \texttt{enabled = false} disables Phase C even if \texttt{small\_parameter} is set (useful for generating the unreduced reference theory during validation).
+\end{itemize}
+
+\paragraph{CLI propagation:} the TOML parser (\texttt{tidal/cli/\_derive.py}) extracts these values and passes them to \texttt{generate\_wls()} as Wolfram options.
+
+\subsection{Pipeline Integration in generate\_wls}
+\label{sec:prd-integration}
+
+Modification to \texttt{tidal/cli/\_derive.py::generate\_wls()}:
+
+\begin{verbatim}
+(* Phase B: Component Euler-Lagrange *)
+Print["Phase B: Computing component Euler-Lagrange equations..."];
+eqsComp = ComponentEulerLagrange[lagComp, fieldList];
+Print["  Obtained ", Length[eqsComp], " equations."];
+
+(* Phase C: Perturbative Reduction (NEW) *)
+If[Lookup[perturbationConfig, "enabled", False],
+  Print["Phase C: Applying perturbative order reduction..."];
+  Print["  Small parameter: ", perturbationConfig["small_parameter"]];
+  Print["  Truncation order: ", perturbationConfig["order"]];
+  With[{
+    reduced = PerturbativeReduce[
+      lagComp,
+      eqsComp,
+      fieldList,
+      Symbol[perturbationConfig["small_parameter"]],
+      perturbationConfig["order"]
+    ]
+  },
+    lagForHamiltonian = reduced[[1]];
+    eqsForExport      = reduced[[2]];
+  ];
+  Print["  Reduction complete. Max time order in output: ",
+        Max[Cases[{lagForHamiltonian, eqsForExport},
+                  D[_, {t, n_}] :> n, Infinity] ~Join~ {0}]];
+  ,
+  (* Phase C disabled: pass through unchanged *)
+  lagForHamiltonian = lagComp;
+  eqsForExport      = eqsComp;
+];
+
+(* Phase D: Hamiltonian computation from (possibly reduced) Lagrangian *)
+Print["Phase D: Computing Hamiltonian..."];
+hamTerms = BuildHamiltonianTerms[lagForHamiltonian, fieldList];
+
+(* Phase E: Export *)
+...
+\end{verbatim}
+
+The rest of the derivation pipeline consumes \texttt{eqsForExport} and \texttt{hamTerms} unchanged. Downstream Python code sees only standard second-order equations and a clean Hamiltonian.
+
+\subsection{Full Removal of Python Ostrogradsky}
+\label{sec:prd-removal}
+
+The Python \texttt{tidal/symbolic/ostrogradsky.py} module (520~lines) and the field-filtered Hamiltonian workaround in \texttt{\_energy.py} and \texttt{\_conversion.py} are removed in the same release that introduces Phase C. A codebase audit confirms this is safe:
+\begin{itemize}
+  \item All existing JSON files in \texttt{examples/data/} have $\mathrm{time\_derivative\_order} \leq 2$. The current Python reduction is only exercised at JSON load for theories re-derived with $a_1$ or $a_2$ $\neq 0$ in \texttt{torsion\_gertsenshtein}; these theories will be re-derived under Phase~C before the removal.
+  \item No test in \texttt{tests/} specifically covers Ostrogradsky reduction behaviour.
+  \item The field-filtered workaround exists solely for Ostrogradsky auxiliary-field artefacts. With auxiliary fields eliminated, the workaround becomes dead code.
+\end{itemize}
+
+\subsubsection{Scope of Deletion}
+
+\begin{table}[htbp]
+\centering
+\caption{Components removed when Phase C is introduced.}
+\label{tab:prd-deletion-scope}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Component & Path & Action \\
+\midrule
+Core module & \texttt{tidal/symbolic/ostrogradsky.py} & Delete file (520 lines) \\
+Call site & \texttt{tidal/symbolic/json\_loader.py:1242--1251} & Replace with strict error \\
+Energy field-filter & \texttt{tidal/measurement/\_energy.py} (\texttt{fields=} kwarg) & Remove kwarg plumbing \\
+Conversion field-filter & \texttt{tidal/measurement/\_conversion.py:66--89, 140--142} & Remove filtering \\
+Documentation & \texttt{docs/}, \texttt{README.md}, docstrings & Update \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{New JSON Load-Time Validation}
+
+The replacement at the call site enforces that JSON files contain only second-order equations:
+
+\begin{verbatim}
+# tidal/symbolic/json_loader.py (new behaviour)
+if any(eq.time_derivative_order > 2 for eq in spec.equations):
+    offenders = [eq.field_name for eq in spec.equations
+                 if eq.time_derivative_order > 2]
+    raise EquationSystemError(
+        f"Equations with time_derivative_order > 2 detected for fields: "
+        f"{offenders}. Higher-derivative equations must be reduced "
+        f"during derivation via Wolfram Phase C (PerturbativeReduction). "
+        f"Re-derive this theory with a [perturbation] section in the TOML: "
+        f"\n    [perturbation]"
+        f"\n    small_parameter = \"<your epsilon symbol>\""
+        f"\n    order = 1"
+    )
+\end{verbatim}
+
+\subsection{Safety Mechanisms}
+\label{sec:prd-safety}
+
+Six independent mechanisms catch errors across the pipeline.
+
+\paragraph{1. Pre-removal instrumentation sweep.} Before deleting \texttt{ostrogradsky.py}, add temporary logging to \texttt{apply\_ostrogradsky\_reduction} that records every invocation during the test suite and CI. The log must be empty for all existing examples and tests --- confirming the audit's finding that no current JSON triggers the Python path at load time. Remove the instrumentation along with the module.
+
+\paragraph{2. Phase C self-check.} Immediately after Phase C produces its output, the \texttt{timeOrderCheck} routine asserts every output equation and the reduced Lagrangian contain only $\partial_t^n$ with $n \leq 2$. If any higher-order residual survives, the phase aborts with a diagnostic naming the offending field and operator. This catches bugs in the JLM substitution algebra before they reach the JSON export.
+
+\paragraph{3. Equation--Lagrangian consistency check.} After Phase C, re-derive the Euler--Lagrange equations from the reduced Lagrangian and compare to the reduced equations. Differences beyond $\mathcal{O}(\varepsilon^{n+1})$ indicate a bug. This check is optional (expensive for large theories) but enabled during validation.
+
+\paragraph{4. JSON schema validation.} The modified \texttt{json\_loader.py} validates that no equation has $\mathrm{time\_derivative\_order} > 2$ and provides actionable migration guidance if the check fails (referencing the \texttt{[perturbation]} TOML section).
+
+\paragraph{5. Theory audit at derivation.} \texttt{tidal derive} emits a warning when the input TOML's Lagrangian contains a known higher-derivative structure (pattern match for \texttt{RSquared}, \texttt{RicciSpinor}, $F^4$ terms, non-minimal couplings with 4th-order contributions) but lacks a \texttt{[perturbation]} section. This catches the ``user forgot to enable Phase C'' case at derivation time rather than at JSON load time (where the error message is less actionable).
+
+\paragraph{6. Regression test suite.} New tests cover:
+\begin{itemize}
+  \item \texttt{test\_phase\_c\_scalar\_toy\_model}: Simon's scalar example with analytical mass shift. Verify reduced equations match $\Box\phi = m^2(1+\varepsilon m^2)\phi$.
+  \item \texttt{test\_phase\_c\_rtilde\_squared\_pgt}: derive \texttt{torsion\_gertsenshtein/theory.toml} with \texttt{[perturbation] small\_parameter = "a1"}. Verify all output equations have $\mathrm{time\_order} \leq 2$ and no $w_*$ auxiliary fields.
+  \item \texttt{test\_phase\_c\_euler\_heisenberg}: minimal EH extension example. Verify effective refractive indices match $n_\perp^2 - 1 = 4\rho B^2_\perp$ at first order.
+  \item \texttt{test\_json\_loader\_rejects\_4th\_order}: construct synthetic JSON with $\mathrm{time\_order} = 4$. Verify \texttt{EquationSystemError} is raised with migration guidance.
+  \item \texttt{test\_measurement\_no\_field\_filter}: run energy and conversion measurements on a Phase-C-reduced system. Verify no \texttt{fields=} kwarg is needed (it has been removed from the API).
+\end{itemize}
+
+\subsection{Migration for Existing Theories}
+\label{sec:prd-migration}
+
+Only two theory files currently exercise the Python Ostrogradsky path:
+\begin{itemize}
+  \item \texttt{examples/torsion\_gertsenshtein/theory.toml} (with $a_1, a_2 \neq 0$)
+  \item \texttt{examples/torsion\_gertsenshtein/theory\_combined.toml} (with $\tilde{R}^2$ invariants)
+\end{itemize}
+
+The migration for each is:
+\begin{enumerate}
+  \item Add a \texttt{[perturbation]} TOML section naming the small parameter (e.g., \texttt{small\_parameter = "a1"} for the first variant, \texttt{small\_parameter = "b5"} for the $b_5 \tilde{R}^2$ term).
+  \item Re-run \texttt{tidal derive} on the theory.
+  \item Verify the resulting JSON simulations reproduce the previous baseline results at zeroth order (with $a_1 = 0$, the reduced theory should be identical to the base theory).
+\end{enumerate}
+
+No code changes are required on the user's side. Simulation, measurement, and analysis commands are unchanged.
+
+\subsection{Related Issues Resolved or Reopened}
+\label{sec:prd-issues}
+
+\paragraph{Issue \#196 (unresolvable $\partial_t^2$ on auxiliary fields):} Resolved. No auxiliary fields means no unresolvable operators. The field-filtered Hamiltonian workaround is removed. Close the issue.
+
+\paragraph{Issue \#195 (EOM substitution for $\partial_t^2$):} Resolved. The abandoned substitution approach was the right idea but at the wrong pipeline stage (Python post-processing). Phase C does substitutions at the correct stage (Wolfram, on symbolic expressions, before Hamiltonian computation). Close the issue.
+
+\paragraph{Issue \#183 (\texttt{ensure\_consistent\_ic} fails on $\partial_t^2$ in constraints):} To re-evaluate after Phase C is implemented. If the reduced Lagrangian produces no $\partial_t^2$ operators in constraint equations (expected, since those terms originated from R\^{2}-type variations now eliminated), the issue becomes moot.
+
+\paragraph{Issue \#164 (ghost-free PGT parameter detection):} Unchanged. The comment referencing Barker (2024)'s ghost-free conditions is moved from \texttt{ostrogradsky.py} (deleted) to \texttt{PerturbativeReduction.wl}. Phase C could optionally emit a warning when the user's parameter point falls within a known ghost-containing window, but this is out of scope for the initial implementation.
+
+\subsection{Implementation Roadmap}
+\label{sec:prd-roadmap}
+
+A rough sequencing:
+
+\begin{enumerate}
+  \item \textbf{Wolfram module} (\texttt{PerturbativeReduction.wl}): implement Steps 1--5 of the algorithm. Unit-test against the scalar toy model. ($\sim$1 week)
+  \item \textbf{TOML schema and CLI wiring:} extend the theory TOML parser, pass configuration into \texttt{generate\_wls}. Add the audit warning for known higher-derivative structures without \texttt{[perturbation]}. ($\sim$3 days)
+  \item \textbf{Pipeline integration:} insert Phase C call into \texttt{generate\_wls}. Verify Phase D receives the reduced Lagrangian and produces a clean Hamiltonian. ($\sim$3 days)
+  \item \textbf{Regression testing:} derive \texttt{torsion\_gertsenshtein} under Phase C. Compare results against stored baselines. ($\sim$3 days)
+  \item \textbf{Python removal:} run the instrumentation sweep, delete \texttt{ostrogradsky.py}, replace the call site with the strict error, remove the \texttt{fields=} kwarg plumbing from measurement code. Update documentation. ($\sim$3 days)
+  \item \textbf{Validation cross-check:} implement the iterative-numerical validation path and run on \texttt{torsion\_gertsenshtein} plus a minimal Euler--Heisenberg example. Confirm agreement with Phase-C-reduced results to machine precision in the small-$\varepsilon$ regime. ($\sim$1 week)
+\end{enumerate}
+
+Total: approximately 3--4 weeks of focused work.
+
+\subsection{Open Implementation Questions}
+\label{sec:prd-open-questions}
+
+\begin{enumerate}
+  \item \textbf{Singular base mass matrices.} If the $\mathcal{O}(\varepsilon^0)$ theory is itself gauge-symmetric with singular $M$, \texttt{Solve} fails at Step 2. Fallback to \texttt{Reduce} with constraint handling, or require gauge-fixing in the TOML before Phase C? (Leaning toward latter for clarity.)
+  \item \textbf{Cross-field time-derivatives.} Products like $\partial_t^2 q_i \cdot \partial_t^2 q_j$ in $\mathcal{L}_{\mathrm{comp}}$ require careful substitution (each $\partial_t^2$ replaced independently). The algorithm handles this via term-by-term \texttt{ReplaceAll}, but test coverage must include this case.
+  \item \textbf{Iterated reduction.} For \texttt{order = 2}, we must apply the substitutions twice (using $\mathcal{O}(\varepsilon^1)$ reduced equations as the new base for $\mathcal{O}(\varepsilon^2)$ substitutions). The algorithm outlined handles \texttt{order = 1} cleanly; extension to higher orders adds one iteration per order level.
+  \item \textbf{Interaction with gauge-fixing phase.} If the TOML specifies both gauge fixing and perturbation reduction, the order is: Gauge fix $\to$ Phase A $\to$ Phase B $\to$ Phase C $\to$ Phase D. Verify this ordering does not interfere with the Lagrangian reduction (gauge-fixing removes fields; Phase C operates on the reduced field set). Should work cleanly but requires testing.
+\end{enumerate}

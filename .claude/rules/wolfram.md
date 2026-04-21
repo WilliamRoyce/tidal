@@ -45,3 +45,11 @@ paths:
 - Cross terms missing → other fields not in additionalFields
 - Epsilon not evaluating → chart name mismatch or mixed index signs
 - Package function unevaluated → missing `::usage` declaration in public section
+
+## Perturbative Reduction
+- **`order_in_eps`** tagging lives in `ExportJSON.wl` — `Max[Total[Exponent]]` over `small_parameters`. Always `∈ {0, 1}` by architecture (quadratic Lagrangians × linear couplings). `order=2` is permanently gated by `NotImplementedError` (#273).
+- **Power-of-contraction rewrite** (#271): user Lagrangians containing `Power[tensor_contraction, n]` (e.g. `(F·F)^2` for Euler–Heisenberg) must be wrapped in `Hold[]` at assignment, then ReplaceRepeated `Power[X, n] → Scalar[X]^n` applied before `ReleaseHold`. Mathematica's built-in `Power[Times[a,b,...], n] → a^n·b^n·...` fires at parse time and produces repeated abstract indices → xAct `Validate::repeated + Throw[Null]`. See `_derive.py::_wls_lagrangian` and `docs/tex/perturbative_reduction.tex` §Power-of-Contraction (sec:pr-eh-cd).
+- **`RenameDummies` is deterministic** — never use `Product[RenameDummies[X], n]` to "freshen" copies; they come out byte-identical and reproduce the clash. Use `Scalar[X]^n` instead (xAct treats it as opaque).
+- **CD ComponentValue precompute gate** (#271): `_wls_precompute_cd_component_values` must run whenever a single-dyn-field Lagrangian has derivative-only dependence (matter-only Maxwell-type). Gate: runs if `len(dyn_fields) ≥ 2` OR any `derived_field` with `"CD["` in its definition is used in `L` OR any dyn-field name appears as `CD[...][name[...]]` in the user expression. The legacy `len < 2` skip was a performance heuristic that silently broke EH-style theories.
+- **`$CDShorthandReverseRules`** is generated at `_derive.py:1407` but only applied as a FreeQ-gated safety net before Component-E-L field detection. Never apply it unconditionally: a naïve `lagComp //. rules` regresses gertsenshtein by ~11s. The FreeQ guard keeps it O(LeafCount[lagComp]).
+- **Validity monitor** (`tidal/solver/perturbative_driver.py`): checks ε·|λ|·t (secular error) and max Re(λ)·t (base-theory stability). Missing small parameter in runtime `params` dict emits a warning (#284–#285).

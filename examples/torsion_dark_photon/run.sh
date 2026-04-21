@@ -50,7 +50,7 @@ echo ""
 # Step 1: Simulate — plane wave graviton h_5 propagating through B0 region
 # k = 2.0 (wavevector), t_end = 50, domain [0, 100] periodic
 echo "--- Step 1: Simulate ---"
-uv run tidal simulate "${SPEC}" \
+tidal simulate "${SPEC}" \
   --grid-shape 512 \
   --bounds 0:100 \
   --periodic \
@@ -69,11 +69,11 @@ echo ""
 # this constrained gauge theory (Dirac-Bergmann: gauge/constraint fields are not
 # independent DOFs). Measure conversion on the physical h_5↔a_1 sector only.
 echo "--- Step 2: Measure ---"
-uv run tidal measure "${OUT}" --what conversion \
+tidal measure "${OUT}" --what conversion \
   --source h_5 --target a_1 \
   --param "kappa=${KAPPA}" --param "B0=${B0}" \
   --param "alpha=${ALPHA}" --param "xi=${XI}" --param "deltam=${DELTAM}"
-uv run tidal measure "${OUT}" --what energy \
+tidal measure "${OUT}" --what energy \
   --param "kappa=${KAPPA}" --param "B0=${B0}" \
   --param "alpha=${ALPHA}" --param "xi=${XI}" --param "deltam=${DELTAM}"
 echo ""
@@ -82,17 +82,17 @@ echo ""
 echo "--- Step 3: Plots ---"
 
 # Spacetime heatmap: graviton h× (should show Rabi amplitude oscillation)
-uv run tidal plot "${OUT}" --type heatmap --field h_5 \
+tidal plot "${OUT}" --type heatmap --field h_5 \
   --title "Graviton h× (h_5) — dark photon torsion model" \
   --output "${OUT}/heatmap_h_5.png" --quiet
 
 # Spacetime heatmap: photon a_x (should show growth from zero)
-uv run tidal plot "${OUT}" --type heatmap --field a_1 \
+tidal plot "${OUT}" --type heatmap --field a_1 \
   --title "Photon a_x (a_1) — Gertsenshtein + torsion conversion" \
   --output "${OUT}/heatmap_a_1.png" --quiet
 
 # Amplitude vs time: shows energy transfer h_5 → a_1
-uv run tidal plot "${OUT}" --type amplitude \
+tidal plot "${OUT}" --type amplitude \
   --fields h_5,a_1 \
   --title "Dark photon torsion: h× → a_x conversion (B0=${B0})" \
   --output "${OUT}/amplitude.png" --quiet

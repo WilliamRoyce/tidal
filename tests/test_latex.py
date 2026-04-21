@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -24,13 +25,9 @@ _EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "data"
 
 # Derived JSON files live in gitignored examples/data/ — only present after
 # running `tidal derive`.  Skip integration tests when absent.
-_KG_JSON = _EXAMPLES / "klein_gordon_1d.json"
 _CS_JSON = _EXAMPLES / "coupled_scalars.json"
-_needs_kg = pytest.mark.skipif(
-    not _KG_JSON.exists(), reason="klein_gordon_1d.json not derived"
-)
 _needs_cs = pytest.mark.skipif(
-    not _CS_JSON.exists(), reason="coupled_scalars.json not derived"
+    not _CS_JSON.exists(), reason="coupled_scalars.json not derived",
 )
 
 
@@ -166,7 +163,7 @@ class TestFieldToLatex:
     def test_with_tensor_meta_vector(self) -> None:
         meta = {"tensor_head": "a", "tensor_rank": 1, "tensor_indices": [1]}
         result = field_to_latex(
-            "a_1", tensor_meta=meta, coordinates=("t", "x", "y", "z")
+            "a_1", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
         )
         assert r"\mathcal{A}" in result
         assert "x" in result
@@ -174,7 +171,7 @@ class TestFieldToLatex:
     def test_with_tensor_meta_rank2(self) -> None:
         meta = {"tensor_head": "h", "tensor_rank": 2, "tensor_indices": [2, 2]}
         result = field_to_latex(
-            "h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z")
+            "h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
         )
         assert r"\mathcal{H}" in result
         assert "yy" in result
@@ -188,7 +185,7 @@ class TestFieldToLatex:
     def test_velocity_with_tensor_meta(self) -> None:
         meta = {"tensor_head": "h", "tensor_rank": 2, "tensor_indices": [2, 2]}
         result = field_to_latex(
-            "v_h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z")
+            "v_h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
         )
         assert r"\dot" in result
 
@@ -369,15 +366,14 @@ class TestLagrangianToLatex:
 class TestEquationToLatex:
     """Integration tests for equation rendering with real JSON specs."""
 
-    @_needs_kg
-    def test_klein_gordon(self) -> None:
+    @_needs_cs
+    def test_single_field(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(_EXAMPLES / "klein_gordon_1d.json")
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
         result = equation_to_latex(spec.equations[0], spec)
         assert r"\partial_t" in result
-        assert r"\phi" in result
-        assert r"\partial_x" in result
+        assert r"\mathcal" in result
         assert "&=" in result
 
     @_needs_cs
@@ -401,11 +397,11 @@ class TestEquationToLatex:
 class TestHamiltonianToLatex:
     """Integration tests for Hamiltonian rendering."""
 
-    @_needs_kg
-    def test_klein_gordon_hamiltonian(self) -> None:
+    @_needs_cs
+    def test_hamiltonian(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(_EXAMPLES / "klein_gordon_1d.json")
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
         assert spec.canonical is not None
         result = hamiltonian_to_latex(list(spec.canonical.hamiltonian_terms), spec)
         assert r"\mathscr{H}" in result
@@ -426,14 +422,14 @@ class TestHamiltonianToLatex:
 # ---------------------------------------------------------------------------
 
 
-@_needs_kg
+@_needs_cs
 class TestSystemToLatex:
     """Tests for full system rendering and output formats."""
 
     def test_align_format(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(_EXAMPLES / "klein_gordon_1d.json")
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
         result = system_to_latex(spec, output_format="align")
         assert r"\begin{align}" in result
         assert r"\end{align}" in result
@@ -442,7 +438,7 @@ class TestSystemToLatex:
     def test_document_format(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(_EXAMPLES / "klein_gordon_1d.json")
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
         result = system_to_latex(spec, output_format="document")
         assert r"\documentclass{article}" in result
         assert r"\usepackage{tensor}" in result
@@ -453,7 +449,7 @@ class TestSystemToLatex:
     def test_raw_format(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(_EXAMPLES / "klein_gordon_1d.json")
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
         result = system_to_latex(spec, output_format="raw")
         assert r"\begin{align}" not in result
         # Should have Lagrangian + equation + Hamiltonian lines
@@ -463,21 +459,21 @@ class TestSystemToLatex:
     def test_no_hamiltonian(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(_EXAMPLES / "klein_gordon_1d.json")
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
         result = system_to_latex(spec, include_hamiltonian=False)
-        assert r"\mathcal{H}" not in result
+        assert r"\mathscr{H}" not in result
 
     def test_no_lagrangian(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(_EXAMPLES / "klein_gordon_1d.json")
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
         result = system_to_latex(spec, include_lagrangian=False)
         assert r"\mathcal{L}" not in result
 
     def test_package_comment(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(_EXAMPLES / "klein_gordon_1d.json")
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
         result = system_to_latex(spec, output_format="align")
         assert "tensor" in result
 
@@ -487,7 +483,7 @@ class TestSystemToLatex:
 # ---------------------------------------------------------------------------
 
 
-@_needs_kg
+@_needs_cs
 class TestCLIIntegration:
     """Tests that the CLI --latex flag works end-to-end."""
 
@@ -495,7 +491,7 @@ class TestCLIIntegration:
         from tidal.cli import main
 
         exit_code = main(
-            ["inspect", str(_EXAMPLES / "klein_gordon_1d.json"), "--latex"]
+            ["inspect", str(_EXAMPLES / "coupled_scalars.json"), "--latex"],
         )
         assert exit_code == 0
 
@@ -505,11 +501,11 @@ class TestCLIIntegration:
         exit_code = main(
             [
                 "inspect",
-                str(_EXAMPLES / "klein_gordon_1d.json"),
+                str(_EXAMPLES / "coupled_scalars.json"),
                 "--latex",
                 "--latex-format",
                 "document",
-            ]
+            ],
         )
         assert exit_code == 0
 
@@ -522,12 +518,28 @@ class TestCLIIntegration:
 class TestAllExamplesRender:
     """Ensure every example JSON renders without errors."""
 
+    # v6 re-derivation migration complete for all three shipped higher-
+    # derivative theories (Phase 6B.3/6B.4 of #267).  Kept as an empty
+    # class-level set for future migrations.
+    _PENDING_V6_REDERIVATION: ClassVar[set[str]] = set()
+
     @pytest.mark.parametrize(
         "json_file",
         sorted(_EXAMPLES.glob("*.json")),
         ids=lambda p: p.stem,
     )
-    def test_no_crash(self, json_file: Path) -> None:
+    def test_no_crash(self, json_file: Path, request: pytest.FixtureRequest) -> None:
+        if json_file.stem in self._PENDING_V6_REDERIVATION:
+            request.applymarker(
+                pytest.mark.xfail(
+                    reason=(
+                        "Pending Phase 6B.3/6B.4 re-derivation with "
+                        "[perturbation] section (v6 #267)."
+                    ),
+                    raises=ValueError,
+                    strict=True,
+                ),
+            )
         from tidal.symbolic.json_loader import load_equation_system
 
         spec = load_equation_system(json_file)

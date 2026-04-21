@@ -1,0 +1,31 @@
+\begin{frame}{\textsc{tidal}: overview}
+  \note{\textasciitilde 9 min mark. Centrepiece of the talk. Sell the idea before the detail.}
+  \textbf{T}ensor \textbf{I}ntegration and \textbf{D}erivation for \textbf{A}ny \textbf{L}agrangian.
+
+  \vspace{0.6em}
+  \begin{center}
+    \begin{tikzpicture}[
+      node distance=0.6cm and 0.5cm,
+      every node/.style={font=\scriptsize},
+      box/.style={draw,rounded corners,thick,align=center,
+                  minimum height=1.1cm,minimum width=2.0cm,inner sep=2pt},
+      arr/.style={-{Latex[length=2mm]},thick},
+    ]
+      \node[box] (toml)   {\texttt{theory.toml}\\\tiny Lagrangian};
+      \node[box,right=of toml]   (wolf) {Mathematica\\xAct / xTras};
+      \node[box,right=of wolf]   (json) {JSON spec\\\tiny linearised};
+      \node[box,right=of json]   (num)  {Python\\numerics};
+      \node[box,right=of num]    (out)  {sweeps\\inference\\plots};
+      \draw[arr] (toml)--(wolf);
+      \draw[arr] (wolf)--(json);
+      \draw[arr] (json)--(num);
+      \draw[arr] (num)--(out);
+    \end{tikzpicture}
+  \end{center}
+
+  \vspace{0.4em}
+  \textbf{Core claim.} \emph{Every equation the numerics solves is traceable back to a single Lagrangian I typed in.} No hand-derived PDEs. No manual index gymnastics.
+
+  \vspace{0.3em}
+  \textbf{Why it matters here.} This project varies the Lagrangian \emph{dozens} of times --- different torsion operators, couplings, gauges, plasma backgrounds. Hand-deriving each variation would be intractable and unreliable.
+\end{frame}

@@ -221,7 +221,7 @@ class GridInfo:
                 np.meshgrid(
                     *(self.axes_coords(i) for i in range(self.ndim)),
                     indexing="ij",
-                )
+                ),
             )
             object.__setattr__(self, "_cached_coord_arrays", result)  # noqa: PLC2801
             return result

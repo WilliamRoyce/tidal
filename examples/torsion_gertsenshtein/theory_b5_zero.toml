@@ -1,0 +1,129 @@
+# Torsion-Gertsenshtein Effect AT b5 = 0: the base (unperturbed) variant.
+#
+# Lagrangian (identical to theory.toml minus the b5·R̃² term):
+#
+#   L = (1/kappa^2) R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3
+#       - (1/4) F_{ab} F^{ab}
+#
+# This is the b5 → 0 limit of the full torsion_gertsenshtein theory —
+# i.e. PGT gravity with Einstein-Cartan kinetics (no curvature-squared
+# term) and Einstein-Maxwell EM. At b5 = 0 the R̃² term vanishes and
+# h_4 / h_7 / h_9 become algebraic constraints natively (no kinetic
+# coefficient to promote them to time_order=4).
+#
+# Purpose
+# -------
+# v6 post-audit issue #289: R5.2 baseline regression requires an
+# independently-derived b5=0 JSON to cross-check
+# ``base_spec(['b5'])`` of the full theory. The existing
+# ``torsion_gertsenshtein_minimal_propagating.toml`` uses a different
+# Lagrangian (Barker's Maxwell-torsion kinetic, β couplings) and is
+# unsuitable for this comparison.
+#
+# This file is a MINIMAL, VERBATIM b5 → 0 reduction of theory.toml:
+#   - Lagrangian: theory.toml minus ``+ b5 RicciScalarCDT[]^2``
+#   - Constants: theory.toml minus ``"b5"``
+#   - [perturbation] section removed (no small parameter at b5 = 0)
+#   - Output JSON path: data/torsion_gertsenshtein_b5_zero.json
+#
+# Every other section matches theory.toml byte-for-byte — same field
+# list, same gauge choices, same plane-wave reduction axis, same
+# background Abar. The derived JSON must map field-for-field against
+# ``base_spec(['b5'])`` applied to the full theory's JSON.
+#
+# Expected derivation: STALE — the original estimate (~15-18 min) predated
+# the #246 per-pair TraceBasisDummy optimization (commit a28a393, 2026-04-11)
+# which brought the full theory.toml from ~20 min down to ~2 min. The b5=0
+# variant is strictly simpler (no R̃² cross-couplings in Euler-Lagrange
+# expansion), so post-#246 it should derive in ≤ 2 min. Needs a fresh
+# measurement on first run; do NOT treat the 15-18 min number as current.
+#
+# Refs:
+#   theory.toml — the full b5 ≠ 0 parent theory.
+#   docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md — v6 perturbative
+#   infrastructure.
+#   docs/tex/derivation_performance.tex §Post-v6 Reference Timings.
+#
+# Derivation timing: TBD (measure on first run; post-#246 expected ≤ 2 min)
+
+[theory]
+name = "Torsion-Gertsenshtein base (b5=0): PGT + Einstein-Maxwell without R̃²"
+description = "b5 → 0 limit of the full Torsion-Gertsenshtein theory: R̃ + T² + F²"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+# Metric perturbation h_{ab} (graviton, rank-2 symmetric)
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+# Full EM 4-potential (fundamental field for perturbation)
+[[fields]]
+name = "A"
+type = "vector"
+
+# EM perturbation (photon), the dynamical 1st-order variable
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA (derived from A)
+# Expanded via MakeRule BEFORE xPert perturbation
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Background EM 4-potential: Abar_y = -B0*z generates B_x = B0
+# (Coulomb gauge, uniform magnetic field along x-axis)
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+# NOTE: b5 removed from constants (no b5·R̃² term at b5 = 0).
+[constants]
+names = ["kappa", "B0", "alpha1", "alpha2", "alpha3"]
+
+# Base Lagrangian (identical to theory.toml minus the b5·R̃² term):
+#   L_base = (1/kappa^2) R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3
+#            - (1/4) F²
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# NO TT gauge on h — matches theory.toml for the same physical reasons
+# (preserves trace, valid through matter, etc.)
+# Lorenz gauge on photon a only.
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction along z-axis — matches theory.toml exactly.
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+# NO [perturbation] section: at b5 = 0 there is no small parameter;
+# every field's LHS is non-perturbative in its kinetic coefficient.
+# h_4 / h_7 / h_9 arrive as algebraic constraints (time_derivative_order=0)
+# directly from the Wolfram pipeline — no demotion needed.
+
+[output]
+path = "../data/torsion_gertsenshtein_b5_zero.json"

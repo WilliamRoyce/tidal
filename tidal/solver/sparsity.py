@@ -123,7 +123,7 @@ def _biharmonic_offsets(ndim: int) -> list[tuple[int, ...]]:
 
 
 def _gradient_or_laplacian_offsets(
-    name: str, ndim: int
+    name: str, ndim: int,
 ) -> list[tuple[int, ...]] | None:
     """Try to resolve gradient_X or laplacian_X operators."""
     deltas = _fd_deltas()

@@ -65,7 +65,6 @@ class ConversionResult:
 
 def _per_field_energy_timeseries(
     data: SimulationData,
-    fields: set[str] | None = None,
 ) -> tuple[NDArray[np.float64], dict[str, NDArray[np.float64]]]:
     """Compute per-field Hamiltonian energy timeseries.
 
@@ -74,18 +73,8 @@ def _per_field_energy_timeseries(
     position-dependent masses.  This ensures the conversion measurement is
     physically correct for curved spacetimes (e.g. spherical coordinates
     with r² volume element).
-
-    Parameters
-    ----------
-    fields : set[str] or None
-        If given, only evaluate Hamiltonian terms involving these base field
-        names.  Avoids evaluating operators on irrelevant fields — critical
-        for Ostrogradsky theories where some fields' EOM contain unresolvable
-        ``d2_t``/``d3_t`` operators.
     """
-    times, per_field, _interaction, _total = compute_energy_timeseries(
-        data, fields=fields
-    )
+    times, per_field, _interaction, _total = compute_energy_timeseries(data)
     return times, per_field
 
 
@@ -136,11 +125,7 @@ def compute_conversion_probability(
         raise ValueError(msg)
 
     # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes).
-    # Filter to source/target fields only — avoids evaluating operators on
-    # irrelevant fields that may have unresolvable d2_t/d3_t terms (#196).
-    times, per_field = _per_field_energy_timeseries(
-        data, fields={source_field, target_field}
-    )
+    times, per_field = _per_field_energy_timeseries(data)
 
     if source_field not in per_field:
         msg = (
@@ -160,18 +145,18 @@ def compute_conversion_probability(
     total_arr = source_arr + target_arr
 
     e_source_0 = source_arr[0]
-    if e_source_0 < _ENERGY_FLOOR:
+    if abs(e_source_0) < _ENERGY_FLOOR:
         msg = (
             f"Source field '{source_field}' has zero initial energy — "
             f"cannot compute conversion probability"
         )
         raise ValueError(msg)
 
-    probability = target_arr / e_source_0
+    probability = target_arr / abs(e_source_0)
     e_total_0 = total_arr[0]
     relative_error = (
-        (total_arr - e_total_0) / e_total_0
-        if e_total_0 >= _ENERGY_FLOOR
+        (total_arr - e_total_0) / abs(e_total_0)
+        if abs(e_total_0) >= _ENERGY_FLOOR
         else np.zeros_like(total_arr)
     )
 
@@ -274,10 +259,7 @@ def compute_group_conversion(  # noqa: C901, PLR0914
         )
 
     # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes).
-    # Filter to source/target fields only — avoids evaluating operators on
-    # irrelevant fields that may have unresolvable d2_t/d3_t terms (#196).
-    all_group_fields = set(src) | set(tgt)
-    times, per_field = _per_field_energy_timeseries(data, fields=all_group_fields)
+    times, per_field = _per_field_energy_timeseries(data)
 
     # Validate all fields are dynamical
     for name in (*src, *tgt):
@@ -295,18 +277,18 @@ def compute_group_conversion(  # noqa: C901, PLR0914
     total_arr = source_arr + target_arr
 
     e_source_0 = float(source_arr[0])
-    if e_source_0 < _ENERGY_FLOOR:
+    if abs(e_source_0) < _ENERGY_FLOOR:
         msg = (
             f"Source group {src} has zero initial energy — "
             f"cannot compute conversion probability"
         )
         raise ValueError(msg)
 
-    probability = target_arr / e_source_0
+    probability = target_arr / abs(e_source_0)
     e_total_0 = float(total_arr[0])
     relative_error: NDArray[np.float64] = (
-        (total_arr - e_total_0) / e_total_0
-        if e_total_0 >= _ENERGY_FLOOR
+        (total_arr - e_total_0) / abs(e_total_0)
+        if abs(e_total_0) >= _ENERGY_FLOOR
         else np.zeros_like(total_arr)
     )
 

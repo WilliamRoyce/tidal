@@ -20,14 +20,18 @@ Chapman & Hall. Ch. 12-14 (non-parametric bootstrap confidence intervals).
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 __all__ = ["SweepResults"]
 
@@ -322,7 +326,7 @@ class SweepResults:
             lines.append("\nSwept parameters:")
             for name, vals in self.swept_params.items():
                 lines.append(
-                    f"  {name}: {min(vals):.6g} to {max(vals):.6g} ({len(vals)} values)"
+                    f"  {name}: {min(vals):.6g} to {max(vals):.6g} ({len(vals)} values)",
                 )
 
         if self.fixed_params:
@@ -344,7 +348,7 @@ class SweepResults:
                 else:
                     lines.append(
                         f"  {m}: mean={np.mean(arr):.6g} \u00b1 {np.std(arr):.6g}, "
-                        f"min={np.min(arr):.6g}, max={np.max(arr):.6g}"
+                        f"min={np.min(arr):.6g}, max={np.max(arr):.6g}",
                     )
 
         return "\n".join(lines)
@@ -448,7 +452,7 @@ class SweepResults:
             # Fixed params and sim settings from first row
             row.update(self.fixed_params)
             row.update(
-                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]}
+                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]},
             )
 
             # Aggregate each metric
@@ -562,7 +566,7 @@ class SweepResults:
             row: dict[str, Any] = dict(zip(param_names, point_key, strict=True))
             row.update(self.fixed_params)
             row.update(
-                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]}
+                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]},
             )
 
             vals = [
@@ -599,6 +603,206 @@ class SweepResults:
             boot_rows.append(row)
 
         return self._with_rows(boot_rows)
+
+    # ------------------------------------------------------------------
+    # Derived metrics
+    # ------------------------------------------------------------------
+
+    def add_derived_columns(
+        self,
+        baseline_formula: str = "sin(kappa * B0 * t_end / 2)**2",
+        *,
+        metric: str = "P_max",
+        validity_threshold: float = 0.1,
+    ) -> None:
+        """Add amplification-related derived columns in place.
+
+        Computes for each row:
+        - ``P_EM``: baseline conversion probability from *baseline_formula*
+        - ``C0``: conversion coefficient ``P / B0**2``
+        - ``A``: amplification factor ``P / P_EM``
+        - ``log10_A``: ``log10(A)`` (useful for divergent colormaps)
+        - ``P_valid``: ``True`` if ``0 < P < validity_threshold``
+
+        Parameters
+        ----------
+        baseline_formula : str
+            Python expression for the GR baseline probability.  May
+            reference any fixed or swept parameter name plus standard
+            math functions (``sin``, ``cos``, ``sqrt``, ``pi``, etc.)
+            and simulation settings (``t_end``, ``grid_shape``).
+        metric : str
+            Column name for the measured conversion probability.
+        validity_threshold : float
+            Maximum *P* for the linear regime (default 0.1).
+        """
+        import math as _math  # noqa: PLC0415
+
+        from tidal.cli._simulate import (  # noqa: PLC0415
+            FORMULA_NAMESPACE,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        for row in self.rows:
+            p_val = row.get(metric)
+            status = row.get("run_status", "success")
+
+            # Build namespace from fixed params, sim settings, and this row
+            ns: dict[str, object] = {**FORMULA_NAMESPACE}
+            ns.update(self.fixed_params)
+            for k, v in self.sim_settings.items():
+                with contextlib.suppress(TypeError, ValueError):
+                    ns[k] = float(v)
+            # Swept params from row override fixed
+            for pname in self.swept_params:
+                val = row.get(pname)
+                if val is not None:
+                    with contextlib.suppress(TypeError, ValueError):
+                        ns[pname] = float(val)
+
+            # Evaluate baseline
+            try:
+                p_em = float(
+                    eval(baseline_formula, {"__builtins__": {}}, ns),  # noqa: S307
+                )
+            except Exception:  # noqa: BLE001
+                p_em = _math.nan
+
+            # Compute derived values
+            try:
+                p = float(p_val)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                p = _math.nan
+
+            valid = status == "success" and 0 < p < validity_threshold
+            b0 = float(ns.get("B0", 0) or 0)  # type: ignore[arg-type]
+
+            row["P_EM"] = p_em if _math.isfinite(p_em) else None
+            row["C0"] = p / b0**2 if b0 > 0 and _math.isfinite(p) else None
+            row["A"] = p / p_em if p_em > 0 and valid and _math.isfinite(p) else None
+            row["log10_A"] = (
+                _math.log10(p / p_em)
+                if p_em > 0 and valid and p > 0 and _math.isfinite(p)
+                else None
+            )
+            row["P_valid"] = valid
+
+    def add_paired_baseline(  # noqa: C901, PLR0912, PLR0914, PLR0915
+        self,
+        baseline: SweepResults,
+        *,
+        metric: str = "P_max",
+        match_tolerance: float = 1e-6,
+    ) -> None:
+        """Add amplification relative to a paired baseline sweep.
+
+        Matches each signal row with the baseline row whose parameter
+        values are closest (within *match_tolerance*).  Adds columns:
+
+        - ``P_baseline``: matched baseline metric value
+        - ``A_paired``: ``signal_metric / P_baseline``
+        - ``log10_A_paired``: ``log10(A_paired)``
+
+        The baseline sweep must cover the same parameter grid for all
+        shared swept parameters.  Unmatched rows get ``None``.
+
+        Parameters
+        ----------
+        baseline : SweepResults
+            Baseline sweep (typically at deltam=0).
+        metric : str
+            Column name for the conversion probability.
+        match_tolerance : float
+            Maximum absolute difference for parameter matching.
+        """
+        import math as _math  # noqa: PLC0415
+
+        # Identify shared swept parameters between signal and baseline
+        base_params = set(baseline.swept_params.keys())
+        sig_params = set(self.swept_params.keys())
+        shared = base_params & sig_params
+
+        # Also include baseline fixed params that are signal swept params
+        # (e.g., baseline has deltam=0 fixed, signal sweeps deltam)
+        # → don't match on those
+        match_params = sorted(shared) if shared else sorted(base_params)
+
+        # Build lookup: tuple of rounded param values → baseline P_max
+        base_lookup: dict[tuple[float, ...], float] = {}
+        for row in baseline.rows:
+            if row.get("run_status") != "success":
+                continue
+            key = tuple(
+                round(float(row.get(p, 0)), 6)
+                for p in match_params  # type: ignore[arg-type]
+            )
+            val = row.get(metric)
+            if val is not None:
+                base_lookup[key] = float(val)
+
+        # 1D baseline with interpolation: when matching on a single parameter,
+        # use np.interp so that LHC/MC samples at arbitrary values can be paired
+        # with a 1D baseline curve.  This avoids requiring exact grid matches.
+        use_interp = len(match_params) == 1 and len(base_lookup) >= 2  # noqa: PLR2004
+        base_xs: NDArray[np.float64] = np.array([])
+        base_ys: NDArray[np.float64] = np.array([])
+        if use_interp:
+            base_xs = np.array(sorted(k[0] for k in base_lookup))
+            base_ys = np.array([base_lookup[x,] for x in base_xs])
+
+        n_matched = 0
+        for row in self.rows:
+            p_val = row.get(metric)
+            try:
+                p = float(p_val)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
+                p = _math.nan
+
+            p_base: float | None = None
+            if use_interp:
+                # Interpolate baseline for 1D case
+                param_name = match_params[0]
+                try:
+                    x_val = float(row.get(param_name, _math.nan))  # type: ignore[arg-type]
+                except (TypeError, ValueError):
+                    x_val = _math.nan
+                if _math.isfinite(x_val) and base_xs[0] <= x_val <= base_xs[-1]:
+                    p_base = float(np.interp(x_val, base_xs, base_ys))
+            else:
+                # Multi-param: exact + fuzzy matching
+                key = tuple(
+                    round(float(row.get(p_name, 0)), 6)
+                    for p_name in match_params  # type: ignore[arg-type]
+                )
+                p_base = base_lookup.get(key)
+                if p_base is None:
+                    for bkey, bval in base_lookup.items():
+                        if all(
+                            abs(a - b) <= match_tolerance
+                            for a, b in zip(key, bkey, strict=False)
+                        ):
+                            p_base = bval
+                            break
+
+            if p_base is not None and p_base > 0 and _math.isfinite(p):
+                a = p / p_base
+                row["P_baseline"] = p_base
+                row["A_paired"] = a
+                row["log10_A_paired"] = _math.log10(a) if a > 0 else None
+                n_matched += 1
+            else:
+                row["P_baseline"] = p_base
+                row["A_paired"] = None
+                row["log10_A_paired"] = None
+
+        import logging  # noqa: PLC0415
+
+        logging.getLogger(__name__).info(
+            "Paired baseline: %d/%d rows matched (%d baseline points, matching on %s)",
+            n_matched,
+            len(self.rows),
+            len(base_lookup),
+            match_params,
+        )
 
     # ------------------------------------------------------------------
     # Serialization
@@ -687,7 +891,7 @@ class SweepResults:
         data["total_runs"] = self.metadata.get("total_runs", self.n_runs)
 
         path.write_text(
-            json.dumps(data, indent=2, default=_json_default), encoding="utf-8"
+            json.dumps(data, indent=2, default=_json_default), encoding="utf-8",
         )
 
     # ------------------------------------------------------------------

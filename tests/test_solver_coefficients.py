@@ -35,7 +35,7 @@ def _make_spec(
                 "field": field_name,
                 "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
                 "rhs": {"type": "linear_combination", "terms": terms},
-            }
+            },
         ],
     }
     return EquationSystem.from_dict(data)
@@ -64,7 +64,7 @@ class TestConstantCoefficients:
         spec = _make_spec(
             [
                 {"coefficient": 1.5, "operator": "laplacian", "field": "phi_0"},
-            ]
+            ],
         )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid)
@@ -83,7 +83,7 @@ class TestConstantCoefficients:
                     "field": "phi_0",
                     "coefficient_symbolic": "m2",
                 },
-            ]
+            ],
         )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid, parameters={"m2": 2.5})
@@ -102,7 +102,7 @@ class TestConstantCoefficients:
                     "field": "phi_0",
                     "coefficient_symbolic": "-m2",
                 },
-            ]
+            ],
         )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid, parameters={"m2": 3.0})
@@ -121,7 +121,7 @@ class TestConstantCoefficients:
                     "field": "phi_0",
                     "coefficient_symbolic": "-2*m2",
                 },
-            ]
+            ],
         )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid, parameters={"m2": 1.5})
@@ -225,7 +225,7 @@ class TestTimeDependent:
                     "time_dependent": True,
                     "coordinate_dependent": ["t"],
                 },
-            ]
+            ],
         )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid)
@@ -255,7 +255,7 @@ class TestErrorHandling:
                     "field": "phi_0",
                     "coefficient_symbolic": "unknown_param",
                 },
-            ]
+            ],
         )
         grid = _make_grid_1d()
         # Should raise during construction (pre-resolve attempt)
@@ -272,7 +272,7 @@ class TestErrorHandling:
                     "field": "phi_0",
                     "coefficient_symbolic": "Sqrt[-1]",
                 },
-            ]
+            ],
         )
         grid = _make_grid_1d()
         # sqrt(-1) gives NaN for real-valued numpy
@@ -291,7 +291,7 @@ class TestErrorHandling:
                     "time_dependent": True,
                     "coordinate_dependent": ["t"],
                 },
-            ]
+            ],
         )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid)

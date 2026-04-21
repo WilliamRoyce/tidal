@@ -1,9 +1,32 @@
 # Next Major Implementation Phases for TIDAL
 
 **Created:** February 2026
-**Last Updated:** March 2026
-**Status:** Phases A, B, C, D, E (FFT), F, J complete; Torsion (PGT) complete (v0.18.0); Torsion-Gertsenshtein investigated (v0.22.8); Phases G–I planned
-**Version:** 0.26.4 | **Tests:** 1,700 collected | **Examples:** 20 working (1+1D to 3+1D)
+**Last Updated:** April 2026
+**Status:** Phases A, B, C, D, E (FFT), F, J complete; Torsion (PGT) complete (v0.18.0); Torsion-Gertsenshtein investigated (v0.22.8); **Perturbative Reduction v6 complete (v0.33.9, Stage 7 closed 2026-04-20, issue #271 resolved — Euler–Heisenberg + matter-only theories now supported)**; Phases G–I planned
+**Version:** 0.33.12 | **Tests:** 1,991 collected | **Examples:** 21 working (1+1D to 3+1D)
+
+## Completed — April 2026
+
+- **Perturbative Reduction v6 Stage 7 closure (issue #271, v0.33.9).**
+  Two orthogonal blockers fixed:
+  (a) Mathematica `Power[Times[...], n]` auto-distribution on the Euler–Heisenberg
+      $(F\cdot F)^2$ term — fixed by wrapping the user Lagrangian in `Hold[]` and
+      rewriting `Power[X, n] → Scalar[X]^n` when `X` carries abstract indices
+      (commit 9d9e73f);
+  (b) CD ComponentValue precompute skipped for `len(dyn_fields) < 2` — fixed by
+      a correctness-aware gate that triggers on any derived_field containing
+      `CD[` in its definition, or any dyn-field appearing as `CD[...][name[...]]`
+      (commit 830a442), plus a FreeQ-gated application of
+      `$CDShorthandReverseRules` before Component-E-L field detection.
+  New example `examples/euler_heisenberg/` ships with the release, derives in
+  ≈19 s, emits `order_in_eps = 1` EH corrections with coefficients $2 B_0^2 \rho$,
+  $-2 B_0^2 \rho$, $-6 B_0^2 \rho$. Full regression matrix in
+  `docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md` Stage-7 closure entry.
+  Documentation subsections added to `perturbative_reduction.tex` §Power-of-Contraction
+  Normalisation and Matter-Only Derivative Dependence, and the engineer-facing
+  counterpart in `perturbative_reduction_design.tex`. Both .tex files now wired
+  into `main.tex` (previously orphan inputs).
+
 
 ## Context
 

@@ -29,13 +29,18 @@ class LikelihoodConfig:
     metric : str
         Name of the metric to extract (e.g. ``"P_max"``, ``"L_mix"``).
     likelihood_type : str
-        One of ``"gaussian"``, ``"threshold"``, ``"maximize"``.
+        One of ``"maximize"``, ``"minimize"``, ``"extremize"``,
+        ``"gaussian"``, ``"threshold"``.
     target : float
         Target value for gaussian likelihood.
     sigma : float
         Uncertainty for gaussian likelihood.
     min_value : float
         Minimum value for threshold likelihood.
+    baseline_formula : str | None
+        Baseline formula for ``extremize`` type.  Evaluated per-point
+        using the current parameter values + math functions.  Example:
+        ``"sin(kappa * B0 * t_end / 2)**2"``.
     """
 
     metric: str
@@ -43,18 +48,27 @@ class LikelihoodConfig:
     target: float = 0.0
     sigma: float = 1.0
     min_value: float = 0.0
+    baseline_formula: str | None = None
 
     def __post_init__(self) -> None:
-        valid = {"gaussian", "threshold", "maximize"}
+        valid = {"gaussian", "threshold", "maximize", "minimize", "extremize"}
         if self.likelihood_type not in valid:
             msg = f"Unknown likelihood type '{self.likelihood_type}'. Must be one of {sorted(valid)}."
             raise ValueError(msg)
         if self.likelihood_type == "gaussian" and self.sigma <= 0:
             msg = f"Gaussian sigma must be positive, got {self.sigma}"
             raise ValueError(msg)
+        if self.likelihood_type == "extremize" and not self.baseline_formula:
+            msg = (
+                "extremize likelihood requires --baseline-formula "
+                '(e.g. "sin(kappa * B0 * t_end / 2)**2")'
+            )
+            raise ValueError(msg)
 
 
-def parse_likelihood(spec: str) -> LikelihoodConfig:
+def parse_likelihood(
+    spec: str, *, baseline_formula: str | None = None,
+) -> LikelihoodConfig:
     """Parse a CLI likelihood specification string.
 
     Format: ``METRIC:TYPE[:ARGS]``
@@ -62,8 +76,18 @@ def parse_likelihood(spec: str) -> LikelihoodConfig:
     Examples::
 
         "P_max:maximize"
+        "P_max:minimize"
+        "P_max:extremize"          # requires baseline_formula
         "P_max:gaussian:0.5:0.1"
         "P_max:threshold:0.01"
+
+    Parameters
+    ----------
+    spec : str
+        Likelihood specification string.
+    baseline_formula : str | None
+        Baseline formula for ``extremize`` type (passed separately via
+        ``--baseline-formula`` CLI flag).
 
     Raises
     ------
@@ -101,12 +125,27 @@ def parse_likelihood(spec: str) -> LikelihoodConfig:
         )
     if ltype == "maximize":
         return LikelihoodConfig(metric=metric, likelihood_type="maximize")
+    if ltype == "minimize":
+        return LikelihoodConfig(metric=metric, likelihood_type="minimize")
+    if ltype == "extremize":
+        return LikelihoodConfig(
+            metric=metric,
+            likelihood_type="extremize",
+            baseline_formula=baseline_formula,
+        )
 
-    msg = f"Unknown likelihood type '{ltype}'. Use: gaussian, threshold, maximize."
+    msg = (
+        f"Unknown likelihood type '{ltype}'. "
+        "Use: maximize, minimize, extremize, gaussian, threshold."
+    )
     raise ValueError(msg)
 
 
-def compute_log_likelihood(metric_value: float, config: LikelihoodConfig) -> float:
+def compute_log_likelihood(
+    metric_value: float,
+    config: LikelihoodConfig,
+    eval_params: dict[str, float] | None = None,
+) -> float:
     """Compute log-likelihood from a metric value and config.
 
     Parameters
@@ -115,6 +154,9 @@ def compute_log_likelihood(metric_value: float, config: LikelihoodConfig) -> flo
         The measured value of the metric from simulation.
     config : LikelihoodConfig
         Likelihood configuration.
+    eval_params : dict | None
+        Current parameter values for formula evaluation (needed by
+        ``extremize`` type to compute the per-point baseline).
     """
     if math.isnan(metric_value) or math.isinf(metric_value):
         return -math.inf
@@ -125,8 +167,70 @@ def compute_log_likelihood(metric_value: float, config: LikelihoodConfig) -> flo
     if config.likelihood_type == "threshold":
         return 0.0 if metric_value >= config.min_value else -math.inf
 
+    # If a baseline formula is provided, use the log-amplification
+    # log(A) = log(metric / baseline) as the physics quantity.  This is
+    # the Gertsenshtein-normalized conversion (dimensionless, centered
+    # on 0 for no-amplification, positive for enhancement, negative for
+    # suppression).  Using log-ratio tames the dynamic range so evidence
+    # isn't dominated by a few large outliers.
+    if config.baseline_formula:
+        baseline = _eval_baseline(config.baseline_formula, eval_params)
+        if baseline is None or baseline <= 0 or metric_value <= 0:
+            return -math.inf
+        log_amplification = math.log(metric_value / baseline)
+        if config.likelihood_type == "maximize":
+            return log_amplification  # find max amplification
+        if config.likelihood_type == "minimize":
+            return -log_amplification  # find max suppression
+        if config.likelihood_type == "extremize":
+            return abs(log_amplification)  # find max deviation (both sides)
+        # gaussian/threshold fall through to raw-metric branches below
+
+    if config.likelihood_type == "minimize":
+        return -metric_value
+
+    if config.likelihood_type == "extremize":
+        # extremize requires a baseline (enforced by __post_init__);
+        # this branch is unreachable but kept for safety.
+        return -math.inf
+
     # maximize: use metric value directly as log-likelihood
     return metric_value
+
+
+def _eval_baseline(
+    formula: str | None, params: dict[str, float] | None,
+) -> float | None:
+    """Evaluate a baseline formula with the given parameter values.
+
+    Reuses the same ``FORMULA_NAMESPACE`` (sin, cos, sqrt, pi, etc.)
+    as the sweep-results derived-columns computation.
+    """
+    if formula is None:
+        return None
+
+    from tidal.cli._simulate import (
+        FORMULA_NAMESPACE,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    ns: dict[str, object] = {**FORMULA_NAMESPACE}
+    if params:
+        ns.update(params)
+
+    try:
+        return float(
+            eval(formula, {"__builtins__": {}}, ns),  # noqa: S307
+        )
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger("tidal.inference").warning(
+            "Baseline formula '%s' failed: %s (params: %s)",
+            formula,
+            exc,
+            sorted(ns.keys()) if params else "none",
+        )
+        return None
 
 
 class SimulationLikelihood:
@@ -198,6 +302,8 @@ class SimulationLikelihood:
         float
             Log-likelihood value. Returns ``-inf`` for failed simulations.
         """
+        call_idx = self._call_count
+        self._call_count += 1
         return _evaluate_likelihood(
             theta=theta,
             base_args=self.base_args,
@@ -210,7 +316,7 @@ class SimulationLikelihood:
             likelihood_config=self.likelihood_config,
             temp_dir=self.temp_dir,
             keep_sims=self.keep_sims,
-            call_index=self._call_count,
+            call_index=call_idx,
         )
 
 
@@ -241,46 +347,99 @@ def _evaluate_likelihood(
     # Build parameter overrides
     param_overrides = {name: float(theta[i]) for i, name in enumerate(param_names)}
 
-    # Create a temp directory for this evaluation
-    base = temp_dir or Path(tempfile.gettempdir())
-    run_dir = base / f"inference_run_{call_index:06d}"
-    run_dir.mkdir(parents=True, exist_ok=True)
+    # Backend selection: in-memory default (fast path), fall back to disk
+    # when the user explicitly requests --likelihood-backend=disk.  The
+    # disk path is kept for bisectability / rollback (see issue #269).
+    backend = getattr(base_args, "likelihood_backend", "memory")
+
+    # The disk backend still needs a temp dir; in-memory does not.
+    run_dir: Path | None = None
+    if backend == "disk":
+        # Create a unique temp directory for this evaluation.
+        # Include PID to avoid collisions between multiprocessing workers
+        # (each fork gets its own counter starting at 0).
+        import os
+
+        base = temp_dir or Path(tempfile.gettempdir())
+        run_dir = base / f"inference_run_{os.getpid()}_{call_index:06d}"
+        run_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # Run simulation
-        exit_code, _wall_time, spec = _simulate_run(
-            base_args,
-            spec_path,
-            param_overrides,
-            run_dir,
-        )
+        if backend == "memory":
+            from tidal.cli._sweep import (
+                _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
+                run_inference_step,
+            )
 
-        if exit_code != 0:
-            return -math.inf
+            sim_data = run_inference_step(base_args, spec_path, param_overrides)
+            spec = sim_data.spec
+            metrics = _measure_from_sim_data(
+                sim_data, measurements, source, target, threshold,
+            )
+        else:
+            # Run simulation (disk path — preserved for rollback)
+            assert run_dir is not None  # set when backend == "disk"
+            exit_code, _wall_time, spec = _simulate_run(
+                base_args,
+                spec_path,
+                param_overrides,
+                run_dir,
+            )
 
-        # Extract metrics
-        metrics = _measure_run(
-            run_dir,
-            spec_path,
-            measurements,
-            source,
-            target,
-            threshold,
-            spec=spec,
-        )
+            if exit_code != 0:
+                return -math.inf
+
+            # Extract metrics
+            metrics = _measure_run(
+                run_dir,
+                spec_path,
+                measurements,
+                source,
+                target,
+                threshold,
+                spec=spec,
+            )
 
         # Get the target metric
         metric_value = metrics.get(likelihood_config.metric)
         if metric_value is None:
             return -math.inf
 
-        return compute_log_likelihood(float(metric_value), likelihood_config)
+        # Build eval_params for formula-based likelihoods.
+        # Merge order (same as _simulate_run): spec.metadata["parameters"]
+        # defaults -> CLI --param overrides -> swept theta.  Without the
+        # first two, formulas like "sin(kappa * B0 * t_end / 2)**2" fail
+        # with NameError, _eval_baseline returns None, and every logL
+        # collapses to -inf (see #270).
+        eval_params: dict[str, float] | None = None
+        if likelihood_config.baseline_formula:
+            from tidal.cli._simulate import (
+                _parse_params,  # pyright: ignore[reportPrivateUsage]
+            )
+
+            eval_params = _parse_params(
+                list(getattr(base_args, "param", []) or []), spec,
+            )
+            eval_params.update(param_overrides)
+            for attr in ("t_end", "dt"):
+                val = getattr(base_args, attr, None)
+                if val is not None:
+                    eval_params[attr] = float(val)
+
+        return compute_log_likelihood(
+            float(metric_value), likelihood_config, eval_params,
+        )
 
     except Exception:  # noqa: BLE001
+        import logging
+
+        logging.getLogger("tidal.inference").debug(
+            "Likelihood evaluation failed at theta=%s", theta, exc_info=True,
+        )
         return -math.inf
 
     finally:
-        if not keep_sims and run_dir.exists():
+        if run_dir is not None and not keep_sims and run_dir.exists():
             shutil.rmtree(run_dir, ignore_errors=True)
 
 

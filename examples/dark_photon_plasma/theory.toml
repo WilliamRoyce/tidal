@@ -1,0 +1,146 @@
+# Dark Photon in Plasma (PGT torsion trace, CDT formulation)
+#
+# Extends the CDT dark photon (torsion_dark_photon) by adding an
+# effective photon mass mA2 as a proxy for a plasma environment.  This
+# breaks the Holdom triviality (Holdom 1986): in vacuum, pure kinetic
+# mixing F·Ftorsion is a field redefinition and produces no observable
+# photon → dark-photon conversion.  In a plasma (mA2 ≠ 0), the photon
+# eigenmode is no longer massless, and the kinetic mixing produces
+# genuine photon ↔ dark-photon oscillation.
+#
+# This is the physically correct formulation: the dark photon mass comes
+# from the PGT I3 torsion invariant written on the FULL rank-3 torsion
+# tensor, not from an ad-hoc Proca term on the perturbation.  The photon
+# mass mA2 is correctly perturbation-level (writing it on the full field
+# A would contaminate the graviton EOM with position-dependent Abar²
+# terms from the background B-field — Issue #142).
+#
+# Mass relationship: mass² = 2·alpha3  (from EL equation of I3 term).
+# Sweep equivalence with old FV model: alpha3 = mT2/2.
+#
+# Lagrangian:
+#   L = (1/kappa^2) R
+#       − 1/4 F^2                                  (Maxwell)
+#       − 1/2 mA2 a_mu a^mu                        (photon effective mass = plasma)
+#       + alpha3 I3                                 (PGT torsion trace mass)
+#       − 1/4 xi Ftorsion^2                        (torsion trace kinetic)
+#       + deltam F_{ab} Ftorsion^{ab}              (kinetic mixing F·Ftorsion)
+#
+# where I3 = TorsionCDT[b,-b,-a] TorsionCDT[c,-c,-d] eta[a,d]
+#          = (torsion trace)_mu (torsion trace)^mu  (axitor invariant)
+#
+# Fields:
+#   h_{ab}  : graviton perturbation (TT gauge)
+#   A_mu    : EM 4-potential, perturbed about Abar (B0 background)
+#   a_mu    : EM perturbation (photon, with effective mass mA2)
+#   t_{abc} : rank-3 torsion perturbation (from [torsion] section)
+#             The trace v_mu = t^b_{b,mu} is the dynamical dark photon mode.
+#
+# Multi-field perturbation:
+#   g    = eta + epsilon * h
+#   A    = Abar + epsilon * a   (Abar gives the B0 background field)
+#   T_{abc} = 0 + epsilon * t_{abc}  (torsion perturbed from flat background)
+#
+# Refs:
+#   Holdom (1986), Phys. Lett. B 166, 196 — kinetic mixing triviality
+#   Pospelov (2008), arXiv:0811.1030 — dark photon portal Lagrangian
+#   An, Pospelov, Pradler (2013), arXiv:1302.3884 — conversion formulas
+#   Fabbrichesi et al. (2020), arXiv:2005.01515 — dark photon review
+#   Raffelt, Stodolsky (1988), Phys. Rev. D 37, 1237 — two-state mixing
+#   Hayashi & Shirafuji (1979) — PGT propagating torsion modes
+
+[theory]
+name = "Dark Photon in Plasma (PGT torsion, CDT)"
+description = "Einstein-Maxwell + PGT torsion dark photon (I3 mass) with kinetic mixing and photon effective mass (plasma)"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# PGT torsion: rank-3 tensor perturbation t_{abc}.
+# The trace v_mu = t^b_{b,mu} is the propagating dark photon mode.
+[torsion]
+perturbation_name = "t"
+
+# Metric perturbation h_{ab} (graviton, rank-2 symmetric)
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+# Full EM 4-potential (fundamental field for perturbation)
+[[fields]]
+name = "A"
+type = "vector"
+
+# EM perturbation (photon)
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength F = dA
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Torsion trace field strength: Ftorsion_{ab} = d_a V_b - d_b V_a
+# where V_mu = TorsionCDT^b_{b,mu} is the torsion trace vector.
+[[derived_fields]]
+name = "Ftorsion"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][TorsionCDT[c,-c,-b]] - CD[-b][TorsionCDT[c,-c,-a]]"
+
+# Background EM 4-potential: Abar_y = -B0*z -> B_x = B0
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "alpha3", "xi", "deltam", "mA2"]
+
+# Lagrangian: Einstein + Maxwell + PGT torsion (I3 mass + kinetic) + kinetic mixing + plasma.
+# alpha3 is the I3 coefficient: mass^2 = 2*alpha3 (from EL of I3 term).
+# mA2 is on the PERTURBATION field a (not full A) to avoid Abar^2 contamination (Issue #142).
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCD[] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/2 mA2 a[-a] eta[a,b] a[-b])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# TT gauge on h — physical graviton polarizations only.
+[[gauge]]
+field = "h"
+type = "tt"
+
+# Lorenz gauge on photon a.
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: propagation along z-axis
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+# Default parameters:
+# kappa   = 1.0   (gravitational coupling; kappa^2 = 16 pi G)
+# B0      = 0.01  (background magnetic field, small-P regime)
+# alpha3  = 0.005 (PGT I3 coefficient; mass^2 = 2*alpha3 = 0.01)
+# xi      = 1.0   (Ftorsion^2 kinetic prefactor)
+# deltam  = 0.1   (kinetic mixing strength)
+# mA2     = 0.01  (photon plasma mass squared, near resonance alpha3=mA2/2)
+
+[output]
+path = "../data/dark_photon_plasma.json"

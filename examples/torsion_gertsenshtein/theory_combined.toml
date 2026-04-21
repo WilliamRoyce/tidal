@@ -1,0 +1,132 @@
+# Combined General PGT: Curvature-Squared + Cross-Couplings + Propagating Torsion
+#
+# The most general parity-even quadratic PGT+EM Lagrangian at linearized level:
+#
+#   L = L_EH + L_R2 + L_T2 + L_Ftorsion + L_coupling + L_EM
+#
+# L_EH = (1/κ²)R̃                                       — Einstein-Cartan
+# L_R2 = a1 R̃² + a2 R̃_{μν}R̃^{μν} + a3 R̃_{μν}R̃^{νμ} — curvature-squared
+#       + a4 R̃_{μνρσ}R̃^{μνρσ} + a5 R̃_{μνρσ}R̃^{μρνσ}
+#       + a6 R̃_{μνρσ}R̃^{ρσμν}
+# L_T2 = β₁I₁ + β₂I₂ + β₃I₃                           — torsion mass
+# L_Ftorsion = −(ξ/4)Ftorsion²                          — torsion kinetics
+# L_coupling = δ₁R̃_{[μν]}F^{μν}                        — curvature-EM
+#            + χ R̃_{[μν]}Ftorsion^{μν}                  — kinetic mixing
+#            + ζ₁(∇_a T^b_{bc})F^{ac}                   — derivative 1
+#            + ζ₂(∇^a T_{a}^{bc})F_{bc}                 — derivative 2
+#            + ζ₃(∇^a T^b_{ac})F_{bc}                   — derivative 3
+# L_EM = −¼F²                                           — Maxwell
+#
+# 18 parameters: κ, B₀, a1..a6, β₁..β₃, ξ, δ₁, χ, ζ₁, ζ₂, ζ₃
+#
+# Ghost safety (linearized): Aoki (2019) shows PGT ≡ ghost-free massive
+# bigravity at linearized level. Ostrogradsky ghosts enter only at cubic
+# order with cutoff Λ₄ = (M_Pl m³)^{1/4}. All terms are safe for TIDAL.
+#
+# Constant naming: no underscores (Mathematica pattern clash).
+# Use a1..a6 for α₁..α₆, not alpha1 (conflicts with original model).
+#
+# Refs:
+#   Aoki (2019), arXiv:1903.09438 — linearized ghost freedom
+#   Blagojevic & Cvetkovic (2018) — 450 ghost-free PGT parameter windows
+#   Barker (2024), arXiv:2406.12826 — ξ (Maxwell torsion), χ (kinetic mixing)
+#   Bahamonde (2025), arXiv:2507.02362 — δ₁ R̃_{[μν]}F coupling
+#   research/general_quadratic_lagrangian.tex — complete enumeration
+
+[theory]
+name = "Combined General PGT (R̃² + cross-couplings + propagating torsion)"
+description = "All safe parity-even quadratic PGT+EM terms at linearized level"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+# Metric perturbation h_{ab} (graviton, rank-2 symmetric)
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+# Full EM 4-potential (fundamental field for perturbation)
+[[fields]]
+name = "A"
+type = "vector"
+
+# EM perturbation (photon)
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Torsion trace field strength: Ftorsion_{ab} = ∂_a T_b - ∂_b T_a
+[[derived_fields]]
+name = "Ftorsion"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][TorsionCDT[c,-c,-b]] - CD[-b][TorsionCDT[c,-c,-a]]"
+
+# Background EM 4-potential: Abar_y = -B0*z → B_x = B0
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "a1", "a2", "a3", "a4", "a5", "a6", "beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3"]
+
+# Lagrangian expression (xAct notation):
+#
+# R̃² sector (6 curvature-squared invariants):
+#   a1 R̃²                          = a1 RicciScalarCDT[]^2
+#   a2 R̃_{μν}R̃^{μν}               = a2 RicciCDT[-a,-b] eta[a,c] eta[b,d] RicciCDT[-c,-d]
+#   a3 R̃_{μν}R̃^{νμ}               = a3 RicciCDT[-a,-b] eta[b,c] eta[a,d] RicciCDT[-c,-d]
+#   a4 R̃_{μνρσ}R̃^{μνρσ}           = a4 RiemannCDT[-a,-b,-c,-d] eta[a,e] eta[b,f] eta[c,g] eta[d,h] RiemannCDT[-e,-f,-g,-h]
+#   a5 R̃_{μνρσ}R̃^{μρνσ}           = a5 RiemannCDT[-a,-b,-c,-d] eta[a,e] eta[c,f] eta[b,g] eta[d,h] RiemannCDT[-e,-f,-g,-h]
+#   a6 R̃_{μνρσ}R̃^{ρσμν}           = a6 RiemannCDT[-a,-b,-c,-d] eta[c,e] eta[d,f] eta[a,g] eta[b,h] RiemannCDT[-e,-f,-g,-h]
+
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + a1 RicciScalarCDT[]^2 + a2 RicciCDT[-a,-b] eta[a,c] eta[b,d] RicciCDT[-c,-d] + a3 RicciCDT[-a,-b] eta[b,c] eta[a,d] RicciCDT[-c,-d] + a4 RiemannCDT[-a,-b,-c,-d] eta[a,e] eta[b,f] eta[c,g] eta[d,h] RiemannCDT[-e,-f,-g,-h] + a5 RiemannCDT[-a,-b,-c,-d] eta[a,e] eta[c,f] eta[b,g] eta[d,h] RiemannCDT[-e,-f,-g,-h] + a6 RiemannCDT[-a,-b,-c,-d] eta[c,e] eta[d,f] eta[a,g] eta[b,h] RiemannCDT[-e,-f,-g,-h] + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + chi RicciCDT[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + zeta1 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e] + zeta2 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e] + zeta3 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# Lorenz gauge on photon a only
+# NO TT gauge on h — preserves trace for R̃² graviton-torsion mixing
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: propagation along z-axis
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+# v6 perturbative reduction — all six Riemann-Cartan curvature-squared
+# couplings (a1..a6) are treated as small.  Any of them promotes some
+# torsion/graviton component to time_order>2 via its kinetic structure;
+# PerturbativeSolver demotes them at Pass 0 and layers a closed-form
+# Duhamel correction at Pass 1.  See
+# docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md.
+[perturbation]
+small_parameters = ["a1", "a2", "a3", "a4", "a5", "a6"]
+order = 1
+
+[output]
+path = "../data/torsion_gertsenshtein_combined.json"

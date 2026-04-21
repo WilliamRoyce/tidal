@@ -40,6 +40,8 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | File | Location | Content |
 | ---- | -------- | ------- |
 | `architecture.tex` | `docs/tex/architecture.tex` | Pipeline overview, module roles, component E-L, Ostrogradsky |
+| `perturbative_reduction.tex` | `docs/tex/perturbative_reduction.tex` | v6 iterative order reduction: Pass 0 / Pass 1, Parker–Simon + FKY validity, closed-form Duhamel kernel, constraint-field Schur recovery, EH Power-normalisation and matter-only CD precompute gate (issue #271) |
+| `perturbative_reduction_design.tex` | `docs/tex/perturbative_reduction_design.tex` | Engineer-facing implementation specification: algorithm pseudocode, module layout, gate helpers, regression matrix |
 | `json_schema.tex` | `docs/tex/json_schema.tex` | Complete JSON specification reference |
 | `solver_migration.tex` | `docs/tex/solver_migration.tex` | py-pde to SUNDIALS migration |
 | `modal_solver.tex` | `docs/tex/modal_solver.tex` | Fourier modal solver |

@@ -21,12 +21,95 @@ These references inform design decisions and should be cited where appropriate i
 | **Gertsenshtein (1962)** — "Wave resonance of light and gravitational waves", JETP 14, 84                                                                                                                            | Original prediction of graviton-photon conversion in B-field                                                  |
 | **Domcke & Garcia-Cely (2023)** — "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072)                                                                            | Modern pedagogical derivation; thin-magnet formula P ~ (κ B L / 2)²                                           |
 | **Hwang & Noh (2023)** — "On graviton-photon conversions in magnetic environments", [arXiv:2310.04150](https://arxiv.org/abs/2310.04150)                                                                              | Proper EM field definitions in curved spacetime; formulation-dependent graviton mass; critique of ad-hoc derivations |
-| **Berlin et al. (2024)** — "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865)                                                                                | Numerical methods for resonant graviton-photon / axion-photon mixing — directly analogous to TIDAL's use case |
+| **Berlin et al. (2024)** — "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865)                                                                                | Eq.(309): Schrödinger-like two-state mixing `2ik∂ₓẼ ≃ -(mₐ²-ωₚ²)Ẽ - coupling`; Eq.(335): resonant conversion probability (= Raffelt-Stodolsky 1988 on resonance). Directly analogous to TIDAL's plasma-Gertsenshtein approach. |
+| **Domcke, Garcia-Cely & Lee (2025)** — "Gravitational wave conversion into photons in magnetized plasmas", [arXiv:2507.16609](https://arxiv.org/abs/2507.16609)                                                      | Eq.(216): massless GW-sourced photon wave eq `□Aₕ = -j_eff` (j_eff defined Eq.(187)). Eq.(1484) §"Towards including Medium Effects": `[□-μ²(x)]Aₕ = -j_eff` with plasma mass — EOM-level counterpart to TIDAL's perturbation-Proca term. |
 | **Ejlli et al. (2019)** — "Upper limits on the amplitude of ultra-high-frequency gravitational waves", Eur. Phys. J. C 79, 1032 (2019). [Springer](https://link.springer.com/article/10.1140/epjc/s10052-019-7542-5) | Experimental bounds on Gertsenshtein conversion                                                               |
 | **Ejlli (2020)** — "Graviton-photon mixing: exact solution in a constant magnetic field", [arXiv:2004.02714](https://arxiv.org/abs/2004.02714) | First exact (non-perturbative) Gertsenshtein solution |
 | **Palessandro (2024)** — "Graviton-Photon Oscillations as a Probe of Quantum Gravity", [arXiv:2405.01407](https://arxiv.org/abs/2405.01407) | Extended Gertsenshtein treatment (**contains normalisation error** corrected by TIDAL) |
 | **Hwang & Noh (2024)** — "Graviton-photon conversions in Euler-Heisenberg nonlinear electrodynamics", [arXiv:2405.11786](https://arxiv.org/abs/2405.11786) | Nonlinear QED corrections to Gertsenshtein; chiral GW propagation |
 | **Graviton-photon oscillation in general modified gravity (2023)** — [arXiv:2302.08186](https://arxiv.org/abs/2302.08186) | Gertsenshtein in Horndeski, massive gravity, cosmic backgrounds |
+
+## Primary Classical References (pre-arXiv)
+
+These papers establish the foundational theory used by TIDAL's Gertsenshtein
+and plasma-Gertsenshtein examples. They predate arXiv and are not stored in
+`Literature/`; the key formulas are transcribed here with cross-references
+to the TIDAL files that implement them.
+
+### Gertsenshtein 1962 — original graviton-photon conversion
+
+**Citation:** M. E. Gertsenshtein, "Wave resonance of light and gravitational
+waves", Sov. Phys. JETP **14**, 84 (1962). Russian original: ZhETF **41**, 113.
+
+**Key result:** A gravitational wave propagating through a static magnetic
+field `B₀` coherently converts into an electromagnetic wave (and vice versa)
+with probability
+
+```
+P(D) = sin²(κ · B₀ · D / 2)     [κ = √(8πG), D = propagation distance]
+```
+
+**Implemented in:** [examples/gertsenshtein/theory.toml](examples/gertsenshtein/theory.toml)
+and validated by [sweep_B0.sh](examples/gertsenshtein/sweep_B0.sh) (RMS < 0.015
+vs analytical).
+
+**Canonical normalization:** The √(8πG) factor is often mis-stated in the
+literature (see Palessandro 2024 critique in arXiv:2405.01407). Dandoy et al.
+2024 ([Literature/2406.17853](Literature/2406.17853)) reproduces the correct
+normalization independently, which TIDAL uses.
+
+### Boccaletti et al. 1970 — localized B-field integral form
+
+**Citation:** D. Boccaletti, V. De Sabbata, P. Fortini, C. Gualdi, "Conversion
+of photons into gravitons and vice versa in a static electromagnetic field",
+Nuovo Cimento B **70**, 129 (1970).
+
+**Key result:** For a magnetic field profile `B(z)` localized in space, the
+massless-vacuum conversion probability generalizes from the uniform-field
+`sin²(κB₀D/2)` to
+
+```
+P = sin²((κ/2) · ∫ B(z) dz)     [integral over propagation path]
+```
+
+**Implemented in:** [docs/tex/gertsenshtein_localized.tex](docs/tex/gertsenshtein_localized.tex)
+and [examples/gertsenshtein/run_localized.sh](examples/gertsenshtein/run_localized.sh).
+Cross-reference: Domcke, Garcia-Cely & Lee 2025 ([Literature/2507.16609](Literature/2507.16609))
+extends the formula to full 3D scattering with Born approximation.
+
+### Raffelt & Stodolsky 1988 — two-state mixing & Lorentzian resonance
+
+**Citation:** G. Raffelt & L. Stodolsky, "Mixing of the photon with low-mass
+particles", Phys. Rev. D **37**, 1237 (1988).
+
+**Key result:** For a photon mixing with a second state carrying effective
+mass `mA²`, the coherent conversion probability has a Lorentzian resonance
+in the detuning `Δm² = mA² - m_g²_eff`:
+
+```
+P_max = (2·κ·B₀·k)² / [(2·κ·B₀·k)² + Δm²²]     [HWHM at Δm² = 2·κ·B₀·k]
+```
+
+where `m_g²_eff = κ²B₀²/2` is the graviton effective mass from background
+EM stress-energy. On resonance (`Δm² = 0`) the mixing is maximal; off by
+the HWHM `2·κ·B₀·k` the amplitude is suppressed by a factor of 2.
+
+**Implemented in:** [examples/gertsenshtein_proca/theory.toml](examples/gertsenshtein_proca/theory.toml)
+which adds a perturbation-level Proca mass `-(mA²/2) a·a` to Einstein-Maxwell.
+Validated end-to-end by [sweep_resonance_1d.sh](examples/gertsenshtein_proca/sweep_resonance_1d.sh)
+(observed HWHM = 0.405 vs theory 0.402 at B₀=0.10, commit `1526d77`) and
+[sweep_resonance.sh](examples/gertsenshtein_proca/sweep_resonance.sh) (2D
+resonance map, HWHM tracks theory within 9% across B₀ ∈ [0.09, 0.25]).
+
+**Why perturbation-level Proca, not full-field:** effective photon mass in
+plasma is a dispersion modification, not a Lorentz-invariant Lagrangian mass.
+Placing the mass on the full field `A_μ A^μ` contaminates the graviton EOM
+with spurious position-dependent `|Ā|²` terms (issue #142). By writing it on
+`a[LI[1]]` only, xPert correctly injects the mass into the O(ε²) Lagrangian
+without polluting the background. This is equivalent to Domcke, Garcia-Cely
+& Lee 2025's EOM-level treatment `[☐ - μ²]A_h = -j_eff` via variational
+calculus, and uses the curved-spacetime Maxwell conventions of Hwang & Noh
+2023 ([Literature/2310.04150](Literature/2310.04150)).
 
 ## Torsion in Gauge Gravity
 
@@ -51,6 +134,17 @@ These references inform design decisions and should be cited where appropriate i
 | **Hehl & Obukhov (2000)** — "How does the EM field couple to gravity?", [arXiv:gr-qc/0001010](https://arxiv.org/abs/gr-qc/0001010) | Canonical classification of all EM-gravity coupling structures in metric-affine geometry |
 | **Rubilar et al. (2003)** — "Torsion nonminimally coupled to the EM field and birefringence", [arXiv:gr-qc/0305049](https://arxiv.org/abs/gr-qc/0305049) | Proves T²F² couplings make light sensitive to torsion; vacuum birefringence |
 | **Itin (2003)** — "Maxwell's field coupled nonminimally to quadratic torsion", [arXiv:gr-qc/0307063](https://arxiv.org/abs/gr-qc/0307063) | Two families: F·T² (modifies Maxwell) and F²·T² (modifies constitutive tensor); induced axion field |
+
+## Dark Photon / Kinetic Mixing Portal
+
+| Reference | Relevance |
+| --- | --- |
+| **Holdom (1986)** — "Two U(1)'s and ε charge shifts", Phys. Lett. B 166, 196 | Original theorem: pure kinetic mixing between two U(1) gauge fields is equivalent to a field redefinition for matter-free sectors. Establishes that kinetic mixing alone is observable only via coupling to charged matter (millicharges). |
+| **Pospelov (2008)** — "Secluded U(1) below the weak scale", [arXiv:0811.1030](https://arxiv.org/abs/0811.1030) | Canonical dark-photon-portal Lagrangian `L ⊃ -¼V² + ½κ V_{μν}F^Y_{μν} + ½m_V² V²` with positive-sign kinetic mixing convention. Effective coupling to EM current after diagonalisation. |
+| **Redondo (2008)** — "Helioscope bounds on hidden sector photons", [arXiv:0801.1527](https://arxiv.org/abs/0801.1527) | Explicit `P(γ→γ') = 4ε² · sin²((m² − ω_p²)·L/4ω)` formula including plasma frequency; rule of thumb for in-medium vs vacuum conversion. |
+| **An, Pospelov, Pradler (2013)** — "New stellar constraints on dark photons", [arXiv:1302.3884](https://arxiv.org/abs/1302.3884) | Stellar dark-photon bounds; eq. (2.4)–(2.6): vacuum and in-medium conversion formulas. |
+| **Fabbrichesi, Gabrielli, Lanfranchi (2020)** — "The Dark Photon", [arXiv:2005.01515](https://arxiv.org/abs/2005.01515) | Comprehensive review of dark-photon phenomenology, conventions, and experimental constraints. |
+| **Caputo, Millar, O'Hare, Vitagliano (2021)** — "Dark photon limits: a cookbook", [arXiv:2105.04565](https://arxiv.org/abs/2105.04565) | Practical oscillation formulae for dark-photon experiments including haloscope / DM-radio analyses. |
 
 ## Verification & Validation Methodology
 

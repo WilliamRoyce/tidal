@@ -1,0 +1,430 @@
+% Dark Photon Torsion Model: Physics, Holdom Triviality, and Investigation Findings
+% Documents the torsion-trace-as-dark-photon model and the 276-run campaign
+% null result, which is the correct physical prediction.
+% Uses macros from preamble.tex
+
+\section{Dark Photon Torsion Model}
+\label{sec:dark-photon-torsion}
+
+\subsection{Motivation and physics goal}
+\label{subsec:dp-motivation}
+
+The torsion dark-photon example
+(\texttt{examples/torsion\_dark\_photon/}~and~\texttt{examples/torsion\_dark\_photon\_fv/})
+investigates a BSM Lagrangian in which a torsion trace vector is
+identified as a Holdom-style dark photon~\cite{Holdom1986}. The goal of
+the 276-run HPC campaign was to characterise the region of
+$(\alpha, \xi, \delta_m)$ parameter space (or $(m_T^2, \xi, \delta_m)$
+in the fundamental-vector formulation) in which a graviton initial
+condition produces observable dark-photon conversion via the
+combination of Gertsenshtein~\cite{Gertsenshtein1962} graviton--photon
+mixing in a background magnetic field $B_0$ and the
+dark-photon kinetic mixing term $\delta_m F \cdot F_t$.
+
+The campaign returned a clean null: every run gave
+$P_{\max}(h_5 \to a_1) = \sin^2(\kappa B_0 t / 2) \approx 0.0612$ to
+$6.7 \times 10^{-6}$ relative precision, with the torsion (dark-photon)
+field amplitudes at numerical round-off. Extensive investigation
+(documented below and in issues \#257--\#262) traced this result to
+its correct physical origin: \emph{the null is the exact prediction of
+this specific Lagrangian}, a manifestation of Holdom's 1986 theorem
+that pure kinetic mixing of a photon with a massive dark photon is
+unobservable from a pure-photon initial condition. The
+276-run campaign result is not a solver bug.
+
+\subsection{Lagrangian}
+\label{subsec:dp-lagrangian}
+
+The fundamental-vector form of the Lagrangian (the cleaner of the two
+implementations; see~\S\ref{subsec:dp-cdt-vs-fv}) is
+\begin{equation}
+  \begin{aligned}
+    \mathcal{L}
+    &= \frac{1}{\kappa^2} R
+      - \tfrac{1}{4} F_{\mu\nu} F^{\mu\nu}
+      - \tfrac{1}{4} \xi\, F^{(t)}_{\mu\nu} F^{(t)\mu\nu} \\
+    &\quad{}
+      + \delta_m\, F_{\mu\nu} F^{(t)\mu\nu}
+      - \tfrac{1}{2} m_T^2\, t_\mu t^\mu ,
+  \end{aligned}
+  \label{eq:dp-lagrangian-fv}
+\end{equation}
+where $A_\mu$ is the Maxwell 4-potential with field strength
+$F = \dd A$, $T_\mu$ is the dark-photon 4-vector with field strength
+$F^{(t)} = \dd T$, $\xi$ is a dimensionless kinetic coefficient
+(canonical normalisation has $\xi = 1$), $\delta_m$ is the
+kinetic-mixing parameter, $m_T^2$ is the dark-photon Proca mass, and
+$\kappa^2 = 16\pi G$ is the gravitational coupling. A
+$B_0 \hat{x}$-directed background magnetic field is included via
+$\bar{A}_\mu = (0, 0, -B_0 z, 0)$.
+
+This Lagrangian matches the conventions used in
+\cite{Pospelov2008SecludedU1}, equation~(2):
+$\mathcal{L}_{\mathrm{SM}+U(1)'} \supset -\tfrac{1}{4} V_{\mu\nu}^2 +
+\tfrac{1}{2}\kappa V_{\mu\nu} F_{\mu\nu}^Y$, with the sign of the
+kinetic-mixing cross term \emph{positive}. The sign is conventional
+(the transformation $T \to -T$ absorbs a sign flip on $\delta_m$), so
+for observable-free dependence on $\delta_m$ the simulation result is
+invariant under $\delta_m \to -\delta_m$ --- verified symbolically
+in~\S\ref{subsec:dp-holdom-algebra} and numerically.
+
+\subsection{Two formulations: CDT and FV}
+\label{subsec:dp-cdt-vs-fv}
+
+The model is implemented in two distinct forms that, after the
+solver-side fix discussed in~\S\ref{subsec:dp-solver-fixes},
+give numerically identical results at all generic parameter points:
+
+\begin{description}
+  \item[CDT (rank-3 trace projection)]
+    \texttt{examples/torsion\_dark\_photon/theory.toml}. Uses the
+    xPert declaration \texttt{[torsion] perturbation\_name = "t"}
+    which linearises the full rank-3 PGT torsion tensor
+    $T^a{}_{bc}$ (24 independent components, 12 surviving the
+    plane-wave reduction along $\hat{z}$). The Lagrangian couples
+    only through the trace $T_\mu = T^\alpha{}_{\mu\alpha}$ and the
+    trace-only kinetic $F^{(t)}$ curl. The derived JSON has 18
+    dynamical fields with 3 algebraic constraint fields
+    ($t_6, t_{13}, t_{20}$) and a rank-deficient mass-matrix block
+    on the dynamical torsion components ($t_0, t_{15}, t_{22}$).
+  \item[FV (fundamental-vector)]
+    \texttt{examples/torsion\_dark\_photon\_fv/theory.toml}. Uses
+    \texttt{[[linearization.matter\_perturbations]]} to declare $T$
+    as a primitive 4-vector matter field, bypassing the rank-3
+    linearisation. The Proca mass is applied to the perturbation
+    $t_\mu$ (analogous to the photon-mass convention in
+    \texttt{gertsenshtein\_proca}). The derived JSON has 10 clean
+    dynamical fields, zero algebraic constraints, and a full-rank
+    mass matrix with no hidden gauge DOF.
+\end{description}
+
+Both are maintained as a cross-validation pair. At the linearised
+level, they describe the same physics: substituting
+$(t_0, t_{15}, t_{22}) = (1/3,\, -1/3,\, -1/3)\cdot\psi$ into the CDT
+equations reproduces the FV $t_1$ equation exactly (verified
+symbolically), with the identification $m_T^2 = -2\alpha$. However,
+the CDT JSON encodes the trace direction inside a rank-deficient
+24-component tensor structure, and the solver must correctly handle
+the rank deficiency to recover the clean physics --- this is the
+motivation for the fixes in~\S\ref{subsec:dp-solver-fixes}.
+
+\subsection{Holdom triviality of pure kinetic mixing}
+\label{subsec:dp-holdom-algebra}
+
+The central physics finding of this investigation is that the
+Lagrangian in~\eqref{eq:dp-lagrangian-fv} produces \emph{zero}
+observable photon to dark-photon conversion from a pure-photon
+plane-wave initial condition. The mathematical mechanism is an exact
+algebraic cancellation in the effective first-order evolution matrix.
+
+Working in the $(a_1, t_1)$ two-field block at wavenumber $k$, the
+derived mass and stiffness matrices are
+\begin{align}
+  M &= \begin{pmatrix} 1 & -2\delta_m \\ +2\delta_m & -\xi \end{pmatrix}
+  \label{eq:dp-M} \\
+  K &= \begin{pmatrix} -k^2 & +2\delta_m k^2 \\
+       -2\delta_m k^2 & m_T^2 + \xi k^2 \end{pmatrix}.
+  \label{eq:dp-K}
+\end{align}
+Note that $M$ is \emph{asymmetric}: the $(a_1, t_1)$ entry
+$-2\delta_m$ and the $(t_1, a_1)$ entry $+2\delta_m$ carry opposite
+signs. This is a consequence of the sign convention used by the
+Wolfram derivation pipeline (moving the $d^2_t$ cross-couplings from
+the RHS to the LHS with sign flip) and is the correct representation
+of the Lagrangian-derived equations of motion in this basis.
+
+The effective acceleration matrix $E = M^{-1} K$ determines the
+first-order evolution $\ddot{\phi} = E \phi$. Computing
+$E_{[t_1, a_1]}$ symbolically,
+\begin{align}
+  E_{[t_1, a_1]}
+  &= M^{-1}_{[t_1, a_1]} K_{[a_1, a_1]}
+     + M^{-1}_{[t_1, t_1]} K_{[t_1, a_1]} \nonumber\\
+  &= \frac{1}{4\delta_m^2 - \xi}\!\left[
+       -2\delta_m \cdot (-k^2)
+       + 1 \cdot (-2\delta_m k^2) \right] \nonumber\\
+  &= \frac{2\delta_m k^2 - 2\delta_m k^2}{4\delta_m^2 - \xi}
+   \;\equiv\; 0 .
+  \label{eq:dp-cancellation}
+\end{align}
+The two terms cancel \emph{identically} for any choice of
+$\delta_m$, $\xi$, $k$, and $m_T^2$. By contrast, the reverse
+coupling is non-zero:
+\begin{equation}
+  E_{[a_1, t_1]}
+  = \frac{2\delta_m m_T^2}{4\delta_m^2 - \xi}
+  \label{eq:dp-eff-at}
+\end{equation}
+which depends linearly on $\delta_m \cdot m_T^2$ --- i.e.\ the
+kinetic mixing produces an effective coupling only when combined
+with the Proca mass, exactly as predicted by canonical-basis
+analysis (see below).
+
+\paragraph{Physical interpretation.}
+The cancellation~\eqref{eq:dp-cancellation} says that the photon
+$a_1$ is an \emph{exact eigenmode} of the kinetic-mixed system at
+the field level. A plane-wave IC pure in $a_1$ is orthogonal to the
+dark-photon eigenmode, and no photon $\to$ dark-photon oscillation
+occurs. The reverse --- a plane-wave IC pure in $t_1$ --- has
+non-trivial projection onto the eigenmode that carries $a_1$
+content, and so $a_1$ is excited with substantial amplitude. This
+asymmetry has been verified numerically at parameters $(\kappa = 1,
+B_0 = 0.01, m_T^2 = 1, \xi = 1, \delta_m = 0.3)$:
+\begin{itemize}
+  \item $a_1$ plane-wave IC of amplitude $10^{-3}$:
+        $t_1$ peak remains at round-off ($\sim 10^{-17}$).
+  \item $t_1$ plane-wave IC of amplitude $10^{-3}$:
+        $a_1$ peak grows to $\sim 10^{-3}$ (100\,\% amplitude
+        transfer).
+\end{itemize}
+
+\paragraph{Relation to Holdom 1986.}
+This result is the symbolic implementation of Holdom's theorem that
+pure kinetic mixing between two $U(1)$ gauge fields is a field
+redefinition, and is observable only through coupling to matter
+fields (which acquire "millicharges" under the redefinition)
+\cite{Holdom1986}. Since our system contains no matter charged
+under $U(1)'$, the kinetic mixing is trivially removable by
+$T \to T + \delta_m A$ (with appropriate scaling). The solver's
+$M^{-1} K$ product performs this field redefinition symbolically via
+the matrix inversion, correctly arriving at the decoupled photon
+eigenmode.
+
+\paragraph{Relation to Raffelt--Stodolsky conversion.}
+The oscillation formula
+$P_{\gamma\to\gamma'} = \varepsilon^2 \sin^2(m_{A'}^2 L / 4 k)$
+derived in~\cite{An2013StellarConstraints} and elsewhere describes
+conversion of a photon \emph{propagating through a medium} (where
+the plasma frequency $\omega_p^2$ enters the denominator and breaks
+Holdom triviality) or of a photon \emph{produced by a matter source}
+(where the source emits in the matter-coupled basis, which after
+kinetic-mixing canonicalisation is a superposition of two mass
+eigenstates). Neither condition applies to our vacuum
+plane-wave IC, which is pumped directly into the $a_1$ field in the
+non-canonical basis, i.e.\ exactly the photon eigenmode.
+
+\subsection{Why the 276-run campaign null is correct}
+\label{subsec:dp-campaign-interpretation}
+
+The graviton--photon Gertsenshtein coupling in our Lagrangian enters
+through the $h_5$ equation as
+\begin{equation}
+  \ddot{h}_5 \supset \kappa^2 B_0 \partial_x a_1
+       - 2 \kappa^2 B_0 \delta_m \partial_x T_{\text{eff}},
+\end{equation}
+where $T_{\text{eff}}$ is the trace-projected dark photon combination.
+The first term is the standard Gertsenshtein source for the photon;
+the second term is a direct $B_0 \delta_m$-order coupling between
+the graviton and the dark photon.
+
+When the system is pumped with a pure graviton plane-wave IC, the
+induced photon $a_1(t)$ lives in the massless photon eigenmode ---
+precisely the mode that is decoupled from the dark photon by the
+cancellation~\eqref{eq:dp-cancellation}. The direct $h \to T$
+coupling (second term above) also passes through the same
+$E_{[T, h]} = 0$ cancellation mechanism, giving no dark-photon
+excitation even from the direct coupling. Both channels vanish
+independently, and the total conversion is exactly zero within
+numerical precision.
+
+Therefore the 276-run campaign null is \emph{the correct physical
+prediction of this Lagrangian}, not an artefact of the modal
+solver. For observable graviton $\to$ dark-photon conversion, the
+Lagrangian needs a modification that breaks the Holdom triviality
+(see~\S\ref{subsec:dp-what-works}).
+
+\subsection{Solver fixes applied during the investigation}
+\label{subsec:dp-solver-fixes}
+
+The investigation uncovered three interlocking modal-solver bugs
+that all had to be fixed together before the CDT and FV models
+could be shown to give identical results at generic parameters.
+They are fixed in commit \texttt{8ddc9cb} on the
+\texttt{feature/torsion-sweeps} branch.
+
+\begin{description}
+  \item[Hardcoded $M_{\mathrm{mat}}$ diagonal (issue \#258).]
+    \texttt{\_build\_evolution\_matrices} previously set
+    \texttt{M\_mat[:, fi, fi] = 1.0} unconditionally, ignoring the
+    \texttt{kinetic\_coefficient\_symbolic} field of each
+    dynamical equation. This caused the off-diagonal structure of
+    $M$ to be interpreted inconsistently for equations with non-unit
+    kinetic coefficients (e.g.\ $-\kappa^{-2}$ for gravitons,
+    $-\xi$ for Proca torsion). Fixed by reading the symbolic
+    kinetic coefficient via \texttt{evaluate\_coefficient} and
+    installing the resolved value on the diagonal.
+  \item[Silent \texttt{np.linalg.eigh} symmetrisation.]
+    The rank-deficient Schur elimination path used
+    \texttt{eigh} on $M$, assuming it was real symmetric. For the
+    kinetic-mixing-derived system, $M$ is asymmetric
+    (see~\eqref{eq:dp-M}), and \texttt{eigh} silently symmetrised
+    via $(M + M^{\mathsf{T}})/2$, producing a wrong eigenbasis.
+    Fixed by replacing with \texttt{np.linalg.svd} plus a
+    Schur-elimination step that uses left and right singular
+    vectors separately.
+  \item[\texttt{\_robust\_eigen\_inv} defensive helper (issue \#259).]
+    A fallback \texttt{pinv} path for ill-conditioned eigenvector
+    matrices was added earlier to mitigate the IC contamination
+    symptom of issue \#258. Once \#258 was root-caused, the
+    contamination disappeared and the helper was reverted to
+    \texttt{np.linalg.inv}, which is now well-conditioned for
+    physical systems.
+  \item[\texttt{normalize\_kinetic\_coefficients} CLI band-aid.]
+    Three call sites in \texttt{\_simulate.py} and
+    \texttt{\_sweep.py} invoked this function to divide each
+    equation by its LHS kinetic coefficient, producing a system
+    where the hardcoded \texttt{M\_mat[fi,fi] = 1.0} would happen
+    to be correct. Removed now that the diagonal is read properly.
+\end{description}
+
+\paragraph{Remaining known-issue: rank-deficient critical point
+(issue \#260).}
+At the specific parameter point $\delta_m = \sqrt{\xi}/2$ (where
+$\det M = -\xi + 4\delta_m^2 = 0$ exactly), the $(a_1, t_1)$
+block becomes rank-deficient. Both CDT and FV hit the SVD Schur
+path at this point and give answers that differ by a factor
+$\sim 20$ between the two formulations and from the neighbouring
+generic-parameter values. This is a measure-zero parameter
+pathology and does not affect the 276-run campaign conclusion,
+but it is tracked as an open issue for future cleanup. Sweeps
+should avoid tuning to this exact point.
+
+\subsection{What would produce observable conversion}
+\label{subsec:dp-what-works}
+
+To break the Holdom triviality in this model, the Lagrangian
+would need one of the following modifications, each motivated by a
+specific dark-photon physics mechanism.
+
+\begin{description}
+  \item[Explicit mass mixing $+\mu^2 A_\mu T^\mu$.]
+    An off-diagonal mass-matrix element between $A$ and $T$ makes
+    the photon and dark photon genuinely non-eigenmode. The
+    symbolic algebra gives
+    $E_{[t_1, a_1]} = -\mu^2 / (4\delta_m^2 - \xi)$ which is
+    non-zero, and observable conversion proceeds at $O(\mu^2)$.
+    This is the "direct mass portal" treatment, distinct from
+    kinetic mixing.
+  \item[Non-vacuum medium.] In a plasma or medium with effective
+    photon mass $\omega_p^2$, the standard Raffelt--Stodolsky
+    formula~\cite{An2013StellarConstraints} gives
+    $P_{\gamma\to\gamma'} = \varepsilon^2 \sin^2((m_{A'}^2 - \omega_p^2) L / 4k)$
+    with $\varepsilon \approx \delta_m$. The photon eigenmode
+    acquires an effective mass from the medium, breaking the
+    Holdom-trivial decoupling.
+  \item[Chern--Simons $\phi F \tilde{F}^{(t)}$.]
+    A parity-odd coupling between a pseudoscalar $\phi$ (axion-like)
+    and $F\tilde{F}^{(t)}$ produces mixing only in a non-trivial
+    background $\bar{F}$, analogous to the
+    Raffelt--Stodolsky~\cite{RaffeltStodolsky1988} axion-photon
+    mixing.
+  \item[Non-minimal gravitational coupling.] A dimension-6 operator
+    like $R_{\mu\nu\rho\sigma} F^{\mu\nu} F^{(t)\rho\sigma}$
+    couples the dark photon to the curvature tensor, giving a
+    graviton-mediated mixing that is non-trivial in the graviton
+    background set up by the GW wave itself. This is the
+    non-minimal torsion-EM coupling studied in
+    \cite{Itin2003} and \cite{Rubilar2003}.
+  \item[Dark-photon coupling to charged matter.] Adding a coupling
+    $\kappa e J_{\mu}^{\mathrm{EM}} T^\mu$ (dark photon couples to
+    the electromagnetic current) produces the standard
+    ``millicharge'' phenomenology of~\cite{Holdom1986}.
+\end{description}
+
+\subsection{Investigation history}
+\label{subsec:dp-history}
+
+The investigation that led to this documentation proceeded through
+several wrong turns and retractions, all of which are worth noting
+as they illustrate the subtlety of the physics:
+
+\begin{enumerate}
+  \item Initial (wrong) interpretation: the 276-run null was a
+        structural feature of the CDT rank-3 projection, with the
+        CDT and FV Lagrangians being "inequivalent at the
+        linearised level". \emph{Retracted}: a sympy-based
+        symbolic reduction showed they are exactly equivalent
+        under the gauge
+        $(t_0, t_{15}, t_{22}) = (1/3, -1/3, -1/3)\cdot \psi$.
+  \item Intermediate (wrong) claim: a factor-$1/3$ suppression in
+        the CDT couplings relative to FV. \emph{Retracted}: a
+        projection-normalisation error on my part during the hand
+        reduction. With the correct normalisation, the equations
+        match term-by-term.
+  \item Intermediate (wrong) claim: "FV gives 50/50 channel split"
+        at $\delta_m = 0.5$, so the expected physics is
+        Raffelt--Stodolsky-like oscillation. \emph{Retracted}: the
+        50/50 split was itself a rank-deficient-critical-point
+        pathology (issue~\#260); at neighbouring parameters both
+        models give pure Gertsenshtein with no dark-photon channel.
+  \item Intermediate (wrong) suspicion: the Wolfram-derived
+        asymmetric $M_{\mathrm{mat}}$ is a sign bug in the
+        derivation pipeline (issue~\#261). \emph{Retracted}: the
+        asymmetry is the correct representation of the
+        Lagrangian-derived equations in the non-canonical basis.
+        It encodes the Holdom-trivial structure precisely: the
+        photon eigenmode is pure~$A$ (no~$T$ admixture), which is
+        faithfully captured by the $E_{[t, a]} = 0$ cancellation.
+  \item Final (correct) picture: the null is real physics. The
+        Lagrangian describes a pure kinetic-mixing dark photon
+        with Proca mass, which by Holdom's theorem produces no
+        observable photon $\to$ dark photon conversion in vacuum
+        from a pure-photon IC. To see conversion, the Lagrangian
+        needs an explicit mass-mixing term or one of the other
+        breakers in~\S\ref{subsec:dp-what-works}.
+\end{enumerate}
+
+\subsection{References and GitHub issues}
+\label{subsec:dp-references}
+
+Key literature:
+\begin{itemize}
+  \item B. Holdom, \textit{Two $U(1)$'s and $\varepsilon$ charge
+        shifts}, Phys.\ Lett.\ B~\textbf{166} (1986) 196.
+        Establishes the field-redefinition triviality of pure
+        kinetic mixing.
+  \item M. Pospelov, \textit{Secluded $U(1)$ below the weak scale},
+        \texttt{arXiv:0811.1030}. Canonical
+        Lagrangian~\eqref{eq:dp-lagrangian-fv} with
+        positive-sign kinetic-mixing convention.
+  \item H. An, M. Pospelov, J. Pradler, \textit{New stellar
+        constraints on dark photons},
+        \texttt{arXiv:1302.3884}. Eq.~(2.4)--(2.6): vacuum and
+        in-medium conversion formulas.
+  \item J. Redondo, \textit{Helioscope bounds on hidden sector
+        photons}, \texttt{arXiv:0801.1527}.
+        Explicit $P_{\gamma\to\gamma'}$ formula with plasma
+        frequency.
+  \item M. Fabbrichesi, E. Gabrielli, G. Lanfranchi,
+        \textit{The Dark Photon}, \texttt{arXiv:2005.01515}.
+        Comprehensive review.
+  \item A. Caputo, A. Millar, C. O'Hare, E. Vitagliano,
+        \textit{Dark photon limits: a cookbook},
+        \texttt{arXiv:2105.04565}. Experimental limits and
+        oscillation formulae.
+  \item G. Raffelt, L. Stodolsky,
+        \textit{Mixing of the photon with low-mass particles},
+        Phys.\ Rev.\ D~\textbf{37} (1988) 1237.
+        Original axion-photon mixing in external $B_0$.
+\end{itemize}
+
+Solver-fix and investigation history is tracked in the following
+GitHub issues:
+
+\begin{itemize}
+  \item \textbf{\#258 (closed)}: hardcoded $M_{\mathrm{mat}}$
+        diagonal --- root fix applied in 8ddc9cb.
+  \item \textbf{\#259 (closed)}: IC projection $\operatorname{cond}(V)$
+        amplification --- root-caused by \#258.
+  \item \textbf{\#260 (open)}: CDT vs FV factor-20 discrepancy at
+        $\delta_m = \sqrt{\xi}/2$ critical point.
+  \item \textbf{\#261 (open)}: asymmetric $M_{\mathrm{mat}}$
+        structural investigation --- not a bug, but documentation
+        and test coverage needed.
+  \item \textbf{\#262 (open)}: this documentation request.
+  \item \textbf{\#257 (open)}: rank-deficient eigenbasis --- kept
+        open for future genuinely rank-deficient systems beyond
+        dark photon.
+\end{itemize}
+
+% -- End of section --

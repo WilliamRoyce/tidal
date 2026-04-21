@@ -62,7 +62,7 @@ echo ""
 # Total Hamiltonian conservation is NOT a valid check for this constrained gauge theory.
 # Diverged (ghost/unstable) runs are identified by P_max >> P_Gertsenshtein or
 # run_status != "success" in the output CSV.
-uv run tidal sweep "${SPEC}" \
+tidal sweep "${SPEC}" \
   --sweep "alpha=0.1:2.0:8" \
   --sweep "deltam=-0.3:0.3:7" \
   --measure peak_conversion \
@@ -71,11 +71,11 @@ uv run tidal sweep "${SPEC}" \
   --ic plane-wave --ic-wavevector "${K0}" --ic-amplitude 0.1 --ic-component h_5 \
   --t-end "${T_END}" \
   --param "kappa=${KAPPA}" --param "B0=${B0}" --param "xi=${XI}" \
-  --parallel 4 --no-require-stable --resume \
+  --parallel "${TIDAL_PARALLEL:-4}" --resume \
   --output "${OUTPUT}"
-# --no-require-stable: pre-simulation mass check flags R̃ tensor/axial eigenvalues
-# as tachyonic, but these have zero physical coupling. The modal solver's
-# _suppress_tachyonic_noise() (#222) handles them during evolution.
+# Rank-deficient mass matrix from the trace projection is handled by
+# the unified _build_evolution_matrices (#256); no --no-require-stable
+# bypass needed. TIDAL_PARALLEL env override: default 4 local, 112 sapphire.
 
 echo ""
 echo "--- Generating plots ---"
@@ -83,13 +83,13 @@ echo "--- Generating plots ---"
 # 2D heatmap: P_max over (alpha, deltam) parameter plane
 # Colours show amplification; dashed contour at P = sin^2(0.25) ~ 0.0617
 # shows the Gertsenshtein baseline (amplification boundary).
-uv run tidal plot "${OUTPUT}" --type sweep \
+tidal plot "${OUTPUT}" --type sweep \
   --metric P_max --log-scale \
   --title "Torsion amplification map: P_max(alpha, deltam) at xi=${XI}" \
   --output "${OUTPUT}/sweep_2d.png" --quiet
 
 # C₀ = P/B₀² analysis (primary metric per project_sweep_measurement_strategy.md)
-uv run python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
+python "${SCRIPT_DIR}/analyze_sweep.py" "${OUTPUT}"
 
 echo ""
 echo "=== Sweep complete ==="

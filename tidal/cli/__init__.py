@@ -27,16 +27,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     """Build the top-level argument parser with subcommands."""
     # Use rich-argparse for colored help if available, fallback to default
     try:
-        from rich_argparse import RichHelpFormatter
+        from rich_argparse import RichHelpFormatter  # type: ignore[import-untyped]
 
-        formatter = RichHelpFormatter
+        formatter: type[argparse.HelpFormatter] = RichHelpFormatter  # type: ignore[reportUnknownVariableType]
     except ImportError:
         formatter = argparse.HelpFormatter
 
     parser = argparse.ArgumentParser(
         prog="tidal",
         description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, plot, sweep, sample, list.",
-        formatter_class=formatter,
+        formatter_class=formatter,  # type: ignore[reportArgumentType]
     )
     parser.add_argument(
         "--version",
@@ -410,6 +410,22 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Ref: Burns et al. (2020), Phys. Rev. Research 2:023068."
         ),
     )
+    sim_parser.add_argument(
+        "--perturbative-order",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Iterative perturbative expansion order for theories with a "
+            "[perturbation] section (v6 plan). N=0 runs the base theory "
+            "only; N=1 adds the closed-form Duhamel correction using Pass 0 "
+            "eigendata. Default: 1 when the JSON metadata includes a "
+            "'perturbation' block (emitted by ExportJSON.wl when "
+            "[perturbation] is configured in theory.toml), 0 otherwise. "
+            "Requires the modal solver (--scheme modal or auto). "
+            "See docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md."
+        ),
+    )
     # Output
     sim_parser.add_argument(
         "--output",
@@ -695,8 +711,13 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "sweep-parallel",
             "sweep-tornado",
             "sweep-scatter",
+            "sweep-grouped",
+            "sweep-histogram",
+            "sweep-divergence",
+            "campaign",
             "convergence",
             "replicate-convergence",
+            "corner",
         ],
         help="Plot type to generate",
     )
@@ -795,6 +816,29 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Use logarithmic y-axis for 1D sweep plots",
     )
     plot_parser.add_argument(
+        "--log-x",
+        dest="log_x",
+        action="store_true",
+        help="Use logarithmic x-axis for 1D sweep plots",
+    )
+    plot_parser.add_argument(
+        "--x-param",
+        dest="x_param",
+        default=None,
+        metavar="PARAM",
+        help="Swept parameter for the x-axis (required for --type sweep-grouped)",
+    )
+    plot_parser.add_argument(
+        "--group-by",
+        dest="group_by",
+        default=None,
+        metavar="PARAM",
+        help=(
+            "Swept parameter to group 1D lines by (required for --type sweep-grouped). "
+            "Produces one connected line per unique value of the grouping parameter."
+        ),
+    )
+    plot_parser.add_argument(
         "--hline",
         action="append",
         default=[],
@@ -820,12 +864,81 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--metric",
         default=None,
         metavar="NAME[,NAME,...]",
-        help="Metric column(s) for sweep plots (e.g. P_max, L_mix, max_energy_error)",
+        help=(
+            "Metric column(s) for sweep plots (e.g. P_max, L_mix, max_energy_error). "
+            "Derived metrics A, log10_A, C0, P_EM, P_valid are auto-computed "
+            "from --baseline-formula when requested."
+        ),
+    )
+    plot_parser.add_argument(
+        "--baseline-formula",
+        dest="baseline_formula",
+        default=None,
+        metavar="EXPR",
+        help=(
+            "Analytical baseline formula for derived metrics (A, C0, log10_A). "
+            "Default: 'sin(kappa * B0 * t_end / 2)**2' (Gertsenshtein). "
+            "Uses swept/fixed param names and sim settings as variables."
+        ),
+    )
+    plot_parser.add_argument(
+        "--baseline-sweep",
+        dest="baseline_sweep",
+        default=None,
+        metavar="DIR",
+        help=(
+            "Path to baseline sweep directory for paired amplification. "
+            "Computes A_paired = P(signal)/P(baseline) by matching "
+            "parameter values. Use with --metric A_paired."
+        ),
     )
     plot_parser.add_argument(
         "--title",
         default=None,
         help="Custom figure title",
+    )
+    # Scatter matrix options
+    plot_parser.add_argument(
+        "--params",
+        default=None,
+        metavar="P1,P2,...",
+        help="Subset of swept parameters for sweep-scatter (comma-separated)",
+    )
+    plot_parser.add_argument(
+        "--log-diagonal",
+        dest="log_diagonal",
+        action="store_true",
+        help="Use log y-axis on scatter matrix diagonal panels",
+    )
+    # 1D sweep options
+    plot_parser.add_argument(
+        "--scatter",
+        action="store_true",
+        help="Use scatter plot instead of line plot for 1D sweep",
+    )
+    plot_parser.add_argument(
+        "--annotate-extremes",
+        dest="annotate_extremes",
+        action="store_true",
+        help="Annotate max/min values with arrows on 1D sweep",
+    )
+    # Axis transform options
+    plot_parser.add_argument(
+        "--arctan-axes",
+        dest="arctan_axes",
+        action="store_true",
+        help=(
+            "Apply arctan transform to parameter axes (compresses ±∞ to bounded range). "
+            "Tick labels show actual parameter values."
+        ),
+    )
+    # 2D heatmap options
+    plot_parser.add_argument(
+        "--clamp-color",
+        dest="clamp_color",
+        default=None,
+        metavar="MIN:MAX",
+        help="Clamp colorbar range (e.g. --clamp-color=-8:5)",
     )
     # Metadata
     plot_parser.add_argument(
@@ -846,6 +959,22 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "-q",
         action="store_true",
         help="Suppress progress messages",
+    )
+    # Campaign-specific options
+    plot_parser.add_argument(
+        "--layout",
+        default=None,
+        metavar="RxC",
+        help="Grid layout for campaign plots (e.g. 3x3). Auto-detected if omitted.",
+    )
+    plot_parser.add_argument(
+        "--classify",
+        default=None,
+        metavar="RULE",
+        help=(
+            "Classify campaign subplots (e.g. 'active:A>1.01'). "
+            "Active panels get warm background, null panels get grey."
+        ),
     )
 
     # --- sweep ---
@@ -1137,7 +1266,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         type=int,
         default=None,
         metavar="N",
-        help="Number of parallel workers (default: sequential)",
+        help=(
+            "Number of parallel worker processes (default: sequential). "
+            "Always set this on HPC — sequential default costs 20-50x wall time. "
+            "Rule of thumb on a 112-core sapphire node: "
+            "< 5 s/point -> min(N,32) (pool startup ~40%% of run time above P=32); "
+            "5-30 s/point -> min(N,56); "
+            "> 30 s/point -> min(N,112) (startup <1%%, use the full node). "
+            "Super-linear speedup at P in {8,16} from BLAS cache effects on short runs. "
+            "Run scripts/hpc_scaling_sweep.sh to profile a new workload."
+        ),
     )
     sweep_parser.add_argument(
         "--force-large-sweep",
@@ -1276,10 +1414,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- analyze ---
     analyze_parser = sub.add_parser(
         "analyze",
-        help="Post-hoc analysis of sweep results (sensitivity, critical field)",
+        help="Post-hoc analysis of sweep or inference results",
         epilog="""Examples:
   tidal analyze sweep_results/ --sensitivity sobol --metric P_max
   tidal analyze sweep_results/ --critical-field B0 --metric P_final --threshold 0.99
+  tidal analyze ns_output/ --inference --importance
 """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -1347,6 +1486,26 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         type=float,
         help="Reference B value for analytical formula (required with --reference-formula)",
     )
+    # Inference analysis
+    analyze_parser.add_argument(
+        "--inference",
+        action="store_true",
+        default=False,
+        help="Treat data as nested sampling output (loads InferenceResult)",
+    )
+    analyze_parser.add_argument(
+        "--importance",
+        action="store_true",
+        default=False,
+        help="Compute parameter importance via KL divergence (requires --inference)",
+    )
+    analyze_parser.add_argument(
+        "--n-bootstrap",
+        type=int,
+        default=100,
+        dest="n_bootstrap_importance",
+        help="Bootstrap samples for importance uncertainties (default: 100)",
+    )
 
     # --- sample (Bayesian inference) ---
     sample_parser = sub.add_parser(
@@ -1356,7 +1515,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         description=(
             "Run Bayesian parameter estimation using simulation-based "
             "likelihood evaluation.  Supports simple Monte Carlo and "
-            "nested sampling (dynesty/PolyChord) with anesthetic visualization."
+            "nested sampling (PolyChord) with anesthetic visualization."
         ),
         epilog=(
             "Examples:\n"
@@ -1404,8 +1563,20 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="SPEC",
         help=(
             "Likelihood specification: METRIC:TYPE[:ARGS]. "
-            "Types: maximize, gaussian:TARGET:SIGMA, threshold:MIN_VALUE. "
+            "Types: maximize, minimize, extremize, gaussian:TARGET:SIGMA, "
+            "threshold:MIN_VALUE. "
             "Example: --likelihood 'P_max:maximize'"
+        ),
+    )
+    sample_parser.add_argument(
+        "--baseline-formula",
+        default=None,
+        metavar="FORMULA",
+        dest="baseline_formula",
+        help=(
+            "Baseline formula for extremize likelihood. "
+            "Evaluated per-point with current parameter values. "
+            'Example: --baseline-formula "sin(kappa * B0 * t_end / 2)**2"'
         ),
     )
     # Sampling method
@@ -1417,9 +1588,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sample_parser.add_argument(
         "--sampler",
-        choices=["dynesty", "polychord"],
-        default="dynesty",
-        help="Nested sampling backend (default: dynesty)",
+        choices=["polychord"],
+        default="polychord",
+        help="Nested sampling backend (only polychord supported)",
     )
     sample_parser.add_argument(
         "--n-samples",
@@ -1436,16 +1607,39 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Number of live points for nested sampling (default: 100)",
     )
     sample_parser.add_argument(
-        "--dlogz",
-        type=float,
-        default=0.01,
-        help="Evidence tolerance for nested sampling (default: 0.01)",
+        "--num-repeats",
+        type=int,
+        default=None,
+        dest="num_repeats",
+        metavar="N",
+        help="PolyChord slice-sampling repeats per dim (default: 5*ndim)",
     )
     sample_parser.add_argument(
-        "--dynamic",
+        "--precision-criterion",
+        type=float,
+        default=None,
+        dest="precision_criterion",
+        help="PolyChord evidence precision stopping criterion (default: 0.001)",
+    )
+    sample_parser.add_argument(
+        "--likelihood-backend",
+        choices=("memory", "disk"),
+        default="memory",
+        dest="likelihood_backend",
+        help=(
+            "Per-evaluation pipeline: 'memory' skips the simulate/measure disk "
+            "round-trip (default, ~2x faster for nested sampling — see #269); "
+            "'disk' preserves the legacy behaviour for bisectability."
+        ),
+    )
+    sample_parser.add_argument(
+        "--no-clustering",
         action="store_true",
-        default=False,
-        help="Use dynamic nested sampling (dynesty only)",
+        dest="no_clustering",
+        help=(
+            "Disable PolyChord's mode-detection clustering.  Safe for "
+            "unimodal posteriors; saves ~5-10%% of likelihood evaluations."
+        ),
     )
     sample_parser.add_argument(
         "--seed",
@@ -1532,22 +1726,22 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sample_parser.add_argument("--rtol", type=float, default=DEFAULT_RTOL)
     sample_parser.add_argument("--atol", type=float, default=DEFAULT_ATOL)
     sample_parser.add_argument(
-        "--method-solver", type=str, default=None, dest="method_solver"
+        "--method-solver", type=str, default=None, dest="method_solver",
     )
     sample_parser.add_argument("--max-step", type=float, default=None)
     sample_parser.add_argument("--snapshots", type=float, default=None)
     sample_parser.add_argument("--fd-order", type=int, choices=[2, 4, 6], default=4)
     sample_parser.add_argument(
-        "--leapfrog-order", type=int, choices=[2, 4], default=None
+        "--leapfrog-order", type=int, choices=[2, 4], default=None,
     )
     sample_parser.add_argument(
-        "--spectral", action=argparse.BooleanOptionalAction, default=None
+        "--spectral", action=argparse.BooleanOptionalAction, default=None,
     )
     sample_parser.add_argument(
-        "--mode", choices=["evolve", "constraint"], default="evolve"
+        "--mode", choices=["evolve", "constraint"], default="evolve",
     )
     sample_parser.add_argument(
-        "--allow-inconsistent-ic", action="store_true", default=False
+        "--allow-inconsistent-ic", action="store_true", default=False,
     )
     # Execution
     sample_parser.add_argument(
@@ -1576,6 +1770,31 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=False,
         help="Generate trace plot",
     )
+    sample_parser.add_argument(
+        "--importance",
+        action="store_true",
+        default=False,
+        help="Generate parameter importance bar chart",
+    )
+    # Analysis
+    sample_parser.add_argument(
+        "--analyze",
+        action="store_true",
+        default=False,
+        help="Run parameter importance analysis after sampling (nested only)",
+    )
+    sample_parser.add_argument(
+        "--nlive-auto",
+        nargs="?",
+        const="standard",
+        default=None,
+        choices=["fast", "standard", "production"],
+        metavar="PRECISION",
+        help=(
+            "Auto-scale nlive based on number of parameters. "
+            "Overrides --nlive. Levels: fast, standard (default), production"
+        ),
+    )
     # Resume fields needed by _build_sim_args
     sample_parser.add_argument("--resume", default=None)
     sample_parser.add_argument("--snapshot", default=None)
@@ -1594,7 +1813,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
 
     # Shell completion (optional dependency: shtab)
     try:
-        import shtab
+        import shtab  # type: ignore[import-untyped]
 
         shtab.add_argument_to(parser)
     except ImportError:

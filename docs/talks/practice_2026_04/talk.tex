@@ -1,0 +1,59 @@
+\documentclass[aspectratio=169,xcolor=dvipsnames]{beamer}
+
+% Cambridge house-style theme (dropped in under theme/). TEXINPUTS in the
+% Makefile adds theme/ to the search path so \usetheme{cambridge} resolves.
+\usetheme{cambridge}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{booktabs}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,decorations.pathmorphing}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+
+% \todo{...} placeholder boxes for unfinished content.
+\usepackage[colorinlistoftodos,textsize=scriptsize]{todonotes}
+\newcommand{\placeholder}[1]{\todo[inline,color=yellow!40]{#1}}
+
+\setbeamertemplate{frame numbering}[fraction]
+\setbeamertemplate{navigation symbols}{}
+
+% ---- Metadata ---------------------------------------------------------------
+\title[Torsion and the Gertsenshtein effect]%
+      {Does torsion modify the Gertsenshtein effect?}
+\subtitle{A symbolic-to-numerical study with TIDAL}
+\author{William Royce}
+\institute{Cavendish Astrophysics \\ University of Cambridge}
+\date{Practice talk --- \today}
+
+% ---- Main deck --------------------------------------------------------------
+\begin{document}
+
+\begin{frame}[plain]
+  \titlepage
+  \vspace{-1em}
+  \centering\small\itshape Practice talk --- feedback on delivery welcome.
+\end{frame}
+
+\input{sections/01_motivation.tex}
+\input{sections/02_gertsenshtein.tex}
+\input{sections/03_literature.tex}
+\input{sections/04_pgt_a.tex}
+\input{sections/05_pgt_b.tex}
+\input{sections/06_question.tex}
+\input{sections/07_tidal_overview.tex}
+\input{sections/08_tidal_symbolic.tex}
+\input{sections/09_tidal_numerical.tex}
+\input{sections/10_tidal_sweeps.tex}
+\input{sections/11_results.tex}
+\input{sections/12_outlook.tex}
+\input{sections/13_summary.tex}
+
+% ---- Backup slides ---------------------------------------------------------
+\appendix
+\input{sections/backup.tex}
+
+\end{document}

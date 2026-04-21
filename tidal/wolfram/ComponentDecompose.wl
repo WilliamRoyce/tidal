@@ -467,23 +467,48 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
     e = ToValues[e]
   ];
 
-  (* NOTE: Supervisor's EuclideanSplinter calls ToValues BEFORE             *)
-  (* TraceBasisDummy, but that only helps for rank>0 expressions where      *)
-  (* ComponentArray pre-resolves free indices. For scalar expressions       *)
-  (* (canonical Lagrangian), ALL indices are contracted — ToValues cannot   *)
-  (* resolve contracted pairs (only TraceBasisDummy can enumerate them).    *)
-  (* Tested: Expand+ToValues×2 before TraceBasisDummy → no improvement     *)
-  (* (42.7s unchanged). TraceBasisDummy's O(dim^{2K}) cost is fundamental  *)
-  (* for K~4 contracted pairs per EH Ricci scalar product term.            *)
+  (* Evaluate epsilon (Levi-Civita) tensor to numeric ±1 BEFORE            *)
+  (* TraceBasisDummy.  At this point ToBasis has converted abstract indices *)
+  (* to basis tuples {i, -chart}, so EvaluateEpsilonComponents can resolve *)
+  (* ε to ±1.  Without this, each epsilon-containing term carries 4 extra  *)
+  (* contracted dummy pairs, inflating TraceBasisDummy cost from O(dim^8)  *)
+  (* to O(dim^16) per term — a 256× slowdown that causes OOM for          *)
+  (* parity-odd Lagrangians.  See issue #246.                              *)
+  e = EvaluateEpsilonComponents[e, chart];
+  e = Expand[e];
 
-  (* TraceBasisDummy: per-term to prevent O(dim^{2K}) explosion.         *)
-  (* The full expression may have K=45 contracted dummy pairs across all *)
-  (* additive terms, but each individual term has only ~3 pairs.         *)
-  (* Per-term: O(N × dim^6) instead of O(dim^90). Same pattern as       *)
-  (* BatchedTraceBasisDummyWithMetric (line 1195).                       *)
-  If[Head[e] === Plus,
-    e = Total[TraceBasisDummy /@ List @@ e],
-    e = TraceBasisDummy[e]
+  (* TraceBasisDummy: per-term, with sequential per-pair tracing for     *)
+  (* high-K terms.  TraceBasisDummy[expr] traces ALL pairs at once:     *)
+  (* O(4^{2K}).  For K>4 (parity-odd epsilon terms), this is too slow.  *)
+  (* Instead: TraceBasisDummy[expr, {idx, basis}] traces ONE pair at a  *)
+  (* time (O(4) per call), with Expand+ToValues between calls to        *)
+  (* collapse zeros early (epsilon antisymmetry, diagonal metric).      *)
+  (* Effective cost: O(4^K × branch_factor) where branch_factor ≈ 1-2  *)
+  (* due to early elimination.  See #246.                                *)
+  Module[{traceOneTerm},
+    traceOneTerm[term_] := Module[{dummies, result = term},
+      (* Find basis dummy symbols: abstract symbols in {sym, ±chart} form *)
+      dummies = Cases[result, {s_Symbol, chart} /; AbstractIndexQ[s] :> s,
+        {0, Infinity}] // DeleteDuplicates;
+      If[Length[dummies] <= 4,
+        (* Low K: standard TraceBasisDummy (fast) *)
+        TraceBasisDummy[result],
+        (* High K: sequential per-pair tracing with intermediate cleanup *)
+        Do[
+          result = TraceBasisDummy[result, {d, chart}];
+          result = Expand[result];
+          result = EvaluateEpsilonComponents[result, chart];
+          result = ToValues[result];
+          result = Expand[result],
+          {d, dummies}
+        ];
+        result
+      ]
+    ];
+    If[Head[e] === Plus,
+      e = Total[traceOneTerm /@ List @@ e],
+      e = traceOneTerm[e]
+    ];
   ];
   e = Expand[e];
 
@@ -861,15 +886,32 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       componentEq = eom
     ];
 
-    (* Separate metric contractions before ToBasis *)
-    componentEq = SeparateFieldMetrics[componentEq, chart];
+    (* Extend ValidateIndices suppression to the pre-loop scalar EOM pipeline.  *)
+    (* (F·F)^n Euler-Heisenberg terms produce Scalar wrapper contents where    *)
+    (* ExpandScalarWrappers reuses dummy index names across Power factors —    *)
+    (* false positives that ToBasis resolves immediately.                      *)
+    (* Off[::repeated] suppresses only the Message; ValidateIndices=(True &)  *)
+    (* prevents the accompanying Throw[Null] from killing the derivation.     *)
+    Off[Validate::repeated];
+    Module[{savedValidateScalar = xAct`xTensor`Private`ValidateIndices},
+      Unprotect[xAct`xTensor`Private`ValidateIndices];
+      xAct`xTensor`Private`ValidateIndices = (True &);
 
-    (* Expand Scalar[] wrappers before staggered ToBasis *)
-    componentEq = ExpandScalarWrappers[componentEq, chart, computeChristoffels =!= False];
+      (* Separate metric contractions before ToBasis *)
+      componentEq = SeparateFieldMetrics[componentEq, chart];
 
-    (* Staggered ToBasis pipeline (replaces old ToBasis + TBD + steps 4-7) *)
-    componentEq = StaggeredToBasis[componentEq, chart, computeChristoffels =!= False];
-    componentEq = Expand[componentEq];
+      (* Expand Scalar[] wrappers before staggered ToBasis *)
+      componentEq = ExpandScalarWrappers[componentEq, chart, computeChristoffels =!= False];
+
+      (* Staggered ToBasis pipeline (replaces old ToBasis + TBD + steps 4-7) *)
+      (* Epsilon evaluation now happens INSIDE StaggeredToBasis, before        *)
+      (* TraceBasisDummy, to prevent O(dim^16) dummy pair explosion. #246      *)
+      componentEq = StaggeredToBasis[componentEq, chart, computeChristoffels =!= False];
+      componentEq = Expand[componentEq];
+
+      xAct`xTensor`Private`ValidateIndices = savedValidateScalar;
+      Protect[xAct`xTensor`Private`ValidateIndices]
+    ];
 
     (* Background field evaluation — not handled by MetricCompute/ToValues *)
     If[backgroundFieldRules =!= {},
@@ -981,19 +1023,31 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          causing index collisions. Let ExpandScalarWrappers run per-component
          inside ExtractTensorComponent (step 1.3), AFTER free indices are
          fixed to specific basis values. *)
-      If[!FreeQ[eomSep, Scalar],
-        (* Check if expression has Christoffel symbols from R̃ decomposition *)
-        Module[{hasTorsionScalars},
-          hasTorsionScalars = !FreeQ[eomSep, Scalar[x_ /; !FreeQ[x, _?CovDQ]]];
-          If[!hasTorsionScalars,
-            (* Safe to hoist: standard theory without CD inside Scalar *)
-            Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
-            eomSep = ExpandScalarWrappers[eomSep, chart, computeChristoffels];
-            Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]],
-            (* Torsion theory: skip hoisting, let per-component expansion handle it *)
-            Print["  Scalar[] wrappers detected with CD operators — expanding per-component"]
+      (* Extend ValidateIndices suppression to the hoisted call.               *)
+      (* (F·F)^n Euler-Heisenberg terms have no CDs in Scalar contents        *)
+      (* (hasTorsionScalars = False), so the hoist fires. ExpandScalarWrappers *)
+      (* then encounters repeated dummy index names — false positives.         *)
+      (* ValidateIndices=(True &) prevents Validate::repeated+Throw[Null].    *)
+      Off[Validate::repeated];
+      Module[{savedValidateHoist = xAct`xTensor`Private`ValidateIndices},
+        Unprotect[xAct`xTensor`Private`ValidateIndices];
+        xAct`xTensor`Private`ValidateIndices = (True &);
+        If[!FreeQ[eomSep, Scalar],
+          (* Check if expression has Christoffel symbols from R̃ decomposition *)
+          Module[{hasTorsionScalars},
+            hasTorsionScalars = !FreeQ[eomSep, Scalar[x_ /; !FreeQ[x, _?CovDQ]]];
+            If[!hasTorsionScalars,
+              (* Safe to hoist: standard theory without CD inside Scalar *)
+              Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
+              eomSep = ExpandScalarWrappers[eomSep, chart, computeChristoffels];
+              Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]],
+              (* Torsion theory: skip hoisting, let per-component expansion handle it *)
+              Print["  Scalar[] wrappers detected with CD operators — expanding per-component"]
+            ]
           ]
-        ]
+        ];
+        xAct`xTensor`Private`ValidateIndices = savedValidateHoist;
+        Protect[xAct`xTensor`Private`ValidateIndices]
       ];
 
       (* Suppress Validate::repeated AND its Throw through the component     *)
@@ -1911,6 +1965,18 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   (* Separate metric contractions before ToBasis *)
   (* Ensures all field tensor indices are in canonical (covariant) form *)
   componentExpr = SeparateFieldMetrics[componentExpr, chart];
+
+  (* Apply CD shorthand rules (CD[-a][T[...]] → CD1T[-a,...]) so that      *)
+  (* pre-computed ComponentValues can be resolved by ToValues in O(1)       *)
+  (* inside StaggeredToBasis.  Without this, raw CD[T] expressions from    *)
+  (* the contortion expansion carry 4+ extra contracted dummy pairs,       *)
+  (* inflating TraceBasisDummy cost by O(dim^8) per term.  See #246.       *)
+  (* NOTE: The top-level Lagrangian already has CD shorthands applied      *)
+  (* (_derive.py line 4075), but sector splitting + Expand can reintroduce *)
+  (* raw CD[T] forms that weren't in the pre-split expression.             *)
+  If[ListQ[Global`$CDShorthandRules] && Length[Global`$CDShorthandRules] > 0,
+    Do[componentExpr = componentExpr /. rule, {rule, Global`$CDShorthandRules}]
+  ];
 
   (* Step 2: Staggered ToBasis + ToValues + TraceBasisDummy                *)
   (* Ref: supervisor's EuclideanSplinter (commit 4a89164).                 *)

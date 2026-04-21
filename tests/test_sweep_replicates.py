@@ -80,7 +80,7 @@ class TestExpandReplicates:
     def test_basic_expansion(self) -> None:
         plans = [_make_plan()]
         expanded = _expand_replicates(
-            plans, n_replicates=3, base_seed=42, param_noise={}
+            plans, n_replicates=3, base_seed=42, param_noise={},
         )
         assert len(expanded) == 3
         for i, rp in enumerate(expanded):
@@ -99,7 +99,7 @@ class TestExpandReplicates:
         plans[1]["run_dir"] = Path("/tmp/test/g0_2")
         plans[1]["index"] = 1
         expanded = _expand_replicates(
-            plans, n_replicates=2, base_seed=0, param_noise={}
+            plans, n_replicates=2, base_seed=0, param_noise={},
         )
         assert len(expanded) == 4
         # First two should be replicates of point 1
@@ -126,7 +126,7 @@ class TestExpandReplicates:
             p["subdir"] = f"g0_{int(p['swept_vals']['g0'])}"
             p["run_dir"] = Path(f"/tmp/test/{p['subdir']}")
         expanded = _expand_replicates(
-            plans, n_replicates=2, base_seed=10, param_noise={}
+            plans, n_replicates=2, base_seed=10, param_noise={},
         )
         indices = [rp["index"] for rp in expanded]
         assert indices == list(range(6))
@@ -143,7 +143,7 @@ class TestParamNoise:
     def test_noise_applied(self) -> None:
         plans = [_make_plan({"g0": 1.0}, {"g0": 1.0})]
         expanded = _expand_replicates(
-            plans, n_replicates=5, base_seed=42, param_noise={"g0": 0.1}
+            plans, n_replicates=5, base_seed=42, param_noise={"g0": 0.1},
         )
         # Each replicate should have a different g0 value
         g0_vals = [rp["swept_vals"]["g0"] for rp in expanded]
@@ -156,7 +156,7 @@ class TestParamNoise:
     def test_nominal_vals_stored(self) -> None:
         plans = [_make_plan({"g0": 1.0}, {"g0": 1.0})]
         expanded = _expand_replicates(
-            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1}
+            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1},
         )
         for rp in expanded:
             assert rp["nominal_vals"] == {"g0": 1.0}
@@ -164,10 +164,10 @@ class TestParamNoise:
     def test_noise_deterministic(self) -> None:
         plans = [_make_plan({"g0": 1.0}, {"g0": 1.0})]
         exp1 = _expand_replicates(
-            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1}
+            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1},
         )
         exp2 = _expand_replicates(
-            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1}
+            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1},
         )
         for a, b in zip(exp1, exp2, strict=True):
             assert a["swept_vals"]["g0"] == b["swept_vals"]["g0"]
@@ -175,7 +175,7 @@ class TestParamNoise:
     def test_noise_not_applied_when_empty(self) -> None:
         plans = [_make_plan({"g0": 1.0}, {"g0": 1.0})]
         expanded = _expand_replicates(
-            plans, n_replicates=3, base_seed=42, param_noise={}
+            plans, n_replicates=3, base_seed=42, param_noise={},
         )
         for rp in expanded:
             assert rp["swept_vals"]["g0"] == 1.0
@@ -222,7 +222,7 @@ def _make_results(
                     "solver_exit_code": 0,
                     "replicate": rep,
                     "seed": 42 + rep,
-                }
+                },
             )
 
     return SweepResults(
@@ -588,13 +588,13 @@ class TestParamNoiseRNGIndependence:
 
         # With only g0 noise
         exp_g0_only = _expand_replicates(
-            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1}
+            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1},
         )
         g0_vals_only = [rp["swept_vals"]["g0"] for rp in exp_g0_only]
 
         # With both g0 and m2 noise
         exp_both = _expand_replicates(
-            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1, "m2": 0.05}
+            plans, n_replicates=3, base_seed=42, param_noise={"g0": 0.1, "m2": 0.05},
         )
         g0_vals_both = [rp["swept_vals"]["g0"] for rp in exp_both]
 

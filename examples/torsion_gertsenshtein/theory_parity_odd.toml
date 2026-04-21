@@ -1,0 +1,125 @@
+# Parity-Odd PGT + Torsion-EM Couplings (All Safe Sectors)
+#
+# Extends the parity-even general nonminimal model with:
+#   - d14..d17: parity-odd torsion mass (ε·T²)
+#   - d19..d21: parity-odd curvature-EM coupling (ε·R̃×F)
+#   - zt1..zt6: parity-odd derivative torsion-EM (ε·∇T×F)
+#
+# All terms are Yang-Mills type (≤ 2nd order), ghost-free.
+# No R̃² terms (avoids Ostrogradsky, see #244).
+# Chern-Simons (cs1-cs3) deferred — require bare A_μ, special handling.
+#
+# Derivation timing: ~24m wall (last verified: 2026-04-11, 38 fields, v0.27.0)
+# Requires --timeout 0 (exceeds default 600s)
+#
+# Parity-odd terms from research/general_quadratic_lagrangian.tex:
+#
+# d14 = ε^{μνρσ} T^α_{μν} T_{αρσ}     (Nieh-Yan form)
+# d15 = ε^{μνρσ} T^α_{μρ} T_{ανσ}
+# d16 = ε^{μνρσ} T_μ T_{νρσ}           (η trace: T_μ = η^{αβ}T_{μαβ})
+# d17 = ε^{μνρσ} T^α_{μα} T_{νρσ}     (natural trace: T^α_{μα})
+#
+# d19 = ε^{μνρσ} R̃_{μνρ}^α F_{σα}
+# d20 = ε^{μνρσ} R̃_{μρν}^α F_{σα}     (index swap on Riemann)
+# d21 = ε^{μνρσ} R̃^α_{μαν} F_{ρσ}     (Ricci contraction)
+#
+# ζ̃₁ = (∇T)^{abcd} ε_{bcde} F_a^e
+# ζ̃₂ = (∇T)^{abcd} ε_{acde} F_b^e
+# ζ̃₃ = (∇T)^{abcd} ε_{abde} F_c^e
+# ζ̃₄ = (∇T)^{ab}_{b}^{c} ε_{acde} F^{de}
+# ζ̃₅ = (∇T)^{a}_{a}^{bc} ε_{bcde} F^{de}
+# ζ̃₆ = (∇T)^{ab}_{a}^{c} ε_{bcde} F^{de}
+#
+# 24 parameters total: kappa, B0, beta1-3, xi, delta1, chi, zeta1-3,
+#                       d14-d17, d19-d21, zt1-zt6
+#
+# Refs:
+#   research/general_quadratic_lagrangian.tex — complete enumeration
+#   Shapiro (2002), hep-th/0103093 — theta parameters
+#   Obukhov et al. — Chern-Simons torsion coupling
+#   #245 — investigation issue
+
+[theory]
+name = "Parity-Odd PGT (all safe torsion-EM couplings)"
+description = "Parity-even + parity-odd cross-couplings + Chern-Simons, no R̃²"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[derived_fields]]
+name = "Ftorsion"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][TorsionCDT[c,-c,-b]] - CD[-b][TorsionCDT[c,-c,-a]]"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3", "d14", "d15", "d16", "d17", "d19", "d20", "d21", "zt1", "zt2", "zt3", "zt4", "zt5", "zt6"]
+
+# xAct Lagrangian expression:
+#
+# Epsilon indices are ALL UP (ε^{abcd}) — directly contracts with DOWN
+# tensor indices. No eta raisings needed. Matches the working pattern
+# from theory_parity_odd_minimal.toml.
+#
+# xAct notation for each parity-odd term:
+#   d14: epsiloneta[a,b,c,d] TorsionCDT[e,-a,-b] TorsionCDT[-e,-c,-d]
+#   d15: epsiloneta[a,b,c,d] TorsionCDT[e,-a,-c] TorsionCDT[-e,-b,-d]
+#   d16: epsiloneta[a,b,c,d] eta[e,f] TorsionCDT[-a,-e,-f] TorsionCDT[-b,-c,-d]
+#   d17: epsiloneta[a,b,c,d] TorsionCDT[e,-a,-e] TorsionCDT[-b,-c,-d]
+#   d19: epsiloneta[a,b,c,d] RiemannCDT[-a,-b,-c,e] F[-d,-e]
+#   d20: epsiloneta[a,b,c,d] RiemannCDT[-a,-c,-b,e] F[-d,-e]
+#   d21: epsiloneta[a,b,c,d] RicciCDT[-a,-b] F[-c,-d]
+#   zt1-zt6: already use UP epsilon indices (unchanged from original)
+
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + chi RicciCDT[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + zeta1 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e] + zeta2 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e] + zeta3 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e] + d14 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-b] TorsionCDT[-e,-c,-d] + d15 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-c] TorsionCDT[-e,-b,-d] + d16 epsiloneta[a,b,c,d] eta[e,f] TorsionCDT[-a,-e,-f] TorsionCDT[-b,-c,-d] + d17 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-e] TorsionCDT[-b,-c,-d] + d19 epsiloneta[a,b,c,d] RiemannCDT[-a,-b,-c,e] F[-d,-e] + d20 epsiloneta[a,b,c,d] RiemannCDT[-a,-c,-b,e] F[-d,-e] + d21 epsiloneta[a,b,c,d] RicciCDT[-a,-b] F[-c,-d] + zt1 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[b,c,d,e] eta[a,f] F[-f,-e] + zt2 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,c,d,e] eta[b,f] F[-f,-e] + zt3 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,b,d,e] eta[c,f] F[-f,-e] + zt4 CD[-a][TorsionCDT[b,-b,-c]] epsiloneta[a,c,d,e] F[-d,-e] + zt5 CD[-a][TorsionCDT[a,-b,-c]] epsiloneta[b,c,d,e] F[-d,-e] + zt6 CD[-a][TorsionCDT[-b,a,-c]] epsiloneta[b,c,d,e] F[-d,-e] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_parity_odd.json"

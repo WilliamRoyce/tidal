@@ -513,36 +513,36 @@ class _PadEntry:
             # Ghost cell destination: left_slcs[k] = layer k (0=outermost)
             self.left_slcs.append(_slice_tuple(ndim, axis, slice(k, k + 1)))
             self.right_slcs.append(
-                _slice_tuple(ndim, axis, slice(n + 2 * ng - 1 - k, n + 2 * ng - k))
+                _slice_tuple(ndim, axis, slice(n + 2 * ng - 1 - k, n + 2 * ng - k)),
             )
             # Non-periodic source from data boundary (innermost=index 0)
             self.src_lo_slcs.append(_slice_tuple(ndim, axis, slice(ng - 1 - k, ng - k)))
             self.src_hi_slcs.append(_slice_tuple(ndim, axis, slice(n + k, n + k + 1)))
             # Periodic source from data: left ghost copies from right end
             self.periodic_left_src.append(
-                _slice_tuple(ndim, axis, slice(n - ng + k, n - ng + k + 1))
+                _slice_tuple(ndim, axis, slice(n - ng + k, n - ng + k + 1)),
             )
             # Periodic source from data: right ghost copies from left end
             self.periodic_right_src.append(
-                _slice_tuple(ndim, axis, slice(ng - 1 - k, ng - k))
+                _slice_tuple(ndim, axis, slice(ng - 1 - k, ng - k)),
             )
             # Recursive ghost fill source (from padded buffer, for k>0)
             if k > 0:
                 # Left: source from previously-filled ghost at index (ng - k)
                 src_l = ng - k
                 self.recursive_left_src.append(
-                    _slice_tuple(ndim, axis, slice(src_l, src_l + 1))
+                    _slice_tuple(ndim, axis, slice(src_l, src_l + 1)),
                 )
                 # Right: source from previously-filled ghost
                 src_r = n + ng + k - 1
                 self.recursive_right_src.append(
-                    _slice_tuple(ndim, axis, slice(src_r, src_r + 1))
+                    _slice_tuple(ndim, axis, slice(src_r, src_r + 1)),
                 )
             else:
                 # Placeholders for k=0 (use data directly, not buffer)
                 self.recursive_left_src.append(_slice_tuple(ndim, axis, slice(0, 1)))
                 self.recursive_right_src.append(
-                    _slice_tuple(ndim, axis, slice(n - 1, n))
+                    _slice_tuple(ndim, axis, slice(n - 1, n)),
                 )
 
 
@@ -564,7 +564,7 @@ class _PadBufferCache:
         self._cache.clear()
 
     def get(
-        self, data_shape: tuple[int, ...], axis: int, ng: int | None = None
+        self, data_shape: tuple[int, ...], axis: int, ng: int | None = None,
     ) -> _PadEntry:
         if ng is None:
             ng = _n_ghost
@@ -643,11 +643,11 @@ def _pad_axis(
             left_ghost_slc = entry.left_slcs[left_ghost_idx]
             if k == 0:
                 np.multiply(
-                    f_lo, data[entry.recursive_left_src[0]], out=buf[left_ghost_slc]
+                    f_lo, data[entry.recursive_left_src[0]], out=buf[left_ghost_slc],
                 )
             else:
                 np.multiply(
-                    f_lo, buf[entry.recursive_left_src[k]], out=buf[left_ghost_slc]
+                    f_lo, buf[entry.recursive_left_src[k]], out=buf[left_ghost_slc],
                 )
             if c_lo != 0.0:
                 buf[left_ghost_slc] += c_lo
@@ -656,11 +656,11 @@ def _pad_axis(
             right_ghost_slc = entry.right_slcs[right_ghost_idx]
             if k == 0:
                 np.multiply(
-                    f_hi, data[entry.recursive_right_src[0]], out=buf[right_ghost_slc]
+                    f_hi, data[entry.recursive_right_src[0]], out=buf[right_ghost_slc],
                 )
             else:
                 np.multiply(
-                    f_hi, buf[entry.recursive_right_src[k]], out=buf[right_ghost_slc]
+                    f_hi, buf[entry.recursive_right_src[k]], out=buf[right_ghost_slc],
                 )
             if c_hi != 0.0:
                 buf[right_ghost_slc] += c_hi

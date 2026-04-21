@@ -5,14 +5,14 @@ for parameter estimation and model comparison.
 
 Supports:
 - Simple Monte Carlo: ``--method mc --n-samples 100``
-- Nested sampling (dynesty): ``--method nested --nlive 100``
+- Nested sampling (PolyChord): ``--method nested --nlive 100``
 - User-specifiable priors: ``--prior "alpha=uniform:0.01:10"``
 - Hard constraints: ``--constraint "xi > 0"``
 - Parallel evaluation: ``--parallel N``
 
 References
 ----------
-Speagle, J.S. (2020) "dynesty", MNRAS 493(3).
+Handley, W. et al. (2015) "PolyChord", MNRAS 453(4).
 Handley, W. (2019) "anesthetic", JOSS 4(37).
 Skilling, J. (2004) "Nested Sampling", AIP Conference Proceedings 735.
 """
@@ -96,8 +96,11 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
     from tidal.inference._likelihood import parse_likelihood
 
+    baseline_formula: str | None = getattr(args, "baseline_formula", None)
     try:
-        likelihood_config = parse_likelihood(likelihood_spec)
+        likelihood_config = parse_likelihood(
+            likelihood_spec, baseline_formula=baseline_formula,
+        )
     except ValueError as e:
         error_with_hint(str(e), ["Check --likelihood format: METRIC:TYPE[:ARGS]"])
         return 1
@@ -152,7 +155,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             for expr in constraints.expressions:
                 print(f"    {expr}")
         print(
-            f"  Likelihood: {likelihood_config.metric} ({likelihood_config.likelihood_type})"
+            f"  Likelihood: {likelihood_config.metric} ({likelihood_config.likelihood_type})",
         )
         print(f"  Measurements: {', '.join(sorted(measurements))}")
         print(f"  Output: {output_path}")
@@ -187,14 +190,19 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
     elif method == "nested":
         nlive = getattr(args, "nlive", 100)
-        dlogz = getattr(args, "dlogz", 0.01)
-        sampler_backend = getattr(args, "sampler", "dynesty")
-        dynamic = getattr(args, "dynamic", False)
+
+        # Auto-scale nlive if requested
+        nlive_auto = getattr(args, "nlive_auto", None)
+        if nlive_auto is not None:
+            from tidal.inference._nested import recommend_nlive
+
+            nlive = recommend_nlive(len(priors), nlive_auto)
+            if not quiet:
+                print(f"  nlive auto ({nlive_auto}): {nlive}")
 
         if not quiet:
             print(f"  Live points: {nlive}")
-            print(f"  dlogz: {dlogz}")
-            print(f"  Sampler: {sampler_backend}")
+            print("  Sampler: polychord")
             if n_workers:
                 print(f"  Workers: {n_workers}")
             print()
@@ -215,18 +223,29 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             temp_dir=output_path / "_runs",
         )
 
+        # Collect optional PolyChord-specific settings (pass-through kwargs)
+        ns_kwargs: dict[str, object] = {
+            "output_dir": str(output_path / "_chains"),
+        }
+        num_repeats = getattr(args, "num_repeats", None)
+        if num_repeats is not None:
+            ns_kwargs["num_repeats"] = num_repeats
+        precision_criterion = getattr(args, "precision_criterion", None)
+        if precision_criterion is not None:
+            ns_kwargs["precision_criterion"] = precision_criterion
+        if getattr(args, "no_clustering", False):
+            ns_kwargs["do_clustering"] = False
+
         result = run_nested_sampling(
             log_likelihood=likelihood_fn,
             prior_transform=build_prior_transform(priors),
             ndim=len(priors),
             param_names=param_names,
-            sampler=sampler_backend,
+            sampler="polychord",
             nlive=nlive,
-            dlogz=dlogz,
             n_workers=n_workers,
-            seed=seed,
-            dynamic=dynamic,
             quiet=quiet,
+            **ns_kwargs,
         )
 
     else:
@@ -236,7 +255,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         )
         return 1
 
-    # --- Save results ---
+    # --- Save results (rank 0 only — all MPI ranks reach here) ---
+    try:
+        from mpi4py import MPI  # type: ignore[import-untyped]
+
+        mpi_rank: int = int(MPI.COMM_WORLD.Get_rank())  # type: ignore[reportUnknownArgumentType]
+    except ImportError:
+        mpi_rank = 0
+    if mpi_rank != 0:
+        return 0
+
     result.save(output_path)
     if not quiet:
         print()
@@ -259,6 +287,31 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         plot_trace(result, trace_path)
         if not quiet:
             print(f"Trace plot: {trace_path}")
+
+    if getattr(args, "importance", False):
+        from tidal.inference._visualize import plot_importance
+
+        importance_path = output_path / "importance.png"
+        try:
+            imp = result.parameter_importance()
+            plot_importance(imp, importance_path)
+            if not quiet:
+                print(f"Importance plot: {importance_path}")
+        except (ImportError, ValueError) as e:
+            if not quiet:
+                print(f"  (importance plot skipped: {e})")
+
+    # --- Optional analysis ---
+    if getattr(args, "analyze", False) and result.method == "nested":
+        try:
+            from tidal.inference._importance import format_importance_table
+
+            imp = result.parameter_importance()
+            if not quiet:
+                print(format_importance_table(imp))
+        except (ImportError, ValueError) as e:
+            if not quiet:
+                print(f"  (importance analysis skipped: {e})")
 
     return 0
 

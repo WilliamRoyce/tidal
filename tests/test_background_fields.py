@@ -221,7 +221,7 @@ def _make_position_dependent_sim_data(
                 field="chi_0",
                 coefficient_symbolic="-g0 * exp(-(x()^2 + y()^2))",
                 coordinate_dependent=("x", "y"),
-            )
+            ),
         )
         chi_terms_list.append(
             OperatorTerm(
@@ -230,7 +230,7 @@ def _make_position_dependent_sim_data(
                 field="phi_0",
                 coefficient_symbolic="-g0 * exp(-(x()^2 + y()^2))",
                 coordinate_dependent=("x", "y"),
-            )
+            ),
         )
 
     eq_phi = ComponentEquation(
@@ -261,7 +261,7 @@ def _make_position_dependent_sim_data(
                     factor_a=HamiltonianFactor(field=fname, operator="identity"),
                     factor_b=HamiltonianFactor(field=fname, operator="laplacian"),
                 ),
-            ]
+            ],
         )
     # Mass terms — position-dependent for phi if requested
     if position_dependent_mass:
@@ -272,7 +272,7 @@ def _make_position_dependent_sim_data(
                 factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
                 coefficient_symbolic="g0/2 * exp(-(x()^2 + y()^2))",
                 coordinate_dependent=("x", "y"),
-            )
+            ),
         )
     else:
         h_terms.append(
@@ -280,14 +280,14 @@ def _make_position_dependent_sim_data(
                 coefficient=0.5,
                 factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
                 factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
-            )
+            ),
         )
     h_terms.append(
         HamiltonianTerm(
             coefficient=0.5,
             factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
             factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
-        )
+        ),
     )
     if position_dependent_coupling:
         h_terms.append(
@@ -297,7 +297,7 @@ def _make_position_dependent_sim_data(
                 factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
                 coefficient_symbolic="g0 * exp(-(x()^2 + y()^2))",
                 coordinate_dependent=("x", "y"),
-            )
+            ),
         )
     canonical = CanonicalStructure(hamiltonian_terms=tuple(h_terms))
 
@@ -588,301 +588,3 @@ class TestProcaScalarBackground:
         # Energy density = 0.5 * m² * <B_1²> = 0.5 * 2 * 1² = 1.0
         expected_potential = 0.5 * 2.0 * 1.0**2
         assert_allclose(result.total, expected_potential, rtol=0.1)
-
-
-# ===========================================================================
-# Group 10: Vector Background (Phase 2C)
-# ===========================================================================
-
-
-_VECTOR_BG_TOML = (
-    Path(__file__).parent.parent / "examples" / "vector_background" / "theory.toml"
-)
-
-
-@pytest.mark.skipif(
-    not _VECTOR_BG_TOML.exists(),
-    reason="vector_background example removed (e4738b0)",
-)
-class TestVectorBackground:
-    """Tests for scalar-vector coupling with tanh domain wall vector background."""
-
-    TOML_PATH = _VECTOR_BG_TOML
-
-    def test_vector_background_wls_dry_run(self) -> None:
-        """WLS generation succeeds and contains ComponentValue lines."""
-        import tomllib
-
-        from tidal.cli._derive import generate_wls
-
-        with self.TOML_PATH.open("rb") as f:
-            config = tomllib.load(f)
-        wls = generate_wls(config, config_dir=self.TOML_PATH.parent)
-        # Must contain Tanh profile
-        assert "Tanh" in wls
-        # Must define background tensor B
-        assert "vbdB" in wls
-
-    def test_vector_background_component_values_emitted(self) -> None:
-        """WLS contains 3 ComponentValue lines for the vector background."""
-        import tomllib
-
-        from tidal.cli._derive import generate_wls
-
-        with self.TOML_PATH.open("rb") as f:
-            config = tomllib.load(f)
-        wls = generate_wls(config, config_dir=self.TOML_PATH.parent)
-
-        # Count ComponentValue lines for the background B
-        cv_lines = [line for line in wls.splitlines() if "ComponentValue[vbdB[" in line]
-        assert len(cv_lines) == 3, (
-            f"Expected 3 ComponentValue lines, got {len(cv_lines)}: {cv_lines}"
-        )
-        # B_2 has tanh profile
-        assert any("Tanh" in line for line in cv_lines)
-
-    def test_vector_background_validation_check_emitted(self) -> None:
-        """WLS contains ValidateNoUnresolvedBackgrounds call."""
-        import tomllib
-
-        from tidal.cli._derive import generate_wls
-
-        with self.TOML_PATH.open("rb") as f:
-            config = tomllib.load(f)
-        wls = generate_wls(config, config_dir=self.TOML_PATH.parent)
-
-        assert "ValidateNoUnresolvedBackgrounds" in wls
-        # Specifically validates the vector background B (not scalar backgrounds)
-        assert "vbdB" in wls
-
-    def test_vector_background_explicit_substitution(self) -> None:
-        """Vector BG gets explicit ReplaceAll after decomposition."""
-        import tomllib
-
-        from tidal.cli._derive import generate_wls
-
-        with self.TOML_PATH.open("rb") as f:
-            config = tomllib.load(f)
-        wls = generate_wls(config, config_dir=self.TOML_PATH.parent)
-
-        # Vector BGs use /. (ReplaceAll) after DecomposeToComponents
-        replace_all_lines = [
-            line for line in wls.splitlines() if "/." in line and "vbdB" in line
-        ]
-        assert len(replace_all_lines) > 0, (
-            "Vector background B should use ReplaceAll after decomposition"
-        )
-        # Should cover all 3 components (indices 0, 1, 2) in both orientations
-        for idx in range(3):
-            assert f"vbdB[{{{idx}, -vbdCart}}]" in wls
-            assert f"vbdB[{{{idx}, vbdCart}}]" in wls
-
-    def test_vector_background_tanh_coefficient_evaluates(self) -> None:
-        """Tanh * Exp profile evaluates correctly on a grid."""
-        from tidal.symbolic._eval_utils import evaluate_coefficient
-
-        expr = "B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))"
-        params: dict[str, float] = {"B0": 1.0, "W": 3.0, "R": 8.0}
-        # Use 33 points so x=0.0 falls exactly on index 16
-        n = 33
-        x = np.linspace(-10, 10, n)
-        y = np.linspace(-10, 10, n)
-        xg, yg = np.meshgrid(x, y, indexing="ij")
-
-        result = evaluate_coefficient(
-            expr,
-            params,
-            ("t", "x", "y"),
-            coord_arrays={"x": xg, "y": yg},
-        )
-        assert isinstance(result, np.ndarray)
-        assert result.shape == (n, n)
-
-        # Antisymmetric in x: B(x, y) = -B(-x, y) at y=0
-        mid = n // 2  # index 16 = x=0
-        assert_allclose(result[:, mid] + result[::-1, mid], 0.0, atol=1e-10)
-
-        # At origin: tanh(0) = 0, exp(0) = 1 → B = 0
-        assert_allclose(result[mid, mid], 0.0, atol=1e-10)
-
-        # At x=+10, y=0: tanh(10/3)~1 * exp(-100/128)~0.46
-        assert result[-1, mid] > 0.3
-
-        # At x=-10, y=0: tanh(-10/3)~-1 * exp(-100/128)~-0.46
-        assert result[0, mid] < -0.3
-
-    def test_vector_background_zero_component_constant(self) -> None:
-        """B_0=0, B_1=0 components give constant zero, not position-dependent."""
-        from tidal.symbolic._eval_utils import evaluate_coefficient
-
-        # The zero components should evaluate to 0.0 (scalar), not an array
-        result = evaluate_coefficient("0", {}, ("t", "x", "y"))
-        assert result == 0.0
-
-    def test_vector_background_wrong_component_count_raises(self) -> None:
-        """2 components for a 3D vector raises ValueError."""
-        from tidal.cli._derive import generate_wls
-
-        config: dict[str, Any] = {
-            "theory": {"name": "Test"},
-            "spacetime": {"dimension": 3, "metric": "minkowski"},
-            "fields": [{"name": "phi", "type": "scalar"}],
-            "constants": {"names": ["B0"]},
-            "background_fields": [
-                {"name": "B", "type": "vector", "components": ["0", "B0"]}
-            ],
-            "lagrangian": {"expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"},
-            "output": {"path": "out.json"},
-        }
-        with pytest.raises(ValueError, match="components"):
-            generate_wls(config)
-
-    def test_vector_background_energy_computation(self) -> None:
-        """compute_system_energy works with mixed-rank position-dependent spec."""
-        from tidal.measurement._energy import compute_system_energy
-
-        # phi: scalar dynamic, A_2: dynamic with position-dependent coupling to phi
-        phi_terms = (
-            OperatorTerm(coefficient=1.0, operator="laplacian", field="phi_0"),
-            OperatorTerm(coefficient=-1.0, operator="identity", field="phi_0"),
-            OperatorTerm(
-                coefficient=-0.5,
-                operator="identity",
-                field="A_2",
-                coefficient_symbolic="-gBV * B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))",
-                coordinate_dependent=("x", "y"),
-            ),
-        )
-        a2_terms = (
-            OperatorTerm(coefficient=1.0, operator="laplacian", field="A_2"),
-            OperatorTerm(coefficient=-2.0, operator="identity", field="A_2"),
-            OperatorTerm(
-                coefficient=-0.5,
-                operator="identity",
-                field="phi_0",
-                coefficient_symbolic="-gBV * B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))",
-                coordinate_dependent=("x", "y"),
-            ),
-        )
-        canonical = CanonicalStructure(
-            hamiltonian_terms=(
-                # ½ v_phi_0²
-                HamiltonianTerm(
-                    coefficient=0.5,
-                    factor_a=HamiltonianFactor(field="v_phi_0", operator="identity"),
-                    factor_b=HamiltonianFactor(field="v_phi_0", operator="identity"),
-                    coefficient_symbolic="1/2",
-                    term_class="self",
-                ),
-                # ½ (∇phi_0)²
-                HamiltonianTerm(
-                    coefficient=0.5,
-                    factor_a=HamiltonianFactor(field="phi_0", operator="gradient_x"),
-                    factor_b=HamiltonianFactor(field="phi_0", operator="gradient_x"),
-                    coefficient_symbolic="1/2",
-                    term_class="self",
-                ),
-                HamiltonianTerm(
-                    coefficient=0.5,
-                    factor_a=HamiltonianFactor(field="phi_0", operator="gradient_y"),
-                    factor_b=HamiltonianFactor(field="phi_0", operator="gradient_y"),
-                    coefficient_symbolic="1/2",
-                    term_class="self",
-                ),
-                # ½ m² phi_0²
-                HamiltonianTerm(
-                    coefficient=0.5,
-                    factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
-                    factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
-                    coefficient_symbolic="1/2",
-                    term_class="self",
-                ),
-                # ½ v_A_2²
-                HamiltonianTerm(
-                    coefficient=0.5,
-                    factor_a=HamiltonianFactor(field="v_A_2", operator="identity"),
-                    factor_b=HamiltonianFactor(field="v_A_2", operator="identity"),
-                    coefficient_symbolic="1/2",
-                    term_class="self",
-                ),
-                # ½ (∇A_2)²
-                HamiltonianTerm(
-                    coefficient=0.5,
-                    factor_a=HamiltonianFactor(field="A_2", operator="gradient_x"),
-                    factor_b=HamiltonianFactor(field="A_2", operator="gradient_x"),
-                    coefficient_symbolic="1/2",
-                    term_class="self",
-                ),
-                HamiltonianTerm(
-                    coefficient=0.5,
-                    factor_a=HamiltonianFactor(field="A_2", operator="gradient_y"),
-                    factor_b=HamiltonianFactor(field="A_2", operator="gradient_y"),
-                    coefficient_symbolic="1/2",
-                    term_class="self",
-                ),
-                # ½ × 2.0 × A_2²
-                HamiltonianTerm(
-                    coefficient=1.0,
-                    factor_a=HamiltonianFactor(field="A_2", operator="identity"),
-                    factor_b=HamiltonianFactor(field="A_2", operator="identity"),
-                    coefficient_symbolic="1",
-                    term_class="self",
-                ),
-                # Position-dependent coupling: gBV * B0 * f(x,y) * phi_0 * A_2
-                HamiltonianTerm(
-                    coefficient=0.5,
-                    factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
-                    factor_b=HamiltonianFactor(field="A_2", operator="identity"),
-                    coefficient_symbolic="gBV * B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))",
-                    coordinate_dependent=("x", "y"),
-                    term_class="interaction",
-                ),
-            ),
-        )
-        spec = EquationSystem(
-            n_components=2,
-            dimension=3,
-            spatial_dimension=2,
-            component_names=("phi_0", "A_2"),
-            equations=(
-                ComponentEquation(
-                    field_name="phi_0",
-                    field_index=0,
-                    time_derivative_order=2,
-                    rhs_terms=phi_terms,
-                ),
-                ComponentEquation(
-                    field_name="A_2",
-                    field_index=1,
-                    time_derivative_order=2,
-                    rhs_terms=a2_terms,
-                ),
-            ),
-            mass_matrix=((1.0, 0.0), (0.0, 2.0)),
-            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
-            metadata={},
-            coordinates=("t", "x", "y"),
-            canonical=canonical,
-        )
-        n_grid = 16
-        dx = 20.0 / n_grid
-        data = SimulationData(
-            times=np.array([0.0]),
-            fields={
-                "phi_0": np.ones((1, n_grid, n_grid)),
-                "A_2": np.zeros((1, n_grid, n_grid)),
-            },
-            velocities={
-                "phi_0": np.zeros((1, n_grid, n_grid)),
-                "A_2": np.zeros((1, n_grid, n_grid)),
-            },
-            grid_spacing=(dx, dx),
-            grid_bounds=((-10.0, 10.0), (-10.0, 10.0)),
-            periodic=(True, True),
-            spec=spec,
-            parameters={"gBV": 0.5, "B0": 1.0, "W": 3.0, "R": 8.0},
-        )
-        result = compute_system_energy(data, 0)
-        # Should succeed — position-dependent coupling evaluated on grid
-        assert result.total >= 0.0
-        assert "phi_0" in result.per_field

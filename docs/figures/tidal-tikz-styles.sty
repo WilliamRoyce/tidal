@@ -5,6 +5,11 @@
 % Required packages
 % ---------------------------------------------------------------
 \RequirePackage[T1]{fontenc}
+% PassOptionsToPackage must precede any load of tikz/pgf, which
+% internally calls \RequirePackage{xcolor} without options.  By
+% declaring svgnames here first, pgf picks up the option and the
+% subsequent explicit load below is then a no-op rather than a clash.
+\PassOptionsToPackage{svgnames}{xcolor}
 \RequirePackage{tikz}
 \RequirePackage[svgnames]{xcolor}
 \RequirePackage{amsmath}

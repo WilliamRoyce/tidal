@@ -1,0 +1,14 @@
+\begin{frame}{\textsc{tidal}: sweeps, inference, HPC}
+  \note{\textasciitilde 12 min mark. Close the TIDAL arc on the \emph{"it scales"} note.}
+  \textbf{Once a theory is compiled, everything downstream is declarative.}
+  \begin{itemize}
+    \item \texttt{tidal sweep} --- parameter sweeps with 13 built-in measurement types (conversion, energy, spectrum, dispersion, resonance, \ldots).
+    \item \texttt{tidal sample} --- Bayesian inference via MC or nested sampling (dynesty / PolyChord), priors, constraints, arbitrary likelihoods.
+    \item HPC integration via \texttt{scripts/hpc\_shuttle.sh} --- push $\to$ submit $\to$ pull to Cambridge's CSD3 (Sapphire / Icelake, DiRAC / SL2 / SL3).
+  \end{itemize}
+  \vspace{0.4em}
+  \begin{block}{}
+    \emph{The same Lagrangian that gave me a single simulation can give me a 276-point, five-parameter sweep with Bayesian uncertainty quantification --- without writing new code.}
+  \end{block}
+  \placeholder{Figure: sweep plot or CLI screenshot.}
+\end{frame}

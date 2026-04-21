@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -19,18 +20,6 @@ from tidal.symbolic.json_loader import (
 )
 
 # === Fixtures ===
-
-
-@pytest.fixture
-def em_json_path() -> Path:
-    """Path to the EM 3D JSON file."""
-    return Path(__file__).parent.parent / "examples" / "data" / "em_3d.json"
-
-
-@pytest.fixture
-def kg_json_path() -> Path:
-    """Path to the Klein-Gordon 1D JSON file."""
-    return Path(__file__).parent.parent / "examples" / "data" / "klein_gordon_1d.json"
 
 
 @pytest.fixture
@@ -54,7 +43,7 @@ def em_json_data() -> dict[str, Any]:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"}
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
                     ],
                 },
             },
@@ -64,7 +53,7 @@ def em_json_data() -> dict[str, Any]:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"}
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"},
                     ],
                 },
             },
@@ -94,7 +83,7 @@ def kg_json_data() -> dict[str, Any]:
                         {"coefficient": -1.0, "operator": "identity", "field": "phi"},
                     ],
                 },
-            }
+            },
         ],
         "coupling": {"mass_matrix": [[1.0]], "coupling_matrix": [[0.0]]},
     }
@@ -213,6 +202,45 @@ class TestOperatorTerm:
         term = OperatorTerm(1.0, "laplacian", "phi")
         assert not term.position_dependent
 
+    # === order_in_eps (v6 perturbative reduction, Stage 2) ===
+
+    def test_order_in_eps_default_zero(self) -> None:
+        """Omitted order_in_eps defaults to 0 (backward compat)."""
+        data = {"coefficient": 1.0, "operator": "laplacian", "field": "phi"}
+        term = OperatorTerm.from_dict(data)
+        assert term.order_in_eps == 0
+
+    def test_order_in_eps_parsed_from_json(self) -> None:
+        """Explicit order_in_eps in JSON round-trips as int."""
+        data = {
+            "coefficient": 2.0,
+            "operator": "laplacian",
+            "field": "phi",
+            "coefficient_symbolic": "2*b5",
+            "order_in_eps": 1,
+        }
+        term = OperatorTerm.from_dict(data)
+        assert term.order_in_eps == 1
+
+    def test_order_in_eps_second_order(self) -> None:
+        """Second-order terms carry order_in_eps=2 through the loader."""
+        data = {
+            "coefficient": 1.0,
+            "operator": "identity",
+            "field": "phi",
+            "coefficient_symbolic": "b5^2",
+            "order_in_eps": 2,
+        }
+        term = OperatorTerm.from_dict(data)
+        assert term.order_in_eps == 2
+
+    def test_order_in_eps_direct_construction(self) -> None:
+        """Direct constructor accepts order_in_eps with default 0."""
+        t0 = OperatorTerm(1.0, "identity", "phi")
+        assert t0.order_in_eps == 0
+        t1 = OperatorTerm(1.0, "identity", "phi", order_in_eps=1)
+        assert t1.order_in_eps == 1
+
 
 # === ComponentEquation Tests ===
 
@@ -228,7 +256,7 @@ class TestComponentEquation:
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
-                    {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"}
+                    {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
                 ],
             },
         }
@@ -349,6 +377,435 @@ class TestEquationSystem:
             )
 
 
+# === Perturbative-order filtering (v6 plan, Stage 2) ===
+
+
+def _mixed_order_spec_data() -> dict[str, Any]:
+    """Synthetic 2-field JSON with mixed-order RHS terms.
+
+    phi has one order-0 term (laplacian) + one order-1 correction
+    (identity with coefficient b5).  chi has only order-0 terms.  This
+    mirrors the structure of the R̃² PGT after order tagging: base
+    dynamics + O(b5) correction source, across one dynamical and one
+    cross-coupled equation.
+    """
+    return {
+        "metadata": {"source": "xAct", "lagrangian_expr": "synthetic"},
+        "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+        "fields": [
+            {"name": "phi", "index": 0, "is_dynamical": True},
+            {"name": "chi", "index": 1, "is_dynamical": True},
+        ],
+        "equations": [
+            {
+                "field": "phi",
+                "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "identity",
+                            "field": "phi",
+                            "coefficient_symbolic": "-b5",
+                            "order_in_eps": 1,
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "chi",
+                "lhs": {"expression": "d2_t(chi)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "chi"},
+                    ],
+                },
+            },
+        ],
+        "coupling": {},
+    }
+
+
+class TestEquationSystemOrderInEps:
+    """Tests for filter_by_order / max_order / has_corrections (v6 Stage 2)."""
+
+    def test_has_corrections_baseline_false(self, kg_json_data: dict[str, Any]) -> None:
+        """A theory with no order-tagged terms reports no corrections."""
+        spec = EquationSystem.from_dict(kg_json_data)
+        assert spec.has_corrections() is False
+        assert spec.max_order() == 0
+
+    def test_has_corrections_true_with_mixed_orders(self) -> None:
+        """Mixed-order spec reports corrections and max_order."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        assert spec.has_corrections() is True
+        assert spec.max_order() == 1
+
+    def test_filter_by_order_zero_keeps_base_terms_only(self) -> None:
+        """filter_by_order(0) drops correction terms, keeps base."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        base = spec.filter_by_order(0)
+
+        # Structure preserved
+        assert base.n_components == spec.n_components
+        assert base.component_names == spec.component_names
+        assert len(base.equations) == 2
+
+        # phi equation: only laplacian survives
+        phi_eq = base.equations[0]
+        assert len(phi_eq.rhs_terms) == 1
+        assert phi_eq.rhs_terms[0].operator == "laplacian"
+        assert phi_eq.rhs_terms[0].order_in_eps == 0
+
+        # chi equation: both base terms retained
+        chi_eq = base.equations[1]
+        assert len(chi_eq.rhs_terms) == 1
+        assert chi_eq.rhs_terms[0].operator == "laplacian"
+
+        # Filtered spec reports no residual corrections
+        assert base.has_corrections() is False
+
+    def test_filter_by_order_one_keeps_correction_terms_only(self) -> None:
+        """filter_by_order(1) keeps only the b5-sourced correction."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        correction = spec.filter_by_order(1)
+
+        # phi equation: the b5 identity term survives
+        phi_eq = correction.equations[0]
+        assert len(phi_eq.rhs_terms) == 1
+        assert phi_eq.rhs_terms[0].operator == "identity"
+        assert phi_eq.rhs_terms[0].order_in_eps == 1
+        assert phi_eq.rhs_terms[0].coefficient_symbolic == "-b5"
+
+        # chi equation: no order-1 terms, rhs_terms is empty tuple
+        chi_eq = correction.equations[1]
+        assert chi_eq.rhs_terms == ()
+
+    def test_filter_by_order_preserves_immutability(self) -> None:
+        """filter_by_order returns a new EquationSystem without mutating."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        original_phi_term_count = len(spec.equations[0].rhs_terms)
+        _ = spec.filter_by_order(0)
+        assert len(spec.equations[0].rhs_terms) == original_phi_term_count
+
+    def test_filter_by_order_empty_high_order(self) -> None:
+        """filter_by_order(n) with no such terms returns empty-rhs spec."""
+        spec = EquationSystem.from_dict(_mixed_order_spec_data())
+        spec_n2 = spec.filter_by_order(2)
+        for eq in spec_n2.equations:
+            assert eq.rhs_terms == ()
+        assert spec_n2.has_corrections() is False
+
+
+# === base_spec (Gap B: LHS demotion, v6 Phase 6A.1) ===
+
+
+def _spec_with_promoted_field(
+    kinetic_sym: str, extra_small: list[str] | None = None,
+) -> dict[str, Any]:
+    """Spec where 'h' has a parameter-dependent kinetic coefficient.
+
+    At eps=0 (when ``kinetic_sym`` collapses), h becomes an algebraic
+    constraint; otherwise it stays dynamical.
+    """
+    small_params = ["b5"]
+    if extra_small:
+        small_params = [*small_params, *extra_small]
+    return {
+        "metadata": {
+            "source": "inline-test",
+            "perturbation": {"small_parameters": small_params, "order": 1},
+        },
+        "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+        "fields": [
+            {"name": "phi", "index": 0, "is_dynamical": True},
+            {"name": "h", "index": 1, "is_dynamical": True},
+        ],
+        "equations": [
+            {
+                "field": "phi",
+                "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "identity",
+                            "field": "phi",
+                            "coefficient_symbolic": "-m2",
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "h",
+                "lhs": {
+                    "expression": "d2_t(h)",
+                    "order": {"time": 2, "space": 0},
+                    "kinetic_coefficient_symbolic": kinetic_sym,
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -1.0,
+                            "operator": "identity",
+                            "field": "h",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "identity",
+                            "field": "phi",
+                            "coefficient_symbolic": "g",
+                        },
+                    ],
+                },
+            },
+        ],
+        "coupling": {},
+    }
+
+
+class TestEquationSystemBaseSpec:
+    """Tests for EquationSystem.base_spec() — LHS demotion at ε=0 (Gap B)."""
+
+    def test_base_spec_demotes_b5_kinetic(self) -> None:
+        """Kinetic '2*b5' → demote h to algebraic at b5=0."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+        base = spec.base_spec()
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 0
+        assert h_eq.kinetic_coefficient_symbolic is None
+        # Identity self-term must be present for Schur elimination.
+        has_self_identity = any(
+            t.operator == "identity" and t.field == "h" for t in h_eq.rhs_terms
+        )
+        assert has_self_identity
+
+    def test_base_spec_preserves_m2_kinetic(self) -> None:
+        """Kinetic 'm2' (independent of b5) → keep LHS unchanged."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("m2"))
+        base = spec.base_spec()
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 2
+        assert h_eq.kinetic_coefficient_symbolic == "m2"
+
+    def test_base_spec_handles_multi_small_param(self) -> None:
+        """Kinetic '2*b5 + 3*b1' with both small → demote."""
+        spec = EquationSystem.from_dict(
+            _spec_with_promoted_field("2*b5 + 3*b1", extra_small=["b1"]),
+        )
+        base = spec.base_spec()
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 0
+
+    def test_base_spec_rejects_third_order_residual_direct(self) -> None:
+        """Direct-construction unit test of the base_spec post-check.
+
+        R5.4 / #283 notes this path is unreachable through normal JSON
+        loading (``from_dict`` rejects time_order > 2 without a
+        [perturbation] block before base_spec runs). Kept here as a
+        lower-level unit test anchoring the post-check logic; the
+        realistic-round-trip variant lives in
+        :func:`test_base_spec_rejects_third_order_residual_roundtrip`.
+        """
+        from tidal.symbolic.json_loader import ComponentEquation
+
+        eq = ComponentEquation(
+            field_name="h",
+            field_index=0,
+            time_derivative_order=3,
+            rhs_terms=(OperatorTerm(coefficient=-1.0, operator="identity", field="h"),),
+            kinetic_coefficient_symbolic=None,
+        )
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("h",),
+            equations=(eq,),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={"perturbation": {"small_parameters": ["b5"], "order": 1}},
+        )
+        with pytest.raises(ValueError, match="time_order > 2"):
+            spec.base_spec()
+
+    def test_base_spec_rejects_third_order_residual_roundtrip(
+        self, tmp_path: Path,
+    ) -> None:
+        """R5.4 / #283 realistic path: JSON with a [perturbation] block
+        whose small_parameters list does NOT cover the kinetic
+        coefficient of a 3rd-order field. ``from_dict`` loads the JSON
+        (migration error suppressed because [perturbation] is present);
+        ``base_spec`` then fires the post-check with its actionable
+        message.
+
+        Pre-R5.4 only the direct-construction test above existed, which
+        bypasses the load-time gate and therefore cannot fail for the
+        reason the post-check is designed to detect. This round-trip
+        confirms the end-to-end user-facing error surface.
+        """
+        # time_order=3 field with a kinetic that DOES NOT contain the
+        # declared small parameter (b5). base_spec(['b5']) won't demote
+        # it, so the post-check fires with the "missing small parameter"
+        # message.
+        data: dict[str, Any] = {
+            "metadata": {
+                "source": "roundtrip-test",
+                "parameters": {"b5": 0.01, "kappa": 1.0},
+                "perturbation": {"small_parameters": ["b5"], "order": 1},
+            },
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [
+                {"name": "h", "index": 0, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "h",
+                    "lhs": {
+                        "expression": "d3_t(h)",
+                        "order": {"time": 3, "space": 0},
+                        # Kinetic coefficient not collapsing at b5=0:
+                        # "kappa" is a base-theory parameter, not a
+                        # small one. base_spec(['b5']) keeps the LHS
+                        # intact and the post-check rejects.
+                        "kinetic_coefficient_symbolic": "kappa",
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "h",
+                                "coefficient_symbolic": "-1",
+                            },
+                        ],
+                    },
+                },
+            ],
+            "coupling": {},
+        }
+        json_path = tmp_path / "third_order_roundtrip.json"
+        json_path.write_text(json.dumps(data))
+
+        spec = load_equation_system(json_path)
+        # base_spec post-check fires with actionable message.
+        with pytest.raises(ValueError, match="time_order > 2"):
+            spec.base_spec()
+
+    def test_base_spec_preserves_other_equations(self) -> None:
+        """Non-promoted equations (phi) pass through unchanged."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+        base = spec.base_spec()
+        phi_eq = next(eq for eq in base.equations if eq.field_name == "phi")
+        assert phi_eq.time_derivative_order == 2
+        # phi RHS had no order_in_eps tags so all terms are kept.
+        assert len(phi_eq.rhs_terms) == 2
+
+    def test_high_order_without_perturbation_raises(self) -> None:
+        """time_order > 2 JSON without [perturbation] raises with migration hint.
+
+        Phase 6B removed Ostrogradsky; the loader now refuses rather
+        than introducing ghost modes.
+        """
+        n_grid = 32
+        # Synthesize a time_order=4 JSON without any perturbation metadata.
+        data: dict[str, Any] = {
+            "metadata": {"source": "inline-test"},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi",
+                    "lhs": {
+                        "expression": "d4_t(phi)",
+                        "order": {"time": 4, "space": 0},
+                        "kinetic_coefficient_symbolic": "2*b5",
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi",
+                            },
+                        ],
+                    },
+                },
+            ],
+            "coupling": {},
+        }
+        _ = n_grid  # silence ruff; kept for symmetry with other fixtures
+        with pytest.raises(ValueError, match=r"time_order > 2"):
+            EquationSystem.from_dict(data)
+
+    def test_base_spec_no_small_parameters_is_noop(self) -> None:
+        """When no small_parameters supplied, behaves as filter_by_order(0)."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+        base = spec.base_spec([])
+        # No demotion because no small parameters declared
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 2
+        assert h_eq.kinetic_coefficient_symbolic == "2*b5"
+
+    def test_base_spec_pulls_small_params_from_metadata(self) -> None:
+        """Default small_parameters read from metadata.perturbation."""
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+        base_from_meta = spec.base_spec()  # reads metadata
+        base_explicit = spec.base_spec(["b5"])
+        # Both routes demote h identically
+        h_meta = next(eq for eq in base_from_meta.equations if eq.field_name == "h")
+        h_expl = next(eq for eq in base_explicit.equations if eq.field_name == "h")
+        assert h_meta.time_derivative_order == 0
+        assert h_expl.time_derivative_order == 0
+
+    def test_base_spec_recomputes_matrices(self) -> None:
+        """After demotion base_spec must return matrices matching its equations
+        (v6 R1.3 / #274). Without the recompute, __post_init__ fires a
+        UserWarning on every call because the cached matrices are stale,
+        and downstream consumers reading spec.mass_matrix get full-spec
+        values that no longer correspond to the demoted algebraic form.
+        """
+        import warnings
+
+        spec = EquationSystem.from_dict(_spec_with_promoted_field("2*b5"))
+
+        # Demotion itself must not trigger __post_init__'s consistency
+        # warning — pre-R1.3 it always did because the cached matrices
+        # (computed from the full spec) didn't match the demoted
+        # equations with their prepended ``1 * identity(self)`` term.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            base = spec.base_spec(["b5"])
+
+        # The base_spec matrices must be internally consistent with the
+        # demoted equations.
+        expected_mass, expected_coupling, _, _ = base._compute_matrices_from_terms(
+            base.equations, base.component_names, parameters=None,
+        )
+        assert base.mass_matrix == expected_mass
+        assert base.coupling_matrix == expected_coupling
+
+        # Confirm Gap B actually fired (h was demoted).
+        h_eq = next(eq for eq in base.equations if eq.field_name == "h")
+        assert h_eq.time_derivative_order == 0
+
+
 # === Schema Validation Tests ===
 
 
@@ -363,7 +820,7 @@ class TestValidateJsonSchema:
         """Test that missing spacetime raises ValueError."""
         data: dict[str, Any] = {"fields": [], "equations": []}
         with pytest.raises(
-            ValueError, match="Missing required top-level field: spacetime"
+            ValueError, match="Missing required top-level field: spacetime",
         ):
             validate_json_schema(data)
 
@@ -371,7 +828,7 @@ class TestValidateJsonSchema:
         """Test that missing fields raises ValueError."""
         data: dict[str, Any] = {"spacetime": {"dimension": 2}, "equations": []}
         with pytest.raises(
-            ValueError, match="Missing required top-level field: fields"
+            ValueError, match="Missing required top-level field: fields",
         ):
             validate_json_schema(data)
 
@@ -382,7 +839,7 @@ class TestValidateJsonSchema:
             "fields": [{"name": "phi"}],
         }
         with pytest.raises(
-            ValueError, match="Missing required top-level field: equations"
+            ValueError, match="Missing required top-level field: equations",
         ):
             validate_json_schema(data)
 
@@ -402,7 +859,7 @@ class TestValidateJsonSchema:
             "spacetime": {"dimension": 2, "signature": [-1, 2]},
             "fields": [{"name": "phi"}],
             "equations": [
-                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}
+                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}},
             ],
         }
         with pytest.raises(ValueError, match="signature must be a list of"):
@@ -414,7 +871,7 @@ class TestValidateJsonSchema:
             "spacetime": {"dimension": 2, "signature": [-1, 1, 1]},
             "fields": [{"name": "phi"}],
             "equations": [
-                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}
+                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}},
             ],
         }
         with pytest.raises(ValueError, match=r"signature length.*must match dimension"):
@@ -442,7 +899,7 @@ class TestValidateJsonSchema:
                 {
                     "field": "nonexistent",
                     "rhs": {"type": "linear_combination", "terms": []},
-                }
+                },
             ],
         }
         with pytest.raises(ValueError, match="not found in fields list"):
@@ -455,44 +912,11 @@ class TestValidateJsonSchema:
 class TestLoadEquationSystem:
     """Tests for loading equation systems from files."""
 
-    def test_load_em_file(self, em_json_path: Path) -> None:
-        """Test loading EM equations from file."""
-        if not em_json_path.exists():
-            pytest.skip(f"Test file not found: {em_json_path}")
-
-        system = load_equation_system(em_json_path)
-
-        num_em_components = 3
-        assert system.n_components == num_em_components
-        assert "A_0" in system.component_names
-        assert "A_1" in system.component_names
-        assert "A_2" in system.component_names
-
-    def test_load_kg_file(self, kg_json_path: Path) -> None:
-        """Test loading Klein-Gordon equations from file."""
-        if not kg_json_path.exists():
-            pytest.skip(f"Test file not found: {kg_json_path}")
-
-        system = load_equation_system(kg_json_path)
-
-        num_kg_components = 1
-        assert system.n_components == num_kg_components
-        assert system.component_names == ("phi_0",)
-
     def test_file_not_found(self, tmp_path: Path) -> None:
         """Test that FileNotFoundError is raised for missing file."""
         nonexistent = tmp_path / "nonexistent.json"
         with pytest.raises(FileNotFoundError):
             load_equation_system(nonexistent)
-
-    def test_load_with_string_path(self, em_json_path: Path) -> None:
-        """Test loading with string path."""
-        if not em_json_path.exists():
-            pytest.skip(f"Test file not found: {em_json_path}")
-
-        system = load_equation_system(str(em_json_path))
-        num_em_components = 3
-        assert system.n_components == num_em_components
 
 
 # === Phase 4: Field Reference Validation Tests ===
@@ -519,7 +943,7 @@ class TestFieldReferenceValidation:
                     ),
                 ),
                 ComponentEquation(
-                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                 ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -547,7 +971,7 @@ class TestFieldReferenceValidation:
                     ),
                 ),
                 ComponentEquation(
-                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                 ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -575,7 +999,7 @@ class TestFieldReferenceValidation:
                         ),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -601,7 +1025,7 @@ class TestFieldReferenceValidation:
                         ),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -642,7 +1066,7 @@ class TestValidationErrors:
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
                                 "field": "phi",
-                            }
+                            },
                         ],
                     },
                 },
@@ -659,7 +1083,7 @@ class TestValidationErrors:
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
                                 "field": "phi",
-                            }
+                            },
                         ],
                     },
                 },
@@ -696,10 +1120,10 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0),),  # 1 row instead of 2
@@ -717,10 +1141,10 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0,), (0.0,)),  # 1 col instead of 2
@@ -738,10 +1162,10 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -760,7 +1184,7 @@ class TestValidationErrors:
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
-                    {"coefficient": 1.0, "operator": "laplacian", "field": "phi"}
+                    {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
                 ],
             },
         }
@@ -942,10 +1366,10 @@ class TestEquationSystemCoordinates:
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
                                 "field": "phi_0",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -971,10 +1395,10 @@ class TestEquationSystemCoordinates:
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
                                 "field": "phi_0",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1009,7 +1433,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1098,7 +1522,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1129,7 +1553,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
             # JSON says 99.0 — auto-computation should override to 2.0
             "coupling": {"mass_matrix": [[99.0]], "coupling_matrix": [[0.0]]},
@@ -1161,7 +1585,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1187,7 +1611,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1220,7 +1644,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
             # No mass_matrix_symbolic in coupling — auto-compute from terms
             "coupling": {"mass_matrix": [[0.0]], "coupling_matrix": [[0.0]]},
@@ -1250,7 +1674,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1262,17 +1686,6 @@ class TestAutoComputedMatrices:
 # === Integration helpers for real JSON files (skip if absent) ===
 
 _DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data"
-
-
-def _load_json(name: str) -> dict[str, Any]:
-    """Load a JSON file from examples/data/, skip test if absent."""
-    import json
-
-    path = _DATA_DIR / name
-    if not path.exists():
-        pytest.skip(f"{name} not found (run tidal derive)")
-    with path.open() as f:
-        return json.load(f)
 
 
 class TestParameterResolvedMatrices:
@@ -1307,7 +1720,7 @@ class TestParameterResolvedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1403,29 +1816,12 @@ class TestParameterResolvedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
         # No parameters → falls back to coefficient shape factor: -(-1.0) = 1.0
         assert spec.mass_matrix == ((1.0,),)
-
-    def test_coupled_proca_correct_masses(self) -> None:
-        """Coupled Proca: A-fields have mA2=1.0, B-fields have mB2=2.0."""
-        spec = EquationSystem.from_dict(_load_json("coupled_proca_3d.json"))
-        # Constraint fields (A_0, B_0): temporal component g_{00}=-1 flips sign
-        assert spec.mass_matrix[0][0] == pytest.approx(-1.0)
-        # Spatial A components: -(-mA2) with mA2=1.0 → 1.0
-        assert spec.mass_matrix[1][1] == pytest.approx(1.0)
-        assert spec.mass_matrix[2][2] == pytest.approx(1.0)
-        # Constraint B_0: temporal → -mB2
-        assert spec.mass_matrix[3][3] == pytest.approx(-2.0)
-        # Spatial B components: -(-mB2) with mB2=2.0 → 2.0
-        assert spec.mass_matrix[4][4] == pytest.approx(2.0)
-        assert spec.mass_matrix[5][5] == pytest.approx(2.0)
-        # Coupling in constraint eqs: temporal sign flip → +0.5
-        assert spec.coupling_matrix[0][3] == pytest.approx(0.5)
-        assert spec.coupling_matrix[3][0] == pytest.approx(0.5)
 
 
 class TestResolveSymbolicCoeff:
@@ -1472,7 +1868,7 @@ class TestLHSStructureMissingTimeOrder:
 
     def test_valid_order_passes(self) -> None:
         lhs = LHSStructure.from_dict(
-            {"expression": "phi", "order": {"time": 2, "space": 0}}
+            {"expression": "phi", "order": {"time": 2, "space": 0}},
         )
         assert lhs.time_order == 2
 
@@ -1503,10 +1899,10 @@ class TestMetadataParameterParsing:
                                 "coefficient": 1.0,
                                 "operator": "laplacian_x",
                                 "field": "phi_0",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
         }
 
@@ -1597,7 +1993,7 @@ class TestCanonicalStructure:
                             },
                         ],
                     },
-                }
+                },
             ],
             "canonical": {
                 "hamiltonian_terms": [
@@ -1632,7 +2028,7 @@ class TestCanonicalStructure:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1643,7 +2039,7 @@ class TestCanonicalStructure:
 
 
 def _make_spec_with_kinetic_coeff(
-    kc_sym: str, coeff: float = 2.0, coeff_sym: str | None = "alpha"
+    kc_sym: str, coeff: float = 2.0, coeff_sym: str | None = "alpha",
 ) -> EquationSystem:
     """Build a minimal EquationSystem with one unnormalized kinetic eq and one normal eq."""
     eq_with_kc = ComponentEquation(
@@ -1818,14 +2214,14 @@ class TestBoundaryConditionToSideBc:
         assert side.kind == "dirichlet"
 
     def test_from_dict_warns_irrelevant_fields(
-        self, caplog: pytest.LogCaptureFixture
+        self, caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Dirichlet with gamma logs a warning about irrelevant fields."""
         from tidal.symbolic.json_loader import BoundaryCondition
 
         with caplog.at_level("WARNING", logger="tidal.symbolic.json_loader"):
             bc = BoundaryCondition.from_dict(
-                {"type": "dirichlet", "value": 1.0, "gamma": 2.0}
+                {"type": "dirichlet", "value": 1.0, "gamma": 2.0},
             )
         assert bc.gamma == 2.0  # stored but irrelevant
         assert "gamma" in caplog.text

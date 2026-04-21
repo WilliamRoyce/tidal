@@ -714,7 +714,7 @@ so that $\xi = 0$ is handled at simulation time rather than derivation time.
 \label{subsec:future-extensions}
 
 \begin{enumerate}
-  \item \textbf{Plasma detuning} (Phase F1): Proca-type mass term (abandoned) --- blocked by gauge-potential coupling artefact (see \cref{subsec:target3}). Requires gauge-invariant mass mechanism for the transverse photon sector.
+  \item \textbf{Plasma detuning} (Phase F1): \textbf{Implemented in v0.30.1}. The perturbation-level Proca term $-(m_A^2/2) a_\mu a^\mu$ is applied directly to the $O(\varepsilon)$ photon via \texttt{xPert}, avoiding the gauge-potential coupling artefact that blocked the earlier full-field approach. Validated against Raffelt \& Stodolsky 1988 (HWHM 0.405 vs theory 0.402 at $B_0=0.10$, commit \texttt{1526d77}). See \cref{sec:gertsenshtein-proca} and \texttt{examples/gertsenshtein\_proca/}.
   \item \textbf{Localised $B$-field scattering} (Phase F2): Implemented --- \texttt{theory\_localized.toml}, \texttt{run\_localized.sh}, \texttt{sweep\_profile.sh}. Validates Boccaletti formula $P = \sin^2(\kappa \cdot B_\mathrm{peak} \cdot R \cdot \sqrt{\pi/2})$.
   \item \textbf{Magnetar/FRB application} (Phase F3): Dipolar $B(r)$, 1+1D radial setup, Gertsenshtein--Zel'dovich mechanism.
   \item \textbf{Non-minimal couplings} (Phase F5): Chern--Simons gravity (parity-violating $P_L \neq P_R$), $\xi R F^2$ curvature--EM coupling. Ref: Kushwaha \& Jain~(2024, arXiv:2410.07338).

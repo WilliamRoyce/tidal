@@ -32,7 +32,7 @@ def _make_kg_spec() -> EquationSystem:
                         },
                     ],
                 },
-            }
+            },
         ],
         "canonical": {
             "hamiltonian_terms": [
@@ -499,7 +499,7 @@ class TestYoshidaConvergenceOrder:
         slopes: list[float] = []
         for i in range(len(errors) - 1):
             slope = float(
-                np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1])
+                np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1]),
             )
             slopes.append(slope)
 
@@ -535,7 +535,7 @@ class TestYoshidaConvergenceOrder:
         slopes: list[float] = []
         for i in range(len(errors) - 1):
             slope = float(
-                np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1])
+                np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1]),
             )
             slopes.append(slope)
 

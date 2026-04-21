@@ -32,7 +32,7 @@ def _make_kg_spec() -> EquationSystem:
                         },
                     ],
                 },
-            }
+            },
         ],
         "canonical": {
             "hamiltonian_terms": [

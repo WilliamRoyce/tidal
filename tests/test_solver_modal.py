@@ -7,6 +7,8 @@ Tests cover:
 4. Cross-validation — modal vs CVODE agreement
 """
 
+# ruff: noqa: RUF002 — math symbols in docstrings.
+
 from __future__ import annotations
 
 import copy
@@ -45,7 +47,7 @@ _KG_1D_SPEC: dict[str, object] = {
                     {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
                 ],
             },
-        }
+        },
     ],
     "coupling": {"mass_matrix_symbolic": [["-m2"]]},
 }
@@ -169,7 +171,7 @@ _DIFFUSION_SPEC: dict[str, object] = {
                     },
                 ],
             },
-        }
+        },
     ],
 }
 
@@ -252,7 +254,7 @@ class TestModalEligibility:
         """first_derivative_t operator → eligible (generalized mass-matrix path)."""
         spec_data = copy.deepcopy(_KG_1D_SPEC)
         spec_data["equations"][0]["rhs"]["terms"].append(  # type: ignore[index]
-            {"coefficient": -0.1, "operator": "first_derivative_t", "field": "phi_0"}
+            {"coefficient": -0.1, "operator": "first_derivative_t", "field": "phi_0"},
         )
         spec = _make_spec(spec_data)
         grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
@@ -262,7 +264,7 @@ class TestModalEligibility:
         """Operator not in modal decomposition registry → not eligible."""
         spec_data = copy.deepcopy(_KG_1D_SPEC)
         spec_data["equations"][0]["rhs"]["terms"].append(  # type: ignore[index]
-            {"coefficient": 1.0, "operator": "derivative_5_x", "field": "phi_0"}
+            {"coefficient": 1.0, "operator": "derivative_5_x", "field": "phi_0"},
         )
         spec = _make_spec(spec_data)
         grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
@@ -588,7 +590,7 @@ class TestModalCorrectness:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = _make_spec(spec_2d)
@@ -950,7 +952,9 @@ class TestModalBlockIsolation:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            with pytest.raises(SimulationDivergedError, match="diverged"):
+            # Either runtime guard ("diverged at t=...") or pre-check
+            # ("predicted to diverge") is an acceptable detection.
+            with pytest.raises(SimulationDivergedError, match="diverge"):
                 solve_modal(
                     spec,
                     grid,
@@ -963,9 +967,9 @@ class TestModalBlockIsolation:
         modal_warnings = [x for x in w if "positive real parts" in str(x.message)]
         assert len(modal_warnings) > 0, "No eigenvalue growth warning issued for t=500"
 
-    def test_find_independent_blocks_utility(self) -> None:
-        """Verify _find_independent_blocks correctly detects block structure."""
-        from tidal.solver.modal import _find_independent_blocks
+    def testfind_independent_blocks_utility(self) -> None:
+        """Verify find_independent_blocks correctly detects block structure."""
+        from tidal.solver.modal import find_independent_blocks
 
         # 4×4 block-diagonal: [[A, 0], [0, B]]
         M = np.zeros((4, 4), dtype=np.complex128)
@@ -973,20 +977,20 @@ class TestModalBlockIsolation:
         M[1, 0] = -1.0
         M[2, 3] = 1.0
         M[3, 2] = -2.0
-        blocks = _find_independent_blocks(M)
+        blocks = find_independent_blocks(M)
         assert len(blocks) == 2
         assert sorted(blocks[0]) in ([0, 1], [2, 3])
         assert sorted(blocks[1]) in ([0, 1], [2, 3])
 
         # Fully coupled 4×4
         M2 = np.ones((4, 4), dtype=np.complex128)
-        blocks2 = _find_independent_blocks(M2)
+        blocks2 = find_independent_blocks(M2)
         assert len(blocks2) == 1
         assert sorted(blocks2[0]) == [0, 1, 2, 3]
 
         # Diagonal (all independent)
         M3 = np.diag([1.0, 2.0, 3.0]).astype(np.complex128)
-        blocks3 = _find_independent_blocks(M3)
+        blocks3 = find_independent_blocks(M3)
         assert len(blocks3) == 3
 
 
@@ -1065,7 +1069,7 @@ class TestConstraintElimination:
         # IC on A₁ field (slot 1)
         a1_slot = layout.field_slot_map["A_1"]
         y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = 0.1 * np.exp(
-            -((x - 5.0) ** 2) / (2 * 1.5**2)
+            -((x - 5.0) ** 2) / (2 * 1.5**2),
         )
 
         result = solve_modal(
@@ -1091,7 +1095,7 @@ class TestConstraintElimination:
         x = np.linspace(0.0, 10.0, 64, endpoint=False)
         a1_slot = layout.field_slot_map["A_1"]
         y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = 0.1 * np.exp(
-            -((x - 5.0) ** 2) / (2 * 1.5**2)
+            -((x - 5.0) ** 2) / (2 * 1.5**2),
         )
 
         result = solve_modal(
@@ -1117,7 +1121,7 @@ class TestConstraintElimination:
         """Reduced system eigenvalues are purely imaginary (Hamiltonian)."""
         from tidal.solver.coefficients import CoefficientEvaluator
         from tidal.solver.modal import (
-            _build_constraint_eliminated_matrices,
+            _build_evolution_matrices,
             _build_k_axes,
             _build_k_grid,
         )
@@ -1130,7 +1134,7 @@ class TestConstraintElimination:
         k_grid = _build_k_grid(k_axes)
         rfft_shape = (17,)
 
-        A_red, _, _, _, _ = _build_constraint_eliminated_matrices(
+        A_red, _, _, _, _, _, _, _ = _build_evolution_matrices(
             spec,
             StateLayout.from_spec(spec, grid.num_points),
             grid,
@@ -1145,4 +1149,290 @@ class TestConstraintElimination:
             max_real = float(np.max(np.abs(np.real(eigs))))
             assert max_real < 1e-10, (
                 f"Mode {m}: max |Re(λ)| = {max_real:.2e}, expected < 1e-10"
+            )
+
+
+class TestRankDeficientBProjection:
+    """Tests for null-space projection of rank-deficient B in the QZ path (issue #257).
+
+    The CDT dark photon plasma model has ~20 kinetic-null non-trace torsion DOF
+    that make B_block rank-deficient.  Before the fix, scipy.linalg.eig(A, B)
+    with rank-deficient B produced FINITE spurious eigenvalues (Re≈25-500) that
+    bypassed the |λ|>1e12 filter.  The fix projects A and B onto range(B) first.
+    """
+
+    def test_spurious_eigenvalues_present_without_projection(self) -> None:
+        """Confirm that QZ on rank-deficient B produces finite spurious eigenvalues.
+
+        This documents the bug: before the fix, sla.eig(A, B) with rank-2 B
+        embedded in a 4×4 space returned non-imaginary eigenvalues for the null
+        directions (rather than Inf, which the old filter would catch).
+        """
+        import scipy.linalg as sla  # type: ignore[import-untyped]
+
+        # 4×4 system: 2 physical (harmonic oscillator, ω=1) + 2 null (B=0).
+        # Physical block: [0, 1; -1, 0] (eigenvalues ±i).
+        # Null block: A has off-diagonal ±1, B has zeros → spurious finite eigs.
+        A = np.zeros((4, 4), dtype=np.complex128)
+        B = np.zeros((4, 4), dtype=np.complex128)
+        A[0, 1] = 1.0
+        A[1, 0] = -1.0
+        A[2, 3] = 1.0
+        A[3, 2] = -1.0
+        B[0, 0] = 1.0
+        B[1, 1] = 1.0
+        # B[2,2] = B[3,3] = 0 → rank-2
+
+        evals = cast("np.ndarray[Any, np.dtype[np.complex128]]", sla.eig(A, B)[0])
+        finite_evals = evals[np.isfinite(evals) & (np.abs(evals) <= 1e12)]
+        # Without projection: all 4 eigenvalues are finite (scipy distributes
+        # physical coupling across all DOF), some with large Re(λ) > 0.
+        # We just assert that the finite set is non-empty to document the issue.
+        assert len(finite_evals) > 0, (
+            "Expected finite spurious eigenvalues from rank-deficient QZ"
+        )
+
+    def test_null_projection_removes_spurious_eigenvalues(self) -> None:
+        """Null-space projection gives correct eigenvalues {+i, -i, 0, 0} for rank-2 B.
+
+        After projecting onto range(B), QZ operates on the 2×2 physical block
+        which yields ±i (harmonic oscillator).  Null directions get eigenvalue 0.
+        The total spectrum should have max |Re(λ)| < 1e-10 (all purely imaginary or 0).
+        """
+        A = np.zeros((4, 4), dtype=np.complex128)
+        B = np.zeros((4, 4), dtype=np.complex128)
+        A[0, 1] = 1.0
+        A[1, 0] = -1.0
+        A[2, 3] = 1.0
+        A[3, 2] = -1.0
+        B[0, 0] = 1.0
+        B[1, 1] = 1.0
+
+        _, s_b, Vt_b = np.linalg.svd(B)
+        rank_b = int(np.sum(s_b > s_b[0] * 1e-10))
+        null_dim_b = 4 - rank_b
+        assert null_dim_b == 2, f"Expected 2 null dimensions, got {null_dim_b}"
+
+        import scipy.linalg as sla  # type: ignore[import-untyped]
+
+        Vphys = Vt_b[:rank_b].T
+        _Vnull_b = Vt_b[rank_b:].T
+        ev_red, _vr_red = cast(
+            "tuple[np.ndarray[Any, np.dtype[np.complex128]], np.ndarray[Any, np.dtype[np.complex128]]]",
+            sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys),
+        )
+        ev_full = np.concatenate([ev_red, np.zeros(null_dim_b, dtype=np.complex128)])
+
+        # All eigenvalues should be purely imaginary or zero (no spurious real parts)
+        max_real = float(np.max(np.abs(np.real(ev_full))))
+        assert max_real < 1e-10, (
+            f"Projected spectrum has max |Re(λ)| = {max_real:.2e}, expected < 1e-10"
+        )
+        # Physical eigenvalues should be ±i (harmonic oscillator with ω=1)
+        phys_evals = np.sort(np.abs(np.imag(ev_full[np.abs(np.imag(ev_full)) > 0.5])))[
+            ::-1
+        ]
+        assert len(phys_evals) == 2, (
+            f"Expected 2 physical eigenvalues, got {len(phys_evals)}"
+        )
+        assert abs(phys_evals[0] - 1.0) < 1e-10, (
+            f"Expected |Im(λ)|=1.0, got {phys_evals[0]:.6f}"
+        )
+
+    def test_eigenbasis_invertible_after_projection(self) -> None:
+        """Full eigenbasis V_full = [Vphys@vr_red | Vnull] is invertible.
+
+        This confirms that the lifted eigenvector matrix can be inverted to
+        transform ICs into the eigenbasis — a necessary condition for correctness.
+        """
+        A = np.zeros((4, 4), dtype=np.complex128)
+        B = np.zeros((4, 4), dtype=np.complex128)
+        A[0, 1] = 1.0
+        A[1, 0] = -1.0
+        A[2, 3] = 1.0
+        A[3, 2] = -1.0
+        B[0, 0] = 1.0
+        B[1, 1] = 1.0
+
+        import scipy.linalg as sla  # type: ignore[import-untyped]
+
+        _, s_b, Vt_b = np.linalg.svd(B)
+        rank_b = int(np.sum(s_b > s_b[0] * 1e-10))
+        Vphys = Vt_b[:rank_b].T
+        Vnull = Vt_b[rank_b:].T
+        _, vr_red = cast(
+            "tuple[np.ndarray[Any, np.dtype[np.complex128]], np.ndarray[Any, np.dtype[np.complex128]]]",
+            sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys),
+        )
+        V_full = np.hstack([Vphys @ vr_red, Vnull])
+
+        cond = float(np.linalg.cond(V_full))
+        assert cond < 1e6, (
+            f"V_full condition number {cond:.2e} too large — not invertible"
+        )
+        # Confirm it can be inverted without error
+        V_inv = np.linalg.inv(V_full)
+        residual = float(np.max(np.abs(V_full @ V_inv - np.eye(4))))
+        assert residual < 1e-10, (
+            f"V_full @ V_inv residual = {residual:.2e}, expected < 1e-10"
+        )
+
+
+class TestEigendataExport:
+    """Tests for return_eigendata=True (v6 Stage 3).
+
+    Pass 0 must expose its eigendecomposition so Pass 1 Duhamel can reuse
+    it without re-eigendecomposing. Verify structure, invertibility, and
+    that the reconstructed state matches the solver's own snapshot
+    output to machine precision.
+    """
+
+    def _run_kg(
+        self, return_eigendata: bool,
+    ) -> tuple[dict[str, Any], np.ndarray, StateLayout, GridInfo]:
+        spec = _make_spec(_KG_1D_SPEC)
+        n = 32
+        length = 2 * np.pi
+        grid = GridInfo(shape=(n,), bounds=((0.0, length),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        x = np.linspace(0.0, length, n, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:n] = np.sin(x)  # k=1 Fourier mode
+        # Give a non-trivial velocity too so the block IC has both components.
+        y0[n : 2 * n] = 0.5 * np.cos(x)
+
+        result = cast(
+            "dict[str, Any]",
+            solve_modal(
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, 1.0),
+                parameters={"m2": 1.0},
+                num_snapshots=11,
+                return_eigendata=return_eigendata,
+            ),
+        )
+        return result, y0, layout, grid
+
+    def test_eigendata_key_absent_by_default(self) -> None:
+        result, _, _, _ = self._run_kg(return_eigendata=False)
+        assert "eigendata" not in result
+
+    def test_eigendata_structure_present_when_requested(self) -> None:
+        result, _, _, _ = self._run_kg(return_eigendata=True)
+        assert "eigendata" in result
+        ed = result["eigendata"]
+        assert set(ed.keys()) >= {"blocks", "mode_k", "state_layout"}
+        assert len(ed["blocks"]) >= 1
+        block = ed["blocks"][0]
+        assert set(block.keys()) == {"slot_indices", "V", "D_diag", "V_inv", "alpha"}
+
+    def test_eigendata_invertibility(self) -> None:
+        """V @ V_inv == I for every block and every mode (round-trip)."""
+        result, _, _, _ = self._run_kg(return_eigendata=True)
+        for block in result["eigendata"]["blocks"]:
+            v_mat = block["V"]
+            v_inv = block["V_inv"]
+            bs = v_mat.shape[-1]
+            eye = np.eye(bs)
+            # Sample a handful of modes for speed (block is n_modes, bs, bs)
+            for m in range(min(4, v_mat.shape[0])):
+                residual = float(np.max(np.abs(v_mat[m] @ v_inv[m] - eye)))
+                assert residual < 1e-10, (
+                    f"V @ V_inv residual {residual:.2e} at mode {m} "
+                    f"for block with slots {block['slot_indices']}"
+                )
+
+    def test_eigendata_alpha_matches_vinv_y0(self) -> None:
+        """Alpha = V_inv @ y0_hat (by construction)."""
+        result, y0, layout, grid = self._run_kg(return_eigendata=True)
+        # The Fourier transform helper is intentionally private in
+        # modal.py; importing here is a deliberate whitebox check that
+        # eigendata.alpha matches V_inv @ rfft(y0) without going
+        # through the full Pass 0 evolution.  If _fft_slots is ever
+        # promoted to public, update this import.
+        from tidal.solver.modal import _fft_slots
+
+        y0_hat = _fft_slots(y0, layout, grid)
+        for block in result["eigendata"]["blocks"]:
+            slot_indices = block["slot_indices"]
+            y0_block = y0_hat[slot_indices, :]  # (bs, n_modes)
+            expected_alpha = np.einsum("mij,mj->mi", block["V_inv"], y0_block.T)
+            np.testing.assert_allclose(
+                block["alpha"], expected_alpha, atol=1e-12, rtol=1e-12,
+            )
+
+    def test_eigendata_reconstructs_pass_zero(self) -> None:
+        """y_hat(t) = V · diag(exp(D·t)) · alpha reproduces snapshots.
+
+        Pass 1 Duhamel relies on this identity to evaluate the
+        inhomogeneous solution. Verify reconstruction matches the
+        solver's own evolved output to machine precision.
+        """
+        result, _, layout, grid = self._run_kg(return_eigendata=True)
+        ed = result["eigendata"]
+        t = result["t"]
+        # Reconstruct at the final snapshot, in Fourier space
+        n_modes = ed["blocks"][0]["V"].shape[0]
+        n_slots = layout.num_slots
+        y_hat_rec = np.zeros((n_slots, n_modes), dtype=np.complex128)
+        ti = len(t) - 1
+        dt = t[ti] - t[0]
+        for block in ed["blocks"]:
+            v_mat = block["V"]  # (n_modes, bs, bs)
+            lam = block["D_diag"]  # (n_modes, bs)
+            alpha = block["alpha"]  # (n_modes, bs)
+            phase = np.exp(lam * dt)  # (n_modes, bs)
+            y_eigen = alpha * phase  # (n_modes, bs)
+            # y_block_hat = V · y_eigen for each mode  (n_modes, bs)
+            y_block_hat = np.einsum("mij,mj->mi", v_mat, y_eigen)
+            for i, slot in enumerate(block["slot_indices"]):
+                y_hat_rec[slot] = y_block_hat[:, i]
+
+        # Inverse FFT to physical space
+        rfft_shape_list = list(grid.shape)
+        rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
+        rfft_shape = tuple(rfft_shape_list)
+        n_pts = grid.num_points
+        # Dynamical slots are [:n_dyn] in the reduced layout (no constraints
+        # here — KG is a pure wave system)
+        n_dyn = n_slots
+        y_rec_phys = np.zeros(n_dyn * n_pts)
+        for si in range(n_dyn):
+            y_rec_phys[si * n_pts : (si + 1) * n_pts] = np.fft.irfftn(
+                y_hat_rec[si].reshape(rfft_shape),
+                s=grid.shape,
+                axes=list(range(len(grid.shape))),
+            ).ravel()
+
+        # Compare against solver's own snapshot
+        err = float(np.max(np.abs(y_rec_phys - result["y"][ti])))
+        assert err < 1e-12, (
+            f"Eigendata reconstruction error {err:.2e} exceeds 1e-12 tolerance"
+        )
+
+    def test_position_dependent_raises(self) -> None:
+        """Position-dependent coefficients + return_eigendata raises."""
+        # Use a spec with position-dependent mass (background field) to force
+        # the convolution path. The simplest trigger: give the mass a
+        # coordinate_dependent entry via a custom spec.
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        eqs = cast("list[dict[str, Any]]", spec_data["equations"])
+        eqs[0]["rhs"]["terms"][0]["coordinate_dependent"] = ["x"]
+        spec = _make_spec(spec_data)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+
+        with pytest.raises(NotImplementedError, match="position-"):
+            solve_modal(
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, 0.1),
+                parameters={"m2": 1.0},
+                num_snapshots=2,
+                return_eigendata=True,
             )

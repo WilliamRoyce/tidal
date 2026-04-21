@@ -145,7 +145,7 @@ class RHSEvaluator:
         for term_idx in range(1, len(terms)):
             operated = self._apply_resolved(resolved[term_idx], fields)
             coeff = self._coeff_eval.resolve(
-                terms[term_idx], t, eq_idx=eq_idx, term_idx=term_idx
+                terms[term_idx], t, eq_idx=eq_idx, term_idx=term_idx,
             )
             np.multiply(coeff, operated, out=temp)
             result += temp

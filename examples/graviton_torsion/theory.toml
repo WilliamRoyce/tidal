@@ -73,6 +73,14 @@ perturbation_field = "h"
 type = "plane_wave"
 propagation_axis = "z"
 
+# v6 perturbative reduction — b5 is the small parameter.  The b5·R̃²
+# term promotes the gauge-trace h_{4,7,9} components to time_order=4,
+# which PerturbativeSolver demotes to algebraic constraints at Pass 0
+# and layers a closed-form Duhamel correction at Pass 1.  See
+# docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md.
+[perturbation]
+small_parameters = ["b5"]
+order = 1
 
 [output]
 path = "../data/graviton_torsion.json"

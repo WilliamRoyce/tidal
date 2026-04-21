@@ -1,0 +1,119 @@
+# Euler-Heisenberg QED Correction to Photon Propagation
+#
+# Lagrangian (with background B-field):
+#
+#   L = -1/4 F_{ab} F^{ab}  +  rho/8 * (F_{ab} F^{ab})^2
+#
+# where rho is the Euler-Heisenberg coupling (dimension [E]^{-4} in natural units).
+# The (F·F)^2 term is the leading QED one-loop correction.
+#
+# Physical content:
+#   - rho = 0: standard Maxwell electrodynamics
+#   - rho != 0: vacuum birefringence — photon speed becomes polarization-dependent
+#   - In a background field B_0: refractive index correction n^2 - 1 ~ 4 rho B_0^2
+#
+# Perturbative scheme (v6 architecture):
+#   Pass 0 (rho=0): standard photon EOM -- partial_nu F^{nu mu} = 0
+#   Pass 1 (O(rho)): EH correction -- 8 rho partial_nu[F_bar^{nu mu} (F_bar . delta_F)]
+#                                    + 4 rho partial_nu[(F_bar . F_bar) delta_F^{nu mu}]
+#
+# Background: uniform B-field along x-axis via Abar_y = -B0 * z (Coulomb gauge).
+# F_bar_{yz} = partial_z(A_y) = -B0, so B_x = B0.
+#
+# Key physics observable: Pass 1 correction to eigenfrequency scales as rho * B0^2.
+# This can be verified against the analytic EH refractive index formula.
+#
+# Refs:
+#   Euler & Heisenberg (1936), Z. Phys. 98:714 -- original QED effective action
+#   Adler (1971), Ann. Phys. 67:599 -- photon splitting / birefringence
+#   Dunne (2004), hep-th/0406216 -- review of Euler-Heisenberg
+#
+# Note: This theory exercises the (F.F)^2 decomposition path added in the
+# ComponentDecompose.wl fix for issue #271. The derivation is the first to use
+# a quartic EM invariant in TIDAL.
+#
+# Derivation timing: ~19 s wall (last verified: 2026-04-20, v0.33.9, 4 fields, matter-only F^4)
+
+[theory]
+name = "Euler-Heisenberg QED Correction"
+description = "Vacuum birefringence: Maxwell + rho*(F.F)^2 in background B-field"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# A: full EM 4-potential (background Abar + perturbation a)
+[[fields]]
+name = "A"
+type = "vector"
+
+# a: photon perturbation — the dynamical 1st-order variable
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA (derived from the full potential A)
+# This is the exact F; xPert splits it into F_bar + delta_F during linearization.
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Background EM 4-potential: Abar_y = -B0*z generates B_x = B0
+# (Coulomb gauge, uniform magnetic field along x-axis)
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["B0", "rho"]
+
+# Full EH Lagrangian: Maxwell + leading QED correction
+#
+# The (F.F)^2 term uses explicit metric contractions with eta:
+#   F.F = F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]  (= F_{ab} F^{ab})
+#
+# Factor conventions: the standard EH leading term is
+#   L_EH = (alpha/8) (F.F)^2 + (beta/8) (F.F~)^2
+# where F.F~ = F[-a,-b] eps[a,b,c,d] F[-c,-d] (parity-odd).
+# We include only the (F.F)^2 sector here (parity-even, rho = alpha).
+[lagrangian]
+expression = "(-1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + rho/8 (F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])^2)"
+
+[linearization]
+# No perturbation_field: matter-only perturbation (no metric perturbation).
+# SetupMetricPerturbation is still called internally (xPert requirement),
+# but h terms are zeroed.
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# Lorenz gauge on photon perturbation: partial^mu a_mu = 0
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: propagation along z-axis (partial_x = partial_y = 0)
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+# Perturbative scheme: rho is the small EH coupling.
+# Pass 0 (rho=0): standard Maxwell photon propagation in B-field.
+# Pass 1 (O(rho^1)): EH correction to photon dispersion / eigenfrequencies.
+# The Pass 1 Duhamel source is proportional to rho*B0^2 (vacuum birefringence).
+[perturbation]
+small_parameters = ["rho"]
+order = 1
+
+[parameters]
+B0 = 1.0
+rho = 0.01
+
+[output]
+path = "../data/euler_heisenberg.json"

@@ -188,7 +188,7 @@ class TestInterpolation:
 
         # Without interpolation
         result_no_interp = compute_critical_field(
-            sweep, "B0", threshold=0.5, interpolate=False
+            sweep, "B0", threshold=0.5, interpolate=False,
         )
         b_min_no_interp = result_no_interp.rows[0]["B_min"]
 
@@ -490,7 +490,7 @@ class TestCLI:
                 "--output",
                 "/tmp/out",
                 "--no-interpolate",
-            ]
+            ],
         )
         assert args.critical_field == "B0"
         assert args.threshold == 0.95
@@ -514,7 +514,7 @@ class TestCLI:
                 "0.1",
                 "--output",
                 "/tmp/out",
-            ]
+            ],
         )
         assert args.reference_formula == "boccaletti"
         assert args.reference_B == 0.1
@@ -810,7 +810,7 @@ class TestLogScaleAndQuality:
                 "--cf-threshold",
                 "0.95",
                 "--no-interpolate",
-            ]
+            ],
         )
         assert args.critical_field == "B0"
         assert args.cf_threshold == 0.95
@@ -830,6 +830,6 @@ class TestLogScaleAndQuality:
                 "--metric",
                 "inv_B_min",
                 "--log-scale",
-            ]
+            ],
         )
         assert args.log_scale is True

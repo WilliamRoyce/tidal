@@ -110,7 +110,7 @@ def enable_pgf(
                 "xtick.labelsize": base_size - 2,
                 "ytick.labelsize": base_size - 2,
                 "axes.unicode_minus": False,
-            }
+            },
         )
     except Exception as e:
         if fallback_on_error:
@@ -141,5 +141,5 @@ def _setup_fallback_fonts(*, serif: bool = True, base_size: int = 10) -> None:
             "xtick.labelsize": base_size - 2,
             "ytick.labelsize": base_size - 2,
             "axes.unicode_minus": False,
-        }
+        },
     )
