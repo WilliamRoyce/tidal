@@ -67,7 +67,9 @@ class LikelihoodConfig:
 
 
 def parse_likelihood(
-    spec: str, *, baseline_formula: str | None = None,
+    spec: str,
+    *,
+    baseline_formula: str | None = None,
 ) -> LikelihoodConfig:
     """Parse a CLI likelihood specification string.
 
@@ -161,6 +163,15 @@ def compute_log_likelihood(
     if math.isnan(metric_value) or math.isinf(metric_value):
         return -math.inf
 
+    # Physics sanity: conversion probability P is bounded by 1. A
+    # finite-but-huge P_max (e.g. 1e100) indicates the linearized
+    # simulation has crossed into the non-perturbative regime (tachyon,
+    # ghost, overflow). This is a numerical artefact, not physics — if
+    # the modal solver's stability guard didn't catch it, reject here
+    # before the unphysical value drives the posterior. (#298 follow-up)
+    if config.metric == "P_max" and metric_value > 2.0:
+        return -math.inf
+
     if config.likelihood_type == "gaussian":
         return -0.5 * ((metric_value - config.target) / config.sigma) ** 2
 
@@ -199,7 +210,8 @@ def compute_log_likelihood(
 
 
 def _eval_baseline(
-    formula: str | None, params: dict[str, float] | None,
+    formula: str | None,
+    params: dict[str, float] | None,
 ) -> float | None:
     """Evaluate a baseline formula with the given parameter values.
 
@@ -374,7 +386,11 @@ def _evaluate_likelihood(
             sim_data = run_inference_step(base_args, spec_path, param_overrides)
             spec = sim_data.spec
             metrics = _measure_from_sim_data(
-                sim_data, measurements, source, target, threshold,
+                sim_data,
+                measurements,
+                source,
+                target,
+                threshold,
             )
         else:
             # Run simulation (disk path — preserved for rollback)
@@ -418,7 +434,8 @@ def _evaluate_likelihood(
             )
 
             eval_params = _parse_params(
-                list(getattr(base_args, "param", []) or []), spec,
+                list(getattr(base_args, "param", []) or []),
+                spec,
             )
             eval_params.update(param_overrides)
             for attr in ("t_end", "dt"):
@@ -427,14 +444,18 @@ def _evaluate_likelihood(
                     eval_params[attr] = float(val)
 
         return compute_log_likelihood(
-            float(metric_value), likelihood_config, eval_params,
+            float(metric_value),
+            likelihood_config,
+            eval_params,
         )
 
     except Exception:  # noqa: BLE001
         import logging
 
         logging.getLogger("tidal.inference").debug(
-            "Likelihood evaluation failed at theta=%s", theta, exc_info=True,
+            "Likelihood evaluation failed at theta=%s",
+            theta,
+            exc_info=True,
         )
         return -math.inf
 
