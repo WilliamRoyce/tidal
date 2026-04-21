@@ -67,6 +67,35 @@ cmd_push() {
     --exclude='*.png' \
     -e "ssh" \
     "${REPO_ROOT}/" "${HOST}:${REMOTE_ROOT}/"
+  _assert_version_sync || die \
+    "HPC tidal version drifted. Re-install + refresh tarball before submitting jobs:
+  ssh $HOST 'cd ${REMOTE_ROOT} && source .venv/bin/activate && pip install -e . --quiet'
+  bash scripts/hpc_refresh_venv_tar.sh"
+}
+
+_assert_version_sync() {
+  # Verify HPC package metadata matches local source version.  rsync
+  # of source alone leaves .dist-info/ stale (editable install records
+  # the version at install time).  A stale metadata on its own is
+  # usually cosmetic, but the tarball built from that metadata is
+  # consumed by compute-node jobs — if the tarball carries old
+  # site-packages/tidal bytecode, jobs quietly run pre-fix code
+  # against new configs (see #307).  Fail fast when versions diverge.
+  local local_version hpc_version tarball_version
+  local_version="$(awk -F'"' '/^version/{print $2; exit}' "${REPO_ROOT}/pyproject.toml" 2>/dev/null || true)"
+  [[ -n "$local_version" ]] || { note "WARN: could not read local tidal version"; return 0; }
+  hpc_version="$(remote_exec "cd ${REMOTE_ROOT} && source .venv/bin/activate 2>/dev/null && pip show tidal 2>/dev/null | awk '/^Version:/{print \$2}'" 2>/dev/null | tr -d '[:space:]')"
+  tarball_version="$(remote_exec "tar tf /home/wr286/venv_site.tar 2>/dev/null | grep -oE 'tidal-[0-9.]+\\.dist-info' | head -1 | sed 's/tidal-//;s/\\.dist-info//'" 2>/dev/null | tr -d '[:space:]')"
+  note "version check: local=${local_version} hpc_venv=${hpc_version:-UNKNOWN} hpc_tarball=${tarball_version:-UNKNOWN}"
+  if [[ -n "$hpc_version" && "$hpc_version" != "$local_version" ]]; then
+    note "WARN: HPC venv tidal is ${hpc_version}, local is ${local_version}"
+    return 1
+  fi
+  if [[ -n "$tarball_version" && "$tarball_version" != "$local_version" ]]; then
+    note "WARN: HPC tarball tidal is ${tarball_version}, local is ${local_version}"
+    return 1
+  fi
+  return 0
 }
 
 cmd_setup() {
