@@ -6,18 +6,22 @@
 #   bash scripts/hpc_shuttle.sh push
 #
 # Usage:
-#   bash scripts/submit_campaign_AB.sh
+#   bash scripts/campaign/submit_campaign_AB.sh
 #
 # After completion, record the job IDs printed in CAMPAIGN.md HPC Job Log.
 
 set -euo pipefail
-TEMPLATE="scripts/hpc_templates/polychord_intr.sbatch"
+# INTR QOS has MaxSubmitPU=1 — at most 1 INTR job in queue at a time.
+# Use INTR for the first job (amplify, gets immediate scheduling) and
+# standard QOS for all others (they queue together without blocking each other).
+INTR="scripts/hpc_templates/polychord_intr.sbatch"
+STD="scripts/hpc_templates/polychord_standard.sbatch"
 
 echo "=== Stage A: Dark-Photon-Plasma (T1) — paired amplify + suppress ==="
 
 # Stage A amplification: posterior concentrated where P_max is largest
 bash scripts/hpc_shuttle.sh submit \
-  --template "$TEMPLATE" \
+  --template "$INTR" \
   --nodes 1 --ntasks 16 --time 01:00:00 --name "dp_amplify" \
   --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/dp_amplify_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/dark_photon_plasma.json \
@@ -38,7 +42,7 @@ tidal plot \${OUTPUT_DIR} --type corner --output \${OUTPUT_DIR}/corner_amplify.p
 
 # Stage A suppression: posterior concentrated where P_max is smallest (logL = -P_max)
 bash scripts/hpc_shuttle.sh submit \
-  --template "$TEMPLATE" \
+  --template "$STD" \
   --nodes 1 --ntasks 16 --time 01:00:00 --name "dp_suppress" \
   --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/dp_suppress_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/dark_photon_plasma.json \
@@ -62,7 +66,7 @@ echo "=== Stage B: Einstein-Cartan null (T2) ==="
 
 # Stage B: single amplification run — if null, suppression run is redundant
 bash scripts/hpc_shuttle.sh submit \
-  --template "$TEMPLATE" \
+  --template "$STD" \
   --nodes 1 --ntasks 16 --time 01:00:00 --name "pgt_null" \
   --cmd "OUTPUT_DIR=\${TIDAL_ROOT}/results/pgt_null_\${SLURM_JOB_ID}; mkdir -p \${OUTPUT_DIR}; \
 \${MPIRUN_PREFIX} tidal sample examples/data/torsion_gertsenshtein_b5_zero.json \

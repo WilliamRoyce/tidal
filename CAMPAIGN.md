@@ -53,8 +53,8 @@ Lagrangian sector and at what parameters?
 ### Stage A: Dark-Photon-Plasma 4D nested sampling
 
 - [x] Stage 0 gate passed for T1
-- [x] HPC amplification job submitted (job ID: 28133218, INTR, running)
-- [x] HPC suppression job submitted (job ID: 28133516, standard QOS, queued)
+- [x] HPC amplification job submitted (job ID: 28133656, INTR, running)
+- [x] HPC suppression job submitted (job ID: 28133932, standard QOS, queued)
 - [ ] Results pulled
 - [ ] Analysis: D_KL(params) computed — threshold > 0.05 nats
 - Notes:
@@ -62,7 +62,7 @@ Lagrangian sector and at what parameters?
 ### Stage B: Einstein-Cartan null (T2)
 
 - [x] Stage 0 gate passed for T2
-- [x] HPC null job submitted (job ID: 28133517, standard QOS, queued)
+- [x] HPC null job submitted (job ID: 28133933, standard QOS, queued)
 - [ ] Results pulled
 - [ ] Analysis: D_KL < 0.005 nats (null confirmed) or signal found
 - Notes:
@@ -136,9 +136,12 @@ Lagrangian sector and at what parameters?
 
 | Job ID | Theory | Run type | Status | Wall time | Notes |
 |--------|--------|----------|--------|-----------|-------|
-| 28133218 | T1 Dark-Photon-Plasma | amplification | running | ≤1h | INTR QOS, icelake, 16 MPI ranks |
-| 28133516 | T1 Dark-Photon-Plasma | suppression | queued | ≤1h | standard QOS, icelake, 16 MPI ranks |
-| 28133517 | T2 Einstein-Cartan | null (amplification) | queued | ≤1h | standard QOS, icelake, 16 MPI ranks, --no-clustering |
+| 28133218 | T1 Dark-Photon-Plasma | amplification | FAILED | 0:02 | REMOTE_ROOT bug (fixed) |
+| 28133516 | T1 Dark-Photon-Plasma | suppression | FAILED | 0:00 | REMOTE_ROOT bug (fixed) |
+| 28133517 | T2 Einstein-Cartan | null | FAILED | 0:00 | REMOTE_ROOT bug (fixed) |
+| 28133656 | T1 Dark-Photon-Plasma | amplification | running | ≤1h | INTR QOS, icelake, 16 MPI ranks |
+| 28133932 | T1 Dark-Photon-Plasma | suppression | queued | ≤1h | standard QOS, icelake, 16 MPI ranks |
+| 28133933 | T2 Einstein-Cartan | null (amplification) | queued | ≤1h | standard QOS, icelake, 16 MPI ranks, --no-clustering |
 
 ---
 

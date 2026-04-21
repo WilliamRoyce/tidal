@@ -6,7 +6,7 @@
 # These runs confirm D_KL(b5,ord=1) vs D_KL(b5,ord=0) — structural comparison.
 #
 # Usage:
-#   bash scripts/submit_campaign_C.sh
+#   bash scripts/campaign/submit_campaign_C.sh
 
 set -euo pipefail
 TEMPLATE="scripts/hpc_templates/polychord_intr.sbatch"

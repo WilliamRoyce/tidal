@@ -3,7 +3,7 @@
 # D3 (T6 YM-PGT-CP). Run after Stages A-C have been pulled and reviewed.
 #
 # Usage:
-#   bash scripts/submit_campaign_D.sh [d1|d2|d3|all]
+#   bash scripts/campaign/submit_campaign_D.sh [d1|d2|d3|all]
 #   Default: all
 
 set -euo pipefail
