@@ -16,12 +16,12 @@ Lagrangian sector and at what parameters?
 
 | ID | Campaign name | JSON | Free params | IC fields |
 |----|--------------|------|-------------|-----------|
-| T1 | Dark-Photon-Plasma | `dark_photon_plasma.json` | mA2, deltam, xi, alpha3 | h=?, a=? (inspect) |
-| T2 | Einstein-Cartan | `torsion_gertsenshtein_b5_zero.json` | alpha1, alpha2, alpha3 | h=?, a=? (inspect) |
-| T3 | R²-PGT | `torsion_gertsenshtein.json` | alpha1-3, b5 | h=?, a=? (inspect) |
-| T4 | Ricci-EM | `torsion_gertsenshtein_nonminimal.json` | alpha1-3, delta1 | h=?, a=? (inspect) |
-| T5 | YM-PGT | `torsion_gertsenshtein_general_nonminimal.json` | beta1-3, xi, delta1, chi, zeta1-3 | h=?, a=? (inspect) |
-| T6 | YM-PGT-CP | `torsion_gertsenshtein_parity_odd.json` | beta1-3, xi, delta1, chi, zeta1-3, d14-21, zt1-6 | h=?, a=? (inspect) |
+| T1 | Dark-Photon-Plasma | `dark_photon_plasma.json` | mA2, deltam, xi, alpha3 (4) | h=h_5, a=a_1 |
+| T2 | Einstein-Cartan | `torsion_gertsenshtein_b5_zero.json` | alpha1, alpha2, alpha3 (3) | h=h_5, a=a_1 |
+| T3 | R²-PGT | `torsion_gertsenshtein.json` | alpha1-3, b5 (4) | h=h_5, a=a_1 |
+| T4 | Ricci-EM | `torsion_gertsenshtein_nonminimal.json` | alpha1-3, delta1 (4) | h=h_5, a=a_1 |
+| T5 | YM-PGT | `torsion_gertsenshtein_general_nonminimal.json` | beta1-3, xi, delta1, chi, zeta1-3 (9) | h=h_5, a=a_1 |
+| T6 | YM-PGT-CP | `torsion_gertsenshtein_parity_odd.json` | T5 + d14-17, d19-21, zt1-6 (22; d18 absent) | h=h_5, a=a_1 |
 | T7 | Complete-Even-PGT | `pgt_complete_even.json` (TBD, needs derivation) | T5 + chi2-10, b2-6 | TBD |
 | T8 | Complete-Odd-PGT | `pgt_complete_odd.json` (TBD, needs derivation) | T6 + chitilde1-36, d1-13 | TBD |
 | EH | Einstein-Maxwell-EH | TBD (GitHub issue filed) | c1, c2 | TBD |
