@@ -1168,7 +1168,7 @@ class TestRankDeficientBProjection:
         embedded in a 4×4 space returned non-imaginary eigenvalues for the null
         directions (rather than Inf, which the old filter would catch).
         """
-        import scipy.linalg as sla
+        import scipy.linalg as sla  # type: ignore[import-untyped]
 
         # 4×4 system: 2 physical (harmonic oscillator, ω=1) + 2 null (B=0).
         # Physical block: [0, 1; -1, 0] (eigenvalues ±i).
@@ -1183,7 +1183,7 @@ class TestRankDeficientBProjection:
         B[1, 1] = 1.0
         # B[2,2] = B[3,3] = 0 → rank-2
 
-        evals = sla.eig(A, B)[0]
+        evals = cast("np.ndarray[Any, np.dtype[np.complex128]]", sla.eig(A, B)[0])
         finite_evals = evals[np.isfinite(evals) & (np.abs(evals) <= 1e12)]
         # Without projection: all 4 eigenvalues are finite (scipy distributes
         # physical coupling across all DOF), some with large Re(λ) > 0.
@@ -1213,11 +1213,14 @@ class TestRankDeficientBProjection:
         null_dim_b = 4 - rank_b
         assert null_dim_b == 2, f"Expected 2 null dimensions, got {null_dim_b}"
 
-        import scipy.linalg as sla
+        import scipy.linalg as sla  # type: ignore[import-untyped]
 
         Vphys = Vt_b[:rank_b].T
         _Vnull_b = Vt_b[rank_b:].T
-        ev_red, _vr_red = sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys)
+        ev_red, _vr_red = cast(
+            "tuple[np.ndarray[Any, np.dtype[np.complex128]], np.ndarray[Any, np.dtype[np.complex128]]]",
+            sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys),
+        )
         ev_full = np.concatenate([ev_red, np.zeros(null_dim_b, dtype=np.complex128)])
 
         # All eigenvalues should be purely imaginary or zero (no spurious real parts)
@@ -1251,13 +1254,16 @@ class TestRankDeficientBProjection:
         B[0, 0] = 1.0
         B[1, 1] = 1.0
 
-        import scipy.linalg as sla
+        import scipy.linalg as sla  # type: ignore[import-untyped]
 
         _, s_b, Vt_b = np.linalg.svd(B)
         rank_b = int(np.sum(s_b > s_b[0] * 1e-10))
         Vphys = Vt_b[:rank_b].T
         Vnull = Vt_b[rank_b:].T
-        _, vr_red = sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys)
+        _, vr_red = cast(
+            "tuple[np.ndarray[Any, np.dtype[np.complex128]], np.ndarray[Any, np.dtype[np.complex128]]]",
+            sla.eig(Vphys.T @ A @ Vphys, Vphys.T @ B @ Vphys),
+        )
         V_full = np.hstack([Vphys @ vr_red, Vnull])
 
         cond = float(np.linalg.cond(V_full))

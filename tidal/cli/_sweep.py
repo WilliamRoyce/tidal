@@ -2341,11 +2341,11 @@ def _init_worker() -> None:
     # worker picks up doesn't pay cold-import latency.  Imports intentionally
     # kept inside the function so the initializer is picklable and so
     # module-import side effects only fire in worker processes.
-    import tidal.cli._simulate  # noqa: F401
-    import tidal.measurement._stability  # noqa: F401
-    import tidal.solver.grid  # noqa: F401
-    import tidal.solver.modal  # noqa: F401
-    import tidal.symbolic.json_loader  # noqa: F401
+    import tidal.cli._simulate  # noqa: F401  # type: ignore[reportUnusedImport]
+    import tidal.measurement._stability  # noqa: F401  # type: ignore[reportUnusedImport]
+    import tidal.solver.grid  # noqa: F401  # type: ignore[reportUnusedImport]
+    import tidal.solver.modal  # noqa: F401  # type: ignore[reportUnusedImport]
+    import tidal.symbolic.json_loader  # noqa: F401  # type: ignore[reportUnusedImport]
 
 
 # Backwards-compatibility alias: some older call sites may still reference

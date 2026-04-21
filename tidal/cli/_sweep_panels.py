@@ -642,7 +642,7 @@ def render_sweep_1d_grouped(  # noqa: PLR0913, PLR0914
             xs,
             ys,
             "o-",
-            color=cmap(color_positions[idx]),
+            color=cmap(float(color_positions[idx])),
             linewidth=1.5,
             markersize=5,
             label=label,
@@ -2039,11 +2039,11 @@ def render_sweep_divergence(  # noqa: C901
     ax.set_title("Divergence Rate by Parameter")
 
     # Add percentage labels
-    for bar, rate in zip(bars, diverge_rates, strict=False):
+    for bar, rate in zip(bars, diverge_rates, strict=False):  # type: ignore[reportUnknownVariableType]
         if rate > 5:  # noqa: PLR2004
             ax.text(
-                bar.get_width() - 3,
-                bar.get_y() + bar.get_height() / 2,
+                bar.get_width() - 3,  # type: ignore[reportUnknownMemberType]
+                bar.get_y() + bar.get_height() / 2,  # type: ignore[reportUnknownMemberType]
                 f"{rate:.0f}%",
                 ha="right",
                 va="center",
@@ -2053,8 +2053,8 @@ def render_sweep_divergence(  # noqa: C901
             )
         elif rate > 0:
             ax.text(
-                bar.get_width() + 1,
-                bar.get_y() + bar.get_height() / 2,
+                bar.get_width() + 1,  # type: ignore[reportUnknownMemberType]
+                bar.get_y() + bar.get_height() / 2,  # type: ignore[reportUnknownMemberType]
                 f"{rate:.1f}%",
                 ha="left",
                 va="center",

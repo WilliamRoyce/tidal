@@ -1249,7 +1249,7 @@ class EquationSystem:
         )
 
         if small_parameters is None:
-            pert_meta = self.metadata.get("perturbation", {}) or {}
+            pert_meta: dict[str, Any] = self.metadata.get("perturbation", {}) or {}
             small_parameters = list(pert_meta.get("small_parameters", []))
 
         new_eqs: list[ComponentEquation] = []
@@ -1713,7 +1713,7 @@ def normalize_kinetic_coefficients(
     # coefficient rescales the identity-operator coefficients, so the
     # cached matrices on spec no longer match.
     new_eqs_t = tuple(new_eqs)
-    mass, coupling, mass_sym, coupling_sym = spec._compute_matrices_from_terms(  # noqa: SLF001
+    mass, coupling, mass_sym, coupling_sym = spec._compute_matrices_from_terms(  # noqa: SLF001  # type: ignore[reportPrivateUsage]
         new_eqs_t, spec.component_names, parameters=None
     )
     return dataclasses.replace(

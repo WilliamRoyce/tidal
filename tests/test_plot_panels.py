@@ -37,7 +37,7 @@ def _make_sweep_results(  # noqa: C901
     """Create a mock SweepResults for testing."""
     [f"param{i}" for i in range(n_params)]
     swept_params: dict[str, list[float]] = {}
-    rows: list[dict] = []
+    rows: list[dict[str, object]] = []
 
     if n_params == 1:
         vals = np.linspace(-1.0, 1.0, n_points).tolist()
@@ -85,7 +85,7 @@ def _make_sweep_results(  # noqa: C901
         for i in range(n_params):
             swept_params[f"param{i}"] = np.linspace(-1.0, 1.0, n_points).tolist()
         for _ in range(n_points):
-            row: dict = {}
+            row: dict[str, object] = {}
             for i in range(n_params):
                 row[f"param{i}"] = float(rng.uniform(-1, 1))
             row["P_max"] = float(rng.uniform(0.0001, 0.01))
@@ -240,12 +240,12 @@ class TestRenderSweep1dGrouped:
         # The _make_sweep_results fixture uses linspace(-1, 1, 5) so
         # there are 5 unique group values → 5 grouped lines.
         grouped_lines = [
-            ln for ln in ax.get_lines() if "analytical" not in (ln.get_label() or "")
+            ln for ln in ax.get_lines() if "analytical" not in str(ln.get_label() or "")
         ]
         assert len(grouped_lines) == 5
         # All lines should be connected (have at least 2 points each).
         for line in grouped_lines:
-            xdata = line.get_xdata()
+            xdata = np.asarray(line.get_xdata())
             assert len(xdata) >= 2, "grouped line should have multiple points"
         # Legend should be present
         assert ax.get_legend() is not None

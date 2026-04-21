@@ -124,11 +124,11 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     ConversionStabilityResult
         Contains stable flag, growth rate, and diagnostic message.
     """
-    import scipy.linalg as sla
+    import scipy.linalg as sla  # type: ignore[import-untyped]
 
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
-        _build_evolution_matrices,
+        _build_evolution_matrices,  # type: ignore[reportPrivateUsage]
         find_independent_blocks,
     )
     from tidal.solver.state import StateLayout
@@ -162,7 +162,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
 
     # Build constraint-eliminated system (with B for generalized eig)
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, B_test, _, _, _, _ = _build_evolution_matrices(
+    A_test, B_test, _, _, _, _, _, _ = _build_evolution_matrices(
         spec, layout, grid, ce, k_grid, rfft_shape
     )
 
@@ -217,20 +217,29 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             # Must match the fix in _evolve_per_mode: project A and B
             # onto range(B) before QZ to avoid finite spurious eigenvalues
             # from kinetic-null DOF (e.g. non-trace CDT torsion components).
-            _, s_bk, Vt_bk = np.linalg.svd(Bk)
-            null_thresh = s_bk[0] * 1e-10 if s_bk[0] > 0 else 1e-14
+            _u_bk, s_bk, Vt_bk = cast(
+                "tuple[NDArray[np.complex128], NDArray[np.float64], NDArray[np.complex128]]",
+                np.linalg.svd(Bk),
+            )
+            null_thresh: float = float(s_bk[0]) * 1e-10 if s_bk[0] > 0 else 1e-14
             rank_bk = int(np.sum(s_bk > null_thresh))
             null_dim = len(s_bk) - rank_bk
             if null_dim > 0:
-                Vphys = Vt_bk[:rank_bk].T
-                Vnull = Vt_bk[rank_bk:].T
-                eig_r = sla.eig(Vphys.T @ Ak @ Vphys, Vphys.T @ Bk @ Vphys)
-                ev_red = np.asarray(eig_r[0], dtype=np.complex128)
-                vr_red = np.asarray(eig_r[1], dtype=np.complex128)
+                Vphys: NDArray[np.complex128] = np.asarray(
+                    Vt_bk[:rank_bk].T, dtype=np.complex128
+                )
+                Vnull: NDArray[np.complex128] = np.asarray(
+                    Vt_bk[rank_bk:].T, dtype=np.complex128
+                )
+                eig_r = sla.eig(  # type: ignore[reportUnknownVariableType]
+                    Vphys.T @ Ak @ Vphys, Vphys.T @ Bk @ Vphys
+                )
+                ev_red = np.asarray(eig_r[0], dtype=np.complex128)  # type: ignore[reportUnknownArgumentType]
+                vr_red = np.asarray(eig_r[1], dtype=np.complex128)  # type: ignore[reportUnknownArgumentType]
                 ev = np.concatenate([ev_red, np.zeros(null_dim, dtype=np.complex128)])
-                VR = np.hstack([Vphys @ vr_red, Vnull])
+                vr_mat: NDArray[np.complex128] = np.hstack([Vphys @ vr_red, Vnull])
             else:
-                ev, VR = cast(
+                ev, vr_mat = cast(
                     "tuple[NDArray[np.complexfloating], NDArray[np.complexfloating]]",
                     sla.eig(Ak, Bk),  # type: ignore[arg-type]
                 )
@@ -239,7 +248,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             ev = ev.copy()
             ev[gauge] = 0.0
         else:
-            ev, VR = cast(
+            ev, vr_mat = cast(
                 "tuple[NDArray[np.complexfloating], NDArray[np.complexfloating]]",
                 np.linalg.eig(Ak),  # type: ignore[assignment]
             )
@@ -251,7 +260,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             # does any one project significantly onto the source field?
             # V_inv[i, j] = how much mode i is excited by a unit IC in slot j.
             tach_mask = np.real(ev) > threshold
-            V_inv = np.linalg.pinv(VR)
+            V_inv = np.linalg.pinv(vr_mat)
             src_col = np.abs(V_inv[:, src_slot_in_block])
             max_col = float(np.max(src_col))
             if max_col > 1e-20:  # noqa: PLR2004
@@ -259,21 +268,21 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             else:
                 rel_coupling = 0.0
 
-            # Condition-aware coupling threshold.  When VR is
+            # Condition-aware coupling threshold.  When vr_mat is
             # ill-conditioned (e.g. CDT non-trace torsion DOF at large ξ),
-            # pinv(VR) entries are unreliable: numerical noise of order
-            # 1/cond(VR) contaminates the coupling column, making truly
+            # pinv(vr_mat) entries are unreliable: numerical noise of order
+            # 1/cond(vr_mat) contaminates the coupling column, making truly
             # IC-decoupled tachyonic modes appear coupled.  The solver's
             # _suppress_tachyonic_noise uses the actual IC vector and
             # correctly finds ~1e-16 for these modes; the guard must
             # account for the conditioning to avoid false rejections.
             # See issue #266.
-            cond_VR = float(np.linalg.cond(VR))
-            # Floor: entries of pinv(VR) have noise ~cond(VR)*eps, so
-            # rel_coupling has noise ~cond(VR)*eps / max_col.  With
-            # max_col ~ O(1), noise floor ~ cond(VR) * eps.  Use a
+            cond_vr_mat = float(np.linalg.cond(vr_mat))
+            # Floor: entries of pinv(vr_mat) have noise ~cond(vr_mat)*eps, so
+            # rel_coupling has noise ~cond(vr_mat)*eps / max_col.  With
+            # max_col ~ O(1), noise floor ~ cond(vr_mat) * eps.  Use a
             # conservative 100x margin on machine epsilon (1e-16).
-            coupling_floor = max(1e-10, min(1.0, cond_VR * 1e-14))
+            coupling_floor = max(1e-10, min(1.0, cond_vr_mat * 1e-14))
             if rel_coupling < coupling_floor:
                 continue
 
@@ -364,7 +373,7 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
     """
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
-        _build_evolution_matrices,
+        _build_evolution_matrices,  # type: ignore[reportPrivateUsage]
         find_independent_blocks,
     )
     from tidal.solver.state import StateLayout
@@ -386,13 +395,13 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
 
     # Build systems
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, _, _, _, _, mapping = _build_evolution_matrices(
+    A_test, _, _, _, _, mapping, _, _ = _build_evolution_matrices(
         spec, layout, grid, ce, k_grid, rfft_shape
     )
 
     baseline_params = {**parameters, **baseline_overrides}
     ce_bl = CoefficientEvaluator(spec, grid, baseline_params)
-    A_bl, _, _, _, _, _ = _build_evolution_matrices(
+    A_bl, _, _, _, _, _, _, _ = _build_evolution_matrices(
         spec, layout, grid, ce_bl, k_grid, rfft_shape
     )
 

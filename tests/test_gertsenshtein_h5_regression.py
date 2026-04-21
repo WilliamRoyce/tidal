@@ -23,19 +23,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 
-def _load_spec(name: str) -> dict:
+def _load_spec(name: str) -> dict[str, Any]:
     """Load a committed example JSON spec."""
     path = Path(__file__).parent.parent / "examples" / "data" / f"{name}.json"
     if not path.exists():
         pytest.skip(f"Example JSON {name}.json not present")
-    return json.loads(path.read_text())
+    return json.loads(path.read_text())  # type: ignore[return-value]
 
 
-def _equation_for(spec: dict, field_name: str) -> dict:
+def _equation_for(spec: dict[str, Any], field_name: str) -> dict[str, Any]:
     """Return the equation dict for a given field name.
 
     Raises

@@ -1004,7 +1004,7 @@ class TestParameterImportance:
         finite D_KL.
         """
         pytest.importorskip("anesthetic")
-        from anesthetic import NestedSamples
+        from anesthetic import NestedSamples  # type: ignore[import-untyped]
 
         from tidal.inference._importance import compute_parameter_importance
 

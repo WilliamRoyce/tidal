@@ -40,7 +40,7 @@ References
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -654,7 +654,7 @@ def _build_evolution_matrices(
             try:
                 kin_val = evaluate_coefficient(
                     kin_sym,
-                    coeff_eval._parameters,  # noqa: SLF001
+                    coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
                     spec.effective_coordinates,
                 )
             except Exception:  # noqa: BLE001
@@ -871,7 +871,10 @@ def _build_evolution_matrices(
             # Ref: Golub & Van Loan (2013), Matrix Computations §5.5
             # (generalized Schur decomposition for DAE systems).
             M0 = M_mat[0]
-            U_svd, S_svd, Vh_svd = np.linalg.svd(M0)
+            U_svd, S_svd, Vh_svd = cast(
+                "tuple[NDArray[np.complex128], NDArray[np.float64], NDArray[np.complex128]]",
+                np.linalg.svd(M0),
+            )
             tol = 1e-10 * max(1.0, float(np.max(S_svd)) if S_svd.size else 1.0)
             dyn_mask = S_svd > tol
             con_mask = ~dyn_mask
@@ -889,11 +892,17 @@ def _build_evolution_matrices(
                 # U = left singular vectors (rows of M -> row basis)
                 # V = right singular vectors (columns of M -> col basis)
                 # Σ_d = diag of positive singular values
-                V_full = Vh_svd.conj().T  # (n_f, n_f)
-                U_full = U_svd  # (n_f, n_f)
-                V_d = V_full[:, dyn_mask]  # (n_f, n_mass_dyn)
-                V_c = V_full[:, con_mask]  # (n_f, n_mass_con)
-                Sigma_d_inv = np.diag(1.0 / S_svd[dyn_mask])  # (n_mass_dyn, n_mass_dyn)
+                V_full: NDArray[np.complex128] = np.asarray(
+                    Vh_svd.conj().T, dtype=np.complex128
+                )  # (n_f, n_f)
+                U_full: NDArray[np.complex128] = np.asarray(
+                    U_svd, dtype=np.complex128
+                )  # (n_f, n_f)
+                V_d: NDArray[np.complex128] = V_full[:, dyn_mask]  # (n_f, n_mass_dyn)
+                V_c: NDArray[np.complex128] = V_full[:, con_mask]  # (n_f, n_mass_con)
+                Sigma_d_inv: NDArray[np.float64] = np.diag(
+                    1.0 / S_svd[dyn_mask]
+                )  # (n_mass_dyn, n_mass_dyn)
 
                 # Rotate K, D, J: K̃ = Uᵀ · K · V
                 K_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, K_mat, V_full)
@@ -922,10 +931,16 @@ def _build_evolution_matrices(
                 # and zeroes undetermined ones.  For full-rank K_cc, pinv ≡ inv.
                 K_cc_norms = np.linalg.norm(K_cc, axis=(1, 2))
                 has_k_con = np.any(K_cc_norms > 1e-14)
+                mass_recovery: NDArray[np.complex128] | None = None
 
                 if has_k_con:
-                    K_cc_pinv = np.linalg.pinv(K_cc)
-                    mass_recovery = -np.einsum("mij,mjk->mik", K_cc_pinv, K_cd)
+                    K_cc_pinv: NDArray[np.complex128] = cast(
+                        "NDArray[np.complex128]", np.linalg.pinv(K_cc)
+                    )
+                    mass_recovery = cast(
+                        "NDArray[np.complex128]",
+                        -np.einsum("mij,mjk->mik", K_cc_pinv, K_cd),
+                    )
                     K_eff = K_dd + np.einsum("mij,mjk->mik", K_dc, mass_recovery)
                     D_eff = D_dd + np.einsum("mij,mjk->mik", D_dc, mass_recovery)
                     J_eff = J_dd + np.einsum("mij,mjk->mik", J_dc, mass_recovery)
@@ -970,9 +985,12 @@ def _build_evolution_matrices(
                 # decoupled constraints), V_eff = V_d and V_eff⁺ = V_dᴴ,
                 # recovering the previous formula.
                 if has_k_con:
+                    assert mass_recovery is not None  # set above when has_k_con is True
                     # mass_recovery: (n_modes, n_mass_con, n_mass_dyn)
-                    V_eff = V_d[np.newaxis, :, :] + np.einsum(
-                        "ic,mcj->mij", V_c, mass_recovery
+                    V_eff: NDArray[np.complex128] = np.asarray(
+                        V_d[np.newaxis, :, :]
+                        + np.einsum("ic,mcj->mij", V_c, mass_recovery),
+                        dtype=np.complex128,
                     )  # (n_modes, n_f, n_mass_dyn)
                     # V_eff^+ = pinv(V_eff) handles rank-deficient cases
                     # (e.g. mA2 near zero where mass modes become degenerate).
@@ -980,7 +998,9 @@ def _build_evolution_matrices(
                     # the two-step (V_eff^H V_eff)^{-1} V_eff^H formula, which
                     # requires inv(V_eff^H V_eff) and fails when V_eff has
                     # linearly-dependent columns.
-                    V_eff_pinv = np.linalg.pinv(V_eff)  # (n_modes, n_mass_dyn, n_f)
+                    V_eff_pinv: NDArray[np.complex128] = cast(
+                        "NDArray[np.complex128]", np.linalg.pinv(V_eff)
+                    )  # (n_modes, n_mass_dyn, n_f)
                     K_orig = np.einsum("mia,mab,mbj->mij", V_eff, E_final, V_eff_pinv)
                     D_orig = np.einsum("mia,mab,mbj->mij", V_eff, F_final, V_eff_pinv)
                 else:
@@ -1138,7 +1158,9 @@ def _build_evolution_matrices(
         # driver only has ``recovery = -S_cc_inv · S_cd`` and cannot
         # reconstruct h_c¹ = recovery·y_dyn¹ + S_cc_inv·[LHS-feedback +
         # order-1 RHS corr].
-        Scc_inv_out: NDArray[np.complex128] | None = S_cc_inv
+        Scc_inv_out: NDArray[np.complex128] | None = np.asarray(
+            S_cc_inv, dtype=np.complex128
+        )
         Scc_singular_mask_out: NDArray[np.bool_] | None = singular_mask
 
         # Recovery: c = -S_cc⁻¹ · S_cd · d
@@ -1796,7 +1818,10 @@ def _evolve_per_mode(
                 # eigenvalues not caught by the |λ|>1e12 filter.  Project A
                 # and B onto range(B) first; null directions get eigenvalue 0
                 # (frozen at IC).  See issue #257.
-                _, s_b, Vt_b = np.linalg.svd(B_m)
+                _u_b, s_b, Vt_b = cast(
+                    "tuple[NDArray[np.complex128], NDArray[np.float64], NDArray[np.complex128]]",
+                    np.linalg.svd(B_m),
+                )
                 null_thresh_b = s_b[0] * 1e-10 if s_b[0] > 0 else 1e-14
                 rank_b = int(np.sum(s_b > null_thresh_b))
                 null_dim_b = bs - rank_b
@@ -2360,6 +2385,15 @@ def solve_modal(
     needs_reduction = (has_constraints or has_time_ops) and not has_pos_dep
     constraint_vel_arrays: dict[str, NDArray[np.float64]] = {}  # populated below
 
+    # Variables assigned inside `if needs_reduction` and used later in the same
+    # function — initialized here so pyright can track definite assignment.
+    dyn_layout: StateLayout | None = None
+    recovery_matrix: NDArray[np.complex128] | None = None
+    c_names: list[str] | None = None
+    orig_to_reduced: dict[int, int] | None = None
+    Scc_inv_modes: NDArray[np.complex128] | None = None
+    Scc_singular_mask_modes: NDArray[np.bool_] | None = None
+
     if needs_reduction:
         (
             A_reduced,
@@ -2558,6 +2592,9 @@ def solve_modal(
             "state_layout": dyn_layout if needs_reduction else layout,
         }
         if needs_reduction:
+            assert recovery_matrix is not None
+            assert c_names is not None
+            assert orig_to_reduced is not None
             schur_ops_out: dict[str, Any] = {
                 "recovery_matrix": recovery_matrix,
                 "constraint_field_names": tuple(c_names),

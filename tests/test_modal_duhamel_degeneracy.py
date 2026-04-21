@@ -32,8 +32,8 @@ def _reference_kernel(lam: complex, mu: complex, t: float) -> complex:
     without going through the singular expression.
     """
     try:
-        from mpmath import (
-            exp as mp_exp,  # type: ignore[import-untyped]
+        from mpmath import (  # type: ignore[import-untyped]
+            exp as mp_exp,  # type: ignore[reportUnknownVariableType]
         )
         from mpmath import mp, mpc  # type: ignore[import-untyped]
     except ImportError:  # pragma: no cover — defer to numpy fallback
@@ -42,15 +42,15 @@ def _reference_kernel(lam: complex, mu: complex, t: float) -> complex:
         return complex((np.exp(mu * t) - np.exp(lam * t)) / (mu - lam))
 
     mp.dps = 50
-    lam_m = mpc(lam.real, lam.imag)
-    mu_m = mpc(mu.real, mu.imag)
+    lam_m = mpc(str(lam.real), str(lam.imag))  # type: ignore[reportArgumentType]
+    mu_m = mpc(str(mu.real), str(mu.imag))  # type: ignore[reportArgumentType]
     t_m = mp.mpf(t)
 
     if mu_m == lam_m:
-        val = t_m * mp_exp(lam_m * t_m)
+        val = t_m * mp_exp(lam_m * t_m)  # type: ignore[reportUnknownVariableType]
     else:
-        val = (mp_exp(mu_m * t_m) - mp_exp(lam_m * t_m)) / (mu_m - lam_m)
-    return complex(float(val.real), float(val.imag))
+        val = (mp_exp(mu_m * t_m) - mp_exp(lam_m * t_m)) / (mu_m - lam_m)  # type: ignore[reportUnknownVariableType]
+    return complex(float(val.real), float(val.imag))  # type: ignore[reportUnknownArgumentType]
 
 
 class TestDuhamelKernelScalar:
@@ -86,7 +86,7 @@ class TestDuhamelKernelScalar:
         lam_i = lam[:, None]
         mu_j = mu[None, :]
         t = 1.5
-        G = _duhamel_kernel(lam_i, mu_j, t)
+        G = np.asarray(_duhamel_kernel(lam_i, mu_j, t), dtype=np.complex128)
         # Diagonal: t·exp(λt)
         for i in range(3):
             expected_diag = t * np.exp(lam[i] * t)

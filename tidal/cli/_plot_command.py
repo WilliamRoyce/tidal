@@ -680,7 +680,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             render_sweep_1d_grouped(
                 ax,
                 results,
-                raw_metric,
+                raw_metric or "",
                 x_param=x_param,
                 group_param=group_by,
                 overlay=getattr(args, "overlay", None),

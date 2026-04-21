@@ -97,10 +97,11 @@ def evaluate_with_substitutions(
         If ``expr`` contains an AST node kind outside the safe
         subset (literals, names, unary +/-, binary +/-/*/////**).
     """
-    if not isinstance(expr, str):
-        msg = f"evaluate_with_substitutions: expected a str, got {type(expr).__name__}"
+    if not isinstance(expr, str):  # type: ignore[reportUnnecessaryIsInstance]
+        msg = (
+            f"evaluate_with_substitutions: expected a str, got {type(expr).__name__!r}"
+        )
         raise KineticEvalError(msg)
-
     normalised = expr.replace("^", "**")
 
     try:

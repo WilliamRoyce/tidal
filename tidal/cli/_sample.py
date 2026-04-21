@@ -259,7 +259,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     try:
         from mpi4py import MPI  # type: ignore[import-untyped]
 
-        mpi_rank = MPI.COMM_WORLD.Get_rank()
+        mpi_rank: int = int(MPI.COMM_WORLD.Get_rank())  # type: ignore[reportUnknownArgumentType]
     except ImportError:
         mpi_rank = 0
     if mpi_rank != 0:

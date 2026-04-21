@@ -526,9 +526,9 @@ _STATIC_EVAL_NAMESPACE: dict[str, object] = {
     "sin": np.sin,
     "cos": np.cos,
     "tan": np.tan,
-    "cot": lambda x: np.cos(x) / np.sin(x),
-    "sec": lambda x: 1.0 / np.cos(x),
-    "csc": lambda x: 1.0 / np.sin(x),
+    "cot": lambda x: np.cos(x) / np.sin(x),  # type: ignore[reportUnknownLambdaType]
+    "sec": lambda x: 1.0 / np.cos(x),  # type: ignore[reportUnknownLambdaType]
+    "csc": lambda x: 1.0 / np.sin(x),  # type: ignore[reportUnknownLambdaType]
     "arcsin": np.arcsin,
     "arccos": np.arccos,
     "arctan": np.arctan,
@@ -545,7 +545,7 @@ _STATIC_EVAL_NAMESPACE: dict[str, object] = {
     "sign": np.sign,
     "maximum": np.maximum,
     "minimum": np.minimum,
-    "heaviside": lambda x: np.heaviside(x, 0.5),
+    "heaviside": lambda x: np.heaviside(x, 0.5),  # type: ignore[reportUnknownLambdaType]
     "piecewise": np.where,
     "erf": special.erf,
     "jv": special.jv,

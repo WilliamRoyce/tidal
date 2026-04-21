@@ -6,7 +6,7 @@ from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.fields import FieldSet
 from tidal.solver.grid import GridInfo
 from tidal.solver.modal import (
-    _build_evolution_matrices,
+    _build_evolution_matrices,  # type: ignore[reportPrivateUsage]
     find_independent_blocks,
     solve_modal,
     solve_modal_pass1,

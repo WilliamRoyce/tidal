@@ -1688,17 +1688,6 @@ class TestAutoComputedMatrices:
 _DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data"
 
 
-def _load_json(name: str) -> dict[str, Any]:
-    """Load a JSON file from examples/data/, skip test if absent."""
-    import json
-
-    path = _DATA_DIR / name
-    if not path.exists():
-        pytest.skip(f"{name} not found (run tidal derive)")
-    with path.open() as f:
-        return json.load(f)
-
-
 class TestParameterResolvedMatrices:
     """Verify that numeric matrices reflect actual parameter values."""
 

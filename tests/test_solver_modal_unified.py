@@ -164,16 +164,19 @@ def test_unified_builder_handles_rank_deficient_mass() -> None:
     # Check eigenvalues at a non-DC mode
     m_idx = 2
     if B_lhs is not None:
-        import scipy.linalg as sla
+        import scipy.linalg as sla  # type: ignore[import-untyped]
 
         w = cast(
-            "np.ndarray[Any, Any]",
+            "np.ndarray[Any, np.dtype[np.complex128]]",
             sla.eig(A_rhs[m_idx], B_lhs[m_idx], right=False),
         )
     else:
-        w = np.linalg.eigvals(A_rhs[m_idx])
+        w = cast(
+            "np.ndarray[Any, np.dtype[np.complex128]]",
+            np.linalg.eigvals(A_rhs[m_idx]),
+        )
 
-    w_finite = w[np.isfinite(w)]
+    w_finite: np.ndarray[Any, np.dtype[np.complex128]] = w[np.isfinite(w)]
     # After mass-matrix Schur elimination, no eigenvalue should have a
     # large positive real part (spurious tachyon). The physical
     # trace-direction mode should have pure imaginary eigenvalue ±ik,
@@ -201,7 +204,7 @@ def test_unified_builder_generalized_eig_tachyon_free() -> None:
     generalized eigenvalue spectrum is tachyon-free (max Re(lambda) ~ 0)
     for the synthetic rank-deficient spec.
     """
-    import scipy.linalg as sla
+    import scipy.linalg as sla  # type: ignore[import-untyped]
 
     spec = _make_rank_deficient_spec()
     layout, grid, coeff_eval, k_grid, rfft_shape = _build_eval_context(spec)
@@ -359,8 +362,14 @@ def test_svd_schur_continuity_through_critical_point() -> None:
 
     # Compare eigenvalues at a representative non-DC mode
     m_idx = 2
-    w_near = np.sort_complex(np.linalg.eigvals(A_near[m_idx]))
-    w_crit = np.sort_complex(np.linalg.eigvals(A_crit[m_idx]))
+    w_near = np.asarray(
+        np.sort_complex(np.linalg.eigvals(A_near[m_idx])),  # type: ignore[reportUnknownArgumentType]
+        dtype=np.complex128,
+    )
+    w_crit = np.asarray(
+        np.sort_complex(np.linalg.eigvals(A_crit[m_idx])),  # type: ignore[reportUnknownArgumentType]
+        dtype=np.complex128,
+    )
 
     # At the critical point, one DOF is eliminated, so A_crit may have
     # some zero eigenvalues.  Compare the non-zero eigenvalues.
@@ -544,8 +553,8 @@ def test_kcc_rank_deficient_pinv_continuity() -> None:
     )
 
     m_idx = 2
-    w_near = np.linalg.eigvals(A_near[m_idx])
-    w_crit = np.linalg.eigvals(A_crit[m_idx])
+    w_near = np.asarray(np.linalg.eigvals(A_near[m_idx]), dtype=np.complex128)
+    w_crit = np.asarray(np.linalg.eigvals(A_crit[m_idx]), dtype=np.complex128)
 
     # No tachyonic eigenvalues at either parameter point
     max_re_near = float(np.max(np.abs(w_near.real)))
@@ -559,8 +568,12 @@ def test_kcc_rank_deficient_pinv_continuity() -> None:
     )
 
     # Physical eigenvalues (|λ| > 0.01) should be continuous
-    phys_near = sorted(w_near[np.abs(w_near) > 0.01], key=lambda z: -abs(z.imag))
-    phys_crit = sorted(w_crit[np.abs(w_crit) > 0.01], key=lambda z: -abs(z.imag))
+    phys_near: list[complex] = sorted(
+        w_near[np.abs(w_near) > 0.01], key=lambda z: -abs(z.imag)
+    )
+    phys_crit: list[complex] = sorted(
+        w_crit[np.abs(w_crit) > 0.01], key=lambda z: -abs(z.imag)
+    )
 
     if phys_near and phys_crit:
         max_imag_near = max(abs(z.imag) for z in phys_near)

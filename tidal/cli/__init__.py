@@ -27,16 +27,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     """Build the top-level argument parser with subcommands."""
     # Use rich-argparse for colored help if available, fallback to default
     try:
-        from rich_argparse import RichHelpFormatter
+        from rich_argparse import RichHelpFormatter  # type: ignore[import-untyped]
 
-        formatter = RichHelpFormatter
+        formatter: type[argparse.HelpFormatter] = RichHelpFormatter  # type: ignore[reportUnknownVariableType]
     except ImportError:
         formatter = argparse.HelpFormatter
 
     parser = argparse.ArgumentParser(
         prog="tidal",
         description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, plot, sweep, sample, list.",
-        formatter_class=formatter,
+        formatter_class=formatter,  # type: ignore[reportArgumentType]
     )
     parser.add_argument(
         "--version",
@@ -1813,7 +1813,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
 
     # Shell completion (optional dependency: shtab)
     try:
-        import shtab
+        import shtab  # type: ignore[import-untyped]
 
         shtab.add_argument_to(parser)
     except ImportError:

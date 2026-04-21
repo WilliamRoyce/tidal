@@ -35,6 +35,7 @@ from tidal.solver.modal import solve_modal, solve_modal_pass1
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from tidal.solver._types import PerturbativePass1Result, SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -105,9 +106,9 @@ class PerturbativeResult:
         coefficient.
     """
 
-    orders: list[dict[str, Any]] = field(default_factory=list)
-    total: dict[str, Any] = field(default_factory=dict)
-    validity: dict[str, Any] = field(default_factory=dict)
+    orders: list[Any] = field(default_factory=list)  # type: ignore[reportUnknownVariableType]
+    total: dict[str, Any] = field(default_factory=dict)  # type: ignore[reportUnknownVariableType]
+    validity: dict[str, Any] = field(default_factory=dict)  # type: ignore[reportUnknownVariableType]
     spec: EquationSystem | None = None
     full_spec: EquationSystem | None = None
 
@@ -251,7 +252,7 @@ def _compute_validity(
 
 
 def _assemble_full_state_pass_n(
-    pass_n_result: dict[str, Any],
+    pass_n_result: SolverResult | PerturbativePass1Result,
     eigendata: dict[str, Any],
     full_state_size: int,
     full_layout: Any,
@@ -414,8 +415,8 @@ class PerturbativeSolver:
         # eps=0 trigger demotion to algebraic constraint (v6 Gap B).
         # Small parameter names come from the metadata.perturbation block
         # emitted by ExportJSON.wl when [perturbation] is configured.
-        pert_meta = spec.metadata.get("perturbation", {}) or {}
-        small_parameters = list(pert_meta.get("small_parameters", []))
+        pert_meta: dict[str, Any] = spec.metadata.get("perturbation", {}) or {}
+        small_parameters: list[str] = list(pert_meta.get("small_parameters", []))
         self._small_parameters = small_parameters
         self.base_spec = spec.base_spec(small_parameters)
         self._max_order = spec.max_order()
@@ -544,7 +545,7 @@ class PerturbativeSolver:
             ),
         )
 
-        orders: list[dict[str, Any]] = [pass0]
+        orders: list[Any] = [pass0]
         total_y = pass0["y"].copy()
         correction_drops: list[dict[str, Any]] = []
 
@@ -610,8 +611,10 @@ class PerturbativeSolver:
 
         # Validity monitor (only meaningful when corrections are present).
         if small_parameters is None:
-            pert_meta = self.full_spec.metadata.get("perturbation", {}) or {}
-            small_parameters = list(pert_meta.get("small_parameters", []))
+            pert_meta_: dict[str, Any] = (
+                self.full_spec.metadata.get("perturbation", {}) or {}
+            )
+            small_parameters = list(pert_meta_.get("small_parameters", []))
 
         t_end = float(t_span[1] - t_span[0])
         if order >= 1 and self.has_corrections() and "eigendata" in pass0:
@@ -619,7 +622,7 @@ class PerturbativeSolver:
                 pass0["eigendata"], small_parameters, parameters, t_end
             )
         else:
-            validity = {
+            validity: dict[str, Any] = {
                 "omega_max": 0.0,
                 "eps_values": {},
                 "validity_param": 0.0,
@@ -753,13 +756,13 @@ def _compute_constraint_source_hat(
         time ``pass0_t[ti]``.
     """
     # pylint: disable=import-outside-toplevel
+    import tidal.solver.modal as _modal_mod  # noqa: PLC0415
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
-    from tidal.solver.modal import (  # noqa: PLC0415
-        _OPERATOR_DECOMP,
-        _build_k_axes,
-        _build_k_grid,
-        _resolve_constant_coeff,
-    )
+
+    OPERATOR_DECOMP = _modal_mod._OPERATOR_DECOMP  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    build_k_axes = _modal_mod._build_k_axes  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    build_k_grid = _modal_mod._build_k_grid  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    resolve_constant_coeff = _modal_mod._resolve_constant_coeff  # noqa: SLF001  # type: ignore[reportPrivateUsage]
 
     schur_ops = eigendata.get("schur_ops")
     if schur_ops is None or "recovery_matrix" not in schur_ops:
@@ -784,8 +787,8 @@ def _compute_constraint_source_hat(
     dyn_layout = eigendata["state_layout"]
 
     # --- Fourier k-grid and spatial-multiplier cache --------------------
-    k_axes = _build_k_axes(grid)
-    k_grid = _build_k_grid(k_axes)
+    k_axes = build_k_axes(grid)
+    k_grid = build_k_grid(k_axes)
     rfft_shape_list = list(grid.shape)
     rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
     rfft_shape = tuple(rfft_shape_list)
@@ -795,7 +798,7 @@ def _compute_constraint_source_hat(
     def _spatial_multiplier(op: str) -> NDArray[np.complex128]:
         if op in spatial_cache:
             return spatial_cache[op]
-        decomp = _OPERATOR_DECOMP.get(op)
+        decomp = OPERATOR_DECOMP.get(op)
         if decomp is None:
             msg = (
                 f"_compute_constraint_source_hat: operator {op!r} has no "
@@ -820,7 +823,7 @@ def _compute_constraint_source_hat(
         for term in eq.rhs_terms:
             if term.order_in_eps != 1:
                 continue
-            decomp = _OPERATOR_DECOMP.get(term.operator)
+            decomp = OPERATOR_DECOMP.get(term.operator)
             if decomp is None:
                 continue
             needed_orders.add(int(decomp.time_order))
@@ -894,11 +897,11 @@ def _compute_constraint_source_hat(
             if term.order_in_eps != 1:
                 continue
             # Resolve numeric coefficient via modal's existing helper.
-            coeff = _resolve_constant_coeff(
+            coeff = resolve_constant_coeff(
                 term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
             )
             mult = _spatial_multiplier(term.operator)  # (n_modes,)
-            decomp = _OPERATOR_DECOMP[term.operator]
+            decomp = OPERATOR_DECOMP[term.operator]
             n_op = int(decomp.time_order)
 
             # Resolve target kind.

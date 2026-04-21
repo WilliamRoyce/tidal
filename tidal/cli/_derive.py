@@ -1563,10 +1563,13 @@ def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0914, PLR091
 
         cd_candidate_names: list[str] = [df["name"] for df in dyn_fields]
         if ctx.linearization is not None:
-            for mp in ctx.linearization.get("matter_perturbations", []) or []:
-                fname = mp.get("field")
-                if fname:
-                    cd_candidate_names.append(fname)
+            matter_perts: list[Any] = list(
+                ctx.linearization.get("matter_perturbations", []) or []
+            )
+            for _mp in matter_perts:
+                raw_fname = _mp.get("field") if isinstance(_mp, dict) else None  # type: ignore[reportUnknownVariableType]
+                if isinstance(raw_fname, str) and raw_fname:
+                    cd_candidate_names.append(raw_fname)
         lag_expr = ctx.lagrangian_expr or ""
         for name in cd_candidate_names:
             if not name:
@@ -4415,7 +4418,8 @@ def _validate_perturbation_config(
             f"strings; got {small_params!r}."
         )
         raise ValueError(msg)
-    for name in small_params:
+    small_params_list: list[Any] = list(small_params)  # type: ignore[reportUnknownVariableType]
+    for name in small_params_list:
         if not isinstance(name, str):
             msg = (
                 f"[perturbation].small_parameters entries must be strings; "
@@ -4444,7 +4448,7 @@ def _validate_perturbation_config(
         raise ValueError(msg)
 
     return {
-        "small_parameters": list(small_params),
+        "small_parameters": small_params_list,
         "order": order,
         "enabled": True,
         "validity_warnings": bool(cfg.get("validity_warnings", True)),

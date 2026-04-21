@@ -413,8 +413,8 @@ class TestPerturbativeBaseStability:
         """
         data = copy.deepcopy(_KG_WITH_EPS)
         # Flip the sign of the -m²·φ term → +m²·φ (wrong-sign mass).
-        terms = data["equations"][0]["rhs"]["terms"]  # type: ignore[index]
-        for t in terms:
+        terms: list[dict[str, Any]] = data["equations"][0]["rhs"]["terms"]  # type: ignore[index, reportUnknownVariableType]
+        for t in terms:  # type: ignore[reportUnknownVariableType]
             if t.get("coefficient_symbolic") == "-m2":
                 t["coefficient"] = 1.0  # was -1.0
                 t["coefficient_symbolic"] = "m2"
@@ -552,16 +552,16 @@ class TestPassOneConstraintRecovery:
         # The recovery check: at each snapshot, extract the Pass 1
         # A_0 component from the full-layout output, FFT it in space,
         # and verify it matches recovery_matrix @ y_hat_dyn[A_1].
-        eigendata = res.orders[0]["eigendata"]
-        schur_ops = eigendata.get("schur_ops")
+        eigendata: dict[str, Any] = res.orders[0]["eigendata"]
+        schur_ops: dict[str, Any] | None = eigendata.get("schur_ops")
         assert schur_ops is not None, "Proca spec must have Schur operators"
 
-        recovery_matrix = schur_ops["recovery_matrix"]
-        c_names = schur_ops["constraint_field_names"]
+        recovery_matrix: Any = schur_ops["recovery_matrix"]
+        c_names: Any = schur_ops["constraint_field_names"]
         assert "A_0" in c_names
         c_idx = list(c_names).index("A_0")
 
-        y_hat_dyn = pass1.get("y_hat_dyn")
+        y_hat_dyn: Any = pass1.get("y_hat_dyn")
         assert y_hat_dyn is not None, (
             "Pass 1 result must carry y_hat_dyn for constraint recovery"
         )

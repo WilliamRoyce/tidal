@@ -488,7 +488,9 @@ class TestCrossBlockCouplingRaises:
         # independent blocks.
         phi_eq = base_data["equations"][0]  # type: ignore[index]
         phi_eq["rhs"]["terms"] = [  # type: ignore[index]
-            t for t in phi_eq["rhs"]["terms"] if t.get("order_in_eps", 0) == 0
+            t
+            for t in phi_eq["rhs"]["terms"]  # type: ignore[reportUnknownVariableType]
+            if t.get("order_in_eps", 0) == 0
         ]
         base_spec = _make_spec(base_data)
         n_grid = 16
@@ -635,7 +637,7 @@ class TestPass1NearDegeneracy:
         → z_0(t) = G(λ_i, λ_j; t). That's the scalar we compare
         against mpmath's direct evaluation of the kernel.
         """
-        import mpmath
+        import mpmath  # type: ignore[import-untyped]
 
         from tidal.solver.modal import (
             _evolve_duhamel_per_mode,
@@ -678,10 +680,10 @@ class TestPass1NearDegeneracy:
         mp.dps = 50
         z = (lam_j - lam_i) * t_end
         # Primary reference: direct formula, arbitrary-precision.
-        num = mpmath.exp(lam_j * t_end) - mpmath.exp(lam_i * t_end)
-        den = mpmath.mpc(lam_j - lam_i)
-        G_ref_mp = num / den
-        G_ref_complex = complex(G_ref_mp.real, G_ref_mp.imag)
+        num = mpmath.exp(lam_j * t_end) - mpmath.exp(lam_i * t_end)  # type: ignore[reportUnknownVariableType]
+        den = mpmath.mpc(lam_j - lam_i)  # type: ignore[reportUnknownVariableType]
+        G_ref_mp = num / den  # type: ignore[reportUnknownVariableType]
+        G_ref_complex = complex(float(G_ref_mp.real), float(G_ref_mp.imag))  # type: ignore[reportUnknownArgumentType]
         _ = z  # keep z in scope for the diagnostic message below
 
         rel_err = abs(pipeline_z - G_ref_complex) / (abs(G_ref_complex) + 1e-30)
@@ -816,7 +818,7 @@ class TestPass1TimeDerivativeTargetingDynamical:
             pass0["t"],
             parameters=params,
         )
-        pass0["y"] + pass1["y"]
+        _ = pass0["y"] + pass1["y"]
 
         omega0 = float(np.sqrt(m2 + 1.0))  # k=1
         t_vals = pass0["t"]

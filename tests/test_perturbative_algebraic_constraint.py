@@ -347,7 +347,7 @@ class TestAugmentedRecoveryMatchesMpmath:
         phi_tot = res.total["y"][:, phi_slot * n : (phi_slot + 1) * n]
         h_tot = res.total["y"][:, h_slot * n : (h_slot + 1) * n]
 
-        import mpmath
+        import mpmath  # type: ignore[import-untyped]
 
         mpmath.mp.dps = 50
         b5 = mpmath.mpf(params["b5"])
@@ -357,14 +357,14 @@ class TestAugmentedRecoveryMatchesMpmath:
         # Light-mode omega² from the 2x2 dispersion det: solve
         #   b5*omega^4 - (1 + a*b5)*omega^2 + (a - b5*g^2) = 0  with a = m² + k².
         # Take the smaller root (light mode).
-        a = m2 + k2
+        a = m2 + k2  # type: ignore[reportUnknownVariableType]
         # Light-mode dispersion: ω² = a + ε·g² + O(ε²) from
         # (a - ω²)·(1 + ε·ω²) + ε·g² = 0 (from det of 2x2 block).
         # Exact eigenvector ratio: h/phi = g / (1 + ε·ω²).
         # Driver Pass 0 + Pass 1 truncates at O(ε¹):
         #   h/phi ≈ g·(1 − ε·ω²_0) = g·(1 − ε·a) + O(ε²)
-        ratio_truncated = g * (1 - b5 * a)
-        ratio_analytical = float(ratio_truncated)
+        ratio_truncated = g * (1 - b5 * a)  # type: ignore[reportUnknownVariableType]
+        ratio_analytical = float(ratio_truncated)  # type: ignore[reportUnknownArgumentType]
 
         # Driver output: sample ratio h_total / phi_total at the
         # snapshot / grid point with largest |phi| (away from nodes).
@@ -395,23 +395,23 @@ class TestAugmentedRecoveryMatchesMpmath:
         phi_tot = res.total["y"][:, phi_slot * n : (phi_slot + 1) * n]
         h_tot = res.total["y"][:, h_slot * n : (h_slot + 1) * n]
 
-        import mpmath
+        import mpmath  # type: ignore[import-untyped]
 
         mpmath.mp.dps = 50
         b5 = mpmath.mpf(params["b5"])
         g = mpmath.mpf(params["g"])
-        a = mpmath.mpf(params["m2"]) + mpmath.mpf(1)
+        a = mpmath.mpf(params["m2"]) + mpmath.mpf(1)  # type: ignore[reportUnknownVariableType]
         # Light-mode ω² from dispersion: (a - ω²)(1 + ε·ω²) + ε·g² = 0
         # Solve exactly via quadratic: ε·ω⁴ + (1 - ε·a)·ω² - (a + ε·g²) = 0
         A = b5
-        B = 1 - b5 * a
-        C = -(a + b5 * g * g)
-        disc = mpmath.sqrt(B * B - 4 * A * C)
+        B = 1 - b5 * a  # type: ignore[reportUnknownVariableType]
+        C = -(a + b5 * g * g)  # type: ignore[reportUnknownVariableType]
+        disc = mpmath.sqrt(B * B - 4 * A * C)  # type: ignore[reportUnknownVariableType]
         # Light mode = smaller positive root.
-        roots = [(-B + disc) / (2 * A), (-B - disc) / (2 * A)]
-        omega2_light_mp = min((r for r in roots if r > 0), key=abs)
-        ratio_exact = g / (1 + b5 * omega2_light_mp)
-        ratio_analytical = float(ratio_exact)
+        roots = [(-B + disc) / (2 * A), (-B - disc) / (2 * A)]  # type: ignore[reportUnknownVariableType]
+        omega2_light_mp = min((r for r in roots if r > 0), key=abs)  # type: ignore[reportUnknownVariableType]
+        ratio_exact = g / (1 + b5 * omega2_light_mp)  # type: ignore[reportUnknownVariableType]
+        ratio_analytical = float(ratio_exact)  # type: ignore[reportUnknownArgumentType]
 
         max_idx = np.argmax(np.abs(phi_tot.ravel()))
         ti_sample, xi_sample = np.unravel_index(max_idx, phi_tot.shape)
@@ -444,19 +444,19 @@ class TestAugmentedRecoveryMatchesMpmath:
         phi_tot = res.total["y"][:, phi_slot * n : (phi_slot + 1) * n]
         h_tot = res.total["y"][:, h_slot * n : (h_slot + 1) * n]
 
-        import mpmath
+        import mpmath  # type: ignore[import-untyped]
 
         mpmath.mp.dps = 50
         b5 = mpmath.mpf(params["b5"])
         m2 = mpmath.mpf(params["m2"])
         g = mpmath.mpf(params["g"])
         k2 = mpmath.mpf(1)
-        a = m2 + k2
+        a = m2 + k2  # type: ignore[reportUnknownVariableType]
         # Pass-0 + Pass-1 corresponds to h/phi ≈ g·(1 − b5·ω²_0) at
         # O(ε¹), with ω²_0 = a (leading-order). Higher-order ω²
         # corrections kick in at O(ε²) which are below our tolerance.
-        ratio_mp_truncated = g * (1 - b5 * a)
-        ratio_analytical = float(ratio_mp_truncated)
+        ratio_mp_truncated = g * (1 - b5 * a)  # type: ignore[reportUnknownVariableType]
+        ratio_analytical = float(ratio_mp_truncated)  # type: ignore[reportUnknownArgumentType]
 
         max_idx = np.argmax(np.abs(phi_tot.ravel()))
         ti_sample, xi_sample = np.unravel_index(max_idx, phi_tot.shape)

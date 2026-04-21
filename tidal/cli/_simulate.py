@@ -2288,7 +2288,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         # perturbation block, 0 otherwise. An explicit --perturbative-order
         # flag on the CLI overrides this default.  Use getattr so callers
         # built from leaner parsers (e.g. `tidal sample`) still work.
-        pert_meta = spec.metadata.get("perturbation") or {}
+        pert_meta: dict[str, Any] = spec.metadata.get("perturbation") or {}
         pert_order_arg = getattr(args, "perturbative_order", None)
         if pert_order_arg is not None:
             pert_order = int(pert_order_arg)
@@ -2315,7 +2315,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 num_snapshots=num_snapshots,
                 small_parameters=list(pert_meta.get("small_parameters") or []),
             )
-            result = pert_result.total
+            result = cast("SolverResult", pert_result.total)
             # Pass 0 / Pass 1 outputs live in base_spec's layout (h_4/h_7/h_9
             # demoted to algebraic constraints at ε=0). The solver now
             # carries this layout on the result itself (#276), so

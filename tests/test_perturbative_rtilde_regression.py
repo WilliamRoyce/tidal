@@ -196,7 +196,7 @@ def test_pass1_has_no_column_missing_drops(rtilde_spec: Any) -> None:
         parameters=_rtilde_params(b5=1e-3),
         num_snapshots=3,
     )
-    drops = res.validity.get("correction_drops") or []
+    drops: list[dict[str, str]] = res.validity.get("correction_drops") or []
     column_missing = [d for d in drops if d["reason"].startswith("column-missing")]
     assert not column_missing, (
         f"Found {len(column_missing)} column-missing drops — these "
