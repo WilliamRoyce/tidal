@@ -62,6 +62,7 @@ class _ResidualCtx:
         grid: GridInfo,
         bc: BCSpec | None,
         rhs_eval: RHSEvaluator | None = None,
+        m_inv: dict[str, float] | None = None,
     ) -> None:
         self.spec = spec
         self.layout = layout
@@ -70,6 +71,9 @@ class _ResidualCtx:
         self.n = grid.num_points
         self.shape = grid.shape
         self.rhs_eval = rhs_eval
+        # #301 / #302: per-field 1/M for non-trivial kinetic_coefficient_symbolic.
+        # None means M = I for every dynamical field (fast path).
+        self.m_inv = m_inv
         self.eq_map: dict[str, int] = spec.equation_map
         # Detect constraints with no self-referencing terms — the field
         # doesn't appear in its own equation (e.g. momentum constraints
@@ -316,11 +320,21 @@ class _ResidualCtx:
             self.res[slot_idx * self.n] = self.y[field_slot * self.n]
 
     def handle_velocity(self, slot_idx: int, slot: SlotInfo) -> None:
-        """E-L equation: dv/dt = RHS."""
+        """E-L equation: dv/dt = M⁻¹ RHS.
+
+        When ``self.m_inv`` carries a per-field inverse kinetic coefficient for
+        this field, apply it — so the residual is ``yp − M⁻¹ K(q) = 0``,
+        equivalent to the DAE ``M ẏ = K(q)`` for non-trivial mass matrices
+        (#301 / #302). Missing entries default to 1.0 (fast path).
+        """
         s = slice(slot_idx * self.n, (slot_idx + 1) * self.n)
         eq_idx = self.eq_map[slot.field_name]
         vel_rhs = self.compute_rhs(eq_idx)
-        self.res[s] = self.yp[s] - vel_rhs.ravel()
+        if self.m_inv is None:
+            self.res[s] = self.yp[s] - vel_rhs.ravel()
+        else:
+            scale = self.m_inv.get(slot.field_name, 1.0)
+            self.res[s] = self.yp[s] - scale * vel_rhs.ravel()
 
     def handle_dynamical_field(self, slot_idx: int, slot: SlotInfo) -> None:
         """Trivial kinematic: dq/dt = v."""
@@ -401,12 +415,20 @@ def build_residual_fn(  # noqa: PLR0913
             coeff_eval.check_periodic_coefficient_continuity(periodic, rtol=rtol)
         rhs_eval = _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
 
+    # #301 / #302: evaluate kinetic_coefficient_symbolic so the DAE residual is
+    # yp − M⁻¹·K(q) for theories with non-trivial mass matrix. None triggers
+    # the M=I fast path.
+    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+    m_inv = build_inverse_kinetic_diag(spec, parameters or {})
+
     ctx = _ResidualCtx(
         spec=spec,
         layout=layout,
         grid=grid,
         bc=bc,
         rhs_eval=rhs_eval,
+        m_inv=m_inv,
     )
 
     def residual(
@@ -570,7 +592,9 @@ def solve_ida(  # noqa: PLR0913
             yp = result.yp
             for i in range(len(result.t)):
                 snapshot_callback(
-                    result.t[i], result.y[i], yp[i] if yp is not None else None,
+                    result.t[i],
+                    result.y[i],
+                    yp[i] if yp is not None else None,
                 )
 
     return {

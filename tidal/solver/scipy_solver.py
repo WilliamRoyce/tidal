@@ -48,9 +48,16 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     grid: GridInfo,
     bc: BCSpec | None,
     rhs_eval: RHSEvaluator,
+    m_inv: dict[str, float] | None,
     progress: SimulationProgress | None = None,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
-    """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``."""
+    """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``.
+
+    When ``m_inv`` is a dict, apply the per-field inverse kinetic coefficient
+    to the velocity slot update so ``d²ₜ q = M⁻¹ · K(q)`` for theories whose
+    spec carries non-trivial ``kinetic_coefficient_symbolic`` (see #301 / #302).
+    ``None`` triggers the fast path (M = I for every dynamical field).
+    """
     eq_map = spec.equation_map
     fs = FieldSet.zeros(layout, grid.shape)
     force_buf = np.zeros(layout.total_size)
@@ -76,8 +83,13 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
             fieldset=fs,
         )
 
-        for _si, s, _fn in layout.velocity_slot_groups:
-            dydt_buf[s] = force_buf[s]
+        if m_inv is None:
+            for _si, s, _fn in layout.velocity_slot_groups:
+                dydt_buf[s] = force_buf[s]
+        else:
+            for _si, s, fn in layout.velocity_slot_groups:
+                scale = m_inv.get(fn, 1.0)
+                dydt_buf[s] = scale * force_buf[s]
         # Zero-copy velocity: read directly from y's velocity slots
         for field_slice, vel_slice in drift_pairs:
             dydt_buf[field_slice] = y[vel_slice]
@@ -157,8 +169,14 @@ def solve_scipy(  # noqa: PLR0913
     warn_frozen_constraints(layout, "scipy")
     rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc, rtol=rtol)
 
+    # #301 / #302: evaluate kinetic_coefficient_symbolic so d²ₜ q = M⁻¹·K(q)
+    # for theories with non-trivial mass matrix. None triggers the M=I fast path.
+    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+    m_inv = build_inverse_kinetic_diag(spec, parameters or {})
+
     # Build RHS closure (with optional progress tracking)
-    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval, progress=progress)
+    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval, m_inv, progress=progress)
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)

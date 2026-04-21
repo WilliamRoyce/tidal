@@ -480,6 +480,42 @@ Component & Location & How Used \\
 
 \textbf{Not reused:} \texttt{constraint\_solve.py:\_MULTIPLIERS} --- uses modified wavenumbers matching FD stencils. Modal solver defines its own exact multiplier registry.
 
+\subsection{Kinetic Coefficient Handling --- Two Dispatches}
+\label{sec:modal-kinetic-dispatches}
+
+The mass matrix $M$ from \texttt{kinetic\_coefficient\_symbolic} (``$M \ddot{x} = K x$'' rather than ``$\ddot{x} = K x$'') reaches the solver through \emph{two distinct code paths} depending on whether the spec has algebraic constraints or higher-order time operators. Both paths must apply $M$ identically, or cross-path regressions appear silently (the original \#301 Bug B symptom). This section documents the contract so future changes update both paths.
+
+\textbf{Why two paths.} The fast path exists because the majority of theories (Klein--Gordon, wave equations, most multi-field systems) have neither constraints nor higher-order time operators on the RHS. For these, bypassing the generalized eigenvalue problem and producing the pre-solved first-order evolution matrix directly saves the QZ decomposition cost and avoids spurious infinite eigenvalues that appear when $B$ is exactly $I$.
+
+\begin{table}[htbp]
+\centering
+\caption{Kinetic coefficient consumption across modal code paths. The dispatch condition is computed by \texttt{solve\_modal} at line 2385 as \texttt{needs\_reduction = (has\_constraints or has\_time\_ops) and not has\_pos\_dep}.}
+\label{tab:modal-kinetic-dispatch}
+\begin{tabular}{@{}p{0.18\textwidth}p{0.32\textwidth}p{0.42\textwidth}@{}}
+\toprule
+Path & Dispatch condition & How $M$ is consumed \\
+\midrule
+Fast (\texttt{\_build\_per\_mode\_matrices}) & No constraints, no d\_t RHS ops, no pos.\ dep.\ coefficients & \texttt{build\_inverse\_kinetic\_diag(spec, params)} computes $M^{-1}$ per field; folded into velocity-row coefficients so \texttt{A[vel\_slot, target\_slot] = $M^{-1}$ · coeff · multiplier}. Single eigendecomposition of the resulting first-order matrix. \\
+Gen.\ eig (\texttt{\_build\_evolution\_matrices}) & Constraints, or d\_t RHS ops, or gauge $A_0$ demotion & \texttt{kinetic\_coefficient\_symbolic} populated on the diagonal of \texttt{M\_mat}; \texttt{scipy.linalg.eig(A, B)} with QZ handles $M$, rank-deficiency via null-space projection, hidden algebraic constraints via Schur elimination. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Shared helper.} \texttt{tidal/solver/\_kinetic.py::build\_inverse\_kinetic\_diag(spec, params)} is the single entry point consumed by:
+\begin{itemize}
+  \item Modal fast path (this path --- folds $M^{-1}$ into the evolution matrix)
+  \item \texttt{solver/scipy\_solver.py}, \texttt{solver/cvode.py}, \texttt{solver/leapfrog.py}, \texttt{solver/ida.py} (time-domain backends --- multiply RHS by $M^{-1}$ at each step; IDA absorbs it into the DAE residual)
+\end{itemize}
+The modal generalized-eig path is the exception: it reads \texttt{kinetic\_coefficient\_symbolic} directly into \texttt{M\_mat}, because the generalized eigenvalue solve needs $M$ as a matrix, not as a scalar-per-field inverse. These are two representations of the same physical input.
+
+\textbf{Fast-path trigger.} \texttt{build\_inverse\_kinetic\_diag} returns \texttt{None} when every dynamical field has $|M_{ii} - 1| < 10^{-12}$, letting every caller skip the per-step multiply. Theories without \texttt{kinetic\_coefficient\_symbolic} (the vast majority) pay zero overhead for this feature.
+
+\textbf{Sign convention.} \texttt{kinetic\_coefficient\_symbolic} carries the raw LHS coefficient sum from the Wolfram EOM (see \cref{sec:pr-eh-cd}), which may be negative (e.g., graviton $-\kappa^{-2}$). Both paths accept negative $M$ --- negative eigenvalues of the generalized problem give ghost modes, which are physically meaningful for theories like PGT with indefinite kinetic structure. The consistency test \texttt{tests/test\_solver\_kinetic\_consistency.py} validates agreement across all five backends on a theory with $M = 1.5$.
+
+\textbf{Regression guard.} Both paths must be updated together when the kinetic handling changes. The cross-backend consistency test will catch any path that stops consuming $M$ correctly.
+
+\textbf{Scope.} Current implementation handles \emph{diagonal} $M$ (one scalar per field). Off-diagonal kinetic mixing (e.g., $\delta_m F \cdot F_{\text{torsion}}$ in dark-photon plasma theories) is a separate extension tracked in issue \#305; the data structures in both paths are already $(n_{\text{fields}}, n_{\text{fields}})$-shaped so the diagonal case is a 1D slice of the general case.
+
 \subsection{Block-Aware Eigendecomposition}
 \label{sec:modal-block-aware}
 

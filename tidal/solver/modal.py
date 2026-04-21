@@ -11,7 +11,39 @@ Applicable to any linear PDE system with:
 - Time-independent coefficients (position-dependent OK via convolution)
 - Operators with known exact Fourier multipliers
 
-Two algorithm paths are used depending on coefficient structure:
+Kinetic-coefficient (mass-matrix) handling — two dispatches
+-----------------------------------------------------------
+Equations with a non-trivial ``kinetic_coefficient_symbolic`` (``M ẍ = K x``
+rather than ``ẍ = K x``) reach the solver via **two distinct code paths**
+depending on whether the spec has algebraic constraints or higher-order time
+operators. Both paths must consume M identically, or cross-path regressions
+appear silently (original #301 Bug B symptom).
+
+1. **Fast path** — :func:`_build_per_mode_matrices` (called when
+   ``needs_reduction = False``: no constraints, no time-derivative operators
+   on the RHS, no position-dependent coefficients). Builds the first-order
+   evolution matrix directly as ``A[velocity_slot, target_slot] =
+   M⁻¹(field) · coeff · multiplier``. M⁻¹ is pre-computed once from
+   :func:`tidal.solver._kinetic.build_inverse_kinetic_diag` and folded into
+   the coefficients — no generalized eigenvalue solve needed.
+
+2. **Generalized-eig path** — :func:`_build_evolution_matrices` (called when
+   the spec has constraints or time-derivative RHS operators). Populates
+   ``M_mat`` from ``kinetic_coefficient_symbolic`` on the diagonal and
+   solves ``(K − λM) v = 0`` via ``scipy.linalg.eig(A, B)`` with QZ
+   decomposition. Handles rank-deficient M via null-space projection and
+   Schur elimination for hidden algebraic constraints.
+
+The choice is transparent to callers of :func:`solve_modal` but load-bearing
+for reviewers: both functions must be updated together when the kinetic
+handling changes. The time-domain backends (cvode/ida/leapfrog/scipy) use
+:func:`tidal.solver._kinetic.build_inverse_kinetic_diag` as a shared entry
+point, keeping the five backends (modal-fast, modal-genEig, cvode, ida,
+leapfrog/scipy) numerically consistent per
+:mod:`tests.test_solver_kinetic_consistency`.
+
+Algorithm paths for coefficient structure
+-----------------------------------------
 - Constant coefficients: per-mode eigendecomposition with block-aware independent
   blocks (machine-precision, ~14x faster).
 - Position-dependent coefficients: Krylov matrix exponential (expm_multiply) which
@@ -694,7 +726,10 @@ def _build_evolution_matrices(
             ci = c_idx_map[eq.field_name]
             for term_idx, term in enumerate(eq.rhs_terms):
                 coeff = _resolve_constant_coeff(
-                    term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                    term,
+                    coeff_eval,
+                    eq_idx=eq_idx,
+                    term_idx=term_idx,
                 )
                 mult = multiplier_cache[term.operator]
                 decomp = _OPERATOR_DECOMP[term.operator]
@@ -733,7 +768,10 @@ def _build_evolution_matrices(
 
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                term,
+                coeff_eval,
+                eq_idx=eq_idx,
+                term_idx=term_idx,
             )
             mult = multiplier_cache[term.operator]
             decomp = _OPERATOR_DECOMP[term.operator]
@@ -893,10 +931,12 @@ def _build_evolution_matrices(
                 # V = right singular vectors (columns of M -> col basis)
                 # Σ_d = diag of positive singular values
                 V_full: NDArray[np.complex128] = np.asarray(
-                    Vh_svd.conj().T, dtype=np.complex128,
+                    Vh_svd.conj().T,
+                    dtype=np.complex128,
                 )  # (n_f, n_f)
                 U_full: NDArray[np.complex128] = np.asarray(
-                    U_svd, dtype=np.complex128,
+                    U_svd,
+                    dtype=np.complex128,
                 )  # (n_f, n_f)
                 V_d: NDArray[np.complex128] = V_full[:, dyn_mask]  # (n_f, n_mass_dyn)
                 V_c: NDArray[np.complex128] = V_full[:, con_mask]  # (n_f, n_mass_con)
@@ -935,7 +975,8 @@ def _build_evolution_matrices(
 
                 if has_k_con:
                     K_cc_pinv: NDArray[np.complex128] = cast(
-                        "NDArray[np.complex128]", np.linalg.pinv(K_cc),
+                        "NDArray[np.complex128]",
+                        np.linalg.pinv(K_cc),
                     )
                     mass_recovery = cast(
                         "NDArray[np.complex128]",
@@ -999,7 +1040,8 @@ def _build_evolution_matrices(
                     # requires inv(V_eff^H V_eff) and fails when V_eff has
                     # linearly-dependent columns.
                     V_eff_pinv: NDArray[np.complex128] = cast(
-                        "NDArray[np.complex128]", np.linalg.pinv(V_eff),
+                        "NDArray[np.complex128]",
+                        np.linalg.pinv(V_eff),
                     )  # (n_modes, n_mass_dyn, n_f)
                     K_orig = np.einsum("mia,mab,mbj->mij", V_eff, E_final, V_eff_pinv)
                     D_orig = np.einsum("mia,mab,mbj->mij", V_eff, F_final, V_eff_pinv)
@@ -1159,7 +1201,8 @@ def _build_evolution_matrices(
         # reconstruct h_c¹ = recovery·y_dyn¹ + S_cc_inv·[LHS-feedback +
         # order-1 RHS corr].
         Scc_inv_out: NDArray[np.complex128] | None = np.asarray(
-            S_cc_inv, dtype=np.complex128,
+            S_cc_inv,
+            dtype=np.complex128,
         )
         Scc_singular_mask_out: NDArray[np.bool_] | None = singular_mask
 
@@ -1266,6 +1309,19 @@ def _build_per_mode_matrices(
 ) -> NDArray[np.complex128]:
     """Build evolution matrices for the all-constant-coefficient case.
 
+    Fast path for systems without constraints and without time-derivative RHS
+    operators — directly produces the pre-solved first-order evolution matrix
+    without needing a generalized eigenvalue decomposition.
+
+    Kinetic-coefficient (mass matrix) handling: when any dynamical equation
+    carries ``kinetic_coefficient_symbolic`` (``M ẍ = K x`` form), ``M⁻¹`` is
+    pre-computed per field via
+    :func:`tidal.solver._kinetic.build_inverse_kinetic_diag` and folded into
+    the velocity-row coefficients so the emitted matrix represents
+    ``dv/dt = M⁻¹ · K(q)``. The companion generalized-eig path
+    (:func:`_build_evolution_matrices`) reads the same field into ``M_mat``
+    instead; the two paths must stay consistent (see module docstring).
+
     Returns array of shape (n_modes, n_state_slots, n_state_slots) where
     each [m, :, :] is the evolution matrix for mode m.
 
@@ -1299,9 +1355,22 @@ def _build_per_mode_matrices(
     # Build matrices: A[m, i, j] for each mode m
     A = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
 
+    # #301 / #302: apply M⁻¹ to velocity-row entries so dv/dt = M⁻¹ K(q) for
+    # theories with non-trivial kinetic_coefficient_symbolic. The generalised
+    # eig path (_build_evolution_matrices) reads kinetic into M_mat directly;
+    # this fast path instead folds M⁻¹ into the pre-solved evolution matrix.
+    # build_inverse_kinetic_diag returns None when every dyn M ≈ 1 (fast path).
+    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+    m_inv = build_inverse_kinetic_diag(
+        spec,
+        coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    )
+
     for _eq_idx, eq in enumerate(spec.equations):
         field_name = eq.field_name
         is_second_order = eq.time_derivative_order >= 2
+        scale = 1.0 if m_inv is None else m_inv.get(field_name, 1.0)
 
         if is_second_order:
             # Field slot and velocity slot
@@ -1311,7 +1380,7 @@ def _build_per_mode_matrices(
             # dq/dt = v  →  A[field_slot, vel_slot] = 1
             A[:, field_slot, vel_slot] = 1.0
 
-            # dv/dt = Σ coeff * operator(target_field)
+            # dv/dt = M⁻¹ · Σ coeff * operator(target_field)
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = _resolve_target_slot(term.field)
                 if target_slot is None:
@@ -1323,10 +1392,12 @@ def _build_per_mode_matrices(
                     term_idx=_term_idx,
                 )
                 mult = multiplier_cache[term.operator]
-                A[:, vel_slot, target_slot] += coeff * mult
+                A[:, vel_slot, target_slot] += scale * coeff * mult
 
         else:
             # First-order: du/dt = Σ coeff * operator(target_field)
+            # First-order kinetic scaling is not current-scope; leave unscaled
+            # so M⁻¹ only affects 2nd-order EL velocity updates.
             this_slot = layout.field_slot_map[field_name]
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = _resolve_target_slot(term.field)
@@ -2724,7 +2795,8 @@ def _build_source_matrix_k(
     def _get_m_src(n: int) -> NDArray[np.complex128]:
         if n not in M_src_by_order:
             M_src_by_order[n] = np.zeros(
-                (n_modes, n_slots, n_slots), dtype=np.complex128,
+                (n_modes, n_slots, n_slots),
+                dtype=np.complex128,
             )
         return M_src_by_order[n]
 
@@ -2795,7 +2867,10 @@ def _build_source_matrix_k(
 
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                term,
+                coeff_eval,
+                eq_idx=eq_idx,
+                term_idx=term_idx,
             )
             mult = multiplier_cache[term.operator]
             # #293: route the contribution to the matrix keyed
@@ -3081,7 +3156,11 @@ def solve_modal_pass1(
             )
 
     times, y_phys, y_hat_dyn = _evolve_duhamel_per_mode(
-        eigendata, M_src_k_by_order, t_eval, layout, grid,
+        eigendata,
+        M_src_k_by_order,
+        t_eval,
+        layout,
+        grid,
     )
 
     result: PerturbativePass1Result = {

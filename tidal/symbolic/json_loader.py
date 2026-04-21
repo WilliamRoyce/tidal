@@ -11,6 +11,7 @@ import json
 import logging
 import math
 import re
+import warnings
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from functools import cached_property
@@ -347,7 +348,9 @@ class BoundaryCondition:
         }
         if extra:
             logger.warning(
-                "%s BC ignores field(s): %s", bc_type, ", ".join(sorted(extra)),
+                "%s BC ignores field(s): %s",
+                bc_type,
+                ", ".join(sorted(extra)),
             )
         return cls(
             type=bc_type,
@@ -714,7 +717,9 @@ class ComponentEquation:
 
     @classmethod
     def from_dict(
-        cls, data: Mapping[str, Any], fields_lookup: dict[str, int],
+        cls,
+        data: Mapping[str, Any],
+        fields_lookup: dict[str, int],
     ) -> ComponentEquation:
         """Create a ComponentEquation from a dictionary.
 
@@ -886,7 +891,9 @@ class EquationSystem:
             k: float(v) for k, v in raw_params.items() if isinstance(v, (int, float))
         }
         expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
-            self.equations, self.component_names, parameters=check_params or None,
+            self.equations,
+            self.component_names,
+            parameters=check_params or None,
         )
         if (
             self.mass_matrix != expected_mass
@@ -1025,7 +1032,8 @@ class EquationSystem:
                     effective_coeff = term.coefficient
                     if term.coefficient_symbolic is not None and parameters:
                         resolved = _resolve_symbolic_coeff(
-                            term.coefficient_symbolic, parameters,
+                            term.coefficient_symbolic,
+                            parameters,
                         )
                         if resolved is not None:
                             effective_coeff = resolved
@@ -1169,7 +1177,9 @@ class EquationSystem:
         # would trigger __post_init__'s inconsistency UserWarning if
         # passed through unchanged.
         mass, coupling, mass_sym, coupling_sym = self._compute_matrices_from_terms(
-            new_eqs, self.component_names, parameters=None,
+            new_eqs,
+            self.component_names,
+            parameters=None,
         )
         return dataclasses.replace(
             self,
@@ -1200,7 +1210,8 @@ class EquationSystem:
         return any(t.order_in_eps > 0 for eq in self.equations for t in eq.rhs_terms)
 
     def base_spec(
-        self, small_parameters: Sequence[str] | None = None,
+        self,
+        small_parameters: Sequence[str] | None = None,
     ) -> EquationSystem:
         """Return the Pass 0 base spec with LHS demoted where required.
 
@@ -1259,7 +1270,8 @@ class EquationSystem:
 
             # Step 2: check whether the LHS itself is a correction.
             demote = lhs_collapses_to_zero(
-                eq.kinetic_coefficient_symbolic, small_parameters,
+                eq.kinetic_coefficient_symbolic,
+                small_parameters,
             )
 
             if demote:
@@ -1317,7 +1329,9 @@ class EquationSystem:
         # spec.mass_matrix get stale values.
         new_eqs_t = tuple(new_eqs)
         mass, coupling, mass_sym, coupling_sym = self._compute_matrices_from_terms(
-            new_eqs_t, self.component_names, parameters=None,
+            new_eqs_t,
+            self.component_names,
+            parameters=None,
         )
 
         return dataclasses.replace(
@@ -1414,7 +1428,9 @@ class EquationSystem:
             mass_matrix_symbolic,
             coupling_matrix_symbolic,
         ) = cls._compute_matrices_from_terms(
-            equations, component_names, parameters=default_params or None,
+            equations,
+            component_names,
+            parameters=default_params or None,
         )
 
         # Extract coordinate names and metric signature
@@ -1614,9 +1630,20 @@ def load_equation_system(json_path: Path | str) -> EquationSystem:
 
 
 def normalize_kinetic_coefficients(
-    spec: EquationSystem, params: dict[str, float],
+    spec: EquationSystem,
+    params: dict[str, float],
 ) -> EquationSystem:
     """Apply symbolic kinetic-coefficient normalization to an equation system.
+
+    .. deprecated::
+        All time-domain solver backends (cvode/ida/leapfrog/scipy) now consume
+        ``kinetic_coefficient_symbolic`` directly via
+        :func:`tidal.solver._kinetic.build_inverse_kinetic_diag`, matching the
+        modal solver's existing behaviour. The canonical spec form carries the
+        kinetic coefficient on the LHS and the un-normalised RHS; every
+        backend applies M⁻¹ at setup. This function is retained only for
+        external callers that pre-normalised specs before the root fix
+        landed (see #301, #304). It will be removed in a future release.
 
     ExportJSON.wl emits equations with a parameter-based kinetic coefficient
     (e.g. ``xi``) **un-divided** when the coefficient cannot be safely divided
@@ -1650,6 +1677,15 @@ def normalize_kinetic_coefficients(
     EquationSystem
         A new ``EquationSystem`` with all kinetic coefficients normalized.
     """
+    warnings.warn(
+        "normalize_kinetic_coefficients is deprecated. Time-domain solver "
+        "backends (cvode/ida/leapfrog/scipy) now consume "
+        "kinetic_coefficient_symbolic directly via "
+        "tidal.solver._kinetic.build_inverse_kinetic_diag, matching modal. "
+        "Drop the pre-normalisation call from your code. See #301, #304.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     new_eqs: list[ComponentEquation] = []
     changed = False
 
@@ -1714,7 +1750,9 @@ def normalize_kinetic_coefficients(
     # cached matrices on spec no longer match.
     new_eqs_t = tuple(new_eqs)
     mass, coupling, mass_sym, coupling_sym = spec._compute_matrices_from_terms(  # noqa: SLF001  # type: ignore[reportPrivateUsage]
-        new_eqs_t, spec.component_names, parameters=None,
+        new_eqs_t,
+        spec.component_names,
+        parameters=None,
     )
     return dataclasses.replace(
         spec,

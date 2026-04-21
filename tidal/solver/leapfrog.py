@@ -193,10 +193,21 @@ def _half_kick(
     force: np.ndarray,
     dt: float,
     layout: StateLayout,
+    m_inv: dict[str, float] | None = None,
 ) -> None:
-    """Apply half-kick: v += (dt/2) F(q), in-place."""
-    for _slot_idx, s, _field_name in layout.velocity_slot_groups:
-        y[s] += 0.5 * dt * force[s]
+    """Apply half-kick: v += (dt/2) M⁻¹ F(q), in-place.
+
+    When ``m_inv`` is a dict, apply the per-field inverse kinetic coefficient
+    for theories with non-trivial ``kinetic_coefficient_symbolic`` (#301 / #302).
+    ``None`` triggers the M = I fast path.
+    """
+    if m_inv is None:
+        for _slot_idx, s, _field_name in layout.velocity_slot_groups:
+            y[s] += 0.5 * dt * force[s]
+    else:
+        for _slot_idx, s, field_name in layout.velocity_slot_groups:
+            scale = m_inv.get(field_name, 1.0)
+            y[s] += 0.5 * dt * scale * force[s]
 
 
 def _weighted_kick(
@@ -204,14 +215,21 @@ def _weighted_kick(
     force: np.ndarray,
     weight_dt: float,
     layout: StateLayout,
+    m_inv: dict[str, float] | None = None,
 ) -> None:
-    """Apply weighted kick: v += weight_dt * F(q), in-place.
+    """Apply weighted kick: v += weight_dt * M⁻¹ F(q), in-place.
 
     Used by the Yoshida fused-kick scheme where adjacent half-kicks merge
-    into a single kick with combined weight.
+    into a single kick with combined weight. ``m_inv`` handling mirrors
+    :func:`_half_kick`.
     """
-    for _slot_idx, s, _field_name in layout.velocity_slot_groups:
-        y[s] += weight_dt * force[s]
+    if m_inv is None:
+        for _slot_idx, s, _field_name in layout.velocity_slot_groups:
+            y[s] += weight_dt * force[s]
+    else:
+        for _slot_idx, s, field_name in layout.velocity_slot_groups:
+            scale = m_inv.get(field_name, 1.0)
+            y[s] += weight_dt * scale * force[s]
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +334,12 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
     if parameters is not None:
         rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
 
+    # #301 / #302: evaluate kinetic_coefficient_symbolic so d²ₜ q = M⁻¹·K(q)
+    # for theories with non-trivial mass matrix. None triggers the M=I fast path.
+    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+    m_inv = build_inverse_kinetic_diag(spec, parameters or {})
+
     # Initialize state
     y = y0.copy()
     t = t_span[0]
@@ -368,7 +392,7 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
 
         for _step in range(n_steps):
             # Half-kick with cached F(q_n)
-            _half_kick(y, force_buf, dt, layout)
+            _half_kick(y, force_buf, dt, layout, m_inv)
 
             # Drift: q += dt * v (zero-copy, reads velocity directly from y)
             for field_slice, vel_slice in drift_pairs:
@@ -388,7 +412,7 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
             )
 
             # Half-kick with F(q_{n+1})
-            _half_kick(y, force_buf, dt, layout)
+            _half_kick(y, force_buf, dt, layout, m_inv)
 
             t += dt
 
@@ -440,7 +464,7 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
             out=force_buf,
             fieldset=fieldset_buf,
         )
-        _weighted_kick(y, force_buf, k_init, layout)
+        _weighted_kick(y, force_buf, k_init, layout, m_inv)
 
         for _step in range(n_steps):
             is_last = _step == n_steps - 1
@@ -462,7 +486,7 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
                 out=force_buf,
                 fieldset=fieldset_buf,
             )
-            _weighted_kick(y, force_buf, k_fused, layout)
+            _weighted_kick(y, force_buf, k_fused, layout, m_inv)
 
             # --- Sub-step 2: drift w₂, force, fused kick (w₂+w₁)/2 ---
             for field_slice, vel_slice in drift_pairs:
@@ -480,7 +504,7 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
                 out=force_buf,
                 fieldset=fieldset_buf,
             )
-            _weighted_kick(y, force_buf, k_fused, layout)
+            _weighted_kick(y, force_buf, k_fused, layout, m_inv)
 
             # --- Sub-step 3: drift w₁, force, closing + opening kick ---
             for field_slice, vel_slice in drift_pairs:
@@ -500,7 +524,7 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
             )
 
             # Closing half-kick w₁/2 — state is now synchronized
-            _weighted_kick(y, force_buf, k_init, layout)
+            _weighted_kick(y, force_buf, k_init, layout, m_inv)
 
             t += dt
 
@@ -514,7 +538,7 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
 
             if not is_last:
                 # Opening half-kick for next step (same force, no re-eval)
-                _weighted_kick(y, force_buf, k_init, layout)
+                _weighted_kick(y, force_buf, k_init, layout, m_inv)
 
     # Ensure final state is saved
     if not times or abs(times[-1] - t) > dt * 0.01:

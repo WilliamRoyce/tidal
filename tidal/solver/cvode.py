@@ -50,14 +50,21 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _build_rhsfn(
+def _build_rhsfn(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
     bc: BCSpec | None,
     rhs_eval: RHSEvaluator,
+    m_inv: dict[str, float] | None,
 ) -> Callable[[float, np.ndarray, np.ndarray], None]:
-    """Build the CVODE RHS closure: ``rhsfn(t, y, yp)``."""
+    """Build the CVODE RHS closure: ``rhsfn(t, y, yp)``.
+
+    When ``m_inv`` is a dict, apply the per-field inverse kinetic coefficient
+    to the velocity slot update so ``d²ₜ q = M⁻¹·K(q)`` for theories with
+    non-trivial ``kinetic_coefficient_symbolic`` (#301 / #302). ``None``
+    triggers the fast path (M = I).
+    """
     eq_map = spec.equation_map
     fs = FieldSet.zeros(layout, grid.shape)
     force_buf = np.zeros(layout.total_size)
@@ -77,8 +84,13 @@ def _build_rhsfn(
         )
         velocity = compute_velocity(layout, y, out=vel_buf)
 
-        for _si, s, _fn in layout.velocity_slot_groups:
-            yp[s] = force[s]
+        if m_inv is None:
+            for _si, s, _fn in layout.velocity_slot_groups:
+                yp[s] = force[s]
+        else:
+            for _si, s, fn in layout.velocity_slot_groups:
+                scale = m_inv.get(fn, 1.0)
+                yp[s] = scale * force[s]
         for _si, s, _vs in layout.dynamical_field_slot_groups:
             yp[s] = velocity[s]
         for _si, s, field_name in layout.first_order_slot_groups:
@@ -161,8 +173,14 @@ def solve_cvode(  # noqa: PLR0913
     warn_frozen_constraints(layout, "CVODE")
     rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc, rtol=rtol)
 
+    # #301 / #302: evaluate kinetic_coefficient_symbolic so d²ₜ q = M⁻¹·K(q)
+    # for theories with non-trivial mass matrix. None triggers the M=I fast path.
+    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+    m_inv = build_inverse_kinetic_diag(spec, parameters or {})
+
     # Build RHS closure
-    rhsfn = _build_rhsfn(spec, layout, grid, bc, rhs_eval)
+    rhsfn = _build_rhsfn(spec, layout, grid, bc, rhs_eval, m_inv)
 
     # Configure CVODE solver
     options: dict[str, Any] = {
