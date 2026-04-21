@@ -151,5 +151,5 @@ Lagrangian sector and at what parameters?
 
 | Issue | Topic |
 |-------|-------|
-| TBD | Euler-Heisenberg F⁴ extension (#271 resolved, defer EH theory to future) |
-| TBD | Non-propagating/constraint torsion theories (single irreducible sector investigation) |
+| #296 | Euler-Heisenberg F⁴ extension (#271 resolved, defer EH theory to future) |
+| #297 | Non-propagating/constraint torsion theories (single irreducible sector investigation) |
