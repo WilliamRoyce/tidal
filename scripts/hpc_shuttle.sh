@@ -141,15 +141,24 @@ cmd_submit() {
   if [[ -z "$ntasks" ]]; then
     ntasks=$(( nodes * 112 ))
   fi
+  # In sed replacement strings, '&' expands to the matched text.
+  # Escape it in user-supplied values to prevent e.g. '&&' in --cmd
+  # from becoming '{{COMMAND}}{{COMMAND}}' after substitution.
+  local safe_cmd safe_root safe_account
+  safe_cmd="${cmd//\\/\\\\}"     # escape backslashes first
+  safe_cmd="${safe_cmd//&/\\&}"  # then escape ampersands
+  safe_root="${REMOTE_ROOT//&/\\&}"
+  safe_account="${account//&/\\&}"
+
   local rendered
   rendered="$(sed \
     -e "s|{{JOB_NAME}}|${name}|g" \
-    -e "s|{{ACCOUNT}}|${account}|g" \
+    -e "s|{{ACCOUNT}}|${safe_account}|g" \
     -e "s|{{NODES}}|${nodes}|g" \
     -e "s|{{NTASKS}}|${ntasks}|g" \
     -e "s|{{TIME}}|${time}|g" \
-    -e "s|{{COMMAND}}|${cmd}|g" \
-    -e "s|{{REMOTE_ROOT}}|${REMOTE_ROOT}|g" \
+    -e "s|{{COMMAND}}|${safe_cmd}|g" \
+    -e "s|{{REMOTE_ROOT}}|${safe_root}|g" \
     "$template")"
 
   note "submitting to sbatch on ${HOST}"
