@@ -26,7 +26,7 @@
 #      is stale (#292 MPI path needs mpi4py too).
 #   3. Run the caller-supplied command (tidal sample ...) via mpirun.
 #      pypolychord auto-detects MPI.COMM_WORLD at import time; with N
-#      ranks it parallelises the slice-sampling step up to ~nlive ranks
+#      ranks it parallelizes the slice-sampling step up to ~nlive ranks
 #      (arXiv:1506.00171 §3).  {{NTASKS}} is the rendered rank count;
 #      the caller controls it via the submit wrapper.
 #      NOTE on --cpus-per-task=1: _set_single_thread_blas() already

@@ -188,7 +188,7 @@ class TestEvaluateAtOne:
 
 
 class TestEvaluateWithSubstitutions:
-    """Generalised evaluator used by the two thin wrappers above."""
+    """Generalized evaluator used by the two thin wrappers above."""
 
     def test_custom_value_map(self) -> None:
         # Evaluating "2*b5 + 3*b1" at b5=0.5, b1=2 gives 2*0.5 + 3*2 = 7.
