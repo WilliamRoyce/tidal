@@ -194,3 +194,120 @@ Two earlier paths have been removed from TIDAL:
 \paragraph{Pre-VarD \texttt{Scalar[x]\textasciicircum n} expansion with \texttt{RenameDummies}.} An earlier version of the linearisation code expanded \texttt{Scalar[x]\textasciicircum n} into a product of \texttt{n} renamed copies before \texttt{VarD}. For the $\tilde{R}^2$ PGT theory this triggered index-inhomogeneity failures because xAct's \texttt{RenameDummies} is deterministic: repeated calls on the same expression return byte-identical output, so the ``product of renamed copies'' was really a product of $n$ identical factors, re-creating the repeated-index problem. The approach was retired and the comment at \texttt{tidal/cli/\_derive.py:2584--2589} explicitly warns against reinstating it. The modern fix for the same family of expressions is documented in \S\ref{sec:pr-eh-cd} below.
 
 \paragraph{Pass~2 numerical Duhamel (\texttt{order\_in\_eps = 2}).} Briefly planned as a natural extension of Pass~1, subsequently proven unreachable under TIDAL's design: Euler--Lagrange differentiation never squares a coupling, and \texttt{[perturbation]} forbids products of small parameters, so \texttt{ComputeOrderInEps} provably returns $\le 1$ for every term emitted by the pipeline. Issue~\#273 documents the closure; the \texttt{solve(order\textgreater{}1)} path raises \texttt{NotImplementedError} permanently, guarded by a warning in \texttt{PerturbativeSolver.solve} when a spec carries higher-order tags.
+
+\subsection{Validation: Euler--Heisenberg Vacuum Birefringence and the Dunne/Adler QED Ratio}
+\label{sec:pr-eh-validation}
+
+The Euler--Heisenberg example (\texttt{examples/euler\_heisenberg/theory.toml}) exercises every stage of the pipeline surveyed above, in a setting where a closed-form dispersion is available for every polarisation. Tests in \texttt{tests/test\_euler\_heisenberg.py} validate the pipeline against two independent benchmarks: (i)~self-consistency with the closed-form dispersion derived directly from TIDAL's JSON coefficients, and (ii)~the textbook QED birefringence ratio $7/4$ from Dunne~\cite{Dunne2004} and Adler~\cite{Adler1971}.
+
+\subsubsection{Lagrangian and JSON Coefficients}
+\label{sec:pr-eh-lagrangian}
+
+The TIDAL Lagrangian for Euler--Heisenberg vacuum birefringence is
+\begin{equation}
+  \mathcal{L}_{\mathrm{EH}}^{\mathrm{TIDAL}}
+  = -\tfrac14 F_{\mu\nu}F^{\mu\nu}
+  + \tfrac{\rho}{8}\big(F_{\mu\nu}F^{\mu\nu}\big)^2
+  + \tfrac{\sigma}{8}\big(\varepsilon^{\alpha\beta\gamma\delta}F_{\alpha\beta}F_{\gamma\delta}\big)^2
+  \label{eq:eh-tidal-lagrangian}
+\end{equation}
+with small parameters $\rho$, $\sigma \in$ \texttt{[perturbation].small\_parameters}. The parity-odd invariant uses the un-halved contraction $\varepsilon^{\alpha\beta\gamma\delta}F_{\alpha\beta}F_{\gamma\delta}$ (no $1/2$ on the dual), mirroring the convention of \texttt{examples/chern\_simons/theory.toml} and matching what \texttt{EvaluateEpsilonComponents} expects (\texttt{tidal/wolfram/CommonUtilities.wl}).
+
+After xAct linearisation around the pure magnetic background $\bar{A}_y = -B_0 z$ (so $B_x = B_0$) and plane-wave reduction along $z$, the four surviving photon components $(a_0, a_1, a_2, a_3) = (A_t, A_x, A_y, A_z)$ have the JSON dispersion
+\begin{align}
+  M_{a_1} &= -1 + 2\rho B_0^2 - 16\sigma B_0^2, \quad K_{a_1}\text{ coef of }\partial_z^2 = -1 + 2\rho B_0^2 \\
+  M_{a_2} &= -1 + 2\rho B_0^2, \qquad K_{a_2}\text{ coef of }\partial_z^2 = -1 + 6\rho B_0^2 \\
+  M_{a_3} &= -1 + 2\rho B_0^2, \qquad K_{a_3}\text{ coef of }\partial_z^2 = -1 + 2\rho B_0^2 \\
+  M_{a_0} &= \mathtt{None} \text{ (implicit }1\text{)}, \quad K_{a_0}\text{ coef of }\partial_z^2 = -1 + 2\rho B_0^2
+\end{align}
+The $\sigma$-dependence appears only in $M_{a_1}$ because, on a pure magnetic background under plane-wave reduction along $z$, the parity-odd contribution $\varepsilon^{\alpha\beta\gamma\delta}F_{\alpha\beta}F_{\gamma\delta}$ survives only through $\delta F_{0x} = \partial_t a_x = v_{a_1}$ -- the perpendicular polarisation $a_2$ is untouched. This is a direct consequence of the background geometry; it is a prediction of Eq.~\eqref{eq:eh-tidal-lagrangian}, not a fit.
+
+\subsubsection{Closed-Form Dispersion}
+\label{sec:pr-eh-dispersion}
+
+From the JSON coefficients above, solving $M \cdot \partial_t^2 q = K(k)\cdot q$ in Fourier space (with $\partial_z^2 \to -k^2$) gives the exact dispersion for each polarisation:
+\begin{align}
+  \frac{\omega_{\parallel}^2}{k^2} &= \frac{1 - 2\rho B_0^2}{1 - 2\rho B_0^2 + 16\sigma B_0^2}
+  \quad(a_1\text{, parallel to the }(k,\bar{B})\text{ plane}) \label{eq:eh-omega-par}\\
+  \frac{\omega_{\perp}^2}{k^2} &= \frac{1 - 6\rho B_0^2}{1 - 2\rho B_0^2}
+  \quad(a_2\text{, perpendicular to the }(k,\bar{B})\text{ plane}) \label{eq:eh-omega-perp}
+\end{align}
+Two features are built into the Lagrangian structure: $\omega_\parallel^2/k^2$ is independent of $\rho$ at $\sigma=0$ (the parity-even correction $(F\cdot F)^2$ is Lorentz-covariant around $\bar{B}$ -- $\rho$ multiplies both the kinetic and the gradient term with the same sign, so the ratio $K/M$ returns unity); and $\omega_\perp^2/k^2$ has no $\sigma$ dependence at all. Tests \texttt{TestAnalyticDispersion} measure both exactly.
+
+From Eqs.~\eqref{eq:eh-omega-par}--\eqref{eq:eh-omega-perp}, the refractive indices $n_\alpha = k/\omega_\alpha$ satisfy
+\begin{align}
+  n_\parallel^2 - 1 &= \frac{16\sigma B_0^2}{1 - 2\rho B_0^2} \approx 16\sigma B_0^2 \\
+  n_\perp^2 - 1 &= \frac{4\rho B_0^2}{1 - 6\rho B_0^2} \approx 4\rho B_0^2
+\end{align}
+so the TIDAL birefringence ratio is
+\begin{equation}
+  \frac{n_\parallel^2 - 1}{n_\perp^2 - 1}
+  = \frac{4\sigma}{\rho} \cdot \frac{1 - 6\rho B_0^2}{1 - 2\rho B_0^2}
+  \;\xrightarrow{\varepsilon \to 0}\; \frac{4\sigma}{\rho}.
+  \label{eq:eh-tidal-ratio}
+\end{equation}
+
+\subsubsection{Dunne/Adler Convention Mapping}
+\label{sec:pr-eh-dunne-mapping}
+
+Dunne's EH Lagrangian~\cite{Dunne2004} uses the \emph{halved} dual:
+\begin{equation}
+  \mathcal{L}_{\mathrm{EH}}^{\mathrm{Dunne}}
+  = -\tfrac14 F^2 + c_1 (F\cdot F)^2 + c_2 (F\cdot \tilde{F})^2,
+  \qquad
+  \tilde{F}^{\mu\nu} = \tfrac12 \varepsilon^{\mu\nu\rho\sigma} F_{\rho\sigma},
+  \label{eq:eh-dunne-lagrangian}
+\end{equation}
+with QED-computed coefficients $c_1 = \alpha^2/(90\pi^2 m_e^4)$ and $c_2 = 7\alpha^2/(360\pi^2 m_e^4)$, giving $c_2/c_1 = 7/4$. The famous QED birefringence prediction is~\cite{Adler1971}
+\begin{equation}
+  \frac{n_\parallel^2 - 1}{n_\perp^2 - 1} = \frac{7}{4}.
+  \label{eq:eh-qed-ratio}
+\end{equation}
+
+Because TIDAL uses the un-halved parity-odd invariant in Eq.~\eqref{eq:eh-tidal-lagrangian},
+\begin{equation}
+  \big(\varepsilon^{\alpha\beta\gamma\delta} F_{\alpha\beta} F_{\gamma\delta}\big)^2
+  = \big(2 F\cdot\tilde{F}\big)^2
+  = 4 \big(F\cdot\tilde{F}\big)^2.
+\end{equation}
+Matching TIDAL's $(\sigma/8)(\varepsilon F F)^2 = (\sigma/2)(F\cdot\tilde{F})^2$ to Dunne's $c_2 (F\cdot\tilde{F})^2$ gives $\sigma = 2c_2$. Similarly $\rho = 8c_1$. Therefore
+\begin{equation}
+  \frac{\sigma}{\rho}\bigg|_{\mathrm{Dunne}}
+  = \frac{2 c_2}{8 c_1} = \frac{c_2}{4 c_1} = \frac{7/4}{4} = \frac{7}{16}.
+  \label{eq:eh-convention-mapping}
+\end{equation}
+Substituting into Eq.~\eqref{eq:eh-tidal-ratio}:
+\begin{equation}
+  \frac{n_\parallel^2-1}{n_\perp^2-1}\bigg|_{\sigma/\rho = 7/16}
+  \xrightarrow{\varepsilon \to 0} 4 \cdot \tfrac{7}{16} = \frac{7}{4},
+\end{equation}
+which is exactly the Dunne/Adler QED ratio, Eq.~\eqref{eq:eh-qed-ratio}. \textbf{TIDAL reproduces the QED birefringence ratio, \emph{provided} the convention mapping Eq.~\eqref{eq:eh-convention-mapping} is applied.} Failing to divide by the factor-of-four in the dual convention -- i.e., naively setting $\sigma/\rho = c_2/c_1 = 7/4$ -- gives TIDAL ratio $4 \cdot (7/4) = 7$, which is \emph{not} the QED result. This is a convention difference, not a physics discrepancy.
+
+\subsubsection{Test Strategy}
+\label{sec:pr-eh-tests}
+
+\texttt{tests/test\_euler\_heisenberg.py} provides five test classes, structured to be non-circular:
+
+\begin{description}
+  \item[\texttt{TestBaseline}] At $\rho = \sigma = 0$, every polarisation is a light wave: $\omega = k$. Baseline sanity (6 parametrised cases).
+  \item[\texttt{TestAnalyticDispersion}] Measured $\omega^2/k^2$ matches Eqs.~\eqref{eq:eh-omega-par}--\eqref{eq:eh-omega-perp} at $\rho = 0.001$ (perturbative regime) and multiple wavenumbers, to the zero-crossing method's $3\times10^{-3}$ precision. Includes the physics-derived check that $a_1$ has no $\rho$-dependence at $\sigma = 0$ (Lorentz covariance) -- a statement about the Lagrangian's symmetry, not about numerical coefficients.
+  \item[\texttt{TestBirefringenceRatioAgainstExactJSONFormula}] At five $\sigma/\rho$ values spanning $1/4$ to $3/2$, the measured ratio matches Eq.~\eqref{eq:eh-tidal-ratio} \emph{exact} (finite-$\varepsilon$) prediction to within 8\% (zero-crossing noise dominates here). Tests the full $(\rho, \sigma)$ dependence, not just a single point.
+  \item[\texttt{TestQEDBirefringenceRatio}] The literature benchmark. Set $\sigma/\rho = 7/16$ (from the convention mapping -- \emph{not} reverse-engineered from $7/4$), measure the ratio at $\rho = 0.01$, apply the $\varepsilon \to 0$ correction factor $(1-2\rho)/(1-6\rho)$ to extrapolate to the Dunne limit, and verify the result is $7/4$ to 3\%. This is a genuine literature reproduction: the input ($\sigma/\rho$) comes from the convention mapping, and the target ($7/4$) comes from~\cite{Adler1971,Dunne2004}; neither is adjusted to match the other.
+  \item[\texttt{TestPerturbativeMethodSelfConsistency}] \texttt{PerturbativeSolver} Pass~0+1 vs.\ \texttt{solve\_modal} (direct generalised eigenvalue). Error scales as $O(\varepsilon^2) \approx 70 \varepsilon^2$ for the multi-field gauge-coupled EH structure; at $\varepsilon = 10^{-3}$, bound is $2\times10^{-4}$, four orders of magnitude below the pre-fix (\#301/\#302/\#303) signature. Also includes the \#303 litmus test: Pass~0 at finite $\sigma$ must equal Pass~0 at $\sigma = 0$ to $10^{-10}$, proving the Phase~3 canonicalisation strips small parameters cleanly.
+\end{description}
+
+\subsubsection{Measurement Precision Limitations}
+\label{sec:pr-eh-precision}
+
+The zero-crossing period-measurement method used by \texttt{\_measure\_omega} has intrinsic precision $\Delta \omega / \omega \sim \Delta t / t_{\mathrm{end}}$ (roughly), where $\Delta t$ is the snapshot spacing. For $\omega \sim k$, $k = 2$, $t_{\mathrm{end}} = 40$, $N_{\mathrm{snapshots}} = 801$, this gives $\Delta\omega/\omega \sim 10^{-3}$. For small $n^2 - 1 \sim 4\rho B_0^2 \sim 10^{-3}$ (at $\rho = 10^{-3}$), the resulting absolute noise on $n_\perp^2 - 1$ is comparable to the signal, which limits the ratio measurement precision to few-\% at small $\varepsilon$. The QED test above uses larger $\rho = 10^{-2}$ (where the signal is 10$\times$ noise) together with longer integration ($t_{\mathrm{end}} = 80$, $N_{\mathrm{snapshots}} = 1601$) and the exact finite-$\varepsilon$ correction to achieve clean agreement with $7/4$.
+
+Tighter benchmarks (e.g., FFT peak-detection with higher resolution, or residual-based eigenfrequency extraction) are possible follow-ups but not on the \#301 critical path. The present suite is sufficient to guard the pipeline against the bug signatures at hand: a $13\%$ linear-in-$\varepsilon$ Pass~1 error (pre-fix) or a $\sigma$-contaminated Pass~0 (pre-Phase~3) would both fail \texttt{TestPerturbativeMethodSelfConsistency} by orders of magnitude.
+
+\subsubsection{Summary}
+\label{sec:pr-eh-summary}
+
+\begin{itemize}
+  \item TIDAL's EH Lagrangian Eq.~\eqref{eq:eh-tidal-lagrangian} with $\sigma/\rho = 7/16$ (Eq.~\eqref{eq:eh-convention-mapping}) reproduces the Dunne/Adler QED birefringence ratio $7/4$ within the zero-crossing measurement precision.
+  \item The convention mapping Eq.~\eqref{eq:eh-convention-mapping} is derived from the Lagrangian translation $\varepsilon^{\alpha\beta\gamma\delta}F_{\alpha\beta}F_{\gamma\delta} = 2 F\cdot\tilde{F}$; naive identification $\sigma/\rho = c_2/c_1$ is incorrect and yields ratio $7 \neq 7/4$. This is a convention difference, not a physics gap. Future EH-heavy work should either apply the mapping explicitly, or adopt the halved-dual convention by adding a $1/4$ factor in the Lagrangian \texttt{expression} to normalise the input.
+  \item The test suite is structured so that neither $\sigma/\rho$ nor the target $7/4$ is tuned to match the other; both are independent inputs from the Lagrangian mapping and from~\cite{Adler1971,Dunne2004} respectively.
+\end{itemize}

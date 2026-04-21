@@ -2792,6 +2792,22 @@ def _build_source_matrix_k(
     # arrays for orders that actually appear.
     M_src_by_order: dict[int, NDArray[np.complex128]] = {}
 
+    # #301 / #302: Pass 1 source mirrors the Pass 0 fast-path contract —
+    # each velocity-row contribution is scaled by M₀⁻¹ for the
+    # corresponding equation's field. Without this, Pass 1 produces a
+    # source that omits the M₀⁻¹(K₁ − M₁·M₀⁻¹·K₀) factor from the
+    # perturbative identity; the error scales linearly with ε and breaks
+    # Phase-3 canonicalised theories (e.g., Euler-Heisenberg with σ in
+    # small_parameters — the synthesized corrections come out wrong).
+    # Returns None when every M ≈ 1 so the existing fast path continues
+    # with zero overhead for theories unaffected by #301.
+    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+    m_inv_src = build_inverse_kinetic_diag(
+        correction_spec,
+        coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    )
+
     def _get_m_src(n: int) -> NDArray[np.complex128]:
         if n not in M_src_by_order:
             M_src_by_order[n] = np.zeros(
@@ -2865,6 +2881,11 @@ def _build_source_matrix_k(
                 )
             continue
 
+        # #301 / #302: scale every contribution by 1/M₀ for this equation.
+        # Mirrors the modal fast path's folding of M⁻¹ into the evolution
+        # matrix (see _build_per_mode_matrices). Missing or trivial M
+        # (m_inv_src is None or field absent) → scale = 1.0, zero overhead.
+        eq_scale = 1.0 if m_inv_src is None else m_inv_src.get(field_name, 1.0)
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
                 term,
@@ -2884,14 +2905,16 @@ def _build_source_matrix_k(
             if target_slot is not None:
                 # Dynamical target: direct write into the slot column.
                 M_n = _get_m_src(op_time_order)
-                M_n[:, row_slot, target_slot] += coeff * mult
+                M_n[:, row_slot, target_slot] += eq_scale * coeff * mult
             elif term.field in constraint_idx and recovery_matrix is not None:
                 # Constraint field: expand via Schur row.
                 # recovery_matrix[m, c_idx, j] → contributes to column j.
                 c_idx = constraint_idx[term.field]
                 # (coeff * mult[m]) * recovery_matrix[m, c_idx, j]
                 # → M_src_n[m, row_slot, j] += ...
-                term_contrib = coeff * mult[:, None] * recovery_matrix[:, c_idx, :]
+                term_contrib = (
+                    eq_scale * coeff * mult[:, None] * recovery_matrix[:, c_idx, :]
+                )
                 M_n = _get_m_src(op_time_order)
                 M_n[:, row_slot, :] += term_contrib
             else:

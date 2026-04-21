@@ -27,6 +27,8 @@ These references inform design decisions and should be cited where appropriate i
 | **Ejlli (2020)** — "Graviton-photon mixing: exact solution in a constant magnetic field", [arXiv:2004.02714](https://arxiv.org/abs/2004.02714) | First exact (non-perturbative) Gertsenshtein solution |
 | **Palessandro (2024)** — "Graviton-Photon Oscillations as a Probe of Quantum Gravity", [arXiv:2405.01407](https://arxiv.org/abs/2405.01407) | Extended Gertsenshtein treatment (**contains normalisation error** corrected by TIDAL) |
 | **Hwang & Noh (2024)** — "Graviton-photon conversions in Euler-Heisenberg nonlinear electrodynamics", [arXiv:2405.11786](https://arxiv.org/abs/2405.11786) | Nonlinear QED corrections to Gertsenshtein; chiral GW propagation |
+| **Adler (1971)** — "Photon splitting and photon dispersion in a strong magnetic field", Ann. Phys. 67, 599. [DOI](https://doi.org/10.1016/0003-4916(71)90154-0) | QED vacuum birefringence: `n_∥ − 1 = (14/45)(α²/π)(B/B_c)²`, `n_⊥ − 1 = (8/45)(α²/π)(B/B_c)²`. Ratio 7/4 reproduced by TIDAL's EH example under the convention mapping `σ/ρ = 7/16`, see [perturbative_reduction.tex §Validation](tex/perturbative_reduction.tex) |
+| **Dunne (2004)** — "Heisenberg–Euler effective Lagrangians: Basics and extensions", [arXiv:hep-th/0406216](https://arxiv.org/abs/hep-th/0406216) | Pedagogical review. Uses halved-dual convention `F̃ = ½ε·F`; TIDAL uses un-halved `ε·F·F`, so Dunne `c₂` → TIDAL `σ = 2c₂`. |
 | **Graviton-photon oscillation in general modified gravity (2023)** — [arXiv:2302.08186](https://arxiv.org/abs/2302.08186) | Gertsenshtein in Horndeski, massive gravity, cosmic backgrounds |
 
 ## Primary Classical References (pre-arXiv)
