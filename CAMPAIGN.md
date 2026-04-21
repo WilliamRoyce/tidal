@@ -145,9 +145,10 @@ Lagrangian sector and at what parameters?
 | 28133656 | T1 Dark-Photon-Plasma | amplification | FAILED | 0:00 | sed & expansion bug (fixed) |
 | 28133932 | T1 Dark-Photon-Plasma | suppression | FAILED | 0:00 | sed & expansion bug (fixed) |
 | 28133933 | T2 Einstein-Cartan | null | FAILED | 0:00 | sed & expansion bug (fixed) |
-| 28134330 | T1 Dark-Photon-Plasma | amplification | RUNNING (52min) | ≤1h | INTR QOS, cpu-q-580, ndead=5760 climbing |
+| 28134330 | T1 Dark-Photon-Plasma | amplification | TIMEOUT | 1:00:26 | INVALID — tachyon peak logL=31430 at unphysical P_max (#307) |
 | 28134387 | T1 Dark-Photon-Plasma | suppression | COMPLETED | 2:43 | D_KL=0.017 (weak), log(Z)=-0.027 |
 | 28134415 | T2 Einstein-Cartan | null (amplification) | COMPLETED | 0:13 | D_KL=0.003 (NULL CONFIRMED), log(Z)=-0.001 |
+| 28141098 | T1 Dark-Photon-Plasma | amplification (re) | queued | 3h | standard QOS, with #307 likelihood cap |
 
 ---
 
