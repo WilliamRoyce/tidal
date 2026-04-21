@@ -396,7 +396,9 @@ def _build_grid_info(
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
     periodic = _parse_periodic(
-        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension,
+        args.bc,
+        periodic=args.periodic,
+        spatial_dim=spec.spatial_dimension,
     )
     axis_bcs = _parse_axis_bcs(args.bc, spatial_dim=spec.spatial_dimension)
 
@@ -1934,7 +1936,9 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     # Distinguish from sweep's boolean --resume (which means "resume sweep")
     if isinstance(resume_path, str):
         resume_state = _load_resume_state(
-            Path(resume_path), spec, getattr(args, "snapshot", None),
+            Path(resume_path),
+            spec,
+            getattr(args, "snapshot", None),
         )
         _validate_resume_grid(resume_state, grid_info)
         y0 = resume_state.y0
@@ -2166,6 +2170,27 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     # 7. Disk writer (if directory output) or in-memory accumulator
     # (inference path: skip disk entirely, see issue #269).
+    #
+    # The perturbative modal solver (--perturbative-order 1) returns state
+    # vectors in base_spec layout (constraint fields demoted to algebraic).
+    # The writer must be set up with this same layout so slot indices match.
+    # Detect perturbative mode early and resolve the effective spec here,
+    # before any writer/accumulator is constructed. (#298)
+    writer_spec = spec
+    if scheme == "modal":
+        early_pert_meta: dict[str, Any] = spec.metadata.get("perturbation") or {}
+        early_pert_order_arg = getattr(args, "perturbative_order", None)
+        if early_pert_order_arg is not None:
+            early_pert_order = int(early_pert_order_arg)
+        else:
+            early_pert_order = 1 if early_pert_meta.get("small_parameters") else 0
+        if early_pert_order > 0 and spec.has_corrections():
+            from tidal.solver.perturbative_driver import (
+                PerturbativeSolver as _EarlyPS,
+            )
+
+            writer_spec = _EarlyPS(spec).base_spec
+
     fmt = _infer_output_format(args)
     writer: SnapshotWriter | None = None
     accumulator: Any = None
@@ -2173,7 +2198,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     if in_memory_out is not None:
         accumulator, snapshot_cb = _setup_memory_accumulator_native(
-            spec,
+            writer_spec,
             grid_info,
             params,
             snapshot_interval,
@@ -2183,7 +2208,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     elif fmt == "directory":
         writer, snapshot_cb = _setup_disk_writer_native(
             args,
-            spec,
+            writer_spec,
             grid_info,
             params,
             snapshot_interval,
@@ -2327,6 +2352,16 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 "PerturbativeResult.spec must be populated. See #276."
             )
             spec = pert_result.spec
+            # Replay snapshots through the writer/accumulator callback. The
+            # perturbative solver computes the full trajectory in memory and
+            # returns it in result["t"] / result["y"]. The writer was set up
+            # with base_spec layout (see section 7 above, #298), so each
+            # y_flat slice maps correctly to the slot indices in _disk_callback.
+            if snapshot_cb is not None:
+                t_arr = pert_result.total["t"]
+                y_arr = pert_result.total["y"]
+                for _i in range(len(t_arr)):
+                    snapshot_cb(float(t_arr[_i]), y_arr[_i])
             log(
                 f"Perturbative layout swap: full-spec fields={len(pert_result.full_spec.equations) if pert_result.full_spec else '?'} "
                 f"→ base-spec fields={len(spec.equations)} "
@@ -2460,7 +2495,8 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         if cv:
             for c_name, c_vel_arr in cv.items():
                 accumulator.set_velocity(
-                    c_name, np.asarray(c_vel_arr, dtype=np.float64),
+                    c_name,
+                    np.asarray(c_vel_arr, dtype=np.float64),
                 )
         sim_data = accumulator.to_sim_data(spec)
     else:
