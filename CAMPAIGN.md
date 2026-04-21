@@ -149,6 +149,9 @@ Lagrangian sector and at what parameters?
 | 28134387 | T1 Dark-Photon-Plasma | suppression | COMPLETED | 2:43 | QUESTIONABLE — ran stale v0.31.5; re-verify after HPC upgrade |
 | 28134415 | T2 Einstein-Cartan | null (amplification) | COMPLETED | 0:13 | D_KL=0.003 (NULL CONFIRMED); valid — torsion decouples, no tachyonic region |
 | 28141098 | T1 Dark-Photon-Plasma | amplification (re) | CANCELLED | 3:20 | cancelled to reinstall HPC tidal properly |
+| 28145274 | (guard test) | verification | COMPLETED | 0:05 | v0.33.13 confirmed; stability guard fires on cpu-q-19 with ratio 1.26e+05 |
+| 28145377 | T1 Dark-Photon-Plasma | amplification (re²) | running | ≤1h | INTR, v0.33.13 confirmed; guard active |
+| 28145425 | T1 Dark-Photon-Plasma | suppression (re) | queued | ≤1h | standard QOS, v0.33.13; for consistency with amp re-run |
 
 ---
 
