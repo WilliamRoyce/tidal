@@ -115,7 +115,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         modes have Re(λ) ≈ 0; values above ~0.3 indicate genuine
         exponential growth.
     n_extra_k : int
-        Deprecated.  Previously controlled the k-neighbourhood scan
+        Deprecated.  Previously controlled the k-neighborhood scan
         width; now all k modes are checked and this parameter is
         ignored.
 
@@ -153,7 +153,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     # Check ALL k modes.
     #
     # CDT/PGT tachyonic modes can peak at any wavenumber depending on the
-    # parameter combination — restricting to a small-k band + IC neighbourhood
+    # parameter combination — restricting to a small-k band + IC neighborhood
     # leaves a gap (e.g. k ~ 0.57-1.70 for N=256, L=100) where instabilities
     # are missed, causing runs to slip through the guard and diverge at runtime.
     # With N=256 there are 129 modes; each eigenvalue problem is <=20x20 so the
@@ -163,7 +163,12 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     # Build constraint-eliminated system (with B for generalized eig)
     ce = CoefficientEvaluator(spec, grid, parameters)
     A_test, B_test, _, _, _, _, _, _ = _build_evolution_matrices(
-        spec, layout, grid, ce, k_grid, rfft_shape
+        spec,
+        layout,
+        grid,
+        ce,
+        k_grid,
+        rfft_shape,
     )
 
     # Find independent blocks; use low-k modes for coupling detection
@@ -226,13 +231,16 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             null_dim = len(s_bk) - rank_bk
             if null_dim > 0:
                 Vphys: NDArray[np.complex128] = np.asarray(
-                    Vt_bk[:rank_bk].T, dtype=np.complex128
+                    Vt_bk[:rank_bk].T,
+                    dtype=np.complex128,
                 )
                 Vnull: NDArray[np.complex128] = np.asarray(
-                    Vt_bk[rank_bk:].T, dtype=np.complex128
+                    Vt_bk[rank_bk:].T,
+                    dtype=np.complex128,
                 )
                 eig_r = sla.eig(  # type: ignore[reportUnknownVariableType]
-                    Vphys.T @ Ak @ Vphys, Vphys.T @ Bk @ Vphys
+                    Vphys.T @ Ak @ Vphys,
+                    Vphys.T @ Bk @ Vphys,
                 )
                 ev_red = np.asarray(eig_r[0], dtype=np.complex128)  # type: ignore[reportUnknownArgumentType]
                 vr_red = np.asarray(eig_r[1], dtype=np.complex128)  # type: ignore[reportUnknownArgumentType]
@@ -396,13 +404,23 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
     # Build systems
     ce = CoefficientEvaluator(spec, grid, parameters)
     A_test, _, _, _, _, mapping, _, _ = _build_evolution_matrices(
-        spec, layout, grid, ce, k_grid, rfft_shape
+        spec,
+        layout,
+        grid,
+        ce,
+        k_grid,
+        rfft_shape,
     )
 
     baseline_params = {**parameters, **baseline_overrides}
     ce_bl = CoefficientEvaluator(spec, grid, baseline_params)
     A_bl, _, _, _, _, _, _, _ = _build_evolution_matrices(
-        spec, layout, grid, ce_bl, k_grid, rfft_shape
+        spec,
+        layout,
+        grid,
+        ce_bl,
+        k_grid,
+        rfft_shape,
     )
 
     # Find independent blocks
@@ -439,7 +457,8 @@ def check_full_stability(  # noqa: PLR0913, PLR0914
             block_bl = A_bl[ki][idx[:, None], idx[None, :]]
 
             eigs_test = cast(
-                "NDArray[np.complexfloating]", np.linalg.eigvals(block_test)
+                "NDArray[np.complexfloating]",
+                np.linalg.eigvals(block_test),
             )
             eigs_bl = cast("NDArray[np.complexfloating]", np.linalg.eigvals(block_bl))
 

@@ -37,7 +37,7 @@ _VALID_TYPES = frozenset(
         "convergence",
         "replicate-convergence",
         "corner",
-    }
+    },
 )
 
 _SWEEP_TYPES = frozenset(
@@ -53,7 +53,7 @@ _SWEEP_TYPES = frozenset(
         "campaign",
         "convergence",
         "replicate-convergence",
-    }
+    },
 )
 
 DPI_DEFAULT = 150
@@ -260,7 +260,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         error_with_hint(
             f"unknown plot type '{plot_type}'. Valid: {', '.join(sorted(_VALID_TYPES))}",
             [
-                "Valid: heatmap, snapshot, amplitude, energy, profile, compare, hamiltonian"
+                "Valid: heatmap, snapshot, amplitude, energy, profile, compare, hamiltonian",
             ],
         )
         return 1
@@ -316,7 +316,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     if not args.quiet:
         print(
             f"Loaded {data.n_snapshots} snapshots, "
-            f"fields: {', '.join(data.fields.keys())}"
+            f"fields: {', '.join(data.fields.keys())}",
         )
 
     # Output path
@@ -675,7 +675,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 )
                 return 1
             fig, ax = plt.subplots(
-                1, 1, figsize=figsize or (9, 6), constrained_layout=True
+                1, 1, figsize=figsize or (9, 6), constrained_layout=True,
             )
             render_sweep_1d_grouped(
                 ax,

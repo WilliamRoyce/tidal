@@ -46,7 +46,7 @@ _LAPLACIAN_OPS = frozenset(
         "laplacian_x",
         "laplacian_y",
         "laplacian_z",
-    }
+    },
 )
 
 # Threshold for zero-evolution diagnostic (effectively machine epsilon)
@@ -396,7 +396,7 @@ def _build_grid_info(
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
     periodic = _parse_periodic(
-        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension
+        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension,
     )
     axis_bcs = _parse_axis_bcs(args.bc, spatial_dim=spec.spatial_dimension)
 
@@ -971,7 +971,7 @@ def _validate_resume_grid(resume: ResumeState, grid_info: GridInfo) -> None:
     # Compare bounds with tolerance for float rounding
     bounds_tol = 1e-10
     for i, (saved, current) in enumerate(
-        zip(resume.grid_bounds, grid_info.bounds, strict=True)
+        zip(resume.grid_bounds, grid_info.bounds, strict=True),
     ):
         if (
             abs(saved[0] - current[0]) > bounds_tol
@@ -1156,7 +1156,7 @@ def _build_initial_y0(
     if ic_type == "zero":
         if args.ic_component is not None:
             print(
-                f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC"
+                f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC",
             )
         slot_data: dict[str, np.ndarray] = {}
 
@@ -1197,7 +1197,7 @@ def _print_summary(sim_data: SimulationData) -> None:
     print()
     print("Results:")
     print(
-        f"  Time range: {float(times[0]):.2f} → {float(times[-1]):.2f} ({len(times)} snapshots)"
+        f"  Time range: {float(times[0]):.2f} → {float(times[-1]):.2f} ({len(times)} snapshots)",
     )
     print(f"  Parameters: {sim_data.parameters}")
     print()
@@ -1210,7 +1210,7 @@ def _print_summary(sim_data: SimulationData) -> None:
         if init_peak > 0:
             ratio = final_peak / init_peak
             print(
-                f"  {name}: peak {init_peak:.4f} → {final_peak:.4f} (ratio: {ratio:.4f})"
+                f"  {name}: peak {init_peak:.4f} → {final_peak:.4f} (ratio: {ratio:.4f})",
             )
         else:
             print(f"  {name}: peak {init_peak:.4f} → {final_peak:.4f}")
@@ -1857,7 +1857,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
     grid_info = _build_grid_info(args, spec, bounds)
     log(
-        f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}"
+        f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}",
     )
 
     _cdebug(f"periodic={grid_info.periodic}, dx={grid_info.dx}")
@@ -1934,14 +1934,14 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     # Distinguish from sweep's boolean --resume (which means "resume sweep")
     if isinstance(resume_path, str):
         resume_state = _load_resume_state(
-            Path(resume_path), spec, getattr(args, "snapshot", None)
+            Path(resume_path), spec, getattr(args, "snapshot", None),
         )
         _validate_resume_grid(resume_state, grid_info)
         y0 = resume_state.y0
         t_start = resume_state.t_start
         log(
             f"  IC: resume from {resume_path} "
-            f"(snapshot {resume_state.snapshot_index}, t={t_start:.4f})"
+            f"(snapshot {resume_state.snapshot_index}, t={t_start:.4f})",
         )
     else:
         y0 = _build_initial_y0(args, spec, grid_info, bounds)
@@ -2033,17 +2033,17 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             mem_str = f"{mem_bytes / (1024 * 1024):.1f} MB"
         spec_name = getattr(args, "json_path", "unknown")
         print(
-            f"  Spec:     {Path(spec_name).name} ({n_fields} fields, {n_eqs} equations)"
+            f"  Spec:     {Path(spec_name).name} ({n_fields} fields, {n_eqs} equations)",
         )
         print(
             f"  Grid:     {'x'.join(str(s) for s in grid_info.shape)} points, "
             f"bounds {grid_info.bounds}, "
-            f"{'periodic' if all(grid_info.periodic) else 'mixed BCs'}"
+            f"{'periodic' if all(grid_info.periodic) else 'mixed BCs'}",
         )
         print(
             f"  Solver:   {scheme} (auto-selected)"
             if args.scheme == "auto"
-            else f"  Solver:   {scheme}"
+            else f"  Solver:   {scheme}",
         )
         print(f"  FD order: {fd_order}")
         print(f"  Steps:    ~{n_snapshots} snapshots, t={t_start}→{args.t_end}")
@@ -2088,7 +2088,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 lf_order = 4
                 log(
                     "  Auto-selected: Yoshida 4th-order leapfrog "
-                    "(time-independent, non-dissipative system)"
+                    "(time-independent, non-dissipative system)",
                 )
             else:
                 lf_order = 2
@@ -2099,7 +2099,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                     reasons.append("time-dependent coefficients")
                 log(
                     f"  Auto-selected: Störmer-Verlet 2nd-order leapfrog "
-                    f"({', '.join(reasons)} detected)"
+                    f"({', '.join(reasons)} detected)",
                 )
         elif lf_order_arg == 4:  # noqa: PLR2004
             # User explicitly requested Yoshida — warn if inappropriate.
@@ -2152,7 +2152,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     if dt is not None and snapshot_interval < dt:
         log(
             f"  Note: snapshot interval {snapshot_interval:.4f} < dt {dt:.4f}; "
-            f"saving every step"
+            f"saving every step",
         )
         snapshot_interval = dt
 
@@ -2214,7 +2214,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
         log(
             f"Running IDA solver (t={t_start} → {args.t_end}, {num_snapshots} snapshots, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...",
         )
         # Skip constraint IC solving when resuming (state already consistent)
         allow_inconsistent = getattr(args, "allow_inconsistent_ic", False)
@@ -2241,7 +2241,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         max_step = args.max_step or 0.0
         log(
             f"Running CVODE solver ({method}, t={t_start} → {args.t_end}, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...",
         )
         result = solve_cvode(
             spec,
@@ -2266,7 +2266,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         max_step = args.max_step if args.max_step is not None else cfl_dt
         log(
             f"Running scipy solver ({method}, t={t_start} → {args.t_end}, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...",
         )
         result = solve_scipy(
             spec,
@@ -2303,7 +2303,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
             log(
                 f"Running perturbative modal solver (order={pert_order}, "
-                f"t={t_start} → {args.t_end}, {num_snapshots} snapshots)..."
+                f"t={t_start} → {args.t_end}, {num_snapshots} snapshots)...",
             )
             pert_solver = PerturbativeSolver(spec)
             pert_result = pert_solver.solve(
@@ -2331,7 +2331,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 f"Perturbative layout swap: full-spec fields={len(pert_result.full_spec.equations) if pert_result.full_spec else '?'} "
                 f"→ base-spec fields={len(spec.equations)} "
                 f"(demoted constraints: "
-                f"{sum(1 for e in spec.equations if e.time_derivative_order == 0)})"
+                f"{sum(1 for e in spec.equations if e.time_derivative_order == 0)})",
             )
             validity = pert_result.validity
             corr_level = validity.get("correction_level", validity.get("warn_level"))
@@ -2376,7 +2376,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
             log(
                 f"Running modal solver (t={t_start} → {args.t_end}, "
-                f"{num_snapshots} snapshots)..."
+                f"{num_snapshots} snapshots)...",
             )
             result = solve_modal(
                 spec,
@@ -2398,7 +2398,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         if lf_order == 4:  # noqa: PLR2004
             log(
                 f"Running Yoshida 4th-order leapfrog "
-                f"(t={t_start} → {args.t_end}, dt={dt:.4f})..."
+                f"(t={t_start} → {args.t_end}, dt={dt:.4f})...",
             )
         else:
             log(f"Running leapfrog solver (t={t_start} → {args.t_end}, dt={dt:.4f})...")
@@ -2460,7 +2460,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         if cv:
             for c_name, c_vel_arr in cv.items():
                 accumulator.set_velocity(
-                    c_name, np.asarray(c_vel_arr, dtype=np.float64)
+                    c_name, np.asarray(c_vel_arr, dtype=np.float64),
                 )
         sim_data = accumulator.to_sim_data(spec)
     else:
@@ -2573,7 +2573,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
     log("Loading equation specification...")
     spec = load_equation_system(json_path)
     log(
-        f"  {spec.n_components} component(s), {spec.dimension}D ({spec.spatial_dimension}+1D)"
+        f"  {spec.n_components} component(s), {spec.dimension}D ({spec.spatial_dimension}+1D)",
     )
 
     # Step 2: Validate resume args and inherit config from checkpoint

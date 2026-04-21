@@ -95,7 +95,7 @@ _KG_1D_SPEC: dict[str, object] = {
                     {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
                 ],
             },
-        }
+        },
     ],
     "coupling": {"mass_matrix_symbolic": [["-m2"]]},
 }
@@ -380,7 +380,7 @@ _CONSTRAINT_SPEC: dict[str, object] = {
 
 
 def _write_inline_json(
-    tmp_path_factory: pytest.TempPathFactory, spec: dict[str, object], name: str
+    tmp_path_factory: pytest.TempPathFactory, spec: dict[str, object], name: str,
 ) -> Path:
     """Write an inline JSON spec dict to a temp file and return its path."""
     d = tmp_path_factory.getbasetemp() / "inline_specs"
@@ -401,7 +401,7 @@ def inline_kg_1d_json(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def inline_coupled_scalars_json(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Inline coupled-scalars JSON spec (always available)."""
     return _write_inline_json(
-        tmp_path_factory, _COUPLED_SCALARS_SPEC, "coupled_scalars.json"
+        tmp_path_factory, _COUPLED_SCALARS_SPEC, "coupled_scalars.json",
     )
 
 
@@ -415,7 +415,7 @@ def inline_em_1d_json(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def inline_constraint_json(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Inline constraint (Poisson) JSON spec (always available)."""
     return _write_inline_json(
-        tmp_path_factory, _CONSTRAINT_SPEC, "electrostatics_2d.json"
+        tmp_path_factory, _CONSTRAINT_SPEC, "electrostatics_2d.json",
     )
 
 
@@ -450,7 +450,7 @@ def coupled_scalars_dir(
             "32",
             "--output",
             str(output),
-        ]
+        ],
     )
     assert ret == 0, "coupled_scalars simulation failed"
     assert output.is_dir(), "Snapshot directory was not created"

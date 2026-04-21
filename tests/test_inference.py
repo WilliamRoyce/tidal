@@ -284,7 +284,7 @@ class TestLikelihoodConfig:
         from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
 
         lc = LikelihoodConfig(
-            metric="P_max", likelihood_type="gaussian", target=1.0, sigma=0.1
+            metric="P_max", likelihood_type="gaussian", target=1.0, sigma=0.1,
         )
         # At target, log_L = 0
         assert compute_log_likelihood(1.0, lc) == pytest.approx(0.0)
@@ -295,7 +295,7 @@ class TestLikelihoodConfig:
         from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
 
         lc = LikelihoodConfig(
-            metric="P_max", likelihood_type="threshold", min_value=0.1
+            metric="P_max", likelihood_type="threshold", min_value=0.1,
         )
         assert compute_log_likelihood(0.5, lc) == 0.0
         assert compute_log_likelihood(0.05, lc) == -math.inf
@@ -446,7 +446,7 @@ class TestSampleCLIHelp:
                 "10",
                 "--output",
                 "/tmp/test",
-            ]
+            ],
         )
         assert args.command == "sample"
         assert args.json_path == "spec.json"
@@ -482,7 +482,7 @@ class TestSampleCLIHelp:
                 "--importance",
                 "--output",
                 "/tmp/test",
-            ]
+            ],
         )
         assert args.likelihood == "P_max:extremize"
         assert args.baseline_formula == "sin(kappa * B0 * t_end / 2)**2"
@@ -545,12 +545,12 @@ class TestNewLikelihoodTypes:
 
         # 2x amplification: logL = log(2) ≈ 0.693
         assert compute_log_likelihood(2 * baseline, lc, params) == pytest.approx(
-            math.log(2)
+            math.log(2),
         )
 
         # 0.5x suppression: logL = |log(0.5)| = log(2) (symmetric)
         assert compute_log_likelihood(0.5 * baseline, lc, params) == pytest.approx(
-            math.log(2)
+            math.log(2),
         )
 
 
@@ -575,7 +575,7 @@ class TestBaselineFormulaSpecParams:
 
         repo_root = Path(__file__).resolve().parents[1]
         spec = load_equation_system(
-            repo_root / "examples" / "data" / "dark_photon_plasma.json"
+            repo_root / "examples" / "data" / "dark_photon_plasma.json",
         )
         params = _parse_params(["kappa=1.0", "B0=0.1"], spec)
         assert params["kappa"] == 1.0
@@ -980,7 +980,7 @@ class TestParameterImportance:
         assert "d_G" in table
 
     def test_from_directory_roundtrip(
-        self, nested_result: InferenceResult, tmp_path: Path
+        self, nested_result: InferenceResult, tmp_path: Path,
     ) -> None:
         from tidal.inference._results import InferenceResult
 
@@ -994,7 +994,7 @@ class TestParameterImportance:
         np.testing.assert_allclose(loaded.samples, nested_result.samples)
 
     def test_marginal_dkl_with_integer_indexed_columns(
-        self, nested_result: InferenceResult
+        self, nested_result: InferenceResult,
     ) -> None:
         """Regression for #287: anesthetic's read_chains returns integer-
         indexed parameter columns in v2.0+ (``[0, 1, 'logL', ...]``), but
@@ -1048,7 +1048,7 @@ class TestParameterImportance:
         # ~50% (bootstrap noise is large at n_bootstrap=10).
         for name in nested_result.param_names:
             assert imp_named.marginal_d_kl[name] == pytest.approx(
-                imp_int.marginal_d_kl[name], rel=0.5, abs=0.1
+                imp_int.marginal_d_kl[name], rel=0.5, abs=0.1,
             )
 
 
@@ -1074,7 +1074,7 @@ class TestAnalyzeInference:
                 "--importance",
                 "--n-bootstrap",
                 "50",
-            ]
+            ],
         )
         assert args.inference is True
         assert args.importance is True

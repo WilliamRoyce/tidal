@@ -99,7 +99,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     baseline_formula: str | None = getattr(args, "baseline_formula", None)
     try:
         likelihood_config = parse_likelihood(
-            likelihood_spec, baseline_formula=baseline_formula
+            likelihood_spec, baseline_formula=baseline_formula,
         )
     except ValueError as e:
         error_with_hint(str(e), ["Check --likelihood format: METRIC:TYPE[:ARGS]"])
@@ -155,7 +155,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             for expr in constraints.expressions:
                 print(f"    {expr}")
         print(
-            f"  Likelihood: {likelihood_config.metric} ({likelihood_config.likelihood_type})"
+            f"  Likelihood: {likelihood_config.metric} ({likelihood_config.likelihood_type})",
         )
         print(f"  Measurements: {', '.join(sorted(measurements))}")
         print(f"  Output: {output_path}")

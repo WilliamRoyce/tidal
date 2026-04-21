@@ -361,7 +361,7 @@ class TestCanonicalHamiltonianEnergy:
 
         # Per-field self-energy sums to total (no interaction for single KG)
         np.testing.assert_allclose(
-            sum(per_field.values()) + interaction, h_total, rtol=1e-10
+            sum(per_field.values()) + interaction, h_total, rtol=1e-10,
         )
         assert h_total > 0  # non-zero energy from excited field
 
@@ -376,7 +376,7 @@ class TestCanonicalHamiltonianEnergy:
         )
 
         canonical = _make_coupled_canonical_structure(
-            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1
+            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1,
         )
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
@@ -410,7 +410,7 @@ class TestCanonicalHamiltonianEnergy:
         )
 
         canonical = _make_coupled_canonical_structure(
-            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1
+            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1,
         )
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
@@ -445,7 +445,7 @@ class TestCanonicalHamiltonianEnergy:
 
         # Canonical energy
         canonical = _make_coupled_canonical_structure(
-            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1
+            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1,
         )
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
@@ -1327,7 +1327,7 @@ class TestConversionProbability:
             p_expected[i] = (pf1_t**2 + m2_1 * f1_t**2) / m2_0 if m2_0 > 0 else 0.0
 
         np.testing.assert_allclose(
-            result.probability, p_expected, rtol=1e-10, atol=1e-15
+            result.probability, p_expected, rtol=1e-10, atol=1e-15,
         )
 
         if g_val != 0:
@@ -1599,10 +1599,10 @@ class TestPositionDependentMass:
                 HamiltonianTerm(
                     coefficient=0.5,
                     factor_a=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative"
+                        field="phi_0", operator="time_derivative",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative"
+                        field="phi_0", operator="time_derivative",
                     ),
                 ),
                 # phi gradient (IBP)
@@ -1623,10 +1623,10 @@ class TestPositionDependentMass:
                 HamiltonianTerm(
                     coefficient=0.5,
                     factor_a=HamiltonianFactor(
-                        field="chi_0", operator="time_derivative"
+                        field="chi_0", operator="time_derivative",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="chi_0", operator="time_derivative"
+                        field="chi_0", operator="time_derivative",
                     ),
                 ),
                 # chi gradient (IBP)
@@ -1821,7 +1821,7 @@ class TestApplySpatialOperator:
         periodic = (True, True)
 
         result = _apply_spatial_operator(
-            "cross_derivative_xy", field, spacing, periodic
+            "cross_derivative_xy", field, spacing, periodic,
         )
         # FD central difference of sin(kx): D_x[sin(kx)] = cos(kx) * sin(k·dx)/dx
         # Cross derivative = product of two central-difference factors
@@ -3762,9 +3762,9 @@ class TestSimulationDataFromResult:
                                 },
                             ],
                         },
-                    }
+                    },
                 ],
-            }
+            },
         )
 
     def test_shapes(self) -> None:
@@ -4215,7 +4215,7 @@ class TestHamiltonianPositionDependentEnergy:
     """
 
     def _make_gaussian_coupling_spec(
-        self, g0: float = 1.0, r_scale: float = 4.0
+        self, g0: float = 1.0, r_scale: float = 4.0,
     ) -> EquationSystem:
         """Build a minimal 2-field spec with a Gaussian interaction Hamiltonian term."""
         data: dict[str, Any] = {
@@ -4339,7 +4339,7 @@ class TestHamiltonianPositionDependentEnergy:
         ys = np.arange(n) * dx + dx / 2
         xx, yy = np.meshgrid(xs, ys, indexing="ij")
         expected_interaction = float(
-            (g0 * np.exp(-0.5 * xx**2 / r_scale**2 - yy**2 / (2 * r_scale**2))).mean()
+            (g0 * np.exp(-0.5 * xx**2 / r_scale**2 - yy**2 / (2 * r_scale**2))).mean(),
         )
 
         # The kinetic terms are 0 (zero momenta), so the total energy = interaction term
@@ -4382,7 +4382,7 @@ class TestHamiltonianPositionDependentEnergy:
                             },
                         ],
                     },
-                }
+                },
             ],
             "canonical": {
                 "hamiltonian_terms": [

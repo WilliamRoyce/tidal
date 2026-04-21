@@ -59,7 +59,7 @@ _SWEEP_MEASUREMENTS = frozenset(
         "velocity",
         "resonance",
         "spectrum",
-    }
+    },
 )
 
 # Safety limits for sweep grid size
@@ -107,7 +107,7 @@ def _warn_high_cv(
                 _cwarn(
                     f"high variability for {base} "
                     f"(CV={cv:.2f}) at {param_info} "
-                    f"— consider more replicates."
+                    f"— consider more replicates.",
                 )
 
 
@@ -166,7 +166,7 @@ def _apply_param_noise_to_plan(
             if pname not in nominal_vals:
                 nominal_vals[pname] = noised_overrides[pname]
             noised_overrides[pname] = noised_swept.get(
-                pname, noised_overrides[pname] + draw
+                pname, noised_overrides[pname] + draw,
             )
     rp["swept_vals"] = noised_swept
     rp["param_overrides"] = noised_overrides
@@ -295,7 +295,7 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float], str]:  # noqa: C901, P
                 msg = f"Sweep count must be >= 2, got {n}"
                 raise ValueError(msg)
             values = cast(
-                "list[float]", np.linspace(float(start), float(stop), n).tolist()
+                "list[float]", np.linspace(float(start), float(stop), n).tolist(),
             )
         elif len(parts) == 4:  # noqa: PLR2004
             # START:STOP:N:log or START:STOP:N:arctan
@@ -453,7 +453,7 @@ def _generate_samples(
         elif scale == "log":
             # Map u ∈ [0,1] → log-spaced between lower and upper
             scaled[:, i] = np.power(
-                10, np.log10(lower[i]) + u * (np.log10(upper[i]) - np.log10(lower[i]))
+                10, np.log10(lower[i]) + u * (np.log10(upper[i]) - np.log10(lower[i])),
             )
         else:
             scaled[:, i] = lower[i] + u * (upper[i] - lower[i])
@@ -907,7 +907,7 @@ def _measure_from_sim_data(  # noqa: C901, PLR0912, PLR0914, PLR0915
                         metrics[f"peak_power_{fname}"] = float(power.max())
                         threshold_val = 0.01 * power.max()
                         metrics[f"n_active_modes_{fname}"] = int(
-                            np.sum(power > threshold_val)
+                            np.sum(power > threshold_val),
                         )
         except (
             ValueError,
@@ -1211,7 +1211,7 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
                     replicate=rep,
                     seed=rep_seed,
                     nominal_vals=nominal_vals,
-                )
+                ),
             )
             _save_incremental(
                 output_dir,
@@ -1254,7 +1254,7 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
                     replicate=rep,
                     seed=rep_seed,
                     nominal_vals=nominal_vals,
-                )
+                ),
             )
             _print_status(metrics)
         except (
@@ -1281,7 +1281,7 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
                     replicate=rep,
                     seed=rep_seed,
                     nominal_vals=nominal_vals,
-                )
+                ),
             )
 
         # ETA
@@ -1406,7 +1406,7 @@ def _execute_parallel(  # noqa: PLR0913, PLR0914, PLR0917
                 "seed": rep_seed,
                 "nominal_vals": nominal_vals,
                 "ic_perturbation": rp.get("ic_perturbation"),
-            }
+            },
         )
 
     if tasks:
@@ -1629,7 +1629,7 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
                 run_dirs=run_dirs,
                 resume=resume,
                 cached_spec=cached_spec,
-            )
+            ),
         )
 
     swept_snapshot = {param_name: list(points)}
@@ -1652,7 +1652,7 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
         metric_key = _detect_adaptive_metric(rows)
     if metric_key is None:
         print(
-            "  Warning: no metric found for adaptive refinement, skipping refinement phase"
+            "  Warning: no metric found for adaptive refinement, skipping refinement phase",
         )
         return rows, run_dirs, swept_snapshot
 
@@ -1665,7 +1665,7 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
 
         if not scores or max(scores) < threshold:
             print(
-                f"  Adaptive: converged after {iteration} iterations (max score < {threshold})"
+                f"  Adaptive: converged after {iteration} iterations (max score < {threshold})",
             )
             break
 
@@ -1866,7 +1866,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
             from tidal.cli._console import warn as _cwarn
 
             _cwarn(
-                f"swept parameter '{name}' not found in equation spec. Possible typo?"
+                f"swept parameter '{name}' not found in equation spec. Possible typo?",
             )
 
     measurements: set[str] = set()
@@ -1881,7 +1881,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 f"unknown measurement(s): {', '.join(sorted(unknown))}. "
                 f"Valid: {', '.join(sorted(_SWEEP_MEASUREMENTS))}",
                 [
-                    "Check spelling. Available: energy, conversion, mixing, spectrum, conservation"
+                    "Check spelling. Available: energy, conversion, mixing, spectrum, conservation",
                 ],
             )
             return 1
@@ -1955,7 +1955,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     parallel = getattr(args, "parallel", None)
     mode_label = f"parallel={parallel}" if parallel and parallel > 1 else "sequential"
     print(
-        f"Sweep: {total_runs} runs ({mode_label}), measurements: {', '.join(sorted(measurements))}"
+        f"Sweep: {total_runs} runs ({mode_label}), measurements: {', '.join(sorted(measurements))}",
     )
     print(f"Output: {output_dir.resolve()}")
 
@@ -1976,7 +1976,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "subdir": subdir,
                 "run_dir": run_dir,
                 "grid_override": grid_override,
-            }
+            },
         )
 
     # Ensemble: expand run_plans with replicates
@@ -1997,7 +1997,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
                 _cwarn(
                     f"--param-noise parameter '{pn_name}' not found "
-                    f"in spec or swept params. Noise will have no effect."
+                    f"in spec or swept params. Noise will have no effect.",
                 )
 
     if n_replicates > 1:
@@ -2010,7 +2010,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         total_runs = len(run_plans)
         run_dirs = [rp["run_dir"] for rp in run_plans]
         print(
-            f"  Ensemble: {n_points} points x {n_replicates} replicates = {total_runs} runs"
+            f"  Ensemble: {n_points} points x {n_replicates} replicates = {total_runs} runs",
         )
 
         # Warn if replicates with no variation source
@@ -2020,7 +2020,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
             _cwarn(
                 "--n-replicates > 1 with deterministic ICs and no "
-                "--ic-perturbation or --param-noise — all replicates will be identical."
+                "--ic-perturbation or --param-noise — all replicates will be identical.",
             )
 
         # Re-check safety limit after expansion
@@ -2064,10 +2064,10 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ac: dict[str, Any] = adaptive_config[adaptive_param]
             adaptive_metric = getattr(args, "adaptive_metric", None) or ac.get("metric")
             adaptive_budget = getattr(args, "adaptive_budget", None) or ac.get(
-                "max_count", 20
+                "max_count", 20,
             )
             adaptive_threshold = getattr(args, "adaptive_threshold", None) or ac.get(
-                "threshold", 0.01
+                "threshold", 0.01,
             )
         else:
             adaptive_param = None
@@ -2087,7 +2087,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     if not getattr(args, "keep_runs", False):
         print(
             "  Per-run data deleted after measurement "
-            "(use --keep-runs to retain for sweep-compare overlays)"
+            "(use --keep-runs to retain for sweep-compare overlays)",
         )
     rows: list[dict[str, Any]] = []
     run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
@@ -2098,7 +2098,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
             _cwarn(
                 "adaptive refinement does not yet support --n-replicates. "
-                "Running single realization per point."
+                "Running single realization per point.",
             )
         initial_values = swept_params[adaptive_param]
         rows, run_dirs, swept_params = _execute_adaptive(
@@ -2438,7 +2438,7 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912
         error_with_hint(
             "json_path is required (via positional arg or TOML spec)",
             [
-                "Example: `tidal sweep spec.json --sweep 'm2=0.1:1:10' --output results/`"
+                "Example: `tidal sweep spec.json --sweep 'm2=0.1:1:10' --output results/`",
             ],
         )
         return 1
@@ -2485,7 +2485,7 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912
         error_with_hint(
             "--sweep and --converge are mutually exclusive",
             [
-                "Choose one: parameter sweep (`--sweep`) or convergence study (`--converge`)"
+                "Choose one: parameter sweep (`--sweep`) or convergence study (`--converge`)",
             ],
         )
         return 1

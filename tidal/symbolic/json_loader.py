@@ -57,7 +57,7 @@ _STATIC_OPERATORS: frozenset[str] = frozenset(
         "cross_derivative_yz",
         "first_derivative_t",
         "biharmonic",
-    }
+    },
 )
 
 #: Pattern for generic single-axis Nth-order derivatives: derivative_3_x, derivative_5_y, etc.
@@ -65,7 +65,7 @@ _GENERIC_SINGLE_AXIS_RE = re.compile(r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r
 
 #: Pattern for generic multi-axis derivatives: derivative_2x_1y, derivative_3x_2z, etc.
 _GENERIC_MULTI_AXIS_RE = re.compile(
-    r"^derivative_(\d+" + _AXIS_RE_CLASS + r"(?:_\d+" + _AXIS_RE_CLASS + r")*)$"
+    r"^derivative_(\d+" + _AXIS_RE_CLASS + r"(?:_\d+" + _AXIS_RE_CLASS + r")*)$",
 )
 
 
@@ -296,7 +296,7 @@ class OperatorTerm:
 # --- Boundary conditions ---
 
 _VALID_BC_TYPES: frozenset[str] = frozenset(
-    {"periodic", "dirichlet", "neumann", "robin"}
+    {"periodic", "dirichlet", "neumann", "robin"},
 )
 
 
@@ -347,7 +347,7 @@ class BoundaryCondition:
         }
         if extra:
             logger.warning(
-                "%s BC ignores field(s): %s", bc_type, ", ".join(sorted(extra))
+                "%s BC ignores field(s): %s", bc_type, ", ".join(sorted(extra)),
             )
         return cls(
             type=bc_type,
@@ -433,7 +433,7 @@ class ConstraintSolverConfig:
     enabled: bool = False
     method: str = "auto"
     boundary_conditions: dict[str, BoundaryCondition] = dataclass_field(
-        default_factory=lambda: {}  # noqa: PIE807  # type: dict[str, BoundaryCondition]
+        default_factory=lambda: {},  # noqa: PIE807  # type: dict[str, BoundaryCondition]
     )
     max_iterations: int = 20
     tolerance: float = 1e-8
@@ -683,7 +683,7 @@ class ComponentEquation:
     time_derivative_order: int
     rhs_terms: tuple[OperatorTerm, ...]
     constraint_solver: ConstraintSolverConfig = dataclass_field(
-        default_factory=ConstraintSolverConfig
+        default_factory=ConstraintSolverConfig,
     )
     kinetic_coefficient_symbolic: str | None = None
     """Symbolic kinetic coefficient when ExportJSON left RHS unnormalized.
@@ -714,7 +714,7 @@ class ComponentEquation:
 
     @classmethod
     def from_dict(
-        cls, data: Mapping[str, Any], fields_lookup: dict[str, int]
+        cls, data: Mapping[str, Any], fields_lookup: dict[str, int],
     ) -> ComponentEquation:
         """Create a ComponentEquation from a dictionary.
 
@@ -753,7 +753,7 @@ class ComponentEquation:
 
         # Parse constraint solver config
         constraint_solver = ConstraintSolverConfig.from_dict(
-            data.get("constraint_solver")
+            data.get("constraint_solver"),
         )
 
         return cls(
@@ -886,7 +886,7 @@ class EquationSystem:
             k: float(v) for k, v in raw_params.items() if isinstance(v, (int, float))
         }
         expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
-            self.equations, self.component_names, parameters=check_params or None
+            self.equations, self.component_names, parameters=check_params or None,
         )
         if (
             self.mass_matrix != expected_mass
@@ -1025,7 +1025,7 @@ class EquationSystem:
                     effective_coeff = term.coefficient
                     if term.coefficient_symbolic is not None and parameters:
                         resolved = _resolve_symbolic_coeff(
-                            term.coefficient_symbolic, parameters
+                            term.coefficient_symbolic, parameters,
                         )
                         if resolved is not None:
                             effective_coeff = resolved
@@ -1169,7 +1169,7 @@ class EquationSystem:
         # would trigger __post_init__'s inconsistency UserWarning if
         # passed through unchanged.
         mass, coupling, mass_sym, coupling_sym = self._compute_matrices_from_terms(
-            new_eqs, self.component_names, parameters=None
+            new_eqs, self.component_names, parameters=None,
         )
         return dataclasses.replace(
             self,
@@ -1200,7 +1200,7 @@ class EquationSystem:
         return any(t.order_in_eps > 0 for eq in self.equations for t in eq.rhs_terms)
 
     def base_spec(
-        self, small_parameters: Sequence[str] | None = None
+        self, small_parameters: Sequence[str] | None = None,
     ) -> EquationSystem:
         """Return the Pass 0 base spec with LHS demoted where required.
 
@@ -1259,12 +1259,12 @@ class EquationSystem:
 
             # Step 2: check whether the LHS itself is a correction.
             demote = lhs_collapses_to_zero(
-                eq.kinetic_coefficient_symbolic, small_parameters
+                eq.kinetic_coefficient_symbolic, small_parameters,
             )
 
             if demote:
                 # Ensure an identity self-term exists on the RHS so
-                # downstream Schur elimination recognises this as a
+                # downstream Schur elimination recognizes this as a
                 # proper algebraic constraint (``1 * field = ...``).
                 has_self_identity = any(
                     t.operator == "identity" and t.field == eq.field_name
@@ -1285,7 +1285,7 @@ class EquationSystem:
                         time_derivative_order=0,
                         rhs_terms=filtered_rhs,
                         kinetic_coefficient_symbolic=None,
-                    )
+                    ),
                 )
             else:
                 new_eqs.append(dataclasses.replace(eq, rhs_terms=filtered_rhs))
@@ -1317,7 +1317,7 @@ class EquationSystem:
         # spec.mass_matrix get stale values.
         new_eqs_t = tuple(new_eqs)
         mass, coupling, mass_sym, coupling_sym = self._compute_matrices_from_terms(
-            new_eqs_t, self.component_names, parameters=None
+            new_eqs_t, self.component_names, parameters=None,
         )
 
         return dataclasses.replace(
@@ -1414,7 +1414,7 @@ class EquationSystem:
             mass_matrix_symbolic,
             coupling_matrix_symbolic,
         ) = cls._compute_matrices_from_terms(
-            equations, component_names, parameters=default_params or None
+            equations, component_names, parameters=default_params or None,
         )
 
         # Extract coordinate names and metric signature
@@ -1614,7 +1614,7 @@ def load_equation_system(json_path: Path | str) -> EquationSystem:
 
 
 def normalize_kinetic_coefficients(
-    spec: EquationSystem, params: dict[str, float]
+    spec: EquationSystem, params: dict[str, float],
 ) -> EquationSystem:
     """Apply symbolic kinetic-coefficient normalization to an equation system.
 
@@ -1695,7 +1695,7 @@ def normalize_kinetic_coefficients(
                         term,
                         coefficient=new_coeff,
                         coefficient_symbolic=new_cs,
-                    )
+                    ),
                 )
             new_eq = dataclasses.replace(
                 eq,
@@ -1714,7 +1714,7 @@ def normalize_kinetic_coefficients(
     # cached matrices on spec no longer match.
     new_eqs_t = tuple(new_eqs)
     mass, coupling, mass_sym, coupling_sym = spec._compute_matrices_from_terms(  # noqa: SLF001  # type: ignore[reportPrivateUsage]
-        new_eqs_t, spec.component_names, parameters=None
+        new_eqs_t, spec.component_names, parameters=None,
     )
     return dataclasses.replace(
         spec,

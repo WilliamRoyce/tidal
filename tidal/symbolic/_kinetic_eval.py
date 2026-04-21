@@ -68,7 +68,7 @@ def evaluate_at_one(expr: str, one_names: set[str] | frozenset[str]) -> float | 
 
 
 def evaluate_with_substitutions(
-    expr: str, substitutions: dict[str, float]
+    expr: str, substitutions: dict[str, float],
 ) -> float | None:
     """Return ``expr`` evaluated after replacing each ``name`` → ``substitutions[name]`` in the AST.
 
@@ -102,14 +102,14 @@ def evaluate_with_substitutions(
             f"evaluate_with_substitutions: expected a str, got {type(expr).__name__!r}"
         )
         raise KineticEvalError(msg)
-    normalised = expr.replace("^", "**")
+    normalized = expr.replace("^", "**")
 
     try:
-        tree = ast.parse(normalised, mode="eval")
+        tree = ast.parse(normalized, mode="eval")
     except SyntaxError as e:
         msg = (
             f"evaluate_with_substitutions: cannot parse {expr!r} "
-            f"(after ^→**: {normalised!r}): {e}"
+            f"(after ^→**: {normalized!r}): {e}"
         )
         raise KineticEvalError(msg) from e
 
@@ -186,7 +186,7 @@ def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:  # noqa
 
 
 def lhs_collapses_to_zero(
-    kinetic_symbolic: str | None, small_parameters: Sequence[str]
+    kinetic_symbolic: str | None, small_parameters: Sequence[str],
 ) -> bool:
     """Return True iff the LHS kinetic coefficient evaluates to literal 0 when every small parameter is set to zero.
 

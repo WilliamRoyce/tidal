@@ -83,7 +83,7 @@ def _run_critical_field(results: SweepResults, args: Namespace) -> int:
         error_with_hint(
             "--output is required for critical field analysis",
             hints=[
-                "Example: `tidal analyze DIR --critical-field B0 --output results/`"
+                "Example: `tidal analyze DIR --critical-field B0 --output results/`",
             ],
         )
         return 1
@@ -98,7 +98,7 @@ def _run_critical_field(results: SweepResults, args: Namespace) -> int:
             return 1
         try:
             threshold = compute_reference_threshold(
-                ref_formula, ref_b, results.fixed_params, results.sim_settings
+                ref_formula, ref_b, results.fixed_params, results.sim_settings,
             )
         except ValueError as exc:
             _cerror(f"reference formula: {exc}")
@@ -249,7 +249,7 @@ def analyze_command(args: Namespace) -> int:  # noqa: PLR0911
             error_with_hint(
                 f"--metric is required. Available: {', '.join(results.metric_names)}",
                 hints=[
-                    "Example: `tidal analyze DIR --metric P_max --sensitivity sobol`"
+                    "Example: `tidal analyze DIR --metric P_max --sensitivity sobol`",
                 ],
             )
             return 1

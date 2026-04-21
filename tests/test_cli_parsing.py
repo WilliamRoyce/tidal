@@ -167,7 +167,7 @@ class TestParseParams:
             _parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
 
     def test_non_numeric_metadata_skipped(
-        self, capsys: pytest.CaptureFixture[str]
+        self, capsys: pytest.CaptureFixture[str],
     ) -> None:
         spec = _make_spec_stub({"parameters": {"note": "not a number", "m2": 1.0}})
         result = _parse_params([], spec)  # type: ignore[arg-type]
@@ -187,7 +187,7 @@ class TestParseParams:
         assert "not found" in err
 
     def test_no_warning_for_known_param(
-        self, capsys: pytest.CaptureFixture[str]
+        self, capsys: pytest.CaptureFixture[str],
     ) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
         _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
@@ -363,8 +363,8 @@ class TestConstraintSolverToml:
                         "x": {"type": "dirichlet", "value": 0.0},
                         "y": {"type": "dirichlet", "value": 0.0},
                     },
-                }
-            }
+                },
+            },
         )
         assert '"type" -> "dirichlet"' in wls
         assert '"value" -> 0.0' in wls
@@ -379,8 +379,8 @@ class TestConstraintSolverToml:
                         "x": {"type": "periodic"},
                         "y": {"type": "periodic"},
                     },
-                }
-            }
+                },
+            },
         )
         assert '"type" -> "periodic"' in wls
         # Periodic BCs should NOT have a "value" key in the BC association
@@ -405,10 +405,10 @@ class TestGaugeToml:
                     "rank": 2,
                     "symmetry": "antisymmetric",
                     "definition": "CD[-a][A[-b]] - CD[-b][A[-a]]",
-                }
+                },
             ],
             "lagrangian": {
-                "expression": "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+                "expression": "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]",
             },
             "output": {"path": "out.json"},
         }
@@ -440,9 +440,9 @@ class TestGaugeToml:
                         "type": "custom",
                         "mechanism": "lagrangian_term",
                         "expression": "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]",
-                    }
-                ]
-            }
+                    },
+                ],
+            },
         )
         assert "GaugeTerm" in wls
         assert "AddGaugeFixingTerm" in wls
@@ -494,12 +494,12 @@ class TestGaugeToml:
         wls = self._generate(
             {
                 "fields": [
-                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"},
                 ],
                 "derived_fields": [],
                 "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
                 "gauge": [{"field": "h", "type": "de_donder"}],
-            }
+            },
         )
         assert "BuildDeDonderGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
@@ -518,13 +518,13 @@ class TestGaugeToml:
                     "expression": (
                         "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] "
                         "- 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]]"
-                    )
+                    ),
                 },
                 "gauge": [
                     {"field": "A", "type": "lorenz"},
                     {"field": "B", "type": "temporal"},
                 ],
-            }
+            },
         )
         assert "BuildLorenzGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
@@ -538,12 +538,12 @@ class TestGaugeToml:
             {
                 "spacetime": {"dimension": 3, "metric": "minkowski"},
                 "fields": [
-                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"},
                 ],
                 "derived_fields": [],
                 "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
                 "gauge": [{"field": "h", "type": "tt"}],
-            }
+            },
         )
         # Temporal zeroing: h_0, h_1, h_2 = 0 (dim=3, first 3 components)
         assert "TT-temporal" in wls
@@ -565,13 +565,13 @@ class TestGaugeToml:
             {
                 "spacetime": {"dimension": 4, "metric": "minkowski"},
                 "fields": [
-                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"},
                 ],
                 "derived_fields": [],
                 "lagrangian": {"expression": "RicciScalarCD[]"},
                 "linearization": {"perturbation_field": "h"},
                 "gauge": [{"field": "h", "type": "tt"}],
-            }
+            },
         )
         # Should contain both linearization AND gauge-fixing code
         assert "Perturbation" in wls
@@ -591,7 +591,7 @@ class TestGaugeToml:
             "theory": {"name": "Test"},
             "spacetime": {"dimension": 2, "metric": "minkowski"},
             "fields": [
-                {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"},
             ],
             "linearization": {
                 "perturbation_field": "h",
@@ -609,12 +609,12 @@ class TestGaugeToml:
             {
                 "spacetime": {"dimension": 3, "metric": "minkowski"},
                 "fields": [
-                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"},
                 ],
                 "derived_fields": [],
                 "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
                 "gauge": [{"field": "h", "type": "tt"}],
-            }
+            },
         )
         assert '"gauge" -> "tt(h)"' in wls
 
@@ -638,14 +638,14 @@ class TestGaugeToml:
                             "type": "tensor",
                             "rank": 2,
                             "symmetry": "antisymmetric",
-                        }
+                        },
                     ],
                     "derived_fields": [],
                     "lagrangian": {
-                        "expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"
+                        "expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]",
                     },
                     "gauge": [{"field": "h", "type": "tt"}],
-                }
+                },
             )
 
 
@@ -957,7 +957,7 @@ def _make_kg_spec() -> EquationSystem:
                         },
                     ],
                 },
-            }
+            },
         ],
     }
     return EquationSystem.from_dict(spec_dict)
@@ -1406,10 +1406,10 @@ def _make_wave_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
                     ],
                 },
-            }
+            },
         ],
         "canonical": {
             "hamiltonian_terms": [
@@ -1441,7 +1441,7 @@ def _make_constraint_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "gradient_x", "field": "A_1"}
+                        {"coefficient": 1.0, "operator": "gradient_x", "field": "A_1"},
                     ],
                 },
             },
@@ -1451,7 +1451,7 @@ def _make_constraint_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"}
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"},
                     ],
                 },
             },
@@ -1482,7 +1482,7 @@ def _make_dissipative_spec() -> EquationSystem:
                         },
                     ],
                 },
-            }
+            },
         ],
         "canonical": {
             "hamiltonian_terms": [

@@ -144,7 +144,7 @@ def plot_importance(
     ax.set_yticklabels(names)
     ax.set_xlabel("Marginal $D_{\\mathrm{KL}}$ (nats)")
     ax.set_title(
-        f"Parameter Importance  ($d_G = {result.d_g:.1f}$ of {len(names)} params)"
+        f"Parameter Importance  ($d_G = {result.d_g:.1f}$ of {len(names)} params)",
     )
 
     # Threshold line
@@ -236,7 +236,7 @@ def _plot_corner_matplotlib(
                 continue
             if i == j:
                 ax.hist(
-                    samples[:, i], bins=30, weights=weights, density=True, alpha=0.7
+                    samples[:, i], bins=30, weights=weights, density=True, alpha=0.7,
                 )
                 ax.set_xlabel(result.param_names[i])
             else:
@@ -255,7 +255,7 @@ def _plot_corner_matplotlib(
 
     fig.suptitle(
         f"Posterior ({result.method}, n={result.n_samples}, "
-        f"ESS={result.effective_sample_size():.0f})"
+        f"ESS={result.effective_sample_size():.0f})",
     )
     fig.tight_layout()
 

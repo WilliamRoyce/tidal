@@ -557,7 +557,7 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames, smallParams];
 
   (* Validate that no emitted term exceeds the declared perturbation_order.
-     Under TIDAL's linearised-theory constraint, order_in_eps > 1 should
+     Under TIDAL's linearized-theory constraint, order_in_eps > 1 should
      never occur: a quadratic Lagrangian with a single linear coupling ε
      produces EOM coefficients with at most one factor of ε. A higher tag
      means the Lagrangian contains products of small parameters (e.g. ε·δ)
@@ -570,7 +570,7 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     If[Length[highOrderTerms] > 0,
       Print["  WARNING [" <> fieldName <> "]: " <> ToString[Length[highOrderTerms]] <>
             " term(s) have order_in_eps > " <> ToString[declaredOrder] <>
-            " (declared perturbation_order). TIDAL's linearised-theory pipeline " <>
+            " (declared perturbation_order). TIDAL's linearized-theory pipeline " <>
             "only supports order_in_eps <= 1. These terms will be silently ignored " <>
             "by PerturbativeSolver. Check your Lagrangian for products of small " <>
             "parameters or higher-power couplings, which are not supported."]

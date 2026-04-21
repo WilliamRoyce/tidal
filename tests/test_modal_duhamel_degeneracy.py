@@ -79,7 +79,7 @@ class TestDuhamelKernelScalar:
         got = _duhamel_kernel(lam, mu, t)
         assert abs(got - expected) < 1e-14
 
-    def test_vectorised_broadcast(self) -> None:
+    def test_vectorized_broadcast(self) -> None:
         """Array lam/mu broadcast elementwise."""
         lam = np.array([1j, 2j, 3j], dtype=np.complex128)
         mu = lam.copy()  # exact degeneracy on diagonal

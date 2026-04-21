@@ -186,7 +186,7 @@ class ConstraintSet:
     """
 
     constraints: list[Callable[[dict[str, float]], bool]] = field(  # pyright: ignore[reportUnknownVariableType]
-        default_factory=list
+        default_factory=list,
     )
     expressions: list[str] = field(default_factory=list)  # pyright: ignore[reportUnknownVariableType]
 

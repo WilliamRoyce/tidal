@@ -165,7 +165,7 @@ def _compute_validity(
             bs = real_lam.shape[1]
             dominant_tachyon_block = block_idx
             dominant_tachyon_slot = int(
-                block["slot_indices"][flat_idx % bs]  # slot within this block
+                block["slot_indices"][flat_idx % bs],  # slot within this block
             )
             _ = n_modes_block  # silence unused-var lint; retained for clarity
 
@@ -233,7 +233,7 @@ def _compute_validity(
             for name, slot in layout.velocity_slot_map.items():
                 slot_to_name[slot] = f"v_{name} (velocity slot)"
             dominant_tachyon_field = slot_to_name.get(
-                dominant_tachyon_slot, f"slot {dominant_tachyon_slot}"
+                dominant_tachyon_slot, f"slot {dominant_tachyon_slot}",
             )
 
     return {
@@ -388,7 +388,7 @@ def _assemble_full_state_pass_n(
                 axes=list(range(len(grid.shape))),
             ).ravel()
             pass_n_full[ti, c_slot * num_points : (c_slot + 1) * num_points] = np.real(
-                c_phys
+                c_phys,
             )
 
     return pass_n_full
@@ -523,7 +523,7 @@ class PerturbativeSolver:
                 "included in the solve at order=%d. First dropped: %s. "
                 "If unexpected, check the [perturbation] section of your "
                 "theory TOML — TIDAL only supports order_in_eps ∈ {0, 1} "
-                "for linearised theories with a single linear coupling.",
+                "for linearized theories with a single linear coupling.",
                 len(dropped),
                 order,
                 spec_max,
@@ -561,7 +561,7 @@ class PerturbativeSolver:
             # Schur recovery. Depends only on Pass 0 output + spec, so
             # it's shared across all correction orders.
             pre_demote = _pre_demote_info(
-                self.full_spec, self.base_spec, self._small_parameters
+                self.full_spec, self.base_spec, self._small_parameters,
             )
             constraint_source_hat = _compute_constraint_source_hat(
                 full_spec=self.full_spec,
@@ -619,7 +619,7 @@ class PerturbativeSolver:
         t_end = float(t_span[1] - t_span[0])
         if order >= 1 and self.has_corrections() and "eigendata" in pass0:
             validity = _compute_validity(
-                pass0["eigendata"], small_parameters, parameters, t_end
+                pass0["eigendata"], small_parameters, parameters, t_end,
             )
         else:
             validity: dict[str, Any] = {
@@ -898,7 +898,7 @@ def _compute_constraint_source_hat(
                 continue
             # Resolve numeric coefficient via modal's existing helper.
             coeff = resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
+                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
             )
             mult = _spatial_multiplier(term.operator)  # (n_modes,)
             decomp = OPERATOR_DECOMP[term.operator]

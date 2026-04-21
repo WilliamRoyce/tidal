@@ -132,7 +132,7 @@ def _make_sim_data(
         if eq.time_derivative_order >= 2:
             vel_base = np.cos(2 * np.pi * x / 10.0)
             velocities[eq.field_name] = np.stack(
-                [vel_base * (1.0 + 0.01 * t) for t in times]
+                [vel_base * (1.0 + 0.01 * t) for t in times],
             )
 
     return SimulationData(

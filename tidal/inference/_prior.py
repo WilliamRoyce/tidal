@@ -102,7 +102,7 @@ class Prior:
         if self.distribution == "normal":
             mean, std = self.low, self.high
             return -0.5 * ((x - mean) / std) ** 2 - math.log(
-                std * math.sqrt(2 * math.pi)
+                std * math.sqrt(2 * math.pi),
             )
         if self.distribution == "arctan_uniform":
             # p(x) = (1/pi) * 1/(1+x^2)  (Cauchy/arctan distribution)

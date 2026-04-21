@@ -221,7 +221,7 @@ def _make_position_dependent_sim_data(
                 field="chi_0",
                 coefficient_symbolic="-g0 * exp(-(x()^2 + y()^2))",
                 coordinate_dependent=("x", "y"),
-            )
+            ),
         )
         chi_terms_list.append(
             OperatorTerm(
@@ -230,7 +230,7 @@ def _make_position_dependent_sim_data(
                 field="phi_0",
                 coefficient_symbolic="-g0 * exp(-(x()^2 + y()^2))",
                 coordinate_dependent=("x", "y"),
-            )
+            ),
         )
 
     eq_phi = ComponentEquation(
@@ -261,7 +261,7 @@ def _make_position_dependent_sim_data(
                     factor_a=HamiltonianFactor(field=fname, operator="identity"),
                     factor_b=HamiltonianFactor(field=fname, operator="laplacian"),
                 ),
-            ]
+            ],
         )
     # Mass terms — position-dependent for phi if requested
     if position_dependent_mass:
@@ -272,7 +272,7 @@ def _make_position_dependent_sim_data(
                 factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
                 coefficient_symbolic="g0/2 * exp(-(x()^2 + y()^2))",
                 coordinate_dependent=("x", "y"),
-            )
+            ),
         )
     else:
         h_terms.append(
@@ -280,14 +280,14 @@ def _make_position_dependent_sim_data(
                 coefficient=0.5,
                 factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
                 factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
-            )
+            ),
         )
     h_terms.append(
         HamiltonianTerm(
             coefficient=0.5,
             factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
             factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
-        )
+        ),
     )
     if position_dependent_coupling:
         h_terms.append(
@@ -297,7 +297,7 @@ def _make_position_dependent_sim_data(
                 factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
                 coefficient_symbolic="g0 * exp(-(x()^2 + y()^2))",
                 coordinate_dependent=("x", "y"),
-            )
+            ),
         )
     canonical = CanonicalStructure(hamiltonian_terms=tuple(h_terms))
 

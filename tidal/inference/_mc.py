@@ -243,7 +243,7 @@ def _run_parallel(
     results = np.zeros(n_valid)
 
     with Pool(
-        n_workers, initializer=_likelihood_worker_init, initargs=(config,)
+        n_workers, initializer=_likelihood_worker_init, initargs=(config,),
     ) as pool:
         for k, logl in enumerate(pool.imap(_likelihood_worker, valid_samples)):
             results[k] = logl

@@ -51,7 +51,7 @@ _RESERVED_NAMES: frozenset[str] = frozenset(
         # Other reserved
         "PD",
         "Christoffel",
-    }
+    },
 )
 
 # Gauge-fixing preset registry.  Each entry maps a preset name to its
@@ -531,7 +531,7 @@ def _validate_linearization(
 
     if matter_perts:
         _validate_matter_perturbations(
-            config, matter_perts, has_lagrangian=has_lagrangian
+            config, matter_perts, has_lagrangian=has_lagrangian,
         )
 
 

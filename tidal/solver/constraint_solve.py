@@ -82,7 +82,7 @@ _ACCEL_AND_HIGHER_OPS: frozenset[str] = frozenset(
         "d3_t",
         *(f"mixed_T2_S{s}{ax}" for s in (1, 2) for ax in "xyz"),
         *(f"mixed_T3_S{s}{ax}" for s in (1,) for ax in "xyz"),
-    }
+    },
 )
 
 # ---------------------------------------------------------------------------
@@ -802,14 +802,14 @@ def _solve_coupled(  # noqa: PLR0912, PLR0913, PLR0914, PLR0917, C901
             methods[terms.field_name] = method
             if method != "fft":
                 op_matrices[terms.field_name] = _probe_operator_matrix(
-                    terms.self_terms, grid, bc
+                    terms.self_terms, grid, bc,
                 )
 
         for _iteration in range(max_iter):
             max_change = 0.0
             for terms in groups:
                 source = _evaluate_source(
-                    terms.source_terms, fields, grid, bc, name_map
+                    terms.source_terms, fields, grid, bc, name_map,
                 )
                 method = methods[terms.field_name]
 
@@ -1175,12 +1175,12 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
 
         lines = [
             "Constraint propagation stalled — these constraints have "
-            "multiple undetermined fields:"
+            "multiple undetermined fields:",
         ]
         for eq_name, free_set in sorted(stall_free_fields.items()):
             lines.append(
                 f"  {eq_name}: {len(free_set)} undetermined "
-                f"[{', '.join(sorted(free_set))}]"
+                f"[{', '.join(sorted(free_set))}]",
             )
         # Highlight high-impact fields (appear in multiple constraints)
         shared = {f: c for f, c in field_counts.items() if c > 1}
@@ -1191,7 +1191,7 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
             )
             hints = [f"{f} (in {shared[f]} constraints)" for f in top[:3]]
             lines.append(
-                f"Setting IC for: {', '.join(hints)} may resolve multiple constraints."
+                f"Setting IC for: {', '.join(hints)} may resolve multiple constraints.",
             )
         warnings.warn("\n".join(lines), UserWarning, stacklevel=2)
 
@@ -1237,12 +1237,12 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
                 free_info = f" — undetermined: [{', '.join(free)}]"
             lines.append(
                 f"  {field_name}: max|residual| = {max_res:.2e} "
-                f"(involves [{', '.join(involved)}]){free_info}"
+                f"(involves [{', '.join(involved)}]){free_info}",
             )
         lines.append(
             "For physical consistency, choose initial conditions that "
             "jointly satisfy all constraint equations, or use "
-            "--allow-inconsistent-ic to proceed with a warning."
+            "--allow-inconsistent-ic to proceed with a warning.",
         )
         msg = "\n".join(lines)
         if strict:

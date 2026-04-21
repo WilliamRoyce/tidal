@@ -79,7 +79,7 @@ class TestEvaluateAtZero:
         # symbolic, so returns None.
         assert evaluate_at_zero("m2 + b5", {"b5"}) is None
 
-    # --- Caret normalisation ---
+    # --- Caret normalization ---
 
     def test_caret_converted_to_power(self) -> None:
         # Bare exponent on a small parameter: b5^2 at b5=0 → 0
@@ -198,5 +198,5 @@ class TestEvaluateWithSubstitutions:
         # Only b5 substituted; kappa still symbolic.
         assert evaluate_with_substitutions("b5 + kappa", {"b5": 1.0}) is None
 
-    def test_caret_is_normalised_to_double_star(self) -> None:
+    def test_caret_is_normalized_to_double_star(self) -> None:
         assert evaluate_with_substitutions("b5^3", {"b5": 2.0}) == 8.0

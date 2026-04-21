@@ -47,7 +47,7 @@ _KG_1D_SPEC: dict[str, object] = {
                     {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
                 ],
             },
-        }
+        },
     ],
     "coupling": {"mass_matrix_symbolic": [["-m2"]]},
 }
@@ -171,7 +171,7 @@ _DIFFUSION_SPEC: dict[str, object] = {
                     },
                 ],
             },
-        }
+        },
     ],
 }
 
@@ -254,7 +254,7 @@ class TestModalEligibility:
         """first_derivative_t operator → eligible (generalized mass-matrix path)."""
         spec_data = copy.deepcopy(_KG_1D_SPEC)
         spec_data["equations"][0]["rhs"]["terms"].append(  # type: ignore[index]
-            {"coefficient": -0.1, "operator": "first_derivative_t", "field": "phi_0"}
+            {"coefficient": -0.1, "operator": "first_derivative_t", "field": "phi_0"},
         )
         spec = _make_spec(spec_data)
         grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
@@ -264,7 +264,7 @@ class TestModalEligibility:
         """Operator not in modal decomposition registry → not eligible."""
         spec_data = copy.deepcopy(_KG_1D_SPEC)
         spec_data["equations"][0]["rhs"]["terms"].append(  # type: ignore[index]
-            {"coefficient": 1.0, "operator": "derivative_5_x", "field": "phi_0"}
+            {"coefficient": 1.0, "operator": "derivative_5_x", "field": "phi_0"},
         )
         spec = _make_spec(spec_data)
         grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
@@ -590,7 +590,7 @@ class TestModalCorrectness:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = _make_spec(spec_2d)
@@ -1069,7 +1069,7 @@ class TestConstraintElimination:
         # IC on A₁ field (slot 1)
         a1_slot = layout.field_slot_map["A_1"]
         y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = 0.1 * np.exp(
-            -((x - 5.0) ** 2) / (2 * 1.5**2)
+            -((x - 5.0) ** 2) / (2 * 1.5**2),
         )
 
         result = solve_modal(
@@ -1095,7 +1095,7 @@ class TestConstraintElimination:
         x = np.linspace(0.0, 10.0, 64, endpoint=False)
         a1_slot = layout.field_slot_map["A_1"]
         y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = 0.1 * np.exp(
-            -((x - 5.0) ** 2) / (2 * 1.5**2)
+            -((x - 5.0) ** 2) / (2 * 1.5**2),
         )
 
         result = solve_modal(
@@ -1288,7 +1288,7 @@ class TestEigendataExport:
     """
 
     def _run_kg(
-        self, return_eigendata: bool
+        self, return_eigendata: bool,
     ) -> tuple[dict[str, Any], np.ndarray, StateLayout, GridInfo]:
         spec = _make_spec(_KG_1D_SPEC)
         n = 32
@@ -1361,7 +1361,7 @@ class TestEigendataExport:
             y0_block = y0_hat[slot_indices, :]  # (bs, n_modes)
             expected_alpha = np.einsum("mij,mj->mi", block["V_inv"], y0_block.T)
             np.testing.assert_allclose(
-                block["alpha"], expected_alpha, atol=1e-12, rtol=1e-12
+                block["alpha"], expected_alpha, atol=1e-12, rtol=1e-12,
             )
 
     def test_eigendata_reconstructs_pass_zero(self) -> None:

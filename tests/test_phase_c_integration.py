@@ -71,24 +71,24 @@ class TestValidatePerturbationConfig:
     def test_zero_order_raises(self) -> None:
         with pytest.raises(ValueError, match="positive integer"):
             _validate_perturbation_config(
-                {"small_parameters": ["b5"], "order": 0}, ["b5"]
+                {"small_parameters": ["b5"], "order": 0}, ["b5"],
             )
 
     def test_negative_order_raises(self) -> None:
         with pytest.raises(ValueError, match="positive integer"):
             _validate_perturbation_config(
-                {"small_parameters": ["b5"], "order": -1}, ["b5"]
+                {"small_parameters": ["b5"], "order": -1}, ["b5"],
             )
 
     def test_non_int_order_raises(self) -> None:
         with pytest.raises(ValueError, match="positive integer"):
             _validate_perturbation_config(
-                {"small_parameters": ["b5"], "order": 1.5}, ["b5"]
+                {"small_parameters": ["b5"], "order": 1.5}, ["b5"],
             )
 
     def test_valid_single_param(self) -> None:
         result = _validate_perturbation_config(
-            {"small_parameters": ["b5"]}, ["kappa", "b5"]
+            {"small_parameters": ["b5"]}, ["kappa", "b5"],
         )
         assert result is not None
         assert result["small_parameters"] == ["b5"]
@@ -144,7 +144,7 @@ class TestAuditHigherDerivativeLagrangian:
         ],
     )
     def test_flags_higher_derivative_patterns(
-        self, capsys: pytest.CaptureFixture[str], label: str, expr: str
+        self, capsys: pytest.CaptureFixture[str], label: str, expr: str,
     ) -> None:
         """Each pattern should trigger the audit warning."""
         config: dict[str, Any] = {"lagrangian": {"expression": expr}}
@@ -157,13 +157,13 @@ class TestAuditHigherDerivativeLagrangian:
         assert "[perturbation]" in captured.out
 
     def test_clean_lagrangian_no_warning(
-        self, capsys: pytest.CaptureFixture[str]
+        self, capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Pure Einstein-Maxwell (no higher derivatives) should produce no output."""
         config: dict[str, Any] = {
             "lagrangian": {
-                "expression": "(1/kappa^2) * RicciScalarCD[] - (1/4) * F[-a,-b] * F[a,b]"
-            }
+                "expression": "(1/kappa^2) * RicciScalarCD[] - (1/4) * F[-a,-b] * F[a,b]",
+            },
         }
         _audit_higher_derivative_lagrangian(config)
         captured = capsys.readouterr()
@@ -171,7 +171,7 @@ class TestAuditHigherDerivativeLagrangian:
         assert "[perturbation]" not in captured.out
 
     def test_perturbation_configured_silences_warning(
-        self, capsys: pytest.CaptureFixture[str]
+        self, capsys: pytest.CaptureFixture[str],
     ) -> None:
         """When [perturbation] is configured, no warning is emitted."""
         config: dict[str, Any] = {
@@ -188,7 +188,7 @@ class TestAuditHigherDerivativeLagrangian:
         assert "[perturbation]" not in captured.out
 
     def test_empty_lagrangian_no_warning(
-        self, capsys: pytest.CaptureFixture[str]
+        self, capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Missing or empty Lagrangian expression should not crash."""
         _audit_higher_derivative_lagrangian({})
@@ -211,7 +211,7 @@ def gertsenshtein_config() -> dict[str, Any]:
 
 class TestWlsGeneration:
     def test_no_perturbation_section_omits_metadata_keys(
-        self, gertsenshtein_config: dict[str, Any]
+        self, gertsenshtein_config: dict[str, Any],
     ) -> None:
         """Theory without [perturbation] omits small_parameters from metadata."""
         wls = generate_wls(gertsenshtein_config)
@@ -222,7 +222,7 @@ class TestWlsGeneration:
         assert "PerturbativeReduce[" not in wls
 
     def test_with_perturbation_injects_small_parameters_into_metadata(
-        self, gertsenshtein_config: dict[str, Any]
+        self, gertsenshtein_config: dict[str, Any],
     ) -> None:
         """TOML with [perturbation] injects small_parameters into metadata."""
         cfg = dict(gertsenshtein_config)
@@ -237,7 +237,7 @@ class TestWlsGeneration:
         )
 
     def test_multi_parameter_injection(
-        self, gertsenshtein_config: dict[str, Any]
+        self, gertsenshtein_config: dict[str, Any],
     ) -> None:
         """Multi-parameter config passes all names into the metadata list."""
         cfg = dict(gertsenshtein_config)
@@ -250,7 +250,7 @@ class TestWlsGeneration:
         )
 
     def test_order_propagated_into_metadata(
-        self, gertsenshtein_config: dict[str, Any]
+        self, gertsenshtein_config: dict[str, Any],
     ) -> None:
         """Default truncation order flows into metadata.perturbation_order."""
         cfg = dict(gertsenshtein_config)
@@ -275,7 +275,7 @@ class TestWlsGeneration:
         assert '"perturbation_order"' not in wls
 
     def test_invalid_config_raises_at_generate(
-        self, gertsenshtein_config: dict[str, Any]
+        self, gertsenshtein_config: dict[str, Any],
     ) -> None:
         """Malformed [perturbation] is rejected at generate_wls, before Wolfram."""
         cfg = dict(gertsenshtein_config)

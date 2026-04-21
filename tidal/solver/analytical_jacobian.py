@@ -206,7 +206,7 @@ class _OperatorCache:
             return self.get_identity()
         if operator not in self._cache:
             self._cache[operator] = build_operator_matrix(
-                operator, self._grid, self._bc
+                operator, self._grid, self._bc,
             )
         return self._cache[operator]
 
@@ -276,7 +276,7 @@ LAPLACIAN_OPS = frozenset(
         "laplacian_x",
         "laplacian_y",
         "laplacian_z",
-    }
+    },
 )
 
 

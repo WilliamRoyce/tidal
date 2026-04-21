@@ -32,7 +32,7 @@
 # ``base_spec(['b5'])`` applied to the full theory's JSON.
 #
 # Expected derivation: STALE — the original estimate (~15-18 min) predated
-# the #246 per-pair TraceBasisDummy optimisation (commit a28a393, 2026-04-11)
+# the #246 per-pair TraceBasisDummy optimization (commit a28a393, 2026-04-11)
 # which brought the full theory.toml from ~20 min down to ~2 min. The b5=0
 # variant is strictly simpler (no R̃² cross-couplings in Euler-Lagrange
 # expansion), so post-#246 it should derive in ≤ 2 min. Needs a fresh

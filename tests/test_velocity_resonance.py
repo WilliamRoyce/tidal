@@ -236,7 +236,7 @@ class TestResonanceAnalysis:
         """Very different masses should give fewer resonant modes."""
         data = _make_two_field_wave_data(m2_phi=0.1, m2_chi=10.0)
         result = compute_resonance_analysis(
-            data, "phi_0", "chi_0", resonance_threshold=0.05
+            data, "phi_0", "chi_0", resonance_threshold=0.05,
         )
         # Very different mass -> large frequency mismatch -> fewer resonant
         assert isinstance(result, ResonanceResult)

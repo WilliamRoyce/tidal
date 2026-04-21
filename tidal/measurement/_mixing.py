@@ -259,7 +259,7 @@ def _find_spectral_peaks(
                 mixing_length=ml,
                 fwhm=fwhm,
                 mixing_length_uncertainty=ml_unc,
-            )
+            ),
         )
 
     # Sort by power descending

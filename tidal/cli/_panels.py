@@ -100,7 +100,7 @@ def _spatial_dim(data: SimulationData) -> int:
 
 
 def _z_profile_1d(
-    snap: np.ndarray, data: SimulationData
+    snap: np.ndarray, data: SimulationData,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Extract z-profile at the centre of x, y for a 3D snapshot.
 
@@ -112,7 +112,7 @@ def _z_profile_1d(
     z_min, z_max = data.grid_bounds[2]
     n_z = snap.shape[2]
     z = np.linspace(
-        z_min + data.grid_spacing[2] / 2, z_max - data.grid_spacing[2] / 2, n_z
+        z_min + data.grid_spacing[2] / 2, z_max - data.grid_spacing[2] / 2, n_z,
     )
     return z, snap[ix, iy, :]
 
@@ -326,7 +326,7 @@ def render_amplitude(
     for i, name in enumerate(fields):
         arr = data.fields[name]  # (n_t, *spatial)
         peaks = np.array(
-            [float(np.max(np.abs(arr[t]))) for t in range(data.n_snapshots)]
+            [float(np.max(np.abs(arr[t]))) for t in range(data.n_snapshots)],
         )
         color = _LINE_COLORS[i % len(_LINE_COLORS)]
         ax.plot(times, peaks, color=color, linewidth=1.5, label=name)
@@ -375,7 +375,7 @@ def render_energy(
     for i, name in enumerate(fields):
         arr = data.fields[name]  # (n_t, *spatial)
         energy = np.array(
-            [float(np.sum(arr[t] ** 2)) * vol for t in range(data.n_snapshots)]
+            [float(np.sum(arr[t] ** 2)) * vol for t in range(data.n_snapshots)],
         )
         color = _LINE_COLORS[i % len(_LINE_COLORS)]
         ax.plot(times, energy, color=color, linewidth=1.5, label=name)
@@ -422,7 +422,7 @@ def render_profile(
             x_min, x_max = data.grid_bounds[0]
             n_x = snap.shape[0]
             x = np.linspace(
-                x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, n_x
+                x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, n_x,
             )
             ax.plot(
                 x,

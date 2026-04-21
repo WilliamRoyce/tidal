@@ -57,7 +57,7 @@ _KG_WITH_EPS: dict[str, object] = {
                     },
                 ],
             },
-        }
+        },
     ],
     "coupling": {},
 }
@@ -83,7 +83,7 @@ _KG_BASELINE_NO_PERT: dict[str, object] = {
                     {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
                 ],
             },
-        }
+        },
     ],
     "coupling": {},
 }
@@ -122,7 +122,7 @@ class TestPerturbativeSolverAPI:
         y0 = _make_ic(spec, grid)
         with pytest.raises(ValueError, match="order=2"):
             solver.solve(
-                y0, grid, (0.0, 1.0), order=2, parameters={"m2": 1.0, "eps": 0.05}
+                y0, grid, (0.0, 1.0), order=2, parameters={"m2": 1.0, "eps": 0.05},
             )
 
     def test_gate_order2_raises_not_implemented(self) -> None:
@@ -141,7 +141,7 @@ class TestPerturbativeSolverAPI:
                 "field": "phi_0",
                 "coefficient_symbolic": "-eps2",
                 "order_in_eps": 2,
-            }
+            },
         )
         data["metadata"]["perturbation"] = {  # type: ignore[index]
             "small_parameters": ["eps", "eps2"],
@@ -210,7 +210,7 @@ class TestPerturbativeSolverSolve:
         assert diff > 1e-6
 
     def test_validity_monitor_flags_strong_correction(
-        self, solver_setup: dict[str, Any]
+        self, solver_setup: dict[str, Any],
     ) -> None:
         """Large ε·ω²·t triggers a warn/error band."""
         # ω_max ≈ √(m² + k_max²) ≈ √(1 + 31²) ≈ 31 (Nyquist for N=64, L=2π)
@@ -262,12 +262,12 @@ class TestPerturbativeCLIFlag:
                 "--perturbative-order",
                 "1",
                 "--no-plot",
-            ]
+            ],
         )
         assert ret == 0
 
     def test_cli_default_when_perturbation_metadata_present(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
     ) -> None:
         """With [perturbation] metadata in JSON, default is order=1."""
         from tidal.cli import main
@@ -291,7 +291,7 @@ class TestPerturbativeCLIFlag:
                 "0:6.283185",
                 "--periodic",
                 "--no-plot",
-            ]
+            ],
         )
         assert ret == 0
         # Log goes to stderr; check both streams for the banner.
@@ -300,7 +300,7 @@ class TestPerturbativeCLIFlag:
         assert "perturbative modal solver" in combined or "order=1" in combined
 
     def test_cli_order_zero_skips_driver(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--perturbative-order 0 routes through plain solve_modal."""
         from tidal.cli import main
@@ -326,7 +326,7 @@ class TestPerturbativeCLIFlag:
                 "--perturbative-order",
                 "0",
                 "--no-plot",
-            ]
+            ],
         )
         assert ret == 0
         captured = capsys.readouterr()
@@ -575,8 +575,8 @@ class TestPassOneConstraintRecovery:
         predicted_hat = np.einsum("mcj,jm->cm", recovery_matrix, y_hat_dyn[ti])[c_idx]
         predicted_phys = np.real(
             np.fft.irfftn(
-                predicted_hat.reshape(rfft_shape), s=grid.shape, axes=[0]
-            ).ravel()
+                predicted_hat.reshape(rfft_shape), s=grid.shape, axes=[0],
+            ).ravel(),
         )
         actual_phys = pass1["y"][ti, a0_slot * n_grid : (a0_slot + 1) * n_grid]
         np.testing.assert_allclose(actual_phys, predicted_phys, atol=1e-12)
@@ -622,7 +622,7 @@ class TestPerturbativeResultLayoutConsistency:
         grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
         y0 = _make_ic(spec, grid)
         res = solver.solve(
-            y0, grid, (0.0, 0.5), order=1, parameters={"m2": 1.0, "eps": 0.05}
+            y0, grid, (0.0, 0.5), order=1, parameters={"m2": 1.0, "eps": 0.05},
         )
         # The result must carry both the base_spec (matches y layout) and
         # the full_spec (for diagnostics).
@@ -645,7 +645,7 @@ class TestPerturbativeResultLayoutConsistency:
         grid = GridInfo(shape=(32,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
         y0 = _make_ic(spec, grid)
         res = solver.solve(
-            y0, grid, (0.0, 0.5), order=1, parameters={"m2": 1.0, "eps": 0.05}
+            y0, grid, (0.0, 0.5), order=1, parameters={"m2": 1.0, "eps": 0.05},
         )
         assert res.spec is not None
         base_layout = StateLayout.from_spec(res.spec, grid.num_points)
@@ -661,11 +661,11 @@ class TestPerturbativeDefensiveHardening:
     """Defensive diagnostics for unsupported pipeline inputs (#273 resolution)."""
 
     def test_warns_when_spec_has_higher_order_terms_than_requested(
-        self, caplog: pytest.LogCaptureFixture
+        self, caplog: pytest.LogCaptureFixture,
     ) -> None:
         """When a spec carries order_in_eps=2 terms but solve(order=1) is
         requested, the solver must emit a warning listing the dropped terms
-        rather than silently ignoring them.  Under TIDAL's linearised-theory
+        rather than silently ignoring them.  Under TIDAL's linearized-theory
         constraint this path should never be reached in practice, but the
         diagnostic prevents silent wrong physics if it ever is.
         """
@@ -680,7 +680,7 @@ class TestPerturbativeDefensiveHardening:
                 "field": "phi_0",
                 "coefficient_symbolic": "-eps2",
                 "order_in_eps": 2,
-            }
+            },
         )
         data["metadata"]["perturbation"] = {  # type: ignore[index]
             "small_parameters": ["eps", "eps2"],
@@ -694,7 +694,7 @@ class TestPerturbativeDefensiveHardening:
         y0 = _make_ic(spec, grid)
 
         with caplog.at_level(
-            logging.WARNING, logger="tidal.solver.perturbative_driver"
+            logging.WARNING, logger="tidal.solver.perturbative_driver",
         ):
             solver.solve(
                 y0,
@@ -710,7 +710,7 @@ class TestPerturbativeDefensiveHardening:
         )
 
     def test_validity_warns_when_small_parameter_missing_from_params(
-        self, caplog: pytest.LogCaptureFixture
+        self, caplog: pytest.LogCaptureFixture,
     ) -> None:
         """If a small parameter declared in [perturbation] is absent from the
         runtime parameters dict, the validity monitor must emit a warning
@@ -769,7 +769,7 @@ class TestPerturbativeDefensiveHardening:
                             },
                         ],
                     },
-                }
+                },
             ],
             "coupling": {},
         }
@@ -779,7 +779,7 @@ class TestPerturbativeDefensiveHardening:
         y0 = _make_ic(spec, grid)
 
         with caplog.at_level(
-            logging.WARNING, logger="tidal.solver.perturbative_driver"
+            logging.WARNING, logger="tidal.solver.perturbative_driver",
         ):
             solver.solve(
                 y0,

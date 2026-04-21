@@ -66,7 +66,7 @@ def _make_3d_kg_spec() -> dict[str, Any]:
                         },
                     ],
                 },
-            }
+            },
         ],
         "coupling": {"mass_matrix_symbolic": [["-m2"]]},
         "canonical": {
@@ -118,7 +118,7 @@ def _make_2field_3d_spec() -> dict[str, Any]:
                     {"coefficient": 1.0, "operator": "laplacian_y", "field": "psi_0"},
                 ],
             },
-        }
+        },
     )
     spec["coupling"]["mass_matrix_symbolic"].append(["-m2"])
     spec["coupling"]["mass_matrix_symbolic"][0].append("0")
@@ -156,7 +156,7 @@ def _make_curved_spec_surviving() -> dict[str, Any]:
                         },
                     ],
                 },
-            }
+            },
         ],
         "canonical": {
             "hamiltonian_terms": [
@@ -202,7 +202,7 @@ def _make_curved_spec_killed_ref() -> dict[str, Any]:
                         },
                     ],
                 },
-            }
+            },
         ],
         "canonical": {"hamiltonian_terms": []},
     }
@@ -586,7 +586,7 @@ class TestWlsReduction:
         wls = self._generate(
             {
                 "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-            }
+            },
         )
         reduction_idx = wls.find("Plane-wave reduction")
         el_idx = wls.find("Euler-Lagrange equations")
@@ -604,7 +604,7 @@ class TestWlsReduction:
         wls = self._generate(
             {
                 "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-            }
+            },
         )
         assert "zeroFieldNames" in wls
         assert "Eliminating zero fields" in wls
@@ -619,7 +619,7 @@ class TestWlsReduction:
                     "metric": "diagonal",
                     "diagonal": [-1, "x[]^2", "x[]^2", 1],
                 },
-            }
+            },
         )
         assert "FreeQ" in wls or "killedVars" in wls
 
@@ -628,7 +628,7 @@ class TestWlsReduction:
         wls = self._generate(
             {
                 "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-            }
+            },
         )
         # Slots 2 and 3 should be zeroed (x=slot 2, y=slot 3 in t,x,y,z)
         assert "{ords}[[2]]" in wls
@@ -639,7 +639,7 @@ class TestWlsReduction:
         wls = self._generate(
             {
                 "reduction": {"type": "plane_wave", "propagation_axis": "x"},
-            }
+            },
         )
         assert "{ords}[[3]]" in wls
         assert "{ords}[[4]]" in wls
@@ -665,7 +665,7 @@ class TestValidateReduction:
             {
                 "spacetime": {"dimension": 4},
                 "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-            }
+            },
         )
 
     def test_no_reduction_ok(self) -> None:
@@ -679,7 +679,7 @@ class TestValidateReduction:
                 {
                     "spacetime": {"dimension": 4},
                     "reduction": {"type": "spherical"},
-                }
+                },
             )
 
     def test_missing_propagation_axis(self) -> None:
@@ -689,7 +689,7 @@ class TestValidateReduction:
                 {
                     "spacetime": {"dimension": 4},
                     "reduction": {"type": "plane_wave"},
-                }
+                },
             )
 
     def test_invalid_propagation_axis(self) -> None:
@@ -699,7 +699,7 @@ class TestValidateReduction:
                 {
                     "spacetime": {"dimension": 4},
                     "reduction": {"type": "plane_wave", "propagation_axis": "w"},
-                }
+                },
             )
 
     def test_1d_cannot_reduce(self) -> None:
@@ -709,7 +709,7 @@ class TestValidateReduction:
                 {
                     "spacetime": {"dimension": 2},
                     "reduction": {"type": "plane_wave", "propagation_axis": "x"},
-                }
+                },
             )
 
     def test_2d_valid(self) -> None:
@@ -718,5 +718,5 @@ class TestValidateReduction:
             {
                 "spacetime": {"dimension": 3},
                 "reduction": {"type": "plane_wave", "propagation_axis": "x"},
-            }
+            },
         )

@@ -117,7 +117,7 @@ def check_cfl_stability(
                     f"CFL violation for '{eq.field_name}': "
                     f"dt={dt:.4g} > CFL limit={cfl_dt:.4g} "
                     f"(c_est={c_est:.4g}, dx_min={dx_min:.4g}). "
-                    f"Consider reducing dt or increasing grid resolution."
+                    f"Consider reducing dt or increasing grid resolution.",
                 )
     return warnings
 
@@ -154,7 +154,7 @@ def check_mass_sign(
                     f"'{term.coefficient_symbolic}' for field "
                     f"'{eq.field_name}' changes sign across "
                     f"the grid (min={float(result.min()):.4g}, "
-                    f"max={float(result.max()):.4g})."
+                    f"max={float(result.max()):.4g}).",
                 )
     return warnings
 
@@ -259,7 +259,7 @@ def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914
     if n > 1 and sym_diff > 1e-12 * mat_scale:
         result.notes.append(
             f"Mass/coupling matrix is asymmetric (max |M-M^T| = {sym_diff:.2e}). "
-            f"Using general eigenvalues; stability check may be less precise."
+            f"Using general eigenvalues; stability check may be less precise.",
         )
         eigenvalues = np.linalg.eigvals(pot_flat).real  # general case
     else:
@@ -311,7 +311,7 @@ def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914
         f"eigenvalue {worst_val:.4g} at ({', '.join(coord_strs)}). "
         f"The system has exponentially growing modes -- it will be unstable. "
         f"With signature ({sig_str}), mass matrix must be {requirement} "
-        f"at all grid points."
+        f"at all grid points.",
     )
     return result
 
@@ -341,6 +341,6 @@ def check_robin_stability(grid: GridInfo) -> list[str]:
                     f"Robin BC on axis {i} ({side_label}): "
                     f"gamma*dx = {side.gamma * dx:.4g} >= 2. "
                     f"Ghost-cell formula becomes unstable. "
-                    f"Increase grid resolution or decrease gamma."
+                    f"Increase grid resolution or decrease gamma.",
                 )
     return warnings

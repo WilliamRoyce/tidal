@@ -213,7 +213,7 @@ class TestBuildJacobianSparsity:
         """EM 2D pattern should be very sparse."""
         spec = _make_em_2d_spec()
         grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True),
         )
         layout = StateLayout.from_spec(spec, grid.num_points)
 

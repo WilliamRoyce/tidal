@@ -43,7 +43,7 @@ def em_json_data() -> dict[str, Any]:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"}
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
                     ],
                 },
             },
@@ -53,7 +53,7 @@ def em_json_data() -> dict[str, Any]:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"}
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"},
                     ],
                 },
             },
@@ -83,7 +83,7 @@ def kg_json_data() -> dict[str, Any]:
                         {"coefficient": -1.0, "operator": "identity", "field": "phi"},
                     ],
                 },
-            }
+            },
         ],
         "coupling": {"mass_matrix": [[1.0]], "coupling_matrix": [[0.0]]},
     }
@@ -256,7 +256,7 @@ class TestComponentEquation:
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
-                    {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"}
+                    {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
                 ],
             },
         }
@@ -504,7 +504,7 @@ class TestEquationSystemOrderInEps:
 
 
 def _spec_with_promoted_field(
-    kinetic_sym: str, extra_small: list[str] | None = None
+    kinetic_sym: str, extra_small: list[str] | None = None,
 ) -> dict[str, Any]:
     """Spec where 'h' has a parameter-dependent kinetic coefficient.
 
@@ -597,7 +597,7 @@ class TestEquationSystemBaseSpec:
     def test_base_spec_handles_multi_small_param(self) -> None:
         """Kinetic '2*b5 + 3*b1' with both small → demote."""
         spec = EquationSystem.from_dict(
-            _spec_with_promoted_field("2*b5 + 3*b1", extra_small=["b1"])
+            _spec_with_promoted_field("2*b5 + 3*b1", extra_small=["b1"]),
         )
         base = spec.base_spec()
         h_eq = next(eq for eq in base.equations if eq.field_name == "h")
@@ -636,7 +636,7 @@ class TestEquationSystemBaseSpec:
             spec.base_spec()
 
     def test_base_spec_rejects_third_order_residual_roundtrip(
-        self, tmp_path: Path
+        self, tmp_path: Path,
     ) -> None:
         """R5.4 / #283 realistic path: JSON with a [perturbation] block
         whose small_parameters list does NOT cover the kinetic
@@ -688,10 +688,10 @@ class TestEquationSystemBaseSpec:
                                 "operator": "identity",
                                 "field": "h",
                                 "coefficient_symbolic": "-1",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
             "coupling": {},
         }
@@ -743,10 +743,10 @@ class TestEquationSystemBaseSpec:
                                 "coefficient": -1.0,
                                 "operator": "identity",
                                 "field": "phi",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
             "coupling": {},
         }
@@ -796,7 +796,7 @@ class TestEquationSystemBaseSpec:
         # The base_spec matrices must be internally consistent with the
         # demoted equations.
         expected_mass, expected_coupling, _, _ = base._compute_matrices_from_terms(
-            base.equations, base.component_names, parameters=None
+            base.equations, base.component_names, parameters=None,
         )
         assert base.mass_matrix == expected_mass
         assert base.coupling_matrix == expected_coupling
@@ -820,7 +820,7 @@ class TestValidateJsonSchema:
         """Test that missing spacetime raises ValueError."""
         data: dict[str, Any] = {"fields": [], "equations": []}
         with pytest.raises(
-            ValueError, match="Missing required top-level field: spacetime"
+            ValueError, match="Missing required top-level field: spacetime",
         ):
             validate_json_schema(data)
 
@@ -828,7 +828,7 @@ class TestValidateJsonSchema:
         """Test that missing fields raises ValueError."""
         data: dict[str, Any] = {"spacetime": {"dimension": 2}, "equations": []}
         with pytest.raises(
-            ValueError, match="Missing required top-level field: fields"
+            ValueError, match="Missing required top-level field: fields",
         ):
             validate_json_schema(data)
 
@@ -839,7 +839,7 @@ class TestValidateJsonSchema:
             "fields": [{"name": "phi"}],
         }
         with pytest.raises(
-            ValueError, match="Missing required top-level field: equations"
+            ValueError, match="Missing required top-level field: equations",
         ):
             validate_json_schema(data)
 
@@ -859,7 +859,7 @@ class TestValidateJsonSchema:
             "spacetime": {"dimension": 2, "signature": [-1, 2]},
             "fields": [{"name": "phi"}],
             "equations": [
-                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}
+                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}},
             ],
         }
         with pytest.raises(ValueError, match="signature must be a list of"):
@@ -871,7 +871,7 @@ class TestValidateJsonSchema:
             "spacetime": {"dimension": 2, "signature": [-1, 1, 1]},
             "fields": [{"name": "phi"}],
             "equations": [
-                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}
+                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}},
             ],
         }
         with pytest.raises(ValueError, match=r"signature length.*must match dimension"):
@@ -899,7 +899,7 @@ class TestValidateJsonSchema:
                 {
                     "field": "nonexistent",
                     "rhs": {"type": "linear_combination", "terms": []},
-                }
+                },
             ],
         }
         with pytest.raises(ValueError, match="not found in fields list"):
@@ -943,7 +943,7 @@ class TestFieldReferenceValidation:
                     ),
                 ),
                 ComponentEquation(
-                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                 ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -971,7 +971,7 @@ class TestFieldReferenceValidation:
                     ),
                 ),
                 ComponentEquation(
-                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                 ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -999,7 +999,7 @@ class TestFieldReferenceValidation:
                         ),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -1025,7 +1025,7 @@ class TestFieldReferenceValidation:
                         ),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -1066,7 +1066,7 @@ class TestValidationErrors:
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
                                 "field": "phi",
-                            }
+                            },
                         ],
                     },
                 },
@@ -1083,7 +1083,7 @@ class TestValidationErrors:
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
                                 "field": "phi",
-                            }
+                            },
                         ],
                     },
                 },
@@ -1120,10 +1120,10 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0),),  # 1 row instead of 2
@@ -1141,10 +1141,10 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0,), (0.0,)),  # 1 col instead of 2
@@ -1162,10 +1162,10 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -1184,7 +1184,7 @@ class TestValidationErrors:
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
-                    {"coefficient": 1.0, "operator": "laplacian", "field": "phi"}
+                    {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
                 ],
             },
         }
@@ -1366,10 +1366,10 @@ class TestEquationSystemCoordinates:
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
                                 "field": "phi_0",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1395,10 +1395,10 @@ class TestEquationSystemCoordinates:
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
                                 "field": "phi_0",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1433,7 +1433,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1522,7 +1522,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1553,7 +1553,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
             # JSON says 99.0 — auto-computation should override to 2.0
             "coupling": {"mass_matrix": [[99.0]], "coupling_matrix": [[0.0]]},
@@ -1585,7 +1585,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1611,7 +1611,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1644,7 +1644,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
             # No mass_matrix_symbolic in coupling — auto-compute from terms
             "coupling": {"mass_matrix": [[0.0]], "coupling_matrix": [[0.0]]},
@@ -1674,7 +1674,7 @@ class TestAutoComputedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1720,7 +1720,7 @@ class TestParameterResolvedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1816,7 +1816,7 @@ class TestParameterResolvedMatrices:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -1868,7 +1868,7 @@ class TestLHSStructureMissingTimeOrder:
 
     def test_valid_order_passes(self) -> None:
         lhs = LHSStructure.from_dict(
-            {"expression": "phi", "order": {"time": 2, "space": 0}}
+            {"expression": "phi", "order": {"time": 2, "space": 0}},
         )
         assert lhs.time_order == 2
 
@@ -1899,10 +1899,10 @@ class TestMetadataParameterParsing:
                                 "coefficient": 1.0,
                                 "operator": "laplacian_x",
                                 "field": "phi_0",
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
         }
 
@@ -1993,7 +1993,7 @@ class TestCanonicalStructure:
                             },
                         ],
                     },
-                }
+                },
             ],
             "canonical": {
                 "hamiltonian_terms": [
@@ -2028,7 +2028,7 @@ class TestCanonicalStructure:
                             },
                         ],
                     },
-                }
+                },
             ],
         }
         spec = EquationSystem.from_dict(data)
@@ -2039,7 +2039,7 @@ class TestCanonicalStructure:
 
 
 def _make_spec_with_kinetic_coeff(
-    kc_sym: str, coeff: float = 2.0, coeff_sym: str | None = "alpha"
+    kc_sym: str, coeff: float = 2.0, coeff_sym: str | None = "alpha",
 ) -> EquationSystem:
     """Build a minimal EquationSystem with one unnormalized kinetic eq and one normal eq."""
     eq_with_kc = ComponentEquation(
@@ -2214,14 +2214,14 @@ class TestBoundaryConditionToSideBc:
         assert side.kind == "dirichlet"
 
     def test_from_dict_warns_irrelevant_fields(
-        self, caplog: pytest.LogCaptureFixture
+        self, caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Dirichlet with gamma logs a warning about irrelevant fields."""
         from tidal.symbolic.json_loader import BoundaryCondition
 
         with caplog.at_level("WARNING", logger="tidal.symbolic.json_loader"):
             bc = BoundaryCondition.from_dict(
-                {"type": "dirichlet", "value": 1.0, "gamma": 2.0}
+                {"type": "dirichlet", "value": 1.0, "gamma": 2.0},
             )
         assert bc.gamma == 2.0  # stored but irrelevant
         assert "gamma" in caplog.text

@@ -142,7 +142,7 @@ def _supports_color() -> bool:
 
 
 def _lerp(
-    a: tuple[int, int, int], b: tuple[int, int, int], t: float
+    a: tuple[int, int, int], b: tuple[int, int, int], t: float,
 ) -> tuple[int, int, int]:
     return (
         int(a[0] + (b[0] - a[0]) * t),
@@ -152,7 +152,7 @@ def _lerp(
 
 
 def _gradient_row(
-    idx: int, total: int, stops: list[tuple[int, int, int]]
+    idx: int, total: int, stops: list[tuple[int, int, int]],
 ) -> tuple[int, int, int]:
     if not stops or total <= 1:
         return (200, 200, 200)
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Preview TIDAL CLI banner")
     p.add_argument("--theme", choices=list(THEMES.keys()), default="ocean")
     p.add_argument(
-        "--layout", choices=["compact", "stacked", "minimal", "auto"], default="auto"
+        "--layout", choices=["compact", "stacked", "minimal", "auto"], default="auto",
     )
     a = p.parse_args()
     print_banner(theme=a.theme, layout=a.layout, file=sys.stdout)

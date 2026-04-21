@@ -213,7 +213,7 @@ def test_pass1_has_no_column_missing_drops(rtilde_spec: Any) -> None:
         )
     ]
     assert not unknown, (
-        f"Found {len(unknown)} drops of unrecognised category; expected "
+        f"Found {len(unknown)} drops of unrecognized category; expected "
         f"only row-routed-to-augmented (R8 / #290). First few: {unknown[:3]}"
     )
 

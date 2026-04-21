@@ -67,7 +67,7 @@ class LikelihoodConfig:
 
 
 def parse_likelihood(
-    spec: str, *, baseline_formula: str | None = None
+    spec: str, *, baseline_formula: str | None = None,
 ) -> LikelihoodConfig:
     """Parse a CLI likelihood specification string.
 
@@ -199,7 +199,7 @@ def compute_log_likelihood(
 
 
 def _eval_baseline(
-    formula: str | None, params: dict[str, float] | None
+    formula: str | None, params: dict[str, float] | None,
 ) -> float | None:
     """Evaluate a baseline formula with the given parameter values.
 
@@ -219,7 +219,7 @@ def _eval_baseline(
 
     try:
         return float(
-            eval(formula, {"__builtins__": {}}, ns)  # noqa: S307
+            eval(formula, {"__builtins__": {}}, ns),  # noqa: S307
         )
     except Exception as exc:  # noqa: BLE001
         import logging
@@ -374,7 +374,7 @@ def _evaluate_likelihood(
             sim_data = run_inference_step(base_args, spec_path, param_overrides)
             spec = sim_data.spec
             metrics = _measure_from_sim_data(
-                sim_data, measurements, source, target, threshold
+                sim_data, measurements, source, target, threshold,
             )
         else:
             # Run simulation (disk path — preserved for rollback)
@@ -418,7 +418,7 @@ def _evaluate_likelihood(
             )
 
             eval_params = _parse_params(
-                list(getattr(base_args, "param", []) or []), spec
+                list(getattr(base_args, "param", []) or []), spec,
             )
             eval_params.update(param_overrides)
             for attr in ("t_end", "dt"):
@@ -427,14 +427,14 @@ def _evaluate_likelihood(
                     eval_params[attr] = float(val)
 
         return compute_log_likelihood(
-            float(metric_value), likelihood_config, eval_params
+            float(metric_value), likelihood_config, eval_params,
         )
 
     except Exception:  # noqa: BLE001
         import logging
 
         logging.getLogger("tidal.inference").debug(
-            "Likelihood evaluation failed at theta=%s", theta, exc_info=True
+            "Likelihood evaluation failed at theta=%s", theta, exc_info=True,
         )
         return -math.inf
 

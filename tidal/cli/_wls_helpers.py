@@ -73,7 +73,7 @@ def wl_skip_tuples(dim: int) -> str:
 def wl_bg_rule_entry(head: str, comps: str, contra: str) -> str:
     """BackgroundFieldRules entry: ``{head, {comps}, {contra}}``."""
     return wl_list(
-        head, wl_list(comps) if comps else "{}", wl_list(contra) if contra else "{}"
+        head, wl_list(comps) if comps else "{}", wl_list(contra) if contra else "{}",
     )
 
 
@@ -170,7 +170,7 @@ def validate_wls_brackets(script: str) -> list[str]:
                     close_line = script[:i].count("\n") + 1
                     errors.append(
                         f"line {close_line}: '{c}' closes '{open_char}' "
-                        f"opened at line {open_line}"
+                        f"opened at line {open_line}",
                     )
         i += 1
 
@@ -212,6 +212,6 @@ def wl_zero_component(
         (
             f'Print["Applied {gauge_type} gauge: {comp_name} = 0"];',
             "",
-        )
+        ),
     )
     return lines

@@ -62,7 +62,7 @@ _KG_BASE: dict[str, object] = {
                     },
                 ],
             },
-        }
+        },
     ],
     "coupling": {"mass_matrix_symbolic": [["-m2 - eps"]]},
 }
@@ -573,7 +573,7 @@ class TestPass1NearDegeneracy:
 
     @staticmethod
     def _craft_eigendata(
-        lam_i: complex, lam_j: complex, alpha: np.ndarray, grid: GridInfo
+        lam_i: complex, lam_j: complex, alpha: np.ndarray, grid: GridInfo,
     ) -> tuple[dict[str, Any], StateLayout]:
         """Build a minimal 2-slot eigendata + layout for direct use in
         _evolve_duhamel_per_mode. The block has diagonal D = diag(λ_i,
@@ -586,11 +586,11 @@ class TestPass1NearDegeneracy:
         rfft_last = grid.shape[-1] // 2 + 1
         n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
         v_mat = np.broadcast_to(
-            np.eye(bs, dtype=np.complex128), (n_modes, bs, bs)
+            np.eye(bs, dtype=np.complex128), (n_modes, bs, bs),
         ).copy()
         v_inv = v_mat.copy()
         d_diag = np.broadcast_to(
-            np.array([lam_i, lam_j], dtype=np.complex128), (n_modes, bs)
+            np.array([lam_i, lam_j], dtype=np.complex128), (n_modes, bs),
         ).copy()
         alpha_full = np.broadcast_to(alpha, (n_modes, bs)).astype(np.complex128).copy()
         block = {
@@ -622,7 +622,7 @@ class TestPass1NearDegeneracy:
         ],
     )
     def test_pipeline_matches_mpmath_across_crossover(
-        self, lam_diff: float, t_end: float
+        self, lam_diff: float, t_end: float,
     ) -> None:
         """Sweep |z| = |Δλ|·t across the Taylor-branch crossover and
         assert ``_evolve_duhamel_per_mode`` agrees with an mpmath
@@ -665,7 +665,7 @@ class TestPass1NearDegeneracy:
         # time-derivative order. This test crafts a bare identity-form
         # M_src representing a source at order 0.
         _, _y_phys, y_hat_snap = _evolve_duhamel_per_mode(
-            eigendata, {0: m_src}, t_eval, layout, grid
+            eigendata, {0: m_src}, t_eval, layout, grid,
         )
 
         # Pipeline output at snapshot 1, slot 0, mode 0:
@@ -756,7 +756,7 @@ class TestPass1TimeDerivativeTargetingDynamical:
                         },
                     ],
                 },
-            }
+            },
         ],
         "coupling": {},
     }

@@ -87,7 +87,7 @@ def _build_operator_remap(
                 "biharmonic",
                 "time_derivative",
             )
-        }
+        },
     )
 
     return remap

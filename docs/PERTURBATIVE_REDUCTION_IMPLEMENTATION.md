@@ -144,7 +144,7 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
   - Driven Klein-Gordon with ε·φ correction: q⁽⁰⁾ + q⁽¹⁾ matches the full-ε solver result to O(ε²) ≈ 1e-2 at ε=0.05, t=2. Also asserts a >4× improvement over bare Pass 0.
   - Empty correction → zero Pass 1 output.
   - IC is zero: `y⁽¹⁾(t_eval[0]) = 0` per construction.
-- [x] **4.8** `tests/test_modal_duhamel_degeneracy.py` (40 tests): scalar edge cases (exact degeneracy, t=0, broadcast vectorised) + parametrised sweep with `log10|μ−λ|` from -15 to 0 on real and imaginary axes, t ∈ {0.1, 1.0, 10.0}, plus crossover-continuity check. mpmath 50-digit reference; all pass with relative error ≤ 1e-12.
+- [x] **4.8** `tests/test_modal_duhamel_degeneracy.py` (40 tests): scalar edge cases (exact degeneracy, t=0, broadcast vectorized) + parametrised sweep with `log10|μ−λ|` from -15 to 0 on real and imaginary axes, t ∈ {0.1, 1.0, 10.0}, plus crossover-continuity check. mpmath 50-digit reference; all pass with relative error ≤ 1e-12.
 
 ### Smoke tests (2026-04-19)
 

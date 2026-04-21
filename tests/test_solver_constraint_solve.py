@@ -252,7 +252,7 @@ def _make_kg_spec() -> EquationSystem:
                         {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
                     ],
                 },
-            }
+            },
         ],
         "canonical": {
             "hamiltonian_terms": [],
@@ -331,7 +331,7 @@ class TestClassifyTerms:
 
         eq = spec.equations[0]
         terms = _classify_terms(
-            0, eq.rhs_terms, "A_0", coeff_eval, 0.0, eq.constraint_solver
+            0, eq.rhs_terms, "A_0", coeff_eval, 0.0, eq.constraint_solver,
         )
 
         # Self-terms: laplacian_x(A_0) + laplacian_y(A_0)
@@ -356,7 +356,7 @@ class TestClassifyTerms:
 
         eq = spec.equations[0]
         terms = _classify_terms(
-            0, eq.rhs_terms, "A_0", coeff_eval, 0.0, eq.constraint_solver
+            0, eq.rhs_terms, "A_0", coeff_eval, 0.0, eq.constraint_solver,
         )
         assert not terms.has_position_dependent_self
 
@@ -368,7 +368,7 @@ class TestClassifyTerms:
 
 class TestSelectMethod:
     def _make_terms(
-        self, *, periodic: bool = True, pos_dep: bool = False
+        self, *, periodic: bool = True, pos_dep: bool = False,
     ) -> tuple[_ConstraintTerms, GridInfo]:
         grid = GridInfo(
             bounds=((0, 10), (0, 10)),
@@ -469,7 +469,7 @@ class TestFFTSolver:
         nx, ny = 32, 32
         lx, ly = 2 * np.pi, 2 * np.pi
         grid = GridInfo(
-            bounds=((0, lx), (0, ly)), shape=(nx, ny), periodic=(True, True)
+            bounds=((0, lx), (0, ly)), shape=(nx, ny), periodic=(True, True),
         )
         x, y = grid.coord_arrays()
 
@@ -926,7 +926,7 @@ class TestPreSolveConstraints:
         y0[a1_slot * n : (a1_slot + 1) * n] = gaussian.ravel()
 
         y0_out = pre_solve_constraints(
-            spec, grid, y0, bc="periodic", parameters={"kappa": 0.5}
+            spec, grid, y0, bc="periodic", parameters={"kappa": 0.5},
         )
 
         # A_0 should be nonzero (kappa source from A_1)
@@ -1100,7 +1100,7 @@ class TestGaugeRegularizationWarnings:
 
         with pytest.warns(UserWarning, match="singular mode"):
             pre_solve_constraints(
-                spec, grid, y0, bc="periodic", parameters={"kappa": 0.5}
+                spec, grid, y0, bc="periodic", parameters={"kappa": 0.5},
             )
 
     @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
@@ -1528,7 +1528,7 @@ class TestNoSelfTermConstraints:
 
         spec = _make_multi_no_self_term_spec()
         grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True),
         )
         layout = StateLayout.from_spec(spec, grid.num_points)
         n = grid.num_points
@@ -1538,7 +1538,7 @@ class TestNoSelfTermConstraints:
         h0_slot = layout.field_slot_map["h_0"]
         x_arr, y_arr = grid.coord_arrays()
         y0[h0_slot * n : (h0_slot + 1) * n] = np.exp(
-            -((x_arr - 5) ** 2 + (y_arr - 5) ** 2) / 2
+            -((x_arr - 5) ** 2 + (y_arr - 5) ** 2) / 2,
         ).ravel()
 
         with pytest.raises(ValueError, match="does not satisfy constraint") as exc_info:
@@ -1732,7 +1732,7 @@ class TestEnsureConsistentIC:
         """EM-like standard constraint (enabled=True) → same as pre_solve."""
         spec = _make_em_2d_spec()
         grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True),
         )
         layout = StateLayout.from_spec(spec, grid.num_points)
         n = grid.num_points
@@ -1896,7 +1896,7 @@ class TestEnsureConsistentIC:
         """EM spec: ensure_consistent_ic produces same result as pre_solve_constraints."""
         spec = _make_em_2d_spec()
         grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True),
         )
         layout = StateLayout.from_spec(spec, grid.num_points)
         n = grid.num_points
@@ -1924,7 +1924,7 @@ class TestEnsureConsistentIC:
         """Chern-Simons: ensure_consistent_ic matches pre_solve_constraints."""
         spec = _make_chern_simons_spec()
         grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True),
         )
         layout = StateLayout.from_spec(spec, grid.num_points)
         n = grid.num_points
@@ -2627,7 +2627,7 @@ class TestEnsureConsistentIC:
         """When multiple constraints are violated, all are listed in the error."""
         spec = _make_multi_no_self_term_spec()
         grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True),
         )
         layout = StateLayout.from_spec(spec, grid.num_points)
         n = grid.num_points
@@ -2636,7 +2636,7 @@ class TestEnsureConsistentIC:
         h0_slot = layout.field_slot_map["h_0"]
         x_arr, y_arr = grid.coord_arrays()
         y0[h0_slot * n : (h0_slot + 1) * n] = np.exp(
-            -((x_arr - 5) ** 2 + (y_arr - 5) ** 2) / 2
+            -((x_arr - 5) ** 2 + (y_arr - 5) ** 2) / 2,
         ).ravel()
 
         with pytest.raises(ValueError, match="does not satisfy constraint") as exc_info:

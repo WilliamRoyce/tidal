@@ -420,7 +420,7 @@ class TestSpectralCLI:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0, "Spectral simulation failed"
         assert output.is_dir()
@@ -449,7 +449,7 @@ class TestSpectralCLI:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1, "Should fail with non-periodic + spectral"
 
@@ -477,7 +477,7 @@ class TestSpectralCLI:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
 
@@ -507,7 +507,7 @@ class TestSpectralCLI:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -548,7 +548,7 @@ class TestSpectralMetadata:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
 
@@ -585,7 +585,7 @@ class TestSpectralMetadata:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
 
@@ -645,7 +645,7 @@ class TestSpectralIntegration:
                             },
                         ],
                     },
-                }
+                },
             ],
             "coupling": {"mass_matrix_symbolic": [["-1"]]},
         }
@@ -747,7 +747,7 @@ class TestAutoDetection:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
 
@@ -781,7 +781,7 @@ class TestAutoDetection:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
 
@@ -815,7 +815,7 @@ class TestAutoDetection:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0  # should not error — spectral silently disabled
 
@@ -847,7 +847,7 @@ class TestAutoDetection:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
 
@@ -890,9 +890,9 @@ class TestSystemPropertyDetection:
                                 },
                             ],
                         },
-                    }
+                    },
                 ],
-            }
+            },
         )
         assert not _has_dissipation(spec)
 
@@ -923,9 +923,9 @@ class TestSystemPropertyDetection:
                                 },
                             ],
                         },
-                    }
+                    },
                 ],
-            }
+            },
         )
         assert _has_dissipation(spec)
 
@@ -951,9 +951,9 @@ class TestSystemPropertyDetection:
                                 },
                             ],
                         },
-                    }
+                    },
                 ],
-            }
+            },
         )
         assert not _has_time_dependent_coeffs(spec)
 
@@ -980,8 +980,8 @@ class TestSystemPropertyDetection:
                                 },
                             ],
                         },
-                    }
+                    },
                 ],
-            }
+            },
         )
         assert _has_time_dependent_coeffs(spec)

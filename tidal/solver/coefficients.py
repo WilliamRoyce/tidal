@@ -112,7 +112,7 @@ class CoefficientEvaluator:
 
         # L3: Per-timestep cache
         self._timestep_cache: dict[
-            tuple[int, int, float], float | NDArray[np.float64]
+            tuple[int, int, float], float | NDArray[np.float64],
         ] = {}
 
         # Pre-check: skip begin_timestep() cache clear when all
@@ -309,7 +309,7 @@ class CoefficientEvaluator:
                 self._evaluate_symbolic(term, 0.0)
 
     def _evaluate_symbolic(
-        self, term: OperatorTerm, t: float
+        self, term: OperatorTerm, t: float,
     ) -> float | NDArray[np.float64]:
         """Evaluate a symbolic coefficient expression."""
         sym = term.coefficient_symbolic
@@ -320,7 +320,7 @@ class CoefficientEvaluator:
         coord_arrays = self._coord_arrays if term.position_dependent else None
 
         return evaluate_coefficient(
-            sym, self._parameters, self._coordinates, coord_arrays, t
+            sym, self._parameters, self._coordinates, coord_arrays, t,
         )
 
     def _check_mass_sign(self) -> None:

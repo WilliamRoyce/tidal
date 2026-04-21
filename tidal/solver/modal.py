@@ -660,7 +660,7 @@ def _build_evolution_matrices(
             except Exception:  # noqa: BLE001
                 # Fall back to the old hardcoded value if resolution fails.
                 # Matches the behaviour of normalize_kinetic_coefficients
-                # which skips normalisation in this case.
+                # which skips normalization in this case.
                 M_mat[:, fi, fi] = 1.0
                 continue
             if isinstance(kin_val, np.ndarray):
@@ -694,7 +694,7 @@ def _build_evolution_matrices(
             ci = c_idx_map[eq.field_name]
             for term_idx, term in enumerate(eq.rhs_terms):
                 coeff = _resolve_constant_coeff(
-                    term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
+                    term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
                 )
                 mult = multiplier_cache[term.operator]
                 decomp = _OPERATOR_DECOMP[term.operator]
@@ -718,7 +718,7 @@ def _build_evolution_matrices(
                     # Acceleration/jerk on dynamical field — defer until M inverted
                     fj = dyn_field_idx[term.field]
                     deferred_constraint_terms.append(
-                        (ci, complex(coeff), mult, t_order, fj)
+                        (ci, complex(coeff), mult, t_order, fj),
                     )
                 elif term.field in dyn_slot_map:
                     # Fallback: direct slot reference
@@ -733,7 +733,7 @@ def _build_evolution_matrices(
 
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
+                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
             )
             mult = multiplier_cache[term.operator]
             decomp = _OPERATOR_DECOMP[term.operator]
@@ -804,7 +804,7 @@ def _build_evolution_matrices(
     if has_singular_M:
         logger.info(
             "Generalized mass matrix: singular M detected — "
-            "applying mass-matrix Schur elimination"
+            "applying mass-matrix Schur elimination",
         )
 
     # Build the first-order evolution matrix A in the FULL dynamical slot space.
@@ -893,15 +893,15 @@ def _build_evolution_matrices(
                 # V = right singular vectors (columns of M -> col basis)
                 # Σ_d = diag of positive singular values
                 V_full: NDArray[np.complex128] = np.asarray(
-                    Vh_svd.conj().T, dtype=np.complex128
+                    Vh_svd.conj().T, dtype=np.complex128,
                 )  # (n_f, n_f)
                 U_full: NDArray[np.complex128] = np.asarray(
-                    U_svd, dtype=np.complex128
+                    U_svd, dtype=np.complex128,
                 )  # (n_f, n_f)
                 V_d: NDArray[np.complex128] = V_full[:, dyn_mask]  # (n_f, n_mass_dyn)
                 V_c: NDArray[np.complex128] = V_full[:, con_mask]  # (n_f, n_mass_con)
                 Sigma_d_inv: NDArray[np.float64] = np.diag(
-                    1.0 / S_svd[dyn_mask]
+                    1.0 / S_svd[dyn_mask],
                 )  # (n_mass_dyn, n_mass_dyn)
 
                 # Rotate K, D, J: K̃ = Uᵀ · K · V
@@ -935,7 +935,7 @@ def _build_evolution_matrices(
 
                 if has_k_con:
                     K_cc_pinv: NDArray[np.complex128] = cast(
-                        "NDArray[np.complex128]", np.linalg.pinv(K_cc)
+                        "NDArray[np.complex128]", np.linalg.pinv(K_cc),
                     )
                     mass_recovery = cast(
                         "NDArray[np.complex128]",
@@ -999,7 +999,7 @@ def _build_evolution_matrices(
                     # requires inv(V_eff^H V_eff) and fails when V_eff has
                     # linearly-dependent columns.
                     V_eff_pinv: NDArray[np.complex128] = cast(
-                        "NDArray[np.complex128]", np.linalg.pinv(V_eff)
+                        "NDArray[np.complex128]", np.linalg.pinv(V_eff),
                     )  # (n_modes, n_mass_dyn, n_f)
                     K_orig = np.einsum("mia,mab,mbj->mij", V_eff, E_final, V_eff_pinv)
                     D_orig = np.einsum("mia,mab,mbj->mij", V_eff, F_final, V_eff_pinv)
@@ -1159,7 +1159,7 @@ def _build_evolution_matrices(
         # reconstruct h_c¹ = recovery·y_dyn¹ + S_cc_inv·[LHS-feedback +
         # order-1 RHS corr].
         Scc_inv_out: NDArray[np.complex128] | None = np.asarray(
-            S_cc_inv, dtype=np.complex128
+            S_cc_inv, dtype=np.complex128,
         )
         Scc_singular_mask_out: NDArray[np.bool_] | None = singular_mask
 
@@ -1837,7 +1837,7 @@ def _evolve_per_mode(
                     vr_red = np.asarray(eig_r[1], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
                     # Lift eigenvectors to full space; null modes frozen at IC
                     ev_m: NDArray[np.complex128] = np.concatenate(
-                        [ev_red, np.zeros(null_dim_b, dtype=np.complex128)]
+                        [ev_red, np.zeros(null_dim_b, dtype=np.complex128)],
                     )
                     # V_full = [Vphys @ vr_red | Vnull] is always invertible:
                     # physical cols live in range(Vphys), null cols in null(B),
@@ -1901,7 +1901,7 @@ def _evolve_per_mode(
                     "D_diag": eig_vals.copy(),
                     "V_inv": v_inv.copy(),
                     "alpha": y0_eigen.copy(),
-                }
+                },
             )
 
     # Evolve at each time point.
@@ -2724,7 +2724,7 @@ def _build_source_matrix_k(
     def _get_m_src(n: int) -> NDArray[np.complex128]:
         if n not in M_src_by_order:
             M_src_by_order[n] = np.zeros(
-                (n_modes, n_slots, n_slots), dtype=np.complex128
+                (n_modes, n_slots, n_slots), dtype=np.complex128,
             )
         return M_src_by_order[n]
 
@@ -2754,7 +2754,7 @@ def _build_source_matrix_k(
                         "eq_idx": eq_idx,
                         "term_idx": None,
                         "n_terms": len(eq.rhs_terms),
-                    }
+                    },
                 )
                 continue
             row_slot = layout.velocity_slot_map[field_name]
@@ -2777,7 +2777,7 @@ def _build_source_matrix_k(
                         "eq_idx": eq_idx,
                         "term_idx": None,
                         "n_terms": len(eq.rhs_terms),
-                    }
+                    },
                 )
             else:
                 drops.append(
@@ -2789,13 +2789,13 @@ def _build_source_matrix_k(
                         "eq_idx": eq_idx,
                         "term_idx": None,
                         "n_terms": len(eq.rhs_terms),
-                    }
+                    },
                 )
             continue
 
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx
+                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
             )
             mult = multiplier_cache[term.operator]
             # #293: route the contribution to the matrix keyed
@@ -2834,7 +2834,7 @@ def _build_source_matrix_k(
                         "eq_idx": eq_idx,
                         "term_idx": term_idx,
                         "row_field": field_name,
-                    }
+                    },
                 )
                 continue
 
@@ -3081,7 +3081,7 @@ def solve_modal_pass1(
             )
 
     times, y_phys, y_hat_dyn = _evolve_duhamel_per_mode(
-        eigendata, M_src_k_by_order, t_eval, layout, grid
+        eigendata, M_src_k_by_order, t_eval, layout, grid,
     )
 
     result: PerturbativePass1Result = {

@@ -52,7 +52,7 @@ _VALID_MEASUREMENTS = frozenset(
         "peak_conversion",
         "velocity",
         "resonance",
-    }
+    },
 )
 
 
@@ -284,7 +284,7 @@ def _run_conversion(
     )
 
     source, target = _resolve_source_target(
-        data, source, target, measurement_name="conversion"
+        data, source, target, measurement_name="conversion",
     )
 
     # Single-field or group conversion
@@ -329,10 +329,10 @@ def _run_spectrum(data: SimulationData) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for name in data.fields:
         snap_initial = compute_spectrum(
-            data.fields[name][0], data.grid_spacing, data.periodic
+            data.fields[name][0], data.grid_spacing, data.periodic,
         )
         snap_final = compute_spectrum(
-            data.fields[name][-1], data.grid_spacing, data.periodic
+            data.fields[name][-1], data.grid_spacing, data.periodic,
         )
         result[name] = {
             "initial": {
@@ -405,7 +405,7 @@ def _run_asymptotic(
     from tidal.measurement import compute_asymptotic_conversion
 
     source, target = _resolve_source_target(
-        data, source, target, measurement_name="asymptotic"
+        data, source, target, measurement_name="asymptotic",
     )
 
     result = compute_asymptotic_conversion(data, list(source), list(target))
@@ -467,7 +467,7 @@ def _run_velocity_mismatch(
     from tidal.measurement import compute_velocity_mismatch
 
     source, target = _resolve_source_target(
-        data, source, target, require_both=True, measurement_name="velocity mismatch"
+        data, source, target, require_both=True, measurement_name="velocity mismatch",
     )
 
     result = compute_velocity_mismatch(data, list(source), list(target))
@@ -491,7 +491,7 @@ def _run_resonance(
     from tidal.measurement import compute_resonance_analysis
 
     source, target = _resolve_source_target(
-        data, source, target, require_both=True, measurement_name="resonance"
+        data, source, target, require_both=True, measurement_name="resonance",
     )
 
     result = compute_resonance_analysis(data, list(source), list(target))
@@ -581,7 +581,7 @@ def _format_text_section_conservation(lines: list[str], cons: dict[str, Any]) ->
                 pass_fail("Energy Conservation", passed=cons["is_conserved"]),
                 key_value("max |dE/E|", f"{cons['max_relative_error']:.2e}"),
                 key_value("threshold", f"{cons['threshold']:.0e}"),
-            ]
+            ],
         )
     lines.append("")
 
@@ -600,7 +600,7 @@ def _format_text_section_energy(lines: list[str], eng: dict[str, Any]) -> None:
             (
                 key_value("interaction", f"{eng['interaction'][-1]:.6f}"),
                 key_value("total", f"{eng['total'][-1]:.6f}"),
-            )
+            ),
         )
     lines.append("")
 
@@ -619,7 +619,7 @@ def _format_text_section_conversion(lines: list[str], conv: dict[str, Any]) -> N
                 f"Conversion ({src} -> {tgt}):",
                 key_value("Peak P(t)", f"{conv['peak_probability']:.6f}"),
                 key_value("at t", f"{conv['peak_time']:.2f}"),
-            )
+            ),
         )
     lines.append("")
 
@@ -637,7 +637,7 @@ def _format_text_section_mixing(lines: list[str], mix: dict[str, Any]) -> None:
                 f"  omega_dom = {mix['dominant_frequency']:.4f}"
                 f"  (FWHM = {mix['frequency_fwhm']:.4f})",
                 f"  Rayleigh  = {mix['rayleigh_resolution']:.4f}",
-            ]
+            ],
         )
     lines.append("")
 
@@ -667,7 +667,7 @@ def _format_text_section_dispersion(
                 f"Dispersion ({disp['field']}):",
                 f"  Active k-modes: {disp['n_active_modes']} / {disp['n_modes']}",
                 f"  Rayleigh resolution: {disp['rayleigh_resolution']:.4f} rad/time",
-            ]
+            ],
         )
     lines.append("")
 
@@ -685,7 +685,7 @@ def _format_text_section_effective_mass(
                 f"Effective Mass ({em['field']}):",
                 f"  m²_eff  = {em['m2_eff']:.6f} +/- {em['m2_eff_std']:.6f}",
                 f"  Active modes: {em['n_active_modes']}",
-            ]
+            ],
         )
     lines.append("")
 
@@ -707,7 +707,7 @@ def _format_text_section_asymptotic(
                 f"  P_transmitted = {asym['P_transmitted']:.6f}",
                 f"  P_reflected = {asym['P_reflected']:.6f}",
                 f"  Source k    = ({', '.join(f'{k:.3f}' for k in asym['source_wavevector'])})",
-            ]
+            ],
         )
     lines.append("")
 
@@ -727,7 +727,7 @@ def _format_text_section_peak_conversion(
                 f"Peak Conversion ({src} -> {tgt}):",
                 f"  P_max   = {pc['P_max']:.6f}  at t = {pc['P_max_time']:.2f}",
                 f"  P_final = {pc['P_final']:.6f}",
-            ]
+            ],
         )
     lines.append("")
 
@@ -746,7 +746,7 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa:
             f"  Time range: {float(data.times[0]):.1f} -> {float(data.times[-1]):.1f}"
             f"  ({data.n_snapshots} snapshots)",
             f"  Fields: {', '.join(data.fields.keys())}",
-        ]
+        ],
     )
     if data.parameters:
         param_str = ", ".join(f"{k}={v}" for k, v in data.parameters.items())
@@ -842,7 +842,7 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
 
     if "conservation" in measurements:
         results["conservation"] = _run_measurement_safe(
-            _run_conservation, data, threshold
+            _run_conservation, data, threshold,
         )
 
     if "conversion" in measurements or "mixing" in measurements:
@@ -872,23 +872,23 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
             )
             return 1
         results["dispersion"] = _run_measurement_safe(
-            _run_dispersion, data, dyn_in_source
+            _run_dispersion, data, dyn_in_source,
         )
 
     if "effective_mass" in measurements:
         dyn_in_source = _filter_to_dynamical(source, data, "effective_mass")
         results["effective_mass"] = _run_measurement_safe(
-            _run_effective_mass, data, dyn_in_source
+            _run_effective_mass, data, dyn_in_source,
         )
 
     if "asymptotic" in measurements:
         results["asymptotic"] = _run_measurement_safe(
-            _run_asymptotic, data, source, target
+            _run_asymptotic, data, source, target,
         )
 
     if "peak_conversion" in measurements:
         results["peak_conversion"] = _run_measurement_safe(
-            _run_peak_conversion, data, source, target
+            _run_peak_conversion, data, source, target,
         )
 
     if "velocity" in measurements:
@@ -896,12 +896,12 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
         results["velocity"] = _run_measurement_safe(_run_velocity, data, dyn_in_source)
         if "error" not in results["velocity"] and target is not None:
             results["velocity_mismatch"] = _run_measurement_safe(
-                _run_velocity_mismatch, data, tuple(dyn_in_source), target
+                _run_velocity_mismatch, data, tuple(dyn_in_source), target,
             )
 
     if "resonance" in measurements:
         results["resonance"] = _run_measurement_safe(
-            _run_resonance, data, source, target
+            _run_resonance, data, source, target,
         )
 
     return results
@@ -987,7 +987,7 @@ def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PL
         print(
             f"  {data.n_snapshots} snapshots, "
             f"{len(data.fields)} fields, "
-            f"t=[{float(data.times[0]):.1f}, {float(data.times[-1]):.1f}]"
+            f"t=[{float(data.times[0]):.1f}, {float(data.times[-1]):.1f}]",
         )
 
     threshold: float = getattr(args, "energy_threshold", 1e-3)

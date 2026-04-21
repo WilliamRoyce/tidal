@@ -193,14 +193,14 @@ def compute_parameter_importance(
 
     marginal_d_kl: dict[str, float] = {}
     logl_arr = np.asarray(
-        ns.logL.to_numpy() if hasattr(ns.logL, "to_numpy") else ns.logL
+        ns.logL.to_numpy() if hasattr(ns.logL, "to_numpy") else ns.logL,
     )
     logl_birth_arr = None
     if hasattr(ns, "logL_birth"):
         logl_birth_arr = np.asarray(
             ns.logL_birth.to_numpy()
             if hasattr(ns.logL_birth, "to_numpy")
-            else ns.logL_birth
+            else ns.logL_birth,
         )
     for i, name in enumerate(result.param_names):
         try:
@@ -217,7 +217,7 @@ def compute_parameter_importance(
             marginal_d_kl[name] = float(marginal.D_KL())
         except (ValueError, ZeroDivisionError, AttributeError, IndexError) as exc:
             logging.getLogger("tidal.inference").warning(
-                "marginal D_KL failed for '%s' (col %d): %s", name, i, exc
+                "marginal D_KL failed for '%s' (col %d): %s", name, i, exc,
             )
             marginal_d_kl[name] = float("nan")
 
@@ -254,7 +254,7 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
         (
             f"  {'Parameter':<20} {'D_KL (nats)':>12}  {'Importance':>12}",
             f"  {'─' * 20} {'─' * 12}  {'─' * 12}",
-        )
+        ),
     )
 
     for name, dkl in ranked:
@@ -275,7 +275,7 @@ def format_importance_table(result: ParameterImportanceResult) -> str:
             f"  Model dim (d_G): {result.d_g:.2f} ± {result.d_g_err:.2f}  (of {len(result.param_names)} parameters)",
             f"  log Z:  {result.log_evidence:.2f} ± {result.log_evidence_err:.2f}",
             "",
-        )
+        ),
     )
 
     return "\n".join(lines)

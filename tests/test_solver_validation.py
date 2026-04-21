@@ -42,7 +42,7 @@ def _make_spec(
                 "field": field_name,
                 "lhs": {"expression": lhs_expr, "order": {"time": order}},
                 "rhs": {"type": "linear_combination", "terms": terms},
-            }
+            },
         ],
     }
     return EquationSystem.from_dict(data)

@@ -6,7 +6,7 @@
 #
 # Physics:
 #   At resonance mA² ≈ mT², the photon and dark-photon dispersions match,
-#   maximising the Raffelt-Stodolsky oscillation. The dark-photon coupling
+#   maximizing the Raffelt-Stodolsky oscillation. The dark-photon coupling
 #   E[t,a] = -2δ·mA²/(4δ²-ξ) has NO B₀ dependence, so A_dark should be
 #   constant across B₀ values in the perturbative (small-P) regime.
 #
@@ -17,7 +17,7 @@
 #
 # Refs:
 #   An, Pospelov, Pradler (2013), arXiv:1302.3884 — conversion formulas
-#   Hwang & Noh (2310.04150) — linearised regime validity
+#   Hwang & Noh (2310.04150) — linearized regime validity
 
 set -euo pipefail
 

@@ -76,7 +76,7 @@ def extract_h5_a1_block(
     """
     coeff_eval = CoefficientEvaluator(spec, grid, params)
     A_reduced, _, _, _, _, mapping = _build_evolution_matrices(
-        spec, layout, grid, coeff_eval, k_grid, rfft_shape
+        spec, layout, grid, coeff_eval, k_grid, rfft_shape,
     )
 
     # Map original slots to reduced slots
@@ -278,7 +278,7 @@ def find_instability_boundary_from_sweep(
                 "alpha2_upper": upper_crit,
                 "alpha2_lower": lower_crit,
                 "alpha2_first_valid": first_valid,
-            }
+            },
         )
     return results
 
@@ -362,7 +362,7 @@ def mini_solver_amplification(
         """Get the full 14x14 reduced system and slot mapping."""
         coeff_eval = CoefficientEvaluator(spec, grid, params)
         A_red, _, _, _, _, mapping = _build_evolution_matrices(
-            spec, layout, grid, coeff_eval, k_grid, rfft_shape
+            spec, layout, grid, coeff_eval, k_grid, rfft_shape,
         )
         return A_red, mapping
 
@@ -502,7 +502,7 @@ def main() -> None:
 
     if args.mode == "point":
         print(
-            f"\nAnalyzing point delta1={args.delta1}, alpha2={args.alpha2}, k={k_vals[args.k_idx]:.4f}"
+            f"\nAnalyzing point delta1={args.delta1}, alpha2={args.alpha2}, k={k_vals[args.k_idx]:.4f}",
         )
         r = analyze_point(
             spec,
@@ -630,7 +630,7 @@ def main() -> None:
                     print(
                         f"  d1={d1:+.3f} a2={a2:.3f}: "
                         f"A_sweep={A_sweep:.2e} A_schur={A_schur:.2e} "
-                        f"err={rel_err:.1%}"
+                        f"err={rel_err:.1%}",
                     )
 
         if errors:

@@ -177,7 +177,7 @@ def compute_sobol_indices(
 
     try:
         si = sobol_analyze.analyze(  # type: ignore[reportUnknownVariableType]
-            problem, y, calc_second_order=False, num_resamples=n_bootstrap
+            problem, y, calc_second_order=False, num_resamples=n_bootstrap,
         )
     except RuntimeError as exc:
         msg = (
@@ -277,7 +277,7 @@ def format_sensitivity_table(result: SensitivityResult) -> str:
             (
                 f"{'Parameter':<15} {'S1 (main)':>12} {'ST (total)':>12} {'Interaction':>12}",
                 "-" * 60,
-            )
+            ),
         )
         for i, name in enumerate(result.param_names):
             s1 = result.s1[i]
@@ -301,7 +301,7 @@ def format_sensitivity_table(result: SensitivityResult) -> str:
         and result.sigma is not None
     ):
         lines.extend(
-            (f"{'Parameter':<15} {'mu* (mean)':>12} {'sigma (std)':>12}", "-" * 60)
+            (f"{'Parameter':<15} {'mu* (mean)':>12} {'sigma (std)':>12}", "-" * 60),
         )
         # Sort by mu_star descending
         order = np.argsort(-result.mu_star)

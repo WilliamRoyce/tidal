@@ -317,7 +317,7 @@ class TestSweepResults:
         assert len(data["rows"]) == 3
 
     def test_save_sweep_json(
-        self, sample_results: SweepResults, tmp_path: Path
+        self, sample_results: SweepResults, tmp_path: Path,
     ) -> None:
         sweep_file = tmp_path / "sweep.json"
         sample_results.save_sweep_json(sweep_file)
@@ -328,7 +328,7 @@ class TestSweepResults:
         assert data["completed_runs"] == 3
 
     def test_save_sweep_json_includes_run_dirs(
-        self, sample_results: SweepResults, tmp_path: Path
+        self, sample_results: SweepResults, tmp_path: Path,
     ) -> None:
         sweep_file = tmp_path / "sweep.json"
         sample_results.save_sweep_json(sweep_file)
@@ -651,7 +651,7 @@ class TestRunStatusTracking:
         assert all(r["run_status"] != "success" for r in f.rows)
 
     def test_successful_rows_preserves_run_dirs(
-        self, mixed_results: SweepResults
+        self, mixed_results: SweepResults,
     ) -> None:
         s = mixed_results.successful_rows()
         assert len(s.run_dirs) == 2
@@ -707,7 +707,7 @@ class TestSweepCLI:
                 _COUPLED_SCATTERING_JSON,
                 "--output",
                 "/tmp/nosweep",
-            ]
+            ],
         )
         assert code == 1
 
@@ -724,7 +724,7 @@ class TestSweepCLI:
                 "32,64",
                 "--output",
                 "/tmp/nosweep",
-            ]
+            ],
         )
         assert code == 1
 
@@ -737,7 +737,7 @@ class TestSweepCLI:
                 _COUPLED_SCATTERING_JSON,
                 "--sweep",
                 "g0=0.1,0.5",
-            ]
+            ],
         )
         assert code == 1
 
@@ -752,7 +752,7 @@ class TestSweepCLI:
                 "g0=0.1,0.5",
                 "--output",
                 "/tmp/nosweep",
-            ]
+            ],
         )
         assert code == 1
 
@@ -792,7 +792,7 @@ class TestSweepCLI:
                 "2",
                 "--output",
                 str(output),
-            ]
+            ],
         )
         assert code == 0
         assert (output / "sweep.json").exists()
@@ -844,7 +844,7 @@ class TestSweepCLI:
                 "--keep-runs",
                 "--output",
                 str(output),
-            ]
+            ],
         )
         assert code == 0
         assert (output / "sweep.json").exists()
@@ -881,7 +881,7 @@ class TestSweepCLI:
                 "--keep-runs",
                 "--output",
                 str(output),
-            ]
+            ],
         )
         assert code == 0
         assert (output / "g0_0.1" / "metadata.json").exists()
@@ -909,7 +909,7 @@ class TestSweepCLI:
                 "--output",
                 str(output),
                 "--resume",
-            ]
+            ],
         )
         assert code == 0
 
@@ -960,7 +960,7 @@ class TestSweepPlot:
                 "2",
                 "--output",
                 str(output),
-            ]
+            ],
         )
         assert code == 0
         return output
@@ -979,7 +979,7 @@ class TestSweepPlot:
                 "P_max",
                 "--output",
                 str(plot_path),
-            ]
+            ],
         )
         assert code == 0
         assert plot_path.exists()
@@ -998,7 +998,7 @@ class TestSweepPlot:
                 "conversion",
                 "--output",
                 str(plot_path),
-            ]
+            ],
         )
         assert code == 0
         assert plot_path.exists()
@@ -1015,7 +1015,7 @@ class TestSweepPlot:
                 "sweep",
                 "--output",
                 str(plot_path),
-            ]
+            ],
         )
         assert code == 0
         assert plot_path.exists()
@@ -1034,7 +1034,7 @@ class TestSweepPlot:
                 "sweep",
                 "--metric",
                 "P_max",
-            ]
+            ],
         )
         assert code == 1
 
@@ -1064,7 +1064,7 @@ class TestSweepValidation:
                 "--output",
                 str(output),
                 "--dry-run",
-            ]
+            ],
         )
         assert code == 0
         # Should NOT create any run directories
@@ -1086,7 +1086,7 @@ class TestSweepValidation:
                 "foobar",
                 "--output",
                 str(tmp_path / "out"),
-            ]
+            ],
         )
         assert code == 1
 
@@ -1104,12 +1104,12 @@ class TestSweepValidation:
                 "conservation,nonexistent",
                 "--output",
                 str(tmp_path / "out"),
-            ]
+            ],
         )
         assert code == 1
 
     def test_unknown_swept_param_warns(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Swept param not in spec should warn but not error."""
         from tidal.cli import main
@@ -1131,7 +1131,7 @@ class TestSweepValidation:
                 "0.1",
                 "--output",
                 str(tmp_path / "out"),
-            ]
+            ],
         )
         captured = capsys.readouterr()
         assert "nonexistent_param_xyz" in captured.err
@@ -1311,7 +1311,7 @@ def _make_2d_sweep_results() -> SweepResults:
         for r in r_vals:
             p = math.sin(1.0 * bp * r * math.sqrt(math.pi / 2.0)) ** 2
             rows.append(
-                {"Bpeak": bp, "R": r, "kappa": 1.0, "P_final": p, "wall_time_s": 1.0}
+                {"Bpeak": bp, "R": r, "kappa": 1.0, "P_final": p, "wall_time_s": 1.0},
             )
     return SweepResults(
         swept_params={"Bpeak": bpeak_vals, "R": r_vals},
@@ -1402,7 +1402,7 @@ class TestSweepPlotOverlay:
         results = _make_1d_sweep_results()
         fig, ax = plt.subplots()
         render_sweep_1d(
-            ax, results, "P_final", overlay="sin(kappa * B0 * t_end / 2)**2"
+            ax, results, "P_final", overlay="sin(kappa * B0 * t_end / 2)**2",
         )
 
         lines = ax.get_lines()
@@ -1454,7 +1454,7 @@ class TestSweepPlotOverlay:
         results = _make_1d_sweep_results()
         fig, ax = plt.subplots()
         render_sweep_1d(
-            ax, results, "P_final", overlay="sin(kappa * B0 * t_end / 2)**2"
+            ax, results, "P_final", overlay="sin(kappa * B0 * t_end / 2)**2",
         )
 
         # The second line is the overlay
@@ -1481,7 +1481,7 @@ class TestSweepPlotOverlay:
         results = _make_2d_sweep_results()
         fig = plt.figure(figsize=(15, 5))
         render_sweep_2d_with_overlay(
-            fig, results, "P_final", "sin(kappa * Bpeak * R * sqrt(pi/2))**2"
+            fig, results, "P_final", "sin(kappa * Bpeak * R * sqrt(pi/2))**2",
         )
 
         assert len(fig.axes) >= 3
@@ -1499,7 +1499,7 @@ class TestSweepPlotOverlay:
         results = _make_2d_sweep_results()
         fig = plt.figure(figsize=(15, 5))
         render_sweep_2d_with_overlay(
-            fig, results, "P_final", "sin(kappa * Bpeak * R * sqrt(pi/2))**2"
+            fig, results, "P_final", "sin(kappa * Bpeak * R * sqrt(pi/2))**2",
         )
 
         # The third pcolormesh (error panel) should have near-zero values
@@ -1548,8 +1548,8 @@ class TestSweepPlotOverlay:
                     "timestamp": "2026-01-01T00:00:00",
                     "total_runs": 4,
                     "completed_runs": 4,
-                }
-            )
+                },
+            ),
         )
         import math
 
@@ -1562,8 +1562,8 @@ class TestSweepPlotOverlay:
                 {
                     "columns": ["B0", "kappa", "P_final"],
                     "rows": rows,
-                }
-            )
+                },
+            ),
         )
 
         from argparse import Namespace
@@ -1609,8 +1609,8 @@ class TestSweepPlotOverlay:
                     "timestamp": "2026-01-01T00:00:00",
                     "total_runs": 2,
                     "completed_runs": 2,
-                }
-            )
+                },
+            ),
         )
         (sweep_dir / "results.json").write_text(
             json.dumps(
@@ -1620,8 +1620,8 @@ class TestSweepPlotOverlay:
                         {"B0": 0.1, "P_final": 0.01},
                         {"B0": 0.2, "P_final": 0.04},
                     ],
-                }
-            )
+                },
+            ),
         )
 
         from argparse import Namespace

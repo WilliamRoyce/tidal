@@ -81,7 +81,7 @@ class TestStateLayout:
                 _constraint_eq("A_0"),
                 _first_order_eq("psi_0"),
                 _wave_eq("phi_0"),
-            ]
+            ],
         )
         layout = StateLayout.from_spec(spec, num_points=4)
         assert layout.num_slots == 4  # constraint + first_order + field + velocity

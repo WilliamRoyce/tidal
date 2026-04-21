@@ -89,7 +89,7 @@ def list_command(args: Namespace) -> int:
         _table(
             ["Name", "Dim", "Fields", "Parameters"],
             [list(e) for e in entries],
-        )
+        ),
     )
 
     print()

@@ -326,7 +326,7 @@ class SweepResults:
             lines.append("\nSwept parameters:")
             for name, vals in self.swept_params.items():
                 lines.append(
-                    f"  {name}: {min(vals):.6g} to {max(vals):.6g} ({len(vals)} values)"
+                    f"  {name}: {min(vals):.6g} to {max(vals):.6g} ({len(vals)} values)",
                 )
 
         if self.fixed_params:
@@ -348,7 +348,7 @@ class SweepResults:
                 else:
                     lines.append(
                         f"  {m}: mean={np.mean(arr):.6g} \u00b1 {np.std(arr):.6g}, "
-                        f"min={np.min(arr):.6g}, max={np.max(arr):.6g}"
+                        f"min={np.min(arr):.6g}, max={np.max(arr):.6g}",
                     )
 
         return "\n".join(lines)
@@ -452,7 +452,7 @@ class SweepResults:
             # Fixed params and sim settings from first row
             row.update(self.fixed_params)
             row.update(
-                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]}
+                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]},
             )
 
             # Aggregate each metric
@@ -566,7 +566,7 @@ class SweepResults:
             row: dict[str, Any] = dict(zip(param_names, point_key, strict=True))
             row.update(self.fixed_params)
             row.update(
-                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]}
+                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]},
             )
 
             vals = [
@@ -662,7 +662,7 @@ class SweepResults:
             # Evaluate baseline
             try:
                 p_em = float(
-                    eval(baseline_formula, {"__builtins__": {}}, ns)  # noqa: S307
+                    eval(baseline_formula, {"__builtins__": {}}, ns),  # noqa: S307
                 )
             except Exception:  # noqa: BLE001
                 p_em = _math.nan
@@ -891,7 +891,7 @@ class SweepResults:
         data["total_runs"] = self.metadata.get("total_runs", self.n_runs)
 
         path.write_text(
-            json.dumps(data, indent=2, default=_json_default), encoding="utf-8"
+            json.dumps(data, indent=2, default=_json_default), encoding="utf-8",
         )
 
     # ------------------------------------------------------------------

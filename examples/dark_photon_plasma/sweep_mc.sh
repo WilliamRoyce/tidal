@@ -40,7 +40,7 @@ N_SAMPLES="${1:-1000}"
 KAPPA=1.0
 B0=0.01        # small-P regime
 K0=2.0         # GW frequency (plane-wave wavevector)
-XI=1.0         # canonical kinetic normalisation
+XI=1.0         # canonical kinetic normalization
 
 # Grid and simulation settings
 GRID=256

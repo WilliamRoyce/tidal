@@ -231,7 +231,7 @@ class TestAsymptoticConversion:
         data = _make_travelling_wave_data()
         result = compute_asymptotic_conversion(data, "phi_0", "chi_0")
         assert result.P_transmitted + result.P_reflected == pytest.approx(
-            result.P_final, rel=1e-2
+            result.P_final, rel=1e-2,
         )
 
     def test_source_wavevector_positive(self) -> None:

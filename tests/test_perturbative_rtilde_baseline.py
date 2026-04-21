@@ -221,7 +221,7 @@ def test_synthetic_b5_kinetic_collapses_correctly() -> None:
     assert has_self_identity, (
         "Demoted h must carry an identity(h) self-term (either the "
         "original one or a prepended coeff=1 sentinel) so downstream "
-        "Schur elimination recognises it as a constraint."
+        "Schur elimination recognizes it as a constraint."
     )
 
 

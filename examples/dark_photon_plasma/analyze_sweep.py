@@ -138,7 +138,7 @@ def main() -> None:
         p_values = [_parse_float(r.get("P_max", "0")) for r in stable]
         print(
             f"\nAmplification A_total: min={min(a_values):.4f}, "
-            f"max={max(a_values):.4f}, median={sorted(a_values)[len(a_values) // 2]:.4f}"
+            f"max={max(a_values):.4f}, median={sorted(a_values)[len(a_values) // 2]:.4f}",
         )
         print(f"P_max: min={min(p_values):.4e}, max={max(p_values):.4e}")
 

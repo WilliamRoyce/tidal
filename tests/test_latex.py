@@ -27,7 +27,7 @@ _EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "data"
 # running `tidal derive`.  Skip integration tests when absent.
 _CS_JSON = _EXAMPLES / "coupled_scalars.json"
 _needs_cs = pytest.mark.skipif(
-    not _CS_JSON.exists(), reason="coupled_scalars.json not derived"
+    not _CS_JSON.exists(), reason="coupled_scalars.json not derived",
 )
 
 
@@ -163,7 +163,7 @@ class TestFieldToLatex:
     def test_with_tensor_meta_vector(self) -> None:
         meta = {"tensor_head": "a", "tensor_rank": 1, "tensor_indices": [1]}
         result = field_to_latex(
-            "a_1", tensor_meta=meta, coordinates=("t", "x", "y", "z")
+            "a_1", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
         )
         assert r"\mathcal{A}" in result
         assert "x" in result
@@ -171,7 +171,7 @@ class TestFieldToLatex:
     def test_with_tensor_meta_rank2(self) -> None:
         meta = {"tensor_head": "h", "tensor_rank": 2, "tensor_indices": [2, 2]}
         result = field_to_latex(
-            "h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z")
+            "h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
         )
         assert r"\mathcal{H}" in result
         assert "yy" in result
@@ -185,7 +185,7 @@ class TestFieldToLatex:
     def test_velocity_with_tensor_meta(self) -> None:
         meta = {"tensor_head": "h", "tensor_rank": 2, "tensor_indices": [2, 2]}
         result = field_to_latex(
-            "v_h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z")
+            "v_h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
         )
         assert r"\dot" in result
 
@@ -491,7 +491,7 @@ class TestCLIIntegration:
         from tidal.cli import main
 
         exit_code = main(
-            ["inspect", str(_EXAMPLES / "coupled_scalars.json"), "--latex"]
+            ["inspect", str(_EXAMPLES / "coupled_scalars.json"), "--latex"],
         )
         assert exit_code == 0
 
@@ -505,7 +505,7 @@ class TestCLIIntegration:
                 "--latex",
                 "--latex-format",
                 "document",
-            ]
+            ],
         )
         assert exit_code == 0
 
@@ -538,7 +538,7 @@ class TestAllExamplesRender:
                     ),
                     raises=ValueError,
                     strict=True,
-                )
+                ),
             )
         from tidal.symbolic.json_loader import load_equation_system
 

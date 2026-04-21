@@ -27,7 +27,7 @@ class TestParseSweepSection:
 
     def test_linear_range(self) -> None:
         values, adaptive = _parse_sweep_section(
-            "g0", {"start": 0.1, "stop": 1.0, "count": 5}
+            "g0", {"start": 0.1, "stop": 1.0, "count": 5},
         )
         assert len(values) == 5
         assert values[0] == pytest.approx(0.1)
@@ -80,13 +80,13 @@ class TestParseSweepSection:
     def test_log_negative_bounds(self) -> None:
         with pytest.raises(ValueError, match="positive bounds"):
             _parse_sweep_section(
-                "g0", {"start": -1.0, "stop": 1.0, "count": 5, "scale": "log"}
+                "g0", {"start": -1.0, "stop": 1.0, "count": 5, "scale": "log"},
             )
 
     def test_unknown_scale(self) -> None:
         with pytest.raises(ValueError, match="unknown scale"):
             _parse_sweep_section(
-                "g0", {"start": 0.0, "stop": 1.0, "count": 5, "scale": "cubic"}
+                "g0", {"start": 0.0, "stop": 1.0, "count": 5, "scale": "cubic"},
             )
 
     def test_explicit_values_too_few(self) -> None:
@@ -108,7 +108,7 @@ class TestLoadSweepConfig:
         spec = tmp_path / "spec.json"
         spec.write_text("{}")
         toml.write_text(
-            'spec = "spec.json"\n[sweep.g0]\nstart = 0.1\nstop = 1.0\ncount = 5\n'
+            'spec = "spec.json"\n[sweep.g0]\nstart = 0.1\nstop = 1.0\ncount = 5\n',
         )
         config = load_sweep_config(toml)
         assert config.spec_path == spec
@@ -148,7 +148,7 @@ class TestLoadSweepConfig:
             "\n"
             "[execution]\n"
             "parallel = 4\n"
-            "resume = true\n"
+            "resume = true\n",
         )
         config = load_sweep_config(toml)
         assert config.fixed_params == {"mPhi2": 1.0, "mChi2": 4.0}
@@ -167,7 +167,7 @@ class TestLoadSweepConfig:
         spec = tmp_path / "spec.json"
         spec.write_text("{}")
         toml.write_text(
-            'spec = "spec.json"\n[convergence]\ngrid_sizes = [32, 64, 128, 256]\n'
+            'spec = "spec.json"\n[convergence]\ngrid_sizes = [32, 64, 128, 256]\n',
         )
         config = load_sweep_config(toml)
         assert config.converge_sizes == [32, 64, 128, 256]
@@ -198,7 +198,7 @@ class TestLoadSweepConfig:
             "stop = 1.0\n"
             "count = 5\n"
             "[convergence]\n"
-            "grid_sizes = [32, 64]\n"
+            "grid_sizes = [32, 64]\n",
         )
         with pytest.raises(ValueError, match="mutually exclusive"):
             load_sweep_config(toml)
@@ -216,14 +216,14 @@ class TestLoadSweepConfig:
             "stop = 1.0\n"
             "count = 3\n"
             "[output]\n"
-            'path = "../results"\n'
+            'path = "../results"\n',
         )
         config = load_sweep_config(toml)
         assert config.spec_path == subdir / ".." / "spec.json"
         assert config.output == subdir / ".." / "results"
 
     def test_unknown_sections_warn(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
     ) -> None:
         toml = tmp_path / "sweep.toml"
         spec = tmp_path / "spec.json"
@@ -235,7 +235,7 @@ class TestLoadSweepConfig:
             "stop = 1.0\n"
             "count = 3\n"
             "[foobar]\n"
-            "x = 1\n"
+            "x = 1\n",
         )
         config = load_sweep_config(toml)
         captured = capsys.readouterr()
@@ -268,7 +268,7 @@ class TestLoadSweepConfig:
             "[sweep.mChi2]\n"
             "start = 0.5\n"
             "stop = 4.0\n"
-            "count = 4\n"
+            "count = 4\n",
         )
         config = load_sweep_config(toml)
         assert len(config.swept_params) == 2
@@ -291,7 +291,7 @@ class TestLoadSweepConfig:
             "[sweep.mChi2]\n"
             "start = 0.5\n"
             "stop = 4.0\n"
-            "count = 4\n"
+            "count = 4\n",
         )
         config = load_sweep_config(toml)
         assert config.sweep_strategy == "latin_hypercube"

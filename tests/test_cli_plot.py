@@ -85,7 +85,7 @@ def two_d_sim_dir(
             "--output",
             str(output),
             "--quiet",
-        ]
+        ],
     )
     assert ret == 0, "2D simulation failed"
     assert output.is_dir()
@@ -138,7 +138,7 @@ class TestHeatmap:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -161,7 +161,7 @@ class TestHeatmap:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -183,7 +183,7 @@ class TestHeatmap:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -204,7 +204,7 @@ class TestHeatmap:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -227,7 +227,7 @@ class TestSnapshot1D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -249,7 +249,7 @@ class TestSnapshot1D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -271,7 +271,7 @@ class TestAmplitude:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -293,7 +293,7 @@ class TestAmplitude:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -315,7 +315,7 @@ class TestAmplitude:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -336,7 +336,7 @@ class TestAmplitude:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -357,7 +357,7 @@ class TestEnergy:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -379,7 +379,7 @@ class TestEnergy:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -401,7 +401,7 @@ class TestProfile:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -423,7 +423,7 @@ class TestProfile:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -445,7 +445,7 @@ class TestCompare:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -472,7 +472,7 @@ class TestSnapshot2D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -492,7 +492,7 @@ class TestSnapshot2D:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -511,7 +511,7 @@ class TestSnapshot2D:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -532,7 +532,7 @@ class TestSnapshot2D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -552,7 +552,7 @@ class TestSnapshot2D:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -573,7 +573,7 @@ class TestSnapshot2D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -648,7 +648,7 @@ def three_d_sim_dir(
             "--output",
             str(output),
             "--quiet",
-        ]
+        ],
     )
     assert ret == 0, "3D simulation failed"
     assert output.is_dir()
@@ -673,7 +673,7 @@ class TestSnapshot3D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -695,7 +695,7 @@ class TestSnapshot3D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -717,7 +717,7 @@ class TestSnapshot3D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -739,7 +739,7 @@ class TestProfile3D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -761,7 +761,7 @@ class TestCompare3D:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -843,7 +843,7 @@ class TestOutputOptions:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -865,7 +865,7 @@ class TestOutputOptions:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -887,7 +887,7 @@ class TestOutputOptions:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -904,7 +904,7 @@ class TestOutputOptions:
                 "--type",
                 "amplitude",
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         expected = coupled_scalars_dir / "amplitude.png"
@@ -928,7 +928,7 @@ class TestOutputOptions:
                 "amplitude",
                 "--output",
                 str(output),
-            ]
+            ],
         )
         assert ret == 0
         captured = capsys.readouterr()
@@ -958,7 +958,7 @@ class TestArgParsing:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -978,7 +978,7 @@ class TestArgParsing:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -998,7 +998,7 @@ class TestArgParsing:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -1018,7 +1018,7 @@ class TestArgParsing:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -1038,7 +1038,7 @@ class TestArgParsing:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -1058,7 +1058,7 @@ class TestArgParsing:
                 "--output",
                 str(tmp_path / "bad.png"),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 1
 
@@ -1080,7 +1080,7 @@ class TestArgParsing:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -1203,7 +1203,7 @@ class TestHamiltonian:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -1226,7 +1226,7 @@ class TestHamiltonian:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -1243,7 +1243,7 @@ class TestHamiltonian:
                 "--type",
                 "hamiltonian",
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         expected = coupled_scalars_dir / "hamiltonian.png"
@@ -1267,7 +1267,7 @@ class TestConservation:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -1290,7 +1290,7 @@ class TestConservation:
                 "--output",
                 str(output),
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         assert output.exists()
@@ -1307,7 +1307,7 @@ class TestConservation:
                 "--type",
                 "conservation",
                 "--quiet",
-            ]
+            ],
         )
         assert ret == 0
         expected = coupled_scalars_dir / "conservation.png"
@@ -1336,7 +1336,7 @@ class TestMeasurePlotEmptyPanels:
 
         ax = self._make_ax()
         results: dict[str, Any] = {
-            "spectrum": {"error": "position-dependent term detected"}
+            "spectrum": {"error": "position-dependent term detected"},
         }
         _plot_spectrum(ax, results)
         assert not ax.get_visible()
@@ -1353,7 +1353,7 @@ class TestMeasurePlotEmptyPanels:
 
         ax = self._make_ax()
         results: dict[str, Any] = {
-            "dispersion": {"error": "requires spatially uniform system"}
+            "dispersion": {"error": "requires spatially uniform system"},
         }
         _plot_dispersion(ax, results)
         assert not ax.get_visible()
@@ -1372,8 +1372,8 @@ class TestMeasurePlotEmptyPanels:
                 "phi_0": {
                     "initial": {"wavenumbers": wn, "power": power},
                     "final": {"wavenumbers": wn, "power": power},
-                }
-            }
+                },
+            },
         }
         _plot_spectrum(ax, results)
         assert ax.get_visible()

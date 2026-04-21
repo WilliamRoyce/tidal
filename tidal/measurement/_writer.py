@@ -176,7 +176,7 @@ class SnapshotWriter:
         # Pre-allocate per-field .npy files
         snapshot_shape = (n_snapshots, *grid_shape)
         self._field_mmaps: dict[
-            str, np.memmap[tuple[int, ...], np.dtype[np.float64]]
+            str, np.memmap[tuple[int, ...], np.dtype[np.float64]],
         ] = {}
         for name in field_names:
             self._field_mmaps[name] = _open_memmap(
@@ -186,7 +186,7 @@ class SnapshotWriter:
 
         # Pre-allocate per-velocity .npy files
         self._velocity_mmaps: dict[
-            str, np.memmap[tuple[int, ...], np.dtype[np.float64]]
+            str, np.memmap[tuple[int, ...], np.dtype[np.float64]],
         ] = {}
         for name in velocity_names:
             self._velocity_mmaps[name] = _open_memmap(
