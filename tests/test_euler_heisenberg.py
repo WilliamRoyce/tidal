@@ -1,97 +1,108 @@
 """Euler-Heisenberg dispersion & perturbative-pipeline validation (#301 Phase 5).
 
-Investigation note — Dunne/Adler QED convention mapping (updated).
+What this file actually tests (and what it does not)
+----------------------------------------------------
 
-Earlier drafts claimed a "genuine convention gap" between TIDAL's
-Lagrangian and Dunne's QED because a naive application of Dunne's
-c₂/c₁ = 7/4 to TIDAL's Lagrangian as σ/ρ = 7/4 yielded an incorrect
-birefringence ratio. The actual situation after a careful derivation is:
+The tests here exercise TIDAL's end-to-end EH pipeline (Wolfram derive →
+Phase-3 canonicalise → modal / perturbative solve → spectral measure) at
+various points in (ρ, σ, B₀) space. They verify:
 
-Mapping. TIDAL's Lagrangian uses the un-halved parity-odd invariant
-Ψ₂_TIDAL = ε^{abcd}F_{ab}F_{cd}, which equals twice Dunne's F·F̃
-(F̃ = ½ε·F). So Dunne's c₂(F·F̃)² = (c₂/4)(ε·F·F)². Matching
-TIDAL's (σ/8)(ε·F·F)² gives σ = 2c₂. Similarly (ρ/8)(F·F)² matched
-to c₁(F·F)² gives ρ = 8c₁. Therefore σ/ρ = 2c₂/8c₁ = c₂/(4c₁). With
-Dunne's c₂/c₁ = 7/4 → σ/ρ = 7/16.
+- The symbolic JSON dispersion formulas match the numerical simulation
+  (pipeline self-consistency — see TestAnalyticDispersion below).
+- The Pass 0 / Pass 1 perturbative hierarchy separates cleanly (#303 —
+  see TestPerturbativeMethodSelfConsistency).
+- The Lagrangian's symmetries are preserved (e.g., Lorentz covariance of
+  (F·F)² around B̄ gives ρ-cancellation on a_1).
 
-Prediction. TIDAL's *derived* birefringence ratio (from the JSON
-coefficients alone, no fitting) at leading order in ε is 4σ/ρ.
-At σ/ρ = 7/16 this gives 4·7/16 = 28/16 = 7/4 — exactly Dunne/Adler's
-QED benchmark. So TIDAL *does* reproduce the literature result when
-the convention mapping is applied correctly; there is no gap.
+They do **not** provide a first-principles QED reproduction that is
+free from all circularity concerns. See the §"Test categories and what
+each actually proves" table in ``docs/tex/perturbative_reduction.tex``
+for an honest assessment of which tests are non-tautological.
 
-Test 4 below picks σ/ρ = 7/16 *on the basis of the convention mapping*
-(independent of the predicted ratio value) and checks the resulting
-ratio matches 7/4. This is a non-circular literature reproduction:
-the σ/ρ value is fixed by the Lagrangian translation, and the 7/4
-target is the Dunne/Adler QED prediction.
+Dunne / Adler convention mapping (corrected)
+--------------------------------------------
 
+An earlier draft of this module claimed a π² "convention gap" between
+TIDAL and Dunne. That claim was wrong — a derivation error. The correct
+mapping, traced from Dunne 2004 hep-th/0406216 eq. "lightlight" (line 332
+of ``literature/hep-th_0406216/koganweb.tex``):
 
+  Dunne eq. lightlight: S^(1) = (e⁴/(360π²m⁴)) ∫ [(E²−B²)² + 7(E·B)²]
 
-**What this file does and does not claim.**
+Using (E²−B²)² = (F·F)²/4 and (E·B)² = (F·F̃)²/16:
+  L_EH = c₁(F·F)² + c₂(F·F̃)²,  c₁ = e⁴/(1440π²m⁴), c₂ = 7c₁/4
 
-This file validates TIDAL's end-to-end pipeline (derive → canonicalize →
-solve → measure) against the dispersion predicted by the SYMBOLIC
-Lagrangian TIDAL currently ships. It does **not** claim to reproduce
-Dunne/Adler's QED Lagrangian coefficients from first principles — that
-would require settling a convention mismatch documented below.
+In Heaviside-Lorentz (α = e²/(4π), e⁴ = 16π²α²) the π² in Dunne's
+prefactor cancels against the 16π² from e⁴:
+  c₁ = α²/(90m⁴), c₂ = 7α²/(360m⁴)
 
-Tests are structured to be non-circular: they compare the measured
-numerical dispersion to a closed-form formula derived *from the
-linearised EOM that Wolfram emitted*, not to targets reverse-engineered
-to satisfy the expected outcome.
+TIDAL's Lagrangian uses the un-halved dual ε·F·F = 2(F·F̃), so
+  (σ/8)(ε·F·F)² = (σ/2)(F·F̃)²
+matching c₂(F·F̃)² gives σ = 2c₂. Similarly ρ = 8c₁. So at the QED
+benchmark c₂/c₁ = 7/4:
+  σ/ρ = c₂/(4c₁) = 7/16
 
-For the Lagrangian ``L = −¼F² + (ρ/8)(F·F)² + (σ/8)(F·F̃)²`` in TIDAL's
-convention (where the parity-odd invariant is ε^{abcd}F_{ab}F_{cd} with
-no 1/2 factor — see ``examples/euler_heisenberg/theory.toml``), the
-Wolfram pipeline produces the component equations in
-``examples/data/euler_heisenberg.json``:
+With TIDAL's leading-order birefringence ratio 4σ/ρ, substituting 7/16
+gives 4·(7/16) = 7/4 — exactly Adler 1971 eq. (5.13). And at the
+absolute level, TIDAL's 2ρ · (B/B_c)² equals 8α²/45·(B/B_c)² when
+ρ = 4α²/45, and TIDAL's 8σ · (B/B_c)² equals 14α²/45·(B/B_c)² when
+σ = 7α²/180 — both Adler coefficients match individually, not just
+their ratio. There is no π² gap.
+
+On the circularity of the 7/4 ratio test (``TestQEDBirefringenceRatio``)
+-----------------------------------------------------------------------
+
+The 7/4 ratio test is weakly tautological: TIDAL's formula is 4σ/ρ, and
+we set σ/ρ = 7/16 from the convention mapping. The arithmetic 4·7/16 =
+7/4 is forced by the chosen σ/ρ, so the test mostly verifies that the
+zero-crossing measurement reproduces what the JSON-derived formula
+predicts — a pipeline self-consistency check. It does NOT independently
+validate that TIDAL's Lagrangian (as linearised by Wolfram) corresponds
+to Dunne's Lagrangian at the numeric level; the convention mapping
+gives that correspondence analytically but is a separate derivation,
+not a test result.
+
+What would make the test genuinely non-tautological:
+
+- Pick (ρ, σ) at the QED-fixed values (ρ = 4α²/45, σ = 7α²/180) with
+  α = 1/137.036 — concrete numbers, no freedom.
+- Measure n_⊥ − 1 and n_∥ − 1 individually as absolute numbers.
+- Compare each to Adler's formulas 8α²/45·(B/B_c)² and 14α²/45·(B/B_c)².
+
+At physical α, the shifts are ~10⁻⁶ — far below the zero-crossing
+method's ~10⁻³ ω-precision. Scaling B₀ up by K amplifies the signal by
+K² but also invalidates the Pass-1 leading-order expansion for large
+K (secular Duhamel growth at ε·ω·t_end > 1). We explored this tradeoff
+and concluded the existing pipeline self-consistency tests are the
+practical verification surface; an isolated non-circular "Adler
+absolute magnitude" test would require either a different measurement
+method (FFT peak-picking with sub-bin interpolation) or a non-
+perturbative modal path that doesn't secular-grow at finite B₀.
+Tracked for follow-up. The analytic agreement (TIDAL's 2ρ·B²
+= 8α²/45·B² at ρ = 4α²/45, and 8σ·B² = 14α²/45·B² at σ = 7α²/180) is
+documented in ``docs/tex/perturbative_reduction.tex §Validation``.
+
+For the Lagrangian ``L = −¼F² + (ρ/8)(F·F)² + (σ/8)(ε·F·F)²`` in
+TIDAL's un-halved-ε convention (see ``examples/euler_heisenberg/
+theory.toml``), the Wolfram pipeline produces these component equations
+in ``examples/data/euler_heisenberg.json``:
 
   a_1 (A_x, parallel mode): M_a1 = −1 + 2ρB₀² − 16σB₀²
                              K_a1 coef of laplacian = −1 + 2ρB₀²
-                             ω²/k² = (1 − 2ρB₀²)/(1 + 16σB₀²)
-                             n_∥² − 1 ≈ (2ρ + 16σ)B₀²   [small ε]
+                             ω²/k² = (1 − 2ρB₀²)/(1 + 16σB₀² − 2ρB₀²)
+                             n_∥² − 1 = 16σB₀²/(1−2ρB₀²) ≈ 16σB₀²
 
   a_2 (A_y, perpendicular): M_a2 = −1 + 2ρB₀²
                              K_a2 coef of laplacian = −1 + 6ρB₀²
                              ω²/k² = (1 − 6ρB₀²)/(1 − 2ρB₀²)
-                             n_⊥² − 1 ≈ 4ρB₀²
+                             n_⊥² − 1 = 4ρB₀²/(1−6ρB₀²) ≈ 4ρB₀²
 
-These formulas are a direct transcription of the JSON coefficients — no
-external input. Tests 2–4 below verify the numerical solver produces
-these dispersions to the zero-crossing method's precision.
-
-**Convention gap with Dunne/Adler's canonical QED.** Dunne's
-L = −¼F² + c₁(F·F)² + c₂(F·F̃)² with c₂/c₁ = 7/4 predicts the famous
-birefringence ratio (n_∥²−1)/(n_⊥²−1) = 7/4. Naively matching
-coefficients to TIDAL's convention (noting TIDAL's Ψ₂ = ε·F·F is 2× Dunne's
-F·F̃): σ = 2c₂, ρ = 8c₁, giving σ/ρ = 7/16. Substituting into TIDAL's
-predicted ratio 1/2 + 4σ/ρ = 1/2 + 7/4 = 9/4 ≠ 7/4. This documents that
-**TIDAL's current EH Lagrangian does not literally reproduce Dunne's
-result** — the convention mismatch is real and traced to how Wolfram's
-ε-tensor contraction (without a 1/2 factor on F̃) cascades through the
-component linearisation.
-
-Closing this gap requires either (a) re-deriving with a Dunne-matching
-Lagrangian (e.g., ``(σ/32)(ε^{abcd}F_{ab}F_{cd})²`` to absorb the
-missing 1/2 factor in F̃ = ½ε·F), or (b) a careful component-by-component
-normalisation audit of the Wolfram ε evaluation. Tracked in a follow-up
-issue.
-
-What we *can* validate honestly now:
-
-- **Test 1 (baseline)**: ρ = σ = 0 → ω = k (light speed) for both polarisations.
-- **Test 2 (analytic dispersion)**: measured ω²/k² matches the JSON-derived
-  closed-form to 3×10⁻³ (zero-crossing measurement precision).
-- **Test 3 (ρ-cancellation on a_1)**: parity-even coupling does NOT affect a_1
-  — Lorentz covariance of (F·F)² on pure-B̄. ω²/k² = 1 exactly at any ρ.
-- **Test 4 (birefringence as function of σ/ρ)**: at varying σ/ρ ratios,
-  the measured ratio (n_∥²−1)/(n_⊥²−1) follows 1/2 + 4σ/ρ — a single
-  prediction from TIDAL's Lagrangian tested across multiple data points.
-- **Test 5 (perturbative self-consistency)**: Pass 0+1 matches modal-direct
-  to O(ε²), prefactor ~70·ε² for EH's multi-field gauge-coupled structure.
-- **Test 6 (Pass 0 hierarchy)**: #303 litmus — Pass 0 at finite σ equals
-  Pass 0 at σ = 0.
+These formulas transcribe the JSON coefficients directly — no tuning.
+Tests 2–3 verify the numerical solver reproduces them to the
+zero-crossing method's precision; test 4 picks σ/ρ = 7/16 (the
+convention-mapped Dunne value) and verifies the resulting ratio matches
+7/4 after finite-ε correction via the exact TIDAL formula (self-
+consistency, weakly tautological).
 """
 
 from __future__ import annotations

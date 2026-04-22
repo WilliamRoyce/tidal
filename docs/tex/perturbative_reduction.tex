@@ -258,7 +258,7 @@ Dunne's EH Lagrangian~\cite{Dunne2004} uses the \emph{halved} dual:
   \tilde{F}^{\mu\nu} = \tfrac12 \varepsilon^{\mu\nu\rho\sigma} F_{\rho\sigma},
   \label{eq:eh-dunne-lagrangian}
 \end{equation}
-with QED-computed coefficients $c_1 = \alpha^2/(90\pi^2 m_e^4)$ and $c_2 = 7\alpha^2/(360\pi^2 m_e^4)$, giving $c_2/c_1 = 7/4$. The famous QED birefringence prediction is~\cite{Adler1971}
+with QED-computed coefficients $c_1 = \alpha^2/(90 m_e^4)$ and $c_2 = 7\alpha^2/(360 m_e^4)$ in Heaviside-Lorentz units (deriving from Dunne's eq.~\texttt{lightlight}~\cite{Dunne2004}: $S^{(1)} = (e^4/(360\pi^2 m_e^4))\int[(E^2-B^2)^2 + 7(E\cdot B)^2]$, with $e^4 = 16\pi^2\alpha^2$ so the $\pi^2$ in Dunne's prefactor cancels). Here $c_2/c_1 = 7/4$. The famous QED birefringence prediction is~\cite{Adler1971}
 \begin{equation}
   \frac{n_\parallel^2 - 1}{n_\perp^2 - 1} = \frac{7}{4}.
   \label{eq:eh-qed-ratio}
@@ -303,11 +303,47 @@ The zero-crossing period-measurement method used by \texttt{\_measure\_omega} ha
 
 Tighter benchmarks (e.g., FFT peak-detection with higher resolution, or residual-based eigenfrequency extraction) are possible follow-ups but not on the \#301 critical path. The present suite is sufficient to guard the pipeline against the bug signatures at hand: a $13\%$ linear-in-$\varepsilon$ Pass~1 error (pre-fix) or a $\sigma$-contaminated Pass~0 (pre-Phase~3) would both fail \texttt{TestPerturbativeMethodSelfConsistency} by orders of magnitude.
 
+\subsubsection{What Each Test Category Actually Proves (Circularity Analysis)}
+\label{sec:pr-eh-circularity}
+
+An earlier draft of this section claimed the 7/4 ratio test constitutes a ``non-circular literature reproduction''. A more careful analysis shows it is \emph{weakly tautological}: TIDAL's leading-order ratio is $4\sigma/\rho$, and the Dunne convention mapping fixes $\sigma/\rho = 7/16$; the arithmetic $4 \cdot 7/16 = 7/4$ is forced by the chosen $\sigma/\rho$ and isn't an independent test of the pipeline's QED fidelity. The table below assesses each test category honestly.
+
+\begin{table}[htbp]
+\centering
+\caption{What each EH test actually proves.}
+\label{tab:eh-test-circularity}
+\begin{tabular}{@{}p{0.26\textwidth}p{0.47\textwidth}p{0.18\textwidth}@{}}
+\toprule
+Test & Verifies & Circular? \\
+\midrule
+\texttt{TestBaseline} ($\rho=\sigma=0$) & $\omega = k$ in vacuum for both polarisations & No (physics-fixed) \\
+\texttt{TestAnalyticDispersion} & Measured $\omega^2/k^2$ matches the JSON-derived closed-form to $3\times 10^{-3}$ & No (spectral FFT and symbolic formula are independent computations) \\
+\texttt{TestBirefringenceRatioAgainst ExactJSONFormula} & Ratio follows $(4\sigma/\rho)(1-6\rho)/(1-2\rho)$ across five $\sigma/\rho$ values & Weak (tests the formula directly) \\
+\texttt{TestQEDBirefringenceRatio} & At $\sigma/\rho = 7/16$, extrapolated ratio matches $7/4$ & \textbf{Weak} (the arithmetic $4\cdot7/16 = 7/4$ is forced; the test verifies the pipeline implements $4\sigma/\rho$, not that TIDAL reproduces QED) \\
+\texttt{TestPerturbativeMethod SelfConsistency} & Pass~0+1 agrees with modal-direct at $O(\varepsilon^2)$ & No (two independent solver paths must converge) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Analytic agreement with Adler 1971 (no tuning).} At the Dunne convention mapping $\rho = 8c_1 = 4\alpha^2/45m_e^{-4}$ and $\sigma = 2c_2 = 7\alpha^2/180m_e^{-4}$, TIDAL's JSON-derived formulas give
+\begin{align*}
+  n_\perp - 1 &\approx 2\rho B_0^2 = \tfrac{8\alpha^2}{45}\!\left(\tfrac{B}{B_c}\right)^2, \\
+  n_\parallel - 1 &\approx 8\sigma B_0^2 = \tfrac{14\alpha^2}{45}\!\left(\tfrac{B}{B_c}\right)^2,
+\end{align*}
+both matching Adler 1971 eq. (5.13)~\cite{Adler1971} in magnitude, not just in ratio. This is an \emph{analytic} agreement: it follows from the Lagrangian translation and the Wolfram linearisation coefficients. A numerical test that verifies the individual coefficients~-- independently of the ratio~-- would require measuring at physical $\alpha \approx 1/137$ where the shifts are $\sim 10^{-6}$, below the zero-crossing method's $\sim 10^{-3}$ $\omega$-precision. Scaling $B_0$ up amplifies the signal as $B_0^2$ but invalidates the Pass-1 leading-order expansion at large $B_0$ (Duhamel secular growth at $\varepsilon \omega t_{\mathrm{end}} > 1$). Tighter benchmarks (FFT peak-detection with sub-bin interpolation, or a non-perturbative modal path that bypasses the Pass-1 secular-growth regime) are a possible follow-up; the present pipeline's analytic agreement with Adler, together with the self-consistency tests, is sufficient regression coverage for the \#301 architecture fix.
+
+\subsubsection{Measurement Precision Limitations}
+\label{sec:pr-eh-precision}
+
+The zero-crossing period-measurement method used by \texttt{\_measure\_omega} has intrinsic precision $\Delta \omega / \omega \sim \Delta t / t_{\mathrm{end}}$ (roughly), where $\Delta t$ is the snapshot spacing. For $\omega \sim k$, $k = 2$, $t_{\mathrm{end}} = 40$, $N_{\mathrm{snapshots}} = 801$, this gives $\Delta\omega/\omega \sim 10^{-3}$. For small $n^2 - 1 \sim 4\rho B_0^2 \sim 10^{-3}$ (at $\rho = 10^{-3}$), the resulting absolute noise on $n_\perp^2 - 1$ is comparable to the signal, which limits the ratio measurement precision to few-\% at small $\varepsilon$. The ratio test above uses larger $\rho = 10^{-2}$ (where the signal is 10$\times$ noise) together with longer integration ($t_{\mathrm{end}} = 80$, $N_{\mathrm{snapshots}} = 1601$) and the exact finite-$\varepsilon$ correction to achieve clean agreement with $7/4$.
+
 \subsubsection{Summary}
 \label{sec:pr-eh-summary}
 
 \begin{itemize}
-  \item TIDAL's EH Lagrangian Eq.~\eqref{eq:eh-tidal-lagrangian} with $\sigma/\rho = 7/16$ (Eq.~\eqref{eq:eh-convention-mapping}) reproduces the Dunne/Adler QED birefringence ratio $7/4$ within the zero-crossing measurement precision.
-  \item The convention mapping Eq.~\eqref{eq:eh-convention-mapping} is derived from the Lagrangian translation $\varepsilon^{\alpha\beta\gamma\delta}F_{\alpha\beta}F_{\gamma\delta} = 2 F\cdot\tilde{F}$; naive identification $\sigma/\rho = c_2/c_1$ is incorrect and yields ratio $7 \neq 7/4$. This is a convention difference, not a physics gap. Future EH-heavy work should either apply the mapping explicitly, or adopt the halved-dual convention by adding a $1/4$ factor in the Lagrangian \texttt{expression} to normalise the input.
-  \item The test suite is structured so that neither $\sigma/\rho$ nor the target $7/4$ is tuned to match the other; both are independent inputs from the Lagrangian mapping and from~\cite{Adler1971,Dunne2004} respectively.
+  \item TIDAL's EH Lagrangian Eq.~\eqref{eq:eh-tidal-lagrangian} analytically reproduces both the Dunne/Adler ratio $7/4$ and the individual absolute coefficients ($8\alpha^2/45$ for $n_\perp - 1$, $14\alpha^2/45$ for $n_\parallel - 1$) at the convention mapping $\rho = 4\alpha^2/45$, $\sigma = 7\alpha^2/180$ (Eq.~\eqref{eq:eh-convention-mapping}).
+  \item An earlier draft claimed a $\pi^2$ gap between TIDAL and Dunne; that claim was a derivation error. Dunne's prefactor $e^4/(360\pi^2 m^4)$ combined with Heaviside-Lorentz $e^4 = 16\pi^2\alpha^2$ cancels the $\pi^2$, giving $c_1 = \alpha^2/(90 m^4)$.
+  \item The convention mapping is $\sigma = 2c_2$, $\rho = 8c_1$ (TIDAL's un-halved $\varepsilon\cdot F\cdot F = 2 F\cdot\tilde{F}$ absorbs a factor of 4 on squaring). Naively setting $\sigma/\rho = c_2/c_1 = 7/4$ skips this convention and gives ratio $7 \neq 7/4$; this is a convention difference, not a physics gap.
+  \item The \texttt{TestQEDBirefringenceRatio} test is weakly tautological (see Table~\ref{tab:eh-test-circularity}). A non-tautological absolute-magnitude test is deferred as a follow-up; the analytic agreement documented here is sufficient for the \#301 fix's validation scope.
+  \item The pipeline tests (\texttt{TestAnalyticDispersion}, \texttt{TestPerturbativeMethodSelfConsistency}) are genuinely non-circular~-- they compare outputs of independent computations (Wolfram-derived JSON vs.\ spectral FFT; modal-direct generalised eig vs.\ Pass~0+1 Duhamel) that must agree iff the pipeline is correct.
 \end{itemize}
