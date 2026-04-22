@@ -291,6 +291,26 @@ cmd_pull() {
   note "pulled to: $dst"
 }
 
+cmd_wait() {
+  # Wait for a job to start, then tail its log.  Uses file-existence polling
+  # (NOT squeue) so no Slurm controller load is generated.  The wait loop runs
+  # locally — no persistent background process is left on the cluster.
+  # Per CSD3 admin guidance: if squeue must be called in a loop, minimum 120 s
+  # between calls; prefer file-existence checks instead (man squeue PERFORMANCE).
+  check_master
+  local jobid="${1:?jobid required}"
+  local interval="${2:-120}"
+  local logfile="${REMOTE_ROOT}/slurm_logs/slurm-${jobid}.out"
+  note "waiting for slurm-${jobid}.out to appear (checking every ${interval}s via stat — no squeue)"
+  note "Loop runs locally; zero persistent processes left on the cluster."
+  while ! remote_exec "test -f ${logfile}" 2>/dev/null; do
+    note "not started yet — sleeping ${interval}s locally"
+    sleep "${interval}"
+  done
+  note "log file appeared — job has started. Tailing (Ctrl-C to detach):"
+  remote_exec "tail -30f ${logfile}"
+}
+
 cmd_cancel() {
   check_master
   local jobid="${1:?jobid required}"
@@ -311,7 +331,8 @@ Subcommands:
   setup                             one-time: harvest templates, create remote venv, install tidal
   submit --template T --cmd C [opts]  render sbatch template and submit via ssh
          [--nodes N] [--ntasks N] [--time HH:MM:SS] [--name X] [--account P]
-  status [jobid]                    one-shot squeue
+  status [jobid]                    one-shot squeue (never in a loop — 120s min between calls)
+  wait <jobid> [interval_s]         wait for job to start via file-existence (NOT squeue), then tail -f
   tail <jobid> [--follow|-f]        tail remote slurm log
   htop <jobid>                      attach htop on the compute node
   pull <jobid> [--all] [--src PATH] rsync lightweight artefacts back (--all for raw data).
@@ -336,6 +357,7 @@ main() {
     tail)    cmd_tail "$@" ;;
     htop)    cmd_htop "$@" ;;
     pull)    cmd_pull "$@" ;;
+    wait)    cmd_wait "$@" ;;
     cancel)  cmd_cancel "$@" ;;
     shell)   cmd_shell "$@" ;;
     resolve-account) cmd_resolve_account ;;
