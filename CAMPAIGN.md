@@ -50,22 +50,30 @@ Lagrangian sector and at what parameters?
 
 **Note:** Conservation checks not valid for these theories (Dirac-Bergmann Hamiltonian issues, documented separately).
 
-### Stage A: Dark-Photon-Plasma 4D nested sampling — ✅ NULL CONFIRMED
+### Stage A: Dark-Photon-Plasma 4D nested sampling — ✅ NULL CONFIRMED (t_end=50 canonical)
 
 - [x] Stage 0 gate passed for T1
-- [x] HPC amplification job submitted (final: 28145377, INTR QOS, 28:16)
-- [x] HPC suppression job submitted (final: 28145425, std QOS, 3:52)
-- [x] Results pulled (hpc_results/28145377/, hpc_results/28145425/)
-- [x] Analysis: **Amplification D_KL=0.0155, Suppression D_KL=0.0057** — both below 0.05 threshold
-- **Finding (2026-04-21):** Dark photon plasma (mA2, deltam, xi, alpha3) shows NULL amplification
-  across the explored 4D prior space. log(Z)=+0.022 for amplify, -0.015 for suppress — both
-  essentially zero. MAP at (mA2=0.057, deltam=-0.24, xi=4.42, alpha3=0.143) is far from the
-  old tachyonic peak (xi=0.52, which the v0.31 pre-guard run falsely concentrated on). 95% CI
-  spans most of the prior for every parameter → posterior ≈ prior.
-- Consistent with v0.31 MC sweep (276 runs, P_max matched sin²(κB₀t/2) to 6.7e-6 precision).
+- [x] HPC amplification job submitted (canonical: 28226826 / resume of 28216041, std QOS, ~2h)
+- [x] HPC suppression job submitted (canonical: 28216072, INTR QOS, 5:18)
+- [x] Results pulled (hpc_results/28226826/, hpc_results/28216072/)
+- [x] Analysis: **Amplification D_KL=0.043, Suppression D_KL=0.010** — both below 0.05 threshold
+- **Finding (2026-04-22, t_end=50):** Dark photon plasma (mA2, deltam, xi, alpha3) shows NULL
+  amplification/suppression across the stability-accessible 4D prior space at t_end=50.
+  - Amplify: log(Z)=+0.118±0.006, joint D_KL=0.043, D_KL(xi)=0.226 (stability cutoff), D_KL(mA2)=0.032.
+    MAP at (mA2=0.34, deltam=-0.21, xi=1.08, alpha3=0.054). Posterior concentrates at small mA2
+    and xi≲1 (stability boundary); within stable region, P_max = P_GR everywhere.
+  - Suppress: log(Z)=-0.081±0.006, joint D_KL=0.010, D_KL(xi)=0.244. 0/2319 samples have
+    P_max < P_GR — the stable prior region has NO parameter combination that suppresses
+    conversion below GR baseline. MAP at alpha3→prior_min (dark photon decouples → P_max=P_GR).
+  - Key physics: the stability-accessible region (xi≲4, large alpha3 UV-unstable) is a null
+    for both amplification and suppression. The suppression visible at small alpha3/large mA2 in
+    coarser grid sweeps is absent at grid_shape=64 — those parameter combinations are UV
+    unstable (modal solver detects Re(λ)>0 at high-k modes) and correctly rejected.
 - **Lesson:** HPC pip metadata must match local source. Invalid pre-fix runs (28133218/516/517,
   28134330) traced to v0.31.5 install predating the stability guard; fixed in this session by
   `pip install -e .` reinstall + tarball refresh + version sync check in hpc_shuttle push.
+- Superseded t_end=10 results: 28145377 (amp, D_KL=0.0155), 28145425 (sup, D_KL=0.0057) —
+  retired per plan (insufficient oscillation exposure at t_end=10); hpc_results/ dirs deleted.
 
 ### Stage B: Einstein-Cartan null (T2) — ✅ NULL CONFIRMED
 
@@ -162,8 +170,9 @@ Lagrangian sector and at what parameters?
 | 28145425 | T1 Dark-Photon-Plasma | suppression (re, t_end=10) | COMPLETED | 3:52 | D_KL=0.0057, log(Z)=-0.015 — same regime caveat |
 | 28215825 | T1 Dark-Photon-Plasma | suppress (tend50 attempt 1) | CANCELLED | 1:02 | INTR; cancelled by accident while targeting amplify |
 | 28215827 | T1 Dark-Photon-Plasma | amplify (tend50 attempt 1) | CANCELLED | 1:43 | std QOS; cancelled — should have been INTR |
-| 28216041 | T1 Dark-Photon-Plasma | amplification (tend50) | queued | ≤1h | INTR, t_end=50 to resolve plasma-mass suppression |
-| 28216072 | T1 Dark-Photon-Plasma | suppression (tend50) | queued | ≤1h | std QOS (INTR occupied), t_end=50 |
+| 28216041 | T1 Dark-Photon-Plasma | amplification (tend50) | TIMEOUT | 1:00:27 | INTR; PolyChord global log(Z)=+0.106±0.005 converged but 12/15 clusters still active at 1h wall |
+| 28216072 | T1 Dark-Photon-Plasma | suppression (tend50) | COMPLETED | 0:05:18 | D_KL: mA2=0.039, xi=0.244, deltam=0.047, alpha3=0.087; log(Z)=-0.081 |
+| 28226826 | T1 Dark-Photon-Plasma | amplification (tend50, resume) | COMPLETED | ~2h | std QOS; D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, MAP(mA2=0.34,xi=1.08,a3=0.054) |
 
 ---
 
@@ -171,12 +180,15 @@ Lagrangian sector and at what parameters?
 
 *(Filled in as results arrive)*
 
-- Stage A: **Dark-Photon-Plasma NULL AMPLIFICATION** across the stability-allowed region.
-  Joint D_KL=0.015 (amp), 0.006 (supp); log(Z) ≈ 0 both. Per-parameter marginals (corrected
-  after #308 fix to tidal inference): **ξ=0.20 nats constrained** (stability cutoff at large ξ
-  ≳ 5), other params weak. MAP at (mA2=0.057, δₘ=-0.24, ξ=4.42, α3=0.143) is the centre of
-  the stability ridge, not an amplification peak. Confirms v0.31 MC sweep: P_max = GR baseline
-  everywhere the linearized sim is stable. (hpc_results/28145377/, 28145425/)
+- Stage A: **Dark-Photon-Plasma NULL** — t_end=50 canonical results (28226826 amp, 28216072 sup):
+  - Amplify: joint D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, D_KL(mA2)=0.032.
+    MAP at (mA2=0.34, δₘ=-0.21, ξ=1.08, α3=0.054). Posterior pulled to small mA2 and xi < stability
+    cutoff (~1-2); P_max = P_GR everywhere in stable region.
+  - Suppress: joint D_KL=0.010, log(Z)=-0.081±0.006, D_KL(xi)=0.244. Zero samples with
+    P_max < P_GR. Stable region shows no suppression — parameter combinations with genuine
+    plasma-mass detuning (large mA2 + large alpha3) are UV unstable at grid_shape=64 and
+    correctly rejected by stability guard. The accessible stable region is a null for both modes.
+  (hpc_results/28226826/, 28216072/; t_end=10 runs 28145377/28145425 retired and deleted)
 - Stage B: Einstein-Cartan (T2). Joint D_KL=0.003, log(Z)≈0 — but **corrected marginals show
   structure**: α1=0.11, α2=0.06, α3=0.07 (all informative). Joint ≪ sum because the posterior
   is broad on a 2D stability ridge in 3D prior. P_max flat on ridge (null amplification) but
