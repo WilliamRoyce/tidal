@@ -976,6 +976,20 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Active panels get warm background, null panels get grey."
         ),
     )
+    plot_parser.add_argument(
+        "--priors",
+        action="append",
+        default=[],
+        metavar="NAME=DIST:LO:HI",
+        help=(
+            "For --type corner: overlay the prior density on 1D marginals. "
+            "Repeatable, one per parameter. Same syntax as `tidal sample "
+            "--prior`. Only needed for chains pulled before the prior-"
+            "in-metadata fix; newer runs auto-load from inference.json. "
+            "Example: --priors mA2=log_uniform:0.001:1.0 --priors "
+            "deltam=uniform:-0.5:0.5"
+        ),
+    )
 
     # --- sweep ---
     sweep_parser = sub.add_parser(
@@ -1726,22 +1740,34 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sample_parser.add_argument("--rtol", type=float, default=DEFAULT_RTOL)
     sample_parser.add_argument("--atol", type=float, default=DEFAULT_ATOL)
     sample_parser.add_argument(
-        "--method-solver", type=str, default=None, dest="method_solver",
+        "--method-solver",
+        type=str,
+        default=None,
+        dest="method_solver",
     )
     sample_parser.add_argument("--max-step", type=float, default=None)
     sample_parser.add_argument("--snapshots", type=float, default=None)
     sample_parser.add_argument("--fd-order", type=int, choices=[2, 4, 6], default=4)
     sample_parser.add_argument(
-        "--leapfrog-order", type=int, choices=[2, 4], default=None,
+        "--leapfrog-order",
+        type=int,
+        choices=[2, 4],
+        default=None,
     )
     sample_parser.add_argument(
-        "--spectral", action=argparse.BooleanOptionalAction, default=None,
+        "--spectral",
+        action=argparse.BooleanOptionalAction,
+        default=None,
     )
     sample_parser.add_argument(
-        "--mode", choices=["evolve", "constraint"], default="evolve",
+        "--mode",
+        choices=["evolve", "constraint"],
+        default="evolve",
     )
     sample_parser.add_argument(
-        "--allow-inconsistent-ic", action="store_true", default=False,
+        "--allow-inconsistent-ic",
+        action="store_true",
+        default=False,
     )
     # Execution
     sample_parser.add_argument(

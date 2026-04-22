@@ -40,7 +40,7 @@ bash scripts/hpc_shuttle.sh submit \
   --num-repeats 5 --precision-criterion 0.01 \
   --grid-shape 64 --bounds 0:50 --periodic \
   --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
-  --source h_5 --target a_1 --snapshots 3 --t-end 10.0 \
+  --source h_5 --target a_1 --snapshots 3 --t-end 50.0 \
   --output \${OUTPUT_DIR} --analyze && \
 tidal plot \${OUTPUT_DIR} --type corner --output \${OUTPUT_DIR}/corner_amplify.png"
 
@@ -62,7 +62,7 @@ bash scripts/hpc_shuttle.sh submit \
   --num-repeats 5 --precision-criterion 0.01 \
   --grid-shape 64 --bounds 0:50 --periodic \
   --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
-  --source h_5 --target a_1 --snapshots 3 --t-end 10.0 \
+  --source h_5 --target a_1 --snapshots 3 --t-end 50.0 \
   --output \${OUTPUT_DIR} --analyze && \
 tidal plot \${OUTPUT_DIR} --type corner --output \${OUTPUT_DIR}/corner_suppress.png"
 
@@ -85,7 +85,7 @@ bash scripts/hpc_shuttle.sh submit \
   --num-repeats 4 --precision-criterion 0.01 --no-clustering \
   --grid-shape 64 --bounds 0:50 --periodic \
   --ic plane-wave --ic-component h_5 --ic-wavevector 1.0 --ic-amplitude 1e-2 \
-  --source h_5 --target a_1 --snapshots 3 --t-end 10.0 \
+  --source h_5 --target a_1 --snapshots 3 --t-end 50.0 \
   --output \${OUTPUT_DIR} --analyze && \
 tidal plot \${OUTPUT_DIR} --type corner --output \${OUTPUT_DIR}/corner_null.png"
 

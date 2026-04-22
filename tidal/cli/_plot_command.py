@@ -208,6 +208,33 @@ def _corner_plot(data_path: Path, args: Namespace) -> int:
         )
         return 1
 
+    # Inject priors supplied via --priors into result.metadata so the
+    # corner plotter can overlay them. This lets us replot chains pulled
+    # before priors were persisted in inference.json (see #308/#309).
+    prior_specs = list(getattr(args, "priors", []) or [])
+    if prior_specs:
+        from tidal.inference._prior import parse_prior
+
+        parsed = []
+        for spec in prior_specs:
+            try:
+                p = parse_prior(spec)
+            except ValueError as exc:
+                error_with_hint(
+                    f"--priors: {exc}",
+                    ["Syntax: NAME=DIST:LO:HI (e.g. mA2=log_uniform:0.001:1.0)"],
+                )
+                return 1
+            parsed.append(
+                {
+                    "name": p.name,
+                    "distribution": p.distribution,
+                    "low": p.low,
+                    "high": p.high,
+                },
+            )
+        result.metadata["priors"] = parsed
+
     out_path = Path(args.output) if args.output else data_path / "corner.png"
     plot_corner(result, out_path)
     if not args.quiet:
@@ -675,7 +702,10 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 )
                 return 1
             fig, ax = plt.subplots(
-                1, 1, figsize=figsize or (9, 6), constrained_layout=True,
+                1,
+                1,
+                figsize=figsize or (9, 6),
+                constrained_layout=True,
             )
             render_sweep_1d_grouped(
                 ax,

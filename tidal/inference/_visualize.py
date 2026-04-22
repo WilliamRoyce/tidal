@@ -166,7 +166,17 @@ def _plot_corner_anesthetic(
     *,
     show: bool = False,
 ) -> None:
-    """Corner plot using anesthetic (Handley 2019)."""
+    """Corner plot using anesthetic (Handley 2019).
+
+    If ``result.metadata["priors"]`` is present (see issue #308 and
+    ``tidal/cli/_sample.py``), this overlay-renders the prior density
+    on each 1D marginal axis:
+
+    - ``uniform`` prior → flat red line at 1/(hi-lo)
+    - ``log_uniform`` prior → flat red line at 1/(log hi - log lo),
+      with the x-axis switched to log scale so a flat posterior =
+      flat prior visually. Resolves #309.
+    """
     import matplotlib.pyplot as plt
 
     from tidal.inference._importance import to_anesthetic_samples
@@ -188,10 +198,16 @@ def _plot_corner_anesthetic(
     ret = samples.plot_2d(result.param_names)
     if isinstance(ret, tuple) and len(ret) == 2:
         fig = ret[0]
+        axes_df = ret[1]
     else:
-        # AxesDataFrame (or similar): pick any cell, grab its figure.
+        # AxesDataFrame: row/col indexed by parameter name; diagonal
+        # cells are the 1D marginals.
+        axes_df = ret
         cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
         fig = cell.get_figure()
+
+    _overlay_priors(axes_df, result)
+
     fig.suptitle(
         f"Posterior ({result.method}, n={result.n_samples}, "
         f"ESS={result.effective_sample_size():.0f})",
@@ -203,6 +219,125 @@ def _plot_corner_anesthetic(
     if show:
         plt.show()
     plt.close(fig)
+
+
+def _overlay_priors(axes_df: object, result: InferenceResult) -> None:
+    """Overlay prior density on each 1D marginal; log-scale for log_uniform.
+
+    Accepts either an anesthetic AxesDataFrame (row/col indexed by
+    parameter name) or an ordinary 2D numpy array of matplotlib Axes.
+    Diagonal cells hold the 1D marginal posteriors.
+
+    No-op if no priors are stored in ``result.metadata["priors"]``.
+    """
+    priors = _extract_prior_map(result)
+    if not priors:
+        return
+
+    for i, name in enumerate(result.param_names):
+        if name not in priors:
+            continue
+        ax = _diagonal_axis(axes_df, i, name)
+        if ax is None:
+            continue
+        dist, lo, hi = priors[name]
+        # Overlay the prior density in the SAME space as the posterior
+        # that anesthetic drew (linear x-axis). For log_uniform this is
+        # the 1/(x·ln(hi/lo)) curve; for uniform it is a flat horizontal
+        # line. The visual "null" signature is then "blue posterior
+        # curve tracks the red prior curve" — no more mistaking a
+        # log_uniform prior shape for a physical signal (#309).
+        import math
+
+        import numpy as np
+
+        # Preserve the original axis limits so the log_uniform prior's
+        # large density at x→lo doesn't squash the posterior via
+        # autoscale.
+        xlim = ax.get_xlim() if hasattr(ax, "get_xlim") else None
+        ylim = ax.get_ylim() if hasattr(ax, "get_ylim") else None
+
+        if dist == "log_uniform" and lo > 0 and hi > lo:
+            xs = np.geomspace(lo, hi, 200)
+            density = 1.0 / (xs * math.log(hi / lo))
+            ax.plot(
+                xs,
+                density,
+                color="red",
+                lw=1.2,
+                alpha=0.8,
+                label="prior",
+            )
+        elif dist == "uniform" and hi > lo:
+            ax.axhline(
+                1.0 / (hi - lo),
+                color="red",
+                lw=1.2,
+                alpha=0.8,
+                label="prior",
+            )
+
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        if ylim is not None:
+            ax.set_ylim(ylim)
+
+
+def _extract_prior_map(
+    result: InferenceResult,
+) -> dict[str, tuple[str, float, float]]:
+    """Pull (distribution, low, high) for each parameter from the result.
+
+    Priors land in metadata via ``tidal/cli/_sample.py`` (commit that
+    added ``result.metadata["priors"]``). When replotting old chains
+    that pre-date that commit, use ``tidal plot --priors "..."`` to
+    inject them via :func:`tidal.inference._prior.parse_prior`.
+    """
+    meta = getattr(result, "metadata", None) or {}
+    entries = meta.get("priors") or []
+    out: dict[str, tuple[str, float, float]] = {}
+    for p in entries:
+        if isinstance(p, dict):
+            name = p.get("name")
+            dist = p.get("distribution") or p.get("dist") or p.get("kind")
+            low = p.get("low", p.get("lo"))
+            high = p.get("high", p.get("hi"))
+        else:
+            name = getattr(p, "name", None)
+            dist = (
+                getattr(p, "distribution", None)
+                or getattr(p, "dist", None)
+                or getattr(p, "kind", None)
+            )
+            low = getattr(p, "low", None) or getattr(p, "lo", None)
+            high = getattr(p, "high", None) or getattr(p, "hi", None)
+        if name and dist and low is not None and high is not None:
+            out[str(name)] = (str(dist), float(low), float(high))
+    return out
+
+
+def _diagonal_axis(axes_df: object, i: int, name: str) -> object | None:
+    """Retrieve the 1D marginal axis for parameter ``name``.
+
+    Works for an anesthetic AxesDataFrame (indexed by parameter name)
+    or a plain 2D ndarray-like of matplotlib Axes.
+    """
+    # AxesDataFrame: row and column labels are parameter names
+    if hasattr(axes_df, "loc"):
+        try:
+            return axes_df.loc[name, name]
+        except (KeyError, AttributeError):
+            pass
+    if hasattr(axes_df, "iloc"):
+        try:
+            return axes_df.iloc[i, i]
+        except (IndexError, AttributeError):
+            pass
+    # Plain 2D array
+    try:
+        return axes_df[i, i]  # type: ignore[index]
+    except (IndexError, TypeError):
+        return None
 
 
 def _plot_corner_matplotlib(
@@ -236,7 +371,11 @@ def _plot_corner_matplotlib(
                 continue
             if i == j:
                 ax.hist(
-                    samples[:, i], bins=30, weights=weights, density=True, alpha=0.7,
+                    samples[:, i],
+                    bins=30,
+                    weights=weights,
+                    density=True,
+                    alpha=0.7,
                 )
                 ax.set_xlabel(result.param_names[i])
             else:
