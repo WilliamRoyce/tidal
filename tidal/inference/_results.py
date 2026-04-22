@@ -217,7 +217,7 @@ class InferenceResult:
         loaded_metadata: dict[str, Any] = {
             "loaded_from": str(path),
         }
-        for key in ("nlive", "sampler", "n_iterations", "n_calls"):
+        for key in ("nlive", "sampler", "n_iterations", "n_calls", "priors"):
             val = meta.get(key)
             if val is not None:
                 loaded_metadata[key] = val
@@ -334,6 +334,9 @@ class InferenceResult:
         sampler = self.metadata.get("sampler")
         if sampler is not None:
             summary["sampler"] = sampler
+        priors = self.metadata.get("priors")
+        if priors is not None:
+            summary["priors"] = priors
 
         # Compute parameter importance for nested sampling results
         if self.method == "nested":
