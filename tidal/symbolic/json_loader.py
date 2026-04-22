@@ -564,6 +564,11 @@ class HamiltonianTerm:
         field) or ``"interaction"`` (cross-field coupling). Defaults to
         ``"unknown"`` for older JSONs; use ``is_self_energy`` property
         which auto-classifies by comparing factor field names.
+    order_in_eps : int or None
+        Perturbative order of this term: ``0`` for leading-order (no
+        symbolic coefficient) terms, ``1`` for first-order corrections
+        (have ``coefficient_symbolic``). ``None`` only for terms created
+        programmatically before this field existed (legacy).
     """
 
     coefficient: float
@@ -572,6 +577,7 @@ class HamiltonianTerm:
     coefficient_symbolic: str | None = None
     coordinate_dependent: tuple[str, ...] = ()
     term_class: str = "unknown"  # "self" or "interaction"
+    order_in_eps: int | None = None  # 0 = leading-order; 1 = first EH/pert correction
 
     @property
     def position_dependent(self) -> bool:
@@ -612,13 +618,18 @@ class HamiltonianTerm:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianTerm:
         """Parse from JSON dict."""
+        coeff_sym = data.get("coefficient_symbolic")
+        # Infer perturbative order: terms with a symbolic coefficient are O(ε¹)
+        # corrections; pure-numeric terms are O(ε⁰) background Maxwell terms.
+        order = 1 if coeff_sym is not None else 0
         return cls(
             coefficient=float(data["coefficient"]),
             factor_a=HamiltonianFactor.from_dict(data["factor_a"]),
             factor_b=HamiltonianFactor.from_dict(data["factor_b"]),
-            coefficient_symbolic=data.get("coefficient_symbolic"),
+            coefficient_symbolic=coeff_sym,
             coordinate_dependent=tuple(data.get("coordinate_dependent", [])),
             term_class=str(data.get("term_class", "unknown")),
+            order_in_eps=order,
         )
 
 

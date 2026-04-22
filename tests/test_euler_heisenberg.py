@@ -118,6 +118,10 @@ from tidal.solver.perturbative_driver import PerturbativeSolver
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import load_equation_system
 
+_ALPHA_EH = 1 / 137.036
+_RHO_QED_EH = 4 * _ALPHA_EH**2 / 45
+_SIGMA_QED_EH = 7 * _ALPHA_EH**2 / 180
+
 _EH_JSON = Path(__file__).parent.parent / "examples" / "data" / "euler_heisenberg.json"
 
 
@@ -602,3 +606,111 @@ class TestPerturbativeMethodSelfConsistency:
             atol=1e-12,
             err_msg="EH Pass 0 contaminated by σ (#303).",
         )
+
+
+class TestEHPerturbativeEnergy:
+    """PerturbativeSolver output: Hamiltonian energy sector ratio + Noether consistency.
+
+    These tests exercise PerturbativeSolver via the Hamiltonian energy path
+    (compute_system_energy), independent of the EOM path used in
+    TestPerturbativeMethodSelfConsistency.
+
+    Non-circularity:
+      test_order1_h_ratio_matches_adler: inputs ρ=4α²/45 come from QED; expected
+      H₁/H₀ = −3×(n⊥−1)_Adler is computed from Adler 1971 eq. (5.13); the
+      measured value comes from the Wolfram-derived Hamiltonian coefficients.
+      If Wolfram's linearisation produced the wrong coefficient for the EH
+      gradient energy (e.g. −2ρB₀² instead of −3ρB₀²), the ratio would
+      deviate from the Adler prediction and this test would fail.
+
+    Derivation of the expected ratio:
+      For a_2 (⊥ polarisation), the Wolfram Hamiltonian has:
+        Order-0 gradient term: 0.5 × |∇a_2|²
+        Order-1 gradient term: −3ρB₀² × |∇a_2|² (from euler_heisenberg.json)
+      At t=0 with zero-velocity IC, only gradient terms contribute.  For a
+      plane-wave IC a_2 = A₀cos(kx):
+        H₀ = 0.5 × ⟨|∂ₓa_2|²⟩ = 0.5 × k²A₀²/2
+        H₁ = −3ρB₀² × ⟨|∂ₓa_2|²⟩ = −3ρB₀² × k²A₀²/2
+        H₁/H₀ = −6ρB₀²
+      Adler 1971 gives n⊥ − 1 = 8α²/45 × B₀².  At ρ = 4α²/45:
+        −6ρB₀² = −6×4α²/45×B₀² = −24α²/45×B₀² = −3×(8α²/45×B₀²) = −3×(n⊥−1).
+    """
+
+    _RHO = _RHO_QED_EH
+    _SIGMA = _SIGMA_QED_EH
+    _B0 = 1.0
+    _N = 64
+    _K = 2  # wavenumber: 2 complete cycles in [0, 2π]
+    _T_END = 0.5
+
+    def _run(self, eh_spec: object) -> tuple[object, object, dict]:  # type: ignore[type-arg]
+        from tidal.measurement._energy import (
+            compute_energy_timeseries,
+            compute_system_energy,
+        )
+        from tidal.measurement._io import SimulationData
+
+        grid = GridInfo(
+            shape=(self._N,),
+            bounds=((0.0, 2 * np.pi),),
+            periodic=(True,),
+        )
+        layout = StateLayout.from_spec(eh_spec, grid.num_points)  # type: ignore[arg-type]
+        n = grid.num_points
+        x = np.linspace(0.0, 2 * np.pi, n, endpoint=False)
+        a2_slot = layout.field_slot_map["a_2"]
+        y0 = np.zeros(layout.num_slots * n)
+        y0[a2_slot * n : (a2_slot + 1) * n] = np.cos(self._K * x)
+        params: dict = {"B0": self._B0, "rho": self._RHO, "sigma": self._SIGMA}
+        result = PerturbativeSolver(eh_spec).solve(  # type: ignore[arg-type]
+            y0,
+            grid,
+            (0.0, self._T_END),
+            order=1,
+            parameters=params,
+            num_snapshots=3,
+        )
+        return (
+            result,
+            grid,
+            params,
+            compute_system_energy,
+            compute_energy_timeseries,
+            SimulationData,
+        )  # type: ignore[return-value]
+
+    def test_order1_h_ratio_matches_adler(self, eh_spec: object) -> None:
+        """H_order1/H_order0 at t=0 = −3×(n⊥−1)_Adler. Non-circular: Adler 1971."""
+        result, grid, params, compute_system_energy, _, SimulationData = self._run(
+            eh_spec
+        )
+        sim_data = SimulationData.from_result(
+            result.orders[0], result.spec, grid, params
+        )  # type: ignore[union-attr]
+        H0 = compute_system_energy(sim_data, t_idx=0, order=0).total  # type: ignore[call-arg]
+        H1 = compute_system_energy(sim_data, t_idx=0, order=1).total  # type: ignore[call-arg]
+        adler_n_perp_minus_1 = 8 * _ALPHA_EH**2 / 45 * self._B0**2
+        expected = -3.0 * adler_n_perp_minus_1
+        assert pytest.approx(expected, rel=1e-4) == H1 / H0
+
+    @pytest.mark.xfail(
+        strict=True,
+        reason=(
+            "FD IBP gradient-energy systematic dominates (~0.23%): periodic IBP uses "
+            "FD Laplacian stencil, which gives mean≈1.9936 instead of 2.0 for cos(2x) "
+            "on N=64 grid.  As the field transitions from pure-gradient t=0 to mixed "
+            "kinetic+gradient t=T, the systematic shifts, appearing as spurious "
+            "conservation violation ~1e3x larger than eps^2=(rho*B0^2)^2~2e-11 at QED params. "
+            "Fix: spectral (Parseval) gradient energy for periodic domains (#312)."
+        ),
+    )
+    def test_energy_conserved_to_eps_squared(self, eh_spec: object) -> None:
+        """H(y_total, T)/H(y_total, 0) ≈ 1 to O(ε²). Tests Wolfram H–EOM Noether consistency."""
+        result, grid, params, _, compute_energy_timeseries, SimulationData = self._run(
+            eh_spec
+        )
+        sim_data = SimulationData.from_result(result.total, result.spec, grid, params)  # type: ignore[union-attr]
+        _, _, _, total_energy = compute_energy_timeseries(sim_data)
+        drift = abs(total_energy[-1] - total_energy[0]) / abs(total_energy[0])
+        eps_sq = (self._RHO * self._B0**2) ** 2  # ε = ρB₀²
+        assert drift < 1000 * eps_sq

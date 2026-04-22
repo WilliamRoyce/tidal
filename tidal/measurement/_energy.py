@@ -351,7 +351,10 @@ def _differentiate_constraint(
                 # Source is velocity v_X → d_t(v_X) = acceleration from EOM
                 base_field = term.field[2:]  # strip "v_" prefix
                 dt_source = _compute_acceleration_from_eom(
-                    data, base_field, t_idx, params,
+                    data,
+                    base_field,
+                    t_idx,
+                    params,
                 )
             else:
                 # Source is field X → d_t(X) = velocity
@@ -758,7 +761,11 @@ def _evaluate_hamiltonian_factor(
     if factor_operator.startswith("mixed_"):
         params = _merge_parameters(data)
         return _evaluate_mixed_factor(
-            factor_field, factor_operator, data, t_idx, params,
+            factor_field,
+            factor_operator,
+            data,
+            t_idx,
+            params,
         )
 
     # Get the field data
@@ -965,7 +972,10 @@ def _prepare_hamiltonian_context(data: SimulationData) -> _HamiltonianContext:
         first_field = next(iter(data.fields.values()))
         field_shape = first_field[0].shape  # spatial shape from first snapshot
         grid_info = _make_grid_info(
-            data.grid_spacing, data.periodic, field_shape, data.bc_types,
+            data.grid_spacing,
+            data.periodic,
+            field_shape,
+            data.bc_types,
         )
 
     return _HamiltonianContext(
@@ -1118,6 +1128,7 @@ def _compute_hamiltonian_per_field(
     data: SimulationData,
     t_idx: int,
     ctx: _HamiltonianContext | None = None,
+    order_filter: int | None = None,
 ) -> tuple[dict[str, float], float]:
     """Decompose Hamiltonian into per-field self-energy and interaction.
 
@@ -1131,6 +1142,9 @@ def _compute_hamiltonian_per_field(
         Snapshot index.
     ctx : _HamiltonianContext or None
         Pre-computed context (for timeseries path).
+    order_filter : int or None
+        When set, only include Hamiltonian terms whose ``order_in_eps``
+        equals this value. ``None`` includes all terms (default).
 
     Returns
     -------
@@ -1162,6 +1176,8 @@ def _compute_hamiltonian_per_field(
     interaction = 0.0
 
     for term_idx, term in enumerate(canonical.hamiltonian_terms):
+        if order_filter is not None and term.order_in_eps != order_filter:
+            continue
         contrib = _evaluate_single_hamiltonian_term(
             term,
             ctx.term_coeffs[term_idx],
@@ -1183,6 +1199,7 @@ def compute_system_energy(
     data: SimulationData,
     t_idx: int,
     _ctx: _HamiltonianContext | None = None,
+    order: int | None = None,
 ) -> SystemEnergy:
     """Compute Hamiltonian energy density at snapshot *t_idx*.
 
@@ -1197,6 +1214,11 @@ def compute_system_energy(
     data : SimulationData
     t_idx : int
         Snapshot index.
+    order : int or None
+        When set, restrict to Hamiltonian terms with ``order_in_eps``
+        equal to this value. ``0`` gives the leading-order Maxwell part;
+        ``1`` gives only the first EH/perturbative correction. ``None``
+        (default) sums all terms.
 
     Raises
     ------
@@ -1230,7 +1252,10 @@ def compute_system_energy(
         )
 
     per_field_totals, interaction = _compute_hamiltonian_per_field(
-        data, t_idx, ctx=_ctx,
+        data,
+        t_idx,
+        ctx=_ctx,
+        order_filter=order,
     )
     per_field = {
         name: FieldEnergy(kinetic=0.0, gradient=0.0, mass=0.0, total=total)
