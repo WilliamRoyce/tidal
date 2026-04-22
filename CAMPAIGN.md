@@ -158,8 +158,12 @@ Lagrangian sector and at what parameters?
 | 28134415 | T2 Einstein-Cartan | null (amplification) | COMPLETED | 0:13 | D_KL=0.003 (NULL CONFIRMED); valid — torsion decouples, no tachyonic region |
 | 28141098 | T1 Dark-Photon-Plasma | amplification (re) | CANCELLED | 3:20 | cancelled to reinstall HPC tidal properly |
 | 28145274 | (guard test) | verification | COMPLETED | 0:05 | v0.33.13 confirmed; stability guard fires on cpu-q-19 with ratio 1.26e+05 |
-| 28145377 | T1 Dark-Photon-Plasma | amplification (re²) | COMPLETED | 28:16 | D_KL=0.0155, log(Z)=+0.022 (NULL) |
-| 28145425 | T1 Dark-Photon-Plasma | suppression (re) | COMPLETED | 3:52 | D_KL=0.0057, log(Z)=-0.015 (NULL) |
+| 28145377 | T1 Dark-Photon-Plasma | amplification (re², t_end=10) | COMPLETED | 28:16 | D_KL=0.0155, log(Z)=+0.022 — pre-oscillation regime, plasma-mass suppression invisible |
+| 28145425 | T1 Dark-Photon-Plasma | suppression (re, t_end=10) | COMPLETED | 3:52 | D_KL=0.0057, log(Z)=-0.015 — same regime caveat |
+| 28215825 | T1 Dark-Photon-Plasma | suppress (tend50 attempt 1) | CANCELLED | 1:02 | INTR; cancelled by accident while targeting amplify |
+| 28215827 | T1 Dark-Photon-Plasma | amplify (tend50 attempt 1) | CANCELLED | 1:43 | std QOS; cancelled — should have been INTR |
+| 28216041 | T1 Dark-Photon-Plasma | amplification (tend50) | queued | ≤1h | INTR, t_end=50 to resolve plasma-mass suppression |
+| 28216072 | T1 Dark-Photon-Plasma | suppression (tend50) | queued | ≤1h | std QOS (INTR occupied), t_end=50 |
 
 ---
 
