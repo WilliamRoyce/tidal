@@ -1656,6 +1656,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         ),
     )
     sample_parser.add_argument(
+        "--read-resume",
+        action="store_true",
+        dest="read_resume",
+        help=(
+            "Resume a previous PolyChord run from the chains in --output. "
+            "Reads tidal.resume from the output directory and continues "
+            "sampling from the last checkpoint. Only valid with --method nested "
+            "and --sampler polychord."
+        ),
+    )
+    sample_parser.add_argument(
         "--seed",
         type=int,
         default=42,
