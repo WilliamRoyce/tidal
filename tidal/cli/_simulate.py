@@ -613,13 +613,19 @@ def _gaussian_slots(  # noqa: PLR0913, PLR0917
     return slot_data
 
 
+# Relative tolerance (fraction of the local k-scale) above which a
+# ``--ic-wavevector`` snap is considered "significant" and a user-visible Note
+# is printed.  The snap itself always fires on periodic axes; this constant
+# only controls the verbosity of the report.
+_SNAP_REPORT_REL_TOL: float = 1e-2
+
+
 def _snap_wavevector_to_grid(
     kvec: tuple[float, ...],
     grid_info: GridInfo,
     bounds: list[tuple[float, float]],
 ) -> tuple[tuple[float, ...], list[tuple[int, float, float]]]:
-    """Snap each component of a requested wavevector to the nearest discrete
-    Fourier mode on periodic axes, staying below Nyquist.
+    """Snap each component of a requested wavevector to the nearest discrete Fourier mode.
 
     A plane wave ``cos(k·x)`` evaluated at grid points is truly monochromatic
     in the discrete Fourier representation only when ``k_dim = 2π·n/L_dim`` for
@@ -662,7 +668,7 @@ def _snap_wavevector_to_grid(
         # (k_req == k_snap) produce no note.
         if abs(k_req - k_snap) > 0.0:
             scale = max(abs(k_req), abs(k_snap), dk)
-            if abs(k_req - k_snap) / scale > 1e-2:
+            if abs(k_req - k_snap) / scale > _SNAP_REPORT_REL_TOL:
                 notes.append((dim, k_req, k_snap))
     return tuple(snapped), notes
 

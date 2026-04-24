@@ -50,30 +50,44 @@ Lagrangian sector and at what parameters?
 
 **Note:** Conservation checks not valid for these theories (Dirac-Bergmann Hamiltonian issues, documented separately).
 
-### Stage A: Dark-Photon-Plasma 4D nested sampling — ✅ NULL CONFIRMED (t_end=50 canonical)
+### Stage A: Dark-Photon-Plasma 4D nested sampling — ⚠️ SUPPRESS INVALID, RERUN AFTER IC FIX
 
 - [x] Stage 0 gate passed for T1
 - [x] HPC amplification job submitted (canonical: 28226826 / resume of 28216041, std QOS, ~2h)
-- [x] HPC suppression job submitted (canonical: 28216072, INTR QOS, 5:18)
+- [x] HPC suppression job submitted (28216072, INTR QOS, 5:18) — **INVALIDATED** by IC spectral leakage bug
 - [x] Results pulled (hpc_results/28226826/, hpc_results/28216072/)
-- [x] Analysis: **Amplification D_KL=0.043, Suppression D_KL=0.010** — both below 0.05 threshold
-- **Finding (2026-04-22, t_end=50):** Dark photon plasma (mA2, deltam, xi, alpha3) shows NULL
-  amplification/suppression across the stability-accessible 4D prior space at t_end=50.
-  - Amplify: log(Z)=+0.118±0.006, joint D_KL=0.043, D_KL(xi)=0.226 (stability cutoff), D_KL(mA2)=0.032.
-    MAP at (mA2=0.34, deltam=-0.21, xi=1.08, alpha3=0.054). Posterior concentrates at small mA2
-    and xi≲1 (stability boundary); within stable region, P_max = P_GR everywhere.
-  - Suppress: log(Z)=-0.081±0.006, joint D_KL=0.010, D_KL(xi)=0.244. 0/2319 samples have
-    P_max < P_GR — the stable prior region has NO parameter combination that suppresses
-    conversion below GR baseline. MAP at alpha3→prior_min (dark photon decouples → P_max=P_GR).
-  - Key physics: the stability-accessible region (xi≲4, large alpha3 UV-unstable) is a null
-    for both amplification and suppression. The suppression visible at small alpha3/large mA2 in
-    coarser grid sweeps is absent at grid_shape=64 — those parameter combinations are UV
-    unstable (modal solver detects Re(λ)>0 at high-k modes) and correctly rejected.
+- [x] Analysis: **Amplification D_KL=0.043 (VALID NULL)**. Suppression D_KL=0.010 (INVALID — 0/2319
+  samples with P_max < P_GR not due to physics, but due to `SimulationDivergedError` rejecting
+  every interesting parameter point).
+- [ ] HPC suppression rerun with IC snap fix (pending this session)
+
+- **Amplify finding (2026-04-22, 28226826):** log(Z)=+0.118±0.006, joint D_KL=0.043,
+  D_KL(xi)=0.226, D_KL(mA2)=0.032. MAP at (mA2=0.34, deltam=-0.21, xi=1.08, alpha3=0.054).
+  Posterior concentrates at small mA2 and xi≲1 (stability boundary); within the stable region,
+  no parameter combination produces P_max > P_GR. **Amplify null is valid.**
+
+- **Suppress finding superseded (2026-04-22, 28216072):** the 0/2319 count was NOT physical —
+  investigation traced it to plane-wave IC spectral leakage. `--ic-wavevector 2.0` on a
+  `bounds 0:50 --grid-shape 32` grid leaks amplitude onto every discrete Fourier mode
+  (the continuous `cos(2.0·x)` is not periodic on [0, 50]). With `deltam ≠ 0` the Gertsenshtein
+  block merges with torsion-trace sub-blocks containing redundant TorsionCDT ghost modes;
+  those ghosts are tachyonic at low k (`Re(λ) ≈ 0.95` at k=0) and the leakage × exp growth
+  trips the modal divergence guard for most of the interesting 4D prior. PolyChord then
+  samples only the narrow stable fraction (alpha3 → 0 decoupling limit) and reports the
+  trivial P_max = P_GR null. This is a discretization artefact, not physics.
+
+- **Fix applied (this session, 2026-04-22):** `tidal/cli/_simulate.py::_plane_wave_slots`
+  now auto-snaps `--ic-wavevector` to the nearest discrete Fourier mode on periodic axes
+  (clamped below Nyquist). Verified empirically: at (mA2=0.955, deltam=0.01, xi=0.274,
+  alpha3=0.123), the `--ic-wavevector 2.0` case now succeeds (snapped to 1.885) and gives
+  P_max ≈ 0.00176 — the genuine ~97% plasma suppression. Cross-check: FV model (10-field
+  formulation, no ghost sector) gives P_max=0.001738 at the same point (1.2% agreement,
+  separately filed as an investigation issue). Docs: `docs/tex/plane_wave_ic.tex`.
+
 - **Lesson:** HPC pip metadata must match local source. Invalid pre-fix runs (28133218/516/517,
-  28134330) traced to v0.31.5 install predating the stability guard; fixed in this session by
-  `pip install -e .` reinstall + tarball refresh + version sync check in hpc_shuttle push.
-- Superseded t_end=10 results: 28145377 (amp, D_KL=0.0155), 28145425 (sup, D_KL=0.0057) —
-  retired per plan (insufficient oscillation exposure at t_end=10); hpc_results/ dirs deleted.
+  28134330) traced to v0.31.5 install predating the stability guard; fixed in an earlier session.
+- **Retired t_end=10 runs:** 28145377 (amp, D_KL=0.0155), 28145425 (sup, D_KL=0.0057) —
+  hpc_results/ dirs deleted as part of this session's cleanup.
 
 ### Stage B: Einstein-Cartan null (T2) — ✅ NULL CONFIRMED
 
@@ -171,8 +185,8 @@ Lagrangian sector and at what parameters?
 | 28215825 | T1 Dark-Photon-Plasma | suppress (tend50 attempt 1) | CANCELLED | 1:02 | INTR; cancelled by accident while targeting amplify |
 | 28215827 | T1 Dark-Photon-Plasma | amplify (tend50 attempt 1) | CANCELLED | 1:43 | std QOS; cancelled — should have been INTR |
 | 28216041 | T1 Dark-Photon-Plasma | amplification (tend50) | TIMEOUT | 1:00:27 | INTR; PolyChord global log(Z)=+0.106±0.005 converged but 12/15 clusters still active at 1h wall |
-| 28216072 | T1 Dark-Photon-Plasma | suppression (tend50) | COMPLETED | 0:05:18 | D_KL: mA2=0.039, xi=0.244, deltam=0.047, alpha3=0.087; log(Z)=-0.081 |
-| 28226826 | T1 Dark-Photon-Plasma | amplification (tend50, resume) | COMPLETED | ~2h | std QOS; D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, MAP(mA2=0.34,xi=1.08,a3=0.054) |
+| 28216072 | T1 Dark-Photon-Plasma | suppression (tend50) | INVALID | 0:05:18 | IC spectral-leakage bug; most samples rejected by divergence guard. Superseded by post-IC-snap rerun (pending). |
+| 28226826 | T1 Dark-Photon-Plasma | amplification (tend50, resume) | COMPLETED | ~2h | std QOS; D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, MAP(mA2=0.34,xi=1.08,a3=0.054). Amplify null still valid after IC-snap fix. |
 
 ---
 
@@ -180,15 +194,23 @@ Lagrangian sector and at what parameters?
 
 *(Filled in as results arrive)*
 
-- Stage A: **Dark-Photon-Plasma NULL** — t_end=50 canonical results (28226826 amp, 28216072 sup):
-  - Amplify: joint D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, D_KL(mA2)=0.032.
-    MAP at (mA2=0.34, δₘ=-0.21, ξ=1.08, α3=0.054). Posterior pulled to small mA2 and xi < stability
-    cutoff (~1-2); P_max = P_GR everywhere in stable region.
-  - Suppress: joint D_KL=0.010, log(Z)=-0.081±0.006, D_KL(xi)=0.244. Zero samples with
-    P_max < P_GR. Stable region shows no suppression — parameter combinations with genuine
-    plasma-mass detuning (large mA2 + large alpha3) are UV unstable at grid_shape=64 and
-    correctly rejected by stability guard. The accessible stable region is a null for both modes.
-  (hpc_results/28226826/, 28216072/; t_end=10 runs 28145377/28145425 retired and deleted)
+- Stage A: **Amplify NULL confirmed; Suppress rerun pending IC-snap fix.**
+  - **Amplify (28226826)** — joint D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, D_KL(mA2)=0.032.
+    MAP at (mA2=0.34, δₘ=-0.21, ξ=1.08, α3=0.054). No P_max > P_GR in the stable region. Valid.
+  - **Suppress (28216072) INVALIDATED (2026-04-22).** The 0/2319 count with `P_max < P_GR` was
+    NOT physics — root cause is plane-wave IC spectral leakage on the periodic grid. Off-grid
+    `--ic-wavevector 2.0` leaks amplitude onto every discrete Fourier mode; at mA2·deltam
+    combinations where the merged Gertsenshtein-torsion block has low-k tachyons (redundant
+    TorsionCDT directions, Re(λ)≈0.95 at k=0), the leaked amplitude is exponentially amplified
+    and trips the divergence guard, leaving PolyChord with only the trivial alpha3→0
+    decoupling slice of the prior. **Fix applied**: `tidal/cli/_simulate.py::_plane_wave_slots`
+    now auto-snaps `--ic-wavevector` to the nearest discrete Fourier mode on periodic axes
+    (pass `--ic-no-snap` for legacy). Direct `tidal simulate` at
+    (mA2=0.955, δₘ=0.01, ξ=0.274, α3=0.123) with the fix gives P_max≈0.00176 — the expected
+    97% plasma suppression below P_GR=0.0612. Cross-check with the FV model
+    (torsion_dark_photon_fv.json, 10 fields, no ghost sector): P_max=0.001738 (1.2% agreement
+    with TorsionCDT; separately filed for follow-up investigation).
+  - **Suppress rerun** submitted with full original 4D prior; awaiting results.
 - Stage B: Einstein-Cartan (T2). Joint D_KL=0.003, log(Z)≈0 — but **corrected marginals show
   structure**: α1=0.11, α2=0.06, α3=0.07 (all informative). Joint ≪ sum because the posterior
   is broad on a 2D stability ridge in 3D prior. P_max flat on ridge (null amplification) but

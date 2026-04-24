@@ -73,6 +73,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Negative CLI values**: use `=` syntax: `--bounds="-100:100"` (not `--bounds "-100:100"`)
 - **Memory size**: MEMORY.md must stay under 200 lines (excess silently truncated)
 - **Wolfram Exp overflow**: serializes `Exp[-x²]` as `1/E^(x²)` → Python overflow. Use `_invert_exp_denominator()`.
+- **Plane-wave IC snap on periodic grids**: `--ic plane-wave --ic-wavevector k0` auto-snaps `k0` to the nearest discrete Fourier mode `2π·n/L` (clamped below Nyquist) to eliminate spectral leakage. A `Note:` is printed when the snap is significant. Off-grid `k` causes cos(k·x) to leak amplitude onto every discrete mode; for theories with tachyonic eigenvalues at some k-modes (e.g. PGT torsion with cross-coupling) this triggers spurious `SimulationDivergedError`. Sharp 0.1%-scale stability boundaries in parameter space are a signature of this — if seen, check whether the IC wavevector is off-grid. Override with `--ic-no-snap`. See `docs/tex/plane_wave_ic.tex`.
 
 ## Claude Code Skills
 

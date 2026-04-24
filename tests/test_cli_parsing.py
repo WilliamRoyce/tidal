@@ -167,7 +167,8 @@ class TestParseParams:
             _parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
 
     def test_non_numeric_metadata_skipped(
-        self, capsys: pytest.CaptureFixture[str],
+        self,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         spec = _make_spec_stub({"parameters": {"note": "not a number", "m2": 1.0}})
         result = _parse_params([], spec)  # type: ignore[arg-type]
@@ -187,7 +188,8 @@ class TestParseParams:
         assert "not found" in err
 
     def test_no_warning_for_known_param(
-        self, capsys: pytest.CaptureFixture[str],
+        self,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
         _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
@@ -972,6 +974,7 @@ def _make_ic_args(**kwargs: object) -> Namespace:
         "ic_width": None,
         "ic_amplitude": 1.0,
         "ic_wavevector": None,
+        "ic_no_snap": False,
         "ic_formula": None,
         "ic_formula_velocity": None,
         "ic_field": [],
@@ -1089,12 +1092,22 @@ class TestBuildInitialY0:
         assert y0.shape == (layout.total_size,)
 
     def test_plane_wave_right_mover(self) -> None:
-        """Plane-wave with k>0 produces positive velocity where sin(kx)>0."""
+        """Plane-wave with k>0 produces positive velocity where sin(kx)>0.
+
+        Uses ``ic_no_snap=True`` so the off-grid ``k=3`` is used verbatim and
+        the ``sin(3x)`` mask lines up with the velocity pattern. The snap
+        behaviour (default) is covered by ``test_plane_wave_snap_*`` below.
+        """
         spec = _make_kg_spec()
         from tidal.solver.grid import GridInfo
 
         gi = GridInfo(bounds=((0.0, 10.0),), shape=(64,), periodic=(True,))
-        args = _make_ic_args(ic="plane-wave", ic_amplitude=1.0, ic_wavevector="3")
+        args = _make_ic_args(
+            ic="plane-wave",
+            ic_amplitude=1.0,
+            ic_wavevector="3",
+            ic_no_snap=True,
+        )
         y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
 
         velocity = y0[64:]
@@ -1102,6 +1115,99 @@ class TestBuildInitialY0:
         # At x where sin(3x) > 0, velocity should be positive (right-mover)
         mask = np.sin(3.0 * x) > 0.5
         assert np.all(velocity[mask] > 0)
+
+    def test_plane_wave_snap_off_grid_k(self) -> None:
+        """Off-grid k is snapped to the nearest discrete Fourier mode.
+
+        With L=50 and N=32, grid modes are k_n = n · 2π/50. The request
+        k=2.0 has no exact discrete representation; the nearest mode is
+        n=16 → k=16·2π/50 ≈ 2.011, BUT n=16 is Nyquist and we clamp to
+        n=15 → k=15·2π/50 ≈ 1.885 to stay below Nyquist.
+        """
+        import math
+
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 50.0),), shape=(32,), periodic=(True,))
+        args = _make_ic_args(ic="plane-wave", ic_amplitude=1.0, ic_wavevector="2.0")
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 50.0)])
+
+        field = y0[:32]
+        expected_k = 15.0 * 2.0 * math.pi / 50.0  # ≈ 1.8850
+        x = gi.axes_coords(0)
+        np.testing.assert_allclose(field, np.cos(expected_k * x), atol=1e-12)
+
+    def test_plane_wave_snap_on_grid_k_unchanged(self) -> None:
+        """Exact grid-mode k passes through snap unchanged (no warning)."""
+        import math
+
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 50.0),), shape=(32,), periodic=(True,))
+        # k = 5 · 2π/50 = π/5 is exactly mode n=5 on this grid
+        k_on_grid = 5.0 * 2.0 * math.pi / 50.0
+        args = _make_ic_args(
+            ic="plane-wave",
+            ic_amplitude=1.0,
+            ic_wavevector=str(k_on_grid),
+        )
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 50.0)])
+
+        field = y0[:32]
+        x = gi.axes_coords(0)
+        np.testing.assert_allclose(field, np.cos(k_on_grid * x), atol=1e-12)
+
+    def test_plane_wave_snap_disabled_legacy_behaviour(self) -> None:
+        """--ic-no-snap keeps the off-grid k verbatim (legacy behaviour)."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 50.0),), shape=(32,), periodic=(True,))
+        args = _make_ic_args(
+            ic="plane-wave",
+            ic_amplitude=1.0,
+            ic_wavevector="2.0",
+            ic_no_snap=True,
+        )
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 50.0)])
+
+        field = y0[:32]
+        x = gi.axes_coords(0)
+        # Verbatim cos(2.0·x) — NOT snapped
+        np.testing.assert_allclose(field, np.cos(2.0 * x), atol=1e-12)
+
+    def test_plane_wave_snap_skips_non_periodic_axes(self) -> None:
+        """Snap is not applied on non-periodic axes (Fourier modes not relevant)."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 50.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(ic="plane-wave", ic_amplitude=1.0, ic_wavevector="2.0")
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 50.0)])
+
+        field = y0[:32]
+        x = gi.axes_coords(0)
+        np.testing.assert_allclose(field, np.cos(2.0 * x), atol=1e-12)
+
+    def test_plane_wave_snap_clamps_below_nyquist(self) -> None:
+        """Requested k at or beyond Nyquist is clamped to N//2 - 1."""
+        import math
+
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 50.0),), shape=(32,), periodic=(True,))
+        # Nyquist for N=32 is n=16 (k=16·2π/50 ≈ 2.011); request way beyond
+        args = _make_ic_args(ic="plane-wave", ic_amplitude=1.0, ic_wavevector="100.0")
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 50.0)])
+
+        # Expected snap: clamped to n=15 (just below Nyquist)
+        expected_k = 15.0 * 2.0 * math.pi / 50.0
+        field = y0[:32]
+        x = gi.axes_coords(0)
+        np.testing.assert_allclose(field, np.cos(expected_k * x), atol=1e-12)
 
     def test_formula_velocity_sets_both_slots(self) -> None:
         """--ic-formula-velocity sets the velocity slot alongside the field."""
