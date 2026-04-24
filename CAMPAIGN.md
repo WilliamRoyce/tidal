@@ -65,10 +65,20 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 - [x] HPC suppression 28216072 (suppress, old convention; pre-IC-snap) — IC-leakage invalidated, archived
 - [x] HPC suppression 28365129 (suppress retry 1, old convention; post-IC-snap) — FAILED on /tmp-full on compute node cpu-q-553, archived
 - [x] HPC suppression 28366464 (suppress retry 2, old convention; post-IC-snap) — completed 3:33, pulled, archived as wrong-regime. log(Z)=-0.069, D_KL(xi)=0.23
-- [x] HPC amplify rerun under NEW convention: **job 28367920** submitted 2026-04-24, std QOS, 3h wall
-- [x] HPC suppress rerun under NEW convention: **job 28367934** submitted 2026-04-24, INTR QOS, 1h wall
-- [ ] Results pulled for 28367920 / 28367934
-- [ ] Analysis of 28367920 / 28367934
+- [x] HPC amplify rerun under NEW convention: **job 28367920** submitted 2026-04-24, std QOS, 3h wall (RUNNING)
+- [x] HPC suppress rerun under NEW convention: **job 28367934** submitted 2026-04-24, INTR QOS, 1h wall (**COMPLETED 2:19**)
+- [x] Results pulled for 28367934
+- [x] Preliminary analysis of 28367934 (suppress, new convention):
+  - log(Z) = -0.056 ± 0.004, N=2294 samples, 100% success (no IC-leakage failures)
+  - **0/2294 samples with P_max < P_GR**: no true suppression found in the stable-Proca prior.
+    Posterior concentrates at alpha3 → 0.001 (log-uniform lower bound) = dark-photon decoupling
+    limit, giving trivial P_max ≈ P_GR.
+  - **Unexpected amplification signal at the prior boundary**: top 5 samples have P_max between
+    1.7× and 5.88× P_GR, at (high |deltam|, high xi, variable mA2/alpha3) — these are
+    "worst suppressors" from the POV of this minimization, but represent real amplification
+    samples that the upcoming amplify run (28367920) should lock onto.
+  - D_KL: xi=0.219, mA2=0.022, alpha3=0.023, deltam=0.020 — xi dominates (stability cutoff)
+- [ ] Pull + analyse amplify 28367920 when complete
 
 - **Amplify finding (2026-04-22, 28226826):** log(Z)=+0.118±0.006, joint D_KL=0.043,
   D_KL(xi)=0.226, D_KL(mA2)=0.032. MAP at (mA2=0.34, deltam=-0.21, xi=1.08, alpha3=0.054).
@@ -202,8 +212,8 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28226826 | T1 Dark-Photon-Plasma | amplification (tend50, resume) | COMPLETED | ~2h | std QOS; D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, MAP(mA2=0.34,xi=1.08,a3=0.054). Amplify null still valid after IC-snap fix. |
 | 28365129 | T1 Dark-Photon-Plasma | suppression rerun with IC-snap fix | FAILED | 0:00:16 | Venv tarball extraction to compute-node /tmp failed with "no space left on device" on node cpu-q-553. Node-specific; resubmitted as 28366464. |
 | 28366464 | T1 Dark-Photon-Plasma | suppression rerun with IC-snap fix (retry) | COMPLETED (WRONG REGIME) | 0:03:33 | INTR QOS, ran fine on a different node. log(Z)=-0.069, D_KL(xi)=0.235, D_KL(alpha3)=0.037. Archived — OLD Lagrangian sign convention, sampled tachyonic regime not stable Proca. |
-| 28367920 | T1 Dark-Photon-Plasma | amplification, NEW Lagrangian sign convention (stable Proca) | SUBMITTED | — | std QOS, 3h wall. Replaces 28226826 semantically: alpha3 = log_uniform(0.001, 0.5) now sweeps stable-Proca regime (m² = +2·alpha3 > 0). |
-| 28367934 | T1 Dark-Photon-Plasma | suppression, NEW Lagrangian sign convention (stable Proca) | SUBMITTED | — | INTR QOS, 1h wall. Replaces 28366464 semantically: same new-convention prior with P_max:minimize. |
+| 28367920 | T1 Dark-Photon-Plasma | amplification, NEW Lagrangian sign convention (stable Proca) | RUNNING | ≥5:12 | std QOS, 3h wall. Replaces 28226826 semantically: alpha3 = log_uniform(0.001, 0.5) now sweeps stable-Proca regime (m² = +2·alpha3 > 0). |
+| 28367934 | T1 Dark-Photon-Plasma | suppression, NEW Lagrangian sign convention (stable Proca) | COMPLETED | 0:02:19 | log(Z)=-0.056±0.004, 2294 samples, 100% success. 0/2294 with P_max<P_GR (posterior concentrates at alpha3→0 decoupling limit). But top-P_max samples reach 5.88× P_GR — amplification signal. D_KL(xi)=0.22 drives stability. |
 
 ---
 
