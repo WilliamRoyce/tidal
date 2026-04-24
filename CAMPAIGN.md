@@ -50,18 +50,23 @@ Lagrangian sector and at what parameters?
 
 **Note:** Conservation checks not valid for these theories (Dirac-Bergmann Hamiltonian issues, documented separately).
 
-### Stage A: Dark-Photon-Plasma 4D nested sampling — ⚠️ SUPPRESS INVALID, RERUN AFTER IC FIX
+### Stage A: Dark-Photon-Plasma 4D nested sampling — ⚠️ ALL 3 OLD RUNS WRONG-REGIME; REDOING UNDER NEW SIGN CONVENTION
+
+**2026-04-24 convention flip:** The CDT Lagrangian was changed from `+alpha3·I3` →
+`-alpha3·I3` so that `alpha3 > 0` now corresponds to the **stable Proca dark photon**
+regime (physical mass² = +2·alpha3 > 0). Previously `alpha3 > 0` was the tachyonic-
+spatial-trace regime, which doesn't match the "torsion as a dark photon" physics intent.
+All three historical Stage A runs used `alpha3 = log_uniform(0.001, 0.5) > 0` under the
+OLD convention, so they sampled the tachyonic regime. They are **archived as valid
+simulations of the wrong physics regime** and are being replaced by new-convention reruns.
 
 - [x] Stage 0 gate passed for T1
-- [x] HPC amplification job submitted (canonical: 28226826 / resume of 28216041, std QOS, ~2h)
-- [x] HPC suppression job submitted (28216072, INTR QOS, 5:18) — **INVALIDATED** by IC spectral leakage bug
-- [x] Results pulled (hpc_results/28226826/, hpc_results/28216072/)
-- [x] Analysis: **Amplification D_KL=0.043 (VALID NULL)**. Suppression D_KL=0.010 (INVALID — 0/2319
-  samples with P_max < P_GR not due to physics, but due to `SimulationDivergedError` rejecting
-  every interesting parameter point).
-- [x] HPC suppression rerun with IC snap fix: **job 28365129** submitted 2026-04-24, INTR QOS, 1h wall
-- [ ] Results pulled for 28365129
-- [ ] Analysis of 28365129
+- [x] HPC amplification 28226826 (amplify, old convention) — archived; was a NULL in tachyonic regime
+- [x] HPC suppression 28216072 (suppress, old convention; pre-IC-snap) — IC-leakage invalidated, archived
+- [x] HPC suppression 28365129 (suppress retry 1, old convention; post-IC-snap) — FAILED on /tmp-full on compute node cpu-q-553, archived
+- [x] HPC suppression 28366464 (suppress retry 2, old convention; post-IC-snap) — completed 3:33, pulled, archived as wrong-regime. log(Z)=-0.069, D_KL(xi)=0.23
+- [ ] HPC amplify rerun under NEW convention (pending)
+- [ ] HPC suppress rerun under NEW convention (pending)
 
 - **Amplify finding (2026-04-22, 28226826):** log(Z)=+0.118±0.006, joint D_KL=0.043,
   D_KL(xi)=0.226, D_KL(mA2)=0.032. MAP at (mA2=0.34, deltam=-0.21, xi=1.08, alpha3=0.054).

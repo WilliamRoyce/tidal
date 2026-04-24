@@ -15,22 +15,34 @@
 # A would contaminate the graviton EOM with position-dependent Abar²
 # terms from the background B-field — Issue #142).
 #
-# Mass relationship: physical mass² = -2·alpha3  (from EL equation of I3 term
-# with mostly-plus signature — the +alpha3·V·V convention is opposite-sign
-# to the standard Proca -1/2·m²·V·V, so alpha3 > 0 is tachyonic in the spatial
-# trace sector; alpha3 < 0 is the standard stable Proca regime).
+# Mass relationship: physical mass² = +2·alpha3  (stable Proca convention)
+#
+# Sign-convention note: this theory uses −alpha3·I3 in the Lagrangian (note the
+# leading minus), so the spatial EOM for the torsion trace V_i is
+# (∂² + 2·alpha3) V_i = 0 → m² = +2·alpha3. With alpha3 > 0 this is a standard
+# stable Proca propagation (positive mass squared at all k). The campaign treats
+# torsion as if it were a simple dark photon sector and naturally expects
+# positive mass, so the stable regime is alpha3 > 0.
 #
 # Equivalence with FV formulation (torsion_dark_photon_fv):
-#     mT2 = -2·alpha3
-# i.e. CDT alpha3 < 0  ↔  FV mT2 > 0  (both stable).
-# Confirmed bit-identical (relative Δ ~ 2.8e-14) at
-# (mA2=0.955, deltam=0.01, xi=0.274, |alpha3|=0.123) — see GitHub Issue #318.
+#     mT2 = 2·alpha3
+# i.e. CDT alpha3 > 0  ↔  FV mT2 > 0  (both stable, same-sign mapping).
+# Confirmed bit-identical (relative Δ ~ 2.8e-14) — see GitHub Issue #318.
+#
+# History: a prior version of this toml used +alpha3·I3 (giving m² = -2·alpha3
+# and an opposite-sign FV map mT2 = -2·alpha3). That convention put the campaign
+# prior alpha3 ∈ log_uniform(0.001, 0.5) into the tachyonic-spatial-trace regime,
+# which doesn't match the "torsion as a stable Proca dark photon" physics intent.
+# Convention flipped 2026-04-24; old-convention HPC runs (28216072, 28226826,
+# 28366464) are archived and documented in CAMPAIGN.md. Issue #318 tracks the
+# resolution.
 #
 # Lagrangian:
 #   L = (1/kappa^2) R
 #       − 1/4 F^2                                  (Maxwell)
 #       − 1/2 mA2 a_mu a^mu                        (photon effective mass = plasma)
-#       + alpha3 I3                                 (PGT torsion trace mass)
+#       − alpha3 I3                                 (PGT torsion trace Proca mass,
+#                                                    stable for alpha3 > 0)
 #       − 1/4 xi Ftorsion^2                        (torsion trace kinetic)
 #       + deltam F_{ab} Ftorsion^{ab}              (kinetic mixing F·Ftorsion)
 #
@@ -117,7 +129,7 @@ names = ["kappa", "B0", "alpha3", "xi", "deltam", "mA2"]
 # alpha3 is the I3 coefficient: mass^2 = 2*alpha3 (from EL of I3 term).
 # mA2 is on the PERTURBATION field a (not full A) to avoid Abar^2 contamination (Issue #142).
 [lagrangian]
-expression = "((1/kappa^2) RicciScalarCD[] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/2 mA2 a[-a] eta[a,b] a[-b])"
+expression = "((1/kappa^2) RicciScalarCD[] - alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/2 mA2 a[-a] eta[a,b] a[-b])"
 
 [linearization]
 perturbation_field = "h"

@@ -1,7 +1,7 @@
 {
 	"metadata": {
 		"source": "xAct",
-		"lagrangian_expr": "((1/kappa^2) RicciScalarCD[] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/2 mA2 a[-a] eta[a,b] a[-b])",
+		"lagrangian_expr": "((1/kappa^2) RicciScalarCD[] - alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/2 mA2 a[-a] eta[a,b] a[-b])",
 		"derived_from": "Euler-Lagrange",
 		"gauge": "tt(h)+lorenz(a)",
 		"linearized": true,
@@ -16,7 +16,7 @@
 				"h_4"
 			]
 		},
-		"derivation_hash": "7a33bcf0f478be5d2baf0306ddff27f283c13e7146fdad7c3775c48f99dcb560"
+		"derivation_hash": "dd0a21d1f39003bff4cf60ec61c05a2d13bb4500e2cdf2f801163d5267d199f2"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -500,22 +500,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_0",
+						"coefficient_symbolic": "2*alpha3"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "identity",
+						"field": "t_15",
 						"coefficient_symbolic": "-2*alpha3"
 					},
 					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_15",
-						"coefficient_symbolic": "2*alpha3"
-					},
-					{
-						"coefficient": 2.0,
+						"coefficient": -2.0,
 						"operator": "identity",
 						"field": "t_22",
-						"coefficient_symbolic": "2*alpha3"
+						"coefficient_symbolic": "-2*alpha3"
 					},
 					{
 						"coefficient": 2.0,
@@ -582,22 +582,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
-						"operator": "identity",
-						"field": "t_1",
-						"coefficient_symbolic": "-2*alpha3"
-					},
-					{
 						"coefficient": 2.0,
 						"operator": "identity",
-						"field": "t_23",
+						"field": "t_1",
 						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": -2.0,
 						"operator": "identity",
-						"field": "t_9",
+						"field": "t_23",
 						"coefficient_symbolic": "-2*alpha3"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_9",
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": 2.0,
@@ -664,22 +664,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_10",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_17",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_2",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": 2.0,
@@ -739,22 +739,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_13",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_20",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_6",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": -2.0,
@@ -821,22 +821,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 2.0,
+						"coefficient": -2.0,
 						"operator": "identity",
 						"field": "t_0",
+						"coefficient_symbolic": "-2*alpha3"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_15",
 						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
-						"operator": "identity",
-						"field": "t_15",
-						"coefficient_symbolic": "-2*alpha3"
-					},
-					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_22",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": -2.0,
@@ -903,22 +903,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_10",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_17",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_2",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": 2.0,
@@ -979,22 +979,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_10",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_17",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_2",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": 2.0,
@@ -1054,22 +1054,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_13",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_20",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_6",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": -2.0,
@@ -1136,22 +1136,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 2.0,
+						"coefficient": -2.0,
 						"operator": "identity",
 						"field": "t_0",
+						"coefficient_symbolic": "-2*alpha3"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_15",
 						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
-						"operator": "identity",
-						"field": "t_15",
-						"coefficient_symbolic": "-2*alpha3"
-					},
-					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_22",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": -2.0,
@@ -1218,22 +1218,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 2.0,
-						"operator": "identity",
-						"field": "t_1",
-						"coefficient_symbolic": "2*alpha3"
-					},
-					{
 						"coefficient": -2.0,
 						"operator": "identity",
-						"field": "t_23",
+						"field": "t_1",
 						"coefficient_symbolic": "-2*alpha3"
 					},
 					{
 						"coefficient": 2.0,
 						"operator": "identity",
-						"field": "t_9",
+						"field": "t_23",
 						"coefficient_symbolic": "2*alpha3"
+					},
+					{
+						"coefficient": -2.0,
+						"operator": "identity",
+						"field": "t_9",
+						"coefficient_symbolic": "-2*alpha3"
 					},
 					{
 						"coefficient": -2.0,
@@ -1299,22 +1299,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_13",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_20",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "identity",
 						"field": "t_6",
-						"coefficient_symbolic": "-2*alpha3"
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": -2.0,
@@ -1381,22 +1381,22 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -2.0,
-						"operator": "identity",
-						"field": "t_1",
-						"coefficient_symbolic": "-2*alpha3"
-					},
-					{
 						"coefficient": 2.0,
 						"operator": "identity",
-						"field": "t_23",
+						"field": "t_1",
 						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": -2.0,
 						"operator": "identity",
-						"field": "t_9",
+						"field": "t_23",
 						"coefficient_symbolic": "-2*alpha3"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_9",
+						"coefficient_symbolic": "2*alpha3"
 					},
 					{
 						"coefficient": 2.0,
@@ -1579,7 +1579,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null,
@@ -1600,7 +1600,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null,
@@ -1621,7 +1621,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null,
@@ -1642,7 +1642,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null,
@@ -1663,7 +1663,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null,
@@ -1684,7 +1684,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null,
@@ -1705,7 +1705,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null,
@@ -1726,7 +1726,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null,
@@ -1747,7 +1747,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null,
 				null
@@ -1768,7 +1768,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null,
 				null
 			],
@@ -1789,7 +1789,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				"2*alpha3",
 				null
 			],
 			[
@@ -1810,7 +1810,7 @@
 				null,
 				null,
 				null,
-				"-2*alpha3"
+				"2*alpha3"
 			]
 		],
 		"coupling_matrix_symbolic": [
@@ -1945,11 +1945,11 @@
 				null,
 				null,
 				null,
-				"2*alpha3",
+				"-2*alpha3",
 				null,
 				null,
 				null,
-				"2*alpha3",
+				"-2*alpha3",
 				null,
 				null,
 				null
@@ -1970,167 +1970,7 @@
 				null,
 				null,
 				null,
-				"2*alpha3",
-				null,
-				"-2*alpha3"
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
 				"-2*alpha3",
-				"-2*alpha3",
-				null,
-				null,
-				null,
-				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-2*alpha3",
-				null,
-				null,
-				"-2*alpha3",
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"2*alpha3",
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-2*alpha3",
-				null,
-				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-2*alpha3",
-				null,
-				null,
-				null,
-				"-2*alpha3",
-				null,
-				null,
-				null,
-				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-2*alpha3",
-				null,
-				null,
-				"-2*alpha3",
-				null,
-				null,
-				null,
-				null,
-				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-2*alpha3",
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"-2*alpha3",
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"2*alpha3",
-				null,
-				null,
-				null,
-				"-2*alpha3",
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null
-			],
-			[
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				"2*alpha3",
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
-				null,
 				null,
 				"2*alpha3"
 			],
@@ -2144,11 +1984,131 @@
 				null,
 				null,
 				null,
-				"-2*alpha3",
+				null,
+				null,
+				"2*alpha3",
+				"2*alpha3",
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				"2*alpha3",
+				null
+			],
+			[
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
 				"-2*alpha3",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha3",
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				null,
 				null,
 				null,
 				null,
@@ -2170,7 +2130,47 @@
 				null,
 				null,
 				null,
+				null,
+				null,
+				"-2*alpha3"
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
 				"2*alpha3",
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha3",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-2*alpha3",
 				null,
 				null
 			]
