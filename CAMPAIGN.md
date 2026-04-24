@@ -193,7 +193,8 @@ Lagrangian sector and at what parameters?
 | 28216041 | T1 Dark-Photon-Plasma | amplification (tend50) | TIMEOUT | 1:00:27 | INTR; PolyChord global log(Z)=+0.106±0.005 converged but 12/15 clusters still active at 1h wall |
 | 28216072 | T1 Dark-Photon-Plasma | suppression (tend50) | INVALID | 0:05:18 | IC spectral-leakage bug; most samples rejected by divergence guard. Superseded by post-IC-snap rerun (pending). |
 | 28226826 | T1 Dark-Photon-Plasma | amplification (tend50, resume) | COMPLETED | ~2h | std QOS; D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, MAP(mA2=0.34,xi=1.08,a3=0.054). Amplify null still valid after IC-snap fix. |
-| 28365129 | T1 Dark-Photon-Plasma | suppression rerun with IC-snap fix | SUBMITTED | — | INTR QOS, 1h wall; resubmit after 28216072 invalidated by IC spectral leakage bug (c97d5ff). Same 4D prior as 28216072, now with `--ic-wavevector 2.0` auto-snapping to nearest discrete Fourier mode on the grid. |
+| 28365129 | T1 Dark-Photon-Plasma | suppression rerun with IC-snap fix | FAILED | 0:00:16 | Venv tarball extraction to compute-node /tmp failed with "no space left on device" on node cpu-q-553. Node-specific; resubmitted as 28366464. |
+| 28366464 | T1 Dark-Photon-Plasma | suppression rerun with IC-snap fix (retry) | SUBMITTED | — | INTR QOS, 1h wall; same command as 28365129, hoping for a different node. |
 
 ---
 
