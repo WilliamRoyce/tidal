@@ -366,6 +366,32 @@ Operator & Min Dim & Description \\
 \end{tabular}
 \end{table}
 
+\subsection{Gradient Energy Measurement}
+\label{sec:gradient-energy-measurement}
+
+\texttt{compute\_system\_energy} in \texttt{tidal/measurement/\_energy.py} evaluates the spatially-averaged Hamiltonian from each theory's \texttt{hamiltonian\_terms}. For gradient-product terms $\langle \partial_a f \cdot \partial_b g \rangle$ the code auto-dispatches between three paths:
+
+\begin{table}[htbp]
+\centering
+\caption{Gradient-energy paths in \texttt{\_evaluate\_single\_hamiltonian\_term}. The dispatch keys only on data properties (periodicity, coefficient structure); it does \emph{not} consult any solver-side flag. Measurement accuracy is decoupled from the solver mode used to produce the fields.}
+\label{tab:gradient-energy-paths}
+\begin{tabular}{@{}p{0.20\textwidth}p{0.35\textwidth}p{0.38\textwidth}@{}}
+\toprule
+Path & Trigger & Error \\
+\midrule
+Parseval (k-space) & all axes periodic + scalar coefficient + scalar volume weight & Machine precision (exact for band-limited periodic fields) \\
+FD IBP & periodic axis with FD solver, position-dependent coefficient, or non-scalar volume weight & $O((k \cdot dx)^2 / 12)$ for 2nd-order stencil; scales as $1/N^2$ \\
+Spectral-direct & spectral solver mode (legacy, retained for non-Parseval paths) & $O(1/N)$ at Nyquist due to rfft phase handling \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Parseval path computes
+\[
+\langle \partial_a f \cdot \partial_b g \rangle \;=\; \frac{1}{\prod_i N_i} \sum_{\vec{k}} w_{\vec{k}}\, k_a k_b\, \operatorname{Re}(\hat{f}^*_{\vec{k}}\, \hat{g}_{\vec{k}})
+\]
+over \texttt{rfftn}'s half-spectrum, with $w_{\vec{k}} = 2$ on interior last-axis bins and $w_{\vec{k}} = 1$ at DC and (for even $N$) Nyquist. When the Parseval path is \emph{not} applicable on an all-periodic domain --- typically because a coefficient is position-dependent --- a one-shot \texttt{RuntimeWarning} signals that the term is being evaluated at FD accuracy rather than machine precision. See issue \#312 for the design rationale and the follow-up tickets for the modal-solver Fourier-coefficient shortcut and the legacy \texttt{\_use\_spectral} flag refactor.
+
 \subsection{Component-Level Euler--Lagrange}
 \label{sec:component-el}
 

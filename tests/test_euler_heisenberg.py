@@ -693,19 +693,15 @@ class TestEHPerturbativeEnergy:
         expected = -3.0 * adler_n_perp_minus_1
         assert pytest.approx(expected, rel=1e-4) == H1 / H0
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "FD IBP gradient-energy systematic dominates (~0.23%): periodic IBP uses "
-            "FD Laplacian stencil, which gives mean≈1.9936 instead of 2.0 for cos(2x) "
-            "on N=64 grid.  As the field transitions from pure-gradient t=0 to mixed "
-            "kinetic+gradient t=T, the systematic shifts, appearing as spurious "
-            "conservation violation ~1e3x larger than eps^2=(rho*B0^2)^2~2e-11 at QED params. "
-            "Fix: spectral (Parseval) gradient energy for periodic domains (#312)."
-        ),
-    )
     def test_energy_conserved_to_eps_squared(self, eh_spec: object) -> None:
-        """H(y_total, T)/H(y_total, 0) ≈ 1 to O(ε²). Tests Wolfram H–EOM Noether consistency."""
+        """H(y_total, T)/H(y_total, 0) ≈ 1 to O(ε²). Tests Wolfram H–EOM Noether consistency.
+
+        Exercises the Parseval-based gradient-energy path (#312): for all-periodic
+        domains with scalar coefficients, `compute_system_energy` evaluates
+        gradient inner products exactly via FFT (Parseval's theorem), independent
+        of the solver mode.  Remaining drift is O(ε²) from the PerturbativeSolver's
+        Duhamel quadrature, which is the genuine physical bound this test probes.
+        """
         result, grid, params, _, compute_energy_timeseries, SimulationData = self._run(
             eh_spec
         )
