@@ -613,6 +613,60 @@ def _gaussian_slots(  # noqa: PLR0913, PLR0917
     return slot_data
 
 
+def _snap_wavevector_to_grid(
+    kvec: tuple[float, ...],
+    grid_info: GridInfo,
+    bounds: list[tuple[float, float]],
+) -> tuple[tuple[float, ...], list[tuple[int, float, float]]]:
+    """Snap each component of a requested wavevector to the nearest discrete
+    Fourier mode on periodic axes, staying below Nyquist.
+
+    A plane wave ``cos(k·x)`` evaluated at grid points is truly monochromatic
+    in the discrete Fourier representation only when ``k_dim = 2π·n/L_dim`` for
+    integer ``n``. Off-grid ``k`` leaks amplitude onto every other discrete
+    k-mode (the FFT encodes the implicit boundary discontinuity). For models
+    with tachyonic eigenvalues at some k-modes — e.g. PGT torsion models where
+    the full-tensor state carries redundant directions with negative mass² —
+    the leakage excites those tachyons and triggers the modal solver's
+    divergence guard. Snapping eliminates the leakage at the source and gives
+    a physically well-defined periodic plane wave.
+
+    Returns the snapped kvec and a list of (dim, requested_k, snapped_k)
+    entries for every dimension where the snap changed the wavevector by
+    more than 1% (used by the caller to emit a user-visible note). Non-periodic
+    axes are passed through unchanged — Fourier modes aren't the right basis
+    for Dirichlet/Neumann/absorbing conditions.
+    """
+    snapped: list[float] = []
+    notes: list[tuple[int, float, float]] = []
+    for dim in range(len(kvec)):
+        k_req = kvec[dim]
+        if dim >= grid_info.ndim or not grid_info.periodic[dim]:
+            snapped.append(k_req)
+            continue
+        lx = bounds[dim][1] - bounds[dim][0]
+        n_pts = grid_info.shape[dim]
+        dk = 2.0 * math.pi / lx
+        # Round to nearest integer mode, clamp below Nyquist (n_pts // 2).
+        # The Nyquist mode itself aliases (cos(π·n) = (-1)^n) and carries no
+        # directional information for real signals, so we exclude it by using
+        # n_pts // 2 - 1 as the cap.  For n_pts=2 the clamp degenerates to
+        # {-0, 0} which keeps the zero-mode behaviour for trivial grids.
+        n_max = max(0, n_pts // 2 - 1)
+        n_target = round(k_req / dk)
+        n_clamped = max(-n_max, min(n_max, n_target))
+        k_snap = n_clamped * dk
+        snapped.append(k_snap)
+        # Report only significant snaps: relative change > 1%, or any change
+        # when the requested k was itself non-zero.  Exactly-on-grid inputs
+        # (k_req == k_snap) produce no note.
+        if abs(k_req - k_snap) > 0.0:
+            scale = max(abs(k_req), abs(k_snap), dk)
+            if abs(k_req - k_snap) / scale > 1e-2:
+                notes.append((dim, k_req, k_snap))
+    return tuple(snapped), notes
+
+
 def _plane_wave_slots(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec: EquationSystem,
@@ -625,6 +679,12 @@ def _plane_wave_slots(  # noqa: PLR0913, PLR0917
 
     Uses ``cos(k·x)`` for field and ``+|k|·sin(k·x)`` for velocity
     (right-mover for positive k).
+
+    On periodic axes, ``--ic-wavevector`` is automatically snapped to the
+    nearest discrete Fourier mode to eliminate spectral leakage (which can
+    excite tachyonic modes at unintended k-values, e.g. in PGT torsion
+    models).  Override with ``--ic-no-snap`` to keep the legacy behaviour
+    where ``cos(k·x)`` is evaluated verbatim at grid points.
     """
     if args.ic_wavevector is not None:
         kvec = tuple(float(k) for k in args.ic_wavevector.split(","))
@@ -633,6 +693,18 @@ def _plane_wave_slots(  # noqa: PLR0913, PLR0917
         kvec = tuple(
             2.0 * math.pi / lx if i == 0 else 0.0 for i in range(spec.spatial_dimension)
         )
+
+    snap_disabled = bool(getattr(args, "ic_no_snap", False))
+    if not snap_disabled:
+        kvec, snap_notes = _snap_wavevector_to_grid(kvec, grid_info, bounds)
+        for dim, k_req, k_snap in snap_notes:
+            _clog(
+                f"  Note: --ic-wavevector[{dim}]={k_req:g} snapped to "
+                f"{k_snap:g} (nearest discrete Fourier mode on periodic "
+                f"grid N={grid_info.shape[dim]}, L={bounds[dim][1] - bounds[dim][0]:g}). "
+                f"This eliminates spectral leakage; pass --ic-no-snap to "
+                f"disable.",
+            )
 
     coords = grid_info.cell_coords
     k_dot_x = np.zeros(grid_info.shape, dtype=np.float64)

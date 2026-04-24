@@ -265,7 +265,19 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="K[,K,K]",
         help="Wavevector for plane-wave or gaussian IC (e.g. 3 or 0.1,0.0,0.0). "
-        "With gaussian: creates a travelling wave packet (positive k = right-mover)",
+        "With gaussian: creates a travelling wave packet (positive k = right-mover). "
+        "On periodic axes, k is automatically snapped to the nearest discrete "
+        "Fourier mode to eliminate spectral leakage; use --ic-no-snap to disable.",
+    )
+    sim_parser.add_argument(
+        "--ic-no-snap",
+        action="store_true",
+        help="Disable automatic snapping of --ic-wavevector to the nearest "
+        "discrete Fourier mode on periodic grids. Legacy behaviour: the IC "
+        "is cos(k·x) evaluated verbatim at grid points, which leaks amplitude "
+        "onto every discrete k-mode when k is off-grid. Only needed for "
+        "reproducing pre-snap simulations or for theories where off-grid "
+        "wavevectors are physically meaningful.",
     )
     sim_parser.add_argument(
         "--ic-formula-velocity",
@@ -1138,7 +1150,15 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--ic-wavevector",
         default=None,
         metavar="K[,K,K]",
-        help="Wavevector for plane-wave or gaussian IC",
+        help="Wavevector for plane-wave or gaussian IC "
+        "(automatically snapped to nearest discrete Fourier mode on periodic "
+        "axes; use --ic-no-snap to disable)",
+    )
+    sweep_parser.add_argument(
+        "--ic-no-snap",
+        action="store_true",
+        help="Disable automatic snap of --ic-wavevector to nearest discrete "
+        "Fourier mode on periodic grids (see `tidal simulate --help`)",
     )
     sweep_parser.add_argument(
         "--ic-formula-velocity",
@@ -1737,6 +1757,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sample_parser.add_argument("--ic-amplitude", type=float, default=1.0)
     sample_parser.add_argument("--ic-component", default=None)
     sample_parser.add_argument("--ic-wavevector", default=None)
+    sample_parser.add_argument("--ic-no-snap", action="store_true")
     sample_parser.add_argument("--ic-formula-velocity", default=None)
     sample_parser.add_argument("--ic-field", action="append", default=[])
     sample_parser.add_argument("--ic-file", default=None)
