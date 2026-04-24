@@ -59,7 +59,9 @@ Lagrangian sector and at what parameters?
 - [x] Analysis: **Amplification D_KL=0.043 (VALID NULL)**. Suppression D_KL=0.010 (INVALID — 0/2319
   samples with P_max < P_GR not due to physics, but due to `SimulationDivergedError` rejecting
   every interesting parameter point).
-- [ ] HPC suppression rerun with IC snap fix (pending this session)
+- [x] HPC suppression rerun with IC snap fix: **job 28365129** submitted 2026-04-24, INTR QOS, 1h wall
+- [ ] Results pulled for 28365129
+- [ ] Analysis of 28365129
 
 - **Amplify finding (2026-04-22, 28226826):** log(Z)=+0.118±0.006, joint D_KL=0.043,
   D_KL(xi)=0.226, D_KL(mA2)=0.032. MAP at (mA2=0.34, deltam=-0.21, xi=1.08, alpha3=0.054).
@@ -81,8 +83,12 @@ Lagrangian sector and at what parameters?
   (clamped below Nyquist). Verified empirically: at (mA2=0.955, deltam=0.01, xi=0.274,
   alpha3=0.123), the `--ic-wavevector 2.0` case now succeeds (snapped to 1.885) and gives
   P_max ≈ 0.00176 — the genuine ~97% plasma suppression. Cross-check: FV model (10-field
-  formulation, no ghost sector) gives P_max=0.001738 at the same point (1.2% agreement,
-  separately filed as an investigation issue). Docs: `docs/tex/plane_wave_ic.tex`.
+  formulation, no ghost sector) **agrees bit-exactly with TorsionCDT** under the correct
+  parameter mapping `mT2 = -2·alpha3` (relative Δ = 2.8e-14, verified 2026-04-24 and
+  documented in Issue #318). The initial "1.2% tension" reported earlier this session
+  was a sign error in the theory.toml equivalence-comment; the modal solver is
+  machine-precision as designed. Docs: `docs/tex/plane_wave_ic.tex`,
+  `examples/dark_photon_plasma/theory.toml` (line 18-28 for the corrected equivalence map).
 
 - **Lesson:** HPC pip metadata must match local source. Invalid pre-fix runs (28133218/516/517,
   28134330) traced to v0.31.5 install predating the stability guard; fixed in an earlier session.
@@ -187,6 +193,7 @@ Lagrangian sector and at what parameters?
 | 28216041 | T1 Dark-Photon-Plasma | amplification (tend50) | TIMEOUT | 1:00:27 | INTR; PolyChord global log(Z)=+0.106±0.005 converged but 12/15 clusters still active at 1h wall |
 | 28216072 | T1 Dark-Photon-Plasma | suppression (tend50) | INVALID | 0:05:18 | IC spectral-leakage bug; most samples rejected by divergence guard. Superseded by post-IC-snap rerun (pending). |
 | 28226826 | T1 Dark-Photon-Plasma | amplification (tend50, resume) | COMPLETED | ~2h | std QOS; D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, MAP(mA2=0.34,xi=1.08,a3=0.054). Amplify null still valid after IC-snap fix. |
+| 28365129 | T1 Dark-Photon-Plasma | suppression rerun with IC-snap fix | SUBMITTED | — | INTR QOS, 1h wall; resubmit after 28216072 invalidated by IC spectral leakage bug (c97d5ff). Same 4D prior as 28216072, now with `--ic-wavevector 2.0` auto-snapping to nearest discrete Fourier mode on the grid. |
 
 ---
 
@@ -207,9 +214,11 @@ Lagrangian sector and at what parameters?
     now auto-snaps `--ic-wavevector` to the nearest discrete Fourier mode on periodic axes
     (pass `--ic-no-snap` for legacy). Direct `tidal simulate` at
     (mA2=0.955, δₘ=0.01, ξ=0.274, α3=0.123) with the fix gives P_max≈0.00176 — the expected
-    97% plasma suppression below P_GR=0.0612. Cross-check with the FV model
-    (torsion_dark_photon_fv.json, 10 fields, no ghost sector): P_max=0.001738 (1.2% agreement
-    with TorsionCDT; separately filed for follow-up investigation).
+    97% plasma suppression below P_GR=0.0612. **FV ↔ TorsionCDT equivalence verified
+    bit-exact** (Δ = 2.8e-14) after re-deriving FV from a fresh theory.toml and applying
+    the correct parameter mapping `mT2 = -2·α₃` (Issue #318 closed 2026-04-24; the
+    initial 1.2% tension was a sign error in `dark_photon_plasma/theory.toml:19`,
+    now corrected to read `mT2 = -2·alpha3`).
   - **Suppress rerun** submitted with full original 4D prior; awaiting results.
 - Stage B: Einstein-Cartan (T2). Joint D_KL=0.003, log(Z)≈0 — but **corrected marginals show
   structure**: α1=0.11, α2=0.06, α3=0.07 (all informative). Joint ≪ sum because the posterior

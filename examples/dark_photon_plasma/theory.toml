@@ -15,8 +15,16 @@
 # A would contaminate the graviton EOM with position-dependent Abar²
 # terms from the background B-field — Issue #142).
 #
-# Mass relationship: mass² = 2·alpha3  (from EL equation of I3 term).
-# Sweep equivalence with old FV model: alpha3 = mT2/2.
+# Mass relationship: physical mass² = -2·alpha3  (from EL equation of I3 term
+# with mostly-plus signature — the +alpha3·V·V convention is opposite-sign
+# to the standard Proca -1/2·m²·V·V, so alpha3 > 0 is tachyonic in the spatial
+# trace sector; alpha3 < 0 is the standard stable Proca regime).
+#
+# Equivalence with FV formulation (torsion_dark_photon_fv):
+#     mT2 = -2·alpha3
+# i.e. CDT alpha3 < 0  ↔  FV mT2 > 0  (both stable).
+# Confirmed bit-identical (relative Δ ~ 2.8e-14) at
+# (mA2=0.955, deltam=0.01, xi=0.274, |alpha3|=0.123) — see GitHub Issue #318.
 #
 # Lagrangian:
 #   L = (1/kappa^2) R
