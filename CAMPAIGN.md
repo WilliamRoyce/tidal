@@ -263,6 +263,8 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28366464 | T1 Dark-Photon-Plasma | suppression rerun with IC-snap fix (retry) | COMPLETED (WRONG REGIME) | 0:03:33 | INTR QOS, ran fine on a different node. log(Z)=-0.069, D_KL(xi)=0.235, D_KL(alpha3)=0.037. Archived — OLD Lagrangian sign convention, sampled tachyonic regime not stable Proca. |
 | 28367920 | T1 Dark-Photon-Plasma | amplification, NEW Lagrangian sign convention (stable Proca) | RUNNING | ≥5:12 | std QOS, 3h wall. Replaces 28226826 semantically: alpha3 = log_uniform(0.001, 0.5) now sweeps stable-Proca regime (m² = +2·alpha3 > 0). |
 | 28367934 | T1 Dark-Photon-Plasma | suppression, NEW Lagrangian sign convention (stable Proca) | COMPLETED | 0:02:19 | log(Z)=-0.056±0.004, 2294 samples, 100% success. 0/2294 with P_max<P_GR (posterior concentrates at alpha3→0 decoupling limit). But top-P_max samples reach 5.88× P_GR — amplification signal. D_KL(xi)=0.22 drives stability. |
+| 28418115 | T1 Dark-Photon-Plasma | amplify v4 — Tier 1 + 1.5 fixed solver, B0=0.01 t_end=10 snapshots=2 nlive=1000 num_repeats=10 prec=0.005 ntasks=76 | PENDING | — | Submitted 2026-04-25 20:24Z, std QOS, 6h wall, polychord_standard.sbatch. Replaces v3 28367920 whose "P_max up to 2.0" was CDT eigenvector ill-conditioning artefact (#320). v0.36.0 modal solver uses unconditional `scipy.linalg.expm` Padé + augmented-exp Pass 1 — robust for arbitrary cond(V). |
+| 28418421 | T1 Dark-Photon-Plasma | suppress v4 — Tier 1 + 1.5 fixed solver, same params as amplify but minimize | RUNNING | — | Submitted 2026-04-25 20:25Z, INTR QOS, 1h wall, polychord_intr.sbatch. Symmetry insurance for the corrected baseline-formula likelihood (post-#319) on the now-robust solver. |
 
 ---
 
