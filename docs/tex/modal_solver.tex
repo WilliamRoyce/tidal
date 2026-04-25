@@ -566,7 +566,7 @@ At each output time, constraint fields are reconstructed directly from the saved
 \subsection{Generalized Mass Matrix (Higher-Derivative Theories)}
 \label{sec:modal-mass-matrix}
 
-Higher-derivative theories such as PGT with $\tilde{R}^2$ terms produce equations with implicit acceleration coupling: \texttt{d2\_t(field\_j)} appearing on the RHS of \texttt{field\_i}'s equation, meaning $\ddot{q}_j$ couples into $\ddot{q}_i$'s dynamics. After Ostrogradsky reduction (\cref{sec:ostrogradsky-reduction}), the system has the generalized form:
+Higher-derivative theories such as PGT with $\tilde{R}^2$ terms produce equations with implicit acceleration coupling: \texttt{d2\_t(field\_j)} appearing on the RHS of \texttt{field\_i}'s equation, meaning $\ddot{q}_j$ couples into $\ddot{q}_i$'s dynamics. After v6 perturbative reduction (\cref{sec:perturbative-reduction}; see also the architectural Ostrogradsky discussion in \cref{sec:ostrogradsky}), the system has the generalized form:
 \begin{equation}
   M(k) \cdot \ddot{x} = K(k) \cdot x + D(k) \cdot \dot{x} + J(k) \cdot \dddot{x}
   \label{eq:generalized-mass}
@@ -832,7 +832,7 @@ This contrasts with \cref{sec:modal-perf-optimizations} Round~1, where the posit
 
 Because path~(d) is wall-time-competitive with eigendecomposition \emph{and} mathematically robust for arbitrary $\mathrm{cond}(V)$, the original hybrid plan (\texttt{cond(V) > 1e12} threshold $\Rightarrow$ \texttt{expm\_multiply} fallback) was unnecessary. Path~(d) is unconditional for default Pass~0 evolution.
 
-The eigendecomposition path remains opt-in for the Pass~1 perturbative-Duhamel solver (\cref{sec:perturbative-pass1} in \texttt{perturbative\_solver.tex}), which requires per-eigenvalue closed-form kernels $G(\lambda_i, \lambda_j; t)$ and the $V$, $V^{-1}$ projection. Callers requesting eigendata via \texttt{collect\_eigendata} retain the original codepath, with an added $\mathrm{cond}(V) > 10^{12}$ check that raises \texttt{NotImplementedError} when Pass~0 is unsound (preventing silent corruption of Pass~1 corrections). The follow-up issue \texttt{\#320-Pass1} tracks an augmented-exponential Pass~1 path (Al-Mohy \& Higham 2011 \S5.2: $\exp(t \cdot \begin{psmallmatrix} A & M_\text{src} \\ 0 & A \end{psmallmatrix}) \cdot \begin{psmallmatrix} 0 \\ y^0(0) \end{psmallmatrix}$) that removes the eigendata dependency entirely, leaving \texttt{scipy.linalg.expm} as the sole canonical Pass~0/Pass~1 backend.
+The eigendecomposition path remains opt-in for the Pass~1 perturbative-Duhamel solver (\cref{sec:perturbative-reduction}), which requires per-eigenvalue closed-form kernels $G(\lambda_i, \lambda_j; t)$ and the $V$, $V^{-1}$ projection. Callers requesting eigendata via \texttt{collect\_eigendata} retain the original codepath, with an added $\mathrm{cond}(V) > 10^{12}$ check that raises \texttt{NotImplementedError} when Pass~0 is unsound (preventing silent corruption of Pass~1 corrections). The follow-up issue \texttt{\#320-Pass1} tracks an augmented-exponential Pass~1 path (Al-Mohy \& Higham 2011 \S5.2: $\exp(t \cdot \begin{psmallmatrix} A & M_\text{src} \\ 0 & A \end{psmallmatrix}) \cdot \begin{psmallmatrix} 0 \\ y^0(0) \end{psmallmatrix}$) that removes the eigendata dependency entirely, leaving \texttt{scipy.linalg.expm} as the sole canonical Pass~0/Pass~1 backend.
 
 \subsubsection{Verification}
 \label{sec:modal-pade-verification}

@@ -30,7 +30,7 @@ This model has several key features:
 \begin{itemize}
   \item No $\ricci^2$ term --- avoids Ostrogradsky ghosts and 4th-order time derivatives.
   \item Torsion is \textbf{non-propagating}: all 20 torsion components satisfy algebraic constraint equations (time derivative order zero).
-  \item The $\delta_1$ coupling is the simplest non-minimal torsion--EM interaction from the general PGT+EM enumeration~\cite{Shapiro2002,Bahamonde2025}.
+  \item The $\delta_1$ coupling is the simplest non-minimal torsion--EM interaction from the general PGT+EM enumeration~\cite{shapiro2002torsion,bahamonde2025torsion}.
   \item Ghost-safe: Yang--Mills type coupling, $\ricci_{[\mu\nu]} F^{\mu\nu} \sim \mathcal{O}(\partial\Gamma) \times \mathcal{O}(\partial A)$.
 \end{itemize}
 
@@ -194,8 +194,8 @@ Mechanism & What changes & Where & Reference \\
 \midrule
 \textbf{PGT torsion (this work)} & Photon mass $\to 0$ (resonance) & $m^2_{\text{eff}}(a_1) = 0$ & --- \\
 Light mediator ($1/m^2$) & Propagator diverges & $m \to 0$ & General \\
-$f(R)$ scalaron & Graviton amplitude grows & $\nu \to -1$ & \cite{Cembranos2023} \\
-Axion--photon MSW & Conversion width diverges & $m_a = \omega_p$ & \cite{Berlin2024} \\
+$f(R)$ scalaron & Graviton amplitude grows & $\nu \to -1$ & \cite{cembranos2023graviton} \\
+Axion--photon MSW & Conversion width diverges & $m_a = \omega_p$ & \cite{berlin2024axionphoton} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -265,9 +265,9 @@ For gravitational wave backgrounds, the suppression means graviton--photon conve
 \begin{equation}
   \frac{dF_{g \to \gamma}^{\text{torsion}}}{df} \approx A_{\text{suppression}} \times \frac{dF_{g \to \gamma}^{\text{GR}}}{df}, \qquad A_{\text{suppression}} \approx 10^{-3}.
 \end{equation}
-Existing bounds on $h_c(f)$ from non-observation of conversion-induced photon flux~\cite{Lella2024} are therefore \textbf{not strengthened} by torsion in this model --- in fact, the reduced conversion makes the GR bounds more conservative than necessary.
+Existing bounds on $h_c(f)$ from non-observation of conversion-induced photon flux~\cite{dandoy2024constraining} are therefore \textbf{not strengthened} by torsion in this model --- in fact, the reduced conversion makes the GR bounds more conservative than necessary.
 
-Lella \emph{et al.}~\cite{Lella2024} derive constraints on $h_c$ at $f \sim 10^{9}$--$10^{26}\,\text{Hz}$ from the Galactic magnetic field (both regular and turbulent components), improving previous bounds by $1$--$2$ orders of magnitude. Previously reported amplification factors ($A = 48$--$665$) were identified as tachyonic instability artifacts (see \cref{subsec:tachyonic-instability}). The genuine effect in the stable region is suppression ($A \approx 10^{-3}$), or conversely, the same bounds would constrain the torsion parameter space $(\delta_1, \alpha_i)$ by ruling out regions where $A$ exceeds the existing GR limits.
+Lella \emph{et al.}~\cite{dandoy2024constraining} derive constraints on $h_c$ at $f \sim 10^{9}$--$10^{26}\,\text{Hz}$ from the Galactic magnetic field (both regular and turbulent components), improving previous bounds by $1$--$2$ orders of magnitude. Previously reported amplification factors ($A = 48$--$665$) were identified as tachyonic instability artifacts (see \cref{subsec:tachyonic-instability}). The genuine effect in the stable region is suppression ($A \approx 10^{-3}$), or conversely, the same bounds would constrain the torsion parameter space $(\delta_1, \alpha_i)$ by ruling out regions where $A$ exceeds the existing GR limits.
 
 \subsubsection{Spectral Signature}
 
@@ -280,43 +280,3 @@ The $k$-dependent coupling modification (see~\cref{subsec:phenomenology}) produc
 The frequency dependence arises because the Schur complement correction grows with $k^2$ (spatial operators in the constraint equations). The suppression is stronger at higher frequencies, producing a \textbf{red-tilted} conversion spectrum relative to GR. This spectral signature, combined with the suppression itself, is a unique prediction of torsion-mediated graviton--photon coupling in this model.
 
 \textbf{Note}: the tachyonic instability boundary is also $k$-dependent (different modes become tachyonic at different $\alpha_2$), making the instability onset frequency-selective. However, this instability is a pathology of the parameter region, not a physical prediction for stable theories.
-
-\begin{thebibliography}{9}
-\bibitem{Shapiro2002}
-  I.\,L.~Shapiro,
-  \emph{Physical aspects of the space-time torsion},
-  Phys.\ Rep.\ \textbf{357}, 113 (2002),
-  \texttt{hep-th/0103093}.
-
-\bibitem{Bahamonde2025}
-  S.~Bahamonde \emph{et al.},
-  \emph{Non-minimal torsion--matter coupling in Poincar\'e gauge gravity},
-  (2025), \texttt{arXiv:2507.02362}.
-
-\bibitem{Cembranos2023}
-  J.\,A.\,R.~Cembranos, L.\,J.~Garay, and J.\,M.~S\'anchez Vel\'azquez,
-  \emph{Graviton--photon conversion in curved spacetime},
-  Phys.\ Rev.\ D \textbf{107}, 044060 (2023),
-  \texttt{arXiv:2302.08186}.
-
-\bibitem{Berlin2024}
-  A.~Berlin, D.~Blas, and R.\,A.~Porto,
-  \emph{Resonant axion--photon conversion},
-  (2024), \texttt{arXiv:2405.08865}.
-
-\bibitem{Blagojevic2019}
-  M.~Blagojevi\'c and B.~Cvetkovi\'c,
-  \emph{General Poincar\'e gauge theory: Hamiltonian structure and particle spectrum},
-  Phys.\ Rev.\ D \textbf{98}, 024014 (2018),
-  \texttt{arXiv:1812.02675}.
-
-\bibitem{Barker2024}
-  W.\,E.\,V.~Barker,
-  \emph{Every Poincar\'e gauge theory is conformal},
-  (2024), \texttt{arXiv:2406.12826}.
-
-\bibitem{Lella2024}
-  L.~Lella \emph{et al.},
-  \emph{Graviton--photon conversion in the galactic magnetic field},
-  (2024), \texttt{arXiv:2406.17853}.
-\end{thebibliography}
