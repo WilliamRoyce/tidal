@@ -669,7 +669,7 @@ The sparsity pattern can be pre-computed from the equation specification without
 evaluating any numerical values.
 
 \subsubsection{Analytical Jacobian}
-\label{sec:analytical-jacobian}
+\label{sec:analytical-jacobian-migration}
 
 For \textbf{time-independent} systems (most TIDAL examples), the Jacobian
 $J = \mathrm{d}F/\mathrm{d}y + c_j \cdot \mathrm{d}F/\mathrm{d}y'$ consists of two constant sparse matrices that are
@@ -679,7 +679,7 @@ residual evaluations. Three delivery modes by system size:
 \begin{table}[htbp]
 \centering
 \caption{Analytical Jacobian delivery tiers.}
-\label{tab:jacobian-tiers}
+\label{tab:jacobian-tiers-migration}
 \begin{tabular}{@{}llll@{}}
 \toprule
 Tier & Size Range & Method & Speedup vs FD \\

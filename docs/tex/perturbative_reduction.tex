@@ -335,11 +335,6 @@ Test & Verifies & Circular? \\
 \end{align*}
 both matching Adler 1971 eq. (5.13)~\cite{Adler1971} in magnitude, not just in ratio. This is an \emph{analytic} agreement: it follows from the Lagrangian translation and the Wolfram linearisation coefficients. A numerical test that verifies the individual coefficients~-- independently of the ratio~-- would require measuring at physical $\alpha \approx 1/137$ where the shifts are $\sim 10^{-6}$, below the zero-crossing method's $\sim 10^{-3}$ $\omega$-precision. Scaling $B_0$ up amplifies the signal as $B_0^2$ but invalidates the Pass-1 leading-order expansion at large $B_0$ (Duhamel secular growth at $\varepsilon \omega t_{\mathrm{end}} > 1$). Tighter benchmarks (FFT peak-detection with sub-bin interpolation, or a non-perturbative modal path that bypasses the Pass-1 secular-growth regime) are a possible follow-up; the present pipeline's analytic agreement with Adler, together with the self-consistency tests, is sufficient regression coverage for the \#301 architecture fix.
 
-\subsubsection{Measurement Precision Limitations}
-\label{sec:pr-eh-precision}
-
-The zero-crossing period-measurement method used by \texttt{\_measure\_omega} has intrinsic precision $\Delta \omega / \omega \sim \Delta t / t_{\mathrm{end}}$ (roughly), where $\Delta t$ is the snapshot spacing. For $\omega \sim k$, $k = 2$, $t_{\mathrm{end}} = 40$, $N_{\mathrm{snapshots}} = 801$, this gives $\Delta\omega/\omega \sim 10^{-3}$. For small $n^2 - 1 \sim 4\rho B_0^2 \sim 10^{-3}$ (at $\rho = 10^{-3}$), the resulting absolute noise on $n_\perp^2 - 1$ is comparable to the signal, which limits the ratio measurement precision to few-\% at small $\varepsilon$. The ratio test above uses larger $\rho = 10^{-2}$ (where the signal is 10$\times$ noise) together with longer integration ($t_{\mathrm{end}} = 80$, $N_{\mathrm{snapshots}} = 1601$) and the exact finite-$\varepsilon$ correction to achieve clean agreement with $7/4$.
-
 \subsubsection{Summary}
 \label{sec:pr-eh-summary}
 
