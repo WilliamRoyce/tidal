@@ -126,9 +126,17 @@ def parse_likelihood(
             min_value=float(parts[2]),
         )
     if ltype == "maximize":
-        return LikelihoodConfig(metric=metric, likelihood_type="maximize")
+        return LikelihoodConfig(
+            metric=metric,
+            likelihood_type="maximize",
+            baseline_formula=baseline_formula,
+        )
     if ltype == "minimize":
-        return LikelihoodConfig(metric=metric, likelihood_type="minimize")
+        return LikelihoodConfig(
+            metric=metric,
+            likelihood_type="minimize",
+            baseline_formula=baseline_formula,
+        )
     if ltype == "extremize":
         return LikelihoodConfig(
             metric=metric,
