@@ -3,7 +3,7 @@
 **Created:** February 2026
 **Last Updated:** April 2026
 **Status:** Phases A, B, C, D, E (FFT), F, J complete; Torsion (PGT) complete (v0.18.0); Torsion-Gertsenshtein investigated (v0.22.8); **Perturbative Reduction v6 complete (v0.33.9, Stage 7 closed 2026-04-20, issue #271 resolved — Euler–Heisenberg + matter-only theories now supported)**; Phases G–I planned
-**Version:** 0.35.0 | **Tests:** 1,991 collected | **Examples:** 21 working (1+1D to 3+1D)
+**Version:** 0.36.0 | **Tests:** 1,991 collected | **Examples:** 21 working (1+1D to 3+1D)
 
 ## Completed — April 2026
 
@@ -214,15 +214,15 @@ This is the integration example that combines Phase A (and optionally Phase B) i
 
 ### Torsion-Gertsenshtein Investigation (v0.22.8)
 
-Combined PGT + Einstein-Maxwell theory derived (`examples/torsion_gertsenshtein/theory.toml`, 23 components after Ostrogradsky reduction). Key findings:
+Combined PGT + Einstein-Maxwell theory derived (`examples/torsion_gertsenshtein/theory.toml`, 38 components under v0.33.0+ pipeline; pre-v0.33.0 used Ostrogradsky-reduced 23-component representation, now removed). Key findings:
 
 - **Polarisation block-diagonal structure (#200):** The plane-wave reduced equations decompose into two completely decoupled channels with zero cross-talk:
   - **h× ↔ a_x** (h_5 ↔ a_1): torsion-independent, stable, P = sin²(κB₀D/2) unchanged
-  - **trace ↔ a_y** (h_4/h_7/h_9 ↔ a_2 ↔ torsion): torsion-dependent, but ghost-unstable (Ostrogradsky from R̃²)
+  - **trace ↔ a_y** (h_4/h_7/h_9 ↔ a_2 ↔ torsion): torsion-dependent, but ghost-unstable from R̃² (Ostrogradsky's theorem; iterative Parker–Simon path #301 evolves only the physical branch)
 - **Torsion-independence of standard Gertsenshtein (#199):** The h× ↔ a_x equations contain NO torsion parameters (α₁, α₂, α₃, b₅). Algebraically identical to EM-only.
-- **Double inaccessibility:** The torsion-sensitive trace channel is both (1) algebraically unreachable from TT initial conditions and (2) ghost-unstable from Ostrogradsky.
+- **Double inaccessibility:** The torsion-sensitive trace channel is both (1) algebraically unreachable from TT initial conditions and (2) carries an Ostrogradsky ghost branch (suppressed by the iterative Parker–Simon path).
 - **Coupling-instability tension:** The b₅R̃² term simultaneously enables propagating torsion AND introduces Ostrogradsky ghosts — a structural consequence of Ostrogradsky's theorem.
-- **Field-filtered energy measurement:** Added `fields` parameter to energy computation chain, allowing conversion measurement on Ostrogradsky theories by evaluating only source/target field Hamiltonian terms.
+- **Energy measurement (post-v0.33.0):** The mechanical Ostrogradsky reduction and its companion `fields` kwarg in the energy computation were removed in v0.33.0 (commit `ceb6e63`). Higher-derivative theories now require an explicit `[perturbation]` block in TOML and are handled by the v6 iterative Parker–Simon scheme (`docs/tex/perturbative_reduction.tex`); for the constraint-promotion case the Hamiltonian path remains an open architectural barrier (`docs/tex/perturbative_reduction_constraint_barrier.tex`, issue #321).
 - **PGT formulation verified correct:** TIDAL varies L independently w.r.t. h, a, and t via VarD — the standard metric-affine/Palatini approach for the torsion sector.
 
 ### Dark Photon Torsion Model (active — v0.24)

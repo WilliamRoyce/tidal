@@ -5,7 +5,7 @@
 		"derived_from": "Euler-Lagrange",
 		"gauge": "none",
 		"linearized": false,
-		"derivation_hash": "446be591985504a6c206ea1cfa4ba3a154dc239fd35fcb1dc6c57f3a4eb34447"
+		"derivation_hash": "896ab91a9117d1647b6eea6afbfa7f68bbc17838a24a1e2d751c4fa7521e6952"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -135,6 +135,7 @@
 					"operator": "identity"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "omegaP2/2"
 			},
 			{
@@ -148,6 +149,7 @@
 					"operator": "identity"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "B0^2/2"
 			},
 			{
@@ -161,6 +163,7 @@
 					"operator": "identity"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "mg2/(2*kappa^2)"
 			},
 			{
@@ -174,6 +177,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "interaction",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "B0"
 			},
 			{
@@ -186,7 +190,8 @@
 					"field": "a_0",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -199,6 +204,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
@@ -211,7 +217,8 @@
 					"field": "a_0",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -224,6 +231,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "1/(2*kappa^2)"
 			}
 		]

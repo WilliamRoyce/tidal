@@ -258,7 +258,7 @@ The full PGT Lagrangian includes a curvature-squared term $b_5 \tilde{R}^2$ wher
 
 \begin{itemize}
   \item \textbf{Graviton-torsion mixing:} $\tilde{R}^2$ introduces coupling between metric and torsion perturbations via 4th-order equations and cross-coupled spatial derivatives. Without it, the torsion sector decouples from gravity at linear order.
-  \item \textbf{4th-order equations:} The variation of $\tilde{R}^2$ produces equations with $\partial_t^4$ terms, requiring Ostrogradsky reduction (see \S\ref{sec:ostrogradsky} in Architecture).
+  \item \textbf{4th-order equations:} The variation of $\tilde{R}^2$ produces equations with $\partial_t^4$ terms.  These are handled by the v6 iterative Parker--Simon scheme (see \cref{sec:perturbative-reduction}), which keeps the LHS evolution operator second-order and treats $b_5$-dependent corrections as Duhamel sources. The mechanical Ostrogradsky reduction used pre-v0.33.0 was removed because it propagated ghost modes; field counts in \S\ref{sec:torsion-perturbation} below reflect the pre-v0.33.0 representation and differ from the v6 layout (which retains the original 4th-order structure but solves it perturbatively).
   \item \textbf{Higher-order spatial operators:} The derived equations contain \texttt{derivative\_3\_x} ($\partial_x^3$), \texttt{biharmonic} ($\nabla^4$), and mixed time-space operators (\texttt{mixed\_T2\_S2x}, \texttt{mixed\_T3\_S1x}).
 \end{itemize}
 
