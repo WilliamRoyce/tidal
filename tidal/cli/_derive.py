@@ -368,6 +368,7 @@ def _wls_packages(
             'Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];',
             'Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];',
             'Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];',
+            'Get[FileNameJoin[{pipelinePath, "PerturbativeReduction.wl"}]];',
             'Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];',
         ),
     )
@@ -5050,6 +5051,61 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "(* from the FULL Lagrangian (cross-terms like dh x T contribute to π_h). *)",
             "(* The filtered H then contains only GW+EM self-energy for P(t).      *)",
             "",
+        ],
+    )
+
+    # --- Lagrangian Perturbative Substitution (LPS, Phase B+) ---
+    # For perturbative theories with declared small_parameters, substitute
+    # higher-order time derivatives in lagComp using the order-0 EOM.  This
+    # eliminates the irreducible q-double-dot residue that IBP cannot handle
+    # alone (the q-double-dot * X products from b5*R~^2-style Lagrangians).
+    # No-op for non-perturbative theories.  Runs BEFORE the IBP loop so
+    # that IBP sees only 1st-order time derivatives.
+    if ctx.perturbative_reduction is not None:
+        small_params_wl = (
+            "{" + ", ".join(ctx.perturbative_reduction["small_parameters"]) + "}"
+        )
+        reduction_order = ctx.perturbative_reduction.get("order", 1)
+        # Wrap the LPS call in Catch so a Throw (e.g., constraint-promotion case)
+        # is captured cleanly and the script aborts with a non-zero exit, rather
+        # than silently producing a pre-LPS JSON.
+        lines.extend(
+            [
+                "(* === Lagrangian Perturbative Substitution (LPS) ============== *)",
+                "(* Eliminates higher-order time derivatives in lagComp by         *)",
+                "(* substituting the order-0 EOM, before the Legendre transform.  *)",
+                "(* See tidal/wolfram/PerturbativeReduction.wl.                    *)",
+                _wls_timing_start("tLPS"),
+                "Module[{lpsResult},",
+                "  lpsResult = Catch[",
+                "    TorsionGertsenshtein`PerturbativeReduction`ReduceLagrangian[",
+                f"      lagComp, fieldEquations, compToFunc, {small_params_wl}, "
+                f"{reduction_order}]",
+                "  ];",
+                "  If[StringQ[lpsResult],",
+                '    Print["[LPS] ERROR: ", lpsResult];',
+                '    Print["[LPS] Aborting derivation — the resulting Hamiltonian "',
+                '      <> "would be physically incorrect.  Investigate the LPS "',
+                '      <> "algorithm or revise the TOML before re-deriving."];',
+                "    Exit[1]",
+                "  ];",
+                "  lagComp = lpsResult;",
+                "];",
+                _wls_timing_end("tLPS", "Lagrangian Perturbative Substitution"),
+                'Print["L after LPS: ", If[Head[lagComp]===Plus, Length[lagComp], 1], " terms"];',
+                "",
+            ],
+        )
+    else:
+        lines.extend(
+            (
+                "(* LPS skipped: no [perturbation] block in TOML — non-perturbative theory *)",
+                "",
+            )
+        )
+
+    lines.extend(
+        [
             'Print["Phase B: starting IBP (lagComp LeafCount=", LeafCount[lagComp], ", terms=", If[Head[lagComp]===Plus, Length[lagComp], 1], ")"];',
             "",
             "(* --- Integration by parts: reduce second time derivatives ---          *)",
@@ -6425,6 +6481,12 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         tmp.write(script_content)
         tmp_path = Path(tmp.name)
 
+    # Record JSON mtime BEFORE wolframscript so we can distinguish
+    # "JSON written by this run" from "stale JSON from a previous run"
+    # in the leniency check below.  Any wolframscript failure that does
+    # NOT touch the output JSON is a real error (e.g., LPS abort before
+    # Phase D); the existing on-disk JSON must not mask it.
+    pre_run_mtime = resolved_out.stat().st_mtime_ns if resolved_out.exists() else 0
     try:
         ret = _run_wolframscript(tmp_path, timeout=args.timeout)
     finally:
@@ -6435,21 +6497,35 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
 
     # Wolfram Engine in Docker sometimes exits with non-zero code due to
     # license cleanup errors AFTER successfully writing the JSON.  If the
-    # output file exists with valid structure, treat as success for
-    # post-processing (reduction, validation, hash injection).
+    # output file was MODIFIED during this run AND has valid structure,
+    # treat as success for post-processing.  Crucially: if the JSON's
+    # mtime did not change, the failing wolframscript never wrote a new
+    # JSON — the existing file is stale from a previous run and the
+    # error must be honoured (LPS abort, parse error, etc.).
     if ret != 0 and resolved.exists():
-        try:
-            probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
-            if probe.get("equations") and len(probe["equations"]) > 0:
-                print(
-                    f"\nNote: wolframscript exited with code {ret} but "
-                    f"JSON was exported successfully — proceeding with "
-                    f"post-processing.",
-                    file=sys.stderr,
-                )
-                ret = 0
-        except Exception:  # noqa: BLE001, S110
-            pass  # JSON missing or corrupt — honour the non-zero exit code
+        post_run_mtime = resolved.stat().st_mtime_ns
+        if post_run_mtime <= pre_run_mtime:
+            print(
+                f"\nwolframscript exited with code {ret} and the output "
+                f"JSON was NOT modified during this run.  Treating as a "
+                f"real failure (stale JSON from a previous run will not "
+                f"mask it).  See the wolframscript output above for the "
+                f"failure cause (e.g., '[LPS] ERROR: ...').",
+                file=sys.stderr,
+            )
+        else:
+            try:
+                probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
+                if probe.get("equations") and len(probe["equations"]) > 0:
+                    print(
+                        f"\nNote: wolframscript exited with code {ret} but "
+                        f"JSON was exported successfully — proceeding with "
+                        f"post-processing.",
+                        file=sys.stderr,
+                    )
+                    ret = 0
+            except Exception:  # noqa: BLE001, S110
+                pass  # JSON missing or corrupt — honour the non-zero exit code
 
     # NOTE: Plane-wave reduction (coordinate remapping, operator renaming,
     # dimension change) is now handled entirely in Wolfram via
