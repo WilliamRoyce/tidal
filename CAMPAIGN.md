@@ -65,20 +65,48 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 - [x] HPC suppression 28216072 (suppress, old convention; pre-IC-snap) — IC-leakage invalidated, archived
 - [x] HPC suppression 28365129 (suppress retry 1, old convention; post-IC-snap) — FAILED on /tmp-full on compute node cpu-q-553, archived
 - [x] HPC suppression 28366464 (suppress retry 2, old convention; post-IC-snap) — completed 3:33, pulled, archived as wrong-regime. log(Z)=-0.069, D_KL(xi)=0.23
-- [x] HPC amplify rerun under NEW convention: **job 28367920** submitted 2026-04-24, std QOS, 3h wall (RUNNING)
+- [x] HPC amplify rerun under NEW convention: **job 28367920** submitted 2026-04-24, std QOS, 3h wall (**COMPLETED 20:01**)
 - [x] HPC suppress rerun under NEW convention: **job 28367934** submitted 2026-04-24, INTR QOS, 1h wall (**COMPLETED 2:19**)
-- [x] Results pulled for 28367934
-- [x] Preliminary analysis of 28367934 (suppress, new convention):
-  - log(Z) = -0.056 ± 0.004, N=2294 samples, 100% success (no IC-leakage failures)
-  - **0/2294 samples with P_max < P_GR**: no true suppression found in the stable-Proca prior.
-    Posterior concentrates at alpha3 → 0.001 (log-uniform lower bound) = dark-photon decoupling
-    limit, giving trivial P_max ≈ P_GR.
-  - **Unexpected amplification signal at the prior boundary**: top 5 samples have P_max between
-    1.7× and 5.88× P_GR, at (high |deltam|, high xi, variable mA2/alpha3) — these are
-    "worst suppressors" from the POV of this minimization, but represent real amplification
-    samples that the upcoming amplify run (28367920) should lock onto.
-  - D_KL: xi=0.219, mA2=0.022, alpha3=0.023, deltam=0.020 — xi dominates (stability cutoff)
-- [ ] Pull + analyse amplify 28367920 when complete
+- [x] Results pulled for both
+- [x] Two bugs found during analysis (now fixed); results re-interpreted
+
+### Bugs identified and fixed during 2026-04-24 post-run analysis
+
+1. **Issue #319**: `parse_likelihood()` silently dropped `--baseline-formula` for
+   `maximize`/`minimize` types (only `extremize` propagated it). Result: HPC
+   `log_likelihood` field was raw `P_max` (or `−P_max` for minimize), not
+   `log(P_max/P_GR)` as documented. Fixed in commit `d34a204`. v3 results need
+   re-interpretation under "raw P_max" semantics.
+2. **Issue #320**: Modal solver eigendecomposition is **ill-conditioned at high-xi
+   resonant-instability regions** of the dark photon plasma model. At "the same"
+   parameter point (precision-equivalent inputs), max `Re(λ)` can vary by 4× (e.g.
+   168 → 316 → 559) and the divergence pre-check fires inconsistently. v3 amplify's
+   "high-amplification" top samples lie precisely in these ill-conditioned regions,
+   so their reported `P_max` values are not trustworthy as physics.
+
+### Re-interpreted results (under raw `P_max` semantics, post-#319 understanding)
+
+- **Suppress 28367934 (real signal, robust)**:
+  - Median `P_max ≈ 0.0036 = 6%` of P_GR (94% suppression).
+  - **2283 / 2294 (99.5%) samples with `P_max < P_GR`** — strong genuine suppression.
+  - Posterior concentrates at small `alpha3` (decoupling limit) — well-conditioned region.
+  - D_KL(xi)=0.22 dominates (stability cutoff); other D_KLs ~0.02.
+  - **This is the first non-null Stage A result**. The claim "0/2294" reported
+    pre-fix was wrong — it came from inverting the wrong likelihood formula.
+
+- **Amplify 28367920 (high-xi signal NOT trustworthy — Issue #320)**:
+  - 41% of samples have `P_max > P_GR`, 18% have `P_max > 1` (unphysical).
+  - Top samples cluster at `xi ∈ [5, 8]` (high-end of `log_uniform(0.05, 20)`),
+    `|deltam| ≈ 0.5` (prior boundary), `alpha3` and `mA2` variable.
+  - Local reproduction of the top-1 sample (`mA2=0.00295, deltam=0.054, xi=5.48,
+    alpha3=0.0098`) showed `tidal simulate` (disk path) DIVERGES at the modal
+    solver's pre-check, while `tidal sample` (in-memory path) returns finite
+    `P_max ≈ 1.7-2.0` — a path-dependent contradiction that Issue #320 traces to
+    eigenvalue ill-conditioning at resonant-instability windows.
+  - Conclusion: the "amplification signal" at high xi is numerical-noise
+    eigenvalue amplification, NOT real physics. v3 amplify cannot be used as-is.
+
+- [ ] Submit Stage A v4 with stability filtering (TBD post-#320 mitigation)
 
 - **Amplify finding (2026-04-22, 28226826):** log(Z)=+0.118±0.006, joint D_KL=0.043,
   D_KL(xi)=0.226, D_KL(mA2)=0.032. MAP at (mA2=0.34, deltam=-0.21, xi=1.08, alpha3=0.054).
