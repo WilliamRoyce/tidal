@@ -18,7 +18,7 @@ for the full architecture. Key guarantees:
   added cost is ~1.5x a single Pass 0 at machine precision.
 """
 
-# ruff: noqa: RUF002, RUF003, ERA001 — Unicode math symbols; shape-annotation comments.
+# ruff: noqa: RUF003, ERA001 — Unicode math symbols; shape-annotation comments.
 # ruff: noqa: PLR0913, PLR0917, PLR0914, PLR0912, PLR0915, PLR2004, C901, N806, ANN401
 #   — numerical code inherently requires many arguments, local variables, and uppercase
 #   matrix names (V, K_eff follow standard linear-algebra notation).
@@ -554,6 +554,8 @@ class PerturbativeSolver:
         orders: list[Any] = [pass0]
         total_y = pass0["y"].copy()
         correction_drops: list[dict[str, Any]] = []
+        # Track Pass-n solver failures so they propagate to result.success
+        # rather than silently corrupting total_y.
 
         if order >= 1 and self.has_corrections():
             from tidal.solver.state import StateLayout  # noqa: PLC0415
@@ -599,6 +601,23 @@ class PerturbativeSolver:
                     pass0["t"],
                     parameters=parameters,
                 )
+                # Fail loud and fast on Pass-n solver failure.  Returning a
+                # degraded result with only Pass 0 would silently mask the
+                # missing perturbative correction and produce physically
+                # wrong physics.  The caller must see the failure and decide
+                # whether to reduce the parameter regime, fix the spec, or
+                # treat the failure as terminal.
+                if not pass_n.get("success", False):
+                    msg = pass_n.get(
+                        "message", f"Pass {n} solver returned success=False"
+                    )
+                    msg = (
+                        f"Perturbative Pass {n} failed: {msg}. The order-{n} "
+                        f"Duhamel correction could not be computed; aborting "
+                        f"rather than returning a degraded result that would "
+                        f"give incorrect physics."
+                    )
+                    raise RuntimeError(msg)
                 correction_drops.extend(
                     {**d, "pass": n} for d in pass_n["correction_drops"]
                 )
@@ -644,6 +663,9 @@ class PerturbativeSolver:
         # CLI / caller can see when Pass 1 silently misses contributions.
         validity["correction_drops"] = correction_drops
 
+        # Pass-n failures raise immediately above; reaching here means all
+        # passes succeeded.  The total result is the sum of Pass 0 and all
+        # Pass-n corrections.
         total: dict[str, Any] = {
             "t": pass0["t"],
             "y": total_y,

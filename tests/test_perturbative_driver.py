@@ -5,7 +5,7 @@ validity-monitor thresholds, and robustness to baseline (no-correction)
 theories.
 """
 
-# ruff: noqa: RUF002 — math symbols in docstrings; commented stubs.
+
 
 from __future__ import annotations
 
@@ -817,6 +817,45 @@ class TestPerturbativeDefensiveHardening:
             "small parameter" in record.message and "eps" in record.message
             for record in caplog.records
         ), "Expected a warning about missing small parameter 'eps'"
+
+    def test_pass_n_failure_raises_runtime_error(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Pass-n solver returning success=False must raise RuntimeError loudly.
+
+        Returning a degraded result (Pass 0 only) would silently mask the
+        missing perturbative correction and produce physically wrong physics.
+        The caller must see the failure.
+        """
+        spec = _make_spec(_KG_WITH_EPS)
+        solver = PerturbativeSolver(spec)
+        grid = GridInfo(shape=(16,), bounds=((0.0, 2 * np.pi),), periodic=(True,))
+        y0 = _make_ic(spec, grid)
+
+        # Force solve_modal_pass1 to return a failure result
+        from tidal.solver import perturbative_driver as pd_module
+
+        def fake_pass1(eigendata, correction_spec, grid_, t_arr, parameters=None):
+            return {
+                "t": t_arr,
+                "y": np.zeros((len(t_arr), 1)),
+                "success": False,
+                "message": "synthetic failure for test",
+                "correction_drops": [],
+            }
+
+        monkeypatch.setattr(pd_module, "solve_modal_pass1", fake_pass1)
+
+        with pytest.raises(RuntimeError, match="Perturbative Pass 1 failed"):
+            solver.solve(
+                y0,
+                grid,
+                (0.0, 0.5),
+                order=1,
+                parameters={"m2": 1.0, "eps": 0.01},
+                num_snapshots=3,
+            )
 
 
 # ---------------------------------------------------------------------------
