@@ -18,7 +18,7 @@
 			"propagation_axis": "z",
 			"eliminated_fields": []
 		},
-		"derivation_hash": "223c7a4e736d577dc4a611c7c464fe733a34aa5deeee7910bf2c510f00aef1df"
+		"derivation_hash": "4ad4b8348669a7147c3875c03d75c3c5ed1d653b6e0169dfead3d0a5f3c08a87"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -186,7 +186,8 @@
 					"field": "a_0",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -199,6 +200,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
+				"order_in_eps": 1,
 				"coefficient_symbolic": "B0^2*rho"
 			},
 			{
@@ -211,7 +213,8 @@
 					"field": "a_1",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -224,6 +227,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
+				"order_in_eps": 1,
 				"coefficient_symbolic": "-(B0^2*rho)"
 			},
 			{
@@ -236,7 +240,8 @@
 					"field": "a_2",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -249,6 +254,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
+				"order_in_eps": 1,
 				"coefficient_symbolic": "-3*B0^2*rho"
 			},
 			{
@@ -261,7 +267,8 @@
 					"field": "a_3",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": -0.5,
@@ -273,7 +280,8 @@
 					"field": "a_0",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 0.5,
@@ -285,7 +293,8 @@
 					"field": "a_1",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -298,6 +307,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
+				"order_in_eps": 1,
 				"coefficient_symbolic": "-(B0^2*rho)"
 			},
 			{
@@ -311,6 +321,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
+				"order_in_eps": 1,
 				"coefficient_symbolic": "8*B0^2*sigma"
 			},
 			{
@@ -323,7 +334,8 @@
 					"field": "a_2",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -336,6 +348,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
+				"order_in_eps": 1,
 				"coefficient_symbolic": "-(B0^2*rho)"
 			},
 			{
@@ -348,7 +361,8 @@
 					"field": "a_3",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -361,6 +375,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
+				"order_in_eps": 1,
 				"coefficient_symbolic": "-(B0^2*rho)"
 			}
 		]

@@ -564,11 +564,13 @@ class HamiltonianTerm:
         field) or ``"interaction"`` (cross-field coupling). Defaults to
         ``"unknown"`` for older JSONs; use ``is_self_energy`` property
         which auto-classifies by comparing factor field names.
-    order_in_eps : int or None
-        Perturbative order of this term: ``0`` for leading-order (no
-        symbolic coefficient) terms, ``1`` for first-order corrections
-        (have ``coefficient_symbolic``). ``None`` only for terms created
-        programmatically before this field existed (legacy).
+    order_in_eps : int
+        Perturbative order of this term: total exponent in declared
+        ``small_parameters``.  Computed by Wolfram's ``ComputeOrderInEps``
+        and emitted explicitly by ``ParseSingleHamiltonianTerm``.  Defaults
+        to 0 for non-perturbative theories and direct hand-construction;
+        legacy JSONs without the explicit field are tagged via heuristic
+        (``1 if coefficient_symbolic else 0``) and should be re-derived.
     """
 
     coefficient: float
@@ -577,7 +579,10 @@ class HamiltonianTerm:
     coefficient_symbolic: str | None = None
     coordinate_dependent: tuple[str, ...] = ()
     term_class: str = "unknown"  # "self" or "interaction"
-    order_in_eps: int | None = None  # 0 = leading-order; 1 = first EH/pert correction
+    # Perturbative order computed by Wolfram via ComputeOrderInEps; matches the
+    # equation-side OperatorTerm.order_in_eps convention.  Default 0 covers
+    # non-perturbative theories and direct hand-construction in tests.
+    order_in_eps: int = 0
 
     @property
     def position_dependent(self) -> bool:
@@ -617,11 +622,25 @@ class HamiltonianTerm:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianTerm:
-        """Parse from JSON dict."""
+        """Parse from JSON dict.
+
+        Reads the explicit ``order_in_eps`` field emitted by Wolfram's
+        ``ComputeOrderInEps`` (single source of truth, matching the equation
+        side at ``OperatorTerm.order_in_eps``).  For legacy JSONs without the
+        explicit field, falls back to the heuristic ``1 if coefficient_symbolic
+        is not None else 0`` — correct for current EH but coincidental in
+        general.  The strict consistency check lives in ``tidal validate``.
+        """
         coeff_sym = data.get("coefficient_symbolic")
-        # Infer perturbative order: terms with a symbolic coefficient are O(ε¹)
-        # corrections; pure-numeric terms are O(ε⁰) background Maxwell terms.
-        order = 1 if coeff_sym is not None else 0
+        if "order_in_eps" in data:
+            order = int(data["order_in_eps"])
+        else:
+            # Legacy JSON: infer via heuristic.  Coincidentally correct when
+            # every coefficient_symbolic contains a small parameter (true for
+            # Euler-Heisenberg) but not robust in general.  Re-derive the JSON
+            # via `uv run tidal derive <toml>` to obtain Wolfram-emitted
+            # rigorous tags.
+            order = 1 if coeff_sym is not None else 0
         return cls(
             coefficient=float(data["coefficient"]),
             factor_a=HamiltonianFactor.from_dict(data["factor_a"]),

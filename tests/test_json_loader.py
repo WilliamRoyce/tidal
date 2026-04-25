@@ -504,7 +504,8 @@ class TestEquationSystemOrderInEps:
 
 
 def _spec_with_promoted_field(
-    kinetic_sym: str, extra_small: list[str] | None = None,
+    kinetic_sym: str,
+    extra_small: list[str] | None = None,
 ) -> dict[str, Any]:
     """Spec where 'h' has a parameter-dependent kinetic coefficient.
 
@@ -636,7 +637,8 @@ class TestEquationSystemBaseSpec:
             spec.base_spec()
 
     def test_base_spec_rejects_third_order_residual_roundtrip(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """R5.4 / #283 realistic path: JSON with a [perturbation] block
         whose small_parameters list does NOT cover the kinetic
@@ -796,7 +798,9 @@ class TestEquationSystemBaseSpec:
         # The base_spec matrices must be internally consistent with the
         # demoted equations.
         expected_mass, expected_coupling, _, _ = base._compute_matrices_from_terms(
-            base.equations, base.component_names, parameters=None,
+            base.equations,
+            base.component_names,
+            parameters=None,
         )
         assert base.mass_matrix == expected_mass
         assert base.coupling_matrix == expected_coupling
@@ -820,7 +824,8 @@ class TestValidateJsonSchema:
         """Test that missing spacetime raises ValueError."""
         data: dict[str, Any] = {"fields": [], "equations": []}
         with pytest.raises(
-            ValueError, match="Missing required top-level field: spacetime",
+            ValueError,
+            match="Missing required top-level field: spacetime",
         ):
             validate_json_schema(data)
 
@@ -828,7 +833,8 @@ class TestValidateJsonSchema:
         """Test that missing fields raises ValueError."""
         data: dict[str, Any] = {"spacetime": {"dimension": 2}, "equations": []}
         with pytest.raises(
-            ValueError, match="Missing required top-level field: fields",
+            ValueError,
+            match="Missing required top-level field: fields",
         ):
             validate_json_schema(data)
 
@@ -839,7 +845,8 @@ class TestValidateJsonSchema:
             "fields": [{"name": "phi"}],
         }
         with pytest.raises(
-            ValueError, match="Missing required top-level field: equations",
+            ValueError,
+            match="Missing required top-level field: equations",
         ):
             validate_json_schema(data)
 
@@ -943,7 +950,10 @@ class TestFieldReferenceValidation:
                     ),
                 ),
                 ComponentEquation(
-                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
+                    "A_1",
+                    1,
+                    2,
+                    (OperatorTerm(1.0, "laplacian", "A_1"),),
                 ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -971,7 +981,10 @@ class TestFieldReferenceValidation:
                     ),
                 ),
                 ComponentEquation(
-                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
+                    "A_1",
+                    1,
+                    2,
+                    (OperatorTerm(1.0, "laplacian", "A_1"),),
                 ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -999,7 +1012,10 @@ class TestFieldReferenceValidation:
                         ),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
+                        "A_1",
+                        1,
+                        2,
+                        (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -1025,7 +1041,10 @@ class TestFieldReferenceValidation:
                         ),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
+                        "A_1",
+                        1,
+                        2,
+                        (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -1120,10 +1139,16 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
+                        "A_0",
+                        0,
+                        2,
+                        (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
+                        "A_1",
+                        1,
+                        2,
+                        (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0),),  # 1 row instead of 2
@@ -1141,10 +1166,16 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
+                        "A_0",
+                        0,
+                        2,
+                        (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
+                        "A_1",
+                        1,
+                        2,
+                        (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0,), (0.0,)),  # 1 col instead of 2
@@ -1162,10 +1193,16 @@ class TestValidationErrors:
                 component_names=("A_0", "A_1"),
                 equations=(
                     ComponentEquation(
-                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),),
+                        "A_0",
+                        0,
+                        2,
+                        (OperatorTerm(1.0, "laplacian", "A_0"),),
                     ),
                     ComponentEquation(
-                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),),
+                        "A_1",
+                        1,
+                        2,
+                        (OperatorTerm(1.0, "laplacian", "A_1"),),
                     ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -1974,6 +2011,78 @@ class TestCanonicalStructure:
         cs = CanonicalStructure.from_dict(self._make_canonical_data(h_terms=[]))
         assert cs.hamiltonian_terms == ()
 
+    # === HamiltonianTerm.order_in_eps (Phase 1: Wolfram-emitted source of truth) ===
+
+    def test_hamiltonian_order_in_eps_explicit_from_json(self) -> None:
+        """Explicit order_in_eps in JSON is read verbatim, not inferred."""
+        from tidal.symbolic.json_loader import HamiltonianTerm
+
+        data = {
+            "coefficient": 1.0,
+            "factor_a": {"field": "phi_0", "operator": "gradient_x"},
+            "factor_b": {"field": "phi_0", "operator": "gradient_x"},
+            "coefficient_symbolic": "rho*sigma",  # heuristic would say 1
+            "order_in_eps": 2,  # but Wolfram knows it's bilinear → 2
+        }
+        term = HamiltonianTerm.from_dict(data)
+        assert term.order_in_eps == 2
+
+    def test_hamiltonian_order_in_eps_explicit_zero_overrides_heuristic(self) -> None:
+        """Explicit order_in_eps=0 overrides the heuristic for legacy
+        coefficient_symbolic terms that turn out to be background-only.
+
+        Example: coefficient_symbolic="B0^2" with small_parameters=["rho"]
+        is order 0 (background magnitude, no small parameter dependence).
+        The pre-Phase-1 heuristic would mis-tag this as order 1.
+        """
+        from tidal.symbolic.json_loader import HamiltonianTerm
+
+        data = {
+            "coefficient": 1.0,
+            "factor_a": {"field": "phi_0", "operator": "identity"},
+            "factor_b": {"field": "phi_0", "operator": "identity"},
+            "coefficient_symbolic": "B0^2",
+            "order_in_eps": 0,
+        }
+        term = HamiltonianTerm.from_dict(data)
+        assert term.order_in_eps == 0
+
+    def test_hamiltonian_order_in_eps_legacy_falls_back_to_heuristic(self) -> None:
+        """Legacy JSONs (no explicit order_in_eps) use the heuristic.
+
+        Backward-compat path: a term with coefficient_symbolic but no
+        explicit order_in_eps gets order=1 (matches the pre-Phase-1
+        behaviour and is correct for current EH).
+        """
+        from tidal.symbolic.json_loader import HamiltonianTerm
+
+        data = {
+            "coefficient": 1.0,
+            "factor_a": {"field": "phi_0", "operator": "gradient_x"},
+            "factor_b": {"field": "phi_0", "operator": "gradient_x"},
+            "coefficient_symbolic": "rho",
+            # no order_in_eps → fall back to heuristic
+        }
+        term = HamiltonianTerm.from_dict(data)
+        assert term.order_in_eps == 1
+
+    def test_hamiltonian_order_in_eps_default_zero_for_direct_construction(
+        self,
+    ) -> None:
+        """Direct hand-construction in tests gets order_in_eps=0 by default.
+
+        Confirms the dataclass default (matches OperatorTerm) so existing
+        hand-constructed test fixtures continue to work without code changes.
+        """
+        from tidal.symbolic.json_loader import HamiltonianFactor, HamiltonianTerm
+
+        term = HamiltonianTerm(
+            coefficient=1.0,
+            factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+        )
+        assert term.order_in_eps == 0
+
     def test_equation_system_with_canonical(self) -> None:
         """EquationSystem.from_dict parses canonical section."""
         data: dict[str, Any] = {
@@ -2039,7 +2148,9 @@ class TestCanonicalStructure:
 
 
 def _make_spec_with_kinetic_coeff(
-    kc_sym: str, coeff: float = 2.0, coeff_sym: str | None = "alpha",
+    kc_sym: str,
+    coeff: float = 2.0,
+    coeff_sym: str | None = "alpha",
 ) -> EquationSystem:
     """Build a minimal EquationSystem with one unnormalized kinetic eq and one normal eq."""
     eq_with_kc = ComponentEquation(
@@ -2214,7 +2325,8 @@ class TestBoundaryConditionToSideBc:
         assert side.kind == "dirichlet"
 
     def test_from_dict_warns_irrelevant_fields(
-        self, caplog: pytest.LogCaptureFixture,
+        self,
+        caplog: pytest.LogCaptureFixture,
     ) -> None:
         """Dirichlet with gamma logs a warning about irrelevant fields."""
         from tidal.symbolic.json_loader import BoundaryCondition

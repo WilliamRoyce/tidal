@@ -953,7 +953,10 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
                 (
                     f"(* Early DefTensor for perturbation field {mp_name} used in Lagrangian *)",
                     _generate_field_def(
-                        mp_field, ctx.prefix, ctx.manifold, head_override=mp_head,
+                        mp_field,
+                        ctx.prefix,
+                        ctx.manifold,
+                        head_override=mp_head,
                     ),
                     "",
                 ),
@@ -1150,7 +1153,10 @@ def _wls_matter_perturbation_setup(  # noqa: PLR0914
 
 
 def _wls_component_metadata(
-    field_name: str, fexpr: str, comp_var: str, dim: int,
+    field_name: str,
+    fexpr: str,
+    comp_var: str,
+    dim: int,
 ) -> list[str]:
     """Generate Wolfram code to build tensor component metadata for a field.
 
@@ -1593,7 +1599,8 @@ def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0914, PLR091
                 "",
                 "On[Validate::repeated]; On[Validate::inhom];",
                 _wls_timing_end(
-                    "tCDPrecomp", "CD shorthand ComponentValue pre-computation",
+                    "tCDPrecomp",
+                    "CD shorthand ComponentValue pre-computation",
                 ),
                 "",
             ],
@@ -1773,7 +1780,8 @@ def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0914, PLR091
             "",
             "On[Validate::repeated]; On[Validate::inhom];",
             _wls_timing_end(
-                "tCDPrecomp", "CD shorthand ComponentValue pre-computation",
+                "tCDPrecomp",
+                "CD shorthand ComponentValue pre-computation",
             ),
             "",
         ],
@@ -2841,7 +2849,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         lines.extend(_wls_gauge_fixing_type_b(ctx))
 
     lines.append(
-        _wls_timing_end("tLinearize", "Linearization (xPert L^(2) + EOM decomposition)"),
+        _wls_timing_end(
+            "tLinearize", "Linearization (xPert L^(2) + EOM decomposition)"
+        ),
     )
     return lines
 
@@ -2885,7 +2895,8 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
         xi = entry.get("xi", 1)
         # Use perturbation head if this field is a perturbation with name collision
         pfx_field = pert_head_map.get(
-            field_name, f"{ctx.prefix}{field_name.capitalize()}",
+            field_name,
+            f"{ctx.prefix}{field_name.capitalize()}",
         )
 
         if entry["type"] == "custom":
@@ -3191,7 +3202,11 @@ def _type_b_tt_gauge(
     # Uses diagonal metric entries for curved backgrounds; flat weights for Minkowski.
     lines.extend(
         _tt_traceless_substitution(
-            dim, comp_pfx, field_name, coord_args, ctx.metric_diagonal,
+            dim,
+            comp_pfx,
+            field_name,
+            coord_args,
+            ctx.metric_diagonal,
         ),
     )
 
@@ -3736,7 +3751,8 @@ def _wls_linearization(ctx: _WlsContext, *, include_bg: bool = False) -> list[st
 
 
 def _wls_constraint_metadata(
-    cs_config: dict[str, Any], spatial_coords: list[str],
+    cs_config: dict[str, Any],
+    spatial_coords: list[str],
 ) -> list[str]:
     """Generate Wolfram metadata lines for constraint solver configuration.
 
@@ -4480,7 +4496,8 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             bg_head = f"{p}{bf['name'].capitalize()}"
             comps_str = ", ".join(str(c) for c in bf["components"])
             contra_comps = _compute_contra_components(
-                bf["components"], ctx.metric_diagonal,
+                bf["components"],
+                ctx.metric_diagonal,
             )
             contra_str = ", ".join(contra_comps)
             bg_rules_entries.append(wl_bg_rule_entry(bg_head, comps_str, contra_str))
@@ -5419,8 +5436,11 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "];",
             "",
             "(* Parse H into structured quadratic terms *)",
+            "(* Thread small_parameters through so ComputeOrderInEps tags each *)",
+            "(* Hamiltonian term symmetrically with the equation side. *)",
             _wls_timing_start("tParseH"),
             "hamiltonianTerms = ParseHamiltonianExpression[canonicalH, allCompNames,"
+            f" {('{' + ', '.join(ctx.perturbative_reduction['small_parameters']) + '}') if ctx.perturbative_reduction is not None else '{}'},"
             f' If[TrueQ[$tidalHamiltonianFilter], "{ctx.torsion["perturbation_name"] if ctx.torsion else ""}", ""]];',
             _wls_timing_end("tParseH", "ParseHamiltonianExpression"),
             'Print["Hamiltonian terms: ", Length[hamiltonianTerms]];',
@@ -6319,7 +6339,9 @@ def _run_wolframscript(script_path: Path, *, timeout: int = 0) -> int:
         )
         # Clean up orphaned WolframKernel after timeout
         subprocess.run(
-            ["pkill", "-f", "WolframKernel"], capture_output=True, check=False,
+            ["pkill", "-f", "WolframKernel"],
+            capture_output=True,
+            check=False,
         )
         return 1
 
@@ -6347,7 +6369,9 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     _audit_higher_derivative_lagrangian(config)
 
     script_content = generate_wls(
-        config, output_override=args.output, config_dir=config_path.parent.resolve(),
+        config,
+        output_override=args.output,
+        config_dir=config_path.parent.resolve(),
     )
 
     if args.dry_run:
@@ -6392,7 +6416,11 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
 
     # Use temp file
     with tempfile.NamedTemporaryFile(
-        encoding="utf-8", mode="w", suffix=".wls", delete=False, prefix="tidal_derive_",
+        encoding="utf-8",
+        mode="w",
+        suffix=".wls",
+        delete=False,
+        prefix="tidal_derive_",
     ) as tmp:
         tmp.write(script_content)
         tmp_path = Path(tmp.name)
@@ -6451,7 +6479,8 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
             spec_data = _json_mod.loads(resolved.read_text(encoding="utf-8"))
             spec_data.setdefault("metadata", {})["derivation_hash"] = script_hash
             resolved.write_text(
-                _json_mod.dumps(spec_data, indent="\t"), encoding="utf-8",
+                _json_mod.dumps(spec_data, indent="\t"),
+                encoding="utf-8",
             )
         except Exception:  # noqa: BLE001, S110
             pass  # Non-critical — derivation succeeded, hash injection is optional

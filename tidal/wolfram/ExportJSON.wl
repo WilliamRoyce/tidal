@@ -1501,9 +1501,10 @@ ClassifyHamiltonianFactor[factor_, allFieldNames_List] := Module[
 
 (* Parse a single expanded term of the Hamiltonian into structured form *)
 (* Returns an Association with coefficient, factor_a, factor_b, or Nothing if not quadratic *)
-ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module[
+(* smallParams: list of declared small-parameter symbols for order_in_eps tagging *)
+ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List, smallParams_List:{}] := Module[
   {factors, fieldFactors = {}, coeffFactors = {},
-   factorA, factorB, coefficient, numCoeff, symbolicCoeff = Null},
+   factorA, factorB, coefficient, numCoeff, symbolicCoeff = Null, orderInEps},
 
   (* Split Times expression into individual factors *)
   factors = If[Head[term] === Times, List @@ term, {term}];
@@ -1563,6 +1564,15 @@ ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module
   factorA = ClassifyHamiltonianFactor[fieldFactors[[1]], allFieldNames];
   factorB = ClassifyHamiltonianFactor[fieldFactors[[2]], allFieldNames];
 
+  (* Compute perturbative order via shared ComputeOrderInEps.  When smallParams
+     is empty (non-perturbative theory), this returns 0 unconditionally.
+     Operates on the raw symbolic coefficient (pre-stringification) so that
+     polynomial structure in small parameters is preserved.  This is the
+     single source of truth for Hamiltonian order tagging — Python loaders
+     read this field directly rather than inferring from coefficient_symbolic
+     presence (which is only a coincidence in EH and not robust in general). *)
+  orderInEps = ComputeOrderInEps[coefficient, smallParams];
+
   (* Build result *)
   Module[{result, coordDeps, termClass},
     (* Classify as self-energy or interaction based on base field *)
@@ -1571,7 +1581,8 @@ ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module
       "coefficient" -> numCoeff,
       "factor_a" -> factorA,
       "factor_b" -> factorB,
-      "term_class" -> termClass
+      "term_class" -> termClass,
+      "order_in_eps" -> orderInEps
     |>;
     If[symbolicCoeff =!= Null,
       result["coefficient_symbolic"] = symbolicCoeff;
@@ -1587,7 +1598,11 @@ ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module
 
 
 (* Parse the full expanded Hamiltonian expression into structured quadratic terms *)
-ParseHamiltonianExpression[componentExpr_, allFieldNames_List, torsionPertName_String:""] := Module[
+(* smallParams: declared small parameters from TOML [perturbation].small_parameters.   *)
+(* Threaded into ParseSingleHamiltonianTerm so each emitted term carries its rigorous *)
+(* order_in_eps tag (computed by ComputeOrderInEps), matching how the equation side  *)
+(* tags terms in ParseMultiFieldRHS.                                                  *)
+ParseHamiltonianExpression[componentExpr_, allFieldNames_List, smallParams_List:{}, torsionPertName_String:""] := Module[
   {terms, fieldHeads, result},
 
   (* Discover all function heads that correspond to known fields *)
@@ -1630,7 +1645,7 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List, torsionPertName_S
   terms = If[Head[componentExpr] === Plus, List @@ componentExpr, {componentExpr}];
 
   (* Parse each term *)
-  result = Map[ParseSingleHamiltonianTerm[#, fieldHeads, allFieldNames] &, terms];
+  result = Map[ParseSingleHamiltonianTerm[#, fieldHeads, allFieldNames, smallParams] &, terms];
   result = DeleteCases[result, Nothing];
 
   (* Hamiltonian sector filter: exclude terms referencing torsion fields.
