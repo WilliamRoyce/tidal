@@ -142,6 +142,97 @@ def _parse_validate_params(raw: list[str], spec: EquationSystem) -> dict[str, fl
     return params
 
 
+def _check_perturbative_consistency(spec: object) -> tuple[list[str], list[str]]:
+    """Check perturbative-reduction scope for theories with [perturbation].
+
+    Returns ``(errors, warnings)``.  Active when the spec has non-empty
+    ``metadata.perturbation.small_parameters``:
+
+    1. Term-vs-coefficient consistency: each ``order_in_eps > 0`` term has
+       a ``coefficient_symbolic`` that mentions a declared small parameter.
+    2. No HamiltonianTerm operator matches the LPS-invariant violation
+       pattern (``mixed_T_*`` with T >= 2) on theories where LPS has run
+       successfully.
+    3. Constraint-promotion detection: warn (not error) when the spec has
+       both ``[perturbation]`` AND any equation with
+       ``time_derivative_order > 2`` whose order-0 kinetic coefficient
+       would vanish (signature of constraint promotion).  Names the
+       affected fields and links to issue #321 / the TeX write-up.
+    """
+    from tidal.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        return [], []
+
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    pert = (spec.metadata or {}).get("perturbation", {})
+    small_params = list(pert.get("small_parameters", []) or [])
+    if not small_params:
+        return [], []
+
+    # Check 1: term-vs-coefficient consistency on Hamiltonian terms
+    if spec.canonical is not None:
+        for idx, term in enumerate(spec.canonical.hamiltonian_terms):
+            if term.order_in_eps and term.order_in_eps > 0:
+                coeff_sym = term.coefficient_symbolic or ""
+                if not any(p in coeff_sym for p in small_params):
+                    warnings.append(
+                        f"hamiltonian_terms[{idx}] has order_in_eps="
+                        f"{term.order_in_eps} but coefficient_symbolic "
+                        f"({coeff_sym!r}) does not mention any declared "
+                        f"small_parameter {small_params}.  Re-derive the "
+                        f"theory if the JSON predates v0.36."
+                    )
+
+    # Check 2: LPS invariant — no mixed_T_* with T >= 2
+    if spec.canonical is not None:
+        import re as _re
+
+        bad_op = _re.compile(r"^mixed_(\d+)_")
+        for idx, term in enumerate(spec.canonical.hamiltonian_terms):
+            for label, factor in (("a", term.factor_a), ("b", term.factor_b)):
+                m = bad_op.match(factor.operator or "")
+                if m and int(m.group(1)) >= 2:
+                    warnings.append(
+                        f"hamiltonian_terms[{idx}].factor_{label}.operator="
+                        f"{factor.operator!r} encodes time-derivative order "
+                        f"{m.group(1)}.  This is the irreducible LPS residue "
+                        f"of the constraint-promotion case (the small parameter "
+                        f"promotes an algebraic constraint to a higher-derivative "
+                        f"dynamical field).  See "
+                        f"docs/tex/perturbative_reduction_constraint_barrier.tex "
+                        f"and issue #321 for the architectural barrier."
+                    )
+
+    # Check 3: constraint-promotion detection on equations
+    constraint_promoted_fields: list[str] = []
+    for eq in spec.equations:
+        if eq.time_derivative_order <= 2:
+            continue
+        # Field is dynamical at full theory but its kinetic coefficient
+        # might vanish at small_param=0 (constraint promotion).  Heuristic:
+        # if kinetic_coefficient_symbolic contains a declared small_parameter,
+        # treat the field as constraint-promoted.
+        kc = eq.kinetic_coefficient_symbolic or ""
+        if any(p in kc for p in small_params):
+            constraint_promoted_fields.append(eq.field_name)
+    if constraint_promoted_fields:
+        warnings.append(
+            f"Constraint-promotion case detected for fields "
+            f"{constraint_promoted_fields}.  Lagrangian Perturbative "
+            f"Substitution (LPS, v6 Phase 2) cannot reduce these theories' "
+            f"Hamiltonians at the standard substitution level.  The JSON's "
+            f"existing hamiltonian_terms are the pre-LPS form (containing "
+            f"mixed_T_* with T>=2 residues).  See issue #321 and "
+            f"docs/tex/perturbative_reduction_constraint_barrier.tex for "
+            f"the architectural barrier and three open research directions."
+        )
+
+    return errors, warnings
+
+
 def _check_tachyons(
     spec: EquationSystem,
     params: dict[str, float],
@@ -292,6 +383,14 @@ def validate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
     # Check 5: Parameters (warnings, not errors)
     warnings.extend(_check_parameters(spec))
+
+    # Check 5b: Perturbative-reduction scope (warnings).  Active when the
+    # spec has [perturbation]; flags constraint-promotion theories where
+    # LPS does not apply, with pointers to issue #321 and the TeX
+    # write-up.
+    pert_errors, pert_warnings = _check_perturbative_consistency(spec)
+    errors.extend(pert_errors)
+    warnings.extend(pert_warnings)
 
     # Check 6: Stability — tachyon and ghost mode detection
     if getattr(args, "stability", False):

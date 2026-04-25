@@ -4464,6 +4464,36 @@ def _validate_perturbation_config(
         msg = f"[perturbation].order must be a positive integer; got {order!r}."
         raise ValueError(msg)
 
+    # Scope warning: LPS handles only the standard "perturbative correction
+    # to a fully dynamical theory" case.  Constraint-promotion theories
+    # (where the small parameter promotes an algebraic constraint to a
+    # higher-derivative dynamical field, e.g. b5*Rtilde^2 in PGT torsion
+    # theories: h_4, h_7, h_9 are constraints at b5=0 and dynamical at
+    # b5!=0) trigger LPS abort.  See docs/tex/perturbative_reduction_constraint_barrier.tex
+    # and issue #321.  Banner printed once per derivation when
+    # [perturbation] is configured, regardless of whether the theory
+    # actually triggers the abort, so users are aware of the scope.
+    print()
+    print("=" * 76)
+    print("  PERTURBATIVE REDUCTION ENABLED ([perturbation] block in TOML)")
+    print("-" * 76)
+    print("  small_parameters = " + str(small_params_list) + ",  order = " + str(order))
+    print()
+    print("  Lagrangian Perturbative Substitution (LPS, v6 Phase 2) is in")
+    print("  development.  It currently handles only the case where every field")
+    print("  with higher-order time derivatives in the Lagrangian is also")
+    print("  dynamical at the leading order (e.g. Pais-Uhlenbeck, Euler-Heisenberg).")
+    print()
+    print("  For theories where the small parameter promotes an algebraic")
+    print("  constraint to a higher-derivative dynamical field (b5*Rtilde^2 in")
+    print("  PGT torsion, similar curvature-squared coupling regimes), LPS will")
+    print("  abort with a clear diagnostic.")
+    print()
+    print("  See: docs/tex/perturbative_reduction_constraint_barrier.tex")
+    print("       https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/321")
+    print("=" * 76)
+    print()
+
     return {
         "small_parameters": small_params_list,
         "order": order,
