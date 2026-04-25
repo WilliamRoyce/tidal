@@ -13,7 +13,7 @@ with q⁽⁰⁾ driving the Pass 1 source. See Parker & Simon 1993
 (literature/gr-qc_9211002/) and the v6 implementation plan.
 """
 
-# ruff: noqa: RUF002, RUF012, RUF043 — math symbols in docstrings; ClassVar in test fixtures.
+# ruff: noqa: RUF012, RUF043 — math symbols in docstrings; ClassVar in test fixtures.
 
 from __future__ import annotations
 
@@ -573,32 +573,41 @@ class TestPass1NearDegeneracy:
 
     @staticmethod
     def _craft_eigendata(
-        lam_i: complex, lam_j: complex, alpha: np.ndarray, grid: GridInfo,
+        lam_i: complex,
+        lam_j: complex,
+        alpha: np.ndarray,
+        grid: GridInfo,
     ) -> tuple[dict[str, Any], StateLayout]:
-        """Build a minimal 2-slot eigendata + layout for direct use in
-        _evolve_duhamel_per_mode. The block has diagonal D = diag(λ_i,
-        λ_j), V = V⁻¹ = I, so the test drives the kernel math in
-        isolation from the spec loader / companion-matrix machinery.
+        """Build a minimal 2-slot pass0_state + layout for direct use in
+        _evolve_duhamel_per_mode. The block has diagonal A = diag(λ_i, λ_j),
+        so the test drives the augmented-exp math in isolation from the
+        spec loader / companion-matrix machinery.
+
+        Schema follows the post-v0.31 augmented-exp Pass 1 contract:
+        ``{slot_indices, M_block, y0_block}`` per block. The legacy
+        ``{V, V_inv, D_diag, alpha}`` schema was retired when Pass 1 was
+        rewritten to use ``exp(t·[[A,S],[0,A]])·[0;y0]`` (Al-Mohy & Higham
+        2011 §5.2). For a diagonal block, ``M_block = diag(λ_i, λ_j)`` and
+        ``y0_block = alpha`` (the legacy ``α = V⁻¹ y₀`` reduces to ``y₀``
+        when ``V = I``).
         """
         from tidal.solver.state import SlotInfo
 
         bs = 2
         rfft_last = grid.shape[-1] // 2 + 1
         n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
-        v_mat = np.broadcast_to(
-            np.eye(bs, dtype=np.complex128), (n_modes, bs, bs),
+        # Diagonal A = diag(lam_i, lam_j) per mode.
+        M_block_single = np.diag(np.array([lam_i, lam_j], dtype=np.complex128))
+        m_block = np.broadcast_to(M_block_single, (n_modes, bs, bs)).copy()
+        # y0_block has shape (bs, n_modes); broadcast the same alpha across modes.
+        y0_block = np.broadcast_to(
+            alpha.astype(np.complex128).reshape(bs, 1),
+            (bs, n_modes),
         ).copy()
-        v_inv = v_mat.copy()
-        d_diag = np.broadcast_to(
-            np.array([lam_i, lam_j], dtype=np.complex128), (n_modes, bs),
-        ).copy()
-        alpha_full = np.broadcast_to(alpha, (n_modes, bs)).astype(np.complex128).copy()
         block = {
             "slot_indices": (0, 1),
-            "V": v_mat,
-            "V_inv": v_inv,
-            "D_diag": d_diag,
-            "alpha": alpha_full,
+            "M_block": m_block,
+            "y0_block": y0_block,
         }
         slot_a = SlotInfo(name="a", field_name="a", kind="field", time_order=2)
         slot_b = SlotInfo(name="b", field_name="b", kind="field", time_order=2)
@@ -622,7 +631,9 @@ class TestPass1NearDegeneracy:
         ],
     )
     def test_pipeline_matches_mpmath_across_crossover(
-        self, lam_diff: float, t_end: float,
+        self,
+        lam_diff: float,
+        t_end: float,
     ) -> None:
         """Sweep |z| = |Δλ|·t across the Taylor-branch crossover and
         assert ``_evolve_duhamel_per_mode`` agrees with an mpmath
@@ -665,7 +676,11 @@ class TestPass1NearDegeneracy:
         # time-derivative order. This test crafts a bare identity-form
         # M_src representing a source at order 0.
         _, _y_phys, y_hat_snap = _evolve_duhamel_per_mode(
-            eigendata, {0: m_src}, t_eval, layout, grid,
+            eigendata,
+            {0: m_src},
+            t_eval,
+            layout,
+            grid,
         )
 
         # Pipeline output at snapshot 1, slot 0, mode 0:

@@ -106,7 +106,28 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
   - Conclusion: the "amplification signal" at high xi is numerical-noise
     eigenvalue amplification, NOT real physics. v3 amplify cannot be used as-is.
 
-- [ ] Submit Stage A v4 with stability filtering (TBD post-#320 mitigation)
+- [ ] Submit Stage A v4 on Tier 1 + 1.5 modal solver (path-D + augmented-exp Pass 1, v0.31+)
+  - Tier 1 (committed v0.31+): `_evolve_per_mode` retired the eigendecomposition default
+    in favour of unconditional `scipy.linalg.expm(M·dt)` precompute + matvec (Higham 2009
+    Padé scaling-and-squaring). Robust for arbitrary `cond(V)`; benchmark wall time
+    0.49-1.06× of eigendecomposition on the campaign workload envelope. Closes the
+    eigenvector ill-conditioning failure mode (#320 root cause).
+  - Tier 1.5 (also v0.31+): `_evolve_duhamel_per_mode` rewritten to use the augmented
+    matrix exponential `exp(t·[[A, S], [0, A]])·[0; y₀]` (Al-Mohy & Higham 2011 §5.2).
+    Pass 0 + Pass 1 share a single canonical robust backend; no eigendecomposition
+    anywhere in the modal solver's per-mode path.
+  - Verification: 2044 tests pass, including 6 new robustness tests in
+    `tests/test_modal_robust_evolution.py` (synthetic ill-conditioned 4×4, Padé
+    machine-precision against mpmath reference, augmented-exp Pass 1 vs Duhamel
+    kernel, Pass 1 IC-zero check, CDT path D smoke).
+  - v4 plan: `B₀=0.01, t_end=10, snapshots=2`, `--nlive 1000 --num-repeats 10
+    --precision-criterion 0.005`, corrected `--baseline-formula 'sin(kappa*B0*t_end/2)**2'`
+    (post-#319 parser fix). Same 4D prior as v3 — no constraint-based tightening
+    needed because path D + augmented-exp make CDT numerically robust everywhere.
+  - Cross-validation: top-amplification samples should agree with FV scan to
+    `Δ/P_max < 1e-9`. Real expected range per FV scan: A ∈ [0.02, 1.6],
+    P_max ∈ [0.001, 0.10]. v3 amplify (28367920) "P_max up to 2.0" was CDT
+    ill-conditioning contamination — superseded.
 
 - **Amplify finding (2026-04-22, 28226826):** log(Z)=+0.118±0.006, joint D_KL=0.043,
   D_KL(xi)=0.226, D_KL(mA2)=0.032. MAP at (mA2=0.34, deltam=-0.21, xi=1.08, alpha3=0.054).

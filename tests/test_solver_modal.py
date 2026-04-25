@@ -7,7 +7,7 @@ Tests cover:
 4. Cross-validation — modal vs CVODE agreement
 """
 
-# ruff: noqa: RUF002 — math symbols in docstrings.
+
 
 from __future__ import annotations
 
@@ -1288,7 +1288,8 @@ class TestEigendataExport:
     """
 
     def _run_kg(
-        self, return_eigendata: bool,
+        self,
+        return_eigendata: bool,
     ) -> tuple[dict[str, Any], np.ndarray, StateLayout, GridInfo]:
         spec = _make_spec(_KG_1D_SPEC)
         n = 32
@@ -1321,84 +1322,71 @@ class TestEigendataExport:
         assert "eigendata" not in result
 
     def test_eigendata_structure_present_when_requested(self) -> None:
+        """Pass 0 collects {slot_indices, M_block, y0_block} for Pass 1.
+
+        The legacy {V, V_inv, D_diag, alpha} schema was retired in v0.31+ when
+        Pass 1 was rewritten to use the augmented matrix exponential
+        (Al-Mohy & Higham 2011 §5.2) — see _evolve_duhamel_per_mode and
+        docs/tex/modal_solver.tex §"Robust Matrix-Exponential Evolution".
+        """
         result, _, _, _ = self._run_kg(return_eigendata=True)
         assert "eigendata" in result
         ed = result["eigendata"]
         assert set(ed.keys()) >= {"blocks", "mode_k", "state_layout"}
         assert len(ed["blocks"]) >= 1
         block = ed["blocks"][0]
-        assert set(block.keys()) == {"slot_indices", "V", "D_diag", "V_inv", "alpha"}
+        assert set(block.keys()) == {"slot_indices", "M_block", "y0_block"}
 
-    def test_eigendata_invertibility(self) -> None:
-        """V @ V_inv == I for every block and every mode (round-trip)."""
-        result, _, _, _ = self._run_kg(return_eigendata=True)
-        for block in result["eigendata"]["blocks"]:
-            v_mat = block["V"]
-            v_inv = block["V_inv"]
-            bs = v_mat.shape[-1]
-            eye = np.eye(bs)
-            # Sample a handful of modes for speed (block is n_modes, bs, bs)
-            for m in range(min(4, v_mat.shape[0])):
-                residual = float(np.max(np.abs(v_mat[m] @ v_inv[m] - eye)))
-                assert residual < 1e-10, (
-                    f"V @ V_inv residual {residual:.2e} at mode {m} "
-                    f"for block with slots {block['slot_indices']}"
-                )
-
-    def test_eigendata_alpha_matches_vinv_y0(self) -> None:
-        """Alpha = V_inv @ y0_hat (by construction)."""
+    def test_eigendata_y0_block_matches_fft_ic(self) -> None:
+        """y0_block stored per block matches rfft(y0) at the same slot indices."""
         result, y0, layout, grid = self._run_kg(return_eigendata=True)
-        # The Fourier transform helper is intentionally private in
-        # modal.py; importing here is a deliberate whitebox check that
-        # eigendata.alpha matches V_inv @ rfft(y0) without going
-        # through the full Pass 0 evolution.  If _fft_slots is ever
-        # promoted to public, update this import.
+        # The Fourier transform helper is intentionally private in modal.py;
+        # importing here is a deliberate whitebox check that y0_block matches
+        # rfft(y0) without going through the full Pass 0 evolution.
         from tidal.solver.modal import _fft_slots
 
         y0_hat = _fft_slots(y0, layout, grid)
         for block in result["eigendata"]["blocks"]:
             slot_indices = block["slot_indices"]
-            y0_block = y0_hat[slot_indices, :]  # (bs, n_modes)
-            expected_alpha = np.einsum("mij,mj->mi", block["V_inv"], y0_block.T)
+            expected_y0_block = y0_hat[slot_indices, :]  # (bs, n_modes)
             np.testing.assert_allclose(
-                block["alpha"], expected_alpha, atol=1e-12, rtol=1e-12,
+                block["y0_block"],
+                expected_y0_block,
+                atol=1e-14,
+                rtol=1e-14,
             )
 
     def test_eigendata_reconstructs_pass_zero(self) -> None:
-        """y_hat(t) = V · diag(exp(D·t)) · alpha reproduces snapshots.
+        """y_hat(t) = exp(M·t) · y0_block reproduces snapshots to machine precision.
 
-        Pass 1 Duhamel relies on this identity to evaluate the
-        inhomogeneous solution. Verify reconstruction matches the
-        solver's own evolved output to machine precision.
+        Pass 1 augmented-exp uses M_block to build the (2bs × 2bs) augmented
+        operator [[A, S], [0, A]]. Verify that the same M_block evolved as
+        exp(M·t)·y0_block reproduces the solver's own Pass 0 output.
         """
+        import scipy.linalg as sla  # type: ignore[import-untyped]
+
         result, _, layout, grid = self._run_kg(return_eigendata=True)
         ed = result["eigendata"]
         t = result["t"]
-        # Reconstruct at the final snapshot, in Fourier space
-        n_modes = ed["blocks"][0]["V"].shape[0]
+        n_modes = ed["blocks"][0]["M_block"].shape[0]
         n_slots = layout.num_slots
         y_hat_rec = np.zeros((n_slots, n_modes), dtype=np.complex128)
         ti = len(t) - 1
-        dt = t[ti] - t[0]
+        dt = float(t[ti] - t[0])
         for block in ed["blocks"]:
-            v_mat = block["V"]  # (n_modes, bs, bs)
-            lam = block["D_diag"]  # (n_modes, bs)
-            alpha = block["alpha"]  # (n_modes, bs)
-            phase = np.exp(lam * dt)  # (n_modes, bs)
-            y_eigen = alpha * phase  # (n_modes, bs)
-            # y_block_hat = V · y_eigen for each mode  (n_modes, bs)
-            y_block_hat = np.einsum("mij,mj->mi", v_mat, y_eigen)
-            for i, slot in enumerate(block["slot_indices"]):
-                y_hat_rec[slot] = y_block_hat[:, i]
+            M = block["M_block"]  # (n_modes, bs, bs)
+            y0_block = block["y0_block"]  # (bs, n_modes)
+            for m in range(n_modes):
+                y_evolved = sla.expm(M[m] * dt) @ y0_block[:, m]
+                for i, slot in enumerate(block["slot_indices"]):
+                    y_hat_rec[slot, m] = y_evolved[i]
 
         # Inverse FFT to physical space
         rfft_shape_list = list(grid.shape)
         rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
         rfft_shape = tuple(rfft_shape_list)
         n_pts = grid.num_points
-        # Dynamical slots are [:n_dyn] in the reduced layout (no constraints
-        # here — KG is a pure wave system)
-        n_dyn = n_slots
+        n_dyn = n_slots  # KG: pure wave system, no constraints
         y_rec_phys = np.zeros(n_dyn * n_pts)
         for si in range(n_dyn):
             y_rec_phys[si * n_pts : (si + 1) * n_pts] = np.fft.irfftn(
@@ -1407,10 +1395,9 @@ class TestEigendataExport:
                 axes=list(range(len(grid.shape))),
             ).ravel()
 
-        # Compare against solver's own snapshot
         err = float(np.max(np.abs(y_rec_phys - result["y"][ti])))
         assert err < 1e-12, (
-            f"Eigendata reconstruction error {err:.2e} exceeds 1e-12 tolerance"
+            f"M_block reconstruction error {err:.2e} exceeds 1e-12 tolerance"
         )
 
     def test_position_dependent_raises(self) -> None:

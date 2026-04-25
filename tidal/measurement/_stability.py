@@ -286,6 +286,26 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             # account for the conditioning to avoid false rejections.
             # See issue #266.
             cond_vr_mat = float(np.linalg.cond(vr_mat))
+            # Diagnostic: warn when cond(V) exceeds Higham 2008 §2.3
+            # eigendecomposition-abandonment threshold (1e13 in IEEE double).
+            # We pick 1e12 as a conservative one-decade margin. Above this,
+            # eigendecomposition-based analyses (this stability check, Pass 1
+            # Duhamel) should be cross-checked against the modal solver's
+            # path-D evolution. Pass 0 is unaffected (uses Padé precompute).
+            # See docs/tex/modal_solver.tex §"Robust Matrix-Exponential
+            # Evolution" and issue #320.
+            if cond_vr_mat > 1e12:  # noqa: PLR2004
+                import warnings
+
+                warnings.warn(
+                    f"Stability analysis: cond(V) = {cond_vr_mat:.2e} at "
+                    f"k_idx={ki} exceeds 1e12 (Higham 2008 §2.3 abandonment "
+                    f"threshold for diagonalization in IEEE double). "
+                    f"Eigendecomposition-based stability metrics may be "
+                    f"unreliable here; cross-check against modal solver "
+                    f"output. See #320.",
+                    stacklevel=2,
+                )
             # Floor: entries of pinv(vr_mat) have noise ~cond(vr_mat)*eps, so
             # rel_coupling has noise ~cond(vr_mat)*eps / max_col.  With
             # max_col ~ O(1), noise floor ~ cond(vr_mat) * eps.  Use a
