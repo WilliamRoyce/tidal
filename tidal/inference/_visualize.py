@@ -195,7 +195,7 @@ def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
     return result.samples[mask]
 
 
-def _plot_corner_anesthetic(
+def _plot_corner_anesthetic(  # noqa: PLR0915
     result: InferenceResult,
     output_path: Path | None = None,
     *,
@@ -284,8 +284,22 @@ def _plot_corner_anesthetic(
             headline_parts.append(f"log Z = {result.log_evidence:.3f}")
     finite_logl = result.log_likelihood[np.isfinite(result.log_likelihood)]
     if finite_logl.size > 0:
-        max_amp = float(np.exp(np.max(finite_logl)))
-        headline_parts.append(f"max A = {max_amp:.3f}")
+        # Interpret max(exp(logL)) according to the inference mode.
+        # `_likelihood.compute_log_likelihood` returns:
+        #   maximize  -> logL = log(A)         => exp(max logL) = max A
+        #   minimize  -> logL = -log(A)        => exp(max logL) = max suppression
+        #               (i.e. P_min / P_GR ≈ 1 / max-suppression-factor)
+        #   extremize -> logL = |log(A)|       => exp(max logL) = max |log A|-factor
+        ltype = (result.metadata or {}).get("likelihood_type", "maximize")
+        max_factor = float(np.exp(np.max(finite_logl)))
+        labels = {
+            "maximize": "max A",
+            "minimize": "max suppression P_GR/P",
+            "extremize": "max |log A|",
+        }
+        headline_parts.append(
+            f"{labels.get(ltype, 'max exp(logL)')} = {max_factor:.3f}"
+        )
     pi = (result.metadata or {}).get("parameter_importance") or {}
     if isinstance(pi, dict) and "d_kl" in pi:
         headline_parts.append(f"D_KL = {pi['d_kl']:.3f} nats")

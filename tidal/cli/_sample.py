@@ -262,6 +262,13 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             }
             for p in priors
         ]
+        # Persist likelihood mode so the corner-plot title can label the
+        # extremal logL correctly: "max A" for maximize, "max suppression"
+        # for minimize, etc.  Without this the same number means different
+        # things and confuses readers (suppress's high logL maps to
+        # tiny P_max, not large amplification).
+        result.metadata["likelihood_type"] = likelihood_config.likelihood_type
+        result.metadata["likelihood_metric"] = likelihood_config.metric
 
         # Post-hoc prior stability sweep: PolyChord drops -inf samples
         # before they enter the chain, so the unstable region is invisible
