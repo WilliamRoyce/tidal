@@ -340,7 +340,7 @@ class SimulationLikelihood:
         )
 
 
-def _evaluate_likelihood(
+def _evaluate_likelihood(  # noqa: PLR0915
     *,
     theta: Any,
     base_args: Namespace,
@@ -383,6 +383,55 @@ def _evaluate_likelihood(
         base = temp_dir or Path(tempfile.gettempdir())
         run_dir = base / f"inference_run_{os.getpid()}_{call_index:06d}"
         run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Pre-flight tachyonic guard — mirrors _run_row_inner in _sweep.py.
+    # Rejects parameter points where the source-containing block has growing
+    # eigenvalues (Re(λ) > threshold) before running any simulation.
+    # Uses conservative=True: when cond(V) is too high to trust the IC-coupling
+    # filter (typical for CDT/PGT models), counts the growing mode as tachyonic
+    # rather than risk a false-negative.  Cost: microseconds per evaluation.
+    if source and target and ({"conversion", "peak_conversion"} & measurements):
+        try:
+            from tidal.cli._simulate import (
+                _parse_params,  # pyright: ignore[reportPrivateUsage]
+            )
+            from tidal.measurement._stability import check_conversion_stability
+            from tidal.solver.grid import GridInfo
+            from tidal.symbolic.json_loader import load_equation_system as _load_spec
+
+            raw_spec = _load_spec(spec_path)
+            base_p = _parse_params(
+                list(getattr(base_args, "param", []) or []), raw_spec
+            )
+            params = {**base_p, **param_overrides}
+            grid_n = int(getattr(base_args, "grid_shape", 256))
+            bounds_str = getattr(base_args, "bounds", "0:100")
+            if isinstance(bounds_str, str):
+                bparts = bounds_str.split(":")
+                bounds_tuple: tuple[tuple[float, float], ...] = (
+                    (float(bparts[0]), float(bparts[1])),
+                )
+            else:
+                bounds_tuple = tuple(bounds_str)
+            grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
+            stability = check_conversion_stability(
+                raw_spec,
+                grid,
+                params,
+                source=source[0],
+                target=target[0],
+                conservative=True,
+            )
+            if not stability.stable:
+                return -math.inf
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger("tidal.inference").debug(
+                "Pre-flight tachyonic check failed (non-critical), "
+                "falling through to simulation",
+                exc_info=True,
+            )
 
     try:
         if backend == "memory":

@@ -64,6 +64,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     ic_wavevector: float | None = None,
     threshold: float = 0.3,
     n_extra_k: int = 4,  # noqa: ARG001
+    conservative: bool = False,
 ) -> ConversionStabilityResult:
     """Check for tachyonic modes in the block containing the source field.
 
@@ -118,6 +119,16 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         Deprecated.  Previously controlled the k-neighborhood scan
         width; now all k modes are checked and this parameter is
         ignored.
+    conservative : bool
+        When True, count any growing mode (Re(λ) > threshold) as
+        tachyonic whenever ``cond(V) > 1e12``, skipping the IC-coupling
+        filter (which is numerically meaningless at that conditioning).
+        Use in the inference path where a false-negative (accepting an
+        unstable point) is worse than a false-positive (rejecting a
+        valid point).  Default False preserves the existing behaviour
+        for sweeps, which use the IC-coupling filter to correctly pass
+        R̃ models whose tachyonic tensor/axial sectors are genuinely
+        decoupled from the source IC.
 
     Returns
     -------
@@ -264,28 +275,12 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         max_re = float(np.max(np.real(ev)))
 
         if max_re > threshold:
-            # IC coupling check: of the tachyonic modes (Re(λ) > threshold),
-            # does any one project significantly onto the source field?
-            # V_inv[i, j] = how much mode i is excited by a unit IC in slot j.
             tach_mask = np.real(ev) > threshold
-            V_inv = np.linalg.pinv(vr_mat)
-            src_col = np.abs(V_inv[:, src_slot_in_block])
-            max_col = float(np.max(src_col))
-            if max_col > 1e-20:  # noqa: PLR2004
-                rel_coupling = float(np.max(src_col[tach_mask])) / max_col
-            else:
-                rel_coupling = 0.0
 
-            # Condition-aware coupling threshold.  When vr_mat is
-            # ill-conditioned (e.g. CDT non-trace torsion DOF at large ξ),
-            # pinv(vr_mat) entries are unreliable: numerical noise of order
-            # 1/cond(vr_mat) contaminates the coupling column, making truly
-            # IC-decoupled tachyonic modes appear coupled.  The solver's
-            # _suppress_tachyonic_noise uses the actual IC vector and
-            # correctly finds ~1e-16 for these modes; the guard must
-            # account for the conditioning to avoid false rejections.
-            # See issue #266.
+            # Compute conditioning BEFORE the expensive pinv call so that
+            # conservative early-exit avoids the pinv entirely.
             cond_vr_mat = float(np.linalg.cond(vr_mat))
+
             # Diagnostic: warn when cond(V) exceeds Higham 2008 §2.3
             # eigendecomposition-abandonment threshold (1e13 in IEEE double).
             # We pick 1e12 as a conservative one-decade margin. Above this,
@@ -306,6 +301,42 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
                     f"output. See #320.",
                     stacklevel=2,
                 )
+                if conservative:
+                    # pinv(V) is numerically meaningless at this conditioning.
+                    # Conservatively count the growing mode as coupled to the
+                    # source IC rather than risk a false-negative.  Used in
+                    # the inference path where rejecting a valid point is
+                    # preferable to accepting an unstable one.  For the
+                    # dark_photon_plasma model, growing modes in the source
+                    # block ARE physically coupled (kinetic mixing acts
+                    # directly on the photon-torsion-trace sector).
+                    n_tachyonic += 1
+                    if max_re > max_excess:
+                        max_excess = max_re
+                        worst_k = float(k_vals[ki])
+                    continue
+
+            # IC coupling check: of the tachyonic modes (Re(λ) > threshold),
+            # does any one project significantly onto the source field?
+            # V_inv[i, j] = how much mode i is excited by a unit IC in slot j.
+            V_inv = np.linalg.pinv(vr_mat)
+            src_col = np.abs(V_inv[:, src_slot_in_block])
+            max_col = float(np.max(src_col))
+            if max_col > 1e-20:  # noqa: PLR2004
+                rel_coupling = float(np.max(src_col[tach_mask])) / max_col
+            else:
+                rel_coupling = 0.0
+
+            # Condition-aware coupling threshold.  When vr_mat is
+            # ill-conditioned (e.g. CDT non-trace torsion DOF at large ξ),
+            # pinv(vr_mat) entries are unreliable: numerical noise of order
+            # 1/cond(vr_mat) contaminates the coupling column, making truly
+            # IC-decoupled tachyonic modes appear coupled.  The solver's
+            # _suppress_tachyonic_noise uses the actual IC vector and
+            # correctly finds ~1e-16 for these modes; the guard must
+            # account for the conditioning to avoid false rejections.
+            # See issue #266.
+            #
             # Floor: entries of pinv(vr_mat) have noise ~cond(vr_mat)*eps, so
             # rel_coupling has noise ~cond(vr_mat)*eps / max_col.  With
             # max_col ~ O(1), noise floor ~ cond(vr_mat) * eps.  Use a
