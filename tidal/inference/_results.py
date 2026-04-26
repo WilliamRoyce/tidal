@@ -213,11 +213,54 @@ class InferenceResult:
 
         weights = np.array(weights_list) if weights_list else None
 
+        # Reconstruct per-sample metrics from CSV columns that aren't part
+        # of the standard schema (params, log_likelihood, log_prior,
+        # log_posterior, weight, error_message).  This is what carries
+        # run_status, tachyonic_excess, and any per-sample physics metrics
+        # back into the InferenceResult so the corner-plot tool sees them.
+        standard_cols = {
+            *param_names,
+            "log_likelihood",
+            "log_prior",
+            "log_posterior",
+            "weight",
+            "error_message",
+        }
+        loaded_metrics: dict[str, np.ndarray] = {}
+        if rows:
+            for col in rows[0]:
+                if col in standard_cols:
+                    continue
+                # Try to parse as float column; fall back to object/string
+                # for run_status and similar string-typed columns.
+                try:
+                    arr_f = np.asarray(
+                        [
+                            float(r[col])
+                            if r.get(col) not in {None, "", "None"}
+                            else np.nan
+                            for r in rows
+                        ],
+                        dtype=float,
+                    )
+                    loaded_metrics[col] = arr_f
+                except (TypeError, ValueError):
+                    loaded_metrics[col] = np.asarray(
+                        [r.get(col) for r in rows], dtype=object
+                    )
+
         # Reconstruct metadata from saved inference.json fields
         loaded_metadata: dict[str, Any] = {
             "loaded_from": str(path),
         }
-        for key in ("nlive", "sampler", "n_iterations", "n_calls", "priors"):
+        for key in (
+            "nlive",
+            "sampler",
+            "n_iterations",
+            "n_calls",
+            "priors",
+            "rejected_prior_path",
+        ):
             val = meta.get(key)
             if val is not None:
                 loaded_metadata[key] = val
@@ -231,6 +274,7 @@ class InferenceResult:
             log_evidence=meta.get("log_evidence"),
             log_evidence_err=meta.get("log_evidence_err"),
             weights=weights,
+            metrics=loaded_metrics or None,
             metadata=loaded_metadata,
         )
 
@@ -251,11 +295,23 @@ class InferenceResult:
             row["log_posterior"] = float(self.log_prior[i] + self.log_likelihood[i])
             if self.weights is not None:
                 row["weight"] = float(self.weights[i])
+            row_status = "success"
+            row_error: str | None = None
             if self.metrics is not None:
                 for key, arr in self.metrics.items():
-                    row[key] = float(arr[i]) if not np.isnan(arr[i]) else None
-            row["run_status"] = "success"
-            row["error_message"] = None
+                    val = arr[i]
+                    if key == "run_status":
+                        # Stored as object dtype (string); not numeric.
+                        row_status = str(val) if val is not None else "success"
+                        row[key] = row_status
+                        continue
+                    # Numeric metrics: NaN -> None for JSON cleanliness.
+                    try:
+                        row[key] = float(val) if not np.isnan(float(val)) else None
+                    except (TypeError, ValueError):
+                        row[key] = val if val is not None else None
+            row["run_status"] = row_status
+            row["error_message"] = row_error
             rows.append(row)
 
         swept_params = {
@@ -337,6 +393,9 @@ class InferenceResult:
         priors = self.metadata.get("priors")
         if priors is not None:
             summary["priors"] = priors
+        rejected_prior_path = self.metadata.get("rejected_prior_path")
+        if rejected_prior_path is not None:
+            summary["rejected_prior_path"] = str(rejected_prior_path)
 
         # Compute parameter importance for nested sampling results
         if self.method == "nested":

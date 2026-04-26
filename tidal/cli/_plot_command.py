@@ -236,7 +236,8 @@ def _corner_plot(data_path: Path, args: Namespace) -> int:
         result.metadata["priors"] = parsed
 
     out_path = Path(args.output) if args.output else data_path / "corner.png"
-    plot_corner(result, out_path)
+    show_rejected = bool(getattr(args, "show_rejected", True))
+    plot_corner(result, out_path, show_rejected=show_rejected)
     if not args.quiet:
         print(f"Saved corner plot to: {out_path}")
     return 0

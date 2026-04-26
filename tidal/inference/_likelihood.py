@@ -308,6 +308,11 @@ class SimulationLikelihood:
         self.temp_dir = temp_dir
         self.keep_sims = keep_sims
         self._call_count = 0
+        # Metadata from the most recent __call__: read by the sequential MC
+        # path to populate per-sample run_status / tachyonic_excess.  Parallel
+        # workers don't share state — they return the metadata from
+        # `_likelihood_worker` directly instead.
+        self._last_metadata: dict[str, Any] = {}
 
     def __call__(self, theta: Any) -> float:
         """Evaluate log-likelihood at parameter vector theta.
@@ -321,10 +326,12 @@ class SimulationLikelihood:
         -------
         float
             Log-likelihood value. Returns ``-inf`` for failed simulations.
+            Per-sample metadata (run_status, tachyonic_excess, etc.) is
+            stashed on ``self._last_metadata`` for the caller to read.
         """
         call_idx = self._call_count
         self._call_count += 1
-        return _evaluate_likelihood(
+        logl, meta = _evaluate_likelihood(
             theta=theta,
             base_args=self.base_args,
             spec_path=self.spec_path,
@@ -338,6 +345,8 @@ class SimulationLikelihood:
             keep_sims=self.keep_sims,
             call_index=call_idx,
         )
+        self._last_metadata = meta
+        return logl
 
 
 def _evaluate_likelihood(  # noqa: PLR0915
@@ -354,10 +363,21 @@ def _evaluate_likelihood(  # noqa: PLR0915
     temp_dir: Path | None,
     keep_sims: bool,
     call_index: int,
-) -> float:
+) -> tuple[float, dict[str, Any]]:
     """Core likelihood evaluation (module-level for pickling).
 
     This function is the integration point with the sweep infrastructure.
+
+    Returns
+    -------
+    tuple[float, dict]
+        ``(log_likelihood, metadata)`` where ``metadata`` always contains
+        a ``run_status`` key with one of:
+        ``"success"``, ``"tachyonic"``, ``"simulation_failed"``,
+        ``"metric_missing"``, ``"exception"``.  When the rejection is
+        tachyonic, ``metadata["tachyonic_excess"]`` carries the maximum
+        Re(λ) found (a positive growth rate).  For successful evaluations,
+        ``metadata`` may also include the measured metric value.
     """
     from tidal.cli._sweep import (
         _measure_run,  # pyright: ignore[reportPrivateUsage]
@@ -423,7 +443,16 @@ def _evaluate_likelihood(  # noqa: PLR0915
                 conservative=True,
             )
             if not stability.stable:
-                return -math.inf
+                return -math.inf, {
+                    "run_status": "tachyonic",
+                    "tachyonic_excess": float(stability.max_excess),
+                    "k_tachyonic": (
+                        float(stability.k_tachyonic)
+                        if stability.k_tachyonic is not None
+                        else float("nan")
+                    ),
+                    "n_tachyonic_modes": int(stability.n_tachyonic_modes),
+                }
         except Exception:  # noqa: BLE001
             import logging
 
@@ -460,7 +489,10 @@ def _evaluate_likelihood(  # noqa: PLR0915
             )
 
             if exit_code != 0:
-                return -math.inf
+                return -math.inf, {
+                    "run_status": "simulation_failed",
+                    "exit_code": int(exit_code),
+                }
 
             # Extract metrics
             metrics = _measure_run(
@@ -476,7 +508,10 @@ def _evaluate_likelihood(  # noqa: PLR0915
         # Get the target metric
         metric_value = metrics.get(likelihood_config.metric)
         if metric_value is None:
-            return -math.inf
+            return -math.inf, {
+                "run_status": "metric_missing",
+                "missing_metric": likelihood_config.metric,
+            }
 
         # Build eval_params for formula-based likelihoods.
         # Merge order (same as _simulate_run): spec.metadata["parameters"]
@@ -500,11 +535,21 @@ def _evaluate_likelihood(  # noqa: PLR0915
                 if val is not None:
                     eval_params[attr] = float(val)
 
-        return compute_log_likelihood(
+        logl = compute_log_likelihood(
             float(metric_value),
             likelihood_config,
             eval_params,
         )
+        success_meta: dict[str, Any] = {
+            "run_status": "success",
+            likelihood_config.metric: float(metric_value),
+        }
+        # If P_max guard in compute_log_likelihood demoted the metric to
+        # -inf (e.g. P_max > 2.0 — non-perturbative regime), record that
+        # explicitly so it shows up as a distinct rejection on the corner plot.
+        if math.isinf(logl) and logl < 0:
+            success_meta["run_status"] = "non_perturbative"
+        return logl, success_meta  # noqa: TRY300
 
     except Exception:  # noqa: BLE001
         import logging
@@ -514,7 +559,7 @@ def _evaluate_likelihood(  # noqa: PLR0915
             theta,
             exc_info=True,
         )
-        return -math.inf
+        return -math.inf, {"run_status": "exception"}
 
     finally:
         if run_dir is not None and not keep_sims and run_dir.exists():
@@ -536,8 +581,14 @@ def _likelihood_worker_init(config: dict[str, Any]) -> None:  # pyright: ignore[
     _LIKELIHOOD_CONFIG.update(config)
 
 
-def _likelihood_worker(theta: Any) -> float:  # pyright: ignore[reportUnusedFunction]
-    """Evaluate likelihood in worker process (picklable module-level function)."""
+def _likelihood_worker(theta: Any) -> tuple[float, dict[str, Any]]:  # pyright: ignore[reportUnusedFunction]
+    """Evaluate likelihood in worker process (picklable module-level function).
+
+    Returns ``(log_likelihood, metadata)``.  The metadata dict carries the
+    per-sample ``run_status`` and rejection details (e.g.
+    ``tachyonic_excess``) so the parent process can populate per-sample
+    columns in the result table.
+    """
     import threading
 
     # Thread-safe call counter

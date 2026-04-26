@@ -17,6 +17,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import numpy as np
+
     from tidal.inference._importance import ParameterImportanceResult
     from tidal.inference._results import InferenceResult
 
@@ -26,6 +28,7 @@ def plot_corner(
     output_path: Path | None = None,
     *,
     show: bool = False,
+    show_rejected: bool = True,
 ) -> None:
     """Generate a corner plot (2D marginals + 1D histograms).
 
@@ -39,11 +42,21 @@ def plot_corner(
         If provided, save figure to this path.
     show : bool
         If True, display the figure interactively.
+    show_rejected : bool
+        If True (default), overlay samples rejected by the pre-flight
+        stability guard (``run_status='tachyonic'``) as a red scatter on
+        each 2D panel.  Convey real physics — the unstable region of
+        parameter space is part of the result.  Following anesthetic
+        conventions (Handley 2019 JOSS) for showing inaccessible regions.
     """
     try:
-        _plot_corner_anesthetic(result, output_path, show=show)
+        _plot_corner_anesthetic(
+            result, output_path, show=show, show_rejected=show_rejected
+        )
     except ImportError:
-        _plot_corner_matplotlib(result, output_path, show=show)
+        _plot_corner_matplotlib(
+            result, output_path, show=show, show_rejected=show_rejected
+        )
 
 
 def plot_trace(
@@ -160,11 +173,33 @@ def plot_importance(
     plt.close(fig)
 
 
+def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
+    """Return an Nx(n_params) array of tachyonic-rejected samples, or None.
+
+    Samples flagged with ``run_status='tachyonic'`` by the pre-flight
+    stability guard.  Returns ``None`` if no metadata or no rejections.
+    Following anesthetic conventions for visualising inaccessible regions
+    of parameter space (Handley 2019 JOSS).  See also
+    ``_rejected_prior.csv`` produced by Phase 4 for nested-sampling output.
+    """
+    import numpy as np
+
+    metrics = getattr(result, "metrics", None)
+    if not metrics or "run_status" not in metrics:
+        return None
+    statuses = metrics["run_status"]
+    mask = np.asarray([str(s) == "tachyonic" for s in statuses])
+    if not mask.any():
+        return None
+    return result.samples[mask]
+
+
 def _plot_corner_anesthetic(
     result: InferenceResult,
     output_path: Path | None = None,
     *,
     show: bool = False,
+    show_rejected: bool = True,
 ) -> None:
     """Corner plot using anesthetic (Handley 2019).
 
@@ -207,6 +242,8 @@ def _plot_corner_anesthetic(
         fig = cell.get_figure()
 
     _overlay_priors(axes_df, result)
+    if show_rejected:
+        _overlay_rejected_anesthetic(axes_df, result)
 
     fig.suptitle(
         f"Posterior ({result.method}, n={result.n_samples}, "
@@ -219,6 +256,121 @@ def _plot_corner_anesthetic(
     if show:
         plt.show()
     plt.close(fig)
+
+
+def _overlay_rejected_anesthetic(
+    axes_df: object,
+    result: InferenceResult,
+) -> None:
+    """Overlay tachyonic-rejected samples on the corner plot.
+
+    Adds a red scatter on lower-triangle panels of an anesthetic
+    AxesDataFrame.  Uses raw scatter rather than ``Samples.plot_2d(
+    kind='scatter_2d')`` so we don't depend on anesthetic version-specific
+    overload semantics; the visual convention (red, lower triangle, low
+    alpha) matches Handley-group corner plots showing inaccessible
+    regions.  Side files written by Phase 4 (``_rejected_prior.csv``) are
+    also picked up here when available — see
+    ``_load_rejected_prior_overlay``.
+    """
+    rejected = _rejected_samples_array(result)
+    rejected_prior = _load_rejected_prior_overlay(result)
+    if rejected is None and rejected_prior is None:
+        return
+
+    # Upper triangle (j > i): anesthetic's scatter convention.  Lower
+    # triangle (j < i): KDE contours — overlaying scatter there would
+    # clash with the contour fill, so we leave it alone.
+    names = result.param_names
+    for i, ni in enumerate(names):
+        for j, nj in enumerate(names):
+            if j <= i:
+                continue
+            ax = _cell_axis(axes_df, i, ni, j, nj)
+            if ax is None:
+                continue
+            if rejected is not None:
+                ax.scatter(
+                    rejected[:, j],
+                    rejected[:, i],
+                    s=6,
+                    alpha=0.7,
+                    color="C3",
+                    label="tachyonic",
+                    zorder=2,
+                )
+            if rejected_prior is not None:
+                ax.scatter(
+                    rejected_prior[:, j],
+                    rejected_prior[:, i],
+                    s=3,
+                    alpha=0.3,
+                    color="C3",
+                    marker=".",
+                    zorder=1,
+                )
+
+
+def _cell_axis(axes_df: object, i: int, ni: str, j: int, nj: str) -> object | None:
+    """Retrieve an off-diagonal (i, j) cell axis.
+
+    Works for an anesthetic AxesDataFrame or a 2D array of axes, falling
+    back through name and integer indexing.
+    """
+    if hasattr(axes_df, "loc"):
+        try:
+            return axes_df.loc[ni, nj]
+        except (KeyError, AttributeError):
+            pass
+    if hasattr(axes_df, "iloc"):
+        try:
+            return axes_df.iloc[i, j]
+        except (IndexError, AttributeError):
+            pass
+    try:
+        return axes_df[i, j]  # type: ignore[index]
+    except (IndexError, TypeError):
+        return None
+
+
+def _load_rejected_prior_overlay(result: InferenceResult) -> np.ndarray | None:
+    """Read the post-hoc prior-only stability sweep file if present.
+
+    Phase 4 writes ``_rejected_prior.csv`` in the inference output dir;
+    ``InferenceResult.metadata['rejected_prior_path']`` carries the path
+    when populated.  Returns an ndarray of rejected prior samples in the
+    same column order as ``result.param_names``, or ``None`` if absent.
+    """
+    import numpy as np
+
+    meta = getattr(result, "metadata", None) or {}
+    path = meta.get("rejected_prior_path")
+    if not path:
+        return None
+    from pathlib import Path as _PathType
+
+    p = _PathType(path)
+    if not p.exists():
+        return None
+    try:
+        import csv
+
+        with p.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            cols = result.param_names
+            rows: list[list[float]] = []
+            for r in reader:
+                if r.get("run_status") != "tachyonic":
+                    continue
+                try:
+                    rows.append([float(r[c]) for c in cols])
+                except (KeyError, ValueError):
+                    continue
+        if not rows:
+            return None
+        return np.asarray(rows, dtype=float)
+    except OSError:
+        return None
 
 
 def _overlay_priors(axes_df: object, result: InferenceResult) -> None:
@@ -345,6 +497,7 @@ def _plot_corner_matplotlib(
     output_path: Path | None = None,
     *,
     show: bool = False,
+    show_rejected: bool = True,
 ) -> None:
     """Basic corner plot using matplotlib (fallback)."""
     import matplotlib.pyplot as plt
@@ -363,6 +516,9 @@ def _plot_corner_matplotlib(
     samples = result.samples[mask]
     weights = result.weights[mask] if result.weights is not None else None
 
+    rejected = _rejected_samples_array(result) if show_rejected else None
+    rejected_prior = _load_rejected_prior_overlay(result) if show_rejected else None
+
     for i in range(n):
         for j in range(n):
             ax = axes[i, j]
@@ -379,6 +535,25 @@ def _plot_corner_matplotlib(
                 )
                 ax.set_xlabel(result.param_names[i])
             else:
+                # Rejected first (zorder=0) then accepted on top.
+                if rejected_prior is not None:
+                    ax.scatter(
+                        rejected_prior[:, j],
+                        rejected_prior[:, i],
+                        s=2,
+                        alpha=0.2,
+                        color="C3",
+                        marker=".",
+                    )
+                if rejected is not None:
+                    ax.scatter(
+                        rejected[:, j],
+                        rejected[:, i],
+                        s=4,
+                        alpha=0.4,
+                        color="C3",
+                        label="tachyonic" if (i == 1 and j == 0) else None,
+                    )
                 ax.scatter(
                     samples[:, j],
                     samples[:, i],

@@ -1002,6 +1002,25 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "deltam=uniform:-0.5:0.5"
         ),
     )
+    plot_parser.add_argument(
+        "--show-rejected",
+        dest="show_rejected",
+        action="store_true",
+        default=True,
+        help=(
+            "For --type corner: overlay samples rejected by the pre-flight "
+            "stability guard (run_status='tachyonic') as red scatter on each "
+            "2D panel. Conveys where kinematically unstable parameter regions "
+            "live (cf. anesthetic conventions for inaccessible regions). "
+            "Default: enabled."
+        ),
+    )
+    plot_parser.add_argument(
+        "--hide-rejected",
+        dest="show_rejected",
+        action="store_false",
+        help="For --type corner: do NOT overlay rejected samples.",
+    )
 
     # --- sweep ---
     sweep_parser = sub.add_parser(

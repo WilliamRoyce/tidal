@@ -263,6 +263,36 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             for p in priors
         ]
 
+        # Post-hoc prior stability sweep: PolyChord drops -inf samples
+        # before they enter the chain, so the unstable region is invisible
+        # in the chain.  Sample the prior independently and run only the
+        # cheap eigenvalue check (~1 ms per draw, no simulation) to
+        # generate a side file for corner-plot overlay.  See
+        # tidal/inference/_prior_stability.py for the rationale.
+        if source and target:
+            try:
+                from tidal.inference._prior_stability import (
+                    run_prior_stability_sweep,
+                )
+
+                rej_path = output_path / "_rejected_prior.csv"
+                run_prior_stability_sweep(
+                    base_args=args,
+                    spec_path=spec_path,
+                    param_names=param_names,
+                    prior_transform=build_prior_transform(priors),
+                    source=source,
+                    target=target,
+                    output_path=rej_path,
+                    n_samples=getattr(args, "prior_sweep_samples", 5000),
+                    seed=seed,
+                    quiet=quiet,
+                )
+                result.metadata["rejected_prior_path"] = str(rej_path)
+            except Exception as exc:  # noqa: BLE001
+                if not quiet:
+                    print(f"  Prior stability sweep skipped: {exc}")
+
     else:
         error_with_hint(
             f"Unknown method '{method}'.",
