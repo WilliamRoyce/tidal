@@ -5,6 +5,8 @@
 \section{Perturbative Reduction: Implementation Design}
 \label{sec:prd-design}
 
+\textbf{Status (v0.36.0):} Phase~C was implemented and shipped in commit \texttt{742c01a} as \texttt{tidal/wolfram/PerturbativeReduction.wl} (LPS --- Lagrangian Perturbative Substitution).  This document preserves the original design specification.  The shipped implementation handles the standard case (every higher-derivative field already propagates at $L_0$; e.g.\ Pais--Uhlenbeck, Euler--Heisenberg).  For the \emph{constraint-promotion} case (small parameter promotes an algebraic-constraint field to dynamical, e.g.\ $b_5 \tilde{R}^2$ in PGT torsion), LPS aborts with a clear diagnostic; see the companion document \cref{sec:pr-constraint-barrier} and issue \#321.
+
 This document specifies the implementation of perturbative order reduction in TIDAL as a new Wolfram phase (Phase C) in the derivation pipeline. The physics motivation, method selection, and rejection of alternatives are covered in the companion research document (\cref{sec:perturbative-reduction}).
 
 \subsection{Pipeline Architecture}
