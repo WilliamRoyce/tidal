@@ -260,6 +260,7 @@ class InferenceResult:
             "n_calls",
             "priors",
             "rejected_prior_path",
+            "parameter_importance",
         ):
             val = meta.get(key)
             if val is not None:

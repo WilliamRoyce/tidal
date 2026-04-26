@@ -12,6 +12,7 @@ JOSS 4(37), 1414. https://doi.org/10.21105/joss.01414
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -203,16 +204,25 @@ def _plot_corner_anesthetic(
 ) -> None:
     """Corner plot using anesthetic (Handley 2019).
 
-    If ``result.metadata["priors"]`` is present (see issue #308 and
-    ``tidal/cli/_sample.py``), this overlay-renders the prior density
-    on each 1D marginal axis:
+    Layout follows the cosmology corner-plot convention:
 
-    - ``uniform`` prior → flat red line at 1/(hi-lo)
-    - ``log_uniform`` prior → flat red line at 1/(log hi - log lo),
-      with the x-axis switched to log scale so a flat posterior =
-      flat prior visually. Resolves #309.
+    - 2D credible regions at 68% / 95% on every off-diagonal cell
+      (anesthetic default ``levels=[0.95, 0.68]`` — same credible mass
+      across all panels)
+    - 1D marginals on the diagonal with a red prior overlay (see
+      :func:`_overlay_priors`), the MAP marker, and a 68% credible-
+      interval shaded band
+    - ``logL`` appended as a final corner row/column so the distribution
+      of log-amplification is shown directly in parameter-space context;
+      this reuses anesthetic's weight-aware KDE rather than building a
+      separate (and weight-unaware) histogram
+    - Tachyonic-rejected samples overlaid in red on the upper triangle
+      (see :func:`_overlay_rejected_anesthetic`)
+    - Headline numbers (log Z, max A, D_KL) printed in the suptitle
     """
+    import matplotlib.patches as mpatches
     import matplotlib.pyplot as plt
+    import numpy as np
 
     from tidal.inference._importance import to_anesthetic_samples
 
@@ -227,35 +237,189 @@ def _plot_corner_anesthetic(
             columns=result.param_names,
         )
 
+    # Append logL as a final column.  anesthetic auto-attaches it as a
+    # WeightedLabelledDataFrame column (samples.py:88) with TeX label
+    # r'$\ln\mathcal{L}$', so the corner-plot 1D and 2D panels for logL
+    # come "for free" with weight-aware KDEs.
+    plot_params: list[str] = list(result.param_names)
+    if "logL" in samples.columns:
+        plot_params.append("logL")
+
     # anesthetic >= 2.0: plot_2d returns an AxesDataFrame whose cells
     # expose .get_figure().  Older versions returned (fig, axes).  Handle
-    # both without version-gating.
-    ret = samples.plot_2d(result.param_names)
+    # both without version-gating.  ``label`` is consumed by anesthetic's
+    # contour code (plot.py:1314) which adds a Rectangle patch to the
+    # legend describing the 68%/95% CL contours.
+    ret = samples.plot_2d(plot_params, label="68% / 95% CL")
     if isinstance(ret, tuple) and len(ret) == 2:
         fig = ret[0]
         axes_df = ret[1]
     else:
-        # AxesDataFrame: row/col indexed by parameter name; diagonal
-        # cells are the 1D marginals.
         axes_df = ret
         cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
         fig = cell.get_figure()
 
     _overlay_priors(axes_df, result)
+    _overlay_map_and_ci(axes_df, result)
     if show_rejected:
         _overlay_rejected_anesthetic(axes_df, result)
 
-    fig.suptitle(
+    # Legend in the conventional top-right slot (the empty upper-corner
+    # cell of the triangle).  Combine anesthetic's auto-added contour
+    # patch with manual entries for MAP, prior, and rejected overlay.
+    _add_corner_legend(axes_df, plot_params, has_rejected=show_rejected)
+
+    # Suptitle with headline numbers.
+    title_lines = [
         f"Posterior ({result.method}, n={result.n_samples}, "
-        f"ESS={result.effective_sample_size():.0f})",
-        y=1.02,
-    )
+        f"ESS={result.effective_sample_size():.0f})"
+    ]
+    headline_parts: list[str] = []
+    if result.log_evidence is not None:
+        if result.log_evidence_err is not None:
+            headline_parts.append(
+                f"log Z = {result.log_evidence:.3f} ± {result.log_evidence_err:.3f}"
+            )
+        else:
+            headline_parts.append(f"log Z = {result.log_evidence:.3f}")
+    finite_logl = result.log_likelihood[np.isfinite(result.log_likelihood)]
+    if finite_logl.size > 0:
+        max_amp = float(np.exp(np.max(finite_logl)))
+        headline_parts.append(f"max A = {max_amp:.3f}")
+    pi = (result.metadata or {}).get("parameter_importance") or {}
+    if isinstance(pi, dict) and "d_kl" in pi:
+        headline_parts.append(f"D_KL = {pi['d_kl']:.3f} nats")
+    if headline_parts:
+        title_lines.append("   |   ".join(headline_parts))
+    fig.suptitle("\n".join(title_lines), y=1.02)
+    # Suppress an unused-import warning for mpatches if no rejected samples
+    # forced the legend entry path; keep the import top-level for clarity.
+    _ = mpatches
 
     if output_path:
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
     if show:
         plt.show()
     plt.close(fig)
+
+
+def _overlay_map_and_ci(axes_df: object, result: InferenceResult) -> None:
+    """Mark the MAP estimate and 68% credible interval on each 1D marginal.
+
+    Anesthetic does not provide a built-in MAP/CI annotation
+    (Handley 2019 leaves these as user-side decisions, see
+    `anesthetic/plot.py:867` `kde_plot_1d`).  This helper draws:
+
+    - solid black vertical line at the MAP value
+    - 68% credible interval as a translucent black axvspan
+
+    The existing red prior overlay (:func:`_overlay_priors`) stays
+    independent.
+    """
+    try:
+        map_estimate = result.best()
+    except Exception:  # noqa: BLE001
+        return
+    try:
+        ci_68 = result.credible_interval(0.68)
+    except Exception:  # noqa: BLE001
+        ci_68 = {}
+
+    for i, name in enumerate(result.param_names):
+        ax = _diagonal_axis(axes_df, i, name)
+        if ax is None:
+            continue
+        # Anesthetic's diagonal cells share an axis with a "twin" — KDE is
+        # drawn on the twin.  Annotations look correct on the cell axis
+        # itself (the visible one).  Pick whichever has data.
+        target = ax
+        if hasattr(ax, "twin") and ax.twin is not None:
+            target = ax.twin
+        try:
+            xmap = float(map_estimate.get(name, float("nan")))
+            if not math.isnan(xmap):
+                target.axvline(xmap, color="black", lw=1.0, alpha=0.85, zorder=3)
+        except (TypeError, ValueError):
+            pass
+        try:
+            if name in ci_68:
+                lo, hi = ci_68[name]
+                target.axvspan(
+                    float(lo),
+                    float(hi),
+                    alpha=0.12,
+                    color="black",
+                    lw=0,
+                    zorder=0,
+                )
+        except (TypeError, ValueError):
+            pass
+
+
+def _add_corner_legend(
+    axes_df: object,
+    plot_params: list[str],
+    *,
+    has_rejected: bool,
+) -> None:
+    """Render a corner-plot legend in the conventional top-right slot.
+
+    Combines anesthetic's auto-added 68%/95% CL Rectangle patch
+    (created when ``label=`` is passed to ``plot_2d``) with manual
+    entries for MAP, prior, and (optionally) the rejected overlay.
+    """
+    import matplotlib.patches as mpatches
+    from matplotlib.lines import Line2D
+
+    if not plot_params:
+        return
+
+    # Top-right cell of the triangle is the conventional legend slot.
+    target = None
+    if hasattr(axes_df, "loc"):
+        try:
+            target = axes_df.loc[plot_params[0], plot_params[-1]]
+        except (KeyError, AttributeError):
+            target = None
+    if target is None and hasattr(axes_df, "iloc"):
+        try:
+            target = axes_df.iloc[0, -1]
+        except (IndexError, AttributeError):
+            target = None
+    if target is None:
+        return
+
+    # Pull anesthetic's auto-added contour patches (one per cell where
+    # plot_2d ran) by collecting all labelled handles from the figure.
+    fig = target.get_figure() if hasattr(target, "get_figure") else None
+    handles: list[object] = []
+    seen_labels: set[str] = set()
+    if fig is not None:
+        for ax in fig.axes:
+            for h, lbl in zip(*ax.get_legend_handles_labels(), strict=False):
+                if lbl and lbl not in seen_labels:
+                    handles.append(h)
+                    seen_labels.add(lbl)
+
+    # Manual MAP and prior entries
+    if "MAP" not in seen_labels:
+        handles.append(Line2D([], [], color="black", lw=1.0, label="MAP + 68% CI"))
+    if "prior" not in seen_labels:
+        handles.append(Line2D([], [], color="red", lw=1.2, label="prior"))
+    if has_rejected and "tachyonic" not in seen_labels:
+        handles.append(
+            mpatches.Patch(color="C3", alpha=0.7, label="Unstable Re(λ) > 0")
+        )
+
+    if not handles:
+        return
+    target.legend(
+        handles=handles,
+        loc="upper right",
+        fontsize=8,
+        frameon=True,
+        framealpha=0.9,
+    )
 
 
 def _overlay_rejected_anesthetic(
