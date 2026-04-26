@@ -344,13 +344,21 @@ def _load_rejected_prior_overlay(result: InferenceResult) -> np.ndarray | None:
     import numpy as np
 
     meta = getattr(result, "metadata", None) or {}
-    path = meta.get("rejected_prior_path")
-    if not path:
-        return None
     from pathlib import Path as _PathType
 
-    p = _PathType(path)
-    if not p.exists():
+    # Try (1) the explicit path stored in metadata, then (2) a sibling
+    # _rejected_prior.csv next to inference.json (typical when results have
+    # been pulled from HPC and the original absolute path is unreachable).
+    candidates: list[_PathType] = []
+    abs_path = meta.get("rejected_prior_path")
+    if abs_path:
+        candidates.append(_PathType(abs_path))
+    loaded_from = meta.get("loaded_from")
+    if loaded_from:
+        candidates.append(_PathType(loaded_from) / "_rejected_prior.csv")
+
+    p: _PathType | None = next((c for c in candidates if c.exists()), None)
+    if p is None:
         return None
     try:
         import csv
