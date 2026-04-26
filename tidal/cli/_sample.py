@@ -301,11 +301,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         return 1
 
     # --- Save results (rank 0 only — all MPI ranks reach here) ---
+    # On HPC login nodes mpi4py imports fine but COMM_WORLD initialisation
+    # aborts (PMI2 not available outside a SLURM allocation).  Catch any
+    # error and treat as rank 0 — the only consequence is that all ranks
+    # in a real MPI run would write the file (rank-0 logic is a wallclock
+    # optimisation, not correctness-critical).
     try:
         from mpi4py import MPI  # type: ignore[import-untyped]
 
         mpi_rank: int = int(MPI.COMM_WORLD.Get_rank())  # type: ignore[reportUnknownArgumentType]
-    except ImportError:
+    except Exception:  # noqa: BLE001
         mpi_rank = 0
     if mpi_rank != 0:
         return 0
