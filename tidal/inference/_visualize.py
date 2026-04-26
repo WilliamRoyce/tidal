@@ -259,6 +259,7 @@ def _plot_corner_anesthetic(  # noqa: PLR0915
         cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
         fig = cell.get_figure()
 
+    _force_solid_credible_fills(fig)
     _overlay_priors(axes_df, result)
     _overlay_map_and_ci(axes_df, result)
     if show_rejected:
@@ -286,20 +287,22 @@ def _plot_corner_anesthetic(  # noqa: PLR0915
     if finite_logl.size > 0:
         # Interpret max(exp(logL)) according to the inference mode.
         # `_likelihood.compute_log_likelihood` returns:
-        #   maximize  -> logL = log(A)         => exp(max logL) = max A
-        #   minimize  -> logL = -log(A)        => exp(max logL) = max suppression
-        #               (i.e. P_min / P_GR ≈ 1 / max-suppression-factor)
-        #   extremize -> logL = |log(A)|       => exp(max logL) = max |log A|-factor
-        ltype = (result.metadata or {}).get("likelihood_type", "maximize")
+        #   maximize  -> logL = log(A)        => exp(max logL) = max A
+        #   minimize  -> logL = -log(A)       => exp(max logL) = max suppression
+        #                                       (i.e. P_min / P_GR ≈ 1 / factor)
+        #   extremize -> logL = |log(A)|      => exp(max logL) = max |log A|-factor
+        # Old chains (pre likelihood_type metadata) don't tag the mode;
+        # fall back to a neutral "max exp(logL)" label rather than
+        # claiming "max A" which is wrong for minimize chains.
+        ltype = (result.metadata or {}).get("likelihood_type")
         max_factor = float(np.exp(np.max(finite_logl)))
         labels = {
             "maximize": "max A",
             "minimize": "max suppression P_GR/P",
             "extremize": "max |log A|",
         }
-        headline_parts.append(
-            f"{labels.get(ltype, 'max exp(logL)')} = {max_factor:.3f}"
-        )
+        label = labels.get(ltype) if ltype else "max exp(log L)"
+        headline_parts.append(f"{label} = {max_factor:.3f}")
     pi = (result.metadata or {}).get("parameter_importance") or {}
     if isinstance(pi, dict) and "d_kl" in pi:
         headline_parts.append(f"D_KL = {pi['d_kl']:.3f} nats")
@@ -315,6 +318,93 @@ def _plot_corner_anesthetic(  # noqa: PLR0915
     if show:
         plt.show()
     plt.close(fig)
+
+
+def _force_solid_credible_fills(fig: object) -> None:
+    """Render solid-fill credible regions per Planck/DES/getdist convention.
+
+    Replaces anesthetic's per-panel-normalised gradient fills with solid
+    colours per credible level.
+
+    **Why**: anesthetic's default ``kde_contour_plot_2d`` renders contour
+    fills via ``ax.contourf(P, levels=[c95, c68], cmap=cmap, vmin=0,
+    vmax=P.max())``.  Because ``vmax`` is the *per-panel* peak density,
+    the same iso-probability levels (68%, 95%) land at different cmap
+    positions in different panels, producing visually inconsistent fill
+    colours across the corner plot.  See
+    ``.venv/.../anesthetic/plot.py:1311``.
+
+    The cosmology community standard (Planck 2018, DES Y3, ACT DR6,
+    SPT-3G, Euclid forecasts; produced via ``getdist`` with ``filled=
+    True``) uses **solid two-tone fills** — one colour for the 95%
+    credible region, a darker colour for the 68% region — identical
+    across every panel.  This is what we want: a reader extracting
+    credible-region boundaries is not misled by panel-to-panel colour
+    drift.
+
+    **How**: walk each axis's ``ContourSet`` collections (anesthetic
+    creates exactly one per panel for the 2D KDE fill), and override
+    the face colours to a fixed two-tone Planck-blue palette.  The
+    associated contour *line* collections (also drawn by anesthetic)
+    are left untouched so the boundaries remain crisp.
+
+    This post-hoc patch keeps anesthetic's KDE computation and contour
+    *placement* intact; we only override the rendered fill colours.
+    """
+    import matplotlib.contour as mcontour
+    from matplotlib import colors as mcolors
+
+    # Two-tone palette: light blue for the 95% credible band, darker for
+    # the 68%.  Matches the standard Planck-blue scheme via getdist.
+    # anesthetic uses `iso_probability_contours([0.95, 0.68])` which
+    # returns levels in *increasing* density order [c95, c68], producing
+    # `contourf` bands [c95, c68] (95% band: between c95 and c68 — the
+    # "outer" annular ring) and [c68, max] (68% core).  So palette index
+    # 0 is the 95% band (light), index 1 is the 68% core (dark).
+    fill_palette = ["#aac8e9", "#3877b8"]
+    if not hasattr(fig, "axes"):
+        return
+    for ax in fig.axes:
+        contour_sets = [
+            obj
+            for obj in ax.findobj(match=mcontour.ContourSet)
+            if getattr(obj, "filled", False)
+        ]
+        for cs in contour_sets:
+            _apply_solid_fill(cs, fill_palette, mcolors)
+
+
+def _apply_solid_fill(
+    cs: object,
+    palette: list[str],
+    mcolors: object,
+) -> None:
+    """Override one ContourSet's fill colours with a solid palette.
+
+    Handles both old matplotlib (< 3.8: ``.collections`` attribute holds
+    one PathCollection per band) and new matplotlib (≥ 3.8: ContourSet
+    *is* a single Collection, ``.set_facecolor`` takes one entry per band).
+    """
+
+    def colour_for(j: int) -> tuple[float, float, float, float]:
+        return mcolors.to_rgba(  # type: ignore[attr-defined]
+            palette[min(j, len(palette) - 1)],
+            alpha=0.85,
+        )
+
+    try:
+        colls = list(getattr(cs, "collections", []) or [])
+        if colls:
+            for j, col in enumerate(colls):
+                if hasattr(col, "set_facecolor"):
+                    col.set_facecolor(colour_for(j))
+                    col.set_edgecolor("none")
+            return
+        n_bands = max(len(getattr(cs, "levels", [])) - 1, 1)
+        cs.set_facecolor([colour_for(j) for j in range(n_bands)])  # type: ignore[attr-defined]
+        cs.set_edgecolor("none")  # type: ignore[attr-defined]
+    except (AttributeError, TypeError):
+        return
 
 
 def _overlay_map_and_ci(axes_df: object, result: InferenceResult) -> None:
