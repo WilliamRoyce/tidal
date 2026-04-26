@@ -264,7 +264,8 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28367920 | T1 Dark-Photon-Plasma | amplification, NEW Lagrangian sign convention (stable Proca) | RUNNING | ≥5:12 | std QOS, 3h wall. Replaces 28226826 semantically: alpha3 = log_uniform(0.001, 0.5) now sweeps stable-Proca regime (m² = +2·alpha3 > 0). |
 | 28367934 | T1 Dark-Photon-Plasma | suppression, NEW Lagrangian sign convention (stable Proca) | COMPLETED | 0:02:19 | log(Z)=-0.056±0.004, 2294 samples, 100% success. 0/2294 with P_max<P_GR (posterior concentrates at alpha3→0 decoupling limit). But top-P_max samples reach 5.88× P_GR — amplification signal. D_KL(xi)=0.22 drives stability. |
 | 28418115 | T1 Dark-Photon-Plasma | amplify v4 — Tier 1 + 1.5 fixed solver, B0=0.01 t_end=10 snapshots=2 nlive=1000 num_repeats=10 prec=0.005 ntasks=76 | PENDING | — | Submitted 2026-04-25 20:24Z, std QOS, 6h wall, polychord_standard.sbatch. Replaces v3 28367920 whose "P_max up to 2.0" was CDT eigenvector ill-conditioning artefact (#320). v0.36.0 modal solver uses unconditional `scipy.linalg.expm` Padé + augmented-exp Pass 1 — robust for arbitrary cond(V). |
-| 28418421 | T1 Dark-Photon-Plasma | suppress v4 — Tier 1 + 1.5 fixed solver, same params as amplify but minimize | RUNNING | — | Submitted 2026-04-25 20:25Z, INTR QOS, 1h wall, polychord_intr.sbatch. Symmetry insurance for the corrected baseline-formula likelihood (post-#319) on the now-robust solver. |
+| 28418421 | T1 Dark-Photon-Plasma | suppress v4 — Tier 1 + 1.5 fixed solver, same params as amplify but minimize | TIMEOUT | 1:00:19 | INTR wall hit before convergence. **partial chains valid**: 2030 dead samples, anesthetic gives log Z (partial) = +0.523, D_KL (partial) = 1.12 nats — same magnitude as amplify, very different from v3 suppress's near-trivial posterior. Confirms the post-fix landscape is **structurally informative** (not concentrated at α₃→0 decoupling). v4 nlive=1000 num_repeats=10 was too aggressive for INTR. Resubmitted as 28461922 at v3 resolution. |
+| 28461922 | T1 Dark-Photon-Plasma | suppress v4 RESUBMIT — v3 resolution (nlive=400, num_repeats=5, prec=0.01) on Tier 1+1.5 solver | RUNNING | — | Submitted 2026-04-26 09:47Z, INTR. Workflow validation: drop back to v3 sampling resolution to verify the post-fix landscape converges within INTR before scaling up resolution. |
 
 ---
 
@@ -272,7 +273,20 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 
 *(Filled in as results arrive)*
 
-- Stage A: **Amplify NULL confirmed; Suppress rerun pending IC-snap fix.**
+- Stage A v4 (Tier 1 + 1.5 path-D solver, 2026-04-26): **Wall-time vindication + tachyonic-instability discovery.**
+  - **Amplify (28418115) COMPLETED in 41 min** despite 5× higher resolution than v3 (which took ~3h). Confirms user's hypothesis: v3's runtime was dominated by numerical-instability churn that path-D + augmented-exp eliminated.
+  - **log(Z) = +0.141 ± 0.021** (v3: +0.118 ± 0.006), **joint D_KL = 1.025 nats** (v3: 0.043 — 24× more posterior structure now visible). MAP at light-mediator corner (mA2=0.001, deltam=+0.28, xi=0.32, alpha3=0.003).
+  - **Top samples reach P_max ≈ 3.6 at t=10, A ≈ 1454.** P_max > 1 means the linearised theory is being evolved past its validity window. Verified independently via `tidal simulate`: same value. Verified bit-exact across CDT ↔ FV formulations: identical P_max(t) and identical divergence at t≥15. Tier 1 + 1.5 path-D fix is correct; the apparent "amplification" is **a real prediction of the linearised model**, not a CDT-specific numerical artefact.
+  - **Diagnostic verdicts (top sample):**
+    - B₀ scaling test: A constant at 1454 ± 1% across B₀ ∈ [0.001, 0.03] → linear regime, equations are linear.
+    - t_end test: A(5)=1.58, A(10)=1454, A(14)=3×10⁶, A≥15 → SimulationDivergedError. Per CLAUDE.md t-independence test, A(2t)/A(t) >> 1 = exponential growth.
+    - Eigenvalue analysis: every k-mode has Re(λ) > 0 (γ scales linearly in k from 2.2 at k=0 to 94 at k=4). The h₅ component of unstable eigenvectors is ~10⁻²¹ (machine-noise direct projection), but the B₀ source term in the EOM couples h₅ → unstable modes at order B₀, giving observed effective growth rate γ_eff ≈ 1.84.
+    - **Within strict linear regime (t≤5, P_max < 0.1):** valid amplification A ≈ 1.58 — modest, real.
+  - **Interpretation:** the dark-photon-plasma model has positive linearised eigenvalues across the prior in the light-mediator corner. Within linearised theory this is exponential conversion; physically, unitarity bounds P ≤ 1 so back-reaction must saturate the conversion at some scale we haven't computed. The amplification IS real in linearised theory, but extracting an observable "amplification factor" requires either (a) restricting the prior to the perturbatively stable region (Re(λ) ≤ 0 with strong physical coupling), or (b) implementing the non-linear back-reaction.
+  - **Suppress (28418421) TIMEOUT at 1h INTR.** Partial chains (2030 dead samples) analysed via anesthetic: log Z (partial) = +0.52, D_KL (partial) = 1.12 nats — same scale as amplify, NOT the v3 trivial decoupling concentration. Resubmitted as 28461922 at v3 resolution to validate workflow.
+  - **Plots:** `hpc_results/28418115/diagnostics/Pt_top_sample.png` shows the P(t) trajectory across linear → transition → tachyonic regimes. `hpc_results/28418115/corner_amplify.png` is the 4D corner.
+
+- Stage A (v3 — superseded): **Amplify NULL confirmed; Suppress rerun pending IC-snap fix.**
   - **Amplify (28226826)** — joint D_KL=0.043, log(Z)=+0.118±0.006, D_KL(xi)=0.226, D_KL(mA2)=0.032.
     MAP at (mA2=0.34, δₘ=-0.21, ξ=1.08, α3=0.054). No P_max > P_GR in the stable region. Valid.
   - **Suppress (28216072) INVALIDATED (2026-04-22).** The 0/2319 count with `P_max < P_GR` was
