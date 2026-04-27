@@ -191,11 +191,19 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 
 #### D1: Ricci-EM / T4
 
-- [ ] Stage 0 gate passed for T4
-- [ ] HPC amplification job (job ID: ?)
-- [ ] HPC suppression job (job ID: ?)
-- [ ] Analysis: D_KL(delta1) > 0.05 nats?
+- [x] Stage 0 gate passed for T4
+- [x] HPC amplification job: 28520217 (INTR; 28519213 first attempt — files vanished post-completion, mystery; resubmitted as v5b)
+- [ ] HPC suppression job: 28519675 (standard QOS, PD in queue)
+- [x] Analysis: **D_KL(delta1) = 1.679 nats — overwhelmingly the dominant constraint (96% of joint D_KL)**
 - Notes:
+  - **Stability-guard refactor (post #322, commit c10aa8a)** was a precondition; old eigenvalue+pinv path 100% rejected T4.
+  - Priors: α₁ ∈ uniform[-1, 1], α₂ ∈ uniform[-2, 2], α₃ ∈ log_uniform[0.05, 2], δ₁ ∈ uniform[-2, 2].
+  - Padé probe 15.2% rejection rate across the prior; mostly at α₂ < -1 (51% at α₂=-2) — consistent with the lower analytic instability boundary at α₂ = -7/(4κ²) = -1.75.
+  - **Amplify (28520217) verdict**: log Z = -2.26 ± 0.07 (model strongly disfavoured vs null), joint D_KL = 1.79 ± 0.06 nats, ESS = 1356.
+  - **Marginal D_KL**: δ₁ = 1.68 nats (dominant), α₁ = 0.05, α₂ = 0.07, α₃ = 0.01. The δ₁ coupling carries virtually all the information; the PGT torsion-mass parameters are barely constrained.
+  - **A range in chain**: [4.95×10⁻⁹, 1.255]. Maximum amplification 1.26 — **does NOT match `docs/AMPLIFICATION_INVESTIGATION.md`'s A_coupling ≈ 1.9 Schur-complement prediction**. Top samples cluster at small |δ₁| ∈ [0.07, 0.15], α₂ ∈ [-1.9, -0.8]; the predicted optimum at δ₁ ≈ 1, α₂ ≈ -1 was sampled (15% rejection rate at δ₁=1) but the inference did not select it.
+  - **A range minimum (4.95×10⁻⁹) FAR EXCEEDS the predicted suppression valley (10⁻³)** at δ₁ ≈ ±1.3, varying α₂ — suggests the destructive-interference mechanism is even stronger than the linearised Schur complement estimate.
+  - **Verdict**: T4 is a **strong suppressor** of Gertsenshtein conversion (avg A ≈ exp(-2.26) ≈ 0.10), with a **modest amplification ceiling** (max A = 1.26) — physical mechanism dominated by the δ₁ R̃ₘᵤᵥ Fᵘᵥ coupling.  Suppress (28519675) pending.
 
 #### D2: YM-PGT / T5 + paper sub-theories
 
@@ -268,12 +276,27 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28461922 | T1 Dark-Photon-Plasma | suppress v4 RESUBMIT — v3 resolution (nlive=400, num_repeats=5, prec=0.01) on Tier 1+1.5 solver | COMPLETED | 0:38 | Submitted 2026-04-26 09:47Z, INTR. log Z = +0.66 ± 0.05, D_KL = 1.95 nats. Posterior concentrates at decoupling corner (small alpha3). Ghost contamination still present without stability guard — superseded by v5. |
 | 28474676 | T1 Dark-Photon-Plasma | **amplify v5** — stability-guard fix (commits e361113, 3855fc1, 7ef182d): pre-flight tachyonic eigenvalue check in `_evaluate_likelihood` rejects Re(λ) > 0.3 samples before simulation. Includes per-sample run_status metadata and post-hoc prior-only stability sweep for visualisation. | COMPLETED | 0:24 | Submitted 2026-04-26, INTR (v3 resolution: nlive=400, num_repeats=5, prec=0.01, ntasks=76). **log Z = -0.073 ± 0.007**, **D_KL = 0.024 nats** (vs v4's 1.025 — 40× collapse confirms the v4 amplify posterior was ghost contamination). Max A in chain = 1.079 — modest decoupling-corner amplification, well below the A ≈ 1.58 finding at t=5. Corner plot: `hpc_results/28474676/corner_amplify_v5.png`. |
 | 28477675 | T1 Dark-Photon-Plasma | **suppress v5** — same fix, P_max:minimize | COMPLETED | 0:38 | Submitted 2026-04-26, INTR. **log Z = +0.66 ± 0.05**, **D_KL = 1.98 nats** — structurally informative (similar to v4's 1.95 nats; the suppress region IS robust to the stability guard because the decoupling corner gives both small P AND no growing modes). Max suppression P_GR/P ≈ 1e5 at MAP (mA2≈0.97, deltam≈-0.45, xi≈0.80, alpha3≈0.001). Corner plot: `hpc_results/28477675/corner_suppress_v5.png`. |
+| 28519213 | T4 Ricci-EM | **amplify v5** (Padé-probe stability guard, post-#322 commit c10aa8a) | COMPLETED | 0:03:23 | INTR; ran cleanly but inference.json + results.csv vanished post-completion (cause unknown, only corner_amplify.png remained on /rds — possibly cleanup race). Log Z = −2.26, D_KL = 1.72 from the corner image. Resubmitted as 28520217. |
+| 28520217 | T4 Ricci-EM | **amplify v5b** — same priors, files captured | COMPLETED | 0:03:30 | INTR. **log Z = −2.26 ± 0.07** (model strongly disfavoured vs null, Bayes factor ≈ 0.10 against), **joint D_KL = 1.79 ± 0.06 nats**, ESS = 1356. Marginal D_KL: δ₁ = **1.68 nats** (dominant); α₁₋₃ < 0.07 nats. A range [4.95×10⁻⁹, 1.255]. Top samples cluster at small \|δ₁\| ∈ [0.07, 0.15]; predicted A_coupling ≈ 1.9 (`docs/AMPLIFICATION_INVESTIGATION.md`) NOT confirmed — the inference finds max A ≈ 1.26.  Bottom of chain shows extreme suppression (~10⁻⁹ at \|δ₁\| ≈ 1.3), much stronger than the predicted 10⁻³ valley. Corner: `hpc_results/28520217/corner_amplify_v5.png`. |
+| 28519675 | T4 Ricci-EM | **suppress v5** | PENDING | — | Standard QOS (parallel with INTR amplify), 3h wall, submitted 2026-04-27. |
 
 ---
 
 ## Key Findings
 
 *(Filled in as results arrive)*
+
+- Stage D1 v5 (T4 Ricci-EM, 2026-04-27): **δ₁ R̃ₘᵤᵥFᵘᵥ coupling drives strong destructive interference, modest amplification ceiling.**
+  - **Stability-guard refactor required first** (#322, commit c10aa8a). Old eigenvalue+pinv path 100% rejected T4 due to high cond(V); new Padé matrix-exponential probe correctly handles IC-decoupled growing modes — same numerical machinery as the modal solver's Pass 0 path-D evolution.
+  - **Amplify (28520217) verdict**: log Z = −2.26 ± 0.07 (Bayes factor ≈ 0.10 vs null, model strongly disfavoured for amplification), joint D_KL = 1.79 ± 0.06 nats. **Marginal D_KL is concentrated almost entirely on δ₁ (1.68 nats; α₁₋₃ each < 0.07 nats)** — confirming `R̃ₘᵤᵥFᵘᵥ` is the dominant coupling mechanism, with the PGT torsion-mass parameters (α₁₋₃) playing a negligible role within the explored range.
+  - **A range [4.95×10⁻⁹, 1.255]** spans 8 decades. Top samples (A ≈ 1.26) cluster at small \|δ₁\| ∈ [0.07, 0.15] with α₂ ∈ [-1.9, -0.8].  Bottom samples (A ≈ 10⁻⁹) cluster at \|δ₁\| ∈ [1.2, 1.3], any α₂.
+  - **Comparison to `docs/AMPLIFICATION_INVESTIGATION.md` predictions**:
+    - Schur-complement A_coupling ≈ 1.9: **NOT confirmed**. Max A in chain is 1.26.  The predicted optimum at δ₁ ≈ 1, α₂ ≈ -1 was sampled (15% Padé-probe rejection rate at δ₁=1) but the inference did not select it — the actual simulation gives lower amplification than the linearised Schur estimate.
+    - Suppression valley A ≈ 10⁻³: **MASSIVELY EXCEEDED**.  Inference finds A ≈ 10⁻⁹ in the deep valley — the destructive-interference mechanism (δ₁ R̃·F coupling shifting the photon's effective dispersion away from resonance) is much more effective than the analytic estimate.
+    - Tachyonic boundary at α₂ ≈ -0.91: Padé probe rejects 18-51% of α₂ < -1 region (consistent), but 0% rejection at α₂ > 0 (where the original investigation expected divergences via Gaussian-IC contamination).  The plane-wave IC is much cleaner than the Gaussian IC used in `AMPLIFICATION_INVESTIGATION.md`'s heatmap.
+  - **Physical interpretation**: T4's δ₁ coupling shifts the photon effective mass through the Schur complement.  In one direction (small δ₁) you get modest amplification through resonance enhancement (A up to 1.26).  In the other (\|δ₁\| ≈ 1) you get destructive interference suppressing conversion by 9 orders of magnitude.  The model is **not a Gertsenshtein amplifier** — its Bayes factor against the null is 1:10.  But it is a **strong nonminimal modifier** of the conversion (D_KL = 1.79 nats — substantial structure).
+  - **Suppress (28519675) PENDING** on standard QOS — will confirm/refine the suppression-valley structure.
+  - Corner plot: `hpc_results/28520217/corner_amplify_v5.png`.
 
 - Stage A v5 (stability-guard fix, 2026-04-26): **Definitive null on amplify; informative suppress at decoupling corner.**
   - **Pre-flight stability guard wired into inference** (commits e361113, 3855fc1, 7ef182d, 9e6776e). `_evaluate_likelihood` now calls `check_conversion_stability(conservative=True)` before any simulation; samples with Re(λ) > 0.3 in the source-containing block return logL=-inf with `run_status='tachyonic'` and the maximum growth rate. Conservative path skips the IC-coupling filter when cond(V) > 1e12 (typical for CDT models) to prevent false-negatives. Fixed coupling_floor bug where cond ≥ 1e14 forced floor=1.0 → all growing modes silently skipped.
