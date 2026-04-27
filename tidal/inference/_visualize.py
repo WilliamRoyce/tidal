@@ -174,6 +174,64 @@ def plot_importance(
     plt.close(fig)
 
 
+def _compute_log10_amplification(
+    result: InferenceResult,
+    samples: object,
+) -> np.ndarray | None:
+    """Derive log10(A) per sample where A = P_max / P_GR_baseline.
+
+    A is the physical amplification factor — same definition for amplify
+    and suppress runs, so the corner-plot column has a consistent meaning
+    across paired figures.  For the Gertsenshtein channel
+    P_GR = sin²(κ B₀ t_end / 2)² depends only on the fixed simulation
+    parameters (κ, B₀, t_end), so it can be computed once and shared
+    across all rows.
+
+    Returns None if the derivation can't be done (no P_max metric, no
+    baseline formula in metadata, or arithmetic failure).  The caller
+    falls back to plain logL in that case.
+    """
+    import numpy as np
+
+    metrics = getattr(result, "metrics", None) or {}
+    metric_name = (result.metadata or {}).get("likelihood_metric") or "P_max"
+    sim = (result.metadata or {}).get("simulation_params") or {}
+    formula = sim.get("baseline_formula")
+
+    # Path 1 (preferred, requires P3 metadata): per-sample metric value
+    # plus baseline formula → exact derivation.
+    if metric_name in metrics and formula:
+        fixed = dict(sim.get("fixed_params") or {})
+        t_end = sim.get("t_end")
+        if t_end:
+            fixed["t_end"] = float(t_end)
+        if fixed:
+            from tidal.inference._likelihood import (
+                _eval_baseline,  # pyright: ignore[reportPrivateUsage]
+            )
+
+            baseline = _eval_baseline(formula, fixed)
+            if baseline is not None and baseline > 0:
+                p_arr = np.asarray(metrics[metric_name], dtype=float)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    ratio = np.where(p_arr > 0, p_arr / baseline, np.nan)
+                    return np.log10(ratio)
+
+    # Path 2 (fallback, for chains predating the metric metadata):
+    # likelihood_type tells us how logL relates to log(A):
+    #   maximize → logL = log(A)        → log10(A) = logL / ln 10
+    #   minimize → logL = -log(A)       → log10(A) = -logL / ln 10
+    # Skip for gaussian / threshold (no A definition there).
+    ltype = (result.metadata or {}).get("likelihood_type")
+    if ltype not in {"maximize", "minimize"}:
+        return None
+    logl = np.asarray(result.log_likelihood, dtype=float)
+    sign = 1.0 if ltype == "maximize" else -1.0
+    with np.errstate(invalid="ignore"):
+        log10a = sign * logl / np.log(10.0)
+        return np.where(np.isfinite(log10a), log10a, np.nan)
+
+
 def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
     """Return an Nx(n_params) array of tachyonic-rejected samples, or None.
 
@@ -237,12 +295,26 @@ def _plot_corner_anesthetic(  # noqa: PLR0915
             columns=result.param_names,
         )
 
-    # Append logL as a final column.  anesthetic auto-attaches it as a
-    # WeightedLabelledDataFrame column (samples.py:88) with TeX label
-    # r'$\ln\mathcal{L}$', so the corner-plot 1D and 2D panels for logL
-    # come "for free" with weight-aware KDEs.
+    # Append log10(A) as a final column where A = P_max / P_GR is the
+    # physical amplification factor.  Same definition across maximize and
+    # minimize runs (amplify finds large A; suppress finds small A) — a
+    # single shared interpretation, unlike raw logL which means opposite
+    # things in the two modes.  Anesthetic's weight-aware KDE handles
+    # the new column transparently because we set it on the
+    # WeightedLabelledDataFrame.  Cosmology convention: derived parameters
+    # appear alongside sampled ones (Planck Omega_m-H_0 panels, DES Y3 S_8).
     plot_params: list[str] = list(result.param_names)
-    if "logL" in samples.columns:
+    log10_a = _compute_log10_amplification(result, samples)
+    if log10_a is not None:
+        try:
+            samples["log10_A"] = log10_a
+            samples.set_label("log10_A", r"$\log_{10} A$")
+            plot_params.append("log10_A")
+        except (AttributeError, KeyError, TypeError):
+            pass
+    elif "logL" in samples.columns:
+        # Fallback: if we can't derive A (no P_max metric, no baseline
+        # formula), still append logL so something useful shows up.
         plot_params.append("logL")
 
     # anesthetic >= 2.0: plot_2d returns an AxesDataFrame whose cells
@@ -283,26 +355,28 @@ def _plot_corner_anesthetic(  # noqa: PLR0915
             )
         else:
             headline_parts.append(f"log Z = {result.log_evidence:.3f}")
-    finite_logl = result.log_likelihood[np.isfinite(result.log_likelihood)]
-    if finite_logl.size > 0:
-        # Interpret max(exp(logL)) according to the inference mode.
-        # `_likelihood.compute_log_likelihood` returns:
-        #   maximize  -> logL = log(A)        => exp(max logL) = max A
-        #   minimize  -> logL = -log(A)       => exp(max logL) = max suppression
-        #                                       (i.e. P_min / P_GR ≈ 1 / factor)
-        #   extremize -> logL = |log(A)|      => exp(max logL) = max |log A|-factor
-        # Old chains (pre likelihood_type metadata) don't tag the mode;
-        # fall back to a neutral "max exp(logL)" label rather than
-        # claiming "max A" which is wrong for minimize chains.
-        ltype = (result.metadata or {}).get("likelihood_type")
-        max_factor = float(np.exp(np.max(finite_logl)))
-        labels = {
-            "maximize": "max A",
-            "minimize": "max suppression P_GR/P",
-            "extremize": "max |log A|",
-        }
-        label = labels.get(ltype) if ltype else "max exp(log L)"
-        headline_parts.append(f"{label} = {max_factor:.3f}")
+    # Headline amplification range: prefer the derived `log10_A` column
+    # (consistent meaning across amplify and suppress runs) and report
+    # both extremes.  Falls back to mode-aware max(exp(logL)) for older
+    # chains lacking the simulation_params metadata.
+    if log10_a is not None:
+        finite_a = log10_a[np.isfinite(log10_a)]
+        if finite_a.size > 0:
+            max_a = float(10 ** np.max(finite_a))
+            min_a = float(10 ** np.min(finite_a))
+            headline_parts.append(f"A ∈ [{min_a:.2e}, {max_a:.2e}]")
+    else:
+        finite_logl = result.log_likelihood[np.isfinite(result.log_likelihood)]
+        if finite_logl.size > 0:
+            ltype = (result.metadata or {}).get("likelihood_type")
+            max_factor = float(np.exp(np.max(finite_logl)))
+            labels = {
+                "maximize": "max A",
+                "minimize": "max suppression P_GR/P",
+                "extremize": "max |log A|",
+            }
+            label = labels.get(ltype) if ltype else "max exp(log L)"
+            headline_parts.append(f"{label} = {max_factor:.3f}")
     pi = (result.metadata or {}).get("parameter_importance") or {}
     if isinstance(pi, dict) and "d_kl" in pi:
         headline_parts.append(f"D_KL = {pi['d_kl']:.3f} nats")

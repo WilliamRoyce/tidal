@@ -261,6 +261,9 @@ class InferenceResult:
             "priors",
             "rejected_prior_path",
             "parameter_importance",
+            "likelihood_type",
+            "likelihood_metric",
+            "simulation_params",
         ):
             val = meta.get(key)
             if val is not None:
@@ -397,7 +400,7 @@ class InferenceResult:
         rejected_prior_path = self.metadata.get("rejected_prior_path")
         if rejected_prior_path is not None:
             summary["rejected_prior_path"] = str(rejected_prior_path)
-        for k in ("likelihood_type", "likelihood_metric"):
+        for k in ("likelihood_type", "likelihood_metric", "simulation_params"):
             v = self.metadata.get(k)
             if v is not None:
                 summary[k] = v

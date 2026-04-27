@@ -269,6 +269,29 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         # tiny P_max, not large amplification).
         result.metadata["likelihood_type"] = likelihood_config.likelihood_type
         result.metadata["likelihood_metric"] = likelihood_config.metric
+        # Persist enough of the simulation context to recompute the
+        # baseline formula (and therefore amplification A = P_max / P_GR)
+        # post-hoc — needed for the corner-plot's derived A column after
+        # results are pulled from HPC where the original CLI args aren't
+        # available.  See tidal/inference/_visualize.py.
+        from tidal.cli._simulate import (  # pyright: ignore[reportPrivateUsage]
+            _parse_params,
+        )
+        from tidal.symbolic import load_equation_system as _load_spec_for_meta
+
+        try:
+            spec_for_params = _load_spec_for_meta(spec_path)
+            persisted_params = _parse_params(
+                list(getattr(args, "param", []) or []), spec_for_params
+            )
+        except Exception:  # noqa: BLE001
+            persisted_params = {}
+        sim_params: dict[str, object] = {
+            "t_end": float(getattr(args, "t_end", 0.0) or 0.0),
+            "fixed_params": persisted_params,
+            "baseline_formula": likelihood_config.baseline_formula,
+        }
+        result.metadata["simulation_params"] = sim_params
 
         # Post-hoc prior stability sweep: PolyChord drops -inf samples
         # before they enter the chain, so the unstable region is invisible
