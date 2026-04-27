@@ -4659,3 +4659,162 @@ class TestHamiltonianPositionDependentEnergy:
         # laplacian_x of linear ramp = 0 everywhere (interior), so energy ≈ 0
         # This just verifies it runs without error and returns a finite value
         assert np.isfinite(energy)
+
+
+# ===================================================================
+# check_conversion_stability — Padé growth probe (post-#322 refactor)
+# ===================================================================
+
+
+class TestCheckConversionStabilityPade:
+    """Tests for the Padé matrix-exponential stability probe.
+
+    Issue #322 root-cause refactor: the eigenvalue + ``pinv(V)`` path was
+    replaced with ``expm(M·t_test)`` applied to a unit IC at the source
+    slot.  The probe mirrors the modal solver's Pass 0 evolution and is
+    robust at any ``cond(V)``.
+    """
+
+    def test_returns_stable_for_decoupling_t1_dark_photon_plasma(self) -> None:
+        """T1 at deltam=0 (decoupling limit) → no growing mode excited by h_5 IC."""
+        from pathlib import Path
+
+        from tidal.cli._simulate import (
+            _parse_params,  # pyright: ignore[reportPrivateUsage]
+        )
+        from tidal.measurement._stability import check_conversion_stability
+        from tidal.solver.grid import GridInfo
+        from tidal.symbolic.json_loader import load_equation_system
+
+        repo = Path(__file__).resolve().parents[1]
+        spec = load_equation_system(repo / "examples/data/dark_photon_plasma.json")
+        grid = GridInfo(shape=(32,), bounds=((0.0, 50.0),), periodic=(True,))
+        params = _parse_params(["kappa=1.0", "B0=0.01"], spec)
+        params.update({"mA2": 0.5, "deltam": 0.0, "xi": 0.5, "alpha3": 0.1})
+
+        result = check_conversion_stability(
+            spec, grid, params, source="h_5", target="a_1", t_test=10.0
+        )
+        assert result.stable
+        assert result.max_excess <= 0.3
+
+    def test_returns_unstable_for_t1_v4_ghost_map(self) -> None:
+        """T1 v4-amplify-MAP (ghost-contaminated, A~1454 in simulation) → reject.
+
+        This is the parameter point that v4 amplify peaked on — exponential
+        ghost growth in the source-coupled torsion sector.  Confirms the
+        Padé probe still catches v4-style ghost contamination (the original
+        guard's correct rejections must persist after the refactor).
+        """
+        from pathlib import Path
+
+        from tidal.cli._simulate import (
+            _parse_params,  # pyright: ignore[reportPrivateUsage]
+        )
+        from tidal.measurement._stability import check_conversion_stability
+        from tidal.solver.grid import GridInfo
+        from tidal.symbolic.json_loader import load_equation_system
+
+        repo = Path(__file__).resolve().parents[1]
+        spec = load_equation_system(repo / "examples/data/dark_photon_plasma.json")
+        grid = GridInfo(shape=(32,), bounds=((0.0, 50.0),), periodic=(True,))
+        params = _parse_params(["kappa=1.0", "B0=0.01"], spec)
+        params.update(
+            {
+                "mA2": 0.001018,
+                "deltam": 0.283592,
+                "xi": 0.320470,
+                "alpha3": 0.002783,
+            }
+        )
+
+        result = check_conversion_stability(
+            spec, grid, params, source="h_5", target="a_1", t_test=10.0
+        )
+        assert not result.stable
+        assert result.max_excess > 0.3
+
+    def test_handles_t4_high_cond_v_without_over_rejection(self) -> None:
+        """T4 (Ricci-EM, cond(V) ~ 1e14) at known-stable (α2=-1, δ1=1) → pass.
+
+        This is the exact failure mode of the previous eigenvalue+pinv
+        path.  The Padé probe must accept this point because the actual
+        simulation runs cleanly to t=10 here (per
+        ``docs/AMPLIFICATION_INVESTIGATION.md``).  Closes the
+        architectural gap that issue #322 reported.
+        """
+        from pathlib import Path
+
+        from tidal.cli._simulate import (
+            _parse_params,  # pyright: ignore[reportPrivateUsage]
+        )
+        from tidal.measurement._stability import check_conversion_stability
+        from tidal.solver.grid import GridInfo
+        from tidal.symbolic.json_loader import load_equation_system
+
+        repo = Path(__file__).resolve().parents[1]
+        spec = load_equation_system(
+            repo / "examples/data/torsion_gertsenshtein_nonminimal.json"
+        )
+        grid = GridInfo(shape=(32,), bounds=((0.0, 50.0),), periodic=(True,))
+        params = _parse_params(["kappa=1.0", "B0=0.01"], spec)
+        params.update({"alpha1": 0.0, "alpha2": -1.0, "alpha3": 1.0, "delta1": 1.0})
+
+        result = check_conversion_stability(
+            spec, grid, params, source="h_5", target="a_1", t_test=10.0
+        )
+        assert result.stable
+
+    def test_t4_lower_boundary_alpha2_minus_2_correctly_rejected(self) -> None:
+        """T4 at α2=-2 (below the analytic lower instability boundary
+        α2 = -7/(4κ²) = -1.75 from
+        ``docs/AMPLIFICATION_INVESTIGATION.md``) → reject.
+
+        Sanity: the probe must catch genuine instability, not just
+        avoid over-rejection.
+        """
+        from pathlib import Path
+
+        from tidal.cli._simulate import (
+            _parse_params,  # pyright: ignore[reportPrivateUsage]
+        )
+        from tidal.measurement._stability import check_conversion_stability
+        from tidal.solver.grid import GridInfo
+        from tidal.symbolic.json_loader import load_equation_system
+
+        repo = Path(__file__).resolve().parents[1]
+        spec = load_equation_system(
+            repo / "examples/data/torsion_gertsenshtein_nonminimal.json"
+        )
+        grid = GridInfo(shape=(32,), bounds=((0.0, 50.0),), periodic=(True,))
+        params = _parse_params(["kappa=1.0", "B0=0.01"], spec)
+        params.update({"alpha1": 0.0, "alpha2": -2.0, "alpha3": 1.0, "delta1": 1.0})
+
+        result = check_conversion_stability(
+            spec, grid, params, source="h_5", target="a_1", t_test=10.0
+        )
+        assert not result.stable
+        assert result.max_excess > 0.3
+
+    def test_unknown_source_field_returns_stable(self) -> None:
+        """Source field not in layout → result reports stable with diagnostic."""
+        from pathlib import Path
+
+        from tidal.cli._simulate import (
+            _parse_params,  # pyright: ignore[reportPrivateUsage]
+        )
+        from tidal.measurement._stability import check_conversion_stability
+        from tidal.solver.grid import GridInfo
+        from tidal.symbolic.json_loader import load_equation_system
+
+        repo = Path(__file__).resolve().parents[1]
+        spec = load_equation_system(repo / "examples/data/dark_photon_plasma.json")
+        grid = GridInfo(shape=(32,), bounds=((0.0, 50.0),), periodic=(True,))
+        params = _parse_params(["kappa=1.0", "B0=0.01"], spec)
+        params.update({"mA2": 0.5, "deltam": 0.0, "xi": 0.5, "alpha3": 0.1})
+
+        result = check_conversion_stability(
+            spec, grid, params, source="not_a_field", target="a_1", t_test=10.0
+        )
+        assert result.stable
+        assert "not found" in result.message.lower()

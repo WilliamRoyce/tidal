@@ -1,8 +1,9 @@
 """Pre-simulation tachyonic onset detection for conversion channels.
 
-Builds the Schur complement of the constraint-eliminated system and checks
-eigenvalues at the IC wavenumber for positive-real-part excess over the GR
-baseline. This catches tachyonic instabilities BEFORE any simulation runs,
+Probes the constraint-eliminated source-containing block by evolving a unit
+IC vector at the source slot through the same Padé matrix exponential that
+the modal solver's Pass 0 uses (`scipy.linalg.expm`, Higham 2009 scaling-
+and-squaring).  Catches tachyonic instabilities BEFORE any simulation runs,
 preventing artifacts from being misidentified as amplification (#238).
 
 Usage::
@@ -12,10 +13,45 @@ Usage::
     result = check_conversion_stability(
         spec, grid, params,
         source="h_5", target="a_1",
-        baseline_overrides={"delta1": 0.0},
+        t_test=10.0,    # match the simulation t_end
     )
     if not result.stable:
-        print(f"TACHYONIC: growth rate {result.max_excess:.4f}")
+        print(f"TACHYONIC: effective growth rate {result.max_excess:.4f}/s")
+
+Architecture (post-#322 refactor, 2026-04-26):
+==============================================
+
+The earlier eigenvalue+``pinv(V)`` implementation became unreliable on
+models with intrinsically high ``cond(V)`` (e.g. T4 Ricci-EM had cond(V)
+~ 1e14--1e17, making the IC-coupling filter fire on every parameter
+point — see issue #322).  The fix mirrors the modal solver's path-D
+evolution:
+
+* Build ``M = B⁻¹·A`` per Fourier mode using the same
+  ``_build_m_with_null_projection`` helper as Pass 0 evolution.
+* Construct a **unit IC at the source field's slot** (the actual h_5
+  plane-wave IC reduces to this in the source-containing block).
+* Compute ``y(t) = expm(M·t_test) @ y0`` via Padé scaling-and-squaring.
+* Effective growth rate ``gamma_eff = log(‖y(t)‖ / ‖y₀‖) / t_test`` is the
+  multiplicative-growth-aware analogue of ``max Re(λ)`` from the old
+  approach, but **cond(V)-independent** because no eigendecomposition or
+  pseudoinverse is involved.
+
+Key correctness property: IC-decoupled growing modes correctly contribute
+**zero growth** to ``y(t)`` because they don't appear in the source IC's
+projection onto the eigenbasis.  The previous eigenvalue+``pinv(V)`` path
+attempted to recover this via a coupling filter on ``pinv(V)[:, src_slot]``,
+which collapsed at high ``cond(V)``.  The Padé probe sidesteps the
+problem entirely by operating on the actual IC vector.
+
+References
+----------
+- Higham, N.J. (2009). "The scaling and squaring method for the matrix
+  exponential revisited." SIAM Review 51(4):747-764.
+- Higham, N.J. (2008). Functions of Matrices, SIAM, §2.3 (cond(V)
+  abandonment threshold for diagonalization).
+- Issue #322 (root cause + resolution discussion).
+- ``docs/tex/modal_solver.tex`` §"Robust Matrix-Exponential Evolution".
 """
 
 from __future__ import annotations
@@ -63,36 +99,54 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     baseline_overrides: dict[str, float] | None = None,  # noqa: ARG001
     ic_wavevector: float | None = None,
     threshold: float = 0.3,
+    t_test: float = 10.0,
     n_extra_k: int = 4,  # noqa: ARG001
-    conservative: bool = False,
+    conservative: bool = False,  # noqa: ARG001
 ) -> ConversionStabilityResult:
-    """Check for tachyonic modes in the block containing the source field.
+    """Check whether the source-IC excites a growing mode in any Fourier block.
 
-    Builds the constraint-eliminated first-order system at k=0 and near
-    the IC wavenumber, finds the independent block containing the source
-    field, and checks its maximum real eigenvalue against an absolute
-    threshold.  Uses the generalized eigenvalue problem (A, B) as in the
-    modal solver, giving the same eigenvalues the solver would use.
+    Mirrors the modal solver's Pass 0 path-D evolution (`_evolve_per_mode_pade`,
+    `tidal/solver/modal.py:1842`).  For each Fourier mode of the source-
+    containing constraint-eliminated block:
 
-    The check always includes k=0 (DC mode) because plane-wave ICs on a
-    finite grid have a non-trivial DC component (sinc leakage when k₀ is
-    not an exact grid frequency), which can excite k=0 tachyonic modes
-    and cause divergence even for ghost-free parameter points.
+    1. Build ``M = B⁻¹·A`` via ``_build_m_with_null_projection`` — same
+       construction as the solver evolves with.
+    2. Construct a unit IC ``y₀`` at the source field's slot in the block
+       (a plane-wave IC on `source` reduces to this in the per-block
+       reduced system).
+    3. Compute ``y(t_test) = expm(M·t_test) @ y₀`` via Padé scaling-and-
+       squaring (`scipy.linalg.expm`, Higham 2009).
+    4. Effective growth rate ``gamma_eff = log(‖y(t_test)‖ / ‖y₀‖) / t_test``.
+       If ``gamma_eff > threshold`` for any k mode, classify the parameter
+       point as tachyonic.
 
-    The full source-containing block (not just the 4x4 {source, target}
-    sub-matrix) is checked because CDT/PGT torsion models have non-trace
-    torsion components that share a block with the source field and carry
-    the instability; the 4x4 sub-matrix is always stable regardless.
+    Why this is correct, and why it replaces the previous eigenvalue-and-
+    pseudoinverse approach
+    --------------------------------------------------------------------
 
-    Tachyonic modes with negligible IC coupling to the source field are
-    excluded from the tachyonic count.  These modes cannot be excited by
-    a source-field IC and are suppressed by the solver's
-    ``_suppress_tachyonic_noise``.  The coupling is measured via the
-    inverse right-eigenvector matrix V⁻¹; a relative coupling
-    ``|V⁻¹[i, src_slot]| / max|V⁻¹[:, src_slot]| < 1e-10`` is treated
-    as IC-decoupled (matching the solver's ``coupling_threshold=1e-12``,
-    with a 100x safety margin).  Values between 1e-10 and 1 will cause
-    genuine exponential growth that the solver will not suppress.
+    The earlier implementation computed the spectrum ``Re(λ_i)`` and the
+    eigenvector matrix ``V``, then estimated the IC's projection onto
+    each eigenmode via ``pinv(V)[:, src_slot]``.  At ``cond(V) > 1e13``
+    (Higham 2008 §2.3 diagonalization-abandonment threshold) ``pinv(V)``
+    is numerically meaningless — the IC-coupling filter cannot
+    distinguish "eigenmode genuinely uncoupled to source" from
+    "eigenvector noise at floor of ``cond(V)·ε``".  T4 (Ricci-EM) hits
+    ``cond(V) ~ 1e14--1e17`` across most parameter points, causing 100%
+    rejection on inputs that ``tidal simulate`` evolves cleanly to
+    ``t_end``.  See issue #322 root-cause discussion.
+
+    The Padé probe sidesteps the entire problem by operating on the
+    *actual* IC vector, exactly as the modal solver does.  IC-decoupled
+    growing modes contribute zero to ``y(t_test)`` because they're not
+    excited by ``y₀`` — the same reason ``tidal simulate`` doesn't
+    diverge.  No eigendecomposition, no pseudoinverse, no
+    ``cond(V)``-sensitive bookkeeping.
+
+    Threshold semantics are unchanged: ``threshold`` is still the
+    rate above which growth is judged non-perturbative.  The reported
+    ``max_excess`` is the worst ``gamma_eff`` across k modes, so existing
+    callers comparing it against rate cutoffs (e.g. 0.3/s) get the same
+    interpretation.
 
     Parameters
     ----------
@@ -105,41 +159,43 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     source, target : str
         Source and target field names for the conversion channel.
     baseline_overrides : dict, optional
-        Unused; kept for API compatibility.  The check now uses an
-        absolute threshold on Re(λ) rather than an excess over a baseline.
+        Unused; kept for API compatibility.
     ic_wavevector : float, optional
         IC wavenumber (used only for documentation; all k modes are
-        checked regardless).  Default: 2π/L (fundamental mode).
+        checked regardless).  Default: ``2π/L`` (fundamental mode).
     threshold : float
-        Maximum Re(λ) in the source-containing block before the run is
-        classified as tachyonic (default: 0.3).  Physical oscillatory
-        modes have Re(λ) ≈ 0; values above ~0.3 indicate genuine
-        exponential growth.
+        Maximum effective growth rate ``gamma_eff`` in the source-block
+        before the run is classified as tachyonic (default: 0.3, same
+        as the original eigenvalue-based threshold).  Physical
+        oscillatory modes excited by the IC give ``gamma_eff ≈ 0``; values
+        above ~0.3 indicate genuine exponential growth that the modal
+        solver's noise-suppression won't catch.
+    t_test : float
+        Probe time for the Padé evolution (default: 10.0).  Ideally
+        match the simulation's ``t_end`` so the probe reflects what the
+        simulation will see.  Has only second-order effect on
+        ``gamma_eff = log(‖y(t)‖/‖y₀‖)/t``: in the linear-eigenvalue limit
+        ``gamma_eff → max(Re(λ_i))`` (subject to IC coupling), independent
+        of ``t_test``.
     n_extra_k : int
-        Deprecated.  Previously controlled the k-neighborhood scan
-        width; now all k modes are checked and this parameter is
-        ignored.
+        Deprecated.  All k modes are checked.
     conservative : bool
-        When True, count any growing mode (Re(λ) > threshold) as
-        tachyonic whenever ``cond(V) > 1e12``, skipping the IC-coupling
-        filter (which is numerically meaningless at that conditioning).
-        Use in the inference path where a false-negative (accepting an
-        unstable point) is worse than a false-positive (rejecting a
-        valid point).  Default False preserves the existing behaviour
-        for sweeps, which use the IC-coupling filter to correctly pass
-        R̃ models whose tachyonic tensor/axial sectors are genuinely
-        decoupled from the source IC.
+        Deprecated.  No longer used — the Padé probe is robust at any
+        ``cond(V)``, so the conservative-fallback path that used to
+        skip the unreliable ``pinv(V)`` filter is no longer needed.
+        Kept for backward-compatible API; ignored.
 
     Returns
     -------
     ConversionStabilityResult
-        Contains stable flag, growth rate, and diagnostic message.
+        ``stable=True`` iff no k-mode produces ``gamma_eff > threshold``
+        when the source-IC is evolved through ``expm(M·t_test)``.
+        ``max_excess`` is the worst observed ``gamma_eff``.
     """
-    import scipy.linalg as sla  # type: ignore[import-untyped]
-
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
         _build_evolution_matrices,  # type: ignore[reportPrivateUsage]
+        _build_m_with_null_projection,  # type: ignore[reportPrivateUsage]
         find_independent_blocks,
     )
     from tidal.solver.state import StateLayout
@@ -153,7 +209,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     k_grid: list[np.ndarray[tuple[int], np.dtype[np.float64]]] = [k_vals]
     rfft_shape = (N // 2 + 1,)
 
-    # Determine IC wavenumber index
+    # Determine IC wavenumber index (documentation only — all k checked)
     if ic_wavevector is None:
         L = grid.bounds[0][1] - grid.bounds[0][0]
         ic_k = 2 * math.pi / L
@@ -161,19 +217,14 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         ic_k = ic_wavevector
     int(np.argmin(np.abs(k_vals - ic_k)))
 
-    # Check ALL k modes.
-    #
-    # CDT/PGT tachyonic modes can peak at any wavenumber depending on the
-    # parameter combination — restricting to a small-k band + IC neighborhood
-    # leaves a gap (e.g. k ~ 0.57-1.70 for N=256, L=100) where instabilities
-    # are missed, causing runs to slip through the guard and diverge at runtime.
-    # With N=256 there are 129 modes; each eigenvalue problem is <=20x20 so the
-    # full scan costs only microseconds per sweep point.
+    # Check ALL k modes.  CDT/PGT tachyonic modes can peak at any wavenumber.
     k_indices = list(range(len(k_vals)))
 
-    # Build constraint-eliminated system (with B for generalized eig)
+    # Build constraint-eliminated system.  ``mapping`` is
+    # ``orig_to_reduced``: it translates full-layout slot indices to
+    # the reduced-system indices that A_test/B_test/blocks all use.
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, B_test, _, _, _, _, _, _ = _build_evolution_matrices(
+    A_test, B_test, _, _, _, mapping, _, _ = _build_evolution_matrices(
         spec,
         layout,
         grid,
@@ -182,13 +233,18 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         rfft_shape,
     )
 
-    # Find independent blocks; use low-k modes for coupling detection
+    # Find independent blocks using low-k coupling structure.  block_slots
+    # returned here are REDUCED-system indices, not full-layout indices.
     combined = np.max(np.abs(A_test[:3]), axis=0)
     blocks = find_independent_blocks(combined, threshold=1e-14)
 
-    # Identify the block containing the source field
+    # Identify the block containing the source field.  Translate the
+    # source field's full-layout slot to its reduced-system index before
+    # comparing against block_slots.  (Pre-refactor code happened to work
+    # when no constraint fields preceded the source slot, but failed
+    # silently otherwise — see issue #322 root-cause analysis.)
     try:
-        src_slot = layout.field_slot_map[source]
+        src_slot_full = layout.field_slot_map[source]
     except KeyError:
         return ConversionStabilityResult(
             stable=True,
@@ -198,9 +254,22 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             message=f"Source field '{source}' not found in reduced system.",
         )
 
+    if src_slot_full not in mapping:
+        return ConversionStabilityResult(
+            stable=True,
+            max_excess=0.0,
+            k_tachyonic=None,
+            n_tachyonic_modes=0,
+            message=(
+                f"Source field '{source}' (full slot {src_slot_full}) is "
+                f"a constraint field eliminated from the reduced system."
+            ),
+        )
+    src_reduced = mapping[src_slot_full]
+
     src_block: list[int] | None = None
     for block_slots in blocks:
-        if src_slot in block_slots:
+        if src_reduced in block_slots:
             src_block = list(block_slots)
             break
 
@@ -214,149 +283,76 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         )
 
     idx = np.array(src_block)
+    src_slot_in_block = list(idx).index(src_reduced)
+    block_size = len(src_block)
 
-    # Check the full source-containing block at each k.
-    # For each k where max Re(λ) > threshold, also verify that at least one
-    # tachyonic mode has significant IC coupling to the source field.  Modes
-    # that are decoupled from the source IC are suppressed by the solver's
-    # _suppress_tachyonic_noise and never cause divergence.
+    # Build the per-mode evolution generator M = B⁻¹·A for the source block,
+    # using the same null-space-aware construction as the modal solver
+    # (handles rank-deficient B via SVD projection onto range(B); null
+    # directions get M=0 so they stay at IC, matching solver semantics).
+    A_block = A_test[:, idx[:, None], idx[None, :]].astype(np.complex128)
+    if B_test is not None:
+        B_block = B_test[:, idx[:, None], idx[None, :]].astype(np.complex128)
+    else:
+        B_block = None
+    M_block = _build_m_with_null_projection(A_block, B_block)
+
+    # Probe each k mode with a unit IC at the source slot.  In the per-block
+    # reduced system, a plane-wave IC on `source` *is* a unit vector at
+    # src_slot_in_block at the IC's k mode (and zero at other k); but each k
+    # mode probes the local M at that k, so the unit-IC probe is the right
+    # universal stress test for "would a source-IC at this k get amplified?".
+    import scipy.linalg as sla  # type: ignore[import-untyped]
+
+    y0 = np.zeros(block_size, dtype=np.complex128)
+    y0[src_slot_in_block] = 1.0
+    y0_norm = float(np.linalg.norm(y0))  # = 1.0 by construction; explicit for clarity
+
     max_excess = 0.0
-    worst_k = None
+    worst_k: float | None = None
     n_tachyonic = 0
-    src_slot_in_block = list(idx).index(src_slot)
 
     for ki in k_indices:
-        Ak = A_test[ki][idx[:, None], idx[None, :]]
-        if B_test is not None:
-            Bk = B_test[ki][idx[:, None], idx[None, :]]
-            # Null-space projection for rank-deficient B (issue #264).
-            # Must match the fix in _evolve_per_mode: project A and B
-            # onto range(B) before QZ to avoid finite spurious eigenvalues
-            # from kinetic-null DOF (e.g. non-trace CDT torsion components).
-            _u_bk, s_bk, Vt_bk = cast(
-                "tuple[NDArray[np.complex128], NDArray[np.float64], NDArray[np.complex128]]",
-                np.linalg.svd(Bk),
+        M_k = M_block[ki]
+        # Padé scaling-and-squaring: robust for arbitrary cond(V).
+        try:
+            exp_M = cast(
+                "NDArray[np.complex128]",
+                sla.expm(M_k * t_test),  # type: ignore[no-untyped-call]
             )
-            null_thresh: float = float(s_bk[0]) * 1e-10 if s_bk[0] > 0 else 1e-14
-            rank_bk = int(np.sum(s_bk > null_thresh))
-            null_dim = len(s_bk) - rank_bk
-            if null_dim > 0:
-                Vphys: NDArray[np.complex128] = np.asarray(
-                    Vt_bk[:rank_bk].T,
-                    dtype=np.complex128,
-                )
-                Vnull: NDArray[np.complex128] = np.asarray(
-                    Vt_bk[rank_bk:].T,
-                    dtype=np.complex128,
-                )
-                eig_r = sla.eig(  # type: ignore[reportUnknownVariableType]
-                    Vphys.T @ Ak @ Vphys,
-                    Vphys.T @ Bk @ Vphys,
-                )
-                ev_red = np.asarray(eig_r[0], dtype=np.complex128)  # type: ignore[reportUnknownArgumentType]
-                vr_red = np.asarray(eig_r[1], dtype=np.complex128)  # type: ignore[reportUnknownArgumentType]
-                ev = np.concatenate([ev_red, np.zeros(null_dim, dtype=np.complex128)])
-                vr_mat: NDArray[np.complex128] = np.hstack([Vphys @ vr_red, Vnull])
-            else:
-                ev, vr_mat = cast(
-                    "tuple[NDArray[np.complexfloating], NDArray[np.complexfloating]]",
-                    sla.eig(Ak, Bk),  # type: ignore[arg-type]
-                )
-            # Zero out gauge/infinite eigenvalues (unphysical DOF)
-            gauge = ~np.isfinite(ev) | (np.abs(ev) > 1e12)  # noqa: PLR2004
-            ev = ev.copy()
-            ev[gauge] = 0.0
-        else:
-            ev, vr_mat = cast(
-                "tuple[NDArray[np.complexfloating], NDArray[np.complexfloating]]",
-                np.linalg.eig(Ak),  # type: ignore[assignment]
-            )
-
-        max_re = float(np.max(np.real(ev)))
-
-        if max_re > threshold:
-            tach_mask = np.real(ev) > threshold
-
-            # Compute conditioning BEFORE the expensive pinv call so that
-            # conservative early-exit avoids the pinv entirely.
-            cond_vr_mat = float(np.linalg.cond(vr_mat))
-
-            # Diagnostic: warn when cond(V) exceeds Higham 2008 §2.3
-            # eigendecomposition-abandonment threshold (1e13 in IEEE double).
-            # We pick 1e12 as a conservative one-decade margin. Above this,
-            # eigendecomposition-based analyses (this stability check, Pass 1
-            # Duhamel) should be cross-checked against the modal solver's
-            # path-D evolution. Pass 0 is unaffected (uses Padé precompute).
-            # See docs/tex/modal_solver.tex §"Robust Matrix-Exponential
-            # Evolution" and issue #320.
-            if cond_vr_mat > 1e12:  # noqa: PLR2004
-                import warnings
-
-                warnings.warn(
-                    f"Stability analysis: cond(V) = {cond_vr_mat:.2e} at "
-                    f"k_idx={ki} exceeds 1e12 (Higham 2008 §2.3 abandonment "
-                    f"threshold for diagonalization in IEEE double). "
-                    f"Eigendecomposition-based stability metrics may be "
-                    f"unreliable here; cross-check against modal solver "
-                    f"output. See #320.",
-                    stacklevel=2,
-                )
-                if conservative:
-                    # pinv(V) is numerically meaningless at this conditioning.
-                    # Conservatively count the growing mode as coupled to the
-                    # source IC rather than risk a false-negative.  Used in
-                    # the inference path where rejecting a valid point is
-                    # preferable to accepting an unstable one.  For the
-                    # dark_photon_plasma model, growing modes in the source
-                    # block ARE physically coupled (kinetic mixing acts
-                    # directly on the photon-torsion-trace sector).
-                    n_tachyonic += 1
-                    if max_re > max_excess:
-                        max_excess = max_re
-                        worst_k = float(k_vals[ki])
-                    continue
-
-            # IC coupling check: of the tachyonic modes (Re(λ) > threshold),
-            # does any one project significantly onto the source field?
-            # V_inv[i, j] = how much mode i is excited by a unit IC in slot j.
-            V_inv = np.linalg.pinv(vr_mat)
-            src_col = np.abs(V_inv[:, src_slot_in_block])
-            max_col = float(np.max(src_col))
-            if max_col > 1e-20:  # noqa: PLR2004
-                rel_coupling = float(np.max(src_col[tach_mask])) / max_col
-            else:
-                rel_coupling = 0.0
-
-            # Condition-aware coupling threshold.  When vr_mat is
-            # ill-conditioned (e.g. CDT non-trace torsion DOF at large ξ),
-            # pinv(vr_mat) entries are unreliable: numerical noise of order
-            # 1/cond(vr_mat) contaminates the coupling column, making truly
-            # IC-decoupled tachyonic modes appear coupled.  The solver's
-            # _suppress_tachyonic_noise uses the actual IC vector and
-            # correctly finds ~1e-16 for these modes; the guard must
-            # account for the conditioning to avoid false rejections.
-            # See issue #266.
-            #
-            # Floor: entries of pinv(vr_mat) have noise ~cond(vr_mat)*eps, so
-            # rel_coupling has noise ~cond(vr_mat)*eps / max_col.  With
-            # max_col ~ O(1), noise floor ~ cond(vr_mat) * eps.  Use a
-            # conservative 100x margin on machine epsilon (1e-16).
-            coupling_floor = max(1e-10, min(1.0, cond_vr_mat * 1e-14))
-            if rel_coupling < coupling_floor:
-                continue
-
+        except (ValueError, np.linalg.LinAlgError):
+            # If expm itself fails (rare; only on pathological inputs),
+            # treat as unstable to be safe.
             n_tachyonic += 1
-            if max_re > max_excess:
-                max_excess = max_re
+            max_excess = max(max_excess, float("inf"))
+            worst_k = float(k_vals[ki])
+            continue
+        y_t = exp_M @ y0
+        y_t_norm = float(np.linalg.norm(y_t))
+        if not math.isfinite(y_t_norm) or y_t_norm <= 0.0:
+            # Overflow or numerical pathology → declare unstable.
+            n_tachyonic += 1
+            if not math.isfinite(y_t_norm):
+                max_excess = float("inf")
+            worst_k = float(k_vals[ki])
+            continue
+        # Effective growth rate over t_test.  In the eigenvalue limit this
+        # converges to max(Re(λ_i)) restricted to modes the IC excites.
+        gamma_eff = math.log(y_t_norm / y0_norm) / t_test
+        if gamma_eff > threshold:
+            n_tachyonic += 1
+            if gamma_eff > max_excess:
+                max_excess = gamma_eff
                 worst_k = float(k_vals[ki])
 
     if n_tachyonic > 0:
         msg = (
-            f"Tachyonic mode in source-block: {n_tachyonic}/{len(k_indices)} "
-            f"k-modes have max Re(λ) > {threshold}. "
-            f"Worst: max_Re={max_excess:.4f} at k={worst_k:.4f} "
-            f"(block size {len(src_block)} fields). "
-            f"System will diverge exponentially; any P_max is an artefact."
+            f"Source-IC excites a growing mode: {n_tachyonic}/{len(k_indices)} "
+            f"k-modes have effective growth rate gamma_eff > {threshold} "
+            f"(Padé probe at t_test={t_test}). "
+            f"Worst: gamma_eff={max_excess:.4f}/s at k={worst_k:.4f} "
+            f"(block size {block_size} fields). "
+            f"Source IC will grow non-perturbatively; any P_max is an artefact."
         )
         return ConversionStabilityResult(
             stable=False,
@@ -371,7 +367,10 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         max_excess=max_excess,
         k_tachyonic=None,
         n_tachyonic_modes=0,
-        message="Stable: max Re(λ) in source-block within tolerance.",
+        message=(
+            f"Stable: source-IC effective growth rate gamma_eff ≤ {threshold} "
+            f"across all k modes (Padé probe at t_test={t_test})."
+        ),
     )
 
 
