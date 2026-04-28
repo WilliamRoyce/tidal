@@ -1570,6 +1570,165 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         dest="n_bootstrap_importance",
         help="Bootstrap samples for importance uncertainties (default: 100)",
     )
+    # --- Post-hoc t-independence audit (#323) ---
+    analyze_parser.add_argument(
+        "--posthoc-audit",
+        action="store_true",
+        default=False,
+        dest="posthoc_audit",
+        help=(
+            "Run the post-hoc t-independence audit on a saved inference "
+            "chain (re-simulate top + borderline + stratified samples at "
+            "2*t_base, classify per Hwang-Noh + A-ratio criteria). See "
+            "tidal/measurement/_posthoc_audit.py for the full classification "
+            "policy. Mitigates the false-negative regime documented in #323."
+        ),
+    )
+    analyze_parser.add_argument(
+        "--spec",
+        default=None,
+        dest="spec",
+        metavar="PATH",
+        help=(
+            "Path to the equation JSON the chain was sampled against "
+            "(required for --posthoc-audit). Example: "
+            "examples/data/torsion_gertsenshtein_nonminimal.json"
+        ),
+    )
+    analyze_parser.add_argument(
+        "--source",
+        default=None,
+        metavar="FIELD",
+        help="Source field (required for --posthoc-audit; e.g. 'h_5')",
+    )
+    analyze_parser.add_argument(
+        "--target",
+        default=None,
+        metavar="FIELD",
+        help="Target field (required for --posthoc-audit; e.g. 'a_1')",
+    )
+    analyze_parser.add_argument(
+        "--t-base",
+        type=float,
+        default=10.0,
+        dest="t_base",
+        help=(
+            "Original simulation t_end; audit re-runs at 2*t_base "
+            "(default: 10.0, matches campaign default)."
+        ),
+    )
+    analyze_parser.add_argument(
+        "--baseline-formula",
+        default=None,
+        dest="baseline_formula",
+        metavar="FORMULA",
+        help=(
+            "Time-resolved Gertsenshtein baseline P_GR(t) for the audit's "
+            "A(t) ratio. Same expression form as `tidal sample "
+            "--baseline-formula`, e.g. 'sin(kappa*B0*t_end/2)**2'."
+        ),
+    )
+    analyze_parser.add_argument(
+        "--n-top",
+        type=int,
+        default=50,
+        dest="n_top",
+        help="Top-posterior samples to audit (default: 50).",
+    )
+    analyze_parser.add_argument(
+        "--n-stratified",
+        type=int,
+        default=200,
+        dest="n_stratified",
+        help="Stratified-cluster samples to audit (default: 200).",
+    )
+    analyze_parser.add_argument(
+        "--n-clusters",
+        type=int,
+        default=5,
+        dest="n_clusters",
+        help="k-means clusters for stratified sampling (default: 5).",
+    )
+    analyze_parser.add_argument(
+        "--audit-seed",
+        type=int,
+        default=0,
+        dest="audit_seed",
+        help="Random seed for stratified sample selection (default: 0).",
+    )
+    analyze_parser.add_argument(
+        "--stability-profile",
+        default="v1-unit-0.3",
+        dest="stability_profile",
+        metavar="NAME",
+        help=(
+            "Stability profile that produced the chain (default: v1-unit-0.3); "
+            "audit reads its perturbativity_p_max for the Hwang-Noh gate."
+        ),
+    )
+    # Simulation passthrough flags for --posthoc-audit (re-run sims at 2*t_base)
+    analyze_parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VAL",
+        help="Fixed parameters (repeatable); merged into per-sample param dict.",
+    )
+    analyze_parser.add_argument(
+        "--grid-shape",
+        default=None,
+        dest="grid_shape",
+        metavar="N",
+        help="Grid points per axis (must match the chain's run).",
+    )
+    analyze_parser.add_argument(
+        "--bounds",
+        default=None,
+        metavar="LO:HI",
+        help="Domain bounds (must match the chain's run).",
+    )
+    analyze_parser.add_argument(
+        "--periodic",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Periodic BCs (default: True).",
+    )
+    analyze_parser.add_argument(
+        "--ic",
+        choices=["gaussian", "plane-wave", "zero", "formula", "file", "noise"],
+        default="plane-wave",
+        help="Initial condition (default: plane-wave to match campaign default).",
+    )
+    analyze_parser.add_argument(
+        "--ic-component",
+        default=None,
+        dest="ic_component",
+        metavar="NAME",
+        help="IC source field (e.g. h_5).",
+    )
+    analyze_parser.add_argument(
+        "--ic-wavevector",
+        default=None,
+        dest="ic_wavevector",
+        metavar="K",
+        help="IC plane-wave wavenumber (must match the chain's run).",
+    )
+    analyze_parser.add_argument(
+        "--ic-amplitude",
+        type=float,
+        default=1e-2,
+        dest="ic_amplitude",
+        help="IC amplitude (default: 1e-2).",
+    )
+    analyze_parser.add_argument(
+        "--snapshots",
+        type=int,
+        default=11,
+        help=(
+            "Snapshot count for the audit sim. Default 11 → 5 snapshots in "
+            "[0, t_base] and 6 in [t_base, 2*t_base], covering both halves."
+        ),
+    )
 
     # --- sample (Bayesian inference) ---
     sample_parser = sub.add_parser(
