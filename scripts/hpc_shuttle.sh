@@ -65,6 +65,10 @@ cmd_push() {
     --exclude='/docs/build/' \
     --exclude='/research/' \
     --exclude='*.png' \
+    --exclude='/results/' \
+    --exclude='/logs/' \
+    --exclude='/slurm_logs/' \
+    --exclude='/hpc_results/' \
     -e "ssh" \
     "${REPO_ROOT}/" "${HOST}:${REMOTE_ROOT}/"
   _assert_version_sync || die \
