@@ -33,6 +33,7 @@ All technical documentation lives in `docs/tex/` as LaTeX fragments. Each file i
 | `background_validity.tex` | `docs/tex/background_validity.tex` | Background validity, B₀→0 argument, EFT structure, sweep methodology |
 | `critical_field.tex` | `docs/tex/critical_field.tex` | Critical field analysis, amplification factor |
 | `torsion.tex` | `docs/tex/torsion.tex` | Poincare gauge theory, torsion implementation |
+| `pgt_stability_priors.tex` | `docs/tex/pgt_stability_priors.tex` | D2 stability priors with TIDAL/Blagojević/Barker cross-check |
 | `chern_simons.tex` | `docs/tex/chern_simons.tex` | Chern-Simons 2+1D implementation |
 
 ### Architecture
