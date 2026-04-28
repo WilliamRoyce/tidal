@@ -88,6 +88,19 @@ class ConversionStabilityResult:
     message: str
     """Human-readable diagnostic message."""
 
+    borderline: bool = False
+    """True if the worst gamma_eff falls in the borderline strip
+    (``[0.7·threshold, threshold]``) for any IC-coupled k mode.
+
+    The borderline strip is the empirical false-negative regime
+    documented in #323: probe verdict ``stable=True`` but the simulation
+    can still evolve into the non-perturbative regime within ``t_end``.
+    Post-hoc audit prioritises borderline samples for re-simulation."""
+
+    profile_name: str = ""
+    """Name of the :class:`StabilityProfile` that produced this result.
+    Empty string for legacy callers using bare-kwarg invocation."""
+
 
 def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
     spec: EquationSystem,
@@ -102,6 +115,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     t_test: float = 10.0,
     n_extra_k: int = 4,  # noqa: ARG001
     conservative: bool = False,  # noqa: ARG001
+    profile: object = None,
 ) -> ConversionStabilityResult:
     """Check whether the source-IC excites a growing mode in any Fourier block.
 
@@ -203,13 +217,29 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         skip the unreliable ``pinv(V)`` filter is no longer needed.
         Kept for backward-compatible API; ignored.
 
+    profile : StabilityProfile, optional
+        Versioned probe configuration. When supplied, takes precedence
+        over ``threshold`` / ``t_test`` and selects the IC-construction
+        mode (``"unit"`` legacy or ``"consistent"`` constraint-aware,
+        the architectural fix for #323's high-k false positives).
+        See ``tidal.measurement._stability_profile.PROFILES`` for the
+        canonical registry. When ``None``, the call is back-compat and
+        an ad-hoc profile is synthesized from the bare kwargs.
+
     Returns
     -------
     ConversionStabilityResult
         ``stable=True`` iff no k-mode produces ``gamma_eff > threshold``
         when the source-IC is evolved through ``expm(M·t_test)``.
-        ``max_excess`` is the worst observed ``gamma_eff``.
+        ``max_excess`` is the worst observed ``gamma_eff``. ``borderline``
+        flags points whose worst ``gamma_eff`` lies in
+        ``[0.7·threshold, threshold]`` — the empirical false-negative
+        strip; surface these to the post-hoc audit.
     """
+    from tidal.measurement._stability_profile import (
+        StabilityProfile,
+        adhoc_profile,
+    )
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
         _build_evolution_matrices,  # type: ignore[reportPrivateUsage]
@@ -217,6 +247,25 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         find_independent_blocks,
     )
     from tidal.solver.state import StateLayout
+
+    # Resolve profile: explicit profile arg wins; otherwise synthesize
+    # from bare kwargs for backward-compat with pre-#323 callers.
+    if profile is None:
+        active_profile = adhoc_profile(
+            threshold=threshold,
+            t_test=t_test,
+            ic_mode="unit",
+        )
+    else:
+        if not isinstance(profile, StabilityProfile):
+            msg = (
+                f"profile must be a StabilityProfile instance, got "
+                f"{type(profile).__name__}"
+            )
+            raise TypeError(msg)
+        active_profile = profile
+    threshold = active_profile.threshold
+    t_test = active_profile.t_test
 
     layout = StateLayout.from_spec(spec, grid.num_points)
 
@@ -227,13 +276,13 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     k_grid: list[np.ndarray[tuple[int], np.dtype[np.float64]]] = [k_vals]
     rfft_shape = (N // 2 + 1,)
 
-    # Determine IC wavenumber index (for documentation in messages).
+    # Determine IC wavenumber. Used to construct the consistent-IC
+    # probe vector and (for ``"unit"`` mode) for diagnostic messages.
     if ic_wavevector is None:
         L = grid.bounds[0][1] - grid.bounds[0][0]
         ic_k = 2 * math.pi / L
     else:
         ic_k = ic_wavevector
-    int(np.argmin(np.abs(k_vals - ic_k)))
 
     # Check ALL k modes.  Even though the plane-wave IC has support only at
     # one k mode at t=0, the simulation's `ensure_consistent_ic` step
@@ -340,28 +389,50 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         B_block = None
     M_block = _build_m_with_null_projection(A_block, B_block)
 
-    # Probe each k mode with a unit IC at the source slot.  In the per-block
-    # reduced system, a plane-wave IC on `source` *is* a unit vector at
-    # src_slot_in_block at the IC's k mode (and zero at other k); but each k
-    # mode probes the local M at that k, so the unit-IC probe is the right
-    # universal stress test for "would a source-IC at this k get amplified?".
+    # Build per-k IC vectors. Two profile-controlled paths:
     #
-    # Performance: empirically ~13-22 ms per call on the campaign workloads
-    # (T1 17 fields x 17 k modes; T4 10 fields x 17 k modes).  Per inference
-    # run (~10000 likelihood evals on 76 MPI ranks) the guard overhead is
-    # ~3 s -- negligible compared to the ~30 min total wall time.  The
-    # cheap-skip below for spectral-norm-bounded growth lets stable points
-    # return almost immediately; the expm cost is paid only when the
-    # spectral radius bound can't rule out growth.
+    # * ``ic_mode == "unit"`` — legacy. Same unit vector at the source
+    #   slot for every k. Conservative across the spectrum but suffers
+    #   high-k false positives at large N because real simulations'
+    #   plane-wave IC has no support at high k (#323).
+    #
+    # * ``ic_mode == "consistent"`` — architectural fix. Build the
+    #   actual real-space plane-wave IC the simulation will use
+    #   (``cos(k_ic·x)`` at the source slot), FFT into the per-mode
+    #   basis, and probe each mode with the IC's true Fourier weight
+    #   restricted to the source block. Modes the IC does not excite
+    #   carry ≈ 0 weight and are skipped (no growth contribution
+    #   regardless of eigenvalue placement, matching what the
+    #   simulation sees).
     import scipy.linalg as sla  # type: ignore[import-untyped]
 
-    y0 = np.zeros(block_size, dtype=np.complex128)
-    y0[src_slot_in_block] = 1.0
-    y0_norm = float(np.linalg.norm(y0))  # = 1.0 by construction; explicit for clarity
+    y0_per_k = _build_probe_ic_per_k(
+        ic_mode=active_profile.ic_mode,
+        block_size=block_size,
+        src_slot_in_block=src_slot_in_block,
+        N=N,
+        dx=dx,
+        rfft_shape=rfft_shape,
+        ic_k=ic_k,
+        k_vals=k_vals,
+    )
+
+    # IC-coupling threshold: skip k modes where the IC weight (per-block
+    # 2-norm) is below ``relative_floor × max_ic_norm``. Only relevant
+    # in ``"consistent"`` mode where most k modes carry zero IC weight;
+    # in ``"unit"`` mode every k carries norm = 1 by construction.
+    relative_floor = 1e-3
+    ic_norms = np.array(
+        [float(np.linalg.norm(y0_per_k[:, ki])) for ki in range(len(k_vals))],
+    )
+    ic_norm_max = float(np.max(ic_norms)) if ic_norms.size else 0.0
+    ic_threshold = max(relative_floor * ic_norm_max, 1e-15)
 
     max_excess = 0.0
     worst_k: float | None = None
+    worst_ic_coupled_excess = 0.0
     n_tachyonic = 0
+    n_modes_checked = 0
 
     # Spectral-radius cutoff (Henrici 1962, gershgorin bound):
     # norm(expm(M*t), 2) <= exp(sigma_max(M*t)) <= exp(norm(M*t, 2)).
@@ -372,6 +443,12 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     cutoff_norm_M_t = threshold * t_test
 
     for ki in k_indices:
+        ic_norm_k = ic_norms[ki]
+        if ic_norm_k <= ic_threshold:
+            # IC has no support at this k → simulation cannot excite
+            # any growing mode here, so the probe must not flag it.
+            continue
+        n_modes_checked += 1
         M_k = M_block[ki]
         # Cheap operator-norm prefilter: skip Padé when M·t is small enough
         # that no growth above the threshold is geometrically possible.
@@ -391,7 +468,8 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             max_excess = max(max_excess, float("inf"))
             worst_k = float(k_vals[ki])
             continue
-        y_t = exp_M @ y0
+        y0_k = y0_per_k[:, ki]
+        y_t = exp_M @ y0_k
         y_t_norm = float(np.linalg.norm(y_t))
         if not math.isfinite(y_t_norm) or y_t_norm <= 0.0:
             # Overflow or numerical pathology → declare unstable.
@@ -400,20 +478,26 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
                 max_excess = float("inf")
             worst_k = float(k_vals[ki])
             continue
-        # Effective growth rate over t_test.  In the eigenvalue limit this
-        # converges to max(Re(λ_i)) restricted to modes the IC excites.
-        gamma_eff = math.log(y_t_norm / y0_norm) / t_test
+        # Effective growth rate over t_test, normalized by IC norm so
+        # the rate is independent of the IC's spectral magnitude.
+        gamma_eff = math.log(y_t_norm / float(ic_norm_k)) / t_test
+        # Track worst gamma across IC-coupled modes regardless of the
+        # tachyonic threshold — this drives the borderline flag.
+        worst_ic_coupled_excess = max(worst_ic_coupled_excess, gamma_eff)
         if gamma_eff > threshold:
             n_tachyonic += 1
             if gamma_eff > max_excess:
                 max_excess = gamma_eff
                 worst_k = float(k_vals[ki])
 
+    borderline = active_profile.borderline_low <= worst_ic_coupled_excess <= threshold
+
     if n_tachyonic > 0:
         msg = (
-            f"Source-IC excites a growing mode: {n_tachyonic}/{len(k_indices)} "
-            f"k-modes have effective growth rate gamma_eff > {threshold} "
-            f"(Padé probe at t_test={t_test}). "
+            f"Source-IC excites a growing mode: {n_tachyonic}/{n_modes_checked} "
+            f"IC-coupled k-modes have effective growth rate gamma_eff > "
+            f"{threshold} (Padé probe at t_test={t_test}, "
+            f"profile={active_profile.name!r}). "
             f"Worst: gamma_eff={max_excess:.4f}/s at k={worst_k:.4f} "
             f"(block size {block_size} fields). "
             f"Source IC will grow non-perturbatively; any P_max is an artefact."
@@ -424,18 +508,89 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             k_tachyonic=worst_k,
             n_tachyonic_modes=n_tachyonic,
             message=msg,
+            borderline=False,  # rejected — borderline only meaningful for stable
+            profile_name=active_profile.name,
         )
 
     return ConversionStabilityResult(
         stable=True,
-        max_excess=max_excess,
+        max_excess=worst_ic_coupled_excess,
         k_tachyonic=None,
         n_tachyonic_modes=0,
         message=(
             f"Stable: source-IC effective growth rate gamma_eff ≤ {threshold} "
-            f"across all k modes (Padé probe at t_test={t_test})."
+            f"across {n_modes_checked} IC-coupled k modes "
+            f"(worst gamma_eff={worst_ic_coupled_excess:.4f}/s; "
+            f"profile={active_profile.name!r}, t_test={t_test}). "
+            + ("BORDERLINE — flagged for post-hoc audit." if borderline else "")
         ),
+        borderline=borderline,
+        profile_name=active_profile.name,
     )
+
+
+def _build_probe_ic_per_k(  # noqa: PLR0913
+    *,
+    ic_mode: str,
+    block_size: int,
+    src_slot_in_block: int,
+    N: int,
+    dx: float,
+    rfft_shape: tuple[int, ...],
+    ic_k: float,
+    k_vals: np.ndarray,
+) -> np.ndarray:
+    """Build per-mode IC vectors for the probe.
+
+    Returns ``y0_per_k`` of shape ``(block_size, n_modes)`` where each
+    column is the source-block component of the probe's per-k IC.
+
+    ``"unit"`` mode reproduces the legacy behaviour exactly: a delta
+    at ``src_slot_in_block`` for every k mode.
+
+    ``"consistent"`` mode mirrors the modal solver's actual IC by
+    constructing the real-space plane wave ``cos(ic_k·x)`` at the
+    source slot, then FFTing into the rfft basis. The resulting
+    Fourier IC is concentrated at the rfft bin closest to ``ic_k`` and
+    decays away — a faithful representation of what the simulation
+    will evolve.
+
+    Notes
+    -----
+    The modal solver does NOT call ``ensure_consistent_ic`` (see
+    ``tidal/solver/modal.py:2436``), so neither does this probe in
+    ``"consistent"`` mode. For solver paths that do (IDA), a future
+    profile name ``v3-consistent-ida-...`` should add the constraint
+    solve here. Out of scope for the current campaign.
+    """
+    n_modes = len(k_vals)
+    y0_per_k = np.zeros((block_size, n_modes), dtype=np.complex128)
+
+    if ic_mode == "unit":
+        # Legacy: unit at source slot, every k.
+        y0_per_k[src_slot_in_block, :] = 1.0
+        return y0_per_k
+
+    if ic_mode == "consistent":
+        # Build cos(ic_k · x) on a 1-D N-point grid spanning [0, L=N·dx)
+        # and rfft. Only the source-slot row is non-zero in real space,
+        # so only that row is non-zero in Fourier. Per-k normalization
+        # is the rfft of cos at that k.
+        x = np.arange(N) * dx
+        src_real = np.cos(ic_k * x)
+        src_hat = np.fft.rfft(src_real)
+        # Defensive shape check: rfft_shape == (N//2+1,) for 1-D.
+        if src_hat.shape != rfft_shape:
+            # Fall back to placing the IC at the nearest discrete k
+            # bin if shapes mismatch (multi-D probe extension).
+            k_index = int(np.argmin(np.abs(k_vals - ic_k)))
+            y0_per_k[src_slot_in_block, k_index] = 1.0
+            return y0_per_k
+        y0_per_k[src_slot_in_block, :] = src_hat
+        return y0_per_k
+
+    msg = f"Unknown ic_mode {ic_mode!r}; expected 'unit' or 'consistent'."
+    raise ValueError(msg)
 
 
 @dataclasses.dataclass(frozen=True)

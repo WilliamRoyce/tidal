@@ -166,7 +166,8 @@ def _apply_param_noise_to_plan(
             if pname not in nominal_vals:
                 nominal_vals[pname] = noised_overrides[pname]
             noised_overrides[pname] = noised_swept.get(
-                pname, noised_overrides[pname] + draw,
+                pname,
+                noised_overrides[pname] + draw,
             )
     rp["swept_vals"] = noised_swept
     rp["param_overrides"] = noised_overrides
@@ -295,7 +296,8 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float], str]:  # noqa: C901, P
                 msg = f"Sweep count must be >= 2, got {n}"
                 raise ValueError(msg)
             values = cast(
-                "list[float]", np.linspace(float(start), float(stop), n).tolist(),
+                "list[float]",
+                np.linspace(float(start), float(stop), n).tolist(),
             )
         elif len(parts) == 4:  # noqa: PLR2004
             # START:STOP:N:log or START:STOP:N:arctan
@@ -453,7 +455,8 @@ def _generate_samples(
         elif scale == "log":
             # Map u ∈ [0,1] → log-spaced between lower and upper
             scaled[:, i] = np.power(
-                10, np.log10(lower[i]) + u * (np.log10(upper[i]) - np.log10(lower[i])),
+                10,
+                np.log10(lower[i]) + u * (np.log10(upper[i]) - np.log10(lower[i])),
             )
         else:
             scaled[:, i] = lower[i] + u * (upper[i] - lower[i])
@@ -681,7 +684,7 @@ def _measure_run(  # noqa: PLR0913, PLR0917
     return _measure_from_sim_data(data, measurements, source, target, threshold)
 
 
-def _measure_from_sim_data(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _measure_from_sim_data(  # noqa: C901, PLR0912, PLR0915
     data: SimulationData,
     measurements: set[str],
     source: tuple[str, ...] | None,
@@ -943,6 +946,7 @@ def _run_single(  # noqa: PLR0913, PLR0917
     """
     # 0. Pre-flight tachyonic check (zero-cost eigenvalue analysis)
     # Skips simulation if the conversion channel has tachyonic modes (#238).
+    sweep_stability_meta: dict[str, Any] = {}
     conversion_measurements = {"peak_conversion", "conversion"} & measurements
     if conversion_measurements and source and target:
         try:
@@ -950,6 +954,10 @@ def _run_single(  # noqa: PLR0913, PLR0917
                 _parse_params,  # pyright: ignore[reportPrivateUsage]
             )
             from tidal.measurement._stability import check_conversion_stability
+            from tidal.measurement._stability_profile import (
+                DEFAULT_PROFILE_NAME,
+                get_profile,
+            )
             from tidal.solver.grid import GridInfo
             from tidal.symbolic.json_loader import (
                 load_equation_system as _load_spec,
@@ -975,12 +983,23 @@ def _run_single(  # noqa: PLR0913, PLR0917
                 periodic=(True,),
             )
 
+            profile_name = getattr(base_args, "stability_profile", DEFAULT_PROFILE_NAME)
+            profile = get_profile(profile_name)
+            ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
+            ic_k: float | None = None
+            if ic_wavevector_str:
+                try:
+                    ic_k = float(str(ic_wavevector_str).split(",")[0])
+                except (ValueError, IndexError):
+                    ic_k = None
             stability = check_conversion_stability(
                 spec_,
                 grid,
                 params,
                 source=source[0],
                 target=target[0],
+                ic_wavevector=ic_k,
+                profile=profile,
             )
             if not stability.stable:
                 return {
@@ -990,7 +1009,12 @@ def _run_single(  # noqa: PLR0913, PLR0917
                     "wall_time_s": 0.0,
                     "error": stability.message,
                     "tachyonic_growth_rate": stability.max_excess,
+                    "stability_profile": stability.profile_name,
+                    "borderline_stability": False,
                 }
+            # Stash the profile + borderline flag for the success row.
+            sweep_stability_meta["stability_profile"] = stability.profile_name
+            sweep_stability_meta["borderline_stability"] = bool(stability.borderline)
         except Exception:  # noqa: BLE001
             import logging as _log_tach
 
@@ -1034,6 +1058,7 @@ def _run_single(  # noqa: PLR0913, PLR0917
     metrics["run_status"] = "success"
     metrics["error_message"] = None
     metrics["solver_exit_code"] = 0
+    metrics.update(sweep_stability_meta)
     return metrics
 
 
@@ -1140,7 +1165,7 @@ def _collect_sim_settings(args: Namespace) -> dict[str, Any]:
     return settings
 
 
-def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
+def _execute_sequential(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec_path: Path,
     run_plans: list[dict[str, Any]],
@@ -1314,7 +1339,7 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
     return rows
 
 
-def _execute_parallel(  # noqa: PLR0913, PLR0914, PLR0917
+def _execute_parallel(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec_path: Path,
     run_plans: list[dict[str, Any]],
@@ -1814,7 +1839,7 @@ def _run_critical_field_post_sweep(
     _print_critical_field_summary(cf_result)
 
 
-def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _run_sweep(  # noqa: C901, PLR0912, PLR0915
     args: Namespace,
     swept_params: dict[str, list[float]],
     converge_sizes: list[int] | None,
@@ -2064,10 +2089,12 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ac: dict[str, Any] = adaptive_config[adaptive_param]
             adaptive_metric = getattr(args, "adaptive_metric", None) or ac.get("metric")
             adaptive_budget = getattr(args, "adaptive_budget", None) or ac.get(
-                "max_count", 20,
+                "max_count",
+                20,
             )
             adaptive_threshold = getattr(args, "adaptive_threshold", None) or ac.get(
-                "threshold", 0.01,
+                "threshold",
+                0.01,
             )
         else:
             adaptive_param = None

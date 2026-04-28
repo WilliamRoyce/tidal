@@ -349,7 +349,7 @@ class SimulationLikelihood:
         return logl
 
 
-def _evaluate_likelihood(  # noqa: PLR0915
+def _evaluate_likelihood(
     *,
     theta: Any,
     base_args: Namespace,
@@ -410,12 +410,17 @@ def _evaluate_likelihood(  # noqa: PLR0915
     # Uses conservative=True: when cond(V) is too high to trust the IC-coupling
     # filter (typical for CDT/PGT models), counts the growing mode as tachyonic
     # rather than risk a false-negative.  Cost: microseconds per evaluation.
+    stability_meta: dict[str, Any] = {}
     if source and target and ({"conversion", "peak_conversion"} & measurements):
         try:
             from tidal.cli._simulate import (
                 _parse_params,  # pyright: ignore[reportPrivateUsage]
             )
             from tidal.measurement._stability import check_conversion_stability
+            from tidal.measurement._stability_profile import (
+                DEFAULT_PROFILE_NAME,
+                get_profile,
+            )
             from tidal.solver.grid import GridInfo
             from tidal.symbolic.json_loader import load_equation_system as _load_spec
 
@@ -434,13 +439,23 @@ def _evaluate_likelihood(  # noqa: PLR0915
             else:
                 bounds_tuple = tuple(bounds_str)
             grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
+            profile_name = getattr(base_args, "stability_profile", DEFAULT_PROFILE_NAME)
+            profile = get_profile(profile_name)
+            ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
+            ic_k: float | None = None
+            if ic_wavevector_str:
+                try:
+                    ic_k = float(str(ic_wavevector_str).split(",")[0])
+                except (ValueError, IndexError):
+                    ic_k = None
             stability = check_conversion_stability(
                 raw_spec,
                 grid,
                 params,
                 source=source[0],
                 target=target[0],
-                conservative=True,
+                ic_wavevector=ic_k,
+                profile=profile,
             )
             if not stability.stable:
                 return -math.inf, {
@@ -452,7 +467,16 @@ def _evaluate_likelihood(  # noqa: PLR0915
                         else float("nan")
                     ),
                     "n_tachyonic_modes": int(stability.n_tachyonic_modes),
+                    "stability_profile": stability.profile_name,
+                    "borderline_stability": False,
                 }
+            # Stable but possibly borderline — surface for the post-hoc
+            # audit to prioritise this sample for re-simulation.
+            stability_meta = {
+                "stability_profile": stability.profile_name,
+                "borderline_stability": bool(stability.borderline),
+                "tachyonic_excess": float(stability.max_excess),
+            }
         except Exception:  # noqa: BLE001
             import logging
 
@@ -543,6 +567,7 @@ def _evaluate_likelihood(  # noqa: PLR0915
         success_meta: dict[str, Any] = {
             "run_status": "success",
             likelihood_config.metric: float(metric_value),
+            **stability_meta,
         }
         # If P_max guard in compute_log_likelihood demoted the metric to
         # -inf (e.g. P_max > 2.0 — non-perturbative regime), record that

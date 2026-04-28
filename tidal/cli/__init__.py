@@ -1095,6 +1095,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="T",
         help="Energy conservation threshold (default: 1e-3)",
     )
+    sweep_parser.add_argument(
+        "--stability-profile",
+        default="v1-unit-0.3",
+        dest="stability_profile",
+        metavar="NAME",
+        help=(
+            "Versioned pre-flight stability probe (default: v1-unit-0.3). "
+            "See `tidal sample --help` and "
+            "tidal/measurement/_stability_profile.py for the registry."
+        ),
+    )
     # Simulation passthrough flags (same as simulate)
     sweep_parser.add_argument(
         "--param",
@@ -1683,6 +1694,20 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Per-evaluation pipeline: 'memory' skips the simulate/measure disk "
             "round-trip (default, ~2x faster for nested sampling — see #269); "
             "'disk' preserves the legacy behaviour for bisectability."
+        ),
+    )
+    sample_parser.add_argument(
+        "--stability-profile",
+        default="v1-unit-0.3",
+        dest="stability_profile",
+        metavar="NAME",
+        help=(
+            "Versioned pre-flight stability probe (default: v1-unit-0.3). "
+            "Available: v1-unit-0.3 (legacy, pinned for v5+D1+D2+D3 "
+            "cross-stage D_KL comparability), v2-consistent-0.1 (architectural "
+            "fix for #323 high-k false positives; NOT default until validated). "
+            "Each chain CSV's 'stability_profile' column records the profile "
+            "applied. See tidal/measurement/_stability_profile.py."
         ),
     )
     sample_parser.add_argument(

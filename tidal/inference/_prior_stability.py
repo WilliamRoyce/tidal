@@ -85,6 +85,10 @@ def run_prior_stability_sweep(
 
     from tidal.cli._simulate import _parse_params  # pyright: ignore[reportPrivateUsage]
     from tidal.measurement._stability import check_conversion_stability
+    from tidal.measurement._stability_profile import (
+        DEFAULT_PROFILE_NAME,
+        get_profile,
+    )
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import load_equation_system
 
@@ -100,6 +104,15 @@ def run_prior_stability_sweep(
     else:
         bounds_tuple = tuple(bounds_str)
     grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
+    profile_name = getattr(base_args, "stability_profile", DEFAULT_PROFILE_NAME)
+    profile = get_profile(profile_name)
+    ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
+    ic_k: float | None = None
+    if ic_wavevector_str:
+        try:
+            ic_k = float(str(ic_wavevector_str).split(",")[0])
+        except (ValueError, IndexError):
+            ic_k = None
 
     rng = np.random.default_rng(seed)
     n_rejected = 0
@@ -121,7 +134,15 @@ def run_prior_stability_sweep(
             message="Stability analysis: cond.V.",
         )
         writer = csv.writer(f)
-        writer.writerow([*param_names, "run_status", "tachyonic_excess"])
+        writer.writerow(
+            [
+                *param_names,
+                "run_status",
+                "tachyonic_excess",
+                "stability_profile",
+                "borderline_stability",
+            ],
+        )
         for _ in range(n_samples):
             cube = list(rng.random(len(param_names)))
             try:
@@ -136,16 +157,33 @@ def run_prior_stability_sweep(
                     params,
                     source=source[0],
                     target=target[0],
-                    conservative=True,
+                    ic_wavevector=ic_k,
+                    profile=profile,
                 )
             except Exception:  # noqa: BLE001, S112
                 continue
             n_evaluated += 1
             if stability.stable:
-                writer.writerow([*theta, "success", ""])
+                writer.writerow(
+                    [
+                        *theta,
+                        "success",
+                        float(stability.max_excess),
+                        stability.profile_name,
+                        int(bool(stability.borderline)),
+                    ],
+                )
             else:
                 n_rejected += 1
-                writer.writerow([*theta, "tachyonic", float(stability.max_excess)])
+                writer.writerow(
+                    [
+                        *theta,
+                        "tachyonic",
+                        float(stability.max_excess),
+                        stability.profile_name,
+                        0,
+                    ],
+                )
 
     if not quiet:
         if n_evaluated:

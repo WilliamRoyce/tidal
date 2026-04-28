@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from tidal.inference._results import InferenceResult
 
 
-def run_monte_carlo(  # noqa: PLR0915
+def run_monte_carlo(
     priors: list[Prior],
     likelihood_config: LikelihoodConfig,
     base_args: Namespace,
@@ -189,13 +189,21 @@ def run_monte_carlo(  # noqa: PLR0915
     # Numeric fields use object arrays so we can mix floats with NaN.
     run_status_arr: np.ndarray = np.full(n_samples, "constraint", dtype=object)
     tachyonic_excess_arr: np.ndarray = np.full(n_samples, np.nan, dtype=float)
+    profile_arr: np.ndarray = np.full(n_samples, "", dtype=object)
+    borderline_arr: np.ndarray = np.full(n_samples, 0, dtype=int)
     for k, idx in enumerate(valid_indices):
         meta = metadata_valid[k] if k < len(metadata_valid) else {}
         run_status_arr[idx] = meta.get("run_status", "success")
         if "tachyonic_excess" in meta:
             tachyonic_excess_arr[idx] = float(meta["tachyonic_excess"])
+        if "stability_profile" in meta:
+            profile_arr[idx] = str(meta["stability_profile"])
+        if "borderline_stability" in meta:
+            borderline_arr[idx] = int(bool(meta["borderline_stability"]))
     all_metrics["run_status"] = run_status_arr
     all_metrics["tachyonic_excess"] = tachyonic_excess_arr
+    all_metrics["stability_profile"] = profile_arr
+    all_metrics["borderline_stability"] = borderline_arr
 
     if not quiet:
         n_success = int(np.sum(np.isfinite(log_likelihoods_valid)))
