@@ -98,7 +98,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     target: str = "a_1",  # noqa: ARG001
     baseline_overrides: dict[str, float] | None = None,  # noqa: ARG001
     ic_wavevector: float | None = None,
-    threshold: float = 0.1,
+    threshold: float = 0.3,
     t_test: float = 10.0,
     n_extra_k: int = 4,  # noqa: ARG001
     conservative: bool = False,  # noqa: ARG001
@@ -165,21 +165,29 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         checked regardless).  Default: ``2π/L`` (fundamental mode).
     threshold : float
         Maximum effective growth rate ``gamma_eff`` in the source-block
-        before the run is classified as tachyonic (default: 0.1).
-        Physical oscillatory modes excited by the IC give
-        ``gamma_eff ≈ 0``; values above ~0.1 indicate exponential growth
-        that approaches Hwang-Noh non-perturbative regime within the
-        simulation window.
+        before the run is classified as tachyonic (default: 0.3).
+        ``exp(0.3·t_end=10) ≈ 20×`` source-norm growth — typically the
+        boundary where the simulation's own divergence pre-check (#298)
+        catches things, so this matches the simulation's own conservatism.
 
-        **Threshold history** (#323): the original 0.3 was chosen as
-        "exp(0.3·t_end=10)≈20× growth — well past linear regime", but
-        the Stage D2.0 (Bahamonde-PGT) smoke test (commit 712336d era)
-        found a parameter point with γ_eff=0.275 that the probe
-        accepted but where ``tidal simulate`` reached P_max=1.06 by
-        t=10 (well into non-perturbative regime).  Tightened to 0.1
-        on 2026-04-27 to eliminate this false-negative regime.
-        exp(0.1·10) = 2.7× growth allowed — closer to Hwang-Noh's
-        P<<1 linear-regime requirement.
+        **Threshold history** (#323):
+        - 0.3 (original, eigenvalue-based): chosen as "exp(0.3·10)≈20×
+          source-norm growth — well past linear regime".
+        - 0.1 (attempted 2026-04-27): aimed at the Stage D2.0
+          Bahamonde-PGT slow-ghost case (γ_eff=0.275 → A=423 in sim
+          at t=10), but the all-k probe at N=64 hit 100% rejection on
+          T1/T4 priors because high-k modes typically have γ ∈ (0.1,
+          0.3). Reverted same day.
+        - 0.3 (current): consistent with v5 + D1 publications. Known
+          false-negative regime: γ_eff ∈ (0.275, 0.3) at IC k can let a
+          slow ghost through; mitigation is post-hoc t-independence
+          test on top samples in each chain.
+
+        Future direction (#323 supervisor question): a probe that uses
+        the constraint-solved IC y0_hat (matching the simulation's
+        divergence pre-check exactly) would let us tighten the threshold
+        without high-k false positives, since high-k modes get zero IC
+        weight when the IC is at low k.  Out of scope for current campaign.
     t_test : float
         Probe time for the Padé evolution (default: 10.0).  Ideally
         match the simulation's ``t_end`` so the probe reflects what the
@@ -219,7 +227,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     k_grid: list[np.ndarray[tuple[int], np.dtype[np.float64]]] = [k_vals]
     rfft_shape = (N // 2 + 1,)
 
-    # Determine IC wavenumber index (documentation only — all k checked)
+    # Determine IC wavenumber index (for documentation in messages).
     if ic_wavevector is None:
         L = grid.bounds[0][1] - grid.bounds[0][0]
         ic_k = 2 * math.pi / L
@@ -227,21 +235,46 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         ic_k = ic_wavevector
     int(np.argmin(np.abs(k_vals - ic_k)))
 
-    # Check ALL k modes.  CDT/PGT tachyonic modes can peak at any wavenumber.
+    # Check ALL k modes.  Even though the plane-wave IC has support only at
+    # one k mode at t=0, the simulation's `ensure_consistent_ic` step
+    # populates constraint-field slots from the algebraic constraints —
+    # which can project onto growing eigenvectors at OTHER k modes.  The
+    # simulation's divergence guard (`_evolve_per_mode_pade`, modal.py:1992)
+    # checks all k via the inverse-FFT path; this probe must do the same to
+    # keep accept/reject decisions consistent with the simulation.  Cost is
+    # still microseconds per k thanks to the spectral-radius prefilter
+    # below.
     k_indices = list(range(len(k_vals)))
 
     # Build constraint-eliminated system.  ``mapping`` is
     # ``orig_to_reduced``: it translates full-layout slot indices to
     # the reduced-system indices that A_test/B_test/blocks all use.
+    # Some parameter points produce singular constraint matrices
+    # (np.linalg.inv on S_cc_reg fails); those are physically degenerate
+    # and the simulation cannot run there either, so we mark them
+    # tachyonic with infinite excess.
     ce = CoefficientEvaluator(spec, grid, parameters)
-    A_test, B_test, _, _, _, mapping, _, _ = _build_evolution_matrices(
-        spec,
-        layout,
-        grid,
-        ce,
-        k_grid,
-        rfft_shape,
-    )
+    try:
+        A_test, B_test, _, _, _, mapping, _, _ = _build_evolution_matrices(
+            spec,
+            layout,
+            grid,
+            ce,
+            k_grid,
+            rfft_shape,
+        )
+    except (np.linalg.LinAlgError, ValueError) as exc:
+        return ConversionStabilityResult(
+            stable=False,
+            max_excess=float("inf"),
+            k_tachyonic=None,
+            n_tachyonic_modes=1,
+            message=(
+                f"Constraint elimination failed at this parameter point "
+                f"({type(exc).__name__}: {exc}); simulation cannot run, "
+                f"treating as tachyonic."
+            ),
+        )
 
     # Find independent blocks using low-k coupling structure.  block_slots
     # returned here are REDUCED-system indices, not full-layout indices.

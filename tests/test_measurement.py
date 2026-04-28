@@ -4791,10 +4791,15 @@ class TestCheckConversionStabilityPade:
         params.update({"alpha1": 0.0, "alpha2": -2.0, "alpha3": 1.0, "delta1": 1.0})
 
         result = check_conversion_stability(
-            spec, grid, params, source="h_5", target="a_1", t_test=10.0
+            spec,
+            grid,
+            params,
+            source="h_5",
+            target="a_1",
+            t_test=10.0,
         )
         assert not result.stable
-        assert result.max_excess > 0.3
+        assert result.max_excess > 0.3  # campaign threshold
 
     def test_unknown_source_field_returns_stable(self) -> None:
         """Source field not in layout → result reports stable with diagnostic."""
