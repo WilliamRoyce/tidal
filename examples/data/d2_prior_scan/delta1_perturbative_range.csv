@@ -1,0 +1,4 @@
+metric,delta1_lower,delta1_upper
+p_max_t10,-0.5,0.5
+p_max_t20,-0.5,0.5
+diverge,-0.5,0.5
