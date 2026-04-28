@@ -98,7 +98,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     target: str = "a_1",  # noqa: ARG001
     baseline_overrides: dict[str, float] | None = None,  # noqa: ARG001
     ic_wavevector: float | None = None,
-    threshold: float = 0.3,
+    threshold: float = 0.1,
     t_test: float = 10.0,
     n_extra_k: int = 4,  # noqa: ARG001
     conservative: bool = False,  # noqa: ARG001
@@ -165,11 +165,21 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         checked regardless).  Default: ``2π/L`` (fundamental mode).
     threshold : float
         Maximum effective growth rate ``gamma_eff`` in the source-block
-        before the run is classified as tachyonic (default: 0.3, same
-        as the original eigenvalue-based threshold).  Physical
-        oscillatory modes excited by the IC give ``gamma_eff ≈ 0``; values
-        above ~0.3 indicate genuine exponential growth that the modal
-        solver's noise-suppression won't catch.
+        before the run is classified as tachyonic (default: 0.1).
+        Physical oscillatory modes excited by the IC give
+        ``gamma_eff ≈ 0``; values above ~0.1 indicate exponential growth
+        that approaches Hwang-Noh non-perturbative regime within the
+        simulation window.
+
+        **Threshold history** (#323): the original 0.3 was chosen as
+        "exp(0.3·t_end=10)≈20× growth — well past linear regime", but
+        the Stage D2.0 (Bahamonde-PGT) smoke test (commit 712336d era)
+        found a parameter point with γ_eff=0.275 that the probe
+        accepted but where ``tidal simulate`` reached P_max=1.06 by
+        t=10 (well into non-perturbative regime).  Tightened to 0.1
+        on 2026-04-27 to eliminate this false-negative regime.
+        exp(0.1·10) = 2.7× growth allowed — closer to Hwang-Noh's
+        P<<1 linear-regime requirement.
     t_test : float
         Probe time for the Padé evolution (default: 10.0).  Ideally
         match the simulation's ``t_end`` so the probe reflects what the
