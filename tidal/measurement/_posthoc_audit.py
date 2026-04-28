@@ -268,6 +268,54 @@ def _classify_sample(
     return "pass", "perturbative; A_med stationary"
 
 
+# Defaults the simulate code path expects directly (not via getattr).  The
+# analyze CLI defines a small subset; the audit re-uses the same simulate
+# entry point as the inference likelihood, so any missing attribute would
+# raise AttributeError on the first chained sim.  Keep keys aligned with
+# _simulate.py's `args.<x>` direct accesses, not the broader getattr set.
+def _backfill_simulate_args(audit_args: Namespace) -> None:
+    """Fill in simulate-required attrs missing from the analyze namespace.
+
+    The analyze CLI was scoped to chain analysis, so it defines only the
+    simulate flags the audit explicitly needs (--ic, --ic-component, etc.).
+    The simulate code path direct-accesses a wider set of attributes —
+    backfill those with their canonical simulate defaults to avoid
+    AttributeError on every sample.
+    """
+    from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
+
+    defaults: dict[str, Any] = {
+        "bc": None,
+        # _resolve_scheme returns the value as-is when != "auto", so a
+        # missing scheme would propagate None into the solver dispatch.
+        # "auto" triggers the standard solver selection used by the
+        # campaign chains.
+        "scheme": "auto",
+        "mode": None,
+        "method": None,
+        "dt": None,
+        # rtol/atol are direct-accessed by _validate_solver_params with
+        # `> 0` checks (no None handling), so they need numeric defaults.
+        "atol": DEFAULT_ATOL,
+        "rtol": DEFAULT_RTOL,
+        "max_step": None,
+        "ic_width": None,
+        "ic_center": None,
+        "ic_formula": None,
+        "output": None,
+        "output_format": None,
+        "no_plot": True,
+        "quiet": True,
+        "resume": None,
+        "snapshot": None,
+        "t_additional": None,
+        "json_path": None,
+    }
+    for key, default in defaults.items():
+        if not hasattr(audit_args, key):
+            setattr(audit_args, key, default)
+
+
 def _evaluate_sample(
     sample_index: int,
     parameters: dict[str, float],
@@ -292,9 +340,45 @@ def _evaluate_sample(
 
     audit_args = copy.copy(base_args)
     audit_args.t_end = 2.0 * t_base
+    # The analyze CLI's --snapshots is an integer count for clarity (the
+    # audit's intent is "N snapshots covering both halves"), but simulate
+    # interprets --snapshots as a float time interval.  Convert count → dt
+    # here so the t-axis is uniform across [0, 2*t_base].
+    snapshot_count = getattr(audit_args, "snapshots", None)
+    if snapshot_count is not None and snapshot_count > 1:
+        audit_args.snapshots = float(audit_args.t_end) / float(snapshot_count - 1)
+    else:
+        audit_args.snapshots = None
+    # The analyze CLI doesn't define every simulate flag, so back-fill any
+    # _simulate-required attributes that may be absent on the analyze
+    # namespace.  Defaults match _build_parser's "simulate" defaults.
+    _backfill_simulate_args(audit_args)
+
+    from tidal.solver._exceptions import SimulationDivergedError
 
     try:
         sim_data = run_inference_step(audit_args, spec_path, parameters)
+    except SimulationDivergedError as exc:
+        # The simulate code path's own Padé probe detected non-perturbative
+        # divergence at 2*t_base — exactly the contamination this audit
+        # exists to surface.  Classify as a hard reject (consistent with
+        # the Hwang-Noh gate's intent) rather than as a generic sim failure.
+        return SampleAudit(
+            index=sample_index,
+            parameters=parameters,
+            p_max_first=float("nan"),
+            p_max_second=float("nan"),
+            p_max_total=float("nan"),
+            a_med_first=float("nan"),
+            a_med_second=float("nan"),
+            a_max_first=float("nan"),
+            a_max_second=float("nan"),
+            a_med_log_ratio=float("nan"),
+            gamma_eff_posthoc=float("inf"),
+            status="hard_reject",
+            reason=f"non-perturbative @ 2*t_base: {exc}",
+            selection_strategy=selection_strategy,
+        )
     except Exception as exc:  # noqa: BLE001
         return SampleAudit(
             index=sample_index,
