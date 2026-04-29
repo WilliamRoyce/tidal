@@ -7,7 +7,9 @@
 \section{PGT Stability Priors for the D2 Campaign}
 \label{sec:pgt-stability-priors}
 
-\textbf{Status:} D2.0 + D2.1 priors locked; D2.2/D2.3 stubbed pending per-model scans \\
+\textbf{Status:} D2.0 + D2.1 priors locked (D2.1 verified at prior corners,
+\cref{tab:d21-p5-corner-verification}); D2.2/D2.3 stubbed pending per-model
+scans following the recipe in \cref{sec:per-model-recipe} \\
 \textbf{Date:} 2026-04-29
 
 The D2 Bayesian campaign explores Poincar\'e gauge theory (PGT) coupled to
@@ -356,24 +358,132 @@ $\log\mathcal{L}=-\infty$ in microseconds for any prior sample that violates
 them, sparing the chain from running the PDE solver on tachyonic parameter
 points.  Confidence levels are tabulated in~\cref{sec:confidence}.
 
-\subsection{D2.1, D2.2, D2.3 priors --- TBD}
+\subsection{Per-model sensitivity scan recipe}
+\label{sec:per-model-recipe}
+
+D2.0's empirical scan delivered an unexpectedly strong invariance
+result: at $\delta_1=0$, $\gamma_\mathrm{eff}=0.1008$ to four
+significant figures across \emph{all five} representative
+$(\beta,\xi)$ anchor points (\cref{tab:d20-scan-points}).  We
+extrapolated from that observation that $\delta_1$'s perturbative
+range was approximately $(\beta,\xi)$-invariant inside the
+constraint region, and the working-point scan in
+\cref{sec:delta1-model-dependence} suffices to set~$\delta^*$.
+
+\paragraph{Yellow flag: the invariance does not generalise.}
+D2.1's analogue scan does not preserve this invariance.  At
+$\delta_1=0.005$, the $\chi$-rejection threshold varies by a
+factor~${\sim}\,2.5$ across the same five anchor points
+(\cref{sec:d21-priors} below: P1: $0.040$, P3: $>0.050$, P4:
+$0.040$, P5: $0.018$).  P5 (the interior of the
+$\beta$-constraint polytope at $\xi=1$) is genuinely more
+sensitive than the boundary anchors.  A working-point-only scan at
+P1 would over-state $\chi^*$ by~${\sim}\,2.2\times$ and admit
+tachyonic samples in the $\beta$-interior region.  D2.0's
+invariance is a feature of $\delta_1$ at $\chi=\zeta_i=0$, not of
+the general spec, and must not be assumed for any other coupling.
+
+\paragraph{Recipe.}
+Each new coupling parameter introduced in a D$x.y$ sub-model is
+characterised by three sequential steps:
+\begin{enumerate}
+  \item[(a)] \textbf{Single-parameter scan at $\delta_1 = 0$ across
+    five anchors} to confirm the parameter is benign on its own.
+    Run the canonical probe at each of the five
+    $(\beta,\xi)$ anchors in \cref{tab:d20-scan-points}, with all
+    other couplings (including~$\delta_1$) fixed at zero, sweeping
+    the new parameter across a wide range
+    $\{0,\,0.05,\,\ldots,\,0.50\}$.  If $\gamma_\mathrm{eff}$ stays
+    at the D2.0 baseline of~$0.101$ across the scan range and all
+    five anchors, the parameter is benign in isolation --- the
+    typical and expected outcome.
+  \item[(b)] \textbf{Joint scan at the working point} to identify
+    the multiplicative-vs-rectangular structure.  Run a~$5\!\times\!5$
+    grid in $(\delta_1,\,\text{new})$ at the D1 working point P1.
+    A \emph{rectangular} unstable region (one axis non-zero
+    \emph{and} the other axis above some threshold) indicates the
+    standard D2.1-type Schur-complement bridge between sectors and
+    means no \texttt{--constraint} clause coupling the two
+    parameters is needed --- the prior box can be set
+    component-wise.  A \emph{multiplicative} or \emph{radial}
+    structure (rejection at small product or small radius) would
+    instead require an explicit cross-coupling
+    \texttt{--constraint} clause to keep the prior inside the
+    stable region.  D2.1 exhibits the rectangular pattern
+    (\cref{tab:d21-joint-scan-working}).
+  \item[(c)] \textbf{Most-restrictive-anchor scan} to set the prior
+    bound.  Repeat the joint scan at the four non-working anchors
+    P2--P5 in the regime indicated by step~(b).  The prior bound
+    is the smallest-rejection threshold across all five anchors,
+    with a~$2\times$ safety margin.  Do not average or extrapolate
+    from the working point alone.
+\end{enumerate}
+
+\paragraph{Worked examples.}
+D2.0 (\cref{sec:delta1-model-dependence}) and D2.1
+(\cref{sec:d21-priors}) carry through this recipe end-to-end and
+serve as concrete templates.  Each subsequent sub-model should
+reproduce the same structure of inline tables: a five-anchor
+single-parameter scan, a working-point joint grid, and a per-anchor
+threshold list.  Storing the raw $\gamma_\mathrm{eff}$ values inline
+keeps the recipe auditable without an external CSV.
+
+\paragraph{Predictions for D2.2 and D2.3.}
+Each $\zeta_i$ in D2.2 (and the joint $\zeta_i\!\times\!\zeta_j$
+combinations in D2.3) should be expected to follow the D2.1
+pattern: benign in isolation, dangerous in combination with
+$\delta_1$ and/or $\chi$.  The shared mechanism is the constraint
+Schur complement, which funnels every curvature- and
+derivative-mediated coupling through the same kinetic-matrix
+inversion; whichever pair of couplings is non-zero, the resulting
+off-diagonal terms can compound.  Default to the recipe above and
+do not skip step~(b).
+
+\subsection{D2.1, D2.2, D2.3 priors}
 \label{sec:d2x-priors}
 
 The $\beta$-stability inequalities (\crefrange{eq:tidal-tensor}{eq:tidal-trace})
 remain in force across all D2 sub-models because none of the additional
 couplings multiply $I_1, I_2, I_3$.  Each sub-model adds new free parameters
-that require their own perturbative-range scan, following the Phase-1d
-template.
+that require their own perturbative-range scan, following the recipe in
+\cref{sec:per-model-recipe}.
 
-\subsubsection*{D2.1 (Barker, +$\chi$)}
+\subsubsection*{D2.1 (Barker, +$\chi$): joint stability structure with $\delta_1$}
 \label{sec:d21-priors}
 
 D2.1 adds the Barker $R\!\sim\!\!F_{\text{torsion}}$ kinetic-mixing
 coupling~$\chi$ on top of D2.0's $\beta/\xi/\delta_1$ structure.
-Following the recipe in \cref{sec:delta1-model-dependence}, we re-ran
-the 5-point scan recipe for~$\chi$ on the general spec
-(\path{examples/data/torsion_gertsenshtein_general_nonminimal.json}),
-$\eta = \zeta_i = 0$.
+
+\paragraph{Joint stability structure for D2.1.}
+The unstable region in the $(\delta_1,\chi)$ plane is the
+\emph{rectangular} set
+\begin{equation*}
+  \{(\delta_1,\chi)\,:\, \delta_1 \neq 0\ \wedge\ |\chi| \gtrsim 0.04\}
+  \quad\text{(at the D1 working point)},
+\end{equation*}
+not a radial or multiplicative product set.  Either coupling alone
+is benign: $\delta_1$ at $\chi=0$ recovers D2.0's $\delta^*=0.025$
+prior bound, and $\chi$ at $\delta_1=0$ shows no rejection across
+the entire $\chi \in [0, 0.5]$ scan range at any of the five
+$(\beta,\xi)$ anchors.  Joint activation is the destabilisation
+channel:~$\delta_1\, \tilde{R}_{[\mu\nu]} F^{\mu\nu}$ couples
+curvature to the photon sector,~$\chi\, \tilde{R}_{[\mu\nu]}
+F_\mathrm{torsion}^{\mu\nu}$ couples the same curvature to the
+torsion-vector sector, and once both are non-zero the curvature
+bridges the two sectors and opens a tachyonic mode in the combined
+reduced system.
+
+The 5$\times$5 working-point table~\ref{tab:d21-joint-scan-working}
+below makes the rectangular boundary explicit.  This is the
+empirical realisation of the rectangular-structure prediction in
+\cref{sec:per-model-recipe} step~(b): each new curvature- or
+derivative-mediated coupling is likely benign on its own and
+dangerous in combination with the others, exactly because they
+all funnel through the same constraint Schur complement.  Because
+the structure is rectangular rather than multiplicative, no
+$\delta_1\!\times\!\chi$ \texttt{--constraint} clause is needed;
+the prior box (set component-wise) fits inside the joint-stable
+region.
 
 \paragraph{$\chi$-only scan at $\delta_1=0$.}
 At each of the five $(\beta,\xi)$ anchor points
@@ -471,8 +581,11 @@ rectangular prior $\delta_1 \in [-0.025, +0.025] \times \chi \in
 [-0.009, +0.009]$ fits inside the joint-stable region with margin.
 
 \paragraph{D2.1 prior + soft-constraint block.}
-The D2.1 sample invocation extends D2.0's by adding the~$\chi$ prior
-and removing~$\chi$ from the \texttt{--param} fix list:
+With the prior-corner verification in \cref{tab:d21-p5-corner-verification}
+confirming that $\chi^*_5 = 0.018$ remains the binding bound at both
+edges of the $\delta_1$ prior, the D2.1 prior $\chi \in [-0.009,
++0.009]$ stands.  The D2.1 sample invocation extends D2.0's by adding
+the~$\chi$ prior and removing~$\chi$ from the \texttt{--param} fix list:
 \begin{lstlisting}[basicstyle=\ttfamily\small]
 --prior "beta1=uniform:-1.5:1.0"
 --prior "beta2=uniform:-3.0:-0.3"
@@ -492,17 +605,52 @@ D2.0 invocation block will pin~$\chi$ at zero and reproduce the
 D2.0 chain instead of D2.1.
 
 \subsubsection*{D2.2 (Shapiro, +$\zeta_{1,2,3}$)}
-Adds three derivative torsion--EM couplings of the form~$(\nabla T) \cdot F$.
-Each~$\zeta_i$ requires its own scan; if the three are perturbatively
-independent, three independent priors with cutoffs~$\zeta_i^*$.  If they show
-joint behaviour at the working point, a 2-D or 3-D scan may be needed.
+\label{sec:d22-priors}
+
+D2.2 adds three derivative torsion--EM couplings of the
+form~$(\nabla T) \cdot F$ on top of D2.1's
+$\beta/\xi/\delta_1/\chi$ structure.  The recipe in
+\cref{sec:per-model-recipe} dictates the scan plan:
+\begin{itemize}
+  \item Step~(a) --- single-parameter scan at $\delta_1=\chi=0$ for
+    each $\zeta_i$ in turn, across the five $(\beta,\xi)$ anchors.
+    Expected outcome based on the D2.1 precedent: each $\zeta_i$
+    is benign in isolation.
+  \item Step~(b) --- joint working-point scans for the three
+    relevant pairs $(\delta_1,\zeta_i)$, $(\chi,\zeta_i)$, and
+    (within D2.2 itself) $(\zeta_i,\zeta_j)$ for $i\neq j$.  The
+    rectangular-structure prediction implies no
+    \texttt{--constraint} clauses coupling the parameters are
+    needed, but step~(b) is what verifies that --- a multiplicative
+    or radial unstable region in any pair would force an explicit
+    cross-coupling clause and is the case to watch for.
+  \item Step~(c) --- most-restrictive-anchor scan for each
+    $\zeta_i^*$ in the regime indicated by step~(b).  Three
+    independent priors $\zeta_i \in [-\zeta_i^*/2, +\zeta_i^*/2]$.
+\end{itemize}
+The D2.2 prior block extends D2.1 by removing $\zeta_1$, $\zeta_2$,
+$\zeta_3$ from the \texttt{--param} fix list and adding three
+\texttt{--prior} clauses.  No additional \texttt{--constraint}
+clauses are anticipated.
 
 \subsubsection*{D2.3 (Full T5 YM--PGT, all enabled)}
+\label{sec:d23-priors}
+
 9~free parameters: $\beta_{1,2,3}$, $\xi$, $\delta_1$, $\chi$,
-$\zeta_{1,2,3}$.  Six are covered by the D2.0/D2.1/D2.2 prior sets;
-the joint chain may need wider priors to permit cross-correlations the
-single-parameter scans cannot capture.  Budget for a longer chain (PolyChord
-\verb|--nlive 800| rather than~$400$).
+$\zeta_{1,2,3}$.  Six are covered by the D2.0/D2.1/D2.2 prior sets
+once those scans complete.  The recipe in \cref{sec:per-model-recipe}
+applies but the joint-scan space is now combinatorial: the relevant
+working-point grids are
+$(\delta_1,\chi)$, $(\delta_1,\zeta_i)$, $(\chi,\zeta_i)$, and
+$(\zeta_i,\zeta_j)$ pairs.  If every pair exhibits the rectangular
+structure already seen in $(\delta_1,\chi)$, the D2.3 prior is the
+component-wise box product of the six existing single-parameter
+priors and no new \texttt{--constraint} clauses are needed.  Budget
+for a longer chain (PolyChord \verb|--nlive 800| rather than~$400$)
+to permit cross-correlations the single-parameter scans cannot
+capture; if a chain run reveals that the posterior pushes against
+the inherited box edges, that is a signal to widen the relevant
+prior, not to tighten the constraints.
 
 \subsection{Confidence levels per parameter}
 \label{sec:confidence}
@@ -536,16 +684,35 @@ single-parameter scans cannot capture.  Budget for a longer chain (PolyChord
         $\Rightarrow \xi > 0$ \\
     $\delta_1$
       & MEDIUM
-      & Phase-1d empirical scan; cutoff is scan-boundary-limited (not a
-        measured perturbativity breakdown) \\
-    $\chi$, $\zeta_{1,2,3}$
+      & 5-anchor empirical scan on the general spec
+        (\cref{sec:delta1-model-dependence}); cutoff
+        $\delta^*_5=0.05$ dominated by small-$\xi$ anchor;
+        $(\beta,\xi)$-invariance at $\delta_1=0$ is a feature of
+        D2.0 only and does not generalise (see
+        \cref{sec:per-model-recipe} yellow flag) \\
+    $\chi$
+      & MEDIUM
+      & 5-anchor multi-anchor empirical scan
+        (\cref{sec:d21-priors}); cutoff $\chi^*_5=0.018$ dominated
+        by $\beta$-interior anchor P5; rectangular joint structure
+        with~$\delta_1$ verified at prior corners
+        (\cref{tab:d21-p5-corner-verification}) \\
+    $\zeta_{1,2,3}$
       & TBD
-      & per Phase~5 (D2.1, D2.2, D2.3 follow-up scans) \\
+      & per D2.2 follow-up; apply recipe in
+        \cref{sec:per-model-recipe} including step~(b) joint scans
+        with $\delta_1$ and $\chi$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-The two HIGH-confidence external sources (Blagojevi\'c, Barker) give us a
-reproducible derivation of every D2.0 prior cutoff except~$\delta_1$, which is
-limited by a single empirical working-point scan and should be revisited at
-each MAP-like region uncovered by downstream chains.
+The two HIGH-confidence external sources (Blagojevi\'c, Barker)
+give us a reproducible derivation of every $\beta$ and $\xi$ prior
+cutoff.  $\delta_1$ and $\chi$ are MEDIUM-confidence empirical
+cutoffs derived from multi-anchor scans on the general spec; both
+should be revisited at each MAP-like region uncovered by
+downstream chains, and the rectangular joint-stability structure
+between them should be re-verified at any new working point that
+chains discover.  $\zeta_{1,2,3}$ remain TBD pending the D2.2
+scans and are to be derived following the
+\cref{sec:per-model-recipe} recipe.
