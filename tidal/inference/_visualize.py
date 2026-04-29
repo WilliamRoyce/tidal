@@ -253,7 +253,73 @@ def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
     return result.samples[mask]
 
 
-def _plot_corner_anesthetic(  # noqa: PLR0915
+def _set_derived_axis_limits(
+    axes_df: object,
+    plot_params: list[str],
+    col_name: str,
+    values: np.ndarray,
+    weights: np.ndarray | None = None,
+) -> None:
+    """Post-hoc fix axis limits for a derived column to the posterior-weighted range.
+
+    anesthetic's plot_2d() sets axis limits from weighted quantiles, but
+    low-weight dead-point samples in nested-sampling chains can still shift
+    the 5th percentile outside the posterior support, making the posterior
+    appear as a thin stripe.  This resets limits to the posterior-weighted
+    5%-95% interval +/- 10% padding.
+    """
+    import numpy as np
+
+    finite_mask = np.isfinite(values)
+    if not finite_mask.any():
+        return
+
+    v = values[finite_mask]
+
+    if weights is not None:
+        w = np.asarray(weights, dtype=float)[finite_mask]
+        total = w.sum()
+        if total > 0:
+            w /= total
+            sort_idx = np.argsort(v)
+            v_s = v[sort_idx]
+            cdf = np.cumsum(w[sort_idx])
+            q05 = float(v_s[np.searchsorted(cdf, 0.05, side="left")])
+            q95 = float(v_s[np.searchsorted(cdf, 0.95, side="left")])
+        else:
+            q05, q95 = float(np.quantile(v, 0.05)), float(np.quantile(v, 0.95))
+    else:
+        q05, q95 = float(np.quantile(v, 0.05)), float(np.quantile(v, 0.95))
+
+    spread = q95 - q05
+    pad = max(0.1 * spread, 1e-3)
+    lo, hi = q05 - pad, q95 + pad
+
+    col_idx = plot_params.index(col_name)
+
+    # 1D marginal diagonal: col_name on x-axis
+    diag = _diagonal_axis(axes_df, col_idx, col_name)
+    if diag is not None:
+        diag.set_xlim(lo, hi)
+
+    # Lower-triangle cells where col_name is the column (x-axis): row index > col_idx
+    for i, row_name in enumerate(plot_params):
+        if i <= col_idx:
+            continue
+        ax = _cell_axis(axes_df, i, row_name, col_idx, col_name)
+        if ax is not None:
+            ax.set_xlim(lo, hi)
+
+    # Lower-triangle cells where col_name is the row (y-axis): col index < col_idx
+    for j, col in enumerate(plot_params):
+        if j >= col_idx:
+            continue
+        ax = _cell_axis(axes_df, col_idx, col_name, j, col)
+        if ax is not None:
+            ax.set_ylim(lo, hi)
+
+
+def _plot_corner_anesthetic(
     result: InferenceResult,
     output_path: Path | None = None,
     *,
@@ -330,6 +396,18 @@ def _plot_corner_anesthetic(  # noqa: PLR0915
         axes_df = ret
         cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
         fig = cell.get_figure()
+
+    # Fix log10_A axis limits: anesthetic's weighted quantiles can still be
+    # skewed by low-weight prior-phase dead points.  Recompute from the
+    # posterior-weighted 5%-95% interval and apply post-hoc.
+    if log10_a is not None and "log10_A" in plot_params:
+        _set_derived_axis_limits(
+            axes_df,
+            plot_params,
+            "log10_A",
+            log10_a,
+            result.weights if result.weights is not None else None,
+        )
 
     _force_solid_credible_fills(fig)
     _overlay_priors(axes_df, result)
