@@ -207,14 +207,17 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 
 #### D2: YM-PGT / T5 + paper sub-theories
 
-- [ ] Stage 0 gate passed for T5
-- [ ] HPC: full YM-PGT amplify (job ID: ?)
-- [ ] HPC: full YM-PGT suppress (job ID: ?)
-- [ ] HPC: Barker-PGT amplify (job ID: ?)
-- [ ] HPC: Shapiro-PGT amplify (job ID: ?)
-- [ ] Results pulled
+- [x] Stage 0 gate passed for T5 (general nonminimal spec; δ₁ prior ±0.025 locked via 5-point empirical scan)
+- [x] D2.0 Bahamonde amp (28598736): log Z = +0.616 ± 0.001, ESS = 877, DONE
+- [ ] D2.0 Bahamonde sup (28606785): P_max:minimize — PENDING (icelake standard, 6 h)
+- [x] D2.1 Barker amp (28607124): log Z = +0.618 ± 0.001, ESS = 875, DONE
+- [ ] D2.1 Barker sup — pending
+- [ ] D2.2 Shapiro amp — pending prior derivation
+- [ ] D2.3 complete-PGT amp — pending prior derivation
+- [x] Results pulled: 28598736, 28607124
+- [x] Corner plots: hpc_results/28598736/corner.png, hpc_results/28607124/d21_barker_amp/corner.png
 - [ ] Analysis: any D_KL > 0.1 nats?
-- Notes:
+- Notes: D2.0 and D2.1 amp log Z agree to 0.002 nats; χ is sub-leading (adding it changes nothing).
 
 #### D3: YM-PGT-CP / T6
 
@@ -279,6 +282,14 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28519213 | T4 Ricci-EM | **amplify v5** (Padé-probe stability guard, post-#322 commit c10aa8a) | COMPLETED | 0:03:23 | INTR; ran cleanly but inference.json + results.csv vanished post-completion (cause unknown, only corner_amplify.png remained on /rds — possibly cleanup race). Log Z = −2.26, D_KL = 1.72 from the corner image. Resubmitted as 28520217. |
 | 28520217 | T4 Ricci-EM | **amplify v5b** — same priors, files captured | COMPLETED | 0:03:30 | INTR. **log Z = −2.26 ± 0.07** (model strongly disfavoured vs null, Bayes factor ≈ 0.10 against), **joint D_KL = 1.79 ± 0.06 nats**, ESS = 1356. Marginal D_KL: δ₁ = **1.68 nats** (dominant); α₁₋₃ < 0.07 nats. A range [4.95×10⁻⁹, 1.255]. Confirms `AMPLIFICATION_INVESTIGATION.md` overall verdict (T4 suppresses, doesn't amplify): max A=1.26 at small \|δ₁\| (residual when destructive interference is detuned), suppression valley reaches 5×10⁻⁹ at \|δ₁\| ≈ 1.3 (much stronger than the analytic 10⁻³ estimate). The "A_coupling = 1.9" reference value was a Schur-complement coupling shift, not a sim-measured prediction. Corner: `hpc_results/28520217/corner_amplify_v5.png`. |
 | 28519675 | T4 Ricci-EM | **suppress v5** | COMPLETED | 0:16:30 | Standard QOS (parallel with INTR amplify), submitted 2026-04-27. **log Z = +15.92 ± 0.13** (model strongly favoured for suppress mode, Bayes factor ~10⁷), **D_KL = 8.91 nats** (very informative posterior), ESS = 1920. MAP at (α₁=+0.33, α₂=+0.92, α₃=+0.92, δ₁=-1.29). A range [3.92×10⁻¹², 1.26]. Marginal D_KL more balanced than amplify (δ₁=0.87, α₁₋₃ each ~0.27). Corner: `hpc_results/28519675/corner_suppress_v5.png`. |
+| 28591809 | T5 general (D2.0) | D2.0 amp attempt 1 | FAILED | 0:00 | RESULTS_DIR unbound variable — fixed in commit 0caf294. |
+| 28592728 | T5 general (D2.0) | D2.0 amp attempt 2 | FAILED | 0:00 | `--measurements` → `--measure` CLI typo. |
+| 28594327 | T5 general (D2.0) | D2.0 amp attempt 3 | FAILED | 0:01 | All 10 prior samples returned non-finite logL: chi/eta/zeta1-3 missing + δ₁ prior was D1's ±0.5 (general spec needs ±0.025). Fixed in commit 9ffba3d. |
+| 28598231 | T5 general (D2.0) | D2.0 amp attempt 4 | FAILED | 0:00 | PMI2_Job_GetId abort — 76 SLURM tasks without MPI. polychord templates now auto-prefix `${MPIRUN_PREFIX}`. |
+| 28598736 | T5 general (D2.0 Bahamonde) | **D2.0 amp** | COMPLETED | ~35 min | INTR. **log Z = +0.616 ± 0.001**, ESS = 877, n_samples = 3450. Params: β₁₋₃, ξ, δ₁ (5D). MAP: β₁=−0.10, β₂=−1.55, β₃=+0.96, ξ=1.85, δ₁=−0.020. 95% CI δ₁=[−0.0235, +0.0236] (fills ±0.025 prior). Marginal D_KL: β₁=0.242 (dominant), ξ=0.127, β₂=0.090, δ₁=0.017, β₃=0.021. Corner: `hpc_results/28598736/corner.png`. |
+| 28601113 | T5 general (D2.0 Bahamonde) | D2.0 sup INTR | TIMEOUT | 1:00 | INTR 1h too tight for minimize landscape. Resubmitted on icelake standard 6h as 28606785. |
+| 28606785 | T5 general (D2.0 Bahamonde) | **D2.0 sup_v2** | PENDING | — | icelake standard, 6h wall, P_max:minimize. |
+| 28607124 | T5 general (D2.1 Barker) | **D2.1 amp** | COMPLETED | ~25 min | INTR. **log Z = +0.618 ± 0.001**, ESS = 875, n_samples = 3458. Params: β₁₋₃, ξ, δ₁, χ (6D). MAP: β₁=+0.73, β₂=−1.91, β₃=−0.67, ξ=0.0105, δ₁=−0.0235, χ=−0.002. 95% CI χ=[−0.0086, +0.0084] (fills ±0.009 prior). Marginal D_KL: β₁=0.297 (dominant), ξ=0.158, χ=0.032, δ₁=0.026. Prior stability: 3033/5000 rejected (60.7%). Corner: `hpc_results/28607124/d21_barker_amp/corner.png`. |
 
 ---
 
@@ -345,8 +356,11 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 - Stage B: **Einstein-Cartan NULL CONFIRMED** — D_KL=0.003 nats for all alphas,
   log(Z)≈0. Non-propagating torsion does not affect h↔a conversion. (hpc_results/28134415/)
 - Stage C: R̃² b5 term decouples from TT Gertsenshtein channel. With IC on h_5, all b5 corrections = 0 (torsion source fields zero in Pass 0). P_max identical to GR baseline for all b5. Expected D_KL(b5) ≈ 0.
-- Stage D1: 
-- Stage D2: 
+- Stage D1: **δ₁ R̃ₘᵤᵥFᵘᵥ coupling drives strong destructive interference; max A = 1.26; model strongly disfavoured for amplification (Bayes factor 0.10).** See D1 v5 entry above.
+- Stage D2 (in progress):
+  - **D2.0 Bahamonde amp (28598736)**: log Z = +0.616 ± 0.001, ESS = 877, 5 params (β₁₋₃, ξ, δ₁). Posterior broad — no strong preference for any β combination. Marginal D_KL: β₁ = 0.242 nats (dominant), ξ = 0.127, β₂ = 0.090. δ₁ and β₃ near zero (δ₁ = 0.017 nats) — the Riemann torsion-EM coupling sub-term and tensor mass are not the primary informative parameters here. All 95% CI fill the prior almost completely, which is consistent with the prior being tight (β₂ ∈ [−3, −0.3] is constrained by the ghost-free β₁+β₂ < −0.5 requirement). **Sub-leading model with no amplification signal.**
+  - **D2.1 Barker amp (28607124)**: log Z = +0.618 ± 0.001, ESS = 875, 6 params (adds χ). Log Z matches D2.0 to 0.002 nats: **adding the Barker χ parameter changes nothing**. 95% CI χ = [−0.0086, +0.0084] (fills the ±0.009 prior), Marginal D_KL(χ) = 0.032 nats (barely above noise). Consistent with the D2.1 prior derivation result: χ alone at δ₁ = 0 is benign, and the joint (δ₁, χ) instability only enters at the prior corners. **χ adds no amplification signal.** Prior stability sweep: 60.7% rejected (general nonminimal spec much tighter than D1).
+  - **Comparison D1 vs D2**: D1 log Z = −2.26 (model disfavoured 10:1 for amplify); D2.0 log Z = +0.616; D2.1 log Z = +0.618. The D2 sub-models are slightly favoured over the null (Bayes factor ≈ 1.9 vs GR), but this is weak evidence at the level of noise. The much lower prior-rejection rate in D1 (single δ₁ parameter, stability boundary far from its prior edges) vs D2 (60.7% rejected) means the priors are tighter in D2 and the small log Z positive shift reflects prior compression, not physics.
 - Stage D3: 
 - Stage E: 
 
