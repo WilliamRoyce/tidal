@@ -242,33 +242,43 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         ``[0.7·threshold, threshold]`` — the empirical false-negative
         strip; surface these to the post-hoc audit.
     """
+    from tidal.measurement._stability_cache import get_structural_context
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.modal import (
         _build_evolution_matrices,  # type: ignore[reportPrivateUsage]
         _build_m_with_null_projection,  # type: ignore[reportPrivateUsage]
         find_independent_blocks,
     )
-    from tidal.solver.state import StateLayout
 
-    layout = StateLayout.from_spec(spec, grid.num_points)
-
-    # Build Fourier wavenumber grid
-    N = grid.shape[0]
-    dx = grid.dx[0]
-    k_vals = np.asarray(2 * math.pi * np.fft.rfftfreq(N, dx), dtype=np.float64)
+    # Cached parameter-independent setup: layout, k_vals, rfft_shape,
+    # ic_k_default, source-slot lookup.  See _stability_cache.py for
+    # the cache-key safety analysis.  This shaves the StateLayout +
+    # FFT-grid + source-lookup overhead off every call.
+    static = get_structural_context(spec, grid, source)
+    layout = static.layout
+    k_vals = static.k_vals
+    rfft_shape = static.rfft_shape
     k_grid: list[np.ndarray[tuple[int], np.dtype[np.float64]]] = [k_vals]
-    rfft_shape = (N // 2 + 1,)
+    int(grid.shape[0])
+
+    # Source field absent from the layout → trivially stable; the
+    # simulation cannot exercise this conversion channel.
+    if static.early_return_reason is not None:
+        return ConversionStabilityResult(
+            stable=True,
+            max_excess=0.0,
+            k_tachyonic=None,
+            n_tachyonic_modes=0,
+            message=static.early_return_reason,
+            profile_name=PROBE_PROFILE_NAME,
+        )
 
     # IC wavenumber is used only for the diagnostic message.  All k
     # modes are checked regardless because the actual numerical
     # simulation reaches non-fundamental bins via off-grid plane-wave
     # snap residual, snapshot rounding, and finite-precision arithmetic
     # (#323 Stage C investigation).
-    if ic_wavevector is None:
-        L = grid.bounds[0][1] - grid.bounds[0][0]
-        ic_k = 2 * math.pi / L
-    else:
-        ic_k = ic_wavevector
+    ic_k = ic_wavevector if ic_wavevector is not None else static.ic_k_default
 
     # All k modes are checked.  ``y₀`` is a unit vector at the source
     # slot, identical at every k — see the architecture-justification
@@ -316,16 +326,11 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     # comparing against block_slots.  (Pre-refactor code happened to work
     # when no constraint fields preceded the source slot, but failed
     # silently otherwise — see issue #322 root-cause analysis.)
-    try:
-        src_slot_full = layout.field_slot_map[source]
-    except KeyError:
-        return ConversionStabilityResult(
-            stable=True,
-            max_excess=0.0,
-            k_tachyonic=None,
-            n_tachyonic_modes=0,
-            message=f"Source field '{source}' not found in reduced system.",
-        )
+    # The "field not found" path is handled upstream via the cached
+    # ProbeStructuralContext; ``static.src_slot_full`` is guaranteed
+    # non-None at this point.
+    src_slot_full = static.src_slot_full
+    assert src_slot_full is not None
 
     if src_slot_full not in mapping:
         return ConversionStabilityResult(

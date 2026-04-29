@@ -461,9 +461,9 @@ def _evaluate_likelihood(
             )
             from tidal.measurement._stability import check_conversion_stability
             from tidal.solver.grid import GridInfo
-            from tidal.symbolic.json_loader import load_equation_system as _load_spec
+            from tidal.symbolic._spec_cache import load_spec_cached
 
-            raw_spec = _load_spec(spec_path)
+            raw_spec = load_spec_cached(spec_path)
             base_p = _parse_params(
                 list(getattr(base_args, "param", []) or []), raw_spec
             )
