@@ -301,12 +301,19 @@ class TestProbePerformance:
         median_ms = float(np.median(timings)) * 1e3
         # Empirical baseline on T1 dark_photon_plasma (N=32, 4 free
         # couplings) under the canonical unit-IC all-k probe at
-        # t_test=20: Phase 3 measured median ≈ 27.6 ms / p90 ≈ 33 ms.
-        # The dominant fixed cost is matrix construction at varying
-        # params (``_build_evolution_matrices`` + Schur elimination +
-        # ``find_independent_blocks``) — not the Padé loop.  Budget
-        # set ~20 % above the observed p90 to absorb noise without
-        # being flaky; a 50 % rise here would indicate a real
-        # regression.  See issue tracking matrix-construction caching
-        # for the path to a faster probe.
-        assert median_ms <= 40.0, f"median probe wall {median_ms:.2f} ms > 40 ms"
+        # t_test=20.  Two coupled wins (issue #327):
+        #
+        #  * Phases 1-2 (commit 350b53b et al.): per-process spec cache
+        #    + parameter-independent structural cache for the probe
+        #    saved ~2 ms/call.
+        #  * Phase 3 (commit XXXXXXX): ``np.einsum`` → ``np.matmul``
+        #    refactor inside ``_build_evolution_matrices``.  Batched
+        #    3-D matmul dispatches to BLAS gemm; the 3-way einsums
+        #    that replicated ``(U @ K) @ V`` were ~70× slower without
+        #    ``optimize=True``.  Saved ~12 ms/call.
+        #
+        # Combined: median dropped from ≈ 27.6 ms → ≈ 13 ms (2.13×).
+        # Budget set ~15 % above the observed p99 (≈ 26 ms) to absorb
+        # CI noise without being flaky.  A 50 % rise here would
+        # indicate a real regression.
+        assert median_ms <= 20.0, f"median probe wall {median_ms:.2f} ms > 20 ms"

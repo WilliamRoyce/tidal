@@ -944,10 +944,14 @@ def _build_evolution_matrices(
                     1.0 / S_svd[dyn_mask],
                 )  # (n_mass_dyn, n_mass_dyn)
 
-                # Rotate K, D, J: K̃ = Uᵀ · K · V
-                K_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, K_mat, V_full)
-                D_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, D_mat, V_full)
-                J_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, J_mat, V_full)
+                # Rotate K, D, J: K̃ = Uᵀ · K · V.  Express as two
+                # 2-D × 3-D matmuls (BLAS gemm) — without
+                # ``optimize=True`` the 3-way einsum is ~70× slower
+                # than this two-step form (#327).
+                Uc_T = U_full.conj().T  # (n_f, n_f)
+                K_rot = (Uc_T @ K_mat) @ V_full
+                D_rot = (Uc_T @ D_mat) @ V_full
+                J_rot = (Uc_T @ J_mat) @ V_full
 
                 # Partition into dyn/con blocks
                 d_idx = np.where(dyn_mask)[0]
@@ -978,13 +982,13 @@ def _build_evolution_matrices(
                         "NDArray[np.complex128]",
                         np.linalg.pinv(K_cc),
                     )
-                    mass_recovery = cast(
-                        "NDArray[np.complex128]",
-                        -np.einsum("mij,mjk->mik", K_cc_pinv, K_cd),
-                    )
-                    K_eff = K_dd + np.einsum("mij,mjk->mik", K_dc, mass_recovery)
-                    D_eff = D_dd + np.einsum("mij,mjk->mik", D_dc, mass_recovery)
-                    J_eff = J_dd + np.einsum("mij,mjk->mik", J_dc, mass_recovery)
+                    # NOTE (#327 perf): batched 3D einsum 'mij,mjk->mik' is
+                    # ~9× slower than np.matmul (`@`) for our shapes; the
+                    # latter dispatches to BLAS gemm.  Bit-equivalent.
+                    mass_recovery = -(K_cc_pinv @ K_cd)
+                    K_eff = K_dd + K_dc @ mass_recovery
+                    D_eff = D_dd + D_dc @ mass_recovery
+                    J_eff = J_dd + J_dc @ mass_recovery
                 else:
                     # Null-space decouples trivially from the rest —
                     # keep only the dyn/dyn block.
@@ -992,21 +996,23 @@ def _build_evolution_matrices(
                     D_eff = D_dd
                     J_eff = J_dd
 
-                # Invert Σ_d (diagonal): E = Σ_d⁻¹·K_eff, F = Σ_d⁻¹·D_eff
-                E = np.einsum("ij,mjk->mik", Sigma_d_inv, K_eff)
-                F = np.einsum("ij,mjk->mik", Sigma_d_inv, D_eff)
+                # Invert Σ_d (diagonal): E = Σ_d⁻¹·K_eff, F = Σ_d⁻¹·D_eff.
+                # Sigma_d_inv is (n_mass_dyn, n_mass_dyn) — broadcasts via
+                # matmul against the (n_modes, n_mass_dyn, n_mass_dyn) RHS.
+                E = Sigma_d_inv @ K_eff
+                F = Sigma_d_inv @ D_eff
 
                 # Jerk substitution: when J ≠ 0, the d3_t(x_j) term on
                 # the RHS couples third-order time derivatives. Reduce
                 # to second-order by iterating the ẍ expression once.
-                J_eff_inv = np.einsum("ij,mjk->mik", Sigma_d_inv, J_eff)
+                J_eff_inv = Sigma_d_inv @ J_eff
                 has_jerk = float(np.max(np.abs(J_eff_inv))) > 1e-15
                 if has_jerk:
                     logger.info("Jerk substitution: applying d3_t elimination")
-                    FE = np.einsum("mij,mjk->mik", F, E)
-                    K_jerk = np.einsum("mij,mjk->mik", J_eff_inv, FE)
-                    FF = np.einsum("mij,mjk->mik", F, F)
-                    D_jerk = np.einsum("mij,mjk->mik", J_eff_inv, E + FF)
+                    FE = F @ E
+                    K_jerk = J_eff_inv @ FE
+                    FF = F @ F
+                    D_jerk = J_eff_inv @ (E + FF)
                     E_final = E + K_jerk
                     F_final = F + D_jerk
                 else:
@@ -1028,9 +1034,9 @@ def _build_evolution_matrices(
                 if has_k_con:
                     assert mass_recovery is not None  # set above when has_k_con is True
                     # mass_recovery: (n_modes, n_mass_con, n_mass_dyn)
+                    # 'ic,mcj->mij' = V_c @ mass_recovery (broadcast).
                     V_eff: NDArray[np.complex128] = np.asarray(
-                        V_d[np.newaxis, :, :]
-                        + np.einsum("ic,mcj->mij", V_c, mass_recovery),
+                        V_d[np.newaxis, :, :] + V_c @ mass_recovery,
                         dtype=np.complex128,
                     )  # (n_modes, n_f, n_mass_dyn)
                     # V_eff^+ = pinv(V_eff) handles rank-deficient cases
@@ -1043,12 +1049,15 @@ def _build_evolution_matrices(
                         "NDArray[np.complex128]",
                         np.linalg.pinv(V_eff),
                     )  # (n_modes, n_mass_dyn, n_f)
-                    K_orig = np.einsum("mia,mab,mbj->mij", V_eff, E_final, V_eff_pinv)
-                    D_orig = np.einsum("mia,mab,mbj->mij", V_eff, F_final, V_eff_pinv)
+                    # 3-way 'mia,mab,mbj->mij' = (V_eff @ E_final) @ V_eff_pinv.
+                    K_orig = (V_eff @ E_final) @ V_eff_pinv
+                    D_orig = (V_eff @ F_final) @ V_eff_pinv
                 else:
-                    # Trivially decoupled: V_eff = V_d, V_eff⁺ = V_dᴴ
-                    K_orig = np.einsum("ia,mab,jb->mij", V_d, E_final, V_d.conj())
-                    D_orig = np.einsum("ia,mab,jb->mij", V_d, F_final, V_d.conj())
+                    # Trivially decoupled: V_eff = V_d, V_eff⁺ = V_dᴴ.
+                    # 'ia,mab,jb->mij' = (V_d @ E_final) @ V_d.conj().T.
+                    V_d_H = V_d.conj().T  # (n_mass_dyn, n_f)
+                    K_orig = (V_d @ E_final) @ V_d_H
+                    D_orig = (V_d @ F_final) @ V_d_H
 
                 # Fill A_dd velocity rows
                 for i, fname_i in enumerate(dyn_field_names):
@@ -1059,19 +1068,20 @@ def _build_evolution_matrices(
                         A_dd[:, vel_i, field_j] += K_orig[:, i, j]
                         A_dd[:, vel_i, vel_j] += D_orig[:, i, j]
             else:
-                # No singular directions — M is invertible
+                # No singular directions — M is invertible.
+                # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
                 m_inv = np.linalg.inv(M_mat)
-                eff_k = np.einsum("mij,mjk->mik", m_inv, K_mat)
-                eff_d = np.einsum("mij,mjk->mik", m_inv, D_mat)
+                eff_k = m_inv @ K_mat
+                eff_d = m_inv @ D_mat
 
                 # Jerk substitution
-                j_inv = np.einsum("mij,mjk->mik", m_inv, J_mat)
+                j_inv = m_inv @ J_mat
                 has_jerk = np.max(np.abs(j_inv)) > 1e-15
                 if has_jerk:
-                    fd_k = np.einsum("mij,mjk->mik", eff_d, eff_k)
-                    k_jerk = np.einsum("mij,mjk->mik", j_inv, fd_k)
-                    fd_d = np.einsum("mij,mjk->mik", eff_d, eff_d)
-                    d_jerk = np.einsum("mij,mjk->mik", j_inv, eff_k + fd_d)
+                    fd_k = eff_d @ eff_k
+                    k_jerk = j_inv @ fd_k
+                    fd_d = eff_d @ eff_d
+                    d_jerk = j_inv @ (eff_k + fd_d)
                     eff_k += k_jerk
                     eff_d += d_jerk
 
@@ -1124,20 +1134,21 @@ def _build_evolution_matrices(
                             A_dd[m, vi, fj] += ek_m2[i, j]
                             A_dd[m, vi, vj] += ed_m2[i, j]
     else:
-        # M is invertible for all modes — standard path
+        # M is invertible for all modes — standard path.
+        # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
         m_inv = np.linalg.inv(M_mat)
-        eff_k = np.einsum("mij,mjk->mik", m_inv, K_mat)
-        eff_d = np.einsum("mij,mjk->mik", m_inv, D_mat)
+        eff_k = m_inv @ K_mat
+        eff_d = m_inv @ D_mat
 
         # Jerk substitution
-        j_inv = np.einsum("mij,mjk->mik", m_inv, J_mat)
+        j_inv = m_inv @ J_mat
         has_jerk = np.max(np.abs(j_inv)) > 1e-15
         if has_jerk:
             logger.info("Jerk substitution: applying d3_t elimination")
-            fd_k = np.einsum("mij,mjk->mik", eff_d, eff_k)
-            k_jerk = np.einsum("mij,mjk->mik", j_inv, fd_k)
-            fd_d = np.einsum("mij,mjk->mik", eff_d, eff_d)
-            d_jerk = np.einsum("mij,mjk->mik", j_inv, eff_k + fd_d)
+            fd_k = eff_d @ eff_k
+            k_jerk = j_inv @ fd_k
+            fd_d = eff_d @ eff_d
+            d_jerk = j_inv @ (eff_k + fd_d)
             eff_k += k_jerk
             eff_d += d_jerk
 
@@ -1206,14 +1217,15 @@ def _build_evolution_matrices(
         )
         Scc_singular_mask_out: NDArray[np.bool_] | None = singular_mask
 
-        # Recovery: c = -S_cc⁻¹ · S_cd · d
-        recovery = -np.einsum("mij,mjk->mik", S_cc_inv, S_cd)
+        # Recovery: c = -S_cc⁻¹ · S_cd · d.
+        # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
+        recovery = -(S_cc_inv @ S_cd)
 
         # Field correction: A_dc_field · recovery
-        field_correction = np.einsum("mij,mjk->mik", A_dc_field, recovery)
+        field_correction = A_dc_field @ recovery
 
         # Velocity coupling: A_dc_vel · recovery
-        vel_coupling = np.einsum("mij,mjk->mik", A_dc_vel, recovery)
+        vel_coupling = A_dc_vel @ recovery
         has_vel = np.max(np.abs(vel_coupling)) > 1e-15
 
         A_rhs = A_dd + field_correction
@@ -1276,9 +1288,10 @@ def _build_evolution_matrices(
                 fallback_count,
                 n_modes,
             )
-        v_recovery = np.einsum("mci,mij->mcj", recovery, A_eff)
+        # Batched matmul (`@`) instead of 'mci,mij->mcj' einsum (#327).
+        v_recovery = recovery @ A_eff
     elif recovery.size > 0:
-        v_recovery = np.einsum("mci,mij->mcj", recovery, A_rhs)
+        v_recovery = recovery @ A_rhs
     else:
         v_recovery = None
 
@@ -3091,9 +3104,8 @@ def _evolve_duhamel_per_mode(
                 ).copy(),
             ]
             for _ in range(max_order):
-                M_block_powers.append(
-                    np.einsum("mij,mjk->mik", M_block_powers[-1], M_block),
-                )
+                # Batched matmul instead of einsum (#327).
+                M_block_powers.append(M_block_powers[-1] @ M_block)
         else:
             M_block_powers = [
                 np.broadcast_to(
@@ -3108,7 +3120,8 @@ def _evolve_duhamel_per_mode(
             if n == 0:
                 S += M_sub_n
             else:
-                S += np.einsum("mij,mjk->mik", M_sub_n, M_block_powers[n])
+                # Batched matmul instead of einsum (#327).
+                S += M_sub_n @ M_block_powers[n]
 
         # Build augmented per-mode generator Aug = [[A, S], [0, A]] of size 2bs×2bs.
         Aug = np.zeros((n_block_modes, 2 * bs, 2 * bs), dtype=np.complex128)
