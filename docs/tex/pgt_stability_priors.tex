@@ -184,6 +184,109 @@ positive-definiteness.  The $\delta_1$ coupling appears only off-diagonally in
 the kinetic matrix; its perturbative range is bounded empirically rather than
 analytically.
 
+\subsubsection*{Model-dependence of the $\delta_1$ stability range}
+\label{sec:delta1-model-dependence}
+
+\textbf{Empirical caveat (post-2026-04-29).}  Phase~1d's $\delta^*=0.5$ was
+measured on the D1 spec
+(\path{examples/data/torsion_gertsenshtein_nonminimal.json}).  When the
+canonical probe (\cref{sec:stability-probe}) is run against the
+\emph{general} spec
+(\path{examples/data/torsion_gertsenshtein_general_nonminimal.json}) with
+$\chi=\eta=\zeta_i=0$ --- i.e.\ the D2.0 limit of the same Lagrangian
+that D1 implements directly --- the $\delta_1$ perturbative cutoff
+\emph{tightens by an order of magnitude}.  This is the central operational
+finding: \textbf{stability ranges of existing parameters are model-dependent},
+not just Lagrangian-dependent, even when the new model parameters are zeroed.
+
+The mechanism is that D2.0's spec carries additional dynamical structure
+($\xi$ kinetic term, suppressed but not removed) that couples to $\delta_1$
+through the constraint Schur complement.  Even at $\xi=1$ and $\chi=\eta=\zeta_i=0$,
+the canonical probe sees a different reduced-system $M_k$ matrix on the general
+spec, and that matrix is more sensitive to $\delta_1$ than D1's.
+
+\paragraph{5-point empirical scan.}
+We re-ran the $\delta_1$ scan on the general spec at five constraint-respecting
+$(\beta_1, \beta_2, \beta_3, \xi)$ points covering a representative spread of
+the prior region:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Point} & $\beta_1$ & $\beta_2$ & $\beta_3$ & $\xi$ \\
+\midrule
+P1 working (D1 reference) & $0.000$ & $-0.600$ & $+0.500$ & $1.000$ \\
+P2 small $\xi$ (D1 limit) & $+0.206$ & $-2.623$ & $-0.600$ & $0.011$ \\
+P3 large $\xi$            & $-1.180$ & $-1.784$ & $-0.258$ & $6.030$ \\
+P4 $\beta$ corner         & $-0.100$ & $-0.450$ & $\phantom{+}0.000$ & $1.000$ \\
+P5 $\beta$ interior       & $\phantom{+}0.000$ & $-1.500$ & $\phantom{+}0.000$ & $1.000$ \\
+\bottomrule
+\end{tabular}
+\caption{Five constraint-respecting $(\beta,\xi)$ points used for the
+2026-04-29 D2.0 $\delta_1$ scan.  All four $\beta/\xi$-constraints
+(\cref{eq:tidal-tensor,eq:tidal-axial,eq:tidal-trace} and $\xi>0.01$) hold at
+each point.}
+\label{tab:d20-scan-points}
+\end{table}
+
+At each point, the canonical probe ($t_\mathrm{test}=20$, $\tau=0.3$,
+$k_0 = 2\pi/100$) was evaluated at $\delta_1 \in
+\{0, 0.05, 0.10, 0.12, 0.15, 0.20, 0.30, 0.50\}$ with $\chi=\eta=\zeta_i=0$:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrrrrr}
+\toprule
+\textbf{Point} & $\delta_1=0$ & $0.05$ & $0.10$ & $0.12$ & $0.15$ & $0.20$ & $0.30$ & $0.50$ \\
+\midrule
+P1 working    & $0.101$ & $0.101$ & $0.101$ & $0.192$ & $\mathbf{0.847}$ & $1.274$ & $1.734$ & $2.800$ \\
+P2 small $\xi$ & $0.101$ & $\mathbf{\infty}$ & $\infty$ & $\infty$ & $\infty$ & $\infty$ & $\infty$ & $9.001$ \\
+P3 large $\xi$ & $0.101$ & $\mathbf{0.396}$ & $\infty$ & $\infty$ & $\infty$ & $\infty$ & $11.621$ & $8.093$ \\
+P4 $\beta$ corner & $0.101$ & $0.101$ & $0.101$ & $0.232$ & $\mathbf{0.849}$ & $1.257$ & $1.719$ & $2.852$ \\
+P5 $\beta$ interior & $0.101$ & $0.101$ & $\mathbf{0.367}$ & $0.640$ & $0.856$ & $1.110$ & $1.507$ & $3.431$ \\
+\bottomrule
+\end{tabular}
+\caption{Empirical probe $\gamma_\mathrm{eff}$ on the general spec at the
+5 representative points (\cref{tab:d20-scan-points}).  Bold entries are
+the smallest~$|\delta_1|$ at which the probe rejects ($\gamma_\mathrm{eff}>0.3$);
+$\infty$ marks singular constraint-Schur failures, which the canonical probe
+treats as catastrophic divergence.  Run \path{examples/data/d2_prior_scan/_analyze_general.py}
+to reproduce.}
+\label{tab:d20-delta1-scan}
+\end{table}
+
+\paragraph{Findings.}
+\begin{enumerate}
+  \item At~$\delta_1=0$, all 5 points return $\gamma_\mathrm{eff}=0.101$ to
+    four significant figures, confirming Finding~1 from the 20-point random
+    scan: the $\beta/\xi$-constraints carve out a $\delta_1=0$ stable region
+    where probe verdict is independent of the in-region $(\beta,\xi)$ values.
+  \item At~$\delta_1\ne 0$ the model-dependence becomes acute.  P2 (small
+    $\xi$) jumps to a singular constraint matrix already at~$\delta_1=0.05$;
+    P3 (large $\xi$) crosses the threshold at~$0.05$.  P1, P4 retain D1-like
+    tolerance (rejection at~$0.15$); P5 is intermediate ($0.10$).
+  \item Therefore $\delta^*$ is \emph{not} a single number on the general
+    spec.  The smallest first-rejection $\delta_1$ across the 5 representative
+    points is $\delta^*_5 = 0.05$, dominated by the small-$\xi$ corner where
+    the constraint-Schur complement becomes singular.
+\end{enumerate}
+
+\paragraph{D2.0 prior cutoff.}
+With~$\delta^*_5 = 0.05$ and a 2$\times$ safety margin (per the campaign's
+``narrow priors + soft constraints'' principle), the D2.0~$\delta_1$ prior is
+$\delta_1 \in [-0.025, +0.025]$.  This is~$\sim 20\times$ narrower than D1's
+range and reflects that the small-$\xi$ region is much more sensitive to
+$\delta_1$ on the general spec than the D1 spec.
+
+\paragraph{Operational gotcha.}
+The general spec carries~$\chi$, $\eta$, $\zeta_1$, $\zeta_2$, $\zeta_3$ as
+free symbols.  D2.0 invocations \emph{must} fix these via
+\verb|--param chi=0.0 --param eta=0.0 --param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0|;
+otherwise \texttt{CoefficientEvaluator} raises
+\verb|NameError: name 'zeta1' is not defined| and the chain returns
+non-finite~$\log\mathcal{L}$ for every prior sample.
+
 \subsubsection*{Empirical $\delta_1$ scan (Phase~1d)}
 
 A 41-point sweep of $\delta_1 \in [-0.5, +0.5]$ at the D1 working point
@@ -232,20 +335,20 @@ Three observations from the scan, important to record honestly:
 
 \subsubsection*{D2.0 prior + soft-constraint block}
 
-Substituting~$\delta^* = 0.5$, the D2.0 sample invocation uses%
-\footnote{No perturbative-validity risk at this working point; for a tighter
-$\delta^*$ at MAP-like~$\beta$-points, re-run
-\path{examples/data/d2_prior_scan/_analyze.py} on a relocated scan.}:
+Substituting the verified~$\delta^*_5 = 0.05$ (\cref{tab:d20-delta1-scan})
+with a 2$\times$ safety margin, the D2.0 sample invocation uses:
 \begin{lstlisting}[basicstyle=\ttfamily\small]
 --prior "beta1=uniform:-1.5:1.0"
 --prior "beta2=uniform:-3.0:-0.3"
 --prior "beta3=uniform:-1.0:1.0"
 --prior "xi=log_uniform:0.01:10"
---prior "delta1=uniform:-0.5:0.5"
+--prior "delta1=uniform:-0.025:0.025"
 --constraint "beta1 + beta2 < -0.5"
 --constraint "beta1 - beta2 > 0.25"
 --constraint "beta3 + (2*beta1 + beta2)/3 < 1.333"
 --constraint "xi > 0.01"
+--param chi=0.0 --param eta=0.0
+--param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0
 \end{lstlisting}
 The four \texttt{--constraint} clauses are evaluated by
 \texttt{tidal/inference/\_constraints.py} via a safe AST and return
