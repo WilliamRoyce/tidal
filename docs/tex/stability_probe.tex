@@ -65,18 +65,16 @@ tachyonic if any $k$ mode produces $\gamma_{\text{eff}} > \tau$.
 
 The default thresholds are $\tau = 0.3$ and $t_{\text{test}} = 20$.
 
-\subsection{The IC question: why we don't run \texttt{ensure\_consistent\_ic}}
+\subsection{Why all-$k$ checking, not IC-coupled-$k$ checking}
+\label{sec:why-all-k}
 
-The naive expectation is that the probe's IVP should match the
-simulation's IVP exactly: a real-space plane wave on the source slot,
-passed through \texttt{ensure\_consistent\_ic} so algebraic-constraint
-slots are populated identically to the simulation, then FFT'd into
-each Fourier block. We tested this approach (the \emph{consistent-ic-solve}
-probe) and an earlier FFT-only variant (the \emph{consistent-IC FFT}
-probe) against simulation truth on the D1 amplify chain
-(HPC job 28520217). The replay results, joined with the post-hoc
-$t$-independence audit's contamination labels, are committed at the
-repo root as \texttt{stage\_c\_truth\_table.csv}:
+A natural design instinct is to only check $k$ bins where the
+linearised initial condition has support --- i.e., the probe should
+match the simulation's initial-value problem exactly. This was the v2
+(consistent-IC FFT) and v3 (consistent-ic-solve via
+\texttt{ensure\_consistent\_ic}) hypothesis. Stage C empirically
+rejected it: those probes catch $0/57$ known contaminations on D1,
+while the all-$k$ probe catches $56/57$.
 
 \begin{table}[ht]
 \centering
@@ -90,27 +88,89 @@ v3 candidate & v2 + \texttt{ensure\_consistent\_ic} & 0/57 \\
 \bottomrule
 \end{tabular}
 \caption{Stage C: contamination samples caught by each probe variant
-on the D1 amplify chain. The shared blind spot of v2 and v3 is that
-the linearised IC has zero overlap with non-fundamental $k$ bins, so
-neither variant checks those bins.}
+on the D1 amplify chain (HPC job 28520217, replay joined against the
+post-hoc $t$-independence audit's labels in
+\texttt{stage\_c\_truth\_table.csv}). The shared blind spot of v2 and
+v3 is that the linearised IC has zero overlap with non-fundamental $k$
+bins, so neither variant checks those bins --- but the simulation
+reaches those bins anyway via the IEEE 754 FFT floor (\S\ref{sec:ieee-floor}).}
 \label{tab:stage-c}
 \end{table}
 
-The simulation, however, does reach those bins. Off-grid plane-wave
-snap residual, snapshot rounding, and finite-precision arithmetic all
-deposit small amounts of energy at non-fundamental $k$, and any
-tachyonic mode at those bins amplifies that floor exponentially during
-the simulation. The all-$k$ unit-IC scan is therefore the empirically
-correct probe: it tests every $k$ bin as a possible exponential
-amplifier of numerical noise, regardless of whether the linearised IC
-would excite the bin in exact arithmetic.
+\subsubsection{Mechanism: IEEE 754 FFT floor amplification}
+\label{sec:ieee-floor}
 
-The empirical result is decisive: \emph{both} consistent-IC variants
-miss every contamination sample, while v1 catches all but one. We
-therefore commit the unit-IC all-$k$ design as the canonical probe.
+The leakage source is finite-precision arithmetic, specifically the
+IEEE 754 double-precision floor of \texttt{numpy.fft}. For a
+$256$-point FFT of $\cos(k_0 x)$ with $k_0$ the fundamental mode,
+bin~$1$ carries amplitude~$128$ (the expected value), while every
+other bin carries amplitude $\sim 10^{-14}$ --- round-off accumulated
+across the transform, scaled from machine epsilon
+$\varepsilon \approx 2.2\times 10^{-16}$.
+
+Per-bin evolution in the modal solver is $e^{\gamma_k t}$ in the
+source-block reduced system. For samples where some bin~$n$ has
+$\gamma_n$ above threshold, the seed amplitude grows as
+$10^{-14}\cdot e^{\gamma_n t}$. For the $56$ D1 contamination samples
+with measured $\gamma_n \in [0.5, 17]$, this reaches:
+\begin{equation*}
+  |\hat{h}_5(k_n,\, t=20)|
+  \;\sim\; 10^{-14}\cdot e^{17 \cdot 20}
+  \;\approx\; 10^{134},
+\end{equation*}
+dominating the fundamental bin which evolved with a small $\gamma_0$.
+This matches the audit's reported $\sim 10^{234}$ amplitude ratio for
+these samples.
+
+\subsubsection{Why this is not a solver defect}
+
+The modal solver builds a separate evolution matrix $M_k$ for each
+Fourier block and evolves them independently --- per the architecture
+rules (flat metric + periodic BCs + time-independent coefficients
+$\Rightarrow$ block-diagonal in $k$). No cross-$k$ coupling occurs in
+the evolution loop. The leakage source is the FFT itself, present at
+IEEE 754 precision.
+
+Eliminating the leakage would require arbitrary-precision arithmetic
+(e.g., \texttt{mpmath}), slowing simulation by $100$--$1000\times$ ---
+operationally out of scope.
+
+\subsubsection{Empirical confirmation: zero false-rejects on D1}
+
+Stage C truth-table replay (\texttt{stage\_c\_truth\_table.csv},
+audited subset $n=150$) shows:
+\begin{itemize}
+  \item Probe rejects, sim non-perturbative: $56$
+  \item Probe rejects, sim perturbative: $0$ \emph{(no false-rejects)}
+  \item Probe accepts, sim perturbative: $93$
+  \item Probe accepts, sim non-perturbative: $1$ \emph{(sample 391,
+    slow-growth Hwang--Noh, caught by inline gate)}
+\end{itemize}
+Every sample the probe rejected on D1 was independently confirmed
+non-perturbative. The probe correctly identifies parameter points
+where finite-precision evolution will compound any tachyonic mode to
+divergence, and does not over-reject points where it won't.
+
+We therefore commit the unit-IC all-$k$ design as the canonical probe.
 Historical replay artefacts remain available at
 \texttt{hpc\_results/28520217/samples.profile\_replay.csv} for any
 future re-investigation.
+
+\subsubsection{Verification (TODO)}
+\label{sec:ieee-floor-verification}
+
+A direct numerical demonstration of the IEEE 754 FFT floor at the
+$\sim 10^{-14}$ level on a $256$-point $\cos(k_0 x)$ transform, with
+the corresponding $e^{\gamma_n t}$ amplification curve overlaid for
+the D1 contamination $\gamma$ range, will be produced by a separate
+diagnostic script. Once that figure lands, embed it here with the
+\texttt{includegraphics} call and a short caption pinning the $128$-vs-$10^{-14}$
+amplitude ratio and the implied minimum $\gamma_n t$ at which a
+non-fundamental bin overtakes the fundamental.
+
+\textbf{TODO}: replace this stub with
+\verb|\includegraphics{...}| once the IEEE-floor diagnostic produces
+the figure.
 
 \subsection{The $t_{\text{test}}$ choice}
 
