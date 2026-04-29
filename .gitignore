@@ -12,6 +12,7 @@ phd-application-context.md
 !/examples/data/README.md
 
 *.png
+!docs/figures/*.png
 /outputs/
 
 importtime.log
