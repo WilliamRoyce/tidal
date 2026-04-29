@@ -7,8 +7,8 @@
 \section{PGT Stability Priors for the D2 Campaign}
 \label{sec:pgt-stability-priors}
 
-\textbf{Status:} D2.0 priors locked; D2.1/D2.2/D2.3 stubbed pending per-model scans \\
-\textbf{Date:} 2026-04-28
+\textbf{Status:} D2.0 + D2.1 priors locked; D2.2/D2.3 stubbed pending per-model scans \\
+\textbf{Date:} 2026-04-29
 
 The D2 Bayesian campaign explores Poincar\'e gauge theory (PGT) coupled to
 electromagnetism with quadratic torsion mass terms~$\beta_1 I_1 + \beta_2 I_2 + \beta_3 I_3$
@@ -366,12 +366,130 @@ that require their own perturbative-range scan, following the Phase-1d
 template.
 
 \subsubsection*{D2.1 (Barker, +$\chi$)}
-Adds the kinetic-mixing parameter~$\chi$ between curvature and torsion-trace
-field strengths.  Since~$\chi$ enters off-diagonally in the kinetic matrix
-(analogously to~$\delta_1$), its prior range is to be set by a~$\chi$-only scan
-at the D1 working point, mirroring \path{examples/data/d2_prior_scan/_analyze.py}
-on a directory \path{examples/data/d2_prior_scan/chi_scan/}.  Add
-\verb|--prior "chi=uniform:-chi_star:chi_star"| once~$\chi^*$ is determined.
+\label{sec:d21-priors}
+
+D2.1 adds the Barker $R\!\sim\!\!F_{\text{torsion}}$ kinetic-mixing
+coupling~$\chi$ on top of D2.0's $\beta/\xi/\delta_1$ structure.
+Following the recipe in \cref{sec:delta1-model-dependence}, we re-ran
+the 5-point scan recipe for~$\chi$ on the general spec
+(\path{examples/data/torsion_gertsenshtein_general_nonminimal.json}),
+$\eta = \zeta_i = 0$.
+
+\paragraph{$\chi$-only scan at $\delta_1=0$.}
+At each of the five $(\beta,\xi)$ anchor points
+(\cref{tab:d20-scan-points}), with $\delta_1=0$ and $\chi$ swept across
+$\{0, 0.05, 0.10, 0.12, 0.15, 0.20, 0.30, 0.50\}$, the canonical probe
+returns $\gamma_\mathrm{eff} = 0.101$ for \emph{every} combination.
+$\chi$ alone --- in the decoupling-from-$\delta_1$ baseline --- has
+no measurable effect on the probe verdict and does not destabilise on
+its own.  This is the analogue of Finding~1 from
+\cref{sec:delta1-model-dependence}: the $\beta/\xi$-constraints
+suffice when one of the off-diagonal couplings is zero.
+
+\paragraph{Joint $(\delta_1,\chi)$ scan at the working point.}
+The interesting question is what happens when both~$\delta_1$ and
+$\chi$ are non-zero.  A 5$\times$5 grid at the D1 working point
+($\beta_1=0$, $\beta_2=-0.6$, $\beta_3=0.5$, $\xi=1$) shows
+\emph{joint} destabilisation:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+& $\chi=0$ & $\chi=0.005$ & $\chi=0.01$ & $\chi=0.02$ & $\chi=0.05$ \\
+\midrule
+$\delta_1=0$    & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ \\
+$\delta_1=0.001$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+$\delta_1=0.005$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+$\delta_1=0.012$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+$\delta_1=0.020$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+\bottomrule
+\end{tabular}
+\caption{Joint $(\delta_1,\chi)$ probe scan at the working point.
+Either parameter alone is stable; together at $\chi \gtrsim 0.04$ the
+constraint-Schur matrix becomes singular for any non-zero~$\delta_1$.
+The boundary structure is \emph{rectangular} (no multiplicative
+$\delta_1\cdot\chi$ scaling), not radial.}
+\label{tab:d21-joint-scan-working}
+\end{table}
+
+\paragraph{$\chi$-threshold across the $(\beta,\xi)$ prior region.}
+The rectangular structure means~$\chi^*$ must be set conservatively
+across the prior, not just at the working point.  Spot-checks at three
+representative points (with $\delta_1=0.005$, mid-D2.0-prior):
+
+\begin{itemize}
+  \item \textbf{P1 working} ($\beta_1=0$, $\beta_2=-0.6$, $\beta_3=0.5$, $\xi=1$):
+    rejection at $\chi \approx 0.040$ (stable through $\chi=0.035$).
+  \item \textbf{P3 large-$\xi$} ($\beta=(-1.18,-1.78,-0.26)$, $\xi=6.03$):
+    stable through $\chi=0.05$ (no rejection in scan range).
+  \item \textbf{P4 boundary} ($\beta=(-0.10,-0.45,0)$, $\xi=1$):
+    rejection at $\chi \approx 0.040$.
+  \item \textbf{P5 interior} ($\beta=(0,-1.5,0)$, $\xi=1$):
+    \emph{rejection at $\chi \approx 0.018$} --- the most-sensitive
+    point in the $\beta$-prior region.
+\end{itemize}
+
+The conservative cutoff is therefore~$\chi^*_5 = 0.018$, set by the
+$\beta$-interior region (P5).  With a 2$\times$ safety margin, the
+D2.1 prior is~$\chi \in [-0.009, +0.009]$.
+
+\paragraph{Prior-corner verification.}
+Because the binding bound on~$\chi^*_5$ comes from a single anchor
+(P5), we re-ran the scan at the prior corner $\delta_1 = +0.025$
+(D2.0's edge) on P5 itself to confirm the margin holds:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrrrrr}
+\toprule
+\textbf{$\delta_1$} & $\chi=0$ & $0.005$ & $0.010$ & $0.015$ & $0.018$ & $0.020$ & $0.023$ & $0.024$ \\
+\midrule
+$+0.025$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+$-0.025$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $-$ & $0.101$ & $-$ & $-$ \\
+\bottomrule
+\end{tabular}
+\caption{$\chi$-scan at P5 interior with $\delta_1$ at the
+\emph{prior corner} $\pm 0.025$.  $\chi$-threshold here is
+$\approx 0.0235$, looser than the mid-prior threshold of $0.018$
+measured at $\delta_1=0.005$.  P5's most-sensitive~$\delta_1$ is
+therefore mid-prior, not at the corner; the original $\chi^*_5 = 0.018$
+remains the binding bound and the prior $\chi \in [-0.009, +0.009]$
+preserves its $2\times$ safety margin.  Dashes indicate scan points
+not run after the trend was clear.}
+\label{tab:d21-p5-corner-verification}
+\end{table}
+
+\paragraph{Joint constraint structure.}
+Empirically the unstable region is approximately the rectangular set
+\begin{equation*}
+  \{(\delta_1,\chi)\,:\,\delta_1 \ne 0\ \text{and}\ |\chi| \gtrsim 0.018\},
+\end{equation*}
+not a radial or multiplicative-product set.  No \texttt{--constraint}
+clause coupling~$\delta_1$ and~$\chi$ is therefore needed: the
+rectangular prior $\delta_1 \in [-0.025, +0.025] \times \chi \in
+[-0.009, +0.009]$ fits inside the joint-stable region with margin.
+
+\paragraph{D2.1 prior + soft-constraint block.}
+The D2.1 sample invocation extends D2.0's by adding the~$\chi$ prior
+and removing~$\chi$ from the \texttt{--param} fix list:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+--prior "beta1=uniform:-1.5:1.0"
+--prior "beta2=uniform:-3.0:-0.3"
+--prior "beta3=uniform:-1.0:1.0"
+--prior "xi=log_uniform:0.01:10"
+--prior "delta1=uniform:-0.025:0.025"
+--prior "chi=uniform:-0.009:0.009"
+--constraint "beta1 + beta2 < -0.5"
+--constraint "beta1 - beta2 > 0.25"
+--constraint "beta3 + (2*beta1 + beta2)/3 < 1.333"
+--constraint "xi > 0.01"
+--param eta=0.0 --param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0
+\end{lstlisting}
+\textbf{Note} that~$\chi$ is now a free parameter; only~$\eta,\zeta_i$
+remain fixed.  Forgetting to remove~\verb|--param chi=0.0| from the
+D2.0 invocation block will pin~$\chi$ at zero and reproduce the
+D2.0 chain instead of D2.1.
 
 \subsubsection*{D2.2 (Shapiro, +$\zeta_{1,2,3}$)}
 Adds three derivative torsion--EM couplings of the form~$(\nabla T) \cdot F$.
