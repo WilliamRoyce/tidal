@@ -253,6 +253,55 @@ def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
     return result.samples[mask]
 
 
+def _clip_to_posterior_range(
+    values: np.ndarray,
+    weights: np.ndarray | None,
+    q_low: float = 0.02,
+    q_high: float = 0.98,
+) -> np.ndarray:
+    """Clip a derived-column array to the posterior-weighted quantile range.
+
+    Values outside [q_low, q_high] are replaced with NaN so anesthetic's
+    KDE is calibrated for the posterior scale rather than the full prior-
+    exploration chain.  NaN rows are skipped by anesthetic's kde_plot_1d
+    and kde_contour_plot_2d (data_compressed step).  Weights are intact.
+
+    Guard: if q_low == q_high (perfectly degenerate posterior) the original
+    array is returned unchanged so anesthetic handles the edge case at its
+    own scale.
+    """
+    import numpy as np
+
+    finite_mask = np.isfinite(values)
+    if not finite_mask.any():
+        return values.copy()
+
+    v = values[finite_mask]
+
+    if weights is not None:
+        w = np.asarray(weights, dtype=float)[finite_mask]
+        total = w.sum()
+        if total > 0:
+            w /= total
+            sort_idx = np.argsort(v)
+            cdf = np.cumsum(w[sort_idx])
+            v_s = v[sort_idx]
+            qlo = float(v_s[np.searchsorted(cdf, q_low, side="left")])
+            qhi = float(v_s[np.searchsorted(cdf, q_high, side="left")])
+        else:
+            qlo, qhi = float(np.quantile(v, q_low)), float(np.quantile(v, q_high))
+    else:
+        qlo, qhi = float(np.quantile(v, q_low)), float(np.quantile(v, q_high))
+
+    if qlo >= qhi:
+        return values.copy()
+
+    out = values.astype(float).copy()
+    out[~np.isfinite(values)] = np.nan
+    out[(values < qlo) | (values > qhi)] = np.nan
+    return out
+
+
 def _set_derived_axis_limits(
     axes_df: object,
     plot_params: list[str],
@@ -373,7 +422,16 @@ def _plot_corner_anesthetic(
     log10_a = _compute_log10_amplification(result, samples)
     if log10_a is not None:
         try:
-            samples["log10_A"] = log10_a
+            # Clip to posterior-weighted 2%-98% range BEFORE plot_2d so
+            # anesthetic's KDE is calibrated for the posterior scale, not
+            # the full prior-exploration chain.  Dead-point samples spanning
+            # the full prior range would otherwise produce an over-smooth KDE
+            # that appears as a wedge when the axis is zoomed to the posterior.
+            log10_a_plot = _clip_to_posterior_range(
+                log10_a,
+                result.weights if result.weights is not None else None,
+            )
+            samples["log10_A"] = log10_a_plot
             samples.set_label("log10_A", r"$\log_{10} A$")
             plot_params.append("log10_A")
         except (AttributeError, KeyError, TypeError):
@@ -396,18 +454,6 @@ def _plot_corner_anesthetic(
         axes_df = ret
         cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
         fig = cell.get_figure()
-
-    # Fix log10_A axis limits: anesthetic's weighted quantiles can still be
-    # skewed by low-weight prior-phase dead points.  Recompute from the
-    # posterior-weighted 5%-95% interval and apply post-hoc.
-    if log10_a is not None and "log10_A" in plot_params:
-        _set_derived_axis_limits(
-            axes_df,
-            plot_params,
-            "log10_A",
-            log10_a,
-            result.weights if result.weights is not None else None,
-        )
 
     _force_solid_credible_fills(fig)
     _overlay_priors(axes_df, result)
