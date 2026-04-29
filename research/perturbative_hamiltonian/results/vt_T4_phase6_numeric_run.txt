@@ -1,0 +1,13 @@
+============================================================================
+T4 Phase 6 numeric — fast Hessian via random rational substitution
+============================================================================
+
+L_canon_num: 1005 terms
+
+Highest jet order at b5=0: 1
+Highest jet order at b5!=0: 5
+
+H0 (b5=0) shape: (3, 3)
+rank(H0) = 3
+det(H0) = 403546363/15422400
+

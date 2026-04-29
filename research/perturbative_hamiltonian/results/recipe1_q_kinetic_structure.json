@@ -1,0 +1,44 @@
+{
+  "_audit": {
+    "audited": "2026-04-27",
+    "status": "annotated",
+    "see": "research/perturbative_hamiltonian/notes/FINAL_ASSESSMENT.md",
+    "specific_corrections": [
+      "Verified at sympy schema level; actual xAct decomposition not yet checked (Review 1, reviews/review1_mathematical_verification.md).",
+      "Phase 2.2 follow-up needed for production-pipeline verification (Review 1 §'Phase 2.2 follow-up needed')."
+    ]
+  },
+  "verdict": "standard-kinetic",
+  "recipe1_preflight": "PASS",
+  "kinetic_structure": "(\u2202q)\u00b7(\u2202q) standard-kinetic",
+  "max_derivative_order_in_R_tilde": 1,
+  "max_derivative_order_in_R_tilde_squared": 2,
+  "n_R_tilde_terms": 24,
+  "n_R_tilde_squared_terms_expanded": 300,
+  "q_free_parameter_count": 16,
+  "q_constraint_residuals": {
+    "asymmetry": 0.0,
+    "trace": 1.1102230246251565e-16,
+    "axial": 2.220446049250313e-16
+  },
+  "DT_x_DT_term_count_existing_enumeration": 16,
+  "stueckelberg_field_content": {
+    "graviton_h_ab": "symmetric, 10 components",
+    "Kalb_Ramond_B_ab": "antisymmetric 2-form, 6 components",
+    "vector_V_a": "vector, 4 components",
+    "total_components": 20,
+    "physical_DOF_after_gauge": 16,
+    "matches_q_components": true,
+    "reference": "Chatzistavrakidis, Ranjbar, Zekoc, JHEP 05 (2025) 218 (arXiv:2411.16928)"
+  },
+  "no_go_applicability": {
+    "Round1_AgentA_AgentD_no_go": "does NOT apply to q-sector (Pais-Uhlenbeck-targeted)",
+    "Round2_AgentG_dual_no_go": "does NOT apply to q-sector",
+    "still_applies_to_metric_h4_h7_h9": true
+  },
+  "caveats": [
+    "Linear order on flat background; nonlinear KK contributions in R\u0303\u00b2 produce (q\u00b2) algebraic terms but no (\u2202\u00b2q) terms.",
+    "The DT \u00d7 DT enumeration is a SUPERSET of what b5\u00b7R\u0303\u00b2 projects onto; in particular the parity-odd block \u03b5\u00b7DT\u00b7DT contributes.",
+    "St\u00fcckelberg construction needs to be applied carefully \u2014 this preflight only verifies the *kinetic structure*, not the full applicability of arXiv:2411.16928."
+  ]
+}

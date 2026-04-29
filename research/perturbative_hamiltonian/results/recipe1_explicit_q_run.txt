@@ -1,0 +1,47 @@
+==============================================================================
+Recipe 1 Preflight — explicit q-substitution sub-check (REVISED)
+==============================================================================
+
+Setup:
+  - 16-parameter q-irreducible torsion (verified count = 16)
+  - Single-Fourier-mode profile q_{abc}(x) = c_{abc} · exp(i k·x)
+  - Flat Minkowski background, mostly-plus metric
+  - Linearized Riemann-Cartan: R̃_{ρσμν} = ∂_μ K_{ρνσ} - ∂_ν K_{ρμσ}
+
+Building q-basis...
+  q-irreducible basis has 16 free parameters (expected 16).
+Building contortion K from q...
+Building linearized Riemann-Cartan R̃_{ρσμν}...
+
+--- (A) Holst scalar  R̃_H = (1/2) ε^{μνρσ} R̃_{μνρσ}  ---
+  R̃_H (after stripping profile) = 0 IDENTICALLY at linear order on flat.
+  → Confirms the Nieh–Yan identity: R̃_H is a TOTAL DERIVATIVE at linear order.
+  → (R̃_H)² therefore does not contribute to a bulk kinetic Lagrangian.
+  → CAVEAT: 'b5·R̃²' in the v6 docs does NOT mean (R̃_H)². It means the
+    parity-odd PONTRYAGIN-type density. See part (B) below.
+
+--- (B) Pontryagin-type density (d_5):  ε^{abef} R̃^{abcd} R̃_{cd}^{ef}  ---
+(This is the natural 'R̃²' parity-odd invariant. It is QUADRATIC in R̃.)
+  Max k-degree of P5 (after stripping profile²): 2  (expected 2)
+  All P5 monomials have k-degree in: min=2, max=2
+  → STANDARD KINETIC structure (∂q)·(∂q) confirmed for d_5 contraction.
+
+--- (C) Direct check: every ε R̃ × R̃ contraction gives 2 derivatives ---
+
+Argument:
+  - At linear order on flat:    R̃_{abcd} = ∂_a K_{bcd... } - ∂_b K_{a...}
+  - Each R̃ carries exactly ONE spacetime derivative.
+  - Any ε·R̃·R̃ contraction has exactly TWO total derivatives.
+  - Two single-derivative factors → kinetic structure (∂q)·(∂q) — STANDARD.
+  - There is NO mechanism at linear order on flat for ∂² of K (= ∂² of q)
+    to appear in a single R̃ factor, hence NO mechanism for (∂²q)² in R̃².
+
+This is the analytical conclusion: b5·R̃² (in the parity-odd Pontryagin-type
+interpretation, which is the version that appears in TIDAL's v6 PerturbativeReduction)
+is STANDARD KINETIC on the q-irreducible sector at linear order on flat.
+
+--- (D) Cross-check: number of (∂T)² terms in the explicit enumeration ---
+    DT × DT block:        16 terms
+    eps DT × DT block:    38 terms
+    NO 'D²T × D²T' block exists in the enumeration.
+    → Recipe 1 preflight PASS.

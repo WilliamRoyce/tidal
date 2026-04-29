@@ -1,0 +1,80 @@
+==============================================================================
+Recipe 1 Preflight: b5·R̃² projected onto q-irreducible torsion
+Round 3 Agent H, 2026-04-26
+==============================================================================
+
+--- Phase 1: Generic q-irreducible torsion ansatz ---
+Number of free parameters in q-tensor : 16  (expected 16)
+Antisymmetry residual                  : 0.000e+00  (expected ~0)
+Tracelessness residual                 : 1.110e-16  (expected ~0)
+Axial-part residual                    : 2.220e-16  (expected ~0)
+OK: q has the expected 16 components.
+
+--- Phase 2: Linearized R̃ in q-only ansatz ---
+Riemann-Cartan curvature linearization on flat background:
+    R̃_{ρσμν} = ∂_μ K_{ρνσ} - ∂_ν K_{ρμσ}      (one derivative of K)
+Contortion in pure-q ansatz:
+    K_{ρμν} = (1/2) (q_{ρμν} - q_{μρν} + q_{νρμ})    (algebraic in q)
+Therefore R̃ at linear order is ONE derivative of q.
+
+R̃-Holst-Pontryagin scalar has 24 expanded summands.
+Derivative order per summand: min=1, max=1 (expected 1).
+OK: R̃ is uniformly first-derivative-of-q at linear order.
+
+--- Phase 3: Squaring R̃ ---
+R̃² has 300 expanded summands (after expansion).
+Derivative order per summand of R̃²: min=2, max=2 (expected 2).
+OK: R̃² is uniformly TWO derivatives total.
+
+Two single-derivative factors → STANDARD KINETIC structure (∂q)·(∂q).
+NO (∂²q) factor can appear at linear order, so NO Pais-Uhlenbeck term.
+
+--- Phase 4: Cross-check against existing TIDAL enumeration ---
+DT × DT block in research/lagrangian_enumeration/explicit_terms_tex.txt:
+  contains 16 terms (matching Agent G's count of 16)
+Each term is schematically (∂T)·(∂T) — first derivatives only.
+Sample first 3 terms:
+   (∂T)_{a}^{d}_{cd} (∂T)^{ab}_{b}^{c}
+   (∂T)_{abcd} (∂T)^{abcd}
+   (∂T)_{acbd} (∂T)^{abcd}
+There is NO 'D²T × D²T' or '(∂²T)²' block in the enumeration.
+This is consistent with R̃² being (∂T)·(∂T) at linear order.
+
+--- Phase 5: Verdict ---
+VERDICT: standard-kinetic
+
+Recipe 1 preflight PASSES.
+The b5·R̃² coupling, projected onto the q-irreducible tensor-torsion sector,
+produces ONLY (∂q)² standard-kinetic structure on flat background at linear
+order. No (∂²q)² Pais-Uhlenbeck term appears.
+
+Implication: the Chatzistavrakidis-Ranjbar-Zekoč 2024 (arXiv:2411.16928)
+Stückelberg construction for massive (2,1)-Young-tableau Curtright fields
+APPLIES to the q-irreducible sector of TIDAL's b5·R̃² PGT theory.
+
+Stückelberg field content (per arXiv:2411.16928 §3):
+   • Symmetric graviton-like h_{ab}     (10 components)
+   • Kalb-Ramond 2-form B_{ab}          (6 components)
+   • Vector V_a                         (4 components)
+                                        ─────────────
+                                       Total 20 components
+Vs. q has 16 components — mismatch is ABSORBED by Stückelberg gauge
+invariance, leaving 16 physical DOF in the m → 0 limit (matching m≠0 q).
+
+--- Cross-validation against round-1+2 no-go theorems ---
+Round 1 Agent A and Round 2 Agent G's no-go theorems target the
+Pais-Uhlenbeck case (∂²X)·(∂²X). Since the q-projection is standard-
+kinetic, those no-go's do NOT apply to the q-sector.
+They DO continue to apply to the metric h₄,h₇,h₉ Pais-Uhlenbeck case.
+
+--- Caveats ---
+1. This calculation is at LINEAR order on a FLAT background. On a curved
+   background, KK quadratic terms in R̃ can contribute (∂q · q) which on
+   integration by parts produces (q²) — still no ∂² of q though.
+2. Beyond linear order in q, R̃² generically has q⁴ algebraic terms;
+   these do not affect the kinetic-structure verdict at the level we
+   need for Stückelberg lifting.
+3. The DT × DT enumeration block is for the GENERIC quadratic
+   Lagrangian. The b5·R̃² operator specifically projects onto a SUBSET
+   of these 16 terms, and additionally produces parity-odd ε·DT·DT
+   structures. None of these introduce ∂² of q.

@@ -1,0 +1,22 @@
+============================================================================
+T4 Phase 6 v3 — float-first Hessian
+============================================================================
+
+r_canon = 5, r_canon_b50 = 1
+Random parameters set with seed=42
+
+Substituting floats into L_canon ...
+  Substituted in 6.60s
+
+Building Hessian via Poly coefficient extraction ...
+Computing H0 (b5=0) ...
+  Done in 0.20s
+  H0 shape: (3, 3)
+  H0 = 
+[[1.55330441 0.5427482  0.25139938]
+ [0.5427482  1.63690864 0.18449437]
+ [0.25139938 0.18449437 1.17183511]]
+  rank(H0) = 3
+  det(H0) = 2.52835
+
+Computing H_eps (b5 = 1e-3) ...

@@ -1,0 +1,12 @@
+============================================================================
+T4 Phase 6 final — full Hessian + Ostrogradsky structure
+============================================================================
+
+Highest jet order at b5=0: 1
+Highest jet order at b5!=0: 5
+
+Velocity-jet Hessian dim at b5=0: (3, 3)
+Velocity-jet Hessian dim at b5!=0: (15, 15)
+
+Computing ranks ...
+rank(H0) = 3

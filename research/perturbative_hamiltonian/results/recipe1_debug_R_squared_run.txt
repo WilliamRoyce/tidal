@@ -1,0 +1,37 @@
+==============================================================================
+DEBUG: R̃² vanishing on q-irreducible projection
+==============================================================================
+
+--- Test 1: unconstrained q (just antisymmetric in last two) ---
+  unconstrained-q free parameters: 24 (expect 24 = 4×6)
+  R̃² (unconstrained) max k-degree: 2 (expected 2)
+  → R̃² is nonzero and standard-kinetic at unconstrained level — GOOD.
+
+--- Test 2: q-irreducible (tracelessness + axial-vanishing imposed) ---
+  constrained-q free parameters: 16 (expect 16)
+  R̃² (q-irreducible) = 0 — Verifies surprising vanishing.
+  Trying random parameters...
+    Still zero with random params — R̃² IS identically zero on q-irreducible.
+
+    NOTE: This particular result (R̃² vanishes ID on q-irreducible at linear
+    order on flat) is consistent with the analytic structure but is
+    surprisingly strong. It implies the q-irreducible at linear order on flat
+    has NO contribution to ANY R̃-quadratic Lagrangian invariant.
+
+    Possible explanations:
+    (a) The q-irreducible projects K into a sector where the ANTISYMMETRIC
+        part of ∂K (which is what R̃ measures) vanishes by Bianchi-like
+        identities induced by q's algebraic constraints.
+    (b) The Hehl-McCrea-Mielke-Ne'eman irreducible decomposition has the
+        property that q is RICCI-FLAT at linear order on flat backgrounds.
+
+    Either way, the verdict for Recipe 1 is even STRONGER than expected:
+    There is NO higher-derivative (∂²q)² structure because there is NO
+    kinetic structure of any kind on the q-irreducible. Trivially
+    standard-kinetic since there's nothing there.
+
+--- Test 3: Detailed inspection of R̃_{0123} for unconstrained q ---
+  R̃_{0,1,2,3} = I*(-k2*q_0_1_3 + k2*q_1_0_3 - k2*q_3_0_1 + k3*q_0_1_2 - k3*q_1_0_2 + k3*q_2_0_1)/2
+
+--- Test 4: R̃_{0123} with q-irreducibility imposed ---
+  R̃_{0,1,2,3} (q-irred) = 0

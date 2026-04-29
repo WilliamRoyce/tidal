@@ -1,0 +1,8 @@
+============================================================================
+T4 Phase 6 numpy-final — float Hessian rank
+============================================================================
+
+r_canon = 5, r_canon_b50 = 1
+Random parameters set with seed=42
+
+Computing Hessian at b5 = 0 ...

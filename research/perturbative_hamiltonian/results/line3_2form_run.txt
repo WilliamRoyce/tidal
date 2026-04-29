@@ -1,0 +1,71 @@
+========================================================================
+LINE 3a: 2-form auxiliary lift  —  toy tensor sector
+========================================================================
+L_orig = -M*q(t)**2/2 + b5*Derivative(q(t), (t, 2))**2/2 - lam*phi(t)*q(t) - m**2*phi(t)**2/2 + Derivative(phi(t), t)**2/2
+
+VARIANT V2 — proposed 2-form auxiliary lift
+L_V2 = (m_K**2*(-M*q(t)**2 - 2*lam*phi(t)*q(t) - m**2*phi(t)**2 + (b5*m_K**2 - 1)*K(t)**2 - 2*K(t)*Derivative(q(t), (t, 2)) + Derivative(phi(t), t)**2) + Derivative(K(t), t)**2)/(2*m_K**2)
+
+After algebraic elimination of K from V2 (drop K_dd term):
+L_eff = -M*q(t)**2/2 - b5*m_K**2*Derivative(q(t), (t, 2))**2/(2*(b5*m_K**2 - 1)**2) - lam*phi(t)*q(t) - m**2*phi(t)**2/2 + Derivative(phi(t), t)**2/2 + Derivative(q(t), (t, 2))**2/(2*(b5*m_K**2 - 1)**2) + Derivative(q(t), (t, 3))**2/(2*m_K**2*(b5*m_K**2 - 1)**2)
+
+L_V2_eff at b5=0:
+  = (m_K**2*(-M*q(t)**2 - 2*lam*phi(t)*q(t) - m**2*phi(t)**2 + Derivative(phi(t), t)**2 + Derivative(q(t), (t, 2))**2) + Derivative(q(t), (t, 3))**2)/(2*m_K**2)
+
+L_orig at b5=0:
+  = -M*q(t)**2/2 - lam*phi(t)*q(t) - m**2*phi(t)**2/2 + Derivative(phi(t), t)**2/2
+
+RESIDUE (V2 - orig at b5=0) = Derivative(q(t), (t, 2))**2/2 + Derivative(q(t), (t, 3))**2/(2*m_K**2)
+→ Residue NONZERO — V2 does NOT have a clean b5→0 limit ✗
+  The auxiliary K leaves behind a kinetic term q_dd^2/(2 m_K^2 (1-b5 m_K^2)^2)
+  that does NOT vanish at b5=0; the spurious DOF persists.
+
+VARIANT V2-IBP — after q_dd → q_d via IBP
+L_V2_IBP = -M*q(t)**2/2 - lam*phi(t)*q(t) - m**2*phi(t)**2/2 - (-b5*m_K**2/2 + 1/2)*K(t)**2 + Derivative(K(t), t)*Derivative(q(t), t) + Derivative(phi(t), t)**2/2 + Derivative(K(t), t)**2/(2*m_K**2)
+
+Now ALL fields are first-order. Conjugate momenta:
+  p_phi = ∂L/∂phi_d = phi_d
+  p_q   = ∂L/∂q_d   = K_d
+  p_K   = ∂L/∂K_d   = K_d/m_K^2 + q_d
+
+Kinetic Hessian:
+Matrix([[1, 0, 0], [0, 0, 1], [0, 1, m_K**(-2)]])
+det(Hessian) = -1
+
+VERDICT for V2-IBP:
+  Kinetic Hessian is degenerate (det = 0).
+  → primary constraint φ₁ := p_q - K_d ≈ 0
+  → secondary constraints from φ̇₁ = 0 must be propagated.
+  → The constraint matrix on (q, K, p_q, p_K) sector picks up b5 from
+    the K^2 coefficient (1-b5·m_K^2). Specifically: at b5=0 the constraint
+    chain TERMINATES at primary level if (1-b5·m_K^2)≠0.
+
+  This is structurally identical to the AGENT A obstruction:
+  the constraint matrix det depends on the parameter that distinguishes
+  the b5=0 algebraic-constraint case from the b5≠0 propagating case.
+
+========================================================================
+LINE 3a (2-form auxiliary): ASSESSMENT
+========================================================================
+
+The naive 2-form auxiliary lift fails on TWO fronts:
+
+  (a) Lagrangian residue: the b5→0 limit leaves a spurious kinetic term
+      q_dd^2/(2 m_K^2) that did not exist in the original theory.
+
+  (b) Constraint-matrix rank: even after IBP to first-order form, the
+      constraint matrix has det proportional to (1 - b5 m_K^2). This is
+      EXACTLY the rank-jump structure that Round 1 Agent A identified
+      and Agent D proved was generic for ANY Stückelberg-type lift.
+
+Conclusion: 2-form auxiliary lift falls under the AGENT D no-go theorem.
+The theorem proved that reducibility null-vectors Z^a are b5-independent
+by construction; a 2-form auxiliary's gauge structure (1-form parameter)
+is also b5-independent, so cannot bridge a b5-dependent Poisson bracket.
+
+The 2-form lift is no different from a vector or scalar Stückelberg lift
+in this respect.  The structural impossibility theorem applies.
+
+VERDICT: BLOCKED for the same reason as the irreducible/reducible vector
+Stückelberg lifts.
+

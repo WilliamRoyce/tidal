@@ -1,0 +1,51 @@
+============================================================================
+T4 Phase 6 (corrected) — Routhian L_eff Hessian analysis
+============================================================================
+
+L_eff = L_T4 |_{h_c = h_c(y, dot y)}, truncated at O(b5)
+
+Highest derivative order in L_eff: 6
+  At b5=0: 2 (standard kinetic = 1, here we count the ddot via Ostrogradsky)
+
+--- Hessian at b5 = 0 ---
+Highest derivative order at b5=0: 2
+W^(b5=0)_ab = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+det(W^(b5=0)) = 0
+
+--- Hessian at b5 != 0 (highest order r = 6) ---
+W^(top, b5!=0)_ab = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+det(W^(top, b5!=0)) = 0
+
+Phase-space dim at b5=0 (Ostrogradsky 2*N*r): 12
+Phase-space dim at b5!=0 (Ostrogradsky 2*N*r): 36
+
+============================================================================
+RANK JUMP DIAGNOSTIC (corrected)
+============================================================================
+Phase-space dimension changes: 12 -> 36
+Rank jump detected: True
+
+det(W^(top, b5!=0)) factored: 0
+det(W^top) ~ b5^0 as b5 -> 0
+
+Constraint Poisson matrix structure:
+  DEGENERATE highest-derivative Hessian -> primary constraints exist
+  -> Path A's L_eff requires Dirac analysis, not Ostrogradsky reduction
+
+Traceback (most recent call last):
+  File "/workspaces/torsion-gertsenshtein/research/perturbative_hamiltonian/scripts/vt_T4_phase6_fixed.py", line 279, in <module>
+    json.dump(existing, f, indent=2)
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/__init__.py", line 179, in dump
+    for chunk in iterable:
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/encoder.py", line 432, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/encoder.py", line 406, in _iterencode_dict
+    yield from chunks
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/encoder.py", line 406, in _iterencode_dict
+    yield from chunks
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/encoder.py", line 439, in _iterencode
+    o = _default(o)
+        ^^^^^^^^^^^
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type Integer is not JSON serializable

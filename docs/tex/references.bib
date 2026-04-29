@@ -1060,14 +1060,25 @@
   note    = {First identification of the ``if-constraints with critical parameters'' phenomenon for $R + R^2 + T^2$ PGT.},
 }
 
-@article{BlagojevicNikolic1984,
+% NOTE: previously cited (in error) as Nuovo Cim B 84:25 (1984).  Verified 2026-04-27
+% by direct PDF retrieval (literature/BF02721794/BF02721794.pdf) that the actual
+% reference is volume 73B, pages 258-273, year 1983, and the title is "Hamiltonian
+% Structure of the Theory of Gravity with R+T^2 Type of Lagrangian" — that is,
+% Einstein-Hilbert (linear in R) + torsion-squared T^2.  This Lagrangian class
+% does NOT include the R^2 / Rtilde^2 curvature-squared terms responsible for
+% TIDAL's b5*Rtilde^2 4th-order Ostrogradsky structure.  Earlier agent claims that
+% this paper is "literally the canonical Hamiltonian of R+R^2+T^2 PGT" are
+% incorrect.  Bib key renamed to ...1983Nuovo to reflect actual year.
+@article{BlagojevicNikolic1983Nuovo,
   author  = {Blagojevi\'c, M. and Nikoli\'c, I. A.},
-  title   = {Hamiltonian structure of the {Poincar\'e} gauge theory of gravity},
+  title   = {{H}amiltonian Structure of the Theory of Gravity with $R + T^2$ Type of {L}agrangian},
   journal = {Il Nuovo Cimento B},
-  volume  = {84},
-  pages   = {25--49},
-  year    = {1984},
-  note    = {Hamiltonian of $R + R^2 + T^2$ PGT — the same theory class TIDAL hits with $b_5 \tilde{R}^2$. Critical-parameter classification stated explicitly.},
+  volume  = {73},
+  number  = {2},
+  pages   = {258--273},
+  year    = {1983},
+  doi     = {10.1007/BF02721794},
+  note    = {Lagrangian linear in scalar curvature $R$ and quadratic in torsion $T$.  Dirac-Bergmann analysis shows the Lorentz gauge potentials can be eliminated via constraint equations.  Pure 2nd-order; does NOT cover the $R^2/\tilde{R}^2$ curvature-squared sector that TIDAL's $b_5\,\tilde{R}^2$ requires.  Local copy: \texttt{literature/BF02721794/}.},
 }
 
 @article{YoNester1999,
@@ -1137,6 +1148,20 @@
   archiveprefix = {arXiv},
   primaryclass = {hep-th},
   note    = {Most general published Stückelberg recipe.  Iteratively closes a system of EOMs by introducing one auxiliary field per derivative consequence.  Identified as the most-promising starting point for a TIDAL-applicable construction in the constraint-promotion case.},
+}
+
+% [audit-2026-04-27] Added per Correction #5 of FINAL_ASSESSMENT.md.
+% CRZ 2024 — parity-even free-field Stückelberg recipe for massive (2,1)
+% Curtright tensor.  Verified locally in literature/2411.16928/Stueckelberg_v2.tex.
+@article{ChatzistavrakidisRanjbarZekoc2024,
+  author  = {Chatzistavrakidis, A. and Ranjbar, A. and Zeko\v{c}, T.},
+  title   = {Higher tensor global symmetries, mixed symmetry fields and the {S}tueckelberg mechanism},
+  journal = {arXiv preprint},
+  year    = {2024},
+  eprint  = {2411.16928},
+  archiveprefix = {arXiv},
+  primaryclass = {hep-th},
+  note    = {Stückelberg construction for massive mixed-symmetry tensor fields (graviton, (2,1) Curtright, (2,2)) at linearised order. Parity-even free fields only; the $m \to 0$ limit is the Nambu--Goldstone limit, not a constraint-promotion limit. Parity-odd extension required for TIDAL's $b_5\,\tilde{R}^2$ is not published.},
 }
 
 @article{LyakhovichSharapov2021,
@@ -1212,15 +1237,22 @@
 % Constraint-promotion barrier — Modern Faddeev-Jackiw and irregular constraints
 % =====================================================================
 
+% [audit-2026-04-27] Correct authors for arXiv:2602.12114 per Meta-K
+% verification (https://arxiv.org/abs/2602.12114).  Previous entry
+% mis-attributed the paper to ``Cabo Bizet \& Bartocci''; the actual
+% authors are Chan-López, Martín-Ruiz, Cabrera, and Paulin Fuentes.
+% The citation key is preserved (CaboBizetBartocci2026) to avoid
+% touching the TeX call sites; the human-readable author field is
+% corrected.
 @article{CaboBizetBartocci2026,
-  author  = {Cabo Bizet, A. and Bartocci, G.},
-  title   = {Matrix bordering structure of the {F}addeev--{J}ackiw algorithm},
+  author  = {Chan-L\'opez, E. and Mart\'in-Ruiz, A. and Cabrera, J. M. and Paulin Fuentes, J. M.},
+  title   = {Matrix bordering structure of the {F}addeev--{J}ackiw algorithm: {S}chur complement regularization and symbolic automation},
   journal = {arXiv preprint},
   year    = {2026},
   eprint  = {2602.12114},
   archiveprefix = {arXiv},
   primaryclass = {hep-th},
-  note    = {Modern formalisation of FJ via Schur-complement bordering.  Termination of the algorithm requires Schur-complement non-degeneracy — exactly what fails on the constraint-promotion critical surface.},
+  note    = {Modern formalisation of FJ via Schur-complement bordering. Termination of the algorithm requires Schur-complement non-degeneracy --- exactly what fails on the constraint-promotion critical surface. Preprint, not yet peer-reviewed.},
 }
 
 @article{Loran2003,
@@ -1282,4 +1314,67 @@
   archiveprefix = {arXiv},
   primaryclass = {gr-qc},
   note    = {EFT-Stückelberg follow-up; lowers the strong-coupling mode appearance from cubic to quadratic order.  Background-dependent.},
+}
+
+% =====================================================================
+% Constraint-promotion barrier — recent published analogues in metric-only
+% quadratic gravity (added 2026-04-27 from Phase 2.1 GZL forward-citation
+% findings; these confirm the barrier is recognised in current peer-reviewed
+% literature for adjacent frameworks, even though no published bridge
+% applies to TIDAL's parity-odd PGT b5·R̃² case).
+% =====================================================================
+
+@article{GlavanZlosnikLin2024,
+  author  = {Glavan, D. and Zlosnik, T. and Lin, C.},
+  title   = {Hamiltonian analysis of metric-affine $R^2$ gravity},
+  journal = {arXiv preprint},
+  year    = {2024},
+  eprint  = {2311.17459},
+  archiveprefix = {arXiv},
+  primaryclass = {gr-qc},
+  note    = {Constructs an explicit Hamiltonian for $R^2$-type quadratic curvature theory in metric-affine geometry.  Methodologically closest published paper to TIDAL's b_5\tilde{R}^2 PGT case.  Three independent obstructions block direct transfer (per Phase 2.1 deep read in `research/perturbative_hamiltonian/notes/lead_glavan_zlosnik_lin.md`): (1) symmetry mismatch — GZL exploits projective + Weyl gauge symmetries that TIDAL's PGT lacks; (2) higher-derivative-trick singularity — GZL's standard scalar-auxiliary lift requires $f''(\varphi) \ne 0$, which vanishes at $b_5 = 0$ for $f = R + b_5 R^2$, so GZL's own construction is non-invertible at the constraint-promotion limit; (3) geometry mismatch — metric-affine connection vs vielbein PGT, different gauge algebras.  Local copy: \texttt{literature/2311.17459/}.},
+}
+
+@article{BarkerGlavan2025,
+  author  = {Barker, W. E. V. and Glavan, D.},
+  title   = {Spectrum of pure $R^2$ gravity: full {H}amiltonian analysis},
+  journal = {arXiv preprint},
+  year    = {2025},
+  eprint  = {2510.08201},
+  archiveprefix = {arXiv},
+  primaryclass = {gr-qc},
+  note    = {Identifies a constraint-promotion mechanism in pure $R^2$ gravity: \emph{verbatim} ``the mechanism for this phenomenon is a change in the nature of the constraints upon linearisation: ten second-class constraints of the full theory become first-class. ... Such backgrounds are surfaces of strong coupling in field space, where the dynamics of perturbations becomes nonperturbative.''  Closest published analogue to TIDAL's $b_5 \to 0$ critical surface in metric-only quadratic gravity (the construction does NOT apply to PGT torsion — different framework).  Local copy: \texttt{literature/2510.08201/}.},
+}
+
+@article{Bellorin2025,
+  author  = {Bellor\'in, J.},
+  title   = {Hamiltonian equations of motion of quadratic gravity},
+  journal = {arXiv preprint},
+  year    = {2025},
+  eprint  = {2506.07305},
+  archiveprefix = {arXiv},
+  primaryclass = {gr-qc},
+  note    = {Cites GZL 2024 (footnote 17) and explicitly states: \emph{verbatim} ``One cannot obtain the ADM Hamiltonian of general relativity as a smooth limit of the case we have considered.''  This is the metric-only Stelle-quadratic-gravity statement of the same barrier TIDAL hits at $b_5 \to 0$.  Local copy: \texttt{literature/2506.07305/}.},
+}
+
+@article{Karananas2024a,
+  author  = {Karananas, G. K.},
+  title   = {Particle content of (scalar curvature)$^2$ gravities revisited},
+  journal = {arXiv preprint},
+  year    = {2024},
+  eprint  = {2407.09598},
+  archiveprefix = {arXiv},
+  primaryclass = {hep-th},
+  note    = {Pure $R^2$ gravity is ``infinitely strongly-coupled at Minkowski'', with ``(numerous) accidental gauged symmetries'' at the linearised level.  Recent independent confirmation that the constraint-promotion phenomenon is recognised for metric-only quadratic gravity.  Local copy: \texttt{literature/2407.09598/}.},
+}
+
+@article{Karananas2024b,
+  author  = {Karananas, G. K.},
+  title   = {Particle content of metric-affine $R^2$ gravities},
+  journal = {arXiv preprint},
+  year    = {2024},
+  eprint  = {2408.16818},
+  archiveprefix = {arXiv},
+  primaryclass = {hep-th},
+  note    = {Companion to Karananas2024a; covers the metric-affine case, including the parity-even Einstein-Cartan quadratic sector that is one corner of the larger PGT $b_5 \tilde{R}^2$ class.  Local copy: \texttt{literature/2408.16818/}.},
 }

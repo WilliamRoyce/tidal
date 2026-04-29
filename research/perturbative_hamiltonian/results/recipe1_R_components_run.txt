@@ -1,0 +1,11 @@
+Number of nonzero R̃-components on q-irreducible: 144 out of 256
+First 5 nonzero examples:
+  R̃[(0, 1, 0, 1)] = I*c2_2_0*k0 - I*c2_2_1*k1 + I*c3_3_0*k0 - I*c3_3_1*k1
+  R̃[(0, 1, 0, 2)] = -I*c2_1_0*k0 - I*c2_2_1*k2 - I*c3_3_1*k2
+  R̃[(0, 1, 0, 3)] = -I*c2_2_1*k3 - I*c3_1_0*k0 - I*c3_3_1*k3
+  R̃[(0, 1, 1, 0)] = -I*c2_2_0*k0 + I*c2_2_1*k1 - I*c3_3_0*k0 + I*c3_3_1*k1
+  R̃[(0, 1, 1, 2)] = -I*c2_1_0*k1 - I*c2_2_0*k2 - I*c3_3_0*k2
+
+Number of nonzero K-components: 48 out of 64
+
+Sum of |K| with sample params: 2348

@@ -1,0 +1,86 @@
+========================================================================
+Step 1: T3 Lagrangian and order-0 algebraic constraint
+========================================================================
+L_T3 (N=2 dyn + 2 constr):
+   K11*b5*Derivative(h1(t), (t, 2))**2/2 + K12*b5*Derivative(h1(t), (t, 2))*Derivative(h2(t), (t, 2)) + K22*b5*Derivative(h2(t), (t, 2))**2/2 - L11*h1(t)*q1(t) - L12*h2(t)*q1(t) - L21*h1(t)*q2(t) - L22*h2(t)*q2(t) - M2_1*h1(t)**2/2 - M2_2*h2(t)**2/2 - m1**2*q1(t)**2/2 - m2**2*q2(t)**2/2 - mu11*q1(t)*Derivative(h1(t), t) - mu12*q1(t)*Derivative(h2(t), t) - mu21*q2(t)*Derivative(h1(t), t) - mu22*q2(t)*Derivative(h2(t), t) + Derivative(q1(t), t)**2/2 + Derivative(q2(t), t)**2/2
+
+Order-0 EOMs for h_a (b5=0):
+  E_h1 = -L11*q1(t) - L21*q2(t) - M2_1*h1(t) + mu11*Derivative(q1(t), t) + mu21*Derivative(q2(t), t)
+  E_h2 = -L12*q1(t) - L22*q2(t) - M2_2*h2(t) + mu12*Derivative(q1(t), t) + mu22*Derivative(q2(t), t)
+
+Order-0 solutions h_a^(0):
+  h1^(0) = (-L11*q1(t) - L21*q2(t) + mu11*Derivative(q1(t), t) + mu21*Derivative(q2(t), t))/M2_1
+  h2^(0) = (-L12*q1(t) - L22*q2(t) + mu12*Derivative(q1(t), t) + mu22*Derivative(q2(t), t))/M2_2
+
+Iterative solutions h_a = h_a^(0) + b5 * h_a^(1) + O(b5^2):
+  h1 = -K11*L11*b5*Derivative(q1(t), (t, 4))/M2_1**2 - K11*L21*b5*Derivative(q2(t), (t, 4))/M2_1**2 + K11*b5*mu11*Derivative(q1(t), (t, 5))/M2_1**2 + K11*b5*mu21*Derivative(q2(t), (t, 5))/M2_1**2 - K12*L12*b5*Derivative(q1(t), (t, 4))/(M2_1*M2_2) - K12*L22*b5*Derivative(q2(t), (t, 4))/(M2_1*M2_2) + K12*b5*mu12*Derivative(q1(t), (t, 5))/(M2_1*M2_2) + K12*b5*mu22*Derivative(q2(t), (t, 5))/(M2_1*M2_2) - L11*q1(t)/M2_1 - L21*q2(t)/M2_1 + mu11*Derivative(q1(t), t)/M2_1 + mu21*Derivative(q2(t), t)/M2_1
+  h2 = -K12*L11*b5*Derivative(q1(t), (t, 4))/(M2_1*M2_2) - K12*L21*b5*Derivative(q2(t), (t, 4))/(M2_1*M2_2) + K12*b5*mu11*Derivative(q1(t), (t, 5))/(M2_1*M2_2) + K12*b5*mu21*Derivative(q2(t), (t, 5))/(M2_1*M2_2) - K22*L12*b5*Derivative(q1(t), (t, 4))/M2_2**2 - K22*L22*b5*Derivative(q2(t), (t, 4))/M2_2**2 + K22*b5*mu12*Derivative(q1(t), (t, 5))/M2_2**2 + K22*b5*mu22*Derivative(q2(t), (t, 5))/M2_2**2 - L12*q1(t)/M2_2 - L22*q2(t)/M2_2 + mu12*Derivative(q1(t), t)/M2_2 + mu22*Derivative(q2(t), t)/M2_2
+
+========================================================================
+Step 2: PS-reduced EOMs E^(1)_qa truncated at O(b5)
+========================================================================
+E^(1)_q1 = K11*L11**2*b5*Derivative(q1(t), (t, 4))/M2_1**2 + K11*L11*L21*b5*Derivative(q2(t), (t, 4))/M2_1**2 - K11*L11*b5*mu21*Derivative(q2(t), (t, 5))/M2_1**2 + K11*L21*b5*mu11*Derivative(q2(t), (t, 5))/M2_1**2 - K11*b5*mu11**2*Derivative(q1(t), (t, 6))/M2_1**2 - K11*b5*mu11*mu21*Derivative(q2(t), (t, 6))/M2_1**2 + 2*K12*L11*L12*b5*Derivative(q1(t), (t, 4))/(M2_1*M2_2) + K12*L11*L22*b5*Derivative(q2(t), (t, 4))/(M2_1*M2_2) - K12*L11*b5*mu22*Derivative(q2(t), (t, 5))/(M2_1*M2_2) + K12*L12*L21*b5*Derivative(q2(t), (t, 4))/(M2_1*M2_2) - K12*L12*b5*mu21*Derivative(q2(t), (t, 5))/(M2_1*M2_2) + K12*L21*b5*mu12*Derivative(q2(t), (t, 5))/(M2_1*M2_2) + K12*L22*b5*mu11*Derivative(q2(t), (t, 5))/(M2_1*M2_2) - 2*K12*b5*mu11*mu12*Derivative(q1(t), (t, 6))/(M2_1*M2_2) - K12*b5*mu11*mu22*Derivative(q2(t), (t, 6))/(M2_1*M2_2) - K12*b5*mu12*mu21*Derivative(q2(t), (t, 6))/(M2_1*M2_2) + K22*L12**2*b5*Derivative(q1(t), (t, 4))/M2_2**2 + K22*L12*L22*b5*Derivative(q2(t), (t, 4))/M2_2**2 - K22*L12*b5*mu22*Derivative(q2(t), (t, 5))/M2_2**2 + K22*L22*b5*mu12*Derivative(q2(t), (t, 5))/M2_2**2 - K22*b5*mu12**2*Derivative(q1(t), (t, 6))/M2_2**2 - K22*b5*mu12*mu22*Derivative(q2(t), (t, 6))/M2_2**2 + L11**2*q1(t)/M2_1 + L11*L21*q2(t)/M2_1 - L11*mu21*Derivative(q2(t), t)/M2_1 + L12**2*q1(t)/M2_2 + L12*L22*q2(t)/M2_2 - L12*mu22*Derivative(q2(t), t)/M2_2 + L21*mu11*Derivative(q2(t), t)/M2_1 + L22*mu12*Derivative(q2(t), t)/M2_2 - m1**2*q1(t) - Derivative(q1(t), (t, 2)) - mu12**2*Derivative(q1(t), (t, 2))/M2_2 - mu12*mu22*Derivative(q2(t), (t, 2))/M2_2 - mu11**2*Derivative(q1(t), (t, 2))/M2_1 - mu11*mu21*Derivative(q2(t), (t, 2))/M2_1
+
+E^(1)_q2 = K11*L11*L21*b5*Derivative(q1(t), (t, 4))/M2_1**2 + K11*L11*b5*mu21*Derivative(q1(t), (t, 5))/M2_1**2 + K11*L21**2*b5*Derivative(q2(t), (t, 4))/M2_1**2 - K11*L21*b5*mu11*Derivative(q1(t), (t, 5))/M2_1**2 - K11*b5*mu11*mu21*Derivative(q1(t), (t, 6))/M2_1**2 - K11*b5*mu21**2*Derivative(q2(t), (t, 6))/M2_1**2 + K12*L11*L22*b5*Derivative(q1(t), (t, 4))/(M2_1*M2_2) + K12*L11*b5*mu22*Derivative(q1(t), (t, 5))/(M2_1*M2_2) + K12*L12*L21*b5*Derivative(q1(t), (t, 4))/(M2_1*M2_2) + K12*L12*b5*mu21*Derivative(q1(t), (t, 5))/(M2_1*M2_2) + 2*K12*L21*L22*b5*Derivative(q2(t), (t, 4))/(M2_1*M2_2) - K12*L21*b5*mu12*Derivative(q1(t), (t, 5))/(M2_1*M2_2) - K12*L22*b5*mu11*Derivative(q1(t), (t, 5))/(M2_1*M2_2) - K12*b5*mu11*mu22*Derivative(q1(t), (t, 6))/(M2_1*M2_2) - K12*b5*mu12*mu21*Derivative(q1(t), (t, 6))/(M2_1*M2_2) - 2*K12*b5*mu21*mu22*Derivative(q2(t), (t, 6))/(M2_1*M2_2) + K22*L12*L22*b5*Derivative(q1(t), (t, 4))/M2_2**2 + K22*L12*b5*mu22*Derivative(q1(t), (t, 5))/M2_2**2 + K22*L22**2*b5*Derivative(q2(t), (t, 4))/M2_2**2 - K22*L22*b5*mu12*Derivative(q1(t), (t, 5))/M2_2**2 - K22*b5*mu12*mu22*Derivative(q1(t), (t, 6))/M2_2**2 - K22*b5*mu22**2*Derivative(q2(t), (t, 6))/M2_2**2 + L11*L21*q1(t)/M2_1 + L11*mu21*Derivative(q1(t), t)/M2_1 + L12*L22*q1(t)/M2_2 + L12*mu22*Derivative(q1(t), t)/M2_2 + L21**2*q2(t)/M2_1 - L21*mu11*Derivative(q1(t), t)/M2_1 + L22**2*q2(t)/M2_2 - L22*mu12*Derivative(q1(t), t)/M2_2 - m2**2*q2(t) - Derivative(q2(t), (t, 2)) - mu12*mu22*Derivative(q1(t), (t, 2))/M2_2 - mu22**2*Derivative(q2(t), (t, 2))/M2_2 - mu11*mu21*Derivative(q1(t), (t, 2))/M2_1 - mu21**2*Derivative(q2(t), (t, 2))/M2_1
+
+Max derivative order in PS-reduced EOMs: r = 6
+
+========================================================================
+Step 3: jet-form EOMs
+========================================================================
+eps_q1(jet) = K11*L11**2*Q1_4*b5/M2_1**2 + K11*L11*L21*Q2_4*b5/M2_1**2 - K11*L11*Q2_5*b5*mu21/M2_1**2 + K11*L21*Q2_5*b5*mu11/M2_1**2 - K11*Q1_6*b5*mu11**2/M2_1**2 - K11*Q2_6*b5*mu11*mu21/M2_1**2 + 2*K12*L11*L12*Q1_4*b5/(M2_1*M2_2) + K12*L11*L22*Q2_4*b5/(M2_1*M2_2) - K12*L11*Q2_5*b5*mu22/(M2_1*M2_2) + K12*L12*L21*Q2_4*b5/(M2_1*M2_2) - K12*L12*Q2_5*b5*mu21/(M2_1*M2_2) + K12*L21*Q2_5*b5*mu12/(M2_1*M2_2) + K12*L22*Q2_5*b5*mu11/(M2_1*M2_2) - 2*K12*Q1_6*b5*mu11*mu12/(M2_1*M2_2) - K12*Q2_6*b5*mu11*mu22/(M2_1*M2_2) - K12*Q2_6*b5*mu12*mu21/(M2_1*M2_2) + K22*L12**2*Q1_4*b5/M2_2**2 + K22*L12*L22*Q2_4*b5/M2_2**2 - K22*L12*Q2_5*b5*mu22/M2_2**2 + K22*L22*Q2_5*b5*mu12/M2_2**2 - K22*Q1_6*b5*mu12**2/M2_2**2 - K22*Q2_6*b5*mu12*mu22/M2_2**2 + L11**2*Q1_0/M2_1 + L11*L21*Q2_0/M2_1 - L11*Q2_1*mu21/M2_1 + L12**2*Q1_0/M2_2 + L12*L22*Q2_0/M2_2 - L12*Q2_1*mu22/M2_2 + L21*Q2_1*mu11/M2_1 + L22*Q2_1*mu12/M2_2 - Q1_0*m1**2 - Q1_2 - Q1_2*mu12**2/M2_2 - Q2_2*mu12*mu22/M2_2 - Q1_2*mu11**2/M2_1 - Q2_2*mu11*mu21/M2_1
+
+eps_q2(jet) = K11*L11*L21*Q1_4*b5/M2_1**2 + K11*L11*Q1_5*b5*mu21/M2_1**2 + K11*L21**2*Q2_4*b5/M2_1**2 - K11*L21*Q1_5*b5*mu11/M2_1**2 - K11*Q1_6*b5*mu11*mu21/M2_1**2 - K11*Q2_6*b5*mu21**2/M2_1**2 + K12*L11*L22*Q1_4*b5/(M2_1*M2_2) + K12*L11*Q1_5*b5*mu22/(M2_1*M2_2) + K12*L12*L21*Q1_4*b5/(M2_1*M2_2) + K12*L12*Q1_5*b5*mu21/(M2_1*M2_2) + 2*K12*L21*L22*Q2_4*b5/(M2_1*M2_2) - K12*L21*Q1_5*b5*mu12/(M2_1*M2_2) - K12*L22*Q1_5*b5*mu11/(M2_1*M2_2) - K12*Q1_6*b5*mu11*mu22/(M2_1*M2_2) - K12*Q1_6*b5*mu12*mu21/(M2_1*M2_2) - 2*K12*Q2_6*b5*mu21*mu22/(M2_1*M2_2) + K22*L12*L22*Q1_4*b5/M2_2**2 + K22*L12*Q1_5*b5*mu22/M2_2**2 + K22*L22**2*Q2_4*b5/M2_2**2 - K22*L22*Q1_5*b5*mu12/M2_2**2 - K22*Q1_6*b5*mu12*mu22/M2_2**2 - K22*Q2_6*b5*mu22**2/M2_2**2 + L11*L21*Q1_0/M2_1 + L11*Q1_1*mu21/M2_1 + L12*L22*Q1_0/M2_2 + L12*Q1_1*mu22/M2_2 + L21**2*Q2_0/M2_1 - L21*Q1_1*mu11/M2_1 + L22**2*Q2_0/M2_2 - L22*Q1_1*mu12/M2_2 - Q2_0*m2**2 - Q2_2 - Q1_2*mu12*mu22/M2_2 - Q2_2*mu22**2/M2_2 - Q1_2*mu11*mu21/M2_1 - Q2_2*mu21**2/M2_1
+
+Polynomiality in fibers:
+  eps_q1 rational in fibers: False
+  eps_q2 rational in fibers: False
+
+========================================================================
+Step 4: VT integrand u-power analysis
+========================================================================
+  eps_q1(u*jet): u-power range [1, 1]
+  eps_q2(u*jet): u-power range [1, 1]
+
+========================================================================
+Step 5: VT Lagrangian (truncated print)
+========================================================================
+L_VT has 70 terms
+
+========================================================================
+Step 6: consistency check  EL(L_VT) == eps_qa
+========================================================================
+  EL_q1(L_VT) - eps_q1 = 0  -- OK
+  EL_q2(L_VT) - eps_q2 = 0  -- OK
+
+Variational completion verified: True
+
+========================================================================
+Step 7: parameter-limit / denominator check
+========================================================================
+L_VT denominator: 2*M2_1**2*M2_2**2
+L_VT denominator (mod /2): M2_1**2*M2_2**2
+  -> L_VT has rational dependence on: {M2_2, M2_1}
+
+Limit b5 -> 0:
+  Number of terms: 26
+
+  Denominator at b5=0: 2*M2_1*M2_2
+
+Limit M2_1 -> 0:
+  Result: finite
+M2 appearing in L_VT denominator: [M2_1, M2_2]
+
+========================================================================
+FINAL VERDICT for T3 (N=2+2):
+========================================================================
+  VT integral CONVERGES on the homotopy [0,1].
+  All eps_qa(u*jet) are polynomial in u.
+  Variational completion EL match: True
+  L_VT denominators are polynomial in (M2, m, lambda, mu, K, b5).
+
+  The expected M2_a^{-1} factors come from inverting the
+  algebraic h-mass matrix (Routhian projector); these are NOT
+  homotopy-integral pathologies.  M2 -> 0 is a separate physical
+  limit (massless constraint field, not the b5 -> 0 critical
+  surface).

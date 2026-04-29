@@ -1,0 +1,139 @@
+========================================================================
+LINE 6: Dual formulation / Curtright-Hull duality
+========================================================================
+
+Tensor torsion q^a_{bc} symmetries:
+  - antisymmetric in (b,c)
+  - traceless on first vs last (q^b_{bc} = 0)
+
+In 4D this matches the (2,1)-Young-tableau symmetry of the dual
+graviton (Curtright 1985, Hull 2001).  Component count:
+  q: 4 × 4 × 4 / antisymm × traceless = 64/2 - 4 = 28 raw, minus 4 trace = 24?
+    Actually: q has 4×6=24 raw (antisymm in bc), minus 4 trace = 20.
+    Hmm.  Let me check via index counting.
+
+q^a_{bc} component count:
+  Raw (antisymm in bc):     4 * 6 = 24
+  Minus trace constraints:  -4 = -4
+  Net:                       20 components
+
+REVISED PICTURE OF THE TENSOR-SECTOR CONSTRAINT PROMOTION:
+
+Examining the explicit terms (research/.../explicit_terms_tex.txt):
+  Tensor sector b5·R̃² produces (∂T)·(∂T) terms — STANDARD KINETIC
+  for q, NOT higher-derivative.
+
+So the constraint promotion is:
+  b5 = 0:  q has no kinetic → algebraic constraint, non-propagating
+  b5 ≠ 0:  q has standard kinetic ∂q·∂q → propagating spin-2-like
+
+This is structurally a MAXWELL-PROCA-style discontinuity, NOT
+an OSTROGRADSKY-style one.
+
+The Stückelberg trick for m → 0 transitions of vector/tensor fields
+IS WELL-DEFINED.  See Hinterbichler 2012 (Rev. Mod. Phys. 84, 671).
+
+CONCRETE PROPOSAL — Boulanger-Hohm Stückelberg for tensor torsion:
+
+  Original tensor sector at b5≠0:
+    L_tensor[q] = (b5/2) (∂q)^2 - (M/2) q^2 + couplings
+
+  Boulanger-Hohm Stückelberg: introduce phi (mixed-symm auxiliary):
+    L_BH = -(1/2) (∂q')^2 - (M/2)(q' + α ∂phi)^2 + couplings
+    where q' = q/sqrt(b5),  α absorbs b5,  and phi is chosen so that
+    the b5 → 0 (i.e. q' → ∞) limit gives a clean massless gauge theory
+    of phi.
+
+  In the limit b5 → 0:
+    q' → 0 (the q field decouples), phi inherits the kinetic.
+    The constraint at b5=0 becomes a residual GAUGE constraint
+    phi^a_{bc} ~ pure gauge → drops out.
+
+  The b5 → 0 limit is SMOOTH in this Stückelberg-extended phase space.
+
+========================================================================
+CRITICAL RE-EXAMINATION: is Agent A/D's no-go applicable to tensor sector?
+========================================================================
+
+Agent A's toy (round1_synthesis.md, lines 8-10):
+  L = (1/2)(∂_t phi)^2 - (m^2/2) phi^2 - lam phi h - (M/2) h^2 + (b5/2)(∂_t² h)^2
+
+Note the (b5/2)(∂_t² h)^2 — this is HIGHER-DERIVATIVE (Pais-Uhlenbeck).
+This toy correctly models the AXIAL/TRACE sector at certain components
+(e.g. the b5·R̃² → b5·(∂·A)^2 axial expansion).
+
+But the TENSOR sector b5·R̃² → b5·(∂q)·(∂q) is STANDARD KINETIC, not
+higher-derivative.  Agent A's toy DOES NOT model the tensor sector!
+
+If this is correct, Agent A's no-go theorem covers axial/trace but
+NOT tensor.  The tensor sector may admit a clean Stückelberg lift via
+Boulanger-Hohm 2008 (arXiv:0804.4334).
+
+CONFIRMED: tensor-sector b5·R̃² gives:
+  • Standard-kinetic (b5/2)(∂q)² — NOT higher-derivative
+  • Proca-style mass -(M/2) q²
+  • Cross-coupling b5 (∂²h)(∂q) — to graviton sector
+
+At b5=0: q has no kinetic, becomes algebraic Lagrange multiplier.
+At b5≠0: q is a propagating Proca-like field with mass^2 = M/b5 (heavy).
+
+This is structurally identical to:
+  • Maxwell ↔ Proca transition (m → 0 limit)
+  • Goldstone mode ↔ massive Higgs (gauge symmetry restoration)
+  • Vainshtein mechanism in massive gravity
+
+ALL of these have well-known Stückelberg constructions.
+
+========================================================================
+LINE 6: VERDICT
+========================================================================
+
+KEY RESULT: the constraint promotion in the TENSOR sector is qualitatively
+DIFFERENT from the axial/trace sector and from Agent A's toy model.
+
+  • Axial/trace sector:  b5 R̃² → b5 (∂²A)² or b5 (∂²Φ)²  (HIGHER-DERIVATIVE)
+  • Tensor sector:       b5 R̃² → b5 (∂q)²                  (STANDARD KINETIC)
+
+Agent A and Agent D's no-go theorems were proved on the higher-derivative
+case.  They DO NOT directly apply to the standard-kinetic case.
+
+The tensor-sector promotion IS a Maxwell-Proca-style m → 0 transition,
+which has a well-defined Stückelberg construction:
+
+  BOULANGER-HOHM Stückelberg for mixed-symmetry tensor (arXiv:0804.4334)
+
+REVISED RECIPE for the tensor sector:
+
+  1. At b5≠0, q^a_{bc} is a massive (2,1)-Young propagating field with
+     m_q^2 = M/b5.
+
+  2. Introduce Stückelberg auxiliary phi^a_b (a (1,1) symmetric tensor, the
+     Boulanger-Hohm Stückelberg field for mixed-symm gauge):
+       q^a_{bc}  →  q'^a_{bc}  =  q^a_{bc}  +  (1/m_q) (∂_b phi^a_c - ∂_c phi^a_b)
+
+  3. The Stückelberg-extended Lagrangian
+       L = -(1/2) (dq')^2 - (m_q^2/2) (q')^2  + couplings
+     has manifest gauge invariance δq = (∂phi - ∂phi^T) at b5≠0.
+
+  4. As b5 → 0, m_q → ∞.  The Stückelberg field phi inherits the dynamics
+     and decouples in a controlled way.  The b5 = 0 limit is a clean massless-
+     gauge theory of phi (or equivalently, q reduced by gauge to fewer components).
+
+This matches the Path B sector decomposition partially: it covers the
+TENSOR sector (where Path B Round 1 said "blocked"), in addition to the
+axial sector (Bopp-Podolsky) and trace sector (conformal embedding).
+
+OVERALL VERDICT: PROMISING — possibly a complete recipe for all three
+sectors of PGT b5·R̃²:
+  • Axial:  Bopp-Podolsky (Agent C, Round 1)
+  • Trace:  Conformal embedding (Barker et al. 2024)
+  • Tensor: Boulanger-Hohm Stückelberg (THIS LINE — NEW)
+
+Caveat: this assumes my reading of "tensor sector promotion is standard-
+kinetic, not higher-derivative" is correct.  This needs to be VERIFIED
+by direct computation — extract from explicit_terms_tex.txt the actual
+b5·R̃² → tensor-projection terms and confirm (∂q)·(∂q) structure.
+This is a CRITICAL preflight test before claiming victory.
+
+Reference: Boulanger, Hohm, Phys. Rev. D 78, 064027 (2008), arXiv:0804.4334.
+

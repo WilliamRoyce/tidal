@@ -1,0 +1,32 @@
+==============================================================================
+Recipe 1 Preflight — parity-even quadratic curvature on q-irreducible
+==============================================================================
+
+q has 16 free parameters.
+Computing α_4: R̃_{μνρσ} R̃^{μνρσ} (parity-even Riemann²)...
+
+  α_4 max k-degree (after stripping profile²): 2  (expected 2)
+  All α_4 monomials k-degree range: min=2, max=2
+  → STANDARD KINETIC (∂q)·(∂q) — Recipe 1 PASS for parity-even R²
+
+Computing α_2: R̃_{μν} R̃^{μν} (parity-even Ricci²)...
+  α_2 max k-degree: 2
+  α_2 monomials k-degree range: min=2, max=2
+  → STANDARD KINETIC (∂q)·(∂q)
+
+Computing α_1: R̃ · R̃ (Ricci scalar squared)...
+  α_1 vanishes IDENTICALLY on q-irreducible.
+  (This is consistent with the trace structure of q being zero.)
+
+==============================================================================
+Verdict
+==============================================================================
+Every parity-EVEN quadratic curvature operator that COUPLES to the
+q-irreducible torsion (notably α_4 = R̃_{μνρσ} R̃^{μνρσ}) gives k-degree
+EXACTLY 2 on the q-projection at linear order on flat Minkowski.
+Two derivatives total, distributed one per q factor, is
+STANDARD KINETIC (∂q)·(∂q) — NOT Pais–Uhlenbeck.
+
+Combined with the parity-odd vanishing result, the conclusion is robust:
+Recipe 1 preflight PASSES. The b5·R̃² coupling (in any reasonable
+interpretation) projects onto the q-irreducible sector as standard-kinetic.
