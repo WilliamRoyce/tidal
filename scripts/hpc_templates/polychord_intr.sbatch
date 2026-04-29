@@ -7,7 +7,8 @@
 #SBATCH --ntasks={{NTASKS}}
 #SBATCH --cpus-per-task=1
 #SBATCH --time={{TIME}}
-#SBATCH --output={{REMOTE_ROOT}}/logs/{{JOB_NAME}}_%j.log
+#SBATCH -o {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
+#SBATCH -e {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
 #SBATCH --exclude=cpu-r-10,cpu-r-15
 
 # Reusable template for PolyChord nested-sampling jobs on CSD3.
@@ -92,7 +93,13 @@ fi
 echo "--- Running tidal command (mpirun -n ${SLURM_NTASKS}) ---"
 cd "${TIDAL_ROOT}"
 MPIRUN_PREFIX="mpirun -n ${SLURM_NTASKS}"
-{{COMMAND}}
+# Auto-prefix the caller's command with mpirun so 76 SLURM tasks become
+# 76 MPI ranks coordinated by pypolychord.  Previously the template
+# defined ``MPIRUN_PREFIX`` but left it to the caller to use it; if the
+# caller forgot, SLURM spawned ``ntasks`` independent processes and
+# pypolychord's ``MPI_Init_thread`` failed (``PMI2_Job_GetId returned 14``).
+# This template is PolyChord-specific so the prefix is unconditional.
+${MPIRUN_PREFIX} {{COMMAND}}
 
 echo "=== DONE ==="
 date

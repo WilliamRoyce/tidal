@@ -29,6 +29,13 @@ source .venv/bin/activate
 export RESULTS_DIR="{{REMOTE_ROOT}}/hpc_results/${SLURM_JOB_ID}"
 mkdir -p "${RESULTS_DIR}"
 
+# Optional MPI prefix for callers that need it (this template is general-
+# purpose: serial sweeps don't want mpirun, but MPI-aware jobs can opt in
+# via ``--cmd '${MPIRUN_PREFIX} <command>'``).  Unlike polychord_*.sbatch,
+# we don't auto-prefix here because most sapphire jobs are single-process.
+MPIRUN_PREFIX="mpirun -n ${SLURM_NTASKS}"
+export MPIRUN_PREFIX
+
 {{COMMAND}}
 
 echo "finished=$(date -Iseconds)"

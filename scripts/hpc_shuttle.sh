@@ -205,6 +205,12 @@ cmd_submit() {
   mkdir -p "$(dirname "$JOBS_FILE")"
   echo "$(date -Iseconds) $jobid $name $template $cmd" >> "$JOBS_FILE"
   echo "$jobid"
+  # User-visible reminder: HPC jobs that crash on startup typically die
+  # within 5-30 s (template bugs, MPI init failures, missing modules).
+  # `wait` would block for the full INTR queue time before discovering
+  # the job is already dead.  `check` does a single sacct + log-tail in
+  # one shot.  See feedback_hpc_check_fast_fail memory for context.
+  note "tip: ~30 s after submit, run \`bash $0 check $jobid\` to confirm the job didn't fast-fail before \`wait\`-blocking"
 }
 
 cmd_status() {
@@ -215,6 +221,19 @@ cmd_status() {
   else
     remote_exec "squeue -u \$USER -o '%.10i %.12j %.8T %.10M %.6D %R'"
   fi
+}
+
+cmd_check() {
+  # One-shot post-submit fast-fail check.  Catches jobs that crashed on
+  # startup (template bugs, unbound variables, MPI init failures, missing
+  # modules, CLI flag typos) without burning the INTR queue's wait time.
+  # Single sacct + single log read; respects the no-polling rule.
+  check_master
+  local jobid="${1:?jobid required}"
+  remote_exec "sacct -j $jobid --format=JobID,State,Reason,Start,End,ExitCode -P 2>/dev/null | head -8"
+  echo "---"
+  local logfile="${REMOTE_ROOT}/slurm_logs/slurm-${jobid}.out"
+  remote_exec "if [[ -f ${logfile} ]]; then echo '== last 30 lines of slurm log =='; tail -30 ${logfile}; else echo '(slurm log not yet written: job either still pending or has not started)'; fi"
 }
 
 cmd_tail() {
@@ -336,6 +355,8 @@ Subcommands:
   submit --template T --cmd C [opts]  render sbatch template and submit via ssh
          [--nodes N] [--ntasks N] [--time HH:MM:SS] [--name X] [--account P]
   status [jobid]                    one-shot squeue (never in a loop — 120s min between calls)
+  check <jobid>                     one-shot post-submit fast-fail check (sacct + log tail);
+                                    use ~30s after submit before any wait-blocking
   wait <jobid> [interval_s]         wait for job to start via file-existence (NOT squeue), then tail -f
   tail <jobid> [--follow|-f]        tail remote slurm log
   htop <jobid>                      attach htop on the compute node
@@ -358,6 +379,7 @@ main() {
     setup)   cmd_setup "$@" ;;
     submit)  cmd_submit "$@" ;;
     status)  cmd_status "$@" ;;
+    check)   cmd_check "$@" ;;
     tail)    cmd_tail "$@" ;;
     htop)    cmd_htop "$@" ;;
     pull)    cmd_pull "$@" ;;

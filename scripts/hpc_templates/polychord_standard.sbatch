@@ -6,7 +6,8 @@
 #SBATCH --ntasks={{NTASKS}}
 #SBATCH --cpus-per-task=1
 #SBATCH --time={{TIME}}
-#SBATCH --output={{REMOTE_ROOT}}/logs/{{JOB_NAME}}_%j.log
+#SBATCH -o {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
+#SBATCH -e {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
 #SBATCH --exclude=cpu-r-10,cpu-r-15
 
 # Standard QOS version of polychord_intr.sbatch (no --qos=intr).
@@ -18,6 +19,11 @@ set -euo pipefail
 
 TIDAL_ROOT="{{REMOTE_ROOT}}"
 LOCAL_SP="/tmp/site_packages_${SLURM_JOB_ID}"
+
+# Per-job results directory.  Callers writing ``--output ${RESULTS_DIR}/<subdir>``
+# get a stable HPC location that ``hpc_shuttle.sh pull <jobid>`` walks.
+export RESULTS_DIR="${TIDAL_ROOT}/hpc_results/${SLURM_JOB_ID}"
+mkdir -p "${RESULTS_DIR}"
 
 echo "=== Job ${SLURM_JOB_ID} on $(hostname), ntasks=${SLURM_NTASKS} ==="
 date
@@ -52,7 +58,9 @@ fi
 echo "--- Running tidal command (mpirun -n ${SLURM_NTASKS}) ---"
 cd "${TIDAL_ROOT}"
 MPIRUN_PREFIX="mpirun -n ${SLURM_NTASKS}"
-{{COMMAND}}
+# Auto-prefix mpirun (PolyChord-specific template — see polychord_intr.sbatch
+# for the rationale).
+${MPIRUN_PREFIX} {{COMMAND}}
 
 echo "=== DONE ==="
 date
