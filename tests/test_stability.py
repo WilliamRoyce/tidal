@@ -299,8 +299,14 @@ class TestProbePerformance:
 
         assert timings, "no valid probe runs"
         median_ms = float(np.median(timings)) * 1e3
-        # Empirical baseline on T1 dark_photon_plasma at N=32: median
-        # ≈ 24 ms with t_test=20 (longer Padé scaling-and-squaring +
-        # spec setup overhead).  Budget set 50 % above to absorb
-        # noise; a doubling here would indicate a real regression.
-        assert median_ms <= 50.0, f"median probe wall {median_ms:.2f} ms > 50 ms"
+        # Empirical baseline on T1 dark_photon_plasma (N=32, 4 free
+        # couplings) under the canonical unit-IC all-k probe at
+        # t_test=20: Phase 3 measured median ≈ 27.6 ms / p90 ≈ 33 ms.
+        # The dominant fixed cost is matrix construction at varying
+        # params (``_build_evolution_matrices`` + Schur elimination +
+        # ``find_independent_blocks``) — not the Padé loop.  Budget
+        # set ~20 % above the observed p90 to absorb noise without
+        # being flaky; a 50 % rise here would indicate a real
+        # regression.  See issue tracking matrix-construction caching
+        # for the path to a faster probe.
+        assert median_ms <= 40.0, f"median probe wall {median_ms:.2f} ms > 40 ms"
