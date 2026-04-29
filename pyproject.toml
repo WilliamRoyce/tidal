@@ -143,7 +143,6 @@ unfixable = ["T201"]
 "tidal/cli/**/*" = ["T201", "PLC0415", "PLR0914"]
 "tidal/inference/**/*" = ["T201", "PLC0415", "PLR0913", "PLR0917", "PLR0911", "PLR0912", "PLR0914", "PLR0915", "C901", "ANN401", "ANN001", "ANN202", "SLF001", "DOC501", "PLR2004", "D401", "ARG001"]
 "tidal/measurement/_stability.py" = ["N803", "N806", "PLC0415", "RUF001", "RUF003", "DOC501"]
-"tidal/measurement/_stability_profile.py" = ["RUF001", "DOC501"]
 "tidal/measurement/_posthoc_audit.py" = ["PLC0415", "C901", "PLR0912", "PLR0914", "PLR0913", "PLR0917"]
 "tidal/cli/_derive.py" = ["T201", "PLC0415", "S404", "S603", "S607"]
 "scripts/**/*" = [

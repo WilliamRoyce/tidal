@@ -1,0 +1,207 @@
+% Conversion-channel stability probe and chain-time perturbativity gate.
+% Source: design notes from the #323 Stage C investigation.
+% Uses macros from preamble.tex
+
+\section{Stability Probe and Inline Perturbativity Gate}
+\label{sec:stability-probe}
+
+The conversion-channel stability probe is the first stage in a
+three-step rejection cascade
+(\Cref{tab:stability-cascade}) that filters out parameter samples
+whose linearised simulation cannot legitimately represent the
+underlying physics. It runs at chain time, before any simulation, and
+combines with an inline perturbativity gate after the simulation to
+produce contamination-free Bayesian chains: every accepted sample has
+been confirmed to (a) admit a numerically stable linearised evolution
+and (b) yield a conversion probability inside the Hwang--Noh
+perturbative window.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Stage} & \textbf{Cost} & \textbf{Rejects} \\
+\midrule
+Probe pre-flight (all $k$ Pad\'e) & $\sim$ ms / sample & tachyonic linearisation \\
+PDE simulation & $\sim$ s / sample & numerical divergence (\#298 guard) \\
+Hwang--Noh $P_{\max}$ gate & one float compare & non-perturbative $P_{\max} > 0.5$ \\
+\bottomrule
+\end{tabular}
+\caption{Chain-time rejection cascade. Each step rejects at zero or
+near-zero marginal cost relative to the next, so contaminated samples
+never enter the live-points pool of the nested sampler.}
+\label{tab:stability-cascade}
+\end{table}
+
+\subsection{Probe architecture}
+
+For a conversion channel \texttt{source}$\rightarrow$\texttt{target}
+in a kinetic-normalised equation system, the probe operates on the
+constraint-eliminated reduced system that the modal solver evolves:
+
+\begin{enumerate}
+\item Build the per-mode evolution generator
+$M_k = B_k^{-1} A_k$ via
+\texttt{tidal.solver.modal.\_build\_m\_with\_null\_projection},
+mirroring the Pass 0 path-D evolution. The Schur complement for
+algebraic constraints (time-derivative-order zero fields) is already
+folded into $M_k$; no separate
+\texttt{ensure\_consistent\_ic} step is required.
+\item Construct a unit initial condition $y_0$ with a single
+non-zero entry at the source field's slot in the per-block reduced
+system. This vector is identical at every $k$ mode by
+construction.
+\item For each Fourier bin, compute
+$y_k(t_{\text{test}}) = \exp(M_k\, t_{\text{test}})\, y_0$ via
+Pad\'e scaling-and-squaring (\texttt{scipy.linalg.expm}, Higham 2009).
+A spectral-radius prefilter
+$\| M_k\, t_{\text{test}} \|_2 \le \tau\, t_{\text{test}}$ skips the
+Pad\'e call whenever Gershgorin's bound rules out
+$\gamma_{\text{eff}} > \tau$.
+\item Define $\gamma_{\text{eff}} = \log \| y_k(t_{\text{test}}) \|
+/ t_{\text{test}}$ (denominator is $\| y_0 \| = 1$). Flag the sample
+tachyonic if any $k$ mode produces $\gamma_{\text{eff}} > \tau$.
+\end{enumerate}
+
+The default thresholds are $\tau = 0.3$ and $t_{\text{test}} = 20$.
+
+\subsection{The IC question: why we don't run \texttt{ensure\_consistent\_ic}}
+
+The naive expectation is that the probe's IVP should match the
+simulation's IVP exactly: a real-space plane wave on the source slot,
+passed through \texttt{ensure\_consistent\_ic} so algebraic-constraint
+slots are populated identically to the simulation, then FFT'd into
+each Fourier block. We tested this approach (the \emph{consistent-ic-solve}
+probe) and an earlier FFT-only variant (the \emph{consistent-IC FFT}
+probe) against simulation truth on the D1 amplify chain
+(HPC job 28520217). The replay results, joined with the post-hoc
+$t$-independence audit's contamination labels, are committed at the
+repo root as \texttt{stage\_c\_truth\_table.csv}:
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{lll}
+\toprule
+\textbf{Variant} & \textbf{IC} & \textbf{Stage C catch rate} \\
+\midrule
+v1 (canonical) & unit at source slot, all $k$ & 56/57 \\
+v2 & FFT'd plane wave, IC-coupled $k$ only & 0/57 \\
+v3 candidate & v2 + \texttt{ensure\_consistent\_ic} & 0/57 \\
+\bottomrule
+\end{tabular}
+\caption{Stage C: contamination samples caught by each probe variant
+on the D1 amplify chain. The shared blind spot of v2 and v3 is that
+the linearised IC has zero overlap with non-fundamental $k$ bins, so
+neither variant checks those bins.}
+\label{tab:stage-c}
+\end{table}
+
+The simulation, however, does reach those bins. Off-grid plane-wave
+snap residual, snapshot rounding, and finite-precision arithmetic all
+deposit small amounts of energy at non-fundamental $k$, and any
+tachyonic mode at those bins amplifies that floor exponentially during
+the simulation. The all-$k$ unit-IC scan is therefore the empirically
+correct probe: it tests every $k$ bin as a possible exponential
+amplifier of numerical noise, regardless of whether the linearised IC
+would excite the bin in exact arithmetic.
+
+The empirical result is decisive: \emph{both} consistent-IC variants
+miss every contamination sample, while v1 catches all but one. We
+therefore commit the unit-IC all-$k$ design as the canonical probe.
+Historical replay artefacts remain available at
+\texttt{hpc\_results/28520217/samples.profile\_replay.csv} for any
+future re-investigation.
+
+\subsection{The $t_{\text{test}}$ choice}
+
+The v1 probe used $t_{\text{test}} = 10$, matching the simulation's
+$t_{\text{end}}$. We raise the default to $t_{\text{test}} = 20$ to
+catch additional slow-growth Hwang--Noh cases inline at probe time.
+The probe cost is dominated by the spectral-radius prefilter; the
+longer $t_{\text{test}}$ adds at most one extra Pad\'e squaring on
+the modes that survive the prefilter, an empirically measured ${\sim}5\%$
+overall cost.
+
+A residual remains: the truth-table sample 391 has
+$\gamma_{\text{eff}}(t = 20) = 0.272 < 0.3$, just below the threshold.
+This sample is not caught by the probe at any reasonable
+$t_{\text{test}}$ within the linear-eigenvalue limit; it is caught
+instead by the inline $P_{\max}$ gate after the simulation runs. The
+test \texttt{tests/test\_stability.py::TestStageCTruthTable::%
+test\_contamination\_caught} pins this residual via the
+\texttt{KNOWN\_PROBE\_RESIDUAL} set.
+
+\subsection{The Hwang--Noh perturbativity gate}
+
+The Hwang--Noh perturbativity bound applies to the \emph{absolute}
+conversion probability $P_{\max}$ itself: a linearised simulation
+that produces $P_{\max} > 0.5$ has crossed the perturbative validity
+boundary (Hwang \& Noh 2002, PRD 65, 124010), the linearised
+dynamics no longer describe the underlying physics, and the value is
+unreliable. This is independent of the physics quantity the user is
+fitting in the likelihood. The campaign's chains typically maximise
+the \emph{amplification ratio}
+\begin{equation}
+A = \frac{P_{\max}}{P_{\mathrm{GR}}}, \qquad
+P_{\mathrm{GR}} = \sin^2\!\left(\frac{\kappa B_0\, t_{\text{end}}}{2}\right),
+\end{equation}
+via \texttt{--baseline-formula
+"sin(kappa*B0*t\_end/2)**2"}, in which case
+\texttt{compute\_log\_likelihood} returns
+$\log A = \log(P_{\max} / P_{\mathrm{GR}})$. The gate condition is
+nevertheless on the raw $P_{\max}$, because the perturbativity boundary
+is on the absolute conversion probability, not on its ratio to
+baseline; the same value of $A$ can be physical or unphysical
+depending on whether $P_{\max}$ itself sits inside the linear regime.
+
+The likelihood applies an inline gate (defined as
+\texttt{P\_MAX\_LIMIT = 0.5} and the helper
+\texttt{\_is\_non\_perturbative} in
+\texttt{tidal/inference/\_likelihood.py}) that returns
+$\log L = -\infty$ with \texttt{run\_status="non\_perturbative"} for
+any sample whose raw $P_{\max}$ exceeds the limit.
+
+The gate is applied only when the configured likelihood is
+\texttt{P\_max:maximize} or \texttt{P\_max:minimize} — Gaussian-on-X
+and threshold likelihoods may legitimately probe parameter regions
+where $P_{\max} > 0.5$ (e.g.\ fitting a measured $P_{\max} \approx
+0.6$). For maximise/minimise the metric is taken at face value (or
+log-ratio'd against the baseline), so super-perturbative samples must
+be rejected before they pollute the live-points pool. The cost is
+one floating-point comparison per already-completed simulation.
+
+\subsection{Inline rejection cascade}
+
+The combined effect of probe + sim + gate is that contaminated
+samples never enter the chain output. The chain CSV's
+\texttt{run\_status} column carries one of
+\texttt{success}, \texttt{tachyonic}, \texttt{simulation\_failed},
+\texttt{metric\_missing}, \texttt{non\_perturbative}, allowing
+downstream tools to distinguish each rejection mode. The
+\texttt{stability\_profile} column carries the probe's stable
+identifier
+(\texttt{tidal.measurement.\_stability.PROBE\_PROFILE\_NAME},
+currently \texttt{"unit-ic-all-k-0.3"}); bumping the probe is a
+public-API change.
+
+The post-hoc $t$-independence audit
+(\texttt{tidal analyze --posthoc-audit}) remains available as a debug
+tool for chains that pre-date this architecture, and as a
+$2 \cdot t_{\text{base}}$ re-simulation cross-check for borderline
+samples.
+
+\subsection{References}
+
+\begin{itemize}
+\item Higham, N.J. (2009). The scaling and squaring method for the
+matrix exponential revisited. SIAM Review 51(4), 747--764.
+\item Higham, N.J. (2008). Functions of Matrices, SIAM, \S 2.3.
+\item Hwang, J. \& Noh, H. (2002). PRD 65, 124010 — perturbativity
+boundary.
+\item Issue \#322: Pad\'e refactor (replaces eigenvalue+pinv approach).
+\item Issue \#323: Stage C investigation (canonical probe selection).
+\item \texttt{stage\_c\_truth\_table.csv} (repo root): committed
+regression dataset.
+\item \texttt{hpc\_results/28520217/samples.profile\_replay.csv}:
+historical investigation artefact.
+\end{itemize}

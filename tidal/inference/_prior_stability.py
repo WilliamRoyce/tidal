@@ -85,10 +85,6 @@ def run_prior_stability_sweep(
 
     from tidal.cli._simulate import _parse_params  # pyright: ignore[reportPrivateUsage]
     from tidal.measurement._stability import check_conversion_stability
-    from tidal.measurement._stability_profile import (
-        DEFAULT_PROFILE_NAME,
-        get_profile,
-    )
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import load_equation_system
 
@@ -104,8 +100,6 @@ def run_prior_stability_sweep(
     else:
         bounds_tuple = tuple(bounds_str)
     grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
-    profile_name = getattr(base_args, "stability_profile", DEFAULT_PROFILE_NAME)
-    profile = get_profile(profile_name)
     ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
     ic_k: float | None = None
     if ic_wavevector_str:
@@ -158,7 +152,6 @@ def run_prior_stability_sweep(
                     source=source[0],
                     target=target[0],
                     ic_wavevector=ic_k,
-                    profile=profile,
                 )
             except Exception:  # noqa: BLE001, S112
                 continue

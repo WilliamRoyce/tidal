@@ -20,6 +20,49 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
 
+# Hwang-Noh perturbativity limit on the *absolute* conversion
+# probability ``P_max``.  A linearised simulation that produces
+# ``P_max > 0.5`` has crossed the perturbative validity boundary
+# (Hwang & Noh 2002, Phys. Rev. D 65, 124010); the linearised dynamics
+# no longer describe the underlying physics and the value is
+# unreliable.  This is independent of the *physics quantity* the user
+# is fitting: the configured likelihood may be on the raw ``P_max`` or
+# on the amplification ratio ``A = P_max / P_GR`` (when
+# ``--baseline-formula`` is supplied — see ``compute_log_likelihood``
+# below, which returns ``log(P_max / baseline)`` in that case).
+# Either way, the gate condition is on the raw ``P_max`` because the
+# Hwang-Noh limit is on the absolute conversion probability, not on
+# its ratio to baseline.  When a sample's raw ``P_max`` exceeds the
+# limit, ``logL = -inf`` is returned with
+# ``run_status="non_perturbative"`` so the sample never enters the
+# PolyChord live-points pool.  Gaussian / threshold likelihoods are
+# exempt because they may legitimately probe parameter regions where
+# ``P_max > 0.5`` (e.g.\ fitting a measured ``P_max ≈ 0.6``).
+P_MAX_LIMIT: float = 0.5
+
+
+def _is_non_perturbative(
+    metric: str,
+    likelihood_type: str,
+    metric_value: float,
+) -> bool:
+    """Inline Hwang-Noh perturbativity gate.
+
+    Returns True iff the metric is ``P_max``, the likelihood is
+    ``maximize`` or ``minimize`` (Gaussian / threshold likelihoods
+    may legitimately probe ``P_max > 0.5``), and the *raw* value
+    exceeds :data:`P_MAX_LIMIT`.  The check is on the raw ``P_max``
+    even when the likelihood is on the baseline-normalised
+    amplification ratio: the Hwang-Noh limit is on the absolute
+    conversion probability, not on its ratio to baseline.
+    """
+    return (
+        metric == "P_max"
+        and likelihood_type in {"maximize", "minimize"}
+        and float(metric_value) > P_MAX_LIMIT
+    )
+
+
 @dataclass(frozen=True)
 class LikelihoodConfig:
     """Configuration for the simulation likelihood.
@@ -417,10 +460,6 @@ def _evaluate_likelihood(
                 _parse_params,  # pyright: ignore[reportPrivateUsage]
             )
             from tidal.measurement._stability import check_conversion_stability
-            from tidal.measurement._stability_profile import (
-                DEFAULT_PROFILE_NAME,
-                get_profile,
-            )
             from tidal.solver.grid import GridInfo
             from tidal.symbolic.json_loader import load_equation_system as _load_spec
 
@@ -439,8 +478,6 @@ def _evaluate_likelihood(
             else:
                 bounds_tuple = tuple(bounds_str)
             grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
-            profile_name = getattr(base_args, "stability_profile", DEFAULT_PROFILE_NAME)
-            profile = get_profile(profile_name)
             ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
             ic_k: float | None = None
             if ic_wavevector_str:
@@ -455,7 +492,6 @@ def _evaluate_likelihood(
                 source=source[0],
                 target=target[0],
                 ic_wavevector=ic_k,
-                profile=profile,
             )
             if not stability.stable:
                 return -math.inf, {
@@ -535,6 +571,19 @@ def _evaluate_likelihood(
             return -math.inf, {
                 "run_status": "metric_missing",
                 "missing_metric": likelihood_config.metric,
+            }
+
+        # Inline Hwang-Noh perturbativity gate (#323 Stage C).  See
+        # :func:`_is_non_perturbative` for the gate condition.
+        if _is_non_perturbative(
+            likelihood_config.metric,
+            likelihood_config.likelihood_type,
+            float(metric_value),
+        ):
+            return -math.inf, {
+                "run_status": "non_perturbative",
+                "P_max": float(metric_value),
+                **stability_meta,
             }
 
         # Build eval_params for formula-based likelihoods.

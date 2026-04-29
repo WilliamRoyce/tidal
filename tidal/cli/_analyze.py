@@ -180,10 +180,7 @@ def _run_posthoc_audit(data_path: Path, args: Namespace) -> int:
     from tidal.cli._console import error as _cerror
     from tidal.cli._console import error_with_hint
     from tidal.measurement._posthoc_audit import run_posthoc_audit
-    from tidal.measurement._stability_profile import (
-        DEFAULT_PROFILE_NAME,
-        get_profile,
-    )
+    from tidal.measurement._stability import PROBE_PROFILE_NAME
 
     spec_path = Path(getattr(args, "spec", "") or "")
     if not spec_path.exists():
@@ -208,14 +205,13 @@ def _run_posthoc_audit(data_path: Path, args: Namespace) -> int:
     source: tuple[str, ...] = tuple(source_str.split(","))
     target: tuple[str, ...] = tuple(target_str.split(","))
 
-    profile_name: str = getattr(args, "stability_profile", DEFAULT_PROFILE_NAME)
-    try:
-        profile = get_profile(profile_name)
-    except KeyError as exc:
-        _cerror(str(exc))
-        return 1
-
-    t_base: float = float(getattr(args, "t_base", profile.t_test))
+    # Probe defaults (formerly carried by the StabilityProfile registry,
+    # removed in #323 Stage C refactor).  ``t_base`` is the
+    # t-independence audit's reference time; ``perturbativity_p_max``
+    # is the Hwang-Noh gate threshold.  Values match the v1 profile that
+    # produced every campaign chain to date.
+    t_base: float = float(getattr(args, "t_base", 10.0))
+    perturbativity_p_max: float = 0.5
     baseline_formula: str | None = getattr(args, "baseline_formula", None)
     n_top: int = int(getattr(args, "n_top", 50))
     n_stratified: int = int(getattr(args, "n_stratified", 200))
@@ -232,14 +228,14 @@ def _run_posthoc_audit(data_path: Path, args: Namespace) -> int:
             spec_path=spec_path,
             source=source,
             target=target,
-            profile_name=profile.name,
+            profile_name=PROBE_PROFILE_NAME,
             t_base=t_base,
             baseline_formula=baseline_formula,
             output_dir=output_dir,
             n_top=n_top,
             n_stratified=n_stratified,
             n_clusters=n_clusters,
-            perturbativity_p_max=profile.perturbativity_p_max,
+            perturbativity_p_max=perturbativity_p_max,
             rng_seed=rng_seed,
         )
     except (FileNotFoundError, ValueError) as exc:

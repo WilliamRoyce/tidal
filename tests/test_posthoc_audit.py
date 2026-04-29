@@ -315,7 +315,7 @@ class TestBuildSummary:
         summary = _build_summary(
             _Stub(),  # type: ignore[arg-type]
             audits,
-            profile_name="v1-unit-0.3",
+            profile_name="unit-ic-all-k-0.3",
             t_base=10.0,
             perturbativity_p_max=0.5,
             selection_strategies=("top", "borderline"),
@@ -328,7 +328,7 @@ class TestBuildSummary:
         assert summary.contamination_rate == pytest.approx(2 / 5)
         assert summary.worst_sample_index == 2
         assert summary.worst_gamma_eff_posthoc == pytest.approx(0.30)
-        assert summary.profile_name == "v1-unit-0.3"
+        assert summary.profile_name == "unit-ic-all-k-0.3"
 
     def test_summary_handles_no_finite_gammas(self) -> None:
         audits = [_make_audit(0, "sim_failed", float("nan"))]
@@ -339,7 +339,7 @@ class TestBuildSummary:
         summary = _build_summary(
             _Stub(),  # type: ignore[arg-type]
             audits,
-            profile_name="v1-unit-0.3",
+            profile_name="unit-ic-all-k-0.3",
             t_base=10.0,
             perturbativity_p_max=0.5,
             selection_strategies=("top",),
@@ -360,7 +360,7 @@ class TestBuildSummary:
             contamination_rate=0.4,
             worst_sample_index=7,
             worst_gamma_eff_posthoc=0.12,
-            profile_name="v1-unit-0.3",
+            profile_name="unit-ic-all-k-0.3",
             t_base=10.0,
             perturbativity_p_max=0.5,
             selection_strategies_used=("top", "borderline"),
