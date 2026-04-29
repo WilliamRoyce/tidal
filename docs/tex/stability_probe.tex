@@ -65,6 +65,48 @@ tachyonic if any $k$ mode produces $\gamma_{\text{eff}} > \tau$.
 
 The default thresholds are $\tau = 0.3$ and $t_{\text{test}} = 20$.
 
+\subsection{Why the block 2-norm, not the source-field amplitude}
+\label{sec:block-norm-not-source}
+
+\textbf{Architectural invariant} --- this subsection records the single
+most consequential design choice in the probe and must not be removed
+or weakened in future cleanups. Step~4 of the architecture above
+defines $\gamma_{\text{eff}}$ on the \emph{block 2-norm}
+$\| y_k(t_{\text{test}}) \|$ across all fields in the reduced
+source-block evolution, not on the projection of $y_k$ onto the source
+field's slot. The two are different by a potentially large factor.
+
+The fastest-growing eigenvector in the source-containing reduced
+block typically lives mostly in non-source slots (e.g. torsion sector
+$t_X$ slots when the source is $h_5$) and projects only weakly onto
+the source slot. The block 2-norm sees the full eigenvalue
+$\gamma_\mathrm{block}$; the source-only projection sees a strictly
+smaller rate $\gamma_\mathrm{source} < \gamma_\mathrm{block}$. The
+audit's $|\hat h_5|^2$ growth rate is the source-only rate; the
+modal solver's pre-flight divergence guard, the IEEE-floor
+amplification predicted in~\S\ref{sec:ieee-floor}, and the canonical
+probe all use the block-norm rate. They agree because they all
+compute the same quantity. A diagnostic that ``watches the source
+field only'' would read $\gamma_\mathrm{source}$ and under-estimate
+the threat by the projection ratio --- precisely the mistake
+\S\ref{sec:why-all-k} ruled out at the $k$-bin level, recurring one
+layer down at the field-projection level.
+
+Sample~2860 in the Phase~3 verification (\S\ref{sec:ieee-floor-verification})
+makes this concrete: $\gamma_\mathrm{block} = 17.11$ versus
+$\gamma_{\mathrm{source},\,h_5} = 7.08$ at the same $k$ bin. Both
+the simulation's pre-flight divergence guard and the canonical
+probe correctly flag this point as catastrophic; a hypothetical
+``gate on the source field's growth rate'' would have read $7.08$,
+sat below any reasonable absolute threshold for a $t \lesssim 1$
+window, and let the sample through.
+
+\paragraph{Future maintainers.} Any proposal to simplify the probe
+or the divergence guard to ``gate on the source field's growth
+rate'' is the v2 mistake one layer down. Re-read this subsection,
+\S\ref{sec:why-all-k}, and \S\ref{sec:ieee-floor-verification}
+before merging.
+
 \subsection{Why all-$k$ checking, not IC-coupled-$k$ checking}
 \label{sec:why-all-k}
 
@@ -193,19 +235,18 @@ the source-only projection rate that h_5 actually displays.}
 \label{fig:probe-diagnostic-ieee-floor}
 \end{figure}
 
-\paragraph{Source-projection effect.} The simulation's per-bin h_5
-amplitude grows at $\gamma_\mathrm{amp,\,h_5} = 7.08$, distinctly
-below the probe's reported $\gamma_{v1} = 17.11$. This is not a
-contradiction but the expected eigenvector-projection effect: the
-fastest-growing eigenvector in the source-containing block lives
-mostly in the torsion sector ($t_X$ slots) and projects only weakly
-onto the source $h_5$ slot. The block 2-norm
-$\sqrt{\sum_i |\hat\Phi_i(k)|^2}$ across all fields in the block
-grows at $\gamma_{v1}$, which is why both the probe (operating on
-the unit-IC at the source slot in the reduced system) and the
-simulation's pre-flight divergence guard (operating on the same
-reduced-system block norm) correctly catch this sample. A
-single-field projection would under-estimate the threat.
+\paragraph{Source-projection effect.} Sample~2860 exhibits
+$\gamma_{\mathrm{block}} = 17.11$ on the block 2-norm but
+$\gamma_{\mathrm{source},\,h_5} = 7.08$ on the source-only
+projection. This is not a contradiction but the expected
+eigenvector-projection effect, fully analysed in
+\S\ref{sec:block-norm-not-source}: the probe and the simulation's
+pre-flight divergence guard both gate on the block norm, which is
+why they agree, and why a hypothetical ``watch $h_5$ only''
+diagnostic would under-estimate the threat. The numerical match
+between the figure's blue dashed reference $\sim
+\mathrm{floor}\cdot\exp(2\gamma_{v1}\,t)$ and the empirical block-
+norm growth confirms the architectural invariant in practice.
 
 \paragraph{Outcome.} The diagnostic confirms outcome (a):
 \emph{IEEE-floor mechanism active}. The non-fundamental bins start
