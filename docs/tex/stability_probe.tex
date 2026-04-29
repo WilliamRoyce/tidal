@@ -107,6 +107,113 @@ rate'' is the v2 mistake one layer down. Re-read this subsection,
 \S\ref{sec:why-all-k}, and \S\ref{sec:ieee-floor-verification}
 before merging.
 
+\subsection{Why we reject tachyonic samples at all: physical motivation}
+\label{sec:tachyonic-physical}
+
+A reasonable concern with the rejection cascade is that pre-flight
+exclusion of tachyonic samples could amount to a numerical workaround:
+``the simulator can't handle these points, so we drop them, and the
+posterior we report is whatever's left''. Stated this way the cut
+would indeed be suspect --- the right move would be to fix the solver
+rather than bias the inference. The actual justification has two
+reinforcing legs, of which the numerical mechanism
+(\S\ref{sec:why-all-k}) is the second, not the first.
+
+\subsubsection{The physical leg: tachyonic linearisation is malformed}
+
+A linearised theory with a wrong-sign mass-squared eigenvalue in any
+spin sector at any~$k$ is fundamentally pathological, regardless of
+which IC is supplied. The Minkowski vacuum is not a minimum of the
+effective potential along the tachyonic direction, so arbitrarily
+small fluctuations --- thermal, quantum, gravitational, or any
+realistic ensemble of initial conditions --- roll the field away from
+it. The ``stability'' one would observe by carefully selecting an IC
+orthogonal to the tachyonic eigenvector is artificial fine-tuning of
+measure zero.
+
+The campaign's physics question is: \emph{in linearised PGT around
+Minkowski, where is graviton--photon conversion enhanced?} For
+parameter points where Minkowski is not even a perturbative vacuum,
+the question is malformed. We are not extracting physics at those
+points; we are reading off the formula at parameter values where the
+formula does not apply.
+
+\subsubsection{Comparison to the Hwang--Noh gate (already accepted
+as physical)}
+
+The Hwang--Noh $P_{\max} > 0.5$ gate (\S\ref{sec:stability-probe},
+\Cref{tab:stability-cascade}) rejects samples that would, in infinite
+precision, produce a perfectly finite $P_{\max}$ value. We reject
+them anyway because their $P_{\max}$ is meaningless --- the
+linearisation has crossed its own validity boundary, so the value the
+solver returns has no physical interpretation. The tachyonic-at-some-$k$
+case is the same logic applied earlier in the cascade: at those
+parameter points the linearisation is invalid before the simulation
+even starts. Both gates reject because the model does not apply at
+those points, not because the solver cannot integrate them. The
+numerical reasons are symptoms.
+
+\subsubsection{Effect on the posterior: restricting, not biasing}
+
+Pre-flight rejection of a parameter region with a hard
+$\log L = -\infty$ acts as a prior cut on the well-defined region of
+parameter space. The architectural consequences are:
+\begin{itemize}
+  \item \textbf{Posterior shape inside the well-defined region}:
+    unchanged. Relative weights between accepted samples are exactly
+    what they would be without the cut.
+  \item \textbf{MAP and credible intervals}: unchanged. The MAP lives
+    in the high-likelihood interior, far from the tachyonic boundary;
+    excluding the tachyonic exterior does not move it.
+  \item \textbf{Prior-to-posterior information gain $D_\mathrm{KL}$}:
+    unchanged for the well-defined region (this is what the campaign
+    reports).
+  \item \textbf{Bayesian evidence $\log Z$}: shifts by the constant
+    offset
+    $\log(\mathrm{vol}_\mathrm{perturbative}\,/\,\mathrm{vol}_\mathrm{total})$.
+    Provided the same probe is applied to every model in the campaign
+    --- which it is --- this offset cancels in $\log Z$ \emph{differences}
+    (Bayes factors between models). Bayes factors are therefore
+    unbiased.
+\end{itemize}
+The cut restricts inference to the region where the model is
+well-defined; it does not bias inference within that region.
+
+\subsubsection{What an infinite-precision simulation would actually
+contribute}
+
+The thought experiment makes the argument concrete. For a
+tachyonic-at-some-$k$ sample with an IC carefully chosen to lie in
+the orthogonal complement of the tachyonic eigenvector at every~$k$:
+\begin{enumerate}
+  \item The simulation runs cleanly to $t_{\text{end}}$.
+  \item $P_{\max}(t)$ tracks $\sin^2(\kappa B_0 t / 2)$ exactly --- the
+    GR baseline, no enhancement, no suppression.
+  \item The likelihood in
+    \texttt{P\_max:maximize} mode evaluates to a constant
+    ${\sim}\log P_\mathrm{GR}$ across all such samples.
+  \item The contribution to the posterior is a flat density plateau
+    over the entire tachyonic-prior subset.
+\end{enumerate}
+This plateau is not informative. It says ``we picked an IC that
+avoided the model's pathology'', not ``the model predicts something
+about graviton--photon physics at these parameters''. Including it
+would dilute the posterior with uninformative regions whose only
+feature is the artificial IC choice. The chain should explore the
+parameter region where the linearised theory makes a substantive
+claim, which is precisely the perturbative region the probe selects.
+
+\subsubsection{Summary}
+
+The cut is physical, not numerical. The numerical mechanism in
+\S\ref{sec:why-all-k} is how the pathology manifests when one tries
+to integrate the equations on a finite-precision computer; the
+physical pathology is why those parameter points should not have been
+included to begin with. Read in this order, the rejection cascade is
+a model-validity filter, with the FFT-floor amplification as
+confirmatory evidence that the filter cannot be bypassed by a more
+careful solver.
+
 \subsection{Why all-$k$ checking, not IC-coupled-$k$ checking}
 \label{sec:why-all-k}
 
