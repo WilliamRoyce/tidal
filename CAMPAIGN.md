@@ -209,7 +209,8 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 
 - [x] Stage 0 gate passed for T5 (general nonminimal spec; δ₁ prior ±0.025 locked via 5-point empirical scan)
 - [x] D2.0 Bahamonde amp (28598736): log Z = +0.616 ± 0.001, ESS = 877, DONE
-- [ ] D2.0 Bahamonde sup (28606785): P_max:minimize — PENDING (icelake standard, 6 h)
+- [x] D2.0 Bahamonde sup (28606785): CANCELLED (killed by node failures Apr 30; resubmitted as campaign+INTR)
+- [ ] D2.0 Bahamonde sup r1 (28684410): INTR campaign=d20_bahamonde_sup, --nlive 400 — RUNNING
 - [x] D2.1 Barker amp (28607124): log Z = +0.618 ± 0.001, ESS = 875, DONE
 - [ ] D2.1 Barker sup — pending
 - [ ] D2.2 Shapiro amp — pending prior derivation
@@ -288,7 +289,10 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28598231 | T5 general (D2.0) | D2.0 amp attempt 4 | FAILED | 0:00 | PMI2_Job_GetId abort — 76 SLURM tasks without MPI. polychord templates now auto-prefix `${MPIRUN_PREFIX}`. |
 | 28598736 | T5 general (D2.0 Bahamonde) | **D2.0 amp** | COMPLETED | ~35 min | INTR. **log Z = +0.616 ± 0.001**, ESS = 877, n_samples = 3450. Params: β₁₋₃, ξ, δ₁ (5D). MAP: β₁=−0.10, β₂=−1.55, β₃=+0.96, ξ=1.85, δ₁=−0.020. 95% CI δ₁=[−0.0235, +0.0236] (fills ±0.025 prior). Marginal D_KL: β₁=0.242 (dominant), ξ=0.127, β₂=0.090, δ₁=0.017, β₃=0.021. Corner: `hpc_results/28598736/corner.png`. |
 | 28601113 | T5 general (D2.0 Bahamonde) | D2.0 sup INTR | TIMEOUT | 1:00 | INTR 1h too tight for minimize landscape. Resubmitted on icelake standard 6h as 28606785. |
-| 28606785 | T5 general (D2.0 Bahamonde) | **D2.0 sup_v2** | PENDING | — | icelake standard, 6h wall, P_max:minimize. |
+| 28606785 | T5 general (D2.0 Bahamonde) | **D2.0 sup_v2** | CANCELLED | — | icelake standard, 6h wall. Killed by node failures (cpu-q-398, cpu-q-197) during CSD3 emergency maintenance Apr 30. Resubmitted as campaign+INTR. |
+| 28677862 | T5 general (D2.0 Bahamonde) | D2.0 sup r1 attempt 1 | FAILED | 0:01 | --n-live typo (correct flag is --nlive). |
+| 28681305 | T5 general (D2.0 Bahamonde) | D2.0 sup r1 attempt 2 | FAILED | 0:03 | All 10 probe samples returned non-finite logL. Root cause: missing --ic/--bounds/--source/--target — default gaussian IC on a_0 excites tachyonic modes → overflow. Fixed in commit 77f8f30 (stability guard None-handling) + corrected command. |
+| 28684410 | T5 general (D2.0 Bahamonde) | **D2.0 sup r1** | RUNNING | — | INTR, campaign=d20_bahamonde_sup, corrected command with --ic plane-wave --ic-component h_5 --bounds 0:50 --source h_5 --target a_1 --baseline-formula. |
 | 28607124 | T5 general (D2.1 Barker) | **D2.1 amp** | COMPLETED | ~25 min | INTR. **log Z = +0.618 ± 0.001**, ESS = 875, n_samples = 3458. Params: β₁₋₃, ξ, δ₁, χ (6D). MAP: β₁=+0.73, β₂=−1.91, β₃=−0.67, ξ=0.0105, δ₁=−0.0235, χ=−0.002. 95% CI χ=[−0.0086, +0.0084] (fills ±0.009 prior). Marginal D_KL: β₁=0.297 (dominant), ξ=0.158, χ=0.032, δ₁=0.026. Prior stability: 3033/5000 rejected (60.7%). Corner: `hpc_results/28607124/d21_barker_amp/corner.png`. |
 
 ---
