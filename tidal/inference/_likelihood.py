@@ -468,15 +468,18 @@ def _evaluate_likelihood(
                 list(getattr(base_args, "param", []) or []), raw_spec
             )
             params = {**base_p, **param_overrides}
-            grid_n = int(getattr(base_args, "grid_shape", 256))
-            bounds_str = getattr(base_args, "bounds", "0:100")
+            grid_n_raw = getattr(base_args, "grid_shape", None)
+            grid_n = int(grid_n_raw) if grid_n_raw is not None else 64
+            bounds_str = getattr(base_args, "bounds", None)
             if isinstance(bounds_str, str):
                 bparts = bounds_str.split(":")
                 bounds_tuple: tuple[tuple[float, float], ...] = (
                     (float(bparts[0]), float(bparts[1])),
                 )
-            else:
+            elif bounds_str is not None:
                 bounds_tuple = tuple(bounds_str)
+            else:
+                bounds_tuple = ((0.0, 50.0),)
             grid = GridInfo(shape=(grid_n,), bounds=bounds_tuple, periodic=(True,))
             ic_wavevector_str = getattr(base_args, "ic_wavevector", None)
             ic_k: float | None = None
