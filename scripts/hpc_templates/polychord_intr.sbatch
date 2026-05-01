@@ -46,6 +46,12 @@ LOCAL_SP="/tmp/site_packages_${SLURM_JOB_ID}"
 export RESULTS_DIR="${TIDAL_ROOT}/hpc_results/${SLURM_JOB_ID}"
 mkdir -p "${RESULTS_DIR}"
 
+# Campaign dir: stable path shared across INTR resume runs.
+# Set by --campaign NAME in hpc_shuttle.sh submit; empty comment when not used.
+# Use ${CAMPAIGN_DIR} in --output so PolyChord finds its .resume checkpoint
+# between rounds.  All rounds must pass identical --prior/--n-live/--ntasks.
+{{CAMPAIGN_DIR_SETUP}}
+
 echo "=== Job ${SLURM_JOB_ID} on $(hostname), ntasks=${SLURM_NTASKS} ==="
 date
 

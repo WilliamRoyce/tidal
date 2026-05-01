@@ -149,7 +149,7 @@ cmd_resolve_account() {
 }
 
 cmd_submit() {
-  local template="" cmd="" nodes=1 time="01:00:00" name="tidal" account="" ntasks=""
+  local template="" cmd="" nodes=1 time="01:00:00" name="tidal" account="" ntasks="" campaign=""
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --template) template="$2"; shift 2 ;;
@@ -159,6 +159,7 @@ cmd_submit() {
       --time)     time="$2"; shift 2 ;;
       --name)     name="$2"; shift 2 ;;
       --account)  account="$2"; shift 2 ;;
+      --campaign) campaign="$2"; shift 2 ;;
       *) die "unknown arg: $1" ;;
     esac
   done
@@ -186,6 +187,22 @@ cmd_submit() {
   safe_account="${account//&/\\&}"
   safe_account="${safe_account//|/\\|}"
 
+  # Campaign dir: stable path across INTR resume rounds.  When --campaign NAME
+  # is given, {{CAMPAIGN_DIR_SETUP}} in the template becomes an export + mkdir
+  # that sets CAMPAIGN_DIR to hpc_results/campaigns/NAME on the HPC.  Use
+  # ${CAMPAIGN_DIR} in --cmd --output to share chains across rounds.
+  # PolyChord writes .resume checkpoints by default; the second round adds
+  # --read-resume to tidal sample to continue from the checkpoint.
+  local camp_setup
+  if [[ -n "$campaign" ]]; then
+    local camp_path="${REMOTE_ROOT}/hpc_results/campaigns/${campaign}"
+    camp_setup="export CAMPAIGN_DIR=\"${camp_path}\"; mkdir -p \"${camp_path}\""
+    camp_setup="${camp_setup//&/\\&}"
+    camp_setup="${camp_setup//|/\\|}"
+  else
+    camp_setup="# (no campaign dir — output goes to \${RESULTS_DIR})"
+  fi
+
   local rendered
   rendered="$(sed \
     -e "s|{{JOB_NAME}}|${name}|g" \
@@ -195,6 +212,7 @@ cmd_submit() {
     -e "s|{{TIME}}|${time}|g" \
     -e "s|{{COMMAND}}|${safe_cmd}|g" \
     -e "s|{{REMOTE_ROOT}}|${safe_root}|g" \
+    -e "s|{{CAMPAIGN_DIR_SETUP}}|${camp_setup}|g" \
     "$template")"
 
   note "submitting to sbatch on ${HOST}"
@@ -314,6 +332,33 @@ cmd_pull() {
   note "pulled to: $dst"
 }
 
+cmd_pull_campaign() {
+  check_master
+  local name="${1:-}"; [[ -n "$name" ]] || die "usage: pull-campaign NAME"
+  local src="${REMOTE_ROOT}/hpc_results/campaigns/${name}"
+  local dst="${REPO_ROOT}/hpc_results/campaigns/${name}"
+  mkdir -p "${dst}"
+  note "pulling campaign artefacts: ${name}"
+  rsync -az -e ssh \
+    --include='*/' \
+    --include='figures/***' \
+    --include='*.csv' \
+    --include='results.json' \
+    --include='sweep.json' \
+    --include='*_summary.json' \
+    --include='SWEEP_RESULTS.md' \
+    --include='inference.json' \
+    --include='importance.json' \
+    --include='*.png' \
+    --include='_chains/*.txt' \
+    --include='_chains/*.stats' \
+    --include='_chains/*.paramnames' \
+    --exclude='_chains/*.resume' \
+    --exclude='*' \
+    "${HOST}:${src}/" "${dst}/"
+  note "pulled to: ${dst}/"
+}
+
 cmd_wait() {
   # Wait for a job to start, then tail its log.  Uses file-existence polling
   # (NOT squeue) so no Slurm controller load is generated.  The wait loop runs
@@ -354,6 +399,8 @@ Subcommands:
   setup                             one-time: harvest templates, create remote venv, install tidal
   submit --template T --cmd C [opts]  render sbatch template and submit via ssh
          [--nodes N] [--ntasks N] [--time HH:MM:SS] [--name X] [--account P]
+         [--campaign NAME]            stable campaign dir for PolyChord resume runs
+                                      sets \${CAMPAIGN_DIR} in the sbatch; use in --cmd --output
   status [jobid]                    one-shot squeue (never in a loop — 120s min between calls)
   check <jobid>                     one-shot post-submit fast-fail check (sacct + log tail);
                                     use ~30s after submit before any wait-blocking
@@ -363,6 +410,8 @@ Subcommands:
   pull <jobid> [--all] [--src PATH] rsync lightweight artefacts back (--all for raw data).
                                     Source path auto-parsed from --output in .hpc_jobs;
                                     override with --src for ad-hoc jobs.
+  pull-campaign NAME                pull campaign artefacts from hpc_results/campaigns/NAME
+                                    (use after resume runs complete with === DONE ===)
   cancel <jobid>                    scancel
   shell                             interactive ssh into remote tidal dir
 
@@ -383,6 +432,7 @@ main() {
     tail)    cmd_tail "$@" ;;
     htop)    cmd_htop "$@" ;;
     pull)    cmd_pull "$@" ;;
+    pull-campaign) cmd_pull_campaign "$@" ;;
     wait)    cmd_wait "$@" ;;
     cancel)  cmd_cancel "$@" ;;
     shell)   cmd_shell "$@" ;;
