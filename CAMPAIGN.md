@@ -210,7 +210,7 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 - [x] Stage 0 gate passed for T5 (general nonminimal spec; δ₁ prior ±0.025 locked via 5-point empirical scan)
 - [x] D2.0 Bahamonde amp (28598736): log Z = +0.616 ± 0.001, ESS = 877, DONE
 - [x] D2.0 Bahamonde sup (28606785): CANCELLED (killed by node failures Apr 30; resubmitted as campaign+INTR)
-- [ ] D2.0 Bahamonde sup r1 (28684410): INTR campaign=d20_bahamonde_sup, --nlive 400 — RUNNING
+- [x] D2.0 Bahamonde sup r1 (28684410): log Z = −0.449 ± 0.002, ESS = 877, DONE (11 min!)
 - [x] D2.1 Barker amp (28607124): log Z = +0.618 ± 0.001, ESS = 875, DONE
 - [ ] D2.1 Barker sup — pending
 - [ ] D2.2 Shapiro amp — pending prior derivation
@@ -292,7 +292,7 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28606785 | T5 general (D2.0 Bahamonde) | **D2.0 sup_v2** | CANCELLED | — | icelake standard, 6h wall. Killed by node failures (cpu-q-398, cpu-q-197) during CSD3 emergency maintenance Apr 30. Resubmitted as campaign+INTR. |
 | 28677862 | T5 general (D2.0 Bahamonde) | D2.0 sup r1 attempt 1 | FAILED | 0:01 | --n-live typo (correct flag is --nlive). |
 | 28681305 | T5 general (D2.0 Bahamonde) | D2.0 sup r1 attempt 2 | FAILED | 0:03 | All 10 probe samples returned non-finite logL. Root cause: missing --ic/--bounds/--source/--target — default gaussian IC on a_0 excites tachyonic modes → overflow. Fixed in commit 77f8f30 (stability guard None-handling) + corrected command. |
-| 28684410 | T5 general (D2.0 Bahamonde) | **D2.0 sup r1** | RUNNING | — | INTR, campaign=d20_bahamonde_sup, corrected command with --ic plane-wave --ic-component h_5 --bounds 0:50 --source h_5 --target a_1 --baseline-formula. |
+| 28684410 | T5 general (D2.0 Bahamonde) | **D2.0 sup r1** | COMPLETED | 0:11 | INTR, campaign=d20_bahamonde_sup. **log Z = −0.449 ± 0.002**, ESS = 877, D_KL = 0.0014 nats (NULL — posterior ≈ prior). MAP: β₁=−0.23, β₂=−1.34, ξ=0.21, δ₁=−0.024. Corner: `hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png`. |
 | 28607124 | T5 general (D2.1 Barker) | **D2.1 amp** | COMPLETED | ~25 min | INTR. **log Z = +0.618 ± 0.001**, ESS = 875, n_samples = 3458. Params: β₁₋₃, ξ, δ₁, χ (6D). MAP: β₁=+0.73, β₂=−1.91, β₃=−0.67, ξ=0.0105, δ₁=−0.0235, χ=−0.002. 95% CI χ=[−0.0086, +0.0084] (fills ±0.009 prior). Marginal D_KL: β₁=0.297 (dominant), ξ=0.158, χ=0.032, δ₁=0.026. Prior stability: 3033/5000 rejected (60.7%). Corner: `hpc_results/28607124/d21_barker_amp/corner.png`. |
 
 ---
@@ -313,6 +313,12 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
   - **Physical interpretation**: T4's δ₁ coupling shifts the photon effective mass through the Schur complement.  In one direction (small δ₁) you get modest amplification through resonance enhancement (A up to 1.26).  In the other (\|δ₁\| ≈ 1) you get destructive interference suppressing conversion by 9 orders of magnitude.  The model is **not a Gertsenshtein amplifier** — its Bayes factor against the null is 1:10.  But it is a **strong nonminimal modifier** of the conversion (D_KL = 1.79 nats — substantial structure).
   - **Suppress (28519675) confirms paired structure**: log Z = +15.92 ± 0.13 (strongly favoured, Bayes factor ~10⁷ for suppression interpretation), D_KL = 8.91 nats (vs amplify's 1.79 — much more informative when targeting the suppression valley). MAP at δ₁ = −1.29 reaches A ≈ 4×10⁻¹² (3 orders deeper than the amplify chain's tail at A=5×10⁻⁹). Marginal D_KL is more balanced than amplify (δ₁=0.87 nats, α₁₋₃ each ≈ 0.25-0.30) — the deep suppression valley requires all four parameters to coordinate, unlike the amplification ceiling which only needs δ₁ ≈ 0.
   - Corner plots: `hpc_results/28520217/corner_amplify_v5.png`, `hpc_results/28519675/corner_suppress_v5.png`.
+
+- Stage D2.0 Bahamonde (T5 YM-PGT, 5D: β₁₋₃, ξ, δ₁; 2026-05-01): **NULL for both amplification and suppression.**
+  - **Amplify (28598736)**: log Z = +0.616 ± 0.001, ESS = 877. D_KL = 0.0013 nats (essentially null). Marginal D_KL: β₁=0.242, ξ=0.127, β₂=0.090 (small structure on β₁ driven by stability boundary). No amplification signal.
+  - **Suppress (28684410)**: log Z = −0.449 ± 0.002, ESS = 877. D_KL = 0.0014 nats (**NULL** — posterior ≈ prior). Marginal D_KL: β₁=0.283, ξ=0.074, β₂=0.062. No suppression signal. Completed in 11 min (flat landscape → fast convergence).
+  - **Physical interpretation**: The Bahamonde sub-theory (β₁₋₃, δ₁ nonminimal + massive torsion ξ) does not significantly modify Gertsenshtein conversion in either direction. All parameters are unconstrained. Prior stability rejection = 60.7% (most prior volume is tachyonic). Contrast with T4 (D1): D_KL=8.91 nats for suppress — T4's R̃F coupling mechanism is absent in the Bahamonde sector. The T5 Bahamonde Lagrangian is **Gertsenshtein-neutral** at these parameter ranges.
+  - Corner plots: `hpc_results/28598736/corner.png` (amp), `hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png` (sup).
 
 - Stage A v5 (stability-guard fix, 2026-04-26): **Definitive null on amplify; informative suppress at decoupling corner.**
   - **Pre-flight stability guard wired into inference** (commits e361113, 3855fc1, 7ef182d, 9e6776e). `_evaluate_likelihood` now calls `check_conversion_stability(conservative=True)` before any simulation; samples with Re(λ) > 0.3 in the source-containing block return logL=-inf with `run_status='tachyonic'` and the maximum growth rate. Conservative path skips the IC-coupling filter when cond(V) > 1e12 (typical for CDT models) to prevent false-negatives. Fixed coupling_floor bug where cond ≥ 1e14 forced floor=1.0 → all growing modes silently skipped.
