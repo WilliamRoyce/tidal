@@ -1037,24 +1037,6 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_false",
         help="For --type corner: do NOT overlay prior-survey rejected samples.",
     )
-    plot_parser.add_argument(
-        "--show-rejected-inrun",
-        dest="show_rejected_inrun",
-        action="store_true",
-        default=False,
-        help=(
-            "For --type corner: overlay in-run tachyonic samples written by "
-            "the SimulationLikelihood during a PolyChord run "
-            "(_tachyonic_samples.csv). Default: off — typically 50k+ rows "
-            "and obscures the posterior contours."
-        ),
-    )
-    plot_parser.add_argument(
-        "--hide-rejected-inrun",
-        dest="show_rejected_inrun",
-        action="store_false",
-        help="For --type corner: do NOT overlay in-run tachyonic samples.",
-    )
 
     # --- sweep ---
     sweep_parser = sub.add_parser(

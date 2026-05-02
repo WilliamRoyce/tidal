@@ -222,7 +222,6 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             threshold=threshold,
             likelihood_config=likelihood_config,
             temp_dir=output_path / "_runs",
-            output_dir=output_path,
         )
 
         # Collect optional PolyChord-specific settings (pass-through kwargs)

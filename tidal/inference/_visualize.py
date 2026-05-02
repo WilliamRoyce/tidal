@@ -31,13 +31,12 @@ def plot_corner(
     show: bool = False,
     show_rejected_inchain: bool = True,
     show_rejected_prior: bool = False,
-    show_rejected_inrun: bool = False,
 ) -> None:
     """Generate a corner plot (2D marginals + 1D histograms).
 
     Uses anesthetic if available, otherwise falls back to matplotlib.
 
-    Three independent rejected-sample overlays are available:
+    Two independent rejected-sample overlays are available:
 
     - ``show_rejected_inchain``: samples in ``results.csv`` with
       ``run_status='tachyonic'`` (MC pipeline only — always empty for
@@ -46,9 +45,6 @@ def plot_corner(
       from ``_rejected_prior.csv`` (5000 prior draws evaluated by the
       stability guard only).  Default off — dense and obscures the
       posterior.
-    - ``show_rejected_inrun``: in-run tachyonic samples written by
-      ``SimulationLikelihood`` during a PolyChord run
-      (``_tachyonic_samples.csv``).  Default off — typically 50k+ rows.
     """
     try:
         _plot_corner_anesthetic(
@@ -57,7 +53,6 @@ def plot_corner(
             show=show,
             show_rejected_inchain=show_rejected_inchain,
             show_rejected_prior=show_rejected_prior,
-            show_rejected_inrun=show_rejected_inrun,
         )
     except ImportError:
         _plot_corner_matplotlib(
@@ -66,7 +61,6 @@ def plot_corner(
             show=show,
             show_rejected_inchain=show_rejected_inchain,
             show_rejected_prior=show_rejected_prior,
-            show_rejected_inrun=show_rejected_inrun,
         )
 
 
@@ -385,7 +379,6 @@ def _plot_corner_anesthetic(
     show: bool = False,
     show_rejected_inchain: bool = True,
     show_rejected_prior: bool = False,
-    show_rejected_inrun: bool = False,
 ) -> None:
     """Corner plot using anesthetic (Handley 2019).
 
@@ -475,7 +468,6 @@ def _plot_corner_anesthetic(
         result,
         show_inchain=show_rejected_inchain,
         show_prior=show_rejected_prior,
-        show_inrun=show_rejected_inrun,
     )
 
     # Legend in the conventional top-right slot (the empty upper-corner
@@ -747,23 +739,20 @@ def _overlay_rejected_anesthetic(
     *,
     show_inchain: bool = True,
     show_prior: bool = False,
-    show_inrun: bool = False,
 ) -> bool:
     """Overlay tachyonic-rejected samples on the corner plot.
 
     Adds a red scatter on upper-triangle panels of an anesthetic
-    AxesDataFrame.  Each of the three overlay layers is independently
-    toggleable — the prior survey and in-run sidecars typically contain
-    tens of thousands of points and obscure the posterior contours when
-    rendered, so they default off.
+    AxesDataFrame.  The two overlay layers are independently toggleable —
+    the prior survey contains thousands of points and obscures the
+    posterior contours when rendered, so it defaults off.
 
     Returns True iff at least one layer rendered samples — used by the
     caller to decide whether to add a legend entry.
     """
     rejected = _rejected_samples_array(result) if show_inchain else None
-    rejected_inrun = _load_tachyonic_samples(result) if show_inrun else None
     rejected_prior = _load_rejected_prior_overlay(result) if show_prior else None
-    if rejected is None and rejected_inrun is None and rejected_prior is None:
+    if rejected is None and rejected_prior is None:
         return False
 
     # Upper triangle (j > i): anesthetic's scatter convention.  Lower
@@ -785,15 +774,6 @@ def _overlay_rejected_anesthetic(
                     alpha=0.7,
                     color="C3",
                     label="tachyonic",
-                    zorder=2,
-                )
-            if rejected_inrun is not None:
-                ax.scatter(
-                    rejected_inrun[:, j],
-                    rejected_inrun[:, i],
-                    s=5,
-                    alpha=0.5,
-                    color="C3",
                     zorder=2,
                 )
             if rejected_prior is not None:
@@ -868,46 +848,6 @@ def _load_rejected_prior_overlay(result: InferenceResult) -> np.ndarray | None:
             for r in reader:
                 if r.get("run_status") != "tachyonic":
                     continue
-                try:
-                    rows.append([float(r[c]) for c in cols])
-                except (KeyError, ValueError):
-                    continue
-        if not rows:
-            return None
-        return np.asarray(rows, dtype=float)
-    except OSError:
-        return None
-
-
-def _load_tachyonic_samples(result: InferenceResult) -> np.ndarray | None:
-    """Read the in-run tachyonic sidecar written during nested sampling.
-
-    ``_tachyonic_samples.csv`` is appended to by ``SimulationLikelihood``
-    each time a sample is rejected by the stability guard.  Unlike
-    ``_rejected_prior.csv`` (a post-hoc uniform prior survey), these reflect
-    the actual PolyChord sampling path — where the sampler was drawing near
-    the stability boundary during inference.  Returns an Nx(n_params) array
-    or None if the file is absent or empty.
-    """
-    import numpy as np
-
-    meta = getattr(result, "metadata", None) or {}
-    from pathlib import Path as _PathType
-
-    loaded_from = meta.get("loaded_from")
-    if not loaded_from:
-        return None
-    p = _PathType(loaded_from) / "_tachyonic_samples.csv"
-    if not p.exists():
-        return None
-    try:
-        import csv
-
-        with p.open("r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            cols = result.param_names
-            rows: list[list[float]] = []
-            for r in reader:
                 try:
                     rows.append([float(r[c]) for c in cols])
                 except (KeyError, ValueError):
@@ -1045,7 +985,6 @@ def _plot_corner_matplotlib(
     show: bool = False,
     show_rejected_inchain: bool = True,
     show_rejected_prior: bool = False,
-    show_rejected_inrun: bool = False,
 ) -> None:
     """Basic corner plot using matplotlib (fallback)."""
     import matplotlib.pyplot as plt
@@ -1068,7 +1007,6 @@ def _plot_corner_matplotlib(
     rejected_prior = (
         _load_rejected_prior_overlay(result) if show_rejected_prior else None
     )
-    rejected_inrun = _load_tachyonic_samples(result) if show_rejected_inrun else None
 
     for i in range(n):
         for j in range(n):
@@ -1095,14 +1033,6 @@ def _plot_corner_matplotlib(
                         alpha=0.2,
                         color="C3",
                         marker=".",
-                    )
-                if rejected_inrun is not None:
-                    ax.scatter(
-                        rejected_inrun[:, j],
-                        rejected_inrun[:, i],
-                        s=3,
-                        alpha=0.3,
-                        color="C3",
                     )
                 if rejected is not None:
                     ax.scatter(

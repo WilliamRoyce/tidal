@@ -324,11 +324,6 @@ class SimulationLikelihood:
         Base temp directory. If None, uses system temp.
     keep_sims : bool
         If True, keep simulation output directories.
-    output_dir : Path | None
-        Inference output directory.  When set, tachyonic-rejected samples
-        are appended to ``output_dir/_tachyonic_samples.csv`` so they can
-        be shown on corner plots.  Multiple MPI ranks write safely via
-        ``fcntl.flock``.  On resume, rows accumulate across rounds.
     """
 
     def __init__(
@@ -344,7 +339,6 @@ class SimulationLikelihood:
         temp_dir: Path | None = None,
         *,
         keep_sims: bool = False,
-        output_dir: Path | None = None,
     ) -> None:
         self.base_args = base_args
         self.spec_path = spec_path
@@ -356,9 +350,6 @@ class SimulationLikelihood:
         self.likelihood_config = likelihood_config
         self.temp_dir = temp_dir
         self.keep_sims = keep_sims
-        self._tachyonic_path: Path | None = (
-            output_dir / "_tachyonic_samples.csv" if output_dir is not None else None
-        )
         self._call_count = 0
         # Metadata from the most recent __call__: read by the sequential MC
         # path to populate per-sample run_status / tachyonic_excess.  Parallel
@@ -398,56 +389,7 @@ class SimulationLikelihood:
             call_index=call_idx,
         )
         self._last_metadata = meta
-        if (
-            not math.isfinite(logl)
-            and meta.get("run_status") == "tachyonic"
-            and self._tachyonic_path is not None
-        ):
-            _append_tachyonic_row(self._tachyonic_path, self.param_names, theta, meta)
         return logl
-
-
-def _append_tachyonic_row(
-    path: Path,
-    param_names: list[str],
-    theta: Any,
-    meta: dict[str, Any],
-) -> None:
-    """Append one tachyonic-rejected sample to the sidecar CSV.
-
-    Safe for concurrent MPI ranks writing to a shared RDS path: uses
-    ``fcntl.flock`` for exclusive locking while checking/writing the header
-    and appending the data row.  On resume the file already exists with
-    non-zero size, so the header is skipped and rows accumulate.
-    """
-    import csv
-    import fcntl
-
-    row: list[Any] = [
-        *list(theta),
-        meta.get("tachyonic_excess", float("nan")),
-        meta.get("k_tachyonic", float("nan")),
-        meta.get("n_tachyonic_modes", 0),
-        meta.get("stability_profile", ""),
-        int(bool(meta.get("borderline_stability"))),
-    ]
-    header = [
-        *param_names,
-        "tachyonic_excess",
-        "k_tachyonic",
-        "n_tachyonic_modes",
-        "stability_profile",
-        "borderline_stability",
-    ]
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", newline="", encoding="utf-8") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        try:
-            if path.stat().st_size == 0:
-                csv.writer(f).writerow(header)
-            csv.writer(f).writerow(row)
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
 
 
 def _evaluate_likelihood(
