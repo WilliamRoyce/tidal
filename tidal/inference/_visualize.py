@@ -740,8 +740,9 @@ def _overlay_rejected_anesthetic(
     ``_load_rejected_prior_overlay``.
     """
     rejected = _rejected_samples_array(result)
+    rejected_inrun = _load_tachyonic_samples(result)
     rejected_prior = _load_rejected_prior_overlay(result)
-    if rejected is None and rejected_prior is None:
+    if rejected is None and rejected_inrun is None and rejected_prior is None:
         return
 
     # Upper triangle (j > i): anesthetic's scatter convention.  Lower
@@ -763,6 +764,15 @@ def _overlay_rejected_anesthetic(
                     alpha=0.7,
                     color="C3",
                     label="tachyonic",
+                    zorder=2,
+                )
+            if rejected_inrun is not None:
+                ax.scatter(
+                    rejected_inrun[:, j],
+                    rejected_inrun[:, i],
+                    s=5,
+                    alpha=0.5,
+                    color="C3",
                     zorder=2,
                 )
             if rejected_prior is not None:
@@ -836,6 +846,46 @@ def _load_rejected_prior_overlay(result: InferenceResult) -> np.ndarray | None:
             for r in reader:
                 if r.get("run_status") != "tachyonic":
                     continue
+                try:
+                    rows.append([float(r[c]) for c in cols])
+                except (KeyError, ValueError):
+                    continue
+        if not rows:
+            return None
+        return np.asarray(rows, dtype=float)
+    except OSError:
+        return None
+
+
+def _load_tachyonic_samples(result: InferenceResult) -> np.ndarray | None:
+    """Read the in-run tachyonic sidecar written during nested sampling.
+
+    ``_tachyonic_samples.csv`` is appended to by ``SimulationLikelihood``
+    each time a sample is rejected by the stability guard.  Unlike
+    ``_rejected_prior.csv`` (a post-hoc uniform prior survey), these reflect
+    the actual PolyChord sampling path — where the sampler was drawing near
+    the stability boundary during inference.  Returns an Nx(n_params) array
+    or None if the file is absent or empty.
+    """
+    import numpy as np
+
+    meta = getattr(result, "metadata", None) or {}
+    from pathlib import Path as _PathType
+
+    loaded_from = meta.get("loaded_from")
+    if not loaded_from:
+        return None
+    p = _PathType(loaded_from) / "_tachyonic_samples.csv"
+    if not p.exists():
+        return None
+    try:
+        import csv
+
+        with p.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            cols = result.param_names
+            rows: list[list[float]] = []
+            for r in reader:
                 try:
                     rows.append([float(r[c]) for c in cols])
                 except (KeyError, ValueError):

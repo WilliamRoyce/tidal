@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from tidal.inference._results import InferenceResult
 
 
-def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Entry point for ``tidal sample``."""
     from pathlib import Path
 
@@ -222,6 +222,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             threshold=threshold,
             likelihood_config=likelihood_config,
             temp_dir=output_path / "_runs",
+            output_dir=output_path,
         )
 
         # Collect optional PolyChord-specific settings (pass-through kwargs)
