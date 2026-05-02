@@ -1,25 +1,42 @@
-\begin{frame}{Torsion via Poincar\'e gauging (II)}
-  \note{\textasciitilde 7 min mark. Geometric intuition + honest caveat about ghosts.}
+\begin{frame}{The systematic landscape}
+  \note{\textasciitilde 7 min mark. Scan ALL quadratic curvature + torsion terms --- both parity sectors. TIDAL is theory-agnostic: PGT is the first case study, not the only one.}
   \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.48\textwidth}
-      \textbf{Geometric picture.} Parallel-transport around a closed loop has \emph{two} independent mismatches:
-      \begin{itemize}
-        \item \textbf{Rotational} mismatch $\to$ \emph{curvature}.
-        \item \textbf{Translational} mismatch (loop fails to close) $\to$ \emph{torsion}.
-      \end{itemize}
-      \vspace{0.5em}
-      \textbf{Why take it seriously?}
+    \begin{column}{0.56\textwidth}
+      Don't pick a theory in advance --- scan the full quadratic landscape:
+      \vspace{-0.4em}
+      \[
+        \mathcal{L} \supset
+          \underbrace{\alpha_i I_i}_{\text{torsion}^2}
+          +
+          \underbrace{\beta_i R^2_{(i)}}_{\text{curvature}^2}
+          +
+          \underbrace{\delta_1 R_{[\mu\nu]}F^{\mu\nu}}_{\text{non-min.}}
+          -\tfrac{1}{4}F^2
+      \]
+      \vspace{-0.3em}
       \begin{itemize}\small
-        \item Couples naturally to fermion spin (Einstein--Cartan).
-        \item High-curvature / early-universe regimes $\Rightarrow$ PGT corrections potentially non-negligible.
-        \item Minimal, well-motivated extension --- first place to look for BSM gravity.
+        \item \textbf{Torsion$^2$:} 3 invariants (tensor, vector, axial).
+        \item \textbf{Curvature$^2$:} Ricci-Cartan; torsion mixes via Shapiro.
+        \item \textbf{Non-minimal:} directly couples gravitational and EM sectors --- most promising for amplification.
       \end{itemize}
     \end{column}
-    \begin{column}{0.48\textwidth}
-      \placeholder{Torsion-vs-curvature loop cartoon (Will has a hand-drawn version; drop in later).}
-      \vspace{1em}
-
-      \small\emph{Caveat, to be honest about:} PGT Lagrangians generically have ghost / tachyon sectors that constrain the allowed parameter space. Becomes relevant in the results.
+    \begin{column}{0.41\textwidth}
+      {\renewcommand{\arraystretch}{0.85}
+      \begin{center}\scriptsize
+        \begin{tabular}{lrr}
+          \toprule
+          Sector & Even & Odd \\
+          \midrule
+          $\tilde{R}^2$ & 6 & 13 \\
+          $T^2$          & 3 & 4  \\
+          $F^2$          & 1 & --- \\
+          $\tilde{R}\times F$ & 1 & 3 \\
+          \midrule
+          \textbf{Total} & \textbf{11} & \textbf{20} \\
+          \bottomrule
+        \end{tabular}
+        \par\vspace{0.3em}{\tiny Barker 2406.12826}
+      \end{center}}
     \end{column}
   \end{columns}
 \end{frame}

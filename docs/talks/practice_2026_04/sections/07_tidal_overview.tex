@@ -2,13 +2,13 @@
   \note{\textasciitilde 9 min mark. Centrepiece of the talk. Sell the idea before the detail.}
   \textbf{T}ensor \textbf{I}ntegration and \textbf{D}erivation for \textbf{A}ny \textbf{L}agrangian.
 
-  \vspace{0.6em}
+  \vspace{0.3em}
   \begin{center}
     \begin{tikzpicture}[
-      node distance=0.6cm and 0.5cm,
+      node distance=0.5cm and 0.4cm,
       every node/.style={font=\scriptsize},
       box/.style={draw,rounded corners,thick,align=center,
-                  minimum height=1.1cm,minimum width=2.0cm,inner sep=2pt},
+                  minimum height=0.9cm,minimum width=1.9cm,inner sep=2pt},
       arr/.style={-{Latex[length=2mm]},thick},
     ]
       \node[box] (toml)   {\texttt{theory.toml}\\\tiny Lagrangian};
@@ -23,9 +23,12 @@
     \end{tikzpicture}
   \end{center}
 
-  \vspace{0.4em}
+  \vspace{0.2em}
   \textbf{Core claim.} \emph{Every equation the numerics solves is traceable back to a single Lagrangian I typed in.} No hand-derived PDEs. No manual index gymnastics.
 
-  \vspace{0.3em}
+  \vspace{0.2em}
   \textbf{Why it matters here.} This project varies the Lagrangian \emph{dozens} of times --- different torsion operators, couplings, gauges, plasma backgrounds. Hand-deriving each variation would be intractable and unreliable.
+
+  \vspace{0.2em}
+  \textbf{Parameter estimation.} \small For each theory, nested sampling (PolyChord / dynesty) scans the coupling-constant space and returns the posterior over which parameters amplify, suppress, or leave conversion unchanged. Tachyonic regions are excluded by a hard prior.
 \end{frame}

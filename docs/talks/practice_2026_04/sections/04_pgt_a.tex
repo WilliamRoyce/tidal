@@ -1,29 +1,31 @@
-\begin{frame}{Torsion via Poincar\'e gauging (I)}
-  \note{\textasciitilde 5.5 min mark. Frame torsion as the \emph{other half} of a gauge story they already believe in.}
+\begin{frame}{Torsion via Poincar\'e gauging}
+  \note{\textasciitilde 5.5 min mark. U(1) analogy on the left, PGT identifications in the middle, Venn diagram on the right to show where GR and PGT sit. Tagline at the bottom.}
 
-  \textbf{Question.} GR uses the Levi-Civita connection (metric compatible, torsion-free). Why \emph{that} choice?
+  \textbf{Why gauging is natural:} local coordinate and frame choices are gauge freedoms of the Poincar\'e group.
 
-  \vspace{0.4em}
-  \textbf{Utiyama (1956), Kibble (1961), Sciama (1962):} gravity as a gauge theory of the Poincar\'e group.
-  \begin{itemize}
-    \item QED $\leftrightarrow$ gauging $U(1)$.
-    \item Yang--Mills $\leftrightarrow$ gauging $SU(N)$.
-    \item Gravity $\leftrightarrow$ gauging the Poincar\'e group = translations $\ltimes$ Lorentz.
-  \end{itemize}
+  \vspace{0.15em}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.37\textwidth}
+      \textbf{Analogy: $U(1)$ gauge theory}
+      \begin{itemize}\scriptsize
+        \item Global $\psi\to e^{i\alpha}\psi$
+        \item Local $\alpha(x)$ $\Rightarrow$ $A_\mu$ $\Rightarrow$ $F_{\mu\nu}$
+      \end{itemize}
+      \vspace{0.3em}
+      \textbf{Poincar\'e group:}
+      \begin{itemize}\scriptsize
+        \item Local Lorentz $\Rightarrow$ $\omega^{ab}{}_\mu$ $\Rightarrow$ $R^{ab}{}_{\mu\nu}$
+        \item Local transl. $\Rightarrow$ $e^a{}_\mu$ $\Rightarrow$ $T^a{}_{\mu\nu}$
+      \end{itemize}
+      \vspace{0.2em}
+      \emph{\scriptsize Identifications are exact geometric ones (Utiyama 1956, Kibble 1961).}
+    \end{column}
+    \begin{column}{0.60\textwidth}
+      \centering
+      \includegraphics[height=0.48\textheight]{metric_affine_classes}
+    \end{column}
+  \end{columns}
 
-  \vspace{0.4em}
-  \textbf{Gauging both subgroups:}
-  \begin{center}
-    \begin{tabular}{lll}
-      \toprule
-      Gauge subgroup & Connection & Field strength \\
-      \midrule
-      Lorentz      & spin connection $\omega^{ab}{}_\mu$ & \textbf{curvature} $R^{ab}{}_{\mu\nu}$ \\
-      Translations & tetrad $e^a{}_\mu$                  & \textbf{torsion}   $T^a{}_{\mu\nu}$ \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-
-  \vspace{0.3em}
-  \emph{GR keeps one of the two field strengths of the Poincar\'e group. PGT keeps both.}
+  \vspace{0.2em}
+  \emph{GR ($V_4$): $\mathcal{R}\neq 0$, $\mathcal{T}=0$, $\mathcal{Q}=0$. \quad PGT ($U_4$): $\mathcal{R}\neq 0$, $\mathcal{T}\neq 0$, $\mathcal{Q}=0$. \quad Torsion is the new degree of freedom.}
 \end{frame}

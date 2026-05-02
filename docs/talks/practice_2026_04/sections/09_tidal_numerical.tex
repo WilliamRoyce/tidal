@@ -1,23 +1,25 @@
-\begin{frame}{\textsc{tidal}: numerical side}
-  \note{\textasciitilde 11 min mark. Emphasise multi-backend cross-checking; modal solver is the hero.}
-  \textbf{Multiple solver backends, auto-selected from the JSON structure:}
-  \begin{center}\small
-    \begin{tabular}{lll}
-      \toprule
-      Backend & Library & Role \\
-      \midrule
-      \textbf{Fourier modal} & numpy/scipy  & \emph{Machine-precision} for flat + periodic + time-indep. \\
-      IDA                    & SUNDIALS     & DAE (algebraic constraints). \\
-      CVODE                  & SUNDIALS     & Stiff adaptive ODE. \\
-      Leapfrog               & native       & Symplectic, exact energy conservation. \\
-      scipy                  & \texttt{solve\_ivp} & General fallback. \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
+\begin{frame}{The modal solver --- architecture}
+  \note{\textasciitilde 11 min mark. What it does and why it's the right tool for this problem. Then land the three hard problems.}
 
-  \vspace{0.5em}
-  \textbf{Why multi-backend matters.} I can cross-check the same physics with two solvers and catch numerical artefacts cleanly. The modal solver gives \emph{exact} answers for the plane-wave problem that \emph{is} Gertsenshtein.
+  \small\textbf{Approach.} For PDEs with constant spatial coefficients, Fourier-transform: each mode $k$ evolves under matrix $M(k)$. Diagonalise once; $y(t,k)=e^{M(k)t}y_0(k)$. Machine-precision ($|dE/E|\sim10^{-14}$), no CFL, cost independent of $t_\mathrm{end}$.\normalsize
 
-  \vspace{0.4em}
-  \placeholder{Figure: modal-vs-analytic $\sin^2$ agreement plot, or solver convergence panel.}
+  \vspace{0.25em}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \textbf{Why it fits this problem:}
+      \begin{itemize}\scriptsize
+        \item Every theory in the scan linearises to constant-coefficient PDEs in flat space $+$ uniform $B_0$ --- the modal eligibility criteria match exactly.
+        \item Signals span $>10^{12}$: time-stepping errors swamp $P < 10^{-8}$; modal solver has no accumulation error.
+        \item $\sim\!10^5$ solver calls per inference run --- $100\times$ speedup over CVODE makes the campaign tractable.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \textbf{Hard problems solved for PGT:}
+      \begin{itemize}\scriptsize
+        \item \textbf{Rank-deficient mass matrices} (PGT constraint fields carry no time derivatives) $\Rightarrow$ Schur-complement elimination. Same structure as Dirac--Bergmann: naive Legendre transform gives $\max|dE/E|=1.37$.
+        \item \textbf{Massive eigenvalue degeneracy} $\Rightarrow$ Krylov \texttt{expm\_multiply} throughout --- computes $e^{Mt}v$ without eigendecomposition; unusual for a spectral solver.
+        \item \textbf{Nyquist-mode energy leak} $\Rightarrow$ zero one Fourier coefficient: $|dE/E|:\;10^{-5}\to10^{-14}$.
+      \end{itemize}
+    \end{column}
+  \end{columns}
 \end{frame}

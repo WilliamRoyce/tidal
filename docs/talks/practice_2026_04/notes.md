@@ -2,290 +2,316 @@
 
 Raw research material for the spoken script. One heading per slide. Phase D turns these into `\note{}` blocks in the Beamer source; Phase E turns them into continuous prose.
 
-All citations are `file:line` references into the codebase so I can dig in later.
+The talk now follows the project abstract's spine: standard Gertsenshtein is astrophysically useless → systematic phenomenological scan over *all parity-even quadratic curvature + torsion terms* → derive PDEs symbolically → screen for causality-violating regions via all-mode eigenvalue stability before sampling → identify any subsector that can amplify.
+
+**Honest framing note for the causality slide**: the abstract pitched "characteristic speeds for causality checking" as a method, but in practice the project never implemented characteristic-speed analysis in the formal PDE sense. What it *did* implement, and what fills the same role, is eigenvalue stability pre-screening: compute the largest real part of any eigenvalue across all spatial modes, reject parameter points with growing modes. This is the working causality gate. Mention the abstract's framing only to say what the implementation evolved into.
+
+---
+
+## Narrative spine (one sentence)
+
+> "The standard Gertsenshtein effect is too weak to ever observe; I'm scanning the space of parity-even quadratic extensions of GR — curvature-squared, torsion-squared, and their cross-couplings — to find any subsector that amplifies it, and to check whether the surviving theories are causal."
+
+Every slide either sets up or executes a clause of this sentence.
 
 ---
 
 ## 1. Title
-- Introduce yourself + project title in one sentence.
-- Name the practice framing: "not the viva, rehearsal for feedback."
+- One sentence intro: "I'm a master's student with the Handley group, working on whether modifying gravity can amplify a particular old graviton-photon conversion process. Practice talk — feedback welcome."
 
-## 2. Motivation — why this room should care
-- GWs are observable; next frontier = high-frequency + BSM couplings.
-- The one non-obvious thing I want to land (the payoff for the whole talk):
-  > "You cannot simply *add torsion* to the Gertsenshtein effect — the theory itself resists it. That resistance has a structural reason I can show you."
-- Three-beat promise: (1) the channel, (2) the question, (3) the tool I built to answer it.
+## 2. Motivation — *why anyone should care*
+
+**The headline numbers**:
+- For a magnetar field $B \sim 10^{15}$ G over its $\sim 10$ km radius, the Gertsenshtein conversion probability is $P \sim 10^{-10}$ — completely negligible against any astrophysical photon background.
+- For a laboratory-scale $B \sim 10$ T, $D \sim 1$ m, $P \sim 10^{-40}$ — there is no foreseeable detector that can see this.
+- **The standard Gertsenshtein effect is astrophysically useless and laboratory-impossible.** That isn't an opinion; it's the textbook answer for Einstein-Maxwell.
+
+**So the question is forced**: *if Einstein-Maxwell can't give us a useful signal, what can?* New physics is required for any significant amplification.
+
+**My approach** (paraphrasing the abstract): unapologetically phenomenological. Don't pick one theory and defend it — instead, systematically scan the space of *parity-even quadratic curvature and torsion terms* added to the Einstein-Maxwell Lagrangian, and ask which (if any) amplify the conversion.
+
+**Three-beat promise** for the rest of the talk:
+1. The channel — what is the Gertsenshtein effect, why is it weak, why might modifying gravity help?
+2. The survey program — what's the parameter space we're scanning, and how do we scan it?
+3. What we've learned so far — partial map of the survey, what amplifies, what doesn't.
 
 ---
 
-## 3. Gertsenshtein — the effect
+## 3. The Gertsenshtein effect
 
 **Setup to say out loud:**
-- Einstein-Maxwell linearised around flat Minkowski; uniform background $B_0$ along $x$ (via Coulomb gauge $\bar A_y = -B_0 z$).
+- Einstein-Maxwell linearised around flat Minkowski + uniform background $B_0$ along $x$ (Coulomb gauge $\bar A_y = -B_0 z$).
 - Expand metric perturbation $h$ (graviton) and EM perturbation $a$ (photon) to first order.
-- TT gauge on $h$, Lorenz on $a$, plane-wave reduction $\partial_x = \partial_y = 0$.
+- TT gauge on $h$, Lorenz on $a$, plane-wave reduction.
 
-**The coupled system** (from `docs/tex/gertsenshtein.tex`):
-$$\partial_t^2 h_+ = \partial_z^2 h_+ - \tfrac12 \kappa^2 B_0^2 h_+ - \kappa^2 B_0\,\partial_z a_y$$
+**Coupled linearised system**:
+$$\partial_t^2 h_+ = \partial_z^2 h_+ - \tfrac12\kappa^2 B_0^2 h_+ - \kappa^2 B_0\,\partial_z a_y$$
 $$\partial_t^2 a_y = \partial_z^2 a_y + B_0\,\partial_z h_+$$
+
 - Asymmetric coupling: gravity kinetic normalisation $1/(2\kappa^2)$ vs Maxwell $1$.
-- Beat frequency $\Delta\omega = \kappa B_0$ is the *geometric mean* of the two asymmetric couplings — worth mentioning as a sanity check.
+- Beat frequency $\Delta\omega = \kappa B_0$ — geometric mean of the two asymmetric couplings.
 
-**Headline formula**: $P(g\to\gamma) = \sin^2(\tfrac12 \kappa B_0 D)$ with $D = ct$.
+**Headline formula**: $P(g\to\gamma) = \sin^2(\tfrac12\kappa B_0 D)$.
 
-**The physics intuition** (the analogy to use): same math as two-state QM mixing, same as axion-photon Primakoff. Background $B_0$ is a "mixing medium" that detunes the graviton and photon dispersion just enough to drive coherent oscillation.
-
-**Deeper, if I have time**: the underlying reason is that the background $B_0$ contributes to the *graviton's* effective dispersion (through its stress-energy), while the photon stays massless. The detuning sets the beat frequency. This framing is more physical than "two-state mixing" and worth one sentence.
+**Physics intuition** (the analogy): same math as two-state QM mixing, same as axion-photon Primakoff. The deeper picture: the background $B_0$ contributes to the *graviton's* effective dispersion via its stress-energy; the photon stays massless. The detuning sets the beat frequency.
 
 ---
 
-## 4. Literature + why it's topical now
+## 4. Why standard Gertsenshtein is useless — and what the literature says now
 
-**Timeline to walk through:**
-- **Gertsenshtein 1962** — the original paper, identified the effect and gave the conversion formula.
-- **Boccaletti, De Sabbata, Fortini, Gualdi 1970** — rederivation with plasma corrections; this is the formula most modern papers actually use.
-- **Raffelt & Stodolsky 1988** — unified with axion-photon mixing in a single mixing-matrix framework. This is how particle physicists cite it.
-- **2020s revival** — Aggarwal et al. *Living Reviews in Relativity* 2021 HFGW review; Berlin, Blas, D'Agnolo, Ellis, Harnik, Kahn, Schutz 2022 (microwave cavity detectors); Domcke & Garcia-Cely 2021 (radio telescopes as HFGW detectors).
+**Why it's so weak**: $\kappa \sim 10^{-19}$ GeV$^{-1}$ — the Planck-scale suppression of gravitational interactions sits inside the conversion frequency. Doubling $B_0$ doubles the conversion rate; you need 20 orders of magnitude.
 
-**Why it's topical in 2026** (three bullets on the slide, say out loud):
-1. Astrophysical $B$-fields — magnetars $\sim 10^{15}$ G, intergalactic medium, early universe — are natural labs.
-2. It's the *only* linear-in-$h$ EM coupling, so any HFGW cavity-detector scheme is using Gertsenshtein (or its inverse).
-3. Model-independent at GR level, so it's a clean place to test *model-dependent* BSM signatures.
+**Literature timeline**:
+- **Gertsenshtein 1962** — original paper, gave the formula, recognised it was hopelessly small.
+- **Boccaletti et al. 1970** — rederived with plasma corrections.
+- **Raffelt & Stodolsky 1988** — unified framework with axion-photon mixing.
+- **2020s revival** — high-frequency GW detection programme: Aggarwal et al. *Living Reviews* 2021, Berlin et al. 2022 (microwave cavity haloscopes), Domcke & Garcia-Cely 2021 (radio-telescope HFGW detection).
 
-**The literature-error anecdote worth dropping if I have 20 seconds** (`docs/tex/gertsenshtein_formula.tex:26-95`):
-> Palessandro & Rothman 2023 quote the formula with a different prefactor — off by $\sqrt{4\pi}$ — because they use a non-canonical graviton kinetic normalisation. Dandoy, Lella et al. 2024 (arXiv:2406.17853) confirm our formula independently. The fact that this effect is *still* being rederived in 2024 and people *still* disagree on factors of $\sqrt{4\pi}$ tells you it's under-explored.
+**Why the revival now**: HFGW detector schemes use *exactly* the inverse Gertsenshtein process to convert hypothetical HFGW signals into photons in a cavity. So the small standard-GR conversion rate sets the noise floor for the entire HFGW programme — and any BSM physics that *amplifies* the conversion is *directly* relevant for detection.
+
+**Worth dropping** (`gertsenshtein_formula.tex:26-95`): the formula is *still* being rederived in the 2020s, and modern papers disagree on prefactors of $\sqrt{4\pi}$ depending on graviton normalisation conventions (Palessandro & Rothman 2023 vs Dandoy-Lella et al. 2024). That's a fingerprint of an under-explored corner of theoretical physics.
 
 ---
 
-## 5-6. Torsion via Poincaré gauging
+## 5. Beyond GR: Poincaré gauging
 
-**Gauge idea, for the audience:**
-- GR uses the Levi-Civita connection (metric compatible, torsion-free). Why? Historical choice, not a consequence.
-- Utiyama 1956, Kibble 1961, Sciama 1962: gravity as a gauge theory of the Poincaré group, analogous to gauging $U(1)$ for QED.
-- Gauging the two subgroups:
-  - Lorentz → spin connection $\omega^{ab}{}_\mu$ → curvature $R^{ab}{}_{\mu\nu}$.
-  - Translations → tetrad $e^a{}_\mu$ → **torsion** $T^a{}_{\mu\nu}$.
-- Tagline: *"GR keeps one of the two field strengths of the Poincaré group. PGT keeps both."*
+**The framing the audience knows**: GR uses a torsion-free, metric-compatible connection (Levi-Civita). That's a *choice*, not a consequence.
 
-**Geometric intuition** (slide 6):
-- Parallel-transport around a closed loop has two independent mismatches: rotational (curvature) and translational (loop fails to close — torsion).
+**Utiyama 1956, Kibble 1961, Sciama 1962**: gravity as a gauge theory of the Poincaré group, analogous to gauging $U(1)$ for QED. Two subgroups, two field strengths:
 
-**Why take PGT seriously** (four quick bullets):
-1. Couples naturally to fermion spin (Einstein-Cartan, Hehl et al. 1976).
-2. Minimal extension — smallest well-motivated deviation from GR.
-3. High-curvature / early-universe regimes where GR might fail first.
-4. Decades of literature: Sezgin & van Nieuwenhuizen 1980, Nikiforova 2009, Barker 2024 — all identifying ghost-free sectors.
+| Gauge subgroup | Connection         | Field strength                    |
+|----------------|--------------------|-----------------------------------|
+| Lorentz        | spin connection $\omega$ | **curvature** $R^{ab}{}_{\mu\nu}$  |
+| Translations   | tetrad $e$         | **torsion** $T^a{}_{\mu\nu}$        |
 
-**Honest caveat bullet**: PGT Lagrangians generically have ghost / tachyon sectors. This isn't a footnote; it will drive the results story later. Name-drop Ostrogradsky's theorem if I'm feeling confident.
+**Tagline**: *"GR keeps one of the two field strengths of the Poincaré group. PGT keeps both."*
 
----
+**Geometric intuition** (loop cartoon — placeholder image): parallel-transport around a closed loop has *two* mismatches — rotational (curvature) and translational (loop fails to close — torsion).
 
-## 7. The question
-
-**Slow down here, read the blockquote out loud:**
-> *In a PGT + Einstein-Maxwell Lagrangian, does torsion modify the Gertsenshtein conversion probability, and if so, through which coupling and in which regime?*
-
-**Sub-question** (the more interesting framing): *what does the Lagrangian have to look like for torsion to matter at all?*
-
-**Pivot line**: "To answer this at the level of an arbitrary Lagrangian — and to do it often enough to sweep parameter space — I built TIDAL."
+**Why take it seriously**:
+- Couples naturally to fermion spin (Einstein-Cartan, Hehl et al. 1976).
+- Minimal extension — smallest well-motivated deviation from GR.
+- Gives the most parameters to play with for *amplifying physics*, which is what we want.
 
 ---
 
-## 8. TIDAL — overview (start of the centrepiece)
+## 6. The systematic landscape — *all parity-even quadratic terms*
 
-**Expand the acronym once, never again**: Tensor Integration and Derivation for Any Lagrangian.
+**The phenomenological scan** (this is the slide that does the most work for the abstract):
 
-**Pipeline** (the tikz already on the slide): TOML → Mathematica (xAct/xTras) → JSON → Python numerics → sweeps/inference/plots.
+The Lagrangian we consider is
+$$\mathcal{L} = \frac{R}{2\kappa^2} + \alpha_1 I_1 + \alpha_2 I_2 + \alpha_3 I_3 + \beta_1 R^2 + \beta_2 R_{\mu\nu}R^{\mu\nu} + \beta_3 R_{[\mu\nu]}R^{[\mu\nu]} + \dots + \delta_1 R_{[\mu\nu]}F^{\mu\nu} + \dots - \tfrac14 F_{\mu\nu}F^{\mu\nu}$$
 
-**What the pipeline buys you — pitch in terms of physics capability, not code metrics:**
-- I can write down a new Lagrangian in a config file and have linearised PDEs, a numerical simulation, and a parameter sweep running within hours — not weeks. For the Gertsenshtein investigation, this meant testing dozens of torsion coupling variants systematically instead of committing to one hand-derived model and hoping it was the right one.
-- The symbolic derivation is *exact* — no truncation, no hand-simplification errors. The numerical solver can reproduce known analytic results (e.g. the Boccaletti Gertsenshtein formula) to **0.04% precision**, so when I see a deviation from the analytic answer, I can trust that it's physics, not numerics.
+The terms split into three families:
 
-**The core claim** to repeat verbatim from the slide:
-> "Every equation the numerics solves is traceable back to a single Lagrangian I typed in. No hand-derived PDEs. No manual index gymnastics."
+1. **Torsion-squared invariants** — three of them ($I_1$ tensor, $I_2$ vector/trator, $I_3$ axial/axitor sectors). Each gives torsion an independent kinetic term.
+2. **Curvature-squared invariants** — $R^2$, Ricci², antisymmetric Ricci², Riemann², all evaluated with the *Ricci-Cartan* connection (which mixes torsion in via the Shapiro identity).
+3. **Non-minimal couplings to matter** — $R_{[\mu\nu]}F^{\mu\nu}$, parity-odd Chern-Simons-like terms, etc. These are the operators that can *directly* shuttle energy between the gravitational and electromagnetic sectors.
 
-**Why it matters for this project**: varying the Lagrangian is the whole scientific method here. I am going to vary it dozens of times — different torsion operators, different couplings, different gauges, plasma backgrounds. Hand-deriving each variation is intractable and error-prone. And as we'll see, several of the key findings in this project came from being *able* to vary the theory systematically rather than committing to a single model upfront.
+**The total parameter space**: parity-even sector has roughly 10 independent couplings; parity-odd extension ~60. The scan is genuinely high-dimensional.
+
+**The methodological commitment** (worth saying out loud): we don't pick a theory in advance. We let the data — meaning the conversion probability and the causality structure — pick the regions of the Lagrangian that survive.
 
 ---
 
-## 9. TIDAL — symbolic side
+## 7. The question + program
 
-**The four cleverest bits** (from `docs/tex/architecture.tex` and `docs/tex/pipeline.tex`):
+**The question** (read out loud, slowly):
+> *Is there any combination of parity-even quadratic curvature and torsion terms whose linearised PDEs, in a background magnetic field, give an amplified Gertsenshtein conversion — and are those surviving theories physically viable?*
 
-1. **Component-level Euler-Lagrange** (`architecture.tex:372-393`). The big win:
-   > "Decompose the Lagrangian into scalar components *first*, then apply standard calculus E-L per component. Skip the abstract-tensor-index machinery entirely."
-   > **900× speedup** over abstract-index VarD for higher-curvature theories (e.g., the $\widetilde R^2$ term with ~45 contracted indices: **77 minutes → 5 seconds** for 2+1D).
+**Three things to do for every Lagrangian in the scan:**
+1. Derive the linearised field equations symbolically.
+2. Screen for causality-violating regimes via all-mode eigenvalue stability.
+3. Compute the conversion probability and compare to the GR baseline.
 
-2. **Deferred field canonicalisation** (`pipeline.tex:46-146`). Multi-field theories with derived tensors (Maxwell $F_{\mu\nu}$, torsion field strength) stay abstract all the way through `xPert`, expand only *after* perturbation is complete. Fixed three subtle pathologies in one change: #218 photon EOM merge, #250 graviton $h_5$ fragment, #255 torsion cross-sector interference. Collapsed three competing workarounds (~175 LoC) into one unified per-component canonicalisation.
+**Pivot line**: "All three steps are what TIDAL automates."
 
-3. **Volume element fix** (`volume_element_fix.tex`). Linearise the action via *native* $\sqrt{-g}$ perturbation — not just $\delta^2 \mathcal{L}$ but $\delta^2(\sqrt{-g}\,\mathcal{L})$. Massive gravity was **exponentially unstable** before this, because the Einstein tensor was missing its trace contribution. Fix: use xPert's native `Perturbation[Sqrt[-Detg[]], n]` support (commit `ca256cb`). **This is a genuinely good anecdote — a subtle symbolic bug that manifested as unphysical growth.**
+---
 
-4. **Ostrogradsky reduction** (`architecture.tex:395-442`). Higher-derivative Lagrangians get auto-reduced to 2nd-order systems via auxiliary fields. Example: graviton-torsion (37 fields after 3 Ostrogradsky auxiliaries) with a singular mass matrix handled by a three-level elimination (mass eigendecomposition → jerk substitution → Schur constraint elimination).
+## 8. TIDAL — overview
 
-**Processing summary** (one sentence for the slide):
-- `xPert` perturbation around arbitrary backgrounds.
-- Euler-Lagrange w.r.t. each field independently (tetrad, spin connection, matter fields).
+**Acronym, once**: Tensor Integration and Derivation for Any Lagrangian.
+
+**Pipeline** (the tikz diagram on the slide):
+TOML → Mathematica (xAct/xTras) → JSON → Python numerics → measurements & inference.
+
+**What the pipeline buys** (in physics-relevant terms):
+- A new candidate Lagrangian becomes runnable — *with derived PDEs, causality screening, and a conversion-probability measurement* — within hours, not weeks.
+- The symbolic derivation is *exact*; the numerics reproduces the analytic Boccaletti formula to **0.04%**, so deviations from analytic GR can be trusted as physics.
+
+**Core claim** (read verbatim from slide):
+> "Every equation the numerics solves is traceable back to a single Lagrangian I typed in. No hand-derived PDEs, no manual index gymnastics."
+
+**Why this matters for *this* project specifically**: scanning ten or sixty couplings systematically is impossible by hand. Without the pipeline, the abstract's "phenomenological scan" reduces to "pick one model and hope." The pipeline turns the abstract's program from a slogan into a procedure.
+
+---
+
+## 9. TIDAL — the symbolic side
+
+**Input**: a TOML file listing fields, Lagrangian, background fields, gauge fixing.
+
+**Processing** (Mathematica + xAct/xTras):
+- `xPert` for perturbation around arbitrary backgrounds.
+- Euler-Lagrange w.r.t. each field independently (tetrad, spin connection, matter).
 - Component decomposition, gauge fixing, mass / coupling matrix extraction.
 
-**Tagline**: *"Not a lookup table of hand-coded theories — a symbolic compiler."*
+**Two clever bits worth a sentence each:**
+
+1. **Component-level Euler-Lagrange** (`architecture.tex:372-393`). Decompose to scalar components first, then apply standard calculus E-L per component. Skips the abstract-tensor-index machinery. Without this, the $\widetilde R^2$ derivation (~45 contracted indices) takes 77 minutes; with it, it takes 5 seconds. *That speedup is what makes scanning the parameter space tractable.*
+
+2. **Custom parallelisation framework**. The abstract calls this out specifically. The xAct contraction kernel runs in parallel over independent symbolic sub-expressions. This was necessary because even with component-level E-L, theories with full quadratic torsion + curvature can produce thousands of terms. Without parallelisation, one Lagrangian variant takes a working day; with it, minutes.
+
+**Tagline**: *"Not a lookup table of hand-coded theories — a symbolic compiler for arbitrary Lagrangians."*
 
 ---
 
-## 10. TIDAL — numerical side
+## 10. The modal solver — architecture and what made it hard
 
-**The modal solver is the hero.** (`docs/tex/modal_solver.tex`). Four facts worth citing out loud:
+**This is the centrepiece of the numerical side.** Don't dilute it with multi-backend selling — focus on what the modal solver *is* and what we had to fix to make it work for PGT.
 
-1. **Machine precision** ($\sim 10^{-14}$ error from eigendecomposition alone).
-2. **No CFL condition.** Exact solution for any $t$ via $\exp(A\cdot t)\cdot y_0$ — cost is $O(1)$ in simulation time. Long-time runs don't cost more than short ones.
-3. **Performance numbers worth saying aloud:**
-   - Coupled scalars ($N=256$): **1,451× faster** than CVODE (0.003s vs 4.27s).
-   - Gertsenshtein ($N=512$, gradient coupling): **83-86× faster**.
-   - Localised Gertsenshtein (position-dependent coefficients): **86× faster** via sparse convolution matrix.
-   - Proca 3D with constraints: **238× faster**.
-   - Long runs ($t_\text{end}=500$): **7.7× faster** — modal is constant, CVODE scales linearly with $t$.
-4. **Cross-check capability**: "I can run the same physics through IDA, CVODE, leapfrog, and the modal solver and have them agree to machine precision. When they disagree, I know there's a bug — and I've caught several that way."
+**What it does** (one paragraph, say out loud):
+For systems linearised around a translation-invariant background, the equations are *linear with constant coefficients in space*. Fourier-transform: each mode $k$ evolves under its own finite-dimensional matrix $M(k)$. Diagonalise $M(k)$ once, compute $y(t,k) = e^{M(k)t}y_0(k)$ for any $t$. **Result: machine-precision accuracy ($|dE/E| \sim 10^{-14}$), no CFL condition, time-evolution cost independent of $t_\text{end}$.**
 
-**The Nyquist mode bug** (`modal_solver.tex:109-144`) — one of the best bug stories in the project:
-> Eigendecomposition of the highest-frequency Fourier mode creates complex coefficients. `irfft` silently discards the imaginary part at the Nyquist bin (it must be real for a real signal). Energy was drifting at $1.5 \times 10^{-5}$ — small enough to miss casually, but a clear fingerprint once you went looking. **Zero the Nyquist bin before eigendecomposition and you're at $2\times 10^{-14}$ — machine precision.** This is standard practice in pseudospectral methods (Boyd 2001) but is a rite of passage to re-discover on your own.
-> **Worth telling verbatim as a backup-slide anecdote.**
+**Why it's the right tool for *this* problem specifically** (this is the bit to say slowly):
+- Every Lagrangian we test linearises to constant-coefficient PDEs in flat space + uniform $B_0$. The modal solver's eligibility criteria are *precisely* the regime of the abstract.
+- Conversion probabilities for amplified parameter regions can range over 10+ orders of magnitude (e.g., Stage D1 detected suppression to $A \sim 10^{-12}$). Time-stepping schemes accumulate CFL error that swamps signals below $\sim 10^{-8}$. The modal solver doesn't accumulate any error, ever.
+- A nested-sampling inference run calls the solver $\sim 10^5$ times. Modal is $\sim 100\times$ faster than CVODE on this workload (`modal_solver.tex:231-246`). That's the difference between a campaign that finishes and one that doesn't.
 
-**Rank-deficient mass matrix / spurious tachyons** (`modal_solver.tex:582-697`, issue #256):
-> PGT with $\widetilde R^2$ produces a singular mass matrix (hidden constraints from Poincaré symmetry). The old modal code mis-classified acceleration operators and spawned fake tachyonic modes with $\mathrm{Re}(\lambda) \approx 1$ that exploded. Fixed in #256 via a unified three-level elimination using QZ decomposition.
-> This one is thematically important for the talk: *the investigation was literally blocked by a modal-solver artefact that masqueraded as physics*. Worth a backup slide.
+**The hard problems we had to solve to make it work for PGT** (this is the war-stories part — pick 2–3 to mention):
 
-**Analytical Jacobian tiers** (if there's time): dense ($N\leq 2k$, 5.3×), sparse ($2k<N\leq 200k$, 2.5×), GMRES ($N>200k$).
+1. **Rank-deficient mass matrices.** PGT generically has constraint fields (e.g., $A_0$, redundant torsion gauge DoF). The mass matrix $M$ is singular; you can't invert it. Fix: Schur-complement elimination — split into dynamical and constraint blocks, solve the constraint block algebraically, recover the evolution matrix on the dynamical sector only. Without this, the entire PGT family was unreachable. (`modal_solver.tex:200-222`.)
+
+2. **Doubly rank-deficient blocks** (when constraints couple to constraints). Standard eigendecomposition of $M^{-1}K$ fails. Fix: generalised eigenvalue problem via QZ decomposition (`scipy.linalg.eig(K, M)`).
+
+3. **Hidden block-diagonal structure**. The PGT+EM linearised system splits into independent polarisation blocks (e.g., $h_5\leftrightarrow a_1$ and trace↔torsion sectors). One sector is physical, the other is ghost-unstable. The modal solver detects this and works on the physical sector only.
+
+4. **The Nyquist energy leak** — pseudospectral war story worth telling: eigendecomposition of the highest-frequency Fourier mode produces complex coefficients; the inverse FFT silently discards the imaginary part at the Nyquist bin. Energy was drifting at $1.5\times 10^{-5}$ — small enough to miss casually, six orders of magnitude away from machine precision once you went looking. Zero the Nyquist bin before eigendecomposition: $|dE/E|$ drops to $2\times 10^{-14}$. Standard practice in pseudospectral methods (Boyd 2001) but a rite of passage to re-discover. (`modal_solver.tex:109-144`.)
+
+5. **Non-normal evolution matrices for localised backgrounds** — when $B_0(x)$ is spatially Gaussian rather than uniform, the Fourier-space coupling becomes a convolution, and the resulting $\sim 3000\times 3000$ matrix is *non-normal* (gradient operators $ik$ create eigenvalues with large positive real parts despite conservative physics). Individual $e^{\lambda t}$ overflow even though $e^{At}\cdot y_0$ is bounded. Fix: never form the eigendecomposition; use `expm_multiply` (Al-Mohy & Higham 2011) to compute the action of the matrix exponential directly. 29 s → 1.4 s, and the result agrees with Boccaletti's localised formula to 0.04%.
+
+**Pitch line for this slide**: *"The modal solver gives us an exact answer. Most of the engineering work was making 'exact' actually mean exact in the presence of constraints, gauge symmetries, and the floating-point traps that follow from them."*
 
 ---
 
-## 11. TIDAL — sweeps, inference, HPC
+## 11. Causality and stability — checking the surviving theories
 
-**Declarative downstream pipeline:**
-- `tidal sweep` — 13 measurement types, grid/LHS/Sobol/Morris.
-- `tidal sample` — Bayesian inference via MC or nested sampling (dynesty dev / PolyChord HPC), with priors (uniform, log-uniform, normal, arctan-uniform), hard constraints, and three likelihoods (maximise, gaussian, threshold).
+**This is the abstract's "characteristic speeds / causality" slide.** Frame it honestly: the project doesn't (yet) compute characteristic speeds in the formal PDE-theory sense; it does the closely related thing of computing *all-mode eigenvalues of the linearised evolution* and rejecting any region with growing modes.
 
-**HPC numbers worth citing** (`CLAUDE.md`, HPC section):
-- CSD3 (Cambridge), Sapphire (112 cores) / Icelake / CClake partitions.
-- Sweep parallelism sweet spot: **~98% of ideal efficiency** at `--parallel 32` on a 90-point plasma-Gertsenshtein benchmark.
-- Super-linear speedup at $P\in\{8,16\}$ from BLAS cache locality.
-- Real campaign number: the null-result sweep was **276 runs** across $(\xi, \alpha, \delta_m)$ with $10^{-6}$ precision agreement with the analytic formula.
+**The mechanism** (`tidal/inference/_prior_stability.py`, `tidal/measurement/_stability.py`):
+1. For every parameter point in the scan, build the modal evolution matrix $M(k)$ at each spatial wavenumber $k$.
+2. Compute the largest real part of any eigenvalue, $\max_k\,\mathrm{Re}(\lambda(k))$.
+3. If $\max\mathrm{Re}(\lambda) > 0$: the linearised system has a tachyonic / gradient-unstable mode. Reject the parameter point.
+4. The remaining region is the *causality-preserving slice* of parameter space.
 
-**Land the block-quote line** verbatim:
-> "The same Lagrangian that gave me a single simulation can give me a 276-point, five-parameter sweep with Bayesian uncertainty quantification — without writing new code."
+**Wired into Bayesian inference**: the stability check is part of the prior, not a post-hoc filter. Tachyonic samples get $\log\mathcal{L} = -\infty$, so PolyChord literally never samples there. The cost is $\sim 1$ ms per sample — about 5 s for a 5000-point prior draw. Cheap enough to do at every sample.
+
+**Why this matters for the talk's narrative** (this is the connection to make explicit):
+- The very same machinery that detects "this Lagrangian is unstable" also detects "this looked like amplification but was actually tachyonic onset" (issue #238 — see backup).
+- Without it, the apparent amplification factor $A\sim 665$ in the early non-minimal sweep would have been claimed as a result. With it, those points are flagged as causality-violating before they enter the posterior.
+
+**The methodological lesson worth landing**: *"In a phenomenological scan, the cheapest sanity check has to be embedded in the prior. Otherwise the inference will spend most of its time in regions where the linearisation is invalid."*
+
+**Future enhancement to mention if asked**: explicit dispersion-relation extraction $\omega(k)$ would give phase/group velocities directly. Listed as Phase I in `NEXT_PHASES.md:405-437`; the eigenvalue stability gate is the current implementation.
 
 ---
 
 ## 12. Results (placeholder)
 
-- Deliberately blank. Populate after the next sweep round: plasma-Proca, dark photon, full PGT HPC.
-- If forced to present earlier, the safe fallback is the **Boccaletti validation**: our numerical solver agrees with the localised-$B_0$ Gertsenshtein formula to **0.04% mean error** across all $R/\sigma$ ratios (`gertsenshtein.tex:161-200`) — and to **<0.015 RMS** across a 40-point $B_0$ sweep at $N=1024$.
-- This is "numerical methodology validation" framing, not "physics result" framing. Honest.
+- Deliberately blank. Populate after the next sweep round (currently Stage D3 / D2.2 Shapiro / parity-odd survey).
+- If forced to present earlier, the safe fallback is the **Boccaletti validation**: numerical agreement to 0.04% with the localised-$B_0$ analytic formula across all $R/\sigma$ ratios. Honest framing — methodology validation, not physics result.
 
 ---
 
-## 13. Outlook — what's coming
+## 13. Outlook — *the survey progress map*
 
-Three concrete upcoming investigations:
-1. **Plasma-Proca Gertsenshtein** — realistic plasma background (effective photon mass); magnetars, neutron-star magnetospheres, IGM.
-2. **Dark-photon BSM coupling** — kinetic mixing with a hidden $U(1)$; cross-references HFGW dark-photon searches.
-3. **Full PGT Lagrangian HPC sweep** — parameter-space map of torsion couplings on CSD3.
+The abstract's "systematic phenomenological program" is being executed as a multi-stage HPC campaign. This slide should show the *map* — what's scanned, what's survived, what's queued. **The audience's takeaway should be: "this is a real survey, with results, not a vague aspiration."**
 
-Payoff line: *"Each of these is now a config-file change, not a rewrite."*
+**Stages completed and what they found:**
+
+| Stage | Theory class | Outcome |
+|-------|--------------|---------|
+| **A** | Dark-photon plasma (T1) | Amplify NULL; **suppress informative** ($D_{\rm KL}=1.98$ nats, $\sim 100\times$ suppression in decoupling corner). |
+| **B** | Einstein-Cartan (T2) | NULL — torsion-trace coupling alone is Gertsenshtein-neutral. |
+| **C** | $R^2$-PGT structural | Algebraic null in TT channel — no run needed. |
+| **D1** | Ricci-EM ($\delta_1 R_{[\mu\nu]}F^{\mu\nu}$, T4) | **Strong suppression: Bayes factor $\sim 10^7$, $A_{\min}\sim 4\times 10^{-12}$.** Mechanism: destructive interference at $|\delta_1|\approx 1.3$. Amplification disfavoured (BF=0.10). |
+| **D2.0** | Bahamonde YM-PGT (T5, 5D) | NULL both directions ($\log Z \approx \pm 0.45$ to $\pm 0.62$). YM-PGT sector is Gertsenshtein-neutral. |
+| **D2.1** | Barker $\chi$-axial (T5+$\chi$, 6D) | NULL both directions; $\chi$ posterior centred at zero. Adding the Barker coupling changes nothing. |
+
+**The story emerging**: amplification is *elusive*. Multiple natural-looking PGT extensions produce no amplification or *suppression*. The phenomenological scan is *eliminating regions*, which is informative — it constrains where signal-bearing physics could live.
+
+**What's queued / planned:**
+- **D2.2 Shapiro PGT** — pending derivation. Extends D2 with additional torsion-curvature cross terms.
+- **D2.3 complete-PGT** — pending derivation. Full quadratic Bahamonde-Barker landscape together.
+- **D3 parity-odd YM-PGT-CP (T6)** — pending derivation. The parity-odd sector (Chern-Simons-like couplings); the abstract restricts to parity-even but parity-odd is a natural follow-up.
+- **Plasma-Proca extensions** — Gertsenshtein in a realistic plasma with effective photon mass; relevant for actual magnetar / IGM observability.
+- **T7 Complete-Even-PGT** (~10 couplings) and **T8 Complete-Odd-PGT** (~60 couplings) — contingent on Stage D finding signal in any subsector. Currently no strong amplification signal, so these are gated on D3 / future stages.
+
+**Pitch line**: *"The campaign so far has eliminated the simple PGT extensions as Gertsenshtein amplifiers. The next stages probe the structurally richer corners — parity-odd couplings, complete higher-curvature models, plasma-modified backgrounds. Each is a config-file change in the pipeline, not a rewrite."*
 
 ---
 
 ## 14. Summary
 - Three bullets, then stop. No rambling.
-- Gertsenshtein is old, under-explored, topical again.
-- Torsion is the half of Poincaré-gauge gravity GR discards; asking whether it modifies Gertsenshtein is the natural first BSM question.
-- TIDAL makes the question tractable, and the physics answers are coming.
+1. Standard Gertsenshtein is astrophysically useless — any usable signal needs new gravitational physics.
+2. We're systematically scanning the parity-even quadratic curvature + torsion landscape, with causality screening built into the inference prior.
+3. The first half of the scan is done: simple PGT extensions don't amplify; one direction (non-minimal Ricci-EM) gives strong *suppression*; the higher-dimensional, parity-odd, and plasma corners are next.
+
+**Closing line**: *"Whether or not amplification exists in this landscape, we're building the systematic map of where it could live. Thanks — questions and delivery feedback welcome."*
 
 ---
 
-## Physics discoveries and insights worth telling
+## Discovery anecdotes (for sprinkling and Q&A)
 
-Raw material for anecdotes to sprinkle into slides or pull into Q&A. Focus is on what's *physically surprising* — things an astrophysicist would find interesting about the interplay between theory, linearisation validity, and constrained systems.
+### A. The backreaction validity regime — Hwang & Noh's argument
 
-### 1. When does linearisation break down? The backreaction regime and the Hwang argument
+Foundational context for the linearisation. **Hwang & Noh 2023**: backreaction parameter scales as $\sim P/(8\pi^2)$, so $P\ll 1$ is exactly the linearisation-validity condition. The conversion probability *itself* measures when perturbation theory fails.
 
-This is foundational context for the whole project and worth a sentence on the Gertsenshtein intro slides or the TIDAL slides.
+**Our extension** — the $B_0\to 0$ theorem: we compute the conversion *coefficient* $C_0\equiv\lim_{B_0\to 0} P/B_0^2$. At $B_0=0$ the background is exactly self-consistent (flat Minkowski with zero gauge field is a trivial solution of the *full nonlinear* equations). Backreaction corrections are $O(B_0)$ and vanish in the limit. So $C_0$ is non-perturbative in the background, perturbative in the perturbation amplitude only.
 
-**The problem**: we linearise around flat Minkowski + uniform $B_0$. But a uniform $B_0$ carries stress-energy that should curve spacetime — the background isn't self-consistent. When is the linearisation trustworthy?
+**Pitch line**: *"We're not computing $P$ at some particular $B_0$ and hoping the answer is right — we're computing the coefficient $C_0 = P/B_0^2$ in the limit, where the background is provably exact."*
 
-**Hwang & Noh (2023)** gave the clean answer: the backreaction parameter scales as $\sim P/(8\pi^2)$. Backreaction is negligible whenever the conversion probability $P \ll 1$ — the conversion probability *itself* measures when perturbation theory fails. For realistic magnetar fields ($P \sim 10^{-10}$), backreaction is utterly negligible.
+### B. The naive Hamiltonian is not conserved
 
-**Our extension — the $B_0 \to 0$ theorem**: The conversion coefficient $C_0 \equiv \lim_{B_0 \to 0} P/B_0^2$ is computed on an *exactly self-consistent* background. At $B_0 = 0$, all field strengths vanish, so flat Minkowski with zero gauge field and zero torsion is a trivial solution of the *full nonlinear* equations. All backreaction and EFT corrections enter at $O(B_0)$ or higher and vanish in the limit. Since graviton-photon coupling requires $B_0$ (angular momentum conservation), $P \propto B_0^2$ analytically, giving a finite $C_0$ that is exact.
+A surprising theoretical fact worth a backup-slide or Q&A anecdote.
 
-**Pitch-line**: *"We're not computing $P$ at some particular $B_0$ and hoping the answer is right. We're computing the coefficient $C_0 = P/B_0^2$ in the limit $B_0 \to 0$, where the background is provably exact. The result is non-perturbative in everything except the perturbation amplitude."*
+For systems with constraint fields (gauge theories, PGT, massive gravity), the naive Hamiltonian — the textbook Legendre transform $H = \sum p_i\dot q_i - L$ — is **not conserved**. We measured $\max|dE/E|=1.37$ for massive gravity. Order-unity violation.
 
-### 2. Tachyonic onset masquerading as amplification (#238) — and the lesson about validity
+**Why it fails**: the Legendre transform assumes all velocities are independent. For constrained systems, constraint-field velocities are algebraically determined by the dynamical fields. The momentum conjugate to a constraint field vanishes by definition ($p_c\equiv \partial L/\partial \dot q_c\approx 0$); the naive $H$ includes terms that are gauge-artefacts, not physical energy.
 
-The most instructive physics discovery in the project. The story:
+**The proper treatment**: Dirac-Bergmann constrained Hamiltonian mechanics. Identify primary constraints, derive secondary constraints from consistency, construct the *reduced* Hamiltonian on the physical phase space. Only this reduced $H$ is gauge-invariant and conserved.
 
-- Swept the non-minimal coupling $\delta_1 \widetilde R_{[\mu\nu]}F^{\mu\nu}$; measured amplification factor $A = P_\text{torsion}/P_\text{GR} \sim 665$ near $\delta_1 = 1.0$, $\alpha_2 \approx -0.91$.
-- This looked like a strong signal. But a time-independence test revealed exponential growth: $P$ grew from $6.5\times$ at $t=20$ to $808\times$ at $t=50$. **Exponential, not oscillatory.**
-- **Physics diagnosis**: the non-minimal coupling introduces a Schur-complement shift to the photon's effective mass: $\Delta m^2_{a_1} \propto \delta_1^2$. At certain parameter values, $m^2_\text{eff}(a_1)$ passes through zero. When $m^2_\text{eff} < 0$, the photon mode is **tachyonic** — growth $\sim e^{|\gamma|t}$, not oscillation.
-- **Why it connects to Hwang**: this is the tachyonic instability Hwang & Noh identified as the fundamental limit of the linearisation. When $P \gtrsim 1$, the perturbation is large enough to backreact and the linearised treatment breaks down. But torsion couplings can drive $P \to 1$ at *much smaller* $B_0$ than GR does, because the tachyonic growth rate is $B_0$-independent — it's set by the effective mass, not the coupling strength.
-- **Methodological surprise**: the $B_0$-scaling test (measuring $C_0 = P/B_0^2 = \mathrm{const}$) *cannot* distinguish amplification from instability, because the tachyonic growth rate doesn't depend on $B_0$. A sanity check we trusted turned out to be blind to exactly the artefact it was supposed to catch.
-- **Pitch-line**: *"We had to go beyond the standard toolkit of checks to detect this — it required a time-independence test at multiple $t$ values, which is not standard practice in this literature."*
-- Source: `docs/AMPLIFICATION_INVESTIGATION.md:162-196`.
+**Pitch line**: *"The Legendre transform you learn in your first mechanics course silently breaks for constrained systems. In gauge gravity the constraints are not optional — so this is a routine surprise that shows up in any honest energy diagnostic."*
 
-### 3. The naive Hamiltonian is not conserved — and why that's physically surprising
+### C. Tachyonic onset masquerading as amplification (#238)
 
-This one is a good backup-slide or Q&A anecdote that would genuinely surprise the audience.
+Best "we thought we had X, turned out to be Y" moment in the project.
 
-**The claim**: for systems with constraint fields (gauge theories, PGT with auxiliary torsion modes, massive gravity), the naive Hamiltonian — the one you get by performing a straightforward Legendre transform $H = \sum_i p_i \dot q_i - L$ — is **not a conserved quantity**. We measured $\max|dE/E| = 1.37$ for massive gravity. Order-unity violation.
+- Early sweep of $\delta_1 R_{[\mu\nu]}F^{\mu\nu}$ showed $A\sim 665$ near $\delta_1\approx 1.0$, $\alpha_2\approx -0.91$.
+- Time-independence test: $P$ grew $6.5\times$ at $t=20$ and $808\times$ at $t=50$. Exponential, not oscillatory.
+- Diagnosis: Schur-complement coupling shift $\Delta m^2_{a_1}\propto\delta_1^2$ drives the photon's effective mass through zero. Tachyonic onset at the boundary of the Hwang validity region.
+- Methodological surprise: the $B_0$-scaling sanity check was *blind* to this, because tachyonic growth rates are $B_0$-independent.
+- Resolution: the all-mode eigenvalue stability gate (slide 11) catches it before the simulation runs.
 
-**Why it fails**: the Legendre transform assumes all velocities are independent. For constrained systems, constraint-field velocities are algebraically determined by the dynamical fields, not independent degrees of freedom. The momentum conjugate to a constraint field vanishes by definition ($p_c \equiv \partial L / \partial \dot q_c \approx 0$), so the naive $H$ includes terms that are gauge-artefacts, not physical energy.
+### D. Torsion-independence is *algebraic* (#199, #200)
 
-**The proper treatment**: Dirac-Bergmann constrained Hamiltonian mechanics. You must identify primary constraints ($p_c \approx 0$), derive secondary constraints from consistency ($\dot p_c \approx 0$ gives Gauss's law for EM, for example), and construct the *reduced* Hamiltonian on the physical phase space. Only this reduced $H$ is gauge-invariant and conserved.
+Cleanest physics result we have. The minimal PGT+EM linearised system decouples into two completely independent polarisation channels:
+- $h_5\leftrightarrow a_1$ (TT graviton ↔ transverse photon): **torsion-free**, gives standard $\sin^2(\kappa B_0 D/2)$.
+- trace sector ↔ $a_2$ ↔ torsion: ghost-unstable, *algebraically inaccessible from TT initial conditions*.
 
-**Why astrophysicists should care**: any gravitational theory with extra fields (PGT, Horndeski, massive gravity, etc.) will generically have constraint sectors. If you naively compute $H$ from the full Lagrangian and check energy conservation, you may conclude the simulation is broken when the physics is actually correct — or worse, conclude everything is fine when it isn't.
+A 200-point scan over all torsion parameters gave $P_\text{max} = 6.249987\times 10^{-6}$ to machine precision — matching the GR baseline.
 
-**Our workaround**: restrict the Hamiltonian to the dynamical sector only (graviton + photon terms), excluding constraint fields. This gives the correct conversion probabilities because the observable is *relative* energy transfer between sectors, and constraint contributions cancel.
+**Pitch line**: *"Torsion doesn't fail to modify Gertsenshtein for numerical reasons. It fails because the polarisation structure won't let it."*
 
-**Pitch-line**: *"The Legendre transform that you learn in your first mechanics course — the one that gives you $H$ from $L$ — silently breaks for constrained systems. And in Poincaré Gauge Theory, the constraints are not optional; they're built into the gauge structure."*
-- Source: `constraint_fields.tex:373-475`, issue #178.
+### E. The $\sqrt{-g}$ subtlety
 
-### 4. Torsion-independence is *algebraic*, not numerical (#199, #200)
-
-Worth embedding in the results or backup slides. This is the cleanest physics result we have.
-
-- The minimal PGT + EM system decomposes into two completely decoupled channels after plane-wave reduction:
-  - $h_5 \leftrightarrow a_1$: torsion-free, stable, gives the standard $\sin^2(\kappa B_0 D/2)$.
-  - trace sector $\leftrightarrow a_2 \leftrightarrow$ torsion: torsion-dependent, ghost-unstable, algebraically inaccessible from TT initial conditions.
-- This is *exact* and *algebraic*, not numerical. A 200-point sweep over all torsion parameters gave $P_\text{max} = 6.249987\times 10^{-6}$ to machine precision, matching the GR baseline.
-- **The physical reason**: the TT graviton ($h_+$) and the transverse photon ($a_x$) live in a polarisation sector that has *zero overlap* with any torsion mode. Torsion couples only to the trace/longitudinal sector, which a vacuum GW source doesn't excite.
-- **Pitch-line**: *"Torsion doesn't fail to modify Gertsenshtein for numerical reasons. It fails because the polarisation structure won't let it — TT gravitons simply don't talk to torsion modes."*
-
-### 5. The propagating-torsion dead end: coupling and instability from the same operator (#236)
-
-Quadratic PGT with propagating torsion ($\xi F_T^2$ kinetic term) plus $\delta_1 \widetilde R_{[\mu\nu]}F^{\mu\nu}$:
-- 5D parameter scan: 497/500 points unstable. Stability window: $|\delta_1| < 0.005$.
-- Within the stability window: $A = 1.000$ exactly — zero amplification.
-- **The physics**: $\widetilde R^2$ is what makes torsion propagate (gives it a kinetic term), but it's *also* the source of Ostrogradsky ghosts (4th-order time derivatives). The coupling that would let torsion modify Gertsenshtein is bundled with the instability that destroys the regime you'd measure it in. This is a consequence of Ostrogradsky's theorem, not a numerical accident.
-- **Literature context**: Sezgin & van Nieuwenhuizen (1980), Nikiforova (2009), Barker (2024) all identify *sector-specific* ghost-free windows, never a universal closed-form condition. The theory space is genuinely constrained.
-- **Pitch-line**: *"Within quadratic PGT, the operator that would do something is also the operator that destroys stability. You can't have one without the other."*
-
-### 6. Volume element linearisation — a subtle point about $\sqrt{-g}$
-
-Worth one sentence on the symbolic-side slide or as a backup-slide detail.
-
-When linearising an action, you must perturb $\sqrt{-g}\,\mathcal{L}$, not just $\mathcal{L}$. The volume element $\sqrt{-g}$ itself depends on the metric perturbation and contributes a trace term to the Einstein tensor at second order. If you omit it (linearise $\mathcal{L}$ alone), massive gravity becomes exponentially unstable. This is a standard GR subtlety but easy to miss in a symbolic pipeline — we caught it because the energy conservation diagnostic flagged unphysical growth in an otherwise well-understood theory.
-- Source: `volume_element_fix.tex`.
+Subtle GR fact worth one sentence on the symbolic-side slide. When linearising an action you must perturb $\sqrt{-g}\,\mathcal{L}$, not $\mathcal{L}$ alone. The volume element contributes a trace term to the Einstein tensor at second order. Massive gravity goes exponentially unstable if you skip it. We caught the bug because the energy-conservation diagnostic flagged unphysical growth in a theory where the answer was known. (`volume_element_fix.tex`.)
 
 ---
 
-## The one non-obvious thing (for the final summary and Q&A)
+## The one non-obvious thing (for the closing summary and Q&A)
 
-**Pulled from the two explore reports, this is the deepest thing I learned from all this documentation:**
+This is the sentence I should rehearse most carefully.
 
-The Gertsenshtein effect is a *generic* consequence of the graviton acquiring an effective mass-like dispersion from the background EM stress-energy, while the photon stays massless. The detuning drives coherent oscillation.
+> "The phenomenological scan over parity-even quadratic gravity is *eliminating regions*. Most extensions don't amplify Gertsenshtein — many actively suppress it, and several boundaries that look like amplification are tachyonic onset. The map of *where amplification cannot live* is itself a result, because it tells you which theoretical structures the relevant physics has to have."
 
-Torsion theories *add* new fields and new coupling paths — but **all minimal PGT constructions are blocked from modifying this channel by algebraic structure** (the polarisation block-diagonal decomposition). To break that structure you need non-minimal operators like $\widetilde R_{[\mu\nu]} F^{\mu\nu}$. But those operators generically introduce tachyonic instabilities at their own coupling boundaries.
-
-There is a *structural tension*: genuine propagating torsion (via higher-derivative terms) *always* comes with instabilities in PGT, because ghost-freedom is so constraining. Sezgin & van Nieuwenhuizen 1980, Nikiforova 2009, Barker 2024 all identify sector-specific ghost-free windows, never a universal closed-form condition.
-
-**The clarifying takeaway for astrophysicists in the audience:**
-> "You cannot simply 'add torsion' to the Gertsenshtein effect. The theory resists it. Either the polarisation structure blocks the coupling, or the coupling comes bundled with an instability that destroys the regime you wanted to probe. Mapping where that resistance gives way — and what's left of the physics on the other side — is what this project is about."
-
-This is the sentence I should rehearse most carefully. If I can land it in 25 seconds at the end of the talk, the rest of the talk is a setup for it.
+If I land that in 25 seconds at the end of the talk, the rest of the talk is its setup.

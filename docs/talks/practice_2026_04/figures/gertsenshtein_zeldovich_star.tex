@@ -1,0 +1,105 @@
+\documentclass[border=3pt,tikz]{standalone}
+\usepackage{bm}
+\usepackage{tikz,pgfplots}
+\usetikzlibrary{arrows.meta}
+\tikzset{>=latex} % for LaTeX arrow head
+\pgfplotsset{compat=1.13}
+\usetikzlibrary{decorations.markings,intersections,calc}
+\usepackage{ifthen}
+\usepackage[svgnames]{xcolor}
+\usepackage[outline]{contour} % glow around text
+\colorlet{Bcol}{violet!90}
+\colorlet{BcolFL}{violet!90!black}
+\colorlet{Corona}{DeepSkyBlue!25!LightSteelBlue}
+\colorlet{GW}{DeepPink}
+\contourlength{1.2pt}
+
+\usetikzlibrary{fadings}
+\begin{tikzfadingfrompicture}[name=halo]
+  \shade[inner color=transparent!0,outer color=transparent!100] (0,0) circle (0.9);
+\end{tikzfadingfrompicture}
+
+\tikzstyle{gw}=[-{Latex[length=2mm,width=1.5mm]}, GW, thick,decorate, decoration={snake,amplitude=3,segment length=8,post length=8}, path fading=east]
+
+
+\begin{document}
+
+\begin{tikzpicture}[
+    line cap=round,
+    line join=round]
+    \def\xmax{8}
+    \def\ymax{2}
+    \def\E{0.7}
+    \def\N{13}
+    \def\cone{27}
+    \def\tilt{8}
+
+    \fill[path fading=halo,Corona] (0,0) circle (2*\E); % Halo/corona
+
+    \draw[thick, dotted, Corona] (0,0) ellipse ({2*\E} and {1.7*\E});
+    \fill[MediumBlue, opacity=0.075] (0,0) ellipse ({2*\E} and {1.7*\E});
+
+    %\draw[green] (0,0) ellipse ({0.22*\xmax} and {0.8*\ymax});
+    \clip (-\xmax,-\ymax) rectangle (\xmax,\ymax);
+        \foreach \i [evaluate={\r=\i*\xmax;}] in {0.15, 0.3, 0.6, 0.99}{
+            \draw[BcolFL, thick, domain=0:360, smooth, samples=50, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+        }
+        \foreach \i/\ang [evaluate={\r=\i*\xmax;}] in {0.15/5, 0.3/2.6, 0.6/1.5, 0.99/0.8}{
+            \draw[BcolFL, -{Latex[length=2mm,width=1.5mm]}, thin, domain=0:90+\ang, smooth, samples=20, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL, -{Latex[length=2mm,width=1.5mm]}, thin, domain=360:270-\ang, smooth, samples=20, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+        }
+        \foreach \i/\ang [evaluate={\r=\i*\xmax;}] in {1.6/30, 3.0/20, 6.0/15, 20.0/10, 70.0/5}{
+            \draw[BcolFL, thick, domain=0:\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL, thick, domain=180-\ang:180, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL, thick, domain=180:180+\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL, thick, domain=360-\ang:360, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+        }
+        \foreach \i/\ang [evaluate={\r=\i*\xmax;}] in {0.3/58, 0.6/36.2, 1.6/20.83, 6.0/10.55}{
+            \draw[BcolFL,-{Latex[length=2mm,width=1.5mm]}, thin, domain=0:\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL,-{Latex[length=2mm,width=1.5mm]}, thin, domain=90:180-\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL,-{Latex[length=2mm,width=1.5mm]}, thin, domain=270:180+\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL,-{Latex[length=2mm,width=1.5mm]}, thin, domain=360:360-\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+        }
+        \draw[BcolFL, -{Latex[length=2mm,width=1.5mm]}, thin] (0,0) -- (0,0.803*\ymax);
+        \draw[BcolFL, -{Latex[length=2mm,width=1.5mm]}, thin] (0,-\ymax) -- (0,-0.803*\ymax);
+
+        \draw[BcolFL, thick] (0,0) -- (0,\ymax);
+        \draw[BcolFL, thick] (0,0) -- (0,-\ymax);
+
+    \draw[line width=1.5pt, white] (\tilt+90:1.1*\ymax) -- (\tilt-90:1.1*\ymax);
+
+    \draw[very thin,Corona,fill=Azure] (0,0) circle (\E); % Star
+
+    \draw[thick, draw=Corona,ball color=Azure,fill opacity=0.15] (0,0) circle (\E);
+    \draw[dashed, thick] (\tilt+90:1.1*\ymax) -- (\tilt-90:1.1*\ymax);
+
+    \node at (0.203*\xmax,0.87*\ymax) {\contour{white}{Magnetosphere}};
+    \node at (0.24*\xmax,-0.315*\ymax) {\contour{white}{Neutron Star}};
+
+    \foreach \i[evaluate={\y=\i*0.2*\ymax;}] in {-1,0,1}{
+        \draw[gw] (-0.9*\xmax,\y) -- (-2*\E,\y);
+    }
+    \node at (-0.65*\xmax,0.4*\ymax) {\contour{white}{Gravitational Waves}};
+
+    \coordinate (EM) at (2*\E,0);
+    \foreach \i [evaluate={\r={\i*0.57*\xmax/\N};}] in {1,...,\N}{
+        \draw[line width=2.5pt, white] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
+        \draw[line width=1.75pt, MediumBlue, opacity=0.075] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
+        \draw[thick, MediumBlue] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
+    }
+
+    \node[align=center] at (0.81*\xmax,0.55*\ymax) {\contour{white}{Fast Radio} \\ \contour{white}{Burst}};
+
+    \coordinate (A) at (-0.7*\xmax,-0.1*\ymax);
+    \coordinate (B) at (125:1.4*\E);
+    \coordinate (C) at (0.53*\xmax,0.23*\ymax);
+
+    \fill[white] (A) circle (0.19);
+    \fill[white] (B) circle (0.23);
+    \fill[white] (C) circle (0.18);
+    \node[shape=circle,draw,fill=white, inner sep=1pt] at (A) {a};
+    \node[shape=circle,draw,fill=white, inner sep=1pt] at (B) {b};
+    \node[shape=circle,draw,fill=white, inner sep=1pt] at (C) {c};
+\end{tikzpicture}
+
+\end{document}

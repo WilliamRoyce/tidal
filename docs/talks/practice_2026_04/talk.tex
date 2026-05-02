@@ -10,9 +10,12 @@
 \usepackage{amsmath,amssymb,bm}
 \usepackage{booktabs}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,decorations.pathmorphing}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,decorations.pathmorphing,
+                fadings,decorations.markings,calc}
 \usepackage{graphicx}
 \graphicspath{{figures/}}
+% standalone: allows \input{figures/*.tex} to work (strips outer \documentclass)
+\usepackage{standalone}
 
 % \todo{...} placeholder boxes for unfinished content.
 \usepackage[colorinlistoftodos,textsize=scriptsize]{todonotes}
@@ -22,9 +25,9 @@
 \setbeamertemplate{navigation symbols}{}
 
 % ---- Metadata ---------------------------------------------------------------
-\title[Torsion and the Gertsenshtein effect]%
-      {Does torsion modify the Gertsenshtein effect?}
-\subtitle{A symbolic-to-numerical study with TIDAL}
+\title[Graviton-photon conversion in PGT]%
+      {Surveying Graviton-Photon Conversion in Poincar\'e Gauge Theory}
+\subtitle{A systematic phenomenological survey}
 \author{William Royce}
 \institute{Cavendish Astrophysics \\ University of Cambridge}
 \date{Practice talk --- \today}
@@ -34,8 +37,6 @@
 
 \begin{frame}[plain]
   \titlepage
-  \vspace{-1em}
-  \centering\small\itshape Practice talk --- feedback on delivery welcome.
 \end{frame}
 
 \input{sections/01_motivation.tex}

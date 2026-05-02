@@ -1,14 +1,16 @@
-\begin{frame}{The question}
-  \note{\textasciitilde 7.5 min mark. Sharpest possible framing, then pivot to the tool.}
+\begin{frame}{The question and the program}
+  \note{\textasciitilde 7.5 min mark. Sharpest framing, then pivot to the tool.}
   \begin{block}{}
     \centering
-    \emph{In a PGT $+$ Einstein--Maxwell Lagrangian,\\
-    does torsion modify the Gertsenshtein conversion probability,\\
-    and if so, through which coupling and in which regime?}
+    \emph{Is there any combination of quadratic curvature and torsion modifications whose linearised PDEs, in a background magnetic field, give an amplified Gertsenshtein conversion --- and are the surviving theories physically viable?}
   \end{block}
-  \vspace{0.5em}
-  \textbf{Sub-question:} \emph{what does the Lagrangian have to look like} for torsion to matter at all?
-  \vspace{0.8em}
-
-  To answer that at the level of an \emph{arbitrary} Lagrangian --- and to do it often enough to sweep parameter space --- I built \textsc{tidal}.
+  \vspace{0.6em}
+  \textbf{For every Lagrangian in the scan, three things to do:}
+  \begin{enumerate}
+    \item Derive the linearised field equations symbolically.
+    \item Screen for causality-violating regimes via all-mode eigenvalue stability.
+    \item Compute the conversion probability and compare to the GR baseline.
+  \end{enumerate}
+  \vspace{0.6em}
+  All three are what \textsc{tidal} automates.
 \end{frame}
