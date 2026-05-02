@@ -35,9 +35,10 @@
     \quad\, no time-dependent coefficients)\\
     3.\ All BCs periodic\\
     4.\ All operators modal-supported\\
-    \quad (12 supported: identity, laplacian,\\
+    \quad (15 supported: identity, laplacian,\\
     \quad\, gradient$_{x,y,z}$, laplacian$_{x,y,z}$,\\
-    \quad\, cross\_deriv$_{xy,xz,yz}$, biharmonic)\\
+    \quad\, cross\_deriv$_{xy,xz,yz}$, biharmonic,\\
+    \quad\, derivative\_3$_{x,y,z}$)\\
     5.\ No time-dependent coefficients};
 
 % --- Modal solver ---
@@ -140,7 +141,7 @@
     \multicolumn{4}{@{}l}{\normalsize\textbf{Solver Key}}\\[4pt]
     \tikz\fill[PurpleFill!40, draw=PurpleLine, rounded corners=1pt]
         (0,0) rectangle (0.5,0.3); & \textbf{Modal}
-        & eigendecomp / matrix exponential & $\sim\!10^{-16}$ precision\\[2pt]
+        & Pad\'{e} matrix-exp (path~D) / \texttt{expm\_multiply} & $\sim\!10^{-16}$ precision\\[2pt]
     \tikz\fill[OrangeFill!40, draw=OrangeLine, rounded corners=1pt]
         (0,0) rectangle (0.5,0.3); & \textbf{IDA}
         & SUNDIALS implicit DAE & $\sim\!10^{-8}$ tolerance\\[2pt]

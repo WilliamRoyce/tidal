@@ -7,11 +7,13 @@ paths:
 # Solver Architecture Rules
 
 ## Solver Selection (auto, by priority)
-1. **Modal** — flat metric + periodic BCs + time-independent + supported operators → eigendecomposition
-2. **Leapfrog** — no constraints + no first_derivative_t + no dissipation → symplectic
-3. **CVODE** — no constraints → adaptive BDF
-4. **IDA** — has constraints (time_order=0 fields) → implicit DAE
-5. **scipy** — fallback
+1. **Modal** — flat metric + periodic BCs + time-independent + 15 supported operators → Padé matrix-exp (path D, `scipy.linalg.expm`). Eigendecomposition retired v0.31+.
+2. **IDA** — constraints present (time_order=0 fields) → implicit SUNDIALS DAE
+3. **IDA** — first-order equations (time_order=1, diffusion) → implicit BDF
+4. **IDA** — dissipation (`first_derivative_t` in RHS) → implicit BDF
+5. **CVODE** — pure wave equations → adaptive BDF (default fallback)
+
+**Leapfrog and scipy are manual-only** (`--scheme leapfrog` / `--scheme scipy`); never auto-selected.
 
 ## Key Classes
 - `FieldSet` — field metadata, slot indices, rebind(). Pre-computed offsets for hot paths.

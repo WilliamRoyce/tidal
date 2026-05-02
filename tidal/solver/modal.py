@@ -68,6 +68,9 @@ References
 #   unused args (bc, grid) kept for interface consistency with other solvers.
 # ruff: noqa: B903, PLR1702 — _OperatorDecomp uses __slots__ for memory efficiency;
 #   nested block depth is inherent to multi-field modal algebra.
+# ruff: noqa: DOC501, DOC502 — _evolve_per_mode_pade raises via nested helper;
+#   _evolve_per_mode wrapper documents the exception from the delegated call.
+# ruff: noqa: PLW2901 — y_curr intentionally overwritten in snapshot loop.
 
 from __future__ import annotations
 

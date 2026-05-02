@@ -38,29 +38,22 @@
     {Position-dep.\\coefficients?};
 
 % ===================================================================
-% PATH A: Per-mode eigendecomposition (upper branch, purple)
+% PATH D: Per-mode Padé matrix-exp (upper branch, pink)
 % ===================================================================
 \node[stage=Pink,
       below right=1.0cm and 0.6cm of branch.east, anchor=north] (matrix_pm)
-    {Build $A(k)$\\[-1pt]\scriptsize independent per mode $k$};
+    {Build $M = B^{-1}A(k)$\\[-1pt]\scriptsize independent per mode $k$};
 
 \node[stage=Pink,
-      below=0.4cm of matrix_pm] (eigen)
-    {Eigendecompose\\[-1pt]\scriptsize $A = V \Lambda V^{-1}$};
+      below=0.4cm of matrix_pm] (pade)
+    {Precompute $\exp(M \cdot dt)$\\[-1pt]\scriptsize via \texttt{scipy.linalg.expm} (Pad\'{e})\\[-1pt]\scriptsize once per mode};
 
 \node[stage=Pink,
-      below=0.4cm of eigen] (filter)
-    {Filter problematic modes\\[-1pt]
-     \scriptsize \textbullet\ gauge modes ($|\lambda| \to \infty$): freeze at IC\\
-     \scriptsize \textbullet\ tachyonic + zero IC coupling:\\
-     \scriptsize \quad $\mathrm{Re}(\lambda)>0$ \emph{and} $|\langle\psi|y_0\rangle|\approx 0$: freeze at IC};
-
-\node[stage=Pink,
-      below=0.4cm of filter] (evolve_eig)
-    {Evolve\\[-1pt]\scriptsize $e^{\Lambda \Delta t}$ (all $\Delta t$ at once)};
+      below=0.4cm of pade] (evolve_pade)
+    {Snapshot loop\\[-1pt]\scriptsize $\hat{y}_{n+1} = \exp(M\,dt)\cdot\hat{y}_n$\\[-1pt]\scriptsize $O(bs^2)$ matvec per mode};
 
 % ===================================================================
-% PATH B: expm_multiply (lower branch, lime)
+% PATH B: expm_multiply (lower branch, blue)
 % ===================================================================
 \node[stage=Blue,
       below left=1.0cm and 0.6cm of branch.west, anchor=north] (matrix_full)
@@ -78,7 +71,7 @@
 % CONVERGENCE: IFFT + output
 % ===================================================================
 \node[stage=Purple,
-      below=4.2cm of branch] (ifft)
+      below=3.8cm of branch] (ifft)
     {\textbf{IFFT}\\[-1pt]\scriptsize per field slot};
 
 \node[stage=Gray,
@@ -92,13 +85,12 @@
 \draw[arr] (input) -- (fft);
 \draw[arr] (fft) -- (branch);
 
-% Path A (upper): No position-dependent → per-mode eigendecomp
+% Path D (upper): No position-dependent → per-mode Padé expm
 \draw[arr] (branch.east) -| node[yeslbl, below left] {No} (matrix_pm.north);
-\draw[arr] (matrix_pm) -- (eigen);
-\draw[arr] (eigen) -- (filter);
-\draw[arr] (filter) -- (evolve_eig);
+\draw[arr] (matrix_pm) -- (pade);
+\draw[arr] (pade) -- (evolve_pade);
 \draw[arr, rounded corners=3pt]
-    (evolve_eig.south) |- (ifft.east);
+    (evolve_pade.south) |- (ifft.east);
 
 % Path B (lower): Yes position-dependent → sparsify → expm_multiply
 \draw[arr] (branch.west) -| node[nolbl, below right] {Yes} (matrix_full.north);
@@ -112,18 +104,18 @@
 
 
 % ===================================================================
-% BLOCK-AWARE CHECK (above per-mode matrix, Path A only)
+% BLOCK-AWARE + SPARSE-IC CHECK (above per-mode matrix, Path D only)
 % ===================================================================
-\node[check, above =1.2cm of matrix_pm.north east, text width=4.4cm] (blocks)
+\node[check, above =1.2cm of matrix_pm.north east, text width=4.6cm] (blocks)
     {Detect decoupled field blocks\\[1pt]
-     skip blocks with zero initial data\\[1pt]
-     check $\mathrm{Re}(\lambda)>0$: warn if large growth;\\
-     suppress if zero IC coupling\\
-     \scriptsize (not a physics change --- genuine coupling kept)};
+     \textbf{sparse-IC}: skip modes with $|\hat{y}_0|=0$ entirely\\[1pt]
+     \textbf{eigenvalue pre-check}: $\mathrm{Re}(\lambda_{\max})>0$\\
+     via \texttt{np.linalg.eigvals} (no full decomp)\\[1pt]
+     \scriptsize (eigenvalue pre-check replaces per-mode expm pre-check)};
 \draw[arr, densely dotted, OrangeLine] ([xshift=-0.8cm]blocks.south) -- ([xshift=-0.8cm]matrix_pm.north east);
 
 % ===================================================================
-% CONSTRAINT ELIMINATION (Schur complement, Path A only)
+% CONSTRAINT ELIMINATION (Schur complement, Path D only)
 % ===================================================================
 \node[detail=Pink, text width=3.1cm, below right=0.6cm and 0.4cm of matrix_pm.east, anchor=west] (schur)
     {\textbf{Schur complement}\\[2pt]
@@ -133,37 +125,52 @@
 
 \node[annot, above=0.0cm of schur] {if constraints present};
 
-% Arrow from matrix_pm down to Schur, then to eigen
+% Arrow from matrix_pm down to Schur, then to pade
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
     (matrix_pm.east) -- ([yshift=0.6cm]schur.west);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    ([yshift=-0.63cm]schur.west) -- (eigen.east);
+    ([yshift=-0.63cm]schur.west) -- (pade.east);
 
-% Tachyonic suppression annotation (right of filter node)
-\node[detail=Orange, text width=3.4cm, right=0.5cm of filter, anchor=west] (tachyon_note)
-    {\textbf{Tachyonic suppression}\\[2pt]
+% Tachyonic note (right of evolve_pade node)
+\node[detail=Orange, text width=3.4cm, right=0.5cm of evolve_pade, anchor=west] (tachyon_note)
+    {\textbf{Tachyonic modes}\\[2pt]
      Arises in e.g.\ PGT with $\tilde{R}^2$:\\
      wrong-sign mass eigenvalues in\\
      unphysical (axial/tensor) sector.\\[2pt]
-     Machine-precision noise in\\
-     uncoupled direction grows as\\
-     $\sim 10^{-16} e^{+5.9\,t} \to 10^{128}$.\\[2pt]
-     Two conditions to suppress:\\
-     \textbullet\ $\mathrm{Re}(\lambda) > 0$ (tachyonic)\\
-     \textbullet\ $|\langle\psi|y_0\rangle| \approx 0$ (uncoupled)};
+     \textbf{Pre-check}: $\mathrm{Re}(\lambda)>0$\\
+     detected via \texttt{eigvals}\\
+     (no full decomp needed).\\[2pt]
+     \textbf{Primary guard}: sparse-IC\\
+     skips modes with $|\hat{y}_0|=0$,\\
+     so noise never amplifies.};
 
 \draw[arr, OrangeLine, densely dashed, rounded corners=3pt]
-    (filter.east) -- (tachyon_note.west);
+    (evolve_pade.east) -- (tachyon_note.west);
 
-% Recovery arrow from evolve_eig down to reconstruction
-\node[detail=Pink, text width=3.0cm, below right=0.2cm and -0.6cm of evolve_eig, text width=2.8cm] (recover)
+% Recovery arrow from evolve_pade down to reconstruction
+\node[detail=Pink, text width=3.0cm, below right=0.2cm and -0.6cm of evolve_pade, text width=2.8cm] (recover)
     {\textbf{Reconstruct}\\[2pt]
      $\hat{c}(k) = -S_{cc}^{-1} S_{cd}\, \hat{d}(k)$\\[2pt]
      IFFT $\to c(x,t)$};
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (evolve_eig.east) -| (recover.north);
+    (evolve_pade.east) -| (recover.north);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
     ([yshift=-0.5cm]recover.west) -- ([yshift=-0.2cm]ifft.east);
+
+% ===================================================================
+% PASS 1 FOOTNOTE (v6 perturbative)
+% ===================================================================
+\node[detail=Gray, text width=4.8cm,
+      below=0.4cm of recover.south, anchor=north] (pass1)
+    {\textbf{Eigendecomposition: opt-in only}\\[2pt]
+     \texttt{collect\_eigendata} flag activates\\
+     per-block $M$, $y_0$ collection for\\
+     Pass~1 perturbative-Duhamel callers\\
+     (\texttt{\_evolve\_duhamel\_per\_mode}).\\[2pt]
+     Pass~1 uses augmented matrix-exp\\
+     $\exp\!\bigl(t\cdot\bigl[\begin{smallmatrix}A&S\\0&A\end{smallmatrix}\bigr]\bigr)$
+     (Al-Mohy \& Higham 2011~\S5.2).\\[2pt]
+     \scriptsize v6 perturbative architecture only};
 
 % ===================================================================
 % BACKGROUND ZONES
@@ -174,7 +181,7 @@
     % Physical space zone (blue tint)
     \node[fit=(input)(output), inner sep=12pt, fill=GrayFill, densely dashed, draw=GrayLine, fill opacity=0.2, rounded corners=5pt] {};
     % Fourier space zone (purple tint) — encompasses both branches
-    \node[fit=(fft)(ifft)(matrix_pm)(filter)(evolve_eig)(matrix_full)(sparsify)(expm),
+    \node[fit=(fft)(ifft)(matrix_pm)(pade)(evolve_pade)(matrix_full)(sparsify)(expm),
           inner sep=4pt, fill=PurpleFill, draw=PurpleLine, densely dashed,
           fill opacity=0.08, rounded corners=5pt] {};
 \end{scope}
@@ -194,11 +201,11 @@
 %       below right=0.2cm and 0.8cm of output.east, anchor=west,
 %       draw=GrayLine, rounded corners=2pt, inner sep=5pt, fill=white] {
 %     \textcolor{PinkLine}{\rule{0.5cm}{2pt}}
-%         \textbf{Path A}: per-mode eigdecomp (constant coeffs)\\
+%         \textbf{Path D}: per-mode Pad\'{e} expm (constant coeffs)\\
 %     \textcolor{BlueLine}{\rule{0.5cm}{2pt}}
 %         \textbf{Path B}: sparse \texttt{expm\_multiply} (position-dep.)\\
 %     \textcolor{PinkLine}{\rule[1pt]{0.5cm}{1pt}}
-%         Schur constraint elimination (Path A only)
+%         Schur constraint elimination (Path D only)
 % };
 
 \end{tikzpicture}

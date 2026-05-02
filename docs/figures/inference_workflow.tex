@@ -24,7 +24,7 @@
 \node[stage=Blue, below right=0.9cm and 1.6cm of input,
       minimum width=2.4cm] (nested)
     {\textbf{Nested sampling}\\[1pt]
-     \scriptsize $N_\mathrm{live}$ live points; dynesty / PolyChord};
+     \scriptsize $N_\mathrm{live}$ live points; PolyChord};
 
 \draw[arr] (input.south) -- ++(0,-0.35) -| (mc.north);
 \draw[arr] (input.south) -- ++(0,-0.35) -| (nested.north);
@@ -63,7 +63,7 @@
     {Measure};
 \node[stage=Blue, below=0.5cm of meas, minimum width=3.2cm] (loglik)
     {\textbf{Log-likelihood}\\[1pt]
-     \scriptsize maximize / gaussian / threshold};
+     \scriptsize maximize / minimize / extremize / gaussian / threshold};
 
 \draw[arr] (ccheck.south) -- (sim) node[midway, right, font=\scriptsize] {pass};
 \draw[arr] (sim) -- (meas);

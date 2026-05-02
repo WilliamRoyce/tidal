@@ -52,8 +52,8 @@
      sparse 1.2--2.5$\times$};
 
 \node[phase=Pink, below=0.4cm of jac, text width=6.6cm] (modal)
-    {\textbf{Fourier modal solver:} per-mode eigdecomp
-     (constant coefficients) / matrix exponential
+    {\textbf{Fourier modal solver:} per-mode Pad\'{e} expm, path~D
+     (constant coefficients) / \texttt{expm\_multiply}
      (position-dependent),
      Schur complement constraint elimination};
 \node[speedup=Pink, right=0.2cm of modal.east, anchor=west,
