@@ -213,12 +213,13 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 - [x] D2.0 Bahamonde sup r1 (28684410): log Z = −0.449 ± 0.002, ESS = 877, DONE (11 min!)
 - [x] D2.1 Barker amp (28607124): log Z = +0.618 ± 0.001, ESS = 875, DONE
 - [x] D2.1 Barker sup (28727741): log Z = −0.447 ± 0.001, ESS = 877, DONE
-- [ ] D2.2 Shapiro amp — pending prior derivation
+- [x] D2.2 Shapiro amp (28736161): log Z = +0.612 ± 0.002, ESS = 882, DONE (38 min INTR)
+- [x] D2.2 Shapiro sup (28739692): log Z = −0.615 ± 0.001, ESS = 883, DONE (33 min INTR)
 - [ ] D2.3 complete-PGT amp — pending prior derivation
-- [x] Results pulled: 28598736, 28607124, 28684410, 28727741
-- [x] Corner plots: hpc_results/28598736/corner.png, hpc_results/28607124/d21_barker_amp/corner.png, hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png, hpc_results/campaigns/d21_barker_sup/run/corner_sup.png
-- [ ] Analysis: any D_KL > 0.1 nats?
-- Notes: D2.0 and D2.1 amp log Z agree to 0.002 nats; χ is sub-leading (adding it changes nothing).
+- [x] Results pulled: 28598736, 28607124, 28684410, 28727741, 28736161, 28739692
+- [x] Corner plots: hpc_results/28598736/corner.png, hpc_results/28607124/d21_barker_amp/corner.png, hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png, hpc_results/campaigns/d21_barker_sup/run/corner_sup.png, hpc_results/28736161/corner_amp.png, hpc_results/28739692/corner_sup.png
+- [x] Analysis: no D_KL > 0.1 nats for any ζᵢ in D2.2 — all ζ parameters inert (< 0.05 nats)
+- Notes: D2.0 and D2.1 amp log Z agree to 0.002 nats; χ is sub-leading (adding it changes nothing). D2.2 adds ζ₁₋₃ (Shapiro derivative couplings): all three inert (D_KL < 0.025 nats each). Paired Bayes factor B = 3.41 (vs 2.90 for D2.0/D2.1) — comparable, Shapiro-neutral verdict stands.
 
 #### D3: YM-PGT-CP / T6
 
@@ -297,6 +298,11 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28727741 | T5 general (D2.1 Barker) | **D2.1 sup** | COMPLETED | ~18 min | INTR, campaign=d21_barker_sup. **log Z = −0.447 ± 0.001**, ESS = 877, n_samples = 3706. Params: β₁₋₃, ξ, δ₁, χ (6D, suppress). MAP: β₁=−0.064, β₂=−1.622, β₃=−0.240, ξ=0.571, δ₁=−0.022, χ=−0.008. D_KL = 0.003 nats (NULL). Marginal D_KL: β₁=0.271, ξ=0.129, β₂=0.055, χ=0.034, δ₁=0.030, β₃=0.018. Corner: `hpc_results/campaigns/d21_barker_sup/run/corner_sup.png`. |
 | 28732531 | T5 general (D2.0 Bahamonde) | D2.0 amp pipeline-check r1 | OOM KILLED | ~40 min | INTR, campaign=d20_bahamonde_amp_rerun_v2. Sidecar revert verified working (445 dead points in 30 min vs 0 in 60 min for 28729189). Controller rank OOM-killed at ~30 min — root cause: `fcntl.flock` sidecar removed but shared INTR node memory contention; no `--mem-per-cpu` in template. Fixed in commit abb85ef (1500 MiB/CPU). |
 | 28733840 | T5 general (D2.0 Bahamonde) | **D2.0 amp pipeline-check** | COMPLETED | 32 min | INTR, campaign=d20_bahamonde_amp_rerun_v2 (resumed from 445 dead-point checkpoint). **log Z = +0.617 ± 0.002**, ESS = 876, n_samples = 3439. Matches original 28598736 (log Z = +0.616 ± 0.001) to 3 sig. figs. Zero OOM events. **Pipeline health confirmed** after sidecar revert (commit 88a8b04) + mem-per-cpu fix (commit abb85ef). |
+| 28735529 | T5 general (D2.2 Shapiro) | D2.2 amp attempt 1 | CANCELLED | 0:00 | Cancelled before start — incorrect assumption about snapshot count; resubmitted without --snapshots flag. |
+| 28735539 | T5 general (D2.2 Shapiro) | D2.2 sup attempt 1 | CANCELLED | 0:00 | Cancelled simultaneously with 28735529. |
+| 28736161 | T5 general (D2.2 Shapiro) | **D2.2 amp** | COMPLETED | 37:51 | INTR. **log Z = +0.612 ± 0.002**, ESS = 882, n_samples = 3501. Params: β₁₋₃, ξ, δ₁, ζ₁, ζ₂, ζ₃ (8D). MAP: β₁=+0.69, β₂=−0.40, β₃=−0.99, ξ=0.011, δ₁=+0.017, ζ₁=+0.041, ζ₂=−0.021, ζ₃=+0.036. Prior stability: 59.1% rejected. Marginal D_KL: β₁=0.237, ξ=0.170, β₂=0.065, δ₁=0.030, ζ₁=0.021, ζ₂=0.025, ζ₃=0.022 — **all ζᵢ < 0.05 nats (inert)**. Corner: `hpc_results/28736161/corner_amp.png`. |
+| 28736190 | T5 general (D2.2 Shapiro) | D2.2 sup attempt 1 (standard) | CANCELLED | 0:00 | Submitted to icelake standard 6h queue; cancelled after INTR resubmit (28739692) completed faster. Never ran. |
+| 28739692 | T5 general (D2.2 Shapiro) | **D2.2 sup** | COMPLETED | 32:48 | INTR, campaign=d22_shapiro_sup_intr. **log Z = −0.615 ± 0.001**, ESS = 883, n_samples = 3641. Params: 8D (same as amp, minimize). MAP: β₁=+0.47, β₂=−2.69, β₃=+0.81, ξ=1.30, δ₁=+0.013, ζ₁=+0.010, ζ₂=−0.015, ζ₃=−0.036. Marginal D_KL: β₁=0.267, ξ=0.141, β₂=0.072, δ₁=0.017, ζ₁=0.013, ζ₂=0.022, ζ₃=0.023 — **all ζᵢ < 0.05 nats (inert)**. Paired B = exp(0.612−(−0.615)) = **3.41** (D2.0/D2.1: 2.90 — comparable). Corner: `hpc_results/28739692/corner_sup.png`. |
 
 ---
 
@@ -381,6 +387,13 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
   - **D2.1 Barker amp (28607124)**: log Z = +0.618 ± 0.001, ESS = 875, 6 params (adds χ). Log Z matches D2.0 to 0.002 nats: **adding the Barker χ parameter changes nothing**. 95% CI χ = [−0.0086, +0.0084] (fills the ±0.009 prior), Marginal D_KL(χ) = 0.032 nats (barely above noise). Consistent with the D2.1 prior derivation result: χ alone at δ₁ = 0 is benign, and the joint (δ₁, χ) instability only enters at the prior corners. **χ adds no amplification signal.** Prior stability sweep: 60.7% rejected (general nonminimal spec much tighter than D1).
   - **D2.1 Barker sup (28727741)**: log Z = −0.447 ± 0.001, ESS = 877. D_KL = 0.003 nats (NULL). χ posterior mean ≈ 0; adding χ to the Bahamonde sup sector also changes nothing. log Z matches D2.0 sup to 3 sig figs. **χ adds no suppression signal.**
   - **Comparison D1 vs D2**: D1 log Z = −2.26 (model disfavoured 10:1 for amplify); D2.0 log Z = +0.616; D2.1 log Z = +0.618. The D2 sub-models are slightly favoured over the null (Bayes factor ≈ 1.9 vs GR), but this is weak evidence at the level of noise. The much lower prior-rejection rate in D1 (single δ₁ parameter, stability boundary far from its prior edges) vs D2 (60.7% rejected) means the priors are tighter in D2 and the small log Z positive shift reflects prior compression, not physics. **D2 sup log Z = −0.447 confirms the symmetric null: the whole D2 sector is Gertsenshtein-neutral in both directions.**
+
+- Stage D2.2 Shapiro (T5 YM-PGT + ζ₁₋₃ Shapiro derivative couplings, 8D: β₁₋₃, ξ, δ₁, ζ₁, ζ₂, ζ₃; 2026-05-02): **NULL for both amplification and suppression — Shapiro ζᵢ couplings add nothing.**
+  - **Amplify (28736161)**: log Z = +0.612 ± 0.002, ESS = 882. D_KL = 0.002 nats. Marginal D_KL: β₁=0.237 (dominant, stability boundary), ξ=0.170, β₂=0.065; **ζ₁=0.021, ζ₂=0.025, ζ₃=0.022 — all below 0.05 nats threshold, inert**. log Z matches D2.0/D2.1 to within 0.006 nats. NULL.
+  - **Suppress (28739692)**: log Z = −0.615 ± 0.001, ESS = 883. D_KL = 0.002 nats. Marginal D_KL: β₁=0.267, ξ=0.141, β₂=0.072; **ζ₁=0.013, ζ₂=0.022, ζ₃=0.023 — all inert**. Completed in 33 min on INTR (standard 6h queue job cancelled as redundant).
+  - **Paired Bayes factor**: B = exp(log Z_amp − log Z_sup) = exp(0.612 − (−0.615)) = exp(1.228) = **3.41**. Compare D2.0: B=2.90, D2.1: B=2.90. D2.2 is slightly elevated (+18%), driven by a more negative log Z_sup (−0.615 vs −0.449 in D2.0). The shift in sup is not due to ζᵢ providing genuine suppression channels (all ζᵢ D_KL < 0.025 nats) but rather reflects the 3 additional ζᵢ prior dimensions slightly expanding parameter-space coverage near the stability boundary. The overall scale (B ≈ 3) is comparable across D2.0/D2.1/D2.2 and is well below the D1 paired-B range (~10⁷ for suppress). **Shapiro is Gertsenshtein-neutral** — identical verdict to D2.0 and D2.1.
+  - **Physical interpretation**: The Shapiro derivative couplings ζ₁R∂T·F, ζ₂R∂T·F̃, ζ₃R∂²T·F (irreducible torsion-derivative contractions with EM) do not modify h↔a Gertsenshtein conversion in the perturbative linear regime at these B₀ and t_end values. This is consistent with the ζ-scan result (all ζᵢ thresholds ≥ ±0.042): the priors are narrow enough that no ζᵢ value within ±0.05 causes a detectable signal. The joint (δ₁, ζᵢ) instability (rectangular structure in pairwise scan) never activates within the ±0.025 × ±0.05 prior box. **D2 sub-models (Bahamonde + Barker + Shapiro) are collectively Gertsenshtein-neutral.**
+  - Corner plots: `hpc_results/28736161/corner_amp.png` (amp), `hpc_results/28739692/corner_sup.png` (sup).
 - Stage D3: 
 - Stage E: 
 
