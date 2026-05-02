@@ -1,0 +1,29 @@
+\begin{frame}{Nested sampling: surveying the amplification landscape}
+  \note{Audience knows nested sampling. Lead with the repurposing: no observed
+    data --- $L(\theta)$ is a deterministic physics score from the PDE solver,
+    not $P(d\mid M)$. $\mathcal{Z}$ is prior-averaged amplification;
+    $D_{\mathrm{KL}}$ diagnoses whether any signal is generic or fine-tuned.}
+
+  \emph{No observed data --- $L(\theta)$ is a physics score, not $P(d\mid\theta)$.}
+
+  \vspace{0.4em}
+  \[
+    L(\theta) = A(\theta)
+    = \frac{P_{\max}(\theta)}{\sin^2\!\bigl(\tfrac{\kappa B_0 t}{2}\bigr)}
+  \]
+  \vspace{0.2em}
+
+  \begin{itemize}
+    \item valid in the linearised, perturbative regime: $P_{\max}\ll 1$,\;
+      $\kappa B_0 t\ll 1$;\;
+      tachyonic and non-perturbative (Hwang--Noh) regions $\to L=0$
+
+    \item $\displaystyle\mathcal{Z}=\int A(\theta)\,\pi(\theta)\,\mathrm{d}\theta$
+      \;---\; prior-averaged amplification:\\
+      $\mathcal{Z}\approx 1$ (null: model is GR-like across coupling space)
+      \quad vs \quad
+      $\mathcal{Z}\gg 1$ (enhancement is generic)
+
+    \item $D_{\mathrm{KL}}$ --- which specific coupling constants drive the signal?
+  \end{itemize}
+\end{frame}

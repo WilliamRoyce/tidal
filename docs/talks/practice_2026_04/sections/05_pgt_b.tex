@@ -1,41 +1,55 @@
 \begin{frame}{The systematic landscape}
-  \note{\textasciitilde 7 min mark. Scan ALL quadratic curvature + torsion terms --- both parity sectors. TIDAL is theory-agnostic: PGT is the first case study, not the only one.}
+  \note{\textasciitilde 7 min mark. Scan ALL quadratic curvature + torsion terms --- both parity sectors. TIDAL is theory-agnostic: PGT is the first case study, not the only one. Table: Barker 2406.12826; $^\dagger$ = upper bound before Bianchi reduction; B/S/O/HS = Barker/Shapiro/Obukhov/Hayashi--Shirafuji.}
   \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.56\textwidth}
-      Don't pick a theory in advance --- scan the full quadratic landscape:
-      \vspace{-0.4em}
+    \begin{column}{0.44\textwidth}
+      Don't pick a theory --- scan the full quadratic landscape:
+      \vspace{-0.3em}
       \[
         \mathcal{L} \supset
-          \underbrace{\alpha_i I_i}_{\text{torsion}^2}
+          \underbrace{\alpha_i I_i}_{T^2}
           +
-          \underbrace{\beta_i R^2_{(i)}}_{\text{curvature}^2}
+          \underbrace{\beta_i \Rt^2_{(i)}}_{\Rt^2}
           +
-          \underbrace{\delta_1 R_{[\mu\nu]}F^{\mu\nu}}_{\text{non-min.}}
+          \underbrace{\delta_1 \Rt_{[\mu\nu]}F^{\mu\nu}}_{\text{non-min.}}
           -\tfrac{1}{4}F^2
       \]
       \vspace{-0.3em}
       \begin{itemize}\small
-        \item \textbf{Torsion$^2$:} 3 invariants (tensor, vector, axial).
-        \item \textbf{Curvature$^2$:} Ricci-Cartan; torsion mixes via Shapiro.
-        \item \textbf{Non-minimal:} directly couples gravitational and EM sectors --- most promising for amplification.
+        \item \textbf{Torsion$^2$:} irreducible decomp.\ (tensor, vector, axial).
+        \item \textbf{Curvature$^2$:} Ricci-Cartan; torsion enters via Shapiro.
+        \item \textbf{Non-minimal:} directly couples gravitational and EM sectors.
       \end{itemize}
     \end{column}
-    \begin{column}{0.41\textwidth}
-      {\renewcommand{\arraystretch}{0.85}
-      \begin{center}\scriptsize
-        \begin{tabular}{lrr}
+    \begin{column}{0.53\textwidth}
+      {\renewcommand{\arraystretch}{0.52}
+      \begin{center}\tiny
+        \begin{tabular}{@{}lllc@{}}
           \toprule
-          Sector & Even & Odd \\
+          \textbf{Sector} & \textbf{Symbols} & \textbf{Lit.} & \textbf{N} \\
           \midrule
-          $\tilde{R}^2$ & 6 & 13 \\
-          $T^2$          & 3 & 4  \\
-          $F^2$          & 1 & --- \\
-          $\tilde{R}\times F$ & 1 & 3 \\
+          \multicolumn{4}{@{}l}{\textit{Parity-even quadratic, non-deriv.\ (11)}} \\
+          $\Rt^2$ & $\alpha_1\ldots\alpha_6$ & B: $\alpha_{1\text{--}6}$ & 6 \\
+          $T^2$ & $\beta_1,\beta_2,\beta_3$ & B: $\beta_{1\text{--}3}$; S: $I_{1\text{--}3}$ & 3 \\
+          $F^2$ & $\gamma_1$ & --- & 1 \\
+          $\Rt\times F$ & $\delta_1$ & --- & 1 \\
           \midrule
-          \textbf{Total} & \textbf{11} & \textbf{20} \\
+          \multicolumn{4}{@{}l}{\textit{Parity-odd quadratic, non-deriv.\ (21; 20 phys.)}} \\
+          $\eps\cdot\Rt^2$ & $d_1\ldots d_{13}$ & --- & 13 \\
+          $\eps\cdot T^2$ & $d_{14}\ldots d_{17}$ & --- & 4 \\
+          $\eps\cdot F^2$ & $d_{18}$ (topo) & --- & 1 \\
+          $\eps\cdot\Rt\times F$ & $d_{19},d_{20},d_{21}$ & --- & 3 \\
+          \midrule
+          \multicolumn{4}{@{}l}{\textit{Deriv.\ ext., parity-even}} \\
+          $\del T\times F$ & $\zeta_1,\zeta_2,\zeta_3$ & S: $\theta_{2,5,6}$ & 3 \\
+          $\Rt\times\del T$ & $\chi,\chi_2\ldots\chi_{10}$ & B: $\chi$ & $10^\dagger$ \\
+          $(\del T)^2$ & $\xi,\xi_2\ldots\xi_{16}$ & B: $\xi$ & $16^\dagger$ \\
+          \midrule
+          \multicolumn{4}{@{}l}{\textit{Deriv.\ ext., parity-odd}} \\
+          $\eps\cdot\del T\times F$ & $\tilde{\zeta}_{1\text{--}6}$ & --- & 6 \\
+          $\eps\cdot\Rt\times\del T$ & $\tilde{\chi}_{1\text{--}36}$ & --- & $36^\dagger$ \\
+          $\eps\cdot(\del T)^2$ & $\tilde{\xi}_{1\text{--}38}$ & --- & $38^\dagger$ \\
           \bottomrule
         \end{tabular}
-        \par\vspace{0.3em}{\tiny Barker 2406.12826}
       \end{center}}
     \end{column}
   \end{columns}
