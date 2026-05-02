@@ -221,7 +221,13 @@ cmd_submit() {
   jobid="${jobid%%;*}"  # strip ;cluster suffix if any
   [[ -n "$jobid" ]] || die "sbatch returned empty job id"
   mkdir -p "$(dirname "$JOBS_FILE")"
-  echo "$(date -Iseconds) $jobid $name $template $cmd" >> "$JOBS_FILE"
+  # Expand ${CAMPAIGN_DIR} in the recorded cmd so pull <jobid> can resolve the
+  # --output path without needing pull-campaign NAME.
+  local recorded_cmd="$cmd"
+  if [[ -n "$campaign" ]]; then
+    recorded_cmd="${cmd//\$\{CAMPAIGN_DIR\}/${camp_path}}"
+  fi
+  echo "$(date -Iseconds) $jobid $name $template $recorded_cmd" >> "$JOBS_FILE"
   echo "$jobid"
   # User-visible reminder: HPC jobs that crash on startup typically die
   # within 5-30 s (template bugs, MPI init failures, missing modules).
