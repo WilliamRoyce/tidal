@@ -24,8 +24,33 @@
   \placeholder{CoefficientEvaluator cache levels, operator library, constraint-IC solver, RHS evaluator, state layout.}
 \end{frame}
 
-\begin{frame}{B4 --- Modal solver under the hood}
-  \placeholder{Fourier diagonalisation + Krylov fallback, block-aware union-find, Schur-complement constraint elimination.}
+\begin{frame}{Modal solver: two structural fixes}
+  \footnotesize
+  After Fourier decomposition each spatial mode $k$ satisfies
+  $\dot{y}(t,k)=M(k)\,y(t,k)$, solved by $y(t,k)=e^{M(k)t}y_0(k)$.
+  Two main problems arise for gauge theories.
+
+  \vspace{0.3em}
+  \textbf{(i) Ill-conditioned eigenvectors.}\\
+  The standard route $V\,\mathrm{diag}(e^{\lambda t})\,V^{-1}y_0$ requires inverting the
+  eigenvector matrix $V$.  Gauge theories have degenerate and near-zero eigenvalues;
+  $\mathrm{cond}(V)$ reaches $10^{15}$--$10^{17}$, making $V^{-1}$ numerically catastrophic.\\[0.15em]
+  \textbf{Fix:} compute $e^{Mt}y_0$ directly via Pad\'e approximant --- no eigenvectors, machine-precision output.
+
+  \vspace{0.3em}
+  \textbf{(ii) Constraint fields (no time derivative).}\\
+  Gauss-law constraints ($A_0$, frame components) enter algebraically, not dynamically.
+  Per mode, partition into dynamic $d$ and constrained $c$:
+  \[
+    \begin{pmatrix}\dot{d}\\0\end{pmatrix}
+    =
+    \begin{pmatrix}S_{dd}&S_{dc}\\S_{cd}&S_{cc}\end{pmatrix}
+    \begin{pmatrix}d\\c\end{pmatrix}
+    \;\Longrightarrow\;
+    c = -S_{cc}^{-1}S_{cd}\,d,\qquad
+    \dot{d} = \underbrace{\bigl(S_{dd}-S_{dc}S_{cc}^{-1}S_{cd}\bigr)}_{M_{\rm red}}\,d.
+  \]
+  Evolve $M_{\rm red}$ by matrix exponential; recover $c$ algebraically at the end.
 \end{frame}
 
 \begin{frame}{B5 --- References}

@@ -1,25 +1,21 @@
-\begin{frame}{The modal solver --- architecture}
-  \note{\textasciitilde 11 min mark. What it does and why it's the right tool for this problem. Then land the three hard problems.}
-
-  \small\textbf{Approach.} For PDEs with constant spatial coefficients, Fourier-transform: each mode $k$ evolves under matrix $M(k)$. Diagonalise once; $y(t,k)=e^{M(k)t}y_0(k)$. Machine-precision ($|dE/E|\sim10^{-14}$), no CFL, cost independent of $t_\mathrm{end}$.\normalsize
+\begin{frame}{Modal solver}
+  A spectral solver for the linearised gauge theories the survey
+  produces. Two regimes --- per-mode (uniform $B_0$) and convolution-coupling (localised $B_0(x)$) --- both evolve by direct matrix
+  exponential, \emph{no eigendecomposition}.
 
   \vspace{0.25em}
-  \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.48\textwidth}
-      \textbf{Why it fits this problem:}
-      \begin{itemize}\scriptsize
-        \item Every theory in the scan linearises to constant-coefficient PDEs in flat space $+$ uniform $B_0$ --- the modal eligibility criteria match exactly.
-        \item Signals span $>10^{12}$: time-stepping errors swamp $P < 10^{-8}$; modal solver has no accumulation error.
-        \item $\sim\!10^5$ solver calls per inference run --- $100\times$ speedup over CVODE makes the campaign tractable.
+  \begin{itemize}\footnotesize
+    \item Every theory linearises to periodic, time-independent PDEs around flat backgrounds
+    \item Both uniform and localised $B_0$ stay inside the regime (per-mode vs.\ convolution coupling)
+    \item Machine-precision time evolution; no time-stepping error
       \end{itemize}
-    \end{column}
-    \begin{column}{0.49\textwidth}
-      \textbf{Hard problems solved for PGT:}
-      \begin{itemize}\scriptsize
-        \item \textbf{Rank-deficient mass matrices} (PGT constraint fields carry no time derivatives) $\Rightarrow$ Schur-complement elimination. Same structure as Dirac--Bergmann: naive Legendre transform gives $\max|dE/E|=1.37$.
-        \item \textbf{Massive eigenvalue degeneracy} $\Rightarrow$ Krylov \texttt{expm\_multiply} throughout --- computes $e^{Mt}v$ without eigendecomposition; unusual for a spectral solver.
-        \item \textbf{Nyquist-mode energy leak} $\Rightarrow$ zero one Fourier coefficient: $|dE/E|:\;10^{-5}\to10^{-14}$.
+
+  Off-the-shelf $V\,\mathrm{diag}(e^{\lambda t})\,V^{-1}$ fails universally on gauge theories.
+  \begin{itemize}\footnotesize
+    \item \textbf{Direct matrix exponential} (Pad\'e / Krylov),
+          not eigendecomposition, $V$ catastrophically ill-conditioned
+    \item \textbf{Fourier-space algebraic elimination} of fields
+          without time derivatives
       \end{itemize}
-    \end{column}
-  \end{columns}
+
 \end{frame}
