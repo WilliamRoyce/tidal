@@ -8,11 +8,11 @@
 \subsection{Overview}
 \label{sec:modal-overview}
 
-The Fourier modal solver (\texttt{tidal/solver/modal.py}) provides exact, machine-precision solutions for linear PDE systems with periodic boundary conditions and time-independent coefficients. It transforms the spatial grid to Fourier space, builds a per-mode evolution matrix, and eigendecomposes to obtain the exact solution $y(t) = \exp(A \cdot t) \cdot y_0$ --- eliminating spatial discretization error entirely.
+The Fourier modal solver (\texttt{tidal/solver/modal.py}) provides exact, machine-precision solutions for linear PDE systems with periodic boundary conditions and time-independent coefficients. It transforms the spatial grid to Fourier space, builds a per-mode evolution matrix, and computes $\exp(A \cdot t) \cdot y_0$ via Pad\'{e} matrix-exponential (\cref{sec:modal-robust-matrix-exp}) --- eliminating spatial discretization error entirely.
 
 \textbf{Key advantages over PDE solvers (CVODE/IDA):}
 \begin{itemize}
-  \item Machine-precision accuracy (${\sim}10^{-14}$ error, limited only by eigendecomposition)
+  \item Machine-precision accuracy (${\sim}10^{-14}$ error, limited only by IEEE-754 floating-point precision; see \cref{sec:modal-snapshot-precision})
   \item No CFL condition or adaptive timestepping needed
   \item $O(N^2)$ per output time after $O(N^3)$ precomputation
   \item Exact for any time point --- no time-stepping error accumulation
@@ -195,8 +195,8 @@ Detection: \texttt{\_has\_position\_dependent\_terms()} checks for spatially-var
 \label{par:modal-one-method}
 
 \begin{itemize}
-  \item \textbf{\texttt{expm\_multiply} for everything?} No --- eigendecomposition is ${\sim}70\times$ faster for constant-coefficient cases and gives machine precision (${\sim}10^{-14}$ error).
-  \item \textbf{Eigendecomposition for everything?} No --- it gives \textbf{wrong results} for non-normal convolution matrices (position-dependent case). This is not a precision issue but a fundamental numerical instability: individual $\exp(\lambda \cdot t)$ overflow while $\exp(A \cdot t) \cdot y_0$ is bounded (pseudospectral phenomenon).
+  \item \textbf{\texttt{expm\_multiply} for everything?} No --- for the small per-mode blocks ($bs \le 15$) of the constant-coefficient path, \texttt{expm\_multiply} carries per-call Krylov-Taylor setup overhead that vastly dominates the $O(bs^3)$ exponential cost. Precomputing $\exp(M \cdot \mathrm{d}t)$ once per mode via \texttt{scipy.linalg.expm} (Pad\'{e} path~d; see \cref{sec:modal-robust-matrix-exp}) is $0.49$--$1.06\times$ the wall time of the former eigendecomposition path while giving equivalent machine precision.
+  \item \textbf{Eigendecomposition for everything?} No --- it gives \textbf{wrong results} for non-normal convolution matrices (position-dependent case). This is not a precision issue but a fundamental numerical instability: individual $\exp(\lambda \cdot t)$ overflow while $\exp(A \cdot t) \cdot y_0$ is bounded (pseudospectral phenomenon). The eigendecomposition path for the constant-coefficient (per-mode) case was also retired in v0.31 in favour of the unconditional Pad\'{e} path (\cref{sec:modal-pade-pass1}), which is robust for any $\mathrm{cond}(V)$.
 \end{itemize}
 
 \paragraph{Sparse convolution matrix optimization.}
@@ -303,7 +303,7 @@ Solution: $\hat{u}_k(t) = \hat{u}_k(0) \cdot \exp(-D k^2 t)$ --- exponential dec
 \subsection{Error Model}
 \label{sec:modal-error-model}
 
-The \textbf{only} error source is eigendecomposition precision (${\sim}10^{-14}$ for well-conditioned matrices). For parameter sweeps, numerical uncertainty is effectively zero --- the dominant error becomes the physics model itself.
+The dominant error source is the Pad\'{e} scaling-and-squaring backward error (${\sim}10^{-14}$ per application; Higham 2009 \S4) plus $O((k-1) \cdot u \cdot \|\exp(M \cdot \mathrm{d}t)\|^2)$ accumulated matmul roundoff for snapshot $k$ in the step-by-step path (see \cref{sec:modal-snapshot-precision}). For inference runs using $N=2$ snapshots (initial + final), the final snapshot is produced by a single matrix-exponential application with zero accumulation --- machine-precision at $t_\mathrm{end}$. For parameter sweeps, numerical uncertainty is effectively zero in all configurations --- the dominant error becomes the physics model itself.
 
 Comparison with other solvers on single-field KG ($k=1$, $m^2=1$, $N=64$, $t=1$):
 
@@ -343,11 +343,11 @@ $N=256$ & 0.003\,s & 4.27\,s & $\mathbf{1{,}451\times}$ & $6.3\times 10^{-4}$ \\
 
 Key observations:
 \begin{itemize}
-  \item \textbf{Modal time is $O(1)$ in grid size} --- eigendecomposition cost is per-mode ($4\times 4$ matrices), independent of $N$. The IFFT reconstruction is $O(N \log N)$ but negligible.
+  \item \textbf{Modal time is $O(1)$ in grid size} --- Pad\'{e} precomputation cost is per-mode ($4\times 4$ matrices), independent of $N$. The IFFT reconstruction is $O(N \log N)$ but negligible.
   \item \textbf{CVODE scales as $O(N^{2+})$} --- spatial operator evaluation is $O(N)$ per timestep, and more grid points require more timesteps to resolve the same physics.
   \item \textbf{Max diff is CVODE error, not modal error} --- modal solutions are exact to machine precision (${\sim}10^{-16}$); the $10^{-4}$ difference is entirely CVODE truncation error.
   \item \textbf{Speedup grows with $N$} --- at $N=256$ the modal solver is ${>}1000\times$ faster, making it transformative for parameter sweeps where hundreds of simulations are needed.
-  \item \textbf{Modal time is $O(1)$ in simulation time} --- eigendecomposition is done once; evaluating at any $t$ is just $\exp(\lambda \cdot \Delta t)$. CVODE must take more timesteps for longer runs. See scaling table below.
+  \item \textbf{Modal time is $O(1)$ in simulation time} --- $\exp(M \cdot \mathrm{d}t)$ is precomputed once per mode; each additional snapshot is one matvec at $O(bs^2)$. CVODE must take more timesteps for longer runs. See scaling table below.
 \end{itemize}
 
 \subsubsection{Gertsenshtein Effect (6 Fields, Gradient Coupling)}
@@ -407,7 +407,7 @@ $t_\text{end}$ & Modal & CVODE & Speedup \\
 \end{table}
 
 \begin{itemize}
-  \item \textbf{Modal cost is constant in $t_\text{end}$} (${\sim}1.5$\,s) --- eigendecomposition is done once, and evaluating $\exp(\lambda \cdot \Delta t)$ at each output time is $O(1)$ regardless of $\Delta t$. The ${\sim}1.5$\,s is Python startup + FFT + eigendecomposition overhead.
+  \item \textbf{Modal cost is constant in $t_\text{end}$} (${\sim}1.5$\,s) --- $\exp(M \cdot \mathrm{d}t)$ is precomputed once per mode, and each snapshot step is one matvec at $O(bs^2)$, $O(1)$ in $\Delta t$. The ${\sim}1.5$\,s is Python startup + FFT + Pad\'{e} precomputation overhead.
   \item \textbf{CVODE cost scales linearly with $t_\text{end}$} --- each additional unit of simulation time requires proportionally more adaptive timesteps.
   \item \textbf{Speedup grows linearly with $t_\text{end}$} --- for a 40-point parameter sweep at $t_\text{end}=500$, modal saves ${\sim}7$ minutes vs CVODE. For $t_\text{end}=5000$ (astrophysical timescales), the advantage would be ${\sim}50\times$.
 \end{itemize}
@@ -848,6 +848,35 @@ The eigendecomposition path remains opt-in for the Pass~1 perturbative-Duhamel s
 The cross-formulation cross-check (FV vs.\ CDT) was the empirical signal that triggered this investigation. For more complex PGT theories in the campaign roadmap (Stages~B--E), an FV-style alternative formulation may not exist for cross-checking. Without the unconditional path~(d) fix, those campaigns would silently produce wrong answers in any region of parameter space where the redundant tensor components drive $\mathrm{cond}(V)$ above $10^{13}$. The unconditional fix is therefore a campaign-wide robustness investment, not just a Stage~A bug fix.
 
 \textbf{References}: Higham, N.J.\ (2008). \emph{Functions of Matrices: Theory and Computation}, SIAM, \S2.3 (eigendecomposition abandonment threshold); Higham, N.J.\ (2009). ``The scaling and squaring method for the matrix exponential revisited.'' \emph{SIAM Review} 51(4):747--764; Trefethen, L.N.\ \& Bau, D.\ (1997). \emph{Numerical Linear Algebra}, SIAM, Lecture~33; Al-Mohy, A.H.\ \& Higham, N.J.\ (2011). ``Computing the action of the matrix exponential.'' \emph{SIAM J.\ Sci.\ Comput.} 33(2):488--511; Davies, P.I.\ \& Higham, N.J.\ (2003). ``A Schur--Parlett algorithm for computing matrix functions.'' \emph{SIAM J.\ Matrix Anal.\ Appl.} 25(2):464--485.
+
+\subsubsection{Snapshot output precision}
+\label{sec:modal-snapshot-precision}
+
+The modal solver produces two structurally different snapshot output paths, with different precision characteristics.
+
+\paragraph{Uniform step-by-step path (default).}
+When the requested snapshot times are equally spaced (\texttt{t\_eval = [0, dt, 2dt, \ldots]}), the solver precomputes $E \equiv \exp(M \cdot \mathrm{d}t)$ once per mode block via \texttt{scipy.linalg.expm}, then applies it iteratively:
+\begin{equation}
+y_k = E \cdot y_{k-1} = E^k \cdot y_0
+\end{equation}
+Snapshot $k$ therefore accumulates $k-1$ matrix-multiplication roundoff errors beyond the initial Pad\'{e} backward error. For $k$ steps with block size $bs$, the bound is
+\begin{equation}
+\|\delta y_k\| \lesssim (k-1) \cdot u \cdot \|E\|^2 \cdot \|y_0\|
+\end{equation}
+where $u \approx 2.2 \times 10^{-16}$ is IEEE-754 unit roundoff. For the D2.2 campaign configuration ($t_\mathrm{end}=10$, $N=21$ snapshots, $\mathrm{d}t=0.5$), the accumulated error at the final snapshot is ${\sim}19 \times u \approx 4 \times 10^{-15}$ --- negligible for all practical physics measurements.
+
+\paragraph{Non-uniform path.}
+When snapshot times are unequally spaced, each snapshot is computed independently from the initial state:
+\begin{equation}
+y(t_k) = \exp\!\bigl(M \cdot (t_k - t_0)\bigr) \cdot y_0
+\end{equation}
+Each snapshot is machine-precision at every $t_k$ with no accumulation. The cost is $n_\mathrm{snaps}$ \texttt{expm} calls per mode block, compared to one \texttt{expm} call for the uniform path.
+
+\paragraph{$N=2$ snapshot special case (inference).}
+When \texttt{--snapshots=t\_end} is passed (or equivalently \texttt{t\_eval = [0, t\_end]}), the uniform path applies with $\mathrm{d}t = t_\mathrm{end}$: $E = \exp(M \cdot t_\mathrm{end})$ is precomputed once and applied \emph{once}. This is machine-precision at $t_\mathrm{end}$ with zero accumulated error --- identical precision to the non-uniform path at every snapshot, at the cost of a single \texttt{expm} precomputation. This is the recommended configuration for PolyChord/nested-sampling inference runs where only the final state is needed (see \cref{sec:inference-snapshot-guidance}).
+
+\paragraph{Why not switch the uniform path to compute each snapshot from $y_0$?}
+For visualization workloads with $N=21$ snapshots and $n_\mathrm{modes}=128$ blocks (e.g.\ \texttt{graviton\_torsion}), switching to direct-from-$y_0$ would require $21 \times 128 = 2688$ \texttt{expm} calls vs.\ $128$ for the current uniform path --- approximately $21\times$ more \texttt{expm} calls. The resulting regression in visualization sweep wall time is not justified by the $4 \times 10^{-15}$ precision improvement. For inference runs where this matters, the $N=2$ configuration already achieves machine precision. The deliberate decision to retain the uniform path is documented in GitHub issue \#331.
 
 \subsection{Performance Optimizations}
 \label{sec:modal-perf-optimizations}

@@ -378,7 +378,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         type=float,
         default=None,
         metavar="DT",
-        help="Snapshot interval (default: t_end/100)",
+        help=(
+            "Snapshot interval (default: t_end/20, giving 21 snapshots). "
+            "Use --snapshots=t_end for 2-snapshot inference runs."
+        ),
     )
     sim_parser.add_argument(
         "--fd-order",
@@ -1268,7 +1271,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         type=float,
         default=None,
         metavar="DT",
-        help="Snapshot interval (default: t_end/100)",
+        help=(
+            "Snapshot interval (default: t_end/20, giving 21 snapshots). "
+            "Use --snapshots=t_end for 2-snapshot inference runs."
+        ),
     )
     sweep_parser.add_argument(
         "--fd-order",
@@ -1962,7 +1968,18 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         dest="method_solver",
     )
     sample_parser.add_argument("--max-step", type=float, default=None)
-    sample_parser.add_argument("--snapshots", type=float, default=None)
+    sample_parser.add_argument(
+        "--snapshots",
+        type=float,
+        default=None,
+        metavar="DT",
+        help=(
+            "Snapshot interval passed to the simulation backend. "
+            "Default: t_end/20 (21 snapshots). For PolyChord inference with "
+            "peak_conversion in the perturbative regime, use --snapshots=t_end "
+            "for 2-snapshot machine-precision evaluation."
+        ),
+    )
     sample_parser.add_argument("--fd-order", type=int, choices=[2, 4, 6], default=4)
     sample_parser.add_argument(
         "--leapfrog-order",

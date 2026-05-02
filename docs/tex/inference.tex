@@ -389,6 +389,34 @@ tidal sample examples/data/torsion_dark_photon.json \
 Evidence and parameter constraints are written to
 \texttt{results\_nested/inference.json}.
 
+\subsubsection{Snapshot count for PolyChord/nested-sampling workloads}
+\label{sec:inference-snapshot-guidance}
+
+For PolyChord and dynesty nested-sampling runs where the likelihood is
+\texttt{peak\_conversion} (or any measurement whose maximum occurs at
+$t = t_\mathrm{end}$ in the perturbative linear regime), pass
+\texttt{--snapshots=\$t\_end} to request exactly two snapshots
+(initial state + final state). The modal solver's Pad\'{e} path then
+applies $\exp(M \cdot t_\mathrm{end})$ in a single step, giving
+machine-precision at $t_\mathrm{end}$ and eliminating $N_\mathrm{snaps}-1$
+unnecessary IFFT reconstructions per likelihood call. This is also the
+most numerically clean configuration: no accumulated matvec roundoff
+(see \cref{sec:modal-snapshot-precision}).
+
+\begin{lstlisting}[style=bash]
+# 2-snapshot machine-precision inference (t_end=10)
+tidal sample spec.json \
+  --prior "zeta1=uniform:-0.05:0.05" \
+  --likelihood "P_max:maximize" \
+  --method nested --sampler polychord --nlive 400 \
+  --snapshots 10 \
+  --output results_polychord/
+\end{lstlisting}
+
+For visualization runs (\texttt{tidal simulate}, \texttt{tidal sweep}),
+the default of $t_\mathrm{end}/20$ snapshot interval (21 snapshots) is
+appropriate.
+
 \subsection{Parameter Importance via KL Divergence}
 \label{sec:inference-importance}
 
