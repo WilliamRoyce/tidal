@@ -212,11 +212,11 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 - [x] D2.0 Bahamonde sup (28606785): CANCELLED (killed by node failures Apr 30; resubmitted as campaign+INTR)
 - [x] D2.0 Bahamonde sup r1 (28684410): log Z = −0.449 ± 0.002, ESS = 877, DONE (11 min!)
 - [x] D2.1 Barker amp (28607124): log Z = +0.618 ± 0.001, ESS = 875, DONE
-- [ ] D2.1 Barker sup — pending
+- [x] D2.1 Barker sup (28727741): log Z = −0.447 ± 0.001, ESS = 877, DONE
 - [ ] D2.2 Shapiro amp — pending prior derivation
 - [ ] D2.3 complete-PGT amp — pending prior derivation
-- [x] Results pulled: 28598736, 28607124
-- [x] Corner plots: hpc_results/28598736/corner.png, hpc_results/28607124/d21_barker_amp/corner.png
+- [x] Results pulled: 28598736, 28607124, 28684410, 28727741
+- [x] Corner plots: hpc_results/28598736/corner.png, hpc_results/28607124/d21_barker_amp/corner.png, hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png, hpc_results/campaigns/d21_barker_sup/run/corner_sup.png
 - [ ] Analysis: any D_KL > 0.1 nats?
 - Notes: D2.0 and D2.1 amp log Z agree to 0.002 nats; χ is sub-leading (adding it changes nothing).
 
@@ -294,6 +294,7 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28681305 | T5 general (D2.0 Bahamonde) | D2.0 sup r1 attempt 2 | FAILED | 0:03 | All 10 probe samples returned non-finite logL. Root cause: missing --ic/--bounds/--source/--target — default gaussian IC on a_0 excites tachyonic modes → overflow. Fixed in commit 77f8f30 (stability guard None-handling) + corrected command. |
 | 28684410 | T5 general (D2.0 Bahamonde) | **D2.0 sup r1** | COMPLETED | 0:11 | INTR, campaign=d20_bahamonde_sup. **log Z = −0.449 ± 0.002**, ESS = 877, D_KL = 0.0014 nats (NULL — posterior ≈ prior). MAP: β₁=−0.23, β₂=−1.34, ξ=0.21, δ₁=−0.024. Corner: `hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png`. |
 | 28607124 | T5 general (D2.1 Barker) | **D2.1 amp** | COMPLETED | ~25 min | INTR. **log Z = +0.618 ± 0.001**, ESS = 875, n_samples = 3458. Params: β₁₋₃, ξ, δ₁, χ (6D). MAP: β₁=+0.73, β₂=−1.91, β₃=−0.67, ξ=0.0105, δ₁=−0.0235, χ=−0.002. 95% CI χ=[−0.0086, +0.0084] (fills ±0.009 prior). Marginal D_KL: β₁=0.297 (dominant), ξ=0.158, χ=0.032, δ₁=0.026. Prior stability: 3033/5000 rejected (60.7%). Corner: `hpc_results/28607124/d21_barker_amp/corner.png`. |
+| 28727741 | T5 general (D2.1 Barker) | **D2.1 sup** | COMPLETED | ~18 min | INTR, campaign=d21_barker_sup. **log Z = −0.447 ± 0.001**, ESS = 877, n_samples = 3706. Params: β₁₋₃, ξ, δ₁, χ (6D, suppress). MAP: β₁=−0.064, β₂=−1.622, β₃=−0.240, ξ=0.571, δ₁=−0.022, χ=−0.008. D_KL = 0.003 nats (NULL). Marginal D_KL: β₁=0.271, ξ=0.129, β₂=0.055, χ=0.034, δ₁=0.030, β₃=0.018. In-run tachyonic sidecar: 104,911 samples. Corner: `hpc_results/campaigns/d21_barker_sup/run/corner_sup.png`. |
 
 ---
 
@@ -319,6 +320,12 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
   - **Suppress (28684410)**: log Z = −0.449 ± 0.002, ESS = 877. D_KL = 0.0014 nats (**NULL** — posterior ≈ prior). Marginal D_KL: β₁=0.283, ξ=0.074, β₂=0.062. No suppression signal. Completed in 11 min (flat landscape → fast convergence).
   - **Physical interpretation**: The Bahamonde sub-theory (β₁₋₃, δ₁ nonminimal + massive torsion ξ) does not significantly modify Gertsenshtein conversion in either direction. All parameters are unconstrained. Prior stability rejection = 60.7% (most prior volume is tachyonic). Contrast with T4 (D1): D_KL=8.91 nats for suppress — T4's R̃F coupling mechanism is absent in the Bahamonde sector. The T5 Bahamonde Lagrangian is **Gertsenshtein-neutral** at these parameter ranges.
   - Corner plots: `hpc_results/28598736/corner.png` (amp), `hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png` (sup).
+
+- Stage D2.1 Barker (T5 YM-PGT + χ Barker term, 6D: β₁₋₃, ξ, δ₁, χ; 2026-05-02): **NULL for both amplification and suppression — χ parameter adds nothing.**
+  - **Amplify (28607124)**: log Z = +0.618 ± 0.001, ESS = 875. D_KL = 0.002 nats. Marginal D_KL: β₁=0.297 (dominant), ξ=0.158, β₂=0.090, χ=0.032. Adding χ shifts log Z by +0.002 nats vs D2.0 (noise-level). NULL.
+  - **Suppress (28727741)**: log Z = −0.447 ± 0.001, ESS = 877. D_KL = 0.003 nats (**NULL** — posterior ≈ prior). Marginal D_KL: β₁=0.271 (stability boundary), ξ=0.129, β₂=0.055, χ=0.034. Completed in 18 min. χ posterior mean ≈ −0.00025 — indistinguishable from zero. log Z matches D2.0 Bahamonde sup to 3 significant figures (−0.449 vs −0.447). First run using in-run tachyonic sidecar: 104,911 rejected samples captured in `_tachyonic_samples.csv`.
+  - **Physical interpretation**: Adding Barker's χ term (a PGT axial-torsion–EM coupling) to the Bahamonde sector leaves the Gertsenshtein signal completely flat. χ is neither an amplifier nor a suppressor at these scales. The D2 sector (Bahamonde+Barker) is **Gertsenshtein-neutral** in both directions. Only β₁ carries marginal D_KL, driven entirely by the tachyonic stability boundary (not by conversion physics). Both amp and sup log Z are within 0.001 nats of each other — an almost perfectly symmetric null.
+  - Corner plots: `hpc_results/28607124/d21_barker_amp/corner.png` (amp), `hpc_results/campaigns/d21_barker_sup/run/corner_sup.png` (sup).
 
 - Stage A v5 (stability-guard fix, 2026-04-26): **Definitive null on amplify; informative suppress at decoupling corner.**
   - **Pre-flight stability guard wired into inference** (commits e361113, 3855fc1, 7ef182d, 9e6776e). `_evaluate_likelihood` now calls `check_conversion_stability(conservative=True)` before any simulation; samples with Re(λ) > 0.3 in the source-containing block return logL=-inf with `run_status='tachyonic'` and the maximum growth rate. Conservative path skips the IC-coupling filter when cond(V) > 1e12 (typical for CDT models) to prevent false-negatives. Fixed coupling_floor bug where cond ≥ 1e14 forced floor=1.0 → all growing modes silently skipped.
@@ -370,7 +377,8 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 - Stage D2 (in progress):
   - **D2.0 Bahamonde amp (28598736)**: log Z = +0.616 ± 0.001, ESS = 877, 5 params (β₁₋₃, ξ, δ₁). Posterior broad — no strong preference for any β combination. Marginal D_KL: β₁ = 0.242 nats (dominant), ξ = 0.127, β₂ = 0.090. δ₁ and β₃ near zero (δ₁ = 0.017 nats) — the Riemann torsion-EM coupling sub-term and tensor mass are not the primary informative parameters here. All 95% CI fill the prior almost completely, which is consistent with the prior being tight (β₂ ∈ [−3, −0.3] is constrained by the ghost-free β₁+β₂ < −0.5 requirement). **Sub-leading model with no amplification signal.**
   - **D2.1 Barker amp (28607124)**: log Z = +0.618 ± 0.001, ESS = 875, 6 params (adds χ). Log Z matches D2.0 to 0.002 nats: **adding the Barker χ parameter changes nothing**. 95% CI χ = [−0.0086, +0.0084] (fills the ±0.009 prior), Marginal D_KL(χ) = 0.032 nats (barely above noise). Consistent with the D2.1 prior derivation result: χ alone at δ₁ = 0 is benign, and the joint (δ₁, χ) instability only enters at the prior corners. **χ adds no amplification signal.** Prior stability sweep: 60.7% rejected (general nonminimal spec much tighter than D1).
-  - **Comparison D1 vs D2**: D1 log Z = −2.26 (model disfavoured 10:1 for amplify); D2.0 log Z = +0.616; D2.1 log Z = +0.618. The D2 sub-models are slightly favoured over the null (Bayes factor ≈ 1.9 vs GR), but this is weak evidence at the level of noise. The much lower prior-rejection rate in D1 (single δ₁ parameter, stability boundary far from its prior edges) vs D2 (60.7% rejected) means the priors are tighter in D2 and the small log Z positive shift reflects prior compression, not physics.
+  - **D2.1 Barker sup (28727741)**: log Z = −0.447 ± 0.001, ESS = 877. D_KL = 0.003 nats (NULL). χ posterior mean ≈ 0; adding χ to the Bahamonde sup sector also changes nothing. log Z matches D2.0 sup to 3 sig figs. **χ adds no suppression signal.** In-run tachyonic sidecar: 104,911 rejected samples.
+  - **Comparison D1 vs D2**: D1 log Z = −2.26 (model disfavoured 10:1 for amplify); D2.0 log Z = +0.616; D2.1 log Z = +0.618. The D2 sub-models are slightly favoured over the null (Bayes factor ≈ 1.9 vs GR), but this is weak evidence at the level of noise. The much lower prior-rejection rate in D1 (single δ₁ parameter, stability boundary far from its prior edges) vs D2 (60.7% rejected) means the priors are tighter in D2 and the small log Z positive shift reflects prior compression, not physics. **D2 sup log Z = −0.447 confirms the symmetric null: the whole D2 sector is Gertsenshtein-neutral in both directions.**
 - Stage D3: 
 - Stage E: 
 
