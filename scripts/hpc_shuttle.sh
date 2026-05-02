@@ -178,10 +178,14 @@ cmd_submit() {
   # In sed replacement strings, '&' expands to the matched text and
   # the delimiter (here '|') terminates the replacement. Escape both
   # in user-supplied values so '&&', 'tail|less', etc. in --cmd survive.
+  # Also collapse shell line-continuation sequences (\ + newline + spaces)
+  # to a single space: literal newlines in the sed replacement text would
+  # terminate the s command and cause "unterminated s command" errors.
   local safe_cmd safe_root safe_account
-  safe_cmd="${cmd//\\/\\\\}"      # escape backslashes first
-  safe_cmd="${safe_cmd//&/\\&}"   # then escape ampersands
-  safe_cmd="${safe_cmd//|/\\|}"   # then escape the sed delimiter
+  safe_cmd="$(printf '%s' "$cmd" | sed ':a;N;$!ba;s/\\\n[[:space:]]*/ /g')"
+  safe_cmd="${safe_cmd//\\/\\\\}"      # escape backslashes first
+  safe_cmd="${safe_cmd//&/\\&}"        # then escape ampersands
+  safe_cmd="${safe_cmd//|/\\|}"        # then escape the sed delimiter
   safe_root="${REMOTE_ROOT//&/\\&}"
   safe_root="${safe_root//|/\\|}"
   safe_account="${account//&/\\&}"
