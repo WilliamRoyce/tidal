@@ -605,34 +605,142 @@ remain fixed.  Forgetting to remove~\verb|--param chi=0.0| from the
 D2.0 invocation block will pin~$\chi$ at zero and reproduce the
 D2.0 chain instead of D2.1.
 
-\subsubsection*{D2.2 (Shapiro, +$\zeta_{1,2,3}$)}
+\subsubsection*{D2.2 (Shapiro, +$\zeta_{1,2,3}$): derivative torsion--EM couplings}
 \label{sec:d22-priors}
 
-D2.2 adds three derivative torsion--EM couplings of the
-form~$(\nabla T) \cdot F$ on top of D2.1's
-$\beta/\xi/\delta_1/\chi$ structure.  The recipe in
-\cref{sec:per-model-recipe} dictates the scan plan:
+D2.2 adds three derivative torsion--EM couplings of the Shapiro
+form~$(\nabla T)\cdot F$ on top of D2.0's $\beta/\xi/\delta_1$
+structure (with $\chi=0$ fixed, i.e.\ D2.2 is an alternative branch
+to D2.1).  The three independent index contractions are
+\begin{align*}
+  \zeta_1\text{-term:} &\quad \zeta_1\,\nabla_a T^{a}{}_{bc}\,
+    \eta^{bd}\eta^{ce}F_{de}, \\
+  \zeta_2\text{-term:} &\quad \zeta_2\,\nabla_a T^{ab}{}_{c}\,
+    \eta_{bd}\eta^{ce}F_{de}, \\
+  \zeta_3\text{-term:} &\quad \zeta_3\,\nabla_a T_b{}^{a}{}_c\,
+    \eta^{bd}\eta^{ce}F_{de}.
+\end{align*}
+Each is a first-derivative coupling between the torsion tensor and the
+EM field-strength; none enter the torsion-squared kinetic terms
+$I_1/I_2/I_3$.  Because the $\zeta_i$ do not alter the torsion kinetic
+matrix, the $\beta$-stability inequalities (\cref{sec:beta-stability})
+are \emph{unchanged} by any values of~$\zeta_{1,2,3}$.
+
+\paragraph{Per-parameter thresholds.}
+Single-parameter scans at $\delta_1=\chi=0$, sweeping each~$\zeta_i$
+across a logarithmic grid with the five $(\beta,\xi)$ anchors of
+\cref{tab:d20-scan-points}, give the following empirical thresholds.
+The binding anchor for all three is P2 (small-$\xi$, same role as P2
+for~$\delta_1$ in \cref{sec:delta1-model-dependence}).
+Data: \path{examples/data/d2_prior_scan/zeta_scan/zeta1_single_param.csv},
+\path{zeta2_single_param.csv}, \path{zeta3_single_param.csv}.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Parameter & $\zeta_i^*$ & $\frac{1}{2}\zeta_i^*$ & Prior range \\
+\midrule
+$\zeta_1$ & $0.100$ & $0.050$ & $[-0.050,\;+0.050]$ \\
+$\zeta_2$ & $0.0422$ & $0.0211$ & $[-0.0211,\;+0.0211]$ \\
+$\zeta_3$ & $0.100$ & $0.050$ & $[-0.050,\;+0.050]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Joint stability structure.}
+Joint scans in the $(\delta_1,\zeta_i)$ plane at the D2.0 MAP anchor
+(P1: $\beta_1=-0.10$, $\beta_2=-1.55$, $\beta_3=+0.96$, $\xi=1.85$)
+reveal three different patterns
+(data: \path{zeta1_delta1_joint.csv}, \path{zeta2_delta1_joint.csv},
+\path{zeta3_delta1_joint.csv}):
 \begin{itemize}
-  \item Step~(a) --- single-parameter scan at $\delta_1=\chi=0$ for
-    each $\zeta_i$ in turn, across the five $(\beta,\xi)$ anchors.
-    Expected outcome based on the D2.1 precedent: each $\zeta_i$
-    is benign in isolation.
-  \item Step~(b) --- joint working-point scans for the three
-    relevant pairs $(\delta_1,\zeta_i)$, $(\chi,\zeta_i)$, and
-    (within D2.2 itself) $(\zeta_i,\zeta_j)$ for $i\neq j$.  The
-    rectangular-structure prediction implies no
-    \texttt{--constraint} clauses coupling the parameters are
-    needed, but step~(b) is what verifies that --- a multiplicative
-    or radial unstable region in any pair would force an explicit
-    cross-coupling clause and is the case to watch for.
-  \item Step~(c) --- most-restrictive-anchor scan for each
-    $\zeta_i^*$ in the regime indicated by step~(b).  Three
-    independent priors $\zeta_i \in [-\zeta_i^*/2, +\zeta_i^*/2]$.
+  \item \textbf{$\zeta_1$}: benign --- within the stable~$\delta_1$
+    range at P1 ($|\delta_1|\lesssim 0.010$), varying~$\zeta_1$ across
+    the full scan range $[-0.10,+0.10]$ causes no additional
+    rejection.  At $|\delta_1|=0.020$ the system is unstable
+    \emph{even at $\zeta_1=0$} (see P1-corner note below), confirming
+    that~$\zeta_1$ adds no marginal instability.
+  \item \textbf{$\zeta_2$}: rectangular --- at $|\delta_1|\le0.005$
+    the system is stable for $|\zeta_2|$ up to the prior edge and
+    beyond; rejection appears only when $|\delta_1|\gtrsim 0.020$
+    \emph{and} $|\zeta_2|\gtrsim 0.042$.  The prior half-width
+    $|\zeta_2|\le0.021$ is within the stable band even at the
+    joint~$\delta_1$ boundary.
+  \item \textbf{$\zeta_3$}: rectangular --- same pattern as~$\zeta_2$
+    with threshold $|\zeta_3|\gtrsim 0.050$.
 \end{itemize}
-The D2.2 prior block extends D2.1 by removing $\zeta_1$, $\zeta_2$,
-$\zeta_3$ from the \texttt{--param} fix list and adding three
-\texttt{--prior} clauses.  No additional \texttt{--constraint}
-clauses are anticipated.
+Pairwise scans $(\zeta_i,\zeta_j)$ at $\delta_1=0$
+(data: \path{zeta1_zeta2_pair.csv}, \path{zeta1_zeta3_pair.csv},
+\path{zeta2_zeta3_pair.csv}) show all three pairs benign: no rejection
+anywhere in the $(\zeta_i,\zeta_j)$ plane within the prior ranges.
+Because the joint structure is rectangular rather than multiplicative,
+no \texttt{--constraint} clause coupling~$\delta_1$ to any~$\zeta_i$
+is needed; the component-wise prior box fits inside the joint-stable
+region.
+
+\paragraph{Prior-corner verification.}
+Selected corners of the combined prior were verified against the
+stability probe
+(data: \path{examples/data/d2_prior_scan/zeta_scan/corner_verification.csv}):
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrl}
+\toprule
+Corner & $\delta_1$ & $\zeta_1$ & $\zeta_2$ & $\zeta_3$ & Stable? \\
+\midrule
+P1, $\delta_1{+}$, $\zeta_1{+}$ & $+0.025$ & $+0.050$ & $0$ & $0$ & No ($\gamma=16.4$) \\
+P1, $\delta_1{+}$, $\zeta_1{-}$ & $+0.025$ & $-0.050$ & $0$ & $0$ & No ($\gamma=16.2$) \\
+P1, $\delta_1{+}$, $\zeta_2{+}$ & $+0.025$ & $0$ & $+0.0211$ & $0$ & Yes \\
+P1, $\delta_1{+}$, $\zeta_3{+}$ & $+0.025$ & $0$ & $0$ & $+0.050$ & Yes \\
+P5, $\delta_1{+}$, $\zeta_1{+}$ & $+0.025$ & $+0.050$ & $0$ & $0$ & Yes \\
+P2, $\delta_1{+}$, $\zeta_1{+}$ & $+0.025$ & $+0.050$ & $0$ & $0$ & Yes \\
+P1, $\delta_1{+}$, all $\zeta{+}$ & $+0.025$ & $+0.050$ & $+0.0211$ & $+0.050$ & No ($\gamma=11.4$) \\
+\bottomrule
+\end{tabular}
+\caption{Prior-corner stability checks for D2.2
+(\path{corner_verification.csv}).  P1 is the D2.0 MAP anchor;
+P5 and P2 are the interior and small-$\xi$ anchors from
+\cref{tab:d20-scan-points}.}
+\label{tab:d22-corner}
+\end{table}
+
+\paragraph{P1-corner instability: $\beta$-dependent, not a $\zeta_1$ effect.}
+The two P1-corner failures ($\zeta_1=\pm0.050$, $\gamma\approx16$) and
+the all-$\zeta$-positive P1 failure ($\gamma\approx11$) are \emph{not}
+caused by~$\zeta_1$ coupling.  The identical corners at P5 (interior)
+and P2 (small-$\xi$) are both stable.  The joint CSV confirms the
+diagnosis: at P1 with $\delta_1=0.020$, the probe returns $\gamma>8$
+even when $\zeta_1=0$, showing that P1's $\delta_1$ stability window
+is narrower than $|\delta_1|<0.025$.  The P1-corner instability is
+$\beta$-dependent; no joint $(\delta_1,\zeta_1)$ constraint is
+warranted.  These corner points are handled inline at chain time by
+the stability probe, which returns $\log L=-\infty$ for any sample
+exceeding the $\gamma_\mathrm{eff}$ threshold (see
+\texttt{stability\_probe.tex}, \S\emph{Inline rejection cascade}).
+
+\paragraph{D2.2 prior block.}
+The D2.2 sample invocation adds three $\zeta_i$ priors to D2.0's
+prior block.  $\chi$ remains fixed at zero:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+--prior "beta1=uniform:-1.5:1.0"
+--prior "beta2=uniform:-3.0:-0.3"
+--prior "beta3=uniform:-1.0:1.0"
+--prior "xi=log_uniform:0.01:10"
+--prior "delta1=uniform:-0.025:0.025"
+--prior "zeta1=uniform:-0.050:0.050"
+--prior "zeta2=uniform:-0.021:0.021"
+--prior "zeta3=uniform:-0.050:0.050"
+--constraint "beta1 + beta2 < -0.5"
+--constraint "beta1 - beta2 > 0.25"
+--constraint "beta3 + (2*beta1 + beta2)/3 < 1.333"
+--constraint "xi > 0.01"
+--param chi=0.0
+\end{lstlisting}
+\textbf{Note}: $\chi$ is pinned at zero here; to run D2.3
+(all nine parameters free), also add
+\verb|--prior "chi=uniform:-0.009:0.009"| and remove
+\verb|--param chi=0.0|.
 
 \subsubsection*{D2.3 (Full T5 YM--PGT, all enabled)}
 \label{sec:d23-priors}
@@ -699,21 +807,23 @@ prior, not to tighten the constraints.
         with~$\delta_1$ verified at prior corners
         (\cref{tab:d21-p5-corner-verification}) \\
     $\zeta_{1,2,3}$
-      & TBD
-      & per D2.2 follow-up; apply recipe in
-        \cref{sec:per-model-recipe} including step~(b) joint scans
-        with $\delta_1$ and $\chi$ \\
+      & MEDIUM
+      & multi-anchor empirical scan (\cref{sec:d22-priors}); thresholds
+        $\zeta_1^*=0.100$, $\zeta_2^*=0.042$, $\zeta_3^*=0.100$;
+        binding anchor P2 (small-$\xi$) for all three; rectangular
+        joint structure with~$\delta_1$ for $\zeta_{2,3}$, benign
+        for~$\zeta_1$; pairwise $(\zeta_i,\zeta_j)$ all benign;
+        P1-MAP corner failures for $\zeta_1$ are $\beta$-dependent,
+        handled inline by probe \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 The two HIGH-confidence external sources (Blagojevi\'c, Barker)
 give us a reproducible derivation of every $\beta$ and $\xi$ prior
-cutoff.  $\delta_1$ and $\chi$ are MEDIUM-confidence empirical
-cutoffs derived from multi-anchor scans on the general spec; both
-should be revisited at each MAP-like region uncovered by
-downstream chains, and the rectangular joint-stability structure
-between them should be re-verified at any new working point that
-chains discover.  $\zeta_{1,2,3}$ remain TBD pending the D2.2
-scans and are to be derived following the
-\cref{sec:per-model-recipe} recipe.
+cutoff.  $\delta_1$, $\chi$, and~$\zeta_{1,2,3}$ are
+MEDIUM-confidence empirical cutoffs derived from multi-anchor scans
+on the general spec; all should be revisited at each MAP-like region
+uncovered by downstream chains, and the rectangular joint-stability
+structure among them should be re-verified at any new working point
+that chains discover.
