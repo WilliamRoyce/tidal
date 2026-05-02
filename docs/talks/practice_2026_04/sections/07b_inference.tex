@@ -1,24 +1,27 @@
 \begin{frame}{Nested sampling: surveying the amplification landscape}
-  For each parameter point $\theta$, we run a full PDE simulation and compute the amplification factor:
+  For each $\theta$ we run a full PDE simulation and compute the \emph{amplification factor} relative to the GR baseline:
 
-  \vspace{0.4em}
+  \vspace{-0.8em}
   \[
-    L(\theta) = A(\theta)
-    = \frac{P_{\max}(\theta)}{\sin^2\!\bigl(\tfrac{\kappa B_0 t}{2}\bigr)}
+    A(\theta) = \frac{P_{\max}(\theta)}{\sin^2 \bigl(\tfrac{\kappa B_0 t}{2}\bigr)}
+    \xrightarrow{\kappa B_0 t \,\ll\, 1}
+    \frac{c(\theta)}{c_{\rm GR}},
+    \quad
+    c \equiv \frac{P_{\max}}{B_0^{2}},\
+    c_{\rm GR} = \left(\frac{\kappa t}{2}\right)^{2}
   \]
-  We then define a score function, which we call the `likelihood': $L(\theta)=\pm \operatorname{log} A(\theta)$.
-
+  The score function, the \emph{likelihood}, is $L(\theta) = \pm \log A(\theta)$.
+  
   \begin{itemize}
-    \item valid in the linearised, perturbative regime: $P_{\max}\ll 1$,\;
-      $\kappa B_0 t\ll 1$;\;
-      tachyonic and non-perturbative (Hwang--Noh) regions $\to L=0$
+    \item Validity requires $P_{\max}\ll 1$ and $\kappa B_0 t \ll 1$ (else $A$ becomes $B_0$-dependent)
 
-    \item Central quantity: $\displaystyle\mathcal{Z}=\int A(\theta)\,\pi(\theta)\,\mathrm{d}\theta$
-      \;---\; prior-averaged amplification:\\
-      $\log\mathcal{Z}\approx 0$ (null: model is GR-like across coupling space)
-      \quad vs \quad
-      $\log\mathcal{Z} > 0$ (enhancement is generic)
+    \item $\mathcal{Z} = \int A(\theta)\,\pi(\theta)\,\mathrm{d}\theta = \langle A\rangle_\pi$ ---
+      \textbf{prior-averaged amplification}.\\
+      $\log\mathcal{Z}\approx 0$: null (no enhancement on average);\quad
+      $\log\mathcal{Z} \gg 0$: amplification persists under prior averaging.
 
-    \item Divergence from prior to posterior: $D_{\mathrm{KL}}$ --- which parameters drive the signal?
+    \item $D_{\mathrm{KL}} \bigl(p(\theta\,|\,A)\,\Vert\,\pi(\theta)\bigr)$ ---
+      \textbf{information gain}, prior to posterior. Is enhancement broadly distributed (\emph{generic}); or concentrated in a narrow coupling region (\emph{fine-tuned}).
+
   \end{itemize}
 \end{frame}

@@ -1,19 +1,18 @@
 \begin{frame}{\textsc{tidal}: overview}
-  \note{\textasciitilde 9 min mark. Centrepiece of the talk. Sell the idea before the detail.}
-  \textbf{T}ensor \textbf{I}ntegration and \textbf{D}erivation for \textbf{A}ny \textbf{L}agrangian.
+  \vphantom{.}{\large \textbf{T}}ensor {\large \textbf{I}}ntegration and {\large \textbf{D}}erivation for {\large \textbf{A}}ny {\large \textbf{L}}agrangian.
 
   \vspace{0.3em}
   \begin{center}
     \begin{tikzpicture}[
-      node distance=0.5cm and 0.4cm,
-      every node/.style={font=\scriptsize},
+      node distance=0.5cm and 0.45cm,
+      every node/.style={font=\footnotesize},
       box/.style={draw,rounded corners,thick,align=center,
-                  minimum height=0.9cm,minimum width=1.9cm,inner sep=2pt},
+                  minimum height=0.9cm,minimum width=1.9cm,inner sep=3pt},
       arr/.style={-{Latex[length=2mm]},thick},
     ]
       \node[box] (toml)   {\texttt{theory.toml}\\\tiny Lagrangian};
       \node[box,right=of toml]   (wolf) {Mathematica\\xAct / xTras};
-      \node[box,right=of wolf]   (json) {JSON spec\\\tiny linearised};
+      \node[box,right=of wolf]   (json) {JSON spec};
       \node[box,right=of json]   (num)  {Python\\numerics};
       \node[box,right=of num]    (out)  {sweeps\\inference\\plots};
       \draw[arr] (toml)--(wolf);
@@ -24,9 +23,12 @@
   \end{center}
 
   \vspace{0.2em}
-  \textbf{Core claim.} \emph{Every equation the numerics solves is traceable back to a single Lagrangian I typed in.} No hand-derived PDEs. No manual index gymnastics.
+  \emph{Every equation in the numerical solver is derived
+  symbolically from a single Lagrangian declaration.} Automatic Euler--Lagrange variation, multi-field perturbation, and the covariant-derivative expansion.
 
   \vspace{0.2em}
-  \textbf{Why it matters here.} This project varies the Lagrangian \emph{dozens} of times --- different torsion operators, couplings, gauges, plasma backgrounds. Hand-deriving each variation would be intractable and unreliable.
+  PGT surveys vary the Lagrangian
+  across dozens of operator combinations. At this level of generality, the associated tensor calculus become intractable by hand
+  --- symbolic computation is the only viable route.
 
 \end{frame}

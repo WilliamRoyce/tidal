@@ -57,6 +57,7 @@ hpc_results/*
 *.synctex.gz
 *.toc
 *.vrb
+*.log
 # Scoped to docs/ and research/ to avoid conflicts with other project *.log/*.out usage
 docs/**/*.log
 docs/**/*.out

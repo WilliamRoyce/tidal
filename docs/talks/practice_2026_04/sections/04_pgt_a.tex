@@ -1,21 +1,34 @@
-\begin{frame}{Torsion via Poincar\'e gauging}
+\begin{frame}{Poincar\'e gauge theory and torsion}
 
-  \textbf{Spacetime has two independent local symmetries.}
+  \textbf{Spacetime has two \emph{independent} local symmetries.}
   Local Lorentz and coordinate freedoms are \emph{gauge redundancies} of the Poincar\'e group --- motivating a gauge treatment of gravity.
+
+  \vspace{0.3em}
   \begin{center}
-    \begin{tabular}{lll}
+    \begin{tabular}{@{}llll@{}}
       \toprule
-      Gauge group & Connection & Field strength \\
+      & Gauge group & Connection & Field strength \\
       \midrule
-      (QED) &$U(1)$                  & $A_\mu$             & $\mathcal{F}_{\mu\nu}$ \\
-      (Lorentz) &$SO(1,3)$           & $\omega^{ab}{}_\mu$ & \textbf{curvature} $\mathcal{R}^{ab}{}_{\mu\nu}$ \\
-      (Translations) &$\mathbb{R}^4$ & $e^a{}_\mu$         & \textbf{torsion}   $\mathcal{T}^a{}_{\mu\nu}$ \\
+      QED          & $U(1)$             & $A_\mu$             & $\mathcal{F}_{\mu\nu}$ \\
+      Lorentz      & $SO(1,3)$          & $\tensor{\omega}{^{ij}_\mu}$ & \textbf{curvature} $\tensor{\mathcal{R}}{^{ij}_{\mu\nu}}$ \\
+      Translations & $\mathbb{R}^4$     & $\tensor{e}{^i_\mu}$         & \textbf{torsion}   $\tensor{\mathcal{T}}{^i_{\mu\nu}}$ \\
       \bottomrule
     \end{tabular}
   \end{center}
 
-  \vspace{0.25em}
-  GR ($V_4$): $\mathcal{R}\neq 0$, $\mathcal{T}=0$, $\mathcal{Q}=0$.\quad
-        PGT ($U_4$): $\mathcal{R}\neq 0$, $\mathcal{T}\neq 0$, $\mathcal{Q}=0$.\quad
-        Torsion is the new degree of freedom.
+  \vspace{1.0em}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.42\textwidth}
+      {\begin{tabular}{@{}l@{\;}r@{,\;}r@{,\;}l@{}}
+        GR ($V_4$):  & $\mathcal{R}\neq 0$ & $\mathcal{T}=0$    & $\mathcal{Q}=0$. \\[0.1em]
+        PGT ($U_4$): & $\mathcal{R}\neq 0$ & $\mathcal{T}\neq 0$ & $\mathcal{Q}=0$.
+      \end{tabular}\\[0.15em]
+      \emph{Torsion is the new degree of freedom.}}
+    \end{column}
+    \begin{column}{0.54\textwidth}
+      \vspace{-0.6em}
+      \includegraphics[width=\linewidth]{figures/diff_geometry.pdf}
+    \end{column}
+  \end{columns}
+
 \end{frame}
