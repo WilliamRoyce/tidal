@@ -1003,23 +1003,57 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         ),
     )
     plot_parser.add_argument(
-        "--show-rejected",
-        dest="show_rejected",
+        "--show-rejected-inchain",
+        dest="show_rejected_inchain",
         action="store_true",
         default=True,
         help=(
-            "For --type corner: overlay samples rejected by the pre-flight "
-            "stability guard (run_status='tachyonic') as red scatter on each "
-            "2D panel. Conveys where kinematically unstable parameter regions "
-            "live (cf. anesthetic conventions for inaccessible regions). "
-            "Default: enabled."
+            "For --type corner: overlay MC in-chain rejected samples "
+            "(results.csv rows with run_status='tachyonic'). Always empty for "
+            "PolyChord, which discards -inf samples upfront. Default: on."
         ),
     )
     plot_parser.add_argument(
-        "--hide-rejected",
-        dest="show_rejected",
+        "--hide-rejected-inchain",
+        dest="show_rejected_inchain",
         action="store_false",
-        help="For --type corner: do NOT overlay rejected samples.",
+        help="For --type corner: do NOT overlay MC in-chain rejected samples.",
+    )
+    plot_parser.add_argument(
+        "--show-rejected-prior",
+        dest="show_rejected_prior",
+        action="store_true",
+        default=False,
+        help=(
+            "For --type corner: overlay post-hoc uniform prior-survey "
+            "samples from _rejected_prior.csv (5000 prior draws evaluated "
+            "by the stability guard). Default: off — dense and obscures "
+            "the posterior contours."
+        ),
+    )
+    plot_parser.add_argument(
+        "--hide-rejected-prior",
+        dest="show_rejected_prior",
+        action="store_false",
+        help="For --type corner: do NOT overlay prior-survey rejected samples.",
+    )
+    plot_parser.add_argument(
+        "--show-rejected-inrun",
+        dest="show_rejected_inrun",
+        action="store_true",
+        default=False,
+        help=(
+            "For --type corner: overlay in-run tachyonic samples written by "
+            "the SimulationLikelihood during a PolyChord run "
+            "(_tachyonic_samples.csv). Default: off — typically 50k+ rows "
+            "and obscures the posterior contours."
+        ),
+    )
+    plot_parser.add_argument(
+        "--hide-rejected-inrun",
+        dest="show_rejected_inrun",
+        action="store_false",
+        help="For --type corner: do NOT overlay in-run tachyonic samples.",
     )
 
     # --- sweep ---

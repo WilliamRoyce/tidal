@@ -236,8 +236,13 @@ def _corner_plot(data_path: Path, args: Namespace) -> int:
         result.metadata["priors"] = parsed
 
     out_path = Path(args.output) if args.output else data_path / "corner.png"
-    show_rejected = bool(getattr(args, "show_rejected", True))
-    plot_corner(result, out_path, show_rejected=show_rejected)
+    plot_corner(
+        result,
+        out_path,
+        show_rejected_inchain=bool(getattr(args, "show_rejected_inchain", True)),
+        show_rejected_prior=bool(getattr(args, "show_rejected_prior", False)),
+        show_rejected_inrun=bool(getattr(args, "show_rejected_inrun", False)),
+    )
     if not args.quiet:
         print(f"Saved corner plot to: {out_path}")
     return 0
@@ -248,7 +253,7 @@ def _corner_plot(data_path: Path, args: Namespace) -> int:
 # ------------------------------------------------------------------
 
 
-def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Execute the ``tidal plot`` subcommand."""
     import matplotlib as mpl
 
@@ -424,7 +429,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
 # ------------------------------------------------------------------
 
 
-def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Handle sweep-specific plot types.
 
     Loads ``SweepResults`` from *data_path* and dispatches to the
