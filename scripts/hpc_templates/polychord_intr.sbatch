@@ -6,6 +6,7 @@
 #SBATCH --nodes={{NODES}}
 #SBATCH --ntasks={{NTASKS}}
 #SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=3380
 #SBATCH --time={{TIME}}
 #SBATCH -o {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
 #SBATCH -e {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
