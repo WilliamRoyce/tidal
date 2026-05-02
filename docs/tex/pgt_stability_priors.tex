@@ -761,6 +761,24 @@ capture; if a chain run reveals that the posterior pushes against
 the inherited box edges, that is a signal to widen the relevant
 prior, not to tighten the constraints.
 
+\paragraph{9-D joint pre-flight check (2026-05-02).}
+\label{par:d23-joint-check}
+Before submitting D2.3, a 2000-sample random-draw scan of the composed
+9-D prior was run with the four D2.0 soft constraints applied and the
+canonical stability probe ($\kappa=1$, $B_0=0.01$, $h_5\!\to\!a_1$,
+\texttt{ic\_wavevector}\,$=2\pi/L$) evaluated on each surviving sample.
+Source: \path{examples/data/d2_prior_scan/d23_joint_check/}\linebreak
+\path{SUMMARY.md}.  Survival statistics: 72.5\% post-$\beta$-constraint,
+34.5\% post-probe (given $\beta$), \textbf{25.0\% effective}.  The top-5
+surviving samples by $\gamma_\mathrm{eff}$ all cluster at $\beta_2 \in
+[-2.9, -2.7]$ and $\xi \in [0.01, 0.02]$, reproducing the D2.0
+$\beta_2$/$\xi$ near-tachyonic edge already characterised by the
+single-parameter scan; no new 9-D-only joint coupling was identified.
+The 25\% effective survival is comfortably above the 5\% PROCEED gate
+defined in \path{_analyze.py}, so D2.3 is submitted unchanged.  The
+chain runs at \verb|--nlive 800| (vs.~$400$ for D2.0--D2.2) to absorb
+the $D^2$-scaling $\log Z$ noise floor at $D=9$.
+
 \subsection{Confidence levels per parameter}
 \label{sec:confidence}
 
