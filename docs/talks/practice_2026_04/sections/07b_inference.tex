@@ -1,29 +1,24 @@
 \begin{frame}{Nested sampling: surveying the amplification landscape}
-  \note{Audience knows nested sampling. Lead with the repurposing: no observed
-    data --- $L(\theta)$ is a deterministic physics score from the PDE solver,
-    not $P(d\mid M)$. $\mathcal{Z}$ is prior-averaged amplification;
-    $D_{\mathrm{KL}}$ diagnoses whether any signal is generic or fine-tuned.}
-
-  \emph{No observed data --- $L(\theta)$ is a physics score, not $P(d\mid\theta)$.}
+  For each parameter point $\theta$, we run a full PDE simulation and compute the amplification factor:
 
   \vspace{0.4em}
   \[
     L(\theta) = A(\theta)
     = \frac{P_{\max}(\theta)}{\sin^2\!\bigl(\tfrac{\kappa B_0 t}{2}\bigr)}
   \]
-  \vspace{0.2em}
+  We then define a score function, which we call the `likelihood': $L(\theta)=\pm \operatorname{log} A(\theta)$.
 
   \begin{itemize}
     \item valid in the linearised, perturbative regime: $P_{\max}\ll 1$,\;
       $\kappa B_0 t\ll 1$;\;
       tachyonic and non-perturbative (Hwang--Noh) regions $\to L=0$
 
-    \item $\displaystyle\mathcal{Z}=\int A(\theta)\,\pi(\theta)\,\mathrm{d}\theta$
+    \item Central quantity: $\displaystyle\mathcal{Z}=\int A(\theta)\,\pi(\theta)\,\mathrm{d}\theta$
       \;---\; prior-averaged amplification:\\
-      $\mathcal{Z}\approx 1$ (null: model is GR-like across coupling space)
+      $\log\mathcal{Z}\approx 0$ (null: model is GR-like across coupling space)
       \quad vs \quad
-      $\mathcal{Z}\gg 1$ (enhancement is generic)
+      $\log\mathcal{Z} > 0$ (enhancement is generic)
 
-    \item $D_{\mathrm{KL}}$ --- which specific coupling constants drive the signal?
+    \item Divergence from prior to posterior: $D_{\mathrm{KL}}$ --- which parameters drive the signal?
   \end{itemize}
 \end{frame}
