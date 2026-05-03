@@ -95,8 +95,8 @@ should re-converge to nearly the same MAPs and log Z.
 
 | Chain | Original Job | Original log Z | Original D_KL (joint / max marginal) | Original MAP | Canonical-Probe MAP-survival | Replay survival (wt / unwt) | Δlog Z (predicted) | Predicted new log Z | Planned baseline-rerun job | Planned hi-res-rerun job | New log Z | New D_KL | Verdict (predicted) |
 |-------|--------------|----------------|--------------------------------------|--------------|-------------------------------|------------------------------|--------------------|---------------------|----------------------------|--------------------------|-----------|----------|---------------------|
-| **D1 amp** (T4 Ricci-EM) | 28520217 | −2.261 ± 0.066 | 1.789 / δ₁=1.679 | α₁=−0.703, α₂=−0.795, α₃=+0.130, δ₁=+0.074 | **REJECTED** (γ_eff = ∞) | **0.965 / 0.703** | **−0.036** | **−2.297** | TBD | TBD | — | — | **MAP shift, Δlog Z small (~−0.04). Amplification claim survives but ceiling will move.** |
-| **D1 sup** (T4 Ricci-EM) | 28519675 | +15.911 ± 0.152 | 8.911 / δ₁=0.870 | α₁=+0.333, α₂=+0.916, α₃=+0.916, δ₁=−1.291 | SURVIVES (γ_eff = 0.101) | **1.000 / 0.995** | **−0.000** | **+15.911** | TBD | TBD | — | — | Reproduce original — no change expected. |
+| **D1 amp** (T4 Ricci-EM) | 28520217 | −2.261 ± 0.066 | 1.789 / δ₁=1.679 | α₁=−0.703, α₂=−0.795, α₃=+0.130, δ₁=+0.074 | **REJECTED** (γ_eff = ∞) | **0.965 / 0.703** | **−0.036** | **−2.297** | **28789437** (icelake-standard 6h) | TBD | — | — | **MAP shift, Δlog Z small (~−0.04). Amplification claim survives but ceiling will move.** |
+| **D1 sup** (T4 Ricci-EM) | 28519675 | +15.911 ± 0.152 | 8.911 / δ₁=0.870 | α₁=+0.333, α₂=+0.916, α₃=+0.916, δ₁=−1.291 | SURVIVES (γ_eff = 0.101) | **1.000 / 0.995** | **−0.000** | **+15.911** | **28789439** (icelake-standard 6h) | TBD | — | — | Reproduce original — no change expected. |
 | **Stage A v5 sup** (dark-photon plasma CDT) | 28477675 | +0.654 ± 0.056 | 1.978 / ξ=0.414 | mA₂=+0.969, δm=−0.446, ξ=+0.796, α₃=+0.001 | SURVIVES (γ_eff = 0.101) | **0.858 / 0.942** | **−0.154** | **+0.500** | TBD | TBD | — | — | Reproduce original within 0.15 nats; α₃≳0.1 region shrinks. |
 
 ### Original marginal D_KL (full)
@@ -303,10 +303,47 @@ Expected accuracy of these predictions:
 - [x] Survival rates + Δlog Z estimates committed
 - [x] Rejection-region maps for D1 amp, D1 sup, Stage A v5 sup
 - [x] Predicted verdicts populated
-- [ ] Decide rerun grid/bounds for each chain (canonical 256/0:100 vs original 64/0:50 vs both)
-- [ ] Plan baseline-rerun submissions (same priors + canonical probe gate, **no** soft constraints)
+- [x] Decide rerun grid/bounds for each chain — chose canonical 256/0:100 (probe and chain matched)
+- [x] Plan baseline-rerun submissions (same priors + canonical probe gate, **no** soft constraints)
 - [ ] Plan hi-res-rerun submissions (canonical probe + grid 256, t_end 10, snapshots 2)
 - [ ] Estimate budget — three chains × {baseline, hi-res} = 6 submissions
+
+---
+
+## Phase 6.C — Baseline rerun submissions (2026-05-03)
+
+**Decision (recorded):** No soft β-style constraints. Both chains use the same
+priors as the originals so the log Z comparison isolates the architectural-
+correction effect (canonical probe + Hwang–Noh gate + canonical grid) from
+any prior-narrowing effect.
+
+**Submission tally:**
+
+| Chain | New job | Template | Partition / QOS | Wall budget | nlive | Probe | Constraints | State |
+|-------|---------|----------|-----------------|-------------|-------|-------|-------------|-------|
+| D1 amp clean (std) | **28789437** | `polychord_standard.sbatch` | icelake / cpu2 | 06:00:00 | 400 | canonical (t_test=20, threshold=0.3, all-k unit-IC) + inline P_max>0.5 Hwang–Noh gate | none | PENDING |
+| D1 sup clean (std) | **28789439** | `polychord_standard.sbatch` | icelake / cpu2 | 06:00:00 | 400 | same | none | PENDING |
+| D1 amp clean (INTR cross-check) | **28789579** | `polychord_intr.sbatch` | icelake / intr | 01:00:00 | 400 | same | none | **COMPLETED** (21 min) |
+
+**Wall-time anticipation note:** the original 28520217 took 3:30 wall; with the
+canonical probe rejecting ~30% of raw samples (per Phase 6.B replay), the new
+chain may need 1.4–1.6× more likelihood evaluations to converge to the same
+nlive. INTR's 1h limit was therefore deemed too tight for a single round;
+submitted to icelake standard 6h as primary. Sup chain has ≈100% probe survival
+— expected wall close to original 16:30.
+
+**INTR cross-check (28789579):** submitted in parallel with the standard D1
+amp job, using `--campaign d1_amp_intr` so PolyChord's `tidal.resume` is
+written to the stable path
+`hpc_results/campaigns/d1_amp_intr/d1_amp_intr/_chains/`. On INTR's 1 h
+timeout, resubmit with `--read-resume` and the same campaign dir to continue
+from the checkpoint. Whichever chain (standard or INTR-resumed) reaches
+PolyChord's stop criterion first becomes the primary; the other is the
+cross-check.
+
+**Pre-flight check (~30 s post-submit):** both jobs PENDING with reason
+`None` (clean queue), no fast-fail. SLURM logs not yet written (jobs not
+started).
 
 **Note on the modal A-template cache WIP:** Reverted on 2026-05-03 (commits
 `62352c4` and `a068453`); revert commits `b4e70c6` and `f994329`. Full
@@ -316,3 +353,67 @@ The probe runs above were performed with that WIP stashed at `e9ed623`, so they
 are unaffected by the revert. The `grid.bounds.ravel()` reconciliation flagged
 earlier is no longer outstanding (the offending code is gone). Bottom line for
 this audit: probe results in this ledger remain valid; nothing to redo.
+
+---
+
+## Phase 6.C — INTR result: 28789579 D1 amp clean (2026-05-03)
+
+**Completed in 21 minutes** (nlive=0; fully converged, not timed out).
+
+| Quantity | Value |
+|----------|-------|
+| log Z (new INTR) | **+2.135 ± 0.059** |
+| log Z (original 28520217) | −2.261 ± 0.066 |
+| Δlog Z (new − old) | **+4.396 nats** |
+| New MAP | α₁=+0.838, α₂=−1.830, α₃=+0.841, δ₁=+1.943 |
+| Old MAP (28520217) | α₁=−0.703, α₂=−0.795, α₃=+0.130, δ₁=+0.074 |
+| New MAP P_max | 0.105 (A ≈ 42×) |
+| Old MAP A | 1.25× (barely above GR) |
+| logL range (new) | [−10.3, +5.3] → A ∈ [3×10⁻⁵, 200] |
+| logL range (old) | [−19.1, +0.23] → A ∈ [5×10⁻⁹, 1.25] |
+| Prior stability sweep | 957/5000 rejected (19.1% tachyonic) |
+| n_posterior / n_like | 4444 / 246371 |
+
+**P_max perturbativity breakdown of the new posterior:**
+
+| P_max range | Weighted fraction |
+|-------------|-------------------|
+| [0, 0.01) | 9.4% |
+| [0.01, 0.05) | 14.3% |
+| [0.05, 0.10) | 12.4% |
+| [0.10, 0.20) | 20.6% |
+| [0.20, 0.30) | 17.4% |
+| [0.30, 0.50) | 26.0% |
+| **P_max > 0.1 (borderline)** | **64%** |
+| **P_max > 0.3 (near-saturated)** | **26%** |
+
+**Physical interpretation of the log Z shift:**
+
+The +4.4 nat shift is NOT purely the probe correction predicted in Phase 6.B (−0.036 nats).
+Two compounding architectural changes explain the radical difference:
+
+1. **k_IC change**: Original D1 runs used k_IC = 2.0 (grid 64, L=50). The canonical
+   reruns use k_IC = 2π/100 ≈ 0.0628 (grid 256, L=100). This is a factor of ~32×
+   change in the probed wavenumber. In the torsion-nonminimal model, the Ricci-EM
+   identity coupling is k-independent but torsion gradient couplings scale with k;
+   the mode structure of the conversion landscape differs substantially.
+
+2. **Stability probe effect**: Old run had no probe gate → explored tachyonic parameter
+   regions where the graviton instability caused the source field to grow faster than
+   the target, leading to *suppression* (A < 1). With the probe, tachyonic regions
+   return −∞ and the chain samples only the stable sector where genuine photon
+   amplification accumulates.
+
+**Combined effect**: The old run was suppression-dominated (tachyonic graviton growth
+outpaced photon build-up). The new canonical run reveals a large stable-sector region
+with genuine amplification up to A ≈ 200 (P_max ≈ 0.5, just below the Hwang-Noh gate).
+
+**Perturbativity concern:** 64% of the new posterior has P_max > 0.1, with 26% above 0.3.
+The linearized conversion measurement is valid for P_max ≪ 1; at P_max = 0.4 the
+perturbative approximation is questionable. The log Z = +2.135 is real (within the
+accepted Hwang-Noh criterion of P_max < 0.5) but a cross-check at smaller B₀ is needed
+to confirm the A values hold under perturbativity. The standard icelake jobs
+(28789437/28789439) will provide a second draw; if they agree, they corroborate the
+canonical result.
+
+**Corner plot:** `hpc_results/28789579/corner_28789579_amp_clean.png`
