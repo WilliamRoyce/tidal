@@ -53,23 +53,11 @@ conversion.
 ▶ Slide 2 — 02 gertsenshtein (~60 s)
 ═══════════════════════════════════════════════════════════════
 
-So what actually is the Gertsenshtein effect. The setup on the slide:
-linearised GR plus Maxwell in a uniform background magnetic field
-B-zero. The reason the graviton and the photon mix is mechanical — the
-EM action contains two metric factors, one in each F-down-mu-nu and
-F-up-mu-nu. When you perturb the metric around B-zero, those two factors
-generate a cross-term coupling the metric perturbation to the photon
-perturbation.
+I'm guessing the first question you'll all have is: what actually is the Gertsenshtein effect? The short answer is: it's a mixing between the graviton and the photon, mediated by the background magnetic field.
 
-What you see on the slide is the conversion-probability formula —
-sin-squared in kappa B-zero D over two. The structure is exactly two-state
-quantum-mechanical mixing, the same machinery you see in axion-photon
-conversion through a Primakoff process. The intuition: the background
-field acts like an off-diagonal coupling between the graviton and the
-photon dispersion relations, with a beat frequency set by kappa B-zero.
+Though perhaps sounding exotic, this is not a new interaction vertex — it's already present in the Einstein–Maxwell action! If we recall that raising indices requires a factor of the inverse metric, we can see the action contains a sort-of three-field vertex coupling between the graviton, the photon, and the background magnetic field.
 
-So now the question becomes: how big is that beat frequency in any
-realistic setting?
+The equations are lengthy to reach, causing the surrounding literature to be littered with mistakes, but their structure is simple. It's a two-state mixing between the graviton and the photon, with an off-diagonal coupling proportional to the background magnetic field. The conversion becomes a standard mixing process, with a beat frequency set by that coupling.
 
 ▶ NEXT — slide 3: why it's so weak
 
@@ -77,23 +65,15 @@ realistic setting?
 ▶ Slide 3 — 03 literature (~50 s)
 ═══════════════════════════════════════════════════════════════
 
-The answer to that question is on the slide: the conversion probability
-scales as B-zero times distance over the Planck mass, squared. M-Planck
-is ten-to-the-nineteen GeV — that's the suppression. Even for a magnetar
-running over its full ten-kilometre scale, B-zero D divided by M-Planck
-is around ten-to-the-minus-five, giving a probability of ten-to-the-minus-ten.
+But why is the conversion so weak? Its fundamental origin is the weakness of gravity, suppressed by the huge Planck scale. It's not exactly looking good for the gertsenshtein effect when the conversion probability is already suppressed by the Planck mass squared.
 
-Three literature points worth knowing. Gertsenshtein himself in 1962
+Gertsenshtein himself in 1962
 gave the formula and immediately recognised it was hopelessly small.
 Boccaletti and collaborators in 1970 did the full analytic solution for
 a localised B-field region. Raffelt and Stodolsky in 1988 embedded the
-problem in the axion-photon-mixing framework, which is the language most
-people use today.
+problem in the axion-photon-mixing framework, which is the modern standard for the effect.
 
-The point to make explicit: this formula is exact in linearised
-Einstein-Maxwell. There's no approximation to soften, no refinement that
-brings it up. Any amplification has to come from new gravitational
-physics outside Einstein-Maxwell.
+We must remember that this formula is exact in linearised Einstein–Maxwell, there are no approximations to wave away. Any amplification has to come from genuine new physics.
 
 ▶ NEXT — slide 4: PGT and torsion
 
@@ -101,24 +81,18 @@ physics outside Einstein-Maxwell.
 ▶ Slide 4 — 04 pgt_a (~60 s)
 ═══════════════════════════════════════════════════════════════
 
-The natural place to look is Poincaré gauge theory. The framing the
-slide leads with: spacetime has two independent local symmetries —
-local Lorentz invariance and local translations — and the slide's
-table makes the analogy explicit. In QED you gauge U(1), get a
-connection A-mu, and a field strength F. In gravity you can gauge
-both subgroups of the Poincaré group: gauging the Lorentz part gives
-you a spin connection and curvature, gauging translations gives you
-the tetrad and torsion.
+Let me attempt to motivate the grounding of the theory we are working with. Naturally, there exists in spacetime two potentially independent symmetries: Lorentz invariance and translations. These are fundamental, and we would expect that we could promote these symmetries to local ones.
 
-GR keeps one of these: curvature. PGT keeps both. So the bottom line:
-in GR torsion is set to zero by assumption; in PGT it's a new
-gravitational degree of freedom on equal footing with the metric.
+This is what a gauge theory does: it takes a global symmetry and promotes it to a local one. So we have some new object which describes how we do this at each point in spacetime, and we need to add these compensating fields to ensure we dont mess up the derivative terms.
 
-The figure on the right is the geometric intuition. Parallel-transport a
-vector around a closed loop and you get two mismatches: a rotational
-mismatch — that's curvature — and a translational one where the loop
-literally fails to close, which is torsion. The third panel is
-non-metricity, which neither GR nor PGT keeps.
+It turns out that gauging the U(1) symmetry gives us precisely the familiar field strength of QED. It turns out that the field strength arising from gauging the Lorentz part of the Poincaré group gives us exactly the geometric curvature, while gauging translations gives us this new object called torsion.
+
+As we know, GR keeps just the curvature, but at this level it looks like there is good reason to keep both in our theory, and we already know from the Standard Model that gauge theories have found great success in describing the other forces of nature.
+
+As we do in GR, its possible to assign a geometric intuition to these objects.
+Parallel-transport a vector around a closed loop and you get two mismatches: a rotational
+mismatch you know as curvature, and a translational one where the loop
+literally fails to close, which is torsion. There is also non-metricity, describing the change in the length of that vector, which neither GR nor PGT keeps.
 
 ▶ NEXT — slide 5: the parameter landscape
 
@@ -126,24 +100,13 @@ non-metricity, which neither GR nor PGT keeps.
 ▶ Slide 5 — 05 pgt_b (~60 s)
 ═══════════════════════════════════════════════════════════════
 
-Once you commit to PGT, the parameter space gets large. The schematic
-Lagrangian on the left has three families: torsion-squared invariants
-giving torsion masses; curvature-squared invariants giving graviton
-self-coupling and torsion mixing; and non-minimal couplings like
-delta-one R-tilde-anti-symmetric F-mu-nu, which directly shuttle energy
-between the gravitational and electromagnetic sectors. The
-non-minimal terms are the most interesting because they're the only
-ones that can directly modify the Gertsenshtein vertex — they're absent
-in GR and they're the principal target of the scan.
+Although we have a nice moral standpoint for PGT, we realise that leaving the geometric perspective for a field theoretic viewpoint, it becomes clear that there are a huge number of possible terms that become available to construct our Lagrangian from.
 
-The table on the right enumerates the sectors. Adding up the entries
-gives roughly 150 independent quadratic couplings — and that's before
-you add cubic vertices on the B-zero background, which is where the
-Gertsenshtein-type physics actually lives. Any of these could in
-principle amplify; hand-deriving any single one safely is fragile, and
-hand-deriving all of them is impossible.
+There exists literature classifying the effects and phenomenology of some of these terms, but the full landscape is largely unexplored. We are free to add parity odd-terms, higher-derivative terms, non-minimal couplings between fields, and so on. Not only this but there ends up being many indices through which we can contract over, so i had to write appropriate mathematica code to systematically enumerate all the possible independent terms.
 
-So the program is to scan this whole landscape systematically.
+The table here already shows a vast number of terms, few of which have been studied in the literature. And we don't even have to stop it there, with no reason a priori to exclude even higher order terms.
+
+We will also consider more phenomenological extensions, such as plasma effects, which more like effective interactions than fundamental modifications of gravity, but which are astrophysical relevant.
 
 ▶ NEXT — slide 6: the question and the method
 
@@ -151,20 +114,14 @@ So the program is to scan this whole landscape systematically.
 ▶ Slide 6 — 06 question (~45 s)
 ═══════════════════════════════════════════════════════════════
 
-This is the central question, framed exactly as on the slide:
-is there any stable combination of quadratic curvature and torsion
-modifications whose linearised PDEs, in a background magnetic field,
-give an amplified Gertsenshtein conversion?
+The central question is therefore whether there exists within this vast landscape any combination of these modifications that can amplify the Gertsenshtein conversion. We are not looking for a specific mechanism, but rather asking whether any mechanism exists at all.
 
-For every Lagrangian we test, three things have to happen. We derive
+For every Lagrangian we test, we first derive
 the linearised field equations symbolically — by hand they're
-intractable for anything but the simplest case. We screen for unstable
-regimes by computing eigenvalues across all spatial modes — tachyonic
-points get rejected before they enter the inference. And we compute the
-conversion probability and compare it to the GR baseline.
+intractable for anything but the simplest case. We then route those equations
+through our solver to compute the conversion probability and compare it to the GR baseline.
 
-All three of those steps are what TIDAL automates, and that's the
-next slide.
+This is what the bulk of my project has been about — building the infrastructure to do allow us to do this systematically and efficiently.
 
 ▶ NEXT — slide 7: TIDAL overview
 
@@ -172,21 +129,9 @@ next slide.
 ▶ Slide 7 — 07 tidal_overview (~60 s)
 ═══════════════════════════════════════════════════════════════
 
-TIDAL stands for Tensor Integration and Derivation for Any Lagrangian.
-The pipeline goes left-to-right across the slide: a TOML config file
-declares the Lagrangian and the field content; Mathematica with the
-xAct and xTras packages does the symbolic work — Euler-Lagrange
-variation, multi-field perturbation around a background, and the
-covariant-derivative expansion that brings in the contortion contributions; that produces a JSON spec; and the Python
-solver consumes the JSON, runs sweeps, runs inference, generates plots.
+We start with a Lagrangian declaration, including the field content, the nature of any perturbative expansion, and the background. We then do the symbolic work to derive the equations of motion, perturb them around the background, and put them in a form suitable for numerical solution. Finally, we run the numerical solver and do inference on the results.
 
-The core claim, which I want to land properly: every equation in the
-numerical solver is traceable back to a single Lagrangian declaration.
-No hand-derived PDEs. No manual index gymnastics. For a phenomenological
-scan that varies the Lagrangian across dozens of operator combinations,
-the underlying tensor calculus and constraint reductions are
-genuinely intractable by hand — symbolic computation isn't
-a convenience here, it's the only viable route.
+I had to ensure that the framework was flexible enough to handle the full range and structure of theories we want to test, and that the symbolic and numerical layers were fully automated and connected. Importantly for the inference layer, the numerical solver has to fast enough turnaround to allow us to run thousands of simulations across the parameter space, and accurate too.
 
 ▶ NEXT — slide 8: the modal solver
 
@@ -194,28 +139,15 @@ a convenience here, it's the only viable route.
 ▶ Slide 8 — 08 tidal_numerical (~70 s)
 ═══════════════════════════════════════════════════════════════
 
-This is the numerical engine. It's a spectral solver tailored for the
-linearised gauge theories the survey produces. Two regimes — per-mode
-when the background magnetic field is uniform, and a convolution-coupled
-form when it's localised in space — and both evolve by direct matrix
-exponential. Crucially, no eigendecomposition.
+The core numerical engine is the spectral solver tailored for the
+linearised gauge theories the survey produces. The linearisation is key, allowing us to work in Fourier space and solve for each mode independently, which is a huge speedup compared to a full nonlinear PDE solver.
+We want a framework that will be able to handle any new terms you want to
+add to it, and in general there are a lot of different structures and types of solutions that can arise, so we had to make sure the solver was flexible enough to handle all of these.
 
-The reason it fits this survey class: every theory we test linearises
-to periodic, time-independent PDEs around a flat background, which are
-exactly the modal solver's eligibility criteria. The benefit is
-machine-precision time evolution with no time-stepping error to obscure
-the weak signals we're trying to measure.
+The key benefit of the modal solver is that we don't actually end up having
+to do any time-stepping at all, provided an exact solution via a matrix exponential. That's a huge advantage in terms of the machine precision accuracy of the time evolution, which is crucial for the weak signals we're trying to measure. The solver is also very fast, and constant order in the end time, since it does only a single time step.
 
-The thing worth flagging is what we had to do to make this work for
-gauge theories. The textbook approach — V times diag-e-lambda-t times
-V-inverse — fails universally on PGT because the eigenvector matrix V
-is catastrophically ill-conditioned: condition numbers in the
-ten-to-the-fifteen range, where inversion just doesn't work
-numerically. So we compute the matrix exponential directly via the
-Padé approximant, never forming V-inverse. Second fix: Fourier-space
-algebraic elimination of fields that have no time derivative — the
-Gauss-law-type constraints that PGT generates in abundance. Both
-formulas are in the backup if anyone wants to see them.
+Unfortunately though, the exact matrix solution is met with many catastrophic numerical issues when applied to gauge theories, which is what we had to fix to make it work for our survey. We are not actually able to eigendecompose the operator, so we have to compute the matrix exponential directly in a way that avoids the ill-conditioned and hugely degenerate eigenvectors. We also have to deal with the presence of algebraically constrained fields, which enter the equations of motion but don't have their own explicit dynamics.
 
 ▶ NEXT — slide 9: the inference framework
 
