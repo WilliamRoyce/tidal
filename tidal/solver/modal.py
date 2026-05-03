@@ -74,7 +74,9 @@ References
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+import os
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -193,6 +195,218 @@ _OPERATOR_DECOMP: dict[str, _OperatorDecomp] = {
 _EXACT_MULTIPLIERS: dict[str, _ExactMultFn] = {
     name: dec.spatial_fn for name, dec in _OPERATOR_DECOMP.items()
 }
+
+
+# ---------------------------------------------------------------------------
+# A-matrix template cache — inference acceleration
+# ---------------------------------------------------------------------------
+# For the inference hot path (tidal sample), the system matrix A[k] is linear
+# in each coupling parameter individually.  Pre-computing A_base + per-param
+# tangent tensors T_p = ∂A/∂θ_p reduces per-call cost from ~49 ms to ~0.5 ms.
+#
+# The cache is process-scoped (module-level dict).  Call
+# register_inference_context() once at chain init to register free params.
+# Kill-switch: TIDAL_MODAL_A_TEMPLATE=0 disables the cache globally.
+#
+# Applicability:
+#   - Only for constant-coefficient (not position-dependent) paths.
+#   - For the needs_reduction=True path: only when n_c == 0 (no constraint
+#     fields).  With constraints the recovery matrix is also param-dependent;
+#     those specs fall back to legacy per-call build automatically.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _ATemplateCache:
+    """Pre-linearised A-matrix template for constant-coefficient modal solver."""
+
+    needs_reduction: bool
+    A_base: NDArray[np.complex128]
+    T_linear: dict[str, NDArray[np.complex128]]
+    base_params: dict[str, float]
+    # needs_reduction=True path extras (None when needs_reduction=False):
+    B_lhs: NDArray[np.complex128] | None
+    recovery: NDArray[np.complex128] | None
+    v_recovery: NDArray[np.complex128] | None
+    c_names: list[str]
+    orig_to_reduced: dict[int, int]
+    Scc_inv: NDArray[np.complex128] | None
+    Scc_singular_mask: NDArray[np.bool_] | None
+
+
+_free_param_names: frozenset[str] = frozenset()
+# Value is _ATemplateCache | None: None signals "not applicable for this spec".
+_A_TEMPLATE_CACHE: dict[
+    tuple[object, ...], _ATemplateCache | _IngredientTemplateCache | None
+] = {}
+# Fourier spatial multipliers keyed by (op_name, ...).
+# Grid-path callers use (op, shape_tuple, bounds_tuple); Duhamel callers use
+# (op, id(k_grid[0])). Safe to share across CoefficientEvaluator instances.
+_MULTIPLIER_CACHE: dict[tuple[object, ...], NDArray[np.complex128]] = {}
+
+
+def register_inference_context(free_param_names: Iterable[str]) -> None:
+    """Register free parameter names to enable the A-matrix template cache.
+
+    Call once before an MCMC/nested-sampling chain.  Each subsequent
+    likelihood call then assembles A(θ) via N_free numpy scale-adds instead
+    of rebuilding from scratch (~0.5 ms vs ~49 ms per call).
+
+    Parameters
+    ----------
+    free_param_names : iterable of str
+        Names of parameters that vary between likelihood calls (the prior
+        variables).  All other parameters are treated as constants and
+        folded into A_base at template-build time.
+
+    Notes
+    -----
+    No-op for standalone ``tidal simulate`` (never called → legacy path
+    runs unchanged).  MPI-safe: each worker process has its own Python
+    module globals.  Kill-switch: ``TIDAL_MODAL_A_TEMPLATE=0``.
+    """
+    global _free_param_names  # noqa: PLW0603
+    _free_param_names = frozenset(free_param_names)
+    _A_TEMPLATE_CACHE.clear()
+
+
+def _make_template_cache_key(
+    spec: EquationSystem,
+    grid: GridInfo,
+) -> tuple[object, ...]:
+    """Return a stable cache key from spec identity + grid content."""
+    return (
+        id(spec),
+        tuple(grid.shape),
+        tuple(float(x) for pair in grid.bounds for x in pair),
+    )
+
+
+def _apply_a_template(
+    tmpl: _ATemplateCache,
+    parameters: dict[str, float],
+) -> NDArray[np.complex128]:
+    """Assemble A(θ) = A_base + Σ_p (θ_p − θ_base_p) · T_p."""
+    a_mat = tmpl.A_base.copy()
+    for p, T in tmpl.T_linear.items():
+        delta = parameters.get(p, 0.0) - tmpl.base_params.get(p, 0.0)
+        if delta != 0.0:
+            a_mat += delta * T
+    return a_mat
+
+
+# ---------------------------------------------------------------------------
+# Pre-Schur ingredient template — inference acceleration for n_c > 0 specs
+# ---------------------------------------------------------------------------
+# For constrained systems (n_c > 0), the post-Schur A_rhs is non-linear in
+# the free coupling parameters (Schur introduces rational functions via
+# S_cc_inv).  Instead, the *pre-Schur* ingredient matrices (A_dd, S_cc, S_cd,
+# A_dc_field, A_dc_vel) are each exactly linear, so they can be templated.
+# Per-call cost: linear combo assembly (~0.5 ms) + batch Schur (~3 ms) vs
+# the full rebuild (~49 ms).
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _IngredientTemplateCache:
+    """Pre-Schur ingredient template for constrained constant-coefficient specs."""
+
+    A_dd_base: NDArray[np.complex128]  # (n_modes, n_dyn, n_dyn)
+    S_cc_base: NDArray[np.complex128]  # (n_modes, n_c, n_c)
+    S_cd_base: NDArray[np.complex128]  # (n_modes, n_c, n_dyn)
+    A_dc_field_base: NDArray[np.complex128]  # (n_modes, n_dyn, n_c)
+    A_dc_vel_base: NDArray[np.complex128]  # (n_modes, n_dyn, n_c)
+    dA_dd: dict[str, NDArray[np.complex128]]  # noqa: N815
+    dS_cc: dict[str, NDArray[np.complex128]]  # noqa: N815
+    dS_cd: dict[str, NDArray[np.complex128]]  # noqa: N815
+    dA_dc_field: dict[str, NDArray[np.complex128]]  # noqa: N815
+    dA_dc_vel: dict[str, NDArray[np.complex128]]  # noqa: N815
+    base_params: dict[str, float]
+    c_names: list[str]
+    orig_to_reduced: dict[int, int]
+
+
+def _apply_ingredient_template(
+    tmpl: _IngredientTemplateCache,
+    parameters: dict[str, float],
+) -> tuple[
+    NDArray[np.complex128],  # A_rhs
+    NDArray[np.complex128] | None,  # B_lhs
+    NDArray[np.complex128],  # recovery
+    NDArray[np.complex128] | None,  # v_recovery
+    list[str],  # c_names
+    dict[int, int],  # orig_to_reduced
+    NDArray[np.complex128] | None,  # S_cc_inv
+    NDArray[np.bool_] | None,  # singular_mask
+]:
+    """Assemble A_rhs via linear ingredient combination + per-call Schur."""
+    # 1. Assemble ingredients (~0.5 ms)
+    A_dd = tmpl.A_dd_base.copy()
+    S_cc = tmpl.S_cc_base.copy()
+    S_cd = tmpl.S_cd_base.copy()
+    A_dc_field = tmpl.A_dc_field_base.copy()
+    A_dc_vel = tmpl.A_dc_vel_base.copy()
+    for p in tmpl.dA_dd:
+        delta = parameters.get(p, 0.0) - tmpl.base_params.get(p, 0.0)
+        if delta != 0.0:
+            A_dd += delta * tmpl.dA_dd[p]
+            S_cc += delta * tmpl.dS_cc[p]
+            S_cd += delta * tmpl.dS_cd[p]
+            A_dc_field += delta * tmpl.dA_dc_field[p]
+            A_dc_vel += delta * tmpl.dA_dc_vel[p]
+
+    # 2. Batch Schur elimination (~2–3 ms for n_c=18, n_modes=129)
+    n_modes = S_cc.shape[0]
+    n_c = S_cc.shape[1]
+    cc_dets = np.linalg.det(S_cc)
+    singular_mask: NDArray[np.bool_] = np.abs(cc_dets) < 1e-14
+    S_cc_reg = S_cc.copy()
+    if np.any(singular_mask):
+        S_cc_reg[singular_mask] += 1e-14 * np.eye(n_c, dtype=np.complex128)
+    S_cc_inv: NDArray[np.complex128] = np.linalg.inv(S_cc_reg).astype(np.complex128)
+
+    recovery: NDArray[np.complex128] = -(S_cc_inv @ S_cd)
+    field_correction: NDArray[np.complex128] = A_dc_field @ recovery
+    vel_coupling: NDArray[np.complex128] = A_dc_vel @ recovery
+    has_vel = bool(np.max(np.abs(vel_coupling)) > 1e-15)
+
+    A_rhs: NDArray[np.complex128] = A_dd + field_correction
+
+    B_lhs: NDArray[np.complex128] | None = None
+    if has_vel:
+        n_dyn = A_rhs.shape[1]
+        eye = np.broadcast_to(
+            np.eye(n_dyn, dtype=np.complex128), (n_modes, n_dyn, n_dyn)
+        ).copy()
+        B_lhs = eye - vel_coupling
+
+    # 3. v_recovery
+    v_recovery: NDArray[np.complex128] | None = None
+    if recovery.size > 0:
+        if B_lhs is not None:
+            A_eff = np.zeros_like(A_rhs)
+            for m in range(n_modes):
+                try:
+                    A_eff[m] = np.linalg.solve(B_lhs[m], A_rhs[m])
+                except np.linalg.LinAlgError:
+                    A_eff[m] = np.asarray(
+                        np.linalg.lstsq(B_lhs[m], A_rhs[m], rcond=None)[0],
+                        dtype=np.complex128,
+                    )
+            v_recovery = recovery @ A_eff
+        else:
+            v_recovery = recovery @ A_rhs
+
+    return (
+        A_rhs,
+        B_lhs,
+        recovery,
+        v_recovery,
+        tmpl.c_names,
+        tmpl.orig_to_reduced,
+        S_cc_inv,
+        singular_mask,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -535,6 +749,7 @@ def _build_evolution_matrices(
     coeff_eval: object,  # CoefficientEvaluator
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
+    _ingredient_out: dict[str, NDArray[np.complex128]] | None = None,
 ) -> tuple[
     NDArray[np.complex128],  # A_rhs (n_modes, n_dyn_slots, n_dyn_slots)
     NDArray[np.complex128] | None,  # B_lhs (n_modes, n_dyn, n_dyn) or None
@@ -635,16 +850,23 @@ def _build_evolution_matrices(
         if si in orig_to_reduced:
             dyn_slot_map[v_name] = orig_to_reduced[si]
 
-    # ---- Evaluate spatial Fourier multipliers ----
+    # ---- Evaluate spatial Fourier multipliers (module-level persistent cache) ----
+    grid_key = (
+        tuple(grid.shape),
+        tuple(float(x) for pair in grid.bounds for x in pair),
+    )
     multiplier_cache: dict[str, NDArray[np.complex128]] = {}
     for eq in spec.equations:
         for term in eq.rhs_terms:
             op = term.operator
             if op not in multiplier_cache:
-                decomp = _OPERATOR_DECOMP[op]
-                mult_val = decomp.spatial_fn(k_grid)
-                mult_full = np.broadcast_to(mult_val, rfft_shape)
-                multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
+                mk = (op, *grid_key)
+                if mk not in _MULTIPLIER_CACHE:
+                    decomp = _OPERATOR_DECOMP[op]
+                    mult_val = decomp.spatial_fn(k_grid)
+                    mult_full = np.broadcast_to(mult_val, rfft_shape)
+                    _MULTIPLIER_CACHE[mk] = mult_full.ravel().astype(np.complex128)
+                multiplier_cache[op] = _MULTIPLIER_CACHE[mk]
 
     # ---- Identify dynamical fields and their indices ----
     # Map: dynamical field name → index in the n_f dynamical field array
@@ -1199,6 +1421,14 @@ def _build_evolution_matrices(
                     t_order,
                 )
 
+    # Capture pre-Schur ingredients for the template cache builder.
+    if _ingredient_out is not None:
+        _ingredient_out["A_dd"] = A_dd.copy()
+        _ingredient_out["S_cc"] = S_cc.copy()
+        _ingredient_out["S_cd"] = S_cd.copy()
+        _ingredient_out["A_dc_field"] = A_dc_field.copy()
+        _ingredient_out["A_dc_vel"] = A_dc_vel.copy()
+
     # ---- Constraint field Schur elimination ----
     if n_c > 0:
         # Batch-invert S_cc
@@ -1356,17 +1586,19 @@ def _build_per_mode_matrices(
             return layout.velocity_slot_map[field_ref[2:]]
         return None
 
-    # Evaluate Fourier multipliers on the k-grid
+    # Evaluate Fourier multipliers on the k-grid (module-level persistent cache)
+    gk = (tuple(grid.shape), tuple(float(x) for pair in grid.bounds for x in pair))
     multiplier_cache: dict[str, NDArray[np.complex128]] = {}
     for eq in spec.equations:
         for term in eq.rhs_terms:
             op = term.operator
             if op not in multiplier_cache:
-                mult_fn = _EXACT_MULTIPLIERS[op]
-                mult_val = mult_fn(k_grid)
-                # Broadcast to full rfft shape and flatten
-                mult_full = np.broadcast_to(mult_val, rfft_shape)
-                multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
+                mk = (op, *gk)
+                if mk not in _MULTIPLIER_CACHE:
+                    mult_val = _EXACT_MULTIPLIERS[op](k_grid)
+                    mult_full = np.broadcast_to(mult_val, rfft_shape)
+                    _MULTIPLIER_CACHE[mk] = mult_full.ravel().astype(np.complex128)
+                multiplier_cache[op] = _MULTIPLIER_CACHE[mk]
 
     # Build matrices: A[m, i, j] for each mode m
     A = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
@@ -1485,16 +1717,19 @@ def _build_convolution_matrix(
             return layout.velocity_slot_map[field_ref[2:]]
         return None
 
-    # Evaluate Fourier multipliers on the k-grid (for constant terms)
+    # Evaluate Fourier multipliers on the k-grid (module-level persistent cache)
+    gk2 = (tuple(grid.shape), tuple(float(x) for pair in grid.bounds for x in pair))
     multiplier_cache: dict[str, NDArray[np.complex128]] = {}
     for eq in spec.equations:
         for term in eq.rhs_terms:
             op = term.operator
             if op not in multiplier_cache:
-                mult_fn = _EXACT_MULTIPLIERS[op]
-                mult_val = mult_fn(k_grid)
-                mult_full = np.broadcast_to(mult_val, rfft_shape)
-                multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
+                mk = (op, *gk2)
+                if mk not in _MULTIPLIER_CACHE:
+                    mult_val = _EXACT_MULTIPLIERS[op](k_grid)
+                    mult_full = np.broadcast_to(mult_val, rfft_shape)
+                    _MULTIPLIER_CACHE[mk] = mult_full.ravel().astype(np.complex128)
+                multiplier_cache[op] = _MULTIPLIER_CACHE[mk]
 
     A = np.zeros((n_total, n_total), dtype=np.complex128)
 
@@ -1897,8 +2132,6 @@ def _evolve_per_mode_pade(
     Higham, N.J. (2008). Functions of Matrices, SIAM, §2.3 (cond(V)
     abandonment threshold).
     """
-    import os  # noqa: PLC0415
-
     import scipy.linalg as sla  # type: ignore[import-untyped]  # noqa: PLC0415
 
     from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
@@ -2439,6 +2672,151 @@ def _evolve_full_matrix(
 
 
 # ---------------------------------------------------------------------------
+# A-matrix template builder
+# ---------------------------------------------------------------------------
+
+
+def _build_a_template_cache(
+    spec: EquationSystem,
+    layout: StateLayout,
+    grid: GridInfo,
+    k_grid: list[NDArray[np.float64]],
+    rfft_shape: tuple[int, ...],
+    base_params: dict[str, float],
+    free_param_names: frozenset[str],
+    *,
+    needs_reduction: bool,
+) -> _ATemplateCache | _IngredientTemplateCache | None:
+    """Build the A-matrix template cache for constant-coefficient modal solver.
+
+    For n_c = 0 specs returns ``_ATemplateCache`` (post-Schur, exact linear).
+    For n_c > 0 specs returns ``_IngredientTemplateCache`` (pre-Schur ingredients,
+    each exactly linear; Schur is redone per-call in ~3 ms).
+    Returns ``None`` only when the cache is not applicable (position-dependent
+    coefficients or other unsupported path).
+
+    Parameters
+    ----------
+    spec, layout, grid, k_grid, rfft_shape
+        Same arguments forwarded to the underlying build functions.
+    base_params : dict
+        Current parameter values; used as the expansion point.
+    free_param_names : frozenset of str
+        Parameters that will vary between likelihood calls.
+    needs_reduction : bool
+        Whether the spec routes through ``_build_evolution_matrices``
+        (True) or ``_build_per_mode_matrices`` (False).
+    """
+    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+    coeff_base = CoefficientEvaluator(spec, grid, base_params)
+
+    if needs_reduction:
+        ingr_base: dict[str, NDArray[np.complex128]] = {}
+        (
+            A_base,
+            B_lhs,
+            recovery,
+            v_recovery,
+            c_names,
+            orig_to_reduced,
+            Scc_inv,
+            Scc_singular_mask,
+        ) = _build_evolution_matrices(
+            spec,
+            layout,
+            grid,
+            coeff_base,
+            k_grid,
+            rfft_shape,
+            _ingredient_out=ingr_base,
+        )
+
+        if len(c_names) > 0:
+            # n_c > 0: post-Schur A_rhs is non-linear → use ingredient template.
+            # Pre-Schur ingredients are all exactly linear in coupling params.
+            dA_dd: dict[str, NDArray[np.complex128]] = {}
+            dS_cc: dict[str, NDArray[np.complex128]] = {}
+            dS_cd: dict[str, NDArray[np.complex128]] = {}
+            dA_dc_field: dict[str, NDArray[np.complex128]] = {}
+            dA_dc_vel: dict[str, NDArray[np.complex128]] = {}
+            for p in free_param_names:
+                probe = dict(base_params)
+                probe[p] = probe.get(p, 0.0) + 1.0
+                coeff_probe = CoefficientEvaluator(spec, grid, probe)
+                ingr_probe: dict[str, NDArray[np.complex128]] = {}
+                _build_evolution_matrices(
+                    spec,
+                    layout,
+                    grid,
+                    coeff_probe,
+                    k_grid,
+                    rfft_shape,
+                    _ingredient_out=ingr_probe,
+                )
+                dA_dd[p] = ingr_probe["A_dd"] - ingr_base["A_dd"]
+                dS_cc[p] = ingr_probe["S_cc"] - ingr_base["S_cc"]
+                dS_cd[p] = ingr_probe["S_cd"] - ingr_base["S_cd"]
+                dA_dc_field[p] = ingr_probe["A_dc_field"] - ingr_base["A_dc_field"]
+                dA_dc_vel[p] = ingr_probe["A_dc_vel"] - ingr_base["A_dc_vel"]
+            return _IngredientTemplateCache(
+                A_dd_base=ingr_base["A_dd"],
+                S_cc_base=ingr_base["S_cc"],
+                S_cd_base=ingr_base["S_cd"],
+                A_dc_field_base=ingr_base["A_dc_field"],
+                A_dc_vel_base=ingr_base["A_dc_vel"],
+                dA_dd=dA_dd,
+                dS_cc=dS_cc,
+                dS_cd=dS_cd,
+                dA_dc_field=dA_dc_field,
+                dA_dc_vel=dA_dc_vel,
+                base_params=dict(base_params),
+                c_names=c_names,
+                orig_to_reduced=orig_to_reduced,
+            )
+    else:
+        A_base = _build_per_mode_matrices(
+            spec, layout, grid, coeff_base, k_grid, rfft_shape
+        )
+        B_lhs = None
+        recovery = None
+        v_recovery = None
+        c_names = []
+        orig_to_reduced = {}
+        Scc_inv = None
+        Scc_singular_mask = None
+
+    T_linear: dict[str, NDArray[np.complex128]] = {}
+    for p in free_param_names:
+        probe = dict(base_params)
+        probe[p] = probe.get(p, 0.0) + 1.0
+        coeff_probe = CoefficientEvaluator(spec, grid, probe)
+        if needs_reduction:
+            A_probe, *_ = _build_evolution_matrices(
+                spec, layout, grid, coeff_probe, k_grid, rfft_shape
+            )
+        else:
+            A_probe = _build_per_mode_matrices(
+                spec, layout, grid, coeff_probe, k_grid, rfft_shape
+            )
+        T_linear[p] = A_probe - A_base
+
+    return _ATemplateCache(
+        needs_reduction=needs_reduction,
+        A_base=A_base,
+        T_linear=T_linear,
+        base_params=dict(base_params),
+        B_lhs=B_lhs,
+        recovery=recovery,
+        v_recovery=v_recovery,
+        c_names=c_names,
+        orig_to_reduced=orig_to_reduced,
+        Scc_inv=Scc_inv,
+        Scc_singular_mask=Scc_singular_mask,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Public solver entry point
 # ---------------------------------------------------------------------------
 
@@ -2537,7 +2915,6 @@ def solve_modal(
         raise ValueError(msg)
 
     layout = StateLayout.from_spec(spec, grid.num_points)
-    coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
 
     # Detect constraint fields
     has_constraints = any(eq.time_derivative_order == 0 for eq in spec.equations)
@@ -2614,24 +2991,71 @@ def solve_modal(
     Scc_inv_modes: NDArray[np.complex128] | None = None
     Scc_singular_mask_modes: NDArray[np.bool_] | None = None
 
+    # A-matrix template cache (inference hot path): resolve once before branching.
+    # Active when register_inference_context() has been called with free param names
+    # and the spec is a constant-coefficient path (not position-dependent).
+    tidal_tmpl: _ATemplateCache | _IngredientTemplateCache | None = None
+    if (
+        os.environ.get("TIDAL_MODAL_A_TEMPLATE", "1") != "0"
+        and _free_param_names
+        and not has_pos_dep
+        and parameters
+    ):
+        cache_key = _make_template_cache_key(spec, grid)
+        if cache_key not in _A_TEMPLATE_CACHE:
+            _A_TEMPLATE_CACHE[cache_key] = _build_a_template_cache(
+                spec,
+                layout,
+                grid,
+                k_grid,
+                rfft_shape,
+                parameters,
+                _free_param_names,
+                needs_reduction=needs_reduction,
+            )
+        tidal_tmpl = _A_TEMPLATE_CACHE[cache_key]
+
     if needs_reduction:
-        (
-            A_reduced,
-            B_lhs_modes,
-            recovery_matrix,
-            _v_recovery_gen,  # unused — constraint vel from eigendata
-            c_names,
-            orig_to_reduced,
-            Scc_inv_modes,
-            Scc_singular_mask_modes,
-        ) = _build_evolution_matrices(
-            spec,
-            layout,
-            grid,
-            coeff_eval,
-            k_grid,
-            rfft_shape,
-        )
+        if isinstance(tidal_tmpl, _IngredientTemplateCache):
+            (
+                A_reduced,
+                B_lhs_modes,
+                recovery_matrix,
+                _v_recovery_ingr,
+                c_names,
+                orig_to_reduced,
+                Scc_inv_modes,
+                Scc_singular_mask_modes,
+            ) = _apply_ingredient_template(tidal_tmpl, parameters or {})
+        elif isinstance(tidal_tmpl, _ATemplateCache):
+            A_reduced = _apply_a_template(tidal_tmpl, parameters or {})
+            B_lhs_modes = tidal_tmpl.B_lhs
+            recovery_matrix = tidal_tmpl.recovery
+            c_names = tidal_tmpl.c_names
+            orig_to_reduced = tidal_tmpl.orig_to_reduced
+            Scc_inv_modes = tidal_tmpl.Scc_inv
+            Scc_singular_mask_modes = tidal_tmpl.Scc_singular_mask
+        else:
+            from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+            coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
+            (
+                A_reduced,
+                B_lhs_modes,
+                recovery_matrix,
+                _v_recovery_gen,  # unused — constraint vel from eigendata
+                c_names,
+                orig_to_reduced,
+                Scc_inv_modes,
+                Scc_singular_mask_modes,
+            ) = _build_evolution_matrices(
+                spec,
+                layout,
+                grid,
+                coeff_eval,
+                k_grid,
+                rfft_shape,
+            )
 
         n_dyn = A_reduced.shape[1]
         n_modes = y0_hat.shape[1]
@@ -2694,6 +3118,7 @@ def solve_modal(
             # Use Fourier data directly (already computed in _evolve_per_mode)
             y_hat_dyn_t = dyn_fourier[ti]  # (n_dyn, n_modes)
 
+            assert recovery_matrix is not None  # set above when needs_reduction is True
             # Recover constraint fields: c_hat = recovery @ d_hat
             c_hat = np.einsum("mcj,jm->cm", recovery_matrix, y_hat_dyn_t)
 
@@ -2739,14 +3164,20 @@ def solve_modal(
 
     elif not has_pos_dep:
         # All-constant coefficients: per-mode independent evolution
-        A_modes = _build_per_mode_matrices(
-            spec,
-            layout,
-            grid,
-            coeff_eval,
-            k_grid,
-            rfft_shape,
-        )
+        if isinstance(tidal_tmpl, _ATemplateCache):
+            A_modes = _apply_a_template(tidal_tmpl, parameters or {})
+        else:
+            from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+            coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
+            A_modes = _build_per_mode_matrices(
+                spec,
+                layout,
+                grid,
+                coeff_eval,
+                k_grid,
+                rfft_shape,
+            )
         times, snapshots, _, _ = _evolve_per_mode(
             A_modes,
             y0_hat,
@@ -2759,7 +3190,10 @@ def solve_modal(
         )
         method_desc = "per-mode eigendecomposition (constant coefficients)"
     else:
-        # Position-dependent coefficients: full convolution matrix
+        # Position-dependent coefficients: full convolution matrix (no template)
+        from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+        coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
         A_full = _build_convolution_matrix(
             spec,
             layout,
@@ -2916,7 +3350,9 @@ def _build_source_matrix_k(
         constraint_idx.update({cname: ci for ci, cname in enumerate(c_names_list)})
         recovery_matrix = schur_ops.get("recovery_matrix")
 
-    # Cache Fourier multipliers per operator
+    # Cache Fourier multipliers per operator (module-level persistent cache)
+    # Use id(k_grid[0]) as the grid uniquifier — k_grid is stable for the session lifetime
+    gk3 = (id(k_grid[0]),)
     multiplier_cache: dict[str, NDArray[np.complex128]] = {}
     for eq in correction_spec.equations:
         for term in eq.rhs_terms:
@@ -2930,10 +3366,12 @@ def _build_source_matrix_k(
                     f"{sorted(_EXACT_MULTIPLIERS)}"
                 )
                 raise ValueError(msg)
-            mult_fn = _EXACT_MULTIPLIERS[op]
-            mult_val = mult_fn(k_grid)
-            mult_full = np.broadcast_to(mult_val, rfft_shape)
-            multiplier_cache[op] = mult_full.ravel().astype(np.complex128)
+            mk = (op, *gk3)
+            if mk not in _MULTIPLIER_CACHE:
+                mult_val = _EXACT_MULTIPLIERS[op](k_grid)
+                mult_full = np.broadcast_to(mult_val, rfft_shape)
+                _MULTIPLIER_CACHE[mk] = mult_full.ravel().astype(np.complex128)
+            multiplier_cache[op] = _MULTIPLIER_CACHE[mk]
 
     # #293: per-time-order matrices so correction terms with
     # d^n_t operators scale by λⁿ in the Duhamel kernel. Key lookup is
