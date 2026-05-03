@@ -31,6 +31,12 @@
 \setbeamertemplate{frame numbering}[fraction]
 \setbeamertemplate{navigation symbols}{}
 
+% Cambridge theme's enumerate item template uses \insertenumlabel which
+% is recursive with current beamer; override with \arabic-based numbering.
+\setbeamertemplate{enumerate item}{\arabic{enumi}.}
+\setbeamertemplate{enumerate subitem}{\arabic{enumi}.\arabic{enumii}}
+\setbeamertemplate{enumerate subsubitem}{\arabic{enumi}.\arabic{enumii}.\arabic{enumiii}}
+
 % ---- Metadata ---------------------------------------------------------------
 \title[Graviton-photon conversion in PGT]%
       {Graviton-Photon Conversion in Poincar\'e Gauge Theory}
