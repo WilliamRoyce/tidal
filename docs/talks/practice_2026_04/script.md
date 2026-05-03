@@ -16,8 +16,7 @@ old graviton-photon conversion process. This is a practice talk on my work the p
 
 The starting point is the Gertsenshtein effect: a graviton propagating
 through a background magnetic field can, perhaps surprisingly, convert into a
-photon. However, it is actually a textbook prediction of Einstein–Maxwell
-theory, and it has been around since 1962.
+photon.
 
 Perhaps unfortunately, this effect is astrophysically
 useless. For a magnetar with the strongest known magnetic fields,
@@ -39,11 +38,12 @@ conversion.
 ▶ Slide 2 — 02 Gertsenshtein (~60 s)
 ═══════════════════════════════════════════════════════════════
 
-I'm guessing the first question you'll all have is: what actually is the Gertsenshtein effect? The short answer is: it's a mixing between the graviton and the photon, mediated by the background magnetic field.
+I'm guessing you'll all be wondering now about what the Gertsenshtein effect actually is? In short: it's a mixing between the graviton and the photon, mediated by the background magnetic field.
 
 Although it might sound exotic, this isn't really new physics — the coupling is already hiding in the Einstein–Maxwell action! Once you turn on a background magnetic field and let the metric fluctuate, those metric factors raising the field strength indices produce a coupling between the graviton, the photon, and the background field.
 
-The equations are lengthy to reach, causing the surrounding literature to be littered with mistakes, but their structure is simple. It's a two-state mixing between the graviton and the photon, with an off-diagonal coupling proportional to the background magnetic field. The conversion becomes a standard mixing process, a sin-squared oscillation with a beat frequency set by that coupling.
+The equations are lengthy to reach, causing the surrounding literature to be littered with mistakes, but their structure is simple. It's a two-state mixing
+between the graviton and the photon, with an off-diagonal coupling proportional to the background magnetic field. The conversion becomes a standard mixing process, a sin-squared oscillation with a beat frequency set by that coupling.
 
 ▶ NEXT — slide 3: why it's so weak
 
