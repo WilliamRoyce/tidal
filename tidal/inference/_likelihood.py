@@ -351,9 +351,6 @@ class SimulationLikelihood:
         self.temp_dir = temp_dir
         self.keep_sims = keep_sims
         self._call_count = 0
-        from tidal.solver.modal import register_inference_context
-
-        register_inference_context(param_names)
         # Metadata from the most recent __call__: read by the sequential MC
         # path to populate per-sample run_status / tachyonic_excess.  Parallel
         # workers don't share state — they return the metadata from
