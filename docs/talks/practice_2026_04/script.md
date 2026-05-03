@@ -1,17 +1,5 @@
 # Practice talk — spoken script
 
-Continuous-prose script for live delivery. Written to be learned and rehearsed.
-Total target ~14–16 min spoken, leaving ~5 min buffer in a 20-min slot.
-
-Conventions:
-
-- `▶ NEXT — …` marks each slide-advance click.
-- Greek letters are written out phonetically (`kappa B-zero`, `alpha-i I-i`, `delta-one`) so the speaker doesn't trip on symbols.
-- Prose is what comes out of the mouth; what's on the slide is referred to ("the formula on the slide", "the table") rather than read out.
-- For each slide: target time + speaking notes + the `▶ NEXT` cue.
-
----
-
 ═══════════════════════════════════════════════════════════════
 ▶ Title slide (~15 s)
 ═══════════════════════════════════════════════════════════════
@@ -140,12 +128,15 @@ I had to ensure that the framework was flexible enough to handle the full range 
 ═══════════════════════════════════════════════════════════════
 
 The core numerical engine is the spectral solver tailored for the
-linearised gauge theories the survey produces. The linearisation is key, allowing us to work in Fourier space and solve for each mode independently, which is a huge speedup compared to a full nonlinear PDE solver.
+linearised gauge theories the survey produces. The linearisation is key,
+allowing us to work in Fourier space and solve for each mode independently, which is a huge speedup compared to a full nonlinear PDE solver.
 We want a framework that will be able to handle any new terms you want to
-add to it, and in general there are a lot of different structures and types of solutions that can arise, so we had to make sure the solver was flexible enough to handle all of these.
+add to it, and in general there are a lot of different structures and types of
+solutions that can arise, so we had to make sure the solver was flexible enough to handle all of these.
 
 The key benefit of the modal solver is that we don't actually end up having
-to do any time-stepping at all, provided an exact solution via a matrix exponential. That's a huge advantage in terms of the machine precision accuracy of the time evolution, which is crucial for the weak signals we're trying to measure. The solver is also very fast, and constant order in the end time, since it does only a single time step.
+to do any time-stepping at all, provided an exact solution via a matrix exponential. That's a huge advantage in terms of the machine precision accuracy of the time evolution, which is crucial for the weak signals we're
+trying to measure. The solver is also very fast, and constant order in the end time, since it does only a single time step.
 
 Unfortunately though, the exact matrix solution is met with many catastrophic numerical issues when applied to gauge theories, which is what we had to fix to make it work for our survey. We are not actually able to eigendecompose the operator, so we have to compute the matrix exponential directly in a way that avoids the ill-conditioned and hugely degenerate eigenvectors. We also have to deal with the presence of algebraically constrained fields, which enter the equations of motion but don't have their own explicit dynamics.
 
@@ -155,31 +146,11 @@ Unfortunately though, the exact matrix solution is met with many catastrophic nu
 ▶ Slide 9 — 09 inference (~75 s)
 ═══════════════════════════════════════════════════════════════
 
-The inference layer turns the survey into a Bayesian search. For each
-parameter point theta we run a full PDE simulation, get a peak
-conversion probability, and divide it by the GR baseline — sin-squared
-kappa B-zero t over two. That ratio is what we call the amplification
-factor A of theta.
+The question i was faced with when I started the project was: how do we actually report results from this survey? We have a huge parameter space, and for each point in that space we get a conversion probability. How do we turn that into a statement about whether amplification exists or not?
 
-The slide shows the small-coupling limit: when the conversion is well
-inside the perturbative regime, the amplification factor reduces to a
-ratio of conversion coefficients independent of B-zero. That's the
-quantity we actually scan over — it's a property of the Lagrangian,
-not of the experimental setup. The likelihood for nested sampling is
-plus-or-minus log A, depending on whether we're searching for
-amplification or suppression.
+To this end, I was able to build a Bayesian inference layer on top of the numerical solver, which allows us to turn the amplification factor across the parameter space into a likelihood for nested sampling. This allows us to compute the evidence for amplification across the parameter space, and to determine the existence and nature of structure.
 
-Two summary statistics come out the back. First, the Bayesian evidence
-Z, which equals the prior-averaged amplification factor — log Z near
-zero means the prior is null on average, log Z much greater than zero
-means amplification persists across the prior. Second, the
-Kullback-Leibler divergence between the posterior and the prior, which
-tells us whether the enhancement is broadly distributed across the
-parameter space, meaning generic, or concentrated in a narrow corner,
-meaning fine-tuned.
-
-So when I report results I'm reporting these summary numbers, not raw
-P-max values.
+We must keep to the linearised regime, taking the limit of vanishingly small magnetic fields at which the amplification becomes independent of the experimental setup and is purely a characteristic property of the theory we wish to measure. In this regime we can also neglect any backreaction effects or worries regarding the infinite background energy density.
 
 ▶ NEXT — slide 10: pre-campaign results
 
@@ -187,69 +158,18 @@ P-max values.
 ▶ Slide 10 — 11 results (~90 s)
 ═══════════════════════════════════════════════════════════════
 
-Three pre-campaign models that determined the structure of the full
-HPC scan.
+To help characterise the direction of the full campaign, I ran a few preliminary tests on some simple theories. The aim is to not just run a single campaign with the most general theory, but to also investigate the structure of theories of interest to the community.
 
-The first is minimal PGT: Einstein–Cartan, plus the three torsion-mass
-invariants alpha-i I-i, plus b-five times R-tilde-squared. The plane-wave
-reduced equations split into two algebraically decoupled channels, and
-the Gertsenshtein channel — the one that an incoming TT graviton can
-actually excite — contains zero torsion fields in either equation.
-That's a structural property of the Lagrangian, visible directly in the
-derived equations. So A equals one exactly, non-perturbatively in
-b-five — no simulation required. This null is the reason the campaign
-targets non-minimal sectors specifically.
+The first key model is the minimal PGT extension, which includes the three torsion-mass invariants and a higher order Ricci-squared term. The Ricci tensor gets modified in the presence of torsion, and its square introduces torsion as a dynamic degree of freedom, but via the derived equations of motion, there was a complete structural decoupling of these sectors, and the new torsion dynamics were not able to interact with the gertsenshtein conversion channel at all. From this it was clear that any amplification must come from non-minimal sectors.
 
-The second is the plasma baseline: pure Einstein–Maxwell plus an
-effective photon mass m-A-squared. The photon mass detunes the
-graviton-photon resonance, and P-max gets monotonically suppressed.
-This sets the floor any BSM amplification mechanism has to overcome —
-plasma alone, in pure GR, suppresses the Gertsenshtein conversion.
+Second was a more phenomenoligcally motivated theory, that of pure Einstein–Maxwell plus an effective photon mass. The photon mass detunes the graviton-photon resonance and suppresses the conversion.
 
-The third is the dark-photon analogy. The slide shows the Lagrangian:
-torsion trace as a hidden U(1) Proca vector, mass coming from the I-3
-invariant on the full torsion tensor, kinetic mixing
-delta-m F-dot-F-of-T into electromagnetism. In vacuum, an algebraic
-cancellation makes the photon and the dark photon exact eigenmodes —
-no graviton-induced channel opens. We then add plasma to break the
-eigenmode degeneracy, which is the standard route from dark-photon
-phenomenology — that's what gives you Raffelt-Stodolsky-type resonant
-conversion. The result: kinetic mixing has negligible effect on total
-conversion. Only the photon mass matters, and only as Gertsenshtein
-detuning. A is at most one everywhere.
+Another key area of interest in BSM phenomenology is the dark-photon model, which is a hidden U(1) Proca vector kinetically mixed with electromagnetism, and is a popular candidate for dark matter. Here, we consider placing a vector made from torsion as this new field. In vacuum, the relevant photon and dark photon sectors are exact eigenmodes and no graviton-induced channel opens. We then add plasma to break the degeneracy, but found the dark photon itself had negligible effect on total conversion. Only the photon mass matters, and only as suppression.
 
-▶ NEXT — slide 11: campaign progress
+▶ NEXT — slide 11: summary
 
 ═══════════════════════════════════════════════════════════════
-▶ Slide 11 — 12 outlook (~75 s)
-═══════════════════════════════════════════════════════════════
-
-This is the campaign progress map. The table walks through stages A
-through D2.1, all closed. Dark-photon plasma — null on amplification,
-informative on suppression. Einstein–Cartan — null. R-squared PGT, the
-structural one I described — null. Ricci-EM, the
-delta-one R-tilde-mu-nu F-mu-nu non-minimal coupling — strong
-suppression, Bayes factor of order ten-to-the-seven. Bahamonde
-Yang-Mills PGT in five dimensions — null both ways. Barker chi-axial
-in six dimensions — null both ways, the chi posterior centred at zero.
-
-The story emerging: amplification is elusive. Multiple natural-looking
-PGT extensions are Gertsenshtein-neutral. The campaign so far has been
-informative by elimination — it's mapped out where amplification
-_can't_ live.
-
-What's queued: the Shapiro PGT and complete-PGT stages. The parity-odd
-Yang-Mills extension — the abstract restricted to parity-even but parity-odd
-is a natural follow-up. Plasma-Proca extensions where the photon's
-effective mass comes from realistic plasma physics, relevant for
-magnetar and IGM observability. And eventually the complete even-PGT
-and odd-PGT landscapes with sixty-plus couplings. Each new theory is a
-config-file change, not a code rewrite.
-
-▶ NEXT — slide 12: summary
-
-═══════════════════════════════════════════════════════════════
-▶ Slide 12 — 13 summary (~45 s)
+▶ Slide 11 — 13 summary (~45 s)
 ═══════════════════════════════════════════════════════════════
 
 Three things to take away.
@@ -268,49 +188,3 @@ whether or not amplification exists in this landscape, we're building
 the systematic map of where it could live.
 
 Thanks — questions and delivery feedback are both welcome.
-
-▶ END — Q&A
-
-═══════════════════════════════════════════════════════════════
-Backup — for Q&A only
-═══════════════════════════════════════════════════════════════
-
-These are short notes for the appendix slides, used only if a question
-takes me there. No need to memorise verbatim.
-
-**B0 — Magnetar context.** Visual reference for "magnetar field
-ten-to-the-fifteen Gauss over ten kilometres gives P around
-ten-to-the-minus-ten". The slide is a single picture; just point at the
-field strength and the scale.
-
-**B1 — Higher-derivative terms via perturbative reduction.** This is
-the slide to reach for if anyone asks how we actually included
-R-tilde-squared in the minimal-PGT calculation, or about the
-Ostrogradsky-ghost issue. The story: R-tilde-squared gives 4th-order
-time derivatives, which generically have ghost modes. We use
-Parker–Simon iterative reduction — treat b-five as small, expand
-order by order, the 4th-order operator never acts on the unknown but
-only as a known source built from the previous order's trajectory, so
-the ghost branch never enters the propagator. The order-1 correction
-is solved analytically by Duhamel's principle: convolution against the
-base propagator, evaluated in closed form using the order-zero
-eigenbasis. The constraint-promotion barrier — what stops us doing
-energy measurements: at b-five equals zero, some metric components
-are pure algebraic constraints; the R-tilde-squared correction
-promotes them to 4th-order propagating fields, the number of
-propagating modes jumps discontinuously, and there's no published
-Hamiltonian-side recipe that handles this case. That's why the
-minimal-PGT null result rests on a structural argument — the
-polarisation block-diagonalisation visible directly in the EOMs —
-rather than on an energy comparison.
-
-**B2 — Modal solver: two structural fixes.** The slide to reach for
-if anyone asks about the solver. Per-mode k satisfies y-dot equals
-M-of-k times y; we evaluate y-of-t as exp-M-of-k-times-t times y-zero.
-Two fixes: (i) ill-conditioned eigenvectors — cond V is ten-to-the-fifteen
-to ten-to-the-seventeen for gauge theories, so we use Padé directly
-instead of V-diag-V-inverse; (ii) constraint fields, which enter
-algebraically — partition into dynamic and constrained, eliminate the
-constrained block via Schur complement, evolve the reduced operator,
-recover the constrained fields algebraically at the end. Both
-formulas are on the slide.
