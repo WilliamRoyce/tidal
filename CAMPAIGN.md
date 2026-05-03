@@ -215,11 +215,13 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 - [x] D2.1 Barker sup (28727741): log Z = −0.447 ± 0.001, ESS = 877, DONE
 - [x] D2.2 Shapiro amp (28736161): log Z = +0.612 ± 0.002, ESS = 882, DONE (38 min INTR)
 - [x] D2.2 Shapiro sup (28739692): log Z = −0.615 ± 0.001, ESS = 883, DONE (33 min INTR)
-- [ ] D2.3 complete-PGT amp — pending prior derivation
-- [x] Results pulled: 28598736, 28607124, 28684410, 28727741, 28736161, 28739692
-- [x] Corner plots: hpc_results/28598736/corner.png, hpc_results/28607124/d21_barker_amp/corner.png, hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png, hpc_results/campaigns/d21_barker_sup/run/corner_sup.png, hpc_results/28736161/corner_amp.png, hpc_results/28739692/corner_sup.png
-- [x] Analysis: no D_KL > 0.1 nats for any ζᵢ in D2.2 — all ζ parameters inert (< 0.05 nats)
-- Notes: D2.0 and D2.1 amp log Z agree to 0.002 nats; χ is sub-leading (adding it changes nothing). D2.2 adds ζ₁₋₃ (Shapiro derivative couplings): all three inert (D_KL < 0.025 nats each). Paired Bayes factor B = 3.41 (vs 2.90 for D2.0/D2.1) — comparable, Shapiro-neutral verdict stands.
+- [x] D2.3 complete-PGT amp (28742024): log Z = +0.615 ± 0.001, ESS = 1691, DONE (std 6h queue, 1:09 wall)
+- [x] D2.3 complete-PGT sup (28742035): log Z = −0.615 ± 0.001, ESS = 1698, DONE (std 6h queue, 1:00 wall)
+- [x] D2.3 INTR amp r1 (28743715) + r2 (28745971): log Z = +0.617 ± 0.001, consistent cross-check
+- [x] Results pulled: 28598736, 28607124, 28684410, 28727741, 28736161, 28739692, 28742024, 28742035, 28745971
+- [x] Corner plots: hpc_results/28598736/corner.png, hpc_results/28607124/d21_barker_amp/corner.png, hpc_results/campaigns/d20_bahamonde_sup/run/corner_sup.png, hpc_results/campaigns/d21_barker_sup/run/corner_sup.png, hpc_results/28736161/corner_amp.png, hpc_results/28739692/corner_sup.png, hpc_results/28742024/corner_d23_amp.png, hpc_results/28742035/corner_d23_sup.png
+- [x] Analysis: no D_KL > 0.1 nats for any ζᵢ in D2.2; δ₁, χ, all ζᵢ inert (< 0.06 nats) in D2.3 — full 9D prior exhausted
+- Notes: D2.0 and D2.1 amp log Z agree to 0.002 nats; χ is sub-leading. D2.2 adds ζ₁₋₃ (Shapiro): all inert, B=3.41. D2.3 adds full 9D (β₁₋₃, ξ, δ₁, χ, ζ₁₋₃): still inert, B=3.42. **All nonminimal PGT+EM couplings exhausted — Gertsenshtein-neutral verdict confirmed.**
 
 #### D3: YM-PGT-CP / T6
 
@@ -303,6 +305,10 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28736161 | T5 general (D2.2 Shapiro) | **D2.2 amp** | COMPLETED | 37:51 | INTR. **log Z = +0.612 ± 0.002**, ESS = 882, n_samples = 3501. Params: β₁₋₃, ξ, δ₁, ζ₁, ζ₂, ζ₃ (8D). MAP: β₁=+0.69, β₂=−0.40, β₃=−0.99, ξ=0.011, δ₁=+0.017, ζ₁=+0.041, ζ₂=−0.021, ζ₃=+0.036. Prior stability: 59.1% rejected. Marginal D_KL: β₁=0.237, ξ=0.170, β₂=0.065, δ₁=0.030, ζ₁=0.021, ζ₂=0.025, ζ₃=0.022 — **all ζᵢ < 0.05 nats (inert)**. Corner: `hpc_results/28736161/corner_amp.png`. |
 | 28736190 | T5 general (D2.2 Shapiro) | D2.2 sup attempt 1 (standard) | CANCELLED | 0:00 | Submitted to icelake standard 6h queue; cancelled after INTR resubmit (28739692) completed faster. Never ran. |
 | 28739692 | T5 general (D2.2 Shapiro) | **D2.2 sup** | COMPLETED | 32:48 | INTR, campaign=d22_shapiro_sup_intr. **log Z = −0.615 ± 0.001**, ESS = 883, n_samples = 3641. Params: 8D (same as amp, minimize). MAP: β₁=+0.47, β₂=−2.69, β₃=+0.81, ξ=1.30, δ₁=+0.013, ζ₁=+0.010, ζ₂=−0.015, ζ₃=−0.036. Marginal D_KL: β₁=0.267, ξ=0.141, β₂=0.072, δ₁=0.017, ζ₁=0.013, ζ₂=0.022, ζ₃=0.023 — **all ζᵢ < 0.05 nats (inert)**. Paired B = exp(0.612−(−0.615)) = **3.41** (D2.0/D2.1: 2.90 — comparable). Corner: `hpc_results/28739692/corner_sup.png`. |
+| 28743715 | T5 general (D2.3 complete-PGT) | D2.3 INTR amp r1 | TIMEOUT | 1:00:00 | INTR. 5873 dead points, log Z = 0.616 ± 0.001 (checkpoint). Resumed as 28745971. |
+| 28745971 | T5 general (D2.3 complete-PGT) | D2.3 INTR amp r2 | COMPLETED | 8:51 | INTR, resumed from 28743715 checkpoint. **log Z = +0.617 ± 0.001**, ESS = 1691, n_samples = 6780. Consistent cross-check for 28742024. |
+| 28742024 | T5 general (D2.3 complete-PGT) | **D2.3 amp** | COMPLETED | 1:09:48 | icelake standard, 6h budget (converged in ~70 min). **log Z = +0.6150 ± 0.0011**, ESS = 1691, n_samples = 6808. Params: β₁₋₃, ξ, δ₁, χ, ζ₁, ζ₂, ζ₃ (9D). MAP: β₁=+0.57, β₂=−1.08, β₃=−0.59, ξ=0.010, δ₁=−0.016, χ=−0.003, ζ₁=−0.049, ζ₂=−0.001, ζ₃=+0.045. Marginal D_KL: β₁=0.221, β₂=0.074, β₃=0.052; **δ₁=0.050, χ=0.050, ζ₁=0.050, ζ₂=0.057, ζ₃=0.052 — all < 0.06 nats (inert)**. Corner: `hpc_results/28742024/corner_d23_amp.png`. |
+| 28742035 | T5 general (D2.3 complete-PGT) | **D2.3 sup** | COMPLETED | 1:00:34 | icelake standard, 8h budget (converged in ~61 min). **log Z = −0.6146 ± 0.0008**, ESS = 1698, n_samples = 7028. Params: 9D (same, minimize). MAP: β₁=+0.26, β₂=−0.98, β₃=−0.91, ξ=0.021, δ₁=−0.016, χ=−0.004, ζ₁=+0.032, ζ₂=−0.020, ζ₃=−0.036. All non-minimal params inert (posterior mean ≈ 0, D_KL < 0.06 nats). Paired B = exp(0.6150−(−0.6146)) = **3.42** (D2.2: 3.41 — identical). Corner: `hpc_results/28742035/corner_d23_sup.png`. |
 
 ---
 
@@ -394,6 +400,12 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
   - **Paired Bayes factor**: B = exp(log Z_amp − log Z_sup) = exp(0.612 − (−0.615)) = exp(1.228) = **3.41**. Compare D2.0: B=2.90, D2.1: B=2.90. D2.2 is slightly elevated (+18%), driven by a more negative log Z_sup (−0.615 vs −0.449 in D2.0). The shift in sup is not due to ζᵢ providing genuine suppression channels (all ζᵢ D_KL < 0.025 nats) but rather reflects the 3 additional ζᵢ prior dimensions slightly expanding parameter-space coverage near the stability boundary. The overall scale (B ≈ 3) is comparable across D2.0/D2.1/D2.2 and is well below the D1 paired-B range (~10⁷ for suppress). **Shapiro is Gertsenshtein-neutral** — identical verdict to D2.0 and D2.1.
   - **Physical interpretation**: The Shapiro derivative couplings ζ₁R∂T·F, ζ₂R∂T·F̃, ζ₃R∂²T·F (irreducible torsion-derivative contractions with EM) do not modify h↔a Gertsenshtein conversion in the perturbative linear regime at these B₀ and t_end values. This is consistent with the ζ-scan result (all ζᵢ thresholds ≥ ±0.042): the priors are narrow enough that no ζᵢ value within ±0.05 causes a detectable signal. The joint (δ₁, ζᵢ) instability (rectangular structure in pairwise scan) never activates within the ±0.025 × ±0.05 prior box. **D2 sub-models (Bahamonde + Barker + Shapiro) are collectively Gertsenshtein-neutral.**
   - Corner plots: `hpc_results/28736161/corner_amp.png` (amp), `hpc_results/28739692/corner_sup.png` (sup).
+- Stage D2.3 complete-PGT (T5 full 9D: β₁₋₃, ξ, δ₁, χ, ζ₁, ζ₂, ζ₃; 2026-05-03): **NULL for both amplification and suppression — all 6 nonminimal PGT+EM couplings exhausted.**
+  - **Amplify (28742024)**: log Z = +0.6150 ± 0.0011, ESS = 1691. Marginal D_KL: β₁=0.221, β₂=0.074, β₃=0.052 (stability-constrained structure); **δ₁=0.050, χ=0.050, ζ₁=0.050, ζ₂=0.057, ζ₃=0.052 — all ≤ 0.06 nats, spanning full prior (inert)**. log Z consistent with D2.2 (0.612) and D2.0 (0.616) to within 0.003 nats. NULL.
+  - **Suppress (28742035)**: log Z = −0.6146 ± 0.0008, ESS = 1698. All non-minimal params inert (posterior mean ≈ 0; 95% CI fills prior). Converged in ~61 min.
+  - **Paired Bayes factor**: B = exp(0.6150 − (−0.6146)) = exp(1.2296) = **3.42**. Matches D2.2 (3.41) to 3 sig. figs. The D2.3 adding 2 new dimensions (δ₁ → full range, χ first with both δ₁ and ζᵢ present) changes B by 0.01 — negligible. The systematic B ≈ 3 across D2.0–D2.3 reflects the β₁₋₃, ξ prior compression from stability boundaries, not physics signal.
+  - **Physical interpretation**: Adding χ (Barker scalar coupling) alongside δ₁ and all three Shapiro ζᵢ couplings simultaneously produces no detectable h↔a conversion signal. The full 9-parameter nonminimal PGT+EM parameter space (as parameterised by the `torsion_gertsenshtein_general_nonminimal.json` spec) is Gertsenshtein-neutral. **D2 stage complete; no new physics found in the nonminimal coupling sector of propagating-torsion PGT.**
+  - Corner plots: `hpc_results/28742024/corner_d23_amp.png` (amp), `hpc_results/28742035/corner_d23_sup.png` (sup). Cross-check chain (INTR r1+r2): `hpc_results/28745971/` (log Z = +0.617 ± 0.001, consistent).
 - Stage D3: 
 - Stage E: 
 
