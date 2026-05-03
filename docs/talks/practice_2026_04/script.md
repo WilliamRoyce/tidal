@@ -4,6 +4,7 @@ Continuous-prose script for live delivery. Written to be learned and rehearsed.
 Total target ~14–16 min spoken, leaving ~5 min buffer in a 20-min slot.
 
 Conventions:
+
 - `▶ NEXT — …` marks each slide-advance click.
 - Greek letters are written out phonetically (`kappa B-zero`, `alpha-i I-i`, `delta-one`) so the speaker doesn't trip on symbols.
 - Prose is what comes out of the mouth; what's on the slide is referred to ("the formula on the slide", "the table") rather than read out.
@@ -12,49 +13,44 @@ Conventions:
 ---
 
 ═══════════════════════════════════════════════════════════════
-▶ Title slide  (~15 s)
+▶ Title slide (~15 s)
 ═══════════════════════════════════════════════════════════════
 
-Hi everyone. I'm William, a master's student in the Handley group at the
-Cavendish, working on whether modifying gravity can amplify a particular
-old graviton-photon conversion process. This is a practice talk —
+Hi everyone. I'm William, a master's student at the
+Cavendish, supervised by Will Barker, Mike Hobson, and Anthony Lasenby, working on whether extensions to our theory of gravity can amplify a particular
+old graviton-photon conversion process. This is a practice talk on my work the past few months on this project —
 feedback on both content and delivery is very welcome.
 
 ▶ NEXT — slide 1: motivation
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 1 — 01 motivation  (~75 s)
+▶ Slide 1 — 01 motivation (~75 s)
 ═══════════════════════════════════════════════════════════════
 
 The starting point is the Gertsenshtein effect: a graviton propagating
-through a background magnetic field can convert into a photon. It's a
-textbook prediction of Einstein–Maxwell, and it has been since 1962.
+through a background magnetic field can, perhaps surprisingly, convert into a
+photon. However, it is actually a textbook prediction of Einstein–Maxwell
+theory, and it has been around since 1962.
 
-The slide gives the punchline upfront: this effect is astrophysically
+Perhaps unfortunately, this effect is astrophysically
 useless. For a magnetar with the strongest known magnetic fields,
-ten-to-the-fifteen Gauss over its ten-kilometre radius, the conversion
-probability is around ten-to-the-minus-ten. For any laboratory setup —
-ten Tesla over a metre, say — you're down at ten-to-the-minus-forty.
-There is no foreseeable detector that will see standard-GR Gertsenshtein
-in any astrophysical or laboratory setting.
+the conversion probability is around ten-to-the-minus-ten. And for any
+laboratory setup it's even more hopeless. At these scales, there is no foreseeable detector that will see Gertsenshtein
+in any astrophysical or laboratory setting, within standard-GR.
 
-So the question is forced: if the textbook answer doesn't help, what
-does? Some kind of new physics has to amplify the channel. The approach
+Our theoretical curiosity however prompts us the question: is there any extension of GR that can amplify this conversion to a detectable level?
+
+The approach
 in this project is unapologetically phenomenological — instead of
 picking one specific extension of GR and defending it, I'm
-systematically scanning the space of quadratic curvature and torsion
+systematically scanning the space of linearised curvature, torsion, and electromagnetic
 modifications and asking which subsectors, if any, amplify the
 conversion.
 
-That sets up the rest of the talk: the channel itself, the survey
-program, and what we've found so far.
-
 ▶ NEXT — slide 2: the Gertsenshtein effect
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 2 — 02 gertsenshtein  (~60 s)
+▶ Slide 2 — 02 gertsenshtein (~60 s)
 ═══════════════════════════════════════════════════════════════
 
 So what actually is the Gertsenshtein effect. The setup on the slide:
@@ -77,9 +73,8 @@ realistic setting?
 
 ▶ NEXT — slide 3: why it's so weak
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 3 — 03 literature  (~50 s)
+▶ Slide 3 — 03 literature (~50 s)
 ═══════════════════════════════════════════════════════════════
 
 The answer to that question is on the slide: the conversion probability
@@ -102,9 +97,8 @@ physics outside Einstein-Maxwell.
 
 ▶ NEXT — slide 4: PGT and torsion
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 4 — 04 pgt_a  (~60 s)
+▶ Slide 4 — 04 pgt_a (~60 s)
 ═══════════════════════════════════════════════════════════════
 
 The natural place to look is Poincaré gauge theory. The framing the
@@ -128,9 +122,8 @@ non-metricity, which neither GR nor PGT keeps.
 
 ▶ NEXT — slide 5: the parameter landscape
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 5 — 05 pgt_b  (~60 s)
+▶ Slide 5 — 05 pgt_b (~60 s)
 ═══════════════════════════════════════════════════════════════
 
 Once you commit to PGT, the parameter space gets large. The schematic
@@ -154,9 +147,8 @@ So the program is to scan this whole landscape systematically.
 
 ▶ NEXT — slide 6: the question and the method
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 6 — 06 question  (~45 s)
+▶ Slide 6 — 06 question (~45 s)
 ═══════════════════════════════════════════════════════════════
 
 This is the central question, framed exactly as on the slide:
@@ -176,9 +168,8 @@ next slide.
 
 ▶ NEXT — slide 7: TIDAL overview
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 7 — 07 tidal_overview  (~60 s)
+▶ Slide 7 — 07 tidal_overview (~60 s)
 ═══════════════════════════════════════════════════════════════
 
 TIDAL stands for Tensor Integration and Derivation for Any Lagrangian.
@@ -199,9 +190,8 @@ a convenience here, it's the only viable route.
 
 ▶ NEXT — slide 8: the modal solver
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 8 — 08 tidal_numerical  (~70 s)
+▶ Slide 8 — 08 tidal_numerical (~70 s)
 ═══════════════════════════════════════════════════════════════
 
 This is the numerical engine. It's a spectral solver tailored for the
@@ -229,9 +219,8 @@ formulas are in the backup if anyone wants to see them.
 
 ▶ NEXT — slide 9: the inference framework
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 9 — 09 inference  (~75 s)
+▶ Slide 9 — 09 inference (~75 s)
 ═══════════════════════════════════════════════════════════════
 
 The inference layer turns the survey into a Bayesian search. For each
@@ -262,9 +251,8 @@ P-max values.
 
 ▶ NEXT — slide 10: pre-campaign results
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 10 — 11 results  (~90 s)
+▶ Slide 10 — 11 results (~90 s)
 ═══════════════════════════════════════════════════════════════
 
 Three pre-campaign models that determined the structure of the full
@@ -300,9 +288,8 @@ detuning. A is at most one everywhere.
 
 ▶ NEXT — slide 11: campaign progress
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 11 — 12 outlook  (~75 s)
+▶ Slide 11 — 12 outlook (~75 s)
 ═══════════════════════════════════════════════════════════════
 
 This is the campaign progress map. The table walks through stages A
@@ -317,7 +304,7 @@ in six dimensions — null both ways, the chi posterior centred at zero.
 The story emerging: amplification is elusive. Multiple natural-looking
 PGT extensions are Gertsenshtein-neutral. The campaign so far has been
 informative by elimination — it's mapped out where amplification
-*can't* live.
+_can't_ live.
 
 What's queued: the Shapiro PGT and complete-PGT stages. The parity-odd
 Yang-Mills extension — the abstract restricted to parity-even but parity-odd
@@ -329,9 +316,8 @@ config-file change, not a code rewrite.
 
 ▶ NEXT — slide 12: summary
 
-
 ═══════════════════════════════════════════════════════════════
-▶ Slide 12 — 13 summary  (~45 s)
+▶ Slide 12 — 13 summary (~45 s)
 ═══════════════════════════════════════════════════════════════
 
 Three things to take away.
@@ -352,7 +338,6 @@ the systematic map of where it could live.
 Thanks — questions and delivery feedback are both welcome.
 
 ▶ END — Q&A
-
 
 ═══════════════════════════════════════════════════════════════
 Backup — for Q&A only
