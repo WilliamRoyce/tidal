@@ -1,5 +1,7 @@
 # Speaker notes — practice talk (2026-04)
 
+> **Superseded for live delivery by [`script.md`](script.md).** This document is now archival research material — slide ordering, anecdotes, and historical framings drove an earlier draft and may not match the current slide deck. Use `script.md` for rehearsal.
+
 Raw research material for the spoken script. One heading per slide. Phase D turns these into `\note{}` blocks in the Beamer source; Phase E turns them into continuous prose.
 
 The talk now follows the project abstract's spine: standard Gertsenshtein is astrophysically useless → systematic phenomenological scan over *all parity-even quadratic curvature + torsion terms* → derive PDEs symbolically → screen for causality-violating regions via all-mode eigenvalue stability before sampling → identify any subsector that can amplify.
