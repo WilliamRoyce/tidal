@@ -68,16 +68,59 @@
 \newrobustcmd{\SciPy}{\textit{SciPy}\xspace}
 
 % === Planck scale ===
-% Convention: MacrosMAG.tex (2406.12826)
-% m_P (reduced Planck mass), ell_P (Planck length)
+% Reduced Planck mass: M_P, with M_P^2 = 1/(8 pi G), units [Mass]
+% Convention: MacrosMAG.tex (2406.12826); BHL joint corpus
+%
+% Relation to TIDAL's kappa (see "Gravitational coupling" block below):
+%   kappa^2 = 16 pi G = 2 / M_P^2
+%   M_P = sqrt(2) / kappa
+%
+% In BHL joint-paper style, the action prefactor on R is written as -(1/2) M_P^2 R.
+% TIDAL writes the same prefactor as 1/kappa^2 (since 1/kappa^2 = M_P^2/2). So
+% TIDAL's L = (1/kappa^2) R is equivalent to writing L = (M_P^2/2) R with the
+% standard reduced Planck mass M_P -- they are the same number written two ways.
+% The Einstein-constant kappa_E = 8 pi G of 2303.11094 is a DIFFERENT object
+% (different dimensions); see the Gravitational coupling block below.
 
 \newrobustcmd{\MPl}{{m_{\mathrm{P}}}}
 \newrobustcmd{\LPl}{{\ell_{\mathrm{P}}}}
 \newcommand{\Planck}{\MPl}    % alias: supervisor template uses \Planck
 
 % === Gravitational coupling ===
-% kappa^2 = 16 pi G  (not 8piG)
-% Convention: BHL 2406.12826 §II; Domcke 2301.02072; Barker 2510.17094
+% TIDAL convention:
+%   - Metric perturbation:  g_{mu nu} = eta_{mu nu} + h_{mu nu}
+%     (RAW perturbation, NO kappa factor in the field redefinition)
+%   - Action prefactor:     L = (1/kappa^2) R - (1/4) F^2
+%   - Numerical value:      kappa^2 = 16 pi G,   units [Mass^{-1}]
+%   - Planck-mass relation: kappa = sqrt(2)/M_P,  M_P = sqrt(2)/kappa
+%
+% kappa appears in two places:
+%   (a) action prefactor 1/kappa^2 in front of R
+%   (b) Gertsenshtein formula P_conv = sin^2(kappa B_0 D / 2)
+%       (kappa enters the EOM via LHS-normalisation by the kinetic prefactor)
+%
+% Equivalent (canonical) form used by Domcke 2301.02072, Dandoy 2406.17853:
+%   g = eta + kappa htilde,   L = (1/2)(d htilde)^2 - (1/4) F^2
+%   related to TIDAL form by htilde = h/kappa. Same numerical kappa, same
+%   physical P_conv, just a different field redefinition.
+%
+% IMPORTANT: this is NOT the "Einstein constant" kappa_E = 8 pi G that
+% appears as the action prefactor 1/(2 kappa_E) in BHL papers (2303.11094,
+% 2406.12826). The two kappas have different dimensions:
+%   kappa_TIDAL:  [Mass^{-1}],  squared = 16 pi G,   prefactor 1/kappa^2
+%   kappa_E:      [Mass^{-2}],  equal to  8 pi G,    prefactor 1/(2 kappa_E)
+% Relation: kappa_TIDAL^2 = 2 kappa_E. Equivalently: 1/kappa_TIDAL^2 = M_P^2/2,
+% so TIDAL's action prefactor matches the BHL form -(1/2) M_P^2 R when written
+% with explicit Planck-mass prefactor.
+%
+% In the MSci report, write the action with explicit M_P^2 prefactor (BHL
+% joint-paper style) and reserve kappa for the Gertsenshtein formula -- this
+% avoids both ambiguities at once.
+%
+% Convention sources: TIDAL derivation in docs/tex/gertsenshtein_formula.tex
+% (see \cref{sec:kappa-conventions}); Domcke 2301.02072; Dandoy 2406.17853;
+% Barker 2510.17094. BHL 2406.12826/2303.11094 use kappa_E -- a different
+% convention, do not conflate. Full discussion: GitHub issue #338.
 
 \renewcommand{\kappa}{\varkappa}
 
@@ -187,8 +230,11 @@
 %   Convention: Hehl et al. Rev.Mod.Phys. 48, 393 (1976); Shapiro hep-th/0103093
 %   Macro: \MAGT{^\alpha_\mu_\nu} or \T[]{mu nu rho} for irrep components
 %
-% Gravitational coupling:  kappa^2 = 16 pi G
-%   Convention: BHL 2406.12826 §II; Domcke 2301.02072; M_Pl = 1/sqrt(kappa)
+% Gravitational coupling (vertex):  kappa^2 = 16 pi G,  units [Mass^{-1}]
+%   - Appears in g = eta + kappa h and in P_conv = sin^2(kappa B_0 D / 2)
+%   - NOT the same as the Einstein-action constant kappa_E = 8 pi G
+%   - See the full block-comment in the "Gravitational coupling" section above
+%   Convention sources: Domcke 2301.02072; TIDAL gertsenshtein_formula.tex
 %   Macro: \kappa (redefined to \varkappa by \renewcommand above)
 %
 % PGT quadratic coupling constants:
@@ -196,6 +242,9 @@
 %   Convention: BHL 2406.12826; 2101.02645 §II
 %   Macro: \Alp{n}, \Bet{n}, \Gam{n}
 %
-% Planck mass:  m_P  (reduced Planck mass, m_P^2 = 1/kappa)
-%   Convention: MacrosMAG.tex (2406.12826)
+% Planck mass:  m_P  (reduced Planck mass)
+%   m_P^2 = 1 / (8 pi G) = 2 / kappa^2,    units [Mass]
+%   m_P = sqrt(2) / kappa
+%   - Action prefactor on Ricci scalar: -(1/2) m_P^2 R  (BHL joint convention)
+%   Convention: MacrosMAG.tex (2406.12826); BHL joint papers
 %   Macro: \MPl

@@ -23,6 +23,97 @@ This is derived from the Lagrangian $\lag = \frac{1}{\kappa^2}R - \frac{1}{4}F^2
 \textbf{Palessandro \& Rothman~(2023) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument.} Hwang \& Noh~\cite{hwangnoh2023graviton} independently criticise P\&R's linearisation procedure.
 
 
+\subsection{Conventions: $\kappa$ in TIDAL vs.\ in the Literature}
+\label{sec:kappa-conventions}
+
+The symbol $\kappa$ is used in the gravity literature for objects that look
+similar but are placed differently in the Lagrangian. Confusing them produces
+wrong numerical factors in mixing amplitudes — this is the origin of several
+discrepancies in the Gertsenshtein literature, including the Palessandro--Rothman
+factor-of-$\sqrt{4\pi}$ error noted above. This block fixes TIDAL's convention
+explicitly so it is never re-confused.
+
+\paragraph*{What TIDAL actually does.}
+TIDAL expands the metric as $g_{\mu\nu} = \etamunu + h_{\mu\nu}$ (the raw
+perturbation, with \emph{no} $\kappa$ factor in the field redefinition). The
+action is
+\begin{equation*}
+    \lag = \frac{1}{\kappa^2} R - \frac{1}{4} F_{\mu\nu} F^{\mu\nu},
+    \qquad
+    \kappa^2 = 16\pi G,
+    \qquad
+    [\kappa] = [\text{Mass}]^{-1}.
+\end{equation*}
+Numerically, $\kappa$ takes the value $\sqrt{16\pi G}$ — the same constant that
+Domcke 2301.02072 and Dandoy et al.\ 2406.17853 call the ``vertex coupling''.
+The $\kappa$ enters the equations of motion through the LHS-normalisation step
+in the TIDAL pipeline: dividing the $h$ equation by its kinetic prefactor
+$1/\kappa^2$ multiplies the photon coupling by $\kappa^2$, giving an
+asymmetric mixing matrix whose beat frequency is $\Bzero\kappa$ (geometric
+mean — see derivation below).
+
+\paragraph*{Two equivalent ways to write the same physics.}
+TIDAL's choice ($g = \eta + h$, action prefactor $1/\kappa^2$) is one of two
+equivalent presentations of canonically-normalised linearised gravity. The
+other is the canonical-graviton form used by Domcke and Dandoy:
+\begin{equation*}
+    g_{\mu\nu} = \etamunu + \kappa\, \tilde{h}_{\mu\nu},
+    \qquad
+    \lag = \tfrac{1}{2}(\partial \tilde{h})^2 - \tfrac{1}{4} F^2 + \dots,
+\end{equation*}
+related to the TIDAL form by the rescaling $\tilde{h} = h/\kappa$. Both choices
+yield the same physical conversion probability $\Pconv = \sin^2(\kappa\Bzero
+D/2)$ with the \emph{same} numerical $\kappa = \sqrt{16\pi G}$. They differ
+only in where the $\kappa$ symbol appears: in TIDAL, it sits in the action
+prefactor; in the canonical form, it sits in the metric expansion. The two are
+related by a field redefinition, not a different convention.
+
+\paragraph*{A genuinely different convention: the Einstein constant
+$\kappa_\text{E}$ (NOT used by TIDAL).}
+Some papers (e.g.\ BHL 2303.11094, 2406.12826) reserve the symbol $\kappa$ for
+the prefactor of the Einstein--Hilbert action in a different normalisation:
+\begin{equation*}
+    S_\text{EH} = -\frac{1}{2\kappa_\text{E}}\!\int\! R\,\sqrt{-g}\, d^4x,
+    \qquad
+    \kappa_\text{E} = 8\pi G,
+    \qquad
+    [\kappa_\text{E}] = [\text{Mass}]^{-2}.
+\end{equation*}
+This $\kappa_\text{E}$ is \emph{not} the same as TIDAL's $\kappa$: it is
+dimensionally distinct ($[\text{Mass}]^{-2}$ vs.\ $[\text{Mass}]^{-1}$) and is
+related to the reduced Planck mass by $\kappa_\text{E} = 1/M_\text{P}^2$ where
+$M_\text{P}^2 = 1/(8\pi G)$.
+
+\paragraph*{Relation to the reduced Planck mass.}
+The two conventions are connected by
+\begin{equation*}
+    \kappa^2_\text{TIDAL} = 2\kappa_\text{E} = 16\pi G,
+    \qquad
+    \kappa_\text{TIDAL} = \frac{\sqrt{2}}{M_\text{P}},
+    \qquad
+    M_\text{P} = \frac{\sqrt{2}}{\kappa_\text{TIDAL}}.
+\end{equation*}
+The factor of $2$ is the canonical-normalisation factor; consistent with
+TIDAL's prefactor $1/\kappa^2 = M_\text{P}^2/2$, which matches the BHL action
+$-\tfrac{1}{2}M_\text{P}^2 R$ when written with explicit Planck-mass prefactor.
+
+\paragraph*{How to tell which $\kappa$ a paper is using.}
+Always check the dimensions and where $\kappa$ sits in the Lagrangian:
+\begin{itemize}
+  \item If $\kappa$ appears as $1/\kappa^2$ in front of $R$, or as $\kappa\Bzero D$
+        inside a sine, or in $g = \eta + \kappa h$ for canonical $h$, it is
+        the TIDAL/Domcke convention ($[\kappa] = [\text{Mass}]^{-1}$,
+        $\kappa^2 = 16\pi G$).
+  \item If $1/(2\kappa)$ is the prefactor of $R$ in the action, it is the
+        Einstein-constant convention ($[\kappa_\text{E}] = [\text{Mass}]^{-2}$,
+        $\kappa_\text{E} = 8\pi G$).
+\end{itemize}
+TIDAL's macros.tex and all docs/tex files use the first convention. The MSci
+report should write the action with explicit $M_\text{P}^2$ prefactor (BHL
+joint-paper style) and reserve the $\kappa$ symbol for the Gertsenshtein
+formula and any place where the linearised vertex coupling is needed — this
+choice avoids both ambiguities at once and is consistent with the macros.
+
 \subsection{Derivation from the TIDAL Equations}
 
 \subsubsection{Starting Point}
