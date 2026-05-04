@@ -506,6 +506,7 @@ D_KL = 8.872 nats; ESS = 1918 (std) / 2204 (INTR r2).
 
 **Corner plots:**
 - Sup std: `hpc_results/28841945/corner_28841945_sup_track1.png`
+- Sup INTR r2: `hpc_results/28848651/corner_28848651_sup_track1_intr.png`
 
 ---
 
