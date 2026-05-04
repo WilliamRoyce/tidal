@@ -471,8 +471,28 @@ Phase 6.B survival analysis predicted Δlog Z ≈ −0.036 nats; this run verifi
 | Job | k_IC | Probe | Constraints | Status | log Z | Notes |
 |-----|------|-------|-------------|--------|-------|-------|
 | 28520217 (original) | 2.0 | none | none | COMPLETED | −2.261 ± 0.066 | Baseline |
-| **28838011** (Track 1) | **2.0** | canonical (t_test=20, threshold=0.3, all-k unit-IC) + Hwang–Noh | none | **RUNNING** | TBD | Probe-only correction |
+| **28838011** (Track 1) | **2.0** | canonical (t_test=20, threshold=0.3, all-k unit-IC) + Hwang–Noh | none | **COMPLETED** (16 min) | **−2.226 ± 0.065** | Probe-only correction |
 
-**Expected outcome:** log Z ≈ −2.261 + (−0.036) = −2.297. If result matches within ~0.1 nats, the
-Phase 6.B replay estimate is validated and the Δlog Z between original and canonical (k_IC=2π/100)
-settings is cleanly attributed to k_IC change, not the probe gate.
+### Track 1 result
+
+- **log Z = −2.226 ± 0.065** (16 min wall, 2 clusters, ndead=4441, nlike=218,581)
+- **Δlog Z (probe-only) = +0.035 ± 0.093 nats** — consistent with zero
+- Phase 6.B prediction was −0.036 nats; magnitudes match (~0.04 nats), signs differ but both well within 1σ combined error of 0.093 nats
+- MAP: α₁=−0.889, α₂=−1.149, α₃=+0.734, δ₁=−0.067 (close to original's MAP at small |δ₁|)
+- ESS=1356.1, D_KL=1.725 nats (essentially identical to original's D_KL=1.79)
+- Corner: `hpc_results/28838011/corner_28838011_track1.png`
+
+### Δlog Z decomposition (canonical vs original)
+
+| Component | Δlog Z (nats) | Source |
+|-----------|---------------|--------|
+| Probe-only (Track 1 − original, k_IC=2.0) | **+0.035** | 28838011 vs 28520217 |
+| k_IC-only (canonical − Track 1, both with probe) | **+4.320** | 28789437/9579 vs 28838011 |
+| **Total (canonical − original)** | **+4.355** | — |
+
+**Conclusion:** the +4.4 nat shift between the original D1 amp result and the canonical Phase 6.C
+result is **dominated almost entirely by the k_IC change** (2.0 → 2π/100), not the probe gate.
+The canonical probe + Hwang–Noh gate adds essentially zero to log Z at the original k_IC. The
+canonical-vs-original log Z shift is therefore a *physical* effect of probing the long-wavelength
+fundamental mode (k_IC=2π/100) instead of the short-wavelength mode (k_IC=2.0), exposing genuine
+amplification in the stable sector that the original short-wavelength analysis simply did not access.
