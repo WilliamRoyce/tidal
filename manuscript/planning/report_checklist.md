@@ -8,6 +8,7 @@ Live tracking document. Tick items as completed. See `report_plan.md` for full c
 
 - [x] Write `manuscript/planning/report_plan.md` — repo-local archive of the full plan
 - [x] Write `manuscript/planning/report_checklist.md` — this file
+- [x] Write `manuscript/planning/literature_content_notes.md` — per-paper notes from reading all 23 locally-available papers
 - [x] Update `docs/MEMORY.md` with pointer to planning files
 - [x] Commit: `chore(report): add report plan archive and Phase 0/1 checklist` (582685e)
 
@@ -59,26 +60,26 @@ Live tracking document. Tick items as completed. See `report_plan.md` for full c
 ### Already-in-`literature/` papers that must be studied for CONTENT (not yet analysed)
 
 These are local — no download needed, but must be read for §1, §2, §4, §5:
-- [ ] Read and note `literature/1812.02675/` — Nair-Park-Yoon ghost-free PGT classification (§1.2, §5.2)
-- [ ] Read and note `literature/1804.05556/` — Blagojević & Cvetković PGT Hamiltonian structure (§5.2)
-- [ ] Read and note `literature/2301.02072/` — Simple derivation of Gertsenshtein effect (§1.1, §4)
-- [ ] Read and note `literature/2310.04150/` — EM field definitions in graviton-photon conversion (§2.3)
-- [ ] Read and note `literature/2004.02714/` — Exact graviton-photon mixing in B-field (Ejlli, §4)
-- [ ] Read and note `literature/2105.04565/` — Dark Photon Limits Handbook (Caputo et al., §4.2)
-- [ ] Read and note `literature/hep-th_0103093/` — Shapiro: Physical aspects of torsion (§2 background)
-- [ ] Read and note `literature/gr-qc_0001010/` — Hehl & Obukhov: How does EM couple to gravity? (§2)
-- [ ] Read and note `literature/gr-qc_0307063/` — Itin & Hehl: Maxwell + quadratic torsion (§2, §5)
+- [x] Read and note `literature/1812.02675/` — Lin, Hobson, Lasenby: ghost-free PGT classification (§1.2, §5.2)
+- [x] Read and note `literature/1804.05556/` — Blagojević & Cvetković PGT Hamiltonian structure (§5.2)
+- [x] Read and note `literature/2301.02072/` — Simple derivation of Gertsenshtein effect (§1.1, §4)
+- [x] Read and note `literature/2310.04150/` — EM field definitions in graviton-photon conversion (§2.3)
+- [x] Read and note `literature/2004.02714/` — Exact graviton-photon mixing in B-field (Ejlli, §4)
+- [x] Read and note `literature/2105.04565/` — Dark Photon Limits Handbook (Caputo et al., §4.2)
+- [x] Read and note `literature/hep-th_0103093/` — Shapiro: Physical aspects of torsion (§2 background)
+- [x] Read and note `literature/gr-qc_0001010/` — Hehl & Obukhov: How does EM couple to gravity? (§2)
+- [x] Read and note `literature/gr-qc_0307063/` — Itin & Hehl: Maxwell + quadratic torsion (§2, §5)
 
 ### Pre-arXiv must-cite papers (bibliography entries only)
 
 These need entries in `references.bib` — no TeX to download:
-- [ ] Add `gertsenshtein1962` — M.E. Gertsenshtein, Sov. Phys. JETP 14, 84 (1962)
-- [ ] Add `boccaletti1970` — Boccaletti et al., Nuovo Cim. B (1970) [the formula we validate to 0.04%]
-- [ ] Add `raffelt1988` — Raffelt & Stodolsky, PRD 37, 1237 (1988)
-- [ ] Add `kibble1961` — T.W.B. Kibble, J. Math. Phys. 2, 212 (1961)
-- [ ] Add `hehl1976` — Hehl et al., Rev. Mod. Phys. 48, 393 (1976)
-- [ ] Add `sezgin1980` — Sezgin & Van Nieuwenhuizen, PRD 21, 3269 (1980)
-- [ ] Add `cillis1996` — Cillis & Harari, PRD 54, 4757 (1996)
+- [x] `gertsenshtein1962wave` — already present in references.bib
+- [x] `boccaletti1970conversion` — already present in references.bib
+- [x] `raffelt1988mixing` — already present in references.bib
+- [x] `kibble1961lorentz` — added (J. Math. Phys. 2, 212 (1961))
+- [x] `hehl1976spin` — already present in references.bib
+- [x] `sezgin1980ghostfree` — added (PRD 21, 3269 (1980))
+- [x] `cillis1996graviton` — added (PRD 54, 4757 (1996))
 
 ### Style intel artefacts
 
@@ -89,7 +90,7 @@ These need entries in `references.bib` — no TeX to download:
 
 ### Commit
 
-- [ ] Commit: `chore(report): freeze style analysis and supervisor reference corpus for MSci draft`
+- [x] Commit: `chore(report): freeze style analysis and supervisor reference corpus for MSci draft`
 
 ---
 
@@ -102,25 +103,25 @@ These need entries in `references.bib` — no TeX to download:
 
 ### Bibliography hygiene
 
-- [ ] Add `barker2024psalter` (2406.09500) to `manuscript/references.bib`
-- [ ] Add `barker2025psalter2` (2506.02111) to `manuscript/references.bib`
-- [ ] Add `barker2025hamilcar` (2512.25007) to `manuscript/references.bib`
-- [ ] Add software comparators: NRPy+, Dedalus, OGRe, FieldsX, Cadabra2 (check if xAct/xPert already present)
-- [ ] Add dark-photon / hidden-photon review (Caputo–Millar–O'Hare–Vitagliano 2021 or equivalent)
-- [ ] Add ghost-instability PGT literature (Sezgin–Van Nieuwenhuizen; Beltrán-Jiménez–Heisenberg–Koivisto; Nair–Park–Yoon)
-- [ ] Add GW-detection context anchors (LISA, NANOGrav, LIGO O4 — one each)
-- [ ] Verify entry count ≥ 55
+- [x] Add `barker2024psalter` (2406.09500) to `manuscript/references.bib`
+- [x] Add `barker2025psalter2` (2506.02111) to `manuscript/references.bib`
+- [x] Add `barker2025hamilcar` (2512.25007) to `manuscript/references.bib`
+- [x] Add software comparators: NRPy+, OGRe, Cadabra2 (×2 entries); Dedalus already present; xAct/xPert already present
+- [x] Add dark-photon / hidden-photon review (`caputo2021darkphoton`, PRD 104, 095029 (2021))
+- [x] Add ghost-instability PGT literature: `sezgin1980ghostfree` (PRD 21, 3269); `lin2019pgt` (Lin-Hobson-Lasenby 2019); `blagojevic2018hamiltonian` — covers the key no-ghost constraints
+- [x] Add GW-detection context anchors: `amaro2017lisa` (LISA); `nanograv2023fifteen` (NANOGrav 15-yr); `abbott2023gwtc3` (GWTC-3 / LIGO O4 context)
+- [x] Verify entry count ≥ 55 — **81 entries** total
 
 ### Notation survey and macros
 
-- [ ] Read Tier 1–2 papers focusing on: metric signature, vierbein/spin-connection notation, torsion irreducible decomposition labels, Gertsenshtein coupling symbols
-- [ ] Record standard choices + source traceback in `manuscript/macros.tex` comments
-- [ ] Agree macro set for all report symbols (metric, indices, torsion components, contortion, irreducible decomp, Gertsenshtein constants)
-- [ ] Check for conflicts with `docs/tex/preamble.tex`; update docs to match report notation where they disagree
+- [x] Read Tier 1–2 papers focusing on: metric signature, vierbein/spin-connection notation, torsion irreducible decomposition labels, Gertsenshtein coupling symbols
+- [x] Record standard choices + source traceback in `manuscript/macros.tex` comments (see §"Agreed notation set" block added to macros.tex)
+- [x] Agree macro set for all report symbols: metric (-,+,+,+); indices μ,ν,ρ (spacetime) / a,b,c (frame); e^a_μ vierbein; ω^{ab}_μ spin connection; T_μ torsion trace; S^μ axial; q_{μνρ} tensor; κ²=16πG; P=sin²(κB₀D/2)
+- [x] Check for conflicts with `docs/tex/preamble.tex` — no conflicts; both use `\varkappa` for κ, same torsion/contorsion names
 
 ### Commit
 
-- [ ] Commit: `chore(report): outline approved, notation agreed, bibliography extended`
+- [ ] Commit: `chore(report): Phase 1 — bibliography 81 entries, notation agreed in macros.tex, literature notes`
 
 ---
 

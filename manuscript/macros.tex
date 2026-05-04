@@ -103,10 +103,81 @@
 
 % Gertsenshtein
 \newcommand{\Bzero}{B_0}                 % background magnetic field
-\renewcommand{\kappa}{\varkappa}         % graviton-photon coupling
-\newcommand{\Pconv}{P_\mathrm{conv}}     % conversion probability
+\renewcommand{\kappa}{\varkappa}         % graviton-photon coupling; kappa^2 = 16piG
+                                         % convention: BHL corpus (2406.12826, 2510.17094)
+\newcommand{\Pconv}{P_\mathrm{conv}}     % conversion probability (weak field)
 
 % Torsion (TIDAL notation)
 \newcommand{\torsionT}{T}               % torsion tensor
 \newcommand{\contorsion}{K}              % contorsion tensor
 \newcommand{\ricciT}{\tilde{R}}          % Ricci scalar with torsion
+
+% =====================================================================
+% Agreed notation set for MSci report — sourced from BHL/Barker corpus
+% =====================================================================
+%
+% Metric signature: (-,+,+,+)
+%   Convention: Shapiro hep-th/0103093 §1; BHL 2406.12826; Barker 2101.02645
+%
+% Spacetime indices: Greek mu,nu,rho,... (0–3); Latin a,b,c,... (frame/tangent)
+%   Convention: all BHL joint papers
+%
+% Vierbein:  e^a_{\ \mu}  (frame index up, coordinate index down)
+%   Convention: BHL 2406.12826 §II; 2309.14783
+%
+% Spin connection:  \omega^{ab}_{\ \ \mu}  (antisymmetric in ab)
+%   Convention: BHL 2406.12826 §II
+%
+% Torsion tensor:  T^\alpha_{\ \mu\nu} = \partial_\mu e^\alpha_\nu - \partial_\nu e^\alpha_\mu + ...
+%   Convention: Hehl et al. Rev.Mod.Phys. 48, 393 (1976); Shapiro hep-th/0103093
+%
+% Torsion irreducible decomposition (Hehl et al. 1976 labelling):
+%   ^{(1)}T  — traceless tensor part  q_{\mu\nu\rho}
+%   ^{(2)}T  — trace vector part      T_\mu = T^\alpha_{\ \mu\alpha}
+%   ^{(3)}T  — axial pseudovector     S^\mu = \varepsilon^{\alpha\beta\gamma\mu} T_{\alpha\beta\gamma}
+%   Convention: Shapiro hep-th/0103093 §2; BHL 2406.12826 (uses same labels)
+%               Barker macros.tex \T[1]{...}, \T[2]{...}, \T[3]{...} above
+
+% Torsion trace vector
+\newcommand{\torsionTrace}[1]{T_{#1}}    % T_mu — torsion trace (^{(2)}T component)
+                                         % = T^\alpha_{\ #1\alpha}
+
+% Torsion axial pseudovector
+\newcommand{\torsionAxial}[1]{S^{#1}}   % S^mu — torsion axial (^{(3)}T component)
+                                         % = epsilon^{alpha beta gamma #1} T_{alpha beta gamma}
+                                         % Convention: Shapiro, Itin-Hehl gr-qc/0307063
+
+% Contorsion
+\newcommand{\contorsionK}[1]{K_{#1}}    % K_{mu nu rho} contorsion tensor
+                                         % Convention: Shapiro hep-th/0103093 eq (2.12)
+
+% Gravitational coupling constant
+% kappa^2 = 16 pi G  (not 8piG — confirmed in BHL 2406.12826 §II and Domcke 2301.02072)
+\newcommand{\kappaG}{\varkappa}          % graviton-photon / gravitational coupling
+
+% Gertsenshtein conversion probability
+% P = sin^2(kappa B_0 D / 2) — Boccaletti 1970; confirmed to 0.04% in TIDAL
+\newcommand{\Pgerts}{P}                  % conversion probability (main body notation)
+
+% Background magnetic field (external, static, uniform)
+\newcommand{\Bext}{B_0}                  % B_0 — background field strength
+
+% Photon field perturbation
+\newcommand{\Apert}{A_\mu}              % A_mu — EM 4-potential perturbation
+
+% Graviton perturbation
+\newcommand{\hpert}{h_{\mu\nu}}          % h_{mu nu} — metric perturbation (TT gauge)
+
+% PGT action coupling constants (BHL 2101.02645 notation for quadratic torsion)
+% General quadratic PGT Lagrangian coefficients: a_0, a_1, a_2, a_3 for torsion^2 terms
+% b_0, b_1, ... for curvature^2 terms
+% Convention: BHL 2101.02645 §II; also Sezgin-VanNieuwenhuizen PRD 21 3269 (1980)
+
+% Torsion sector coupling parameters (matches research/ TOML naming convention)
+\newcommand{\deltaone}{\delta_1}         % delta_1 — propagating torsion deformation param
+                                         % |delta_1| < 0.005 stability window (TIDAL result)
+
+% Software name macros
+\newcommand{\TIDAL}{\textsc{TIDAL}}      % TIDAL pipeline name
+\newcommand{\PSALTer}{\textsc{PSALTer}}  % PSALTer software name
+\newcommand{\Hamilcar}{\textsc{Hamilcar}} % Hamilcar software name
