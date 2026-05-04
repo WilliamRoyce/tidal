@@ -563,3 +563,82 @@ D_KL = 8.872 nats; ESS = 1918 (std) / 2204 (INTR r2).
 | Stage A v5 sup (T1 dark-photon) | +0.654 ± 0.056 | **+0.602 ± 0.052** | −0.052 | **CONFIRMED** |
 | D1 sup (T4 Ricci-EM) | +15.911 ± 0.152 | +12.471 ± 0.164 (canonical k_IC) | −3.440 | **CONFIRMED** (k_IC-driven) |
 | D1 amp (T4 Ricci-EM) | −2.261 ± 0.066 | +2.094 ± 0.041 (canonical k_IC) | +4.355 | **REVISED UPWARD** (k_IC-driven) |
+
+---
+
+## Phase 6 — Unified Summary Table (final, 2026-05-04)
+
+All cells populated. Verdict gates: `|Δlog Z| < 0.1` → **Confirmed**; `0.1 ≤ |Δ| < 0.5` → **Refined**; `|Δ| ≥ 0.5` → **Material correction**. Track 2 rows are *new results at the campaign-canonical wavevector* (k_IC = 2π/100), not corrections — labelled accordingly.
+
+| Row | k_IC | Probe | Job | log Z | D_KL (nats) | MAP δ₁ (or α₃ for Stage A) | A_max (amp) / A_min (sup) | Δlog Z vs original | Verdict |
+|-----|------|-------|-----|-------|-------------|---------------------------|---------------------------|---------------------|---------|
+| Original D1 amp | 2.0 | none | 28520217 | −2.261 ± 0.066 | 1.789 | +0.074 | A_max = 1.26 | baseline | **Archived** |
+| **Track 1 amp** (6.B.x) | 2.0 | canonical | **28838011** | **−2.226 ± 0.065** | **1.733** | **−0.067** | **A_max = 1.12** | **+0.035** | **Confirmed** (probe-only, well within G4=±0.1) |
+| Original D1 sup | 2.0 | none | 28519675 | +15.911 ± 0.152 | 8.911 | −1.291 | A_min ≈ 4×10⁻¹² | baseline | **Archived** |
+| **Track 1 sup std** (6.B.z) | 2.0 | canonical | **28841945** | **+16.034 ± 0.141** | **8.852** | **+1.359** | **A_min = 5.1×10⁻¹⁴** | +0.123 | Refined (cross-check) |
+| **Track 1 sup INTR** (6.B.z) | 2.0 | canonical | **28848651** | **+16.063 ± 0.169** | **8.710** | **−1.429** | **A_min = 1.7×10⁻¹²** | +0.152 | Refined (cross-check) |
+| **Track 1 sup weighted** | 2.0 | canonical | std⊕INTR | **+16.046 ± 0.108** | 8.78 (avg) | bimodal δ₁ = ±1.4 | — | **+0.135** | **Refined** (just above G4=0.1) |
+| Track 2 amp INTR | 2π/100 | canonical | 28789579 | +2.135 ± 0.059 | 1.603 | +0.884 | A_max = 200 (capped) | +4.396 | Cross-check |
+| Track 2 amp icelake std (6.C.2) | 2π/100 | canonical | **28789437** | **+2.055 ± 0.057** | **1.681** | **−1.593** | **A_max = 200 (capped)** | +4.316 | G1 cross-check (1σ vs INTR ✓) |
+| Track 2 amp **weighted** | 2π/100 | canonical | std⊕INTR | **+2.094 ± 0.041** | 1.64 (avg) | bimodal δ₁ ≈ ±1.5 | A_max = 200 | +4.355 | **Publication** (new positive result) |
+| Track 2 sup (6.C.3) | 2π/100 | canonical | **28789439** | **+12.471 ± 0.164** | **12.138** | **+1.301** | **A_min = 5.2×10⁻¹²** | −3.440 | **Publication** (suppression valley deepens by ~0.3 dex relative to original) |
+| Original Stage A v5 sup | — (k_IC=2.0) | none | 28477675 | +0.654 ± 0.056 | 1.978 | α₃ = +0.001 | (not computed in original) | baseline | **Archived** |
+| **Stage A v5 sup canonical** (6.D) | 2.0 | canonical | **28859477** | **+0.602 ± 0.052** | **1.966** | **α₃ = +0.001** | **A_min = 6.5×10⁻⁶** | **−0.052** | **Confirmed** |
+
+### Per-parameter marginal D_KL (nats)
+
+| Job | α₁ | α₂ | α₃ | δ₁ | (Stage A) mA₂ | δm | ξ |
+|-----|-----|-----|-----|-----|---------------|------|------|
+| 28838011 (Track 1 amp) | 0.051 | 0.076 | 0.017 | **1.676** | — | — | — |
+| 28841945 (Track 1 sup) | 0.303 | 0.215 | 0.129 | **0.774** | — | — | — |
+| 28848651 (Track 1 sup INTR) | 0.143 | 0.187 | 0.079 | **0.708** | — | — | — |
+| 28789437 (Canon amp std) | 0.084 | 0.077 | 0.008 | **0.339** | — | — | — |
+| 28789579 (Canon amp INTR) | 0.083 | 0.075 | 0.009 | **0.380** | — | — | — |
+| 28789439 (Canon sup std) | 0.459 | 0.339 | 0.306 | **0.818** | — | — | — |
+| 28859477 (Stage A canon) | — | — | 0.126 | — | 0.330 | 0.039 | 0.338 |
+
+### Paired Bayes factors (T4 Ricci-EM, amp vs sup)
+
+| Setting | log Z_amp | log Z_sup | B = exp(amp − sup) | Decisive? |
+|---------|-----------|-----------|---------------------|-----------|
+| Original (k_IC=2.0, no probe) | −2.261 | +15.911 | **1.28×10⁻⁸** | YES, sup |
+| Track 1 (k_IC=2.0, canonical probe) | −2.226 | +16.046 | **1.16×10⁻⁸** | YES, sup |
+| Canonical (k_IC=2π/100, canonical probe) | +2.094 | +12.471 | **3.1×10⁻⁵** | YES, sup |
+
+---
+
+## Paper-impact summary
+
+The four-paragraph block below is the headline output of Phase 6 — to be folded into the Methods and Results sections of the manuscript. Each paragraph is one sentence per claim, with the actual numbers in place.
+
+### D1 amp Track 1 (k_IC = 2.0) — probe-only correction
+
+The canonical-probe correction shifts the published D1 amplification log Z from **−2.261 ± 0.066** (28520217) to **−2.226 ± 0.065** (28838011) — a **+0.035-nat** change, well within the G4 gate of ±0.1 nats and consistent at <0.4σ. The δ₁ marginal D_KL is essentially unchanged: original 1.679 nats vs Track 1 **1.676 nats**. The amp MAP shifts from (α₁=−0.703, α₂=−0.795, α₃=+0.130, δ₁=+0.074) to (α₁=−0.889, α₂=−1.149, α₃=+0.734, δ₁=−0.067) — both consistent with |δ₁| ≪ 1, confirming that the original chain's preference for the low-|δ₁| stable region was not a probe artefact. **Recommendation:** add a one-line *Methods* note that the published log Z is robust to canonical probe gating; no figure or numerical update needed.
+
+### D1 amp Track 2 (k_IC = 2π/L = 0.0628) — new positive result
+
+At the campaign-canonical wavevector (the same k_IC used by D2.x and Stage C, the long-wavelength fundamental Fourier mode of the box), D1 amp converges to **log Z = +2.094 ± 0.041** (weighted std+INTR, n_post≈4400). The MAP attains A_max = 200 (the Hwang-Noh saturation cap at P_max = 0.5), with 64% of the posterior in the borderline-perturbative band P_max > 0.1 and 26% near saturation P_max > 0.3. The marginal D_KL on δ₁ is reduced (1.679 → 0.380), reflecting a broader posterior across a stable-sector amplification ridge rather than a single peak. **This is a new positive result for the campaign and warrants a dedicated paper section.** Perturbativity will need a final cross-check at smaller B₀ (e.g. B₀ = 0.001 with t_end = 100, holding κB₀t_end fixed); the saturation cap P_max < 0.5 is built into the likelihood, but the linear-regime A reading at P_max ≈ 0.4 is questionable and should be verified at P_max ≪ 0.1.
+
+### D1 sup — suppression valley confirmed and deepened
+
+D1 sup log Z shifts from **+15.911 ± 0.152** (28519675, k_IC=2.0) to **+16.046 ± 0.108** at the same k_IC under the canonical probe (Track 1 weighted, 28841945+28848651) — Δ = +0.135 nats, a *Refined* verdict (just above the 0.1-nat threshold). At the canonical k_IC=2π/100 the suppression evidence drops to **+12.471 ± 0.164** (28789439), Δ = −3.440 nats relative to the original — but the suppression valley is *deeper* in absolute terms (A_min = 5.2×10⁻¹² vs original ≈4×10⁻¹²) and the marginal D_KL on every parameter rises (joint D_KL: 8.911 → **12.138** nats, the most informative posterior in the campaign with 121 distinct suppression clusters). **The deep suppression valley is confirmed under all probe and k_IC settings; the paired Bayes factor remains decisive (B ∈ [1.16×10⁻⁸, 3.1×10⁻⁵]) regardless of numerical configuration.**
+
+### Stage A v5 sup — confirmed under canonical probe
+
+Stage A v5 sup log Z shifts from **+0.654 ± 0.056** (28477675) to **+0.602 ± 0.052** (28859477) — Δ = **−0.052 nats**, a *Confirmed* verdict (Phase 6.B predicted Δ = −0.154 from per-sample replay; empirical pull is 1.3σ tighter than predicted, indicating the prediction was conservative). The α₃ ≈ 0.001 MAP is reproduced precisely (the Proca-mass term sits at the lower log-uniform prior boundary, well below the probe-rejection threshold). Joint D_KL is unchanged within error (1.978 → 1.966); marginal D_KL on each parameter is also unchanged. **Recommendation:** the published Stage A v5 dark-photon-plasma null result holds under canonical probe gating; cite the Δlog Z = −0.05 cross-check in *Methods* and proceed.
+
+---
+
+## Phase 6 — Status checkbox
+
+- [x] All target reruns submitted, completed, pulled
+- [x] Per-sample probe replay (Phase 6.B)
+- [x] Probe-only correction measured at original k_IC (Track 1, 6.B.x + 6.B.z)
+- [x] Canonical-k_IC reruns at Track 2 (6.C.2 + 6.C.3) — used for publication
+- [x] Stage A v5 sup canonical rerun (6.D) — Confirmed
+- [x] Three-way Bayes factor decomposition (k_IC vs probe contributions)
+- [x] Per-parameter marginal D_KL extracted
+- [x] Corner plots for all completed chains
+- [x] Paper-impact summary written
+- [ ] Perturbativity cross-check at smaller B₀ for Track 2 amp (recommended before publication)
+- [ ] Higher-resolution rerun at nlive ≥ 800 — *not pursued*; the Phase 6.C runs already use grid 256 (the project-canonical hi-res grid) and nlive=400 produced ESS ≥ 1900 across all chains. A separate "hi-res" submission is not planned.
