@@ -417,3 +417,45 @@ to confirm the A values hold under perturbativity. The standard icelake jobs
 canonical result.
 
 **Corner plot:** `hpc_results/28789579/corner_28789579_amp_clean.png`
+
+---
+
+## Phase 6.C — Final results: D1 amp + sup canonical (2026-05-04)
+
+All four Phase 6.C jobs complete. Two independent amp draws and one sup draw.
+
+### D1 amp canonical — confirmed
+
+| Job | log Z | Clusters | nlike |
+|-----|-------|----------|-------|
+| 28789579 (INTR) | +2.135 ± 0.059 | 2 | 246,371 |
+| 28789437 (std)  | +2.055 ± 0.057 | 2 | 246,649 |
+| **Weighted avg** | **+2.094 ± 0.041** | — | — |
+
+MAP (std): α₁=+0.034, α₂=−1.187, α₃=+0.154, δ₁=−1.593
+
+### D1 sup canonical — final
+
+| Job | log Z | Clusters | nlike |
+|-----|-------|----------|-------|
+| 28799598 INTR r1 (checkpoint) | +12.129 ± 0.180 | 52 active / 52 | 1,126,678 |
+| 28801350 INTR r2 (checkpoint) | +12.688 ± 0.184 | 64 active / 99 | 2,076,053 |
+| **28789439 std (converged)**  | **+12.471 ± 0.164** | **0 active / 121** | **2,734,800** |
+
+MAP (std): α₁=+0.373, α₂=+0.889, α₃=+0.568, δ₁=+1.301  
+D_KL total = 12.12 nats — highly informative posterior.  
+Marginal D_KL: δ₁=0.81 (dominant), α₁=0.45, α₂=0.32, α₃=0.32.  
+**121 distinct suppression clusters** resolved — the most complex posterior in this campaign.
+
+### Paired Bayes factor — canonical vs original
+
+| | log Z_amp | log Z_sup | B = exp(amp−sup) | Verdict |
+|--|-----------|-----------|------------------|---------|
+| Original (k_IC=2.0, no probe) | −2.261 | +15.911 | **1.3×10⁻⁸** | Sup overwhelmingly favoured |
+| Canonical (k_IC=2π/100, probe) | +2.094 | +12.471 | **3.1×10⁻⁵** | Sup still overwhelmingly favoured |
+
+The qualitative verdict is unchanged: **T4 Ricci-EM strongly favours suppression over amplification** under any numerical setting. Under canonical settings the Bayes factor narrows from ~10⁸ to ~3×10⁴ (still decisive), driven by the k_IC change exposing genuine stable-sector amplification. The absolute log Z values shift substantially due to the combined k_IC + probe gate change (see amp result section above), but the *relative* evidence firmly maintains the suppression conclusion.
+
+**Corner plots:**
+- Amp std: `hpc_results/28789437/corner_28789437_amp_clean.png`
+- Sup std: `hpc_results/28789439/corner_28789439_sup_clean.png`
