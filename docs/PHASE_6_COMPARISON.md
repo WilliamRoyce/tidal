@@ -640,5 +640,67 @@ Stage A v5 sup log Z shifts from **+0.654 ± 0.056** (28477675) to **+0.602 ± 0
 - [x] Per-parameter marginal D_KL extracted
 - [x] Corner plots for all completed chains
 - [x] Paper-impact summary written
-- [ ] Perturbativity cross-check at smaller B₀ for Track 2 amp (recommended before publication)
+- [x] Perturbativity cross-check at smaller B₀ for Track 2 amp — **B₀ PASSES, t_end FAILS** (see §"Perturbativity validation at the hi-res MAP" below)
 - [ ] Higher-resolution rerun at nlive ≥ 800 — *not pursued*; the Phase 6.C runs already use grid 256 (the project-canonical hi-res grid) and nlive=400 produced ESS ≥ 1900 across all chains. A separate "hi-res" submission is not planned.
+
+---
+
+## Perturbativity validation at the hi-res MAP — issue #340 (2026-05-04)
+
+**Verdict: B₀ check PASS, t_end check FAIL.** The published Phase 6.C.2 publication number A_max = 200 is a **tachyonic-instability artefact** at the hi-res D1 amp MAP, not genuine perturbative amplification. The canonical stability probe (t_test=20, γ_eff>0.3) did not catch the mode because γ at this MAP sits just below the threshold (γ_measured ≈ 0.27 vs γ_threshold = 0.30). #340 stays OPEN; follow-up issue filed for probe-architecture review.
+
+**MAP tested (from 28789437 std, the primary publication chain):**
+
+| α₁ | α₂ | α₃ | δ₁ |
+|----|----|----|----|
+| +0.034 | −1.187 | +0.154 | −1.593 |
+
+Note: the chain is multi-modal — both 28789437 and 28789579 hit A=200 at MAP (the Hwang–Noh saturation cap), but at different (α₁,α₂,α₃,δ₁) representatives. The instability is generic to the saturation locus, not specific to one mode (verified by chain inspection: 5 of the top-5 weighted samples in 28789437 cluster around |δ₁| ∈ [1.5, 2.0] with α₂ ∈ [−1.2, −0.5]).
+
+### Sweep 1 — B₀ scaling at fixed t_end = 10 (PASS)
+
+`examples/data/d1_perturbativity_check_hires/b0_sweep/results.csv` — 7 points, geometric in B₀ ∈ [10⁻⁴, 10⁻²]:
+
+| B₀ | P_max | sin²(κB₀t/2) | A = P/baseline |
+|----|-------|--------------|----------------|
+| 10⁻⁴ | 5.04×10⁻⁵ | 2.50×10⁻⁷ | 201.41 |
+| 2.15×10⁻⁴ | 2.34×10⁻⁴ | 1.16×10⁻⁶ | 201.41 |
+| 4.64×10⁻⁴ | 1.08×10⁻³ | 5.39×10⁻⁶ | 201.41 |
+| 10⁻³ | 5.04×10⁻³ | 2.50×10⁻⁵ | 201.40 |
+| 2.15×10⁻³ | 2.34×10⁻² | 1.16×10⁻⁴ | 201.35 |
+| 4.64×10⁻³ | 1.08×10⁻¹ | 5.39×10⁻⁴ | 201.14 |
+| 10⁻² | 5.00×10⁻¹ | 2.50×10⁻³ | 200.17 |
+
+**A varies by 0.62% over 2 decades — well within the 20% tolerance.** This confirms B₀-independence and rules out P_max-saturation breakdown of the linearised conversion measurement at fixed t_end. Plot: `examples/data/d1_perturbativity_check_hires/b0_scaling.png`.
+
+### Sweep 2 — t_end independence at B₀ = 10⁻⁴ (FAIL)
+
+5 simulations at the same MAP, B₀ held at the most-perturbative value (so any growth observed is dynamical, not P-saturation):
+
+| t_end | P_max | sin²(κB₀t/2) | A | A/A(t=10) |
+|-------|-------|--------------|---|-----------|
+| 5  | 2.99×10⁻⁷ | 6.25×10⁻⁸ | **4.78** | 0.19 |
+| 10 | 6.45×10⁻⁶ | 2.50×10⁻⁷ | **25.82** | 1.00 |
+| 15 | 5.30×10⁻⁵ | 5.63×10⁻⁷ | **94.26** | 3.65 |
+| 20 | 3.20×10⁻⁴ | 1.00×10⁻⁶ | **319.89** | 12.39 |
+| 25 | 1.71×10⁻³ | 1.56×10⁻⁶ | **1097.51** | 42.51 |
+
+**A(20)/A(10) = 12.39 — far outside the [0.5, 2.0] pass band → FAIL.** A grows exponentially with t_end. Linear fit `log A = γ·t + const` gives:
+
+- **γ ≈ 0.268 per time-unit** (e-folding time τ_e ≈ 3.73)
+- This is *just below* the canonical-probe threshold of γ_eff = 0.30 — the probe at t_test = 20 measures γ_eff at this MAP and reports it as **stable**, but it's exponentially unstable.
+- A grows as exp(γ·t) — A=200 at t=10 is already ~5 e-foldings into instability; A=1000 at t=25 is ~7 e-foldings.
+
+Plot: `examples/data/d1_perturbativity_check_hires/tend_independence.png`.
+
+### Implication for the publication
+
+**The Phase 6.C.2 publication number A_max = 200 is NOT genuine linearised amplification.** It is the tachyonic-growth value at t_end = 10 starting from B₀=0.01 IC, capped only by the Hwang–Noh gate at P_max < 0.5. A separate publication-quality number cannot be quoted from this MAP under the current probe.
+
+**The published log Z = +2.094 ± 0.041 (paired Bayes factor 3.1×10⁻⁵) remains valid as evidence that the model gives non-zero amplification under the probe, but the A_max value is contaminated** and must not be quoted as a physical amplification factor.
+
+### Action items
+
+1. **Issue #340 — STAYS OPEN.** Do not close until the probe is re-architected and 6.C.2 is re-run.
+2. **Follow-up issue filed (#341):** investigate raising probe t_test from 20 to 30, OR lowering the γ_eff threshold from 0.3 to ≤0.25, OR adding a t_end-independence check to the canonical probe. After fix, re-run 6.C.2 hi-res and re-validate.
+3. **Manuscript impact**: the publication needs a methods note that the canonical probe at γ_threshold = 0.3 admits modes with γ ≲ 0.27, so quoted A values from probe-passed regions require an independent t_end-independence cross-check before they can be cited as physical.
