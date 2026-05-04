@@ -40,6 +40,46 @@ Live tracking document. Tick items as completed. See `report_plan.md` for full c
 - [x] Download `literature/2205.13534/` — solo-author multipliers paper (2 .tex files)
 - [x] Download `literature/2311.11790/` — solo-author Yang-Mills gravity (2 .tex files)
 
+### Tier 5 — Additional Barker papers (recent metric-affine and PGT work)
+
+- [x] Download `literature/2510.17094/` — Gertsenshtein effect on curved spacetime (1 .tex, DIRECT relevance)
+- [x] Download `literature/2507.09228/` — TorC torsion condensation cosmology (Handley+Barker, 2 .tex)
+- [x] Verify `literature/2510.08201/` — R² Hamiltonian analysis (already local, 1 .tex)
+- [x] Download `literature/2506.21662/` — Infrared foundations I: rank-3 field theories (5 .tex)
+- [x] Download `literature/2507.05349/` — Infrared foundations II: torsion-like + ghost analysis (5 .tex)
+- [x] Download `literature/2505.23894/` — Can metric-affine gravity be saved? (2 .tex)
+- [x] Download `literature/2402.07641/` — Particle spectra of Palatini/metric-affine (2 .tex)
+- [x] Download `literature/2402.14917/` — Metric-affine gravity from extended projective symmetry (4 .tex)
+
+### Tier 6 — Key collaborator / field papers
+
+- [x] Download `literature/2406.11956/` — Weyl-invariant Einstein-Cartan gravity (Karananas et al., 1 .tex)
+- [x] Download `literature/2506.17017/` — Cosmology of Cubic PGT (Bahamonde et al., 1 .tex)
+
+### Already-in-`literature/` papers that must be studied for CONTENT (not yet analysed)
+
+These are local — no download needed, but must be read for §1, §2, §4, §5:
+- [ ] Read and note `literature/1812.02675/` — Nair-Park-Yoon ghost-free PGT classification (§1.2, §5.2)
+- [ ] Read and note `literature/1804.05556/` — Blagojević & Cvetković PGT Hamiltonian structure (§5.2)
+- [ ] Read and note `literature/2301.02072/` — Simple derivation of Gertsenshtein effect (§1.1, §4)
+- [ ] Read and note `literature/2310.04150/` — EM field definitions in graviton-photon conversion (§2.3)
+- [ ] Read and note `literature/2004.02714/` — Exact graviton-photon mixing in B-field (Ejlli, §4)
+- [ ] Read and note `literature/2105.04565/` — Dark Photon Limits Handbook (Caputo et al., §4.2)
+- [ ] Read and note `literature/hep-th_0103093/` — Shapiro: Physical aspects of torsion (§2 background)
+- [ ] Read and note `literature/gr-qc_0001010/` — Hehl & Obukhov: How does EM couple to gravity? (§2)
+- [ ] Read and note `literature/gr-qc_0307063/` — Itin & Hehl: Maxwell + quadratic torsion (§2, §5)
+
+### Pre-arXiv must-cite papers (bibliography entries only)
+
+These need entries in `references.bib` — no TeX to download:
+- [ ] Add `gertsenshtein1962` — M.E. Gertsenshtein, Sov. Phys. JETP 14, 84 (1962)
+- [ ] Add `boccaletti1970` — Boccaletti et al., Nuovo Cim. B (1970) [the formula we validate to 0.04%]
+- [ ] Add `raffelt1988` — Raffelt & Stodolsky, PRD 37, 1237 (1988)
+- [ ] Add `kibble1961` — T.W.B. Kibble, J. Math. Phys. 2, 212 (1961)
+- [ ] Add `hehl1976` — Hehl et al., Rev. Mod. Phys. 48, 393 (1976)
+- [ ] Add `sezgin1980` — Sezgin & Van Nieuwenhuizen, PRD 21, 3269 (1980)
+- [ ] Add `cillis1996` — Cillis & Harari, PRD 54, 4757 (1996)
+
 ### Style intel artefacts
 
 - [x] Create `manuscript/style_intel/` directory

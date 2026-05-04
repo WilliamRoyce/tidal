@@ -51,6 +51,61 @@ The Barker–Hobson–Lasenby joint corpus on PGT/torsion is the headline match 
 
 None of these eight joint papers are currently in `literature/`. **Fetching their TeX sources is the highest-priority context action** (Phase 0 below), alongside the three Barker package papers.
 
+### Additional Barker papers (Phase 0 Tier 5 — recent work on metric-affine and PGT)
+
+| arXiv ID | Year | Title | Topic relevance |
+|----------|------|-------|-----------------|
+| **2510.17094** | 2025 | Gertsenshtein effect on curved spacetime with geometric optics | **Direct** — on our exact topic |
+| **2507.09228** | 2025 | Alleviating H₀ tension with Torsion Condensation (Legner, Handley, Barker) | **Direct** — propagating torsion cosmology |
+| **2510.08201** | 2025 | Spectrum of pure R² gravity: full Hamiltonian analysis (Barker et al.) | **Direct** — Hamiltonian spectral analysis |
+| **2506.21662** | 2025 | Infrared foundations I: catalogue of rank-three field theories | Adjacent — systematic field theory catalogue |
+| **2507.05349** | 2025 | Infrared foundations II: all torsion-like theories, ghost-tachyon-free cases | **Direct** — torsion-like theories with ghost analysis |
+| **2505.23894** | 2025 | Can metric-affine gravity be saved? (Barker, Marzo, Santoni) | Adjacent — ghost pathologies in metric-affine |
+| **2402.07641** | 2024 | Particle spectra of Palatini/metric-affine theories (Barker, Marzo) | **Direct** — ghost/spectrum methodology |
+| **2402.14917** | 2024 | Consistent particle physics in metric-affine gravity (Barker, Zell) | Adjacent — extended projective symmetry → ghost control |
+
+### Key collaborator / field papers (Phase 0 Tier 6)
+
+| arXiv ID | Year | Title | Topic relevance |
+|----------|------|-------|-----------------|
+| **2406.11956** | 2024 | Weyl-invariant Einstein-Cartan gravity (Karananas, Shaposhnikov, Zell) | Adjacent — conformal protection in EC/PGT |
+| **2506.17017** | 2025 | Cosmology of Cubic PGT (Bahamonde, Iosifidis et al.) | **Direct** — cubic PGT cosmology, constructive path §5.2 |
+
+### Papers already in `literature/` that must be studied (not yet analysed)
+
+These were present before Phase 0 but not included in the style analysis. They are primary references for CONTENT (§1, §2, §4, §5) even though they are not supervisor papers:
+
+| ID | Title / Authors | Section relevance |
+|----|----------------|------------------|
+| **1812.02675** | Nair, Park, Yoon — ghost-free PGT systematic classification (450 cases) | §1.2, §5.2 |
+| **1804.05556** | Blagojević & Cvetković — General PGT Hamiltonian structure | §5.2 |
+| **2301.02072** | Palessandro & Rothman — Simple derivation of Gertsenshtein effect | §1.1, §4 |
+| **2310.04150** | Hwang & Noh — EM field definitions in graviton-photon conversion | §2.3 |
+| **2004.02714** | Ejlli — Exact graviton-photon mixing in uniform B-field | §4 |
+| **2405.11786** | Hwang & Noh — Graviton-photon in Euler-Heisenberg regime | §5 context |
+| **2405.01407** | Palessandro — Gertsenshtein as probe of quantum gravity | §1, §5 |
+| **2105.04565** | Caputo et al. — Dark Photon Limits: a Handbook | §4.2 |
+| **2507.16609** | Domcke et al. — GW scattering on magnetic fields (2025) | §5 context |
+| **hep-th_0103093** | Shapiro — Physical aspects of space-time torsion (comprehensive review) | §2 background |
+| **gr-qc_0001010** | Hehl & Obukhov — How does EM couple to gravity? | §2 framework |
+| **gr-qc_0307063** | Itin & Hehl — Maxwell nonminimally coupled to quadratic torsion | §2, §5 path 1 |
+| **gr-qc_0305049** | Rubilar & Obukhov — Torsion nonminimally coupled to EM | §2 |
+| **2510.08201** | Barker et al. — Spectrum of pure R² gravity (already local) | §5.2 Hamiltonian |
+
+### Pre-arXiv foundational papers (bib entries only — no TeX available)
+
+These must be in `references.bib` but cannot be downloaded as TeX sources. They are essential citations:
+
+| Cite key | Reference | Section use |
+|----------|-----------|-------------|
+| `gertsenshtein1962` | M.E. Gertsenshtein, Sov. Phys. JETP **14**, 84 (1962) | §1.1 — original discovery |
+| `boccaletti1970` | Boccaletti et al., Nuovo Cim. B (1970) | §4.1 — the formula we validate to 0.04% |
+| `raffelt1988` | Raffelt & Stodolsky, PRD **37**, 1237 (1988) | §2.3, §4.2 — foundational photon mixing |
+| `kibble1961` | T.W.B. Kibble, J. Math. Phys. **2**, 212 (1961) | §1.2 — gauge origin of PGT |
+| `hehl1976` | Hehl, von der Heyde, Kerlick, Nester, Rev. Mod. Phys. **48**, 393 (1976) | §2.1 — definitive PGT review |
+| `sezgin1980` | Sezgin & Van Nieuwenhuizen, PRD **21**, 3269 (1980) | §1.2 — first systematic ghost analysis |
+| `cillis1996` | Cillis & Harari, PRD **54**, 4757 (1996) | §4 — cosmological conversion + plasma |
+
 ---
 
 ## What we already have (do not re-do)
