@@ -1,89 +1,89 @@
-% Theory scaffold (Phase 2): conventions paragraph plus four subsections,
+% Theory scaffold (Phase 2): conventions paragraph plus three subsections,
 % per genre_conventions_theory.md §(d) Steps 0–e and §(f) sub-movements.
-% Total target ~1200 words.
+% Total target ~1100 words. (§2.3 fold: the original §2.3 "Gertsenshtein
+% kernel" + §2.4 "Channel decomposition" merged into one §2.3 covering
+% both, since each was below the BHL subsection weight.)
 %
-% Conventions paragraph declares signature, indices, units, and the
-% kappa-as-vertex-coupling note. Does NOT include the irreducible torsion
+% Conventions paragraph declares signature, indices, units, M_P, kappa,
+% and the Levi-Civita epsilon. Does NOT include the irreducible torsion
 % decomposition labelling — that goes after the action in §2.1.
 
 \section{Theoretical framework}%
-\label{sec:Theory}
+\label{Theory}
 
 % Conventions named paragraph (Step 0): signature, indices, units, M_P,
-% kappa convention. The kappa note must reference \cref{sec:kappa-conventions}
-% — the canonical disambiguation in docs/tex/gertsenshtein_formula.tex —
-% to resolve the two-meanings-of-kappa ambiguity (issue #338).
-\paragraph*{Conventions}%
-\label{par:Conventions}
+% kappa convention, Levi-Civita epsilon. The kappa note must reference
+% \cref{sec:kappa-conventions} — the canonical disambiguation in
+% docs/tex/gertsenshtein_formula.tex — to resolve the two-meanings-of-kappa
+% ambiguity (issue #338). The label sec:kappa-conventions retains its
+% prefix because it is defined in docs/tex/, not the manuscript scaffolding;
+% see STYLE_GUIDE.md §(c).
+\paragraph*{Conventions}
 % TODO: declare metric signature $(+,-,-,-)$; spacetime indices $\mu,\nu,\rho$
-% (Greek, coordinate) and frame indices $a,b,c$ (Latin, Lorentz); natural
-% units $\hbar = c = 1$; reduced Planck mass $\MPl$ via $\MPl^2 = (8\pi G)^{-1}$;
+% (Greek, coordinate) and frame indices $a,b,c$ (Latin, Lorentz);
+% Levi-Civita symbol $\varepsilon^{0123} = +1$ (sign convention for the
+% axial pseudovector ${}^{(3)}T$); natural units $\hbar = c = 1$;
+% reduced Planck mass $\MPl$ via $\MPl^2 = (8\pi G)^{-1}$;
 % the gravitational coupling $\kappa = \sqrt{2}/\MPl$, equivalently
-% $\kappa^2 = 16\pi G$, used throughout for the linearised vertex coupling and
-% Gertsenshtein formula \cref{eq:GertsenshteinFormula}; explicitly NOT the
-% Einstein-action constant $\kappa_\text{E} = 8\pi G$ of some BHL papers
-% (\cref{sec:kappa-conventions}).
+% $\kappa^2 = 16\pi G$, used throughout for the linearised vertex coupling
+% and the Gertsenshtein formula \cref{GertsenshteinFormula}; explicitly NOT
+% the Einstein-action constant $\kappa_\text{E} = 8\pi G$ of some BHL
+% papers (see \cref{sec:kappa-conventions} for the full disambiguation).
 
 \subsection{Poincar\'{e} gauge theory}%
-\label{sec:PGTframework}
+\label{PGTframework}
 % Pedagogical sequence per genre_conventions_theory.md §(d) Steps (a)–(e).
 % Target ~350 w.
 
 % Step (a): Riemannian baseline (notation, not pedagogy).
-\paragraph*{Riemannian baseline}%
-\label{par:RiemannianBaseline}
+\paragraph*{Riemannian baseline notation}
 % TODO: one sentence on metric and Levi-Civita connection notation.
 
 % Step (b): Promotion of connection to independent field. Palatini
 % formulation declared explicitly.
-\paragraph*{Independent connection in the Palatini formulation}%
-\label{par:Palatini}
+\paragraph*{Independent connection in the Palatini formulation}
 % TODO: one to two sentences declaring Palatini formalism (metric and
 % connection independent), introducing the vierbein and spin connection.
 
 % Step (c): Paired curvature and torsion field-strength definitions.
-\paragraph*{Curvature and torsion}%
-\label{par:FieldStrengths}
+\paragraph*{Field strengths: curvature and torsion}
 % TODO: paired adjacent equations for $R^\sigma{}_{\mu\nu\rho}$ and
 % $T^\sigma{}_{\mu\nu}$ with identical syntactic structure.
 \begin{align}
   % TODO: curvature definition R^sigma_{mu nu rho}
-  \label{eq:Curvature}
+  \label{Curvature}
 \end{align}
 \begin{align}
   % TODO: torsion definition T^sigma_{mu nu}
-  \label{eq:Torsion}
+  \label{Torsion}
 \end{align}
 
 % Step (d): General quadratic action with named couplings.
-\paragraph*{Quadratic action}%
-\label{par:QuadraticAction}
+\paragraph*{General quadratic action}
 % TODO: state that this is the most general parity-preserving quadratic
 % PGT action; introduce $\Alp{n}$, $\Bet{n}$, $\Gam{n}$ couplings; gloss
 % the coupling groups in one prose sentence.
 \begin{align}
   % TODO: most general quadratic action
-  \label{eq:QuadraticAction}
+  \label{QuadraticAction}
 \end{align}
 
 % Step (e): Irreducible torsion decomposition introduced AFTER the action.
 % This is also the cross-reference target for App E.
-\paragraph*{Irreducible torsion decomposition}%
-\label{par:IrreducibleDecomposition}
+\paragraph*{Irreducible torsion decomposition}
 % TODO: tensor part \T[1]{}, trace vector \T[2]{}, axial pseudovector \T[3]{}
 % following Hehl 1976. Cite \cite{hehl1976spin}.
 \begin{align}
   % TODO: T = T^(1) + T^(2) + T^(3) decomposition
-  \label{eq:IrreducibleTorsion}
+  \label{IrreducibleTorsion}
 \end{align}
 
 \subsection{Linearisation around flat $+$ $B_0$ background}%
-\label{sec:Linearisation}
+\label{Linearisation}
 % Target ~350 w. Per genre_conventions_theory.md §(f) linearisation
 % sub-movement.
 
-\paragraph*{Background and perturbation ansatz}%
-\label{par:LinearisationSetup}
+\paragraph*{Background and perturbation ansatz}
 % TODO: state the background — flat metric $\eta_{\mu\nu}$, uniform static
 % magnetic field $\Bzero$ in the $\hat{z}$ direction. Write the perturbation
 % ansatz: $g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu}$,
@@ -91,72 +91,71 @@
 % (raw perturbation), NOT g = eta + kappa h. See \cref{sec:kappa-conventions}.
 \begin{align}
   % TODO: perturbation ansatz
-  \label{eq:PerturbationAnsatz}
+  \label{PerturbationAnsatz}
 \end{align}
 
-\paragraph*{Order-counting rule}%
-\label{par:OrderCounting}
+\paragraph*{Order-counting rule}
 % TODO: state immediately after the ansatz: "We work to linear order in
 % $h_{\mu\nu}$ and $\delta A_\mu$, and to first order in $\Bzero$."
 
 % Kinetic-matrix sub-movement (third move per §(f)). Equation label is the
-% cross-reference target for §4.4 and App E.
-\paragraph*{Kinetic matrix}%
-\label{par:KineticMatrix}
+% cross-reference target for §4 and App E.
+\paragraph*{Linearised kinetic matrix}
 % TODO: "After expanding the Lagrangian to quadratic order, one finds…"
 % Display the kinetic matrix without showing intermediate algebra.
 \begin{align}
   % TODO: kinetic matrix (linearised quadratic Lagrangian)
-  \label{eq:KineticMatrix}
+  \label{KineticMatrix}
 \end{align}
 
-\subsection{The Gertsenshtein conversion kernel}%
-\label{sec:GertsenshteinKernel}
-% Target ~250 w. Three named paragraphs.
+\subsection{Gertsenshtein conversion kernel and channel structure}%
+\label{Gertsenshtein}
+% Target ~400 w. Combined subsection covering both the kernel display
+% (was §2.3) and the channel structure observation (was §2.4). The fold
+% addresses the BHL-subsection-weight concern: each was ~250 w on its own
+% which sits below the BHL norm; together they cover the natural single
+% topic ("how the linearised system converts gravitons to photons, and
+% which channels do so").
 
 % Required EM-convention paragraph BEFORE the formula, per the recent
 % style-intel refinement. Without it the §1 literature-tension framing
-% hangs.
-\paragraph*{Electromagnetic-field conventions}%
-\label{par:EMConventions}
+% hangs and the Palessandro–Rothman / Hwang–Noh disagreement cannot be
+% navigated.
+\paragraph*{Electromagnetic-field conventions}
 % TODO: state the convention used ($E_i = F_{i0}$ vs the alternative);
 % cite \cite{hwangnoh2023graviton} for the convention discussion. Make
 % explicit that TIDAL adopts the convention used by Hwang–Noh and Dandoy
-% rather than the Palessandro–Rothman alternative.
+% rather than the Palessandro–Rothman alternative — this is what
+% reconciles the §1 literature-tension framing.
 
-\paragraph*{Conversion probability}%
-\label{par:ConversionProbability}
+\paragraph*{Conversion probability}
 % TODO: display the formula; one prose sentence on $\Bzero$-scaling; cite
 % Domcke 2301.02072 (modern derivation reference) and Ejlli 2004.02714
-% (non-perturbative comparator). Note: Domcke and Ejlli bib entries to be
-% verified during \cite{} audit; Domcke is listed in
-% .claude/rules/literature.md but check references.bib.
+% (non-perturbative comparator).
 \begin{align}
   \Pconv = \sin^2\!\left(\frac{\kappa\,\Bzero\,D}{2}\right)
-  \label{eq:GertsenshteinFormula}
+  \label{GertsenshteinFormula}
 \end{align}
 
-\paragraph*{Validation pointer}%
-\label{par:ValidationPointer}
+\paragraph*{Validation pointer}
 % TODO: one-clause cross-reference: "The quantitative reproduction of this
-% kernel is reported in \cref{app:Validation}." Add the one-clause hint
-% per STYLE_GUIDE.md §(i).
+% kernel across our validation grid is reported in \cref{Validation},
+% with the simulation-to-analytic comparison shown there." Per
+% STYLE_GUIDE.md §(i), include the one-clause hint describing what is
+% deferred.
 
-\subsection{Channel decomposition: $h_\times \leftrightarrow \mathrm{ax}$ vs trace sector}%
-\label{sec:ChannelDecomposition}
-% Target ~250 w. Name the two sectors; state the structural observation;
-% cross-reference \cref{app:OutputsPropagating} (App E) where the
-% equal-coefficient line is visible in the symbolic output. Frame this
-% as observation, not derivation — the symbolic pipeline produces the
-% equations and inspection reveals the identity.
-\paragraph*{Two sectors of interest}%
-\label{par:TwoSectors}
-% TODO: name $h_\times \leftrightarrow$ ax sector and trace sector;
-% briefly motivate the split.
-
-\paragraph*{Structural observation in the symbolic output}%
-\label{par:ChannelObservation}
-% TODO: state that inspection of the kinetic matrix \cref{eq:KineticMatrix}
-% reveals an identity in the hx and ax kinetic coefficients; full
-% equations in \cref{app:OutputsPropagating}, the
-% equal-coefficient line is \cref{eq:HxAxIdentity}.
+% Channel structure: hx<->ax kinetic-coefficient identity (was §2.4).
+% Reframed per Agent 3 review from "structural observation" to a stronger
+% claim: this is a structural identity at linear order under the
+% Hehl-Obukhov admissibility constraint (gr-qc/0001010), not a numerical
+% coincidence. The agent recommended upgrading to "theorem" wording — we
+% retain "structural identity" as a middle ground that can be sharpened
+% during drafting once the algebraic argument is fully written out in
+% App E.
+\paragraph*{Channel decomposition}
+% TODO: name the hx and ax channels and the trace channel; state that the
+% hx and ax kinetic-matrix entries coincide at linear order under the
+% admissibility constraint of gr-qc/0001010 — this is a structural
+% identity, not a parameter-point coincidence. Cross-reference
+% \cref{HxAxIdentity} (App E, where the equal-coefficient line is shown
+% explicitly in the symbolic output).

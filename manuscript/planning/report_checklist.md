@@ -193,4 +193,44 @@ a separate later effort. See plan archived as
 
 ### Commit
 
-- [ ] Commit Phase 2: scaffolding, figure stubs, bibliography hygiene
+- [x] Commit Phase 2: scaffolding, figure stubs, bibliography hygiene (944b447)
+
+---
+
+## Phase 2.1 — Structural review and restructure (post initial scaffolding)
+
+A three-agent structural review identified that the initial Phase 2 scaffolding tied §4 too closely to specific projected results, while several HPC campaigns are still in progress and the eventual headline finding cannot be confidently predicted. This phase implements the review's recommendations with a survey-shape principle that does not commit to specific findings.
+
+### Style-guide refinements
+
+- [x] Update `STYLE_GUIDE.md §(c)` to specify bare-CamelCase labels for all types (equations, sections, figures, appendices) — matches BHL corpus convention; remove `eq:`, `sec:`, `fig:`, `app:` prefixes. Cross-refs to labels in `docs/tex/` keep their existing prefixes.
+
+### Section-level restructure
+
+- [x] `introduction.tex`: rename paragraph titles to content-bearing micro-headings (no "Frontier tension"-style stage labels). Split Stage 4 into "In this report" + "Structure of this report" (PSALTer §I "Aims"+"Structure" split). Add bridging logic between the §1.2 ghost-restriction motivation and §4 sector coverage. Word allocation 800→900.
+- [x] `theory.tex`: switch to bare CamelCase labels. Add Levi-Civita ε convention to Conventions paragraph. Upgrade hx↔ax framing from "structural observation" to "structural identity at linear order under the admissibility constraint of gr-qc/0001010". Fold §2.4 (Channel decomposition) into §2.3 (Gertsenshtein kernel and channel structure) — combined ~400 w subsection. Remove `\paragraph*{}` labels (BHL doesn't label them).
+- [x] `computational_approach.tex`: shrink from 600 w to 400 w. Add new `Relation to other automation tools` paragraph distinguishing TIDAL from PSALTer/Hamilcar (per Agent 3 review I1).
+- [x] `results.tex`: restructure around survey shape — Validation / Sector Survey (table-driven) / Channel Structure (mechanism explaining nulls) / Headline Finding (TBD slot for the strongest result emerging from in-progress campaigns). Add `Survey perimeter` opening paragraph. Add `Coverage rationale` paragraph (per Agent 3 review C4). Remove §4.5 ghost diagnosis subsection (moved to App D Validation Pathological). Word allocation 1700→1900 to absorb the survey table and headline slot.
+- [x] `discussion.tex`: collapse the 4 subsections to flat named paragraphs (per Agent 2 review S3 — matches BHL letter convention). Connect path 1 explicitly to non-minimal couplings (Itin-Hehl, Karananas et al.). Use `bahamonde2025cubic` bibkey for path 3. Drop "or equivalent" hedges.
+- [x] `appendices.tex`: switch to bare CamelCase labels. Move trace-channel ghost diagnosis to App D `Pathological cases` paragraph (was §4.5). Add new `Stability guard for plane-wave initial conditions` paragraph in App D documenting the engineering work that was previously invisible (per Agent 3 review I7). Rename App E equation-block subsections to be theory-agnostic (`SymbolicReference`, `SymbolicMechanism`, `SymbolicHeadline`) so they accommodate whichever theories prove most informative at drafting time.
+
+### Word allocation (final)
+
+- §1 Introduction: ~900 w (was 800)
+- §2 Theory: ~1100 w (was 1200; folded §2.4 into §2.3)
+- §3 Computational approach: ~400 w (was 600)
+- §4 Results: ~1900 w (was 1700)
+- §5+§6 Discussion+Conclusion: ~700 w (unchanged)
+- Total: 5000 w main body
+
+### Verification
+
+- [x] `pdflatex` compiles cleanly to a 4-page PDF showing every planned heading.
+- [x] All section/subsection headings appear in the compiled TOC; cross-refs resolve.
+- [x] Forbidden-words grep on all section files returns no matches.
+- [x] `python -m py_compile scripts/figures/*.py` succeeds.
+- [x] No undefined references or citation warnings.
+
+### Commit
+
+- [ ] Commit Phase 2.1 restructure

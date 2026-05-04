@@ -1,20 +1,34 @@
-% Appendices scaffold (Phase 2): five appendices A–E. Apps A–D follow
-% genre_conventions_software.md §(h)–(k). App E is project-specific
-% (symbolic-pipeline outputs for surveyed PGT theories, with the
-% hx<->ax structural observation noted alongside the propagating-PGT
-% equations). Total target ~7000 w + several long equations and figures.
+% Appendices scaffold (Phase 2): five appendices A–E.
+%
+% Apps A–D follow genre_conventions_software.md §(h)–(k). App E is
+% project-specific (symbolic-pipeline outputs for surveyed PGT theories,
+% with the hx↔ax structural identity noted alongside the propagating-PGT
+% equations).
+%
+% Restructure changes from the previous Phase 2 scaffold:
+%   - Single-point trace-channel ghost diagnosis moved from §4.5 into
+%     App D `ValidationPathological` (methodology validation, not a
+%     standalone result).
+%   - New `StabilityGuard` named paragraph in App D documenting the
+%     stability-guard / IC plane-wave-snap engineering work that was
+%     previously invisible in the report.
+%   - App E equation-block subsections renamed to be theory-agnostic
+%     (`SymbolicReference`, `SymbolicMechanism`, `SymbolicHeadline`)
+%     so they can be filled at drafting time with whichever theories
+%     prove most informative — the eventual content depends on
+%     campaigns still in flight.
+%   - All labels switched to bare CamelCase per STYLE_GUIDE.md §(c).
 %
 % Note: \appendix is invoked in main.tex BEFORE this file is input, so
 % \section{} commands here automatically receive appendix numbering.
 
 % ============================================================================
 \section{TIDAL pipeline architecture}%
-\label{app:Architecture}
+\label{Architecture}
 % ============================================================================
 % Target ~1800 w + diagram. Per genre_conventions_software.md §(h).
 
-\paragraph*{Overview}%
-\label{par:AppAOverview}
+\paragraph*{Overview}
 % TODO: 3–4 sentences précis of the whole pipeline — inputs, outputs,
 % what is automated. Open the appendix; do not repeat the §3 summary.
 
@@ -22,113 +36,96 @@
 \begin{figure}[t]
   \centering
   % TODO: \input{figures/figA1_architecture} (TikZ)
-  % TODO caption: "TIDAL pipeline. The symbolic stage (Wolfram/xAct) ingests
-  % a TOML Lagrangian, derives the Euler–Lagrange equations, decomposes by
-  % component, and exports a JSON specification. The numerical stage
-  % (Python) dispatches to one of five solver backends based on equation
-  % properties, producing simulation data and measurements."
-  \caption{TODO: pipeline diagram (symbolic --> JSON --> numerical).}%
-  \label{fig:Architecture}
+  % TODO caption: "TIDAL pipeline. The symbolic stage (\xAct/\Mathematica)
+  % ingests a TOML Lagrangian, derives the Euler–Lagrange equations,
+  % decomposes by component, and exports a JSON specification. The
+  % numerical stage (\Python) dispatches to one of five solver backends
+  % based on equation properties, producing simulation data and
+  % measurements."
+  \caption{TODO: pipeline diagram (symbolic --> JSON --> numerical).}
+  \label{ArchitectureDiagram}
 \end{figure}
 
-\paragraph*{Symbolic stage}%
-\label{par:AppASymbolic}
+\paragraph*{Symbolic stage}
 % TODO: 4–6 sentences. \xAct/\xPert, Euler–Lagrange derivation, component
 % decomposition. User-perspective only — no internal routine descriptions.
 
-\paragraph*{JSON handoff}%
-\label{par:AppAJSON}
+\paragraph*{JSON handoff}
 % TODO: 4–6 sentences. JSON schema fields present (equations, fields,
-% canonical block, hamiltonian terms, etc.); reference json_schema.tex if
-% appropriate.
+% canonical block, hamiltonian terms, etc.); reference json_schema.tex
+% if appropriate.
 
-\paragraph*{Solver dispatch}%
-\label{par:AppADispatch}
+\paragraph*{Solver dispatch}
 % TODO: 4–6 sentences. Auto-selection logic — modal first if conditions
 % are met, otherwise IDA/CVODE/leapfrog/scipy fallback.
 
-\paragraph*{Output}%
-\label{par:AppAOutput}
+\paragraph*{Output}
 % TODO: 4–6 sentences. Simulation data files, measurement types
 % (energy, conversion, mixing, spectrum, etc.).
 
-\paragraph*{Dependencies}%
-\label{par:AppADependencies}
+\paragraph*{Dependencies}
 % TODO: explicit citations to each package: \xAct, \xPert, xTras,
 % SUNDIALS/scikit-sundae, \NumPy, \SciPy, \Mathematica. Cite via
 % \cite{} for each — bib audit must verify these keys exist.
 
 % ============================================================================
 \section{Symbolic stage}%
-\label{app:SymbolicStage}
+\label{SymbolicStage}
 % ============================================================================
 % Target ~1600 w. Per genre_conventions_software.md §(i).
 
-\paragraph*{xAct environment}%
-\label{par:AppBxAct}
+\paragraph*{xAct environment}
 % TODO: which packages are loaded; why \xPert is used for metric
 % perturbations (not xTens alone); why xTras is needed for the
 % Einstein–Cartan coupling.
 
-\paragraph*{Lagrangian input from TOML}%
-\label{par:AppBLagrangian}
+\paragraph*{Lagrangian input from TOML}
 % TODO: how a TOML config becomes a Wolfram session; representative
 % user-session listing showing how to invoke `tidal derive`.
-% (\lstinputlisting{listings/derive_invocation.sh} — to create later.)
 
-\paragraph*{Euler--Lagrange derivation}%
-\label{par:AppBEulerLagrange}
+\paragraph*{Euler--Lagrange derivation}
 % TODO: E-L velocity form (state, v, A0); not Legendre transform.
 
-\paragraph*{Component decomposition}%
-\label{par:AppBComponents}
-% TODO: DecomposeToComponents, cross-field handling via
-% additionalFields. Brief note on why component-level E-L is required.
+\paragraph*{Component decomposition}
+% TODO: DecomposeToComponents, cross-field handling via additionalFields.
+% Brief note on why component-level E-L is required.
 
-\paragraph*{JSON export}%
-\label{par:AppBExport}
+\paragraph*{JSON export}
 % TODO: which fields are written; how the canonical block is constructed.
 
-\paragraph*{Failure modes and diagnostics}%
-\label{par:AppBFailureModes}
-% TODO: derivation timeouts, index inconsistency, malformed JSON;
-% how each is diagnosed.
+\paragraph*{Failure modes and diagnostics}
+% TODO: derivation timeouts, index inconsistency, malformed JSON; how
+% each is diagnosed.
 
 % ============================================================================
 \section{Numerical stage}%
-\label{app:NumericalStage}
+\label{NumericalStage}
 % ============================================================================
 % Target ~2000 w. Per genre_conventions_software.md §(j).
 
-\paragraph*{Solver selection hierarchy}%
-\label{par:AppCHierarchy}
+\paragraph*{Solver selection hierarchy}
 % TODO: opener — modal --> IDA --> CVODE --> leapfrog --> scipy;
 % auto-selection logic: which equation properties trigger each backend.
 
 \subsection{Fourier modal solver}%
-\label{app:ModalSolver}
+\label{ModalSolver}
 % Target ~800 w — primary backend, longest treatment.
 
-\paragraph*{Eigendecomposition}%
-\label{par:ModalEigen}
+\paragraph*{Eigendecomposition}
 % TODO: constant-coefficient case — exact matrix exponential. State what
 % "machine precision" means in this context.
 
-\paragraph*{Position-dependent coefficients}%
-\label{par:ModalKrylov}
+\paragraph*{Position-dependent coefficients}
 % TODO: Krylov \texttt{expm\_multiply}.
 
-\paragraph*{Constraint elimination}%
-\label{par:ModalConstraint}
+\paragraph*{Constraint elimination}
 % TODO: Fourier Schur complement.
 
-\paragraph*{Mathematical foundations}%
-\label{par:ModalFoundations}
+\paragraph*{Mathematical foundations}
 % TODO: cite \cite{higham2008functions} and \cite{molervanloan2003nineteen}
 % for matrix-exponential methods.
 
-% Figure C.1 — Fourier modal solver convergence.
-% This figure is referenced from App D as well (it serves both purposes).
+% Figure C.1 — Fourier modal solver convergence. Referenced from App D.
 \begin{figure}[t]
   \centering
   % TODO: \includegraphics{figC1_solver_convergence}
@@ -136,136 +133,162 @@
   % resolution for Einstein–Maxwell at $\Bzero = [\text{value}]$,
   % $D = [\text{value}]$. The solver attains machine precision
   % ($\sim 10^{-14}$) at modest resolution, demonstrating the
-  % spectral-precision behaviour expected for a constant-coefficient system."
-  \caption{TODO: solver convergence vs resolution.}%
-  \label{fig:SolverConvergence}
+  % spectral-precision behaviour expected for a constant-coefficient
+  % system. This figure also satisfies the App D convergence requirement."
+  \caption{TODO: solver convergence vs resolution.}
+  \label{SolverConvergence}
 \end{figure}
 
 \subsection{Analytical Jacobian}%
-\label{app:AnalyticalJacobian}
+\label{AnalyticalJacobian}
 % Target ~400 w.
 
-\paragraph*{Three-tier structure}%
-\label{par:JacobianTiers}
-% TODO: dense (N <= 2K), sparse (2K < N <= 200K), GMRES (N > 200K).
-% One sentence on when each is active.
+\paragraph*{Three-tier structure}
+% TODO: dense (N <= 2K), sparse (2K < N <= 200K), GMRES (N > 200K). One
+% sentence on when each is active.
 
-\paragraph*{Speedup factors}%
-\label{par:JacobianSpeedups}
+\paragraph*{Speedup factors}
 % TODO: quote the measured speedups (5.3x dense; 2.5x IDA sparse;
 % 1.2–1.4x CVODE sparse) from solver_optimizations.tex.
 
 \subsection{Other backends}%
-\label{app:OtherBackends}
+\label{OtherBackends}
 % Target ~200 w total.
 
-\paragraph*{IDA}%
-\label{par:BackendIDA}
+\paragraph*{IDA}
 % TODO: 3–4 sentences on DAE / constraint handling.
 
-\paragraph*{CVODE}%
-\label{par:BackendCVODE}
+\paragraph*{CVODE}
 % TODO: 3–4 sentences on adaptive ODE for waves.
 
-\paragraph*{Leapfrog}%
-\label{par:BackendLeapfrog}
+\paragraph*{Leapfrog}
 % TODO: 3–4 sentences on symplectic integration.
 
-\paragraph*{scipy}%
-\label{par:BackendScipy}
+\paragraph*{scipy}
 % TODO: 3–4 sentences on general-purpose fallback.
 
-\paragraph*{JSON-to-solver interface}%
-\label{par:JSONInterface}
+\paragraph*{JSON-to-solver interface}
 % TODO: closing paragraph with two distinct moves —
 % (i) coefficient-matrix EXTRACTION from the JSON spec (which fields are
-% read, how they are interpreted); (ii) solver DISPATCH (how auto-selection
-% decides which backend to call given the extracted properties). One
-% sentence each.
+% read, how they are interpreted); (ii) solver DISPATCH (how
+% auto-selection decides which backend to call given the extracted
+% properties). One sentence each.
 
 % ============================================================================
 \section{Validation suite}%
-\label{app:Validation}
+\label{Validation}
 % ============================================================================
-% Target ~1200 w. Per genre_conventions_software.md §(k) Barker validation
-% hierarchy.
+% Target ~1300 w (was 1200 — +100 because the §4.5 ghost diagnosis is
+% now hosted here as methodology validation, and the StabilityGuard
+% paragraph is new). Per genre_conventions_software.md §(k) Barker
+% validation hierarchy.
 
-\paragraph*{Analytic limits}%
-\label{par:ValidationAnalytic}
+\paragraph*{Analytic limits}
 % TODO: massless Klein–Gordon, Maxwell. Compare TIDAL output to textbook
-% result. Optionally one figure per case, or a summary figure with subpanels.
+% result. Optionally one figure per case, or a summary figure with
+% subpanels.
 
-\paragraph*{Reference model reproduction}%
-\label{par:ValidationReference}
+\paragraph*{Reference-model reproduction}
 % TODO: Boccaletti formula validation. Most important validation result.
-% Cross-ref \cref{fig:BoccalettiValidation} (main body) and report the
+% Cross-ref \cref{BoccalettiValidation} (main body) and report the
 % quantitative agreement here.
 
-\paragraph*{Pathological cases}%
-\label{par:ValidationPathological}
-% TODO: trace-channel ghost diagnosis validates the methodology — TIDAL
-% correctly identifies exponential growth at the known unstable
-% parameter point.
+% Pathological-cases paragraph — now hosts the trace-channel ghost
+% diagnosis. The §4.5 result was moved here per the structural review
+% (a single-point ghost diagnosis is methodology validation, not a
+% standalone §4 result).
+\paragraph*{Pathological cases}
+% TODO: ~250 w. Demonstrates that TIDAL correctly diagnoses ghost
+% instability at a known unstable parameter point. This validates the
+% diagnosis methodology (TIDAL produces an exponentially-growing
+% time-domain signal at parameter points where the no-ghost condition is
+% violated). State the no-ghost condition as a closed inequality (eqn
+% \cref{NoGhostCondition}) citing \cite{sezgin1980ghostfree} and
+% \cite{lin2019pgt}; report whether the inequality is satisfied at the
+% studied parameter point; cross-ref \cref{TraceKineticOutput} (App E)
+% for the kinetic matrix that exhibits the wrong-sign coefficient.
+% Frame as methodology validation, not as a sector-wide claim.
+\begin{align}
+  % TODO: no-ghost inequality
+  \label{NoGhostCondition}
+\end{align}
 
-\paragraph*{Convergence}%
-\label{par:ValidationConvergence}
+% Convergence paragraph — same figure (SolverConvergence) used by App C.
+\paragraph*{Convergence}
 % TODO: convergence test for the Fourier modal solver. Cross-ref
-% \cref{fig:SolverConvergence} (App C — same figure serves App D).
-% State the convergence rate (spectral / machine-precision for the modal
+% \cref{SolverConvergence} (App C — same figure serves App D). State
+% the convergence rate (spectral / machine-precision for the modal
 % solver).
+
+% NEW — StabilityGuard paragraph documents the engineering work that
+% was previously invisible in the report (per Agent 3 review I7).
+% Stability guard architecture, VHV crash fix, IC plane-wave-snap.
+\paragraph*{Stability guard for plane-wave initial conditions}
+% TODO: ~150 w. Document the stability guard that prevents spurious
+% exponential growth from off-grid initial-condition spectral leakage.
+% Off-grid `--ic-wavevector` values cause cos(k·x) to leak amplitude
+% onto every discrete Fourier mode, including modes with tachyonic
+% eigenvalues in PGT systems with cross-coupling — this triggers
+% spurious SimulationDivergedError. TIDAL auto-snaps the IC wavevector
+% to the nearest discrete mode (clamped below Nyquist) to eliminate
+% the leakage. Reference docs/tex/plane_wave_ic.tex; cite GitHub issue
+% #263 for the original observation. Frame as a methodology
+% contribution that protects survey results from a specific
+% well-defined failure mode.
 
 % Figure D.1 — Stage A heatmap.
 \begin{figure}[t]
   \centering
   % TODO: \includegraphics{figD1_stageA_heatmap}
-  % TODO caption: "Stage A heatmap of $\Pconv^\text{max}$ in the
-  % $(m_A, \varepsilon)$ parameter plane for the T1 dark-photon-plasma
-  % sector at $\Bzero = [\text{value}]$, $t_\text{end} = [\text{value}]$.
-  % The amplification factor stays at $A = 1$ across the plane,
-  % constraining the T1 amplification to $A < [\text{bound}]$."
-  \caption{TODO: T1 sector $(m_A, \varepsilon)$ heatmap.}%
-  \label{fig:StageAHeatmap}
+  % TODO caption: "Stage A heatmap: $\Pconv^\text{max}$ in the
+  % $(m_A, \varepsilon)$ parameter plane for the [sector] at
+  % $\Bzero = [\text{value}]$, $t_\text{end} = [\text{value}]$. Bounds
+  % the amplification across the swept region; supports the
+  % corresponding row of \cref{SectorSurveyTable} (§4.2)."
+  \caption{TODO: parameter-plane heatmap supporting a sector-survey row.}
+  \label{StageAHeatmap}
 \end{figure}
 
-% Figure D.2 — Stage B sweep (276 runs).
+% Figure D.2 — Stage B sweep.
 \begin{figure}[t]
   \centering
   % TODO: \includegraphics{figD2_stageB_sweep}
-  % TODO caption: "Stage B sweep of T2 Einstein–Cartan: 276-run scatter of
-  % $\Pconv^\text{max}$ vs $\sin^2(\kappa\Bzero t/2)$ for swept torsion
-  % couplings. The tight diagonal demonstrates that conversion in this
-  % sector is bounded by the GR baseline within statistical fluctuation,
-  % constraining T2 amplification to $A < [\text{bound}]$."
-  \caption{TODO: T2 sector 276-run sweep, $\Pconv$ vs analytic baseline.}%
-  \label{fig:StageBSweep}
+  % TODO caption: "Stage B sweep: scatter of $\Pconv^\text{max}$ vs the
+  % analytic baseline $\sin^2(\kappa\Bzero t/2)$ across [N] runs in the
+  % swept torsion-coupling region. The tight diagonal supports the
+  % corresponding row of \cref{SectorSurveyTable}."
+  \caption{TODO: sweep scatter of $\Pconv$ vs analytic baseline.}
+  \label{StageBSweep}
 \end{figure}
 
-% Figure D.3 — Channel comparison (hx<->ax vs trace).
+% Figure D.3 — Channel comparison.
 \begin{figure}[t]
   \centering
   % TODO: \includegraphics{figD3_channel_comparison}
   % TODO caption: "Channel comparison: time evolution of conversion
   % probability in the $h_\times \leftrightarrow \mathrm{ax}$ channel
-  % (solid) and the trace channel (dashed) at the propagating-PGT parameter
-  % point. The two channels behave qualitatively differently, validating
-  % the channel-decomposition methodology."
-  \caption{TODO: channel comparison; hx<->ax vs trace time series.}%
-  \label{fig:ChannelComparison}
+  % (solid) and the trace channel (dashed). The two channels behave
+  % qualitatively differently, supporting the channel-decomposition
+  % framing of \cref{ChannelStructure}."
+  \caption{TODO: channel comparison; hx<->ax vs trace time series.}
+  \label{ChannelComparison}
 \end{figure}
 
 % ============================================================================
 \section{Symbolic-pipeline outputs for the surveyed theories}%
-\label{app:SymbolicOutputs}
+\label{SymbolicOutputs}
 % ============================================================================
 % Target ~700 w + long equations. Project-specific physics appendix.
-% Primary purpose: display the long equations the TIDAL Wolfram pipeline
-% produces for the more complex PGT theories. Structural observations
-% that emerge from inspection (notably the hx<->ax kinetic-coefficient
-% identity that justifies §4.4) are noted alongside the relevant equation
-% block, NOT derived in a separate subsection.
+%
+% Subsection slots are intentionally theory-agnostic at scaffold time
+% (`SymbolicReference`, `SymbolicMechanism`, `SymbolicHeadline`) so they
+% can be filled with whichever theories prove most informative — the
+% eventual choice depends on campaigns still in flight. The HxAxIdentity
+% equation is hosted in `SymbolicMechanism` because the channel-structure
+% identity is the most stable cross-reference target across the
+% restructure.
 
-\paragraph*{Purpose and reading guide}%
-\label{par:AppEPurpose}
+\paragraph*{Purpose and reading guide}
 % TODO: ~100 w paragraph. These are equations as produced by the TIDAL
 % Wolfram pipeline for the PGT models surveyed in §4 that are too lengthy
 % to display in the main body. Each block is the equation of motion or
@@ -274,69 +297,97 @@
 % Each block names the source JSON path so the equations can be
 % regenerated from the pipeline.
 
-\subsection{Einstein--Cartan with full $T_2$ coupling}%
-\label{app:OutputsEC}
-% Target ~150 w + equation block. Source JSON: examples/<theory>/data/...
-% (verify exact path during App E drafting session).
+\subsection{Reference theory: minimally-coupled Einstein--Cartan}%
+\label{SymbolicReference}
+% Target ~150 w + equation block. Source JSON: examples/<reference
+% theory>/data/<file>.json. Serves as the simplest case in the survey
+% — the theory whose kinetic matrix the reader should examine first to
+% calibrate expectations for the other equation blocks.
 
-\paragraph*{Kinetic matrix}%
-\label{par:ECKinetic}
-% TODO: introductory sentence + equation block.
+\paragraph*{Kinetic matrix}
+% TODO: introductory sentence + equation block. For long output, use
+% \lstinputlisting{...} from an external .tex file
+% (genre_conventions_software.md §(f.1)).
 \begin{align}
-  % TODO: paste from the relevant JSON; use \lstinputlisting if more than
-  % ~12 lines. Source: examples/<EC theory>/data/<file>.json
-  \label{eq:ECKineticMatrix}
+  % TODO: paste from the relevant JSON. Source: examples/<reference>/data/...
+  \label{ReferenceKineticOutput}
 \end{align}
 
-\paragraph*{Structural feature}%
-\label{par:ECStructure}
-% TODO: one sentence noting any structural feature visible in the
-% equations.
+\paragraph*{Structural baseline}
+% TODO: one sentence noting any structural feature that calibrates
+% comparison with the other equation blocks (e.g. which entries are
+% zero in the reference theory; which are non-zero only off-diagonal).
 
-\subsection{Propagating PGT Lagrangian (§4.4)}%
-\label{app:OutputsPropagating}
-% Target ~300 w + equation blocks. Source JSON:
-% examples/<propagating PGT>/data/<file>.json. This is the MOST
-% IMPORTANT subsection of App E because it is the cross-reference target
-% for §4.4 and §2.4.
+\subsection{Channel-structure mechanism: propagating PGT}%
+\label{SymbolicMechanism}
+% Target ~300 w + equation blocks. Source JSON: examples/<propagating
+% PGT>/data/<file>.json. This subsection hosts the hx↔ax structural
+% identity equation \cref{HxAxIdentity}, which is the cross-reference
+% target for §4.3 and §2.3 (channel decomposition).
 
-\paragraph*{Kinetic matrix and equations of motion}%
-\label{par:PropagatingEOM}
+\paragraph*{Kinetic matrix and equations of motion}
 % TODO: introductory sentence + long equation block.
 \begin{align}
-  % TODO: paste the kinetic matrix and EOMs from the propagating PGT JSON.
-  \label{eq:PropagatingKineticMatrix}
+  % TODO: paste the kinetic matrix and EOMs from the propagating-PGT JSON.
+  \label{PropagatingKineticOutput}
 \end{align}
 
-% This is where the hx<->ax observation appears — a SINGLE named
-% paragraph, not a multi-step derivation. It is inspection of the
-% kinetic-matrix entries.
-\paragraph*{Structural observation: $h_\times$ and ax kinetic coefficients}%
-\label{par:HxAxStructure}
-% TODO: ~80 w. State that the two relevant kinetic-matrix entries are
-% identical by inspection of \cref{eq:PropagatingKineticMatrix}; display
-% the equal-coefficient line as \cref{eq:HxAxIdentity}; note that this is
-% a structural fact about the symbolic output, not a derivation.
+% Single named paragraph hosting the hx↔ax structural identity. This
+% is inspection of two coefficients in the kinetic matrix — not a
+% multi-step derivation — but the resulting identity is structural
+% (visible in the symbolic output of every theory in the surveyed
+% admissibility class), not a parameter-point coincidence.
+\paragraph*{Structural identity: $h_\times$ and ax kinetic coefficients}
+% TODO: ~80 w. State that the two relevant kinetic-matrix entries
+% \cref{PropagatingKineticOutput} are identical at linear order under
+% the admissibility constraint of gr-qc/0001010; display the
+% equal-coefficient line as \cref{HxAxIdentity}; note that this
+% structural identity is the kinematic explanation for the
+% \cref{ChannelStructure} (§4.3) finding and the survey nulls in
+% \cref{SectorSurveyTable} (§4.2).
 \begin{align}
   % TODO: equal-coefficient line showing hx-coefficient = ax-coefficient
-  \label{eq:HxAxIdentity}
+  \label{HxAxIdentity}
 \end{align}
 
-\subsection{Trace-channel parameter point (§4.5)}%
-\label{app:OutputsTrace}
-% Target ~150 w + equation block. Source JSON: examples/<trace-channel
-% theory>/data/<file>.json at the parameter point used in §4.5.
+\subsection{Headline-theory equation block}%
+\label{SymbolicHeadline}
+% Target ~250 w + equation block. Source JSON: TBD — selected at
+% drafting time to match the §4.4 headline finding. If the headline
+% turns out to be a non-minimal-coupling amplification corner, this
+% subsection hosts that theory's kinetic matrix (showing the new
+% vertex that breaks the channel-structure identity). If the headline
+% is structural rather than amplification, this subsection may host
+% additional kinematic identities or wrong-sign coefficients.
+%
+% Also serves as the cross-reference target for the App D
+% `Pathological cases` paragraph if that paragraph references a
+% trace-channel kinetic-matrix excerpt.
 
-\paragraph*{Kinetic matrix at the diagnosed point}%
-\label{par:TraceKinetic}
-% TODO: introductory sentence + equation block.
+\paragraph*{Kinetic matrix}
+% TODO: introductory sentence + equation block at the headline
+% parameter point or theory class.
 \begin{align}
-  % TODO: paste the kinetic matrix at the §4.5 parameter point.
-  \label{eq:TraceKineticMatrix}
+  % TODO: paste from the relevant JSON.
+  \label{HeadlineKineticOutput}
 \end{align}
 
-\paragraph*{Wrong-sign kinetic coefficient}%
-\label{par:TraceWrongSign}
-% TODO: one-paragraph note on what is visible in the equations
-% (e.g. wrong-sign kinetic coefficient that signals the ghost). Reference
-% \cref{eq:NoGhostCondition} (in §4.5) to close the loop.
+% Reused label for the trace-channel kinetic-matrix excerpt (referenced
+% from App D `Pathological cases`). Keeps a stable cross-reference
+% target even though the surrounding subsection content is flexible.
+\paragraph*{Trace-channel excerpt for the pathological-cases test}
+% TODO: ~60 w. If the headline is *not* the trace-channel ghost (likely),
+% this paragraph hosts only the trace-channel kinetic excerpt that App D
+% Pathological-cases needs to cross-reference. If the headline IS the
+% trace-channel ghost, fold this paragraph into the headline equation
+% block above. The label \cref{TraceKineticOutput} is the stable
+% cross-reference target for App D regardless.
+\begin{align}
+  % TODO: paste from the trace-channel JSON.
+  \label{TraceKineticOutput}
+\end{align}
+
+\paragraph*{Structural feature of the headline regime}
+% TODO: one paragraph noting what is visible in the equations that
+% explains the §4.4 finding (e.g. a new non-zero off-diagonal entry,
+% a wrong-sign kinetic coefficient, an algebraic relation that fails).

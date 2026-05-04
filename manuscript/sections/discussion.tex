@@ -1,71 +1,96 @@
-% Discussion + Conclusion scaffold (Phase 2): three discussion subsections
-% plus a conclusion subsection, per genre_conventions_theory.md §(h)
-% three-move structure. Total target ~700 w (600 discussion + 100 conclusion).
-
-\section{Discussion}%
-\label{sec:Discussion}
-
-\subsection{Findings restated}%
-\label{sec:Findings}
-% Target ~150 w. Move 1: plain-language restatement, no equations.
-% Results that were presented with hedges in §4 are stated confidently
-% here (per genre_conventions_theory.md §(h) Move 1).
+% Discussion + Conclusion scaffold (Phase 2): per Agent 2 review S3,
+% collapsed from four \subsection{} blocks to flat \paragraph*{} blocks
+% to match the BHL letter convention (compare 2406.12826 "Closing
+% remarks" and 2510.08201 §V — both use named paragraphs only, no
+% subsections).
 %
-% TODO: "We have shown that…" / "We found that…" — restate the Boccaletti
-% reproduction, the T1/T2 sector constraints, the
-% $h_\times \leftrightarrow \mathrm{ax}$ torsion-independence (the
-% headline positive structural finding), and the trace-channel ghost
-% diagnosis. Plain language; do not retrospectively hedge.
+% Total target ~700 w (600 discussion + 100 conclusion). Three-move
+% structure (Restate / Implications / Specific next step) per
+% genre_conventions_theory.md §(h), executed via named paragraphs
+% rather than subsections.
 
-\subsection{Implications and constructive paths}%
-\label{sec:Implications}
-% Target ~250 w. Move 2: enumerate the three avenues
-% (per genre_conventions_theory.md §(h) Move 2). These are speculative
-% implications — do NOT develop them quantitatively. They belong here,
-% not in §4.
+\section{Discussion and conclusion}%
+\label{Discussion}
 
-\paragraph*{Structural meaning of the $h_\times \leftrightarrow \mathrm{ax}$ identity}%
-\label{par:StructuralMeaning}
-% TODO: one paragraph (~80 w) explaining what the kinetic-matrix identity
-% implies physically — why hx and ax see the same torsion-EM coupling at
-% linear order in this model class.
+% Move 1: Findings restated (~150 w). Plain language, no equations.
+% Confidence-positive: results that were hedged in §4 are restated
+% with the confidence the calculations support.
+\paragraph*{Findings restated}
+% TODO: "We have shown that…" — restate the validation (Boccaletti
+% reproduction), the scope of the sector survey, the structural
+% identity in the linearised kinetic matrix \cref{HxAxIdentity}, and
+% the headline finding (whatever it turns out to be — see §4.4).
+% Plain language; do not retrospectively hedge.
 
-\paragraph*{Avenue: non-minimal coupling}%
-\label{par:NonMinimalCoupling}
-% TODO: ~50 w. Torsion–curvature cross-terms could break the hx<->ax
-% identity. Name the term type, cite the literature on non-minimal
-% PGT couplings.
-
-\paragraph*{Avenue: ghost-free kinetics in the propagating-torsion sector}%
-\label{par:GhostFreeKinetics}
-% TODO: ~50 w. Ghost-free PGT theories restrict the parameter space;
-% within the ghost-free subspace, the channel structure may differ.
-% Cite \cite{lin2019pgt} for the ghost-free classification.
-
-\paragraph*{Avenue: cubic-order extensions}%
-\label{par:CubicExtensions}
-% TODO: ~50 w. Cubic-PGT theories add new operators that may carry the
-% torsion–EM coupling beyond the quadratic-order cancellation. Cite
-% \cite{bahamonde2025cubic} or equivalent if available, otherwise note
-% the cubic-PGT literature in passing.
-
-\subsection{Limitations and threats to validity}%
-\label{sec:Limitations}
-% Target ~100 w. Acknowledge limitations inline; do NOT bullet-list per
-% genre_conventions_theory.md §(h) anti-patterns.
+% Move 2: Implications (~250 w total across three named paragraphs,
+% one per constructive path). Each path is named, not derived; brief.
 %
-% TODO: linearised regime; first-order in $\Bzero$; finite parameter
-% sweep coverage; ghost diagnosis is single-point.
+% Per Agent 1 review N4 — path 1 should connect to the actual surveyed
+% non-minimal mechanism (e.g. a curvature–EM cross-term such as δ_1
+% R̃μν F^μν), not be left abstract. Path 2 (ghost-free kinetics) is
+% strongest because the survey's negative outcomes empirically support
+% the ghost-restriction hypothesis. Path 3 (cubic-PGT) is the speculative
+% extension; treat briefly.
+\paragraph*{Implications: structural identity and the surveyed nulls}
+% TODO: ~80 w. The hx↔ax identity (\cref{HxAxIdentity}) is the
+% kinematic explanation for why the §4.2 sector survey returns nulls
+% in the ghost-restricted subspace. This is empirical support for the
+% spin-1 trace-sector restriction (\cite{lin2019pgt}); the survey's
+% null entries are positive evidence for the restriction, not
+% inconclusive results.
 
-\subsection{Conclusion}%
-\label{sec:Conclusion}
-% Target ~100 w. Move 3 per genre_conventions_theory.md §(h):
-% one concrete next step. Specific theory + specific observable +
-% TIDAL application. Closing sentence pattern: "The natural next step
-% is to apply TIDAL to [Lagrangian], which [concrete prediction]."
-%
-% TODO: name one concrete theory (a non-minimal PGT Lagrangian with
-% torsion–curvature cross-term) and one concrete observable (non-zero
-% channel amplification if the cross-term coefficient enters the
-% kinetic matrix). Close with the active-direction sentence; do NOT
+\paragraph*{Constructive path: non-minimal couplings}
+% TODO: ~80 w. Non-minimal torsion–EM couplings (curvature–EM
+% cross-terms; e.g. the δ_1 R̃μν F^μν Lagrangian if surveyed) break
+% the kinematic identity by introducing a new vertex outside the
+% admissibility class. Cite Itin–Hehl gr-qc/0307063 (the 17-parameter
+% non-minimal F²T² family) and Karananas–Shaposhnikov–Zell 2406.11956
+% (Weyl-invariant non-minimal subset) — verify both bibkeys exist in
+% references.bib at drafting time.
+
+\paragraph*{Constructive path: ghost-free kinetics in the propagating sector}
+% TODO: ~80 w. Within the ghost-free PGT subspace
+% (\cite{lin2019pgt} classification), the propagating spin-1 trace
+% torsion is the only sector that can carry a Gertsenshtein channel
+% without ghost contamination. The survey's findings constrain
+% conversion across this subspace; finer-grained scans within the
+% ghost-free subspace (and emerging tools such as TorC,
+% \cite{barker2025torc} if added to references.bib) would localise
+% any non-trivial channel structure.
+
+\paragraph*{Constructive path: cubic-PGT extensions}
+% TODO: ~50 w. Cubic-order extensions add operators outside the
+% admissibility class of the quadratic theory and may carry new
+% channel structures. Cite \cite{bahamonde2025cubic}.
+
+% Move 3: Specific next step (~100 w). Concrete: name one theory,
+% one observable, one calculational tool. Closing sentence pattern
+% from genre_conventions_theory.md §(h) Move 3.
+\paragraph*{Specific next step}
+% TODO: ~100 w. Name one concrete theory class (the most informative
+% non-minimal extension visible in the surveyed data); one concrete
+% observable (a parameter regime where the kinematic identity breaks
+% and channel amplification becomes possible); one calculational
+% tool (TIDAL applied to the broader Lagrangian). Close with the
+% active-direction sentence ("The natural next step is…") — do NOT
 % end with "we hope that…" per the BHL anti-patterns.
+
+% Move closing — Limitations folded into one named paragraph rather
+% than a separate subsection (per Agent 2 review S3). Acknowledge
+% inline; do not bullet-list.
+\paragraph*{Scope and limitations}
+% TODO: ~100 w. Linearised regime; first order in $\Bzero$; finite
+% parameter sweep coverage; the headline finding is bounded to the
+% specific theory class and parameter regime in which it was observed.
+% Avoid bullet lists per genre_conventions_theory.md §(h)
+% anti-patterns.
+
+% Conclusion paragraph — short, confident closing of the report.
+\paragraph*{Closing remarks}
+% TODO: ~70 w. Two-sentence closing summarising what the report
+% delivers (a survey of the Gertsenshtein channel across [N] PGT
+% theory classes, a structural identity that explains the survey
+% nulls, and a positive [or null] headline finding) and one
+% forward-looking sentence about the natural extension. The closing
+% sentence is definitive (per style_analysis.md §(a)), not
+% aspirational.

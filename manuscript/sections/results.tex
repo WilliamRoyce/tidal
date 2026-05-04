@@ -1,153 +1,229 @@
-% Results scaffold (Phase 2): five subsections; opens with one-sentence
-% structural map. Target ~1700 w total. Each subsection has named-paragraph
-% stubs, equation placeholders where required, and figure placeholders for
-% the three planned main-body figures.
+% Results scaffold (Phase 2): survey-shaped structure that does not commit
+% to specific findings at scaffold time, since several HPC campaigns are
+% still in progress and the eventual headline finding cannot be predicted
+% with confidence.
 %
-% Each subsection's content is project-status-dependent (more campaigns to
-% come). Phase 2 fixes structure; content moves into prose during the
-% per-section drafting session, drawing on whatever campaign data exists at
-% that moment.
+% Structure (target ~1900 w):
+%   §4 opens with a structural map and a "Survey perimeter" paragraph
+%      declaring which PGT theory classes were scanned and the parameter
+%      dimensions of each. This paragraph is the load-bearing scope
+%      statement that anchors every subsequent subsection.
+%   §4.1 Validation: Boccaletti reproduction (~250 w + figure 1).
+%   §4.2 Sector survey: a paired-Bayes-factor table summarising the
+%        outcome of each scanned theory in a single subsection. As more
+%        campaigns finish, rows are added; the subsection structure does
+%        not change. (~600 w + figures D.1, D.2 cross-refs).
+%   §4.3 Channel structure: hx↔ax torsion-independence as the kinematic
+%        identity that explains the survey nulls — repositioned as a
+%        mechanism, not a headline (~400 w + figure 2).
+%   §4.4 Headline finding (TBD): a deliberately flexible slot for whichever
+%        finding emerges as most striking from the in-progress campaigns —
+%        could be an amplification corner, a new instability boundary, or
+%        a structural feature in the symbolic outputs (~600 w).
+%
+% Rationale: this structure can absorb new campaign results without
+% restructuring. Nulls feed §4.2 (just a new table row); positive findings
+% feed §4.4 (the headline slot). The single-point ghost diagnosis that the
+% original scaffold had as §4.5 is moved to App D as methodology validation
+% per the structural-review recommendations.
 
 \section{Results}%
-\label{sec:Results}
+\label{Results}
 
-% One-sentence structural map.
-% TODO: open with the §4-internal roadmap per genre_conventions_theory.md
-% §(g) Pattern 5: "§4.1 validates TIDAL against the Boccaletti formula;
-% §4.2–4.3 report sector-level constraints from the T1 and T2 channel
-% surveys; §4.4 presents the propagating-PGT structural finding;
-% §4.5 reports the trace-channel ghost diagnosis." (One sentence.)
+% Opening structural map. One sentence, four-item enumeration matching
+% the four subsections.
+% TODO: "§4.1 reports the validation against the Boccaletti formula;
+% §4.2 summarises the sector survey across the [N] PGT theory classes
+% we scanned; §4.3 isolates the kinematic channel structure that
+% underlies the survey nulls; §4.4 reports the headline finding."
 
-\subsection{Einstein--Maxwell baseline}%
-\label{sec:Validation}
-% Target ~250 w. Leads with the formula; figure 1 placeholder; the actual
-% percentage agreement will be filled during drafting from the final
-% Boccaletti validation campaign.
+% NEW — Survey perimeter paragraph. This is the scope-statement anchor
+% that names the surveyed theory classes and parameter dimensions.
+% Without it, every subsection's scope is implicit and hard to defend.
+% Update at drafting time to match the campaigns that have actually
+% completed.
+\paragraph*{Survey perimeter}
+% TODO: list the PGT theory classes scanned (e.g. minimal Einstein–Cartan
+% with T2 coupling, minimal-coupling dark-photon-plasma sector, propagating
+% PGT in a chosen ghost-free subspace, nonminimal Lagrangians with curvature
+% –EM cross-terms, …). For each class, state the parameter dimension of
+% the prior and the order of magnitude of the parameter range. Cross-ref
+% \cref{Validation} (App D) for the validation hierarchy and \cref{HPC}
+% if HPC infrastructure detail is appendix-resident.
 
-\paragraph*{Validation setup and result}%
-\label{par:ValidationSetup}
+\subsection{Validation against the Einstein--Maxwell baseline}%
+\label{ValidationResult}
+% Target ~250 w. Leads with the formula; figure 1 placeholder; quantitative
+% agreement filled at drafting time from the final Boccaletti validation
+% campaign.
+
+\paragraph*{Validation setup}
 % TODO: state the validation point ($\Bzero$, $D$, $t_\text{end}$, grid
-% resolution); cross-ref \cref{eq:GertsenshteinFormula}; report the
-% measured agreement quantitatively (TBD: percentage from final HPC run);
-% frame as a physics result, not a software test.
+% resolution); cross-ref \cref{GertsenshteinFormula}.
+
+\paragraph*{Reproduction of the Boccaletti kernel}
+% TODO: report the measured agreement quantitatively (TBD: percentage
+% from final HPC run); frame as a physics result (the Gertsenshtein
+% kernel is correctly reproduced), not a software test.
 
 % Figure 1 — Boccaletti validation.
 \begin{figure}[t]
   \centering
   % TODO: \includegraphics{fig1_boccaletti_validation}
-  % TODO caption: "Simulated vs analytic conversion probability $\Pconv(t)$
-  % for Einstein–Maxwell on a flat Minkowski background with uniform
-  % $\Bzero = [\text{value}]$ and propagation distance $D = [\text{value}]$.
-  % Upper panel: simulated (solid) and analytic (dashed); lower panel:
-  % residual. The maximum relative deviation across the validation grid is
-  % $[\text{value}]\%$, demonstrating the TIDAL pipeline reproduces the
-  % Boccaletti kernel."
-  \caption{TODO: Boccaletti validation; sim vs analytic with residual.}%
-  \label{fig:BoccalettiValidation}
+  % TODO caption (per STYLE_GUIDE.md §(h)): "Simulated vs analytic
+  % conversion probability $\Pconv(t)$ for Einstein–Maxwell on a flat
+  % Minkowski background with uniform $\Bzero = [\text{value}]$ and
+  % propagation distance $D = [\text{value}]$. Upper panel: simulated
+  % (solid) and analytic (dashed); lower panel: residual. The maximum
+  % relative deviation across the validation grid is $[\text{value}]\%$,
+  % demonstrating that the TIDAL pipeline reproduces the Boccaletti
+  % kernel."
+  \caption{TODO: Boccaletti validation; sim vs analytic with residual.}
+  \label{BoccalettiValidation}
 \end{figure}
 
-\subsection{T1 sector: dark-photon--plasma channels}%
-\label{sec:T1null}
-% Target ~350 w.
+\subsection{Sector survey: scanned theories and outcomes}%
+\label{SectorSurvey}
+% Target ~600 w. Single subsection consolidating the per-sector results
+% into a paired-Bayes-factor table — the BHL convention for survey-style
+% results sections (compare 2406.12826 §V parameter-sweep tables). New
+% campaigns that finish before submission slot in as additional table
+% rows, not new subsections.
 
-\paragraph*{Constraint statement}%
-\label{par:T1Constraint}
-% TODO: Dandoy precision-bound framing — "we constrain the T1 sector
-% conversion amplification to $A < [\text{value}]$ across the
-% $(m_A, \varepsilon)$ parameter plane." Cite \cite{caputo2021darkphoton}
-% for the dark-photon parameter context.
+\paragraph*{Coverage rationale}
+% TODO: per Agent 3 review C4 — state the rationale for the swept
+% parameter regions. "We sweep [parameters] over [bounds] motivated by
+% [physical/literature anchor]; the swept region covers [observational
+% target]." Cite \cite{caputo2021darkphoton} for dark-photon parameter
+% choices; cite the relevant PGT-stability literature for torsion-coupling
+% bounds.
 
-\paragraph*{Physical mechanism}%
-\label{par:T1Mechanism}
-% TODO: one sentence on the physical mechanism — what causes the no-amplification
-% finding ("the [coupling term] vanishes at linear order because…").
-% Cross-ref \cref{fig:StageAHeatmap} (App D).
+\paragraph*{Summary of scanned theories}
+% TODO: introduce the table; state the columns
+% (theory / prior dimension / log~Z amplification model / log~Z suppression
+% model / D_KL / max~$A$ in the swept region / verdict). Cite the BHL
+% precision-bound framing of \cite{dandoy2024constraining} as the
+% template ("we constrain $A < \epsilon$ across [region]").
 
-\subsection{T2 sector: Einstein--Cartan parameter sweep}%
-\label{sec:T2null}
-% Target ~350 w.
+% Table placeholder for the survey summary.
+\begin{table}[t]
+  \centering
+  % TODO: paired-Bayes-factor table.
+  % Columns: Theory | Prior dim | log~Z (amp) | log~Z (sup) | D_KL | max A | Verdict
+  % Rows: one per scanned theory class. At Phase 2 scaffold time the
+  % theory list is intentionally TBD — fill at drafting time from
+  % CAMPAIGN.md and AMPLIFICATION_INVESTIGATION.md as campaigns finish.
+  \caption{TODO: paired-Bayes-factor sector survey summary.}
+  \label{SectorSurveyTable}
+\end{table}
 
-\paragraph*{Constraint statement}%
-\label{par:T2Constraint}
-% TODO: same framing template — "we constrain the T2 sector conversion
-% amplification to $A < [\text{value}]$ across the [parameter region]."
-% State the number of runs (276 in the d21_barker_sup campaign).
+\paragraph*{Mechanism notes}
+% TODO: short prose accompanying the table — for each theory class with
+% a null verdict, give one sentence on the physical mechanism that
+% suppresses amplification at linear order. Cross-ref the relevant App E
+% subsection where the symbolic kinetic matrix shows the suppression
+% explicitly. Frame as "the [coupling term] vanishes at linear order
+% because [reason]" — never "we did not find amplification."
 
-\paragraph*{Physical mechanism}%
-\label{par:T2Mechanism}
-% TODO: one sentence on the physical mechanism. Cross-ref
-% \cref{fig:StageBSweep} (App D).
+% Cross-references to the App D figures supporting the table.
+% (\cref{StageAHeatmap} and \cref{StageBSweep} are defined in App D.)
+\paragraph*{Where to read further}
+% TODO: one sentence with one-clause hint per STYLE_GUIDE.md §(i):
+% "Detailed parameter-plane heatmaps and per-theory sweep figures are in
+% \cref{Validation}, with the complete symbolic kinetic matrices archived
+% in \cref{SymbolicOutputs}."
 
-\subsection{Propagating PGT: $h_\times \leftrightarrow \mathrm{ax}$ torsion-independence}%
-\label{sec:PropagatingPGT}
-% Target ~400 w. Competing-effects framing per genre_conventions_theory.md
-% §(g) Pattern 3.
+\subsection{Channel structure: $h_\times \leftrightarrow \mathrm{ax}$ torsion-independence}%
+\label{ChannelStructure}
+% Target ~400 w. Repositioned per the structural-review consensus:
+% hx↔ax torsion-independence is the kinematic identity that EXPLAINS
+% the survey nulls in §4.2, not a standalone headline. This subsection
+% is the mechanism that justifies the survey's negative outcomes; the
+% reader who has just absorbed the table in §4.2 reads §4.3 to learn
+% why so many entries say "null".
 
-\paragraph*{Structural observation}%
-\label{par:HxAxObservation}
-% TODO: state the result as a structural observation visible in the
-% symbolic output, not a derivation: "The hx and ax torsion sectors
-% enter the kinetic matrix \cref{eq:KineticMatrix} with identical
-% coefficients (\cref{eq:HxAxIdentity}, \cref{app:OutputsPropagating})."
-% Frame consequence: "Consequently, the conversion probability is
-% torsion-independent in this sector — agreeing with the Einstein–Maxwell
-% prediction across the full stability window $|\delta_1| < 0.005$."
+\paragraph*{Identity in the linearised kinetic matrix}
+% TODO: state the structural claim — at linear order in $h_{\mu\nu}$ and
+% $\delta A_\mu$, with the $\Bzero$-background admissibility constraint of
+% gr-qc/0001010, the hx and ax kinetic-matrix entries coincide. Cross-ref
+% \cref{KineticMatrix} (the §2.2 kinetic matrix) and \cref{HxAxIdentity}
+% (App E, where the equal-coefficient line is shown explicitly in the
+% symbolic output). Per Agent 3 review C3 — frame as a structural
+% identity (visible in the symbolic output of every theory in the surveyed
+% class), not a parameter-point coincidence.
 
-\paragraph*{Numerical confirmation}%
-\label{par:HxAxNumerics}
-% TODO: state the numerical finding ($A = 1$ to $[\text{tolerance}]$);
-% cross-ref figure 2.
+\paragraph*{Consequence for the conversion amplitude}
+% TODO: one paragraph: torsion couplings cancel in the linearised
+% conversion amplitude in this channel; the prediction reduces to the
+% Einstein–Maxwell baseline within the surveyed class. Frame as
+% mechanism: this is why the §4.2 entries for ghost-free propagating-PGT
+% theories register as nulls.
 
-% Figure 2 — Propagating-torsion parameter map (the headline result figure).
+\paragraph*{Numerical confirmation}
+% TODO: state the numerical finding ($A = 1$ within $[\text{tolerance}]$
+% across the stability window — precise tolerance filled at drafting
+% time); cross-ref \cref{PropagatingTorsionMap}.
+
+% Figure 2 — propagating-torsion parameter map. Retained as a
+% mechanism-confirming figure rather than a headline figure.
 \begin{figure}[t]
   \centering
   % TODO: \includegraphics{fig2_propagating_torsion_map}
-  % TODO caption: "Amplification factor $A = \Pconv^\text{torsion}/\Pconv^\text{GR}$
-  % vs torsion stability parameter $\delta_1$ for the propagating-PGT model
-  % at $\Bzero = [\text{value}]$ and $t_\text{end} = [\text{value}]$. $A = 1$
-  % across the full stability window $|\delta_1| < 0.005$ demonstrates the
-  % $h_\times \leftrightarrow \mathrm{ax}$ torsion-independence
-  % (\cref{eq:HxAxIdentity})."
-  \caption{TODO: propagating-torsion parameter map; $A$ vs $\delta_1$.}%
-  \label{fig:PropagatingTorsionMap}
+  % TODO caption: "Amplification factor $A = \Pconv^\text{torsion} /
+  % \Pconv^\text{GR}$ vs the torsion stability parameter $\delta_1$ for
+  % the propagating-PGT model at $\Bzero = [\text{value}]$ and
+  % $t_\text{end} = [\text{value}]$. $A = 1$ across the full stability
+  % window confirms the structural identity \cref{HxAxIdentity}."
+  \caption{TODO: propagating-torsion parameter map; $A$ vs $\delta_1$.}
+  \label{PropagatingTorsionMap}
 \end{figure}
 
-\subsection{Trace-channel ghost diagnosis}%
-\label{sec:GhostDiagnosis}
-% Target ~200 w (downscoped from 350 w because there is no dedicated
-% appendix-level investigation behind this finding). Three-step ghost
-% reporting per genre_conventions_theory.md §(g) Pattern 4.
-%
-% Decision deferred to drafting session: include \cref{fig:TraceGhostGrowth}
-% if data quality supports a clean exponential-growth signal; otherwise
-% drop fig 3 and reduce the subsection to ~150 w.
+\subsection{Headline finding from the survey}%
+\label{HeadlineFinding}
+% Target ~600 w. Deliberately flexible at scaffold time — the headline
+% finding is whichever result emerges as most striking from the
+% in-progress HPC campaigns. Could be:
+%   (i)  an amplification corner in some theory class (positive signal);
+%   (ii) a previously-unknown instability boundary;
+%   (iii) a structural feature visible across multiple symbolic outputs;
+%   (iv) the closure of a previously-open question in the BHL landscape.
+% The drafting session decides which of these is the headline AT
+% submission time and writes the corresponding paragraph stubs. Word
+% allocation reserves ~600 w so a substantive finding can be developed.
 
-\paragraph*{No-ghost condition}%
-\label{par:NoGhostCondition}
-% TODO: state the closed inequality on the relevant coupling combination;
-% cite \cite{sezgin1980ghostfree} and \cite{lin2019pgt} for the
-% no-ghost-condition provenance.
-\begin{align}
-  % TODO: no-ghost inequality
-  \label{eq:NoGhostCondition}
-\end{align}
+\paragraph*{Setup of the headline regime}
+% TODO: name the theory class and parameter regime where the headline
+% finding emerges. Briefly describe how this regime was identified by
+% the survey (which prior dimension, which campaign, which Bayes-factor
+% threshold).
 
-\paragraph*{Single-point diagnosis}%
-\label{par:GhostDiagnosis}
-% TODO: report whether the inequality is satisfied at the studied
-% parameter point; cross-ref \cref{app:OutputsTrace} for the kinetic
-% matrix at that point. State the consequence with caveat: "We diagnose
-% the trace channel as ghost-unstable at this single parameter point;
-% this is not a systematic claim about the trace sector across PGT."
+\paragraph*{Result}
+% TODO: state the result quantitatively. If positive (e.g. amplification
+% corner with non-trivial $A$), give the maximum value and where in
+% parameter space it occurs. If negative (e.g. an instability boundary),
+% state the boundary equation and how it bounds the physically viable
+% subspace. If structural (a kinetic-matrix feature), cross-ref the
+% relevant App E equation block.
 
-% Figure 3 — Trace-channel ghost growth (CONDITIONAL — drafting session
-% decides whether to include based on data quality).
+\paragraph*{Mechanism interpretation}
+% TODO: one paragraph linking the headline to the channel structure of
+% §4.3 and the survey context of §4.2. Avoid over-claiming generality;
+% state precisely the parameter scope ("across the [regime] of the
+% [theory class]"); link forward to the discussion's constructive-paths
+% framing.
+
+% Headline figure placeholder. Whether this is a parameter-plane plot,
+% a time-series, or a kinetic-matrix excerpt depends on what the headline
+% turns out to be. Decision deferred to the drafting session.
 \begin{figure}[t]
   \centering
-  % TODO conditional: \includegraphics{fig3_trace_ghost_growth}
-  % TODO caption: "Time evolution of $\log|h_\text{trace}(t)|$ at the
-  % parameter point $[\text{values}]$. The exponential growth identifies
-  % the trace channel as ghost-unstable at this point."
-  \caption{TODO: trace-channel ghost growth (conditional).}%
-  \label{fig:TraceGhostGrowth}
+  % TODO: include the headline figure once identified. Possible scripts:
+  %   - scripts/figures/fig2_propagating_torsion_map.py (reuse if
+  %     the headline is a propagating-PGT amplification corner)
+  %   - a new fig in scripts/figures/ matching the headline finding's
+  %     data source.
+  % TODO caption: as per STYLE_GUIDE.md §(h) — what shown, parameter
+  % regime, key result.
+  \caption{TODO: headline finding figure (figure type TBD).}
+  \label{HeadlineFigure}
 \end{figure}
