@@ -12,6 +12,8 @@ The pattern: software papers benefit from a title that either embeds the tool na
 
 HiGGS (2206.00658) uses "Supercomputers against strong coupling in gravity with curvature and torsion" — here the computational capability (supercomputers) comes first, and the physics problem comes second. This is the most evocative title of the set, and it positions the paper as a computational physics paper as much as a mathematical physics paper.
 
+> **Note for the TIDAL MSci report**: The TIDAL report is primarily a physics project with a software contribution — it is not a standalone software-release paper. The conventions above are for papers whose primary contribution is the software tool itself. For the TIDAL report title, the conventions in `genre_conventions_theory.md §(a)` take precedence: a capability-as-title placing the physics question first (torsion in the Gertsenshtein channel) with TIDAL as the enabling instrument. The "software name first" pattern (PSALTer:..., Hamilcar:...) is appropriate only when the software is itself the principal contribution. The current working title *"Torsion in the Gertsenshtein effect: a symbolic–numerical survey of Poincaré gauge theory"* correctly places the physics first and the method second.
+
 ---
 
 ## (b) Problem-Centric Opening: Why Does Physics Need This Tool?
@@ -83,9 +85,36 @@ Implementation detail in Barker software papers is consistently relegated to app
 
 Where code is shown in the main text, it serves as user documentation, not implementation documentation. The PSALTer paper shows user-session code (how to call `ParticleSpectrum[]`) but not the internal routines that compute the SPOs. Hamilcar shows how to call `PoissonBracket[]` and `FindAlgebra[]` but not the variational derivative engine underneath.
 
-Long code listings are handled via `\lstinputlisting{}` from external `.tex` files (one file per listing). This keeps the main source clean and allows listings to be updated without touching the manuscript. The Hamilcar paper uses this convention consistently throughout.
-
 Appendices carry: installation instructions (always present), mathematical proofs of the underlying algorithm, and index conventions. The HiGGS/supercomputers paper (2206.00658) has the most extensive appendix structure, with the full PGT constraint algebra tabulated there — recognising that the constraint brackets are primary data that the paper makes available but cannot display inline.
+
+---
+
+## (f.1) Code Listings: What Is Actually Shown (and What Is Not)
+
+A systematic search of all three Barker software papers (PSALTer 2406.09500, PSALTer v2 2506.02111, Hamilcar 2512.25007) reveals a consistent and restrictive code-presentation pattern. **None of the three papers contains pseudocode, algorithm environments, or flowcharts.** The findings are:
+
+**No pseudocode in any form.** None of the papers uses `\begin{algorithm}`, `\begin{algorithmic}`, or any pseudocode block. There is no algorithmic environment. All algorithms are described entirely in prose with LaTeX mathematics: the SPO algorithm in PSALTer is presented as a sequence of named equations with interpretive paragraphs; the Dirac–Bergmann algorithm in Hamilcar is described as mathematical steps with equation references. The prose-and-mathematics description is the only format used for algorithms.
+
+**Code listings are exclusively short user-facing API calls.** Code shown in the main text or appendices is always a session-style demonstration of how to *call* a function, never how it is implemented. Listings are typically 1–3 lines:
+```
+In[#]:= Get["xAct`PSALTer`"];
+In[#]:= ParticleSpectrum[Lagrangian, TheoryName -> "ScalarKG", Method -> "Hard"]
+```
+The longest listings in any of the three papers run to approximately 5–6 lines (a `MakeRule` definition with tensor expressions). Internal loops, data structures, and conditional logic never appear in listings.
+
+**Technical counts across papers:**
+- PSALTer (2406.09500): 6 inline `lstlisting` blocks + 32 `\lstinputlisting` calls from external files
+- PSALTer v2 (2506.02111): 0 inline blocks + 18 `\lstinputlisting` calls from named external files
+- Hamilcar (2512.25007): 10 inline `lstlisting` blocks + uses a custom `\lstinputoutput` macro that pairs input listings with rendered PDF output
+
+**`\lstinputlisting` from external files is the standard.** Listings are stored in dedicated external `.tex` files (one per listing in PSALTer; named by operation in PSALTer v2; named by function in Hamilcar). This keeps the main source clean, allows listings to be updated without touching the manuscript, and is a deliberate convention — not an incidental implementation choice.
+
+**Syntax highlighting follows a consistent style** across all three papers: a `listings` package configuration with custom Wolfram Language keyword sets, colour-coding by keyword type (built-ins, xAct objects, user-defined), and a light-coloured background. The `In[#]:=` / `Out[#]=` Mathematica session prompt is preserved in listings to make the notebook context clear.
+
+**Implications for the TIDAL appendices:**
+- App B (symbolic stage) and App C (numerical stage) should describe algorithms in prose + equations. Do not write pseudocode for the Euler–Lagrange derivation or the Fourier modal solver — describe the mathematical steps with numbered equations and interpretive paragraphs.
+- Any code shown in the appendices should be limited to user-facing function calls: how to invoke `tidal derive`, how to configure a `theory.toml`, how to call the solver from Python. Do not show internal solver loops or numpy array operations.
+- `\lstinputlisting` from external files is strongly preferred over inline code blocks for listings of more than 2–3 lines. Name the external files semantically (e.g., `listings/tidal_derive_example.sh`).
 
 ---
 

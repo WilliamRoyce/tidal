@@ -57,7 +57,7 @@ BHL abstracts follow a strict four-part structure in 150–200 words:
 
 **Barker solo abstracts** (2205.13534, 2510.08201) tend to be denser in the contribution slot — more results per sentence, tighter scoping, less hedging. Joint abstracts (2101.02645, 2006.03581) expand the context slightly to ensure all co-authors' perspectives are represented.
 
-**Gertsenshtein-paper abstracts** (gr-qc/0307063, 1812.02675) place the physical formula (the conversion probability) in the abstract itself — this is unusual and specific to calculation papers where the result *is* a formula. If the TIDAL report's main numerical result is a confirmed null (A = 1.0 to quantified precision), state that number in the abstract.
+**Gertsenshtein-paper abstracts** (gr-qc/0307063, 1812.02675) place the physical formula (the conversion probability) in the abstract itself — this is unusual and specific to single-calculation papers where the result *is* a formula. The TIDAL report is a survey paper, not a single-formula paper: it investigates multiple sectors and parameter landscapes rather than deriving one conversion probability. For a survey paper, the abstract should state the overall scope (what theories, what sectors, what parameter ranges were surveyed) and the key structural findings (torsion-independence, ghost diagnosis). Where a quantitative result is definitive at submission time, state it; but do not try to compress a multi-sector survey into a single number.
 
 ---
 
@@ -75,6 +75,12 @@ Examples of the tension statement (regardless of how the paragraph opens):
 - 2303.11094: flat galactic rotation curves are conventionally attributed to dark matter — but modified gravity is a live alternative.
 
 The tension is always stated in one rhetorical move: X (the phenomenon) is important because Y (the stakes), but Z (the gap) prevents us from knowing W (the specific unknown).
+
+**For the TIDAL report, the frontier tension has two independent sources** that should both be acknowledged in Stage 1:
+
+*Source 1 — Theory space*: Gravitational wave detectors are entering a precision era (LISA, DECIGO, NANOGrav) that probes the gauge-gravity sector, but the torsion channel in PGT is a multi-dimensional parameter space whose Gertsenshtein structure is unknown. Probing it manually is infeasible at scale.
+
+*Source 2 — Gertsenshtein literature tensions*: The Gertsenshtein literature itself is contested. Hwang and Noh (see their critique) have argued that several derivations in the graviton–photon conversion literature contain errors in how the electromagnetic coupling is handled. Separately, analytical results from different groups (including Palessandro's calculations) are in tension with one another on the precise form of the conversion kernel in curved or magnetised backgrounds. This internal tension in the foundational literature makes the validation step (reproducing a known result to high precision) load-bearing, not merely illustrative. The TIDAL report should acknowledge this landscape — not just the gap in the torsion calculation, but the fact that even the GR baseline requires careful treatment. This elevates the Boccaletti validation from a "sanity check" to a genuine contribution.
 
 ### Stage 2 — The Deep Problem (~1–2 paragraphs)
 
@@ -303,15 +309,19 @@ Also cite ≥1 future detector (LISA, DECIGO) and ≥1 current bound (LIGO O3, N
 3. *Immediately* state the order-counting rule: "We work to linear order in $h_{\mu\nu}$ and $\delta A_\mu$, and to first order in $B_0$."
 4. Derive kinetic matrix: "After expanding the Lagrangian to quadratic order, one finds..." — do not display intermediate algebra
 
-### §4 Results (~1700 words, four subsections)
+### §4 Results (~1700 words, structure TBD at submission)
 
-**§4.1 Boccaletti validation**: Lead with the formula $P = \sin^2(\kappa B_0 D / 2)$. Show figure. State: "TIDAL reproduces the Boccaletti conversion probability to 0.04%." This is the positive result that validates §4.2–4.5.
+**Note on ongoing work**: The TIDAL project is a survey with HPC campaigns still in progress at the time of writing these style notes. The §4 structure below reflects the state of results as of mid-2026; the final section structure should be updated to match what has actually been computed by submission. Do not write §4 to pre-announce results that have not yet been obtained. Leave genuine open questions open; do not pre-fill them with expected answers.
 
-**§4.2–4.3 Null results**: Framing template: "we constrain the [T1/T2] sector conversion amplification to $A < X$ across the full [$(m_A, \varepsilon)$] parameter plane." Explain the physical mechanism in one sentence: "the [coupling term] vanishes at linear order because [reason]." Do not write "we did not find amplification." Cite the Dandoy precision-bound framing (2406.17853) as the published precedent.
+**§4.1 Boccaletti validation**: Lead with the formula $P = \sin^2(\kappa B_0 D / 2)$. Show a figure of simulated vs. analytic conversion probability. State the measured agreement quantitatively — the exact percentage will be determined by the final HPC runs and may improve on early estimates; use the actual measured value at submission. This subsection is the positive result that validates the tool and every subsequent result. Frame it as a physics result (the Gertsenshtein kernel is correctly reproduced), not a software test.
 
-**§4.4 Propagating torsion**: Competing-effects framing. Two sentences: "The tensor (hx) and axial (ax) torsion sectors enter the kinetic matrix identically at quadratic order. Consequently, the conversion probability is torsion-independent in this sector — deviating from the Einstein–Maxwell prediction by less than [bound] across the full stability window $|\delta_1| < 0.005$."
+**For sectors with null or constrained results**: Use the Dandoy precision-bound framing (2406.17853): "we constrain the [sector] conversion amplification to $A < X$ across the [parameter space description]." State the physical reason for the null in one sentence. Do not write "we did not find amplification." Whether the null is a full parameter-plane sweep or a targeted point will depend on what campaigns have completed — frame the result precisely for what has been done.
 
-**§4.5 Ghost diagnosis**: Three sentences: (1) state the no-ghost condition as a closed inequality; (2) show it is violated at the model point; (3) state the consequence. Do NOT call this a "failure" — use "diagnosis." Template: "Ghost freedom in the trace sector requires [condition]. At the parameter point [values], this condition is violated. We diagnose the trace channel as ghost-unstable, confirming the linear PGT ghost analysis of [cite]."
+**For the propagating torsion finding**: Use competing-effects framing (§(g) Pattern 3). State the structural result — that hx and ax torsion sectors enter the kinetic matrix identically — as an analytic claim. This is a calculation result that can be stated as a theorem derived from the action, independently of any particular parameter value; the simulations confirm it.
+
+**For ghost diagnosis**: Follow the three-step BHL pattern (§(g) Pattern 4): (1) state the no-ghost condition as a closed inequality; (2) show it is satisfied or violated at the point under study; (3) state the consequence for that sector's viability. Do NOT call instability a "failure" — use "diagnosis."
+
+**Results framing across the survey**: §4 is a report of what has been found, not a proof that the theory space is exhausted. Phrase each result to be precise about scope: "across the [specific parameter range], in the [specific sector], at [specific order in B₀]." Do not over-generalise from the models studied.
 
 ### §5 Discussion (~600 words)
 
@@ -340,4 +350,50 @@ Also cite ≥1 future detector (LISA, DECIGO) and ≥1 current bound (LIGO O3, N
 Whether TIDAL should be named in the abstract: yes, by name and acronym expansion. Software tools that are the paper's central contribution are always named in the abstract (PSALTer, Hamilcar precedent).
 
 **Subsection vs. named-paragraph structure for §2**: The TIDAL report is a hybrid letter — compact main body, appendix-heavy. Use subsections (§2.1, §2.2) rather than pure named paragraphs, because the 5000-word limit means each subsection has ~400 words and will contain multiple named paragraphs within it. The structure is: §2 with §2.1 and §2.2 as labelled subsections, and within each subsection, named paragraphs (`\paragraph*{...}`) for each logical move. Do not attempt to use only named paragraphs without subsections — that is the letter convention for ≤10 page papers without a word limit, and creates navigation problems in a report format.
+
+---
+
+### κ vs. Planck Mass Conventions
+
+This is one of the most variable conventions across the BHL corpus and requires an explicit decision before writing §2.
+
+**What the BHL papers actually do** (from systematic search of `literature/`):
+
+| Paper | Convention used | Action form |
+|-------|----------------|-------------|
+| 2406.12826 (BHL joint) | $\MPl \equiv 1/\sqrt{\kappa}$, "Einstein constant" | $-\MPl^2/2 \times R_\text{curvature}$ |
+| 2101.02645 (BHL joint) | $m_\text{p}$ (reduced Planck mass) explicit | $-\tfrac{1}{2}\alpha_0 m_\text{p}^2 \mathcal{R} + \sum \hat\alpha_I \ldots$ |
+| 2303.11094 (BHL joint) | $8\pi G \equiv \kappa \equiv 1/\MPl^2$ | $-\tfrac{1}{2\kappa}R$ (i.e. $-\MPl^2/2 \times R$) |
+| 2311.11790 (Barker solo) | $\kappa$ = "Einstein constant" | $-\tfrac{1}{8\kappa} \times H^{\rho\mu\nu}H_{\rho\mu\nu}$ |
+| 2205.13534 (Barker solo) | $\planck$ (Planck mass symbol) | $-\tfrac{1}{2}\alpha_0\planck^2 \mathcal{R}$ |
+
+**The consistent BHL joint-paper pattern**: the Ricci scalar (Einstein–Hilbert) term is always written with an explicit $\MPl^2$ (or $m_\text{p}^2$) prefactor: $\mathscr{L} \supset -\frac{1}{2}\MPl^2\,\tilde{R}$. For quadratic torsion/curvature operators, the coupling constants absorb mass dimensions — so $\alpha_n$, $\beta_n$ in 2101.02645 are dimensionless (or carry implicit mass-scale factors via $\hat\alpha_I$), not prefixed by additional $\MPl^2$.
+
+**Two distinct uses of "κ" in the literature**: there is an important ambiguity to be aware of:
+- *κ as Einstein constant* (action convention): $\kappa = 8\pi G = 1/\MPl^2$, so $-\tfrac{1}{2\kappa}R = -\tfrac{\MPl^2}{2}R$. This is 2303.11094 and 2406.12826.
+- *κ as gravitational coupling in the Gertsenshtein formula*: $\kappa^2 = 16\pi G$ (the coupling in $P = \sin^2(\kappa B_0 D/2)$). This is the macros.tex convention and matches Domcke 2301.02072. Here $\kappa = \sqrt{16\pi G} = \MPl^{-1}\sqrt{2}$.
+
+**These are not the same κ.** The macros.tex comment `kappa^2 = 16 pi G` with `M_Pl = 1/sqrt(kappa)` defines the *Gertsenshtein-formula coupling*, not the Einstein constant. The `\MPl` macro in macros.tex is the reduced Planck mass consistent with the BHL joint convention.
+
+**Recommendation for the TIDAL report**:
+1. Follow the BHL joint-paper convention for the action: write $\mathscr{L} \supset -\frac{1}{2}\MPl^2\,\tilde{R} + \sum_n \Alp{n}\,{}^{(n)}T^2 + \sum_n \Bet{n}\,R_n^2$ using the macros `\MPl`, `\Alp{n}`, `\Bet{n}`.
+2. In the conventions paragraph, state: "We use units $\hbar = c = 1$ and define the reduced Planck mass $\MPl$ via $\MPl^2 = (8\pi G)^{-1}$; the gravitational coupling $\kappa = \MPl^{-1}$ appears in the Gertsenshtein conversion probability $P = \sin^2(\kappa B_0 D/2)$."
+3. Set $\kappa = 1$ (equivalently, $\MPl = 1$) for numerical simulations, and state this explicitly when presenting numerical results.
+4. Do NOT adopt the convention where every quadratic term is prefixed by a Planck mass factor — the 2101.02645 convention absorbs mass dimensions into coupling constants, which is cleaner for the PGT action where there are $\sim$10 independent terms. The TIDAL code uses dimensionless-coupling conventions already; be consistent with the code.
+
+---
+
+### Optional Appendix: PGT Background
+
+The PGT framework was not part of standard Part II/III coursework. For a report intended for a Cambridge MSci audience (and potentially published), a brief background appendix following the structure of gr-qc/0302040 (Blagojević's gauge theory of gravity review) could serve two purposes: (i) make the report self-contained for readers from adjacent communities (CMB cosmology, particle physics), and (ii) provide a reference appendix that can be cited internally to avoid spending main-body words on pedagogy.
+
+**If included**, this appendix should:
+- Follow the pedagogical sequence from gr-qc/0302040: gauge principle → Poincaré group → vierbein/spin-connection → torsion/curvature field strengths → quadratic Lagrangian
+- Be titled "Appendix [X]: Elements of Poincaré gauge theory" — a semantic label, not "Background"
+- Run approximately 800–1000 words, keeping it tight enough to be read as a reference
+- Be structured so that a reader who knows GR but not PGT can follow §2 after reading the appendix
+- Cross-referenced from §2.1 with: "For a self-contained introduction to the PGT framework, see App. X"
+
+**Whether to include it** is a supervisor decision. Barker's own papers never include such an appendix because their target audience already knows PGT; but for an MSci report that must stand as an independent document, the appendix adds value. If Barker is comfortable with the audience assumption (PGT-literate readers only), it can be omitted. If the examiners are likely to include someone unfamiliar with PGT, include it.
+
 - Do NOT put the three constructive paths in §4; they are implications, not results
