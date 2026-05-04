@@ -490,6 +490,19 @@ Phase 6.B survival analysis predicted Δlog Z ≈ −0.036 nats; this run verifi
 | k_IC-only (canonical − Track 1, both with probe) | **+4.320** | 28789437/9579 vs 28838011 |
 | **Total (canonical − original)** | **+4.355** | — |
 
+### Track 1 sup (probe-only, k_IC=2.0)
+
+| Job | k_IC | Probe | Status | log Z | Notes |
+|-----|------|-------|--------|-------|-------|
+| 28519675 (original sup) | 2.0 | none | COMPLETED | +15.911 ± 0.13 | Baseline |
+| **28841945** (Track 1 sup) | **2.0** | canonical + Hwang–Noh | **RUNNING** | TBD | Probe-only correction (sup side) |
+
+Submitted 2026-05-04 alongside Track 1 amp (28838011, completed). Standard icelake 6h queue (sup
+landscape is broader; original 28519675 took 16:30 wall). Phase 6.A MAP check confirmed the
+published sup MAP survives the canonical probe at γ_eff=0.101 (≪ threshold 0.3), so the
+expectation is log Z ≈ +15.9 with only a small probe-only shift. If the shift is > 1 nat the
+suppress landscape is more probe-sensitive than the MAP check suggested.
+
 **Conclusion:** the +4.4 nat shift between the original D1 amp result and the canonical Phase 6.C
 result is **dominated almost entirely by the k_IC change** (2.0 → 2π/100), not the probe gate.
 The canonical probe + Hwang–Noh gate adds essentially zero to log Z at the original k_IC. The
