@@ -63,7 +63,7 @@ BHL abstracts follow a strict four-part structure in 150–200 words:
 
 ## (c) Introduction Architecture: The BHL Four-Stage Scaffold
 
-Every BHL theoretical paper introduction follows a four-stage scaffold. This is not accidental — it is the most consistent cross-paper structural pattern in the corpus.
+Every BHL theoretical paper introduction follows a four-stage logical structure. This is a *conceptual* scaffold — the stages do not necessarily map to four distinct paragraphs with those labels. In actual papers, the introduction uses named paragraphs (e.g., "Introduction to torsion", "No-go theorem for vector torsion", "In this letter" in 2406.12826) that each correspond to one of the four stages below. The four-stage framework is a tool for *auditing* an introduction's logic, not a prescription for four generic paragraphs.
 
 ### Stage 1 — The Frontier Tension (~1 paragraph)
 
@@ -287,15 +287,15 @@ Also cite ≥1 future detector (LISA, DECIGO) and ≥1 current bound (LIGO O3, N
 
 ### §2 Theory (~1200 words)
 
-**First named paragraph ("Conventions")**: declare metric signature $(+,-,-,-)$, index conventions (Greek = coordinate, Roman = Lorentz if vierbein used), $\kappa^2 = 16\pi G$, irreducible torsion labelling (Hehl 1976).
+**First conventions note**: declare metric signature $(+,-,-,-)$, index conventions (Greek = coordinate, Roman = Lorentz if vierbein used), $\kappa^2 = 16\pi G$, and natural units $\hbar = c = 1$. This note is a single sentence or two; do NOT include the irreducible torsion decomposition labelling here — that belongs after the action.
 
 **§2.1 PGT framework**:
-1. One sentence: Riemannian baseline (notation only)
+1. One sentence: Riemannian baseline (notation, not pedagogy)
 2. State whether working in Palatini (first-order) or metric (second-order) formulation — do this explicitly
 3. One sentence: promotion of connection to independent field
 4. Paired equations: curvature $R^\sigma{}_{\mu\nu\rho}$ then torsion $T^\sigma{}_{\mu\nu}$, identical syntactic structure
-5. General quadratic action — label it `\label{QuadraticAction}` — with coupling constants $\alpha_n$, $\beta_n$, $\gamma_n$. Follow with: "The $\alpha_n$ couple the three irreducible torsion-squared invariants."
-6. Irreducible decomposition in a named paragraph after the action (never before)
+5. General quadratic action — label it `\label{QuadraticAction}` — with coupling constants using the report's macros (`\Alp{n}`, `\Bet{n}`, `\Gam{n}`). Follow immediately with: "The $\alpha_n$ couple the three irreducible torsion-squared invariants; the $\beta_n$ couple the curvature-squared terms."
+6. Irreducible decomposition in a named paragraph **after** the action (never before, not in the conventions note)
 
 **§2.2 Linearisation**:
 1. State the background: flat metric $\eta_{\mu\nu}$, uniform static $B_0$ in the $z$-direction
@@ -320,4 +320,24 @@ Also cite ≥1 future detector (LISA, DECIGO) and ≥1 current bound (LIGO O3, N
 **Move 2 (~250 words)**: Implications. "If the null result is robust, it implies that [physical consequence]. However, three avenues remain open: (i) non-minimal coupling (torsion–curvature cross-terms); (ii) ghost-free kinetics in the propagating-torsion sector; (iii) cubic-order extensions." These are speculative implications — do not develop them quantitatively. They belong here, not in §4.
 
 **Move 3 (~100 words)**: Specific next step. Name one concrete theory (the non-minimal PGT Lagrangian with torsion–curvature cross-term, already in App. B), one observable (non-zero channel amplification if the cross-term coefficient enters the kinetic matrix), and one calculational tool (TIDAL applied to the full non-minimal Lagrangian). Close: "The natural next step is to apply TIDAL to [specific Lagrangian], which [concrete prediction]."
+
+---
+
+### TIDAL-Specific Framing Notes
+
+**Amplification ratio $A = P_\mathrm{torsion}/P_\mathrm{GR}$**: The ratio $A$ compares the torsion-theory conversion probability to the Einstein–Maxwell (GR) prediction. $A = 1$ means torsion makes no difference; $A \neq 1$ would be a genuine signal. When introducing this ratio in §4, frame it as "the amplification factor $A \equiv P/P_\mathrm{GR}$, where $A = 1$ corresponds to the Einstein–Maxwell prediction." Do NOT say "$A$ is expected to be greater than 1" — the finding that $A = 1$ is the result, not the null. Never introduce $A$ as a quantity that "should" exceed 1.
+
+**What "0.04% agreement" means**: In §4.1, the phrase "TIDAL reproduces the Boccaletti formula to 0.04%" means the relative deviation $(|P_\mathrm{sim} - P_\mathrm{Boccaletti}|)/P_\mathrm{Boccaletti} < 0.04\%$. State this explicitly in one sentence after the percentage claim: "The maximum relative deviation between the simulated and analytic conversion probabilities is 0.04% across the validation grid." Do not call it "agreement" without quantifying what "agreement" means.
+
+**Framing automation as physics, not software**: When asserting TIDAL's necessity in §1 and §3, use the form: "Manual derivation of the Gertsenshtein kinetic matrix is tractable for a single PGT model but becomes infeasible across the theory space, which contains [N] independent coupling-constant combinations." This frames automation as a physics-scale requirement, not a convenience. Compare the PSALTer precedent: "several such applications... appear to have been computed manually" — the implication is that manual methods exist but cannot scale.
+
+**Hybrid-paper abstract allocation** (~180 words): The TIDAL abstract must cover four things — allocate approximately:
+1. *Phenomenon/context* (~30 words, 1–2 sentences): "Gravitational and electromagnetic waves mix in a background magnetic field — the Gertsenshtein effect — providing a new channel for high-frequency gravitational wave detection."
+2. *Tool + what it does* (~40 words, 2 sentences): "We present TIDAL, a symbolic–numerical pipeline that automates the Gertsenshtein channel computation for any quadratic PGT+EM Lagrangian."
+3. *Results* (~70 words, 3–4 sentences): one sentence each for Boccaletti validation, Stage A/B null, torsion-independence (the main positive result), ghost diagnosis.
+4. *Scope/implication* (~40 words, 1–2 sentences): "The null results constrain [sectors]; the torsion-independence finding implies [consequence]; the ghost diagnosis identifies [theory-space boundary]."
+
+Whether TIDAL should be named in the abstract: yes, by name and acronym expansion. Software tools that are the paper's central contribution are always named in the abstract (PSALTer, Hamilcar precedent).
+
+**Subsection vs. named-paragraph structure for §2**: The TIDAL report is a hybrid letter — compact main body, appendix-heavy. Use subsections (§2.1, §2.2) rather than pure named paragraphs, because the 5000-word limit means each subsection has ~400 words and will contain multiple named paragraphs within it. The structure is: §2 with §2.1 and §2.2 as labelled subsections, and within each subsection, named paragraphs (`\paragraph*{...}`) for each logical move. Do not attempt to use only named paragraphs without subsections — that is the letter convention for ≤10 page papers without a word limit, and creates navigation problems in a report format.
 - Do NOT put the three constructive paths in §4; they are implications, not results
