@@ -19,7 +19,15 @@ Every displayed equation must be preceded or followed by at least one complete p
 
 ## (c) Label Rule
 
-Every equation that will be cited — even once — must have a label. Labels must be semantic, not serial. Use `\label{QuadraticAction}`, `\label{TorsionTransform}`, `\label{GertsenshteinProbability}`, not `\label{eq17}`. Subsections should also carry semantic labels: `\label{sec:LinearisedPGT}`, not `\label{sec:2.3}`. Labels are the paper's conceptual index; name them accordingly.
+Every equation, section, subsection, figure, and appendix that will be cited — even once — must have a label. Labels must be semantic, not serial.
+
+**Use bare CamelCase descriptive names**: `\label{QuadraticAction}`, `\label{TorsionTransform}`, `\label{GertsenshteinFormula}`, `\label{BoccalettiValidation}`. **Do not** use type prefixes like `eq:`, `sec:`, `fig:`, `app:`. The bare-CamelCase convention is the BHL corpus standard (verified across 2406.12826 and 2101.02645 — every label is bare). `cleveref` auto-detects the reference type from the LaTeX context, so prefixes are unnecessary; the bare names also read as a flat conceptual index of the paper rather than a typed namespace.
+
+**Choose names that cannot clash across types**. If a section and an equation share a topic, give them distinct names (e.g. `\label{Linearisation}` for the subsection and `\label{KineticMatrix}` for the equation it produces — never two labels with the same bare name).
+
+**Do not label `\paragraph*{...}` headers** unless they are explicit cross-reference targets. Named paragraphs are organisational devices, not citeable objects in the BHL convention.
+
+**Cross-references to labels in `docs/tex/`**: those files use their own conventions (some keep the `sec:` prefix). Cross-references from manuscript scaffolding to docs labels keep whatever prefix the docs use — for example, `\cref{sec:kappa-conventions}` resolves to a label in `docs/tex/gertsenshtein_formula.tex` that uses the prefix.
 
 ---
 
