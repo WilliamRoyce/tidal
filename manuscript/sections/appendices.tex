@@ -1,4 +1,342 @@
-\section{Some lengthy calculations}
-\label{sec:Appendix}
+% Appendices scaffold (Phase 2): five appendices A–E. Apps A–D follow
+% genre_conventions_software.md §(h)–(k). App E is project-specific
+% (symbolic-pipeline outputs for surveyed PGT theories, with the
+% hx<->ax structural observation noted alongside the propagating-PGT
+% equations). Total target ~7000 w + several long equations and figures.
+%
+% Note: \appendix is invoked in main.tex BEFORE this file is input, so
+% \section{} commands here automatically receive appendix numbering.
 
-If you have any lengthy calculations which would break the flow of the main text, you can put them here.
+% ============================================================================
+\section{TIDAL pipeline architecture}%
+\label{app:Architecture}
+% ============================================================================
+% Target ~1800 w + diagram. Per genre_conventions_software.md §(h).
+
+\paragraph*{Overview}%
+\label{par:AppAOverview}
+% TODO: 3–4 sentences précis of the whole pipeline — inputs, outputs,
+% what is automated. Open the appendix; do not repeat the §3 summary.
+
+% Figure A.1 — TIDAL architecture diagram.
+\begin{figure}[t]
+  \centering
+  % TODO: \input{figures/figA1_architecture} (TikZ)
+  % TODO caption: "TIDAL pipeline. The symbolic stage (Wolfram/xAct) ingests
+  % a TOML Lagrangian, derives the Euler–Lagrange equations, decomposes by
+  % component, and exports a JSON specification. The numerical stage
+  % (Python) dispatches to one of five solver backends based on equation
+  % properties, producing simulation data and measurements."
+  \caption{TODO: pipeline diagram (symbolic --> JSON --> numerical).}%
+  \label{fig:Architecture}
+\end{figure}
+
+\paragraph*{Symbolic stage}%
+\label{par:AppASymbolic}
+% TODO: 4–6 sentences. \xAct/\xPert, Euler–Lagrange derivation, component
+% decomposition. User-perspective only — no internal routine descriptions.
+
+\paragraph*{JSON handoff}%
+\label{par:AppAJSON}
+% TODO: 4–6 sentences. JSON schema fields present (equations, fields,
+% canonical block, hamiltonian terms, etc.); reference json_schema.tex if
+% appropriate.
+
+\paragraph*{Solver dispatch}%
+\label{par:AppADispatch}
+% TODO: 4–6 sentences. Auto-selection logic — modal first if conditions
+% are met, otherwise IDA/CVODE/leapfrog/scipy fallback.
+
+\paragraph*{Output}%
+\label{par:AppAOutput}
+% TODO: 4–6 sentences. Simulation data files, measurement types
+% (energy, conversion, mixing, spectrum, etc.).
+
+\paragraph*{Dependencies}%
+\label{par:AppADependencies}
+% TODO: explicit citations to each package: \xAct, \xPert, xTras,
+% SUNDIALS/scikit-sundae, \NumPy, \SciPy, \Mathematica. Cite via
+% \cite{} for each — bib audit must verify these keys exist.
+
+% ============================================================================
+\section{Symbolic stage}%
+\label{app:SymbolicStage}
+% ============================================================================
+% Target ~1600 w. Per genre_conventions_software.md §(i).
+
+\paragraph*{xAct environment}%
+\label{par:AppBxAct}
+% TODO: which packages are loaded; why \xPert is used for metric
+% perturbations (not xTens alone); why xTras is needed for the
+% Einstein–Cartan coupling.
+
+\paragraph*{Lagrangian input from TOML}%
+\label{par:AppBLagrangian}
+% TODO: how a TOML config becomes a Wolfram session; representative
+% user-session listing showing how to invoke `tidal derive`.
+% (\lstinputlisting{listings/derive_invocation.sh} — to create later.)
+
+\paragraph*{Euler--Lagrange derivation}%
+\label{par:AppBEulerLagrange}
+% TODO: E-L velocity form (state, v, A0); not Legendre transform.
+
+\paragraph*{Component decomposition}%
+\label{par:AppBComponents}
+% TODO: DecomposeToComponents, cross-field handling via
+% additionalFields. Brief note on why component-level E-L is required.
+
+\paragraph*{JSON export}%
+\label{par:AppBExport}
+% TODO: which fields are written; how the canonical block is constructed.
+
+\paragraph*{Failure modes and diagnostics}%
+\label{par:AppBFailureModes}
+% TODO: derivation timeouts, index inconsistency, malformed JSON;
+% how each is diagnosed.
+
+% ============================================================================
+\section{Numerical stage}%
+\label{app:NumericalStage}
+% ============================================================================
+% Target ~2000 w. Per genre_conventions_software.md §(j).
+
+\paragraph*{Solver selection hierarchy}%
+\label{par:AppCHierarchy}
+% TODO: opener — modal --> IDA --> CVODE --> leapfrog --> scipy;
+% auto-selection logic: which equation properties trigger each backend.
+
+\subsection{Fourier modal solver}%
+\label{app:ModalSolver}
+% Target ~800 w — primary backend, longest treatment.
+
+\paragraph*{Eigendecomposition}%
+\label{par:ModalEigen}
+% TODO: constant-coefficient case — exact matrix exponential. State what
+% "machine precision" means in this context.
+
+\paragraph*{Position-dependent coefficients}%
+\label{par:ModalKrylov}
+% TODO: Krylov \texttt{expm\_multiply}.
+
+\paragraph*{Constraint elimination}%
+\label{par:ModalConstraint}
+% TODO: Fourier Schur complement.
+
+\paragraph*{Mathematical foundations}%
+\label{par:ModalFoundations}
+% TODO: cite \cite{higham2008functions} and \cite{molervanloan2003nineteen}
+% for matrix-exponential methods.
+
+% Figure C.1 — Fourier modal solver convergence.
+% This figure is referenced from App D as well (it serves both purposes).
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figC1_solver_convergence}
+  % TODO caption: "Fourier modal solver convergence: relative error vs grid
+  % resolution for Einstein–Maxwell at $\Bzero = [\text{value}]$,
+  % $D = [\text{value}]$. The solver attains machine precision
+  % ($\sim 10^{-14}$) at modest resolution, demonstrating the
+  % spectral-precision behaviour expected for a constant-coefficient system."
+  \caption{TODO: solver convergence vs resolution.}%
+  \label{fig:SolverConvergence}
+\end{figure}
+
+\subsection{Analytical Jacobian}%
+\label{app:AnalyticalJacobian}
+% Target ~400 w.
+
+\paragraph*{Three-tier structure}%
+\label{par:JacobianTiers}
+% TODO: dense (N <= 2K), sparse (2K < N <= 200K), GMRES (N > 200K).
+% One sentence on when each is active.
+
+\paragraph*{Speedup factors}%
+\label{par:JacobianSpeedups}
+% TODO: quote the measured speedups (5.3x dense; 2.5x IDA sparse;
+% 1.2–1.4x CVODE sparse) from solver_optimizations.tex.
+
+\subsection{Other backends}%
+\label{app:OtherBackends}
+% Target ~200 w total.
+
+\paragraph*{IDA}%
+\label{par:BackendIDA}
+% TODO: 3–4 sentences on DAE / constraint handling.
+
+\paragraph*{CVODE}%
+\label{par:BackendCVODE}
+% TODO: 3–4 sentences on adaptive ODE for waves.
+
+\paragraph*{Leapfrog}%
+\label{par:BackendLeapfrog}
+% TODO: 3–4 sentences on symplectic integration.
+
+\paragraph*{scipy}%
+\label{par:BackendScipy}
+% TODO: 3–4 sentences on general-purpose fallback.
+
+\paragraph*{JSON-to-solver interface}%
+\label{par:JSONInterface}
+% TODO: closing paragraph with two distinct moves —
+% (i) coefficient-matrix EXTRACTION from the JSON spec (which fields are
+% read, how they are interpreted); (ii) solver DISPATCH (how auto-selection
+% decides which backend to call given the extracted properties). One
+% sentence each.
+
+% ============================================================================
+\section{Validation suite}%
+\label{app:Validation}
+% ============================================================================
+% Target ~1200 w. Per genre_conventions_software.md §(k) Barker validation
+% hierarchy.
+
+\paragraph*{Analytic limits}%
+\label{par:ValidationAnalytic}
+% TODO: massless Klein–Gordon, Maxwell. Compare TIDAL output to textbook
+% result. Optionally one figure per case, or a summary figure with subpanels.
+
+\paragraph*{Reference model reproduction}%
+\label{par:ValidationReference}
+% TODO: Boccaletti formula validation. Most important validation result.
+% Cross-ref \cref{fig:BoccalettiValidation} (main body) and report the
+% quantitative agreement here.
+
+\paragraph*{Pathological cases}%
+\label{par:ValidationPathological}
+% TODO: trace-channel ghost diagnosis validates the methodology — TIDAL
+% correctly identifies exponential growth at the known unstable
+% parameter point.
+
+\paragraph*{Convergence}%
+\label{par:ValidationConvergence}
+% TODO: convergence test for the Fourier modal solver. Cross-ref
+% \cref{fig:SolverConvergence} (App C — same figure serves App D).
+% State the convergence rate (spectral / machine-precision for the modal
+% solver).
+
+% Figure D.1 — Stage A heatmap.
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figD1_stageA_heatmap}
+  % TODO caption: "Stage A heatmap of $\Pconv^\text{max}$ in the
+  % $(m_A, \varepsilon)$ parameter plane for the T1 dark-photon-plasma
+  % sector at $\Bzero = [\text{value}]$, $t_\text{end} = [\text{value}]$.
+  % The amplification factor stays at $A = 1$ across the plane,
+  % constraining the T1 amplification to $A < [\text{bound}]$."
+  \caption{TODO: T1 sector $(m_A, \varepsilon)$ heatmap.}%
+  \label{fig:StageAHeatmap}
+\end{figure}
+
+% Figure D.2 — Stage B sweep (276 runs).
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figD2_stageB_sweep}
+  % TODO caption: "Stage B sweep of T2 Einstein–Cartan: 276-run scatter of
+  % $\Pconv^\text{max}$ vs $\sin^2(\kappa\Bzero t/2)$ for swept torsion
+  % couplings. The tight diagonal demonstrates that conversion in this
+  % sector is bounded by the GR baseline within statistical fluctuation,
+  % constraining T2 amplification to $A < [\text{bound}]$."
+  \caption{TODO: T2 sector 276-run sweep, $\Pconv$ vs analytic baseline.}%
+  \label{fig:StageBSweep}
+\end{figure}
+
+% Figure D.3 — Channel comparison (hx<->ax vs trace).
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figD3_channel_comparison}
+  % TODO caption: "Channel comparison: time evolution of conversion
+  % probability in the $h_\times \leftrightarrow \mathrm{ax}$ channel
+  % (solid) and the trace channel (dashed) at the propagating-PGT parameter
+  % point. The two channels behave qualitatively differently, validating
+  % the channel-decomposition methodology."
+  \caption{TODO: channel comparison; hx<->ax vs trace time series.}%
+  \label{fig:ChannelComparison}
+\end{figure}
+
+% ============================================================================
+\section{Symbolic-pipeline outputs for the surveyed theories}%
+\label{app:SymbolicOutputs}
+% ============================================================================
+% Target ~700 w + long equations. Project-specific physics appendix.
+% Primary purpose: display the long equations the TIDAL Wolfram pipeline
+% produces for the more complex PGT theories. Structural observations
+% that emerge from inspection (notably the hx<->ax kinetic-coefficient
+% identity that justifies §4.4) are noted alongside the relevant equation
+% block, NOT derived in a separate subsection.
+
+\paragraph*{Purpose and reading guide}%
+\label{par:AppEPurpose}
+% TODO: ~100 w paragraph. These are equations as produced by the TIDAL
+% Wolfram pipeline for the PGT models surveyed in §4 that are too lengthy
+% to display in the main body. Each block is the equation of motion or
+% kinetic matrix in a chosen basis. Readers reproducing a §4 result can
+% copy the equations into a Mathematica session and continue from there.
+% Each block names the source JSON path so the equations can be
+% regenerated from the pipeline.
+
+\subsection{Einstein--Cartan with full $T_2$ coupling}%
+\label{app:OutputsEC}
+% Target ~150 w + equation block. Source JSON: examples/<theory>/data/...
+% (verify exact path during App E drafting session).
+
+\paragraph*{Kinetic matrix}%
+\label{par:ECKinetic}
+% TODO: introductory sentence + equation block.
+\begin{align}
+  % TODO: paste from the relevant JSON; use \lstinputlisting if more than
+  % ~12 lines. Source: examples/<EC theory>/data/<file>.json
+  \label{eq:ECKineticMatrix}
+\end{align}
+
+\paragraph*{Structural feature}%
+\label{par:ECStructure}
+% TODO: one sentence noting any structural feature visible in the
+% equations.
+
+\subsection{Propagating PGT Lagrangian (§4.4)}%
+\label{app:OutputsPropagating}
+% Target ~300 w + equation blocks. Source JSON:
+% examples/<propagating PGT>/data/<file>.json. This is the MOST
+% IMPORTANT subsection of App E because it is the cross-reference target
+% for §4.4 and §2.4.
+
+\paragraph*{Kinetic matrix and equations of motion}%
+\label{par:PropagatingEOM}
+% TODO: introductory sentence + long equation block.
+\begin{align}
+  % TODO: paste the kinetic matrix and EOMs from the propagating PGT JSON.
+  \label{eq:PropagatingKineticMatrix}
+\end{align}
+
+% This is where the hx<->ax observation appears — a SINGLE named
+% paragraph, not a multi-step derivation. It is inspection of the
+% kinetic-matrix entries.
+\paragraph*{Structural observation: $h_\times$ and ax kinetic coefficients}%
+\label{par:HxAxStructure}
+% TODO: ~80 w. State that the two relevant kinetic-matrix entries are
+% identical by inspection of \cref{eq:PropagatingKineticMatrix}; display
+% the equal-coefficient line as \cref{eq:HxAxIdentity}; note that this is
+% a structural fact about the symbolic output, not a derivation.
+\begin{align}
+  % TODO: equal-coefficient line showing hx-coefficient = ax-coefficient
+  \label{eq:HxAxIdentity}
+\end{align}
+
+\subsection{Trace-channel parameter point (§4.5)}%
+\label{app:OutputsTrace}
+% Target ~150 w + equation block. Source JSON: examples/<trace-channel
+% theory>/data/<file>.json at the parameter point used in §4.5.
+
+\paragraph*{Kinetic matrix at the diagnosed point}%
+\label{par:TraceKinetic}
+% TODO: introductory sentence + equation block.
+\begin{align}
+  % TODO: paste the kinetic matrix at the §4.5 parameter point.
+  \label{eq:TraceKineticMatrix}
+\end{align}
+
+\paragraph*{Wrong-sign kinetic coefficient}%
+\label{par:TraceWrongSign}
+% TODO: one-paragraph note on what is visible in the equations
+% (e.g. wrong-sign kinetic coefficient that signals the ghost). Reference
+% \cref{eq:NoGhostCondition} (in §4.5) to close the loop.

@@ -1,4 +1,153 @@
-\section{Results}
-\label{sec:results}
+% Results scaffold (Phase 2): five subsections; opens with one-sentence
+% structural map. Target ~1700 w total. Each subsection has named-paragraph
+% stubs, equation placeholders where required, and figure placeholders for
+% the three planned main-body figures.
+%
+% Each subsection's content is project-status-dependent (more campaigns to
+% come). Phase 2 fixes structure; content moves into prose during the
+% per-section drafting session, drawing on whatever campaign data exists at
+% that moment.
 
-% TODO
+\section{Results}%
+\label{sec:Results}
+
+% One-sentence structural map.
+% TODO: open with the §4-internal roadmap per genre_conventions_theory.md
+% §(g) Pattern 5: "§4.1 validates TIDAL against the Boccaletti formula;
+% §4.2–4.3 report sector-level constraints from the T1 and T2 channel
+% surveys; §4.4 presents the propagating-PGT structural finding;
+% §4.5 reports the trace-channel ghost diagnosis." (One sentence.)
+
+\subsection{Einstein--Maxwell baseline}%
+\label{sec:Validation}
+% Target ~250 w. Leads with the formula; figure 1 placeholder; the actual
+% percentage agreement will be filled during drafting from the final
+% Boccaletti validation campaign.
+
+\paragraph*{Validation setup and result}%
+\label{par:ValidationSetup}
+% TODO: state the validation point ($\Bzero$, $D$, $t_\text{end}$, grid
+% resolution); cross-ref \cref{eq:GertsenshteinFormula}; report the
+% measured agreement quantitatively (TBD: percentage from final HPC run);
+% frame as a physics result, not a software test.
+
+% Figure 1 — Boccaletti validation.
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{fig1_boccaletti_validation}
+  % TODO caption: "Simulated vs analytic conversion probability $\Pconv(t)$
+  % for Einstein–Maxwell on a flat Minkowski background with uniform
+  % $\Bzero = [\text{value}]$ and propagation distance $D = [\text{value}]$.
+  % Upper panel: simulated (solid) and analytic (dashed); lower panel:
+  % residual. The maximum relative deviation across the validation grid is
+  % $[\text{value}]\%$, demonstrating the TIDAL pipeline reproduces the
+  % Boccaletti kernel."
+  \caption{TODO: Boccaletti validation; sim vs analytic with residual.}%
+  \label{fig:BoccalettiValidation}
+\end{figure}
+
+\subsection{T1 sector: dark-photon--plasma channels}%
+\label{sec:T1null}
+% Target ~350 w.
+
+\paragraph*{Constraint statement}%
+\label{par:T1Constraint}
+% TODO: Dandoy precision-bound framing — "we constrain the T1 sector
+% conversion amplification to $A < [\text{value}]$ across the
+% $(m_A, \varepsilon)$ parameter plane." Cite \cite{caputo2021darkphoton}
+% for the dark-photon parameter context.
+
+\paragraph*{Physical mechanism}%
+\label{par:T1Mechanism}
+% TODO: one sentence on the physical mechanism — what causes the no-amplification
+% finding ("the [coupling term] vanishes at linear order because…").
+% Cross-ref \cref{fig:StageAHeatmap} (App D).
+
+\subsection{T2 sector: Einstein--Cartan parameter sweep}%
+\label{sec:T2null}
+% Target ~350 w.
+
+\paragraph*{Constraint statement}%
+\label{par:T2Constraint}
+% TODO: same framing template — "we constrain the T2 sector conversion
+% amplification to $A < [\text{value}]$ across the [parameter region]."
+% State the number of runs (276 in the d21_barker_sup campaign).
+
+\paragraph*{Physical mechanism}%
+\label{par:T2Mechanism}
+% TODO: one sentence on the physical mechanism. Cross-ref
+% \cref{fig:StageBSweep} (App D).
+
+\subsection{Propagating PGT: $h_\times \leftrightarrow \mathrm{ax}$ torsion-independence}%
+\label{sec:PropagatingPGT}
+% Target ~400 w. Competing-effects framing per genre_conventions_theory.md
+% §(g) Pattern 3.
+
+\paragraph*{Structural observation}%
+\label{par:HxAxObservation}
+% TODO: state the result as a structural observation visible in the
+% symbolic output, not a derivation: "The hx and ax torsion sectors
+% enter the kinetic matrix \cref{eq:KineticMatrix} with identical
+% coefficients (\cref{eq:HxAxIdentity}, \cref{app:OutputsPropagating})."
+% Frame consequence: "Consequently, the conversion probability is
+% torsion-independent in this sector — agreeing with the Einstein–Maxwell
+% prediction across the full stability window $|\delta_1| < 0.005$."
+
+\paragraph*{Numerical confirmation}%
+\label{par:HxAxNumerics}
+% TODO: state the numerical finding ($A = 1$ to $[\text{tolerance}]$);
+% cross-ref figure 2.
+
+% Figure 2 — Propagating-torsion parameter map (the headline result figure).
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{fig2_propagating_torsion_map}
+  % TODO caption: "Amplification factor $A = \Pconv^\text{torsion}/\Pconv^\text{GR}$
+  % vs torsion stability parameter $\delta_1$ for the propagating-PGT model
+  % at $\Bzero = [\text{value}]$ and $t_\text{end} = [\text{value}]$. $A = 1$
+  % across the full stability window $|\delta_1| < 0.005$ demonstrates the
+  % $h_\times \leftrightarrow \mathrm{ax}$ torsion-independence
+  % (\cref{eq:HxAxIdentity})."
+  \caption{TODO: propagating-torsion parameter map; $A$ vs $\delta_1$.}%
+  \label{fig:PropagatingTorsionMap}
+\end{figure}
+
+\subsection{Trace-channel ghost diagnosis}%
+\label{sec:GhostDiagnosis}
+% Target ~200 w (downscoped from 350 w because there is no dedicated
+% appendix-level investigation behind this finding). Three-step ghost
+% reporting per genre_conventions_theory.md §(g) Pattern 4.
+%
+% Decision deferred to drafting session: include \cref{fig:TraceGhostGrowth}
+% if data quality supports a clean exponential-growth signal; otherwise
+% drop fig 3 and reduce the subsection to ~150 w.
+
+\paragraph*{No-ghost condition}%
+\label{par:NoGhostCondition}
+% TODO: state the closed inequality on the relevant coupling combination;
+% cite \cite{sezgin1980ghostfree} and \cite{lin2019pgt} for the
+% no-ghost-condition provenance.
+\begin{align}
+  % TODO: no-ghost inequality
+  \label{eq:NoGhostCondition}
+\end{align}
+
+\paragraph*{Single-point diagnosis}%
+\label{par:GhostDiagnosis}
+% TODO: report whether the inequality is satisfied at the studied
+% parameter point; cross-ref \cref{app:OutputsTrace} for the kinetic
+% matrix at that point. State the consequence with caveat: "We diagnose
+% the trace channel as ghost-unstable at this single parameter point;
+% this is not a systematic claim about the trace sector across PGT."
+
+% Figure 3 — Trace-channel ghost growth (CONDITIONAL — drafting session
+% decides whether to include based on data quality).
+\begin{figure}[t]
+  \centering
+  % TODO conditional: \includegraphics{fig3_trace_ghost_growth}
+  % TODO caption: "Time evolution of $\log|h_\text{trace}(t)|$ at the
+  % parameter point $[\text{values}]$. The exponential growth identifies
+  % the trace channel as ghost-unstable at this point."
+  \caption{TODO: trace-channel ghost growth (conditional).}%
+  \label{fig:TraceGhostGrowth}
+\end{figure}

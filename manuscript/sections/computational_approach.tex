@@ -1,0 +1,48 @@
+% Computational approach scaffold (Phase 2): single section, no subsections,
+% five named-paragraph stubs per STYLE_GUIDE.md §3 template. Target ~600 w.
+% This section states what TIDAL is, what the Fourier modal solver achieves,
+% and defers all detail to App A–E.
+
+\section{Computational approach}%
+\label{sec:ComputationalApproach}
+
+% Paragraph 1 — TIDAL pipeline (~120 w).
+\paragraph*{TIDAL pipeline}%
+\label{par:TidalPipeline}
+% TODO: describe the symbolic→numerical pipeline at architecture level
+% (\xAct/\Mathematica → JSON → Python PDE solvers); state what it
+% automates; explain why automation is necessary at the survey scale
+% ("manual derivation of the Gertsenshtein kinetic matrix is tractable
+% for a single PGT model but becomes infeasible across the theory space").
+% Cross-ref \cref{app:Architecture} with one-clause hint.
+
+% Paragraph 2 — Fourier modal solver (~120 w).
+\paragraph*{Fourier modal solver}%
+\label{par:ModalSolver}
+% TODO: lead with capability, NOT algorithm. "TIDAL auto-selects the Fourier
+% modal backend for flat-metric, periodic-boundary systems and delivers
+% machine-precision eigendecompositions." Do NOT describe the algorithm.
+% Cross-ref \cref{app:NumericalStage} for detail.
+
+% Paragraph 3 — Other solver backends (~80 w).
+\paragraph*{Other solver backends}%
+\label{par:OtherBackends}
+% TODO: IDA, CVODE, leapfrog, scipy each in one sentence as fallback context;
+% no algorithmic detail. State that auto-selection picks the appropriate
+% backend based on equation properties.
+
+% Paragraph 4 — Validation strategy and HPC scale (~80 w).
+\paragraph*{Validation strategy and HPC scale}%
+\label{par:ValidationAndScale}
+% TODO: one sentence on validation hierarchy with \cref{app:Validation};
+% one sentence on HPC scale (number of campaigns, total runs, broad
+% facility — Cambridge CSD3 is fine as a one-clause mention without its
+% own appendix-level treatment).
+
+% Closing paragraph — Detail deferred to appendices.
+\paragraph*{Detail deferred to appendices}%
+\label{par:DetailDeferred}
+% TODO: one sentence: "Full implementation details and validation suite
+% are in \cref{app:Architecture}–\cref{app:Validation}; derivations and
+% symbolic-pipeline outputs for the surveyed theories are in
+% \cref{app:SymbolicOutputs}."

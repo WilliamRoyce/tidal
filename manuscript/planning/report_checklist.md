@@ -135,3 +135,62 @@ These need entries in `references.bib` — no TeX to download:
 - Outline sign-off received from Barker
 
 **Phase 2 (drafting) is a separate future session — do not begin writing report prose until Phase 0/1 are complete.**
+
+---
+
+## Phase 2 — Manuscript scaffolding (no prose drafting)
+
+Phase 2 produces *scaffolding with content plans*: section/subsection headers
+with semantic labels, named-paragraph topic stubs, equation placeholders with
+labels, figure placeholders with caption stubs, and cross-references that
+resolve. **No prose for any section** — each per-section drafting session is
+a separate later effort. See plan archived as
+`/home/vscode/.claude/plans/we-are-planning-to-federated-papert.md`.
+
+### Bibliography hygiene additions
+
+- [x] Add `hwangnoh2023graviton` (2310.04150)
+- [x] Add `hwangnoh2024nonlinear` (2405.11786)
+- [x] Add `higham2008functions` (Higham, *Functions of Matrices*, SIAM 2008)
+- [x] Add `molervanloan2003nineteen` (Moler & Van Loan, SIAM Review 2003)
+- [x] Verify `palessandro2024gertsenshtein` already present (it is)
+- [x] Verify entry count ≥ 84 — **85 entries** total
+
+### Figure infrastructure
+
+- [x] Create `scripts/figures/` directory
+- [x] Create `scripts/figures/README.md` (figure-script convention)
+- [x] Stub `fig1_boccaletti_validation.py` (§4.1)
+- [x] Stub `fig2_propagating_torsion_map.py` (§4.4 headline)
+- [x] Stub `fig3_trace_ghost_growth.py` (§4.5 conditional)
+- [x] Stub `figA1_architecture_tikz.tex` (App A diagram)
+- [x] Stub `figC1_solver_convergence.py` (App C; cross-ref from App D)
+- [x] Stub `figD1_stageA_heatmap.py` (App D)
+- [x] Stub `figD2_stageB_sweep.py` (App D)
+- [x] Stub `figD3_channel_comparison.py` (App D)
+
+### Section scaffolding
+
+- [x] Scaffold `manuscript/sections/abstract.tex` (4 placeholder slots)
+- [x] Scaffold `manuscript/sections/introduction.tex` (4 BHL four-stage paragraphs)
+- [x] Scaffold `manuscript/sections/theory.tex` (conventions + 4 subsections, equation labels)
+- [x] Create `manuscript/sections/computational_approach.tex` (5 paragraphs, no subsections)
+- [x] Update `manuscript/main.tex` to `\input` the new computational-approach file
+- [x] Scaffold `manuscript/sections/results.tex` (5 subsections, 3 figure placeholders, ghost-condition equation label)
+- [x] Scaffold `manuscript/sections/discussion.tex` (3 discussion subsections + Conclusion)
+- [x] Scaffold `manuscript/sections/appendices.tex` (5 appendices A–E with subsections, named paragraphs, equation labels, figure placeholders)
+- [x] Keep `manuscript/sections/acknowledgements.tex` unchanged (Barker boilerplate is correct as-is)
+
+### Verification
+
+- [ ] `latexmk -pdf manuscript/main.tex` compiles cleanly
+- [ ] `\cref{}` resolution clean (no "undefined reference" warnings)
+- [ ] `chktex` clean on all scaffolding files
+- [ ] `\cite{}` resolution clean (no "Citation undefined" warnings)
+- [ ] Forbidden-words grep on `manuscript/sections/*.tex` returns no matches
+- [ ] `python -m py_compile scripts/figures/*.py` succeeds
+- [ ] Compiled PDF table of contents matches the plan outline
+
+### Commit
+
+- [ ] Commit Phase 2: scaffolding, figure stubs, bibliography hygiene
