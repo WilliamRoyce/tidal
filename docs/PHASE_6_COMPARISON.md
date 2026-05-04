@@ -531,3 +531,35 @@ D_KL = 8.872 nats; ESS = 1918 (std) / 2204 (INTR r2).
 - The k_IC change (2.0 → 2π/100) is the dominant driver on both sides: it raises amp log Z (+4.32 nats, exposing stable-sector amplification at long wavelengths) and lowers sup log Z (−3.58 nats, as the suppression landscape at k_IC=2π/100 is less favourable for multi-modal clustering than at k_IC=2.0).
 - **The qualitative verdict is unchanged at every setting:** T4 Ricci-EM strongly favours suppression over amplification across all numerical configurations tested.
 - The Bayes factor range is B ∈ [1.2×10⁻⁸, 3.1×10⁻⁵] — decisive suppression evidence regardless of probe or k_IC choice.
+
+---
+
+## Phase 6.E — Stage A v5 sup canonical rerun (T1 Dark-Photon-Plasma, 2026-05-04)
+
+**Job 28859477** — INTR, 4 min 17s wall.
+
+| Quantity | Value |
+|----------|-------|
+| log Z (canonical) | **+0.602 ± 0.052** |
+| log Z (original 28477675) | +0.654 ± 0.056 |
+| Δlog Z (new − old) | **−0.052 nats** |
+| Phase 6.B prediction | −0.154 nats |
+| Pull vs prediction | **1.3σ** — consistent |
+| ESS | 2526 |
+| MAP | mA₂=+0.983, δm=+0.466, ξ=+0.870, α₃=+0.001 |
+| Original MAP | mA₂=+0.969, δm=−0.446, ξ=+0.796, α₃=+0.001 |
+| Prior stability (canonical probe) | 1365/5000 rejected (27.3%) |
+
+**Notes:**
+- The α₃ ≈ 0.001 MAP is reproduced precisely — the dark-photon Proca mass sits at the lower log-uniform boundary, well below the probe-rejection threshold.
+- Phase 6.B predicted Δ = −0.154 based on weighted survival = 0.858; empirical Δ = −0.052 (1.3σ discrepancy). The Phase 6.B bound was conservative — it assumed the rejected mass had high likelihood, but the canonical probe at full runtime rejects a higher fraction (27.3% vs the Phase 6.B 5.7% from per-sample replay) with lower posterior weight concentrated there.
+- **Verdict: CONFIRMED.** Stage A dark-photon result is robust to the canonical probe. The 0.05-nat shift is within normal PolyChord sampling error.
+- Corner plot: `hpc_results/28859477/stage_a_sup_canonical/corner_suppress_canonical.png`
+
+### Updated comparison ledger row
+
+| Chain | Original log Z | New log Z | Δlog Z | Verdict |
+|-------|----------------|-----------|--------|---------|
+| Stage A v5 sup (T1 dark-photon) | +0.654 ± 0.056 | **+0.602 ± 0.052** | −0.052 | **CONFIRMED** |
+| D1 sup (T4 Ricci-EM) | +15.911 ± 0.152 | +12.471 ± 0.164 (canonical k_IC) | −3.440 | **CONFIRMED** (k_IC-driven) |
+| D1 amp (T4 Ricci-EM) | −2.261 ± 0.066 | +2.094 ± 0.041 (canonical k_IC) | +4.355 | **REVISED UPWARD** (k_IC-driven) |
