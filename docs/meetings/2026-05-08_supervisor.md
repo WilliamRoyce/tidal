@@ -60,7 +60,7 @@ If the conclusion really does flip with initial-condition choice, that itself is
 
 ### Theory partition
 
-The linearised landscape splits naturally on two axes — *whether torsion propagates* and *whether nonminimal couplings are present*:
+Organising the completed theories by whether torsion propagates and whether nonminimal couplings are present gives a useful summary of results so far:
 
 | | constraint torsion | propagating torsion |
 |---|---|---|
@@ -69,7 +69,7 @@ The linearised landscape splits naturally on two axes — *whether torsion propa
 
 Plus the phenomenological class (dark-photon-plasma, plasma Gertsenshtein) and not-yet-completed parity-odd / complete-PGT / higher-curvature-EM theories.
 
-**Emerging pattern:** the only quadrant with structure is *constraint torsion + nonminimal coupling*. The entire propagating-torsion nonminimal sector (five sub-theories, six couplings: $\delta_1, \chi, \zeta_{1,2,3}$, plus kinetic $\xi$) is inert. The kinetic structure that gives torsion its own modes appears to dilute or close the cross-channel — suggesting the constraint-torsion direction may be more fruitful.
+**Observation:** the most structure found so far exists in the constraint-torsion case. We cannot yet say whether this reflects something fundamental about the landscape or is simply where we happened to look — propagating-torsion with nonminimal couplings dominates the parameter count of what has been tested, and the parity-odd and complete-PGT sectors remain untested. That said, it is enough to motivate the question of whether the constraint-torsion direction deserves more attention.
 
 Within the YM-PGT family we tested **nested sub-theories** prominent in the literature before the full joint: Bahamonde $\subset$ Barker $\subset$ Shapiro $\subset$ full. Each layer adds couplings; each layer was null.
 
@@ -175,11 +175,7 @@ When $b_5$ promotes a constraint field, that field has *zero amplitude* in $y^{(
 
 ## 5. Practice talk
 
-The talk covering this project has been written and is ready to schedule. Key framings:
-
-- The Gertsenshtein effect is presented as *astrophysically useless at GR rates* before the survey question is introduced.
-- The dark-photon vacuum null is framed as an *eigenmode* argument (the graviton initial condition cannot populate the mass eigenstate in which the dark photon lives) rather than a generic kinetic-mixing triviality.
-- The Bayesian inference is described as mapping expected amplification across the prior, with $\log Z$ as the single summary number.
+The talk covering this project has been written and is ready to schedule. The structure leads with why the Gertsenshtein effect is astrophysically useless at GR rates, introduces the survey question, and describes the inference framework before the results. Ready to give — looking to schedule a time.
 
 ---
 
