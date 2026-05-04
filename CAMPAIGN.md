@@ -313,7 +313,7 @@ simulations of the wrong physics regime** and are being replaced by new-conventi
 | 28789439 | T4 Ricci-EM | **Phase 6.C D1 sup clean (std)** | PENDING | — | icelake standard 6h; same probe/priors/canonical settings as above but P_max:minimize. |
 | 28799598 | T4 Ricci-EM | **Phase 6.C D1 sup clean (INTR r1)** | TIMEOUT | 1:06:25 | INTR, campaign=d1_sup_intr. Checkpoint: log Z = +12.13 ± 0.18 (preliminary), 52 clusters (47 active), ndead=6193, nlike=1,126,678. Multi-modal suppress landscape. Resumed as 28801350. |
 | 28801350 | T4 Ricci-EM | **Phase 6.C D1 sup clean (INTR r2)** | TIMEOUT | 1:00:17 | Checkpoint: log Z = +12.688 ± 0.184, 99 clusters (64 active), ndead=8514, nlike=2,076,053. Still multi-modal. Resumed as 28828457. |
-| 28828457 | T4 Ricci-EM | **Phase 6.C D1 sup clean (INTR r3)** | PENDING | — | INTR resume r3 from d1_sup_intr checkpoint. |
+| 28828457 | T4 Ricci-EM | **Phase 6.C D1 sup clean (INTR r3)** | FAILED | 0:00:19 | Resume file corrupted — r2 was killed mid-write by SLURM. Fortran input conversion error on tidal.resume. No recovery possible; standard job 28789439 is primary. |
 | 28789579 | T4 Ricci-EM | **Phase 6.C D1 amp clean (INTR)** | COMPLETED | 0:21:31 | INTR, campaign=d1_amp_intr. Canonical settings (grid 256, bounds 0:100, k_IC=2π/100). **log Z = +2.135 ± 0.059** (vs old 28520217: −2.261). New MAP: α₁=+0.838, α₂=−1.830, α₃=+0.841, δ₁=+1.943, P_max=0.105 (A≈42×). Prior stability: 19.1% tachyonic. 64% of posterior has P_max>0.1; 26% has P_max>0.3 (borderline perturbativity). Δlog Z = +4.4 nats driven by k_IC change (2.0→0.0628) + stability probe removing tachyon-suppressed region. Corner: `hpc_results/28789579/corner_28789579_amp_clean.png`. |
 
 ---
