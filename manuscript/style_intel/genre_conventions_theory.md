@@ -8,7 +8,7 @@ This document synthesises the conventions of the theoretical physics paper genre
 
 **Cluster III — Gertsenshtein-effect and torsion-EM papers**: 2301.02072, 2406.17853, gr-qc/0307063, hep-th/0103093, gr-qc/0001010, 1812.02675
 
-The companion file `genre_conventions.md` covers the software-paper genre (PSALTer, Hamilcar). The present file covers theoretical physics content — the conventions relevant to §1, §2, §4, and §5 of the TIDAL report.
+The companion file `genre_conventions_software.md` covers the software-paper genre (PSALTer, Hamilcar). The present file covers theoretical physics content — the conventions relevant to §1, §2, §4, and §5 of the TIDAL report.
 
 ---
 
@@ -67,12 +67,12 @@ Every BHL theoretical paper introduction follows a four-stage scaffold. This is 
 
 ### Stage 1 — The Frontier Tension (~1 paragraph)
 
-Open with the phenomenon that motivates the paper, stated as an active research tension. BHL never opens an introduction with historical overview ("since Einstein introduced...") or a statement of personal interest ("in this paper we study..."). The opening sentence identifies a current unresolved tension in physics.
+Open with the phenomenon that motivates the paper, stated as an active research tension. The dominant BHL pattern avoids warm-up historiography ("since Einstein introduced...") and opens directly on the current state of the field. However, note that the opening style varies across the corpus: some papers (2406.12826) begin with a mini-historical framing ("General relativity offers a remarkably successful description...") before immediately pivoting to the tension, while others (2101.02645, 2303.11094) open on the tension directly. The key criterion is that the *tension* is established within the first two sentences — not that historical background is entirely absent.
 
-Examples:
-- 2406.12826 opens: gravitational waves probe a theory space that includes torsion — but the theoretical structure of that space is incompletely understood.
-- 2101.02645 opens: the Hamiltonian analysis of Poincaré gauge theories is central to ghost and tachyon elimination — but the full nonlinear analysis has not been completed.
-- 2303.11094 opens: flat galactic rotation curves are conventionally attributed to dark matter — but modified gravity is a live alternative.
+Examples of the tension statement (regardless of how the paragraph opens):
+- 2406.12826: the conformal structure of PGT has been disputed for decades — but the resolution requires examining torsion's role under dilations.
+- 2101.02645: the Hamiltonian analysis of Poincaré gauge theories is central to ghost and tachyon elimination — but the full nonlinear analysis has not been completed.
+- 2303.11094: flat galactic rotation curves are conventionally attributed to dark matter — but modified gravity is a live alternative.
 
 The tension is always stated in one rhetorical move: X (the phenomenon) is important because Y (the stakes), but Z (the gap) prevents us from knowing W (the specific unknown).
 
@@ -84,7 +84,7 @@ BHL uses the second paragraph for two purposes simultaneously: (a) establishing 
 
 ### Stage 3 — Prior Art Survey (~2–3 paragraphs)
 
-The prior art is surveyed with high citation density. BHL introductions regularly contain 5–15 citations in a single sentence when establishing that a result is known across the field. The prior art section has a specific rhetorical goal: establish what *has* been done and *where the gap lies*. The gap is always stated explicitly — not implied. The last sentence of the prior art survey typically begins "However..." or "But..." and names the specific gap that the paper fills.
+The prior art is surveyed with high citation density. BHL introductions contain 5–10 citations in a single sentence when establishing that a result is known across the field. The prior art section has a specific rhetorical goal: establish what *has* been done and *where the gap lies*. The gap is always stated explicitly — not implied. The last sentence of the prior art survey typically begins "However..." or "But..." and names the specific gap that the paper fills.
 
 Citation placement in BHL prior art: citations always appear in parentheses at the end of a sentence or clause, never at the start. Never "As Jones showed [1], ..." — instead "the conversion probability for the Gertsenshtein effect is known analytically [Jones 1962; Boccaletti 1970; ...]."
 
@@ -100,13 +100,15 @@ The hook announces the paper's contribution and maps the remaining sections. BHL
 
 The theory section of a BHL gauge-gravity paper — whether on PGT, Weyl gauge theory, or Einstein–Cartan theory — follows a strict pedagogical sequence. This sequence is so consistent across the corpus (2406.12826, 2101.02645, 2309.14783, 2005.02228, 2008.09053) that deviating from it signals a pedagogical or structural error.
 
-**Step (a): Recall the Riemannian baseline (1–2 sentences).** Even in papers where the reader knows GR, the Riemannian baseline is stated. Its purpose is not pedagogy but notation: "We work with a metric $g_{\mu\nu}$ of signature $(+,-,-,-)$; the Levi-Civita connection is $\mathring{\Gamma}^\sigma{}_{\mu\nu}$." This sentence is purely notational.
+**Step (0): Index and notation conventions.** Before any tensor definitions, state the index convention: lowercase Greek for coordinate/holonomic indices ($\mu, \nu, \rho, \sigma$), uppercase Roman for Lorentz/frame indices ($A, B, C$) if the vierbein formalism is used. BHL papers declare this in the first named paragraph of the theory section ("Conventions" or as part of the Riemannian baseline). For the TIDAL report, this convention paragraph should also declare the signature $(+,-,-,-)$ and the Planck mass definition $\kappa^2 = 16\pi G$.
 
-**Step (b): State the generalisation (1–2 sentences).** "In Poincaré gauge theory, the connection $\Gamma^\sigma{}_{\mu\nu}$ is promoted to an independent field." State the physical meaning of the generalisation and name its gauge symmetry. No more than two sentences.
+**Step (a): Recall the Riemannian baseline (1–2 sentences).** Even in papers where the reader knows GR, the Riemannian baseline is stated. Its purpose is not pedagogy but notation: "We work with a metric $g_{\mu\nu}$ of signature $(+,-,-,-)$; the Levi-Civita connection is $\mathring{\Gamma}^\sigma{}_{\mu\nu}$." This sentence is purely notational. Note: some BHL papers work in the metric (second-order) formulation, others in the Palatini (first-order, metric + connection independent) formulation. State the choice explicitly here: "We adopt the Palatini formalism in which both the metric and connection are independent fields."
+
+**Step (b): State the generalisation (1–2 sentences).** "In Poincaré gauge theory, the connection $\Gamma^\sigma{}_{\mu\nu}$ is promoted to an independent field." State the physical meaning of the generalisation and name its gauge symmetry. No more than two sentences. If the vierbein formalism is used, note it here: "The connection is most naturally expressed via the vierbein $e^A{}_\mu$ and spin connection $\omega^{AB}{}_\mu$."
 
 **Step (c): Define the two field strengths (paired adjacent equations).** The curvature tensor $R^\sigma{}_{\mu\nu\rho}$ and the torsion tensor $T^\sigma{}_{\mu\nu}$ are defined in paired adjacent equations with nearly identical syntactic structure — the reader sees them as a system, not as independent definitions. "The field strengths of the gauge connection are the curvature (i) and torsion (ii)..." followed by the two equations.
 
-**Step (d): State the most general quadratic action.** Write the action with named coupling constants. State explicitly that this is the most general quadratic action and that special cases correspond to known theories. Do not derive which special cases — just assert the claim. The coupling constants are given generic labels ($\alpha_n$, $\beta_n$, $\gamma_n$ in BHL notation) with brief physical glosses.
+**Step (d): State the most general quadratic action.** Write the action with named coupling constants. State explicitly that this is the most general quadratic action and that special cases correspond to known theories. Do not derive which special cases — just assert the claim. The coupling constants are given generic labels ($\alpha_n$, $\beta_n$, $\gamma_n$ in BHL notation) with brief physical glosses. After the action equation, one prose sentence glosses the coupling constant groups: "The $\alpha_n$ couple the three irreducible torsion-squared invariants; the $\beta_n$ the curvature-squared invariants."
 
 **Step (e): Introduce the irreducible decomposition (in a named paragraph or subsection).** The irreducible torsion decomposition (traceless tensor ${}^{(1)}T$, trace vector ${}^{(2)}T$, axial pseudovector ${}^{(3)}T$ following Hehl 1976) is always introduced *after* the action, never before. The reason: the decomposition is used to write the action in canonical form; introducing it before the action inverts the logical order.
 
@@ -243,13 +245,17 @@ The Gertsenshtein-effect literature (gr-qc/0307063, hep-th/0103093, 1812.02675, 
 
 **The conversion probability formula is always displayed prominently.** In Gertsenshtein papers, $P = \sin^2(\kappa B_0 D / 2)$ (or its generalisation) is displayed as a named, labelled equation in the theory or results section — not buried in prose. This formula is the paper's central technical object. Papers that extend or modify the formula display both the original and the generalisation for comparison.
 
-**The B₀-scaling argument always appears.** Any paper computing conversion probabilities establishes the $B_0$ scaling of the result before giving numerical values. The reason: $B_0$ is the experimental control parameter, and readers comparing with observations need to know how the probability scales with field strength.
+**The B₀-scaling argument typically appears.** Papers computing conversion probabilities usually establish the $B_0$ scaling of the result, because $B_0$ is the experimental control parameter that readers comparing with observations need. This is not a hard genre requirement — in some papers (2406.17853) the scaling emerges as part of the solution rather than being foregrounded — but when writing §4, including the $B_0$ scaling explicitly (e.g., "$P \propto B_0^2$") aids comparison with observational bounds. If the TIDAL null result is B₀-independent (as expected for the torsion sectors), state this explicitly.
 
 **Wave decomposition as standard technique**: torsion-EM papers decompose gravitational waves into polarisation modes (cross, plus, axial, trace) before computing coupling. The decomposition is standard enough that it is not derived — the modes are named and the decomposition is stated as a known fact with a citation.
 
-**The "comma-goes-to-semicolon rule"**: in calculation-centric papers (gr-qc/0307063, hep-th/0103093), the convention is that equations are punctuated as part of a sentence, but when a long derivation produces a chain of equations, later equations in the chain are separated by semicolons rather than new sentences. "The kinetic matrix reads [eq.1]; expanding in the background field, [eq.2]; diagonalising, [eq.3]." This compact chaining style is specific to the derivation-paper sub-type and is not used in BHL letters.
+**Two Gertsenshtein-paper sub-genres require different prose styles**:
 
-**Observational bounds as post-2020 development**: pre-2020 Gertsenshtein papers are purely theoretical (derive the formula, discuss the regime). Post-2020 papers (1812.02675, 2301.02072, 2406.17853) connect to LISA, NANOGrav, and LIGO sensitivity curves and express conversion probabilities as detectable signal-to-noise. This is a genre evolution: papers in the field now cite at least one observational instrument in the introduction and one sensitivity curve in the results. The TIDAL report should follow this convention by anchoring its results to detection-relevant field strengths.
+*Pre-2015 calculation papers* (gr-qc/0307063, hep-th/0103093): sparse prose, dense equations, derivation is the result. These papers use compact equation chaining within paragraphs — in a long derivation, sequential equations are introduced with minimal transition prose ("expanding...," "diagonalising..."). This style is not appropriate for the TIDAL report, which is written in the post-2020 narrative register.
+
+*Post-2020 constraint papers* (1812.02675, 2301.02072, 2406.17853): these papers have absorbed the full BHL narrative style — introduction with tension, theory with named conventions, results with figures, conclusion with outlook. The TIDAL report should follow this sub-genre. The post-2020 papers connect to LISA, NANOGrav, and LIGO sensitivity curves and cite at least one observational instrument in the introduction and one sensitivity curve in the results. The report should anchor results to detection-relevant field strengths, even if the tidal result is a null.
+
+**Observational instrument citation as genre norm** (post-2020 papers only): cite at least one future detector (LISA, DECIGO, BBO) and one current bound (LIGO O3, PPTA, NANOGrav) by the end of §1. This positions the calculation within a detectability programme, even for a theory-side null result.
 
 ---
 
@@ -267,27 +273,51 @@ The Gertsenshtein-effect literature (gr-qc/0307063, hep-th/0103093, 1812.02675, 
 
 ## Summary for Agent Use
 
-When drafting §1 (Introduction):
-- Stage 1: GW detection probes the gauge-gravity sector — but the torsion channel structure is unknown
-- Stage 2: the kinetic matrix of PGT+EM has not been computed across the theory space; doing so by hand for each model is infeasible
-- Stage 3: dense citation cluster (8–15 refs) establishing: Gertsenshtein mechanism, BHL PGT landscape, PSALTer/Hamilcar as spectral tools, prior Gertsenshtein-torsion papers, gap = no systematic channel decomposition
-- Stage 4: "We present TIDAL..." one paragraph + structural map
+### §1 Introduction (~800 words, four stages)
 
-When drafting §2 (Theory):
-- Open with one-sentence Riemannian baseline (notation, not pedagogy)
-- Paired equations: curvature then torsion (same syntactic structure)
-- General quadratic action with $\alpha_n$, $\beta_n$, $\gamma_n$ coupling constants
-- Irreducible decomposition after the action, in a named paragraph
-- Linearisation: flat background + $B_0$, perturbation ansatz, order-counting rule immediately after the ansatz
+**Stage 1 (~1 paragraph)**: Open on the active research tension — gravitational wave detectors probe the gauge-gravity sector, but the torsion channel structure in PGT is unknown. The tension may begin with a brief framing reference to GR before pivoting to the gap. Do not begin "We present..." or "In this paper..." Open on the physics.
 
-When drafting §4 (Results):
-- First subsection: positive validation (Boccaletti formula recovered to 0.04%)
-- Null results: use precision-finding framing ("we constrain [sector] amplification to $A < X$ across [parameter range]")
-- Propagating torsion: competing-effects / cancellation framing ("hx and ax enter the kinetic matrix identically, hence torsion is invisible at this order")
-- Ghost diagnosis: no-ghost condition as closed inequality first, then check at model point, then consequence
+**Stage 2 (~1–2 paragraphs)**: Narrow to the specific problem: the Gertsenshtein kinetic matrix for PGT+EM has not been computed across the theory space; manual computation is infeasible for more than one model at a time. Name what makes the problem hard (scale of theory space, entanglement of coupling constants and spectrum).
 
-When drafting §5 (Discussion):
-- Move 1: plain-language restatement, no equations, no hedging (1 paragraph)
-- Move 2: null + torsion-independence → implications → three constructive paths (enumerated, not developed)
-- Move 3: one concrete next step (named theory, named observable, named calculation)
+**Stage 3 (~2 paragraphs)**: Survey prior art with 5–10 citations per broad claim. Cover: original Gertsenshtein/Boccaletti mechanism [cite]; BHL PGT landscape (2406.12826, 2101.02645); PSALTer/Hamilcar as spectral tools (2406.09500, 2512.25007); prior Gertsenshtein-torsion papers (1812.02675, 2301.02072, 2406.17853). Close with "However, no systematic Gertsenshtein channel decomposition for PGT+EM has been performed."
+
+**Stage 4 (~1 paragraph + structural map)**: "We present TIDAL, a symbolic–numerical pipeline that automates this calculation for any quadratic PGT+EM Lagrangian. We apply it to [specific sectors] and find [headline results: null/torsion-independence/ghost]." Then: "§2 establishes the theoretical framework; §3 describes the computational approach; §4 presents the results; §5 discusses implications."
+
+Also cite ≥1 future detector (LISA, DECIGO) and ≥1 current bound (LIGO O3, NANOGrav) to anchor the calculation within the detectability programme.
+
+### §2 Theory (~1200 words)
+
+**First named paragraph ("Conventions")**: declare metric signature $(+,-,-,-)$, index conventions (Greek = coordinate, Roman = Lorentz if vierbein used), $\kappa^2 = 16\pi G$, irreducible torsion labelling (Hehl 1976).
+
+**§2.1 PGT framework**:
+1. One sentence: Riemannian baseline (notation only)
+2. State whether working in Palatini (first-order) or metric (second-order) formulation — do this explicitly
+3. One sentence: promotion of connection to independent field
+4. Paired equations: curvature $R^\sigma{}_{\mu\nu\rho}$ then torsion $T^\sigma{}_{\mu\nu}$, identical syntactic structure
+5. General quadratic action — label it `\label{QuadraticAction}` — with coupling constants $\alpha_n$, $\beta_n$, $\gamma_n$. Follow with: "The $\alpha_n$ couple the three irreducible torsion-squared invariants."
+6. Irreducible decomposition in a named paragraph after the action (never before)
+
+**§2.2 Linearisation**:
+1. State the background: flat metric $\eta_{\mu\nu}$, uniform static $B_0$ in the $z$-direction
+2. Write the perturbation ansatz explicitly: $g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu}$, $A_\mu = A_\mu^{(0)} + \delta A_\mu$
+3. *Immediately* state the order-counting rule: "We work to linear order in $h_{\mu\nu}$ and $\delta A_\mu$, and to first order in $B_0$."
+4. Derive kinetic matrix: "After expanding the Lagrangian to quadratic order, one finds..." — do not display intermediate algebra
+
+### §4 Results (~1700 words, four subsections)
+
+**§4.1 Boccaletti validation**: Lead with the formula $P = \sin^2(\kappa B_0 D / 2)$. Show figure. State: "TIDAL reproduces the Boccaletti conversion probability to 0.04%." This is the positive result that validates §4.2–4.5.
+
+**§4.2–4.3 Null results**: Framing template: "we constrain the [T1/T2] sector conversion amplification to $A < X$ across the full [$(m_A, \varepsilon)$] parameter plane." Explain the physical mechanism in one sentence: "the [coupling term] vanishes at linear order because [reason]." Do not write "we did not find amplification." Cite the Dandoy precision-bound framing (2406.17853) as the published precedent.
+
+**§4.4 Propagating torsion**: Competing-effects framing. Two sentences: "The tensor (hx) and axial (ax) torsion sectors enter the kinetic matrix identically at quadratic order. Consequently, the conversion probability is torsion-independent in this sector — deviating from the Einstein–Maxwell prediction by less than [bound] across the full stability window $|\delta_1| < 0.005$."
+
+**§4.5 Ghost diagnosis**: Three sentences: (1) state the no-ghost condition as a closed inequality; (2) show it is violated at the model point; (3) state the consequence. Do NOT call this a "failure" — use "diagnosis." Template: "Ghost freedom in the trace sector requires [condition]. At the parameter point [values], this condition is violated. We diagnose the trace channel as ghost-unstable, confirming the linear PGT ghost analysis of [cite]."
+
+### §5 Discussion (~600 words)
+
+**Move 1 (~150 words)**: Restatement — plain language, no equations. "We have shown that... We found that... Our main finding is..." State each result from §4 confidently. Do not hedge retrospectively.
+
+**Move 2 (~250 words)**: Implications. "If the null result is robust, it implies that [physical consequence]. However, three avenues remain open: (i) non-minimal coupling (torsion–curvature cross-terms); (ii) ghost-free kinetics in the propagating-torsion sector; (iii) cubic-order extensions." These are speculative implications — do not develop them quantitatively. They belong here, not in §4.
+
+**Move 3 (~100 words)**: Specific next step. Name one concrete theory (the non-minimal PGT Lagrangian with torsion–curvature cross-term, already in App. B), one observable (non-zero channel amplification if the cross-term coefficient enters the kinetic matrix), and one calculational tool (TIDAL applied to the full non-minimal Lagrangian). Close: "The natural next step is to apply TIDAL to [specific Lagrangian], which [concrete prediction]."
 - Do NOT put the three constructive paths in §4; they are implications, not results

@@ -109,48 +109,66 @@ In Hamilcar (2512.25007), the scope statement is more precisely calibrated: the 
 
 ---
 
-## The BHL Physics-Calculation Paper
+## Appendix Conventions for TIDAL Software Documentation
 
-The five sections above cover the software-paper genre. §1, §2, §4, and §5 of the TIDAL report are primarily physics-theory content. Their genre conventions are distinct and are documented here, drawn from: 2406.12826, 2101.02645, 2510.08201, 2407.09598, 2303.11094, 2205.13534, and 2510.17094.
+The five sections above cover the software-paper genre at the level of a full standalone paper (PSALTer, Hamilcar). TIDAL's software contribution appears in Appendices A–E of a physics report rather than as a standalone paper. The conventions differ from a standalone software paper in important ways. This section documents how to write Apps A–E.
 
-### (h) Macro-Structure of a BHL Physics Paper
+**The general rule**: each appendix is a focused technical document that supports a specific claim in the main body. The main text makes a claim ("TIDAL auto-selects the Fourier modal solver") and cites the appendix; the appendix documents how and why. Each appendix opens with a one-sentence purpose statement.
 
-A BHL physics paper at letter or short-article length (≤ 15 pages) has the following macro-structure:
+### (h) App A — Pipeline Architecture (~1800 words + diagram)
 
-1. **Abstract** (~180 words): phenomenon → contribution → scope statement or main finding.
-2. **Introduction** (one section, ~600–800 words): four-stage scaffold (Frontier → Deep Problem → Prior Art → Hook). Ends with a structural paragraph mapping the remaining sections.
-3. **Framework / Theory** (one or two sections): establishes the gauge structure, defines fields and notation, derives or states the key equations of motion or particle spectrum. Subsections are organised by the logical chain of the derivation, not by topic alone.
-4. **Results / Analysis** (one or two sections): applies the framework. Opens with validation (known case reproduced), then advances to new results. Null results and constraints are reported before speculative findings.
-5. **Conclusions / Discussion** (one section, ~400–600 words): three paragraphs — what we found, what it means for the broader programme, what should be done next. The final paragraph is always forward-looking but specific: not "future work is important" but "the next step is to test whether X holds at nonlinear order."
-6. **Appendices**: proofs, extended tables, computational details that are primary data but would interrupt the main narrative.
+The audience for App A is a reader who wants to understand the overall system before examining any subsystem. Model: the HiGGS paper (2206.00658) appendix, which documents the full PGT constraint algebra and serves as primary data that the paper makes available.
 
-The TIDAL report departs from this macro-structure only by inserting a "Computational approach" section (§3) between theory and results — otherwise it follows the template exactly.
+**Structure**:
+1. One-paragraph overview (3–4 sentences): what TIDAL does, what its inputs and outputs are, what it automates. Write this as the appendix's opening — a précis of the whole pipeline.
+2. Pipeline diagram (TikZ): the symbolic stage (Wolfram/xAct) → JSON handoff → numerical stage (Python). Keep the diagram schematic; do not show code-level details.
+3. One named paragraph per pipeline stage: (i) Symbolic (xAct/xPert, Euler–Lagrange, component decomposition); (ii) JSON handoff (format, what fields are present); (iii) Solver dispatch (auto-selection logic); (iv) Output (simulation data, measurement types). Each named paragraph is 4–6 sentences.
+4. One named paragraph on dependencies: cite each package with a reference (xAct, xPert, xTras, SUNDIALS/scikit-sundae, numpy, scipy, Mathematica). "Standard tools" without references is not acceptable.
 
-### (i) How BHL Papers Introduce Gauge Theory Frameworks
+**What to avoid**: describing the algorithm's internal structure in App A — that is App C. App A documents the architecture from the *user's perspective*: what goes in, what the tool does at each stage, what comes out.
 
-The theory section of a BHL gauge-gravity paper follows a strict pedagogical sequence:
-(a) Recall the Riemannian baseline (Levi-Civita connection, standard GR) in one or two sentences.
-(b) State the generalisation: "In Poincaré gauge theory, the connection is promoted to an independent field." No more than two sentences.
-(c) Define the two field strengths (curvature, torsion) in paired adjacent equations with nearly identical structure.
-(d) State the most general quadratic action in the field strengths, with named coupling constants.
-(e) Introduce the irreducible decomposition only after the action — never before.
+### (i) App B — Symbolic Stage (~1600 words)
 
-Step (a) is present even in papers where the reader is assumed to know GR. Its purpose is to fix notation for the paper, not to teach GR. Step (e) is often in a subsection or named paragraph of its own ("Irreducible torsion", "Torsion decomposition").
+The audience for App B is a reader who wants to understand the Wolfram/xAct component: how it receives a TOML Lagrangian, what symbolic operations it performs, what it outputs.
 
-### (j) How BHL Papers Handle a Parameter Space Result
+**Structure**:
+1. One paragraph on the xAct environment: what packages are loaded, why xPert is used for metric perturbations (not xTens alone), and why xTras is needed for the Einstein–Cartan coupling.
+2. One named paragraph per major symbolic step: (i) Lagrangian input from TOML; (ii) Euler–Lagrange derivation (E-L velocity form, not Legendre transform); (iii) component decomposition (DecomposeToComponents, cross-field handling); (iv) JSON export.
+3. For each step, show representative Wolfram code *only* if it serves as user documentation (how to call the function, not how it is implemented internally). The PSALTer paper convention: show user-session code, not internal routines.
+4. Close with a paragraph on failure modes and diagnostics: what happens when the derivation times out, when indices are inconsistent, when the JSON is malformed.
 
-When a calculation involves scanning a space of coupling constants or model parameters (as in §4 of the report):
+**Code listing conventions**: use `\lstinputlisting{}` from external `.wls` files rather than inline listings, following the Hamilcar convention. This keeps the appendix source clean and allows listings to be updated independently.
 
-- The **parameter space is always defined before any scan results are presented**. A table or list naming every parameter, its range, and its physical meaning appears before the first result figure.
-- **Positive validation is always the first result**, even if the main scientific contribution is a null or a constraint.
-- **Constraints are stated as closed inequalities**, not as upper/lower bounds from a scan: "ghost freedom requires $a_1 > 0$", not "our scan found no ghosts above $a_1 = 0$".
-- **Figures carry the primary result load in long parameter scans**; prose identifies the key feature visible in each figure (the boundary of the stable region, the torsion-independent line) without repeating the number already readable in the plot.
-- When the scan result is a null (no amplification found across the parameter space), the result is quantified as a precision bound: "conversion probability matches the torsion-free prediction to within $\delta < 10^{-5}$ across the entire $(a_1, a_3)$ plane". The prose then explains what physical mechanism enforces the null.
+### (j) App C — Numerical Stage (~2000 words)
 
-### (k) Discussion Section Conventions in BHL Physics Papers
+The audience for App C is a reader who wants to understand the Python solver backends and the selection logic. The Fourier modal solver is the primary backend and receives the longest treatment; the others are documented briefly.
 
-The discussion section of a BHL physics paper (2303.11094, 2406.12826, 2510.08201) has a recognisable three-move structure:
+**Structure**:
+1. One opening paragraph: the solver selection hierarchy (modal → IDA → CVODE → leapfrog → scipy) and the auto-selection logic.
+2. **Fourier modal solver** (the primary backend, ~800 words): describe the eigendecomposition approach (constant-coefficient systems → exact matrix exponential; position-dependent → Krylov expm_multiply). State what "machine precision" means in this context. Describe the constraint elimination via Fourier Schur complement. Cite the mathematical foundations (matrix exponential methods: Higham 2008, Moler–van Loan). One figure showing convergence vs. resolution.
+3. **Analytical Jacobian** (~400 words): describe the three-tier structure (dense/sparse/GMRES), with one sentence on when each is active. State the speedup factors.
+4. **Other backends** (~200 words total): IDA for DAE systems, CVODE for adaptive ODE, leapfrog for symplectic, scipy as general-purpose fallback. One named paragraph of 3–4 sentences each.
+5. Close with a paragraph on the JSON-to-solver interface: how the coefficient matrix is extracted from the JSON spec and how solver selection is dispatched.
 
-1. **Restatement of findings** (~1 paragraph): a plain-language summary of what was found, without equations. Uses "we have shown that...", "we found that...", "our main finding is that...". Does not hedge retrospectively — findings that were reported as provisional in the results section are stated confidently in the conclusions.
-2. **Implications for the programme** (~1–2 paragraphs): what the findings imply for the broader theoretical programme. This is where the "three constructive paths" framing belongs in the TIDAL report — not in the results section. The standard move is: "If our null result is robust, it has the following implication for X... however, three avenues remain open: [list]."
-3. **Specific next steps** (~1 paragraph): one or two concrete, specific research questions that follow directly from the paper's findings. Not vague ("future work should explore...") but actionable: "The natural next step is to apply TIDAL to the full non-minimal PGT Lagrangian (App. B), which contains the torsion–curvature cross-term that the present campaign excluded by construction." This closing paragraph should name a specific theory, a specific observable, or a specific calculational extension.
+### (k) App D — Validation Suite (~1200 words)
+
+Follow the Barker validation hierarchy (from PSALTer 2406.09500 and Hamilcar 2512.25007):
+
+1. **Analytic limits** (named paragraph): massless Klein–Gordon, Maxwell electromagnetism. TIDAL output compared to textbook result. One figure per case.
+2. **Reference model reproduction** (named paragraph): the Boccaletti formula for Einstein–Maxwell Gertsenshtein conversion. Show the simulation vs. analytic comparison with the 0.04% agreement stated explicitly. This is the most important validation result.
+3. **Pathological cases** (named paragraph): the trace-channel ghost, identified in §4.5. App D verifies that TIDAL correctly diagnoses ghost instability (exponential growth in the time-domain simulation) at the known unstable parameter point. This validates the ghost-diagnosis methodology.
+4. **Convergence** (named paragraph): convergence test for the Fourier modal solver. Show error vs. grid resolution for one theory (Einstein–Maxwell). State the convergence rate (spectral/machine-precision for the modal solver).
+
+**Caption convention for App D figures**: each caption must include (i) what the figure shows, (ii) the parameter values used, and (iii) the key numerical result or agreement statement. For Gertsenshtein figures, include the $B_0$ value and $t_\mathrm{end}$ explicitly.
+
+### (l) App E — HPC Infrastructure and Reproducibility (~1000 words)
+
+The audience for App E is a reader who wants to reproduce the campaign results or understand the computational resources required.
+
+**Structure**:
+1. One paragraph on the CSD3 setup: partition (sapphire/icelake), node configuration, TIDAL version, Python/scipy/sundials versions. Cite CSD3 (DiRAC; the specific HPC facility).
+2. One table: campaign summary. Columns: campaign label, HPC job ID, theory, parameters swept, number of runs, wall time, key result. This table is the primary reproducibility artefact.
+3. One paragraph on reproducibility: TIDAL version at campaign time (commit hash or version tag), where to find the input JSONs and output data. Reference the Zenodo DOI (if minted) or the GitHub repository tag.
+4. One paragraph on data archiving: where simulation outputs are stored, file format (HDF5, CSV, JSON), and how to re-run a single campaign point with the provided inputs.
+
+**Reproducibility statement template** (from Hamilcar): "All results were produced with [Software] version [X.Y.Z] at commit [hash], available at [URL]. Input files and output data are archived at [DOI/URL]."

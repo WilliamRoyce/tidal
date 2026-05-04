@@ -124,13 +124,13 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 **Template papers:** 2206.00658 §III (HiGGS overview paragraph); 2406.09500 §I-B (PSALTer pipeline overview).
 
-**Single section, no subsections.** Target: 600 words.
+**Single section, no subsections.** Target: 600 words (~5 paragraphs of 120 words each).
 
 **Structural moves:**
-1. One paragraph: what TIDAL is (symbolic → numerical pipeline), what it automates, why automation is necessary (scale of the PGT theory space).
-2. One paragraph: the Fourier modal solver as the key numerical innovation. Lead with what it achieves (machine-precision eigendecomposition for flat periodic domains, auto-selected) before any implementation detail.
-3. One paragraph: the other solver backends (one sentence each) as context and fallback.
-4. One paragraph: validation strategy (App D) and HPC scale (App E). One sentence each, with `\cref{app:...}` forward references — do not give numbers here.
+1. One paragraph (~120 words): what TIDAL is (symbolic–numerical pipeline: xAct/Wolfram → JSON → Python PDE solver), what it automates, why automation is necessary (scale of the PGT theory space, manual calculation infeasible for more than one model). Name both components by their standard acronyms/names: \textit{xAct}, \textit{Wolfram}.
+2. One paragraph (~120 words): the Fourier modal solver as the key numerical innovation. Lead with what it achieves (machine-precision eigendecomposition, auto-selected for flat periodic domains) before any implementation detail. Do NOT describe the algorithm — that is App C. State capability: "TIDAL auto-selects the Fourier modal backend for flat-metric, periodic-boundary systems and delivers machine-precision eigendecompositions."
+3. One paragraph (~80 words): the other solver backends — IDA, CVODE, leapfrog, scipy — each in one sentence as context and fallback. Do not describe their algorithms.
+4. One paragraph (~80 words): validation strategy (`\cref{app:validation}`) and HPC scale (`\cref{app:hpc}`). One sentence each. Do not give benchmark numbers here.
 5. Closing sentence: "Full implementation details, validation suite, and reproducibility materials are in Apps A–E."
 
 **Do not** describe the algorithm in §3. That belongs in App C. §3 states that the algorithm exists, what it achieves, and where to find it.
@@ -145,7 +145,7 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 **§4.1 Boccaletti validation:** Lead with the formula. Show fig. 1 (simulation vs. analytic). State: "TIDAL reproduces the Boccaletti conversion probability to 0.04%." This is the positive result that validates everything downstream.
 
-**§4.2–4.3 Null results:** Use the Dandoy framing (2406.17853): "we constrain the [T1/T2] sector conversion amplification to $A < X$ across the full parameter plane (Fig. 2)." Never write "we did not find amplification". Explain the physical mechanism in one sentence: "the trace coupling vanishes at linear order because..."
+**§4.2–4.3 Null results:** Use the Dandoy framing (2406.17853): "we constrain the [T1/T2] sector conversion amplification to $A < X$ across the full parameter plane (Fig. 2)." Never write "we did not find amplification". Explain the physical mechanism in one sentence: "the trace coupling vanishes at linear order because..." Each subsection opens directly on the result — do not repeat the §4 roadmap sentence inside each subsection.
 
 **§4.4 Propagating torsion:** Use the 2510.17094 plane-wave-cancellation framing: state the two sectors (hx and ax), show they enter the kinetic matrix identically, state the consequence (torsion-independence), cite App F for the derivation. One paragraph, one figure.
 
@@ -157,7 +157,7 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 **Template papers:** 2406.12826 conclusions; 2303.11094 §V; 2510.08201 §V.
 
-**Three-move structure (see genre_conventions.md §k):**
+**Three-move structure (see genre_conventions_theory.md §h):**
 1. Findings restatement: plain language, no equations, ~150 words.
 2. Implications: what the null + torsion-independence mean for PGT as a physical model; the "three constructive paths" enumerated here (not in §4).
 3. Specific next steps: name one concrete theory (the non-minimal PGT with torsion–curvature cross-terms) and one concrete observable (non-zero channel amplification if the cross-term coefficient enters the kinetic matrix). This last paragraph should be completeable in one sentence per path.
@@ -166,19 +166,44 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 ---
 
-## (j) Self-Review Checklist Before Sharing a Draft
+---
+
+## (i) Appendix Structure Rule
+
+Every appendix carries a semantic title that states its content (not "Appendix A: Technical details" but "Appendix A: TIDAL pipeline architecture"). Each appendix opens with a single declarative sentence stating its purpose and what it contains — this is the appendix's equivalent of the section opening rule (a).
+
+Appendix subsections are numbered A.1, A.2, etc. Each subsection opens with a declarative sentence. Appendix figures are numbered in sequence with main-body figures (not restarted at A.1).
+
+**Cross-referencing convention in the main text**: at every point where a main-body sentence would otherwise spend words on implementation detail, replace the detail with a one-clause forward reference: "We solve the linearised system using the Fourier modal backend (\cref{app:modal}), which auto-selects on flat metrics with periodic boundary conditions." The clause after the `\cref{}` is mandatory — it tells the reader why they might want to follow the cross-reference.
+
+**Per-appendix structural guidance for TIDAL**:
+- **App A (architecture)**: begin with a 2–3 sentence overview of the pipeline stages (symbolic → JSON → numerical), then a schematic diagram (TikZ), then prose expanding each stage. ~1800 words + 1 diagram.
+- **App B (symbolic stage)**: begin with the xAct/xPert environment and the Euler–Lagrange derivation procedure. Show representative code only if it serves as user documentation; avoid listing internal routines. ~1600 words.
+- **App C (numerical stage)**: begin with the Fourier modal solver (the primary backend) — describe the eigendecomposition algorithm and auto-selection logic. The other backends (IDA, CVODE, leapfrog, scipy) each get one named paragraph. ~2000 words.
+- **App D (validation suite)**: four named paragraphs following the Barker validation hierarchy (analytic limits → reference models → pathological cases → scale-up). Each named paragraph has a figure; caption supplies the quantitative reading; prose gives the interpretation. ~1200 words.
+- **App E (HPC infrastructure)**: one paragraph on the CSD3 campaign setup, one on reproducibility (commit hash, TIDAL version, campaign IDs keyed to figures). A table of campaign parameters is appropriate. ~1000 words.
+
+---
+
+## (k) Self-Review Checklist Before Sharing a Draft
 
 Before circulating any draft section, confirm all of the following:
 
 - [ ] Introduction has four identifiable stages: Frontier, Deep Problem, Prior Art, Hook
+- [ ] §2 has a "Conventions" named paragraph declaring signature, index conventions, and $\kappa^2 = 16\pi G$
+- [ ] §2 states explicitly whether working in Palatini or metric formulation
+- [ ] §2.2 linearisation has: background declared, perturbation ansatz, order-counting rule immediately after ansatz
 - [ ] Every section and named paragraph opens with a declarative sentence (no equation-first openings)
 - [ ] Every displayed equation has surrounding prose (one sentence before or after minimum)
 - [ ] All cited equations use `\cref{}` (no bare equation numbers, no "Eq. (N)")
 - [ ] All equation labels are semantic, not serial
+- [ ] Coupling constants are introduced in the action equation first, then glossed in prose
 - [ ] No forbidden words from the list above appear in the draft
-- [ ] Every figure is cited in text before it appears; caption is self-contained
+- [ ] Every figure is cited in text before it appears; caption is self-contained; caption names the parameter regime
 - [ ] All hedges are in the form "finding first, caveat second"
 - [ ] Every footnote passes the "could this go in the body?" test
 - [ ] Citation density is high in the prior-art inventory and sparse in the derivation sections
-- [ ] Null results are framed as precision findings ("we exclude", "we show that X is not present"), not as failures
-- [ ] Abstract ends with a result or a scope statement, not a promise
+- [ ] Null results are framed as precision findings using "we constrain", "we exclude", "we confirm X to within Y", not "we did not find"
+- [ ] Abstract ends with a definitive claim, scope statement, or emphatic result — not a promise or a limitation
+- [ ] Each appendix opens with a declarative sentence; subsections are numbered A.1, A.2 etc.
+- [ ] Every main-text cross-reference to an appendix includes a one-clause explanation of what is deferred
