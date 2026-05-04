@@ -8,8 +8,8 @@ Live tracking document. Tick items as completed. See `report_plan.md` for full c
 
 - [x] Write `manuscript/planning/report_plan.md` — repo-local archive of the full plan
 - [x] Write `manuscript/planning/report_checklist.md` — this file
-- [ ] Update `docs/MEMORY.md` with pointer to planning files
-- [ ] Commit: `chore(report): add report plan archive and Phase 0/1 checklist`
+- [x] Update `docs/MEMORY.md` with pointer to planning files
+- [x] Commit: `chore(report): add report plan archive and Phase 0/1 checklist` (582685e)
 
 ---
 
@@ -17,35 +17,35 @@ Live tracking document. Tick items as completed. See `report_plan.md` for full c
 
 ### Tier 1 — Barker software-package papers (highest priority)
 
-- [ ] Download `literature/2406.09500/` — PSALTer original (Barker, Marzo, Rigouzzo 2024)
-- [ ] Download `literature/2506.02111/` — PSALTer v2 parity-violating (Barker, Karananas, Tu 2025)
-- [ ] Download `literature/2512.25007/` — Hamilcar (Barker sole author 2025)
+- [x] Download `literature/2406.09500/` — PSALTer original (125 .tex files)
+- [x] Download `literature/2506.02111/` — PSALTer v2 parity-violating (26 .tex files)
+- [x] Download `literature/2512.25007/` — Hamilcar (103 .tex files)
 
 ### Tier 2 — BHL joint corpus on PGT/torsion (highest priority for main body)
 
-- [x] Verify `literature/2406.12826/` — *Every PGT is conformal* (already local; check TeX completeness)
-- [ ] Download `literature/2309.14783/` — *Manifestly covariant variational principle*
-- [ ] Download `literature/2303.11094/` — *Gravitational confinement and galactic rotation curves*
-- [ ] Download `literature/2101.02645/` — *Nonlinear Hamiltonian analysis, quadratic torsion I*
-- [ ] Download `literature/2006.03581/` — *PGT cosmology → Horndeski*
-- [ ] Download `literature/2003.02690/` — *H₀ tension with emergent dark radiation*
+- [x] Verify `literature/2406.12826/` — *Every PGT is conformal* (4 .tex files, already local)
+- [x] Download `literature/2309.14783/` — *Manifestly covariant variational principle* (1 .tex, single-file gz)
+- [x] Download `literature/2303.11094/` — *Gravitational confinement and galactic rotation curves* (5 .tex files)
+- [x] Download `literature/2101.02645/` — *Nonlinear Hamiltonian analysis, quadratic torsion I* (4 .tex files)
+- [x] Download `literature/2006.03581/` — *PGT cosmology → Horndeski* (2 .tex files)
+- [x] Download `literature/2003.02690/` — *H₀ tension with emergent dark radiation* (14 .tex files)
 
 ### Tier 3 — Hobson + Lasenby joint, close-topic
 
-- [ ] Download `literature/2008.09053/` — *Fresh perspective on gauging the conformal group*
-- [ ] Download `literature/2005.02228/` — *Ghost and tachyon free Weyl gauge theories*
+- [x] Download `literature/2008.09053/` — *Fresh perspective on gauging the conformal group* (1 .tex, single-file gz)
+- [x] Download `literature/2005.02228/` — *Ghost and tachyon free Weyl gauge theories* (1 .tex file)
 
 ### Tier 4 — Barker solo voice
 
-- [ ] Download `literature/2205.13534/` — solo-author multipliers paper (2022)
-- [ ] Download `literature/2311.11790/` — solo-author Yang-Mills gravity (3 pp)
+- [x] Download `literature/2205.13534/` — solo-author multipliers paper (2 .tex files)
+- [x] Download `literature/2311.11790/` — solo-author Yang-Mills gravity (2 .tex files)
 
 ### Style intel artefacts
 
-- [ ] Create `manuscript/style_intel/` directory
-- [ ] Write `manuscript/style_intel/style_analysis.md` — analytical write-up of Barker + BHL writing patterns (abstract, intro scaffold, section structure, equation handling, voice, transitions). Analytical, not extractive. Original prose only.
-- [ ] Write `manuscript/style_intel/genre_conventions.md` — analytical synthesis of physics-software-paper genre conventions (from 16-paper survey). Used to plan appendices A–E.
-- [ ] Create `manuscript/STYLE_GUIDE.md` — concrete checklists (section-opening rule, equation rule, label rule, voice rule, figures rule, forbidden-words list, self-review checklist)
+- [x] Create `manuscript/style_intel/` directory
+- [x] Write `manuscript/style_intel/style_analysis.md` — 117 lines, covers all 10 patterns (a–j), analytical prose
+- [x] Write `manuscript/style_intel/genre_conventions.md` — 108 lines, covers (a–g) + cross-paper evolution notes
+- [x] Create `manuscript/STYLE_GUIDE.md` — 96 lines, actionable checklist with 9 sections + self-review list
 
 ### Commit
 
