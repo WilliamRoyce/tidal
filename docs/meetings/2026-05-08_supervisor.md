@@ -6,18 +6,17 @@
 
 ## Summary
 
-Four workstreams since the last meeting:
+Five workstreams since the last meeting:
 
-1. **T4 Ricci-EM is the live wire.** First completed theory with posterior structure. Under the v5 IC it is a strong suppressor (Bayes factor 0.10 against amplification); under the canonical IC the rerun appears to amplify ($\Delta \log Z = +4.4$ nats). Verdict held until the suppress cross-check lands.
-2. **Survey progress and roadmap.** Stage A v5 (T1 dark-photon-plasma), Stage B (T2 Einstein-Cartan), Stage D1 (T4 Ricci-EM), Stage D2.0–D2.3 (the entire propagating-torsion nonminimal sector: Bahamonde / Barker / Shapiro / full T5 9-D) are complete. T6 (parity-odd), T7/T8 (complete-PGT), and EH (higher-curvature EM) remain.
-3. **Methodology updates that changed what's accessible.** Stability-guard refactor (T4-class theories now usable); perturbative-reduction v6 (constraint-promotion theories like $b_5\tilde R^2$ PGT now usable, ghost-free by construction); CDT sign-convention flip (Stage A now in the physical Proca regime); unified $\log_{10} A$ Bayes-factor framework.
-4. **Practice talk drafted.** Script finalised; framing tightened by audience-test of the narrative.
+1. **T4 Ricci-EM is the live wire.** First completed theory with posterior structure. Initial runs strongly disfavour amplification (Bayes factor 0.10); a rerun with corrected initial conditions appears to amplify ($\Delta \log Z = +4.4$ nats). Verdict held until the suppress cross-check lands.
+2. **Survey progress and roadmap.** The effective dark-photon model, the minimal Einstein-Cartan theory, the Ricci-EM model, and the entire propagating-torsion nonminimal sector (five nested sub-theories up to the full 9-D joint) are complete. Parity-odd, complete-PGT, and higher-curvature EM remain.
+3. **Stability filtering in the linearised regime — open question.** A key methodological decision was made to exclude exponentially-growing modes from the inference; this enabled results on the Ricci-EM class. But the physical validity of that choice is an open question worth discussing.
+4. **Perturbative reduction — major new research direction.** Handling theories with higher-derivative corrections required developing a novel approach after all standard Hamiltonian methods failed. This is now working numerically, with one unresolved theoretical gap.
+5. **Practice talk written.** The talk is now ready to schedule and give.
 
 ---
 
 ## 1. T4 Ricci-EM (the live wire)
-
-**Theory**: `examples/torsion_gertsenshtein_nonminimal/theory.toml`
 
 ### Lagrangian
 
@@ -25,28 +24,28 @@ $$\mathcal{L} = \frac{1}{\kappa^2}R + \alpha_i\,I_i + \delta_1\,\tilde R_{\mu\nu
 
 The three torsion-mass invariants $\alpha_{1,2,3}$ plus a single nonminimal coupling $\delta_1$ between the Ricci-Cartan tensor and the photon field strength.
 
-**Crucially, T4 has *constraint* (non-propagating) torsion** — there is no kinetic term for torsion, so it carries no dynamical modes and acts purely as an auxiliary field. $\delta_1$ is the only term that *connects* torsion to the Gertsenshtein channel; without it, torsion is structurally decoupled (the takeaway from the 17 April meeting). This makes T4 the only completed theory in the *constraint torsion + nonminimal coupling* quadrant of the survey — see §2.
+**Crucially, this theory has *constraint* (non-propagating) torsion** — there is no kinetic term for torsion, so it carries no dynamical modes and acts as an auxiliary field. $\delta_1$ is the only term that *connects* torsion to the Gertsenshtein channel; without it, torsion is structurally decoupled (the takeaway from the 17 April meeting). This makes T4 the only completed theory in the *constraint torsion + nonminimal coupling* quadrant of the survey — see §2.
 
-### Stage D1 v5 (paired runs, $k_{\rm IC}=2.0$)
+### Results (paired amplify / suppress runs)
 
-| Run | Job | $\log Z$ | joint $D_{\rm KL}$ | Posterior signal |
-|---|---|---|---|---|
-| Amplify | 28520217 | $-2.26 \pm 0.07$ | 1.79 nats | $A_{\max}=1.26$; Bayes factor 0.10 vs null (model **disfavoured 10:1** for amplification) |
-| Suppress | 28519675 | $+15.92 \pm 0.13$ | 8.91 nats | $A_{\min} \approx 4\times 10^{-12}$ at MAP; valley reaches $\sim 5\times 10^{-9}$ across $(\alpha_i, \delta_1)$ |
+| Run | $\log Z$ | joint $D_{\rm KL}$ | Posterior signal |
+|---|---|---|---|
+| Amplify | $-2.26 \pm 0.07$ | 1.79 nats | $A_{\max}=1.26$; Bayes factor 0.10 vs null — **model disfavoured 10:1 for amplification** |
+| Suppress | $+15.92 \pm 0.13$ | 8.91 nats | $A_{\min} \approx 4\times 10^{-12}$ at MAP; valley reaches $\sim 5\times 10^{-9}$ across $(\alpha_i, \delta_1)$ |
 
-- $\delta_1$'s marginal $D_{\rm KL}$ is **96% of the joint** in amplify — a single coupling carries the entire structure. In suppress, $\delta_1$ leads (0.87 nats) but $\alpha_{1,2,3}$ each contribute $\sim 0.25$–$0.30$ nats: the deepest suppression valley needs all four parameters to coordinate.
-- Suppression depth is far below the analytic estimate ($\sim 10^{-3}$). The valley signature is consistent with destructive interference, but the mechanism is not yet pinned down.
+- $\delta_1$'s marginal $D_{\rm KL}$ is **96% of the joint** in amplify — a single coupling carries the entire signal. In suppress, $\delta_1$ leads but $\alpha_{1,2,3}$ each contribute $\sim 0.25$–$0.30$ nats: the deepest suppression valley needs all four parameters to coordinate.
+- Suppression depth is far below the analytic estimate ($\sim 10^{-3}$). Consistent with destructive interference; mechanism not yet pinned down.
 - **This is the first non-trivial result of the survey** — every other completed theory has been null.
 
-### Phase 6.C canonical-IC rerun (in flight, deferred)
+### Corrected-IC rerun (in flight, deferred)
 
-Same Lagrangian, but with $k_{\rm IC} = 2\pi/L$ (the canonical Fourier-grid choice, $L=100$) and the Hwang–Noh stability gate.
+Same Lagrangian, but with the initial condition wavevector aligned to the canonical Fourier-grid mode ($k_{\rm IC} = 2\pi/L$, $L=100$) and a different stability criterion.
 
-- **Amplify rerun (28789579, INTR, completed 2026-05-03)**: $\log Z = +2.135 \pm 0.059$, a $+4.4$ nat shift from v5. New MAP at $\delta_1 \approx +1.94$, apparent $A_{\max} \approx 42$.
-- **Caveat**: $\sim$26% of the posterior has $P_{\max} > 0.3$, so perturbative validity is borderline.
-- **Suppress cross-check (28799598, INTR)**: still running. **Verdict held until it lands.**
+- Amplify rerun: $\log Z = +2.135 \pm 0.059$, a **$+4.4$ nat shift**. New MAP at $\delta_1 \approx +1.94$, apparent $A_{\max} \approx 42$.
+- Caveat: $\sim$26% of the posterior has $P_{\max} > 0.3$, so perturbative validity is borderline at the MAP.
+- Suppress cross-check still running. **Verdict held until it lands.**
 
-If the conclusion really does flip with IC choice, that itself is a methodological finding — and a question for the meeting (see §Questions).
+If the conclusion really does flip with initial-condition choice, that itself is a methodological finding and a question for the meeting (see §Questions).
 
 ### Literature
 
@@ -54,7 +53,6 @@ If the conclusion really does flip with IC choice, that itself is a methodologic
 |---|---|---|
 | Ricci $\times F$ as the sole single-coupling channel | This work — informed by 17 April meeting | T4 derivation |
 | Constraint vs propagating torsion in PGT | Hehl et al. 1995 | _Phys. Rep._ 258, 1 |
-| Padé matrix-exponential for ill-conditioned linear systems | Higham 2008 | _Functions of Matrices_ |
 
 ---
 
@@ -66,131 +64,163 @@ The linearised landscape splits naturally on two axes — *whether torsion propa
 
 | | constraint torsion | propagating torsion |
 |---|---|---|
-| **minimal (no nonminimal coupling)** | T2 Einstein-Cartan — null | T3 $R^2$-PGT — $b_5$ decouples structurally |
-| **nonminimal coupling present** | **T4 Ricci-EM — structure** | T5 YM-PGT family (Bahamonde, Barker, Shapiro, full 9-D) — all null |
+| **minimal (no nonminimal coupling)** | Einstein-Cartan — null | $R^2$-PGT — $b_5$ decouples structurally |
+| **nonminimal coupling present** | **T4 Ricci-EM — structure** | YM-PGT family (5 nested sub-theories) — all null |
 
-Plus the phenomenological/effective class (T1 dark-photon-plasma, plasma Gertsenshtein) and the not-yet-completed parity-odd / complete-PGT / higher-curvature-EM theories (T6, T7, T8, EH).
+Plus the phenomenological class (dark-photon-plasma, plasma Gertsenshtein) and not-yet-completed parity-odd / complete-PGT / higher-curvature-EM theories.
 
-Within T5 we deliberately tested **nested sub-theories** prominent in the literature before the full 9-D run: Bahamonde $\subset$ Barker $\subset$ Shapiro $\subset$ full T5. Each layer adds one or more nonminimal couplings; each layer was null; the full 9-D confirms there is nothing hiding in the higher-dimensional joint.
+**Emerging pattern:** the only quadrant with structure is *constraint torsion + nonminimal coupling*. The entire propagating-torsion nonminimal sector (five sub-theories, six couplings: $\delta_1, \chi, \zeta_{1,2,3}$, plus kinetic $\xi$) is inert. The kinetic structure that gives torsion its own modes appears to dilute or close the cross-channel — suggesting the constraint-torsion direction may be more fruitful.
 
-**Emerging pattern (worth raising explicitly):** the only quadrant with structure is *constraint torsion + nonminimal coupling*. Propagating torsion is inert across the entire nonminimal subspace tested (couplings $\delta_1, \chi, \zeta_{1,2,3}$, plus the kinetic $\xi$). The kinetic structure that gives torsion its own modes appears to dilute or close the cross-channel.
+Within the YM-PGT family we tested **nested sub-theories** prominent in the literature before the full joint: Bahamonde $\subset$ Barker $\subset$ Shapiro $\subset$ full. Each layer adds couplings; each layer was null.
 
 ### Roadmap
 
-| Stage | Theory class | Free dim | Status | Verdict |
+| Theory class | Free dim | Status | Verdict |
+|---|---|---|---|
+| T1 dark-photon-plasma (effective) | 4 | Done | Null amplify; genuine suppression at decoupling corner |
+| T2 Einstein-Cartan (minimal constraint torsion) | 3 | Done | Null — torsion structurally decouples |
+| T3 $R^2$-PGT ($b_5$ minimal-quadratic) | 4 | Deferred | $b_5$ decouples from TT channel structurally |
+| T4 Ricci-EM (nonminimal, constraint torsion) | 4 | Done + rerun in flight | **Strong suppressor; structure on $\delta_1$. Rerun deferred.** |
+| T5-Bahamonde ($\beta_{1\text{–}3}, \xi, \delta_1$) | 5 | Done | Null |
+| T5-Barker ($+\chi$) | 6 | Done | Null — $\chi$ inert |
+| T5-Shapiro ($+\zeta_{1\text{–}3}$) | 8 | Done | Null — $\zeta_i$ inert |
+| T5 full (9-D) | 9 | Done | Null — all 6 nonminimal couplings inert |
+| T6 YM-PGT-CP (parity-odd) | $\sim$22 | **Next** | Pending; HPC submission planned |
+| T7 Complete-Even-PGT | $\sim$20 | Pending | Derivation in progress |
+| T8 Complete-Odd-PGT | $\sim$30+ | Pending | Derivation in progress |
+| Einstein–Maxwell + higher-curvature EM | TBD | Pending | Blocked on Wolfram-side xAct issue |
+
+### YM-PGT null results (compact)
+
+| Theory | Amp $\log Z$ | Sup $\log Z$ | Bayes factor | Inert couplings |
 |---|---|---|---|---|
-| A v5 | T1 dark-photon-plasma (effective) | 4 | Done | Null amplify; real suppression at decoupling corner |
-| B | T2 Einstein-Cartan (minimal) | 3 | Done | Null — torsion structurally decouples |
-| (deferred) | T3 $R^2$-PGT ($b_5$ minimal-quadratic) | 4 | Deferred | $b_5$ decouples from TT channel structurally |
-| D1 v5 | T4 Ricci-EM (nonminimal, constraint torsion) | 4 | Done | **Strong suppressor; structure on $\delta_1$** |
-| D1 6.C | T4 canonical-IC rerun | 4 | **In flight** | Held — apparent amplifier; awaiting suppress cross-check |
-| D2.0 | T5-Bahamonde ($\beta, \xi, \delta_1$) | 5 | Done | Null |
-| D2.1 | T5-Barker ($+\chi$) | 6 | Done | Null — $\chi$ inert |
-| D2.2 | T5-Shapiro ($+\zeta_{1\text{–}3}$) | 8 | Done | Null — $\zeta_i$ inert |
-| D2.3 | T5 full (9-D) | 9 | Done | Null — all 6 nonminimal couplings inert |
-| **D3** | T6 YM-PGT-CP (parity-odd) | $\sim$22 | **Next** | Pending derivation; HPC submission planned |
-| **E1** | T7 Complete-Even-PGT | $\sim$20 | Pending | Wolfram derivation in progress |
-| **E2** | T8 Complete-Odd-PGT | $\sim$30+ | Pending | Wolfram derivation in progress |
-| EH | Einstein–Maxwell + higher-curvature EM | TBD | Pending | Blocked on xAct $(F\!\cdot\!F)^2$ issue |
+| T5-Bahamonde | $+0.616$ | $-0.449$ | 2.90 | $\delta_1$ |
+| T5-Barker | $+0.618$ | $-0.447$ | 2.90 | $\delta_1, \chi$ |
+| T5-Shapiro | $+0.612$ | $-0.615$ | 3.41 | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
+| T5 full | $+0.6150$ | $-0.6146$ | 3.42 | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
 
-### D2 sub-stage results (compact)
+The propagating-torsion nonminimal sector is **Gertsenshtein-neutral**: no coupling opens a conversion channel. Posterior shape is dominated entirely by the $\beta_{1\text{–}3}, \xi$ stability boundary; all six nonminimal couplings have marginal $D_{\rm KL} < 0.06$ nats.
 
-| Stage | Theory | Amp $\log Z$ | Sup $\log Z$ | Bayes factor | Inert couplings |
-|---|---|---|---|---|---|
-| D2.0 | T5-Bahamonde | $+0.616$ | $-0.449$ | 2.90 | $\delta_1$ |
-| D2.1 | T5-Barker | $+0.618$ | $-0.447$ | 2.90 | $\delta_1, \chi$ |
-| D2.2 | T5-Shapiro | $+0.612$ | $-0.615$ | 3.41 | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
-| D2.3 | T5 full | $+0.6150$ | $-0.6146$ | 3.42 | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
+### Dark-photon-plasma model
 
-**Key claim**: the entire propagating-torsion nonminimal sector (Barker $\chi$, Shapiro $\zeta_i$, Bahamonde $\delta_1$ in T5 form) is **Gertsenshtein-neutral** — these couplings do not open conversion channels. Posterior shape is dominated entirely by the $\beta_{1\text{–}3}, \xi$ stability boundary; the *interesting* couplings are flat (max marginal $D_{\rm KL} < 0.06$ nats in D2.3 across all six nonminimal parameters).
+The torsion trace vector acts as a Proca dark photon kinetically mixed with the photon, with an effective plasma mass $m_A^2$ on the photon. Earlier runs were in the wrong physical regime (a sign error meant $\alpha_3 > 0$ was the tachyonic-instability regime, not the stable Proca regime). After correction:
 
-### Stage A v5 (T1 dark-photon-plasma, post sign-convention flip)
-
-| Run | Job | $\log Z$ | $D_{\rm KL}$ | Verdict |
-|---|---|---|---|---|
-| Amplify | 28474676 | $-0.073 \pm 0.007$ | 0.024 nats | Null amplify; previous "informative" v4 amplify was ghost contamination |
-| Suppress | 28477675 | $+0.66 \pm 0.05$ | 1.98 nats | Real suppression at decoupling corner ($m_A^2\approx 0.97, \alpha_3 \approx 0.001$) |
-
-The v4–v5 consistency of the suppress $D_{\rm KL}$ confirms the decoupling corner is a genuine physical mechanism, not a ghost.
+| Run | $\log Z$ | $D_{\rm KL}$ | Verdict |
+|---|---|---|---|
+| Amplify | $-0.073 \pm 0.007$ | 0.024 nats | Null amplify |
+| Suppress | $+0.66 \pm 0.05$ | 1.98 nats | Genuine suppression at decoupling corner ($m_A^2\approx 0.97, \alpha_3 \approx 0.001$) |
 
 ### References
 
-- Barker (arXiv:2406.12826) — Barker-PGT, $\chi$ scalar
+- Barker (arXiv:2406.12826) — Barker-PGT, $\chi$ coupling
 - Shapiro (arXiv:hep-th/0103093) — Shapiro derivative couplings $\zeta_{1,2,3}$
 - Bahamonde et al. (2024) — propagating-torsion phenomenology programme
-- Holdom 1986, _Phys. Lett. B_ 166, 196 — kinetic mixing benchmark
-- An, Pospelov, Pradler 2013 (arXiv:1302.3884) — dark-photon plasma conversion
+- An, Pospelov, Pradler (arXiv:1302.3884) — dark-photon plasma conversion
 
 ### Next steps (provisional, subject to discussion)
 
-- **D3** (parity-odd YM-PGT-CP): direct extension of the T5 null. Tests whether parity-violation in the torsion sector opens what nonminimal even-parity couplings did not.
-- **E1/E2** (complete-even / complete-odd PGT): exhaustive quadratic enumeration. After D3 either gives null or signal, E1/E2 settle the quadratic question.
-- **EH**: higher-curvature EM (Euler–Heisenberg style $F^4$). Blocked on a Wolfram-side xAct issue with $(F\!\cdot\!F)^2$ distribution; separate fix.
-- **Possible reorientation toward more constraint-torsion theories.** Given T4's structure vs T5's emptiness, it may be more fruitful to broaden the *constraint-torsion + nonminimal-coupling* class — single cross-terms in the T4 mould, e.g. scalar-curvature-photon, torsion-trace-to-photon, axial-torsion-to-photon — than to keep pushing depth into propagating-torsion. Worth your input.
+- **T6 parity-odd YM-PGT-CP:** tests whether parity-violation in the torsion sector opens what even-parity nonminimal couplings did not.
+- **T7/T8 complete-PGT:** exhaustive quadratic enumeration. Derivations running locally.
+- **Possible reorientation toward constraint-torsion + extended nonminimal couplings.** Given T4's structure vs the entire T5 family's emptiness, it may be more fruitful to broaden the *constraint-torsion + nonminimal* class — single cross-terms in the T4 mould: scalar-curvature-photon, torsion-trace-to-photon, axial-torsion-to-photon, etc. Worth your input.
 
 ---
 
-## 3. Methodology updates that changed what's accessible
+## 3. Stability filtering in the linearised regime
 
-Three changes mattered for results — what physical class each unlocked:
+To run inference on the Ricci-EM class we had to address a fundamental issue: the Padé matrix-exponential that evaluates the field equations is robust for well-conditioned systems, but the eigendecomposition-based path used previously catastrophically rejected all parameter points in the Ricci-EM prior (including physically clean ones) due to ill-conditioning. After switching to a conditioning-robust method, the approach is to compute the growth rate of the solution directly and *exclude* any parameter point where the linearised fields grow exponentially.
 
-**(a) Stability-guard refactor — T4-class theories now accessible.**
-The old guard rejected $\sim$100% of T4 prior samples (including physically clean points) because the eigendecomposition path failed at high condition number. Replaced with a direct matrix-exponential growth probe (Padé scaling-and-squaring), robust irrespective of conditioning. T4 inference was *impossible* before; D1 v5 is the first run that produced meaningful posterior structure on this class. Growth rates above threshold are tagged tachyonic and excluded from the likelihood — physically justified because the perturbative linearisation breaks once amplitudes reach the background scale. Per-sample rejection metadata flows through to the corner plots so the unstable region is visible, not invisible.
+This choice — excluding samples with any exponential growth above a threshold — enabled all the T4 results above. But it raises a question worth discussing:
 
-**(b) Perturbative-reduction v6 — constraint-promotion theories accessible.**
-Theories like $b_5\tilde R^2$ PGT have constraint fields ($h_4, h_7, h_9$) that get *promoted to dynamical* by the small-parameter correction. The earlier Ostrogradsky-style reduction created singular mass matrices and ghost artefacts. The v6 idea: solve the unmodified base equations, then treat the small-parameter correction as a *source* in a Duhamel integral against the closed-form kernel of the base operator. Ghost-free by construction; theory-agnostic; no symbolic post-processing. Validity is monitored by $\varepsilon \cdot \omega \cdot t$ following Figueras–Kovács–Yao 2025. Verified against Parker–Simon FLRW to $10^{-12}$ and against driven-oscillator analytics to $10^{-14}$.
+**Physical question**: In the linearised regime, an exponentially growing mode will eventually violate the linearisation assumption ($\delta g \ll g_{\rm background}$). But should all such modes be discarded? One could argue:
 
-There is, however, a research gap on the validity-bound for the constraint-promotion case specifically — see §Questions.
+- Large amplification of the Gertsenshtein signal may *require* some resonant growth to accumulate — the very mechanism by which the photon channel is enhanced might look like tachyonic instability in the linearised equations.
+- Some apparent instabilities may be artefacts of the linearised approximation that are cut off in the full nonlinear theory (e.g. by backreaction on the background field, or by nonlinear saturation).
+- There may be a middle ground: instabilities that grow slowly enough that the linearised solution remains valid over the physical propagation length of interest, and for which the accumulated conversion is what we actually want to measure.
 
-**(c) CDT sign-convention flip — Stage A in the physical regime.**
-The torsion-trace mass invariant was previously entered with the wrong overall sign: $\alpha_3 > 0$ corresponded to the tachyonic-spatial-trace regime, not the stable Proca dark-photon regime. Fixed; Stage A v5 reruns (28474676, 28477675) are in the physically intended regime. Older Stage A runs are archived as valid simulations of the wrong physics regime.
-
-**(d) Unified $\log_{10}A$ Bayes-factor framework.**
-Amplify and suppress runs now share a single derived metric $A = P_{\max}/P_{\rm GR}$, reported in $\log_{10}$. This is what enables paired-Bayes-factor comparison across the survey table. A previously-silent sign bug in the minimize likelihood briefly inverted the metric, making real suppressions look like nulls; now fixed, with the Stage A v5 suppression as the first correctly-interpreted non-trivial result.
+Currently we treat any growth rate above $\sim 0.3\,\text{s}^{-1}$ as unphysical and return $\log\mathcal{L} = -\infty$. The question is whether this threshold is too conservative, and whether some of the discarded parameter space represents genuine physics.
 
 ---
 
-## 4. Practice talk
+## 4. Perturbative reduction of higher-derivative theories
 
-Script finalised; the audience-test of the narrative tightened a few framings worth flagging:
+Some of the most physically interesting PGT Lagrangians include terms that are quadratic in the Riemann-Cartan curvature (e.g. $b_5\tilde R^2$). These generate **fourth-order** equations of motion which, naively, carry Ostrogradsky ghost modes — unphysical negative-energy degrees of freedom arising from the higher-derivative structure.
 
-- Lead with *why* the Gertsenshtein effect is astrophysically useless before the survey question, rather than after.
-- The dark-photon vacuum null lands better as an *eigenmode* statement (the IC's mass eigenstate is orthogonal to the dark-photon direction) than as a generic "Holdom triviality" statement.
-- The inference layer story works when $\log Z$ is described as "expected amplification under the prior", not as a generic Bayesian quantity.
+The standard resolution is *perturbative reduction*: treating $b_5$ as a small coupling, one substitutes the leading-order ($b_5{=}0$) equations of motion back into the correction terms to eliminate the higher time derivatives, leaving a second-order system.
+
+### Methods attempted and why they failed
+
+**(a) JLM substitution (Jaén–Llosa–Molina).**
+The most direct approach: substitute the $b_5{=}0$ equations into the $b_5$-correction terms algebraically. This works when the constraint structure of the theory is unchanged at $\mathcal{O}(b_5)$. For our $b_5\tilde R^2$ PGT theory it fails because the correction *promotes constraint fields to dynamical* — in the $b_5{=}0$ theory, several torsion components are purely algebraically constrained (no time derivatives), but the $b_5$ correction adds kinetic terms for these fields. Substituting the wrong (static) equation of motion for a now-dynamical field gives incorrect correction terms and breaks the perturbative expansion.
+
+**(b) LPS canonical analysis (Lyakhovich–Pluschchay–Sharapov) and Dirac–Bergmann.**
+The principled Hamiltonian route: work out the full constraint algebra of the $b_5$ theory and classify all first- and second-class constraints. This is exact but practically infeasible: our 18-field PGT theory with a fourth-order Lagrangian generates an intractable number of constraint equations ($\mathcal{O}(10^3)$ symbolically), and the constraint structure *changes dimensionality* at $\mathcal{O}(b_5)$ — the phase space itself gains new dimensions when the promoted fields acquire dynamics.
+
+**The key obstruction shared by both:** there is no published recipe in the literature for the *constraint-promotion* case, where a field that was non-dynamical at leading order becomes dynamical at the next order. Both approaches implicitly assume the number of dynamical degrees of freedom is fixed.
+
+### What was implemented instead
+
+Rather than working at the Lagrangian level, we work directly with the linearised equations of motion. The strategy:
+
+1. **Solve the base ($b_5{=}0$) equations exactly** using the spectral solver, obtaining the leading-order field evolution $y^{(0)}(t)$.
+2. **Treat the $b_5$-correction terms as a source** for the base operator. The $\mathcal{O}(b_5)$ correction satisfies $L\,y^{(1)} = S[y^{(0)}]$ where $L$ is the second-order base operator and $S$ is the correction source built from $y^{(0)}$.
+3. **Solve via the Duhamel convolution integral**: the correction is $y^{(1)}(t) = \int_0^t e^{(t-\tau)A}\,S(\tau)\,y^{(0)}(\tau)\,\mathrm{d}\tau$, which reduces to a closed-form kernel evaluated from the base eigendata.
+
+This approach is **ghost-free by construction** — the base LHS operator $L$ is always second-order, so no Ostrogradsky modes enter. It is also theory-agnostic: the same code handles any small-parameter correction without per-theory classification. Verified against exact analytic solutions (Parker–Simon FLRW to $10^{-12}$, driven-oscillator to $10^{-14}$) and against a $b_5{=}0$ reference limit.
+
+### Open gap: validity bound for the constraint-promotion case
+
+When $b_5$ promotes a constraint field, that field has *zero amplitude* in $y^{(0)}$ but acquires $\mathcal{O}(b_5)$ amplitude from the source. The Duhamel answer is numerically sound, but we lack a closed-form theorem bounding the validity domain of the expansion — only the heuristic $\varepsilon\cdot\omega\cdot t$ threshold from Figueras–Kovács–Yao (2025). See §Questions.
+
+---
+
+## 5. Practice talk
+
+The talk covering this project has been written and is ready to schedule. Key framings:
+
+- The Gertsenshtein effect is presented as *astrophysically useless at GR rates* before the survey question is introduced.
+- The dark-photon vacuum null is framed as an *eigenmode* argument (the graviton initial condition cannot populate the mass eigenstate in which the dark photon lives) rather than a generic kinetic-mixing triviality.
+- The Bayesian inference is described as mapping expected amplification across the prior, with $\log Z$ as the single summary number.
 
 ---
 
 ## Questions
 
-### 1. Validity bound for perturbative-reduction v6 in the constraint-promotion case (anchor)
+### 1. Stability filtering — how conservative should we be?
 
-When the small-parameter correction promotes a base-theory *constraint field* to dynamical (e.g. $b_5\tilde R^2$ PGT, where $h_4, h_7, h_9$ become dynamical at $\mathcal O(\varepsilon)$), neither LPS (Lyakhovich–Pluschchay–Sharapov) nor JLM (Jaén–Llosa–Molina) gives a clean reduction — both throw on our worked example. The v6 Duhamel-source approach gives a numerically correct $\mathcal O(\varepsilon^1)$ answer, but we don't have a *theorem* bounding the validity domain — only the heuristic $\varepsilon\cdot\omega\cdot t$ threshold from Figueras–Kovács–Yao 2025.
+We currently exclude all parameter points where linearised fields grow exponentially above a threshold. This enabled the Ricci-EM inference results. But:
 
-- [ ] Is it worth a focused literature search / a fresh derivation to nail this down before claiming v6 covers the class?
-- [ ] Or do we treat the numerical agreement (Parker–Simon to $10^{-12}$, driven-oscillator analytics to $10^{-14}$, $b_5{=}0$ baseline regression) as the validity test in itself?
+- [ ] Can large amplification of the Gertsenshtein signal occur *without* some resonant growth? If the conversion mechanism is fundamentally a resonance, the very signal we are looking for might live in the excluded region.
+- [ ] Are some of the apparent instabilities artefacts of the linearised approximation, stopped by nonlinear effects in the full theory?
+- [ ] Is there a physically motivated threshold below which growth is acceptable — e.g. growth slow enough that amplitudes remain in the linearised regime over the propagation distance?
 
-### 2. Constraint torsion vs propagating torsion — should the campaign reorient?
+### 2. Perturbative-reduction validity bound for the constraint-promotion case
 
-The only theory with structure has *constraint* torsion + a single nonminimal coupling (T4). The entire propagating-torsion nonminimal sector (T5 Bahamonde / Barker / Shapiro / full 9-D) is null.
+The Duhamel-source approach gives a numerically correct $\mathcal{O}(b_5)$ answer for $b_5\tilde R^2$ PGT, but when $b_5$ promotes constraint fields to dynamical the standard Hamiltonian methods (JLM, LPS) cannot provide the validity bound. We have only the heuristic $\varepsilon\cdot\omega\cdot t$ threshold from Figueras–Kovács–Yao (2025) and numerical cross-checks.
 
-- [ ] Is it worth pivoting HPC budget toward a class of *constraint-torsion + extended nonminimal couplings* — multiple T4-mould theories with different cross-terms — rather than continuing depth into propagating-torsion (T6, T7, T8)?
-- [ ] Or run T6 / E1 / E2 first to be sure parity-odd / complete-PGT doesn't change the verdict?
+- [ ] Is there literature on the validity of perturbative expansions when the number of dynamical degrees of freedom changes order-by-order that you know of?
+- [ ] Should we treat numerical agreement as sufficient, or is a formal bound needed before these results appear in a paper?
 
-### 3. Phase 6.C IC-dependence (preview, not headline)
+### 3. Campaign direction — constraint torsion vs propagating torsion
 
-v5 IC gives T4 as a strong *suppressor* (Bayes factor 0.10 for amplification); canonical IC gives an apparent *amplifier* ($\Delta\log Z = +4.4$ nats). Verdict held until the suppress cross-check completes.
+The only completed theory with posterior structure has constraint torsion + a nonminimal coupling. The entire propagating-torsion nonminimal sector (five sub-theories) is null.
 
-- [ ] If the conclusion really does flip with IC choice, what's the right basis for paper-grade Bayes-factor reporting?
+- [ ] Is it worth pivoting to broaden the constraint-torsion + nonminimal class (T4-mould theories with different cross-terms) rather than continuing into propagating-torsion / parity-odd / complete-PGT?
+- [ ] Or complete the parity-odd and full-quadratic enumeration first?
 
-### 4. Reporting a survey of nulls
+### 4. Initial-condition dependence in the Ricci-EM results
 
-Stages B and D2.0–D2.3 are all null. The stability-boundary structure dominates everything visible; nonminimal couplings ($\chi, \zeta_{1\text{–}3}, \delta_1$ in the T5 form) are flat in posterior.
+Initial runs give a strong suppressor (Bayes factor 0.10 for amplification). A rerun with the canonical Fourier-grid initial condition gives an apparent amplifier ($\Delta\log Z = +4.4$ nats, apparent $A_{\max} \approx 42$, but borderline perturbativity). Cross-check still in flight.
 
-- [ ] For the paper, do we report a joint Bayes factor across the nested survey, or per-theory?
-- [ ] Is "$B \approx 1$ across 5 nested sub-theories of propagating-torsion YM-PGT" the right framing of *strong evidence of no Gertsenshtein channel from the propagating-torsion nonminimal sector*?
+- [ ] If the verdict does flip with initial condition, what is the right choice for paper-grade reporting?
 
-### 5. Carry-forward from 17 April
+### 5. Reporting a survey of nulls
 
+The dark-photon, Einstein-Cartan, and all five YM-PGT sub-theories are null. The nonminimal couplings (six parameters spanning the propagating-torsion sector) are all flat in posterior.
+
+- [ ] What is the right framing for the paper — a joint Bayes factor, per-theory, or something else?
+
+### 6. Carry-forward from 17 April
+
+- [ ] **Scheduling the practice talk** — when and to whom? Would you like to be in the audience?
 - [ ] **Will Handley** PhD application — when to email?
 - [ ] **Sven Krippendorf** — outcome of any intervention?
-- [ ] **Practice talk** — anything outstanding on emphasis now that the script is finalised?
