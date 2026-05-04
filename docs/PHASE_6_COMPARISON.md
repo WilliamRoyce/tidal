@@ -459,3 +459,20 @@ The qualitative verdict is unchanged: **T4 Ricci-EM strongly favours suppression
 **Corner plots:**
 - Amp std: `hpc_results/28789437/corner_28789437_amp_clean.png`
 - Sup std: `hpc_results/28789439/corner_28789439_sup_clean.png`
+
+---
+
+## Phase 6.D — Track 1: probe-only correction at original k_IC (2026-05-04)
+
+**Goal:** Isolate the probe-only Δlog Z correction to the published D1 amp number (−2.261).
+Run uses **k_IC = 2.0** (identical to 28520217) with the canonical probe gate, no other changes.
+Phase 6.B survival analysis predicted Δlog Z ≈ −0.036 nats; this run verifies it empirically.
+
+| Job | k_IC | Probe | Constraints | Status | log Z | Notes |
+|-----|------|-------|-------------|--------|-------|-------|
+| 28520217 (original) | 2.0 | none | none | COMPLETED | −2.261 ± 0.066 | Baseline |
+| **28838011** (Track 1) | **2.0** | canonical (t_test=20, threshold=0.3, all-k unit-IC) + Hwang–Noh | none | **RUNNING** | TBD | Probe-only correction |
+
+**Expected outcome:** log Z ≈ −2.261 + (−0.036) = −2.297. If result matches within ~0.1 nats, the
+Phase 6.B replay estimate is validated and the Δlog Z between original and canonical (k_IC=2π/100)
+settings is cleanly attributed to k_IC change, not the probe gate.
