@@ -580,6 +580,90 @@ derivative coupling in constraint equations.  Parameter sweeps over
 $\alpha_1, \alpha_2, \alpha_3$ with $b_5 = 0$ are therefore entirely free
 of \texttt{d2\_t} complications.
 
+\subsection{Alternative energy routes: $T^{00}$ vs.\ canonical Hamiltonian}
+\label{sec:cf-t00}
+
+A natural question is whether computing the energy as
+$E = \int T^{00}\,d^3x$ (the time-time component of the stress-energy tensor
+integrated over space) avoids the Dirac--Bergmann and Ostrogradsky difficulties
+described above.  The answer is: \emph{not in principle}, but \emph{partially in
+practice} for specific routes.
+
+\paragraph{The Noether identity $T^{00}_{\mathrm{Noether}} = H_{\mathrm{canonical}}$.}
+Noether's theorem for time-translation symmetry gives
+\[
+  T^{00}_{\mathrm{Noether}}
+  = \sum_i \frac{\partial\mathcal{L}}{\partial\dot\phi_i}\,\dot\phi_i - \mathcal{L}
+  = H_{\mathrm{canonical}}.
+\]
+The two expressions are \emph{identical} before any further simplification.
+Every problem that affects $H$ (constraint momenta vanishing, Ostrogradsky
+linear-in-momentum terms) appears in $T^{00}$ in exactly the same form.
+
+\paragraph{Dirac--Bergmann in $T^{00}$.}
+For a constraint field $C$ (e.g.\ $A_0$ in Maxwell, $h_{0i}$ in linearised GR):
+$\pi_C = \partial\mathcal{L}/\partial\dot C = 0$ (primary constraint), so
+$\pi_C\dot C = 0$ in both $T^{00}$ and $H$.  The Lagrange-multiplier terms that
+complete the correct Dirac Hamiltonian ($H_{\mathrm{total}} = H + \lambda\phi_1
++ \mu\phi_2$) are absent from both expressions; they must be recovered by
+imposing the constraint equations on-shell.  Switching from $H$ to $T^{00}$
+provides no relief for issue~\#178.
+
+\paragraph{Ostrogradsky ghost in $T^{00}$.}
+For $\mathcal{L} \ni (\partial^2_t\phi)^2$ (as in $b_5\tilde R^2$), the
+Ostrogradsky Hamiltonian $H_{\mathrm{Ost}} = \pi_1\dot\phi + \pi_2\ddot\phi - \mathcal{L}$
+is linear in $\pi_1$ (ghost) and so is $T^{00}$.  In the \emph{linearised}
+theory the ghost is simply one eigenmode with negative $\omega^2$; the physical
+graviton and photon modes ($\omega \approx \pm k$) are unaffected.  Sector-based
+conversion measurements (\texttt{--source h\_5 --target a\_1}) naturally exclude
+the ghost sector.
+
+\paragraph{One genuine advantage: avoiding IBP-form mixed operators.}
+The TIDAL pipeline performs spatial integration-by-parts (IBP) on $H$ to convert
+$f\partial^2_x g \to -(\partial_x f)(\partial_x g)$, preventing numerical
+cancellation between large near-equal terms.  When applied to temporal
+derivatives from the linearised Einstein tensor, IBP produces
+\emph{mixed time-space operators} $\partial_t\partial_x$ --- the direct cause
+of the massive-gravity energy failure (issue~\#175, max\,$|\Delta E/E| = 1.76$).
+The un-IBP'd $T^{00}$ form contains $h\,\partial_t\partial_x h$ instead.
+On a periodic spectral domain, this evaluates stably and exactly in Fourier space
+as $\hat h_k\cdot(i\omega)(ik)\hat h_k$ with no mixed-operator ambiguity.
+This is the approach taken in issues \#312 and \#313 (Parseval k-space energy).
+
+\paragraph{Modal eigendata and PSALTer k-space operator.}
+The modal solver builds the kinetic matrix $M$ from \texttt{kinetic\_coefficient\_symbolic}
+(\texttt{modal.py:662}) and solves $M\ddot x = Kx$ per Fourier mode.  The correct
+energy per mode is
+\[
+  E_m = \omega_m^2\,|c_m|^2\,(v_m^\dagger M\, v_m),
+\]
+where $v_m^\dagger M v_m$ is the $M$-weighted norm of the eigenvector — a
+theory-specific quantity involving kinetic coefficients such as $-\kappa^{-2}$
+(graviton) or $-\xi$ (massive torsion).  Modal or PSALTer approaches therefore
+do \emph{not} bypass the need for the Hamiltonian's kinetic structure; they
+improve the \emph{numerical form} by avoiding IBP-induced mixed operators, not
+the underlying physics calculation.  The PSALTer package (arXiv:2406.09500)
+computes the wave operator $O(k)$ in momentum space; this is equivalent and
+shares the same $M$-dependence.  See issues \#186 (modal eigendata energy)
+and \#188 (PSALTer-style k-space operator).
+
+\paragraph{Belinfante--Rosenfeld tensor.}
+The symmetric, gauge-invariant Belinfante tensor satisfies
+$T^{00}_{\mathrm{BR}} = T^{00}_{\mathrm{Noether}} + \partial_i K^{i00}$ with
+$\int K^{i00}\,d^3x = 0$ for periodic or decaying boundary conditions.
+The total energy is therefore identical; $T^{00}_{\mathrm{BR}}$ differs only
+in its local distribution, which is useful for gauge-invariant \emph{local}
+energy density comparisons but does not resolve any of the global issues above.
+
+\paragraph{Summary for current campaigns.}
+The campaign theories (gertsenshtein, torsion\_gertsenshtein, dark\_photon\_plasma)
+have no constraint fields coupling to the graviton/photon dynamical sector.
+The sector-based energy (dynamical fields only) is therefore \emph{correct for
+conversion measurements} in all current HPC runs, even though the total system
+energy may not be exactly conserved (issue~\#175 for massive\_gravity).
+Switching to k-space energy evaluation (\#312, \#313) would close the remaining
+conservation gap on periodic domains.
+
 \subsection{References}
 \label{sec:cf-references}
 
