@@ -44,20 +44,97 @@
 \setlength{\parskip}{1mm}
 \setlength{\parindent}{2mm}
 
-% === Supervisor's physics macros ===
+% === Abbreviations ===
+% Convention: MacrosTextual.tex from BHL corpus (2406.12826)
 
-% Planck mass
-\newcommand{\Planck}{M_{\text{Pl}}}
+\newcommand*{\ie}{i.e.,\@\xspace}
+\newcommand*{\eg}{e.g.,\@\xspace}
+\newcommand*{\wrt}{w.r.t.\@\xspace}
+\newcommand*{\eq}{eq.\@\xspace}
+\newcommand*{\eqs}{eqs.\@\xspace}
+
+% === Software names ===
+% Convention: MacrosNames.tex (2512.25007); MacrosMAG.tex (2406.12826)
+% All software names use \textit{}, not \textsc{} — per Barker corpus
+
+\newrobustcmd{\TIDAL}{\textit{TIDAL}\xspace}
+\newrobustcmd{\PSALTer}{\textit{PSALTer}\xspace}
+\newrobustcmd{\Hamilcar}{\textit{Hamilcar}\xspace}
+\newrobustcmd{\xAct}{\textit{xAct}\xspace}
+\newrobustcmd{\xPert}{\textit{xPert}\xspace}
+\newrobustcmd{\Mathematica}{\textit{Mathematica}\xspace}
+\newrobustcmd{\Python}{\textit{Python}\xspace}
+\newrobustcmd{\NumPy}{\textit{NumPy}\xspace}
+\newrobustcmd{\SciPy}{\textit{SciPy}\xspace}
+
+% === Planck scale ===
+% Convention: MacrosMAG.tex (2406.12826)
+% m_P (reduced Planck mass), ell_P (Planck length)
+
+\newrobustcmd{\MPl}{{m_{\mathrm{P}}}}
+\newrobustcmd{\LPl}{{\ell_{\mathrm{P}}}}
+
+% === Gravitational coupling ===
+% kappa^2 = 16 pi G  (not 8piG)
+% Convention: BHL 2406.12826 §II; Domcke 2301.02072; Barker 2510.17094
+
+\renewcommand{\kappa}{\varkappa}
+
+% === PGT quadratic action coupling constants ===
+% General quadratic PGT: a_0 R + a_1 (1)T^2 + a_2 (2)T^2 + a_3 (3)T^2 + b_1 R^2 + ...
+% Convention: MacrosMAG.tex (2406.12826); Barker 2101.02645 §II
+% Usage: \Alp{1}, \Bet{2}, \Gam{3}  (subscript placed by tensor package)
+
+\newrobustcmd{\Alp}[1]{\tensor{\alpha}{_{#1}}}
+\newrobustcmd{\Bet}[1]{\tensor{\beta}{_{#1}}}
+\newrobustcmd{\Gam}[1]{\tensor{\gamma}{_{#1}}}
+
+% === Metric and connection ===
+% Convention: MacrosMAG.tex (2406.12826)
+
+\newrobustcmd{\g}[1]{\tensor{g}{#1}}               % metric g_{mu nu}
+\newrobustcmd{\rCon}[1]{\tensor{\mathring{\Gamma}}{#1}}  % Riemannian Christoffel
+\newrobustcmd{\rcCon}[1]{\tensor*{\Gamma}{#1}}           % RC connection
 
 % Covariant derivatives
-\newcommand{\rD}[1]{\accentset{\circ}{\nabla}_{#1}}   % Riemannian
-\newcommand{\rcD}[1]{\nabla_{#1}}                       % Riemann-Cartan
+\newrobustcmd{\rD}[1]{\tensor{\mathring{\nabla}}{#1}}    % Riemannian nabla
+\newrobustcmd{\rcD}[1]{\tensor{\nabla}{#1}}              % Riemann-Cartan nabla
 
-% Curvature tensors
-\newcommand{\rR}[1]{\accentset{\circ}{R}_{#1}}         % Riemann
-\newcommand{\rcR}[1]{R_{#1}}                             % Riemann-Cartan
+% === PGT fields: connection, torsion, curvature ===
+% Convention: MacrosMAG.tex (2406.12826)
+% Usage: \MAGA{^\alpha_\mu_\nu}, \MAGT{^\alpha_\mu_\nu}, \MAGF{^\alpha_\beta_\mu_\nu}
 
-% Torsion components (use \T[1]{indices}, \T[2]{indices}, \T[3]{indices})
+\newrobustcmd{\MAGA}[1]{\tensor{\Gamma}{#1}}         % RC connection Gamma
+\newrobustcmd{\MAGT}[1]{\tensor{T}{#1}}              % torsion tensor T
+\newrobustcmd{\MAGTTilde}[1]{\tensor{\tilde T}{#1}}  % traceless torsion (^{(1)}T part)
+\newrobustcmd{\MAGF}[1]{\tensor{R}{#1}}              % curvature tensor R
+\newrobustcmd{\MAGFt}[1]{\tensor{\tilde{R}}{#1}}     % post-torsion Ricci scalar tilde-R
+
+% Riemannian curvature (ring-decorated, for contrast with RC)
+\newrobustcmd{\rR}[1]{\tensor{\mathring{R}}{#1}}     % Riemannian Riemann/Ricci
+\newrobustcmd{\rcR}[1]{\tensor{R}{#1}}               % RC Riemann/Ricci
+
+% === Electromagnetic fields ===
+% Convention: BHL 2406.12826; Barker 2510.17094
+% Usage: \FieldA{_\mu}, \FieldF{_\mu_\nu}
+
+\newrobustcmd{\FieldA}[1]{\tensor{A}{#1}}    % EM 4-potential
+\newrobustcmd{\FieldF}[1]{\tensor{F}{#1}}    % EM field strength
+\newrobustcmd{\FieldH}[1]{\tensor{h}{#1}}    % metric perturbation (TT gauge)
+
+% === Partial derivative ===
+% Convention: MacrosMAG.tex (2406.12826); Hamilcar Macros.tex (2512.25007)
+
+\newrobustcmd{\PD}[1]{\tensor{\partial}{#1}}
+
+% === Torsion irreducible decomposition ===
+% Hehl et al. Rev.Mod.Phys. 48, 393 (1976) labelling:
+%   ^{(1)}T  traceless tensor part   q_{mu nu rho}
+%   ^{(2)}T  trace vector part       T_mu = T^alpha_{\ mu alpha}
+%   ^{(3)}T  axial pseudovector      S^mu = epsilon^{alpha beta gamma mu} T_{alpha beta gamma}
+% Convention: Shapiro hep-th/0103093 §2; BHL 2406.12826; supervisor template
+% Usage: \T[1]{_{\mu\nu\rho}}, \T[2]{_\mu}, \T[3]{^\mu}
+
 \newcommand{\T}[2][]{%
   \IfEqCase{#1}{%
     {1}{\accentset{(1)}{T}_{#2}}%
@@ -67,7 +144,7 @@
   }[\PackageError{macros}{Invalid torsion index: #1}{}]%
 }
 
-% Multiplier components
+% Lagrange multiplier components (for constrained PGT action)
 \newcommand{\TLambda}[2][]{%
   \IfEqCase{#1}{%
     {1}{\accentset{(1)}{\Lambda}_{#2}}%
@@ -77,40 +154,17 @@
   }[\PackageError{macros}{Invalid multiplier index: #1}{}]%
 }
 
-% === TIDAL-specific macros ===
-% (from docs/tex/preamble.tex — project notation)
+% === Gertsenshtein effect ===
+% Conversion probability P = sin^2(kappa B_0 D / 2)
+% Convention: Boccaletti 1970; confirmed in BHL 2510.17094; Domcke 2301.02072
 
-% Fields
-\newcommand{\lag}{\mathscr{L}}           % Lagrangian density
-\newcommand{\ham}{\mathscr{H}}           % Hamiltonian density
-\newcommand{\field}[1]{\mathcal{#1}}     % field components
+\newcommand{\Bzero}{B_0}                  % background magnetic field strength
+\newcommand{\Pconv}{P_\mathrm{conv}}      % photon-graviton conversion probability
 
-% Operators
-\newcommand{\lapl}{\nabla^2}             % Laplacian
-\newcommand{\ddt}{\partial_t}            % time derivative
-\newcommand{\ddx}{\partial_x}            % spatial derivatives
-\newcommand{\ddy}{\partial_y}
-\newcommand{\ddz}{\partial_z}
+% === Lagrangian / Hamiltonian densities ===
 
-% Metrics
-\newcommand{\gmunu}{g_{\mu\nu}}
-\newcommand{\etamunu}{\eta_{\mu\nu}}
-\newcommand{\sqrtg}{\sqrt{|g|}}
-
-% Perturbation theory
-\newcommand{\pert}[1]{\delta #1}         % linear perturbation
-\newcommand{\bg}[1]{\bar{#1}}            % background value
-
-% Gertsenshtein
-\newcommand{\Bzero}{B_0}                 % background magnetic field
-\renewcommand{\kappa}{\varkappa}         % graviton-photon coupling; kappa^2 = 16piG
-                                         % convention: BHL corpus (2406.12826, 2510.17094)
-\newcommand{\Pconv}{P_\mathrm{conv}}     % conversion probability (weak field)
-
-% Torsion (TIDAL notation)
-\newcommand{\torsionT}{T}               % torsion tensor
-\newcommand{\contorsion}{K}              % contorsion tensor
-\newcommand{\ricciT}{\tilde{R}}          % Ricci scalar with torsion
+\newcommand{\lag}{\mathscr{L}}
+\newcommand{\ham}{\mathscr{H}}
 
 % =====================================================================
 % Agreed notation set for MSci report — sourced from BHL/Barker corpus
@@ -119,65 +173,28 @@
 % Metric signature: (-,+,+,+)
 %   Convention: Shapiro hep-th/0103093 §1; BHL 2406.12826; Barker 2101.02645
 %
-% Spacetime indices: Greek mu,nu,rho,... (0–3); Latin a,b,c,... (frame/tangent)
+% Spacetime indices: Greek mu,nu,rho,... (0-3); Latin a,b,c,... (frame/tangent)
 %   Convention: all BHL joint papers
 %
-% Vierbein:  e^a_{\ \mu}  (frame index up, coordinate index down)
+% Vierbein:  e^a_{\ mu}  (frame index up, coordinate index down)
 %   Convention: BHL 2406.12826 §II; 2309.14783
 %
-% Spin connection:  \omega^{ab}_{\ \ \mu}  (antisymmetric in ab)
+% Spin connection:  omega^{ab}_{\ \ mu}  (antisymmetric in ab)
 %   Convention: BHL 2406.12826 §II
 %
-% Torsion tensor:  T^\alpha_{\ \mu\nu} = \partial_\mu e^\alpha_\nu - \partial_\nu e^\alpha_\mu + ...
+% Torsion tensor:  T^alpha_{\ mu nu} = partial_mu e^alpha_nu - partial_nu e^alpha_mu + ...
 %   Convention: Hehl et al. Rev.Mod.Phys. 48, 393 (1976); Shapiro hep-th/0103093
+%   Macro: \MAGT{^\alpha_\mu_\nu} or \T[]{mu nu rho} for irrep components
 %
-% Torsion irreducible decomposition (Hehl et al. 1976 labelling):
-%   ^{(1)}T  — traceless tensor part  q_{\mu\nu\rho}
-%   ^{(2)}T  — trace vector part      T_\mu = T^\alpha_{\ \mu\alpha}
-%   ^{(3)}T  — axial pseudovector     S^\mu = \varepsilon^{\alpha\beta\gamma\mu} T_{\alpha\beta\gamma}
-%   Convention: Shapiro hep-th/0103093 §2; BHL 2406.12826 (uses same labels)
-%               Barker macros.tex \T[1]{...}, \T[2]{...}, \T[3]{...} above
-
-% Torsion trace vector
-\newcommand{\torsionTrace}[1]{T_{#1}}    % T_mu — torsion trace (^{(2)}T component)
-                                         % = T^\alpha_{\ #1\alpha}
-
-% Torsion axial pseudovector
-\newcommand{\torsionAxial}[1]{S^{#1}}   % S^mu — torsion axial (^{(3)}T component)
-                                         % = epsilon^{alpha beta gamma #1} T_{alpha beta gamma}
-                                         % Convention: Shapiro, Itin-Hehl gr-qc/0307063
-
-% Contorsion
-\newcommand{\contorsionK}[1]{K_{#1}}    % K_{mu nu rho} contorsion tensor
-                                         % Convention: Shapiro hep-th/0103093 eq (2.12)
-
-% Gravitational coupling constant
-% kappa^2 = 16 pi G  (not 8piG — confirmed in BHL 2406.12826 §II and Domcke 2301.02072)
-\newcommand{\kappaG}{\varkappa}          % graviton-photon / gravitational coupling
-
-% Gertsenshtein conversion probability
-% P = sin^2(kappa B_0 D / 2) — Boccaletti 1970; confirmed to 0.04% in TIDAL
-\newcommand{\Pgerts}{P}                  % conversion probability (main body notation)
-
-% Background magnetic field (external, static, uniform)
-\newcommand{\Bext}{B_0}                  % B_0 — background field strength
-
-% Photon field perturbation
-\newcommand{\Apert}{A_\mu}              % A_mu — EM 4-potential perturbation
-
-% Graviton perturbation
-\newcommand{\hpert}{h_{\mu\nu}}          % h_{mu nu} — metric perturbation (TT gauge)
-
-% PGT action coupling constants (BHL 2101.02645 notation for quadratic torsion)
-% General quadratic PGT Lagrangian coefficients: a_0, a_1, a_2, a_3 for torsion^2 terms
-% b_0, b_1, ... for curvature^2 terms
-% Convention: BHL 2101.02645 §II; also Sezgin-VanNieuwenhuizen PRD 21 3269 (1980)
-
-% Torsion sector coupling parameters (matches research/ TOML naming convention)
-\newcommand{\deltaone}{\delta_1}         % delta_1 — propagating torsion deformation param
-                                         % |delta_1| < 0.005 stability window (TIDAL result)
-
-% Software name macros
-\newcommand{\TIDAL}{\textsc{TIDAL}}      % TIDAL pipeline name
-\newcommand{\PSALTer}{\textsc{PSALTer}}  % PSALTer software name
-\newcommand{\Hamilcar}{\textsc{Hamilcar}} % Hamilcar software name
+% Gravitational coupling:  kappa^2 = 16 pi G
+%   Convention: BHL 2406.12826 §II; Domcke 2301.02072; M_Pl = 1/sqrt(kappa)
+%   Macro: \kappa (redefined to \varkappa by \renewcommand above)
+%
+% PGT quadratic coupling constants:
+%   alpha_n (curvature^2), beta_n (torsion^2), gamma_n (cross terms)
+%   Convention: BHL 2406.12826; 2101.02645 §II
+%   Macro: \Alp{n}, \Bet{n}, \Gam{n}
+%
+% Planck mass:  m_P  (reduced Planck mass, m_P^2 = 1/kappa)
+%   Convention: MacrosMAG.tex (2406.12826)
+%   Macro: \MPl
