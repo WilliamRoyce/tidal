@@ -78,7 +78,95 @@ Label axes with physical quantities and units. Do not use variable names alone (
 
 ---
 
-## (i) Self-Review Checklist Before Sharing a Draft
+## (i) Per-Section Templates
+
+Use these when drafting each section. Each entry names the closest-match template paper and the specific structural moves to imitate.
+
+---
+
+### §1 Introduction
+
+**Template papers:** 2206.00658 §I (HiGGS — software-physics hybrid intro); 2510.08201 §I (R² — concise, paradox-driven); 2406.12826 §I (conformal PGT — letter format, dense).
+
+**Structural moves:**
+1. Open with a living research tension, not a historical overview. The tension is: GW detectors are probing new physics, but the gauge-gravity sector they probe is theoretically vast and poorly constrained.
+2. State the deep problem in one paragraph: the Gertsenshtein channel structure in PGT is unknown, and computing it manually is infeasible for more than one model at a time.
+3. Survey prior art: Gertsenshtein/Boccaletti (mechanism), BHL (PGT landscape), PSALTer/Hamilcar (spectrum tools), TIDAL (this work). Dense citation cluster here (8–15 refs in 2–3 sentences is normal in BHL intros). Identify the gap: no systematic channel decomposition for PGT + EM has been done.
+4. Hook: "We present TIDAL, a symbolic–numerical pipeline that automates this calculation for any quadratic PGT+EM Lagrangian. We apply it to..." One paragraph.
+5. Close with one sentence per remaining section (the structural map).
+
+**Sentence-level pattern for opening:** Begin with the phenomenon, not the history. Compare: ✗ "The Gertsenshtein effect was discovered by..." vs ✓ "When gravitational and electromagnetic waves propagate through a background magnetic field, they mix — a phenomenon with direct consequences for high-frequency GW detection."
+
+---
+
+### §2 Theory
+
+**Template papers:** 2406.12826 §II (PGT framework); 2101.02645 §II (quadratic action); 2510.17094 §II–III (linearisation around background); 2510.08201 §II (action + ADM).
+
+**Structural moves for §2.1 (PGT framework):**
+1. One sentence recalling the Riemannian baseline (to fix notation, not to teach GR).
+2. Two sentences on the PGT generalisation: connection promoted to independent field; field strengths are torsion and curvature.
+3. Paired equations: curvature tensor, then torsion tensor, with identical syntactic structure.
+4. General quadratic action with coupling constants `\Bet{1}`, `\Bet{2}`, `\Bet{3}` (torsion²), etc. State: this is the most general action; special cases correspond to known theories.
+5. Irreducible decomposition in a named paragraph or subsection after the action.
+
+**Structural moves for §2.2 (linearisation):**
+1. State the background: flat metric $\eta_{\mu\nu}$, uniform static $B_0$ in the $z$-direction.
+2. Write the perturbation ansatz: $g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu}$, $A_\mu = A_\mu^{(0)} + \delta A_\mu$. State the order of truncation.
+3. State the order-counting rule immediately after the ansatz: "We work to linear order in $h_{\mu\nu}$ and $\delta A_\mu$, and to first order in $B_0$." (Pattern from 2510.17094 §II.)
+4. Derive kinetic matrix — credit the algebra with "after expanding the Lagrangian to quadratic order in the perturbations, one finds..." without displaying intermediate steps.
+
+**Do not** open §2.1 with a definition of a Lie group or a review of Yang-Mills. The BHL template assumes the reader knows gauge theory; §2.1 fixes the PGT-specific notation.
+
+---
+
+### §3 Computational Approach
+
+**Template papers:** 2206.00658 §III (HiGGS overview paragraph); 2406.09500 §I-B (PSALTer pipeline overview).
+
+**Single section, no subsections.** Target: 600 words.
+
+**Structural moves:**
+1. One paragraph: what TIDAL is (symbolic → numerical pipeline), what it automates, why automation is necessary (scale of the PGT theory space).
+2. One paragraph: the Fourier modal solver as the key numerical innovation. Lead with what it achieves (machine-precision eigendecomposition for flat periodic domains, auto-selected) before any implementation detail.
+3. One paragraph: the other solver backends (one sentence each) as context and fallback.
+4. One paragraph: validation strategy (App D) and HPC scale (App E). One sentence each, with `\cref{app:...}` forward references — do not give numbers here.
+5. Closing sentence: "Full implementation details, validation suite, and reproducibility materials are in Apps A–E."
+
+**Do not** describe the algorithm in §3. That belongs in App C. §3 states that the algorithm exists, what it achieves, and where to find it.
+
+---
+
+### §4 Results
+
+**Template papers:** 2406.12826 §V (conformal PGT results); 2303.11094 §III–IV (null + constraint framing); 2510.17094 §IV (competing-effects result).
+
+**Opening:** One sentence mapping the four subsections. "§4.1 validates TIDAL against the Boccaletti formula; §4.2–4.3 present the null results for the T1 and T2 sectors; §4.4–4.5 present the propagating-torsion findings."
+
+**§4.1 Boccaletti validation:** Lead with the formula. Show fig. 1 (simulation vs. analytic). State: "TIDAL reproduces the Boccaletti conversion probability to 0.04%." This is the positive result that validates everything downstream.
+
+**§4.2–4.3 Null results:** Use the Dandoy framing (2406.17853): "we constrain the [T1/T2] sector conversion amplification to $A < X$ across the full parameter plane (Fig. 2)." Never write "we did not find amplification". Explain the physical mechanism in one sentence: "the trace coupling vanishes at linear order because..."
+
+**§4.4 Propagating torsion:** Use the 2510.17094 plane-wave-cancellation framing: state the two sectors (hx and ax), show they enter the kinetic matrix identically, state the consequence (torsion-independence), cite App F for the derivation. One paragraph, one figure.
+
+**§4.5 Ghost diagnosis:** Use the 2510.08201 ghost-reporting pattern: state the no-ghost condition first, show it is violated in the trace sector, state the consequence. Do not call this a "failure" — call it a "diagnosis" that "identifies the trace channel as ghost-unstable at the parameter point..."
+
+---
+
+### §5 Discussion
+
+**Template papers:** 2406.12826 conclusions; 2303.11094 §V; 2510.08201 §V.
+
+**Three-move structure (see genre_conventions.md §k):**
+1. Findings restatement: plain language, no equations, ~150 words.
+2. Implications: what the null + torsion-independence mean for PGT as a physical model; the "three constructive paths" enumerated here (not in §4).
+3. Specific next steps: name one concrete theory (the non-minimal PGT with torsion–curvature cross-terms) and one concrete observable (non-zero channel amplification if the cross-term coefficient enters the kinetic matrix). This last paragraph should be completeable in one sentence per path.
+
+**Do not** put the three constructive paths in §4. They are speculative implications, not results. §4 reports what was found; §5 interprets it.
+
+---
+
+## (j) Self-Review Checklist Before Sharing a Draft
 
 Before circulating any draft section, confirm all of the following:
 

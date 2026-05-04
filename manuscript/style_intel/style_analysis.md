@@ -1,6 +1,6 @@
 # Style Intelligence: Writing Physics Papers in the Barker / BHL Register
 
-This document is a teaching resource for writing original prose in the register of Will Barker and the Barker–Hobson–Lasenby (BHL) Cambridge group. It is based on close reading of ten papers from the corpus (2406.09500, 2506.02111, 2512.25007, 2406.12826, 2303.11094, 2303.11094, 2101.02645, 2006.03581, 2003.02690, 2206.00658, 2311.11790, 2309.14783, 2008.09053, 2005.02228). Each pattern below is described analytically. One short attributed phrase illustrates the pattern where it anchors the analysis; further quotation is avoided.
+This document is a teaching resource for writing original prose in the register of Will Barker and the Barker–Hobson–Lasenby (BHL) Cambridge group. It is based on close reading of papers from the corpus: 2406.09500, 2506.02111, 2512.25007, 2406.12826, 2303.11094, 2101.02645, 2006.03581, 2003.02690, 2206.00658, 2311.11790, 2309.14783, 2008.09053, 2005.02228, 2510.08201, 2407.09598, 2205.13534; and from the Gertsenshtein literature for results-section conventions: 2510.17094 (Tomomatsu et al., not Barker-authored), 2406.17853 (Dandoy et al.), 2301.02072 (Domcke et al.). Each pattern below is described analytically. One short attributed phrase illustrates the pattern where it anchors the analysis; further quotation is avoided.
 
 ---
 
@@ -109,6 +109,42 @@ The PSALTer introduction (2406.09500) demonstrates the pattern clearly: a senten
 Self-citation follows a distinct pattern: prior papers by the same group are cited without fanfare, as factual antecedents. "Previous iterations of PSALTer were used in [refs]" is a matter-of-fact acknowledgement, not a promotional sentence. Software papers consistently cite the underlying dependency stack (xAct, Mathematica, specific sub-packages) with precise references rather than vague "standard tools" language.
 
 One unusual feature: the BHL group sometimes cites classical papers (Maxwell 1865, Einstein 1915, Proca 1936, Klein 1926, Gordon 1926) using their original bibliographic form even in a 2024 software paper. This is not pedantry; it signals that the examples are canonical physics tests, not novelties.
+
+---
+
+## (k) Theory and Calculation Section Conventions
+
+BHL physics papers follow a consistent internal structure within their theory sections, distinct from both the introduction scaffold and the software-paper architecture section.
+
+**Subsection opening moves.** Every subsection opens with a complete declarative sentence that situates the calculation: either (i) a contrastive reference to the standard framework before the deviation — "Recall that in Einstein's theory, the covariant derivative acting on a vector is simply..." (2406.12826) — or (ii) a direct statement of the first computational step — "The pure R² theory... is defined by its action," (2510.08201). Neither form begins with motivation; the motivation was supplied by the introduction. The subsection opens by *doing*.
+
+**Equation introduction verbs.** The prose sentence immediately before a displayed equation almost always uses a structural framing verb rather than an interpretive one: "is defined by", "is given by", "is provided by", "follows", "reads". These verbs locate the equation as a definition or consequence; they do not say what it means (that comes after). The meaning sentence, which always appears within two lines of the equation, uses verbs like "where", "here", "this encodes", "this ensures that".
+
+**Paired definitions.** When two tensors are related (curvature and torsion, metric and connection), BHL papers consistently define them in adjacent equations of nearly identical syntactic structure. Torsion always appears after curvature in this pairing — "These are the Riemann-Cartan curvature and torsion tensors" (2101.02645) — reinforcing the parallelism of the field-strength structure. Never define torsion in isolation; always pair it with the curvature it accompanies.
+
+**Crediting effort without showing algebra.** When a calculation is long, BHL papers credit the work with a single honest phrase and give only the result: "After some work, the ADM decomposition of the Ricci scalar follows..." (2510.08201). The reader is told that algebra happened; the algebra does not appear unless it is itself the contribution. This is the correct pattern for §2 of the report — state what was done, give the result, move on.
+
+**Derivation closure sentences.** Derivations end with one of two patterns: (a) a teleological sentence marking completion of a phase — "The canonical action is then written in the standard form" (2510.08201) — or (b) an interpretive payoff that anchors the result to physics — "Not only do we recover... but we see how local scale invariance additionally points to..." (2406.12826). Pattern (a) is used when the next subsection continues the same chain; pattern (b) is used at major section boundaries.
+
+**Linearisation around a background.** The Tomomatsu et al. paper (2510.17094) and 2510.08201 both introduce linearisation with the same move: state the background field (uniform magnetic field, flat metric), write the metric ansatz $g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu}$, then immediately state the order-counting rule ("accurate to $\mathcal{O}(B^2)$"). The order-counting statement is always present and always immediately follows the ansatz. For §2.2 of the report, introduce the linearisation ansatz, state the order of accuracy, and then state what is assumed about the background (uniform $B_0$, flat metric) before proceeding to derive anything.
+
+---
+
+## (l) Results Section Conventions in Physics Papers
+
+The results section of a BHL physics paper (or a Gertsenshtein-field paper) has conventions distinct from both the introduction and the theory section. These patterns are drawn from 2510.17094, 2406.17853, 2407.09598, and 2303.11094.
+
+**Lead with the positive validation before the null.** Every results section in this corpus opens with a calculation that works — a case where the expected physics is confirmed. Tomomatsu et al. (2510.17094) presents the plane-wave solution (which gives exact cancellation, a clean analytic result) before the spherical-wave solution (which gives the non-trivial competition). Dandoy et al. (2406.17853) opens the results with the Gertsenshtein conversion probability formula (already known) before applying it to derive the new constraint. The principle: establish that the tool reproduces known physics before using it to generate new physics.
+
+**Null results as precision findings.** When a calculation yields zero or no excess, the BHL convention — and the Gertsenshtein field convention — is to state the null as a positive characterisation of theory space. Dandoy et al. (2406.17853): "we set stringent constraints on the gravitational-wave strain $h_c$, strengthening current astrophysical bounds by ∼1–2 orders of magnitude." The language is "we constrain", "we exclude", "we set bounds on" — never "we did not find" or "there is no signal". The 276-run null sweep in §4.3 of the report should be presented as "we confirm that the trace-channel amplification satisfies $A < \epsilon$ across the full (parameter) plane" — a precision statement, not a failure report.
+
+**Quantify with explicit comparisons.** Results in this field are almost always stated as ratios or improvements relative to prior work or reference calculations. Dandoy et al. quantifies every bound against the prior state of the art. Tomomatsu et al. quantifies the competing effects (focusing vs. conversion) as a ratio. For the report, every numerical result in §4 must include: (a) the value, (b) the reference value it is being compared to (Boccaletti formula, prior PGT computation, or theoretical prediction), and (c) the precision or relative deviation.
+
+**Competing effects and cancellations.** When two effects partially cancel (torsion-independence in the hx/ax sector is an exact decoupling, analogous to the plane-wave cancellation in 2510.17094), the framing pattern is: state the two competing mechanisms, show they cancel to a given order, and then name the surviving effect. The sentence structure is: "The [first effect] and the [second effect] precisely cancel, leaving [the surviving physics]." For §4.4, present hx↔ax torsion-independence as: "the torsion coupling in the tensor sector and in the axial sector enter the kinetic matrix with equal and opposite sign at quadratic order, leaving the conversion probability torsion-independent in this sector." This follows the 2510.17094 plane-wave cancellation framing exactly.
+
+**Ghost instability results.** The R² paper (2510.08201) and the PSALTer papers set the convention for reporting ghost diagnoses: state the ghost condition first as a no-ghost requirement (positive definite residue), then show the condition is violated (residue changes sign), then state the consequence (the mode is a ghost). Never lead with "there is a ghost" — lead with the condition that would have to be satisfied and show it is not. This is the pattern for §4.5.
+
+**Section-internal roadmapping.** Results sections in 2510.08201 and 2407.09598 open with a brief forward map of the subsections: "In Sec. X we derive...; In Sec. Y we show...; In Sec. Z we demonstrate..." This is distinct from the global roadmap in the introduction. For §4 of the report, open with one sentence mapping the four subsections (validation → Stage A null → Stage B null → propagating PGT) before diving in.
 
 ---
 

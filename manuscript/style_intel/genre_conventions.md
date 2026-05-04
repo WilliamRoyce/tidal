@@ -106,3 +106,51 @@ In Hamilcar (2512.25007), the scope statement is more precisely calibrated: the 
 **From HiGGS to Hamilcar:** HiGGS (2206.00658) is presented as an HPC survey instrument — the emphasis is on scale. Hamilcar is presented as a general-purpose algebraic tool. HiGGS lacks a formal API section; Hamilcar has a complete one. The genre understanding has matured: software papers now need an API reference section, not just an existence proof.
 
 **Persistent genre signature across all four papers:** Every paper in this group ends its examples section with a non-trivial case that would have been impractical without the tool. This "flagship example" structure closes the loop between the motivating problem (stated in the introduction) and the delivered capability (demonstrated in the examples). The flagship example is always a theory from the literature, not a synthetic benchmark.
+
+---
+
+## The BHL Physics-Calculation Paper
+
+The five sections above cover the software-paper genre. §1, §2, §4, and §5 of the TIDAL report are primarily physics-theory content. Their genre conventions are distinct and are documented here, drawn from: 2406.12826, 2101.02645, 2510.08201, 2407.09598, 2303.11094, 2205.13534, and 2510.17094.
+
+### (h) Macro-Structure of a BHL Physics Paper
+
+A BHL physics paper at letter or short-article length (≤ 15 pages) has the following macro-structure:
+
+1. **Abstract** (~180 words): phenomenon → contribution → scope statement or main finding.
+2. **Introduction** (one section, ~600–800 words): four-stage scaffold (Frontier → Deep Problem → Prior Art → Hook). Ends with a structural paragraph mapping the remaining sections.
+3. **Framework / Theory** (one or two sections): establishes the gauge structure, defines fields and notation, derives or states the key equations of motion or particle spectrum. Subsections are organised by the logical chain of the derivation, not by topic alone.
+4. **Results / Analysis** (one or two sections): applies the framework. Opens with validation (known case reproduced), then advances to new results. Null results and constraints are reported before speculative findings.
+5. **Conclusions / Discussion** (one section, ~400–600 words): three paragraphs — what we found, what it means for the broader programme, what should be done next. The final paragraph is always forward-looking but specific: not "future work is important" but "the next step is to test whether X holds at nonlinear order."
+6. **Appendices**: proofs, extended tables, computational details that are primary data but would interrupt the main narrative.
+
+The TIDAL report departs from this macro-structure only by inserting a "Computational approach" section (§3) between theory and results — otherwise it follows the template exactly.
+
+### (i) How BHL Papers Introduce Gauge Theory Frameworks
+
+The theory section of a BHL gauge-gravity paper follows a strict pedagogical sequence:
+(a) Recall the Riemannian baseline (Levi-Civita connection, standard GR) in one or two sentences.
+(b) State the generalisation: "In Poincaré gauge theory, the connection is promoted to an independent field." No more than two sentences.
+(c) Define the two field strengths (curvature, torsion) in paired adjacent equations with nearly identical structure.
+(d) State the most general quadratic action in the field strengths, with named coupling constants.
+(e) Introduce the irreducible decomposition only after the action — never before.
+
+Step (a) is present even in papers where the reader is assumed to know GR. Its purpose is to fix notation for the paper, not to teach GR. Step (e) is often in a subsection or named paragraph of its own ("Irreducible torsion", "Torsion decomposition").
+
+### (j) How BHL Papers Handle a Parameter Space Result
+
+When a calculation involves scanning a space of coupling constants or model parameters (as in §4 of the report):
+
+- The **parameter space is always defined before any scan results are presented**. A table or list naming every parameter, its range, and its physical meaning appears before the first result figure.
+- **Positive validation is always the first result**, even if the main scientific contribution is a null or a constraint.
+- **Constraints are stated as closed inequalities**, not as upper/lower bounds from a scan: "ghost freedom requires $a_1 > 0$", not "our scan found no ghosts above $a_1 = 0$".
+- **Figures carry the primary result load in long parameter scans**; prose identifies the key feature visible in each figure (the boundary of the stable region, the torsion-independent line) without repeating the number already readable in the plot.
+- When the scan result is a null (no amplification found across the parameter space), the result is quantified as a precision bound: "conversion probability matches the torsion-free prediction to within $\delta < 10^{-5}$ across the entire $(a_1, a_3)$ plane". The prose then explains what physical mechanism enforces the null.
+
+### (k) Discussion Section Conventions in BHL Physics Papers
+
+The discussion section of a BHL physics paper (2303.11094, 2406.12826, 2510.08201) has a recognisable three-move structure:
+
+1. **Restatement of findings** (~1 paragraph): a plain-language summary of what was found, without equations. Uses "we have shown that...", "we found that...", "our main finding is that...". Does not hedge retrospectively — findings that were reported as provisional in the results section are stated confidently in the conclusions.
+2. **Implications for the programme** (~1–2 paragraphs): what the findings imply for the broader theoretical programme. This is where the "three constructive paths" framing belongs in the TIDAL report — not in the results section. The standard move is: "If our null result is robust, it has the following implication for X... however, three avenues remain open: [list]."
+3. **Specific next steps** (~1 paragraph): one or two concrete, specific research questions that follow directly from the paper's findings. Not vague ("future work should explore...") but actionable: "The natural next step is to apply TIDAL to the full non-minimal PGT Lagrangian (App. B), which contains the torsion–curvature cross-term that the present campaign excluded by construction." This closing paragraph should name a specific theory, a specific observable, or a specific calculational extension.
