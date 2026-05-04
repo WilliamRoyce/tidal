@@ -490,22 +490,43 @@ Phase 6.B survival analysis predicted Δlog Z ≈ −0.036 nats; this run verifi
 | k_IC-only (canonical − Track 1, both with probe) | **+4.320** | 28789437/9579 vs 28838011 |
 | **Total (canonical − original)** | **+4.355** | — |
 
-### Track 1 sup (probe-only, k_IC=2.0)
+### Track 1 sup (probe-only, k_IC=2.0) — final
 
-| Job | k_IC | Probe | Status | log Z | Notes |
-|-----|------|-------|--------|-------|-------|
-| 28519675 (original sup) | 2.0 | none | COMPLETED | +15.911 ± 0.13 | Baseline |
-| **28841945** (Track 1 sup) | **2.0** | canonical + Hwang–Noh | **RUNNING** | TBD | Probe-only correction (sup side) |
+| Job | k_IC | Probe | Status | Wall | log Z | Notes |
+|-----|------|-------|--------|------|-------|-------|
+| 28519675 (original sup) | 2.0 | none | COMPLETED | 16:30 | +15.911 ± 0.152 | Baseline |
+| **28841945** (Track 1 sup std) | **2.0** | canonical + Hwang–Noh | **COMPLETED** | 2:20:39 | **+16.034 ± 0.141** | Primary |
+| **28842500** (Track 1 INTR r1) | **2.0** | same | TIMEOUT | 1:00:08 | — | Checkpoint only |
+| **28848651** (Track 1 INTR r2) | **2.0** | same | **COMPLETED** | 0:45:23 | **+16.063 ± 0.169** | Cross-check |
+| **Weighted avg (28841945 + 28848651)** | — | — | — | — | **+16.046 ± 0.108** | Final |
 
-Submitted 2026-05-04 alongside Track 1 amp (28838011, completed). Standard icelake 6h queue (sup
-landscape is broader; original 28519675 took 16:30 wall). Phase 6.A MAP check confirmed the
-published sup MAP survives the canonical probe at γ_eff=0.101 (≪ threshold 0.3), so the
-expectation is log Z ≈ +15.9 with only a small probe-only shift. If the shift is > 1 nat the
-suppress landscape is more probe-sensitive than the MAP check suggested.
+**Probe-only Δ (sup side):** +16.046 − 15.911 = **+0.135 ± 0.169 nats** — within 1σ of zero.  
+**28841945 MAP:** α₁=+0.423, α₂=+1.096, α₃=+0.493, δ₁=+1.359 (close to original +0.333/+0.916/+0.916/−1.291).  
+D_KL = 8.872 nats; ESS = 1918 (std) / 2204 (INTR r2).
 
-**Conclusion:** the +4.4 nat shift between the original D1 amp result and the canonical Phase 6.C
-result is **dominated almost entirely by the k_IC change** (2.0 → 2π/100), not the probe gate.
-The canonical probe + Hwang–Noh gate adds essentially zero to log Z at the original k_IC. The
-canonical-vs-original log Z shift is therefore a *physical* effect of probing the long-wavelength
-fundamental mode (k_IC=2π/100) instead of the short-wavelength mode (k_IC=2.0), exposing genuine
-amplification in the stable sector that the original short-wavelength analysis simply did not access.
+**Corner plots:**
+- Sup std: `hpc_results/28841945/corner_28841945_sup_track1.png`
+
+---
+
+## Phase 6 — Final Three-Way Bayes Factor Comparison
+
+| Setting | log Z_amp | log Z_sup | B = exp(amp − sup) | Verdict |
+|---------|-----------|-----------|---------------------|---------|
+| Original (k_IC=2.0, no probe) | −2.261 ± 0.066 | +15.911 ± 0.152 | **1.28×10⁻⁸** | Sup overwhelmingly |
+| Track 1 (k_IC=2.0, canonical probe) | −2.226 ± 0.065 | +16.046 ± 0.108 | **1.16×10⁻⁸** | Sup overwhelmingly |
+| Canonical (k_IC=2π/100, canonical probe) | +2.094 ± 0.041 | +12.471 ± 0.164 | **3.1×10⁻⁵** | Sup overwhelmingly |
+
+### Key decomposition
+
+| Component | Δlog Z amp (nats) | Δlog Z sup (nats) |
+|-----------|-------------------|-------------------|
+| Probe-only (Track 1 − original, k_IC=2.0) | **+0.035 ± 0.093** | **+0.135 ± 0.169** |
+| k_IC-only (canonical − Track 1, both with probe) | **+4.320** | **−3.575** |
+| **Total (canonical − original)** | **+4.355** | **−3.440** |
+
+**Interpretation:**
+- The canonical probe is **probe-neutral on both sides** — it shifts amp log Z by ~+0.04 nats and sup log Z by ~+0.14 nats, both within 1σ of zero.
+- The k_IC change (2.0 → 2π/100) is the dominant driver on both sides: it raises amp log Z (+4.32 nats, exposing stable-sector amplification at long wavelengths) and lowers sup log Z (−3.58 nats, as the suppression landscape at k_IC=2π/100 is less favourable for multi-modal clustering than at k_IC=2.0).
+- **The qualitative verdict is unchanged at every setting:** T4 Ricci-EM strongly favours suppression over amplification across all numerical configurations tested.
+- The Bayes factor range is B ∈ [1.2×10⁻⁸, 3.1×10⁻⁵] — decisive suppression evidence regardless of probe or k_IC choice.
