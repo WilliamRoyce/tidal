@@ -85,8 +85,9 @@ These need entries in `references.bib` — no TeX to download:
 
 - [x] Create `manuscript/style_intel/` directory
 - [x] Write `manuscript/style_intel/style_analysis.md` — 117 lines, covers all 10 patterns (a–j), analytical prose
-- [x] Write `manuscript/style_intel/genre_conventions.md` — 108 lines, covers (a–g) + cross-paper evolution notes
-- [x] Create `manuscript/STYLE_GUIDE.md` — 96 lines, actionable checklist with 9 sections + self-review list
+- [x] Write `manuscript/style_intel/genre_conventions.md` — covers (a–g) + BHL physics-calculation sections (h–k) + cross-paper evolution notes
+- [x] Write `manuscript/style_intel/genre_conventions_theory.md` — comprehensive theoretical paper genre (18 papers across 3 clusters): 6 paper sub-types, title/abstract/intro/theory/results/discussion/appendix conventions, Gertsenshtein-specific patterns, agent-use summary
+- [x] Create `manuscript/STYLE_GUIDE.md` — actionable checklist (a–j), per-section templates §1–§5, self-review checklist
 
 ### Commit
 
