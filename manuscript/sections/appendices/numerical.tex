@@ -1,0 +1,81 @@
+% Appendix C: Numerical evolution of the linearised system (~2000 w).
+% Per genre_conventions_software.md §(j). Renamed from "Numerical stage"
+% — the title now describes what the appendix actually does (evolves the
+% linearised system numerically), matching the BHL convention of
+% content-bearing names. The Fourier modal solver receives the longest
+% treatment because it is the primary backend; the others are documented
+% briefly.
+
+\section{Numerical evolution of the linearised system}%
+\label{NumericalEvolution}
+
+\paragraph*{Solver selection hierarchy}
+% TODO: opener — modal --> IDA --> CVODE --> leapfrog --> scipy;
+% auto-selection logic: which equation properties trigger each backend.
+
+\subsection{Fourier modal solver}%
+\label{ModalSolver}
+% Target ~800 w — primary backend, longest treatment.
+
+\paragraph*{Eigendecomposition}
+% TODO: constant-coefficient case — exact matrix exponential. State what
+% "machine precision" means in this context.
+
+\paragraph*{Position-dependent coefficients}
+% TODO: Krylov \texttt{expm\_multiply}.
+
+\paragraph*{Constraint elimination}
+% TODO: Fourier Schur complement.
+
+\paragraph*{Mathematical foundations}
+% TODO: cite \cite{higham2008functions} and \cite{molervanloan2003nineteen}
+% for matrix-exponential methods.
+
+% Figure C.1 — Fourier modal solver convergence. Referenced from App D.
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figC1_solver_convergence}
+  % TODO caption: "Fourier modal solver convergence: relative error vs grid
+  % resolution for Einstein–Maxwell at $\Bzero = [\text{value}]$,
+  % $D = [\text{value}]$. The solver attains machine precision
+  % ($\sim 10^{-14}$) at modest resolution, demonstrating the
+  % spectral-precision behaviour expected for a constant-coefficient
+  % system. This figure also satisfies the App D convergence requirement."
+  \caption{TODO: solver convergence vs resolution.}
+  \label{SolverConvergence}
+\end{figure}
+
+\subsection{Analytical Jacobian}%
+\label{AnalyticalJacobian}
+% Target ~400 w.
+
+\paragraph*{Three-tier structure}
+% TODO: dense (N <= 2K), sparse (2K < N <= 200K), GMRES (N > 200K). One
+% sentence on when each is active.
+
+\paragraph*{Speedup factors}
+% TODO: quote the measured speedups (5.3x dense; 2.5x IDA sparse;
+% 1.2–1.4x CVODE sparse) from solver_optimizations.tex.
+
+\subsection{Other backends}%
+\label{OtherBackends}
+% Target ~200 w total.
+
+\paragraph*{IDA}
+% TODO: 3–4 sentences on DAE / constraint handling.
+
+\paragraph*{CVODE}
+% TODO: 3–4 sentences on adaptive ODE for waves.
+
+\paragraph*{Leapfrog}
+% TODO: 3–4 sentences on symplectic integration.
+
+\paragraph*{scipy}
+% TODO: 3–4 sentences on general-purpose fallback.
+
+\paragraph*{JSON-to-solver interface}
+% TODO: closing paragraph with two distinct moves —
+% (i) coefficient-matrix EXTRACTION from the JSON spec (which fields are
+% read, how they are interpreted); (ii) solver DISPATCH (how
+% auto-selection decides which backend to call given the extracted
+% properties). One sentence each.

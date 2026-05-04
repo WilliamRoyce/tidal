@@ -1,0 +1,103 @@
+% Appendix D: Validation against analytic limits and reference models
+% (~1300 w). Per genre_conventions_software.md §(k) Barker validation
+% hierarchy. Renamed from "Validation suite" to a content-bearing title
+% that matches the BHL convention (compare PSALTer v2's "Analytic
+% calibration" / "Spectral calibration" naming).
+%
+% This appendix also hosts the trace-channel ghost diagnosis as a
+% methodology-validation case (was §4.5; demoted because a single-point
+% diagnosis is not a §4 result), and the new stability-guard paragraph
+% documenting the engineering work that protects survey results from
+% off-grid plane-wave-IC spectral leakage.
+
+\section{Validation against analytic limits and reference models}%
+\label{Validation}
+
+\paragraph*{Analytic limits}
+% TODO: massless Klein–Gordon, Maxwell. Compare TIDAL output to textbook
+% result. Optionally one figure per case, or a summary figure with
+% subpanels.
+
+\paragraph*{Reference-model reproduction}
+% TODO: Boccaletti formula validation. Most important validation result.
+% Cross-ref \cref{BoccalettiValidation} (main body) and report the
+% quantitative agreement here.
+
+% Pathological-cases paragraph — hosts the trace-channel ghost diagnosis
+% as methodology validation (the §4.5 result was demoted here per the
+% structural review).
+\paragraph*{Pathological cases}
+% TODO: ~250 w. Demonstrates that TIDAL correctly diagnoses ghost
+% instability at a known unstable parameter point. This validates the
+% diagnosis methodology (TIDAL produces an exponentially-growing
+% time-domain signal at parameter points where the no-ghost condition is
+% violated). State the no-ghost condition as a closed inequality (eqn
+% \cref{NoGhostCondition}) citing \cite{sezgin1980ghostfree} and
+% \cite{lin2019pgt}; report whether the inequality is satisfied at the
+% studied parameter point; cross-ref \cref{TraceKineticOutput} (App E)
+% for the kinetic matrix that exhibits the wrong-sign coefficient.
+% Frame as methodology validation, not as a sector-wide claim.
+\begin{align}
+  % TODO: no-ghost inequality
+  \label{NoGhostCondition}
+\end{align}
+
+% Convergence paragraph — same figure (SolverConvergence) used by App C.
+\paragraph*{Convergence}
+% TODO: convergence test for the Fourier modal solver. Cross-ref
+% \cref{SolverConvergence} (App C — same figure serves App D). State
+% the convergence rate (spectral / machine-precision for the modal
+% solver).
+
+% Stability-guard paragraph documents the engineering work that was
+% previously invisible in the report.
+\paragraph*{Stability guard for plane-wave initial conditions}
+% TODO: ~150 w. Document the stability guard that prevents spurious
+% exponential growth from off-grid initial-condition spectral leakage.
+% Off-grid `--ic-wavevector` values cause cos(k·x) to leak amplitude
+% onto every discrete Fourier mode, including modes with tachyonic
+% eigenvalues in PGT systems with cross-coupling — this triggers
+% spurious SimulationDivergedError. TIDAL auto-snaps the IC wavevector
+% to the nearest discrete mode (clamped below Nyquist) to eliminate
+% the leakage. Reference docs/tex/plane_wave_ic.tex; cite GitHub issue
+% #263 for the original observation. Frame as a methodology
+% contribution that protects survey results from a specific
+% well-defined failure mode.
+
+% Figure D.1 — Stage A heatmap.
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figD1_stageA_heatmap}
+  % TODO caption: "Stage A heatmap: $\Pconv^\text{max}$ in the
+  % $(m_A, \varepsilon)$ parameter plane for the [sector] at
+  % $\Bzero = [\text{value}]$, $t_\text{end} = [\text{value}]$. Bounds
+  % the amplification across the swept region; supports the
+  % corresponding row of \cref{SectorSurveyTable} (§4.2)."
+  \caption{TODO: parameter-plane heatmap supporting a sector-survey row.}
+  \label{StageAHeatmap}
+\end{figure}
+
+% Figure D.2 — Stage B sweep.
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figD2_stageB_sweep}
+  % TODO caption: "Stage B sweep: scatter of $\Pconv^\text{max}$ vs the
+  % analytic baseline $\sin^2(\kappa\Bzero t/2)$ across [N] runs in the
+  % swept torsion-coupling region. The tight diagonal supports the
+  % corresponding row of \cref{SectorSurveyTable}."
+  \caption{TODO: sweep scatter of $\Pconv$ vs analytic baseline.}
+  \label{StageBSweep}
+\end{figure}
+
+% Figure D.3 — Channel comparison.
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figD3_channel_comparison}
+  % TODO caption: "Channel comparison: time evolution of conversion
+  % probability in the $h_\times \leftrightarrow \mathrm{ax}$ channel
+  % (solid) and the trace channel (dashed). The two channels behave
+  % qualitatively differently, supporting the channel-decomposition
+  % framing of \cref{ChannelStructure}."
+  \caption{TODO: channel comparison; hx<->ax vs trace time series.}
+  \label{ChannelComparison}
+\end{figure}

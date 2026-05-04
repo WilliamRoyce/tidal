@@ -1,0 +1,31 @@
+% Appendix B: Symbolic computation of the equations of motion (~1600 w).
+% Per genre_conventions_software.md §(i). Renamed from "Symbolic stage"
+% — the BHL convention is content-bearing names (compare PSALTer v2's
+% "Construction of operators", "Moore--Penrose pseudoinversion") rather
+% than pipeline-stage labels.
+
+\section{Symbolic computation of the equations of motion}%
+\label{SymbolicComputation}
+
+\paragraph*{xAct environment}
+% TODO: which packages are loaded; why \xPert is used for metric
+% perturbations (not xTens alone); why xTras is needed for the
+% Einstein–Cartan coupling.
+
+\paragraph*{Lagrangian input from TOML}
+% TODO: how a TOML config becomes a Wolfram session; representative
+% user-session listing showing how to invoke `tidal derive`.
+
+\paragraph*{Euler--Lagrange derivation}
+% TODO: E-L velocity form (state, v, A0); not Legendre transform.
+
+\paragraph*{Component decomposition}
+% TODO: DecomposeToComponents, cross-field handling via additionalFields.
+% Brief note on why component-level E-L is required.
+
+\paragraph*{JSON export}
+% TODO: which fields are written; how the canonical block is constructed.
+
+\paragraph*{Failure modes and diagnostics}
+% TODO: derivation timeouts, index inconsistency, malformed JSON; how
+% each is diagnosed.

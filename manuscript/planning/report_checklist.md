@@ -233,4 +233,37 @@ A three-agent structural review identified that the initial Phase 2 scaffolding 
 
 ### Commit
 
-- [ ] Commit Phase 2.1 restructure
+- [x] Commit Phase 2.1 restructure (f6e0efd)
+
+---
+
+## Phase 2.2 — Appendix split and BHL-flavoured renaming
+
+A check of the cached BHL/Barker corpus showed that appendix titles are uniformly content-bearing (compare PSALTer v2's "Construction of operators", "Moore--Penrose pseudoinversion", "Chequer-Hermicity"; Hamilcar's "Gauss--Codazzi and the Ricci scalar"; BHL long paper 2101.02645's "Irreducible decomposition of the fields", "Nonlinear Poisson brackets"). Generic stage labels like "Symbolic stage" / "Numerical stage" do not appear anywhere in the corpus. Splitting the single `appendices.tex` into per-appendix files is also a forward-looking decision given the anticipated content volume.
+
+### Per-appendix file split
+
+- [x] Create `manuscript/sections/appendices/` subdirectory
+- [x] `appendices/architecture.tex` — App A "TIDAL pipeline architecture"
+- [x] `appendices/symbolic.tex` — App B "Symbolic computation of the equations of motion" (was "Symbolic stage")
+- [x] `appendices/numerical.tex` — App C "Numerical evolution of the linearised system" (was "Numerical stage")
+- [x] `appendices/validation.tex` — App D "Validation against analytic limits and reference models" (was "Validation suite")
+- [x] `appendices/symbolic_outputs.tex` — App E "Symbolic-pipeline outputs for the surveyed theories"
+- [x] `appendices.tex` rewritten as a five-line wrapper that `\input`s each per-appendix file
+
+### Label renames (cross-refs updated everywhere)
+
+- [x] `\label{SymbolicStage}` → `\label{SymbolicComputation}` (App B)
+- [x] `\label{NumericalStage}` → `\label{NumericalEvolution}` (App C)
+- [x] `computational_approach.tex` cross-refs updated: `\cref{NumericalStage}` → `\cref{NumericalEvolution}`
+- Other labels (`Architecture`, `Validation`, `SymbolicOutputs`, `ModalSolver`, `AnalyticalJacobian`, `OtherBackends`, etc.) unchanged.
+
+### Verification
+
+- [x] `pdflatex` compiles cleanly to a 4-page PDF.
+- [x] Compiled PDF shows "Appendix A: TIDAL pipeline architecture", "Appendix B: Symbolic computation of the equations of motion", "Appendix C: Numerical evolution of the linearised system", "Appendix D: Validation against analytic limits and reference models", "Appendix E: Symbolic-pipeline outputs for the surveyed theories".
+- [x] No undefined references; cross-refs from main body to appendices resolve.
+
+### Commit
+
+- [ ] Commit Phase 2.2 appendix split
