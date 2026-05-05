@@ -2,15 +2,19 @@
 
 These tests pin the empirical Stage C truth-table results
 (:file:`stage_c_truth_table.csv` at repo root): the unit-IC all-k Padé
-probe at ``threshold=0.3`` and ``t_test=20`` must catch the
-contamination samples found by the post-hoc t-independence audit on
-the D1 amplify chain (HPC job 28520217), and must not over-reject
+probe at ``threshold=0.15`` and ``t_test=20`` (post-#341) must catch
+the contamination samples found by the post-hoc t-independence audit
+on the D1 amplify chain (HPC job 28520217), and must not over-reject
 samples the audit confirmed perturbative.
 
-Sample 391 is a known residual: ``γ_eff(t=20)=0.272 < 0.3``, so the
-probe alone does not catch it; the inline Hwang–Noh gate in
-:mod:`tidal.inference._likelihood` rejects it after the simulation
-runs.
+Threshold history:
+* Pre-#341: ``threshold=0.3`` caught 56/57 contamination — sample 391
+  (γ_eff(t=20)=0.272) leaked through; caught only by the inline
+  Hwang–Noh ``P_max > 0.5`` gate after the simulation.
+* Post-#341: ``threshold=0.15`` catches 57/57 (sample 391 included);
+  motivated by Phase 6 hi-res D1 amp MAP at γ_eff=0.281, where the
+  γ ∈ [0.15, 0.30] regime produced exponential A(t) ∝ exp(0.27·t)
+  and failed the t_end-independence cross-check (#340).
 
 See ``docs/tex/stability_probe.tex`` for the architecture and #323
 Stage C investigation for the empirical foundations.
@@ -47,10 +51,11 @@ IC_K = 0.06283185307179587
 KAPPA = 1.0
 B0 = 0.01
 
-# Known-residual sample index — γ_eff(t=20)=0.272, just under the 0.3
-# threshold; caught by the inline Hwang–Noh gate after sim, not by the
-# probe.
-KNOWN_PROBE_RESIDUAL = {"391"}
+# Known-residual samples not caught by the probe.  Empty post-#341:
+# sample 391 (γ_eff=0.272) is now caught by the threshold=0.15 probe.
+# Kept as a sentinel set so future regressions can be flagged here
+# without changing test logic.
+KNOWN_PROBE_RESIDUAL: set[str] = set()
 
 
 def _load_d1() -> tuple[EquationSystem, GridInfo]:
@@ -313,7 +318,15 @@ class TestProbePerformance:
         #    ``optimize=True``.  Saved ~12 ms/call.
         #
         # Combined: median dropped from ≈ 27.6 ms → ≈ 13 ms (2.13×).
-        # Budget set ~15 % above the observed p99 (≈ 26 ms) to absorb
-        # CI noise without being flaky.  A 50 % rise here would
-        # indicate a real regression.
-        assert median_ms <= 20.0, f"median probe wall {median_ms:.2f} ms > 20 ms"
+        #
+        # Post-#341 (threshold 0.30 → 0.15): the spectral-radius
+        # prefilter cutoff is ``threshold * t_test`` so dropping the
+        # threshold by 2× admits roughly twice as many modes through
+        # the ``expm`` call — observed median rose from ~13 ms to
+        # ~62 ms (T1 N=32). The probe is still fast in absolute terms
+        # (∼60 ms vs typical sample-time of seconds) and the wall-time
+        # cost is the unavoidable price of tightening the threshold
+        # without weakening probe correctness. Budget set ∼25 % above
+        # the observed median; a 50 % rise here would indicate a real
+        # regression beyond the expected #341 cost.
+        assert median_ms <= 80.0, f"median probe wall {median_ms:.2f} ms > 80 ms"

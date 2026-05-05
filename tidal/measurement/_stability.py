@@ -39,7 +39,11 @@ audit) showed three probe variants on the D1 amplify chain's 57
 audited contamination samples:
 
 * ``v1`` (unit IC at source slot, all k, ``threshold=0.3``,
-  ``t_test=10``): **56/57** caught.
+  ``t_test=10``): **56/57** caught (sample 391's γ_eff(t=20)=0.272
+  was the residual — leaked through).
+* ``v1.5`` post-#341 (unit IC at source slot, all k,
+  ``threshold=0.15``, ``t_test=20``): **57/57** caught;
+  see :ref:`Phase 6 hi-res perturbativity finding <#341>`.
 * ``v2`` (consistent-IC FFT'd into k-space, only IC-coupled k bins
   checked): **0/57**.
 * ``v3`` candidate (consistent-ic-solve via
@@ -62,9 +66,10 @@ Probe cost is dominated by the spectral-radius prefilter (committed
 6a7d638) which skips ``expm`` whenever ``‖M·t_test‖ ≤ threshold·t_test``;
 the longer ``t_test`` adds one extra Padé squaring on the modes that
 do trigger the call (≈5 % overall cost).  Sample 391's Hwang–Noh
-slow-growth case has γ_eff(t=20)=0.272 — still below the 0.3
-threshold; this last residual is caught by the inline ``P_max > 0.5``
-gate in ``tidal/inference/_likelihood.py`` after the simulation runs.
+slow-growth case has γ_eff(t=20)=0.272 — caught by the post-#341
+threshold of 0.15 (was the residual under the original 0.3 threshold,
+where it was caught only by the inline Hwang–Noh gate after the
+simulation).
 
 References
 ----------
@@ -97,7 +102,7 @@ if TYPE_CHECKING:
 # column) so the chain-time probe used by a given chain can be
 # identified after the fact.  Bumping the probe is a public-API change:
 # pick a new name and update ``docs/tex/stability_probe.tex``.
-PROBE_PROFILE_NAME: str = "unit-ic-all-k-0.3"
+PROBE_PROFILE_NAME: str = "unit-ic-all-k-0.15"
 
 # Lower bound of the borderline strip used by the post-hoc audit's
 # sample selection.  Empirically the false-negative regime is the top
@@ -153,7 +158,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
     target: str = "a_1",  # noqa: ARG001
     baseline_overrides: dict[str, float] | None = None,  # noqa: ARG001
     ic_wavevector: float | None = None,
-    threshold: float = 0.3,
+    threshold: float = 0.15,
     t_test: float = 20.0,
     n_extra_k: int = 4,  # noqa: ARG001
     conservative: bool = False,  # noqa: ARG001
@@ -209,11 +214,15 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         are checked regardless).  Default: ``2π/L`` (fundamental mode).
     threshold : float
         Maximum effective growth rate ``γ_eff`` before the run is
-        classified as tachyonic (default: 0.3).  ``exp(0.3·t_end) ≈
-        20×`` source-norm growth at ``t_end=10`` — typically the
-        boundary where the simulation's own divergence pre-check
-        (#298) catches things, matching the simulation's own
-        conservatism.
+        classified as tachyonic (default: 0.15, post-#341).  At
+        ``t_end=10`` this caps source-norm growth at
+        ``exp(0.15·10) ≈ 4.5×`` — comfortably perturbative and
+        catches the γ ∈ [0.15, 0.30] regime that the original 0.3
+        threshold missed (Phase 6 hi-res D1 amp MAP at γ_eff=0.281
+        produced exponential A(t) ∝ exp(0.27·t), not periodic
+        Gertsenshtein; see #340).  Stage C truth-table regression at
+        the new threshold: 57/57 contamination caught, 0/93
+        perturbative samples falsely rejected.
     t_test : float
         Probe time for the Padé evolution (default: 20.0; was 10.0 in
         the v1 probe).  Larger ``t_test`` catches additional slow-
@@ -221,9 +230,8 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
         evolution window.  Probe cost increases ≈5 % (one extra Padé
         squaring on the modes that survive the spectral-radius
         prefilter).  Sample 391's slow-growth case has
-        ``γ_eff(t=20)=0.272 < 0.3``; that final residual is caught
-        by the inline ``P_max > 0.5`` gate in the likelihood after
-        the simulation runs.
+        ``γ_eff(t=20)=0.272``; under the post-#341 threshold of 0.15
+        it is now caught by the probe directly.
     n_extra_k : int
         Deprecated.  All k modes are checked.
     conservative : bool

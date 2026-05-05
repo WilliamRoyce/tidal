@@ -63,7 +63,13 @@ $\gamma_{\text{eff}} > \tau$.
 tachyonic if any $k$ mode produces $\gamma_{\text{eff}} > \tau$.
 \end{enumerate}
 
-The default thresholds are $\tau = 0.3$ and $t_{\text{test}} = 20$.
+The default thresholds are $\tau = 0.15$ and $t_{\text{test}} = 20$
+(post-\#341, see \S\ref{sec:threshold-tightening}). Earlier
+campaign chains (D1 v5, Stage A v5, Phase 6.B/C) used $\tau = 0.3$
+with the same $t_{\text{test}} = 20$; bumping the probe is a public
+API change and the chain CSV's
+\texttt{stability\_profile} column records which probe version
+gated each chain.
 
 \subsection{Why the block 2-norm, not the source-field amplitude}
 \label{sec:block-norm-not-source}
@@ -371,14 +377,100 @@ longer $t_{\text{test}}$ adds at most one extra Pad\'e squaring on
 the modes that survive the prefilter, an empirically measured ${\sim}5\%$
 overall cost.
 
-A residual remains: the truth-table sample 391 has
-$\gamma_{\text{eff}}(t = 20) = 0.272 < 0.3$, just below the threshold.
-This sample is not caught by the probe at any reasonable
-$t_{\text{test}}$ within the linear-eigenvalue limit; it is caught
-instead by the inline $P_{\max}$ gate after the simulation runs. The
-test \texttt{tests/test\_stability.py::TestStageCTruthTable::%
-test\_contamination\_caught} pins this residual via the
-\texttt{KNOWN\_PROBE\_RESIDUAL} set.
+Pre-\#341 residual: under the original threshold $\tau = 0.3$
+the truth-table sample 391 has $\gamma_{\text{eff}}(t = 20) = 0.272$,
+just below threshold and not caught by the probe at any reasonable
+$t_{\text{test}}$ within the linear-eigenvalue limit. The post-\#341
+threshold $\tau = 0.15$ catches this sample directly
+(\S\ref{sec:threshold-tightening}); the
+\texttt{KNOWN\_PROBE\_RESIDUAL} set in
+\texttt{tests/test\_stability.py::TestStageCTruthTable} is therefore
+empty in current code, kept as a sentinel for any future regression.
+
+\subsection{Post-\#341 threshold tightening to $\tau = 0.15$}
+\label{sec:threshold-tightening}
+
+The Phase 6.C.2 publication chain (D1 hi-res amp, HPC job 28789437)
+attained $A_{\max} = 200$ at MAP, hitting the Hwang--Noh saturation
+cap. A direct perturbativity cross-check at the MAP (\#340) found:
+\begin{itemize}
+\item $B_0$ scaling: $A$ varies by $0.62\%$ over $B_0 \in [10^{-4},
+10^{-2}]$ at fixed $t_{\text{end}} = 10$ — \emph{passes}.
+\item $t_{\text{end}}$ independence: $A(t_{\text{end}})$ grows as
+$\exp(\gamma\, t)$ with $\gamma \approx 0.268$, e-folding time
+$\tau_e \approx 3.7$. $A(20) / A(10) = 12.4$, far outside the
+acceptance band $[0.5, 2.0]$ — \emph{fails decisively}.
+\end{itemize}
+The MAP's $\gamma_{\text{eff}}(t = 20) = 0.281$ from the canonical
+probe matches the dynamical growth rate, but sits below the original
+threshold $\tau = 0.3$ and so passed the chain-time gate. Modes with
+$\gamma \in [0.15, 0.30]$ are slow enough to survive a fixed-time probe
+at $\tau = 0.3$ yet fast enough to drive $\exp(\gamma\, t_{\text{end}})$
+into the $\sim 100\times$ regime --- amplification that masquerades as
+a positive Gertsenshtein result while being pure exponential growth.
+
+\paragraph{Threshold scan.}
+\Cref{tab:threshold-scan} reports the per-sample $\gamma_{\text{eff}}$
+distribution across the 28789437 equal-weight chain (1{,}318 samples)
+and the Stage C audit set (57 contamination + 93 perturbative). The
+chosen $\tau = 0.15$ caps source-norm growth at
+$\exp(\tau \cdot t_{\text{end}}) \approx 4.5\times$ over a
+$t_{\text{end}} = 10$ window --- comfortably perturbative --- and is
+the tightest $\tau$ in the scan that catches every Stage C
+contamination sample while rejecting zero perturbative samples.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{cccccc}
+\toprule
+$\tau$ & rejection rate & $A_{\max}$ surviving & $\exp(\tau\, t_{\text{end}})$ & contam caught & pert.\ false rejects \\
+\midrule
+0.30 (pre-\#341) & 0/1318 & 200.15 & 20.09 & 56/57 & 0/93 \\
+0.25 & 450/1318 & 103.32 & 12.18 & 57/57 & 0/93 \\
+0.20 & 836/1318 & 41.97 & 7.39 & 57/57 & 0/93 \\
+\textbf{0.15 (post-\#341)} & \textbf{1009/1318} & \textbf{19.09} & \textbf{4.48} & \textbf{57/57} & \textbf{0/93} \\
+0.10 & 1318/1318 & 0.00 & 2.72 & 57/57 & 93/93 \\
+\bottomrule
+\end{tabular}
+\caption{Threshold-vs-perturbativity scan for the conversion-channel
+probe at $t_{\text{test}} = 20$. ``Contam.\ caught'' is the count of
+audited Stage C \texttt{sim\_non\_perturbative} samples whose
+$\gamma_{\text{eff}}$ exceeds $\tau$ (criterion: must be all 57 to
+preserve the pre-\#341 regression); ``pert.\ false rejects'' is
+audited \texttt{sim\_perturbative} samples falsely classified
+tachyonic (must be 0 -- $\le 4$ to keep the Stage C truth-table test
+green at the looser tolerance). Source: %
+\texttt{examples/data/probe\_redesign/threshold\_scan.csv}.}
+\label{tab:threshold-scan}
+\end{table}
+
+\paragraph{Equivalent growth-bound criterion.}
+A physically equivalent reformulation (Option B in the design notes)
+replaces the constant $\tau$ with a growth-bound criterion
+$\exp(\gamma_{\text{eff}}\, t_{\text{end}}) < G_{\max}$ that adapts to
+the simulation $t_{\text{end}}$. At $t_{\text{end}} = 10$, $G_{\max} =
+5$ corresponds to $\tau = \log(5)/10 \approx 0.161$, essentially
+identical to the chosen $\tau = 0.15$. We retained the constant-$\tau$
+formulation because the probe runs at fixed $t_{\text{test}} = 20$
+regardless of the chain's $t_{\text{end}}$ (the probe measures the
+asymptotic exponential rate, not a $t_{\text{end}}$-dependent growth
+factor); a $t_{\text{end}}$-adaptive bound would couple the probe to a
+parameter that does not appear in the probe's calculation, complicating
+the architecture without adding empirical sensitivity.
+
+\paragraph{Impact on existing chains.}
+Phase 6 chains run under $\tau = 0.3$ (D1 amp/sup canonical, Stage A
+v5 sup canonical, Track 1 amp/sup) admitted modes with
+$\gamma \in [0.15, 0.30]$. The 6.C.2 hi-res D1 amp result
+($\log Z = +2.094$, $A_{\max} = 200$) is the sole chain whose
+\emph{quoted MAP value} sits in the new rejection band; that chain is
+flagged for re-run under $\tau = 0.15$ before publication. The
+qualitative paired-Bayes-factor verdict
+($B = 3.1 \times 10^{-5}$, suppression decisive) is unaffected because
+both amp and sup chains were gated identically and the Bayes factor
+inherits the same probe offset on both numerator and denominator. The
+Track 1, D1 sup, and Stage A v5 sup MAPs all sit in regions with
+$\gamma_{\text{eff}} < 0.15$ and remain valid under the new threshold.
 
 \subsection{The Hwang--Noh perturbativity gate}
 
@@ -430,7 +522,7 @@ downstream tools to distinguish each rejection mode. The
 \texttt{stability\_profile} column carries the probe's stable
 identifier
 (\texttt{tidal.measurement.\_stability.PROBE\_PROFILE\_NAME},
-currently \texttt{"unit-ic-all-k-0.3"}); bumping the probe is a
+currently \texttt{"unit-ic-all-k-0.15"} post-\#341); bumping the probe is a
 public-API change.
 
 The post-hoc $t$-independence audit
@@ -449,6 +541,10 @@ matrix exponential revisited. SIAM Review 51(4), 747--764.
 boundary.
 \item Issue \#322: Pad\'e refactor (replaces eigenvalue+pinv approach).
 \item Issue \#323: Stage C investigation (canonical probe selection).
+\item Issue \#340: Phase 6.C.2 hi-res D1 amp perturbativity cross-check
+(empirical motivation for threshold tightening).
+\item Issue \#341: probe-architecture follow-up (this section's
+recommendation: lower $\tau$ from 0.3 to 0.15).
 \item \texttt{stage\_c\_truth\_table.csv} (repo root): committed
 regression dataset.
 \item \texttt{hpc\_results/28520217/samples.profile\_replay.csv}:

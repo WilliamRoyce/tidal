@@ -13,10 +13,12 @@ Architecture
 
 The audit complements the pre-flight stability probe; it does not
 replace it. The probe runs in microseconds per evaluation and is
-campaign-fixed at ``threshold=0.3`` for cross-stage ``D_KL``
-comparability. The audit runs ~3 s per sample and applies a
-stricter physics gate (``P_max < 0.5`` Hwang–Noh perturbativity bound)
-that the probe cannot encode.
+campaign-fixed (post-#341) at ``threshold=0.15`` for cross-stage
+``D_KL`` comparability — chains run before #341 used ``threshold=0.3``
+and have ``stability_profile`` column ``unit-ic-all-k-0.3``. The audit
+runs ~3 s per sample and applies a stricter physics gate
+(``P_max < 0.5`` Hwang–Noh perturbativity bound) that the probe cannot
+encode.
 
 Per-sample classification
 -------------------------
