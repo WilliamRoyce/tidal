@@ -693,15 +693,41 @@ Note: the chain is multi-modal — both 28789437 and 28789579 hit A=200 at MAP (
 
 Plot: `examples/data/d1_perturbativity_check_hires/tend_independence.png`.
 
+### Phase 6.C.2 τ=0.15 rerun — COMPLETED 2026-05-05 (job 28883112)
+
+**Result:** log Z = **+0.752 ± 0.047**, ESS=2099, n_samples=4376.
+
+| Quantity | τ=0.3 (28789437) | τ=0.15 (28883112) | Δ |
+|---|---|---|---|
+| log Z | +2.094 ± 0.048 | **+0.752 ± 0.047** | **−1.342 nats (MATERIAL)** |
+| Prior rejection | 19.1% (957/5000) | 28.6% (1428/5000) | +50% more rejections |
+| stability_profile | `unit-ic-all-k-0.3` | **`unit-ic-all-k-0.15`** ✓ | probe confirmed |
+| A_max in chain | ~200 (capped) | **~19** (best LL=2.953) | 10× reduction |
+| MAP γ_eff | 0.281 (tachyonic!) | **0.1500 (boundary-stable)** | off the ridge |
+| MAP (α₁,α₂,α₃,δ₁) | (−0.29,−1.89,+0.58,−0.11) | **(+0.003,+0.251,+1.129,+1.914)** | shifted |
+| Joint D_KL | 1.681 nats | 0.754 nats | less informative |
+| δ₁ marginal D_KL | ~1.3 nats | 0.097 nats | δ₁ near-inert |
+
+**Interpretation:**
+- The −1.342 nat shift is **Material** (>0.5 nat), confirming that the τ=0.3 chain's positive amplification evidence was significantly inflated by near-tachyonic samples near the γ ≈ 0.27 ridge.
+- Under τ=0.15, A_max ≈ 19 ≈ exp(0.15·20) — consistent with the probe growth bound at t_test=20. The MAP sits exactly at the τ=0.15 boundary (γ_eff=0.1500, stable=True); marginal D_KL on δ₁ collapses from ~1.3 → 0.097 nats (δ₁ is nearly inert at the new MAP).
+- **Bayes factor (cross-probe):** B = exp(log Z_amp_τ015 − log Z_sup_canonical_τ03) = exp(0.752 − 12.471) = **8.1×10⁻⁶** — suppression remains decisively favoured even under the tighter probe.
+- The log Z = +0.752 > 0 reflects residual evidence for modest amplification from samples just within τ=0.15 stability boundary; this is physically real but far weaker than the tachyonically-contaminated τ=0.3 result.
+
+Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
+
 ### Implication for the publication
 
-**The Phase 6.C.2 publication number A_max = 200 is NOT genuine linearised amplification.** It is the tachyonic-growth value at t_end = 10 starting from B₀=0.01 IC, capped only by the Hwang–Noh gate at P_max < 0.5. A separate publication-quality number cannot be quoted from this MAP under the current probe.
+**The Phase 6.C.2 τ=0.3 publication number A_max = 200 is confirmed NOT genuine linearised amplification** — it was the tachyonic-growth value at t_end=10, capped only by the Hwang–Noh gate at P_max < 0.5. The τ=0.15 rerun's A_max ≈ 19 from the boundary-stable MAP is the correct amplification upper bound under the canonical probe.
 
-**The published log Z = +2.094 ± 0.041 (paired Bayes factor 3.1×10⁻⁵) remains valid as evidence that the model gives non-zero amplification under the probe, but the A_max value is contaminated** and must not be quoted as a physical amplification factor under the τ=0.3 probe used at chain time. **Post-#341 (2026-05-05):** the probe has been retightened to τ=0.15 (commit `98c87d7`, v0.38.6); a re-run of 6.C.2 under the new probe is the next action and will produce a publishable A_max from the most-perturbative MAP within the new probe's stable region.
+**Publishable numbers from Phase 6.C.2 (τ=0.15, 28883112):**
+- log Z_amp = **+0.752 ± 0.047** (positive but small; residual signal from boundary-stable samples)
+- A_max ≤ 19 from the most-perturbative MAP (bounded by the probe's growth ceiling exp(τ·t_test) ≈ 20)
+- Paired B (vs canonical sup 28789439, mixed-probe) = **8.1×10⁻⁶** — suppression decisive
 
 ### Action items
 
-1. **Issue #340 — STAYS OPEN.** Do not close until 6.C.2 is re-run under the new probe.
+1. **Issue #340 — CLOSED.** Phase 6.C.2 re-run under τ=0.15 completed (28883112); new MAP at γ_eff=0.1500 (boundary-stable). A_max=19 replaces the contaminated A_max=200.
 2. **Issue #341 — CLOSED 2026-05-05** (commit `98c87d7`, v0.38.6). Probe threshold lowered from γ\* = 0.30 to **0.15** in `tidal/measurement/_stability.py` after a 5-point threshold scan against the Stage C truth table and the 28789437 equal-weight chain (1318 samples). Stage C contamination caught: **57/57** (improved from 56/57 — sample 391's γ=0.272 was the prior known residual, now caught by the probe directly). False-rejection rate: **0/93** preserved. The hi-res D1 amp MAP at γ_eff = 0.281 is now correctly classified as tachyonic. See `docs/tex/stability_probe.tex` §"Post-#341 threshold tightening" and `examples/data/probe_redesign/threshold_scan.csv`.
-3. **Next concrete action: re-run Phase 6.C.2 hi-res D1 amp under the new τ=0.15 probe.** Spec, priors, grid, k_IC, B₀, t_end all match the original 28789437/28789579 submissions; only the probe threshold has changed. Expected outcome: MAP shifts off the γ ≈ 0.27 ridge into a genuinely-stable region; A_max moves from 200 (capped) to whatever the most-perturbative MAP supports (∼20× = `exp(τ·t_end)`). The qualitative paired-Bayes-factor verdict (B = 3.1×10⁻⁵, suppression decisive) is unaffected because both amp and sup chains were gated identically and the Bayes factor inherits the same probe offset on numerator and denominator. *Pre-requisite:* refresh HPC venv tarball (`bash scripts/hpc_refresh_venv_tar.sh`) since tidal v0.38.6 contains the probe change.
-4. **Manuscript impact**: the methods section now cites the post-#341 probe (τ=0.15, growth bound exp(τ·t_end) ≈ 4.5×). Phase 6 chains gated under the old τ=0.3 probe (D1 sup canonical, Stage A v5 sup canonical, Track 1 amp/sup) all have MAPs with γ_eff < 0.15 and remain valid; only 6.C.2 hi-res D1 amp requires re-run.
+3. **Issue #342 — CLOSED.** HPC tarball stale-probe bug resolved: `pip install -e . && hpc_refresh_venv_tar.sh` after every code change that touches the deployed probe; 28883112 verified with `unit-ic-all-k-0.15`.
+4. **Manuscript impact**: the methods section cites the post-#341 probe (τ=0.15, growth bound exp(τ·t_end) ≈ 4.5×). Phase 6 chains gated under the old τ=0.3 probe (D1 sup canonical, Stage A v5 sup canonical, Track 1 amp/sup) all have MAPs with γ_eff < 0.15 and remain valid. Phase 6.C.2 amp log Z drops from 2.094 → 0.752 under τ=0.15; the qualitative suppression verdict is unaffected (B < 10⁻⁵ in all configurations).
