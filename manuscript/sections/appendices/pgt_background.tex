@@ -38,3 +38,35 @@
 % stability conditions from pgt_stability_priors.tex; cite lin2019pgt
 % and blagojevic2018hamiltonian as the canonical references for the
 % ghost-restriction analysis.
+
+\paragraph*{Electromagnetic field decomposition in curved spacetime}
+% Moved from §2.3 (EM-conventions paragraph). The covariant
+% decomposition of F_{μν} via the normal-frame observer four-vector
+% U^a, with metric corrections that the naive flat-space identification
+% misses. Source: hwangnoh2023emdef + hwangnoh2023graviton.
+The covariant decomposition of the electromagnetic field strength
+$\FieldF{_{\mu\nu}}$ with respect to the normal-frame observer
+four-vector $U^a$ (with $U_a U^a = -1$)
+reads~\cite{hwangnoh2023emdef,hwangnoh2023graviton}
+\begin{align}
+  \FieldF{_{ab}} = U_a E_b - U_b E_a - \eta_{abcd}\,U^c B^d,
+  \qquad
+  E_a = \FieldF{_{ab}}\,U^b,
+  \qquad
+  B_a = \tfrac{1}{2}\,\eta_{ab cd}\,\FieldF{^{cd}}\,U^b.
+  \label{EMDecomposition}
+\end{align}
+In the normal frame the magnetic-field expression carries an explicit
+metric correction,
+\begin{align}
+  \widetilde{F}_{ij}
+    = \eta_{ijk}\bigl[(1 + \tfrac{1}{2}\,h^\ell{}_\ell)\,B^k
+                     - h^{k\ell}\,B_\ell\bigr],
+  \label{MagneticMetricCorrection}
+\end{align}
+the term $-h^{k\ell}\,B_\ell$ being the leading curved-spacetime
+correction to the naive flat-space identification
+$B^i = \tfrac{1}{2}\varepsilon^{ijk} F_{jk}$. The TIDAL pipeline
+operates at the Lagrangian level via $\sqrt{-g}$ expansion, so this
+correction enters automatically and does not require an explicit
+field-redefinition step in the symbolic-derivation pipeline.

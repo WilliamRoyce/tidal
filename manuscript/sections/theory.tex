@@ -8,7 +8,7 @@
 % and the Levi-Civita epsilon. Does NOT include the irreducible torsion
 % decomposition labelling — that goes after the action in §2.1.
 
-\section{Theoretical framework}%
+\section{Poincar\'{e} gauge theory and the Gertsenshtein kernel}%
 \label{Theory}
 
 % Conventions named paragraph (Step 0): signature, indices, units, M_P,
@@ -32,71 +32,92 @@ the Gertsenshtein conversion formula. The totally antisymmetric symbol
 is normalised to $\varepsilon^{0123} = +1$, fixing the sign of the
 axial torsion pseudovector below.
 
-\subsection{Poincar\'{e} gauge theory}%
+\subsection{Field content and quadratic action}%
 \label{PGTframework}
 % Pedagogical sequence per genre_conventions_theory.md §(d) Steps (a)–(e).
 % Target ~350 w.
 
 % Step (a): Riemannian baseline (notation, not pedagogy).
 \paragraph*{Riemannian baseline notation}
-The metric $\g{_{\mu\nu}}$ defines the Levi--Civita connection
+We follow~\cite{barker2024poincare} in distinguishing the Riemannian
+Levi--Civita connection
 $\rCon{^\sigma_{\mu\nu}}
   = \tfrac{1}{2}\g{^{\sigma\rho}}\bigl(
       \PD{_\mu}\g{_{\nu\rho}} + \PD{_\nu}\g{_{\mu\rho}}
       - \PD{_\rho}\g{_{\mu\nu}}\bigr)$
-and the associated covariant derivative $\rD{_\mu}$.
+(decorated with a ring) from the independent Riemann--Cartan
+connection $\MAGA{^\sigma_\mu_\nu}$ introduced below; the
+corresponding covariant derivatives are denoted $\rD{_\mu}$ and
+$\rcD{_\mu}$.
 
 % Step (b): Promotion of connection to independent field. Palatini
 % formulation declared explicitly.
 \paragraph*{Independent connection in the Palatini formulation}
 Poincar\'{e} gauge theory promotes the metric and the affine
 connection $\MAGA{^\sigma_\mu_\nu}$ to independent dynamical fields,
-with torsion and curvature appearing as the field strengths of
-spacetime translations and rotations
-respectively~\cite{kibble1961lorentz,hehl1976spin}. The full
-field-variable formalism, including the vierbein, the spin connection,
-and the irreducible torsion components used in the kinetic-matrix
-analysis below, is collected in \cref{PGTBackground}.
+gauging the Poincar\'{e} group on the tangent bundle and producing
+torsion and curvature as the field strengths of spacetime translations
+and rotations
+respectively~\cite{utiyama1956invariant,kibble1961lorentz,sciama1962physical,trautman1972einstein,hehl1976spin}.
+Modern reviews and the textbook presentations relevant here are given
+in~\cite{hehl1995metric,blagojevic2002gravitation,blagojevic2003lectures,blagojevicHehl2013};
+recent applications and computational frameworks at the level used
+here are developed in~\cite{barker2024poincare,barker2024psalter}. The
+full field-variable formalism, including the vierbein, the spin
+connection, and the irreducible torsion components used in the
+kinetic-matrix analysis below, is collected in \cref{PGTBackground}.
 
 % Step (c): Paired curvature and torsion field-strength definitions.
 \paragraph*{Field strengths: curvature and torsion}
-The two field strengths are defined by
+The translational and rotational gauge field strengths take the
+standard
+form~\cite{kibble1961lorentz,hehl1976spin,hehl1995metric,blagojevic2003lectures,hehlobukhov2007cartan,barker2024poincare},
 \begin{align}
   \MAGF{^\sigma_\mu_\nu_\rho}
     &\equiv 2\,\PD{_{[\mu}}\MAGA{^\sigma_{\nu]}_\rho}
        + 2\,\MAGA{^\sigma_{[\mu|\lambda|}}\MAGA{^\lambda_{\nu]}_\rho},
   \label{Curvature} \\
   \MAGT{^\sigma_\mu_\nu}
-    &\equiv 2\,\MAGA{^\sigma_{[\mu\nu]}},
+    &\equiv 2\,\MAGA{^\sigma_{[\mu\nu]}}.
   \label{Torsion}
 \end{align}
-the rotational and translational gauge field strengths in turn.
+Curvature reduces to its Riemannian limit when the antisymmetric part
+of the connection vanishes; torsion is the obstruction to that limit.
 
 % Step (d): General quadratic action with named couplings.
 \paragraph*{General quadratic action}
 The most general parity-preserving quadratic PGT action coupled to
-electromagnetism takes the form
+electromagnetism contains eleven independent invariants --- six
+$\MAGFt{}^2$, three $\mathcal{T}^2$, one $\FieldF{}^2$, and one
+$\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ cross-term --- with parity-odd
+extensions and cubic completions catalogued in~\cite{bahamonde2025cubic}
+and the symbolic enumeration documented in
+\cref{PGTBackground}~\cite{lin2019pgt,blagojevic2018hamiltonian,blagojevic2003lectures,barker2024poincare,sezgin1980ghostfree,aoki2020nonlinear}.
+Schematically,
 \begin{align}
   S = \int d^4x\,\sqrt{-g}\,\Bigl[
         \frac{1}{\kappa^2}\,\MAGFt{}
         - \tfrac{1}{4}\,\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
-        + \sum_n \Alp{n}\,(\mathcal{R}^2)_n
-        + \sum_n \Bet{n}\,(\mathcal{T}^2)_n
+        + \sum_n \Alp{n}\,(\mathcal{T}^2)_n
+        + \sum_n \Bet{n}\,(\mathcal{R}^2)_n
         + \Gam{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}
       \Bigr],
   \label{QuadraticAction}
 \end{align}
-where the $\Alp{n}$ couple the curvature-squared invariants, the
-$\Bet{n}$ couple the torsion-squared invariants, and $\Gam{1}$ couples
-the parity-even curvature--electromagnetic cross-term; the full
-classification is given in~\cite{lin2019pgt}, with the corresponding
-ghost-restriction analysis in~\cite{blagojevic2018hamiltonian}.
+where the $\Alp{n}$ couple the torsion-squared invariants, the
+$\Bet{n}$ couple the curvature-squared invariants, and $\Gam{1}$
+couples the parity-even curvature--electromagnetic cross-term. This
+assignment matches the convention used in our symbolic implementation
+and in the BHL/Barker corpus; the constrained ghost-free subspace of
+the $\Alp{n},\,\Bet{n}$ parameter space is the subject of the
+classifications cited above, while the unrestricted enumeration we
+employ is set out in \cref{PGTBackground}.
 
 % Step (e): Irreducible torsion decomposition introduced AFTER the action.
 % This is also the cross-reference target for App E.
 \paragraph*{Irreducible torsion decomposition}
 The torsion tensor admits a unique decomposition into irreducible
-$\mathrm{O}(3,1)$ representations~\cite{hehl1976spin,shapiro2002torsion}:
+$\mathrm{O}(3,1)$ representations~\cite{hehl1976spin,shapiro2002torsion,blagojevic2003lectures,barker2024poincare}:
 a traceless tensor part $\T[1]{_{\alpha\beta\mu}}$, a trace vector
 $\T[2]{_\mu} \equiv \MAGT{^\lambda_\lambda_\mu}$, and an axial
 pseudovector
@@ -106,13 +127,26 @@ $\T[3]{^\mu} \equiv \varepsilon^{\alpha\beta\gamma\mu}\MAGT{_{\alpha\beta\gamma}
     = \tfrac{1}{3}\bigl(\T[2]{_\beta}\,\g{_{\alpha\mu}}
                        - \T[2]{_\mu}\,\g{_{\alpha\beta}}\bigr)
     - \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\,\T[3]{^\nu}
-    + \T[1]{_{\alpha\beta\mu}},
+    + \T[1]{_{\alpha\beta\mu}}.
   \label{IrreducibleTorsion}
 \end{align}
-the three components being algebraically independent and
-mutually orthogonal under the standard inner product. Their explicit
-component expressions and the basis transformation used in the
-kinetic-matrix analysis below are collected in \cref{PGTBackground}.
+The torsion-squared sector of \cref{QuadraticAction} is equivalently
+written in the \emph{direct basis} of scalar contractions,
+\begin{align}
+  I_1 \equiv \MAGT{_{\alpha\beta\mu}}\MAGT{^{\alpha\beta\mu}},
+  \qquad
+  I_2 \equiv \MAGT{_{\alpha\beta\mu}}\MAGT{^{\beta\alpha\mu}},
+  \qquad
+  I_3 \equiv \MAGT{^\alpha_\alpha_\mu}\MAGT{^\beta_\beta^\mu},
+  \label{TorsionDirectBasis}
+\end{align}
+with $\{I_1,I_2,I_3\}$ related to the irreducible squared-norms
+$\{q^2,\,T^2,\,S^2\}$ by an invertible linear transformation collected
+in \cref{PGTBackground}~\cite{shapiro2002torsion}. Coupling-constant
+labelling varies across the PGT literature; throughout this work we
+use the direct basis $\{I_1,I_2,I_3\}$ computationally and the
+irreducible decomposition for naming the physical degrees of freedom
+that each interaction term selects.
 
 \subsection{Linearisation around flat $+$ $B_0$ background}%
 \label{Linearisation}
@@ -135,10 +169,12 @@ with the connection treated as inherently perturbative,
 $\MAGA{^\sigma_\mu_\nu} = \delta\MAGA{^\sigma_\mu_\nu}$. The metric
 perturbation $h_{\mu\nu}$ enters without a $\kappa$ prefactor; this
 choice is equivalent under field redefinition to the
-canonically-normalised convention $g = \eta + \kappa\,\tilde{h}$ used
-elsewhere, with the relation between the two forms set out in
-\cref{sec:kappa-conventions}. A self-consistency bound on the
-campaign parameter choices is in \cref{PerturbativeRegime}.
+canonically-normalised convention
+$g_{\mu\nu} = \eta_{\mu\nu} + \kappa\,\tilde{h}_{\mu\nu}$ used
+in~\cite{lella2024constraining}, with the relation between the two
+forms set out in \cref{sec:kappa-conventions}. A self-consistency
+bound on the campaign parameter choices is in
+\cref{PerturbativeRegime}.
 
 \paragraph*{Order-counting rule}
 We work to linear order in $h_{\mu\nu}$, $\delta A_\mu$, and the
@@ -186,20 +222,13 @@ entries.
 % navigated.
 \paragraph*{Electromagnetic-field conventions}
 The electric and magnetic fields are defined via the covariant
-decomposition of $\FieldF{_{\mu\nu}}$ with respect to the normal-frame
-observer four-vector~$U^a$~\cite{hwangnoh2023emdef,hwangnoh2023graviton}:
-$E_a = \FieldF{_{ab}}\,U^b$ and
-$B_a = \tilde{\FieldF{_{ab}}}\,U^b$, with
-$\tilde{\FieldF{_{ab}}} = \tfrac{1}{2}\varepsilon_{abcd}\FieldF{^{cd}}$
-the Hodge dual. In this frame the magnetic-field
-expression carries an explicit metric correction,
-$\widetilde{F}_{ij} = \varepsilon_{ijk}\bigl[(1 + \tfrac{1}{2}\,h^\ell{}_\ell)\,B^k - h^{k\ell}\,B_\ell\bigr]$,
-the term $-h^{k\ell}\,B_\ell$ being the leading curved-spacetime
-correction to the naive flat-space identification. Our pipeline
-operates at the Lagrangian level via $\sqrt{-g}$ expansion, so all
-metric-dependent factors --- including this $F$-correction --- enter
-the equations of motion automatically; in particular, the linearised
-graviton mass coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ reproduces
+decomposition of $\FieldF{_{\mu\nu}}$ in the normal-frame observer
+four-vector~\cite{hwangnoh2023emdef,hwangnoh2023graviton}, which
+entails metric-dependent corrections to the naive flat-space
+identification (the explicit form is given in \cref{PGTBackground}).
+Our pipeline derives equations from $\sqrt{-g}\,\lag$ at the Lagrangian
+level, so these corrections enter automatically; the linearised
+graviton mass coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ agrees with
 the potential-formulation result of~\cite{hwangnoh2023graviton}.
 
 \paragraph*{Conversion probability}
@@ -217,10 +246,8 @@ the potential-formulation result of~\cite{hwangnoh2023graviton}.
 % one place in the report where the kappa-convention story is told in
 % full; the rest of the report uses the symbol freely.
 The conversion probability for a graviton traversing a region of
-uniform $\Bzero$ over distance $D$ takes the closed form
-\begin{align}
-  \Pconv = \sin^2\!\left(\frac{\kappa\,\Bzero\,D}{2}\right)%
-  \footnote{%
+uniform $\Bzero$ over distance $D$ takes the closed
+form\footnote{%
     Two distinct objects appear under the symbol $\kappa$ in the
     recent Gertsenshtein literature: the linearised
     graviton--photon vertex coupling adopted here, with
@@ -240,6 +267,8 @@ uniform $\Bzero$ over distance $D$ takes the closed form
     relation $\kappa = \sqrt{2}/\MPl$, is given in
     \cref{sec:kappa-conventions}.
   }
+\begin{align}
+  \Pconv = \sin^2\!\left(\frac{\kappa\,\Bzero\,D}{2}\right),
   \label{GertsenshteinFormula}
 \end{align}
 which in the small-argument limit $\kappa\Bzero D \ll 1$ scales as
