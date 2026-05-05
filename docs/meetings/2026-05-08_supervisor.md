@@ -217,13 +217,11 @@ The dark-photon, Einstein-Cartan, and all five YM-PGT sub-theories are null. The
 
 ### 6. Manuscript appendix — brief introduction to PGT?
 
-PGT isn't covered in the masters curriculum, so the examiner (not yourself) will not have the background context to follow the manuscript. I am wondering whether to include an appendix giving a brief introduction to PGT — collecting key results and a few illustrative figures from canonical references (Blagojević, arXiv:gr-qc/0302040, was particularly helpful for me) into a self-contained overview.
+PGT isn't covered in the masters curriculum, so the examiner will not have the background context to follow the manuscript. I am wondering whether to include an appendix giving a brief introduction to PGT — collecting key results and a few illustrative figures from canonical references (Blagojević, arXiv:gr-qc/0302040, was particularly helpful for me) into a self-contained overview.
 
-- [ ] Is this the right approach for setting context for an unfamiliar examiner, or is there a different convention for this in the department?
-- [ ] If yes, how long an appendix would be reasonable, and is there a particular pedagogical structure or set of references you would recommend?
+- [ ] Is this the right approach for setting context, or is there a different convention for this?
 
 ### 7. Carry-forward from 17 April
 
-- [ ] **Scheduling the practice talk** — when and to whom? Would you like to be in the audience?
-- [ ] **Will Handley** PhD application — when to email?
+- [ ] **Scheduling the practice talk** — when?
 - [ ] **Sven Krippendorf** — outcome of any intervention?
