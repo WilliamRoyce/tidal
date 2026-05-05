@@ -19,16 +19,18 @@
 % prefix because it is defined in docs/tex/, not the manuscript scaffolding;
 % see STYLE_GUIDE.md §(c).
 \paragraph*{Conventions}
-% TODO: declare metric signature $(+,-,-,-)$; spacetime indices $\mu,\nu,\rho$
-% (Greek, coordinate) and frame indices $a,b,c$ (Latin, Lorentz);
-% Levi-Civita symbol $\varepsilon^{0123} = +1$ (sign convention for the
-% axial pseudovector ${}^{(3)}T$); natural units $\hbar = c = 1$;
-% reduced Planck mass $\MPl$ via $\MPl^2 = (8\pi G)^{-1}$;
-% the gravitational coupling $\kappa = \sqrt{2}/\MPl$, equivalently
-% $\kappa^2 = 16\pi G$, used throughout for the linearised vertex coupling
-% and the Gertsenshtein formula \cref{GertsenshteinFormula}; explicitly NOT
-% the Einstein-action constant $\kappa_\text{E} = 8\pi G$ of some BHL
-% papers (see \cref{sec:kappa-conventions} for the full disambiguation).
+We work in the metric signature $(-,+,+,+)$ with natural units
+$\hbar = c = 1$. Greek indices $\mu,\nu,\dots$ denote spacetime
+coordinate components and Latin indices $a,b,\dots$ denote Lorentz-frame
+components. The reduced Planck mass is $\MPl$ with
+$\MPl^2 = (8\pi G)^{-1}$. Throughout we use the gravitational coupling
+$\kappa$ defined by $\kappa^2 = 16\pi G$, which has dimension
+$[\kappa] = [\mathrm{Mass}]^{-1}$ and satisfies $\kappa = \sqrt{2}/\MPl$;
+this is the coupling that enters the Lagrangian prefactor
+$\kappa^{-2}\,\MAGFt{}$ and the linearised graviton--photon vertex in
+the Gertsenshtein conversion formula. The totally antisymmetric symbol
+is normalised to $\varepsilon^{0123} = +1$, fixing the sign of the
+axial torsion pseudovector below.
 
 \subsection{Poincar\'{e} gauge theory}%
 \label{PGTframework}
@@ -37,46 +39,80 @@
 
 % Step (a): Riemannian baseline (notation, not pedagogy).
 \paragraph*{Riemannian baseline notation}
-% TODO: one sentence on metric and Levi-Civita connection notation.
+The metric $\g{_{\mu\nu}}$ defines the Levi--Civita connection
+$\rCon{^\sigma_{\mu\nu}}
+  = \tfrac{1}{2}\g{^{\sigma\rho}}\bigl(
+      \PD{_\mu}\g{_{\nu\rho}} + \PD{_\nu}\g{_{\mu\rho}}
+      - \PD{_\rho}\g{_{\mu\nu}}\bigr)$
+and the associated covariant derivative $\rD{_\mu}$.
 
 % Step (b): Promotion of connection to independent field. Palatini
 % formulation declared explicitly.
 \paragraph*{Independent connection in the Palatini formulation}
-% TODO: one to two sentences declaring Palatini formalism (metric and
-% connection independent), introducing the vierbein and spin connection.
+Poincar\'{e} gauge theory promotes the metric and the affine
+connection $\MAGA{^\sigma_\mu_\nu}$ to independent dynamical fields,
+with torsion and curvature appearing as the field strengths of
+spacetime translations and rotations
+respectively~\cite{kibble1961lorentz,hehl1976spin}. The full
+field-variable formalism, including the vierbein, the spin connection,
+and the irreducible torsion components used in the kinetic-matrix
+analysis below, is collected in \cref{PGTBackground}.
 
 % Step (c): Paired curvature and torsion field-strength definitions.
 \paragraph*{Field strengths: curvature and torsion}
-% TODO: paired adjacent equations for $R^\sigma{}_{\mu\nu\rho}$ and
-% $T^\sigma{}_{\mu\nu}$ with identical syntactic structure.
+The two field strengths are defined by
 \begin{align}
-  % TODO: curvature definition R^sigma_{mu nu rho}
-  \label{Curvature}
-\end{align}
-\begin{align}
-  % TODO: torsion definition T^sigma_{mu nu}
+  \MAGF{^\sigma_\mu_\nu_\rho}
+    &\equiv 2\,\PD{_{[\mu}}\MAGA{^\sigma_{\nu]}_\rho}
+       + 2\,\MAGA{^\sigma_{[\mu|\lambda|}}\MAGA{^\lambda_{\nu]}_\rho},
+  \label{Curvature} \\
+  \MAGT{^\sigma_\mu_\nu}
+    &\equiv 2\,\MAGA{^\sigma_{[\mu\nu]}},
   \label{Torsion}
 \end{align}
+the rotational and translational gauge field strengths in turn.
 
 % Step (d): General quadratic action with named couplings.
 \paragraph*{General quadratic action}
-% TODO: state that this is the most general parity-preserving quadratic
-% PGT action; introduce $\Alp{n}$, $\Bet{n}$, $\Gam{n}$ couplings; gloss
-% the coupling groups in one prose sentence.
+The most general parity-preserving quadratic PGT action coupled to
+electromagnetism takes the form
 \begin{align}
-  % TODO: most general quadratic action
+  S = \int d^4x\,\sqrt{-g}\,\Bigl[
+        \frac{1}{\kappa^2}\,\MAGFt{}
+        - \tfrac{1}{4}\,\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
+        + \sum_n \Alp{n}\,(\mathcal{R}^2)_n
+        + \sum_n \Bet{n}\,(\mathcal{T}^2)_n
+        + \Gam{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}
+      \Bigr],
   \label{QuadraticAction}
 \end{align}
+where the $\Alp{n}$ couple the curvature-squared invariants, the
+$\Bet{n}$ couple the torsion-squared invariants, and $\Gam{1}$ couples
+the parity-even curvature--electromagnetic cross-term; the full
+classification is given in~\cite{lin2019pgt}, with the corresponding
+ghost-restriction analysis in~\cite{blagojevic2018hamiltonian}.
 
 % Step (e): Irreducible torsion decomposition introduced AFTER the action.
 % This is also the cross-reference target for App E.
 \paragraph*{Irreducible torsion decomposition}
-% TODO: tensor part \T[1]{}, trace vector \T[2]{}, axial pseudovector \T[3]{}
-% following Hehl 1976. Cite \cite{hehl1976spin}.
+The torsion tensor admits a unique decomposition into irreducible
+$\mathrm{O}(3,1)$ representations~\cite{hehl1976spin,shapiro2002torsion}:
+a traceless tensor part $\T[1]{_{\alpha\beta\mu}}$, a trace vector
+$\T[2]{_\mu} \equiv \MAGT{^\lambda_\lambda_\mu}$, and an axial
+pseudovector
+$\T[3]{^\mu} \equiv \varepsilon^{\alpha\beta\gamma\mu}\MAGT{_{\alpha\beta\gamma}}$,
 \begin{align}
-  % TODO: T = T^(1) + T^(2) + T^(3) decomposition
+  \MAGT{_{\alpha\beta\mu}}
+    = \tfrac{1}{3}\bigl(\T[2]{_\beta}\,\g{_{\alpha\mu}}
+                       - \T[2]{_\mu}\,\g{_{\alpha\beta}}\bigr)
+    - \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\,\T[3]{^\nu}
+    + \T[1]{_{\alpha\beta\mu}},
   \label{IrreducibleTorsion}
 \end{align}
+the three components being algebraically independent and
+mutually orthogonal under the standard inner product. Their explicit
+component expressions and the basis transformation used in the
+kinetic-matrix analysis below are collected in \cref{PGTBackground}.
 
 \subsection{Linearisation around flat $+$ $B_0$ background}%
 \label{Linearisation}
@@ -84,29 +120,56 @@
 % sub-movement.
 
 \paragraph*{Background and perturbation ansatz}
-% TODO: state the background — flat metric $\eta_{\mu\nu}$, uniform static
-% magnetic field $\Bzero$ in the $\hat{z}$ direction. Write the perturbation
-% ansatz: $g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu}$,
-% $A_\mu = \bar{A}_\mu + \delta A_\mu$. Note: TIDAL uses g = eta + h
-% (raw perturbation), NOT g = eta + kappa h. See \cref{sec:kappa-conventions}.
+We linearise about a flat metric carrying a uniform static magnetic
+field $\Bzero$ along $\hat{z}$, with vanishing background torsion.
+The metric and four-potential are decomposed as
 \begin{align}
-  % TODO: perturbation ansatz
+  g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu},
+  \qquad
+  A_\mu = \bar{A}_\mu + \delta A_\mu,
+  \qquad
+  \bar{A}_\mu\,dx^\mu = -\Bzero\,z\,dy,
   \label{PerturbationAnsatz}
 \end{align}
+with the connection treated as inherently perturbative,
+$\MAGA{^\sigma_\mu_\nu} = \delta\MAGA{^\sigma_\mu_\nu}$. The metric
+perturbation $h_{\mu\nu}$ enters without a $\kappa$ prefactor; this
+choice is equivalent under field redefinition to the
+canonically-normalised convention $g = \eta + \kappa\,\tilde{h}$ used
+elsewhere, with the relation between the two forms set out in
+\cref{sec:kappa-conventions}. A self-consistency bound on the
+campaign parameter choices is in \cref{PerturbativeRegime}.
 
 \paragraph*{Order-counting rule}
-% TODO: state immediately after the ansatz: "We work to linear order in
-% $h_{\mu\nu}$ and $\delta A_\mu$, and to first order in $\Bzero$."
+We work to linear order in $h_{\mu\nu}$, $\delta A_\mu$, and the
+torsion fluctuation $\delta\MAGA{^\sigma_\mu_\nu}$, and to first order
+in $\Bzero$.
 
 % Kinetic-matrix sub-movement (third move per §(f)). Equation label is the
 % cross-reference target for §4 and App E.
 \paragraph*{Linearised kinetic matrix}
-% TODO: "After expanding the Lagrangian to quadratic order, one finds…"
-% Display the kinetic matrix without showing intermediate algebra.
+After expanding $\sqrt{-g}\,\lag$ to quadratic order in the
+perturbation fields and reducing to plane-wave dependence
+$\partial_x = \partial_y = 0$ along the propagation direction
+$\hat{z}$, the quadratic Lagrangian assembles into a block-structured
+kinetic system,
 \begin{align}
-  % TODO: kinetic matrix (linearised quadratic Lagrangian)
+  \lag^{(2)} = \tfrac{1}{2}\,\xi^\mathsf{T}\,
+    \mathcal{K}(\partial_t,\partial_z)\,\xi,
+  \qquad
+  \mathcal{K}
+    = \begin{pmatrix} \mathcal{K}_\times & 0 \\ 0 & \mathcal{K}_\text{trace} \end{pmatrix},
   \label{KineticMatrix}
 \end{align}
+where $\xi$ groups the surviving gauge-fixed degrees of freedom
+into the cross-polarisation channel
+$(h_\times,\,a_\parallel)^\mathsf{T}$ and the trace sector
+containing $(h_+, h_4, h_9, a_\perp)^\mathsf{T}$ together with the
+axial torsion mode when present. The upper $2\times 2$ block governs
+the standard $h_\times$--photon Gertsenshtein channel; the lower
+block carries the trace-sector fields, into which torsion
+couplings --- where they appear --- enter through off-diagonal
+entries.
 
 \subsection{Gertsenshtein conversion kernel and channel structure}%
 \label{Gertsenshtein}
@@ -122,11 +185,22 @@
 % hangs and the Palessandro–Rothman / Hwang–Noh disagreement cannot be
 % navigated.
 \paragraph*{Electromagnetic-field conventions}
-% TODO: state the convention used ($E_i = F_{i0}$ vs the alternative);
-% cite \cite{hwangnoh2023graviton} for the convention discussion. Make
-% explicit that TIDAL adopts the convention used by Hwang–Noh and Dandoy
-% rather than the Palessandro–Rothman alternative — this is what
-% reconciles the §1 literature-tension framing.
+The electric and magnetic fields are defined via the covariant
+decomposition of $\FieldF{_{\mu\nu}}$ with respect to the normal-frame
+observer four-vector~$U^a$~\cite{hwangnoh2023emdef,hwangnoh2023graviton}:
+$E_a = \FieldF{_{ab}}\,U^b$ and
+$B_a = \tilde{\FieldF{_{ab}}}\,U^b$, with
+$\tilde{\FieldF{_{ab}}} = \tfrac{1}{2}\varepsilon_{abcd}\FieldF{^{cd}}$
+the Hodge dual. In this frame the magnetic-field
+expression carries an explicit metric correction,
+$\widetilde{F}_{ij} = \varepsilon_{ijk}\bigl[(1 + \tfrac{1}{2}\,h^\ell{}_\ell)\,B^k - h^{k\ell}\,B_\ell\bigr]$,
+the term $-h^{k\ell}\,B_\ell$ being the leading curved-spacetime
+correction to the naive flat-space identification. Our pipeline
+operates at the Lagrangian level via $\sqrt{-g}$ expansion, so all
+metric-dependent factors --- including this $F$-correction --- enter
+the equations of motion automatically; in particular, the linearised
+graviton mass coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ reproduces
+the potential-formulation result of~\cite{hwangnoh2023graviton}.
 
 \paragraph*{Conversion probability}
 % TODO: display the formula; one prose sentence on $\Bzero$-scaling; cite
@@ -142,49 +216,41 @@
 % \cref{sec:kappa-conventions} for the full disambiguation. This is the
 % one place in the report where the kappa-convention story is told in
 % full; the rest of the report uses the symbol freely.
+The conversion probability for a graviton traversing a region of
+uniform $\Bzero$ over distance $D$ takes the closed form
 \begin{align}
   \Pconv = \sin^2\!\left(\frac{\kappa\,\Bzero\,D}{2}\right)%
   \footnote{%
-    % BHL substantive-aside footnote (compare 2406.12826 fn~2 on the
-    % EC vs PGT distinction). Drafting target: 4 sentences, ~6-8 lines
-    % rendered. Bibkeys verified to exist: palessandro2024gertsenshtein,
-    % hwangnoh2023graviton, hwangnoh2024nonlinear, lella2024constraining,
-    % barker2024poincare. Content plan:
-    %
-    %   (1) State the two-kappa ambiguity. The symbol kappa is used in
-    %   the literature for two distinct objects of different mass
-    %   dimensions: the linearised vertex coupling
-    %   kappa = sqrt(16 pi G), [kappa] = [Mass^{-1}], adopted here, and
-    %   the Einstein-action constant kappa_E = 8 pi G,
-    %   [kappa_E] = [Mass^{-2}], used as the prefactor of R in some BHL
-    %   papers (e.g. \cite{barker2024poincare}).
-    %
-    %   (2) Note the published consequences. Misidentification of these
-    %   has produced a factor-of-sqrt(4 pi) ~ 3.54 error in the
-    %   Gertsenshtein conversion formula \cite{palessandro2024gertsenshtein},
-    %   traceable to the prefactor of the linearised graviton kinetic
-    %   term.
-    %
-    %   (3) Cite the critique and the corrected calculation. The
-    %   discrepancy was identified by \cite{hwangnoh2023graviton} (with
-    %   non-linear follow-up in \cite{hwangnoh2024nonlinear}) and is
-    %   resolved by the convention of \cite{lella2024constraining},
-    %   which agrees with ours.
-    %
-    %   (4) Forward-pointer. The full disambiguation, including
-    %   dimensional analysis and the relation kappa = sqrt(2)/MPl, is
-    %   in \cref{sec:kappa-conventions}.
-    TODO: kappa-convention footnote per the four-sentence plan above.
+    Two distinct objects appear under the symbol $\kappa$ in the
+    recent Gertsenshtein literature: the linearised
+    graviton--photon vertex coupling adopted here, with
+    $\kappa^2 = 16\pi G$ and $[\kappa] = [\mathrm{Mass}]^{-1}$, and
+    the Einstein-action constant $\kappa_\mathrm{E} = 8\pi G$,
+    $[\kappa_\mathrm{E}] = [\mathrm{Mass}]^{-2}$, used as the
+    prefactor of $\MAGFt{}$ in some recent
+    work~\cite{barker2024poincare}. A non-canonical kinetic
+    normalisation in the derivations
+    of~\cite{palessandro2023simple,palessandro2024gertsenshtein}
+    produces a factor-of-$\sqrt{4\pi}$ error in the conversion
+    formula argument; \cite{hwangnoh2023graviton} identifies the
+    compounding issue of electromagnetic-field identification in
+    magnetic environments. The convention adopted
+    in~\cite{lella2024constraining} agrees with ours. The full
+    disambiguation, including dimensional analysis and the
+    relation $\kappa = \sqrt{2}/\MPl$, is given in
+    \cref{sec:kappa-conventions}.
   }
   \label{GertsenshteinFormula}
 \end{align}
+which in the small-argument limit $\kappa\Bzero D \ll 1$ scales as
+$\Pconv \propto \Bzero^2$, the characteristic Gertsenshtein
+signature; the regime of validity of this linearised expression in
+the torsionful background is set out in \cref{PerturbativeRegime}.
 
 \paragraph*{Validation pointer}
-% TODO: one-clause cross-reference: "The quantitative reproduction of this
-% kernel across our validation grid is reported in \cref{Validation},
-% with the simulation-to-analytic comparison shown there." Per
-% STYLE_GUIDE.md §(i), include the one-clause hint describing what is
-% deferred.
+The quantitative reproduction of this kernel across our validation
+grid is reported in \cref{ValidationResult}, with the full
+simulation-to-analytic comparison archived in \cref{Validation}.
 
 % Channel decomposition: kinematic introduction only. The earlier draft
 % claimed an algebraic "structural identity" between hx and ax kinetic
@@ -196,12 +262,14 @@
 % (Results) with explicit caveats, NOT in §2 (Theory). §2.3 here only
 % introduces the kinematic decomposition.
 \paragraph*{Channel decomposition}
-% TODO: name the kinematic decomposition of the linearised perturbation
-% into the hx and h+ tensor channels, the axial torsion mode, and the
-% trace channel; state that these are the natural sectors in which the
-% conversion question is posed. State NO claim about which channels
-% couple to which — the empirical analysis of the inter-channel
-% coupling is reported in \cref{ChannelStructure} (§4.3), and the
-% explicit symbolic-pipeline outputs that motivate that analysis are
-% archived in \cref{SymbolicMechanism} (App E.2). Use a one-clause hint
-% per STYLE_GUIDE.md §(i) on the cross-references.
+The linearised perturbation falls naturally into the two transverse
+tensor polarisations $h_+$ and $h_\times$, the trace sector
+$\{h_+, h_4, h_9, a_\perp\}$, and the irreducible torsion modes ---
+trace vector $\T[2]{_\mu}$ and axial pseudovector $\T[3]{^\mu}$
+where present. These are the kinematic sectors in which the
+conversion question is posed; the standard Gertsenshtein channel
+$h_\times \leftrightarrow a_\parallel$ is the canonical example.
+The empirical inter-channel structure observed across the surveyed
+theory classes is reported in \cref{ChannelStructure}, with the
+symbolic-pipeline outputs that motivate it archived in
+\cref{SymbolicMechanism}.
