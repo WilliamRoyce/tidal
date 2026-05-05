@@ -133,47 +133,78 @@
 % \cref{Validation}, with the complete symbolic kinetic matrices archived
 % in \cref{SymbolicOutputs}."
 
-\subsection{Channel structure: $h_\times \leftrightarrow \mathrm{ax}$ torsion-independence}%
+\subsection{Observed channel structure across the surveyed theories}%
 \label{ChannelStructure}
-% Target ~400 w. Repositioned per the structural-review consensus:
-% hx↔ax torsion-independence is the kinematic identity that EXPLAINS
-% the survey nulls in §4.2, not a standalone headline. This subsection
-% is the mechanism that justifies the survey's negative outcomes; the
-% reader who has just absorbed the table in §4.2 reads §4.3 to learn
-% why so many entries say "null".
+% Target ~400 w. Demoted from the previous "structural identity" framing
+% — the hx↔ax kinetic-coefficient coincidence is an empirical observation
+% in a finite explicit set of theories, on a specific B0 background, with
+% specific IC choices. There is no algebraic proof, and several open
+% validity questions (IC-choice not WLOG; TT-gauge admissibility under
+% non-vacuum stress-energy not formally re-derived; theory class is
+% finite). This subsection reports the observation honestly and lists
+% the caveats; it does NOT claim a theorem.
 
-\paragraph*{Identity in the linearised kinetic matrix}
-% TODO: state the structural claim — at linear order in $h_{\mu\nu}$ and
-% $\delta A_\mu$, with the $\Bzero$-background admissibility constraint of
-% gr-qc/0001010, the hx and ax kinetic-matrix entries coincide. Cross-ref
-% \cref{KineticMatrix} (the §2.2 kinetic matrix) and \cref{HxAxIdentity}
-% (App E, where the equal-coefficient line is shown explicitly in the
-% symbolic output). Per Agent 3 review C3 — frame as a structural
-% identity (visible in the symbolic output of every theory in the surveyed
-% class), not a parameter-point coincidence.
+\paragraph*{Observed pattern in the kinetic matrices}
+% TODO: state the empirical observation. In the propagating-PGT theories
+% TIDAL has run on, with the IC choices and \Bzero background described
+% in \cref{Linearisation}, the hx and ax kinetic-matrix entries coincide
+% — the equal-coefficient line is visible in the symbolic output and is
+% archived in \cref{HxAxIdentity} (App E.2,
+% \cref{SymbolicMechanism}). Cross-ref \cref{KineticMatrix} (§2.2) for
+% the linearised matrix in which the coincidence appears. Frame as
+% observation, not theorem.
 
-\paragraph*{Consequence for the conversion amplitude}
-% TODO: one paragraph: torsion couplings cancel in the linearised
-% conversion amplitude in this channel; the prediction reduces to the
-% Einstein–Maxwell baseline within the surveyed class. Frame as
-% mechanism: this is why the §4.2 entries for ghost-free propagating-PGT
-% theories register as nulls.
+\paragraph*{Mechanism for the surveyed nulls}
+% TODO: one paragraph. In the channels and theories where the observed
+% pattern holds, the torsion couplings cancel in the linearised
+% conversion amplitude, and the prediction reduces to the
+% Einstein–Maxwell baseline. This is the kinematic mechanism behind the
+% corresponding null entries in \cref{SectorSurveyTable} (§4.2). Frame
+% as a partial explanation — only those §4.2 nulls whose theory falls
+% within the observation's scope are explained by it.
 
-\paragraph*{Numerical confirmation}
+\paragraph*{Numerical confirmation within the surveyed regime}
 % TODO: state the numerical finding ($A = 1$ within $[\text{tolerance}]$
-% across the stability window — precise tolerance filled at drafting
-% time); cross-ref \cref{PropagatingTorsionMap}.
+% across the surveyed parameter regions of the propagating-PGT class);
+% cross-ref \cref{PropagatingTorsionMap}. The qualifier "within the
+% surveyed regime" is essential — the §4.4 headline finding may yet
+% identify a non-surveyed regime where the pattern fails.
+
+% New paragraph required by the user-flagged validity concerns. This is
+% the most important paragraph in §4.3 — it is the reason §4.3 is in §4
+% (Results) and not §2 (Theory).
+\paragraph*{Validity caveats}
+% TODO: ~80 w. List the open questions that bound the observation's
+% scope:
+%
+%   (a) IC choice not WLOG. The IC family TIDAL has tested is finite;
+%   in particular R^2 gravity has additional independent IC sets we
+%   have not exercised. A different IC could couple sectors that
+%   appear decoupled with our chosen IC.
+%
+%   (b) TT-gauge legitimacy under \Bzero stress-energy. TT decomposition
+%   is gauge-fixed against transverse-traceless modes of vacuum
+%   perturbation theory; in the presence of $\Bzero$ stress-energy the
+%   residual gauge freedom shrinks, and we have not formally re-derived
+%   TT admissibility on this background.
+%
+%   (c) Theory class is finite. We have not proved extrapolation
+%   outside the explicit set of theories TIDAL has run on.
+%
+% Close with a forward pointer: these caveats motivate the constructive
+% paths in \cref{Discussion} (§5).
 
 % Figure 2 — propagating-torsion parameter map. Retained as a
-% mechanism-confirming figure rather than a headline figure.
+% mechanism-confirming figure within the surveyed regime.
 \begin{figure}[t]
   \centering
   % TODO: \includegraphics{fig2_propagating_torsion_map}
   % TODO caption: "Amplification factor $A = \Pconv^\text{torsion} /
   % \Pconv^\text{GR}$ vs the torsion stability parameter $\delta_1$ for
   % the propagating-PGT model at $\Bzero = [\text{value}]$ and
-  % $t_\text{end} = [\text{value}]$. $A = 1$ across the full stability
-  % window confirms the structural identity \cref{HxAxIdentity}."
+  % $t_\text{end} = [\text{value}]$. $A = 1$ across the surveyed
+  % stability window is consistent with the equal-coefficient pattern
+  % \cref{HxAxIdentity} observed in the symbolic output."
   \caption{TODO: propagating-torsion parameter map; $A$ vs $\delta_1$.}
   \label{PropagatingTorsionMap}
 \end{figure}

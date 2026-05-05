@@ -42,33 +42,39 @@
 % comparison with the other equation blocks (e.g. which entries are
 % zero in the reference theory; which are non-zero only off-diagonal).
 
-\subsection{Channel-structure mechanism: propagating PGT}%
+\subsection{Observed channel pattern: propagating PGT}%
 \label{SymbolicMechanism}
 % Target ~300 w + equation blocks. Source JSON: examples/<propagating
-% PGT>/data/<file>.json. This subsection hosts the hx↔ax structural
-% identity equation \cref{HxAxIdentity}, which is the cross-reference
-% target for §4.3 and §2.3 (channel decomposition).
+% PGT>/data/<file>.json. This subsection hosts the equation block that
+% the §4.3 ChannelStructure subsection cross-refs as evidence for the
+% empirical observation. Demoted from "structural-identity mechanism"
+% framing — the equation is presented as an observed pattern, not a
+% theorem; the validity caveats live in §4.3 alongside the empirical
+% claim.
 
 \paragraph*{Kinetic matrix and equations of motion}
-% TODO: introductory sentence + long equation block.
+% TODO: introductory sentence + long equation block. State the source
+% JSON path; describe the basis (sectorial / channel-aligned) in which
+% the matrix is displayed.
 \begin{align}
   % TODO: paste the kinetic matrix and EOMs from the propagating-PGT JSON.
   \label{PropagatingKineticOutput}
 \end{align}
 
-% Single named paragraph hosting the hx↔ax structural identity. This is
-% inspection of two coefficients in the kinetic matrix — not a multi-step
-% derivation — but the resulting identity is structural (visible in the
-% symbolic output of every theory in the surveyed admissibility class),
-% not a parameter-point coincidence.
-\paragraph*{Structural identity: $h_\times$ and ax kinetic coefficients}
-% TODO: ~80 w. State that the two relevant kinetic-matrix entries
-% \cref{PropagatingKineticOutput} are identical at linear order under
-% the admissibility constraint of gr-qc/0001010; display the
-% equal-coefficient line as \cref{HxAxIdentity}; note that this
-% structural identity is the kinematic explanation for the
-% \cref{ChannelStructure} (§4.3) finding and the survey nulls in
-% \cref{SectorSurveyTable} (§4.2).
+% Single named paragraph hosting the equal-coefficient line. Framing is
+% "observed pattern in the symbolic output", not "structural identity"
+% — the latter would require an algebraic proof we do not have.
+\paragraph*{Observed coincidence in the $h_\times$ and ax kinetic coefficients}
+% TODO: ~80 w. State that the two relevant entries of
+% \cref{PropagatingKineticOutput} have been observed to coincide in the
+% symbolic output for the propagating-PGT theories TIDAL has run on.
+% Display the equal-coefficient line as \cref{HxAxIdentity}, presented
+% as the artefact that motivated the observation. Note that the
+% empirical scope of the observation, and the validity caveats that
+% bound it (IC choice not WLOG; TT-gauge admissibility under \Bzero
+% not formally re-derived; theory class is finite), are stated in
+% \cref{ChannelStructure} (§4.3) — not here. This subsection presents
+% only the artefact.
 \begin{align}
   % TODO: equal-coefficient line showing hx-coefficient = ax-coefficient
   \label{HxAxIdentity}
