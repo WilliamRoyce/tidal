@@ -8,11 +8,10 @@
 
 Key workstreams since the last meeting:
 
-1. **Ricci-EM with constraint torsion is the live wire.** First completed theory with posterior structure. Initial runs strongly disfavour amplification; a rerun with corrected initial conditions appears to amplify. Verdict held until the suppress cross-check lands.
-2. **Survey progress and roadmap.** The effective dark-photon model, the minimal Einstein-Cartan theory, the Ricci-EM model, and the entire propagating-torsion nonminimal sector (five nested sub-theories up to the full 9-D joint) are complete. Parity-odd, complete-PGT, and higher-curvature EM remain.
+1. **Survey progress and roadmap.** The effective dark-photon model, the minimal Einstein-Cartan theory, the Ricci-EM model, and the entire propagating-torsion nonminimal sector (five nested sub-theories up to the full 9-D joint) are complete. Parity-odd, complete-PGT, and higher-curvature EM remain.
+2. **Perturbative reduction — major new research direction.** Handling theories with higher-derivative corrections required developing a novel approach after all standard Hamiltonian methods failed. The equations of motion can now be solved correctly without ghost contamination. For the specific case where the small parameter promotes a non-dynamical field to dynamical, however, the measurement and inference pipeline has not yet been extended — so physics results from that class remain outstanding.
 3. **Stability filtering in the linearised regime — open question.** A key methodological decision was made to exclude exponentially-growing modes from the inference. But the physical validity of that choice is an open question.
-4. **Perturbative reduction — major new research direction.** Handling theories with higher-derivative corrections required developing a novel approach after all standard Hamiltonian methods failed. The equations of motion can now be solved correctly without ghost contamination. For the specific case where the small parameter promotes a non-dynamical field to dynamical, however, the measurement and inference pipeline has not yet been extended — so physics results from that class remain outstanding.
-5. **Practice talk written.** The talk is now ready to schedule and give.
+4. **Practice talk written.** The talk is now ready to schedule and give.
 
 ---
 
@@ -24,7 +23,7 @@ $$\mathcal{L} = \frac{1}{\kappa^2}R + \alpha_i\,I_i + \delta_1\,\tilde R_{\mu\nu
 
 The three torsion-mass invariants $\alpha_{1,2,3}$ plus a single nonminimal coupling $\delta_1$ between the Ricci-Cartan tensor and the photon field strength.
 
-**Crucially, this theory has _constraint_ (non-propagating) torsion** — there is no kinetic term for torsion, so it carries no dynamical modes and acts as an auxiliary field. $\delta_1$ is the only term that _connects_ torsion to the Gertsenshtein channel; without it, torsion is structurally decoupled (the takeaway from the 17 April meeting). This is the only completed theory in the _constraint torsion + nonminimal coupling_ quadrant of the survey — see §2.
+**Crucially, this theory has _constraint_ (non-propagating) torsion** — there is no kinetic term for torsion, so it carries no dynamical modes and acts as an auxiliary field. $\delta_1$ is the only term that _connects_ torsion to the Gertsenshtein channel. This is the only completed theory in the _constraint torsion + nonminimal coupling_ quadrant of the survey.
 
 ### Results (paired amplify / suppress runs)
 
@@ -36,23 +35,6 @@ The three torsion-mass invariants $\alpha_{1,2,3}$ plus a single nonminimal coup
 - $\delta_1$'s marginal $D_{\rm KL}$ is **96% of the joint** in amplify — a single coupling carries the entire signal. In suppress, $\delta_1$ leads but $\alpha_{1,2,3}$ each contribute $\sim 0.25$–$0.30$ nats: the deepest suppression valley needs all four parameters to coordinate.
 - Suppression depth is far below the analytic estimate ($\sim 10^{-3}$). Consistent with destructive interference; mechanism not yet pinned down.
 - **This is the first non-trivial result of the survey** — every other completed theory has been null.
-
-### Corrected-IC rerun (in flight, deferred)
-
-Same Lagrangian, but with the initial condition wavevector aligned to the canonical Fourier-grid mode ($k_{\rm IC} = 2\pi/L$, $L=100$) and a different stability criterion.
-
-- Amplify rerun: $\log Z = +2.135 \pm 0.059$, a **$+4.4$ nat shift**. New MAP at $\delta_1 \approx +1.94$, apparent $A_{\max} \approx 42$.
-- Caveat: $\sim$26% of the posterior has $P_{\max} > 0.3$, so perturbative validity is borderline at the MAP.
-- Suppress cross-check still running. **Verdict held until it lands.**
-
-If the conclusion really does flip with initial-condition choice, that itself is a methodological finding and a question for the meeting (see §Questions).
-
-### Literature
-
-| Claim                                                | Citation                                 | Reference           |
-| ---------------------------------------------------- | ---------------------------------------- | ------------------- |
-| Ricci $\times F$ as the sole single-coupling channel | This work — informed by 17 April meeting | Ricci-EM derivation |
-| Constraint vs propagating torsion in PGT             | Hehl et al. 1995                         | _Phys. Rep._ 258, 1 |
 
 ---
 
@@ -137,7 +119,7 @@ This choice — excluding samples with any exponential growth above a threshold 
 - Some apparent instabilities may be artefacts of the linearised approximation that are cut off in the full nonlinear theory (e.g. by backreaction on the background field, or by nonlinear saturation).
 - There may be a middle ground: instabilities that grow slowly enough that the linearised solution remains valid over the physical propagation length of interest, and for which the accumulated conversion is what we actually want to measure.
 
-Currently we treat any growth rate above $\sim 0.3\,\text{s}^{-1}$ as unphysical and return $\log\mathcal{L} = -\infty$. The question is whether this threshold is too conservative, and whether some of the discarded parameter space represents genuine physics.
+Currently we treat any growth rate above $\sim 0.15\,\text{s}^{-1}$ as unphysical and return $\log\mathcal{L} = -\infty$. The question is whether this threshold is too conservative, and whether some of the discarded parameter space represents genuine physics.
 
 ---
 
@@ -189,12 +171,13 @@ We currently exclude all parameter points where linearised fields grow exponenti
 - [ ] Are some of the apparent instabilities artefacts of the linearised approximation, stopped by nonlinear effects in the full theory?
 - [ ] Is there a physically motivated threshold below which growth is acceptable — e.g. growth slow enough that amplitudes remain in the linearised regime over the propagation distance?
 
-### 2. Perturbative-reduction validity bound for the constraint-promotion case
+### 2. Is a Hamiltonian analysis possible at all for the constraint-promotion case?
 
-The Duhamel-source approach gives a numerically correct $\mathcal{O}(b_5)$ answer for $b_5\tilde R^2$ PGT, but when $b_5$ promotes constraint fields to dynamical the standard Hamiltonian methods (JLM, LPS) cannot provide the validity bound. We have only the heuristic $\varepsilon\cdot\omega\cdot t$ threshold from Figueras–Kovács–Yao (2025) and numerical cross-checks.
+As described in §4, both JLM substitution and LPS/Dirac–Bergmann fail on the constraint-promotion case ($b_5\tilde R^2$ PGT: h₄, h₇, h₉ becoming dynamical). The failure is not a matter of practical complexity — it is structural. Blagojević and Cvetković (2018) prove it explicitly: "the expressions for $c_n$ when $\bar{b} = 0$ cannot be obtained by taking the limit $\bar{b} \to 0$ of the generic result" — the perturbative Hamiltonian does not exist in this limit.
 
-- [ ] Is there literature on the validity of perturbative expansions when the number of dynamical degrees of freedom changes order-by-order that you know of?
-- [ ] Should we treat numerical agreement as sufficient, or is a formal bound needed before these results appear in a paper?
+This has been identified as a named open problem three times in 25 years (Blagojević–Nikolić 1983; Yo–Nester–Ni 1999–2002; Blagojević–Cvetković 2018). We have the Duhamel-source equations of motion (ghost-free, numerically verified to $10^{-12}$), but without a Hamiltonian we have no formal ghost-freedom guarantee beyond leading order and no proper degree-of-freedom count. The most promising lead in the literature is Lyakhovich (2021, arXiv:2102.10579), which has an existence theorem for a generalised Stückelberg recipe — but it has not been applied to PGT curvature-squared theories.
+
+- [ ] Do you know of any framework that handles the case where the number of dynamical degrees of freedom changes order-by-order in perturbation theory? Is there a route — even in principle — to perform a Hamiltonian analysis for this class?
 
 ### 3. Campaign direction — constraint torsion vs propagating torsion
 
@@ -203,25 +186,19 @@ The only completed theory with posterior structure has constraint torsion + a no
 - [ ] Is it worth pivoting to broaden the constraint-torsion + nonminimal class (Ricci-EM-mould theories with different cross-terms) rather than continuing into propagating-torsion / parity-odd / complete-PGT?
 - [ ] Or complete the parity-odd and full-quadratic enumeration first?
 
-### 4. Initial-condition dependence in the Ricci-EM results
-
-Initial runs give a strong suppressor (Bayes factor 0.10 for amplification). A rerun with the canonical Fourier-grid initial condition gives an apparent amplifier ($\Delta\log Z = +4.4$ nats, apparent $A_{\max} \approx 42$, but borderline perturbativity). Cross-check still in flight.
-
-- [ ] If the verdict does flip with initial condition, what is the right choice for paper-grade reporting?
-
-### 5. Reporting a survey of nulls
+### 4. Reporting a survey of nulls
 
 The dark-photon, Einstein-Cartan, and all five YM-PGT sub-theories are null. The nonminimal couplings (six parameters spanning the propagating-torsion sector) are all flat in posterior.
 
 - [ ] What is the right framing for the paper — a joint Bayes factor, per-theory, or something else?
 
-### 6. Manuscript appendix — brief introduction to PGT?
+### 5. Manuscript appendix — brief introduction to PGT?
 
 PGT isn't covered in the masters curriculum, so the examiner will not have the background context to follow the manuscript. I am wondering whether to include an appendix giving a brief introduction to PGT — collecting key results and a few illustrative figures from canonical references (Blagojević, arXiv:gr-qc/0302040, was particularly helpful for me) into a self-contained overview.
 
 - [ ] Is this the right approach for setting context, or is there a different convention for this?
 
-### 7. Carry-forward from 17 April
+### 6. Carry-forward from 17 April
 
 - [ ] **Scheduling the practice talk** — when?
 - [ ] **Sven Krippendorf** — outcome of any intervention?
