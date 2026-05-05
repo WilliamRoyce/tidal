@@ -18,18 +18,18 @@ The starting point is the Gertsenshtein effect: a graviton propagating
 through a background magnetic field can, perhaps surprisingly, convert into a
 photon.
 
-Perhaps unfortunately, this effect is astrophysically
+Unfortunately, this effect is astrophysically
 useless. For a magnetar with the strongest known magnetic fields,
 the conversion probability is around ten-to-the-minus-ten. And for any
 laboratory setup it's even more hopeless. At these scales, there is no foreseeable detector that will see Gertsenshtein
-in any astrophysical or laboratory setting, within standard-GR.
+in any astrophysical or laboratory setting... within standard-GR.
 
-Our theoretical curiosity however prompts us the question: is there any extension of GR that can amplify this conversion to a detectable level?
+So our theoretical curiosity prompts us the question: is there any extension of GR that can amplify this conversion to a detectable level?
 
 The approach in this project is unapologetically phenomenological — instead of
 picking one specific extension of GR and defending it, I'm
 systematically scanning the space of curvature, torsion, and electromagnetic
-modifications of linearised GR and asking which subsectors, if any, amplify the
+modifications of linearised GR and asking which sectors, if any, amplify the
 conversion.
 
 ▶ NEXT — slide 2: the Gertsenshtein effect
@@ -38,7 +38,7 @@ conversion.
 ▶ Slide 2 — 02 Gertsenshtein (~60 s)
 ═══════════════════════════════════════════════════════════════
 
-I'm guessing you'll all be wondering now about what the Gertsenshtein effect actually is? In short: it's a mixing between the graviton and the photon, mediated by the background magnetic field.
+I'm guessing you'll all first be wondering what the Gertsenshtein effect actually is? In short: it's a mixing between the graviton and the photon, mediated by the background magnetic field.
 
 Although it might sound exotic, this isn't really new physics — the coupling is already hiding in the Einstein–Maxwell action! Once you turn on a background magnetic field and let the metric fluctuate, those metric factors raising the field strength indices produce a coupling between the graviton, the photon, and the background field.
 
