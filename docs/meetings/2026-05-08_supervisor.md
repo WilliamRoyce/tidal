@@ -62,9 +62,9 @@ If the conclusion really does flip with initial-condition choice, that itself is
 
 Organising the completed theories by whether torsion propagates and whether nonminimal couplings are present gives a useful summary of results so far:
 
-|                                      | constraint torsion          | propagating torsion                              |
-| ------------------------------------ | --------------------------- | ------------------------------------------------ |
-| **minimal (no nonminimal coupling)** | Einstein-Cartan — null      | $R^2$-PGT — $b_5$ decouples structurally         |
+|                                      | constraint torsion       | propagating torsion                              |
+| ------------------------------------ | ------------------------ | ------------------------------------------------ |
+| **minimal (no nonminimal coupling)** | Einstein-Cartan — null   | $R^2$-PGT — $b_5$ decouples structurally         |
 | **nonminimal coupling present**      | **Ricci-EM — structure** | YM-PGT family (5 nested sub-theories) — all null |
 
 Plus the phenomenological class (dark-photon-plasma, plasma Gertsenshtein) and not-yet-completed parity-odd / complete-PGT / higher-curvature-EM theories.
@@ -75,29 +75,29 @@ Within the YM-PGT family we tested **nested sub-theories** prominent in the lite
 
 ### Roadmap
 
-| Theory class                                       | Free dim  | Status                 | Verdict                                                         |
-| -------------------------------------------------- | --------- | ---------------------- | --------------------------------------------------------------- |
-| dark-photon-plasma (effective, Proca torsion)      | 4         | Done                   | Null amplify; genuine suppression at decoupling corner          |
-| Einstein-Cartan (minimal constraint torsion)       | 3         | Done                   | Null — torsion structurally decouples                           |
-| $R^2$-PGT ($b_5$ minimal-quadratic)               | 4         | Deferred               | $b_5$ decouples from TT channel structurally                    |
-| Ricci-EM (nonminimal, constraint torsion)          | 4         | Done + rerun in flight | **Strong suppressor; structure on $\delta_1$. Rerun deferred.** |
-| Bahamonde YM-PGT ($\beta_{1\text{–}3}, \xi, \delta_1$) | 5    | Done                   | Null                                                            |
-| Barker YM-PGT ($+\chi$)                           | 6         | Done                   | Null — $\chi$ inert                                             |
-| Shapiro YM-PGT ($+\zeta_{1\text{–}3}$)           | 8         | Done                   | Null — $\zeta_i$ inert                                          |
-| full YM-PGT (9-D)                                 | 9         | Done                   | Null — all 6 nonminimal couplings inert                         |
-| parity-odd YM-PGT                                 | $\sim$22  | **Next**               | Pending; HPC submission planned                                 |
-| complete-even PGT                                  | $\sim$20  | Pending                | Derivation in progress                                          |
-| complete-odd PGT                                   | $\sim$30+ | Pending                | Derivation in progress                                          |
-| Einstein–Maxwell + higher-curvature EM             | TBD       | Pending                | Blocked on Wolfram-side xAct issue                              |
+| Theory class                                           | Free dim  | Status                 | Verdict                                                         |
+| ------------------------------------------------------ | --------- | ---------------------- | --------------------------------------------------------------- |
+| dark-photon-plasma (effective, Proca torsion)          | 4         | Done                   | Null amplify; genuine suppression at decoupling corner          |
+| Einstein-Cartan (minimal constraint torsion)           | 3         | Done                   | Null — torsion structurally decouples                           |
+| $R^2$-PGT ($b_5$ minimal-quadratic)                    | 4         | Deferred               | $b_5$ decouples from TT channel structurally                    |
+| Ricci-EM (nonminimal, constraint torsion)              | 4         | Done + rerun in flight | **Strong suppressor; structure on $\delta_1$. Rerun deferred.** |
+| Bahamonde YM-PGT ($\beta_{1\text{–}3}, \xi, \delta_1$) | 5         | Done                   | Null                                                            |
+| Barker YM-PGT ($+\chi$)                                | 6         | Done                   | Null — $\chi$ inert                                             |
+| Shapiro YM-PGT ($+\zeta_{1\text{–}3}$)                 | 8         | Done                   | Null — $\zeta_i$ inert                                          |
+| full YM-PGT (9-D)                                      | 9         | Done                   | Null — all 6 nonminimal couplings inert                         |
+| parity-odd YM-PGT                                      | $\sim$22  | **Next**               | Pending; HPC submission planned                                 |
+| complete-even PGT                                      | $\sim$20  | Pending                | Derivation in progress                                          |
+| complete-odd PGT                                       | $\sim$30+ | Pending                | Derivation in progress                                          |
+| Einstein–Maxwell + higher-curvature EM                 | TBD       | Pending                | Blocked on Wolfram-side xAct issue                              |
 
 ### YM-PGT null results (compact)
 
-| Theory       | Amp $\log Z$ | Sup $\log Z$ | Bayes factor | Inert couplings                      |
-| ------------ | ------------ | ------------ | ------------ | ------------------------------------ |
-| Bahamonde | $+0.616$     | $-0.449$     | 2.90         | $\delta_1$                           |
-| Barker    | $+0.618$     | $-0.447$     | 2.90         | $\delta_1, \chi$                     |
-| Shapiro   | $+0.612$     | $-0.615$     | 3.41         | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
-| full (9-D) | $+0.6150$   | $-0.6146$    | 3.42         | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
+| Theory     | Amp $\log Z$ | Sup $\log Z$ | Bayes factor | Inert couplings                      |
+| ---------- | ------------ | ------------ | ------------ | ------------------------------------ |
+| Bahamonde  | $+0.616$     | $-0.449$     | 2.90         | $\delta_1$                           |
+| Barker     | $+0.618$     | $-0.447$     | 2.90         | $\delta_1, \chi$                     |
+| Shapiro    | $+0.612$     | $-0.615$     | 3.41         | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
+| full (9-D) | $+0.6150$    | $-0.6146$    | 3.42         | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
 
 The propagating-torsion nonminimal sector is **Gertsenshtein-neutral**: no coupling opens a conversion channel. Posterior shape is dominated entirely by the $\beta_{1\text{–}3}, \xi$ stability boundary; all six nonminimal couplings have marginal $D_{\rm KL} < 0.06$ nats.
 
@@ -215,7 +215,14 @@ The dark-photon, Einstein-Cartan, and all five YM-PGT sub-theories are null. The
 
 - [ ] What is the right framing for the paper — a joint Bayes factor, per-theory, or something else?
 
-### 6. Carry-forward from 17 April
+### 6. Manuscript appendix — brief introduction to PGT?
+
+PGT isn't covered in the masters curriculum, so the examiner (not yourself) will not have the background context to follow the manuscript. I am wondering whether to include an appendix giving a brief introduction to PGT — collecting key results and a few illustrative figures from canonical references (Blagojević, arXiv:gr-qc/0302040, was particularly helpful for me) into a self-contained overview.
+
+- [ ] Is this the right approach for setting context for an unfamiliar examiner, or is there a different convention for this in the department?
+- [ ] If yes, how long an appendix would be reasonable, and is there a particular pedagogical structure or set of references you would recommend?
+
+### 7. Carry-forward from 17 April
 
 - [ ] **Scheduling the practice talk** — when and to whom? Would you like to be in the audience?
 - [ ] **Will Handley** PhD application — when to email?
