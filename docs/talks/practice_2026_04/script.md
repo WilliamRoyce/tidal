@@ -51,7 +51,7 @@ between the graviton and the photon, with an off-diagonal coupling proportional 
 ▶ Slide 3 — 03 literature (~50 s)
 ═══════════════════════════════════════════════════════════════
 
-But why is that coupling so weak? Its fundamental origin is the weakness of gravity, suppressed by the huge Planck scale. It's not exactly looking good for the Gertsenshtein effect when the conversion probability is already suppressed by the Planck mass squared.
+But why is that coupling so weak? Fundamentally, it's the weakness of gravity, with the conversion probability suppressed by the square of the Planck mass.
 
 Gertsenshtein himself in 1962
 gave the formula and immediately recognised it was hopelessly small.
