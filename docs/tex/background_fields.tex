@@ -10,7 +10,7 @@ but are \emph{not} varied in the Euler--Lagrange derivation. They survive as
 (possibly position-dependent) coefficients in the equations of motion.
 
 This feature is essential for simulating the Gertsenshtein effect
-(Gertsenshtein 1962; Domcke \& Garcia-Cely 2023~\cite{domcke2023simple}), where a static external
+(Gertsenshtein 1962; Palessandro \& Rothman 2023~\cite{palessandro2023simple}), where a static external
 magnetic field $\Bzero(\bm{x})$ catalyses photon-graviton conversion. It also enables
 general probe-field approximations and theories with fixed external sources.
 
@@ -265,7 +265,7 @@ both delegate to \texttt{\_eval\_utils.py}, so no changes are needed in \texttt{
 
 \begin{itemize}
   \item Gertsenshtein (1962), ``Wave resonance of light and gravitational waves'', JETP 14, 84~\cite{gertsenshtein1962wave} --- original prediction requiring external $B$-field as background
-  \item Domcke \& Garcia-Cely (2023), ``A simple derivation of the Gertsenshtein effect'', arXiv:2301.02072~\cite{domcke2023simple} --- modern derivation with inhomogeneous background profiles
+  \item Palessandro \& Rothman (2023), ``A simple derivation of the Gertsenshtein effect'', Phys.\ Dark Univ.\ 40, 101187, arXiv:2301.02072~\cite{palessandro2023simple} --- simple Dyson-style derivation; note that their formula has a $\sqrt{4\pi}$ normalisation error (see~\cref{sec:gertsenshtein-formula})
   \item Mart\'in-Garc\'ia et al., ``xAct: Efficient tensor computer algebra for Mathematica'' --- symbolic tensor algebra (\texttt{VarD}, \texttt{ComponentValue}, \texttt{ToBasis})
   \item Zwicker (2020), ``py-pde: A Python package for solving partial differential equations'', JOSS 5(48), 2158 --- original PDE backend; FD stencil conventions retained in TIDAL's native operators
 \end{itemize}

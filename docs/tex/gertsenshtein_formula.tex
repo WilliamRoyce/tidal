@@ -18,7 +18,7 @@ where $\kappa^2 = 16\pi G$ (standard gravitational coupling). Equivalently:
   \label{eq:gertsenshtein-P-alt}
 \end{equation}
 
-This is derived from the Lagrangian $\lag = \frac{1}{\kappa^2}R - \frac{1}{4}F^2$ via the TIDAL symbolic pipeline and confirmed numerically (RMS $< 0.015$ across a 40-point $\Bzero$ sweep at $N=1024$, corrected for graviton effective mass). It is independently confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}.
+This is derived from the Lagrangian $\lag = \frac{1}{\kappa^2}R - \frac{1}{4}F^2$ via the TIDAL symbolic pipeline and confirmed numerically (RMS $< 0.015$ across a 40-point $\Bzero$ sweep at $N=1024$, corrected for graviton effective mass). It is independently confirmed by Lella et al.~\cite{lella2024constraining}.
 
 \textbf{Palessandro \& Rothman~(2023) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument.} Hwang \& Noh~\cite{hwangnoh2023graviton} independently criticise P\&R's linearisation procedure.
 
@@ -45,7 +45,12 @@ action is
     [\kappa] = [\text{Mass}]^{-1}.
 \end{equation*}
 Numerically, $\kappa$ takes the value $\sqrt{16\pi G}$ — the same constant that
-Domcke 2301.02072 and Dandoy et al.\ 2406.17853 call the ``vertex coupling''.
+Lella et al.\ (2406.17853, formerly mis-cited in this document as ``Lella et al.'')
+call the ``vertex coupling''. The earlier reference to ``Domcke 2301.02072'' on
+this line was an attribution error: arxiv 2301.02072 is Palessandro \& Rothman
+(\emph{Phys. Dark Univ.} 40, 101187, 2023), and they use a different,
+non-canonical normalisation $\sqrt{G}\Bzero$ that is wrong by $\sqrt{4\pi}$
+in the conversion-formula argument (see~\cref{sec:conventions}).
 The $\kappa$ enters the equations of motion through the LHS-normalisation step
 in the TIDAL pipeline: dividing the $h$ equation by its kinetic prefactor
 $1/\kappa^2$ multiplies the photon coupling by $\kappa^2$, giving an
@@ -195,19 +200,19 @@ Note: the beat frequency $\Bzero\kappa$ is the geometric mean of the two asymmet
 Source & Metric pert.\ & Gravity kinetic & Coupling & Vacuum $P$ \\
 \midrule
 \textbf{TIDAL} & $g = \eta + h$ & $(1/\kappa^2)(\partial h)^2$ & $\kappa\Bzero/2$ & $\sin^2(\kappa\Bzero D/2)$ \\
-\textbf{Dandoy et al.}~\cite{dandoy2024constraining} & $g = \eta + \tfrac{2}{M_P}h$ & $\tfrac{1}{2}(\partial h_c)^2$ & $\Bzero/(\sqrt{2}\,M_P)$ & $\sin^2(\sqrt{4\pi G}\,\Bzero D)$ \\
+\textbf{Lella et al.}~\cite{lella2024constraining} & $g = \eta + \tfrac{2}{M_P}h$ & $\tfrac{1}{2}(\partial h_c)^2$ & $\Bzero/(\sqrt{2}\,M_P)$ & $\sin^2(\sqrt{4\pi G}\,\Bzero D)$ \\
 \textbf{P\&R (2023)} & $g = \eta + h$ & $(1/16\pi G)(\partial h)^2$ & $\sqrt{G}\,\Bzero$ & $\sin^2(\sqrt{G}\,\Bzero D)$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsubsection{Algebraic Equivalence: TIDAL = Dandoy/Lella}
+\subsubsection{Algebraic Equivalence: TIDAL = Lella}
 
 TIDAL uses $\kappa^2 = 16\pi G$:
 \begin{equation}
   \frac{\kappa}{2} = \frac{\sqrt{16\pi G}}{2} = \sqrt{4\pi G}
 \end{equation}
-Dandoy/Lella use the reduced Planck mass $M_P = 1/\sqrt{8\pi G}$:
+Lella use the reduced Planck mass $M_P = 1/\sqrt{8\pi G}$:
 \begin{equation}
   \frac{\Bzero}{\sqrt{2}\,M_P} = \Bzero\,\frac{\sqrt{8\pi G}}{\sqrt{2}} = \Bzero\,\sqrt{4\pi G}
 \end{equation}
@@ -350,7 +355,7 @@ The formula generalises to the detuned case (plasma effects, massive graviton):
   \item[Gertsenshtein (1962)~\cite{gertsenshtein1962wave}] Original prediction. Weak-field limit: $P \approx (\kappa B L/2)^2$, consistent with $\sin^2 \approx x^2$ for small argument.
   \item[Raffelt \& Stodolsky (1988)] Established the $2\times 2$ mixing-matrix formalism by analogy with neutrino oscillations. Introduced MSW resonance for graviton-photon mixing.
   \item[Hwang \& Noh (2023)~\cite{hwangnoh2023graviton}] Proper EM field definitions in curved spacetime; formulation-dependent graviton mass/instability term; critiques ad-hoc approaches including P\&R.
-  \item[Dandoy et al.\ (2024)~\cite{dandoy2024constraining}] Full 4-component mixing (two GW polarisations $\times$ two photon polarisations). \textbf{Confirms TIDAL's formula:} $P = \sin^2(\sqrt{4\pi G}\,\Bzero D)$.
+  \item[Lella et al.\ (2024)~\cite{lella2024constraining}] Full 4-component mixing (two GW polarisations $\times$ two photon polarisations). \textbf{Confirms TIDAL's formula:} $P = \sin^2(\sqrt{4\pi G}\,\Bzero D)$.
   \item[Domcke et al.\ (2025)~\cite{domcke2025scattering}] GW scattering on localised magnetic fields. Extension target for TIDAL.
 \end{description}
 
@@ -359,6 +364,6 @@ The formula generalises to the detuned case (plasma effects, massive graviton):
 
 \begin{enumerate}
   \item \textbf{Our formula is correct.} The TIDAL pipeline (xAct $\to$ VarD $\to$ ExportJSON normalisation) correctly derives the coupled equations.
-  \item \textbf{P\&R is not a reliable validation target.} The 2023 and 2024 papers both contain the same normalisation error. Dandoy et al.~\cite{dandoy2024constraining} should be used as the primary cross-check.
+  \item \textbf{P\&R is not a reliable validation target.} The 2023 and 2024 papers both contain the same normalisation error. Lella et al.~\cite{lella2024constraining} should be used as the primary cross-check.
   \item \textbf{The formula generalises cleanly} to the detuned case via \cref{eq:detuned}.
 \end{enumerate}
