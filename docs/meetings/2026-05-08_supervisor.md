@@ -15,11 +15,11 @@ Key workstreams since the last meeting:
 
 ---
 
-## 1. Ricci-EM with constraint torsion (the live wire)
+## 1. Constraint-torsion theory with a nonminimal Ricci–photon coupling (the only structured result)
 
 ### Lagrangian
 
-$$\mathcal{L} = \frac{1}{\kappa^2}R + \alpha_i\,I_i + \delta_1\,\tilde R_{\mu\nu}\,F^{\mu\nu} - \frac{1}{4}F_{\mu\nu}F^{\mu\nu}$$
+$$\mathcal{L} = \frac{1}{\kappa^2}\tilde{R} + \alpha_i\,I_i + \delta_1\,\tilde R_{[\mu\nu]}\,F^{\mu\nu} - \frac{1}{4}F_{\mu\nu}F^{\mu\nu}$$
 
 The three torsion-mass invariants $\alpha_{1,2,3}$ plus a single nonminimal coupling $\delta_1$ between the Ricci-Cartan tensor and the photon field strength.
 
@@ -53,39 +53,39 @@ Plus the phenomenological class (dark-photon-plasma, plasma Gertsenshtein) and n
 
 **Observation:** the most structure found so far exists in the constraint-torsion case. We cannot yet say whether this reflects something fundamental about the landscape or is simply where we happened to look — propagating-torsion with nonminimal couplings dominates the parameter count of what has been tested, and the parity-odd and complete-PGT sectors remain untested. That said, it is enough to motivate the question of whether the constraint-torsion direction deserves more attention.
 
-Within the YM-PGT family we tested **nested sub-theories** prominent in the literature before the full joint: Bahamonde $\subset$ Barker $\subset$ Shapiro $\subset$ full. Each layer adds couplings; each layer was null.
+Within the YM-PGT family we tested **nested sub-theories** prominent in the literature before the full joint: Bahamonde (arXiv:2402.08937) $\subset$ Barker (arXiv:2406.12826) $\subset$ Shapiro (arXiv:hep-th/0103093) $\subset$ full (9-D). Each layer adds couplings; each layer was null.
 
 ### Roadmap
 
-| Theory class                                           | Free dim  | Status                 | Verdict                                                         |
-| ------------------------------------------------------ | --------- | ---------------------- | --------------------------------------------------------------- |
-| dark-photon-plasma (effective, Proca torsion)          | 4         | Done                   | Null amplify; genuine suppression at decoupling corner          |
-| Einstein-Cartan (minimal constraint torsion)           | 3         | Done                   | Null — torsion structurally decouples                           |
-| $R^2$-PGT ($b_5$ minimal-quadratic)                    | 4         | Deferred               | $b_5$ decouples from TT channel structurally                    |
-| Ricci-EM (nonminimal, constraint torsion)              | 4         | Done + rerun in flight | **Strong suppressor; structure on $\delta_1$. Rerun deferred.** |
-| Bahamonde YM-PGT ($\beta_{1\text{–}3}, \xi, \delta_1$) | 5         | Done                   | Null                                                            |
-| Barker YM-PGT ($+\chi$)                                | 6         | Done                   | Null — $\chi$ inert                                             |
-| Shapiro YM-PGT ($+\zeta_{1\text{–}3}$)                 | 8         | Done                   | Null — $\zeta_i$ inert                                          |
-| full YM-PGT (9-D)                                      | 9         | Done                   | Null — all 6 nonminimal couplings inert                         |
-| parity-odd YM-PGT                                      | $\sim$22  | **Next**               | Pending; HPC submission planned                                 |
-| complete-even PGT                                      | $\sim$20  | Pending                | Derivation in progress                                          |
-| complete-odd PGT                                       | $\sim$30+ | Pending                | Derivation in progress                                          |
-| Einstein–Maxwell + higher-curvature EM                 | TBD       | Pending                | Blocked on Wolfram-side xAct issue                              |
+| Theory class                                           | Free dim | Status                 | Verdict                                                         |
+| ------------------------------------------------------ | -------- | ---------------------- | --------------------------------------------------------------- |
+| dark-photon-plasma (effective, Proca torsion)          | 4        | Done                   | Null amplify; genuine suppression at decoupling corner          |
+| Einstein-Cartan (minimal constraint torsion)           | 3        | Done                   | Null — torsion structurally decouples                           |
+| $R^2$-PGT ($b_5$ minimal-quadratic)                    | 4        | Deferred               | $b_5$ decouples from TT channel structurally                    |
+| Ricci-EM (nonminimal, constraint torsion)              | 4        | Done + rerun in flight | **Strong suppressor; structure on $\delta_1$. Rerun deferred.** |
+| Bahamonde YM-PGT ($\beta_{1\text{–}3}, \xi, \delta_1$) | 5        | Done                   | Null                                                            |
+| Barker YM-PGT ($+\chi$)                                | 6        | Done                   | Null — $\chi$ inert                                             |
+| Shapiro YM-PGT ($+\zeta_{1\text{–}3}$)                 | 8        | Done                   | Null — $\zeta_i$ inert                                          |
+| full YM-PGT (9-D)                                      | 9        | Done                   | Null — all 6 nonminimal couplings inert                         |
+| parity-odd YM-PGT                                      | ~22      | **Next**               | Pending; HPC submission planned                                 |
+| complete-even PGT                                      | ~20      | Pending                | Derivation in progress                                          |
+| complete-odd PGT                                       | ~30+     | Pending                | Derivation in progress                                          |
+| Einstein–Maxwell + higher-curvature EM                 | TBD      | Pending                | Blocked on Wolfram-side xAct issue                              |
 
 ### YM-PGT null results (compact)
 
-| Theory     | Amp $\log Z$ | Sup $\log Z$ | Bayes factor | Inert couplings                      |
-| ---------- | ------------ | ------------ | ------------ | ------------------------------------ |
-| Bahamonde  | $+0.616$     | $-0.449$     | 2.90         | $\delta_1$                           |
-| Barker     | $+0.618$     | $-0.447$     | 2.90         | $\delta_1, \chi$                     |
-| Shapiro    | $+0.612$     | $-0.615$     | 3.41         | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
-| full (9-D) | $+0.6150$    | $-0.6146$    | 3.42         | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
+| Theory     | arXiv          | Amp $\log Z$ | Sup $\log Z$ | Bayes factor | Inert couplings                      |
+| ---------- | -------------- | ------------ | ------------ | ------------ | ------------------------------------ |
+| Bahamonde  | 2402.08937     | $+0.616$     | $-0.449$     | 2.90         | $\delta_1$                           |
+| Barker     | 2406.12826     | $+0.618$     | $-0.447$     | 2.90         | $\delta_1, \chi$                     |
+| Shapiro    | hep-th/0103093 | $+0.612$     | $-0.615$     | 3.41         | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
+| full (9-D) | —              | $+0.6150$    | $-0.6146$    | 3.42         | $\delta_1, \chi, \zeta_{1\text{–}3}$ |
 
 The propagating-torsion nonminimal sector is **Gertsenshtein-neutral**: no coupling opens a conversion channel. Posterior shape is dominated entirely by the $\beta_{1\text{–}3}, \xi$ stability boundary; all six nonminimal couplings have marginal $D_{\rm KL} < 0.06$ nats.
 
 ### Dark-photon-plasma model
 
-The torsion trace vector acts as a Proca dark photon kinetically mixed with the photon, with an effective plasma mass $m_A^2$ on the photon. Earlier runs were in the wrong physical regime (a sign error meant $\alpha_3 > 0$ was the tachyonic-instability regime, not the stable Proca regime). After correction:
+The torsion trace vector acts as a Proca dark photon kinetically mixed with the photon, with an effective plasma mass $m_A^2$ on the photon.
 
 | Run      | $\log Z$           | $D_{\rm KL}$ | Verdict                                                                                |
 | -------- | ------------------ | ------------ | -------------------------------------------------------------------------------------- |
@@ -103,6 +103,8 @@ The torsion trace vector acts as a Proca dark photon kinetically mixed with the 
 
 - **Parity-odd YM-PGT:** tests whether parity-violation in the torsion sector opens what even-parity nonminimal couplings did not.
 - **Complete-even and complete-odd PGT:** exhaustive quadratic enumeration. Derivations running locally.
+- **Plasma background for the torsion models.** The effective dark-photon model shows that adding an effective photon mass from the plasma environment (Raffelt–Stodolsky resonance) opens conversion channels that are zero in vacuum. The same extension can be applied to the constraint-torsion theories — placing the Ricci-EM (and future constraint-torsion + nonminimal) Lagrangians in a plasma background to ask whether the resonance lifts the suppression or opens amplification channels that the vacuum survey misses.
+- **Einstein-Maxwell + Euler-Heisenberg ($F^4$) correction.** The one-loop QED correction to Maxwell adds an $F^4$ term to the Lagrangian. Unlike the $b_5\tilde R^2$ PGT case, this does not promote any constraint field and so the measurement pipeline is unaffected by the Hamiltonian issues. Does the EH nonlinearity modify Gertsenshtein at all, even without any torsion?
 - **Possible reorientation toward constraint-torsion + extended nonminimal couplings.** Given the Ricci-EM structure vs the entire propagating-torsion family's emptiness, it may be more fruitful to broaden the _constraint-torsion + nonminimal_ class — single cross-terms in the Ricci-EM mould: scalar-curvature-photon, torsion-trace-to-photon, axial-torsion-to-photon, etc. Worth your input.
 
 ---
@@ -139,25 +141,21 @@ The principled Hamiltonian route: work out the full constraint algebra of the $b
 
 **The key obstruction shared by both:** there is no published recipe in the literature for the _constraint-promotion_ case, where a field that was non-dynamical at leading order becomes dynamical at the next order. Both approaches implicitly assume the number of dynamical degrees of freedom is fixed.
 
-### What was implemented instead
+### What the equations-of-motion approach gives — and where it stops
 
-Rather than working at the Lagrangian level, we work directly with the linearised equations of motion. The strategy:
+For the equations of motion we made progress. Rather than reducing the Lagrangian, we work at the EOM level directly: solve the unperturbed ($b_5{=}0$) equations exactly, then treat the $b_5$-correction as a source $S[y^{(0)}]$ for the second-order base operator $L$. The correction $y^{(1)}$ satisfies $L\,y^{(1)} = S[y^{(0)}]$, solved via the Duhamel convolution integral:
 
-1. **Solve the base ($b_5{=}0$) equations exactly** using the spectral solver, obtaining the leading-order field evolution $y^{(0)}(t)$.
-2. **Treat the $b_5$-correction terms as a source** for the base operator. The $\mathcal{O}(b_5)$ correction satisfies $L\,y^{(1)} = S[y^{(0)}]$ where $L$ is the second-order base operator and $S$ is the correction source built from $y^{(0)}$.
-3. **Solve via the Duhamel convolution integral**: the correction is $y^{(1)}(t) = \int_0^t e^{(t-\tau)A}\,S(\tau)\,y^{(0)}(\tau)\,\mathrm{d}\tau$, which reduces to a closed-form kernel evaluated from the base eigendata.
+$$y^{(1)}(t) = \int_0^t e^{(t-\tau)A}\,S(\tau)\,y^{(0)}(\tau)\,\mathrm{d}\tau$$
 
-This approach is **ghost-free by construction** — the base LHS operator $L$ is always second-order, so no Ostrogradsky modes enter. It is also theory-agnostic: the same code handles any small-parameter correction without per-theory classification. Verified against exact analytic solutions (Parker–Simon FLRW to $10^{-12}$, driven-oscillator to $10^{-14}$) and against a $b_5{=}0$ reference limit.
+This gives correct, ghost-free equations of motion — the base operator $L$ is always second-order, so no Ostrogradsky modes enter. Verified against exact analytic solutions (Parker–Simon FLRW to $10^{-12}$, driven-oscillator to $10^{-14}$).
 
-### Open gap: validity bound for the constraint-promotion case
-
-When $b_5$ promotes a constraint field, that field has _zero amplitude_ in $y^{(0)}$ but acquires $\mathcal{O}(b_5)$ amplitude from the source. The Duhamel answer is numerically sound, but we lack a closed-form theorem bounding the validity domain of the expansion — only the heuristic $\varepsilon\cdot\omega\cdot t$ threshold from Figueras–Kovács–Yao (2025). See §Questions.
+**However, solving the equations of motion is not enough to do physics.** Computing observables — conversion probability, energy in each mode — requires a Hamiltonian: you need to know which quadratic combinations of fields and velocities are conserved energy, and how to assign energy to each mode. Without a Hamiltonian, the EOM solution is a set of evolving field amplitudes with no clear physical meaning. For the constraint-promotion case, the Hamiltonian analysis is exactly what fails. The measurement and inference pipeline for these theories is consequently blocked: we can propagate the fields but cannot convert those trajectories to the observables needed for Bayesian inference.
 
 ---
 
 ## 5. Practice talk
 
-The talk covering this project has been written and is ready to schedule. The structure leads with why the Gertsenshtein effect is astrophysically useless at GR rates, introduces the survey question, and describes the inference framework before the results. Ready to give — looking to schedule a time.
+The talk covering this project has been written and is ready to schedule. The structure leads with why the Gertsenshtein effect is astrophysically useless at GR rates, introduces the survey question, and describes the inference framework before the results (yet to be added). Ready to give — looking to schedule a time.
 
 ---
 
