@@ -24,13 +24,20 @@ $\hbar = c = 1$. Greek indices $\mu,\nu,\dots$ denote spacetime
 coordinate components and Latin indices $a,b,\dots$ denote Lorentz-frame
 components. The reduced Planck mass is $\MPl$ with
 $\MPl^2 = (8\pi G)^{-1}$. Throughout we use the gravitational coupling
-$\kappa$ defined by $\kappa^2 = 16\pi G$, which has dimension
-$[\kappa] = [\mathrm{Mass}]^{-1}$ and satisfies $\kappa = \sqrt{2}/\MPl$;
-this is the coupling that enters the Lagrangian prefactor
-$\kappa^{-2}\,\MAGFt{}$ and the linearised graviton--photon vertex in
-the Gertsenshtein conversion formula. The totally antisymmetric symbol
-is normalised to $\varepsilon^{0123} = +1$, fixing the sign of the
-axial torsion pseudovector below.
+$\kappa$ defined by $\kappa^2 = 16\pi G$, equivalently
+$\kappa = \sqrt{2}/\MPl$; this is the linearised graviton--photon
+vertex coupling, and the action prefactor $\kappa^{-2}\,\MAGFt{}$
+corresponds to a canonical graviton kinetic term under the field
+redefinition $\tilde{h}_{\mu\nu} = h_{\mu\nu}/\kappa$ used
+in~\cite{lella2024constraining}. We distinguish $\kappa$ from the
+Einstein constant $\kappa_\mathrm{E}\equiv 8\pi G$, used as the
+prefactor of $\MAGFt{}$
+in~\cite{barker2024poincare,barker2023confinement,barker2024psalter};
+the dimensional analysis distinguishing the two and the relation
+$\kappa^2 = 2\kappa_\mathrm{E}$ are set out in
+\cref{sec:kappa-conventions}. The totally antisymmetric symbol is
+normalised to $\varepsilon^{0123} = +1$, fixing the sign of the axial
+torsion pseudovector below.
 
 \subsection{Field content and quadratic action}%
 \label{PGTframework}
@@ -53,25 +60,29 @@ $\rcD{_\mu}$.
 % Step (b): Promotion of connection to independent field. Palatini
 % formulation declared explicitly.
 \paragraph*{Independent connection in the Palatini formulation}
-Poincar\'{e} gauge theory promotes the metric and the affine
-connection $\MAGA{^\sigma_\mu_\nu}$ to independent dynamical fields,
-gauging the Poincar\'{e} group on the tangent bundle and producing
-torsion and curvature as the field strengths of spacetime translations
-and rotations
-respectively~\cite{utiyama1956invariant,kibble1961lorentz,sciama1962physical,trautman1972einstein,hehl1976spin}.
-Modern reviews and the textbook presentations relevant here are given
-in~\cite{hehl1995metric,blagojevic2002gravitation,blagojevic2003lectures,blagojevicHehl2013};
-recent applications and computational frameworks at the level used
-here are developed in~\cite{barker2024poincare,barker2024psalter}. The
-full field-variable formalism, including the vierbein, the spin
-connection, and the irreducible torsion components used in the
-kinetic-matrix analysis below, is collected in \cref{PGTBackground}.
+Poincar\'{e} gauge theory of
+Kibble~\cite{kibble1961lorentz},
+Utiyama~\cite{utiyama1956invariant}, and
+Sciama~\cite{sciama1962physical}, developed
+by~\cite{trautman1972einstein,hehl1976spin,hehl1995metric},
+promotes the metric and the affine connection
+$\MAGA{^\sigma_\mu_\nu}$ to independent dynamical fields, with
+torsion and curvature appearing as the field strengths of spacetime
+translations and rotations respectively
+(see~\cite{blagojevic2002gravitation,blagojevic2003lectures,blagojevicHehl2013,hehlobukhov2007cartan}
+for textbook and lecture-note treatments,
+\cite{barker2024poincare,barker2024psalter,barker2023confinement}
+for recent applications, and~\cite{lin2019pgt,blagojevic2018hamiltonian}
+for the spin-parity projection method underpinning the spectral
+analysis of the action below). The full field-variable formalism,
+including the vierbein, the spin connection, and the irreducible
+torsion components used in the kinetic-matrix analysis below, is
+collected in \cref{PGTBackground}.
 
 % Step (c): Paired curvature and torsion field-strength definitions.
 \paragraph*{Field strengths: curvature and torsion}
 The translational and rotational gauge field strengths take the
-standard
-form~\cite{kibble1961lorentz,hehl1976spin,hehl1995metric,blagojevic2003lectures,hehlobukhov2007cartan,barker2024poincare},
+standard form~\cite{hehlobukhov2007cartan,barker2024poincare},
 \begin{align}
   \MAGF{^\sigma_\mu_\nu_\rho}
     &\equiv 2\,\PD{_{[\mu}}\MAGA{^\sigma_{\nu]}_\rho}
@@ -86,14 +97,15 @@ of the connection vanishes; torsion is the obstruction to that limit.
 
 % Step (d): General quadratic action with named couplings.
 \paragraph*{General quadratic action}
-The most general parity-preserving quadratic PGT action coupled to
-electromagnetism contains eleven independent invariants --- six
-$\MAGFt{}^2$, three $\mathcal{T}^2$, one $\FieldF{}^2$, and one
-$\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ cross-term --- with parity-odd
-extensions and cubic completions catalogued in~\cite{bahamonde2025cubic}
-and the symbolic enumeration documented in
+At lowest order in derivatives, the most general parity-preserving
+quadratic PGT+EM action contains eleven independent invariants ---
+six $\MAGFt{}^2$, three $\mathcal{T}^2$, one $\FieldF{}^2$, and one
+$\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ cross-term --- with the
+explicit enumeration collected in
 \cref{PGTBackground}~\cite{lin2019pgt,blagojevic2018hamiltonian,blagojevic2003lectures,barker2024poincare,sezgin1980ghostfree,aoki2020nonlinear}.
-Schematically,
+Parity-odd extensions and ghost-free derivative completions are set
+out in \cref{PGTBackground}, and cubic-order extensions are developed
+in~\cite{bahamonde2025cubic}. Schematically,
 \begin{align}
   S = \int d^4x\,\sqrt{-g}\,\Bigl[
         \frac{1}{\kappa^2}\,\MAGFt{}
@@ -106,12 +118,13 @@ Schematically,
 \end{align}
 where the $\Alp{n}$ couple the torsion-squared invariants, the
 $\Bet{n}$ couple the curvature-squared invariants, and $\Gam{1}$
-couples the parity-even curvature--electromagnetic cross-term. This
-assignment matches the convention used in our symbolic implementation
-and in the BHL/Barker corpus; the constrained ghost-free subspace of
-the $\Alp{n},\,\Bet{n}$ parameter space is the subject of the
-classifications cited above, while the unrestricted enumeration we
-employ is set out in \cref{PGTBackground}.
+couples the parity-even curvature--electromagnetic cross-term; this
+assignment aligns
+with~\cite{lin2019pgt,barker2024poincare,blagojevic2003lectures}. The
+constrained ghost-free subspace of the $\Alp{n},\,\Bet{n}$ parameter
+space is the subject of the classifications cited above, while the
+unrestricted enumeration we employ is set out in
+\cref{PGTBackground}.
 
 % Step (e): Irreducible torsion decomposition introduced AFTER the action.
 % This is also the cross-reference target for App E.
@@ -143,10 +156,13 @@ written in the \emph{direct basis} of scalar contractions,
 with $\{I_1,I_2,I_3\}$ related to the irreducible squared-norms
 $\{q^2,\,T^2,\,S^2\}$ by an invertible linear transformation collected
 in \cref{PGTBackground}~\cite{shapiro2002torsion}. Coupling-constant
-labelling varies across the PGT literature; throughout this work we
-use the direct basis $\{I_1,I_2,I_3\}$ computationally and the
-irreducible decomposition for naming the physical degrees of freedom
-that each interaction term selects.
+labels and basis orderings differ across the PGT literature ---
+\cite{lin2019pgt} and~\cite{sezgin1980ghostfree} use distinct
+conventions, and the explicit translation table is collected in
+\cref{PGTBackground}. Throughout this work we use the direct basis
+$\{I_1,I_2,I_3\}$ computationally and the irreducible decomposition
+for naming the physical degrees of freedom that each interaction
+term selects.
 
 \subsection{Linearisation around flat $+$ $B_0$ background}%
 \label{Linearisation}
@@ -219,15 +235,22 @@ entries.
 % hangs and the Palessandro–Rothman / Hwang–Noh disagreement cannot be
 % navigated.
 \paragraph*{Electromagnetic-field conventions}
-The electric and magnetic fields are defined via the covariant
-decomposition of $\FieldF{_{\mu\nu}}$ in the normal-frame observer
-four-vector~\cite{hwangnoh2023emdef,hwangnoh2023graviton}, which
-entails metric-dependent corrections to the naive flat-space
-identification (the explicit form is given in \cref{PGTBackground}).
-Our pipeline derives equations from $\sqrt{-g}\,\lag$ at the Lagrangian
-level, so these corrections enter automatically; the linearised
-graviton mass coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ agrees with
-the potential-formulation result of~\cite{hwangnoh2023graviton}.
+Our pipeline derives equations from $\sqrt{-g}\,\lag$ at the
+Lagrangian level, with the electromagnetic sector formulated in terms
+of the four-potential $\FieldA{_\mu}$ and the gauge field strength
+$\FieldF{_{\mu\nu}}$; background fields are configured through the
+background four-potential $\bar{A}_\mu$ rather than through any
+explicit electric/magnetic decomposition. The $\sqrt{-g}$ expansion
+automatically captures the metric-dependent contractions that
+distinguish curved-spacetime EM from its naive flat-space
+identification --- the issue addressed analytically
+by~\cite{hwangnoh2023emdef,hwangnoh2023graviton} via a covariant
+normal-frame decomposition --- and the linearised graviton mass
+coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ that emerges from our
+pipeline agrees with the potential-formulation result
+of~\cite{hwangnoh2023graviton}. The explicit normal-frame
+decomposition is collected in \cref{PGTBackground} for readers
+comparing with the H-N treatment.
 
 \paragraph*{Conversion probability}
 % TODO: display the formula; one prose sentence on $\Bzero$-scaling; cite
@@ -250,19 +273,17 @@ form\footnote{%
     recent Gertsenshtein literature: the linearised
     graviton--photon vertex coupling adopted here, with
     $\kappa^2 = 16\pi G$ and $[\kappa] = [\mathrm{Mass}]^{-1}$, and
-    the Einstein-action constant $\kappa_\mathrm{E} = 8\pi G$,
+    the Einstein constant $\kappa_\mathrm{E} = 8\pi G$,
     $[\kappa_\mathrm{E}] = [\mathrm{Mass}]^{-2}$, used as the
-    prefactor of $\MAGFt{}$ in some recent
-    work~\cite{barker2024poincare}. A non-canonical kinetic
-    normalisation in the derivations
+    prefactor of $\MAGFt{}$
+    in~\cite{barker2024poincare,barker2023confinement,barker2024psalter}.
+    A non-canonical kinetic normalisation in the derivations
     of~\cite{palessandro2023simple,palessandro2024gertsenshtein}
-    produces a factor-of-$\sqrt{4\pi}$ error in the conversion
-    formula argument; \cite{hwangnoh2023graviton} identifies the
-    compounding issue of electromagnetic-field identification in
-    magnetic environments. The convention adopted
+    propagates this ambiguity into a factor-of-$\sqrt{4\pi}$ error
+    in the conversion-formula argument, while the convention adopted
     in~\cite{lella2024constraining} agrees with ours. The full
-    disambiguation, including dimensional analysis and the
-    relation $\kappa = \sqrt{2}/\MPl$, is given in
+    disambiguation, including dimensional analysis and the relation
+    $\kappa = \sqrt{2}/\MPl$, is given in
     \cref{sec:kappa-conventions}.
   }
 \begin{align}
