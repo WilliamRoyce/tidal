@@ -139,7 +139,7 @@ sector blocks~\cite{lin2019pgt,blagojevic2018hamiltonian,blagojevic2003lectures,
 where $\mathcal{L}_\text{lin}$ collects the linear invariants
 (Einstein--Hilbert, cosmological constant $\Lambda$, and the Holst
 term~\cite{holst1995barbero} with Barbero--Immirzi parameter
-$\gamma_\text{BI}$); $\mathcal{L}_{\tilde{R}^2}$ contains the
+$\gamma_\text{BI}$~\cite{barbero1995real,immirzi1997real}); $\mathcal{L}_{\tilde{R}^2}$ contains the
 parity-even curvature-squared invariants\footnote{The
 Riemann--Cartan curvature lacks the pair-exchange symmetry of the
 torsion-free Riemann tensor ---
@@ -156,8 +156,10 @@ collects the parity-odd quadratic
 invariants~\cite{karananas2014parity,blagojevic2018hamiltonian};
 $\mathcal{L}_\partial$ the higher-derivative
 extensions~\cite{aoki2020nonlinear}; $\mathcal{L}_\text{cubic}$
-the cubic completions relevant for linearisation around magnetic
-backgrounds and for ghost elimination~\cite{bahamonde2025cubic};
+the cubic-order completions that contribute to the linearised
+dynamics when one field takes a non-trivial background value, as
+for $\bar A_\mu$ here, and are catalogued
+in~\cite{bahamonde2025cubic};
 and $\mathcal{L}_\text{CS}$ collects the Chern--Simons torsion--EM
 couplings involving the gauge potential, motivated
 by~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion}
@@ -249,9 +251,11 @@ the second term being the contortion tensor that encodes the
 torsion contribution to the connection. The linearised connection
 perturbation $\delta\MAGA{^\sigma_\mu_\nu}$ therefore inherits
 contributions from both the metric perturbation $h_{\mu\nu}$,
-through the linearised Levi--Civita variation of \cref{LeviCivita},
-and the torsion perturbation $\delta\MAGT{^\sigma_\mu_\nu}$,
-through the contortion $\delta K^\sigma{}_{\mu\nu}$. The metric
+through the variation of the Levi--Civita connection
+$\delta\rCon{^\sigma_\mu_\nu}$ obtained by varying the metric in
+\cref{LeviCivita}, and the torsion perturbation
+$\delta\MAGT{^\sigma_\mu_\nu}$, through the contortion variation
+$\delta K^\sigma{}_{\mu\nu}$. The metric
 perturbation $h_{\mu\nu}$ enters without a $\kappa$ prefactor;
 this choice is equivalent under field redefinition to the
 canonically-normalised convention
@@ -360,7 +364,6 @@ $\Pconv \propto \Bzero^2$, the characteristic Gertsenshtein
 signature; the regime of validity of this linearised expression in
 the torsionful background is set out in \cref{PerturbativeRegime}.
 
-\paragraph*{Validation pointer}
 The quantitative reproduction of this kernel across our validation
 grid is reported in \cref{ValidationResult}, with the full
 simulation-to-analytic comparison archived in \cref{Validation}.
