@@ -159,11 +159,11 @@
 % Convention: MacrosMAG.tex (2406.12826)
 % Usage: \MAGA{^\alpha_\mu_\nu}, \MAGT{^\alpha_\mu_\nu}, \MAGF{^\alpha_\beta_\mu_\nu}
 
-\newrobustcmd{\MAGA}[1]{\tensor{\Gamma}{#1}}         % RC connection Gamma
-\newrobustcmd{\MAGT}[1]{\tensor{T}{#1}}              % torsion tensor T
-\newrobustcmd{\MAGTTilde}[1]{\tensor{\tilde T}{#1}}  % traceless torsion (^{(1)}T part)
-\newrobustcmd{\MAGF}[1]{\tensor{R}{#1}}              % curvature tensor R
-\newrobustcmd{\MAGFt}[1]{\tensor{\tilde{R}}{#1}}     % post-torsion Ricci scalar tilde-R
+\newrobustcmd{\MAGA}[1]{\tensor{\Gamma}{#1}}                       % RC connection Gamma
+\newrobustcmd{\MAGT}[1]{\tensor{\mathcal{T}}{#1}}                  % torsion tensor (calligraphic T)
+\newrobustcmd{\MAGTTilde}[1]{\tensor{\tilde{\mathcal{T}}}{#1}}     % traceless torsion (^{(1)}T part)
+\newrobustcmd{\MAGF}[1]{\tensor{\mathcal{R}}{#1}}                  % curvature tensor (calligraphic R)
+\newrobustcmd{\MAGFt}[1]{\tensor{\mathcal{R}}{#1}}                 % Riemann-Cartan curvature; tilde dropped — \mathcal{R} vs \rR{} distinguishes RC from Riemannian
 
 % Riemannian curvature (ring-decorated, for contrast with RC)
 \newrobustcmd{\rR}[1]{\tensor{\mathring{R}}{#1}}     % Riemannian Riemann/Ricci
@@ -173,9 +173,9 @@
 % Convention: BHL 2406.12826; Barker 2510.17094
 % Usage: \FieldA{_\mu}, \FieldF{_\mu_\nu}
 
-\newrobustcmd{\FieldA}[1]{\tensor{A}{#1}}    % EM 4-potential
-\newrobustcmd{\FieldF}[1]{\tensor{F}{#1}}    % EM field strength
-\newrobustcmd{\FieldH}[1]{\tensor{h}{#1}}    % metric perturbation (TT gauge)
+\newrobustcmd{\FieldA}[1]{\tensor{A}{#1}}              % EM 4-potential
+\newrobustcmd{\FieldF}[1]{\tensor{\mathcal{F}}{#1}}    % EM field strength (calligraphic F)
+\newrobustcmd{\FieldH}[1]{\tensor{h}{#1}}              % metric perturbation (TT gauge)
 
 % === Partial derivative ===
 % Convention: MacrosMAG.tex (2406.12826); Hamilcar Macros.tex (2512.25007)

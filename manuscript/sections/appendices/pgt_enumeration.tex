@@ -1,94 +1,382 @@
-% App H: General PGT+EM Lagrangian — sector-by-sector enumeration.
-% Forward-reference target from §2.1 for the explicit invariant
-% lists and parameter counts. The theory-background formalism
-% (vierbein, spin connection, irreducible torsion, ghost-restriction
-% concepts) lives in App F (pgt_background.tex).
+% App H: explicit sector-by-sector enumeration of the general PGT+EM
+% Lagrangian, providing the symbol set carried by the campaign theories
+% of \cref{SectorSurvey}. Theory-background formalism (Palatini
+% formulation, full irreducible-decomposition machinery,
+% ghost-restriction concepts) lives in \cref{PGTBackground} (App F).
 
-\section{General PGT+EM Lagrangian: sector-by-sector enumeration}
+\section{General quadratic PGT Lagrangian coupled to electromagnetism: sector-by-sector enumeration}
 \label{PGTEnumeration}
+
+Our scope is the set of PGT Lagrangians coupled to
+electromagnetism whose dynamics are tractable at quadratic order
+in the field perturbations around a static magnetic background.
+The literature on Poincar\'{e} gauge
+theory~\cite{kibble1961lorentz,hehl1976spin,hehl1995metric,blagojevic2002gravitation,blagojevic2003lectures,sezgin1980ghostfree,hayashi1979new,lin2019pgt,blagojevic2018hamiltonian,karananas2014parity,aoki2020nonlinear,barker2024poincare,barker2021hamiltonian,bahamonde2025cubic}
+and on torsion--electromagnetism
+couplings~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion,shapiro2002torsion,obukhov2024electrodynamics,bahamonde2025torsion}
+motivates which combinations are studied as named theories in
+\cref{SectorSurvey}, but the present catalogue covers the full
+operator content within the cutoff below --- including sectors
+that have been excluded for simplicity in the prior PGT
+literature, such as the parity-odd quadratic invariants
+explicitly omitted by~\cite{barker2024poincare} and treated only
+in part by~\cite{karananas2014parity,blagojevic2018hamiltonian}.
+
+We adopt an arbitrary cutoff at cubic field-strength count ---
+operators with at most three factors drawn from
+$\{\mathcal{R}, T, F\}$. The standard PGT cutoff is quadratic in
+field
+strengths~\cite{blagojevic2018hamiltonian,shapiro2002torsion},
+but the cubic completions of \cref{CubicCompletions} contribute
+at quadratic order in the perturbation through one or two
+background-field insertions, so they are retained alongside the
+quadratic terms. The cutoff is a convention rather than a
+derivable boundary: ghost-safety alone admits operators of
+arbitrarily high power in $T$~\cite{shapiro2002torsion}. An
+effective-field-theory classification ordering operators by
+canonical mass dimension would in principle remove this
+arbitrariness, but assigning canonical dimensions requires first
+identifying the propagating modes --- and the propagating modes
+depend on which kinetic terms are present~\cite{aoki2020nonlinear},
+which is exactly the choice the enumeration is meant to expose;
+we therefore do not pursue an EFT ordering here.
+
+Within this scope, the Lagrangian is built from
+scalar contractions of
+$\{\MAGFt{^\sigma_{\mu\nu\rho}},\,\MAGT{^\sigma_{\mu\nu}},\,\FieldF{_{\mu\nu}},\,\PD{_\mu},\,\varepsilon^{\mu\nu\rho\sigma}\}$,
+arranged into the seven sector blocks of \cref{QuadraticAction}.
+We generate the basis of contractions at each operator class
+using the systematic-contraction enumeration
+of~\cite{nutma2014xtras}, applying the within-pair antisymmetries
+of the Riemann--Cartan curvature,
+$\MAGFt{_{(\mu\nu)\rho\sigma}} = \MAGFt{_{\mu\nu(\rho\sigma)}} = 0$,
+the antisymmetries $\MAGT{^\sigma_{[\mu\nu]}}$ and
+$\FieldF{_{[\mu\nu]}}$, and the total antisymmetry of
+$\varepsilon^{\mu\nu\rho\sigma}$, together with integration by
+parts, to project out manifestly equivalent operators. We do not attempt the residual Bianchi-identity and
+dimension-dependent-identity\footnote{Dimension-dependent
+identities~\cite{edgarhoglund2002ddi} are algebraic relations
+among tensors that hold only
+in a fixed spacetime dimension --- here, $D=4$. The canonical
+example is that antisymmetrisation over five or more indices
+vanishes identically, so any tensor expression containing a
+totally antisymmetric subblock on five or more indices reduces
+to combinations of expressions with smaller antisymmetric
+blocks. Their application reduces redundancies in the operator
+basis beyond what Bianchi-identity reductions alone achieve.}
+reductions of these ans\"atze in the present work; the
+parity-odd, derivative, and cubic sectors are correspondingly
+flagged in \cref{MasterParameterCount} with $\dagger$ as upper
+bounds, and a complete reduction is left for future work.
+
+The post-Riemannian field parameterisation of \cref{PGTBackground}
+exchanges the affine connection for the metric and the torsion
+tensor, allowing the torsion to be decomposed into its
+irreducible Lorentz components; we use the irreducible labels of
+\cref{IrreducibleTorsion} only as named handles for the counts
+below, with the explicit $3\times 3$ basis transformation
+between scalar and irreducible torsion-squared invariants given
+at \cref{DirectIrreducibleTransform} of \cref{PGTBackground}.
+
+The full inventory is collected in \cref{MasterParameterCount}, with
+the literature equivalents of each sector noted alongside; the
+remainder of this appendix discusses each block in turn.
+
+\begin{table*}[t]
+  \centering
+  \small
+  \caption{Inventory of independent invariants in the general
+    quadratic PGT Lagrangian coupled to electromagnetism, ordered
+    by sector. Symbols correspond to the macros adopted in the
+    present work; the Equivalent column gives the closest
+    published symbol set or recognised name. Counts marked
+    $^\dagger$ are upper bounds (residual identities not applied;
+    see lead-in); the count marked $^*$ is topological (total
+    derivative on flat space). The Maxwell sector
+    $-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$ is
+    canonically normalised and carries no free parameter; it is
+    omitted from the parity-even quadratic count of ten free
+    parameters but enters the Lagrangian alongside them. The
+    explicit linear map between the present basis and Shapiro's
+    $\theta_n$~\cite{shapiro2002torsion} non-minimal basis is
+    left for future work.}
+  \label{MasterParameterCount}
+  \begin{tabular}{@{}lllp{0.34\textwidth}@{}}
+    \toprule
+    Sector & Symbols & Count & Equivalent \\
+    \midrule
+    $\MAGFt{}$                                              & $\MPl$                       & 1            & Einstein--Hilbert \\
+    $\Lambda$                                               & $\Lambda$                    & 1            & cosmological constant \\
+    $\varepsilon\!\cdot\!\MAGFt{}$                          & $\gamma_\text{BI}$           & 1            & Holst~\cite{holst1995barbero}; Barbero--Immirzi~\cite{barbero1995real,immirzi1997real} \\
+    \midrule
+    $\MAGFt{}^2$                                            & $\Alp{1}\dots\Alp{6}$        & 6            & Barker \etal~\cite{barker2024poincare}; Lin \etal~\cite{lin2019pgt} (alternative $r_n$) \\
+    $\mathcal{T}^2$                                         & $\Bet{1},\Bet{2},\Bet{3}$    & 3            & Barker \etal~\cite{barker2024poincare}; Shapiro~\cite{shapiro2002torsion} \\
+    $\MAGFt{}\,F$                                           & $\Del{1}$                    & 1            & Bahamonde \etal~\cite{bahamonde2025torsion} \\
+    \midrule
+    $\varepsilon\!\cdot\!\MAGFt{}^2$                        & $d_1\dots d_{13}$            & 13           & Pontryagin-type~\cite{karananas2014parity} \\
+    $\varepsilon\!\cdot\!\mathcal{T}^2$                     & $d_{14}\dots d_{17}$         & 4            & Nieh--Yan-type~\cite{niehyan1982} \\
+    $\varepsilon\!\cdot\!F^2$                               & $d_{18}$                     & $1^*$        & $F\tilde F$ (total derivative) \\
+    $\varepsilon\!\cdot\!\MAGFt{}\,F$                       & $d_{19},d_{20},d_{21}$       & 3            & --- \\
+    \midrule
+    $\PD{}\mathcal{T}\!\times\!F$                           & $\zeta_{1,2,3}$              & 3            & Shapiro non-minimal~\cite{shapiro2002torsion} (parity-even sector) \\
+    $\MAGFt{}\!\times\!\PD{}\mathcal{T}$                    & $\chi,\chi_2\dots\chi_{10}$  & $10^\dagger$ & Barker \etal\ $\chi$~\cite{barker2024poincare} \\
+    $(\PD{}\mathcal{T})^2$                                  & $\xi,\xi_2\dots\xi_{16}$     & $16^\dagger$ & Barker \etal\ $\xi$~\cite{barker2024poincare} \\
+    \midrule
+    $\varepsilon\!\cdot\!\PD{}\mathcal{T}\!\times\!F$       & $\tilde\zeta_{1\text{--}6}$  & 6            & --- \\
+    $\varepsilon\!\cdot\!\MAGFt{}\!\times\!\PD{}\mathcal{T}$ & $\tilde\chi_{1\text{--}36}$ & $36^\dagger$ & --- \\
+    $\varepsilon\!\cdot\!(\PD{}\mathcal{T})^2$              & $\tilde\xi_{1\text{--}38}$   & $38^\dagger$ & --- \\
+    \midrule
+    $\MAGFt{}\!\times\!F^2$                                 & $\lambda_{1\text{--}4}$      & 4            & Gertsenshtein-type~\cite{itin2004maxwell,bahamonde2025torsion} \\
+    $\mathcal{T}^2\!\times\!F$                              & $\kappa_{1\text{--}3}$       & 3            & Shapiro non-minimal~\cite{shapiro2002torsion} (parity-even sector) \\
+    $\MAGFt{}^2\!\times\!F$                                 & $\rho_{1\text{--}8}$         & 8            & --- \\
+    $\PD{}\mathcal{T}\!\times\!F^2$                         & $\mu_{1\text{--}5}$          & 5            & --- \\
+    $\varepsilon\!\cdot\!\MAGFt{}\!\times\!F^2$             & $\tilde\lambda_{1\text{--}12}$ & 12         & --- \\
+    $\varepsilon\!\cdot\!\mathcal{T}^2\!\times\!F$          & $\tilde\kappa_{1\text{--}15}$  & 15         & Shapiro non-minimal~\cite{shapiro2002torsion} (parity-odd sector) \\
+    $\varepsilon\!\cdot\!F^2\!\times\!\PD{}\mathcal{T}$     & $\tilde\mu_{1\text{--}18}$    & 18          & --- \\
+    \midrule
+    $\varepsilon\!\cdot\!\T[2]{}\,\FieldA{}\,\FieldF{}$     & $\chi^\text{CS}_1$ & 1 & trace-torsion CS~\cite{hehl2000electromagnetic,itin2004maxwell} \\
+    $\varepsilon\!\cdot\!\T[3]{}\,\FieldA{}\,\FieldF{}$     & $\chi^\text{CS}_2$ & 1 & axial-torsion CS~\cite{obukhov2024electrodynamics} \\
+    $\varepsilon\!\cdot\!\T[1]{}\,\FieldA{}\,\FieldF{}$     & $\chi^\text{CS}_3$ & 1 & tensor-torsion CS \\
+    \bottomrule
+  \end{tabular}
+\end{table*}
 
 \paragraph*{Linear sector}
 \label{LinearSector}
-% TODO ~80 w. Three independent linear invariants: Einstein--Hilbert
-% term R/\kappa^2, cosmological constant \Lambda, and the Holst term
-% \varepsilon^{\mu\nu\rho\sigma} \tilde{R}_{\mu\nu\rho\sigma} with
-% Barbero--Immirzi parameter \gamma_BI. Cite holst1995barbero,
-% kibble1961lorentz.
+The linear sector contains three independent
+invariants~\cite{kibble1961lorentz,holst1995barbero} and reads
+\begin{align}
+  \mathcal{L}_\text{lin}
+  = -\frac{1}{\kappa^2}\,\MAGFt{}
+  -\frac{2\Lambda}{\kappa^2}
+  +\frac{1}{\kappa^2\,\gamma_\text{BI}}\,
+   \varepsilon^{\mu\nu\rho\sigma}\,\MAGFt{_{\mu\nu\rho\sigma}},
+  \label{LinearAction}
+\end{align}
+where $\gamma_\text{BI}$ is the Barbero--Immirzi
+parameter~\cite{barbero1995real,immirzi1997real}.
+The Holst term is a topological density in the torsion-free
+limit, proportional there to the Pontryagin density modulo
+Bianchi identities~\cite{hehlobukhov2007cartan,shapiro2002torsion},
+but becomes dynamical with torsion present
+through the Nieh--Yan identity~\cite{niehyan1982}; its variation
+is therefore exchangeable with one parity-odd
+$\varepsilon\!\cdot\!\mathcal{T}^2$ coefficient introduced below.
+We retain $\gamma_\text{BI}$ and $d_{14}\dots d_{17}$ as
+independent symbols in the catalogue and do not use the
+Nieh--Yan trade to reduce the parameter count, since the natural
+parametrisation in each sector is more transparent than the
+reduced one.
 
 \paragraph*{Parity-even quadratic sector}
 \label{ParityEvenQuadratic}
-% TODO ~250 w + 1 equation block. Eleven independent invariants:
-% six \tilde{R}^2 (\alpha_1 ... \alpha_6 in research-doc convention,
-% \beta_1 ... \beta_6 in §2.1 manuscript convention), three
-% \mathcal{T}^2 (three irreducible torsion-squared, written in
-% direct basis {I_1, I_2, I_3} as in §2.1), one F^2 (Maxwell), and
-% one \tilde{R}_{[\mu\nu]} F^{\mu\nu} cross-term (\delta_1).
-% Three of the six \tilde{R}^2 invariants reduce in the torsion-free
-% case via Bianchi + pair-exchange symmetry, with Gauss--Bonnet
-% further reducing to two; with torsion all six are independent
-% (citing the project's research/lagrangian_enumeration/
-% general_quadratic_lagrangian.tex enumeration). Cite lin2019pgt,
-% blagojevic2018hamiltonian, blagojevic2003lectures,
-% barker2024poincare, sezgin1980ghostfree, aoki2020nonlinear.
+The parity-even quadratic sector contains ten independent free
+parameters together with the canonically-normalised Maxwell
+term: six $\mathcal{R}^2$ contractions~\cite{lin2019pgt,barker2021hamiltonian,barker2024poincare},
+three torsion-squared invariants in the direct basis
+$\{I_1,I_2,I_3\}$ of \cref{TorsionDirectBasis}~\cite{shapiro2002torsion,hayashi1979new},
+and the parity-even curvature--electromagnetic contraction
+$\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$~\cite{bahamonde2025torsion},
+alongside the Maxwell term $-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$
+which carries no free coefficient. Together these read
+\begin{widetext}
+\begin{multline}
+  \mathcal{L}_{\mathcal{R}^2}
+  +\mathcal{L}_{\mathcal{T}^2}
+  +\mathcal{L}_{F^2}
+  +\mathcal{L}_{\mathcal{R} F}
+  =
+  \Alp{1}\,\MAGFt{}^2
+  +\MAGFt{_{\mu\nu}}\bigl(\Alp{2}\MAGFt{^{\mu\nu}}+\Alp{3}\MAGFt{^{\nu\mu}}\bigr)
+  +\Alp{4}\,\MAGFt{_{\mu\nu\rho\sigma}}\MAGFt{^{\mu\nu\rho\sigma}}
+  +\Alp{5}\,\MAGFt{_{\mu\nu\rho\sigma}}\MAGFt{^{\mu\rho\nu\sigma}}
+  +\Alp{6}\,\MAGFt{_{\mu\nu\rho\sigma}}\MAGFt{^{\rho\sigma\mu\nu}} \\
+  +\Bet{1}\,I_1
+  +\Bet{2}\,I_2
+  +\Bet{3}\,I_3
+  -\tfrac{1}{4}\,\FieldF{_{\mu\nu}}\,\FieldF{^{\mu\nu}}
+  +\Del{1}\,\MAGFt{_{[\mu\nu]}}\,\FieldF{^{\mu\nu}},
+  \label{ParityEvenQuadraticAction}
+\end{multline}
+\end{widetext}
+The labels $\Alp{n}$, $\Bet{n}$, $\Del{1}$ follow the convention
+of~\cite{barker2024poincare}; \cref{MasterParameterCount} records
+the alternative parametrisation of~\cite{lin2019pgt}.
+
+All six $\mathcal{R}^2$ contractions are independent when torsion
+is present: the Riemann--Cartan curvature lacks the pair-exchange
+symmetry of the torsion-free Riemann tensor (i.e.,
+$\MAGFt{_{\rho\sigma\mu\nu}} \neq \MAGFt{_{\mu\nu\rho\sigma}}$ in
+general), since the antisymmetric Ricci $\MAGFt{_{[\mu\nu]}}$
+does not vanish in the presence of
+torsion~\cite{shapiro2002torsion,hehl1976spin,hehl1995metric,barker2024poincare},
+and additional independent contractions enter beyond the
+torsion-free Riemann-square count. The count reduces to two ---
+a Riemann-square and the Gauss--Bonnet topological
+combination~\cite{lin2019pgt} --- in the torsion-free limit. The
+parity-even $\mathcal{R} F$ contraction $\Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$
+likewise vanishes in the torsion-free limit, since it requires a
+non-zero antisymmetric Ricci to contract against the Maxwell
+field strength; the parity-odd partners of this cross-coupling
+are catalogued separately below.
+
+Ghost- and tachyon-freedom of this combined parameter family is
+analysed
+in~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,aoki2020nonlinear,barker2021hamiltonian},
+with the no-tachyon conditions of these analyses constraining
+the parameter region accessible to the present work. Direct
+integration of the present enumeration with
+\PSALTer{}~\cite{barker2024psalter} for automated extraction of
+the no-tachyon spectrum is left for future work. The
+torsion-squared sub-Lagrangian is equivalently presented in the
+irreducible basis $\{q^2,\,S^2,\,T^2\}$ via the linear map
+collected at \cref{TorsionSquaredCouplingMap} below.
 
 \paragraph*{Parity-odd quadratic sector}
 \label{ParityOddQuadratic}
-% TODO ~150 w. Twenty additional physical parity-odd quadratic
-% invariants from \varepsilon-weighted contractions of curvature,
-% torsion, and EM field strength: e.g.\ \varepsilon^{\mu\nu\rho\sigma}
-% T_{\mu\nu\alpha} T_{\rho\sigma}{}^\alpha, \tilde{R}_{[\mu\nu]}
-% \tilde{F}^{\mu\nu} (Hodge-dual EM cross), Holst-like
-% \tilde{R}_{\mu\nu\rho\sigma}\tilde{R}^{\rho\sigma\mu\nu}.
-% Karananas 2014 + Blagojevic--Cvetkovic 2018 give the parity-odd
-% mass-spectrum analyses. Cite karananas2014parity,
-% blagojevic2018hamiltonian.
+The parity-odd quadratic sector adds twenty-one
+$\varepsilon$-weighted invariants, of which twenty are dynamical.
+Thirteen are Pontryagin-type contractions~\cite{karananas2014parity,barker2025psalter2}
+of the form $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\MAGFt{}$
+(with parameters $d_1\dots d_{13}$ in
+\cref{MasterParameterCount}); these collapse to a single
+topological density in the torsion-free
+limit~\cite{shapiro2002torsion,karananas2014parity} but
+generically propagate when torsion is present. Four are
+Nieh--Yan-type contractions~\cite{niehyan1982} of the form
+$\varepsilon^{\mu\nu\rho\sigma}\MAGT{}\MAGT{}$
+($d_{14}\dots d_{17}$); the family contains the Nieh--Yan form
+whose total-derivative identity dynamically links it to the
+Holst term of \cref{LinearAction}. One is the electromagnetic
+$\theta$-term~\cite{wilczek1987axion}
+$d_{18}\,\varepsilon^{\mu\nu\rho\sigma}\FieldF{_{\mu\nu}}\FieldF{_{\rho\sigma}} = 4\,d_{18}\,\PD{_\mu}\bigl(\varepsilon^{\mu\nu\rho\sigma}\FieldA{_\nu}\PD{_\rho}\FieldA{_\sigma}\bigr)$,
+a total derivative on flat space and therefore non-dynamical. The remaining three
+are parity-odd curvature--electromagnetic cross-terms
+$\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\FieldF{}$
+($d_{19},d_{20},d_{21}$), opening through the same antisymmetric
+Ricci that activates the parity-even cross-coupling. The
+propagator-level analysis of these
+sectors~\cite{karananas2014parity,blagojevic2018hamiltonian,barker2025psalter2}
+identifies the parity-violating mass spectra associated with each
+combination, together with the additional parameter constraints
+required to maintain ghost- and tachyon-freedom alongside those
+of the parity-even sector.
 
 \paragraph*{Ghost-free derivative extensions}
 \label{DerivativeExtensions}
-% TODO ~100 w. Ghost-free higher-derivative completions add at
-% most ~29 parity-even and ~80 parity-odd invariants (upper bounds
-% before Bianchi reduction), as enumerated in
-% research/lagrangian_enumeration/general_quadratic_lagrangian.tex.
-% Aoki--Yokoyama 2020 provides the nonlinearly-ghost-free
-% higher-curvature analysis. Cite aoki2020nonlinear.
+A covariant derivative adds one index, enabling cross-sectors
+that vanish without it. In the first-order formalism
+$\PD{_\mu}\MAGT{} \sim \PD{_\mu}\MAGA{} \sim \MAGFt{}$, so
+operators built from $\{\MAGFt{},\,\MAGT{},\,\FieldF{},\,\PD{}\MAGT{}\}$\footnote{We
+use the symbol $\partial$ for the derivative acting on $T$
+throughout this appendix. In Riemann--Cartan geometry the natural
+derivative on $T$ is the covariant $\nabla$; the two differ by
+torsion-coupled lower-rank operators that are already enumerated
+in the $\mathcal{T}^2$ family of \cref{ParityEvenQuadratic}, and
+an explicit verification that the basis is closed under this
+redefinition is left for future work.}
+remain Yang--Mills-type and produce at most second-order
+equations of motion; sectors involving $\PD{}\MAGFt{}$ or
+$\PD{}\FieldF{}$ generate fourth-order equations and are excluded
+as ghost-prone~\cite{aoki2020nonlinear,nikiforova2009torsion}.
+Three parity-even safe sectors then follow:
+$\PD{}\MAGT{}\!\times\!\FieldF{}$, generating three independent
+invariants $\zeta_{1,2,3}$ in the parity-even sector of Shapiro's
+non-minimal classification~\cite{shapiro2002torsion} (the
+explicit linear map between the present basis and Shapiro's
+$\theta_n$ is left for future work);
+$\MAGFt{}\!\times\!\PD{}\MAGT{}$, of which Barker's $\chi$
+kinetic mixing is a specific contraction~\cite{barker2024poincare};
+and $(\PD{}\MAGT{})^2$, containing Barker's $\xi$ Maxwell-type
+kinetic term~\cite{barker2024poincare,barker2021hamiltonian},
+which is the unique contraction that propagates the trace
+torsion vector. The two latter sectors carry up to ten and
+sixteen invariants respectively before Bianchi reduction. Their
+$\varepsilon$-twins furnish the corresponding parity-odd
+derivative sectors $(\tilde\zeta,\tilde\chi,\tilde\xi)$. The ghost-free
+conditions on these combinations follow from the standard
+linearised propagator analysis applied to the post-Riemannian
+expansion~\cite{lin2019pgt,blagojevic2018hamiltonian}.
 
 \paragraph*{Cubic completions}
 \label{CubicCompletions}
-% TODO ~80 w. Approximately 65 safe cubic operators relevant for
-% (i) ghost elimination in propagating-torsion theories and (ii)
-% linearisation around magnetic backgrounds (in which the cubic
-% terms contribute at quadratic order in the perturbation).
-% Bahamonde et al. 2025 constructs ghost-free cubic PGT
-% cosmologies. Cite bahamonde2025cubic.
+Cubic operators contribute at quadratic order in the perturbation
+when one or two field-strength factors are absorbed into a
+non-zero classical background, since each background insertion
+removes one power of the dynamical fields. With a uniform
+magnetic background $\bar{F}_{\mu\nu}$, four parity-even
+cubic sectors enter the linearised analysis, each with the
+schematic structure of a quadratic operator dressed by one or
+two background insertions:
+$\mathcal{R}\!\times\!F^2$ ($\lambda_{1\dots 4}$, the Gertsenshtein
+channel into curvature--photon mixing~\cite{itin2004maxwell,bahamonde2025torsion}),
+$\mathcal{T}^2\!\times\!F$ ($\kappa_{1\dots 3}$, generating
+torsion-mass corrections proportional to $\bar B$),
+$\mathcal{R}^2\!\times\!F$ ($\rho_{1\dots 8}$, modifying the
+quadratic graviton self-interaction in the magnetic background),
+and $\PD{}\mathcal{T}\!\times\!F^2$ ($\mu_{1\dots 5}$, a
+torsion--photon conversion channel proportional to $\bar B$).
+The parity-odd partners $(\tilde\lambda,\tilde\kappa,\tilde\mu)$
+enumerated in \cref{MasterParameterCount} arise by
+$\varepsilon$-contraction of the same parity-even contractions.
+The cubic operators are independent coupling constants of the
+full theory~\cite{bahamonde2025cubic}.
 
 \paragraph*{Chern--Simons torsion--EM couplings}
 \label{ChernSimonsCouplings}
-% TODO ~120 w. Parity-odd couplings involving the gauge potential
-% A_\mu directly (rather than only F_{\mu\nu}): the trace-torsion
-% Chern--Simons \chi^{CS}_2 \varepsilon^{\mu\nu\rho\sigma} T_\mu A_\nu
-% \partial_\rho A_\sigma; the full-torsion Chern--Simons
-% \chi^{CS}_3 \varepsilon^{\mu\nu\rho\sigma} T_{\mu\nu}{}^\alpha
-% A_\alpha \partial_\rho A_\sigma (one term + six tensor variants).
-% Hehl--Obukhov 2000 gave the original axion/birefringence
-% framework; Itin--Hehl 2003 the systematic T^2 F^2 classification;
-% Rubilar 2003 the torsion-birefringence treatment; Obukhov et
-% al.\ 2024 the recent classical-electrodynamics + spin-torsion
-% analysis. Cite hehl2000electromagnetic, itin2004maxwell,
-% rubilar2003torsion, obukhov2024electrodynamics.
+Beyond the field-strength couplings catalogued above, the
+electromagnetic gauge potential $\FieldA{_\mu}$ admits three
+irreducible parity-odd contractions with the torsion
+tensor~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion,obukhov2024electrodynamics}:
+\begin{align}
+  \mathcal{L}_\text{CS}
+  &= \chi^\text{CS}_1\,\varepsilon^{\mu\nu\rho\sigma}\,\T[2]{_\mu}\,\FieldA{_\nu}\,\FieldF{_{\rho\sigma}} \nonumber \\
+  &\quad +\chi^\text{CS}_2\,\varepsilon^{\mu\nu\rho\sigma}\,\T[3]{_\mu}\,\FieldA{_\nu}\,\FieldF{_{\rho\sigma}} \nonumber \\
+  &\quad +\chi^\text{CS}_3\,\varepsilon^{\mu\nu\rho\sigma}\,\T[1]{^\lambda_{\mu\alpha}}\,g^\alpha{}_\nu\,\FieldA{_\lambda}\,\FieldF{_{\rho\sigma}},
+  \label{ChernSimonsAction}
+\end{align}
+contracting the photon with the trace, axial, and tensor
+irreducible parts of the torsion respectively. The first two
+families are Chern--Simons-like in the conventional sense ---
+their $\MAGT{}\,\FieldA{}\,\FieldF{}$ structure mirrors the
+gauge-field Chern--Simons three-form --- and the axial coupling
+$\chi^\text{CS}_2$ sources the magnetic-helicity density
+$\FieldA{_i}\FieldF{^{0i}}\!\sim\!\bm{A}\!\cdot\!\bm{B}$,
+producing the parity-odd birefringence and dichroism signatures
+analysed in~\cite{rubilar2003torsion,obukhov2024electrodynamics}.
+The third coupling, contracting the Maxwell pair with the
+tensor torsion, vanishes whenever the irreducible tensor part
+$\T[1]{}$ vanishes; it is the natural channel through which a
+non-trivial spin-two torsion sector enters the photon system.
 
 \paragraph*{Direct--irreducible basis translation}
 \label{DirectIrreducibleTranslation}
-% TODO ~150 w + 1 equation block. The 3x3 invertible
-% transformation between the direct basis {I_1, I_2, I_3} of
-% torsion-squared scalar contractions and the irreducible basis
-% {q^2, T^2, S^2}; the explicit conversion factors. Convention
-% comparison table: research/lagrangian_enumeration uses (\alpha
-% for \tilde{R}^2, \beta for T^2); the §2.1 manuscript convention
-% uses (\alpha for T^2, \beta for \tilde{R}^2) matching TIDAL's
-% code labels (alpha1, alpha2, alpha3 in TOML files). Cite
-% shapiro2002torsion §2.3.
-\begin{align}
-  % TODO: 3x3 transformation matrix between {I_1, I_2, I_3}
-  % and {q^2, T^2, S^2}
-  \label{DirectIrreducibleTransform}
-\end{align}
+Two equivalent presentations of the parity-even torsion-squared
+sub-Lagrangian appear in the literature: the direct basis
+$\{I_1,I_2,I_3\}$ of \cref{TorsionDirectBasis}, in which each
+invariant is a single index contraction of two torsion tensors,
+and the irreducible basis $\{q^2,S^2,T^2\}$ built from the
+squared norms of the irreducible parts $\T[1]{}$, $\T[3]{}$, and
+$\T[2]{}$ of \cref{IrreducibleTorsion}. The two are related by an
+invertible linear map; for the Lagrangian coefficients,
+\begin{gather}
+  \mathcal{L}_{\mathcal{T}^2}
+  = a\,q^2 + b\,S^2 + c\,T^2,
+  \label{TorsionSquaredCouplingMap} \\
+  a = \Bet{1}+\Bet{2},
+  \quad
+  b = -\tfrac{1}{6}\bigl(\Bet{1}-\Bet{2}\bigr),
+  \quad
+  c = \Bet{3}+\tfrac{1}{3}\bigl(2\Bet{1}+\Bet{2}\bigr), \nonumber
+\end{gather}
+following the conventions of~\cite{shapiro2002torsion}; the
+explicit $3\times 3$ matrix between $\{I_1,I_2,I_3\}$ and
+$\{q^2,S^2,T^2\}$ that induces this coefficient map, together
+with its inverse, is collected at
+\cref{DirectIrreducibleTransform} of \cref{PGTBackground}.
+Coupling-constant orderings and basis labels differ across the
+literature~\cite{hayashi1979new,sezgin1980ghostfree,lin2019pgt,blagojevic2018hamiltonian};
+\cref{TorsionSquaredCouplingMap} fixes the convention used
+throughout the present work, with $\Alp{n}$ multiplying
+curvature-squared invariants and $\Bet{n}$ multiplying
+torsion-squared invariants.

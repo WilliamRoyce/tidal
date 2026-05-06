@@ -58,7 +58,11 @@ indices~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehl
 \end{gather}
 \end{subequations}
 and which relate the curved-space metric to the Minkowski metric
-of the local Lorentz frame via $\g{_{\mu\nu}} = \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu$.
+of the local Lorentz frame via the tetrad-bilinear relation
+\begin{align}
+  \g{_{\mu\nu}} &= \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu.
+  \label{TetradMetric}
+\end{align}
 \Cref{TetradFrames} illustrates the geometric content:
 at each point $P$ the coordinate basis $\partial_\mu|_P$ and an
 orthonormal Lorentz frame $\mathbf{e}_i|_P$ span the same tangent
@@ -82,16 +86,18 @@ a connection term inside the covariant derivative on a matter
 field; it instead converts the resulting spacetime-index
 covariant derivative to Lorentz-frame-index form,
 $\nabla_k\phi = h_k{}^\mu\,\nabla_\mu\phi$~\cite[eq.~(1.7b)]{blagojevic2003lectures}.
-Its gauge-field role manifests separately, through the
-tetrad-bilinear form of the metric just stated and through the
-translation field strength --- the torsion --- that arises from
-the commutator calculation below.
+The tetrad's role as the translation gauge field manifests instead
+through the metric relation \cref{TetradMetric} and through its
+field strength --- the torsion --- that arises from the
+commutator calculation below.
 
 The covariant derivative on a tensor of mixed type acts with the
 spin connection on each Latin index and with the affine connection
-on each Greek index, with the standard $+$/$-$ signs depending on
-whether the index is upper or lower. Schematically, for a
-representative tensor $\Phi^{i\,\mu}{}_{j\,\nu}$ with one Latin
+$\MAGA{^\sigma_\mu_\nu}$ (the independent Riemann--Cartan
+connection of the Palatini formulation, introduced in
+\cref{PGTframework}) on each Greek index, with the $\pm$ sign
+convention determined by whether each index is upper or lower.
+For a tensor $\Phi^{i\,\mu}{}_{j\,\nu}$ carrying one Latin
 upper, one Latin lower, one Greek upper, and one Greek lower
 index,
 \begin{align}
@@ -101,14 +107,18 @@ index,
        - A^k{}_{j\rho}\,\Phi^{i\,\mu}{}_{k\,\nu} \nonumber \\
     &\quad
        + \MAGA{^\mu_{\rho\sigma}}\,\Phi^{i\,\sigma}{}_{j\,\nu}
-       - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma},
+       - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma}.
   \label{MixedCovariantDerivative}
 \end{align}
-generalising the matter-field rule \cref{LorentzCovariantDeriv} to
-arbitrary tensorial type. \Cref{MixedCovariantDerivative} is the
-standard form on which the symbolic decomposition of covariant
-derivatives in the presence of torsion rests, as discussed in
-\cref{Architecture}.
+The matter-field rule \cref{LorentzCovariantDeriv} is the same
+construction evaluated on the spinor representation of the
+Lorentz group: the spin matrix $\Sigma_{ij}$ in
+\cref{LorentzCovariantDeriv} is replaced here by the explicit
+index-action $A^i{}_{k\rho}\delta^j_l - A^k{}_{j\rho}\delta^i_l
+- \cdots$ that projects onto Lorentz-tensor indices.
+\Cref{MixedCovariantDerivative} is the standard form on which the
+symbolic decomposition of covariant derivatives in the presence
+of torsion rests, as discussed in \cref{SymbolicComputation}.
 
 In any gauge theory the field strength can be read off the
 commutator of two covariant derivatives acting on a matter field:
@@ -138,36 +148,46 @@ forms~\cite[eq.~(1.11)]{blagojevic2003lectures} are
        + 2\,A^i{}_{s[\mu}A^{sj}{}_{\nu]},
   \label{CurvatureDef} \\
   \MAGT{^i_{\mu\nu}}
-    &= 2\,\partial_{[\mu}b^i{}_{\nu]}
+    &= 2\,\nabla_{[\mu} b^i{}_{\nu]}
+     = 2\,\partial_{[\mu}b^i{}_{\nu]}
        + 2\,A^i{}_{j[\mu}\,b^j{}_{\nu]}.
   \label{TorsionDef}
 \end{align}
 \end{subequations}
-The torsion form follows from \cref{MixedCovariantDerivative}
-applied to $b^i{}_\nu$: the spin connection acts on the Lorentz
-index, while the antisymmetrisation on $[\mu\nu]$ kills the
-Christoffel correction on the Greek index. The first measures the
+The schematic torsion form $2\nabla_{[\mu} b^i{}_{\nu]}$ unfolds
+to its explicit form via \cref{MixedCovariantDerivative} applied
+to $b^i{}_\nu$: the spin connection acts on the Lorentz index,
+while the antisymmetrisation on $[\mu\nu]$ kills the Christoffel
+correction on the Greek index. The first measures the
 rotation of a vector parallel-transported around an infinitesimal
 closed loop; the second measures the non-closure of infinitesimal
 parallelograms formed from parallel-transported vectors. Both
 interpretations are illustrated in
 \cref{DiffGeometryObstructions}.\footnote{The geometric framing
-is heuristic. As Barker, Marzo and
-Santoni emphasise~\cite{barker2024poincare,barker2025metricaffine},
-the affine connection decomposes as
-$\MAGA{^\sigma_\mu_\nu} = \rCon{^\sigma_\mu_\nu} + \mathcal{D}^\sigma{}_{\mu\nu}$
+is heuristic. As Barker, Marzo and Santoni
+emphasise~\cite{barker2024poincare,barker2025metricaffine}, the
+affine connection in the most general metric-affine
+setting~\cite{hehl1995metric} decomposes as
+$\MAGA{^\sigma_\mu_\nu} = \rCon{^\sigma_\mu_\nu} + \mathcal{D}^\sigma{}_{\mu\nu}$,
 with the distortion $\mathcal{D}^\sigma{}_{\mu\nu}$ a rank-three
-tensor field; curvature, torsion, and non-metricity are all
-different parts of this distortion. Every metric-affine model can
-therefore be recast as a Riemannian theory of gravity coupled to
-a rank-three tensor matter field. Unlike the geometric picture of
-general relativity --- which maps cleanly onto a healthy spin-2
-graviton --- the metric-affine geometric picture obscures the
-rank-three matter content, which inherits the standard
-quantum-field-theoretic pathologies (ghosts, tachyons, strong
-coupling) typical of high-rank fields. The physical content is
-in this sense insensitive to whether one adopts the geometric or
-the matter-field framing, but the matter-field framing makes the
+tensor field that subsumes torsion and non-metricity content
+together; in the metric-compatible case adopted throughout
+Poincar\'{e} gauge theory (and \cref{PalatiniDecomposition}), the
+distortion reduces to the contortion $K^\sigma{}_{\mu\nu}$ used
+elsewhere in this report, and the rank-three matter content is
+purely torsion-driven. Every metric-affine model can therefore be
+recast as a Riemannian theory of gravity coupled to a rank-three
+tensor matter field. Unlike the geometric picture of general
+relativity --- which maps cleanly onto a healthy spin-2 graviton
+--- the metric-affine geometric picture obscures the rank-three
+matter content, which inherits the standard
+quantum-field-theoretic pathologies typical of high-rank fields:
+ghosts and tachyons in the linearised
+spectrum~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,lin2019pgt},
+and strong-coupling instabilities at non-linear
+order~\cite{aoki2020nonlinear}. The physical content is in this
+sense insensitive to whether one adopts the geometric or the
+matter-field framing, but the matter-field framing makes the
 pathologies manifest.}
 On a generic linear connection the metric and the connection are
 independent, so the covariant derivative of the metric does not
@@ -233,13 +253,13 @@ sector-by-sector truncation conventions reviewed in
 \cref{PGTEnumeration}.
 
 The construction above used the gauge-theoretic field pair
-$(b^i{}_\mu, A^{ij}{}_\mu)$, while \cref{Theory} works in the
-affine-connection language with the metric and connection pair
-$(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$. The two
-parameterisations describe the same geometric data, related
-object-by-object as in \cref{PGTRiemannCartanTranslation},
-following Blagojevi\'{c}'s
-table~1~\cite[Table~1]{blagojevic2003lectures}.
+$(b^i{}_\mu, A^{ij}{}_\mu)$, while \cref{Theory} and the
+symbolic-computation pipeline (\cref{SymbolicComputation}) both
+work in the affine-connection language with the metric and
+connection pair $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$. The
+two parameterisations describe the same geometric data, related
+object-by-object as in \cref{PGTRiemannCartanTranslation}, after
+Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
 \begin{table}[h]
   \centering
   \begin{tabular}{@{}ll@{}}
@@ -322,9 +342,9 @@ the Lorentz frame or in the coordinate basis: the spin connection
 $A^{ij}{}_\mu$ acting on the Lorentz-frame components $u^i$ and
 the affine connection $\MAGA{^\sigma_\mu_\nu}$ acting on the
 coordinate-basis components $u^\mu$ must produce the same
-parallel-transported vector when applied to any $u$.
-Mathematically, this is the condition that the full covariant
-derivative of the tetrad vanishes,
+parallel-transported vector when applied to any $u$. Imposing
+this consistency is equivalent to demanding that the full
+covariant derivative of the tetrad vanish,
 \begin{align}
   \partial_\mu b^i{}_\nu
     + A^i{}_{j\mu}\,b^j{}_\nu
@@ -401,8 +421,9 @@ The reconstruction formula
      + \T[1]{_{\alpha\beta\mu}}
   \label{IrreducibleTorsionFullDecomp}
 \end{align}
-expresses the torsion in terms of its irreducible parts and is
-the explicit form of \cref{IrreducibleTorsion}.
+expresses the torsion in terms of its irreducible parts; this
+restates \cref{IrreducibleTorsion} for self-containment of the
+appendix and to anchor the basis-transformation that follows.
 
 The torsion-squared sector of the action admits two equivalent
 parameterisations. In the irreducible basis it reads $a\,(\T[1]{})^2 +
@@ -427,19 +448,22 @@ map~\cite{sezgin1980ghostfree,hehl1995metric,lin2019pgt}
 \end{align}
 which is invertible.
 
-The contraction $I_3 = \T[2]{_\mu}\T[2]{^\mu}$ contains only the
-trace-vector content of the torsion, since the trace of the
-axial-pseudovector and totally-traceless tensor parts vanishes
-identically. The coefficient $c$ of $(\T[2]{})^2$ in the
-irreducible basis therefore receives a contribution $\beta_3$
-from $I_3$ \emph{plus} the trace-vector pieces of $I_1$ and $I_2$,
-which contribute $\tfrac{2}{3}\beta_1$ and $\tfrac{1}{3}\beta_2$
-to $c$ respectively when \cref{IrreducibleTorsionFullDecomp} is
-substituted into the direct-basis contractions and the
-orthogonality of the three irreducible parts is used. The other
-two coefficients, $a$ and $b$, inherit pieces from $\beta_1$ and
-$\beta_2$ alone --- not $\beta_3$ --- because $I_3$ is blind to
-the traceless and axial parts. The direct basis $\{I_1,I_2,I_3\}$
+The matrix structure has a transparent reading. The third direct
+contraction $I_3 = \T[2]{_\mu}\T[2]{^\mu}$ involves only the
+trace vector, so $\beta_3$ contributes to $c$ alone: this is the
+isolated unit entry in the bottom-right of the matrix, and the
+zeros immediately above it leave $\beta_3$ out of $a$ and $b$.
+The first two contractions $I_1$ and $I_2$ involve all three
+irreducible parts: substituting \cref{IrreducibleTorsionFullDecomp}
+into $I_1, I_2$ and using the orthogonality of $\T[1]{}$,
+$\T[2]{}$, and $\T[3]{}$ projects each direct contraction onto
+the three squared-norms with the coefficients in the
+corresponding column of the matrix. The asymmetry between the
+entries proportional to $\beta_1$ and $\beta_2$ reflects the
+index-swap that distinguishes
+$I_1 = \MAGT{_{\alpha\beta\mu}}\MAGT{^{\alpha\beta\mu}}$ from
+$I_2 = \MAGT{_{\alpha\beta\mu}}\MAGT{^{\beta\alpha\mu}}$. The
+direct basis $\{I_1,I_2,I_3\}$
 is the natural one for symbolic computation because it carries no
 $\varepsilon$-tensor or projector contractions; the irreducible
 basis $\{(\T[1]{})^2, (\T[3]{})^2, (\T[2]{})^2\}$ is the natural
