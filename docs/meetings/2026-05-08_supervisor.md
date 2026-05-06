@@ -207,7 +207,7 @@ Standard-QOS jobs consistently sit PENDING indefinitely (current jobs have been 
 
 We evolve the metric perturbation without an equation-of-motion gauge constraint, and impose only TT-compatible initial conditions in the vacuum region where the wavepacket originates. Per issue #167 this is the supervisor-guided approach, but the manuscript prose currently has no published reference for it.
 
-- [ ] Is there a published reference for this TT-in-matter approach (Lasenby/Hobson notes? a recent paper?), or should we cite it as "private communication"?
+- [ ] Is there a published reference for this TT-in-matter approach (notes? a recent paper?), or should we cite it as "private communication"?
 
 ### 8. Carry-forward from 17 April
 
