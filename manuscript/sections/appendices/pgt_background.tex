@@ -16,9 +16,12 @@ of the matter sector is promoted to a local one, the resulting
 non-invariance is restored by introducing compensating connection
 fields, and the geometric interpretation of those fields fixes the
 kinematic arena. We work through the construction in the order one
-would present it pedagogically, then specialise to the irreducible
-decomposition of the torsion tensor used computationally in
-\cref{PGTframework}.
+would present it pedagogically: gauging the Poincar\'{e} group to
+identify the field content; building Lorentz-scalar invariants
+from the resulting field strengths to motivate the form of the
+general Lagrangian appearing in \cref{QuadraticAction}; and
+assembling the irreducible decomposition of the torsion tensor
+that underpins the basis-translation in \cref{TorsionDirectBasis}.
 
 \paragraph*{Gauging the Poincar\'{e} group}
 \label{FieldContent}
@@ -56,20 +59,26 @@ indices~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehl
   \label{TetradIndexConversion}
 \end{align}
 and which relate the curved-space metric to the Minkowski metric
-of the local Lorentz frame via
-\begin{align}
-  \g{_{\mu\nu}} &= \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu.
-  \label{TetradMetric}
-\end{align}
+of the local Lorentz frame via $\g{_{\mu\nu}} = \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu$.
+Unlike the spin connection, the tetrad does \emph{not} appear as
+a connection term inside the covariant derivative on a matter
+field; it instead converts the resulting spacetime-index
+covariant derivative to Lorentz-frame-index form,
+$\nabla_k\phi = h_k{}^\mu\,\nabla_\mu\phi$~\cite[eq.~(1.7b)]{blagojevic2003lectures}.
+Its gauge-field role manifests separately, through the
+tetrad-bilinear form of the metric just stated and through the
+translation field strength --- the torsion --- that arises from
+the commutator calculation below.
 
-In any gauge theory the field strength is the obstruction to the
-commutator of two covariant derivatives reducing to a partial
-commutator: the failure measures the curvature of the connection.
-For the familiar internal-symmetry case of electrodynamics one
-has $[\nabla_\mu,\nabla_\nu]\phi = i e\,F_{\mu\nu}\phi$ on a
-charged matter field $\phi$. In Poincar\'{e} gauge theory the
-analogous calculation produces two terms, one for each
-generator type~\cite[eq.~(1.11)]{blagojevic2003lectures},
+In any gauge theory the field strength can be read off the
+commutator of two covariant derivatives acting on a matter field:
+were the connection trivial the commutator would vanish, so any
+non-vanishing piece is proportional to the field strength. For
+electrodynamics this gives the familiar relation
+$[\nabla_\mu,\nabla_\nu]\phi = i e\,F_{\mu\nu}\phi$ on a charged
+matter field. In Poincar\'{e} gauge theory the analogous
+calculation produces two terms, one for each generator
+type~\cite[eq.~(1.11)]{blagojevic2003lectures},
 \begin{align}
   [\nabla_\mu,\nabla_\nu]\phi
     &= \tfrac{1}{2}\,\MAGFt{^{ij}_{\mu\nu}}\,\Sigma_{ij}\phi
@@ -96,14 +105,17 @@ forms~\cite[eq.~(1.11)]{blagojevic2003lectures} are
 The first measures the rotation of a vector parallel-transported
 around an infinitesimal closed loop; the second measures the
 non-closure of infinitesimal parallelograms formed from
-parallel-transported vectors. Both interpretations are illustrated
-in
+parallel-transported vectors. Both interpretations are
+illustrated in
 \cref{DiffGeometryObstructions}.\footnote{We adopt this geometric
 framing as a pedagogical aid only. The physical content of
 metric-affine theories is insensitive to the geometric
-interpretation of the fields, and in contrast to the analogous
-interpretation of general relativity it is of limited
-constructive use~\cite{barker2025metricaffine}.}
+interpretation of the fields, and a recent series of
+works~\cite{barker2024poincare,barker2025metricaffine} argues that
+every PGT model can equivalently be described as a theory of a
+rank-three matter field on a Riemannian background, so the
+geometric picture is, in contrast to the analogous interpretation
+of general relativity, of limited constructive use.}
 On a generic linear connection the metric and the affine connection
 are independent, so the covariant derivative of the metric does not
 vanish. The resulting tensor is the
@@ -119,9 +131,10 @@ linear connection, completing the trio shown in
 \cref{DiffGeometryObstructions}: $\mathcal{Q}$ measures the
 evolution of a vector's length under parallel transport. The
 most general space carrying all three obstructions is the
-metric-affine space $L_4$~\cite{hehl1995metric}; demanding that
-the connection preserves the metric under parallel transport,
-equivalently that $\rcD{_\mu}\g{_{\nu\lambda}} = 0$, is the
+metric-affine space $L_4$ (\cref{MetricAffineClasses})~\cite{hehl1995metric};
+demanding that the connection preserves the metric under parallel
+transport, equivalently that
+$\rcD{_\mu}\g{_{\nu\lambda}} = 0$, is the
 \emph{metric-compatibility}
 condition~\cite[eq.~(2.5)]{blagojevic2003lectures}, and it sets
 $\mathcal{Q}_{\lambda\mu\nu} = 0$ identically. Poincar\'{e} gauge
@@ -139,7 +152,8 @@ curvature and torsion remain as independent field strengths.
     non-metricity causes the evolution of vector length under
     parallel transport. Imposing metric compatibility sets the
     non-metricity tensor to zero, leaving curvature and torsion as
-    the two field strengths of Poincar\'{e} gauge theory.}
+    the two field strengths of Poincar\'{e} gauge theory. Adapted
+    from figure~1 of~\cite{barker2025metricaffine}.}
   \label{DiffGeometryObstructions}
 \end{figure}
 
@@ -162,12 +176,9 @@ analogue is the set of all independent quadratic contractions of
 $\MAGFt{}$ and $\MAGT{}$ with one
 another~\cite{barker2024poincare,sezgin1980ghostfree,hehl1995metric}.
 This procedure produces a finite list of independent invariants
-per sector --- six parity-even quadratic curvature invariants,
-three parity-even torsion invariants, parity-odd extensions, and
-the parity-even cross-coupling --- which assemble into the
-sector-block decomposition of \cref{QuadraticAction} catalogued
-explicitly in
-\cref{PGTEnumeration}~\cite{karananas2014parity,lin2019pgt,blagojevic2018hamiltonian}.
+per sector that decompose as
+\cref{QuadraticAction} and are catalogued sector-by-sector
+in~\cref{PGTEnumeration}~\cite{karananas2014parity,lin2019pgt,blagojevic2018hamiltonian}.
 
 The two parameterisations of the same geometric data --- the
 gauge-theoretic $(b^i{}_\mu, A^{ij}{}_\mu)$ pair and the
@@ -187,6 +198,8 @@ table 1~\cite[Table~1]{blagojevic2003lectures}.
        & $D_\mu(\omega)$ $\omega$-covariant derivative \\
     $b^i{}_\mu$, $h_i{}^\mu$ translation gauge field
        & $e^i{}_\mu$, $e_i{}^\mu$ tetrad coframe / frame \\
+    $\eta_{ij}$ flat-frame metric
+       & $\g{_{\mu\nu}} = \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu$ \\
     $\MAGA{^\rho_\mu_\nu}$ not defined a priori
        & $\MAGA{^\rho_\mu_\nu}$ affine connection \\
     \emph{Tetrad postulate} $\Rightarrow$ $\MAGA{^\rho_\mu_\nu}$ defined
@@ -204,12 +217,12 @@ table 1~\cite[Table~1]{blagojevic2003lectures}.
     theory, after Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
     The left column lists each gauge-theoretic object generated
     by gauging the corresponding Poincar\'{e} generator; the right
-    column gives its Riemann--Cartan geometric counterpart, with
-    the central row showing how the affine connection
-    $\MAGA{^\rho_\mu_\nu}$ is fixed in terms of the spin
-    connection by the tetrad postulate, and the metricity row
-    showing how the spin- and affine-connection covariant
-    derivatives of the metric coincide.}
+    column gives its Riemann--Cartan geometric counterpart. The
+    metric-relation row shows the tetrad-bilinear form of the
+    spacetime metric in terms of the flat-frame metric, and the
+    tetrad-postulate row shows how the affine connection
+    $\MAGA{^\rho_\mu_\nu}$ is determined once a tetrad and a
+    spin connection are chosen.}
   \label{PGTRiemannCartanTranslation}
 \end{table}
 
@@ -248,21 +261,27 @@ equivalent to the Palatini-style formulation adopted in
 in which the metric $\g{_{\mu\nu}}$ and the affine connection
 $\MAGA{^\sigma_\mu_\nu}$ are the independent variational fields.
 The bridge between the two formulations is the \emph{tetrad
-postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures},
+postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures}. Intuitively,
+the tetrad postulate enforces that parallel transport is a single
+geometric operation independent of whether we describe a tangent
+vector in the Lorentz frame or in the coordinate basis: the spin
+connection $A^{ij}{}_\mu$ acting on the Lorentz-frame components
+$u^i$ and the affine connection $\MAGA{^\sigma_\mu_\nu}$ acting
+on the coordinate-basis components $u^\mu$ must give the same
+parallel-transported vector when applied to any $u$. Mathematically,
+this is the condition
 \begin{align}
   \nabla_\mu^{(\omega + \Gamma)} b^i{}_\nu
     &\equiv \nabla_\mu^{(\omega)} b^i{}_\nu
       - \MAGA{^\rho_{\nu\mu}}\,b^i{}_\rho = 0,
   \label{TetradPostulate}
 \end{align}
-which is a simultaneous covariance condition under both Latin
-(Lorentz) and Greek (coordinate) indices. \Cref{TetradPostulate}
-fixes a one-to-one map between $A^{ij}{}_\mu$ and
-$\MAGA{^\sigma_\mu_\nu}$ once a tetrad is chosen, so the two
-formulations describe the same geometric data --- this is the
-content of the central two rows of
-\cref{PGTRiemannCartanTranslation}. Imposing metricity
-($\mathcal{Q} = 0$) then forces the
+imposing simultaneous covariance under both Latin (Lorentz) and
+Greek (coordinate) indices. \Cref{TetradPostulate} fixes a
+one-to-one map between $A^{ij}{}_\mu$ and $\MAGA{^\sigma_\mu_\nu}$
+once a tetrad is chosen, so the two formulations describe the
+same geometric data. Imposing metricity ($\mathcal{Q} = 0$) then
+forces the
 decomposition~\cite[eq.~(2.6)]{blagojevic2003lectures}
 \begin{align}
   \MAGA{^\sigma_\mu_\nu} &= \rCon{^\sigma_\mu_\nu}
@@ -271,9 +290,22 @@ decomposition~\cite[eq.~(2.6)]{blagojevic2003lectures}
 \end{align}
 which is the same content as \cref{PalatiniDecomposition} written
 in spin-connection language $A^{ij}{}_\mu = \Delta^{ij}{}_\mu(b)
-+ K^{ij}{}_\mu$~\cite[eq.~(2.12)]{blagojevic2003lectures}, with
-$\rCon{^\sigma_\mu_\nu}$ the Levi--Civita connection and
-$K^\sigma{}_{\mu\nu}$ the contortion.
++ K^{ij}{}_\mu$~\cite[eq.~(2.12)]{blagojevic2003lectures}. The
+Riemannian part of the spin connection is given explicitly in
+terms of the tetrad by
+\begin{align}
+  \Delta_{ij\mu}(b)
+    &= \tfrac{1}{2}\bigl(c_{ijm} - c_{mij} + c_{jmi}\bigr)\,e^m{}_\mu,
+  \qquad
+  c^i{}_{\mu\nu} \equiv \partial_\mu e^i{}_\nu - \partial_\nu e^i{}_\mu,
+  \label{RiemannianSpinConnection}
+\end{align}
+where $c^i{}_{\mu\nu}$ is the object of anholonomity, and is the
+spin-connection counterpart of the Christoffel symbols
+$\rCon{^\sigma_\mu_\nu}$. The contortion $K^{ij}{}_\mu$ is its
+torsion-driven correction, related to the coordinate-form
+contortion $K^\sigma{}_{\mu\nu}$ via index conversion through the
+tetrad pair.
 
 \paragraph*{Irreducible torsion decomposition}
 \label{IrreducibleTorsionFull}
@@ -284,40 +316,49 @@ representations of the local Lorentz
 group~\cite{hehl1976spin,hehl1995metric,shapiro2002torsion,obukhov2024electrodynamics}.
 The trace vector
 \begin{align}
-  T_\mu &\equiv \MAGT{^\lambda_\lambda_\mu}
+  \T[2]{_\mu} &\equiv \MAGT{^\lambda_\lambda_\mu}
 \end{align}
 collects the four components carrying the spin-1 vector
 representation, the axial pseudovector
 \begin{align}
-  S^\mu &\equiv \varepsilon^{\alpha\beta\gamma\mu}\,
+  \T[3]{^\mu} &\equiv \varepsilon^{\alpha\beta\gamma\mu}\,
     \MAGT{_{\alpha\beta\gamma}}
 \end{align}
 collects the four components carrying the spin-1 pseudovector
-representation, and a totally traceless tensor part
-$q_{\alpha\beta\mu}$ collects the remaining sixteen components and
-satisfies the orthogonality conditions $q^\lambda{}_{\lambda\mu}
-= 0$ and $\varepsilon^{\alpha\beta\gamma\delta}q_{\alpha\beta\gamma}
-= 0$. The reconstruction formula
+representation, and the totally traceless tensor part
+$\T[1]{_{\alpha\beta\mu}}$ collects the remaining sixteen
+components, which transform in the spin-2 (plus an additional
+spin-1) representation of the Lorentz
+group~\cite{hehl1976spin,karananas2014parity}, and satisfies the
+orthogonality conditions $\T[1]{^\lambda_\lambda_\mu} = 0$ and
+$\varepsilon^{\alpha\beta\gamma\delta}\T[1]{_{\alpha\beta\gamma}} = 0$.
+In Shapiro's notation~\cite{shapiro2002torsion} these three
+components are written as $T_\mu, S^\mu, q_{\alpha\beta\mu}$
+respectively; we use the overset $\overset{(n)}{T}$ notation
+throughout for consistency with \cref{IrreducibleTorsion}. The
+reconstruction formula
 \begin{align}
   \MAGT{_{\alpha\beta\mu}}
-    &= \tfrac{1}{3}\bigl(T_\beta\,\g{_{\alpha\mu}}
-                       - T_\mu\,\g{_{\alpha\beta}}\bigr)
-     - \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\,S^\nu
-     + q_{\alpha\beta\mu}
+    &= \tfrac{1}{3}\bigl(\T[2]{_\beta}\,\g{_{\alpha\mu}}
+                       - \T[2]{_\mu}\,\g{_{\alpha\beta}}\bigr)
+     - \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\,\T[3]{^\nu}
+     + \T[1]{_{\alpha\beta\mu}}
   \label{IrreducibleTorsionFullDecomp}
 \end{align}
 expresses the torsion in terms of its irreducible parts and is
 the explicit form of \cref{IrreducibleTorsion}.
 
 The torsion-squared sector of the action admits two equivalent
-parameterisations. In the irreducible basis it reads $a\,q^2 +
-b\,S^2 + c\,T^2$, with $q^2 \equiv q_{\alpha\beta\mu}q^{\alpha\beta\mu}$
-and $S^2,T^2$ defined analogously; in the direct basis of scalar
+parameterisations. In the irreducible basis it reads $a\,(\T[1]{})^2 +
+b\,(\T[3]{})^2 + c\,(\T[2]{})^2$, with $(\T[1]{})^2 \equiv
+\T[1]{_{\alpha\beta\mu}}\T[1]{^{\alpha\beta\mu}}$ and the other
+squared norms defined analogously; in the direct basis of scalar
 contractions of \cref{TorsionDirectBasis} it reads $\beta_1 I_1 +
 \beta_2 I_2 + \beta_3 I_3$. Substituting
 \cref{IrreducibleTorsionFullDecomp} into the direct-basis
 contractions and using the orthogonality of the three irreducible
-parts gives the linear map
+parts gives the linear
+map~\cite{sezgin1980ghostfree,hehl1995metric,lin2019pgt}
 \begin{align}
   \begin{pmatrix} a \\ b \\ c \end{pmatrix}
   &= \begin{pmatrix}
@@ -328,12 +369,24 @@ parts gives the linear map
      \begin{pmatrix} \beta_1 \\ \beta_2 \\ \beta_3 \end{pmatrix},
   \label{DirectIrreducibleTransform}
 \end{align}
-which is invertible. The component $I_3$ coincides with $T^2$
-trivially via $T_\mu T^\mu = \MAGT{^\alpha_\alpha_\mu}\MAGT{^\beta_\beta^\mu}$.
-The direct basis $\{I_1,I_2,I_3\}$ is the natural one for
-symbolic computation because it carries no $\varepsilon$-tensor
-or projector contractions; the irreducible basis
-$\{q^2,T^2,S^2\}$ is the natural one for assigning physical
-degrees of freedom to spin-parity sectors.
-\Cref{DirectIrreducibleTransform} is the bridge between the two
-pictures.
+which is invertible.
+
+The contraction $I_3 = \T[2]{_\mu}\T[2]{^\mu}$ contains only the
+trace-vector content of the torsion, since the trace of the
+axial-pseudovector and totally-traceless tensor parts vanishes
+identically. The coefficient $c$ of $(\T[2]{})^2$ in the
+irreducible basis therefore receives a contribution $\beta_3$
+from $I_3$ \emph{plus} the trace-vector pieces of $I_1$ and $I_2$,
+which contribute $\tfrac{2}{3}\beta_1$ and $\tfrac{1}{3}\beta_2$
+to $c$ respectively when \cref{IrreducibleTorsionFullDecomp} is
+substituted into the direct-basis contractions and the
+orthogonality of the three irreducible parts is used. The other
+two coefficients, $a$ and $b$, inherit pieces from $\beta_1$ and
+$\beta_2$ alone --- not $\beta_3$ --- because $I_3$ is blind to
+the traceless and axial parts. The direct basis $\{I_1,I_2,I_3\}$
+is the natural one for symbolic computation because it carries no
+$\varepsilon$-tensor or projector contractions; the irreducible
+basis $\{(\T[1]{})^2, (\T[3]{})^2, (\T[2]{})^2\}$ is the natural
+one for assigning physical degrees of freedom to spin-parity
+sectors. \Cref{DirectIrreducibleTransform} is the bridge between
+the two pictures.
