@@ -10,16 +10,15 @@
 \section{Poincar\'{e} gauge theory: field content and conventions}
 \label{PGTBackground}
 
-Poincar\'{e} gauge theory follows the same gauge-theoretic
-template as Yang--Mills theories: a global symmetry of the matter
-sector is promoted to a local one, the resulting non-invariance is
-restored by introducing compensating connection fields, and the
-geometric interpretation of those fields fixes the kinematic
-arena. We work through the construction in the order one would
-present it pedagogically, emphasising the parallels with familiar
-gauge theories of internal symmetries, before specialising to the
-irreducible decomposition of the torsion tensor used throughout
-the main text.
+Poincar\'{e} gauge theory follows the same gauge-theoretic template
+as Yang--Mills theories of internal symmetries: a global symmetry
+of the matter sector is promoted to a local one, the resulting
+non-invariance is restored by introducing compensating connection
+fields, and the geometric interpretation of those fields fixes the
+kinematic arena. We work through the construction in the order one
+would present it pedagogically, then specialise to the irreducible
+decomposition of the torsion tensor used computationally in
+\cref{PGTframework}.
 
 \paragraph*{Gauging the Poincar\'{e} group}
 \label{FieldContent}
@@ -30,7 +29,7 @@ transformations~\cite{kibble1961lorentz,utiyama1956invariant,sciama1962physical,
 Promoting the ten Poincar\'{e} parameters to spacetime-dependent
 functions breaks invariance through derivative terms acting on the
 local parameters; these are removed by introducing one
-compensating connection for each generator type, exactly as in
+compensating connection per generator type, exactly as in
 internal-symmetry gauge theories. The Lorentz-rotation generators
 are compensated by a \emph{spin connection} $A^{ij}{}_\mu$ that
 enters the covariant derivative
@@ -42,7 +41,7 @@ enters the covariant derivative
 acting on a matter field $\phi$ in the representation with spin
 matrix $\Sigma_{ij}$. The translation generators are compensated
 by a \emph{tetrad} $b^i{}_\mu$ (or equivalently its inverse
-$h_i{}^\mu$), which converts the Lorentz-frame index $i$ to a
+$h_i{}^\mu$), which converts a Lorentz-frame index $i$ to a
 coordinate index $\mu$ and relates the curved-space metric to the
 Minkowski metric of the local Lorentz
 frame~\cite{blagojevic2003lectures,barker2024poincare}:
@@ -50,108 +49,126 @@ frame~\cite{blagojevic2003lectures,barker2024poincare}:
   \g{_{\mu\nu}} &= \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu.
   \label{TetradMetric}
 \end{align}
-This parallel with the gauging of internal symmetries is direct;
-\cref{GaugeFieldStrengths} sets it out explicitly alongside QED.
-\begin{table}[h]
-  \centering
-  \begin{tabular}{@{}llll@{}}
-    \toprule
-                 & Gauge group     & Connection                & Field strength \\
-    \midrule
-    QED          & $U(1)$          & $A_\mu$                   & $F_{\mu\nu}$ \\
-    Lorentz      & $\mathrm{SO}(1,3)$ & $A^{ij}{}_\mu$         & curvature $\MAGFt{^{ij}_{\mu\nu}}$ \\
-    Translations & $\mathbb{R}^{1,3}$ & $b^i{}_\mu$            & torsion $\MAGT{^i_{\mu\nu}}$ \\
-    \bottomrule
-  \end{tabular}
-  \caption{The two compensating connections of Poincar\'{e} gauge
-    theory and their associated field strengths, alongside the
-    familiar $U(1)$ gauge field of electrodynamics. The Lorentz
-    field strength is the Riemann--Cartan curvature; the
-    translation field strength is the torsion. The
-    affine-connection components $\MAGA{^\sigma_\mu_\nu}$ used in
-    the main text are recovered from $(b^i{}_\mu, A^{ij}{}_\mu)$
-    via the tetrad postulate~\cite{blagojevic2003lectures}.}
-  \label{GaugeFieldStrengths}
-\end{table}
 
-The two field strengths emerge together from the commutator of
-two covariant derivatives. Computing
-$[\nabla_\mu,\nabla_\nu]\phi$ produces a term proportional to the
-Lorentz curvature
+The two field strengths emerge together from the commutator of two
+covariant derivatives. Computing $[\nabla_\mu,\nabla_\nu]\phi$
+produces a term proportional to the Lorentz curvature acting on
+the spin matrix, plus a term proportional to the translation field
+strength acting on the covariant derivative of the
+field~\cite{blagojevic2003lectures}. The two are
+\begin{subequations}
 \begin{align}
-  \MAGFt{^{ij}_{\mu\nu}} &= 2\,\partial_{[\mu}A^{ij}{}_{\nu]}
-    + 2\,A^i{}_{s[\mu}A^{sj}{}_{\nu]}
-  \label{LorentzCurvature}
+  \MAGFt{^{ij}_{\mu\nu}}
+    &= 2\,\partial_{[\mu}A^{ij}{}_{\nu]}
+       + 2\,A^i{}_{s[\mu}A^{sj}{}_{\nu]},
+  \label{CurvatureDef} \\
+  \MAGT{^i_{\mu\nu}}
+    &= 2\,\nabla_{[\mu}b^i{}_{\nu]},
+  \label{TorsionDef}
 \end{align}
-acting on the spin matrix, plus a term proportional to the
-translation field strength
-$\MAGT{^i_{\mu\nu}} = 2\,\nabla_{[\mu}b^i{}_{\nu]}$ acting on the
-covariant derivative of the field. The Lorentz field strength
-$\MAGFt{^{ij}_{\mu\nu}}$ is the Riemann--Cartan curvature, and
-the translation field strength $\MAGT{^i_{\mu\nu}}$ is the
-torsion --- both displayed in coordinate-component form at
-\cref{Curvature} and \cref{Torsion}. These are the gauge-theoretic
-analogues of the QED field strength $F_{\mu\nu} =
-2\partial_{[\mu}A_{\nu]}$ that summarises the listing in
-\cref{GaugeFieldStrengths}.
-
-Geometrically, the two field strengths admit independent
-interpretations: torsion is the antisymmetric part of the affine
-connection and obstructs the closure of infinitesimal
-parallelograms, while curvature governs the failure of parallel
-transport along closed loops. Imposing metric compatibility
-($\rcD{_\mu}\g{_{\nu\lambda}} = 0$) eliminates a third potential
-obstruction, the non-metricity tensor $\mathcal{Q}{_{\mu\nu\lambda}}$.
-The three obstructions are illustrated schematically in
-\cref{DiffGeometryObstructions}; Poincar\'{e} gauge theory keeps
-$\mathcal{Q}=0$ and admits both curvature and torsion.
+\end{subequations}
+the Lorentz field strength $\MAGFt{^{ij}_{\mu\nu}}$ being the
+Riemann--Cartan curvature, and the translation field strength
+$\MAGT{^i_{\mu\nu}}$ being the torsion. A third potential
+geometric obstruction, the non-metricity tensor, is defined for
+completeness as
+\begin{align}
+  \mathcal{Q}_{\lambda\mu\nu}
+    &\equiv -\partial_\lambda \g{_{\mu\nu}}
+       + 2\,\MAGA{_\lambda^\alpha_{(\mu|}}\,\g{_{\alpha|\nu)}}
+  \label{NonMetricityDef}
+\end{align}
+and is set to zero throughout this work by the metric-compatibility
+requirement~\cite{hehl1995metric}. The properties in
+\cref{CurvatureDef,TorsionDef,NonMetricityDef} have a well-known
+geometric interpretation, illustrated in
+\cref{DiffGeometryObstructions}.
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/diff_geometry.pdf}
-  \caption{The three independent geometric obstructions on a
-    differentiable manifold equipped with a linear connection:
-    curvature $\mathcal{F}$ (failure of parallel transport along
-    closed loops, left), torsion $\mathcal{T}$ (failure of
-    infinitesimal parallelograms to close, centre), and
-    non-metricity $\mathcal{Q}$ (failure of inner products to be
-    preserved under parallel transport, right). Imposing metric
-    compatibility eliminates $\mathcal{Q}$; the remaining two
-    field strengths are the gauge-theoretic outputs of localising
-    the Poincar\'{e} group.}
+  \caption{From \cref{CurvatureDef}, curvature
+    $\MAGFt{^{ij}_{\mu\nu}}$ rotates a vector after parallel
+    transport around a closed loop. From \cref{TorsionDef},
+    torsion $\MAGT{^i_{\mu\nu}}$ causes the non-closure of
+    parallelograms formed from infinitesimally
+    parallel-transported vectors. From \cref{NonMetricityDef},
+    non-metricity $\mathcal{Q}_{\lambda\mu\nu}$ causes the
+    evolution of vector length under parallel transport. We work
+    throughout under metric compatibility, so
+    $\mathcal{Q}_{\lambda\mu\nu} = 0$ and only curvature and
+    torsion remain.}
   \label{DiffGeometryObstructions}
 \end{figure}
+
+The two parameterisations of the same geometric data --- the
+gauge-theoretic $(b^i{}_\mu, A^{ij}{}_\mu)$ pair and the
+affine-connection $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$ pair
+used in \cref{Theory} --- are bridged object-by-object as in
+\cref{PGTRiemannCartanTranslation}, following Blagojevi\'{c}'s
+table 1~\cite{blagojevic2003lectures}.
+\begin{table}[h]
+  \centering
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    Gauge-theoretic & Riemann--Cartan geometric \\
+    \midrule
+    $A^{ij}{}_\mu$ Lorentz gauge field
+       & $\omega^{ij}{}_\mu$ spin connection \\
+    $\nabla_\mu(A)$ covariant derivative
+       & $D_\mu(\omega)$ $\omega$-covariant derivative \\
+    $b^i{}_\mu$, $h_i{}^\mu$ translation gauge field
+       & $e^i{}_\mu$, $e_i{}^\mu$ tetrad coframe / frame \\
+    $\MAGA{^\rho_\mu_\nu}$ not defined a priori
+       & $\MAGA{^\rho_\mu_\nu}$ affine connection \\
+    \emph{Tetrad postulate} $\Rightarrow$ $\MAGA{^\rho_\mu_\nu}$ defined
+       & $D_\mu(\omega)\,e^i{}_\nu = \MAGA{^\rho_{\nu\mu}}\,e^i{}_\rho$ \\
+    $\nabla_\mu \eta_{ij} = 0$ metricity
+       & $D_\mu(\Gamma)\,\g{_{\nu\lambda}} = 0$ metricity \\
+    $F^i{}_{\mu\nu}$ translation field strength
+       & $\MAGT{^i_{\mu\nu}}$ torsion \\
+    $F^{ij}{}_{\mu\nu}$ Lorentz field strength
+       & $\MAGFt{^{ij}_{\mu\nu}}$ curvature \\
+    \bottomrule
+  \end{tabular}
+  \caption{Translation between the gauge-theoretic and
+    Riemann--Cartan geometric pictures of Poincar\'{e} gauge theory,
+    after Blagojevi\'{c}~\cite{blagojevic2003lectures}, table 1. The
+    right column is the language used throughout \cref{Theory};
+    the left column is the gauge-theoretic origin walked through
+    in this paragraph.}
+  \label{PGTRiemannCartanTranslation}
+\end{table}
 
 \paragraph*{Spacetime classification and the Palatini formulation}
 \label{SpacetimeClassification}
 Different combinations of vanishing curvature, torsion, and
 non-metricity define the standard hierarchy of geometric arenas
-for theories of gravity. \Cref{SpacetimeClassTable} lists the
-four cases relevant here, with the present work inhabiting the
-full Riemann--Cartan space $U_4$.
-\begin{table}[h]
+for theories of gravity. \Cref{MetricAffineClasses} shows the
+classification: the outermost set is metric-affine
+$(L_4, \g{})$, with the three obstructions
+$\mathcal{R}, \mathcal{T}, \mathcal{Q}$ generating distinguished
+sub-arenas by switching off subsets. The present work imposes
+$\mathcal{Q} = 0$ and inhabits the Riemann--Cartan space $U_4$.
+\begin{figure}[h]
   \centering
-  \begin{tabular}{@{}llll@{}}
-    \toprule
-    Space & $\mathcal{R}$ & $\mathcal{T}$ & $\mathcal{Q}$ \\
-    \midrule
-    Minkowski $M_4$       & $0$        & $0$        & $0$ \\
-    Riemannian $V_4$ (GR) & $\neq 0$   & $0$        & $0$ \\
-    Weitzenb\"{o}ck $T_4$ & $0$        & $\neq 0$   & $0$ \\
-    Riemann--Cartan $U_4$ (PGT) & $\neq 0$ & $\neq 0$ & $0$ \\
-    \bottomrule
-  \end{tabular}
-  \caption{Geometric arenas for theories of gravity, classified by
-    which of curvature $\mathcal{R}$, torsion $\mathcal{T}$, and
-    non-metricity $\mathcal{Q}$ are non-zero. General relativity
-    inhabits $V_4$ with vanishing torsion; teleparallel gravity
-    inhabits the dual case $T_4$ with vanishing curvature;
-    Poincar\'{e} gauge theory inhabits the full $U_4$.}
-  \label{SpacetimeClassTable}
-\end{table}
+  \includegraphics[width=0.85\linewidth]{figures/metric_affine_classes.pdf}
+  \caption{Metric-affine geometric classification. The outer
+    region is the metric-affine space $(L_4, \g{})$, characterised
+    by independent metric and connection. The three overlapping
+    discs label which of curvature $\mathcal{R}$, torsion
+    $\mathcal{T}$, and non-metricity $\mathcal{Q}$ are non-zero.
+    General relativity inhabits Riemann $V_4$ ($\mathcal{T} =
+    \mathcal{Q} = 0$); the present work inhabits Riemann--Cartan
+    $U_4$ ($\mathcal{Q} = 0$, both $\mathcal{R}$ and $\mathcal{T}$
+    allowed); the dual case is teleparallel $W_4$ ($\mathcal{R} =
+    \mathcal{Q} = 0$). Setting all three obstructions to zero
+    recovers Minkowski $\mathbb{M}^4$.}
+  \label{MetricAffineClasses}
+\end{figure}
 
 The tetrad / spin-connection presentation just developed is
-equivalent to the Palatini-style formulation used in the main
-text~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini},
+equivalent to the Palatini-style formulation adopted in
+\cref{PGTframework}~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini},
 in which the metric $\g{_{\mu\nu}}$ and the affine connection
 $\MAGA{^\sigma_\mu_\nu}$ are the independent variational fields.
 The bridge between the two formulations is the \emph{tetrad
@@ -166,8 +183,10 @@ which is a simultaneous covariance condition under both Latin
 (Lorentz) and Greek (coordinate) indices. \Cref{TetradPostulate}
 fixes a one-to-one map between $A^{ij}{}_\mu$ and
 $\MAGA{^\sigma_\mu_\nu}$ once a tetrad is chosen, so the two
-formulations describe the same geometric data. Imposing
-metricity then forces the
+formulations describe the same geometric data --- this is the
+content of the central two rows of
+\cref{PGTRiemannCartanTranslation}. Imposing metricity
+($\mathcal{Q} = 0$) then forces the
 decomposition~\cite{blagojevic2003lectures,hehl1976spin,hehlobukhov2007cartan}
 \begin{align}
   \MAGA{^\sigma_\mu_\nu} &= \rCon{^\sigma_\mu_\nu}
@@ -180,8 +199,7 @@ in spin-connection language $A^{ij}{}_\mu = \Delta^{ij}{}_\mu(b)
 convention~\cite{barker2024poincare} of decorating the
 Levi--Civita connection with a ring,
 $\rCon{^\sigma_\mu_\nu}$, to distinguish it visually from the
-un-decorated Riemann--Cartan $\MAGA{^\sigma_\mu_\nu}$ throughout
-the report.
+un-decorated Riemann--Cartan $\MAGA{^\sigma_\mu_\nu}$ throughout.
 
 \paragraph*{Irreducible torsion decomposition}
 \label{IrreducibleTorsionFull}
