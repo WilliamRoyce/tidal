@@ -29,8 +29,9 @@ $\kappa$\footnote{%
     recent Gertsenshtein literature: the linearised
     graviton--photon vertex coupling adopted here, with
     $\kappa^2 = 16\pi G$ and $[\kappa] = [\mathrm{Mass}]^{-1}$, and
-    the Einstein constant $\kappa_\mathrm{E} \equiv 8\pi G$,
-    $[\kappa_\mathrm{E}] = [\mathrm{Mass}]^{-2}$, used as the
+    the Einstein constant which we denote
+    $\kappa_{(\mathrm{E})}\equiv 8\pi G$,
+    $[\kappa_{(\mathrm{E})}] = [\mathrm{Mass}]^{-2}$, used as the
     prefactor of $\MAGFt{}$
     in~\cite{barker2024poincare,barker2023confinement,barker2024psalter}.
     A non-canonical kinetic normalisation in the derivations
@@ -39,7 +40,7 @@ $\kappa$\footnote{%
     in the conversion-formula argument, while the convention
     adopted in~\cite{lella2024constraining} agrees with ours.
     The two normalisations are related by
-    $\kappa^2 = 2\kappa_\mathrm{E}$.
+    $\kappa^2 = 2\kappa_{(\mathrm{E})}$.
 } defined by $\kappa^2 = 16\pi G$; this is the linearised
 graviton--photon vertex coupling, and the action prefactor
 $\kappa^{-2}\,\MAGFt{}$ corresponds to a canonical graviton kinetic
@@ -137,14 +138,13 @@ where $\mathcal{L}_\text{lin}$ collects the linear invariants
 term~\cite{holst1995barbero} with Barbero--Immirzi parameter
 $\gamma_\text{BI}$); $\mathcal{L}_{\tilde{R}^2}$ contains the
 parity-even curvature-squared invariants\footnote{The
-Riemann--Cartan curvature lacks the pair-exchange symmetry
-$\tilde{R}_{\rho\sigma\mu\nu}=\tilde{R}_{\mu\nu\rho\sigma}$ of the
-torsion-free Riemann tensor, since the antisymmetric Ricci
-$\tilde{R}_{[\mu\nu]}$ does not vanish in
-general~\cite{shapiro2002torsion,hehl1995metric}; the parity-even
+Riemann--Cartan curvature lacks the pair-exchange symmetry of the
+torsion-free Riemann tensor ---
+$\tilde{R}_{\rho\sigma\mu\nu}\neq\tilde{R}_{\mu\nu\rho\sigma}$ in
+general --- since the antisymmetric Ricci
+$\tilde{R}_{[\mu\nu]}$ does not vanish~\cite{shapiro2002torsion,hehl1976spin,hehl1995metric,barker2024poincare}; the parity-even
 curvature-squared sector therefore contains additional independent
-contractions beyond the torsion-free Riemann-square
-count~\cite{hehl1976spin,barker2024poincare}.};
+contractions beyond the torsion-free Riemann-square count.};
 $\mathcal{L}_{\mathcal{T}^2}$ holds the parity-even torsion-squared
 invariants; $\mathcal{L}_{F^2}$ is the Maxwell term and
 $\mathcal{L}_{\tilde{R}F}$ the parity-even
@@ -161,26 +161,19 @@ by~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion}
 and treated systematically
 in~\cite{obukhov2024electrodynamics}. The explicit sector-by-sector
 enumeration is collected in \cref{PGTEnumeration}, with
-\cref{SectorSurvey} reporting the campaign results across these
-sectors as they become accessible.
+\cref{SectorSurvey} reporting the campaign survey across the
+surveyed subsets of these sectors.
 
-For the parity-even quadratic plus $\tilde{R}F$-cross-term sector
-we adopt the explicit coupling-letter convention
-\begin{align}
-  \mathcal{L}_{\mathcal{T}^2} + \mathcal{L}_{\tilde{R}^2}
-    + \mathcal{L}_{\tilde{R}F}
-  = \sum_n \Alp{n}\,(\mathcal{T}^2)_n
-    + \sum_n \Bet{n}\,(\mathcal{R}^2)_n
-    + \Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}},
-  \label{QuadraticAlphaBetaGamma}
-\end{align}
-matching our symbolic-pipeline implementation and aligning
-with~\cite{barker2024poincare,blagojevic2003lectures}. Where
-alternative literature conventions reverse the
-$\Alp{n}\leftrightarrow\Bet{n}$ assignment (e.g.\ the
-irreducible-basis form used in~\cite{shapiro2002torsion} and the
-related labelling conventions of~\cite{sezgin1980ghostfree}), the
-explicit translation is collected in
+Throughout this work we follow the symbolic-pipeline labelling
+convention --- $\Alp{n}$ for torsion-squared invariants,
+$\Bet{n}$ for curvature-squared, $\Del{1}$ for the parity-even
+$\tilde{R}F$ cross-term, with the Barker scalar coupling
+$\chi$~\cite{barker2024poincare} and Shapiro-style derivative
+couplings $\zeta_n$~\cite{shapiro2002torsion} introduced as
+required in subsequent sections. The per-sector definitions and
+the alternative-convention translation table (e.g.\ the
+$\Alp{n}\leftrightarrow\Bet{n}$ inversion used
+in~\cite{sezgin1980ghostfree}) are collected in
 \cref{DirectIrreducibleTranslation}.
 
 % Step (e): Irreducible torsion decomposition introduced AFTER the action.
@@ -256,9 +249,27 @@ in $\Bzero$.
 After expanding $\sqrt{-g}\,\lag$ to quadratic order in the
 perturbation fields and reducing to plane-wave dependence
 $\partial_x = \partial_y = 0$ along the propagation direction
-$\hat{z}$, with the metric perturbation in transverse-traceless
-gauge and the photon perturbation in Lorenz gauge, the surviving
-degrees of freedom assemble into a quadratic kinetic system
+$\hat{z}$, perpendicular to the background magnetic field
+$\bm{B} = \Bzero\,\hat{x}$ --- the standard Gertsenshtein
+geometry~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,cillis1996graviton,ejlli2020graviton,palessandro2023simple,palessandro2024gertsenshtein,lella2024constraining,domcke2025scattering}%
+% TODO: investigate WLOG vs not-WLOG status of this propagation
+% direction for derivative / parity-odd PGT sectors (relates to
+% issue #300 and the new "investigation: propagation-direction
+% WLOG status" issue created with this revision).
+---
+with the photon perturbation in Lorenz gauge and the metric
+perturbation evolved without an equation-of-motion gauge
+constraint%
+% TODO: cite TT-in-matter approach (await supervisor meeting
+% 2026-05-08 outcome --- see docs/meetings/2026-05-08_supervisor.md
+% for the question being raised).
+(transverse-traceless-compatible initial conditions are imposed
+in the vacuum region where the wavepacket is set up; the
+evolution through the magnetic-field region is unconstrained,
+allowing non-TT components to develop through coupling to the
+background stress-energy, per the supervisor-guided approach
+documented in our issue tracker), the surviving degrees of
+freedom assemble into a quadratic kinetic system
 \begin{align}
   \lag^{(2)} = \tfrac{1}{2}\,\xi^\mathsf{T}\,
     \mathcal{K}(\partial_t,\partial_z)\,\xi,
@@ -295,8 +306,11 @@ identification --- the issue addressed analytically
 by~\cite{hwangnoh2023emdef,hwangnoh2023graviton} via a covariant
 normal-frame decomposition --- and the linearised graviton mass
 coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ that emerges from our
-pipeline agrees with the potential-formulation result
-of~\cite{hwangnoh2023graviton}.
+pipeline reproduces the explicit potential-formulation result
+of~\cite{hwangnoh2023graviton} as a scalar cross-check; the
+equation-of-motion structure on which our $\Bzero \to 0$
+survey-coefficient analysis depends agrees with their derivation
+in the same gauge.
 
 \paragraph*{Conversion probability}
 % TODO: display the formula; one prose sentence on $\Bzero$-scaling; cite
@@ -312,8 +326,11 @@ of~\cite{hwangnoh2023graviton}.
 % \cref{sec:kappa-conventions} for the full disambiguation. This is the
 % one place in the report where the kappa-convention story is told in
 % full; the rest of the report uses the symbol freely.
-The conversion probability for a graviton traversing a region of
-uniform $\Bzero$ over distance $D$ takes the closed form
+The conversion probability --- defined as the energy fraction
+transferred from the graviton sector to the photon sector at
+peak Rabi oscillation~\cite{raffelt1988mixing} --- for a graviton
+traversing a region of uniform $\Bzero$ over distance $D$ takes
+the closed form~\cite{gertsenshtein1962wave,boccaletti1970conversion,lella2024constraining,domcke2025scattering}
 \begin{align}
   \Pconv = \sin^2\!\left(\frac{\kappa\,\Bzero\,D}{2}\right),
   \label{GertsenshteinFormula}

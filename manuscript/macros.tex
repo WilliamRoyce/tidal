@@ -186,10 +186,10 @@
 
 \newcommand{\T}[2][]{%
   \IfEqCase{#1}{%
-    {1}{\accentset{(1)}{T}_{#2}}%
-    {2}{\accentset{(2)}{T}_{#2}}%
-    {3}{\accentset{(3)}{T}_{#2}}%
-    {}{{T}_{#2}}%
+    {1}{\tensor{\accentset{(1)}{T}}{#2}}%
+    {2}{\tensor{\accentset{(2)}{T}}{#2}}%
+    {3}{\tensor{\accentset{(3)}{T}}{#2}}%
+    {}{\tensor{T}{#2}}%
   }[\PackageError{macros}{Invalid torsion index: #1}{}]%
 }
 

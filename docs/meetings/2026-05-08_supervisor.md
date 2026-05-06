@@ -196,7 +196,20 @@ PGT isn't covered in the masters curriculum, so the examiner will not have the b
 
 - [ ] Is this the right approach for setting context, or is there a different convention for this?
 
-### 6. Carry-forward from 17 April
+### 6. HPC queue — is this normal?
+
+Standard-QOS jobs consistently sit PENDING indefinitely (current jobs have been queued for days without running). In practice every job ends up submitted to the INTR queue (1h wall limit), which schedules immediately but times out before convergence, requiring repeated `--resume` resubmissions. The current nested-sampling runs each take 3–5 INTR slots to converge.
+
+- [ ] Is this typical for CSD3 at the moment, or is there something wrong with how the jobs are configured?
+- [ ] Is there a recommended way to run jobs that genuinely need more than 1 hour without hitting the standard queue?
+
+### 7. Manuscript §2.2 — TT-gauge-in-matter citation
+
+We evolve the metric perturbation without an equation-of-motion gauge constraint, and impose only TT-compatible initial conditions in the vacuum region where the wavepacket originates. Per issue #167 this is the supervisor-guided approach, but the manuscript prose currently has no published reference for it.
+
+- [ ] Is there a published reference for this TT-in-matter approach (Lasenby/Hobson notes? a recent paper?), or should we cite it as "private communication"?
+
+### 8. Carry-forward from 17 April
 
 - [ ] **Scheduling the practice talk** — when?
 - [ ] **Sven Krippendorf** — outcome of any intervention?
