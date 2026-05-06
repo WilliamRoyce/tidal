@@ -151,7 +151,7 @@ $\mathcal{L}_{\tilde{R}F}$ the parity-even
 curvature--electromagnetic cross-term; $\mathcal{L}_\text{odd}$
 collects the parity-odd quadratic
 invariants~\cite{karananas2014parity,blagojevic2018hamiltonian};
-$\mathcal{L}_\partial$ the ghost-free derivative-order
+$\mathcal{L}_\partial$ the higher-derivative
 extensions~\cite{aoki2020nonlinear}; $\mathcal{L}_\text{cubic}$
 the cubic completions relevant for linearisation around magnetic
 backgrounds and for ghost elimination~\cite{bahamonde2025cubic};
@@ -164,17 +164,11 @@ enumeration is collected in \cref{PGTEnumeration}, with
 \cref{SectorSurvey} reporting the campaign survey across the
 surveyed subsets of these sectors.
 
-Throughout this work we follow the symbolic-pipeline labelling
-convention --- $\Alp{n}$ for torsion-squared invariants,
-$\Bet{n}$ for curvature-squared, $\Del{1}$ for the parity-even
-$\tilde{R}F$ cross-term, with the Barker scalar coupling
-$\chi$~\cite{barker2024poincare} and Shapiro-style derivative
-couplings $\zeta_n$~\cite{shapiro2002torsion} introduced as
-required in subsequent sections. The per-sector definitions and
-the alternative-convention translation table (e.g.\ the
-$\Alp{n}\leftrightarrow\Bet{n}$ inversion used
-in~\cite{sezgin1980ghostfree}) are collected in
-\cref{DirectIrreducibleTranslation}.
+% Label-glossary sentence removed in Pass 6 (was circular per
+% user feedback): the α/β/δ/χ/ζ coupling letters are introduced
+% in §4 where the campaigns name the specific theories that use
+% them. The convention-translation table lives in
+% \cref{DirectIrreducibleTranslation}.
 
 % Step (e): Irreducible torsion decomposition introduced AFTER the action.
 % This is also the cross-reference target for App E.
@@ -226,13 +220,27 @@ The metric and four-potential are decomposed as
 \begin{gather}
   g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu},
   \quad
-  A_\mu = \bar{A}_\mu + \delta A_\mu, \label{PerturbationAnsatz} \\
+  A_\mu = \bar{A}_\mu + \delta A_\mu,
+  \quad
+  \MAGT{^\sigma_\mu_\nu} = 0 + \delta\MAGT{^\sigma_\mu_\nu},
+  \label{PerturbationAnsatz} \\
   \bar{A}_\mu\,\diff x^\mu = -\Bzero\,z\,\diff y, \nonumber
 \end{gather}
-with the connection treated as inherently perturbative,
-$\MAGA{^\sigma_\mu_\nu} = \delta\MAGA{^\sigma_\mu_\nu}$. The metric
-perturbation $h_{\mu\nu}$ enters without a $\kappa$ prefactor; this
-choice is equivalent under field redefinition to the
+with the torsion tensor $\MAGT{^\sigma_\mu_\nu}$ perturbed
+directly via xPert's \texttt{DefTensorPerturbation}. The Palatini
+connection decomposes as
+$\MAGA{^\sigma_\mu_\nu} = \rCon{^\sigma_\mu_\nu} + K^\sigma{}_{\mu\nu}$,
+where $\rCon{^\sigma_\mu_\nu}$ is the ring-decorated Riemannian
+Levi--Civita connection (function of $g$, defined in §2.1) and
+$K^\sigma{}_{\mu\nu}$ is the contortion (function of
+$\MAGT{^\alpha_\beta_\gamma}$); the linearised connection
+perturbation $\delta\MAGA{^\sigma_\mu_\nu}$ therefore inherits
+contributions from both the metric perturbation $h_{\mu\nu}$
+(through $\delta\rCon{^\sigma_\mu_\nu}$) and the torsion
+perturbation $\delta\MAGT{^\sigma_\mu_\nu}$ (through
+$\delta K^\sigma{}_{\mu\nu}$). The metric
+perturbation $h_{\mu\nu}$ enters without a $\kappa$ prefactor;
+this choice is equivalent under field redefinition to the
 canonically-normalised convention
 $g_{\mu\nu} = \eta_{\mu\nu} + \kappa\,\tilde{h}_{\mu\nu}$ used
 in~\cite{lella2024constraining}. A self-consistency bound on the
@@ -240,8 +248,8 @@ campaign parameter choices is in \cref{PerturbativeRegime}.
 
 \paragraph*{Order-counting rule}
 We work to linear order in $h_{\mu\nu}$, $\delta A_\mu$, and the
-torsion fluctuation $\delta\MAGA{^\sigma_\mu_\nu}$, and to first order
-in $\Bzero$.
+torsion fluctuation $\delta\MAGT{^\sigma_\mu_\nu}$, and to first
+order in $\Bzero$.
 
 % Kinetic-matrix sub-movement (third move per §(f)). Equation label is the
 % cross-reference target for §4.
@@ -267,9 +275,8 @@ constraint%
 in the vacuum region where the wavepacket is set up; the
 evolution through the magnetic-field region is unconstrained,
 allowing non-TT components to develop through coupling to the
-background stress-energy, per the supervisor-guided approach
-documented in our issue tracker), the surviving degrees of
-freedom assemble into a quadratic kinetic system
+background stress-energy), the surviving degrees of freedom
+assemble into a quadratic kinetic system
 \begin{align}
   \lag^{(2)} = \tfrac{1}{2}\,\xi^\mathsf{T}\,
     \mathcal{K}(\partial_t,\partial_z)\,\xi,
@@ -327,9 +334,9 @@ in the same gauge.
 % one place in the report where the kappa-convention story is told in
 % full; the rest of the report uses the symbol freely.
 The conversion probability --- defined as the energy fraction
-transferred from the graviton sector to the photon sector at
-peak Rabi oscillation~\cite{raffelt1988mixing} --- for a graviton
-traversing a region of uniform $\Bzero$ over distance $D$ takes
+transferred from the graviton sector to the photon sector over
+the propagation distance $D$~\cite{raffelt1988mixing} --- for
+a graviton traversing a region of uniform $\Bzero$ takes
 the closed form~\cite{gertsenshtein1962wave,boccaletti1970conversion,lella2024constraining,domcke2025scattering}
 \begin{align}
   \Pconv = \sin^2\!\left(\frac{\kappa\,\Bzero\,D}{2}\right),
