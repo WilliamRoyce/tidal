@@ -24,7 +24,7 @@ $\hbar = c = 1$. Greek indices $\mu,\nu,\dots$ denote spacetime
 coordinate components and Latin indices $a,b,\dots$ denote Lorentz-frame
 components. The reduced Planck mass is $\MPl$ with
 $\MPl^2 = (8\pi G)^{-1}$. Throughout we use the gravitational coupling
-$\kappa$\footnote{%
+$\kappa$ defined by $\kappa^2 = 16\pi G$.\footnote{%
     Two distinct objects appear under the symbol $\kappa$ in the
     recent Gertsenshtein literature: the linearised
     graviton--photon vertex coupling adopted here, with
@@ -41,10 +41,9 @@ $\kappa$\footnote{%
     adopted in~\cite{lella2024constraining} agrees with ours.
     The two normalisations are related by
     $\kappa^2 = 2\kappa_{(\mathrm{E})}$.
-} defined by $\kappa^2 = 16\pi G$; this is the linearised
-graviton--photon vertex coupling, and the action prefactor
-$\kappa^{-2}\,\MAGFt{}$ corresponds to a canonical graviton kinetic
-term under the field redefinition
+} This is the linearised graviton--photon vertex coupling, and the
+action prefactor $\kappa^{-2}\,\MAGFt{}$ corresponds to a canonical
+graviton kinetic term under the field redefinition
 $\tilde{h}_{\mu\nu} = h_{\mu\nu}/\kappa$ used
 in~\cite{lella2024constraining}. The totally antisymmetric
 Levi--Civita tensor $\varepsilon^{\mu\nu\rho\sigma}$ is normalised to
@@ -74,13 +73,16 @@ $\rcD{_\mu}$.
 % Step (b): Promotion of connection to independent field. Palatini
 % formulation declared explicitly.
 \paragraph*{Independent connection in the Palatini formulation}
-Poincar\'{e} gauge theory of
+The Palatini formulation~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}
+treats the metric and the affine connection as independent
+variational fields. Poincar\'{e} gauge theory of
 Kibble~\cite{kibble1961lorentz},
 Utiyama~\cite{utiyama1956invariant}, and
 Sciama~\cite{sciama1962physical}, developed
 by~\cite{trautman1972einstein,hehl1976spin,hehl1995metric},
 promotes the metric and the affine connection
-$\MAGA{^\sigma_\mu_\nu}$ to independent dynamical fields, with
+$\MAGA{^\sigma_\mu_\nu}$ to independent dynamical fields in this
+sense, with
 torsion and curvature appearing as the field strengths of spacetime
 translations and rotations respectively
 (see~\cite{blagojevic2002gravitation,blagojevic2003lectures,blagojevicHehl2013,hehlobukhov2007cartan}
@@ -157,8 +159,7 @@ invariants~\cite{karananas2014parity,blagojevic2018hamiltonian};
 $\mathcal{L}_\partial$ the higher-derivative
 extensions~\cite{aoki2020nonlinear}; $\mathcal{L}_\text{cubic}$
 the cubic-order completions that contribute to the linearised
-dynamics when one field takes a non-trivial background value, as
-for $\bar A_\mu$ here, and are catalogued
+dynamics, and those as catalogued
 in~\cite{bahamonde2025cubic};
 and $\mathcal{L}_\text{CS}$ collects the Chern--Simons torsion--EM
 couplings involving the gauge potential, motivated
@@ -179,7 +180,7 @@ surveyed subsets of these sectors.
 % This is also the cross-reference target for App E.
 \paragraph*{Irreducible torsion decomposition}
 The torsion tensor admits a unique decomposition into irreducible
-$\mathrm{O}(3,1)$ representations~\cite{hehl1976spin,shapiro2002torsion,blagojevic2003lectures,barker2024poincare}:
+$\mathrm{O}(3,1)$ representations~\cite{hehl1976spin,hehl1995metric,shapiro2002torsion,blagojevic2003lectures,obukhov2024electrodynamics,barker2024poincare}:
 a traceless tensor part $\T[1]{_{\alpha\beta\mu}}$, a trace vector
 $\T[2]{_\mu} \equiv \MAGT{^\lambda_\lambda_\mu}$, and an axial
 pseudovector
@@ -220,7 +221,7 @@ term selects.
 
 \paragraph*{Background and perturbation ansatz}
 We linearise about a flat metric carrying a uniform static magnetic
-field $\Bzero$ along $\hat{z}$, with vanishing background torsion.
+field $\Bzero$ along $\hat{x}$, with vanishing background torsion.
 The metric, four-potential, and torsion are decomposed as
 \begin{gather}
   g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu},
@@ -283,16 +284,14 @@ geometry~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,
 % WLOG status" issue created with this revision).
 ---
 with the photon perturbation in Lorenz gauge and the metric
-perturbation evolved without an equation-of-motion gauge
-constraint%
+perturbation evolved without a gauge constraint%
 % TODO: cite TT-in-matter approach (await supervisor meeting
 % 2026-05-08 outcome --- see docs/meetings/2026-05-08_supervisor.md
 % for the question being raised).
 (transverse-traceless-compatible initial conditions are imposed
 in the vacuum region where the wavepacket is set up; the
 evolution through the magnetic-field region is unconstrained,
-allowing non-TT components to develop through coupling to the
-background stress-energy), the surviving degrees of freedom
+allowing non-TT components to develop), the surviving degrees of freedom
 assemble into a quadratic kinetic system
 \begin{align}
   \lag^{(2)} = \tfrac{1}{2}\,\xi^\mathsf{T}\,
