@@ -211,7 +211,7 @@ $\{I_1,I_2,I_3\}$ computationally and the irreducible decomposition
 for naming the physical degrees of freedom that each interaction
 term selects.
 
-\subsection{Linearisation around flat $+$ $B_0$ background}%
+\subsection{Linearisation around the magnetic background}%
 \label{Linearisation}
 % Target ~350 w. Per genre_conventions_theory.md §(f) linearisation
 % sub-movement.
@@ -219,13 +219,13 @@ term selects.
 \paragraph*{Background and perturbation ansatz}
 We linearise about a flat metric carrying a uniform static magnetic
 field $\Bzero$ along $\hat{z}$, with vanishing background torsion.
-The metric and four-potential are decomposed as
+The metric, four-potential, and torsion are decomposed as
 \begin{gather}
   g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu},
   \quad
   A_\mu = \bar{A}_\mu + \delta A_\mu,
   \quad
-  \MAGT{^\sigma_\mu_\nu} = 0 + \delta\MAGT{^\sigma_\mu_\nu},
+  \MAGT{^\sigma_\mu_\nu} = \delta\MAGT{^\sigma_\mu_\nu},
   \label{PerturbationAnsatz} \\
   \bar{A}_\mu\,\diff x^\mu = -\Bzero\,z\,\diff y, \nonumber
 \end{gather}
@@ -235,13 +235,13 @@ decomposes
 as~\cite{hehl1976spin,shapiro2002torsion,hehlobukhov2007cartan,blagojevic2003lectures}
 \begin{align}
   \MAGA{^\sigma_\mu_\nu}
-    = \rCon{^\sigma_\mu_\nu} + K^\sigma{}_{\mu\nu},
-  \qquad
+    = \rCon{^\sigma_\mu_\nu} \!+ K^\sigma{}_{\mu\nu},
+  \quad
   K^\sigma{}_{\mu\nu}
     = \tfrac{1}{2}\bigl(
         \MAGT{^\sigma_\mu_\nu}
-        + \MAGT{_\mu^\sigma_\nu}
-        + \MAGT{_\nu^\sigma_\mu}
+        \!\!+ \MAGT{_\mu^\sigma_\nu}
+        \!+ \MAGT{_\nu^\sigma_\mu}\!
       \bigr),
   \label{PalatiniDecomposition}
 \end{align}
