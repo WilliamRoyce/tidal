@@ -1,65 +1,142 @@
 % App F: Poincaré gauge theory — field content and conventions.
 % Forward-reference target from §2 for theory-background topics
 % (vierbein/spin connection, Palatini, irreducible torsion
-% decomposition formalism, ghost-restriction conceptual treatment).
-% The sector-by-sector enumeration of invariants lives in App H
-% (pgt_enumeration.tex).
+% decomposition formalism). The sector-by-sector enumeration of
+% invariants and the cross-author coupling-constant translation
+% table live in App H (pgt_enumeration.tex).
 
 \section{Poincar\'{e} gauge theory: field content and conventions}
 \label{PGTBackground}
 
+This appendix collects the field-variable formalism that §2
+invokes by reference: the tetrad and spin-connection presentation
+of Poincar\'{e} gauge theory in which curvature and torsion
+appear as the field strengths of local Lorentz rotations and
+local translations, the Palatini equivalence between the
+spin-connection formulation and the affine-connection formulation
+adopted in the main text, and the full irreducible decomposition
+of the torsion tensor with the explicit transformation between
+its irreducible squared-norms and the direct basis of scalar
+contractions used computationally.
+
 \paragraph*{Gauging the Poincar\'{e} group}
 \label{FieldContent}
-% TODO ~150 w. Following Kibble--Sciama--Utiyama and the modern
-% pedagogical treatment in Blagojevi\'{c} 2003 lectures
-% (gr-qc/0302040), describe how gauging local translations gives
-% rise to the tetrad e^a_\mu as the compensating gauge field, with
-% torsion T^a appearing as the corresponding field strength;
-% gauging local Lorentz rotations gives the spin connection
-% \omega^{ab}_\mu, with curvature R^{ab} as the field strength.
-% State that the geometric reading of these objects (torsion as
-% the obstruction to integrable orthonormal frames; curvature as
-% the failure of parallel transport) coincides with the
-% gauge-theoretic reading. Cite kibble1961lorentz,
-% utiyama1956invariant, sciama1962physical, blagojevic2003lectures,
-% blagojevicHehl2013.
-
-\paragraph*{Palatini formulation and the ring/no-ring connection
-distinction}
-% TODO ~80 w. Metric and connection treated as independent
-% dynamical fields; equivalent to the vierbein + spin connection
-% formulation up to a tetrad postulate. The ring decoration
-% \mathring{\Gamma}^\sigma_{\mu\nu} for the Riemannian Levi--Civita
-% connection (vs the un-decorated Riemann--Cartan connection
-% \Gamma^\sigma_{\mu\nu} introduced by the Palatini variation) is
-% a Barker-lab convention~\cite{barker2024poincare} adopted here
-% for clarity. Cite hehl1976spin, hehlobukhov2007cartan,
-% barker2024poincare.
-
-\paragraph*{Irreducible torsion decomposition: full treatment}
-\label{IrreducibleTorsionFull}
-% TODO ~150 w + 1 equation block. Tensor part q_{\alpha\beta\mu},
-% trace vector T_\mu, axial pseudovector S^\mu; orthogonality
-% relations; explicit components; the invertible 3x3 transformation
-% between {q^2, T^2, S^2} and the direct basis {I_1, I_2, I_3}
-% used computationally. Cite hehl1976spin, shapiro2002torsion §2.3,
-% blagojevic2003lectures.
+We follow the pedagogical line of
+Blagojevi\'{c}~\cite{blagojevic2003lectures} in deriving Poincar\'{e}
+gauge theory by promoting the rigid Poincar\'{e} symmetry of
+Minkowski spacetime to a local one. A matter Lagrangian
+$\mathcal{L}_M(\phi,\partial_k\phi)$ that is invariant under
+constant Poincar\'{e} transformations fails to remain invariant
+once the parameters become spacetime-dependent functions;
+restoring invariance requires two compensating fields, one for
+each generator type. The Lorentz generators are compensated by a
+\emph{spin connection} $A^{ij}{}_\mu$, which enters the
+Lorentz-covariant derivative $\nabla_\mu\phi = (\partial_\mu +
+\tfrac{1}{2}A^{ij}{}_\mu\Sigma_{ij})\phi$ acting on a matter
+field $\phi$ in the representation with spin matrix $\Sigma_{ij}$.
+The translation generators are compensated by the
+\emph{tetrad} $b^i{}_\mu$, which relates the Riemann--Cartan
+metric to the Minkowski metric of the local Lorentz
+frame~\cite{kibble1961lorentz,utiyama1956invariant,sciama1962physical,barker2024poincare} via
 \begin{align}
-  % TODO: T_{\alpha\beta\mu} = (1/3)(T_\beta g_{\alpha\mu} - T_\mu g_{\alpha\beta})
-  %                          - (1/6) \varepsilon_{\alpha\beta\mu\nu} S^\nu
-  %                          + q_{\alpha\beta\mu}
+  \g{_{\mu\nu}} &= \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu.
+  \label{TetradMetric}
+\end{align}
+The commutator of two covariant derivatives produces both gauge
+field strengths simultaneously: the Lorentz field strength
+$F^{ij}{}_{\mu\nu} = 2\partial_{[\mu}A^{ij}{}_{\nu]} +
+2A^i{}_{s[\mu}A^{sj}{}_{\nu]}$ is the curvature, and the
+translation field strength $F^i{}_{\mu\nu} = 2\nabla_{[\mu}b^i{}_{\nu]}$
+is the torsion. Spacetime thereby acquires the
+Riemann--Cartan structure $U_4$ in which curvature and torsion are
+the two independent geometric obstructions: torsion is the
+antisymmetric part of the affine connection, and curvature
+measures the failure of parallel transport along closed
+loops~\cite{blagojevic2003lectures,hehl1976spin}. The torsion-free
+limit recovers the Riemannian $V_4$ of general relativity, while
+the flat-curvature limit recovers Weitzenb\"{o}ck's teleparallel
+geometry $T_4$; the present work inhabits the full $U_4$.
+
+\paragraph*{Palatini formulation and the ring connection
+convention}
+The tetrad / spin-connection formulation just described is
+equivalent to the Palatini-style formulation used in the main
+text, in which the metric $\g{_{\mu\nu}}$ and the affine
+connection $\MAGA{^\sigma_\mu_\nu}$ are treated as independent
+variational fields~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}.
+The bridge is the tetrad
+postulate~\cite{blagojevic2003lectures}, $\nabla_\mu^{(\omega+\Gamma)}
+b^i{}_\nu = 0$, which fixes a one-to-one map between the spin
+connection $A^{ij}{}_\mu$ and the affine connection
+$\MAGA{^\sigma_\mu_\nu}$ once the tetrad is chosen. Imposing the
+metricity condition $\rcD{_\mu}\g{_{\nu\lambda}} = 0$ then
+forces the metric-compatible
+decomposition~\cite{blagojevic2003lectures,hehl1976spin,hehlobukhov2007cartan},
+\begin{align}
+  \MAGA{^\sigma_\mu_\nu} &= \rCon{^\sigma_\mu_\nu}
+    + K^\sigma{}_{\mu\nu},
+  \label{ContortionSplit}
+\end{align}
+between the Levi--Civita part and the contortion --- the same
+content as the spin-connection split $A^{ij}{}_\mu = \Delta^{ij}{}_\mu(b)
++ K^{ij}{}_\mu$ that follows from the tetrad postulate, restated
+here in coordinate components and consistent with §2.2's
+\cref{PalatiniDecomposition}. Throughout the report we follow the
+Barker-lab convention~\cite{barker2024poincare} of decorating the
+Levi--Civita connection with a ring, $\rCon{^\sigma_\mu_\nu}$,
+to distinguish it visually from the un-decorated Riemann--Cartan
+$\MAGA{^\sigma_\mu_\nu}$.
+
+\paragraph*{Irreducible torsion decomposition}
+\label{IrreducibleTorsionFull}
+The torsion tensor $\MAGT{_{\alpha\beta\mu}}$ admits a unique
+decomposition into three irreducible representations of the local
+Lorentz group~\cite{hehl1976spin,hehl1995metric,shapiro2002torsion,obukhov2024electrodynamics}:
+the trace vector $T_\mu \equiv \MAGT{^\lambda_\lambda_\mu}$ (four
+components), the axial pseudovector $S^\mu \equiv \varepsilon^{\alpha\beta\gamma\mu}
+\MAGT{_{\alpha\beta\gamma}}$ (four components), and a totally
+traceless tensor part $q_{\alpha\beta\mu}$ (sixteen components)
+that satisfies $q^\lambda{}_{\lambda\mu} = 0$ and
+$\varepsilon^{\alpha\beta\gamma\delta}q_{\alpha\beta\gamma} = 0$.
+The reconstruction formula
+\begin{align}
+  \MAGT{_{\alpha\beta\mu}}
+  &= \tfrac{1}{3}\bigl(T_\beta\,\g{_{\alpha\mu}}
+                 - T_\mu\,\g{_{\alpha\beta}}\bigr)
+   - \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\,S^\nu
+   + q_{\alpha\beta\mu}
   \label{IrreducibleTorsionFullDecomp}
 \end{align}
+expresses the same content as §2.1's
+\cref{IrreducibleTorsion} restated here at appendix level so
+that the orthogonality relations and the basis transformation
+that follow are anchored to a single equation. The three
+irreducible parts are mutually orthogonal under the natural
+quadratic-norm pairing.
 
-\paragraph*{Stability and ghost-restriction}
-\label{StabilityGhostFree}
-% TODO ~80 w. Conceptual treatment of the ghost-free / no-tachyon
-% classification: spin-parity sector requirement m_s^2 > 0 for
-% J^P \in {0^\pm, 1^\pm, 2^\pm}, after Lin--Hobson--Lasenby and
-% Blagojevi\'{c}--Cvetkovi\'{c}; the relation between published
-% classifications and our empirically-constructed survey priors
-% (5-point empirical scans + runtime tachyonic-eigenvalue rejection).
-% The sector-by-sector enumeration of invariants and explicit
-% stability boundaries are in \cref{PGTEnumeration} (App H).
-% Cite lin2019pgt, blagojevic2018hamiltonian, karananas2014parity,
-% sezgin1980ghostfree, aoki2020nonlinear.
+The torsion-squared sector of \cref{QuadraticAction} can be
+written either in the irreducible basis as $a\,q^2 + b\,S^2 + c\,T^2$,
+where $q^2 \equiv q_{\alpha\beta\mu}q^{\alpha\beta\mu}$ and
+similarly for $S^2,T^2$, or in the direct basis $\beta_1 I_1 +
+\beta_2 I_2 + \beta_3 I_3$ of scalar contractions defined in
+\cref{TorsionDirectBasis}. Substituting
+\cref{IrreducibleTorsionFullDecomp} into the direct-basis
+contractions and using the orthogonality of the irreducible parts
+gives the linear map
+\begin{align}
+  \begin{pmatrix} a \\ b \\ c \end{pmatrix}
+  &= \begin{pmatrix}
+       1 & 1 & 0 \\
+       -\tfrac{1}{6} & \tfrac{1}{6} & 0 \\
+       \tfrac{2}{3} & \tfrac{1}{3} & 1
+     \end{pmatrix}
+     \begin{pmatrix} \beta_1 \\ \beta_2 \\ \beta_3 \end{pmatrix},
+  \label{DirectIrreducibleTransform}
+\end{align}
+which is invertible and identifies $I_3 = T^2$ trivially through
+$T_\mu T^\mu = \MAGT{^\alpha_\alpha_\mu}\MAGT{^\beta_\beta^\mu}$.
+The direct basis is convenient for symbolic computation because
+it carries no $\varepsilon$-tensor or projector contractions; the
+irreducible basis is the natural one for assigning physical
+degrees of freedom to spin-parity sectors. \Cref{DirectIrreducibleTransform}
+is the bridge between the two pictures used throughout §2.
