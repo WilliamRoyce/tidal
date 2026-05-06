@@ -1,0 +1,94 @@
+% App H: General PGT+EM Lagrangian — sector-by-sector enumeration.
+% Forward-reference target from §2.1 for the explicit invariant
+% lists and parameter counts. The theory-background formalism
+% (vierbein, spin connection, irreducible torsion, ghost-restriction
+% concepts) lives in App F (pgt_background.tex).
+
+\section{General PGT+EM Lagrangian: sector-by-sector enumeration}
+\label{PGTEnumeration}
+
+\paragraph*{Linear sector}
+\label{LinearSector}
+% TODO ~80 w. Three independent linear invariants: Einstein--Hilbert
+% term R/\kappa^2, cosmological constant \Lambda, and the Holst term
+% \varepsilon^{\mu\nu\rho\sigma} \tilde{R}_{\mu\nu\rho\sigma} with
+% Barbero--Immirzi parameter \gamma_BI. Cite holst1995barbero,
+% kibble1961lorentz.
+
+\paragraph*{Parity-even quadratic sector}
+\label{ParityEvenQuadratic}
+% TODO ~250 w + 1 equation block. Eleven independent invariants:
+% six \tilde{R}^2 (\alpha_1 ... \alpha_6 in research-doc convention,
+% \beta_1 ... \beta_6 in §2.1 manuscript convention), three
+% \mathcal{T}^2 (three irreducible torsion-squared, written in
+% direct basis {I_1, I_2, I_3} as in §2.1), one F^2 (Maxwell), and
+% one \tilde{R}_{[\mu\nu]} F^{\mu\nu} cross-term (\delta_1).
+% Three of the six \tilde{R}^2 invariants reduce in the torsion-free
+% case via Bianchi + pair-exchange symmetry, with Gauss--Bonnet
+% further reducing to two; with torsion all six are independent
+% (citing the project's research/lagrangian_enumeration/
+% general_quadratic_lagrangian.tex enumeration). Cite lin2019pgt,
+% blagojevic2018hamiltonian, blagojevic2003lectures,
+% barker2024poincare, sezgin1980ghostfree, aoki2020nonlinear.
+
+\paragraph*{Parity-odd quadratic sector}
+\label{ParityOddQuadratic}
+% TODO ~150 w. Twenty additional physical parity-odd quadratic
+% invariants from \varepsilon-weighted contractions of curvature,
+% torsion, and EM field strength: e.g.\ \varepsilon^{\mu\nu\rho\sigma}
+% T_{\mu\nu\alpha} T_{\rho\sigma}{}^\alpha, \tilde{R}_{[\mu\nu]}
+% \tilde{F}^{\mu\nu} (Hodge-dual EM cross), Holst-like
+% \tilde{R}_{\mu\nu\rho\sigma}\tilde{R}^{\rho\sigma\mu\nu}.
+% Karananas 2014 + Blagojevic--Cvetkovic 2018 give the parity-odd
+% mass-spectrum analyses. Cite karananas2014parity,
+% blagojevic2018hamiltonian.
+
+\paragraph*{Ghost-free derivative extensions}
+\label{DerivativeExtensions}
+% TODO ~100 w. Ghost-free higher-derivative completions add at
+% most ~29 parity-even and ~80 parity-odd invariants (upper bounds
+% before Bianchi reduction), as enumerated in
+% research/lagrangian_enumeration/general_quadratic_lagrangian.tex.
+% Aoki--Yokoyama 2020 provides the nonlinearly-ghost-free
+% higher-curvature analysis. Cite aoki2020nonlinear.
+
+\paragraph*{Cubic completions}
+\label{CubicCompletions}
+% TODO ~80 w. Approximately 65 safe cubic operators relevant for
+% (i) ghost elimination in propagating-torsion theories and (ii)
+% linearisation around magnetic backgrounds (in which the cubic
+% terms contribute at quadratic order in the perturbation).
+% Bahamonde et al. 2025 constructs ghost-free cubic PGT
+% cosmologies. Cite bahamonde2025cubic.
+
+\paragraph*{Chern--Simons torsion--EM couplings}
+\label{ChernSimonsCouplings}
+% TODO ~120 w. Parity-odd couplings involving the gauge potential
+% A_\mu directly (rather than only F_{\mu\nu}): the trace-torsion
+% Chern--Simons \chi^{CS}_2 \varepsilon^{\mu\nu\rho\sigma} T_\mu A_\nu
+% \partial_\rho A_\sigma; the full-torsion Chern--Simons
+% \chi^{CS}_3 \varepsilon^{\mu\nu\rho\sigma} T_{\mu\nu}{}^\alpha
+% A_\alpha \partial_\rho A_\sigma (one term + six tensor variants).
+% Hehl--Obukhov 2000 gave the original axion/birefringence
+% framework; Itin--Hehl 2003 the systematic T^2 F^2 classification;
+% Rubilar 2003 the torsion-birefringence treatment; Obukhov et
+% al.\ 2024 the recent classical-electrodynamics + spin-torsion
+% analysis. Cite hehl2000electromagnetic, itin2004maxwell,
+% rubilar2003torsion, obukhov2024electrodynamics.
+
+\paragraph*{Direct--irreducible basis translation}
+\label{DirectIrreducibleTranslation}
+% TODO ~150 w + 1 equation block. The 3x3 invertible
+% transformation between the direct basis {I_1, I_2, I_3} of
+% torsion-squared scalar contractions and the irreducible basis
+% {q^2, T^2, S^2}; the explicit conversion factors. Convention
+% comparison table: research/lagrangian_enumeration uses (\alpha
+% for \tilde{R}^2, \beta for T^2); the §2.1 manuscript convention
+% uses (\alpha for T^2, \beta for \tilde{R}^2) matching TIDAL's
+% code labels (alpha1, alpha2, alpha3 in TOML files). Cite
+% shapiro2002torsion §2.3.
+\begin{align}
+  % TODO: 3x3 transformation matrix between {I_1, I_2, I_3}
+  % and {q^2, T^2, S^2}
+  \label{DirectIrreducibleTransform}
+\end{align}

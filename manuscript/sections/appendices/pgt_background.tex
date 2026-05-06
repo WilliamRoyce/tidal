@@ -1,73 +1,65 @@
-% App F: Poincaré gauge theory — conventions and field content
-% Forward-reference target from §2.1 (Palatini paragraph) and §2.1
-% (irreducible torsion paragraph). This appendix expands the field-
-% variable formalism so §2.1 can stay in dense BHL register.
+% App F: Poincaré gauge theory — field content and conventions.
+% Forward-reference target from §2 for theory-background topics
+% (vierbein/spin connection, Palatini, irreducible torsion
+% decomposition formalism, ghost-restriction conceptual treatment).
+% The sector-by-sector enumeration of invariants lives in App H
+% (pgt_enumeration.tex).
 
-\section{Poincaré gauge theory: conventions and field content}
+\section{Poincar\'{e} gauge theory: field content and conventions}
 \label{PGTBackground}
 
-\paragraph*{Field variables and Palatini formalism}
-% TODO ~150 w. Vierbein e^a_μ, spin connection ω^{ab}_μ; Palatini
-% promotion of connection to independent field; gauge interpretation
-% of T^a and R^{ab} as translational and rotational field strengths.
-% Cite kibble1961lorentz, hehl1976spin.
+\paragraph*{Gauging the Poincar\'{e} group}
+\label{FieldContent}
+% TODO ~150 w. Following Kibble--Sciama--Utiyama and the modern
+% pedagogical treatment in Blagojevi\'{c} 2003 lectures
+% (gr-qc/0302040), describe how gauging local translations gives
+% rise to the tetrad e^a_\mu as the compensating gauge field, with
+% torsion T^a appearing as the corresponding field strength;
+% gauging local Lorentz rotations gives the spin connection
+% \omega^{ab}_\mu, with curvature R^{ab} as the field strength.
+% State that the geometric reading of these objects (torsion as
+% the obstruction to integrable orthonormal frames; curvature as
+% the failure of parallel transport) coincides with the
+% gauge-theoretic reading. Cite kibble1961lorentz,
+% utiyama1956invariant, sciama1962physical, blagojevic2003lectures,
+% blagojevicHehl2013.
 
-\paragraph*{General quadratic action and coupling taxonomy}
-% TODO ~250 w + 1 equation block. Display the full parity-even
-% quadratic PGT action with explicit α_1...α_6 R² terms, β_1...β_3 T²
-% terms, γ_1 R̃·F cross-term. Cite lin2019pgt for the 450-case
-% ghost-free classification. State which sectors §4 surveys (3 T²,
-% 1 R̃², 1 F²) and which are unsurveyed (R²-beyond-Ricci, parity-odd).
-\begin{align}
-  % TODO: full action with all parity-even quadratic couplings
-  \label{FullPGTAction}
-\end{align}
+\paragraph*{Palatini formulation and the ring/no-ring connection
+distinction}
+% TODO ~80 w. Metric and connection treated as independent
+% dynamical fields; equivalent to the vierbein + spin connection
+% formulation up to a tetrad postulate. The ring decoration
+% \mathring{\Gamma}^\sigma_{\mu\nu} for the Riemannian Levi--Civita
+% connection (vs the un-decorated Riemann--Cartan connection
+% \Gamma^\sigma_{\mu\nu} introduced by the Palatini variation) is
+% a Barker-lab convention~\cite{barker2024poincare} adopted here
+% for clarity. Cite hehl1976spin, hehlobukhov2007cartan,
+% barker2024poincare.
 
 \paragraph*{Irreducible torsion decomposition: full treatment}
-% TODO ~150 w + 1 equation block. T = T^(1) + T^(2) + T^(3); the
-% explicit components q_{αβμ}, T_μ, S^μ; orthogonality (state, do not
-% prove); cite hehl1976spin, shapiro2002torsion.
+\label{IrreducibleTorsionFull}
+% TODO ~150 w + 1 equation block. Tensor part q_{\alpha\beta\mu},
+% trace vector T_\mu, axial pseudovector S^\mu; orthogonality
+% relations; explicit components; the invertible 3x3 transformation
+% between {q^2, T^2, S^2} and the direct basis {I_1, I_2, I_3}
+% used computationally. Cite hehl1976spin, shapiro2002torsion §2.3,
+% blagojevic2003lectures.
 \begin{align}
-  % TODO: T_{αβμ} = (1/3)(T_β g_{αμ} - T_μ g_{αβ})
-  %                - (1/6) ε_{αβμν} S^ν + q_{αβμ}
-  \label{IrreducibleTorsionFull}
+  % TODO: T_{\alpha\beta\mu} = (1/3)(T_\beta g_{\alpha\mu} - T_\mu g_{\alpha\beta})
+  %                          - (1/6) \varepsilon_{\alpha\beta\mu\nu} S^\nu
+  %                          + q_{\alpha\beta\mu}
+  \label{IrreducibleTorsionFullDecomp}
 \end{align}
 
-\paragraph*{Stability and ghost-restriction in the surveyed subspace}
-% TODO ~50 w. State (do not prove) the three irreducible-basis
-% stability conditions from pgt_stability_priors.tex; cite lin2019pgt
-% and blagojevic2018hamiltonian as the canonical references for the
-% ghost-restriction analysis.
-
-\paragraph*{Electromagnetic field decomposition in curved spacetime}
-% Moved from §2.3 (EM-conventions paragraph). The covariant
-% decomposition of F_{μν} via the normal-frame observer four-vector
-% U^a, with metric corrections that the naive flat-space identification
-% misses. Source: hwangnoh2023emdef + hwangnoh2023graviton.
-The covariant decomposition of the electromagnetic field strength
-$\FieldF{_{\mu\nu}}$ with respect to the normal-frame observer
-four-vector $U^a$ (with $U_a U^a = -1$)
-reads~\cite{hwangnoh2023emdef,hwangnoh2023graviton}
-\begin{equation}
-  \begin{gathered}
-    \FieldF{_{ab}} = U_a E_b - U_b E_a - \eta_{abcd}\,U^c B^d, \\
-    E_a = \FieldF{_{ab}}\,U^b,
-    \qquad
-    B_a = \tfrac{1}{2}\,\eta_{ab cd}\,\FieldF{^{cd}}\,U^b.
-    \label{EMDecomposition}
-  \end{gathered}
-\end{equation}
-In the normal frame the magnetic-field expression carries an explicit
-metric correction,
-\begin{align}
-  \widetilde{F}_{ij}
-    = \eta_{ijk}\bigl[(1 + \tfrac{1}{2}\,h^\ell{}_\ell)\,B^k
-                     - h^{k\ell}\,B_\ell\bigr],
-  \label{MagneticMetricCorrection}
-\end{align}
-the term $-h^{k\ell}\,B_\ell$ being the leading curved-spacetime
-correction to the naive flat-space identification
-$B^i = \tfrac{1}{2}\varepsilon^{ijk} F_{jk}$. The TIDAL pipeline
-operates at the Lagrangian level via $\sqrt{-g}$ expansion, so this
-correction enters automatically and does not require an explicit
-field-redefinition step in the symbolic-derivation pipeline.
+\paragraph*{Stability and ghost-restriction}
+\label{StabilityGhostFree}
+% TODO ~80 w. Conceptual treatment of the ghost-free / no-tachyon
+% classification: spin-parity sector requirement m_s^2 > 0 for
+% J^P \in {0^\pm, 1^\pm, 2^\pm}, after Lin--Hobson--Lasenby and
+% Blagojevi\'{c}--Cvetkovi\'{c}; the relation between published
+% classifications and our empirically-constructed survey priors
+% (5-point empirical scans + runtime tachyonic-eigenvalue rejection).
+% The sector-by-sector enumeration of invariants and explicit
+% stability boundaries are in \cref{PGTEnumeration} (App H).
+% Cite lin2019pgt, blagojevic2018hamiltonian, karananas2014parity,
+% sezgin1980ghostfree, aoki2020nonlinear.

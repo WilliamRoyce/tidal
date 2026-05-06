@@ -37,11 +37,9 @@ $\kappa$\footnote{%
     of~\cite{palessandro2023simple,palessandro2024gertsenshtein}
     propagates this ambiguity into a factor-of-$\sqrt{4\pi}$ error
     in the conversion-formula argument, while the convention
-    adopted in~\cite{lella2024constraining} agrees with ours. The
-    full disambiguation, including dimensional analysis and the
-    relation $\kappa = \sqrt{2}/\MPl$ (equivalently
-    $\kappa^2 = 2\kappa_\mathrm{E}$), is given in
-    \cref{sec:kappa-conventions}.
+    adopted in~\cite{lella2024constraining} agrees with ours.
+    The two normalisations are related by
+    $\kappa^2 = 2\kappa_\mathrm{E}$.
 } defined by $\kappa^2 = 16\pi G$; this is the linearised
 graviton--photon vertex coupling, and the action prefactor
 $\kappa^{-2}\,\MAGFt{}$ corresponds to a canonical graviton kinetic
@@ -85,9 +83,15 @@ translations and rotations respectively
 for textbook and lecture-note treatments,
 \cite{barker2024poincare,barker2024psalter,barker2023confinement}
 for recent applications, and~\cite{lin2019pgt,blagojevic2018hamiltonian}
-for the ghost-free and no-tachyon classification of the linearised
-propagator that underpins the stability analysis used when
-constructing our survey priors). The full field-variable formalism,
+for the ghost-free and no-tachyon classifications of the linearised
+propagator, against which our empirically-constructed survey
+priors can be cross-checked%
+% TODO: complete the verification of survey priors against the
+% Lin / Blagojevic ghost-free classifications before final
+% submission. Per docs/tex/pgt_stability_priors.tex, partial
+% verification has been done for the early-stage models; the
+% later-stage models are pending.
+). The full field-variable formalism,
 including the vierbein, the spin connection, and the irreducible
 torsion components used in the kinetic-matrix analysis below, is
 collected in \cref{PGTBackground}.
@@ -114,63 +118,70 @@ The most general PGT+EM action constructed from the gauge field
 strengths $\MAGFt{^\sigma_{\mu\nu\rho}}$, $\MAGT{^\sigma_{\mu\nu}}$,
 and $\FieldF{_{\mu\nu}}$ decomposes schematically into
 sector blocks~\cite{lin2019pgt,blagojevic2018hamiltonian,blagojevic2003lectures,barker2024poincare,sezgin1980ghostfree,aoki2020nonlinear,bahamonde2025cubic},
-\begin{align}
-  S = \int d^4x\,\sqrt{-g}\,\bigl[
+\begin{multline}
+  S = \int \diff^4 x\,\sqrt{-g}\,\Bigl[
         \mathcal{L}_\text{lin}
         + \mathcal{L}_{\tilde{R}^2}
         + \mathcal{L}_{\mathcal{T}^2}
         + \mathcal{L}_{F^2}
-        + \mathcal{L}_{\tilde{R}F}
+        + \mathcal{L}_{\tilde{R}F} \\[-0.5em]
         + \mathcal{L}_\text{odd}
         + \mathcal{L}_\partial
         + \mathcal{L}_\text{cubic}
         + \mathcal{L}_\text{CS}
-      \bigr],
+      \Bigr],
   \label{QuadraticAction}
-\end{align}
-where $\mathcal{L}_\text{lin}$ collects the three linear invariants
+\end{multline}
+where $\mathcal{L}_\text{lin}$ collects the linear invariants
 (Einstein--Hilbert, cosmological constant $\Lambda$, and the Holst
 term~\cite{holst1995barbero} with Barbero--Immirzi parameter
-$\gamma_\text{BI}$); $\mathcal{L}_{\tilde{R}^2}$ contains six
-independent parity-even curvature-squared invariants (three reduce
-in the torsion-free case via Bianchi and pair-exchange symmetry, all
-six independent with torsion); $\mathcal{L}_{\mathcal{T}^2}$ holds
-the three parity-even torsion-squared invariants; $\mathcal{L}_{F^2}$
-is the Maxwell term and $\mathcal{L}_{\tilde{R}F}$ the parity-even
-curvature--electromagnetic cross-term;
-$\mathcal{L}_\text{odd}$ adds twenty parity-odd quadratic invariants
-~\cite{karananas2014parity,blagojevic2018hamiltonian};
-$\mathcal{L}_\partial$ collects the ghost-free derivative-order
-extensions~\cite{aoki2020nonlinear};
-$\mathcal{L}_\text{cubic}$ contains cubic completions relevant for
-linearisation around magnetic backgrounds and for ghost
-elimination~\cite{bahamonde2025cubic}; and
-$\mathcal{L}_\text{CS}$ holds the Chern--Simons torsion--EM
-couplings involving the gauge potential. The explicit
-enumeration of all sectors --- 11 parity-even quadratic, 20
-parity-odd quadratic, 29~+~80 ghost-free derivative extensions, and
-$\sim$~65 safe cubic operators --- is collected in
-\cref{PGTBackground}; the §4 survey reports campaign results across
-these sectors as they become accessible.
+$\gamma_\text{BI}$); $\mathcal{L}_{\tilde{R}^2}$ contains the
+parity-even curvature-squared invariants\footnote{The
+Riemann--Cartan curvature lacks the pair-exchange symmetry
+$\tilde{R}_{\rho\sigma\mu\nu}=\tilde{R}_{\mu\nu\rho\sigma}$ of the
+torsion-free Riemann tensor, since the antisymmetric Ricci
+$\tilde{R}_{[\mu\nu]}$ does not vanish in
+general~\cite{shapiro2002torsion,hehl1995metric}; the parity-even
+curvature-squared sector therefore contains additional independent
+contractions beyond the torsion-free Riemann-square
+count~\cite{hehl1976spin,barker2024poincare}.};
+$\mathcal{L}_{\mathcal{T}^2}$ holds the parity-even torsion-squared
+invariants; $\mathcal{L}_{F^2}$ is the Maxwell term and
+$\mathcal{L}_{\tilde{R}F}$ the parity-even
+curvature--electromagnetic cross-term; $\mathcal{L}_\text{odd}$
+collects the parity-odd quadratic
+invariants~\cite{karananas2014parity,blagojevic2018hamiltonian};
+$\mathcal{L}_\partial$ the ghost-free derivative-order
+extensions~\cite{aoki2020nonlinear}; $\mathcal{L}_\text{cubic}$
+the cubic completions relevant for linearisation around magnetic
+backgrounds and for ghost elimination~\cite{bahamonde2025cubic};
+and $\mathcal{L}_\text{CS}$ collects the Chern--Simons torsion--EM
+couplings involving the gauge potential, motivated
+by~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion}
+and treated systematically
+in~\cite{obukhov2024electrodynamics}. The explicit sector-by-sector
+enumeration is collected in \cref{PGTEnumeration}, with
+\cref{SectorSurvey} reporting the campaign results across these
+sectors as they become accessible.
 
-For the parity-even quadratic plus $\tilde{R}F$-cross-term subset,
-which the campaigns reported below currently span, we adopt the
-explicit coupling-letter convention
+For the parity-even quadratic plus $\tilde{R}F$-cross-term sector
+we adopt the explicit coupling-letter convention
 \begin{align}
   \mathcal{L}_{\mathcal{T}^2} + \mathcal{L}_{\tilde{R}^2}
     + \mathcal{L}_{\tilde{R}F}
   = \sum_n \Alp{n}\,(\mathcal{T}^2)_n
     + \sum_n \Bet{n}\,(\mathcal{R}^2)_n
-    + \Gam{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}},
+    + \Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}},
   \label{QuadraticAlphaBetaGamma}
 \end{align}
 matching our symbolic-pipeline implementation and aligning
-with~\cite{barker2024poincare,blagojevic2003lectures}. Where alternative literature
-conventions reverse the $\Alp{n}\leftrightarrow\Bet{n}$ assignment
-(e.g.\ the irreducible-basis form used
-in~\cite{shapiro2002torsion} and the related labelling conventions
-of~\cite{sezgin1980ghostfree}), the explicit translation is collected
-in \cref{PGTBackground}.
+with~\cite{barker2024poincare,blagojevic2003lectures}. Where
+alternative literature conventions reverse the
+$\Alp{n}\leftrightarrow\Bet{n}$ assignment (e.g.\ the
+irreducible-basis form used in~\cite{shapiro2002torsion} and the
+related labelling conventions of~\cite{sezgin1980ghostfree}), the
+explicit translation is collected in
+\cref{DirectIrreducibleTranslation}.
 
 % Step (e): Irreducible torsion decomposition introduced AFTER the action.
 % This is also the cross-reference target for App E.
@@ -223,7 +234,7 @@ The metric and four-potential are decomposed as
   g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu},
   \quad
   A_\mu = \bar{A}_\mu + \delta A_\mu, \label{PerturbationAnsatz} \\
-  \bar{A}_\mu\,dx^\mu = -\Bzero\,z\,dy, \nonumber
+  \bar{A}_\mu\,\diff x^\mu = -\Bzero\,z\,\diff y, \nonumber
 \end{gather}
 with the connection treated as inherently perturbative,
 $\MAGA{^\sigma_\mu_\nu} = \delta\MAGA{^\sigma_\mu_\nu}$. The metric
@@ -231,10 +242,8 @@ perturbation $h_{\mu\nu}$ enters without a $\kappa$ prefactor; this
 choice is equivalent under field redefinition to the
 canonically-normalised convention
 $g_{\mu\nu} = \eta_{\mu\nu} + \kappa\,\tilde{h}_{\mu\nu}$ used
-in~\cite{lella2024constraining}, with the relation between the two
-forms set out in \cref{sec:kappa-conventions}. A self-consistency
-bound on the campaign parameter choices is in
-\cref{PerturbativeRegime}.
+in~\cite{lella2024constraining}. A self-consistency bound on the
+campaign parameter choices is in \cref{PerturbativeRegime}.
 
 \paragraph*{Order-counting rule}
 We work to linear order in $h_{\mu\nu}$, $\delta A_\mu$, and the
@@ -242,30 +251,23 @@ torsion fluctuation $\delta\MAGA{^\sigma_\mu_\nu}$, and to first order
 in $\Bzero$.
 
 % Kinetic-matrix sub-movement (third move per §(f)). Equation label is the
-% cross-reference target for §4 and App E.
+% cross-reference target for §4.
 \paragraph*{Linearised kinetic matrix}
 After expanding $\sqrt{-g}\,\lag$ to quadratic order in the
 perturbation fields and reducing to plane-wave dependence
 $\partial_x = \partial_y = 0$ along the propagation direction
-$\hat{z}$, the quadratic Lagrangian assembles into a block-structured
-kinetic system,
+$\hat{z}$, with the metric perturbation in transverse-traceless
+gauge and the photon perturbation in Lorenz gauge, the surviving
+degrees of freedom assemble into a quadratic kinetic system
 \begin{align}
   \lag^{(2)} = \tfrac{1}{2}\,\xi^\mathsf{T}\,
     \mathcal{K}(\partial_t,\partial_z)\,\xi,
-  \qquad
-  \mathcal{K}
-    = \begin{pmatrix} \mathcal{K}_\times & 0 \\ 0 & \mathcal{K}_\text{trace} \end{pmatrix},
   \label{KineticMatrix}
 \end{align}
-where $\xi$ groups the surviving gauge-fixed degrees of freedom
-into the cross-polarisation channel
-$(h_\times,\,a_\parallel)^\mathsf{T}$ and the trace sector
-containing $(h_+, h_4, h_9, a_\perp)^\mathsf{T}$ together with the
-axial torsion mode when present. The upper $2\times 2$ block governs
-the standard $h_\times$--photon Gertsenshtein channel; the lower
-block carries the trace-sector fields, into which torsion
-couplings --- where they appear --- enter through off-diagonal
-entries.
+for a vector $\xi$ of gauge-fixed metric, photon, and (where
+propagating) torsion fluctuations. The detailed structure of
+$\mathcal{K}$ depends on the Lagrangian chosen, and is reported
+per surveyed theory class in \cref{ChannelStructure}.
 
 \subsection{Gertsenshtein conversion kernel and channel structure}%
 \label{Gertsenshtein}
@@ -294,9 +296,7 @@ by~\cite{hwangnoh2023emdef,hwangnoh2023graviton} via a covariant
 normal-frame decomposition --- and the linearised graviton mass
 coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ that emerges from our
 pipeline agrees with the potential-formulation result
-of~\cite{hwangnoh2023graviton}. The explicit normal-frame
-decomposition is collected in \cref{PGTBackground} for readers
-comparing with the H-N treatment.
+of~\cite{hwangnoh2023graviton}.
 
 \paragraph*{Conversion probability}
 % TODO: display the formula; one prose sentence on $\Bzero$-scaling; cite
