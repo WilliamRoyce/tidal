@@ -15,11 +15,10 @@ as Yang--Mills theories of internal symmetries: a global symmetry
 of the matter sector is promoted to a local one, the resulting
 non-invariance is restored by introducing compensating connection
 fields, and the geometric interpretation of those fields fixes the
-kinematic arena. We work through the construction in the order one
-would present it pedagogically: gauging the Poincar\'{e} group to
-identify the field content, and building Lorentz-scalar invariants
-from the resulting field strengths to motivate the form of the
-general Lagrangian appearing in \cref{QuadraticAction}.
+kinematic arena. The construction proceeds in two steps: gauging
+the Poincar\'{e} group to identify the field content, and building
+Lorentz-scalar invariants from the resulting field strengths to
+motivate the general Lagrangian of \cref{QuadraticAction}.
 
 \paragraph*{Gauging the Poincar\'{e} group}
 \label{FieldContent}
@@ -97,9 +96,8 @@ $\MAGA{^\sigma_\mu_\nu}$ (the independent Riemann--Cartan
 connection of the Palatini formulation, introduced in
 \cref{PGTframework}) on each Greek index, with the $\pm$ sign
 convention determined by whether each index is upper or lower.
-For a tensor $\Phi^{i\,\mu}{}_{j\,\nu}$ carrying one Latin
-upper, one Latin lower, one Greek upper, and one Greek lower
-index,
+For a tensor $\Phi^{i\,\mu}{}_{j\,\nu}$ with mixed Latin and
+Greek indices,
 \begin{align}
   \nabla_\rho \Phi^{i\,\mu}{}_{j\,\nu}
     &= \partial_\rho \Phi^{i\,\mu}{}_{j\,\nu}
@@ -114,11 +112,11 @@ The matter-field rule \cref{LorentzCovariantDeriv} is the same
 construction evaluated on the spinor representation of the
 Lorentz group: the spin matrix $\Sigma_{ij}$ in
 \cref{LorentzCovariantDeriv} is replaced here by the explicit
-index-action $A^i{}_{k\rho}\delta^j_l - A^k{}_{j\rho}\delta^i_l
-- \cdots$ that projects onto Lorentz-tensor indices.
-\Cref{MixedCovariantDerivative} is the standard form on which the
-symbolic decomposition of covariant derivatives in the presence
-of torsion rests, as discussed in \cref{SymbolicComputation}.
+index-action of the spin connection on each Lorentz-tensor
+index~\cite[eq.~(1.7a)]{blagojevic2003lectures}.
+\Cref{MixedCovariantDerivative} underlies the symbolic
+decomposition of covariant derivatives implemented in
+\cref{SymbolicComputation}.
 
 In any gauge theory the field strength can be read off the
 commutator of two covariant derivatives acting on a matter field:
@@ -194,7 +192,7 @@ independent, so the covariant derivative of the metric does not
 vanish. The resulting tensor is the \emph{non-metricity}
 $\mathcal{Q}_{\lambda\mu\nu} \equiv -\rcD{_\lambda}\g{_{\mu\nu}}$~\cite[\eg eq.~(2.5)]{blagojevic2003lectures,hehl1995metric},
 the third independent geometric obstruction associated with a
-linear connection, completing the trio shown in
+linear connection, shown alongside curvature and torsion in
 \cref{DiffGeometryObstructions}: $\mathcal{Q}$ measures the
 evolution of a vector's length under parallel transport. The
 most general space carrying all three obstructions is the
@@ -223,11 +221,10 @@ curvature and torsion remain as independent field strengths.
 \end{figure}
 
 \paragraph*{From field strengths to a gauge-invariant action}
-With the field strengths $\MAGFt{}$ and $\MAGT{}$ identified as
-the dynamical degrees of freedom of the gauge fields, the
-gravitational action follows from the same construction principle
-that determines the action of any gauge theory: the free
-Lagrangian must be a scalar under both local Lorentz
+With $\MAGFt{}$ and $\MAGT{}$ as the dynamical gauge fields, the
+gravitational action is built from them by the same principle as
+any other gauge theory: the free Lagrangian must be a scalar
+under both local Lorentz
 transformations (acting on the Latin indices) and general
 coordinate transformations (acting on the Greek indices), built
 from the field strengths and their covariant derivatives, and
@@ -342,9 +339,9 @@ the Lorentz frame or in the coordinate basis: the spin connection
 $A^{ij}{}_\mu$ acting on the Lorentz-frame components $u^i$ and
 the affine connection $\MAGA{^\sigma_\mu_\nu}$ acting on the
 coordinate-basis components $u^\mu$ must produce the same
-parallel-transported vector when applied to any $u$. Imposing
-this consistency is equivalent to demanding that the full
-covariant derivative of the tetrad vanish,
+parallel-transported vector when applied to any $u$.
+Equivalently, the full covariant derivative of the tetrad
+vanishes,
 \begin{align}
   \partial_\mu b^i{}_\nu
     + A^i{}_{j\mu}\,b^j{}_\nu
@@ -372,16 +369,12 @@ terms of the tetrad by
 \begin{align}
   \Delta_{ij\mu}(b)
     &= \tfrac{1}{2}\bigl(c_{ijm} - c_{mij} + c_{jmi}\bigr)\,e^m{}_\mu,
-  \qquad
-  c^i{}_{\mu\nu} \equiv \partial_\mu e^i{}_\nu - \partial_\nu e^i{}_\mu,
   \label{RiemannianSpinConnection}
 \end{align}
-where $c^i{}_{\mu\nu}$ is the object of anholonomity, and is the
+where $c^i{}_{\mu\nu} \equiv \partial_\mu e^i{}_\nu
+- \partial_\nu e^i{}_\mu$ is the object of anholonomity --- the
 spin-connection counterpart of the Christoffel symbols
-$\rCon{^\sigma_\mu_\nu}$. The contortion $K^{ij}{}_\mu$ is its
-torsion-driven correction, related to the coordinate-form
-contortion $K^\sigma{}_{\mu\nu}$ by index conversion through the
-tetrad pair (\cref{TetradIndexConversion}).
+$\rCon{^\sigma_\mu_\nu}$.
 
 \paragraph*{Irreducible torsion decomposition}
 \label{IrreducibleTorsionFull}
@@ -406,12 +399,11 @@ representation of the Lorentz group~\cite{hehl1976spin}, and
 satisfying the orthogonality conditions
 $\T[1]{^\lambda_\lambda_\mu} = 0$ and
 $\varepsilon^{\alpha\beta\gamma\delta}\T[1]{_{\alpha\beta\gamma}} = 0$.
-In Shapiro's notation~\cite{shapiro2002torsion} these three
-components are written as $T_\mu, S^\mu, q_{\alpha\beta\mu}$
-respectively; we adopt the overset $\overset{(n)}{T}$ notation
-throughout, following the foundational metric-affine and
-Poincar\'{e}-gauge-theory
-conventions~\cite{hehl1976spin,hehl1995metric,obukhov2024electrodynamics}.
+Shapiro's letter labels $T_\mu, S^\mu, q_{\alpha\beta\mu}$ for the
+same three components~\cite{shapiro2002torsion} appear in the
+older literature; we use the overset $\overset{(n)}{T}$ notation,
+which is the foundational metric-affine and PGT
+convention~\cite{hehl1976spin,hehl1995metric,obukhov2024electrodynamics}.
 The reconstruction formula
 \begin{align}
   \MAGT{_{\alpha\beta\mu}}
@@ -421,9 +413,8 @@ The reconstruction formula
      + \T[1]{_{\alpha\beta\mu}}
   \label{IrreducibleTorsionFullDecomp}
 \end{align}
-expresses the torsion in terms of its irreducible parts; this
-restates \cref{IrreducibleTorsion} for self-containment of the
-appendix and to anchor the basis-transformation that follows.
+expresses the torsion in terms of its irreducible parts,
+restating \cref{IrreducibleTorsion}.
 
 The torsion-squared sector of the action admits two equivalent
 parameterisations. In the irreducible basis it reads $a\,(\T[1]{})^2 +
@@ -448,8 +439,9 @@ map~\cite{sezgin1980ghostfree,hehl1995metric,lin2019pgt}
 \end{align}
 which is invertible.
 
-The matrix structure has a transparent reading. The third direct
-contraction $I_3 = \T[2]{_\mu}\T[2]{^\mu}$ involves only the
+The matrix entries follow directly from substituting
+\cref{IrreducibleTorsionFullDecomp} into the direct basis. The
+third contraction $I_3 = \T[2]{_\mu}\T[2]{^\mu}$ involves only the
 trace vector, so $\beta_3$ contributes to $c$ alone: this is the
 isolated unit entry in the bottom-right of the matrix, and the
 zeros immediately above it leave $\beta_3$ out of $a$ and $b$.
