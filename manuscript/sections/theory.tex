@@ -59,11 +59,14 @@ torsion pseudovector below.
 \paragraph*{Riemannian baseline notation}
 We follow~\cite{barker2024poincare} in distinguishing the Riemannian
 Levi--Civita connection
-$\rCon{^\sigma_{\mu\nu}}
-  = \tfrac{1}{2}\g{^{\sigma\rho}}\bigl(
-      \PD{_\mu}\g{_{\nu\rho}} + \PD{_\nu}\g{_{\mu\rho}}
-      - \PD{_\rho}\g{_{\mu\nu}}\bigr)$
-(decorated with a ring) from the independent Riemann--Cartan
+\begin{align}
+  \rCon{^\sigma_{\mu\nu}}
+    = \tfrac{1}{2}\g{^{\sigma\rho}}\bigl(
+        \PD{_\mu}\g{_{\nu\rho}} + \PD{_\nu}\g{_{\mu\rho}}
+        - \PD{_\rho}\g{_{\mu\nu}}\bigr),
+  \label{LeviCivita}
+\end{align}
+decorated with a ring, from the independent Riemann--Cartan
 connection $\MAGA{^\sigma_\mu_\nu}$ introduced below; the
 corresponding covariant derivatives are denoted $\rD{_\mu}$ and
 $\rcD{_\mu}$.
@@ -226,19 +229,29 @@ The metric and four-potential are decomposed as
   \label{PerturbationAnsatz} \\
   \bar{A}_\mu\,\diff x^\mu = -\Bzero\,z\,\diff y, \nonumber
 \end{gather}
-with the torsion tensor $\MAGT{^\sigma_\mu_\nu}$ perturbed
-directly via xPert's \texttt{DefTensorPerturbation}. The Palatini
-connection decomposes as
-$\MAGA{^\sigma_\mu_\nu} = \rCon{^\sigma_\mu_\nu} + K^\sigma{}_{\mu\nu}$,
-where $\rCon{^\sigma_\mu_\nu}$ is the ring-decorated Riemannian
-Levi--Civita connection (function of $g$, defined in §2.1) and
-$K^\sigma{}_{\mu\nu}$ is the contortion (function of
-$\MAGT{^\alpha_\beta_\gamma}$); the linearised connection
+with the torsion tensor $\MAGT{^\sigma_\mu_\nu}$ treated as
+an inherently perturbative field. The Palatini connection
+decomposes
+as~\cite{hehl1976spin,shapiro2002torsion,hehlobukhov2007cartan,blagojevic2003lectures}
+\begin{align}
+  \MAGA{^\sigma_\mu_\nu}
+    = \rCon{^\sigma_\mu_\nu} + K^\sigma{}_{\mu\nu},
+  \qquad
+  K^\sigma{}_{\mu\nu}
+    = \tfrac{1}{2}\bigl(
+        \MAGT{^\sigma_\mu_\nu}
+        + \MAGT{_\mu^\sigma_\nu}
+        + \MAGT{_\nu^\sigma_\mu}
+      \bigr),
+  \label{PalatiniDecomposition}
+\end{align}
+the second term being the contortion tensor that encodes the
+torsion contribution to the connection. The linearised connection
 perturbation $\delta\MAGA{^\sigma_\mu_\nu}$ therefore inherits
-contributions from both the metric perturbation $h_{\mu\nu}$
-(through $\delta\rCon{^\sigma_\mu_\nu}$) and the torsion
-perturbation $\delta\MAGT{^\sigma_\mu_\nu}$ (through
-$\delta K^\sigma{}_{\mu\nu}$). The metric
+contributions from both the metric perturbation $h_{\mu\nu}$,
+through the linearised Levi--Civita variation of \cref{LeviCivita},
+and the torsion perturbation $\delta\MAGT{^\sigma_\mu_\nu}$,
+through the contortion $\delta K^\sigma{}_{\mu\nu}$. The metric
 perturbation $h_{\mu\nu}$ enters without a $\kappa$ prefactor;
 this choice is equivalent under field redefinition to the
 canonically-normalised convention
@@ -316,8 +329,8 @@ coefficient $-\tfrac{1}{2}\kappa^2\Bzero^2$ that emerges from our
 pipeline reproduces the explicit potential-formulation result
 of~\cite{hwangnoh2023graviton} as a scalar cross-check; the
 equation-of-motion structure on which our $\Bzero \to 0$
-survey-coefficient analysis depends agrees with their derivation
-in the same gauge.
+survey-coefficient analysis (\cref{SurveyCoefficient}) depends
+agrees with their derivation in the same gauge.
 
 \paragraph*{Conversion probability}
 % TODO: display the formula; one prose sentence on $\Bzero$-scaling; cite
@@ -368,7 +381,7 @@ $\{h_+, h_4, h_9, a_\perp\}$, and the irreducible torsion modes ---
 trace vector $\T[2]{_\mu}$ and axial pseudovector $\T[3]{^\mu}$
 where present. These are the kinematic sectors in which the
 conversion question is posed; the standard Gertsenshtein channel
-$h_\times \leftrightarrow a_\parallel$ is the canonical example.
+$h_\times \leftrightarrow a_\parallel$ is the canonical example~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,lella2024constraining,domcke2025scattering}.
 The empirical inter-channel structure observed across the surveyed
 theory classes is reported in \cref{ChannelStructure}, with the
 symbolic-pipeline outputs that motivate it archived in
