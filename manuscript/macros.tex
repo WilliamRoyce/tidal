@@ -1,5 +1,9 @@
 % === Packages ===
 
+% xcolor option must be passed before any package transitively loads xcolor
+% (tikz, standalone, etc.). svgnames is needed by the figures in figures/.
+\PassOptionsToPackage{svgnames}{xcolor}
+
 % Input & encoding
 \usepackage[utf8]{inputenc}
 \usepackage{parskip}
@@ -60,6 +64,7 @@
 
 \newrobustcmd{\TIDAL}{\textit{TIDAL}\xspace}
 \newrobustcmd{\PSALTer}{\textit{PSALTer}\xspace}
+\newrobustcmd{\etal}{\textit{et al.}\xspace}
 \newrobustcmd{\Hamilcar}{\textit{Hamilcar}\xspace}
 \newrobustcmd{\xAct}{\textit{xAct}\xspace}
 \newrobustcmd{\xPert}{\textit{xPert}\xspace}
