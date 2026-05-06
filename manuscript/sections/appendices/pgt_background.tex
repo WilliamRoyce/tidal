@@ -33,7 +33,7 @@ compensating connection per generator type, exactly as in
 internal-symmetry gauge theories. The Lorentz-rotation generators
 are compensated by a \emph{spin connection} $A^{ij}{}_\mu$ that
 enters the covariant
-derivative~\cite[Eq.~(1.7)]{blagojevic2003lectures}
+derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
 \begin{align}
   \nabla_\mu\phi &= \bigl(\partial_\mu
     + \tfrac{1}{2}A^{ij}{}_\mu\,\Sigma_{ij}\bigr)\phi
@@ -44,7 +44,7 @@ matrix $\Sigma_{ij}$. The translation generators are compensated
 by a \emph{tetrad} $b^i{}_\mu$ together with its inverse
 $h_i{}^\mu$, which together provide the explicit basis-conversion
 rule between Lorentz-frame and coordinate
-indices~\cite{blagojevic2003lectures,barker2024poincare},
+indices~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehlobukhov2007cartan,blagojevicHehl2013,hehl1995metric,barker2024poincare},
 \begin{align}
   V^\mu = h_i{}^\mu\,V^i,
   \qquad
@@ -69,7 +69,7 @@ For the familiar internal-symmetry case of electrodynamics one
 has $[\nabla_\mu,\nabla_\nu]\phi = i e\,F_{\mu\nu}\phi$ on a
 charged matter field $\phi$. In Poincar\'{e} gauge theory the
 analogous calculation produces two terms, one for each
-generator type~\cite[Eq.~(1.11)]{blagojevic2003lectures},
+generator type~\cite[eq.~(1.11)]{blagojevic2003lectures},
 \begin{align}
   [\nabla_\mu,\nabla_\nu]\phi
     &= \tfrac{1}{2}\,\MAGFt{^{ij}_{\mu\nu}}\,\Sigma_{ij}\phi
@@ -81,7 +81,7 @@ $\MAGFt{^{ij}_{\mu\nu}}$ as the Lorentz-rotation field strength;
 the second term acts on the Lorentz-frame derivative of $\phi$
 and identifies $\MAGT{^i_{\mu\nu}}$ as the translation field
 strength. Their explicit
-forms~\cite[Eq.~(1.11)]{blagojevic2003lectures} are
+forms~\cite[eq.~(1.11)]{blagojevic2003lectures} are
 \begin{subequations}
 \begin{align}
   \MAGFt{^{ij}_{\mu\nu}}
@@ -93,6 +93,17 @@ forms~\cite[Eq.~(1.11)]{blagojevic2003lectures} are
   \label{TorsionDef}
 \end{align}
 \end{subequations}
+The first measures the rotation of a vector parallel-transported
+around an infinitesimal closed loop; the second measures the
+non-closure of infinitesimal parallelograms formed from
+parallel-transported vectors. Both interpretations are illustrated
+in
+\cref{DiffGeometryObstructions}.\footnote{We adopt this geometric
+framing as a pedagogical aid only. The physical content of
+metric-affine theories is insensitive to the geometric
+interpretation of the fields, and in contrast to the analogous
+interpretation of general relativity it is of limited
+constructive use~\cite{barker2025metricaffine}.}
 On a generic linear connection the metric and the affine connection
 are independent, so the covariant derivative of the metric does not
 vanish. The resulting tensor is the
@@ -104,26 +115,19 @@ vanish. The resulting tensor is the
   \label{NonMetricityDef}
 \end{align}
 the third independent geometric obstruction associated with a
-linear connection alongside curvature and torsion. The most
-general space carrying all three is the metric-affine space
-$L_4$~\cite{hehl1995metric}; demanding that the connection
-preserves the metric under parallel transport, equivalently that
-$\rcD{_\mu}\g{_{\nu\lambda}} = 0$, is the
+linear connection, completing the trio shown in
+\cref{DiffGeometryObstructions}: $\mathcal{Q}$ measures the
+evolution of a vector's length under parallel transport. The
+most general space carrying all three obstructions is the
+metric-affine space $L_4$~\cite{hehl1995metric}; demanding that
+the connection preserves the metric under parallel transport,
+equivalently that $\rcD{_\mu}\g{_{\nu\lambda}} = 0$, is the
 \emph{metric-compatibility}
-condition~\cite[Eq.~(2.5)]{blagojevic2003lectures}, and it sets
+condition~\cite[eq.~(2.5)]{blagojevic2003lectures}, and it sets
 $\mathcal{Q}_{\lambda\mu\nu} = 0$ identically. Poincar\'{e} gauge
 theory adopts metric compatibility as a defining
 requirement~\cite{hehl1976spin,blagojevic2003lectures}, so only
 curvature and torsion remain as independent field strengths.
-
-\Cref{CurvatureDef,TorsionDef,NonMetricityDef} have a popular
-geometric interpretation, illustrated in
-\cref{DiffGeometryObstructions}.\footnote{This geometric framing
-is heuristic: the physical content of metric-affine theories is
-insensitive to the geometric interpretation of the fields, and
-in contrast to the analogous interpretation of general
-relativity it is of limited constructive
-use~\cite{barker2025metricaffine}.}
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.95\linewidth]{figures/diff_geometry.pdf}
@@ -138,6 +142,32 @@ use~\cite{barker2025metricaffine}.}
     the two field strengths of Poincar\'{e} gauge theory.}
   \label{DiffGeometryObstructions}
 \end{figure}
+
+\paragraph*{From field strengths to a gauge-invariant action}
+With the field strengths $\MAGFt{}$ and $\MAGT{}$ identified as
+the dynamical degrees of freedom of the gauge fields, the
+gravitational action follows from the same construction principle
+that determines the action of any gauge theory: the free
+Lagrangian must be a Lorentz scalar built from the field
+strengths and their covariant derivatives, integrated against an
+invariant volume element on
+spacetime~\cite[eq.~(1.13)]{blagojevic2003lectures,lin2019pgt}.
+Lorentz scalars are formed by full index contractions with the
+metric $\g{_{\mu\nu}}$ and the totally antisymmetric tensor
+$\varepsilon^{\mu\nu\rho\sigma}$, exactly as in Yang--Mills
+theories of internal symmetries: the QED kinetic action
+$-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$ is the unique
+Lorentz scalar quadratic in the field strength, and the PGT
+analogue is the set of all independent quadratic contractions of
+$\MAGFt{}$ and $\MAGT{}$ with one
+another~\cite{barker2024poincare,sezgin1980ghostfree,hehl1995metric}.
+This procedure produces a finite list of independent invariants
+per sector --- six parity-even quadratic curvature invariants,
+three parity-even torsion invariants, parity-odd extensions, and
+the parity-even cross-coupling --- which assemble into the
+sector-block decomposition of \cref{QuadraticAction} catalogued
+explicitly in
+\cref{PGTEnumeration}~\cite{karananas2014parity,lin2019pgt,blagojevic2018hamiltonian}.
 
 The two parameterisations of the same geometric data --- the
 gauge-theoretic $(b^i{}_\mu, A^{ij}{}_\mu)$ pair and the
@@ -170,11 +200,16 @@ table 1~\cite[Table~1]{blagojevic2003lectures}.
     \bottomrule
   \end{tabular}
   \caption{Translation between the gauge-theoretic and
-    Riemann--Cartan geometric pictures of Poincar\'{e} gauge theory,
-    after Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
-    The right column is the language used throughout
-    \cref{Theory}; the left column is the gauge-theoretic origin
-    walked through above.}
+    Riemann--Cartan geometric pictures of Poincar\'{e} gauge
+    theory, after Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
+    The left column lists each gauge-theoretic object generated
+    by gauging the corresponding Poincar\'{e} generator; the right
+    column gives its Riemann--Cartan geometric counterpart, with
+    the central row showing how the affine connection
+    $\MAGA{^\rho_\mu_\nu}$ is fixed in terms of the spin
+    connection by the tetrad postulate, and the metricity row
+    showing how the spin- and affine-connection covariant
+    derivatives of the metric coincide.}
   \label{PGTRiemannCartanTranslation}
 \end{table}
 
@@ -213,7 +248,7 @@ equivalent to the Palatini-style formulation adopted in
 in which the metric $\g{_{\mu\nu}}$ and the affine connection
 $\MAGA{^\sigma_\mu_\nu}$ are the independent variational fields.
 The bridge between the two formulations is the \emph{tetrad
-postulate}~\cite[Eq.~(2.9)]{blagojevic2003lectures},
+postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures},
 \begin{align}
   \nabla_\mu^{(\omega + \Gamma)} b^i{}_\nu
     &\equiv \nabla_\mu^{(\omega)} b^i{}_\nu
@@ -228,7 +263,7 @@ formulations describe the same geometric data --- this is the
 content of the central two rows of
 \cref{PGTRiemannCartanTranslation}. Imposing metricity
 ($\mathcal{Q} = 0$) then forces the
-decomposition~\cite[Eq.~(2.6)]{blagojevic2003lectures}
+decomposition~\cite[eq.~(2.6)]{blagojevic2003lectures}
 \begin{align}
   \MAGA{^\sigma_\mu_\nu} &= \rCon{^\sigma_\mu_\nu}
     + K^\sigma{}_{\mu\nu},
@@ -236,7 +271,7 @@ decomposition~\cite[Eq.~(2.6)]{blagojevic2003lectures}
 \end{align}
 which is the same content as \cref{PalatiniDecomposition} written
 in spin-connection language $A^{ij}{}_\mu = \Delta^{ij}{}_\mu(b)
-+ K^{ij}{}_\mu$~\cite[Eq.~(2.12)]{blagojevic2003lectures}, with
++ K^{ij}{}_\mu$~\cite[eq.~(2.12)]{blagojevic2003lectures}, with
 $\rCon{^\sigma_\mu_\nu}$ the Levi--Civita connection and
 $K^\sigma{}_{\mu\nu}$ the contortion.
 
