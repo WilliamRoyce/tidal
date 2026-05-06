@@ -161,7 +161,7 @@ parameter space into a likelihood for nested sampling. This gives us two key
 summary numbers: log Z, which tells us the expected amplification for the
 theory, and the KL divergence, which tells us whether any enhancement is broadly distributed or concentrated within the parameter space.
 
-We must keep to the linearised regime, taking the limit of vanishingly small magnetic fields at which the amplification becomes independent of the experimental setup and is purely a characteristic property of the theory we wish to measure. In precisely this regime we can also thankfully neglect any backreaction on the geometry, and the formal infinity that comes with treating a uniform magnetic field as filling all of spacetime.
+We must keep to the linearised regime, taking the limit of vanishingly small magnetic fields at which the amplification becomes independent of the experimental setup and is purely a characteristic property of the theory we wish to measure. In precisely this regime we can also thankfully neglect any backreaction on the geometry, and the problems that comes with a uniform magnetic field filling all of spacetime.
 
 ▶ NEXT — slide 10: pre-campaign results
 
@@ -174,12 +174,12 @@ campaign with the most general theory, but to also investigate the structure of 
 
 The first key model is the minimal PGT extension, which includes the three
 torsion-mass invariants and a higher order R-squared term. The Ricci-Cartan
-tensor promotes some torsion components from constraints into propagating fields, but the equations of motion show a complete structural decoupling between the new sectors and the Gertsenshtein channel — the new torsion dynamics simply don't enter the channel that an incoming graviton can excite.
-From this it was clear that any amplification must come from non-minimal sectors — meaning couplings that connect the fields is new ways.
+tensor promotes some torsion components into propagating fields, but the equations of motion show a complete structural decoupling between the new sectors and the Gertsenshtein channel — the new torsion dynamics simply don't enter the channel that an incoming graviton can excite.
+It was clear that any amplification must come from non-minimal sectors — meaning couplings that connect the fields in new ways.
 
 Second was a more phenomenologically motivated theory, that of pure Einstein–Maxwell plus an effective photon mass. The photon mass detunes the graviton-photon resonance and suppresses the conversion.
 
-Another key area of interest in BSM phenomenology is the dark-photon model, which is a hidden U(1) Proca vector kinetically mixed with electromagnetism, and is a popular candidate for dark matter. Here, I identify torsion's trace vector as this hidden field. In vacuum, the relevant photon and dark photon sectors are exact eigenmodes and no graviton-induced channel opens. I then added plasma to break the degeneracy, but found the dark photon itself had negligible effect on total conversion. Only the photon mass matters, and only as suppression.
+Another key area of interest in BSM phenomenology is the dark-photon model, which is a hidden U(1) Proca vector kinetically mixed with electromagnetism, and is a popular candidate for dark matter. Here, I identify torsion's trace vector as this hidden field. In vacuum, the relevant photon and dark photon sectors are exact eigenmodes and no graviton-induced channel opens. So I added plasma to break the degeneracy, but found the dark photon itself had negligible effect on total conversion. Only the photon mass matters, and as suppression.
 
 ▶ NEXT — slide 11: summary
 
