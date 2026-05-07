@@ -8,91 +8,70 @@
 
 \paragraph*{Background-perturbativity in Einstein--Maxwell}
 
-Following the standard Gertsenshtein
+The standard Gertsenshtein
 analysis~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing},
-the linearised calculation takes the magnetic field $\Bzero$ as
+takes the magnetic field $\Bzero$ as
 externally prescribed rather than self-consistently sourcing the
 background metric.
 Hwang \& Noh~\cite{hwangnoh2023graviton} examine the validity of
-this assumption: the EM stress-energy modifies the linearised
-graviton equation of motion through a tachyonic mass-like term
-$-(\kappa^2/2)\Bzero^2 h$ (which appears explicitly in the
+this assumption: the EM stress-energy modifies the
+graviton through a tachyonic mass-like term
+$-(\kappa^2/2)\Bzero^2$ (which appears explicitly in the
 kinetic matrix produced by the symbolic pipeline,
 \cref{ReferenceKineticOutput}, and is implicit in the closed-form
-Boccaletti reproduction of \cref{ValidationResult}),
-with critical scale $\lambda_B = 2\pi/k_B$ and
+Boccaletti reproduction of \cref{ValidationResult}).
+There is a critical scale $\lambda_B = 2\pi/k_B$, with
 $k_B = \sqrt{8\pi G}\,\Bzero/c^2$, above which the dimensionless
 backreaction parameter $D^2/\lambda_B^2$ ceases to be small ---
-signalling that the assumption that the magnetic field's own
+the assumption that the magnetic field's own
 gravitational field is negligible breaks down.
-They show that the backreaction parameter is proportional to
+They show that the backreaction parameter is proportional to~\cite{hwangnoh2023graviton}
 $\Pconv$:
 \begin{align}
   \frac{D^2}{\lambda_B^2}
-  \;\sim\; \frac{\Pconv}{\sin^2\!\theta} ,
+  \;\sim\; \Pconv,
   \label{HwangNohBound}
 \end{align}
-where $\theta$ is the angle between $\Bzero$ and the propagation
-direction (only the transverse component $\Bzero\sin\theta$
-couples)~\cite{hwangnoh2023graviton}.
-Since $\Pconv$ is itself $O(\Bzero^2)$ in the small-$\Bzero$ limit
-(\cref{GertsenshteinFormula}), the bound \cref{HwangNohBound} gives
-$D^2/\lambda_B^2 = O(\Bzero^2)$, vanishing alongside the conversion
-probability.
-
-Hwang \& Noh also obtain the peak-amplitude estimate
-$P\sim 8\pi^2\sin^2\!\theta\,(D/\lambda_B)^2$ from the coupled
-graviton--photon wave equations.
+Since $\Pconv$ is itself $\mathcal{O}(\Bzero^2)$ in the small-$\Bzero$ limit
+(\cref{GertsenshteinFormula}), the bound is vanishing alongside the conversion
+probability. Equivalently, $\kappa\Bzero D\ll 1$, i.e. $\Pconv\ll 1$.\footnote{The Hwang \& Noh peak-amplitude estimate
+is $P\sim 8\pi^2\,(D/\lambda_B)^2$.
 This differs by a factor of four from the small-angle expansion of
 \cref{GertsenshteinFormula},
-$\Pconv\approx\kappa^2\Bzero^2 D^2\sin^2\!\theta/4$:
-Hwang \& Noh estimate the energy ratio
-$P\equiv(c^2/16\pi G)|\dot{h}|^2/|b|^2$ by scaling the peak amplitude,
-while \cref{GertsenshteinFormula} gives the exact conversion
-probability~\cite{raffelt1988mixing}.
-Hwang \& Noh's estimate treats the gravitational-wave amplitude as
-building up linearly with propagation distance,
-$h\sim\kappa\Bzero D\sin\theta$, ignoring the back-coupling that
+$\Pconv\approx\kappa^2\Bzero^2 D^2/4$:
+Hwang \& Noh estimate the energy ratio by scaling the peak amplitude,
+treating the graviton as
+building linearly with propagation distance,
+$h\sim\kappa\Bzero D$, ignoring the back-coupling that
 returns energy to the photon channel.
-The exact two-mode mixing of \cref{GertsenshteinFormula} has
-$h\propto\sin(\kappa\Bzero D\sin\theta/2)$;
-in the small-$\kappa\Bzero D$ limit this is half the linear-build-up
-estimate, and squaring to get the probability gives the factor of
-four.
-\cref{GertsenshteinFormula} is the authoritative quantitative form;
-\cref{HwangNohBound} is used as a parametric bound only.
-Equivalently, $\kappa\Bzero D\ll 1$, i.e. $\Pconv\ll 1$.
+The exact conversion probability \cref{GertsenshteinFormula} has
+$h\propto\sin(\kappa\Bzero D/2)$;
+in the small-$\kappa\Bzero D$ limit this is half the
+estimate, and squaring gives the factor of
+four.}
+
 
 \paragraph*{Self-consistency at vanishing background field}
 
 PGT coupled to electromagnetism adds a torsion perturbation
 $\delta\MAGT{^\sigma_\mu_\nu}$ alongside the graviton $h_{\mu\nu}$
-and photon perturbation $\delta\FieldA{_\mu}$, and non-minimal
-couplings such as $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$
-introduce new mixing vertices.
+and photon perturbation $\delta\FieldA{_\mu}$ (\cref{Linearisation}).
 At $\Bzero=0$ the configuration $g_{\mu\nu}=\eta_{\mu\nu}$,
-$\bar{A}_\mu=0$, $\bar{\MAGT{}}=0$ ---
-the background of \cref{Linearisation} evaluated at $\Bzero=0$ ---
-satisfies the full nonlinear field equations of any ghost-safe
+$\bar{A}_\mu=0$, $\bar{\MAGT{}}=0$ satisfies the full nonlinear field equations of any ghost-safe
 polynomial PGT Lagrangian identically: every field-equation term
 is at least linear in the field strengths
 $\{\widetilde{\mathcal{R}},\MAGT{},\FieldF{},\rcD{}\MAGT{}\}$,
 all of which vanish on this background.
-Each such term therefore vanishes term-by-term, and their sum ---
-the field equation --- vanishes identically.
 The leading Taylor coefficient $c_2$ of the expansion
 \cref{TaylorPconv} is therefore evaluated free of the
 metric-backreaction shift discussed above.
 
 \paragraph*{Analytic dependence on the background field}
 
-The background field $\bar{\FieldF{}}_{zy}=-\Bzero$ enters the
-linearised equations of motion only through coupling vertices,
-so the kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix}
+The kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix}
 acquires an explicit $\Bzero$-dependence
 $\mathcal{K}(\partial_t,\partial_z;\Bzero)$ that is polynomial in
-$\Bzero$ (at most linear for a quadratic Lagrangian, at most
-quadratic if cubic terms are included).
+$\Bzero$.
 The conversion amplitude follows from $\mathcal{K}$ by standard
 mode decomposition, yielding a transition amplitude that is
 analytic in $\Bzero$ at $\Bzero=0$;
@@ -101,11 +80,10 @@ in a neighbourhood of zero.
 Each graviton--photon coupling vertex is linear in the background
 $\bar{\FieldF{}}\propto\Bzero$, so all such vertices vanish at
 $\Bzero=0$; the kinetic matrix becomes block-diagonal between the
-graviton and photon channels and $\Pconv(0)=0$.
+channels and $\Pconv(0)=0$.
 Since each vertex contributes one factor of $\Bzero$, the
 transition amplitude $\mathcal{M}(\Bzero)$ for graviton--photon
-conversion contains only odd powers of $\Bzero$ (an odd number of
-vertex insertions is needed to interconvert the two channels), and
+conversion contains only odd powers of $\Bzero$, and
 $\Pconv = |\mathcal{M}|^2$ contains only even powers:
 \begin{align}
   \Pconv \;=\; c_2\Bzero^2 + c_4\Bzero^4 + \cdots ,
@@ -189,11 +167,11 @@ reported in \cref{SectorSurvey}.
   \centering
   \caption{Linearisation conditions for the linearised Gertsenshtein
     calculation in the torsionful background and their dependence
-    on $\Bzero$.
+    on the background magnetic field $\Bzero$.
     The first and fourth conditions are set by the geometry and
     perturbation choices of \cref{Linearisation};
     the middle two are satisfied as $\Bzero\to 0$
-    at fixed graviton amplitude~$A$.}
+    at fixed graviton amplitude.}
   \label{PerturbativityHierarchy}
   \begin{tabular}{@{}lll@{}}
     \toprule
@@ -234,8 +212,8 @@ the leading Taylor coefficient of \cref{TaylorPconv}.
 All corrections to $C = \Pconv/\Bzero^2$ enter at $O(\Bzero^2)$,
 leaving $\Czero$ at $O(1)$.
 The Taylor remainder is $c_4\Bzero^2$ from \cref{TaylorPconv}.
-The metric backreaction enters via the tachyonic-mass term
-$-(\kappa^2/2)\Bzero^2 h$ of the Einstein--Maxwell paragraph above,
+The metric backreaction enters via the -mass term
+$-(\kappa^2/2)\Bzero^2 $,
 which detunes the graviton dispersion by $\Delta\propto\Bzero^2$.
 The mixing of two modes coupled at strength $g\propto\Bzero$ with
 detuning $\Delta\propto\Bzero^2$ yields the two-mode oscillation
