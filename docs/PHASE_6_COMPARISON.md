@@ -7,6 +7,33 @@ re-running them under the canonical D2.x probe + canonical numerical settings.
 
 ---
 
+## v2 settings (Phase 6.G follow-up — publication paired re-run)
+
+**v2 changes vs 28789437/28789439 baseline:**
+- (a) probe threshold 0.30 → 0.15 via HEAD commit `98c87d7`
+- (b) nlive 400 → 1200
+- (c) grid 256 → 512
+- (d) snapshots default(=21) → 2 (per user policy `feedback_snapshots_mandatory.md`)
+
+All other settings identical: priors α₁∈[−1,1], α₂∈[−2,2], α₃∈log[0.05,2], δ₁∈[−2,2];
+k_IC = 0.06283185307179587 (= 2π/100, fundamental mode of L=100 box); bounds = 0:100;
+t_end = 10; B0 = 0.01; kappa = 1.0; IC plane-wave on h_5, amplitude 1e-2;
+source = h_5, target = a_1; measure = conversion,peak_conversion;
+likelihood = `P_max:maximize` (amp) / `P_max:minimize` (sup) with baseline
+`sin(kappa*B0*t_end/2)**2`; sampler = polychord; precision-criterion = 0.01;
+template = `polychord_standard.sbatch` (icelake).
+
+**Submit drafts (paper-trail):** `scripts/hpc_submit_drafts/d1_amp_v2_submit.sh`,
+`scripts/hpc_submit_drafts/d1_sup_v2_submit.sh`.
+
+**Cost estimate vs 28789439 (2:32 wall):** snapshots 21→2 ≈ 10× faster per call;
+grid 256→512 ≈ 2× slower per call; nlive 400→1200 + cluster growth ≈ 3-4× more
+dead points; net ~1.5-2.5h sup wall (within 6h std budget). Amp single-cluster,
+~10-30 min wall. INTR reduced cross-checks at grid=256/nlive=600/snap=2 run in
+parallel for early signal.
+
+---
+
 ## Spec drift checks
 
 | Spec file | Last commit (any) | Mtime | Drift since original run? |

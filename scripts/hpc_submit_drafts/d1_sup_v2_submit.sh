@@ -20,7 +20,7 @@
 set -euo pipefail
 
 bash scripts/hpc_shuttle.sh submit \
-  --template scripts/hpc_templates/sapphire_cpu.sbatch \
+  --template scripts/hpc_templates/polychord_standard.sbatch \
   --name d1_sup_track2_hires_v2 --ntasks 76 --time 06:00:00 \
   --cmd 'tidal sample examples/data/torsion_gertsenshtein_nonminimal.json \
     --prior "alpha1=uniform:-1:1" --prior "alpha2=uniform:-2:2" \
