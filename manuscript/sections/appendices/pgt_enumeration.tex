@@ -1,10 +1,10 @@
-% App H: explicit sector-by-sector enumeration of the general PGT+EM
+% App H: independent-invariant catalogue of the general PGT+EM
 % Lagrangian, providing the symbol set carried by the campaign theories
 % of \cref{SectorSurvey}. Theory-background formalism (Palatini
 % formulation, full irreducible-decomposition machinery,
 % ghost-restriction concepts) lives in \cref{PGTBackground} (App F).
 
-\section{General quadratic PGT Lagrangian coupled to electromagnetism: sector-by-sector enumeration}
+\section{General quadratic PGT Lagrangian coupled to electromagnetism}
 \label{PGTEnumeration}
 
 We enumerate the independent invariants of the general PGT
@@ -21,34 +21,27 @@ by~\cite{karananas2014parity,blagojevic2018hamiltonian}.
 
 We adopt an arbitrary cutoff at cubic field-strength count, with
 operators carrying at most three factors drawn from
-$\{\mathcal{R}, \mathcal{T}, \mathcal{F}\}$. The standard PGT cutoff is quadratic in
+$\{\mathcal{R}, \mathcal{T}, \mathcal{F}\}$. The standard PGT is quadratic in
 field
 strengths~\cite{blagojevic2018hamiltonian,shapiro2002torsion},
-but cubic completions admitted below contribute at quadratic
-order in the perturbation through one or two
-background-field insertions, so they are retained alongside the
-quadratic terms. No physical principle fixes this cutoff: ghost-safety alone
+but the cubic completions contributing at quadratic
+order in the perturbation (through
+background-field insertions) are retained below. No physical principle fixes this cutoff: ghost-safety alone
 admits operators of arbitrarily high power in $\mathcal{T}$. An
 effective-field-theory (EFT) classification ordering operators by
-canonical mass dimension would remove this arbitrariness, but
+canonical mass dimension would resolve this arbitrariness, but
 the canonical dimensions depend on the propagating modes, which
 in turn depend on which kinetic terms are
 present~\cite{aoki2020nonlinear}; we therefore do not pursue an
 EFT ordering here.
 
-The Lagrangian is built from
-scalar contractions of
-$\{\MAGFt{^\sigma_{\mu\nu\rho}},\,\MAGT{^\sigma_{\mu\nu}},\,\FieldF{_{\mu\nu}},\,\rcD{_\mu},\,\varepsilon^{\mu\nu\rho\sigma}\}$,
+The Lagrangian is built from scalar contractions of
+$\{\MAGFt{^\sigma_{\mu\nu\rho}},\,\MAGT{^\sigma_{\mu\nu}}\!,\,\FieldF{_{\mu\nu}},\rcD{_\mu},\,\varepsilon^{\mu\nu\rho\sigma}\}$,
 arranged into the seven sector blocks of \cref{QuadraticAction}.
 We generate the basis of contractions at each operator class
 using the systematic-contraction enumeration
-of~\cite{nutma2014xtras}, applying the pair antisymmetries $\MAGFt{_{[\mu\nu]\rho\sigma}}$
-and $\MAGFt{_{\mu\nu[\rho\sigma]}}$ that survive in the
-Riemann--Cartan setting,
-the antisymmetries $\MAGT{^\sigma_{[\mu\nu]}}$ and
-$\FieldF{_{[\mu\nu]}}$, and the total antisymmetry of
-$\varepsilon^{\mu\nu\rho\sigma}$, together with integration by
-parts, to remove operators equivalent up to a covariant total divergence. We do not attempt the residual Bianchi-identity and
+of~\cite{nutma2014xtras}, applying the index (anti-)symmetries and integration by parts to remove operators
+equivalent up to a covariant total divergence. We do not attempt the residual Bianchi-identity and
 dimension-dependent-identity\footnote{Dimension-dependent
 identities~\cite{edgarhoglund2002ddi} are algebraic relations
 among tensors that hold only
@@ -101,8 +94,8 @@ The inventory is collected in \cref{MasterParameterCount}.
     $\mathcal{T}^2$                                         & $\Bet{1},\Bet{2},\Bet{3}$    & 3            & Barker \etal~\cite{barker2024poincare}; Shapiro~\cite{shapiro2002torsion} \\
     $\MAGFt{}\,\mathcal{F}$                                           & $\Del{1}$                    & 1            & Bahamonde \etal~\cite{bahamonde2025torsion} \\
     \midrule
-    $\varepsilon\!\cdot\!\MAGFt{}^2$                        & $d_1\dots d_{13}$            & 13           & Pontryagin-type~\cite{karananas2014parity} \\
-    $\varepsilon\!\cdot\!\mathcal{T}^2$                     & $d_{14}\dots d_{17}$         & 4            & Nieh--Yan-type~\cite{niehyan1982} \\
+    $\varepsilon\!\cdot\!\MAGFt{}^2$                        & $d_1\dots d_{13}$            & 13           & parity-odd $\varepsilon\!\cdot\!\tilde{\mathcal{R}}^2$~\cite{karananas2014parity,barker2025psalter2} \\
+    $\varepsilon\!\cdot\!\mathcal{T}^2$                     & $d_{14}\dots d_{17}$         & 4            & parity-odd $\varepsilon\!\cdot\!\mathcal{T}^2$; Nieh--Yan~\cite{niehyan1982} \\
     $\varepsilon\!\cdot\!\mathcal{F}^2$                               & $d_{18}$                     & $1^*$        & $\mathcal{F}\tilde{\mathcal{F}}$ (total derivative) \\
     $\varepsilon\!\cdot\!\MAGFt{}\,\mathcal{F}$                       & $d_{19},d_{20},d_{21}$       & 3            & --- \\
     \midrule
@@ -217,17 +210,13 @@ extraction remains for future work.
 \label{ParityOddQuadratic}
 The parity-odd quadratic sector adds twenty-one
 $\varepsilon$-weighted invariants, of which twenty are dynamical.
-Thirteen are parity-odd curvature-square contractions
-(Pontryagin-type~\cite{karananas2014parity,barker2025psalter2})
-of the form $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\MAGFt{}$,
-generalising the Pontryagin topological density of
-pseudo-Riemannian geometry to the torsionful setting (with
-parameters $d_1\dots d_{13}$ in \cref{MasterParameterCount});
-these collapse to a single topological density in the
-torsion-free limit~\cite{shapiro2002torsion,karananas2014parity}
-but generically propagate when torsion is present. Four are
-parity-odd torsion-square contractions
-(Nieh--Yan-type~\cite{niehyan1982}) of the form
+Thirteen are parity-odd curvature-square contractions of the
+form $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\MAGFt{}$
+($d_1\dots d_{13}$); these collapse to a single topological term
+in the torsion-free
+limit~\cite{shapiro2002torsion,karananas2014parity} but
+generically propagate when torsion is present. Four are
+parity-odd torsion-square contractions of the form
 $\varepsilon^{\mu\nu\rho\sigma}\MAGT{}\MAGT{}$
 ($d_{14}\dots d_{17}$); the family contains the Nieh--Yan form
 $\varepsilon^{\mu\nu\rho\sigma}T^a{}_{\mu\nu}T_{a\rho\sigma}$, a
