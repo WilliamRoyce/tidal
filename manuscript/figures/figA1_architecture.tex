@@ -1,0 +1,82 @@
+\documentclass[border=10pt]{standalone}
+\usepackage{tidal-tikz-styles}
+
+\begin{document}
+\begin{tikzpicture}[
+    node distance=0.4cm
+]
+
+% ===================================================================
+% ROW 1: Main pipeline stages (left to right)
+% ===================================================================
+
+% --- Input ---
+\node[data] (toml) {\texttt{theory.toml}};
+
+% --- Derive ---
+\node[stage=Pink, right=1.0cm of toml] (derive)
+    {Symbolic derivation\\[2pt]\scriptsize Wolfram/xAct};
+
+% --- JSON (narrow waist) ---
+\node[data, right=1.0cm of derive, minimum width=1.8cm,
+      draw=BlueLine, fill=BlueFill, fill opacity=0.35,
+      font=\footnotesize\bfseries] (json)
+    {\texttt{spec.json}};
+
+% --- Simulate ---
+\node[stage=Purple, right=1.0cm of json] (sim)
+    {Numerical integration\\[2pt]\scriptsize modal $\cdot$ IDA $\cdot$ CVODE $\cdot$ leapfrog $\cdot$ scipy};
+
+% --- Snapshots ---
+\node[data, right=1.0cm of sim] (snaps)
+    {Field\\[-1pt]\scriptsize snapshots};
+
+% --- Measure ---
+\node[stage=Green, right=1.0cm of snaps] (meas)
+    {Post-processing\\[2pt]\scriptsize 12 measurement types};
+
+% --- Results ---
+\node[data, right=1.0cm of meas] (results)
+    {Measurement\\[-1pt]\scriptsize results};
+
+% ===================================================================
+% ARROWS (main flow)
+% ===================================================================
+\draw[arr] (toml) -- (derive);
+\draw[arr] (derive) -- (json);
+\draw[arr] (json) -- (sim);
+\draw[arr] (sim) -- (snaps);
+\draw[arr] (snaps) -- (meas);
+\draw[arr] (meas) -- (results);
+
+% ===================================================================
+% ROW 2: External libraries (below stages)
+% ===================================================================
+\node[lib, below=0.15cm of derive] (lib1)
+    {xAct, xPert, xTras};
+\node[lib, below=0.15cm of sim] (lib2)
+    {SUNDIALS, NumPy\\SciPy};
+\node[lib, below=0.15cm of meas] (lib3)
+    {NumPy, SciPy\\FFT};
+
+% ===================================================================
+% BRACE: Symbolic vs Numerical separation at JSON
+% ===================================================================
+\draw[decorate, decoration={brace, amplitude=6pt, raise=2pt},
+      PinkLine, thick]
+    (toml.north west) -- (derive.north east)
+    node[midway, above=10pt, font=\scriptsize\bfseries, text=PinkLine]
+    {Symbolic (CAS)};
+
+\draw[decorate, decoration={brace, amplitude=6pt, raise=2pt},
+      PurpleLine, thick]
+    (sim.north west) -- (meas.north east)
+    node[midway, above=10pt, font=\scriptsize\bfseries, text=PurpleLine]
+    {Numerical (PDE)};
+
+% JSON label
+\node[above=0.25cm of json, font=\scriptsize\bfseries, text=BlueLine]
+    {portable contract};
+
+\end{tikzpicture}
+\end{document}
