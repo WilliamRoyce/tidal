@@ -7,9 +7,10 @@
 \section{General quadratic PGT Lagrangian coupled to electromagnetism: sector-by-sector enumeration}
 \label{PGTEnumeration}
 
-Our scope is the set of PGT Lagrangians coupled to
-electromagnetism whose dynamics are tractable at quadratic order
-in the field perturbations around a static magnetic background.
+We enumerate the independent invariants of the general Poincar\'{e}
+gauge theory Lagrangian coupled to electromagnetism, restricting
+attention to operators tractable at quadratic order in the field
+perturbations around a static magnetic background.
 The literature on Poincar\'{e} gauge
 theory~\cite{kibble1961lorentz,hehl1976spin,hehl1995metric,blagojevic2002gravitation,blagojevic2003lectures,sezgin1980ghostfree,hayashi1979new,lin2019pgt,blagojevic2018hamiltonian,karananas2014parity,aoki2020nonlinear,barker2024poincare,barker2021hamiltonian,bahamonde2025cubic}
 and on torsion--electromagnetism
@@ -28,29 +29,27 @@ strengths~\cite{blagojevic2018hamiltonian,shapiro2002torsion},
 but cubic completions admitted below contribute at quadratic
 order in the perturbation through one or two
 background-field insertions, so they are retained alongside the
-quadratic terms. The cutoff is a convention rather than a
-derivable boundary: ghost-safety alone admits operators of
-arbitrarily high power in $\mathcal{T}$. An
-effective-field-theory classification ordering operators by
+quadratic terms. No physical principle fixes this cutoff: ghost-safety alone
+admits operators of arbitrarily high power in $\mathcal{T}$. An
+effective-field-theory (EFT) classification ordering operators by
 canonical mass dimension would remove this arbitrariness, but
 the canonical dimensions depend on the propagating modes, which
 in turn depend on which kinetic terms are
 present~\cite{aoki2020nonlinear}; we therefore do not pursue an
 EFT ordering here.
 
-Within this scope, the Lagrangian is built from
+The Lagrangian is built from
 scalar contractions of
 $\{\MAGFt{^\sigma_{\mu\nu\rho}},\,\MAGT{^\sigma_{\mu\nu}},\,\FieldF{_{\mu\nu}},\,\rcD{_\mu},\,\varepsilon^{\mu\nu\rho\sigma}\}$,
 arranged into the seven sector blocks of \cref{QuadraticAction}.
 We generate the basis of contractions at each operator class
 using the systematic-contraction enumeration
-of~\cite{nutma2014xtras}, applying the within-pair antisymmetries
-of the Riemann--Cartan curvature,
-$\MAGFt{_{(\mu\nu)\rho\sigma}} = \MAGFt{_{\mu\nu(\rho\sigma)}} = 0$,
+of~\cite{nutma2014xtras}, applying the antisymmetries $\MAGFt{_{[\mu\nu]\rho\sigma}}$
+and $\MAGFt{_{\mu\nu[\rho\sigma]}}$,
 the antisymmetries $\MAGT{^\sigma_{[\mu\nu]}}$ and
 $\FieldF{_{[\mu\nu]}}$, and the total antisymmetry of
 $\varepsilon^{\mu\nu\rho\sigma}$, together with integration by
-parts, to project out operators that are manifestly equivalent up to a covariant total divergence; the connection terms generated under integration by parts contribute to lower-rank sectors already in the basis. We do not attempt the residual Bianchi-identity and
+parts, to remove operators equivalent up to a covariant total divergence; the connection terms generated under integration by parts contribute to lower-rank sectors already in the basis. We do not attempt the residual Bianchi-identity and
 dimension-dependent-identity\footnote{Dimension-dependent
 identities~\cite{edgarhoglund2002ddi} are algebraic relations
 among tensors that hold only
@@ -66,10 +65,9 @@ parity-odd, derivative, and cubic sectors are correspondingly
 flagged in \cref{MasterParameterCount} with $\dagger$ as upper
 bounds, and a complete reduction is left for future work.
 
-The post-Riemannian formalism, the irreducible torsion
-decomposition, and the basis transformation between
-$\{I_1, I_2, I_3\}$ and the irreducible-norm-squared basis are
-collected in \cref{PGTBackground}.
+The irreducible torsion parts $\T[1]{},\T[2]{},\T[3]{}$ used in
+the Chern--Simons couplings below follow the conventions of
+\cref{PGTBackground}.
 
 The inventory is collected in \cref{MasterParameterCount}.
 
@@ -267,8 +265,7 @@ kinetic mixing is a specific contraction~\cite{barker2024poincare};
 and $(\rcD{}\MAGT{})^2$, containing Barker's $\xi$ Maxwell-type
 kinetic term~\cite{barker2024poincare,barker2021hamiltonian},
 which is the unique contraction that propagates the trace
-torsion vector. The two latter sectors carry up to ten and
-sixteen invariants respectively before Bianchi reduction. Their
+torsion vector. Their
 $\varepsilon$-twins furnish the corresponding parity-odd
 derivative sectors $(\tilde\zeta,\tilde\chi,\tilde\xi)$. The ghost-free
 conditions on these combinations follow from the standard
@@ -322,7 +319,6 @@ $\chi^\text{CS}_2$ sources the magnetic-helicity density
 $\FieldA{_i}\FieldF{^{0i}}\!\sim\!\bm{A}\!\cdot\!\bm{B}$,
 producing the parity-odd birefringence and dichroism signatures
 analysed in~\cite{rubilar2003torsion,obukhov2024electrodynamics}.
-The third coupling contracts the Maxwell pair with the tensor
-torsion and vanishes whenever the irreducible tensor part
-$\T[1]{}$ vanishes; it couples the photon to the spin-two
-torsion sector.
+The third coupling is the unique Chern--Simons interaction
+selecting the spin-two torsion sector, contracting the Maxwell
+pair with the tensor component $\T[1]{}$.
