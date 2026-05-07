@@ -12,7 +12,7 @@
 
 PGT is constructed by gauging the Poincar\'{e}
 group: the ten rigid symmetries of a matter Lagrangian are promoted
-to local ones, and the resulting non-invariance is cancelled by two
+to local ones, and the invariance is restored by two
 compensating connection fields, the spin connection $A^{ij}{}_\mu$
 and the tetrad $b^i{}_\mu$.
 
@@ -24,8 +24,7 @@ $\mathcal{L}_M(\phi,\partial_k\phi)$ that is invariant under
 transformations~\cite{kibble1961lorentz,utiyama1956invariant,sciama1962physical,blagojevic2003lectures}.
 Promoting the ten Poincar\'{e} parameters to spacetime-dependent
 functions breaks invariance through derivative terms acting on the
-local parameters; these are removed by introducing one
-compensating connection per generator type. The Lorentz-rotation generators
+local parameters. The Lorentz-rotation generators
 are compensated by a \emph{spin connection} $A^{ij}{}_\mu$ that
 enters the covariant
 derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
@@ -73,9 +72,9 @@ The tetrad $b^i{}_\mu$ is the linear map between the two;
     $\mathbf{e}_i|_P$ (chosen at $P$ independently of the
     coordinates) span the same tangent space. The tetrad
     $b^i{}_\mu$ and its inverse $h_i{}^\mu$ relate the components
-    of any tangent vector in the two bases; cf.\ figure~4
+    of any tangent vector in the two bases (cf.\ figure~4
     of~\cite{capozziello2022comparing} and figure~1
-    of~\cite{hehlobukhov2007cartan}.}
+    of~\cite{hehlobukhov2007cartan}).}
   \label{TetradFrames}
 \end{figure}
 Unlike the spin connection, the tetrad does \emph{not} appear as
@@ -85,7 +84,7 @@ covariant derivative to Lorentz-frame-index form,
 $\nabla_k\phi = h_k{}^\mu\,\nabla_\mu\phi$~\cite[eq.~(1.7b)]{blagojevic2003lectures}.
 The tetrad instead enters as a gauge field through the metric
 relation \cref{TetradMetric} and the torsion field strength
-\cref{TorsionDef}.
+\cref{TorsionDef} below.
 
 The covariant derivative on a tensor of mixed type acts with the
 spin connection on each Latin index and with the affine connection
@@ -95,16 +94,15 @@ connection of the Palatini formulation, introduced in
 index and $-$ on each lower index.
 For a tensor $\Phi^{i\,\mu}{}_{j\,\nu}$ with mixed Latin and
 Greek indices,
-\begin{align}
+\begin{multline}
   \nabla_\rho \Phi^{i\,\mu}{}_{j\,\nu}
-    &= \partial_\rho \Phi^{i\,\mu}{}_{j\,\nu}
+    = \partial_\rho \Phi^{i\,\mu}{}_{j\,\nu}
        + A^i{}_{k\rho}\,\Phi^{k\,\mu}{}_{j\,\nu}
-       - A^k{}_{j\rho}\,\Phi^{i\,\mu}{}_{k\,\nu} \nonumber \\
-    &\quad
+       - A^k{}_{j\rho}\,\Phi^{i\,\mu}{}_{k\,\nu} \\
        + \MAGA{^\mu_{\rho\sigma}}\,\Phi^{i\,\sigma}{}_{j\,\nu}
        - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma}.
   \label{MixedCovariantDerivative}
-\end{align}
+\end{multline}
 The matter-field rule \cref{LorentzCovariantDeriv} is the same
 construction evaluated on the spinor representation of the
 Lorentz group: the spin matrix $\Sigma_{ij}$ in
@@ -244,8 +242,9 @@ $(b^i{}_\mu, A^{ij}{}_\mu)$, while \cref{Theory} and the
 symbolic-computation pipeline (\cref{SymbolicComputation}) both
 work in the affine-connection language with the metric and
 connection pair $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$. The
-two parameterisations describe the same geometric data, related
-object-by-object as in \cref{PGTRiemannCartanTranslation}, after
+two parameterisations encode the same Riemann--Cartan
+geometry, related object-by-object as in
+\cref{PGTRiemannCartanTranslation}, after
 Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
 \begin{table}[h]
   \centering
@@ -342,8 +341,8 @@ vanishes,
 imposing simultaneous covariance under both Latin (Lorentz) and
 Greek (coordinate) indices. \Cref{TetradPostulate} fixes a
 one-to-one map between $A^{ij}{}_\mu$ and $\MAGA{^\sigma_\mu_\nu}$
-once a tetrad is chosen, so the two formulations describe the
-same geometric data. Imposing metricity ($\mathcal{Q} = 0$) then
+once a tetrad is chosen, so the two formulations encode the
+same Riemann--Cartan geometry. Imposing metricity ($\mathcal{Q} = 0$) then
 forces the
 decomposition~\cite[eq.~(2.6)]{blagojevic2003lectures}
 \begin{align}
@@ -353,18 +352,7 @@ decomposition~\cite[eq.~(2.6)]{blagojevic2003lectures}
 \end{align}
 which is the same content as \cref{PalatiniDecomposition} written
 in spin-connection language $A^{ij}{}_\mu = \Delta^{ij}{}_\mu(b)
-+ K^{ij}{}_\mu$~\cite[eq.~(2.12)]{blagojevic2003lectures}. The
-Riemannian part of the spin connection is given explicitly in
-terms of the tetrad by
-\begin{align}
-  \Delta_{ij\mu}(b)
-    &= \tfrac{1}{2}\bigl(c_{ijm} - c_{mij} + c_{jmi}\bigr)\,e^m{}_\mu,
-  \label{RiemannianSpinConnection}
-\end{align}
-where $c^i{}_{\mu\nu} \equiv \partial_\mu e^i{}_\nu
-- \partial_\nu e^i{}_\mu$ is the object of anholonomity --- the
-spin-connection counterpart of the Christoffel symbols
-$\rCon{^\sigma_\mu_\nu}$.
++ K^{ij}{}_\mu$~\cite[eq.~(2.12)]{blagojevic2003lectures}.
 
 \paragraph*{Irreducible torsion decomposition}
 \label{IrreducibleTorsionFull}
@@ -411,10 +399,10 @@ parts gives the linear
 map~\cite{sezgin1980ghostfree,hehl1995metric,lin2019pgt}
 \begin{align}
   \begin{pmatrix} a \\ b \\ c \end{pmatrix}
-  &= \begin{pmatrix}
-       1 & 1 & 0 \\
-       -\tfrac{1}{6} & \tfrac{1}{6} & 0 \\
-       \tfrac{2}{3} & \tfrac{1}{3} & 1
+  &= \frac{1}{6} \begin{pmatrix}
+       6 & 6 & 0 \\
+       -1 & 1 & 0 \\
+       4 & 2 & 6
      \end{pmatrix}
      \begin{pmatrix} \beta_1 \\ \beta_2 \\ \beta_3 \end{pmatrix},
   \label{DirectIrreducibleTransform}
