@@ -1,53 +1,216 @@
 % App G: Perturbative-regime bound in the torsionful background
-% Forward-reference target from §2.2 (background ansatz) and §2.3
-% (conversion-probability prose). Extends the Hwang & Noh
-% Einstein--Maxwell perturbativity argument to PGT+EM theories.
-% Project source: docs/tex/background_validity.tex (already documents
-% the B_0 → 0 generalisation; this appendix presents the result in
-% report form).
+% Forward-reference targets:
+%   \cref{PerturbativeRegime} from theory.tex §2.2 and §2.3
+%   \cref{SurveyCoefficient}  from theory.tex §2.3 EM-conventions paragraph
 
 \section{Perturbative-regime bound in the torsionful background}
 \label{PerturbativeRegime}
 
 \paragraph*{Background-perturbativity in Einstein--Maxwell}
-% TODO ~150 w. State the linearisation validity condition:
-% |h_{μν}| ≪ 1 across the propagation distance, equivalently
-% κ B_0 D ≪ 1 (so that P_conv = sin²(κ B_0 D / 2) ≪ 1).
-% Cite hwangnoh2023graviton for the explicit second-order
-% perturbation structure that motivates the bound. Note: the
-% κ B_0 D ≪ 1 statement is our packaging of H-N's |h| ≪ 1 condition
-% in a form directly comparable to campaign measurables.
+
+The linearised Gertsenshtein calculation treats the external magnetic
+field $\Bzero$ as prescribed rather than dynamical.
+At finite $\Bzero$ the field carries EM stress-energy
+$T^{\mathrm{EM}}_{\mu\nu}\sim\Bzero^2$ that sources a metric correction
+$\delta g_{\mu\nu}\sim\Bzero^2/\MPl^2$;
+the question is whether this backreaction is negligible.
+For Einstein--Maxwell with a uniform external $\Bzero$,
+Hwang \& Noh~\cite{hwangnoh2023graviton} derive the critical scale
+$\lambda_B = 2\pi/k_B$ with $k_B = \sqrt{8\pi G}\,\Bzero/c^2$
+above which the EM stress-energy gravitates to order unity,
+and show that the backreaction parameter equals $\Pconv$ parametrically:
+\begin{align}
+  \frac{D^2}{\lambda_B^2}
+  \;\sim\; \frac{\Pconv}{\sin^2\!\theta} .
+  \label{HwangNohBound}
+\end{align}
+The linearised calculation is self-consistent whenever $\Pconv\ll 1$
+and breaks down at $\Pconv\sim 1$.
+
+Hwang \& Noh also obtain the peak-amplitude estimate
+$P\sim 8\pi^2\sin^2\!\theta\,(D/\lambda_B)^2$ from
+the coupled graviton--photon wave equations.
+This differs by a factor of four from the small-angle expansion of
+\cref{GertsenshteinFormula},
+$\Pconv\approx\kappa^2\Bzero^2 D^2/4$:
+Hwang \& Noh estimate the energy ratio
+$P\equiv(c^2/16\pi G)|\dot{h}|^2/|b|^2$ by scaling the peak amplitude,
+while \cref{GertsenshteinFormula} gives the unitary transition
+probability.
+The two differ by the half-angle factor $\sin^2(x/2)\approx x^2/4$:
+the peak estimate gives $\sim(\kappa\Bzero D)^2$,
+the exact oscillation gives $(\kappa\Bzero D)^2/4$.
+\cref{GertsenshteinFormula} is the authoritative quantitative form;
+\cref{HwangNohBound} is used as a parametric bound only.
+In campaign-measurable form the self-consistency condition is
+$\kappa\Bzero D\ll 1$, equivalently $\Pconv\ll 1$.
 
 \paragraph*{Extension to PGT torsion backgrounds}
-% TODO ~200 w + eq. With propagating torsion, the effective coupling
-% in the Gertsenshtein channel can pick up torsion-mass-scale-dependent
-% factors. Reproduce the B_0 → 0 argument from
-% docs/tex/background_validity.tex §sec:bv-b0-argument: the conversion
-% coefficient C_0 = lim_{B_0 → 0} P / B_0² is finite, computed on a
-% self-consistent flat / zero-torsion background, and free from
-% backreaction effects. Backreaction enters at O(B_0) and vanishes in
-% the limit. Verify against campaign results: across the swept
-% parameter ranges in §4.2, P_max < 0.1 was confirmed numerically.
+
+PGT+EM theories add a torsion perturbation $\delta\MAGT{^\sigma_\mu_\nu}$
+alongside the graviton $h_{\mu\nu}$ and photon perturbation
+$\delta\FieldA{_\mu}$, and non-minimal couplings such as
+$\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ introduce new mixing
+vertices.
+Four properties establish the order-counting framework for the
+survey coefficient $C\equiv\Pconv/\Bzero^2$.
+
+At $\Bzero=0$ the field configuration $(\eta_{\mu\nu},0,0)$ satisfies
+the full nonlinear field equations of any ghost-safe polynomial
+PGT+EM Lagrangian identically: every field-equation source term is
+at least linear in the field strengths
+$\{\widetilde{\mathcal{R}},\MAGT{},\FieldF{},\rcD{}\MAGT{}\}$,
+all of which vanish on this background.
+This is the foundation of the $\Czero$ definition ---
+$c_2$ is evaluated on an exact background, free of the
+$\Bzero^2/\MPl^2$ correction that affects the finite-$\Bzero$
+campaign background.
+
+The background field $\bar{\FieldF{}}_{zy}=-\Bzero$ enters the
+linearised equations of motion only through coupling vertices,
+so the mixing matrix $M(\Bzero)$ has entries polynomial in $\Bzero$
+(at most linearly for a quadratic Lagrangian, at most quadratically
+if cubic terms are included).
+The transition amplitude is an off-diagonal element of $e^{M(\Bzero)D}$,
+which is an entire function of $\Bzero$ since the matrix exponential
+of a polynomial matrix is entire.
+At $\Bzero=0$ every graviton--photon coupling vertex carries at least
+one contraction with $\bar{\FieldF{}}\propto\Bzero$;
+all such vertices vanish and the mixing matrix is block-diagonal,
+giving $\Pconv(0)=0$.
+The Taylor expansion in $\Bzero$ is therefore
 \begin{align}
-  % TODO: C_0 definition and the |h| ≪ 1 bound in PGT generalisation
+  \Pconv \;=\; c_2\Bzero^2 + c_4\Bzero^4 + \cdots ,
+  \label{TaylorPconv}
+\end{align}
+with $c_2=\Czero$ finite.
+
+On the uniform-field flat background $\partial_\mu\bar{\FieldF{}}_{\nu\rho}=0$.
+Varying $\Del{1}\int\bar{\FieldF{}}^{\mu\nu}\delta\widetilde{\mathcal{R}}_{[\mu\nu]}$
+with respect to $\MAGT{}^{\rho}{}_{\mu\nu}$ and integrating by parts
+gives $\Del{1}(\nabla_\rho\bar{\FieldF{}}^{\mu\nu})\cdot(\,\cdot\,)=0$.
+The remaining Cartan-equation terms vanish because
+$\widetilde{\mathcal{R}}_{[\mu\nu]}|_{\eta,\,T=0}=0$
+(the antisymmetric Ricci of flat Minkowski with zero torsion vanishes
+identically) and all torsion mass and kinetic terms are at least
+linear in $\MAGT{}$.
+Thus $\bar{\MAGT{}}=0$ is an exact solution of the Cartan equation
+on the campaign background, not merely an approximation.
+The uniformity condition $\partial_\mu\bar{\FieldF{}}=0$ is the key:
+for non-uniform fields or curved backgrounds
+$\nabla\bar{\FieldF{}}\neq 0$ and $\bar{\MAGT{}}=0$ need not
+hold~\cite{bahamonde2025torsion}.
+
+The linearised Cartan equation for $\delta\MAGT{}$ has its
+leading-order $\bar{\FieldF{}}\nabla\delta\MAGT{}$ coupling cancelled
+by integration by parts in the same way.
+The source comes from the second-order cross-term in the
+Riemann--Cartan tensor: the product $(\Gamma^{(0)}(h))\cdot K(\delta T)$
+at quadratic order in perturbations contributes
+$\propto\Del{1}\bar{\FieldF{}}\,\partial h$ when varied with
+respect to $\delta\MAGT{}$, giving a source $\sim\Del{1}\Bzero\,kA$
+for a plane-wave graviton of amplitude~$A$ and wavenumber~$k$.
+Algebraic inversion through the $\Alp{}\MAGT{}^2$ mass term gives
+$|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\Bzero A$,
+so perturbativity of the torsion sector
+($|\delta\MAGT{}|\ll\Alp{}$) requires
+\begin{align}
+  |\Del{1}|\,\Bzero\,A \;\ll\; \Alp{}^{\,2} .
   \label{PerturbativeBound}
 \end{align}
+At the worst-case point of the survey
+$(\Bzero,A,|\Del{1}|,\Alp{}) = (10^{-3},0.1,1,1)$
+this reads $10^{-4}\ll 1$;
+at the smallest stable $\Alp{}\simeq 0.1$, still $10^{-4}\ll 10^{-2}$.
 
-\paragraph*{Self-consistency of the §4 survey}
-% TODO ~50 w. One sentence: across the parameter regions surveyed in
-% §4 the perturbative bound is satisfied numerically; cross-ref
-% \cref{SectorSurvey} for the per-theory P_max values.
+The first three properties above hold for any ghost-safe polynomial
+PGT+EM Lagrangian~\cite{blagojevic2018hamiltonian}.
+The bound \cref{PerturbativeBound} is specific to the algebraic-torsion
+theory with $\Del{1}$ coupling;
+for a general non-minimal coupling coefficient $g_{\mathrm{NM}}$
+and torsion mass scale $m_T$,
+the torsion correction to $C$ is $O(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2)$,
+and for theories without non-minimal coupling the torsion sector
+decouples at $\Bzero=0$ and contributes nothing.
+
+\paragraph*{Self-consistency of the sector survey}
+
+Across the parameter regions of \cref{SectorSurvey} ---
+$\Bzero\in[10^{-5},10^{-3}]$ in simulation units,
+$A=0.1$, with coupling coefficients within their swept windows ---
+\cref{PerturbativeBound} is satisfied with at least two decades of
+margin and $\Pmax<0.1$ throughout,
+confirming \cref{HwangNohBound}.
+\cref{PerturbativityHierarchy} collects the four linearisation
+conditions and their dependence on $\Bzero$.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Linearisation conditions for the PGT+EM Gertsenshtein
+    calculation and their dependence on $\Bzero$.
+    The first and fourth conditions are set by the IC and geometry
+    choices of \cref{Linearisation};
+    the middle two are automatically satisfied as $\Bzero\to 0$
+    at fixed IC amplitude~$A$.}
+  \label{PerturbativityHierarchy}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Condition & Physical origin & $\Bzero$-dependence \\
+    \midrule
+    $\lvert h_{\mu\nu}\rvert \ll 1$
+      & metric linearisation
+      & independent of $\Bzero$ \\
+    $\Pconv \ll 1$
+      & Hwang--Noh bound \cref{HwangNohBound}
+      & $\propto\Bzero^2$ \\
+    $\lvert\delta\MAGT{}\rvert \ll \Alp{}$
+      & torsion-sector linearisation \cref{PerturbativeBound}
+      & $\propto\Bzero$ \\
+    $\lvert\delta\FieldA{_\mu}\rvert \ll \lvert\bar{A}_\mu\rvert$
+      & EM linearisation
+      & independent of $\Bzero$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The multi-$\Bzero$ convergence diagnostic at
+$\Bzero\in\{10^{-3},10^{-4},10^{-5}\}$ is the operational signature
+of the perturbative regime: the $c_4\Bzero^2$ remainder in
+\cref{TaylorPconv} predicts $C(\Bzero)\to\Czero$ at a rate linear
+in $\Bzero^2$, and this is what the survey of \cref{SectorSurvey}
+measures.
 
 \paragraph*{The $\Bzero \to 0$ survey coefficient}
-\label{SurveyCoefficient}
-% TODO ~150 w. State the C_0 = lim_{B_0 → 0} P / B_0^2 framework
-% that our HPC campaigns measure: this is the well-defined survey
-% observable, independent of B_0 in the small-B_0 limit, that
-% characterises the conversion physics of each Lagrangian without
-% B_0-dependent artefacts (per docs/tex/background_validity.tex
-% §sec:bv-b0-argument). The framework relies on a gauge-consistent
-% equation-of-motion structure for the linearised graviton-photon
-% coupling, which agrees with the potential-formulation derivation
-% in~\cite{hwangnoh2023graviton}. Backreaction enters at O(B_0)
-% and vanishes in the limit, making C_0 the natural cross-theory
-% comparison observable.
+
+The parameter survey of \cref{SectorSurvey} evaluates the limiting
+survey coefficient
+\begin{align}
+  \Czero \;\equiv\; \lim_{\Bzero\to 0}\,\frac{\Pconv}{\Bzero^2}
+  \;=\; c_2 ,
+  \label{SurveyCoefficient}
+\end{align}
+identified with the leading Taylor coefficient of \cref{TaylorPconv}.
+
+All corrections to $C = \Pconv/\Bzero^2$ enter at $O(\Bzero^2)$
+or smaller, leaving $\Czero$ at $O(1)$ and $\Bzero$-independent.
+The Taylor remainder is $c_4\Bzero^2$ from \cref{TaylorPconv}.
+Metric backreaction enters at $O(\Bzero^2/\MPl^2)$ and cannot shift
+$\Czero$ by a $\Bzero$-independent amount: every graviton--photon
+mixing vertex vanishes at $\Bzero=0$, forcing
+$g(\Bzero) = g_0\Bzero + O(\Bzero^3)$,
+so the tachyonic-mass detuning $\Delta\propto\Bzero^2$ satisfies
+$\Delta/g\propto\Bzero$ and the exact two-state formula
+$\Pconv = [g^2/(g^2+\Delta^2)]\sin^2(\sqrt{g^2+\Delta^2}\,D)$
+corrects $C$ at $O(\Bzero^2)$, not at $O(1)$.
+The torsion nonlinearity contributes at $O(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2)$
+per \cref{PerturbativeBound}.
+Signal and corrections are separated by one power of $\Bzero^2$.
+
+The amplification factor $\Aamp\equiv\sqrt{\Czero^{\mathrm{torsion}}/\Czero^{\mathrm{EM}}}$
+of \cref{SectorSurvey} is $\Bzero$-independent to $O(\Bzero^2)$
+per the above.
+The limiting coefficient $\Czero^{\mathrm{EM}}$ is consistent with the
+potential-formulation derivation of~\cite{hwangnoh2023graviton}:
+their conversion coefficient $\Delta_{g\gamma}=\kappa\Bzero/2$
+is exactly linear in $\Bzero$, confirming no $\Bzero$-independent
+backreaction shift in $\Czero^{\mathrm{EM}}$.
