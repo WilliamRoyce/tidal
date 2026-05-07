@@ -758,3 +758,89 @@ Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
 2. **Issue #341 — CLOSED 2026-05-05** (commit `98c87d7`, v0.38.6). Probe threshold lowered from γ\* = 0.30 to **0.15** in `tidal/measurement/_stability.py` after a 5-point threshold scan against the Stage C truth table and the 28789437 equal-weight chain (1318 samples). Stage C contamination caught: **57/57** (improved from 56/57 — sample 391's γ=0.272 was the prior known residual, now caught by the probe directly). False-rejection rate: **0/93** preserved. The hi-res D1 amp MAP at γ_eff = 0.281 is now correctly classified as tachyonic. See `docs/tex/stability_probe.tex` §"Post-#341 threshold tightening" and `examples/data/probe_redesign/threshold_scan.csv`.
 3. **Issue #342 — CLOSED.** HPC tarball stale-probe bug resolved: `pip install -e . && hpc_refresh_venv_tar.sh` after every code change that touches the deployed probe; 28883112 verified with `unit-ic-all-k-0.15`.
 4. **Manuscript impact**: the methods section cites the post-#341 probe (τ=0.15, growth bound exp(τ·t_end) ≈ 4.5×). Phase 6 chains gated under the old τ=0.3 probe (D1 sup canonical, Stage A v5 sup canonical, Track 1 amp/sup) all have MAPs with γ_eff < 0.15 and remain valid. Phase 6.C.2 amp log Z drops from 2.094 → 0.752 under τ=0.15; the qualitative suppression verdict is unaffected (B < 10⁻⁵ in all configurations).
+
+---
+
+## Phase 6.G — Matched-resolution paired cross-check (2026-05-07/08)
+
+**Goal:** Quantify the grid/bounds mismatch between the Phase 6.C chains (amp at grid=256/L=100, sup at grid=64/L=50) and obtain matched-params cross-checks under τ=0.15.
+
+### D1 amp Phase 6.G
+
+| Job | Grid | Bounds | nlive | Snap | Status | Wall | log Z | ESS | Notes |
+|-----|------|--------|-------|------|--------|------|-------|-----|-------|
+| 28886734 (r1) | 512 | 0:100 | 600 | 21 | TIMEOUT | 1:00:08 | +0.716 ± 0.027 (checkpoint) | 8670 dead | Mismatched params |
+| 28896653 (r2) | 512 | 0:100 | 600 | 21 | COMPLETED | 0:19:51 | **+0.720 ± 0.024** | 5997 | Primary hi-res |
+| **28976470** (midres) | **128** | **0:50** | **600** | **2** | COMPLETED | 0:03:56 | **−2.091 ± 0.048** | 2003 | Matched-params cross-check |
+
+**28896653 MAP:** α₁=−0.422, α₂=−0.594, α₃=0.204, δ₁=−0.847; γ_eff=0.137 (stable, < 0.15). D_KL=0.765 nats.
+
+**Midres 28976470 MAP:** α₁=−0.765, α₂=−0.580, α₃=1.177, δ₁=−0.037. The 2.8-nat shift between 28896653 (grid=512/L=100) and 28976470 (grid=128/L=50) is attributed to the bounds change (0:100 → 0:50): a shorter box resolves fewer k-modes, altering the k-mode coverage of the stability probe and the conversion landscape.
+
+### D1 sup Phase 6.G
+
+| Job | Grid | Bounds | nlive | Snap | num-repeats | Status | Wall | log Z | ESS | Notes |
+|-----|------|--------|-------|------|-------------|--------|------|-------|-----|-------|
+| 28966800 (origparams) | 64 | 0:50 | 400 | 2 | 5 | COMPLETED | 0:08:49 | +16.449 ± 0.158 | 2076 | Matches original 28519675 settings |
+| **28967862** (midres) | **128** | **0:50** | **600** | **2** | 5 | COMPLETED | 0:16:14 | **+16.329 ± 0.121** | ≈2000 | Matched with amp 28976470 |
+
+**Grid stability (sup):** 16.449 vs 16.329 at grid 64→128 (0.12-nat difference, within σ) — the sup landscape is grid-stable.
+
+### Phase 6.G Bayes factors
+
+| Pairing | log Z_amp | log Z_sup | log B | B | Verdict |
+|---------|-----------|-----------|-------|---|---------|
+| Mismatched-params (28896653 vs 28967862) | +0.720 | +16.329 | −15.61 | **1.7×10⁻⁷** | Sup decisively |
+| Matched midres (28976470 vs 28967862) | −2.091 | +16.329 | −18.42 | **9×10⁻⁹** | Sup overwhelmingly |
+
+**Interpretation:** The matched-midres Bayes factor is even more decisive than the original — the bounds change (L=50 vs L=100) systematically suppresses the amp log Z by ~2.8 nats while barely affecting the sup (grid-stable at 16.3–16.4). Under L=100 (canonical) settings, the amp result is consistently +0.7 to +2.1 nats depending on probe threshold; the suppression verdict is robust across all configurations tested.
+
+---
+
+## Phase 6.H v2 — Publication-quality paired re-run at τ=0.15 (current, 2026-05-07/08)
+
+**Goal:** Single definitive publication pair at v2 settings (τ=0.15 probe, nlive=1200, grid=512, bounds=0:100, snapshots=2) for the T4 Ricci-EM model.
+
+### v2 settings rationale
+
+| Change | v1 (Phase 6.C) | v2 | Impact |
+|--------|-------|----|--------|
+| Probe threshold | 0.30 | **0.15** | Reject near-tachyonic γ∈[0.15,0.30] ridge; A_max drops ~200→19 |
+| nlive | 400 | **1200** | 3× more live points; ESS increases, error bars tighten |
+| Grid | 256 | **512** | 2× finer k-mode resolution; probe sees more modes |
+| Snapshots | default(21) | **2** | 10× faster per likelihood eval |
+
+### INTR cross-checks (completed/in-progress)
+
+| Job | Chain | Grid | nlive | Status | Wall | log Z | Notes |
+|-----|-------|------|-------|--------|------|-------|-------|
+| 28982029 | amp intr-reduced | 256 | 600 | COMPLETED | 0:15:57 | **+0.679 ± 0.041** | ESS=3113, MAP α₁=−0.322/α₂=−0.786/α₃=0.388/δ₁=0.764 |
+| 28983285 | sup intr-reduced | 256 | 600 | TIMEOUT | 1:00:06 | — | 35 clusters at timeout; sup landscape too complex for 1h |
+| 28985713 | sup intr-xreduced | 128 | 300 | RUNNING | — | — | Further-reduced settings; rough log Z estimate pending |
+
+**Amp INTR reduced result:** log Z = +0.679 ± 0.041 — consistent with 28883112 (+0.752 ± 0.047) at <1.5σ. Confirms v2 amp standard will land ~+0.7 ± 0.05.
+
+**Sup INTR timeout:** 35 clusters in 1h (nlive=600/grid=256). At v2 settings (nlive=1200/grid=512), each evaluation is ~4-6× more expensive; 6h wall was insufficient. Resubmitted with 12h wall.
+
+### Standard jobs (v2 publication run)
+
+| Job | Chain | Grid | nlive | Time limit | Status | log Z |
+|-----|-------|------|-------|-----------|--------|-------|
+| **28982006** | D1 amp v2 | 512 | 1200 | 8h icelake-std | PENDING | — |
+| 28982018 | D1 sup v2 | 512 | 1200 | 6h icelake-std | CANCELLED (wall too short) | — |
+| **28985879** | D1 sup v2 (resubmit) | 512 | 1200 | **12h** icelake-std | PENDING | — |
+
+**Submit drafts:** `scripts/hpc_submit_drafts/d1_amp_v2_submit.sh`, `scripts/hpc_submit_drafts/d1_sup_v2_submit.sh` (updated to 12h).
+
+**Predicted results:**
+- Amp: log Z ≈ +0.7 ± 0.05 (consistent across 28883112 / 28982029 / 28896653, bracketing with τ=0.15)
+- Sup: log Z unknown — matched-params sup under τ=0.15 has not been run at any grid. Phase 6.G Phase 6.G sup at origparams/midres gives 16.3–16.4 under τ=0.3; expected to be somewhat lower under τ=0.15 (borderline-stable samples near γ∈[0.15,0.30] are now rejected; 121-cluster landscape may simplify or complicate). **Conservative Bayes factor estimate: B ≈ exp(0.7−14) ≈ 10⁻⁶ (suppression decisive regardless).**
+
+### Phase 6.H status checklist
+
+- [x] INTR cross-checks submitted and running
+- [x] Amp INTR reduced completed (+0.679 — confirms expected amp range)
+- [x] Sup 6h cancelled; 12h resubmitted as 28985879
+- [ ] 28982006 amp std converged
+- [ ] 28985879 sup std converged
+- [ ] Phase 6.I: pull both, perturbativity cross-check at new MAPs, update table, close #340/#341

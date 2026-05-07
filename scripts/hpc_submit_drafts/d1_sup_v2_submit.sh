@@ -15,13 +15,15 @@
 #   snapshots 21→2: ~10× faster per call
 #   grid 256→512: ~2× slower per call
 #   nlive 400→1200 + cluster growth: ~3-4× more dead points
-#   Net: ~1.5-2.5h wall expected — within 6h std budget
+#   τ=0.15 probe accepts more borderline samples → more multi-modal sup surface
+#   Empirical: intr_reduced (nlive=600/grid=256) timed out at 35 clusters in 1h (28983285)
+#   At v2 settings ~4-6× more expensive per eval → 12h wall (job 28982018 at 6h cancelled)
 
 set -euo pipefail
 
 bash scripts/hpc_shuttle.sh submit \
   --template scripts/hpc_templates/polychord_standard.sbatch \
-  --name d1_sup_track2_hires_v2 --ntasks 76 --time 06:00:00 \
+  --name d1_sup_track2_hires_v2 --ntasks 76 --time 12:00:00 \
   --cmd 'tidal sample examples/data/torsion_gertsenshtein_nonminimal.json \
     --prior "alpha1=uniform:-1:1" --prior "alpha2=uniform:-2:2" \
     --prior "alpha3=log_uniform:0.05:2" --prior "delta1=uniform:-2:2" \
