@@ -12,19 +12,18 @@ We document here the architecture of \TIDAL{} (Tensor Integration and
 Derivation for Any Lagrangian), a two-stage symbolic–numerical pipeline
 that automates the derivation and solution of linearised equations of motion
 for any quadratic field theory expressed as a Lagrangian.
-The symbolic stage, implemented in \Mathematica{} via the \xAct{}
-tensor-algebra suite, ingests a TOML theory specification and exports a
-self-contained JSON equation specification; the numerical stage, implemented
-in \Python{}, reads this specification and evolves the field equations in
-time, returning physics observables.
-The central design invariant is that all equations of motion are derived from
-the Lagrangian symbolically — no equations are manually hard-coded at any
-point in the pipeline.
+The symbolic stage, implemented in \Mathematica{}~\cite{mathematica} via the
+\xAct{}~\cite{martingarcia2007xact} tensor-algebra suite, ingests a TOML
+theory specification and exports a self-contained JSON equation specification;
+the numerical stage, implemented in \Python{}, reads this specification and
+evolves the field equations in time, returning physics observables.
+All equations of motion are derived automatically from the Lagrangian; the
+user specifies only the theory, not the equations.
 The pipeline operates exclusively in the linearised regime: quadratic
 Lagrangians producing linear PDEs; nonlinear extensions are outside the scope
 of the present implementation.
-The pipeline is illustrated schematically in \cref{ArchitectureDiagram}; the
-following named paragraphs expand each stage.
+The pipeline is shown in~\cref{ArchitectureDiagram}; the following named
+paragraphs expand each stage.
 
 % Figure A.1 — TIDAL architecture diagram.
 \begin{figure}[t]
@@ -48,19 +47,19 @@ The symbolic stage derives the linearised equations of motion directly
 from the Lagrangian, eliminating the need for manual symbolic algebra.
 For the Poincaré gauge theory Lagrangians surveyed in \cref{Results},
 the spin-connection field carries 24 independent components, and
-expanding the Euler–Lagrange equations by hand is infeasible for more
-than one or two theory instances; \xAct{} and \xPert{} automate this
-step for arbitrary quadratic Lagrangians in any coordinate basis.
-The user provides a \texttt{theory.toml} file specifying the Lagrangian,
-field content, background, and gauge conditions; \texttt{tidal derive}
-generates a Wolfram script and invokes \texttt{wolframscript} without
-further user intervention.
+expanding the Euler–Lagrange equations by hand is infeasible across the
+theory classes surveyed; \xAct{}, \xPert{}~\cite{brizuela2009xpert}, and
+\xTras{}~\cite{nutma2014xtras} automate this step for arbitrary quadratic
+Lagrangians in any coordinate basis.
+The user provides a TOML Lagrangian specification naming the field
+content, background, and gauge conditions; the derivation is then
+carried out automatically, without further user intervention.
 \xPert{} linearises the Lagrangian about the declared background (flat
 metric, uniform $\Bzero$) to quadratic order; \xAct{} applies the
 Euler–Lagrange variation and decomposes the tensor equations to their
 scalar components; gauge conditions are imposed algebraically using
-presets declared in the TOML (Lorenz, de~Donder, Coulomb, temporal, or
-axial).
+presets declared in the specification (Lorenz, de~Donder, Coulomb,
+temporal, or axial).
 The symbolic operations — including the Euler–Lagrange velocity form,
 PGT component decomposition, and handling of higher-derivative
 $\tilde{R}^2$ terms — are described in detail in
@@ -75,77 +74,55 @@ completely: the symbolic stage exports a self-contained JSON file that is
 the sole interface between the stages, and the numerical solver reads it
 with no knowledge of \xAct{}, the derivation history, or the symbolic
 representation.
-The \texttt{equations} array records each field's equation of motion as a
-list of operator terms, each specifying an operator name
-(\texttt{identity}, \texttt{laplacian}, \texttt{gradient\_x},
-\texttt{biharmonic}, mixed time-space operators, and others), a target
-field, and a parameter-dependent coefficient expression; the
-\texttt{hamiltonian\_terms} array holds the Hamiltonian density in the
-same form; the \texttt{fields} record identifies each field's time order
-(0 for algebraically constrained fields, 1 for first-order, 2 for
-wave-like).
-The same JSON specification supports arbitrary grid resolutions, initial
+The specification records each field's equation of motion as a sum of
+differential operators with parameter-dependent coefficients; the
+Hamiltonian density is recorded in the same form.
+The specification also declares whether each field is wave-like,
+first-order in time, or algebraically constrained, enabling the
+numerical stage to select and configure its evolution scheme without
+knowledge of the underlying theory.
+The same specification supports arbitrary grid resolutions, initial
 conditions, and parameter choices without re-derivation.
 
 \paragraph*{Numerical backend auto-selection}
 \TIDAL{} examines the equation specification and dispatches automatically
 to the appropriate solver backend, without requiring the user to specify
 a numerical scheme.
-The choice of backend is not merely a convenience: applying a symplectic
-integrator to a system with algebraic constraints, or a general-purpose
-adaptive solver to a constant-coefficient system amenable to exact
-eigendecomposition, produces incorrect results silently; auto-selection
-eliminates this failure mode by design.
+The appropriate backend depends on the algebraic structure of the
+specification: applying a time-stepping scheme to a constant-coefficient
+system amenable to exact eigendecomposition discards machine precision
+unnecessarily; applying a symplectic integrator to a system with
+algebraic constraints fails to enforce those constraints.
+\TIDAL{} determines the appropriate backend automatically, preventing
+both failure modes.
 The highest-priority backend, the Fourier modal solver, is selected when
 the background metric is flat, all boundary conditions are periodic, all
 coefficients are time-independent, and all differential operators belong
 to the supported set; this backend delivers machine-precision solutions
-via matrix exponentiation and was used for all simulation campaigns in
-\cref{Results}.
+via matrix exponentiation~(\cref{ModalSolver}) and was used for all
+simulation campaigns reported in \cref{Results}.
 When the modal conditions are not met, \TIDAL{} falls back in priority
-order to: \textsc{IDA} (SUNDIALS DAE solver, for systems with
-algebraically constrained fields); \textsc{CVODE} (SUNDIALS adaptive
-BDF, the default wave-equation backend); leapfrog (symplectic
-integration when a Hamiltonian is available); and \SciPy{}
-\texttt{solve\_ivp} (general-purpose fallback).
-The full backend-selection logic is illustrated by
-\cref{SolverFlowchart} and the eigendecomposition algorithm is detailed
-in \cref{NumericalEvolution}.
+order to: \textsc{IDA} (SUNDIALS~\cite{hindmarsh2005sundials} DAE
+solver, for systems with algebraically constrained fields);
+\textsc{CVODE} (SUNDIALS adaptive BDF, the default wave-equation
+backend); leapfrog (symplectic integration when a Hamiltonian is
+available); and \SciPy{}~\cite{virtanen2020scipy} \texttt{solve\_ivp}
+(general-purpose fallback).
+The full backend-selection logic is shown in~\cref{SolverFlowchart} and
+the eigendecomposition algorithm is detailed in \cref{NumericalEvolution}.
 
 \paragraph*{Simulation output and observables}
-A completed simulation produces a checkpoint directory containing field
-snapshots at each saved timestep together with parameter metadata and the
-originating equation specification, forming a self-contained archive of
-the run.
-\TIDAL{} provides twelve physics measurement types applicable to any
-simulation output: \texttt{energy}, \texttt{conversion},
-\texttt{mixing}, \texttt{spectrum}, \texttt{spectral\_conversion},
-\texttt{dispersion}, \texttt{conservation}, \texttt{effective\_mass},
-\texttt{asymptotic}, \texttt{peak\_conversion}, \texttt{velocity}, and
-\texttt{resonance}.
-For the Gertsenshtein surveys of \cref{Results}, the primary
-observable is the graviton–photon conversion probability $\Pconv(t)$
-extracted by the \texttt{conversion} measurement; the
-\texttt{peak\_conversion} measurement provides $\Pmax$ for the
-sector-survey comparisons of \cref{SectorSurvey}.
-Parameter sweeps (\texttt{tidal sweep}) parallelise the
-simulate–measure pipeline over a user-specified parameter grid; the
-276-run survey of \cref{Results}, spanning the PGT coupling
-parameter space, was made possible by this automation — a scale not
-feasible by manual simulation.
-
-\paragraph*{Software dependencies}
-The symbolic stage depends on \xAct{}~\cite{martingarcia2007xact},
-\xPert{}~\cite{brizuela2009xpert}, and
-\xTras{}~\cite{nutma2014xtras} running within
-\Mathematica{}~\cite{mathematica}.
-The numerical stage depends on \NumPy{}~\cite{harris2020numpy} (array
-operations and spatial-operator evaluation), \SciPy{}~\cite{virtanen2020scipy}
-(matrix routines and the \SciPy{} solver backend), and
-scikit-sundae~\cite{mekki2023skitsundae} (the \Python{} interface to
-SUNDIALS~\cite{hindmarsh2005sundials} \textsc{IDA} and \textsc{CVODE}).
-\PSALTer{}~\cite{barker2024psalter} and
-\Hamilcar{}~\cite{barker2025hamilcar} address the spectrum and
-constraint-algebra aspects of the same theory class respectively;
-the complementary relationship between those tools and \TIDAL{} is
-discussed in \cref{ComputationalApproach}.
+From a completed simulation, \TIDAL{} computes the graviton–photon
+conversion probability and its maximum over the run, field energy
+densities, spectral decompositions, and mixing coefficients; ancillary
+diagnostics include effective masses and signal asymptotes.
+The simulation data are preserved as a checkpoint directory of field
+snapshots, together with parameter metadata and the originating
+equation specification.
+For the surveys of \cref{Results}, the primary observable is the
+conversion probability $\Pconv(t)$, with $\Pmax$ extracted for the
+sector-by-sector comparisons of \cref{SectorSurvey}.
+Parameter sweeps parallelise the simulate–measure pipeline across a
+user-specified parameter grid; the systematic survey of the PGT
+coupling space reported in \cref{Results} was made possible by this
+automation, at a scale not accessible by manual simulation.
