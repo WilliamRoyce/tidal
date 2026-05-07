@@ -7,12 +7,10 @@
 \section{General quadratic PGT Lagrangian coupled to electromagnetism: sector-by-sector enumeration}
 \label{PGTEnumeration}
 
-We enumerate the independent invariants of the general Poincar\'{e}
-gauge theory Lagrangian coupled to electromagnetism, restricting
-attention to operators tractable at quadratic order in the field
-perturbations around a static magnetic background.
-The literature on Poincar\'{e} gauge
-theory~\cite{kibble1961lorentz,hehl1976spin,hehl1995metric,blagojevic2002gravitation,blagojevic2003lectures,sezgin1980ghostfree,hayashi1979new,lin2019pgt,blagojevic2018hamiltonian,karananas2014parity,aoki2020nonlinear,barker2024poincare,barker2021hamiltonian,bahamonde2025cubic}
+We enumerate the independent invariants of the general PGT
+Lagrangian coupled to electromagnetism around a static magnetic
+background.
+The literature on PGT~\cite{kibble1961lorentz,hehl1976spin,hehl1995metric,blagojevic2002gravitation,blagojevic2003lectures,sezgin1980ghostfree,hayashi1979new,lin2019pgt,blagojevic2018hamiltonian,karananas2014parity,aoki2020nonlinear,barker2024poincare,barker2021hamiltonian,bahamonde2025cubic}
 and on torsion--electromagnetism
 couplings~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion,shapiro2002torsion,obukhov2024electrodynamics,bahamonde2025torsion}
 motivates which combinations are studied as named theories in
@@ -44,12 +42,13 @@ $\{\MAGFt{^\sigma_{\mu\nu\rho}},\,\MAGT{^\sigma_{\mu\nu}},\,\FieldF{_{\mu\nu}},\
 arranged into the seven sector blocks of \cref{QuadraticAction}.
 We generate the basis of contractions at each operator class
 using the systematic-contraction enumeration
-of~\cite{nutma2014xtras}, applying the antisymmetries $\MAGFt{_{[\mu\nu]\rho\sigma}}$
-and $\MAGFt{_{\mu\nu[\rho\sigma]}}$,
+of~\cite{nutma2014xtras}, applying the pair antisymmetries $\MAGFt{_{[\mu\nu]\rho\sigma}}$
+and $\MAGFt{_{\mu\nu[\rho\sigma]}}$ that survive in the
+Riemann--Cartan setting,
 the antisymmetries $\MAGT{^\sigma_{[\mu\nu]}}$ and
 $\FieldF{_{[\mu\nu]}}$, and the total antisymmetry of
 $\varepsilon^{\mu\nu\rho\sigma}$, together with integration by
-parts, to remove operators equivalent up to a covariant total divergence; the connection terms generated under integration by parts contribute to lower-rank sectors already in the basis. We do not attempt the residual Bianchi-identity and
+parts, to remove operators equivalent up to a covariant total divergence. We do not attempt the residual Bianchi-identity and
 dimension-dependent-identity\footnote{Dimension-dependent
 identities~\cite{edgarhoglund2002ddi} are algebraic relations
 among tensors that hold only
@@ -149,7 +148,7 @@ limit, proportional there to the Pontryagin density modulo
 Bianchi identities~\cite{hehlobukhov2007cartan,shapiro2002torsion},
 but becomes dynamical with torsion present
 through the Nieh--Yan identity~\cite{niehyan1982}; its variation
-is therefore exchangeable with one parity-odd
+is exchangeable with one parity-odd
 $\varepsilon\!\cdot\!\mathcal{T}^2$ coefficient introduced below.
 We retain $\gamma_\text{BI}$ and $d_{14}\dots d_{17}$ as
 independent symbols rather than using the Nieh--Yan trade to
@@ -218,18 +217,23 @@ extraction remains for future work.
 \label{ParityOddQuadratic}
 The parity-odd quadratic sector adds twenty-one
 $\varepsilon$-weighted invariants, of which twenty are dynamical.
-Thirteen are Pontryagin-type contractions~\cite{karananas2014parity,barker2025psalter2}
-of the form $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\MAGFt{}$
-(with parameters $d_1\dots d_{13}$ in
-\cref{MasterParameterCount}); these collapse to a single
-topological density in the torsion-free
-limit~\cite{shapiro2002torsion,karananas2014parity} but
-generically propagate when torsion is present. Four are
-Nieh--Yan-type contractions~\cite{niehyan1982} of the form
+Thirteen are parity-odd curvature-square contractions
+(Pontryagin-type~\cite{karananas2014parity,barker2025psalter2})
+of the form $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\MAGFt{}$,
+generalising the Pontryagin topological density of
+pseudo-Riemannian geometry to the torsionful setting (with
+parameters $d_1\dots d_{13}$ in \cref{MasterParameterCount});
+these collapse to a single topological density in the
+torsion-free limit~\cite{shapiro2002torsion,karananas2014parity}
+but generically propagate when torsion is present. Four are
+parity-odd torsion-square contractions
+(Nieh--Yan-type~\cite{niehyan1982}) of the form
 $\varepsilon^{\mu\nu\rho\sigma}\MAGT{}\MAGT{}$
 ($d_{14}\dots d_{17}$); the family contains the Nieh--Yan form
-whose total-derivative identity dynamically links it to the
-Holst term of \cref{LinearAction}. One is the electromagnetic
+$\varepsilon^{\mu\nu\rho\sigma}T^a{}_{\mu\nu}T_{a\rho\sigma}$, a
+Riemann--Cartan topological density whose total-derivative
+identity dynamically links it to the Holst term of
+\cref{LinearAction}. One is the electromagnetic
 $\theta$-term~\cite{wilczek1987axion}
 $d_{18}\,\varepsilon^{\mu\nu\rho\sigma}\FieldF{_{\mu\nu}}\FieldF{_{\rho\sigma}} = 4\,d_{18}\,\PD{_\mu}\bigl(\varepsilon^{\mu\nu\rho\sigma}\FieldA{_\nu}\PD{_\rho}\FieldA{_\sigma}\bigr)$,
 a topological U(1) Chern density that is a total covariant divergence on any spacetime background, and therefore non-dynamical. The remaining three
@@ -246,8 +250,9 @@ tachyons beyond those of the parity-even sector.
 
 \paragraph*{Ghost-free derivative extensions}
 \label{DerivativeExtensions}
-A covariant derivative adds one index and introduces
-cross-sectors that vanish without it. In the first-order
+A covariant derivative adds one index, opening three further
+parity-even sectors beyond the algebraic enumeration above. In
+the first-order
 formalism $\rcD{_\mu}\MAGT{} \sim \MAGFt{}$, so
 operators built from $\{\MAGFt{},\,\MAGT{},\,\FieldF{},\,\rcD{}\MAGT{}\}$
 remain Yang--Mills-type and produce at most second-order
@@ -285,11 +290,11 @@ into one or two factors of a quadratic operator:
 $\mathcal{R}\!\times\!\mathcal{F}^2$ ($\lambda_{1\dots 4}$, the Gertsenshtein
 channel into curvature--photon mixing~\cite{itin2004maxwell,bahamonde2025torsion}),
 $\mathcal{T}^2\!\times\!\mathcal{F}$ ($\kappa_{1\dots 3}$, generating
-torsion-mass corrections proportional to $\bar B$),
+torsion-mass corrections proportional to $\Bzero$),
 $\mathcal{R}^2\!\times\!\mathcal{F}$ ($\rho_{1\dots 8}$, modifying the
 quadratic graviton self-interaction in the magnetic background),
 and $\rcD{}\mathcal{T}\!\times\!\mathcal{F}^2$ ($\mu_{1\dots 5}$, a
-torsion--photon conversion channel proportional to $\bar B$).
+torsion--photon conversion channel proportional to $\Bzero$).
 The parity-odd partners $(\tilde\lambda,\tilde\kappa,\tilde\mu)$
 enumerated in \cref{MasterParameterCount} arise by
 $\varepsilon$-contraction of the same parity-even contractions.
