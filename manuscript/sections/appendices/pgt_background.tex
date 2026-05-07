@@ -11,14 +11,11 @@
 \label{PGTBackground}
 
 Poincar\'{e} gauge theory follows the same gauge-theoretic template
-as Yang--Mills theories of internal symmetries: a global symmetry
+as any Yang--Mills gauge theory: a global symmetry
 of the matter sector is promoted to a local one, the resulting
 non-invariance is restored by introducing compensating connection
 fields, and the geometric interpretation of those fields fixes the
-kinematic arena. The construction proceeds in two steps: gauging
-the Poincar\'{e} group to identify the field content, and building
-Lorentz-scalar invariants from the resulting field strengths to
-motivate the general Lagrangian of \cref{QuadraticAction}.
+kinematic arena.
 
 \paragraph*{Gauging the Poincar\'{e} group}
 \label{FieldContent}
@@ -30,7 +27,7 @@ Promoting the ten Poincar\'{e} parameters to spacetime-dependent
 functions breaks invariance through derivative terms acting on the
 local parameters; these are removed by introducing one
 compensating connection per generator type, exactly as in
-internal-symmetry gauge theories. The Lorentz-rotation generators
+any gauge field theory. The Lorentz-rotation generators
 are compensated by a \emph{spin connection} $A^{ij}{}_\mu$ that
 enters the covariant
 derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
@@ -62,11 +59,14 @@ of the local Lorentz frame via the tetrad-bilinear relation
   \g{_{\mu\nu}} &= \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu.
   \label{TetradMetric}
 \end{align}
-\Cref{TetradFrames} illustrates the geometric content:
-at each point $P$ the coordinate basis $\partial_\mu|_P$ and an
-orthonormal Lorentz frame $\mathbf{e}_i|_P$ span the same tangent
-space, with the tetrad pair $(b^i{}_\mu, h_i{}^\mu)$ providing the
-linear map between them.
+A manifold with metric admits two frame types at each tangent space:
+the coordinate basis $\partial_\mu$ (fixed by the chart $x^\mu$,
+generally non-orthonormal in a curved space) and an orthonormal
+Lorentz frame $\mathbf{e}_i$ (chosen at each point so that
+$\g{_{\mu\nu}}\mathbf{e}^\mu_i\,\mathbf{e}^\nu_j = \eta_{ij}$).
+The tetrad $b^i{}_\mu$ is the linear map from one to the other,
+with inverse $h_i{}^\mu$; \cref{TetradFrames} illustrates the two
+frames at a single point $P$.
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.78\linewidth]{figures/tetrad.pdf}
@@ -76,8 +76,7 @@ linear map between them.
     $\mathbf{e}_i|_P$ (chosen at $P$ independently of the
     coordinates) span the same tangent space. The tetrad
     $b^i{}_\mu$ and its inverse $h_i{}^\mu$ relate the components
-    of any tangent vector in the two bases, and the inner product
-    in either basis reproduces the same metric.}
+    of any tangent vector in the two bases.}
   \label{TetradFrames}
 \end{figure}
 Unlike the spin connection, the tetrad does \emph{not} appear as
@@ -94,8 +93,8 @@ The covariant derivative on a tensor of mixed type acts with the
 spin connection on each Latin index and with the affine connection
 $\MAGA{^\sigma_\mu_\nu}$ (the independent Riemann--Cartan
 connection of the Palatini formulation, introduced in
-\cref{PGTframework}) on each Greek index, with the $\pm$ sign
-convention determined by whether each index is upper or lower.
+\cref{PGTframework}) on each Greek index, with $+$ on each upper
+index and $-$ on each lower index.
 For a tensor $\Phi^{i\,\mu}{}_{j\,\nu}$ with mixed Latin and
 Greek indices,
 \begin{align}
@@ -120,8 +119,8 @@ decomposition of covariant derivatives implemented in
 
 In any gauge theory the field strength can be read off the
 commutator of two covariant derivatives acting on a matter field:
-were the connection trivial the commutator would vanish, so any
-non-vanishing piece is proportional to the field strength. For
+were the connection trivial the commutator would vanish, so the
+commutator is linear in the field strength. For
 electrodynamics this gives the familiar relation
 $[\nabla_\mu,\nabla_\nu]\phi = i e\,\mathcal{F}_{\mu\nu}\phi$ on a charged
 matter field. In Poincar\'{e} gauge theory the analogous
@@ -156,7 +155,9 @@ The schematic torsion form $2\nabla_{[\mu} b^i{}_{\nu]}$ unfolds
 to its explicit form via \cref{MixedCovariantDerivative} applied
 to $b^i{}_\nu$: the spin connection acts on the Lorentz index,
 while the antisymmetrisation on $[\mu\nu]$ kills the Christoffel
-correction on the Greek index. The first measures the
+correction on the Greek index.
+
+The first measures the
 rotation of a vector parallel-transported around an infinitesimal
 closed loop; the second measures the non-closure of infinitesimal
 parallelograms formed from parallel-transported vectors. Both
@@ -171,8 +172,8 @@ with the distortion $\mathcal{D}^\sigma{}_{\mu\nu}$ a rank-three
 tensor field that subsumes torsion and non-metricity content
 together; in the metric-compatible case adopted throughout
 Poincar\'{e} gauge theory (and \cref{PalatiniDecomposition}), the
-distortion reduces to the contortion $K^\sigma{}_{\mu\nu}$ used
-elsewhere in this report, and the rank-three matter content is
+distortion reduces to the contortion $K^\sigma{}_{\mu\nu}$ of
+\cref{ContortionSplit}, and the rank-three matter content is
 purely torsion-driven. Every metric-affine model can therefore be
 recast as a Riemannian theory of gravity coupled to a rank-three
 tensor matter field. Unlike the geometric picture of general
@@ -215,8 +216,10 @@ curvature and torsion remain as independent field strengths.
     closed loop; torsion causes the non-closure of parallelograms
     formed from infinitesimally parallel-transported vectors;
     non-metricity causes the evolution of vector length under
-    parallel transport. Adapted from
-    figure~1 of~\cite{barker2025metricaffine}.}
+    parallel transport. Recreated from~\cite{bahamonde2021teleparallel};
+    cf.\ figure~4 of~\cite{capozziello2022comparing},
+    figure~1 of~\cite{hehlobukhov2007cartan},
+    and figure~1 of~\cite{barker2025metricaffine}.}
   \label{DiffGeometryObstructions}
 \end{figure}
 
@@ -234,19 +237,13 @@ Such double-invariant scalars are formed by full index
 contractions with the metric $\g{_{\mu\nu}}$, the flat-frame
 metric $\eta_{ij}$, the tetrad pair, and the totally
 antisymmetric tensor $\varepsilon^{\mu\nu\rho\sigma}$, exactly as
-in Yang--Mills theories of internal symmetries: the QED kinetic
+in other gauge field theories: the QED kinetic
 action $-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$ is the
 unique Lorentz scalar quadratic in the field strength, and the
 PGT analogue is the set of all independent quadratic contractions
 of $\MAGFt{}$ and $\MAGT{}$ with one
 another~\cite{barker2024poincare,sezgin1980ghostfree,hehl1995metric}.
-Restricted to quadratic order in the field strengths, this
-procedure produces a finite list of independent invariants per
-sector that decompose as \cref{QuadraticAction} and are catalogued
-sector-by-sector in
-\cref{PGTEnumeration}~\cite{karananas2014parity,lin2019pgt,blagojevic2018hamiltonian};
-at higher orders the list grows without bound, motivating the
-sector-by-sector truncation conventions reviewed in
+The independent invariants per sector are catalogued in
 \cref{PGTEnumeration}.
 
 The construction above used the gauge-theoretic field pair
@@ -384,14 +381,18 @@ otherwise unconstrained --- which split into three irreducible
 representations of the local Lorentz
 group~\cite{hehl1976spin,hehl1995metric,shapiro2002torsion,obukhov2024electrodynamics}.
 The trace vector
+\begin{subequations}
 \begin{align}
   \T[2]{_\mu} &\equiv \MAGT{^\lambda_\lambda_\mu}
+  \label{TraceVector}
 \end{align}
-collects four components, the axial pseudovector
+collects four components; the axial pseudovector
 \begin{align}
   \T[3]{^\mu} &\equiv \varepsilon^{\alpha\beta\gamma\mu}\,
     \MAGT{_{\alpha\beta\gamma}}
+  \label{AxialVector}
 \end{align}
+\end{subequations}
 collects another four, and the totally traceless tensor part
 $\T[1]{_{\alpha\beta\mu}}$ collects the remaining sixteen
 components, transforming as a single irreducible tensor
@@ -399,11 +400,8 @@ representation of the Lorentz group~\cite{hehl1976spin}, and
 satisfying the orthogonality conditions
 $\T[1]{^\lambda_\lambda_\mu} = 0$ and
 $\varepsilon^{\alpha\beta\gamma\delta}\T[1]{_{\alpha\beta\gamma}} = 0$.
-Shapiro's letter labels $T_\mu, S^\mu, q_{\alpha\beta\mu}$ for the
-same three components~\cite{shapiro2002torsion} appear in the
-older literature; we use the overset $\overset{(n)}{T}$ notation,
-which is the foundational metric-affine and PGT
-convention~\cite{hehl1976spin,hehl1995metric,obukhov2024electrodynamics}.
+Shapiro's letter labels $T_\mu, S^\mu, q_{\alpha\beta\mu}$~\cite{shapiro2002torsion}
+for the same three components appear in the older literature.
 The reconstruction formula
 \begin{align}
   \MAGT{_{\alpha\beta\mu}}
@@ -438,27 +436,3 @@ map~\cite{sezgin1980ghostfree,hehl1995metric,lin2019pgt}
   \label{DirectIrreducibleTransform}
 \end{align}
 which is invertible.
-
-The matrix entries follow directly from substituting
-\cref{IrreducibleTorsionFullDecomp} into the direct basis. The
-third contraction $I_3 = \T[2]{_\mu}\T[2]{^\mu}$ involves only the
-trace vector, so $\beta_3$ contributes to $c$ alone: this is the
-isolated unit entry in the bottom-right of the matrix, and the
-zeros immediately above it leave $\beta_3$ out of $a$ and $b$.
-The first two contractions $I_1$ and $I_2$ involve all three
-irreducible parts: substituting \cref{IrreducibleTorsionFullDecomp}
-into $I_1, I_2$ and using the orthogonality of $\T[1]{}$,
-$\T[2]{}$, and $\T[3]{}$ projects each direct contraction onto
-the three squared-norms with the coefficients in the
-corresponding column of the matrix. The asymmetry between the
-entries proportional to $\beta_1$ and $\beta_2$ reflects the
-index-swap that distinguishes
-$I_1 = \MAGT{_{\alpha\beta\mu}}\MAGT{^{\alpha\beta\mu}}$ from
-$I_2 = \MAGT{_{\alpha\beta\mu}}\MAGT{^{\beta\alpha\mu}}$. The
-direct basis $\{I_1,I_2,I_3\}$
-is the natural one for symbolic computation because it carries no
-$\varepsilon$-tensor or projector contractions; the irreducible
-basis $\{(\T[1]{})^2, (\T[3]{})^2, (\T[2]{})^2\}$ is the natural
-one for assigning physical degrees of freedom to spin-parity
-sectors. \Cref{DirectIrreducibleTransform} is the bridge between
-the two pictures.
