@@ -38,21 +38,21 @@ EFT ordering here.
 The Lagrangian is built from scalar contractions of
 $\{\MAGFt{^\sigma_{\mu\nu\rho}},\,\MAGT{^\sigma_{\mu\nu}}\!,\,\FieldF{_{\mu\nu}},\rcD{_\mu},\,\varepsilon^{\mu\nu\rho\sigma}\}$,
 arranged into the seven sector blocks of \cref{QuadraticAction}.
-We generate the basis of contractions at each operator class
-using the systematic-contraction enumeration
-of~\cite{nutma2014xtras}, applying the index (anti-)symmetries and integration by parts to remove operators
-equivalent up to a covariant total divergence. We do not attempt the residual Bianchi-identity and
+For each tensor product we obtain the independent
+contractions~\cite{nutma2014xtras} modulo
+the relevant index (anti-)symmetries and removes operators equivalent up to a covariant
+total divergence. We do not attempt the Bianchi-identity and
 dimension-dependent-identity\footnote{Dimension-dependent
 identities~\cite{edgarhoglund2002ddi} are algebraic relations
 among tensors that hold only
-in a fixed spacetime dimension --- here, $D=4$. The canonical
-example is that antisymmetrisation over five or more indices
+in a fixed spacetime dimension --- here, $D=4$. For example,
+antisymmetrisation over five or more indices
 vanishes identically, so any tensor expression containing a
 totally antisymmetric subblock on five or more indices reduces
 to combinations of expressions with smaller antisymmetric
 blocks. Their application reduces redundancies in the operator
 basis beyond what Bianchi-identity reductions alone achieve.}
-reductions of these ans\"atze in the present work; the
+reductions of these ans\"atze; the
 parity-odd, derivative, and cubic sectors are correspondingly
 flagged in \cref{MasterParameterCount} with $\dagger$ as upper
 bounds, and a complete reduction is left for future work.
@@ -137,15 +137,10 @@ invariants~\cite{kibble1961lorentz,holst1995barbero} and reads
 where $\gamma_\text{BI}$ is the Barbero--Immirzi
 parameter~\cite{barbero1995real,immirzi1997real}.
 The Holst term is a topological density in the torsion-free
-limit, proportional there to the Pontryagin density modulo
-Bianchi identities~\cite{hehlobukhov2007cartan,shapiro2002torsion},
-but becomes dynamical with torsion present
-through the Nieh--Yan identity~\cite{niehyan1982}; its variation
-is exchangeable with one parity-odd
-$\varepsilon\!\cdot\!\mathcal{T}^2$ coefficient introduced below.
+limit~\cite{hehlobukhov2007cartan,shapiro2002torsion} but
+becomes dynamical with torsion~\cite{niehyan1982}.
 We retain $\gamma_\text{BI}$ and $d_{14}\dots d_{17}$ as
-independent symbols rather than using the Nieh--Yan trade to
-reduce the parameter count by one.
+independent symbols.
 
 \paragraph*{Parity-even quadratic sector}
 \label{ParityEvenQuadratic}
@@ -156,8 +151,8 @@ three torsion-squared invariants in the direct basis
 $\{I_1,I_2,I_3\}$ of \cref{TorsionDirectBasis}~\cite{shapiro2002torsion,hayashi1979new},
 and the parity-even curvature--electromagnetic contraction
 $\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$~\cite{bahamonde2025torsion},
-alongside the Maxwell term $-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$
-which carries no free coefficient. Together these read
+alongside the Maxwell term $-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$.
+Together these read
 \begin{widetext}
 \begin{multline}
   \mathcal{L}_{\tilde{\mathcal{R}}^2}
@@ -182,22 +177,14 @@ The labels $\Alp{n}$, $\Bet{n}$, $\Del{1}$ follow the convention
 of~\cite{barker2024poincare}; \cref{MasterParameterCount} records
 the alternative parametrisation of~\cite{lin2019pgt}.
 
-All six $\tilde{\mathcal{R}}^2$ contractions are independent when torsion
-is present: the Riemann--Cartan curvature lacks the pair-exchange
-symmetry of the torsion-free Riemann tensor (i.e.,
-$\MAGFt{_{\rho\sigma\mu\nu}} \neq \MAGFt{_{\mu\nu\rho\sigma}}$ in
-general), since the antisymmetric Ricci $\MAGFt{_{[\mu\nu]}}$
-does not vanish in the presence of
-torsion~\cite{shapiro2002torsion,hehl1976spin,hehl1995metric,barker2024poincare},
-and additional independent contractions enter beyond the
-torsion-free Riemann-square count. In the torsion-free limit the
-count reduces to two (a Riemann-square and the Gauss--Bonnet
-topological combination~\cite{lin2019pgt}), and the parity-even
-$\tilde{\mathcal{R}} \mathcal{F}$ contraction
+All six $\tilde{\mathcal{R}}^2$ contractions are independent when
+torsion is present, since the antisymmetric Ricci
+$\MAGFt{_{[\mu\nu]}}$ does not
+vanish~\cite{shapiro2002torsion,hehl1976spin,hehl1995metric,barker2024poincare};
+in the torsion-free limit the count reduces to
+two~\cite{lin2019pgt}. The coupling
 $\Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ likewise
-vanishes since it requires a non-zero antisymmetric Ricci to
-contract against the Maxwell field strength; the parity-odd
-partners of this cross-coupling are catalogued separately below.
+requires non-vanishing antisymmetric Ricci.
 
 Ghost- and tachyon-freedom of this combined parameter family is
 analysed
@@ -211,14 +198,12 @@ extraction remains for future work.
 The parity-odd quadratic sector adds twenty-one
 $\varepsilon$-weighted invariants, of which twenty are dynamical.
 Thirteen are parity-odd curvature-square contractions of the
-form $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\MAGFt{}$
-($d_1\dots d_{13}$); these collapse to a single topological term
+form $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}^2$; these collapse to a single topological term
 in the torsion-free
 limit~\cite{shapiro2002torsion,karananas2014parity} but
 generically propagate when torsion is present. Four are
 parity-odd torsion-square contractions of the form
-$\varepsilon^{\mu\nu\rho\sigma}\MAGT{}\MAGT{}$
-($d_{14}\dots d_{17}$); the family contains the Nieh--Yan form
+$\varepsilon^{\mu\nu\rho\sigma}\MAGT{}^2$; the family contains the Nieh--Yan form
 $\varepsilon^{\mu\nu\rho\sigma}T^a{}_{\mu\nu}T_{a\rho\sigma}$, a
 Riemann--Cartan topological density whose total-derivative
 identity dynamically links it to the Holst term of
@@ -227,10 +212,7 @@ $\theta$-term~\cite{wilczek1987axion}
 $d_{18}\,\varepsilon^{\mu\nu\rho\sigma}\FieldF{_{\mu\nu}}\FieldF{_{\rho\sigma}} = 4\,d_{18}\,\PD{_\mu}\bigl(\varepsilon^{\mu\nu\rho\sigma}\FieldA{_\nu}\PD{_\rho}\FieldA{_\sigma}\bigr)$,
 a topological U(1) Chern density that is a total covariant divergence on any spacetime background, and therefore non-dynamical. The remaining three
 are parity-odd curvature--electromagnetic cross-terms
-$\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\FieldF{}$
-($d_{19},d_{20},d_{21}$), again requiring a non-zero
-antisymmetric Ricci to contract against the photon as in the
-parity-even cross-coupling. The propagator-level analysis of
+$\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\FieldF{}$. The propagator-level analysis of
 these
 sectors~\cite{karananas2014parity,blagojevic2018hamiltonian,barker2025psalter2}
 identifies the parity-violating mass spectra and gives the
@@ -242,11 +224,11 @@ tachyons beyond those of the parity-even sector.
 A covariant derivative adds one index, opening three further
 parity-even sectors beyond the algebraic enumeration above. In
 the first-order
-formalism $\rcD{_\mu}\MAGT{} \sim \MAGFt{}$, so
+formalism $\rcD{}\MAGT{} \sim \MAGFt{}$, so
 operators built from $\{\MAGFt{},\,\MAGT{},\,\FieldF{},\,\rcD{}\MAGT{}\}$
 remain Yang--Mills-type and produce at most second-order
-equations of motion; sectors involving $\PD{}\MAGFt{}$ or
-$\PD{}\FieldF{}$ generate fourth-order equations and are excluded
+equations of motion; sectors involving $\rcD{}\MAGFt{}$ or
+$\rcD{}\FieldF{}$ generate fourth-order equations and are excluded
 as ghost-prone~\cite{aoki2020nonlinear,nikiforova2009torsion}.
 Three parity-even safe sectors then follow:
 $\rcD{}\MAGT{}\!\times\!\FieldF{}$, generating three independent
@@ -270,12 +252,9 @@ expansion~\cite{lin2019pgt,blagojevic2018hamiltonian}.
 \label{CubicCompletions}
 A cubic operator contributes at quadratic order in the
 perturbation when one or two of its field-strength factors are
-evaluated on a non-zero classical background, since each
-background insertion converts one dynamical factor into a fixed
-coefficient. With a uniform magnetic background
+evaluated on a non-zero classical background. With a uniform magnetic background
 $\bar{F}_{\mu\nu}$, four parity-even cubic sectors enter the
-linearised analysis, each formed by inserting the background
-into one or two factors of a quadratic operator:
+linearised analysis:
 $\mathcal{R}\!\times\!\mathcal{F}^2$ ($\lambda_{1\dots 4}$, the Gertsenshtein
 channel into curvature--photon mixing~\cite{itin2004maxwell,bahamonde2025torsion}),
 $\mathcal{T}^2\!\times\!\mathcal{F}$ ($\kappa_{1\dots 3}$, generating
@@ -292,7 +271,7 @@ full theory~\cite{bahamonde2025cubic}.
 
 \paragraph*{Chern--Simons torsion--EM couplings}
 \label{ChernSimonsCouplings}
-Beyond the field-strength couplings catalogued above, the
+Beyond the field-strength couplings, the
 electromagnetic gauge potential $\FieldA{_\mu}$ admits three
 irreducible parity-odd contractions with the torsion
 tensor~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion,obukhov2024electrodynamics}:
