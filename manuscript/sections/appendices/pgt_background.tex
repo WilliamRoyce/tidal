@@ -10,12 +10,11 @@
 \section{Poincar\'{e} gauge theory: field content and conventions}
 \label{PGTBackground}
 
-Poincar\'{e} gauge theory follows the same gauge-theoretic template
-as any Yang--Mills gauge theory: a global symmetry
-of the matter sector is promoted to a local one, the resulting
-non-invariance is restored by introducing compensating connection
-fields, and the geometric interpretation of those fields fixes the
-kinematic arena.
+PGT is constructed by gauging the Poincar\'{e}
+group: the ten rigid symmetries of a matter Lagrangian are promoted
+to local ones, and the resulting non-invariance is cancelled by two
+compensating connection fields, the spin connection $A^{ij}{}_\mu$
+and the tetrad $b^i{}_\mu$.
 
 \paragraph*{Gauging the Poincar\'{e} group}
 \label{FieldContent}
@@ -26,8 +25,7 @@ transformations~\cite{kibble1961lorentz,utiyama1956invariant,sciama1962physical,
 Promoting the ten Poincar\'{e} parameters to spacetime-dependent
 functions breaks invariance through derivative terms acting on the
 local parameters; these are removed by introducing one
-compensating connection per generator type, exactly as in
-any gauge field theory. The Lorentz-rotation generators
+compensating connection per generator type. The Lorentz-rotation generators
 are compensated by a \emph{spin connection} $A^{ij}{}_\mu$ that
 enters the covariant
 derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
@@ -64,9 +62,8 @@ the coordinate basis $\partial_\mu$ (fixed by the chart $x^\mu$,
 generally non-orthonormal in a curved space) and an orthonormal
 Lorentz frame $\mathbf{e}_i$ (chosen at each point so that
 $\g{_{\mu\nu}}\mathbf{e}^\mu_i\,\mathbf{e}^\nu_j = \eta_{ij}$).
-The tetrad $b^i{}_\mu$ is the linear map from one to the other,
-with inverse $h_i{}^\mu$; \cref{TetradFrames} illustrates the two
-frames at a single point $P$.
+The tetrad $b^i{}_\mu$ is the linear map between the two;
+\cref{TetradFrames} illustrates this at a single point $P$.
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.78\linewidth]{figures/tetrad.pdf}
@@ -76,7 +73,9 @@ frames at a single point $P$.
     $\mathbf{e}_i|_P$ (chosen at $P$ independently of the
     coordinates) span the same tangent space. The tetrad
     $b^i{}_\mu$ and its inverse $h_i{}^\mu$ relate the components
-    of any tangent vector in the two bases.}
+    of any tangent vector in the two bases; cf.\ figure~4
+    of~\cite{capozziello2022comparing} and figure~1
+    of~\cite{hehlobukhov2007cartan}.}
   \label{TetradFrames}
 \end{figure}
 Unlike the spin connection, the tetrad does \emph{not} appear as
@@ -84,10 +83,9 @@ a connection term inside the covariant derivative on a matter
 field; it instead converts the resulting spacetime-index
 covariant derivative to Lorentz-frame-index form,
 $\nabla_k\phi = h_k{}^\mu\,\nabla_\mu\phi$~\cite[eq.~(1.7b)]{blagojevic2003lectures}.
-The tetrad's role as the translation gauge field manifests instead
-through the metric relation \cref{TetradMetric} and through its
-field strength --- the torsion --- that arises from the
-commutator calculation below.
+The tetrad instead enters as a gauge field through the metric
+relation \cref{TetradMetric} and the torsion field strength
+\cref{TorsionDef}.
 
 The covariant derivative on a tensor of mixed type acts with the
 spin connection on each Latin index and with the affine connection
@@ -123,7 +121,7 @@ were the connection trivial the commutator would vanish, so the
 commutator is linear in the field strength. For
 electrodynamics this gives the familiar relation
 $[\nabla_\mu,\nabla_\nu]\phi = i e\,\mathcal{F}_{\mu\nu}\phi$ on a charged
-matter field. In Poincar\'{e} gauge theory the analogous
+matter field. In PGT the analogous
 calculation produces two terms, one for each generator
 type~\cite[eq.~(1.11)]{blagojevic2003lectures},
 \begin{align}
@@ -171,14 +169,15 @@ $\MAGA{^\sigma_\mu_\nu} = \rCon{^\sigma_\mu_\nu} + \mathcal{D}^\sigma{}_{\mu\nu}
 with the distortion $\mathcal{D}^\sigma{}_{\mu\nu}$ a rank-three
 tensor field that subsumes torsion and non-metricity content
 together; in the metric-compatible case adopted throughout
-Poincar\'{e} gauge theory (and \cref{PalatiniDecomposition}), the
+PGT (and \cref{PalatiniDecomposition}), the
 distortion reduces to the contortion $K^\sigma{}_{\mu\nu}$ of
 \cref{ContortionSplit}, and the rank-three matter content is
 purely torsion-driven. Every metric-affine model can therefore be
 recast as a Riemannian theory of gravity coupled to a rank-three
 tensor matter field. Unlike the geometric picture of general
-relativity --- which maps cleanly onto a healthy spin-2 graviton
---- the metric-affine geometric picture obscures the rank-three
+relativity --- which maps cleanly onto a healthy spin-2
+graviton~\cite{sezgin1980ghostfree,lin2019pgt} --- the
+metric-affine geometric picture obscures the rank-three
 matter content, which inherits the standard
 quantum-field-theoretic pathologies typical of high-rank fields:
 ghosts and tachyons in the linearised
@@ -191,20 +190,17 @@ pathologies manifest.}
 On a generic linear connection the metric and the connection are
 independent, so the covariant derivative of the metric does not
 vanish. The resulting tensor is the \emph{non-metricity}
-$\mathcal{Q}_{\lambda\mu\nu} \equiv -\rcD{_\lambda}\g{_{\mu\nu}}$~\cite[\eg eq.~(2.5)]{blagojevic2003lectures,hehl1995metric},
-the third independent geometric obstruction associated with a
-linear connection, shown alongside curvature and torsion in
-\cref{DiffGeometryObstructions}: $\mathcal{Q}$ measures the
-evolution of a vector's length under parallel transport. The
-most general space carrying all three obstructions is the
+$\mathcal{Q}_{\lambda\mu\nu} \equiv -\rcD{_\lambda}\g{_{\mu\nu}}$~\cite[eq.~(2.5)]{blagojevic2003lectures},
+which measures the failure of parallel transport to preserve inner
+products (\cref{DiffGeometryObstructions}). The
+most general space carrying all three is the
 metric-affine space $L_4$ (\cref{MetricAffineClasses})~\cite{hehl1995metric};
 demanding that the connection preserves the metric under parallel
 transport, equivalently that
 $\rcD{_\mu}\g{_{\nu\lambda}} = 0$, is the
 \emph{metric-compatibility}
 condition~\cite[eq.~(2.5)]{blagojevic2003lectures}, and it sets
-$\mathcal{Q}_{\lambda\mu\nu} = 0$ identically. Poincar\'{e} gauge
-theory adopts metric compatibility as a defining
+$\mathcal{Q}_{\lambda\mu\nu} = 0$ identically. PGT adopts metric compatibility as a defining
 requirement~\cite{hehl1976spin,blagojevic2003lectures}, so only
 curvature and torsion remain as independent field strengths.
 \begin{figure}[h]
@@ -217,9 +213,7 @@ curvature and torsion remain as independent field strengths.
     formed from infinitesimally parallel-transported vectors;
     non-metricity causes the evolution of vector length under
     parallel transport. Recreated from~\cite{bahamonde2021teleparallel};
-    cf.\ figure~4 of~\cite{capozziello2022comparing},
-    figure~1 of~\cite{hehlobukhov2007cartan},
-    and figure~1 of~\cite{barker2025metricaffine}.}
+    cf.\ figure~1 of~\cite{barker2025metricaffine}.}
   \label{DiffGeometryObstructions}
 \end{figure}
 
@@ -227,13 +221,12 @@ curvature and torsion remain as independent field strengths.
 With $\MAGFt{}$ and $\MAGT{}$ as the dynamical gauge fields, the
 gravitational action is built from them by the same principle as
 any other gauge theory: the free Lagrangian must be a scalar
-under both local Lorentz
-transformations (acting on the Latin indices) and general
-coordinate transformations (acting on the Greek indices), built
+under local Lorentz and general-coordinate
+transformations, built
 from the field strengths and their covariant derivatives, and
 integrated against an invariant volume element on
 spacetime~\cite[eq.~(1.13)]{blagojevic2003lectures,lin2019pgt}.
-Such double-invariant scalars are formed by full index
+These scalars are formed by full index
 contractions with the metric $\g{_{\mu\nu}}$, the flat-frame
 metric $\eta_{ij}$, the tetrad pair, and the totally
 antisymmetric tensor $\varepsilon^{\mu\nu\rho\sigma}$, exactly as
@@ -302,7 +295,7 @@ for theories of gravity. \Cref{MetricAffineClasses} shows the
 classification: the outermost set is metric-affine
 $(L_4, \g{})$, with the three obstructions
 $\mathcal{R}, \mathcal{T}, \mathcal{Q}$ generating distinguished
-sub-arenas by switching off subsets. Poincar\'{e} gauge theory
+sub-arenas by switching off subsets. PGT
 inhabits the Riemann--Cartan space $U_4$ defined by
 $\mathcal{Q} = 0$.
 \begin{figure}[h]
@@ -402,17 +395,8 @@ $\T[1]{^\lambda_\lambda_\mu} = 0$ and
 $\varepsilon^{\alpha\beta\gamma\delta}\T[1]{_{\alpha\beta\gamma}} = 0$.
 Shapiro's letter labels $T_\mu, S^\mu, q_{\alpha\beta\mu}$~\cite{shapiro2002torsion}
 for the same three components appear in the older literature.
-The reconstruction formula
-\begin{align}
-  \MAGT{_{\alpha\beta\mu}}
-    &= \tfrac{1}{3}\bigl(\T[2]{_\beta}\,\g{_{\alpha\mu}}
-                       - \T[2]{_\mu}\,\g{_{\alpha\beta}}\bigr)
-     - \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\,\T[3]{^\nu}
-     + \T[1]{_{\alpha\beta\mu}}
-  \label{IrreducibleTorsionFullDecomp}
-\end{align}
-expresses the torsion in terms of its irreducible parts,
-restating \cref{IrreducibleTorsion}.
+The reconstruction formula \cref{IrreducibleTorsion}
+expresses the torsion in terms of its irreducible parts.
 
 The torsion-squared sector of the action admits two equivalent
 parameterisations. In the irreducible basis it reads $a\,(\T[1]{})^2 +
@@ -421,7 +405,7 @@ b\,(\T[3]{})^2 + c\,(\T[2]{})^2$, with $(\T[1]{})^2 \equiv
 squared norms defined analogously; in the direct basis of scalar
 contractions of \cref{TorsionDirectBasis} it reads $\beta_1 I_1 +
 \beta_2 I_2 + \beta_3 I_3$. Substituting
-\cref{IrreducibleTorsionFullDecomp} into the direct-basis
+\cref{IrreducibleTorsion} into the direct-basis
 contractions and using the orthogonality of the three irreducible
 parts gives the linear
 map~\cite{sezgin1980ghostfree,hehl1995metric,lin2019pgt}
