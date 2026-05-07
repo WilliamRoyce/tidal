@@ -16,16 +16,13 @@ background metric.
 Hwang \& Noh~\cite{hwangnoh2023graviton} examine the validity of
 this assumption: the EM stress-energy modifies the
 graviton through a tachyonic mass-like term
-$-(\kappa^2/2)\Bzero^2$ (which appears explicitly in the
-kinetic matrix produced by the symbolic pipeline,
-\cref{ReferenceKineticOutput}, and is implicit in the closed-form
-Boccaletti reproduction of \cref{ValidationResult}).
+$-(\kappa^2/2)\Bzero^2$.
 There is a critical scale $\lambda_B = 2\pi/k_B$, with
 $k_B = \sqrt{8\pi G}\,\Bzero/c^2$, above which the dimensionless
 backreaction parameter $D^2/\lambda_B^2$ ceases to be small ---
 the assumption that the magnetic field's own
 gravitational field is negligible breaks down.
-They show that the backreaction parameter is proportional to~\cite{hwangnoh2023graviton}
+Hwang \& Noh show~\cite{hwangnoh2023graviton} that the backreaction parameter is proportional to
 $\Pconv$:
 \begin{align}
   \frac{D^2}{\lambda_B^2}
@@ -58,10 +55,9 @@ $\delta\MAGT{^\sigma_\mu_\nu}$ alongside the graviton $h_{\mu\nu}$
 and photon perturbation $\delta\FieldA{_\mu}$ (\cref{Linearisation}).
 At $\Bzero=0$ the configuration $g_{\mu\nu}=\eta_{\mu\nu}$,
 $\bar{A}_\mu=0$, $\bar{\MAGT{}}=0$ satisfies the full nonlinear field equations of any ghost-safe
-polynomial PGT Lagrangian identically: every field-equation term
-is at least linear in the field strengths
-$\{\widetilde{\mathcal{R}},\MAGT{},\FieldF{},\rcD{}\MAGT{}\}$,
-all of which vanish on this background.
+polynomial PGT Lagrangian identically: the field equations are polynomial in
+$\MAGT{}$, $\MAGFt{}$, and $\FieldF{}$,
+all of which vanish at $(\eta_{\mu\nu},0,0)$.
 The leading Taylor coefficient $c_2$ of the expansion
 \cref{TaylorPconv} is therefore evaluated free of the
 metric-backreaction shift discussed above.
@@ -98,14 +94,12 @@ defined below in \cref{SurveyCoefficient}.
 On the uniform-field flat background,
 $\partial_\mu\bar{\FieldF{}}_{\nu\rho}=0$.
 The Cartan equation --- the field equation for torsion, obtained by
-varying the action with respect to $\MAGT{}$ (\cref{PGTBackground})
+varying the PGT Lagrangian of \cref{PGTBackground} with respect to $\MAGT{}$
 --- collects contributions from every Lagrangian term that depends on
 $\MAGT{}$, either directly or through the Riemann--Cartan curvature
 $\MAGFt{}$, which inherits a torsion-dependence through the contortion
-$K(\MAGT{})$ in the Riemann--Cartan connection.
-The connection contains both a $\rcD{}K$ piece (linear in $\MAGT{}$,
-with a covariant derivative) and a $K{\cdot}K$ piece (quadratic in
-$\MAGT{}$, derivative-free).
+$K\propto\MAGT{}$ in the Riemann--Cartan connection;
+the connection contains both a $\rcD{}K$ piece and a $K{\cdot}K$ piece.
 At the background $(\eta_{\mu\nu},\,\bar{\FieldF{}},\,\bar{\MAGT{}}=0)$,
 every term type in the Lagrangian vanishes:
 the pure-torsion terms ($\MAGT{}^2$, $(\rcD{}\MAGT{})^2$) are at least
@@ -121,7 +115,8 @@ for the uniform background; the $K{\cdot}K$ piece vanishes at
 $\bar{\MAGT{}}=0$ directly because its variation is proportional to
 $K|_{\bar{\MAGT{}}=0}=0$.
 Thus $\bar{\MAGT{}}=0$ solves the Cartan equation on this background
-exactly, not merely as an approximation.
+exactly for the parity-even quadratic theory class surveyed,
+not merely as an approximation.
 This conclusion relies on $\partial_\mu\bar{\FieldF{}}=0$:
 for non-uniform fields or curved backgrounds
 $\rcD{}\bar{\FieldF{}}\neq 0$ and $\bar{\MAGT{}}=0$ need not
@@ -145,12 +140,10 @@ of the form $(\partial h){\cdot}K[\delta\MAGT{}]$ to $\MAGFt{}$ at
 second perturbative order.
 Varying $\Del{1}\MAGFt{_{[\mu\nu]}}\bar{\FieldF{}}^{\mu\nu}$ with
 respect to $\delta\MAGT{}$ selects this cross-term, producing a source
-$\propto\Del{1}\bar{\FieldF{}}\,\partial h$, of order
-$\Del{1}\Bzero A/D$ for a plane-wave graviton of dimensionless
-amplitude $A$ defined in \cref{Linearisation} and wavenumber
-$k\sim 1/D$.
-Algebraic inversion through the $\Alp{}\MAGT{}^2$ mass term gives
-$|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$.
+$\propto\Del{1}\bar{\FieldF{}}\,\partial h$;
+algebraic inversion through the $\Alp{}\MAGT{}^2$ mass term gives
+$|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
+for a graviton of dimensionless amplitude $A$ (\cref{Linearisation}).
 Perturbativity of the torsion sector
 ($|\delta\MAGT{}|\ll\Alp{}$) requires
 \begin{align}
@@ -165,9 +158,9 @@ Lagrangian coupled to electromagnetism~\cite{blagojevic2018hamiltonian}.
 The bound \cref{PerturbativeBound} is specific to the algebraic-torsion
 theory with the
 $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ coupling.
-For a generic non-minimal coupling of the form
-$g_{\mathrm{NM}}\,\widetilde{\mathcal{R}}\,\FieldF{}$ ---
-with $\Del{1}$ the specific instance considered above ---
+For non-minimal couplings of the form
+$g_{\mathrm{NM}}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ ---
+with $\Del{1}$ the specific value surveyed ---
 and a torsion mass scale $m_T$ set by the algebraic torsion term
 ($m_T^2\sim\Alp{}$ for the algebraic-torsion theory of
 \cref{PerturbativeBound}), the torsion correction to the survey
@@ -212,11 +205,6 @@ reported in \cref{SectorSurvey}.
   \end{tabular}
 \end{table}
 
-The multi-$\Bzero$ convergence rate predicted by \cref{TaylorPconv},
-$C(\Bzero)\to\Czero$ linearly in $\Bzero^2$, is the operational check
-on the perturbative regime; it is exercised by the survey of
-\cref{SectorSurvey}.
-
 \paragraph*{The survey coefficient}
 
 The parameter survey of \cref{SectorSurvey} evaluates the limiting
@@ -229,7 +217,7 @@ survey coefficient
 the leading Taylor coefficient of \cref{TaylorPconv}.
 
 Since $\Pconv$ vanishes at $\Bzero=0$ and contains only even powers of
-$\Bzero$ (``Analytic dependence on the background field'' above),
+$\Bzero$ (\cref{TaylorPconv}),
 $c_2$ is the lowest non-zero Taylor coefficient of $\Pconv$.
 The survey coefficient $\Czero=c_2$ is therefore the leading term in
 $C=\Pconv/\Bzero^2$ --- not by definition, but as a consequence of the
