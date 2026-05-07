@@ -39,8 +39,8 @@ The Lagrangian is built from scalar contractions of
 $\{\MAGFt{^\sigma_{\mu\nu\rho}},\,\MAGT{^\sigma_{\mu\nu}}\!,\,\FieldF{_{\mu\nu}},\rcD{_\mu},\,\varepsilon^{\mu\nu\rho\sigma}\}$,
 arranged into the seven sector blocks of \cref{QuadraticAction}.
 For each tensor product we obtain the independent
-contractions~\cite{nutma2014xtras} modulo
-the relevant index (anti-)symmetries and removes operators equivalent up to a covariant
+contractions modulo
+the relevant index (anti-)symmetries~\cite{nutma2014xtras} and remove operators equivalent up to a covariant
 total divergence. We do not attempt the Bianchi-identity and
 dimension-dependent-identity\footnote{Dimension-dependent
 identities~\cite{edgarhoglund2002ddi} are algebraic relations
@@ -90,18 +90,18 @@ The inventory is collected in \cref{MasterParameterCount}.
     $\Lambda$                                               & $\Lambda$                    & 1            & cosmological constant \\
     $\varepsilon\!\cdot\!\MAGFt{}$                          & $\gamma_\text{BI}$           & 1            & Holst~\cite{holst1995barbero}; Barbero--Immirzi~\cite{barbero1995real,immirzi1997real} \\
     \midrule
-    $\MAGFt{}^2$                                            & $\Alp{1}\dots\Alp{6}$        & 6            & Barker \etal~\cite{barker2024poincare}; Lin \etal~\cite{lin2019pgt} (alternative $r_n$) \\
-    $\mathcal{T}^2$                                         & $\Bet{1},\Bet{2},\Bet{3}$    & 3            & Barker \etal~\cite{barker2024poincare}; Shapiro~\cite{shapiro2002torsion} \\
+    $\MAGFt{}^2$                                            & $\Alp{1\text{--}6}$        & 6            & Barker \etal~\cite{barker2024poincare}; Lin \etal~\cite{lin2019pgt} (alternative $r_n$) \\
+    $\mathcal{T}^2$                                         & $\Bet{1\text{--}3}$    & 3            & Barker \etal~\cite{barker2024poincare}; Shapiro~\cite{shapiro2002torsion} \\
     $\MAGFt{}\,\mathcal{F}$                                           & $\Del{1}$                    & 1            & Bahamonde \etal~\cite{bahamonde2025torsion} \\
     \midrule
-    $\varepsilon\!\cdot\!\MAGFt{}^2$                        & $d_1\dots d_{13}$            & 13           & parity-odd $\varepsilon\!\cdot\!\tilde{\mathcal{R}}^2$~\cite{karananas2014parity,barker2025psalter2} \\
-    $\varepsilon\!\cdot\!\mathcal{T}^2$                     & $d_{14}\dots d_{17}$         & 4            & parity-odd $\varepsilon\!\cdot\!\mathcal{T}^2$; Nieh--Yan~\cite{niehyan1982} \\
+    $\varepsilon\!\cdot\!\MAGFt{}^2$                        & $d_{1\text{--}13}$            & 13           & parity-odd $\varepsilon\!\cdot\!\tilde{\mathcal{R}}^2$~\cite{karananas2014parity,barker2025psalter2} \\
+    $\varepsilon\!\cdot\!\mathcal{T}^2$                     & $d_{14\text{--}17}$         & 4            & parity-odd $\varepsilon\!\cdot\!\mathcal{T}^2$; Nieh--Yan~\cite{niehyan1982} \\
     $\varepsilon\!\cdot\!\mathcal{F}^2$                               & $d_{18}$                     & $1^*$        & $\mathcal{F}\tilde{\mathcal{F}}$ (total derivative) \\
-    $\varepsilon\!\cdot\!\MAGFt{}\,\mathcal{F}$                       & $d_{19},d_{20},d_{21}$       & 3            & --- \\
+    $\varepsilon\!\cdot\!\MAGFt{}\,\mathcal{F}$                       & $d_{19\text{--}21}$       & 3            & --- \\
     \midrule
-    $\rcD{}\mathcal{T}\!\times\!\mathcal{F}$                           & $\zeta_{1,2,3}$              & 3            & Shapiro non-minimal~\cite{shapiro2002torsion} (parity-even sector) \\
-    $\MAGFt{}\!\times\!\rcD{}\mathcal{T}$                    & $\chi,\chi_2\dots\chi_{10}$  & $10^\dagger$ & Barker \etal\ $\chi$~\cite{barker2024poincare} \\
-    $(\rcD{}\mathcal{T})^2$                                  & $\xi,\xi_2\dots\xi_{16}$     & $16^\dagger$ & Barker \etal\ $\xi$~\cite{barker2024poincare} \\
+    $\rcD{}\mathcal{T}\!\times\!\mathcal{F}$                           & $\zeta_{1\text{--}3}$              & 3            & Shapiro non-minimal~\cite{shapiro2002torsion} (parity-even sector) \\
+    $\MAGFt{}\!\times\!\rcD{}\mathcal{T}$                    & $\chi,\chi_{2\text{--}10}$  & $10^\dagger$ & Barker \etal\ $\chi$~\cite{barker2024poincare} \\
+    $(\rcD{}\mathcal{T})^2$                                  & $\xi,\xi_{2\text{--}16}$     & $16^\dagger$ & Barker \etal\ $\xi$~\cite{barker2024poincare} \\
     \midrule
     $\varepsilon\!\cdot\!\rcD{}\mathcal{T}\!\times\!\mathcal{F}$       & $\tilde\zeta_{1\text{--}6}$  & 6            & --- \\
     $\varepsilon\!\cdot\!\MAGFt{}\!\times\!\rcD{}\mathcal{T}$ & $\tilde\chi_{1\text{--}36}$ & $36^\dagger$ & --- \\
@@ -255,19 +255,49 @@ perturbation when one or two of its field-strength factors are
 evaluated on a non-zero classical background. With a uniform magnetic background
 $\bar{F}_{\mu\nu}$, four parity-even cubic sectors enter the
 linearised analysis:
-$\mathcal{R}\!\times\!\mathcal{F}^2$ ($\lambda_{1\dots 4}$, the Gertsenshtein
+$\mathcal{R}\!\times\!\mathcal{F}^2$ (the Gertsenshtein
 channel into curvature--photon mixing~\cite{itin2004maxwell,bahamonde2025torsion}),
-$\mathcal{T}^2\!\times\!\mathcal{F}$ ($\kappa_{1\dots 3}$, generating
+$\mathcal{T}^2\!\times\!\mathcal{F}$ (generating
 torsion-mass corrections proportional to $\Bzero$),
-$\mathcal{R}^2\!\times\!\mathcal{F}$ ($\rho_{1\dots 8}$, modifying the
+$\mathcal{R}^2\!\times\!\mathcal{F}$ (modifying the
 quadratic graviton self-interaction in the magnetic background),
-and $\rcD{}\mathcal{T}\!\times\!\mathcal{F}^2$ ($\mu_{1\dots 5}$, a
+and $\rcD{}\mathcal{T}\!\times\!\mathcal{F}^2$ (a
 torsion--photon conversion channel proportional to $\Bzero$).
-The parity-odd partners $(\tilde\lambda,\tilde\kappa,\tilde\mu)$
+The parity-odd partners
 enumerated in \cref{MasterParameterCount} arise by
 $\varepsilon$-contraction of the same parity-even contractions.
 The cubic operators are independent coupling constants of the
-full theory~\cite{bahamonde2025cubic}.
+full theory~\cite{bahamonde2025cubic}. The four linearised vertex
+topologies generated by background insertion --- two trilinear
+vertices opening new conversion channels and two
+$2$-point corrections shifting masses and
+self-energies --- are depicted in \cref{VertexTopologyCubic}.
+% Conversion amplitudes are computed from the kinetic matrix
+% $\mathcal{K}(\Bzero)$ of \cref{KineticMatrix}, not from Feynman-rule
+% evaluation~\cite{burgess2003quantum,hwangnoh2023graviton}.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{figures/vertex_topology_cubic.pdf}
+  \caption{Linearised vertex topologies of the four parity-even
+    cubic completions. Dynamical external legs carry the bare
+    field symbol ($h$, $A$, $T$); background-field legs are
+    solid lines terminated with a cross, representing the magnetic
+    background $\bar{F}$. (a)~$\mathcal{R}\!\times\!\mathcal{F}^2$
+    generates a trilinear
+    $h$--$A$--$\bar F$ vertex, an
+    additional Gertsenshtein channel into curvature--photon
+    mixing. (b)~$\mathcal{T}^2\!\times\!\mathcal{F}$ becomes a
+    two-point torsion correction, shifting the torsion mass at order
+    $\Bzero$. (c)~$\mathcal{R}^2\!\times\!\mathcal{F}$ becomes a
+    two-point graviton self-energy in the magnetic background. (d)~$\rcD{}\mathcal{T}\!\times\!\mathcal{F}^2$
+    generates a trilinear $T$--$A$--$\bar F$ vertex, opening a direct torsion--photon conversion channel
+    at order $\Bzero$. The ``$+\,\varepsilon$'' badge in panels
+    (a), (b), and (d) denotes the parity-odd
+    $\varepsilon$-contracted twins
+    enumerated in \cref{MasterParameterCount}}
+  \label{VertexTopologyCubic}
+\end{figure}
 
 \paragraph*{Chern--Simons torsion--EM couplings}
 \label{ChernSimonsCouplings}
@@ -294,4 +324,27 @@ producing the parity-odd birefringence and dichroism signatures
 analysed in~\cite{rubilar2003torsion,obukhov2024electrodynamics}.
 The third coupling is the unique Chern--Simons interaction
 selecting the spin-two torsion sector, contracting the Maxwell
-pair with the tensor component $\T[1]{}$.
+pair with the tensor component $\T[1]{}$. The three irreducible-sector
+couplings share a single parity-odd vertex topology and are summarised
+in \cref{VertexTopologyCS}.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.5\linewidth]{figures/vertex_topology_cs.pdf}
+  \caption{Parity-odd Chern--Simons vertex topology shared by the
+    three irreducible torsion-sector couplings
+    $\chi^{\mathrm{CS}}_{1,2,3}$ of \cref{ChernSimonsAction}.
+    All three contractions $\varepsilon\,T^{(i)}\,A\,\bar F$ have
+    identical leg structure and parity-odd $\varepsilon$-vertex
+    (hollow square, distinguishing them from the parity-even
+    cubic-completion vertices of \cref{VertexTopologyCubic});
+    they differ only by which irreducible torsion sector enters
+    the $T$ leg ($T^{(1)}$ tensor, $T^{(2)}$ trace, $T^{(3)}$
+    axial). The axial coupling $\chi^{\mathrm{CS}}_{2}$ sources the
+    magnetic-helicity density
+    $\bm A\!\cdot\!\bm B$~\cite{rubilar2003torsion,obukhov2024electrodynamics};
+    $\chi^{\mathrm{CS}}_{3}$ is the unique Chern--Simons
+    interaction selecting the spin-two torsion sector. Leg-style
+    convention as in \cref{VertexTopologyCubic}.}
+  \label{VertexTopologyCS}
+\end{figure}
