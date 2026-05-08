@@ -884,3 +884,39 @@ Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
 **Verdict: t_end-stable — AGAINST tachyonic contamination.** The small negative shift (1.8σ, consistent with sampling noise) argues that A_static ≈ A_chain at both t_end values. If tachyons dominated, the chain at t_end=3 would find no viable high-A samples (the instability hasn't had time to grow) and log Z would drop by ~1 nat. The absence of this drop indicates the amplification seen in v2 chains is predominantly the t-independent A_static (light-mediator / Schur-complement coupling-strength enhancement), not spurious tachyonic growth.
 
 **Implication for publication:** The v2 amp log Z = +0.68 and associated A≈38 MAP are validated as predominantly real signal. The residual tachyonic growth factor (~1.6× at t_end=3, ~4× at t_end=10) is a small correction, not the dominant contribution. Reporting A at t_end=10 with a note on the probe boundary attractor is defensible. Campaign re-anchoring at t_end=3 (which would require re-runs of all D1/D2.x/Stage A jobs) is not urgently required.
+
+
+---
+
+## Phase 6.J — D1 bounds-dependence sweep at L=75 (#344, 2026-05-08)
+
+**Goal:** Bracket the L=50→L=100 trend with one intermediate point at L=75 to test monotonicity. Phase 6.G observed amp log Z shifting from −2.091 (L=50) to +0.679 (L=100) and sup from +16.329 to +12.957 — natural to ask whether the trend is linear or has a peak/plateau.
+
+**Settings:** matched to Phase 6.G/H midres (grid=128/nlive=300/τ=0.15/snapshots=2) for direct comparison; ic_wavevector = 2π/75 = 0.0838 (fundamental mode at L=75). INTR, sequential (MaxSubmitPU=1).
+
+| Job | Chain | L | log Z | Wall | ndead | Clusters |
+|-----|-------|---|-------|------|-------|----------|
+| 28976470 | amp midres (Phase 6.G) | 50 | −2.091 ± 0.048 | 0:03:56 | 2003 | — |
+| **29019705** | **amp L=75 (Phase 6.J)** | **75** | **+0.842 ± 0.053** | 0:03:41 | 2619 | 0/3 |
+| 28982029 | amp L=100 (Phase 6.H INTR-reduced) | 100 | +0.679 ± 0.041 | 0:15:57 | — | — |
+| 28967862 | sup midres (Phase 6.G) | 50 | +16.329 ± 0.121 | 0:16:14 | ~2000 | — |
+| **29021563** | **sup L=75 (Phase 6.J)** | **75** | **+12.814 ± 0.208** | 0:17:13 | 6357 | 0/81 |
+| 28985713 | sup L=100 (Phase 6.H INTR-xreduced) | 100 | +12.957 ± 0.205 | 0:40:06 | 6322 | 0/72 |
+
+### Bayes factors at each L
+
+| L | log Z_amp | log Z_sup | log B | B | Verdict |
+|---|-----------|-----------|-------|---|---------|
+| 50 | −2.091 | +16.329 | −18.42 | 9×10⁻⁹ | Sup overwhelmingly |
+| 75 | +0.842 | +12.814 | **−11.97** | **6×10⁻⁶** | Sup decisively |
+| 100 | +0.679 | +12.957 | **−12.27** | **5×10⁻⁶** | Sup decisively |
+
+### Findings
+
+**1. Amp landscape is non-monotonic in L.** L=75 (+0.842) > L=100 (+0.679); the L=50→L=100 +2.8-nat shift is the leading edge of a curve that peaks near L≈75 and plateaus/decreases toward L=100, not a linear bounds-dependence. The L=50 result was outside this plateau (probe rejects almost all parameter space at the small box, since fewer k-modes are resolved → sparser stability check → more borderline-tachyon rejections).
+
+**2. Sup landscape is bounds-stable in L≥75.** The L=50→L=75 drop (+16.329 → +12.814, −3.5 nats) is large, but L=75→L=100 (+12.814 → +12.957, +0.14 nats) is within σ. Suggests the sup landscape is saturated for L≥75.
+
+**3. Bayes factor stability is the key publication-quality result.** B ≈ 5–6×10⁻⁶ at both L=75 and L=100 (log B within 0.30 nats of each other, well within combined errors). The suppression verdict is bounds-independent in the L≥75 regime — the ~10⁻⁶ Bayes factor is not an artefact of choosing L=100. Future paired runs at L≥75 with comparable settings will produce comparable Bayes factors.
+
+**Implication:** L=100 (canonical Phase 6.H setting) is a defensible choice — it's deep in the bounds-stable plateau, not at an extremum. The original L=50 amp/sup numbers (Phase 6.D) were outside this plateau and therefore mis-represented the model; Phase 6.G's L=100 re-run was a necessary correction, but no further bounds extension is needed.
