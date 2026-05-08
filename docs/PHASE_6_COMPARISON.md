@@ -816,11 +816,15 @@ Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
 |-----|-------|------|-------|--------|------|-------|-------|
 | 28982029 | amp intr-reduced | 256 | 600 | COMPLETED | 0:15:57 | **+0.679 ± 0.041** | ESS=3113, MAP α₁=−0.322/α₂=−0.786/α₃=0.388/δ₁=0.764 |
 | 28983285 | sup intr-reduced | 256 | 600 | TIMEOUT | 1:00:06 | — | 35 clusters at timeout; sup landscape too complex for 1h |
-| 28985713 | sup intr-xreduced | 128 | 300 | RUNNING | — | — | Further-reduced settings; rough log Z estimate pending |
+| 28985713 | sup intr-xreduced | 128 | 300 | COMPLETED | 0:40:06 | **+12.957 ± 0.205** | Fully drained (0/72 active clusters), ndead=6322; rough sup estimate |
 
 **Amp INTR reduced result:** log Z = +0.679 ± 0.041 — consistent with 28883112 (+0.752 ± 0.047) at <1.5σ. Confirms v2 amp standard will land ~+0.7 ± 0.05.
 
 **Sup INTR timeout:** 35 clusters in 1h (nlive=600/grid=256). At v2 settings (nlive=1200/grid=512), each evaluation is ~4-6× more expensive; 6h wall was insufficient. Resubmitted with 12h wall.
+
+**Sup INTR xreduced (28985713):** at grid=128/nlive=300/τ=0.15 the chain converged in 40 min (fully drained, 0/72 active clusters). **log Z = +12.957 ± 0.205** — confirms the τ=0.15 probe leaves the sup landscape robust under the canonical L=100 grid. Cross-comparison with Phase 6.G midres (28967862, grid=128, **L=50**, +16.329) shows a ~3.4-nat downward shift attributable to the bounds change (more k-modes resolved at L=100 → tighter probe rejection of borderline samples). This mirrors the amp side: Phase 6.G midres at L=50 was −2.091, but at L=100 it is +0.679/+0.752 (a +2.8-nat shift in the same direction).
+
+**Early Bayes factor (mismatched fidelity, INTR-reduced):** B = exp(0.679 − 12.957) = **4.6×10⁻⁶** — decisively suppression, consistent with all prior settings (Phase 6.C: 3.1×10⁻⁵ at τ=0.3; Phase 6.G matched midres: 9×10⁻⁹ at L=50). The full v2 publication number will refine this once 28982006 + 28985879 converge.
 
 ### Standard jobs (v2 publication run)
 
@@ -834,7 +838,8 @@ Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
 
 **Predicted results:**
 - Amp: log Z ≈ +0.7 ± 0.05 (consistent across 28883112 / 28982029 / 28896653, bracketing with τ=0.15)
-- Sup: log Z unknown — matched-params sup under τ=0.15 has not been run at any grid. Phase 6.G Phase 6.G sup at origparams/midres gives 16.3–16.4 under τ=0.3; expected to be somewhat lower under τ=0.15 (borderline-stable samples near γ∈[0.15,0.30] are now rejected; 121-cluster landscape may simplify or complicate). **Conservative Bayes factor estimate: B ≈ exp(0.7−14) ≈ 10⁻⁶ (suppression decisive regardless).**
+- Sup: log Z ≈ +13.0 (xreduced INTR 28985713 gives +12.957 ± 0.205 at grid=128/nlive=300/L=100/τ=0.15; v2 standard refines this at higher resolution).
+- **Early Bayes factor estimate: B = exp(0.679 − 12.957) = 4.6×10⁻⁶ — decisively suppression.** Refines from Phase 6.C's 3.1×10⁻⁵ as the τ=0.15 probe excludes the tachyonically-contaminated near-boundary amp samples.
 
 ### Phase 6.H status checklist
 
