@@ -51,30 +51,32 @@ indices~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehl
 \end{gather}
 \end{subequations}
 and which relate the curved-space metric to the Minkowski metric
-of the local Lorentz frame via the tetrad-bilinear relation
+of the local Lorentz frame via the tetrad-bilinear
+relation~\cite[\S II]{blagojevic2003lectures}
 \begin{align}
   \g{_{\mu\nu}} &= \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu.
   \label{TetradMetric}
 \end{align}
-A manifold with metric admits two frame types at each tangent space:
-the coordinate basis $\partial_\mu$ (fixed by the chart $x^\mu$,
-generally non-orthonormal in a curved space) and an orthonormal
-Lorentz frame $\mathbf{e}_i$ (chosen at each point so that
+A manifold with metric admits two frame types at each tangent
+space (\cref{TetradFrames}): the coordinate basis $\partial_\mu$
+(fixed by the chart $x^\mu$, generally non-orthonormal in a
+curved space) and an \emph{orthonormal} Lorentz frame
+$\mathbf{e}_i$ (chosen at each point so that
 $\g{_{\mu\nu}}\mathbf{e}^\mu_i\,\mathbf{e}^\nu_j = \eta_{ij}$).
-The tetrad $b^i{}_\mu$ is the linear map between the two;
-\cref{TetradFrames} illustrates this at a single point $P$.
+The tetrad $b^i{}_\mu$ is the linear map between the two.
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.78\linewidth]{figures/tetrad.pdf}
+  \includegraphics[width=\linewidth]{figures/tetrad.pdf}
   \caption{At each point $P$ of a differentiable manifold, the
     coordinate basis $\partial_\mu|_P$ (induced by the local
     coordinates $x^\mu$) and an orthonormal Lorentz frame
     $\mathbf{e}_i|_P$ (chosen at $P$ independently of the
     coordinates) span the same tangent space. The tetrad
     $b^i{}_\mu$ and its inverse $h_i{}^\mu$ relate the components
-    of any tangent vector in the two bases (cf.\ figure~4
-    of~\cite{capozziello2022comparing} and figure~1
-    of~\cite{hehlobukhov2007cartan}).}
+    of any tangent vector in the two bases. Adapted from
+    figure~4 of~\cite{bahamonde2021teleparallel};
+    cf.\ figure~4 of~\cite{capozziello2022comparing} and
+    figure~1 of~\cite{hehlobukhov2007cartan}.}
   \label{TetradFrames}
 \end{figure}
 Unlike the spin connection, the tetrad does \emph{not} appear as
@@ -82,16 +84,16 @@ a connection term inside the covariant derivative on a matter
 field; it instead converts the resulting spacetime-index
 covariant derivative to Lorentz-frame-index form,
 $\nabla_k\phi = h_k{}^\mu\,\nabla_\mu\phi$~\cite[eq.~(1.7b)]{blagojevic2003lectures}.
-The tetrad instead enters as a gauge field through the metric
-relation \cref{TetradMetric} and the torsion field strength
+Its gauge-field role surfaces through the metric relation
+\cref{TetradMetric} and the torsion field strength
 \cref{TorsionDef} below.
 
 The covariant derivative on a tensor of mixed type acts with the
-spin connection on each Latin index and with the affine connection
-$\MAGA{^\sigma_\mu_\nu}$ (the independent Riemann--Cartan
-connection of the Palatini formulation, introduced in
-\cref{PGTframework}) on each Greek index, with $+$ on each upper
-index and $-$ on each lower index.
+spin connection on each Latin index and with an analogous
+\emph{affine} connection $\MAGA{^\sigma_\mu_\nu}$ on each Greek
+index --- the independent Riemann--Cartan connection of the
+Palatini formulation, introduced in \cref{PGTframework} ---
+with $+$ on each upper index and $-$ on each lower index.
 For a tensor $\Phi^{i\,\mu}{}_{j\,\nu}$ with mixed Latin and
 Greek indices,
 \begin{multline}
@@ -103,12 +105,10 @@ Greek indices,
        - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma}.
   \label{MixedCovariantDerivative}
 \end{multline}
-The matter-field rule \cref{LorentzCovariantDeriv} is the same
-construction evaluated on the spinor representation of the
-Lorentz group: the spin matrix $\Sigma_{ij}$ in
-\cref{LorentzCovariantDeriv} is replaced here by the explicit
-index-action of the spin connection on each Lorentz-tensor
-index~\cite[eq.~(1.7a)]{blagojevic2003lectures}.
+For tensor matter, the abstract spin matrix $\Sigma_{ij}$ in
+\cref{LorentzCovariantDeriv} reduces to the explicit index-action
+of the spin connection on each Lorentz-tensor index shown in
+\cref{MixedCovariantDerivative}~\cite[eq.~(1.7a)]{blagojevic2003lectures}.
 \Cref{MixedCovariantDerivative} underlies the symbolic
 decomposition of covariant derivatives implemented in
 \cref{SymbolicComputation}.
@@ -118,7 +118,7 @@ commutator of two covariant derivatives acting on a matter field:
 were the connection trivial the commutator would vanish, so the
 commutator is linear in the field strength. For
 electrodynamics this gives the familiar relation
-$[\nabla_\mu,\nabla_\nu]\phi = i e\,\mathcal{F}_{\mu\nu}\phi$ on a charged
+$[\nabla_\mu,\nabla_\nu]\phi = i e\,\mathcal{F}_{\mu\nu}\phi$ on a
 matter field. In PGT the analogous
 calculation produces two terms, one for each generator
 type~\cite[eq.~(1.11)]{blagojevic2003lectures},
@@ -192,18 +192,19 @@ $\mathcal{Q}_{\lambda\mu\nu} \equiv -\rcD{_\lambda}\g{_{\mu\nu}}$~\cite[eq.~(2.5
 which measures the failure of parallel transport to preserve inner
 products (\cref{DiffGeometryObstructions}). The
 most general space carrying all three is the
-metric-affine space $L_4$ (\cref{MetricAffineClasses})~\cite{hehl1995metric};
+metric-affine space $(L_4, \g{})$
+(\cref{MetricAffineClasses})~\cite{hehl1995metric};
 demanding that the connection preserves the metric under parallel
 transport, equivalently that
 $\rcD{_\mu}\g{_{\nu\lambda}} = 0$, is the
 \emph{metric-compatibility}
-condition~\cite[eq.~(2.5)]{blagojevic2003lectures}, and it sets
-$\mathcal{Q}_{\lambda\mu\nu} = 0$ identically. PGT adopts metric compatibility as a defining
+condition~\cite[eq.~(2.5)]{blagojevic2003lectures}. PGT adopts
+metric compatibility as a defining
 requirement~\cite{hehl1976spin,blagojevic2003lectures}, so only
 curvature and torsion remain as independent field strengths.
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.95\linewidth]{figures/diff_geometry.pdf}
+  \includegraphics[width=\linewidth]{figures/diff_geometry.pdf}
   \caption{The three independent geometric obstructions associated
     with a generic linear connection on a differentiable manifold.
     Curvature rotates a vector after parallel transport around a
@@ -224,27 +225,33 @@ transformations, built
 from the field strengths and their covariant derivatives, and
 integrated against an invariant volume element on
 spacetime~\cite[eq.~(1.13)]{blagojevic2003lectures,lin2019pgt}.
-These scalars are formed by full index
-contractions with the metric $\g{_{\mu\nu}}$, the flat-frame
-metric $\eta_{ij}$, the tetrad pair, and the totally
-antisymmetric tensor $\varepsilon^{\mu\nu\rho\sigma}$, exactly as
+These scalars are formed by full index contractions with
+$\g{_{\mu\nu}}$ and $\varepsilon^{\mu\nu\rho\sigma}$
+(Lorentz-frame indices on the field strengths are converted to
+spacetime indices via \cref{TetradMetric}), exactly as
 in other gauge field theories: the QED kinetic
 action $-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$ is the
-unique Lorentz scalar quadratic in the field strength, and the
+unique Lorentz scalar quadratic in the field strength up to a
+total derivative (the parity-odd
+$\FieldF{_{\mu\nu}}\tensor{\tilde{\mathcal{F}}}{^{\mu\nu}}$ being topological), and the
 PGT analogue is the set of all independent quadratic contractions
 of $\MAGFt{}$ and $\MAGT{}$ with one
 another~\cite{barker2024poincare,sezgin1980ghostfree,hehl1995metric}.
 The independent invariants per sector are catalogued in
 \cref{PGTEnumeration}.
 
-The construction above used the gauge-theoretic field pair
-$(b^i{}_\mu, A^{ij}{}_\mu)$, while \cref{Theory} and the
-symbolic-computation pipeline (\cref{SymbolicComputation}) both
-work in the affine-connection language with the metric and
-connection pair $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$. The
-two parameterisations encode the same Riemann--Cartan
-geometry, related object-by-object as in
-\cref{PGTRiemannCartanTranslation}, after
+The construction above developed PGT in the gauge-theoretic
+notation centred on $(b^i{}_\mu, A^{ij}{}_\mu)$. \Cref{Theory}
+and the symbolic-computation pipeline
+(\cref{SymbolicComputation}) instead work in the equivalent
+metric-affine
+notation~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}
+centred on $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$, with the
+metric built from the tetrad via \cref{TetradMetric} and the
+affine connection determined from the spin connection by the
+tetrad postulate \cref{TetradPostulate} below.
+\Cref{PGTRiemannCartanTranslation} provides the object-by-object
+notation dictionary, after
 Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
 \begin{table}[h]
   \centering
@@ -299,7 +306,7 @@ inhabits the Riemann--Cartan space $U_4$ defined by
 $\mathcal{Q} = 0$.
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.85\linewidth]{figures/metric_affine_classes.pdf}
+  \includegraphics[width=\linewidth]{figures/metric_affine_classes.pdf}
   \caption{Classification of metric-affine spacetime geometries by
     which of the three obstructions --- curvature $\mathcal{R}$,
     torsion $\mathcal{T}$, and non-metricity $\mathcal{Q}$ --- are
@@ -315,11 +322,6 @@ $\mathcal{Q} = 0$.
   \label{MetricAffineClasses}
 \end{figure}
 
-The tetrad-and-spin-connection presentation just developed is
-equivalent to the Palatini-style formulation adopted in
-\cref{PGTframework}~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini},
-in which the metric $\g{_{\mu\nu}}$ and the affine connection
-$\MAGA{^\sigma_\mu_\nu}$ are the independent variational fields.
 The bridge between the two formulations is the \emph{tetrad
 postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures}. Intuitively,
 it enforces that parallel transport is a single geometric
@@ -342,8 +344,8 @@ imposing simultaneous covariance under both Latin (Lorentz) and
 Greek (coordinate) indices. \Cref{TetradPostulate} fixes a
 one-to-one map between $A^{ij}{}_\mu$ and $\MAGA{^\sigma_\mu_\nu}$
 once a tetrad is chosen, so the two formulations encode the
-same Riemann--Cartan geometry. Imposing metricity ($\mathcal{Q} = 0$) then
-forces the
+same Riemann--Cartan geometry. Imposing metricity then forces
+the
 decomposition~\cite[eq.~(2.6)]{blagojevic2003lectures}
 \begin{align}
   \MAGA{^\sigma_\mu_\nu} &= \rCon{^\sigma_\mu_\nu}
@@ -380,9 +382,9 @@ components, transforming as a single irreducible tensor
 representation of the Lorentz group~\cite{hehl1976spin}, and
 satisfying the orthogonality conditions
 $\T[1]{^\lambda_\lambda_\mu} = 0$ and
-$\varepsilon^{\alpha\beta\gamma\delta}\T[1]{_{\alpha\beta\gamma}} = 0$.
-Shapiro's letter labels $T_\mu, S^\mu, q_{\alpha\beta\mu}$~\cite{shapiro2002torsion}
-for the same three components appear in the older literature.
+$\varepsilon^{\alpha\beta\gamma\delta}\T[1]{_{\alpha\beta\gamma}} = 0$.\footnote{Shapiro's
+letter labels $T_\mu, S^\mu, q_{\alpha\beta\mu}$~\cite{shapiro2002torsion}
+for the same three components appear in the older literature.}
 The reconstruction formula \cref{IrreducibleTorsion}
 expresses the torsion in terms of its irreducible parts.
 
