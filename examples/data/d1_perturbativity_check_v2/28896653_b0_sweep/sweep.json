@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "spec_path": "examples/data/torsion_gertsenshtein_nonminimal.json",
+  "swept_parameters": {
+    "B0": [
+      0.0001,
+      0.00021544346900318845,
+      0.00046415888336127773,
+      0.001,
+      0.002154434690031882,
+      0.004641588833612777,
+      0.01
+    ]
+  },
+  "fixed_parameters": {
+    "alpha1": -0.421957101279681,
+    "alpha2": -0.593937487672145,
+    "alpha3": 0.204359237975282,
+    "delta1": -0.846739495149705,
+    "kappa": 1.0
+  },
+  "sim_settings": {
+    "grid_shape": "512",
+    "t_end": 10.0,
+    "dt": "auto",
+    "scheme": "auto",
+    "bc": "periodic"
+  },
+  "measurements": [
+    "peak_conversion"
+  ],
+  "source": [
+    "h_5"
+  ],
+  "target": [
+    "a_1"
+  ],
+  "run_dirs": [
+    "examples/data/d1_perturbativity_check_v2/28896653_b0_sweep/B0_0.0001",
+    "examples/data/d1_perturbativity_check_v2/28896653_b0_sweep/B0_0.000215443",
+    "examples/data/d1_perturbativity_check_v2/28896653_b0_sweep/B0_0.000464159",
+    "examples/data/d1_perturbativity_check_v2/28896653_b0_sweep/B0_0.001",
+    "examples/data/d1_perturbativity_check_v2/28896653_b0_sweep/B0_0.00215443",
+    "examples/data/d1_perturbativity_check_v2/28896653_b0_sweep/B0_0.00464159",
+    "examples/data/d1_perturbativity_check_v2/28896653_b0_sweep/B0_0.01"
+  ],
+  "timestamp": "2026-05-08T09:10:12.781862+00:00",
+  "total_runs": 7,
+  "sampling_strategy": "grid",
+  "hostname": "01f52c360ddd",
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.36",
+  "tidal_version": "0.38.6",
+  "git_hash": "d8bc4d7",
+  "completed_runs": 7
+}
