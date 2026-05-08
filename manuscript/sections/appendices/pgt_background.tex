@@ -64,7 +64,7 @@ curved space) and an \emph{orthonormal} Lorentz frame
 $\mathbf{e}_i$ (chosen at each point so that
 $\g{_{\mu\nu}}\mathbf{e}^\mu_i\,\mathbf{e}^\nu_j = \eta_{ij}$).
 The tetrad $b^i{}_\mu$ is the linear map between the two.
-\begin{figure}[h]
+\begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/tetrad.pdf}
   \caption{At each point $P$ of a differentiable manifold, the
@@ -147,27 +147,34 @@ forms~\cite[eq.~(1.11)]{blagojevic2003lectures} are
   \label{TorsionDef}
 \end{align}
 \end{subequations}
-The schematic torsion form $2\nabla_{[\mu} b^i{}_{\nu]}$ unfolds
-to its explicit form via \cref{MixedCovariantDerivative} applied
-to $b^i{}_\nu$: the spin connection acts on the Lorentz index,
-while the antisymmetrisation on $[\mu\nu]$ kills the Christoffel
-correction on the Greek index.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/diff_geometry.pdf}
+  \caption{The three independent geometric obstructions associated
+    with a generic linear connection on a differentiable manifold.
+    Curvature rotates a vector after parallel transport around a
+    closed loop; torsion causes the non-closure of parallelograms
+    formed from infinitesimally parallel-transported vectors;
+    non-metricity causes the evolution of vector length under
+    parallel transport. Recreated from~\cite{bahamonde2021teleparallel};
+    cf.\ figure~1 of~\cite{barker2025metricaffine}.}
+  \label{DiffGeometryObstructions}
+\end{figure}
 
 The first measures the
 rotation of a vector parallel-transported around an infinitesimal
 closed loop; the second measures the non-closure of infinitesimal
 parallelograms formed from parallel-transported vectors. Both
-interpretations are illustrated in
-\cref{DiffGeometryObstructions}.\footnote{The geometric framing
+interpretations\footnote{The geometric framing
 is heuristic. As Barker, Marzo and Santoni
 emphasise~\cite{barker2024poincare,barker2025metricaffine}, the
 affine connection in the most general metric-affine
 setting~\cite{hehl1995metric} decomposes as
 $\MAGA{^\sigma_\mu_\nu} = \rCon{^\sigma_\mu_\nu} + \mathcal{D}^\sigma{}_{\mu\nu}$,
 with the distortion $\mathcal{D}^\sigma{}_{\mu\nu}$ a rank-three
-tensor field that subsumes torsion and non-metricity content
-together; in the metric-compatible case adopted throughout
-PGT (and \cref{PalatiniDecomposition}), the
+tensor field that subsumes torsion and non-metricity (\cref{NonMetricityDef})
+together; in the metric-compatible PGT (and \cref{PalatiniDecomposition}), the
 distortion reduces to the contortion $K^\sigma{}_{\mu\nu}$ of
 \cref{ContortionSplit}, and the rank-three matter content is
 purely torsion-driven. Every metric-affine model can therefore be
@@ -184,11 +191,16 @@ and strong-coupling instabilities at non-linear
 order~\cite{aoki2020nonlinear}. The physical content is in this
 sense insensitive to whether one adopts the geometric or the
 matter-field framing, but the matter-field framing makes the
-pathologies manifest.}
+pathologies manifest.} are illustrated in
+\cref{DiffGeometryObstructions}.
 On a generic linear connection the metric and the connection are
 independent, so the covariant derivative of the metric does not
-vanish. The resulting tensor is the \emph{non-metricity}
-$\mathcal{Q}_{\lambda\mu\nu} \equiv -\rcD{_\lambda}\g{_{\mu\nu}}$~\cite[eq.~(2.5)]{blagojevic2003lectures},
+vanish; this defines the \emph{non-metricity}
+tensor~\cite[eq.~(2.5)]{blagojevic2003lectures}
+\begin{equation}
+  \mathcal{Q}_{\lambda\mu\nu} \equiv -\rcD{_\lambda}\g{_{\mu\nu}},
+  \label{NonMetricityDef}
+\end{equation}
 which measures the failure of parallel transport to preserve inner
 products (\cref{DiffGeometryObstructions}). The
 most general space carrying all three is the
@@ -202,19 +214,6 @@ condition~\cite[eq.~(2.5)]{blagojevic2003lectures}. PGT adopts
 metric compatibility as a defining
 requirement~\cite{hehl1976spin,blagojevic2003lectures}, so only
 curvature and torsion remain as independent field strengths.
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=\linewidth]{figures/diff_geometry.pdf}
-  \caption{The three independent geometric obstructions associated
-    with a generic linear connection on a differentiable manifold.
-    Curvature rotates a vector after parallel transport around a
-    closed loop; torsion causes the non-closure of parallelograms
-    formed from infinitesimally parallel-transported vectors;
-    non-metricity causes the evolution of vector length under
-    parallel transport. Recreated from~\cite{bahamonde2021teleparallel};
-    cf.\ figure~1 of~\cite{barker2025metricaffine}.}
-  \label{DiffGeometryObstructions}
-\end{figure}
 
 \paragraph*{From field strengths to a gauge-invariant action}
 With $\MAGFt{}$ and $\MAGT{}$ as the dynamical gauge fields, the
@@ -226,24 +225,21 @@ from the field strengths and their covariant derivatives, and
 integrated against an invariant volume element on
 spacetime~\cite[eq.~(1.13)]{blagojevic2003lectures,lin2019pgt}.
 These scalars are formed by full index contractions with
-$\g{_{\mu\nu}}$ and $\varepsilon^{\mu\nu\rho\sigma}$
-(Lorentz-frame indices on the field strengths are converted to
-spacetime indices via \cref{TetradMetric}), exactly as
+$\g{_{\mu\nu}}$ and $\varepsilon^{\mu\nu\rho\sigma}$, exactly as
 in other gauge field theories: the QED kinetic
 action $-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$ is the
 unique Lorentz scalar quadratic in the field strength up to a
-total derivative (the parity-odd
-$\FieldF{_{\mu\nu}}\tensor{\tilde{\mathcal{F}}}{^{\mu\nu}}$ being topological), and the
-PGT analogue is the set of all independent quadratic contractions
+total derivative,\footnote{The parity-odd
+$\FieldF{_{\mu\nu}}\tensor{\tilde{\mathcal{F}}}{^{\mu\nu}}$ being topological.} and the
+PGT analogue is the set of all independent contractions
 of $\MAGFt{}$ and $\MAGT{}$ with one
 another~\cite{barker2024poincare,sezgin1980ghostfree,hehl1995metric}.
-The independent invariants per sector are catalogued in
+The invariants are catalogued in
 \cref{PGTEnumeration}.
 
 The construction above developed PGT in the gauge-theoretic
 notation centred on $(b^i{}_\mu, A^{ij}{}_\mu)$. \Cref{Theory}
-and the symbolic-computation pipeline
-(\cref{SymbolicComputation}) instead work in the equivalent
+and \cref{SymbolicComputation} instead work in the equivalent
 metric-affine
 notation~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}
 centred on $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$, with the
@@ -253,7 +249,7 @@ tetrad postulate \cref{TetradPostulate} below.
 \Cref{PGTRiemannCartanTranslation} provides the object-by-object
 notation dictionary, after
 Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
-\begin{table}[h]
+\begin{table}[t]
   \centering
   \begin{tabular}{@{}ll@{}}
     \toprule
@@ -296,15 +292,14 @@ Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
 \paragraph*{Spacetime classification and the Palatini formulation}
 \label{SpacetimeClassification}
 Different combinations of vanishing curvature, torsion, and
-non-metricity define the standard hierarchy of geometric arenas
-for theories of gravity. \Cref{MetricAffineClasses} shows the
-classification: the outermost set is metric-affine
-$(L_4, \g{})$, with the three obstructions
-$\mathcal{R}, \mathcal{T}, \mathcal{Q}$ generating distinguished
-sub-arenas by switching off subsets. PGT
-inhabits the Riemann--Cartan space $U_4$ defined by
-$\mathcal{Q} = 0$.
-\begin{figure}[h]
+non-metricity define the standard metric-affine spacetime
+hierarchy. \Cref{MetricAffineClasses} shows the
+classification: the most general space is metric-affine
+$(L_4, \g{})$, and setting subsets of
+$\mathcal{R}, \mathcal{T}, \mathcal{Q}$ to zero recovers the named
+special cases. PGT inhabits the Riemann--Cartan space $U_4$
+defined by $\mathcal{Q} = 0$.
+\begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/metric_affine_classes.pdf}
   \caption{Classification of metric-affine spacetime geometries by
@@ -312,7 +307,7 @@ $\mathcal{Q} = 0$.
     torsion $\mathcal{T}$, and non-metricity $\mathcal{Q}$ --- are
     non-zero. The outer region is the most general metric-affine
     space $(L_4, \g{})$. General relativity inhabits the
-    Riemannian sub-arena $V_4$ ($\mathcal{T} = \mathcal{Q} = 0$);
+    Riemannian space $V_4$ ($\mathcal{T} = \mathcal{Q} = 0$);
     Poincar\'{e} gauge theory inhabits the Riemann--Cartan space
     $U_4$ ($\mathcal{Q} = 0$); the dual case is Weitzenb\"{o}ck
     teleparallel $W_4$ ($\mathcal{R} = \mathcal{Q} = 0$); setting
@@ -323,16 +318,14 @@ $\mathcal{Q} = 0$.
 \end{figure}
 
 The bridge between the two formulations is the \emph{tetrad
-postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures}. Intuitively,
-it enforces that parallel transport is a single geometric
-operation independent of whether we describe a tangent vector in
-the Lorentz frame or in the coordinate basis: the spin connection
-$A^{ij}{}_\mu$ acting on the Lorentz-frame components $u^i$ and
-the affine connection $\MAGA{^\sigma_\mu_\nu}$ acting on the
-coordinate-basis components $u^\mu$ must produce the same
-parallel-transported vector when applied to any $u$.
-Equivalently, the full covariant derivative of the tetrad
-vanishes,
+postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures}. Any tangent
+vector $u$ can be expanded in either basis,
+$u = u^i\,\mathbf{e}_i = u^\mu\,\partial_\mu$;
+parallel-transporting $u$ must give the same result whether the
+spin connection $A^{ij}{}_\mu$ acts on the Lorentz-frame
+components $u^i$ or the affine connection $\MAGA{^\sigma_\mu_\nu}$
+acts on the coordinate-basis components $u^\mu$. Equivalently,
+the full covariant derivative of the tetrad vanishes,
 \begin{align}
   \partial_\mu b^i{}_\nu
     + A^i{}_{j\mu}\,b^j{}_\nu
@@ -341,10 +334,19 @@ vanishes,
   \label{TetradPostulate}
 \end{align}
 imposing simultaneous covariance under both Latin (Lorentz) and
-Greek (coordinate) indices. \Cref{TetradPostulate} fixes a
-one-to-one map between $A^{ij}{}_\mu$ and $\MAGA{^\sigma_\mu_\nu}$
-once a tetrad is chosen, so the two formulations encode the
-same Riemann--Cartan geometry. Imposing metricity then forces
+Greek (coordinate) indices. \Cref{TetradPostulate} solves
+algebraically for the affine connection in terms of the
+gauge-theoretic data,
+\begin{align}
+  \MAGA{^\rho_{\nu\mu}}
+    &= h_i{}^\rho\bigl(\partial_\mu b^i{}_\nu
+       + A^i{}_{j\mu}\,b^j{}_\nu\bigr),
+  \label{AffineFromGauge}
+\end{align}
+fixing a one-to-one map between $A^{ij}{}_\mu$ and
+$\MAGA{^\sigma_\mu_\nu}$ once a tetrad is chosen, so the two
+formulations encode the \emph{same} Riemann--Cartan geometry.
+Imposing metricity then forces
 the
 decomposition~\cite[eq.~(2.6)]{blagojevic2003lectures}
 \begin{align}
