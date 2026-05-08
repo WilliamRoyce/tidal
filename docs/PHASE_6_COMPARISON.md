@@ -761,6 +761,20 @@ Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
 
 ---
 
+## Phase 6.K — Stage A v5 sup at τ=0.15 (probe-tightening cross-check, 2026-05-08)
+
+**Job 29014114** — INTR, 4:39 wall, 11 clusters drained cleanly, ndead=6807.
+
+| Run | Probe τ | log Z | Δ vs 28477675 |
+|-----|---------|-------|---------------|
+| 28477675 (published) | 0.30 | +0.654 ± 0.056 | — |
+| 28859477 (Phase 6.E) | 0.30 | +0.602 ± 0.052 | −0.052 |
+| **29014114 (Phase 6.K)** | **0.15** | **+0.715 ± 0.062** | **+0.061** |
+
+**Verdict: CONFIRMED.** Tightening τ from 0.30 to 0.15 shifts the Stage A v5 sup log Z by +0.061 nats — well within sampling noise (combined σ ≈ 0.083). The α₃ ≈ 0.001 MAP region is far from the probe boundary, so the tightening doesn't perturb the result. The published Stage A dark-photon-plasma null result is robust to both τ=0.3 and τ=0.15 probe configurations.
+
+---
+
 ## Phase 6.G — Matched-resolution paired cross-check (2026-05-07/08)
 
 **Goal:** Quantify the grid/bounds mismatch between the Phase 6.C chains (amp at grid=256/L=100, sup at grid=64/L=50) and obtain matched-params cross-checks under τ=0.15.
