@@ -33,8 +33,9 @@ derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
     + \tfrac{1}{2}A^{ij}{}_\mu\,\Sigma_{ij}\bigr)\phi
   \label{LorentzCovariantDeriv}
 \end{align}
-acting on a matter field $\phi$ in the representation with spin
-matrix $\Sigma_{ij}$. The translation generators are compensated
+acting on a matter field $\phi$ carrying a Lorentz representation,
+with $\Sigma_{ij}$ the Lorentz-generator matrix in that
+representation. The translation generators are compensated
 by a \emph{tetrad} $b^i{}_\mu$ together with its inverse
 $h_i{}^\mu$, which together provide the explicit basis-conversion
 rule between Lorentz-frame and coordinate
@@ -52,7 +53,7 @@ indices~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehl
 \end{subequations}
 and which relate the curved-space metric to the Minkowski metric
 of the local Lorentz frame via the tetrad-bilinear
-relation~\cite[\S II]{blagojevic2003lectures}
+relation~\cite{blagojevic2003lectures}
 \begin{align}
   \g{_{\mu\nu}} &= \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu.
   \label{TetradMetric}
@@ -81,11 +82,11 @@ The tetrad $b^i{}_\mu$ is the linear map between the two.
 \end{figure}
 Unlike the spin connection, the tetrad does \emph{not} appear as
 a connection term inside the covariant derivative on a matter
-field; it instead converts the resulting spacetime-index
-covariant derivative to Lorentz-frame-index form,
-$\nabla_k\phi = h_k{}^\mu\,\nabla_\mu\phi$~\cite[eq.~(1.7b)]{blagojevic2003lectures}.
-Its gauge-field role surfaces through the metric relation
-\cref{TetradMetric} and the torsion field strength
+field \cref{LorentzCovariantDeriv}; it instead converts the
+resulting spacetime-index covariant derivative to Lorentz-frame-index
+form, $\nabla_k\phi = h_k{}^\mu\,\nabla_\mu\phi$~\cite[eq.~(1.7b)]{blagojevic2003lectures}.
+Instead, the tetrad enters the gauge dynamics through the metric
+relation \cref{TetradMetric} and the torsion field strength
 \cref{TorsionDef} below.
 
 The covariant derivative on a tensor of mixed type acts with the
@@ -105,13 +106,13 @@ Greek indices,
        - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma}.
   \label{MixedCovariantDerivative}
 \end{multline}
-For tensor matter, the abstract spin matrix $\Sigma_{ij}$ in
-\cref{LorentzCovariantDeriv} reduces to the explicit index-action
-of the spin connection on each Lorentz-tensor index shown in
-\cref{MixedCovariantDerivative}~\cite[eq.~(1.7a)]{blagojevic2003lectures}.
-\Cref{MixedCovariantDerivative} underlies the symbolic
-decomposition of covariant derivatives implemented in
-\cref{SymbolicComputation}.
+\Cref{MixedCovariantDerivative} is \cref{LorentzCovariantDeriv}
+written out for Lorentz-tensor matter --- the case used throughout
+this work: the abstract action of $\Sigma_{ij}$ becomes the
+explicit per-index spin-connection terms, plus the corresponding
+affine-connection terms on each Greek
+index~\cite[eq.~(1.7a)]{blagojevic2003lectures}. This is the form
+used in \cref{SymbolicComputation}.
 
 In any gauge theory the field strength can be read off the
 commutator of two covariant derivatives acting on a matter field:
@@ -205,10 +206,9 @@ which measures the failure of parallel transport to preserve inner
 products (\cref{DiffGeometryObstructions}). The
 most general space carrying all three is the
 metric-affine space $(L_4, \g{})$
-(\cref{MetricAffineClasses})~\cite{hehl1995metric};
-demanding that the connection preserves the metric under parallel
-transport, equivalently that
-$\rcD{_\mu}\g{_{\nu\lambda}} = 0$, is the
+(\cref{MetricAffineClasses})~\cite{hehl1995metric}. Demanding that
+the connection preserves the metric under parallel transport,
+equivalently that $\rcD{_\mu}\g{_{\nu\lambda}} = 0$, is the
 \emph{metric-compatibility}
 condition~\cite[eq.~(2.5)]{blagojevic2003lectures}. PGT adopts
 metric compatibility as a defining
@@ -236,58 +236,6 @@ of $\MAGFt{}$ and $\MAGT{}$ with one
 another~\cite{barker2024poincare,sezgin1980ghostfree,hehl1995metric}.
 The invariants are catalogued in
 \cref{PGTEnumeration}.
-
-The construction above developed PGT in the gauge-theoretic
-notation centred on $(b^i{}_\mu, A^{ij}{}_\mu)$. \Cref{Theory}
-and \cref{SymbolicComputation} instead work in the equivalent
-metric-affine
-notation~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}
-centred on $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$, with the
-metric built from the tetrad via \cref{TetradMetric} and the
-affine connection determined from the spin connection by the
-tetrad postulate \cref{TetradPostulate} below.
-\Cref{PGTRiemannCartanTranslation} provides the object-by-object
-notation dictionary, after
-Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
-\begin{table}[t]
-  \centering
-  \begin{tabular}{@{}ll@{}}
-    \toprule
-    Gauge-theoretic & Riemann--Cartan geometric \\
-    \midrule
-    $A^{ij}{}_\mu$ Lorentz gauge field
-       & $\omega^{ij}{}_\mu$ spin connection \\
-    $\nabla_\mu(A)$ covariant derivative
-       & $D_\mu(\omega)$ $\omega$-covariant derivative \\
-    $b^i{}_\mu$, $h_i{}^\mu$ translation gauge field
-       & $e^i{}_\mu$, $e_i{}^\mu$ tetrad coframe / frame \\
-    $\eta_{ij}$ flat-frame metric
-       & $\g{_{\mu\nu}} = \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu$ \\
-    $\MAGA{^\rho_\mu_\nu}$ not defined a priori
-       & $\MAGA{^\rho_\mu_\nu}$ affine connection \\
-    \emph{Tetrad postulate} $\Rightarrow$ $\MAGA{^\rho_\mu_\nu}$ defined
-       & $D_\mu(\omega)\,e^i{}_\nu = \MAGA{^\rho_{\nu\mu}}\,e^i{}_\rho$ \\
-    $\nabla_\mu \eta_{ij} = 0$ metricity
-       & $D_\mu(\Gamma)\,\g{_{\nu\lambda}} = 0$ metricity \\
-    $\mathcal{F}^i{}_{\mu\nu}$ translation field strength
-       & $\MAGT{^i_{\mu\nu}}$ torsion \\
-    $\mathcal{F}^{ij}{}_{\mu\nu}$ Lorentz field strength
-       & $\MAGFt{^{ij}_{\mu\nu}}$ curvature \\
-    \bottomrule
-  \end{tabular}
-  \caption{Translation between the gauge-theoretic and
-    Riemann--Cartan geometric pictures of Poincar\'{e} gauge
-    theory, after Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
-    The left column lists each gauge-theoretic object generated
-    by gauging the corresponding Poincar\'{e} generator; the right
-    column gives its Riemann--Cartan geometric counterpart. The
-    metric-relation row shows the tetrad-bilinear form of the
-    spacetime metric in terms of the flat-frame metric, and the
-    tetrad-postulate row shows how the affine connection
-    $\MAGA{^\rho_\mu_\nu}$ is determined once a tetrad and a
-    spin connection are chosen.}
-  \label{PGTRiemannCartanTranslation}
-\end{table}
 
 \paragraph*{Spacetime classification and the Palatini formulation}
 \label{SpacetimeClassification}
@@ -358,10 +306,57 @@ which is the same content as \cref{PalatiniDecomposition} written
 in spin-connection language $A^{ij}{}_\mu = \Delta^{ij}{}_\mu(b)
 + K^{ij}{}_\mu$~\cite[eq.~(2.12)]{blagojevic2003lectures}.
 
+\Cref{Theory} and \cref{SymbolicComputation} use the metric-affine
+notation $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$
+throughout~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}.
+\Cref{PGTRiemannCartanTranslation} summarises the object-by-object
+dictionary between this notation and the gauge-theoretic notation
+$(b^i{}_\mu, A^{ij}{}_\mu)$ used above, after
+Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
+\begin{table}[t]
+  \centering
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    Gauge-theoretic & Riemann--Cartan geometric \\
+    \midrule
+    $A^{ij}{}_\mu$ Lorentz gauge field
+       & $\omega^{ij}{}_\mu$ spin connection \\
+    $\nabla_\mu(A)$ covariant derivative
+       & $D_\mu(\omega)$ $\omega$-covariant derivative \\
+    $b^i{}_\mu$, $h_i{}^\mu$ translation gauge field
+       & $e^i{}_\mu$, $e_i{}^\mu$ tetrad coframe / frame \\
+    $\eta_{ij}$ flat-frame metric
+       & $\g{_{\mu\nu}} = \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu$ \\
+    $\MAGA{^\rho_\mu_\nu}$ not defined a priori
+       & $\MAGA{^\rho_\mu_\nu}$ affine connection \\
+    \emph{Tetrad postulate} $\Rightarrow$ $\MAGA{^\rho_\mu_\nu}$ defined
+       & $D_\mu(\omega)\,e^i{}_\nu = \MAGA{^\rho_{\nu\mu}}\,e^i{}_\rho$ \\
+    $\nabla_\mu \eta_{ij} = 0$ metricity
+       & $D_\mu(\Gamma)\,\g{_{\nu\lambda}} = 0$ metricity \\
+    $\mathcal{F}^i{}_{\mu\nu}$ translation field strength
+       & $\MAGT{^i_{\mu\nu}}$ torsion \\
+    $\mathcal{F}^{ij}{}_{\mu\nu}$ Lorentz field strength
+       & $\MAGFt{^{ij}_{\mu\nu}}$ curvature \\
+    \bottomrule
+  \end{tabular}
+  \caption{Translation between the gauge-theoretic and
+    Riemann--Cartan geometric pictures of Poincar\'{e} gauge
+    theory, after Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
+    The left column lists each gauge-theoretic object generated
+    by gauging the corresponding Poincar\'{e} generator; the right
+    column gives its Riemann--Cartan geometric counterpart. The
+    metric-relation row shows the tetrad-bilinear form of the
+    spacetime metric in terms of the flat-frame metric, and the
+    tetrad-postulate row shows how the affine connection
+    $\MAGA{^\rho_\mu_\nu}$ is determined once a tetrad and a
+    spin connection are chosen.}
+  \label{PGTRiemannCartanTranslation}
+\end{table}
+
 \paragraph*{Irreducible torsion decomposition}
 \label{IrreducibleTorsionFull}
-The torsion tensor $\MAGT{_{\alpha\beta\mu}}$ has 24 independent
-components --- antisymmetric in its last two indices and
+The torsion tensor $\MAGT{^\alpha_{\beta\mu}}$ has 24 independent
+components --- antisymmetric in its lower two indices and
 otherwise unconstrained --- which split into three irreducible
 representations of the local Lorentz
 group~\cite{hehl1976spin,hehl1995metric,shapiro2002torsion,obukhov2024electrodynamics}.
@@ -379,7 +374,7 @@ collects four components; the axial pseudovector
 \end{align}
 \end{subequations}
 collects another four, and the totally traceless tensor part
-$\T[1]{_{\alpha\beta\mu}}$ collects the remaining sixteen
+$\T[1]{^\alpha_{\beta\mu}}$ collects the remaining sixteen
 components, transforming as a single irreducible tensor
 representation of the Lorentz group~\cite{hehl1976spin}, and
 satisfying the orthogonality conditions
