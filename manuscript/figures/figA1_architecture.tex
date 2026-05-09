@@ -25,7 +25,7 @@
 
 % --- Simulate ---
 \node[stage=Purple, right=1.0cm of json] (sim)
-    {Numerical integration\\[2pt]\scriptsize modal $\cdot$ IDA $\cdot$ CVODE $\cdot$ leapfrog $\cdot$ scipy};
+    {Numerical integration};
 
 % --- Snapshots ---
 \node[data, right=1.0cm of sim] (snaps)
@@ -33,7 +33,7 @@
 
 % --- Measure ---
 \node[stage=Green, right=1.0cm of snaps] (meas)
-    {Post-processing\\[2pt]\scriptsize 12 measurement types};
+    {Post-processing};
 
 % --- Results ---
 \node[data, right=1.0cm of meas] (results)
@@ -49,22 +49,13 @@
 \draw[arr] (snaps) -- (meas);
 \draw[arr] (meas) -- (results);
 
-% ===================================================================
-% ROW 2: External libraries (below stages)
-% ===================================================================
-\node[lib, below=0.15cm of derive] (lib1)
-    {xAct, xPert, xTras};
-\node[lib, below=0.15cm of sim] (lib2)
-    {SUNDIALS, NumPy\\SciPy};
-\node[lib, below=0.15cm of meas] (lib3)
-    {NumPy, SciPy\\FFT};
 
 % ===================================================================
 % BRACE: Symbolic vs Numerical separation at JSON
 % ===================================================================
 \draw[decorate, decoration={brace, amplitude=6pt, raise=2pt},
       PinkLine, thick]
-    (toml.north west) -- (derive.north east)
+    (toml.west |- derive.north) -- (derive.north east)
     node[midway, above=10pt, font=\scriptsize\bfseries, text=PinkLine]
     {Symbolic (CAS)};
 

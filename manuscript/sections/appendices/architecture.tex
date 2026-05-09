@@ -40,11 +40,9 @@ Lagrangian to quadratic order around the declared background using
 \xPert{}~\cite{brizuela2009xpert}, applies the Euler–Lagrange
 variation, and decomposes the resulting tensor equations into their
 components with the aid of \xTras{}~\cite{nutma2014xtras}.
-A complete description of the symbolic operations is given in
-\cref{SymbolicComputation}, with the gauge-fixing methodology and
-the obstructions to perturbative reduction of higher-derivative
-terms in the quadratic PGT action discussed in \cref{GaugeFixing}
-and \cref{PerturbativeReduction} respectively.
+A complete description of the symbolic operations — including gauge
+fixing and the handling of the higher-derivative terms in the
+quadratic PGT action — is given in \cref{SymbolicComputation}.
 
 \paragraph*{Equation specification}
 The equation specification is the sole interface between the symbolic
@@ -56,14 +54,13 @@ order — wave-like, first-order, or algebraically constrained.
 Decoupling the two parts in this way allows the same derivation to
 support arbitrary grid resolutions, initial conditions, and parameter
 choices without re-derivation, which is what makes parameter surveys
-of the kind reported in \cref{Results} feasible.
+of the kind reported in \cref{Results} both fast and feasible.
 
 \paragraph*{Numerical integration}
 The numerical integration evolves the equations in time.
-\TIDAL{} provides five solver backends and dispatches between them
-automatically from the algebraic structure of the equations; both the
-backends and the dispatch logic are described in
-\cref{NumericalEvolution}.
+\TIDAL{} dispatches automatically between several solver backends
+from the algebraic structure of the equations; the backends and the
+dispatch logic are described in \cref{NumericalEvolution}.
 For all surveys reported in \cref{Results}, the Fourier modal solver
 was used.
 
