@@ -24,7 +24,7 @@ operators carrying at most three factors drawn from
 $\{\mathcal{R}, \mathcal{T}, \mathcal{F}\}$. The standard PGT is quadratic in
 field
 strengths~\cite{blagojevic2018hamiltonian,shapiro2002torsion},
-but the cubic completions contributing at quadratic
+but the cubic operators contributing at quadratic
 order in the perturbation (through
 background-field insertions) are retained below. No physical principle fixes this cutoff: ghost-safety alone
 admits operators of arbitrarily high power in $\mathcal{T}$. An
@@ -69,7 +69,7 @@ The inventory is collected in \cref{MasterParameterCount}.
   \caption{Inventory of independent invariants in the general
     quadratic PGT Lagrangian coupled to electromagnetism, ordered
     by sector. Symbols correspond to the macros adopted in the
-    present work; the Equivalent column gives the closest
+    present work; the Reference column gives the closest
     published symbol set or recognised name. Counts marked
     $^\dagger$ are upper bounds (residual identities not applied;
     see lead-in); the count marked $^*$ is a topological U(1) Chern density (total
@@ -78,13 +78,12 @@ The inventory is collected in \cref{MasterParameterCount}.
     canonically normalised and carries no free parameter; it is
     omitted from the parity-even quadratic count of ten free
     parameters but enters the Lagrangian alongside them. The
-    explicit linear map between the present basis and Shapiro's
-    $\theta_n$~\cite{shapiro2002torsion} non-minimal basis remains
-    to be derived.}
+    explicit linear map to Shapiro's non-minimal
+    basis~\cite{shapiro2002torsion} remains to be derived.}
   \label{MasterParameterCount}
   \begin{tabular}{@{}lllp{0.34\textwidth}@{}}
     \toprule
-    Sector & Symbols & Count & Equivalent \\
+    \textbf{Sector} & \textbf{Symbols} & \textbf{Count} & \textbf{Reference} \\
     \midrule
     $\MAGFt{}$                                              & $\MPl$                       & 1            & Einstein--Hilbert \\
     $\Lambda$                                               & $\Lambda$                    & 1            & cosmological constant \\
@@ -128,8 +127,7 @@ The linear sector contains three independent
 invariants~\cite{kibble1961lorentz,holst1995barbero} and reads
 \begin{align}
   \mathcal{L}_\text{lin}
-  = -\frac{1}{\kappa^2}\,\MAGFt{}
-  -\frac{2\Lambda}{\kappa^2}
+  = -\frac{1}{\kappa^2}\,(\MAGFt{}+2\Lambda)
   +\frac{1}{\kappa^2\,\gamma_\text{BI}}\,
    \varepsilon^{\mu\nu\rho\sigma}\,\MAGFt{_{\mu\nu\rho\sigma}},
   \label{LinearAction}
@@ -188,15 +186,23 @@ requires non-vanishing antisymmetric Ricci.
 
 Ghost- and tachyon-freedom of this combined parameter family is
 analysed
-in~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,aoki2020nonlinear,barker2021hamiltonian},
+in~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,aoki2020nonlinear,barker2021hamiltonian}.
 Integration with
-\PSALTer{}~\cite{barker2024psalter} for automated no-tachyon
-extraction remains for future work.
+\PSALTer{}~\cite{barker2024psalter} for automated
+ghost-and-tachyon extraction remains for future
+work.\footnote{\PSALTer{} expands the Lagrangian quadratically
+around the matter-free Minkowski
+vacuum~\cite{barker2024psalter}, whereas the present work
+retains the classical magnetic background $\Bzero$ on the same
+Minkowski spacetime. An in-vacuo pass would still serve as a
+stricter pre-filter, since pathologies of the linearised
+spectrum at $\Bzero=0$ persist once $\Bzero$ is switched on ---
+the converse does not hold.}
 
 \paragraph*{Parity-odd quadratic sector}
 \label{ParityOddQuadratic}
 The parity-odd quadratic sector adds twenty-one
-$\varepsilon$-weighted invariants, of which twenty are dynamical.
+$\varepsilon$-weighted invariants.
 Thirteen are parity-odd curvature-square contractions of the
 form $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}^2$; these collapse to a single topological term
 in the torsion-free
@@ -205,12 +211,11 @@ generically propagate when torsion is present. Four are
 parity-odd torsion-square contractions of the form
 $\varepsilon^{\mu\nu\rho\sigma}\MAGT{}^2$; the family contains the Nieh--Yan form
 $\varepsilon^{\mu\nu\rho\sigma}T^a{}_{\mu\nu}T_{a\rho\sigma}$, a
-Riemann--Cartan topological density whose total-derivative
-identity dynamically links it to the Holst term of
-\cref{LinearAction}. One is the electromagnetic
+Riemann--Cartan topological
+density~\cite{niehyan1982,hehlobukhov2007cartan}. One is the electromagnetic
 $\theta$-term~\cite{wilczek1987axion}
 $d_{18}\,\varepsilon^{\mu\nu\rho\sigma}\FieldF{_{\mu\nu}}\FieldF{_{\rho\sigma}} = 4\,d_{18}\,\PD{_\mu}\bigl(\varepsilon^{\mu\nu\rho\sigma}\FieldA{_\nu}\PD{_\rho}\FieldA{_\sigma}\bigr)$,
-a topological U(1) Chern density that is a total covariant divergence on any spacetime background, and therefore non-dynamical. The remaining three
+a topological U(1) Chern density that is a total covariant divergence on any spacetime background. The remaining three
 are parity-odd curvature--electromagnetic cross-terms
 $\varepsilon^{\mu\nu\rho\sigma}\MAGFt{}\FieldF{}$. The propagator-level analysis of
 these
@@ -234,8 +239,8 @@ Three parity-even safe sectors then follow:
 $\rcD{}\MAGT{}\!\times\!\FieldF{}$, generating three independent
 invariants $\zeta_{1,2,3}$ in the parity-even sector of Shapiro's
 non-minimal classification~\cite{shapiro2002torsion} (the
-explicit linear map to Shapiro's $\theta_n$ remains to be
-derived);
+explicit linear map to Shapiro's non-minimal basis remains to
+be derived);
 $\MAGFt{}\!\times\!\rcD{}\MAGT{}$, of which Barker's $\chi$
 kinetic mixing is a specific contraction~\cite{barker2024poincare};
 and $(\rcD{}\MAGT{})^2$, containing Barker's $\xi$ Maxwell-type
@@ -248,7 +253,7 @@ conditions on these combinations follow from the standard
 linearised propagator analysis applied to the post-Riemannian
 expansion~\cite{lin2019pgt,blagojevic2018hamiltonian}.
 
-\paragraph*{Cubic completions}
+\paragraph*{Cubic operators}
 \label{CubicCompletions}
 A cubic operator contributes at quadratic order in the
 perturbation when one or two of its field-strength factors are
@@ -280,7 +285,7 @@ self-energies --- are depicted in \cref{VertexTopologyCubic}.
   \centering
   \includegraphics[width=\linewidth]{figures/vertex_topology_cubic.pdf}
   \caption{Linearised vertex topologies of the four parity-even
-    cubic completions. Dynamical external legs carry the bare
+    cubic operators. Dynamical external legs carry the bare
     field symbol ($h$, $A$, $T$); background-field legs are
     solid lines terminated with a cross, representing the magnetic
     background $\bar{F}$. (a)~$\mathcal{R}\!\times\!\mathcal{F}^2$
@@ -337,7 +342,7 @@ in \cref{VertexTopologyCS}.
     All three contractions $\varepsilon\,T^{(i)}\,A\,\bar F$ have
     identical leg structure and parity-odd $\varepsilon$-vertex
     (hollow square, distinguishing them from the parity-even
-    cubic-completion vertices of \cref{VertexTopologyCubic});
+    cubic-operator vertices of \cref{VertexTopologyCubic});
     they differ only by which irreducible torsion sector enters
     the $T$ leg ($T^{(1)}$ tensor, $T^{(2)}$ trace, $T^{(3)}$
     axial). The axial coupling $\chi^{\mathrm{CS}}_{2}$ sources the
