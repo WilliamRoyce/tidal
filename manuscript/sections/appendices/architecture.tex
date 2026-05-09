@@ -41,20 +41,21 @@ Lagrangian to quadratic order around the declared background using
 variation, and decomposes the resulting tensor equations into their
 components with the aid of \xTras{}~\cite{nutma2014xtras}.
 A complete description of the symbolic operations — including gauge
-fixing and the handling of the higher-derivative terms in the
-quadratic PGT action — is given in \cref{SymbolicComputation}.
+fixing and the handling of the higher-order equations of motion — is
+given in \cref{SymbolicComputation}.
 
 \paragraph*{Equation specification}
 The equation specification is the sole interface between the symbolic
 and numerical parts of \TIDAL{}.
 It records each field's equation of motion as a sum of differential
 operators with parameter-dependent coefficients, the Hamiltonian
-density in the same form, and a declaration of each field's time
-order — wave-like, first-order, or algebraically constrained.
+density in the same form, and the time-derivative order — zero,
+one, or two — of each field's equation.
 Decoupling the two parts in this way allows the same derivation to
-support arbitrary grid resolutions, initial conditions, and parameter
-choices without re-derivation, which is what makes parameter surveys
-of the kind reported in \cref{Results} both fast and feasible.
+support arbitrary grids, boundary conditions, initial conditions,
+and parameter choices without re-derivation, which is what makes
+parameter surveys of the kind reported in \cref{Results} both fast
+and feasible.
 
 \paragraph*{Numerical integration}
 The numerical integration evolves the equations in time.
