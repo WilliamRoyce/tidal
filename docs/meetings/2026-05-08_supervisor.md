@@ -55,6 +55,24 @@ Plus the phenomenological class (dark-photon-plasma, plasma Gertsenshtein) and n
 
 Within the YM-PGT family we tested **nested sub-theories** prominent in the literature before the full joint: Bahamonde (arXiv:2402.08937) $\subset$ Barker (arXiv:2406.12826) $\subset$ Shapiro (arXiv:hep-th/0103093) $\subset$ full (9-D). Each layer adds couplings; each layer was null.
 
+### YM-PGT Lagrangian
+
+The full nine-dimensional family is
+
+$$\mathcal{L} = \frac{1}{\kappa^2}\tilde{R} + \beta_i\,I_i - \frac{\xi}{4}(F_T)_{\mu\nu}(F_T)^{\mu\nu} + \delta_1\,\tilde R_{[\mu\nu]}\,F^{\mu\nu} + \chi\,\tilde R_{[\mu\nu]}\,(F_T)^{\mu\nu} + \zeta_a\,(\nabla T)_a^{\mu\nu}\,F_{\mu\nu} - \frac{1}{4}F_{\mu\nu}F^{\mu\nu}$$
+
+where $(F_T)_{\mu\nu} = \partial_\mu T_\nu - \partial_\nu T_\mu$ is the field strength of the torsion-trace vector $T_\mu$, and $(\nabla T)_a^{\mu\nu} F_{\mu\nu}$ collects three independent derivative-torsion–EM contractions.
+
+| Coupling        | Role                                                                                                  |
+| --------------- | ----------------------------------------------------------------------------------------------------- |
+| $\beta_{1,2,3}$ | _propagating-torsion masses_ (analogue of §1's $\alpha_i$ once $\xi \neq 0$ activates the trace)      |
+| $\xi$           | torsion-trace Yang-Mills kinetic term — gives the trace its propagating character                     |
+| $\delta_1$      | $\tilde R_{[\mu\nu]} F^{\mu\nu}$ — same nonminimal coupling as in §1                                  |
+| $\chi$          | $\tilde R_{[\mu\nu]} (F_T)^{\mu\nu}$ — kinetic mixing of Ricci-Cartan and the torsion field strength  |
+| $\zeta_{1,2,3}$ | three independent derivative-torsion–EM cross-terms (Shapiro)                                         |
+
+The nested sub-theories activate progressively: Bahamonde keeps $\beta, \xi, \delta_1$; Barker adds $\chi$; Shapiro adds $\zeta_{1,2,3}$; the full 9-D activates everything.
+
 ### Roadmap
 
 | Theory class                                           | Free dim | Status                 | Verdict                                                         |
@@ -139,7 +157,7 @@ The most direct approach: substitute the $b_5{=}0$ equations into the $b_5$-corr
 **(b) LPS canonical analysis (Lyakhovich–Pluschchay–Sharapov) and Dirac–Bergmann.**
 The principled Hamiltonian route: work out the full constraint algebra of the $b_5$ theory and classify all first- and second-class constraints. This is exact but practically infeasible: our 18-field PGT theory with a fourth-order Lagrangian generates an intractable number of constraint equations ($\mathcal{O}(10^3)$ symbolically), and the constraint structure _changes dimensionality_ at $\mathcal{O}(b_5)$ — the phase space itself gains new dimensions when the promoted fields acquire dynamics.
 
-**The key obstruction shared by both:** there is no published recipe in the literature for the _constraint-promotion_ case, where a field that was non-dynamical at leading order becomes dynamical at the next order. Both approaches implicitly assume the number of dynamical degrees of freedom is fixed.
+**The key obstruction shared by both:** there is no published recipe in the literature for the _constraint-promotion_ case, where a field that was non-dynamical at leading order becomes dynamical at the next order. Both approaches implicitly assume the number of dynamical degrees of freedom is fixed. This barrier has been recognised as a named open problem in the PGT literature for over 25 years: Blagojević–Nikolić (1983) called it "if-constraints with critical parameters"; Yo–Nester–Ni (1999–2002, gr-qc/9902032 and gr-qc/0112030) called it "constraint bifurcation with field activation"; Blagojević–Cvetković (2018, arXiv:1804.05556) prove explicitly that the perturbative Hamiltonian fails to exist in the relevant subspace. No published method resolves it for the generic PGT case.
 
 ### What the equations-of-motion approach gives — and where it stops
 
@@ -184,32 +202,27 @@ The only completed theory with posterior structure has constraint torsion + a no
 - [ ] Is it worth pivoting to broaden the constraint-torsion + nonminimal class (Ricci-EM-mould theories with different cross-terms) rather than continuing into propagating-torsion / parity-odd / complete-PGT?
 - [ ] Or complete the parity-odd and full-quadratic enumeration first?
 
-### 4. Reporting a survey of nulls
-
-The dark-photon, Einstein-Cartan, and all five YM-PGT sub-theories are null. The nonminimal couplings (six parameters spanning the propagating-torsion sector) are all flat in posterior.
-
-- [ ] What is the right framing for the paper — a joint Bayes factor, per-theory, or something else?
-
-### 5. Manuscript appendix — brief introduction to PGT?
+### 4. Manuscript appendix — brief introduction to PGT?
 
 PGT isn't covered in the masters curriculum, so the examiner will not have the background context to follow the manuscript. I am wondering whether to include an appendix giving a brief introduction to PGT — collecting key results and a few illustrative figures from canonical references (Blagojević, arXiv:gr-qc/0302040, was particularly helpful for me) into a self-contained overview.
 
 - [ ] Is this the right approach for setting context, or is there a different convention for this?
 
-### 6. HPC queue — is this normal?
+### 5. HPC queue — is this normal?
 
 Standard-QOS jobs consistently sit PENDING indefinitely (current jobs have been queued for days without running). In practice every job ends up submitted to the INTR queue (1h wall limit), which schedules immediately but times out before convergence, requiring repeated `--resume` resubmissions. The current nested-sampling runs each take 3–5 INTR slots to converge.
 
 - [ ] Is this typical for CSD3 at the moment, or is there something wrong with how the jobs are configured?
 - [ ] Is there a recommended way to run jobs that genuinely need more than 1 hour without hitting the standard queue?
 
-### 7. Manuscript §2.2 — TT-gauge-in-matter citation
+### 6. Manuscript §2.2 — TT-gauge-in-matter citation
 
 We evolve the metric perturbation without an equation-of-motion gauge constraint, and impose only TT-compatible initial conditions in the vacuum region where the wavepacket originates. Per issue #167 this is the supervisor-guided approach, but the manuscript prose currently has no published reference for it.
 
 - [ ] Is there a published reference for this TT-in-matter approach (notes? a recent paper?), or should we cite it as "private communication"?
 
-### 8. Carry-forward from 17 April
+### 7. Carry-forward from 17 April
 
 - [ ] **Scheduling the practice talk** — when?
-- [ ] **Sven Krippendorf** — outcome of any intervention?
+- [ ] **Sven Krippendorf** — any reply since you reached out?
+- [ ] **Will Handley** — anything new on his upcoming PhD positions, and the right timing for an application?
