@@ -77,19 +77,18 @@ contributing a finite polynomial in $\Bzero$.
 This series has a non-zero radius of convergence around $\Bzero=0$
 because the unperturbed propagators are non-singular,
 and $\Pconv = |\mathcal{M}|^2$ therefore admits a convergent Taylor
-expansion in $\Bzero$ in a neighbourhood of zero.
-The argument does not invoke a diagonalisation of $\mathcal{K}$ and
-so tolerates the eigenvalue coincidences that occur in the surveyed
-parameter space --- including the graviton--photon vacuum-dispersion
-coincidence $\omega=k$ that is precisely what makes the Gertsenshtein
-effect resonant in the first place.
-Each graviton--photon coupling vertex is linear in the background
-$\bar{\FieldF{}}\propto\Bzero$, so all such vertices vanish at
-$\Bzero=0$ and the kinetic matrix becomes block-diagonal between the
-channels.
-Since each vertex contributes one factor of $\Bzero$, the
-transition amplitude $\mathcal{M}(\Bzero)$ for graviton--photon
-conversion contains only odd powers of $\Bzero$, and
+expansion in $\Bzero$ in a neighbourhood of zero.%
+\footnote{The argument does not invoke a diagonalisation of
+$\mathcal{K}$ and so tolerates the eigenvalue coincidences that occur
+in the surveyed parameter space.}
+The setup is invariant under rotation by $\pi$ about the propagation
+axis $\hat{z}$: this sends $\Bzero\to-\Bzero$ and the transverse
+photon $\delta\FieldA{_{x,y}}\to-\delta\FieldA{_{x,y}}$ while leaving
+the transverse--traceless graviton polarisations
+$h_+=\tfrac{1}{2}(h_{xx}-h_{yy})$ and $h_\times=h_{xy}$ invariant.
+The conversion amplitude picks up a single sign from the photon flip,
+so $\mathcal{M}(-\Bzero)=-\mathcal{M}(\Bzero)$:
+$\mathcal{M}$ contains only odd powers of $\Bzero$, and
 $\Pconv = |\mathcal{M}|^2$ contains only even powers:
 \begin{align}
   \Pconv \;=\; c_2\Bzero^2 + c_4\Bzero^4 + \cdots ,
@@ -109,7 +108,8 @@ varying the PGT Lagrangian of \cref{PGTBackground} with respect to $\MAGT{}$
 $\MAGT{}$, either directly or through the Riemann--Cartan curvature
 $\MAGFt{}$, which inherits a torsion-dependence through the contortion
 $K\propto\MAGT{}$ from the Palatini split (\cref{PalatiniDecomposition});
-the connection contains both a $\rcD{}K$ piece and a $K{\cdot}K$ piece.
+substituting into \cref{Curvature} gives $\MAGFt{}$ a $\rcD{}K$ piece
+and a $K{\cdot}K$ piece.
 At the background $(\eta_{\mu\nu},\,\bar{\FieldF{}},\,\bar{\MAGT{}}=0)$,
 every term type in the Lagrangian vanishes:
 the pure-torsion terms ($\MAGT{}^2$, $(\rcD{}\MAGT{})^2$) are at least
@@ -150,17 +150,18 @@ second perturbative order.
 Varying $\Del{1}\MAGFt{_{[\mu\nu]}}\bar{\FieldF{}}^{\mu\nu}$ with
 respect to $\delta\MAGT{}$ selects this cross-term, producing a source
 $\propto\Del{1}\bar{\FieldF{}}\,\partial h$.
-The simplest realisation of the bound is the algebraic-torsion form,
-in which $\delta\MAGT{}$ has no kinetic operator and the linearised
+In the algebraic-torsion form,
+$\delta\MAGT{}$ has no kinetic operator and the linearised
 Cartan equation is purely algebraic,
 $2\Alp{}\,\delta\MAGT{} = -\text{source}$;
 inverting this algebraic equation directly gives
 $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
 for a graviton of dimensionless amplitude $A$ (\cref{Linearisation}).
 This is a self-consistency check on the linearised treatment of the
-torsion sector: the $\MAGT{}^3$ and higher self-interactions dropped
-at linear order are negligible only while $\delta\MAGT{}$ stays small
-relative to the torsion mass scale, hence
+torsion sector: the Cartan equation receives cubic corrections of
+order $(\delta\MAGT{})^2$ from the $\MAGT{}^3$ self-interactions,
+which are negligible compared to the linear mass term
+$2\Alp{}\,\delta\MAGT{}$ only when $|\delta\MAGT{}|/\Alp{}\ll 1$, hence
 \begin{align}
   |\delta\MAGT{}|\ll\Alp{}
   \quad\Longleftrightarrow\quad
@@ -172,9 +173,8 @@ is active and $\delta\MAGT{}$ propagates: the algebraic inversion is
 then replaced by a Green's function inversion, but the magnitude of
 the response and the scaling of the bound are unchanged with $\Alp{}$
 generalised to the dominant torsion mass scale.
-\cref{PerturbativeBound} takes its sharpest form in the algebraic
-case; the extension to the rest of the surveyed parameter space is
-treated in the next paragraph.
+The extension to the rest of the surveyed parameter space is in the
+following paragraph.
 
 \paragraph*{Generality beyond the algebraic-torsion theory}
 
@@ -184,9 +184,15 @@ The bound \cref{PerturbativeBound} fixes specific values
 $\Del{1}$ and $\Alp{}$ within the algebraic-torsion sub-class.
 Across the surveyed parameter space, the same IBP-and-inversion
 argument applies with two extensions.
-First, the scan over non-minimal coupling strength $g_{\mathrm{NM}}$
-and torsion mass scale $m_T$ within the algebraic-torsion sub-class
-gives a torsion correction to the survey coefficient that scales as
+First, \cref{PerturbativeBound} with $\Del{1}\to g_{\mathrm{NM}}$ and
+$\Alp{}\to m_T^2$ gives
+$|\delta\MAGT{}|\sim(g_{\mathrm{NM}}/m_T^2)\,\Bzero A$;
+the cubic self-interaction then contributes a correction of order
+$(\delta\MAGT{})^2 \sim (g_{\mathrm{NM}}/m_T^2)^2\,\Bzero^2$ to the
+linearised Cartan equation, placing the nonlinear torsion correction
+to $\Pconv$ at
+$\mathcal{O}\!\left(\Bzero^4(g_{\mathrm{NM}}/m_T^2)^2\right)$
+and the correction to $C=\Pconv/\Bzero^2$ at
 $\mathcal{O}\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$.
 Second, when the Barker kinetic term is active and $\delta\MAGT{}$
 propagates, the linearised Cartan equation takes the form
