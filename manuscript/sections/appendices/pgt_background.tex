@@ -20,7 +20,7 @@ and the tetrad $b^i{}_\mu$.
 \label{FieldContent}
 The starting point is a matter Lagrangian
 $\mathcal{L}_M(\phi,\partial_k\phi)$ for a field carrying
-energy-momentum and (for spinning matter) spin-angular-momentum,
+energy-momentum and (in general) spin-angular-momentum,
 invariant under \emph{rigid} (constant-parameter) Poincar\'{e}
 transformations~\cite{kibble1961lorentz,utiyama1956invariant,sciama1962physical,blagojevic2003lectures,lasenby2016scale}.
 Promoting the ten Poincar\'{e} parameters to spacetime-dependent
@@ -36,19 +36,18 @@ derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
 \end{align}
 acting on a matter field $\phi$ carrying a Lorentz representation,
 with $\Sigma_{ij} = \Sigma_{[ij]}$ the antisymmetric
-Lorentz-generator matrix in that representation: a finite local
-Lorentz rotation $\Omega^{ij}(x)$ acts on $\phi$ as
+Lorentz-generator matrix in that representation. A finite local
+Lorentz rotation $\Omega^{ij}(x)$ acts on $\phi$
+as~\cite{lasenby2016scale}
 \begin{align}
-  \phi &\mapsto \exp\!\Bigl(\tfrac{1}{2}\Omega^{ij}(x)\,\Sigma_{ij}\Bigr)\phi,
+  \phi &\mapsto \exp\!\Bigl(\tfrac{1}{2}\Omega^{ij}(x)\,\Sigma_{ij}\Bigr)\phi.
   \label{LorentzMatterTransform}
 \end{align}
-which fixes the form of the spin-connection
-term~\cite{lasenby2016scale}. The translation generators are
-compensated
-by a \emph{tetrad} $b^i{}_\mu$ together with its inverse
-$h_i{}^\mu$, which together provide the explicit basis-conversion
-rule between Lorentz-frame and coordinate
-indices~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehlobukhov2007cartan,blagojevicHehl2013,hehl1995metric,barker2024poincare},
+The translation generators are compensated by a \emph{tetrad}
+$b^i{}_\mu$ together with its inverse
+$h_i{}^\mu$~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehlobukhov2007cartan,blagojevicHehl2013,hehl1995metric,barker2024poincare}.
+The pair provides the explicit basis-conversion rule between
+Lorentz-frame and coordinate indices,
 \begin{subequations}
 \begin{gather}
   V^\mu = h_i{}^\mu\,V^i,
@@ -60,9 +59,9 @@ indices~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehl
   \label{TetradIndexConversion}
 \end{gather}
 \end{subequations}
-and which relate the curved-space metric to the Minkowski metric
-of the local Lorentz frame via the tetrad-bilinear
-relation~\cite{blagojevic2003lectures}
+and relates the curved-space metric to the Minkowski metric of the
+local Lorentz frame via the tetrad-bilinear
+relation~\cite{blagojevic2003lectures},
 \begin{align}
   \g{_{\mu\nu}} &= \eta_{ij}\,b^i{}_\mu\,b^j{}_\nu.
   \label{TetradMetric}
@@ -115,23 +114,10 @@ Greek indices,
        - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma}.
   \label{MixedCovariantDerivative}
 \end{multline}
-Specialising \cref{LorentzCovariantDeriv} to the Lorentz-vector
-representation (i.e., $\phi = V^i$, with $\Sigma_{ij}$ acting as
-the Lorentz generators on the vector index) gives the standard
-form
-\begin{align}
-  \nabla_\mu V^i &= \partial_\mu V^i + A^i{}_{j\mu}\,V^j,
-  \label{LorentzVectorCovariantDeriv}
-\end{align}
-with the sign reversed for a lower index.
-\Cref{MixedCovariantDerivative} generalises
-\cref{LorentzVectorCovariantDeriv} to tensors with both Latin and
-Greek indices --- the case used throughout this work --- with the
-analogous affine-connection contribution on each Greek
-index~\cite[eq.~(1.7a)]{blagojevic2003lectures}.
-This per-index form is the one needed for the symbolic
-implementation of torsion and curvature, set up in
-\cref{SymbolicComputation}.
+\Cref{MixedCovariantDerivative} is the per-index form used in the
+symbolic implementation of torsion and
+curvature~\cite[eq.~(1.7a)]{blagojevic2003lectures}
+(\cref{SymbolicComputation}).
 
 In any gauge theory the field strength can be read off the
 commutator of two covariant derivatives acting on a matter
