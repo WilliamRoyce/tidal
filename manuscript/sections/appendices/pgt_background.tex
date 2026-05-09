@@ -25,23 +25,23 @@ invariant under \emph{rigid} (constant-parameter) Poincar\'{e}
 transformations~\cite{kibble1961lorentz,utiyama1956invariant,sciama1962physical,blagojevic2003lectures,lasenby2016scale}.
 Promoting the ten Poincar\'{e} parameters to spacetime-dependent
 functions breaks invariance through derivative terms acting on the
-local parameters. The Lorentz-rotation generators
+local parameters. A finite local
+Lorentz rotation $\Omega^{ij}(x)$ acts on a matter field $\phi$ carrying a Lorentz representation
+as~\cite{lasenby2016scale}
+\begin{align}
+  \phi &\mapsto \exp\Bigl(\tfrac{1}{2}\Omega^{ij}(x)\,\Sigma_{ij}\Bigr)\phi,
+  \label{LorentzMatterTransform}
+\end{align}
+with $\Sigma_{ij} = \Sigma_{[ij]}$ the antisymmetric
+Lorentz-generator.
+The Lorentz-rotation generators
 are compensated by a \emph{spin connection} $A^{ij}{}_\mu$ that
 enters the covariant
 derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
 \begin{align}
   \nabla_\mu\phi &= \bigl(\partial_\mu
-    + \tfrac{1}{2}A^{ij}{}_\mu\,\Sigma_{ij}\bigr)\phi
+    + \tfrac{1}{2}A^{ij}{}_\mu\,\Sigma_{ij}\bigr)\phi.
   \label{LorentzCovariantDeriv}
-\end{align}
-acting on a matter field $\phi$ carrying a Lorentz representation,
-with $\Sigma_{ij} = \Sigma_{[ij]}$ the antisymmetric
-Lorentz-generator matrix in that representation. A finite local
-Lorentz rotation $\Omega^{ij}(x)$ acts on $\phi$
-as~\cite{lasenby2016scale}
-\begin{align}
-  \phi &\mapsto \exp\!\Bigl(\tfrac{1}{2}\Omega^{ij}(x)\,\Sigma_{ij}\Bigr)\phi.
-  \label{LorentzMatterTransform}
 \end{align}
 The translation generators are compensated by a \emph{tetrad}
 $b^i{}_\mu$ together with its inverse
