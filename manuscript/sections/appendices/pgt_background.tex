@@ -34,8 +34,9 @@ derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
   \label{LorentzCovariantDeriv}
 \end{align}
 acting on a matter field $\phi$ carrying a Lorentz representation,
-with $\Sigma_{ij}$ the Lorentz-generator matrix in that
-representation. The translation generators are compensated
+with $\Sigma_{ij} = \Sigma_{[ij]}$ the antisymmetric Lorentz-generator
+matrix in that representation~\cite{lasenby2016scale}. The
+translation generators are compensated
 by a \emph{tetrad} $b^i{}_\mu$ together with its inverse
 $h_i{}^\mu$, which together provide the explicit basis-conversion
 rule between Lorentz-frame and coordinate
@@ -85,9 +86,9 @@ a connection term inside the covariant derivative on a matter
 field \cref{LorentzCovariantDeriv}; it instead converts the
 resulting spacetime-index covariant derivative to Lorentz-frame-index
 form, $\nabla_k\phi = h_k{}^\mu\,\nabla_\mu\phi$~\cite[eq.~(1.7b)]{blagojevic2003lectures}.
-Instead, the tetrad enters the gauge dynamics through the metric
-relation \cref{TetradMetric} and the torsion field strength
-\cref{TorsionDef} below.
+The tetrad enters the gauge dynamics through the metric relation
+\cref{TetradMetric} and the torsion field strength \cref{TorsionDef}
+below.
 
 The covariant derivative on a tensor of mixed type acts with the
 spin connection on each Latin index and with an analogous
@@ -106,18 +107,29 @@ Greek indices,
        - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma}.
   \label{MixedCovariantDerivative}
 \end{multline}
-\Cref{MixedCovariantDerivative} is \cref{LorentzCovariantDeriv}
-written out for Lorentz-tensor matter --- the case used throughout
-this work: the abstract action of $\Sigma_{ij}$ becomes the
-explicit per-index spin-connection terms, plus the corresponding
-affine-connection terms on each Greek
-index~\cite[eq.~(1.7a)]{blagojevic2003lectures}. This is the form
-used in \cref{SymbolicComputation}.
+For a Lorentz-vector field $V^i$, the generator
+$(\Sigma_{kl})^i{}_j = \delta^i_k\,\eta_{lj} - \delta^i_l\,\eta_{kj}$
+substituted into \cref{LorentzCovariantDeriv} gives one
+spin-connection term per index,
+\begin{align}
+  \nabla_\mu V^i &= \partial_\mu V^i + A^i{}_{j\mu}\,V^j,
+  \label{LorentzVectorCovariantDeriv}
+\end{align}
+with the sign reversed for a lower index.
+\Cref{MixedCovariantDerivative} generalises
+\cref{LorentzVectorCovariantDeriv} to tensors with both Latin and
+Greek indices --- the case used throughout this work --- with the
+analogous affine-connection contribution on each Greek
+index~\cite[eq.~(1.7a)]{blagojevic2003lectures}.
+This per-index form is the one needed for the symbolic
+implementation of torsion and curvature, set up in
+\cref{SymbolicComputation}.
 
 In any gauge theory the field strength can be read off the
-commutator of two covariant derivatives acting on a matter field:
-were the connection trivial the commutator would vanish, so the
-commutator is linear in the field strength. For
+commutator of two covariant derivatives acting on a matter
+field~\cite{blagojevic2002gravitation}: were the connection
+trivial the commutator would vanish, so the commutator is linear
+in the field strength. For
 electrodynamics this gives the familiar relation
 $[\nabla_\mu,\nabla_\nu]\phi = i e\,\mathcal{F}_{\mu\nu}\phi$ on a
 matter field. In PGT the analogous
@@ -257,16 +269,23 @@ defined by $\mathcal{Q} = 0$.
     space $(L_4, \g{})$. General relativity inhabits the
     Riemannian space $V_4$ ($\mathcal{T} = \mathcal{Q} = 0$);
     Poincar\'{e} gauge theory inhabits the Riemann--Cartan space
-    $U_4$ ($\mathcal{Q} = 0$); the dual case is Weitzenb\"{o}ck
-    teleparallel $W_4$ ($\mathcal{R} = \mathcal{Q} = 0$); setting
-    all three obstructions to zero recovers Minkowski
+    $U_4$ ($\mathcal{Q} = 0$); the flat-connection (teleparallel)
+    case $W_4$ has $\mathcal{R} = 0$, with the metric-teleparallel
+    ($\mathcal{R} = \mathcal{Q} = 0$, the classical Weitzenb\"{o}ck
+    space) and symmetric-teleparallel
+    ($\mathcal{R} = \mathcal{T} = 0$) sub-cases obtained by
+    additionally setting $\mathcal{Q} = 0$ or $\mathcal{T} = 0$;
+    setting all three obstructions to zero recovers Minkowski
     $\mathbb{M}^4$. Adapted from
     figure~3 of~\cite{bahamonde2021teleparallel}.}
   \label{MetricAffineClasses}
 \end{figure}
 
-The bridge between the two formulations is the \emph{tetrad
-postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures}. Any tangent
+The bridge between the gauge-theoretic formulation (with fields
+$b^i{}_\mu$ and $A^{ij}{}_\mu$) and the metric-affine formulation
+(with fields $\g{_{\mu\nu}}$ and $\MAGA{^\sigma_\mu_\nu}$) is the
+\emph{tetrad postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures}.
+Any tangent
 vector $u$ can be expanded in either basis,
 $u = u^i\,\mathbf{e}_i = u^\mu\,\partial_\mu$;
 parallel-transporting $u$ must give the same result whether the
@@ -302,9 +321,8 @@ decomposition~\cite[eq.~(2.6)]{blagojevic2003lectures}
     + K^\sigma{}_{\mu\nu},
   \label{ContortionSplit}
 \end{align}
-which is the same content as \cref{PalatiniDecomposition} written
-in spin-connection language $A^{ij}{}_\mu = \Delta^{ij}{}_\mu(b)
-+ K^{ij}{}_\mu$~\cite[eq.~(2.12)]{blagojevic2003lectures}.
+which is the same content as
+\cref{PalatiniDecomposition}~\cite[eq.~(2.6)]{blagojevic2003lectures}.
 
 \Cref{Theory} and \cref{SymbolicComputation} use the metric-affine
 notation $(\g{_{\mu\nu}}, \MAGA{^\sigma_\mu_\nu})$
