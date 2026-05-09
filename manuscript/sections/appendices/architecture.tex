@@ -14,14 +14,12 @@ software with which we obtained the results of \cref{Results}.
 \TIDAL{} comprises two parts: a symbolic computation that derives the
 linearised field equations from a Lagrangian, and a numerical
 integration that evolves them in time.
-All equations of motion are derived automatically from the input
-Lagrangian; nothing else is specified by hand.
 The architecture is shown in~\cref{ArchitectureDiagram}.
 
 % Figure A.1 — TIDAL architecture diagram.
-\begin{figure}[t]
+\begin{figure*}[t]
   \centering
-  \includegraphics{figures/figA1_architecture}
+  \includegraphics[width=\linewidth]{figures/figA1_architecture}
   \caption{\TIDAL{} architecture. The symbolic computation
     (\xAct{}/\Mathematica{}) ingests a TOML theory specification,
     derives the Euler–Lagrange equations via \xPert{} perturbation
@@ -33,23 +31,20 @@ The architecture is shown in~\cref{ArchitectureDiagram}.
     (\cref{NumericalEvolution}), and produces simulation data from
     which the physics observables of interest are extracted.}
   \label{ArchitectureDiagram}
-\end{figure}
+\end{figure*}
 
 \paragraph*{Symbolic computation}
 The symbolic computation, written in \Mathematica{}~\cite{mathematica}
 on the \xAct{}~\cite{martingarcia2007xact} suite, expands the
 Lagrangian to quadratic order around the declared background using
 \xPert{}~\cite{brizuela2009xpert}, applies the Euler–Lagrange
-variation, and decomposes the resulting tensor equations into scalar
+variation, and decomposes the resulting tensor equations into their
 components with the aid of \xTras{}~\cite{nutma2014xtras}.
-Gauge fixing is carried out either by adding a gauge-fixing term to
-the Lagrangian or by imposing the gauge condition as a constraint
-after the variation; the specific gauge is declared in the theory
-specification.
-The complete description of the symbolic operations is given in
-\cref{SymbolicComputation}; the higher-derivative terms in the
-quadratic PGT action and the obstructions to their perturbative
-reduction are discussed in \cref{PerturbativeReduction}.
+A complete description of the symbolic operations is given in
+\cref{SymbolicComputation}, with the gauge-fixing methodology and
+the obstructions to perturbative reduction of higher-derivative
+terms in the quadratic PGT action discussed in \cref{GaugeFixing}
+and \cref{PerturbativeReduction} respectively.
 
 \paragraph*{Equation specification}
 The equation specification is the sole interface between the symbolic
