@@ -395,6 +395,87 @@ cmd_cancel() {
   remote_exec "scancel $jobid"
 }
 
+cmd_interactive() {
+  local time="01:00:00" name="tidal-interactive" account="" nodes=1 ntasks=112
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --time)    time="$2";    shift 2 ;;
+      --name)    name="$2";    shift 2 ;;
+      --account) account="$2"; shift 2 ;;
+      --nodes)   nodes="$2";   shift 2 ;;
+      --ntasks)  ntasks="$2";  shift 2 ;;
+      *) die "unknown arg: $1" ;;
+    esac
+  done
+  check_master
+  [[ -n "$account" ]] || account="$(cmd_resolve_account)"
+
+  local template="${TEMPLATE_DIR}/interactive.sbatch"
+  [[ -f "$template" ]] || die "template not found: $template"
+
+  local safe_root safe_account
+  safe_root="${REMOTE_ROOT//&/\\&}"; safe_root="${safe_root//|/\\|}"
+  safe_account="${account//&/\\&}"; safe_account="${safe_account//|/\\|}"
+
+  local rendered
+  rendered="$(sed \
+    -e "s|{{JOB_NAME}}|${name}|g" \
+    -e "s|{{ACCOUNT}}|${safe_account}|g" \
+    -e "s|{{NODES}}|${nodes}|g" \
+    -e "s|{{NTASKS}}|${ntasks}|g" \
+    -e "s|{{TIME}}|${time}|g" \
+    -e "s|{{REMOTE_ROOT}}|${safe_root}|g" \
+    "$template")"
+
+  note "submitting interactive allocation (nodes=${nodes} ntasks=${ntasks} time=${time})"
+  local jobid
+  jobid="$(remote_exec "cd ${REMOTE_ROOT} && sbatch --parsable" <<<"$rendered")"
+  jobid="${jobid%%;*}"
+  [[ -n "$jobid" ]] || die "sbatch returned empty job id"
+
+  local results_dir="${REMOTE_ROOT}/hpc_results/${jobid}"
+  mkdir -p "$(dirname "$JOBS_FILE")"
+  # Record without brackets so pull's sed parser extracts --output PATH cleanly.
+  echo "$(date -Iseconds) $jobid $name ${template} --output ${results_dir}" >> "$JOBS_FILE"
+  echo "$jobid"
+  note "interactive allocation submitted: job $jobid"
+  note "tip: ~30 s after submit, run \`bash $0 check $jobid\` to confirm startup"
+  note "wait for start: bash $0 wait $jobid"
+  note "then attach:    bash $0 attach $jobid"
+  note "cancel early:   bash $0 cancel $jobid"
+}
+
+cmd_attach() {
+  check_master
+  local jobid="${1:?jobid required}"
+  # Get state and nodelist in one squeue call.  squeue -o %N returns reason strings
+  # like '(Resources)' for pending jobs (not empty), so we must check state explicitly.
+  local sq_out state node
+  sq_out="$(remote_exec "squeue -j $jobid -h -o '%T,%N'" 2>/dev/null || true)"
+  state="$(cut -d, -f1 <<<"$sq_out")"
+  node="$(cut -d, -f2 <<<"$sq_out")"
+  if [[ "$state" != "RUNNING" || -z "$node" ]]; then
+    die "job $jobid is not RUNNING (state: ${state:-unknown}); use: bash $0 wait $jobid"
+  fi
+  local results_dir="${REMOTE_ROOT}/hpc_results/${jobid}"
+  note "attaching to compute node: $node (job $jobid)"
+  note "RESULTS_DIR: $results_dir"
+  # SSH jump: devcontainer -> login node -> compute node.
+  # Local vars ($node, ${REMOTE_ROOT}, ${results_dir}) are expanded here before the
+  # string reaches the login node; the single-quoted inner command then runs verbatim
+  # on the compute node.  exec bash (not bash -l) inherits the env without re-sourcing
+  # profile scripts that could reset the module environment.
+  ssh -t "$HOST" "ssh -t $node \
+    'source /etc/profile.d/modules.sh 2>/dev/null || true; \
+     module purge 2>/dev/null || true; \
+     module load rhel8/default-sar 2>/dev/null || true; \
+     module load python/3.11.0-icl 2>/dev/null || true; \
+     cd ${REMOTE_ROOT}; \
+     source .venv/bin/activate; \
+     export RESULTS_DIR=${results_dir}; \
+     exec bash'"
+}
+
 cmd_shell() {
   check_master
   ssh -t "$HOST" "cd ${REMOTE_ROOT} && exec bash -l"
@@ -422,6 +503,12 @@ Subcommands:
                                     override with --src for ad-hoc jobs.
   pull-campaign NAME                pull campaign artefacts from hpc_results/campaigns/NAME
                                     (use after resume runs complete with === DONE ===)
+  interactive [--time HH:MM:SS] [--nodes N] [--ntasks N] [--name X] [--account P]
+                                    book a full sapphire node via sbatch sleep (INTR QOS);
+                                    allocation persists across SSH disconnects; follow with
+                                    'wait <jobid>' then 'attach <jobid>'
+  attach <jobid>                    SSH to the compute node of a running interactive job;
+                                    modules loaded, venv activated, \$RESULTS_DIR set
   cancel <jobid>                    scancel
   shell                             interactive ssh into remote tidal dir
 
@@ -444,6 +531,8 @@ main() {
     pull)    cmd_pull "$@" ;;
     pull-campaign) cmd_pull_campaign "$@" ;;
     wait)    cmd_wait "$@" ;;
+    interactive) cmd_interactive "$@" ;;
+    attach)      cmd_attach "$@" ;;
     cancel)  cmd_cancel "$@" ;;
     shell)   cmd_shell "$@" ;;
     resolve-account) cmd_resolve_account ;;
