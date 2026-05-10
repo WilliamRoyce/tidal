@@ -57,39 +57,44 @@ The Taylor expansion \cref{TaylorPconv} is centred on $\Bzero=0$,
 where the configuration $g_{\mu\nu}=\eta_{\mu\nu}$,
 $\bar{\FieldA{_\mu}}=0$, $\bar{\MAGT{}}=0$ trivially solves the full
 nonlinear field equations.
-The leading coefficient $c_2$ is therefore extracted at the unperturbed
-background, free of the metric-backreaction shift discussed above;
-the harder $\Bzero\neq 0$ check is given below.
+The Taylor coefficient $c_2 = \lim_{\Bzero\to 0}\Pconv/\Bzero^2$ is read
+off in the limit $\Bzero\to 0$, where the Hwang--Noh backreaction shift
+of \cref{HwangNohBound} (itself $\mathcal{O}(\Bzero^2)$) vanishes.
+The non-trivial finite-$\Bzero$ check --- that the torsion sector
+remains within the linearised regime --- is the subject of the
+following paragraphs.
 
 \paragraph*{Analytic dependence on the background field}
 
-The kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix}
-acquires an explicit $\Bzero$-dependence
+At $\Bzero=0$ the system is rotationally invariant about the
+propagation axis $\hat{z}$: any Lorentz-invariant Lagrangian
+constructed from $h$, $\delta\MAGT{}$, and $\delta\FieldA{}$ alone
+can couple the perturbations only within sectors of common spin
+projection on $\hat{z}$.
+The transverse graviton is spin-2 and the transverse photon is
+spin-1, so at $\Bzero=0$ they live in disjoint sectors and
+$\Pconv(\Bzero=0)=0$.
+Switching on $\Bzero$ introduces $\bar{\FieldF{}}\propto\Bzero\hat{x}$,
+an external tensor that breaks the $\hat{z}$-rotational symmetry and
+lifts the spin-2/spin-1 selection rule.
+The kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix} acquires an
+explicit $\Bzero$-dependence
 $\mathcal{K}(\partial_t,\partial_z;\Bzero)$ that is polynomial in
-$\Bzero$.
-At $\Bzero=0$ the off-diagonal graviton--photon couplings vanish and
-the channels are decoupled, so $\Pconv(\Bzero=0)=0$.
-For small $\Bzero$ the off-diagonal couplings are a perturbation on
-this decoupled theory; standard perturbation theory expresses the
-conversion amplitude $\mathcal{M}(\Bzero)$ as a sum over diagrams
-with vertex insertions of $\bar{\FieldF{}}\propto\Bzero$, each diagram
-contributing a finite polynomial in $\Bzero$.
-This series has a non-zero radius of convergence around $\Bzero=0$
-because the unperturbed propagators are non-singular,
-and $\Pconv = |\mathcal{M}|^2$ therefore admits a convergent Taylor
-expansion in $\Bzero$ in a neighbourhood of zero.%
+$\Bzero$, and $\mathcal{M}(\Bzero)$ depends analytically on
+$\mathcal{K}$ wherever the unperturbed propagators are non-singular;
+$\Pconv = |\mathcal{M}|^2$ is therefore analytic in $\Bzero$ in a
+neighbourhood of zero.%
 \footnote{The argument does not invoke a diagonalisation of
 $\mathcal{K}$ and so tolerates the eigenvalue coincidences that occur
 in the surveyed parameter space.}
-The setup is invariant under rotation by $\pi$ about the propagation
-axis $\hat{z}$: this sends $\Bzero\to-\Bzero$ and the transverse
-photon $\delta\FieldA{_{x,y}}\to-\delta\FieldA{_{x,y}}$ while leaving
-the transverse--traceless graviton polarisations
-$h_+=\tfrac{1}{2}(h_{xx}-h_{yy})$ and $h_\times=h_{xy}$ invariant.
-The conversion amplitude picks up a single sign from the photon flip,
-so $\mathcal{M}(-\Bzero)=-\mathcal{M}(\Bzero)$:
-$\mathcal{M}$ contains only odd powers of $\Bzero$, and
-$\Pconv = |\mathcal{M}|^2$ contains only even powers:
+A rotation of the lab frame by $\pi$ about $\hat{z}$ is a coordinate
+relabelling that sends $\bm{B}\to-\bm{B}$: the rotated frame describes
+the same physical system with the parameter $\Bzero$ replaced by
+$-\Bzero$.
+Since $\Pconv$ is a coordinate-invariant observable, this gives
+$\Pconv(-\Bzero)=\Pconv(\Bzero)$, so $\Pconv$ is even in $\Bzero$.
+Combined with $\Pconv(\Bzero=0)=0$ and analyticity, $\Pconv$ starts at
+$\Bzero^2$ with only even powers:
 \begin{align}
   \Pconv \;=\; c_2\Bzero^2 + c_4\Bzero^4 + \cdots ,
   \label{TaylorPconv}
@@ -121,7 +126,8 @@ the non-minimal coupling $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$
 has two torsion-dependent pieces through $K$ --- the $\rcD{}K$ piece is
 handled by integration by parts, transferring the covariant derivative
 onto $\bar{\FieldF{}}$ and using $\rcD{_\rho}\bar{\FieldF{}}^{\mu\nu}=0$
-for the uniform background; the $K{\cdot}K$ piece vanishes at
+for the externally-prescribed uniform background of the standard
+Gertsenshtein convention (opening paragraph); the $K{\cdot}K$ piece vanishes at
 $\bar{\MAGT{}}=0$ directly because its variation is proportional to
 $K|_{\bar{\MAGT{}}=0}=0$.
 Thus $\bar{\MAGT{}}=0$ solves the Cartan equation on this background
@@ -137,11 +143,16 @@ The preceding paragraph established $\bar{\MAGT{}}=0$ at the background.
 To bound the torsion perturbation $\delta\MAGT{}$, expand the same
 Cartan equation to first order in the perturbations
 $\{h_{\mu\nu},\delta\FieldA{_\mu},\delta\MAGT{}\}$.
-The $\rcD{}K$ piece of $\MAGFt{}$ contributes a term that cancels at
-first order by the same integration by parts as in the preceding
-paragraph: $\rcD{_\rho}\bar{\FieldF{}}^{\mu\nu}=0$.
-The non-vanishing source comes from one order higher in the perturbation
-expansion.
+The $\rcD{}K$ piece of $\MAGFt{}$ contracted with $\bar{\FieldF{}}$
+cancels at first order by the same integration by parts as in the
+preceding paragraph: $\rcD{_\rho}\bar{\FieldF{}}^{\mu\nu}=0$.
+The same piece contracted with $\delta\FieldF{}$ instead gives a
+non-vanishing first-order source $\propto\Del{1}\,\partial\delta\FieldA{}$,
+but in the conversion regime
+$|\delta\FieldA{}|\sim\Bzero|h|$ (\cref{GertsenshteinFormula})
+this scales identically to the dominant source, derived next, which
+comes from one order higher in the perturbation expansion of the
+$\bar{\FieldF{}}$ piece.
 The Riemann--Cartan connection is the sum of the Levi-Civita piece
 (depending on the metric perturbation $h$) and the contortion
 (depending on $\delta\MAGT{}$); their product contributes a cross-term
@@ -169,12 +180,11 @@ $2\Alp{}\,\delta\MAGT{}$ only when $|\delta\MAGT{}|/\Alp{}\ll 1$, hence
   \label{PerturbativeBound}
 \end{align}
 The same dimensional argument applies when the Barker kinetic term
-is active and $\delta\MAGT{}$ propagates: the algebraic inversion is
+$(\rcD{}\MAGT{})^2$~\cite{barker2024poincare} is active and
+$\delta\MAGT{}$ propagates: the algebraic inversion is
 then replaced by a Green's function inversion, but the magnitude of
 the response and the scaling of the bound are unchanged with $\Alp{}$
 generalised to the dominant torsion mass scale.
-The extension to the rest of the surveyed parameter space is in the
-following paragraph.
 
 \paragraph*{Generality beyond the algebraic-torsion theory}
 
@@ -266,7 +276,7 @@ $\Bzero$ (\cref{TaylorPconv}),
 $c_2$ is the lowest non-zero Taylor coefficient of $\Pconv$.
 The survey coefficient $\Czero=c_2$ is therefore the leading term in
 $C=\Pconv/\Bzero^2$ --- not by definition, but as a consequence of the
-vertex-vanishing and analyticity arguments above.
+spin-selection and analyticity arguments above.
 In the Einstein--Maxwell limit $\Czero$ reduces to $(\kappa D/2)^2$
 from \cref{GertsenshteinFormula}; in the torsionful theory $\Czero=c_2$
 is the total graviton-photon conversion coefficient at leading order in
