@@ -120,24 +120,9 @@ Greek indices,
        - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma}.
   \label{MixedCovariantDerivative}
 \end{multline}
-\Cref{MixedCovariantDerivative} is the per-index form for general
-mixed-Latin/Greek tensors. Restricting to pure-Greek tensors --- the
-case used throughout the TIDAL Lagrangians in \cref{Theory} and the
-symbolic implementation --- the Latin-index spin-connection terms
-drop out, leaving the standard affine-connection covariant
-derivative,
-\begin{align}
-  \rcD{_\rho}\tensor{T}{^\mu_\nu}
-    &= \PD{_\rho}\tensor{T}{^\mu_\nu}
-       + \MAGA{^\mu_\rho_\sigma}\,\tensor{T}{^\sigma_\nu}
-       - \MAGA{^\sigma_\rho_\nu}\,\tensor{T}{^\mu_\sigma},
-  \label{AffineCovariantDerivative}
-\end{align}
-with $+\MAGA{}$ on each upper Greek index and $-\MAGA{}$ on each
-lower one~\cite[eq.~(1.7a)]{blagojevic2003lectures}; the Riemannian
+the Riemannian
 counterpart $\rD{_\rho}$ is the same expression with
-$\MAGA{}\to\rCon{}$. \Cref{AffineCovariantDerivative} is the form
-used in \cref{SymbolicComputation}.
+$\MAGA{}\to\rCon{}$.
 
 In any gauge theory the field strength can be read off the
 commutator of two covariant derivatives acting on a matter
