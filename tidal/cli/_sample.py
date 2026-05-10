@@ -254,8 +254,11 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
         from tidal.inference._mc import run_monte_carlo
 
+        # MC path is gated above to per-parameter priors only (joint
+        # priors fail-fast); pass per_param_priors explicitly so the
+        # type is `list[Prior]`.
         result = run_monte_carlo(
-            priors=priors,
+            priors=per_param_priors,
             likelihood_config=likelihood_config,
             base_args=args,
             spec_path=spec_path,
@@ -376,8 +379,8 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         # post-hoc — needed for the corner-plot's derived A column after
         # results are pulled from HPC where the original CLI args aren't
         # available.  See tidal/inference/_visualize.py.
-        from tidal.cli._simulate import (  # pyright: ignore[reportPrivateUsage]
-            _parse_params,
+        from tidal.cli._simulate import (
+            _parse_params,  # pyright: ignore[reportPrivateUsage]
         )
         from tidal.symbolic import load_equation_system as _load_spec_for_meta
 

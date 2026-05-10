@@ -60,7 +60,7 @@ def _parse_cell_dir_name(name: str) -> tuple[int, tuple[int, ...]] | None:
     return face_idx, sub_tile
 
 
-def _load_cell_metadata(cell_dir: Path) -> dict | None:
+def _load_cell_metadata(cell_dir: Path) -> dict[str, object] | None:
     """Load ``inference.json`` from one cell's output dir.
 
     Returns ``None`` if the file does not exist or is unreadable.
@@ -75,9 +75,13 @@ def _load_cell_metadata(cell_dir: Path) -> dict | None:
         return None
 
 
-def _find_joint_prior_record(meta: dict) -> dict | None:
+def _find_joint_prior_record(
+    meta: dict[str, object],
+) -> dict[str, object] | None:
     """Return the radial-angular prior record from a saved metadata dict."""
     priors = meta.get("priors", [])
+    if not isinstance(priors, list):
+        return None
     for p in priors:
         if isinstance(p, dict) and p.get("kind") == "radial_angular":
             return p
@@ -129,8 +133,8 @@ def _physical_to_face_local(
     Therefore ``chi_j = v_unit_j / |v_unit_{k-1}|`` for the (N - 1)
     non-dominant slots.
     """
-    Q = np.asarray(Q)  # noqa: N806
-    n = Q.shape[0]
+    q_arr = np.asarray(Q)
+    n = q_arr.shape[0]
     if c.shape[1] != n:
         msg = f"c has {c.shape[1]} cols, expected {n}"
         raise ValueError(msg)
@@ -138,7 +142,7 @@ def _physical_to_face_local(
     # v_unit[i] = (Q @ c[i]) / |c[i]|; vectorise across samples.
     norms = np.linalg.norm(c, axis=1, keepdims=True)
     safe = np.where(norms > 0, norms, 1.0)
-    v_unit = c @ Q.T / safe  # shape (n_samples, N)
+    v_unit = c @ q_arr.T / safe  # shape (n_samples, N)
 
     k, _s = face_to_axis_sign(face_idx)
     dom = np.abs(v_unit[:, k - 1])
@@ -180,13 +184,14 @@ def _grid_shape(faces: int) -> tuple[int, int]:
 
 
 def _render_face_panel(
-    fig,
+    fig: object,  # matplotlib Figure | SubFigure (untyped to keep deps light)
     face_idx: int,
     chi: NDArray[np.float64] | None,
     n_dims: int,
 ) -> None:
-    """Render one face: lower-triangle 2D histograms, diagonal hidden,
-    upper triangle blank, face label top-right.
+    """Render one face panel: lower-triangle 2D histograms.
+
+    Diagonal hidden, upper triangle blank, face label top-right.
     """
     n_chi = n_dims - 1
     axes = fig.subplots(n_chi, n_chi, sharex=False, sharey=False)
@@ -317,7 +322,7 @@ def plot_atlas(
     # Pool by face.  Determine N from the first cell's metadata.
     by_face: dict[int, list[NDArray[np.float64]]] = {}
     n_dims: int | None = None
-    for face_idx, sub_tile, cell_dir in cells:
+    for face_idx, _sub_tile, cell_dir in cells:
         meta = _load_cell_metadata(cell_dir)
         if meta is None:
             logger.warning("cell %s: no inference.json, skipping", cell_dir.name)

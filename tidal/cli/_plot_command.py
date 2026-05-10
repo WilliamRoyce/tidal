@@ -37,6 +37,7 @@ _VALID_TYPES = frozenset(
         "convergence",
         "replicate-convergence",
         "corner",
+        "atlas",
     },
 )
 
@@ -313,6 +314,32 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     # _chains/).
     if plot_type == "corner":
         return _corner_plot(data_path, args)
+
+    # Atlas plot: cubed-sphere posterior atlas, one panel per face.
+    # Reads <data_path>/<face_label>_tile<sub_tile>/ subdirs written by
+    # `tidal sample --joint-prior`.  See tidal.inference._atlas.
+    if plot_type == "atlas":
+        from tidal.inference._atlas import plot_atlas
+
+        out_path = (
+            Path(args.output)
+            if getattr(args, "output", None)
+            else data_path / "atlas.pdf"
+        )
+        try:
+            plot_atlas(data_path, out_path)
+        except (FileNotFoundError, ValueError) as exc:
+            error_with_hint(
+                f"atlas plot failed: {exc}",
+                [
+                    "Run `tidal sample --joint-prior ...` per tile first; "
+                    "atlas pools <face_label>_tile<sub>/ subdirectories.",
+                ],
+            )
+            return 1
+        if not getattr(args, "quiet", False):
+            print(f"Atlas: {out_path}")
+        return 0
 
     # Parse options
     try:

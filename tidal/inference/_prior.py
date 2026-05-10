@@ -333,7 +333,7 @@ def parse_joint_prior(spec: str) -> RadialAngularPrior:
         raise ValueError(msg) from None
 
     n = len(names)
-    Q = np.eye(n)  # noqa: N806
+    q_arr = np.eye(n)
     q_spec = fields.get("Q", "identity")
     if q_spec == "identity":
         pass
@@ -343,7 +343,7 @@ def parse_joint_prior(spec: str) -> RadialAngularPrior:
         except ValueError:
             msg = f"joint-prior Q=random:SEED expects integer seed, got '{q_spec}'"
             raise ValueError(msg) from None
-        Q = random_rotation(n, seed=seed)  # noqa: N806
+        q_arr = random_rotation(n, seed=seed)
     else:
         msg = f"joint-prior Q must be 'identity' or 'random:SEED', got '{q_spec}'"
         raise ValueError(msg)
@@ -355,7 +355,7 @@ def parse_joint_prior(spec: str) -> RadialAngularPrior:
         face_idx=face_idx,
         sub_tile=sub_tile,
         M=m,
-        Q=Q,
+        Q=q_arr,
     )
 
 

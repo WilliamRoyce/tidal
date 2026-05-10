@@ -109,10 +109,10 @@ def face_to_direction(
     x : array, shape (N,)
         Unit-norm direction on ``S^(N-1)`` in physical coordinates.
     """
-    Q = np.asarray(Q)  # noqa: N806
-    n = Q.shape[0]
-    if Q.shape != (n, n):
-        msg = f"Q must be square; got shape {Q.shape}"
+    q_arr = np.asarray(Q)
+    n = q_arr.shape[0]
+    if q_arr.shape != (n, n):
+        msg = f"Q must be square; got shape {q_arr.shape}"
         raise ValueError(msg)
     u = np.asarray(u, dtype=np.float64)
     if u.shape != (n - 1,):
@@ -133,7 +133,7 @@ def face_to_direction(
         j += 1
     norm = float(np.linalg.norm(x))
     x /= norm
-    return Q.T @ x
+    return q_arr.T @ x
 
 
 def tile_bounds(
