@@ -13,8 +13,8 @@ analysis~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing}
 takes the magnetic field $\Bzero$ as
 externally prescribed rather than self-consistently sourcing the
 background metric.
-Hwang \& Noh~\cite{hwangnoh2023graviton} examine the validity of
-this assumption: the EM stress-energy modifies the
+Hwang \& Noh~\cite{hwangnoh2023graviton} examine when this
+approximation breaks down: the EM stress-energy modifies the
 graviton through a tachyonic mass-like term
 $-(\kappa^2/2)\Bzero^2$.
 There is a critical scale $\lambda_B = 2\pi/k_B$, with
@@ -55,11 +55,18 @@ $\delta\MAGT{^\sigma_\mu_\nu}$ alongside the graviton $h_{\mu\nu}$
 and photon perturbation $\delta\FieldA{_\mu}$ (\cref{Linearisation}).
 The Taylor expansion \cref{TaylorPconv} is centred on $\Bzero=0$,
 where the configuration $g_{\mu\nu}=\eta_{\mu\nu}$,
-$\bar{\FieldA{_\mu}}=0$, $\bar{\MAGT{}}=0$ trivially solves the full
-nonlinear field equations.
+$\bar{\FieldA{_\mu}}=0$,%
+\footnote{$\bar{\FieldF{}}=\diff\bar{\FieldA{}}=0$ fixes
+$\bar{\FieldA{}}$ only up to a gauge transformation;
+$\bar{\FieldA{}}=0$ is a valid gauge on the flat, simply-connected
+background of \cref{Linearisation}.}
+$\bar{\MAGT{}}=0$ trivially solves the full nonlinear field equations.
 The Taylor coefficient $c_2 = \lim_{\Bzero\to 0}\Pconv/\Bzero^2$ is read
-off in the limit $\Bzero\to 0$, where the Hwang--Noh backreaction shift
-of \cref{HwangNohBound} (itself $\mathcal{O}(\Bzero^2)$) vanishes.
+off in the limit $\Bzero\to 0$, where the Hwang--Noh tachyonic
+mass-like dispersion shift $-(\kappa^2/2)\Bzero^2 h$ from the
+EM stress-energy --- itself $\mathcal{O}(\Bzero^2)$ at the equation-of-motion
+level, so contributing to $\Pconv$ only at $\mathcal{O}(\Bzero^4)$ and
+hence to $c_4, c_6, \ldots$ but not to $c_2$ --- vanishes.
 The non-trivial finite-$\Bzero$ check --- that the torsion sector
 remains within the linearised regime --- is the subject of the
 following paragraphs.
@@ -67,21 +74,24 @@ following paragraphs.
 \paragraph*{Analytic dependence on the background field}
 
 At $\Bzero=0$ the system is rotationally invariant about the
-propagation axis $\hat{z}$: any Lorentz-invariant Lagrangian
-constructed from $h$, $\delta\MAGT{}$, and $\delta\FieldA{}$ alone
-can couple the perturbations only within sectors of common spin
-projection on $\hat{z}$.
+propagation axis $\hat{z}$, so the linearised theory conserves the
+angular momentum projected on $\hat{z}$ (helicity), and any coupling
+between two perturbations requires that they carry the same helicity.
 The transverse graviton is spin-2 and the transverse photon is
 spin-1, so at $\Bzero=0$ they live in disjoint sectors and
 $\Pconv(\Bzero=0)=0$.
-Switching on $\Bzero$ introduces $\bar{\FieldF{}}\propto\Bzero\hat{x}$,
-an external tensor that breaks the $\hat{z}$-rotational symmetry and
-lifts the spin-2/spin-1 selection rule.
+Switching on $\Bzero$ introduces a fixed background tensor
+$\bar{\FieldF{}}\propto\Bzero\hat{x}$ that picks out the $\hat{x}$
+direction in the transverse plane, breaking rotational symmetry about
+$\hat{z}$ and lifting the helicity-conservation selection rule that
+forbade graviton-photon transitions at $\Bzero=0$.
 The kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix} acquires an
 explicit $\Bzero$-dependence
 $\mathcal{K}(\partial_t,\partial_z;\Bzero)$ that is polynomial in
-$\Bzero$, and $\mathcal{M}(\Bzero)$ depends analytically on
-$\mathcal{K}$ wherever the unperturbed propagators are non-singular;
+$\Bzero$, and the graviton--photon conversion amplitude
+$\mathcal{M}(\Bzero)$ defined via $\Pconv=|\mathcal{M}|^2$ depends
+analytically on $\mathcal{K}$ wherever the unperturbed propagators are
+non-singular;
 $\Pconv = |\mathcal{M}|^2$ is therefore analytic in $\Bzero$ in a
 neighbourhood of zero.%
 \footnote{The argument does not invoke a diagonalisation of
@@ -112,24 +122,30 @@ varying the PGT Lagrangian of \cref{PGTBackground} with respect to $\MAGT{}$
 --- collects contributions from every Lagrangian term that depends on
 $\MAGT{}$, either directly or through the Riemann--Cartan curvature
 $\MAGFt{}$, which inherits a torsion-dependence through the contortion
-$K\propto\MAGT{}$ from the Palatini split (\cref{PalatiniDecomposition});
-substituting into \cref{Curvature} gives $\MAGFt{}$ a $\rcD{}K$ piece
-and a $K{\cdot}K$ piece.
+$K\propto\MAGT{}$ from the Palatini split (\cref{PalatiniDecomposition}).
+Substituting $\MAGA{} = \rCon{} + K$ into \cref{Curvature} gives
+\begin{align}
+  \MAGFt{} \;=\; \rR{} \,+\, \rcD{}K \,+\, K{\cdot}K ,
+  \label{RiemannCartanDecomp}
+\end{align}
+with the index contractions of \cref{Curvature} understood;
+$\rR{}$ is the Riemannian curvature of the Levi-Civita connection.
 At the background $(\eta_{\mu\nu},\,\bar{\FieldF{}},\,\bar{\MAGT{}}=0)$,
-every term type in the Lagrangian vanishes:
-the pure-torsion terms ($\MAGT{}^2$, $(\rcD{}\MAGT{})^2$) are at least
-quadratic in $\MAGT{}$ and their variation is at least linear in
-$\MAGT{}$, vanishing at $\bar{\MAGT{}}=0$;
-the pure-curvature terms ($\MAGFt{}^2$) vanish as a product because
-$\MAGFt{}|_{\eta,\,\bar{\MAGT{}}=0}=0$ identically;
-the non-minimal coupling $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$
-has two torsion-dependent pieces through $K$ --- the $\rcD{}K$ piece is
-handled by integration by parts, transferring the covariant derivative
-onto $\bar{\FieldF{}}$ and using $\rcD{_\rho}\bar{\FieldF{}}^{\mu\nu}=0$
-for the externally-prescribed uniform background of the standard
-Gertsenshtein convention (opening paragraph); the $K{\cdot}K$ piece vanishes at
-$\bar{\MAGT{}}=0$ directly because its variation is proportional to
-$K|_{\bar{\MAGT{}}=0}=0$.
+every term type in the Lagrangian vanishes.
+The pure-torsion terms ($\MAGT{}^2$, $(\rcD{}\MAGT{})^2$) are at least
+quadratic in $\MAGT{}$, so their variation is at least linear in
+$\MAGT{}$ and vanishes at $\bar{\MAGT{}}=0$.
+The pure-curvature terms ($\MAGFt{}^2$) vanish as a product because
+$\MAGFt{}|_{\eta,\,\bar{\MAGT{}}=0}=0$ identically.
+The non-minimal coupling $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$
+has two torsion-dependent pieces through $K$.
+The $\rcD{}K$ piece is handled by integration by parts: the covariant
+derivative is transferred onto $\bar{\FieldF{}}$, and
+$\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$ on the externally-prescribed
+uniform background of the standard Gertsenshtein convention (opening
+paragraph).
+The $K{\cdot}K$ piece vanishes at $\bar{\MAGT{}}=0$ directly because
+its variation is proportional to $K|_{\bar{\MAGT{}}=0}=0$.
 Thus $\bar{\MAGT{}}=0$ solves the Cartan equation on this background
 exactly for the parity-even quadratic theory class surveyed.
 This conclusion relies on $\partial_\mu\bar{\FieldF{}}=0$:
@@ -145,22 +161,20 @@ Cartan equation to first order in the perturbations
 $\{h_{\mu\nu},\delta\FieldA{_\mu},\delta\MAGT{}\}$.
 The $\rcD{}K$ piece of $\MAGFt{}$ contracted with $\bar{\FieldF{}}$
 cancels at first order by the same integration by parts as in the
-preceding paragraph: $\rcD{_\rho}\bar{\FieldF{}}^{\mu\nu}=0$.
-The same piece contracted with $\delta\FieldF{}$ instead gives a
-non-vanishing first-order source $\propto\Del{1}\,\partial\delta\FieldA{}$,
-but in the conversion regime
-$|\delta\FieldA{}|\sim\Bzero|h|$ (\cref{GertsenshteinFormula})
-this scales identically to the dominant source, derived next, which
-comes from one order higher in the perturbation expansion of the
-$\bar{\FieldF{}}$ piece.
-The Riemann--Cartan connection is the sum of the Levi-Civita piece
-(depending on the metric perturbation $h$) and the contortion
-(depending on $\delta\MAGT{}$); their product contributes a cross-term
-of the form $(\partial h){\cdot}K[\delta\MAGT{}]$ to $\MAGFt{}$ at
-second perturbative order.
-Varying $\Del{1}\MAGFt{_{[\mu\nu]}}\bar{\FieldF{}}^{\mu\nu}$ with
-respect to $\delta\MAGT{}$ selects this cross-term, producing a source
-$\propto\Del{1}\bar{\FieldF{}}\,\partial h$.
+preceding paragraph: $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$.
+The dominant source therefore comes from one order higher: per
+\cref{PalatiniDecomposition}, $\MAGFt{}$ acquires a
+$(\partial h){\cdot}K[\delta\MAGT{}]$ cross-term at second perturbative
+order, and varying
+$\Del{1}\MAGFt{_{[\mu\nu]}}\bar{\FieldF{}}^{\mu\nu}$ with respect to
+$\delta\MAGT{}$ produces a source
+$\propto\Del{1}\bar{\FieldF{}}\,\partial h$.%
+\footnote{The same $\rcD{}K$ piece contracted with $\delta\FieldF{}$
+instead of $\bar{\FieldF{}}$ gives an additional first-order source
+$\propto\Del{1}\,\partial\delta\FieldA{}$ that is $\Bzero$-independent;
+in the conversion regime $|\delta\FieldA{}|\sim\Bzero|h|$
+(\cref{GertsenshteinFormula}) this scales identically to the dominant
+source above, so \cref{PerturbativeBound} is unchanged.}
 In the algebraic-torsion form,
 $\delta\MAGT{}$ has no kinetic operator and the linearised
 Cartan equation is purely algebraic,
@@ -168,11 +182,10 @@ $2\Alp{}\,\delta\MAGT{} = -\text{source}$;
 inverting this algebraic equation directly gives
 $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
 for a graviton of dimensionless amplitude $A$ (\cref{Linearisation}).
-This is a self-consistency check on the linearised treatment of the
-torsion sector: the Cartan equation receives cubic corrections of
-order $(\delta\MAGT{})^2$ from the $\MAGT{}^3$ self-interactions,
-which are negligible compared to the linear mass term
-$2\Alp{}\,\delta\MAGT{}$ only when $|\delta\MAGT{}|/\Alp{}\ll 1$, hence
+The linearised treatment is self-consistent when the torsion
+perturbation remains small compared to the torsion mass scale,
+$|\delta\MAGT{}|/\Alp{}\ll 1$;
+substituting the linearised solution above into this requirement gives
 \begin{align}
   |\delta\MAGT{}|\ll\Alp{}
   \quad\Longleftrightarrow\quad
