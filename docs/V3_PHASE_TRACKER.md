@@ -7,7 +7,7 @@
 ## Phase A — Soft-penalty refactor + compactified-prior + de-pruning (in progress)
 
 | Step | Description | Status | Issue / Notes |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | A.0a | `docs/V3_ARCHITECTURE.md` written | ✅ done | 2026-05-10 |
 | A.0b | `docs/V3_PHASE_TRACKER.md` written | ✅ done | (this file) |
 | A.0c | `docs/V3_PHASE_E_DESIGN.md` written | ✅ done | Deferred-but-documented |
@@ -20,12 +20,12 @@
 | A.3 | Corner-plot upper-triangle removal in `tidal/inference/_visualize.py` | ✅ done | [#347](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/347) — `_hide_upper_triangle()` helper |
 | A.4 | Soft-penalty tests (`test_likelihood_*.py`) | ✅ done | [#348](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/348) — 3 new modules, 36 new test cases, all green |
 | A.5 | D1 v1 chain replay sanity check | ✅ done | [#349](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/349) — `examples/data/v3_d1_replay/`; v3 admits 14.3% more samples than v2 |
-| A.6 | Commit + version bump | ⏳ in progress | |
+| A.6 | Commit + version bump | ✅ done | 400a455 (v0.39.0) |
 
 ## Phase A-γ — γ_conversion (deferred to its own session)
 
 | Step | Description | Status |
-|---|---|---|
+| --- | --- | --- |
 | A-γ.1 | Refactored γ_conversion with multi-t_test sampling + log-zero clamp in `_stability.py` | ⏳ deferred |
 | A-γ.2 | `gamma_conversion` metric in `parse_likelihood()` (opt-in) | ⏳ deferred |
 | A-γ.3 | 10-point D1 P_max correlation validation | ⏳ deferred |
@@ -38,7 +38,7 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 | Step | Description | Status | Notes |
 | --- | --- | --- | --- |
 | B.0 | Decision: per-param `arctan_uniform` vs cubed-sphere joint prior for publication numbers (small-scale comparison) | ⏳ pending | gated on parallel session landing joint prior |
-| B.1 | D1 amp v3 smoke (mid-res INTR) | 🚀 running | HPC job 29149724 (icelake INTR, grid=128/nlive=300, 2026-05-10) |
+| B.1 | D1 amp v3 smoke (mid-res INTR) | 🚀 running | HPC job 29149987 (icelake INTR, grid=128/nlive=300, 2026-05-10) |
 | B.2 | D1 amp v3 publication run | ⏳ pending | gated on B.1 pass |
 | B.3 | D1 sup v3 paired with B.2 | ⏳ pending | |
 | B.4 | Stage A v3 paired re-run | ⏳ pending | |
@@ -54,7 +54,7 @@ Open follow-up question for supervisor: coupling grouping (monolithic / per-Lagr
 ## Phase D — Manuscript implications
 
 | Step | Description | Status |
-|---|---|---|
+| --- | --- | --- |
 | D.1 | `manuscript/sections/computational_approach.tex` — add §"Tachyon-permissive inference architecture" | ⏳ pending (after Phase B) |
 | D.2 | Update results sections with v3 numbers; comparison table v2 vs v3 | ⏳ pending (after Phase B) |
 | D.3 | `docs/PHASE_6_COMPARISON.md` — append "v3 architecture" section | ⏳ pending (after Phase B) |
