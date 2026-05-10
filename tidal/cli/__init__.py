@@ -1803,6 +1803,29 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             'Example: --baseline-formula "sin(kappa * B0 * t_end / 2)**2"'
         ),
     )
+    # v3 likelihood architecture flags (see docs/V3_ARCHITECTURE.md)
+    sample_parser.add_argument(
+        "--gated",
+        action="store_true",
+        dest="gated",
+        help=(
+            "Reproduce v2 / canonical-probe hard-rejection: tachyonic samples "
+            "return -inf instead of being recorded as metadata. v3 default is "
+            "permissive (no probe gate)."
+        ),
+    )
+    sample_parser.add_argument(
+        "--soft-floor-noise",
+        type=float,
+        default=1.0,
+        metavar="SIGMA",
+        dest="soft_floor_noise",
+        help=(
+            "Standard deviation of the Gaussian noise added to the soft penalty "
+            "floor for sim divergence / NaN / exception (default: 1.0). "
+            "Set to 0 to disable noise (ablation tests)."
+        ),
+    )
     # Sampling method
     sample_parser.add_argument(
         "--method",

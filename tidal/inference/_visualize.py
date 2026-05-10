@@ -463,6 +463,12 @@ def _plot_corner_anesthetic(
     _force_solid_credible_fills(fig)
     _overlay_priors(axes_df, result)
     _overlay_map_and_ci(axes_df, result)
+    # v3 architecture: the upper-right triangle is hidden because at large N
+    # (v3 chains have higher ESS than v2) anesthetic's default scatter
+    # rendering becomes a solid mess with no extra information beyond the
+    # lower-triangle KDE contours.  See docs/V3_ARCHITECTURE.md and
+    # https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/347.
+    _hide_upper_triangle(axes_df, plot_params)
     has_any_rejected = _overlay_rejected_anesthetic(
         axes_df,
         result,
@@ -731,6 +737,33 @@ def _add_corner_legend(
         frameon=True,
         framealpha=0.9,
     )
+
+
+def _hide_upper_triangle(axes_df: object, plot_params: list[str]) -> None:
+    """Hide the upper-right triangle of an anesthetic corner plot.
+
+    v3 default: only the lower triangle (KDE 2D contours) and the diagonal
+    (1D marginals) are shown.  The upper triangle is set invisible so the
+    scatter rendering doesn't clutter the figure at large N.
+
+    Iterates the off-diagonal cells with ``j > i`` (upper triangle) and
+    calls ``ax.set_visible(False)`` on each.  ``_cell_axis`` already
+    handles the AxesDataFrame indexing convention and returns ``None``
+    for missing cells (defensive).  Tolerates anesthetic API variations.
+    """
+    for i, ni in enumerate(plot_params):
+        for j, nj in enumerate(plot_params):
+            if j <= i:
+                continue
+            ax = _cell_axis(axes_df, i, ni, j, nj)
+            if ax is None:
+                continue
+            try:
+                ax.set_visible(False)
+            except (AttributeError, ValueError):
+                # Defensive: unfamiliar axes object (e.g.\ a subfigure
+                # wrapper); skip rather than fail the whole plot.
+                continue
 
 
 def _overlay_rejected_anesthetic(

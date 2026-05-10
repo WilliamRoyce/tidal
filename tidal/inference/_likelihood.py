@@ -4,7 +4,18 @@ Wraps the existing ``_run_single`` + ``_measure_run`` pipeline from
 :mod:`tidal.cli._sweep` as a callable ``log_likelihood(theta) -> float``.
 
 Each likelihood evaluation runs one PDE simulation and extracts a scalar
-metric (e.g. ``P_max``).  Failed simulations return ``-inf``.
+metric (e.g. ``P_max``).
+
+In the v3 architecture (post-2026-05-08 supervisor pivot — see
+``docs/V3_ARCHITECTURE.md``) the only ``-inf`` return is for genuine
+metric-key-missing bugs.  Numerical failures (sim divergence, NaN, exception)
+return a noisy soft floor ``logL = SOFT_FLOOR_LOGL + Normal(0, sigma_explore)``
+so PolyChord sees a gradient in the failure region.  The Hwang-Noh
+perturbativity gate (``P_max > 0.5 -> -inf``) is removed entirely; large
+``P_max`` is faithful linearised-PDE output, not a probability-conservation
+violation.  The pre-flight tachyonic probe is run as a metadata measurement
+only — its verdict no longer gates samples (``--gated`` flag preserves the
+v2 hard-rejection behaviour for reproducibility).
 """
 
 from __future__ import annotations
@@ -16,51 +27,38 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 if TYPE_CHECKING:
     from argparse import Namespace
 
 
-# Hwang-Noh perturbativity limit on the *absolute* conversion
-# probability ``P_max``.  A linearised simulation that produces
-# ``P_max > 0.5`` has crossed the perturbative validity boundary
-# (Hwang & Noh 2002, Phys. Rev. D 65, 124010); the linearised dynamics
-# no longer describe the underlying physics and the value is
-# unreliable.  This is independent of the *physics quantity* the user
-# is fitting: the configured likelihood may be on the raw ``P_max`` or
-# on the amplification ratio ``A = P_max / P_GR`` (when
-# ``--baseline-formula`` is supplied — see ``compute_log_likelihood``
-# below, which returns ``log(P_max / baseline)`` in that case).
-# Either way, the gate condition is on the raw ``P_max`` because the
-# Hwang-Noh limit is on the absolute conversion probability, not on
-# its ratio to baseline.  When a sample's raw ``P_max`` exceeds the
-# limit, ``logL = -inf`` is returned with
-# ``run_status="non_perturbative"`` so the sample never enters the
-# PolyChord live-points pool.  Gaussian / threshold likelihoods are
-# exempt because they may legitimately probe parameter regions where
-# ``P_max > 0.5`` (e.g.\ fitting a measured ``P_max ≈ 0.6``).
-P_MAX_LIMIT: float = 0.5
+# Soft penalty floor for numerical-failure samples (sim divergence, NaN
+# metric, broad exception).  The chain still rejects these in practice
+# (``exp(-100) ~ 4e-44`` so they can't out-compete a real sample), but
+# PolyChord sees a finite logL and can navigate the failure landscape.
+# Per the supervisor's "noise-on-floor" suggestion the actual return value
+# is ``SOFT_FLOOR_LOGL + Normal(0, sigma_explore)`` with default
+# ``sigma_explore = 1.0`` so the sampler doesn't see a flat plateau where
+# it can't tell directions apart.
+SOFT_FLOOR_LOGL: float = -100.0
 
 
-def _is_non_perturbative(
-    metric: str,
-    likelihood_type: str,
-    metric_value: float,
-) -> bool:
-    """Inline Hwang-Noh perturbativity gate.
+def _soft_floor_logl(
+    sigma_explore: float,
+    rng: np.random.Generator | None = None,
+) -> float:
+    """Return the soft penalty floor with optional exploration noise.
 
-    Returns True iff the metric is ``P_max``, the likelihood is
-    ``maximize`` or ``minimize`` (Gaussian / threshold likelihoods
-    may legitimately probe ``P_max > 0.5``), and the *raw* value
-    exceeds :data:`P_MAX_LIMIT`.  The check is on the raw ``P_max``
-    even when the likelihood is on the baseline-normalised
-    amplification ratio: the Hwang-Noh limit is on the absolute
-    conversion probability, not on its ratio to baseline.
+    Returns ``SOFT_FLOOR_LOGL + Normal(0, sigma_explore)``.  When
+    ``sigma_explore <= 0`` the noise is disabled and the bare floor is
+    returned (useful for ablation tests via ``--soft-floor-noise=0``).
     """
-    return (
-        metric == "P_max"
-        and likelihood_type in {"maximize", "minimize"}
-        and float(metric_value) > P_MAX_LIMIT
-    )
+    if sigma_explore <= 0.0:
+        return SOFT_FLOOR_LOGL
+    if rng is None:
+        rng = np.random.default_rng()
+    return SOFT_FLOOR_LOGL + float(rng.normal(0.0, sigma_explore))
 
 
 @dataclass(frozen=True)
@@ -92,6 +90,15 @@ class LikelihoodConfig:
     sigma: float = 1.0
     min_value: float = 0.0
     baseline_formula: str | None = None
+    permissive: bool = True
+    """v3 default: don't gate on the pre-flight probe.  When False,
+    tachyonic samples return ``-inf`` (preserves v2 / canonical-probe
+    behaviour, opt-in via ``--gated`` CLI flag for reproducibility)."""
+    soft_floor_noise_sigma: float = 1.0
+    """Standard deviation of the Gaussian noise added to the soft penalty
+    floor (sim divergence / NaN / exception).  Default 1.0 gives the
+    sampler a finite gradient in the failure region; set to 0 via
+    ``--soft-floor-noise 0`` to disable noise for ablation tests."""
 
     def __post_init__(self) -> None:
         valid = {"gaussian", "threshold", "maximize", "minimize", "extremize"}
@@ -113,6 +120,8 @@ def parse_likelihood(
     spec: str,
     *,
     baseline_formula: str | None = None,
+    permissive: bool = True,
+    soft_floor_noise_sigma: float = 1.0,
 ) -> LikelihoodConfig:
     """Parse a CLI likelihood specification string.
 
@@ -133,6 +142,15 @@ def parse_likelihood(
     baseline_formula : str | None
         Baseline formula for ``extremize`` type (passed separately via
         ``--baseline-formula`` CLI flag).
+    permissive : bool
+        v3 default ``True``: pre-flight tachyonic probe is recorded as
+        metadata only, doesn't gate samples.  Set to ``False`` (via the
+        ``--gated`` CLI flag) to reproduce v2 / canonical-probe hard-
+        rejection behaviour.
+    soft_floor_noise_sigma : float
+        Standard deviation of the Gaussian noise added to the soft penalty
+        floor (sim divergence / NaN / exception).  Default 1.0; set to 0
+        via ``--soft-floor-noise 0`` to disable noise for ablation tests.
 
     Raises
     ------
@@ -147,6 +165,11 @@ def parse_likelihood(
     metric = parts[0]
     ltype = parts[1]
 
+    common = {
+        "permissive": permissive,
+        "soft_floor_noise_sigma": soft_floor_noise_sigma,
+    }
+
     if ltype == "gaussian":
         if len(parts) < 4:
             msg = (
@@ -158,6 +181,7 @@ def parse_likelihood(
             likelihood_type="gaussian",
             target=float(parts[2]),
             sigma=float(parts[3]),
+            **common,
         )
     if ltype == "threshold":
         if len(parts) < 3:
@@ -167,24 +191,28 @@ def parse_likelihood(
             metric=metric,
             likelihood_type="threshold",
             min_value=float(parts[2]),
+            **common,
         )
     if ltype == "maximize":
         return LikelihoodConfig(
             metric=metric,
             likelihood_type="maximize",
             baseline_formula=baseline_formula,
+            **common,
         )
     if ltype == "minimize":
         return LikelihoodConfig(
             metric=metric,
             likelihood_type="minimize",
             baseline_formula=baseline_formula,
+            **common,
         )
     if ltype == "extremize":
         return LikelihoodConfig(
             metric=metric,
             likelihood_type="extremize",
             baseline_formula=baseline_formula,
+            **common,
         )
 
     msg = (
@@ -214,14 +242,11 @@ def compute_log_likelihood(
     if math.isnan(metric_value) or math.isinf(metric_value):
         return -math.inf
 
-    # Physics sanity: conversion probability P is bounded by 1. A
-    # finite-but-huge P_max (e.g. 1e100) indicates the linearized
-    # simulation has crossed into the non-perturbative regime (tachyon,
-    # ghost, overflow). This is a numerical artefact, not physics — if
-    # the modal solver's stability guard didn't catch it, reject here
-    # before the unphysical value drives the posterior. (#298 follow-up)
-    if config.metric == "P_max" and metric_value > 2.0:
-        return -math.inf
+    # v3 (post-2026-05-08 supervisor pivot): no upper cap on ``P_max`` at
+    # any value.  Large ``P_max`` is faithful linearised-PDE output, not
+    # a probability-conservation violation — interaction energies become
+    # negative to compensate.  Downstream interpretation handles physical
+    # meaning; the chain records every value.  See ``docs/V3_ARCHITECTURE.md``.
 
     if config.likelihood_type == "gaussian":
         return -0.5 * ((metric_value - config.target) / config.sigma) ** 2
@@ -496,26 +521,30 @@ def _evaluate_likelihood(
                 target=target[0],
                 ic_wavevector=ic_k,
             )
-            if not stability.stable:
-                return -math.inf, {
-                    "run_status": "tachyonic",
-                    "tachyonic_excess": float(stability.max_excess),
-                    "k_tachyonic": (
-                        float(stability.k_tachyonic)
-                        if stability.k_tachyonic is not None
-                        else float("nan")
-                    ),
-                    "n_tachyonic_modes": int(stability.n_tachyonic_modes),
-                    "stability_profile": stability.profile_name,
-                    "borderline_stability": False,
-                }
-            # Stable but possibly borderline — surface for the post-hoc
-            # audit to prioritise this sample for re-simulation.
+            # Always record probe diagnostics in metadata (chain CSVs surface
+            # gamma_eff / k_tachyonic / n_tachyonic_modes / borderline_stability
+            # for post-hoc filtering).  Whether the verdict gates the sample
+            # depends on ``likelihood_config.permissive``.
             stability_meta = {
                 "stability_profile": stability.profile_name,
                 "borderline_stability": bool(stability.borderline),
                 "tachyonic_excess": float(stability.max_excess),
+                "k_tachyonic": (
+                    float(stability.k_tachyonic)
+                    if stability.k_tachyonic is not None
+                    else float("nan")
+                ),
+                "n_tachyonic_modes": int(stability.n_tachyonic_modes),
             }
+            if not stability.stable and not likelihood_config.permissive:
+                # Gated mode (``--gated`` CLI flag) reproduces the v2 / canonical-
+                # probe hard-rejection behaviour for reproducibility.  Default v3
+                # is permissive: sim continues, tachyon-permissive sampling maps
+                # the structure of the unstable regions.
+                return -math.inf, {
+                    "run_status": "tachyonic_gated",
+                    **stability_meta,
+                }
         except Exception:  # noqa: BLE001
             import logging
 
@@ -552,9 +581,12 @@ def _evaluate_likelihood(
             )
 
             if exit_code != 0:
-                return -math.inf, {
+                # v3 soft floor: Normal(SOFT_FLOOR_LOGL, sigma_explore) so the
+                # chain learns "this region fails" without a flat plateau.
+                return _soft_floor_logl(likelihood_config.soft_floor_noise_sigma), {
                     "run_status": "simulation_failed",
                     "exit_code": int(exit_code),
+                    **stability_meta,
                 }
 
             # Extract metrics
@@ -571,23 +603,32 @@ def _evaluate_likelihood(
         # Get the target metric
         metric_value = metrics.get(likelihood_config.metric)
         if metric_value is None:
+            # Genuine bug (key missing from sim output) — keep -inf.  Per v3
+            # plan, this is distinct from a NaN/Inf metric value (handled
+            # below as ``metric_nan`` with the soft floor).
             return -math.inf, {
                 "run_status": "metric_missing",
                 "missing_metric": likelihood_config.metric,
             }
 
-        # Inline Hwang-Noh perturbativity gate (#323 Stage C).  See
-        # :func:`_is_non_perturbative` for the gate condition.
-        if _is_non_perturbative(
-            likelihood_config.metric,
-            likelihood_config.likelihood_type,
-            float(metric_value),
-        ):
-            return -math.inf, {
-                "run_status": "non_perturbative",
-                "P_max": float(metric_value),
+        # NaN / Inf metric: numerical failure of the sim (overflow at very
+        # large growth rates, NaN propagation through the Padé propagator,
+        # etc.).  Distinct ``run_status="metric_nan"`` tag (per supervisor
+        # request) so post-chain analysis can locate these specifically and
+        # inspect what the sim was doing.  Soft floor + noise.
+        metric_value_f = float(metric_value)
+        if math.isnan(metric_value_f) or math.isinf(metric_value_f):
+            return _soft_floor_logl(likelihood_config.soft_floor_noise_sigma), {
+                "run_status": "metric_nan",
+                likelihood_config.metric: metric_value_f,
                 **stability_meta,
             }
+
+        # v3: no Hwang-Noh perturbativity gate.  P_max is recorded faithfully
+        # at all values; downstream analysis interprets whether the
+        # linearised result is physically meaningful at that parameter point.
+        # See ``docs/V3_ARCHITECTURE.md`` and the supervisor meeting notes
+        # at ``docs/meetings/2026-05-08_supervisor.md``.
 
         # Build eval_params for formula-based likelihoods.
         # Merge order (same as _simulate_run): spec.metadata["parameters"]
@@ -621,11 +662,19 @@ def _evaluate_likelihood(
             likelihood_config.metric: float(metric_value),
             **stability_meta,
         }
-        # If P_max guard in compute_log_likelihood demoted the metric to
-        # -inf (e.g. P_max > 2.0 — non-perturbative regime), record that
-        # explicitly so it shows up as a distinct rejection on the corner plot.
+        # In v3 ``compute_log_likelihood`` returns finite values for almost
+        # every numeric input — the only ``-inf`` paths left are: NaN/Inf
+        # metric (already routed to ``metric_nan`` soft floor upstream),
+        # threshold-likelihood below ``min_value``, gaussian/extremize edge
+        # cases, and ``baseline <= 0 or metric_value <= 0``.  The first is
+        # by construction handled before this point; the others are rare.
+        # Route any residual ``-inf`` to the soft floor with a distinct
+        # ``logl_minus_inf`` tag so post-chain analysis can locate them.
         if math.isinf(logl) and logl < 0:
-            success_meta["run_status"] = "non_perturbative"
+            return _soft_floor_logl(likelihood_config.soft_floor_noise_sigma), {
+                **success_meta,
+                "run_status": "logl_minus_inf",
+            }
         return logl, success_meta  # noqa: TRY300
 
     except Exception:  # noqa: BLE001
@@ -636,7 +685,12 @@ def _evaluate_likelihood(
             theta,
             exc_info=True,
         )
-        return -math.inf, {"run_status": "exception"}
+        # v3 soft floor: never -inf for numerical exception.  Sampler can
+        # still reject these in practice (exp(-100) ~ 4e-44) but sees a
+        # gradient in the failure region.
+        return _soft_floor_logl(likelihood_config.soft_floor_noise_sigma), {
+            "run_status": "exception"
+        }
 
     finally:
         if run_dir is not None and not keep_sims and run_dir.exists():

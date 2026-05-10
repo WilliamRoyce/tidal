@@ -13,14 +13,14 @@
 | A.0c | `docs/V3_PHASE_E_DESIGN.md` written | ✅ done | Deferred-but-documented |
 | A.0d | `CAMPAIGN.md` updated with v3 architecture pointer | ✅ done | |
 | A.0e | GitHub issues created for v3-A/A-γ/B/D/E/C tracking | ✅ done | #345–#355 |
-| A.0f | Obsolete HPC jobs (28982006, 28985879) cancelled | ⏳ in progress | |
-| A.0g | Phase A.0 persistence committed | ⏳ pending | |
-| A.1 | Soft-penalty refactor in `tidal/inference/_likelihood.py` | ⏳ pending | [#345](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/345) — lines 499–511, 581–590, 554, 557, 573 |
-| A.2 | Lagrangian de-pruning audit + per-param `arctan_uniform` scripts | ⏳ pending | [#346](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/346) — 12 paired scripts |
-| A.3 | Corner-plot upper-triangle removal in `tidal/inference/_visualize.py` | ⏳ pending | [#347](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/347) |
-| A.4 | Soft-penalty tests (`test_likelihood_*.py`) | ⏳ pending | [#348](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/348) — 3 new test modules |
-| A.5 | D1 v1 chain replay sanity check on `hpc_results/28520217/` | ⏳ pending | [#349](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/349) |
-| A.6 | Commit + version bump | ⏳ pending | |
+| A.0f | Obsolete HPC jobs (28982006, 28985879) cancelled | ✅ done | 2026-05-10 |
+| A.0g | Phase A.0 persistence committed | ✅ done | 62c7ac9 |
+| A.1 | Soft-penalty refactor in `tidal/inference/_likelihood.py` | ✅ done | [#345](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/345) — Hwang-Noh + P_max>2 cap removed; soft floor `-100 + Normal(0, σ)` for sim/NaN/exception; distinct `run_status` tags. New `--gated` and `--soft-floor-noise SIGMA` flags. |
+| A.2 | Lagrangian de-pruning audit + per-param `arctan_uniform` scripts | ✅ done | [#346](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/346) — `docs/lagrangian_depruning_audit.md` + 12 v3_permissive scripts |
+| A.3 | Corner-plot upper-triangle removal in `tidal/inference/_visualize.py` | ✅ done | [#347](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/347) — `_hide_upper_triangle()` helper |
+| A.4 | Soft-penalty tests (`test_likelihood_*.py`) | ✅ done | [#348](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/348) — 3 new modules, 36 new test cases, all green |
+| A.5 | D1 v1 chain replay sanity check | ✅ done | [#349](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/349) — `examples/data/v3_d1_replay/`; v3 admits 14.3% more samples than v2 |
+| A.6 | Commit + version bump | ⏳ in progress | |
 
 ## Phase A-γ — γ_conversion (deferred to its own session)
 
@@ -69,3 +69,13 @@ See [V3_PHASE_E_DESIGN.md](V3_PHASE_E_DESIGN.md). Replaces plane-wave + uniform 
 
 - 2026-05-10 — A.0a — `docs/V3_ARCHITECTURE.md` written; canonical architecture reference live.
 - 2026-05-10 — A.0b — `docs/V3_PHASE_TRACKER.md` written (this file).
+- 2026-05-10 — A.0c — `docs/V3_PHASE_E_DESIGN.md` written; Phase E deferred-but-documented.
+- 2026-05-10 — A.0d — `CAMPAIGN.md` updated with v3 architecture pointer and HPC-job cancellations.
+- 2026-05-10 — A.0e — GitHub issues #345–#355 created; `v3-architecture` label added.
+- 2026-05-10 — A.0f — HPC jobs 28982006 + 28985879 cancelled.
+- 2026-05-10 — A.0g — Phase A.0 persistence committed in 62c7ac9.
+- 2026-05-10 — A.1 — Soft-penalty refactor in `_likelihood.py`: Hwang-Noh and `P_max>2` cap removed; soft floor `−100 + Normal(0, σ)` for sim/NaN/exception; distinct run_status tags. New `--gated` and `--soft-floor-noise SIGMA` flags wired through `_sample.py` + `cli/__init__.py`.
+- 2026-05-10 — A.2 — Lagrangian de-pruning audit (`docs/lagrangian_depruning_audit.md`) committed: no de-pruning needed for Phase A's 6 campaigns; T6/EH applications deferred. Twelve `scripts/hpc_submit_drafts/v3_permissive/` campaign scripts written for D1, Stage A, D2.0–D2.3 paired chains.
+- 2026-05-10 — A.3 — Corner-plot upper-triangle scatter rendering disabled via new `_hide_upper_triangle()` helper in `tidal/inference/_visualize.py`.
+- 2026-05-10 — A.4 — Three new test modules `tests/test_likelihood_{soft_floor_noise,no_hwang_noh,permissive}.py` (36 cases); 107/107 inference tests pass; ruff/format clean.
+- 2026-05-10 — A.5 — D1 v1/v2 chain replay landed at `examples/data/v3_d1_replay/`. Headline: v3 architecture admits 14.3% more samples than v2 (1428/10000 tachyonic samples now contribute via the v2→v3 admission shift on `28982029`). 28520217 v1 chain pre-dates the rejected-prior sidecar so the comparison uses 28982029 instead.
