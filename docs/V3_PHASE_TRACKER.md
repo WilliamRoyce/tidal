@@ -35,15 +35,15 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 
 ## Phase B — Campaign re-runs
 
-| Step | Description | Status |
-|---|---|---|
-| B.0 | Decision: per-param `arctan_uniform` vs cubed-sphere joint prior for publication numbers (small-scale comparison) | ⏳ pending (gated on parallel session landing joint prior) |
-| B.1 | D1 amp v3 smoke (mid-res INTR) | ⏳ pending |
-| B.2 | D1 amp v3 publication run | ⏳ pending |
-| B.3 | D1 sup v3 paired with B.2 | ⏳ pending |
-| B.4 | Stage A v3 paired re-run | ⏳ pending |
-| B.5 | D2.0–D2.3 v3 paired re-runs | ⏳ pending |
-| B.6 | Bounds-dependence cross-check at L=75 under v3 | ⏳ pending |
+| Step | Description | Status | Notes |
+| --- | --- | --- | --- |
+| B.0 | Decision: per-param `arctan_uniform` vs cubed-sphere joint prior for publication numbers (small-scale comparison) | ⏳ pending | gated on parallel session landing joint prior |
+| B.1 | D1 amp v3 smoke (mid-res INTR) | 🚀 running | HPC job 29149724 (icelake INTR, grid=128/nlive=300, 2026-05-10) |
+| B.2 | D1 amp v3 publication run | ⏳ pending | gated on B.1 pass |
+| B.3 | D1 sup v3 paired with B.2 | ⏳ pending | |
+| B.4 | Stage A v3 paired re-run | ⏳ pending | |
+| B.5 | D2.0–D2.3 v3 paired re-runs | ⏳ pending | |
+| B.6 | Bounds-dependence cross-check at L=75 under v3 | ⏳ pending | |
 
 ## Phase C — Cubed-sphere coupling-space chart (HANDLED BY PARALLEL SESSION)
 

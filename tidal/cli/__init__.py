@@ -1768,6 +1768,24 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Example: --prior 'alpha=uniform:0.01:10'"
         ),
     )
+    sample_parser.add_argument(
+        "--joint-prior",
+        action="append",
+        default=[],
+        dest="joint_prior",
+        metavar="SPEC",
+        help=(
+            "Joint prior over a coupling vector via the cubed-sphere chart "
+            "(currently --method nested only; one --joint-prior per "
+            "invocation). Each spec parses N coupling names plus magnitude "
+            "and angular-tile parameters. "
+            "Format: 'names=N1,N2,...;type=cubed_sphere;M=K;face=F;"
+            "sub=S1_S2_...;r_lo=L;r_hi=H[;Q=identity|random:SEED]'. "
+            "Output goes to <output>/<face_label>_tile<sub>/ for atlas "
+            "pooling. Mixable with per-parameter --prior; coupling names "
+            "must be disjoint."
+        ),
+    )
     # Constraints
     sample_parser.add_argument(
         "--constraint",

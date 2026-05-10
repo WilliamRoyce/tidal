@@ -182,16 +182,244 @@ def parse_prior(spec: str) -> Prior:
     return Prior(name=name, distribution=distribution, low=low, high=high)
 
 
+@dataclass(frozen=True)
+class RadialAngularPrior:
+    """Joint prior over (r, theta_hat) for a coupling vector ``c = r * theta_hat``.
+
+    The N coupling values form a vector in ``R^N``.  The prior factorises
+    into a magnitude ``r`` (sampled ``log_uniform(r_lo, r_hi)``) and a
+    direction ``theta_hat`` on the unit sphere ``S^(N-1)`` (sampled
+    uniformly within one cubed-sphere sub-tile).  See
+    :mod:`tidal.inference._sphere` for the angular chart.
+
+    The ``transform`` method consumes ``N`` cube dimensions:
+
+    - ``u[0]`` -> ``r`` via ``log_uniform(r_lo, r_hi)``
+    - ``u[1:N]`` -> ``theta_hat`` via the cubed-sphere chart on the
+      ``(face_idx, sub_tile, M, Q)`` cell
+
+    and returns the physical coupling vector ``c = r * theta_hat`` of
+    length N.
+
+    Per-coupling signs are encoded in ``theta_hat`` (S^(N-1) is
+    sign-symmetric); the prior covers the full real line for each
+    coupling component.
+
+    Designed for the nested-sampling code path; ``sample`` and
+    ``log_prob`` are not implemented in this session (Monte Carlo
+    support deferred — the v3 campaign use case is PolyChord).
+    """
+
+    names: tuple[str, ...]
+    r_lo: float
+    r_hi: float
+    face_idx: int
+    sub_tile: tuple[int, ...]
+    M: int
+    Q: NDArray[np.float64]
+
+    def __post_init__(self) -> None:
+        if len(self.names) < 2:
+            msg = (
+                f"RadialAngularPrior requires at least 2 couplings; "
+                f"got {len(self.names)}"
+            )
+            raise ValueError(msg)
+        if self.r_lo <= 0 or self.r_hi <= 0:
+            msg = f"r bounds must be positive; got [{self.r_lo}, {self.r_hi}]"
+            raise ValueError(msg)
+        if self.r_lo >= self.r_hi:
+            msg = f"r_lo must be < r_hi; got [{self.r_lo}, {self.r_hi}]"
+            raise ValueError(msg)
+        n = len(self.names)
+        if len(self.sub_tile) != n - 1:
+            msg = f"sub_tile must have length N - 1 = {n - 1}; got {len(self.sub_tile)}"
+            raise ValueError(msg)
+        Q = np.asarray(self.Q)  # noqa: N806
+        if Q.shape != (n, n):
+            msg = f"Q must have shape ({n}, {n}); got {Q.shape}"
+            raise ValueError(msg)
+
+    @property
+    def n_dims(self) -> int:
+        """Number of coupling dimensions covered by this joint prior (= N)."""
+        return len(self.names)
+
+    def transform(self, u: NDArray[np.float64]) -> NDArray[np.float64]:
+        """Map ``u in [0, 1]^N`` to the physical coupling vector ``c``."""
+        from tidal.inference._sphere import face_to_direction, tile_bounds
+
+        u = np.asarray(u, dtype=np.float64)
+        n = self.n_dims
+        if u.shape != (n,):
+            msg = f"u must have shape ({n},); got {u.shape}"
+            raise ValueError(msg)
+
+        log_lo, log_hi = math.log(self.r_lo), math.log(self.r_hi)
+        r = math.exp(log_lo + float(u[0]) * (log_hi - log_lo))
+
+        u_lo, u_hi = tile_bounds(self.sub_tile, self.M)
+        u_face = u_lo + u[1:] * (u_hi - u_lo)
+
+        theta_hat = face_to_direction(self.face_idx, u_face, self.Q)
+        return r * theta_hat
+
+
+def parse_joint_prior(spec: str) -> RadialAngularPrior:
+    """Parse a CLI joint-prior specification string.
+
+    Format: ``names=N1,N2,...;type=cubed_sphere;M=K;face=F;sub=S1_S2_...;``
+    ``r_lo=L;r_hi=H[;Q=identity|random:SEED]``
+
+    Top-level fields are separated by ``;``; each is ``key=value``.
+    Optional ``Q=identity`` (default) or ``Q=random:SEED``.
+
+    Examples
+    --------
+    >>> spec = (
+    ...     "names=alpha1,alpha2,alpha3,delta1;"
+    ...     "type=cubed_sphere;M=2;face=1;sub=1_1;"
+    ...     "r_lo=1e-3;r_hi=1e3"
+    ... )
+    >>> p = parse_joint_prior(spec)
+    >>> p.n_dims
+    4
+
+    Raises
+    ------
+    ValueError
+        If the specification string is malformed.
+    """
+    from tidal.inference._sphere import random_rotation
+
+    fields: dict[str, str] = {}
+    for raw in spec.split(";"):
+        part = raw.strip()
+        if not part:
+            continue
+        if "=" not in part:
+            msg = f"joint-prior field must be 'key=value', got '{part}'"
+            raise ValueError(msg)
+        k, v = part.split("=", 1)
+        fields[k.strip()] = v.strip()
+
+    required = ("names", "type", "M", "face", "sub", "r_lo", "r_hi")
+    missing = [r for r in required if r not in fields]
+    if missing:
+        msg = (
+            f"joint-prior missing required field(s): {', '.join(missing)}. "
+            f"Format: 'names=N1,N2,...;type=cubed_sphere;M=K;face=F;"
+            f"sub=S1_S2_...;r_lo=L;r_hi=H'"
+        )
+        raise ValueError(msg)
+
+    if fields["type"] != "cubed_sphere":
+        msg = f"only type=cubed_sphere is supported, got '{fields['type']}'"
+        raise ValueError(msg)
+
+    names = tuple(s.strip() for s in fields["names"].split(",") if s.strip())
+    if len(names) < 2:
+        msg = f"joint-prior 'names' must list >= 2 couplings, got {names}"
+        raise ValueError(msg)
+
+    try:
+        m = int(fields["M"])
+        face_idx = int(fields["face"])
+        sub_tile = tuple(int(s) for s in fields["sub"].split("_") if s)
+        r_lo = float(fields["r_lo"])
+        r_hi = float(fields["r_hi"])
+    except ValueError as e:
+        msg = f"joint-prior field parse error: {e}"
+        raise ValueError(msg) from None
+
+    n = len(names)
+    Q = np.eye(n)  # noqa: N806
+    q_spec = fields.get("Q", "identity")
+    if q_spec == "identity":
+        pass
+    elif q_spec.startswith("random:"):
+        try:
+            seed = int(q_spec.split(":", 1)[1])
+        except ValueError:
+            msg = f"joint-prior Q=random:SEED expects integer seed, got '{q_spec}'"
+            raise ValueError(msg) from None
+        Q = random_rotation(n, seed=seed)  # noqa: N806
+    else:
+        msg = f"joint-prior Q must be 'identity' or 'random:SEED', got '{q_spec}'"
+        raise ValueError(msg)
+
+    return RadialAngularPrior(
+        names=names,
+        r_lo=r_lo,
+        r_hi=r_hi,
+        face_idx=face_idx,
+        sub_tile=sub_tile,
+        M=m,
+        Q=Q,
+    )
+
+
+def total_prior_ndim(priors: list[Prior | RadialAngularPrior]) -> int:
+    """Total cube dimension covered by a (possibly mixed) prior list."""
+    return sum(p.n_dims if isinstance(p, RadialAngularPrior) else 1 for p in priors)
+
+
+def prior_param_names(priors: list[Prior | RadialAngularPrior]) -> list[str]:
+    """Flat list of physical-parameter names from a (possibly mixed) prior list.
+
+    Per-coupling Priors contribute their ``name``; RadialAngularPriors
+    contribute each entry of ``names`` in order.  Result is the column
+    order downstream code (chain matrix, plotting) should use.
+    """
+    out: list[str] = []
+    for p in priors:
+        if isinstance(p, RadialAngularPrior):
+            out.extend(p.names)
+        else:
+            out.append(p.name)
+    return out
+
+
+def validate_prior_names(priors: list[Prior | RadialAngularPrior]) -> None:
+    """Reject duplicate parameter names in a (possibly mixed) prior list."""
+    names = prior_param_names(priors)
+    duplicates = {n for n in names if names.count(n) > 1}
+    if duplicates:
+        msg = (
+            f"duplicate parameter name(s) in prior list: "
+            f"{sorted(duplicates)}; --prior and --joint-prior name spaces "
+            f"must be disjoint"
+        )
+        raise ValueError(msg)
+
+
 def build_prior_transform(
-    priors: list[Prior],
+    priors: list[Prior] | list[Prior | RadialAngularPrior],
 ) -> Callable[[NDArray[np.float64]], NDArray[np.float64]]:
     """Build a joint prior_transform for nested sampling.
 
+    Accepts a list mixing :class:`Prior` (per-parameter) and
+    :class:`RadialAngularPrior` (joint over N couplings).  Each Prior
+    consumes 1 cube dimension; each RadialAngularPrior consumes
+    ``n_dims`` (= len(names)).
+
     Returns a callable that maps a unit-cube vector ``u`` of shape
-    ``(ndim,)`` to physical parameters.
+    ``(total_ndim,)`` to physical parameters in the column order given
+    by :func:`prior_param_names`.
     """
 
     def prior_transform(u: NDArray[np.float64]) -> NDArray[np.float64]:
-        return np.array([p.transform(float(u[i])) for i, p in enumerate(priors)])
+        out: list[float] = []
+        idx = 0
+        for p in priors:
+            if isinstance(p, RadialAngularPrior):
+                n = p.n_dims
+                segment = p.transform(u[idx : idx + n])
+                out.extend(float(x) for x in segment)
+                idx += n
+            else:
+                out.append(p.transform(float(u[idx])))
+                idx += 1
+        return np.asarray(out, dtype=np.float64)
 
     return prior_transform

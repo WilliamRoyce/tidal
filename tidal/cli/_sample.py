@@ -50,25 +50,72 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         )
         return 1
 
-    # --- Parse priors ---
+    # --- Parse priors (per-parameter --prior + optional --joint-prior) ---
     prior_specs: list[str] = getattr(args, "prior", []) or []
-    if not prior_specs:
+    joint_prior_specs: list[str] = getattr(args, "joint_prior", []) or []
+    if not prior_specs and not joint_prior_specs:
         error_with_hint(
             "No priors specified.",
             [
-                "Use --prior 'NAME=DIST:LOW:HIGH' (repeatable)",
-                "Distributions: uniform, log_uniform, normal, arctan_uniform",
+                "Use --prior 'NAME=DIST:LOW:HIGH' (repeatable) or",
+                "--joint-prior 'names=...;type=cubed_sphere;M=K;face=F;"
+                "sub=S;r_lo=L;r_hi=H' (cubed-sphere joint prior)",
+                "Distributions for --prior: uniform, log_uniform, normal, "
+                "arctan_uniform",
                 "Example: --prior 'alpha=uniform:0.01:10'",
             ],
         )
         return 1
 
-    from tidal.inference._prior import parse_prior
+    from tidal.inference._prior import (
+        Prior,
+        RadialAngularPrior,
+        parse_joint_prior,
+        parse_prior,
+        prior_param_names,
+        total_prior_ndim,
+        validate_prior_names,
+    )
+
+    if len(joint_prior_specs) > 1:
+        error_with_hint(
+            "Only one --joint-prior per invocation is supported in this release.",
+            [
+                "Multiple cubed-sphere joint priors (e.g. one per spin "
+                "sector) are deferred — the supervisor's directive is one "
+                "monolithic sphere over all BSM couplings."
+            ],
+        )
+        return 1
 
     try:
-        priors = [parse_prior(s) for s in prior_specs]
+        per_param_priors: list[Prior] = [parse_prior(s) for s in prior_specs]
+        joint_priors: list[RadialAngularPrior] = [
+            parse_joint_prior(s) for s in joint_prior_specs
+        ]
     except ValueError as e:
-        error_with_hint(str(e), ["Check --prior format: NAME=DIST:ARG1:ARG2"])
+        error_with_hint(
+            str(e),
+            [
+                "Check --prior format: NAME=DIST:ARG1:ARG2",
+                "Check --joint-prior format: 'names=N1,N2,...;"
+                "type=cubed_sphere;M=K;face=F;sub=S1_S2_...;r_lo=L;r_hi=H'",
+            ],
+        )
+        return 1
+
+    priors: list[Prior | RadialAngularPrior] = [
+        *joint_priors,
+        *per_param_priors,
+    ]
+
+    try:
+        validate_prior_names(priors)
+    except ValueError as e:
+        error_with_hint(
+            str(e),
+            ["--prior names must be disjoint from --joint-prior names"],
+        )
         return 1
 
     # --- Parse constraints ---
@@ -142,13 +189,25 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         return 1
     output_path = Path(output_dir)
 
+    # Per-tile output redirect for cubed-sphere joint priors: chains land
+    # in <output>/<face_label>_tile<sub_tile>/ so the atlas plotter can
+    # pool tiles transparently.  Convention matches the supervisor's
+    # psalter cell-directory layout.
+    if joint_priors:
+        from tidal.inference._sphere import cell_label
+
+        jp = joint_priors[0]
+        cell_dir = cell_label(jp.face_idx, jp.sub_tile)
+        output_path /= cell_dir
+        output_path.mkdir(parents=True, exist_ok=True)
+
     # --- Common settings ---
     method: str = getattr(args, "method", "mc")
     n_workers: int | None = getattr(args, "parallel", None)
     seed: int = getattr(args, "seed", 42)
     quiet: bool = getattr(args, "quiet", False)
 
-    param_names = [p.name for p in priors]
+    param_names = prior_param_names(priors)
 
     # --- Print summary ---
     if not quiet:
@@ -156,7 +215,14 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         print(f"  Spec: {spec_path}")
         print(f"  Parameters: {', '.join(param_names)}")
         for p in priors:
-            print(f"    {p.name} ~ {p.distribution}({p.low}, {p.high})")
+            if isinstance(p, RadialAngularPrior):
+                print(
+                    f"    [{', '.join(p.names)}] ~ "
+                    f"cubed_sphere(face={p.face_idx}, sub={p.sub_tile}, "
+                    f"M={p.M}) x log_uniform(r={p.r_lo}..{p.r_hi})"
+                )
+            else:
+                print(f"    {p.name} ~ {p.distribution}({p.low}, {p.high})")
         if constraints:
             print(f"  Constraints: {len(constraints)}")
             for expr in constraints.expressions:
@@ -169,6 +235,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
     # --- Run inference ---
     if method == "mc":
+        if joint_priors:
+            error_with_hint(
+                "--joint-prior is not supported with --method mc in this release.",
+                [
+                    "Use --method nested for cubed-sphere joint priors",
+                    "(MC support for the joint sampler is deferred — the v3 "
+                    "campaign use case is PolyChord nested sampling)",
+                ],
+            )
+            return 1
         n_samples = getattr(args, "n_samples", 100)
         if not quiet:
             print(f"  Samples: {n_samples}")
@@ -203,7 +279,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         if nlive_auto is not None:
             from tidal.inference._nested import recommend_nlive
 
-            nlive = recommend_nlive(len(priors), nlive_auto)
+            nlive = recommend_nlive(total_prior_ndim(priors), nlive_auto)
             if not quiet:
                 print(f"  nlive auto ({nlive_auto}): {nlive}")
 
@@ -248,7 +324,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         result = run_nested_sampling(
             log_likelihood=likelihood_fn,
             prior_transform=build_prior_transform(priors),
-            ndim=len(priors),
+            ndim=total_prior_ndim(priors),
             param_names=param_names,
             sampler="polychord",
             nlive=nlive,
@@ -258,16 +334,36 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         )
         # Record priors in metadata so post-hoc analysis (e.g. correct
         # marginal D_KL per parameter, #308) can transform each column
-        # into the space where its prior is uniform.
-        result.metadata["priors"] = [
-            {
-                "name": p.name,
-                "distribution": p.distribution,
-                "low": p.low,
-                "high": p.high,
-            }
-            for p in priors
-        ]
+        # into the space where its prior is uniform.  Mixed priors are
+        # serialised by type so the loader can reconstruct each component.
+        import numpy as np
+
+        prior_records: list[dict[str, object]] = []
+        for p in priors:
+            if isinstance(p, RadialAngularPrior):
+                prior_records.append(
+                    {
+                        "kind": "radial_angular",
+                        "names": list(p.names),
+                        "r_lo": p.r_lo,
+                        "r_hi": p.r_hi,
+                        "face_idx": p.face_idx,
+                        "sub_tile": list(p.sub_tile),
+                        "M": p.M,
+                        "Q": np.asarray(p.Q).tolist(),
+                    }
+                )
+            else:
+                prior_records.append(
+                    {
+                        "kind": "scalar",
+                        "name": p.name,
+                        "distribution": p.distribution,
+                        "low": p.low,
+                        "high": p.high,
+                    }
+                )
+        result.metadata["priors"] = prior_records
         # Persist likelihood mode so the corner-plot title can label the
         # extremal logL correctly: "max A" for maximize, "max suppression"
         # for minimize, etc.  Without this the same number means different
