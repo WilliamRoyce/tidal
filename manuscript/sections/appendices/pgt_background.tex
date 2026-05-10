@@ -46,11 +46,9 @@ derivative~\cite[eq.~(1.7)]{blagojevic2003lectures}
 A finite local translation $\xi^\mu(x)$ shifts the argument of
 $\phi$~\cite{lasenby2016scale},
 \begin{align}
-  \phi(x) &\mapsto \phi\bigl(x - \xi(x)\bigr),
+  \phi(x) &\mapsto \phi\bigl(x - \xi(x)\bigr).
   \label{TranslationMatterTransform}
 \end{align}
-i.e.\ $\phi$ carries only Lorentz indices and transforms as a
-coordinate scalar.
 The translation generators are compensated by a \emph{tetrad}
 $b^i{}_\mu$ together with its inverse
 $h_i{}^\mu$~\cite{hehl1976spin,blagojevic2002gravitation,blagojevic2003lectures,hehlobukhov2007cartan,blagojevicHehl2013,hehl1995metric,barker2024poincare}.
@@ -122,10 +120,24 @@ Greek indices,
        - \MAGA{^\sigma_{\rho\nu}}\,\Phi^{i\,\mu}{}_{j\,\sigma}.
   \label{MixedCovariantDerivative}
 \end{multline}
-\Cref{MixedCovariantDerivative} is the per-index form used in the
-symbolic implementation of torsion and
-curvature~\cite[eq.~(1.7a)]{blagojevic2003lectures}
-(\cref{SymbolicComputation}).
+\Cref{MixedCovariantDerivative} is the per-index form for general
+mixed-Latin/Greek tensors. Restricting to pure-Greek tensors --- the
+case used throughout the TIDAL Lagrangians in \cref{Theory} and the
+symbolic implementation --- the Latin-index spin-connection terms
+drop out, leaving the standard affine-connection covariant
+derivative,
+\begin{align}
+  \rcD{_\rho}\tensor{T}{^\mu_\nu}
+    &= \PD{_\rho}\tensor{T}{^\mu_\nu}
+       + \MAGA{^\mu_\rho_\sigma}\,\tensor{T}{^\sigma_\nu}
+       - \MAGA{^\sigma_\rho_\nu}\,\tensor{T}{^\mu_\sigma},
+  \label{AffineCovariantDerivative}
+\end{align}
+with $+\MAGA{}$ on each upper Greek index and $-\MAGA{}$ on each
+lower one~\cite[eq.~(1.7a)]{blagojevic2003lectures}; the Riemannian
+counterpart $\rD{_\rho}$ is the same expression with
+$\MAGA{}\to\rCon{}$. \Cref{AffineCovariantDerivative} is the form
+used in \cref{SymbolicComputation}.
 
 In any gauge theory the field strength can be read off the
 commutator of two covariant derivatives acting on a matter
@@ -287,9 +299,9 @@ defined by $\mathcal{Q} = 0$.
   \label{MetricAffineClasses}
 \end{figure}
 
-The bridge between the gauge-theoretic formulation (with fields
-$b^i{}_\mu$ and $A^{ij}{}_\mu$) and the metric-affine formulation
-(with fields $\g{_{\mu\nu}}$ and $\MAGA{^\sigma_\mu_\nu}$) is the
+The bridge between the gauge-theoretic (with fields
+$b^i{}_\mu$ and $A^{ij}{}_\mu$) and the metric-affine
+(fields $\g{_{\mu\nu}}$ and $\MAGA{^\sigma_\mu_\nu}$) formulations is the
 \emph{tetrad postulate}~\cite[eq.~(2.9)]{blagojevic2003lectures}.
 Any tangent
 vector $u$ can be expanded in either basis,
