@@ -45,7 +45,7 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 | B.4b | Stage A sup INTR smoke | 🚀 running | 29199129 (submitted 2026-05-11 ~12:50 BST) |
 | B.4-full-amp | Stage A amp v3 publication | 🟡 pending | 29205968 (standard 6h) — submitted 2026-05-11 |
 | B.4-full-sup | Stage A sup v3 publication | 🟡 pending | 29205982 (standard 12h) — submitted 2026-05-11 |
-| B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | 🚀 in progress | D2.0 amp 29207374 ✅ logZ=+7.71, all 4 D_KL > 2.5 nats. D2.0 sup 29208280 ✅ logZ=-0.82, all 4 D_KL > 2.1 nats. D2.1 amp 29209010 running. |
+| B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | 🚀 in progress | **D2.0 Bahamonde** amp 29207374 ✅ logZ=+7.71, all 4 D_KL > 2.5 nats. sup 29208280 ✅ logZ=-0.82, all 4 D_KL > 2.1 nats. **D2.1 Barker** amp 29209010 (nlive=400) under-converged ESS=474; rerun 29209795 (nlive=1200) ESS=1274 (3× scaling) ✅ **CONFIRMED NULL** logZ=0.001±0.0006, joint D_KL=0.0009. sup 29209289 same null pattern; rerun 29210161 (nlive=1200) running. **Updated D2.2 (nlive 400→1200) and D2.3 (nlive 500→1800)** scripts for proper convergence (~200 live/dim minimum). |
 | B.6 | Bounds-dependence cross-check at L=75 under v3 | ✅ done | 29205638 (25 min INTR). log Z=+13.18±0.12 (nearly identical to B.1's +13.29). Per-coupling D_KL essentially unchanged. **v3 washes out v2's bounds-dependence non-monotonicity** (v2 L=75 = +0.84, v2 L=100 = +0.68 — non-mono; v3 L=75 ≈ L=100). |
 
 ## Phase C — Cubed-sphere coupling-space chart (HANDLED BY PARALLEL SESSION)
