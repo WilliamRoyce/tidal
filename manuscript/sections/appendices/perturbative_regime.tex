@@ -19,17 +19,18 @@ Including the metric perturbation in the EM stress-energy
 self-consistently produces a tachyonic mass-like term
 $-(\kappa^2/2)\Bzero^2$ in the graviton equation of motion;
 they show that the regime in which this term would drive an
-exponential instability is the same regime in which the
+exponential instability coincides with the regime in which the
 gravity of the background magnetic field can no longer be
-ignored, so the instability lies outside the framework's range
-of validity.
+ignored, so the linear analysis cannot self-consistently establish
+the instability and the framework remains internally consistent
+within its declared regime of validity.
 There is a critical scale $\lambda_B = 2\pi/k_B$, with
 $k_B = \sqrt{8\pi G}\,\Bzero/c^2$, above which the dimensionless
 backreaction parameter $D^2/\lambda_B^2$ ceases to be small ---
 the assumption that the magnetic field's own
 gravitational field is negligible breaks down.
 Hwang \& Noh show~\cite{hwangnoh2023graviton} that the backreaction parameter is proportional to
-$\Pconv$:
+the conversion probability $\Pconv$ of \cref{GertsenshteinFormula}:
 \begin{align}
   \frac{D^2}{\lambda_B^2}
   \;\sim\; \Pconv,
@@ -53,8 +54,9 @@ in the small-$\kappa\Bzero D$ limit this is half the
 estimate, and squaring gives the factor of
 four.}
 The simulations of \cref{SectorSurvey} solve the linearised
-equations of motion derived from the PGT--Maxwell action of
-\cref{PGTframework} on a flat Minkowski background with externally
+equations of motion derived from the parity-even quadratic
+PGT--Maxwell theories enumerated in \cref{PGTEnumeration} on a
+flat Minkowski background with externally
 prescribed $\Bzero$, retaining the tachyonic mass-like term
 automatically. \cref{HwangNohBound} is the self-consistency
 condition for this linear-on-flat-background framework, under which
@@ -93,9 +95,10 @@ propagation axis $\hat{z}$, so the linearised theory conserves the
 angular momentum projected on $\hat{z}$ (helicity).
 % , and any coupling
 % between two perturbations requires that they carry the same helicity.
-The transverse graviton is spin-2 and the transverse photon is
-spin-1, so at $\Bzero=0$ they live in disjoint sectors and
-$\Pconv(\Bzero=0)=0$.
+The transverse graviton is
+spin-2~\cite{sezgin1980ghostfree,barker2024poincare,cillis1996graviton}
+and the transverse photon is spin-1, so at $\Bzero=0$ they live
+in disjoint sectors and $\Pconv(\Bzero=0)=0$.
 Switching on $\Bzero$ introduces a fixed background tensor
 $\bar{\FieldF{}}\propto\Bzero\hat{x}$ that breaks the rotational symmetry
 and lifts the helicity-conservation selection rule
@@ -105,10 +108,12 @@ explicit $\Bzero$-dependence
 $\mathcal{K}(\partial_t,\partial_z;\Bzero)$ that is polynomial in
 $\Bzero$, and the graviton--photon conversion amplitude
 $\mathcal{M}(\Bzero)$ defined via $\Pconv=|\mathcal{M}|^2$ depends
-analytically on $\mathcal{K}$ wherever the unperturbed propagators are
-non-singular;
-$\Pconv = |\mathcal{M}|^2$ is therefore analytic in $\Bzero$ in a
-neighbourhood of zero.
+analytically on $\mathcal{K}$ wherever the unperturbed kinetic
+operator is non-singular --- generically true across the surveyed
+parameter space, with isolated exceptional points where the
+multi-field kinetic structure becomes degenerate;
+$\Pconv$ is therefore analytic in $\Bzero$ in a neighbourhood of
+zero at every generic point of the survey.
 A rotation of the lab frame by $\pi$ about $\hat{z}$ is a coordinate
 relabelling that sends $\bm{B}\to-\bm{B}$: the rotated frame describes
 the same physical system with the parameter $\Bzero$ replaced by
@@ -129,8 +134,9 @@ defined below in \cref{SurveyCoefficient}.
 
 On the uniform-field flat background,
 $\partial_\mu\bar{\FieldF{}}_{\nu\rho}=0$.
-The Cartan equation --- the field equation for torsion, obtained by
-varying the PGT Lagrangian of \cref{PGTBackground} \wrt $\MAGT{}$
+The Cartan equation~\cite{blagojevic2013gauge,hehlobukhov2007cartan}
+--- the field equation for torsion, obtained by varying the PGT
+Lagrangian of \cref{PGTBackground} \wrt $\MAGT{}$
 --- collects contributions from every Lagrangian term that depends on
 $\MAGT{}$, either directly or through the Riemann--Cartan curvature
 \begin{align}
@@ -161,10 +167,10 @@ hold~\cite{bahamonde2025torsion}.}
 
 \paragraph*{Torsion-perturbation bound}
 
-The preceding paragraph established $\bar{\MAGT{}}=0$ at the background.
-To bound the torsion perturbation $\delta\MAGT{}$, expand the same
-Cartan equation to first order in the perturbations
-$\{h_{\mu\nu},\delta\FieldA{_\mu},\delta\MAGT{}\}$.
+With $\bar{\MAGT{}}=0$ at the background, expand the Cartan equation
+to first order in the perturbations
+$\{h_{\mu\nu},\delta\FieldA{_\mu},\delta\MAGT{}\}$ to bound the
+torsion perturbation $\delta\MAGT{}$.
 The $\rcD{}K$ term of \cref{RiemannCartanDecomp} contracted with $\bar{\FieldF{}}$
 cancels at first order by the same integration by parts as in the
 preceding paragraph: $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$.
@@ -189,10 +195,12 @@ $2\Alp{}\,\delta\MAGT{} = -\text{source}$;
 inverting this algebraic equation directly gives
 $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
 for a graviton of dimensionless amplitude $A$ (\cref{Linearisation}).
-The linearised treatment is self-consistent when the torsion
-perturbation remains small compared to the torsion mass scale,
-$|\delta\MAGT{}|/\Alp{}\ll 1$;
-substituting the linearised solution above into this requirement gives
+The linearised Cartan equation drops $(\delta\MAGT{})^2$ corrections
+from the $K{\cdot}K$ term of \cref{RiemannCartanDecomp}: these become
+comparable to the linear $2\Alp{}\,\delta\MAGT{}$ term when
+$|\delta\MAGT{}|/\Alp{}\sim 1$, so the linearised treatment is
+self-consistent only when $|\delta\MAGT{}|/\Alp{}\ll 1$.
+Substituting the linearised solution above into this requirement gives
 \begin{align}
   |\delta\MAGT{}|\ll\Alp{}
   \quad\Longleftrightarrow\quad
@@ -208,8 +216,12 @@ generalised to the dominant torsion mass scale.
 
 \paragraph*{Generality beyond the algebraic-torsion theory}
 
-The preceding properties hold for any ghost-safe polynomial PGT
-Lagrangian coupled to electromagnetism~\cite{blagojevic2018hamiltonian}.
+The preceding properties were established for the parity-even
+quadratic theory class with the $\Del{1}\MAGFt{}\FieldF{}$
+non-minimal coupling; the same argument extends to the broader
+ghost-safe polynomial PGT class spanned by the
+survey~\cite{blagojevic2018hamiltonian} with the two modifications
+detailed below.
 The bound \cref{PerturbativeBound} fixes specific values
 $\Del{1}$ and $\Alp{}$ within the algebraic-torsion sub-class.
 Across the surveyed parameter space, the same IBP-and-inversion
@@ -234,8 +246,8 @@ the algebraic inversion of \cref{PerturbativeBound} is then replaced
 by a Green's function inversion
 $\delta\MAGT{} = \int G\,(\text{source})$,
 $G = [\mathcal{D}(\partial)+\Alp{}]^{-1}$, with the
-propagating-torsion mode structure given
-in~\cite{blagojevic2018hamiltonian}.
+propagating-torsion mode structure analysed
+in~\cite{blagojevic2018hamiltonian,lin2019pgt}.
 The magnitude of $\delta\MAGT{}$ is set by the dominant mass-squared
 scale of $G$, and the same
 $\mathcal{O}\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$ scaling
@@ -263,7 +275,7 @@ reported in \cref{SectorSurvey}.
   \label{PerturbativityHierarchy}
   \begin{tabular}{@{}lll@{}}
     \toprule
-    Condition & Physical origin & $\Bzero$-dependence \\
+    Condition & Physical origin & LHS dependence on $\Bzero$ \\
     \midrule
     $\lvert h_{\mu\nu}\rvert \ll 1$
       & metric linearisation
@@ -305,9 +317,13 @@ $\Bzero$, taking a value determined by the full kinetic matrix of
 \cref{KineticMatrix} and differing from $\Czero^{\mathrm{EM}}$ when
 torsion couplings are active.
 The amplification factor
-$\Aamp\equiv\sqrt{\Czero^{\mathrm{torsion}}/\Czero^{\mathrm{EM}}}$
-of \cref{SectorSurvey} measures this deviation and is
-$\Bzero$-independent to $\mathcal{O}(\Bzero^2)$ by the same limit argument.
+\begin{align}
+  \Aamp \;\equiv\; \sqrt{\Czero^{\mathrm{torsion}}/\Czero^{\mathrm{EM}}},
+  \label{AmplificationFactor}
+\end{align}
+reported in \cref{SectorSurvey}, measures this deviation and is
+$\Bzero$-independent to $\mathcal{O}(\Bzero^2)$ by the same limit
+argument.
 
 The torsion signal --- the deviation of $\Czero$ from its
 Einstein--Maxwell value $(\kappa D/2)^2$ --- is contained in $c_2$
