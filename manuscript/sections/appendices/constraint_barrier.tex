@@ -1,0 +1,161 @@
+% Appendix H: Constraint promotion in higher-curvature PGT (~1150 w).
+%
+% Replaces the placeholder file. App B forward-references \cref{ConstraintBarrier}
+% from its Euler--Lagrange paragraph.
+%
+% Reference source for facts (no verbatim reuse):
+% docs/tex/perturbative_reduction_constraint_barrier.tex (1103 lines).
+
+\section{Constraint promotion in higher-curvature PGT}%
+\label{ConstraintBarrier}
+
+For Lagrangians that contain higher-curvature terms multiplied by a
+small coupling, the canonical-analysis programme used elsewhere in
+this report meets a structural obstruction --- the
+\emph{constraint-promotion barrier} --- that bears on which PGT
+theories the pipeline of \cref{SymbolicComputation} can survey
+reliably.
+This appendix sets out the barrier in its three classical statements,
+records the structural analogues familiar from other gravity and
+field-theory limits, and describes the \emph{Lagrangian perturbative
+substitution} algorithm by which the pipeline handles the cases it can
+handle.
+
+\paragraph*{The constraint-promotion barrier}
+A quadratic action that becomes a constrained system in the limit
+$\varepsilon \to 0$ --- the small parameter typically being a
+coefficient of a higher-curvature operator such as $b\,\tilde{R}^{2}$
+in PGT --- admits an algebraic relation between the field components
+at $\varepsilon = 0$.
+Turning $\varepsilon$ on infinitesimally promotes this algebraic
+constraint to a dynamical equation, and a new degree of freedom enters
+the spectrum.
+Generically this degree of freedom carries the wrong sign in its
+kinetic term: it is a ghost, and the small-parameter theory therefore
+has more physical content than its $\varepsilon \to 0$ limit, with a
+part of that content unphysical.
+Naive perturbation theory in $\varepsilon$ is blind to the promotion
+because the new mode appears only when $\varepsilon \neq 0$.
+The barrier is the statement that no perturbative expansion can
+connect the $\varepsilon = 0$ theory to the $\varepsilon \neq 0$
+theory once a constraint has been promoted.
+
+\paragraph*{Failure mode I: Ostrogradsky}
+The Ostrogradsky
+theorem~\cite{ostrogradsky1850memoires,woodard2015ostrogradsky}
+states that a non-degenerate Lagrangian containing time derivatives of
+order higher than one possesses a Hamiltonian that is linear in at
+least one of the canonical momenta.
+Linearity in a momentum is fatal: the Hamiltonian is unbounded below,
+and the corresponding mode is a ghost.
+The theorem is non-perturbative; it applies whenever the
+higher-derivative kinetic structure is non-degenerate, regardless of
+the magnitude of its coefficient.
+In our setting, a generic PGT Lagrangian containing terms quadratic in
+curvature with non-zero coefficient fails the non-degeneracy condition
+only in special parameter directions, and the generic case carries an
+Ostrogradsky ghost.
+The Ostrogradsky statement is the cleanest formulation of the barrier
+because it diagnoses the pathology directly at the level of the
+higher-derivative Lagrangian rather than at the level of any
+perturbative expansion.
+
+\paragraph*{Failure mode II: Parker--Simon reduction}
+Parker and Simon~\cite{parker1993reduced} addressed a closely related
+question for the late-time effective theory of semi-classical gravity:
+when can one reduce a higher-derivative equation of motion to one of
+standard second order by treating the higher-derivative terms as
+small corrections?
+Their procedure --- order-by-order substitution of the lower-order
+equation into the higher-derivative terms --- is faithful when the
+higher-derivative corrections genuinely encode a small perturbation
+around a well-posed lower-order theory.
+It fails when the higher-derivative terms introduce new degrees of
+freedom that have no analogue at lower order: the substitution then
+drops those modes silently, producing a reduced equation that no
+longer reflects the full spectrum.
+The pathology is the perturbative-limit version of the Ostrogradsky
+diagnosis: solutions present in the small-$\varepsilon$ theory that
+are absent in the $\varepsilon = 0$ theory cannot be recovered by a
+power-series substitution.
+
+\paragraph*{Failure mode III: the Ja{\'e}n--Llosa--Molina obstruction}
+Ja{\'e}n, Llosa and Molina~\cite{jaen1986reduction} formalised the
+perturbative-limit failure for the general higher-derivative
+Lagrangian.
+They showed that a finite-order reduction can in principle be
+constructed by repeated use of the order-zero equation of motion,
+provided the original Lagrangian satisfies a regularity condition;
+their condition fails precisely when an algebraic constraint of the
+unperturbed theory is promoted to a dynamical equation at first order
+in $\varepsilon$.
+Their result is the closest fit to the PGT-with-small-coupling
+structure we encounter: the order-zero theory is the Einstein--Cartan
+system with algebraic torsion constraints, and the higher-curvature
+operators in the quadratic-PGT action promote some of those
+constraints to propagating fields.
+The Ja{\'e}n--Llosa--Molina obstruction tells us that a uniform
+perturbative reduction does not work for every quadratic-PGT theory,
+and gives a sharp criterion that distinguishes the theories where the
+reduction is faithful from those where it loses content.
+
+\paragraph*{Structural analogues}
+The barrier sits within a wider class of perturbative-limit failures
+in gravity and gauge theory.
+In the massive-graviton limit, the van Dam--Veltman--Zakharov
+discontinuity~\cite{vandam1970massive,zakharov1970linearized} shows
+that the massless limit of a Fierz--Pauli graviton recovers only five
+of the six polarisations of general relativity, with the missing one
+appearing through a constraint that is promoted at non-zero mass.
+The Boulware--Deser non-decoupling~\cite{boulware1972gravitation}
+extends this diagnosis to the non-linear theory by identifying a
+ghost-like sixth mode once the Fierz--Pauli tuning is broken.
+The Maxwell--Proca boundary is the simplest instance: at finite
+vector-boson mass the algebraic relation $\rcD{_\mu}\FieldA{^\mu} = 0$
+holds, but at zero mass it becomes a gauge symmetry, and no
+perturbative expansion encodes the transition.
+The PGT barrier is the quadratic-curvature analogue of the same
+structural pattern.
+
+\paragraph*{Lagrangian perturbative substitution}
+To handle higher-curvature PGT theories where the regularity condition
+holds, the pipeline implements \emph{Lagrangian perturbative
+substitution} (LPS).
+The order-$\varepsilon^{0}$ equations of motion are extracted and
+solved for the highest time derivative in terms of lower-order and
+spatial derivatives,
+\begin{align}
+  \partial_{t}^{(n)}\varphi
+  \;=\;
+  f_{0}\!\bigl[\varphi,\,\partial_{t}^{(<n)}\varphi,\,\partial_{x}^{(*)}\varphi\bigr]
+  \;+\; \mathcal{O}(\varepsilon),
+  \label{LPSReduction}
+\end{align}
+and substituted back into the order-$\varepsilon^{1}$ Lagrangian
+before a series truncation.
+The reduced Lagrangian carries at most first-order time derivatives
+and is therefore admissible for the standard Legendre transform of
+\cref{EulerLagrange}.
+The substitution is faithful exactly when the
+Ja{\'e}n--Llosa--Molina regularity condition holds.
+For theories where the condition fails, the substitution silently
+drops the promoted mode and the reduced theory loses physical
+content; the pipeline detects the failure during derivation, by
+checking whether the order-$\varepsilon^{0}$ momentum kernel changes
+rank when $\varepsilon$ is turned on, and emits a diagnostic that
+prevents the reduced theory from being used as a substitute for the
+full one.
+
+\paragraph*{Implications for the surveys}
+The barrier delimits the scope of what the surveys of \cref{Results}
+can claim.
+Theories without higher-curvature terms, and theories where LPS
+succeeds, are surveyed against the standard linearised pipeline of
+\cref{SymbolicComputation}.
+Theories where LPS fails are flagged at derivation time and excluded
+from the channel-by-channel analysis, with the failure recorded
+against the theory in the campaign log.
+The Ja{\'e}n--Llosa--Molina obstruction is therefore not a defect of
+the pipeline but a sharp statement of which corners of the PGT
+theory space the linearised methodology can address; the remainder
+requires the non-perturbative treatment outlined in \cref{Discussion}.
