@@ -31,6 +31,7 @@ def plot_corner(
     show: bool = False,
     show_rejected_inchain: bool = True,
     show_rejected_prior: bool = False,
+    full_prior_bounds: bool = False,
 ) -> None:
     """Generate a corner plot (2D marginals + 1D histograms).
 
@@ -45,6 +46,13 @@ def plot_corner(
       from ``_rejected_prior.csv`` (5000 prior draws evaluated by the
       stability guard only).  Default off — dense and obscures the
       posterior.
+
+    The ``full_prior_bounds`` flag (v3 architecture) overrides the
+    anesthetic per-panel auto-scale with the full prior range, so that
+    compactified ``arctan_uniform`` priors visibly span their full
+    ±tan(89°) ≈ ±57.3 sample range.  Useful when the user needs to
+    confirm posterior compactness rather than read marginal shape.
+    Only supported by the anesthetic backend.
     """
     try:
         _plot_corner_anesthetic(
@@ -53,6 +61,7 @@ def plot_corner(
             show=show,
             show_rejected_inchain=show_rejected_inchain,
             show_rejected_prior=show_rejected_prior,
+            full_prior_bounds=full_prior_bounds,
         )
     except ImportError:
         _plot_corner_matplotlib(
@@ -372,6 +381,64 @@ def _set_derived_axis_limits(
             ax.set_ylim(lo, hi)
 
 
+def _set_full_prior_axis_limits(
+    axes_df: object,
+    plot_params: list[str],
+    priors: dict[str, tuple[str, float, float]],
+) -> None:
+    """Set every panel's x/y limits to the *full prior range* per parameter.
+
+    Counter-part to :func:`_set_derived_axis_limits` which uses the
+    posterior-weighted 5%-95% interval.  This mode is invoked by
+    ``tidal plot --type corner --full-prior-bounds`` to make the
+    compactified-prior coverage visually honest: arctan_uniform:-89:89
+    panels show their full ±tan(89°) ≈ ±57.3 range so the user can
+    confirm the posterior is genuinely concentrated rather than
+    artificially auto-scaled to a sub-region.
+
+    For ``arctan_uniform`` priors the bounds are degrees of the angle
+    variable and the physical sample range is ``tan(deg · π/180)``.
+    For ``log_uniform`` and ``uniform`` priors the ``[low, high]``
+    bounds map directly to the sample axis.
+    """
+    import math
+
+    def _physical_bounds(dist: str, lo: float, hi: float) -> tuple[float, float]:
+        if dist == "arctan_uniform":
+            # Map angle-degrees bounds → physical sample bounds via tan.
+            return math.tan(math.radians(lo)), math.tan(math.radians(hi))
+        return lo, hi
+
+    for col_idx, col_name in enumerate(plot_params):
+        if col_name not in priors:
+            continue
+        dist, lo, hi = priors[col_name]
+        x_lo, x_hi = _physical_bounds(dist, lo, hi)
+        if not (x_lo < x_hi):
+            continue
+
+        # 1D marginal diagonal
+        diag = _diagonal_axis(axes_df, col_idx, col_name)
+        if diag is not None:
+            diag.set_xlim(x_lo, x_hi)
+
+        # Lower-triangle x-axis cells (row > col_idx)
+        for i, row_name in enumerate(plot_params):
+            if i <= col_idx:
+                continue
+            ax = _cell_axis(axes_df, i, row_name, col_idx, col_name)
+            if ax is not None:
+                ax.set_xlim(x_lo, x_hi)
+
+        # Lower-triangle y-axis cells (col < col_idx)
+        for j, col in enumerate(plot_params):
+            if j >= col_idx:
+                continue
+            ax = _cell_axis(axes_df, col_idx, col_name, j, col)
+            if ax is not None:
+                ax.set_ylim(x_lo, x_hi)
+
+
 def _plot_corner_anesthetic(
     result: InferenceResult,
     output_path: Path | None = None,
@@ -379,6 +446,7 @@ def _plot_corner_anesthetic(
     show: bool = False,
     show_rejected_inchain: bool = True,
     show_rejected_prior: bool = False,
+    full_prior_bounds: bool = False,
 ) -> None:
     """Corner plot using anesthetic (Handley 2019).
 
@@ -469,6 +537,17 @@ def _plot_corner_anesthetic(
     # lower-triangle KDE contours.  See docs/V3_ARCHITECTURE.md and
     # https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/347.
     _hide_upper_triangle(axes_df, plot_params)
+    # --full-prior-bounds: override per-panel axis auto-scaling with the
+    # full prior range so visually-honest compactified-prior coverage is
+    # shown (the posterior is genuinely concentrated, not artificially
+    # cropped).  Runs *after* _overlay_priors so the red prior curve and
+    # the relaxed axes are consistent.
+    if full_prior_bounds:
+        _set_full_prior_axis_limits(
+            axes_df,
+            plot_params,
+            _extract_prior_map(result),
+        )
     has_any_rejected = _overlay_rejected_anesthetic(
         axes_df,
         result,

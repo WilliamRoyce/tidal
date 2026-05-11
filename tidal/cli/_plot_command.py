@@ -242,6 +242,7 @@ def _corner_plot(data_path: Path, args: Namespace) -> int:
         out_path,
         show_rejected_inchain=bool(getattr(args, "show_rejected_inchain", True)),
         show_rejected_prior=bool(getattr(args, "show_rejected_prior", False)),
+        full_prior_bounds=bool(getattr(args, "full_prior_bounds", False)),
     )
     if not args.quiet:
         print(f"Saved corner plot to: {out_path}")

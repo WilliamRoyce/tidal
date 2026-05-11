@@ -1040,6 +1040,19 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_false",
         help="For --type corner: do NOT overlay prior-survey rejected samples.",
     )
+    plot_parser.add_argument(
+        "--full-prior-bounds",
+        dest="full_prior_bounds",
+        action="store_true",
+        default=False,
+        help=(
+            "For --type corner: set every panel axis to the full prior "
+            "range, overriding anesthetic's 95%%-credible auto-scale. "
+            "Makes compactified arctan_uniform priors visually span their "
+            "full ±tan(89°) ≈ ±57.3 sample range so the user can confirm "
+            "posterior compactness. Default: off (auto-scale per panel)."
+        ),
+    )
 
     # --- sweep ---
     sweep_parser = sub.add_parser(
