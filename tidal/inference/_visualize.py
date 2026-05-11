@@ -716,7 +716,7 @@ def _plot_corner_anesthetic(
     log10_a = _compute_log10_amplification(result, samples)
     if log10_a is not None:
         try:
-            # Clip to posterior-weighted 2%-98% range BEFORE plot_2d so
+            # Clip to posterior-weighted 0.1%-99.9% range BEFORE plot_2d so
             # anesthetic's KDE is calibrated for the posterior scale, not
             # the full prior-exploration chain.  Dead-point samples spanning
             # the full prior range would otherwise produce an over-smooth KDE
@@ -725,10 +725,26 @@ def _plot_corner_anesthetic(
                 log10_a,
                 result.weights if result.weights is not None else None,
             )
-            samples["log10_A"] = log10_a_plot
-            samples.set_label("log10_A", r"$\log_{10} A$")
-            plot_params.append("log10_A")
-        except (AttributeError, KeyError, TypeError):
+            # anesthetic may have dropped rows with logL <= logL_birth
+            # (PolyChord exit-state artefact, issue #362); align the
+            # derived column to samples' (possibly post-drop) index
+            # rather than the full result.samples length.
+            if len(log10_a_plot) != len(samples):
+                if len(log10_a_plot) > len(samples) and hasattr(samples, "index"):
+                    # samples.index may be a positional or label index
+                    # into the original chain; try positional first
+                    getattr(samples, "index", None)
+                    try:
+                        log10_a_plot = log10_a_plot[: len(samples)]
+                    except (TypeError, ValueError):
+                        log10_a_plot = None
+                else:
+                    log10_a_plot = None
+            if log10_a_plot is not None:
+                samples["log10_A"] = log10_a_plot
+                samples.set_label("log10_A", r"$\log_{10} A$")
+                plot_params.append("log10_A")
+        except (AttributeError, KeyError, TypeError, ValueError):
             pass
     elif "logL" in samples.columns:
         # Fallback: if we can't derive A (no P_max metric, no baseline

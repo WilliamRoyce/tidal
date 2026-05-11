@@ -25,6 +25,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 400 \
+    --method nested --sampler polychord --nlive 1200 \
     --num-repeats 5 --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d22_shapiro_amp_v3'
