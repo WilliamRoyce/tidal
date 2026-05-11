@@ -37,13 +37,16 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 
 | Step | Description | Status | Notes |
 | --- | --- | --- | --- |
-| B.0 | Decision: per-param `arctan_uniform` vs cubed-sphere joint prior for publication numbers (small-scale comparison) | ⏳ pending | gated on parallel session landing joint prior |
-| B.1 | D1 amp v3 smoke (mid-res INTR) | ✅ done | 29149987 (23 min INTR, grid=128/nlive=300). log Z=+13.29±0.13 (vs v2 +0.72; +12.5 nats), ESS=1410/3651, MAP δ₁=4.80 (outside v2 prior). Per-coupling D_KL: α₁=3.20, α₂=2.96, α₃=0.02, δ₁=1.44 nats. 100% success run_status. Post-hoc probe sweep flags 45% of prior as v2-tachyonic. |
-| B.2 | D1 amp v3 publication run | ⏳ pending | gated on B.1 pass |
-| B.3 | D1 sup v3 paired with B.2 | ⏳ pending | |
-| B.4 | Stage A v3 paired re-run | ⏳ pending | |
-| B.5 | D2.0–D2.3 v3 paired re-runs | ⏳ pending | |
-| B.6 | Bounds-dependence cross-check at L=75 under v3 | ⏳ pending | |
+| B.0a | Joint-prior smoke comparison (D1 amp, 1 tile, INTR) | ⏳ to submit | NEW — head-to-head ESS/walltime vs B.1; adopt for B.5 if competitive. See plan §"Joint-prior smoke" |
+| B.1 | D1 amp v3 smoke (mid-res INTR) | ✅ done | 29149987 (23 min INTR, grid=128/nlive=300). log Z=+13.29±0.13 (vs v2 +0.72; +12.5 nats), ESS=1410/3651, MAP δ₁=4.80 (outside v2 prior). Per-coupling D_KL: α₁=3.20, α₂=2.96, α₃=0.02, δ₁=1.44 nats. 100% success run_status. Post-hoc probe sweep flags 45% of prior as v2-tachyonic. See `docs/comparison/d1_amp_v2_v3.md` |
+| B.2 | D1 amp v3 publication run | 🟡 pending | 29189748 (standard 8h) — submitted 2026-05-10 |
+| B.3 | D1 sup v3 paired with B.2 | 🟡 pending | 29189761 (standard 12h) — submitted 2026-05-10 |
+| B.4a | Stage A amp INTR smoke | 🚀 running | 29189966 — started 11:39 BST 2026-05-11 |
+| B.4b | Stage A sup INTR smoke | ⏳ to submit | submit after B.4a completes |
+| B.4-full-amp | Stage A amp v3 publication | ⏳ to submit | NEW — standard queue ~6h after B.4a/b smoke passes |
+| B.4-full-sup | Stage A sup v3 publication | ⏳ to submit | NEW — standard queue ~12h paired with B.4-full-amp |
+| B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | ⏳ to submit | INTR sequentially; joint-prior IF B.0a passes, else arctan |
+| B.6 | Bounds-dependence cross-check at L=75 under v3 | ⏳ to submit | INTR ~30 min, after Stage A INTR slot frees |
 
 ## Phase C — Cubed-sphere coupling-space chart (HANDLED BY PARALLEL SESSION)
 

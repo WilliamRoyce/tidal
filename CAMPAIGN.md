@@ -42,8 +42,11 @@ The 8 May 2026 supervisor meeting redirected the campaign methodology: tachyon-p
 - **Canonical reference:** [docs/V3_ARCHITECTURE.md](docs/V3_ARCHITECTURE.md)
 - **Phase tracker:** [docs/V3_PHASE_TRACKER.md](docs/V3_PHASE_TRACKER.md)
 - **Origin meeting:** [docs/meetings/2026-05-08_supervisor.md](docs/meetings/2026-05-08_supervisor.md)
+- **Phase D design (manuscript update sequence):** [docs/V3_PHASE_D_DESIGN.md](docs/V3_PHASE_D_DESIGN.md)
 - **Phase E design (deferred — localised geometry):** [docs/V3_PHASE_E_DESIGN.md](docs/V3_PHASE_E_DESIGN.md)
-- **Phase C reference (parallel session — cubed-sphere prior):** `docs/V3_PHASE_C_REFERENCE.md` (in flight)
+- **Phase C reference (parallel session — cubed-sphere prior):** [docs/V3_PHASE_C_REFERENCE.md](docs/V3_PHASE_C_REFERENCE.md)
+- **v2 vs v3 comparison tooling:** [scripts/v3_v2_comparison.py](scripts/v3_v2_comparison.py); per-model docs land in [docs/comparison/](docs/comparison/)
+- **Mandatory chain-pull workflow:** `bash scripts/pull_and_plot.sh <jobid> [--v2 V2_JOBID]` — pulls + corner plot + chain-health summary + comparison in one step. Run after every completed v3 HPC chain.
 
 Phase 6.H std HPC jobs **28982006** (D1 amp, 8 h) and **28985879** (D1 sup, 12 h) were cancelled on 2026-05-10 as part of the v3 pivot — they were running canonical-probe v2 settings, now superseded.
 
