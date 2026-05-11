@@ -57,9 +57,21 @@ Brief 2D scan over (σ_w, σ_B) at the D1 v2 amp MAP (`α₁=−0.422, α₂=−
 - σ_B ∈ {10, 25, 50}
 - Measure A = P_max / P_GR at each (σ_w, σ_B); also at multiple t_end values (5, 10, 20).
 
-Acceptance: A(σ_w, σ_B, t_end) is approximately t_end-independent (plateaus once t_end > σ_w + σ_B), confirming finite interaction time bounds growth.
+Parameter range justification (relative to box L=100):
 
-Output: `examples/data/v3_localised_geometry_tuning/` with the 9-point CSV and a 2D plot.
+- **σ_w ∈ {2, 5, 10}**: wavepacket width spans 2–10% of the domain. σ_w=2 is the tightest packet for which spectral content from the FFT periodic grid (Δk = 2π/L = 0.063) is still well-sampled (~30 active modes). σ_w=10 is broad enough to overlap a sizeable fraction of σ_B=25 but narrow enough that wavepacket-edge wrap-around is negligible at t_end ≤ 20.
+- **σ_B ∈ {10, 25, 50}**: B-field width covers 10–50% of L. σ_B=10 is the marginal case where wavepacket and B-field overlap region is comparable to σ_w; σ_B=25 is the design default (full traversal time ~ 50 units, well-clear of t_end ≤ 20); σ_B=50 approaches the uniform-B₀ limit (sanity check that A converges to Phase B values).
+- **t_end ∈ {5, 10, 20}**: brackets the wavepacket transit time σ_w + σ_B. At σ_w + σ_B = 5+10 = 15 the wavepacket has not yet fully cleared the B-field at t_end=10; at σ_w + σ_B = 10 + 50 = 60 the geometry effectively reverts to plane-wave overlap throughout t ≤ 20.
+
+**Quantitative acceptance criterion**: localised geometry is validated for a given (σ_w, σ_B) cell when
+
+```text
+A(t_end = 20) / A(t_end = 10) < 1.05
+```
+
+i.e. amplification has plateaued to within 5% by t_end=10 (relaxed from the asymptotic limit because we only need t-independent ranking for the inference, not exact convergence). Cells failing this criterion are unusable: the geometry hasn't bounded the growth and we'd be back in the plane-wave-like regime.
+
+Output: `examples/data/v3_localised_geometry_tuning/` with the 9-point × 3-t_end CSV and a 2D heatmap.
 
 ### E.4 — Re-baseline campaign scripts
 
@@ -80,6 +92,16 @@ If those land cleanly, expand to D2.1–D2.3.
 Comparison table in `docs/PHASE_E_GEOMETRY.md` (new). Per-coupling marginal D_KL shifts; per-coupling posterior-shape comparison; A_max headline number under each geometry. Decision: which geometry gets the publication numbers.
 
 If shifts are < 0.5 nats marginal D_KL per coupling: Phase B numbers are defensible without the geometry change (publication uses plane-wave with a footnote). If shifts are larger: Phase E geometry becomes canonical, Phase B numbers become an appendix.
+
+## Interaction with Phase A-γ (γ_conversion)
+
+Phase A-γ refactors the coupling-aware γ_conversion probe (`log(|target_amp|)/t_test` with multi-`t_test` sampling and log-zero clamp) for a ~1000× amp-chain speedup, deferred to its own session (GH issues #350, #351). Phase E does **not** depend on or block on Phase A-γ:
+
+- Phase E publishes under `P_max:maximize` regardless of A-γ outcome. The geometry pivot is a methodology change (bounded interaction time), independent of which metric drives the likelihood.
+- If A-γ ships and validates (Spearman ρ > 0.7 vs P_max), Phase B amp chains *and* Phase E amp chains could both use `gamma_conversion:maximize`. Until then, both use `P_max:maximize`.
+- A-γ's `t_test` parameter is unrelated to Phase E's t_end — γ_conversion measures the eigenvalue-implied amplification rate at a probe-internal test time, while Phase E bounds the simulation's interaction time. They're orthogonal.
+
+Decision rule: if A-γ converges *before* Phase E launches, use γ_conversion for Phase E amp chains for the speedup. If not, P_max is the metric. Phase E's geometry conclusions are robust to either choice.
 
 ## Done condition
 
