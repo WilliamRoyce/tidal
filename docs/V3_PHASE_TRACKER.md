@@ -43,10 +43,10 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 | B.3 | D1 sup v3 paired with B.2 | 🟡 pending | 29189761 (standard 12h) — submitted 2026-05-10 |
 | B.4a | Stage A amp INTR smoke | ✅ done | 29189966 (8 min INTR). log Z=+9.31±0.13 (vs v2 −0.07; +9.4 nats), ESS=2649/6464. **v2 "null verdict" was an artefact of narrow priors** — v3 reveals joint D_KL=6.59 nats. MAP shifts ~1.1–2.0σ on all 4 params. See `docs/comparison/stage_a_amp_v2_v3.md` |
 | B.4b | Stage A sup INTR smoke | 🚀 running | 29199129 (submitted 2026-05-11 ~12:50 BST) |
-| B.4-full-amp | Stage A amp v3 publication | ⏳ to submit | NEW — standard queue ~6h after B.4a/b smoke passes |
-| B.4-full-sup | Stage A sup v3 publication | ⏳ to submit | NEW — standard queue ~12h paired with B.4-full-amp |
-| B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | ⏳ to submit | INTR sequentially; joint-prior IF B.0a passes, else arctan |
-| B.6 | Bounds-dependence cross-check at L=75 under v3 | ⏳ to submit | INTR ~30 min, after Stage A INTR slot frees |
+| B.4-full-amp | Stage A amp v3 publication | 🟡 pending | 29205968 (standard 6h) — submitted 2026-05-11 |
+| B.4-full-sup | Stage A sup v3 publication | 🟡 pending | 29205982 (standard 12h) — submitted 2026-05-11 |
+| B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | 🚀 in progress | D2.0 amp 29207374 running (INTR); per-param arctan (joint-prior failed B.0a adoption) |
+| B.6 | Bounds-dependence cross-check at L=75 under v3 | ✅ done | 29205638 (25 min INTR). log Z=+13.18±0.12 (nearly identical to B.1's +13.29). Per-coupling D_KL essentially unchanged. **v3 washes out v2's bounds-dependence non-monotonicity** (v2 L=75 = +0.84, v2 L=100 = +0.68 — non-mono; v3 L=75 ≈ L=100). |
 
 ## Phase C — Cubed-sphere coupling-space chart (HANDLED BY PARALLEL SESSION)
 
