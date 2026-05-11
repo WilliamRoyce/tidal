@@ -13,10 +13,10 @@ analysis~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing}
 takes the magnetic field $\Bzero$ as
 externally prescribed rather than self-consistently sourcing the
 background metric.
-Hwang \& Noh~\cite{hwangnoh2023graviton} examine when this
-approximation breaks down: the EM stress-energy modifies the
-graviton through a tachyonic mass-like term
-$-(\kappa^2/2)\Bzero^2$.
+Hwang \& Noh~\cite{hwangnoh2023graviton} relax this assumption by
+including the metric perturbation in the EM stress-energy, and
+find that the stress-energy then sources a tachyonic mass-like
+term $-(\kappa^2/2)\Bzero^2$ in the graviton equation of motion.
 There is a critical scale $\lambda_B = 2\pi/k_B$, with
 $k_B = \sqrt{8\pi G}\,\Bzero/c^2$, above which the dimensionless
 backreaction parameter $D^2/\lambda_B^2$ ceases to be small ---
@@ -29,9 +29,9 @@ $\Pconv$:
   \;\sim\; \Pconv,
   \label{HwangNohBound}
 \end{align}
-Since $\Pconv$ is itself $\mathcal{O}(\Bzero^2)$ in the small-$\Bzero$ limit
-(\cref{GertsenshteinFormula}), the bound is vanishing alongside the conversion
-probability. Equivalently, $\kappa\Bzero D\ll 1$, i.e. $\Pconv\ll 1$.\footnote{The Hwang \& Noh peak-amplitude estimate
+Since $D^2/\lambda_B^2 \propto \Bzero^2 \to 0$, the bound holds
+trivially in the small-$\Bzero$ limit;
+equivalently, $\kappa\Bzero D\ll 1$, i.e. $\Pconv\ll 1$.\footnote{The Hwang \& Noh peak-amplitude estimate
 is $P\sim 8\pi^2\,(D/\lambda_B)^2$.
 This differs by a factor of four from the small-angle expansion of
 \cref{GertsenshteinFormula},
@@ -46,6 +46,16 @@ $h\propto\sin(\kappa\Bzero D/2)$;
 in the small-$\kappa\Bzero D$ limit this is half the
 estimate, and squaring gives the factor of
 four.}
+The simulations of \cref{SectorSurvey} solve the linearised
+equations of motion derived from the PGT--Maxwell action of
+\cref{PGTframework} on a flat Minkowski background with externally
+prescribed $\Bzero$, retaining the tachyonic mass-like term
+automatically. \cref{HwangNohBound} is the self-consistency
+condition for this linear-on-flat-background framework, under which
+both the simulations and the analytic comparison formula
+\cref{GertsenshteinFormula} are reliable; in the small-$\Bzero$
+regime of the survey, $\kappa\Bzero D\ll 1$ holds with comfortable
+margin.
 
 
 \paragraph*{Self-consistency at vanishing background field}
@@ -130,7 +140,7 @@ every term type in the Lagrangian vanishes.
 % $\MAGFt{}|_{\eta,\,\bar{\MAGT{}}=0}=0$ identically.
 The non-minimal coupling $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$
 has two torsion-dependent pieces through $K$ \cref{RiemannCartanDecomp}.
-The $\rcD{}K$ piece is handled by integration by parts: the covariant
+The $\rcD{}K$ term of \cref{RiemannCartanDecomp} is handled by integration by parts: the covariant
 derivative is transferred onto $\bar{\FieldF{}}$, and
 $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$ on the externally-prescribed
 uniform background (\cref{Linearisation}).
@@ -149,7 +159,7 @@ The preceding paragraph established $\bar{\MAGT{}}=0$ at the background.
 To bound the torsion perturbation $\delta\MAGT{}$, expand the same
 Cartan equation to first order in the perturbations
 $\{h_{\mu\nu},\delta\FieldA{_\mu},\delta\MAGT{}\}$.
-The $\rcD{}K$ piece of $\MAGFt{}$ contracted with $\bar{\FieldF{}}$
+The $\rcD{}K$ term of \cref{RiemannCartanDecomp} contracted with $\bar{\FieldF{}}$
 cancels at first order by the same integration by parts as in the
 preceding paragraph: $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$.
 The dominant source therefore comes from one order higher: per
@@ -163,8 +173,9 @@ $\propto\Del{1}\bar{\FieldF{}}\,\partial h$.%
 instead of $\bar{\FieldF{}}$ gives an additional first-order source
 $\propto\Del{1}\,\partial\delta\FieldA{}$ that is $\Bzero$-independent;
 in the conversion regime $|\delta\FieldA{}|\sim\Bzero|h|$
-(\cref{GertsenshteinFormula}) this scales identically to the dominant
-source above, so \cref{PerturbativeBound} is unchanged.}
+(\cref{GertsenshteinFormula}) this is the same order as the dominant
+source $\propto\Del{1}\bar{\FieldF{}}\,\partial h$, so
+\cref{PerturbativeBound} is unchanged.}
 In the algebraic-torsion form,
 $\delta\MAGT{}$ has no kinetic operator and the linearised
 Cartan equation is purely algebraic,
@@ -200,7 +211,8 @@ argument applies with two extensions.
 First, \cref{PerturbativeBound} with $\Del{1}\to g_{\mathrm{NM}}$ and
 $\Alp{}\to m_T^2$ gives
 $|\delta\MAGT{}|\sim(g_{\mathrm{NM}}/m_T^2)\,\Bzero A$;
-the cubic self-interaction then contributes a correction of order
+the $K{\cdot}K$ term of \cref{RiemannCartanDecomp} then contributes a
+correction of order
 $(\delta\MAGT{})^2 \sim (g_{\mathrm{NM}}/m_T^2)^2\,\Bzero^2$ to the
 linearised Cartan equation, placing the nonlinear torsion correction
 to $\Pconv$ at
