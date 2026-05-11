@@ -34,24 +34,21 @@ Operators fixed to 0 for *non-analytical* reasons (sub-theory definition matchin
 
 ### D2.0 Bahamonde — `torsion_gertsenshtein_general_nonminimal.json`
 
-**Free in v2:** `β₁, β₂, β₃, δ₁` (4 params).
-**Fixed:** `xi=0, chi=0, zeta1=0, zeta2=0, zeta3=0`.
-**De-pruning candidates:** the JSON's Lagrangian includes ξ (kinetic), χ, and ζ_i — fixing them to 0 is a *sub-theory definition* matching Bahamonde et al.'s paper, not an analytical-inertness pruning. Kinetic ξ in particular is necessary to give the torsion-trace propagating dynamics; its absence in Bahamonde is a deliberate choice to study the propagating-torsion-mass-only regime.
-**v3 action:** keep the sub-theory partition (it's a literature-comparison choice). Rewrite priors only.
+**Free in v2 (verified against chain 28598736 inference.json):** `β₁, β₂, β₃, ξ, δ₁` (5 params).
+**Fixed:** `chi=0, zeta1=0, zeta2=0, zeta3=0`.
+**v3 action:** keep partition; rewrite priors only. ⚠️ Earlier 2026-05-10 audit pass missed ξ being free in v2 — corrected 2026-05-11 after user-flagged param-mismatch.
 
 ### D2.1 Barker — same JSON as D2.0
 
-**Free in v2:** `β₁, β₂, β₃, ξ, χ` (5 params).
-**Fixed:** `delta1=0, zeta1=0, zeta2=0, zeta3=0`.
-**De-pruning candidates:** Barker's paper omits δ₁ and ζ_i to focus on the χ-only nonminimal coupling. Same sub-theory-definition rationale as D2.0.
-**v3 action:** keep partition; rewrite priors only.
+**Free in v2 (verified against chain 28607124 inference.json):** `β₁, β₂, β₃, ξ, δ₁, χ` (6 params).
+**Fixed:** `zeta1=0, zeta2=0, zeta3=0`.
+**v3 action:** keep partition; rewrite priors only. ⚠️ Earlier audit pass missed δ₁ being free in v2 — δ₁ is the nonminimal R-F coupling coefficient. Pinning δ₁=0 *decouples torsion from the photon entirely* and turns the inference into a trivial null. The originally-recorded "D2.1 null verdict" under the wrong partition (29209795 et al.) is therefore physically misleading and superseded by the corrected re-run.
 
 ### D2.2 Shapiro — same JSON
 
-**Free in v2:** `β₁, β₂, β₃, ζ₁, ζ₂, ζ₃` (6 params).
-**Fixed:** `xi=0, delta1=0, chi=0`.
-**De-pruning candidates:** Shapiro's paper studies derivative-torsion couplings ζ_i without ξ/δ₁/χ. Sub-theory.
-**v3 action:** keep partition; rewrite priors only.
+**Free in v2 (verified against chain 28736161 inference.json):** `β₁, β₂, β₃, ξ, δ₁, ζ₁, ζ₂, ζ₃` (8 params).
+**Fixed:** `chi=0`.
+**v3 action:** keep partition; rewrite priors only. ⚠️ Earlier audit pass missed ξ and δ₁ being free in v2 — corrected 2026-05-11. Without ξ (kinetic) the torsion trace lacks proper propagating dynamics; without δ₁ (R-F coupling) torsion decouples from the photon. Both are physically essential for the Shapiro-derivative-coupling study.
 
 ### D2.3 Full T5 — same JSON, 9 params free
 
