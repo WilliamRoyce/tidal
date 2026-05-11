@@ -496,32 +496,82 @@ def _set_log_axes_for_log_uniform_priors(
     axes_df: object,
     plot_params: list[str],
     priors: dict[str, tuple[str, float, float]],
-) -> None:
-    """Set log axes for parameters with log_uniform priors.
+    chain_data: dict[str, np.ndarray] | None = None,
+    weights: np.ndarray | None = None,
+    *,
+    min_decades: float = 1.0,
+) -> set[str]:
+    """Set log axes for parameters with log_uniform priors *AND* multi-decade posterior support.
 
-    A posterior over a ``log_uniform`` prior is naturally log-distributed
-    in the sample space (heavy tail at small values, long tail at large).
-    Linear axes squash the bulk near zero — most of the posterior mass
-    occupies < 5% of the visible panel.  Log axes give a uniform visual
-    representation across decades, revealing the actual posterior shape.
+    A posterior over a ``log_uniform`` prior may or may not be naturally
+    log-distributed in practice:
 
-    For each parameter with a ``log_uniform`` prior, this helper:
+    * If the posterior spans multiple decades (e.g. mA² ∈ [0.001, 100]),
+      a log axis is essential — linear squashes the bulk near zero.
+    * If the posterior is concentrated within < 1 decade (e.g.
+      ξ ∈ [0.5, 2.0]), log axes stretch the small-value side and
+      compress the large-value side, making the structure *less* clear.
+
+    This helper applies log scale only when the 95%-credible posterior
+    range spans at least ``min_decades`` decades.  Otherwise the axis
+    stays linear (anesthetic's default), letting the credible-interval
+    axis tightening take over.
+
+    For each qualifying parameter:
 
     * Sets the diagonal panel's x-axis to log scale.
     * Sets each lower-triangle cell containing this parameter on either
       the x- or y-axis to the corresponding log scale.
 
-    Linear axes for non-log_uniform parameters (e.g. ``arctan_uniform``,
-    ``uniform``) are unchanged — mixed log+linear corner panels are
-    standard practice (cosmology corner plots routinely combine log
-    H_0-axes with linear Omega_m).
+    Returns the set of parameter names that received log-scale axes,
+    so the caller can skip them in subsequent linear-credible-interval
+    tightening (which would otherwise compute a negative-lo bound and
+    cause matplotlib to revert the scale to linear).
     """
+    import numpy as np
+
+    logged: set[str] = set()
     for col_idx, col_name in enumerate(plot_params):
         if col_name not in priors:
             continue
         dist, _lo, _hi = priors[col_name]
         if dist != "log_uniform":
             continue
+
+        # Decade-span check: skip log scale if posterior is concentrated
+        # within < min_decades decades of dynamic range.
+        if chain_data is not None and col_name in chain_data:
+            values = chain_data[col_name]
+            finite_mask = np.isfinite(values) & (values > 0)
+            if finite_mask.any():
+                v = values[finite_mask]
+                if weights is not None:
+                    w = np.asarray(weights, dtype=float)[finite_mask]
+                    total = w.sum()
+                    if total > 0:
+                        w /= total
+                        sort_idx = np.argsort(v)
+                        cdf = np.cumsum(w[sort_idx])
+                        v_s = v[sort_idx]
+                        qlo_idx = min(int(np.searchsorted(cdf, 0.025)), len(v_s) - 1)
+                        qhi_idx = min(int(np.searchsorted(cdf, 0.975)), len(v_s) - 1)
+                        qlo, qhi = float(v_s[qlo_idx]), float(v_s[qhi_idx])
+                    else:
+                        qlo, qhi = (
+                            float(np.quantile(v, 0.025)),
+                            float(np.quantile(v, 0.975)),
+                        )
+                else:
+                    qlo, qhi = (
+                        float(np.quantile(v, 0.025)),
+                        float(np.quantile(v, 0.975)),
+                    )
+                if qlo > 0 and qhi > qlo:
+                    decades = math.log10(qhi / qlo)
+                    if decades < min_decades:
+                        # Posterior is concentrated within < min_decades —
+                        # log axis would stretch things unhelpfully.
+                        continue
 
         # 1D diagonal: x-axis only
         diag = _diagonal_axis(axes_df, col_idx, col_name)
@@ -546,6 +596,10 @@ def _set_log_axes_for_log_uniform_priors(
             if ax is not None:
                 with contextlib.suppress(AttributeError, ValueError):
                     ax.set_yscale("log")
+
+        logged.add(col_name)
+
+    return logged
 
 
 def _set_full_prior_axis_limits(
@@ -699,8 +753,20 @@ def _plot_corner_anesthetic(
     # Set log axes for log_uniform-prior parameters FIRST — before
     # prior/MAP overlays — so the overlays are drawn in the correct
     # log space, not against linear axes that get re-scaled later.
+    # Only params whose posterior spans ≥ 1 decade get log scale; tightly
+    # concentrated posteriors (< 1 decade) stay linear so log-stretching
+    # doesn't make them harder to read.
     prior_map = _extract_prior_map(result)
-    _set_log_axes_for_log_uniform_priors(axes_df, plot_params, prior_map)
+    chain_data_for_log = {
+        name: result.samples[:, i] for i, name in enumerate(result.param_names)
+    }
+    logged_params = _set_log_axes_for_log_uniform_priors(
+        axes_df,
+        plot_params,
+        prior_map,
+        chain_data_for_log,
+        result.weights,
+    )
     _overlay_priors(axes_df, result)
     _overlay_map_and_ci(axes_df, result)
     # v3 architecture: the upper-right triangle is hidden because at large N
@@ -716,24 +782,21 @@ def _plot_corner_anesthetic(
             prior_map,
         )
     else:
-        # Default: tighten per-panel axes to the weighted 99%-credible
-        # interval of each parameter, plus 15% padding.  anesthetic's
+        # Default: tighten per-panel axes to the weighted 95%-credible
+        # interval of each parameter, plus 5% padding.  anesthetic's
         # default auto-scale is closer to the full chain extent, which
         # makes highly-concentrated posteriors (e.g. Stage A sup
         # deltam 98%-cred [-1.4, +1.3] vs chain extent [-19, +20])
         # appear as thin lines occupying < 10% of the panel.
-        chain_data = {
-            name: result.samples[:, i] for i, name in enumerate(result.param_names)
-        }
-        log_param_names = tuple(
-            name for name, (dist, _, _) in prior_map.items() if dist == "log_uniform"
-        )
+        # Skip log-scale params (those whose posterior spanned ≥ 1
+        # decade and got log axes) since additive-padding around their
+        # lo-bound goes negative and matplotlib reverts to linear.
         _set_credible_axis_limits(
             axes_df,
             plot_params,
-            chain_data,
+            chain_data_for_log,
             result.weights,
-            skip=log_param_names,
+            skip=tuple(logged_params),
         )
         # log10_A (derived column) — tighten its axes to the same
         # 95%-credible + 5%-pad treatment so the bottom row contours
@@ -751,7 +814,13 @@ def _plot_corner_anesthetic(
     # some matplotlib versions silently reverts the scale to linear.
     # This final pass guarantees the rendered axis is log for every
     # log_uniform-prior parameter, regardless of intermediate changes.
-    _set_log_axes_for_log_uniform_priors(axes_df, plot_params, prior_map)
+    _set_log_axes_for_log_uniform_priors(
+        axes_df,
+        plot_params,
+        prior_map,
+        chain_data_for_log,
+        result.weights,
+    )
     has_any_rejected = _overlay_rejected_anesthetic(
         axes_df,
         result,
