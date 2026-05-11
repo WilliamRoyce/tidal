@@ -125,6 +125,7 @@ class TestRunStatusTags:
             "metric_nan",
             "metric_missing",
             "logl_minus_inf",
+            "below_noise_floor",
             "exception",
         ],
     )

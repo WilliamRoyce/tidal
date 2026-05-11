@@ -33,8 +33,11 @@ The campaign output shifts from headline log Z and A_max numbers to per-coupling
 | Sim exit_code ≠ 0 | `-inf` | same floor + noise | `simulation_failed` |
 | NaN/Inf metric | `-inf` | same floor + noise; **distinct tag** for post-chain inspection | `metric_nan` |
 | Metric missing from sim output | `-inf` | `-inf` (genuine bug, not parameter-space signal) | `metric_missing` |
+| Sim returns finite logL **below** `SOFT_FLOOR_LOGL` | n/a (no analogue in v2) | logL kept verbatim (no clamp); distinct tag so post-chain analysis can filter sub-noise-floor samples from "physical" min/max summaries. Issue #356. | `below_noise_floor` |
 
 Default `σ_explore = 1.0` nat; tunable via `--soft-floor-noise SIGMA`. The `--gated` flag preserves v2 hard-rejection behaviour for reproducibility.
+
+`below_noise_floor` is observational metadata only — sample weights at logL ≈ −101 are ~1e−50 (vs ~1e−2 at MAP), so posterior inference is unaffected. The tag protects diagnostic summaries (corner-plot A-range, headline tables) from quoting numerical-noise floors as physical bounds. The simulation's effective noise floor scales with IC amplitude and solver precision; for typical IC=1e−2 and double-precision modal solver, P_max ≈ 1e−34 is the natural threshold and SOFT_FLOOR_LOGL = −100 (P_max ≈ 1e−44) provides a comfortable margin.
 
 ## Compactified prior table (per-param `arctan_uniform` safety-net path)
 

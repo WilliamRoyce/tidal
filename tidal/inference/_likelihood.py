@@ -675,6 +675,14 @@ def _evaluate_likelihood(
                 **success_meta,
                 "run_status": "logl_minus_inf",
             }
+        # Distinct tag for samples whose simulation succeeded but logL fell
+        # below the soft-floor sentinel — typically P_max ~ 1e-44 or smaller
+        # in maximize mode, which is below the simulation's effective
+        # numerical noise floor (issue #356).  Value is preserved (no
+        # clamping); only the run_status tag changes so post-chain analysis
+        # can filter these from "physical" min/max summaries.
+        if math.isfinite(logl) and logl < SOFT_FLOOR_LOGL:
+            return logl, {**success_meta, "run_status": "below_noise_floor"}
         return logl, success_meta  # noqa: TRY300
 
     except Exception:  # noqa: BLE001
