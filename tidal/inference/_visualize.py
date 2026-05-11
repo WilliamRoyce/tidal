@@ -756,7 +756,49 @@ def _plot_corner_anesthetic(
     # both without version-gating.  ``label`` is consumed by anesthetic's
     # contour code (plot.py:1314) which adds a Rectangle patch to the
     # legend describing the 68%/95% CL contours.
-    ret = samples.plot_2d(plot_params, label="68% / 95% CL")
+    def _plot_with_kinds(plot_params: list[str], kinds: dict[str, str] | None = None):
+        if kinds is None:
+            return samples.plot_2d(plot_params, label="68% / 95% CL")
+        return samples.plot_2d(plot_params, label="samples", kinds=kinds)
+
+    try:
+        ret = _plot_with_kinds(plot_params)
+    except (RuntimeError, ValueError, np.linalg.LinAlgError) as e:
+        # Degenerate-posterior fallback (e.g. genuine-null chains like
+        # D2.1 Barker where the posterior is essentially flat).  Two
+        # failure modes from anesthetic's KDE machinery:
+        # - qhull Delaunay triangulation: 'singular input data'
+        # - scipy gaussian_kde: 'singular data covariance matrix'
+        # Both are downstream of "data spans a lower-dimensional subspace"
+        # which is exactly what a flat posterior looks like.  Fall back
+        # to histogram diagonals + scatter cross-panels — no covariance
+        # estimation needed.  See GH issue #362.
+        msg = str(e).lower()
+        if (
+            "qhull" not in msg
+            and "singular" not in msg
+            and "lower-dimensional" not in msg
+        ):
+            raise
+        # First fallback: KDE on diagonals (works for moderately-flat
+        # posteriors with enough samples for bandwidth selection).
+        try:
+            ret = _plot_with_kinds(
+                plot_params,
+                {"diagonal": "kde_1d", "lower": "scatter_2d", "upper": "scatter_2d"},
+            )
+        except (RuntimeError, ValueError, np.linalg.LinAlgError):
+            # Final fallback for severely-degenerate chains (e.g.
+            # under-converged 474-sample chain with all samples at
+            # identical logL): drop the derived log10_A column (whose
+            # post-clip values may be all-NaN for null chains) and use
+            # hist_1d on the remaining params + scatter_2d cross-panels.
+            params_no_derived = [p for p in plot_params if p in result.param_names]
+            ret = _plot_with_kinds(
+                params_no_derived,
+                {"diagonal": "hist_1d", "lower": "scatter_2d", "upper": "scatter_2d"},
+            )
+            plot_params = params_no_derived
     if isinstance(ret, tuple) and len(ret) == 2:
         fig = ret[0]
         axes_df = ret[1]
