@@ -338,7 +338,9 @@ def _set_derived_axis_limits(
     low-weight dead-point samples in nested-sampling chains can still shift
     the 5th percentile outside the posterior support, making the posterior
     appear as a thin stripe.  This resets limits to the posterior-weighted
-    5%-95% interval +/- 10% padding.
+    2.5%-97.5% (95% credible) interval +/- 5% padding so the visible
+    contour boundary sits at the panel edge without large whitespace
+    margins.
     """
     import numpy as np
 
@@ -356,15 +358,15 @@ def _set_derived_axis_limits(
             sort_idx = np.argsort(v)
             v_s = v[sort_idx]
             cdf = np.cumsum(w[sort_idx])
-            q05 = float(v_s[np.searchsorted(cdf, 0.05, side="left")])
-            q95 = float(v_s[np.searchsorted(cdf, 0.95, side="left")])
+            q05 = float(v_s[np.searchsorted(cdf, 0.025, side="left")])
+            q95 = float(v_s[np.searchsorted(cdf, 0.975, side="left")])
         else:
-            q05, q95 = float(np.quantile(v, 0.05)), float(np.quantile(v, 0.95))
+            q05, q95 = float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))
     else:
-        q05, q95 = float(np.quantile(v, 0.05)), float(np.quantile(v, 0.95))
+        q05, q95 = float(np.quantile(v, 0.025)), float(np.quantile(v, 0.975))
 
     spread = q95 - q05
-    pad = max(0.1 * spread, 1e-3)
+    pad = max(0.05 * spread, 1e-3)
     lo, hi = q05 - pad, q95 + pad
 
     col_idx = plot_params.index(col_name)
@@ -398,9 +400,9 @@ def _set_credible_axis_limits(
     weights: np.ndarray | None,
     *,
     skip: tuple[str, ...] = (),
-    q_low: float = 0.005,
-    q_high: float = 0.995,
-    pad_frac: float = 0.15,
+    q_low: float = 0.025,
+    q_high: float = 0.975,
+    pad_frac: float = 0.05,
 ) -> None:
     """Tighten every panel's axes to the weighted credible interval of each parameter.
 
@@ -411,10 +413,11 @@ def _set_credible_axis_limits(
     of the underlying parameter samples, plus a ``pad_frac`` fractional
     padding.
 
-    Default ``[0.005, 0.995]`` (99% credible) + 15% padding gives visible
-    posterior structure for tight peaks while keeping all contour-relevant
-    samples in-view (the 95% / 68% contours land well inside the 99%
-    bounds, with the pad ensuring they're not clipped).
+    Default ``[0.025, 0.975]`` (95% credible) + 5% padding fits the
+    outer-contour boundary tightly without leaving large whitespace
+    margins.  The visible 2D contours are drawn at 95% / 68%, so axes
+    matched to the 95%-credible bounds enclose them without padding
+    becoming visible whitespace beyond the contour outline.
 
     Skips parameters not present in ``chain_data`` (e.g. derived columns
     handled by :func:`_set_derived_axis_limits` separately).
@@ -732,6 +735,17 @@ def _plot_corner_anesthetic(
             result.weights,
             skip=log_param_names,
         )
+        # log10_A (derived column) — tighten its axes to the same
+        # 95%-credible + 5%-pad treatment so the bottom row contours
+        # sit at the panel edge without large whitespace margins.
+        if log10_a is not None and "log10_A" in plot_params:
+            _set_derived_axis_limits(
+                axes_df,
+                plot_params,
+                "log10_A",
+                log10_a,
+                result.weights,
+            )
     # Re-apply log scale at the very end — overlays (priors, MAP, CI)
     # internally save/restore xlim around their plot() calls which on
     # some matplotlib versions silently reverts the scale to linear.
