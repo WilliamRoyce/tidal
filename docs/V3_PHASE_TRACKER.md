@@ -37,7 +37,7 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 
 | Step | Description | Status | Notes |
 | --- | --- | --- | --- |
-| B.0a | Joint-prior smoke comparison (D1 amp, 1 tile, INTR) | ⏳ to submit | NEW — head-to-head ESS/walltime vs B.1; adopt for B.5 if competitive. Script: `scripts/hpc_submit_drafts/v3_jointprior/d1_amp_smoke_tile.sh` |
+| B.0a | Joint-prior smoke comparison (D1 amp, 1 tile, INTR) | ⚠️ done — **does not pass adoption criterion** | 29204991 (8 min INTR). log Z=+13.76±0.09 (matches B.1 +13.29), ESS=1398 (matches B.1 1410), but **MAP α₁=+582, α₂=−575, δ₁=+575** vs B.1's ±0.5 — joint prior explores a different region than per-param. Per-coupling D_KL much lower (0.27–0.34 vs 2.96–3.20). Joint prior's r∈[1e-3,1e3] × sphere volume scaling concentrates at r_hi=1000; needs r_hi tuning. **Decision: keep per-param arctan for B.5.** See `docs/comparison/d1_amp_joint_v2_v3.md` |
 | B.1 | D1 amp v3 smoke (mid-res INTR) | ✅ done | 29149987 (23 min INTR, grid=128/nlive=300). log Z=+13.29±0.13 (vs v2 +0.72; +12.5 nats), ESS=1410/3651, MAP δ₁=4.80 (outside v2 prior). Per-coupling D_KL: α₁=3.20, α₂=2.96, α₃=0.02, δ₁=1.44 nats. 100% success run_status. Post-hoc probe sweep flags 45% of prior as v2-tachyonic. See `docs/comparison/d1_amp_v2_v3.md` |
 | B.2 | D1 amp v3 publication run | 🟡 pending | 29189748 (standard 8h) — submitted 2026-05-10 |
 | B.3 | D1 sup v3 paired with B.2 | 🟡 pending | 29189761 (standard 12h) — submitted 2026-05-10 |

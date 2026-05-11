@@ -54,6 +54,14 @@ def _ci_to_sigma(ci_lo: float, ci_hi: float) -> float:
 
 def _prior_compactness(prior: dict[str, Any]) -> str:
     """Single-line summary of a prior's effective coupling-space coverage."""
+    # Joint (radial-angular) priors have a different schema: ``kind ==
+    # "radial_angular"`` with magnitude bounds ``r_lo`` / ``r_hi`` and
+    # angular tile spec — there's no single distribution + low/high pair.
+    if prior.get("kind") == "radial_angular":
+        r_lo = prior.get("r_lo", float("nan"))
+        r_hi = prior.get("r_hi", float("nan"))
+        n_names = len(prior.get("names", []))
+        return f"joint sphere S^{n_names - 1} × log[{r_lo:.0e}..{r_hi:.0e}]"
     dist = prior.get("distribution", "?")
     lo = prior.get("low", float("nan"))
     hi = prior.get("high", float("nan"))
@@ -66,6 +74,26 @@ def _prior_compactness(prior: dict[str, Any]) -> str:
     if dist == "uniform":
         return f"uniform[{lo:g}..{hi:g}]"
     return f"{dist}[{lo}..{hi}]"
+
+
+def _index_priors(priors_list: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Build a {param_name: prior_dict} map, handling both scalar and joint priors.
+
+    Scalar priors have ``name``; joint (radial-angular) priors have
+    ``names`` (a list).  This function flattens the joint priors by
+    repeating the prior_dict per name, so per-coupling lookup works
+    uniformly downstream.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for p in priors_list:
+        if p.get("kind") == "radial_angular":
+            for name in p.get("names", []):
+                out[name] = p
+        else:
+            name = p.get("name")
+            if name:
+                out[name] = p
+    return out
 
 
 def render_table(  # noqa: PLR0914
@@ -115,8 +143,8 @@ def render_table(  # noqa: PLR0914
         )
     )
 
-    v2_priors = {p["name"]: p for p in v2.get("priors", [])}
-    v3_priors = {p["name"]: p for p in v3.get("priors", [])}
+    v2_priors = _index_priors(v2.get("priors", []))
+    v3_priors = _index_priors(v3.get("priors", []))
     v2_map = v2.get("map_estimate", {})
     v3_map = v3.get("map_estimate", {})
     v2.get("credible_interval_95", {})
