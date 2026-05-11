@@ -7,25 +7,22 @@
 \section{Symbolic computation of the equations of motion}%
 \label{SymbolicComputation}
 
-The symbolic side of \TIDAL{} converts a Lagrangian, a background ansatz,
-and a parameter set into a JSON specification of the linearised field
-equations and the Hamiltonian density.
+The symbolic computation produces, from a Lagrangian, a background
+ansatz, and a parameter set, a JSON specification of the linearised
+field equations and the Hamiltonian density.
 \cref{Architecture} sets out the high-level pipeline, with the data-flow
 diagram shown in \cref{ArchitectureDiagram};
 \cref{ComputationalApproach} gives the body's one-paragraph overview,
 and the equation outputs for the surveyed theories are collected in
 \cref{SymbolicOutputs}.
-We document the symbolic stages here in detail because every partial
-differential equation evolved by the numerical solver of
-\cref{NumericalEvolution} is the output of these stages, so the contents
-of \cref{NumericalEvolution} depend on the pipeline described below
-being trusted.
+Every partial differential equation evolved by the numerical solver of
+\cref{NumericalEvolution} is the output of this pipeline.
 
 \paragraph*{xAct environment}
 The symbolic stage runs in \Mathematica{}~\cite{mathematica} on the
 \xAct{}~\cite{martingarcia2007xact} suite, which provides the
 abstract-index tensor algebra, automatic component decomposition, and
-perturbation-theory machinery we require.
+perturbation theory.
 Three \xAct{} packages are loaded: \texttt{xTensor} for abstract-index
 algebra and the functional derivative \texttt{VarD};
 \xPert{}~\cite{brizuela2009xpert} for metric perturbation theory through
@@ -40,8 +37,7 @@ The manifold, metric, Levi-Civita and Riemann--Cartan covariant
 derivatives, and the torsion tensor are declared once at session start;
 the Christoffel components, inverse-metric components, and Levi-Civita
 tensor are precomputed for the declared metric and substituted from the
-cache at every later stage that needs them, so the geometric setup pays
-its cost once per theory rather than once per equation.
+cache at every later stage that needs them.
 
 \paragraph*{Lagrangian input from TOML}
 The theory is specified by a single TOML file, which isolates everything
@@ -105,7 +101,7 @@ leaving
   \textsf{ExpandPerturbation}\!\bigl[
     \textsf{Perturbation}[\sqrt{-g}\,\mathcal{L},\,2]
   \bigr]\Big|_{\textsf{LI}[2]\,\mapsto\,0}.
-  \label{QuadraticAction}
+  \label{QuadraticExpansion}
 \end{align}
 
 Antisymmetric derived tensors whose definition references a
@@ -133,7 +129,7 @@ the solver.
 \paragraph*{Euler--Lagrange derivation}
 The field equation for every dynamical perturbation is obtained by
 variational differentiation of the quadratic action $\mathcal{L}^{(2)}$
-built in \cref{QuadraticAction}: for fields $\{\varphi_i\}$ of arbitrary
+built in \cref{QuadraticExpansion}: for fields $\{\varphi_i\}$ of arbitrary
 tensor type, the equation of motion is
 \begin{align}
   \frac{\partial \mathcal{L}^{(2)}}{\partial \varphi_i}
