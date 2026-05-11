@@ -38,7 +38,7 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 | Step | Description | Status | Notes |
 | --- | --- | --- | --- |
 | B.0 | Decision: per-param `arctan_uniform` vs cubed-sphere joint prior for publication numbers (small-scale comparison) | ⏳ pending | gated on parallel session landing joint prior |
-| B.1 | D1 amp v3 smoke (mid-res INTR) | 🚀 running | HPC job 29149987 (icelake INTR, grid=128/nlive=300, 2026-05-10) |
+| B.1 | D1 amp v3 smoke (mid-res INTR) | ✅ done | 29149987 (23 min INTR, grid=128/nlive=300). log Z=+13.29±0.13 (vs v2 +0.72; +12.5 nats), ESS=1410/3651, MAP δ₁=4.80 (outside v2 prior). Per-coupling D_KL: α₁=3.20, α₂=2.96, α₃=0.02, δ₁=1.44 nats. 100% success run_status. Post-hoc probe sweep flags 45% of prior as v2-tachyonic. |
 | B.2 | D1 amp v3 publication run | ⏳ pending | gated on B.1 pass |
 | B.3 | D1 sup v3 paired with B.2 | ⏳ pending | |
 | B.4 | Stage A v3 paired re-run | ⏳ pending | |
