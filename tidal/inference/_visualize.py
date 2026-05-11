@@ -12,6 +12,7 @@ JOSS 4(37), 1414. https://doi.org/10.21105/joss.01414
 
 from __future__ import annotations
 
+import contextlib
 import math
 from typing import TYPE_CHECKING
 
@@ -390,6 +391,160 @@ def _set_derived_axis_limits(
             ax.set_ylim(lo, hi)
 
 
+def _set_credible_axis_limits(
+    axes_df: object,
+    plot_params: list[str],
+    chain_data: dict[str, np.ndarray],
+    weights: np.ndarray | None,
+    *,
+    skip: tuple[str, ...] = (),
+    q_low: float = 0.005,
+    q_high: float = 0.995,
+    pad_frac: float = 0.15,
+) -> None:
+    """Tighten every panel's axes to the weighted credible interval of each parameter.
+
+    anesthetic's default ``plot_2d`` auto-scale uses a wide quantile range
+    (close to the chain extent), which makes highly-concentrated posteriors
+    appear as thin lines occupying < 10% of the panel.  This helper sets
+    each panel's x/y axis to the weighted [q_low, q_high] credible interval
+    of the underlying parameter samples, plus a ``pad_frac`` fractional
+    padding.
+
+    Default ``[0.005, 0.995]`` (99% credible) + 15% padding gives visible
+    posterior structure for tight peaks while keeping all contour-relevant
+    samples in-view (the 95% / 68% contours land well inside the 99%
+    bounds, with the pad ensuring they're not clipped).
+
+    Skips parameters not present in ``chain_data`` (e.g. derived columns
+    handled by :func:`_set_derived_axis_limits` separately).
+    """
+    import numpy as np
+
+    for col_idx, col_name in enumerate(plot_params):
+        if col_name not in chain_data:
+            continue
+        if col_name in skip:
+            # log_uniform-prior params get log axes separately; using
+            # additive padding here would push the lower bound negative
+            # and matplotlib silently reverts the axis to linear.
+            continue
+        values = chain_data[col_name]
+        finite_mask = np.isfinite(values)
+        if not finite_mask.any():
+            continue
+        v = values[finite_mask]
+
+        if weights is not None:
+            w = np.asarray(weights, dtype=float)[finite_mask]
+            total = w.sum()
+            if total > 0:
+                w /= total
+                sort_idx = np.argsort(v)
+                cdf = np.cumsum(w[sort_idx])
+                v_s = v[sort_idx]
+                lo_idx = min(
+                    int(np.searchsorted(cdf, q_low, side="left")), len(v_s) - 1
+                )
+                hi_idx = min(
+                    int(np.searchsorted(cdf, q_high, side="left")), len(v_s) - 1
+                )
+                qlo = float(v_s[lo_idx])
+                qhi = float(v_s[hi_idx])
+            else:
+                qlo = float(np.quantile(v, q_low))
+                qhi = float(np.quantile(v, q_high))
+        else:
+            qlo = float(np.quantile(v, q_low))
+            qhi = float(np.quantile(v, q_high))
+
+        spread = qhi - qlo
+        if spread <= 0:
+            continue
+        pad = max(pad_frac * spread, 1e-9)
+        lo, hi = qlo - pad, qhi + pad
+
+        # 1D diagonal: x-axis
+        diag = _diagonal_axis(axes_df, col_idx, col_name)
+        if diag is not None:
+            with contextlib.suppress(AttributeError, ValueError):
+                diag.set_xlim(lo, hi)
+
+        # Lower-triangle x-axis cells (row > col_idx)
+        for i, row_name in enumerate(plot_params):
+            if i <= col_idx:
+                continue
+            ax = _cell_axis(axes_df, i, row_name, col_idx, col_name)
+            if ax is not None:
+                with contextlib.suppress(AttributeError, ValueError):
+                    ax.set_xlim(lo, hi)
+
+        # Lower-triangle y-axis cells (col < col_idx)
+        for j, col in enumerate(plot_params):
+            if j >= col_idx:
+                continue
+            ax = _cell_axis(axes_df, col_idx, col_name, j, col)
+            if ax is not None:
+                with contextlib.suppress(AttributeError, ValueError):
+                    ax.set_ylim(lo, hi)
+
+
+def _set_log_axes_for_log_uniform_priors(
+    axes_df: object,
+    plot_params: list[str],
+    priors: dict[str, tuple[str, float, float]],
+) -> None:
+    """Set log axes for parameters with log_uniform priors.
+
+    A posterior over a ``log_uniform`` prior is naturally log-distributed
+    in the sample space (heavy tail at small values, long tail at large).
+    Linear axes squash the bulk near zero — most of the posterior mass
+    occupies < 5% of the visible panel.  Log axes give a uniform visual
+    representation across decades, revealing the actual posterior shape.
+
+    For each parameter with a ``log_uniform`` prior, this helper:
+
+    * Sets the diagonal panel's x-axis to log scale.
+    * Sets each lower-triangle cell containing this parameter on either
+      the x- or y-axis to the corresponding log scale.
+
+    Linear axes for non-log_uniform parameters (e.g. ``arctan_uniform``,
+    ``uniform``) are unchanged — mixed log+linear corner panels are
+    standard practice (cosmology corner plots routinely combine log
+    H_0-axes with linear Omega_m).
+    """
+    for col_idx, col_name in enumerate(plot_params):
+        if col_name not in priors:
+            continue
+        dist, _lo, _hi = priors[col_name]
+        if dist != "log_uniform":
+            continue
+
+        # 1D diagonal: x-axis only
+        diag = _diagonal_axis(axes_df, col_idx, col_name)
+        if diag is not None:
+            with contextlib.suppress(AttributeError, ValueError):
+                diag.set_xscale("log")
+
+        # Lower-triangle x-axis cells (row > col_idx)
+        for i, row_name in enumerate(plot_params):
+            if i <= col_idx:
+                continue
+            ax = _cell_axis(axes_df, i, row_name, col_idx, col_name)
+            if ax is not None:
+                with contextlib.suppress(AttributeError, ValueError):
+                    ax.set_xscale("log")
+
+        # Lower-triangle y-axis cells (col < col_idx)
+        for j, col in enumerate(plot_params):
+            if j >= col_idx:
+                continue
+            ax = _cell_axis(axes_df, col_idx, col_name, j, col)
+            if ax is not None:
+                with contextlib.suppress(AttributeError, ValueError):
+                    ax.set_yscale("log")
+
+
 def _set_full_prior_axis_limits(
     axes_df: object,
     plot_params: list[str],
@@ -538,6 +693,11 @@ def _plot_corner_anesthetic(
         fig = cell.get_figure()
 
     _force_solid_credible_fills(fig)
+    # Set log axes for log_uniform-prior parameters FIRST — before
+    # prior/MAP overlays — so the overlays are drawn in the correct
+    # log space, not against linear axes that get re-scaled later.
+    prior_map = _extract_prior_map(result)
+    _set_log_axes_for_log_uniform_priors(axes_df, plot_params, prior_map)
     _overlay_priors(axes_df, result)
     _overlay_map_and_ci(axes_df, result)
     # v3 architecture: the upper-right triangle is hidden because at large N
@@ -546,17 +706,38 @@ def _plot_corner_anesthetic(
     # lower-triangle KDE contours.  See docs/V3_ARCHITECTURE.md and
     # https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/347.
     _hide_upper_triangle(axes_df, plot_params)
-    # --full-prior-bounds: override per-panel axis auto-scaling with the
-    # full prior range so visually-honest compactified-prior coverage is
-    # shown (the posterior is genuinely concentrated, not artificially
-    # cropped).  Runs *after* _overlay_priors so the red prior curve and
-    # the relaxed axes are consistent.
     if full_prior_bounds:
         _set_full_prior_axis_limits(
             axes_df,
             plot_params,
-            _extract_prior_map(result),
+            prior_map,
         )
+    else:
+        # Default: tighten per-panel axes to the weighted 99%-credible
+        # interval of each parameter, plus 15% padding.  anesthetic's
+        # default auto-scale is closer to the full chain extent, which
+        # makes highly-concentrated posteriors (e.g. Stage A sup
+        # deltam 98%-cred [-1.4, +1.3] vs chain extent [-19, +20])
+        # appear as thin lines occupying < 10% of the panel.
+        chain_data = {
+            name: result.samples[:, i] for i, name in enumerate(result.param_names)
+        }
+        log_param_names = tuple(
+            name for name, (dist, _, _) in prior_map.items() if dist == "log_uniform"
+        )
+        _set_credible_axis_limits(
+            axes_df,
+            plot_params,
+            chain_data,
+            result.weights,
+            skip=log_param_names,
+        )
+    # Re-apply log scale at the very end — overlays (priors, MAP, CI)
+    # internally save/restore xlim around their plot() calls which on
+    # some matplotlib versions silently reverts the scale to linear.
+    # This final pass guarantees the rendered axis is log for every
+    # log_uniform-prior parameter, regardless of intermediate changes.
+    _set_log_axes_for_log_uniform_priors(axes_df, plot_params, prior_map)
     has_any_rejected = _overlay_rejected_anesthetic(
         axes_df,
         result,
