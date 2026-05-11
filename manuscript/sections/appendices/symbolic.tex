@@ -1,4 +1,4 @@
-% Appendix B: Symbolic computation of the equations of motion (~1600 w).
+% Appendix B: Symbolic computation of the equations of motion (~1850 w).
 % Per genre_conventions_software.md §(i). Renamed from "Symbolic stage"
 % — the BHL convention is content-bearing names (compare PSALTer v2's
 % "Construction of operators", "Moore--Penrose pseudoinversion") rather
@@ -7,51 +7,279 @@
 \section{Symbolic computation of the equations of motion}%
 \label{SymbolicComputation}
 
+The symbolic side of \TIDAL{} converts a Lagrangian, a background ansatz,
+and a parameter set into a JSON specification of the linearised field
+equations and the Hamiltonian density.
+\cref{Architecture} sets out the high-level pipeline, with the data-flow
+diagram shown in \cref{ArchitectureDiagram};
+\cref{ComputationalApproach} gives the body's one-paragraph overview,
+and the equation outputs for the surveyed theories are collected in
+\cref{SymbolicOutputs}.
+We document the symbolic stages here in detail because every partial
+differential equation evolved by the numerical solver of
+\cref{NumericalEvolution} is the output of these stages, so the contents
+of \cref{NumericalEvolution} depend on the pipeline described below
+being trusted.
+
 \paragraph*{xAct environment}
-% TODO: which packages are loaded; why \xPert is used for metric
-% perturbations (not xTens alone); why xTras is needed for the
-% Einstein–Cartan coupling.
+The symbolic stage runs in \Mathematica{}~\cite{mathematica} on the
+\xAct{}~\cite{martingarcia2007xact} suite, which provides the
+abstract-index tensor algebra, automatic component decomposition, and
+perturbation-theory machinery we require.
+Three \xAct{} packages are loaded: \texttt{xTensor} for abstract-index
+algebra and the functional derivative \texttt{VarD};
+\xPert{}~\cite{brizuela2009xpert} for metric perturbation theory through
+\texttt{DefTensorPerturbation}; and \xTras{}~\cite{nutma2014xtras} for
+the Einstein--Cartan operators that include the torsion-inclusive
+covariant derivative used throughout the PGT theories of
+\cref{PGTBackground}.
+Two further \xAct{} packages, \texttt{xCoba} for charts and
+\texttt{xPerm} for index symmetries, enter as transitive dependencies of
+the first three.
+The manifold, metric, Levi-Civita and Riemann--Cartan covariant
+derivatives, and the torsion tensor are declared once at session start;
+the Christoffel components, inverse-metric components, and Levi-Civita
+tensor are precomputed for the declared metric and substituted from the
+cache at every later stage that needs them, so the geometric setup pays
+its cost once per theory rather than once per equation.
 
 \paragraph*{Lagrangian input from TOML}
-% TODO: how a TOML config becomes a Wolfram session; representative
-% user-session listing showing how to invoke `tidal derive`.
+The theory is specified by a single TOML file, which isolates everything
+theory-dependent from the derivation pipeline so the same code can serve
+any quadratic Lagrangian without per-theory editing.
+The TOML declares the spacetime (dimension, signature, coordinate
+names); the dynamical fields, with their tensor type and index
+symmetries; any algebraically-derived tensors such as the
+electromagnetic field strength $\FieldF{_\mu_\nu}$; the background
+fields; the parameter symbol set; the Lagrangian expression in
+\xAct{} syntax; and optional blocks for gauge fixing, linearisation,
+and perturbative reduction.
+Parameters are carried symbolically through the entire pipeline, so a
+numerical value supplied at run time selects values without
+re-derivation.
+A hash of the TOML and the pipeline version keys a derivation cache,
+ensuring that an unchanged input never re-derives and that every
+numerical result can be reproduced from its source declaration.
+The pipeline as a whole is therefore the map
+\begin{align*}
+  \textsc{TOML}\!\bigl[\mathcal{L},\,\{\varphi_i\},\,\{p_a\}\bigr]
+  \;\longmapsto\;
+  \textsc{JSON}\!\bigl[\{\textsf{EOM}_i\},\,\mathcal{H}\bigr],
+\end{align*}
+whose internal stages occupy the rest of this appendix.
+
+\paragraph*{Linearisation around backgrounds}
+The pipeline implements the background-and-perturbation decomposition
+of \cref{Linearisation} by expanding the action to second order in the
+perturbations using \xPert{}~\cite{brizuela2009xpert}, with each
+dynamical field perturbed independently around its declared background.
+The multi-field generalisation, in which the metric and the matter
+fields are perturbed simultaneously, is what makes the Gertsenshtein
+conversion calculation possible within a general-purpose pipeline.
+
+For each field the perturbation is registered as a tensor in \xAct{}:
+the metric carries one through \texttt{SetupMetricPerturbation}, and
+each matter field $\varphi_i$ declared in the
+\texttt{[[linearization.matter\_perturbations]]} TOML block carries one
+through \texttt{DefTensorPerturbation}, yielding
+\begin{align}
+  g_{\mu\nu} = \eta_{\mu\nu} + \varepsilon\,h_{\mu\nu},
+  \qquad
+  \varphi_i = \bar{\varphi}_i + \varepsilon\,\delta\varphi_i,
+  \label{MultiFieldPerturbation}
+\end{align}
+which is the pipeline-side reading of \cref{PerturbationAnsatz}.
+Backgrounds are supplied separately through
+\texttt{[[background\_fields]]}, with their component values fixed by
+\texttt{xCoba}'s \texttt{ComponentValue} declarations --- for example
+$\bar{A}_y = -\Bzero\,z$ for the uniform magnetic background of the
+Gertsenshtein analysis.
+The quadratic action is built by applying \texttt{Perturbation} of
+order two to $\sqrt{-g}\,\mathcal{L}$ followed by
+\texttt{ExpandPerturbation}; pure second-order perturbations are
+dropped because \TIDAL{} operates exclusively in the linearised regime,
+leaving
+\begin{align}
+  \mathcal{L}^{(2)}
+  \;=\;
+  \textsf{ExpandPerturbation}\!\bigl[
+    \textsf{Perturbation}[\sqrt{-g}\,\mathcal{L},\,2]
+  \bigr]\Big|_{\textsf{LI}[2]\,\mapsto\,0}.
+  \label{QuadraticAction}
+\end{align}
+
+Antisymmetric derived tensors whose definition references a
+perturbation field --- most prominently
+$\FieldF{_\mu_\nu} = \rcD{_\mu}\FieldA{_\nu} - \rcD{_\nu}\FieldA{_\mu}$
+when $\FieldA{}$ is itself a matter perturbation --- must remain
+abstract through the perturbation expansion and be substituted only
+afterwards.
+Without this deferral, the canonicalisation step that follows collapses
+the antisymmetric kinetic structure to zero before perturbation indices
+are assigned, and the photon equations emerge as non-dynamical
+constraints.
+The pipeline detects deferral candidates automatically from the TOML
+symmetry annotation and threads them through the expansion as abstract
+tensors with their own \texttt{DefTensorPerturbation} registration.
+The remaining abstract covariant derivatives of background tensors are
+resolved against the \texttt{ComponentValue} declarations once the
+equations have been decomposed onto the chart
+(\cref{ComponentDecomposition}), so $\rcD{_z}\bar{A}_y = -\Bzero$ for
+the uniform background and a coordinate-dependent expression for a
+localised one --- the mechanism by which position-dependent coupling
+coefficients enter the JSON specification without special-casing in
+the solver.
 
 \paragraph*{Euler--Lagrange derivation}
-% TODO: E-L velocity form (state, v, A0); not Legendre transform.
+The field equation for every dynamical perturbation is obtained by
+variational differentiation of the quadratic action $\mathcal{L}^{(2)}$
+built in \cref{QuadraticAction}: for fields $\{\varphi_i\}$ of arbitrary
+tensor type, the equation of motion is
+\begin{align}
+  \frac{\partial \mathcal{L}^{(2)}}{\partial \varphi_i}
+  \;-\; \rcD{_\mu}\!\frac{\partial \mathcal{L}^{(2)}}{\partial(\rcD{_\mu}\varphi_i)}
+  \;+\; \rcD{_\mu}\rcD{_\nu}\!\frac{\partial \mathcal{L}^{(2)}}{\partial(\rcD{_\mu}\rcD{_\nu}\varphi_i)}
+  \;-\; \cdots \;=\; 0,
+  \label{EulerLagrange}
+\end{align}
+where the series terminates at the highest derivative order present in
+$\mathcal{L}^{(2)}$.
+This is the only stage of the pipeline that consumes the Lagrangian as
+a single object; every later stage operates on the equations themselves.
+The differentiation is performed by \xAct{}'s
+\texttt{VarD}~\cite{martingarcia2007xact}, which handles the chain rule
+and integration-by-parts for arbitrary tensor structure and arbitrary
+derivative chains, and returns the equation in abstract-index form
+before any component reduction.
 
-\paragraph*{Component decomposition}
-% TODO: DecomposeToComponents, cross-field handling via additionalFields.
-% Brief note on why component-level E-L is required.
+The equations are kept in second-order velocity form, with explicit
+velocity slots $v_i = \partial_t\varphi_i$ alongside the fields and
+additional zero-time-order slots for any gauge-potential temporal
+components, rather than passed through a Legendre transform to a
+Hamiltonian system.
+This choice preserves the algebraic structure of constraint fields,
+which the Legendre transform mangles, and lets the downstream solver
+dispatcher read the time-derivative order off each field's equation
+directly --- a property the SUNDIALS DAE
+backend~\cite{hindmarsh2005sundials} of \cref{NumericalEvolution} relies
+on.
+The Hamiltonian density is built separately and used only for energy
+diagnostics, not for evolution; it is the canonical block of the JSON
+specification described below.
+For Lagrangians containing higher-curvature terms multiplied by a small
+parameter, which generate equations of motion of order higher than two
+in time, the pipeline applies a perturbative substitution before the
+variation; we defer the algorithm, its scope, and the structural
+obstruction that limits it to \cref{ConstraintBarrier}.
 
-% Placeholder for the gauge-fixing methodology. Source content in
-% docs/tex/gauge_fixing.tex (the named presets — lorenz, de_donder,
-% temporal, coulomb, axial, tt — and the custom Lagrangian-term
-% mechanism for arbitrary user-specified gauges). Topics to cover when
-% authored: the two mechanisms (gauge-fixing term added to the
-% Lagrangian before E-L vs. constraint imposed after E-L); the named
-% presets; how custom gauges are declared; how the choice interacts
-% with the constraint elimination in the JSON export.
-% Cross-referenced from \cref{Architecture}.
+\paragraph*{Component decomposition}%
+\label{ComponentDecomposition}
+The abstract-index equations returned by \texttt{VarD} are reduced to
+scalar component equations on the declared chart before numerical
+evaluation.
+Four operations are performed in sequence: the metric is separated
+from any contracted indices so that the chart conversion can act on
+each leg independently; the expression is converted to chart
+components by \texttt{ToBasis}; repeated indices are summed by
+\texttt{TraceBasisDummy}; and the abstract covariant derivative is
+converted to partial derivatives plus the appropriate connection
+corrections, with the Christoffel and contortion components drawn from
+the geometric cache established at session start.
+The cache specialises to vanishing Christoffels whenever the declared
+metric matrix has no coordinate dependence, and to vanishing contortion
+whenever the theory has no torsion, so the routine produces the
+simplest expression compatible with the declared geometry.
+Canonicalisation of the full quadratic Lagrangian is performed in a
+single pass rather than by batching across additive terms, because
+batched canonicalisation can collapse antisymmetric kinetic structure
+that spans multiple summands; an \texttt{Expand}-only fallback is used
+when the single pass exceeds the canonicalisation timeout, with
+per-component canonicalisation in the chart-conversion step recovering
+the canonical form downstream.
+
 \paragraph*{Gauge fixing}%
 \label{GaugeFixing}
-% TODO: synthesise from docs/tex/gauge_fixing.tex.
+Gauge-symmetric Lagrangians require an additional condition to remove
+the redundant degrees of freedom and render the kinetic operator
+invertible.
+The pipeline supports two structurally distinct mechanisms because
+some gauges are most naturally imposed before the Euler--Lagrange
+variation and others after.
+
+The first mechanism adds a gauge-fixing term to the Lagrangian before
+variation.
+For a vector field $\FieldA{_\mu}$, the Lorenz gauge is realised by the
+augmentation
+\begin{align}
+  \mathcal{L} \;\longrightarrow\;
+  \mathcal{L} \;-\; \frac{1}{2\xi}\bigl(\rcD{_\mu}\FieldA{^\mu}\bigr)^{2},
+  \label{LorenzGauge}
+\end{align}
+with the gauge parameter $\xi$ controlling the weight of the residual
+symmetry; the augmented Lagrangian then enters the variational
+pipeline in the usual way.
+The second mechanism imposes a constraint on the field components
+after decomposition, as in the transverse-traceless prescription that
+sets $h_{0\mu} = 0$ and $h^\mu{}_\mu = 0$ on the metric-perturbation
+components --- a constraint expressible only at the component level
+because it refers to component indices, not abstract ones.
+
+Six named presets cover the gauges in routine use: Lorenz for vector
+fields, de Donder for the metric perturbation, Coulomb for the spatial
+part of a vector field, temporal ($A_0 = 0$), axial ($A_3 = 0$), and
+transverse-traceless.
+Arbitrary user-specified gauges are declared by writing the gauge
+expression directly in the \texttt{[[gauge]]} TOML block, which is
+treated as either a Lagrangian term or a component constraint
+according to a flag.
+The choice of gauge interacts with the constraint elimination performed
+at the numerical-evolution stage: gauge-fixed kinetic operators
+sometimes still produce equations of zeroth time-derivative order,
+which the JSON-export step identifies and which the constraint
+pre-solve of \cref{NumericalEvolution} handles before the system is
+integrated.
 
 \paragraph*{JSON export}
-% TODO: which fields are written; how the canonical block is constructed.
+The symbolic stage terminates by writing a JSON specification, the
+sole interface to the numerical side of \TIDAL{}; fixing this interface
+cleanly is what allows parameter sweeps and grid changes without
+re-derivation.
+The specification has five top-level entries: a spacetime block
+(dimension, signature, coordinate names); the field list, with each
+field's time-derivative order recorded explicitly --- two for
+wave-like, one for first-order, zero for constraint; the equations,
+each carried as a linear combination of named differential operators
+acting on the dynamical fields with parameter-dependent coefficients;
+the canonical block, which holds the Hamiltonian density in the same
+operator format and is used for energy diagnostics; and a metadata
+block recording the source Lagrangian, the gauge, the linearisation
+flag, the parameter values, and a derivation hash.
+The operator alphabet --- identity, full and directional Laplacians,
+directional gradients, mixed cross-derivatives, a first-order time
+derivative, the biharmonic, and a generic mixed-derivative form --- is
+fixed and small.
+Each term carries both its numerical coefficient and its symbolic
+expression, so a runtime parameter override never regenerates the
+JSON; the equation specification is the centre arrow of
+\cref{ArchitectureDiagram}.
 
 \paragraph*{Failure modes and diagnostics}
-% TODO: derivation timeouts, index inconsistency, malformed JSON; how
-% each is diagnosed.
-
-% Placeholder for the perturbative-reduction discussion. Source content in
-% docs/tex/perturbative_reduction_constraint_barrier.tex (~550 lines).
-% Topics to cover when authored: the constraint-promotion barrier (a
-% small parameter promoting an algebraic constraint to a dynamical
-% field), Ostrogradsky / Parker–Simon / JLM failure modes, structural
-% analogues (vDVZ discontinuity, Boulware–Deser non-decoupling,
-% Maxwell–Proca reclassification), and open research directions.
-% Cross-referenced from \cref{Architecture} for the higher-derivative
-% terms in the quadratic PGT action.
-\paragraph*{Perturbative reduction and constraint promotion}%
-\label{PerturbativeReduction}
-% TODO: synthesise from docs/tex/perturbative_reduction_constraint_barrier.tex.
+The symbolic stage has three classes of failure that the pipeline
+detects and surfaces as derivation artefacts rather than as silent
+numerical pathologies downstream.
+The canonicalisation of the full quadratic Lagrangian is super-linear
+in term count, and the default six-hundred-second ceiling triggers
+the \texttt{Expand}-only fallback noted at
+\cref{ComponentDecomposition} --- equivalent on linear theories, and
+cheaper.
+Malformed Lagrangians, such as free-index miscounts or contractions
+across symbolic dummies that \xAct{} cannot resolve, are caught by
+\xAct{}'s built-in index-validation pass and reported with the
+offending term.
+A post-export validator confirms that every operator and field
+reference is known and that the canonical block matches the kinetic
+structure implied by the field list's time-derivative orders; failures
+point the user to the responsible Lagrangian term.
+Surfacing failures here, rather than in the numerical stage, is what
+made the surveys of \cref{Results} tractable; the complementary
+numerical-validation pass of \cref{Validation} catches the remainder.
