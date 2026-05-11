@@ -19,10 +19,9 @@
 equation specification produced by~\cref{SymbolicComputation} and
 evolves the linearised fields on a Cartesian grid. \TIDAL{} is
 designed for arbitrary tensor Lagrangians on flat or curved
-backgrounds; theory-by-theory validation against analytic limits and
-reference models is collected in~\cref{Validation}, and the
-symbolic-pipeline outputs for the surveyed theories are tabulated
-in~\cref{SymbolicOutputs}. The arrangement consists of a shared
+backgrounds; validation against analytic limits is collected
+in~\cref{Validation}, and the symbolic-pipeline outputs for the
+surveyed theories are tabulated in~\cref{SymbolicOutputs}. The arrangement consists of a shared
 substrate (state layout, spatial operators, coefficient cache) and a
 dispatcher that selects among several solver backends from the
 algebraic structure of the equation system. The Fourier modal solver
@@ -36,14 +35,12 @@ sectors require simultaneous algebraic-and-differential
 solution~\cite{henneaux1992quantization}; pure wave systems benefit
 from explicit symplectic integration when long-time energy
 conservation matters more than tolerance control; dissipative
-parabolic systems break the symplectic structure and call for
-implicit methods; and curved-metric systems require
-position-dependent coefficient evaluation. A single backend cannot
-serve all four classes. The dispatcher \lstinline!_resolve_scheme!
-traverses the eligibility predicates in order, returning the first
-match. The full decision tree, including the modal eligibility
-sub-checks, is shown in~\cref{SolverDispatchFlowchart}; in summary
-the rules are:
+parabolic systems call for implicit methods; and curved-metric
+systems require position-dependent coefficient evaluation. The
+dispatcher \lstinline!_resolve_scheme! selects the first applicable
+backend from the following ordered rules; the full decision tree,
+including the modal eligibility sub-checks, is shown
+in~\cref{SolverDispatchFlowchart}:
 \begin{enumerate}
   \item \textbf{Modal} when the metric is flat, the boundaries are
     all periodic, the coefficients are time-independent, and every
@@ -59,9 +56,8 @@ the rules are:
     (\lstinline!time_order!~$=1$) equations, since adaptive implicit
     integration is preferred for diffusive and transport equations.
   \item \textbf{IDA} when any right-hand-side carries a
-    \lstinline!first_derivative_t! operator, since dissipation breaks
-    the symplectic structure on which a conservative integrator would
-    rely.
+    \lstinline!first_derivative_t! operator (dissipation, handled by
+    implicit BDF rather than the symplectic path).
   \item \textbf{CVODE} (SUNDIALS adaptive ODE,
     BDF~\cite{hindmarsh2005sundials}) when none of the above
     predicates holds and the system is a pure second-order wave.
@@ -119,11 +115,11 @@ time-derivative order of its equation of motion:
     --- typically a Helmholtz or Poisson equation --- against the
     current values of the other fields in the system.
 \end{enumerate}
-Familiar examples of the constraint class are the Maxwell scalar
+A familiar example of the constraint class is the Maxwell scalar
 potential $A_0$, which in the Lorenz gauge satisfies an instantaneous
-Helmholtz equation $(\nabla^2 - m^2) A_0 = $~source rather than a wave
-equation, and the lapse and shift of an ADM decomposition, both of
-which appear as Lagrange multipliers in the Einstein--Hilbert action.
+Helmholtz equation $(\nabla^2 - m^2)\, A_0 = \mathcal{S}[A_i]$, with
+the source $\mathcal{S}[A_i]$ supplied by the spatial components of
+the dynamical photon field, rather than a wave equation.
 For a wave field, the kinematic identity is
 \begin{align}
   \partial_t \varphi = v_\varphi
@@ -137,10 +133,10 @@ in the field and velocity slots respectively.
 
 \paragraph*{Velocity form versus canonical phase space} Writing the
 quadratic kinetic operator $\mathcal{K}$ of~\cref{KineticMatrix} as a
-polynomial in time derivatives, its leading $\partial_t^2$ block is a
-coefficient matrix $K_{ij}$ --- the Hessian of the linearised
+polynomial in time derivatives, its leading $\partial_t^2$ block is
+the kinetic matrix $K_{ij}$, defined as the Hessian of the linearised
 Lagrangian density with respect to the field
-velocities~\cite{henneaux1992quantization} ---
+velocities~\cite{henneaux1992quantization},
 \begin{align}
   K_{ij} \equiv \frac{\partial^2 \lag}{\partial(\partial_t \varphi_i)\,
     \partial(\partial_t \varphi_j)}
@@ -288,13 +284,14 @@ that specifies the Fourier multiplier and time-derivative order, and
 the corresponding ghost-cell stencil in \lstinline!tidal.solver.operators!;
 the analytical-Jacobian sparsity pattern and the constraint pre-solver
 inherit the registration automatically. Operators with time-derivative
-order three or four (\lstinline!d3_t!, \lstinline!d4_t!, and the
-\lstinline!mixed_T3_*!, \lstinline!mixed_T4_*! families) arise in
-theories with higher-derivative kinetic terms such as the
+order three or four ($\partial_t^3$, $\partial_t^4$, and the mixed
+families $\partial_t^3 \partial_a$, $\partial_t^4 \partial_a$,
+$\partial_t^4 \partial_a \partial_b$, named in~\cref{OperatorCatalogue})
+arise in theories with higher-derivative kinetic terms such as the
 $b_5\,\tilde R^2$ correction. They are handled by the
-perturbative-reduction scheme described in~\cref{LPSReduction}; they
-never appear as kinetic terms in the second-order base system that
-the modal solver evolves.
+perturbative-reduction scheme described in~\cref{ConstraintBarrier};
+they never appear as kinetic terms in the second-order base system
+that the modal solver evolves.
 
 % Figure C.1 — Operator catalogue.
 \begin{figure*}[t]
@@ -311,7 +308,7 @@ the modal solver evolves.
     stiffness matrix $K$, the damping matrix $D$, the mass matrix
     $M$, and the jerk matrix $J$). The \lstinline!d4_t! and
     \lstinline!mixed_T4_*! operators appear only as source terms in the
-    perturbative-reduction pipeline of~\cref{LPSReduction},
+    perturbative-reduction pipeline of~\cref{ConstraintBarrier},
     and are excluded from the second-order base system that the modal
     solver evolves.}
   \label{OperatorCatalogue}
@@ -356,40 +353,48 @@ six-field Einstein--Maxwell pair of~\cref{Results}; the analogous
 matrix for the full quadratic Poincar\'e gauge theory plus
 electromagnetism is block-diagonalised by the parity decomposition of
 \cref{ChannelStructure} but otherwise has the same structure. The
-inverse FFT recovers the time-domain state. The wall time is $O(1)$ in
-the integration endpoint $t_{\rm end}$ once the per-mode exponentials
-are precomputed: every output snapshot is then a single
-matrix--vector product per mode.
+wall time is $O(1)$ in the integration endpoint $t_{\rm end}$ once
+the per-mode exponentials are precomputed: every output snapshot is
+then a single matrix--vector product per mode. When some coefficients
+are position-dependent, the per-mode decoupling fails and the
+evolution is computed instead by Krylov action on the full
+mode-coupled matrix; that path is described below.
 
 \paragraph*{Pad\'e scaling and squaring} The per-mode matrix
 exponential in~\cref{ModalPerMode} is computed via the Pad\'e
 scaling-and-squaring method of
-\lstinline!scipy.linalg.expm!~\cite{higham2009scaling}. We do not employ
-the eigendecomposition $M(k) = V D V^{-1}$ with $\exp(M t) =
-V \exp(D\, t) V^{-1}$ because the eigenvector matrix $V$ becomes
-ill-conditioned for several cases of interest in the Poincar\'e
-gauge sector: small parameter detunings produce near-degenerate
-eigenvalues, and the worst-case condition number
-$\operatorname{cond}(V)$ can exceed $10^{13}$ on theories with
-cross-coupling. At that conditioning the diagonalisation accumulates
-roundoff far above the level at which backward-stable
+\lstinline!scipy.linalg.expm!~\cite{higham2009scaling}. We do not
+employ the eigendecomposition $M(k) = V D V^{-1}$ with
+$\exp(M t) = V \exp(D\, t) V^{-1}$ because the eigenvector matrix $V$
+becomes ill-conditioned for several cases of interest in the
+Poincar\'e gauge sector: near-degenerate eigenvalues arise from a
+variety of sources --- gauge orbits, accidental kinematic
+degeneracies between coupled fields, and small-parameter detunings
+of mass terms --- and the worst-case condition number
+$\operatorname{cond}(V)$ can exceed $10^{13}$ on the multi-field
+theories of~\cref{Results}. At that conditioning the diagonalisation
+accumulates roundoff far above the level at which backward-stable
 matrix-exponential algorithms remain
 accurate~\cite{higham2008functions,molervanloan2003nineteen,golub2013matrix,trefethen1997numerical};
 \cite{higham2008functions}~\S 2.3 records the cond-$V$ abandonment
 threshold above which diagonalisation should be replaced by a
 backward-stable scheme, and we adopt that recommendation. The Pad\'e
-path is by contrast robust at arbitrary $\operatorname{cond}(V)$. The
-wall-time penalty for adopting it is modest: on three representative
-campaign theories the ratio of Pad\'e wall time to the former
-eigendecomposition wall time lies in the interval $0.49$--$1.06$
-(\cref{tab:PadeBenchmark}), so we incur no significant performance
-cost in exchange for the robustness guarantee. The eigendecomposition
-path remains available internally for the closed-form Duhamel kernel
-used in the perturbative-reduction pipeline
-of~\cref{LPSReduction}, which requires the per-eigenmode
-expansion explicitly.
+path is by contrast robust at arbitrary
+$\operatorname{cond}(V)$~\cite{higham2009scaling,higham2008functions}.
+The wall-time penalty for adopting it is modest: on three
+representative campaign theories the ratio of Pad\'e wall time to the
+former eigendecomposition wall time lies in the interval
+$0.49$--$1.06$ (\cref{tab:PadeBenchmark}), so we incur no significant
+performance cost in exchange for the robustness guarantee. The
+eigendecomposition path remains available internally for the
+closed-form Duhamel kernel used in the perturbative-reduction
+pipeline of~\cref{ConstraintBarrier}, which requires the
+per-eigenmode expansion explicitly.
 
 % Table C.PadeBenchmark — wall-time comparison.
+% TODO: extend the Pade-vs-eig benchmark to more theories
+% (gertsenshtein_localised, torsion_gertsenshtein, plasma_dispersion);
+% ideally five-to-eight rows spanning the operator regimes.
 \begin{table}[t]
   \centering
   \begin{tabular}{lcccc}
@@ -405,12 +410,12 @@ expansion explicitly.
     (\lstinline!scipy.linalg.expm!) relative to the former
     eigendecomposition path on three representative theories. All
     figures are per-mode times averaged over the active modes after
-    the block decomposition described in the next paragraph, on a
-    single-core run; the methodology is recorded in
-    \texttt{docs/tex/modal\_solver.tex}~\S\textit{Robust Matrix
-    Exponential Evolution}. The ratio is always within a factor of
-    two and frequently below unity, confirming that Pad\'e robustness
-    is acquired at negligible average cost.}
+    block decomposition, on a single-core run; the algorithmic basis
+    is Higham's scaling-and-squaring with backward-error
+    truncation~\cite{higham2009scaling}, applied independently to
+    each per-mode block. The ratio is always within a factor of two
+    and frequently below unity, confirming that Pad\'e robustness is
+    acquired at negligible average cost.}
   \label{tab:PadeBenchmark}
 \end{table}
 
@@ -419,21 +424,25 @@ inherits the block structure of the underlying coupled-field
 equations. A typical multi-field theory decomposes into several
 decoupled sub-blocks --- for example, the $h_\times\!\leftrightarrow\!
 a_y$ graviton--photon pair separates from the trace--vector torsion
-channel at the linear level --- and processing such a block-diagonal
-matrix as a single dense object would waste both wall time (since the
-per-mode \lstinline!expm! cost scales as $O(b^3)$ in the block size $b$)
-and conditioning. We therefore precompute the block decomposition:
-slots $i$ and $j$ are deemed coupled if $|M_{ij}|$ exceeds a heuristic
-cut-off of $10^{-14}\!\cdot\!\max|M|$ or $|M_{ji}|$ exceeds the same
-cut-off, and a union-find with path compression collects the resulting
-graph into connected components. The exponential is then applied
-block-by-block: a single dense $12\!\times\!12$ block resolved into
-two independent $6\!\times\!6$ blocks saves a factor of four in the
-per-mode cost, and we observe both the speed-up and an unconditional
-improvement in numerical conditioning. The block decomposition is
-retained under the Pad\'e path of the previous paragraph for the same
-reason; the union-find threshold is an engineering heuristic and is
-deliberately conservative.
+channel at the linear level (see~\cref{ChannelStructure} for the
+numerical demonstration on the survey theories) --- and processing
+such a block-diagonal matrix as a single dense object would waste
+both wall time (since the per-mode \lstinline!expm! cost scales as
+$O(b^3)$ in the block size $b$) and conditioning. We therefore
+precompute the block decomposition: slots $i$ and $j$ are deemed
+coupled when either off-diagonal entry $M_{ij}$ or $M_{ji}$ exceeds
+a heuristic cut-off of $10^{-14}\,\max|M|$ in absolute value (the
+kinetic matrix is not in general symmetric on multi-field theories
+with non-symmetric kinetic structure), and a union-find with path
+compression~\cite{tarjan1975unionfind} collects the resulting
+coupling graph into connected components. The exponential is then
+applied block-by-block: a single dense $12\!\times\!12$ block
+resolved into two independent $6\!\times\!6$ blocks saves a factor
+of four in the per-mode cost, and we observe both the speed-up and
+an unconditional improvement in numerical conditioning. The block
+decomposition is retained under the Pad\'e path of the previous
+paragraph for the same reason; the union-find threshold is an
+engineering heuristic and is deliberately conservative.
 
 \paragraph*{Constraint elimination via Fourier Schur complement}
 When the equation system carries algebraic constraints
@@ -592,11 +601,10 @@ the cost from six force evaluations per outer step to three plus one
 initialiser. Both integrators preserve a shadow Hamiltonian to
 machine precision and exhibit zero secular energy drift over arbitrary
 integration times~\cite{hairer2006geometric}. We retain the leapfrog
-backend as an opt-in scheme (\lstinline!--scheme leapfrog!) for long-time
-conservative runs in which the energy-drift guarantee matters more
-than tolerance control; the dispatcher never selects it automatically,
-because the adaptive solvers are a safer default on systems whose
-stability properties are not yet understood.
+backend as an opt-in scheme (\lstinline!--scheme leapfrog!) for
+long-time conservative runs; the dispatcher never selects it
+automatically, because the adaptive solvers are a safer default on
+systems whose stability properties are not yet understood.
 
 \paragraph*{\SciPy{} --- general-purpose adaptive ODE} The \SciPy{}
 backend wraps \lstinline!scipy.integrate.solve_ivp!~\cite{virtanen2020scipy},
