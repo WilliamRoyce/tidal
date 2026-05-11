@@ -35,6 +35,26 @@
 \usepackage{xspace}
 \usepackage{listings}
 
+% --- Inline-code styling for source-code identifiers (\lstinline) ---
+% Matches the Hamilcar / PSALTer v1 / PSALTer v2 shared baseline for
+% \lstinline rendering. Settings sourced from:
+%   literature/2512.25007/MacrosLstListings.tex (Hamilcar)
+%   literature/2406.09500/MacrosLstListings.tex (PSALTer v1)
+%   literature/2506.02111/MacrosLstListings.tex (PSALTer v2)
+% HiGGS (literature/2206.00658) omits this configuration because its
+% Wolfram identifiers are camelCase; our manuscript cites Python
+% identifiers with underscores and dots that need the explicit
+% settings below. A full \lstdefinelanguage[TIDAL]{Python} keyword
+% table is tracked as a future enhancement (see GitHub issue).
+\usepackage{upquote}
+\lstset{
+  basicstyle=\ttfamily,
+  columns=flexible,
+  extendedchars=true,
+  tabsize=4,
+  upquote=true,
+}
+
 % References
 \usepackage[colorlinks=true,allcolors=blue]{hyperref}
 \usepackage{cleveref}

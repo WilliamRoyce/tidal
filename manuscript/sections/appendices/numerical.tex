@@ -18,32 +18,30 @@
 \paragraph*{Overview} The numerical stage of \TIDAL{} consumes the
 equation specification produced by~\cref{SymbolicComputation} and
 evolves the linearised fields on a Cartesian grid. \TIDAL{} is designed
-to support arbitrary tensor Lagrangians on either flat or curved
-backgrounds --- the example library includes scalar and vector fields
-on Minkowski, Klein--Gordon evolution on stereographic $S^2$,
-cylindrical coordinates, linearised gravity in transverse--traceless
-gauge, and the multi-field Poincar\'e gauge theories that occupy
-\cref{Results} --- and the numerical architecture is arranged around
-this generality rather than around any specific theory class. The
-arrangement consists of a shared substrate (state layout, spatial
-operators, coefficient cache) and a dispatcher that selects among
-several solver backends from the algebraic structure of the equation
-system. The Fourier modal solver of~\cref{ModalSolver} is the primary
-backend, and is auto-selected for every survey reported in
-\cref{Results}; the supporting infrastructure of state layout, spatial
-discretisation, constraint initialisation, and analytical Jacobian is
-described in the remaining subsections.
+for arbitrary tensor Lagrangians on flat or curved backgrounds; the
+numerical pipeline is generic in the equation specification it
+consumes. Theory-by-theory validation against analytic limits and
+reference models is collected in~\cref{Validation}, and the
+symbolic-pipeline outputs for the surveyed theories are tabulated
+in~\cref{SymbolicOutputs}. The arrangement consists of a shared
+substrate (state layout, spatial operators, coefficient cache) and a
+dispatcher that selects among several solver backends from the
+algebraic structure of the equation system. The Fourier modal solver
+of~\cref{ModalSolver} is the primary backend, and is auto-selected for
+every survey reported in~\cref{Results}; the supporting infrastructure
+of state layout, spatial discretisation, constraint initialisation,
+and analytical Jacobian is described in the remaining subsections.
 
-\paragraph*{Solver selection hierarchy} The architectural reason for
-multiple backends is that the equation systems \TIDAL{} must handle
-form a heterogeneous family. Differential--algebraic equations arising
-from gauge sectors require simultaneous algebraic-and-differential
-solution; pure wave systems benefit from explicit symplectic
-integration when energy conservation matters more than tolerance
-control; dissipative parabolic systems break the symplectic structure
-and call for implicit methods; and curved-metric systems require
+\paragraph*{Solver selection hierarchy} \TIDAL{} provides several
+solver backends because the equation systems it handles form a
+heterogeneous family. Differential--algebraic equations from gauge
+sectors require simultaneous algebraic-and-differential solution; pure
+wave systems benefit from explicit symplectic integration when
+long-time energy conservation matters more than tolerance control;
+dissipative parabolic systems break the symplectic structure and call
+for implicit methods; and curved-metric systems require
 position-dependent coefficient evaluation. A single backend cannot
-serve all four. The dispatcher
+serve all four classes. The dispatcher
 \lstinline!_resolve_scheme! (in \lstinline!tidal.cli._simulate!)
 traverses the eligibility predicates in order, returning the first
 match. The full decision tree, including the modal eligibility
@@ -52,9 +50,9 @@ rules are:
 \begin{enumerate}
   \item \textbf{Modal} when the metric is flat, the boundaries are
     all periodic, the coefficients are time-independent, and every
-    right-hand-side operator has an exact Fourier multiplier; algebraic
-    constraints, when present, are eliminated by a per-mode Schur
-    complement step before the matrix exponential is applied.
+    right-hand-side operator has an exact Fourier multiplier;
+    algebraic constraints, when present, are eliminated per-mode by
+    Schur complement before the exponential (\cref{ModalSolver}).
   \item \textbf{IDA} (SUNDIALS differential--algebraic, BDF orders
     $1$--$5$~\cite{hindmarsh2005sundials}) when the modal eligibility
     fails and the system carries equations with
@@ -99,15 +97,19 @@ rules are:
 \label{EquationSubstrate}
 
 \paragraph*{Euler--Lagrange velocity form} \TIDAL{} stores the
-simulation state in the Euler--Lagrange velocity form, comprising
-primary fields $q$ and their time derivatives $v_q \equiv \partial_t q$
-for second-order equations, together with constraint multipliers
-$\Phi$ for fields whose equations of motion are algebraic
-(\texttt{time\_order}~$=0$, i.e.\ Lagrange multipliers and gauge
-fields with degenerate temporal kinetic term). For a second-order
-equation $\partial_t^2 \varphi = L[\varphi]$ on a foliation of
-constant-$t$ slices, the substrate carries
-$(\varphi, v_\varphi)$ together with the kinematic identity
+simulation state in the Euler--Lagrange velocity form, comprising the
+primary fields $q$ and their time derivatives
+$v_q \equiv \partial_t q$ for second-order equations, together with a
+separate slot family for those fields whose equations of motion are
+algebraic (\texttt{time\_order}~$=0$) rather than evolution laws.
+Familiar examples of this last class are the Maxwell scalar potential
+$A_0$, which in the Lorenz gauge satisfies an instantaneous Helmholtz
+equation rather than a wave equation, and the lapse and shift of an
+ADM decomposition. We refer to this third class collectively as the
+\emph{constraint fields}. For a second-order equation
+$\partial_t^2 \varphi = L[\varphi]$ on a foliation of
+constant-$t$ slices, the substrate carries $(\varphi, v_\varphi)$
+together with the kinematic identity
 \begin{align}
   \partial_t \varphi = v_\varphi
   \, ,
@@ -116,26 +118,35 @@ $(\varphi, v_\varphi)$ together with the kinematic identity
   \, ,
   \label{ELVelocityForm}
 \end{align}
-in the field and velocity slots respectively. The choice of
-$(q, v, \Phi)$ rather than the canonical phase-space pair $(q, p)$ is
-deliberate: for many of the Lagrangians in our surveys --- those
-containing degenerate Hessians, higher-derivative sectors with
-Ostrogradsky pathology, or constraint-promotion structures of the
-Ja\'en--Llosa--Molina type --- the Legendre transform is either not
-unique or genuinely unavailable, and the canonical formulation
-becomes an obstruction rather than a convenience. These obstructions
-are catalogued in~\cref{ConstraintBarrier}, alongside the structural
-analogues in massive gravity (vDVZ, Boulware--Deser) and the
-Maxwell--Proca reclassification. Even when the canonical form
-\emph{is} available, evaluating the kinetic-matrix inverse at every
-right-hand-side application would carry an unnecessary overhead;
-the velocity form sidesteps this by recording the velocities directly.
-The energy diagnostic of~\cref{Validation} draws on the
-\texttt{hamiltonian\_terms} block of the specification independently
-of the integration scheme, so that conservation can be monitored
-without committing to a Hamiltonian state vector. The relationship
-between the $(q, v)$ form and an underlying symplectic structure
-where such a structure exists is reviewed in~\cite{hairer2006geometric}.
+in the field and velocity slots respectively. The choice of the
+propagating-and-constraint state $(q, v)$ rather than the canonical
+phase-space pair $(q, p)$ is deliberate. Writing the quadratic kinetic
+operator $\mathcal{K}$ of~\cref{KineticMatrix} as a polynomial in time
+derivatives, its leading $\partial_t^2$ block is a coefficient matrix
+$K_{ij}$, the Hessian of the linearised Lagrangian density with
+respect to the field velocities,
+\begin{align}
+  K_{ij} \equiv \frac{\partial^2 \lag}{\partial(\partial_t \varphi_i)\,
+    \partial(\partial_t \varphi_j)}
+  \, ,
+\end{align}
+evaluated at the background. The canonical momenta are then
+$p_i = K_{ij}\, v_j$, and the canonical equations of motion contain
+the inverse $K^{-1}$ as a left-multiplier of the right-hand side. For
+many of the Lagrangians in our surveys $K$ is degenerate or extremely
+ill-conditioned, and the Legendre transform $v \leftrightarrow p$ is
+non-unique or unavailable in the perturbative regime. These three
+obstructions --- Ostrogradsky's theorem for higher-derivative kinetic
+terms, the Ja\'en--Llosa--Molina obstruction at the perturbative
+limit, and the generic degenerate-Hessian case --- are catalogued
+in~\cref{ConstraintBarrier}. Even when the canonical form
+\emph{is} available, evaluating $K^{-1}$ at every right-hand-side
+application would carry an unnecessary overhead; the velocity form
+sidesteps this by recording $v_q$ directly. The energy diagnostic
+of~\cref{Validation} draws on the \texttt{hamiltonian\_terms} block of
+the specification independently of the integration scheme, so that
+conservation can be monitored without committing to a Hamiltonian
+state vector.
 
 \paragraph*{State layout and field views} The mapping between a
 field's component name and its slot in the flat state vector is
@@ -482,7 +493,7 @@ in~\cref{SolverConvergence} and discussed in~\cref{Validation}.
 \paragraph*{\texttt{IDA} --- differential--algebraic equations}
 The \texttt{IDA} backend is the implicit differential--algebraic
 solver from SUNDIALS~\cite{hindmarsh2005sundials}, accessed via the
-\texttt{scikit-sundae}~\cite{mekki2023skitsundae} \Python{} wrapper.
+\texttt{scikit-sundae}~\cite{randall2024skitsundae} \Python{} wrapper.
 \texttt{IDA} integrates a residual form $F(t, y, y') = 0$ by adaptive
 backward differentiation formulas of orders $1$ through $5$.
 \TIDAL{} populates the residual with $F_i = y_i'- R_i(y)$ for
@@ -500,7 +511,7 @@ campaigns of~\cref{Results}.
 \paragraph*{\texttt{CVODE} --- adaptive ODE} The \texttt{CVODE}
 backend wraps the SUNDIALS ordinary-differential-equation solver of
 the same name~\cite{hindmarsh2005sundials} through
-\texttt{scikit-sundae}~\cite{mekki2023skitsundae}, and is
+\texttt{scikit-sundae}~\cite{randall2024skitsundae}, and is
 auto-selected for pure wave systems in which every equation has
 time order~$2$ and a canonical Hamiltonian structure is recorded in
 the specification. \texttt{CVODE} supports both
@@ -546,17 +557,15 @@ stability properties are not yet understood.
 \paragraph*{\SciPy{} --- general-purpose adaptive ODE} The \SciPy{}
 backend wraps \texttt{scipy.integrate.solve\_ivp}~\cite{virtanen2020scipy},
 with a default method of DOP853 (an eighth-order embedded
-Runge--Kutta scheme~\cite{dormand1980runge}) and the Radau and
-BDF families available through \texttt{--method}. We retain this
-backend for two reasons. First, smooth non-stiff problems are
+Runge--Kutta scheme~\cite{dormand1980runge,hairer1993ode1}) and the
+Radau and BDF families available through \texttt{--method}. We retain
+this backend for two reasons. First, smooth non-stiff problems are
 sometimes solved more cheaply by an explicit high-order method than by
 adaptive BDF, because DOP853 requires fewer function evaluations per
-unit of accuracy. Second, the existence of a second independent
-implementation --- one routed through SUNDIALS and one through
-\SciPy{} --- provides a cross-check during validation: a result that
-agrees between two independent integrators carries more weight than a
-result that only agrees with itself. Like leapfrog, the \SciPy{}
-backend is opt-in only.
+unit of accuracy. Second, an independent \SciPy{} integration path
+provides a cross-check on the SUNDIALS implementations; the per-theory
+agreement numbers are reported in~\cref{Validation}. Like leapfrog,
+the \SciPy{} backend is opt-in only.
 
 \subsection{Constraint initialisation}%
 \label{ConstraintIC}
