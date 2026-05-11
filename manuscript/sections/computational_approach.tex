@@ -49,6 +49,20 @@
 % no algorithmic detail. State that auto-selection picks the appropriate
 % backend based on equation properties.
 
+% Paragraph 4b — Inference architecture (~70 w, NEW; v3 architecture pivot
+% post-2026-05-08 supervisor meeting).  Forward-reference to App J details.
+\paragraph*{Tachyon-permissive inference}
+% TODO: one paragraph introducing the v3 inference architecture: probe is
+% metadata not gate; soft floor logL = -100 + Normal(0, σ_explore) gives
+% PolyChord a stability gradient; compactified arctan_uniform priors and
+% the optional cubed-sphere joint prior cover full real-line coupling
+% support; distinct run_status tags (success, simulation_diverged,
+% metric_nan, below_noise_floor, ...) enable post-chain filtering.
+% End with \cref{InferenceArchitecture} pointer per STYLE_GUIDE.md §(i):
+% "The Bayesian-inference architecture, soft-penalty mathematics, and
+% prior-compactification scheme are documented in \cref{InferenceArchitecture}."
+% Source material: docs/V3_ARCHITECTURE.md, docs/V3_PHASE_D_DESIGN.md.
+
 % Paragraph 5 — Validation and HPC scale (~60 w, with concrete number).
 \paragraph*{Validation and survey scale}
 % TODO: one sentence on the validation hierarchy with \cref{Validation}
