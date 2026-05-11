@@ -37,12 +37,12 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 
 | Step | Description | Status | Notes |
 | --- | --- | --- | --- |
-| B.0a | Joint-prior smoke comparison (D1 amp, 1 tile, INTR) | ⏳ to submit | NEW — head-to-head ESS/walltime vs B.1; adopt for B.5 if competitive. See plan §"Joint-prior smoke" |
+| B.0a | Joint-prior smoke comparison (D1 amp, 1 tile, INTR) | ⏳ to submit | NEW — head-to-head ESS/walltime vs B.1; adopt for B.5 if competitive. Script: `scripts/hpc_submit_drafts/v3_jointprior/d1_amp_smoke_tile.sh` |
 | B.1 | D1 amp v3 smoke (mid-res INTR) | ✅ done | 29149987 (23 min INTR, grid=128/nlive=300). log Z=+13.29±0.13 (vs v2 +0.72; +12.5 nats), ESS=1410/3651, MAP δ₁=4.80 (outside v2 prior). Per-coupling D_KL: α₁=3.20, α₂=2.96, α₃=0.02, δ₁=1.44 nats. 100% success run_status. Post-hoc probe sweep flags 45% of prior as v2-tachyonic. See `docs/comparison/d1_amp_v2_v3.md` |
 | B.2 | D1 amp v3 publication run | 🟡 pending | 29189748 (standard 8h) — submitted 2026-05-10 |
 | B.3 | D1 sup v3 paired with B.2 | 🟡 pending | 29189761 (standard 12h) — submitted 2026-05-10 |
-| B.4a | Stage A amp INTR smoke | 🚀 running | 29189966 — started 11:39 BST 2026-05-11 |
-| B.4b | Stage A sup INTR smoke | ⏳ to submit | submit after B.4a completes |
+| B.4a | Stage A amp INTR smoke | ✅ done | 29189966 (8 min INTR). log Z=+9.31±0.13 (vs v2 −0.07; +9.4 nats), ESS=2649/6464. **v2 "null verdict" was an artefact of narrow priors** — v3 reveals joint D_KL=6.59 nats. MAP shifts ~1.1–2.0σ on all 4 params. See `docs/comparison/stage_a_amp_v2_v3.md` |
+| B.4b | Stage A sup INTR smoke | 🚀 running | 29199129 (submitted 2026-05-11 ~12:50 BST) |
 | B.4-full-amp | Stage A amp v3 publication | ⏳ to submit | NEW — standard queue ~6h after B.4a/b smoke passes |
 | B.4-full-sup | Stage A sup v3 publication | ⏳ to submit | NEW — standard queue ~12h paired with B.4-full-amp |
 | B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | ⏳ to submit | INTR sequentially; joint-prior IF B.0a passes, else arctan |
