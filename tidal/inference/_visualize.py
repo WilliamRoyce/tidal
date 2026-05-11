@@ -269,8 +269,8 @@ def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
 def _clip_to_posterior_range(
     values: np.ndarray,
     weights: np.ndarray | None,
-    q_low: float = 0.02,
-    q_high: float = 0.98,
+    q_low: float = 0.001,
+    q_high: float = 0.999,
 ) -> np.ndarray:
     """Clip a derived-column array to the posterior-weighted quantile range.
 
@@ -278,6 +278,15 @@ def _clip_to_posterior_range(
     KDE is calibrated for the posterior scale rather than the full prior-
     exploration chain.  NaN rows are skipped by anesthetic's kde_plot_1d
     and kde_contour_plot_2d (data_compressed step).  Weights are intact.
+
+    Default range is [0.001, 0.999] (i.e. drops 0.1% from each tail) so
+    KDE bandwidth stays calibrated for the posterior peak while the clip
+    boundaries fall at asymptotic density — anesthetic's 2D contours
+    therefore do not produce visibly-cut horizontal lines at the panel
+    boundaries.  An earlier [0.02, 0.98] default caused obvious
+    horizontal cuts in derived-column rows of the corner plot because
+    anesthetic drew contours that ended sharply at the 2%/98% clip
+    boundaries (where density is non-negligible).
 
     Guard: if q_low == q_high (perfectly degenerate posterior) the original
     array is returned unchanged so anesthetic handles the edge case at its
