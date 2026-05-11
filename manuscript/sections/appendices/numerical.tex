@@ -8,7 +8,7 @@
 % non-normal-matrix-exponential and DAE literature explicitly, and
 % (d) cross-refs the Hamiltonian-obstruction discussion in
 % \cref{ConstraintBarrier} and the perturbative-reduction pipeline in
-% \cref{PerturbativeReduction}. The Fourier modal solver receives the
+% \cref{LPSReduction}. The Fourier modal solver receives the
 % longest treatment because it is the primary backend; the others are
 % documented briefly.
 
@@ -35,8 +35,9 @@ and analytical Jacobian is described in the remaining subsections.
 \paragraph*{Solver selection hierarchy} \TIDAL{} provides several
 solver backends because the equation systems it handles form a
 heterogeneous family. Differential--algebraic equations from gauge
-sectors require simultaneous algebraic-and-differential solution; pure
-wave systems benefit from explicit symplectic integration when
+sectors require simultaneous algebraic-and-differential
+solution~\cite{henneaux1992quantization}; pure wave systems benefit
+from explicit symplectic integration when
 long-time energy conservation matters more than tolerance control;
 dissipative parabolic systems break the symplectic structure and call
 for implicit methods; and curved-metric systems require
@@ -56,13 +57,13 @@ rules are:
   \item \textbf{IDA} (SUNDIALS differential--algebraic, BDF orders
     $1$--$5$~\cite{hindmarsh2005sundials}) when the modal eligibility
     fails and the system carries equations with
-    \texttt{time\_order}~$=0$; algebraic constraints are treated
+    \lstinline!time_order!~$=0$; algebraic constraints are treated
     natively in the residual form.
   \item \textbf{IDA} when the system carries first-order
-    (\texttt{time\_order}~$=1$) equations, since adaptive implicit
+    (\lstinline!time_order!~$=1$) equations, since adaptive implicit
     integration is preferred for diffusive and transport equations.
   \item \textbf{IDA} when any right-hand-side carries a
-    \texttt{first\_derivative\_t} operator, since dissipation breaks
+    \lstinline!first_derivative_t! operator, since dissipation breaks
     the symplectic structure on which a conservative integrator would
     rely.
   \item \textbf{CVODE} (SUNDIALS adaptive ODE,
@@ -70,7 +71,7 @@ rules are:
     holds, and the system is a pure second-order wave with a canonical
     Hamiltonian sector recorded in the specification.
   \item \textbf{Leapfrog and \SciPy{}} are available only via
-    explicit \texttt{--scheme} override and are never auto-selected;
+    explicit \lstinline!--scheme! override and are never auto-selected;
     they are retained for symplectic long-time evolution
     (\cref{OtherBackends}) and as an independent cross-check of the
     SUNDIALS implementations, respectively.
@@ -96,20 +97,40 @@ rules are:
 \subsection{Equation substrate and state layout}%
 \label{EquationSubstrate}
 
-\paragraph*{Euler--Lagrange velocity form} \TIDAL{} stores the
-simulation state in the Euler--Lagrange velocity form, comprising the
-primary fields $q$ and their time derivatives
-$v_q \equiv \partial_t q$ for second-order equations, together with a
-separate slot family for those fields whose equations of motion are
-algebraic (\texttt{time\_order}~$=0$) rather than evolution laws.
-Familiar examples of this last class are the Maxwell scalar potential
-$A_0$, which in the Lorenz gauge satisfies an instantaneous Helmholtz
-equation rather than a wave equation, and the lapse and shift of an
-ADM decomposition. We refer to this third class collectively as the
-\emph{constraint fields}. For a second-order equation
-$\partial_t^2 \varphi = L[\varphi]$ on a foliation of
-constant-$t$ slices, the substrate carries $(\varphi, v_\varphi)$
-together with the kinematic identity
+\paragraph*{Euler--Lagrange velocity form} \TIDAL{} represents the
+simulation state at any given time as a flat vector of numerical
+values --- field amplitudes sampled on the Cartesian grid --- and
+never as symbolic expressions or equations. The equations of motion
+themselves come from the JSON specification produced
+by~\cref{SymbolicComputation} and are applied to the state by the
+right-hand-side evaluator at every timestep. The number of slots a
+field contributes to this state vector is determined by the
+time-derivative order of its equation of motion:
+\begin{enumerate}
+  \item \textbf{Wave fields} (\lstinline!time_order!~$=2$) contribute
+    two slots: an array of values for the field $q$ itself, and an
+    array of values for its time derivative
+    $v_q \equiv \partial_t q$ at the current time. The two arrays
+    are linked at evaluation time by the kinematic
+    identity~\cref{ELVelocityForm} below, which the right-hand-side
+    evaluator uses to advance the field slot from the velocity slot.
+  \item \textbf{First-order fields} (\lstinline!time_order!~$=1$)
+    contribute one slot: an array of values for the field. The
+    integrator advances this array using $\partial_t q$ computed from
+    the right-hand-side specification at each timestep.
+  \item \textbf{Constraint fields} (\lstinline!time_order!~$=0$)
+    contribute one slot: an array of values for the field. The values
+    are not advanced by an integrator at all; they are determined at
+    each timestep by solving the field's algebraic equation of motion
+    --- typically a Helmholtz or Poisson equation --- against the
+    values currently held in the other slots.
+\end{enumerate}
+Familiar examples of the constraint class are the Maxwell scalar
+potential $A_0$, which in the Lorenz gauge satisfies an instantaneous
+Helmholtz equation $(\nabla^2 - m^2) A_0 = $~source rather than a wave
+equation, and the lapse and shift of an ADM decomposition, both of
+which appear as Lagrange multipliers in the Einstein--Hilbert action.
+For a wave field, the kinematic identity is
 \begin{align}
   \partial_t \varphi = v_\varphi
   \, ,
@@ -130,10 +151,26 @@ respect to the field velocities,
     \partial(\partial_t \varphi_j)}
   \, ,
 \end{align}
-evaluated at the background. The canonical momenta are then
-$p_i = K_{ij}\, v_j$, and the canonical equations of motion contain
-the inverse $K^{-1}$ as a left-multiplier of the right-hand side. For
-many of the Lagrangians in our surveys $K$ is degenerate or extremely
+evaluated at the background~\cite{henneaux1992quantization}. The
+canonical momenta are defined by differentiation of the Lagrangian
+with respect to the velocities,
+\begin{align}
+  p_i \equiv \frac{\partial \lag}{\partial(\partial_t \varphi_i)}
+  \, ,
+  \label{CanonicalMomenta}
+\end{align}
+which for a Lagrangian quadratic in time derivatives gives the linear
+relation $p_i = K_{ij}\, v_j$. To express the Hamiltonian density
+$\ham = p_i\, v_i - \lag$ in terms of the canonical pair $(q, p)$
+alone --- as the Hamiltonian formulation requires --- one must
+eliminate the velocities through $v_i = (K^{-1})_{ij}\, p_j$, and this
+inversion is what makes $K^{-1}$ appear as a left-multiplier of the
+right-hand side of the canonical equations of motion. The inversion
+fails precisely when $K$ is singular at the background; that failure
+is the entry point of the Dirac--Bergmann
+algorithm~\cite{henneaux1992quantization} and the source of the
+obstructions catalogued in~\cref{ConstraintBarrier}. For many of the
+Lagrangians in our surveys $K$ is degenerate or extremely
 ill-conditioned, and the Legendre transform $v \leftrightarrow p$ is
 non-unique or unavailable in the perturbative regime. These three
 obstructions --- Ostrogradsky's theorem for higher-derivative kinetic
@@ -143,22 +180,22 @@ in~\cref{ConstraintBarrier}. Even when the canonical form
 \emph{is} available, evaluating $K^{-1}$ at every right-hand-side
 application would carry an unnecessary overhead; the velocity form
 sidesteps this by recording $v_q$ directly. The energy diagnostic
-of~\cref{Validation} draws on the \texttt{hamiltonian\_terms} block of
+of~\cref{Validation} draws on the \lstinline!hamiltonian_terms! block of
 the specification independently of the integration scheme, so that
 conservation can be monitored without committing to a Hamiltonian
 state vector.
 
 \paragraph*{State layout and field views} The mapping between a
 field's component name and its slot in the flat state vector is
-captured by a frozen \texttt{StateLayout} dataclass, which is
+captured by a frozen \lstinline!StateLayout! dataclass, which is
 constructed once from the equation specification before integration
-begins. Every component carries a \texttt{slot\_kind} of one of three
-values --- \texttt{"field"} for primary fields, \texttt{"velocity"} for
-time derivatives in wave-type equations, or \texttt{"constraint"} for
+begins. Every component carries a \lstinline!slot_kind! of one of three
+values --- \lstinline!"field"! for primary fields, \lstinline!"velocity"! for
+time derivatives in wave-type equations, or \lstinline!"constraint"! for
 the multiplier slots --- and an integer time-derivative order. The
-flat state itself is wrapped by a \texttt{FieldSet} container that
+flat state itself is wrapped by a \lstinline!FieldSet! container that
 provides zero-copy named views into the contiguous
-\NumPy{}~\cite{harris2020numpy} array, plus a \texttt{rebind} operation
+\NumPy{}~\cite{harris2020numpy} array, plus a \lstinline!rebind! operation
 that swaps the underlying buffer for in-place state updates without
 reallocation. This is what permits the Yoshida fused-kick scheme of
 \cref{OtherBackends} to reuse a single buffer across three force
@@ -170,7 +207,7 @@ elimination machinery of \cref{ConstraintIC}.
 symbolic coefficient string emitted by the \xAct{} stage, which must be
 resolved at run time against the user's parameter assignments and, for
 backgrounds, the spatial coordinate grid. The
-\texttt{CoefficientEvaluator} class implements a four-level cache to
+\lstinline!CoefficientEvaluator! class implements a four-level cache to
 amortise this resolution. The first level stores pre-resolved constants
 that depend on neither parameters nor coordinates; the second stores
 the parsed parameter-resolved expression; the third stores spatial
@@ -192,7 +229,7 @@ propagates automatically to every backend.
 \paragraph*{Finite-difference stencils} The default spatial
 discretisation is a central-difference scheme on a uniform Cartesian
 grid, with stencil width and ghost-cell count controlled by a single
-parameter (the \texttt{--fd-order} option, with allowed values $2$,
+parameter (the \lstinline!--fd-order! option, with allowed values $2$,
 $4$, and $6$). The orders correspond to widths of $3$, $5$, and $7$
 points respectively, with one, two, and three ghost cells per side;
 the stencil coefficients are those of Fornberg's algorithm for
@@ -212,7 +249,7 @@ with recursive layer-by-layer fill for orders greater than~$2$.
 \paragraph*{Pseudo-spectral evaluation} When every boundary is
 periodic, \TIDAL{} also exposes a pseudo-spectral evaluation path in
 which spatial operators are applied as Fourier multipliers via the
-real-to-complex FFT \texttt{numpy.fft.rfftn}. In this representation
+real-to-complex FFT \lstinline!numpy.fft.rfftn!. In this representation
 the identity becomes unity, the gradient $\partial_x$ becomes $ik_x$,
 the Laplacian becomes $-k^2$, and the biharmonic operator becomes
 $k^4$, with $k = 2\pi\cdot\texttt{rfftfreq}(N,\Delta x)$. The
@@ -248,7 +285,7 @@ the corresponding ghost-cell stencil in \lstinline!tidal.solver.operators!;
 the analytical-Jacobian sparsity pattern and the constraint pre-solver
 inherit the registration automatically. Operators with time-derivative
 order three or four arise only as source terms in the iterative
-perturbative-reduction pipeline of~\cref{PerturbativeReduction},
+perturbative-reduction pipeline of~\cref{LPSReduction},
 which is used for higher-derivative Lagrangians, and never in the
 second-order base system that the modal solver actually evolves.
 
@@ -265,9 +302,9 @@ second-order base system that the modal solver actually evolves.
     time-derivative-order classification used by the modal solver,
     sorted by the matrix block to which each operator contributes (the
     stiffness matrix $K$, the damping matrix $D$, the mass matrix
-    $M$, and the jerk matrix $J$). The \texttt{d4\_t} and
-    \texttt{mixed\_T4\_*} operators appear only as source terms in the
-    perturbative-reduction pipeline of~\cref{PerturbativeReduction},
+    $M$, and the jerk matrix $J$). The \lstinline!d4_t! and
+    \lstinline!mixed_T4_*! operators appear only as source terms in the
+    perturbative-reduction pipeline of~\cref{LPSReduction},
     and are excluded from the second-order base system that the modal
     solver evolves.}
   \label{OperatorCatalogue}
@@ -279,14 +316,14 @@ second-order base system that the modal solver actually evolves.
 \paragraph*{Eligibility and routing} The Fourier modal solver is the
 primary backend, and is auto-selected when all five of the following
 conditions hold: the metric is flat ($\sqrt{|g|}$ is identically unity,
-which the specification records as a \texttt{null} \texttt{volume\_element}
+which the specification records as a \lstinline!null! \lstinline!volume_element!
 field); every spatial boundary is periodic; the equation system
 contains no algebraic constraint that cannot be eliminated by a
 Fourier Schur step; every right-hand-side operator has an exact
 Fourier multiplier in the modal catalogue; and no coefficient depends
 explicitly on time. Position-dependent coefficients are admitted, and
 are handled by the Krylov path described below. When the user
-requests \texttt{--scheme modal} explicitly on a system that fails one
+requests \lstinline!--scheme modal! explicitly on a system that fails one
 of the five conditions, the dispatcher raises an error citing the
 failed predicate, rather than silently falling back. The exhaustive
 eligibility check is implemented as \lstinline!can_use_modal! in
@@ -320,7 +357,7 @@ matrix--vector product per mode.
 \paragraph*{Pad\'e scaling and squaring} The per-mode matrix
 exponential in~\cref{ModalPerMode} is computed via the Pad\'e
 scaling-and-squaring method of
-\texttt{scipy.linalg.expm}~\cite{higham2009scaling}. We do not employ
+\lstinline!scipy.linalg.expm!~\cite{higham2009scaling}. We do not employ
 the eigendecomposition $M(k) = V D V^{-1}$ with $\exp(M t) =
 V \exp(D\, t) V^{-1}$ because the eigenvector matrix $V$ becomes
 ill-conditioned for several cases of interest in the Poincar\'e
@@ -342,7 +379,7 @@ eigendecomposition wall time lies in the interval $0.49$--$1.06$
 cost in exchange for the robustness guarantee. The eigendecomposition
 path remains available internally for the closed-form Duhamel kernel
 used in the perturbative-reduction pipeline
-of~\cref{PerturbativeReduction}, which requires the per-eigenmode
+of~\cref{LPSReduction}, which requires the per-eigenmode
 expansion explicitly.
 
 % Table C.PadeBenchmark — wall-time comparison.
@@ -352,13 +389,13 @@ expansion explicitly.
   \hline\hline
   Theory & $N$ & Eig.\ (s) & Pad\'e (s) & Ratio \\
   \hline
-  \texttt{coupled\_scalars}     & $256$        & $0.0028$ & $0.0030$ & $1.06$ \\
-  \texttt{gertsenshtein}        & $512$        & $0.022$  & $0.020$  & $0.91$ \\
-  \texttt{coupled\_proca\_3d}   & $16^3$       & $0.16$   & $0.078$  & $0.49$ \\
+  \lstinline!coupled_scalars!     & $256$        & $0.0028$ & $0.0030$ & $1.06$ \\
+  \lstinline!gertsenshtein!        & $512$        & $0.022$  & $0.020$  & $0.91$ \\
+  \lstinline!coupled_proca_3d!   & $16^3$       & $0.16$   & $0.078$  & $0.49$ \\
   \hline\hline
   \end{tabular}
   \caption{Wall-time of the Pad\'e scaling-and-squaring path
-    (\texttt{scipy.linalg.expm}) relative to the former
+    (\lstinline!scipy.linalg.expm!) relative to the former
     eigendecomposition path on three representative theories. All
     figures are per-mode times averaged over the active modes after
     the block decomposition described in the next paragraph, on a
@@ -377,7 +414,7 @@ decoupled sub-blocks --- for example, the $h_\times\!\leftrightarrow\!
 a_y$ graviton--photon pair separates from the trace--vector torsion
 channel at the linear level --- and processing such a block-diagonal
 matrix as a single dense object would waste both wall time (since the
-per-mode \texttt{expm} cost scales as $O(b^3)$ in the block size $b$)
+per-mode \lstinline!expm! cost scales as $O(b^3)$ in the block size $b$)
 and conditioning. We therefore precompute the block decomposition:
 slots $i$ and $j$ are deemed coupled if $|M_{ij}|$ exceeds a heuristic
 cut-off of $10^{-14}\!\cdot\!\max|M|$ or $|M_{ji}|$ exceeds the same
@@ -393,7 +430,7 @@ deliberately conservative.
 
 \paragraph*{Constraint elimination via Fourier Schur complement}
 When the equation system carries algebraic constraints
-(\texttt{time\_order}~$=0$ fields) and is otherwise modal-eligible,
+(\lstinline!time_order!~$=0$ fields) and is otherwise modal-eligible,
 we eliminate the constraint slots per mode by Schur complement before
 forming the exponential. Partitioning the per-mode evolution matrix
 into a dynamical block $A$ and a constraint block,
@@ -413,7 +450,7 @@ gauge-symmetric quadratic form) the same reduced exponential is
 evaluated through the generalised eigenvalue problem
 $(K - \lambda M)\, v = 0$, which is solved internally by the QZ
 algorithm of Moler \& Stewart~\cite{moler1973algorithm} as exposed by
-\texttt{scipy.linalg.eig(A, B)}. QZ handles rank-deficiency cleanly
+\lstinline!scipy.linalg.eig(A, B)!. QZ handles rank-deficiency cleanly
 through the Schur form without requiring the eigenvector matrix to be
 well conditioned. The Schur-complement reduction itself is standard
 DAE practice~\cite{brenan1996numerical,hairer1996ode2}, and a unified
@@ -438,7 +475,7 @@ of $\|\exp(A t)\|$ for non-normal $A$ is controlled by the
 $\varepsilon$-pseudospectrum rather than by the spectrum itself. We
 bypass the eigendecomposition entirely on this path and compute the
 action of the matrix exponential directly via the Krylov scheme of
-\texttt{scipy.sparse.linalg.expm\_multiply}~\cite{almohy2011action}.
+\lstinline!scipy.sparse.linalg.expm_multiply!~\cite{almohy2011action}.
 For localised coefficient profiles the Fourier convolution kernel
 decays exponentially in mode separation, so the convolution matrix is
 effectively banded; \TIDAL{} converts it to sparse CSC format when
@@ -452,13 +489,13 @@ precision. The real-to-complex FFT's Nyquist bin (the $k=N/2$ mode on
 even-$N$ grids) must be purely real for real-valued fields, but the
 per-mode evolution matrix has complex entries from the gradient
 couplings, so $\exp(M t)$ generates an imaginary Nyquist component
-which \texttt{irfft} silently discards on each reconstruction. We
+which \lstinline!irfft! silently discards on each reconstruction. We
 zero the Nyquist mode in the initial condition before evolution,
 which is the linear analogue of the dealiasing rule used by spectral
 codes for nonlinear
 problems~\cite{boyd2001chebyshev,burns2020dedalus}. With the Nyquist
 zero in place we observe a relative energy drift of
-$|\diff E/E|\approx 2\times 10^{-14}$ on \texttt{coupled\_scalars} at
+$|\diff E/E|\approx 2\times 10^{-14}$ on \lstinline!coupled_scalars! at
 every resolution from $N=128$ to $N=1024$, and $|\diff E/E|\approx
 1.3\times 10^{-14}$ on the full six-field Einstein--Maxwell system;
 without the Nyquist zero, the same systems exhibit a
@@ -505,7 +542,7 @@ ineligible and a constraint, first-order, or dissipative equation is
 present, and is the only \TIDAL{} backend that supports algebraic
 constraints natively at run time. We pair it with the analytical
 Jacobian of~\cref{AnalyticalJacobian}, and use the default tolerances
-\texttt{rtol}=$10^{-8}$, \texttt{atol}=$10^{-10}$ throughout the
+\lstinline!rtol!~$=10^{-8}$, \lstinline!atol!~$=10^{-10}$ throughout the
 campaigns of~\cref{Results}.
 
 \paragraph*{\texttt{CVODE} --- adaptive ODE} The \texttt{CVODE}
@@ -548,17 +585,17 @@ the cost from six force evaluations per outer step to three plus one
 initialiser. Both integrators preserve a shadow Hamiltonian to
 machine precision and exhibit zero secular energy drift over arbitrary
 integration times~\cite{hairer2006geometric}. We retain the leapfrog
-backend as an opt-in scheme (\texttt{--scheme leapfrog}) for long-time
+backend as an opt-in scheme (\lstinline!--scheme leapfrog!) for long-time
 conservative runs in which the energy-drift guarantee matters more
 than tolerance control; the dispatcher never selects it automatically,
 because the adaptive solvers are a safer default on systems whose
 stability properties are not yet understood.
 
 \paragraph*{\SciPy{} --- general-purpose adaptive ODE} The \SciPy{}
-backend wraps \texttt{scipy.integrate.solve\_ivp}~\cite{virtanen2020scipy},
+backend wraps \lstinline!scipy.integrate.solve_ivp!~\cite{virtanen2020scipy},
 with a default method of DOP853 (an eighth-order embedded
 Runge--Kutta scheme~\cite{dormand1980runge,hairer1993ode1}) and the
-Radau and BDF families available through \texttt{--method}. We retain
+Radau and BDF families available through \lstinline!--method!. We retain
 this backend for two reasons. First, smooth non-stiff problems are
 sometimes solved more cheaply by an explicit high-order method than by
 adaptive BDF, because DOP853 requires fewer function evaluations per
@@ -596,7 +633,7 @@ that the constraint solution is spectrally consistent with the FD
 stencils used during evolution; the cost is $O(N\log N)$. The second
 tier covers non-periodic boundaries and variable coefficients: the
 constraint Jacobian is built by impulse-probing the same
-\texttt{RHSEvaluator} operators used during evolution, then stored as
+\lstinline!RHSEvaluator! operators used during evolution, then stored as
 sparse CSC and factored by SuperLU~\cite{demmel1999supernodal} with
 $O(N^2)$ build cost and $O(N)$ solve. The third tier, reserved for
 the $N>2\times 10^{5}$ regime, is a Krylov iterative scheme; it is
@@ -682,8 +719,8 @@ system this contributes an additional factor of roughly $28\times$
 in operator-matrix construction.
 
 \paragraph*{Substrate sharing} The analytical Jacobian reuses the
-same \texttt{CoefficientEvaluator} cache and operator catalogue that
-the \texttt{RHSEvaluator} draws from in time evolution. A change to
+same \lstinline!CoefficientEvaluator! cache and operator catalogue that
+the \lstinline!RHSEvaluator! draws from in time evolution. A change to
 coefficient resolution therefore propagates to all three tiers
 without duplication, and an operator added to the catalogue acquires
 Jacobian support automatically once its sparsity offsets are
@@ -696,14 +733,14 @@ theories are added.
 
 \paragraph*{JSON specification ingestion} The numerical stage begins
 by parsing the JSON specification produced
-by~\cref{SymbolicComputation} into an \texttt{EquationSystem}
+by~\cref{SymbolicComputation} into an \lstinline!EquationSystem!
 dataclass. The parser records each equation's left-hand-side
 time-derivative order, the list of right-hand-side (coefficient,
 operator, target field) triples, the Hamiltonian terms used by the
 energy diagnostic, and the mass and coupling matrices used by the
 modal solver. From this representation \lstinline!StateLayout.from_spec!
 builds the slot mapping of~\cref{EquationSubstrate},
-\texttt{CoefficientEvaluator} precomputes the four-level cache, and
+\lstinline!CoefficientEvaluator! precomputes the four-level cache, and
 the operator catalogue of~\cref{SpatialDiscretisation} resolves each
 operator string to a \NumPy{} callable.
 
@@ -713,9 +750,9 @@ the section opener is implemented as \lstinline!_resolve_scheme!
 in~\cref{SolverDispatchFlowchart}. The function evaluates each
 predicate in turn and returns a backend tag, which is then used to
 instantiate the appropriate solver class. Manual override is
-available through the \texttt{--scheme} command-line option and takes
+available through the \lstinline!--scheme! command-line option and takes
 precedence over auto-selection, with one exception: an explicit
-request for \texttt{--scheme modal} on a system that fails
+request for \lstinline!--scheme modal! on a system that fails
 \lstinline!can_use_modal! raises an error citing the failed
 predicate, because falling back silently to a different solver would
 mask the unmet eligibility condition.
@@ -729,8 +766,8 @@ adapter layer in each solver module. The
 \lstinline!tidal.io._writer! module serialises these to the output
 directory together with the resolved equation specification and the
 runtime parameter values, so that downstream measurement and
-analysis subcommands (\texttt{measure}, \texttt{analyze},
-\texttt{plot}) can reconstruct the run without re-reading the
+analysis subcommands (\lstinline!measure!, \lstinline!analyze!,
+\lstinline!plot!) can reconstruct the run without re-reading the
 original \xAct{} session. The architecture diagram
 of~\cref{Architecture} summarises this two-stage pipeline at the
 level of data flow; the present appendix has filled in its
