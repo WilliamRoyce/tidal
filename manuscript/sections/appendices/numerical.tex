@@ -17,37 +17,33 @@
 
 \paragraph*{Overview} The numerical stage of \TIDAL{} consumes the
 equation specification produced by~\cref{SymbolicComputation} and
-evolves the linearised fields on a Cartesian grid. \TIDAL{} is designed
-for arbitrary tensor Lagrangians on flat or curved backgrounds; the
-numerical pipeline is generic in the equation specification it
-consumes. Theory-by-theory validation against analytic limits and
+evolves the linearised fields on a Cartesian grid. \TIDAL{} is
+designed for arbitrary tensor Lagrangians on flat or curved
+backgrounds; theory-by-theory validation against analytic limits and
 reference models is collected in~\cref{Validation}, and the
 symbolic-pipeline outputs for the surveyed theories are tabulated
 in~\cref{SymbolicOutputs}. The arrangement consists of a shared
 substrate (state layout, spatial operators, coefficient cache) and a
 dispatcher that selects among several solver backends from the
 algebraic structure of the equation system. The Fourier modal solver
-of~\cref{ModalSolver} is the primary backend, and is auto-selected for
-every survey reported in~\cref{Results}; the supporting infrastructure
-of state layout, spatial discretisation, constraint initialisation,
-and analytical Jacobian is described in the remaining subsections.
+of~\cref{ModalSolver} is the primary backend, and is auto-selected
+for every survey reported in~\cref{Results}.
 
 \paragraph*{Solver selection hierarchy} \TIDAL{} provides several
 solver backends because the equation systems it handles form a
 heterogeneous family. Differential--algebraic equations from gauge
 sectors require simultaneous algebraic-and-differential
 solution~\cite{henneaux1992quantization}; pure wave systems benefit
-from explicit symplectic integration when
-long-time energy conservation matters more than tolerance control;
-dissipative parabolic systems break the symplectic structure and call
-for implicit methods; and curved-metric systems require
+from explicit symplectic integration when long-time energy
+conservation matters more than tolerance control; dissipative
+parabolic systems break the symplectic structure and call for
+implicit methods; and curved-metric systems require
 position-dependent coefficient evaluation. A single backend cannot
-serve all four classes. The dispatcher
-\lstinline!_resolve_scheme! (in \lstinline!tidal.cli._simulate!)
+serve all four classes. The dispatcher \lstinline!_resolve_scheme!
 traverses the eligibility predicates in order, returning the first
 match. The full decision tree, including the modal eligibility
-sub-checks, is shown in~\cref{SolverDispatchFlowchart}; in summary the
-rules are:
+sub-checks, is shown in~\cref{SolverDispatchFlowchart}; in summary
+the rules are:
 \begin{enumerate}
   \item \textbf{Modal} when the metric is flat, the boundaries are
     all periodic, the coefficients are time-independent, and every
@@ -67,9 +63,8 @@ rules are:
     the symplectic structure on which a conservative integrator would
     rely.
   \item \textbf{CVODE} (SUNDIALS adaptive ODE,
-    BDF~\cite{hindmarsh2005sundials}) when none of the above predicates
-    holds, and the system is a pure second-order wave with a canonical
-    Hamiltonian sector recorded in the specification.
+    BDF~\cite{hindmarsh2005sundials}) when none of the above
+    predicates holds and the system is a pure second-order wave.
   \item \textbf{Leapfrog and \SciPy{}} are available only via
     explicit \lstinline!--scheme! override and are never auto-selected;
     they are retained for symplectic long-time evolution
@@ -82,8 +77,7 @@ rules are:
   \centering
   \includegraphics[width=\linewidth]{figures/solver_flowchart}
   \caption{Auto-selection decision tree for the \TIDAL{} solver
-    dispatcher \lstinline!_resolve_scheme! (in
-    \lstinline!tidal.cli._simulate!). Diamond nodes are predicates
+    dispatcher \lstinline!_resolve_scheme!. Diamond nodes are predicates
     evaluated against the equation specification and grid; rectangular
     leaves are the available backends. The dispatcher traverses the
     tree top-down and returns the first leaf whose ancestor predicates
@@ -97,11 +91,11 @@ rules are:
 \subsection{Equation substrate and state layout}%
 \label{EquationSubstrate}
 
-\paragraph*{Euler--Lagrange velocity form} \TIDAL{} represents the
-simulation state at any given time as a flat vector of numerical
-values --- field amplitudes sampled on the Cartesian grid --- and
-never as symbolic expressions or equations. The equations of motion
-themselves come from the JSON specification produced
+\paragraph*{State representation} \TIDAL{} represents the simulation
+state at any given time as a flat vector of numerical values ---
+field amplitudes sampled on the Cartesian grid --- and never as
+symbolic expressions or equations. The equations of motion themselves
+come from the JSON specification produced
 by~\cref{SymbolicComputation} and are applied to the state by the
 right-hand-side evaluator at every timestep. The number of slots a
 field contributes to this state vector is determined by the
@@ -123,7 +117,7 @@ time-derivative order of its equation of motion:
     are not advanced by an integrator at all; they are determined at
     each timestep by solving the field's algebraic equation of motion
     --- typically a Helmholtz or Poisson equation --- against the
-    values currently held in the other slots.
+    current values of the other fields in the system.
 \end{enumerate}
 Familiar examples of the constraint class are the Maxwell scalar
 potential $A_0$, which in the Lorenz gauge satisfies an instantaneous
@@ -139,21 +133,21 @@ For a wave field, the kinematic identity is
   \, ,
   \label{ELVelocityForm}
 \end{align}
-in the field and velocity slots respectively. The choice of the
-propagating-and-constraint state $(q, v)$ rather than the canonical
-phase-space pair $(q, p)$ is deliberate. Writing the quadratic kinetic
-operator $\mathcal{K}$ of~\cref{KineticMatrix} as a polynomial in time
-derivatives, its leading $\partial_t^2$ block is a coefficient matrix
-$K_{ij}$, the Hessian of the linearised Lagrangian density with
-respect to the field velocities,
+in the field and velocity slots respectively.
+
+\paragraph*{Velocity form versus canonical phase space} Writing the
+quadratic kinetic operator $\mathcal{K}$ of~\cref{KineticMatrix} as a
+polynomial in time derivatives, its leading $\partial_t^2$ block is a
+coefficient matrix $K_{ij}$ --- the Hessian of the linearised
+Lagrangian density with respect to the field
+velocities~\cite{henneaux1992quantization} ---
 \begin{align}
   K_{ij} \equiv \frac{\partial^2 \lag}{\partial(\partial_t \varphi_i)\,
     \partial(\partial_t \varphi_j)}
   \, ,
 \end{align}
-evaluated at the background~\cite{henneaux1992quantization}. The
-canonical momenta are defined by differentiation of the Lagrangian
-with respect to the velocities,
+evaluated at the background. The canonical momenta are defined by
+differentiation of the Lagrangian with respect to the velocities,
 \begin{align}
   p_i \equiv \frac{\partial \lag}{\partial(\partial_t \varphi_i)}
   \, ,
@@ -163,25 +157,22 @@ which for a Lagrangian quadratic in time derivatives gives the linear
 relation $p_i = K_{ij}\, v_j$. To express the Hamiltonian density
 $\ham = p_i\, v_i - \lag$ in terms of the canonical pair $(q, p)$
 alone --- as the Hamiltonian formulation requires --- one must
-eliminate the velocities through $v_i = (K^{-1})_{ij}\, p_j$, and this
-inversion is what makes $K^{-1}$ appear as a left-multiplier of the
-right-hand side of the canonical equations of motion. The inversion
-fails precisely when $K$ is singular at the background; that failure
-is the entry point of the Dirac--Bergmann
-algorithm~\cite{henneaux1992quantization} and the source of the
-obstructions catalogued in~\cref{ConstraintBarrier}. For many of the
-Lagrangians in our surveys $K$ is degenerate or extremely
-ill-conditioned, and the Legendre transform $v \leftrightarrow p$ is
-non-unique or unavailable in the perturbative regime. These three
-obstructions --- Ostrogradsky's theorem for higher-derivative kinetic
-terms, the Ja\'en--Llosa--Molina obstruction at the perturbative
-limit, and the generic degenerate-Hessian case --- are catalogued
+eliminate the velocities through $v_i = (K^{-1})_{ij}\, p_j$. The
+inversion fails precisely when $K$ is singular at the background; such
+failures may originate from gauge redundancy, from genuine
+degeneracies in the field-space kinetic structure (as in the trace
+sector of certain torsion-coupled gauge theories), or from
+higher-derivative kinetic terms that promote algebraic constraints to
+dynamical fields under perturbation. In each case the canonical
+formulation requires explicit constrained-Hamiltonian
+treatment~\cite{henneaux1992quantization}; the failure modes
+relevant to the present surveys are catalogued
 in~\cref{ConstraintBarrier}. Even when the canonical form
 \emph{is} available, evaluating $K^{-1}$ at every right-hand-side
 application would carry an unnecessary overhead; the velocity form
 sidesteps this by recording $v_q$ directly. The energy diagnostic
-of~\cref{Validation} draws on the \lstinline!hamiltonian_terms! block of
-the specification independently of the integration scheme, so that
+of~\cref{Validation} draws on the \lstinline!hamiltonian_terms! block
+of the specification independently of the integration scheme, so that
 conservation can be monitored without committing to a Hamiltonian
 state vector.
 
@@ -189,19 +180,17 @@ state vector.
 field's component name and its slot in the flat state vector is
 captured by a frozen \lstinline!StateLayout! dataclass, which is
 constructed once from the equation specification before integration
-begins. Every component carries a \lstinline!slot_kind! of one of three
-values --- \lstinline!"field"! for primary fields, \lstinline!"velocity"! for
-time derivatives in wave-type equations, or \lstinline!"constraint"! for
-the multiplier slots --- and an integer time-derivative order. The
-flat state itself is wrapped by a \lstinline!FieldSet! container that
-provides zero-copy named views into the contiguous
-\NumPy{}~\cite{harris2020numpy} array, plus a \lstinline!rebind! operation
-that swaps the underlying buffer for in-place state updates without
-reallocation. This is what permits the Yoshida fused-kick scheme of
-\cref{OtherBackends} to reuse a single buffer across three force
-evaluations per outer timestep, and what allows the modal solver of
-\cref{ModalSolver} to share its post-FFT buffer with the constraint
-elimination machinery of \cref{ConstraintIC}.
+begins. Each component carries a \lstinline!slot_kind! discriminator
+drawn from the three categories enumerated above. The flat state
+itself is wrapped by a \lstinline!FieldSet! container that provides
+zero-copy named views into the contiguous
+\NumPy{}~\cite{harris2020numpy} array, plus a \lstinline!rebind!
+operation that swaps the underlying buffer for in-place state updates
+without reallocation. This is what permits the Yoshida fused-kick
+scheme of~\cref{OtherBackends} to reuse a single buffer across three
+force evaluations per outer timestep, and what allows the modal
+solver of~\cref{ModalSolver} to share its post-FFT buffer with the
+constraint elimination machinery of~\cref{ConstraintIC}.
 
 \paragraph*{Coefficient evaluator} Each right-hand-side term carries a
 symbolic coefficient string emitted by the \xAct{} stage, which must be
@@ -214,11 +203,11 @@ the parsed parameter-resolved expression; the third stores spatial
 grids of coefficient values for position-dependent but time-independent
 coefficients (Gaussian magnetic-field profiles, localised plasma
 masses, and similar); the fourth performs per-timestep deduplication of
-any time-dependent coefficients. The cache also tracks a
-periodic-boundary \emph{leak metric} that detects discontinuities at
-periodic seams --- a silent failure mode that would otherwise spoil
-energy conservation through the integration-by-parts boundary terms in
-the Hamiltonian. Because the cache is shared between the
+any time-dependent coefficients.\footnote{The cache also tracks a
+periodic-boundary leak metric that detects discontinuities at periodic
+seams. Without this guard, integration-by-parts boundary terms in the
+Hamiltonian density would silently spoil long-time energy
+conservation.} Because the cache is shared between the
 right-hand-side evaluator and the analytical-Jacobian machinery of
 \cref{AnalyticalJacobian}, a change to coefficient resolution
 propagates automatically to every backend.
@@ -234,17 +223,32 @@ $4$, and $6$). The orders correspond to widths of $3$, $5$, and $7$
 points respectively, with one, two, and three ghost cells per side;
 the stencil coefficients are those of Fornberg's algorithm for
 arbitrarily spaced grids~\cite{fornberg1988generation}, specialised
-here to the uniform-grid limit. At a typical resolution of $N=64$
-points the gradient of $\sin(x)$ is computed to a maximum absolute
-error of $1.6\times 10^{-3}$ at order $2$, $3.1\times 10^{-6}$ at
-order $4$, and $6.4\times 10^{-9}$ at order $6$ --- roughly $500\times$
-error reduction per order step at fixed resolution. The default in
-the present work is order $4$, which provides $O(\Delta x^4)$
-convergence at approximately a ten-percent per-step overhead over
-order $2$. Boundary conditions (periodic, Dirichlet, Neumann, or
-Robin) are handled uniformly by a ghost-cell formula of the form
+here to the uniform-grid limit. The expected algebraic convergence
+rates $N^{-2}$, $N^{-4}$, $N^{-6}$ are realised on a smooth gradient
+test in~\cref{FDConvergence}; the default in the present work is
+order $4$, which delivers $O(\Delta x^4)$ convergence at a small
+per-step overhead over order $2$ on the example library. Boundary
+conditions (periodic, Dirichlet, Neumann, or Robin) are handled
+uniformly by a ghost-cell formula of the form
 $\mathrm{ghost} = \mathrm{const} + \mathrm{factor}\times \mathrm{interior}$,
 with recursive layer-by-layer fill for orders greater than~$2$.
+
+% Figure C.FDConvergence — FD vs spectral spatial convergence on the smooth gradient test.
+\begin{figure}[t]
+  \centering
+  % TODO: \includegraphics{figures/FDConvergence}
+  \caption{Spatial-discretisation convergence on the smooth gradient
+    test $\partial_x \sin(x)$. The four curves are the Fornberg
+    finite-difference stencils at orders $2$, $4$ and $6$ and the
+    periodic-domain pseudo-spectral path. Dashed guide lines indicate
+    the expected algebraic rates $N^{-2}$, $N^{-4}$, $N^{-6}$; the
+    spectral path falls exponentially until it hits the IEEE-754
+    round-off floor at $N \approx 64$ in double precision. The
+    order-$4$, $N=64$, $\sin(x)$ benchmark previously summarised
+    inline (max error $3.1\times 10^{-6}$) is the third point of the
+    FD-$4$ curve.}
+  \label{FDConvergence}
+\end{figure}
 
 \paragraph*{Pseudo-spectral evaluation} When every boundary is
 periodic, \TIDAL{} also exposes a pseudo-spectral evaluation path in
@@ -284,10 +288,13 @@ that specifies the Fourier multiplier and time-derivative order, and
 the corresponding ghost-cell stencil in \lstinline!tidal.solver.operators!;
 the analytical-Jacobian sparsity pattern and the constraint pre-solver
 inherit the registration automatically. Operators with time-derivative
-order three or four arise only as source terms in the iterative
-perturbative-reduction pipeline of~\cref{LPSReduction},
-which is used for higher-derivative Lagrangians, and never in the
-second-order base system that the modal solver actually evolves.
+order three or four (\lstinline!d3_t!, \lstinline!d4_t!, and the
+\lstinline!mixed_T3_*!, \lstinline!mixed_T4_*! families) arise in
+theories with higher-derivative kinetic terms such as the
+$b_5\,\tilde R^2$ correction. They are handled by the
+perturbative-reduction scheme described in~\cref{LPSReduction}; they
+never appear as kinetic terms in the second-order base system that
+the modal solver evolves.
 
 % Figure C.1 — Operator catalogue.
 \begin{figure*}[t]
@@ -745,9 +752,8 @@ the operator catalogue of~\cref{SpatialDiscretisation} resolves each
 operator string to a \NumPy{} callable.
 
 \paragraph*{Auto-dispatch} The six-rule auto-selection algorithm of
-the section opener is implemented as \lstinline!_resolve_scheme!
-(in \lstinline!tidal.cli._simulate!), as shown
-in~\cref{SolverDispatchFlowchart}. The function evaluates each
+the section opener is implemented as \lstinline!_resolve_scheme!, as
+shown in~\cref{SolverDispatchFlowchart}. The function evaluates each
 predicate in turn and returns a backend tag, which is then used to
 instantiate the appropriate solver class. Manual override is
 available through the \lstinline!--scheme! command-line option and takes
