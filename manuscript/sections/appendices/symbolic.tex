@@ -1,5 +1,5 @@
-% Appendix B: Symbolic computation of the equations of motion (~1600 w body prose
-% + TOML figure + B.5 equations + deferred-derived-fields footnote).
+% Appendix B: Symbolic computation of the equations of motion (~1300 w body prose
+% + TOML figure + JSON figure + B.5 equations + deferred-derived-fields footnote).
 % Per genre_conventions_software.md §(i). Renamed from "Symbolic stage"
 % — the BHL convention is content-bearing names (compare PSALTer v2's
 % "Construction of operators", "Moore--Penrose pseudoinversion") rather
@@ -23,30 +23,19 @@ described in \cref{ConstraintBarrier} precedes the variation.
 
 \paragraph*{xAct environment}
 The symbolic stage runs in \Mathematica{}~\cite{mathematica} on the
-\xAct{}~\cite{martingarcia2007xact} suite, which provides the
-abstract-index tensor algebra, automatic component decomposition, and
-perturbation theory.
-Three \xAct{} packages are loaded: \texttt{xTensor} for abstract-index
-algebra and the functional derivative \texttt{VarD};
-\xPert{}~\cite{brizuela2009xpert} for metric perturbation theory through
-\texttt{DefTensorPerturbation}; and \xTras{}~\cite{nutma2014xtras} for
-the Einstein--Cartan operators that include the torsion-inclusive
-covariant derivative used throughout the PGT theories of
-\cref{PGTBackground}.
-Two further \xAct{} packages, \texttt{xCoba} for charts and
-\texttt{xPerm} for index symmetries, enter as transitive dependencies of
-the first three.
+\xAct{}~\cite{martingarcia2007xact} suite, with
+\xPert{}~\cite{brizuela2009xpert} providing the perturbation-theory
+layer and \xTras{}~\cite{nutma2014xtras} the Einstein--Cartan
+operators used throughout the PGT theories of \cref{PGTBackground}.
 The manifold, metric, Levi-Civita and Riemann--Cartan covariant
 derivatives, and the torsion tensor are declared once at session start;
 the Christoffel components, the inverse metric, and the Levi-Civita
 tensor are computed once and cached against the declared metric.
 
 \paragraph*{Lagrangian input from TOML}
-The theory is specified by a single TOML file --- a human-readable
-configuration format used widely in scientific software --- which
-isolates everything theory-dependent from the derivation pipeline so
-the same code can serve any quadratic Lagrangian without per-theory
-editing.
+The theory is specified by a single TOML file, which isolates
+everything theory-dependent from the derivation pipeline so the same
+code can serve any quadratic Lagrangian without per-theory editing.
 The TOML declares the spacetime (dimension, signature, coordinate
 names); the dynamical fields, with their tensor type and index
 symmetries; any algebraically-derived tensors such as the
@@ -57,7 +46,7 @@ and perturbative reduction.
 A representative theory file --- the Einstein--Maxwell setup that
 underlies the Gertsenshtein analysis of \cref{Results} --- is shown in
 \cref{TOMLExample}.
-The pipeline as a whole is the map
+The symbolic stage is the map
 \begin{align*}
   \textsc{TOML}\!\bigl[\mathcal{L},\,\{\varphi_i\},\,\{p_a\}\bigr]
   \;\longmapsto\;
@@ -208,8 +197,6 @@ tensor type, the equation of motion is
 \end{align}
 where the series terminates at the highest derivative order present in
 $\mathcal{L}^{(2)}$.
-This is the only stage of the pipeline that consumes the Lagrangian as
-a single object; every later stage operates on the equations themselves.
 The differentiation is performed by \xAct{}'s
 \texttt{VarD}~\cite{martingarcia2007xact}, which handles the chain rule
 and integration-by-parts for arbitrary tensor structure and arbitrary
@@ -217,17 +204,14 @@ derivative chains, and returns the equation in abstract-index form
 before any component reduction.
 
 The equations are kept in second-order velocity form, with explicit
-velocity slots $v_i = \partial_t\varphi_i$ alongside the fields; the
-rationale --- the kinetic-matrix definition, the canonical-momentum
-inversion failures that the velocity form sidesteps, and the
-consequences for solver dispatch --- is the subject of
-\cref{NumericalEvolution}'s \emph{Velocity form versus canonical phase
-space} block.
-For Lagrangians containing higher-curvature terms multiplied by a
-small parameter, which generate equations of motion of order higher
-than two in time, the pipeline applies a perturbative substitution
-before the variation; the algorithm, its scope, and the structural
-obstruction that limits it are deferred to \cref{ConstraintBarrier}.
+velocity slots $v_i = \partial_t\varphi_i$ alongside the fields; we
+defer the rationale, the kinetic-matrix definition, and the
+canonical-momentum inversion failures to \cref{NumericalEvolution}.
+For Lagrangians where a small-parameter expansion introduces equations
+of motion of order higher than two in time, the pipeline applies a
+perturbative substitution before the variation; the algorithm, its
+scope, and the structural obstruction that limits it are deferred to
+\cref{ConstraintBarrier}.
 
 \paragraph*{Component decomposition}
 The abstract-index equations returned by \texttt{VarD} are reduced to
@@ -245,40 +229,27 @@ tensor expression onto the chart's coordinate basis,
 \end{align}
 with Roman indices labelling chart components; repeated indices are
 summed by \texttt{TraceBasisDummy}; and the abstract covariant
-derivative is converted to partial derivatives plus the appropriate
-connection corrections,
+derivative is converted to partial derivatives plus the connection
+correction,
 \begin{align}
   \rcD{_\mu}\varphi_{\nu}
   \;=\;
-  \PD{_\mu}\varphi_{\nu}
-  \;-\; \bigl(\rCon{^\sigma_\mu_\nu}
-              + K^{\sigma}{}_{\mu\nu}\bigr)\,\varphi_{\sigma},
+  \PD{_\mu}\varphi_{\nu} \;-\; \MAGA{^\sigma_\mu_\nu}\,\varphi_{\sigma},
   \label{CovariantDerivativeExpansion}
 \end{align}
-where $\mathring{\Gamma}$ is the Levi-Civita part and $K$ the
-contortion; for tensors of higher rank the routine emits one such
-connection term per slot, drawn from the geometric cache established
-at session start.
-The cache specialises to vanishing Christoffels whenever the declared
-metric matrix has no coordinate dependence, and to vanishing contortion
-whenever the theory has no torsion, so the routine produces the
-simplest expression compatible with the declared geometry.
-Canonicalisation of the full quadratic Lagrangian is performed in a
-single pass rather than by batching across additive terms, because
-batched canonicalisation can collapse antisymmetric kinetic structure
-that spans multiple summands; an \texttt{Expand}-only fallback is used
-when the single pass exceeds the canonicalisation timeout, with
-per-component canonicalisation in the chart-conversion step recovering
-the canonical form downstream.
+where $\Gamma$ is the full Cartan connection of
+\cref{PalatiniDecomposition} and one such term appears per index slot
+for tensors of higher rank, with a sign matching whether the slot is
+covariant or contravariant.
 
 \paragraph*{Gauge fixing}%
 \label{GaugeFixing}
-When a gauge is to be fixed --- an option, not a requirement, since
-the surveys of \cref{Results} run at both fixed and unfixed gauges
-depending on what is known about a theory's symmetry structure ---
-\TIDAL{} offers two structurally distinct mechanisms: some gauges are
-most naturally imposed before the Euler--Lagrange variation, others
-after.
+Gauges are fixed only where the symmetry structure is known well enough
+for the choice to be physically motivated; the surveys of
+\cref{Results} run at both fixed and unfixed gauges.
+When a gauge is to be fixed, \TIDAL{} offers two structurally distinct
+mechanisms: some gauges are most naturally imposed before the
+Euler--Lagrange variation, others after.
 
 The first mechanism adds a gauge-fixing term to the Lagrangian before
 variation~\cite{faddeev1967feynman}.
@@ -303,56 +274,69 @@ fields, de Donder for the metric perturbation, Coulomb for the spatial
 part of a vector field, temporal ($A_0 = 0$), axial ($A_3 = 0$), and
 transverse-traceless.
 Arbitrary user-specified gauges are declared by writing the gauge
-expression directly in the \texttt{[[gauge]]} TOML block, which is
+expression directly in the gauge block of \cref{TOMLExample}, which is
 treated as either a Lagrangian term or a component constraint
 according to a flag.
-The choice of gauge interacts with the constraint elimination performed
-at the numerical-evolution stage: gauge-fixed kinetic operators
-sometimes still produce equations of zeroth time-derivative order,
-which the JSON-export step identifies and which the constraint
-pre-solve of \cref{NumericalEvolution} handles before the system is
-integrated.
 
 \paragraph*{JSON export}
 The symbolic stage terminates by writing a JSON specification, the
 sole interface to the numerical side of \TIDAL{}; fixing this interface
 cleanly is what allows parameter sweeps and grid changes without
 re-derivation.
-The specification has five top-level entries: a spacetime block
-(dimension, signature, coordinate names); the field list, with each
-field's time-derivative order recorded explicitly --- two for
-wave-like, one for first-order, zero for constraint; the equations,
-each carried as a linear combination of named differential operators
-acting on the dynamical fields with parameter-dependent coefficients;
-the canonical block, which holds the Hamiltonian density in the same
-operator format and is used for energy diagnostics; and a metadata
-block recording the source Lagrangian, the gauge, the linearisation
-flag, the parameter values, and a derivation hash.
-The operator alphabet --- identity, full and directional Laplacians,
-directional gradients, mixed cross-derivatives, a first-order time
-derivative, the biharmonic, and a generic mixed-derivative form --- is
-fixed and small.
+The specification has five top-level entries: a spacetime block, the
+field list with each field's time-derivative order recorded
+explicitly, the equations carried as linear combinations of named
+differential operators with parameter-dependent coefficients, the
+canonical block holding the Hamiltonian density in the same operator
+format, and a metadata block recording the source Lagrangian, the
+gauge, the linearisation flag, the parameter values, and a derivation
+hash.
+\cref{JSONExample} shows a representative excerpt for the
+Einstein--Maxwell theory of \cref{TOMLExample}.
 Each term carries both its numerical coefficient and its symbolic
 expression, so a runtime parameter override never regenerates the
 JSON; the equation specification is the centre arrow of
 \cref{ArchitectureDiagram}.
 
-\paragraph*{Failure modes and diagnostics}
-The symbolic stage has three classes of failure that the pipeline
-detects and surfaces as derivation artefacts rather than as silent
-numerical pathologies downstream.
-The canonicalisation of the full quadratic Lagrangian is super-linear
-in term count, and the default six-hundred-second ceiling triggers
-the \texttt{Expand}-only fallback discussed above --- equivalent on
-linear theories, and cheaper.
-Malformed Lagrangians, such as free-index miscounts or contractions
-across symbolic dummies that \xAct{} cannot resolve, are caught by
-\xAct{}'s built-in index-validation pass and reported with the
-offending term.
-A post-export validator confirms that every operator and field
-reference is known and that the canonical block matches the kinetic
-structure implied by the field list's time-derivative orders; failures
-point the user to the responsible Lagrangian term.
-Surfacing failures here, rather than in the numerical stage, is what
-made the surveys of \cref{Results} tractable; the complementary
-numerical-validation pass of \cref{Validation} catches the remainder.
+\begin{figure}[t]
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize,frame=single,
+    framerule=0.4pt,columns=fullflexible,
+    keepspaces=true,xleftmargin=1em]
+{
+  "spacetime": { "dimension": 4, "signature": [-1, 1, 1, 1],
+                 "coordinates": ["t", "x", "y", "z"] },
+  "fields": [
+    { "name": "h_00", "time_derivative_order": 2 },
+    { "name": "h_01", "time_derivative_order": 2 },
+    ...
+    { "name": "a_0",  "time_derivative_order": 0 },
+    { "name": "a_1",  "time_derivative_order": 1 }
+  ],
+  "equations": [
+    { "field": "a_1",
+      "rhs": [
+        { "coefficient_symbolic": "B0",
+          "operator": "gradient_z",
+          "field": "h_22" },
+        { "coefficient_symbolic": "1",
+          "operator": "laplacian",
+          "field": "a_1" }
+      ] }
+  ],
+  "canonical": { "hamiltonian_terms": [ ... ] },
+  "metadata":  { "lagrangian": "...",
+                 "gauge": "lorenz(A)",
+                 "derivation_hash": "..." }
+}
+\end{lstlisting}
+\caption{Representative JSON output: the Einstein--Maxwell
+specification produced from \cref{TOMLExample}. The fields list
+records each component with its time-derivative order; the equations
+list carries each right-hand side as a linear combination of named
+differential operators with parameter-dependent coefficients; the
+canonical block holds the Hamiltonian density in the same operator
+format; the metadata block records the source Lagrangian, the gauge,
+and a derivation hash for reproducibility.}
+\label{JSONExample}
+\end{figure}
+
