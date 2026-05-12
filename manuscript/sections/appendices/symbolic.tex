@@ -24,7 +24,7 @@ The symbolic stage runs in \Mathematica{}~\cite{mathematica} on the
 \xAct{}~\cite{martingarcia2007xact} suite, with
 \xPert{}~\cite{brizuela2009xpert} providing the perturbation-theory
 layer and \xTras{}~\cite{nutma2014xtras} the Einstein--Cartan
-operators used throughout the PGT theories of \cref{PGTBackground}.
+operators used throughout the PGT theories of \cref{PGTEnumeration}.
 The manifold, metric, Levi-Civita and Riemann--Cartan covariant
 derivatives, and the torsion tensor are declared once at session start;
 the Christoffel symbols, the inverse metric, and the Levi-Civita
@@ -47,7 +47,7 @@ The symbolic stage is the map
 \begin{align*}
   \textsc{TOML} \bigl[\lag,\,\{\varphi^{\mathcal{I}}_n\}_{n=1}^{N},
                      \,\{p_a\}_{a=1}^{P}\bigr]
-  \;\longmapsto\;
+  \longmapsto
   \textsc{JSON} \bigl[\{\textsf{EOM}^{\mathcal{I}}_n\}_{n=1}^{N},
                      \,\ham\bigr],
 \end{align*}
@@ -57,31 +57,31 @@ suppressed tensor indices (a convention used throughout this
 appendix); the internal stages occupy the rest of this appendix.
 
 \begin{figure}[t]
-\begin{lstlisting}[frame=single,keepspaces=true]
+\begin{lstlisting}[frame=single,keepspaces=true,basicstyle=\footnotesize\ttfamily]
 [spacetime]
 dimension = 4
 signature = "minkowski"
 coordinates = ["t", "x", "y", "z"]
 
 [[fields]]
-name = "h"           # metric perturbation
+name = "h"             # metric perturbation
 type = "tensor"
 rank = 2
 symmetry = "symmetric"
 
 [[fields]]
-name = "A"           # electromagnetic potential
+name = "A"             # electromagnetic potential
 type = "vector"
 
 [[derived_fields]]
-name = "F"           # F_{ab} = d A
+name = "F"             # F_{ab} = d A
 type = "tensor"
 rank = 2
 symmetry = "antisymmetric"
 definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
 
 [[background_fields]]
-name  = "Abar"       # uniform magnetic field along x
+name  = "Abar"         # background B field along x
 type  = "vector"
 components = ["0", "0", "-B0 * z[]", "0"]
 
@@ -89,7 +89,8 @@ components = ["0", "0", "-B0 * z[]", "0"]
 names  = ["B0", "kappa"]
 
 [lagrangian]
-expression = "-(1/4) F[-a,-b] F[a,b] + (1/kappa^2) RicciScalarCD[]"
+expression = "-(1/4) F[-a,-b] F[a,b]
+              + (1/kappa^2) RicciScalarCD[]"
 
 [[linearization.matter_perturbations]]
 field             = "A"
@@ -246,9 +247,8 @@ for tensors of higher rank; the general mixed-type form is
 
 \paragraph*{Gauge fixing}%
 \label{GaugeFixing}
-Gauges are fixed only where the symmetry structure is known well enough
-for the choice to be physically motivated; the surveys of
-\cref{Results} run at both fixed and unfixed gauges.
+Gauges are fixed only where a physically motivated choice
+is available for the field content.
 When a gauge is to be fixed, \TIDAL{} offers two structurally distinct
 mechanisms: some gauges are most naturally imposed before the
 Euler--Lagrange variation, others after.
@@ -256,14 +256,14 @@ Euler--Lagrange variation, others after.
 The first mechanism adds a gauge-fixing term to the Lagrangian before
 variation~\cite{faddeev1967feynman}.
 For a vector field $\FieldA{_\mu}$, the Lorenz condition
-$\rcD{_\mu}\FieldA{^\mu} = 0$ is imposed by the gauge-fixing term
+$\rcD{_\mu}\FieldA{^\mu} = 0$ is imposed by
 \begin{align}
   \lag \;\longrightarrow\;
   \lag \;-\; \frac{1}{2\xi}\bigl(\rcD{_\mu}\FieldA{^\mu}\bigr)^{2},
   \label{LorenzGauge}
 \end{align}
-with $\xi$ the gauge-fixing weight ($\xi \to 0$ recovers the hard
-condition); the modified Lagrangian then enters the variational
+with $\xi$ the gauge-fixing weight, defaulting to $\xi=1$
+($\xi\to 0$ recovers the hard Lorenz condition); the modified Lagrangian then enters the variational
 procedure in the usual way.
 The second mechanism imposes a constraint on the field components
 after decomposition, as in the transverse-traceless prescription that
@@ -296,15 +296,17 @@ hash.
 \cref{JSONExample} shows a representative excerpt for the
 Einstein--Maxwell theory of \cref{TOMLExample}.
 Each term carries both its numerical coefficient and its symbolic
-expression, so a runtime parameter override never regenerates the
-JSON; the equation specification is the centre arrow of
-\cref{ArchitectureDiagram}.
+expression.%, so a runtime parameter override never regenerates the
+% JSON; the equation specification is the centre arrow of
+% \cref{ArchitectureDiagram}.
 
 \begin{figure}[t]
-\begin{lstlisting}[frame=single,keepspaces=true]
+\begin{lstlisting}[frame=single,keepspaces=true,basicstyle=\footnotesize\ttfamily]
 {
-  "spacetime": { "dimension": 4, "signature": [-1, 1, 1, 1],
-                 "coordinates": ["t", "x", "y", "z"] },
+  "spacetime": {
+    "dimension": 4, "signature": [-1, 1, 1, 1],
+    "coordinates": ["t", "x", "y", "z"]
+  },
   "fields": [
     { "name": "h_00", "time_derivative_order": 2 },
     { "name": "h_01", "time_derivative_order": 2 },
@@ -318,10 +320,9 @@ JSON; the equation specification is the centre arrow of
         { "coefficient_symbolic": "B0",
           "operator": "gradient_z",
           "field": "h_22" },
-        { "coefficient_symbolic": "1",
-          "operator": "laplacian",
-          "field": "a_1" }
-      ] }
+        ...
+      ] },
+    ...
   ],
   "canonical": { "hamiltonian_terms": [ ... ] },
   "metadata":  { "lagrangian": "...",
