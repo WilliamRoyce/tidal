@@ -31,31 +31,6 @@ the Christoffel symbols, the inverse metric, and the Levi-Civita
 pseudotensor $\sqrt{-g}\,\varepsilon$ are computed once and cached
 against the declared metric.
 
-\paragraph*{Lagrangian input from TOML}
-The theory is specified by a single TOML file, which isolates
-everything theory-dependent from the derivation so the same code can
-serve any quadratic Lagrangian without per-theory editing.
-The TOML declares the spacetime (dimension, signature, coordinate
-names); the dynamical fields, with their tensor type and index
-symmetries; any algebraically-derived tensors such as the
-electromagnetic field strength $\FieldF{_\mu_\nu}$; the background
-fields; the parameter symbol set; the Lagrangian expression in
-\xAct{} syntax; and optional blocks for gauge fixing, linearisation,
-and perturbative reduction.
-A representative theory file is shown in \cref{TOMLExample}.
-The symbolic stage is the map
-\begin{align*}
-  \textsc{TOML} \bigl[\lag,\,\{\varphi^{\mathcal{I}}_n\}_{n=1}^{N},
-                     \,\{p_a\}_{a=1}^{P}\bigr]
-  \longmapsto
-  \textsc{JSON} \bigl[\{\textsf{EOM}^{\mathcal{I}}_n\}_{n=1}^{N},
-                     \,\ham\bigr],
-\end{align*}
-with $n$ labelling the $N$ dynamical fields, $a$ labelling the $P$
-scalar parameters, and $\mathcal{I}$ standing for each field's
-suppressed tensor indices (a convention used throughout this
-appendix); the internal stages occupy the rest of this appendix.
-
 \begin{figure}[t]
 \begin{lstlisting}[frame=single,keepspaces=true,basicstyle=\footnotesize\ttfamily]
 [spacetime]
@@ -113,6 +88,31 @@ in their declared fields and Lagrangian.}
 \label{TOMLExample}
 \end{figure}
 
+\paragraph*{Lagrangian input from TOML}
+The theory is specified by a single TOML file, which isolates
+everything theory-dependent from the derivation so the same code can
+serve any quadratic Lagrangian without per-theory editing.
+The TOML declares the spacetime (dimension, signature, coordinate
+names); the dynamical fields, with their tensor type and index
+symmetries; any algebraically-derived tensors such as the
+electromagnetic field strength $\FieldF{_\mu_\nu}$; the background
+fields; the parameter symbol set; the Lagrangian expression in
+\xAct{} syntax; and optional blocks for gauge fixing, linearisation,
+and perturbative reduction.
+A representative theory file is shown in \cref{TOMLExample}.
+The symbolic stage is the map
+\begin{align*}
+  \textsc{TOML} \bigl[\lag,\,\{\varphi^{\mathcal{I}}_n\}_{n=1}^{N},
+                     \,\{p_a\}_{a=1}^{P}\bigr]
+  \longmapsto
+  \textsc{JSON} \bigl[\{\textsf{EOM}^{\mathcal{I}}_n\}_{n=1}^{N},
+                     \,\ham\bigr],
+\end{align*}
+with $n$ labelling the $N$ dynamical fields, $a$ labelling the $P$
+scalar parameters, and $\mathcal{I}$ standing for each field's
+suppressed tensor indices (a convention used throughout this
+appendix); the internal stages occupy the rest of this appendix.
+
 \paragraph*{Linearisation around backgrounds}
 The software implements the background-and-perturbation decomposition
 of \cref{Linearisation} by expanding the action to second order in the
@@ -123,7 +123,7 @@ Each dynamical field is declared with its own
 \texttt{DefTensorPerturbation} call (the metric carries one through
 \texttt{SetupMetricPerturbation}), and the perturbation expansion is a
 single operation applying \texttt{Perturbation} of
-order two to $\sqrt{-g}\,\lag$: producing every bilinear product of
+order two to $\sqrt{-g}\,\lag$, producing every bilinear product of
 first-order perturbations.
 Each matter field $\varphi^{\mathcal{I}}$ declared in the
 matter-perturbations block of \cref{TOMLExample} yields
@@ -192,13 +192,13 @@ The field equation for every dynamical perturbation is obtained by
 variational differentiation of the quadratic action $\lag^{(2)}$
 above: for fields $\varphi^{\mathcal{I}}$
 of arbitrary tensor type, the equation of motion is
-\begin{equation*}
+\begin{equation}
   \frac{\partial \lag^{(2)}}{\partial \varphi^{\mathcal{I}}}
   \;-\; \rcD{_\mu} \frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\varphi^{\mathcal{I}})}
   \;+\; \rcD{_\mu}\rcD{_\nu} \frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\rcD{_\nu}\varphi^{\mathcal{I}})}
   \;-\; \cdots \;=\; 0,
-  % \label{EulerLagrange}
-\end{equation*}
+  \label{EulerLagrange}
+\end{equation}
 where the series terminates at the highest derivative order present in
 $\lag^{(2)}$.
 The differentiation is performed by \xAct{}'s
@@ -249,7 +249,7 @@ for tensors of higher rank; the general mixed-type form is
 \label{GaugeFixing}
 Gauges are fixed only where a physically motivated choice
 is available for the field content.
-When a gauge is to be fixed, \TIDAL{} offers two structurally distinct
+When a gauge is to be fixed, \TIDAL{} implements two structurally distinct
 mechanisms: some gauges are most naturally imposed before the
 Euler--Lagrange variation, others after.
 
@@ -278,7 +278,7 @@ Coulomb for the spatial part of a vector field, temporal
 Arbitrary user-specified gauges are declared by writing the gauge
 expression directly in the gauge block of \cref{TOMLExample}, which is
 treated as either a Lagrangian term or a component constraint
-according to a flag.
+according to a mode-selection field in the gauge block.
 
 \paragraph*{JSON export}
 The symbolic stage terminates by writing a JSON specification, the
