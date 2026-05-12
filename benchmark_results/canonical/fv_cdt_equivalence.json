@@ -1,0 +1,68 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-12T20:11:10.482431+00:00",
+    "host": "01f52c360ddd",
+    "python_version": "3.11.15",
+    "numpy_version": "2.3.4",
+    "scipy_version": "1.16.3",
+    "git_sha": "0f15caa206ea2e170b949c1ed4e157afffcef1b7",
+    "parameters": {
+      "n_points": 2,
+      "grid_n": 32,
+      "kappa": 1.0,
+      "B0": 0.05,
+      "kwave": 2.0106,
+      "t_end": 50.0,
+      "bounds": [
+        0.0,
+        100.0
+      ],
+      "fv_spec": "examples/data/torsion_dark_photon_fv.json",
+      "cdt_spec": "examples/data/dark_photon_plasma.json",
+      "smoke": true
+    }
+  },
+  "summary": {
+    "n_points": 2,
+    "n_ok": 2,
+    "max_rel_diff": 2.8493712284614327e-15,
+    "median_rel_diff": 2.139694311435042e-15,
+    "min_rel_diff": 1.4300173944086515e-15,
+    "ieee_floor": 2.22e-16,
+    "convention_map": "m_T\u00b2 = 2\u00b7\u03b1_3 (post 2026-04-24, GH #318)"
+  },
+  "results": [
+    {
+      "label": "canonical",
+      "params": {
+        "label": "canonical",
+        "mA2": 0.955,
+        "deltam": 0.01,
+        "xi": 0.274,
+        "alpha3": 0.123
+      },
+      "mT2_equivalence": 0.246,
+      "ok": true,
+      "P_max_FV": 0.014556943008605787,
+      "P_max_CDT": 0.014556943008605766,
+      "abs_diff": 2.0816681711721685e-17,
+      "rel_diff": 1.4300173944086515e-15
+    },
+    {
+      "label": "low_mass",
+      "params": {
+        "label": "low_mass",
+        "mA2": 0.5,
+        "deltam": 0.01,
+        "xi": 0.5,
+        "alpha3": 0.05
+      },
+      "mT2_equivalence": 0.1,
+      "ok": true,
+      "P_max_FV": 0.043834263862407186,
+      "P_max_CDT": 0.04383426386240731,
+      "abs_diff": 1.249000902703301e-16,
+      "rel_diff": 2.8493712284614327e-15
+    }
+  ]
+}

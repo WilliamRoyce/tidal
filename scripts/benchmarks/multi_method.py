@@ -55,9 +55,14 @@ BACKENDS: list[tuple[str, list[str]]] = [
     ("leapfrog_Y2", ["--scheme", "leapfrog", "--leapfrog-order", "2"]),
     ("leapfrog_Y4", ["--scheme", "leapfrog", "--leapfrog-order", "4"]),
     ("scipy_DOP853", ["--scheme", "scipy", "--method", "DOP853"]),
-    ("scipy_Radau", ["--scheme", "scipy", "--method", "Radau"]),
-    ("scipy_BDF", ["--scheme", "scipy", "--method", "BDF"]),
+    # scipy Radau and BDF are implicit and hang convergence-iterating
+    # on these wave problems at our grid sizes (~40 min per cell with
+    # no return). Excluded; the implicit family is already represented
+    # by IDA and CVODE.
 ]
+# Per-cell wall-clock timeout — safety net against future backend
+# regressions silently locking up the benchmark.
+CELL_TIMEOUT = 240
 
 THEORIES: list[dict] = [
     {
@@ -145,9 +150,22 @@ def _run_one(
     for k, v in theory["params"].items():
         sim_cmd.extend(["--param", f"{k}={v}"])
 
-    res = subprocess.run(
-        sim_cmd, capture_output=True, text=True, cwd=REPO_ROOT, check=False
-    )
+    try:
+        res = subprocess.run(
+            sim_cmd,
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+            timeout=CELL_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "theory": theory["label"],
+            "backend": label,
+            "ok": False,
+            "error": f"sim timed out after {CELL_TIMEOUT}s",
+        }
     if res.returncode != 0:
         err = (res.stderr or res.stdout or "").splitlines()
         return {

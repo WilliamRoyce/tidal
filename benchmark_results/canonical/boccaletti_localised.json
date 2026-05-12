@@ -1,0 +1,57 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-12T20:11:27.292122+00:00",
+    "host": "01f52c360ddd",
+    "python_version": "3.11.15",
+    "numpy_version": "2.3.4",
+    "scipy_version": "1.16.3",
+    "git_sha": "0f15caa206ea2e170b949c1ed4e157afffcef1b7",
+    "parameters": {
+      "Bpeak_values": [
+        0.05,
+        0.1
+      ],
+      "R_values": [
+        5.0
+      ],
+      "grid_n": 256,
+      "kappa": 1.0,
+      "bounds": [
+        -100.0,
+        100.0
+      ],
+      "t_end": 120.0,
+      "ic_center": -50.0,
+      "ic_width": 5.0,
+      "ic_wavevector": 2.0,
+      "smoke": true
+    }
+  },
+  "summary": {
+    "n_cells": 2,
+    "n_ok": 2,
+    "max_abs_residual": 0.001213919761383353,
+    "rms_residual": 0.0008840825423731995,
+    "max_abs_rel_diff": 0.0035297372714725474
+  },
+  "results": [
+    {
+      "Bpeak": 0.05,
+      "R": 5.0,
+      "ok": true,
+      "P_sim": 0.09470443280802537,
+      "P_analytic": 0.09500376990292192,
+      "residual": -0.0002993370948965457,
+      "abs_rel_diff": 0.0031507917549210783
+    },
+    {
+      "Bpeak": 0.1,
+      "R": 5.0,
+      "ok": true,
+      "P_sim": 0.342698294667235,
+      "P_analytic": 0.34391221442861836,
+      "residual": -0.001213919761383353,
+      "abs_rel_diff": 0.0035297372714725474
+    }
+  ]
+}

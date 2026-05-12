@@ -1,0 +1,56 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-12T20:11:24.587659+00:00",
+    "host": "01f52c360ddd",
+    "python_version": "3.11.15",
+    "numpy_version": "2.3.4",
+    "scipy_version": "1.16.3",
+    "git_sha": "0f15caa206ea2e170b949c1ed4e157afffcef1b7",
+    "parameters": {
+      "smoke": true,
+      "examples": [
+        "gertsenshtein",
+        "coupled_scalars",
+        "gertsenshtein_proca",
+        "coupled_scattering"
+      ]
+    }
+  },
+  "summary": {
+    "n_examples": 4,
+    "n_ok": 3,
+    "n_failed": 1,
+    "max_drift": 1.0076577048719727e-14,
+    "median_drift": 1.5593020008780288e-15,
+    "min_drift": 1.3336646093893757e-15
+  },
+  "results": [
+    {
+      "label": "gertsenshtein",
+      "ok": true,
+      "max_abs_dE_over_E": 1.3336646093893757e-15,
+      "is_conserved": true,
+      "threshold": 0.001
+    },
+    {
+      "label": "coupled_scalars",
+      "ok": true,
+      "max_abs_dE_over_E": 1.5593020008780288e-15,
+      "is_conserved": true,
+      "threshold": 0.001
+    },
+    {
+      "label": "gertsenshtein_proca",
+      "ok": true,
+      "max_abs_dE_over_E": 1.0076577048719727e-14,
+      "is_conserved": true,
+      "threshold": 0.001
+    },
+    {
+      "label": "coupled_scattering",
+      "ok": false,
+      "stage": "simulate",
+      "error": "[ERROR] Unknown component 'h_0'. Available: chi_0, phi_0"
+    }
+  ]
+}

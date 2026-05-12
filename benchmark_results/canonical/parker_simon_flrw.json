@@ -1,0 +1,78 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-12T20:11:05.131625+00:00",
+    "host": "01f52c360ddd",
+    "python_version": "3.11.15",
+    "numpy_version": "2.3.4",
+    "scipy_version": "1.16.3",
+    "git_sha": "0f15caa206ea2e170b949c1ed4e157afffcef1b7",
+    "parameters": {
+      "m2": 1.0,
+      "t_end": 2.0,
+      "n_grid": 64,
+      "k_mode": 2.0,
+      "n_snapshots": 21,
+      "domain": [
+        0.0,
+        6.283185307179586
+      ],
+      "eps_values": [
+        0.1,
+        0.05,
+        0.01,
+        0.005,
+        0.001
+      ],
+      "smoke": false,
+      "correction": "\u03b5 \u00b7 \u2202_x^4 (phi) [derivative_4_x]",
+      "full_dispersion": "omega\u00b2 = k\u00b2 + m\u00b2 + \u03b5 k\u2074"
+    }
+  },
+  "summary": {
+    "n_eps_points": 5,
+    "fitted_slope_err_vs_eps": 2.5870016317060873,
+    "expected_slope": 2.0,
+    "max_err_combined": 0.044079329439460246,
+    "min_err_combined": 4.715219227569012e-07,
+    "median_improvement_ratio": 5948.297814942346,
+    "correction_operator": "biharmonic",
+    "reference": "Parker & Simon 1993, gr-qc/9211002 (canonical higher-derivative perturbative-reduction structure)"
+  },
+  "results": [
+    {
+      "eps": 0.1,
+      "err_pass0_vs_full": 0.6509104892849124,
+      "err_combined_vs_full": 0.044079329439460246,
+      "improvement_ratio": 14.766796536206172,
+      "scaled_err_combined_over_eps2": 4.407932943946024
+    },
+    {
+      "eps": 0.05,
+      "err_pass0_vs_full": 0.34200851934981347,
+      "err_combined_vs_full": 0.005486390012372833,
+      "improvement_ratio": 62.33762429913303,
+      "scaled_err_combined_over_eps2": 2.1945560049491326
+    },
+    {
+      "eps": 0.01,
+      "err_pass0_vs_full": 0.06949315107386422,
+      "err_combined_vs_full": 5.830798572997731e-06,
+      "improvement_ratio": 11918.290471511931,
+      "scaled_err_combined_over_eps2": 0.05830798572997731
+    },
+    {
+      "eps": 0.005,
+      "err_pass0_vs_full": 0.0347553338403333,
+      "err_combined_vs_full": 5.842904125114012e-06,
+      "improvement_ratio": 5948.297814942346,
+      "scaled_err_combined_over_eps2": 0.2337161650045605
+    },
+    {
+      "eps": 0.001,
+      "err_pass0_vs_full": 0.006950369709164406,
+      "err_combined_vs_full": 4.715219227569012e-07,
+      "improvement_ratio": 14740.289631767031,
+      "scaled_err_combined_over_eps2": 0.4715219227569012
+    }
+  ]
+}

@@ -70,10 +70,12 @@ TIO_SCHEMES_FULL: list[tuple[str, list[str]]] = [
     ("cvode", ["--scheme", "cvode"]),
     ("ida", ["--scheme", "ida"]),
     ("scipy_DOP853", ["--scheme", "scipy", "--method", "DOP853"]),
-    ("scipy_Radau", ["--scheme", "scipy", "--method", "Radau"]),
-    ("scipy_BDF", ["--scheme", "scipy", "--method", "BDF"]),
+    # scipy Radau and BDF: implicit solvers hang convergence-iterating
+    # on these wave problems at our grid sizes. Excluded; implicit
+    # behaviour is already represented by IDA and CVODE.
 ]
 TIO_SCHEMES_SMOKE = TIO_SCHEMES_FULL[:3]
+TIO_CELL_TIMEOUT = 240  # seconds; safety net per (scheme, dt) cell
 TIO_DT_FULL = [0.2, 0.1, 0.05, 0.025, 0.0125, 0.00625, 0.003125, 0.0015625]
 TIO_DT_SMOKE = [0.1, 0.05, 0.025]
 TIO_GRID_N_FULL = 512
@@ -362,9 +364,22 @@ def _tio_run_one(
         str(out_dir),
         "--force",
     ]
-    res = subprocess.run(
-        sim_cmd, capture_output=True, text=True, cwd=REPO_ROOT, check=False
-    )
+    try:
+        res = subprocess.run(
+            sim_cmd,
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+            timeout=TIO_CELL_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "scheme": scheme_label,
+            "dt": dt,
+            "ok": False,
+            "error": f"sim timed out after {TIO_CELL_TIMEOUT}s",
+        }
     if res.returncode != 0:
         return {"scheme": scheme_label, "dt": dt, "ok": False, "error": "sim failed"}
 
