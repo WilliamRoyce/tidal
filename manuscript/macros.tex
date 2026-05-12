@@ -13,7 +13,6 @@
 \usepackage{amsmath}
 \usepackage{mathtools}
 \usepackage{stix}
-\usepackage{bm}
 \usepackage{mathrsfs}
 \usepackage{tensor}
 \usepackage{accents}
@@ -69,6 +68,10 @@
 
 \setlength{\parskip}{1mm}
 \setlength{\parindent}{2mm}
+
+% \bm{} alias: bm package exhausts TeX's 16 symbol-font slots alongside stix.
+% \boldsymbol (amsbsy via amsmath) gives identical output for our use case.
+\let\bm\boldsymbol
 
 % === Abbreviations ===
 % Convention: MacrosTextual.tex from BHL corpus (2406.12826)
