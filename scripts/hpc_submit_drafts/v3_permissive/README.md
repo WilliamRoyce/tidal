@@ -55,7 +55,7 @@ output directory — pull once at the end with the original jobid as the src pat
 Observed v3 timings (updated 2026-05-12):
 
 - D2.0 amp (5p): 22 min INTR ✓ (18K dead pts, ESS=8338)
-- D2.0 sup (5p): **3-5 INTR sessions** — 123+ clusters discovered; 37K dead pts after 2 sessions; highly multi-modal suppression landscape
+- D2.0 sup (5p): **5-8+ INTR sessions** — 190+ clusters after 2 sessions (43.7K dead pts), σ_logZ still growing; multi-modal discovery accelerating
 - D2.1 amp (6p): 27 min INTR ✓ (21K dead pts, ESS=9517, 27 clusters)
 - D2.1 sup (6p): ~90-180 min → 1-2 resumes (6 params + wide priors)
 - D2.2 amp (8p): v2 was 38 min; v3 uncertain — plan for 1-2 resumes
@@ -63,9 +63,9 @@ Observed v3 timings (updated 2026-05-12):
 - D2.3 amp (9p): v2 was 1:09; v3 uncertain — plan for 1-3 resumes
 - D2.3 sup (9p): **≥5 resumes** — 9-param sup + wide v3 priors = most compute-intensive chain
 
-**Key finding**: v3 sup chains are highly multi-modal (100+ PolyChord clusters for 5-param theories).
-The ×5 v2 slowdown estimate is now a **lower bound** — amp estimate remains a lower bound too.
-Plan for 3-5 INTR sessions per sup chain, 1-3 per amp chain.
+**Key finding**: v3 sup chains are extremely multi-modal (190+ PolyChord clusters for 5-param D2.0 theory).
+The ×5 v2 slowdown estimate is now a **severe lower bound** — sup chains can take 5-8× longer.
+Plan for 5-8+ INTR sessions per sup chain, 1-3 per amp chain.
 
 If/when the cubed-sphere joint prior (parallel session) lands, sibling `scripts/hpc_submit_drafts/v3_jointprior/` will contain `--joint-prior` versions of the same campaigns for direct comparison.
 
