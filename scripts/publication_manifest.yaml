@@ -1,0 +1,53 @@
+# Publication artefact manifest.
+#
+# Maps each manuscript figure/table to its producing script(s), data
+# dependencies, and appendix reference. Read by:
+#   - tests/publication/* (validates round-trip script -> data -> output)
+#   - scripts/run_benchmarks.sh (enumerates benchmark jobs)
+#
+# Each entry under appendix_<X> is keyed by the artefact's manuscript label.
+# `kind` is one of: figure, table, static_tikz.
+# `appendix_ref` is the source-line citation pointing at the TODO this
+# artefact satisfies.
+
+appendix_C:
+
+  figC1_solver_convergence:
+    kind: figure
+    figure_script: scripts/figures/figC1_solver_convergence.py
+    benchmark_script: scripts/benchmarks/solver_convergence.py
+    canonical_data: benchmark_results/canonical/solver_convergence.json
+    output: manuscript/figures/figC1_solver_convergence.pdf
+    appendix_ref: manuscript/sections/appendices/numerical.tex:547
+
+  figC2_fd_convergence:
+    kind: figure
+    figure_script: scripts/figures/figC2_fd_convergence.py
+    benchmark_script: scripts/benchmarks/fd_convergence.py
+    canonical_data: benchmark_results/canonical/fd_convergence.json
+    output: manuscript/figures/figC2_fd_convergence.pdf
+    appendix_ref: manuscript/sections/appendices/numerical.tex:236
+
+  tab_pade_benchmark:
+    kind: table
+    table_script: scripts/tables/tab_pade_benchmark.py
+    benchmark_script: scripts/benchmarks/pade_vs_eig.py
+    canonical_data: benchmark_results/canonical/pade_vs_eig.json
+    output: manuscript/tables/pade_benchmark.tex
+    appendix_ref: manuscript/sections/appendices/numerical.tex:348
+
+  tab_sparse_csc:
+    kind: table
+    table_script: scripts/tables/tab_sparse_csc.py
+    benchmark_script: scripts/benchmarks/sparse_csc_vs_dense.py
+    canonical_data: benchmark_results/canonical/sparse_csc_vs_dense.json
+    output: manuscript/tables/sparse_csc_benchmark.tex
+    appendix_ref: manuscript/sections/appendices/numerical.tex:490
+
+  tab_nyquist_energy:
+    kind: table
+    table_script: scripts/tables/tab_nyquist_energy.py
+    benchmark_script: scripts/benchmarks/nyquist_energy.py
+    canonical_data: benchmark_results/canonical/nyquist_energy.json
+    output: manuscript/tables/nyquist_energy.tex
+    appendix_ref: manuscript/sections/appendices/numerical.tex:525

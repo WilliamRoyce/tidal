@@ -1,4 +1,6 @@
-.PHONY: test lint format typecheck docs clean install all help
+.PHONY: test lint format typecheck docs clean install all help \
+        publication publication-benchmarks publication-tables \
+        publication-figures publication-test
 
 help:  ## Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
@@ -40,3 +42,20 @@ install:  ## Install dependencies
 	uv sync --all-extras
 
 all: lint typecheck test  ## Run all checks (lint, typecheck, test)
+
+publication-benchmarks:  ## Rerun all App C benchmarks (per-machine, writes to benchmark_results/<host>-<date>/)
+	bash scripts/run_benchmarks.sh
+
+publication-tables:  ## Regenerate App C .tex tables from canonical benchmark data
+	uv run python scripts/tables/tab_pade_benchmark.py
+	uv run python scripts/tables/tab_sparse_csc.py
+	uv run python scripts/tables/tab_nyquist_energy.py
+
+publication-figures:  ## Regenerate App C PDFs from canonical benchmark data
+	uv run python scripts/figures/figC1_solver_convergence.py
+	uv run python scripts/figures/figC2_fd_convergence.py
+
+publication: publication-tables publication-figures  ## Rebuild all App C publication artefacts
+
+publication-test:  ## Run publication-pipeline tests (skipped by default lane)
+	uv run pytest -m publication tests/publication/
