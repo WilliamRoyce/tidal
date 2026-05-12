@@ -38,7 +38,7 @@ from tidal.solver.operators import (  # noqa: E402
 # Sweep parameters — N values cover the regime where round-off floor is
 # reached for the spectral path (~64) and where high-order FD curves
 # have asymptoted to their stencil convergence rate (>= 32).
-N_VALUES = [16, 32, 64, 128, 256, 512]
+N_VALUES = [8, 16, 32, 64, 128, 256, 512]
 FD_ORDERS = [2, 4, 6]
 
 
@@ -70,8 +70,8 @@ def _metadata() -> dict:
             "n_values": N_VALUES,
             "fd_orders": FD_ORDERS,
             "domain": [0.0, 2.0 * float(np.pi)],
-            "test_function": "sin(x)",
-            "exact_derivative": "cos(x)",
+            "test_function": "exp(sin(x))",
+            "exact_derivative": "cos(x)*exp(sin(x))",
         },
     }
 
@@ -81,8 +81,8 @@ def _measure(n: int, order: int | None) -> dict:
     bounds = ((0.0, 2.0 * np.pi),)
     grid = GridInfo(bounds=bounds, shape=(n,), periodic=(True,))
     x = grid.axes_coords(0)
-    f = np.sin(x)
-    exact = np.cos(x)
+    f = np.exp(np.sin(x))
+    exact = np.cos(x) * np.exp(np.sin(x))
 
     prev_order = get_fd_order()
     prev_spectral = get_spectral()

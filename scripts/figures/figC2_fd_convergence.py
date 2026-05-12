@@ -1,9 +1,10 @@
 """Figure C.2 — FD-stencil and spectral convergence on the smooth gradient test.
 
-Plots L_2 error vs N on log-log axes for FD orders 2, 4, 6 and the FFT-based
-pseudo-spectral path, on the test problem f(x) = sin(x) over a periodic
-[0, 2pi] grid. Dashed guide lines show the theoretical algebraic rates
-N^{-2}, N^{-4}, N^{-6}.
+Plots RMS error vs N on log-log axes for FD orders 2, 4, 6 and the FFT-based
+pseudo-spectral path, on the test problem f(x) = exp(sin(x)) over a periodic
+[0, 2pi] grid. Dashed fitted lines show the measured algebraic rates with
+slope alpha-hat and R^2 from log-log linear regression. Spectral curve
+descends exponentially to the floating-point floor then saturates.
 
 Data source:  benchmark_results/canonical/fd_convergence.json
 Output:       manuscript/figures/figC2_fd_convergence.pdf
@@ -19,6 +20,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.stats import linregress
 
 # Match the manuscript: revtex4-2/PRD, \usepackage{stix}, single-column 3.375 in.
 mpl.rcParams.update(
@@ -48,8 +50,21 @@ SCHEME_STYLE = {
     "fd_o2": {"label": "FD order 2", "marker": "o", "color": "#1f77b4"},
     "fd_o4": {"label": "FD order 4", "marker": "s", "color": "#ff7f0e"},
     "fd_o6": {"label": "FD order 6", "marker": "^", "color": "#2ca02c"},
-    "spectral": {"label": "Spectral", "marker": "D", "color": "#d62728"},
+    "spectral": {"label": r"Spectral (f.p.\ floor)", "marker": "D", "color": "#d62728"},
 }
+
+_FLOOR = 1e-14  # exclude points at/near machine-precision floor
+
+
+def _regress(
+    ns: np.ndarray, errs: np.ndarray
+) -> tuple[float | None, float | None, np.ndarray | None]:
+    mask = errs > _FLOOR
+    if mask.sum() < 2:
+        return None, None, None
+    slope, intercept, r, _, _ = linregress(np.log10(ns[mask]), np.log10(errs[mask]))
+    fitted = 10.0 ** (intercept + slope * np.log10(ns))
+    return float(slope), float(r**2), fitted
 
 
 def _group_by_scheme(rows: list[dict]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
@@ -67,61 +82,79 @@ def _group_by_scheme(rows: list[dict]) -> dict[str, tuple[np.ndarray, np.ndarray
 
 def _plot(data: dict, out_path: Path) -> None:
     grouped = _group_by_scheme(data["results"])
+    n_vals = sorted({row["n"] for row in data["results"]})
 
     fig, ax = plt.subplots(figsize=(_FIG_WIDTH, _FIG_HEIGHT))
 
-    # Guide lines span the full data range (N=16 to N_max).
-    n_values = sorted({row["n"] for row in data["results"]})
-    n_guide = np.array([n_values[0], n_values[-1]])
-
+    # Build labels for FD curves from regression; spectral uses constant label.
+    computed_labels: dict[str, str] = {}
     for order, color in [(2, "#1f77b4"), (4, "#ff7f0e"), (6, "#2ca02c")]:
         scheme = f"fd_o{order}"
         if scheme not in grouped:
             continue
         ns, errs = grouped[scheme]
-        anchor_idx = len(ns) // 2
-        anchor_n = ns[anchor_idx]
-        anchor_err = errs[anchor_idx]
-        guide = anchor_err * (anchor_n / n_guide) ** order
-        ax.plot(n_guide, guide, ls="--", color=color, alpha=0.45, lw=0.8)
-        # Label the slope at the geometric midpoint of the guide line.
-        mid_n = float(np.sqrt(n_guide[0] * n_guide[-1]))
-        mid_e = float(anchor_err * (anchor_n / mid_n) ** order)
-        ax.text(
-            mid_n,
-            mid_e * 2.2,
-            rf"$N^{{-{order}}}$",
-            color=color,
-            fontsize=7,
-            ha="center",
-            va="bottom",
-        )
+        slope, r_sq, fitted = _regress(ns, errs)
+        # Dashed regression line plotted first so markers sit on top.
+        if fitted is not None:
+            ax.plot(ns, fitted, ls="--", color=color, alpha=0.55, lw=0.8)
+        if slope is not None:
+            computed_labels[scheme] = (
+                rf"FD-{order} ($\hat{{\alpha}}={slope:.2f},\,R^2={r_sq:.4f}$)"
+            )
+        else:
+            computed_labels[scheme] = f"FD-{order}"
 
+    # Data markers on top of regression lines.
     for scheme, (ns, errs) in grouped.items():
         style = SCHEME_STYLE[scheme]
-        mask = errs > 0  # hide round-off floor so log plot stays tidy
+        lbl = computed_labels.get(scheme, style["label"])
+        mask = errs > 0
         ax.plot(
             ns[mask],
             errs[mask],
             marker=style["marker"],
             color=style["color"],
-            label=style["label"],
+            label=lbl,
             lw=1.0,
             ms=4,
         )
 
+    # Floating-point floor reference line.
+    fp_eps = 2.0**-52
+    ax.axhline(fp_eps, color="gray", ls=":", lw=0.6, alpha=0.6)
+    ax.text(
+        n_vals[-1] * 1.3,
+        fp_eps * 2.5,
+        r"f.p.\ floor",
+        color="gray",
+        fontsize=6.5,
+        ha="right",
+        va="bottom",
+    )
+
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(r"Grid resolution $N$")
-    ax.set_ylabel(r"$L_2$ error, $\partial_x \sin x$")
+    ax.set_ylabel(r"RMS error $\|\hat{\partial}_x f - \partial_x f\|$", labelpad=4)
+    ax.set_xticks(n_vals)
+    ax.set_xticklabels([str(n) for n in n_vals])
+    ax.set_xlim(n_vals[0] * 0.7, n_vals[-1] * 1.4)
     ax.grid(visible=True, which="both", ls=":", alpha=0.35, lw=0.5)
-    ax.legend(frameon=False, loc="lower left", fontsize=8, handlelength=1.5)
+    ax.legend(
+        loc="upper right",
+        fontsize=7,
+        frameon=False,
+        handlelength=1.4,
+        handletextpad=0.4,
+        borderpad=0.0,
+        labelspacing=0.25,
+    )
     ax.tick_params(which="both", direction="in", top=False, right=False)
     ax.spines[["top", "right"]].set_visible(False)
 
-    fig.tight_layout(pad=0.3)
+    fig.tight_layout(pad=0.2)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, format="pdf", bbox_inches="tight")
+    fig.savefig(out_path, format="pdf", bbox_inches="tight", pad_inches=0.02)
     plt.close(fig)
 
 
