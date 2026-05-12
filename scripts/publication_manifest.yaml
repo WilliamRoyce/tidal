@@ -12,14 +12,6 @@
 
 appendix_C:
 
-  figC1_solver_convergence:
-    kind: figure
-    figure_script: scripts/figures/figC1_solver_convergence.py
-    benchmark_script: scripts/benchmarks/solver_convergence.py
-    canonical_data: benchmark_results/canonical/solver_convergence.json
-    output: manuscript/figures/figC1_solver_convergence.pdf
-    appendix_ref: manuscript/sections/appendices/numerical.tex:547
-
   figC2_fd_convergence:
     kind: figure
     figure_script: scripts/figures/figC2_fd_convergence.py
@@ -54,55 +46,75 @@ appendix_C:
 
 appendix_D:
 
-  figD_boccaletti_calibration:
+  figD_boccaletti_uniform:
     kind: figure
-    figure_script: scripts/figures/figD_boccaletti_calibration.py
-    benchmark_script: scripts/benchmarks/boccaletti_calibration.py
-    canonical_data: benchmark_results/canonical/boccaletti_calibration.json
-    output: manuscript/figures/figD_boccaletti_calibration.pdf
+    figure_script: scripts/figures/figD_boccaletti_uniform.py
+    benchmark_script: scripts/benchmarks/boccaletti_uniform_rich.py
+    canonical_data: benchmark_results/canonical/boccaletti_uniform_rich.json
+    output: manuscript/figures/figD_boccaletti_uniform.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §1)
 
-  figD_torsion_limit:
+  figD_boccaletti_localised:
     kind: figure
-    figure_script: scripts/figures/figD_torsion_limit.py
-    benchmark_script: scripts/benchmarks/torsion_limit.py
-    canonical_data: benchmark_results/canonical/torsion_limit.json
-    output: manuscript/figures/figD_torsion_limit.pdf
+    figure_script: scripts/figures/figD_boccaletti_localised.py
+    benchmark_script: scripts/benchmarks/boccaletti_localised.py
+    canonical_data: benchmark_results/canonical/boccaletti_localised.json
+    output: manuscript/figures/figD_boccaletti_localised.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §2)
 
-  figD_cross_backend:
+  figD_forced_oscillator:
     kind: figure
-    figure_script: scripts/figures/figD_cross_backend.py
-    benchmark_script: scripts/benchmarks/cross_backend.py
-    canonical_data: benchmark_results/canonical/cross_backend.json
-    output: manuscript/figures/figD_cross_backend.pdf
+    figure_script: scripts/figures/figD_forced_oscillator.py
+    benchmark_script: scripts/benchmarks/forced_oscillator.py
+    canonical_data: benchmark_results/canonical/forced_oscillator.json
+    output: manuscript/figures/figD_forced_oscillator.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §3)
 
-  figD_dispersion_time_order:
+  figD_parker_simon:
     kind: figure
-    figure_script: scripts/figures/figD_dispersion_time_order.py
-    benchmark_scripts:
-      - scripts/benchmarks/proca_dispersion.py
-      - scripts/benchmarks/time_integration_order.py
-    canonical_data:
-      - benchmark_results/canonical/proca_dispersion.json
-      - benchmark_results/canonical/time_integration_order.json
-    output: manuscript/figures/figD_dispersion_time_order.pdf
+    figure_script: scripts/figures/figD_parker_simon.py
+    benchmark_script: scripts/benchmarks/parker_simon_flrw.py
+    canonical_data: benchmark_results/canonical/parker_simon_flrw.json
+    output: manuscript/figures/figD_parker_simon.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §4)
 
-  figD_conservation_audit:
+  figD_fv_cdt:
     kind: figure
-    figure_script: scripts/figures/figD_conservation_audit.py
-    benchmark_script: scripts/benchmarks/conservation_audit.py
-    canonical_data: benchmark_results/canonical/conservation_audit.json
-    output: manuscript/figures/figD_conservation_audit.pdf
+    figure_script: scripts/figures/figD_fv_cdt.py
+    benchmark_script: scripts/benchmarks/fv_cdt_equivalence.py
+    canonical_data: benchmark_results/canonical/fv_cdt_equivalence.json
+    output: manuscript/figures/figD_fv_cdt.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §5)
+
+  figD_multi_method:
+    kind: figure
+    figure_script: scripts/figures/figD_multi_method.py
+    benchmark_script: scripts/benchmarks/multi_method.py
+    canonical_data: benchmark_results/canonical/multi_method.json
+    output: manuscript/figures/figD_multi_method.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D §6)
+
+  figD_convergence:
+    kind: figure
+    figure_script: scripts/figures/figD_convergence.py
+    benchmark_script: scripts/benchmarks/convergence_rich.py
+    canonical_data: benchmark_results/canonical/convergence_rich.json
+    output: manuscript/figures/figD_convergence.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D §7)
+
+  figD_conservation:
+    kind: figure
+    figure_script: scripts/figures/figD_conservation.py
+    benchmark_script: scripts/benchmarks/conservation_audit_full.py
+    canonical_data: benchmark_results/canonical/conservation_audit_full.json
+    output: manuscript/figures/figD_conservation.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D §8)
 
   fig1_boccaletti_validation:
     kind: figure
     figure_script: scripts/figures/fig1_boccaletti_validation.py
-    benchmark_script: scripts/benchmarks/boccaletti_calibration.py
-    canonical_data: benchmark_results/canonical/boccaletti_calibration.json
+    benchmark_script: scripts/benchmarks/boccaletti_uniform_rich.py
+    canonical_data: benchmark_results/canonical/boccaletti_uniform_rich.json
     output: manuscript/figures/fig1_boccaletti_validation.pdf
     appendix_ref: manuscript/sections/results.tex (§4.1 ValidationResult)
 
