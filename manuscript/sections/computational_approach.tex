@@ -13,16 +13,13 @@
 \label{ComputationalApproach}
 
 % Paragraph 1 — TIDAL pipeline (~80 w).
-\paragraph*{TIDAL}
-\TIDAL{} (Tensor Integration and Derivation for Any Lagrangian) automates
-the linearised-PDE survey: a Lagrangian specification in TOML format
-drives a \xAct{}/\Mathematica{} symbolic backend that derives the Euler--Lagrange
-equations, exports them as a JSON theory file, and passes the result to
-native Python PDE solvers backed by SUNDIALS, leapfrog, or spectral methods.
-The automation is necessary for a survey across PGT theory space: each of the
-[N] theory variants examined here requires a distinct set of coupled tensor PDEs
-that would be error-prone to derive by hand.
-The full architecture is documented in \cref{Architecture}.
+\paragraph*{TIDAL pipeline}
+% TODO: describe the symbolic→numerical pipeline at architecture level
+% (\xAct/\Mathematica → JSON → \Python PDE solvers); state what it
+% automates; explain why automation is necessary for a survey across
+% the PGT theory space. Cross-ref \cref{Architecture} with one-clause
+% hint per STYLE_GUIDE.md §(i): "Full pipeline architecture is in
+% \cref{Architecture}."
 
 % Paragraph 2 — Scope contrast (NEW — addresses Agent 3 I1 and Agent 1 M4).
 % Per literature_content_notes.md: PSALTer handles particle spectra,
@@ -30,62 +27,53 @@ The full architecture is documented in \cref{Architecture}.
 % — the three are complementary tools, not competing ones. This paragraph
 % frames TIDAL within the BHL software-paper landscape.
 \paragraph*{Relation to other automation tools}
-\TIDAL{} complements \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}
-(particle-spectrum extraction from arbitrary tensor Lagrangians) and
-\Hamilcar{}~\cite{barker2025hamilcar}
-(Poisson-bracket and constraint-algebra computation in canonical gravity)
-by automating the dynamical-evolution step — solving the linearised PDEs
-that the spectrum and constraint analyses do not address.
+% TODO: ~50 w. "TIDAL complements \PSALTer{} (particle-spectrum extraction
+% from arbitrary tensor Lagrangians) and \Hamilcar{} (Poisson-bracket and
+% constraint-algebra computation in canonical gravity) by automating the
+% dynamical-evolution step — solving the linearised PDEs that the spectrum
+% and constraint analyses do not address." Cite \cite{barker2024psalter}
+% and \cite{barker2025hamilcar}.
 
 % Paragraph 3 — Fourier modal solver (~100 w).
 \paragraph*{Fourier modal solver}
-\TIDAL{} auto-selects a Fourier modal backend for flat-metric, periodic-boundary
-systems and delivers machine-precision eigendecompositions of the full
-coupled-field evolution operator.
-The Fourier decomposition eliminates spatial operators analytically,
-reducing the PDE system to a dense matrix ODE per wavenumber mode that
-is then solved by eigendecomposition or Krylov matrix-exponential methods.
-This gives machine-precision conversion amplitudes and eliminates the spatial
-discretisation error that limits finite-difference solvers.
-Algorithmic detail and convergence behaviour are documented in
-\cref{NumericalEvolution}.
+% TODO: lead with capability, NOT algorithm. "TIDAL auto-selects the
+% Fourier modal backend for flat-metric, periodic-boundary systems and
+% delivers machine-precision eigendecompositions." Do NOT describe the
+% algorithm. Cross-ref \cref{NumericalEvolution} with one-clause hint:
+% "Algorithmic detail and convergence behaviour are documented in
+% \cref{NumericalEvolution}."
 
 % Paragraph 4 — Other backends (~60 w).
 \paragraph*{Solver fallbacks}
-For non-periodic boundaries or curved-space theories the \TIDAL{} solver
-auto-selects from four fallback backends based on equation structure:
-SUNDIALS IDA for DAE systems with algebraic constraints,
-SUNDIALS CVODE for stiff-wave-like ODEs,
-a native leapfrog integrator for Hamiltonian-conserving evolution,
-and \texttt{scipy.integrate} for general-purpose ODE systems.
-Details are in \cref{NumericalEvolution}.
+% TODO: IDA, CVODE, leapfrog, scipy each in one sentence as fallback context;
+% no algorithmic detail. State that auto-selection picks the appropriate
+% backend based on equation properties.
 
 % Paragraph 4b — Inference architecture (~70 w, NEW; v3 architecture pivot
 % post-2026-05-08 supervisor meeting).  Forward-reference to App J details.
 \paragraph*{Tachyon-permissive inference}
-Bayesian parameter estimation uses PolyChord nested sampling with a
-\emph{tachyon-permissive} likelihood architecture: linear instabilities are
-assigned a soft floor $\log\mathcal{L} = {-100} + \mathcal{N}(0,\,\sigma)$
-rather than being rejected, providing a stability gradient that guides
-sampler exploration across multi-modal posterior landscapes.
-Coupling priors are compactified via $\arctan$-uniform
-distributions, covering the full real line without hard boundaries.
-Each simulation is tagged with a \texttt{run\_status} label
-(\texttt{success}, \texttt{simulation\_diverged}, \texttt{metric\_nan},
-etc.)\ enabling post-chain filtering and diagnostic analysis.
-The Bayesian-inference architecture, soft-penalty mathematics, and
-prior-compactification scheme are documented in \cref{InferenceArchitecture}.
+% TODO: one paragraph introducing the v3 inference architecture: probe is
+% metadata not gate; soft floor logL = -100 + Normal(0, σ_explore) gives
+% PolyChord a stability gradient; compactified arctan_uniform priors and
+% the optional cubed-sphere joint prior cover full real-line coupling
+% support; distinct run_status tags (success, simulation_diverged,
+% metric_nan, below_noise_floor, ...) enable post-chain filtering.
+% End with \cref{InferenceArchitecture} pointer per STYLE_GUIDE.md §(i):
+% "The Bayesian-inference architecture, soft-penalty mathematics, and
+% prior-compactification scheme are documented in \cref{InferenceArchitecture}."
+% Source material: docs/V3_ARCHITECTURE.md, docs/V3_PHASE_D_DESIGN.md.
 
 % Paragraph 5 — Validation and HPC scale (~60 w, with concrete number).
 \paragraph*{Validation and survey scale}
-The software is validated against the analytic Boccaletti conversion
-formula~\cite{boccaletti1970conversion} to better than $[\text{B.2 \%}]$
-across the full sweep of survey parameters; the validation hierarchy is
-documented in \cref{Validation}.
-The survey covers [N] PGT theory variants in parameter spaces ranging from
-4-D to 9-D, totalling [M] HPC campaigns on the CSD3 DiRAC cluster.
+% TODO: one sentence on the validation hierarchy with \cref{Validation}
+% one-clause hint; one sentence stating the survey scale ("six theories
+% scanned in 4D–9D priors across [N] HPC campaigns" — fill N from
+% CAMPAIGN.md at drafting time). The one-clause hint per
+% STYLE_GUIDE.md §(i) avoids word-spend on detail that lives in
+% \cref{Validation}.
 
 % Closing pointer (~30 w) — minimal, one sentence.
 \paragraph*{Detail deferred}
-Implementation details, the validation suite, and symbolic-stage outputs
-for the surveyed theories are documented in \cref{Architecture}--\cref{SymbolicOutputs}.
+% TODO: one sentence: "Implementation details, validation suite, and
+% symbolic-pipeline outputs for the surveyed theories are in
+% \cref{Architecture}–\cref{SymbolicOutputs}."
