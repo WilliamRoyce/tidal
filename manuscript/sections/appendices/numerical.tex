@@ -15,7 +15,7 @@
 \section{Numerical evolution of the linearised system}%
 \label{NumericalEvolution}
 
-\paragraph*{Overview} The numerical stage of \TIDAL{} consumes the
+The numerical stage of \TIDAL{} consumes the
 equation specification produced by~\cref{SymbolicComputation} and
 evolves the linearised fields on a Cartesian sampling grid,
 supporting either flat or curved spacetime metrics. The grid and
@@ -48,7 +48,7 @@ in~\cref{SolverDispatchFlowchart}:
     all periodic, and the coefficients are time-independent;
     algebraic constraints, when present, are eliminated per-mode by
     Schur complement before the exponential (\cref{ModalSolver}).
-  \item \textbf{IDA} (SUNDIALS differential--algebraic, BDF orders
+  \item \textbf{IDA} (\SUNDIALS{} differential--algebraic, BDF orders
     $1$--$5$~\cite{hindmarsh2005sundials}) when the modal eligibility
     fails and the system carries equations with
     \lstinline!time_order!~$=0$; algebraic constraints are handled in
@@ -59,14 +59,14 @@ in~\cref{SolverDispatchFlowchart}:
   \item \textbf{IDA} when any right-hand-side carries a
     \lstinline!first_derivative_t! operator (dissipation, handled by
     implicit BDF rather than the symplectic path).
-  \item \textbf{CVODE} (SUNDIALS adaptive ODE,
+  \item \textbf{CVODE} (\SUNDIALS{} adaptive ODE,
     BDF~\cite{hindmarsh2005sundials}) when none of the above
     predicates holds and the system is a pure second-order wave.
   \item \textbf{Leapfrog and \SciPy{}} are available only via
     explicit \lstinline!--scheme! override and are never auto-selected;
     they are retained for symplectic long-time evolution
     (\cref{OtherBackends}) and as an independent cross-check of the
-    SUNDIALS implementations, respectively.
+    \SUNDIALS{} implementations, respectively.
 \end{enumerate}
 
 % Figure C.0 — Solver dispatch flowchart.
@@ -81,7 +81,7 @@ in~\cref{SolverDispatchFlowchart}:
     all hold. The left-hand sub-check panel enumerates the operators
     for which the modal solver carries exact Fourier multipliers;
     systems containing unsupported operators fall through to the
-    \texttt{IDA}/\texttt{CVODE} branch.}
+    \IDA{}/\CVODE{} branch.}
   \label{SolverDispatchFlowchart}
 \end{figure}
 
@@ -251,9 +251,9 @@ path below is eligible.
 periodic, \TIDAL{} also exposes a pseudo-spectral evaluation path in
 which spatial operators are applied as Fourier multipliers via the
 real-to-complex FFT \lstinline!numpy.fft.rfftn!, with
-$k = 2\pi\cdot\texttt{rfftfreq}(N,\Delta x)$~\cite{burns2020dedalus}.
+with wavenumbers $k_n = 2\pi n/(N\,\Delta x)$~\cite{burns2020dedalus}.
 The pseudo-spectral path is auto-enabled for all-periodic boundary
-conditions in every solver backend except \texttt{IDA}, whose Newton
+conditions in every solver backend except \IDA{}, whose Newton
 iteration uses a sparse linear solver to factor the DAE Jacobian
 $\partial F/\partial y$: the finite-difference stencils produce a
 banded Jacobian that the sparse factoring exploits, whereas the
@@ -324,14 +324,13 @@ Poincar\'e gauge sector: near-degenerate eigenvalues arise from a
 variety of sources --- gauge orbits, accidental kinematic
 degeneracies between coupled fields, and small-parameter detunings
 of mass terms --- and the worst-case condition number
-$\operatorname{cond}(V)$ can exceed $10^{13}$ on the multi-field
+$\operatorname{cond}(V)$ can exceed $10^{13}$~\cite{golub2013matrix,higham2008functions} on the multi-field
 theories of~\cref{Results}. At that conditioning the diagonalisation
 accumulates roundoff far above the level at which backward-stable
 matrix-exponential algorithms remain
-accurate~\cite{higham2008functions,molervanloan2003nineteen,golub2013matrix,trefethen1997numerical};
-\cite{higham2008functions}~\S 2.3 records the cond-$V$ abandonment
-threshold above which diagonalisation should be replaced by a
-backward-stable scheme, and we adopt that recommendation. The Pad\'e
+accurate~\cite{higham2008functions,molervanloan2003nineteen,golub2013matrix,trefethen1997numerical}.
+We adopt the recommendation of~\cite{higham2008functions}~\S~2.3: the cond-$V$ threshold above which
+diagonalisation should be replaced by a backward-stable scheme. The Pad\'e
 path is by contrast robust at arbitrary
 $\operatorname{cond}(V)$~\cite{higham2009scaling,higham2008functions}.
 The wall-time penalty for adopting it is modest: on three
@@ -341,7 +340,7 @@ $0.49$--$1.06$ (\cref{tab:PadeBenchmark}), so we incur no significant
 performance cost in exchange for the robustness guarantee. The
 eigendecomposition path remains available internally for the
 closed-form Duhamel kernel used in the perturbative-reduction
-stage of~\cref{ConstraintBarrier}, which requires the
+scheme of~\cref{ConstraintBarrier}, which requires the
 per-eigenmode expansion explicitly.
 
 % Table C.PadeBenchmark — wall-time comparison.
@@ -466,15 +465,14 @@ the mode-coupled form
 where $M(k, k')$ inherits both the standard $k$-multiplier structure
 and the convolution kernel from $\hat c$. On the numerical grid this
 collapses to a single dense matrix of dimension
-$N_{\rm modes}\!\times\!N_{\rm slots}$. The
-convolution matrix is generally non-normal, in which case the
+$N_{\rm modes}\!\times\!N_{\rm slots}$. This matrix is generally non-normal, in which case the
 eigendecomposition picture breaks down at the level of the operator,
 not just at the level of finite-precision arithmetic: individual
 eigenvalues $\exp(\lambda t)$ would overflow even in exact arithmetic
 because $\lambda$ has a large positive real part, while the action
 $\exp(M t)\, y_0$ remains bounded. This is the pseudospectral
 phenomenon analysed in Trefethen \& Embree~\cite{trefethen2005spectra}
-\S 15, where the transient growth of $\|\exp(A t)\|$ for non-normal
+\S~15, where the transient growth of $\|\exp(A t)\|$ for non-normal
 $A$ is controlled by the $\varepsilon$-pseudospectrum rather than by
 the spectrum itself. We
 bypass the eigendecomposition entirely on this path and compute the
@@ -553,7 +551,7 @@ in~\cref{SolverConvergence} and discussed in~\cref{Validation}.
     machine precision (${\sim}10^{-14}$) at modest resolution and
     shows no further reduction with $N$ once the spectral floor is
     reached. Panel (b) compares the modal solver against the
-    \texttt{CVODE} and \texttt{IDA} backends at fixed grid resolution
+    \CVODE{} and \IDA{} backends at fixed grid resolution
     and rising relative-tolerance setting, illustrating the
     truncation-error gap between the exact modal evolution and the
     adaptive-BDF schemes. This figure also satisfies the convergence
@@ -564,27 +562,27 @@ in~\cref{SolverConvergence} and discussed in~\cref{Validation}.
 \subsection{Other backends}%
 \label{OtherBackends}
 
-\paragraph*{\texttt{IDA} --- differential--algebraic equations}
-The \texttt{IDA} backend is the implicit differential--algebraic
-solver from SUNDIALS~\cite{hindmarsh2005sundials}, accessed via the
-\texttt{scikit-sundae}~\cite{randall2024skitsundae} \Python{} wrapper.
-\texttt{IDA} integrates a residual form $F(t, y, y') = 0$ by adaptive
+\paragraph*{\IDA{} --- differential--algebraic equations}
+The \IDA{} backend is the implicit differential--algebraic
+solver from \SUNDIALS{}~\cite{hindmarsh2005sundials}, accessed via the
+\lstinline!scikit-sundae!~\cite{randall2024skitsundae} \Python{} wrapper.
+\IDA{} integrates a residual form $F(t, y, y') = 0$ by adaptive
 backward differentiation formulas of orders $1$ through $5$.
 \TIDAL{} populates the residual with $F_i = y_i'- R_i(y)$ for
 dynamical fields (with $R_i$ the Euler--Lagrange right-hand side),
 and with $F_i = R_i(y)$ for constraint fields, so that a single
-Newton iteration handles both classes simultaneously. \texttt{IDA} is
+Newton iteration handles both classes simultaneously. \IDA{} is
 the only \TIDAL{} backend that supports algebraic constraints natively
 at run time. We pair it with the analytical
 Jacobian of~\cref{AnalyticalJacobian}.
 
-\paragraph*{\texttt{CVODE} --- adaptive ODE} The \texttt{CVODE}
-backend wraps the SUNDIALS ordinary-differential-equation solver of
+\paragraph*{\CVODE{} --- adaptive ODE} The \CVODE{}
+backend wraps the \SUNDIALS{} ordinary-differential-equation solver of
 the same name~\cite{hindmarsh2005sundials} through
-\texttt{scikit-sundae}~\cite{randall2024skitsundae}, and is
+\lstinline!scikit-sundae!~\cite{randall2024skitsundae}, and is
 auto-selected for pure wave systems in which every equation has
 time order~$2$ and a canonical Hamiltonian structure is recorded in
-the specification. \texttt{CVODE} supports both
+the specification. \CVODE{} supports both
 backward-differentiation formulas (orders $1$ through $5$, suitable
 for the mild stiffness that finite-difference discretisations
 introduce through eigenvalues scaling as $1/\Delta
@@ -593,7 +591,7 @@ $12$, for non-stiff problems~\cite{hairer1993ode1}).
 Constraint fields, when present in the equation specification but not
 eliminable by the modal Schur path, are frozen at their
 initial-condition values; systems with algebraic constraints therefore
-route to \texttt{IDA} instead.
+route to \IDA{} instead.
 
 \paragraph*{Leapfrog --- symplectic St\"ormer--Verlet and Yoshida}
 The leapfrog backend implements two symplectic integrators. The first
@@ -623,7 +621,7 @@ this backend for two reasons. First, smooth non-stiff problems are
 sometimes solved more cheaply by an explicit high-order method than by
 adaptive BDF, because DOP853 requires fewer function evaluations per
 unit of accuracy. Second, an independent \SciPy{} integration path
-provides a cross-check on the SUNDIALS implementations; the per-theory
+provides a cross-check on the \SUNDIALS{} implementations; the per-theory
 agreement numbers are reported in~\cref{Validation}. Like leapfrog,
 the \SciPy{} backend is opt-in only.
 
@@ -641,12 +639,11 @@ similar constraints arise from every gauge-fixed sector of the
 symbolic stage (see~\cref{Architecture}). Without projection of
 $(q_0, v_0)$ onto the constraint surface --- \ie{} without solving the
 algebraic equations of motion for the constraint slots given the
-user-supplied dynamical-slot values --- the \texttt{IDA} Newton
+user-supplied dynamical-slot values --- the \IDA{} Newton
 iteration fails to converge at the first timestep, and the modal Schur
 path produces an inconsistent reduced state. The
 \lstinline!ensure_consistent_ic! function performs this projection
-once, after the user-specified initial condition has been built and
-before the chosen backend is invoked.
+once, after the initial condition is assembled and before the chosen backend is invoked.
 
 \paragraph*{Three-tier solver} The projection is implemented as a
 three-tier solver. The first tier handles the common case in which
@@ -688,8 +685,8 @@ symbolic stage and discussed in~\cref{GaugeFixing}.
 \subsection{Analytical Jacobian}%
 \label{AnalyticalJacobian}
 
-\paragraph*{Motivation} The implicit backends \texttt{IDA} and
-\texttt{CVODE} both rely on a Jacobian matrix $J = \partial F/\partial y +
+\paragraph*{Motivation} The implicit backends \IDA{} and
+\CVODE{} both rely on a Jacobian matrix $J = \partial F/\partial y +
 c_j\,\partial F/\partial y'$ to drive the Newton iteration of each
 backward-differentiation step. Finite-difference approximation of
 this matrix requires multiple residual evaluations per Newton
@@ -703,7 +700,7 @@ $N\!\sim\!10^4$ degrees of freedom that arise in the PGT campaigns
 of~\cref{Results}, that overhead is the dominant cost. We circumvent
 it by precomputing the Jacobian analytically, once, from the symbolic
 right-hand-side terms in the equation specification, and supplying
-it to the linear solver directly through the SUNDIALS callback
+it to the linear solver directly through the \SUNDIALS{} callback
 interface of~\cite{hindmarsh2005sundials}.
 
 \paragraph*{Three-tier dispatch} The analytical-Jacobian machinery
@@ -711,18 +708,18 @@ maintains three distinct delivery tiers, with thresholds $N \leq
 2{,}000$ for the dense tier, $2{,}000<N\leq 200{,}000$ for the sparse
 tier, and $N>200{,}000$ for the matrix-free tier. The dense tier
 fills a two-dimensional \NumPy{} array with $\partial F/\partial y +
-c_j\,\partial F/\partial y'$ at every Newton step, which the SUNDIALS
+c_j\,\partial F/\partial y'$ at every Newton step, which the \SUNDIALS{}
 direct linear solver factors by LAPACK LU; this path delivers a
 five-fold wall-time speedup over finite differencing on
 representative small systems. The sparse tier instead fills a flat
 CSC data buffer paired with a fixed sparsity
-pattern, which SUNDIALS factors with
+pattern, which \SUNDIALS{} factors with
 SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu}; this yields
-a measurable speedup for both backends, larger for \texttt{IDA}
-(heavier per-step Jacobian cost) than for \texttt{CVODE}. The
+a measurable speedup for both backends, larger for \IDA{}
+(heavier per-step Jacobian cost) than for \CVODE{}. The
 matrix-free tier supplies an analytical
 Jacobian--vector product callback $J\,v = (\partial F/\partial y)\,v +
-c_j\,(\partial F/\partial y')\,v$ to the SUNDIALS Krylov interface,
+c_j\,(\partial F/\partial y')\,v$ to the \SUNDIALS{} Krylov interface,
 which then solves the linear step by GMRES~\cite{saad1986gmres}
 without ever materialising $J$ explicitly --- this is the regime in
 which the $\mathcal{O}(n_{\rm colors})$ overhead of finite differencing would
