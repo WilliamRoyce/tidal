@@ -17,12 +17,15 @@
 
 \paragraph*{Overview} The numerical stage of \TIDAL{} consumes the
 equation specification produced by~\cref{SymbolicComputation} and
-evolves the linearised fields on a Cartesian grid. \TIDAL{} is
-designed for arbitrary tensor Lagrangians on flat or curved
-backgrounds; validation against analytic limits is collected
-in~\cref{Validation}, and the symbolic-pipeline outputs for the
-surveyed theories are tabulated in~\cref{SymbolicOutputs}. \TIDAL{} provides a shared substrate
---- state layout, spatial operators, coefficient cache --- and a
+evolves the linearised fields on a Cartesian sampling grid,
+supporting either flat or curved spacetime metrics. The grid and
+field-container design draws on the py-pde
+framework~\cite{zwicker2020pypde}. \TIDAL{} is designed for arbitrary
+tensor Lagrangians on flat or curved backgrounds; validation against
+analytic limits is collected in~\cref{Validation}, and the
+symbolic-pipeline outputs for the surveyed theories are tabulated
+in~\cref{SymbolicOutputs}. \TIDAL{} provides a shared substrate ---
+state layout, spatial operators, coefficient cache --- and a
 dispatcher that selects among several solver backends from the
 algebraic structure of the equation system. The Fourier modal solver
 of~\cref{ModalSolver} is the primary backend, and is auto-selected
@@ -34,8 +37,7 @@ heterogeneous family. Differential--algebraic equations from gauge
 sectors require simultaneous algebraic-and-differential
 solution~\cite{henneaux1992quantization}; pure wave systems benefit
 from explicit symplectic integration when long-time energy
-conservation matters more than tolerance control; dissipative
-parabolic systems call for implicit methods; and curved-metric
+conservation matters more than tolerance control; and curved-metric
 systems require position-dependent coefficient evaluation. The
 dispatcher \lstinline!_resolve_scheme! selects the first applicable
 backend from the following ordered rules; the full decision tree,
@@ -43,15 +45,14 @@ including the modal eligibility sub-checks, is shown
 in~\cref{SolverDispatchFlowchart}:
 \begin{enumerate}
   \item \textbf{Modal} when the metric is flat, the boundaries are
-    all periodic, the coefficients are time-independent, and every
-    right-hand-side operator has an exact Fourier multiplier;
+    all periodic, and the coefficients are time-independent;
     algebraic constraints, when present, are eliminated per-mode by
     Schur complement before the exponential (\cref{ModalSolver}).
   \item \textbf{IDA} (SUNDIALS differential--algebraic, BDF orders
     $1$--$5$~\cite{hindmarsh2005sundials}) when the modal eligibility
     fails and the system carries equations with
-    \lstinline!time_order!~$=0$; algebraic constraints are treated
-    natively in the residual form.
+    \lstinline!time_order!~$=0$; algebraic constraints are handled in
+    the residual form described in~\cref{OtherBackends}.
   \item \textbf{IDA} when the system carries first-order
     (\lstinline!time_order!~$=1$) equations, since adaptive implicit
     integration is preferred for diffusive and transport equations.
@@ -88,12 +89,13 @@ in~\cref{SolverDispatchFlowchart}:
 \label{EquationSubstrate}
 
 \paragraph*{State representation} \TIDAL{} represents the simulation
-state at any given time as a flat vector of numerical values ---
-field amplitudes sampled on the Cartesian grid --- and never as
-symbolic expressions or equations. The equations of motion themselves
-come from the JSON specification produced
-by~\cref{SymbolicComputation} and are applied to the state by the
-right-hand-side evaluator at every timestep. The number of slots a
+state at any given time as a flat vector of numerical values. The
+equations of motion come from the JSON specification produced
+by~\cref{SymbolicComputation} (schematic in~\cref{JSONSpecSchematic};
+each right-hand side is a list of (coefficient, operator, target
+field) triples, one example shown in~\cref{RHSTripleExample}) and are
+applied to the state by the right-hand-side evaluator at every
+timestep. The number of slots a
 field contributes to this state vector is determined by the
 time-derivative order of its equation of motion:
 \begin{enumerate}
@@ -131,8 +133,7 @@ components. For a wave field, the kinematic identity is
 \end{align}
 in the field and velocity slots respectively. The Euler--Lagrange
 right-hand side $L$ in general acts on both the field and its time
-derivative --- friction-style terms, gauge-fixing penalties, and
-mixed kinetic structures all introduce $v_\varphi$-dependence.
+derivative.
 
 \paragraph*{Velocity form versus canonical phase space} Writing the
 quadratic kinetic operator $\mathcal{K}$ of~\cref{KineticMatrix} as a
@@ -177,26 +178,26 @@ state vector.
 
 \paragraph*{State layout and field views} The mapping between a
 field's component name and its slot in the flat state vector is
-captured by a frozen \lstinline!StateLayout! dataclass, which is
+captured by a frozen \lstinline!StateLayout! dataclass~\cite{zwicker2020pypde},
 constructed once from the equation specification before integration
 begins. Each component carries a \lstinline!slot_kind! discriminator
 drawn from the three categories enumerated above. The flat state
-itself is wrapped by a \lstinline!FieldSet! container that provides
-zero-copy named views into the contiguous
-\NumPy{}~\cite{harris2020numpy} array, plus a \lstinline!rebind!
-operation that swaps the underlying buffer for in-place state updates
-without reallocation. This is what permits the Yoshida fused-kick
-scheme of~\cref{OtherBackends} to reuse a single buffer across three
-force evaluations per outer timestep, and what allows the modal
-solver of~\cref{ModalSolver} to share its post-FFT buffer with the
-constraint elimination machinery of~\cref{ConstraintIC}.
+itself is wrapped by a \lstinline!FieldSet!
+container~\cite{zwicker2020pypde} that provides zero-copy named views
+into the contiguous \NumPy{}~\cite{harris2020numpy} array, plus a
+\lstinline!rebind! operation that re-points the container's named
+views at a different underlying buffer without copying. The pattern
+follows the field-container design of
+py-pde~\cite{zwicker2020pypde}; for the multi-substep symplectic
+schemes of~\cref{OtherBackends} the rebind avoids per-substep
+allocation~\cite{yoshida1990symplectic,forestruth1990fourth}.
 
 \paragraph*{Coefficient evaluator} Each right-hand-side term carries a
 symbolic coefficient string emitted by the \xAct{} stage, which must be
 resolved at run time against the user's parameter assignments and, for
 backgrounds, the spatial coordinate grid. The
 \lstinline!CoefficientEvaluator! class implements a four-level cache to
-amortise this resolution. The first level stores pre-resolved constants
+amortise these per-call evaluations. The first level stores pre-resolved constants
 that depend on neither parameters nor coordinates; the second stores
 the parsed parameter-resolved expression; the third stores spatial
 grids of coefficient values for position-dependent but time-independent
@@ -227,8 +228,7 @@ formula of the form $\mathrm{ghost} = \mathrm{const} +
 \mathrm{factor}\times \mathrm{interior}$~\cite{leveque2007finite}.
 The finite-difference path is the fallback for systems on which
 neither the modal solver of~\cref{ModalSolver} nor the pseudo-spectral
-path below is eligible; it is not exercised by any of the surveys
-reported in~\cref{Results}, which all run through the modal solver.
+path below is eligible.
 
 % Figure C.FDConvergence — FD vs spectral spatial convergence on the smooth gradient test.
 \begin{figure}[t]
@@ -274,22 +274,6 @@ stencils~\cite{fornberg1988generation}, so that the constraint
 solution remains spectrally consistent with the FD stencils used in
 time evolution.
 
-\paragraph*{Operator catalogue} The right-hand side of an equation in
-the JSON specification is a list of (coefficient, operator, target
-field) triples (\cref{RHSTripleExample}) drawn from a fixed set of
-spatial operators: identity, gradient $\partial_a$, Laplacian
-$\nabla^2$ and its directional variants $\partial_a^2$, cross
-derivatives $\partial_a\partial_b$, biharmonic $\nabla^4$, third-order
-spatial derivatives $\partial_a^3$, and mixed time--space operators
-$\partial_t^n \partial_a^m$. Operators with time-derivative order
-three or four ($\partial_t^3$, $\partial_t^4$, and the mixed families
-$\partial_t^3\partial_a$, $\partial_t^4\partial_a$,
-$\partial_t^4\partial_a\partial_b$) arise in theories with
-higher-derivative kinetic terms such as the $b_5\,\tilde R^2$
-correction. They are handled by the perturbative-reduction scheme
-described in~\cref{ConstraintBarrier}; they never appear as kinetic
-terms in the second-order base system that the modal solver evolves.
-
 \subsection{Fourier modal solver}%
 \label{ModalSolver}
 
@@ -301,8 +285,6 @@ field); every spatial boundary is periodic; the equation system
 contains no algebraic constraint that cannot be eliminated by a
 Fourier Schur step; every right-hand-side operator has an exact
 Fourier multiplier; and no coefficient depends explicitly on time.
-Position-dependent coefficients are admitted, and are handled by the
-Krylov path described below.
 
 \paragraph*{Mode-by-mode evolution} The state $(q, v)$ is transformed
 to Fourier space slot by slot, and the right-hand-side operators are
@@ -324,7 +306,7 @@ six-field Einstein--Maxwell pair of~\cref{Results}; the analogous
 matrix for the full quadratic Poincar\'e gauge theory plus
 electromagnetism is block-diagonalised by the parity decomposition of
 \cref{ChannelStructure} but otherwise has the same structure. The
-wall time is $O(1)$ in the integration endpoint $t_{\rm end}$ once
+wall time is $\mathcal{O}(1)$ in the integration endpoint $t_{\rm end}$ once
 the per-mode exponentials are precomputed: every output snapshot is
 then a single matrix--vector product per mode. When some coefficients
 are position-dependent, the per-mode decoupling fails and the
@@ -399,7 +381,7 @@ channel at the linear level (see~\cref{ChannelStructure} for the
 numerical demonstration on the survey theories) --- and processing
 such a block-diagonal matrix as a single dense object would waste
 both wall time (since the per-mode \lstinline!expm! cost scales as
-$O(b^3)$ in the block size $b$) and conditioning. We therefore
+$\mathcal{O}(b^3)$ in the block size $b$) and conditioning. We therefore
 precompute the block decomposition: slots $i$ and $j$ are deemed
 coupled when either off-diagonal entry $M_{ij}$ or $M_{ji}$ exceeds
 a heuristic cut-off of $10^{-14}\,\max|M|$ in absolute value (the
@@ -409,7 +391,7 @@ compression~\cite{tarjan1975unionfind} collects the resulting
 coupling graph into connected components. The exponential is then
 applied block-by-block: replacing a single block of size $b$ by $n$
 independent blocks of size $b/n$ reduces the total per-mode cost from
-$O(b^3)$ to $O(b^3/n^2)$, where the $b^3$ scaling is the standard
+$\mathcal{O}(b^3)$ to $\mathcal{O}(b^3/n^2)$, where the $b^3$ scaling is the standard
 cost of Pad\'e scaling-and-squaring on a dense block of
 size~$b$~\cite{higham2009scaling}. For the representative case of
 one $12\!\times\!12$ block split into two $6\!\times\!6$ blocks this
@@ -423,16 +405,22 @@ engineering heuristic and is deliberately conservative.
 When the equation system carries algebraic constraints
 (\lstinline!time_order!~$=0$ fields) and is otherwise modal-eligible,
 we eliminate the constraint slots per mode by Schur complement before
-forming the exponential. Partitioning the per-mode evolution matrix
-into a dynamical block $A$ and a constraint block,
+forming the exponential. Partitioning the per-mode state
+$\hat y(k) = (y_d, y_c)^{\mathsf{T}}$ into a dynamical part $y_d$ and
+a constraint part $y_c$, the equation
+$\partial_t \hat y(k) = M(k)\, \hat y(k)$ of~\cref{ModalPerMode} reads
+in block form
 \begin{align}
-  M(k) = \begin{pmatrix} A(k) & \mathsf{S}_{dc}(k) \\
+  \begin{pmatrix} \partial_t y_d \\ \partial_t y_c \end{pmatrix}
+  = \begin{pmatrix} A(k) & \mathsf{S}_{dc}(k) \\
     \mathsf{S}_{cd}(k) & \mathsf{S}_{cc}(k) \end{pmatrix}
-  \, ,
+    \begin{pmatrix} y_d \\ y_c \end{pmatrix}
+  \, .
   \label{ModalSchur}
 \end{align}
-the algebraic block $\mathsf{S}_{cd}\, y_d + \mathsf{S}_{cc}\, y_c = 0$
-yields the reduced constraint relation
+The constraint block is algebraic (no time derivative on the
+constraint slots, $\partial_t y_c = 0$), so the constraint row reduces
+to $\mathsf{S}_{cd}\, y_d + \mathsf{S}_{cc}\, y_c = 0$, yielding
 \begin{align}
   y_c = -\mathsf{S}_{cc}^{-1}\!\mathsf{S}_{cd}\, y_d
   \, ,
@@ -440,9 +428,8 @@ yields the reduced constraint relation
 \end{align}
 and substitution into the dynamical block produces a reduced
 evolution matrix on $y_d$ alone. For systems with a rank-deficient kinetic
-matrix (degenerate kinetic eigenstructures, gauge fields with
-Stueckelberg-type couplings, the Maxwell sector with a manifestly
-gauge-symmetric quadratic form) the same reduced exponential is
+matrix (degenerate kinetic eigenstructures, or gauge fields with
+manifestly gauge-symmetric kinetic terms) the same reduced exponential is
 evaluated through the generalised eigenvalue problem
 $(K - \lambda M)\, v = 0$, which is solved internally by the QZ
 algorithm of Moler \& Stewart~\cite{moler1973algorithm} as exposed by
@@ -458,9 +445,28 @@ same Schur operator is used in both contexts.
 Position-dependent coefficients --- a Gaussian magnetic-field profile
 $\Bzero(x)$, a localised plasma mass term, a coordinate-dependent
 gauge-fixing source --- couple the per-mode systems together. The
-product $c(x)\, u(x)$ becomes a Fourier convolution
-$\hat c \ast \hat u$, and the evolution matrix becomes a single large
-block of dimension $N_{\rm modes}\!\times\!N_{\rm slots}$. The
+product $c(x)\, u(x)$ becomes a Fourier convolution,
+\begin{align}
+  \widehat{c \cdot u}(k)
+  = (\hat c \ast \hat u)(k)
+  = \int \hat c(k - k')\, \hat u(k')\, \diff k'
+  \, ,
+  \label{ModalConvolution}
+\end{align}
+and the per-mode decoupling of~\cref{ModalPerMode} fails: every mode
+$\hat u(k)$ now sees a contribution from every other mode
+$\hat u(k')$ through the convolution kernel. The evolution then takes
+the mode-coupled form
+\begin{align}
+  \partial_t \hat y(k)
+  = \int M(k, k')\, \hat y(k')\, \diff k'
+  \, ,
+  \label{ModalCoupled}
+\end{align}
+where $M(k, k')$ inherits both the standard $k$-multiplier structure
+and the convolution kernel from $\hat c$. On the numerical grid this
+collapses to a single dense matrix of dimension
+$N_{\rm modes}\!\times\!N_{\rm slots}$. The
 convolution matrix is generally non-normal, in which case the
 eigendecomposition picture breaks down at the level of the operator,
 not just at the level of finite-precision arithmetic: individual
@@ -567,11 +573,9 @@ backward differentiation formulas of orders $1$ through $5$.
 \TIDAL{} populates the residual with $F_i = y_i'- R_i(y)$ for
 dynamical fields (with $R_i$ the Euler--Lagrange right-hand side),
 and with $F_i = R_i(y)$ for constraint fields, so that a single
-Newton iteration handles both classes simultaneously. The
-\texttt{IDA} backend is auto-selected whenever the modal solver is
-ineligible and a constraint, first-order, or dissipative equation is
-present, and is the only \TIDAL{} backend that supports algebraic
-constraints natively at run time. We pair it with the analytical
+Newton iteration handles both classes simultaneously. \texttt{IDA} is
+the only \TIDAL{} backend that supports algebraic constraints natively
+at run time. We pair it with the analytical
 Jacobian of~\cref{AnalyticalJacobian}.
 
 \paragraph*{\texttt{CVODE} --- adaptive ODE} The \texttt{CVODE}
@@ -588,31 +592,19 @@ x^2$~\cite{hairer1996ode2}) and the Adams family (orders $1$ through
 $12$, for non-stiff problems~\cite{hairer1993ode1}).
 Constraint fields, when present in the equation specification but not
 eliminable by the modal Schur path, are frozen at their
-initial-condition values --- a deliberate limitation that motivates
-the auto-dispatch to \texttt{IDA} when any algebraic constraint is
-detected.
+initial-condition values; systems with algebraic constraints therefore
+route to \texttt{IDA} instead.
 
 \paragraph*{Leapfrog --- symplectic St\"ormer--Verlet and Yoshida}
 The leapfrog backend implements two symplectic integrators. The first
 is the second-order St\"ormer--Verlet
 scheme~\cite{hairer2006geometric}, with a single force evaluation per
-timestep. The second is the fourth-order Yoshida
-composition~\cite{yoshida1990symplectic},
-\begin{align}
-  S_4(\Delta t) = S_2(w_1\,\Delta t) \circ S_2(w_2\,\Delta t)
-  \circ S_2(w_1\,\Delta t)
-  \, ,
-  \quad
-  w_1 = \frac{1}{2 - 2^{1/3}}\, ,
-  \quad
-  w_2 = -\,\frac{2^{1/3}}{2 - 2^{1/3}}\, ,
-  \label{YoshidaWeights}
-\end{align}
-in which the negative middle weight cancels the leading
-$O(\Delta t^2)$ error of
-St\"ormer--Verlet~\cite{yoshida1990symplectic}. Adjacent half-kicks
-between the three sub-steps in~\cref{YoshidaWeights} merge into a
-single combined kick (the Forest--Ruth fused-kick
+timestep. The second is the fourth-order Yoshida composition of three
+St\"ormer--Verlet sub-steps~\cite{yoshida1990symplectic}, in which a
+negative middle-step weight cancels the leading
+$\mathcal{O}(\Delta t^2)$ error of St\"ormer--Verlet. Adjacent
+half-kicks between the three sub-steps merge into a single combined
+kick (the Forest--Ruth fused-kick
 scheme~\cite{forestruth1990fourth}), reducing the cost from six force
 evaluations per outer step to three plus one initialiser. Both integrators preserve a shadow Hamiltonian to
 machine precision and exhibit zero secular energy drift over arbitrary
@@ -641,17 +633,20 @@ the \SciPy{} backend is opt-in only.
 \paragraph*{Motivation} When the equation specification contains
 algebraic constraints, the user-supplied initial condition
 $(q_0, v_0)$ generically lies off the constraint surface. The Maxwell
-$A_0$ satisfies an instantaneous Helmholtz equation in the Lorenz
-gauge ($\nabla^2 A_0 - m^2 A_0 = $ source), the linearised
+$A_0$ satisfies an instantaneous Helmholtz equation
+$(\nabla^2 - m^2)\, A_0 = \mathcal{S}[A_i]$ in the Lorenz gauge, the
+linearised
 gravitational-wave metric satisfies a transversality condition, and
 similar constraints arise from every gauge-fixed sector of the
-symbolic pipeline (see~\cref{Architecture}). Without projection onto
-the constraint surface the \texttt{IDA} Newton iteration fails to
-converge at the first timestep, and the modal Schur path produces an
-inconsistent reduced state. The \lstinline!ensure_consistent_ic!
-function in \lstinline!tidal.solver.constraint_solve! performs this
-projection once, after the user-specified initial condition has been
-built and before the chosen backend is invoked.
+symbolic pipeline (see~\cref{Architecture}). Without projection of
+$(q_0, v_0)$ onto the constraint surface --- \ie{} without solving the
+algebraic equations of motion for the constraint slots given the
+user-supplied dynamical-slot values --- the \texttt{IDA} Newton
+iteration fails to converge at the first timestep, and the modal Schur
+path produces an inconsistent reduced state. The
+\lstinline!ensure_consistent_ic! function performs this projection
+once, after the user-specified initial condition has been built and
+before the chosen backend is invoked.
 
 \paragraph*{Three-tier solver} The projection is implemented as a
 three-tier solver. The first tier handles the common case in which
@@ -661,12 +656,13 @@ Fourier transform, with FD-order-aware modified wavenumbers
 $k_{\rm mod}^2 = -(2/\Delta x^2)(1 - \cos(k\,\Delta x))$ at order~$2$
 and the analogous higher-order expressions at orders~$4$ and~$6$ so
 that the constraint solution is spectrally consistent with the FD
-stencils used during evolution; the cost is $O(N\log N)$. The second
+stencils used during evolution; the cost is
+$\mathcal{O}(N\log N)$~\cite{cooley1965fft}. The second
 tier covers non-periodic boundaries and variable coefficients: the
 constraint Jacobian is built by impulse-probing the same
 \lstinline!RHSEvaluator! operators used during evolution, then stored as
 CSC and factored by SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu} with
-$O(N^2)$ build cost and $O(N)$ solve. The third tier, reserved for
+$\mathcal{O}(N^2)$ build cost and $\mathcal{O}(N)$ solve. The third tier, reserved for
 the $N>2\times 10^{5}$ regime, is a Krylov iterative scheme; it is
 implemented but not exercised in the campaigns of~\cref{Results},
 where the largest grids fit comfortably within tier~$2$. The
@@ -678,12 +674,16 @@ in the specification.
 periodic domain has a one-dimensional null space: the zero Fourier
 mode is undetermined by the elliptic problem and must be supplied by
 an external condition. We pin the zero mode to zero as a numerical
-regularisation, because the physical observables of the present work
-depend on derivatives of the constraint field (the electric and
-magnetic field strengths, not the four-potential) and so are
-insensitive to this choice. This is a numerical gauge fix, distinct
-from the algebraic gauge-fixing presets implemented at the symbolic
-stage and discussed in~\cref{GaugeFixing}.
+regularisation. For the gauge-field constraints relevant to the
+present work --- the Maxwell scalar potential $A_0$ and similar
+four-potentials --- physical observables are constructed from
+derivatives (the field strengths $F_{\mu\nu}$), and the zero-mode
+choice cancels in any gauge-invariant quantity. The same is not
+automatic for non-gauge constraint fields, where the field value itself
+may carry physical content; such cases are handled instead by
+source-side normalisation in the spec. This is a numerical gauge fix,
+distinct from the algebraic gauge-fixing presets implemented at the
+symbolic stage and discussed in~\cref{GaugeFixing}.
 
 \subsection{Analytical Jacobian}%
 \label{AnalyticalJacobian}
@@ -692,10 +692,13 @@ stage and discussed in~\cref{GaugeFixing}.
 \texttt{CVODE} both rely on a Jacobian matrix $J = \partial F/\partial y +
 c_j\,\partial F/\partial y'$ to drive the Newton iteration of each
 backward-differentiation step. Finite-difference approximation of
-this matrix --- the default behaviour of every adaptive solver out
-of the box --- requires $O(n_{\rm colors})$ residual evaluations per
-Newton iteration, where $n_{\rm colors}$ is the chromatic number of
-the sparsity graph. For the multi-field systems with
+this matrix requires multiple residual evaluations per Newton
+iteration~\cite{hindmarsh2005sundials}.\footnote{Specifically, the
+cost is $\mathcal{O}(n_{\rm colors})$ residual evaluations per Newton
+iteration, where $n_{\rm colors}$ is the chromatic number of the
+sparsity graph~\cite{curtispowellreid1974}: each column-colour group
+of structurally non-overlapping entries can be probed in a single
+residual evaluation.} For the multi-field systems with
 $N\!\sim\!10^4$ degrees of freedom that arise in the PGT campaigns
 of~\cref{Results}, that overhead is the dominant cost. We circumvent
 it by precomputing the Jacobian analytically, once, from the symbolic
@@ -715,29 +718,28 @@ representative small systems. The sparse tier instead fills a flat
 CSC data buffer paired with a fixed sparsity
 pattern, which SUNDIALS factors with
 SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu}; this yields
-a roughly
-$2.5\times$ speedup for \texttt{IDA} and $1.2$--$1.4\times$ for
-\texttt{CVODE}. The matrix-free tier supplies an analytical
+a measurable speedup for both backends, larger for \texttt{IDA}
+(heavier per-step Jacobian cost) than for \texttt{CVODE}. The
+matrix-free tier supplies an analytical
 Jacobian--vector product callback $J\,v = (\partial F/\partial y)\,v +
 c_j\,(\partial F/\partial y')\,v$ to the SUNDIALS Krylov interface,
 which then solves the linear step by GMRES~\cite{saad1986gmres}
 without ever materialising $J$ explicitly --- this is the regime in
-which the $O(n_{\rm colors})$ overhead of finite differencing would
+which the $\mathcal{O}(n_{\rm colors})$ overhead of finite differencing would
 dominate absolutely.
 
 \paragraph*{Coordinate accumulation} The sparse Jacobian matrix is
 built by accumulating contributions from each operator into a
-coordinate (COO) triplet buffer, then converting once at the end to
-compressed-sparse-column format. We adopted this scheme after the
-profiler identified the naive list-of-lists assembly as the
-bottleneck: at a $48\!\times\!48$ grid the LIL-based assembly took
-$1{,}700\,\mathrm{ms}$ per Jacobian, while the COO path takes
-$4\,\mathrm{ms}$, a more than four-hundred-fold improvement that
-brought Jacobian construction down from the dominant cost to a
-negligible fraction of the per-step budget. The cost scales linearly
-with the number of non-zero entries rather than with the system size,
-which is what permits the $N\sim 10^4$ surveys of~\cref{Results} to
-run within the wall-clock budgets we report.
+coordinate (COO) triplet buffer~\cite{davis2006sparse}, then
+converting once at the end to compressed-sparse-column format. We
+adopted this scheme after the profiler identified the naive
+list-of-lists assembly as the bottleneck: at a $48\!\times\!48$ grid
+the LIL-based assembly took $1{,}700\,\mathrm{ms}$ per Jacobian, while
+the COO path takes $4\,\mathrm{ms}$, a more than four-hundred-fold
+improvement that brought Jacobian construction down from the dominant
+cost to a negligible fraction of the per-step budget. The cost scales
+linearly with the number of non-zero entries rather than with the
+system size.
 
 \paragraph*{Circulant operators on periodic grids} A further saving
 is available when the boundary conditions are all periodic and the
@@ -745,37 +747,13 @@ coefficients are spatially constant: the spatial-operator matrices
 are then circulant, since each row is a cyclic shift of the same
 stencil. We exploit this by probing a single grid point and tiling
 the resulting stencil row across all $N$ rows via modular arithmetic,
-an $O(\mathrm{nnz})$ construction in place of the $O(N^2)$ assembly
+an $\mathcal{O}(\mathrm{nnz})$ construction in place of the $\mathcal{O}(N^2)$ assembly
 of the general sparse path. On the periodic-domain Einstein--Maxwell
 system this contributes an additional factor of roughly $28\times$
 in operator-matrix construction.
 
-\paragraph*{Substrate sharing} The analytical Jacobian reuses the
-same \lstinline!CoefficientEvaluator! cache and operator catalogue that
-the \lstinline!RHSEvaluator! draws from in time evolution. A change to
-coefficient resolution therefore propagates to all three tiers
-without duplication, and an operator added to the catalogue acquires
-Jacobian support automatically once its sparsity offsets are
-registered. This architectural sharing is what permits the
-engineering layer to scale with the operator catalogue as new
-theories are added.
-
 \subsection{Dispatch and runtime workflow}%
 \label{Dispatch}
-
-\paragraph*{JSON specification ingestion} The numerical stage begins
-by parsing the JSON specification produced
-by~\cref{SymbolicComputation} (a schematic of the JSON block is shown
-in~\cref{JSONSpecSchematic}) into an \lstinline!EquationSystem!
-dataclass. The parser records each equation's left-hand-side
-time-derivative order, the list of right-hand-side (coefficient,
-operator, target field) triples, the Hamiltonian terms used by the
-energy diagnostic, and the mass and coupling matrices used by the
-modal solver. From this representation \lstinline!StateLayout.from_spec!
-builds the slot mapping of~\cref{EquationSubstrate},
-\lstinline!CoefficientEvaluator! precomputes the four-level cache, and
-the operator catalogue of~\cref{SpatialDiscretisation} resolves each
-operator string to a \NumPy{} callable.
 
 % Figure C.JSONSpecSchematic — JSON-output schematic (mirrors the TOML-input listing in App B).
 \begin{figure}[t]
@@ -816,30 +794,12 @@ operator string to a \NumPy{} callable.
   \label{RHSTripleExample}
 \end{figure}
 
-\paragraph*{Auto-dispatch} The six-rule auto-selection algorithm of
-the section opener is implemented as \lstinline!_resolve_scheme!, as
-shown in~\cref{SolverDispatchFlowchart}. The function evaluates each
-predicate in turn and returns a backend tag, which is then used to
-instantiate the appropriate solver class. Manual override is
-available through the \lstinline!--scheme! command-line option and takes
-precedence over auto-selection, with one exception: an explicit
-request for \lstinline!--scheme modal! on a system that fails
-\lstinline!can_use_modal! raises an error citing the failed
-predicate, because falling back silently to a different solver would
-mask the unmet eligibility condition.
-
 \paragraph*{Result handling} Every backend returns a uniform result
-dictionary with snapshot times, the corresponding flat state vectors,
-a success boolean, and a human-readable status string; the
-unification across the SUNDIALS~\cite{hindmarsh2005sundials} and
-\SciPy{}~\cite{virtanen2020scipy} backends is provided by a thin
-adapter layer in each solver module. The
-\lstinline!tidal.io._writer! module serialises these to the output
-directory together with the resolved equation specification and the
-runtime parameter values, so that downstream measurement and
-analysis subcommands (\lstinline!measure!, \lstinline!analyze!,
-\lstinline!plot!) can reconstruct the run without re-reading the
-original \xAct{} session. The architecture diagram
-of~\cref{Architecture} summarises this two-stage pipeline at the
-level of data flow; the present appendix has filled in its
-right-hand half.
+dictionary --- snapshot times, the corresponding flat state vectors,
+a success boolean, and a human-readable status string --- which is
+serialised to the output directory together with the resolved
+equation specification and the runtime parameter values. Downstream
+measurement and analysis subcommands consume this directory directly,
+so a run can be re-analysed without re-reading the original
+\xAct{} session. The two-stage architecture diagram
+of~\cref{Architecture} summarises the full data flow.
