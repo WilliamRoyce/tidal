@@ -11,13 +11,11 @@
 From a Lagrangian, a background ansatz, and a parameter set, the
 symbolic computation produces a JSON specification of the linearised
 field equations and the Hamiltonian density.
-\cref{Architecture} sets out the high-level pipeline, with the data-flow
-diagram shown in \cref{ArchitectureDiagram};
-the main-text overview is \cref{ComputationalApproach}, and the
-equation outputs for the surveyed theories are collected in
+The high-level architecture is shown in \cref{ArchitectureDiagram},
+and the equation outputs for the surveyed theories are collected in
 \cref{SymbolicOutputs}.
 Every partial differential equation evolved by the numerical solver of
-\cref{NumericalEvolution} is the output of this pipeline; for
+\cref{NumericalEvolution} is the output of the symbolic stage; for
 higher-curvature theories, an additional perturbative-reduction stage
 described in \cref{ConstraintBarrier} precedes the variation.
 
@@ -29,13 +27,14 @@ layer and \xTras{}~\cite{nutma2014xtras} the Einstein--Cartan
 operators used throughout the PGT theories of \cref{PGTBackground}.
 The manifold, metric, Levi-Civita and Riemann--Cartan covariant
 derivatives, and the torsion tensor are declared once at session start;
-the Christoffel components, the inverse metric, and the Levi-Civita
-tensor are computed once and cached against the declared metric.
+the Christoffel symbols, the inverse metric, and the Levi-Civita
+pseudotensor $\sqrt{-g}\,\varepsilon$ are computed once and cached
+against the declared metric.
 
 \paragraph*{Lagrangian input from TOML}
 The theory is specified by a single TOML file, which isolates
-everything theory-dependent from the derivation pipeline so the same
-code can serve any quadratic Lagrangian without per-theory editing.
+everything theory-dependent from the derivation so the same code can
+serve any quadratic Lagrangian without per-theory editing.
 The TOML declares the spacetime (dimension, signature, coordinate
 names); the dynamical fields, with their tensor type and index
 symmetries; any algebraically-derived tensors such as the
@@ -43,14 +42,12 @@ electromagnetic field strength $\FieldF{_\mu_\nu}$; the background
 fields; the parameter symbol set; the Lagrangian expression in
 \xAct{} syntax; and optional blocks for gauge fixing, linearisation,
 and perturbative reduction.
-A representative theory file --- the Einstein--Maxwell setup that
-underlies the Gertsenshtein analysis of \cref{Results} --- is shown in
-\cref{TOMLExample}.
+A representative theory file is shown in \cref{TOMLExample}.
 The symbolic stage is the map
 \begin{align*}
-  \textsc{TOML}\!\bigl[\mathcal{L},\,\{\varphi_i\},\,\{p_a\}\bigr]
+  \textsc{TOML}\!\bigl[\lag,\,\{\varphi_i\},\,\{p_a\}\bigr]
   \;\longmapsto\;
-  \textsc{JSON}\!\bigl[\{\textsf{EOM}_i\},\,\mathcal{H}\bigr],
+  \textsc{JSON}\!\bigl[\{\textsf{EOM}_i\},\,\ham\bigr],
 \end{align*}
 whose internal stages occupy the rest of this appendix.
 
@@ -113,18 +110,20 @@ in their declared fields and Lagrangian.}
 \end{figure}
 
 \paragraph*{Linearisation around backgrounds}
-The pipeline implements the background-and-perturbation decomposition
+The software implements the background-and-perturbation decomposition
 of \cref{Linearisation} by expanding the action to second order in the
-perturbations using \xPert{}~\cite{brizuela2009xpert}, with each
-dynamical field perturbed independently around its declared background.
-The multi-field generalisation perturbs the metric and any declared
-matter fields simultaneously.
+perturbations using \xPert{}~\cite{brizuela2009xpert}, with the metric
+and any declared matter fields perturbed simultaneously.
 
-For each field the perturbation is registered as a tensor in \xAct{}:
-the metric carries one through \texttt{SetupMetricPerturbation}, and
-each matter field $\varphi^{\mathcal{I}}$ declared in the
-matter-perturbations block of \cref{TOMLExample} carries one through
-\texttt{DefTensorPerturbation}, yielding
+Each dynamical field is \emph{declared} with its own
+\texttt{DefTensorPerturbation} call (the metric carries one through
+\texttt{SetupMetricPerturbation}), but the perturbation expansion is a
+single operation on the action: applying \texttt{Perturbation} of
+order two to $\sqrt{-g}\,\lag$ produces every bilinear product of
+first-order perturbations, including the cross-couplings between
+different fields that drive the Gertsenshtein mixing.
+Each matter field $\varphi^{\mathcal{I}}$ declared in the
+matter-perturbations block of \cref{TOMLExample} yields
 \begin{align}
   g_{\mu\nu} = \eta_{\mu\nu} + \varepsilon\,h_{\mu\nu},
   \qquad
@@ -134,7 +133,7 @@ matter-perturbations block of \cref{TOMLExample} carries one through
 \end{align}
 where $\mathcal{I}$ stands for the field's tensor indices, suppressed
 throughout this paragraph; \cref{MultiFieldPerturbation} is the
-pipeline-side reading of \cref{PerturbationAnsatz}.
+symbolic-stage reading of \cref{PerturbationAnsatz}.
 Backgrounds are supplied through the background-fields block of
 \cref{TOMLExample}, with their component values fixed by
 \texttt{xCoba}'s \texttt{ComponentValue} declarations --- for example
@@ -147,30 +146,28 @@ abstract through the perturbation expansion and be substituted only
 afterwards. Without this deferral, the canonicalisation step that
 follows collapses the antisymmetric kinetic structure to zero before
 perturbation indices are assigned, and the photon equations emerge as
-non-dynamical constraints. The pipeline detects deferral candidates
+non-dynamical constraints. The software detects deferral candidates
 automatically from the TOML symmetry annotation and threads them
 through the expansion as abstract tensors with their own
 \texttt{DefTensorPerturbation} registration.}
 
-We expand the action to second order in the perturbation parameter
-$\varepsilon$ by applying \texttt{Perturbation} of order two to
-$\sqrt{-g}\,\mathcal{L}$ followed by \texttt{ExpandPerturbation}.
-The resulting $\mathcal{L}^{(2)}$ contains two kinds of terms: products
-of first-order perturbations (the \textsf{LI}[1] symbols of \xPert{}),
-which constitute the kinetic and coupling structure of the linearised
-theory, and linear couplings to isolated second-order perturbation
-tensors (the \textsf{LI}[2] symbols, parametrising the
-$\mathcal{O}(\varepsilon^{2})$ corrections to the fields themselves).
+The resulting $\lag^{(2)}$, returned by \texttt{ExpandPerturbation},
+contains two kinds of terms: products of first-order perturbations
+(the \textsf{LI}[1] symbols of \xPert{}), which constitute the kinetic
+and coupling structure of the linearised theory, and linear couplings
+to isolated second-order perturbation tensors (the \textsf{LI}[2]
+symbols, parametrising the $\mathcal{O}(\varepsilon^{2})$ corrections
+to the fields themselves).
 The first kind we keep verbatim; the second we drop via the
 substitution rule $\textsf{LI}[2] \mapsto 0$, since the linearised
 equations of motion are obtained by variation with respect to
 first-order fields and are unaffected by the \textsf{LI}[2] content.
 The retained
 \begin{align}
-  \mathcal{L}^{(2)}
+  \lag^{(2)}
   \;=\;
   \textsf{ExpandPerturbation}\!\bigl[
-    \textsf{Perturbation}[\sqrt{-g}\,\mathcal{L},\,2]
+    \textsf{Perturbation}[\sqrt{-g}\,\lag,\,2]
   \bigr]\Big|_{\textsf{LI}[2]\,\mapsto\,0}
   \label{QuadraticExpansion}
 \end{align}
@@ -178,25 +175,25 @@ is the linearised action of the multi-field system.
 
 The remaining abstract covariant derivatives of background tensors are
 resolved against the \texttt{ComponentValue} declarations during the
-chart conversion, so $\rcD{_z}\bar{A}_y = -\Bzero$ for the uniform
-background and a coordinate-dependent expression for a localised one
---- the mechanism by which position-dependent coupling coefficients
-enter the JSON specification without special-casing in the solver.
+chart conversion: the uniform background gives
+$\rcD{_z}\bar{A}_y = -\Bzero$, and a localised one gives a
+coordinate-dependent expression that enters the JSON specification as
+a position-dependent coefficient.
 
 \paragraph*{Euler--Lagrange derivation}
 The field equation for every dynamical perturbation is obtained by
-variational differentiation of the quadratic action $\mathcal{L}^{(2)}$
-built in \cref{QuadraticExpansion}: for fields $\{\varphi_i\}$ of arbitrary
-tensor type, the equation of motion is
+variational differentiation of the quadratic action $\lag^{(2)}$
+built in \cref{QuadraticExpansion}: for fields $\varphi^{\mathcal{I}}$
+of arbitrary tensor type, the equation of motion is
 \begin{align}
-  \frac{\partial \mathcal{L}^{(2)}}{\partial \varphi_i}
-  \;-\; \rcD{_\mu}\!\frac{\partial \mathcal{L}^{(2)}}{\partial(\rcD{_\mu}\varphi_i)}
-  \;+\; \rcD{_\mu}\rcD{_\nu}\!\frac{\partial \mathcal{L}^{(2)}}{\partial(\rcD{_\mu}\rcD{_\nu}\varphi_i)}
+  \frac{\partial \lag^{(2)}}{\partial \varphi^{\mathcal{I}}}
+  \;-\; \rcD{_\mu}\!\frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\varphi^{\mathcal{I}})}
+  \;+\; \rcD{_\mu}\rcD{_\nu}\!\frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\rcD{_\nu}\varphi^{\mathcal{I}})}
   \;-\; \cdots \;=\; 0,
   \label{EulerLagrange}
 \end{align}
 where the series terminates at the highest derivative order present in
-$\mathcal{L}^{(2)}$.
+$\lag^{(2)}$.
 The differentiation is performed by \xAct{}'s
 \texttt{VarD}~\cite{martingarcia2007xact}, which handles the chain rule
 and integration-by-parts for arbitrary tensor structure and arbitrary
@@ -204,13 +201,12 @@ derivative chains, and returns the equation in abstract-index form
 before any component reduction.
 
 The equations are kept in second-order velocity form, with explicit
-velocity slots $v_i = \partial_t\varphi_i$ alongside the fields; we
-defer the rationale, the kinetic-matrix definition, and the
-canonical-momentum inversion failures to \cref{NumericalEvolution}.
-For Lagrangians where a small-parameter expansion introduces equations
-of motion of order higher than two in time, the pipeline applies a
-perturbative substitution before the variation; the algorithm, its
-scope, and the structural obstruction that limits it are deferred to
+velocity slots $v^{\mathcal{I}} = \PD{_t}\varphi^{\mathcal{I}}$
+alongside the fields; rationale and consequences for solver dispatch
+are discussed in \cref{NumericalEvolution}.
+Higher-time-derivative Lagrangians arising from small-parameter
+expansions are handled by a perturbative substitution before the
+variation, discussed with its scope and limitations in
 \cref{ConstraintBarrier}.
 
 \paragraph*{Component decomposition}
@@ -237,10 +233,10 @@ correction,
   \PD{_\mu}\varphi_{\nu} \;-\; \MAGA{^\sigma_\mu_\nu}\,\varphi_{\sigma},
   \label{CovariantDerivativeExpansion}
 \end{align}
-where $\Gamma$ is the full Cartan connection of
-\cref{PalatiniDecomposition} and one such term appears per index slot
-for tensors of higher rank, with a sign matching whether the slot is
-covariant or contravariant.
+where $\MAGA{}$ is the full Cartan connection of
+\cref{PalatiniDecomposition}, with one such term per coordinate slot
+for tensors of higher rank; the general mixed-type form is
+\cref{MixedCovariantDerivative}.
 
 \paragraph*{Gauge fixing}%
 \label{GaugeFixing}
@@ -256,13 +252,13 @@ variation~\cite{faddeev1967feynman}.
 For a vector field $\FieldA{_\mu}$, the Lorenz gauge is realised by
 the augmentation
 \begin{align}
-  \mathcal{L} \;\longrightarrow\;
-  \mathcal{L} \;-\; \frac{1}{2\xi}\bigl(\rcD{_\mu}\FieldA{^\mu}\bigr)^{2},
+  \lag \;\longrightarrow\;
+  \lag \;-\; \frac{1}{2\xi}\bigl(\rcD{_\mu}\FieldA{^\mu}\bigr)^{2},
   \label{LorenzGauge}
 \end{align}
 with the gauge parameter $\xi$ controlling the weight of the residual
 symmetry; the augmented Lagrangian then enters the variational
-pipeline in the usual way.
+procedure in the usual way.
 The second mechanism imposes a constraint on the field components
 after decomposition, as in the transverse-traceless prescription that
 sets $h_{0\mu} = 0$ and $h^\mu{}_\mu = 0$ on the metric-perturbation
@@ -270,9 +266,9 @@ components --- a constraint expressible only at the component level
 because it refers to component indices, not abstract ones.
 
 Six named presets cover the gauges in routine use: Lorenz for vector
-fields, de Donder for the metric perturbation, Coulomb for the spatial
-part of a vector field, temporal ($A_0 = 0$), axial ($A_3 = 0$), and
-transverse-traceless.
+fields, de Donder~\cite{wald1984general} for the metric perturbation,
+Coulomb for the spatial part of a vector field, temporal
+($A_0 = 0$), axial ($A_3 = 0$), and transverse-traceless.
 Arbitrary user-specified gauges are declared by writing the gauge
 expression directly in the gauge block of \cref{TOMLExample}, which is
 treated as either a Lagrangian term or a component constraint
