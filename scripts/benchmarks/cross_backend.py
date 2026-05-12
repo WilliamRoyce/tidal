@@ -67,7 +67,7 @@ CASES_FULL = [
         "ic_component": "h_0",
         "source": "h_0",
         "target": "a_0",
-        "params": {},
+        "params": {"omegaP2": 0.0, "mg2": 0.0, "B0": 0.05, "kappa": 1.0},
         "t_end": 10.0,
         "kwave": 1.0,
         "bounds": (0.0, 2.0 * np.pi),

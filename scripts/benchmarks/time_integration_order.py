@@ -184,8 +184,20 @@ def _run_one(
 
 
 def _fit_order(rows: list[dict]) -> float | None:
-    """Log-log slope of (abs_error vs dt) on the cleanly-converging segment."""
-    ok = [r for r in rows if r.get("ok") and r["abs_error"] > 1e-14]
+    """Log-log slope of (abs_error vs dt) on the cleanly-converging segment.
+
+    Excludes rows where the error is inf, NaN, or below the round-off floor,
+    so unstable runs (dt above the CFL limit) and saturated runs (below the
+    spatial-discretisation floor) do not corrupt the slope estimate.
+    """
+    ok = []
+    for r in rows:
+        if not r.get("ok"):
+            continue
+        err = r.get("abs_error")
+        if err is None or not math.isfinite(err) or err <= 1e-14:
+            continue
+        ok.append(r)
     if len(ok) < 2:
         return None
     dts = np.log10([r["dt"] for r in ok])

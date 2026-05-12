@@ -1,0 +1,47 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-12T15:46:19.072076+00:00",
+    "host": "cpu-r-110",
+    "python_version": "3.11.0",
+    "numpy_version": "2.4.4",
+    "scipy_version": "1.17.1",
+    "git_sha": "unknown",
+    "parameters": {
+      "smoke": false,
+      "examples": [
+        "coupled_scalars",
+        "gertsenshtein"
+      ]
+    }
+  },
+  "summary": {
+    "n_examples": 2,
+    "n_ok": 2,
+    "n_failed": 0,
+    "max_drift": 1.039534667252019e-15,
+    "median_drift": 8.902297251230583e-16,
+    "min_drift": 7.409247829940978e-16
+  },
+  "examples": [
+    {
+      "label": "coupled_scalars",
+      "ok": true,
+      "max_abs_dE_over_E": 1.039534667252019e-15,
+      "conservation_raw": {
+        "max_relative_error": 1.039534667252019e-15,
+        "is_conserved": true,
+        "threshold": 0.001
+      }
+    },
+    {
+      "label": "gertsenshtein",
+      "ok": true,
+      "max_abs_dE_over_E": 7.409247829940978e-16,
+      "conservation_raw": {
+        "max_relative_error": 7.409247829940978e-16,
+        "is_conserved": true,
+        "threshold": 0.001
+      }
+    }
+  ]
+}

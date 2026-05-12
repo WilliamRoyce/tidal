@@ -1,0 +1,187 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-12T15:54:07.762537+00:00",
+    "host": "cpu-r-110",
+    "python_version": "3.11.0",
+    "numpy_version": "2.4.4",
+    "scipy_version": "1.17.1",
+    "git_sha": "unknown",
+    "parameters": {
+      "backends": [
+        "modal",
+        "cvode",
+        "ida",
+        "leapfrog"
+      ],
+      "theories": [
+        "gertsenshtein",
+        "coupled_scalars"
+      ],
+      "smoke": false
+    }
+  },
+  "summary": {
+    "n_runs": 8,
+    "n_ok": 8,
+    "n_failed": 0,
+    "failures": [],
+    "max_pairwise_rel_diff": 0.0010958125985356883,
+    "median_pairwise_rel_diff": 0.0004178387542636824
+  },
+  "runs": [
+    {
+      "label": "gertsenshtein",
+      "backend": "modal",
+      "ok": true,
+      "P_max": 0.900551497098249,
+      "P_peak_time": 50.0
+    },
+    {
+      "label": "gertsenshtein",
+      "backend": "cvode",
+      "ok": true,
+      "P_max": 0.9005472848753551,
+      "P_peak_time": 50.0
+    },
+    {
+      "label": "gertsenshtein",
+      "backend": "ida",
+      "ok": true,
+      "P_max": 0.9000667391313371,
+      "P_peak_time": 50.0
+    },
+    {
+      "label": "gertsenshtein",
+      "backend": "leapfrog",
+      "ok": true,
+      "P_max": 0.9008193884348947,
+      "P_peak_time": 50.02087083166636
+    },
+    {
+      "label": "coupled_scalars",
+      "backend": "modal",
+      "ok": true,
+      "P_max": 0.06129589382947253,
+      "P_peak_time": 10.0
+    },
+    {
+      "label": "coupled_scalars",
+      "backend": "cvode",
+      "ok": true,
+      "P_max": 0.061295894856375384,
+      "P_peak_time": 10.0
+    },
+    {
+      "label": "coupled_scalars",
+      "backend": "ida",
+      "ok": true,
+      "P_max": 0.0612959023086964,
+      "P_peak_time": 10.0
+    },
+    {
+      "label": "coupled_scalars",
+      "backend": "leapfrog",
+      "ok": true,
+      "P_max": 0.0613631363273457,
+      "P_peak_time": 10.005391654097679
+    }
+  ],
+  "pairwise": [
+    {
+      "label": "gertsenshtein",
+      "backend_a": "cvode",
+      "backend_b": "ida",
+      "P_a": 0.9005472848753551,
+      "P_b": 0.9000667391313371,
+      "rel_diff": 0.0005336152271943446
+    },
+    {
+      "label": "gertsenshtein",
+      "backend_a": "cvode",
+      "backend_b": "leapfrog",
+      "P_a": 0.9005472848753551,
+      "P_b": 0.9008193884348947,
+      "rel_diff": 0.0003020622813330202
+    },
+    {
+      "label": "gertsenshtein",
+      "backend_a": "cvode",
+      "backend_b": "modal",
+      "P_a": 0.9005472848753551,
+      "P_b": 0.900551497098249,
+      "rel_diff": 4.6773814795728735e-06
+    },
+    {
+      "label": "gertsenshtein",
+      "backend_a": "ida",
+      "backend_b": "leapfrog",
+      "P_a": 0.9000667391313371,
+      "P_b": 0.9008193884348947,
+      "rel_diff": 0.0008355163234944845
+    },
+    {
+      "label": "gertsenshtein",
+      "backend_a": "ida",
+      "backend_b": "modal",
+      "P_a": 0.9000667391313371,
+      "P_b": 0.900551497098249,
+      "rel_diff": 0.0005382901127519366
+    },
+    {
+      "label": "gertsenshtein",
+      "backend_a": "leapfrog",
+      "backend_b": "modal",
+      "P_a": 0.9008193884348947,
+      "P_b": 0.900551497098249,
+      "rel_diff": 0.0002973862908425764
+    },
+    {
+      "label": "coupled_scalars",
+      "backend_a": "cvode",
+      "backend_b": "ida",
+      "P_a": 0.061295894856375384,
+      "P_b": 0.0612959023086964,
+      "rel_diff": 1.2157943249942821e-07
+    },
+    {
+      "label": "coupled_scalars",
+      "backend_a": "cvode",
+      "backend_b": "leapfrog",
+      "P_a": 0.061295894856375384,
+      "P_b": 0.0613631363273457,
+      "rel_diff": 0.0010957958636861373
+    },
+    {
+      "label": "coupled_scalars",
+      "backend_a": "cvode",
+      "backend_b": "modal",
+      "P_a": 0.061295894856375384,
+      "P_b": 0.06129589382947253,
+      "rel_diff": 1.675320764667185e-08
+    },
+    {
+      "label": "coupled_scalars",
+      "backend_a": "ida",
+      "backend_b": "leapfrog",
+      "P_a": 0.0612959023086964,
+      "P_b": 0.0613631363273457,
+      "rel_diff": 0.0010956744174651118
+    },
+    {
+      "label": "coupled_scalars",
+      "backend_a": "ida",
+      "backend_b": "modal",
+      "P_a": 0.0612959023086964,
+      "P_b": 0.06129589382947253,
+      "rel_diff": 1.3833263810925458e-07
+    },
+    {
+      "label": "coupled_scalars",
+      "backend_a": "leapfrog",
+      "backend_b": "modal",
+      "P_a": 0.0613631363273457,
+      "P_b": 0.06129589382947253,
+      "rel_diff": 0.0010958125985356883
+    }
+  ]
+}
