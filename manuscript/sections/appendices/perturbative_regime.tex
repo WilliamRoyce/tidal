@@ -14,15 +14,15 @@ takes the magnetic field $\Bzero$ as
 externally prescribed rather than self-consistently sourcing the
 background metric.
 Hwang \& Noh~\cite{hwangnoh2023graviton} examine the
-self-consistency of this linear-on-flat-background analysis.
-Including the metric perturbation in the EM stress-energy
-self-consistently produces a tachyonic mass-like term
-$-(\kappa^2/2)\Bzero^2$ in the graviton equation of motion;
-they show that the regime in which this term would drive an
-exponential instability coincides with the regime in which the
-gravity of the background magnetic field can no longer be
-ignored, so the linear analysis cannot self-consistently establish
-the instability and the framework remains internally consistent
+self-consistency of this linear-on-flat-background analysis:
+including the metric perturbation in the EM stress-energy
+produces a tachyonic mass-like term $-(\kappa^2/2)\Bzero^2$ in
+the graviton equation of motion, but the regime in which this
+term would drive an exponential instability coincides with the
+regime in which the gravity of the background magnetic field can
+no longer be ignored.
+The linear analysis therefore cannot self-consistently establish
+the instability, and the framework remains internally consistent
 within its declared regime of validity.
 There is a critical scale $\lambda_B = 2\pi/k_B$, with
 $k_B = \sqrt{8\pi G}\,\Bzero/c^2$, above which the dimensionless
@@ -54,16 +54,10 @@ in the small-$\kappa\Bzero D$ limit this is half the
 estimate, and squaring gives the factor of
 four.}
 The simulations of \cref{SectorSurvey} solve the linearised
-equations of motion derived from the parity-even quadratic
-PGT--Maxwell theories enumerated in \cref{PGTEnumeration} on a
-flat Minkowski background with externally
-prescribed $\Bzero$, retaining the tachyonic mass-like term
-automatically. \cref{HwangNohBound} is the self-consistency
-condition for this linear-on-flat-background framework, under which
-both the simulations and the analytic comparison formula
-\cref{GertsenshteinFormula} are reliable; in the small-$\Bzero$
-regime of the survey, $\kappa\Bzero D\ll 1$ holds with comfortable
-margin.
+equations of motion derived from the PGT--Maxwell theories
+enumerated in \cref{PGTEnumeration} on a flat Minkowski background
+with externally prescribed $\Bzero$, retaining the tachyonic
+mass-like term automatically.
 
 
 \paragraph*{Self-consistency at vanishing background field}
@@ -102,18 +96,16 @@ in disjoint sectors and $\Pconv(\Bzero=0)=0$.
 Switching on $\Bzero$ introduces a fixed background tensor
 $\bar{\FieldF{}}\propto\Bzero\hat{x}$ that breaks the rotational symmetry
 and lifts the helicity-conservation selection rule
-forbiding graviton-photon transitions at $\Bzero=0$.
+forbidding graviton-photon transitions.
 The kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix} acquires an
 explicit $\Bzero$-dependence
 $\mathcal{K}(\partial_t,\partial_z;\Bzero)$ that is polynomial in
 $\Bzero$, and the graviton--photon conversion amplitude
 $\mathcal{M}(\Bzero)$ defined via $\Pconv=|\mathcal{M}|^2$ depends
 analytically on $\mathcal{K}$ wherever the unperturbed kinetic
-operator is non-singular --- generically true across the surveyed
-parameter space, with isolated exceptional points where the
-multi-field kinetic structure becomes degenerate;
+operator is non-singular;
 $\Pconv$ is therefore analytic in $\Bzero$ in a neighbourhood of
-zero at every generic point of the survey.
+zero.
 A rotation of the lab frame by $\pi$ about $\hat{z}$ is a coordinate
 relabelling that sends $\bm{B}\to-\bm{B}$: the rotated frame describes
 the same physical system with the parameter $\Bzero$ replaced by
@@ -174,13 +166,11 @@ torsion perturbation $\delta\MAGT{}$.
 The $\rcD{}K$ term of \cref{RiemannCartanDecomp} contracted with $\bar{\FieldF{}}$
 cancels at first order by the same integration by parts as in the
 preceding paragraph: $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$.
-The dominant source therefore comes from one order higher: per
-\cref{PalatiniDecomposition}, $\MAGFt{}$ acquires a
-$(\partial h){\cdot}K[\delta\MAGT{}]$ cross-term at second perturbative
-order, and varying
+The dominant source therefore comes from varying
 $\Del{1}\MAGFt{_{[\mu\nu]}}\bar{\FieldF{}}^{\mu\nu}$ \wrt
-$\delta\MAGT{}$ produces a source
-$\propto\Del{1}\bar{\FieldF{}}\,\partial h$.%
+$\delta\MAGT{}$ using the Palatini split
+(\cref{PalatiniDecomposition}), which produces a source
+$\mathcal{S}\propto\Del{1}\bar{\FieldF{}}\,\partial h$.%
 \footnote{The same $\rcD{}K$ piece contracted with $\delta\FieldF{}$
 instead of $\bar{\FieldF{}}$ gives an additional first-order source
 $\propto\Del{1}\,\partial\delta\FieldA{}$ that is $\Bzero$-independent;
@@ -191,7 +181,7 @@ source $\propto\Del{1}\bar{\FieldF{}}\,\partial h$, so
 In the algebraic-torsion form,
 $\delta\MAGT{}$ has no kinetic operator and the linearised
 Cartan equation is purely algebraic,
-$2\Alp{}\,\delta\MAGT{} = -\text{source}$;
+$2\Alp{}\,\delta\MAGT{} = -\mathcal{S}$;
 inverting this algebraic equation directly gives
 $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
 for a graviton of dimensionless amplitude $A$ (\cref{Linearisation}).
@@ -207,8 +197,10 @@ Substituting the linearised solution above into this requirement gives
   |\Del{1}|\,\Bzero\,A \;\ll\; \Alp{}^{\,2} .
   \label{PerturbativeBound}
 \end{align}
-The same dimensional argument applies when the Barker kinetic term
-$(\rcD{}\MAGT{})^2$~\cite{barker2024poincare} is active and
+The same dimensional argument applies when the torsion-derivative
+kinetic term
+$(\rcD{}\MAGT{})^2$~\cite{barker2024poincare}~(\cref{PGTEnumeration})
+is active and
 $\delta\MAGT{}$ propagates: the algebraic inversion is
 then replaced by a Green's function inversion, but the magnitude of
 the response and the scaling of the bound are unchanged with $\Alp{}$
@@ -237,17 +229,14 @@ to $\Pconv$ at
 $\mathcal{O}\!\left(\Bzero^4(g_{\mathrm{NM}}/m_T^2)^2\right)$
 and the correction to $C=\Pconv/\Bzero^2$ at
 $\mathcal{O}\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$.
-Second, when the Barker kinetic term is active and $\delta\MAGT{}$
-propagates, the linearised Cartan equation takes the form
-$[\mathcal{D}(\partial)+\Alp{}]\,\delta\MAGT{} = -\text{source}$,
-where $\mathcal{D}(\partial)$ is the second-order kinetic operator
-from the Barker term;
+Second, when the torsion-derivative kinetic term is active and
+$\delta\MAGT{}$ propagates, the linearised Cartan equation takes
+the form $[\mathcal{D}(\partial)+\Alp{}]\,\delta\MAGT{} = -\mathcal{S}$,
+where $\mathcal{D}(\partial)$ is the second-order kinetic operator;
 the algebraic inversion of \cref{PerturbativeBound} is then replaced
 by a Green's function inversion
-$\delta\MAGT{} = \int G\,(\text{source})$,
-$G = [\mathcal{D}(\partial)+\Alp{}]^{-1}$, with the
-propagating-torsion mode structure analysed
-in~\cite{blagojevic2018hamiltonian,lin2019pgt}.
+$\delta\MAGT{} = \int G\,\mathcal{S}$,
+$G = [\mathcal{D}(\partial)+\Alp{}]^{-1}$.
 The magnitude of $\delta\MAGT{}$ is set by the dominant mass-squared
 scale of $G$, and the same
 $\mathcal{O}\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$ scaling
@@ -308,8 +297,7 @@ Since $\Pconv$ vanishes at $\Bzero=0$ and contains only even powers of
 $\Bzero$ (\cref{TaylorPconv}),
 $c_2$ is the lowest non-zero Taylor coefficient of $\Pconv$.
 The survey coefficient $\Czero=c_2$ is therefore the leading term in
-$C=\Pconv/\Bzero^2$ --- not by definition, but as a consequence of the
-spin-selection and analyticity arguments above.
+$C=\Pconv/\Bzero^2$.
 In the Einstein--Maxwell limit $\Czero$ reduces to $(\kappa D/2)^2$
 from \cref{GertsenshteinFormula}; in the torsionful theory $\Czero=c_2$
 is the total graviton-photon conversion coefficient at leading order in
@@ -333,19 +321,20 @@ this value via $\Czero=\lim_{\Bzero\to 0}\Pconv/\Bzero^2$.
 Two further mechanisms also contribute to $\Pconv$ but not to $c_2$:
 the metric-backreaction detuning $\Delta\propto\Bzero^2$ enters
 $\Pconv$ as $(\Delta/g)^2\propto\Bzero^2$ on top of the leading
-$\Bzero^2$ amplitude;
+$\Bzero^2$ amplitude, where $g\propto\Bzero$ is the
+graviton-photon coupling strength of the two-mode mixing formula
+below;
 the torsion-sector nonlinearity contributes at
 $\mathcal{O}((\delta\MAGT{})^2)\propto\Bzero^2$ relative to the linear
 $\delta\MAGT{}$ response of \cref{PerturbativeBound}.
 Both place their contribution at $\mathcal{O}(\Bzero^4)$ in $\Pconv$
-and $\mathcal{O}(\Bzero^2)$ in $C$, strictly subleading to $c_2$, and
-the exact-limit definition extracts $\Czero$ free of either: any term
-proportional to $\Bzero^k$ for $k\geq 2$ drops out of
-$\lim_{\Bzero\to 0}\Pconv/\Bzero^2$ and appears instead among
-$c_4,c_6,\ldots$.
-These are the corrections we want to neglect --- they are not the
-linear-response torsion signal, and the discrete integer-power
-structure of the Taylor expansion ensures the separation is exact.
+and $\mathcal{O}(\Bzero^2)$ in $C$, strictly subleading to $c_2$;
+the exact-limit definition extracts $\Czero$ free of either.
+The discrete integer-power structure of the Taylor expansion
+separates $c_2$ from the higher Taylor coefficients exactly:
+the survey coefficient $\Czero$ isolates the linear-response
+torsion signal from the metric-backreaction and torsion-nonlinearity
+corrections.
 
 The metric backreaction enters via the tachyonic-mass term
 $-(\kappa^2/2)\Bzero^2 h$,
@@ -360,8 +349,9 @@ formula~\cite{raffelt1988mixing}
 substituting $\Delta/g\propto\Bzero$ gives a correction to $C$
 at $\mathcal{O}(\Bzero^2)$, consistent with the analyticity bound.
 The torsion nonlinearity contributes at
-$\mathcal{O}\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$ per
-\cref{PerturbativeBound}, again consistent.
+$\mathcal{O}\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$ from
+squaring the linearised solution of \cref{PerturbativeBound},
+again consistent.
 
 The limiting coefficient $\Czero^{\mathrm{EM}}$ matches the
 potential-formulation derivation of~\cite{hwangnoh2023graviton}:
