@@ -761,7 +761,7 @@ def _plot_corner_anesthetic(
             return samples.plot_2d(
                 plot_params,
                 label="68% / 95% / 99% CL",
-                levels=[0.99, 0.95, 0.68],
+                lower_kwargs={"levels": [0.99, 0.95, 0.68]},
             )
         return samples.plot_2d(plot_params, label="samples", kinds=kinds)
 
