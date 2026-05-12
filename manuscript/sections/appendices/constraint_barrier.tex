@@ -13,13 +13,11 @@ For Lagrangians that contain higher-curvature terms multiplied by a
 small coupling, the canonical-analysis programme used elsewhere in
 this report meets a structural obstruction --- the
 \emph{constraint-promotion barrier} --- that bears on which PGT
-theories the pipeline of \cref{SymbolicComputation} can survey
-reliably.
+theories \cref{SymbolicComputation} can survey reliably.
 This appendix sets out the barrier in its three classical statements,
 records the structural analogues familiar from other gravity and
 field-theory limits, and describes the \emph{Lagrangian perturbative
-substitution} algorithm by which the pipeline handles the cases it can
-handle.
+substitution} algorithm by which the software handles the cases where it applies.
 
 \paragraph*{The constraint-promotion barrier}
 A quadratic action that becomes a constrained system in the limit
@@ -119,7 +117,7 @@ structural pattern.
 
 \paragraph*{Lagrangian perturbative substitution}
 To handle higher-curvature PGT theories where the regularity condition
-holds, the pipeline implements \emph{Lagrangian perturbative
+holds, \TIDAL{} implements \emph{Lagrangian perturbative
 substitution} (LPS).
 The order-$\varepsilon^{0}$ equations of motion are extracted and
 solved for the highest time derivative in terms of lower-order and
@@ -140,7 +138,7 @@ The substitution is faithful exactly when the
 Ja{\'e}n--Llosa--Molina regularity condition holds.
 For theories where the condition fails, the substitution silently
 drops the promoted mode and the reduced theory loses physical
-content; the pipeline detects the failure during derivation, by
+content; the software detects the failure during derivation, by
 checking whether the order-$\varepsilon^{0}$ momentum kernel changes
 rank when $\varepsilon$ is turned on, and emits a diagnostic that
 prevents the reduced theory from being used as a substitute for the
@@ -150,12 +148,12 @@ full one.
 The barrier delimits the scope of what the surveys of \cref{Results}
 can claim.
 Theories without higher-curvature terms, and theories where LPS
-succeeds, are surveyed against the standard linearised pipeline of
+succeeds, are surveyed using the standard linearised methodology of
 \cref{SymbolicComputation}.
 Theories where LPS fails are flagged at derivation time and excluded
 from the channel-by-channel analysis, with the failure recorded
 against the theory in the campaign log.
 The Ja{\'e}n--Llosa--Molina obstruction is therefore not a defect of
-the pipeline but a sharp statement of which corners of the PGT
+the software but a sharp statement of which corners of the PGT
 theory space the linearised methodology can address; the remainder
 requires the non-perturbative treatment outlined in \cref{Discussion}.

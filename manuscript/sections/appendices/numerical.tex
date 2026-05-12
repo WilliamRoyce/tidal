@@ -23,7 +23,7 @@ field-container design draws on the py-pde
 framework~\cite{zwicker2020pypde}. \TIDAL{} is designed for arbitrary
 tensor Lagrangians on flat or curved backgrounds; validation against
 analytic limits is collected in~\cref{Validation}, and the
-symbolic-pipeline outputs for the surveyed theories are tabulated
+symbolic-stage outputs for the surveyed theories are tabulated
 in~\cref{SymbolicOutputs}. \TIDAL{} provides a shared substrate ---
 state layout, spatial operators, coefficient cache --- and a
 dispatcher that selects among several solver backends from the
@@ -341,7 +341,7 @@ $0.49$--$1.06$ (\cref{tab:PadeBenchmark}), so we incur no significant
 performance cost in exchange for the robustness guarantee. The
 eigendecomposition path remains available internally for the
 closed-form Duhamel kernel used in the perturbative-reduction
-pipeline of~\cref{ConstraintBarrier}, which requires the
+stage of~\cref{ConstraintBarrier}, which requires the
 per-eigenmode expansion explicitly.
 
 % Table C.PadeBenchmark — wall-time comparison.
@@ -638,7 +638,7 @@ $(\nabla^2 - m^2)\, A_0 = \mathcal{S}[A_i]$ in the Lorenz gauge, the
 linearised
 gravitational-wave metric satisfies a transversality condition, and
 similar constraints arise from every gauge-fixed sector of the
-symbolic pipeline (see~\cref{Architecture}). Without projection of
+symbolic stage (see~\cref{Architecture}). Without projection of
 $(q_0, v_0)$ onto the constraint surface --- \ie{} without solving the
 algebraic equations of motion for the constraint slots given the
 user-supplied dynamical-slot values --- the \texttt{IDA} Newton
@@ -786,7 +786,7 @@ in operator-matrix construction.
   % the operator name, and the target field name.
   \caption{Example right-hand-side triples from the JSON equation
     specification. Each triple carries a numerical coefficient (which
-    in our pipeline is the resolved value of a symbolic coefficient
+    the resolved value of a symbolic coefficient
     string), an operator name drawn from the catalogue
     of~\cref{SpatialDiscretisation}, and a target field name. The
     triples are summed to give the right-hand side of the

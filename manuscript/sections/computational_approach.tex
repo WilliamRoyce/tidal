@@ -13,16 +13,16 @@
 \label{ComputationalApproach}
 
 % Paragraph 1 — TIDAL pipeline (~80 w).
-\paragraph*{TIDAL pipeline}
+\paragraph*{TIDAL}
 \TIDAL{} (Tensor Integration and Derivation for Any Lagrangian) automates
-the linearised-PDE survey pipeline: a Lagrangian specification in TOML format
+the linearised-PDE survey: a Lagrangian specification in TOML format
 drives a \xAct{}/\Mathematica{} symbolic backend that derives the Euler--Lagrange
 equations, exports them as a JSON theory file, and passes the result to
 native Python PDE solvers backed by SUNDIALS, leapfrog, or spectral methods.
 The automation is necessary for a survey across PGT theory space: each of the
 [N] theory variants examined here requires a distinct set of coupled tensor PDEs
 that would be error-prone to derive by hand.
-Full pipeline architecture is documented in \cref{Architecture}.
+The full architecture is documented in \cref{Architecture}.
 
 % Paragraph 2 — Scope contrast (NEW — addresses Agent 3 I1 and Agent 1 M4).
 % Per literature_content_notes.md: PSALTer handles particle spectra,
@@ -78,7 +78,7 @@ prior-compactification scheme are documented in \cref{InferenceArchitecture}.
 
 % Paragraph 5 — Validation and HPC scale (~60 w, with concrete number).
 \paragraph*{Validation and survey scale}
-The pipeline is validated against the analytic Boccaletti conversion
+The software is validated against the analytic Boccaletti conversion
 formula~\cite{boccaletti1970conversion} to better than $[\text{B.2 \%}]$
 across the full sweep of survey parameters; the validation hierarchy is
 documented in \cref{Validation}.
@@ -87,5 +87,5 @@ The survey covers [N] PGT theory variants in parameter spaces ranging from
 
 % Closing pointer (~30 w) — minimal, one sentence.
 \paragraph*{Detail deferred}
-Implementation details, validation suite, and symbolic-pipeline outputs
+Implementation details, the validation suite, and symbolic-stage outputs
 for the surveyed theories are documented in \cref{Architecture}--\cref{SymbolicOutputs}.
