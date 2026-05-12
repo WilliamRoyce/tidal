@@ -23,7 +23,7 @@ regime in which the gravity of the background magnetic field can
 no longer be ignored.
 The linear analysis therefore cannot self-consistently establish
 the instability, and the framework remains internally consistent
-within its declared regime of validity.
+within its regime of validity.
 There is a critical scale $\lambda_B = 2\pi/k_B$, with
 $k_B = \sqrt{8\pi G}\,\Bzero/c^2$, above which the dimensionless
 backreaction parameter $D^2/\lambda_B^2$ ceases to be small ---
@@ -33,12 +33,12 @@ Hwang \& Noh show~\cite{hwangnoh2023graviton} that the backreaction parameter is
 the conversion probability $\Pconv$ of \cref{GertsenshteinFormula}:
 \begin{align}
   \frac{D^2}{\lambda_B^2}
-  \;\sim\; \Pconv,
+  \;\sim\; \Pconv.
   \label{HwangNohBound}
 \end{align}
 Since $D^2/\lambda_B^2 \propto \Bzero^2 \to 0$, the bound holds
 trivially in the small-$\Bzero$ limit;
-equivalently, $\kappa\Bzero D\ll 1$, i.e. $\Pconv\ll 1$.\footnote{The Hwang \& Noh peak-amplitude estimate
+equivalently, $\kappa\Bzero D\ll 1$, \ie $\Pconv\ll 1$.\footnote{The Hwang \& Noh peak-amplitude estimate
 is $P\sim 8\pi^2\,(D/\lambda_B)^2$.
 This differs by a factor of four from the small-angle expansion of
 \cref{GertsenshteinFormula},
@@ -53,11 +53,11 @@ $h\propto\sin(\kappa\Bzero D/2)$;
 in the small-$\kappa\Bzero D$ limit this is half the
 estimate, and squaring gives the factor of
 four.}
-The simulations of \cref{SectorSurvey} solve the linearised
-equations of motion derived from the PGT--Maxwell theories
-enumerated in \cref{PGTEnumeration} on a flat Minkowski background
-with externally prescribed $\Bzero$, retaining the tachyonic
-mass-like term automatically.
+% The simulations of \cref{SectorSurvey} solve the linearised
+% equations of motion derived from the PGT--Maxwell theories
+% enumerated in \cref{PGTEnumeration} on a flat Minkowski background
+% with externally prescribed $\Bzero$, retaining the tachyonic
+% mass-like term automatically.
 
 
 \paragraph*{Self-consistency at vanishing background field}
@@ -78,9 +78,8 @@ off in the limit $\Bzero\to 0$, where the Hwang--Noh tachyonic
 mass-like dispersion shift $-(\kappa^2/2)\Bzero^2 h$
 --- itself contributing to $\Pconv$ only at $\mathcal{O}(\Bzero^4)$ and
 --- vanishes.
-The non-trivial finite-$\Bzero$ check that the torsion sector
-remains within the linearised regime is the subject of the
-following paragraphs.
+We now examine whether the torsion sector remains within
+the linearised regime at finite $\Bzero$.
 
 \paragraph*{Analytic dependence on the background field}
 
@@ -93,14 +92,14 @@ The transverse graviton is
 spin-2~\cite{sezgin1980ghostfree,barker2024poincare,cillis1996graviton}
 and the transverse photon is spin-1, so at $\Bzero=0$ they live
 in disjoint sectors and $\Pconv(\Bzero=0)=0$.
-Switching on $\Bzero$ introduces a fixed background tensor
+Switching on $\Bzero$ introduces a background tensor
 $\bar{\FieldF{}}\propto\Bzero\hat{x}$ (\cref{BackgroundPotential}) that breaks the rotational symmetry
 and lifts the helicity-conservation selection rule
 forbidding graviton-photon transitions.
 The kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix} acquires an
 explicit $\Bzero$-dependence
 $\mathcal{K}(\partial_t,\partial_z;\Bzero)$ that is polynomial in
-$\Bzero$, and the graviton--photon conversion amplitude
+$\Bzero$, and the conversion amplitude
 $\mathcal{M}(\Bzero)$ defined via $\Pconv=|\mathcal{M}|^2$ depends
 analytically on $\mathcal{K}$ wherever the unperturbed kinetic
 operator is non-singular;
@@ -355,6 +354,6 @@ again consistent.
 
 The limiting coefficient $\Czero^{\mathrm{EM}}$ matches the
 potential-formulation derivation of~\cite{hwangnoh2023graviton},
-whose graviton-photon coupling is exactly linear in $\Bzero$:
+in which the graviton-photon coupling is exactly linear in $\Bzero$:
 $\Czero^{\mathrm{EM}}$ therefore has no $\Bzero$-independent
 backreaction shift.
