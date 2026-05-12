@@ -45,9 +45,9 @@ and perturbative reduction.
 A representative theory file is shown in \cref{TOMLExample}.
 The symbolic stage is the map
 \begin{align*}
-  \textsc{TOML}\!\bigl[\lag,\,\{\varphi_i\},\,\{p_a\}\bigr]
+  \textsc{TOML} \bigl[\lag,\,\{\varphi_i\},\,\{p_a\}\bigr]
   \;\longmapsto\;
-  \textsc{JSON}\!\bigl[\{\textsf{EOM}_i\},\,\ham\bigr],
+  \textsc{JSON} \bigl[\{\textsf{EOM}_i\},\,\ham\bigr],
 \end{align*}
 whose internal stages occupy the rest of this appendix.
 
@@ -115,13 +115,12 @@ of \cref{Linearisation} by expanding the action to second order in the
 perturbations using \xPert{}~\cite{brizuela2009xpert}, with the metric
 and any declared matter fields perturbed simultaneously.
 
-Each dynamical field is \emph{declared} with its own
+Each dynamical field is declared with its own
 \texttt{DefTensorPerturbation} call (the metric carries one through
-\texttt{SetupMetricPerturbation}), but the perturbation expansion is a
-single operation on the action: applying \texttt{Perturbation} of
-order two to $\sqrt{-g}\,\lag$ produces every bilinear product of
-first-order perturbations, including the cross-couplings between
-different fields that drive the Gertsenshtein mixing.
+\texttt{SetupMetricPerturbation}), and the perturbation expansion is a
+single operation applying \texttt{Perturbation} of
+order two to $\sqrt{-g}\,\lag$: producing every bilinear product of
+first-order perturbations.
 Each matter field $\varphi^{\mathcal{I}}$ declared in the
 matter-perturbations block of \cref{TOMLExample} yields
 \begin{align}
@@ -134,11 +133,11 @@ matter-perturbations block of \cref{TOMLExample} yields
 where $\mathcal{I}$ stands for the field's tensor indices, suppressed
 throughout this paragraph; \cref{MultiFieldPerturbation} is the
 symbolic-stage reading of \cref{PerturbationAnsatz}.
-Backgrounds are supplied through the background-fields block of
-\cref{TOMLExample}, with their component values fixed by
-\texttt{xCoba}'s \texttt{ComponentValue} declarations --- for example
-the uniform magnetic background of \cref{PerturbationAnsatz},
-$\bar{A}_y = -\Bzero\,z$.\footnote{Antisymmetric derived tensors whose
+The background-fields have their component values fixed by
+\texttt{xCoba}'s \texttt{ComponentValue} declarations, \eg
+the uniform magnetic background
+$\bar{A}_y = -\Bzero\,z$ of \cref{BackgroundPotential}.%
+\footnote{Antisymmetric derived tensors whose
 definition references a perturbation field --- most prominently
 $\FieldF{_\mu_\nu} = \rcD{_\mu}\FieldA{_\nu} - \rcD{_\nu}\FieldA{_\mu}$
 when $\FieldA{}$ is itself a matter perturbation --- must remain
@@ -157,25 +156,26 @@ contains two kinds of terms: products of first-order perturbations
 and coupling structure of the linearised theory, and linear couplings
 to isolated second-order perturbation tensors (the \textsf{LI}[2]
 symbols, parametrising the $\mathcal{O}(\varepsilon^{2})$ corrections
-to the fields themselves).
-The first kind we keep verbatim; the second we drop via the
-substitution rule $\textsf{LI}[2] \mapsto 0$, since the linearised
-equations of motion are obtained by variation with respect to
-first-order fields and are unaffected by the \textsf{LI}[2] content.
+to the fields themselves dropped via the
+substitution rule $\textsf{LI}[2] \mapsto 0$).
+% The first kind we keep verbatim; the second we drop via the
+% substitution rule $\textsf{LI}[2] \mapsto 0$, since the linearised
+% equations of motion are obtained by variation with respect to
+% first-order fields and are unaffected by the \textsf{LI}[2] content.
 The retained
 \begin{align}
   \lag^{(2)}
-  \;=\;
-  \textsf{ExpandPerturbation}\!\bigl[
-    \textsf{Perturbation}[\sqrt{-g}\,\lag,\,2]
-  \bigr]\Big|_{\textsf{LI}[2]\,\mapsto\,0}
+  =
+  \underset{\textsf{LI}[2]\,\mapsto\,0}{\textsf{ExpandPerturbation}} \Bigl[
+    \textsf{Perturbation} \bigl[\sqrt{-g}\,\lag,\,2 \bigr]
+  \Bigr]
   \label{QuadraticExpansion}
 \end{align}
 is the linearised action of the multi-field system.
 
 The remaining abstract covariant derivatives of background tensors are
 resolved against the \texttt{ComponentValue} declarations during the
-chart conversion: the uniform background gives
+chart conversion: the uniform background \cref{BackgroundPotential} gives
 $\rcD{_z}\bar{A}_y = -\Bzero$, and a localised one gives a
 coordinate-dependent expression that enters the JSON specification as
 a position-dependent coefficient.
