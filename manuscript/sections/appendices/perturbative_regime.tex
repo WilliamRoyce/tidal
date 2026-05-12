@@ -16,8 +16,8 @@ background metric.
 Hwang \& Noh~\cite{hwangnoh2023graviton} examine the
 self-consistency of this linear-on-flat-background analysis:
 including the metric perturbation in the EM stress-energy
-produces a tachyonic mass-like term $-(\kappa^2/2)\Bzero^2$ in
-the graviton equation of motion, but the regime in which this
+produces a tachyonic mass-like term $-(\kappa^2/2)\Bzero^2$ for
+the graviton, but the regime in which this
 term would drive an exponential instability coincides with the
 regime in which the gravity of the background magnetic field can
 no longer be ignored.
@@ -94,7 +94,7 @@ spin-2~\cite{sezgin1980ghostfree,barker2024poincare,cillis1996graviton}
 and the transverse photon is spin-1, so at $\Bzero=0$ they live
 in disjoint sectors and $\Pconv(\Bzero=0)=0$.
 Switching on $\Bzero$ introduces a fixed background tensor
-$\bar{\FieldF{}}\propto\Bzero\hat{x}$ that breaks the rotational symmetry
+$\bar{\FieldF{}}\propto\Bzero\hat{x}$ (\cref{BackgroundPotential}) that breaks the rotational symmetry
 and lifts the helicity-conservation selection rule
 forbidding graviton-photon transitions.
 The kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix} acquires an
@@ -179,12 +179,12 @@ in the conversion regime $|\delta\FieldA{}|\sim\Bzero|h|$
 source $\propto\Del{1}\bar{\FieldF{}}\,\partial h$, so
 \cref{PerturbativeBound} is unchanged.}
 In the algebraic-torsion form,
-$\delta\MAGT{}$ has no kinetic operator and the linearised
-Cartan equation is purely algebraic,
+% $\delta\MAGT{}$ has no kinetic operator and the linearised
+% Cartan equation is purely algebraic,
 $2\Alp{}\,\delta\MAGT{} = -\mathcal{S}$;
-inverting this algebraic equation directly gives
-$|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
-for a graviton of dimensionless amplitude $A$ (\cref{Linearisation}).
+% inverting this algebraic equation directly gives
+giving $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
+for a graviton of dimensionless amplitude $A$.
 The linearised Cartan equation drops $(\delta\MAGT{})^2$ corrections
 from the $K{\cdot}K$ term of \cref{RiemannCartanDecomp}: these become
 comparable to the linear $2\Alp{}\,\delta\MAGT{}$ term when
@@ -199,7 +199,7 @@ Substituting the linearised solution above into this requirement gives
 \end{align}
 The same dimensional argument applies when the torsion-derivative
 kinetic term
-$(\rcD{}\MAGT{})^2$~\cite{barker2024poincare}~(\cref{PGTEnumeration})
+$(\rcD{}\MAGT{})^2$~(\cref{PGTEnumeration})
 is active and
 $\delta\MAGT{}$ propagates: the algebraic inversion is
 then replaced by a Green's function inversion, but the magnitude of
@@ -273,7 +273,7 @@ reported in \cref{SectorSurvey}.
       & Hwang--Noh bound \cref{HwangNohBound}
       & $\propto\Bzero^2$ \\
     $\lvert\delta\MAGT{}\rvert \ll \Alp{}$
-      & torsion-sector linearisation \cref{PerturbativeBound}
+      & $\MAGT{}$ linearisation \cref{PerturbativeBound}
       & $\propto\Bzero$ \\
     $\lvert\delta\FieldA{_\mu}\rvert \ll \lvert\bar{A}_\mu\rvert$
       & EM linearisation
@@ -317,7 +317,7 @@ The torsion signal --- the deviation of $\Czero$ from its
 Einstein--Maxwell value $(\kappa D/2)^2$ --- is contained in $c_2$
 itself: each surveyed theory realises its own $c_2$, set by the full
 torsionful kinetic matrix at $\Bzero=0$, and the survey reads off
-this value via $\Czero=\lim_{\Bzero\to 0}\Pconv/\Bzero^2$.
+this value via \cref{SurveyCoefficient}.
 Two further mechanisms also contribute to $\Pconv$ but not to $c_2$:
 the metric-backreaction detuning $\Delta\propto\Bzero^2$ enters
 $\Pconv$ as $(\Delta/g)^2\propto\Bzero^2$ on top of the leading
