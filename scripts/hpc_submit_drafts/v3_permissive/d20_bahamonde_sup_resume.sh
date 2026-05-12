@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # v3 D2.0 Bahamonde sup — RESUME (reusable; always resumes from 29232780's directory)
 #
-# PolyChord found 123+ clusters at 37K dead points; this script can be re-run
-# for successive resumes until convergence (precision_criterion=0.01 met).
+# State at 2026-05-12: 165 PolyChord clusters discovered, 52 active, 42K dead pts,
+# logZ=+6.26±0.17 (σ increasing — deep exploration phase). Re-run this script
+# for successive resumes until sacct shows COMPLETED (not TIMEOUT).
 # Output always written to the SAME directory; pull uses: hpc_shuttle.sh pull 29232780.
-# Expected total: 3-5 INTR sessions (sup chains with wide v3 priors are highly multi-modal).
+# Expected total: 5-8 INTR sessions total (highly multi-modal, σ_logZ still rising).
 
 set -euo pipefail
 
