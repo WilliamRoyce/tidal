@@ -234,16 +234,20 @@ path below is eligible.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figC2_fd_convergence}
-  \caption{Spatial-discretisation convergence on the smooth gradient
-    test $\partial_x \sin(x)$. The four curves are the Fornberg
-    finite-difference stencils at orders $2$, $4$ and $6$ and the
-    periodic-domain pseudo-spectral path. Dashed guide lines indicate
-    the expected algebraic rates $N^{-2}$, $N^{-4}$, $N^{-6}$; the
-    spectral path falls exponentially until it hits the IEEE-754
-    round-off floor at $N \approx 64$ in double precision. The
-    order-$4$, $N=64$, $\sin(x)$ benchmark previously summarised
-    inline (max error $3.1\times 10^{-6}$) is the third point of the
-    FD-$4$ curve.}
+  \caption{Spatial-discretisation convergence on the test function
+    $f(x)=e^{\sin x}$ (exact derivative $f'(x)=\cos x\,e^{\sin x}$),
+    periodic on $[0,2\pi]$. The four curves show the Fornberg
+    finite-difference stencils at orders $2$, $4$, and $6$ and the
+    periodic-domain pseudo-spectral path. Dashed lines are log--log
+    linear regression fits to the converging segment of each FD curve;
+    the fitted slope $\hat{\alpha}$ and coefficient of determination
+    $R^2$ are quoted in the legend. The dotted horizontal line marks
+    the IEEE-754 double-precision machine epsilon
+    $\varepsilon_{\rm mach}=2^{-52}\approx2.2\times10^{-16}$.
+    The spectral curve converges exponentially (four decades in two
+    doublings, $N=8\to32$) and then saturates; the slow upward drift
+    at $N\gtrsim64$ is accumulated FFT rounding noise, not a loss of
+    convergence.}
   \label{FDConvergence}
 \end{figure}
 

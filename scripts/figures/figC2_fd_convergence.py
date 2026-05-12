@@ -125,19 +125,42 @@ def _plot(data: dict, out_path: Path) -> None:
     ax.text(
         n_vals[-1] * 1.3,
         fp_eps * 2.5,
-        r"f.p.\ floor",
+        r"$\varepsilon_{\rm mach}$",
         color="gray",
         fontsize=6.5,
         ha="right",
         va="bottom",
     )
 
+    # Annotate the spectral drift tail so it is not mistaken for degradation.
+    spec_ns, spec_errs = grouped.get("spectral", (np.array([]), np.array([])))
+    drift_mask = spec_errs > fp_eps * 5  # points clearly above the floor
+    if drift_mask.sum() >= 2:
+        tail_n = spec_ns[drift_mask][-1]
+        tail_e = spec_errs[drift_mask][-1]
+        ax.annotate(
+            r"FFT rounding",
+            xy=(tail_n, tail_e),
+            xytext=(tail_n * 0.28, tail_e * 8),
+            color=SCHEME_STYLE["spectral"]["color"],
+            fontsize=6,
+            ha="center",
+            va="bottom",
+            arrowprops={
+                "arrowstyle": "-",
+                "color": SCHEME_STYLE["spectral"]["color"],
+                "lw": 0.5,
+                "alpha": 0.7,
+            },
+        )
+
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(r"Grid resolution $N$")
-    ax.set_ylabel(r"RMS error $\|\hat{\partial}_x f - \partial_x f\|$", labelpad=4)
-    ax.set_xticks(n_vals)
-    ax.set_xticklabels([str(n) for n in n_vals])
+    ax.set_ylabel(r"RMS error", labelpad=4)
+    pow2_ticks = [n for n in n_vals if (n & (n - 1)) == 0]
+    ax.set_xticks(pow2_ticks)
+    ax.set_xticklabels([str(n) for n in pow2_ticks])
     ax.set_xlim(n_vals[0] * 0.7, n_vals[-1] * 1.4)
     ax.grid(visible=True, which="both", ls=":", alpha=0.35, lw=0.5)
     ax.legend(

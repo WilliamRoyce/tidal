@@ -38,7 +38,25 @@ from tidal.solver.operators import (  # noqa: E402
 # Sweep parameters — N values cover the regime where round-off floor is
 # reached for the spectral path (~64) and where high-order FD curves
 # have asymptoted to their stencil convergence rate (>= 32).
-N_VALUES = [8, 16, 32, 64, 128, 256, 512]
+N_VALUES = [
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64,
+    96,
+    128,
+    192,
+    256,
+    384,
+    512,
+    768,
+    1024,
+    1536,
+    2048,
+]
 FD_ORDERS = [2, 4, 6]
 
 
