@@ -91,7 +91,7 @@ The architecture as deployed in Phase B chains carries two architectural comprom
 
 1. **Asymmetric per-parameter priors**: v2-inherited `log_uniform:1e-3:1e3` (positive-only) is still used for couplings named α₃ in D1 and mA², ξ, α₃ in Stage A. The v3 architecture should let the chain *learn* whether a parameter must be positive (ghost constraint) from D_KL evidence — but currently we impose positivity by prior fiat. Whether each of these parameters is truly kinetic-coefficient (positivity required to avoid ghosts) or mass-like (sign-symmetric in v3 tachyon-permissive policy) needs theory-by-theory classification. Observed effect in B.4b Stage A sup: chain MAP at α₃ = 0.0012 hits the prior lower bound, indicating posterior support beyond the prior. See [V3_2_DESIGN_INVESTIGATION.md](V3_2_DESIGN_INVESTIGATION.md) for the planned resolution (per-coupling abs-fold in the cubed-sphere joint prior, gated on supervisor classification, with PSALTer integration as the ultimate goal).
 
-2. ~~**Visualization: 95%-credible contours show posterior cliffs as sharp edges**~~. **Resolved (v0.39.1, d784bf1)**: levels extended to `[0.99, 0.95, 0.68]`; the 99% outer ring now shows tail falloff. GH issue #361 closed.
+2. **Visualization: 95%-credible contours show posterior cliffs as sharp edges**. anesthetic's default contour drawing stops at the iso-density boundary, so a posterior with a sharp logL falloff (e.g., Stage A's deltam > 8 cliff) appears as a hard vertical cut in the cross-panel even though the chain explored beyond it. Filed as `[v3-viz]` GH issue: add outer 99% credibility contour to reveal tail-falloff.
 
 ## What's discarded from v2
 
