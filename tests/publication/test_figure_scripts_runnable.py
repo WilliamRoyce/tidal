@@ -1,0 +1,58 @@
+"""Each figure script produces a PDF when invoked from a clean tempdir.
+
+Marked `publication_slow` because matplotlib + PDF backend is slower than
+the table/data tests. Run with:
+
+    uv run pytest -m "publication and publication_slow" tests/publication/
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+from typing import TYPE_CHECKING
+
+import pytest
+import yaml
+
+from .conftest import MANIFEST_PATH, REPO_ROOT, iter_artefacts
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+pytestmark = [pytest.mark.publication, pytest.mark.publication_slow]
+
+
+@pytest.mark.parametrize(
+    ("appendix", "name", "entry"),
+    [
+        pytest.param(*x, id=f"{x[0]}/{x[1]}")
+        for x in iter_artefacts(
+            yaml.safe_load(MANIFEST_PATH.read_text()), kinds=("figure",)
+        )
+    ],
+)
+def test_figure_script_runs(
+    appendix: str,  # noqa: ARG001
+    name: str,  # noqa: ARG001
+    entry: dict,
+    tmp_path: Path,
+) -> None:
+    canon = REPO_ROOT / entry["canonical_data"]
+    if not canon.exists():
+        pytest.skip(f"canonical data not yet produced: {entry['canonical_data']}")
+
+    script = REPO_ROOT / entry["figure_script"]
+    out = tmp_path / "figure.pdf"
+
+    result = subprocess.run(
+        [sys.executable, str(script), "--out", str(out)],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    assert result.returncode == 0, f"{script} failed:\n{result.stderr}"
+    assert out.exists(), f"{script} produced no PDF"
+    assert out.stat().st_size > 0, f"{script} produced an empty PDF"
+    assert out.read_bytes()[:4] == b"%PDF", f"{script} output is not a PDF"

@@ -182,6 +182,8 @@ convention = "numpy"
 testpaths = ["tests"]
 markers = [
     "slow: integration test with non-trivial compute (simulate, derive, etc.); runs in default lane but can be skipped with `-m 'not slow'`.",
+    "publication: tests of the App C publication pipeline (manifest, canonical data, table/figure scripts); skipped by default, run with `-m publication tests/publication/`.",
+    "publication_slow: subset of publication tests that build PDFs via matplotlib; skipped within `publication` unless explicitly requested.",
 ]
 
 [tool.coverage.run]
