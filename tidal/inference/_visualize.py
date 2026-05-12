@@ -755,14 +755,10 @@ def _plot_corner_anesthetic(
     # expose .get_figure().  Older versions returned (fig, axes).  Handle
     # both without version-gating.  ``label`` is consumed by anesthetic's
     # contour code (plot.py:1314) which adds a Rectangle patch to the
-    # legend describing the 68%/95%/99% CL contours.
+    # legend describing the 68%/95% CL contours.
     def _plot_with_kinds(plot_params: list[str], kinds: dict[str, str] | None = None):
         if kinds is None:
-            return samples.plot_2d(
-                plot_params,
-                label="68% / 95% / 99% CL",
-                levels=[0.99, 0.95, 0.68],
-            )
+            return samples.plot_2d(plot_params, label="68% / 95% CL")
         return samples.plot_2d(plot_params, label="samples", kinds=kinds)
 
     try:
@@ -965,13 +961,13 @@ def _force_solid_credible_fills(fig: object) -> None:
     SPT-3G, Euclid forecasts; produced via ``getdist`` with ``filled=
     True``) uses **solid two-tone fills** — one colour for the 95%
     credible region, a darker colour for the 68% region — identical
-    across every panel.  We extend this to three tones: an additional
-    outermost 99% ring to make tail falloff visible instead of showing
-    a hard posterior cliff at the 95% boundary.
+    across every panel.  This is what we want: a reader extracting
+    credible-region boundaries is not misled by panel-to-panel colour
+    drift.
 
     **How**: walk each axis's ``ContourSet`` collections (anesthetic
     creates exactly one per panel for the 2D KDE fill), and override
-    the face colours to a fixed three-tone Planck-blue palette.  The
+    the face colours to a fixed two-tone Planck-blue palette.  The
     associated contour *line* collections (also drawn by anesthetic)
     are left untouched so the boundaries remain crisp.
 
@@ -981,12 +977,14 @@ def _force_solid_credible_fills(fig: object) -> None:
     import matplotlib.contour as mcontour
     from matplotlib import colors as mcolors
 
-    # Three-tone palette: lightest for 99% outer band, mid-blue for 95%,
-    # dark blue for 68% core.  Matches the Planck-blue getdist convention.
-    # anesthetic uses `iso_probability_contours([0.99, 0.95, 0.68])` which
-    # returns levels in *increasing* density order [c99, c95, c68], producing
-    # `contourf` bands: 99%-95% (outermost annulus), 95%-68%, and 68% core.
-    fill_palette = ["#d8e9f6", "#aac8e9", "#3877b8"]
+    # Two-tone palette: light blue for the 95% credible band, darker for
+    # the 68%.  Matches the standard Planck-blue scheme via getdist.
+    # anesthetic uses `iso_probability_contours([0.95, 0.68])` which
+    # returns levels in *increasing* density order [c95, c68], producing
+    # `contourf` bands [c95, c68] (95% band: between c95 and c68 — the
+    # "outer" annular ring) and [c68, max] (68% core).  So palette index
+    # 0 is the 95% band (light), index 1 is the 68% core (dark).
+    fill_palette = ["#aac8e9", "#3877b8"]
     if not hasattr(fig, "axes"):
         return
     for ax in fig.axes:
@@ -1093,7 +1091,7 @@ def _add_corner_legend(
 ) -> None:
     """Render a corner-plot legend in the conventional top-right slot.
 
-    Combines anesthetic's auto-added 68%/95%/99% CL Rectangle patch
+    Combines anesthetic's auto-added 68%/95% CL Rectangle patch
     (created when ``label=`` is passed to ``plot_2d``) with manual
     entries for MAP, prior, and (optionally) the rejected overlay.
     """
