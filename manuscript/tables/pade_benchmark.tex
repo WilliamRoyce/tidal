@@ -1,9 +1,9 @@
-% Placeholder body: scripts/benchmarks/pade_vs_eig.py is a stub.
-% Implement the benchmark, then re-run this script.
 \begin{tabular}{lcccc}
-  \hline\hline
+  \toprule
   Theory & $N$ & Eig.\ (s) & Pad\'e (s) & Ratio \\
-  \hline
-  \multicolumn{5}{c}{\itshape benchmark pending} \\
-  \hline\hline
+  \midrule
+  \lstinline!coupled_scalars! & $256$ & $3.58\times10^{-5}$ & $1.04\times10^{-5}$ & $0.29$ \\
+  \lstinline!gertsenshtein! & $512$ & $4.81\times10^{-5}$ & $4.21\times10^{-5}$ & $0.87$ \\
+  \lstinline!massive_gravity_3d! & $32^2$ & $3.62\times10^{-5}$ & $2.67\times10^{-5}$ & $0.74$ \\
+  \bottomrule
 \end{tabular}
