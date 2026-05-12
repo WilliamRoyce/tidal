@@ -243,11 +243,12 @@ path below is eligible.
     the fitted slope $\hat{\alpha}$ and coefficient of determination
     $R^2$ are quoted in the legend. The dotted horizontal line marks
     the IEEE-754 double-precision machine epsilon
-    $\varepsilon_{\rm mach}=2^{-52}\approx2.2\times10^{-16}$.
-    The spectral curve converges exponentially (four decades in two
-    doublings, $N=8\to32$) and then saturates; the slow upward drift
-    at $N\gtrsim64$ is accumulated FFT rounding noise, not a loss of
-    convergence.}
+    $\varepsilon_{\rm mach}=2^{-52}\approx2.2\times10^{-16}$~\cite{goldberg1991floating}.
+    The spectral curve converges super-algebraically---faster than
+    any fixed algebraic rate~\cite{boyd2001chebyshev}; on this log--log
+    plot such convergence appears as a steep inward curve rather than a
+    straight line---reaching machine precision by $N\approx32$, after
+    which the slow upward drift is accumulated FFT rounding noise.}
   \label{FDConvergence}
 \end{figure}
 

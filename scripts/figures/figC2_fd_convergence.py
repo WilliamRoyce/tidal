@@ -2,9 +2,8 @@
 
 Plots RMS error vs N on log-log axes for FD orders 2, 4, 6 and the FFT-based
 pseudo-spectral path, on the test problem f(x) = exp(sin(x)) over a periodic
-[0, 2pi] grid. Dashed fitted lines show the measured algebraic rates with
-slope alpha-hat and R^2 from log-log linear regression. Spectral curve
-descends exponentially to the floating-point floor then saturates.
+[0, 2pi] grid. Dashed fitted regression lines cover only the converging segment
+of each FD curve. Spectral curve is dimmed in the floor/drift regime.
 
 Data source:  benchmark_results/canonical/fd_convergence.json
 Output:       manuscript/figures/figC2_fd_convergence.pdf
@@ -50,7 +49,7 @@ SCHEME_STYLE = {
     "fd_o2": {"label": "FD order 2", "marker": "o", "color": "#1f77b4"},
     "fd_o4": {"label": "FD order 4", "marker": "s", "color": "#ff7f0e"},
     "fd_o6": {"label": "FD order 6", "marker": "^", "color": "#2ca02c"},
-    "spectral": {"label": r"Spectral (f.p.\ floor)", "marker": "D", "color": "#d62728"},
+    "spectral": {"label": "Spectral", "marker": "D", "color": "#d62728"},
 }
 
 _FLOOR = 1e-14  # exclude points at/near machine-precision floor
@@ -58,13 +57,15 @@ _FLOOR = 1e-14  # exclude points at/near machine-precision floor
 
 def _regress(
     ns: np.ndarray, errs: np.ndarray
-) -> tuple[float | None, float | None, np.ndarray | None]:
+) -> tuple[float | None, float | None, np.ndarray | None, np.ndarray | None]:
+    """Fit log-log linear regression to the converging segment only."""
     mask = errs > _FLOOR
     if mask.sum() < 2:
-        return None, None, None
+        return None, None, None, None
     slope, intercept, r, _, _ = linregress(np.log10(ns[mask]), np.log10(errs[mask]))
-    fitted = 10.0 ** (intercept + slope * np.log10(ns))
-    return float(slope), float(r**2), fitted
+    ns_fit = ns[mask]
+    fitted = 10.0 ** (intercept + slope * np.log10(ns_fit))
+    return float(slope), float(r**2), ns_fit, fitted
 
 
 def _group_by_scheme(rows: list[dict]) -> dict[str, tuple[np.ndarray, np.ndarray]]:
@@ -83,20 +84,20 @@ def _group_by_scheme(rows: list[dict]) -> dict[str, tuple[np.ndarray, np.ndarray
 def _plot(data: dict, out_path: Path) -> None:
     grouped = _group_by_scheme(data["results"])
     n_vals = sorted({row["n"] for row in data["results"]})
+    fp_eps = 2.0**-52
 
     fig, ax = plt.subplots(figsize=(_FIG_WIDTH, _FIG_HEIGHT))
 
-    # Build labels for FD curves from regression; spectral uses constant label.
+    # Dashed regression lines (converging segment only) plotted before markers.
     computed_labels: dict[str, str] = {}
     for order, color in [(2, "#1f77b4"), (4, "#ff7f0e"), (6, "#2ca02c")]:
         scheme = f"fd_o{order}"
         if scheme not in grouped:
             continue
         ns, errs = grouped[scheme]
-        slope, r_sq, fitted = _regress(ns, errs)
-        # Dashed regression line plotted first so markers sit on top.
+        slope, r_sq, ns_fit, fitted = _regress(ns, errs)
         if fitted is not None:
-            ax.plot(ns, fitted, ls="--", color=color, alpha=0.55, lw=0.8)
+            ax.plot(ns_fit, fitted, ls="--", color=color, alpha=0.55, lw=0.8)
         if slope is not None:
             computed_labels[scheme] = (
                 rf"FD-{order} ($\hat{{\alpha}}={slope:.2f},\,R^2={r_sq:.4f}$)"
@@ -108,19 +109,43 @@ def _plot(data: dict, out_path: Path) -> None:
     for scheme, (ns, errs) in grouped.items():
         style = SCHEME_STYLE[scheme]
         lbl = computed_labels.get(scheme, style["label"])
-        mask = errs > 0
-        ax.plot(
-            ns[mask],
-            errs[mask],
-            marker=style["marker"],
-            color=style["color"],
-            label=lbl,
-            lw=1.0,
-            ms=4,
-        )
+        if scheme == "spectral":
+            # Split into converging (full opacity) and floor/drift (dimmed) segments.
+            conv_mask = errs > fp_eps * 50
+            floor_mask = ~conv_mask & (errs > 0)
+            if conv_mask.any():
+                ax.plot(
+                    ns[conv_mask],
+                    errs[conv_mask],
+                    marker=style["marker"],
+                    color=style["color"],
+                    label=lbl,
+                    lw=1.0,
+                    ms=4,
+                )
+            if floor_mask.any():
+                ax.plot(
+                    ns[floor_mask],
+                    errs[floor_mask],
+                    marker=style["marker"],
+                    color=style["color"],
+                    lw=1.0,
+                    ms=4,
+                    alpha=0.35,
+                )
+        else:
+            mask = errs > 0
+            ax.plot(
+                ns[mask],
+                errs[mask],
+                marker=style["marker"],
+                color=style["color"],
+                label=lbl,
+                lw=1.0,
+                ms=4,
+            )
 
-    # Floating-point floor reference line.
-    fp_eps = 2.0**-52
+    # Machine-epsilon floor reference line.
     ax.axhline(fp_eps, color="gray", ls=":", lw=0.6, alpha=0.6)
     ax.text(
         n_vals[-1] * 1.3,
@@ -132,9 +157,9 @@ def _plot(data: dict, out_path: Path) -> None:
         va="bottom",
     )
 
-    # Annotate the spectral drift tail so it is not mistaken for degradation.
+    # Annotate spectral drift tail so readers do not mistake it for degradation.
     spec_ns, spec_errs = grouped.get("spectral", (np.array([]), np.array([])))
-    drift_mask = spec_errs > fp_eps * 5  # points clearly above the floor
+    drift_mask = spec_errs > fp_eps * 5
     if drift_mask.sum() >= 2:
         tail_n = spec_ns[drift_mask][-1]
         tail_e = spec_errs[drift_mask][-1]
@@ -162,7 +187,9 @@ def _plot(data: dict, out_path: Path) -> None:
     ax.set_xticks(pow2_ticks)
     ax.set_xticklabels([str(n) for n in pow2_ticks])
     ax.set_xlim(n_vals[0] * 0.7, n_vals[-1] * 1.4)
-    ax.grid(visible=True, which="both", ls=":", alpha=0.35, lw=0.5)
+    ax.xaxis.set_minor_locator(mpl.ticker.NullLocator())
+    ax.yaxis.grid(visible=True, which="both", ls=":", alpha=0.35, lw=0.5)
+    ax.xaxis.grid(visible=True, which="major", ls=":", alpha=0.35, lw=0.5)
     ax.legend(
         loc="upper right",
         fontsize=7,
