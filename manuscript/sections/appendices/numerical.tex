@@ -247,10 +247,12 @@ path below is eligible.
     The spectral curve converges super-algebraically---faster than
     any fixed algebraic rate~\cite{boyd2001chebyshev}; on this log--log
     plot such convergence appears as a steep inward curve rather than a
-    straight line---reaching machine precision by $N\approx32$.
-    Data below $10^{-12}$ are not shown: at those resolutions
-    accumulated FFT rounding ($\mathcal{O}(\varepsilon_{\rm mach}\,N\log N)$)
-    dominates the discretisation error and grows slowly with $N$.}
+    straight line---reaching machine precision by $N\approx32$, after
+    which accumulated FFT rounding
+    ($\mathcal{O}(\varepsilon_{\rm mach}\,N\log N)$)
+    dominates and grows slowly with~$N$.
+    Dashed regression lines are fitted only to the converging segment
+    ($\varepsilon > 10^{-12}$) and do not extend into the floor region.}
   \label{FDConvergence}
 \end{figure}
 

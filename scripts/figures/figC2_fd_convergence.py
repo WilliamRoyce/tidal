@@ -2,8 +2,9 @@
 
 Plots RMS error vs N on log-log axes for FD orders 2, 4, 6 and the FFT-based
 pseudo-spectral path, on the test problem f(x) = exp(sin(x)) over a periodic
-[0, 2pi] grid. Only the converging segment of each curve is shown (errors
-above _FLOOR); data at or near the machine-precision floor is omitted.
+[0, 2pi] grid. All data points are shown; regression lines are fitted only to
+the converging segment (errors above _FLOOR) and do not extend into the
+machine-precision floor or floor-bounce region.
 
 Data source:  benchmark_results/canonical/fd_convergence.json
 Output:       manuscript/figures/figC2_fd_convergence.pdf
@@ -52,9 +53,10 @@ SCHEME_STYLE = {
     "spectral": {"label": "Spectral", "marker": "D", "color": "#d62728"},
 }
 
-# Only plot points well above machine precision. Raising this threshold hides
-# the floor-bounce region where errors stop decreasing and become dominated by
-# floating-point rounding (FD-6 at N>=768, spectral at N>=32).
+# Threshold for regression segment only — points at or below this value are
+# excluded from the log-log linear fit (floor-bounce region dominated by
+# floating-point rounding: FD-6 at N>=768, spectral at N>=32).
+# All data points are still plotted.
 _FLOOR = 1e-12
 
 
@@ -108,21 +110,19 @@ def _plot(data: dict, out_path: Path) -> None:
         else:
             computed_labels[scheme] = f"FD-{order}"
 
-    # Data markers: only show the converging segment (errs > _FLOOR).
+    # Data markers: show all points.
     for scheme, (ns, errs) in grouped.items():
         style = SCHEME_STYLE[scheme]
         lbl = computed_labels.get(scheme, style["label"])
-        mask = errs > _FLOOR
-        if mask.any():
-            ax.plot(
-                ns[mask],
-                errs[mask],
-                marker=style["marker"],
-                color=style["color"],
-                label=lbl,
-                lw=1.0,
-                ms=4,
-            )
+        ax.plot(
+            ns,
+            errs,
+            marker=style["marker"],
+            color=style["color"],
+            label=lbl,
+            lw=1.0,
+            ms=4,
+        )
 
     # Machine-epsilon floor reference line.
     ax.axhline(fp_eps, color="gray", ls=":", lw=0.6, alpha=0.6)
