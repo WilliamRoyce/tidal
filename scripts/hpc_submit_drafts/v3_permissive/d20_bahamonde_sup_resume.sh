@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# v3 D2.0 Bahamonde sup — RESUME from 29232780 (TIMEOUT after 1h INTR, 34K dead points)
+# v3 D2.0 Bahamonde sup — RESUME (reusable; always resumes from 29232780's directory)
 #
-# Resumes PolyChord nested sampling from the checkpoint written by 29232780.
-# Output written back to the SAME directory so pull uses: hpc_shuttle.sh pull 29232780.
-# Expect ~30-40 min to convergence (most work already done).
+# PolyChord found 123+ clusters at 37K dead points; this script can be re-run
+# for successive resumes until convergence (precision_criterion=0.01 met).
+# Output always written to the SAME directory; pull uses: hpc_shuttle.sh pull 29232780.
+# Expected total: 3-5 INTR sessions (sup chains with wide v3 priors are highly multi-modal).
 
 set -euo pipefail
 
