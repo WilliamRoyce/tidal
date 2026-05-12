@@ -45,16 +45,19 @@ and perturbative reduction.
 A representative theory file is shown in \cref{TOMLExample}.
 The symbolic stage is the map
 \begin{align*}
-  \textsc{TOML} \bigl[\lag,\,\{\varphi_i\},\,\{p_a\}\bigr]
+  \textsc{TOML} \bigl[\lag,\,\{\varphi^{\mathcal{I}}_n\}_{n=1}^{N},
+                     \,\{p_a\}_{a=1}^{P}\bigr]
   \;\longmapsto\;
-  \textsc{JSON} \bigl[\{\textsf{EOM}_i\},\,\ham\bigr],
+  \textsc{JSON} \bigl[\{\textsf{EOM}^{\mathcal{I}}_n\}_{n=1}^{N},
+                     \,\ham\bigr],
 \end{align*}
-whose internal stages occupy the rest of this appendix.
+with $n$ labelling the $N$ dynamical fields, $a$ labelling the $P$
+scalar parameters, and $\mathcal{I}$ standing for each field's
+suppressed tensor indices (a convention used throughout this
+appendix); the internal stages occupy the rest of this appendix.
 
 \begin{figure}[t]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize,frame=single,
-    framerule=0.4pt,columns=fullflexible,
-    keepspaces=true,xleftmargin=1em]
+\begin{lstlisting}[frame=single,keepspaces=true]
 [spacetime]
 dimension = 4
 signature = "minkowski"
@@ -130,9 +133,8 @@ matter-perturbations block of \cref{TOMLExample} yields
                           + \varepsilon\,\delta\varphi^{\mathcal{I}},
   \label{MultiFieldPerturbation}
 \end{align}
-where $\mathcal{I}$ stands for the field's tensor indices, suppressed
-throughout this paragraph; \cref{MultiFieldPerturbation} is the
-symbolic-stage reading of \cref{PerturbationAnsatz}.
+\cref{MultiFieldPerturbation} is the symbolic-stage reading of
+\cref{PerturbationAnsatz}.
 The background-fields have their component values fixed by
 \texttt{xCoba}'s \texttt{ComponentValue} declarations, \eg
 the uniform magnetic background
@@ -156,42 +158,46 @@ contains two kinds of terms: products of first-order perturbations
 and coupling structure of the linearised theory, and linear couplings
 to isolated second-order perturbation tensors (the \textsf{LI}[2]
 symbols, parametrising the $\mathcal{O}(\varepsilon^{2})$ corrections
-to the fields themselves dropped via the
-substitution rule $\textsf{LI}[2] \mapsto 0$).
+to the fields themselves) which are dropped via the
+substitution rule $\textsf{LI}[2] \mapsto 0$.
 % The first kind we keep verbatim; the second we drop via the
 % substitution rule $\textsf{LI}[2] \mapsto 0$, since the linearised
 % equations of motion are obtained by variation with respect to
 % first-order fields and are unaffected by the \textsf{LI}[2] content.
 The retained
-\begin{align}
+\begin{equation*}
   \lag^{(2)}
   =
   \underset{\textsf{LI}[2]\,\mapsto\,0}{\textsf{ExpandPerturbation}} \Bigl[
     \textsf{Perturbation} \bigl[\sqrt{-g}\,\lag,\,2 \bigr]
   \Bigr]
-  \label{QuadraticExpansion}
-\end{align}
+  % \label{QuadraticExpansion}
+\end{equation*}
 is the linearised action of the multi-field system.
 
 The remaining abstract covariant derivatives of background tensors are
 resolved against the \texttt{ComponentValue} declarations during the
-chart conversion: the uniform background \cref{BackgroundPotential} gives
-$\rcD{_z}\bar{A}_y = -\Bzero$, and a localised one gives a
-coordinate-dependent expression that enters the JSON specification as
-a position-dependent coefficient.
+chart conversion.
+On the flat Minkowski background of \cref{Linearisation} the
+Christoffel symbols vanish and the background carries no torsion, so
+the covariant derivative reduces to the partial; substituting the
+uniform background \cref{BackgroundPotential} then gives
+$\PD{_z}\bar{A}_y = -\Bzero$.
+A localised background gives a coordinate-dependent expression that
+enters the JSON specification as a position-dependent coefficient.
 
 \paragraph*{Euler--Lagrange derivation}
 The field equation for every dynamical perturbation is obtained by
 variational differentiation of the quadratic action $\lag^{(2)}$
-built in \cref{QuadraticExpansion}: for fields $\varphi^{\mathcal{I}}$
+above: for fields $\varphi^{\mathcal{I}}$
 of arbitrary tensor type, the equation of motion is
-\begin{align}
+\begin{equation*}
   \frac{\partial \lag^{(2)}}{\partial \varphi^{\mathcal{I}}}
-  \;-\; \rcD{_\mu}\!\frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\varphi^{\mathcal{I}})}
-  \;+\; \rcD{_\mu}\rcD{_\nu}\!\frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\rcD{_\nu}\varphi^{\mathcal{I}})}
+  \;-\; \rcD{_\mu} \frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\varphi^{\mathcal{I}})}
+  \;+\; \rcD{_\mu}\rcD{_\nu} \frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\rcD{_\nu}\varphi^{\mathcal{I}})}
   \;-\; \cdots \;=\; 0,
-  \label{EulerLagrange}
-\end{align}
+  % \label{EulerLagrange}
+\end{equation*}
 where the series terminates at the highest derivative order present in
 $\lag^{(2)}$.
 The differentiation is performed by \xAct{}'s
@@ -217,22 +223,22 @@ Four operations are performed in sequence: the metric is separated
 from any contracted indices; the expression is converted to chart
 components by \texttt{ToBasis}, which projects an abstract-index
 tensor expression onto the chart's coordinate basis,
-\begin{align}
-  \textsf{ToBasis}\!\bigl[T_{\mu_1\cdots\mu_n}\bigr]
+\begin{equation*}
+  \textsf{ToBasis} \bigl[T_{\mu_1\cdots\mu_n}\bigr]
   \;=\; T_{i_1\cdots i_n}\,
         \mathrm{d}x^{i_1} \otimes \cdots \otimes \mathrm{d}x^{i_n},
-  \label{ToBasisProjection}
-\end{align}
+  % \label{ToBasisProjection}
+\end{equation*}
 with Roman indices labelling chart components; repeated indices are
 summed by \texttt{TraceBasisDummy}; and the abstract covariant
 derivative is converted to partial derivatives plus the connection
 correction,
-\begin{align}
+\begin{equation*}
   \rcD{_\mu}\varphi_{\nu}
   \;=\;
   \PD{_\mu}\varphi_{\nu} \;-\; \MAGA{^\sigma_\mu_\nu}\,\varphi_{\sigma},
-  \label{CovariantDerivativeExpansion}
-\end{align}
+  % \label{CovariantDerivativeExpansion}
+\end{equation*}
 where $\MAGA{}$ is the full Cartan connection of
 \cref{PalatiniDecomposition}, with one such term per coordinate slot
 for tensors of higher rank; the general mixed-type form is
@@ -249,15 +255,15 @@ Euler--Lagrange variation, others after.
 
 The first mechanism adds a gauge-fixing term to the Lagrangian before
 variation~\cite{faddeev1967feynman}.
-For a vector field $\FieldA{_\mu}$, the Lorenz gauge is realised by
-the augmentation
+For a vector field $\FieldA{_\mu}$, the Lorenz condition
+$\rcD{_\mu}\FieldA{^\mu} = 0$ is imposed by the gauge-fixing term
 \begin{align}
   \lag \;\longrightarrow\;
   \lag \;-\; \frac{1}{2\xi}\bigl(\rcD{_\mu}\FieldA{^\mu}\bigr)^{2},
   \label{LorenzGauge}
 \end{align}
-with the gauge parameter $\xi$ controlling the weight of the residual
-symmetry; the augmented Lagrangian then enters the variational
+with $\xi$ the gauge-fixing weight ($\xi \to 0$ recovers the hard
+condition); the modified Lagrangian then enters the variational
 procedure in the usual way.
 The second mechanism imposes a constraint on the field components
 after decomposition, as in the transverse-traceless prescription that
@@ -295,9 +301,7 @@ JSON; the equation specification is the centre arrow of
 \cref{ArchitectureDiagram}.
 
 \begin{figure}[t]
-\begin{lstlisting}[basicstyle=\ttfamily\footnotesize,frame=single,
-    framerule=0.4pt,columns=fullflexible,
-    keepspaces=true,xleftmargin=1em]
+\begin{lstlisting}[frame=single,keepspaces=true]
 {
   "spacetime": { "dimension": 4, "signature": [-1, 1, 1, 1],
                  "coordinates": ["t", "x", "y", "z"] },
