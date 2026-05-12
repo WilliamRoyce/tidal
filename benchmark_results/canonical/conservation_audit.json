@@ -43,5 +43,27 @@
         "threshold": 0.001
       }
     }
+  ],
+  "results": [
+    {
+      "label": "coupled_scalars",
+      "ok": true,
+      "max_abs_dE_over_E": 1.039534667252019e-15,
+      "conservation_raw": {
+        "max_relative_error": 1.039534667252019e-15,
+        "is_conserved": true,
+        "threshold": 0.001
+      }
+    },
+    {
+      "label": "gertsenshtein",
+      "ok": true,
+      "max_abs_dE_over_E": 7.409247829940978e-16,
+      "conservation_raw": {
+        "max_relative_error": 7.409247829940978e-16,
+        "is_conserved": true,
+        "threshold": 0.001
+      }
+    }
   ]
 }

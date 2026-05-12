@@ -28,17 +28,23 @@ REQUIRED_METADATA_KEYS = {"timestamp", "host", "git_sha", "parameters"}
     ],
 )
 def test_canonical_data_present(appendix: str, name: str, entry: dict) -> None:  # noqa: ARG001
+    if entry.get("status") == "stub":
+        pytest.skip("entry marked stub")
     canon = entry.get("canonical_data")
     if canon is None:
         pytest.skip("no canonical_data for this entry")
-    path = REPO_ROOT / canon
-    if not path.exists():
-        pytest.skip(f"canonical data not yet produced: {canon}")
-
-    with path.open() as fh:
-        data = json.load(fh)
-    assert isinstance(data, dict), f"{canon} root must be an object"
-    assert "metadata" in data, f"{canon} missing 'metadata'"
-    assert "results" in data, f"{canon} missing 'results'"
-    missing = REQUIRED_METADATA_KEYS - set(data["metadata"])
-    assert not missing, f"{canon} metadata missing keys: {missing}"
+    # canonical_data may be a single path or a list of paths (figures
+    # that consume multiple benchmarks). Validate each one individually
+    # under the same schema.
+    paths = canon if isinstance(canon, list) else [canon]
+    for canon_one in paths:
+        path = REPO_ROOT / canon_one
+        if not path.exists():
+            pytest.skip(f"canonical data not yet produced: {canon_one}")
+        with path.open() as fh:
+            data = json.load(fh)
+        assert isinstance(data, dict), f"{canon_one} root must be an object"
+        assert "metadata" in data, f"{canon_one} missing 'metadata'"
+        assert "results" in data, f"{canon_one} missing 'results'"
+        missing = REQUIRED_METADATA_KEYS - set(data["metadata"])
+        assert not missing, f"{canon_one} metadata missing keys: {missing}"

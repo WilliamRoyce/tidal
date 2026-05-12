@@ -183,5 +183,63 @@
       "P_b": 0.06129589382947253,
       "rel_diff": 0.0010958125985356883
     }
+  ],
+  "results": [
+    {
+      "label": "gertsenshtein",
+      "backend": "modal",
+      "ok": true,
+      "P_max": 0.900551497098249,
+      "P_peak_time": 50.0
+    },
+    {
+      "label": "gertsenshtein",
+      "backend": "cvode",
+      "ok": true,
+      "P_max": 0.9005472848753551,
+      "P_peak_time": 50.0
+    },
+    {
+      "label": "gertsenshtein",
+      "backend": "ida",
+      "ok": true,
+      "P_max": 0.9000667391313371,
+      "P_peak_time": 50.0
+    },
+    {
+      "label": "gertsenshtein",
+      "backend": "leapfrog",
+      "ok": true,
+      "P_max": 0.9008193884348947,
+      "P_peak_time": 50.02087083166636
+    },
+    {
+      "label": "coupled_scalars",
+      "backend": "modal",
+      "ok": true,
+      "P_max": 0.06129589382947253,
+      "P_peak_time": 10.0
+    },
+    {
+      "label": "coupled_scalars",
+      "backend": "cvode",
+      "ok": true,
+      "P_max": 0.061295894856375384,
+      "P_peak_time": 10.0
+    },
+    {
+      "label": "coupled_scalars",
+      "backend": "ida",
+      "ok": true,
+      "P_max": 0.0612959023086964,
+      "P_peak_time": 10.0
+    },
+    {
+      "label": "coupled_scalars",
+      "backend": "leapfrog",
+      "ok": true,
+      "P_max": 0.0613631363273457,
+      "P_peak_time": 10.005391654097679
+    }
   ]
 }

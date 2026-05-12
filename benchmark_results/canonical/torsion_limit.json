@@ -121,5 +121,79 @@
       "abs_diff_P_max": 0.0,
       "abs_diff_P_final": 0.0
     }
+  ],
+  "results": [
+    {
+      "xi": 0.1,
+      "P_max_sim": 0.900551497098249,
+      "P_final_sim": 0.900551497098249,
+      "P_max_EM": 0.900551497098249,
+      "P_final_EM": 0.900551497098249,
+      "abs_diff_P_max": 0.0,
+      "abs_diff_P_final": 0.0
+    },
+    {
+      "xi": 0.01,
+      "P_max_sim": 0.900551497098249,
+      "P_final_sim": 0.900551497098249,
+      "P_max_EM": 0.900551497098249,
+      "P_final_EM": 0.900551497098249,
+      "abs_diff_P_max": 0.0,
+      "abs_diff_P_final": 0.0
+    },
+    {
+      "xi": 0.001,
+      "P_max_sim": 0.900551497098249,
+      "P_final_sim": 0.900551497098249,
+      "P_max_EM": 0.900551497098249,
+      "P_final_EM": 0.900551497098249,
+      "abs_diff_P_max": 0.0,
+      "abs_diff_P_final": 0.0
+    },
+    {
+      "xi": 0.0001,
+      "P_max_sim": 0.900551497098249,
+      "P_final_sim": 0.900551497098249,
+      "P_max_EM": 0.900551497098249,
+      "P_final_EM": 0.900551497098249,
+      "abs_diff_P_max": 0.0,
+      "abs_diff_P_final": 0.0
+    },
+    {
+      "xi": 1e-05,
+      "P_max_sim": 0.900551497098249,
+      "P_final_sim": 0.900551497098249,
+      "P_max_EM": 0.900551497098249,
+      "P_final_EM": 0.900551497098249,
+      "abs_diff_P_max": 0.0,
+      "abs_diff_P_final": 0.0
+    },
+    {
+      "xi": 1e-06,
+      "P_max_sim": 0.900551497098249,
+      "P_final_sim": 0.900551497098249,
+      "P_max_EM": 0.900551497098249,
+      "P_final_EM": 0.900551497098249,
+      "abs_diff_P_max": 0.0,
+      "abs_diff_P_final": 0.0
+    },
+    {
+      "xi": 1e-07,
+      "P_max_sim": 0.900551497098249,
+      "P_final_sim": 0.900551497098249,
+      "P_max_EM": 0.900551497098249,
+      "P_final_EM": 0.900551497098249,
+      "abs_diff_P_max": 0.0,
+      "abs_diff_P_final": 0.0
+    },
+    {
+      "xi": 1e-08,
+      "P_max_sim": 0.900551497098249,
+      "P_final_sim": 0.900551497098249,
+      "P_max_EM": 0.900551497098249,
+      "P_final_EM": 0.900551497098249,
+      "abs_diff_P_max": 0.0,
+      "abs_diff_P_final": 0.0
+    }
   ]
 }

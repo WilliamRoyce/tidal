@@ -38,9 +38,14 @@ def test_figure_script_runs(
     entry: dict,
     tmp_path: Path,
 ) -> None:
-    canon = REPO_ROOT / entry["canonical_data"]
-    if not canon.exists():
-        pytest.skip(f"canonical data not yet produced: {entry['canonical_data']}")
+    if entry.get("status") == "stub":
+        pytest.skip(f"entry marked stub: {entry.get('figure_script')}")
+
+    canon = entry["canonical_data"]
+    paths = canon if isinstance(canon, list) else [canon]
+    for canon_one in paths:
+        if not (REPO_ROOT / canon_one).exists():
+            pytest.skip(f"canonical data not yet produced: {canon_one}")
 
     script = REPO_ROOT / entry["figure_script"]
     out = tmp_path / "figure.pdf"
