@@ -2,8 +2,8 @@
 
 Plots RMS error vs N on log-log axes for FD orders 2, 4, 6 and the FFT-based
 pseudo-spectral path, on the test problem f(x) = exp(sin(x)) over a periodic
-[0, 2pi] grid. Dashed fitted regression lines cover only the converging segment
-of each FD curve. Spectral curve is dimmed in the floor/drift regime.
+[0, 2pi] grid. Only the converging segment of each curve is shown (errors
+above _FLOOR); data at or near the machine-precision floor is omitted.
 
 Data source:  benchmark_results/canonical/fd_convergence.json
 Output:       manuscript/figures/figC2_fd_convergence.pdf
@@ -52,7 +52,10 @@ SCHEME_STYLE = {
     "spectral": {"label": "Spectral", "marker": "D", "color": "#d62728"},
 }
 
-_FLOOR = 1e-14  # exclude points at/near machine-precision floor
+# Only plot points well above machine precision. Raising this threshold hides
+# the floor-bounce region where errors stop decreasing and become dominated by
+# floating-point rounding (FD-6 at N>=768, spectral at N>=32).
+_FLOOR = 1e-12
 
 
 def _regress(
@@ -105,36 +108,12 @@ def _plot(data: dict, out_path: Path) -> None:
         else:
             computed_labels[scheme] = f"FD-{order}"
 
-    # Data markers on top of regression lines.
+    # Data markers: only show the converging segment (errs > _FLOOR).
     for scheme, (ns, errs) in grouped.items():
         style = SCHEME_STYLE[scheme]
         lbl = computed_labels.get(scheme, style["label"])
-        if scheme == "spectral":
-            # Split into converging (full opacity) and floor/drift (dimmed) segments.
-            conv_mask = errs > fp_eps * 50
-            floor_mask = ~conv_mask & (errs > 0)
-            if conv_mask.any():
-                ax.plot(
-                    ns[conv_mask],
-                    errs[conv_mask],
-                    marker=style["marker"],
-                    color=style["color"],
-                    label=lbl,
-                    lw=1.0,
-                    ms=4,
-                )
-            if floor_mask.any():
-                ax.plot(
-                    ns[floor_mask],
-                    errs[floor_mask],
-                    marker=style["marker"],
-                    color=style["color"],
-                    lw=1.0,
-                    ms=4,
-                    alpha=0.35,
-                )
-        else:
-            mask = errs > 0
+        mask = errs > _FLOOR
+        if mask.any():
             ax.plot(
                 ns[mask],
                 errs[mask],
@@ -157,28 +136,6 @@ def _plot(data: dict, out_path: Path) -> None:
         va="bottom",
     )
 
-    # Annotate spectral drift tail so readers do not mistake it for degradation.
-    spec_ns, spec_errs = grouped.get("spectral", (np.array([]), np.array([])))
-    drift_mask = spec_errs > fp_eps * 5
-    if drift_mask.sum() >= 2:
-        tail_n = spec_ns[drift_mask][-1]
-        tail_e = spec_errs[drift_mask][-1]
-        ax.annotate(
-            r"FFT rounding",
-            xy=(tail_n, tail_e),
-            xytext=(tail_n * 0.28, tail_e * 8),
-            color=SCHEME_STYLE["spectral"]["color"],
-            fontsize=6,
-            ha="center",
-            va="bottom",
-            arrowprops={
-                "arrowstyle": "-",
-                "color": SCHEME_STYLE["spectral"]["color"],
-                "lw": 0.5,
-                "alpha": 0.7,
-            },
-        )
-
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(r"Grid resolution $N$")
@@ -191,20 +148,23 @@ def _plot(data: dict, out_path: Path) -> None:
     ax.yaxis.grid(visible=True, which="both", ls=":", alpha=0.35, lw=0.5)
     ax.xaxis.grid(visible=True, which="major", ls=":", alpha=0.35, lw=0.5)
     ax.legend(
-        loc="upper right",
+        bbox_to_anchor=(0.5, 1.02),
+        loc="lower center",
+        ncols=2,
         fontsize=7,
         frameon=False,
-        handlelength=1.4,
-        handletextpad=0.4,
+        handlelength=1.2,
+        handletextpad=0.3,
         borderpad=0.0,
-        labelspacing=0.25,
+        labelspacing=0.15,
+        columnspacing=0.5,
     )
     ax.tick_params(which="both", direction="in", top=False, right=False)
     ax.spines[["top", "right"]].set_visible(False)
 
     fig.tight_layout(pad=0.2)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, format="pdf", bbox_inches="tight", pad_inches=0.02)
+    fig.savefig(out_path, format="pdf", bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
 
 

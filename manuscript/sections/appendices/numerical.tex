@@ -235,7 +235,7 @@ path below is eligible.
   \centering
   \includegraphics[width=\columnwidth]{figures/figC2_fd_convergence}
   \caption{Spatial-discretisation convergence on the test function
-    $f(x)=e^{\sin x}$ (exact derivative $f'(x)=\cos x\,e^{\sin x}$),
+    $f(x)=e^{\sin x}$,
     periodic on $[0,2\pi]$. The four curves show the Fornberg
     finite-difference stencils at orders $2$, $4$, and $6$ and the
     periodic-domain pseudo-spectral path. Dashed lines are log--log
@@ -247,8 +247,10 @@ path below is eligible.
     The spectral curve converges super-algebraically---faster than
     any fixed algebraic rate~\cite{boyd2001chebyshev}; on this log--log
     plot such convergence appears as a steep inward curve rather than a
-    straight line---reaching machine precision by $N\approx32$, after
-    which the slow upward drift is accumulated FFT rounding noise.}
+    straight line---reaching machine precision by $N\approx32$.
+    Data below $10^{-12}$ are not shown: at those resolutions
+    accumulated FFT rounding ($\mathcal{O}(\varepsilon_{\rm mach}\,N\log N)$)
+    dominates the discretisation error and grows slowly with $N$.}
   \label{FDConvergence}
 \end{figure}
 
@@ -629,6 +631,37 @@ unit of accuracy. Second, an independent \SciPy{} integration path
 provides a cross-check on the \SUNDIALS{} implementations; the per-theory
 agreement numbers are reported in~\cref{Validation}. Like leapfrog,
 the \SciPy{} backend is opt-in only.
+
+\subsection{Initial-condition preparation}%
+\label{ICPreparation}
+
+\paragraph*{Plane-wave projection onto the discrete Fourier basis} The
+plane-wave initial condition
+$\psi(x_i, 0) = A\cos(k_0 x_i)$ is a sampled trigonometric function on
+the $N$ grid points of a periodic interval $[0, L]$. The discrete
+Fourier modes available on this grid are $k_n = 2\pi n / L$ for
+$n = 0, 1, \ldots, N/2$, and the sampled field is monochromatic in the
+discrete representation only when $k_0$ coincides with some $k_n$.
+For any other $k_0$ the discrete Fourier transform of the sampled
+values has non-zero amplitude on every mode, falling off as
+$|k_n - k_0|^{-1}$: this is spectral leakage of an off-grid wavevector
+onto the on-grid basis. In linearly stable systems the leakage is
+benign --- each contaminated mode oscillates at its own frequency and
+contributes only a small decoration to observables --- but in systems
+with tachyonic eigenvalues at some $k$-modes the leakage onto those
+modes is exponentially amplified over the simulation interval, and the
+solver's perturbation-validity guard rejects the run even though the
+intended physical IC would have been stable. The plane-wave constructor
+\lstinline!_plane_wave_slots! therefore snaps each component of the
+requested wavevector to the nearest discrete mode on every periodic axis,
+clamped one below Nyquist; a user-visible \texttt{Note} is emitted
+whenever the snap changes $k$ by more than one percent. The override
+\lstinline!--ic-no-snap! recovers the legacy verbatim-$k$ behaviour for
+reproducibility of pre-snap runs. The snap is critical to the PGT
+amplification surveys of~\cref{Results}: without it, $k_0$ values
+chosen for physics reasons leak amplitude onto the redundant
+TorsionCDT state directions and produce spurious divergences within
+the linearized regime.
 
 \subsection{Constraint initialisation}%
 \label{ConstraintIC}
