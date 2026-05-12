@@ -24,10 +24,48 @@
 | `d21_barker_sup.sh` | T5 Barker sub | `P_max:minimize` | INTR / 2 h std |
 | `d22_shapiro_amp.sh` | T5 Shapiro sub | `P_max:maximize` | INTR / 3 h std |
 | `d22_shapiro_sup.sh` | T5 Shapiro sub | `P_max:minimize` | INTR / 3 h std |
-| `d23_full_amp.sh` | T5 full 9-D | `P_max:maximize` | 6 h std |
-| `d23_full_sup.sh` | T5 full 9-D | `P_max:minimize` | 6 h std |
+| `d23_full_amp.sh` | T5 full 9-D | `P_max:maximize` | INTR / 1-2 resumes |
+| `d23_full_sup.sh` | T5 full 9-D | `P_max:minimize` | INTR / 4-5 resumes |
 
-Scripts default to `polychord_intr.sbatch` for the mid-res variants (smoke / cross-check) and `polychord_standard.sbatch` for hi-res publication runs. The publication-run scripts are committed; INTR variants can be derived locally by changing `--template` and reducing `--nlive`.
+All D2 chains use INTR (starts immediately vs days of standard queue wait). Amp chains
+typically fit in one 1h INTR session; sup chains (finding the null region in wide v3 priors)
+take 5-6× longer than v2 and will need successive resumes via `--read-resume`.
+
+## INTR + resume workflow
+
+If a chain times out (SLURM state TIMEOUT), resume it immediately:
+
+```bash
+# Hardcode the previous job's output directory
+PREV_OUTPUT=/rds/user/wr286/hpc-work/tidal/hpc_results/<JOBID>/<chain_name>
+
+bash scripts/hpc_shuttle.sh submit \
+  --template scripts/hpc_templates/polychord_intr.sbatch \
+  --name <same_name_as_before> --ntasks 76 --time 01:00:00 \
+  --cmd "tidal sample examples/data/<json> \
+    <same flags as original> \
+    --output ${PREV_OUTPUT} \
+    --read-resume"
+```
+
+PolyChord writes `_chains/tidal.resume` on every checkpoint; the new job picks up from there.
+Repeat until sacct shows COMPLETED (not TIMEOUT). Each successive job writes to the SAME
+output directory — pull once at the end with the original jobid as the src path.
+
+Observed v3 timings (2026-05-11):
+
+- D2.0 amp (5p): 22 min INTR ✓
+- D2.0 sup (5p): >1h TIMEOUT → expect 1 resume (34K dead points already written)
+- D2.1 amp (6p): v2 was 31 min; v3 uncertain — richer posterior may take longer (use as lower bound)
+- D2.1 sup (6p): ~90 min → 1 resume (sup: ~5× v2 due to wide null region)
+- D2.2 amp (8p): v2 was 38 min; v3 uncertain — may need resume if posterior structure is complex
+- D2.2 sup (8p): ~150 min → 2 resumes
+- D2.3 amp (9p): v2 was 1:09; v3 uncertain — plan for 1-2 resumes
+- D2.3 sup (9p): ~300+ min → 4-5 resumes
+
+**Key asymmetry**: sup timing estimates (×5 v2 slowdown) are reliable — the wide v3 priors
+force thorough null-region characterisation. Amp estimates are lower bounds only — richer
+v3 posteriors with more structure can require significantly more iterations than v2.
 
 If/when the cubed-sphere joint prior (parallel session) lands, sibling `scripts/hpc_submit_drafts/v3_jointprior/` will contain `--joint-prior` versions of the same campaigns for direct comparison.
 

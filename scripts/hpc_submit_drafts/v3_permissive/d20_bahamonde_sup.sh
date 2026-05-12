@@ -3,6 +3,7 @@
 #
 # Parameter partition matches v2 chain 28684410 exactly.
 # Reference v2 sup: 28684410 (log Z = -0.449 ± 0.002, ESS=877; 11 min INTR).
+# Note: 29232780 TIMEOUT at 1h INTR — resume with d20_bahamonde_sup_resume.sh.
 
 set -euo pipefail
 

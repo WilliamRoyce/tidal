@@ -2,12 +2,13 @@
 # v3 D2.3 full T5 sup — all 9 nonminimal couplings free
 #
 # Reference v2: 28742035 (log Z = -0.615 ± 0.001, std 6h, 1:00 wall).
+# Strategy: INTR+resume — expect 4-5 sessions (v3 sup is ~5x slower for wide priors).
 
 set -euo pipefail
 
 bash scripts/hpc_shuttle.sh submit \
-  --template scripts/hpc_templates/polychord_standard.sbatch \
-  --name d23_full_sup_v3 --ntasks 76 --time 06:00:00 \
+  --template scripts/hpc_templates/polychord_intr.sbatch \
+  --name d23_full_sup_v3 --ntasks 76 --time 01:00:00 \
   --cmd 'tidal sample examples/data/torsion_gertsenshtein_general_nonminimal.json \
     --param kappa=1.0 --param B0=0.01 \
     --prior "beta1=arctan_uniform:-89:89" \

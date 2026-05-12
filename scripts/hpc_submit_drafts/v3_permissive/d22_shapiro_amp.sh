@@ -4,6 +4,7 @@
 # Parameter partition matches v2 chain 28736161 exactly.
 # Pinned: chi (was 0 in v2 too).
 # Reference v2: 28736161 (log Z = +0.612 ± 0.002, 38 min INTR).
+# Note: 8 params; v2 took 38 min INTR — v3 amp should fit within 1h; resume if not.
 
 set -euo pipefail
 

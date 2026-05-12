@@ -3,6 +3,7 @@
 #
 # Parameter partition matches v2 chain 28727741 exactly.
 # Reference v2: 28727741 (log Z = -0.447 ± 0.001).
+# Note: may need resume if >1h; see INTR+resume strategy in V3_PHASE_TRACKER.md §B.5.
 
 set -euo pipefail
 
