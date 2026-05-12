@@ -51,3 +51,81 @@ appendix_C:
     canonical_data: benchmark_results/canonical/nyquist_energy.json
     output: manuscript/tables/nyquist_energy.tex
     appendix_ref: manuscript/sections/appendices/numerical.tex:525
+
+appendix_D:
+
+  figD_boccaletti_calibration:
+    kind: figure
+    figure_script: scripts/figures/figD_boccaletti_calibration.py
+    benchmark_script: scripts/benchmarks/boccaletti_calibration.py
+    canonical_data: benchmark_results/canonical/boccaletti_calibration.json
+    output: manuscript/figures/figD_boccaletti_calibration.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D §1)
+
+  figD_torsion_limit:
+    kind: figure
+    figure_script: scripts/figures/figD_torsion_limit.py
+    benchmark_script: scripts/benchmarks/torsion_limit.py
+    canonical_data: benchmark_results/canonical/torsion_limit.json
+    output: manuscript/figures/figD_torsion_limit.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D §2)
+
+  figD_cross_backend:
+    kind: figure
+    figure_script: scripts/figures/figD_cross_backend.py
+    benchmark_script: scripts/benchmarks/cross_backend.py
+    canonical_data: benchmark_results/canonical/cross_backend.json
+    output: manuscript/figures/figD_cross_backend.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D §3)
+
+  figD_dispersion_time_order:
+    kind: figure
+    figure_script: scripts/figures/figD_dispersion_time_order.py
+    benchmark_scripts:
+      - scripts/benchmarks/proca_dispersion.py
+      - scripts/benchmarks/time_integration_order.py
+    canonical_data:
+      - benchmark_results/canonical/proca_dispersion.json
+      - benchmark_results/canonical/time_integration_order.json
+    output: manuscript/figures/figD_dispersion_time_order.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D §4)
+
+  figD_conservation_audit:
+    kind: figure
+    figure_script: scripts/figures/figD_conservation_audit.py
+    benchmark_script: scripts/benchmarks/conservation_audit.py
+    canonical_data: benchmark_results/canonical/conservation_audit.json
+    output: manuscript/figures/figD_conservation_audit.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D §5)
+
+  fig1_boccaletti_validation:
+    kind: figure
+    figure_script: scripts/figures/fig1_boccaletti_validation.py
+    benchmark_script: scripts/benchmarks/boccaletti_calibration.py
+    canonical_data: benchmark_results/canonical/boccaletti_calibration.json
+    output: manuscript/figures/fig1_boccaletti_validation.pdf
+    appendix_ref: manuscript/sections/results.tex (§4.1 ValidationResult)
+
+  figD1_stageA_heatmap:
+    kind: figure
+    figure_script: scripts/figures/figD1_stageA_heatmap.py
+    canonical_data: hpc_results/campaigns/d20_bahamonde_amp_rerun_v2/run/results.csv
+    output: manuscript/figures/figD1_stageA_heatmap.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.2 SectorSurveyTable)
+    status: stub  # current campaign data is nested-sampling output; a parameter-plane (m_A, eps) heatmap needs grid-sweep data not yet collected
+
+  figD2_stageB_sweep:
+    kind: figure
+    figure_script: scripts/figures/figD2_stageB_sweep.py
+    canonical_data: hpc_results/campaigns/d21_barker_sup/run/results.csv
+    output: manuscript/figures/figD2_stageB_sweep.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.2 SectorSurveyTable)
+    status: stub  # depends on sweep-scatter data with simulated P_max column
+
+  figD3_channel_comparison:
+    kind: figure
+    figure_script: scripts/figures/figD3_channel_comparison.py
+    canonical_data: TBD
+    output: manuscript/figures/figD3_channel_comparison.pdf
+    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.3 ChannelStructure)
+    status: stub
