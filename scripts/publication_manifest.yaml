@@ -20,29 +20,29 @@ appendix_C:
     output: manuscript/figures/figC2_fd_convergence.pdf
     appendix_ref: manuscript/sections/appendices/numerical.tex:236
 
-  tab_pade_benchmark:
-    kind: table
-    table_script: scripts/tables/tab_pade_benchmark.py
+  figC3_pade_vs_eig:
+    kind: figure
+    figure_script: scripts/figures/figC3_pade_vs_eig.py
     benchmark_script: scripts/benchmarks/pade_vs_eig.py
     canonical_data: benchmark_results/canonical/pade_vs_eig.json
-    output: manuscript/tables/pade_benchmark.tex
-    appendix_ref: manuscript/sections/appendices/numerical.tex:348
+    output: manuscript/figures/figC3_pade_vs_eig.pdf
+    appendix_ref: manuscript/sections/appendices/numerical.tex (tab:PadeBenchmark replacement)
 
-  tab_sparse_csc:
-    kind: table
-    table_script: scripts/tables/tab_sparse_csc.py
+  figC4_sparse_csc:
+    kind: figure
+    figure_script: scripts/figures/figC4_sparse_csc.py
     benchmark_script: scripts/benchmarks/sparse_csc_vs_dense.py
     canonical_data: benchmark_results/canonical/sparse_csc_vs_dense.json
-    output: manuscript/tables/sparse_csc_benchmark.tex
-    appendix_ref: manuscript/sections/appendices/numerical.tex:490
+    output: manuscript/figures/figC4_sparse_csc.pdf
+    appendix_ref: manuscript/sections/appendices/numerical.tex (tab:SparseCSCBenchmark replacement)
 
-  tab_nyquist_energy:
-    kind: table
-    table_script: scripts/tables/tab_nyquist_energy.py
+  figC5_nyquist_energy:
+    kind: figure
+    figure_script: scripts/figures/figC5_nyquist_energy.py
     benchmark_script: scripts/benchmarks/nyquist_energy.py
     canonical_data: benchmark_results/canonical/nyquist_energy.json
-    output: manuscript/tables/nyquist_energy.tex
-    appendix_ref: manuscript/sections/appendices/numerical.tex:525
+    output: manuscript/figures/figC5_nyquist_energy.pdf
+    appendix_ref: manuscript/sections/appendices/numerical.tex (tab:NyquistEnergy replacement)
 
 appendix_D:
 
