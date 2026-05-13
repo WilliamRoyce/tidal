@@ -120,7 +120,7 @@ def _plot(data: dict, out_path: Path) -> None:
             marker=style["marker"],
             color=style["color"],
             label=lbl,
-            lw=1.0,
+            linestyle="none",
             ms=4,
         )
 
