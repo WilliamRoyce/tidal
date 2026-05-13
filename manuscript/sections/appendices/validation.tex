@@ -1,4 +1,4 @@
-% Appendix D: Validation against analytic limits and reference models
+% Appendix D: Calibration against analytic limits and reference models
 %
 % Structure: eight named calibrations in the BHL/Hamilcar register,
 % with the FV <-> TorsionCDT cross-formulation check as the central
@@ -9,83 +9,97 @@
 % round trip). Headline corpus tics: avoid `pipeline`/`validate`;
 % prefer `calibrate`/`reproduce`/`recover`/`agreement`/`sanity-check`/
 % `audit`/`diagnostic`/`precision floor`.
+%
+% No internal git/issue/commit/date references appear in the prose;
+% bugs surfaced by the calibration suite are described by what they
+% were (with citations to the relevant numerical-methods literature),
+% not by their tracker IDs. Example-library entries are referred to
+% by their physics, not by their repository filenames.
 
 \section{Calibration against analytic limits and reference models}%
 \label{Validation}
 
-\paragraph*{Reproduction of the Boccaletti kernel on a uniform background}
+\paragraph*{Boccaletti reproduction on a uniform background}
 The Gertsenshtein conversion kernel of \cref{GertsenshteinFormula}
 provides the closed-form analytic baseline against which we calibrate
 \TIDAL{} on a uniform background magnetic field. We sweep $\Bzero$
-over the perturbative regime $\Bzero \in [0.005, 0.20]$ at four values
-of the propagation distance $D = c\,t_\mathrm{end} \in \{25, 50, 75, 100\}$
-on a periodic grid of $N=1024$ points with fourth-order finite-difference
-operators, and overlay three analytic predictions on the same axis: the
-bare formula $\Pconv = \sin^2(\kappa\Bzero t/2)$; the energy-cap form
-$\Pmax = \sin^2(\kappa\Bzero t/2)\cdot k^2/(k^2 + \kappa^2\Bzero^2/2)$
-that accounts for the graviton effective-mass energy the massless
-photon cannot absorb; and the Raffelt--Stodolsky two-mode formula
-with frequency detuning~\cite{raffelt1988mixing}
-\begin{align}
-  \Pconv = \frac{g^2}{g^2 + \Delta^2}
-  \sin^2\!\left(\sqrt{g^2+\Delta^2}\,D\right),
-  \quad g = \tfrac{\kappa\Bzero}{2},
-  \quad \Delta = -\tfrac{\kappa^2 \Bzero^2}{4\omega},
+over the perturbative regime at fixed propagation distance
+$D = c\,t_\mathrm{end} = 50$ on a periodic grid of $N=1024$ points
+with fourth-order finite-difference operators, and overlay the
+calibration data on two analytic predictions: the bare formula
+\begin{equation}
+  \Pconv = \sin^2\!\left(\tfrac{\kappa\Bzero t}{2}\right)
+  \label{BareSinSquare}
+\end{equation}
+and the Raffelt--Stodolsky two-mode formula with graviton-effective-mass
+detuning~\cite{raffelt1988mixing},
+\begin{equation}
+  \Pconv = \frac{g^2}{g^2 + \Delta^2}\,
+    \sin^2\!\left(\sqrt{g^2+\Delta^2}\,D\right),
+  \qquad g = \tfrac{\kappa\Bzero}{2},
+  \qquad \Delta = -\frac{\kappa^2 \Bzero^2}{4\omega},
   \label{TwoModeRabi}
-\end{align}
-in which both the amplitude prefactor and the oscillation frequency
-receive corrections from the effective mass; the regime of validity
-follows \cref{PerturbativityHierarchy}. The smoke-resolution run at
-$N=128$ over a four-cell slice already gives a maximum $P_\mathrm{final}$
-residual of $1.4 \times 10^{-3}$ against the bare formula and a
-Raffelt--Stodolsky residual on $P_\mathrm{max}$ as small as
-$5\times 10^{-6}$ at the regime point $\Bzero=0.05$. \Cref{BoccalettiUniform}
-displays the calibration overlay, the residual band against all three
-analytic forms, and the multi-resolution convergence at the regime
-point. The reproduction calibrates the uniform-background sector;
-localised-profile reproduction is calibrated separately in
-\cref{BoccalettiLocalised}.
+\end{equation}
+in which $\omega \simeq k$ is the carrier angular frequency of the
+photon mode in the massless-dispersion limit, and both the amplitude
+prefactor and the oscillation frequency receive corrections from the
+effective mass; the regime of validity follows
+\cref{PerturbativityHierarchy}. The two predictions coincide while
+$\kappa\Bzero t/2 \ll \pi/2$; the swept $\Bzero$ range extends just
+into the saturated regime where they begin to differ visibly. The
+peak metric $P_\mathrm{max}$ saturates at the energy-cap value once a
+Rabi peak fires and is not a clean perturbative-regime metric; we
+report $P_\mathrm{final}$ exclusively. \Cref{BoccalettiUniform}
+displays the calibration overlay and the multi-resolution convergence
+of the residual at one regime point. The reproduction calibrates the
+uniform-background sector; localised-profile reproduction is
+calibrated separately in \cref{BoccalettiLocalised}.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_boccaletti_uniform}
   \caption{Boccaletti-kernel reproduction in the uniform-$\Bzero$
-    regime. (a) Simulated $P_\mathrm{final}(\Bzero)$ and $P_\mathrm{max}(\Bzero)$
-    overlaid with the bare formula, the energy-cap form, and the
-    Raffelt--Stodolsky two-mode formula \cref{TwoModeRabi} at the
-    validation $t_\mathrm{end}$. (b) Residual band: each simulation
-    metric against its appropriate analytic form. (c) Multi-resolution
-    convergence of $|P_\mathrm{final}^\mathrm{sim} - P_\mathrm{bare}|$
-    at the regime point $\Bzero = 0.05$, decreasing toward the modal
-    solver's round-off floor.}
+    regime. (a) Simulated $P_\mathrm{final}(\Bzero)$ at fixed
+    $t_\mathrm{end}=50$ overlaid with the bare sin\textsuperscript{2}
+    formula \cref{BareSinSquare} and the Raffelt--Stodolsky two-mode
+    formula \cref{TwoModeRabi}, the latter accounting for both the
+    amplitude and frequency corrections from the graviton effective
+    mass. (b) Multi-resolution convergence of
+    $|P_\mathrm{final}^\mathrm{sim} - \sin^2(\kappa\Bzero t/2)|$ at
+    the regime point $\Bzero = 0.05$ on log--log axes, decreasing
+    toward the modal-solver round-off floor; the fitted algebraic
+    slope is reported in the legend.}
   \label{BoccalettiUniform}
 \end{figure*}
 
-\paragraph*{Path-integrated Boccaletti reproduction on a Gaussian-localised profile}
+\paragraph*{Path-integrated Boccaletti reproduction on a Gaussian profile}
 For a finite magnetised region of profile $B_x(z)$ the Gertsenshtein
 formula generalises to the path-integrated form
-\begin{align}
+\begin{equation}
   \Pconv = \sin^2\!\left(
     \tfrac{\kappa}{2}\int_{-\infty}^{+\infty}\!B_x(z)\,\mathrm{d}z\right),
   \label{BoccalettiPathIntegrated}
-\end{align}
+\end{equation}
 and for the Gaussian profile
 $B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$ the integral is
 $\int B\,\mathrm{d}z = B_\mathrm{peak}\,R\sqrt{2\pi}$, giving
-$\Pconv = \sin^2(\kappa B_\mathrm{peak} R \sqrt{\pi/2})$. We
-calibrate against this closed-form on a $(B_\mathrm{peak}, R)$ grid
-using the derived \texttt{gertsenshtein\_localized.json} specification
-and a Gaussian wave-packet initial condition on $h_+$ at $z=-50$
-traversing the magnetised region at $z=0$. Neumann boundary conditions
-are essential: the gauge potential $\bar{A}_y \propto \mathrm{erf}(z/\sqrt{2}R)$
-is non-periodic, and periodic boundaries introduce spectral leakage
-that triggers spurious exponential growth. Smoke-mode residual is
-$1.2\times 10^{-3}$ in $\Pconv$ at $B_\mathrm{peak}=0.1, R=5$ (a 0.35\%
-relative deviation), in line with the documented sub-percent agreement
-of the localised path. \Cref{BoccalettiLocalised} displays the
-$(B_\mathrm{peak}, R)$ residual heatmap and a line cut at fixed $R$.
-This calibrates the path-integrated kernel; finite-frequency dispersion
-corrections are calibrated in \cref{ConvergenceCalibration}.
+$\Pconv = \sin^2(\kappa B_\mathrm{peak}\,R\sqrt{\pi/2})$. We
+calibrate against this closed-form on a 40-cell
+$(B_\mathrm{peak}, R)$ grid using the derived localised
+Gertsenshtein theory and a Gaussian wave-packet initial condition on
+$h_+$ at $z=-50$ traversing the magnetised region at $z=0$. Neumann
+boundary conditions are essential: the gauge potential
+$\bar{A}_y \propto \mathrm{erf}(z/\sqrt{2}R)$ is non-periodic, and
+periodic boundaries introduce spectral leakage that triggers spurious
+exponential growth on tachyonic discrete modes (the failure mode
+analysed in \cref{ICPreparation}). The strongest diagnostic is the
+universal collapse of all 40 cells onto the single curve
+$P = \sin^2(s)$ in the dimensionless variable
+$s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$; the residual heatmap
+shows the deviation cell-by-cell. \Cref{BoccalettiLocalised} displays
+both diagnostics. This calibrates the path-integrated kernel;
+finite-frequency dispersion corrections are calibrated in
+\cref{ConvergenceCalibration}.
 
 \begin{figure*}[t]
   \centering
@@ -93,202 +107,226 @@ corrections are calibrated in \cref{ConvergenceCalibration}.
   \caption{Path-integrated Boccaletti reproduction on the Gaussian
     profile. (a) Residual heatmap
     $\Pconv^\mathrm{sim} - \Pconv^\mathrm{ana}$ across the
-    $(B_\mathrm{peak}, R)$ grid. (b) Line cut at fixed $R$ showing
-    \TIDAL{} against the analytic
-    $\sin^2(\kappa B_\mathrm{peak}\,R\,\sqrt{\pi/2})$ across the
-    $B_\mathrm{peak}$ axis.}
+    $(B_\mathrm{peak}, R)$ grid, with a diverging colour scale centred
+    at zero. (b) Universal collapse: every cell is plotted against
+    the dimensionless variable $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$,
+    on which the path-integrated prediction reduces to $\sin^2(s)$
+    regardless of the individual $(B_\mathrm{peak}, R)$ values; the
+    collapse onto the universal curve is the strongest visual
+    confirmation of the kernel.}
   \label{BoccalettiLocalised}
 \end{figure*}
 
-\paragraph*{Forced-oscillator calibration of the closed-form Duhamel kernel}
-The perturbative reduction's Pass 0 + Pass 1 path solves an
-inhomogeneous linear ODE via the closed-form Duhamel kernel
-$\varphi_1(\lambda_i, \lambda_j; t)$ in the eigenbasis of the base
-operator~\cite{almohy2011action}; we calibrate the kernel against the
-analytical perturbative expansion of a driven Klein--Gordon oscillator
-with an order-$\varepsilon$ mass-shift correction,
-$\partial_t^2\phi = \partial_x^2\phi - m^2\phi - \varepsilon\phi$.
-Pass 0 evolves the $\varepsilon=0$ base; Pass 1 integrates the
-correction against the Pass 0 trajectory; the combined
-$\phi^{(0)} + \phi^{(1)}$ matches the full-$\varepsilon$ modal solution
-to $\mathcal{O}(\varepsilon^2)$ by construction. Across the smoke
-sweep $\varepsilon \in \{0.1, 0.05, 0.01\}$ at $k=1$, the log--log
-slope of $|\phi^{\mathrm{sim}} - \phi^{\mathrm{full}}|$ versus
-$\varepsilon$ fits to $1.99$ against the expected $2.0$, and the
-improvement ratio over Pass 0 alone grows from $7.4$ at $\varepsilon=0.1$
-to $81$ at $\varepsilon=0.01$. The calibration is non-circular: the
-closed-form Duhamel kernel is a generic ODE-theory construct, derived
-independently of \TIDAL{}'s implementation, and the small parameter
-$\varepsilon$ appears in the correction source, not in the tuning of
-the test target. \Cref{ForcedOscillator} displays the error scaling
-and the improvement ratio.
+\paragraph*{Perturbed-Klein--Gordon calibration of the closed-form Duhamel kernel}
+The perturbative-reduction machinery described in \cref{LPSReduction}
+splits a Lagrangian carrying a small parameter $\varepsilon$ into a
+base order-zero theory and an order-$\varepsilon$ correction source,
+then evolves the system as a Pass~0 base solution plus a Pass~1
+correction computed by the closed-form Duhamel
+kernel~\cite{almohy2011action}. We calibrate the kernel against the
+analytical perturbative expansion of a Klein--Gordon wave with a
+small mass-shift correction,
+\begin{equation}
+  \partial_t^2\phi - \partial_x^2\phi + m^2\phi
+  \;=\; -\varepsilon\,\phi,
+  \label{KGMassShift}
+\end{equation}
+whose full-$\varepsilon$ modal solution is closed-form. Pass~0
+evolves the $\varepsilon=0$ base; Pass~1 integrates the correction
+against the Pass~0 trajectory; the combined approximation
+$\phi^{(0)} + \phi^{(1)}$ matches the full solution to
+$\mathcal{O}(\varepsilon^2)$ by construction. Across the sweep
+$\varepsilon \in \{0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2\}$
+at $k=1$, the log--log slope of
+$|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{full}|$ versus $\varepsilon$
+recovers the expected algebraic order, with an improvement ratio
+over Pass~0 alone that grows as $1/\varepsilon$.
+\Cref{ForcedOscillator} reports the error scaling and the fitted
+slope.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figD_forced_oscillator}
-  \caption{Forced-oscillator calibration of the Pass 0 + Pass 1
-    Duhamel kernel. (a) Pass 0 error and combined Pass 0 + Pass 1
-    error versus $\varepsilon$ on log--log axes, with the
-    $\mathcal{O}(\varepsilon)$ and $\mathcal{O}(\varepsilon^2)$
-    guide lines. The fitted combined slope is close to $2.0$.
-    (b) Improvement ratio: combined-path accuracy gain over Pass 0
-    alone, growing as $\varepsilon$ decreases.}
+  \caption{Perturbed-Klein--Gordon calibration of the Pass 0 + Pass 1
+    Duhamel kernel. Pass 0 error and combined Pass 0 + Pass 1 error
+    versus $\varepsilon$ on log--log axes for the mass-shift correction
+    \cref{KGMassShift}; fitted log--log slopes and $R^2$ values are
+    reported in the legend. The Pass 0 + Pass 1 error scales as
+    $\mathcal{O}(\varepsilon^2)$, an order of magnitude per
+    half-decade in $\varepsilon$.}
   \label{ForcedOscillator}
 \end{figure}
 
-\paragraph*{Higher-derivative perturbative calibration on a Parker--Simon-style correction}
-The closed-form Duhamel kernel calibrates against a second perturbative
-structure --- a fourth-order spatial correction
-$\partial_t^2 \phi = \partial_x^2 \phi - m^2 \phi - \varepsilon\,\partial_x^4 \phi$
-that is the canonical higher-derivative form encountered in the
-perturbative reductions of \cite{parker1993reduced}. The base is the
-same Klein--Gordon wave; the correction exercises a different
-Fourier multiplier ($k^4$) from the mass shift ($1$), and therefore a
-different code path through the correction-source assembly of the
-solver. Smoke-mode behaviour at $k=2$ shows the Pass 0 + Pass 1
-truncation error decreasing rapidly with $\varepsilon$, well below the
-$\mathcal{O}(\varepsilon^2)$ worst-case bound demanded by the
-perturbative theorem; the improvement ratio over Pass 0 alone reaches
-$\sim 10^4$ at $\varepsilon=0.01$. \Cref{ParkerSimon} shows the error
-scaling. The literal 1+0D Parker--Simon FLRW reduction at
-equations~3.39--3.44 of~\cite{parker1993reduced} is documented as a
-planned regression test and is the cosmological counterpart of this
-higher-derivative calibration; the present test probes the same Pass 1
-machinery on the flat-background field-theoretic analogue.
+\paragraph*{Higher-derivative perturbative calibration}
+We exercise the same Pass~0 + Pass~1 machinery on a perturbative
+correction of distinct structure --- a fourth-order spatial operator
+in place of the mass shift,
+\begin{equation}
+  \partial_t^2 \phi - \partial_x^2 \phi + m^2 \phi
+  \;=\; -\varepsilon\,\partial_x^4 \phi,
+  \label{KGBiharmonic}
+\end{equation}
+the canonical higher-derivative form encountered in the perturbative
+reductions of \cite{parker1993reduced}. The base is the same
+Klein--Gordon wave of \cref{KGMassShift}; the correction exercises a
+different Fourier multiplier ($k^4$) from the mass shift ($1$), and
+therefore a different path through the correction-source assembly of
+\cref{LPSReduction}. At $k=2$ the Pass~0 + Pass~1 truncation error
+falls faster than the worst-case $\mathcal{O}(\varepsilon^2)$ bound
+demanded by the perturbative theorem; the improvement ratio over
+Pass~0 alone reaches $\sim 10^4$ at $\varepsilon=0.01$.
+\Cref{ParkerSimon} shows the error scaling. Points at the smallest
+$\varepsilon$ that fall below the discretisation noise floor are
+excluded from the slope fit and flagged.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figD_parker_simon}
-  \caption{Parker--Simon-style higher-derivative perturbative
-    calibration. Pass 0 and Pass 0 + Pass 1 error versus $\varepsilon$
-    for the correction $\varepsilon\,\partial_x^4 \phi$ on a base
-    Klein--Gordon wave; the combined-path error falls faster than the
-    worst-case $\mathcal{O}(\varepsilon^2)$ bound at small
-    $\varepsilon$.}
+  \caption{Higher-derivative perturbative calibration. Pass 0 and
+    Pass 0 + Pass 1 error versus $\varepsilon$ for the biharmonic
+    correction \cref{KGBiharmonic} on the Klein--Gordon base of
+    \cref{KGMassShift}. The combined-path error falls faster than
+    the worst-case $\mathcal{O}(\varepsilon^2)$ bound at small
+    $\varepsilon$. Points below the discretisation noise floor
+    ($\sim 10^3\,\varepsilon_\mathrm{mach}$) are excluded from the
+    slope fit and shown as open markers.}
   \label{ParkerSimon}
 \end{figure}
 
-\paragraph*{Convention-anchored agreement with the Euler--Heisenberg QED birefringence}
+\paragraph*{Convention-anchored agreement with Euler--Heisenberg QED birefringence}
 The QED Euler--Heisenberg effective action predicts a vacuum
 birefringence with refractive-index shifts
-$n_\perp - 1 = (8\alpha^2/45)\,(B/B_c)^2$ and
-$n_\parallel - 1 = (14\alpha^2/45)\,(B/B_c)^2$~\cite{adler1971photon},
-giving the canonical ratio
-$(n_\parallel - 1)/(n_\perp - 1) = 7/4$~\cite{dunne2004heisenberg}.
+$n_\perp - 1 = (8\alpha^2/45)(B/B_c)^2$ and
+$n_\parallel - 1 = (14\alpha^2/45)(B/B_c)^2$~\cite{adler1971photon},
+giving the canonical
+ratio~\cite{dunne2004heisenberg}
+\begin{equation}
+  \frac{n_\parallel - 1}{n_\perp - 1} \;=\; \frac{7}{4}.
+  \label{EHRatio}
+\end{equation}
 \TIDAL{}'s symbolic stage produces both absolute coefficients
 analytically at the convention mapping $\sigma/\rho = 7/16$, in full
 accordance with~\cite{adler1971photon}; the agreement is at the level
-of individual coefficients, not just the ratio, and constitutes a
-genuine analytic match. The Hamiltonian-path test
-\texttt{test\_order1\_h\_ratio\_matches\_adler} provides an additional
-non-circular cross-check via an independent measurement code path:
-$H_1/H_0 = -3(n_\perp - 1)_\mathrm{Adler}$ recovered from the symbolic
-Hamiltonian, with no involvement of the equation-of-motion solver.
-The bare ratio test
-$(n_\parallel-1)/(n_\perp-1) \to 7/4$ at small $\varepsilon$ is
-reported but flagged as weakly tautological: the leading-order \TIDAL{}
-formula is $4\sigma/\rho$ by construction, and $4\cdot(7/16)=7/4$ is
-arithmetic forced by the convention mapping.
+of individual coefficients rather than the ratio alone. An
+independent measurement-path cross-check derives
+$H_1/H_0 = -3\,(n_\perp - 1)_\mathrm{Adler}$ from the symbolic
+Hamiltonian on the Pass~0 trajectory, with no involvement of the
+equation-of-motion solver. The bare ratio test
+$(n_\parallel-1)/(n_\perp-1) \to 7/4$ is flagged as weakly
+tautological: the leading-order \TIDAL{} formula is $4\sigma/\rho$ by
+construction, and $4\cdot(7/16) = 7/4$ is arithmetic forced by the
+convention mapping.
 
-\paragraph*{Cross-formulation equivalence: fundamental-vector and TorsionCDT}
-\label{FVCDTEquivalence}
-For complex PGT theories where no closed-form solution or weak-field
-analytic limit is available --- the bulk of the \cref{SectorSurvey}
-campaigns --- the only available consistency check is to derive the
-same continuum action through two mathematically distinct field
-formulations and verify identical observables to the IEEE round-off
-limit. The dark-photon-plasma sector affords this comparison directly.
-The \emph{fundamental-vector} representation
-$\mathcal{L}_\mathrm{FV} \supset
-   -\tfrac14 \xi (\partial T)^2
+\paragraph*{Cross-formulation equivalence: fundamental-vector versus
+TorsionCDT}\label{FVCDTEquivalence}
+For complex PGT theories where no closed-form solution and no
+weak-field analytic limit is available --- the bulk of the
+\cref{SectorSurvey} campaigns --- the only available consistency
+check is to derive the same continuum action through two
+mathematically distinct field formulations and verify that the
+observables agree at the IEEE round-off limit. The
+dark-photon-plasma sector affords this comparison directly. The
+\emph{fundamental-vector} (FV) representation expresses the
+torsion-coupling as a Proca-like massive vector field
+$t_\mu$~\cite{caputo2021darkphoton},
+\begin{equation}
+  \mathcal{L}_\mathrm{FV} \;\supset\;
+   -\tfrac14 \xi\,(\partial T)^2
    - \tfrac12 m_T^2\,t\!\cdot\! t
-   + \delta_m\,F\!\cdot\!(\partial T)$
-carries 10 dynamical fields with a clean kinetic structure
-($\operatorname{cond}(V)\sim 10^{8}$--$10^{10}$); the
-\emph{TorsionCDT} representation
-$\mathcal{L}_\mathrm{CDT} \supset
+   + \delta_m\,F\!\cdot\!(\partial T),
+  \label{LagFV}
+\end{equation}
+carrying $10$ dynamical fields with a clean kinetic structure
+($\operatorname{cond}(V) \sim 10^{8\text{--}10}$); the
+\emph{TorsionCDT} representation uses the irreducible-torsion
+decomposition of~\cite{hehl1995metric,itin2004maxwell} with a
+constrained-dyad kinetic ansatz,
+\begin{equation}
+  \mathcal{L}_\mathrm{CDT} \;\supset\;
    -\alpha_3\,I_3
-   - \tfrac14 \xi (\partial T_{[\mu\nu]})^2
-   + \delta_m\,F\!\cdot\!(\partial T_{[\mu\nu]})$
-carries 18 fields including redundant constrained directions
-($\operatorname{cond}(V)\sim 10^{15}$--$10^{17}$). The continuum
-equivalence map (post-2026-04-24 convention, GitHub issue \#318) is
-$m_T^2 = +2\alpha_3$. At the canonical campaign point
-$(m_A^2 = 0.955, \delta_m = 0.01, \xi = 0.274, \alpha_3 = +0.123)$
-the two formulations agree on $\Pmax$ to a relative difference
-$\Delta\Pmax / \Pmax = 1.4\times 10^{-15}$ --- bit-exact at the
-IEEE-754 round-off floor of $2.22\times 10^{-16}$; the agreement is
-preserved at the same level across five distinct parameter points
-spanning the surveyed sector.
+   - \tfrac14 \xi\,(\partial T_{[\mu\nu]})^2
+   + \delta_m\,F\!\cdot\!(\partial T_{[\mu\nu]}),
+  \label{LagCDT}
+\end{equation}
+carrying $18$ fields including redundant constrained directions
+($\operatorname{cond}(V) \sim 10^{15\text{--}17}$). The continuum
+equivalence is recovered under the map $m_T^2 = +2\alpha_3$, derived
+by squaring the FV mass term and identifying it with the trace
+contribution to $I_3$. Across five canonical parameter points
+spanning the surveyed sector the two formulations agree on $\Pmax$
+to a relative difference at the IEEE-754 round-off floor of
+$2.22\times 10^{-16}$, preserved at the same level across all
+points.
 
-The cross-formulation comparison has been load-bearing: it surfaced
-four numerical-methods bugs that would have been silently invisible
-to single-formulation testing. (i) Off-grid plane-wave initial
-conditions leak amplitude onto every discrete Fourier mode (issue
-\#305); on PGT theories with tachyonic eigenvalues at some $k$-modes
-this produces spurious exponential growth that disagrees between
-formulations until the initial-condition wavevector is snapped to
-the nearest discrete mode. (ii) The TorsionCDT kinetic matrix is
-rank-deficient and gives $\operatorname{cond}(V)$ above the Higham
-\S2.3 threshold for eigendecomposition~\cite{higham2008functions}
-(issue \#320); the eigendecomposition path loses precision while
-fundamental-vector remains accurate, and bit-exact agreement is
-restored only by switching to the scaling-and-squaring matrix
-exponential~\cite{higham2009scaling} for the base evolution and the
-augmented matrix exponential of~\cite{almohy2011action} for the
-Pass 1 correction. (iii) The QZ generalised-eigenvalue solver
-produced spurious finite eigenvalues on TorsionCDT's null-space-rich
-kinetic matrix (issue \#264); the cure was an SVD null-space
-projection before the QZ. (iv) An inference-posterior cross-check
-between formulations exposed a 0.36\% bias in a candidate template
-cache, which was reverted before merging. \Cref{FVCDT} displays the
-side-by-side $\Pmax$ comparison and the per-point relative-difference
-bars. The equivalence is a cross-formulation consistency check, not
-an independent reproduction of an analytic limit, but it is the only
-available non-trivial check on the linearisation,
-constraint-elimination, and numerical-evolution paths for the complex
-PGT theories surveyed in \cref{SectorSurvey}.
+The cross-formulation comparison has been load-bearing: four
+numerical-methods regressions that would have been silently invisible
+to single-formulation testing were surfaced and resolved by
+demanding agreement at the IEEE floor. (i) Off-grid plane-wave
+initial conditions on a periodic grid leak amplitude onto every
+discrete Fourier mode (see \cref{ICPreparation}); on PGT theories
+with tachyonic eigenvalues at some $k$-modes this produces spurious
+exponential growth that disagrees between formulations, since the FV
+representation contains no such directions. The cure is to snap the
+requested initial-condition wavevector to the nearest discrete
+Fourier mode. (ii) The TorsionCDT kinetic matrix is rank-deficient
+and the eigenvector matrix becomes ill-conditioned above the
+double-precision threshold $\operatorname{cond}(V) \gtrsim 10^{13}$
+flagged by~\cite{higham2008functions}; the eigendecomposition path
+loses precision while the FV path remains accurate, and bit-exact
+agreement is restored only by switching to the scaling-and-squaring
+matrix exponential of~\cite{higham2009scaling} for the base evolution
+and the augmented matrix exponential of~\cite{almohy2011action} for
+the Pass~1 correction. (iii) The QZ generalised-eigenvalue solver
+produced spurious finite eigenvalues on the null-space-rich
+TorsionCDT kinetic matrix; an SVD null-space projection before the
+QZ resolved the spurious roots. (iv) A candidate template cache for
+the modal evolution operator drifted under parameter changes by
+$0.36\%$ in inference posteriors, which the cross-formulation
+comparison flagged as a violation of linearity in the cached
+template; the cache was retired. \Cref{FVCDT} displays the per-point
+relative difference. The equivalence is a cross-formulation
+consistency check, not an independent reproduction of an analytic
+limit; it is the only available non-trivial diagnostic on the
+linearisation, constraint-elimination, and numerical-evolution paths
+for the complex PGT theories surveyed in \cref{SectorSurvey}.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_fv_cdt}
-  \caption{Cross-formulation equivalence: fundamental-vector vs
-    TorsionCDT representations of the dark-photon-plasma sector.
-    (a) $\Pmax$ from each formulation at five canonical
-    parameter points (equivalence map $m_T^2 = +2\alpha_3$,
-    post-2026-04-24 convention). (b) Relative difference
-    $|\Delta\Pmax|/\Pmax$ on a logarithmic axis, with the IEEE-754
-    round-off floor drawn for reference. Bit-exact agreement is the
-    criterion; the cross-check has surfaced four distinct
-    numerical-methods bugs (issues \#305, \#320, \#264, and the
-    template-cache revert) that would have been silently invisible
-    to single-formulation testing.}
+  \caption{Cross-formulation equivalence between the
+    fundamental-vector representation \cref{LagFV} and the
+    TorsionCDT representation \cref{LagCDT} of the dark-photon-plasma
+    sector. Relative difference $|\Delta\Pmax|/\Pmax$ across the
+    five canonical parameter points on a logarithmic axis, with the
+    IEEE-754 round-off floor drawn for reference; the criterion is
+    that all bars sit at or just above the floor.}
   \label{FVCDT}
 \end{figure*}
 
-\paragraph*{Multi-method agreement: backend, measurement, and reduction self-consistency}
-\TIDAL{} dispatches to one of several solver backends according to the
-equation specification (see \cref{SolverDispatchFlowchart}); we
-calibrate the dispatcher's backend-selection consistency by running
-representative theories under every applicable backend and checking
-pairwise relative agreement in $\Pmax$. Eight backends --- modal,
-\CVODE{}, \IDA{}, leapfrog Yoshida-2, leapfrog Yoshida-4, \SciPy{}
-DOP853, \SciPy{} Radau, and \SciPy{} BDF~\cite{hindmarsh2005sundials} ---
-are exercised on the Einstein--Maxwell baseline of
-\cref{GertsenshteinFormula} and on a gradient-coupled scalar pair
-that is the analogue of the Raffelt--Stodolsky two-channel mixing
-model~\cite{raffelt1988mixing}. The same calibration also runs a
-measurement-path cross-check: $H(t)$ derived from the symbolic
-Hamiltonian (Parseval gradient energy on periodic domains) is
-compared to the EOM-based energy diagnostic, two independent code
-paths for the same physical quantity. The smoke run on four backends
-shows a median pairwise relative difference of $5\times 10^{-3}$
-across all pairs; a single backend pair on the gradient-coupled
-theory at smoke resolution shows the expected outlier (the explicit
-leapfrog and implicit \IDA{} drift toward their default tolerances)
-which the HPC-resolution sweep removes. \Cref{MultiMethod} displays
-the backend-pair heatmap on each theory together with the pairwise
-rel\_diff distribution. These are internal-consistency checks across
+\paragraph*{Multi-method agreement across backends and measurement paths}
+\TIDAL{} dispatches to one of several solver backends according to
+the equation specification (see \cref{SolverDispatchFlowchart}); we
+calibrate the dispatcher by running representative theories under
+every applicable backend and checking pairwise relative agreement
+in $\Pmax$. Six backends --- modal, \CVODE{}, \IDA{}, leapfrog
+Yoshida-2, leapfrog Yoshida-4, and \SciPy{}
+DOP853~\cite{hindmarsh2005sundials} --- are exercised on the
+Einstein--Maxwell baseline of \cref{GertsenshteinFormula} and on a
+gradient-coupled scalar pair that is the analogue of the
+Raffelt--Stodolsky two-channel mixing
+model~\cite{raffelt1988mixing}. \SciPy{} Radau and BDF are excluded
+on this benchmark: their implicit BDF/Radau Newton iteration
+fails to converge on wave problems at the surveyed grid sizes; the
+implicit family is already represented by \CVODE{} and \IDA{}. The
+same calibration also runs a measurement-path cross-check: $H(t)$
+derived from the symbolic Hamiltonian (Parseval gradient energy on
+periodic domains) is compared to the EOM-based energy diagnostic,
+two independent code paths for the same physical quantity. The
+modal and \CVODE{} backends agree at the precision floor of the
+modal evolution; explicit leapfrog and implicit \IDA{} agree with
+the modal--\CVODE{} pair within their default integration
+tolerances. \Cref{MultiMethod} displays the backend-pair heatmap on
+each theory. These are internal-consistency checks across
 independent computational paths; only the calibrations against
 external analytic predictions in the earlier paragraphs constitute
 independent reproductions.
@@ -296,17 +334,19 @@ independent reproductions.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_multi_method}
-  \caption{Multi-method agreement across solver backends and
-    measurement paths. (a, b) Backend-pair $\Pmax$ relative-difference
-    heatmaps on the Einstein--Maxwell Gertsenshtein baseline and the
-    gradient-coupled scalar pair (an analogue of the
-    Raffelt--Stodolsky two-channel mixing~\cite{raffelt1988mixing}).
-    (c) Histogram of pairwise rel\_diff across all backend pairs.}
+  \caption{Multi-method agreement across solver backends. Pairwise
+    $\Pmax$ relative-difference heatmaps on the Einstein--Maxwell
+    Gertsenshtein baseline (left) and the gradient-coupled scalar
+    pair (right), the latter an analogue of the Raffelt--Stodolsky
+    two-channel mixing model~\cite{raffelt1988mixing}. Logarithmic
+    viridis colormap; cells encode
+    $|P_a - P_b|/\max(|P_a|, |P_b|)$ between backend pairs $(a, b)$.
+    Per-theory min, median, and max rel\_diff are annotated below
+    each panel.}
   \label{MultiMethod}
 \end{figure*}
 
-\paragraph*{Spatial and temporal convergence}
-\label{ConvergenceCalibration}
+\paragraph*{Spatial and temporal convergence}\label{ConvergenceCalibration}
 The spatial-operator catalogue is calibrated against analytic
 derivatives in \cref{FDConvergence}, where the Fornberg
 finite-difference orders 2, 4 and 6 recover their predicted
@@ -315,84 +355,86 @@ floor by $N\approx 64$~\cite{fornberg1988generation,burns2020dedalus}.
 We extend the spatial calibration to a physical example by running
 the Proca-mass equation at $\Bzero=0$ for a $k$-sweep at three
 values of $m^2 \in \{0.1, 1.0, 10.0\}$; for each $(k, m^2)$ the
-angular frequency is recovered by spatial-FFT mode identification
-followed by time-FFT with a Hann window and quadratic peak
-refinement. The recovered dispersion matches
-$\omega(k) = \sqrt{k^2 + m^2}$ across the swept $k$-range, with the
-median rel error at smoke resolution at $3.4\times 10^{-3}$. The
-Rabi-frequency grid convergence on the Einstein--Maxwell baseline
-exhibits the predicted $(k\Delta x)^2$ scaling of the FD-4 stencil
-error~\cite{fornberg1988generation}, decreasing as $N$ increases.
-Time-integration convergence is calibrated by sweeping the
-integrator step $\Delta t$ across seven schemes: the leapfrog
-Yoshida-2 fits a log--log slope of $2.07$ (predicted
-$2.0$~\cite{yoshida1990symplectic,hairer2006geometric}); the
-Yoshida-4 saturates at the spatial-discretisation floor at the
-coarser smoke ladder; the implicit \CVODE{}, \IDA{}, and \SciPy{}
-DOP853/Radau/BDF schemes each saturate at their rtol setting
-independently of $\Delta t$, as expected.
-\Cref{ConvergenceFigure} displays the three convergence diagnostics.
-These calibrate discretisation and integrator order against analytic
-targets; they do not probe modelling errors upstream of the
-discretised system.
+angular frequency is recovered by spatial-FFT identification of the
+dominant mode, time-FFT of its complex amplitude with a Hann window,
+and quadratic peak refinement, then compared to
+$\omega(k) = \sqrt{k^2 + m^2}$. The Rabi-frequency grid convergence
+runs on the Einstein--Maxwell baseline at $\Bzero=0.2$ (chosen so
+that the Rabi period $2\pi/(\kappa\Bzero) = 31.4$ fits comfortably
+inside the simulation window $t_\mathrm{end}=200$) and exposes the
+$(k\Delta x)^2$ scaling of the fourth-order FD stencil error as $N$
+varies~\cite{fornberg1988generation}. Time-integration convergence
+is reported only for the symplectic family (leapfrog Yoshida-2 and
+Yoshida-4)~\cite{yoshida1990symplectic,hairer2006geometric}, where
+the log--log slope of the absolute error versus $\Delta t$ is a
+meaningful order-of-convergence diagnostic; implicit schemes
+saturate at their rtol setting and their behaviour is covered in
+\cref{MultiMethod}. \Cref{ConvergenceFigure} displays the three
+diagnostics with fitted slopes and $R^2$ values annotated in each
+legend. These calibrate discretisation and integrator order against
+analytic targets; they do not probe modelling errors upstream of
+the discretised system.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_convergence}
   \caption{Spatial and temporal convergence. (a) Proca dispersion
-    $\omega(k)$ overlay against $\sqrt{k^2+m^2}$ at three values of
-    $m^2$. (b) Rabi-frequency grid convergence
+    $\omega(k)$ extracted by FFT from \TIDAL{} at three values of
+    $m^2$, overlaid with the analytic
+    $\omega = \sqrt{k^2 + m^2}$. (b) Rabi-frequency grid convergence
     $|\Omega_\mathrm{eff}/\Omega_\mathrm{theory} - 1|$ as a function
-    of $k\Delta x$, with the $(k\Delta x)^2$ guide. (c) Time-integration
-    error vs $\Delta t$ for seven solver schemes on the
-    Einstein--Maxwell baseline, with fitted log--log slopes annotated.}
+    of $k\Delta x$, with the $(k\Delta x)^2$ guide and fitted slope
+    annotated. (c) Time-integration error versus $\Delta t$ for
+    leapfrog Yoshida-2 and Yoshida-4 on the Einstein--Maxwell
+    baseline; fitted log--log slopes and $R^2$ values are reported
+    in the legend.}
   \label{ConvergenceFigure}
 \end{figure*}
 
 \paragraph*{Energy-conservation audit across the example library}
 Energy conservation provides a structural diagnostic that engages
-every layer of the workflow at once: a constraint solver that returns
-inconsistent initial conditions, a symbolic stage that loses
-cross-coupling terms in field decomposition, or a time integrator
-that drifts past its predicted order, all surface as relative energy
-drift. We audit the canonical example library --- Einstein--Maxwell
-Gertsenshtein, the gradient-coupled scalar pair, the propagating-PGT
-and nonminimal torsion variants of \cref{SectorSurvey}, the
-dark-photon-plasma sector in both FV and CDT formulations, the
-Proca-mass case, and several flat- and curved-background tests ---
-and record the maximum relative energy drift $|dE/E|_\mathrm{max}$
-per example. At smoke resolution the gertsenshtein and
-coupled-scalars examples both achieve drift of $\sim 10^{-15}$ at
-machine precision; the larger-system audit follows the same pattern,
-with two expected outliers --- de-Sitter Klein--Gordon (physical
-Hubble friction $\sim 30\%$) and \texttt{massive\_3form}
-(Hamiltonian skipped at rank-3 Lagrangian decomposition) ---
-documented separately. The volume-element fix of GitHub issue
-\#308 dropped the curvilinear spherical and polar drifts from
-43--66\% to $\sim 10^{-9}$, and the Parseval gradient-energy fix of
-issue \#312 brought the Euler--Heisenberg test to its
-$\mathcal{O}(\varepsilon^2)$-compliant floor.
-\Cref{ConservationAudit} displays the per-example drift bar chart
-with the default $10^{-3}$ conservation threshold drawn for reference.
-Per-example precision is set by the backend the dispatcher selects;
-the audit is a structural regression diagnostic, not a per-example
-precision statement.
+every layer of the workflow at once: a constraint solver that
+returns inconsistent initial conditions, a symbolic stage that
+loses cross-coupling terms in field decomposition, or a time
+integrator that drifts past its predicted order, all surface as
+relative energy drift. We audit the canonical example library and
+record the maximum relative energy drift $|dE/E|_\mathrm{max}$ per
+example: the Einstein--Maxwell Gertsenshtein baseline, the
+gradient-coupled scalar pair, the propagating-PGT and nonminimal
+torsion variants of \cref{SectorSurvey}, the dark-photon-plasma
+sector in both fundamental-vector and TorsionCDT formulations, the
+Proca-mass photon, and several flat- and curved-background
+Klein--Gordon tests. Successful examples cluster at $\sim
+10^{-15}$, near the IEEE-754 round-off floor of the modal solver.
+Two structurally distinct outliers are documented separately and
+not included in the calibration figure: the de-Sitter Klein--Gordon
+example, where the energy drift is the physical Hubble friction of
+the expanding background; and the massive rank-three antisymmetric
+tensor example, whose Hamiltonian is omitted from the symbolic
+stage because the Lagrangian decomposition cost is super-exponential
+in tensor rank and exceeds the available compute budget. The audit
+catches structural regressions, not per-example precision: the
+precision floor is set by the backend the dispatcher selects, which
+differs across examples. \Cref{ConservationAudit} displays the
+per-example drift on a logarithmic axis, sorted in descending order.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figD_conservation}
   \caption{Energy-conservation audit across the example library.
     Maximum absolute relative energy drift $|dE/E|_\mathrm{max}$ per
-    example on a logarithmic axis. The default $10^{-3}$ conservation
-    threshold (dashed) and the IEEE-754 round-off floor (dotted) are
-    drawn for reference. Examples that fail structurally during the
-    audit (typically due to missing IC parameters on theories
-    requiring user setup) are coloured red.}
+    example on a logarithmic axis, sorted in descending order. The
+    default $10^{-3}$ conservation threshold (dashed) and the
+    IEEE-754 round-off floor (dotted) are drawn for reference.
+    Structurally distinct outliers (de-Sitter Klein--Gordon under
+    physical Hubble friction; massive rank-three antisymmetric
+    tensor with no symbolic Hamiltonian) are dropped from the
+    audit and discussed separately in the text.}
   \label{ConservationAudit}
 \end{figure}
 
 \paragraph*{Torsion-limit recovery as a kinematic identity}
-At $\xi \to 0$ the propagating-PGT (T3) theory of
+At $\xi \to 0$ the propagating-PGT theory of
 \cref{PropagatingKineticOutput} reduces to the Einstein--Maxwell
 baseline bit-exactly in the $h_\times \leftrightarrow a_x$ channel,
 by the kinematic identity reported in \cref{ChannelStructure}. The

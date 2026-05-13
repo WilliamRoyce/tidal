@@ -1,11 +1,11 @@
 {
   "metadata": {
-    "timestamp": "2026-05-12T20:11:05.131625+00:00",
+    "timestamp": "2026-05-12T21:05:52.685497+00:00",
     "host": "01f52c360ddd",
     "python_version": "3.11.15",
     "numpy_version": "2.3.4",
     "scipy_version": "1.16.3",
-    "git_sha": "0f15caa206ea2e170b949c1ed4e157afffcef1b7",
+    "git_sha": "21f35d8b40da4c05f989162820027fe6e128a46f",
     "parameters": {
       "m2": 1.0,
       "t_end": 2.0,
@@ -17,11 +17,12 @@
         6.283185307179586
       ],
       "eps_values": [
+        0.2,
         0.1,
         0.05,
+        0.02,
         0.01,
-        0.005,
-        0.001
+        0.005
       ],
       "smoke": false,
       "correction": "\u03b5 \u00b7 \u2202_x^4 (phi) [derivative_4_x]",
@@ -29,16 +30,23 @@
     }
   },
   "summary": {
-    "n_eps_points": 5,
-    "fitted_slope_err_vs_eps": 2.5870016317060873,
+    "n_eps_points": 6,
+    "fitted_slope_err_vs_eps": 3.2120999557359577,
     "expected_slope": 2.0,
-    "max_err_combined": 0.044079329439460246,
-    "min_err_combined": 4.715219227569012e-07,
-    "median_improvement_ratio": 5948.297814942346,
+    "max_err_combined": 0.30268819658369195,
+    "min_err_combined": 5.830798572997731e-06,
+    "median_improvement_ratio": 308.56646006807887,
     "correction_operator": "biharmonic",
     "reference": "Parker & Simon 1993, gr-qc/9211002 (canonical higher-derivative perturbative-reduction structure)"
   },
   "results": [
+    {
+      "eps": 0.2,
+      "err_pass0_vs_full": 1.0872914408650536,
+      "err_combined_vs_full": 0.30268819658369195,
+      "improvement_ratio": 3.59211708000785,
+      "scaled_err_combined_over_eps2": 7.567204914592297
+    },
     {
       "eps": 0.1,
       "err_pass0_vs_full": 0.6509104892849124,
@@ -54,6 +62,13 @@
       "scaled_err_combined_over_eps2": 2.1945560049491326
     },
     {
+      "eps": 0.02,
+      "err_pass0_vs_full": 0.13874787533141364,
+      "err_combined_vs_full": 0.00025008841346083055,
+      "improvement_ratio": 554.7952958370247,
+      "scaled_err_combined_over_eps2": 0.6252210336520764
+    },
+    {
       "eps": 0.01,
       "err_pass0_vs_full": 0.06949315107386422,
       "err_combined_vs_full": 5.830798572997731e-06,
@@ -66,13 +81,6 @@
       "err_combined_vs_full": 5.842904125114012e-06,
       "improvement_ratio": 5948.297814942346,
       "scaled_err_combined_over_eps2": 0.2337161650045605
-    },
-    {
-      "eps": 0.001,
-      "err_pass0_vs_full": 0.006950369709164406,
-      "err_combined_vs_full": 4.715219227569012e-07,
-      "improvement_ratio": 14740.289631767031,
-      "scaled_err_combined_over_eps2": 0.4715219227569012
     }
   ]
 }
