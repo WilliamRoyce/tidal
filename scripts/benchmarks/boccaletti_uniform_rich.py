@@ -57,17 +57,25 @@ SOURCE = "h_5"
 TARGET = "a_1"
 IC_COMPONENT = "h_5"
 
-# Full HPC scale.
-FULL_B0_LO, FULL_B0_HI, FULL_B0_N = 0.005, 0.20, 16
-FULL_T_END_VALUES = [25.0, 50.0, 75.0, 100.0]
-FULL_GRID_N = 1024
-FULL_N_CONVERGE = [128, 256, 512, 1024, 2048]
+# Full HPC scale. Single t_end (sweeping it adds no information beyond
+# what the bare formula already encodes); 24 B0 points spanning both the
+# perturbative regime (kappa*B0*t/2 < pi/2 i.e. B0 < 0.126 at t=50) and
+# the saturated regime where the bare sin^2 and the Raffelt-Stodolsky
+# two-mode formula begin to differ visibly. Grid N=512 keeps the Nyquist
+# wavenumber (k_max = pi*N/L = 16 for L=100) well below the FD-4
+# stencil's high-k discretisation artifact at k ~ 32 where the stability
+# guard would otherwise refuse to run; the IC at k=1 is far from this
+# Nyquist band and the result is converged at this N.
+FULL_B0_LO, FULL_B0_HI, FULL_B0_N = 0.005, 0.25, 24
+FULL_T_END_VALUES = [50.0]
+FULL_GRID_N = 512
+FULL_N_CONVERGE = [64, 128, 256, 512]
 
 # Smoke mode.
-SMOKE_B0_LO, SMOKE_B0_HI, SMOKE_B0_N = 0.05, 0.20, 4
-SMOKE_T_END_VALUES = [25.0, 50.0]
+SMOKE_B0_LO, SMOKE_B0_HI, SMOKE_B0_N = 0.005, 0.25, 8
+SMOKE_T_END_VALUES = [50.0]
 SMOKE_GRID_N = 128
-SMOKE_N_CONVERGE = [64, 128]
+SMOKE_N_CONVERGE = [128, 256]
 
 
 def _git_sha() -> str:

@@ -62,14 +62,15 @@ IC_COMPONENT = "h_7"
 SOURCE = "h_7"
 TARGET = "a_2"
 
-# Full HPC scale.
-FULL_BPEAK_VALUES = [0.05, 0.10, 0.15, 0.20]
-FULL_R_VALUES = [3.0, 5.0, 7.0, 10.0]
+# Full HPC scale: 8 x 5 = 40 cells spanning the perturbative regime
+# (kappa*Bpeak*R*sqrt(pi/2) < pi/2 i.e. Bpeak*R < 1.25 at kappa=1).
+FULL_BPEAK_VALUES = [0.04, 0.06, 0.08, 0.10, 0.12, 0.14, 0.16, 0.18]
+FULL_R_VALUES = [3.0, 4.5, 6.0, 7.5, 9.0]
 FULL_GRID_N = 1024
 
 # Smoke.
-SMOKE_BPEAK_VALUES = [0.05, 0.10]
-SMOKE_R_VALUES = [5.0]
+SMOKE_BPEAK_VALUES = [0.06, 0.10, 0.14]
+SMOKE_R_VALUES = [4.0, 6.0]
 SMOKE_GRID_N = 256
 
 

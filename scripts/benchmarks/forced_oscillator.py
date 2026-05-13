@@ -84,7 +84,10 @@ _KG_BASE: dict[str, Any] = {
     "coupling": {"mass_matrix_symbolic": [["-m2 - eps"]]},
 }
 
-FULL_EPS_VALUES = [0.5, 0.1, 0.05, 0.01, 0.005, 0.001]
+# eps ladder restricted to the perturbative regime where the O(eps^2)
+# theorem is informative. The eps=0.5 point hits saturation
+# (err_pass0 ~ err_combined) and was dropped.
+FULL_EPS_VALUES = [0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001]
 SMOKE_EPS_VALUES = [0.1, 0.05, 0.01]
 M2 = 1.0
 T_END = 2.0

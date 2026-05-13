@@ -59,27 +59,37 @@ PROCA_GRID_N_SMOKE = 256
 PROCA_SNAP_DT_FULL = 0.05
 PROCA_SNAP_DT_SMOKE = 0.05
 
-# (b) Rabi N-sweep params
+# (b) Rabi-frequency grid convergence. Use a stronger background
+# B0_RABI = 0.2 so the Rabi period 2*pi/(kappa*B0) = 31.4 fits comfortably
+# inside t_end = 200 (six full periods); the FFT then resolves the slow
+# Rabi modulation cleanly, and Omega_eff/Omega_theory exposes the
+# (k*dx)^2 FD-stencil error as N varies.
+RABI_B0 = 0.2
+RABI_T_END = 200.0
 RABI_N_FULL = [128, 256, 512, 1024, 2048, 4096]
 RABI_N_SMOKE = [128, 256]
+RABI_SNAPSHOT_DT = 0.1  # ~2000 snapshots over t_end=200
 
-# (c) Time-integration order params
+# (c) Time-integration order params. Restricted to the symplectic family
+# (leapfrog Y2, Y4) which is the only family where the slope is a
+# meaningful convergence-order diagnostic on a wave problem at fixed
+# spatial discretisation. Implicit schemes (CVODE, IDA, scipy DOP853)
+# saturate at their rtol setting and exhibit a flat horizontal in this
+# panel; their behaviour is already covered by the multi-method
+# agreement figure.
 TIO_SCHEMES_FULL: list[tuple[str, list[str]]] = [
     ("leapfrog_Y2", ["--scheme", "leapfrog", "--leapfrog-order", "2"]),
     ("leapfrog_Y4", ["--scheme", "leapfrog", "--leapfrog-order", "4"]),
-    ("cvode", ["--scheme", "cvode"]),
-    ("ida", ["--scheme", "ida"]),
-    ("scipy_DOP853", ["--scheme", "scipy", "--method", "DOP853"]),
-    # scipy Radau and BDF: implicit solvers hang convergence-iterating
-    # on these wave problems at our grid sizes. Excluded; implicit
-    # behaviour is already represented by IDA and CVODE.
 ]
-TIO_SCHEMES_SMOKE = TIO_SCHEMES_FULL[:3]
+TIO_SCHEMES_SMOKE = TIO_SCHEMES_FULL
 TIO_CELL_TIMEOUT = 240  # seconds; safety net per (scheme, dt) cell
-TIO_DT_FULL = [0.2, 0.1, 0.05, 0.025, 0.0125, 0.00625, 0.003125, 0.0015625]
-TIO_DT_SMOKE = [0.1, 0.05, 0.025]
-TIO_GRID_N_FULL = 512
-TIO_GRID_N_SMOKE = 128
+# Twelve dt values log-spaced over two decades to give a clean log-log
+# slope fit. Spatial floor pushed down by using N=2048 in the full
+# benchmark.
+TIO_DT_FULL = [0.5, 0.3, 0.2, 0.1, 0.07, 0.05, 0.03, 0.02, 0.01, 0.007, 0.005, 0.003]
+TIO_DT_SMOKE = [0.2, 0.1, 0.05]
+TIO_GRID_N_FULL = 2048
+TIO_GRID_N_SMOKE = 256
 TIO_ANALYTIC = math.sin(0.5 * KAPPA * B0_RABI * T_END) ** 2
 
 
@@ -258,13 +268,13 @@ def _rabi_simulate(*, grid_n: int, out_dir: Path, snapshot_dt: float) -> None:
         "--ic-component",
         "h_5",
         "--t-end",
-        f"{T_END}",
+        f"{RABI_T_END}",
         "--snapshots",
         f"{snapshot_dt}",
         "--param",
         f"kappa={KAPPA}",
         "--param",
-        f"B0={B0_RABI}",
+        f"B0={RABI_B0}",
         "--fd-order",
         "4",
         "--output",
@@ -300,8 +310,8 @@ def _rabi_omega_eff(out_dir: Path) -> float:
 
 def _run_rabi(*, smoke: bool, work_dir: Path) -> list[dict]:
     n_values = RABI_N_SMOKE if smoke else RABI_N_FULL
-    omega_theory = KAPPA * B0_RABI  # Rabi angular frequency for sin^2(omega t/2)
-    snapshot_dt = 0.1
+    omega_theory = KAPPA * RABI_B0  # Rabi angular frequency for sin^2(omega t/2)
+    snapshot_dt = RABI_SNAPSHOT_DT
     rows: list[dict] = []
     for n in n_values:
         sub = work_dir / f"rabi_N{n}"

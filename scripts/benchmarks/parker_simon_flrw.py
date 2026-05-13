@@ -91,7 +91,10 @@ _PS_BASE: dict[str, Any] = {
     "coupling": {"mass_matrix_symbolic": [["-m2"]]},
 }
 
-FULL_EPS_VALUES = [0.1, 0.05, 0.01, 0.005, 0.001]
+# eps ladder restricted to the regime where err_combined is above the
+# round-off floor (~1e-7 in this setup). Points below the floor are
+# excluded to avoid misleading log-log slopes.
+FULL_EPS_VALUES = [0.2, 0.1, 0.05, 0.02, 0.01, 0.005]
 SMOKE_EPS_VALUES = [0.1, 0.05, 0.01]
 M2 = 1.0
 T_END = 2.0

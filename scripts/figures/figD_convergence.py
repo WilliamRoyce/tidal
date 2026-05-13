@@ -1,10 +1,19 @@
-"""Figure D §7 — three-panel convergence (Proca m², Rabi N, multi-scheme dt).
+r"""Figure D §7 — spatial and temporal convergence (App-C styled).
 
-(figure*) Three panels:
-  (a) Proca dispersion omega(k) overlay vs sqrt(k²+m²) at three m².
-  (b) Rabi-frequency grid convergence log-log with (k·Δx)² guide.
-  (c) Time-integration error vs Δt for seven schemes with expected-order
-      guides.
+Three-panel `figure*`:
+
+  (a) Proca dispersion: $\omega(k)$ extracted by FFT from TIDAL at
+      three values of $m^2 \in \{0.1, 1.0, 10.0\}$, overlaid with the
+      analytic $\omega(k) = \sqrt{k^2 + m^2}$ at each $m^2$.
+  (b) Rabi-frequency grid convergence: $|\Omega_\mathrm{eff}/
+      \Omega_\mathrm{theory} - 1|$ versus $k\,\Delta x$ on log–log,
+      with the $(k\,\Delta x)^2$ guide. The Rabi benchmark uses
+      $B_0 = 0.2, t_\mathrm{end} = 200$ (≥6 Rabi periods).
+  (c) Time-integration order: $|P_\mathrm{final}^\mathrm{sim} -
+      \sin^2(\kappa B_0 t/2)|$ versus $\Delta t$ for leapfrog
+      Yoshida-2 and Yoshida-4. Fitted log–log slopes and $R^2$
+      annotated in the legend. Implicit schemes are deliberately
+      excluded (their flat-at-rtol behaviour is covered in App D §6).
 
 Data:   benchmark_results/canonical/convergence_rich.json
 Output: manuscript/figures/figD_convergence.pdf
@@ -14,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import operator
 from pathlib import Path
 
@@ -23,12 +33,22 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "benchmark_results" / "canonical" / "convergence_rich.json"
 DEFAULT_OUT = REPO_ROOT / "manuscript" / "figures" / "figD_convergence.pdf"
-FLOOR = 1e-16
+EPS_MACH = 2.220446049250313e-16
+FLOOR_TOL = 1e3 * EPS_MACH
+
+
+def _fit_loglog(x: np.ndarray, y: np.ndarray) -> tuple[float, float]:
+    lx, ly = np.log10(x), np.log10(y)
+    slope, intercept = np.polyfit(lx, ly, 1)
+    pred = slope * lx + intercept
+    ss_res = np.sum((ly - pred) ** 2)
+    ss_tot = np.sum((ly - ly.mean()) ** 2)
+    return float(slope), float(1.0 - ss_res / ss_tot if ss_tot > 0 else math.nan)
 
 
 def _plot_dispersion(ax, data: dict) -> None:
     rows = [r for r in data.get("dispersion", []) if r.get("ok")]
-    by_m = {}
+    by_m: dict[float, list[tuple[float, float]]] = {}
     for r in rows:
         by_m.setdefault(r["mass2"], []).append((r["k_realised"], r["omega_sim"]))
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
@@ -39,60 +59,114 @@ def _plot_dispersion(ax, data: dict) -> None:
         kd = np.linspace(ks.min() * 0.9, ks.max() * 1.05, 200)
         c = colors[i % len(colors)]
         ax.plot(kd, np.sqrt(kd**2 + m2), ls="--", lw=0.9, color=c, alpha=0.5)
-        ax.plot(ks, oms, marker="o", ms=5, lw=0, color=c, label=rf"$m^2={m2}$")
+        ax.plot(ks, oms, marker="o", ms=5, lw=0, color=c, label=rf"$m^2 = {m2}$")
     ax.set_xlabel(r"$k$")
     ax.set_ylabel(r"$\omega$")
     ax.set_title("(a) Proca dispersion", fontsize=10)
-    ax.legend(frameon=False, fontsize=9)
-    ax.grid(visible=True, ls=":", alpha=0.4)
+    ax.legend(frameon=False, fontsize=9, loc="best")
+    ax.grid(visible=True, ls=":", alpha=0.3)
 
 
 def _plot_rabi(ax, data: dict) -> None:
-    rows = [r for r in data.get("rabi_convergence", []) if r.get("ok")]
+    rows = sorted(
+        [r for r in data.get("rabi_convergence", []) if r.get("ok")],
+        key=operator.itemgetter("N"),
+    )
     if not rows:
         ax.text(
             0.5, 0.5, "no rabi data", ha="center", va="center", transform=ax.transAxes
         )
         return
-    rows.sort(key=operator.itemgetter("N"))
     kdx = np.array([r["k_dx"] for r in rows])
-    err = np.array([max(abs(r["ratio"] - 1.0), FLOOR) for r in rows])
-    ax.loglog(kdx, err, marker="o", ms=5, lw=1.0, color="#1f77b4")
-    if kdx.size >= 2:
-        guide = err[0] * (kdx / kdx[0]) ** 2
-        ax.loglog(
-            kdx, guide, ls=":", lw=0.8, color="#888", label=r"$(k\Delta x)^2$ guide"
+    err = np.array([max(abs(r["ratio"] - 1.0), EPS_MACH) for r in rows])
+    ax.loglog(
+        kdx,
+        err,
+        marker="o",
+        ms=5,
+        lw=1.0,
+        color="#1f77b4",
+        label=r"$|\Omega_{\mathrm{eff}}/\Omega_{\mathrm{theory}} - 1|$",
+    )
+    # If the data is flat (FFT-extraction floor reached at every N),
+    # annotate the plateau instead of fitting a meaningless slope.
+    e_lo, e_hi = float(err.min()), float(err.max())
+    is_flat = e_hi / max(e_lo, EPS_MACH) < 2.0
+    if is_flat:
+        plateau = float(np.median(err))
+        ax.axhline(
+            plateau,
+            ls="-.",
+            lw=0.9,
+            color="#1f77b4",
+            alpha=0.5,
+            label=rf"FFT-extraction floor $\approx {plateau:.1e}$",
         )
-        ax.legend(frameon=False, fontsize=9)
+    else:
+        anchor_x = float(kdx.max())
+        anchor_y = float(err[int(np.argmax(kdx))])
+        ax.loglog(
+            kdx,
+            anchor_y * (kdx / anchor_x) ** 2,
+            ls=":",
+            lw=0.8,
+            color="#888",
+            label=r"$(k\Delta x)^2$ guide",
+        )
+    ax.axhline(
+        EPS_MACH, ls=":", lw=0.7, color="#666", label=r"$\varepsilon_{\mathrm{mach}}$"
+    )
     ax.set_xlabel(r"$k\,\Delta x$")
-    ax.set_ylabel(r"$|\Omega_{\rm eff}/\Omega_{\rm theory} - 1|$")
+    ax.set_ylabel(r"$|\Omega_{\mathrm{eff}}/\Omega_{\mathrm{theory}} - 1|$")
     ax.set_title("(b) Rabi-frequency grid convergence", fontsize=10)
-    ax.grid(visible=True, which="both", ls=":", alpha=0.4)
+    ax.legend(frameon=False, fontsize=8, loc="best")
+    ax.grid(visible=True, which="both", ls=":", alpha=0.3)
 
 
 def _plot_tio(ax, data: dict) -> None:
-    rows = [r for r in data.get("time_integration_order", []) if r.get("ok")]
-    slopes = data["summary"].get("tio_fitted_slopes", {})
-    by_scheme = {}
+    rows = [
+        r
+        for r in data.get("time_integration_order", [])
+        if r.get("ok")
+        and r.get("abs_error") is not None
+        and math.isfinite(r["abs_error"])
+    ]
+    by_scheme: dict[str, list[dict]] = {}
     for r in rows:
         by_scheme.setdefault(r["scheme"], []).append(r)
-    colors = plt.get_cmap("tab10")
-    for i, (scheme, srows) in enumerate(sorted(by_scheme.items())):
+    colors = {"leapfrog_Y2": "#1f77b4", "leapfrog_Y4": "#ff7f0e"}
+    markers = {"leapfrog_Y2": "o", "leapfrog_Y4": "s"}
+    for scheme, srows in sorted(by_scheme.items()):
         srows.sort(key=operator.itemgetter("dt"))
         dts = np.array([r["dt"] for r in srows])
-        errs = np.array([max(r["abs_error"], FLOOR) for r in srows])
-        slope = slopes.get(scheme)
-        label = scheme + (f" (slope={slope:.2f})" if slope is not None else "")
-        ax.loglog(dts, errs, marker="o", ms=4, lw=1.0, color=colors(i), label=label)
+        errs = np.array([max(r["abs_error"], EPS_MACH) for r in srows])
+        fit_mask = errs > FLOOR_TOL
+        if fit_mask.sum() >= 3:
+            s, r2 = _fit_loglog(dts[fit_mask], errs[fit_mask])
+            label = rf"{scheme} ($\hat{{\alpha}} = {s:.2f}$, $R^2 = {r2:.3f}$)"
+        else:
+            label = scheme
+        ax.loglog(
+            dts,
+            errs,
+            marker=markers.get(scheme, "."),
+            ms=5,
+            lw=1.0,
+            color=colors.get(scheme, "#666"),
+            label=label,
+        )
+    ax.axhline(
+        EPS_MACH, ls=":", lw=0.7, color="#666", label=r"$\varepsilon_{\mathrm{mach}}$"
+    )
     ax.set_xlabel(r"$\Delta t$")
-    ax.set_ylabel(r"$|P_{\rm final}^{\rm sim} - P_{\rm bare}|$")
-    ax.set_title("(c) time-integration order", fontsize=10)
-    ax.legend(frameon=False, fontsize=7, loc="best")
-    ax.grid(visible=True, which="both", ls=":", alpha=0.4)
+    ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - \sin^2(\kappa B_0 t/2)|$")
+    ax.set_title("(c) time-integration order (leapfrog only)", fontsize=10)
+    ax.legend(frameon=False, fontsize=8, loc="best")
+    ax.grid(visible=True, which="both", ls=":", alpha=0.3)
 
 
 def _plot(data: dict, out_path: Path) -> None:
-    fig, axes = plt.subplots(1, 3, figsize=(14.0, 3.8))
+    fig, axes = plt.subplots(1, 3, figsize=(14.5, 4.0))
     _plot_dispersion(axes[0], data)
     _plot_rabi(axes[1], data)
     _plot_tio(axes[2], data)

@@ -80,12 +80,12 @@ EXAMPLES_LIST: list[dict] = [
     {
         "label": "coupled_scattering",
         "json": "coupled_scattering.json",
-        "ic_component": "h_0",
+        "ic_component": "chi_0",
         "bounds": (0.0, 100.0),
         "t_end": 30.0,
         "grid_n_full": 256,
         "grid_n_smoke": 64,
-        "params": {"kappa": 1.0},
+        "params": {},
     },
     {
         "label": "chern_simons_3d",

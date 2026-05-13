@@ -1,7 +1,19 @@
-"""Figure D §2 — Localised Boccaletti path-integrated calibration.
+r"""Figure D §2 — path-integrated Boccaletti reproduction (App-C styled).
 
-Two-panel (figure*): heatmap of P_sim(Bpeak, R) on the left; overlay
-of P_sim vs analytic at fixed R on the right with a residual band.
+Two-panel `figure*` showing the validation of the path-integrated
+Boccaletti kernel on a Gaussian-localised B-field profile:
+
+  (a) Residual heatmap $P_\mathrm{sim} - P_\mathrm{analytic}$ across
+      the $(B_\mathrm{peak}, R)$ parameter grid, diverging colormap
+      centred at zero.
+  (b) Universal-collapse plot: all 40 simulation points plotted against
+      the dimensionless variable $s \equiv \kappa\,B_\mathrm{peak}\,R\,
+      \sqrt{\pi/2}$, overlaid with the analytic prediction $\sin^2(s)$.
+
+The collapse plot is the strongest visual demonstration that the
+path-integrated kernel is correct: all simulation points should fall
+on the universal curve regardless of their individual
+$(B_\mathrm{peak}, R)$ values.
 
 Data:   benchmark_results/canonical/boccaletti_localised.json
 Output: manuscript/figures/figD_boccaletti_localised.pdf
@@ -11,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -21,16 +34,15 @@ DEFAULT_DATA = (
     REPO_ROOT / "benchmark_results" / "canonical" / "boccaletti_localised.json"
 )
 DEFAULT_OUT = REPO_ROOT / "manuscript" / "figures" / "figD_boccaletti_localised.pdf"
+KAPPA = 1.0
 
 
 def _plot(data: dict, out_path: Path) -> None:
-    rows = [r for r in data.get("results", []) if r.get("ok")]
-    if not rows:
-        msg = "no localised rows"
-        raise ValueError(msg)
+    rows = [r for r in data["results"] if r.get("ok")]
     bps = sorted({r["Bpeak"] for r in rows})
     rs = sorted({r["R"] for r in rows})
-    p_sim = np.full((len(rs), len(bps)), np.nan)
+    nbp, nr = len(bps), len(rs)
+    p_sim = np.full((nr, nbp), np.nan)
     p_ana = np.full_like(p_sim, np.nan)
     for r in rows:
         i = rs.index(r["R"])
@@ -39,43 +51,60 @@ def _plot(data: dict, out_path: Path) -> None:
         p_ana[i, j] = r["P_analytic"]
     residual = p_sim - p_ana
 
-    fig, axes = plt.subplots(1, 2, figsize=(11.0, 3.8))
+    s_vals = np.array(
+        [KAPPA * r["Bpeak"] * r["R"] * math.sqrt(math.pi / 2.0) for r in rows]
+    )
+    p_sim_flat = np.array([r["P_sim"] for r in rows])
 
+    fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.8))
+
+    # Panel (a): residual heatmap
     ax = axes[0]
+    vmax = max(abs(np.nanmin(residual)), abs(np.nanmax(residual)), 1e-6)
     im = ax.imshow(
         residual,
         origin="lower",
         aspect="auto",
         extent=(bps[0], bps[-1], rs[0], rs[-1]),
         cmap="RdBu_r",
-        vmin=-max(abs(np.nanmin(residual)), abs(np.nanmax(residual)), 1e-6),
-        vmax=+max(abs(np.nanmin(residual)), abs(np.nanmax(residual)), 1e-6),
+        vmin=-vmax,
+        vmax=+vmax,
     )
-    ax.set_xlabel(r"$B_{\rm peak}$")
+    ax.set_xlabel(r"$B_{\mathrm{peak}}$")
     ax.set_ylabel(r"$R$")
-    ax.set_title("(a) residual P_sim − P_ana", fontsize=10)
-    fig.colorbar(im, ax=ax, label="residual")
+    ax.set_title(
+        rf"(a) residual $P_{{\mathrm{{sim}}}} - P_{{\mathrm{{ana}}}}$ "
+        rf"(max $|\Delta| = {vmax:.1e}$)",
+        fontsize=10,
+    )
+    fig.colorbar(im, ax=ax, shrink=0.85)
 
-    # right-panel: line overlay at the middle R
-    r_idx = len(rs) // 2
-    r0 = rs[r_idx]
+    # Panel (b): universal collapse
     ax = axes[1]
+    s_dense = np.linspace(0.0, max(s_vals.max() * 1.05, 0.1), 400)
     ax.plot(
-        bps,
-        p_ana[r_idx, :],
+        s_dense,
+        np.sin(s_dense) ** 2,
         ls="--",
         lw=1.0,
         color="#666",
-        label=r"$\sin^2(\kappa B_{\rm peak} R \sqrt{\pi/2})$",
+        label=r"$\sin^2(s)$",
     )
+    n_cells = nbp * nr
     ax.plot(
-        bps, p_sim[r_idx, :], marker="o", ms=5, lw=1.0, color="#1f77b4", label="TIDAL"
+        s_vals,
+        p_sim_flat,
+        marker="o",
+        ms=4,
+        lw=0,
+        color="#1f77b4",
+        label=rf"TIDAL ($N = {n_cells}$ cells)",
     )
-    ax.set_xlabel(r"$B_{\rm peak}$")
-    ax.set_ylabel("P")
-    ax.set_title(f"(b) line cut at $R={r0}$", fontsize=10)
-    ax.legend(frameon=False, fontsize=9)
-    ax.grid(visible=True, ls=":", alpha=0.4)
+    ax.set_xlabel(r"$s = \kappa\,B_{\mathrm{peak}}\,R\,\sqrt{\pi/2}$")
+    ax.set_ylabel(r"$P_{g\gamma}$")
+    ax.legend(frameon=False, fontsize=9, loc="best")
+    ax.grid(visible=True, ls=":", alpha=0.3)
+    ax.set_title("(b) universal-collapse plot", fontsize=10)
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

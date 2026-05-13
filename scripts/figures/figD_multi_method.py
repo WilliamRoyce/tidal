@@ -1,8 +1,12 @@
-"""Figure D §6 — multi-method agreement heatmap.
+r"""Figure D §6 — multi-method agreement (App-C styled).
 
-Two-panel (figure*): (a) Backend-pair relative-difference heatmap per
-theory; (b) summary bar chart of pairwise rel_diff distribution
-plus the median and max across all pairs.
+Two heatmaps side-by-side (`figure*`) of the pairwise relative
+difference $|P_a - P_b|/\max(|P_a|, |P_b|)$ across backend pairs on
+two representative theories. Log-scale viridis colormap; the IEEE
+floor is included in the lower colour bound for anchoring.
+
+Annotated `min / max / median` rel_diff per theory in the in-figure
+text.
 
 Data:   benchmark_results/canonical/multi_method.json
 Output: manuscript/figures/figD_multi_method.pdf
@@ -20,7 +24,17 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "benchmark_results" / "canonical" / "multi_method.json"
 DEFAULT_OUT = REPO_ROOT / "manuscript" / "figures" / "figD_multi_method.pdf"
-FLOOR = 1e-16
+EPS_MACH = 2.220446049250313e-16
+
+# Descriptive titles (the panel key is the JSON's repository-style
+# identifier; the figure must show physics-descriptive names instead).
+THEORY_TITLE: dict[str, str] = {
+    "gertsenshtein": "Einstein–Maxwell Gertsenshtein",
+    "coupled_scalars": "Coupled-scalar two-channel mixing",
+    "gertsenshtein_proca": "Einstein–Maxwell + Proca-mass photon",
+    "torsion_gertsenshtein": "Propagating-PGT torsion–Gertsenshtein",
+    "torsion_gertsenshtein_nonminimal": "Nonminimal torsion–EM coupling",
+}
 
 
 def _matrix(pairs: list[dict], theory: str, backends: list[str]) -> np.ndarray:
@@ -42,35 +56,41 @@ def _plot(data: dict, out_path: Path) -> None:
     theories = data["metadata"]["parameters"]["theories"]
     pairs = data["pairwise"]
 
-    n_theories = len(theories)
-    fig, axes = plt.subplots(
-        1, n_theories + 1, figsize=(5.0 * n_theories + 4, 4.0), squeeze=False
+    n_th = len(theories)
+    fig, axes = plt.subplots(1, n_th, figsize=(5.2 * n_th, 4.4), squeeze=False)
+    vmax = max(
+        (p["rel_diff"] for p in pairs if p["rel_diff"] > 0),
+        default=1e-2,
     )
+
     for k, theory in enumerate(theories):
         ax = axes[0, k]
         m = _matrix(pairs, theory, backends)
-        im = ax.imshow(
-            np.where(np.isnan(m), FLOOR, np.maximum(m, FLOOR)),
-            norm="log",
-            cmap="viridis",
-            vmin=FLOOR,
-            vmax=max(1e-2, np.nanmax(m) if np.any(~np.isnan(m)) else 1e-2),
-        )
+        # Replace zeros with EPS_MACH for log-norm rendering.
+        rendered = np.where(np.isnan(m), EPS_MACH, np.maximum(m, EPS_MACH))
+        im = ax.imshow(rendered, norm="log", cmap="viridis", vmin=EPS_MACH, vmax=vmax)
         ax.set_xticks(range(len(backends)))
         ax.set_yticks(range(len(backends)))
-        ax.set_xticklabels(backends, rotation=45, ha="right", fontsize=7)
-        ax.set_yticklabels(backends, fontsize=7)
-        ax.set_title(theory, fontsize=10)
-        fig.colorbar(im, ax=ax, label="rel. diff." if k == n_theories - 1 else "")
+        ax.set_xticklabels(backends, rotation=45, ha="right", fontsize=8)
+        ax.set_yticklabels(backends, fontsize=8)
+        ax.set_title(THEORY_TITLE.get(theory, theory), fontsize=10)
 
-    # Right-most panel: distribution of pairwise rel_diff
-    ax = axes[0, -1]
-    rels = [max(p["rel_diff"], FLOOR) for p in pairs]
-    ax.hist(np.log10(rels), bins=20, color="#1f77b4", alpha=0.8)
-    ax.set_xlabel(r"$\log_{10}(\Delta P / P)$")
-    ax.set_ylabel("pair count")
-    ax.set_title("(c) pairwise distribution", fontsize=10)
-    ax.grid(visible=True, ls=":", alpha=0.4)
+        # Annotate min / max / median in figure text
+        theory_pairs = [p["rel_diff"] for p in pairs if p["theory"] == theory]
+        if theory_pairs:
+            mn, mx = min(theory_pairs), max(theory_pairs)
+            md = float(np.median(theory_pairs))
+            ax.text(
+                0.02,
+                -0.18,
+                rf"min $= {mn:.1e}$,  median $= {md:.1e}$,  max $= {mx:.1e}$",
+                transform=ax.transAxes,
+                fontsize=8,
+                va="top",
+            )
+        fig.colorbar(
+            im, ax=ax, shrink=0.85, label="rel. diff." if k == n_th - 1 else ""
+        )
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
