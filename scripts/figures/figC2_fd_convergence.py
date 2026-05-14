@@ -57,7 +57,7 @@ SCHEME_STYLE = {
 # excluded from the log-log linear fit (floor-bounce region dominated by
 # floating-point rounding: FD-6 at N>=768, spectral at N>=32).
 # All data points are still plotted.
-_FLOOR = 1e-12
+_FLOOR = 1e-13
 
 
 def _regress(
