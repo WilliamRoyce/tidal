@@ -7,7 +7,7 @@
 \usepackage{tikz}
 \usetikzlibrary{decorations.markings,arrows.meta,calc}
 \usepackage[outline]{contour} % glow around text
-\contourlength{0.5pt}
+\contourlength{0.8pt}
 \tikzset{>={Stealth[length=1.2mm,width=1.2mm]}} % default arrow tip for -> etc.
 \colorlet{OrangeFill}{LightSalmon}
 \colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
@@ -41,7 +41,7 @@
 % Top-level size parameters
 % =========================================================
 \pgfmathsetmacro{\Umax}{8.4}   % abstract width  (in units of \figL)
-\pgfmathsetmacro{\Vmax}{5.6}   % abstract height (in units of \figL)
+\pgfmathsetmacro{\Vmax}{3.6}   % abstract height (in units of \figL)
 \pgfmathtruncatemacro{\Nsamp}{20}
 
 % =========================================================
@@ -92,10 +92,10 @@
 
 % label positions
 \pgfmathsetmacro{\uxlabel}{0.18*\Umax}
-\pgfmathsetmacro{\vxlabel}{0.82*\Vmax}
+\pgfmathsetmacro{\vxlabel}{0.76*\Vmax}
 
 \pgfmathsetmacro{\uylabel}{0.78*\Umax}
-\pgfmathsetmacro{\vylabel}{0.18*\Vmax}
+\pgfmathsetmacro{\vylabel}{0.22*\Vmax}
 
 % basis-vector lengths (fractions of patch size)
 \pgfmathsetmacro{\dblack}{0.4375*\Vmax}
@@ -140,8 +140,8 @@
       ({\X{\Umax/2}{\t}},{\Y{\Umax/2}{\t}});
 
 % y = const. family
-\foreach \k in {1,...,7}{
-  \pgfmathsetmacro{\v}{\k*\Vmax/8}
+\foreach \k in {1,...,5}{
+  \pgfmathsetmacro{\v}{\k*\Vmax/6}
   \draw[GreenLine, thin, loosely dashed]
     plot[variable=\t,domain=0:\Umax,samples=\Nsamp]
       ({\X{\t}{\v}},{\Y{\t}{\v}});
