@@ -18,7 +18,7 @@
 The numerical stage of \TIDAL{} reads the
 equation specification produced by~\cref{SymbolicComputation} and
 evolves the linearised fields on a Cartesian sampling grid,
-supporting either flat or curved spacetime metrics. The grid and
+supporting both flat and curved spacetime metrics. The grid and
 field-container design draws on the \pypde{}
 framework~\cite{zwicker2020pypde}. \TIDAL{} is designed for arbitrary
 tensor Lagrangians on flat or curved backgrounds; validation against
@@ -36,23 +36,19 @@ heterogeneous because the equation systems \TIDAL{} handles span DAE,
 pure-wave, and curved-metric regimes. Differential--algebraic equations from gauge
 sectors require simultaneous algebraic-and-differential
 solution~\cite{henneaux1992quantization}; pure wave systems benefit
-from explicit symplectic integration when long-time energy
-conservation matters more than tolerance control; and curved-metric
+from explicit symplectic integration; and curved-metric
 systems require position-dependent coefficient evaluation. The
-dispatcher \lstinline!_resolve_scheme! selects the first applicable
-backend from the following ordered rules; the full decision tree,
-including the modal eligibility sub-checks, is shown
-in~\cref{SolverDispatchFlowchart}:
+dispatcher \lstinline!_resolve_scheme!~(\cref{SolverDispatchFlowchart}) selects the first applicable
+backend from the following ordered rules:
 \begin{enumerate}
-  \item \textbf{Modal} when the metric is flat ($\sqrt{|g|}$ is unity), the spatialboundaries are
+  \item \textbf{Modal} when the metric is flat ($\sqrt{|g|}$ is unity), the spatial boundaries are
     all periodic, and the coefficients are time-independent;
     algebraic constraints, when present, can be eliminated per-mode by
     Schur complement before the exponential (\cref{ModalSolver}).
   \item \textbf{IDA} (Implicit Differential-Algebraic solver,
     \SUNDIALS{}~\cite{hindmarsh2005sundials}; uses backward
-    differentiation formulas, an implicit linear-multistep stiff-ODE
-    family~\cite{hairer1996ode2}, of orders $1$--$5$) when the modal
-    eligibility fails and the system carries equations with
+    differentiation formulas (BDF), an implicit linear-multistep stiff-ODE
+    family~\cite{hairer1996ode2}) when the system carries equations with
     \lstinline!time_order!~$=0$; algebraic constraints are handled in
     the residual form described in~\cref{OtherBackends}.
   \item \textbf{IDA} when the system carries first-order
@@ -62,12 +58,11 @@ in~\cref{SolverDispatchFlowchart}:
     \lstinline!first_derivative_t! operator (dissipation, handled by
     implicit BDF rather than the symplectic path).
   \item \textbf{CVODE} (\SUNDIALS{} adaptive ODE,
-    BDF~\cite{hindmarsh2005sundials}, same family) when none of the above
+    BDF~\cite{hindmarsh2005sundials}) when none of the above
     predicates holds and the system is a pure second-order wave.
   \item \textbf{Leapfrog} is retained for symplectic long-time
-    evolution where energy conservation under arbitrary integration
-    windows is the dominant concern (\cref{OtherBackends}).
-    \textbf{\SciPy{}} provides explicit Runge--Kutta and Adams families
+    evolution (\cref{OtherBackends}).
+    \SciPy{} provides explicit Runge--Kutta and Adams families
     through \lstinline!scipy.integrate.solve_ivp!, used for non-stiff
     cross-validation runs in~\cref{Validation}. Both are opt-in via
     \lstinline!--scheme! and are never auto-selected.
@@ -115,7 +110,7 @@ determined by the time-derivative order of its equation of motion:
     against the
     current values of the other fields in the system.
 \end{enumerate}
-A familiar example of the constraint class is the Maxwell scalar
+An example of the constraint class is the Maxwell scalar
 potential $A_0$: in the Lorenz gauge it does not propagate as a wave
 but is instead determined at each instant by an instantaneous
 Helmholtz equation $(\nabla^2 - m^2)\, A_0 = \mathcal{S}[A_i]$, with
@@ -125,12 +120,12 @@ components. For a wave field, the kinematic identity is
   \partial_t \varphi = v_\varphi
   \, ,
   \qquad
-  \partial_t v_\varphi = L[\varphi, v_\varphi]
+  \partial_t v_\varphi = \mathcal{L}[\varphi, v_\varphi]
   \, ,
   \label{ELVelocityForm}
 \end{align}
 in the field and velocity slots respectively. The Euler--Lagrange
-right-hand side $L$ in general acts on both the field and its time
+right-hand side $\mathcal{L}$ in general acts linearly on \emph{both} the field and its time
 derivative.
 
 \paragraph*{Equation specification and right-hand-side evaluator}
@@ -359,14 +354,14 @@ which requires the per-eigenmode expansion explicitly.
 \paragraph*{Block-aware union-find} The evolution matrix $M(k)$
 inherits the block structure of the underlying coupled-field
 equations. A typical multi-field theory decomposes into several
-decoupled sub-blocks% --- for example, the $h_\times\!\leftrightarrow\!
+decoupled sub-blocks % --- for example, the $h_\times\!\leftrightarrow\!
 % a_y$ graviton--photon pair separates from the trace--vector torsion
 % channel at the linear level (see~\cref{ChannelStructure} for the
 % numerical demonstration on the survey theories) --- and processing
 % such a block-diagonal matrix as a single dense object would waste
 % both wall time (since the per-mode \lstinline!expm! cost scales as
 % $\mathcal{O}(b^3)$ in the block size $b$) and conditioning.
-so weprecompute the block decomposition: slots $i$ and $j$ are deemed
+so we recompute the block decomposition: slots $i$ and $j$ are deemed
 coupled when either off-diagonal entry $M_{ij}$ or $M_{ji}$ exceeds
 a heuristic cut-off of $10^{-14}\,\max|M|$ in absolute value,%
 \footnote{The kinetic matrix is not in general symmetric in field
@@ -382,10 +377,8 @@ compression~\cite{tarjan1975unionfind} collects the resulting
 coupling graph into connected components. The exponential is then
 applied block-by-block: replacing a single block of size $b$ by $n$
 independent blocks of size $b/n$ reduces the total per-mode cost from
-$\mathcal{O}(b^3)$~\cite{higham2009scaling} to $\mathcal{O}(b^3/n^2)$.
-For the representative case of
-one $12\!\times\!12$ block split into two $6\!\times\!6$ blocks this
-is a factor of $4$, and we observe both the speed-up and an
+$\mathcal{O}(b^3)$~\cite{higham2009scaling} to $\mathcal{O}(b^3/n^2)$,
+we observe both the speed-up and an
 unconditional improvement in numerical conditioning.
 % The block
 % decomposition is retained under the Pad\'e path of the previous
@@ -499,12 +492,10 @@ with each entry the sum of two contributions,
 \end{align}
 where $A(k)$ is the diagonal per-mode operator
 of~\cref{ModalPerMode}, $\hat c_{\,k-k'}$ are the discrete Fourier
-coefficients of $c(x)$, and $\mathcal{L}(k')$ is the Fourier symbol
+coefficients of $c(x)$, and $\mathcal{L}(k') \in \{1,i k', -k'^2,\cdots\}$ is the Fourier symbol
 of the spatial operator the coefficient
-multiplies~\cite{boyd2001chebyshev} --- identity ($\mathcal{L}=1$),
-Laplacian ($\mathcal{L}=-k'^2$), gradient ($\mathcal{L}=i k'$), etc.
-The matrix is dense in general, of side
-$N_{\rm modes} \cdot N_{\rm slots}$ (the total state size), and is
+multiplies~\cite{boyd2001chebyshev}.
+The matrix is dense in general, and is
 generally non-normal, in which case the
 eigendecomposition picture breaks down at the level of the operator,
 not just at the level of finite-precision arithmetic: individual
