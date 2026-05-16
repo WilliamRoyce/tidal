@@ -83,10 +83,51 @@ TIO_SCHEMES_FULL: list[tuple[str, list[str]]] = [
 ]
 TIO_SCHEMES_SMOKE = TIO_SCHEMES_FULL
 TIO_CELL_TIMEOUT = 240  # seconds; safety net per (scheme, dt) cell
-# Twelve dt values log-spaced over two decades to give a clean log-log
-# slope fit. Spatial floor pushed down by using N=2048 in the full
-# benchmark.
-TIO_DT_FULL = [0.5, 0.3, 0.2, 0.1, 0.07, 0.05, 0.03, 0.02, 0.01, 0.007, 0.005, 0.003]
+# Dense dt grid (~36 values) log-spaced over two decades for a clean
+# slope fit and a densely-populated convergence panel. Spatial floor
+# pushed down by N=2048 in the full benchmark.
+TIO_DT_FULL = [
+    0.5,
+    0.493,
+    0.411,
+    0.342,
+    0.3,
+    0.285,
+    0.238,
+    0.2,
+    0.198,
+    0.165,
+    0.137,
+    0.115,
+    0.1,
+    0.0955,
+    0.0796,
+    0.07,
+    0.0663,
+    0.0552,
+    0.05,
+    0.046,
+    0.0383,
+    0.0319,
+    0.03,
+    0.0266,
+    0.0222,
+    0.02,
+    0.0185,
+    0.0154,
+    0.0128,
+    0.01,
+    0.0107,
+    0.0089,
+    0.0074,
+    0.007,
+    0.0062,
+    0.005,
+    0.0052,
+    0.0043,
+    0.0036,
+    0.003,
+]
 TIO_DT_SMOKE = [0.2, 0.1, 0.05]
 TIO_GRID_N_FULL = 2048
 TIO_GRID_N_SMOKE = 256
@@ -501,14 +542,63 @@ def run(*, smoke: bool, work_dir: Path) -> dict:
     }
 
 
+def append_tio(*, out: Path, work_dir: Path) -> None:
+    """Append missing (scheme, dt) time_integration_order rows.
+
+    Loads the existing JSON, identifies (scheme, dt) pairs in
+    TIO_SCHEMES_FULL × TIO_DT_FULL that are not already present, runs only
+    those, and merges into the row list. Existing rows survive untouched.
+    """
+    if not out.exists():
+        msg = f"--append-tio requires existing {out}; run the full benchmark first."
+        raise FileNotFoundError(
+            msg
+        )
+    with out.open(encoding="utf-8") as fh:
+        data = json.load(fh)
+    existing = data.get("time_integration_order", [])
+    have = {(r.get("scheme"), float(r["dt"])) for r in existing}
+
+    work_dir.mkdir(parents=True, exist_ok=True)
+    new_rows: list[dict] = []
+    grid_n = TIO_GRID_N_FULL
+    for label, args in TIO_SCHEMES_FULL:
+        missing = [dt for dt in TIO_DT_FULL if (label, dt) not in have]
+        if not missing:
+            continue
+        for dt in missing:
+            sub = work_dir / f"tio_{label}_dt{str(dt).replace('.', 'p')}"
+            if sub.exists():
+                shutil.rmtree(sub)
+            new_rows.append(_tio_run_one(label, args, dt, grid_n=grid_n, out_dir=sub))
+
+    merged = list(existing) + new_rows
+    merged.sort(key=lambda r: (r.get("scheme", ""), float(r["dt"])))
+    data["time_integration_order"] = merged
+    with out.open("w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2)
+    print(f"appended {len(new_rows)} TIO rows to {out}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--work-dir", type=Path, default=None)
+    parser.add_argument(
+        "--append-tio",
+        action="store_true",
+        help=(
+            "Run only the time_integration_order sweep for (scheme, dt) "
+            "pairs missing from the existing JSON; preserves all other rows."
+        ),
+    )
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="convergence_rich_") as tmp:
         work = Path(args.work_dir) if args.work_dir else Path(tmp)
+        if args.append_tio:
+            append_tio(out=args.out, work_dir=work)
+            return
         data = run(smoke=args.smoke, work_dir=work)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w") as fh:

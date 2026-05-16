@@ -424,73 +424,27 @@
   "time_integration_order": [
     {
       "scheme": "leapfrog_Y2",
-      "dt": 0.5,
+      "dt": 0.003,
       "ok": true,
-      "P_final_sim": Infinity,
+      "P_final_sim": 0.9005698546784453,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": Infinity
+      "abs_error": 1.953095021489659e-06
     },
     {
       "scheme": "leapfrog_Y2",
-      "dt": 0.3,
-      "ok": false,
-      "error": "sim failed"
-    },
-    {
-      "scheme": "leapfrog_Y2",
-      "dt": 0.2,
-      "ok": false,
-      "error": "sim failed"
-    },
-    {
-      "scheme": "leapfrog_Y2",
-      "dt": 0.1,
-      "ok": false,
-      "error": "sim failed"
-    },
-    {
-      "scheme": "leapfrog_Y2",
-      "dt": 0.07,
-      "ok": false,
-      "error": "sim failed"
-    },
-    {
-      "scheme": "leapfrog_Y2",
-      "dt": 0.05,
-      "ok": false,
-      "error": "sim failed"
-    },
-    {
-      "scheme": "leapfrog_Y2",
-      "dt": 0.03,
+      "dt": 0.0036,
       "ok": true,
-      "P_final_sim": 0.9010408912818224,
+      "P_final_sim": 0.9005623770666464,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": 0.00046908350835561663
+      "abs_error": 9.43070682035696e-06
     },
     {
       "scheme": "leapfrog_Y2",
-      "dt": 0.02,
+      "dt": 0.0043,
       "ok": true,
-      "P_final_sim": 0.900702681474745,
+      "P_final_sim": 0.9005644665610117,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": 0.000130873701278178
-    },
-    {
-      "scheme": "leapfrog_Y2",
-      "dt": 0.01,
-      "ok": true,
-      "P_final_sim": 0.900589285268087,
-      "P_final_analytic": 0.9005718077734668,
-      "abs_error": 1.7477494620221634e-05
-    },
-    {
-      "scheme": "leapfrog_Y2",
-      "dt": 0.007,
-      "ok": true,
-      "P_final_sim": 0.9005849678508364,
-      "P_final_analytic": 0.9005718077734668,
-      "abs_error": 1.3160077369622769e-05
+      "abs_error": 7.3412124550475966e-06
     },
     {
       "scheme": "leapfrog_Y2",
@@ -502,79 +456,277 @@
     },
     {
       "scheme": "leapfrog_Y2",
-      "dt": 0.003,
+      "dt": 0.0052,
       "ok": true,
-      "P_final_sim": 0.9005698546784453,
+      "P_final_sim": 0.9006095670198593,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": 1.953095021489659e-06
+      "abs_error": 3.7759246392488066e-05
     },
     {
-      "scheme": "leapfrog_Y4",
-      "dt": 0.5,
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0062,
+      "ok": true,
+      "P_final_sim": 0.9006108831731225,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 3.907539965575246e-05
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.007,
+      "ok": true,
+      "P_final_sim": 0.9005849678508364,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 1.3160077369622769e-05
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0074,
+      "ok": true,
+      "P_final_sim": 0.9005991067521408,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 2.729897867403963e-05
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0089,
+      "ok": true,
+      "P_final_sim": 0.9005844196253271,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 1.2611851860300227e-05
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.01,
+      "ok": true,
+      "P_final_sim": 0.900589285268087,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 1.7477494620221634e-05
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0107,
+      "ok": true,
+      "P_final_sim": 0.900611208856427,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 3.940108296018874e-05
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0128,
+      "ok": true,
+      "P_final_sim": 0.9007568537925296,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.0001850460190627734
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0154,
+      "ok": true,
+      "P_final_sim": 0.9006979137196528,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.0001261059461860059
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0185,
+      "ok": true,
+      "P_final_sim": 0.9007630112544697,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.00019120348100287732
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.02,
+      "ok": true,
+      "P_final_sim": 0.900702681474745,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.000130873701278178
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0222,
+      "ok": true,
+      "P_final_sim": 0.9009854763281019,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.0004136685546350938
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0266,
+      "ok": true,
+      "P_final_sim": 0.9009383526155875,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.0003665448421207307
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.03,
+      "ok": true,
+      "P_final_sim": 0.9010408912818224,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.00046908350835561663
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0319,
+      "ok": true,
+      "P_final_sim": Infinity,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": Infinity
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0383,
       "ok": false,
       "error": "sim failed"
     },
     {
-      "scheme": "leapfrog_Y4",
-      "dt": 0.3,
+      "scheme": "leapfrog_Y2",
+      "dt": 0.046,
       "ok": false,
       "error": "sim failed"
     },
     {
-      "scheme": "leapfrog_Y4",
-      "dt": 0.2,
-      "ok": false,
-      "error": "sim failed"
-    },
-    {
-      "scheme": "leapfrog_Y4",
-      "dt": 0.1,
-      "ok": false,
-      "error": "sim failed"
-    },
-    {
-      "scheme": "leapfrog_Y4",
-      "dt": 0.07,
-      "ok": false,
-      "error": "sim failed"
-    },
-    {
-      "scheme": "leapfrog_Y4",
+      "scheme": "leapfrog_Y2",
       "dt": 0.05,
       "ok": false,
       "error": "sim failed"
     },
     {
-      "scheme": "leapfrog_Y4",
-      "dt": 0.03,
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0552,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0663,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.07,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0796,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.0955,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.1,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.115,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.137,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.165,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.198,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.2,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.238,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.285,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.3,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.342,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.411,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.493,
       "ok": true,
-      "P_final_sim": 0.9007203893355196,
+      "P_final_sim": Infinity,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": 0.00014858156205277417
+      "abs_error": Infinity
+    },
+    {
+      "scheme": "leapfrog_Y2",
+      "dt": 0.5,
+      "ok": true,
+      "P_final_sim": Infinity,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": Infinity
     },
     {
       "scheme": "leapfrog_Y4",
-      "dt": 0.02,
+      "dt": 0.003,
       "ok": true,
-      "P_final_sim": 0.9007207021117106,
+      "P_final_sim": 0.9005627502546844,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": 0.00014889433824383236
+      "abs_error": 9.057518782440432e-06
     },
     {
       "scheme": "leapfrog_Y4",
-      "dt": 0.01,
+      "dt": 0.0036,
       "ok": true,
-      "P_final_sim": 0.9006330081459433,
+      "P_final_sim": 0.9005627502128232,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": 6.120037247647758e-05
+      "abs_error": 9.05756064362162e-06
     },
     {
       "scheme": "leapfrog_Y4",
-      "dt": 0.007,
+      "dt": 0.0043,
       "ok": true,
-      "P_final_sim": 0.9006066684868148,
+      "P_final_sim": 0.9005697783859092,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": 3.4860713348017214e-05
+      "abs_error": 2.029387557556106e-06
     },
     {
       "scheme": "leapfrog_Y4",
@@ -586,11 +738,251 @@
     },
     {
       "scheme": "leapfrog_Y4",
-      "dt": 0.003,
+      "dt": 0.0052,
       "ok": true,
-      "P_final_sim": 0.9005627502546844,
+      "P_final_sim": 0.9005803197544702,
       "P_final_analytic": 0.9005718077734668,
-      "abs_error": 9.057518782440432e-06
+      "abs_error": 8.511981003378466e-06
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0062,
+      "ok": true,
+      "P_final_sim": 0.9005978864436357,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 2.6078670168905305e-05
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.007,
+      "ok": true,
+      "P_final_sim": 0.9006066684868148,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 3.4860713348017214e-05
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0074,
+      "ok": true,
+      "P_final_sim": 0.9005645059558752,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 7.3018175915651184e-06
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0089,
+      "ok": true,
+      "P_final_sim": 0.9006198390583295,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 4.8031284862748436e-05
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.01,
+      "ok": true,
+      "P_final_sim": 0.9006330081459433,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 6.120037247647758e-05
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0107,
+      "ok": true,
+      "P_final_sim": 0.9006259823740246,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 5.417460055778811e-05
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0128,
+      "ok": true,
+      "P_final_sim": 0.9006575815241654,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 8.577375069862558e-05
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0154,
+      "ok": true,
+      "P_final_sim": 0.9006435214761066,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 7.171370263980847e-05
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0185,
+      "ok": true,
+      "P_final_sim": 0.9006944001467345,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.00012259237326772698
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.02,
+      "ok": true,
+      "P_final_sim": 0.9007207021117106,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.00014889433824383236
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0222,
+      "ok": true,
+      "P_final_sim": 0.9006943396343573,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.00012253186089050683
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0266,
+      "ok": true,
+      "P_final_sim": 0.9007784260537902,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.0002066182803234229
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.03,
+      "ok": true,
+      "P_final_sim": 0.9007203893355196,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.00014858156205277417
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0319,
+      "ok": true,
+      "P_final_sim": 0.9007299308727562,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.00015812309928942003
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0383,
+      "ok": true,
+      "P_final_sim": 0.9007276391162903,
+      "P_final_analytic": 0.9005718077734668,
+      "abs_error": 0.00015583134282348698
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.046,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.05,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0552,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0663,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.07,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0796,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.0955,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.1,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.115,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.137,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.165,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.198,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.2,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.238,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.285,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.3,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.342,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.411,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.493,
+      "ok": false,
+      "error": "sim failed"
+    },
+    {
+      "scheme": "leapfrog_Y4",
+      "dt": 0.5,
+      "ok": false,
+      "error": "sim failed"
     }
   ]
 }

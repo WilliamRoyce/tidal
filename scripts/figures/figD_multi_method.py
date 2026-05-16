@@ -63,12 +63,19 @@ def _plot(data: dict, out_path: Path) -> None:
         default=1e-2,
     )
 
+    cmap = plt.get_cmap("viridis").copy()
+    cmap.set_bad(color="white")
+
     for k, theory in enumerate(theories):
         ax = axes[0, k]
         m = _matrix(pairs, theory, backends)
         # Replace zeros with EPS_MACH for log-norm rendering.
         rendered = np.where(np.isnan(m), EPS_MACH, np.maximum(m, EPS_MACH))
-        im = ax.imshow(rendered, norm="log", cmap="viridis", vmin=EPS_MACH, vmax=vmax)
+        # Mask upper triangle (including diagonal) to avoid double-showing
+        # the symmetric pair (a, b) ≡ (b, a) and the trivial self-comparisons.
+        mask_upper = np.triu(np.ones_like(rendered, dtype=bool))
+        rendered = np.ma.masked_array(rendered, mask=mask_upper)
+        im = ax.imshow(rendered, norm="log", cmap=cmap, vmin=EPS_MACH, vmax=vmax)
         ax.set_xticks(range(len(backends)))
         ax.set_yticks(range(len(backends)))
         ax.set_xticklabels(backends, rotation=45, ha="right", fontsize=8)

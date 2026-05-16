@@ -34,6 +34,7 @@ import operator
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -170,8 +171,11 @@ def _plot(data: dict, out_path: Path) -> None:
         )
     ax.set_xlabel(r"grid resolution $N$")
     ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - \sin^2(\kappa B_0 t/2)|$")
-    ax.legend(frameon=False, fontsize=8, loc="lower right")
+    ax.legend(frameon=False, fontsize=8, loc="upper right")
     ax.grid(visible=True, which="both", ls=":", alpha=0.3)
+    ax.set_xticks([64, 128, 256, 512])
+    ax.xaxis.set_major_formatter(matplotlib.ticker.ScalarFormatter())
+    ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
     b0_converge = params.get("b0_converge_point", "—")
     ax.set_title(rf"(b) $N$-convergence at $B_0 = {b0_converge:g}$", fontsize=10)
 

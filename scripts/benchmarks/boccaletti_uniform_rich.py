@@ -69,7 +69,36 @@ IC_COMPONENT = "h_5"
 FULL_B0_LO, FULL_B0_HI, FULL_B0_N = 0.005, 0.25, 24
 FULL_T_END_VALUES = [50.0]
 FULL_GRID_N = 512
-FULL_N_CONVERGE = [64, 128, 256, 512]
+# Dense N grid within [64, 512]. Each (N, scheme) run is sub-second;
+# the dense grid lets the figure show the FD-4 plateau as a clean band
+# rather than four disconnected dots.
+FULL_N_CONVERGE = [
+    64,
+    72,
+    80,
+    88,
+    96,
+    104,
+    112,
+    120,
+    128,
+    144,
+    160,
+    176,
+    192,
+    208,
+    224,
+    240,
+    256,
+    288,
+    320,
+    352,
+    384,
+    416,
+    448,
+    480,
+    512,
+]
 
 # Smoke mode.
 SMOKE_B0_LO, SMOKE_B0_HI, SMOKE_B0_N = 0.005, 0.25, 8
@@ -431,15 +460,94 @@ def run(*, smoke: bool, parallel: int, work_dir: Path) -> dict:
     }
 
 
+def append_convergence(*, out: Path, parallel: int, work_dir: Path) -> None:
+    """Append missing (N, scheme) convergence rows to an existing JSON.
+
+    Reads the existing convergence rows, identifies which (N, scheme) pairs
+    are missing relative to FULL_N_CONVERGE x CONVERGENCE_SCHEMES, runs only
+    those, and merges into the file. Pre-existing rows survive untouched.
+    """
+    if not out.exists():
+        msg = (
+            f"--append-convergence requires existing {out}; run the full "
+            "benchmark first."
+        )
+        raise FileNotFoundError(
+            msg
+        )
+    with out.open(encoding="utf-8") as fh:
+        data = json.load(fh)
+    existing = data.get("convergence", [])
+    have = {(int(r["N"]), r.get("scheme", "modal")) for r in existing}
+
+    b0_converge = data["metadata"]["parameters"].get("b0_converge_point")
+    t_converge = data["metadata"]["parameters"].get("t_converge_point")
+    if b0_converge is None or t_converge is None:
+        msg = "existing JSON metadata lacks b0_converge_point/t_converge_point"
+        raise RuntimeError(
+            msg
+        )
+
+    work_dir.mkdir(parents=True, exist_ok=True)
+    new_rows: list[dict] = []
+    for scheme_label, scheme_args in CONVERGENCE_SCHEMES:
+        missing = [n for n in FULL_N_CONVERGE if (n, scheme_label) not in have]
+        if not missing:
+            continue
+        scheme_dir = work_dir / f"converge_append_{scheme_label}"
+        if scheme_dir.exists():
+            shutil.rmtree(scheme_dir)
+        try:
+            raw = _converge(
+                n_values=missing,
+                b0=b0_converge,
+                t_end=t_converge,
+                parallel=max(1, parallel // 2),
+                out_dir=scheme_dir,
+                extra_args=scheme_args,
+            )
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"[append] scheme {scheme_label} failed (rc={exc.returncode}); "
+                "skipping rows.",
+                flush=True,
+            )
+            continue
+        new_rows.extend(
+            _converge_rows(raw, b0=b0_converge, t_end=t_converge, scheme=scheme_label)
+        )
+
+    merged = list(existing) + new_rows
+    merged.sort(key=lambda r: (r.get("scheme", "modal"), int(r["N"])))
+    data["convergence"] = merged
+    data.setdefault("metadata", {}).setdefault("parameters", {})[
+        "n_converge_values"
+    ] = sorted({int(r["N"]) for r in merged})
+    with out.open("w", encoding="utf-8") as fh:
+        json.dump(data, fh, indent=2)
+    print(f"appended {len(new_rows)} convergence rows to {out}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--parallel", type=int, default=4)
     parser.add_argument("--work-dir", type=Path, default=None)
+    parser.add_argument(
+        "--append-convergence",
+        action="store_true",
+        help=(
+            "Run only the convergence sweep for (N, scheme) pairs missing "
+            "from the existing JSON; preserves all other rows."
+        ),
+    )
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="boccaletti_uniform_rich_") as tmp:
         work = Path(args.work_dir) if args.work_dir else Path(tmp)
+        if args.append_convergence:
+            append_convergence(out=args.out, parallel=args.parallel, work_dir=work)
+            return
         data = run(smoke=args.smoke, parallel=args.parallel, work_dir=work)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w") as fh:
