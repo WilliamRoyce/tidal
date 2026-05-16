@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -916,7 +917,7 @@ class ResumeState:  # noqa: B903
         self.snapshot_index = snapshot_index
 
 
-def _load_resume_state(  # noqa: PLR0914
+def _load_resume_state(
     resume_dir: Path,
     spec: EquationSystem,
     snapshot_index: int | None = None,
@@ -1840,13 +1841,13 @@ def _resolve_scheme(  # noqa: C901
     eligibility_spec = spec.base_spec() if spec.has_corrections() else spec
 
     if scheme != "auto":
-        if scheme == "modal" and grid is not None:
+        if scheme in {"modal", "modal-jax"} and grid is not None:
             # Validate modal eligibility when explicitly requested
             from tidal.solver.modal import can_use_modal
 
             if not can_use_modal(eligibility_spec, grid, bc):
                 msg = (
-                    "--scheme modal requested but system is not eligible. "
+                    f"--scheme {scheme} requested but system is not eligible. "
                     "Modal solver requires: flat metric, all-periodic BCs, "
                     "time-independent coefficients, and supported spatial "
                     "operators.  Use 'auto' or another solver."
@@ -1899,7 +1900,7 @@ def _resolve_scheme(  # noqa: C901
     return "cvode"
 
 
-def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
     args: Namespace,
     spec: EquationSystem,
     params: dict[str, float],
@@ -2060,6 +2061,9 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     # Resolve solver scheme (auto-select based on equation operators)
     scheme = _resolve_scheme(args.scheme, spec, grid_info, bc)
+    # TIDAL_MODAL_BACKEND=jax overrides modal → modal-jax without touching auto-select.
+    if scheme == "modal" and os.environ.get("TIDAL_MODAL_BACKEND", "") == "jax":
+        scheme = "modal-jax"
     if args.scheme == "auto":
         log(f"  Auto-selected solver: {scheme}")
     _cdebug(f"solver={scheme}, fd_order={fd_order}, spectral={use_spectral}")
@@ -2255,7 +2259,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     # Detect perturbative mode early and resolve the effective spec here,
     # before any writer/accumulator is constructed. (#298)
     writer_spec = spec
-    if scheme == "modal":
+    if scheme in {"modal", "modal-jax"}:
         early_pert_meta: dict[str, Any] = spec.metadata.get("perturbation") or {}
         early_pert_order_arg = getattr(args, "perturbative_order", None)
         if early_pert_order_arg is not None:
@@ -2504,6 +2508,26 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 snapshot_callback=snapshot_cb,
                 progress=progress,
             )
+    elif scheme == "modal-jax":
+        from tidal.solver.modal_jax import solve_modal_jax
+
+        log(
+            f"Running JAX modal solver (t={t_start} → {args.t_end}, "
+            f"{num_snapshots} snapshots)...",
+        )
+        result = solve_modal_jax(
+            spec,
+            grid_info,
+            y0,
+            t_span=(t_start, args.t_end),
+            bc=bc,
+            parameters=params,
+            rtol=args.rtol,
+            atol=args.atol,
+            num_snapshots=num_snapshots,
+            snapshot_callback=snapshot_cb,
+            progress=progress,
+        )
     else:  # leapfrog
         from tidal.solver.leapfrog import solve_leapfrog
 
@@ -2656,12 +2680,15 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
     """
     if getattr(args, "list_schemes", False):
         print("Available solver schemes:")
-        print("  auto      Auto-select based on equation structure (default)")
-        print("  modal     Fourier modal solver (periodic, time-independent)")
-        print("  cvode     SUNDIALS CVODE (adaptive ODE, tolerance-controlled)")
-        print("  ida       SUNDIALS IDA (DAE, algebraic constraints)")
-        print("  leapfrog  Symplectic leapfrog (exact energy conservation)")
-        print("  scipy     SciPy solve_ivp (DOP853, Radau, BDF)")
+        print("  auto       Auto-select based on equation structure (default)")
+        print("  modal      Fourier modal solver (periodic, time-independent)")
+        print(
+            "  modal-jax  JAX-accelerated modal solver (requires: uv sync --extra jax)"
+        )
+        print("  cvode      SUNDIALS CVODE (adaptive ODE, tolerance-controlled)")
+        print("  ida        SUNDIALS IDA (DAE, algebraic constraints)")
+        print("  leapfrog   Symplectic leapfrog (exact energy conservation)")
+        print("  scipy      SciPy solve_ivp (DOP853, Radau, BDF)")
         return 0
 
     if args.json_path is None:

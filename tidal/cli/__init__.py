@@ -330,7 +330,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "modal-jax", "auto"],
         default="auto",
         help=(
             "Solver scheme (default: auto). "
@@ -1251,7 +1251,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sweep_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "modal-jax", "auto"],
         default="auto",
         help="Solver scheme (default: auto)",
     )
@@ -2010,7 +2010,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sample_parser.add_argument("--dt", type=float, default=None)
     sample_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "modal-jax", "auto"],
         default="auto",
     )
     sample_parser.add_argument("--rtol", type=float, default=DEFAULT_RTOL)

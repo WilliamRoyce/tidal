@@ -2457,6 +2457,7 @@ def solve_modal(
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
     progress: SimulationProgress | None = None,
     return_eigendata: bool = False,
+    _zero_nyquist: bool = True,
 ) -> SolverResult:
     """Solve a TIDAL equation system using Fourier modal decomposition.
 
@@ -2574,15 +2575,17 @@ def solve_modal(
     # This is standard practice in spectral methods — the Nyquist mode
     # aliases with its conjugate and cannot represent physical content.
     # Ref: Boyd (2001), Chebyshev & Fourier Spectral Methods, §11.5.
-    for _dim_idx, n in enumerate(grid.shape):
-        if n % 2 == 0:  # Nyquist mode exists only for even N
-            nyq_mode = n // 2  # last rfft bin
-            if len(grid.shape) == 1:
-                y0_hat[:, nyq_mode] = 0.0
-            else:
-                # Multi-D: zero along the last-axis Nyquist slice
-                rfft_last = grid.shape[-1] // 2
-                y0_hat[:, ..., rfft_last] = 0.0
+    # _zero_nyquist=False reproduces the pre-fix behaviour for benchmarking.
+    if _zero_nyquist:
+        for _dim_idx, n in enumerate(grid.shape):
+            if n % 2 == 0:  # Nyquist mode exists only for even N
+                nyq_mode = n // 2  # last rfft bin
+                if len(grid.shape) == 1:
+                    y0_hat[:, nyq_mode] = 0.0
+                else:
+                    # Multi-D: zero along the last-axis Nyquist slice
+                    rfft_last = grid.shape[-1] // 2
+                    y0_hat[:, ..., rfft_last] = 0.0
 
     has_pos_dep = _has_position_dependent_terms(spec)
     has_time_ops = _has_time_derivative_operators(spec)

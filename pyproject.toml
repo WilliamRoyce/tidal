@@ -49,6 +49,7 @@ dependencies = [
 wolfram = ["wolframclient>=1.4.0,<2.0"]
 sensitivity = ["SALib>=1.4"]
 inference = ["anesthetic>=2.0"]
+jax = ["jax>=0.4.20", "jaxlib>=0.4.20"]
 # pypolychord: install manually (requires gfortran):
 #   git clone https://github.com/PolyChord/PolyChordLite /tmp/PolyChordLite
 #   cd /tmp/PolyChordLite && pip install --no-build-isolation --config-settings="--global-option=--no-mpi" .

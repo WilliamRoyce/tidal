@@ -7,8 +7,6 @@ Tests cover:
 4. Cross-validation — modal vs CVODE agreement
 """
 
-
-
 from __future__ import annotations
 
 import copy
@@ -1421,5 +1419,295 @@ class TestEigendataExport:
                 t_span=(0.0, 0.1),
                 parameters={"m2": 1.0},
                 num_snapshots=2,
+                return_eigendata=True,
+            )
+
+
+# =========================================================================
+# JAX backend tests (phase 1: constant-coefficient path)
+# =========================================================================
+
+
+def _jax_solver() -> object:
+    """Import solve_modal_jax, skip test if JAX not installed."""
+    jax = pytest.importorskip("jax")
+    jax.config.update("jax_enable_x64", True)  # noqa: FBT003
+    from tidal.solver.modal_jax import solve_modal_jax
+
+    return solve_modal_jax
+
+
+class TestModalJAXCorrectness:
+    """Validate the JAX modal backend against the scipy backend.
+
+    All tests skip automatically when ``jax`` / ``jaxlib`` are not installed.
+    Phase-1 scope: constant-coefficient, no constraints, no position-dependent
+    coefficients.  Phase-2 paths (position-dep, constraints, return_eigendata)
+    are marked skip here.
+    """
+
+    _TOL = 1e-10  # max relative error between JAX and scipy backends
+
+    def _assert_backends_agree(
+        self,
+        result_scipy: dict[str, object],
+        result_jax: dict[str, object],
+    ) -> None:
+        """Assert that JAX and scipy outputs agree to self._TOL."""
+        y_s = result_scipy["y"]
+        y_j = result_jax["y"]
+        assert y_s.shape == y_j.shape, f"Shape mismatch: {y_s.shape} vs {y_j.shape}"  # type: ignore[union-attr]
+        max_ref = float(np.max(np.abs(y_s)))  # type: ignore[union-attr]
+        if max_ref < 1e-15:
+            # Zero solution: check absolute error
+            max_abs_err = float(np.max(np.abs(y_j - y_s)))  # type: ignore[operator]
+            assert max_abs_err < 1e-13, f"Zero-IC: abs err {max_abs_err:.2e}"
+        else:
+            max_rel_err = float(np.max(np.abs(y_j - y_s))) / max_ref  # type: ignore[operator]
+            assert max_rel_err < self._TOL, (
+                f"JAX vs scipy max relative error {max_rel_err:.2e} > {self._TOL}"
+            )
+
+    def test_scalar_wave_jax_agrees_with_scipy(self) -> None:
+        """KG scalar wave: JAX backend matches scipy to < 1e-10 relative error."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_KG_1D_SPEC)
+        N = 64
+        L = 10.0
+        grid = GridInfo(shape=(N,), bounds=((0.0, L),), periodic=(True,))
+        y0 = _make_gaussian_ic(spec, grid)
+        params = {"m2": 1.0}
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 5.0), parameters=params, num_snapshots=51
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 5.0), parameters=params, num_snapshots=51
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_coupled_wave_jax_agrees_with_scipy(self) -> None:
+        """Coupled scalars: JAX backend matches scipy to < 1e-10 relative error."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_COUPLED_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        y0 = _make_gaussian_ic(spec, grid)
+        params = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 3.0), parameters=params, num_snapshots=31
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 3.0), parameters=params, num_snapshots=31
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_diffusion_jax_agrees_with_scipy(self) -> None:
+        """Diffusion: JAX backend matches scipy to < 1e-10 relative error."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_DIFFUSION_SPEC)
+        N = 64
+        L = 10.0
+        grid = GridInfo(shape=(N,), bounds=((0.0, L),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = np.linspace(0, L, N, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:N] = np.cos(2 * np.pi * 2 / L * x)
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 5.0), parameters={"D": 0.1}, num_snapshots=11
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 5.0), parameters={"D": 0.1}, num_snapshots=11
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_machine_precision_jax(self) -> None:
+        """JAX backend achieves < 1e-10 relative error vs scipy (machine precision)."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_KG_1D_SPEC)
+        N = 32
+        L = 2 * np.pi
+        grid = GridInfo(shape=(N,), bounds=((0.0, L),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = np.linspace(0, L, N, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:N] = np.sin(x)
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 1.0), parameters={"m2": 1.0}, num_snapshots=2
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 1.0), parameters={"m2": 1.0}, num_snapshots=2
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_2d_wave_jax_agrees_with_scipy(self) -> None:
+        """2D wave: JAX backend matches scipy to < 1e-10 relative error."""
+        solve_modal_jax = _jax_solver()
+
+        spec_2d: dict[str, object] = {
+            "metadata": {"source": "inline-test", "parameters": {"m2": 1.0}},
+            "spacetime": {
+                "dimension": 3,
+                "signature": [-1, 1, 1],
+                "coordinates": ["t", "x", "y"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
+        }
+        spec = _make_spec(spec_2d)
+        Nx, Ny, Lx, Ly = 16, 16, 4.0, 4.0
+        grid = GridInfo(
+            shape=(Nx, Ny), bounds=((0.0, Lx), (0.0, Ly)), periodic=(True, True)
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        # 2D Gaussian IC — must use meshgrid, not 1D linspace
+        x = np.linspace(0.0, Lx, Nx, endpoint=False)
+        y = np.linspace(0.0, Ly, Ny, endpoint=False)
+        X, Y = np.meshgrid(x, y, indexing="ij")
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[: grid.num_points] = (
+            0.1 * np.exp(-((X - Lx / 2) ** 2 + (Y - Ly / 2) ** 2) / (2 * 1.5**2))
+        ).ravel()
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 2.0), parameters={"m2": 1.0}, num_snapshots=11
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 2.0), parameters={"m2": 1.0}, num_snapshots=11
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_zero_ic_stays_zero_jax(self) -> None:
+        """Zero IC: JAX backend produces zero output."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_KG_1D_SPEC)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 5.0), parameters={"m2": 1.0}, num_snapshots=11
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        assert np.max(np.abs(result_jax["y"])) < 1e-14
+
+    def test_block_isolation_jax(self) -> None:
+        """Zero-IC block stays at machine zero with JAX backend."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_DEGENERATE_PAIRS_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        x = np.linspace(0.0, 10.0, 64, endpoint=False)
+        y0[: grid.num_points] = 0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
+
+        result_jax = solve_modal_jax(  # type: ignore[operator]
+            spec,
+            grid,
+            y0,
+            (0.0, 10.0),
+            parameters={"B0": 0.3, "kappa2": 1.0},
+            num_snapshots=5,
+        )
+
+        assert result_jax["success"]
+        # Pair 2 fields (phi_1, chi_1) should stay at machine zero
+        phi_1_slot = layout.field_slot_map["phi_1"]
+        chi_1_slot = layout.field_slot_map["chi_1"]
+        final = result_jax["y"][-1]
+        n = grid.num_points
+        for slot in [phi_1_slot, chi_1_slot]:
+            max_val = np.max(np.abs(final[slot * n : (slot + 1) * n]))
+            assert max_val < 1e-12, f"Zero-IC slot {slot} grew to {max_val:.2e}"
+
+    @pytest.mark.skip(
+        reason="phase 1: modal-jax position-dependent path not implemented"
+    )
+    def test_position_dependent_jax(self) -> None:
+        pass
+
+    @pytest.mark.skip(reason="phase 1: modal-jax constraint/Schur path not implemented")
+    def test_constraint_jax(self) -> None:
+        pass
+
+    @pytest.mark.skip(reason="phase 1: modal-jax return_eigendata not implemented")
+    def test_eigendata_jax(self) -> None:
+        pass
+
+    def test_jax_raises_for_position_dependent(self) -> None:
+        """JAX backend raises NotImplementedError for position-dependent systems."""
+        _jax_solver()
+        from tidal.solver.modal_jax import solve_modal_jax
+
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        eqs = cast("list[dict[str, Any]]", spec_data["equations"])
+        eqs[0]["rhs"]["terms"][0]["coordinate_dependent"] = ["x"]
+        spec = _make_spec(spec_data)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+
+        with pytest.raises(NotImplementedError, match="phase 1"):
+            solve_modal_jax(spec, grid, y0, (0.0, 1.0), parameters={"m2": 1.0})
+
+    def test_jax_raises_for_return_eigendata(self) -> None:
+        """JAX backend raises NotImplementedError for return_eigendata=True."""
+        _jax_solver()
+        from tidal.solver.modal_jax import solve_modal_jax
+
+        spec = _make_spec(_KG_1D_SPEC)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        y0 = _make_gaussian_ic(spec, grid)
+
+        with pytest.raises(NotImplementedError, match="phase 1"):
+            solve_modal_jax(
+                spec,
+                grid,
+                y0,
+                (0.0, 1.0),
+                parameters={"m2": 1.0},
                 return_eigendata=True,
             )
