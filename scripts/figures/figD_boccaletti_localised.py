@@ -1,19 +1,16 @@
 r"""Figure D §2 — path-integrated Boccaletti reproduction (App-C styled).
 
-Two-panel `figure*` showing the validation of the path-integrated
-Boccaletti kernel on a Gaussian-localised B-field profile:
+Single-panel universal-collapse plot: every simulation cell of the
+$(B_\mathrm{peak}, R)$ sweep is plotted against the dimensionless
+variable $s \equiv \kappa\,B_\mathrm{peak}\,R\,\sqrt{\pi/2}$,
+overlaid with the analytic prediction $\sin^2(s)$.
 
-  (a) Residual heatmap $P_\mathrm{sim} - P_\mathrm{analytic}$ across
-      the $(B_\mathrm{peak}, R)$ parameter grid, diverging colormap
-      centred at zero.
-  (b) Universal-collapse plot: all 40 simulation points plotted against
-      the dimensionless variable $s \equiv \kappa\,B_\mathrm{peak}\,R\,
-      \sqrt{\pi/2}$, overlaid with the analytic prediction $\sin^2(s)$.
-
-The collapse plot is the strongest visual demonstration that the
-path-integrated kernel is correct: all simulation points should fall
-on the universal curve regardless of their individual
-$(B_\mathrm{peak}, R)$ values.
+This is the strongest visual demonstration that the path-integrated
+kernel is correct: every simulation point should fall on the
+universal curve regardless of its individual $(B_\mathrm{peak}, R)$
+values. Points at $s > \pi/2$ (past the first quarter-period) lie
+below $\sin^2(s)$ as the bare-formula coherent approximation breaks
+down.
 
 Data:   benchmark_results/canonical/boccaletti_localised.json
 Output: manuscript/figures/figD_boccaletti_localised.pdf
@@ -39,48 +36,13 @@ KAPPA = 1.0
 
 def _plot(data: dict, out_path: Path) -> None:
     rows = [r for r in data["results"] if r.get("ok")]
-    bps = sorted({r["Bpeak"] for r in rows})
-    rs = sorted({r["R"] for r in rows})
-    nbp, nr = len(bps), len(rs)
-    p_sim = np.full((nr, nbp), np.nan)
-    p_ana = np.full_like(p_sim, np.nan)
-    for r in rows:
-        i = rs.index(r["R"])
-        j = bps.index(r["Bpeak"])
-        p_sim[i, j] = r["P_sim"]
-        p_ana[i, j] = r["P_analytic"]
-    residual = p_sim - p_ana
-
     s_vals = np.array(
         [KAPPA * r["Bpeak"] * r["R"] * math.sqrt(math.pi / 2.0) for r in rows]
     )
     p_sim_flat = np.array([r["P_sim"] for r in rows])
+    n_cells = len(rows)
 
-    fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.8))
-
-    # Panel (a): residual heatmap
-    ax = axes[0]
-    vmax = max(abs(np.nanmin(residual)), abs(np.nanmax(residual)), 1e-6)
-    im = ax.imshow(
-        residual,
-        origin="lower",
-        aspect="auto",
-        extent=(bps[0], bps[-1], rs[0], rs[-1]),
-        cmap="RdBu_r",
-        vmin=-vmax,
-        vmax=+vmax,
-    )
-    ax.set_xlabel(r"$B_{\mathrm{peak}}$")
-    ax.set_ylabel(r"$R$")
-    ax.set_title(
-        rf"(a) residual $P_{{\mathrm{{sim}}}} - P_{{\mathrm{{ana}}}}$ "
-        rf"(max $|\Delta| = {vmax:.1e}$)",
-        fontsize=10,
-    )
-    fig.colorbar(im, ax=ax, shrink=0.85)
-
-    # Panel (b): universal collapse
-    ax = axes[1]
+    fig, ax = plt.subplots(figsize=(5.2, 4.0))
     s_dense = np.linspace(0.0, max(s_vals.max() * 1.05, 0.1), 400)
     ax.plot(
         s_dense,
@@ -90,7 +52,6 @@ def _plot(data: dict, out_path: Path) -> None:
         color="#666",
         label=r"$\sin^2(s)$",
     )
-    n_cells = nbp * nr
     ax.plot(
         s_vals,
         p_sim_flat,
@@ -104,7 +65,6 @@ def _plot(data: dict, out_path: Path) -> None:
     ax.set_ylabel(r"$P_{g\gamma}$")
     ax.legend(frameon=False, fontsize=9, loc="best")
     ax.grid(visible=True, ls=":", alpha=0.3)
-    ax.set_title("(b) universal-collapse plot", fontsize=10)
 
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)

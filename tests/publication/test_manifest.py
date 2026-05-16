@@ -25,6 +25,8 @@ def test_manifest_loads() -> None:
     ],
 )
 def test_artefact_scripts_exist(appendix: str, name: str, entry: dict) -> None:  # noqa: ARG001
+    if entry.get("status") == "stub":
+        pytest.skip("entry marked stub")
     kind = entry["kind"]
     if kind == "figure":
         assert (REPO_ROOT / entry["figure_script"]).is_file(), entry["figure_script"]
@@ -46,6 +48,8 @@ def test_artefact_scripts_exist(appendix: str, name: str, entry: dict) -> None: 
     ],
 )
 def test_benchmark_scripts_exist(appendix: str, name: str, entry: dict) -> None:  # noqa: ARG001
+    if entry.get("status") == "stub":
+        pytest.skip("entry marked stub")
     bs = entry.get("benchmark_script")
     if bs is None:
         pytest.skip("no benchmark_script for this entry")

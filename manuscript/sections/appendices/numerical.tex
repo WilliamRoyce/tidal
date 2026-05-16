@@ -461,6 +461,22 @@ entry point shared by both the modal solver and the constraint
 initial-condition machinery of~\cref{ConstraintIC} ensures that the
 same Schur operator is used in both contexts.
 
+\paragraph*{SVD null-space projection on rank-deficient kinetic matrices}%
+\label{SVDNullSpace}
+For theories whose linearised kinetic matrix $K$ is rank-deficient
+(redundant constrained-dyad directions in the vector-torsion
+representation of \cref{Validation}, or any gauge-fixed sector that
+admits algebraic gauge orbits beyond the constraints solved by the
+Schur complement), the generalised-eigenvalue path can return
+spurious finite eigenvalues for the redundant directions before the
+QZ algorithm has a chance to identify the infinite eigenvalues.
+\TIDAL{} projects out the null space of $K$ by an SVD truncation at
+machine precision before forming the generalised eigenproblem; the
+resulting operator is rank-correct and the spurious eigenvalues are
+removed. This is the bit-exact diagnostic that the cross-formulation
+comparison in \cref{Validation} validates against the Proca-vector
+representation.
+
 \paragraph*{Position-dependent coefficients via Krylov action}
 Position-dependent coefficients couple the per-mode systems together.
 Let $y(x)$ denote any state slot in position space and $c(x)$ a

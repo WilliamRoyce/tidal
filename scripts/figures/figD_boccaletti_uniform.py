@@ -86,10 +86,16 @@ def _plot(data: dict, out_path: Path) -> None:
     p_bare = np.sin(0.5 * kappa * b0_dense * t0) ** 2
     p_rs = _raffelt_stodolsky(b0_dense, kappa, t0, kwave)
 
-    # Convergence rows
-    conv = sorted(data.get("convergence", []), key=operator.itemgetter("N"))
-    n_arr = np.array([r["N"] for r in conv]) if conv else np.array([])
-    err = np.array([r["abs_error_final"] for r in conv]) if conv else np.array([])
+    # Convergence rows, grouped by scheme. Older smoke runs may have
+    # a single (modal) trace with no `scheme` field; treat that as
+    # one scheme labelled 'modal'.
+    conv_all = data.get("convergence", [])
+    schemes: dict[str, list[dict]] = {}
+    for row in conv_all:
+        s = row.get("scheme", "modal")
+        schemes.setdefault(s, []).append(row)
+    for k in schemes:
+        schemes[k].sort(key=operator.itemgetter("N"))
 
     fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.8))
 
@@ -126,64 +132,45 @@ def _plot(data: dict, out_path: Path) -> None:
     ax.grid(visible=True, ls=":", alpha=0.3)
     ax.set_title(rf"(a) calibration at $t = {t0:g}$", fontsize=10)
 
-    # Panel (b): N-convergence
+    # Panel (b): multi-solver N-convergence at one regime point.
     ax = axes[1]
-    if n_arr.size:
+    scheme_styles = {
+        "modal": ("#1f77b4", "o", "modal"),
+        "cvode": ("#2ca02c", "s", "CVODE"),
+        "leapfrog_Y2": ("#ff7f0e", "^", "leapfrog $Y_2$"),
+        "leapfrog_Y4": ("#d62728", "D", "leapfrog $Y_4$"),
+    }
+    plateau_for_label = None
+    for scheme_name in ("modal", "cvode", "leapfrog_Y2", "leapfrog_Y4"):
+        rows = schemes.get(scheme_name)
+        if not rows:
+            continue
+        color, marker, display = scheme_styles[scheme_name]
+        ns = np.array([r["N"] for r in rows], dtype=float)
+        es = np.maximum(np.array([r["abs_error_final"] for r in rows]), EPS_MACH)
         ax.loglog(
-            n_arr,
-            np.maximum(err, EPS_MACH),
-            marker="s",
+            ns,
+            es,
+            marker=marker,
             ms=5,
-            color="#2ca02c",
-            lw=1.0,
-            label="$|P_{\\mathrm{final}}^{\\mathrm{sim}}-\\sin^2|$",
+            color=color,
+            lw=0,
+            label=display,
         )
-        # Annotate the discretisation plateau when the data is flat;
-        # otherwise fit a slope. The data is flat when the FD-4 stencil
-        # error has saturated at every N tested (P agreement limited by
-        # the spatial-discretisation floor, not by under-resolution).
-        e_lo, e_hi = float(err.min()), float(err.max())
-        is_flat = e_hi / max(e_lo, EPS_MACH) < 2.0
-        if is_flat:
-            plateau = float(np.median(err))
-            ax.axhline(
-                plateau,
-                ls="-.",
-                lw=0.9,
-                color="#2ca02c",
-                alpha=0.6,
-                label=rf"FD-4 plateau $\approx {plateau:.1e}$",
-            )
-        elif err.size >= 3 and (err > 10 * EPS_MACH).sum() >= 3:
-            mask = err > 10 * EPS_MACH
-            slope, r2 = _fit_loglog(n_arr[mask].astype(float), err[mask])
-            ax.loglog(
-                n_arr[mask],
-                (
-                    10
-                    ** (
-                        np.polyval(
-                            [
-                                slope,
-                                np.log10(err[mask][0])
-                                - slope * np.log10(n_arr[mask][0]),
-                            ],
-                            np.log10(n_arr[mask].astype(float)),
-                        )
-                    )
-                ),
-                ls=":",
-                lw=0.8,
-                color="#2ca02c",
-                alpha=0.4,
-                label=rf"fit: $\hat{{\alpha}} = {slope:.2f}$, $R^2 = {r2:.3f}$",
-            )
-    ax.axhline(
-        EPS_MACH, ls=":", lw=0.7, color="#666", label=r"$\varepsilon_{\mathrm{mach}}$"
-    )
+        if scheme_name in {"modal", "cvode"}:
+            plateau_for_label = float(np.median(es))
+    if plateau_for_label is not None:
+        ax.axhline(
+            plateau_for_label,
+            ls="-.",
+            lw=0.7,
+            color="#666",
+            alpha=0.5,
+            label=rf"FD-4 plateau $\approx {plateau_for_label:.1e}$",
+        )
     ax.set_xlabel(r"grid resolution $N$")
     ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - \sin^2(\kappa B_0 t/2)|$")
-    ax.legend(frameon=False, fontsize=8, loc="best")
+    ax.legend(frameon=False, fontsize=8, loc="lower right")
     ax.grid(visible=True, which="both", ls=":", alpha=0.3)
     b0_converge = params.get("b0_converge_point", "—")
     ax.set_title(rf"(b) $N$-convergence at $B_0 = {b0_converge:g}$", fontsize=10)

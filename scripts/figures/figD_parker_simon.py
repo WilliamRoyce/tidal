@@ -93,7 +93,7 @@ def _plot(data: dict, out_path: Path) -> None:
         np.maximum(err_p0, EPS_MACH),
         marker="o",
         ms=5,
-        lw=1.0,
+        lw=0,
         color="#d62728",
         label=rf"Pass 0 only ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
     )
@@ -102,7 +102,7 @@ def _plot(data: dict, out_path: Path) -> None:
         err_c[~floor_mask],
         marker="s",
         ms=5,
-        lw=1.0,
+        lw=0,
         color="#1f77b4",
         label=rf"Pass 0 + Pass 1 ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
     )
@@ -115,11 +115,22 @@ def _plot(data: dict, out_path: Path) -> None:
             lw=0,
             mfc="white",
             mec="#1f77b4",
-            label="Pass 0+1 (floor-saturated; excluded from fit)",
+            label="Pass 0+1 (below spatial-FD floor; excluded from fit)",
+        )
+        # Annotate the FD-4 spatial-discretisation floor at the median
+        # of the saturated points so the exclusion is visually justified.
+        floor_val = float(np.median(np.maximum(err_c[floor_mask], EPS_MACH)))
+        ax.axhline(
+            floor_val,
+            ls="-.",
+            lw=0.7,
+            color="#888",
+            alpha=0.6,
+            label=rf"FD-4 spatial floor $\approx {floor_val:.1e}$",
         )
     # Reference guides
     if fit_mask.any():
-        idx = np.where(fit_mask)[0][0]
+        idx = np.where(fit_mask)[0][-1]
         ax.loglog(
             eps,
             err_c[idx] * (eps / eps[idx]) ** 2,
@@ -129,9 +140,6 @@ def _plot(data: dict, out_path: Path) -> None:
             alpha=0.5,
             label=r"$\mathcal{O}(\varepsilon^2)$ worst-case guide",
         )
-    ax.axhline(
-        EPS_MACH, ls=":", lw=0.7, color="#666", label=r"$\varepsilon_{\mathrm{mach}}$"
-    )
 
     ax.set_xlabel(r"perturbation parameter $\varepsilon$")
     ax.set_ylabel(r"error vs full-$\varepsilon$ modal solution")

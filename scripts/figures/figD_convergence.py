@@ -1,19 +1,20 @@
 r"""Figure D §7 — spatial and temporal convergence (App-C styled).
 
-Three-panel `figure*`:
+Two-panel `figure*`:
 
   (a) Proca dispersion: $\omega(k)$ extracted by FFT from TIDAL at
       three values of $m^2 \in \{0.1, 1.0, 10.0\}$, overlaid with the
       analytic $\omega(k) = \sqrt{k^2 + m^2}$ at each $m^2$.
-  (b) Rabi-frequency grid convergence: $|\Omega_\mathrm{eff}/
-      \Omega_\mathrm{theory} - 1|$ versus $k\,\Delta x$ on log–log,
-      with the $(k\,\Delta x)^2$ guide. The Rabi benchmark uses
-      $B_0 = 0.2, t_\mathrm{end} = 200$ (≥6 Rabi periods).
-  (c) Time-integration order: $|P_\mathrm{final}^\mathrm{sim} -
+  (b) Time-integration order: $|P_\mathrm{final}^\mathrm{sim} -
       \sin^2(\kappa B_0 t/2)|$ versus $\Delta t$ for leapfrog
       Yoshida-2 and Yoshida-4. Fitted log–log slopes and $R^2$
       annotated in the legend. Implicit schemes are deliberately
       excluded (their flat-at-rtol behaviour is covered in App D §6).
+
+The Rabi-frequency grid-convergence panel that previously sat in
+position (b) has been dropped: the data is FFT-bin-width bounded
+across the surveyed N range and adds no spatial-convergence
+information at this resolution.
 
 Data:   benchmark_results/canonical/convergence_rich.json
 Output: manuscript/figures/figD_convergence.pdf
@@ -102,6 +103,9 @@ def _plot_rabi(ax, data: dict) -> None:
             alpha=0.5,
             label=rf"FFT-extraction floor $\approx {plateau:.1e}$",
         )
+        # Anchor the y-range so the plateau reads as a clean
+        # horizontal at the FFT floor rather than zoomed-in noise.
+        ax.set_ylim(plateau / 30.0, plateau * 30.0)
     else:
         anchor_x = float(kdx.max())
         anchor_y = float(err[int(np.argmax(kdx))])
@@ -113,9 +117,6 @@ def _plot_rabi(ax, data: dict) -> None:
             color="#888",
             label=r"$(k\Delta x)^2$ guide",
         )
-    ax.axhline(
-        EPS_MACH, ls=":", lw=0.7, color="#666", label=r"$\varepsilon_{\mathrm{mach}}$"
-    )
     ax.set_xlabel(r"$k\,\Delta x$")
     ax.set_ylabel(r"$|\Omega_{\mathrm{eff}}/\Omega_{\mathrm{theory}} - 1|$")
     ax.set_title("(b) Rabi-frequency grid convergence", fontsize=10)
@@ -151,25 +152,21 @@ def _plot_tio(ax, data: dict) -> None:
             errs,
             marker=markers.get(scheme, "."),
             ms=5,
-            lw=1.0,
+            lw=0,
             color=colors.get(scheme, "#666"),
             label=label,
         )
-    ax.axhline(
-        EPS_MACH, ls=":", lw=0.7, color="#666", label=r"$\varepsilon_{\mathrm{mach}}$"
-    )
     ax.set_xlabel(r"$\Delta t$")
     ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - \sin^2(\kappa B_0 t/2)|$")
-    ax.set_title("(c) time-integration order (leapfrog only)", fontsize=10)
+    ax.set_title("(b) time-integration order (leapfrog only)", fontsize=10)
     ax.legend(frameon=False, fontsize=8, loc="best")
     ax.grid(visible=True, which="both", ls=":", alpha=0.3)
 
 
 def _plot(data: dict, out_path: Path) -> None:
-    fig, axes = plt.subplots(1, 3, figsize=(14.5, 4.0))
+    fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.0))
     _plot_dispersion(axes[0], data)
-    _plot_rabi(axes[1], data)
-    _plot_tio(axes[2], data)
+    _plot_tio(axes[1], data)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, format="pdf", bbox_inches="tight")

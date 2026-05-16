@@ -77,6 +77,16 @@ SMOKE_T_END_VALUES = [50.0]
 SMOKE_GRID_N = 128
 SMOKE_N_CONVERGE = [128, 256]
 
+# Convergence-sweep schemes. The convergence panel runs each grid size
+# under several solver backends to show that the FD-4 spatial plateau
+# is integrator-independent. Each entry: (label, extra_cli_args).
+CONVERGENCE_SCHEMES: list[tuple[str, list[str]]] = [
+    ("modal", ["--scheme", "modal"]),
+    ("cvode", ["--scheme", "cvode"]),
+    ("leapfrog_Y2", ["--scheme", "leapfrog", "--leapfrog-order", "2"]),
+    ("leapfrog_Y4", ["--scheme", "leapfrog", "--leapfrog-order", "4"]),
+]
+
 
 def _git_sha() -> str:
     try:
@@ -176,7 +186,13 @@ def _sweep_b0(
 
 
 def _converge(
-    *, n_values: list[int], b0: float, t_end: float, parallel: int, out_dir: Path
+    *,
+    n_values: list[int],
+    b0: float,
+    t_end: float,
+    parallel: int,
+    out_dir: Path,
+    extra_args: list[str] | None = None,
 ) -> list[dict]:
     cmd = [
         "tidal",
@@ -216,6 +232,7 @@ def _converge(
         "--parallel",
         str(parallel),
         "--force",
+        *(extra_args or []),
     ]
     print(f"[boccaletti_uniform_rich] N-converge: {' '.join(cmd[:6])} ...", flush=True)
     subprocess.run(cmd, check=True, cwd=REPO_ROOT)
@@ -279,7 +296,9 @@ def _b0_residuals(rows: list[dict], t_end: float) -> list[dict]:
     return out
 
 
-def _converge_rows(rows: list[dict], b0: float, t_end: float) -> list[dict]:
+def _converge_rows(
+    rows: list[dict], b0: float, t_end: float, scheme: str = "modal"
+) -> list[dict]:
     out: list[dict] = []
     bare = _analytic_bare(b0, t_end)
     for row in rows:
@@ -290,6 +309,7 @@ def _converge_rows(rows: list[dict], b0: float, t_end: float) -> list[dict]:
             continue
         out.append(
             {
+                "scheme": scheme,
                 "N": int(n),
                 "B0": b0,
                 "t_end": t_end,
@@ -330,20 +350,34 @@ def run(*, smoke: bool, parallel: int, work_dir: Path) -> dict:
         )
         all_rows.extend(_b0_residuals(raw, t_end))
 
-    # Convergence at a regime point.
-    converge_dir = work_dir / "converge"
-    if converge_dir.exists():
-        shutil.rmtree(converge_dir)
+    # Multi-solver convergence at a regime point.
     b0_converge = b0_lo + 0.5 * (b0_hi - b0_lo)
     t_converge = t_values[0]
-    converge_raw = _converge(
-        n_values=n_converge,
-        b0=b0_converge,
-        t_end=t_converge,
-        parallel=max(1, parallel // 2),
-        out_dir=converge_dir,
-    )
-    converge_rows = _converge_rows(converge_raw, b0=b0_converge, t_end=t_converge)
+    converge_rows: list[dict] = []
+    schemes = CONVERGENCE_SCHEMES if not smoke else CONVERGENCE_SCHEMES[:2]
+    for scheme_label, scheme_args in schemes:
+        scheme_dir = work_dir / f"converge_{scheme_label}"
+        if scheme_dir.exists():
+            shutil.rmtree(scheme_dir)
+        try:
+            raw = _converge(
+                n_values=n_converge,
+                b0=b0_converge,
+                t_end=t_converge,
+                parallel=max(1, parallel // 2),
+                out_dir=scheme_dir,
+                extra_args=scheme_args,
+            )
+        except subprocess.CalledProcessError as exc:
+            print(
+                f"[boccaletti_uniform_rich] scheme {scheme_label} failed "
+                f"(rc={exc.returncode}); skipping rows.",
+                flush=True,
+            )
+            continue
+        converge_rows.extend(
+            _converge_rows(raw, b0=b0_converge, t_end=t_converge, scheme=scheme_label)
+        )
 
     # Summary
     rfin = np.array([r["residual_final_vs_bare"] for r in all_rows])

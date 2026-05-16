@@ -63,7 +63,7 @@ def _plot(data: dict, out_path: Path) -> None:
         np.maximum(err_p0, EPS_MACH),
         marker="o",
         ms=5,
-        lw=1.0,
+        lw=0,
         color="#d62728",
         label=rf"Pass 0 only ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
     )
@@ -72,32 +72,30 @@ def _plot(data: dict, out_path: Path) -> None:
         np.maximum(err_c, EPS_MACH),
         marker="s",
         ms=5,
-        lw=1.0,
+        lw=0,
         color="#1f77b4",
         label=rf"Pass 0 + Pass 1 ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
     )
-    # O(eps^2) reference guide anchored at largest eps
+    # O(eps^2) reference guide anchored at largest eps (distinct grey
+    # so the line doesn't merge with the Pass 0+1 trace).
     ax.loglog(
         eps,
         err_c[-1] * (eps / eps[-1]) ** 2,
-        ls=":",
-        lw=0.7,
-        color="#1f77b4",
-        alpha=0.5,
+        ls="--",
+        lw=0.8,
+        color="#444",
+        alpha=0.7,
         label=r"$\mathcal{O}(\varepsilon^2)$ guide",
     )
     # O(eps) reference for Pass 0
     ax.loglog(
         eps,
         err_p0[-1] * (eps / eps[-1]),
-        ls=":",
-        lw=0.7,
-        color="#d62728",
-        alpha=0.5,
+        ls="--",
+        lw=0.8,
+        color="#888",
+        alpha=0.7,
         label=r"$\mathcal{O}(\varepsilon)$ guide",
-    )
-    ax.axhline(
-        EPS_MACH, ls=":", lw=0.7, color="#666", label=r"$\varepsilon_{\mathrm{mach}}$"
     )
 
     ax.set_xlabel(r"perturbation parameter $\varepsilon$")
