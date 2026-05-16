@@ -23,7 +23,9 @@ The Fourier modal solver (\texttt{tidal/solver/modal.py}) provides exact, machin
   \item Requires periodic boundary conditions (FFT periodicity)
   \item Requires time-independent coefficients (evolution matrix must be constant)
   \item Requires flat (Minkowski) metric --- curved metrics couple modes via position-dependent coefficients that decay too slowly in $k$-space
-  \item Currently pure NumPy/SciPy --- no GPU acceleration
+  \item Default backend is pure NumPy/SciPy; a JAX-accelerated path
+    (\texttt{--scheme modal-jax}) is available for PolyChord inference runs
+    --- see \S\ref{sec:modal_jax}
 \end{itemize}
 
 \subsection{How It Works}
