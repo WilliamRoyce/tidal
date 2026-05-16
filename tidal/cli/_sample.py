@@ -216,10 +216,15 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         print(f"  Parameters: {', '.join(param_names)}")
         for p in priors:
             if isinstance(p, RadialAngularPrior):
+                radial = (
+                    f"fixed r={p.r_lo}"
+                    if p.is_fixed_radius
+                    else f"log_uniform(r={p.r_lo}..{p.r_hi})"
+                )
                 print(
                     f"    [{', '.join(p.names)}] ~ "
                     f"cubed_sphere(face={p.face_idx}, sub={p.sub_tile}, "
-                    f"M={p.M}) x log_uniform(r={p.r_lo}..{p.r_hi})"
+                    f"M={p.M}) x {radial}"
                 )
             else:
                 print(f"    {p.name} ~ {p.distribution}({p.low}, {p.high})")

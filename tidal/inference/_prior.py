@@ -228,8 +228,11 @@ class RadialAngularPrior:
         if self.r_lo <= 0 or self.r_hi <= 0:
             msg = f"r bounds must be positive; got [{self.r_lo}, {self.r_hi}]"
             raise ValueError(msg)
-        if self.r_lo >= self.r_hi:
-            msg = f"r_lo must be < r_hi; got [{self.r_lo}, {self.r_hi}]"
+        if self.r_lo > self.r_hi:
+            msg = (
+                f"r_lo must be <= r_hi; got [{self.r_lo}, {self.r_hi}] "
+                f"(equal bounds are allowed as fixed-radius mode)"
+            )
             raise ValueError(msg)
         n = len(self.names)
         if len(self.sub_tile) != n - 1:
@@ -245,6 +248,16 @@ class RadialAngularPrior:
         """Number of coupling dimensions covered by this joint prior (= N)."""
         return len(self.names)
 
+    @property
+    def is_fixed_radius(self) -> bool:
+        """True when ``r_lo == r_hi`` — only the angular direction is sampled.
+
+        In fixed-radius mode ``u[0]`` is still consumed (cube dimensionality
+        stays at ``N`` for sampler-API stability) but its value is discarded;
+        the magnitude is always ``r_lo``.
+        """
+        return self.r_lo == self.r_hi
+
     def transform(self, u: NDArray[np.float64]) -> NDArray[np.float64]:
         """Map ``u in [0, 1]^N`` to the physical coupling vector ``c``."""
         from tidal.inference._sphere import face_to_direction, tile_bounds
@@ -255,8 +268,11 @@ class RadialAngularPrior:
             msg = f"u must have shape ({n},); got {u.shape}"
             raise ValueError(msg)
 
-        log_lo, log_hi = math.log(self.r_lo), math.log(self.r_hi)
-        r = math.exp(log_lo + float(u[0]) * (log_hi - log_lo))
+        if self.is_fixed_radius:
+            r = self.r_lo
+        else:
+            log_lo, log_hi = math.log(self.r_lo), math.log(self.r_hi)
+            r = math.exp(log_lo + float(u[0]) * (log_hi - log_lo))
 
         u_lo, u_hi = tile_bounds(self.sub_tile, self.M)
         u_face = u_lo + u[1:] * (u_hi - u_lo)

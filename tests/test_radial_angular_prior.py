@@ -65,7 +65,10 @@ def test_post_init_rejects_negative_r() -> None:
 
 
 def test_post_init_rejects_swapped_r_bounds() -> None:
-    with pytest.raises(ValueError, match="r_lo must be < r_hi"):
+    """r_lo strictly greater than r_hi is rejected (equal bounds are allowed —
+    that's fixed-radius mode; see :func:`test_post_init_accepts_equal_r_bounds`).
+    """
+    with pytest.raises(ValueError, match="r_lo must be <= r_hi"):
         RadialAngularPrior(
             names=("a", "b"),
             r_lo=10.0,
@@ -75,6 +78,59 @@ def test_post_init_rejects_swapped_r_bounds() -> None:
             M=1,
             Q=np.eye(2),
         )
+
+
+def test_post_init_accepts_equal_r_bounds() -> None:
+    """``r_lo == r_hi`` is accepted as fixed-radius mode."""
+    p = RadialAngularPrior(
+        names=("a", "b"),
+        r_lo=1.5,
+        r_hi=1.5,
+        face_idx=1,
+        sub_tile=(1,),
+        M=1,
+        Q=np.eye(2),
+    )
+    assert p.is_fixed_radius
+    assert p.r_lo == 1.5
+    assert p.r_hi == 1.5
+
+
+def test_is_fixed_radius_false_for_variable_r() -> None:
+    p = _make_prior()
+    assert not p.is_fixed_radius
+
+
+def test_transform_fixed_radius_ignores_u0() -> None:
+    """In fixed-radius mode the magnitude is independent of ``u[0]``."""
+    p = RadialAngularPrior(
+        names=("a", "b", "c"),
+        r_lo=0.01,
+        r_hi=0.01,
+        face_idx=1,
+        sub_tile=(1, 1),
+        M=1,
+        Q=np.eye(3),
+    )
+    c1 = p.transform(np.array([0.1, 0.5, 0.5]))
+    c2 = p.transform(np.array([0.9, 0.5, 0.5]))
+    assert math.isclose(float(np.linalg.norm(c1)), 0.01, rel_tol=1e-12)
+    assert math.isclose(float(np.linalg.norm(c2)), 0.01, rel_tol=1e-12)
+    # u[0] is discarded entirely — angular outputs must match bit-for-bit.
+    np.testing.assert_array_equal(c1, c2)
+
+
+def test_parse_joint_prior_fixed_radius() -> None:
+    """The CLI parser accepts ``r_lo == r_hi`` and produces a fixed-radius prior."""
+    spec = "names=a,b,c;type=cubed_sphere;M=1;face=1;sub=1_1;r_lo=1.5;r_hi=1.5"
+    p = parse_joint_prior(spec)
+    assert isinstance(p, RadialAngularPrior)
+    assert p.is_fixed_radius
+    assert p.r_lo == 1.5
+    assert p.r_hi == 1.5
+    # Round-trip: transform delivers magnitude exactly r_lo regardless of u[0].
+    c = p.transform(np.array([0.3, 0.5, 0.5]))
+    assert math.isclose(float(np.linalg.norm(c)), 1.5, rel_tol=1e-12)
 
 
 def test_post_init_rejects_wrong_subtile_length() -> None:
