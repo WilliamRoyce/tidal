@@ -2062,8 +2062,22 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
     # Resolve solver scheme (auto-select based on equation operators)
     scheme = _resolve_scheme(args.scheme, spec, grid_info, bc)
     # TIDAL_MODAL_BACKEND=jax overrides modal → modal-jax without touching auto-select.
+    # Phase-1 eligibility gate: only upgrade when the theory has no constraints,
+    # no position-dependent coefficients, and no time-derivative RHS operators.
+    # Ineligible theories silently keep scipy to avoid NotImplementedError.
     if scheme == "modal" and os.environ.get("TIDAL_MODAL_BACKEND", "") == "jax":
-        scheme = "modal-jax"
+        from tidal.solver.modal import (
+            _has_position_dependent_terms,
+            _has_time_derivative_operators,
+        )
+
+        jax_eligible = not (
+            any(eq.time_derivative_order == 0 for eq in spec.equations)
+            or _has_position_dependent_terms(spec)
+            or _has_time_derivative_operators(spec)
+        )
+        if jax_eligible:
+            scheme = "modal-jax"
     if args.scheme == "auto":
         log(f"  Auto-selected solver: {scheme}")
     _cdebug(f"solver={scheme}, fd_order={fd_order}, spectral={use_spectral}")
