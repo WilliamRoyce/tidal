@@ -45,7 +45,7 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 | B.4b | Stage A sup INTR smoke | ✅ done | 29199129 (22 min INTR). logZ=+4.08±0.12 (vs v2 +0.66; +3.4 nats). ESS=4961. Joint D_KL=7.30 nats. MAP mA2=605 (v2: 0.97 — massive prior shift). Per-param D_KL: deltam=3.02, xi=1.05, mA2=0.86, alpha3=0.63 nats. |
 | B.4-full-amp | Stage A amp v3 publication | 🟡 pending | 29205968 (standard 6h) — submitted 2026-05-11 |
 | B.4-full-sup | Stage A sup v3 publication | 🟡 pending | 29205982 (standard 12h) — submitted 2026-05-11 |
-| B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | 🚀 in progress | **PARTITION-AUDIT BUG (2026-05-11)** retracted: first-batch chains 29207374/29208280/29209010/29209289/29209795/29210161/29210726/29228796 SUPERSEDED. Scripts corrected to match v2 exactly. **Strategy: INTR+resume** (see `scripts/hpc_submit_drafts/v3_permissive/README.md`). D2.0 Bahamonde amp 29229768 ✅ (22 min, logZ=+9.29±0.06, D_KL=4.31 nats). D2.0 sup 29232780 TIMEOUT→resume 29257772 🚀 running (43.7K dead pts, 72/190 active clusters, logZ=+6.82±0.29 — σ doubling per batch; expect 5-8+ total INTR sessions). D2.1 Barker amp 29256858 ✅ (27 min, logZ=+9.58±0.05, D_KL=4.13 nats, 27 clusters, ESS=9517; β₂ MAP=−11.7 outside v2 prior). D2.1 sup + D2.2–D2.3 amp+sup still to submit (INTR+resume). |
+| B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | 🚀 in progress | **PARTITION-AUDIT BUG (2026-05-11)** retracted: first-batch chains 29207374/29208280/29209010/29209289/29209795/29210161/29210726/29228796 SUPERSEDED. **Policy updated 2026-05-15 (supervisor meeting): 1 INTR session per chain, accept state at TIMEOUT — landscape overview, not convergence.** D2.0 Bahamonde amp 29229768 ✅ (22 min, logZ=+9.29±0.06, D_KL=4.31 nats). D2.0 sup ⚠️ done (truncated, supervisor-approved): 29232780 session 1 + 6 INTR resumes → final checkpoint 58.5K dead pts, 174/401 active clusters, logZ=+134.47±0.453; see `docs/comparison/d20_bahamonde_sup_v2_v3.md`. D2.1 Barker amp 29256858 ✅ (27 min, logZ=+9.58±0.05, D_KL=4.13 nats, 27 clusters, ESS=9517; β₂ MAP=−11.7 outside v2 prior). D2.1 sup + D2.2–D2.3 amp+sup still to submit (1 INTR session each). |
 | B.6 | Bounds-dependence cross-check at L=75 under v3 | ✅ done | 29205638 (25 min INTR). log Z=+13.18±0.12 (nearly identical to B.1's +13.29). Per-coupling D_KL essentially unchanged. **v3 washes out v2's bounds-dependence non-monotonicity** (v2 L=75 = +0.84, v2 L=100 = +0.68 — non-mono; v3 L=75 ≈ L=100). |
 
 ## Phase C — Cubed-sphere coupling-space chart (HANDLED BY PARALLEL SESSION)
@@ -64,7 +64,17 @@ Open follow-up question for supervisor: coupling grouping (monolithic / per-Lagr
 
 ## Phase E — Localised geometry pivot (DEFERRED, gated on Phase B convergence)
 
-See [V3_PHASE_E_DESIGN.md](V3_PHASE_E_DESIGN.md). Replaces plane-wave + uniform B₀ with Gaussian wavepacket + Gaussian B-field profile; finite interaction time bounds P_max physically.
+See [V3_PHASE_E_DESIGN.md](V3_PHASE_E_DESIGN.md). Replaces plane-wave + uniform B₀ with Gaussian wavepacket + dual-Gaussian B-field profile; finite interaction time bounds P_max physically.
+
+| Step | Description | Status | Notes |
+| --- | --- | --- | --- |
+| E.0 | Dual-Gaussian localised B-field empirical validation | ✅ done (2026-05-16) | `examples/gertsenshtein/theory_e0_dual_gaussian.toml` derived. sigB=5, zc1=25, zc2=75, L=100. A(20)/A(10)=1.00 < 1.05 ✓. P_max=0.00348 at t=18 (CVODE). Modal auto-selects but diverges → GH #367; use `--scheme cvode`. |
+| E.1 | Wavepacket IC switch for all v3 campaign scripts | ⏳ deferred | After Phase B convergence |
+| E.2 | Localised B-field theory TOMLs for all D1/D2/StageA models | ⏳ deferred | After Phase B convergence |
+| E.3 | σ_w × σ_B tuning scan | ⏳ deferred | After E.2 |
+| E.4 | Re-baseline campaign scripts in `v3e_localised/` | ⏳ deferred | After E.3 |
+| E.5 | Re-run highest-value chains under E geometry | ⏳ deferred | D1 amp first |
+| E.6 | Phase B vs Phase E comparison + publication decision | ⏳ deferred | After E.5 |
 
 ## Sign-off log
 
@@ -84,3 +94,5 @@ See [V3_PHASE_E_DESIGN.md](V3_PHASE_E_DESIGN.md). Replaces plane-wave + uniform 
 - 2026-05-10 — A.5 — D1 v1/v2 chain replay landed at `examples/data/v3_d1_replay/`. Headline: v3 architecture admits 14.3% more samples than v2 (1428/10000 tachyonic samples now contribute via the v2→v3 admission shift on `28982029`). 28520217 v1 chain pre-dates the rejected-prior sidecar so the comparison uses 28982029 instead.
 - 2026-05-12 — B.4b — Stage A sup v3 INTR smoke (29199129, 22 min): logZ=+4.08±0.12 (vs v2 +0.66; +3.4 nats), ESS=4961, joint D_KL=7.30 nats. MAP mA2=605 vs v2 MAP 0.97 — massive prior-shift. deltam D_KL=3.02 nats strongest. v3 unambiguously reveals structure masked by v2's narrow priors.
 - 2026-05-12 — B.5 (D2.1 amp) — D2.1 Barker amp v3 INTR (29256858, 27 min): logZ=+9.58±0.05 (vs v2 +0.62; +8.96 nats), ESS=9517, joint D_KL=4.13 nats. β₂ MAP=−11.7 (outside v2's narrow [-3..-0.3] prior, 2.5σ shift). All 5 sign-symmetric params D_KL ≈ 2.5-2.8 nats. 27 clusters (multi-modal). See `docs/comparison/d21_barker_amp_v2_v3.md`.
+- 2026-05-16 — B.5 (policy) — D2.0 sup truncated at session 7 (supervisor-approved): 58.5K dead pts, 174/401 active clusters, logZ=+134.47±0.453. `*_resume.sh` scripts deleted. 1-INTR-session-per-chain policy baked into `v3_permissive/README.md`. See `docs/comparison/d20_bahamonde_sup_v2_v3.md`.
+- 2026-05-16 — E.0 — Dual-Gaussian localised B-field validated: `theory_e0_dual_gaussian.toml` derived (6 fields, 22 H terms). CVODE smoke tests pass; A(20)/A(10)=1.00 < 1.05 ✓; P_max=0.00348 at t=18. Modal solver auto-selects but diverges (GH #367 filed); workaround: `--scheme cvode`.

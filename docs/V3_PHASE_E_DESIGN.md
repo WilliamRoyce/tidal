@@ -1,7 +1,7 @@
-# Phase E — Localised wavepacket + localised B-field geometry (DEFERRED)
+# Phase E — Localised wavepacket + localised B-field geometry
 
 **Created:** 2026-05-10
-**Status:** DEFERRED — gated on Phase B (plane-wave architecture) convergence
+**Status:** E.0 empirical validation complete (2026-05-16). E.1–E.6 still deferred pending Phase B convergence.
 **Companion to:** [V3_ARCHITECTURE.md](V3_ARCHITECTURE.md)
 
 ## Problem
@@ -22,6 +22,87 @@ Replace the plane-wave + uniform-B₀ setup with:
 
 Result: the wavepacket traverses the B-field interaction region in finite time `t_int ~ (σ_w + σ_B) / c`. After traversal, source/target amplitudes propagate in vacuum where the EOM is the free wave equation (no Gertsenshtein conversion). Tachyonic eigenvalues no longer accumulate growth indefinitely — total amplification is bounded by exp(γ·t_int), which is physically meaningful (a finite interaction time turns the unbounded exponential into a finite multiplier).
 
+## E.0 — Dual-Gaussian localised B-field (empirically validated 2026-05-16)
+
+### Why not single-Gaussian
+
+The original sketch in this document (§"Physical resolution") proposed a single-Gaussian B₀ profile. The integral of a single Gaussian is an error function:
+
+```text
+A_y(z) = -Bpeak · R · √(π/2) · Erf[z/(√2·R)]
+```
+
+which runs from −1 to +1 across the domain. This is explicitly non-periodic: `A_y(0) ≠ A_y(L)`. Consequence: any theory TOML using this form must declare **Neumann BCs** (as `examples/gertsenshtein/theory_localized.toml` does explicitly on line 24), which prevents `can_use_modal()` from returning True — the modal solver is never auto-selected for single-Gaussian localised-B runs.
+
+### Dual-Gaussian trick (supervisor, 2026-05-15)
+
+Use two equal-and-opposite Gaussian peaks with centres symmetric about L/2:
+
+```text
+B_z(z) = Bpeak · [exp(-(z-zc1)²/(2·sigB²)) − exp(-(z-zc2)²/(2·sigB²))]
+```
+
+with `zc1 + zc2 = L`. Then `∫₀ᴸ B_z dz = 0`, and the gauge potential
+
+```text
+A_y(z) = -Bpeak · sigB · √(π/2) · [Erf[(z-zc1)/(√2·sigB)] − Erf[(z-zc2)/(√2·sigB)]]
+```
+
+satisfies `A_y(0) = A_y(L) = 0` (both Erf terms saturate to ±1 at the boundaries; the difference cancels). With `sigB ≪ zc1`, boundary leakage `B(0) ~ exp(-zc1²/(2·sigB²))` is negligible — at `sigB=5, zc1=25`: `exp(-12.5) ≈ 4×10⁻⁶·Bpeak`.
+
+### Canonical theory file
+
+`examples/gertsenshtein/theory_e0_dual_gaussian.toml` — new (2026-05-16). Key `[[background_fields]]` block:
+
+```toml
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = [
+  "0",
+  "0",
+  "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1)/(Sqrt[2]*sigB)] - Erf[(z[] - zc2)/(Sqrt[2]*sigB)])",
+  "0"
+]
+
+[constants]
+names = ["kappa", "Bpeak", "sigB", "zc1", "zc2"]
+```
+
+Same fields (h, A, a, F), same Lagrangian, same TT+Lorenz gauges, same plane-wave reduction as `theory_localized.toml`. No Neumann BC override — the TOML uses default periodic BCs.
+
+### Validated parameters
+
+| Parameter | Value | Rationale |
+| --- | --- | --- |
+| `sigB` | 5 | Decay to 4e-6 at boundaries; smooth-periodic |
+| `zc1` | 25 (= L/4) | Left peak at quarter-box |
+| `zc2` | 75 (= 3L/4) | Right peak; zc1+zc2=L=100 |
+| `t_end` | ≤ 25 | Wavepacket at zc1=25 reaches zc2=75 at t≈50; keep below L/4=25 to avoid wrap-around |
+| `--ic gaussian --ic-width 5 --ic-center 25` | | Wavepacket at left interaction region |
+| `--grid-shape` | 256 | Resolves sigB=5 at L=100 |
+
+### Boundedness verification (A(20)/A(10) criterion)
+
+Measured with `--scheme cvode`, grid=256, bounds=0:100, Bpeak=0.1, sigB=5, zc1=25, zc2=75, kappa=1.0:
+
+| t_end | a_1 peak | P_max |
+| --- | --- | --- |
+| 5 | 0.0001 | ~0.0001 |
+| 10 | 0.0003 | ~0.0003 |
+| 15 | 0.0003 | ~0.0003 |
+| 20 | 0.0003 | 0.00348 |
+
+**A(t=20) / A(t=10) = 1.00 ≪ 1.05 criterion ✓** — bounded interaction time, no tachyonic accumulation.
+
+Full conversion: P_max = 0.003475 at t = 18.0 s (then decays as wavepacket exits interaction region).
+
+### Modal solver caveat (GH #367)
+
+The dual-Gaussian theory has position-dependent coefficients (Erf background). `can_use_modal()` still returns True (periodic BCs + flat metric + supported operators). However, `_has_position_dependent_terms()` returns True, routing dispatch to `_evolve_full_matrix()`, which calls `expm_multiply` on a non-normal convolution matrix. The convolution matrix has positive-real eigenvalues (max ~+0.5 at N=16) — a pseudospectral artifact — causing `expm_multiply` to diverge catastrophically (h_5 → 10⁶⁰ by t=20).
+
+**Workaround: always use `--scheme cvode` for Phase E runs.** CVODE gives correct bounded results. Issue #367 tracks the fix.
+
 ## Tasks
 
 ### E.1 — Wavepacket IC switch
@@ -32,22 +113,26 @@ Already supported per CLAUDE.md — no code changes needed.
 
 ### E.2 — Localised B-field background
 
-Modify the `[[background_fields]]` block of the relevant theory TOML files (`examples/torsion_gertsenshtein/`, `examples/torsion_gertsenshtein_nonminimal/`, etc.) to declare `B0` as a position-dependent background:
+Create new theory TOML files for each model (`examples/torsion_gertsenshtein/`, `examples/torsion_gertsenshtein_nonminimal/`, etc.) following the dual-Gaussian pattern validated in E.0. The `[[background_fields]]` block uses the explicit Erf formula — there is no `profile = "gaussian"` shorthand in the TOML schema; the position-dependent expression goes directly into `components`:
 
 ```toml
 [[background_fields]]
-name = "B0"
-profile = "gaussian"
-amplitude = 0.01
-center = 75.0
-width = 25.0
-```
+name = "Abar"
+type = "vector"
+components = [
+  "0",
+  "0",
+  "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1)/(Sqrt[2]*sigB)] - Erf[(z[] - zc2)/(Sqrt[2]*sigB)])",
+  "0"
+]
 
-(Profile syntax may need extension if `gaussian` isn't already a recognised position-profile type; check `tidal/symbolic/_derive.py` and `tidal/solver/coefficients.py`.)
+[constants]
+names = [..., "Bpeak", "sigB", "zc1", "zc2"]
+```
 
 Re-derive the affected theories via `tidal derive` (Wolfram pipeline). Expected wall: ~30 min per theory.
 
-Width σ_B = 25 (a quarter of the box) at L=100 keeps the wavepacket-B-field overlap region centred. The wavepacket transit time from σ_w = 5 / σ_B = 25 / box L = 100: full traversal in ~50 time units; the existing t_end = 10 is well within "wavepacket inside B-field" regime, so the localised geometry effectively sets a new default t_end based on σ_B / c ~ 25.
+Use `sigB = 5` (validated in E.0) with `zc1 = L/4`, `zc2 = 3L/4`. Cap `t_end ≤ 25` to keep the wavepacket inside the interaction region before it wraps. All Phase E simulations must use `--scheme cvode` until GH #367 is resolved (modal solver auto-selects but diverges for position-dependent Erf backgrounds).
 
 ### E.3 — Tuning σ_w and σ_B
 
@@ -119,3 +204,6 @@ Also, Phase E introduces new tuning parameters (σ_w, σ_B) that should be physi
 - [docs/PHASE_6_COMPARISON.md](PHASE_6_COMPARISON.md) §"Phase 6.L" — boundary-attractor finding that motivates this phase
 - [docs/meetings/2026-05-08_supervisor.md](meetings/2026-05-08_supervisor.md) §3
 - CLAUDE.md "Background fields" + "Common pitfalls" — `--ic gaussian` and `[[background_fields]]` are already supported
+- `examples/gertsenshtein/theory_e0_dual_gaussian.toml` — canonical dual-Gaussian theory file (E.0 validated)
+- `examples/data/gertsenshtein_e0_dual_gaussian.json` — derived output (6 fields, 22 hamiltonian terms)
+- GH #367 — `_evolve_full_matrix` divergence for position-dependent Erf backgrounds
