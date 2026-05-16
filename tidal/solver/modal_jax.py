@@ -150,6 +150,27 @@ def _get_batch_expm_fn() -> Callable[..., Any]:
 
 
 @functools.lru_cache(maxsize=8)
+def _get_batch_eigvals_fn() -> Callable[..., Any]:
+    """Return a JIT+vmap wrapper for ``jnp.linalg.eigvals`` over modes.
+
+    Signature::
+
+        batch_eigvals(M) -> eigvals
+
+    ``M`` has shape ``(n_modes, bs, bs)``; output is ``(n_modes, bs)``.
+    Replaces the per-block ``np.linalg.eigvals`` in the divergence pre-check,
+    moving ~2-3 ms of numpy cost into compiled XLA.
+    """
+    jax, jnp, _ = _require_jax()
+
+    @jax.jit
+    def _batch_eigvals(M: Any) -> Any:
+        return jax.vmap(jnp.linalg.eigvals)(M)  # (n_modes, bs, bs) → (n_modes, bs)
+
+    return _batch_eigvals
+
+
+@functools.lru_cache(maxsize=8)
 def _get_evolve_nonuniform_fn() -> Callable[..., Any]:
     """Return a JIT-compiled function for non-uniform snapshot times.
 
@@ -341,7 +362,9 @@ def solve_modal_jax(
         M_block: NDArray[np.complex128] = A_block
 
         if t_end_rel > 0:
-            eigvals = np.linalg.eigvals(M_block)  # shape (n_modes, bs)
+            M_block_jax = jnp.array(M_block, dtype=jnp.complex128)
+            eigvals_jax = _get_batch_eigvals_fn()(M_block_jax)  # (n_modes, bs)
+            eigvals = np.array(eigvals_jax)
             _warn_eigenvalue_growth(
                 eigvals.ravel().astype(np.complex128), t_end_rel, context="JAX modal"
             )
@@ -400,10 +423,9 @@ def solve_modal_jax(
 
         # Transfer back to numpy and accumulate into the full Fourier state
         ys_np: NDArray[np.complex128] = np.array(ys_jax)  # (n_snapshots, n_modes, bs)
-        for si, orig_slot in enumerate(block_slots):
-            # ys_np[ti, :, si] is the Fourier state of slot `si` at time ti
-            # y_hat_all[ti, orig_slot, :] needs shape (n_modes,)
-            y_hat_all[:, orig_slot, :] = ys_np[:, :, si]
+        # Vectorized scatter: (n_snapshots, n_modes, bs) → y_hat_all[:, slots, :]
+        # ys_np.transpose(0,2,1) has shape (n_snapshots, bs, n_modes), matching y_hat_all layout.
+        y_hat_all[:, np.array(block_slots), :] = ys_np.transpose(0, 2, 1)
 
     # --- IFFT back to physical space -----------------------------------------
     snapshots: NDArray[np.float64] = np.zeros((num_snapshots, n_slots * n_pts))
