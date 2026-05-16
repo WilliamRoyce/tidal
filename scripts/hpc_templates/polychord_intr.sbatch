@@ -64,6 +64,11 @@ tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
 source "${TIDAL_ROOT}/.venv/bin/activate"
 export PYTHONPATH="${LOCAL_SP}/site-packages:${PYTHONPATH:-}"
 
+# JAX modal solver: upgrade eligible theories (no constraints, no position-dep)
+# from scipy to modal-jax automatically. Ineligible theories silently keep scipy.
+# Requires JAX in the venv: pip install "jax[cpu]>=0.4.20" && hpc_refresh_venv_tar.sh
+export TIDAL_MODAL_BACKEND=jax
+
 # MPI toolchain must be loaded inside the job too — sbatch inherits a
 # stripped environment on CSD3 and the compute node doesn't auto-load
 # site modules.  Needed both for libchord.so's MPI symbols and for

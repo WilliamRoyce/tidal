@@ -174,9 +174,23 @@ def _run_benchmark(  # noqa: PLR0915
     print(f"  {label}  (N={grid.shape}, snapshots={num_snapshots})")  # type: ignore[union-attr]
     print(f"{'=' * 60}")
 
-    # --- scipy baseline --------------------------------------------------
-    print("\n  scipy backend:")
-    # Warm up
+    # --- JAX JIT warmup (done first to avoid contaminating scipy timing) ---
+    if not has_jax:
+        result_scipy = None
+        result_jax = None
+        jit_time = 0.0
+    else:
+        print("\n  JAX JIT warmup:")
+        t_jit_start = time.perf_counter()
+        result_jax = solve_modal_jax(  # type: ignore[arg-type]
+            spec, grid, y0, (0.0, t_end), parameters=params, num_snapshots=num_snapshots
+        )
+        jit_time = time.perf_counter() - t_jit_start
+        print(
+            f"    JIT compile time: {jit_time * 1000:.0f} ms  (first call, not timed)"
+        )
+
+    # --- scipy warmup (after JAX JIT so caches are at steady state) --------
     _ = solve_modal(
         spec,
         grid,
@@ -185,8 +199,14 @@ def _run_benchmark(  # noqa: PLR0915
         parameters=params,  # type: ignore[arg-type]
         num_snapshots=num_snapshots,
     )
-    times_scipy = []
+
+    # --- Interleaved timing: alternating scipy/JAX to cancel monotonic drift -
+    # Both backends see the same cache state / thermal conditions at each pair.
+    times_scipy: list[float] = []
+    times_jax: list[float] = []
+
     for _ in range(n_runs):
+        # scipy
         t0 = time.perf_counter()
         result_scipy = solve_modal(
             spec,
@@ -197,49 +217,47 @@ def _run_benchmark(  # noqa: PLR0915
             num_snapshots=num_snapshots,
         )
         times_scipy.append(time.perf_counter() - t0)
-    mean_scipy = float(np.mean(times_scipy))
-    median_scipy = float(np.median(times_scipy))
-    print(
-        f"    mean={mean_scipy * 1000:.1f} ms  median={median_scipy * 1000:.1f} ms"
-        f"  (n={n_runs})"
-    )
+
+        if has_jax:
+            t0 = time.perf_counter()
+            result_jax = solve_modal_jax(  # type: ignore[arg-type]
+                spec,
+                grid,
+                y0,
+                (0.0, t_end),
+                parameters=params,
+                num_snapshots=num_snapshots,
+            )
+            times_jax.append(time.perf_counter() - t0)
+
+    def _fmt_ms(vals: list[float]) -> str:
+        arr = np.array(vals) * 1000.0
+        p25, p50, p75 = np.percentile(arr, [25, 50, 75])
+        return (
+            f"median={p50:.2f} ms  IQR=[{p25:.2f},{p75:.2f}]  mean={arr.mean():.2f} ms"
+            f"  (n={len(vals)})"
+        )
+
+    print(f"\n  scipy backend:  {_fmt_ms(times_scipy)}")
 
     if not has_jax:
         return {
             "label": label,
-            "scipy_mean_ms": mean_scipy * 1000,
+            "scipy_mean_ms": float(np.mean(times_scipy)) * 1000,
             "jax_available": False,
         }
 
-    # --- JAX backend -----------------------------------------------------
-    print("\n  JAX backend:")
-    # JIT compile time (first call)
-    t_jit_start = time.perf_counter()
-    solve_modal_jax(  # type: ignore[arg-type]
-        spec, grid, y0, (0.0, t_end), parameters=params, num_snapshots=num_snapshots
-    )
-    jit_time = time.perf_counter() - t_jit_start
-    print(
-        f"    JIT compile time: {jit_time * 1000:.0f} ms  (first call, not included in benchmark)"
-    )
+    print(f"  JAX backend:    {_fmt_ms(times_jax)}  [post-JIT]")
+    print(f"    JIT compile time: {jit_time * 1000:.0f} ms")
 
-    # Warm runs (post-JIT)
-    times_jax = []
-    for _ in range(n_runs):
-        t0 = time.perf_counter()
-        result_jax = solve_modal_jax(  # type: ignore[arg-type]
-            spec, grid, y0, (0.0, t_end), parameters=params, num_snapshots=num_snapshots
-        )
-        times_jax.append(time.perf_counter() - t0)
+    mean_scipy = float(np.mean(times_scipy))
     mean_jax = float(np.mean(times_jax))
+    median_scipy = float(np.median(times_scipy))
     median_jax = float(np.median(times_jax))
-    print(
-        f"    mean={mean_jax * 1000:.1f} ms  median={median_jax * 1000:.1f} ms"
-        f"  (n={n_runs}, post-JIT)"
-    )
 
-    speedup = mean_scipy / mean_jax
-    print(f"\n  Speedup (scipy/JAX): {speedup:.2f}x")
+    # Speedup from medians (more robust than means for skewed distributions)
+    speedup = median_scipy / median_jax
+    print(f"\n  Speedup (scipy/JAX, median): {speedup:.2f}x")
 
     # --- Numerical agreement ---------------------------------------------
     y_s = result_scipy["y"][-1]
@@ -285,8 +303,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--n-runs",
         type=int,
-        default=10,
-        help="Benchmark runs per backend (default: 10)",
+        default=50,
+        help="Interleaved benchmark pairs per backend (default: 50)",
     )
     parser.add_argument(
         "--snapshots",
@@ -392,8 +410,8 @@ def main(argv: list[str] | None = None) -> int:
             status = "PASS" if r.get("pass") else "FAIL"
             print(
                 f"  [{status}] {r['label']}: "
-                f"scipy={r['scipy_mean_ms']:.1f}ms  "
-                f"jax={r['jax_mean_ms']:.1f}ms  "
+                f"scipy_med={r['scipy_median_ms']:.2f}ms  "
+                f"jax_med={r['jax_median_ms']:.2f}ms  "
                 f"speedup={r['speedup']:.2f}x  "
                 f"rel_err={r['max_rel_error']:.1e}"
             )
