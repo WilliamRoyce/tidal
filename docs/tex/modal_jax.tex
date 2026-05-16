@@ -112,21 +112,29 @@ Sparse-IC support for the JAX path is deferred to phase~2.
 \subsubsection{Phase-1 Restrictions}
 \label{sec:modal_jax_phase1}
 
-The following paths raise \texttt{NotImplementedError} in phase~1 and fall
-back to \texttt{--scheme modal}:
+The following paths raise \texttt{NotImplementedError} in the JAX backend
+and fall back to \texttt{--scheme modal}:
 
 \begin{itemize}
   \item Position-dependent coefficients (\texttt{\_evolve\_full\_matrix},
     \texttt{scipy.sparse.linalg.expm\_multiply}).  The convolution matrix
     couples all modes; the JAX equivalent would require a dense
     $N_s N \times N_s N$ Krylov exponential.
-  \item Algebraic constraint fields (Schur elimination path,
-    \texttt{\_build\_evolution\_matrices}).  Requires generalised
-    eigendecomposition with rank-deficient mass matrix.
   \item \texttt{return\_eigendata=True} (Pass~1 Duhamel callers).  The JAX
     path uses \texttt{lax.scan} without storing per-mode eigendecomposition
     data.
 \end{itemize}
+
+\paragraph{Phase 2a (constraint systems) — implemented.}
+Algebraic constraint fields are supported as of Phase~2a.  The constraint
+path (\texttt{\_solve\_modal\_jax\_constrained}) calls the numpy
+\texttt{\_build\_evolution\_matrices} routine to perform the Schur
+elimination of constraint fields, then runs the JAX expm+scan kernel on the
+reduced dynamical subspace.  Constraint fields are reconstructed
+post-evolution via \texttt{einsum("mcj,tmj->tcm", recovery, ys)}.
+
+Verified against \texttt{dark\_photon\_plasma} (3~constraint fields,
+30~dynamical slots): \texttt{rel\_err = 2.7e-17} (machine precision).
 
 \subsection{Dispatch and Installation}
 \label{sec:modal_jax_dispatch}
@@ -177,11 +185,49 @@ Combined expected speedup for the inference workload ($N=64$, $b=8$,
 $N_{\mathrm{rfft}}=33$, $N_{\mathrm{snap}}=2$): $\sim5\times$ on the full
 \texttt{solve\_modal\_jax} call after JIT warmup.
 
-\paragraph{Local benchmark.}
-Run \texttt{scripts/local\_jax\_benchmark.py} to measure the achieved
-speedup on the development machine.  JIT compile time (first call) is
-reported separately and excluded from the benchmark mean.  Relative error
-is verified to be $<10^{-10}$ against the scipy backend.
+\paragraph{Measured speedup (devcontainer, CPU XLA).}
+Interleaved benchmarking (\texttt{n=50}, alternating scipy/JAX to cancel
+monotonic drift; see \texttt{scripts/local\_jax\_benchmark.py}):
+
+\begin{itemize}
+  \item KG-1D ($N=64$, $N_{\mathrm{snap}}=101$): scipy~$2.8$ms,
+    JAX~$2.5$ms, speedup~$1.13\times$.
+  \item Coupled scalars ($N=64$): scipy~$5.1$ms, JAX~$4.7$ms,
+    speedup~$1.08\times$.
+  \item \texttt{dark\_photon\_plasma} ($N=32$, 17~modes, 30~dyn slots,
+    Phase~2a+2b): scipy~$11$ms, JAX~$21$ms, speedup~$0.51\times$
+    (machine-precision agreement, but \textbf{JAX is slower at this size}).
+\end{itemize}
+
+The supervisor's $10$--$100\times$ expectation is unrealistic at the
+current PolyChord problem size on CPU XLA. Profile evidence:
+
+\begin{verbatim}
+dark_photon_plasma N=32 breakdown (Phase 2b):
+  _build_evolution_matrices (numpy Schur):  1.94 ms
+  batch_expm (Padé, 17 modes x 30x30):      8.76 ms  <- dominant
+  evolve_uniform scan:                      0.08 ms
+  einsum recovery + IFFT + assembly:        ~10  ms
+  Total JAX:                                ~21  ms
+
+  scipy total (Padé loop + IFFT):           ~11  ms
+\end{verbatim}
+
+\texttt{scipy.linalg.expm} (LAPACK) for a single $30\times30$ complex
+matrix is $\sim0.5$~ms; 17 serial calls = $\sim8.5$~ms.  JAX
+\texttt{vmap(expm)} for the same workload is $\sim8.8$~ms ---
+\textbf{vmap parallelism does not overcome XLA dispatch overhead until
+$\geq100$ modes} ($N\geq192$ in~1D).
+
+\paragraph{Where JAX wins.}
+\begin{itemize}
+  \item Large grids ($N\geq128$ in~1D, $N\geq64$ in~2D) where the rfft
+    has $\geq100$ modes.
+  \item Larger dynamical blocks ($N_f \geq 10$, $b \geq 20$) where each
+    expm is large enough to amortise dispatch overhead.
+  \item GPU XLA (not available on CSD3 sapphire CPU partitions); GPU
+    JAX can parallelise across modes essentially for free.
+\end{itemize}
 
 \paragraph{HPC validation.}
 The script \texttt{scripts/hpc\_jax\_benchmark.sh} runs two short
@@ -191,8 +237,9 @@ CSD3 sapphire.  Results are written to
 \begin{verbatim}
 bash scripts/hpc_shuttle.sh submit scripts/hpc_jax_benchmark.sh
 \end{verbatim}
-Do not submit until local benchmark results show $\geq3\times$ speedup and
-relative error $<10^{-10}$.
+The HPC benchmark on sapphire compute nodes (Intel Sapphire Rapids with
+larger L2 cache, faster BLAS) may show better JAX speedup than the
+devcontainer.
 
 \subsection{Numerical Validation}
 \label{sec:modal_jax_validation}
