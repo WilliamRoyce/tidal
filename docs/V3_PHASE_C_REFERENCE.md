@@ -112,3 +112,17 @@ Items the parallel agent should **keep** on their plan:
 The supervisor's package is read only via `tar -xzOf psalter.tar.gz <member>` — never extracted to the working tree. The relevant reference modules are `psalter/_tile/geometry.py` and `psalter/tile.py` (geometry conventions); `psalter/_sample/sample.py` (per-tile NS driver pattern); `psalter/_plot/core.py` (atlas renderer pattern).
 
 Our implementation is independent code and not a derivative of psalter; the value of psalter as a reference is that it pins the *naming and orientation conventions* — so a TIDAL chain in `01p_tile2_3/` and a psalter chain in the same directory layout describe the same sphere region, simplifying any future cross-validation. We do not redistribute psalter; neither does this codebase.
+
+## Sync log
+
+### 2026-05-16 — focused session: fixed-radius mode + orthant classifier
+
+Landed by a focused session running parallel to the coordinator's v3.x campaign work:
+
+1. **Fixed-radius mode** in `RadialAngularPrior` (commit 5db6f64) — `r_lo == r_hi` is now accepted and triggers the angular-only sampling path. The supervisor's stated scheme is "fixed small r, scan only the angular direction"; the prior now matches it without breaking backward compatibility (existing `r_lo < r_hi` callers unchanged). New `is_fixed_radius` property. `u[0]` is still consumed by `transform()` (cube dimensionality stable for PolyChord) but ignored when fixed. CLI prior summary prints `fixed r=X` in this mode. Four new tests; full prior test count now 33.
+
+2. **Orthant / constraint tile classifier** in `_sphere.py` (commit cdc20b1) — new `TileStatus` enum and `classify_tile` / `classify_all_cells` helpers that evaluate a `ConstraintSet` at tile corners (and optional interior samples) under the fixed-r cubed-sphere transform. Output: `FULLY_INSIDE` (skip runtime check), `BOUNDARY` (runtime rejection active), `FULLY_OUTSIDE` (drop tile entirely). Per-axis sign constraints (`ξ > 0`) and linear half-spaces are convex along the gnomonic chart, so corner evaluation is exact for them. Non-convex regions are caught by `sample_interior=K` and otherwise fall back to runtime rejection (correctness backstop). 10 new tests in `tests/test_tile_orthant_filter.py`.
+
+3. **GH issue housekeeping** — closed duplicates #363, #366, #364 against originals #358, #359, #360. Commented on #358 noting that fixed-r + tile classifier are now in tree, so Approach A becomes a small wiring step once the supervisor returns the kinetic-vs-mass classification.
+
+What this session did **not** do: PSALTer integration (post-deadline per user); the `[v3-viz]` 99% credibility contour (coordinator owns); Approach A wiring (gated on #358); a `tidal sample --survey` orchestration driver (out of scope; helpers are ready for it).
