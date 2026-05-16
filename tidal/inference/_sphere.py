@@ -26,11 +26,15 @@ Public API
 ``random_rotation(n_dims, seed)``      — proper rotation via QR (det +1).
 ``tile_label(sub_tile)``               — ``"2_3"`` ASCII tag.
 ``cell_label(face_idx, sub_tile)``     — ``"01p_tile2_3"`` directory key.
+``TileStatus``                         — FULLY_INSIDE / BOUNDARY / FULLY_OUTSIDE.
+``classify_tile(...)``                 — corner-eval constraint check for one tile.
+``classify_all_cells(...)``            — classify every cell of an M-subdivided sphere.
 """
 
 from __future__ import annotations
 
 import itertools
+from enum import Enum
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -39,6 +43,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from numpy.typing import NDArray
+
+    from tidal.inference._constraints import ConstraintSet
 
 
 def n_faces(n_dims: int) -> int:
@@ -222,3 +228,171 @@ def random_rotation(
     if np.linalg.det(Q) < 0:
         Q[:, 0] *= -1
     return Q.astype(np.float64)
+
+
+# ---------------------------------------------------------------------------
+# Tile-eligibility classification for orthant-restricted angular surveys
+# ---------------------------------------------------------------------------
+
+
+class TileStatus(Enum):
+    """Classification of a single tile against a constraint set.
+
+    - ``FULLY_INSIDE``  — every probed point passes; runtime rejection is
+      unnecessary for samples drawn inside this tile.
+    - ``BOUNDARY``      — some probed points pass and some fail; runtime
+      rejection must stay active for samples in this tile.
+    - ``FULLY_OUTSIDE`` — every probed point fails; a survey driver should
+      skip this tile entirely.
+    """
+
+    FULLY_INSIDE = "fully_inside"
+    BOUNDARY = "boundary"
+    FULLY_OUTSIDE = "fully_outside"
+
+
+def _tile_corners(
+    sub_tile: tuple[int, ...],
+    M: int,  # noqa: N803
+) -> NDArray[np.float64]:
+    """Return the ``2^(N-1)`` corners of one sub-tile as a ``(2^(N-1), N-1)`` array."""
+    u_lo, u_hi = tile_bounds(sub_tile, M)
+    n_minus_1 = u_lo.shape[0]
+    corners = np.empty((2**n_minus_1, n_minus_1), dtype=np.float64)
+    for idx, bits in enumerate(itertools.product((0, 1), repeat=n_minus_1)):
+        for j, b in enumerate(bits):
+            corners[idx, j] = u_hi[j] if b else u_lo[j]
+    return corners
+
+
+def classify_tile(
+    face_idx: int,
+    sub_tile: tuple[int, ...],
+    M: int,  # noqa: N803
+    Q: NDArray[np.float64],  # noqa: N803
+    r: float,
+    coupling_names: tuple[str, ...],
+    constraints: ConstraintSet,
+    *,
+    sample_interior: int = 0,
+    rng_seed: int = 0,
+) -> TileStatus:
+    r"""Classify one tile by evaluating ``constraints`` at its corners (and optionally interior samples) under the fixed-r cubed-sphere transform.
+
+    For each corner ``u`` of the M-subdivided sub-tile (``2^(N-1)`` total),
+    compute ``c = r * face_to_direction(face_idx, u, Q)`` and evaluate the
+    ConstraintSet against ``dict(zip(coupling_names, c))``.  If
+    ``sample_interior > 0``, additionally evaluate at that many random
+    interior points (drawn uniformly inside the sub-tile bounds) to tighten
+    the classification on non-convex constraint regions.
+
+    Per-axis sign constraints (``xi > 0``) and linear-half-space algebraic
+    constraints are convex along the gnomonic chart, so corner evaluation
+    is exact for them: a FULLY_INSIDE verdict from corners alone is
+    correct.  Non-convex constraint regions can fool corner-only checks;
+    the optional interior-sampling tightens this but is not a proof.  The
+    runtime-rejection layer (likelihood returns ``-inf`` on
+    ``constraints.check``) remains the correctness backstop in all cases —
+    this classifier is a survey-design-time speedup, not a correctness
+    gate.
+
+    Parameters
+    ----------
+    face_idx : int
+        1-indexed face id in ``[1, 2 * n_dims]``.
+    sub_tile : tuple of int
+        1-indexed sub-tile coords, length ``n_dims - 1``.
+    M : int
+        Per-axis subdivision count.
+    Q : array, shape (n_dims, n_dims)
+        Pre-rotation matrix used in the gnomonic chart.
+    r : float
+        Fixed radius — the coupling vector evaluated is ``r * theta_hat``.
+    coupling_names : tuple of str
+        Names of the physical couplings, in order; must have length n_dims.
+    constraints : ConstraintSet
+        AST-safe constraint set (see :mod:`tidal.inference._constraints`).
+    sample_interior : int, optional
+        Number of uniformly-random interior points to evaluate in addition
+        to the corners.  Default 0 (corners only).
+    rng_seed : int, optional
+        Seed for the interior-sample RNG.  Default 0.
+
+    Returns
+    -------
+    TileStatus
+        ``FULLY_INSIDE``, ``BOUNDARY``, or ``FULLY_OUTSIDE`` per the policy
+        described above.
+    """
+    n = Q.shape[0]
+    if len(coupling_names) != n:
+        msg = f"coupling_names must have length n_dims = {n}; got {len(coupling_names)}"
+        raise ValueError(msg)
+    if not constraints:
+        # No constraints — every tile is trivially fully inside.
+        return TileStatus.FULLY_INSIDE
+
+    corners = _tile_corners(sub_tile, M)
+
+    n_pass = 0
+    n_fail = 0
+    for u in corners:
+        c = r * face_to_direction(face_idx, u, Q)
+        params = dict(zip(coupling_names, (float(x) for x in c), strict=True))
+        if constraints.check(params):
+            n_pass += 1
+        else:
+            n_fail += 1
+
+    if sample_interior > 0:
+        rng = np.random.default_rng(rng_seed)
+        u_lo, u_hi = tile_bounds(sub_tile, M)
+        for _ in range(sample_interior):
+            u = u_lo + rng.random(u_lo.shape[0]) * (u_hi - u_lo)
+            c = r * face_to_direction(face_idx, u, Q)
+            params = dict(zip(coupling_names, (float(x) for x in c), strict=True))
+            if constraints.check(params):
+                n_pass += 1
+            else:
+                n_fail += 1
+
+    if n_fail == 0:
+        return TileStatus.FULLY_INSIDE
+    if n_pass == 0:
+        return TileStatus.FULLY_OUTSIDE
+    return TileStatus.BOUNDARY
+
+
+def classify_all_cells(
+    n_dims: int,
+    M: int,  # noqa: N803
+    Q: NDArray[np.float64],  # noqa: N803
+    r: float,
+    coupling_names: tuple[str, ...],
+    constraints: ConstraintSet,
+    *,
+    sample_interior: int = 0,
+    rng_seed: int = 0,
+) -> Iterator[tuple[int, tuple[int, ...], TileStatus]]:
+    """Iterate ``(face_idx, sub_tile, status)`` across all ``2N * M^(N-1)`` cells of the M-subdivided cubed sphere, classifying each via :func:`classify_tile`.
+
+    The iterator yields *every* cell — the caller decides what to skip.
+    Survey drivers will typically drop FULLY_OUTSIDE cells at dispatch
+    time; BOUNDARY cells run with runtime rejection active; FULLY_INSIDE
+    cells can use a fast path that skips the runtime check.  An empty
+    survey (every cell FULLY_OUTSIDE) is possible under tight constraints
+    and must be handled gracefully by the caller.
+    """
+    for face_idx, sub_tile in enumerate_cells(n_dims, M):
+        status = classify_tile(
+            face_idx,
+            sub_tile,
+            M,
+            Q,
+            r,
+            coupling_names,
+            constraints,
+            sample_interior=sample_interior,
+            rng_seed=rng_seed,
+        )
+        yield face_idx, sub_tile, status
