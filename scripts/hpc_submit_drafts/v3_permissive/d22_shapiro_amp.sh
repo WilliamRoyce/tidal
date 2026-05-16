@@ -4,7 +4,7 @@
 # Parameter partition matches v2 chain 28736161 exactly.
 # Pinned: chi (was 0 in v2 too).
 # Reference v2: 28736161 (log Z = +0.612 ± 0.002, 38 min INTR).
-# Note: 8 params; v2 took 38 min INTR — v3 amp should fit within 1h; resume if not.
+# max_ndead=20000: safety cap; 8p amp likely hits precision_criterion first (~30-40 min).
 
 set -euo pipefail
 
@@ -31,4 +31,5 @@ bash scripts/hpc_shuttle.sh submit \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
     --method nested --sampler polychord --nlive 2400 \
     --num-repeats 5 --precision-criterion 0.01 \
+    --max-ndead 20000 \
     --output ${RESULTS_DIR}/d22_shapiro_amp_v3'

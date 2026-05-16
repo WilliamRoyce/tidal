@@ -96,6 +96,10 @@ fi
 #      --num-repeats 2*ndim         (Handley's own run_pypolychord.py)
 #      --precision-criterion 0.01   (Cobaya's expensive-likelihood rec)
 #      --no-clustering              (safe for unimodal posteriors)
+#      --max-ndead N                (REQUIRED for clean INTR exit: ensures
+#                                    inference.json is written before walltime.
+#                                    amp chains: ~25000; sup chains: ~5000.
+#                                    Measure rate from first run: nDead/min × 45.)
 #    For ntasks=1, mpirun still works as a pass-through.
 echo "--- Running tidal command (mpirun -n ${SLURM_NTASKS}) ---"
 cd "${TIDAL_ROOT}"

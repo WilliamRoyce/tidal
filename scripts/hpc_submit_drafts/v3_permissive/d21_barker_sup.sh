@@ -3,7 +3,7 @@
 #
 # Parameter partition matches v2 chain 28727741 exactly.
 # Reference v2: 28727741 (log Z = -0.447 ± 0.001).
-# Note: may need resume if >1h; see INTR+resume strategy in V3_PHASE_TRACKER.md §B.5.
+# max_ndead=5000: at D2.0 sup rate (~138 dead pts/min), terminates in ~36 min + post-processing.
 
 set -euo pipefail
 
@@ -28,4 +28,5 @@ bash scripts/hpc_shuttle.sh submit \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
     --method nested --sampler polychord --nlive 1800 \
     --num-repeats 5 --precision-criterion 0.01 \
+    --max-ndead 5000 \
     --output ${RESULTS_DIR}/d21_barker_sup_v3'

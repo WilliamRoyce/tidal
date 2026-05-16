@@ -328,6 +328,9 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             ns_kwargs["do_clustering"] = False
         if getattr(args, "read_resume", False):
             ns_kwargs["read_resume"] = True
+        max_ndead = getattr(args, "max_ndead", None)
+        if max_ndead is not None:
+            ns_kwargs["max_ndead"] = max_ndead
 
         result = run_nested_sampling(
             log_likelihood=likelihood_fn,

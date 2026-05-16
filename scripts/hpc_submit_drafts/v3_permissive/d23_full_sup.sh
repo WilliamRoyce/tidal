@@ -2,7 +2,7 @@
 # v3 D2.3 full T5 sup — all 9 nonminimal couplings free
 #
 # Reference v2: 28742035 (log Z = -0.615 ± 0.001, std 6h, 1:00 wall).
-# Strategy: INTR+resume — expect 4-5 sessions (v3 sup is ~5x slower for wide priors).
+# max_ndead=2000: very conservative for 9p sup (most complex chain); ~15 min + post-processing.
 
 set -euo pipefail
 
@@ -29,4 +29,5 @@ bash scripts/hpc_shuttle.sh submit \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
     --method nested --sampler polychord --nlive 1800 \
     --num-repeats 5 --precision-criterion 0.01 \
+    --max-ndead 2000 \
     --output ${RESULTS_DIR}/d23_full_sup_v3'

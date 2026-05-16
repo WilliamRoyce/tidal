@@ -4,7 +4,7 @@
 # Parameter partition matches v2 chain 28739692 exactly.
 # Pinned: chi (was 0 in v2 too).
 # Reference v2: 28739692 (log Z = -0.615 ± 0.001, 33 min INTR).
-# Note: 8 params sup; v2 took 33 min INTR but v3 sup is ~5x slower — expect 2+ resumes.
+# max_ndead=3000: conservative for 8p sup (harder than 5p); ~22 min + post-processing.
 
 set -euo pipefail
 
@@ -31,4 +31,5 @@ bash scripts/hpc_shuttle.sh submit \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
     --method nested --sampler polychord --nlive 2400 \
     --num-repeats 5 --precision-criterion 0.01 \
+    --max-ndead 3000 \
     --output ${RESULTS_DIR}/d22_shapiro_sup_v3'

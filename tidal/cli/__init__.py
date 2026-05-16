@@ -1931,6 +1931,20 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         ),
     )
     sample_parser.add_argument(
+        "--max-ndead",
+        type=int,
+        default=None,
+        dest="max_ndead",
+        metavar="N",
+        help=(
+            "PolyChord: stop cleanly after N dead points and write all output "
+            "(inference.json, results.csv). Required for INTR jobs — ensures "
+            "output is written before SLURM walltime. Has no effect if "
+            "precision_criterion terminates the run first. "
+            "Typical values: amp chains ~25000; sup chains ~5000."
+        ),
+    )
+    sample_parser.add_argument(
         "--seed",
         type=int,
         default=42,
