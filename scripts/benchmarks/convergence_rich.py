@@ -506,8 +506,6 @@ def _tio_run_one(
         f"{T_END}",
         "--dt",
         f"{dt}",
-        "--snapshots",
-        f"{T_END}",
         *scheme_args,
         "--param",
         f"kappa={KAPPA}",
@@ -543,7 +541,7 @@ def _tio_run_one(
         "measure",
         str(out_dir),
         "--what",
-        "conversion",
+        "peak_conversion",
         "--source",
         "h_5",
         "--target",
@@ -561,7 +559,10 @@ def _tio_run_one(
     if res.returncode != 0:
         return {"scheme": scheme_label, "dt": dt, "ok": False, "error": "meas failed"}
     meas = json.loads(res.stdout)
-    p = float(meas.get("conversion", {}).get("peak_probability", 0.0))
+    # P_final = probability at last snapshot = P(t_align); robust regardless of
+    # snapshot count (unlike peak_probability which is argmax and can pick an
+    # intermediate snapshot when Y4's oscillatory error temporarily overshoots).
+    p = float(meas.get("peak_conversion", {}).get("P_final", 0.0))
     err_modal = abs(p - modal_reference) if modal_reference is not None else None
     t_ref = t_align if t_align is not None else T_END
     p_analytic_aligned = math.sin(0.5 * KAPPA * B0_RABI * t_ref) ** 2
