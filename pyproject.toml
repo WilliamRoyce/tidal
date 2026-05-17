@@ -162,6 +162,22 @@ unfixable = ["T201"]
     "PLC2701",
     "PLR0913",
     "PLR0914",
+    # Mathematical naming conventions (matrices, Jacobians, etc.)
+    "N803",
+    "N806",
+    # × and other Unicode math symbols in comments are intentional
+    "RUF003",
+    # THEORIES-format description comments in benchmark scripts
+    "ERA001",
+    # Benchmark helpers often need > 5 positional args
+    "PLR0917",
+    # Inner plotting helpers don't need full type annotations
+    "ANN001",
+    "ANN202",
+    # Figure scripts have necessarily complex single-function plot pipelines
+    "C901",
+    "PLR0915",
+    "PLR0912",
 ]
 "docs/**/*" = ["INP001", "I002"]
 
