@@ -10,7 +10,7 @@
 
 \TIDAL{} treats a correction $\varepsilon\,\mathcal{L}_1$ to a well-posed base
 Lagrangian $\mathcal{L}_0$ as a perturbative shift to the base-theory dynamics.
-The effective-field-theory grounds for this treatment, the %order-by-order
+The effective-field-theory background, the %order-by-order
 equations-of-motion reduction, and the Lagrangian perturbative substitution used
 for Hamiltonian analysis
 %  --- together with the conditions under which it fails ---
@@ -40,26 +40,22 @@ Such a redefinition is a canonical transformation: it preserves the Poisson brac
 relations between coordinates and momenta, so that Hamilton's equations and all physical
 observables take identical form in the new variables.
 The original higher-derivative Lagrangian and the perturbatively reduced one are therefore
-physically equivalent within the perturbative regime.
-% ; the reduction is an exact canonical
-% equivalence, not an on-shell approximation.
-This equivalence underlies the order-by-order expansion of \cref{EOMHierarchy}: the
-perturbatively corrected solution reproduces the physical predictions of $\mathcal{L}$
-to first order in $\varepsilon$.
-The construction has a prerequisite that bears emphasis: the base-theory equation of
-motion for each reduced field must be of the form $\partial_t^2\varphi^{\mathcal{I}} =
-F^{\mathcal{I}}[\varphi,\partial_t\varphi,\nabla\varphi]$, since this equation is the
-substitution rule itself; fields whose base-theory equation is purely algebraic violate
-the prerequisite and the canonical equivalence breaks down --- the failure mode addressed
-below.
+physically equivalent within the perturbative regime, and the order-by-order expansion of
+\cref{EOMHierarchy} reproduces the physical predictions of $\mathcal{L}$ to first order
+in $\varepsilon$.
+This equivalence requires that the base-theory equation of motion for each reduced field
+take the form $\partial_t^2\varphi^{\mathcal{I}} = F^{\mathcal{I}}[\varphi,\partial_t\varphi,
+\nabla\varphi]$, since this equation is the substitution rule itself; fields whose
+base-theory equation is purely algebraic violate the requirement and the canonical
+equivalence breaks down --- the failure mode addressed below.
 
 The alternative --- treating $\mathcal{L}$ as an exact theory rather than a truncated
 expansion --- encounters a structural obstruction.
-Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Woodard:2015zca} states that any
-non-degenerate Lagrangian whose Euler--Lagrange equations are of differential order
-greater than two has a Hamiltonian unbounded below: the momentum conjugate to the highest
-time derivative enters the Hamiltonian linearly so that the energy is unbounded below for
-arbitrary sign of that momentum, and the corresponding mode is a ghost.%
+Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Pais:1950za,Woodard:2015zca} states
+that any non-degenerate Lagrangian whose Euler--Lagrange equations are of differential
+order greater than two has a Hamiltonian unbounded below: the momentum conjugate to the
+highest time derivative enters the Hamiltonian linearly so that the energy is unbounded
+below for arbitrary sign of that momentum, and the corresponding mode is a ghost.%
 \footnote{Apparent counterexamples in gravity --- the Gauss--Bonnet term in four
 spacetime dimensions~\cite{Lovelock:1971yv} and the higher-derivative terms in the
 Einstein--Hilbert Lagrangian~\cite{hobson2006general,wald1984general} --- are excluded:
@@ -107,9 +103,12 @@ correction~\cite{jaen1986reduction} --- expressing each $\partial_t^n\varphi^{\m
 via repeated differentiation of the base-theory equations --- has no substitution target
 when a field equation is purely algebraic at order zero; and
 introducing each time-derivative order of the fields as a separate dynamical
-variable~\cite{ostrogradsky1850memoires,Woodard:2015zca} to reduce the system to a
-first-order form promotes the ghost modes predicted by Ostrogradsky's theorem to live
-degrees of freedom, producing unphysical exponential growth in long-time simulation.
+variable~\cite{ostrogradsky1850memoires,Woodard:2015zca} ---
+$Q_n^{\mathcal{I}} \equiv \partial_t^n\varphi^{\mathcal{I}}$ for $n = 0, 1, \ldots, N-1$
+with $N$ the order of the highest time derivative in $\mathcal{L}$ --- to reduce the
+system to a first-order form promotes the ghost modes predicted by Ostrogradsky's
+theorem to live degrees of freedom, producing unphysical exponential growth in long-time
+simulation.
 
 On flat periodic domains, the Pass~0 system at wavenumber $k$ reduces to the per-mode
 ODE $\partial_t\hat{y}^{(0)} = M(k)\,\hat{y}^{(0)}$ (cf.~\cref{ModalPerMode}), where
@@ -117,8 +116,9 @@ $\hat{y}^{(0)}$ stacks the Fourier amplitudes of every field and velocity slot.
 For the perturbative-reduction path, the eigendecomposition $M(k) = V D V^{-1}$ is
 used rather than the Pad\'e scaling-and-squaring path of \cref{ModalSolver}, since the
 per-eigenmode expansion is required explicitly for the Duhamel integral.
-With $D$ diagonal with eigenvalues $\{\lambda_i\}$ and $V$ the right-eigenvector
-matrix, the Pass~0 solution at initial data $\hat{y}^{(0)}(0)$ is
+With $D = \mathrm{diag}(\lambda_1,\lambda_2,\ldots)$ collecting the eigenvalues of $M(k)$
+and $V$ the right-eigenvector matrix, the Pass~0 solution at initial data
+$\hat{y}^{(0)}(0)$ is
 \begin{equation}
   \hat{y}^{(0)}(t) = V\,e^{Dt}\,\alpha,
   \qquad
@@ -130,17 +130,30 @@ Pass~1 satisfies the inhomogeneous system
 $\partial_t\hat{y}^{(1)} = M(k)\,\hat{y}^{(1)} + C_{\mathrm{src}}\,\hat{y}^{(0)}(t)$
 with $\hat{y}^{(1)}(0) = 0$, where $C_{\mathrm{src}}$ is the source coupling matrix
 assembled from the $\varepsilon^1$ terms in the equations of motion.
-Working in the eigenbasis with $\beta = V^{-1}C_{\mathrm{src}}V$, the transformed
-component $\hat{z}^{(1)}_i = [V^{-1}\hat{y}^{(1)}]_i$ satisfies the scalar
-inhomogeneous ODE with zero initial data,
+Substituting $\hat{y}^{(1)} = V\hat{z}^{(1)}$ and the Pass~0 solution
+$\hat{y}^{(0)}(t) = V e^{Dt}\alpha$ into this system and multiplying through by $V^{-1}$
+diagonalises the homogeneous part ($V^{-1}M(k)V = D$) and rotates the source into the
+eigenbasis ($V^{-1}C_{\mathrm{src}}V \equiv \beta$), giving
+\begin{equation}
+  \dot{\hat{z}}^{(1)}
+  \;=\;
+  D\,\hat{z}^{(1)}
+  \;+\; \beta\,e^{Dt}\,\alpha,
+  \qquad \hat{z}^{(1)}(0) = 0.
+  \label{EigenODESystem}
+\end{equation}
+Component-wise this is a set of decoupled scalar inhomogeneous ODEs,
 \begin{equation}
   \dot{\hat{z}}^{(1)}_i
   \;=\;
   \lambda_i\,\hat{z}^{(1)}_i
   \;+\; \sum_j\beta_{ij}\,\alpha_j\,e^{\lambda_j t},
-  \qquad \hat{z}^{(1)}_i(0) = 0.
+  \qquad \hat{z}^{(1)}_i(0) = 0,
   \label{EigenODE}
 \end{equation}
+the homogeneous term carrying the eigenvalue $\lambda_i$ of mode $i$ and the source term
+expressing the rotated coupling of every Pass~0 mode $j$ into the Pass~1 evolution of
+mode $i$.
 Multiplying through by $e^{-\lambda_i t}$ converts the left side to
 $\tfrac{d}{dt}[e^{-\lambda_i t}\hat{z}^{(1)}_i]$; integrating both sides from $0$ to
 $t$~\cite{hochbruck2010exponential,almohy2011action} then gives
@@ -151,8 +164,7 @@ $t$~\cite{hochbruck2010exponential,almohy2011action} then gives
   \int_0^t e^{(\lambda_j - \lambda_i)\tau}\,\mathrm{d}\tau,
   \label{DuhamelIntegral}
 \end{equation}
-in which the exponential integrand evaluates in closed form; no time-step discretisation
-is involved.
+in which the exponential integrand evaluates in closed form.
 Restoring the factor $e^{\lambda_i t}$ gives
 \begin{equation}
   \hat{z}^{(1)}_i(t)
