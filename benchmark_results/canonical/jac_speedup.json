@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-17T22:16:59.521460+00:00",
+    "source": "reconstructed from job 29495390 slurm log (cancelled by TIME LIMIT)",
+    "note": "PARTIAL DATA \u2014 only 2 of 36 configs completed. See jac_speedup.json after full run.",
+    "parameters": {
+      "theories": [
+        "coupled_scalars",
+        "gertsenshtein",
+        "navier_cauchy_2d"
+      ],
+      "n_reps": 20,
+      "seed": 42,
+      "dense_bench_limit": 50000,
+      "dense_threshold": 2000,
+      "sparse_threshold": 200000
+    }
+  },
+  "results": [
+    {
+      "theory": "coupled_scalars",
+      "n_grid": 32768,
+      "grid_shape": [
+        32768
+      ],
+      "n_total": 131072,
+      "n_colors": 6,
+      "nnz": 524288,
+      "auto_tier": "sparse",
+      "dense_s_mean": NaN,
+      "dense_s_std": 0.0,
+      "dense_s_reps": [],
+      "sparse_s_mean": 0.000645,
+      "sparse_s_std": 0.0,
+      "sparse_s_reps": [],
+      "gmres_s_mean": 0.000622,
+      "gmres_s_std": 0.0,
+      "gmres_s_reps": [],
+      "fd_s_mean": 0.00289,
+      "fd_s_std": 0.0,
+      "fd_s_reps": [],
+      "speedup_auto_vs_fd": 4.48
+    },
+    {
+      "theory": "gertsenshtein",
+      "n_grid": 16,
+      "grid_shape": [
+        16
+      ],
+      "n_total": 192,
+      "n_colors": 6,
+      "nnz": 704,
+      "auto_tier": "dense",
+      "dense_s_mean": 6.91e-05,
+      "dense_s_std": 0.0,
+      "dense_s_reps": [],
+      "sparse_s_mean": 1.09e-06,
+      "sparse_s_std": 0.0,
+      "sparse_s_reps": [],
+      "gmres_s_mean": 6.46e-06,
+      "gmres_s_std": 0.0,
+      "gmres_s_reps": [],
+      "fd_s_mean": 1.82e-05,
+      "fd_s_std": 0.0,
+      "fd_s_reps": [],
+      "speedup_auto_vs_fd": 0.26
+    }
+  ]
+}

@@ -82,41 +82,69 @@ THEORIES: list[
     ]
 ] = [
     (
+        # 4 slots, 1-D → n_total = 4N.  Dense tier (n<2000): N≤500.
+        # Densified at low N to resolve the dense-tier speedup region.
         "coupled_scalars",
         REPO_ROOT / "examples" / "data" / "coupled_scalars.json",
         [
+            (32,),
+            (48,),
             (64,),
+            (96,),
             (128,),
+            (192,),
             (256,),
-            (512,),
+            (384,),
+            (500,),
+            (768,),
             (1024,),
+            (1536,),
             (2048,),
+            (3072,),
             (4096,),
+            (6144,),
             (8192,),
+            (12288,),
             (16384,),
+            (24576,),
             (32768,),
+            (49152,),
             (65536,),
-            (131072,),
         ],
         ((0.0, 100.0),),
         {"kappa": 1.0, "B0": 0.1, "omegaP2": 0.0, "mg2": 0.0},
     ),
     (
+        # 12 slots, 1-D → n_total = 12N.  Dense tier (n<2000): N≤166.
+        # Densified at low N; upper end trimmed (was N=32768 ≈ 393k).
         "gertsenshtein",
         REPO_ROOT / "examples" / "data" / "gertsenshtein.json",
         [
+            (4,),
+            (8,),
+            (12,),
             (16,),
+            (24,),
             (32,),
+            (48,),
             (64,),
+            (96,),
             (128,),
+            (160,),
+            (192,),
             (256,),
+            (384,),
             (512,),
+            (768,),
             (1024,),
+            (1536,),
             (2048,),
+            (3072,),
             (4096,),
+            (6144,),
             (8192,),
+            (12288,),
             (16384,),
-            (32768,),
         ],
         ((0.0, 100.0),),
         {"kappa": 1.0, "B0": 0.3},
@@ -126,21 +154,30 @@ THEORIES: list[
         # with the analytical Jacobian builder.  Use navier_cauchy_2d instead:
         # 2 displacement fields (+ 2 velocity slots) on an N×N grid give
         # n_total = 4N², the same O(N²) 2-D scaling the figure aims to show.
+        # Densified at low N; upper end trimmed (was N=256 ≈ 262k).
         "navier_cauchy_2d",
         REPO_ROOT / "examples" / "data" / "navier_cauchy_2d.json",
         [
+            (4, 4),
+            (6, 6),
             (8, 8),
+            (10, 10),
             (12, 12),
+            (14, 14),
             (16, 16),
+            (20, 20),
             (24, 24),
             (32, 32),
+            (40, 40),
             (48, 48),
+            (56, 56),
             (64, 64),
+            (80, 80),
             (96, 96),
+            (112, 112),
             (128, 128),
             (160, 160),
             (192, 192),
-            (256, 256),
         ],
         ((0.0, 1.0), (0.0, 1.0)),
         {"rho": 1.0, "lam": 1.0, "mu": 1.0},
@@ -283,14 +320,33 @@ def build_jac_setup(
 # ---------------------------------------------------------------------------
 
 
-def probe_jac_batch_size(setup: dict, target_s: float = _PROBE_TARGET_S) -> int:
-    """Pick a batch size so one sparse-callback measurement ≥ target_s."""
+def _probe_batch_size(call, target_s: float = _PROBE_TARGET_S) -> int:
+    """Pick a batch size for one callback so probe time ≥ target_s.
+
+    Probing per-callback is essential: the dense path can be 1e5x slower than
+    sparse, so using a sparse-derived batch_size for dense over-batches by 5
+    orders of magnitude and stalls the job.
+    """
     t0 = time.perf_counter()
-    setup["call_sparse"]()
+    call()
     probe_s = time.perf_counter() - t0
     if probe_s >= target_s:
         return 1
     return max(1, math.ceil(target_s / probe_s))
+
+
+def probe_jac_batch_size(
+    setup: dict, target_s: float = _PROBE_TARGET_S
+) -> dict[str, int]:
+    """Per-callback adaptive batch sizes."""
+    return {
+        "dense": _probe_batch_size(setup["call_dense"], target_s)
+        if setup["call_dense"]
+        else 1,
+        "sparse": _probe_batch_size(setup["call_sparse"], target_s),
+        "gmres": _probe_batch_size(setup["call_gmres"], target_s),
+        "matvec": _probe_batch_size(setup["call_matvec"], target_s),
+    }
 
 
 def warmup_jac(setup: dict, n_warmup: int = N_WARMUP) -> None:
@@ -308,42 +364,62 @@ def warmup_jac(setup: dict, n_warmup: int = N_WARMUP) -> None:
 # ---------------------------------------------------------------------------
 
 
-def time_one_jac_rep(setup: dict, batch_size: int = 1) -> dict:
+def time_one_jac_rep(setup: dict, batch_sizes: dict[str, int] | int = 1) -> dict:
     """Time one rep of all four paths. Returns per-call wall times in seconds.
 
     The FD proxy is timed as ``n_colors`` sequential mat-vec calls (simulating
     the n_colors residual evaluations that SUNDIALS performs per Jacobian fill).
+    ``batch_sizes`` may be a single int (legacy) or a per-callback dict from
+    ``probe_jac_batch_size`` — the latter is essential because dense and
+    sparse callbacks differ by orders of magnitude in cost.
     """
+    if isinstance(batch_sizes, int):
+        bs = {
+            "dense": batch_sizes,
+            "sparse": batch_sizes,
+            "gmres": batch_sizes,
+            "matvec": batch_sizes,
+        }
+    else:
+        bs = batch_sizes
+
     results: dict[str, float] = {}
     n_colors = setup["n_colors"]
 
     # Dense
     if setup["call_dense"] is not None:
+        b = bs["dense"]
         t0 = time.perf_counter()
-        for _ in range(batch_size):
+        for _ in range(b):
             setup["call_dense"]()
-        results["dense_s"] = (time.perf_counter() - t0) / batch_size
+        results["dense_s"] = (time.perf_counter() - t0) / b
     else:
         results["dense_s"] = float("nan")
 
     # Sparse
+    b = bs["sparse"]
     t0 = time.perf_counter()
-    for _ in range(batch_size):
+    for _ in range(b):
         setup["call_sparse"]()
-    results["sparse_s"] = (time.perf_counter() - t0) / batch_size
+    results["sparse_s"] = (time.perf_counter() - t0) / b
 
     # GMRES jactimes (one JVP call)
+    b = bs["gmres"]
     t0 = time.perf_counter()
-    for _ in range(batch_size):
+    for _ in range(b):
         setup["call_gmres"]()
-    results["gmres_s"] = (time.perf_counter() - t0) / batch_size
+    results["gmres_s"] = (time.perf_counter() - t0) / b
 
-    # FD proxy: n_colors mat-vec calls in a loop (= n_colors residual calls)
+    # FD proxy: time one mat-vec (batched), then scale by n_colors.  Scaling
+    # is exact for linear FD (the colored evaluations are independent) and
+    # avoids paying n_colors × batch_size matvecs in the inner loop.
+    b = bs["matvec"]
     t0 = time.perf_counter()
-    for _ in range(batch_size):
-        for _ in range(n_colors):
-            setup["call_matvec"]()
-    results["fd_s"] = (time.perf_counter() - t0) / batch_size
+    for _ in range(b):
+        setup["call_matvec"]()
+    matvec_s = (time.perf_counter() - t0) / b
+    results["matvec_s"] = matvec_s
+    results["fd_s"] = matvec_s * n_colors
 
     return results
 
@@ -380,7 +456,7 @@ def _time_one_config(
     )
 
     warmup_jac(setup)
-    batch_size = probe_jac_batch_size(setup)
+    batch_sizes = probe_jac_batch_size(setup)
 
     dense_reps: list[float] = []
     sparse_reps: list[float] = []
@@ -388,7 +464,7 @@ def _time_one_config(
     fd_reps: list[float] = []
 
     for _ in range(reps):
-        rep = time_one_jac_rep(setup, batch_size=batch_size)
+        rep = time_one_jac_rep(setup, batch_sizes=batch_sizes)
         dense_reps.append(rep["dense_s"])
         sparse_reps.append(rep["sparse_s"])
         gmres_reps.append(rep["gmres_s"])
@@ -448,11 +524,40 @@ def _time_one_config(
 # ---------------------------------------------------------------------------
 
 
-def run(reps: int = N_REPS, seed: int = 42) -> dict:
+def _config_key(
+    theory_name: str, grid_shape: tuple[int, ...]
+) -> tuple[str, tuple[int, ...]]:
+    return (theory_name, tuple(grid_shape))
+
+
+def _load_existing_rows(path: Path) -> dict[tuple[str, tuple[int, ...]], dict]:
+    """Load (theory, grid_shape) -> row mapping from an existing JSON file."""
+    if not path.exists():
+        return {}
+    with path.open(encoding="utf-8") as fh:
+        data = json.load(fh)
+    out: dict[tuple[str, tuple[int, ...]], dict] = {}
+    for row in data.get("results", []):
+        key = (row["theory"], tuple(row["grid_shape"]))
+        out[key] = row
+    return out
+
+
+def run(
+    reps: int = N_REPS,
+    seed: int = 42,
+    out_path: Path | None = None,
+    *,
+    skip_existing: bool = False,
+) -> dict:
     """Run the full benchmark.
 
     Trials are shuffled across all (theory, N_grid) configurations per rep
-    to average out monotonic thermal drift.
+    to average out monotonic thermal drift.  After each config completes, the
+    full JSON is rewritten to ``out_path`` so a job killed by walltime still
+    leaves partial data on disk.  If ``skip_existing`` is set, configs that
+    already appear in ``out_path`` are skipped — useful for splitting the
+    sweep across multiple INTR rounds.
     """
     rng = random.Random(seed)  # noqa: S311
 
@@ -464,6 +569,15 @@ def run(reps: int = N_REPS, seed: int = 42) -> dict:
             for grid_shape in grid_shapes
         )
 
+    existing: dict[tuple[str, tuple[int, ...]], dict] = {}
+    if out_path is not None and skip_existing:
+        existing = _load_existing_rows(out_path)
+        if existing:
+            print(
+                f"jac_speedup: found {len(existing)} existing rows in {out_path}",
+                flush=True,
+            )
+
     print(
         f"jac_speedup: {len(configs)} configs x {reps} reps  seed={seed}",
         flush=True,
@@ -474,10 +588,25 @@ def run(reps: int = N_REPS, seed: int = 42) -> dict:
     shuffled = list(configs)
     rng.shuffle(shuffled)
 
-    rows: list[dict] = []
+    rows: list[dict] = list(existing.values())
     for theory_name, json_path, grid_shape, bounds, params in shuffled:
+        if skip_existing and _config_key(theory_name, grid_shape) in existing:
+            print(
+                f"  SKIP {theory_name} shape={grid_shape} (already in JSON)", flush=True
+            )
+            continue
         row = _time_one_config(theory_name, json_path, grid_shape, bounds, params, reps)
         rows.append(row)
+
+        # Per-config checkpoint: rewrite JSON immediately so a job killed by
+        # the INTR walltime still leaves partial results on disk.
+        if out_path is not None:
+            data = {"metadata": _metadata(reps, seed), "results": rows}
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = out_path.with_suffix(out_path.suffix + ".tmp")
+            with tmp.open("w", encoding="utf-8") as fh:
+                json.dump(data, fh, indent=2)
+            tmp.replace(out_path)
 
     return {"metadata": _metadata(reps, seed), "results": rows}
 
@@ -496,9 +625,19 @@ def main() -> None:
     )
     parser.add_argument("--reps", type=int, default=N_REPS)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip configs already present in --out (resume mode).",
+    )
     args = parser.parse_args()
 
-    data = run(reps=args.reps, seed=args.seed)
+    data = run(
+        reps=args.reps,
+        seed=args.seed,
+        out_path=args.out,
+        skip_existing=args.skip_existing,
+    )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
