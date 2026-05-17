@@ -100,38 +100,32 @@ def _plot(data: dict, out_path: Path) -> None:
 
     fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.8))
 
-    # Panel (a): calibration overlay
+    # Panel (a): TIDAL residual against RS + analytic sin²-RS gap as smooth curve.
     ax = axes[0]
-    ax.plot(
-        b0_dense,
-        p_bare,
-        ls=":",
-        lw=1.2,
-        color="#444",
-        label=r"$\sin^2(\kappa B_0 t/2)$",
-    )
-    ax.plot(
-        b0_dense,
-        p_rs,
-        ls="--",
-        lw=1.0,
-        color="#888",
-        label=r"Raffelt–Stodolsky",
-    )
-    ax.plot(
+    p_rs_at = _raffelt_stodolsky(b0, kappa, t0, kwave)
+    ax.semilogy(
         b0,
-        p_final,
+        np.maximum(np.abs(p_final - p_rs_at), EPS_MACH),
         marker="o",
         ms=4,
         lw=0,
         color="#1f77b4",
-        label=r"TIDAL $P_{\mathrm{final}}^{\mathrm{sim}}$",
+        label=r"$|P_\mathrm{TIDAL} - P_\mathrm{RS}|$",
+    )
+    ax.semilogy(
+        b0_dense,
+        np.maximum(np.abs(p_bare - p_rs), EPS_MACH),
+        ls="--",
+        lw=1.0,
+        color="#888",
+        alpha=0.7,
+        label=r"$|\sin^2(\kappa B_0 t/2) - P_\mathrm{RS}|$ (analytic)",
     )
     ax.set_xlabel(r"$B_0$")
-    ax.set_ylabel(r"$P_{g\gamma}$")
+    ax.set_ylabel(r"residual against Raffelt--Stodolsky")
     ax.legend(frameon=False, fontsize=8, loc="best")
-    ax.grid(visible=True, ls=":", alpha=0.3)
-    ax.set_title(rf"(a) calibration at $t = {t0:g}$", fontsize=10)
+    ax.grid(visible=True, which="both", ls=":", alpha=0.3)
+    ax.set_title(rf"(a) residual at $t = {t0:g}$", fontsize=10)
 
     # Panel (b): multi-solver N-convergence at one regime point.
     ax = axes[1]

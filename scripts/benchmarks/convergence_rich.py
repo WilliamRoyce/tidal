@@ -370,13 +370,15 @@ def _run_rabi(*, smoke: bool, work_dir: Path) -> list[dict]:
 # -------- (c) Time-integration order --------
 
 
-def _tio_modal_reference(*, grid_n: int, out_dir: Path) -> float | None:
-    """Run modal once at the TIO grid to obtain a P_max reference.
+def _tio_modal_reference(
+    *, grid_n: int, out_dir: Path, t_end: float = T_END
+) -> float | None:
+    """Run modal at t_end to obtain a per-cell aligned P reference.
 
-    Modal does exact spectral evolution with the same IC and snapshot grid
-    that the leapfrog cells use, so subtracting modal's P_max from each
-    leapfrog P_max cancels the IC-snap, FFT-extraction, and spatial-FD
-    floors and isolates the time-integration error.
+    Pass t_end = math.ceil(T_END / dt) * dt so modal reports P at the same
+    simulation time as the leapfrog cell, eliminating the snapshot-misalignment
+    term (dt · dP/dt) that otherwise dominates the small-dt residual and masks
+    the Y4 slope-4 signal.
     """
     sim_cmd = [
         "tidal",
@@ -396,7 +398,7 @@ def _tio_modal_reference(*, grid_n: int, out_dir: Path) -> float | None:
         "--ic-component",
         "h_5",
         "--t-end",
-        f"{T_END}",
+        f"{t_end}",
         "--scheme",
         "modal",
         "--param",
@@ -456,6 +458,7 @@ def _tio_run_one(
     grid_n: int,
     out_dir: Path,
     modal_reference: float | None = None,
+    t_align: float | None = None,
 ) -> dict:
     sim_cmd = [
         "tidal",
@@ -533,14 +536,19 @@ def _tio_run_one(
     meas = json.loads(res.stdout)
     p = float(meas.get("conversion", {}).get("peak_probability", 0.0))
     err_modal = abs(p - modal_reference) if modal_reference is not None else None
+    t_ref = t_align if t_align is not None else T_END
+    p_analytic_aligned = math.sin(0.5 * KAPPA * B0_RABI * t_ref) ** 2
     return {
         "scheme": scheme_label,
         "dt": dt,
+        "t_align": t_ref,
         "ok": True,
         "P_final_sim": p,
         "P_final_analytic": TIO_ANALYTIC,
+        "P_final_analytic_aligned": p_analytic_aligned,
         "P_final_modal": modal_reference,
         "abs_error": abs(p - TIO_ANALYTIC),
+        "abs_error_analytic_aligned": abs(p - p_analytic_aligned),
         "abs_error_vs_modal": err_modal,
     }
 
@@ -549,15 +557,25 @@ def _run_tio(*, smoke: bool, work_dir: Path) -> list[dict]:
     schemes = TIO_SCHEMES_SMOKE if smoke else TIO_SCHEMES_FULL
     dts = TIO_DT_SMOKE if smoke else TIO_DT_FULL
     grid_n = TIO_GRID_N_SMOKE if smoke else TIO_GRID_N_FULL
-    # Modal reference at the same N and IC — cancels spatial/IC/extraction floors.
-    modal_dir = work_dir / "tio_modal_reference"
-    if modal_dir.exists():
-        shutil.rmtree(modal_dir)
-    p_modal = _tio_modal_reference(grid_n=grid_n, out_dir=modal_dir)
-    print(f"[tio] modal reference P_max = {p_modal!r}", flush=True)
     rows: list[dict] = []
     for label, args in schemes:
         for dt in dts:
+            # Leapfrog captures its final snapshot at the first step crossing
+            # T_END: t_align = ceil(T_END / dt) * dt.  Run modal at the same
+            # t_end so both schemes report P at exactly the same simulation
+            # time, eliminating the snapshot-misalignment residual ~dt·dP/dt
+            # that otherwise masks Y4's slope-4 signal.
+            t_align = math.ceil(T_END / dt) * dt
+            modal_dir = work_dir / f"tio_modal_align_dt{str(dt).replace('.', 'p')}"
+            if modal_dir.exists():
+                shutil.rmtree(modal_dir)
+            p_modal = _tio_modal_reference(
+                grid_n=grid_n, out_dir=modal_dir, t_end=t_align
+            )
+            print(
+                f"[tio] {label} dt={dt} t_align={t_align:.6f} P_modal={p_modal!r}",
+                flush=True,
+            )
             sub = work_dir / f"tio_{label}_dt{str(dt).replace('.', 'p')}"
             if sub.exists():
                 shutil.rmtree(sub)
@@ -569,6 +587,7 @@ def _run_tio(*, smoke: bool, work_dir: Path) -> list[dict]:
                     grid_n=grid_n,
                     out_dir=sub,
                     modal_reference=p_modal,
+                    t_align=t_align,
                 )
             )
     return rows

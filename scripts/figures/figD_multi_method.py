@@ -75,24 +75,39 @@ def _plot(data: dict, out_path: Path) -> None:
     cmap = plt.get_cmap("viridis").copy()
     cmap.set_bad(color="white")
 
+    # The lower-triangle mask leaves row 0 (modal) and the last column
+    # (scipy_DOP853) with zero visible cells.  Clip to the populated
+    # 5x5 sub-matrix: rows backends[1:], cols backends[:-1].
+    row_labels = backends[1:]
+    col_labels = backends[:-1]
+    n_row = len(row_labels)
+    n_col = len(col_labels)
+
     im = None
     for k, theory in enumerate(theories):
         ax = axes[0, k]
-        m = _matrix(pairs, theory, backends)
-        rendered = np.where(np.isnan(m), EPS_MACH, np.maximum(m, EPS_MACH))
-        # Lower-triangle only (drop diagonal + upper).
-        mask_upper = np.triu(np.ones_like(rendered, dtype=bool))
-        rendered = np.ma.masked_array(rendered, mask=mask_upper)
+        m_full = _matrix(pairs, theory, backends)
+        rendered_full = np.where(
+            np.isnan(m_full), EPS_MACH, np.maximum(m_full, EPS_MACH)
+        )
+        mask_upper_full = np.triu(np.ones_like(rendered_full, dtype=bool))
+        # Clip: drop row 0 (modal) and last col (DOP853).
+        sub = rendered_full[1:, :-1]
+        sub_mask = mask_upper_full[1:, :-1]
+        rendered = np.ma.masked_array(sub, mask=sub_mask)
         im = ax.imshow(rendered, norm="log", cmap=cmap, vmin=EPS_MACH, vmax=vmax)
-        ax.set_xticks(range(len(backends)))
-        ax.set_yticks(range(len(backends)))
-        ax.set_xticklabels(backends, rotation=45, ha="right", fontsize=8)
-        ax.set_yticklabels(backends, fontsize=8)
+        ax.set_xticks(range(n_col))
+        ax.set_yticks(range(n_row))
+        ax.set_xticklabels(col_labels, rotation=45, ha="right", fontsize=8)
+        if k == 0:
+            ax.set_yticklabels(row_labels, fontsize=8)
+        else:
+            ax.set_yticklabels([])
         ax.set_title(THEORY_TITLE.get(theory, theory), fontsize=10)
 
         # Grid lines around each cell (minor-tick trick).
-        ax.set_xticks(np.arange(len(backends) + 1) - 0.5, minor=True)
-        ax.set_yticks(np.arange(len(backends) + 1) - 0.5, minor=True)
+        ax.set_xticks(np.arange(n_col + 1) - 0.5, minor=True)
+        ax.set_yticks(np.arange(n_row + 1) - 0.5, minor=True)
         ax.grid(which="minor", color="0.7", linewidth=0.5)
         ax.tick_params(which="minor", length=0)
 

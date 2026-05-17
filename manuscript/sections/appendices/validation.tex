@@ -23,16 +23,19 @@
   \centering
   \includegraphics[width=\textwidth]{figures/figD_boccaletti_uniform}
   \caption{Boccaletti-kernel reproduction in the uniform-$\Bzero$
-    regime. (a) Simulated $P_\mathrm{final}(\Bzero)$ at fixed
-    $t_\mathrm{end}=50$ overlaid with the bare sin\textsuperscript{2}
-    formula \cref{GertsenshteinFormula} and the Raffelt--Stodolsky two-mode
-    formula \cref{TwoModeRabi}, the latter accounting for both the
-    amplitude and frequency corrections from the graviton effective
-    mass; the $\Bzero \in [0.005, 0.25]$ sweep is sampled at 24
-    points on a periodic grid of $N=512$ points.
+    regime. (a) Residuals against the Raffelt--Stodolsky two-mode
+    formula \cref{TwoModeRabi} at fixed $t_\mathrm{end}=50$ across
+    the $\Bzero \in [0.005, 0.25]$ sweep sampled at 24 points on a
+    periodic $N=512$ grid.
+    Filled circles: $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$ at each
+    simulated $\Bzero$ (numerical residual against the RS reference).
+    Dashed curve: the analytic $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$
+    evaluated at 400 dense $\Bzero$ values, showing the $\Bzero^2$ growth
+    of the bare-formula deviation from RS; TIDAL sits at the numerical
+    floor while the bare formula departs from RS as $\Bzero$ grows.
     (b) Convergence of
     $|P_\mathrm{final}^\mathrm{sim} - \sin^2(\kappa\Bzero t/2)|$ at
-    the regime point $\Bzero = 0.1275$ on for four
+    the regime point $\Bzero = 0.1275$ for four
     solver backends.
     Modal and \CVODE{} reach the modal-evolution precision floor
     (dotted line); Y2 shows clean $(\Delta t^2)$-dominated decay
@@ -74,8 +77,9 @@ every grid size; the validation backends converge toward the same
 plateau under grid refinement. The swept range stays within the
 perturbative regime where both predictions remain valid; the
 localised-profile sweep of \cref{BoccalettiLocalised} deliberately
-extends past the first quarter-period ($s > \pi/2$) to expose where
-the bare path-integrated formula breaks down.
+extends past the first quarter-period ($s > \pi/2$), where the
+$P_\mathrm{conv} \ll 1$ row of \cref{PerturbativityHierarchy} fails
+and the bare path-integrated formula no longer applies.
 
 \paragraph*{Boccaletti kernel on a Gaussian profile}
 For a finite magnetised region of profile $B_x(z)$ the Gertsenshtein
@@ -227,7 +231,7 @@ term~\cite{caputo2021darkphoton,pospelov2008secluded},
   \label{LagFV}
 \end{equation}
 carrying $10$ dynamical fields with kinetic-matrix condition number
-$\operatorname{cond}(V) \sim 10^{8\text{--}10}$. The
+$\operatorname{cond}(V)$~\cite{higham2008functions}~$\sim 10^{8\text{--}10}$. The
 \emph{vector-torsion} representation expresses the same theory using
 the trace of the spacetime torsion tensor evolved with the
 Maxwell-like field-strength tensor
@@ -255,12 +259,7 @@ Agreement at the IEEE floor served as the bit-exact diagnostic
 during the implementation of the numerical-method choices
 discussed in \cref{NumericalEvolution} (in particular the
 constraint-handling, the matrix-exponential choice, and the
-absence of a modal-template cache). The equivalence is a
-cross-formulation consistency check rather than an independent
-reproduction of an analytic limit; it is the diagnostic available
-on the linearisation, constraint-elimination, and
-numerical-evolution paths for the complex PGT theories surveyed in
-\cref{SectorSurvey}.
+absence of a modal-template cache).
 
 \paragraph*{Multi-method agreement across backends and measurement paths}
 \TIDAL{} dispatches to one of several solver backends according to
@@ -273,7 +272,7 @@ pairwise relative agreement in $\Pmax$. \Cref{MultiMethod} displays
 the backend-pair heatmaps; all backends agree within their default
 integration tolerances. The same calibration confirms that the
 symbolic energy $E(t)$ remains flat to the backend integration
-tolerance, reported as relative drift $|dE/E_0|$ in the
+tolerance, reported as relative drift $|\Delta E/E_0|$ in the
 energy-conservation audit below. These are internal-consistency
 checks across independent computational paths; only the calibrations
 against external analytic predictions in the earlier paragraphs
@@ -288,9 +287,10 @@ constitute independent reproductions.
     pair (right), the latter an analogue of the Raffelt--Stodolsky
     two-channel mixing model~\cite{raffelt1988mixing}. Logarithmic
     viridis colormap; cells encode
-    $|P_a - P_b|/\max(|P_a|, |P_b|)$ between backend pairs $(a, b)$.
-    Per-theory min, median, and max rel\_diff are annotated below
-    each panel.}
+    $|P_a - P_b|/\max(|P_a|, |P_b|)$ between backend pairs $(a, b)$;
+    the upper triangle is masked. Row \texttt{modal} (first) and
+    column \texttt{scipy\_DOP853} (last) carry no lower-triangle
+    cells and are omitted.}
   \label{MultiMethod}
 \end{figure*}
 
@@ -345,7 +345,7 @@ returns inconsistent initial conditions, a symbolic stage that
 loses cross-coupling terms in field decomposition, or a time
 integrator that drifts past its predicted order, all reveal
 themselves as relative energy drift. We audit the maximum relative
-energy drift $|dE/E|_\mathrm{max}$ across the theories of physical
+energy drift $|\Delta E/E|_\mathrm{max}$ across the theories of physical
 relevance to the \cref{Results} campaigns: the Einstein--Maxwell
 Gertsenshtein baseline of \cref{GertsenshteinFormula}, a
 gradient-coupled scalar pair (an analogue of \cref{TwoModeRabi}),
@@ -363,7 +363,7 @@ selects, which differs across theories.
   \centering
   \begin{tabular}{lr}
     \toprule
-    Theory & $|dE/E|_\mathrm{max}$ \\
+    Theory & $|\Delta E/E|_\mathrm{max}$ \\
     \midrule
     Propagating-PGT torsion (nonminimal)       & $1.9\times 10^{-1}$ \\
     Dark-photon plasma (vector-torsion)        & $4.4\times 10^{-3}$ \\
@@ -375,7 +375,7 @@ selects, which differs across theories.
     \bottomrule
   \end{tabular}
   \caption{Energy-conservation audit: maximum relative drift
-    $|dE/E|_\mathrm{max}$ across the surveyed theories, sorted in
+    $|\Delta E/E|_\mathrm{max}$ across the surveyed theories, sorted in
     descending order. The four bottom rows sit at the IEEE-754
     round-off floor of the modal solver. The two top rows exceed
     the $10^{-3}$ conservation threshold of the dispatcher's
