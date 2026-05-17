@@ -87,7 +87,7 @@ TIO_SCHEMES_FULL: list[tuple[str, list[str]]] = [
 TIO_SCHEMES_SMOKE = TIO_SCHEMES_FULL
 TIO_CELL_TIMEOUT = 240  # seconds; safety net per (scheme, dt) cell
 # 60 log-spaced dt values within the CFL-stable region (dt <= dx = 0.049
-# at N=2048, L=100; safety cap at 0.024).  60 cells/scheme × 2 schemes =
+# at N=2048, L=100; safety cap at 0.024).  60 cells/scheme x 2 schemes =
 # 120 parallel cells on sapphire (112 cores → 2 waves, ~60 s total).
 TIO_DT_FULL: list[float] = [
     round(float(x), 7) for x in np.logspace(np.log10(0.001), np.log10(0.024), 60)
@@ -648,10 +648,8 @@ def _run_tio(*, smoke: bool, work_dir: Path, max_workers: int = 1) -> list[dict]
         initargs=(avail,),
     ) as pool:
         futures = {pool.submit(_tio_cell, c): c for c in cells}
-        n_done = 0
-        for fut in as_completed(futures):
+        for n_done, fut in enumerate(as_completed(futures), start=1):
             rows.append(fut.result())
-            n_done += 1
             if n_done % 10 == 0 or n_done == len(cells):
                 print(f"[tio] {n_done}/{len(cells)} cells done", flush=True)
     return rows
@@ -730,33 +728,72 @@ def run(*, smoke: bool, work_dir: Path, max_workers: int = 1) -> dict:
     }
 
 
-def append_tio(*, out: Path, work_dir: Path) -> None:
+def append_tio(*, out: Path, work_dir: Path, max_workers: int = 1) -> None:
     """Append missing (scheme, dt) time_integration_order rows.
 
     Loads the existing JSON, identifies (scheme, dt) pairs in
-    TIO_SCHEMES_FULL × TIO_DT_FULL that are not already present, runs only
-    those, and merges into the row list. Existing rows survive untouched.
+    TIO_SCHEMES_FULL x TIO_DT_FULL that are not already present, runs only
+    those (via _tio_cell so per-cell aligned modal reference is applied), and
+    merges into the row list. Existing rows survive untouched.
+
+    Seeds are loaded ONCE before any cells run; the output file is only
+    written after all new rows are collected, so re-reading the file mid-run
+    cannot cause double-counting.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``out`` does not exist (full run required first).
     """
     if not out.exists():
         msg = f"--append-tio requires existing {out}; run the full benchmark first."
         raise FileNotFoundError(msg)
+    # Load seeds once; never re-read until after all new rows are ready.
     with out.open(encoding="utf-8") as fh:
         data = json.load(fh)
     existing = data.get("time_integration_order", [])
     have = {(r.get("scheme"), float(r["dt"])) for r in existing}
 
     work_dir.mkdir(parents=True, exist_ok=True)
-    new_rows: list[dict] = []
     grid_n = TIO_GRID_N_FULL
-    for label, args in TIO_SCHEMES_FULL:
-        missing = [dt for dt in TIO_DT_FULL if (label, dt) not in have]
-        if not missing:
-            continue
-        for dt in missing:
-            sub = work_dir / f"tio_{label}_dt{str(dt).replace('.', 'p')}"
-            if sub.exists():
-                shutil.rmtree(sub)
-            new_rows.append(_tio_run_one(label, args, dt, grid_n=grid_n, out_dir=sub))
+    cells = [
+        {
+            "label": label,
+            "scheme_args": scheme_args,
+            "dt": dt,
+            "grid_n": grid_n,
+            "work_dir": str(work_dir),
+        }
+        for label, scheme_args in TIO_SCHEMES_FULL
+        for dt in TIO_DT_FULL
+        if (label, dt) not in have
+    ]
+    if not cells:
+        print("append_tio: nothing to do (all cells already present)")
+        return
+
+    new_rows: list[dict] = []
+    if max_workers <= 1:
+        new_rows = [_tio_cell(c) for c in cells]
+    else:
+        ctx = mp.get_context("fork")
+        avail = (
+            sorted(os.sched_getaffinity(0))
+            if hasattr(os, "sched_getaffinity")
+            else list(range(os.cpu_count() or 1))
+        )
+        n_workers = min(max_workers, len(cells))
+        with ProcessPoolExecutor(
+            max_workers=n_workers,
+            mp_context=ctx,
+            initializer=_worker_init,
+            initargs=(avail,),
+        ) as pool:
+            futures = {pool.submit(_tio_cell, c): c for c in cells}
+            for n_done, fut in enumerate(as_completed(futures), start=1):
+                new_rows.append(fut.result())
+                if n_done % 10 == 0 or n_done == len(cells):
+                    print(f"[append_tio] {n_done}/{len(cells)} cells done", flush=True)
 
     merged = list(existing) + new_rows
     merged.sort(key=lambda r: (r.get("scheme", ""), float(r["dt"])))
@@ -793,7 +830,7 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="convergence_rich_") as tmp:
         work = Path(args.work_dir) if args.work_dir else Path(tmp)
         if args.append_tio:
-            append_tio(out=args.out, work_dir=work)
+            append_tio(out=args.out, work_dir=work, max_workers=args.parallel)
             return
         data = run(smoke=args.smoke, work_dir=work, max_workers=args.parallel)
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -804,7 +841,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     # Force single-threaded BLAS in every worker subprocess so that
-    # N workers × M BLAS threads don't fight over the same cores.
+    # N workers x M BLAS threads don't fight over the same cores.
     # Must be set before ProcessPoolExecutor forks workers (fork inherits env).
     for _var in (
         "OMP_NUM_THREADS",
