@@ -3,7 +3,7 @@ r"""Figure D §1 — Boccaletti uniform-B0 calibration (App-C styled).
 Two-panel `figure*` (two-column spread) showing the photon–graviton
 conversion probability $P_\mathrm{final}(B_0)$ on a uniform background
 calibrated against the analytic Boccaletti kernel
-$\sin^2(\kappa B_0 t/2)$ and the Raffelt–Stodolsky two-mode formula
+$\sin^2(\kappa B_0 t/2)$ and the Raffelt–Stodolsky formula
 with the graviton effective-mass detuning.
 
   (a) $P_\mathrm{final}^{\mathrm{sim}}(B_0)$ across the full sweep at
@@ -108,7 +108,7 @@ def _plot(data: dict, out_path: Path) -> None:
         ls=":",
         lw=1.2,
         color="#444",
-        label=r"$\sin^2(\kappa B_0 t/2)$ (bare)",
+        label=r"$\sin^2(\kappa B_0 t/2)$",
     )
     ax.plot(
         b0_dense,
@@ -116,7 +116,7 @@ def _plot(data: dict, out_path: Path) -> None:
         ls="--",
         lw=1.0,
         color="#888",
-        label=r"Raffelt–Stodolsky two-mode",
+        label=r"Raffelt–Stodolsky",
     )
     ax.plot(
         b0,
@@ -167,7 +167,7 @@ def _plot(data: dict, out_path: Path) -> None:
             lw=0.7,
             color="#666",
             alpha=0.5,
-            label=rf"FD-4 plateau $\approx {plateau_for_label:.1e}$",
+            label=rf"modal-evolution floor $\approx {plateau_for_label:.1e}$",
         )
     ax.set_xlabel(r"grid resolution $N$")
     ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - \sin^2(\kappa B_0 t/2)|$")

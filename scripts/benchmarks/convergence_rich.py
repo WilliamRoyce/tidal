@@ -83,50 +83,40 @@ TIO_SCHEMES_FULL: list[tuple[str, list[str]]] = [
 ]
 TIO_SCHEMES_SMOKE = TIO_SCHEMES_FULL
 TIO_CELL_TIMEOUT = 240  # seconds; safety net per (scheme, dt) cell
-# Dense dt grid (~36 values) log-spaced over two decades for a clean
-# slope fit and a densely-populated convergence panel. Spatial floor
-# pushed down by N=2048 in the full benchmark.
+# Dense dt grid restricted to the CFL-stable region (dt <= dx = 0.049
+# at N=2048, L=100) with a safety margin of 0.024 so leapfrog never
+# diverges. 30 log-spaced values within [0.001, 0.024].
 TIO_DT_FULL = [
-    0.5,
-    0.493,
-    0.411,
-    0.342,
-    0.3,
-    0.285,
-    0.238,
-    0.2,
-    0.198,
-    0.165,
-    0.137,
-    0.115,
-    0.1,
-    0.0955,
-    0.0796,
-    0.07,
-    0.0663,
-    0.0552,
-    0.05,
-    0.046,
-    0.0383,
-    0.0319,
-    0.03,
-    0.0266,
-    0.0222,
-    0.02,
-    0.0185,
-    0.0154,
-    0.0128,
-    0.01,
-    0.0107,
+    0.024,
+    0.022,
+    0.020,
+    0.018,
+    0.016,
+    0.014,
+    0.012,
+    0.010,
     0.0089,
+    0.0080,
     0.0074,
-    0.007,
+    0.0066,
     0.0062,
-    0.005,
-    0.0052,
+    0.0055,
+    0.0050,
+    0.0046,
     0.0043,
+    0.0040,
     0.0036,
-    0.003,
+    0.0033,
+    0.0030,
+    0.0027,
+    0.0024,
+    0.0022,
+    0.0020,
+    0.0018,
+    0.0016,
+    0.0014,
+    0.0012,
+    0.0010,
 ]
 TIO_DT_SMOKE = [0.2, 0.1, 0.05]
 TIO_GRID_N_FULL = 2048
@@ -380,8 +370,92 @@ def _run_rabi(*, smoke: bool, work_dir: Path) -> list[dict]:
 # -------- (c) Time-integration order --------
 
 
+def _tio_modal_reference(*, grid_n: int, out_dir: Path) -> float | None:
+    """Run modal once at the TIO grid to obtain a P_max reference.
+
+    Modal does exact spectral evolution with the same IC and snapshot grid
+    that the leapfrog cells use, so subtracting modal's P_max from each
+    leapfrog P_max cancels the IC-snap, FFT-extraction, and spatial-FD
+    floors and isolates the time-integration error.
+    """
+    sim_cmd = [
+        "tidal",
+        "simulate",
+        str(EXAMPLES / "data" / "gertsenshtein.json"),
+        "--grid-shape",
+        str(grid_n),
+        "--bounds",
+        f"{BOUNDS[0]}:{BOUNDS[1]}",
+        "--periodic",
+        "--ic",
+        "plane-wave",
+        "--ic-wavevector",
+        f"{KWAVE}",
+        "--ic-amplitude",
+        "0.1",
+        "--ic-component",
+        "h_5",
+        "--t-end",
+        f"{T_END}",
+        "--scheme",
+        "modal",
+        "--param",
+        f"kappa={KAPPA}",
+        "--param",
+        f"B0={B0_RABI}",
+        "--fd-order",
+        "4",
+        "--output",
+        str(out_dir),
+        "--force",
+    ]
+    try:
+        res = subprocess.run(
+            sim_cmd,
+            capture_output=True,
+            text=True,
+            cwd=REPO_ROOT,
+            check=False,
+            timeout=TIO_CELL_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return None
+    if res.returncode != 0:
+        return None
+    meas_cmd = [
+        "tidal",
+        "measure",
+        str(out_dir),
+        "--what",
+        "conversion",
+        "--source",
+        "h_5",
+        "--target",
+        "a_1",
+        "--param",
+        f"kappa={KAPPA}",
+        "--param",
+        f"B0={B0_RABI}",
+        "--json",
+        "--quiet",
+    ]
+    res = subprocess.run(
+        meas_cmd, capture_output=True, text=True, cwd=REPO_ROOT, check=False
+    )
+    if res.returncode != 0:
+        return None
+    meas = json.loads(res.stdout)
+    return float(meas.get("conversion", {}).get("peak_probability", 0.0))
+
+
 def _tio_run_one(
-    scheme_label: str, scheme_args: list[str], dt: float, *, grid_n: int, out_dir: Path
+    scheme_label: str,
+    scheme_args: list[str],
+    dt: float,
+    *,
+    grid_n: int,
+    out_dir: Path,
+    modal_reference: float | None = None,
 ) -> dict:
     sim_cmd = [
         "tidal",
@@ -458,13 +532,16 @@ def _tio_run_one(
         return {"scheme": scheme_label, "dt": dt, "ok": False, "error": "meas failed"}
     meas = json.loads(res.stdout)
     p = float(meas.get("conversion", {}).get("peak_probability", 0.0))
+    err_modal = abs(p - modal_reference) if modal_reference is not None else None
     return {
         "scheme": scheme_label,
         "dt": dt,
         "ok": True,
         "P_final_sim": p,
         "P_final_analytic": TIO_ANALYTIC,
+        "P_final_modal": modal_reference,
         "abs_error": abs(p - TIO_ANALYTIC),
+        "abs_error_vs_modal": err_modal,
     }
 
 
@@ -472,30 +549,56 @@ def _run_tio(*, smoke: bool, work_dir: Path) -> list[dict]:
     schemes = TIO_SCHEMES_SMOKE if smoke else TIO_SCHEMES_FULL
     dts = TIO_DT_SMOKE if smoke else TIO_DT_FULL
     grid_n = TIO_GRID_N_SMOKE if smoke else TIO_GRID_N_FULL
+    # Modal reference at the same N and IC — cancels spatial/IC/extraction floors.
+    modal_dir = work_dir / "tio_modal_reference"
+    if modal_dir.exists():
+        shutil.rmtree(modal_dir)
+    p_modal = _tio_modal_reference(grid_n=grid_n, out_dir=modal_dir)
+    print(f"[tio] modal reference P_max = {p_modal!r}", flush=True)
     rows: list[dict] = []
     for label, args in schemes:
         for dt in dts:
             sub = work_dir / f"tio_{label}_dt{str(dt).replace('.', 'p')}"
             if sub.exists():
                 shutil.rmtree(sub)
-            rows.append(_tio_run_one(label, args, dt, grid_n=grid_n, out_dir=sub))
+            rows.append(
+                _tio_run_one(
+                    label,
+                    args,
+                    dt,
+                    grid_n=grid_n,
+                    out_dir=sub,
+                    modal_reference=p_modal,
+                )
+            )
     return rows
 
 
-def _fit_slope(rows: list[dict], scheme: str) -> float | None:
+def _fit_slope(
+    rows: list[dict], scheme: str, *, key: str = "abs_error_vs_modal"
+) -> float | None:
+    """Fit log-log slope of the given error metric vs dt.
+
+    Default key is the modal-reference error so spatial/IC floors cancel;
+    falls back to "abs_error" (vs sin² analytic) if modal reference is
+    unavailable.
+    """
     ok = [
         r
         for r in rows
         if r.get("ok")
         and r.get("scheme") == scheme
-        and r.get("abs_error") is not None
-        and math.isfinite(r["abs_error"])
-        and r["abs_error"] > 1e-14
+        and r.get(key) is not None
+        and math.isfinite(r[key])
+        and r[key] > 1e-14
     ]
     if len(ok) < 2:
+        # Fall back to vs-analytic if vs-modal is empty.
+        if key != "abs_error":
+            return _fit_slope(rows, scheme, key="abs_error")
         return None
     dts = np.log10([r["dt"] for r in ok])
-    errs = np.log10([r["abs_error"] for r in ok])
+    errs = np.log10([r[key] for r in ok])
     slope, _ = np.polyfit(dts, errs, 1)
     return float(slope)
 
@@ -551,9 +654,7 @@ def append_tio(*, out: Path, work_dir: Path) -> None:
     """
     if not out.exists():
         msg = f"--append-tio requires existing {out}; run the full benchmark first."
-        raise FileNotFoundError(
-            msg
-        )
+        raise FileNotFoundError(msg)
     with out.open(encoding="utf-8") as fh:
         data = json.load(fh)
     existing = data.get("time_integration_order", [])

@@ -125,13 +125,20 @@ def _plot_rabi(ax, data: dict) -> None:
 
 
 def _plot_tio(ax, data: dict) -> None:
+    # Prefer modal-reference error; spatial/IC/extraction floors cancel.
+    err_key = "abs_error_vs_modal"
     rows = [
         r
         for r in data.get("time_integration_order", [])
-        if r.get("ok")
-        and r.get("abs_error") is not None
-        and math.isfinite(r["abs_error"])
+        if r.get("ok") and r.get(err_key) is not None and math.isfinite(r[err_key])
     ]
+    if not rows:
+        err_key = "abs_error"
+        rows = [
+            r
+            for r in data.get("time_integration_order", [])
+            if r.get("ok") and r.get(err_key) is not None and math.isfinite(r[err_key])
+        ]
     by_scheme: dict[str, list[dict]] = {}
     for r in rows:
         by_scheme.setdefault(r["scheme"], []).append(r)
@@ -140,7 +147,7 @@ def _plot_tio(ax, data: dict) -> None:
     for scheme, srows in sorted(by_scheme.items()):
         srows.sort(key=operator.itemgetter("dt"))
         dts = np.array([r["dt"] for r in srows])
-        errs = np.array([max(r["abs_error"], EPS_MACH) for r in srows])
+        errs = np.array([max(r[err_key], EPS_MACH) for r in srows])
         fit_mask = errs > FLOOR_TOL
         if fit_mask.sum() >= 3:
             s, r2 = _fit_loglog(dts[fit_mask], errs[fit_mask])
@@ -157,7 +164,12 @@ def _plot_tio(ax, data: dict) -> None:
             label=label,
         )
     ax.set_xlabel(r"$\Delta t$")
-    ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - \sin^2(\kappa B_0 t/2)|$")
+    if err_key == "abs_error_vs_modal":
+        ax.set_ylabel(
+            r"$|P_{\mathrm{final}}^{\mathrm{sim}} - P_{\mathrm{final}}^{\mathrm{modal}}|$"
+        )
+    else:
+        ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - \sin^2(\kappa B_0 t/2)|$")
     ax.set_title("(b) time-integration order (leapfrog only)", fontsize=10)
     ax.legend(frameon=False, fontsize=8, loc="best")
     ax.grid(visible=True, which="both", ls=":", alpha=0.3)

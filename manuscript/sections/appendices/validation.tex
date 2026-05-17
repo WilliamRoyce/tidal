@@ -19,9 +19,34 @@
 \section{Calibration against analytic limits and reference models}%
 \label{Validation}
 
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/figD_boccaletti_uniform}
+  \caption{Boccaletti-kernel reproduction in the uniform-$\Bzero$
+    regime. (a) Simulated $P_\mathrm{final}(\Bzero)$ at fixed
+    $t_\mathrm{end}=50$ overlaid with the bare sin\textsuperscript{2}
+    formula \cref{GertsenshteinFormula} and the Raffelt--Stodolsky two-mode
+    formula \cref{TwoModeRabi}, the latter accounting for both the
+    amplitude and frequency corrections from the graviton effective
+    mass; the $\Bzero \in [0.005, 0.25]$ sweep is sampled at 24
+    points on a periodic grid of $N=512$ points.
+    (b) Convergence of
+    $|P_\mathrm{final}^\mathrm{sim} - \sin^2(\kappa\Bzero t/2)|$ at
+    the regime point $\Bzero = 0.1275$ on log--log axes for four
+    solver backends (modal, \CVODE{}, leapfrog Yoshida-2, leapfrog
+    Yoshida-4) at $N \in \{64, \ldots, 512\}$.
+    Modal and \CVODE{} reach the modal-evolution precision floor
+    (dotted line); Y2 shows clean $(\Delta t^2)$-dominated decay
+    across the whole $N$ range; Y4 falls past Y2 quickly and
+    approaches a higher residual floor (median $\sim 10^{-4}$) set
+    by the CFL-bounded $\Delta t$ together with the IC-snap phase
+    residual, both of which vary mildly with $N$.}
+  \label{BoccalettiUniform}
+\end{figure*}
+
 \paragraph*{Boccaletti kernel on a uniform background}
 The Gertsenshtein conversion kernel of \cref{GertsenshteinFormula}
-provides the closed-form analytic baseline against which we calibrate
+provides the closed-form analytic baseline against which we test
 \TIDAL{} on a uniform background magnetic field. We sweep $\Bzero$
 over the perturbative regime with fourth-order finite-difference
 operators on a periodic grid, and overlay the calibration data on
@@ -48,31 +73,11 @@ values where the effective-mass detuning $\Delta$ of \cref{TwoModeRabi}
 becomes significant and the two predictions begin to diverge.
 The modal solver reaches the FD-4 spatial-discretisation plateau at
 every grid size; the validation backends converge toward the same
-plateau under grid refinement. Localised-profile reproduction is
-calibrated separately in \cref{BoccalettiLocalised}.
-
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=\textwidth]{figures/figD_boccaletti_uniform}
-  \caption{Boccaletti-kernel reproduction in the uniform-$\Bzero$
-    regime. (a) Simulated $P_\mathrm{final}(\Bzero)$ at fixed
-    $t_\mathrm{end}=50$ overlaid with the bare sin\textsuperscript{2}
-    formula \cref{GertsenshteinFormula} and the Raffelt--Stodolsky two-mode
-    formula \cref{TwoModeRabi}, the latter accounting for both the
-    amplitude and frequency corrections from the graviton effective
-    mass; the $\Bzero \in [0.005, 0.25]$ sweep is sampled at 24
-    points on a periodic grid of $N=512$ points.
-    (b) Convergence of
-    $|P_\mathrm{final}^\mathrm{sim} - \sin^2(\kappa\Bzero t/2)|$ at
-    the regime point $\Bzero = 0.1275$ on log--log axes for four
-    solver backends (modal, \CVODE{}, leapfrog Yoshida-2, leapfrog
-    Yoshida-4) at $N \in \{64, 128, 256, 512\}$. The
-    tolerance-controlled backends (modal, \CVODE{}) reach the
-    FD-4 spatial-discretisation plateau at every $N$; the
-    symplectic backends converge toward the same plateau from above
-    as the Courant--Friedrichs--Lewy time step shrinks with $\Delta x$.}
-  \label{BoccalettiUniform}
-\end{figure*}
+plateau under grid refinement. The swept range stays within the
+perturbative regime where both predictions remain valid; the
+localised-profile sweep of \cref{BoccalettiLocalised} deliberately
+extends past the first quarter-period ($s > \pi/2$) to expose where
+the bare path-integrated formula breaks down.
 
 \paragraph*{Boccaletti kernel on a Gaussian profile}
 For a finite magnetised region of profile $B_x(z)$ the Gertsenshtein
@@ -85,7 +90,7 @@ formula generalises to the path-integrated form~\cite{raffelt1988mixing}
 and for the Gaussian profile
 $B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$ the integral gives
 $\Pconv = \sin^2(\kappa B_\mathrm{peak}\,R\sqrt{\pi/2})$. We
-calibrate against this closed-form by sweeping the
+reproduce this closed-form by sweeping the
 $(B_\mathrm{peak}, R)$ plane using the derived localised
 Gertsenshtein theory and a Gaussian wave-packet initial condition on
 $h_+$ traversing the magnetised region. \Cref{BoccalettiLocalised}
@@ -116,7 +121,7 @@ calibrated in the convergence diagnostic below.
 The perturbative-reduction machinery described in \cref{LPSReduction}
 evolves the system as a base (order-$\varepsilon^{0}$) solution plus
 a correction (order-$\varepsilon^{1}$), denoted \emph{Pass 0} and
-\emph{Pass 1} in the figure legends below. We calibrate the kernel
+\emph{Pass 1} in the figure legends below. We test the kernel
 against the analytical perturbative expansion of a Klein--Gordon
 wave with a small mass-shift correction,
 \begin{equation}
@@ -184,7 +189,7 @@ the base solution reaches $\sim 10^4$ at $\varepsilon=0.01$.
 
 \paragraph*{Convention-anchored agreement with Euler--Heisenberg QED birefringence}
 The QED Euler--Heisenberg effective action in the weak-field
-limit~\cite{heisenberg1936consequences,schwinger1951gauge,dunne2004heisenberg}
+limit~\cite{heisenberg1936consequences,schwinger1951gauge,dunne2004heisenberg,adler1971photon}
 is, to leading order in the field strength,
 \begin{equation}
   \lag_{\mathrm{EH}} \;=\;
@@ -197,12 +202,11 @@ is, to leading order in the field strength,
 \end{equation}
 with $\rho = 4\alpha^{2}/(45\,m_{e}^{4}\,\pi^{2})$ and
 $\sigma = 7\alpha^{2}/(90\,m_{e}^{4}\,\pi^{2})$ the standard QED
-weak-field coefficients of~\cite{adler1971photon}. \TIDAL{}'s
+weak-field coefficients. \TIDAL{}'s
 symbolic stage assigns the $(F_{\mu\nu}F^{\mu\nu})^{2}$ correction
 to the perpendicular photon polarisation and the
 $(F_{\mu\nu}\tilde{F}^{\mu\nu})^{2}$ correction to the parallel
-polarisation, without mixing the two Lorentz invariants; the
-resulting refractive-index shifts
+polarisation; the resulting refractive-index shifts
 $n_\perp - 1 = (8\alpha^2/45)(B/B_c)^2$ and
 $n_\parallel - 1 = (14\alpha^2/45)(B/B_c)^2$ reproduce the Adler
 birefringence ratio
@@ -233,9 +237,11 @@ $\operatorname{cond}(V) \sim 10^{8\text{--}10}$. The
 the trace of the spacetime torsion tensor evolved with the
 Maxwell-like field-strength tensor
 $T_{\mu\nu}\equiv 2\,\partial_{[\mu} T_{\nu]}$ of the propagating
-vector-torsion construction of~\cite{barker2024poincare}, activating
-the $\Bet{3}\,I_3$ torsion-trace term of
-\cref{ParityEvenQuadraticAction}, with kinetic prefactor $\xi$,
+vector-torsion construction of~\cite{barker2024poincare}, with the
+torsion trace $T_\mu \equiv T^\nu{}_{\nu\mu}$ promoted to a
+propagating vector field,
+%TODO replace prose description with a direct cref to the propagating-vector-torsion sector definition once that lands in results.tex.
+kinetic prefactor $\xi$,
 gauge-coupling shift $\alpha_3$, and mass mixing $\delta_m$ (the
 Lagrangian appears with the dark-photon-plasma sector in
 \cref{SectorSurvey}%
@@ -264,15 +270,15 @@ numerical-evolution paths for the complex PGT theories surveyed in
 \paragraph*{Multi-method agreement across backends and measurement paths}
 \TIDAL{} dispatches to one of several solver backends according to
 the equation specification (see \cref{SolverDispatchFlowchart}); we
-calibrate the dispatcher by running each applicable backend on the
+audit the dispatcher by running each applicable backend on the
 Einstein--Maxwell baseline of \cref{GertsenshteinFormula} and on a
 gradient-coupled scalar pair analogous to the Raffelt--Stodolsky
 two-channel mixing model~\cite{raffelt1988mixing}, and checking
 pairwise relative agreement in $\Pmax$. \Cref{MultiMethod} displays
 the backend-pair heatmaps; all backends agree within their default
 integration tolerances. The same calibration confirms that the
-symbolic Hamiltonian $H(t)$ remains flat to the backend integration
-tolerance, reported as relative drift $|dH/H_0|$ in the
+symbolic energy $E(t)$ remains flat to the backend integration
+tolerance, reported as relative drift $|dE/E_0|$ in the
 energy-conservation audit below. These are internal-consistency
 checks across independent computational paths; only the calibrations
 against external analytic predictions in the earlier paragraphs
@@ -294,7 +300,7 @@ constitute independent reproductions.
 \end{figure*}
 
 \paragraph*{Spatial and temporal convergence}\label{ConvergenceCalibration}
-The spatial-operator catalogue is calibrated against analytic
+The spatial-operator catalogue is tested against analytic
 derivatives in \cref{FDConvergence}, where the Fornberg
 finite-difference orders 2, 4 and 6 recover their predicted
 algebraic rates and the pseudo-spectral path falls to the round-off
@@ -325,10 +331,18 @@ discretised system.
   \caption{Spatial and temporal convergence. (a) Proca dispersion
     $\omega(k)$ extracted by FFT from \TIDAL{} at $m^2 \in \{0.1, 1, 10\}$,
     overlaid with the analytic $\omega = \sqrt{k^2 + m^2}$.
-    (b) Time-integration error versus $\Delta t$ for leapfrog
-    Yoshida-2 and Yoshida-4 on the Einstein--Maxwell baseline;
-    fitted log--log slopes and $R^2$ values are reported in the
-    legend.}
+    (b) Time-integration error
+    $|P_\mathrm{final}^\mathrm{sim} - P_\mathrm{final}^\mathrm{modal}|$
+    versus $\Delta t$ for leapfrog Yoshida-2 and Yoshida-4 on the
+    Einstein--Maxwell baseline, against a modal reference at the
+    same grid and IC so spatial-FD, IC-snap, and extraction floors
+    largely cancel. The CFL-stable dt grid (30 values per scheme on
+    $\Delta t \in [10^{-3}, 0.024]$) confirms the expected ordering
+    (Y4 below Y2 across the surveyed range); the fitted log--log
+    slopes underestimate the formal orders ($\hat{\alpha} \approx
+    1.5$, $1.2$ vs. expected $2$, $4$) because the $P_\mathrm{max}$
+    snapshot-extraction noise dominates at small $\Delta t$ and is
+    not removed by the modal reference.}
   \label{ConvergenceFigure}
 \end{figure*}
 

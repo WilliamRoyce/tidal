@@ -57,22 +57,30 @@ def _plot(data: dict, out_path: Path) -> None:
     pairs = data["pairwise"]
 
     n_th = len(theories)
-    fig, axes = plt.subplots(1, n_th, figsize=(5.2 * n_th, 4.4), squeeze=False)
-    vmax = max(
-        (p["rel_diff"] for p in pairs if p["rel_diff"] > 0),
-        default=1e-2,
-    )
+    fig, axes = plt.subplots(1, n_th, figsize=(5.2 * n_th, 4.2), squeeze=False)
+
+    # vmax from lower-triangle (visible) cells only — otherwise the
+    # colour range is set by upper-triangle cells the reader can't see.
+    visible_diffs: list[float] = []
+    for theory in theories:
+        for p in pairs:
+            if p["theory"] != theory:
+                continue
+            i = backends.index(p["backend_a"])
+            j = backends.index(p["backend_b"])
+            if i > j and p["rel_diff"] > 0:
+                visible_diffs.append(p["rel_diff"])
+    vmax = max(visible_diffs, default=1e-2)
 
     cmap = plt.get_cmap("viridis").copy()
     cmap.set_bad(color="white")
 
+    im = None
     for k, theory in enumerate(theories):
         ax = axes[0, k]
         m = _matrix(pairs, theory, backends)
-        # Replace zeros with EPS_MACH for log-norm rendering.
         rendered = np.where(np.isnan(m), EPS_MACH, np.maximum(m, EPS_MACH))
-        # Mask upper triangle (including diagonal) to avoid double-showing
-        # the symmetric pair (a, b) ≡ (b, a) and the trivial self-comparisons.
+        # Lower-triangle only (drop diagonal + upper).
         mask_upper = np.triu(np.ones_like(rendered, dtype=bool))
         rendered = np.ma.masked_array(rendered, mask=mask_upper)
         im = ax.imshow(rendered, norm="log", cmap=cmap, vmin=EPS_MACH, vmax=vmax)
@@ -82,24 +90,20 @@ def _plot(data: dict, out_path: Path) -> None:
         ax.set_yticklabels(backends, fontsize=8)
         ax.set_title(THEORY_TITLE.get(theory, theory), fontsize=10)
 
-        # Annotate min / max / median in figure text
-        theory_pairs = [p["rel_diff"] for p in pairs if p["theory"] == theory]
-        if theory_pairs:
-            mn, mx = min(theory_pairs), max(theory_pairs)
-            md = float(np.median(theory_pairs))
-            ax.text(
-                0.02,
-                -0.18,
-                rf"min $= {mn:.1e}$,  median $= {md:.1e}$,  max $= {mx:.1e}$",
-                transform=ax.transAxes,
-                fontsize=8,
-                va="top",
-            )
-        fig.colorbar(
-            im, ax=ax, shrink=0.85, label="rel. diff." if k == n_th - 1 else ""
-        )
+        # Grid lines around each cell (minor-tick trick).
+        ax.set_xticks(np.arange(len(backends) + 1) - 0.5, minor=True)
+        ax.set_yticks(np.arange(len(backends) + 1) - 0.5, minor=True)
+        ax.grid(which="minor", color="0.7", linewidth=0.5)
+        ax.tick_params(which="minor", length=0)
 
-    fig.tight_layout()
+        # Drop the rectangular outer frame so the triangle reads as a triangle.
+        for spine in ax.spines.values():
+            spine.set_visible(False)
+
+    # Single shared colorbar across both panels.
+    if im is not None:
+        fig.colorbar(im, ax=axes[0, :], shrink=0.85, label="rel. diff.")
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, format="pdf", bbox_inches="tight")
     plt.close(fig)
