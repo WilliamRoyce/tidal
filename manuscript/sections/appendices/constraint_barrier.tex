@@ -10,46 +10,55 @@
 
 \TIDAL{} treats a correction $\varepsilon\,\mathcal{L}_1$ to a well-posed base
 Lagrangian $\mathcal{L}_0$ as a perturbative shift to the base-theory dynamics.
-The effective-field-theory grounds for this treatment, the order-by-order
+The effective-field-theory grounds for this treatment, the %order-by-order
 equations-of-motion reduction, and the Lagrangian perturbative substitution used
-for Hamiltonian analysis --- together with the conditions under which it fails ---
+for Hamiltonian analysis
+%  --- together with the conditions under which it fails ---
 are described here.
 
 \paragraph*{Higher-order terms as effective corrections}
-For the theories studied here --- those whose Lagrangian admits the split
+For theories whose Lagrangian admits the split
 $\mathcal{L} = \mathcal{L}_0 + \varepsilon\,\mathcal{L}_1$ with $\varepsilon$ a small
-dimensionless coupling --- the correction $\varepsilon\,\mathcal{L}_1$ is treated
-throughout as a perturbative correction to the dynamics of $\mathcal{L}_0$ within the
-regime $\varepsilon \ll 1$, not as an independent dynamical source.
+dimensionless coupling, the correction $\varepsilon\,\mathcal{L}_1$ is treated
+throughout as a perturbative correction to the dynamics of $\mathcal{L}_0$,
+not as an independent dynamical source.
 
-Effective field theory establishes this interpretation on physical grounds: terms of this form are the low-energy residues of an unknown ultraviolet
-completion, encoding perturbative corrections to base-theory observables and not
-independent dynamics in their own right~\cite{Simon:1990ic,Simon:1990jn,Donoghue:1994dn,
-burgess2003quantum}.
+Within effective field theory, terms of this form are the low-energy residues of an
+unknown ultraviolet completion, encoding perturbative corrections to base-theory
+observables and not independent dynamics in their own right~\cite{Simon:1990ic,
+Simon:1990jn,Donoghue:1994dn,burgess2003quantum}.
 Grosse-Knetter~\cite{Grosse-Knetter:1993tae} proves, within the canonical formalism for
 higher-derivative theories~\cite{ostrogradsky1850memoires,Woodard:2015zca}, that
 expressing the higher time derivatives in $\mathcal{L}_1$ by substituting the
-base-theory equations of motion --- which solve for $\partial_t^2\varphi^{\mathcal{I}}$
-as a function of fields and first derivatives --- is equivalent to a field redefinition
+base-theory equations of motion
+% --- which solve for $\partial_t^2\varphi^{\mathcal{I}}$
+% as a function of fields and first derivatives --- 
+is equivalent to a field redefinition
 $\varphi^{\mathcal{I}} \to \varphi^{\mathcal{I}} + \varepsilon\,\delta\varphi^{\mathcal{I}}$
 in the action.
 Such a redefinition is a canonical transformation: it preserves the Poisson bracket
 relations between coordinates and momenta, so that Hamilton's equations and all physical
 observables take identical form in the new variables.
 The original higher-derivative Lagrangian and the perturbatively reduced one are therefore
-physically equivalent within the perturbative regime; the reduction is an exact canonical
-equivalence, not an on-shell approximation.
+physically equivalent within the perturbative regime.
+% ; the reduction is an exact canonical
+% equivalence, not an on-shell approximation.
 This equivalence underlies the order-by-order expansion of \cref{EOMHierarchy}: the
 perturbatively corrected solution reproduces the physical predictions of $\mathcal{L}$
 to first order in $\varepsilon$.
+The construction has a prerequisite that bears emphasis: the base-theory equation of
+motion for each reduced field must be of the form $\partial_t^2\varphi^{\mathcal{I}} =
+F^{\mathcal{I}}[\varphi,\partial_t\varphi,\nabla\varphi]$, since this equation is the
+substitution rule itself; fields whose base-theory equation is purely algebraic violate
+the prerequisite and the canonical equivalence breaks down --- the failure mode addressed
+below.
 
 The alternative --- treating $\mathcal{L}$ as an exact theory rather than a truncated
 expansion --- encounters a structural obstruction.
 Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Woodard:2015zca} states that any
 non-degenerate Lagrangian whose Euler--Lagrange equations are of differential order
 greater than two has a Hamiltonian unbounded below: the momentum conjugate to the highest
-time derivative enters the Hamiltonian linearly --- in contrast to the quadratic form
-$p^2/2m$ of a standard kinetic term --- so that the energy is unbounded below for
+time derivative enters the Hamiltonian linearly so that the energy is unbounded below for
 arbitrary sign of that momentum, and the corresponding mode is a ghost.%
 \footnote{Apparent counterexamples in gravity --- the Gauss--Bonnet term in four
 spacetime dimensions~\cite{Lovelock:1971yv} and the higher-derivative terms in the
@@ -74,8 +83,8 @@ regime of \TIDAL{}.
 Using $q = \{\varphi^{\mathcal{I}}\}$ to denote the collection of perturbation fields
 and writing the full equation of motion as $E[q;\,\varepsilon] = 0$~\cite{parker1993reduced,
 jaen1986reduction},
-the base operator is $E_{\mathrm{base}}[q] \equiv E[q;\,\varepsilon{=}0]$ --- the
-second-order ghost-free operator from $\mathcal{L}_0$ --- and the correction operator
+the base operator is $E_{\mathrm{base}}[q] \equiv E[q;\,\varepsilon{=}0]$ (the
+second-order ghost-free operator from $\mathcal{L}_0$) and the correction operator
 is $E_{\mathrm{corr}}[q] \equiv \partial_\varepsilon E[q;\,\varepsilon]\big|_{\varepsilon=0}$
 from $\mathcal{L}_1$, which may carry higher time derivatives.
 Expanding $q = q^{(0)} + \varepsilon\,q^{(1)} + \cdots$ and collecting by order:
@@ -92,11 +101,12 @@ contributions from $\mathcal{L}_1$ appear only as sources evaluated on the
 previous-order solution.
 We call the order-$\varepsilon^0$ solution \emph{Pass~0} and the
 order-$\varepsilon^1$ correction \emph{Pass~1}.
+
 Two alternatives were investigated and rejected: Lagrangian-level substitution of the
 order-zero equations of motion directly into the higher-derivative
 correction~\cite{jaen1986reduction} --- expressing each $\partial_t^n\varphi^{\mathcal{I}}$
 via repeated differentiation of the base-theory equations --- has no substitution target
-when a field equation is purely algebraic at order zero (as described below); and
+when a field equation is purely algebraic at order zero; and
 introducing each time-derivative order of the fields as a separate dynamical
 variable~\cite{ostrogradsky1850memoires,Woodard:2015zca} to reduce the system to a
 first-order form promotes the ghost modes predicted by Ostrogradsky's theorem to live
@@ -107,7 +117,7 @@ ODE $\partial_t\hat{y}^{(0)} = M(k)\,\hat{y}^{(0)}$ (cf.~\cref{ModalPerMode}), w
 $\hat{y}^{(0)}$ stacks the Fourier amplitudes of every field and velocity slot.
 For the perturbative-reduction path, the eigendecomposition $M(k) = V D V^{-1}$ is
 used rather than the Pad\'e scaling-and-squaring path of \cref{ModalSolver}, since the
-per-eigenmode expansion is required explicitly for the Pass~1 Duhamel integral.
+per-eigenmode expansion is required explicitly for the Duhamel integral.
 With $D$ diagonal with eigenvalues $\{\lambda_i\}$ and $V$ the right-eigenvector
 matrix, the Pass~0 solution at initial data $\hat{y}^{(0)}(0)$ is
 \begin{equation}
@@ -179,7 +189,7 @@ The iterative approximation holds while the cumulative phase error satisfies
 $\varepsilon\,\omega\,t_{\mathrm{end}} \ll 1$~\cite{parker1993reduced}, monitored
 at run time by \TIDAL{}'s validity diagnostic.
 
-\paragraph*{Perturbative reduction of the Hamiltonian}
+\subsection{Perturbative reduction of the Hamiltonian}
 Energy measurement and Noether consistency require a Hamiltonian, and the standard
 Legendre transform applies once the Lagrangian contains at most first-order time
 derivatives.
@@ -270,6 +280,12 @@ Their result fits the PGT structure exactly: the order-zero theory is the
 Einstein--Cartan system with algebraic torsion constraints, and the
 higher-curvature operators in the quadratic-PGT action promote some of those
 constraints to propagating fields.
+Grosse-Knetter's canonical-equivalence result~\cite{Grosse-Knetter:1993tae}
+reaches the same conclusion from the Hamiltonian side: the field redefinition
+that realises the perturbative substitution requires the base-theory equation
+of motion to contain a $\partial_t^2\varphi^{\mathcal{I}}$ term to solve for ---
+the same prerequisite that the Ja{\'e}n--Llosa--Molina condition formalises ---
+and is therefore equally inapplicable to algebraically constrained fields.
 The Ja{\'e}n--Llosa--Molina obstruction gives the sharpest analytical
 criterion, distinguishing theories where LPS is faithful from those where it
 loses physical content.
@@ -308,7 +324,7 @@ jump signals constraint promotion and the software emits a diagnostic that
 marks the theory as having no LPS-reduced Hamiltonian.
 The three affected theories --- \texttt{graviton\_torsion},
 \texttt{torsion\_gertsenshtein}, and \texttt{torsion\_gertsenshtein\_combined},
-all carrying $b_5\,\tilde{R}^2$ --- retain their pre-LPS Hamiltonians, and
+all carrying $\tilde{R}^2$ --- retain their pre-LPS Hamiltonians, and
 their energy diagnostics are recorded separately rather than alongside
 conversion results.
 
@@ -316,7 +332,7 @@ conversion results.
 The EOM and Hamiltonian reductions have different scopes, and the surveys of
 \cref{Results} are structured accordingly.
 The iterative EOM reduction of \cref{EOMHierarchy} succeeds for all surveyed
-theories, including the $b_5\,\tilde{R}^2$ quadratic-PGT theories: conversion
+theories, including the $\tilde{R}^2$ quadratic-PGT theories: conversion
 probabilities are computed from field trajectories evolved by Pass~0 and
 Pass~1, and no Hamiltonian is required for that computation.
 Constraint promotion applies only to the Hamiltonian side and only
