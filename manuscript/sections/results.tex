@@ -26,6 +26,27 @@
 % feed §4.4 (the headline slot). The single-point ghost diagnosis that the
 % original scaffold had as §4.5 is moved to App D as methodology validation
 % per the structural-review recommendations.
+%
+% TODO (drafting reminder, §3 spillover): two pieces of material were
+% intentionally kept OUT of §3 Computational approach and belong here in
+% §4 instead.
+%   (a) The amplification-vs-background-instability distinction.  In a
+%       linearised PDE on a tachyonic background, growth in the field
+%       amplitude can reflect either genuine Gertsenshtein-channel
+%       amplification or a numerical artefact of the background-stability
+%       boundary; B_0 scaling alone does NOT distinguish them
+%       (see MEMORY.md `stability_guard_findings.md`,
+%       `tachyon_irreducible_analysis.md`).  The current localised-B HPC
+%       campaign is the methodological route by which the two are being
+%       disambiguated — the headline finding (§4.4) should address this
+%       distinction directly.
+%   (b) The inference-mechanism details (compactified arctan_uniform /
+%       log_uniform priors, the soft-floor log-likelihood, the per-sample
+%       `run_status` tags used for post-chain filtering) that §3
+%       deliberately omits because they are parameter-level choices.
+%       Surface them HERE in §4 where the inference outputs make them
+%       necessary for the reader to understand the posterior shapes.
+%       Reference: docs/V3_ARCHITECTURE.md, App J (InferenceArchitecture).
 
 \section{Results}%
 \label{Results}
