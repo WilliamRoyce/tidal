@@ -2062,17 +2062,23 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
     # Resolve solver scheme (auto-select based on equation operators)
     scheme = _resolve_scheme(args.scheme, spec, grid_info, bc)
     # TIDAL_MODAL_BACKEND=jax overrides modal → modal-jax without touching auto-select.
-    # Phase-2a eligibility gate: block only position-dependent theories (no JAX Krylov
-    # equivalent) and LHS time_order > 2 (modal_jax.py raises ValueError for these).
-    # Constraints and RHS time-derivative operators (first_derivative_t, d2_t) are
-    # handled by _solve_modal_jax_constrained via _build_evolution_matrices.
-    # Ineligible theories silently keep scipy to avoid NotImplementedError.
+    # CPU-only conservative gate: block constraints, position-dependent coefficients,
+    # AND RHS time-derivative operators. Measured 2026-05-17: even with the Phase 2a
+    # constraint path enabled, JAX vmap(expm) is ~3.7x SLOWER than scipy's expm loop
+    # for the matrix sizes encountered in T2/T4/T5/T6 + dark_photon_plasma on CPU
+    # (XLA expm dispatch overhead dominates at 30x30 and below). The Phase 2a code
+    # remains valid for a future GPU JAX path; on CPU, force ineligibility for any
+    # theory that would route through it. See jax_modal_cpu_negative_result.md.
     if scheme == "modal" and os.environ.get("TIDAL_MODAL_BACKEND", "") == "jax":
-        from tidal.solver.modal import _has_position_dependent_terms
+        from tidal.solver.modal import (
+            _has_position_dependent_terms,
+            _has_time_derivative_operators,
+        )
 
-        jax_eligible = not _has_position_dependent_terms(spec) and all(
-            eq.time_derivative_order <= 2  # noqa: PLR2004
-            for eq in spec.equations
+        jax_eligible = not (
+            any(eq.time_derivative_order == 0 for eq in spec.equations)
+            or _has_position_dependent_terms(spec)
+            or _has_time_derivative_operators(spec)
         )
         if jax_eligible:
             scheme = "modal-jax"
