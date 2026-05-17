@@ -64,6 +64,16 @@ dispatch logic are described in \cref{NumericalEvolution}.
 For all surveys reported in \cref{Results}, the Fourier modal solver
 was used.
 
+% TODO (placement reminder, surfaced during §3 drafting): the
+% "Observables" paragraph below describes \Pconv(t) and \Pmax, which
+% are physics quantities defined in \cref{Theory} (or \cref{Results}),
+% not software-architecture facts.  Consider, in a later pass, moving
+% this paragraph to §2 Theoretical framework where the conversion
+% probability is first introduced, or to §4 Results where \Pmax
+% becomes the comparison quantity.  We did not move it as part of the
+% §3 drafting because relocation requires §2's notation and §4's
+% metric-definition convention to be settled first.
+
 \paragraph*{Observables}
 The numerical integration produces field snapshots at each saved
 timestep, from which physics observables are extracted.
