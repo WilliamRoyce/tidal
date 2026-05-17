@@ -125,7 +125,7 @@ and fall back to \texttt{--scheme modal}:
     data.
 \end{itemize}
 
-\paragraph{Phase 2a (constraint systems) — implemented.}
+\paragraph{Phase 2a (constraint systems) — implemented but not faster.}
 Algebraic constraint fields are supported as of Phase~2a.  The constraint
 path (\texttt{\_solve\_modal\_jax\_constrained}) calls the numpy
 \texttt{\_build\_evolution\_matrices} routine to perform the Schur
@@ -135,6 +135,14 @@ post-evolution via \texttt{einsum("mcj,tmj->tcm", recovery, ys)}.
 
 Verified against \texttt{dark\_photon\_plasma} (3~constraint fields,
 30~dynamical slots): \texttt{rel\_err = 2.7e-17} (machine precision).
+
+\textbf{Benchmark result (2026-05-17):} JAX Phase~2a is $3\times$
+\emph{slower} than scipy for all production PGT theories on devcontainer
+CPU: \texttt{dark\_photon\_plasma} $N=32$ gives scipy~$9.2$ms,
+JAX~$28$ms (speedup~$0.33\times$).  See GH~\#368 for full analysis.
+The gating environment variable \verb|TIDAL_MODAL_BACKEND=jax| is
+therefore \textbf{disabled} in \texttt{polychord\_intr.sbatch} until GPU
+backend or $N\geq192$ in~1D is available.
 
 \subsection{Dispatch and Installation}
 \label{sec:modal_jax_dispatch}
@@ -195,22 +203,25 @@ monotonic drift; see \texttt{scripts/local\_jax\_benchmark.py}):
   \item Coupled scalars ($N=64$): scipy~$5.1$ms, JAX~$4.7$ms,
     speedup~$1.08\times$.
   \item \texttt{dark\_photon\_plasma} ($N=32$, 17~modes, 30~dyn slots,
-    Phase~2a+2b): scipy~$11$ms, JAX~$21$ms, speedup~$0.51\times$
-    (machine-precision agreement, but \textbf{JAX is slower at this size}).
+    Phase~2a, interleaved $n=30$): scipy~$9.2$ms, JAX~$28$ms,
+    speedup~$\mathbf{0.33\times}$ — JAX is $3\times$ \emph{slower}.
+    Constraint path profiling: JAX fused expm+scan takes $9.7$ms
+    vs scipy per-mode loop $2.6$ms for the same 30$\times$30 matrices.
 \end{itemize}
 
 The supervisor's $10$--$100\times$ expectation is unrealistic at the
 current PolyChord problem size on CPU XLA. Profile evidence:
 
 \begin{verbatim}
-dark_photon_plasma N=32 breakdown (Phase 2b):
-  _build_evolution_matrices (numpy Schur):  1.94 ms
-  batch_expm (Padé, 17 modes x 30x30):      8.76 ms  <- dominant
-  evolve_uniform scan:                      0.08 ms
-  einsum recovery + IFFT + assembly:        ~10  ms
-  Total JAX:                                ~21  ms
+dark_photon_plasma N=32 breakdown (Phase 2a, 2026-05-17):
+  _build_evolution_matrices (numpy Schur):  2.11 ms
+  JAX fused expm+scan (17 modes, 30x30):   9.68 ms  <- dominant (XLA)
+  numpy->JAX conversion:                   0.44 ms
+  reconstruction + IFFT:                   0.36 ms
+  Total JAX:                               ~21  ms
 
-  scipy total (Padé loop + IFFT):           ~11  ms
+  scipy per-mode expm loop (30x30 x17):   2.56 ms  <- LAPACK wins
+  scipy total (_build_evo + expm + IFFT):  ~9.2 ms
 \end{verbatim}
 
 \texttt{scipy.linalg.expm} (LAPACK) for a single $30\times30$ complex
