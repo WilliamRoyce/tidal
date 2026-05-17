@@ -4,7 +4,10 @@
 # Reference v2: 28742024 (log Z = +0.615 ± 0.001, std 6h, 1:09 wall).
 # Tests whether full 9-D parameter space surfaces structure under
 # tachyon-permissive sampling that the v2 hard-rejection masked.
-# max_ndead=15000: safety cap for 9p amp; precision_criterion likely fires first.
+#
+# PolyChord sampling budget — ndim=9:
+#   Landscape (this script):    nlive=225  (25×ndim), num_repeats=18 (2×ndim)
+#   Publication (future rerun): nlive=450 (50×ndim), num_repeats=18
 
 set -euo pipefail
 
@@ -29,7 +32,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 1800 \
-    --num-repeats 5 --precision-criterion 0.01 \
-    --max-ndead 15000 \
+    --method nested --sampler polychord --nlive 225 \
+    --num-repeats 18 --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d23_full_amp_v3'

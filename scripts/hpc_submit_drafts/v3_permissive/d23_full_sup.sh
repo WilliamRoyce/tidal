@@ -2,7 +2,10 @@
 # v3 D2.3 full T5 sup — all 9 nonminimal couplings free
 #
 # Reference v2: 28742035 (log Z = -0.615 ± 0.001, std 6h, 1:00 wall).
-# max_ndead=2000: very conservative for 9p sup (most complex chain); ~15 min + post-processing.
+#
+# PolyChord sampling budget — ndim=9:
+#   Landscape (this script):    nlive=225  (25×ndim), num_repeats=18 (2×ndim)
+#   Publication (future rerun): nlive=450 (50×ndim), num_repeats=18
 
 set -euo pipefail
 
@@ -27,7 +30,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 1800 \
-    --num-repeats 5 --precision-criterion 0.01 \
-    --max-ndead 2000 \
+    --method nested --sampler polychord --nlive 225 \
+    --num-repeats 18 --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d23_full_sup_v3'

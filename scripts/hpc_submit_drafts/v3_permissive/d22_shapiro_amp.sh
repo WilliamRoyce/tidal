@@ -4,7 +4,10 @@
 # Parameter partition matches v2 chain 28736161 exactly.
 # Pinned: chi (was 0 in v2 too).
 # Reference v2: 28736161 (log Z = +0.612 ± 0.002, 38 min INTR).
-# max_ndead=20000: safety cap; 8p amp likely hits precision_criterion first (~30-40 min).
+#
+# PolyChord sampling budget — ndim=8:
+#   Landscape (this script):    nlive=200  (25×ndim), num_repeats=16 (2×ndim)
+#   Publication (future rerun): nlive=400 (50×ndim), num_repeats=16
 
 set -euo pipefail
 
@@ -29,7 +32,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 2400 \
-    --num-repeats 5 --precision-criterion 0.01 \
-    --max-ndead 20000 \
+    --method nested --sampler polychord --nlive 200 \
+    --num-repeats 16 --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d22_shapiro_amp_v3'

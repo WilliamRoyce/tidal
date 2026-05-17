@@ -3,7 +3,12 @@
 #
 # Parameter partition matches v2 chain 28684410 exactly.
 # Reference v2 sup: 28684410 (log Z = -0.449 ± 0.002, ESS=877; 11 min INTR).
-# Note: 29232780 TIMEOUT at 1h INTR — resume with d20_bahamonde_sup_resume.sh.
+# 29232780: TIMEOUT at 1h (nlive=1500 was ~12× recommended — divergence-guard
+# era legacy). Resubmitted at default nlive.
+#
+# PolyChord sampling budget — ndim=5:
+#   Landscape (this script):    nlive=125  (25×ndim), num_repeats=10 (2×ndim)
+#   Publication (future rerun): nlive=250 (50×ndim), num_repeats=10
 
 set -euo pipefail
 
@@ -25,6 +30,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 1500 \
-    --num-repeats 5 --precision-criterion 0.01 \
+    --method nested --sampler polychord --nlive 125 \
+    --num-repeats 10 --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d20_bahamonde_sup_v3'

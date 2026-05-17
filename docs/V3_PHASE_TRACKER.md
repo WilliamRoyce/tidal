@@ -33,6 +33,25 @@
 
 GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-zero clamp` and `[v3-A-γ] γ_conversion: P_max correlation validation` track the work.
 
+## PolyChord sampling budget reference
+
+Previous campaigns used `nlive=1500–2400` to compensate for divergence-guard rejections
+(many prior samples were rejected as tachyonic, requiring a large live set to explore the
+posterior). v3 permissive sampling removes that need — PolyChord's own recommendations apply
+directly.
+
+| Theory | ndim | Landscape nlive | Publication nlive | num_repeats |
+| --- | --- | --- | --- | --- |
+| D2.0 Bahamonde | 5 | **125** (25×ndim) | 250 (50×ndim) | 10 (2×ndim) |
+| D2.1 Barker | 6 | **150** | 300 | 12 |
+| D2.2 Shapiro | 8 | **200** | 400 | 16 |
+| D2.3 Full | 9 | **225** | 450 | 18 |
+
+**Landscape pass** = current B.5 goal — sufficient for Bayes-factor comparison and MAP
+identification. **Publication pass** = future rerun for tighter logZ (±0.1 vs ±0.3) and
+credible-interval reporting in the manuscript. All `v3_permissive/*.sh` scripts use landscape
+settings; future scripts go in `v3_publication/`.
+
 ## Phase B — Campaign re-runs
 
 | Step | Description | Status | Notes |

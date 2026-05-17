@@ -9,6 +9,12 @@
 # Reference v2: 28598736 (log Z = +0.616 ± 0.001, ESS=877).
 # v2 priors were tight (xi=log[0.01,10], delta1=uniform[-0.025,0.025]);
 # v3 widens them via the architecture-standard compactification.
+#
+# PolyChord sampling budget — ndim=5:
+#   Landscape (this script):   nlive=125  (25×ndim), num_repeats=10 (2×ndim)
+#   Publication (future rerun): nlive=250 (50×ndim), num_repeats=10
+# Previous campaigns used nlive=1500–1800 to compensate for divergence-guard
+# rejections; v3 permissive sampling removes that need.
 
 set -euo pipefail
 
@@ -30,6 +36,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 1500 \
-    --num-repeats 5 --precision-criterion 0.01 \
+    --method nested --sampler polychord --nlive 125 \
+    --num-repeats 10 --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d20_bahamonde_amp_v3'

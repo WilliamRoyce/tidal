@@ -3,7 +3,10 @@
 #
 # Parameter partition matches v2 chain 28727741 exactly.
 # Reference v2: 28727741 (log Z = -0.447 ± 0.001).
-# max_ndead=5000: at D2.0 sup rate (~138 dead pts/min), terminates in ~36 min + post-processing.
+#
+# PolyChord sampling budget — ndim=6:
+#   Landscape (this script):    nlive=150  (25×ndim), num_repeats=12 (2×ndim)
+#   Publication (future rerun): nlive=300 (50×ndim), num_repeats=12
 
 set -euo pipefail
 
@@ -26,7 +29,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 1800 \
-    --num-repeats 5 --precision-criterion 0.01 \
-    --max-ndead 5000 \
+    --method nested --sampler polychord --nlive 150 \
+    --num-repeats 12 --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d21_barker_sup_v3'

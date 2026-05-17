@@ -4,7 +4,10 @@
 # Parameter partition matches v2 chain 28739692 exactly.
 # Pinned: chi (was 0 in v2 too).
 # Reference v2: 28739692 (log Z = -0.615 ± 0.001, 33 min INTR).
-# max_ndead=3000: conservative for 8p sup (harder than 5p); ~22 min + post-processing.
+#
+# PolyChord sampling budget — ndim=8:
+#   Landscape (this script):    nlive=200  (25×ndim), num_repeats=16 (2×ndim)
+#   Publication (future rerun): nlive=400 (50×ndim), num_repeats=16
 
 set -euo pipefail
 
@@ -29,7 +32,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 2400 \
-    --num-repeats 5 --precision-criterion 0.01 \
-    --max-ndead 3000 \
+    --method nested --sampler polychord --nlive 200 \
+    --num-repeats 16 --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d22_shapiro_sup_v3'
