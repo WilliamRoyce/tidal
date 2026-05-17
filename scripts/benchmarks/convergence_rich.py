@@ -506,6 +506,8 @@ def _tio_run_one(
         f"{T_END}",
         "--dt",
         f"{dt}",
+        "--snapshots",
+        f"{T_END}",
         *scheme_args,
         "--param",
         f"kappa={KAPPA}",
