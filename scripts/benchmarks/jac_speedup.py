@@ -549,16 +549,19 @@ def run(
     out_path: Path | None = None,
     *,
     skip_existing: bool = False,
+    order: str = "shuffle",
 ) -> dict:
     """Run the full benchmark.
 
-    Trials are shuffled across all (theory, N_grid) configurations per rep
-    to average out monotonic thermal drift.  After each config completes, the
-    full JSON is rewritten to ``out_path`` so a job killed by walltime still
-    leaves partial data on disk.  If ``skip_existing`` is set, configs that
-    already appear in ``out_path`` are skipped — useful for splitting the
-    sweep across multiple INTR rounds.
-    """
+    ``order`` controls the traversal sequence: ``shuffle`` (default) randomises
+    across all (theory, N_grid) configurations to average out monotonic
+    thermal drift; ``ascending`` sorts by n_total so cheap small-N configs
+    complete first — useful when you want rapid early checkpoints.  After
+    each config completes the full JSON is rewritten to ``out_path`` so a
+    job killed by walltime still leaves partial data on disk.  If
+    ``skip_existing`` is set, configs already present in ``out_path`` are
+    skipped — useful for splitting the sweep across multiple INTR rounds.
+    """  # noqa: DOC501  (ValueError raised for invalid `order`)
     rng = random.Random(seed)  # noqa: S311
 
     # Build all configs
@@ -579,14 +582,26 @@ def run(
             )
 
     print(
-        f"jac_speedup: {len(configs)} configs x {reps} reps  seed={seed}",
+        f"jac_speedup: {len(configs)} configs x {reps} reps  seed={seed}  order={order}",
         flush=True,
     )
 
-    # Run each config sequentially (setup is heavy; shuffle is per-config not per-rep
-    # because we re-use setup across reps within a config).
-    shuffled = list(configs)
-    rng.shuffle(shuffled)
+    # Run each config sequentially (setup is heavy; order is per-config not
+    # per-rep because we re-use setup across reps within a config).
+    ordered = list(configs)
+    if order == "shuffle":
+        rng.shuffle(ordered)
+    elif order == "ascending":
+        # Sort by n_total (= slots × product(grid_shape)).  Slot count requires
+        # loading the spec; cheap to do once.  Use product(grid_shape) as a
+        # proxy (correct ordering within a theory; close-enough across).
+        from math import prod
+
+        ordered.sort(key=lambda c: prod(c[2]))
+    else:
+        msg = f"unknown order={order!r}; use 'shuffle' or 'ascending'"
+        raise ValueError(msg)
+    shuffled = ordered
 
     rows: list[dict] = list(existing.values())
     for theory_name, json_path, grid_shape, bounds, params in shuffled:
@@ -630,6 +645,13 @@ def main() -> None:
         action="store_true",
         help="Skip configs already present in --out (resume mode).",
     )
+    parser.add_argument(
+        "--order",
+        choices=["shuffle", "ascending"],
+        default="shuffle",
+        help="Config traversal order: 'shuffle' (default, randomises) or "
+        "'ascending' (sort by n_total — small/cheap configs first).",
+    )
     args = parser.parse_args()
 
     data = run(
@@ -637,6 +659,7 @@ def main() -> None:
         seed=args.seed,
         out_path=args.out,
         skip_existing=args.skip_existing,
+        order=args.order,
     )
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w", encoding="utf-8") as fh:
