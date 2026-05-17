@@ -1,4 +1,4 @@
-% Appendix H: Perturbative reduction in higher-curvature Lagrangians (~2000 w).
+% Appendix H: Perturbative reduction in higher-curvature Lagrangians (~2100 w).
 %
 % Supersedes the "Constraint promotion in higher-curvature PGT" first draft.
 % Sources (read-only, no verbatim reuse):
@@ -8,62 +8,68 @@
 \section{Perturbative reduction in higher-curvature Lagrangians}%
 \label{PerturbativeReduction}
 
-We describe the perturbative-reduction framework by which \TIDAL{} handles
-Lagrangians containing higher-order terms multiplied by a small coupling.
-The four topics are: the effective-field-theory interpretation under which such
-terms are corrections to a well-posed base theory rather than independent exact
-theories; the Pass~0 and Pass~1 iterative algorithm by which the equations of
-motion are evolved without ghost modes; the integration of Pass~1 with the
-Fourier modal solver of \cref{ModalSolver} via a closed-form Duhamel kernel;
-and the constraint-promotion barrier that prevents the same iterative strategy
-from extending to the Lagrangian perturbative substitution required for
-Hamiltonian analysis.
+The iterative algorithm by which \TIDAL{} evolves theories whose Lagrangian contains
+a small correction $\varepsilon\,\mathcal{L}_1$ alongside a well-posed base
+$\mathcal{L}_0$ is described here: its formulation as an order-by-order expansion in
+$\varepsilon$; the closed-form Duhamel kernel that integrates the first-order correction
+within the Fourier modal solver of \cref{ModalSolver}; and the constraint-promotion
+barrier that prevents the same expansion from extending to the Legendre transform in
+certain higher-curvature PGT theories.
 
 \paragraph*{Higher-order terms as effective corrections}
-The higher-order Lagrangian terms surveyed in this work share a common physical
-character: they are the low-energy residues of unknown ultraviolet-complete
-physics, valid only as perturbative corrections to an already well-posed base
-theory.
-Terms such as $b_5\,\tilde{R}^{2}$ in quadratic Poincar\'e gauge theory, the
-Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^{2}$ correction to Maxwell
-electrodynamics, and curvature-squared operators more broadly fall into this
-class.
-The effective-field-theory programme, established for quantum gravity by
-Simon~\cite{Simon:1990ic,Simon:1990jn} and Donoghue~\cite{Donoghue:1994dn} and
-synthesised by Burgess~\cite{burgess2003quantum}, interprets higher-order
-operators not as generating new exact degrees of freedom but as perturbing the
-trajectories of the base theory to order $\varepsilon$, where $\varepsilon$ is
-the small coupling.
+For the theories studied here --- those whose Lagrangian admits the split
+$\mathcal{L} = \mathcal{L}_0 + \varepsilon\,\mathcal{L}_1$ with $\varepsilon$ a small
+dimensionless coupling --- the correction $\varepsilon\,\mathcal{L}_1$ is treated
+throughout as a perturbative shift to the dynamics of the base Lagrangian $\mathcal{L}_0$,
+not as a source of new independent degrees of freedom.
+The split arises naturally in each case: $b_5\,\tilde{R}^{2}$ in quadratic Poincar\'e
+gauge theory with $\varepsilon = b_5$; the Euler--Heisenberg
+$(F_{\mu\nu}F^{\mu\nu})^{2}$ correction to Maxwell electrodynamics with
+$\varepsilon = \rho$; and the Klein--Gordon mass-shift $-\varepsilon\,\phi^{2}$ used in
+\cref{Validation} to calibrate the algorithm.
 
-The alternative interpretation --- treating the full Lagrangian as exact ---
-leads to a well-known pathology.
-Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Woodard:2015zca} states
-that a non-degenerate Lagrangian containing time derivatives of order higher
-than one has a Hamiltonian unbounded below: at least one canonical momentum
-appears linearly, and the corresponding degree of freedom is a ghost.
-The theorem is non-perturbative; the ghost is present for any non-zero
-coefficient, however small.
-In the effective-field-theory interpretation the ghost is harmless: its
-characteristic mass scale is $\sim 1/\sqrt{\varepsilon}$, coinciding with the
-cutoff at which the truncated effective Lagrangian breaks down.
-It is an artefact of extrapolating the effective theory beyond its regime of
-validity, not a physical mode; the physical content of the theory resides in
-the correction to the base-theory solution.
-Grosse-Knetter~\cite{Grosse-Knetter:1993tae} establishes the equivalence at the
-quantum level: effective Lagrangians related by derivative field redefinitions
-using the equations of motion are physically equivalent, not merely classical
-approximations.
-The correct treatment keeps the base theory as the dynamical backbone and
-accounts for the $\varepsilon\mathcal{L}_1$ term as a perturbative source.
+The effective-field-theory programme establishes this interpretation on physical
+grounds: terms of this form are the low-energy residues of an unknown ultraviolet
+completion, encoding perturbative corrections to base-theory observables and not
+independent dynamics in their own right~\cite{Simon:1990ic,Simon:1990jn,Donoghue:1994dn,
+burgess2003quantum}.
+Grosse-Knetter~\cite{Grosse-Knetter:1993tae} shows, within the Ostrogradsky canonical
+formalism, that field redefinitions using the equations of motion map the higher-order
+Lagrangian to the reduced one through a canonical transformation; the two are exactly
+equivalent through that transformation, not approximations to one another.
+
+The alternative --- treating $\mathcal{L}$ as an exact theory rather than a truncated
+expansion --- encounters a structural obstruction.
+Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Woodard:2015zca} states that any
+non-degenerate Lagrangian containing time derivatives of order higher than one has a
+Hamiltonian unbounded below: at least one canonical momentum enters linearly, and the
+corresponding mode is a ghost.
+The theorem is non-perturbative; the ghost is present for any non-zero $\varepsilon$.
+For the theories we study, the ghost mode has characteristic frequency
+$\sim 1/\sqrt{\varepsilon}$, exactly the scale at which $\varepsilon\,\mathcal{L}_1$
+becomes comparable to $\mathcal{L}_0$ and the perturbative expansion itself breaks
+down; the ghost is therefore an artefact of extrapolating the truncated Lagrangian
+beyond its regime of validity, not a physical degree of freedom.
+We keep $\mathcal{L}_0$ as the dynamical backbone and compute the effect of
+$\varepsilon\,\mathcal{L}_1$ iteratively as a correction to the base-theory solution.
 
 \paragraph*{Perturbative reduction of the equations of motion}
-We solve the higher-order equations of motion by the iterative order-reduction
-method of Parker and Simon~\cite{parker1993reduced}, generalised to the
-multi-field linearised-PDE regime of \TIDAL{}.
-Given a Lagrangian $\mathcal{L} = \mathcal{L}_0 + \varepsilon\,\mathcal{L}_1$
-with $\varepsilon$ a small symbolic coupling, we expand the solution
-$q = q^{(0)} + \varepsilon\,q^{(1)} + \cdots$ and collect the equations of
-motion by order:
+We solve the equations of motion by the iterative order-reduction method of Parker
+and Simon~\cite{parker1993reduced}, generalised to the multi-field linearised-PDE
+regime of \TIDAL{}.
+Direct substitution of the order-zero equations into the higher-derivative terms,
+following Ja{\'e}n, Llosa and Molina~\cite{jaen1986reduction}, and the mechanical
+Ostrogradsky path via auxiliary fields were both investigated and rejected: the former
+has no substitution target when a field is algebraically constrained at order zero
+(see the constraint-promotion barrier below), and the latter introduces ghost modes
+as explicit degrees of freedom, producing unphysical growth in long-time simulation.
+
+Writing the full equation of motion as $E[q;\,\varepsilon] = 0$, we define the base
+operator $E_{\mathrm{base}}[q] \equiv E[q;\,\varepsilon{=}0]$ --- the second-order
+ghost-free operator from $\mathcal{L}_0$ --- and the correction operator
+$E_{\mathrm{corr}}[q] \equiv \partial_\varepsilon E[q;\,\varepsilon]\big|_{\varepsilon=0}$
+from $\mathcal{L}_1$, which may carry higher time derivatives.
+Expanding $q = q^{(0)} + \varepsilon\,q^{(1)} + \cdots$ and collecting by order:
 \begin{align}
   \mathcal{O}(\varepsilon^0) &:\quad
     E_{\mathrm{base}}\bigl[q^{(0)}\bigr] = 0, \notag \\[2pt]
@@ -71,20 +77,22 @@ motion by order:
     E_{\mathrm{base}}\bigl[q^{(1)}\bigr] = -E_{\mathrm{corr}}\bigl[q^{(0)}\bigr].
   \label{EOMHierarchy}
 \end{align}
-The essential property is that the operator on the left-hand side at every order
-is always the ghost-free second-order base operator $E_{\mathrm{base}}$; the
-higher-derivative terms from $\mathcal{L}_1$ appear only as sources, evaluated
-on the previous-order solution.
-Ghost modes cannot arise because the evolution operator is always the
-second-order base.
+The essential property is that the left-hand side operator at every order is always the
+ghost-free second-order base operator $E_{\mathrm{base}}$; the higher-derivative
+contributions from $\mathcal{L}_1$ appear only as sources evaluated on the
+previous-order solution.
+We call the order-$\varepsilon^0$ solution \emph{Pass~0} and the
+order-$\varepsilon^1$ correction \emph{Pass~1}; these names are adopted in
+\cref{Validation} where the solver is calibrated against analytic benchmarks.
 
-On flat periodic domains, \TIDAL{} solves the Pass~0 system by Fourier-modal
-eigendecomposition (\cref{ModalSolver}).
-Transforming to wavenumber $\mathbf{k}$, the first-order system
-$\partial_t \hat{y} = A(\mathbf{k})\,\hat{y}$ admits the eigendecomposition
-$A = V D V^{-1}$; with $D$ diagonal with eigenvalues $\{\lambda_i\}$ and $V$
-the matrix of right eigenvectors, the Pass~0 solution at initial data
-$\hat{y}^{(0)}(0)$ is
+On flat periodic domains, the Pass~0 system at wavenumber $k$ reduces to the per-mode
+ODE $\partial_t\hat{y}^{(0)} = M(k)\,\hat{y}^{(0)}$ (cf.~\cref{ModalPerMode}), where
+$\hat{y}^{(0)}$ stacks the Fourier amplitudes of every field and velocity slot.
+For the perturbative-reduction path, the eigendecomposition $M(k) = V D V^{-1}$ is
+used rather than the Pad\'e scaling-and-squaring path of \cref{ModalSolver}, since the
+per-eigenmode expansion is required explicitly for the Pass~1 Duhamel integral.
+With $D$ diagonal with eigenvalues $\{\lambda_i\}$ and $V$ the right-eigenvector
+matrix, the Pass~0 solution at initial data $\hat{y}^{(0)}(0)$ is
 \begin{equation}
   \hat{y}^{(0)}(t) = V\,e^{Dt}\,\alpha,
   \qquad
@@ -93,10 +101,12 @@ $\hat{y}^{(0)}(0)$ is
 \end{equation}
 
 Pass~1 satisfies the inhomogeneous system
-$\partial_t \hat{y}^{(1)} = A\,\hat{y}^{(1)} + M_{\mathrm{src}}\,\hat{y}^{(0)}(t)$
-with $\hat{y}^{(1)}(0) = 0$.
-Working in the eigenbasis of $A$, with $\beta = V^{-1}M_{\mathrm{src}}V$, the
-component $\hat{z}^{(1)}_i = [V^{-1}\hat{y}^{(1)}]_i$ is
+$\partial_t\hat{y}^{(1)} = M(k)\,\hat{y}^{(1)} + C_{\mathrm{src}}\,\hat{y}^{(0)}(t)$
+with $\hat{y}^{(1)}(0) = 0$, where $C_{\mathrm{src}}$ is the source coupling matrix
+assembled from the $\varepsilon^1$ terms in the equations of motion.
+Working in the eigenbasis with $\beta = V^{-1}C_{\mathrm{src}}V$, the component
+$\hat{z}^{(1)}_i = [V^{-1}\hat{y}^{(1)}]_i$ is given by the variation-of-constants
+integral~\cite{hochbruck2010exponential,almohy2011action}
 $\hat{z}^{(1)}_i(t) = \sum_j \beta_{ij}\,\alpha_j\,G(\lambda_i,\lambda_j;t)$;
 the Duhamel kernel $G$ is
 \begin{equation}
@@ -112,15 +122,24 @@ and the full Pass~1 state is recovered as $\hat{y}^{(1)}(t) = V\,\hat{z}^{(1)}(t
 Pass~1 is therefore computed entirely from the Pass~0 eigensystem; no additional
 differential equation need be solved.
 Near the degenerate limit $|(\mu-\lambda)t| \to 0$, direct evaluation of
-\cref{DuhamelKernel} suffers catastrophic cancellation; \TIDAL{} switches
-automatically to a twelve-term Taylor expansion that maintains double-precision
-accuracy down to $|(\mu-\lambda)t| \sim 10^{-15}$.
+\cref{DuhamelKernel} suffers catastrophic cancellation; setting $z = (\mu-\lambda)t$,
+\TIDAL{} uses the Taylor expansion~\cite{almohy2011action}
+\begin{equation}
+  G\bigl|_{|z|<10^{-5}}
+  \;=\;
+  t\,e^{\lambda t}\sum_{j=0}^{12}\frac{z^{j}}{(j+1)!},
+  \label{DuhamelTaylor}
+\end{equation}
+the threshold and term count from Al-Mohy \& Higham~\cite{almohy2011action}
+Table~3.1; the twelve-term sum maintains relative error below $10^{-13}$ across
+$|z| \in [10^{-15},1]$, validated against 50-digit \texttt{mpmath} reference values.
 
-The approximation is valid while $\varepsilon\,\omega_{\max}\,t_{\mathrm{end}} \ll 1$,
-monitored at run time.
-The Pass~0 and Pass~1 solver is validated in \cref{Validation} against analytic
-solutions for the Klein--Gordon perturbative theory, a higher-derivative biharmonic
-correction, and the Euler--Heisenberg QED vacuum birefringence ratio.
+The iterative approximation holds while the cumulative phase error satisfies
+$\varepsilon\,\omega\,t_{\mathrm{end}} \ll 1$~\cite{parker1993reduced}, monitored
+at run time by \TIDAL{}'s validity diagnostic.
+The Pass~0 and Pass~1 solver is calibrated in \cref{Validation} against analytic
+solutions for the Klein--Gordon mass-shift correction, a higher-derivative biharmonic
+perturbation, and the Euler--Heisenberg QED vacuum birefringence ratio.
 
 \paragraph*{Perturbative reduction of the Hamiltonian}
 Energy measurement and Noether consistency require a Hamiltonian, and the standard
@@ -162,8 +181,8 @@ components satisfy algebraic relations and carry no kinetic term.
 Turning on $\varepsilon$ infinitesimally promotes these relations to dynamical
 equations and introduces new propagating modes; the constraint structure of the
 theory changes discontinuously across $\varepsilon = 0$.
-Naive perturbation theory is blind to this promotion because the new mode is
-absent at $\varepsilon = 0$ and cannot be reached by a power-series
+An order-by-order expansion in $\varepsilon$ is blind to this promotion because
+the new mode is absent at $\varepsilon = 0$ and cannot be reached by a power-series
 expansion.
 The barrier is the statement that no perturbative expansion in $\varepsilon$
 connects the base theory to the small-$\varepsilon$ theory once a constraint has
@@ -232,7 +251,7 @@ this structural pattern.
 \paragraph*{Software implementation and failure detection}
 \TIDAL{} handles both sides of the perturbative-reduction framework
 automatically.
-For the equations of motion, the Wolfram derivation pipeline tags each operator
+For the equations of motion, the Wolfram derivation stage tags each operator
 term with an \texttt{order\_in\_eps} integer; at simulation time,
 \texttt{PerturbativeSolver} separates base-theory terms from correction terms
 and runs Pass~0 followed by Pass~1 via the Duhamel kernel of
@@ -241,7 +260,7 @@ and runs Pass~0 followed by Pass~1 via the Duhamel kernel of
 For the Hamiltonian, \TIDAL{} attempts LPS symbolically at derivation time.
 Failure is detected by checking whether the order-$\varepsilon^0$ momentum
 kernel changes rank when $\varepsilon$ is set to a non-zero test value; a rank
-jump signals constraint promotion and the pipeline emits a diagnostic that
+jump signals constraint promotion and the software emits a diagnostic that
 marks the theory as having no LPS-reduced Hamiltonian.
 The three affected theories --- \texttt{graviton\_torsion},
 \texttt{torsion\_gertsenshtein}, and \texttt{torsion\_gertsenshtein\_combined},
