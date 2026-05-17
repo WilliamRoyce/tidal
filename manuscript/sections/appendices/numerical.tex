@@ -7,8 +7,8 @@
 % flowchart and operator catalogue figures, (c) cites the broader
 % non-normal-matrix-exponential and DAE literature explicitly, and
 % (d) cross-refs the Hamiltonian-obstruction discussion in
-% \cref{ConstraintBarrier} and the perturbative-reduction pipeline in
-% \cref{LPSReduction}. The Fourier modal solver receives the
+% \cref{PerturbativeReduction} and the perturbative-reduction pipeline in
+% \cref{LPSSubstitution}. The Fourier modal solver receives the
 % longest treatment because it is the primary backend; the others are
 % documented briefly.
 
@@ -329,7 +329,7 @@ algorithms~\cite{higham2008functions,molervanloan2003nineteen,golub2013matrix,tr
 we adopt the recommendation of Higham~\cite[\S~2.3]{higham2008functions} and
 replace it with the Pad\'e path,\footnote{The eigendecomposition path
 remains available internally for the closed-form Duhamel kernel used
-in the perturbative-reduction scheme of~\cref{ConstraintBarrier},
+in the perturbative-reduction scheme of~\cref{PerturbativeReduction},
 which requires the per-eigenmode expansion explicitly.}
 which is robust at arbitrary
 $\operatorname{cond}(V)$~\cite{higham2009scaling,higham2008functions}.

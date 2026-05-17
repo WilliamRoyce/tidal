@@ -1,159 +1,267 @@
-% Appendix H: Constraint promotion in higher-curvature PGT (~1150 w).
+% Appendix H: Perturbative reduction in higher-curvature Lagrangians (~2000 w).
 %
-% Replaces the placeholder file. App B forward-references \cref{ConstraintBarrier}
-% from its Euler--Lagrange paragraph.
-%
-% Reference source for facts (no verbatim reuse):
-% docs/tex/perturbative_reduction_constraint_barrier.tex (1103 lines).
+% Supersedes the "Constraint promotion in higher-curvature PGT" first draft.
+% Sources (read-only, no verbatim reuse):
+%   docs/tex/perturbative_reduction.tex          (§§1–2: EFT problem, v6 algorithm)
+%   docs/tex/perturbative_reduction_constraint_barrier.tex   (§§3–4: LPS, barrier)
 
-\section{Constraint promotion in higher-curvature PGT}%
-\label{ConstraintBarrier}
+\section{Perturbative reduction in higher-curvature Lagrangians}%
+\label{PerturbativeReduction}
 
-For Lagrangians that contain higher-curvature terms multiplied by a
-small coupling, the canonical-analysis programme used elsewhere in
-this report meets a structural obstruction --- the
-\emph{constraint-promotion barrier} --- that bears on which PGT
-theories \cref{SymbolicComputation} can survey reliably.
-This appendix sets out the barrier in its three classical statements,
-records the structural analogues familiar from other gravity and
-field-theory limits, and describes the \emph{Lagrangian perturbative
-substitution} algorithm by which the software handles the cases where it applies.
+We describe the perturbative-reduction framework by which \TIDAL{} handles
+Lagrangians containing higher-order terms multiplied by a small coupling.
+The four topics are: the effective-field-theory interpretation under which such
+terms are corrections to a well-posed base theory rather than independent exact
+theories; the Pass~0 and Pass~1 iterative algorithm by which the equations of
+motion are evolved without ghost modes; the integration of Pass~1 with the
+Fourier modal solver of \cref{ModalSolver} via a closed-form Duhamel kernel;
+and the constraint-promotion barrier that prevents the same iterative strategy
+from extending to the Lagrangian perturbative substitution required for
+Hamiltonian analysis.
+
+\paragraph*{Higher-order terms as effective corrections}
+The higher-order Lagrangian terms surveyed in this work share a common physical
+character: they are the low-energy residues of unknown ultraviolet-complete
+physics, valid only as perturbative corrections to an already well-posed base
+theory.
+Terms such as $b_5\,\tilde{R}^{2}$ in quadratic Poincar\'e gauge theory, the
+Euler--Heisenberg $(F_{\mu\nu}F^{\mu\nu})^{2}$ correction to Maxwell
+electrodynamics, and curvature-squared operators more broadly fall into this
+class.
+The effective-field-theory programme, established for quantum gravity by
+Simon~\cite{Simon:1990ic,Simon:1990jn} and Donoghue~\cite{Donoghue:1994dn} and
+synthesised by Burgess~\cite{burgess2003quantum}, interprets higher-order
+operators not as generating new exact degrees of freedom but as perturbing the
+trajectories of the base theory to order $\varepsilon$, where $\varepsilon$ is
+the small coupling.
+
+The alternative interpretation --- treating the full Lagrangian as exact ---
+leads to a well-known pathology.
+Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Woodard:2015zca} states
+that a non-degenerate Lagrangian containing time derivatives of order higher
+than one has a Hamiltonian unbounded below: at least one canonical momentum
+appears linearly, and the corresponding degree of freedom is a ghost.
+The theorem is non-perturbative; the ghost is present for any non-zero
+coefficient, however small.
+In the effective-field-theory interpretation the ghost is harmless: its
+characteristic mass scale is $\sim 1/\sqrt{\varepsilon}$, coinciding with the
+cutoff at which the truncated effective Lagrangian breaks down.
+It is an artefact of extrapolating the effective theory beyond its regime of
+validity, not a physical mode; the physical content of the theory resides in
+the correction to the base-theory solution.
+Grosse-Knetter~\cite{Grosse-Knetter:1993tae} establishes the equivalence at the
+quantum level: effective Lagrangians related by derivative field redefinitions
+using the equations of motion are physically equivalent, not merely classical
+approximations.
+The correct treatment keeps the base theory as the dynamical backbone and
+accounts for the $\varepsilon\mathcal{L}_1$ term as a perturbative source.
+
+\paragraph*{Perturbative reduction of the equations of motion}
+We solve the higher-order equations of motion by the iterative order-reduction
+method of Parker and Simon~\cite{parker1993reduced}, generalised to the
+multi-field linearised-PDE regime of \TIDAL{}.
+Given a Lagrangian $\mathcal{L} = \mathcal{L}_0 + \varepsilon\,\mathcal{L}_1$
+with $\varepsilon$ a small symbolic coupling, we expand the solution
+$q = q^{(0)} + \varepsilon\,q^{(1)} + \cdots$ and collect the equations of
+motion by order:
+\begin{align}
+  \mathcal{O}(\varepsilon^0) &:\quad
+    E_{\mathrm{base}}\bigl[q^{(0)}\bigr] = 0, \notag \\[2pt]
+  \mathcal{O}(\varepsilon^1) &:\quad
+    E_{\mathrm{base}}\bigl[q^{(1)}\bigr] = -E_{\mathrm{corr}}\bigl[q^{(0)}\bigr].
+  \label{EOMHierarchy}
+\end{align}
+The essential property is that the operator on the left-hand side at every order
+is always the ghost-free second-order base operator $E_{\mathrm{base}}$; the
+higher-derivative terms from $\mathcal{L}_1$ appear only as sources, evaluated
+on the previous-order solution.
+Ghost modes cannot arise because the evolution operator is always the
+second-order base.
+
+On flat periodic domains, \TIDAL{} solves the Pass~0 system by Fourier-modal
+eigendecomposition (\cref{ModalSolver}).
+Transforming to wavenumber $\mathbf{k}$, the first-order system
+$\partial_t \hat{y} = A(\mathbf{k})\,\hat{y}$ admits the eigendecomposition
+$A = V D V^{-1}$; with $D$ diagonal with eigenvalues $\{\lambda_i\}$ and $V$
+the matrix of right eigenvectors, the Pass~0 solution at initial data
+$\hat{y}^{(0)}(0)$ is
+\begin{equation}
+  \hat{y}^{(0)}(t) = V\,e^{Dt}\,\alpha,
+  \qquad
+  \alpha = V^{-1}\hat{y}^{(0)}(0).
+  \label{PassZeroSolution}
+\end{equation}
+
+Pass~1 satisfies the inhomogeneous system
+$\partial_t \hat{y}^{(1)} = A\,\hat{y}^{(1)} + M_{\mathrm{src}}\,\hat{y}^{(0)}(t)$
+with $\hat{y}^{(1)}(0) = 0$.
+Working in the eigenbasis of $A$, with $\beta = V^{-1}M_{\mathrm{src}}V$, the
+component $\hat{z}^{(1)}_i = [V^{-1}\hat{y}^{(1)}]_i$ is
+$\hat{z}^{(1)}_i(t) = \sum_j \beta_{ij}\,\alpha_j\,G(\lambda_i,\lambda_j;t)$;
+the Duhamel kernel $G$ is
+\begin{equation}
+  G(\lambda,\mu;t)
+  \;=\;
+  \begin{cases}
+    \dfrac{e^{\mu t} - e^{\lambda t}}{\mu - \lambda} & \mu \neq \lambda, \\[6pt]
+    t\,e^{\lambda t} & \mu = \lambda,
+  \end{cases}
+  \label{DuhamelKernel}
+\end{equation}
+and the full Pass~1 state is recovered as $\hat{y}^{(1)}(t) = V\,\hat{z}^{(1)}(t)$.
+Pass~1 is therefore computed entirely from the Pass~0 eigensystem; no additional
+differential equation need be solved.
+Near the degenerate limit $|(\mu-\lambda)t| \to 0$, direct evaluation of
+\cref{DuhamelKernel} suffers catastrophic cancellation; \TIDAL{} switches
+automatically to a twelve-term Taylor expansion that maintains double-precision
+accuracy down to $|(\mu-\lambda)t| \sim 10^{-15}$.
+
+The approximation is valid while $\varepsilon\,\omega_{\max}\,t_{\mathrm{end}} \ll 1$,
+monitored at run time.
+The Pass~0 and Pass~1 solver is validated in \cref{Validation} against analytic
+solutions for the Klein--Gordon perturbative theory, a higher-derivative biharmonic
+correction, and the Euler--Heisenberg QED vacuum birefringence ratio.
+
+\paragraph*{Perturbative reduction of the Hamiltonian}
+Energy measurement and Noether consistency require a Hamiltonian, and the standard
+Legendre transform applies once the Lagrangian contains at most first-order time
+derivatives.
+Integration by parts reduces most higher-derivative products, but certain residues
+are irreducible: a term such as
+$b_5(\partial_t^2 h_a)(\partial_t^2 h_b)$ leaves a second-time-derivative product
+after any finite sequence of integration-by-parts moves.
+
+To reduce the Lagrangian before the Legendre transform, \TIDAL{} implements
+\emph{Lagrangian perturbative substitution} (LPS).
+The order-$\varepsilon^0$ equations of motion are solved for the highest time
+derivative of each field in terms of lower-order and spatial derivatives,
+\begin{align}
+  \partial_t^{(n)}\varphi
+  \;=\;
+  f_0\!\bigl[\varphi,\,\partial_t^{(<n)}\varphi,\,\partial_x^{(*)}\varphi\bigr]
+  \;+\; \mathcal{O}(\varepsilon),
+  \label{LPSSubstitution}
+\end{align}
+and substituted into the order-$\varepsilon^1$ Lagrangian before the series
+is truncated at $\mathcal{O}(\varepsilon^2)$.
+The reduced Lagrangian carries at most first-order time derivatives and is
+admissible for the standard Legendre transform of \cref{EulerLagrange}.
+LPS is faithful exactly when the Ja{\'e}n--Llosa--Molina regularity
+condition holds~\cite{jaen1986reduction}: the order-zero equations must contain a
+time-derivative term of order $n$ to solve for.
+When the condition fails, the substitution silently drops a promoted degree of
+freedom and the reduced theory loses physical content.
+The limit of LPS is the subject of the paragraphs that follow.
 
 \paragraph*{The constraint-promotion barrier}
-A quadratic action that becomes a constrained system in the limit
-$\varepsilon \to 0$ --- the small parameter typically being a
-coefficient of a higher-curvature operator such as $b\,\tilde{R}^{2}$
-in PGT --- admits an algebraic relation between the field components
-at $\varepsilon = 0$.
-Turning $\varepsilon$ on infinitesimally promotes this algebraic
-constraint to a dynamical equation, and a new degree of freedom enters
-the spectrum.
-Generically this degree of freedom carries the wrong sign in its
-kinetic term: it is a ghost, and the small-parameter theory therefore
-has more physical content than its $\varepsilon \to 0$ limit, with a
-part of that content unphysical.
-Naive perturbation theory in $\varepsilon$ is blind to the promotion
-because the new mode appears only when $\varepsilon \neq 0$.
-The barrier is the statement that no perturbative expansion can
-connect the $\varepsilon = 0$ theory to the $\varepsilon \neq 0$
-theory once a constraint has been promoted.
+The constraint-promotion barrier arises when the small coupling $\varepsilon$
+promotes an algebraic constraint of the base theory to a propagating degree of
+freedom.
+In the Einstein--Cartan limit $\varepsilon = 0$, certain metric-perturbation
+components satisfy algebraic relations and carry no kinetic term.
+Turning on $\varepsilon$ infinitesimally promotes these relations to dynamical
+equations and introduces new propagating modes; the constraint structure of the
+theory changes discontinuously across $\varepsilon = 0$.
+Naive perturbation theory is blind to this promotion because the new mode is
+absent at $\varepsilon = 0$ and cannot be reached by a power-series
+expansion.
+The barrier is the statement that no perturbative expansion in $\varepsilon$
+connects the base theory to the small-$\varepsilon$ theory once a constraint has
+been promoted.
 
 \paragraph*{Failure mode I: Ostrogradsky}
-The Ostrogradsky
-theorem~\cite{ostrogradsky1850memoires}
-states that a non-degenerate Lagrangian containing time derivatives of
-order higher than one possesses a Hamiltonian that is linear in at
-least one of the canonical momenta.
-Linearity in a momentum is fatal: the Hamiltonian is unbounded below,
-and the corresponding mode is a ghost.
-The theorem is non-perturbative; it applies whenever the
-higher-derivative kinetic structure is non-degenerate, regardless of
-the magnitude of its coefficient.
-In our setting, a generic PGT Lagrangian containing terms quadratic in
-curvature with non-zero coefficient fails the non-degeneracy condition
-only in special parameter directions, and the generic case carries an
-Ostrogradsky ghost.
-The Ostrogradsky statement is the cleanest formulation of the barrier
-because it diagnoses the pathology directly at the level of the
-higher-derivative Lagrangian rather than at the level of any
-perturbative expansion.
+The Ostrogradsky theorem~\cite{ostrogradsky1850memoires,Woodard:2015zca} is the
+cleanest statement of the barrier at the Lagrangian level: a non-degenerate
+higher-derivative kinetic structure produces a Hamiltonian unbounded below.
+In the quadratic-PGT theories that carry $b_5\,\tilde{R}^2$, the correction
+term generates fourth-order time derivatives of the metric perturbation, and the
+Ostrogradsky diagnosis applies directly.
+The theorem is non-perturbative; it holds regardless of how small $b_5$ is, and
+it is the mechanism by which constraint promotion enters the Hamiltonian analysis
+at the Lagrangian level.
 
-\paragraph*{Failure mode II: Parker--Simon reduction}
-Parker and Simon~\cite{parker1993reduced} addressed a closely related
-question for the late-time effective theory of semi-classical gravity:
-when can one reduce a higher-derivative equation of motion to one of
-standard second order by treating the higher-derivative terms as
-small corrections?
-Their procedure --- order-by-order substitution of the lower-order
-equation into the higher-derivative terms --- is faithful when the
-higher-derivative corrections genuinely encode a small perturbation
-around a well-posed lower-order theory.
-It fails when the higher-derivative terms introduce new degrees of
-freedom that have no analogue at lower order: the substitution then
-drops those modes silently, producing a reduced equation that no
-longer reflects the full spectrum.
-The pathology is the perturbative-limit version of the Ostrogradsky
-diagnosis: solutions present in the small-$\varepsilon$ theory that
-are absent in the $\varepsilon = 0$ theory cannot be recovered by a
-power-series substitution.
+\paragraph*{Failure mode II: order-by-order substitution}
+The same order-by-order substitution strategy that drives the EOM reduction of
+\cref{EOMHierarchy} was also investigated for Hamiltonian order-reduction.
+Parker and Simon~\cite{parker1993reduced} identified the precise boundary of its
+validity in semi-classical gravity: the procedure is faithful when the
+higher-derivative correction perturbs a well-posed lower-order theory, and it
+fails when the correction introduces degrees of freedom with no lower-order
+analogue.
+In the Hamiltonian setting, LPS cannot execute \cref{LPSSubstitution} for a
+field whose order-zero equation is algebraic rather than differential, because
+there is no $\partial_t^n\varphi$ term on the left-hand side to solve for.
+The substitution step is therefore undefined at the constraint-promotion
+boundary, and LPS cannot bridge the discontinuity that the Ostrogradsky
+diagnosis already identifies at the Lagrangian level.
 
 \paragraph*{Failure mode III: the Ja{\'e}n--Llosa--Molina obstruction}
-Ja{\'e}n, Llosa and Molina~\cite{jaen1986reduction} formalised the
-perturbative-limit failure for the general higher-derivative
-Lagrangian.
-They showed that a finite-order reduction can in principle be
-constructed by repeated use of the order-zero equation of motion,
-provided the original Lagrangian satisfies a regularity condition;
-their condition fails precisely when an algebraic constraint of the
-unperturbed theory is promoted to a dynamical equation at first order
-in $\varepsilon$.
-Their result is the closest fit to the PGT-with-small-coupling
-structure we encounter: the order-zero theory is the Einstein--Cartan
-system with algebraic torsion constraints, and the higher-curvature
-operators in the quadratic-PGT action promote some of those
+Ja{\'e}n, Llosa and Molina~\cite{jaen1986reduction} formalised the failure for
+the general higher-derivative Lagrangian.
+They showed that a finite-order reduction by repeated use of the order-zero
+equation of motion can in principle be constructed, provided the Lagrangian
+satisfies a regularity condition; that condition fails precisely when an
+algebraic constraint of the unperturbed theory is promoted to a dynamical
+equation at first order in $\varepsilon$.
+Their result fits the PGT structure exactly: the order-zero theory is the
+Einstein--Cartan system with algebraic torsion constraints, and the
+higher-curvature operators in the quadratic-PGT action promote some of those
 constraints to propagating fields.
-The Ja{\'e}n--Llosa--Molina obstruction tells us that a uniform
-perturbative reduction does not work for every quadratic-PGT theory,
-and gives a sharp criterion that distinguishes the theories where the
-reduction is faithful from those where it loses content.
+The Ja{\'e}n--Llosa--Molina obstruction gives the sharpest analytical
+criterion, distinguishing theories where LPS is faithful from those where it
+loses physical content.
 
 \paragraph*{Structural analogues}
-The barrier sits within a wider class of perturbative-limit failures
-in gravity and gauge theory.
-In the massive-graviton limit, the van Dam--Veltman--Zakharov
-discontinuity~\cite{vandam1970massive,zakharov1970linearized} shows
-that the massless limit of a Fierz--Pauli graviton recovers only five
-of the six polarisations of general relativity, with the missing one
-appearing through a constraint that is promoted at non-zero mass.
-The Boulware--Deser non-decoupling~\cite{boulware1972gravitation}
-extends this diagnosis to the non-linear theory by identifying a
-ghost-like sixth mode once the Fierz--Pauli tuning is broken.
-The Maxwell--Proca boundary is the simplest instance: at finite
-vector-boson mass the algebraic relation $\rcD{_\mu}\FieldA{^\mu} = 0$
-holds, but at zero mass it becomes a gauge symmetry, and no
-perturbative expansion encodes the transition.
-The PGT barrier is the quadratic-curvature analogue of the same
-structural pattern.
+The constraint-promotion barrier belongs to a wider class of discontinuous
+limits in gravity and gauge theory.
+The van Dam--Veltman--Zakharov
+discontinuity~\cite{vandam1970massive,zakharov1970linearized} shows that the
+massless limit of a Fierz--Pauli graviton recovers only five of the six
+general-relativistic polarisations: the sixth arises through a constraint
+promoted at non-zero mass.
+The Boulware--Deser non-decoupling~\cite{boulware1972gravitation} extends this
+to the non-linear theory by identifying a ghost-like sixth mode once the
+Fierz--Pauli tuning is broken.
+The Maxwell--Proca boundary is the simplest instance: at finite vector-boson
+mass the algebraic relation $\rcD{_\mu}\FieldA{^\mu} = 0$ holds as a
+constraint, while at zero mass it becomes a gauge symmetry; no perturbative
+expansion in the mass encodes the transition.
+The $b_5\,\tilde{R}^2$ PGT barrier is the quadratic-curvature analogue of
+this structural pattern.
 
-\paragraph*{Lagrangian perturbative substitution}
-To handle higher-curvature PGT theories where the regularity condition
-holds, \TIDAL{} implements \emph{Lagrangian perturbative
-substitution} (LPS).
-The order-$\varepsilon^{0}$ equations of motion are extracted and
-solved for the highest time derivative in terms of lower-order and
-spatial derivatives,
-\begin{align}
-  \partial_{t}^{(n)}\varphi
-  \;=\;
-  f_{0}\!\bigl[\varphi,\,\partial_{t}^{(<n)}\varphi,\,\partial_{x}^{(*)}\varphi\bigr]
-  \;+\; \mathcal{O}(\varepsilon),
-  \label{LPSReduction}
-\end{align}
-and substituted back into the order-$\varepsilon^{1}$ Lagrangian
-before a series truncation.
-The reduced Lagrangian carries at most first-order time derivatives
-and is therefore admissible for the standard Legendre transform of
-\cref{EulerLagrange}.
-The substitution is faithful exactly when the
-Ja{\'e}n--Llosa--Molina regularity condition holds.
-For theories where the condition fails, the substitution silently
-drops the promoted mode and the reduced theory loses physical
-content; the software detects the failure during derivation, by
-checking whether the order-$\varepsilon^{0}$ momentum kernel changes
-rank when $\varepsilon$ is turned on, and emits a diagnostic that
-prevents the reduced theory from being used as a substitute for the
-full one.
+\paragraph*{Software implementation and failure detection}
+\TIDAL{} handles both sides of the perturbative-reduction framework
+automatically.
+For the equations of motion, the Wolfram derivation pipeline tags each operator
+term with an \texttt{order\_in\_eps} integer; at simulation time,
+\texttt{PerturbativeSolver} separates base-theory terms from correction terms
+and runs Pass~0 followed by Pass~1 via the Duhamel kernel of
+\cref{DuhamelKernel}, without theory-specific code.
+
+For the Hamiltonian, \TIDAL{} attempts LPS symbolically at derivation time.
+Failure is detected by checking whether the order-$\varepsilon^0$ momentum
+kernel changes rank when $\varepsilon$ is set to a non-zero test value; a rank
+jump signals constraint promotion and the pipeline emits a diagnostic that
+marks the theory as having no LPS-reduced Hamiltonian.
+The three affected theories --- \texttt{graviton\_torsion},
+\texttt{torsion\_gertsenshtein}, and \texttt{torsion\_gertsenshtein\_combined},
+all carrying $b_5\,\tilde{R}^2$ --- retain their pre-LPS Hamiltonians, and
+their energy diagnostics are recorded separately rather than alongside
+conversion results.
 
 \paragraph*{Implications for the surveys}
-The barrier delimits the scope of what the surveys of \cref{Results}
-can claim.
-Theories without higher-curvature terms, and theories where LPS
-succeeds, are surveyed using the standard linearised methodology of
-\cref{SymbolicComputation}.
-Theories where LPS fails are flagged at derivation time and excluded
-from the channel-by-channel analysis, with the failure recorded
-against the theory in the campaign log.
-The Ja{\'e}n--Llosa--Molina obstruction is therefore not a defect of
-the software but a sharp statement of which corners of the PGT
-theory space the linearised methodology can address; the remainder
-requires the non-perturbative treatment outlined in \cref{Discussion}.
+The EOM and Hamiltonian reductions have different scopes, and the surveys of
+\cref{Results} are structured accordingly.
+The iterative EOM reduction of \cref{EOMHierarchy} succeeds for all surveyed
+theories, including the $b_5\,\tilde{R}^2$ quadratic-PGT theories: conversion
+probabilities are computed from field trajectories evolved by Pass~0 and
+Pass~1, and no Hamiltonian is required for that computation.
+The constraint-promotion barrier applies only to the Hamiltonian side and only
+for the three theories named above; their energy diagnostics are not presented
+alongside the conversion amplitudes.
+Theories without higher-curvature terms are unaffected and use the standard
+linearised methodology of \cref{SymbolicComputation} throughout.
+The Ja{\'e}n--Llosa--Molina obstruction is therefore a precise statement of
+which analyses the linearised methodology can perform for each theory class,
+not a defect of the software; the non-perturbative treatment needed to go
+further is outlined in \cref{Discussion}.

@@ -32,22 +32,20 @@
     points on a periodic grid of $N=512$ points.
     (b) Convergence of
     $|P_\mathrm{final}^\mathrm{sim} - \sin^2(\kappa\Bzero t/2)|$ at
-    the regime point $\Bzero = 0.1275$ on log--log axes for four
-    solver backends (modal, \CVODE{}, leapfrog Yoshida-2, leapfrog
-    Yoshida-4) at $N \in \{64, \ldots, 512\}$.
+    the regime point $\Bzero = 0.1275$ on for four
+    solver backends.
     Modal and \CVODE{} reach the modal-evolution precision floor
     (dotted line); Y2 shows clean $(\Delta t^2)$-dominated decay
     across the whole $N$ range; Y4 falls past Y2 quickly and
     approaches a higher residual floor (median $\sim 10^{-4}$) set
-    by the CFL-bounded $\Delta t$ together with the IC-snap phase
-    residual, both of which vary mildly with $N$.}
+    by the CFL-bounded $\Delta t$ which varies with $N$.}
   \label{BoccalettiUniform}
 \end{figure*}
 
 \paragraph*{Boccaletti kernel on a uniform background}
 The Gertsenshtein conversion kernel of \cref{GertsenshteinFormula}
 provides the closed-form analytic baseline against which we test
-\TIDAL{} on a uniform background magnetic field. We sweep $\Bzero$
+\TIDAL{}. We sweep $\Bzero$
 over the perturbative regime with fourth-order finite-difference
 operators on a periodic grid, and overlay the calibration data on
 two analytic predictions (\Cref{BoccalettiUniform} displays the
@@ -116,9 +114,8 @@ calibrated in the convergence diagnostic below.
   \label{BoccalettiLocalised}
 \end{figure}
 
-%TODO update once \cref{LPSReduction} settles its Pass 0 / Pass 1 wording and equation numbering.
 \paragraph*{Klein--Gordon perturbative calibration}
-The perturbative-reduction machinery described in \cref{LPSReduction}
+The perturbative-reduction machinery described in \cref{LPSSubstitution}
 evolves the system as a base (order-$\varepsilon^{0}$) solution plus
 a correction (order-$\varepsilon^{1}$), denoted \emph{Pass 0} and
 \emph{Pass 1} in the figure legends below. We test the kernel
@@ -134,21 +131,19 @@ order-$\varepsilon^{0}$ solution evolves the $\varepsilon=0$ base;
 the order-$\varepsilon^{1}$ correction is integrated against the
 base trajectory; the combined approximation
 $\phi^{(0)} + \phi^{(1)}$ matches the full solution to
-$\mathcal{O}(\varepsilon^2)$ by construction. The log--log slope of
+$\mathcal{O}(\varepsilon^2)$ by construction. \Cref{ForcedOscillator} shows the slope of
 $|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{full}|$ versus $\varepsilon$
-recovers the expected algebraic order.
-\Cref{ForcedOscillator} reports the error scaling and the fitted
-slope.
+recovers the expected algebraic order of error scaling.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figD_forced_oscillator}
   \caption{Perturbed-Klein--Gordon calibration of the Pass 0 + Pass 1
     Duhamel kernel. Pass 0 error and combined Pass 0 + Pass 1 error
-    versus $\varepsilon$ on log--log axes for the mass-shift correction
+    versus $\varepsilon$ for the mass-shift correction
     \cref{KGMassShift}, sampled at eight logarithmically spaced
     points covering $\varepsilon \in [10^{-3}, 0.2]$ at $k=1$; fitted
-    log--log slopes and $R^2$ values are reported in the legend. The
+    slopes and $R^2$ values are reported in the legend. The
     Pass 0 + Pass 1 error scales as $\mathcal{O}(\varepsilon^2)$, an
     order of magnitude per half-decade in $\varepsilon$.}
   \label{ForcedOscillator}
@@ -166,7 +161,7 @@ the canonical higher-derivative form encountered in the perturbative
 reductions of \cite{parker1993reduced}. The correction exercises a
 different Fourier multiplier ($k^4$) from the mass shift ($1$), and
 therefore a different path through the correction-source assembly of
-\cref{LPSReduction}. At $k=2$ the order-$\varepsilon^{0,1}$
+\cref{LPSSubstitution}. At $k=2$ the order-$\varepsilon^{0,1}$
 truncation error falls faster than the $\mathcal{O}(\varepsilon^2)$
 worst-case scaling of the reduced-order
 construction~\cite{parker1993reduced}; the improvement ratio over
@@ -318,12 +313,9 @@ across the surveyed $N$, well below the spatial FD-4 error of
 \cref{FDConvergence} and not the limiting diagnostic at this
 resolution. Time-integration convergence is reported in
 \cref{ConvergenceFigure} for the symplectic backends, where the
-log--log slope of the absolute error versus $\Delta t$ recovers the
+slope of the absolute error versus $\Delta t$ recovers the
 predicted order. Implicit and tolerance-controlled backends saturate
 at their \texttt{rtol} setting and are covered in \cref{MultiMethod}.
-These calibrate discretisation and integrator order against analytic
-targets; they do not probe modelling errors upstream of the
-discretised system.
 
 \begin{figure*}[t]
   \centering
@@ -338,7 +330,7 @@ discretised system.
     same grid and IC so spatial-FD, IC-snap, and extraction floors
     largely cancel. The CFL-stable dt grid (30 values per scheme on
     $\Delta t \in [10^{-3}, 0.024]$) confirms the expected ordering
-    (Y4 below Y2 across the surveyed range); the fitted log--log
+    (Y4 below Y2 across the surveyed range); the fitted
     slopes underestimate the formal orders ($\hat{\alpha} \approx
     1.5$, $1.2$ vs. expected $2$, $4$) because the $P_\mathrm{max}$
     snapshot-extraction noise dominates at small $\Delta t$ and is
