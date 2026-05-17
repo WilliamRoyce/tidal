@@ -446,16 +446,27 @@ therefore structurally unable to handle constraint promotion.
 The original on-shell-reduction method~\cite{JLM1986} substitutes
 $\partial_t^2$~terms in the higher-derivative correction using the
 order-0 Euler--Lagrange equation.  Cheyette~\cite{Cheyette1988} adapts
-this to effective Standard Model Lagrangians; Simon~\cite{Simon1990}
+this to effective Standard Model Lagrangians; Grosse-Knetter~\cite{GrosseKnetter1994}
+extends this to electroweak higher-derivative operators and proves via the
+Ostrogradsky formalism that EOM substitution is a canonical field redefinition
+(``\emph{here, an effective higher order Lagrangian is reduced to a first order one
+without introducing extra degrees of freedom}'' \cite[\S3, p.\,6714]{GrosseKnetter1994});
+Simon~\cite{Simon1990}
 formalises the perturbative ghost-suppression argument; Eliezer \&
 Woodard~\cite{EliezerWoodard1989} prove the ghost branch contains
 ``runaway pseudosolutions'' that are excised by the iterative reduction;
 Bender \& Mannheim~\cite{BenderMannheim2008} apply the framework to
 the Pais--Uhlenbeck oscillator.  All assume the $\varepsilon = 0$ theory
 is non-degenerate (every field propagates at the leading order).
-\textbf{They fail on constraint promotion} because the substitution
+Grosse-Knetter explicitly acknowledges that the theory has ``no analytic
+limit for $\varepsilon\to 0$'' and that the EFT prescription resolves this
+\emph{only} by assuming UV cancellation at $O(\varepsilon^2)$ and above
+\cite[\S5]{GrosseKnetter1994}.
+\textbf{All these methods fail on constraint promotion} because the substitution
 rule $\partial_t^2 h_c \to \dots$ does not exist when $h_c$ is constrained
-at order zero.  TIDAL's v6 chose Parker--Simon~\cite{ParkerSimon1993}
+at order zero --- Grosse-Knetter's own prerequisite (that $\mathcal{L}_0$
+must supply the wave equation $\partial_t^2\varphi = \Delta\varphi - M^2\varphi$
+as a substitution rule) is violated for TIDAL's $h_4/h_7/h_9$ at $b_5=0$.  TIDAL's v6 chose Parker--Simon~\cite{ParkerSimon1993}
 iterative source-evaluation \emph{precisely} to avoid this failure mode
 on the EOM side; a Lagrangian analogue is not yet worked out.
 
