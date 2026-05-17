@@ -1,0 +1,106 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-14T10:51:01.977263+00:00",
+    "host": "01f52c360ddd",
+    "python_version": "3.11.15",
+    "numpy_version": "2.3.4",
+    "scipy_version": "1.16.3",
+    "git_sha": "c5daecd9a5a93e51e8858bebaccee1ff6f401474",
+    "parameters": {
+      "theories": [
+        "coupled_scalars",
+        "coupled_scalars_massive"
+      ],
+      "n_values": [
+        128,
+        256,
+        512,
+        1024,
+        2048,
+        4096
+      ],
+      "domain": [
+        0.0,
+        100.0
+      ],
+      "t_end": 10.0,
+      "gauss_amplitude": 0.1,
+      "gauss_width": 10.0,
+      "nyq_relative_amplitude": 0.002
+    }
+  },
+  "results": [
+    {
+      "theory": "coupled_scalars",
+      "n": 128,
+      "abs_dE_over_E_fixed": 0.00022896837325324883,
+      "abs_dE_over_E_nofixed": 0.015760656710987354
+    },
+    {
+      "theory": "coupled_scalars",
+      "n": 256,
+      "abs_dE_over_E_fixed": 5.724596206309278e-05,
+      "abs_dE_over_E_nofixed": 0.052247903234580735
+    },
+    {
+      "theory": "coupled_scalars",
+      "n": 512,
+      "abs_dE_over_E_fixed": 1.4311731961551157e-05,
+      "abs_dE_over_E_nofixed": 0.12314238123528613
+    },
+    {
+      "theory": "coupled_scalars",
+      "n": 1024,
+      "abs_dE_over_E_fixed": 3.57794807681636e-06,
+      "abs_dE_over_E_nofixed": 0.18900273847273988
+    },
+    {
+      "theory": "coupled_scalars",
+      "n": 2048,
+      "abs_dE_over_E_fixed": 8.9448796441816e-07,
+      "abs_dE_over_E_nofixed": 0.21846721988309167
+    },
+    {
+      "theory": "coupled_scalars",
+      "n": 4096,
+      "abs_dE_over_E_fixed": 2.236220516529725e-07,
+      "abs_dE_over_E_nofixed": 0.22690892993813158
+    },
+    {
+      "theory": "coupled_scalars_massive",
+      "n": 128,
+      "abs_dE_over_E_fixed": 6.61025574739313e-08,
+      "abs_dE_over_E_nofixed": 7.383085761009706e-05
+    },
+    {
+      "theory": "coupled_scalars_massive",
+      "n": 256,
+      "abs_dE_over_E_fixed": 1.653088829471177e-08,
+      "abs_dE_over_E_nofixed": 0.00032809612950865824
+    },
+    {
+      "theory": "coupled_scalars_massive",
+      "n": 512,
+      "abs_dE_over_E_fixed": 4.133050715493108e-09,
+      "abs_dE_over_E_nofixed": 0.0013111037234339825
+    },
+    {
+      "theory": "coupled_scalars_massive",
+      "n": 1024,
+      "abs_dE_over_E_fixed": 1.033283951271542e-09,
+      "abs_dE_over_E_nofixed": 0.005205480878588326
+    },
+    {
+      "theory": "coupled_scalars_massive",
+      "n": 2048,
+      "abs_dE_over_E_fixed": 2.583234832923603e-10,
+      "abs_dE_over_E_nofixed": 0.019565114333342067
+    },
+    {
+      "theory": "coupled_scalars_massive",
+      "n": 4096,
+      "abs_dE_over_E_fixed": 6.458117514924557e-11,
+      "abs_dE_over_E_nofixed": 0.062319610029886015
+    }
+  ]
+}

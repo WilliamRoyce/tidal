@@ -167,7 +167,10 @@ _WORKER_CORE: int | None = None
 from collections import OrderedDict
 
 _SETUP_CACHE: OrderedDict[tuple, Any] = OrderedDict()
-_SETUP_CACHE_MAX = 2  # keep the 2 most recent setups; matrices can be huge
+_SETUP_CACHE_MAX = 1  # one cached setup per worker — matrices can be huge,
+# and with N_workers × LRU × peak_setup_size as the memory budget, the
+# previous LRU=2 setting pushed sapphire over the OOM line on shuffled
+# task lists that span the largest 2D massive_gravity_3d configs.
 
 
 def _cache_get(key):
@@ -747,6 +750,13 @@ def main() -> int:
         help="Skip any (theory, N) config with N > max_n. For local dev-container "
         "runs where memory or wall-time forbids the heavy end of the sweep.",
     )
+    parser.add_argument(
+        "--min-n",
+        type=int,
+        default=None,
+        help="Skip any (theory, N) config with N < min_n. Pair with --merge to "
+        "resume a timed-out run by collecting only the missing high-N reps.",
+    )
     args = parser.parse_args()
 
     print(
@@ -754,6 +764,26 @@ def main() -> int:
         f"parallel={args.parallel} passes={args.repeat_passes} "
         f"seed={args.seed}",
         flush=True,
+    )
+
+    # Load merge seeds ONCE before any tasks run.  Passing them explicitly to
+    # every _write_canonical call prevents the periodic-checkpoint path from
+    # re-reading the file it just wrote as fresh seeds and accumulating reps
+    # exponentially across checkpoint writes.
+    initial_pade_seeds = (
+        _load_existing_pade_reps(args.out_dir / "pade_vs_eig.json")
+        if args.merge
+        else {}
+    )
+    initial_sparse_seeds = (
+        _load_existing_sparse_reps(args.out_dir / "sparse_csc_vs_dense.json")
+        if args.merge
+        else {}
+    )
+    initial_nyquist_seeds = (
+        _load_existing_nyquist_rows(args.out_dir / "nyquist_energy.json")
+        if args.merge
+        else {}
     )
 
     # Accumulate per-rep rows across passes (different seeds per pass).
@@ -764,7 +794,7 @@ def main() -> int:
         pass_seed = args.seed + pass_idx
         pass_seeds.append(pass_seed)
         tasks = _build_task_list(args.tier, args.reps)
-        if args.max_n is not None:
+        if args.max_n is not None or args.min_n is not None:
 
             def _task_n(t):
                 n = t.get("n")
@@ -775,7 +805,10 @@ def main() -> int:
                         n = 0
                 return int(n)
 
-            tasks = [t for t in tasks if _task_n(t) <= args.max_n]
+            if args.max_n is not None:
+                tasks = [t for t in tasks if _task_n(t) <= args.max_n]
+            if args.min_n is not None:
+                tasks = [t for t in tasks if _task_n(t) >= args.min_n]
         rng = random.Random(pass_seed)
         rng.shuffle(tasks)
         print(
@@ -881,6 +914,23 @@ def main() -> int:
                         args.parallel,
                         pass_seeds,
                     )
+                    # Also write canonical JSONs so a Slurm timeout only loses
+                    # the last 30 s of work rather than the entire run.
+                    # Seeds are passed explicitly so this call does NOT re-read
+                    # from disk (which would accumulate reps exponentially).
+                    _write_canonical(
+                        args.out_dir,
+                        all_rep_rows,
+                        args.tier,
+                        args.reps,
+                        args.seed,
+                        args.parallel,
+                        pass_seeds,
+                        merge=args.merge,
+                        pade_seeds=initial_pade_seeds,
+                        sparse_seeds=initial_sparse_seeds,
+                        nyquist_seeds=initial_nyquist_seeds,
+                    )
                     last_checkpoint = now
 
         print(
@@ -888,7 +938,7 @@ def main() -> int:
             flush=True,
         )
 
-    # Final write.
+    # Final write — same pre-loaded seeds as checkpoints.
     _write_canonical(
         args.out_dir,
         all_rep_rows,
@@ -898,6 +948,9 @@ def main() -> int:
         args.parallel,
         pass_seeds,
         merge=args.merge,
+        pade_seeds=initial_pade_seeds,
+        sparse_seeds=initial_sparse_seeds,
+        nyquist_seeds=initial_nyquist_seeds,
     )
     print(
         f"run_all_hpc: wrote canonical JSONs to {args.out_dir}",
@@ -947,6 +1000,9 @@ def _write_canonical(
     pass_seeds: list[int],
     *,
     merge: bool = True,
+    pade_seeds: dict | None = None,
+    sparse_seeds: dict | None = None,
+    nyquist_seeds: dict | None = None,
 ) -> None:
     """Aggregate per-rep rows into the three canonical per-benchmark JSONs.
 
@@ -955,6 +1011,11 @@ def _write_canonical(
     cross-host data collection additive: a local pass + an HPC pass + a
     later re-run all accumulate into one larger sample, rather than
     overwriting each other.
+
+    Pass pre-loaded ``pade_seeds``/``sparse_seeds``/``nyquist_seeds`` to
+    avoid re-reading from disk on every periodic checkpoint call. Without
+    this, each checkpoint would re-read the file it just wrote as fresh
+    seeds, accumulating reps exponentially across checkpoint writes.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     errors = [r for r in rows if "error" in r]
@@ -963,13 +1024,22 @@ def _write_canonical(
     sparse_rows = [r for r in rows if r["benchmark"] == "sparse_csc_vs_dense"]
     nyquist_rows = [r for r in rows if r["benchmark"] == "nyquist_energy"]
 
-    pade_seeds = _load_existing_pade_reps(out_dir / "pade_vs_eig.json") if merge else {}
-    sparse_seeds = (
-        _load_existing_sparse_reps(out_dir / "sparse_csc_vs_dense.json")
-        if merge
-        else {}
-    )
-    (_load_existing_nyquist_rows(out_dir / "nyquist_energy.json") if merge else {})
+    if pade_seeds is None:
+        pade_seeds = (
+            _load_existing_pade_reps(out_dir / "pade_vs_eig.json") if merge else {}
+        )
+    if sparse_seeds is None:
+        sparse_seeds = (
+            _load_existing_sparse_reps(out_dir / "sparse_csc_vs_dense.json")
+            if merge
+            else {}
+        )
+    if nyquist_seeds is None:
+        nyquist_seeds = (
+            _load_existing_nyquist_rows(out_dir / "nyquist_energy.json")
+            if merge
+            else {}
+        )
 
     meta_base = _metadata(tier, reps, seed, n_workers)
     meta_base["parameters"]["pass_seeds"] = pass_seeds
