@@ -1,79 +1,48 @@
-% Computational approach scaffold (Phase 2): single section, no subsections,
-% five tight named-paragraph stubs. Target ~400 w (down from 600 — Agent 2
-% review noted that BHL/Barker analogues do not have a separate ~600-word
-% computational section between Theory and Results; tighter forward-reference
-% framing matches the corpus better).
+% Computational approach: minimal BHL-style mention of the pipeline,
+% the modal solver, and nested sampling.  All elaboration is deferred
+% to App A--J via inline \cref{} -- no architectural breakdown, no
+% backend enumeration, no validation paragraph, no inference design
+% justification, no inference-mechanism enumeration, no closing
+% "deferred" paragraph.  Target ~105 words.
 %
-% This section is a forward-reference hub: it states what TIDAL is, what
-% it does that PSALTer/Hamilcar do not, that the Fourier modal solver is
-% the core numerical innovation, and where the implementation detail
-% lives. No algorithm description here — that's all App A–D.
+% Style anchors: HiGGS-introduction pattern (2206.00658 line 168) for
+% the tool-naming sentence; 2101.02645 §I HiGGS-mention pattern for
+% the brief-§3-with-detailed-appendix distribution; PolyChordLite README
+% requirement for citing BOTH Handley papers.
+%
+% Numerical method (¶2): TIDAL uses Padé scaling-and-squaring via
+% scipy.linalg.expm, NOT eigendecomposition; see
+% appendices/numerical.tex:315-344 for the rationale (eigendecomposition
+% abandoned because cond(V) > 1e13 for the multi-field PGT theories of
+% \cref{Results}).
+%
+% Reminder comments for the deferred material live in
+% sections/discussion.tex (App H / EFT placement),
+% sections/results.tex (amplification-vs-instability framing and the
+% inference-mechanism details that surface in \S4), and
+% sections/appendices/architecture.tex (observables-paragraph
+% relocation).
 
 \section{Computational approach}%
 \label{ComputationalApproach}
 
-% Paragraph 1 — TIDAL pipeline (~80 w).
-\paragraph*{TIDAL pipeline}
-% TODO: describe the symbolic→numerical pipeline at architecture level
-% (\xAct/\Mathematica → JSON → \Python PDE solvers); state what it
-% automates; explain why automation is necessary for a survey across
-% the PGT theory space. Cross-ref \cref{Architecture} with one-clause
-% hint per STYLE_GUIDE.md §(i): "Full pipeline architecture is in
-% \cref{Architecture}."
+\paragraph*{\TIDAL{}}
+We obtain the linearised field equations for every theory surveyed
+in \cref{Results} with \TIDAL{} (\emph{Tensor Integration and
+Derivation for Any Lagrangian}; see \cref{Architecture,SymbolicComputation,NumericalEvolution}), grounded
+in the \xAct{}~\cite{martingarcia2007xact} suite for
+\Mathematica{}~\cite{mathematica}.
 
-% Paragraph 2 — Scope contrast (NEW — addresses Agent 3 I1 and Agent 1 M4).
-% Per literature_content_notes.md: PSALTer handles particle spectra,
-% Hamilcar handles constraint algebras, TIDAL handles dynamical evolution
-% — the three are complementary tools, not competing ones. This paragraph
-% frames TIDAL within the BHL software-paper landscape.
-\paragraph*{Relation to other automation tools}
-% TODO: ~50 w. "TIDAL complements \PSALTer{} (particle-spectrum extraction
-% from arbitrary tensor Lagrangians) and \Hamilcar{} (Poisson-bracket and
-% constraint-algebra computation in canonical gravity) by automating the
-% dynamical-evolution step — solving the linearised PDEs that the spectrum
-% and constraint analyses do not address." Cite \cite{barker2024psalter}
-% and \cite{barker2025hamilcar}.
+\paragraph*{Numerical evolution}
+The linearised equations are evolved with \TIDAL{}'s Fourier modal
+solver (\cref{ModalSolver}) on the flat-metric, periodic, time-independent systems of
+\cref{Results}.
+Per-mode matrix exponentials are computed by Pad\'e
+scaling-and-squaring~\cite{higham2009scaling}, giving machine-precision
+evolution over the long integration windows of \cref{Results}.
 
-% Paragraph 3 — Fourier modal solver (~100 w).
-\paragraph*{Fourier modal solver}
-% TODO: lead with capability, NOT algorithm. "TIDAL auto-selects the
-% Fourier modal backend for flat-metric, periodic-boundary systems and
-% delivers machine-precision eigendecompositions." Do NOT describe the
-% algorithm. Cross-ref \cref{NumericalEvolution} with one-clause hint:
-% "Algorithmic detail and convergence behaviour are documented in
-% \cref{NumericalEvolution}."
-
-% Paragraph 4 — Other backends (~60 w).
-\paragraph*{Solver fallbacks}
-% TODO: IDA, CVODE, leapfrog, scipy each in one sentence as fallback context;
-% no algorithmic detail. State that auto-selection picks the appropriate
-% backend based on equation properties.
-
-% Paragraph 4b — Inference architecture (~70 w, NEW; v3 architecture pivot
-% post-2026-05-08 supervisor meeting).  Forward-reference to App J details.
-\paragraph*{Tachyon-permissive inference}
-% TODO: one paragraph introducing the v3 inference architecture: probe is
-% metadata not gate; soft floor logL = -100 + Normal(0, σ_explore) gives
-% PolyChord a stability gradient; compactified arctan_uniform priors and
-% the optional cubed-sphere joint prior cover full real-line coupling
-% support; distinct run_status tags (success, simulation_diverged,
-% metric_nan, below_noise_floor, ...) enable post-chain filtering.
-% End with \cref{InferenceArchitecture} pointer per STYLE_GUIDE.md §(i):
-% "The Bayesian-inference architecture, soft-penalty mathematics, and
-% prior-compactification scheme are documented in \cref{InferenceArchitecture}."
-% Source material: docs/V3_ARCHITECTURE.md, docs/V3_PHASE_D_DESIGN.md.
-
-% Paragraph 5 — Validation and HPC scale (~60 w, with concrete number).
-\paragraph*{Validation and survey scale}
-% TODO: one sentence on the validation hierarchy with \cref{Validation}
-% one-clause hint; one sentence stating the survey scale ("six theories
-% scanned in 4D–9D priors across [N] HPC campaigns" — fill N from
-% CAMPAIGN.md at drafting time). The one-clause hint per
-% STYLE_GUIDE.md §(i) avoids word-spend on detail that lives in
-% \cref{Validation}.
-
-% Closing pointer (~30 w) — minimal, one sentence.
-\paragraph*{Detail deferred}
-% TODO: one sentence: "Implementation details, validation suite, and
-% symbolic-pipeline outputs for the surveyed theories are in
-% \cref{Architecture}–\cref{SymbolicOutputs}."
+\paragraph*{Parameter inference}
+Parameter exploration is by nested sampling, with the posterior
+sampled by
+PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; the inference
+architecture is documented in \cref{InferenceArchitecture}.
