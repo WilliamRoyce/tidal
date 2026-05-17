@@ -2325,24 +2325,26 @@ def _evolve_full_matrix(
     A_full has shape (n_total, n_total) where n_total = n_slots x n_modes.
     y0_hat has shape (n_slots, n_modes).
 
-    Uses ``scipy.sparse.linalg.expm_multiply`` to compute exp(A·t)·y₀ at each
-    output time without eigendecomposition.  This is backward-stable for
-    non-normal matrices (position-dependent gradient coupling creates non-normal
-    convolution matrices whose eigenvalues have large real parts, but the true
-    dynamics are bounded).  The algorithm uses scaling + truncated Taylor series
-    in matrix-vector products, avoiding individual exp(λ·t) overflow.
+    Uses ``scipy.sparse.linalg.expm_multiply`` (Al-Mohy & Higham 2011) to compute
+    exp(A·t)·y₀ at each output time without eigendecomposition.
 
-    **Why not eigendecomposition?**  The original full-matrix eigendecomposition
-    gave incorrect physics for localized Gertsenshtein (P=0.477 vs correct
-    P=0.3437) because non-normal convolution matrices have eigenvalues with
-    significant positive real parts despite conservative physics — individual
-    exp(λ·t) overflow while exp(A·t)·y₀ is bounded (pseudospectral phenomenon;
-    Trefethen & Embree 2005, Ch. 14).
+    **Why not eigendecomposition?**  Non-normal convolution matrices have
+    eigenvalues with positive real parts that cause exp(λ·t) overflow while
+    exp(A·t)·y₀ remains bounded.  Eigendecomposition was permanently retired
+    in v0.31 (GH #320).
 
-    **Sparse optimization:** For localized coefficients (e.g. Gaussian B₀), the
-    convolution kernel ĉ(q) decays exponentially, making the matrix effectively
-    banded.  Entries below a relative threshold (1e-14 x max|A|) are zeroed, and
-    if density < 30% the matrix is converted to sparse CSC format.  This
+    **Why not dense Padé (scipy.linalg.expm)?**  For strongly non-normal matrices
+    (GH #367: max real eigenvalue > 0 from pseudospectral Fourier truncation of
+    a localised background field), exp(A·t) has norm ~10⁹ while the physically
+    correct exp(A·t)·y₀ is ~0.005 — 12 orders of magnitude of catastrophic
+    cancellation, impossible at float64 precision.  Dense Padé computes exp(A·t)
+    correctly but the subsequent product with y₀ loses all significant digits.
+    **Workaround for this case: ``--scheme cvode``** (integrates in physical space,
+    avoids the Fourier coupling matrix entirely).
+
+    **Sparse optimization:** For Gaussian B₀(x), the convolution kernel decays
+    exponentially → effectively banded matrix.  Entries below 1e-14 × max|A|
+    are zeroed; if density < 30% the matrix converts to sparse CSC format.  This
     accelerates expm_multiply's internal matrix-vector products.
 
     Ref: Al-Mohy & Higham (2011), "Computing the Action of the Matrix
@@ -2352,6 +2354,8 @@ def _evolve_full_matrix(
     from scipy.sparse.linalg import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
         expm_multiply,  # pyright: ignore[reportUnknownVariableType]
     )
+
+    from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
 
     n_slots = layout.num_slots
     n_pts = layout.num_points
@@ -2434,6 +2438,24 @@ def _evolve_full_matrix(
                 snapshot_callback(t, y_physical)
             if progress is not None:
                 progress.update(t)
+
+    # --- Post-evolution divergence check (GH #367) ----------------------------
+    # expm_multiply fails for strongly non-normal convolution matrices (localised
+    # background field + small N): exp(A·t) has large norm but exp(A·t)·y₀ is
+    # small — catastrophic cancellation at float64 precision makes the result
+    # meaningless.  Detect by comparing peak amplitudes.
+    y0_max = float(np.max(np.abs(y0_flat))) or 1.0
+    y_final_max = float(np.max(np.abs(snapshots[-1])))
+    if y_final_max > y0_max * 1e6 and t_end > t0:
+        msg = (
+            f"Simulation diverged in _evolve_full_matrix: final amplitude "
+            f"{y_final_max:.2e} is >{y_final_max / y0_max:.1e}× the initial "
+            f"amplitude {y0_max:.2e}. "
+            f"This is a known failure mode of expm_multiply for strongly "
+            f"non-normal convolution matrices at small grid sizes (GH #367). "
+            f"Workaround: rerun with --scheme cvode."
+        )
+        raise SimulationDivergedError(msg)
 
     return times, snapshots
 
