@@ -27,11 +27,14 @@ import argparse
 import datetime
 import json
 import math
+import multiprocessing as mp
+import os
 import platform
 import shutil
 import socket
 import subprocess  # noqa: S404
 import tempfile
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 import numpy as np
@@ -83,40 +86,11 @@ TIO_SCHEMES_FULL: list[tuple[str, list[str]]] = [
 ]
 TIO_SCHEMES_SMOKE = TIO_SCHEMES_FULL
 TIO_CELL_TIMEOUT = 240  # seconds; safety net per (scheme, dt) cell
-# Dense dt grid restricted to the CFL-stable region (dt <= dx = 0.049
-# at N=2048, L=100) with a safety margin of 0.024 so leapfrog never
-# diverges. 30 log-spaced values within [0.001, 0.024].
-TIO_DT_FULL = [
-    0.024,
-    0.022,
-    0.020,
-    0.018,
-    0.016,
-    0.014,
-    0.012,
-    0.010,
-    0.0089,
-    0.0080,
-    0.0074,
-    0.0066,
-    0.0062,
-    0.0055,
-    0.0050,
-    0.0046,
-    0.0043,
-    0.0040,
-    0.0036,
-    0.0033,
-    0.0030,
-    0.0027,
-    0.0024,
-    0.0022,
-    0.0020,
-    0.0018,
-    0.0016,
-    0.0014,
-    0.0012,
-    0.0010,
+# 60 log-spaced dt values within the CFL-stable region (dt <= dx = 0.049
+# at N=2048, L=100; safety cap at 0.024).  60 cells/scheme × 2 schemes =
+# 120 parallel cells on sapphire (112 cores → 2 waves, ~60 s total).
+TIO_DT_FULL: list[float] = [
+    round(float(x), 7) for x in np.logspace(np.log10(0.001), np.log10(0.024), 60)
 ]
 TIO_DT_SMOKE = [0.2, 0.1, 0.05]
 TIO_GRID_N_FULL = 2048
@@ -228,53 +202,81 @@ def _proca_omega(out_dir: Path, component: str = "a_1") -> tuple[float, float]:
     return omega, k_real
 
 
-def _run_dispersion(*, smoke: bool, work_dir: Path) -> list[dict]:
+def _worker_init(avail_cores: list[int]) -> None:
+    """Pin each worker to a private core to minimise cache thrashing."""
+    worker_id = mp.current_process()._identity  # type: ignore[attr-defined]
+    idx = (worker_id[0] - 1) % len(avail_cores) if worker_id else 0
+    try:
+        os.sched_setaffinity(0, {avail_cores[idx]})
+    except (AttributeError, PermissionError, OSError):
+        pass  # macOS dev or restricted env — degrade gracefully
+
+
+def _dispersion_cell(cell: dict) -> dict:
+    """Top-level function for ProcessPoolExecutor: one Proca dispersion cell."""
+    m2 = cell["mass2"]
+    k_req = cell["k_req"]
+    sub = Path(cell["sub"])
+    if sub.exists():
+        shutil.rmtree(sub)
+    try:
+        _proca_simulate(
+            k_request=k_req,
+            mass2=m2,
+            grid_n=cell["grid_n"],
+            snapshot_dt=cell["snapshot_dt"],
+            t_end=cell["t_end"],
+            out_dir=sub,
+        )
+        omega_sim, k_real = _proca_omega(sub)
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as exc:
+        return {"mass2": m2, "k_requested": k_req, "ok": False, "error": str(exc)}
+    omega_ana = math.sqrt(k_real**2 + m2)
+    return {
+        "mass2": m2,
+        "k_requested": k_req,
+        "k_realised": k_real,
+        "ok": True,
+        "omega_sim": omega_sim,
+        "omega_analytic": omega_ana,
+        "rel_error": abs(omega_sim - omega_ana) / max(abs(omega_ana), 1e-30),
+    }
+
+
+def _run_dispersion(*, smoke: bool, work_dir: Path, max_workers: int = 1) -> list[dict]:
     mass_values = PROCA_MASS_SQ
     k_mults = PROCA_KMULT_SMOKE if smoke else PROCA_KMULT_FULL
     grid_n = PROCA_GRID_N_SMOKE if smoke else PROCA_GRID_N_FULL
     snapshot_dt = PROCA_SNAP_DT_SMOKE if smoke else PROCA_SNAP_DT_FULL
     t_end = PROCA_T_END_SMOKE if smoke else PROCA_T_END_FULL
     base_k = 2.0 * math.pi / (BOUNDS[1] - BOUNDS[0])
-    rows: list[dict] = []
-    for m2 in mass_values:
-        for kmult in k_mults:
-            k_req = base_k * kmult
-            sub = work_dir / f"proca_m{str(m2).replace('.', 'p')}_k{kmult}"
-            if sub.exists():
-                shutil.rmtree(sub)
-            try:
-                _proca_simulate(
-                    k_request=k_req,
-                    mass2=m2,
-                    grid_n=grid_n,
-                    snapshot_dt=snapshot_dt,
-                    t_end=t_end,
-                    out_dir=sub,
-                )
-                omega_sim, k_real = _proca_omega(sub)
-            except (
-                subprocess.CalledProcessError,
-                FileNotFoundError,
-                ValueError,
-            ) as exc:
-                rows.append(
-                    {"mass2": m2, "k_requested": k_req, "ok": False, "error": str(exc)}
-                )
-                continue
-            omega_ana = math.sqrt(k_real**2 + m2)
-            rows.append(
-                {
-                    "mass2": m2,
-                    "k_requested": k_req,
-                    "k_realised": k_real,
-                    "ok": True,
-                    "omega_sim": omega_sim,
-                    "omega_analytic": omega_ana,
-                    "rel_error": abs(omega_sim - omega_ana)
-                    / max(abs(omega_ana), 1e-30),
-                }
-            )
-    return rows
+    cells = [
+        {
+            "mass2": m2,
+            "k_req": base_k * kmult,
+            "grid_n": grid_n,
+            "snapshot_dt": snapshot_dt,
+            "t_end": t_end,
+            "sub": str(work_dir / f"proca_m{str(m2).replace('.', 'p')}_k{kmult}"),
+        }
+        for m2 in mass_values
+        for kmult in k_mults
+    ]
+    if max_workers > 1:
+        avail = (
+            sorted(os.sched_getaffinity(0))
+            if hasattr(os, "sched_getaffinity")
+            else list(range(os.cpu_count() or 1))
+        )
+        ctx = mp.get_context("fork")
+        with ProcessPoolExecutor(
+            max_workers=min(max_workers, len(cells)),
+            mp_context=ctx,
+            initializer=_worker_init,
+            initargs=(avail,),
+        ) as ex:
+            return list(ex.map(_dispersion_cell, cells))
+    return [_dispersion_cell(c) for c in cells]
 
 
 # -------- (b) Rabi-frequency grid convergence --------
@@ -339,32 +341,55 @@ def _rabi_omega_eff(out_dir: Path) -> float:
     return 2.0 * math.pi * f_peak
 
 
-def _run_rabi(*, smoke: bool, work_dir: Path) -> list[dict]:
+def _rabi_cell(cell: dict) -> dict:
+    """Top-level function for ProcessPoolExecutor: one Rabi-N cell."""
+    n = cell["N"]
+    sub = Path(cell["sub"])
+    omega_theory = cell["omega_theory"]
+    if sub.exists():
+        shutil.rmtree(sub)
+    try:
+        _rabi_simulate(grid_n=n, out_dir=sub, snapshot_dt=cell["snapshot_dt"])
+        omega_eff = _rabi_omega_eff(sub)
+    except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as exc:
+        return {"N": n, "ok": False, "error": str(exc)}
+    return {
+        "N": n,
+        "ok": True,
+        "omega_eff": omega_eff,
+        "omega_theory": omega_theory,
+        "ratio": omega_eff / max(omega_theory, 1e-30),
+        "k_dx": KWAVE * (BOUNDS[1] - BOUNDS[0]) / n,
+    }
+
+
+def _run_rabi(*, smoke: bool, work_dir: Path, max_workers: int = 1) -> list[dict]:
     n_values = RABI_N_SMOKE if smoke else RABI_N_FULL
-    omega_theory = KAPPA * RABI_B0  # Rabi angular frequency for sin^2(omega t/2)
-    snapshot_dt = RABI_SNAPSHOT_DT
-    rows: list[dict] = []
-    for n in n_values:
-        sub = work_dir / f"rabi_N{n}"
-        if sub.exists():
-            shutil.rmtree(sub)
-        try:
-            _rabi_simulate(grid_n=n, out_dir=sub, snapshot_dt=snapshot_dt)
-            omega_eff = _rabi_omega_eff(sub)
-        except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as exc:
-            rows.append({"N": n, "ok": False, "error": str(exc)})
-            continue
-        rows.append(
-            {
-                "N": n,
-                "ok": True,
-                "omega_eff": omega_eff,
-                "omega_theory": omega_theory,
-                "ratio": omega_eff / max(omega_theory, 1e-30),
-                "k_dx": KWAVE * (BOUNDS[1] - BOUNDS[0]) / n,
-            }
+    omega_theory = KAPPA * RABI_B0
+    cells = [
+        {
+            "N": n,
+            "omega_theory": omega_theory,
+            "snapshot_dt": RABI_SNAPSHOT_DT,
+            "sub": str(work_dir / f"rabi_N{n}"),
+        }
+        for n in n_values
+    ]
+    if max_workers > 1:
+        avail = (
+            sorted(os.sched_getaffinity(0))
+            if hasattr(os, "sched_getaffinity")
+            else list(range(os.cpu_count() or 1))
         )
-    return rows
+        ctx = mp.get_context("fork")
+        with ProcessPoolExecutor(
+            max_workers=min(max_workers, len(cells)),
+            mp_context=ctx,
+            initializer=_worker_init,
+            initargs=(avail,),
+        ) as ex:
+            return list(ex.map(_rabi_cell, cells))
+    return [_rabi_cell(c) for c in cells]
 
 
 # -------- (c) Time-integration order --------
@@ -553,43 +578,82 @@ def _tio_run_one(
     }
 
 
-def _run_tio(*, smoke: bool, work_dir: Path) -> list[dict]:
+def _tio_cell(cell: dict) -> dict:
+    """Top-level function for ProcessPoolExecutor: one (scheme, dt) TIO cell.
+
+    Runs modal at t_align = ceil(T_END/dt)*dt, then leapfrog at T_END with
+    the same dt.  Using a scheme-specific modal dir avoids write conflicts when
+    Y2 and Y4 cells for the same dt run concurrently.
+    """
+    label = cell["label"]
+    scheme_args = cell["scheme_args"]
+    dt = cell["dt"]
+    grid_n = cell["grid_n"]
+    work_dir = Path(cell["work_dir"])
+
+    t_align = math.ceil(T_END / dt) * dt
+    dt_tag = str(dt).replace(".", "p")
+    modal_dir = work_dir / f"tio_modal_{label}_dt{dt_tag}"
+    if modal_dir.exists():
+        shutil.rmtree(modal_dir)
+    p_modal = _tio_modal_reference(grid_n=grid_n, out_dir=modal_dir, t_end=t_align)
+    print(
+        f"[tio] {label} dt={dt:.6f} t_align={t_align:.6f} P_modal={p_modal!r}",
+        flush=True,
+    )
+    sub = work_dir / f"tio_{label}_dt{dt_tag}"
+    if sub.exists():
+        shutil.rmtree(sub)
+    return _tio_run_one(
+        label,
+        scheme_args,
+        dt,
+        grid_n=grid_n,
+        out_dir=sub,
+        modal_reference=p_modal,
+        t_align=t_align,
+    )
+
+
+def _run_tio(*, smoke: bool, work_dir: Path, max_workers: int = 1) -> list[dict]:
     schemes = TIO_SCHEMES_SMOKE if smoke else TIO_SCHEMES_FULL
     dts = TIO_DT_SMOKE if smoke else TIO_DT_FULL
     grid_n = TIO_GRID_N_SMOKE if smoke else TIO_GRID_N_FULL
+    cells = [
+        {
+            "label": label,
+            "scheme_args": scheme_args,
+            "dt": dt,
+            "grid_n": grid_n,
+            "work_dir": str(work_dir),
+        }
+        for label, scheme_args in schemes
+        for dt in dts
+    ]
+    if max_workers <= 1:
+        return [_tio_cell(c) for c in cells]
+
+    ctx = mp.get_context("fork")
     rows: list[dict] = []
-    for label, args in schemes:
-        for dt in dts:
-            # Leapfrog captures its final snapshot at the first step crossing
-            # T_END: t_align = ceil(T_END / dt) * dt.  Run modal at the same
-            # t_end so both schemes report P at exactly the same simulation
-            # time, eliminating the snapshot-misalignment residual ~dt·dP/dt
-            # that otherwise masks Y4's slope-4 signal.
-            t_align = math.ceil(T_END / dt) * dt
-            modal_dir = work_dir / f"tio_modal_align_dt{str(dt).replace('.', 'p')}"
-            if modal_dir.exists():
-                shutil.rmtree(modal_dir)
-            p_modal = _tio_modal_reference(
-                grid_n=grid_n, out_dir=modal_dir, t_end=t_align
-            )
-            print(
-                f"[tio] {label} dt={dt} t_align={t_align:.6f} P_modal={p_modal!r}",
-                flush=True,
-            )
-            sub = work_dir / f"tio_{label}_dt{str(dt).replace('.', 'p')}"
-            if sub.exists():
-                shutil.rmtree(sub)
-            rows.append(
-                _tio_run_one(
-                    label,
-                    args,
-                    dt,
-                    grid_n=grid_n,
-                    out_dir=sub,
-                    modal_reference=p_modal,
-                    t_align=t_align,
-                )
-            )
+    avail = (
+        sorted(os.sched_getaffinity(0))
+        if hasattr(os, "sched_getaffinity")
+        else list(range(os.cpu_count() or 1))
+    )
+    n_workers = min(max_workers, len(cells))
+    with ProcessPoolExecutor(
+        max_workers=n_workers,
+        mp_context=ctx,
+        initializer=_worker_init,
+        initargs=(avail,),
+    ) as pool:
+        futures = {pool.submit(_tio_cell, c): c for c in cells}
+        n_done = 0
+        for fut in as_completed(futures):
+            rows.append(fut.result())
+            n_done += 1
+            if n_done % 10 == 0 or n_done == len(cells):
+                print(f"[tio] {n_done}/{len(cells)} cells done", flush=True)
     return rows
 
 
@@ -622,11 +686,13 @@ def _fit_slope(
     return float(slope)
 
 
-def run(*, smoke: bool, work_dir: Path) -> dict:
+def run(*, smoke: bool, work_dir: Path, max_workers: int = 1) -> dict:
     work_dir.mkdir(parents=True, exist_ok=True)
-    dispersion_rows = _run_dispersion(smoke=smoke, work_dir=work_dir)
-    rabi_rows = _run_rabi(smoke=smoke, work_dir=work_dir)
-    tio_rows = _run_tio(smoke=smoke, work_dir=work_dir)
+    dispersion_rows = _run_dispersion(
+        smoke=smoke, work_dir=work_dir, max_workers=max_workers
+    )
+    rabi_rows = _run_rabi(smoke=smoke, work_dir=work_dir, max_workers=max_workers)
+    tio_rows = _run_tio(smoke=smoke, work_dir=work_dir, max_workers=max_workers)
 
     # Slope fits
     schemes_done = sorted({r["scheme"] for r in tio_rows if r.get("ok")})
@@ -706,6 +772,16 @@ def main() -> None:
     parser.add_argument("--smoke", action="store_true")
     parser.add_argument("--work-dir", type=Path, default=None)
     parser.add_argument(
+        "--parallel",
+        type=int,
+        default=1,
+        metavar="N",
+        help=(
+            "Run benchmark cells concurrently using N worker processes "
+            "(fork context; set to 112 on a sapphire INTR node)."
+        ),
+    )
+    parser.add_argument(
         "--append-tio",
         action="store_true",
         help=(
@@ -719,7 +795,7 @@ def main() -> None:
         if args.append_tio:
             append_tio(out=args.out, work_dir=work)
             return
-        data = run(smoke=args.smoke, work_dir=work)
+        data = run(smoke=args.smoke, work_dir=work, max_workers=args.parallel)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with args.out.open("w") as fh:
         json.dump(data, fh, indent=2)
@@ -727,4 +803,15 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # Force single-threaded BLAS in every worker subprocess so that
+    # N workers × M BLAS threads don't fight over the same cores.
+    # Must be set before ProcessPoolExecutor forks workers (fork inherits env).
+    for _var in (
+        "OMP_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "BLIS_NUM_THREADS",
+    ):
+        os.environ.setdefault(_var, "1")
     main()
