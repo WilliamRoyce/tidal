@@ -767,21 +767,27 @@ dominate absolutely.
 %   per Newton iteration: analytical vs FD.
 % Output: benchmark_results/canonical/jac_speedup.json.
 % Figure script: scripts/figures/figC6_jac_speedup.py.
-\begin{figure}[t]
+\begin{figure*}[t]
   \centering
-  % Uncomment once canonical data + script exist:
-  % \includegraphics[width=\columnwidth]{figures/figC6_jac_speedup}
+  \includegraphics[width=\textwidth]{figures/figC6_jac_speedup}
   \caption{Per-Newton-iteration wall time of the analytical-Jacobian
-    path (dense, sparse-CSC, GMRES) compared against finite-difference
-    Jacobian evaluation on three representative survey theories
+    delivery tiers (dense, sparse-CSC, GMRES \texttt{jactimes})
+    compared against the finite-difference proxy
+    $n_{\rm colors}\!\times\!t_{\rm matvec}$ on three representative
+    survey theories
     (\lstinline!coupled_scalars!, \lstinline!gertsenshtein!,
     \lstinline!navier_cauchy_2d!). Markers show the mean over
     $N_{\rm reps}{=}20$ repetitions; error bars are the per-rep
-    standard deviation. The analytical path delivers a five-fold
-    speedup in the dense tier, with the gap narrowing as the system
-    transitions to the sparse and GMRES tiers.}
+    standard deviation. The analytical path delivers a several-fold
+    speedup over the FD proxy across the sparse and GMRES tiers; the
+    dense tier shows a transition from below unity at very small
+    $n_{\rm total}$ (where the dense \texttt{toarray} fill dominates)
+    to a 4--5$\times$ advantage near the dense--sparse boundary. The
+    vertical dashed lines mark the production auto-selection
+    thresholds at $n_{\rm total}{=}2{,}000$ (dense$\to$sparse) and
+    $n_{\rm total}{=}200{,}000$ (sparse$\to$GMRES).}
   \label{fig:AnalyticalJacobianSpeedup}
-\end{figure}
+\end{figure*}
 
 % \paragraph*{Coordinate accumulation} The sparse Jacobian is assembled
 % efficiently in a single pass over the operator list before being
