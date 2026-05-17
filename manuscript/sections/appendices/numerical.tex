@@ -119,9 +119,11 @@ determined by the time-derivative order of its equation of motion:
 The equations of motion come from the JSON specification produced
 by~\cref{SymbolicComputation} (format illustrated in~\cref{JSONExample};
 each right-hand side is a list of (coefficient, operator,
-target-field) triples). The right-hand-side evaluator resolving these
-into the callable implementation that the chosen backend then
-invokes.
+target-field) triples). The right-hand-side evaluator assembles these triples ---
+parameter-resolving each coefficient, dispatching each operator to
+its spatial implementation, and routing the result into the correct
+slot --- into the callable right-hand side that the chosen backend
+then invokes.
 
 \paragraph*{Velocity form versus canonical phase space} Writing the
 quadratic kinetic operator $\mathcal{K}$ of~\cref{KineticMatrix} as a
@@ -154,8 +156,14 @@ and constraint fields, so every backend sees regardless a single residual
 function $F(t, y, \dot y) = 0$ (for \IDA{}) or a single right-hand
 side $\dot y = f(t, y)$ (for \CVODE{}, leapfrog, \SciPy{}).
 (iii) It is well-defined even when the kinetic matrix is singular at
-the background. The velocity form sidesteps the change of variables entirely and
-remains valid in this regime.
+the background. A singular $K$ signals that the field variables in
+the Lagrangian are not all independent --- primary constraints from
+gauge orbits or coincident kinetic eigenvectors --- and prevents the
+canonical change of variables from $(q, v)$ to $(q, p)$, requiring
+the constrained-Hamiltonian apparatus
+of~\cite{henneaux1992quantization} to recover a canonical
+formulation. The velocity form sidesteps the change of variables
+entirely and remains valid in this regime.
 
 \paragraph*{State layout and field views} The mapping between a
 field's component name and its slot in the flat state vector is
