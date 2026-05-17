@@ -149,9 +149,15 @@ def _plot_tio(ax, data: dict) -> None:
         dts = np.array([r["dt"] for r in srows])
         errs = np.array([max(r[err_key], EPS_MACH) for r in srows])
         fit_mask = errs > FLOOR_TOL
+        slope: float | None = None
+        intercept: float | None = None
         if fit_mask.sum() >= 3:
-            s, r2 = _fit_loglog(dts[fit_mask], errs[fit_mask])
-            label = rf"{scheme} ($\hat{{\alpha}} = {s:.2f}$, $R^2 = {r2:.3f}$)"
+            slope, r2 = _fit_loglog(dts[fit_mask], errs[fit_mask])
+            # refit to capture intercept (np.polyfit returns slope only via _fit_loglog)
+            lx = np.log10(dts[fit_mask])
+            ly = np.log10(errs[fit_mask])
+            _, intercept = np.polyfit(lx, ly, 1)
+            label = rf"{scheme} ($\hat{{\alpha}} = {slope:.2f}$, $R^2 = {r2:.3f}$)"
         else:
             label = scheme
         ax.loglog(
@@ -163,6 +169,20 @@ def _plot_tio(ax, data: dict) -> None:
             color=colors.get(scheme, "#666"),
             label=label,
         )
+        # Overlay the least-squares regression line as a dashed guide so the
+        # reader can see at a glance what slope the legend reports. For Y4 this
+        # also makes the size of the residual scatter visible against the fit.
+        if slope is not None and intercept is not None:
+            dt_line = np.array([dts.min(), dts.max()])
+            err_line = 10.0 ** (slope * np.log10(dt_line) + intercept)
+            ax.loglog(
+                dt_line,
+                err_line,
+                ls="--",
+                lw=1.0,
+                color=colors.get(scheme, "#666"),
+                alpha=0.6,
+            )
     ax.set_xlabel(r"$\Delta t$")
     if err_key == "abs_error_vs_modal":
         ax.set_ylabel(

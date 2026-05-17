@@ -22,26 +22,24 @@
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_boccaletti_uniform}
-  \caption{Boccaletti-kernel reproduction in the uniform-$\Bzero$
-    regime. (a) Residuals against the Raffelt--Stodolsky two-mode
-    formula \cref{TwoModeRabi} at fixed $t_\mathrm{end}=50$ across
-    the $\Bzero \in [0.005, 0.25]$ sweep sampled at 24 points on a
-    periodic $N=512$ grid.
-    Filled circles: $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$ at each
-    simulated $\Bzero$ (numerical residual against the RS reference).
-    Dashed curve: the analytic $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$
-    evaluated at 400 dense $\Bzero$ values, showing the $\Bzero^2$ growth
-    of the bare-formula deviation from RS; TIDAL sits at the numerical
-    floor while the bare formula departs from RS as $\Bzero$ grows.
-    (b) Convergence of
+  \caption{Boccaletti-kernel reproduction on a uniform $\Bzero$
+    background. (a) Numerical residual against the
+    Raffelt--Stodolsky two-mode formula \cref{TwoModeRabi} at
+    $t_\mathrm{end}=50$ across a 24-point $\Bzero \in [0.005, 0.25]$
+    sweep on a periodic $N=512$ grid (filled circles), with the
+    analytic $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$ (dashed)
+    drawn at 400 dense $\Bzero$ values to show the $\Bzero^2$ growth
+    of the bare-formula deviation from RS; the simulation residual
+    sits at the numerical floor while the bare formula departs from
+    RS as $\Bzero$ grows.
+    (b) Grid-refinement convergence of
     $|P_\mathrm{final}^\mathrm{sim} - \sin^2(\kappa\Bzero t/2)|$ at
-    the regime point $\Bzero = 0.1275$ for four
-    solver backends.
-    Modal and \CVODE{} reach the modal-evolution precision floor
-    (dotted line); Y2 shows clean $(\Delta t^2)$-dominated decay
-    across the whole $N$ range; Y4 falls past Y2 quickly and
-    approaches a higher residual floor (median $\sim 10^{-4}$) set
-    by the CFL-bounded $\Delta t$ which varies with $N$.}
+    the regime point $\Bzero = 0.1275$ for four backends. Modal and
+    \CVODE{} reach the modal-evolution precision floor (dotted line)
+    and remain there across $N$; leapfrog Yoshida-2 decays
+    monotonically toward the floor; leapfrog Yoshida-4 shows
+    reproducible non-monotonic scatter across the surveyed $N$
+    range.}
   \label{BoccalettiUniform}
 \end{figure*}
 
@@ -72,9 +70,11 @@ effective mass; the regime of validity follows
 $\kappa\Bzero t/2 \ll \pi/2$; the swept $\Bzero$ range extends to
 values where the effective-mass detuning $\Delta$ of \cref{TwoModeRabi}
 becomes significant and the two predictions begin to diverge.
-The modal solver reaches the FD-4 spatial-discretisation plateau at
-every grid size; the validation backends converge toward the same
-plateau under grid refinement. The swept range stays within the
+The modal solver and \CVODE{} reach the modal-evolution precision
+floor at every grid size and Yoshida-2 converges monotonically toward
+that floor; Yoshida-4 shows the same non-monotonic residual scatter
+under grid refinement that is documented for $\Delta t$ refinement in
+\cref{ConvergenceFigure}. The swept range stays within the
 perturbative regime where both predictions remain valid; the
 localised-profile sweep of \cref{BoccalettiLocalised} deliberately
 extends past the first quarter-period ($s > \pi/2$), where the
@@ -312,29 +312,46 @@ $|\Omega_\mathrm{eff}/\Omega_\mathrm{theory} - 1| \approx 7\times 10^{-3}$
 across the surveyed $N$, well below the spatial FD-4 error of
 \cref{FDConvergence} and not the limiting diagnostic at this
 resolution. Time-integration convergence is reported in
-\cref{ConvergenceFigure} for the symplectic backends, where the
-slope of the absolute error versus $\Delta t$ recovers the
-predicted order. Implicit and tolerance-controlled backends saturate
-at their \texttt{rtol} setting and are covered in \cref{MultiMethod}.
+\cref{ConvergenceFigure} for the symplectic backends, where
+Yoshida-2 recovers its formal slope to four-figure precision
+($\hat{\alpha} = 2.00$, $R^2 = 1.000$). Yoshida-4 instead exhibits
+reproducible non-power-law scatter spanning two orders of magnitude
+at fixed $\Delta t$; the same pattern reappears in
+\cref{BoccalettiUniform}(b) under grid refinement at fixed
+$\Delta t$. The scatter is bit-identical across reruns with $2$
+versus $20$ snapshots and across $P_\mathrm{final}$ versus
+$P_\mathrm{max}$ extraction, ruling out snapshot-timing and
+measurement-extraction artefacts; modal, \CVODE, and Yoshida-2 are
+smooth on the same data. We attribute the residual Yoshida-4
+pathology to a still-uncharacterised interaction between the
+Yoshida composition and either the coupled two-field structure or
+the two well-separated frequency scales
+($\kappa\Bzero/2 = 0.025$, $\omega_k \approx 2.0$) of the
+Einstein--Maxwell baseline; the production work in this paper uses
+Yoshida-2 for symplectic evolution. Implicit and
+tolerance-controlled backends saturate at their \texttt{rtol}
+setting and are covered in \cref{MultiMethod}.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_convergence}
-  \caption{Spatial and temporal convergence. (a) Proca dispersion
-    $\omega(k)$ extracted by FFT from \TIDAL{} at $m^2 \in \{0.1, 1, 10\}$,
-    overlaid with the analytic $\omega = \sqrt{k^2 + m^2}$.
+  \caption{Spatial and temporal convergence diagnostics.
+    (a) Proca dispersion $\omega(k)$ extracted by FFT from \TIDAL{} at
+    $m^2 \in \{0.1, 1, 10\}$ (markers), overlaid with the analytic
+    $\omega = \sqrt{k^2 + m^2}$ (dashed).
     (b) Time-integration error
     $|P_\mathrm{final}^\mathrm{sim} - P_\mathrm{final}^\mathrm{modal}|$
-    versus $\Delta t$ for leapfrog Yoshida-2 and Yoshida-4 on the
-    Einstein--Maxwell baseline, against a modal reference at the
-    same grid and IC so spatial-FD, IC-snap, and extraction floors
-    largely cancel. The CFL-stable dt grid (30 values per scheme on
-    $\Delta t \in [10^{-3}, 0.024]$) confirms the expected ordering
-    (Y4 below Y2 across the surveyed range); the fitted
-    slopes underestimate the formal orders ($\hat{\alpha} \approx
-    1.5$, $1.2$ vs. expected $2$, $4$) because the $P_\mathrm{max}$
-    snapshot-extraction noise dominates at small $\Delta t$ and is
-    not removed by the modal reference.}
+    versus $\Delta t$ for leapfrog Yoshida-2 (circles) and Yoshida-4
+    (squares) on the Einstein--Maxwell baseline at
+    $\kappa\Bzero = 0.05$, $T = 50$, $N = 2048$; $60$ log-spaced
+    $\Delta t \in [10^{-3}, 0.024]$ per scheme. The modal reference is
+    rerun per cell at $t_\mathrm{end} = \lceil T/\Delta t\rceil\Delta t$
+    so $P_\mathrm{final}^\mathrm{modal}$ and
+    $P_\mathrm{final}^\mathrm{sim}$ share a snapshot time exactly and
+    the misalignment residual cancels. Dashed lines are least-squares
+    $\log_{10}\!$\,–$\log_{10}$ regressions through each scheme's full
+    $60$-point cloud; the fitted slope $\hat{\alpha}$ and coefficient
+    of determination $R^2$ are reported in the legend.}
   \label{ConvergenceFigure}
 \end{figure*}
 
