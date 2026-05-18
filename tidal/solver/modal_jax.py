@@ -107,37 +107,6 @@ def _require_jax() -> tuple[Any, Any, Any]:
 
 
 @functools.lru_cache(maxsize=32)
-def _get_evolve_uniform_fn(n_snapshots: int) -> Callable[..., Any]:
-    """Return a JIT-compiled scan that evolves *n_snapshots* steps.
-
-    The returned function signature is::
-
-        evolve(exp_M_dt, y0_T) -> ys
-
-    where ``exp_M_dt`` has shape ``(n_modes, bs, bs)`` and ``y0_T`` has
-    shape ``(n_modes, bs)``, returning ``ys`` of shape
-    ``(n_snapshots, n_modes, bs)`` with ``ys[ti]`` = state at ``t_eval[ti]``.
-
-    Cached by ``n_snapshots`` so compilation happens once per snapshot count.
-    The cache persists across calls within a process — warm hits are free.
-    """
-    jax, jnp, _ = _require_jax()
-
-    @jax.jit
-    def _evolve(exp_M_dt: Any, y0_T: Any) -> Any:
-        def step(y_curr: Any, _: Any) -> tuple[Any, Any]:
-            y_next = jnp.einsum("mij,mj->mi", exp_M_dt, y_curr)
-            return y_next, y_curr  # carry=next, output=current (before step)
-
-        # scan runs n_snapshots iterations:
-        #   output[0] = y0, output[1] = y1, ..., output[n-1] = y_{n-1}
-        _final, ys = jax.lax.scan(step, y0_T, None, length=n_snapshots)
-        return ys
-
-    return _evolve
-
-
-@functools.lru_cache(maxsize=32)
 def _get_fused_expm_scan_fn(n_snapshots: int) -> Callable[..., Any]:
     """Return a JIT-compiled (expm + scan) fused kernel for uniform-snapshot evolution.
 
@@ -149,9 +118,9 @@ def _get_fused_expm_scan_fn(n_snapshots: int) -> Callable[..., Any]:
     ``y0_T`` has shape ``(n_modes, bs)``, and ``dt`` is a scalar. Returns
     ``ys`` of shape ``(n_snapshots, n_modes, bs)``.
 
-    Fuses ``batch_expm`` + ``evolve_uniform`` into a single JIT trace,
-    eliminating one round of Python ↔ JAX dispatch per call. Saves ~2-3 ms
-    per solve at small problem sizes where dispatch overhead dominates.
+    Single JIT trace fusing ``vmap(expm)`` and ``lax.scan`` — eliminates one
+    round of Python ↔ JAX dispatch per call. Used by both the constrained
+    Phase 2a path and the unconstrained Phase 1 path.
     """
     jax, jnp, jsl = _require_jax()
 
@@ -167,19 +136,6 @@ def _get_fused_expm_scan_fn(n_snapshots: int) -> Callable[..., Any]:
         return ys
 
     return _fused
-
-
-@functools.lru_cache(maxsize=8)
-def _get_batch_expm_fn() -> Callable[..., Any]:
-    """Return a JIT+vmap wrapper for ``jax.scipy.linalg.expm`` over modes."""
-    jax, _, jsl = _require_jax()
-
-    @jax.jit
-    def _batch_expm(M_scaled: Any) -> Any:
-        # M_scaled: (n_modes, bs, bs) — already multiplied by dt
-        return jax.vmap(jsl.expm)(M_scaled)
-
-    return _batch_expm
 
 
 @functools.lru_cache(maxsize=8)
@@ -583,19 +539,37 @@ def solve_modal_jax(
         initial_physical = _ifft_slots(y0_hat, layout, grid)
         initial_max_amp = max(float(np.max(np.abs(initial_physical))), 1e-15)
 
+    # Collect M_blocks for active blocks (with non-trivial IC); pad to bs_max so
+    # we can run vmap(eigvals) on a single stacked tensor instead of one JAX
+    # dispatch + numpy transfer per block.
+    active_M_blocks: list[NDArray[np.complex128]] = []
+    active_block_sizes: list[int] = []
     for block_slots in blocks:
         idx = np.array(block_slots)
         y0_block = y0_hat[idx, :]
         if np.max(np.abs(y0_block)) < 1e-15:
             continue
         A_block = A_modes[:, idx[:, None], idx[None, :]]  # (n_modes, bs, bs)
-        # For the fast path (no B matrix), M = A directly.
-        M_block: NDArray[np.complex128] = A_block
+        active_M_blocks.append(A_block)
+        active_block_sizes.append(A_block.shape[-1])
 
-        if t_end_rel > 0:
-            M_block_jax = jnp.array(M_block, dtype=jnp.complex128)
-            eigvals_jax = _get_batch_eigvals_fn()(M_block_jax)  # (n_modes, bs)
-            eigvals = np.array(eigvals_jax)
+    if t_end_rel > 0 and active_M_blocks:
+        bs_max = max(active_block_sizes)
+        n_active = len(active_M_blocks)
+        # Pad each M_block to (n_modes, bs_max, bs_max); padded entries are zero so
+        # the extra eigenvalues are zero (no contribution to max_real_eig or warnings).
+        M_padded = np.zeros((n_active, n_modes, bs_max, bs_max), dtype=np.complex128)
+        for i, M_block in enumerate(active_M_blocks):
+            bs = M_block.shape[-1]
+            M_padded[i, :, :bs, :bs] = M_block
+        # Reshape to (n_active * n_modes, bs_max, bs_max) and run batched eigvals once.
+        M_padded_flat = M_padded.reshape(-1, bs_max, bs_max)
+        M_padded_jax = jnp.array(M_padded_flat, dtype=jnp.complex128)
+        eigvals_jax_all = _get_batch_eigvals_fn()(M_padded_jax)
+        eigvals_all = np.array(eigvals_jax_all)  # single JAX→numpy sync for all blocks
+        eigvals_all = eigvals_all.reshape(n_active, n_modes, bs_max)
+        for i in range(n_active):
+            eigvals = eigvals_all[i]  # (n_modes, bs_max); padded zeros are harmless
             _warn_eigenvalue_growth(
                 eigvals.ravel().astype(np.complex128), t_end_rel, context="JAX modal"
             )
@@ -627,11 +601,15 @@ def solve_modal_jax(
         (num_snapshots, n_slots, n_modes), dtype=np.complex128
     )
 
-    batch_expm = _get_batch_expm_fn()
-    evolve_uniform = _get_evolve_uniform_fn(num_snapshots)
+    fused_expm_scan = _get_fused_expm_scan_fn(num_snapshots)
     evolve_nonuniform = _get_evolve_nonuniform_fn()
 
     t_rel_jax = jnp.array(t_eval - t0, dtype=jnp.float64)
+    dt_jax = (
+        jnp.array(dt_step, dtype=jnp.float64)
+        if (uniform and dt_step is not None and dt_step > 0)
+        else None
+    )
 
     for block_slots in blocks:
         idx = np.array(block_slots)
@@ -643,11 +621,10 @@ def solve_modal_jax(
         M_jax = jnp.array(A_block, dtype=jnp.complex128)  # M = A (B=None fast path)
         y0_T_jax = jnp.array(y0_block.T, dtype=jnp.complex128)  # (n_modes, bs)
 
-        if uniform and dt_step is not None and dt_step > 0:
-            # Precompute exp(M * dt) for all modes in parallel via vmap+JIT
-            exp_M_dt = batch_expm(M_jax * dt_step)  # (n_modes, bs, bs)
-            # Evolve all snapshots via scan
-            ys_jax = evolve_uniform(exp_M_dt, y0_T_jax)  # (n_snapshots, n_modes, bs)
+        if dt_jax is not None:
+            # Fused expm+scan: single JIT dispatch instead of two (saves one
+            # round-trip; matches the constrained Phase 2a path at line 335).
+            ys_jax = fused_expm_scan(M_jax, y0_T_jax, dt_jax)
         else:
             # Non-uniform spacing: vmap over time points
             ys_jax = evolve_nonuniform(M_jax, y0_T_jax, t_rel_jax)  # same shape

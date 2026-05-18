@@ -75,6 +75,21 @@ detection, divergence pre-check) is reused unmodified from the scipy path.
 The new file adds $\approx250$ lines and introduces no changes to
 \texttt{modal.py} itself.
 
+\paragraph{Single fused expm+scan kernel.}  The unconstrained Phase~1 path
+and the constrained Phase~2a path both call
+\texttt{\_get\_fused\_expm\_scan\_fn(num\_snapshots)} so the
+\texttt{vmap(expm)} and \texttt{lax.scan} run as a single JIT trace per
+block.  This avoids the dispatch overhead of separate
+\texttt{batch\_expm} $+$ \texttt{evolve\_uniform} calls.
+
+\paragraph{Batched eigenvalue pre-check.}  The divergence pre-check pads
+all active blocks' $M$-matrices to the maximum block size, stacks them
+into a single \texttt{(n\_active, n\_modes, bs\_max, bs\_max)} tensor,
+and runs \texttt{vmap(jnp.linalg.eigvals)} once.  Padded entries
+contribute zero eigenvalues that are harmless to the
+\texttt{max\_real\_eig} check.  This replaces a per-block JAX$\to$numpy
+sync, useful for theories with multiple independent slot blocks.
+
 \subsubsection{Double Precision}
 \label{sec:modal_jax_f64}
 
