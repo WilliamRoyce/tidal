@@ -222,6 +222,21 @@ def _plot(data: dict, out_path: Path) -> None:
         ax.set_title(_TITLES[theory], fontsize=8, pad=4)
         ax.set_xlabel(r"$n_{\rm total}$")
 
+        # Force log-scale minor ticks (2x, 3x, ..., 9x within each decade)
+        # to render on both axes — matplotlib auto-suppresses these when
+        # the major tick range spans more than ~6 decades, which our
+        # 9-decade y-range triggers.
+        ax.xaxis.set_major_locator(mpl.ticker.LogLocator(base=10, numticks=12))
+        ax.xaxis.set_minor_locator(
+            mpl.ticker.LogLocator(base=10, subs=tuple(range(2, 10)), numticks=120)
+        )
+        ax.yaxis.set_major_locator(mpl.ticker.LogLocator(base=10, numticks=12))
+        ax.yaxis.set_minor_locator(
+            mpl.ticker.LogLocator(base=10, subs=tuple(range(2, 10)), numticks=120)
+        )
+        ax.xaxis.set_minor_formatter(mpl.ticker.NullFormatter())
+        ax.yaxis.set_minor_formatter(mpl.ticker.NullFormatter())
+
         ax.tick_params(which="major", direction="in", top=False, right=False)
         ax.tick_params(which="minor", direction="in", top=False, right=False, length=2)
         ax.yaxis.grid(visible=True, which="both", ls=":", alpha=0.35, lw=0.5)
