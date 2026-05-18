@@ -33,13 +33,16 @@
     sits at the numerical floor while the bare formula departs from
     RS as $\Bzero$ grows.
     (b) Grid-refinement convergence of
-    $|P_\mathrm{final}^\mathrm{sim} - \sin^2(\kappa\Bzero t/2)|$ at
-    the regime point $\Bzero = 0.1275$ for four backends. Modal and
-    \CVODE{} reach the modal-evolution precision floor (dotted line)
-    and remain there across $N$; leapfrog Yoshida-2 decays
-    monotonically toward the floor; leapfrog Yoshida-4 shows
-    reproducible non-monotonic scatter across the surveyed $N$
-    range.}
+    $|P_\mathrm{final}^\mathrm{sim} - P_\mathrm{RS}|$ --- the residual
+    against the two-mode prediction \cref{TwoModeRabi} with the
+    corrected detuning --- at the regime point $\Bzero = 0.1275$ for
+    four backends. Modal and \CVODE{} reach a plateau of
+    $\sim 4\times 10^{-8}$ across $N$, set by the $(\Delta/g)^4$
+    next-order truncation of the two-mode reduction (verified by the
+    $\Bzero^{3.65}$ scaling of the panel-(a) residual); leapfrog
+    Yoshida-2 converges monotonically toward this plateau under grid
+    refinement, and Yoshida-4 shows reproducible non-monotonic
+    scatter across the surveyed $N$ range.}
   \label{BoccalettiUniform}
 \end{figure*}
 
@@ -72,14 +75,30 @@ effective mass, and the bare Boccaletti formula $\Pconv =
 $\kappa\Bzero t/2 \ll \pi/2$; the swept $\Bzero$ range extends to
 values where the effective-mass detuning $\Delta$ of \cref{TwoModeRabi}
 becomes significant and the two predictions begin to diverge.
-The \TIDAL{} evolution reproduces the two-mode formula
-\cref{TwoModeRabi} to the modal-evolution precision floor across the
-full $\Bzero$ sweep, capturing the metric-backreaction detuning of
-\cref{PerturbativityHierarchy} and not merely the leading $\sin^2$
-coupling. The modal solver and \CVODE{} reach the modal-evolution
-precision floor at every grid size and Yoshida-2 converges
-monotonically toward that floor; Yoshida-4 shows the same
-non-monotonic residual scatter under grid refinement that is
+The two-mode formula \cref{TwoModeRabi} is derived from the full
+Einstein--Maxwell PDE via three layered approximations: (i) projection
+onto the $(h(k), a(k))$ mode pair at a single carrier wavevector,
+dropping mode-coupling to neighbouring $k'$ in any wave-packet IC;
+(ii) leading-order expansion of the massive-graviton dispersion
+$\omega_h \simeq k + m_h^2/(2k)$, dropping $\mathcal{O}(m_h^4/k^4)$
+contributions to the detuning; and (iii) the rotating-wave reduction
+to a $2\times 2$ effective Hamiltonian in the slowly-varying envelope,
+dropping counter-rotating Bloch--Siegert-type terms at
+$\mathcal{O}((g/\omega)^2)$. Each of these truncations contributes
+to $\Pconv$ at $\mathcal{O}(\Bzero^4)$ relative to the two-mode
+prediction. \TIDAL{} evolves the full PDE without any of these
+approximations, so the residual $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$
+measures exactly the cumulative size of the truncated higher-order
+physics. We observe
+$|P_\mathrm{TIDAL} - P_\mathrm{RS}| \propto \Bzero^{3.65}$ in
+\cref{BoccalettiUniform}(a) and a corresponding plateau in
+\cref{BoccalettiUniform}(b) at $\sim 4\times 10^{-8}$, both matching
+the predicted $(\Delta/g)^4 \sim \Bzero^4$ aggregate to within a
+factor of $1.4$ across the full $\Bzero$ sweep --- a positive
+validation that \TIDAL{} captures the dynamics one order beyond the
+two-mode formula. Yoshida-2 converges monotonically toward the
+$(\Delta/g)^4$ plateau under grid refinement; Yoshida-4 shows the
+same non-monotonic residual scatter under grid refinement that is
 documented for $\Delta t$ refinement in \cref{ConvergenceFigure}. The swept range stays within the
 perturbative regime where both predictions remain valid; the
 localised-profile sweep of \cref{BoccalettiLocalised} deliberately

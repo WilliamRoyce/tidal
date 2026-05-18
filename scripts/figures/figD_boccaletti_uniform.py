@@ -132,6 +132,13 @@ def _plot(data: dict, out_path: Path) -> None:
     ax.set_title(rf"(a) residual at $t = {t0:g}$", fontsize=10)
 
     # Panel (b): multi-solver N-convergence at one regime point.
+    # Errors are computed against the corrected two-mode RS prediction
+    # (the best-available analytic baseline), NOT against the bare sin^2
+    # formula. With the bare baseline, modal/CVODE would plateau at the
+    # analytic 2-mode offset |sin^2 - P_RS| ~3.6e-5 and obscure the true
+    # numerical precision of the backend; against RS, modal/CVODE drop
+    # to ~4e-8 (the next-order (Delta/g)^4 truncation that the 2x2
+    # reduction itself drops), giving a meaningful convergence diagnostic.
     ax = axes[1]
     scheme_styles = {
         "modal": ("#1f77b4", "o", "modal"),
@@ -139,14 +146,30 @@ def _plot(data: dict, out_path: Path) -> None:
         "leapfrog_Y2": ("#ff7f0e", "^", "leapfrog $Y_2$"),
         "leapfrog_Y4": ("#d62728", "D", "leapfrog $Y_4$"),
     }
-    plateau_for_label = None
+    # Resolve the regime point (B0, t_end) once from any convergence row.
+    any_conv_row = next(iter(schemes.values()))[0] if schemes else None
+    if any_conv_row is None:
+        b0_regime, t_regime = 0.0, 0.0
+        p_rs_regime = 0.0
+    else:
+        b0_regime = float(any_conv_row["B0"])
+        t_regime = float(any_conv_row["t_end"])
+        p_rs_regime = float(
+            _raffelt_stodolsky(np.array([b0_regime]), kappa, t_regime, kwave)[0]
+        )
     for scheme_name in ("modal", "cvode", "leapfrog_Y2", "leapfrog_Y4"):
         rows = schemes.get(scheme_name)
         if not rows:
             continue
         color, marker, display = scheme_styles[scheme_name]
         ns = np.array([r["N"] for r in rows], dtype=float)
-        es = np.maximum(np.array([r["abs_error_final"] for r in rows]), EPS_MACH)
+        # Recompute against corrected RS (the data field abs_error_final
+        # stores |sim - bare| for backward compatibility with the JSON
+        # schema; we want |sim - RS| instead).
+        es = np.maximum(
+            np.abs(np.array([r["P_final_sim"] for r in rows]) - p_rs_regime),
+            EPS_MACH,
+        )
         ax.loglog(
             ns,
             es,
@@ -156,19 +179,8 @@ def _plot(data: dict, out_path: Path) -> None:
             lw=0,
             label=display,
         )
-        if scheme_name in {"modal", "cvode"}:
-            plateau_for_label = float(np.median(es))
-    if plateau_for_label is not None:
-        ax.axhline(
-            plateau_for_label,
-            ls="-.",
-            lw=0.7,
-            color="#666",
-            alpha=0.5,
-            label=rf"modal-evolution floor $\approx {plateau_for_label:.1e}$",
-        )
     ax.set_xlabel(r"grid resolution $N$")
-    ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - \sin^2(\kappa B_0 t/2)|$")
+    ax.set_ylabel(r"$|P_{\mathrm{final}}^{\mathrm{sim}} - P_{\mathrm{RS}}|$")
     ax.legend(frameon=False, fontsize=8, loc="upper right")
     ax.grid(visible=True, which="both", ls=":", alpha=0.3)
     ax.set_xticks([64, 128, 256, 512])
