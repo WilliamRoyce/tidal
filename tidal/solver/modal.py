@@ -2473,7 +2473,9 @@ def _evolve_full_matrix(
             f"amplitude {y0_max:.2e}. "
             f"This is a known failure mode of expm_multiply for strongly "
             f"non-normal convolution matrices at small grid sizes (GH #367). "
-            f"Workaround: rerun with --scheme cvode."
+            f"Workaround: rerun with --scheme cvode (or --scheme ida if "
+            f"the theory has algebraic constraints — CVODE silently freezes "
+            f"those at IC; see _setup.py:warn_frozen_constraints)."
         )
         raise SimulationDivergedError(msg)
 

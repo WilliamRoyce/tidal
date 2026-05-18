@@ -320,15 +320,38 @@ $\exp(A t) \cdot v$ then amplifies.
 
 \paragraph{Auto-routing under \texttt{--scheme auto}.} To prevent silent
 wrong answers, the CLI \emph{auto-routes} all
-position-dependent + periodic theories to CVODE under \texttt{--scheme
-auto} (\texttt{tidal/cli/\_simulate.py}, just after \texttt{\_resolve\_scheme}
-returns). CVODE integrates in physical space, never builds the Fourier
-convolution matrix, and gives correct bounded results. Users see a one-line
-notice:
+position-dependent + periodic theories away from modal under
+\texttt{--scheme auto} (via
+\texttt{\_override\_pos\_dep\_periodic\_scheme} in
+\texttt{tidal/cli/\_simulate.py}, just after \texttt{\_resolve\_scheme}
+returns). The replacement depends on whether the theory carries algebraic
+constraints (\texttt{time\_order=0} equations):
+\begin{itemize}
+  \item \textbf{No constraints} $\to$ \textbf{CVODE} (default). Faster
+    than IDA; correct in physical space.
+  \item \textbf{Has constraints} $\to$ \textbf{IDA}. CVODE would
+    silently freeze the constraint fields at their initial values
+    (\texttt{cvode.py}:103--104,
+    \texttt{\_setup.py:warn\_frozen\_constraints} only warns), giving
+    wrong physics for DAE systems. Phase E's localised PGT theories
+    (T2--T6 with Erf-profile backgrounds) carry hidden mass-matrix
+    constraints from the Schur path (\texttt{modal.py}:541--595); IDA
+    handles those natively.
+\end{itemize}
+Both physical-space solvers avoid the Fourier convolution matrix entirely
+and give correct bounded results. Users see a one-line notice:
 \begin{lstlisting}[style=bash]
 Note: position-dependent + periodic theory detected; auto-routing
 to CVODE for correctness (GH #367 ...). Override with --scheme modal
 if you have a known-safe parameter regime.
+\end{lstlisting}
+or, for the constraint case:
+\begin{lstlisting}[style=bash]
+Note: position-dependent + periodic theory with algebraic constraints
+detected; auto-routing to IDA (GH #367 -- modal solver's
+Fourier-convolution matrix has discretization artifacts; CVODE would
+freeze the constraints at IC). Override with --scheme modal if you
+have a known-safe parameter regime.
 \end{lstlisting}
 
 \paragraph{Override and safety net.} Explicit \texttt{--scheme modal}

@@ -1838,3 +1838,95 @@ class TestPositionDepAutoRoute:
         assert exit_code == 0, f"simulate failed unexpectedly:\n{output}"
         assert "Scheme: modal" in output
         assert "Simulation diverged" not in output
+
+
+class TestOverridePosDepPeriodicScheme:
+    """Unit tests for ``_override_pos_dep_periodic_scheme`` (GH #367 auto-route).
+
+    Position-dependent + periodic theories must NOT run through the modal
+    solver's Fourier-convolution path under ``--scheme auto``. The override
+    sends them to IDA when algebraic constraints (``time_order==0``) are
+    present, or CVODE otherwise.
+    """
+
+    @staticmethod
+    def _pos_dep_diffusion() -> EquationSystem:
+        """Pos-dep (no constraint): first-order diffusion with symbolic coord
+        in the coefficient. Mirrors the trick used in
+        ``test_position_dependent_correctness``.
+        """
+        spec_data = copy.deepcopy(_DIFFUSION_SPEC)
+        spec_data["equations"][0]["rhs"]["terms"][0][  # type: ignore[index]
+            "coefficient_symbolic"
+        ] = "D*(1 + 0*x[])"
+        return _make_spec(spec_data)
+
+    @staticmethod
+    def _pos_dep_with_constraint() -> EquationSystem:
+        """Pos-dep + constraint: A_0 is a constraint (time_order=0), A_1 is
+        dynamical with a position-dependent coefficient. Models the Phase E
+        localized PGT pattern (constraint field + Erf-profile background).
+        """
+        spec_data = copy.deepcopy(_CONSTRAINT_SPEC)
+        # Force position-dependence on the dynamical equation's RHS term.
+        spec_data["equations"][1]["rhs"]["terms"][0][  # type: ignore[index]
+            "coefficient_symbolic"
+        ] = "1 + 0*x[]"
+        return _make_spec(spec_data)
+
+    def test_non_modal_scheme_passes_through(self) -> None:
+        """If _resolve_scheme didn't pick modal, the override is a no-op."""
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = self._pos_dep_with_constraint()
+        for scheme in ("cvode", "ida", "leapfrog", "scipy"):
+            new_scheme, msg = _override_pos_dep_periodic_scheme(scheme, "auto", spec)
+            assert new_scheme == scheme
+            assert msg is None
+
+    def test_explicit_modal_not_overridden(self) -> None:
+        """User explicitly asked for modal; respect it (post-evolution
+        amplitude check at modal.py:2469 is the safety net for that path).
+        """
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = self._pos_dep_with_constraint()
+        new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "modal", spec)
+        assert new_scheme == "modal"
+        assert msg is None
+
+    def test_constant_coefficients_no_override(self) -> None:
+        """No pos-dep terms → modal is correct and stays."""
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = _make_spec(_KG_1D_SPEC)
+        new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
+        assert new_scheme == "modal"
+        assert msg is None
+
+    def test_pos_dep_no_constraint_routes_to_cvode(self) -> None:
+        """Pos-dep + no constraint: CVODE is the correct fallback (faster
+        than IDA and correct in physical space).
+        """
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = self._pos_dep_diffusion()
+        new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
+        assert new_scheme == "cvode"
+        assert msg is not None
+        assert "auto-routing to CVODE" in msg
+        assert "GH #367" in msg
+
+    def test_pos_dep_with_constraint_routes_to_ida(self) -> None:
+        """Pos-dep + constraint: IDA is required (CVODE would freeze the
+        algebraic constraint at IC and silently produce wrong physics).
+        """
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = self._pos_dep_with_constraint()
+        new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
+        assert new_scheme == "ida"
+        assert msg is not None
+        assert "auto-routing to IDA" in msg
+        assert "constraints" in msg
+        assert "GH #367" in msg

@@ -1900,6 +1900,67 @@ def _resolve_scheme(  # noqa: C901
     return "cvode"
 
 
+def _override_pos_dep_periodic_scheme(
+    scheme: str,
+    args_scheme: str,
+    spec: EquationSystem,
+) -> tuple[str, str | None]:
+    """Auto-route position-dependent + periodic theories away from modal (GH #367).
+
+    The modal solver's ``_evolve_full_matrix`` path uses
+    ``scipy.sparse.linalg.expm_multiply`` on a convolution matrix
+    ``A[m,m'] = c_hat(m-m') * i*k_m'`` whose spurious eigenvalue tracks the
+    Nyquist wavenumber ``k_max = π/dx`` exactly (verified empirically
+    2026-05-18 on E.0 dual-Gaussian for N ∈ {32..512}; max Re(λ) = N·π/L).
+    The artifact is intrinsic to the discretization
+    (``modal.py::_add_convolution_coupling``, line 1587+) — no
+    matrix-exponential method (dense Padé, ``expm_multiply``, Arnoldi-Krylov)
+    recovers the true physics. Empirically modal gives wrong answers from
+    very small t_end (E.0 N=64: 4% wrong at k_max·t=2, 18% at k_max·t=4,
+    42% at k_max·t=6, 165% at k_max·t=10, 10⁹× at k_max·t=40).
+
+    Replacement: IDA when algebraic constraints (``time_order=0`` equations)
+    are present, CVODE otherwise. CVODE would silently freeze constraints at
+    IC (``cvode.py:103-104``, ``_setup.py:warn_frozen_constraints`` only
+    warns). Phase E will localize T2-T6 with hidden mass-matrix constraints
+    (``modal.py:541-595`` Schur structure); IDA handles those natively.
+
+    Only triggers on ``--scheme auto``. Explicit ``--scheme modal`` still
+    runs the modal path; the post-evolution amplitude-growth check
+    (commit a2cdaa5, threshold 10⁶) catches catastrophic cases.
+
+    Returns
+    -------
+    tuple[str, str | None]
+        ``(new_scheme, log_message)``. ``log_message`` is ``None`` when no
+        override applies.
+    """
+    if scheme != "modal" or args_scheme != "auto":
+        return scheme, None
+    from tidal.solver.modal import _has_position_dependent_terms
+
+    if not _has_position_dependent_terms(spec):
+        return scheme, None
+    has_constraints = any(eq.time_derivative_order == 0 for eq in spec.equations)
+    if has_constraints:
+        return "ida", (
+            "  Note: position-dependent + periodic theory with algebraic "
+            "constraints detected; auto-routing to IDA (GH #367 — modal "
+            "solver's Fourier-convolution matrix has discretization "
+            "artifacts; CVODE would freeze the constraints at IC). "
+            "Override with --scheme modal if you have a known-safe "
+            "parameter regime."
+        )
+    return "cvode", (
+        "  Note: position-dependent + periodic theory detected; "
+        "auto-routing to CVODE for correctness (GH #367 — modal "
+        "solver's Fourier-convolution matrix has discretization "
+        "artifacts that give wrong answers from small t_end onward). "
+        "Override with --scheme modal if you have a known-safe "
+        "parameter regime."
+    )
+
+
 def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
     args: Namespace,
     spec: EquationSystem,
@@ -2061,39 +2122,9 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
 
     # Resolve solver scheme (auto-select based on equation operators)
     scheme = _resolve_scheme(args.scheme, spec, grid_info, bc)
-    # Auto-route position-dependent + periodic theories to CVODE under --scheme auto.
-    # The modal solver's _evolve_full_matrix path uses scipy.sparse.linalg.expm_multiply
-    # on a convolution matrix whose spurious eigenvalue tracks the Nyquist wavenumber
-    # k_max = π/dx exactly (verified empirically 2026-05-18 on E.0 dual-Gaussian for
-    # N ∈ {32..512}; max Re(λ) = +N·π/L matches k_max). The artifact is intrinsic to
-    # the discretization A[m,m'] = c_hat(m-m') * i*k_m'
-    # (modal.py::_add_convolution_coupling, line 1587+). No matrix-exponential
-    # method (dense Pade, expm_multiply, Arnoldi-Krylov) recovers the true physics;
-    # empirically modal gives wrong answers from very small t_end (E.0 N=64
-    # measurements 2026-05-18: 4% wrong at k_max*t=2, 18% at k_max*t=4,
-    # 42% at k_max*t=6, 165% at k_max*t=10, 10^9 at k_max*t=40).
-    # CVODE in physical space avoids the Fourier coupling matrix and gives correct
-    # results. See GH #367 and docs/tex/modal_solver.tex.
-    #
-    # Only triggers on --scheme auto. Explicit --scheme modal still runs the modal
-    # path; the post-evolution amplitude-growth check in _evolve_full_matrix (commit
-    # a2cdaa5, threshold 10^6) catches catastrophic cases and raises
-    # SimulationDivergedError with the --scheme cvode workaround in the message.
-    # For 1% accuracy, modal would need k_max*t_end < 0.5 — too restrictive to
-    # be worth preserving an "auto-modal" path for position-dependent theories,
-    # so we auto-route ALL pos-dep + periodic to CVODE.
-    if scheme == "modal" and args.scheme == "auto":
-        from tidal.solver.modal import _has_position_dependent_terms
-
-        if _has_position_dependent_terms(spec):
-            log(
-                "  Note: position-dependent + periodic theory detected; "
-                "auto-routing to CVODE for correctness (GH #367 — modal solver's "
-                "Fourier-convolution matrix has discretization artifacts that give "
-                "wrong answers from small t_end onward). Override with --scheme modal "
-                "if you have a known-safe parameter regime."
-            )
-            scheme = "cvode"
+    scheme, override_msg = _override_pos_dep_periodic_scheme(scheme, args.scheme, spec)
+    if override_msg is not None:
+        log(override_msg)
     # TIDAL_MODAL_BACKEND=jax overrides modal → modal-jax without touching auto-select.
     # CPU-only conservative gate: block constraints, position-dependent coefficients,
     # AND RHS time-derivative operators. Measured 2026-05-17: even with the Phase 2a

@@ -556,7 +556,8 @@ localised or dual-Gaussian background field) under periodic BCs gives a
 wildly divergent result --- field amplitude grows by $10^6$--$10^9 \times$
 over the simulation --- and \texttt{SimulationDivergedError} is raised with
 the message ``Simulation diverged in \_evolve\_full\_matrix\ldots
-Workaround: rerun with --scheme cvode.''
+Workaround: rerun with --scheme cvode (or --scheme ida if the theory has
+algebraic constraints).''
 
 \textbf{Cause}: The modal solver's Fourier convolution matrix
 $A[m, m'] = \widehat{c}(m - m') \cdot i\,k_{m'}$ is intrinsically non-normal
@@ -571,10 +572,14 @@ analysis.
 \textbf{Solution}:
 \begin{itemize}
   \item Use \texttt{--scheme auto} (the default) --- position-dependent
-    + periodic theories are automatically routed to CVODE for correctness.
+    + periodic theories are automatically routed to CVODE for
+    correctness, or to IDA when algebraic constraints
+    (\texttt{time\_order=0} equations) are present (CVODE freezes those
+    silently). See \S\ref{sec:modal-pos-dep-auto-route}.
   \item If you explicitly passed \texttt{--scheme modal}, switch to
-    \texttt{--scheme cvode}.
+    \texttt{--scheme cvode} for unconstrained theories, or
+    \texttt{--scheme ida} for theories with algebraic constraints.
   \item Or, if your parameter regime is provably outside the artifact
     window (e.g.\ very small $t_{\mathrm{end}}$), keep \texttt{--scheme
-    modal} and compare against CVODE to validate.
+    modal} and compare against CVODE/IDA to validate.
 \end{itemize}
