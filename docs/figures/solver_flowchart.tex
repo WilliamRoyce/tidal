@@ -1,25 +1,9 @@
-\documentclass[border=4pt]{standalone}
+\documentclass[border=10pt]{standalone}
 \usepackage{tidal-tikz-styles}
-
-% Local style overrides — the labels ("IDA", "CVODE", "Modal solver",
-% "Explicit scheme?", "Constraint equations?", ...) are all short, so
-% the shared `solver` (3.2 x 0.9 cm) and `decision` (1.6 cm) box sizes
-% leave a lot of whitespace.  Tighten only for this figure; the global
-% styles in tidal-tikz-styles.sty are reused by other diagrams.
-\tikzset{
-    solver/.append style={
-        minimum width=1.9cm, minimum height=0.55cm,
-        inner sep=2pt, font=\scriptsize\bfseries,
-    },
-    decision/.append style={
-        minimum width=1.0cm, text width=1.7cm,
-        inner sep=1pt, font=\scriptsize,
-    },
-}
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.35cm and 0.9cm,
+    node distance=0.5cm and 1.2cm,
     thick
 ]
 
@@ -68,7 +52,7 @@
 %     (a4) {dissipative $\partial_t$ terms\\(breaks symplecticity)};
 
 % --- IDA (dissipation) ---
-\node[solver=Orange, right=of d4] (ida3) {IDA};
+\node[solver=Orange, right=1.6cm of d4] (ida3) {IDA};
 
 % --- Default: CVODE ---
 \node[solver=Green, below=of d4] (cvode)
