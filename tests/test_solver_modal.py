@@ -1711,3 +1711,130 @@ class TestModalJAXCorrectness:
                 parameters={"m2": 1.0},
                 return_eigendata=True,
             )
+
+
+# =========================================================================
+# GH #367: position-dependent + periodic auto-routing
+# =========================================================================
+
+
+class TestPositionDepAutoRoute:
+    """Verify the GH #367 fix: position-dependent + periodic theories auto-route to
+    CVODE under ``--scheme auto`` because the modal solver's Fourier-convolution
+    path has discretization artifacts that give wrong answers (spurious eigenvalue
+    tracks Nyquist wavenumber k_max = π/dx; verified empirically across N).
+
+    The CLI auto-routing lives in ``tidal/cli/_simulate.py`` after
+    ``_resolve_scheme``; these tests exercise that path via the ``tidal`` CLI.
+    """
+
+    @pytest.fixture
+    def e0_args(self, tmp_path: Path) -> list[str]:  # noqa: F821
+        """CLI args for the GH #367 reproducer (E.0 dual-Gaussian)."""
+        output_dir = tmp_path / "out"
+        return [
+            "examples/data/gertsenshtein_e0_dual_gaussian.json",
+            "--grid-shape",
+            "64",
+            "--bounds",
+            "0:100",
+            "--periodic",
+            "--ic",
+            "gaussian",
+            "--ic-component",
+            "h_5",
+            "--ic-amplitude",
+            "1e-2",
+            "--ic-width",
+            "5",
+            "--ic-center",
+            "25",
+            "--param",
+            "kappa=1.0",
+            "--param",
+            "Bpeak=0.01",
+            "--param",
+            "sigB=5",
+            "--param",
+            "zc1=25",
+            "--param",
+            "zc2=75",
+            "--snapshots",
+            "2",
+            "--output",
+            str(output_dir),
+        ]
+
+    def _run_simulate(self, args: list[str]) -> tuple[int, str]:
+        """Invoke the ``tidal simulate`` CLI; return (exit_code, combined_output)."""
+        import subprocess
+
+        result = subprocess.run(
+            ["uv", "run", "tidal", "simulate", *args],  # noqa: S607
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        return result.returncode, result.stdout + result.stderr
+
+    def test_gh367_reproducer_auto_routes_to_cvode(self, e0_args: list[str]) -> None:
+        """GH #367 reproducer at t_end=20: --scheme auto silently routes to CVODE
+        and produces the correct decaying h_5 (≈0.005), not 25 million.
+        """
+        args = [*e0_args, "--t-end", "20"]
+        exit_code, output = self._run_simulate(args)
+        assert exit_code == 0, f"simulate failed:\n{output}"
+        # Auto-routing notice must appear
+        assert "auto-routing to CVODE" in output, (
+            f"expected auto-route notice; got:\n{output}"
+        )
+        # Scheme line confirms CVODE
+        assert "Auto-selected solver: cvode" in output, (
+            f"expected auto-selected cvode; got:\n{output}"
+        )
+        # The physical result: h_5 should be ≈0.005 (CVODE truth)
+        # Format from CLI: "h_5: peak 0.0099 → 0.0050 (ratio: 0.5035)"
+        import re
+
+        match = re.search(r"h_5:.*→\s*([0-9.eE+-]+)", output)
+        assert match is not None, f"h_5 result line not found in:\n{output}"
+        h5_final = float(match.group(1))
+        assert 0.003 < h5_final < 0.007, (
+            f"h_5={h5_final} not in expected CVODE range [0.003, 0.007]"
+        )
+
+    def test_explicit_modal_at_t20_raises_diverged(self, e0_args: list[str]) -> None:
+        """--scheme modal at the broken regime hits the post-evolution divergence
+        check (commit a2cdaa5) and surfaces the cvode workaround message.
+        """
+        args = [*e0_args, "--scheme", "modal", "--t-end", "20"]
+        exit_code, output = self._run_simulate(args)
+        # CLI returns non-zero on simulation failure, but the error message must
+        # mention the workaround (we don't assert on exit_code because the CLI
+        # may return 0 with [ERROR] printed — check the message itself).
+        del exit_code  # exit code semantics vary; message check is authoritative
+        assert "Simulation diverged" in output, (
+            f"expected diverged message; got:\n{output}"
+        )
+        assert "--scheme cvode" in output, (
+            f"expected workaround message; got:\n{output}"
+        )
+
+    def test_explicit_modal_safe_regime_does_not_raise(
+        self, e0_args: list[str]
+    ) -> None:
+        """--scheme modal at small t_end (within the modal-solver's
+        amplitude-growth window) runs to completion without raising
+        SimulationDivergedError. The result will not match CVODE for
+        position-dependent backgrounds (the discretization artifact exists at
+        all t_end > 0), but the user has explicitly opted in to --scheme modal,
+        and the post-evolution amplitude-growth check (10⁶× threshold) does
+        not fire at small t_end. This documents the override-still-runs
+        behaviour.
+        """
+        args = [*e0_args, "--scheme", "modal", "--t-end", "1"]
+        exit_code, output = self._run_simulate(args)
+        assert exit_code == 0, f"simulate failed unexpectedly:\n{output}"
+        assert "Scheme: modal" in output
+        assert "Simulation diverged" not in output

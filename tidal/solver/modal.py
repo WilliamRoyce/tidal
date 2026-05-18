@@ -2362,6 +2362,26 @@ def _evolve_full_matrix(
     n_modes = y0_hat.shape[1]
     n_snapshots = len(t_eval)
 
+    # GH #367 NOTE: position-dependent + periodic theories with real spatial
+    # variation in the coefficient (e.g. the Gertsenshtein dual-Gaussian B-field)
+    # produce a convolution matrix A[m,m'] = ĉ(m−m')·i·k_{m'} (see
+    # _add_convolution_coupling, modal.py:1587+) whose spurious eigenvalue tracks
+    # the Nyquist wavenumber k_max = π/dx exactly (verified empirically
+    # 2026-05-18 across N ∈ {32..512}). All matrix-exponential methods give
+    # numerically-meaningless results above ~k_max·t_end > 2 (4% error grows to
+    # 10⁹× by k_max·t_end ≈ 40). The CLI (tidal/cli/_simulate.py) auto-routes
+    # pos-dep + periodic to CVODE under --scheme auto so users see correct
+    # physics by default. The post-evolution amplitude-growth check below (10⁶
+    # threshold) catches catastrophic cases when --scheme modal is forced.
+    #
+    # We do NOT pre-flight gate on k_max·t_end here because that heuristic would
+    # falsely reject tests like test_position_dependent_correctness that mark
+    # coefficients as symbolically position-dependent but analytically constant
+    # ("D*(1 + 0*x[])" at k_max·t_end ≈ 40 is correct because the convolution
+    # matrix is diagonal). Detecting the artifact properly requires computing
+    # eigenvalues of A_full (O(n³)) — more expensive than just running the solve
+    # and checking the post-evolution amplitude.
+
     # Flatten y0_hat to (n_total,) — slot-major order
     y0_flat = y0_hat.ravel()
 

@@ -548,3 +548,33 @@ This is normal and expected --- no user action needed.
   \item The $(-,+,+,+)$ metric convention: negative kinetic energy for timelike components is physical, not a ghost
 \end{itemize}
 See issue \#164 for full propagator analysis (future work).
+
+\subsubsection{Position-Dependent Theory at Periodic BCs Diverges (GH \#367)}
+
+\textbf{Symptom}: A position-dependent theory (e.g.\ Gertsenshtein with a
+localised or dual-Gaussian background field) under periodic BCs gives a
+wildly divergent result --- field amplitude grows by $10^6$--$10^9 \times$
+over the simulation --- and \texttt{SimulationDivergedError} is raised with
+the message ``Simulation diverged in \_evolve\_full\_matrix\ldots
+Workaround: rerun with --scheme cvode.''
+
+\textbf{Cause}: The modal solver's Fourier convolution matrix
+$A[m, m'] = \widehat{c}(m - m') \cdot i\,k_{m'}$ is intrinsically non-normal
+and has spurious eigenvalues that track the Nyquist wavenumber
+$k_{\max} = \pi / \Delta x$. No matrix-exponential method
+(\texttt{scipy.sparse.linalg.expm\_multiply}, dense Padé, Arnoldi-Krylov)
+recovers the true physics above $k_{\max} \cdot t_{\mathrm{end}} \approx 2$
+because $\exp(A t) \cdot v$ requires more cancellation than float64
+precision provides. See \S\ref{sec:modal-pos-dep-auto-route} for the full
+analysis.
+
+\textbf{Solution}:
+\begin{itemize}
+  \item Use \texttt{--scheme auto} (the default) --- position-dependent
+    + periodic theories are automatically routed to CVODE for correctness.
+  \item If you explicitly passed \texttt{--scheme modal}, switch to
+    \texttt{--scheme cvode}.
+  \item Or, if your parameter regime is provably outside the artifact
+    window (e.g.\ very small $t_{\mathrm{end}}$), keep \texttt{--scheme
+    modal} and compare against CVODE to validate.
+\end{itemize}

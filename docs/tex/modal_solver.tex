@@ -274,6 +274,81 @@ Position-dependent coefficients are OK (handled via convolution). The full auto-
 
 Users can explicitly request \texttt{--scheme modal} (validated for eligibility) or override with \texttt{--scheme cvode}.
 
+\subsubsection{Position-Dependent + Periodic Auto-Routing (GH \#367)}
+\label{sec:modal-pos-dep-auto-route}
+
+\textbf{Important exception to the eligibility rules above.} Theories with
+\emph{real spatial variation} in their position-dependent coefficients
+(e.g.\ the Gertsenshtein dual-Gaussian background field, where
+$B(x) = B_{\mathrm{peak}}[e^{-(x-z_{c1})^2/2\sigma^2} - e^{-(x-z_{c2})^2/2\sigma^2}]$)
+build a Fourier convolution matrix
+\[
+A[m, m'] = \widehat{c}(m - m') \cdot i\,k_{m'},
+\]
+implemented in \texttt{\_add\_convolution\_coupling}
+(\texttt{modal.py}:1587+). This matrix is \emph{intrinsically non-normal}
+(the gradient multiplier $i k_{m'}$ is applied column-wise while the
+convolution kernel mixes rows), and at finite $N$ it has spurious
+positive-real-part eigenvalues that track the Nyquist wavenumber
+$k_{\max} = \pi / \Delta x$ \emph{exactly}.  Empirical verification
+(2026-05-18, E.0 dual-Gaussian theory at $L=100$):
+\begin{center}
+\begin{tabular}{rrrr}
+$N$ & $n_{\mathrm{total}}$ & $\max\Re(\lambda)$ & $k_{\max} = \pi N / L$ \\
+\hline
+32  & 198  & 1.005  & 1.005  \\
+64  & 396  & 2.011  & 2.011  \\
+128 & 780  & 4.021  & 4.021  \\
+256 & 1548 & 8.042  & 8.042  \\
+512 & 3084 & 16.085 & 16.085 \\
+\end{tabular}
+\end{center}
+The spurious eigenvalue \emph{grows linearly with grid resolution}, so
+``use higher $N$'' is not a fix. Above $k_{\max} \cdot t_{\mathrm{end}}
+\approx 2$ the artifact begins to dominate the dynamics in any
+matrix-exponential method that materialises $\exp(A t)$ first;
+above $k_{\max} \cdot t_{\mathrm{end}} \approx 20$ the result is wrong by
+orders of magnitude (verified for dense Padé, \texttt{expm\_multiply}, and
+a hand-coded Arnoldi-Krylov implementation).
+
+The phenomenon is the non-normal pseudospectral transient growth of
+Trefethen and Embree (\textit{Spectra and Pseudospectra}, 2005, Ch.\ 14--15),
+inseparable from the discretization: $\partial_x \cdot B(x)$ has
+eigenvalues $i k$ (all imaginary) in the continuous limit, but its
+finite-$N$ Fourier representation acquires real-part eigenvalues that
+$\exp(A t) \cdot v$ then amplifies.
+
+\paragraph{Auto-routing under \texttt{--scheme auto}.} To prevent silent
+wrong answers, the CLI \emph{auto-routes} all
+position-dependent + periodic theories to CVODE under \texttt{--scheme
+auto} (\texttt{tidal/cli/\_simulate.py}, just after \texttt{\_resolve\_scheme}
+returns). CVODE integrates in physical space, never builds the Fourier
+convolution matrix, and gives correct bounded results. Users see a one-line
+notice:
+\begin{lstlisting}[style=bash]
+Note: position-dependent + periodic theory detected; auto-routing
+to CVODE for correctness (GH #367 ...). Override with --scheme modal
+if you have a known-safe parameter regime.
+\end{lstlisting}
+
+\paragraph{Override and safety net.} Explicit \texttt{--scheme modal}
+runs the modal path normally. The post-evolution amplitude-growth check
+in \texttt{\_evolve\_full\_matrix} (commit a2cdaa5, threshold
+$10^6 \times$ initial amplitude) catches catastrophic cases and raises
+\texttt{SimulationDivergedError} with the \texttt{--scheme cvode}
+workaround in the message. The artifact is most severe at the
+$k_{\max} \cdot t_{\mathrm{end}} \approx 40$ regime that triggers GH \#367.
+
+\paragraph{Future work} on this issue (the discretization rather than its
+workaround): operator splitting $A = A_{\mathrm{const}} + A_{\mathrm{conv}}$
+with Strang or Yoshida-4 (the codebase already distinguishes
+\texttt{term.position\_dependent} at \texttt{modal.py}:1522);
+Hou-Li exponential filter on $\widehat{c}(q)$; mixed
+real/Fourier representation that keeps the gradient in physical space;
+higher-precision arithmetic as a reference oracle. None of these were
+implemented in the GH \#367 fix; see the planning notes for the next
+investigation pass.
+
 \subsection{Usage}
 \label{sec:modal-usage}
 
