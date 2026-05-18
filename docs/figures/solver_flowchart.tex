@@ -1,9 +1,25 @@
-\documentclass[border=10pt]{standalone}
+\documentclass[border=4pt]{standalone}
 \usepackage{tidal-tikz-styles}
+
+% Local style overrides — the labels ("IDA", "CVODE", "Modal solver",
+% "Explicit scheme?", "Constraint equations?", ...) are all short, so
+% the shared `solver` (3.2 x 0.9 cm) and `decision` (1.6 cm) box sizes
+% leave a lot of whitespace.  Tighten only for this figure; the global
+% styles in tidal-tikz-styles.sty are reused by other diagrams.
+\tikzset{
+    solver/.append style={
+        minimum width=1.9cm, minimum height=0.55cm,
+        inner sep=2pt, font=\scriptsize\bfseries,
+    },
+    decision/.append style={
+        minimum width=1.0cm, text width=1.7cm,
+        inner sep=1pt, font=\scriptsize,
+    },
+}
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.5cm and 1.8cm,
+    node distance=0.35cm and 0.9cm,
     thick
 ]
 
@@ -32,51 +48,42 @@
 
 % --- D2: Constraint eqs? ---
 \node[decision, below=of d1] (d2) {Constraint\\equations?};
-\node[annot, right=-0.7cm of d2.east, anchor=north west]
-    (a2) {zeroth-order in $t$\\(elliptic / algebraic DAE)};
+% \node[annot, right=-0.7cm of d2.east, anchor=north west]
+%     (a2) {zeroth-order in $t$\\(elliptic / algebraic DAE)};
 
 % --- IDA (constraint) ---
 \node[solver=Orange, right=of d2] (ida1) {IDA};
 
 % --- D3: First-order eqs? ---
 \node[decision, below=of d2] (d3) {First-order\\equations?};
-\node[annot, right=-0.4cm of d3.east, anchor=north west]
-    (a3) {first-order in $t$\\(diffusion / transport) \\ (implicit BDF)};
+% \node[annot, right=-0.4cm of d3.east, anchor=north west]
+%     (a3) {first-order in $t$\\(diffusion / transport) \\ (implicit BDF)};
 
 % --- IDA (first-order) ---
 \node[solver=Orange, right=of d3] (ida2) {IDA};
 
 % --- D4: Dissipation? ---
 \node[decision, below=of d3] (d4) {Dissipation?};
-\node[annot, right=0.0cm of d4.east, anchor=north west]
-    (a4) {dissipative $\partial_t$ terms\\(breaks symplecticity)};
+% \node[annot, right=0.0cm of d4.east, anchor=north west]
+%     (a4) {dissipative $\partial_t$ terms\\(breaks symplecticity)};
 
 % --- IDA (dissipation) ---
-\node[solver=Orange, right=2.2cm of d4] (ida3) {IDA};
-
-% --- D5: Missing Hamiltonian? ---
-\node[decision, below=of d4] (d5) {Missing\\Hamiltonian?};
-\node[annot, below right=0.1cm and -0.4cm of d5.east, anchor=north west]
-    (a5) {no Hamiltonian available\\for second-order wave eqs};
-
-% --- Warning + fallthrough ---
-\node[solver=Green, right=1.86cm of d5] (warn)
-    {\textit{Warning} $\to$\\CVODE fallback};
+\node[solver=Orange, right=of d4] (ida3) {IDA};
 
 % --- Default: CVODE ---
-\node[solver=Green, left=of d5] (cvode)
+\node[solver=Green, below=of d4] (cvode)
     {CVODE};
-\node[annot, below left=0.1cm and -0.5cm of d5.west, anchor=north east]
-    (a6) {Pure wave, Hamiltonian\\(adaptive BDF)};
+% \node[annot, below left=0.1cm and -0.5cm of d5.west, anchor=north east]
+%     (a6) {Pure wave, Hamiltonian\\(adaptive BDF)};
 
 % --- Modal sub-check panel (below the flowchart; references D1) ---
-\node[subcheck, below=0.8cm of cvode.south west, anchor=north west] (subchecks) {%
-    \textbf{Modal eligibility (D1) requires all of:}\\[3pt]
-    1.\ Flat metric\\
-    2.\ All BCs periodic\\
-    3.\ No time-dependent coefficients\\
-    4.\ All operators have exact Fourier multipliers\\
-    5.\ Constraints Fourier-eliminable (when present)};
+% \node[subcheck, below=0.8cm of cvode.south west, anchor=north west] (subchecks) {%
+%     \textbf{Modal eligibility (D1) requires all of:}\\[3pt]
+%     1.\ Flat metric\\
+%     2.\ All BCs periodic\\
+%     3.\ No time-dependent coefficients\\
+%     4.\ All operators have exact Fourier multipliers\\
+%     5.\ Constraints Fourier-eliminable (when present)};
 
 % ===================================================================
 % EDGES
@@ -92,9 +99,9 @@
 \draw[arr] (d0) -- node[nolbl, left] {No (auto)} (d1);
 
 % Sub-check panel -> D1 (now sits below the flowchart; reference link only)
-\draw[dotarr] (subchecks.north) to[out=90, in=180]
-    node[yeslbl, midway, sloped, above, text=GrayLine]
-    {\itshape requires all} (d1.west);
+% \draw[dotarr] (subchecks.north) to[out=90, in=180]
+%     node[yeslbl, midway, sloped, above, text=GrayLine]
+%     {\itshape requires all} (d1.west);
 
 % D1 -> Modal (yes)
 \draw[arr] (d1) -- node[yeslbl, above] {Yes} (modal);
@@ -118,13 +125,7 @@
 \draw[arr] (d4) -- node[yeslbl, above] {Yes} (ida3);
 
 % D4 -> D5 (no)
-\draw[arr] (d4) -- node[nolbl, left] {No} (d5);
-
-% D5 -> warn (yes)
-\draw[arr] (d5) -- node[yeslbl, above] {Yes} (warn);
-
-% D5 -> CVODE (no)
-\draw[arr] (d5) -- node[nolbl, above] {No} (cvode);
+\draw[arr] (d4) -- node[nolbl, left] {No} (cvode);
 
 \end{tikzpicture}
 \end{document}
