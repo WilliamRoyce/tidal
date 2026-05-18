@@ -77,7 +77,31 @@ def _plot(data: dict, out_path: Path) -> None:
     for rows in by_theory.values():
         rows.sort(key=operator.itemgetter("n_total"))
 
-    fig, axes = plt.subplots(1, 3, figsize=(_FIG_WIDTH, _FIG_HEIGHT))
+    # Global x-range: union of all data points, extended so the
+    # sparse->GMRES threshold (200K) lands inside every panel.
+    all_n = np.array(
+        [r["n_total"] for r in data["results"]],
+        dtype=float,
+    )
+    if all_n.size == 0:
+        all_n = np.array([1.0, _SPARSE_THRESHOLD * 2.0])
+    global_x_lo = float(all_n.min()) * 0.7
+    global_x_hi = max(float(all_n.max()), _SPARSE_THRESHOLD * 1.5) * 1.4
+
+    # Global y-range: union of all four series across all theories.
+    all_y_vals: list[float] = []
+    for r in data["results"]:
+        for key in ("dense_s_mean", "sparse_s_mean", "gmres_s_mean", "fd_s_mean"):
+            v = r.get(key, float("nan"))
+            if isinstance(v, (int, float)) and not math.isnan(v) and v > 0:
+                all_y_vals.append(float(v))
+    if all_y_vals:
+        global_y_lo = min(all_y_vals) * 0.3
+        global_y_hi = max(all_y_vals) * 3.0
+    else:
+        global_y_lo, global_y_hi = 1e-9, 1e-3
+
+    fig, axes = plt.subplots(1, 3, figsize=(_FIG_WIDTH, _FIG_HEIGHT), sharey=True)
 
     for ax_idx, (ax, theory) in enumerate(zip(axes, _THEORY_ORDER, strict=True)):
         rows = by_theory.get(theory, [])
@@ -161,82 +185,38 @@ def _plot(data: dict, out_path: Path) -> None:
             ax, n_totals, fd_mean, fd_std, all_mask, "D", _FD_COLOR, "none", "FD proxy"
         )
 
-        # Axis limits — set x before drawing vertical lines.
+        # Shared axis limits + scales — set x before drawing vertical lines.
         ax.set_xscale("log")
         ax.set_yscale("log")
+        ax.set_xlim(global_x_lo, global_x_hi)
+        ax.set_ylim(global_y_lo, global_y_hi)
 
-        x_lo = n_totals[0] * 0.7
-        x_hi = n_totals[-1] * 1.4
-        ax.set_xlim(x_lo, x_hi)
-
-        # Vertical tier-boundary lines.
+        # Vertical tier-boundary lines — guard still passes for both thresholds
+        # because the global x-range was extended past _SPARSE_THRESHOLD * 1.5.
         for n_thresh in (_DENSE_THRESHOLD, _SPARSE_THRESHOLD):
-            if x_lo < n_thresh < x_hi:
+            if global_x_lo < n_thresh < global_x_hi:
                 ax.axvline(n_thresh, ls="--", lw=0.7, color="#555555", zorder=2)
 
-        # Tier-label shaded bands only in the first panel.
-        if ax_idx == 0:
-            _ylo_ax, _yhi_ax = ax.get_ylim()
-            # Recompute from data to get reasonable bounds.
-            all_vals = np.concatenate(
-                [
-                    dense_mean[mask_dense],
-                    sparse_mean,
-                    gmres_mean,
-                    fd_mean,
-                ]
-            )
-            all_vals = all_vals[~np.isnan(all_vals)]
-            if all_vals.size:
-                all_vals.min() * 0.3
-                all_vals.max() * 3.0
-            else:
-                _ylo_data, _yhi_data = 1e-9, 1e-3
-
-            band_alpha = 0.07
-            band_color = "#000000"
-            # Dense region
-            ax.axvspan(
-                x_lo, _DENSE_THRESHOLD, alpha=band_alpha, color=band_color, zorder=1
-            )
-            # Sparse region
-            ax.axvspan(
-                _DENSE_THRESHOLD,
-                min(_SPARSE_THRESHOLD, x_hi),
-                alpha=band_alpha * 0.5,
-                color=band_color,
-                zorder=1,
-            )
-            # GMRES region
-            if x_hi > _SPARSE_THRESHOLD:
-                ax.axvspan(
-                    _SPARSE_THRESHOLD,
-                    x_hi,
-                    alpha=band_alpha,
-                    color=band_color,
-                    zorder=1,
-                )
-
-            # Tier text annotations at the top of the panel.
-            for n_mid, label in [
-                (min(_DENSE_THRESHOLD * 0.5, x_hi * 0.9), "auto: dense"),
-                (
-                    math.sqrt(_DENSE_THRESHOLD * min(_SPARSE_THRESHOLD, x_hi)),
-                    "auto: sparse",
-                ),
-                (min(_SPARSE_THRESHOLD * 2.0, x_hi * 0.9), "auto: GMRES"),
-            ]:
-                if x_lo < n_mid < x_hi:
+        # Tier-zone labels: italicised, near the bottom of the centre panel
+        # only.  Avoids the title-clash and shading-ambiguity issues of the
+        # previous design.
+        if ax_idx == 1:
+            for n_mid, label in (
+                (math.sqrt(global_x_lo * _DENSE_THRESHOLD), "dense"),
+                (math.sqrt(_DENSE_THRESHOLD * _SPARSE_THRESHOLD), "sparse"),
+                (math.sqrt(_SPARSE_THRESHOLD * global_x_hi), "GMRES"),
+            ):
+                if global_x_lo < n_mid < global_x_hi:
                     ax.text(
                         n_mid,
-                        1.0,
+                        0.02,
                         label,
                         transform=ax.get_xaxis_transform(),
                         ha="center",
                         va="bottom",
                         fontsize=6.5,
-                        color="#333333",
-                        rotation=0,
+                        style="italic",
+                        color="#555555",
                     )
 
         ax.set_title(_TITLES[theory], fontsize=8, pad=4)
