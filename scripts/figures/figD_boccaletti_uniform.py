@@ -50,10 +50,14 @@ def _raffelt_stodolsky(
 ) -> np.ndarray:
     """Two-mode detuned formula from perturbative_regime.tex eq. 344-347.
 
-    g = kappa B0 / 2; Delta = -kappa² B0² / (4 omega); omega ≈ k carrier.
+    g = kappa B0 / 2; Delta = m_h^2 / (4 omega) = kappa^2 B0^2 / (8 omega);
+    omega ~ k carrier. The 1/8 coefficient comes from the standard
+    relativistic two-mode reduction Delta = (omega_h - omega_a)/2 with
+    omega_h - omega_a = m_h^2/(2 omega) and m_h^2 = kappa^2 B0^2 / 2 from
+    the B0^2 stress-energy backreaction on the graviton dispersion.
     """
     g = 0.5 * kappa * b0
-    delta = -(kappa**2) * (b0**2) / (4.0 * omega)
+    delta = -(kappa**2) * (b0**2) / (8.0 * omega)
     om = np.sqrt(g * g + delta * delta)
     return (g * g) / (g * g + delta * delta) * np.sin(om * t) ** 2
 

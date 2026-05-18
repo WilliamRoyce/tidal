@@ -58,23 +58,29 @@ detuning~\cite{raffelt1988mixing},
     \Pconv &= \frac{g^2}{g^2 + \Delta^2}\,
       \sin^2\!\left(\sqrt{g^2+\Delta^2}\,D\right), \\
     g &= \frac{\kappa\Bzero}{2},
-    \qquad \Delta = -\frac{\kappa^2 \Bzero^2}{4\omega},
+    \qquad \Delta = -\frac{\kappa^2 \Bzero^2}{8\omega},
   \end{split}
   \label{TwoModeRabi}
 \end{equation}
-in which $\omega \simeq k$ is the carrier angular frequency of the
-photon mode in the massless-dispersion limit, and both the amplitude
-prefactor and the oscillation frequency receive corrections from the
-effective mass; the regime of validity follows
-\cref{PerturbativityHierarchy}. The two predictions coincide while
+where $\omega \simeq k$ is the carrier angular frequency of the photon
+mode and $\Delta = m_h^2/(4\omega)$ with graviton effective mass
+$m_h^2 = \kappa^2\Bzero^2/2$ from the $\Bzero^2$ metric backreaction,
+as derived in \cref{PerturbativityHierarchy}; both the amplitude
+prefactor and the oscillation frequency receive corrections from this
+effective mass, and the bare Boccaletti formula $\Pconv =
+\sin^2(\kappa\Bzero D/2)$ is recovered in the $\Delta \to 0$ limit. The two predictions coincide while
 $\kappa\Bzero t/2 \ll \pi/2$; the swept $\Bzero$ range extends to
 values where the effective-mass detuning $\Delta$ of \cref{TwoModeRabi}
 becomes significant and the two predictions begin to diverge.
-The modal solver and \CVODE{} reach the modal-evolution precision
-floor at every grid size and Yoshida-2 converges monotonically toward
-that floor; Yoshida-4 shows the same non-monotonic residual scatter
-under grid refinement that is documented for $\Delta t$ refinement in
-\cref{ConvergenceFigure}. The swept range stays within the
+The \TIDAL{} evolution reproduces the two-mode formula
+\cref{TwoModeRabi} to the modal-evolution precision floor across the
+full $\Bzero$ sweep, capturing the metric-backreaction detuning of
+\cref{PerturbativityHierarchy} and not merely the leading $\sin^2$
+coupling. The modal solver and \CVODE{} reach the modal-evolution
+precision floor at every grid size and Yoshida-2 converges
+monotonically toward that floor; Yoshida-4 shows the same
+non-monotonic residual scatter under grid refinement that is
+documented for $\Delta t$ refinement in \cref{ConvergenceFigure}. The swept range stays within the
 perturbative regime where both predictions remain valid; the
 localised-profile sweep of \cref{BoccalettiLocalised} deliberately
 extends past the first quarter-period ($s > \pi/2$), where the
