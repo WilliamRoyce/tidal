@@ -362,15 +362,37 @@ $10^6 \times$ initial amplitude) catches catastrophic cases and raises
 workaround in the message. The artifact is most severe at the
 $k_{\max} \cdot t_{\mathrm{end}} \approx 40$ regime that triggers GH \#367.
 
-\paragraph{Future work} on this issue (the discretization rather than its
-workaround): operator splitting $A = A_{\mathrm{const}} + A_{\mathrm{conv}}$
-with Strang or Yoshida-4 (the codebase already distinguishes
-\texttt{term.position\_dependent} at \texttt{modal.py}:1522);
-Hou-Li exponential filter on $\widehat{c}(q)$; mixed
-real/Fourier representation that keeps the gradient in physical space;
-higher-precision arithmetic as a reference oracle. None of these were
-implemented in the GH \#367 fix; see the planning notes for the next
-investigation pass.
+\paragraph{IDA performance is acceptable for Phase E (measured 2026-05-18).}
+Profiling the auto-route fallback on the GH \#367 reproducer (E.0
+dual-Gaussian, no constraints) at the campaign envelope showed IDA wall
+time within 1.3$\times$ of CVODE:
+\begin{center}
+\begin{tabular}{rrrr}
+\toprule
+$N$ & CVODE & IDA & IDA / CVODE \\
+\midrule
+64 & 1.24 s & 1.23 s & 0.99$\times$ \\
+128 & 2.09 s & 2.62 s & 1.25$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+At PolyChord nested-sampling scale (10$^4$ likelihood calls per chain),
+this puts the IDA-fallback path at $\sim$25 minutes additional per chain
+vs an ideal modal-solver path -- tractable for Phase E. Adding actual
+algebraic constraints to a derived PGT theory would add Newton-iteration
+overhead but should remain well under the 3$\times$ threshold based on the
+Stage A/B campaign timings for constant-$B_0$ PGT theories. Algorithm
+work to fix the modal-solver discretization is therefore \emph{not} on
+the Phase E critical path.
+
+\paragraph{Future work} on the discretization itself: operator splitting
+$A = A_{\mathrm{const}} + A_{\mathrm{conv}}$ with Strang or Yoshida-4 (the
+codebase already distinguishes \texttt{term.position\_dependent} at
+\texttt{modal.py}:1522); Hou-Li exponential filter on $\widehat{c}(q)$;
+mixed real/Fourier representation that keeps the gradient in physical
+space; higher-precision arithmetic as a reference oracle. None of these
+were implemented in the GH \#367 fix or the Phase 1 followup; deferred
+until a future Phase E measurement contradicts the timing above.
 
 \subsection{Usage}
 \label{sec:modal-usage}
