@@ -3,7 +3,7 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.4cm and 2.8cm,
+    node distance=0.5cm and 1.8cm,
     thick
 ]
 
@@ -25,17 +25,6 @@
 
 % --- D1: Modal eligible? ---
 \node[decision, below=of d0] (d1) {Modal\\eligible?};
-
-% --- Modal sub-check panel (left of d1) ---
-\node[subcheck, left=2.0cm of d1] (subchecks) {%
-    \textbf{All conditions required:}\\[3pt]
-    1.\ Flat metric\\
-    2.\ All BCs periodic\\
-    3.\ No time-dependent coefficients\\
-    4.\ All operators have exact\\
-    \quad Fourier multipliers\\
-    5.\ Constraints Fourier-eliminable\\
-    \quad (when present)};
 
 % --- Modal solver ---
 \node[solver=Purple, right=of d1] (modal)
@@ -63,7 +52,7 @@
     (a4) {dissipative $\partial_t$ terms\\(breaks symplecticity)};
 
 % --- IDA (dissipation) ---
-\node[solver=Orange, right=3.2cm of d4] (ida3) {IDA};
+\node[solver=Orange, right=2.2cm of d4] (ida3) {IDA};
 
 % --- D5: Missing Hamiltonian? ---
 \node[decision, below=of d4] (d5) {Missing\\Hamiltonian?};
@@ -71,7 +60,7 @@
     (a5) {no Hamiltonian available\\for second-order wave eqs};
 
 % --- Warning + fallthrough ---
-\node[solver=Green, right=2.86cm of d5] (warn)
+\node[solver=Green, right=1.86cm of d5] (warn)
     {\textit{Warning} $\to$\\CVODE fallback};
 
 % --- Default: CVODE ---
@@ -79,6 +68,15 @@
     {CVODE};
 \node[annot, below left=0.1cm and -0.5cm of d5.west, anchor=north east]
     (a6) {Pure wave, Hamiltonian\\(adaptive BDF)};
+
+% --- Modal sub-check panel (below the flowchart; references D1) ---
+\node[subcheck, below=0.8cm of cvode.south west, anchor=north west] (subchecks) {%
+    \textbf{Modal eligibility (D1) requires all of:}\\[3pt]
+    1.\ Flat metric\\
+    2.\ All BCs periodic\\
+    3.\ No time-dependent coefficients\\
+    4.\ All operators have exact Fourier multipliers\\
+    5.\ Constraints Fourier-eliminable (when present)};
 
 % ===================================================================
 % EDGES
@@ -93,8 +91,9 @@
 % D0 -> D1 (no / "auto")
 \draw[arr] (d0) -- node[nolbl, left] {No (auto)} (d1);
 
-% Sub-check panel -> D1
-\draw[dotarr] (subchecks.east) -- node[yeslbl, above, text=GrayLine]
+% Sub-check panel -> D1 (now sits below the flowchart; reference link only)
+\draw[dotarr] (subchecks.north) to[out=90, in=180]
+    node[yeslbl, midway, sloped, above, text=GrayLine]
     {\itshape requires all} (d1.west);
 
 % D1 -> Modal (yes)
@@ -126,33 +125,6 @@
 
 % D5 -> CVODE (no)
 \draw[arr] (d5) -- node[nolbl, above] {No} (cvode);
-
-% ===================================================================
-% LEGEND
-% ===================================================================
-\node[below left=0.2cm and 1.0cm of d2, anchor=north east,
-      draw=GrayLine, rounded corners=3pt, inner sep=8pt,
-      fill=white, font=\scriptsize] (legend) {%
-\begin{tabular}{@{}l l l l@{}}
-    \multicolumn{4}{@{}l}{\normalsize\textbf{Solver Key}}\\[4pt]
-    \tikz\fill[PurpleFill!40, draw=PurpleLine, rounded corners=1pt]
-        (0,0) rectangle (0.5,0.3); & \textbf{Modal}
-        & Pad\'{e} matrix-exp (path~D) / \texttt{expm\_multiply} & $\sim\!10^{-16}$ precision\\[2pt]
-    \tikz\fill[OrangeFill!40, draw=OrangeLine, rounded corners=1pt]
-        (0,0) rectangle (0.5,0.3); & \textbf{IDA}
-        & SUNDIALS implicit DAE & $\sim\!10^{-8}$ tolerance\\[2pt]
-    \tikz\fill[GreenFill!40, draw=GreenLine, rounded corners=1pt]
-        (0,0) rectangle (0.5,0.3); & \textbf{CVODE}
-        & SUNDIALS adaptive ODE & $\sim\!10^{-8}$ tolerance\\[2pt]
-    \tikz\fill[GrayFill!40, draw=GrayLine, rounded corners=1pt]
-        (0,0) rectangle (0.5,0.3); & \textbf{Leapfrog}
-        & Symplectic KDK/Yoshida & Manual only\\[2pt]
-    \tikz\fill[GrayFill!40, draw=GrayLine, rounded corners=1pt]
-        (0,0) rectangle (0.5,0.3); & \textbf{scipy}
-        & DOP853/Radau/BDF & Manual only\\[4pt]
-    \multicolumn{4}{@{}l}{\textit{Leapfrog and scipy are never auto-selected}}\\
-    \multicolumn{4}{@{}l}{\textit{(require explicit solver specification).}}
-\end{tabular}};
 
 \end{tikzpicture}
 \end{document}

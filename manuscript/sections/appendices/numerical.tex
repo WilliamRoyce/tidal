@@ -24,17 +24,18 @@ framework~\cite{zwicker2020pypde}. \TIDAL{} provides common
 infrastructure and a dispatcher that selects
 among several solver backends from the algebraic structure of the
 equation system. The Fourier modal solver
-of~\cref{ModalSolver} is the primary backend, and is auto-selected
+of~\cref{ModalSolver} is the primary backend, used
 for every survey reported in~\cref{Results}.
 
 \paragraph*{Solver selection hierarchy} The solver-backend family is
 heterogeneous because the equation systems \TIDAL{} handles span
 differential--algebraic (DAE), pure-wave, and spatially-varying-background
-regimes. Differential--algebraic equations from gauge sectors require
-simultaneous algebraic-and-differential
-solution~\cite{henneaux1992quantization}; pure wave systems benefit
-from explicit symplectic integration; and systems with spatially
-varying backgrounds require position-dependent coefficient evaluation. The
+regimes. DAEs from gauge sectors require simultaneous
+algebraic-and-differential solution~\cite{henneaux1992quantization};
+pure wave systems benefit from explicit symplectic integration to
+suppress secular energy drift; and time-independent
+constant-coefficient systems on periodic boundaries diagonalise
+per-wavenumber, bypassing time integration entirely. The
 dispatcher \lstinline!_resolve_scheme!~(\cref{SolverDispatchFlowchart}) selects the first applicable
 backend from the following ordered rules:
 \begin{enumerate}
@@ -44,18 +45,17 @@ backend from the following ordered rules:
     Schur complement (\cref{ModalSolver}).
   \item \textbf{IDA} (Implicit Differential-Algebraic solver,
     \SUNDIALS{}~\cite{gardner2022sundials,hindmarsh2005sundials}) when
-    modal eligibility fails and any of the following holds: the system
-    carries algebraic constraints (\lstinline!time_order!~$=0$); the
-    system carries first-order equations (\lstinline!time_order!~$=1$,
-    diffusion or transport); or any right-hand side carries a
-    \lstinline!first_derivative_t! operator (dissipation).
+    any of the following holds: the system
+    carries algebraic constraints; the
+    system carries first-order equations; or any right-hand side carries a
+    $\PD{_t}$ operator.
   \item \textbf{CVODE} (\SUNDIALS{} adaptive ODE,
-    BDF~\cite{gardner2022sundials,hindmarsh2005sundials}) when none of the above
-    predicates holds and the system is a pure second-order wave.
+    BDF~\cite{gardner2022sundials,hindmarsh2005sundials}) when the
+    system is a pure second-order wave.
 \end{enumerate}
 The leapfrog backend (\cref{OtherBackends}) and the \SciPy{} backend
 are opt-in only via \lstinline!--scheme leapfrog! and
-\lstinline!--scheme scipy!; the dispatcher never auto-selects them.
+\lstinline!--scheme scipy!.%; the dispatcher never auto-selects them.
 
 % Figure C.0 — Solver dispatch flowchart.
 \begin{figure}[t]
@@ -76,10 +76,9 @@ are opt-in only via \lstinline!--scheme leapfrog! and
 \subsection{Equation substrate and state layout}%
 \label{EquationSubstrate}
 
-\paragraph*{State representation} \TIDAL{} represents the simulation
-state at any given time as a flat vector of numerical values. The
-number of slots a field contributes to this state vector is
-determined by the time-derivative order of its equation of motion:
+\paragraph*{State representation} The \TIDAL{} state vector packs each
+field's slots into a flat array, with the number of slots per field
+set by the time-derivative order of its equation of motion:
 \begin{enumerate}
   \item \textbf{Wave fields} (\lstinline!time_order!~$=2$) contribute
     two slots: an array of values for the field $q$ itself, and an
@@ -100,7 +99,7 @@ determined by the time-derivative order of its equation of motion:
   \item \textbf{First-order fields} (\lstinline!time_order!~$=1$)
     contribute one slot: an array of values for the field. The
     integrator advances this array using $\partial_t q$ computed from
-    the right-hand-side specification at each timestep.
+    the right-hand-side specification.
   \item \textbf{Constraint fields} (\lstinline!time_order!~$=0$)
     contribute one slot: an array of values for the field. The values
     are not advanced by an integrator at all; they are determined at
@@ -115,15 +114,14 @@ determined by the time-derivative order of its equation of motion:
   $\mathcal{S}[A_i]$ supplied by the spatial photon components.
 \end{enumerate}
 
-\paragraph*{Equation specification and right-hand-side evaluator}
+\paragraph*{Equation specification and evaluator}
 The equations of motion come from the JSON specification produced
-by~\cref{SymbolicComputation} (format illustrated in~\cref{JSONExample};
-each right-hand side is a list of (coefficient, operator,
-target-field) triples). The right-hand-side evaluator assembles these triples ---
-parameter-resolving each coefficient, dispatching each operator to
-its spatial implementation, and routing the result into the correct
-slot --- into the callable right-hand side that the chosen backend
-then invokes.
+by~\cref{SymbolicComputation} (format illustrated
+in~\cref{JSONExample}; each equation is a list of (coefficient,
+operator, target-field) triples). At each call the evaluator
+parameter-resolves the coefficients, dispatches each operator to its
+spatial implementation, and assembles the result into the callable
+that the chosen backend invokes.
 
 \paragraph*{Velocity form versus canonical phase space} Writing the
 quadratic kinetic operator $\mathcal{K}$ of~\cref{KineticMatrix} as a
@@ -149,12 +147,18 @@ $\ham = p_i\, v_i - \lag$ in terms of the canonical pair $(q, p)$
 alone one must
 eliminate the velocities through $v_i = (K^{-1})_{ij}\, p_j$.
 \TIDAL{} chooses the velocity form for three reasons. (i) It avoids
-inverting the kinetic matrix at the field level, a step that any
-backend would otherwise have to perform repeatedly during integration.
-(ii) The same flat-state representation accommodates wave, first-order,
-and constraint fields, so every backend sees regardless a single residual
-function $F(t, y, \dot y) = 0$ (for \IDA{}) or a single right-hand
-side $\dot y = f(t, y)$ (for \CVODE{}, leapfrog, \SciPy{}).
+the symbolic inversion of the kinetic matrix at derivation time. For
+non-diagonal $K$ the entries of $K^{-1}$ are rational expressions
+whose size grows combinatorially with the number of fields; the
+$7{\times}7$ block of linearised gravity, for example, already fills
+the exported equations with ${-}4/3$ and ${-}2/3$ fragments that
+further compound under perturbation theory. Keeping the velocity
+form $(q, v)$ instead passes $K$ directly to the solver, which the
+implicit \IDA{} Newton iteration handles natively without ever
+materialising $K^{-1}$. (ii) The same flat-state representation
+accommodates wave, first-order, and constraint fields, so every
+backend sees a single residual function $F(t, y, \dot y) = 0$ (for
+\IDA{}) or $\dot y = f(t, y)$ (for \CVODE{}, leapfrog, \SciPy{}).
 (iii) It is well-defined even when the kinetic matrix is singular at
 the background. A singular $K$ signals that the field variables in
 the Lagrangian are not all independent --- primary constraints from
@@ -162,15 +166,14 @@ gauge orbits or coincident kinetic eigenvectors --- and prevents the
 canonical change of variables from $(q, v)$ to $(q, p)$, requiring
 the constrained-Hamiltonian apparatus
 of~\cite{henneaux1992quantization} to recover a canonical
-formulation. The velocity form sidesteps the change of variables
-entirely and remains valid in this regime.
+formulation. The velocity form sidesteps the change of variables entirely.
 
 \paragraph*{State layout and field views} The mapping between a
 field's component name and its slot in the flat state vector is
 captured by a frozen \lstinline!StateLayout! dataclass, with each
 component carrying a \lstinline!slot_kind! discriminator from
 the categories above. The flat state itself is
-wrapped by a \lstinline!FieldSet! container~\cite{zwicker2020pypde}
+wrapped by a \lstinline!FieldSet! container
 that exposes the named field arrays to the right-hand-side evaluator
 and the backend integrators.
 
@@ -200,7 +203,7 @@ Dirichlet, Neumann, or Robin) are handled uniformly by a ghost-cell
 formula~\cite{leveque2007finite}.
 The finite-difference (FD) path is the fallback for systems on which
 neither the modal solver of~\cref{ModalSolver} nor the pseudo-spectral
-path below is eligible.
+path of~\cref{OtherBackends} is eligible.
 
 % Figure C.FDConvergence — FD vs spectral spatial convergence on the smooth gradient test.
 \begin{figure}[t]
@@ -223,42 +226,6 @@ path below is eligible.
     dominates and grows slowly with~$N$.}
   \label{FDConvergence}
 \end{figure}
-
-\paragraph*{Pseudo-spectral evaluation}
-The Fourier modal solver of~\cref{ModalSolver} bypasses time
-integration entirely. This is available \emph{only} when every coefficient is
-time-independent and no equation carries a first-time-derivative
-term. When the system needs a time integrator for those reasons
-but every spatial boundary is still periodic, \TIDAL{} provides a
-complementary \emph{pseudo-spectral evaluation path} that the
-step-based backends (\IDA{}, \CVODE{}, leapfrog, \SciPy{}) can use:
-spatial operators are applied as Fourier
-multipliers,%~\cite{burns2020dedalus},
-\footnote{The pseudo-spectral path uses the exact continuous wavenumber $k$ as
-a Fourier multiplier --- the same convention as the Fourier modal
-solver of~\cref{ModalSolver}. The constraint initial-condition solver
-of~\cref{ConstraintIC} instead uses the modified wavenumber
-$k_{\rm mod}^2 = -(2/\Delta x^2)(1 - \cos(k\,\Delta x))$ at order~$2$,
-with the order-$4$ and order-$6$ Fornberg
-generalisations~\cite{fornberg1988generation}. This choice keeps the
-constraint solution spectrally consistent with the FD stencils that
-drive the time evolution on those paths.}
-while the time evolution is driven by the chosen step-based backend.% The
-% pseudo-spectral path is therefore the natural spectral-spatial
-% complement to the modal solver for systems the modal solver cannot
-% accept.
-\footnote{The path is auto-enabled in every
-solver backend except \IDA{}, whose Newton iteration uses a sparse
-linear solver to factor the DAE Jacobian $\partial F/\partial y$: the
-FD stencils produce a banded Jacobian that the sparse
-factoring exploits, whereas the spectral path produces a dense
-Jacobian in which every $k$-mode couples to every other, which the
-sparse solver cannot exploit.}
-Spectral methods give super-algebraic convergence on smooth periodic
-data~\cite{boyd2001chebyshev}: the error decays faster than any power
-of $1/N$. \Cref{FDConvergence} show the spectral path reaching the round-off floor by
-$N\approx 32$, while the FD orders display the predicted algebraic
-rates.
 
 \subsection{Fourier modal solver}%
 \label{ModalSolver}
@@ -597,6 +564,39 @@ the Nyquist mode oscillates faster at finer resolution.
 
 \subsection{Other backends}%
 \label{OtherBackends}
+
+\paragraph*{Pseudo-spectral evaluation}
+The Fourier modal solver of~\cref{ModalSolver} bypasses time
+integration entirely. This is available \emph{only} when every coefficient is
+time-independent and no equation carries a first-time-derivative
+term. When the system needs a time integrator for those reasons
+but every spatial boundary is still periodic, \TIDAL{} provides a
+complementary \emph{pseudo-spectral evaluation path} that the
+step-based backends below (\IDA{}, \CVODE{}, leapfrog, \SciPy{}) can
+use: spatial operators are applied as Fourier
+multipliers,%~\cite{burns2020dedalus},
+\footnote{The pseudo-spectral path uses the exact continuous wavenumber $k$ as
+a Fourier multiplier --- the same convention as the Fourier modal
+solver of~\cref{ModalSolver}. The constraint initial-condition solver
+of~\cref{ConstraintIC} instead uses the modified wavenumber
+$k_{\rm mod}^2 = -(2/\Delta x^2)(1 - \cos(k\,\Delta x))$ at order~$2$,
+with the order-$4$ and order-$6$ Fornberg
+generalisations~\cite{fornberg1988generation}. This choice keeps the
+constraint solution spectrally consistent with the FD stencils that
+drive the time evolution on those paths.}
+while the time evolution is driven by the chosen step-based backend.%
+\footnote{The path is auto-enabled in every
+solver backend except \IDA{}, whose Newton iteration uses a sparse
+linear solver to factor the DAE Jacobian $\partial F/\partial y$: the
+FD stencils produce a banded Jacobian that the sparse
+factoring exploits, whereas the spectral path produces a dense
+Jacobian in which every $k$-mode couples to every other, which the
+sparse solver cannot exploit.}
+Spectral methods give super-algebraic convergence on smooth periodic
+data~\cite{boyd2001chebyshev}: the error decays faster than any power
+of $1/N$. \Cref{FDConvergence} shows the spectral path reaching the
+round-off floor by $N\approx 32$, while the FD orders display the
+predicted algebraic rates.
 
 \paragraph*{\IDA{} --- differential--algebraic equations}
 The \IDA{} backend is the implicit differential--algebraic
