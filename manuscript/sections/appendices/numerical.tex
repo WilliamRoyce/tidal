@@ -830,7 +830,7 @@ coefficients are spatially constant: the spatial-operator matrices
 are then circulant. We probe a single grid point and tile
 the resulting stencil row across all $N$ rows via modular arithmetic,
 an $\mathcal{O}(\mathrm{nnz})$ construction in place of the $\mathcal{O}(N^2)$ assembly
-of the general sparse path. On the periodic-domain Einstein--Maxwell
+of the general sparse path. On the periodic-domain EM
 system this contributes an additional factor of roughly $28\times$
 in operator-matrix construction.
 
