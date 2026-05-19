@@ -59,8 +59,11 @@ def _plot(data: dict, out_path: Path) -> None:
     n_th = len(theories)
     fig, axes = plt.subplots(1, n_th, figsize=(5.2 * n_th, 4.2), squeeze=False)
 
-    # vmax from lower-triangle (visible) cells only — otherwise the
-    # colour range is set by upper-triangle cells the reader can't see.
+    # vmin/vmax from lower-triangle (visible) cells only.  vmax was already
+    # clipped this way, but vmin used to be hard-pinned to EPS_MACH ~ 2e-16,
+    # which made the colorbar span ~14 decades of empty range below the
+    # actual data and left every visible cell sitting in the upper half of
+    # the viridis ramp.
     visible_diffs: list[float] = []
     for theory in theories:
         for p in pairs:
@@ -71,6 +74,7 @@ def _plot(data: dict, out_path: Path) -> None:
             if i > j and p["rel_diff"] > 0:
                 visible_diffs.append(p["rel_diff"])
     vmax = max(visible_diffs, default=1e-2)
+    vmin = min(visible_diffs, default=EPS_MACH)
 
     cmap = plt.get_cmap("viridis").copy()
     cmap.set_bad(color="white")
@@ -95,7 +99,7 @@ def _plot(data: dict, out_path: Path) -> None:
         sub = rendered_full[1:, :-1]
         sub_mask = mask_upper_full[1:, :-1]
         rendered = np.ma.masked_array(sub, mask=sub_mask)
-        im = ax.imshow(rendered, norm="log", cmap=cmap, vmin=EPS_MACH, vmax=vmax)
+        im = ax.imshow(rendered, norm="log", cmap=cmap, vmin=vmin, vmax=vmax)
         ax.set_xticks(range(n_col))
         ax.set_yticks(range(n_row))
         ax.set_xticklabels(col_labels, rotation=45, ha="right", fontsize=8)
@@ -105,11 +109,23 @@ def _plot(data: dict, out_path: Path) -> None:
             ax.set_yticklabels([])
         ax.set_title(THEORY_TITLE.get(theory, theory), fontsize=10)
 
-        # Grid lines around each cell (minor-tick trick).
-        ax.set_xticks(np.arange(n_col + 1) - 0.5, minor=True)
-        ax.set_yticks(np.arange(n_row + 1) - 0.5, minor=True)
-        ax.grid(which="minor", color="0.7", linewidth=0.5)
-        ax.tick_params(which="minor", length=0)
+        # Outline each populated lower-triangle cell with a Rectangle patch
+        # so masked upper-right cells get no surrounding grid lines.
+        from matplotlib.patches import Rectangle
+
+        for i_sub in range(n_row):
+            for j_sub in range(n_col):
+                if i_sub >= j_sub:  # populated (lower-triangle in sub-coords)
+                    ax.add_patch(
+                        Rectangle(
+                            (j_sub - 0.5, i_sub - 0.5),
+                            1,
+                            1,
+                            fill=False,
+                            edgecolor="0.7",
+                            linewidth=0.5,
+                        )
+                    )
 
         # Drop the rectangular outer frame so the triangle reads as a triangle.
         for spine in ax.spines.values():

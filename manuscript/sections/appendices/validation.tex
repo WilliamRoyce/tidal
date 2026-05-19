@@ -37,9 +37,9 @@
     against the two-mode prediction \cref{TwoModeRabi} with the
     corrected detuning --- at the regime point $\Bzero = 0.1275$ for
     four backends. Modal and \CVODE{} reach a plateau of
-    $\sim 4\times 10^{-8}$ across $N$, set by the $(\Delta/g)^4$
-    next-order truncation of the two-mode reduction (verified by the
-    $\Bzero^{3.65}$ scaling of the panel-(a) residual); leapfrog
+    $\sim 4\times 10^{-8}$ across $N$, of the same order as the
+    $(\Delta/g)^4 = 6.3\times 10^{-8}$ next-order truncation of the
+    two-mode reduction; leapfrog
     Yoshida-2 converges monotonically toward this plateau under grid
     refinement, and Yoshida-4 shows reproducible non-monotonic
     scatter across the surveyed $N$ range.}
@@ -48,11 +48,10 @@
 
 \paragraph*{Boccaletti kernel on a uniform background}
 The Gertsenshtein conversion kernel of \cref{GertsenshteinFormula}
-provides the closed-form analytic baseline against which we test
-\TIDAL{}. We sweep $\Bzero$
-over the perturbative regime with fourth-order FD
-operators on a periodic grid, and \cref{BoccalettiUniform} overlays the calibration data on
-two analytic predictions: \cref{GertsenshteinFormula} and the
+is one of the closed-form analytic predictions we test \TIDAL{}
+against. We sweep $\Bzero$ over the perturbative regime and overlay
+the simulation against two analytic predictions in
+\cref{BoccalettiUniform}: \cref{GertsenshteinFormula} and the
 Raffelt--Stodolsky two-mode formula with graviton-effective-mass
 detuning~\cite{raffelt1988mixing},
 \begin{equation}
@@ -65,43 +64,43 @@ detuning~\cite{raffelt1988mixing},
   \label{TwoModeRabi}
 \end{equation}
 where $\omega \simeq k$ is the carrier angular frequency of the photon
-mode and $\Delta = m_h^2/(4\omega)$ with graviton effective mass
-$m_h^2 = \kappa^2\Bzero^2/2$ from the $\Bzero^2$ metric backreaction,
-as derived in \cref{PerturbativityHierarchy}; both the amplitude
-prefactor and the oscillation frequency receive corrections from this
-effective mass, and the bare Boccaletti formula $\Pconv =
-\sin^2(\kappa\Bzero D/2)$ is recovered in the $\Delta \to 0$ limit. The two predictions coincide while
+mode. The graviton acquires an effective mass
+$m_h^2 = \kappa^2\Bzero^2/2$ from the $\Bzero^2$ metric backreaction
+(\cref{PerturbativityHierarchy}), detuning its dispersion against
+the massless photon by $\Delta = m_h^2/(4\omega)$. Both the amplitude
+prefactor and the oscillation frequency receive corrections from
+this detuning; the bare Boccaletti formula
+$\Pconv = \sin^2(\kappa\Bzero D/2)$ is recovered in the
+$\Delta\to 0$ limit. The two predictions coincide while
 $\kappa\Bzero t/2 \ll \pi/2$; the swept $\Bzero$ range extends to
 values where the effective-mass detuning $\Delta$ of \cref{TwoModeRabi}
-becomes significant and the two predictions begin to diverge.
-The two-mode formula \cref{TwoModeRabi} is derived from the full
-EM PDE via three layered approximations: (i) projection
-onto the $(h(k), a(k))$ mode pair at a single carrier wavevector,
-dropping mode-coupling to neighbouring $k'$ in any wave-packet IC;
-(ii) leading-order expansion of the massive-graviton dispersion
-$\omega_h \simeq k + m_h^2/(2k)$, dropping $\mathcal{O}(m_h^4/k^4)$
-contributions to the detuning; and (iii) the rotating-wave reduction
-to a $2\times 2$ effective Hamiltonian in the slowly-varying envelope,
-dropping counter-rotating Bloch--Siegert-type terms at
-$\mathcal{O}((g/\omega)^2)$. Each of these truncations contributes
-to $\Pconv$ at $\mathcal{O}(\Bzero^4)$ relative to the two-mode
-prediction. \TIDAL{} evolves the full PDE without any of these
-approximations, so the residual $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$
-measures exactly the cumulative size of the truncated higher-order
-physics. We observe
-$|P_\mathrm{TIDAL} - P_\mathrm{RS}| \propto \Bzero^{3.65}$ in
-\cref{BoccalettiUniform}(a) and a corresponding plateau in
-\cref{BoccalettiUniform}(b) at $\sim 4\times 10^{-8}$, both matching
-the predicted $(\Delta/g)^4 \sim \Bzero^4$ aggregate to within a
-factor of $1.4$ across the full $\Bzero$ sweep --- a positive
-validation that \TIDAL{} captures the dynamics one order beyond the
-two-mode formula. Yoshida-2 converges monotonically toward the
-$(\Delta/g)^4$ plateau under grid refinement; Yoshida-4 shows the
-same non-monotonic residual scatter under grid refinement that is
-documented for $\Delta t$ refinement in \cref{ConvergenceFigure}. The swept range stays within the
+becomes significant and the two predictions diverge
+(\cref{BoccalettiUniform}(a)).
+The two-mode formula \cref{TwoModeRabi} truncates the full
+EM PDE in two ways: it expands the graviton dispersion to leading
+order in $m_h^2/k^2$ (\cref{PerturbativityHierarchy}) and discards
+fast-oscillating cross-terms in the field amplitudes. Both
+truncations contribute to $\Pconv$ at $\mathcal{O}(\Bzero^4)$
+relative to the two-mode prediction. \TIDAL{} evolves the full PDE
+without either approximation, so the residual
+$|P_\mathrm{TIDAL} - P_\mathrm{RS}|$ measures the size of the
+truncated higher-order physics. At small $\Bzero$ the
+panel-(a) residual sits at the modal-evolution IEEE-754 round-off
+floor; as $\Bzero$ grows it rises into the range
+$10^{-8}$--$10^{-6}$, of the same order as the $(\Delta/g)^4$
+prediction at those $\Bzero$ values. The panel-(b) plateau at
+$\sim 4\times 10^{-8}$ is of the same order as
+$(\Delta/g)^4 = 6.3\times 10^{-8}$ at the regime point
+$\Bzero = 0.1275$. \TIDAL{} therefore captures the
+$\mathcal{O}(\Bzero^4)$ truncation error of the two-mode reduction
+at the expected order of magnitude. Yoshida-2 converges
+monotonically toward the $(\Delta/g)^4$ plateau under grid
+refinement; Yoshida-4 shows the same non-monotonic residual
+scatter under grid refinement that is documented for $\Delta t$
+refinement in \cref{ConvergenceFigure}. The swept range stays within the
 perturbative regime where both predictions remain valid; the
-localised-profile sweep of \cref{BoccalettiLocalised} deliberately
-extends past the first quarter-period ($s > \pi/2$), where the
+localised-profile sweep of \cref{BoccalettiLocalised} extends
+past the first quarter-period ($s > \pi/2$), where the
 $P_\mathrm{conv} \ll 1$ row of \cref{PerturbativityHierarchy} fails
 and the bare path-integrated formula no longer applies.
 
@@ -124,7 +123,7 @@ shows every cell of the $(B_\mathrm{peak}, R)$ sweep collapsing
 onto the single curve $P = \sin^2(s)$ in the dimensionless variable
 $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$, reproducing the
 path-integrated kernel; finite-frequency dispersion corrections are
-calibrated in the convergence diagnostic below.
+calibrated in \cref{ConvergenceFigure}.
 
 \begin{figure}[t]
   \centering
@@ -143,10 +142,11 @@ calibrated in the convergence diagnostic below.
 \end{figure}
 
 \paragraph*{Klein--Gordon perturbative calibration}
-The perturbative-reduction machinery described in \cref{LPSSubstitution}
-evolves the system as a base (order-$\varepsilon^{0}$) solution plus
-a correction (order-$\varepsilon^{1}$), denoted \emph{Pass 0} and
-\emph{Pass 1} in the figure legends below. We test the kernel
+The perturbative-reduction machinery of \cref{PerturbativeReduction}
+(Pass 0/Pass 1 Duhamel kernel, \cref{DuhamelKernel}) evolves the
+system as a base (order-$\varepsilon^{0}$) solution plus a correction
+(order-$\varepsilon^{1}$), denoted \emph{Pass 0} and \emph{Pass 1} in
+the figure legends of \cref{ForcedOscillator,ParkerSimon}. We test the kernel
 against the analytical perturbative expansion of a Klein--Gordon
 wave with a small mass-shift correction,
 \begin{equation}
@@ -186,15 +186,15 @@ A second perturbative calibration replaces the mass shift of
   \label{KGBiharmonic}
 \end{equation}
 the canonical higher-derivative form encountered in the perturbative
-reductions of \cite{parker1993reduced}. The correction exercises a
+reductions of Parker and Simon~\cite{parker1993reduced}. The correction exercises a
 different Fourier multiplier ($k^4$) from the mass shift ($1$), and
 therefore a different path through the correction-source assembly of
 \cref{LPSSubstitution}. At $k=2$ the order-$\varepsilon^{0,1}$
 truncation error falls faster than the $\mathcal{O}(\varepsilon^2)$
 worst-case scaling of the reduced-order
 construction~\cite{parker1993reduced}; the improvement ratio over
-the base solution reaches $\sim 10^4$ at $\varepsilon=0.01$.
-\Cref{ParkerSimon} shows the error scaling.
+the base solution reaches $\sim 10^4$ at $\varepsilon=0.01$ in
+\cref{ParkerSimon}.
 
 \begin{figure}[t]
   \centering
@@ -225,15 +225,16 @@ is, to leading order in the field strength,
 \end{equation}
 with $\rho = 4\alpha^{2}/(45\,m_{e}^{4}\,\pi^{2})$ and
 $\sigma = 7\alpha^{2}/(90\,m_{e}^{4}\,\pi^{2})$ the standard QED
-weak-field coefficients. \TIDAL{}'s
-symbolic stage assigns the $(F_{\mu\nu}F^{\mu\nu})^{2}$ correction
-to the perpendicular photon polarisation and the
-$(F_{\mu\nu}\tilde{F}^{\mu\nu})^{2}$ correction to the parallel
-polarisation; the resulting refractive-index shifts
+weak-field coefficients. \TIDAL{}'s symbolic stage routes the
+$(F_{\mu\nu}F^{\mu\nu})^{2}$ correction onto the perpendicular
+photon polarisation and the $(F_{\mu\nu}\tilde{F}^{\mu\nu})^{2}$
+correction onto the parallel polarisation; the resulting
+refractive-index shifts
 $n_\perp - 1 = (8\alpha^2/45)(B/B_c)^2$ and
 $n_\parallel - 1 = (14\alpha^2/45)(B/B_c)^2$ reproduce the Adler
 birefringence ratio
-$(n_\parallel - 1)/(n_\perp - 1) = 4\sigma/\rho = 7/4$.
+$(n_\parallel - 1)/(n_\perp - 1) = 4\sigma/\rho =
+7/4$~\cite{adler1971photon} exactly.
 
 \paragraph*{Cross-formulation equivalence: Proca versus vector-torsion}%
 \label{ProcaVTEquivalence}
@@ -260,9 +261,9 @@ The
 \emph{vector-torsion} representation expresses the same theory using
 the trace of the spacetime torsion tensor evolved with the
 Maxwell-like field-strength tensor
-$T_{\mu\nu}\equiv 2\,\partial_{[\mu} T_{\nu]}$ of the propagating
-vector-torsion construction of~\cite{barker2024poincare}, with the
-torsion trace $T_\mu \equiv T^\nu{}_{\nu\mu}$ promoted to a
+$\FieldF{^{(T)}_{\mu\nu}} \equiv 2\,\partial_{[\mu} T_{\nu]}$ of the
+propagating vector-torsion construction of~\cite{barker2024poincare},
+with the torsion trace $T_\mu \equiv T^\nu{}_{\nu\mu}$ promoted to a
 propagating vector field,
 %TODO replace prose description with a direct cref to the propagating-vector-torsion sector definition once that lands in results.tex.
 kinetic prefactor $\xi$,
@@ -274,20 +275,14 @@ Lagrangian appears with the dark-photon-plasma sector in
 directions ($\operatorname{cond}(V) \sim 10^{15\text{--}17}$). The
 continuum equivalence is recovered under the map
 $m_T^2 = +2\alpha_3$, derived by squaring the Proca mass term and
-identifying it with the trace contribution to $I_3$. Across five
-canonical parameter points spanning the surveyed sector the two
+identifying it with the trace contribution to $I_3$. The two
 formulations agree on $\Pmax$ to a maximum relative difference of
-$1.1\times 10^{-14}$, all five points sitting within $5\times$ the
-IEEE-754 round-off floor.
-
-Agreement at the IEEE floor served as the bit-exact diagnostic
-during the implementation of the numerical-method choices
-discussed in \cref{NumericalEvolution} (in particular the
-constraint-handling, the matrix-exponential choice, and the
-absence of a modal-template cache).
+$1.1\times 10^{-14}$ across five parameter points spanning the
+surveyed sector --- within a few times the IEEE-754 round-off floor
+of the modal solver.
 
 \paragraph*{Multi-method agreement across backends and measurement paths}
-We audit the \TIDAL{} dispatcher (see \cref{SolverDispatchFlowchart})
+We audit the \TIDAL{} dispatcher (see \cref{NumericalEvolution})
 by running each applicable backend on the
 EM baseline of \cref{GertsenshteinFormula} and on a
 gradient-coupled scalar pair analogous to the Raffelt--Stodolsky
@@ -419,8 +414,15 @@ selects, which differs across theories.
     default tolerance: the propagating-PGT nonminimal sector and
     the vector-torsion dark-photon plasma both carry rank-deficient
     kinetic matrices ($\operatorname{cond}(V) \gtrsim 10^{15}$ in
-    the latter case) and are integrated under the SVD null-space
-    projection of \cref{NumericalEvolution}.}
+    the latter case), so a Legendre transform onto the full
+    configuration space is singular and no Hamiltonian exists in
+    the strict sense. These theories are simulated under the SVD
+    null-space projection of \cref{NumericalEvolution}, which
+    restricts the dynamics to the non-null subspace; the residual
+    drift quoted here is the projection error of the
+    original-variable energy through that restriction, a
+    structural property of the rank-deficient kinetic structure
+    and not a failure of the time integrator.}
   \label{ConservationAudit}
 \end{table}
 
