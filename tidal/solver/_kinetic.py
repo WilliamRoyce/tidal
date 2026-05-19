@@ -94,3 +94,53 @@ def build_inverse_kinetic_diag(
             nontrivial = True
 
     return result if nontrivial else None
+
+
+def velocity_row_scale(
+    field_name: str,
+    m_inv: dict[str, float] | None,
+) -> float:
+    """Return the ``M⁻¹`` scale for a 2nd-order field's velocity-row contributions.
+
+    Single source of truth for the ``kinetic_coefficient_symbolic`` consumption
+    pattern used by every matrix builder in :mod:`tidal.solver.modal` that
+    emits entries into ``A[velocity_slot, target_slot]``. Builders MUST call
+    this rather than inline the lookup, so the contract is reviewable from
+    the function definition and so the regression guard in
+    :class:`tests.test_solver_kinetic_consistency.TestAllModalPathsRespectKinetic`
+    can pin all callers to the same behaviour.
+
+    ``m_inv`` is the dict returned by :func:`build_inverse_kinetic_diag`.
+    ``None`` (every field has ``M ≈ 1``) and missing-from-dict (this field
+    has ``M ≈ 1``) both yield ``1.0`` — zero-overhead for theories where
+    the kinetic-coefficient class doesn't apply.
+
+    Note: :func:`tidal.solver.modal._build_evolution_matrices` (the Schur /
+    generalized-eig path) does NOT call this helper. That builder writes
+    ``M`` directly onto the diagonal of ``M_mat`` for the generalized
+    eigenvalue problem ``(K − λM) v = 0`` rather than post-multiplying a
+    velocity-row contribution; it has a structurally different consumption
+    pattern that's documented separately in :mod:`tidal.solver.modal`'s
+    module docstring.
+
+    Parameters
+    ----------
+    field_name : str
+        Name of the dynamical (2nd-order) field whose velocity-row
+        contribution is being assembled.
+    m_inv : dict[str, float] | None
+        Output of :func:`build_inverse_kinetic_diag`. ``None`` denotes the
+        fast path (no theory in the spec has non-trivial ``M``); a missing
+        key denotes that this specific field has ``M ≈ 1``.
+
+    Returns
+    -------
+    float
+        Multiplicative factor to apply to every velocity-row contribution
+        for ``field_name``. ``1.0`` for the no-op path.
+
+    See Also
+    --------
+    build_inverse_kinetic_diag : Source of the ``m_inv`` dict.
+    """
+    return 1.0 if m_inv is None else m_inv.get(field_name, 1.0)

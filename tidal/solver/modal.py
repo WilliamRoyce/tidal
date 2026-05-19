@@ -11,35 +11,63 @@ Applicable to any linear PDE system with:
 - Time-independent coefficients (position-dependent OK via convolution)
 - Operators with known exact Fourier multipliers
 
-Kinetic-coefficient (mass-matrix) handling — two dispatches
------------------------------------------------------------
+Kinetic-coefficient (mass-matrix) handling — three primary dispatches
+---------------------------------------------------------------------
 Equations with a non-trivial ``kinetic_coefficient_symbolic`` (``M ẍ = K x``
-rather than ``ẍ = K x``) reach the solver via **two distinct code paths**
-depending on whether the spec has algebraic constraints or higher-order time
-operators. Both paths must consume M identically, or cross-path regressions
-appear silently (original #301 Bug B symptom).
+rather than ``ẍ = K x``) reach the solver via **three distinct code paths**
+plus the Pass 1 correction-matrix builder. All four must consume ``M``
+identically, or cross-path regressions appear silently — the latest such
+regression was GH #367, where the third dispatch (the position-dependent
+convolution path) silently dropped ``M⁻¹`` for several months until traced
+2026-05-19 and fixed in v0.42.0.
 
 1. **Fast path** — :func:`_build_per_mode_matrices` (called when
-   ``needs_reduction = False``: no constraints, no time-derivative operators
-   on the RHS, no position-dependent coefficients). Builds the first-order
-   evolution matrix directly as ``A[velocity_slot, target_slot] =
-   M⁻¹(field) · coeff · multiplier``. M⁻¹ is pre-computed once from
-   :func:`tidal.solver._kinetic.build_inverse_kinetic_diag` and folded into
-   the coefficients — no generalized eigenvalue solve needed.
+   ``needs_reduction = False`` *and* no position-dependent coefficients).
+   Builds the first-order evolution matrix directly as
+   ``A[velocity_slot, target_slot] = M⁻¹(field) · coeff · multiplier``.
+   M⁻¹ is pre-computed once from
+   :func:`tidal.solver._kinetic.build_inverse_kinetic_diag` and folded in
+   via the shared :func:`tidal.solver._kinetic.velocity_row_scale` helper.
 
-2. **Generalized-eig path** — :func:`_build_evolution_matrices` (called when
-   the spec has constraints or time-derivative RHS operators). Populates
-   ``M_mat`` from ``kinetic_coefficient_symbolic`` on the diagonal and
-   solves ``(K − λM) v = 0`` via ``scipy.linalg.eig(A, B)`` with QZ
-   decomposition. Handles rank-deficient M via null-space projection and
-   Schur elimination for hidden algebraic constraints.
+2. **Generalized-eig path** — :func:`_build_evolution_matrices` (called
+   when the spec has constraints or time-derivative RHS operators, and no
+   position-dependent coefficients). Populates ``M_mat`` from
+   ``kinetic_coefficient_symbolic`` on the diagonal and solves
+   ``(K − λM) v = 0`` via ``scipy.linalg.eig(A, B)`` with QZ decomposition.
+   Handles rank-deficient M via null-space projection and Schur elimination
+   for hidden algebraic constraints. *Structurally distinct* from paths 1
+   and 3: writes ``M`` to the generalized eigenvalue problem rather than
+   post-multiplying a velocity-row contribution, so it intentionally does
+   NOT call :func:`velocity_row_scale`.
 
-The choice is transparent to callers of :func:`solve_modal` but load-bearing
-for reviewers: both functions must be updated together when the kinetic
-handling changes. The time-domain backends (cvode/ida/leapfrog/scipy) use
-:func:`tidal.solver._kinetic.build_inverse_kinetic_diag` as a shared entry
-point, keeping the five backends (modal-fast, modal-genEig, cvode, ida,
-leapfrog/scipy) numerically consistent per
+3. **Position-dependent convolution path** — :func:`_build_convolution_matrix`
+   (called when any RHS term is marked ``position_dependent``). Builds
+   ``A[m, m'] = ĉ(m − m') · op_mult(k_{m'})`` over the full Fourier-mode
+   block, threading ``M⁻¹`` through both the constant-coefficient and the
+   convolution-coupling paths via :func:`velocity_row_scale`.
+
+Plus the Pass 1 correction-matrix builder
+:func:`_build_pass1_source_matrices` (the perturbative Duhamel correction
+path; see :class:`tidal.solver.perturbative_driver.PerturbativeSolver`),
+which also emits velocity-row entries into a per-mode source matrix and
+likewise consumes ``M⁻¹`` through :func:`velocity_row_scale`.
+
+**Cross-builder contract** (enforced by the regression test
+:class:`tests.test_solver_kinetic_consistency.TestAllModalPathsRespectKinetic`):
+any matrix builder that populates ``A[velocity_slot, target_slot]`` entries
+for a second-order equation **MUST** apply
+:func:`tidal.solver._kinetic.velocity_row_scale(field_name, m_inv)` to the
+contribution. Path 2 (generalized-eig) is the documented exception —
+it writes ``M`` to a separate matrix that participates in the eigenvalue
+problem. Adding a new matrix builder without satisfying this contract was
+exactly the GH #367 regression; please don't repeat it.
+
+The choice between dispatches is transparent to callers of :func:`solve_modal`
+but load-bearing for reviewers: all four sites must be updated together
+when the kinetic handling changes. The time-domain backends (cvode/ida/
+leapfrog/scipy) use :func:`tidal.solver._kinetic.build_inverse_kinetic_diag`
+as a shared entry point, keeping the five backends (modal-fast, modal-genEig,
+cvode, ida, leapfrog/scipy) numerically consistent per
 :mod:`tests.test_solver_kinetic_consistency`.
 
 Algorithm paths for coefficient structure
@@ -1376,7 +1404,13 @@ def _build_per_mode_matrices(
     # eig path (_build_evolution_matrices) reads kinetic into M_mat directly;
     # this fast path instead folds M⁻¹ into the pre-solved evolution matrix.
     # build_inverse_kinetic_diag returns None when every dyn M ≈ 1 (fast path).
-    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+    # Shared `velocity_row_scale` helper enforces the cross-builder contract
+    # (see modal.py module docstring; regression guard:
+    # tests.test_solver_kinetic_consistency::TestAllModalPathsRespectKinetic).
+    from tidal.solver._kinetic import (  # noqa: PLC0415
+        build_inverse_kinetic_diag,
+        velocity_row_scale,
+    )
 
     m_inv = build_inverse_kinetic_diag(
         spec,
@@ -1386,7 +1420,7 @@ def _build_per_mode_matrices(
     for _eq_idx, eq in enumerate(spec.equations):
         field_name = eq.field_name
         is_second_order = eq.time_derivative_order >= 2
-        scale = 1.0 if m_inv is None else m_inv.get(field_name, 1.0)
+        scale = velocity_row_scale(field_name, m_inv)
 
         if is_second_order:
             # Field slot and velocity slot
@@ -1501,13 +1535,17 @@ def _build_convolution_matrix(
     # #301 / #302 / GH #367 fix: apply M⁻¹ to velocity-row contributions so
     # `dv/dt = M⁻¹·K(q)` for theories with non-trivial `kinetic_coefficient_symbolic`
     # (e.g. `-1/kappa²` on graviton h-modes in Gertsenshtein). The per-mode path
-    # `_build_per_mode_matrices` already does this (modal.py:1381+); the convolution
-    # path previously did not, producing wrong-sign EOM that drove `expm_multiply`
-    # to ~10⁹× error at large `t_end·k_max` — diagnosed 2026-05-19 as the actual
-    # root cause of GH #367 (originally believed to be a non-normal Fourier
-    # convolution artifact). `build_inverse_kinetic_diag` returns None when every
-    # field has M ≈ 1 so existing theories are unaffected.
-    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+    # `_build_per_mode_matrices` already does this; the convolution path previously
+    # did not, producing wrong-sign EOM that drove `expm_multiply` to ~10⁹× error
+    # — diagnosed 2026-05-19 as the actual root cause of GH #367 (originally
+    # believed to be a non-normal Fourier convolution artifact). Shared
+    # `velocity_row_scale` helper enforces the cross-builder contract (see
+    # modal.py module docstring; regression guard:
+    # tests.test_solver_kinetic_consistency::TestAllModalPathsRespectKinetic).
+    from tidal.solver._kinetic import (  # noqa: PLC0415
+        build_inverse_kinetic_diag,
+        velocity_row_scale,
+    )
 
     m_inv = build_inverse_kinetic_diag(
         spec,
@@ -1517,7 +1555,7 @@ def _build_convolution_matrix(
     for _eq_idx, eq in enumerate(spec.equations):
         field_name = eq.field_name
         is_second_order = eq.time_derivative_order >= 2
-        scale = 1.0 if m_inv is None else m_inv.get(field_name, 1.0)
+        scale = velocity_row_scale(field_name, m_inv)
 
         if is_second_order:
             field_slot = layout.field_slot_map[field_name]
@@ -3024,7 +3062,10 @@ def _build_source_matrix_k(
     # small_parameters — the synthesized corrections come out wrong).
     # Returns None when every M ≈ 1 so the existing fast path continues
     # with zero overhead for theories unaffected by #301.
-    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+    from tidal.solver._kinetic import (  # noqa: PLC0415
+        build_inverse_kinetic_diag,
+        velocity_row_scale,
+    )
 
     m_inv_src = build_inverse_kinetic_diag(
         correction_spec,
@@ -3106,9 +3147,11 @@ def _build_source_matrix_k(
 
         # #301 / #302: scale every contribution by 1/M₀ for this equation.
         # Mirrors the modal fast path's folding of M⁻¹ into the evolution
-        # matrix (see _build_per_mode_matrices). Missing or trivial M
-        # (m_inv_src is None or field absent) → scale = 1.0, zero overhead.
-        eq_scale = 1.0 if m_inv_src is None else m_inv_src.get(field_name, 1.0)
+        # matrix (see _build_per_mode_matrices). Shared `velocity_row_scale`
+        # helper enforces the cross-builder contract (see modal.py module
+        # docstring; regression guard:
+        # tests.test_solver_kinetic_consistency::TestAllModalPathsRespectKinetic).
+        eq_scale = velocity_row_scale(field_name, m_inv_src)
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
                 term,
