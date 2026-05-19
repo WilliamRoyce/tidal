@@ -57,3 +57,17 @@ The ms-not-s correction above grounds the broader strategic picture:
 1. **Was the JAX suggestion grounded in a GPU expectation?** If we had GPU access anywhere (cluster other than CSD3 sapphire, cloud), the picture flips — we'd expect a real 10–100× from XLA on GPU. We did not investigate that path because CSD3 sapphire is CPU-only.
 2. **Is there a problem-size regime we should be designing for** that we haven't reached yet? JAX wins above ~100 Fourier modes; if Phase F+ takes us to N=256+, re-enabling JAX becomes worth it.
 3. **Given the ms-per-call cost** (not seconds), what is the realistic performance target for Phase E inference? At ~17 min/chain for position-dep theories via CVODE, is that acceptable, or does it justify the harder modal optimisations described below?
+
+---
+
+## Extending the parameter space: sampling over the base-theory coefficients
+
+The Einstein-Cartan gravity term $\frac{1}{\kappa^2}\tilde R$ and the Maxwell kinetic term $-\frac{1}{4}F_{\mu\nu}F^{\mu\nu}$ — have been held fixed at their standard values while we sampled over the torsion and nonminimal couplings.
+
+The effective-field-theory perspective says this is not obviously justified. If we regard the Lagrangian as a truncated expansion, integrating out heavy fields will in general shift the coefficients of _all_ operators at a given order, including the dimension-4 base terms.
+
+The Maxwell coefficient is similarly renormalised by any loop involving charged matter or by EFT operators like the Euler–Heisenberg $F^4$ term. An $O(1)$ shift in the Maxwell coefficient could in principle amplify or suppress the Gertsenshtein channel in a way that mimics torsion structure.
+
+**Concrete proposal:** add $\kappa^{-2}$ and the Maxwell coefficient as two additional free parameters in future inference runs, and check whether the nulls in the propagating-torsion sector survive marginalisation over these.
+
+**Question for supervisors:** is there a physical argument for holding these fixed that we are missing, or would sampling over them be a straightforward extension worth including in the paper?
