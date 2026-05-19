@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from tidal.inference._results import InferenceResult
 
 
-def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Entry point for ``tidal sample``."""
     from pathlib import Path
 
@@ -50,25 +50,72 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         )
         return 1
 
-    # --- Parse priors ---
+    # --- Parse priors (per-parameter --prior + optional --joint-prior) ---
     prior_specs: list[str] = getattr(args, "prior", []) or []
-    if not prior_specs:
+    joint_prior_specs: list[str] = getattr(args, "joint_prior", []) or []
+    if not prior_specs and not joint_prior_specs:
         error_with_hint(
             "No priors specified.",
             [
-                "Use --prior 'NAME=DIST:LOW:HIGH' (repeatable)",
-                "Distributions: uniform, log_uniform, normal, arctan_uniform",
+                "Use --prior 'NAME=DIST:LOW:HIGH' (repeatable) or",
+                "--joint-prior 'names=...;type=cubed_sphere;M=K;face=F;"
+                "sub=S;r_lo=L;r_hi=H' (cubed-sphere joint prior)",
+                "Distributions for --prior: uniform, log_uniform, normal, "
+                "arctan_uniform",
                 "Example: --prior 'alpha=uniform:0.01:10'",
             ],
         )
         return 1
 
-    from tidal.inference._prior import parse_prior
+    from tidal.inference._prior import (
+        Prior,
+        RadialAngularPrior,
+        parse_joint_prior,
+        parse_prior,
+        prior_param_names,
+        total_prior_ndim,
+        validate_prior_names,
+    )
+
+    if len(joint_prior_specs) > 1:
+        error_with_hint(
+            "Only one --joint-prior per invocation is supported in this release.",
+            [
+                "Multiple cubed-sphere joint priors (e.g. one per spin "
+                "sector) are deferred — the supervisor's directive is one "
+                "monolithic sphere over all BSM couplings."
+            ],
+        )
+        return 1
 
     try:
-        priors = [parse_prior(s) for s in prior_specs]
+        per_param_priors: list[Prior] = [parse_prior(s) for s in prior_specs]
+        joint_priors: list[RadialAngularPrior] = [
+            parse_joint_prior(s) for s in joint_prior_specs
+        ]
     except ValueError as e:
-        error_with_hint(str(e), ["Check --prior format: NAME=DIST:ARG1:ARG2"])
+        error_with_hint(
+            str(e),
+            [
+                "Check --prior format: NAME=DIST:ARG1:ARG2",
+                "Check --joint-prior format: 'names=N1,N2,...;"
+                "type=cubed_sphere;M=K;face=F;sub=S1_S2_...;r_lo=L;r_hi=H'",
+            ],
+        )
+        return 1
+
+    priors: list[Prior | RadialAngularPrior] = [
+        *joint_priors,
+        *per_param_priors,
+    ]
+
+    try:
+        validate_prior_names(priors)
+    except ValueError as e:
+        error_with_hint(
+            str(e),
+            ["--prior names must be disjoint from --joint-prior names"],
+        )
         return 1
 
     # --- Parse constraints ---
@@ -97,9 +144,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     from tidal.inference._likelihood import parse_likelihood
 
     baseline_formula: str | None = getattr(args, "baseline_formula", None)
+    # v3 architecture: --gated reverts to v2 hard-rejection; --soft-floor-noise
+    # tunes the Normal(0, sigma) noise on the soft penalty floor.
+    gated: bool = bool(getattr(args, "gated", False))
+    soft_floor_noise: float = float(getattr(args, "soft_floor_noise", 1.0))
     try:
         likelihood_config = parse_likelihood(
-            likelihood_spec, baseline_formula=baseline_formula,
+            likelihood_spec,
+            baseline_formula=baseline_formula,
+            permissive=(not gated),
+            soft_floor_noise_sigma=soft_floor_noise,
         )
     except ValueError as e:
         error_with_hint(str(e), ["Check --likelihood format: METRIC:TYPE[:ARGS]"])
@@ -135,13 +189,25 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         return 1
     output_path = Path(output_dir)
 
+    # Per-tile output redirect for cubed-sphere joint priors: chains land
+    # in <output>/<face_label>_tile<sub_tile>/ so the atlas plotter can
+    # pool tiles transparently.  Convention matches the supervisor's
+    # psalter cell-directory layout.
+    if joint_priors:
+        from tidal.inference._sphere import cell_label
+
+        jp = joint_priors[0]
+        cell_dir = cell_label(jp.face_idx, jp.sub_tile)
+        output_path /= cell_dir
+        output_path.mkdir(parents=True, exist_ok=True)
+
     # --- Common settings ---
     method: str = getattr(args, "method", "mc")
     n_workers: int | None = getattr(args, "parallel", None)
     seed: int = getattr(args, "seed", 42)
     quiet: bool = getattr(args, "quiet", False)
 
-    param_names = [p.name for p in priors]
+    param_names = prior_param_names(priors)
 
     # --- Print summary ---
     if not quiet:
@@ -149,7 +215,19 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         print(f"  Spec: {spec_path}")
         print(f"  Parameters: {', '.join(param_names)}")
         for p in priors:
-            print(f"    {p.name} ~ {p.distribution}({p.low}, {p.high})")
+            if isinstance(p, RadialAngularPrior):
+                radial = (
+                    f"fixed r={p.r_lo}"
+                    if p.is_fixed_radius
+                    else f"log_uniform(r={p.r_lo}..{p.r_hi})"
+                )
+                print(
+                    f"    [{', '.join(p.names)}] ~ "
+                    f"cubed_sphere(face={p.face_idx}, sub={p.sub_tile}, "
+                    f"M={p.M}) x {radial}"
+                )
+            else:
+                print(f"    {p.name} ~ {p.distribution}({p.low}, {p.high})")
         if constraints:
             print(f"  Constraints: {len(constraints)}")
             for expr in constraints.expressions:
@@ -162,6 +240,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
     # --- Run inference ---
     if method == "mc":
+        if joint_priors:
+            error_with_hint(
+                "--joint-prior is not supported with --method mc in this release.",
+                [
+                    "Use --method nested for cubed-sphere joint priors",
+                    "(MC support for the joint sampler is deferred — the v3 "
+                    "campaign use case is PolyChord nested sampling)",
+                ],
+            )
+            return 1
         n_samples = getattr(args, "n_samples", 100)
         if not quiet:
             print(f"  Samples: {n_samples}")
@@ -171,8 +259,11 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
 
         from tidal.inference._mc import run_monte_carlo
 
+        # MC path is gated above to per-parameter priors only (joint
+        # priors fail-fast); pass per_param_priors explicitly so the
+        # type is `list[Prior]`.
         result = run_monte_carlo(
-            priors=priors,
+            priors=per_param_priors,
             likelihood_config=likelihood_config,
             base_args=args,
             spec_path=spec_path,
@@ -196,7 +287,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         if nlive_auto is not None:
             from tidal.inference._nested import recommend_nlive
 
-            nlive = recommend_nlive(len(priors), nlive_auto)
+            nlive = recommend_nlive(total_prior_ndim(priors), nlive_auto)
             if not quiet:
                 print(f"  nlive auto ({nlive_auto}): {nlive}")
 
@@ -235,11 +326,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             ns_kwargs["precision_criterion"] = precision_criterion
         if getattr(args, "no_clustering", False):
             ns_kwargs["do_clustering"] = False
+        if getattr(args, "read_resume", False):
+            ns_kwargs["read_resume"] = True
+        max_ndead = getattr(args, "max_ndead", None)
+        if max_ndead is not None:
+            ns_kwargs["max_ndead"] = max_ndead
 
         result = run_nested_sampling(
             log_likelihood=likelihood_fn,
             prior_transform=build_prior_transform(priors),
-            ndim=len(priors),
+            ndim=total_prior_ndim(priors),
             param_names=param_names,
             sampler="polychord",
             nlive=nlive,
@@ -247,6 +343,98 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             quiet=quiet,
             **ns_kwargs,
         )
+        # Record priors in metadata so post-hoc analysis (e.g. correct
+        # marginal D_KL per parameter, #308) can transform each column
+        # into the space where its prior is uniform.  Mixed priors are
+        # serialised by type so the loader can reconstruct each component.
+        import numpy as np
+
+        prior_records: list[dict[str, object]] = []
+        for p in priors:
+            if isinstance(p, RadialAngularPrior):
+                prior_records.append(
+                    {
+                        "kind": "radial_angular",
+                        "names": list(p.names),
+                        "r_lo": p.r_lo,
+                        "r_hi": p.r_hi,
+                        "face_idx": p.face_idx,
+                        "sub_tile": list(p.sub_tile),
+                        "M": p.M,
+                        "Q": np.asarray(p.Q).tolist(),
+                    }
+                )
+            else:
+                prior_records.append(
+                    {
+                        "kind": "scalar",
+                        "name": p.name,
+                        "distribution": p.distribution,
+                        "low": p.low,
+                        "high": p.high,
+                    }
+                )
+        result.metadata["priors"] = prior_records
+        # Persist likelihood mode so the corner-plot title can label the
+        # extremal logL correctly: "max A" for maximize, "max suppression"
+        # for minimize, etc.  Without this the same number means different
+        # things and confuses readers (suppress's high logL maps to
+        # tiny P_max, not large amplification).
+        result.metadata["likelihood_type"] = likelihood_config.likelihood_type
+        result.metadata["likelihood_metric"] = likelihood_config.metric
+        # Persist enough of the simulation context to recompute the
+        # baseline formula (and therefore amplification A = P_max / P_GR)
+        # post-hoc — needed for the corner-plot's derived A column after
+        # results are pulled from HPC where the original CLI args aren't
+        # available.  See tidal/inference/_visualize.py.
+        from tidal.cli._simulate import (
+            _parse_params,  # pyright: ignore[reportPrivateUsage]
+        )
+        from tidal.symbolic import load_equation_system as _load_spec_for_meta
+
+        try:
+            spec_for_params = _load_spec_for_meta(spec_path)
+            persisted_params = _parse_params(
+                list(getattr(args, "param", []) or []), spec_for_params
+            )
+        except Exception:  # noqa: BLE001
+            persisted_params = {}
+        sim_params: dict[str, object] = {
+            "t_end": float(getattr(args, "t_end", 0.0) or 0.0),
+            "fixed_params": persisted_params,
+            "baseline_formula": likelihood_config.baseline_formula,
+        }
+        result.metadata["simulation_params"] = sim_params
+
+        # Post-hoc prior stability sweep: PolyChord drops -inf samples
+        # before they enter the chain, so the unstable region is invisible
+        # in the chain.  Sample the prior independently and run only the
+        # cheap eigenvalue check (~1 ms per draw, no simulation) to
+        # generate a side file for corner-plot overlay.  See
+        # tidal/inference/_prior_stability.py for the rationale.
+        if source and target:
+            try:
+                from tidal.inference._prior_stability import (
+                    run_prior_stability_sweep,
+                )
+
+                rej_path = output_path / "_rejected_prior.csv"
+                run_prior_stability_sweep(
+                    base_args=args,
+                    spec_path=spec_path,
+                    param_names=param_names,
+                    prior_transform=build_prior_transform(priors),
+                    source=source,
+                    target=target,
+                    output_path=rej_path,
+                    n_samples=getattr(args, "prior_sweep_samples", 5000),
+                    seed=seed,
+                    quiet=quiet,
+                )
+                result.metadata["rejected_prior_path"] = str(rej_path)
+            except Exception as exc:  # noqa: BLE001
+                if not quiet:
+                    print(f"  Prior stability sweep skipped: {exc}")
 
     else:
         error_with_hint(
@@ -256,11 +444,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         return 1
 
     # --- Save results (rank 0 only — all MPI ranks reach here) ---
+    # On HPC login nodes mpi4py imports fine but COMM_WORLD initialization
+    # aborts (PMI2 not available outside a SLURM allocation).  Catch any
+    # error and treat as rank 0 — the only consequence is that all ranks
+    # in a real MPI run would write the file (rank-0 logic is a wallclock
+    # optimization, not correctness-critical).
     try:
         from mpi4py import MPI  # type: ignore[import-untyped]
 
         mpi_rank: int = int(MPI.COMM_WORLD.Get_rank())  # type: ignore[reportUnknownArgumentType]
-    except ImportError:
+    except Exception:  # noqa: BLE001
         mpi_rank = 0
     if mpi_rank != 0:
         return 0

@@ -7,12 +7,10 @@ Tests cover:
 4. Cross-validation — modal vs CVODE agreement
 """
 
-# ruff: noqa: RUF002 — math symbols in docstrings.
-
 from __future__ import annotations
 
 import copy
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pytest
@@ -21,6 +19,9 @@ from tidal.solver.grid import GridInfo
 from tidal.solver.modal import can_use_modal, solve_modal
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import EquationSystem
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Inline specs for testing
@@ -1288,7 +1289,8 @@ class TestEigendataExport:
     """
 
     def _run_kg(
-        self, return_eigendata: bool,
+        self,
+        return_eigendata: bool,
     ) -> tuple[dict[str, Any], np.ndarray, StateLayout, GridInfo]:
         spec = _make_spec(_KG_1D_SPEC)
         n = 32
@@ -1321,84 +1323,71 @@ class TestEigendataExport:
         assert "eigendata" not in result
 
     def test_eigendata_structure_present_when_requested(self) -> None:
+        """Pass 0 collects {slot_indices, M_block, y0_block} for Pass 1.
+
+        The legacy {V, V_inv, D_diag, alpha} schema was retired in v0.31+ when
+        Pass 1 was rewritten to use the augmented matrix exponential
+        (Al-Mohy & Higham 2011 §5.2) — see _evolve_duhamel_per_mode and
+        docs/tex/modal_solver.tex §"Robust Matrix-Exponential Evolution".
+        """
         result, _, _, _ = self._run_kg(return_eigendata=True)
         assert "eigendata" in result
         ed = result["eigendata"]
         assert set(ed.keys()) >= {"blocks", "mode_k", "state_layout"}
         assert len(ed["blocks"]) >= 1
         block = ed["blocks"][0]
-        assert set(block.keys()) == {"slot_indices", "V", "D_diag", "V_inv", "alpha"}
+        assert set(block.keys()) == {"slot_indices", "M_block", "y0_block"}
 
-    def test_eigendata_invertibility(self) -> None:
-        """V @ V_inv == I for every block and every mode (round-trip)."""
-        result, _, _, _ = self._run_kg(return_eigendata=True)
-        for block in result["eigendata"]["blocks"]:
-            v_mat = block["V"]
-            v_inv = block["V_inv"]
-            bs = v_mat.shape[-1]
-            eye = np.eye(bs)
-            # Sample a handful of modes for speed (block is n_modes, bs, bs)
-            for m in range(min(4, v_mat.shape[0])):
-                residual = float(np.max(np.abs(v_mat[m] @ v_inv[m] - eye)))
-                assert residual < 1e-10, (
-                    f"V @ V_inv residual {residual:.2e} at mode {m} "
-                    f"for block with slots {block['slot_indices']}"
-                )
-
-    def test_eigendata_alpha_matches_vinv_y0(self) -> None:
-        """Alpha = V_inv @ y0_hat (by construction)."""
+    def test_eigendata_y0_block_matches_fft_ic(self) -> None:
+        """y0_block stored per block matches rfft(y0) at the same slot indices."""
         result, y0, layout, grid = self._run_kg(return_eigendata=True)
-        # The Fourier transform helper is intentionally private in
-        # modal.py; importing here is a deliberate whitebox check that
-        # eigendata.alpha matches V_inv @ rfft(y0) without going
-        # through the full Pass 0 evolution.  If _fft_slots is ever
-        # promoted to public, update this import.
+        # The Fourier transform helper is intentionally private in modal.py;
+        # importing here is a deliberate whitebox check that y0_block matches
+        # rfft(y0) without going through the full Pass 0 evolution.
         from tidal.solver.modal import _fft_slots
 
         y0_hat = _fft_slots(y0, layout, grid)
         for block in result["eigendata"]["blocks"]:
             slot_indices = block["slot_indices"]
-            y0_block = y0_hat[slot_indices, :]  # (bs, n_modes)
-            expected_alpha = np.einsum("mij,mj->mi", block["V_inv"], y0_block.T)
+            expected_y0_block = y0_hat[slot_indices, :]  # (bs, n_modes)
             np.testing.assert_allclose(
-                block["alpha"], expected_alpha, atol=1e-12, rtol=1e-12,
+                block["y0_block"],
+                expected_y0_block,
+                atol=1e-14,
+                rtol=1e-14,
             )
 
     def test_eigendata_reconstructs_pass_zero(self) -> None:
-        """y_hat(t) = V · diag(exp(D·t)) · alpha reproduces snapshots.
+        """y_hat(t) = exp(M·t) · y0_block reproduces snapshots to machine precision.
 
-        Pass 1 Duhamel relies on this identity to evaluate the
-        inhomogeneous solution. Verify reconstruction matches the
-        solver's own evolved output to machine precision.
+        Pass 1 augmented-exp uses M_block to build the (2bs × 2bs) augmented
+        operator [[A, S], [0, A]]. Verify that the same M_block evolved as
+        exp(M·t)·y0_block reproduces the solver's own Pass 0 output.
         """
+        import scipy.linalg as sla  # type: ignore[import-untyped]
+
         result, _, layout, grid = self._run_kg(return_eigendata=True)
         ed = result["eigendata"]
         t = result["t"]
-        # Reconstruct at the final snapshot, in Fourier space
-        n_modes = ed["blocks"][0]["V"].shape[0]
+        n_modes = ed["blocks"][0]["M_block"].shape[0]
         n_slots = layout.num_slots
         y_hat_rec = np.zeros((n_slots, n_modes), dtype=np.complex128)
         ti = len(t) - 1
-        dt = t[ti] - t[0]
+        dt = float(t[ti] - t[0])
         for block in ed["blocks"]:
-            v_mat = block["V"]  # (n_modes, bs, bs)
-            lam = block["D_diag"]  # (n_modes, bs)
-            alpha = block["alpha"]  # (n_modes, bs)
-            phase = np.exp(lam * dt)  # (n_modes, bs)
-            y_eigen = alpha * phase  # (n_modes, bs)
-            # y_block_hat = V · y_eigen for each mode  (n_modes, bs)
-            y_block_hat = np.einsum("mij,mj->mi", v_mat, y_eigen)
-            for i, slot in enumerate(block["slot_indices"]):
-                y_hat_rec[slot] = y_block_hat[:, i]
+            M = block["M_block"]  # (n_modes, bs, bs)
+            y0_block = block["y0_block"]  # (bs, n_modes)
+            for m in range(n_modes):
+                y_evolved = sla.expm(M[m] * dt) @ y0_block[:, m]
+                for i, slot in enumerate(block["slot_indices"]):
+                    y_hat_rec[slot, m] = y_evolved[i]
 
         # Inverse FFT to physical space
         rfft_shape_list = list(grid.shape)
         rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
         rfft_shape = tuple(rfft_shape_list)
         n_pts = grid.num_points
-        # Dynamical slots are [:n_dyn] in the reduced layout (no constraints
-        # here — KG is a pure wave system)
-        n_dyn = n_slots
+        n_dyn = n_slots  # KG: pure wave system, no constraints
         y_rec_phys = np.zeros(n_dyn * n_pts)
         for si in range(n_dyn):
             y_rec_phys[si * n_pts : (si + 1) * n_pts] = np.fft.irfftn(
@@ -1407,10 +1396,9 @@ class TestEigendataExport:
                 axes=list(range(len(grid.shape))),
             ).ravel()
 
-        # Compare against solver's own snapshot
         err = float(np.max(np.abs(y_rec_phys - result["y"][ti])))
         assert err < 1e-12, (
-            f"Eigendata reconstruction error {err:.2e} exceeds 1e-12 tolerance"
+            f"M_block reconstruction error {err:.2e} exceeds 1e-12 tolerance"
         )
 
     def test_position_dependent_raises(self) -> None:
@@ -1436,3 +1424,514 @@ class TestEigendataExport:
                 num_snapshots=2,
                 return_eigendata=True,
             )
+
+
+# =========================================================================
+# JAX backend tests (phase 1: constant-coefficient path)
+# =========================================================================
+
+
+def _jax_solver() -> object:
+    """Import solve_modal_jax, skip test if JAX not installed."""
+    jax = pytest.importorskip("jax")
+    jax.config.update("jax_enable_x64", True)  # noqa: FBT003
+    from tidal.solver.modal_jax import solve_modal_jax
+
+    return solve_modal_jax
+
+
+class TestModalJAXCorrectness:
+    """Validate the JAX modal backend against the scipy backend.
+
+    All tests skip automatically when ``jax`` / ``jaxlib`` are not installed.
+    Phase-1 scope: constant-coefficient, no constraints, no position-dependent
+    coefficients.  Phase-2 paths (position-dep, constraints, return_eigendata)
+    are marked skip here.
+    """
+
+    _TOL = 1e-10  # max relative error between JAX and scipy backends
+
+    def _assert_backends_agree(
+        self,
+        result_scipy: dict[str, object],
+        result_jax: dict[str, object],
+    ) -> None:
+        """Assert that JAX and scipy outputs agree to self._TOL."""
+        y_s = result_scipy["y"]
+        y_j = result_jax["y"]
+        assert y_s.shape == y_j.shape, f"Shape mismatch: {y_s.shape} vs {y_j.shape}"  # type: ignore[union-attr]
+        max_ref = float(np.max(np.abs(y_s)))  # type: ignore[union-attr]
+        if max_ref < 1e-15:
+            # Zero solution: check absolute error
+            max_abs_err = float(np.max(np.abs(y_j - y_s)))  # type: ignore[operator]
+            assert max_abs_err < 1e-13, f"Zero-IC: abs err {max_abs_err:.2e}"
+        else:
+            max_rel_err = float(np.max(np.abs(y_j - y_s))) / max_ref  # type: ignore[operator]
+            assert max_rel_err < self._TOL, (
+                f"JAX vs scipy max relative error {max_rel_err:.2e} > {self._TOL}"
+            )
+
+    def test_scalar_wave_jax_agrees_with_scipy(self) -> None:
+        """KG scalar wave: JAX backend matches scipy to < 1e-10 relative error."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_KG_1D_SPEC)
+        N = 64
+        L = 10.0
+        grid = GridInfo(shape=(N,), bounds=((0.0, L),), periodic=(True,))
+        y0 = _make_gaussian_ic(spec, grid)
+        params = {"m2": 1.0}
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 5.0), parameters=params, num_snapshots=51
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 5.0), parameters=params, num_snapshots=51
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_coupled_wave_jax_agrees_with_scipy(self) -> None:
+        """Coupled scalars: JAX backend matches scipy to < 1e-10 relative error."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_COUPLED_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        y0 = _make_gaussian_ic(spec, grid)
+        params = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 3.0), parameters=params, num_snapshots=31
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 3.0), parameters=params, num_snapshots=31
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_diffusion_jax_agrees_with_scipy(self) -> None:
+        """Diffusion: JAX backend matches scipy to < 1e-10 relative error."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_DIFFUSION_SPEC)
+        N = 64
+        L = 10.0
+        grid = GridInfo(shape=(N,), bounds=((0.0, L),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = np.linspace(0, L, N, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:N] = np.cos(2 * np.pi * 2 / L * x)
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 5.0), parameters={"D": 0.1}, num_snapshots=11
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 5.0), parameters={"D": 0.1}, num_snapshots=11
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_machine_precision_jax(self) -> None:
+        """JAX backend achieves < 1e-10 relative error vs scipy (machine precision)."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_KG_1D_SPEC)
+        N = 32
+        L = 2 * np.pi
+        grid = GridInfo(shape=(N,), bounds=((0.0, L),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        x = np.linspace(0, L, N, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:N] = np.sin(x)
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 1.0), parameters={"m2": 1.0}, num_snapshots=2
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 1.0), parameters={"m2": 1.0}, num_snapshots=2
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_2d_wave_jax_agrees_with_scipy(self) -> None:
+        """2D wave: JAX backend matches scipy to < 1e-10 relative error."""
+        solve_modal_jax = _jax_solver()
+
+        spec_2d: dict[str, object] = {
+            "metadata": {"source": "inline-test", "parameters": {"m2": 1.0}},
+            "spacetime": {
+                "dimension": 3,
+                "signature": [-1, 1, 1],
+                "coordinates": ["t", "x", "y"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
+        }
+        spec = _make_spec(spec_2d)
+        Nx, Ny, Lx, Ly = 16, 16, 4.0, 4.0
+        grid = GridInfo(
+            shape=(Nx, Ny), bounds=((0.0, Lx), (0.0, Ly)), periodic=(True, True)
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        # 2D Gaussian IC — must use meshgrid, not 1D linspace
+        x = np.linspace(0.0, Lx, Nx, endpoint=False)
+        y = np.linspace(0.0, Ly, Ny, endpoint=False)
+        X, Y = np.meshgrid(x, y, indexing="ij")
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[: grid.num_points] = (
+            0.1 * np.exp(-((X - Lx / 2) ** 2 + (Y - Ly / 2) ** 2) / (2 * 1.5**2))
+        ).ravel()
+
+        result_scipy = solve_modal(
+            spec, grid, y0, (0.0, 2.0), parameters={"m2": 1.0}, num_snapshots=11
+        )
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 2.0), parameters={"m2": 1.0}, num_snapshots=11
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        self._assert_backends_agree(result_scipy, result_jax)
+
+    def test_zero_ic_stays_zero_jax(self) -> None:
+        """Zero IC: JAX backend produces zero output."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_KG_1D_SPEC)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+
+        result_jax = solve_modal_jax(
+            spec, grid, y0, (0.0, 5.0), parameters={"m2": 1.0}, num_snapshots=11
+        )  # type: ignore[operator]
+
+        assert result_jax["success"]
+        assert np.max(np.abs(result_jax["y"])) < 1e-14
+
+    def test_block_isolation_jax(self) -> None:
+        """Zero-IC block stays at machine zero with JAX backend."""
+        solve_modal_jax = _jax_solver()
+
+        spec = _make_spec(_DEGENERATE_PAIRS_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        x = np.linspace(0.0, 10.0, 64, endpoint=False)
+        y0[: grid.num_points] = 0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
+
+        result_jax = solve_modal_jax(  # type: ignore[operator]
+            spec,
+            grid,
+            y0,
+            (0.0, 10.0),
+            parameters={"B0": 0.3, "kappa2": 1.0},
+            num_snapshots=5,
+        )
+
+        assert result_jax["success"]
+        # Pair 2 fields (phi_1, chi_1) should stay at machine zero
+        phi_1_slot = layout.field_slot_map["phi_1"]
+        chi_1_slot = layout.field_slot_map["chi_1"]
+        final = result_jax["y"][-1]
+        n = grid.num_points
+        for slot in [phi_1_slot, chi_1_slot]:
+            max_val = np.max(np.abs(final[slot * n : (slot + 1) * n]))
+            assert max_val < 1e-12, f"Zero-IC slot {slot} grew to {max_val:.2e}"
+
+    @pytest.mark.skip(
+        reason="phase 1: modal-jax position-dependent path not implemented"
+    )
+    def test_position_dependent_jax(self) -> None:
+        pass
+
+    @pytest.mark.skip(reason="phase 1: modal-jax constraint/Schur path not implemented")
+    def test_constraint_jax(self) -> None:
+        pass
+
+    @pytest.mark.skip(reason="phase 1: modal-jax return_eigendata not implemented")
+    def test_eigendata_jax(self) -> None:
+        pass
+
+    def test_jax_raises_for_position_dependent(self) -> None:
+        """JAX backend raises NotImplementedError for position-dependent systems."""
+        _jax_solver()
+        from tidal.solver.modal_jax import solve_modal_jax
+
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        eqs = cast("list[dict[str, Any]]", spec_data["equations"])
+        eqs[0]["rhs"]["terms"][0]["coordinate_dependent"] = ["x"]
+        spec = _make_spec(spec_data)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+
+        with pytest.raises(NotImplementedError, match="phase 1"):
+            solve_modal_jax(spec, grid, y0, (0.0, 1.0), parameters={"m2": 1.0})
+
+    def test_jax_raises_for_return_eigendata(self) -> None:
+        """JAX backend raises NotImplementedError for return_eigendata=True."""
+        _jax_solver()
+        from tidal.solver.modal_jax import solve_modal_jax
+
+        spec = _make_spec(_KG_1D_SPEC)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        y0 = _make_gaussian_ic(spec, grid)
+
+        with pytest.raises(NotImplementedError, match="phase 1"):
+            solve_modal_jax(
+                spec,
+                grid,
+                y0,
+                (0.0, 1.0),
+                parameters={"m2": 1.0},
+                return_eigendata=True,
+            )
+
+
+# =========================================================================
+# GH #367: position-dependent + periodic auto-routing
+# =========================================================================
+
+
+class TestPositionDepAutoRoute:
+    """Verify the GH #367 fix (v0.41.6): the convolution-matrix path in
+    ``_build_convolution_matrix`` now applies the ``M⁻¹`` (inverse kinetic
+    coefficient) scaling that the per-mode path already had. With the fix,
+    position-dependent + periodic theories run correctly on the modal
+    solver — no auto-route to CVODE/IDA is needed.
+
+    Root cause: ``_build_per_mode_matrices`` already folded
+    ``build_inverse_kinetic_diag`` into velocity-row coefficients (#301/#302),
+    but ``_build_convolution_matrix`` was missing that step. For Gertsenshtein-
+    class theories carrying ``kinetic_coefficient_symbolic = -1/kappa²`` on
+    graviton modes, the discrete EOM had a sign-flipped Laplacian giving
+    a real eigenvalue at every k. ``expm_multiply`` faithfully amplified
+    it — the apparent "Nyquist spurious eigenvalue" was the visible
+    high-k symptom of a uniform-in-k sign error.
+    """
+
+    @pytest.fixture
+    def e0_args(self, tmp_path: Path) -> list[str]:
+        """CLI args for the GH #367 reproducer (E.0 dual-Gaussian)."""
+        output_dir = tmp_path / "out"
+        return [
+            "examples/data/gertsenshtein_e0_dual_gaussian.json",
+            "--grid-shape",
+            "64",
+            "--bounds",
+            "0:100",
+            "--periodic",
+            "--ic",
+            "gaussian",
+            "--ic-component",
+            "h_5",
+            "--ic-amplitude",
+            "1e-2",
+            "--ic-width",
+            "5",
+            "--ic-center",
+            "25",
+            "--param",
+            "kappa=1.0",
+            "--param",
+            "Bpeak=0.01",
+            "--param",
+            "sigB=5",
+            "--param",
+            "zc1=25",
+            "--param",
+            "zc2=75",
+            "--snapshots",
+            "2",
+            "--output",
+            str(output_dir),
+        ]
+
+    def _run_simulate(self, args: list[str]) -> tuple[int, str]:
+        """Invoke the ``tidal simulate`` CLI; return (exit_code, combined_output)."""
+        import subprocess
+
+        result = subprocess.run(
+            ["uv", "run", "tidal", "simulate", *args],  # noqa: S607
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        return result.returncode, result.stdout + result.stderr
+
+    def test_gh367_reproducer_modal_correct(self, e0_args: list[str]) -> None:
+        """GH #367 reproducer at t_end=20: --scheme auto stays on modal
+        (no override since v0.41.6) and produces the correct decaying
+        h_5 (≈0.005), matching CVODE within 1%.
+        """
+        args = [*e0_args, "--t-end", "20"]
+        exit_code, output = self._run_simulate(args)
+        assert exit_code == 0, f"simulate failed:\n{output}"
+        # No auto-routing happens any more.
+        assert "auto-routing" not in output, (
+            f"unexpected auto-route after the v0.41.6 fix; got:\n{output}"
+        )
+        # Scheme line confirms modal.
+        assert "Auto-selected solver: modal" in output, (
+            f"expected auto-selected modal; got:\n{output}"
+        )
+        import re
+
+        match = re.search(r"h_5:.*→\s*([0-9.eE+-]+)", output)
+        assert match is not None, f"h_5 result line not found in:\n{output}"
+        h5_final = float(match.group(1))
+        assert 0.003 < h5_final < 0.007, (
+            f"h_5={h5_final} not in expected range [0.003, 0.007] (CVODE truth ≈ 0.005)"
+        )
+
+    def test_explicit_modal_at_t20_produces_correct_h5(
+        self, e0_args: list[str]
+    ) -> None:
+        """Explicit --scheme modal at t_end=20 runs to completion and matches
+        CVODE on h_5 peak (the convolution-path m_inv fix in v0.41.6).
+        """
+        args = [*e0_args, "--scheme", "modal", "--t-end", "20"]
+        exit_code, output = self._run_simulate(args)
+        assert exit_code == 0, f"simulate failed:\n{output}"
+        assert "Simulation diverged" not in output, (
+            f"unexpected divergence after the v0.41.6 fix; got:\n{output}"
+        )
+        import re
+
+        match = re.search(r"h_5:.*→\s*([0-9.eE+-]+)", output)
+        assert match is not None, f"h_5 result line not found in:\n{output}"
+        h5_final = float(match.group(1))
+        assert 0.003 < h5_final < 0.007, (
+            f"h_5={h5_final} not in expected range [0.003, 0.007]"
+        )
+
+    def test_explicit_modal_safe_regime_correct(self, e0_args: list[str]) -> None:
+        """Sanity check the modal solver at small t_end is accurate.
+
+        Before the v0.41.6 fix this only verified non-divergence; with the
+        fix in place the answer must match CVODE within a few percent
+        even at very small t_end.
+        """
+        args = [*e0_args, "--scheme", "modal", "--t-end", "1"]
+        exit_code, output = self._run_simulate(args)
+        assert exit_code == 0, f"simulate failed unexpectedly:\n{output}"
+        assert "Scheme: modal" in output
+        assert "Simulation diverged" not in output
+
+
+class TestOverridePosDepPeriodicScheme:
+    """Unit tests for ``_override_pos_dep_periodic_scheme``.
+
+    Since v0.41.6 the function is a permanent no-op — the GH #367 root cause
+    (the convolution path missing ``M⁻¹`` scaling) was fixed in
+    ``_build_convolution_matrix``, so modal is the correct choice for
+    pos-dep + periodic theories. These tests pin the no-op semantics so a
+    future regression that reintroduces the override is caught.
+    """
+
+    @staticmethod
+    def _pos_dep_diffusion() -> EquationSystem:
+        """Pos-dep (no constraint): first-order diffusion with symbolic coord
+        in the coefficient. Mirrors the trick used in
+        ``test_position_dependent_correctness``.
+        """
+        spec_data = copy.deepcopy(_DIFFUSION_SPEC)
+        spec_data["equations"][0]["rhs"]["terms"][0][  # type: ignore[index]
+            "coefficient_symbolic"
+        ] = "D*(1 + 0*x[])"
+        return _make_spec(spec_data)
+
+    @staticmethod
+    def _pos_dep_with_constraint() -> EquationSystem:
+        """Pos-dep + constraint: A_0 is a constraint (time_order=0), A_1 is
+        dynamical with a position-dependent coefficient. Models the Phase E
+        localized PGT pattern (constraint field + Erf-profile background).
+        """
+        spec_data = copy.deepcopy(_CONSTRAINT_SPEC)
+        # Force position-dependence on the dynamical equation's RHS term.
+        spec_data["equations"][1]["rhs"]["terms"][0][  # type: ignore[index]
+            "coefficient_symbolic"
+        ] = "1 + 0*x[]"
+        return _make_spec(spec_data)
+
+    def test_non_modal_scheme_passes_through(self) -> None:
+        """If _resolve_scheme didn't pick modal, the override is a no-op."""
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = self._pos_dep_with_constraint()
+        for scheme in ("cvode", "ida", "leapfrog", "scipy"):
+            new_scheme, msg = _override_pos_dep_periodic_scheme(scheme, "auto", spec)
+            assert new_scheme == scheme
+            assert msg is None
+
+    def test_explicit_modal_not_overridden(self) -> None:
+        """User explicitly asked for modal; respect it (post-evolution
+        amplitude check at modal.py:2469 is the safety net for that path).
+        """
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = self._pos_dep_with_constraint()
+        new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "modal", spec)
+        assert new_scheme == "modal"
+        assert msg is None
+
+    def test_constant_coefficients_no_override(self) -> None:
+        """No pos-dep terms → modal is correct and stays."""
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = _make_spec(_KG_1D_SPEC)
+        new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
+        assert new_scheme == "modal"
+        assert msg is None
+
+    def test_pos_dep_no_constraint_stays_on_modal(self) -> None:
+        """Pos-dep + no constraint: since v0.41.6 modal is the correct choice
+        (was: routed to CVODE under the GH #367 safety net).
+        """
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = self._pos_dep_diffusion()
+        new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
+        assert new_scheme == "modal"
+        assert msg is None
+
+    def test_pos_dep_with_constraint_stays_on_modal(self) -> None:
+        """Pos-dep + constraint: since v0.41.6 modal is the correct choice
+        (was: routed to IDA under the GH #367 safety net). The modal solver's
+        Schur path handles constraints natively (modal.py:541-595).
+        """
+        from tidal.cli._simulate import _override_pos_dep_periodic_scheme
+
+        spec = self._pos_dep_with_constraint()
+        new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
+        assert new_scheme == "modal"
+        assert msg is None

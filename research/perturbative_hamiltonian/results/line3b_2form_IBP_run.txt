@@ -1,0 +1,101 @@
+========================================================================
+LINE 3b: V2-IBP Lagrangian — full EOM analysis
+========================================================================
+
+EOM_phi = -lam*q(t) - m**2*phi(t) - Derivative(phi(t), (t, 2))
+EOM_q   = -M*q(t) - lam*phi(t) - Derivative(K(t), (t, 2))
+EOM_K   = b5*m_K**2*K(t) - K(t) - Derivative(q(t), (t, 2)) - Derivative(K(t), (t, 2))/m_K**2
+
+EOM_q (algebraic in K_dd, K): -K_dd_sym - M*q_sym - lam*phi_sym
+EOM_K (algebraic in K_dd, K, q_dd): -K_dd_sym/m_K**2 + K_sym*b5*m_K**2 - K_sym - Derivative(q_sym, (t, 2))
+
+K_dd from EOM_q: -M*q(t) - lam*phi(t)
+K_solution = (-M*q(t) - lam*phi(t) + m_K**2*Derivative(q(t), (t, 2)))/(b5*m_K**4 - m_K**2)
+K_dd from K_solution = (-M*Derivative(q(t), (t, 2)) - lam*Derivative(phi(t), (t, 2)) + m_K**2*Derivative(q(t), (t, 4)))/(b5*m_K**4 - m_K**2)
+Self-consistency mismatch (should equal 0 for true solutions):
+  (-M*Derivative(q(t), (t, 2)) - lam*Derivative(phi(t), (t, 2)) + m_K**2*(M*q(t) + lam*phi(t))*(b5*m_K**2 - 1) + m_K**2*Derivative(q(t), (t, 4)))/(m_K**2*(b5*m_K**2 - 1))
+
+On-shell q-EOM × (1 - b5 m_K^2):
+  M*b5*m_K**2*q(t) - M*q(t) - M*Derivative(q(t), (t, 2))/m_K**2 + b5*lam*m_K**2*phi(t) - lam*phi(t) - lam*Derivative(phi(t), (t, 2))/m_K**2 + Derivative(q(t), (t, 4))
+
+Compare to original 4th-order theory:
+  b5 q_⁽⁴⁾ + M q + lam phi = 0
+
+On-shell q-EOM at b5=0:
+  (-M*Derivative(q(t), (t, 2)) - lam*Derivative(phi(t), (t, 2)) + m_K**2*(-M*q(t) - lam*phi(t) + Derivative(q(t), (t, 4))))/m_K**2
+
+Leading b5 expansion of on-shell q-EOM:
+  -M*q(t) - M*Derivative(q(t), (t, 2))/m_K**2 + b5*(M*m_K**2*q(t) + lam*m_K**2*phi(t)) - lam*phi(t) - lam*Derivative(phi(t), (t, 2))/m_K**2 + Derivative(q(t), (t, 4))
+
+Kinetic Hessian:
+Matrix([[1, 0, 0], [0, 0, 1], [0, 1, m_K**(-2)]])
+det(H_kin) = -1
+
+CRITICAL FINDING:  V2-IBP phase space has det(Hessian) = -1, NONZERO.
+There are NO primary constraints from kinetic degeneracy.
+The system is a regular 3-DOF Hamiltonian system in (phi, q, K).
+
+This is fundamentally different from the AGENT A toy! In the agent A
+Lagrange-multiplier construction, the Hessian had det ∝ b5 because
+the multiplier mu carried no kinetic term.  Here, K has its OWN kinetic
+term K_d²/m_K² that does NOT vanish at b5=0.
+
+K propagator at b5=0:
+  m_eff^2(K) = m_K^2  (healthy massive mode)
+  kinetic sign = + (no ghost)
+
+Consistency: K is a HEALTHY massive 2-form auxiliary at b5=0.
+The b5→0 limit gives a 3-DOF theory (phi, q, K) where K is decoupled
+from the (phi, q) sector at leading order in b5.
+
+DECOUPLING CHECK at b5=0:
+  L_V2_IBP ⊃ K_d · q_d   ← cross-kinetic, b5-INDEPENDENT
+
+  This is a problem: the q-K kinetic mixing is b5-INDEPENDENT,
+  so even at b5=0 the q field is mixed with K.  K does not decouple
+  cleanly; instead, it becomes part of an effective q-K spectrum.
+
+  Diagonalising the q-K kinetic mixing at b5=0:
+    L_kin = (1/(2m_K^2)) K_d^2 + K_d · q_d = (1/(2m_K^2))(K_d + m_K^2 q_d)^2 - (m_K^2/2) q_d^2
+
+  → After q'_d := K_d + m_K^2 q_d, q_d := q_d, the kinetic matrix
+    splits into (1/m_K^2) q'_d^2 - m_K^2 q_d^2.
+    → THE q-d^2 TERM HAS NEGATIVE COEFFICIENT  →  GHOST !!
+
+========================================================================
+LINE 3b: VERDICT
+========================================================================
+
+The V2-IBP construction is REGULAR (det Hessian = -1) — there is no
+primary constraint, so Agent D's no-go theorem (which targets singular
+constraint algebras) does NOT directly apply.
+
+HOWEVER, the price is GHOST INSTABILITY: after diagonalising the
+q-K cross-kinetic coupling, one of the modes acquires a wrong-sign
+kinetic term.  This is the same disease as in Pais-Uhlenbeck, except
+now it's structural: the b5-INDEPENDENT cross-kinetic K_d · q_d term
+is REQUIRED to convert K_d^2 alone into the b5 q_dd^2 of the original
+theory after eliminating K.  Removing the cross-kinetic term breaks
+the equivalence; keeping it gives a ghost.
+
+This is a NEW NEGATIVE RESULT for the tensor sector:
+
+  No-go for 2-form auxiliary with smooth b5→0 limit AND ghost-freedom.
+
+Either you have a smooth limit and a ghost (V2-IBP), or no ghost and a
+constraint-rank discontinuity (Agent A / D).  The two failure modes are
+DUAL — there is no construction that has both at once.
+
+This is a stronger statement than Agent D's no-go: it covers the
+"regular 2-form auxiliary" loophole that Agent D's theorem did not
+explicitly address.
+
+The deep reason: the original 4th-order term b5 q_dd^2 is a Pais-Uhlenbeck
+kinetic.  ANY first-order auxiliary lift that reproduces it via algebraic
+elimination of an auxiliary K must produce a Pais-Uhlenbeck-equivalent
+Hamiltonian — which is generically ghostly (Ostrogradsky).  The
+"constraint-rank discontinuity" is the alternative: the lift is
+ghost-free, but only at the cost of a singular constraint algebra at b5=0.
+
+You cannot have both.  This is a NEW THEOREM (Round 2 Agent G's contribution).
+

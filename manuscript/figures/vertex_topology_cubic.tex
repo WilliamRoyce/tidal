@@ -1,0 +1,217 @@
+% Vertex-topology figure for cubic-operator sectors of App H §C.
+%
+% Four parity-even cubic operators generate four distinct linearised
+% vertex topologies after one factor of F is replaced by the magnetic
+% background F_bar:
+%   (a)  R   x F^2  ->  h - A - F_bar    (lambda; 3-leg, Gertsenshtein channel)
+%   (b)  T^2 x F    ->  T - T  with F_bar insertion (kappa; 2-pt mass shift)
+%   (c)  R^2 x F    ->  h - h  with F_bar insertion (rho;   2-pt self-energy)
+%   (d)  dT  x F^2  ->  T - A - F_bar    (mu; 3-leg torsion-photon channel)
+%
+% Leg conventions (matched to vertex_topology_cs.tex):
+%   h        - coil-decorated line
+%   A        - snake-decorated line
+%   T        - dashed line
+%   F_bar    - solid line ending in a cross (background insertion)
+% Vertex dot carries the coupling-family letter (lambda, kappa, rho, mu).
+% Parity-odd epsilon-twins are indicated by a small "+ epsilon" badge.
+\documentclass[border=3pt,tikz,svgnames]{standalone}
+\usepackage{stix}
+\usepackage{tikz}
+\usetikzlibrary{decorations.markings,decorations.pathmorphing,arrows.meta,calc}
+\usepackage[outline]{contour}
+\contourlength{0.5pt}
+\tikzset{>={Stealth[length=1.2mm,width=1.2mm]}}
+
+\colorlet{GravitonLine}{MediumPurple!50!SlateBlue}
+\colorlet{PhotonLine}{Goldenrod!70!DarkOrange}
+\colorlet{TorsionLine}{MediumAquamarine!60!Teal}
+\colorlet{BgLine}{Sienna!80!Black}
+\colorlet{VertexDot}{black!80!White}
+\colorlet{PanelFrame}{Silver!50!White}
+\colorlet{TagText}{black!75}
+
+% Line styles
+\tikzset{
+  graviton/.style = {
+    draw=GravitonLine, line width=0.7pt,
+    decorate, decoration={coil, aspect=0.6, segment length=1.4mm, amplitude=0.55mm}
+  },
+  photon/.style = {
+    draw=PhotonLine, line width=0.7pt,
+    decorate, decoration={snake, segment length=1.4mm, amplitude=0.45mm}
+  },
+  torsion/.style = {
+    draw=TorsionLine, line width=0.9pt, dash pattern={on 1.4mm off 0.9mm}
+  },
+  bgleg/.style = {
+    draw=BgLine, line width=0.7pt
+  },
+  vertexdot/.style = {
+    fill=VertexDot, draw=VertexDot, circle, inner sep=0pt, minimum size=2.0pt
+  },
+  bginsertion/.style = {
+    fill=BgLine, draw=BgLine, circle, inner sep=0pt, minimum size=1.6pt
+  },
+  legend/.style = {font=\footnotesize, TagText}
+}
+
+\newcommand{\bgcross}[2][0.9mm]{%
+  % cross marker at coordinate #2 with arm half-length #1
+  \draw[BgLine, line width=0.8pt]
+    ($(#2)+(45:#1)$)  -- ($(#2)+(225:#1)$)
+    ($(#2)+(135:#1)$) -- ($(#2)+(-45:#1)$);
+}
+
+\newcommand{\paneltitle}[1]{%
+  % Call inside a panel scope where coordinate (BC) marks the
+  % bottom-centre anchor.
+  % #1: sector mathy label, e.g. $\mathcal{R}\!\times\!\mathcal{F}^2$
+  \node[font=\small, anchor=north] at ($(BC)+(0,-0.15)$) {#1};
+}
+
+\newcommand{\epsilonbadge}{%
+  % Call inside a panel scope where coordinate (TR) marks the
+  % top-right anchor. Badge sits inside the corner so leg labels
+  % can extend out to the top-right without collision.
+  \node[font=\scriptsize, TagText!85, anchor=north east, inner sep=2pt]
+    at (TR) {{$+\,\varepsilon$}};
+}
+
+\begin{document}
+
+\newlength{\figL}
+\setlength{\figL}{0.95cm}
+
+\begin{tikzpicture}[
+    x=\figL, y=\figL,
+    line cap=round, line join=round,
+    font=\normalsize
+]
+
+% Panel grid: 2x2, each panel ~3.6 wide, 3.0 tall (in figL units).
+% Panel centres:
+\pgfmathsetmacro{\panW}{3.8}
+\pgfmathsetmacro{\panH}{3.6}
+
+\coordinate (Apos) at (0,            \panH);   % top-left  (a)
+\coordinate (Bpos) at (\panW,        \panH);   % top-right (b)
+\coordinate (Cpos) at (0,            0);       % bottom-left  (c)
+\coordinate (Dpos) at (\panW,        0);       % bottom-right (d)
+
+% Faint frames around each panel for visual structure
+\foreach \P in {Apos, Bpos, Cpos, Dpos} {
+  \draw[PanelFrame, very thin]
+    ($(\P)+(-1.55,-1.45)$) rectangle ($(\P)+(1.55, 1.45)$);
+}
+
+% =========================================================
+% Panel (a):  R x F^2 vertex  ->  h - A - F_bar  (lambda)
+% =========================================================
+\begin{scope}[shift={(Apos)}]
+  \coordinate (V)  at (0,0);
+  \coordinate (BC) at (0,-1.45);
+  \coordinate (TR) at (1.42, 1.32);
+  % three legs from the vertex
+  \coordinate (Lh) at (135:1.15);  % graviton up-left
+  \coordinate (LA) at (45:1.15);   % photon  up-right
+  \coordinate (LF) at (-90:1.15);  % background straight down
+
+  \draw[graviton] (V) -- (Lh);
+  \draw[photon]   (V) -- (LA);
+  \draw[bgleg]    (V) -- (LF);
+  \bgcross{LF}
+
+  \node[vertexdot] at (V) {};
+
+  \node[GravitonLine, font=\small] at ($(Lh)+(-0.1,0.18)$) {$h$};
+  \node[PhotonLine,   font=\small] at ($(LA)+(0.20,0.05)$) {$A$};
+  \node[BgLine,       font=\small] at ($(LF)+(0.22,0)$)    {$\bar F$};
+
+  \node[font=\small, TagText, anchor=north west, inner sep=2pt] at (-1.55, 1.45) {(a)};
+  \epsilonbadge
+  \paneltitle{$\mathcal{R}\!\times\!\mathcal{F}^{2}$}
+\end{scope}
+
+% =========================================================
+% Panel (b):  T^2 x F vertex  ->  T - T  with F_bar insertion  (kappa)
+% =========================================================
+\begin{scope}[shift={(Bpos)}]
+  \coordinate (BC) at (0,-1.45);
+  \coordinate (TR) at (1.42, 1.32);
+  % Two torsion legs joined by an F_bar insertion at the midpoint
+  \coordinate (Tl) at (-1.15, 0.1);
+  \coordinate (Tr) at ( 1.15, 0.1);
+  \coordinate (Vins) at (0, 0.1);
+
+  \draw[torsion] (Tl) -- (Vins);
+  \draw[torsion] (Vins) -- (Tr);
+
+  \node[bginsertion] at (Vins) {};
+  \bgcross[1.0mm]{Vins}
+
+  \node[BgLine, font=\small] at ($(Vins)+(0,-0.45)$) {$\bar F$};
+
+  \node[TorsionLine, font=\small] at ($(Tl)+(-0.18,0.18)$) {$T$};
+  \node[TorsionLine, font=\small] at ($(Tr)+( 0.18,0.18)$) {$T$};
+
+  \node[font=\small, TagText, anchor=north west, inner sep=2pt] at (-1.55, 1.45) {(b)};
+  \epsilonbadge
+  \paneltitle{$\mathcal{T}^{2}\!\times\!\mathcal{F}$}
+\end{scope}
+
+% =========================================================
+% Panel (c):  R^2 x F vertex  ->  h - h  with F_bar insertion  (rho)
+% =========================================================
+\begin{scope}[shift={(Cpos)}]
+  \coordinate (BC) at (0,-1.45);
+  \coordinate (TR) at (1.42, 1.32);
+  \coordinate (Hl) at (-1.15, 0.1);
+  \coordinate (Hr) at ( 1.15, 0.1);
+  \coordinate (Vins) at (0, 0.1);
+
+  \draw[graviton] (Hl) -- (Vins);
+  \draw[graviton] (Vins) -- (Hr);
+
+  \node[bginsertion] at (Vins) {};
+  \bgcross[1.0mm]{Vins}
+
+  \node[BgLine, font=\small] at ($(Vins)+(0,-0.45)$) {$\bar F$};
+
+  \node[GravitonLine, font=\small] at ($(Hl)+(-0.18,0.18)$) {$h$};
+  \node[GravitonLine, font=\small] at ($(Hr)+( 0.18,0.18)$) {$h$};
+
+  \node[font=\small, TagText, anchor=north west, inner sep=2pt] at (-1.55, 1.45) {(c)};
+  \paneltitle{$\mathcal{R}^{2}\!\times\!\mathcal{F}$}
+\end{scope}
+
+% =========================================================
+% Panel (d):  dT x F^2 vertex  ->  T - A - F_bar  (mu)
+% =========================================================
+\begin{scope}[shift={(Dpos)}]
+  \coordinate (V)  at (0,0);
+  \coordinate (BC) at (0,-1.45);
+  \coordinate (TR) at (1.42, 1.32);
+  \coordinate (LT) at (135:1.15);  % torsion up-left
+  \coordinate (LA) at (45:1.15);   % photon  up-right
+  \coordinate (LF) at (-90:1.15);  % background straight down
+
+  \draw[torsion] (V) -- (LT);
+  \draw[photon]  (V) -- (LA);
+  \draw[bgleg]   (V) -- (LF);
+  \bgcross{LF}
+
+  \node[vertexdot] at (V) {};
+
+  \node[TorsionLine, font=\small] at ($(LT)+(-0.1,0.18)$) {$T$};
+  \node[PhotonLine,  font=\small] at ($(LA)+(0.20,0.05)$) {$A$};
+  \node[BgLine,      font=\small] at ($(LF)+(0.22,0)$)    {$\bar F$};
+
+  \node[font=\small, TagText, anchor=north west, inner sep=2pt] at (-1.55, 1.45) {(d)};
+  \epsilonbadge
+  \paneltitle{$\widetilde{\nabla}\mathcal{T}\!\times\!\mathcal{F}^{2}$}
+\end{scope}
+
+\end{tikzpicture}
+
+\end{document}

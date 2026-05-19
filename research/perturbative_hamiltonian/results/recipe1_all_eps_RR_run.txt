@@ -1,0 +1,29 @@
+==============================================================================
+Recipe 1 Preflight — all ε R̃·R̃ contractions on q-irreducible
+==============================================================================
+
+q has 16 free parameters.
+Building 4 representative contractions (d_1, d_5, d_9, d_13)...
+
+--- Contraction d_1 ---
+  d_1 vanishes identically on the q-irreducible projection.
+
+--- Contraction d_5 ---
+  Max k-degree of d_5 (after stripping profile²): 2
+  All monomials k-degree range: min=2, max=2
+  → STANDARD KINETIC (∂q)·(∂q) confirmed.
+
+--- Contraction d_9 ---
+  d_9 vanishes identically on the q-irreducible projection.
+
+--- Contraction d_13 ---
+  Max k-degree of d_13 (after stripping profile²): 2
+  All monomials k-degree range: min=2, max=2
+  → STANDARD KINETIC (∂q)·(∂q) confirmed.
+
+---
+Verdict: every nonzero ε R̃·R̃ contraction gives k-degree ≤ 2 on the
+q-irreducible projection at linear order on flat Minkowski. No (∂²q)²
+structure ever appears.
+This is the analytical conclusion: there is NO mechanism for
+Pais–Uhlenbeck (∂²q)² to arise from b5·R̃² on the q-sector.

@@ -1,0 +1,64 @@
+{
+  "_audit": {
+    "audited": "2026-04-27",
+    "status": "annotated",
+    "see": "research/perturbative_hamiltonian/notes/FINAL_ASSESSMENT.md",
+    "specific_corrections": [
+      "A-block rank uniformity is verified BUT aux block diverges as 1/b^2; rank-jump is *relocated* to the disconnected aux block, not removed (Review 1 C8, reviews/review1_mathematical_verification.md).",
+      "Curved-background O(h^2) extension fails: Nieh-Yan-type cross terms remain unabsorbed (FINAL_ASSESSMENT §'What is overstated').",
+      "Compatibility with Aoki-Mukohyama 2020 should be downgraded to qualitative consistency at linearised order, not structural equivalence: AM's varphi has non-canonical sinh-tower kinetic and lives in dRGT-bigravity infinite tower (Meta-K K6, meta_reviews/meta_review_K_literature_claims.md)."
+    ]
+  },
+  "agent": "Round 2 Agent F",
+  "date": "2026-04-26",
+  "verdict_axial_at_linear_flat": "VERIFIED",
+  "verdict_curved_extension": "BREAKS at O(h^2)",
+  "verdict_higher_orders_axial_only": "SURVIVES (algebraic cubic)",
+  "verdict_other_sectors": "tensor blocked, trace zero-projection",
+  "key_findings": [
+    "Bopp-Podolsky single-auxiliary lift in Agent C's *vector* form (B_mu) does NOT integrate B out algebraically -- B appears in the Lagrangian only through G=dB which is first-order in B.",
+    "The CORRECT single-auxiliary lift uses a SCALAR phi (since (d.A) is a scalar). This IS algebraic and reproduces L_HD exactly.",
+    "Constraint Poisson matrix M = M_A oplus M_aux is block-diagonal.",
+    "M_A has det = m_A^4, b-independent: A-sector rank-stable.",
+    "M_aux has det = -1/b^2, diverges as b -> 0: aux sector decouples in a singular limit (auxiliary mass^2 = 1/b -> infty).",
+    "b -> 0 limit recovers pure Proca cleanly at the LEVEL OF THE A-SECTOR.",
+    "At the LEVEL OF THE AUXILIARY, b -> 0 is singular -- Lyakhovich's discontinuity is named, not bridged. This is consistent with Round 1 Agent A's verdict."
+  ],
+  "M_A_block": [
+    [
+      0,
+      -1
+    ],
+    [
+      1,
+      0
+    ]
+  ],
+  "M_A_block_factor": "m_A^2",
+  "M_A_det_normalized": "m_A^4",
+  "M_aux_block": [
+    [
+      0,
+      -1
+    ],
+    [
+      1,
+      0
+    ]
+  ],
+  "M_aux_block_factor": "1/b",
+  "M_aux_det_normalized": "1/b^2",
+  "primary_constraints": [
+    "pi_A0 ~ 0",
+    "pi_phi ~ 0"
+  ],
+  "secondary_constraints": [
+    "EL_A0 = (d.F) - m_A^2 * A^0 ~ 0  (Gauss law)",
+    "EL_phi = (d.A) - phi/b ~ 0       (algebraic for phi)"
+  ],
+  "lift_correction_to_agent_C": "Agent C's *vector* B_mu lift (with G=dB and G.F coupling) is NOT a valid Bopp-Podolsky lift: G.F is the F.F field-strength of B and adds a NEW propagating photon, not a Lagrange multiplier. The valid single-auxiliary form uses a SCALAR phi conjugate to (d.A), because Rtilde reduces to a SCALAR (d.A) in the axial sector. The structural conclusion (rank-stable A-block, rank-jump confined to aux block) is unchanged.",
+  "extends_to_curved_bg": false,
+  "obstruction_curved": "eps . R(omega-tilde) generates Nieh-Yan-like cross-couplings between axial torsion and metric curvature; these are not linear in (d.A) and break the scalar-auxiliary template.",
+  "extends_to_higher_axial_only": true,
+  "compatibility_with_AM_2009_11739": "Aoki-Mukohyama Eq. 497-526 shows the Holst-squared term introduces a single propagating SCALAR (spin-0^-) mode phi with kinetic ~ (d phi)^2/(1+phi^2). Our scalar-auxiliary lift reproduces this scalar at linear order: phi here corresponds to AM's varphi at linearised order. CONSISTENT."
+}

@@ -1,6 +1,6 @@
 [project]
 name = "tidal"
-version = "0.33.12"
+version = "0.42.1"
 description = "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -49,6 +49,7 @@ dependencies = [
 wolfram = ["wolframclient>=1.4.0,<2.0"]
 sensitivity = ["SALib>=1.4"]
 inference = ["anesthetic>=2.0"]
+jax = ["jax>=0.4.20", "jaxlib>=0.4.20"]
 # pypolychord: install manually (requires gfortran):
 #   git clone https://github.com/PolyChord/PolyChordLite /tmp/PolyChordLite
 #   cd /tmp/PolyChordLite && pip install --no-build-isolation --config-settings="--global-option=--no-mpi" .
@@ -100,6 +101,7 @@ ignore = [
     "DOC201",
     "DOC402",
     "PD",
+    "RUF002",  # physics docstrings intentionally use Unicode Greek/math symbols
 ]
 fixable = ["ALL"]
 unfixable = ["T201"]
@@ -114,6 +116,8 @@ unfixable = ["T201"]
     "D103",
     "D104",
     "D205",
+    "D400",
+    "D401",
     "SLF001",
     "PLC0415",
     "PLC2701",
@@ -122,12 +126,22 @@ unfixable = ["T201"]
     "PLR0917",
     "PLR2004",
     "FBT001",
+    "FBT002",
+    "N803",
     "N806",
+    "RUF001",
     "RUF003",
+    "RUF012",
     "S108",
     "S404",
     "S603",
+    "ARG001",
     "ARG002",
+    "ANN001",
+    "ANN201",
+    "ANN202",
+    "DOC501",
+    "DOC502",
     "E303",
 ]
 "examples/**/*" = [
@@ -139,10 +153,17 @@ unfixable = ["T201"]
     "PLC0415", "PLC1901", "PLC2701", "PLR0124",
     "EXE001", "RUF001", "BLE001",
 ]
-"tidal/cli/**/*" = ["T201", "PLC0415"]
-"tidal/inference/**/*" = ["T201", "PLC0415", "PLR0913", "PLR0917", "PLR0911", "PLR0912", "PLR0914", "C901", "ANN401", "ANN001", "ANN202", "SLF001", "DOC501", "PLR2004", "D401", "ARG001"]
-"tidal/measurement/_stability.py" = ["N806", "PLC0415"]
+"tidal/cli/**/*" = ["T201", "PLC0415", "PLR0914"]
+"tidal/inference/**/*" = ["T201", "PLC0415", "PLR0913", "PLR0917", "PLR0911", "PLR0912", "PLR0914", "PLR0915", "C901", "ANN401", "ANN001", "ANN202", "SLF001", "DOC501", "PLR2004", "D401", "ARG001"]
+"tidal/measurement/_stability.py" = ["N803", "N806", "PLC0415", "RUF001", "RUF003", "DOC501"]
+"tidal/measurement/_stability_cache.py" = ["N806", "PLC0415"]
+"tidal/symbolic/_spec_cache.py" = ["PLC0415"]
+"tidal/measurement/_posthoc_audit.py" = ["PLC0415", "C901", "PLR0912", "PLR0914", "PLR0913", "PLR0917"]
 "tidal/cli/_derive.py" = ["T201", "PLC0415", "S404", "S603", "S607"]
+"tidal/cli/_validate.py" = ["C901", "PLR0912", "PLR2004"]
+"tidal/symbolic/_kinetic_eval.py" = ["DOC501", "PLR6301"]
+"tidal/symbolic/json_loader.py" = ["DOC502"]
+"tidal/solver/ida.py" = ["PLR0913", "PLR0917", "RUF003"]
 "scripts/**/*" = [
     "INP001",
     "T201",
@@ -150,10 +171,132 @@ unfixable = ["T201"]
     "D102",
     "D103",
     "D104",
+    "D205",
+    "D400",
+    "D401",
     "S607",
     "S603",
+    "EXE001",
+    "PLC0415",
+    "PLC2701",
+    "PLC0206",
+    "PLR0913",
+    "PLR0914",
+    # Mathematical naming conventions (matrices, Jacobians, etc.)
+    "N803",
+    "N806",
+    # Unicode math symbols (×, α, σ, EN DASH, MINUS SIGN) in strings/comments
+    "RUF001",
+    "RUF003",
+    "RUF012",
+    # THEORIES-format description comments in benchmark scripts
+    "ERA001",
+    # Benchmark helpers often need > 5 positional args, magic comparison values
+    "PLR0917",
+    "PLR2004",
+    # Inner plotting helpers don't need full type annotations
+    "ANN001",
+    "ANN002",
+    "ANN201",
+    "ANN202",
+    "ANN401",
+    # Figure scripts have necessarily complex single-function plot pipelines
+    "C901",
+    "PLR0915",
+    "PLR0912",
+    "PLR0911",
+    # Benchmark scripts use try/except generously and have boolean toggles
+    "BLE001",
+    "B007",
+    "B023",
+    "FBT001",
+    "FBT002",
+    "SIM105",
+    "SIM113",
+    "SLF001",
+    # Path/encoding modernisations not enforced on one-off scripts
+    "PTH100",
+    "PTH103",
+    "PTH118",
+    "PTH120",
+    "PTH123",
+    "PLW0603",
+    "PLW1514",
+    "PERF401",
+    "EM101",
+    "F541",
+    "E402",
+    "E741",
+    # Docstring exception listings not enforced on benchmark scripts
+    "DOC501",
+    "DOC502",
+    "TRY003",
+    # Random module fine for benchmark/sweep seeding
+    "S311",
+    "S307",
+    "FURB103",
+    "RUF015",
 ]
 "docs/**/*" = ["INP001", "I002"]
+"research/**/*" = [
+    # Research review / exploration scripts — same relaxations as scripts/**, plus
+    # physics-notation function names (Dt, Dx, EL_phi, Fring, T, L) and module-level
+    # globals (eps_phi_PS) that match the source papers.
+    "INP001",
+    "T201",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D205",
+    "S607",
+    "S603",
+    "EXE001",
+    "PLC0415",
+    "PLC2701",
+    "PLR0913",
+    "PLR0914",
+    "PLR0915",
+    "PLR0912",
+    "PLR0917",
+    "PLR2004",
+    "N802",
+    "N803",
+    "N806",
+    "N816",
+    "ANN001",
+    "ANN201",
+    "ANN202",
+    "RUF001",
+    "RUF003",
+    "ERA001",
+    "E402",
+    "E741",
+    "C901",
+    "BLE001",
+    "B007",
+    "B023",
+    "B905",
+    "S307",
+    "S311",
+    "D400",
+    "D401",
+    "D209",
+    "F541",
+    "PERF401",
+    "EM101",
+    "RUF012",
+    "FBT001",
+    "FBT002",
+    "SIM105",
+    "SIM113",
+    "DOC501",
+    "DOC502",
+    "TRY003",
+    "ANN002",
+    "PTH118",
+    "PLR0911",
+]
 
 [tool.ruff.lint.pylint]
 allow-dunder-method-names = [
@@ -175,6 +318,8 @@ convention = "numpy"
 testpaths = ["tests"]
 markers = [
     "slow: integration test with non-trivial compute (simulate, derive, etc.); runs in default lane but can be skipped with `-m 'not slow'`.",
+    "publication: tests of the App C publication pipeline (manifest, canonical data, table/figure scripts); skipped by default, run with `-m publication tests/publication/`.",
+    "publication_slow: subset of publication tests that build PDFs via matplotlib; skipped within `publication` unless explicitly requested.",
 ]
 
 [tool.coverage.run]

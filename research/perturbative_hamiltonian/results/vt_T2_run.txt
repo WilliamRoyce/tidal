@@ -1,0 +1,100 @@
+========================================================================
+Step 1: Parker-Simon-reduced EOMs (truncated at O(b5))
+========================================================================
+E^(1)_phi = b5*lambda**2*Derivative(phi(t), (t, 4)) - b5*lambda*lambda_chi*Derivative(chi(t), (t, 5)) + lambda**2*phi(t) - lambda*lambda_chi*Derivative(chi(t), t) - m_phi**2*phi(t) - Derivative(phi(t), (t, 2))
+
+E^(1)_chi = b5*lambda*lambda_chi*Derivative(phi(t), (t, 5)) - b5*lambda_chi**2*Derivative(chi(t), (t, 6)) + lambda*lambda_chi*Derivative(phi(t), t) - lambda_chi**2*Derivative(chi(t), (t, 2)) - m_chi**2*chi(t) - Derivative(chi(t), (t, 2))
+
+Max derivative order in PS-reduced EOMs: r = 6
+  phi appears in E_phi_red up to order 4
+  chi appears in E_phi_red up to order 5
+  phi appears in E_chi_red up to order 5
+  chi appears in E_chi_red up to order 6
+
+========================================================================
+Step 2: jet-form EOMs
+========================================================================
+eps_phi(jet) = -Chi_1*lambda*lambda_chi - Chi_5*b5*lambda*lambda_chi + Phi_0*lambda**2 - Phi_0*m_phi**2 - Phi_2 + Phi_4*b5*lambda**2
+
+eps_chi(jet) = -Chi_0*m_chi**2 - Chi_2*lambda_chi**2 - Chi_2 - Chi_6*b5*lambda_chi**2 + Phi_1*lambda*lambda_chi + Phi_5*b5*lambda*lambda_chi
+
+========================================================================
+Step 3: VT integrand structure
+========================================================================
+eps_phi(u*jet) = -Chi_1*lambda*lambda_chi*u - Chi_5*b5*lambda*lambda_chi*u + Phi_0*lambda**2*u - Phi_0*m_phi**2*u - Phi_2*u + Phi_4*b5*lambda**2*u
+
+eps_chi(u*jet) = -Chi_0*m_chi**2*u - Chi_2*lambda_chi**2*u - Chi_2*u - Chi_6*b5*lambda_chi**2*u + Phi_1*lambda*lambda_chi*u + Phi_5*b5*lambda*lambda_chi*u
+
+Polynomial degree in u:
+  eps_phi(u*jet): degree 1
+  eps_chi(u*jet): degree 1
+
+VT integrand polynomial degree in u (must be >= 0 polynomial):
+  Phi[0]*eps_phi(u*jet): degree 1, lowest power (1,)
+  Chi[0]*eps_chi(u*jet): degree 1, lowest power (1,)
+
+========================================================================
+Step 4: VT Lagrangian (integrated over u in [0,1])
+========================================================================
+INT[Phi*eps_phi du] = -Chi_1*Phi_0*lambda*lambda_chi/2 - Chi_5*Phi_0*b5*lambda*lambda_chi/2 + Phi_0**2*lambda**2/2 - Phi_0**2*m_phi**2/2 - Phi_0*Phi_2/2 + Phi_0*Phi_4*b5*lambda**2/2
+
+INT[Chi*eps_chi du] = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2*lambda_chi**2/2 - Chi_0*Chi_2/2 - Chi_0*Chi_6*b5*lambda_chi**2/2 + Chi_0*Phi_1*lambda*lambda_chi/2 + Chi_0*Phi_5*b5*lambda*lambda_chi/2
+
+L_VT(jet) = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2*lambda_chi**2/2 - Chi_0*Chi_2/2 - Chi_0*Chi_6*b5*lambda_chi**2/2 + Chi_0*Phi_1*lambda*lambda_chi/2 + Chi_0*Phi_5*b5*lambda*lambda_chi/2 - Chi_1*Phi_0*lambda*lambda_chi/2 - Chi_5*Phi_0*b5*lambda*lambda_chi/2 + Phi_0**2*lambda**2/2 - Phi_0**2*m_phi**2/2 - Phi_0*Phi_2/2 + Phi_0*Phi_4*b5*lambda**2/2
+
+========================================================================
+Step 5: consistency check  EL(L_VT) == E^(1)_sigma ?
+========================================================================
+EL_phi(L_VT) = -Chi_1*lambda*lambda_chi - Chi_5*b5*lambda*lambda_chi + Phi_0*lambda**2 - Phi_0*m_phi**2 - Phi_2 + Phi_4*b5*lambda**2
+
+EL_chi(L_VT) = -Chi_0*m_chi**2 - Chi_2*lambda_chi**2 - Chi_2 - Chi_6*b5*lambda_chi**2 + Phi_1*lambda*lambda_chi + Phi_5*b5*lambda*lambda_chi
+
+EL_phi(L_VT) - eps_phi = 0
+EL_chi(L_VT) - eps_chi = 0
+
+Variational completion verified: True
+
+========================================================================
+Step 6: parameter-limit pathology check
+========================================================================
+  b5 -> 0: L_VT = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2*lambda_chi**2/2 - Chi_0*Chi_2/2 + Chi_0*Phi_1*lambda*lambda_chi/2 - Chi_1*Phi_0*lambda*lambda_chi/2 + Phi_0**2*lambda**2/2 - Phi_0**2*m_phi**2/2 - Phi_0*Phi_2/2
+  m_phi -> 0: L_VT = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2*lambda_chi**2/2 - Chi_0*Chi_2/2 - Chi_0*Chi_6*b5*lambda_chi**2/2 + Chi_0*Phi_1*lambda*lambda_chi/2 + Chi_0*Phi_5*b5*lambda*lambda_chi/2 - Chi_1*Phi_0*lambda*lambda_chi/2 - Chi_5*Phi_0*b5*lambda*lambda_chi/2 + Phi_0**2*lambda**2/2 - Phi_0*Phi_2/2 + Phi_0*Phi_4*b5*lambda**2/2
+  m_chi -> 0: L_VT = -Chi_0*Chi_2*lambda_chi**2/2 - Chi_0*Chi_2/2 - Chi_0*Chi_6*b5*lambda_chi**2/2 + Chi_0*Phi_1*lambda*lambda_chi/2 + Chi_0*Phi_5*b5*lambda*lambda_chi/2 - Chi_1*Phi_0*lambda*lambda_chi/2 - Chi_5*Phi_0*b5*lambda*lambda_chi/2 + Phi_0**2*lambda**2/2 - Phi_0**2*m_phi**2/2 - Phi_0*Phi_2/2 + Phi_0*Phi_4*b5*lambda**2/2
+  lambda -> 0: L_VT = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2*lambda_chi**2/2 - Chi_0*Chi_2/2 - Chi_0*Chi_6*b5*lambda_chi**2/2 - Phi_0**2*m_phi**2/2 - Phi_0*Phi_2/2
+  lambda_chi -> 0: L_VT = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2/2 + Phi_0**2*lambda**2/2 - Phi_0**2*m_phi**2/2 - Phi_0*Phi_2/2 + Phi_0*Phi_4*b5*lambda**2/2
+
+  L_VT denominator: 2
+  -> has rational structure
+
+========================================================================
+Step 7: comparison L_eff (direct on-shell Routhian) vs L_VT
+========================================================================
+L_eff(jet) = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2*lambda_chi**2 - Chi_0*Chi_6*b5*lambda_chi**2 + Chi_0*Phi_1*lambda*lambda_chi + Chi_0*Phi_5*b5*lambda*lambda_chi - Chi_1**2*Chi_5*b5*lambda_chi**3/(Chi_1*lambda_chi - Phi_0*lambda) + Chi_1**2*Phi_4*b5*lambda*lambda_chi**2/(Chi_1*lambda_chi - Phi_0*lambda) - Chi_1**2*lambda_chi**2/2 + Chi_1**2/2 + 2*Chi_1*Chi_5*Phi_0*b5*lambda*lambda_chi**2/(Chi_1*lambda_chi - Phi_0*lambda) - 2*Chi_1*Phi_0*Phi_4*b5*lambda**2*lambda_chi/(Chi_1*lambda_chi - Phi_0*lambda) + Chi_3**2*b5*lambda_chi**2/2 - Chi_3*Phi_2*b5*lambda*lambda_chi - Chi_5*Phi_0**2*b5*lambda**2*lambda_chi/(Chi_1*lambda_chi - Phi_0*lambda) - Chi_5*Phi_0*b5*lambda*lambda_chi + Phi_0**2*Phi_4*b5*lambda**3/(Chi_1*lambda_chi - Phi_0*lambda) + Phi_0**2*lambda**2/2 - Phi_0**2*m_phi**2/2 + Phi_0*Phi_4*b5*lambda**2 + Phi_1**2/2 + Phi_2**2*b5*lambda**2/2
+
+L_VT (jet) = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2*lambda_chi**2/2 - Chi_0*Chi_2/2 - Chi_0*Chi_6*b5*lambda_chi**2/2 + Chi_0*Phi_1*lambda*lambda_chi/2 + Chi_0*Phi_5*b5*lambda*lambda_chi/2 - Chi_1*Phi_0*lambda*lambda_chi/2 - Chi_5*Phi_0*b5*lambda*lambda_chi/2 + Phi_0**2*lambda**2/2 - Phi_0**2*m_phi**2/2 - Phi_0*Phi_2/2 + Phi_0*Phi_4*b5*lambda**2/2
+
+L_eff - L_VT = -Chi_0*Chi_2*lambda_chi**2/2 + Chi_0*Chi_2/2 - Chi_0*Chi_6*b5*lambda_chi**2/2 + Chi_0*Phi_1*lambda*lambda_chi/2 + Chi_0*Phi_5*b5*lambda*lambda_chi/2 - Chi_1**2*Chi_5*b5*lambda_chi**3/(Chi_1*lambda_chi - Phi_0*lambda) + Chi_1**2*Phi_4*b5*lambda*lambda_chi**2/(Chi_1*lambda_chi - Phi_0*lambda) - Chi_1**2*lambda_chi**2/2 + Chi_1**2/2 + 2*Chi_1*Chi_5*Phi_0*b5*lambda*lambda_chi**2/(Chi_1*lambda_chi - Phi_0*lambda) - 2*Chi_1*Phi_0*Phi_4*b5*lambda**2*lambda_chi/(Chi_1*lambda_chi - Phi_0*lambda) + Chi_1*Phi_0*lambda*lambda_chi/2 + Chi_3**2*b5*lambda_chi**2/2 - Chi_3*Phi_2*b5*lambda*lambda_chi - Chi_5*Phi_0**2*b5*lambda**2*lambda_chi/(Chi_1*lambda_chi - Phi_0*lambda) - Chi_5*Phi_0*b5*lambda*lambda_chi/2 + Phi_0**2*Phi_4*b5*lambda**3/(Chi_1*lambda_chi - Phi_0*lambda) + Phi_0*Phi_2/2 + Phi_0*Phi_4*b5*lambda**2/2 + Phi_1**2/2 + Phi_2**2*b5*lambda**2/2
+
+EL_phi(L_eff) - EL_phi(L_VT) = 0
+EL_chi(L_eff) - EL_chi(L_VT) = 0
+
+========================================================================
+Step 8: source-form homogeneity analysis
+========================================================================
+eps_phi rational in fibers: False
+eps_chi rational in fibers: False
+
+Min power of u in eps_phi(u*jet): 1
+Min power of u in eps_chi(u*jet): 1
+
+VT integrand u * Phi[0] * eps_phi(u*jet) has min u-power = 1  (must be >= 0 for convergence)
+
+========================================================================
+FINAL VERDICT for T2:
+========================================================================
+  VT integral CONVERGES.
+  Source form is polynomial in fibers => integrand is
+  polynomial in u => integral over [0,1] is finite.
+  Reproduced original EOMs via EL: True
+
+  L_VT = -Chi_0**2*m_chi**2/2 - Chi_0*Chi_2*lambda_chi**2/2 - Chi_0*Chi_2/2 - Chi_0*Chi_6*b5*lambda_chi**2/2 + Chi_0*Phi_1*lambda*lambda_chi/2 + Chi_0*Phi_5*b5*lambda*lambda_chi/2 - Chi_1*Phi_0*lambda*lambda_chi/2 - Chi_5*Phi_0*b5*lambda*lambda_chi/2 + Phi_0**2*lambda**2/2 - Phi_0**2*m_phi**2/2 - Phi_0*Phi_2/2 + Phi_0*Phi_4*b5*lambda**2/2

@@ -236,9 +236,11 @@ Print["Result: ", result];  (* Should be a number, not symbolic *)
 
 \textbf{Cause:} Curvature-squared Lagrangians ($R^2$, $\tilde{R}^2$) produce higher-derivative equations of motion.
 
-\textbf{Resolution:} Automatic Ostrogradsky reduction is applied on JSON load (v0.15.2+). The reducer introduces auxiliary fields to convert all equations to $\leq$2nd order. See \S\ref{sec:ostrogradsky} in the Architecture documentation.
+\textbf{Resolution (v0.33.0+, current):} Automatic mechanical Ostrogradsky reduction was \emph{removed} in v0.33.0 (commit \texttt{ceb6e63}) because it introduced ghost modes that caused long-time-growth artefacts in simulations.  Higher-derivative theories now require an explicit \texttt{[perturbation]} block in the TOML, with a small parameter declared.  The v6 iterative Parker--Simon scheme (see \cref{sec:perturbative-reduction}) handles such theories by treating the higher-derivative correction as a Duhamel source on the second-order base operator, never propagating ghost modes.  Loading a JSON with \texttt{time\_derivative\_order > 2} but no \texttt{[perturbation]} metadata raises a clear \texttt{ValueError} at JSON-load time.
 
-\textbf{Note:} After reduction, implicit acceleration cross-references ($\partial_t^2 q_j$ in $q_i$'s equation) are handled by the generalized mass-matrix modal solver (v0.16.0, issue \#165 resolved). See \cref{sec:modal-mass-matrix} and \cref{sec:troubleshoot-singular-mass}.
+\textbf{Note:} After Parker--Simon reduction, implicit acceleration cross-references ($\partial_t^2 q_j$ in $q_i$'s equation) are handled by the generalised mass-matrix modal solver. See \cref{sec:modal-mass-matrix} and \cref{sec:troubleshoot-singular-mass}.
+
+\textbf{Architectural barrier (constraint promotion):} For theories where the small parameter promotes an algebraic constraint to a higher-derivative dynamical field (e.g. $b_5\,\tilde{R}^2$ in PGT torsion), the equation-side reduction completes but the Lagrangian-side substitution (LPS, \cref{sec:pr-cb-lps}) aborts; the resulting Hamiltonian retains $\partial_t^2$ residues.  See \cref{sec:pr-constraint-barrier} for the architectural barrier and open research directions.
 
 \subsubsection{IBP Failures for Curvature-Squared Theories}
 \label{sec:ibp-curvature-squared}
@@ -495,7 +497,7 @@ def check_rates(state):
 
 \textbf{Symptom}: Modal solver logs ``Generalized mass matrix: singular M detected'' and produces large matrix entries ($\max|A| \gg 1$).
 
-\textbf{Cause}: Higher-derivative Lagrangians (e.g., $\tilde{R}^2$ in PGT) produce equations with implicit acceleration coupling: $\partial_t^2(q_j)$ appears on the RHS of $q_i$'s equation. After Ostrogradsky reduction, the mass matrix $M$ may be singular, indicating hidden algebraic constraints between fields.
+\textbf{Cause}: A singular mass matrix typically indicates hidden algebraic constraints between fields, which can arise from gauge symmetry (e.g., Poincar\'e gauge symmetry in PGT) or from constraint-field demotion under v6 perturbative reduction (\cref{sec:pr-v6}). Pre-v6 derivations also produced singular $M$ via Ostrogradsky-auxiliary fields, but the Ostrogradsky reduction was removed in v0.33.0; see \cref{sec:4th-order-eom}.
 
 \textbf{Solution}: The modal solver handles this automatically via mass-matrix eigendecomposition (\cref{sec:modal-singular-mass}). Zero eigenvalues are detected and the corresponding directions are Schur-eliminated. No user action needed.
 
@@ -546,3 +548,43 @@ This is normal and expected --- no user action needed.
   \item The $(-,+,+,+)$ metric convention: negative kinetic energy for timelike components is physical, not a ghost
 \end{itemize}
 See issue \#164 for full propagator analysis (future work).
+
+\subsubsection{Position-Dependent Theory at Periodic BCs Diverges (GH \#367)}
+
+\textbf{Resolved in v0.41.6 (2026-05-19).} The historical symptom was
+field-amplitude growth by $10^6$--$10^9\times$ and a
+\texttt{SimulationDivergedError} from
+\texttt{\_evolve\_full\_matrix}. If you are seeing this on a current
+tip-of-tree build, you have either pinned a pre-v0.41.6 version of
+\texttt{tidal/solver/modal.py} or hit a different bug — proceed to
+diagnostics below.
+
+\textbf{Root cause and fix}: \texttt{\_build\_convolution\_matrix}
+was missing the $M^{-1}$ (inverse \texttt{kinetic\_coefficient\_symbolic})
+folding that \texttt{\_build\_per\_mode\_matrices} already applied
+(\#301/\#302). Theories whose graviton or torsion modes carry a
+non-trivial kinetic coefficient (Gertsenshtein: $-1/\kappa^2$; massive
+vector torsion: $-\xi$) had a discrete Laplacian with the wrong sign
+at every $k$, giving the state matrix real eigenvalues $\pm k$ that
+$\exp(A t)$ faithfully amplified. The visible $\max\Re(\lambda) =
+k_{\max}$ was the symptom of a uniform-in-$k$ sign error, not a
+non-normal pseudospectral artifact at the Nyquist edge. See
+\S\ref{sec:modal-pos-dep-auto-route} for the full diagnosis and the
+list of rejected hypotheses.
+
+\textbf{Diagnostic checklist} if you are still hitting amplitude growth
+on a current tip-of-tree build:
+\begin{itemize}
+  \item Confirm you are on v0.41.6 or later
+    (\texttt{git log --oneline tidal/solver/modal.py | head -5}).
+  \item Run \texttt{uv run python scripts/benchmarks/modal\_vs\_ida\_inprocess.py}
+    — at $N \in \{64, 128\}$, modal should agree with CVODE on the
+    h$_5$ peak to $<$1\% at $t_{\mathrm{end}} = 20$.
+  \item If the disagreement is large, dump
+    \texttt{kinetic\_coefficient\_symbolic} on the divergent field's
+    equation — if it is non-trivial and the per-mode path also
+    disagrees with CVODE, the bug is elsewhere.
+  \item As a last-resort manual workaround: pass \texttt{--scheme
+    cvode} (no constraints) or \texttt{--scheme ida} (with
+    constraints — CVODE silently freezes those at IC).
+\end{itemize>

@@ -1,0 +1,21 @@
+\begin{frame}{Modal solver}
+  A spectral solver for the linearised gauge theories the survey
+  produces. Two regimes --- per-mode (uniform $B_0$) and convolution-coupling (localised $B_0(x)$) --- both evolve by direct matrix
+  exponential, \emph{no eigendecomposition}.
+
+  \vspace{0.25em}
+  \begin{itemize}\footnotesize
+    \item Every theory linearises to periodic, time-independent PDEs around flat backgrounds
+    \item Both uniform and localised $B_0$ stay inside the regime (per-mode vs.\ convolution coupling)
+    \item Machine-precision time evolution; no time-stepping error
+      \end{itemize}
+
+  Off-the-shelf $V\,\mathrm{diag}(e^{\lambda t})\,V^{-1}$ fails universally on gauge theories.
+  \begin{itemize}\footnotesize
+    \item \textbf{Direct matrix exponential} (Pad\'e / Krylov),
+          not eigendecomposition, $V$ catastrophically ill-conditioned
+    \item \textbf{Fourier-space algebraic elimination} of fields
+          without time derivatives
+      \end{itemize}
+
+\end{frame}

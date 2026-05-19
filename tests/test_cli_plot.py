@@ -774,7 +774,7 @@ class TestSingleFieldSelection:
         from tidal.cli._panels import single_field
 
         class _MockData:
-            fields = {"h_0": None, "h_1": None, "h_4": None}  # noqa: RUF012
+            fields = {"h_0": None, "h_1": None, "h_4": None}
             dynamical_fields = ("h_4",)
 
         result = single_field(_MockData(), None)  # type: ignore[arg-type]
@@ -785,9 +785,9 @@ class TestSingleFieldSelection:
         from tidal.cli._panels import single_field
 
         class _MockData:
-            fields = {"h_0": None, "h_1": None, "h_4": None}  # noqa: RUF012
+            fields = {"h_0": None, "h_1": None, "h_4": None}
             dynamical_fields = ("h_4",)
-            velocities = {"h_0": None, "h_1": None, "h_4": None}  # noqa: RUF012
+            velocities = {"h_0": None, "h_1": None, "h_4": None}
 
         result = single_field(_MockData(), None)  # type: ignore[arg-type]
         assert result == "h_4"
@@ -796,7 +796,7 @@ class TestSingleFieldSelection:
         from tidal.cli._panels import single_field
 
         class _MockData:
-            fields = {"h_0": None, "h_1": None}  # noqa: RUF012
+            fields = {"h_0": None, "h_1": None}
             dynamical_fields = ()
 
         result = single_field(_MockData(), None)  # type: ignore[arg-type]
@@ -809,7 +809,7 @@ class TestSingleFieldSelection:
         from tidal.cli._panels import single_field
 
         class _MockData:
-            fields = {  # noqa: RUF012
+            fields = {
                 "A_0": np.zeros((10, 32, 32)),  # constraint
                 "A_1": np.ones((10, 32, 32)) * 1e-13,  # near-zero (longitudinal)
                 "A_2": np.ones((10, 32, 32)) * 0.5,  # actual wave

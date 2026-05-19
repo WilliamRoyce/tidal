@@ -1,0 +1,46 @@
+% Computational approach: minimal BHL-style mention of the pipeline,
+% the modal solver, and nested sampling.  All elaboration is deferred
+% to App A--J via inline \cref{} -- no architectural breakdown, no
+% backend enumeration, no validation paragraph, no inference design
+% justification, no inference-mechanism enumeration, no closing
+% "deferred" paragraph.  Target ~80 words.
+%
+% Style anchors: HiGGS-introduction pattern (2206.00658 line 168) for
+% the tool-naming sentence; 2101.02645 §I HiGGS-mention pattern for
+% the brief-§3-with-detailed-appendix distribution; PolyChordLite README
+% requirement for citing BOTH Handley papers.
+%
+% Numerical method (¶2): TIDAL uses Padé scaling-and-squaring via
+% scipy.linalg.expm, NOT eigendecomposition; see
+% appendices/numerical.tex:315-344 for the rationale (eigendecomposition
+% abandoned because cond(V) > 1e13 for the multi-field PGT theories of
+% \cref{Results}).
+%
+% Reminder comments for the deferred material live in
+% sections/discussion.tex (App H / EFT placement),
+% sections/results.tex (amplification-vs-instability framing and the
+% inference-mechanism details that surface in \S4), and
+% sections/appendices/architecture.tex (observables-paragraph
+% relocation).
+
+\section{Computational approach}%
+\label{ComputationalApproach}
+
+\paragraph*{\TIDAL{}}
+We obtain the linearised field equations for every theory surveyed
+in \cref{Results} with \TIDAL{} (\emph{Tensor Integration and
+Derivation for Any Lagrangian}; \cref{Architecture,SymbolicComputation,NumericalEvolution}), grounded
+in the \xAct{}~\cite{martingarcia2007xact} suite for
+\Mathematica{}~\cite{mathematica}.
+
+\paragraph*{Numerical evolution}
+The linearised equations are evolved with \TIDAL{}'s Fourier modal
+solver (\cref{ModalSolver}).
+Each Fourier mode is propagated by a single application of its
+matrix exponential, computed via Pad\'e
+scaling-and-squaring~\cite{higham2009scaling}.
+
+\paragraph*{Parameter inference}
+Parameter exploration is by nested sampling with
+PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; the inference
+architecture is documented in \cref{InferenceArchitecture}.

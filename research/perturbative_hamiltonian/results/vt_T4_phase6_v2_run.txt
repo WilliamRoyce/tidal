@@ -1,0 +1,59 @@
+============================================================================
+T4 Phase 6 v2 — IBP-canonicalised Routhian Hessian
+============================================================================
+
+Number of terms in L_eff_jet: 1653
+Number of terms in L_eff_canon: 1374
+
+Highest jet order in L_eff_canon: 5
+Highest jet order at b5=0: 1
+
+--- W^(top) at b5 = 0 ---
+W0 = [[1 + mu13**2/M3 + mu12**2/M2 + mu11**2/M1, mu13*mu23/M3 + mu12*mu22/M2 + mu11*mu21/M1, mu13*mu33/M3 + mu12*mu32/M2 + mu11*mu31/M1], [mu13*mu23/M3 + mu12*mu22/M2 + mu11*mu21/M1, 1 + mu23**2/M3 + mu22**2/M2 + mu21**2/M1, mu23*mu33/M3 + mu22*mu32/M2 + mu21*mu31/M1], [mu13*mu33/M3 + mu12*mu32/M2 + mu11*mu31/M1, mu23*mu33/M3 + mu22*mu32/M2 + mu21*mu31/M1, 1 + mu33**2/M3 + mu32**2/M2 + mu31**2/M1]]
+det(W0) = (M1*M2*M3 + M1*M2*mu13**2 + M1*M2*mu23**2 + M1*M2*mu33**2 + M1*M3*mu12**2 + M1*M3*mu22**2 + M1*M3*mu32**2 + M1*mu12**2*mu23**2 + M1*mu12**2*mu33**2 - 2*M1*mu12*mu13*mu22*mu23 - 2*M1*mu12*mu13*mu32*mu33 + M1*mu13**2*mu22**2 + M1*mu13**2*mu32**2 + M1*mu22**2*mu33**2 - 2*M1*mu22*mu23*mu32*mu33 + M1*mu23**2*mu32**2 + M2*M3*mu11**2 + M2*M3*mu21**2 + M2*M3*mu31**2 + M2*mu11**2*mu23**2 + M2*mu11**2*mu33**2 - 2*M2*mu11*mu13*mu21*mu23 - 2*M2*mu11*mu13*mu31*mu33 + M2*mu13**2*mu21**2 + M2*mu13**2*mu31**2 + M2*mu21**2*mu33**2 - 2*M2*mu21*mu23*mu31*mu33 + M2*mu23**2*mu31**2 + M3*mu11**2*mu22**2 + M3*mu11**2*mu32**2 - 2*M3*mu11*mu12*mu21*mu22 - 2*M3*mu11*mu12*mu31*mu32 + M3*mu12**2*mu21**2 + M3*mu12**2*mu31**2 + M3*mu21**2*mu32**2 - 2*M3*mu21*mu22*mu31*mu32 + M3*mu22**2*mu31**2 + mu11**2*mu22**2*mu33**2 - 2*mu11**2*mu22*mu23*mu32*mu33 + mu11**2*mu23**2*mu32**2 - 2*mu11*mu12*mu21*mu22*mu33**2 + 2*mu11*mu12*mu21*mu23*mu32*mu33 + 2*mu11*mu12*mu22*mu23*mu31*mu33 - 2*mu11*mu12*mu23**2*mu31*mu32 + 2*mu11*mu13*mu21*mu22*mu32*mu33 - 2*mu11*mu13*mu21*mu23*mu32**2 - 2*mu11*mu13*mu22**2*mu31*mu33 + 2*mu11*mu13*mu22*mu23*mu31*mu32 + mu12**2*mu21**2*mu33**2 - 2*mu12**2*mu21*mu23*mu31*mu33 + mu12**2*mu23**2*mu31**2 - 2*mu12*mu13*mu21**2*mu32*mu33 + 2*mu12*mu13*mu21*mu22*mu31*mu33 + 2*mu12*mu13*mu21*mu23*mu31*mu32 - 2*mu12*mu13*mu22*mu23*mu31**2 + mu13**2*mu21**2*mu32**2 - 2*mu13**2*mu21*mu22*mu31*mu32 + mu13**2*mu22**2*mu31**2)/(M1*M2*M3)
+
+--- W^(top) at b5 != 0 (highest order = 5) ---
+W = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+det(W^top) = 0
+
+============================================================================
+RANK & b5-SCALING ANALYSIS
+============================================================================
+Phase-space dim at b5=0 (Ostrogradsky 2*N*r): 6
+Phase-space dim at b5!=0: 30
+Jump: 24
+
+det(W^top) b5-power at leading order: 0
+
+============================================================================
+PATH A HAMILTONIAN-SIDE VERDICT FOR T4 (3+3)
+============================================================================
+
+  At b5=0: Lagrangian is order 1 in derivatives, 
+           DOF count = N_DYN = 3, phase space = 6
+  At b5!=0: Lagrangian is order 5 in derivatives, 
+            phase space = 30
+  Phase-space jump: 6 -> 30  (factor of 5)
+
+  det(W^top) at b5=0: (M1*M2*M3 + M1*M2*mu13**2 + M1*M2*mu23**2 + M1*M2*mu33**2 + M1*M3*mu12**2 + M1*M3*mu22**2 + M1*M3*mu32**2 + M1*mu12**2*mu23**2 + M1*mu12**2*mu33**2 - 2*M1*mu12*mu13*mu22*mu23 - 2*M1*mu12*mu13*mu32*mu33 + M1*mu13**2*mu22**2 + M1*mu13**2*mu32**2 + M1*mu22**2*mu33**2 - 2*M1*mu22*mu23*mu32*mu33 + M1*mu23**2*mu32**2 + M2*M3*mu11**2 + M2*M3*mu21**2 + M2*M3*mu31**2 + M2*mu11**2*mu23**2 + M2*mu11**2*mu33**2 - 2*M2*mu11*mu13*mu21*mu23 - 2*M2*mu11*mu13*mu31*mu33 + M2*mu13**2*mu21**2 + M2*mu13**2*mu31**2 + M2*mu21**2*mu33**2 - 2*M2*mu21*mu23*mu31*mu33 + M2*mu23**2*mu31**2 + M3*mu11**2*mu22**2 + M3*mu11**2*mu32**2 - 2*M3*mu11*mu12*mu21*mu22 - 2*M3*mu11*mu12*mu31*mu32 + M3*mu12**2*mu21**2 + M3*mu12**2*mu31**2 + M3*mu21**2*mu32**2 - 2*M3*mu21*mu22*mu31*mu32 + M3*mu22**2*mu31**2 + mu11**2*mu22**2*mu33**2 - 2*mu11**2*mu22*mu23*mu32*mu33 + mu11**2*mu23**2*mu32**2 - 2*mu11*mu12*mu21*mu22*mu33**2 + 2*mu11*mu12*mu21*mu23*mu32*mu33 + 2*mu11*mu12*mu22*mu23*mu31*mu33 - 2*mu11*mu12*mu23**2*mu31*mu32 + 2*mu11*mu13*mu21*mu22*mu32*mu33 - 2*mu11*mu13*mu21*mu23*mu32**2 - 2*mu11*mu13*mu22**2*mu31*mu33 + 2*mu11*mu13*mu22*mu23*mu31*mu32 + mu12**2*mu21**2*mu33**2 - 2*mu12**2*mu21*mu23*mu31*mu33 + mu12**2*mu23**2*mu31**2 - 2*mu12*mu13*mu21**2*mu32*mu33 + 2*mu12*mu13*mu21*mu22*mu31*mu33 + 2*mu12*mu13*mu21*mu23*mu31*mu32 - 2*mu12*mu13*mu22*mu23*mu31**2 + mu13**2*mu21**2*mu32**2 - 2*mu13**2*mu21*mu22*mu31*mu32 + mu13**2*mu22**2*mu31**2)/(M1*M2*M3)
+  det(W^top) at b5!=0 ~ b5^0
+
+  -> det(W^top) is finite at b5=0.  No rank jump on the kinetic
+     Hessian itself.
+
+Traceback (most recent call last):
+  File "/workspaces/torsion-gertsenshtein/research/perturbative_hamiltonian/scripts/vt_T4_phase6_v2.py", line 366, in <module>
+    existing = json.load(f)
+               ^^^^^^^^^^^^
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+           ^^^^^^^^^^^^^^^^
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/vscode/.local/share/uv/python/cpython-3.11.15-linux-x86_64-gnu/lib/python3.11/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 113 column 32 (char 2275)

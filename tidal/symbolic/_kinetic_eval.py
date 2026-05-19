@@ -21,7 +21,13 @@ from __future__ import annotations
 
 import ast
 import operator
+import sys
 from typing import TYPE_CHECKING
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -68,7 +74,8 @@ def evaluate_at_one(expr: str, one_names: set[str] | frozenset[str]) -> float | 
 
 
 def evaluate_with_substitutions(
-    expr: str, substitutions: dict[str, float],
+    expr: str,
+    substitutions: dict[str, float],
 ) -> float | None:
     """Return ``expr`` evaluated after replacing each ``name`` → ``substitutions[name]`` in the AST.
 
@@ -185,8 +192,266 @@ def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:  # noqa
     raise KineticEvalError(msg)
 
 
+def split_small_parameter_kinetic(
+    expr: str,
+    small_parameters: Sequence[str],
+) -> tuple[str, dict[str, str]]:
+    """Split a kinetic coefficient into base (M₀) and per-small-parameter corrections.
+
+    Given an expression like ``"1 - 2*B0^2*rho + 16*B0^2*sigma"`` and
+    ``small_parameters = ["rho", "sigma"]``, returns::
+
+        ("1", {"rho": "-2*B0**2", "sigma": "16*B0**2"})
+
+    Used by :meth:`EquationSystem.canonicalize_kinetic_for_perturbation`
+    (#301 Phase 3 / #303) to move small-parameter kinetic dependence into
+    Pass-1 RHS corrections via the identity
+    ``(M₀ + εM₁)⁻¹(K₀ + εK₁) ≈ M₀⁻¹K₀ + ε M₀⁻¹(K₁ − M₁·M₀⁻¹·K₀)``.
+
+    Contract
+    --------
+    - Input must be a sum of monomials (post-``Expand`` on the Wolfram side;
+      :func:`tidal.wolfram.ExportJSON.EquationToJSONMultiField` uses
+      ``Expand`` for this reason). Parenthesised sub-sums raise.
+    - Each summand contains each small parameter *at most linearly* (exponent
+      exactly 1, in the numerator of any division, and not raised to a Power).
+      Bilinear terms (``rho*sigma``), quadratic terms (``rho^2``), and
+      in-denominator appearances (``1/(1-rho)``) all raise
+      :class:`KineticEvalError`. These are gated by the TIDAL perturbative
+      contract (#273: ``order_in_eps > 1`` not implemented).
+    - A summand containing no small parameter goes into ``M₀``.
+    - A summand containing exactly one small parameter ``p`` contributes its
+      "coefficient when ``p = 1``" to ``c_p``.
+
+    Parameters
+    ----------
+    expr
+        Kinetic coefficient string as emitted by ExportJSON.wl.
+    small_parameters
+        The names in ``[perturbation].small_parameters``.
+
+    Returns
+    -------
+    ``(M0_expr, {param: c_expr})`` where all expressions are Python-syntax
+    strings (``**`` for exponentiation; ``^`` is converted internally).
+    ``M0_expr`` is ``"0"`` if every summand contained a small parameter.
+    The returned dict maps *every* small parameter, including those with a
+    zero coefficient (``"0"``) — callers can skip those if desired.
+
+    Raises
+    ------
+    KineticEvalError
+        On unsupported structure as described in the contract.
+    """
+    if not isinstance(expr, str):  # type: ignore[reportUnnecessaryIsInstance]
+        msg = (
+            f"split_small_parameter_kinetic: expected a str, "
+            f"got {type(expr).__name__!r}"
+        )
+        raise KineticEvalError(msg)
+
+    small_set = frozenset(small_parameters)
+    normalized = expr.replace("^", "**")
+    try:
+        tree = ast.parse(normalized, mode="eval")
+    except SyntaxError as e:
+        msg = (
+            f"split_small_parameter_kinetic: cannot parse {expr!r} "
+            f"(after ^→**: {normalized!r}): {e}"
+        )
+        raise KineticEvalError(msg) from e
+
+    summands: list[tuple[int, ast.AST]] = []  # (sign, AST)
+    _flatten_summands(tree.body, +1, summands)
+
+    m0_terms: list[ast.AST] = []
+    coefficients: dict[str, list[ast.AST]] = {name: [] for name in small_set}
+
+    for sign, summand in summands:
+        small_params_seen = _count_small_parameters(summand, small_set)
+        if sum(small_params_seen.values()) == 0:
+            m0_terms.append(_apply_sign(summand, sign))
+            continue
+        if len(small_params_seen) > 1 or max(small_params_seen.values()) > 1:
+            msg = (
+                f"split_small_parameter_kinetic: summand in {expr!r} has "
+                f"multiple or higher-order small-parameter dependence "
+                f"{dict(small_params_seen)!r}; order_in_eps > 1 is gated by "
+                "#273 (not implemented). Emit a linear Lagrangian or split "
+                "into lower-order pieces."
+            )
+            raise KineticEvalError(msg)
+        (param_name,) = small_params_seen.keys()
+        coeff_ast = _substitute_names(summand, {param_name: 1.0})
+        coefficients[param_name].append(_apply_sign(coeff_ast, sign))
+
+    m0_expr = _terms_to_expr(m0_terms) if m0_terms else "0"
+    coefficient_exprs = {
+        name: _terms_to_expr(coefficients[name]) if coefficients[name] else "0"
+        for name in small_set
+    }
+    return m0_expr, coefficient_exprs
+
+
+def _flatten_summands(
+    node: ast.AST,
+    sign: int,
+    out: list[tuple[int, ast.AST]],
+) -> None:
+    """Walk top-level Add/Sub tree, emit each monomial with a ±1 sign."""
+    if isinstance(node, ast.BinOp):
+        if isinstance(node.op, ast.Add):
+            _flatten_summands(node.left, sign, out)
+            _flatten_summands(node.right, sign, out)
+            return
+        if isinstance(node.op, ast.Sub):
+            _flatten_summands(node.left, sign, out)
+            _flatten_summands(node.right, -sign, out)
+            return
+    if isinstance(node, ast.UnaryOp):
+        if isinstance(node.op, ast.USub):
+            _flatten_summands(node.operand, -sign, out)
+            return
+        if isinstance(node.op, ast.UAdd):
+            _flatten_summands(node.operand, sign, out)
+            return
+    # Leaf or multiplicative/pow/div subtree — one summand.
+    _reject_inner_addition(node)
+    out.append((sign, node))
+
+
+def _reject_inner_addition(node: ast.AST) -> None:
+    """Raise if any Add/Sub BinOp appears inside a summand (i.e. a parenthesised sum).
+
+    ``Expand`` on the Wolfram side removes these. If one survives, the splitter
+    cannot reliably attribute the sub-terms to base vs. small-parameter
+    corrections and must fail loud.
+    """
+    for child in ast.walk(node):
+        if isinstance(child, ast.BinOp) and isinstance(child.op, (ast.Add, ast.Sub)):
+            msg = (
+                "split_small_parameter_kinetic: parenthesised sub-sum "
+                f"{ast.unparse(child)!r} inside a monomial is not supported "
+                "(expected Expand'd input)."
+            )
+            raise KineticEvalError(msg)
+
+
+def _count_small_parameters(
+    node: ast.AST,
+    small_set: frozenset[str],
+) -> dict[str, int]:
+    """Return the occurrence count of each small parameter in *node*.
+
+    Also enforces exponent==1 and numerator-only constraints: any small
+    parameter inside ``Pow(base=p, exp != 1)`` or ``Div(num, denom)`` where
+    ``p`` is in ``denom`` raises ``KineticEvalError``.
+    """
+    counts: dict[str, int] = {}
+    for child in ast.walk(node):
+        if not isinstance(child, ast.Name):
+            continue
+        if child.id not in small_set:
+            continue
+        counts[child.id] = counts.get(child.id, 0) + 1
+
+    # Validate: each small-parameter Name must be a direct factor, not a Pow
+    # base with exponent != 1 nor inside a Div denominator.
+    for child in ast.walk(node):
+        if isinstance(child, ast.BinOp):
+            if isinstance(child.op, ast.Pow):
+                _reject_small_param_in_pow_base(child, small_set)
+            elif isinstance(child.op, ast.Div):
+                _reject_small_param_in_denominator(child.right, small_set)
+    return counts
+
+
+def _reject_small_param_in_pow_base(
+    pow_node: ast.BinOp,
+    small_set: frozenset[str],
+) -> None:
+    """Reject ``p^n`` for n != 1 when ``p`` is a small parameter."""
+    for child in ast.walk(pow_node.left):
+        if isinstance(child, ast.Name) and child.id in small_set:
+            exp_is_one = (
+                isinstance(pow_node.right, ast.Constant) and pow_node.right.value == 1
+            )
+            if not exp_is_one:
+                msg = (
+                    f"split_small_parameter_kinetic: small parameter "
+                    f"{child.id!r} appears with non-unit exponent "
+                    f"{ast.unparse(pow_node.right)!r} (order_in_eps > 1, #273)."
+                )
+                raise KineticEvalError(msg)
+
+
+def _reject_small_param_in_denominator(
+    denom: ast.AST,
+    small_set: frozenset[str],
+) -> None:
+    """Reject rational forms with a small parameter in the denominator."""
+    for child in ast.walk(denom):
+        if isinstance(child, ast.Name) and child.id in small_set:
+            msg = (
+                f"split_small_parameter_kinetic: small parameter "
+                f"{child.id!r} appears in a denominator — rational dependence "
+                "on a small parameter is outside the perturbative contract."
+            )
+            raise KineticEvalError(msg)
+
+
+def _substitute_names(node: ast.AST, subs: dict[str, float]) -> ast.AST:
+    """Return a new AST with ``Name(id=k)`` replaced by ``Constant(v)`` for ``k, v in subs``.
+
+    Used to extract a small parameter's coefficient by setting the parameter
+    to 1.0 in a monomial.
+    """
+
+    class _Sub(ast.NodeTransformer):
+        @override
+        def visit_Name(self, node: ast.Name) -> ast.AST:
+            if node.id in subs:
+                return ast.copy_location(ast.Constant(value=subs[node.id]), node)
+            return node
+
+    return _Sub().visit(
+        ast.fix_missing_locations(ast.parse(ast.unparse(node), mode="eval").body)
+    )
+
+
+def _apply_sign(node: ast.AST, sign: int) -> ast.AST:
+    """Return ``node`` if ``sign == +1`` else ``-node`` at the AST level."""
+    if sign == 1:
+        return node
+    return ast.copy_location(
+        ast.UnaryOp(op=ast.USub(), operand=node),  # pyright: ignore[reportArgumentType]
+        node,
+    )
+
+
+def _terms_to_expr(terms: list[ast.AST]) -> str:
+    """Join a list of AST nodes into a single sum expression string.
+
+    Uses :func:`ast.unparse`; emits Python syntax (``**``, ``-x``). The
+    consumer :func:`evaluate_coefficient` accepts both ``^`` and ``**``.
+    """
+    if not terms:
+        return "0"
+    if len(terms) == 1:
+        return ast.unparse(terms[0])
+    expr: ast.AST = terms[0]
+    for t in terms[1:]:
+        # Collapse ``+ (-x)`` into ``- x`` for readability.
+        if isinstance(t, ast.UnaryOp) and isinstance(t.op, ast.USub):
+            expr = ast.BinOp(left=expr, op=ast.Sub(), right=t.operand)  # pyright: ignore[reportArgumentType]
+        else:
+            expr = ast.BinOp(left=expr, op=ast.Add(), right=t)  # pyright: ignore[reportArgumentType]
+    return ast.unparse(expr)
+
+
 def lhs_collapses_to_zero(
-    kinetic_symbolic: str | None, small_parameters: Sequence[str],
+    kinetic_symbolic: str | None,
+    small_parameters: Sequence[str],
 ) -> bool:
     """Return True iff the LHS kinetic coefficient evaluates to literal 0 when every small parameter is set to zero.
 

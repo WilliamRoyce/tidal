@@ -137,9 +137,10 @@ def run_monte_carlo(
 
     t0 = time.monotonic()
 
+    metadata_valid: list[dict[str, Any]]
     if n_workers and n_workers > 1:
         # Parallel evaluation
-        log_likelihoods_valid = _run_parallel(
+        log_likelihoods_valid, metadata_valid = _run_parallel(
             valid_samples=valid_samples,
             base_args=base_args,
             spec_path=spec_path,
@@ -169,9 +170,11 @@ def run_monte_carlo(
             keep_sims=keep_sims,
         )
         log_likelihoods_valid = np.zeros(n_valid)
+        metadata_valid = []
         for k, sample in enumerate(valid_samples):
             likelihood_fn._call_count = k  # pyright: ignore[reportPrivateUsage]
             log_likelihoods_valid[k] = likelihood_fn(sample)
+            metadata_valid.append(dict(likelihood_fn._last_metadata))  # pyright: ignore[reportPrivateUsage]
             if not quiet and (k + 1) % max(1, n_valid // 10) == 0:
                 print(f"  MC progress: {k + 1}/{n_valid} simulations")
 
@@ -181,9 +184,34 @@ def run_monte_carlo(
     for k, idx in enumerate(valid_indices):
         log_likelihood[idx] = log_likelihoods_valid[k]
 
+    # Build per-sample metric arrays from collected metadata.  Constraint-
+    # rejected samples (not in valid_indices) get a "constraint" status.
+    # Numeric fields use object arrays so we can mix floats with NaN.
+    run_status_arr: np.ndarray = np.full(n_samples, "constraint", dtype=object)
+    tachyonic_excess_arr: np.ndarray = np.full(n_samples, np.nan, dtype=float)
+    profile_arr: np.ndarray = np.full(n_samples, "", dtype=object)
+    borderline_arr: np.ndarray = np.full(n_samples, 0, dtype=int)
+    for k, idx in enumerate(valid_indices):
+        meta = metadata_valid[k] if k < len(metadata_valid) else {}
+        run_status_arr[idx] = meta.get("run_status", "success")
+        if "tachyonic_excess" in meta:
+            tachyonic_excess_arr[idx] = float(meta["tachyonic_excess"])
+        if "stability_profile" in meta:
+            profile_arr[idx] = str(meta["stability_profile"])
+        if "borderline_stability" in meta:
+            borderline_arr[idx] = int(bool(meta["borderline_stability"]))
+    all_metrics["run_status"] = run_status_arr
+    all_metrics["tachyonic_excess"] = tachyonic_excess_arr
+    all_metrics["stability_profile"] = profile_arr
+    all_metrics["borderline_stability"] = borderline_arr
+
     if not quiet:
         n_success = int(np.sum(np.isfinite(log_likelihoods_valid)))
-        print(f"  Simulations: {n_success}/{n_valid} succeeded ({wall_time:.1f}s)")
+        n_tachy = int(np.sum(run_status_arr == "tachyonic"))
+        msg = f"  Simulations: {n_success}/{n_valid} succeeded ({wall_time:.1f}s)"
+        if n_tachy > 0:
+            msg += f"; {n_tachy} pre-rejected (tachyonic)"
+        print(msg)
 
     return InferenceResult(
         samples=all_samples,
@@ -216,8 +244,13 @@ def _run_parallel(
     keep_sims: bool,
     n_workers: int,
     quiet: bool,
-) -> np.ndarray:
-    """Run likelihood evaluations in parallel using multiprocessing."""
+) -> tuple[np.ndarray, list[dict[str, Any]]]:
+    """Run likelihood evaluations in parallel using multiprocessing.
+
+    Returns ``(log_likelihoods, per_sample_metadata)`` — workers cannot
+    share state, so the metadata dicts are returned as values from each
+    likelihood call rather than read from instance attributes.
+    """
     from multiprocessing import Pool
 
     from tidal.inference._likelihood import (
@@ -241,16 +274,20 @@ def _run_parallel(
 
     n_valid = len(valid_samples)
     results = np.zeros(n_valid)
+    metadata: list[dict[str, Any]] = [{} for _ in range(n_valid)]
 
     with Pool(
-        n_workers, initializer=_likelihood_worker_init, initargs=(config,),
+        n_workers,
+        initializer=_likelihood_worker_init,
+        initargs=(config,),
     ) as pool:
-        for k, logl in enumerate(pool.imap(_likelihood_worker, valid_samples)):
+        for k, (logl, meta) in enumerate(pool.imap(_likelihood_worker, valid_samples)):
             results[k] = logl
+            metadata[k] = meta
             if not quiet and (k + 1) % max(1, n_valid // 10) == 0:
                 print(f"  MC progress: {k + 1}/{n_valid} simulations")
 
-    return results
+    return results, metadata
 
 
 def _print_mc_status(n_total: int, n_rejected: int, n_valid: int) -> None:

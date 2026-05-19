@@ -1,0 +1,89 @@
+% Metric-affine geometric classification figure.
+% Adapted from figure 3 of Bahamonde et al., "Teleparallel gravity:
+% from theory to cosmology", Rep. Prog. Phys. 86 026901 (2023),
+% arXiv:2106.13793 — bib key bahamonde2021teleparallel.
+\documentclass[border=3pt,tikz,svgnames]{standalone}
+\usepackage{stix} % match the body-document font for visual consistency
+\usepackage{tikz}
+\usetikzlibrary{decorations.markings,arrows.meta,calc,matrix,patterns,patterns.meta}
+\usepackage[outline]{contour} % glow around text
+\usepackage{amssymb}
+\contourlength{0.6pt}
+\tikzset{>={Stealth[length=1.2mm,width=1.2mm]}} % default arrow tip for -> etc.
+
+\colorlet{OrangeFill}{LightSalmon}
+\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
+\colorlet{GreenFill}{MediumAquamarine}
+\colorlet{GreenLine}{MediumAquamarine!30!Teal}
+\colorlet{PurpleFill}{MediumPurple}
+\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\colorlet{GrayFill}{LightGray!60!OldLace}
+\colorlet{GrayLine}{RosyBrown!50!Silver}
+
+% Legend styles
+\tikzset{
+  setlegend/.style={
+    draw=GrayLine,
+      rounded corners,
+    fill=GrayFill,
+    fill opacity=0.4,
+    text opacity=1,
+    inner sep=0.8pt,
+    font=\footnotesize,
+    align=left
+  },
+  legendswatch/.style={
+    rectangle,
+    minimum width=6pt,
+    minimum height=6pt,
+      rounded corners=2pt
+  }
+}
+
+
+\begin{document}
+
+\begin{tikzpicture}[
+    line cap=round,
+    line join=round,
+    font=\footnotesize]
+    \def\R{2.2}
+    \def\L{0.6*\R}
+
+    \fill[thick, draw=PurpleLine, fill=PurpleFill, fill opacity=0.4] (90:\L) circle (\R);
+    \fill[thick, draw=GreenLine, fill=GreenFill, fill opacity=0.4] (-30:\L) circle (\R);
+    \fill[thick, draw=OrangeLine, fill=OrangeFill, fill opacity=0.4] (-150:\L) circle (\R);
+
+    \node[align=center] at (0,-0.07*\R) {Metric--Affine\\$(L_4,g)$};
+    
+    \node at (30:0.72*\R) {Symmetric};
+    \node[align=center] at ($(150:0.72*\R)+(0,-0.07*\R)$) {Riemann--\\Cartan\\$U_4$};
+    \node[align=center] at ($(-90:0.72*\R)+(0,-0.07*\R)$) {Teleparallel\\$W_4$};
+    
+    \node[align=center] at (90:1.12*\R) {Riemann\\$V_4$};
+    \node[align=center] at (-30:1.12*\R) {Symmetric \\ Teleparallel};
+    \node[align=center] at (-150:1.12*\R) {Metric \\ Teleparallel};
+
+    % \node at (90:\L) {$\mathcal{R} \neq 0$};
+    % \node at (-30:\L) {$\mathcal{Q} \neq 0$};
+    % \node at (-150:\L) {$\mathcal{T} \neq 0$};
+
+    \node[align=center] at (-1.15*\R,1.30*\R) {Minkowski\\$\mathbb{M}^4$};
+    
+    \node[setlegend, anchor=north east] at (current bounding box.north east) {%
+        \begin{tikzpicture}[baseline=(m.center)]
+            \matrix (m) [
+            matrix of nodes,
+            nodes={anchor=west, inner sep=0pt, outer sep=0pt},
+            column sep=3pt,
+            row sep=3pt
+            ] {
+            |[legendswatch, fill=PurpleFill!40, draw=PurpleLine]| {} & $\mathcal R \neq 0$ \\
+            |[legendswatch, fill=OrangeFill!40, draw=OrangeLine]| {} & $\mathcal T \neq 0$ \\
+            |[legendswatch, fill=GreenFill!40, draw=GreenLine]| {} & $\mathcal Q \neq 0$ \\
+            };
+        \end{tikzpicture}%
+    };
+\end{tikzpicture}
+
+\end{document}

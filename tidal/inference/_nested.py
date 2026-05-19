@@ -122,7 +122,7 @@ def run_nested_sampling(
 # ---------------------------------------------------------------------------
 
 
-def _run_polychord(  # noqa: PLR0915
+def _run_polychord(
     *,
     log_likelihood: Callable[..., float],
     prior_transform: Callable[..., Any],

@@ -10,21 +10,37 @@
 \usepackage{amsmath,amssymb,bm}
 \usepackage{booktabs}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,positioning,shapes.geometric,decorations.pathmorphing}
+\usepackage{tensor}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,decorations.pathmorphing,
+                fadings,decorations.markings,calc}
 \usepackage{graphicx}
 \graphicspath{{figures/}}
+% standalone: allows \input{figures/*.tex} to work (strips outer \documentclass)
+\usepackage{standalone}
 
 % \todo{...} placeholder boxes for unfinished content.
 \usepackage[colorinlistoftodos,textsize=scriptsize]{todonotes}
 \newcommand{\placeholder}[1]{\todo[inline,color=yellow!40]{#1}}
 
+% Macros matching research/lagrangian_enumeration/general_quadratic_lagrangian.tex
+\newcommand{\Rt}{\tilde{R}}
+\newcommand{\Mpl}{M_{\mathrm{pl}}}
+\newcommand{\eps}{\varepsilon}
+\newcommand{\del}{\partial}
+
 \setbeamertemplate{frame numbering}[fraction]
 \setbeamertemplate{navigation symbols}{}
 
+% Cambridge theme's enumerate item template uses \insertenumlabel which
+% is recursive with current beamer; override with \arabic-based numbering.
+\setbeamertemplate{enumerate item}{\arabic{enumi}.}
+\setbeamertemplate{enumerate subitem}{\arabic{enumi}.\arabic{enumii}}
+\setbeamertemplate{enumerate subsubitem}{\arabic{enumi}.\arabic{enumii}.\arabic{enumiii}}
+
 % ---- Metadata ---------------------------------------------------------------
-\title[Torsion and the Gertsenshtein effect]%
-      {Does torsion modify the Gertsenshtein effect?}
-\subtitle{A symbolic-to-numerical study with TIDAL}
+\title[Graviton-photon conversion in PGT]%
+      {Graviton-Photon Conversion in Poincar\'e Gauge Theory}
+\subtitle{A phenomenological survey}
 \author{William Royce}
 \institute{Cavendish Astrophysics \\ University of Cambridge}
 \date{Practice talk --- \today}
@@ -34,8 +50,6 @@
 
 \begin{frame}[plain]
   \titlepage
-  \vspace{-1em}
-  \centering\small\itshape Practice talk --- feedback on delivery welcome.
 \end{frame}
 
 \input{sections/01_motivation.tex}
@@ -45,11 +59,9 @@
 \input{sections/05_pgt_b.tex}
 \input{sections/06_question.tex}
 \input{sections/07_tidal_overview.tex}
-\input{sections/08_tidal_symbolic.tex}
-\input{sections/09_tidal_numerical.tex}
-\input{sections/10_tidal_sweeps.tex}
+\input{sections/08_tidal_numerical.tex}
+\input{sections/09_inference.tex}
 \input{sections/11_results.tex}
-\input{sections/12_outlook.tex}
 \input{sections/13_summary.tex}
 
 % ---- Backup slides ---------------------------------------------------------

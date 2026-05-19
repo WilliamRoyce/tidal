@@ -351,7 +351,10 @@ def _differentiate_constraint(
                 # Source is velocity v_X → d_t(v_X) = acceleration from EOM
                 base_field = term.field[2:]  # strip "v_" prefix
                 dt_source = _compute_acceleration_from_eom(
-                    data, base_field, t_idx, params,
+                    data,
+                    base_field,
+                    t_idx,
+                    params,
                 )
             else:
                 # Source is field X → d_t(X) = velocity
@@ -758,7 +761,11 @@ def _evaluate_hamiltonian_factor(
     if factor_operator.startswith("mixed_"):
         params = _merge_parameters(data)
         return _evaluate_mixed_factor(
-            factor_field, factor_operator, data, t_idx, params,
+            factor_field,
+            factor_operator,
+            data,
+            t_idx,
+            params,
         )
 
     # Get the field data
@@ -870,6 +877,144 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
     return grad_a * grad_b
 
 
+# Module-level cache for one-shot fallback warnings.  Keyed by (field_a,
+# field_b, term_class) to deduplicate across snapshots during a single run.
+_warned_positional_coeff: set[tuple[str, str, str]] = set()
+
+
+def _warn_parseval_fallback_once(term: HamiltonianTerm) -> None:
+    """Emit a one-shot RuntimeWarning for Parseval FD fallback on periodic domains.
+
+    Fires when a position-dependent coefficient forces the FD gradient-energy
+    path on an all-periodic domain.  Dedupes by
+    ``(field_a, field_b, term_class)`` so long simulations don't spam the log.
+    The user can silence by setting the coefficient to a constant or by
+    filtering ``RuntimeWarning`` with ``warnings.simplefilter``.
+    """
+    import warnings  # noqa: PLC0415
+
+    key = (term.factor_a.field, term.factor_b.field, term.term_class)
+    if key in _warned_positional_coeff:
+        return
+    _warned_positional_coeff.add(key)
+    warnings.warn(
+        f"Term {term.factor_a.field} x {term.factor_b.field} "
+        f"(class={term.term_class}): position-dependent coefficient forces FD "
+        f"gradient-energy path on an all-periodic domain. This has "
+        f"O((k*dx)^2) systematic error (~0.3% at N=64, k=2). For "
+        f"machine-precision accuracy make the coefficient constant.",
+        RuntimeWarning,
+        stacklevel=3,
+    )
+
+
+def _parseval_applies(
+    data: SimulationData,
+    term: HamiltonianTerm,
+    coeff: float | NDArray[np.float64],
+    volume_weight: float | NDArray[np.float64],
+) -> bool:
+    """Decide whether the Parseval gradient path is exact for this term and data.
+
+    Parseval gives the spatial mean of ``∂_a f · ∂_b g`` to machine precision
+    for periodic band-limited fields.  It applies only when:
+
+    * every axis is periodic and has no per-axis BC override;
+    * the term coefficient is position-independent;
+    * the volume weight is a scalar (no non-trivial ``volume_element``);
+    * the resolved coefficient value is scalar.
+    """
+    if not all(data.periodic):
+        return False
+    if data.bc_types is not None and not all(bc == "periodic" for bc in data.bc_types):
+        return False
+    if term.coordinate_dependent:
+        return False
+    if not np.isscalar(volume_weight):
+        return False
+    return np.isscalar(coeff)
+
+
+def _gradient_product_parseval(  # noqa: PLR0913, PLR0917, PLR0914
+    op_a: str,
+    field_a: NDArray[np.float64],
+    op_b: str,
+    field_b: NDArray[np.float64],
+    grid_spacing: tuple[float, ...],
+    shape: tuple[int, ...],
+) -> float:
+    """Exact gradient inner product ``⟨∂_a f · ∂_b g⟩`` via Parseval's theorem.
+
+    For a periodic real-valued field on a d-dimensional uniform grid, the
+    spatial mean of a gradient product equals a simple sum in Fourier space::
+
+        ⟨∂_a f · ∂_b g⟩ = (1 / ∏ N_i) × Σ_k w_k · k_a · k_b · Re(f̂*_k · ĝ_k)
+
+    where the sum runs over ``rfftn``'s half-spectrum; ``w_k = 2`` on interior
+    indices of the last (real-transformed) axis and ``w_k = 1`` at DC (k=0)
+    and Nyquist (k = N/2 for even N).
+
+    Returns the spatial mean directly (not a pointwise density array).  The
+    caller is expected to multiply by a scalar coefficient and volume weight.
+
+    Parameters
+    ----------
+    op_a, op_b
+        Gradient operator names (``gradient_x``, ``gradient_y``,
+        ``gradient_z``).
+    field_a, field_b
+        Real spatial fields of identical shape.
+    grid_spacing
+        Per-axis grid spacing ``(dx, [dy, [dz]])``.
+    shape
+        Grid shape.  Used to build the wavenumber arrays.
+    """
+    ax_a = _GRADIENT_AXES[op_a]
+    ax_b = _GRADIENT_AXES[op_b]
+
+    ndim = field_a.ndim
+    f_hat = np.fft.rfftn(field_a)
+    g_hat = f_hat if field_a is field_b else np.fft.rfftn(field_b)
+
+    # Per-axis wavenumbers.  Last axis is the rfft axis (half-spectrum).
+    k_vecs: list[NDArray[np.float64]] = []
+    for i in range(ndim):
+        if i == ndim - 1:
+            k_i = 2.0 * np.pi * np.fft.rfftfreq(shape[i], d=grid_spacing[i])
+        else:
+            k_i = 2.0 * np.pi * np.fft.fftfreq(shape[i], d=grid_spacing[i])
+        k_vecs.append(k_i)  # pyright: ignore[reportArgumentType]
+
+    # Broadcasting shapes for k_a and k_b.
+    def _bcast(arr: NDArray[np.float64], axis: int) -> NDArray[np.float64]:
+        bshape = [1] * ndim
+        bshape[axis] = arr.shape[0]
+        return arr.reshape(bshape)
+
+    k_a = _bcast(k_vecs[ax_a], ax_a)
+    k_b = _bcast(k_vecs[ax_b], ax_b)
+
+    # rfft conjugate-symmetry: interior bins of the last axis represent two
+    # conjugate modes (+k and -k) with a single stored value.  DC (k=0) and
+    # (if shape[-1] is even) the Nyquist bin each represent one mode.
+    last_n_full = shape[-1]
+    last_n_half = f_hat.shape[-1]
+    weight = np.full(f_hat.shape, 2.0)
+    # Build a slice that selects the DC and (for even N) Nyquist bins on the
+    # last axis for a weight of 1.0.
+    dc_slice: list[slice | int] = [slice(None)] * ndim
+    dc_slice[-1] = 0
+    weight[tuple(dc_slice)] = 1.0
+    if last_n_full % 2 == 0 and last_n_half >= 1:
+        ny_slice: list[slice | int] = [slice(None)] * ndim
+        ny_slice[-1] = last_n_half - 1
+        weight[tuple(ny_slice)] = 1.0
+
+    n_total = int(np.prod(shape))
+    inner = np.real(np.sum(weight * k_a * k_b * np.conj(f_hat) * g_hat))
+    return float(inner / (n_total * n_total))
+
+
 def _merge_parameters(data: SimulationData) -> dict[str, float]:
     """Merge spec metadata parameters with runtime parameters.
 
@@ -965,7 +1110,10 @@ def _prepare_hamiltonian_context(data: SimulationData) -> _HamiltonianContext:
         first_field = next(iter(data.fields.values()))
         field_shape = first_field[0].shape  # spatial shape from first snapshot
         grid_info = _make_grid_info(
-            data.grid_spacing, data.periodic, field_shape, data.bc_types,
+            data.grid_spacing,
+            data.periodic,
+            field_shape,
+            data.bc_types,
         )
 
     return _HamiltonianContext(
@@ -1044,7 +1192,7 @@ def _compute_hamiltonian_from_canonical(  # pyright: ignore[reportUnusedFunction
     return total
 
 
-def _evaluate_single_hamiltonian_term(  # noqa: PLR0913, PLR0917
+def _evaluate_single_hamiltonian_term(  # noqa: PLR0913, PLR0917, PLR0911
     term: HamiltonianTerm,
     coeff: float | NDArray[np.float64],
     volume_weight: float | NDArray[np.float64],
@@ -1064,13 +1212,32 @@ def _evaluate_single_hamiltonian_term(  # noqa: PLR0913, PLR0917
     op_a = term.factor_a.operator
     op_b = term.factor_b.operator
 
-    # Gradient x gradient path: use _gradient_product_density (single source
-    # of truth).  BC-aware: periodic→IBP, non-periodic→CD.
+    # Gradient x gradient path.  For all-periodic domains with scalar
+    # coefficients, Parseval's theorem gives the exact inner product in
+    # k-space (machine precision).  Otherwise fall back to
+    # _gradient_product_density (BC-aware FD IBP or spectral-direct gradient).
     if op_a in _GRADIENT_AXES and op_b in _GRADIENT_AXES:
         field_a = _resolve_term_target(data, term.factor_a.field, t_idx)
         field_b = _resolve_term_target(data, term.factor_b.field, t_idx)
         if field_a is None or field_b is None:
             return 0.0
+
+        if _parseval_applies(data, term, coeff, volume_weight):
+            scalar = _gradient_product_parseval(
+                op_a,
+                field_a,
+                op_b,
+                field_b,
+                data.grid_spacing,
+                field_a.shape,
+            )
+            return float(coeff * scalar * volume_weight)
+
+        # Guardrail: warn once if we fall back on an all-periodic domain due
+        # to a position-dependent coefficient (Concern 2 / #312).
+        if all(data.periodic) and term.coordinate_dependent:
+            _warn_parseval_fallback_once(term)
+
         density = _gradient_product_density(
             op_a,
             field_a,
@@ -1118,6 +1285,7 @@ def _compute_hamiltonian_per_field(
     data: SimulationData,
     t_idx: int,
     ctx: _HamiltonianContext | None = None,
+    order_filter: int | None = None,
 ) -> tuple[dict[str, float], float]:
     """Decompose Hamiltonian into per-field self-energy and interaction.
 
@@ -1131,6 +1299,9 @@ def _compute_hamiltonian_per_field(
         Snapshot index.
     ctx : _HamiltonianContext or None
         Pre-computed context (for timeseries path).
+    order_filter : int or None
+        When set, only include Hamiltonian terms whose ``order_in_eps``
+        equals this value. ``None`` includes all terms (default).
 
     Returns
     -------
@@ -1162,6 +1333,8 @@ def _compute_hamiltonian_per_field(
     interaction = 0.0
 
     for term_idx, term in enumerate(canonical.hamiltonian_terms):
+        if order_filter is not None and term.order_in_eps != order_filter:
+            continue
         contrib = _evaluate_single_hamiltonian_term(
             term,
             ctx.term_coeffs[term_idx],
@@ -1183,6 +1356,7 @@ def compute_system_energy(
     data: SimulationData,
     t_idx: int,
     _ctx: _HamiltonianContext | None = None,
+    order: int | None = None,
 ) -> SystemEnergy:
     """Compute Hamiltonian energy density at snapshot *t_idx*.
 
@@ -1197,6 +1371,11 @@ def compute_system_energy(
     data : SimulationData
     t_idx : int
         Snapshot index.
+    order : int or None
+        When set, restrict to Hamiltonian terms with ``order_in_eps``
+        equal to this value. ``0`` gives the leading-order Maxwell part;
+        ``1`` gives only the first EH/perturbative correction. ``None``
+        (default) sums all terms.
 
     Raises
     ------
@@ -1230,7 +1409,10 @@ def compute_system_energy(
         )
 
     per_field_totals, interaction = _compute_hamiltonian_per_field(
-        data, t_idx, ctx=_ctx,
+        data,
+        t_idx,
+        ctx=_ctx,
+        order_filter=order,
     )
     per_field = {
         name: FieldEnergy(kinetic=0.0, gradient=0.0, mass=0.0, total=total)

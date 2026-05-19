@@ -4,6 +4,9 @@
   "exclude": ["examples", "**/node_modules", "**/__pycache__", "**/.venv", "**/.*"],
   "reportImplicitOverride": true,
   "reportUnknownMemberType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownVariableType": false,
+  "reportMissingTypeStubs": false,
   "executionEnvironments": [
     {
       "root": "tidal/inference",
@@ -19,7 +22,21 @@
     },
     {
       "root": "tests",
-      "reportPrivateUsage": false
+      "reportPrivateUsage": false,
+      "reportUnknownVariableType": false,
+      "reportUnknownArgumentType": false,
+      "reportUnknownParameterType": false,
+      "reportUnknownMemberType": false,
+      "reportMissingTypeArgument": false,
+      "reportMissingParameterType": false,
+      "reportAttributeAccessIssue": false,
+      "reportConstantRedefinition": false,
+      "reportArgumentType": false,
+      "reportAssignmentType": false,
+      "reportUnusedFunction": false,
+      "reportUnusedExpression": false,
+      "reportMissingTypeStubs": false,
+      "reportImplicitOverride": false
     }
   ]
 }

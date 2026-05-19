@@ -1,0 +1,10 @@
+# Per-machine benchmark reruns are gitignored.
+# Only benchmark_results/canonical/ (the single source of truth for
+# committed manuscript artefacts) is tracked.
+*
+!.gitignore
+!canonical/
+!canonical/**
+# Transient run scratch (underscore-prefix convention): logs, fan-out summaries.
+# JSON results in canonical/ remain tracked.
+canonical/_*

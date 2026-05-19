@@ -1,0 +1,20 @@
+{
+  "_audit": {
+    "audited": "2026-04-27",
+    "status": "annotated",
+    "see": "research/perturbative_hamiltonian/notes/FINAL_ASSESSMENT.md",
+    "specific_corrections": [
+      "Verification at 1+1D toy only; 4D rank uniformity NOT verified (Review 1 C3, reviews/review1_mathematical_verification.md).",
+      "CRZ paper handles only parity-even free fields (Meta-K K5, meta_reviews/meta_review_K_literature_claims.md); the parity-odd extension required for TIDAL b5*Rtilde^2 does not exist in the published literature.",
+      "F-J cross-validation with Agent F is structurally OPPOSITE, not parallel: F's det(M_aux)=1/b^2 diverges at b=0, J's det(H_kin)=1-lam^2 is genuinely b5-independent (Review 1 C8, reviews/review1_mathematical_verification.md)."
+    ]
+  },
+  "applies": "APPLIES WITH CAVEATS",
+  "rank_uniformity": "Verified at the 1+1D toy level: det(H_kin) = 1 - lam_a^2 is b5-independent.",
+  "smooth_b5_limit": "Confirmed: q decouples (infinite mass), auxiliaries h, b, a inherit dynamics.",
+  "gauge_invariance": "Verified explicitly in Phase 2: F0_{mu nu | rho} is invariant under all three Stueckelberg shifts.",
+  "parity_odd_extension_needed": true,
+  "metric_h4_h7_h9_solved": false,
+  "tensor_torsion_q_solved": "Yes, modulo parity-odd extension and 4D vs 1+1D promotion.",
+  "compared_to_axial_lift": "Both decouple the heavy field via infinite-mass; tensor case needs 3 auxiliaries, axial 1."
+}

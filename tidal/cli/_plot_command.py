@@ -37,6 +37,7 @@ _VALID_TYPES = frozenset(
         "convergence",
         "replicate-convergence",
         "corner",
+        "atlas",
     },
 )
 
@@ -208,8 +209,41 @@ def _corner_plot(data_path: Path, args: Namespace) -> int:
         )
         return 1
 
+    # Inject priors supplied via --priors into result.metadata so the
+    # corner plotter can overlay them. This lets us replot chains pulled
+    # before priors were persisted in inference.json (see #308/#309).
+    prior_specs = list(getattr(args, "priors", []) or [])
+    if prior_specs:
+        from tidal.inference._prior import parse_prior
+
+        parsed = []
+        for spec in prior_specs:
+            try:
+                p = parse_prior(spec)
+            except ValueError as exc:
+                error_with_hint(
+                    f"--priors: {exc}",
+                    ["Syntax: NAME=DIST:LO:HI (e.g. mA2=log_uniform:0.001:1.0)"],
+                )
+                return 1
+            parsed.append(
+                {
+                    "name": p.name,
+                    "distribution": p.distribution,
+                    "low": p.low,
+                    "high": p.high,
+                },
+            )
+        result.metadata["priors"] = parsed
+
     out_path = Path(args.output) if args.output else data_path / "corner.png"
-    plot_corner(result, out_path)
+    plot_corner(
+        result,
+        out_path,
+        show_rejected_inchain=bool(getattr(args, "show_rejected_inchain", True)),
+        show_rejected_prior=bool(getattr(args, "show_rejected_prior", False)),
+        full_prior_bounds=bool(getattr(args, "full_prior_bounds", False)),
+    )
     if not args.quiet:
         print(f"Saved corner plot to: {out_path}")
     return 0
@@ -220,7 +254,7 @@ def _corner_plot(data_path: Path, args: Namespace) -> int:
 # ------------------------------------------------------------------
 
 
-def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Execute the ``tidal plot`` subcommand."""
     import matplotlib as mpl
 
@@ -281,6 +315,32 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     # _chains/).
     if plot_type == "corner":
         return _corner_plot(data_path, args)
+
+    # Atlas plot: cubed-sphere posterior atlas, one panel per face.
+    # Reads <data_path>/<face_label>_tile<sub_tile>/ subdirs written by
+    # `tidal sample --joint-prior`.  See tidal.inference._atlas.
+    if plot_type == "atlas":
+        from tidal.inference._atlas import plot_atlas
+
+        out_path = (
+            Path(args.output)
+            if getattr(args, "output", None)
+            else data_path / "atlas.pdf"
+        )
+        try:
+            plot_atlas(data_path, out_path)
+        except (FileNotFoundError, ValueError) as exc:
+            error_with_hint(
+                f"atlas plot failed: {exc}",
+                [
+                    "Run `tidal sample --joint-prior ...` per tile first; "
+                    "atlas pools <face_label>_tile<sub>/ subdirectories.",
+                ],
+            )
+            return 1
+        if not getattr(args, "quiet", False):
+            print(f"Atlas: {out_path}")
+        return 0
 
     # Parse options
     try:
@@ -396,7 +456,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
 # ------------------------------------------------------------------
 
 
-def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Handle sweep-specific plot types.
 
     Loads ``SweepResults`` from *data_path* and dispatches to the
@@ -675,7 +735,10 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 )
                 return 1
             fig, ax = plt.subplots(
-                1, 1, figsize=figsize or (9, 6), constrained_layout=True,
+                1,
+                1,
+                figsize=figsize or (9, 6),
+                constrained_layout=True,
             )
             render_sweep_1d_grouped(
                 ax,

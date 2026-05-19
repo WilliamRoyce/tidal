@@ -1,0 +1,101 @@
+% Vertex-topology figure for Chern--Simons torsion-EM couplings of App H §C.
+%
+% Three irreducible parity-odd  epsilon T A F  couplings
+%   chi^CS_1 epsilon T^{(2)} A F   (trace torsion)
+%   chi^CS_2 epsilon T^{(3)} A F   (axial torsion)
+%   chi^CS_3 epsilon T^{(1)} A F   (tensor torsion)
+% share the same leg structure (T - A - F-bar after background insertion);
+% they differ only by which irreducible torsion sector enters the T leg.
+% Drawn as a single vertex with the T-leg label cycling over T^{(1,2,3)}.
+%
+% Conventions matched to vertex_topology_cubic.tex.
+\documentclass[border=3pt,tikz,svgnames]{standalone}
+\usepackage{stix}
+\usepackage{tikz}
+\usetikzlibrary{decorations.markings,decorations.pathmorphing,arrows.meta,calc}
+\usepackage[outline]{contour}
+\contourlength{0.5pt}
+\tikzset{>={Stealth[length=1.2mm,width=1.2mm]}}
+
+\colorlet{GravitonLine}{MediumPurple!50!SlateBlue}
+\colorlet{PhotonLine}{Goldenrod!70!DarkOrange}
+\colorlet{TorsionLine}{MediumAquamarine!60!Teal}
+\colorlet{BgLine}{Sienna!80!Black}
+\colorlet{VertexDot}{black!80!White}
+\colorlet{PanelFrame}{Silver!50!White}
+\colorlet{TagText}{black!75}
+
+\tikzset{
+  graviton/.style = {
+    draw=GravitonLine, line width=0.7pt,
+    decorate, decoration={coil, aspect=0.6, segment length=1.4mm, amplitude=0.55mm}
+  },
+  photon/.style = {
+    draw=PhotonLine, line width=0.7pt,
+    decorate, decoration={snake, segment length=1.4mm, amplitude=0.45mm}
+  },
+  torsion/.style = {
+    draw=TorsionLine, line width=0.9pt, dash pattern={on 1.4mm off 0.9mm}
+  },
+  bgleg/.style = {
+    draw=BgLine, line width=0.7pt
+  },
+  csvertex/.style = {
+    % Parity-odd CS vertex: hollow square marker to distinguish from
+    % filled-dot parity-even vertices used in vertex_topology_cubic.tex.
+    draw=VertexDot, fill=white, line width=0.7pt,
+    rectangle, inner sep=0pt, minimum size=5.5pt
+  }
+}
+
+\newcommand{\bgcross}[2][0.9mm]{%
+  \draw[BgLine, line width=0.8pt]
+    ($(#2)+(45:#1)$)  -- ($(#2)+(225:#1)$)
+    ($(#2)+(135:#1)$) -- ($(#2)+(-45:#1)$);
+}
+
+\begin{document}
+
+\newlength{\figL}
+\setlength{\figL}{0.95cm}
+
+\begin{tikzpicture}[
+    x=\figL, y=\figL,
+    line cap=round, line join=round,
+    font=\normalsize
+]
+
+% Single panel layout
+\coordinate (V)  at (0, 0);
+\coordinate (LT) at (135:1.35);  % torsion up-left
+\coordinate (LA) at (45:1.35);   % photon  up-right
+\coordinate (LF) at (-90:1.35);  % background straight down
+
+% Faint frame
+\draw[PanelFrame, very thin]
+  ($(V)+(-1.85,-1.95)$) rectangle ($(V)+(1.85, 1.85)$);
+
+\draw[torsion] (V) -- (LT);
+\draw[photon]  (V) -- (LA);
+\draw[bgleg]   (V) -- (LF);
+\bgcross{LF}
+
+% CS vertex: hollow square + tiny epsilon annotation
+\node[csvertex] at (V) {};
+
+% Leg labels
+\node[TorsionLine, font=\small] at ($(LT)+(-0.12,0.20)$) {$T^{(i)}$};
+\node[PhotonLine,  font=\small] at ($(LA)+(0.20,0.05)$)  {$A$};
+\node[BgLine,      font=\small] at ($(LF)+(0.22,0)$)     {$\bar F$};
+
+% Title and physics tag below the panel
+\node[font=\small, anchor=north]
+  at ($(V)+(0,-1.95)$)
+  {$\varepsilon\,T^{(i)}\,A\,\bar F$ \,(parity-odd Chern--Simons)};
+\node[font=\footnotesize, TagText, anchor=north]
+  at ($(V)+(0,-2.35)$)
+  {$i = 1$ tensor, $\;i = 2$ trace, $\;i = 3$ axial};
+
+\end{tikzpicture}
+
+\end{document}

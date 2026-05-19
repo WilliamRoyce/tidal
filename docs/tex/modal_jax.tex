@@ -1,0 +1,303 @@
+% Modal solver JAX acceleration — phase 1 design document.
+% Documents the bottleneck evidence, implementation decisions, and
+% expected/measured speedups for the manuscript and future developers.
+
+\section{JAX-Accelerated Modal Solver (Phase~1)}
+\label{sec:modal_jax}
+
+\subsection{Motivation and Bottleneck Evidence}
+\label{sec:modal_jax_motivation}
+
+The Fourier modal solver (\texttt{tidal/solver/modal.py}) is the dominant
+compute cost per PolyChord likelihood call during HPC Bayesian inference
+runs.  Each call to \texttt{solve\_modal()} follows the path described
+in~\S\ref{sec:modal_solver}; for the constant-coefficient case (no
+position-dependent terms, no constraint fields), the execution profile
+is:
+
+\begin{enumerate}
+  \item \textbf{FFT of initial conditions} — \texttt{numpy.fft.rfftn} over
+    all slots.  One-time cost $\mathcal{O}(N_s N \log N)$ where $N_s$ is
+    the number of state slots and $N$ the grid size.  Typically $<1\%$ of
+    wall time.
+
+  \item \textbf{Per-mode matrix construction} —
+    \texttt{\_build\_per\_mode\_matrices} assembles
+    $A \in \mathbb{C}^{N_{\mathrm{modes}} \times N_s \times N_s}$.
+    Pure numpy; $\mathcal{O}(N_{\mathrm{modes}} N_s^2)$, typically $<5\%$
+    of wall time.
+
+  \item \textbf{Per-mode matrix exponential} —
+    \texttt{\_evolve\_per\_mode\_pade} (line~1858 of \texttt{modal.py}):
+    for each active mode $m$, computes
+    $\exp(M_m \cdot \Delta t) \in \mathbb{C}^{b \times b}$
+    via \texttt{scipy.linalg.expm} (Pad\'e scaling-and-squaring,
+    Higham~2009).  For a coupled $N_f$-field system with $N_{\mathrm{rfft}}
+    = N/2+1$ modes, this is $N_{\mathrm{rfft}}$ sequential calls to
+    \texttt{scipy.linalg.expm}. \textbf{This is the dominant cost} — $>80\%$
+    of wall time at $N \geq 64$ for typical inference configurations.
+
+  \item \textbf{Snapshot evolution loop} — \texttt{numpy.einsum("mij,mj->mi",
+    exp\_M\_dt, y\_curr)} repeated $N_{\mathrm{snap}}$ times.  Typically
+    $5$–$15\%$ of wall time.
+
+  \item \textbf{IFFT of snapshots} — \texttt{numpy.fft.irfftn} per snapshot.
+    Negligible.
+\end{enumerate}
+
+For the default inference configuration (coupled dark-photon-plasma theory,
+$N=64$, $N_{\mathrm{snap}}=101$, $N_f=4$ dynamical fields, $N_{\mathrm{rfft}}
+= 33$ modes), the bottleneck is item~3: 33 sequential calls to a $8\times8$
+(or $4\times4$ per block) \texttt{scipy.linalg.expm}.  PolyChord makes
+$\mathcal{O}(10^4)$ likelihood calls per chain, so the amortised cost of
+JIT compilation is negligible after the first call.
+
+\subsection{Implementation: \texttt{tidal/solver/modal\_jax.py}}
+\label{sec:modal_jax_impl}
+
+The JAX backend (\texttt{solve\_modal\_jax}) replaces step~3 and~4 above
+with:
+
+\begin{enumerate}
+  \item \textbf{Batched matrix exponential} — for each independent block
+    of slots, \texttt{jax.vmap(jax.scipy.linalg.expm)(M\_block * dt)}
+    computes $\exp(M_m \cdot \Delta t)$ for all $m$ in one fused JIT kernel.
+    This replaces the Python-level \texttt{for m in active\_modes} loop.
+
+  \item \textbf{JIT-compiled scan} — \texttt{jax.lax.scan} over the snapshot
+    axis: each step applies $\mathrm{einsum}(\exp M_{\Delta t}, y_{\mathrm{curr}})$
+    and accumulates outputs without returning to Python.  For $N_{\mathrm{snap}}
+    = 101$ this eliminates $\approx100$ Python$\to$C round-trips per block.
+\end{enumerate}
+
+All setup code (coefficient evaluation, matrix construction, FFT/IFFT, block
+detection, divergence pre-check) is reused unmodified from the scipy path.
+The new file adds $\approx250$ lines and introduces no changes to
+\texttt{modal.py} itself.
+
+\paragraph{Single fused expm+scan kernel.}  The unconstrained Phase~1 path
+and the constrained Phase~2a path both call
+\texttt{\_get\_fused\_expm\_scan\_fn(num\_snapshots)} so the
+\texttt{vmap(expm)} and \texttt{lax.scan} run as a single JIT trace per
+block.  This avoids the dispatch overhead of separate
+\texttt{batch\_expm} $+$ \texttt{evolve\_uniform} calls.
+
+\paragraph{Batched eigenvalue pre-check.}  The divergence pre-check pads
+all active blocks' $M$-matrices to the maximum block size, stacks them
+into a single \texttt{(n\_active, n\_modes, bs\_max, bs\_max)} tensor,
+and runs \texttt{vmap(jnp.linalg.eigvals)} once.  Padded entries
+contribute zero eigenvalues that are harmless to the
+\texttt{max\_real\_eig} check.  This replaces a per-block JAX$\to$numpy
+sync, useful for theories with multiple independent slot blocks.
+
+\subsubsection{Double Precision}
+\label{sec:modal_jax_f64}
+
+JAX defaults to 32-bit floating point.  \texttt{modal\_jax.py} calls
+\texttt{jax.config.update("jax\_enable\_x64", True)} unconditionally before
+any numerical work.  Without this, the eigenvalue-based divergence pre-check
+and the matrix-exponential coefficients would lose precision, producing
+relative errors of order $10^{-7}$ rather than $<10^{-12}$.
+
+\subsubsection{Sparse-IC Mode Skip}
+\label{sec:modal_jax_sparse_ic}
+
+The scipy path maintains a \texttt{sparse\_ic\_enabled} flag
+(\texttt{TIDAL\_MODAL\_SPARSE\_IC} env var, default on) that skips the
+per-mode \texttt{expm} call for modes whose IC amplitude is below the
+IEEE~754 FFT floor ($\approx10^{-14}$).  For plane-wave IC on a grid of
+$N=64$, only $\sim1$ out of $33$ rfft modes is active, giving $32\times$
+speedup on the precompute step.
+
+The JAX path \emph{does not} implement this optimisation.  \texttt{jax.vmap}
+maps uniformly over all modes; data-dependent masking of the vmap range
+would require \texttt{jax.lax.dynamic\_slice} or padding strategies that
+complicate the JIT trace.  As a result:
+
+\begin{itemize}
+  \item For \textbf{Gaussian IC} (all modes active): JAX wins on wall time
+    due to fused kernel + scan.
+  \item For \textbf{plane-wave IC} with $N\gg1$: scipy's sparse-IC path may
+    win on precompute cost.  The JAX scan still wins on the evolution loop,
+    so the crossover depends on $N_{\mathrm{snap}}$.
+\end{itemize}
+
+Sparse-IC support for the JAX path is deferred to phase~2.
+
+\subsubsection{Phase-1 Restrictions}
+\label{sec:modal_jax_phase1}
+
+The following paths raise \texttt{NotImplementedError} in the JAX backend
+and fall back to \texttt{--scheme modal}:
+
+\begin{itemize}
+  \item Position-dependent coefficients (\texttt{\_evolve\_full\_matrix},
+    \texttt{scipy.sparse.linalg.expm\_multiply}).  The convolution matrix
+    couples all modes; the JAX equivalent would require a dense
+    $N_s N \times N_s N$ Krylov exponential.
+  \item \texttt{return\_eigendata=True} (Pass~1 Duhamel callers).  The JAX
+    path uses \texttt{lax.scan} without storing per-mode eigendecomposition
+    data.
+\end{itemize}
+
+\paragraph{Phase 2a (constraint systems) — implemented but not faster.}
+Algebraic constraint fields are supported as of Phase~2a.  The constraint
+path (\texttt{\_solve\_modal\_jax\_constrained}) calls the numpy
+\texttt{\_build\_evolution\_matrices} routine to perform the Schur
+elimination of constraint fields, then runs the JAX expm+scan kernel on the
+reduced dynamical subspace.  Constraint fields are reconstructed
+post-evolution via \texttt{einsum("mcj,tmj->tcm", recovery, ys)}.
+
+Verified against \texttt{dark\_photon\_plasma} (3~constraint fields,
+30~dynamical slots): \texttt{rel\_err = 2.7e-17} (machine precision).
+
+\textbf{Benchmark result (2026-05-17):} JAX Phase~2a is $3\times$
+\emph{slower} than scipy for all production PGT theories on devcontainer
+CPU: \texttt{dark\_photon\_plasma} $N=32$ gives scipy~$9.2$ms,
+JAX~$28$ms (speedup~$0.33\times$).  See GH~\#368 for full analysis.
+The gating environment variable \verb|TIDAL_MODAL_BACKEND=jax| is
+therefore \textbf{disabled} in \texttt{polychord\_intr.sbatch} until GPU
+backend or $N\geq192$ in~1D is available.
+
+\subsection{Dispatch and Installation}
+\label{sec:modal_jax_dispatch}
+
+\paragraph{CLI:} \verb|--scheme modal-jax| selects the JAX path.  The
+eligibility check (\texttt{can\_use\_modal}) is shared with the scipy path;
+the JAX path adds its own \texttt{NotImplementedError} gates.
+
+\paragraph{Environment variable:} \verb|TIDAL_MODAL_BACKEND=jax| flips
+\verb|--scheme modal| to \verb|modal-jax| at dispatch time, enabling
+JAX for PolyChord runs without changing sbatch scripts.
+
+\paragraph{Installation:} JAX is an optional dependency to avoid adding
+$\sim200$~MB to every install (including the HPC venv tarball):
+\begin{verbatim}
+uv sync --extra jax           # adds jax>=0.4.20, jaxlib>=0.4.20
+\end{verbatim}
+The HPC venv must be refreshed after installation:
+\begin{verbatim}
+bash scripts/hpc_refresh_venv_tar.sh
+\end{verbatim}
+
+\subsection{Expected and Measured Speedup}
+\label{sec:modal_jax_speedup}
+
+\paragraph{Expected speedup analysis.}
+For a system with $N_f$ dynamical fields (block size $b = 2N_f$ slots),
+$N_{\mathrm{rfft}} = N/2+1$ modes, and $N_{\mathrm{snap}}$ snapshots:
+
+\begin{itemize}
+  \item scipy precompute: $N_{\mathrm{rfft}}$ serial calls to
+    \texttt{scipy.linalg.expm} (each $\mathcal{O}(b^3)$ flops).
+    Python interpreter overhead $\sim5\,\mu$s per call dominates for
+    small $b$.
+  \item JAX vmap precompute: $\mathcal{O}(N_{\mathrm{rfft}} \cdot b^3)$
+    flops in a single fused kernel; interpreter overhead eliminated.
+    Expected $3$--$10\times$ speedup on the precompute step for
+    $N_{\mathrm{rfft}} \geq 32$.
+  \item scipy scan: $N_{\mathrm{snap}}$ Python loop iterations, each a
+    \texttt{numpy.einsum} call ($\mathcal{O}(N_{\mathrm{rfft}} b^2)$).
+    Approximately $1\,\mu$s/iter overhead.
+  \item JAX scan: $N_{\mathrm{snap}}$ iterations compiled to XLA with
+    no Python overhead.  Expected $2$--$5\times$ speedup on the scan step
+    for $N_{\mathrm{snap}} = 101$.
+\end{itemize}
+
+Combined expected speedup for the inference workload ($N=64$, $b=8$,
+$N_{\mathrm{rfft}}=33$, $N_{\mathrm{snap}}=2$): $\sim5\times$ on the full
+\texttt{solve\_modal\_jax} call after JIT warmup.
+
+\paragraph{Measured speedup (devcontainer, CPU XLA).}
+Interleaved benchmarking (\texttt{n=50}, alternating scipy/JAX to cancel
+monotonic drift; see \texttt{scripts/local\_jax\_benchmark.py}):
+
+\begin{itemize}
+  \item KG-1D ($N=64$, $N_{\mathrm{snap}}=101$): scipy~$2.8$ms,
+    JAX~$2.5$ms, speedup~$1.13\times$.
+  \item Coupled scalars ($N=64$): scipy~$5.1$ms, JAX~$4.7$ms,
+    speedup~$1.08\times$.
+  \item \texttt{dark\_photon\_plasma} ($N=32$, 17~modes, 30~dyn slots,
+    Phase~2a, interleaved $n=30$): scipy~$9.2$ms, JAX~$28$ms,
+    speedup~$\mathbf{0.33\times}$ — JAX is $3\times$ \emph{slower}.
+    Constraint path profiling: JAX fused expm+scan takes $9.7$ms
+    vs scipy per-mode loop $2.6$ms for the same 30$\times$30 matrices.
+\end{itemize}
+
+The supervisor's $10$--$100\times$ expectation is unrealistic at the
+current PolyChord problem size on CPU XLA. Profile evidence:
+
+\begin{verbatim}
+dark_photon_plasma N=32 breakdown (Phase 2a, 2026-05-17):
+  _build_evolution_matrices (numpy Schur):  2.11 ms
+  JAX fused expm+scan (17 modes, 30x30):   9.68 ms  <- dominant (XLA)
+  numpy->JAX conversion:                   0.44 ms
+  reconstruction + IFFT:                   0.36 ms
+  Total JAX:                               ~21  ms
+
+  scipy per-mode expm loop (30x30 x17):   2.56 ms  <- LAPACK wins
+  scipy total (_build_evo + expm + IFFT):  ~9.2 ms
+\end{verbatim}
+
+\texttt{scipy.linalg.expm} (LAPACK) for a single $30\times30$ complex
+matrix is $\sim0.5$~ms; 17 serial calls = $\sim8.5$~ms.  JAX
+\texttt{vmap(expm)} for the same workload is $\sim8.8$~ms ---
+\textbf{vmap parallelism does not overcome XLA dispatch overhead until
+$\geq100$ modes} ($N\geq192$ in~1D).
+
+\paragraph{Where JAX wins.}
+\begin{itemize}
+  \item Large grids ($N\geq128$ in~1D, $N\geq64$ in~2D) where the rfft
+    has $\geq100$ modes.
+  \item Larger dynamical blocks ($N_f \geq 10$, $b \geq 20$) where each
+    expm is large enough to amortise dispatch overhead.
+  \item GPU XLA (not available on CSD3 sapphire CPU partitions); GPU
+    JAX can parallelise across modes essentially for free.
+\end{itemize}
+
+\paragraph{HPC validation.}
+The script \texttt{scripts/hpc\_jax\_benchmark.sh} runs two short
+\texttt{tidal sample} chains (INTR QOS, $N_{\mathrm{samples}}=50$) on
+CSD3 sapphire.  Results are written to
+\texttt{\$\{RESULTS\_DIR\}/jax\_vs\_scipy.txt}.  Submit with:
+\begin{verbatim}
+bash scripts/hpc_shuttle.sh submit scripts/hpc_jax_benchmark.sh
+\end{verbatim}
+The HPC benchmark on sapphire compute nodes (Intel Sapphire Rapids with
+larger L2 cache, faster BLAS) may show better JAX speedup than the
+devcontainer.
+
+\subsection{Numerical Validation}
+\label{sec:modal_jax_validation}
+
+The test class \texttt{TestModalJAXCorrectness} in
+\texttt{tests/test\_solver\_modal.py} verifies:
+
+\begin{itemize}
+  \item Scalar KG wave: relative error $<10^{-10}$ vs scipy over 51 snapshots.
+  \item Coupled scalars ($m_\phi^2=1$, $m_\chi^2=4$, $g=0.5$): same tolerance.
+  \item 1D diffusion: relative error $<10^{-10}$.
+  \item 2D wave ($16\times16$ grid): relative error $<10^{-10}$.
+  \item Zero IC: absolute error $<10^{-14}$.
+  \item Block isolation (4-field system): zero-IC block stays $<10^{-12}$.
+  \item Phase-1 \texttt{NotImplementedError} gates verified for
+    position-dependent and \texttt{return\_eigendata} paths.
+\end{itemize}
+
+All JAX tests skip cleanly via \texttt{pytest.importorskip("jax")} when JAX
+is not installed, so the base CI (without \texttt{--extra jax}) is unaffected.
+
+\subsection{Relation to Manuscript}
+\label{sec:modal_jax_manuscript}
+
+The JAX acceleration targets PolyChord nested sampling runs (Phase~6 of the
+HPC campaign), where the modal solver is called $\mathcal{O}(n_{\mathrm{live}}
+\times n_{\mathrm{repeats}})$ times per chain — typically $10^4$--$10^5$
+calls per inference.  Even a $3\times$ speedup reduces a $30$-minute INTR
+job to $10$ minutes, fitting comfortably within the queue-free window.
+
+The implementation is physics-neutral: it exploits JAX's XLA backend for
+linear-algebra acceleration without changing the mathematical content of
+the solver.  All results produced by \texttt{--scheme modal-jax} are
+numerically equivalent to \texttt{--scheme modal} to within double-precision
+truncation ($<10^{-10}$ relative error), as verified by the test suite.

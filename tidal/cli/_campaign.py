@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
 
-def render_campaign(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PLR0915
+def render_campaign(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0915
     """Render a multi-panel figure from multiple sweep subdirectories.
 
     Returns 0 on success, 1 on error.

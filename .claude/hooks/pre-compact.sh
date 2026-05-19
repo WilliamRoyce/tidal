@@ -14,9 +14,6 @@ STAGED_ESC=$(echo "$STAGED" | tr '\n' '|' | sed 's/|/\\n/g')
 
 cat <<EOF
 {
-  "hookSpecificOutput": {
-    "hookEventName": "PreCompact",
-    "additionalContext": "CONTEXT BEFORE COMPACTION:\\nBranch: $BRANCH\\nRecent commits:\\n$RECENT_ESC\\nModified files:\\n$MODIFIED_ESC\\nStaged files:\\n$STAGED_ESC\\nRemember: check CLAUDE.md and memory files for project rules after compaction."
-  }
+  "additionalContext": "CONTEXT BEFORE COMPACTION:\\nBranch: $BRANCH\\nRecent commits:\\n$RECENT_ESC\\nModified files:\\n$MODIFIED_ESC\\nStaged files:\\n$STAGED_ESC\\nRemember: check CLAUDE.md and memory files for project rules after compaction."
 }
 EOF

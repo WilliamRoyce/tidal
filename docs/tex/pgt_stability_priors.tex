@@ -1,0 +1,851 @@
+% PGT Stability Priors
+% Derives the prior + soft-constraint set used by `tidal sample` for the D2
+% (extended PGT+EM nonminimal) Bayesian campaign. Cross-checks the TIDAL
+% conditions against Blagojevic 2018 (1812.02675) and Barker 2024 (2406.12826).
+% Uses macros from preamble.tex.
+
+\section{PGT Stability Priors for the D2 Campaign}
+\label{sec:pgt-stability-priors}
+
+\textbf{Status:} D2.0 + D2.1 priors locked (D2.1 verified at prior corners,
+\cref{tab:d21-p5-corner-verification}); D2.2/D2.3 stubbed pending per-model
+scans following the recipe in \cref{sec:per-model-recipe} \\
+\textbf{Date:} 2026-04-29
+
+The D2 Bayesian campaign explores Poincar\'e gauge theory (PGT) coupled to
+electromagnetism with quadratic torsion mass terms~$\beta_1 I_1 + \beta_2 I_2 + \beta_3 I_3$
+and (in the extended models) the Barker--Maxwell torsion kinetic
+term~$-\tfrac{1}{4}\xi\, F_{\mathrm{torsion}}^2$, the Bahamonde curvature--EM
+coupling~$\delta_1\, \tilde{R}_{[\mu\nu]} F^{\mu\nu}$, the Barker kinetic
+mixing~$\chi$, and the Shapiro derivative couplings~$\zeta_{1,2,3}$.  Wide,
+uniform priors waste HPC time on tachyonic samples; narrow priors over-constrain
+the chain.  This document pins the priors and \emph{soft constraints} (constraints
+that return $\log\mathcal{L}=-\infty$ instantly without invoking the solver) used
+in the campaign, and verifies that the TIDAL stability inequalities are
+consistent with the no-tachyon spectrum derived in the literature.
+
+\subsection{TIDAL conventions}
+\label{sec:tidal-conventions}
+
+TIDAL works in the mostly-plus signature $\eta_{\mu\nu} = \mathrm{diag}(-,+,+,+)$,
+and adopts the standard Proca-like convention in which a spacelike vector field
+with positive Hamiltonian mass squared appears in the Lagrangian with a
+\emph{negative} coefficient.  The torsion tensor is decomposed under the Lorentz
+group into trace, axial, and tensor irreducible parts following the
+classification in~\path{research/lagrangian_enumeration/general_quadratic_lagrangian.tex}
+(lines~121--127):
+\begin{align}
+  T_\mu &\equiv T^\lambda{}_{\lambda\mu}, &
+  S^\mu &\equiv \varepsilon^{\alpha\beta\gamma\mu}\, T_{\alpha\beta\gamma},
+  \nonumber \\
+  T_{\alpha\beta\mu}
+  &= \tfrac{1}{3}(T_\beta\, g_{\alpha\mu} - T_\mu\, g_{\alpha\beta})
+  -  \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\, S^\nu
+  +  q_{\alpha\beta\mu},
+  \label{eq:torsion-irreducible}
+\end{align}
+with the tensor part $q_{\alpha\beta\gamma}$ traceless and dual-traceless
+(16~components).  In the irreducible basis the torsion-squared sector
+is~(\path{general_quadratic_lagrangian.tex}, lines~240--250)
+\begin{align}
+  \mathcal{L}_{T^2}
+  &= a\, q^2 + b\, S^2 + c\, T^2, &
+  a &= \beta_1 + \beta_2, \nonumber \\
+  b &= -\tfrac{1}{6}(\beta_1 - \beta_2), &
+  c &= \beta_3 + \tfrac{1}{3}(2\beta_1 + \beta_2).
+  \label{eq:irreducible-basis}
+\end{align}
+The Einstein--Hilbert curvature scalar~$\tilde{R}/\kappa^2$ contributes additional
+mass-coefficient pieces in each sector~\cite{hayashi1979new}, and the three
+combined TIDAL stability conditions (recorded in
+\path{examples/torsion_gertsenshtein/theory_nonminimal.toml} lines~91--97 as
+the source of truth for the campaign) read:
+\begin{align}
+  \text{tensor } q^2 :& \quad
+    \tfrac{1}{2}/\kappa^2 + (\beta_1 + \beta_2) < 0
+    \;\Rightarrow\; \beta_1 + \beta_2 < -\tfrac{1}{2}/\kappa^2,
+  \label{eq:tidal-tensor} \\
+  \text{axial } S^2 :& \quad
+    \tfrac{1}{24}/\kappa^2 - \tfrac{1}{6}(\beta_1 - \beta_2) < 0
+    \;\Rightarrow\; \beta_1 - \beta_2 > \tfrac{1}{4}/\kappa^2,
+  \label{eq:tidal-axial} \\
+  \text{trace } T^2 :& \quad
+    -\tfrac{4}{3}/\kappa^2 + \beta_3 + \tfrac{1}{3}(2\beta_1 + \beta_2) < 0.
+  \label{eq:tidal-trace}
+\end{align}
+Setting~$\kappa = 1$ (TIDAL working units), the inequalities reduce to
+$\beta_1+\beta_2 < -0.5$, $\beta_1-\beta_2 > +0.25$, and
+$\beta_3 + (2\beta_1 + \beta_2)/3 < +1.\overline{3}$.  Their intersection
+requires $\beta_2 < -0.375$ strictly; at the D1 working point
+$(\beta_1,\beta_2,\beta_3) = (0, -0.6, 0.5)$, all three are
+satisfied~(\path{theory_nonminimal.toml} line~97 records the working-point
+margins as $-0.1$, $-0.058$, $-1.033$ respectively).
+
+\subsection{Literature cross-check}
+\label{sec:literature-cross-check}
+
+Two recent literature sources cover the no-tachyon spectrum of PGT in detail:
+Blagojevi\'c et al.~2018~\cite{blagojevic2018ghost} and
+Barker--Lasenby~2024~\cite{barker2024poincare}.  Their conventions differ from
+TIDAL's, summarised in~\cref{tab:signature-conventions}.
+
+\begin{table}[h]
+  \centering
+  \caption{Signature and torsion-squared coupling conventions across the three
+    sources used to verify the D2 stability priors.  All three works analyse
+    the same physical PGT Lagrangian; they differ only in convention.}
+  \label{tab:signature-conventions}
+  \begin{tabular}{@{}lll@{}}
+    \toprule
+    Source & $\eta_{\mu\nu}$ & Torsion-squared symbols \\
+    \midrule
+    TIDAL (this work)
+      & $(-,+,+,+)$
+      & $\beta_1$, $\beta_2$, $\beta_3$ \\
+    Blagojevi\'c~2018 \path{literature/1812.02675/}
+      & $(+,-,-,-)$
+      & $t_1$, $t_2$, $t_3$ \\
+    Barker~2024 \path{literature/2406.12826/}
+      & $(-,+,+,+)$
+      & $\alpha_1, \dots, \alpha_6$ (gauge-form) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Blagojevi\'c no-tachyon condition.}
+The general no-tachyon requirement appears as Blagojevi\'c et al.\
+Eq.~(noTachyonSpin)~\cite[line~846]{blagojevic2018ghost}:
+\begin{equation}
+  m_s^2 > 0 \quad \forall \, s,
+  \label{eq:blagojevic-no-tachyon}
+\end{equation}
+holding for every spin-parity sector $J^P \in \{0^\pm, 1^\pm, 2^\pm\}$ of the
+linearised propagator.  In the teleparallel-PGT subcase
+(\cite[lines~1146--1158]{blagojevic2018ghost}, Eq.~(TeleparallelPGT)),
+the Lagrangian density is written
+\begin{align*}
+  \mathcal{L}/b
+  =& \left(\tfrac{t_1}{3}+\tfrac{t_2}{12}\right) T^{ABC} T_{ABC} \\
+  &+ \left(-\tfrac{t_1}{3}+\tfrac{t_2}{6}\right) T^{ABC} T_{BCA} \\
+  &+ \left(-\tfrac{t_1}{3}+\tfrac{2t_3}{3}\right) T_{BAB}\, T_C{}^{AC},
+\end{align*}
+which maps onto TIDAL's Eq.~\ref{eq:irreducible-basis} with
+$\beta_1 = t_1/3 + t_2/12$, $\beta_2 = -t_1/3 + t_2/6$,
+$\beta_3 = -t_1/3 + 2t_3/3$ (Blagojevi\'c's $\mathcal{L}/b$ is the standard
+Lagrangian density; the additional factor of $b\equiv\det(b^a{}_\mu)$ is the
+Riemann--Cartan volume element).  The signature flip $(-,+,+,+) \to (+,-,-,-)$
+multiplies the three-index torsion contractions $T_{\lambda\mu\nu} T^{\lambda\mu\nu}$
+by~$(-1)^3 = -1$ and likewise reverses the sign of $\tilde{R}/\kappa^2$, so the
+\emph{relative} sign between the curvature and torsion-squared contributions to
+each sector mass eigenvalue is preserved.  Combined with TIDAL's
+``Lagrangian-mass-coefficient $<0$'' Proca convention versus Blagojevi\'c's
+``$m^2 > 0$'' Hamiltonian-mass convention, the two conventions are equivalent
+once both are projected onto the irreducible basis.
+
+\paragraph{Worked sector check: tensor (spin-$2^-$) and axial (spin-$1^+$).}
+The tensor part $q_{\alpha\beta\gamma}$ carries the spin-$2^-$ representation;
+its mass eigenvalue in the TIDAL Lagrangian is
+$\tfrac{1}{2}/\kappa^2 + a = \tfrac{1}{2}/\kappa^2 + (\beta_1+\beta_2)$.
+\Cref{eq:blagojevic-no-tachyon} requires the corresponding Hamiltonian mass
+squared to be positive, which in TIDAL's negative-coefficient convention
+becomes \cref{eq:tidal-tensor}:
+$\beta_1 + \beta_2 < -\tfrac{1}{2}/\kappa^2$.
+Repeating for the axial pseudovector $S^\mu$ (spin-$1^+$): mass eigenvalue
+$\tfrac{1}{24}/\kappa^2 + b = \tfrac{1}{24}/\kappa^2 - \tfrac{1}{6}(\beta_1-\beta_2)$,
+and the no-tachyon requirement reproduces \cref{eq:tidal-axial}:
+$\beta_1 - \beta_2 > +\tfrac{1}{4}/\kappa^2$.
+The structural form of the inequalities matches the Blagojevi\'c spectrum
+sector by sector.  No disagreement.
+
+\paragraph{Barker on the kinetic term.}
+The eWGT action presented in Barker--Lasenby~\cite[line~219]{barker2024poincare}
+introduces the kinetic-mixing parameter~$\chi$ and
+the Maxwell-torsion coupling~$\xi$ as
+two new dimensionless couplings beyond the traditional PGT~$\alpha_i$.  The
+Maxwell-torsion kinetic term~$-\tfrac{1}{4}\xi\, F_{\mathrm{torsion}}^2$ is the
+sole propagator for the trace torsion vector and must therefore have a positive
+kinetic coefficient: $\xi > 0$ is required for ghost-free vector torsion
+\cite[line~277]{barker2024poincare}.  Barker's Einstein--Proca branch
+$\alpha_5 = \chi^2/\xi - 2(\alpha_2 + 2\alpha_4)$ identifies a region of the
+parameter space in which the trace vector becomes massive and ghost-free; this
+branch is incorporated into the D2.0 prior set by demanding $\xi > 0$ as a
+floor.
+
+\subsection{D2.0 priors (Bahamonde non-minimal coupling)}
+\label{sec:d20-priors}
+
+D2.0 is the D1 (Ricci--EM nonminimal) Lagrangian extended with the Barker
+$\xi$ kinetic term and Bahamonde~$\delta_1$ coupling, but with $\chi=\zeta_i=0$
+fixed.  Crucially, the new terms in
+\path{examples/torsion_gertsenshtein/theory_general_nonminimal.toml} ($\xi$,
+$\chi$, $\zeta_i$) do \emph{not} multiply the torsion mass invariants
+$I_1, I_2, I_3$, so they cannot shift the $\beta$-stability conditions
+(\crefrange{eq:tidal-tensor}{eq:tidal-trace}).  D2.0's $\beta$-stability is
+therefore \emph{identical} to D1's, supplemented only by~$\xi > 0$ for kinetic
+positive-definiteness.  The $\delta_1$ coupling appears only off-diagonally in
+the kinetic matrix; its perturbative range is bounded empirically rather than
+analytically.
+
+\subsubsection*{Model-dependence of the $\delta_1$ stability range}
+\label{sec:delta1-model-dependence}
+
+\textbf{Empirical caveat (post-2026-04-29).}  Phase~1d's $\delta^*=0.5$ was
+measured on the D1 spec
+(\path{examples/data/torsion_gertsenshtein_nonminimal.json}).  When the
+canonical probe (\cref{sec:stability-probe}) is run against the
+\emph{general} spec
+(\path{examples/data/torsion_gertsenshtein_general_nonminimal.json}) with
+$\chi=\eta=\zeta_i=0$ --- i.e.\ the D2.0 limit of the same Lagrangian
+that D1 implements directly --- the $\delta_1$ perturbative cutoff
+\emph{tightens by an order of magnitude}.  This is the central operational
+finding: \textbf{stability ranges of existing parameters are model-dependent},
+not just Lagrangian-dependent, even when the new model parameters are zeroed.
+
+The mechanism is that D2.0's spec carries additional dynamical structure
+($\xi$ kinetic term, suppressed but not removed) that couples to $\delta_1$
+through the constraint Schur complement.  Even at $\xi=1$ and $\chi=\eta=\zeta_i=0$,
+the canonical probe sees a different reduced-system $M_k$ matrix on the general
+spec, and that matrix is more sensitive to $\delta_1$ than D1's.
+
+\paragraph{5-point empirical scan.}
+We re-ran the $\delta_1$ scan on the general spec at five constraint-respecting
+$(\beta_1, \beta_2, \beta_3, \xi)$ points covering a representative spread of
+the prior region:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Point} & $\beta_1$ & $\beta_2$ & $\beta_3$ & $\xi$ \\
+\midrule
+P1 working (D1 reference) & $0.000$ & $-0.600$ & $+0.500$ & $1.000$ \\
+P2 small $\xi$ (D1 limit) & $+0.206$ & $-2.623$ & $-0.600$ & $0.011$ \\
+P3 large $\xi$            & $-1.180$ & $-1.784$ & $-0.258$ & $6.030$ \\
+P4 $\beta$ corner         & $-0.100$ & $-0.450$ & $\phantom{+}0.000$ & $1.000$ \\
+P5 $\beta$ interior       & $\phantom{+}0.000$ & $-1.500$ & $\phantom{+}0.000$ & $1.000$ \\
+\bottomrule
+\end{tabular}
+\caption{Five constraint-respecting $(\beta,\xi)$ points used for the
+2026-04-29 D2.0 $\delta_1$ scan.  All four $\beta/\xi$-constraints
+(\cref{eq:tidal-tensor,eq:tidal-axial,eq:tidal-trace} and $\xi>0.01$) hold at
+each point.}
+\label{tab:d20-scan-points}
+\end{table}
+
+At each point, the canonical probe ($t_\mathrm{test}=20$, $\tau=0.3$ at
+the time of this scan; current default $\tau=0.15$ post-\#341, see
+\cref{sec:threshold-tightening}; the displayed $\gamma_\mathrm{eff}$
+values are independent of $\tau$ since the threshold only changes
+verdicts, not measurements),
+$k_0 = 2\pi/100$, was evaluated at $\delta_1 \in
+\{0, 0.05, 0.10, 0.12, 0.15, 0.20, 0.30, 0.50\}$ with $\chi=\eta=\zeta_i=0$:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrrrrr}
+\toprule
+\textbf{Point} & $\delta_1=0$ & $0.05$ & $0.10$ & $0.12$ & $0.15$ & $0.20$ & $0.30$ & $0.50$ \\
+\midrule
+P1 working    & $0.101$ & $0.101$ & $0.101$ & $0.192$ & $\mathbf{0.847}$ & $1.274$ & $1.734$ & $2.800$ \\
+P2 small $\xi$ & $0.101$ & $\mathbf{\infty}$ & $\infty$ & $\infty$ & $\infty$ & $\infty$ & $\infty$ & $9.001$ \\
+P3 large $\xi$ & $0.101$ & $\mathbf{0.396}$ & $\infty$ & $\infty$ & $\infty$ & $\infty$ & $11.621$ & $8.093$ \\
+P4 $\beta$ corner & $0.101$ & $0.101$ & $0.101$ & $0.232$ & $\mathbf{0.849}$ & $1.257$ & $1.719$ & $2.852$ \\
+P5 $\beta$ interior & $0.101$ & $0.101$ & $\mathbf{0.367}$ & $0.640$ & $0.856$ & $1.110$ & $1.507$ & $3.431$ \\
+\bottomrule
+\end{tabular}
+\caption{Empirical probe $\gamma_\mathrm{eff}$ on the general spec at the
+5 representative points (\cref{tab:d20-scan-points}).  Bold entries are
+the smallest~$|\delta_1|$ at which the probe rejects ($\gamma_\mathrm{eff}>0.3$);
+$\infty$ marks singular constraint-Schur failures, which the canonical probe
+treats as catastrophic divergence.  Run \path{examples/data/d2_prior_scan/_analyze_general.py}
+to reproduce.}
+\label{tab:d20-delta1-scan}
+\end{table}
+
+\paragraph{Findings.}
+\begin{enumerate}
+  \item At~$\delta_1=0$, all 5 points return $\gamma_\mathrm{eff}=0.101$ to
+    four significant figures, confirming Finding~1 from the 20-point random
+    scan: the $\beta/\xi$-constraints carve out a $\delta_1=0$ stable region
+    where probe verdict is independent of the in-region $(\beta,\xi)$ values.
+  \item At~$\delta_1\ne 0$ the model-dependence becomes acute.  P2 (small
+    $\xi$) jumps to a singular constraint matrix already at~$\delta_1=0.05$;
+    P3 (large $\xi$) crosses the threshold at~$0.05$.  P1, P4 retain D1-like
+    tolerance (rejection at~$0.15$); P5 is intermediate ($0.10$).
+  \item Therefore $\delta^*$ is \emph{not} a single number on the general
+    spec.  The smallest first-rejection $\delta_1$ across the 5 representative
+    points is $\delta^*_5 = 0.05$, dominated by the small-$\xi$ corner where
+    the constraint-Schur complement becomes singular.
+\end{enumerate}
+
+\paragraph{D2.0 prior cutoff.}
+With~$\delta^*_5 = 0.05$ and a 2$\times$ safety margin (per the campaign's
+``narrow priors + soft constraints'' principle), the D2.0~$\delta_1$ prior is
+$\delta_1 \in [-0.025, +0.025]$.  This is~$\sim 20\times$ narrower than D1's
+range and reflects that the small-$\xi$ region is much more sensitive to
+$\delta_1$ on the general spec than the D1 spec.
+
+\paragraph{Operational gotcha.}
+The general spec carries~$\chi$, $\eta$, $\zeta_1$, $\zeta_2$, $\zeta_3$ as
+free symbols.  D2.0 invocations \emph{must} fix these via
+\verb|--param chi=0.0 --param eta=0.0 --param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0|;
+otherwise \texttt{CoefficientEvaluator} raises
+\verb|NameError: name 'zeta1' is not defined| and the chain returns
+non-finite~$\log\mathcal{L}$ for every prior sample.
+
+\subsubsection*{Empirical $\delta_1$ scan (Phase~1d)}
+
+A 41-point sweep of $\delta_1 \in [-0.5, +0.5]$ at the D1 working point
+$(\beta_1,\beta_2,\beta_3) = (0, -0.6, +0.5)$, $\kappa=1$, $B_0=0.01$,
+plane-wave initial condition on $h_5$ at the discrete Fourier mode
+$k_0 = 2\pi/100$, $t_\mathrm{end} \in \{10, 20\}$, was run to identify the
+perturbative cutoff~$\delta^*$.  The scan results are committed at
+\path{examples/data/d2_prior_scan/} and summarised in
+\path{examples/data/d2_prior_scan/delta1_perturbative_range.csv}:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+metric,delta1_lower,delta1_upper
+p_max_t10,-0.5,0.5
+p_max_t20,-0.5,0.5
+diverge,-0.5,0.5
+\end{lstlisting}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{../../examples/data/d2_prior_scan/delta1_scan.png}
+  \caption{$P_\mathrm{max}$ vs $\delta_1$ at the D1 working point
+    $(0,-0.6,+0.5)$, $\kappa=1$, $B_0=0.01$.  Linear (top) and log (bottom)
+    panels at $t_\mathrm{end}\in\{10,20\}$.  $P_\mathrm{max}$ peaks at
+    $\delta_1=0$ and decreases monotonically with $|\delta_1|$, confirming
+    $\delta_1$ acts as a suppressor (not amplifier) at this~$\beta$-point.}
+  \label{fig:delta1-scan}
+\end{figure}
+
+\paragraph{Interpretation.}
+Three observations from the scan, important to record honestly:
+\begin{enumerate}
+  \item At this~$\beta$ working point, $\delta_1$ is \emph{not perturbatively
+    limiting} anywhere in $[-0.5, +0.5]$:~$P_\mathrm{max}$ peaks at $\delta_1=0$
+    ($4.7\times10^{-3}$ at $t=10$, $1.6\times10^{-2}$ at $t=20$) and decreases
+    monotonically with~$|\delta_1|$.  $\delta_1$ acts as a \emph{suppressor}
+    of the bare Gertsenshtein conversion, not an amplifier.
+  \item The $t=20 / t=10$ ratio of~$P_\mathrm{max}$ values is~$\approx 4$,
+    consistent with the perturbative-Rabi scaling
+    $P \sim \sin^2(\kappa B_0 t/2)$.  The simulation is genuinely in the
+    perturbative regime, not in a tachyonic-but-suppressed regime.
+  \item Therefore the value $\delta^* = 0.5$ recorded in
+    \path{delta1_perturbative_range.csv} is a \emph{lower bound} on the
+    true perturbative cutoff at this~$\beta$-point, set by the scan extent
+    rather than by a measured perturbativity breakdown.  A wider or
+    differently-located~$\beta$-point may give a tighter~$\delta^*$.
+\end{enumerate}
+
+\subsubsection*{D2.0 prior + soft-constraint block}
+
+Substituting the verified~$\delta^*_5 = 0.05$ (\cref{tab:d20-delta1-scan})
+with a 2$\times$ safety margin, the D2.0 sample invocation uses:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+--prior "beta1=uniform:-1.5:1.0"
+--prior "beta2=uniform:-3.0:-0.3"
+--prior "beta3=uniform:-1.0:1.0"
+--prior "xi=log_uniform:0.01:10"
+--prior "delta1=uniform:-0.025:0.025"
+--constraint "beta1 + beta2 < -0.5"
+--constraint "beta1 - beta2 > 0.25"
+--constraint "beta3 + (2*beta1 + beta2)/3 < 1.333"
+--constraint "xi > 0.01"
+--param chi=0.0 --param eta=0.0
+--param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0
+\end{lstlisting}
+The four \texttt{--constraint} clauses are evaluated by
+\texttt{tidal/inference/\_constraints.py} via a safe AST and return
+$\log\mathcal{L}=-\infty$ in microseconds for any prior sample that violates
+them, sparing the chain from running the PDE solver on tachyonic parameter
+points.  Confidence levels are tabulated in~\cref{sec:confidence}.
+
+\subsection{Per-model sensitivity scan recipe}
+\label{sec:per-model-recipe}
+
+D2.0's empirical scan delivered an unexpectedly strong invariance
+result: at $\delta_1=0$, $\gamma_\mathrm{eff}=0.1008$ to four
+significant figures across \emph{all five} representative
+$(\beta,\xi)$ anchor points (\cref{tab:d20-scan-points}).  We
+extrapolated from that observation that $\delta_1$'s perturbative
+range was approximately $(\beta,\xi)$-invariant inside the
+constraint region, and the working-point scan in
+\cref{sec:delta1-model-dependence} suffices to set~$\delta^*$.
+
+\paragraph{Yellow flag: the invariance does not generalise.}
+D2.1's analogue scan does not preserve this invariance.  At
+$\delta_1=0.005$, the $\chi$-rejection threshold varies by a
+factor~${\sim}\,2.5$ across the same five anchor points
+(\cref{sec:d21-priors} below: P1: $0.040$, P3: $>0.050$, P4:
+$0.040$, P5: $0.018$).  P5 (the interior of the
+$\beta$-constraint polytope at $\xi=1$) is genuinely more
+sensitive than the boundary anchors.  A working-point-only scan at
+P1 would over-state $\chi^*$ by~${\sim}\,2.2\times$ and admit
+tachyonic samples in the $\beta$-interior region.  D2.0's
+invariance is a feature of $\delta_1$ at $\chi=\zeta_i=0$, not of
+the general spec, and must not be assumed for any other coupling.
+
+\paragraph{Recipe.}
+Each new coupling parameter introduced in a D$x.y$ sub-model is
+characterised by three sequential steps:
+\begin{enumerate}
+  \item[(a)] \textbf{Single-parameter scan at $\delta_1 = 0$ across
+    five anchors} to confirm the parameter is benign on its own.
+    Run the canonical probe at each of the five
+    $(\beta,\xi)$ anchors in \cref{tab:d20-scan-points}, with all
+    other couplings (including~$\delta_1$) fixed at zero, sweeping
+    the new parameter across a wide range
+    $\{0,\,0.05,\,\ldots,\,0.50\}$.  If $\gamma_\mathrm{eff}$ stays
+    at the D2.0 baseline of~$0.101$ across the scan range and all
+    five anchors, the parameter is benign in isolation --- the
+    typical and expected outcome.
+  \item[(b)] \textbf{Joint scan at the working point} to identify
+    the multiplicative-vs-rectangular structure.  Run a~$5\!\times\!5$
+    grid in $(\delta_1,\,\text{new})$ at the D1 working point P1.
+    A \emph{rectangular} unstable region (one axis non-zero
+    \emph{and} the other axis above some threshold) indicates the
+    standard D2.1-type Schur-complement bridge between sectors and
+    means no \texttt{--constraint} clause coupling the two
+    parameters is needed --- the prior box can be set
+    component-wise.  A \emph{multiplicative} or \emph{radial}
+    structure (rejection at small product or small radius) would
+    instead require an explicit cross-coupling
+    \texttt{--constraint} clause to keep the prior inside the
+    stable region.  D2.1 exhibits the rectangular pattern
+    (\cref{tab:d21-joint-scan-working}).
+  \item[(c)] \textbf{Most-restrictive-anchor scan} to set the prior
+    bound.  Repeat the joint scan at the four non-working anchors
+    P2--P5 in the regime indicated by step~(b).  The prior bound
+    is the smallest-rejection threshold across all five anchors,
+    with a~$2\times$ safety margin.  Do not average or extrapolate
+    from the working point alone.
+\end{enumerate}
+
+\paragraph{Worked examples.}
+D2.0 (\cref{sec:delta1-model-dependence}) and D2.1
+(\cref{sec:d21-priors}) carry through this recipe end-to-end and
+serve as concrete templates.  Each subsequent sub-model should
+reproduce the same structure of inline tables: a five-anchor
+single-parameter scan, a working-point joint grid, and a per-anchor
+threshold list.  Storing the raw $\gamma_\mathrm{eff}$ values inline
+keeps the recipe auditable without an external CSV.
+
+\paragraph{Predictions for D2.2 and D2.3.}
+Each $\zeta_i$ in D2.2 (and the joint $\zeta_i\!\times\!\zeta_j$
+combinations in D2.3) should be expected to follow the D2.1
+pattern: benign in isolation, dangerous in combination with
+$\delta_1$ and/or $\chi$.  The shared mechanism is the constraint
+Schur complement, which funnels every curvature- and
+derivative-mediated coupling through the same kinetic-matrix
+inversion; whichever pair of couplings is non-zero, the resulting
+off-diagonal terms can compound.  Default to the recipe above and
+do not skip step~(b).
+
+\subsection{D2.1, D2.2, D2.3 priors}
+\label{sec:d2x-priors}
+
+The $\beta$-stability inequalities (\crefrange{eq:tidal-tensor}{eq:tidal-trace})
+remain in force across all D2 sub-models because none of the additional
+couplings multiply $I_1, I_2, I_3$.  Each sub-model adds new free parameters
+that require their own perturbative-range scan, following the recipe in
+\cref{sec:per-model-recipe}.
+
+\subsubsection*{D2.1 (Barker, +$\chi$): joint stability structure with $\delta_1$}
+\label{sec:d21-priors}
+
+D2.1 adds the Barker $R\!\sim\!\!F_{\text{torsion}}$ kinetic-mixing
+coupling~$\chi$ on top of D2.0's $\beta/\xi/\delta_1$ structure.
+
+\paragraph{Joint stability structure for D2.1.}
+The unstable region in the $(\delta_1,\chi)$ plane is the
+\emph{rectangular} set
+\begin{equation*}
+  \{(\delta_1,\chi)\,:\, \delta_1 \neq 0\ \wedge\ |\chi| \gtrsim 0.04\}
+  \quad\text{(at the D1 working point)},
+\end{equation*}
+not a radial or multiplicative product set.  Either coupling alone
+is benign: $\delta_1$ at $\chi=0$ recovers D2.0's $\delta^*=0.025$
+prior bound, and $\chi$ at $\delta_1=0$ shows no rejection across
+the entire $\chi \in [0, 0.5]$ scan range at any of the five
+$(\beta,\xi)$ anchors.  Joint activation is the destabilisation
+channel:~$\delta_1\, \tilde{R}_{[\mu\nu]} F^{\mu\nu}$ couples
+curvature to the photon sector,~$\chi\, \tilde{R}_{[\mu\nu]}
+F_\mathrm{torsion}^{\mu\nu}$ couples the same curvature to the
+torsion-vector sector, and once both are non-zero the curvature
+bridges the two sectors and opens a tachyonic mode in the combined
+reduced system.
+
+The 5$\times$5 working-point table~\ref{tab:d21-joint-scan-working}
+below makes the rectangular boundary explicit.  This is the
+empirical realisation of the rectangular-structure prediction in
+\cref{sec:per-model-recipe} step~(b): each new curvature- or
+derivative-mediated coupling is likely benign on its own and
+dangerous in combination with the others, exactly because they
+all funnel through the same constraint Schur complement.  Because
+the structure is rectangular rather than multiplicative, no
+$\delta_1\!\times\!\chi$ \texttt{--constraint} clause is needed;
+the prior box (set component-wise) fits inside the joint-stable
+region.
+
+\paragraph{$\chi$-only scan at $\delta_1=0$.}
+At each of the five $(\beta,\xi)$ anchor points
+(\cref{tab:d20-scan-points}), with $\delta_1=0$ and $\chi$ swept across
+$\{0, 0.05, 0.10, 0.12, 0.15, 0.20, 0.30, 0.50\}$, the canonical probe
+returns $\gamma_\mathrm{eff} = 0.101$ for \emph{every} combination.
+$\chi$ alone --- in the decoupling-from-$\delta_1$ baseline --- has
+no measurable effect on the probe verdict and does not destabilise on
+its own.  This is the analogue of Finding~1 from
+\cref{sec:delta1-model-dependence}: the $\beta/\xi$-constraints
+suffice when one of the off-diagonal couplings is zero.
+
+\paragraph{Joint $(\delta_1,\chi)$ scan at the working point.}
+The interesting question is what happens when both~$\delta_1$ and
+$\chi$ are non-zero.  A 5$\times$5 grid at the D1 working point
+($\beta_1=0$, $\beta_2=-0.6$, $\beta_3=0.5$, $\xi=1$) shows
+\emph{joint} destabilisation:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrr}
+\toprule
+& $\chi=0$ & $\chi=0.005$ & $\chi=0.01$ & $\chi=0.02$ & $\chi=0.05$ \\
+\midrule
+$\delta_1=0$    & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ \\
+$\delta_1=0.001$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+$\delta_1=0.005$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+$\delta_1=0.012$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+$\delta_1=0.020$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+\bottomrule
+\end{tabular}
+\caption{Joint $(\delta_1,\chi)$ probe scan at the working point.
+Either parameter alone is stable; together at $\chi \gtrsim 0.04$ the
+constraint-Schur matrix becomes singular for any non-zero~$\delta_1$.
+The boundary structure is \emph{rectangular} (no multiplicative
+$\delta_1\cdot\chi$ scaling), not radial.}
+\label{tab:d21-joint-scan-working}
+\end{table}
+
+\paragraph{$\chi$-threshold across the $(\beta,\xi)$ prior region.}
+The rectangular structure means~$\chi^*$ must be set conservatively
+across the prior, not just at the working point.  Spot-checks at three
+representative points (with $\delta_1=0.005$, mid-D2.0-prior):
+
+\begin{itemize}
+  \item \textbf{P1 working} ($\beta_1=0$, $\beta_2=-0.6$, $\beta_3=0.5$, $\xi=1$):
+    rejection at $\chi \approx 0.040$ (stable through $\chi=0.035$).
+  \item \textbf{P3 large-$\xi$} ($\beta=(-1.18,-1.78,-0.26)$, $\xi=6.03$):
+    stable through $\chi=0.05$ (no rejection in scan range).
+  \item \textbf{P4 boundary} ($\beta=(-0.10,-0.45,0)$, $\xi=1$):
+    rejection at $\chi \approx 0.040$.
+  \item \textbf{P5 interior} ($\beta=(0,-1.5,0)$, $\xi=1$):
+    \emph{rejection at $\chi \approx 0.018$} --- the most-sensitive
+    point in the $\beta$-prior region.
+\end{itemize}
+
+The conservative cutoff is therefore~$\chi^*_5 = 0.018$, set by the
+$\beta$-interior region (P5).  With a 2$\times$ safety margin, the
+D2.1 prior is~$\chi \in [-0.009, +0.009]$.
+
+\paragraph{Prior-corner verification.}
+Because the binding bound on~$\chi^*_5$ comes from a single anchor
+(P5), we re-ran the scan at the prior corner $\delta_1 = +0.025$
+(D2.0's edge) on P5 itself to confirm the margin holds:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrrrr}
+\toprule
+\textbf{$\delta_1$} & $\chi=0$ & $0.005$ & $0.010$ & $0.015$ & $0.018$ & $0.020$ & $0.025$ \\
+\midrule
+$+0.025$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $0.101$ & $\infty$ \\
+\bottomrule
+\end{tabular}
+\caption{$\chi$-scan at P5 interior with $\delta_1$ at the prior
+corner $+0.025$.  $\chi$-threshold here is bracketed in
+$(0.020,\,0.025)$, looser than the mid-prior threshold of $0.018$
+measured at $\delta_1=0.005$.  P5's most-sensitive~$\delta_1$ is
+therefore mid-prior, not at the corner; the original
+$\chi^*_5 = 0.018$ remains the binding bound and the prior
+$\chi \in [-0.009, +0.009]$ preserves its $2\times$ safety margin
+(0.020/0.009 $\approx 2.2\times$).  An earlier finer scan at
+$\chi \in \{0.023,\,0.024\}$ pinned the corner threshold at
+$\approx 0.0235$ but did not change the decision.}
+\label{tab:d21-p5-corner-verification}
+\end{table}
+
+\paragraph{Joint constraint structure.}
+Empirically the unstable region is approximately the rectangular set
+\begin{equation*}
+  \{(\delta_1,\chi)\,:\,\delta_1 \ne 0\ \text{and}\ |\chi| \gtrsim 0.018\},
+\end{equation*}
+not a radial or multiplicative-product set.  No \texttt{--constraint}
+clause coupling~$\delta_1$ and~$\chi$ is therefore needed: the
+rectangular prior $\delta_1 \in [-0.025, +0.025] \times \chi \in
+[-0.009, +0.009]$ fits inside the joint-stable region with margin.
+
+\paragraph{D2.1 prior + soft-constraint block.}
+With the prior-corner verification in \cref{tab:d21-p5-corner-verification}
+confirming that $\chi^*_5 = 0.018$ remains the binding bound at both
+edges of the $\delta_1$ prior, the D2.1 prior $\chi \in [-0.009,
++0.009]$ stands.  The D2.1 sample invocation extends D2.0's by adding
+the~$\chi$ prior and removing~$\chi$ from the \texttt{--param} fix list:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+--prior "beta1=uniform:-1.5:1.0"
+--prior "beta2=uniform:-3.0:-0.3"
+--prior "beta3=uniform:-1.0:1.0"
+--prior "xi=log_uniform:0.01:10"
+--prior "delta1=uniform:-0.025:0.025"
+--prior "chi=uniform:-0.009:0.009"
+--constraint "beta1 + beta2 < -0.5"
+--constraint "beta1 - beta2 > 0.25"
+--constraint "beta3 + (2*beta1 + beta2)/3 < 1.333"
+--constraint "xi > 0.01"
+--param eta=0.0 --param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0
+\end{lstlisting}
+\textbf{Note} that~$\chi$ is now a free parameter; only~$\eta,\zeta_i$
+remain fixed.  Forgetting to remove~\verb|--param chi=0.0| from the
+D2.0 invocation block will pin~$\chi$ at zero and reproduce the
+D2.0 chain instead of D2.1.
+
+\subsubsection*{D2.2 (Shapiro, +$\zeta_{1,2,3}$): derivative torsion--EM couplings}
+\label{sec:d22-priors}
+
+D2.2 adds three derivative torsion--EM couplings of the Shapiro
+form~$(\nabla T)\cdot F$ on top of D2.0's $\beta/\xi/\delta_1$
+structure (with $\chi=0$ fixed, i.e.\ D2.2 is an alternative branch
+to D2.1).  The three independent index contractions are
+\begin{align*}
+  \zeta_1\text{-term:} &\quad \zeta_1\,\nabla_a T^{a}{}_{bc}\,
+    \eta^{bd}\eta^{ce}F_{de}, \\
+  \zeta_2\text{-term:} &\quad \zeta_2\,\nabla_a T^{ab}{}_{c}\,
+    \eta_{bd}\eta^{ce}F_{de}, \\
+  \zeta_3\text{-term:} &\quad \zeta_3\,\nabla_a T_b{}^{a}{}_c\,
+    \eta^{bd}\eta^{ce}F_{de}.
+\end{align*}
+Each is a first-derivative coupling between the torsion tensor and the
+EM field-strength; none enter the torsion-squared kinetic terms
+$I_1/I_2/I_3$.  Because the $\zeta_i$ do not alter the torsion kinetic
+matrix, the $\beta$-stability inequalities (\cref{sec:literature-cross-check})
+are \emph{unchanged} by any values of~$\zeta_{1,2,3}$.
+
+\paragraph{Per-parameter thresholds.}
+Single-parameter scans at $\delta_1=\chi=0$, sweeping each~$\zeta_i$
+across a logarithmic grid with the five $(\beta,\xi)$ anchors of
+\cref{tab:d20-scan-points}, give the following empirical thresholds.
+The binding anchor for all three is P2 (small-$\xi$, same role as P2
+for~$\delta_1$ in \cref{sec:delta1-model-dependence}).
+Data: \path{examples/data/d2_prior_scan/zeta_scan/zeta1_single_param.csv},
+\path{zeta2_single_param.csv}, \path{zeta3_single_param.csv}.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Parameter & $\zeta_i^*$ & $\frac{1}{2}\zeta_i^*$ & Prior range \\
+\midrule
+$\zeta_1$ & $0.100$ & $0.050$ & $[-0.050,\;+0.050]$ \\
+$\zeta_2$ & $0.0422$ & $0.0211$ & $[-0.0211,\;+0.0211]$ \\
+$\zeta_3$ & $0.100$ & $0.050$ & $[-0.050,\;+0.050]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Joint stability structure.}
+Joint scans in the $(\delta_1,\zeta_i)$ plane at the D2.0 MAP anchor
+(P1: $\beta_1=-0.10$, $\beta_2=-1.55$, $\beta_3=+0.96$, $\xi=1.85$)
+reveal three different patterns
+(data: \path{zeta1_delta1_joint.csv}, \path{zeta2_delta1_joint.csv},
+\path{zeta3_delta1_joint.csv}):
+\begin{itemize}
+  \item \textbf{$\zeta_1$}: benign --- within the stable~$\delta_1$
+    range at P1 ($|\delta_1|\lesssim 0.010$), varying~$\zeta_1$ across
+    the full scan range $[-0.10,+0.10]$ causes no additional
+    rejection.  At $|\delta_1|=0.020$ the system is unstable
+    \emph{even at $\zeta_1=0$} (see P1-corner note below), confirming
+    that~$\zeta_1$ adds no marginal instability.
+  \item \textbf{$\zeta_2$}: rectangular --- at $|\delta_1|\le0.005$
+    the system is stable for $|\zeta_2|$ up to the prior edge and
+    beyond; rejection appears only when $|\delta_1|\gtrsim 0.020$
+    \emph{and} $|\zeta_2|\gtrsim 0.042$.  The prior half-width
+    $|\zeta_2|\le0.021$ is within the stable band even at the
+    joint~$\delta_1$ boundary.
+  \item \textbf{$\zeta_3$}: rectangular --- same pattern as~$\zeta_2$
+    with threshold $|\zeta_3|\gtrsim 0.050$.
+\end{itemize}
+Pairwise scans $(\zeta_i,\zeta_j)$ at $\delta_1=0$
+(data: \path{zeta1_zeta2_pair.csv}, \path{zeta1_zeta3_pair.csv},
+\path{zeta2_zeta3_pair.csv}) show all three pairs benign: no rejection
+anywhere in the $(\zeta_i,\zeta_j)$ plane within the prior ranges.
+Because the joint structure is rectangular rather than multiplicative,
+no \texttt{--constraint} clause coupling~$\delta_1$ to any~$\zeta_i$
+is needed; the component-wise prior box fits inside the joint-stable
+region.
+
+\paragraph{Prior-corner verification.}
+Selected corners of the combined prior were verified against the
+stability probe
+(data: \path{examples/data/d2_prior_scan/zeta_scan/corner_verification.csv}):
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrrl}
+\toprule
+Corner & $\delta_1$ & $\zeta_1$ & $\zeta_2$ & $\zeta_3$ & Stable? \\
+\midrule
+P1, $\delta_1{+}$, $\zeta_1{+}$ & $+0.025$ & $+0.050$ & $0$ & $0$ & No ($\gamma=16.4$) \\
+P1, $\delta_1{+}$, $\zeta_1{-}$ & $+0.025$ & $-0.050$ & $0$ & $0$ & No ($\gamma=16.2$) \\
+P1, $\delta_1{+}$, $\zeta_2{+}$ & $+0.025$ & $0$ & $+0.0211$ & $0$ & Yes \\
+P1, $\delta_1{+}$, $\zeta_3{+}$ & $+0.025$ & $0$ & $0$ & $+0.050$ & Yes \\
+P5, $\delta_1{+}$, $\zeta_1{+}$ & $+0.025$ & $+0.050$ & $0$ & $0$ & Yes \\
+P2, $\delta_1{+}$, $\zeta_1{+}$ & $+0.025$ & $+0.050$ & $0$ & $0$ & Yes \\
+P1, $\delta_1{+}$, all $\zeta{+}$ & $+0.025$ & $+0.050$ & $+0.0211$ & $+0.050$ & No ($\gamma=11.4$) \\
+\bottomrule
+\end{tabular}
+\caption{Prior-corner stability checks for D2.2
+(\path{corner_verification.csv}).  P1 is the D2.0 MAP anchor;
+P5 and P2 are the interior and small-$\xi$ anchors from
+\cref{tab:d20-scan-points}.}
+\label{tab:d22-corner}
+\end{table}
+
+\paragraph{P1-corner instability: $\beta$-dependent, not a $\zeta_1$ effect.}
+The two P1-corner failures ($\zeta_1=\pm0.050$, $\gamma\approx16$) and
+the all-$\zeta$-positive P1 failure ($\gamma\approx11$) are \emph{not}
+caused by~$\zeta_1$ coupling.  The identical corners at P5 (interior)
+and P2 (small-$\xi$) are both stable.  The joint CSV confirms the
+diagnosis: at P1 with $\delta_1=0.020$, the probe returns $\gamma>8$
+even when $\zeta_1=0$, showing that P1's $\delta_1$ stability window
+is narrower than $|\delta_1|<0.025$.  The P1-corner instability is
+$\beta$-dependent; no joint $(\delta_1,\zeta_1)$ constraint is
+warranted.  These corner points are handled inline at chain time by
+the stability probe, which returns $\log L=-\infty$ for any sample
+exceeding the $\gamma_\mathrm{eff}$ threshold (see
+\texttt{stability\_probe.tex}, \S\emph{Inline rejection cascade}).
+
+\paragraph{D2.2 prior block.}
+The D2.2 sample invocation adds three $\zeta_i$ priors to D2.0's
+prior block.  $\chi$ remains fixed at zero:
+\begin{lstlisting}[basicstyle=\ttfamily\small]
+--prior "beta1=uniform:-1.5:1.0"
+--prior "beta2=uniform:-3.0:-0.3"
+--prior "beta3=uniform:-1.0:1.0"
+--prior "xi=log_uniform:0.01:10"
+--prior "delta1=uniform:-0.025:0.025"
+--prior "zeta1=uniform:-0.050:0.050"
+--prior "zeta2=uniform:-0.021:0.021"
+--prior "zeta3=uniform:-0.050:0.050"
+--constraint "beta1 + beta2 < -0.5"
+--constraint "beta1 - beta2 > 0.25"
+--constraint "beta3 + (2*beta1 + beta2)/3 < 1.333"
+--constraint "xi > 0.01"
+--param chi=0.0
+\end{lstlisting}
+\textbf{Note}: $\chi$ is pinned at zero here; to run D2.3
+(all nine parameters free), also add
+\verb|--prior "chi=uniform:-0.009:0.009"| and remove
+\verb|--param chi=0.0|.
+
+\subsubsection*{D2.3 (Full T5 YM--PGT, all enabled)}
+\label{sec:d23-priors}
+
+9~free parameters: $\beta_{1,2,3}$, $\xi$, $\delta_1$, $\chi$,
+$\zeta_{1,2,3}$.  Six are covered by the D2.0/D2.1/D2.2 prior sets
+once those scans complete.  The recipe in \cref{sec:per-model-recipe}
+applies but the joint-scan space is now combinatorial: the relevant
+working-point grids are
+$(\delta_1,\chi)$, $(\delta_1,\zeta_i)$, $(\chi,\zeta_i)$, and
+$(\zeta_i,\zeta_j)$ pairs.  If every pair exhibits the rectangular
+structure already seen in $(\delta_1,\chi)$, the D2.3 prior is the
+component-wise box product of the six existing single-parameter
+priors and no new \texttt{--constraint} clauses are needed.  Budget
+for a longer chain (PolyChord \verb|--nlive 800| rather than~$400$)
+to permit cross-correlations the single-parameter scans cannot
+capture; if a chain run reveals that the posterior pushes against
+the inherited box edges, that is a signal to widen the relevant
+prior, not to tighten the constraints.
+
+\paragraph{9-D joint pre-flight check (2026-05-02).}
+\label{par:d23-joint-check}
+Before submitting D2.3, a 2000-sample random-draw scan of the composed
+9-D prior was run with the four D2.0 soft constraints applied and the
+canonical stability probe ($\kappa=1$, $B_0=0.01$, $h_5\!\to\!a_1$,
+\texttt{ic\_wavevector}\,$=2\pi/L$) evaluated on each surviving sample.
+Source: \path{examples/data/d2_prior_scan/d23_joint_check/}\linebreak
+\path{SUMMARY.md}.  Survival statistics: 72.5\% post-$\beta$-constraint,
+34.5\% post-probe (given $\beta$), \textbf{25.0\% effective}.  The top-5
+surviving samples by $\gamma_\mathrm{eff}$ all cluster at $\beta_2 \in
+[-2.9, -2.7]$ and $\xi \in [0.01, 0.02]$, reproducing the D2.0
+$\beta_2$/$\xi$ near-tachyonic edge already characterised by the
+single-parameter scan; no new 9-D-only joint coupling was identified.
+The 25\% effective survival is comfortably above the 5\% PROCEED gate
+defined in \path{_analyze.py}, so D2.3 is submitted unchanged.  The
+chain runs at \verb|--nlive 800| (vs.~$400$ for D2.0--D2.2) to absorb
+the $D^2$-scaling $\log Z$ noise floor at $D=9$.
+
+\subsection{Confidence levels per parameter}
+\label{sec:confidence}
+
+\begin{table}[h]
+  \centering
+  \caption{Confidence levels for the D2.0 prior cutoffs and constraint
+    coefficients.  ``HIGH'' indicates the cutoff is derived analytically and
+    cross-checked against at least one literature source.  ``MEDIUM'' indicates
+    an empirical scan with a known limitation.  ``TBD'' indicates the cutoff
+    is not yet set.}
+  \label{tab:confidence}
+  \begin{tabular}{@{}llp{0.55\linewidth}@{}}
+    \toprule
+    Parameter & Confidence & Source \\
+    \midrule
+    $\beta_1$
+      & HIGH
+      & TIDAL spec (\path{theory_nonminimal.toml}:91--97); cross-check via
+        Blagojevi\'c spin-$2^-$ tensor sector \\
+    $\beta_2$
+      & HIGH
+      & TIDAL spec; intersection of the tensor and axial conditions
+        forces $\beta_2 < -0.375$ strictly \\
+    $\beta_3$
+      & HIGH
+      & TIDAL spec (trace condition, \cref{eq:tidal-trace}) \\
+    $\xi$
+      & HIGH
+      & Barker eWGT \cite{barker2024poincare}; standard Maxwell-type kinetic
+        $\Rightarrow \xi > 0$ \\
+    $\delta_1$
+      & MEDIUM
+      & 5-anchor empirical scan on the general spec
+        (\cref{sec:delta1-model-dependence}); cutoff
+        $\delta^*_5=0.05$ dominated by small-$\xi$ anchor;
+        $(\beta,\xi)$-invariance at $\delta_1=0$ is a feature of
+        D2.0 only and does not generalise (see
+        \cref{sec:per-model-recipe} yellow flag) \\
+    $\chi$
+      & MEDIUM
+      & 5-anchor multi-anchor empirical scan
+        (\cref{sec:d21-priors}); cutoff $\chi^*_5=0.018$ dominated
+        by $\beta$-interior anchor P5; rectangular joint structure
+        with~$\delta_1$ verified at prior corners
+        (\cref{tab:d21-p5-corner-verification}) \\
+    $\zeta_{1,2,3}$
+      & MEDIUM
+      & multi-anchor empirical scan (\cref{sec:d22-priors}); thresholds
+        $\zeta_1^*=0.100$, $\zeta_2^*=0.042$, $\zeta_3^*=0.100$;
+        binding anchor P2 (small-$\xi$) for all three; rectangular
+        joint structure with~$\delta_1$ for $\zeta_{2,3}$, benign
+        for~$\zeta_1$; pairwise $(\zeta_i,\zeta_j)$ all benign;
+        P1-MAP corner failures for $\zeta_1$ are $\beta$-dependent,
+        handled inline by probe \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The two HIGH-confidence external sources (Blagojevi\'c, Barker)
+give us a reproducible derivation of every $\beta$ and $\xi$ prior
+cutoff.  $\delta_1$, $\chi$, and~$\zeta_{1,2,3}$ are
+MEDIUM-confidence empirical cutoffs derived from multi-anchor scans
+on the general spec; all should be revisited at each MAP-like region
+uncovered by downstream chains, and the rectangular joint-stability
+structure among them should be re-verified at any new working point
+that chains discover.

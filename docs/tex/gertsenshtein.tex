@@ -23,7 +23,7 @@ The full Lagrangian:
   \lag = \frac{1}{\kappa^2}\, R - \frac{1}{4}\, F_{\mu\nu}\, F^{\mu\nu}
   \label{eq:gertsenshtein-lagrangian}
 \end{equation}
-where $\kappa^2 = 16\pi G$, $R$ is the Ricci scalar, and $F_{\mu\nu} = \partial_\mu A_\nu - \partial_\nu A_\mu$ is the electromagnetic field strength tensor.
+where $\kappa^2 = 16\pi G$, $R$ is the Ricci scalar, and $F_{\mu\nu} = \partial_\mu A_\nu - \partial_\nu A_\mu$ is the electromagnetic field strength tensor. Throughout TIDAL, $\kappa$ is the \emph{vertex coupling} (linearised graviton, $[\kappa] = [\text{Mass}]^{-1}$), \emph{not} the Einstein action constant $\kappa_\text{E} = 8\pi G$ of some BHL papers — the two differ by a factor of $\sqrt{2}$. See \cref{sec:kappa-conventions} for the full discussion.
 
 \subsubsection{Background Configuration}
 \label{subsec:background-config}
@@ -96,7 +96,7 @@ This is confirmed numerically (RMS error $< 0.015$ across a 40-point $\Bzero$ sw
 \paragraph{Note on P\&R error.}
 \label{par:pr-error}
 
-Palessandro \& Rothman~(2023, Eq.~26; 2024, arXiv:2405.01407) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument. They fail to properly account for the $1/(16\pi G)$ kinetic prefactor when extracting the mixing frequency from their non-canonically-normalised system. Hwang \& Noh~\cite{hwangnoh2023graviton} independently criticise P\&R's linearisation. Our formula is confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}, who use canonical normalisation and obtain $\Delta_{g,\gamma} = \sqrt{4\pi G}\,\Bzero$, matching $\kappa\Bzero/2$ exactly. See \cref{sec:gertsenshtein-formula} for the full derivation and literature comparison.
+Palessandro \& Rothman~(2023, Eq.~26; 2024, arXiv:2405.01407) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument. They fail to properly account for the $1/(16\pi G)$ kinetic prefactor when extracting the mixing frequency from their non-canonically-normalised system. Hwang \& Noh~\cite{hwangnoh2023graviton} independently criticise P\&R's linearisation. Our formula is confirmed by Lella et al.~\cite{lella2024constraining}, who use canonical normalisation and obtain $\Delta_{g,\gamma} = \sqrt{4\pi G}\,\Bzero$, matching $\kappa\Bzero/2$ exactly. See \cref{sec:gertsenshtein-formula} for the full derivation and literature comparison.
 
 \paragraph{Graviton effective mass from background EM field.}
 \label{par:graviton-mass}
@@ -355,7 +355,7 @@ Ejlli~(2020) & 2020 & First exact (non-perturbative) solution \\
 Palessandro \& Rothman~(2023) & 2023 & Lagrangian derivation (\textbf{contains normalisation error}) \\
 % NOTE: palessandro2023 key needs adding to references.bib
 Hwang \& Noh~\cite{hwangnoh2023graviton} & 2023 & Proper EM field definitions in curved spacetime; formulation-dependent graviton mass \\
-\textbf{Dandoy, Lella et al.}~\cite{dandoy2024constraining} & \textbf{2024} & \textbf{4-component mixing, canonical graviton --- confirms our formula} \\
+\textbf{Lella et al.}~\cite{lella2024constraining} & \textbf{2024} & \textbf{4-component mixing, canonical graviton --- confirms our formula} \\
 Palessandro~(2024) & 2024 & Extended treatment (same normalisation error as 2023) \\
 % NOTE: palessandro2024 key needs adding to references.bib
 \bottomrule
@@ -407,7 +407,7 @@ All equations are \textbf{derived from the Lagrangian} by the TIDAL pipeline ---
 \subsubsection{Target 1: Vacuum Conversion Probability}
 \label{subsec:target1}
 
-\textbf{Source}: Eigenmode analysis of coupled $h_7/a_2$ system; confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}.
+\textbf{Source}: Eigenmode analysis of coupled $h_7/a_2$ system; confirmed by Lella et al.~\cite{lella2024constraining}.
 
 \begin{itemize}
   \item Uniform $\Bzero$, vacuum (no plasma), massless graviton
@@ -455,7 +455,7 @@ Adding a Proca-type photon mass $-\omega_p^2/2 \cdot a_{-\mu}\, \eta^{\mu\nu}\, 
 
 \textbf{What would be needed}: A gauge-invariant effective mass that couples only to the transverse photon polarisation without coupling to the background gauge potential through the volume element. Possible approaches: (a)~a Stueckelberg mass in unitary gauge with a carefully chosen gauge field, or (b)~a medium/refractive-index formulation at the level of the equations of motion (bypassing the Lagrangian for the plasma sector).
 
-\textbf{Reference}: Raffelt \& Stodolsky~(1988, PRD 37:1237); Dandoy, Lella et al.~\cite{dandoy2024constraining}
+\textbf{Reference}: Raffelt \& Stodolsky~(1988, PRD 37:1237); Lella et al.~\cite{lella2024constraining}
 
 \subsubsection{Target 4: Finite-Region Scattering (Phase F2)}
 \label{subsec:target4}
@@ -582,7 +582,7 @@ The \emph{dark photon torsion model} breaks this independence by introducing a
 Yang-Mills kinetic term for the torsion trace vector $T_\mu \equiv T^\lambda{}_{\lambda\mu}$
 together with an EM--torsion kinetic mixing term, yielding a theory where torsion
 propagates as a massive vector boson (dark photon analogue) and couples directly to
-the photon sector~\cite{barker2024ewgt}.
+the photon sector~\cite{barker2024poincare}.
 
 \subsubsection{Lagrangian}
 
@@ -719,6 +719,6 @@ so that $\xi = 0$ is handled at simulation time rather than derivation time.
   \item \textbf{Magnetar/FRB application} (Phase F3): Dipolar $B(r)$, 1+1D radial setup, Gertsenshtein--Zel'dovich mechanism.
   \item \textbf{Non-minimal couplings} (Phase F5): Chern--Simons gravity (parity-violating $P_L \neq P_R$), $\xi R F^2$ curvature--EM coupling. Ref: Kushwaha \& Jain~(2024, arXiv:2410.07338).
   % NOTE: kushwaha2024nonminimal key needs adding to references.bib
-  \item \textbf{Axion--photon--graviton mixing} (future): Three-way mixing matrix with $g_{a\gamma\gamma}\, a\, F\, \tilde{F}$. Ref: Dandoy, Lella et al.~\cite{dandoy2024constraining}.
+  \item \textbf{Axion--photon--graviton mixing} (future): Three-way mixing matrix with $g_{a\gamma\gamma}\, a\, F\, \tilde{F}$. Ref: Lella et al.~\cite{lella2024constraining}.
   \item \textbf{Photon--torsion conversion} (ultimate goal): Obukhov et al.~\cite{obukhov2024electrodynamics} --- axial torsion waves coupled to EM. Separate branch after Gertsenshtein programme matures.
 \end{enumerate}

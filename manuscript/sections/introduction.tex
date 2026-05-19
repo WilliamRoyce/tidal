@@ -1,86 +1,83 @@
-\section{Introduction}
-\label{sec:Introduction}
+% Introduction scaffold (Phase 2): five named-paragraph stubs covering the
+% BHL four-stage scaffold (genre_conventions_theory.md §(c)). Stage 4 is
+% split into two paragraphs — the contribution announcement and a
+% one-sentence-per-section structural map — following the PSALTer §I
+% "Aims" + "Structure" convention. No subsections — letter-style §1.
+% Target ~900 words across the five paragraphs.
+%
+% Paragraph titles are content-bearing micro-headings matching the BHL
+% letter idiom (compare 2406.12826: "Introduction to torsion", "No-go
+% theorem for vector torsion", "In this letter"). Avoid stage labels.
 
-This is the introduction, and it should be a fairly long section in which the reader is introduced to the topic of the paper.
-You should begin with a very broad brush stroke, and then narrow down to the specific topic of the paper.
-It is \textit{critical} that you cite the relevant literature throughout~\cite{gertsenshtein1962wave}.
-Think of it this way: the reader wants to
-\begin{enumerate}
-  \item know where to go for more information,
-  \item understand the existing literature,
-  \item understand the position that your paper occupies in the literature,
-  \item not waste time reinventing the wheel.
-\end{enumerate}
-So you should be citing a lot.
-Note that you should also refer to any figures or graphics which help to explain the topic, and these should be placed in the \texttt{figures/} directory.
+\section{Introduction}%
+\label{Introduction}
 
-%If you want to introduce an acronym, such as Einstein--Cartan (EC) theory,
-%you should write it out in full the first time, and then use the acronym thereafter.
-%Note the use of the long hyphen~\texttt{--} for name concatenation.
+% Stage 1 — Frontier tension (~200 w).
+% Two-source framing per the recent style refinement:
+%   (a) GW detector precision era probes the gauge-gravity sector;
+%   (b) the Gertsenshtein literature itself is contested (Hwang–Noh,
+%       Palessandro tensions; resolved in §2.3 EM-conventions paragraph).
+% Required citations: ≥1 future detector (\cite{amaro2017lisa},
+% \cite{nanograv2023fifteen}) and ≥1 current bound (\cite{abbott2023gwtc3}).
+\paragraph*{High-frequency gravitational waves and the gauge-gravity sector}
+% TODO
 
-We use the $(+\,-\,-\,-)$ signature convention and natural units where $\hbar=c=1$.
+% Stage 2 — Deep problem (~250 w).
+% Narrows to the deep problem with two moves:
+%  - The PGT theory space is multi-dimensional; manual Gertsenshtein-channel
+%    derivation is infeasible at scale across this space.
+%  - Ghost-freedom imposes a sharp restriction (only spin-1 trace torsion
+%    can propagate ghost-free in PGT — Lin–Hobson–Lasenby 2019; Barker–Marzo
+%    type analysis), so the Gertsenshtein channel structure inside the
+%    ghost-free subspace is a quantitative open question, while the
+%    behaviour outside that subspace is itself informative.
+% Required citations: \cite{lin2019pgt}, \cite{blagojevic2018hamiltonian};
+% optional: 2507.05349 if added to bib. The ghost-restriction logic is the
+% conceptual hinge of §1; do not omit. The bridging move that connects
+% this to the §4 sector survey (which spans both ghost-restricted and
+% non-ghost-restricted theories) is critical: nulls outside the
+% ghost-free subspace are evidence FOR the restriction, not a separate
+% inquiry.
+\paragraph*{Torsion theory space and the spin-1 ghost restriction}
+% TODO
 
-The structure of the remaining sections is as follows.
-In \cref{sec:Theory} we review the relevant theory.
-In \cref{sec:Results} we describe our main results.
-In \cref{sec:ConcludingRemarks} we summarise and discuss the implications.
+% Stage 3 — Prior derivations and their tensions (~250 w).
+% Dense citation cluster covering:
+%  - Original Gertsenshtein/Boccaletti/Raffelt
+%    (\cite{gertsenshtein1962wave}, \cite{boccaletti1970conversion},
+%     \cite{raffelt1988mixing});
+%  - BHL PGT landscape (2406.12826, 2101.02645, conformal embedding);
+%  - PSALTer/Hamilcar as adjacent automation tools
+%    (\cite{barker2024psalter}, \cite{barker2025hamilcar});
+%  - Modern Gertsenshtein derivations and their tensions
+%    (\cite{hwangnoh2023graviton}, \cite{hwangnoh2024nonlinear},
+%     \cite{palessandro2024gertsenshtein}, Domcke 2301.02072,
+%     Dandoy 2406.17853).
+% Close with: "However, no systematic Gertsenshtein channel decomposition
+% for PGT+EM has been performed."
+\paragraph*{Prior derivations and their tensions}
+% TODO
 
-\subsection{Equation formatting}
-\label{sec:EquationFormatting}
+% Stage 4a — Contribution announcement (~150 w).
+% Must be specific enough that an examiner reading only §1 knows what to
+% expect from §4. The slot enumerates the actual outcomes of the survey
+% rather than promising abstract capability. State, in order:
+%  (i)   what TIDAL is (one sentence — see par:TidalScope in §3 for the
+%        PSALTer/Hamilcar contrast);
+%  (ii)  the survey perimeter (which PGT theory classes were scanned and
+%        the parameter dimensions of each — match §4 "Survey perimeter"
+%        paragraph);
+%  (iii) the validation result (TIDAL reproduces the Boccaletti formula);
+%  (iv)  the structural finding visible in the kinetic matrix
+%        (\cref{HxAxIdentity});
+%  (v)   the headline survey finding from the campaign as it stands at
+%        submission time (left flexible — campaigns ongoing at scaffold
+%        time).
+\paragraph*{In this report}
+% TODO
 
-Real scientific papers do not have a `methods' section.
-This is a fiction which you learn in school.
-Instead, each section title should refer to a real thing.
-For example, this subsection demonstrates equation formatting conventions.
-
-Equations should be dense in every section of the paper.
-As a rough guide, you should have at least one equation per paragraph, and at most three display equations per paragraph.
-Rather than display every equation, you should use inline equations such as $x=y$, $z=w$, $v=u$, and reserve display equations for important results.
-
-All equations should be part of a sentence.
-For example, the Lagrangian for general relativity in the Palatini formalism can be written
-\begin{align}
-  \lag_\mathrm{GR}
-    &\equiv -\frac{1}{2}\Planck^2 R
-     \simeq -\frac{1}{2}\Planck^2 \rR{}
-            + \T{}{\mu\nu\sigma}\T{}^{\mu\nu\sigma}\,,
-  \label{eq:NormalGR}
-\end{align}
-where $\Planck$ is the reduced Planck mass.
-Notice the comma after the equation, because the sentence continues.
-The next sentence might present a large system of equations, such as
-\begin{subequations}
-\label{eq:BigSystem}
-\begin{align}
-  \frac{\mathrm{d}x}{\mathrm{d}t}
-    &\equiv 17x^7y^3+5x^6y^4-7x^4y^5-3x^4y^3 \nonumber\\
-    &\quad +7x^4y^2+17x^3y^3+5x^2y^3+11x^3y^2 \nonumber\\
-    &\quad -13x^2y^2+19xy^2-23x^2y+37xy+87\,,\\
-  \frac{\mathrm{d}y}{\mathrm{d}t}
-    &\equiv 5x^7y^3-11x^6y^4-3x^4y^5+11x^4y^3 \nonumber\\
-    &\quad +23x^4y^2-53x^3y^3+2x^2y^3+17x^3y^2 \nonumber\\
-    &\quad -107x^2y^2+xy^2-3x^2y+3xy+7\,.
-\end{align}
-\end{subequations}
-Notice the comma after the first equation, and the full stop after the second.
-
-When using tensor notation, you can use the \texttt{tensor} package to place indices flexibly, for example $\tensor{A}{_\nu}$ or $\tensor{h}{_\mu_\nu}$.
-Total differentials should be typeset as $\mathrm{d}x$, not $dx$.
-
-The teleparallel equivalent of general relativity (TEGR) Lagrangian can be written in terms of the irreducible torsion components as
-\begin{align}
-  \lag_\mathrm{TEGR}
-    &\equiv \frac{4}{9}\Planck^2 \T[1]{\mu[\nu\sigma]}\T[1]^{\mu[\nu\sigma]}
-           -\frac{1}{3}\Planck^2 \T[2]{\mu}\T[2]^{\mu} \nonumber\\
-    &\quad +\frac{3}{4}\Planck^2 \T[3]{\mu}\T[3]^{\mu}\,,
-  \label{eq:TEGR}
-\end{align}
-where $\T[1]{}$, $\T[2]{}$ and $\T[3]{}$ are the three irreducible parts of the torsion tensor.
-
-By the way, don't be afraid to use footnotes.\footnote{They are a useful way to add extra information without breaking the flow of the text.}
-
-\subsection{Code listings}
-\label{sec:CodeListings}
-
-If you want to include code listings, you can use the \texttt{listings} package.
-Note however that in most papers, \texttt{Matplotlib} output should be saved as a PDF and included with \texttt{graphicx}, not pasted as a code listing.
+% Stage 4b — Structural map (~50 w).
+% One sentence per remaining section. Per-section drafting fills in the
+% specific verb choice ("In §2 we...", "§3 describes...", etc.).
+\paragraph*{Structure of this report}
+% TODO

@@ -12,6 +12,7 @@ phd-application-context.md
 !/examples/data/README.md
 
 *.png
+!docs/figures/*.png
 /outputs/
 
 importtime.log
@@ -56,6 +57,7 @@ hpc_results/*
 *.synctex.gz
 *.toc
 *.vrb
+*.log
 # Scoped to docs/ and research/ to avoid conflicts with other project *.log/*.out usage
 docs/**/*.log
 docs/**/*.out
@@ -66,3 +68,6 @@ docs/tex/*.pdf
 docs/talks/*/*.pdf
 docs/figures/*.pdf
 research/*.pdf
+
+psalter.tar.gz
+TensorTheory_unitarity_deep_classified.pdf

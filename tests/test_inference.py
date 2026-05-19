@@ -251,6 +251,37 @@ class TestLikelihoodConfig:
         assert lc.metric == "P_max"
         assert lc.likelihood_type == "maximize"
 
+    def test_parse_likelihood_propagates_baseline_for_maximize(self) -> None:
+        """Regression for #319: ``--baseline-formula`` must reach
+        ``LikelihoodConfig`` for ``maximize`` (was silently dropped).
+        """
+        from tidal.inference._likelihood import parse_likelihood
+
+        formula = "sin(kappa*B0*t_end/2)**2"
+        lc = parse_likelihood("P_max:maximize", baseline_formula=formula)
+        assert lc.likelihood_type == "maximize"
+        assert lc.baseline_formula == formula
+
+    def test_parse_likelihood_propagates_baseline_for_minimize(self) -> None:
+        """Regression for #319: same propagation for ``minimize``."""
+        from tidal.inference._likelihood import parse_likelihood
+
+        formula = "sin(kappa*B0*t_end/2)**2"
+        lc = parse_likelihood("P_max:minimize", baseline_formula=formula)
+        assert lc.likelihood_type == "minimize"
+        assert lc.baseline_formula == formula
+
+    def test_parse_likelihood_extremize_baseline_unchanged(self) -> None:
+        """Sanity: ``extremize`` already worked before #319, ensure the fix
+        didn't regress it.
+        """
+        from tidal.inference._likelihood import parse_likelihood
+
+        formula = "0.05"
+        lc = parse_likelihood("P_max:extremize", baseline_formula=formula)
+        assert lc.likelihood_type == "extremize"
+        assert lc.baseline_formula == formula
+
     def test_parse_gaussian(self) -> None:
         from tidal.inference._likelihood import parse_likelihood
 
@@ -284,7 +315,10 @@ class TestLikelihoodConfig:
         from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
 
         lc = LikelihoodConfig(
-            metric="P_max", likelihood_type="gaussian", target=1.0, sigma=0.1,
+            metric="P_max",
+            likelihood_type="gaussian",
+            target=1.0,
+            sigma=0.1,
         )
         # At target, log_L = 0
         assert compute_log_likelihood(1.0, lc) == pytest.approx(0.0)
@@ -295,7 +329,9 @@ class TestLikelihoodConfig:
         from tidal.inference._likelihood import LikelihoodConfig, compute_log_likelihood
 
         lc = LikelihoodConfig(
-            metric="P_max", likelihood_type="threshold", min_value=0.1,
+            metric="P_max",
+            likelihood_type="threshold",
+            min_value=0.1,
         )
         assert compute_log_likelihood(0.5, lc) == 0.0
         assert compute_log_likelihood(0.05, lc) == -math.inf
@@ -980,7 +1016,9 @@ class TestParameterImportance:
         assert "d_G" in table
 
     def test_from_directory_roundtrip(
-        self, nested_result: InferenceResult, tmp_path: Path,
+        self,
+        nested_result: InferenceResult,
+        tmp_path: Path,
     ) -> None:
         from tidal.inference._results import InferenceResult
 
@@ -994,7 +1032,8 @@ class TestParameterImportance:
         np.testing.assert_allclose(loaded.samples, nested_result.samples)
 
     def test_marginal_dkl_with_integer_indexed_columns(
-        self, nested_result: InferenceResult,
+        self,
+        nested_result: InferenceResult,
     ) -> None:
         """Regression for #287: anesthetic's read_chains returns integer-
         indexed parameter columns in v2.0+ (``[0, 1, 'logL', ...]``), but
@@ -1048,7 +1087,9 @@ class TestParameterImportance:
         # ~50% (bootstrap noise is large at n_bootstrap=10).
         for name in nested_result.param_names:
             assert imp_named.marginal_d_kl[name] == pytest.approx(
-                imp_int.marginal_d_kl[name], rel=0.5, abs=0.1,
+                imp_int.marginal_d_kl[name],
+                rel=0.5,
+                abs=0.1,
             )
 
 

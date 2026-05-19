@@ -1,0 +1,190 @@
+============================================================================
+Phase 2 — T4 Lagrangian (3 dynamical + 3 constraint-promoted)
+============================================================================
+
+L_T4 has 33 terms (Lagrangian density)
+
+Structural breakdown:
+  - 3 dynamical kinetic + mass terms (y_a)
+  - 3 constraint mass terms (-M_c^2 h_c^2 / 2)
+  - 9 algebraic mixings (lambda) + 9 velocity mixings (mu)
+  - 6 symmetric b5-sector kinetic terms (K_cd ddot h_c ddot h_d)
+
+============================================================================
+Phase 3 — Parker-Simon iterative reduction
+============================================================================
+
+Order-0 EOMs for h_c (b5=0):
+  E_h1 = -M1*h1(t) - lam11*y1(t) - lam21*y2(t) - lam31*y3(t) + mu11*Derivative(y1(t), t) + mu21*Derivative(y2(t), t) + mu31*Derivative(y3(t), t)
+  E_h2 = -M2*h2(t) - lam12*y1(t) - lam22*y2(t) - lam32*y3(t) + mu12*Derivative(y1(t), t) + mu22*Derivative(y2(t), t) + mu32*Derivative(y3(t), t)
+  E_h3 = -M3*h3(t) - lam13*y1(t) - lam23*y2(t) - lam33*y3(t) + mu13*Derivative(y1(t), t) + mu23*Derivative(y2(t), t) + mu33*Derivative(y3(t), t)
+
+Order-0 algebraic solutions:
+  h1^(0) = (-lam11*y1(t) - lam21*y2(t) - lam31*y3(t) + mu11*Derivative(y1(t), t) + mu21*Derivative(y2(t), t) + mu31*Derivative(y3(t), t))/M1
+  h2^(0) = (-lam12*y1(t) - lam22*y2(t) - lam32*y3(t) + mu12*Derivative(y1(t), t) + mu22*Derivative(y2(t), t) + mu32*Derivative(y3(t), t))/M2
+  h3^(0) = (-lam13*y1(t) - lam23*y2(t) - lam33*y3(t) + mu13*Derivative(y1(t), t) + mu23*Derivative(y2(t), t) + mu33*Derivative(y3(t), t))/M3
+
+Computing PS-reduced y-EOMs (this is the slow step) ...
+Max derivative order in PS-reduced y-EOMs: r = 6
+Expected: 6 (from the b5*K*d_t^4 -> y_a chain through h)
+
+Polynomiality of PS-reduced epsilons in fibres:
+  eps_y1 rational in fibres: False
+  eps_y2 rational in fibres: False
+  eps_y3 rational in fibres: False
+
+============================================================================
+Phase 4 — Vainberg-Tonti integral construction
+============================================================================
+
+u-power range of eps_a(u*jet) (should be [1,1] for linear sources):
+  eps_y1(u*jet): u-power range [1, 1]
+  eps_y2(u*jet): u-power range [1, 1]
+  eps_y3(u*jet): u-power range [1, 1]
+
+Computing VT integral (homotopy [0,1]) ...
+L_VT constructed: 339 terms
+
+Verifying Krupka-Voicu Theorem 1: EL(L_VT) = eps_y ...
+  EL_y1(L_VT) - eps_y1 = 0 -- OK
+  EL_y2(L_VT) - eps_y2 = 0 -- OK
+  EL_y3(L_VT) - eps_y3 = 0 -- OK
+
+VT canonical-completion verified for T4 (3+3): True
+
+L_VT denominator (mod /2): M1**2*M2**2*M3**2
+
+============================================================================
+Phase 5 — Project L_VT onto constraint (h_4,h_7,h_9) subspace
+============================================================================
+
+L_VT lives in y-space (the dynamical sector). To answer the metric
+Pais-Uhlenbeck question we examine TWO subspaces:
+  (a) The Routhian/on-shell L_eff obtained by substituting h(y) into
+      L_T4 directly. This is the 'h-eliminated direct Lagrangian'.
+  (b) An L_VT-h that we obtain by extending VT to BOTH y AND h
+      coordinates simultaneously (treating h as a dynamical fibre
+      coordinate too). This is needed to address the 'kinetic
+      structure of the constraint subspace' question.
+
+(a) Direct on-shell Lagrangian L_eff = L_T4|_{h=h_full}
+    L_eff has 1653 terms after expansion.
+
+    Highest derivative of y in L_eff (per field):
+      y_1: order 6
+      y_2: order 6
+      y_3: order 6
+
+    At b5=0 (algebraic constraint subspace):
+      y_1: order 2  (2 = standard kinetic; >2 = HD)
+      y_2: order 2  (2 = standard kinetic; >2 = HD)
+      y_3: order 2  (2 = standard kinetic; >2 = HD)
+
+    O(b5) correction:
+      y_1: order 6  (>= 4 indicates Pais-Uhlenbeck)
+      y_2: order 6  (>= 4 indicates Pais-Uhlenbeck)
+      y_3: order 6  (>= 4 indicates Pais-Uhlenbeck)
+
+(b) Joint VT on (y,h) — full 6-field system
+    Computing full 6-field EL system ...
+    Computing VT integral of the full 6-field epsilon system ...
+    u-power range of full 6-field epsilons:
+      eps_y1(t): u-power [1, 1]
+      eps_y2(t): u-power [1, 1]
+      eps_y3(t): u-power [1, 1]
+      eps_h1(t): u-power [1, 1]
+      eps_h2(t): u-power [1, 1]
+      eps_h3(t): u-power [1, 1]
+
+    Verifying EL(L_VT_full) = eps for the parent system ...
+      EL_y1(t)(L_VT_full) - eps = 0 -- OK
+      EL_y2(t)(L_VT_full) - eps = 0 -- OK
+      EL_y3(t)(L_VT_full) - eps = 0 -- OK
+      EL_h1(t)(L_VT_full) - eps = 0 -- OK
+      EL_h2(t)(L_VT_full) - eps = 0 -- OK
+      EL_h3(t)(L_VT_full) - eps = 0 -- OK
+
+    Joint VT consistency: True
+
+Projecting L_VT_full onto h-subspace (y_a = d_t y_a = ... = 0):
+
+L_VT |_{y=0} (h-only subspace, jet form):
+  -F4_0**2*M1/2 + F4_0*F4_4*K11*b5/2 + F4_0*F5_4*K12*b5/2 + F4_0*F6_4*K13*b5/2 + F4_4*F5_0*K12*b5/2 + F4_4*F6_0*K13*b5/2 - F5_0**2*M2/2 + F5_0*F5_4*K22*b5/2 + F5_0*F6_4*K23*b5/2 + F5_4*F6_0*K23*b5/2 - F6_0**2*M3/2 + F6_0*F6_4*K33*b5/2
+
+Highest derivative of h_c in L_VT_h:
+  h_1: highest jet order 4
+  h_2: highest jet order 4
+  h_3: highest jet order 4
+
+h-only subspace breakdown:
+  At b5=0 (3 terms):
+    -F4_0**2*M1/2 - F5_0**2*M2/2 - F6_0**2*M3/2
+
+  O(b5) (9 terms):
+    F4_0*F4_4*K11*b5/2 + F4_0*F5_4*K12*b5/2 + F4_0*F6_4*K13*b5/2 + F4_4*F5_0*K12*b5/2 + F4_4*F6_0*K13*b5/2 + F5_0*F5_4*K22*b5/2 + F5_0*F6_4*K23*b5/2 + F5_4*F6_0*K23*b5/2 + F6_0*F6_4*K33*b5/2
+
+Pais-Uhlenbeck (d_t^2 h)*(d_t^2 h) pairs in O(b5) part of L_VT_h:
+  None (h-subspace is NOT PU at order b5).
+
+============================================================================
+Phase 6 — Hamiltonian analysis of L_VT
+============================================================================
+
+y-only L_VT depends on derivatives up to order 6.
+
+Ostrogradsky construction: introduce auxiliary fields
+  Q_a^k = d_t^k y_a    for k=0,...,r-1
+and conjugate momenta
+  P_a^k = sum_{j=0}^{r-1-k} (-1)^j d_t^j (dL/d(d_t^{k+1+j} y_a))
+for k=0,...,r-1.
+
+Computing Ostrogradsky momenta for L_VT (linearised) ...
+  L0_VT (b5=0 part) has 87 terms
+  L1_VT (O(b5) part) has 252 terms
+
+Highest-derivative jet structure of L_VT_jet:
+  At b5=0: max jet order = 2
+  At b5 != 0: max jet order = 6
+
+Top-Hessian (kinetic block) at order Y_a_6:
+  H_top = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+
+  det(H_top) = 0
+
+Kinetic Hessian at b5=0 (Y_a_1 block): H_kin0 = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
+  det(H_kin0) = 0
+
+Full velocity-jet Hessian rank diagnostic:
+  rank(H_velocity_jet) at b5=0 (params=1): 0
+  rank(H_velocity_jet) at b5=1/1000 (params=1): 0
+
+  Velocity-jet dimension at b5=0: 6
+  Velocity-jet dimension at b5!=0: 18
+
+  -> RANK JUMP DETECTED.  Path A's L_VT inherits the same
+     constraint-promotion structure as the parent Lagrangian.
+     The Hamiltonian-side rank-jump persists.
+
+============================================================================
+FINAL VERDICT for T4 (3 dynamical + 3 constraint, BC-style mass matrix)
+============================================================================
+
+  VT integral CONVERGES on [0,1] for all 3 dynamical eps.
+  Krupka-Voicu Theorem 1: EL(L_VT) - eps = 0 verified: True
+  L_VT denominator: M1**2*M2**2*M3**2
+
+  Phase 5 result on the metric Pais-Uhlenbeck subspace:
+    L_eff (h-eliminated) at b5=0: standard 2nd-order kinetic
+    L_eff at O(b5): contains derivatives up to 6-th order in y
+    h-only subspace contains (d^2 h)^2 PU pairs: NO
+
+  Phase 6 result on the Hamiltonian-side rank:
+    Highest-velocity-jet rank at b5=0: 0
+    Highest-velocity-jet rank at b5!=0: 0
+    Phase-space dimension at b5=0: 6
+    Phase-space dimension at b5!=0: 18
+
+Wrote y-only L_VT and projections to: /workspaces/torsion-gertsenshtein/research/perturbative_hamiltonian/results/vt_T4_lagrangian.txt
+Wrote constraint analysis to: /workspaces/torsion-gertsenshtein/research/perturbative_hamiltonian/results/vt_T4_constraint_matrix.json
+
+DONE.

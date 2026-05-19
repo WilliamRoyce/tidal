@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# v3 D2.2 Shapiro sup — sub-theory of T5 (8 free params: β₁₋₃, ξ, δ₁, ζ₁₋₃)
+#
+# Parameter partition matches v2 chain 28739692 exactly.
+# Pinned: chi (was 0 in v2 too).
+# Reference v2: 28739692 (log Z = -0.615 ± 0.001, 33 min INTR).
+#
+# PolyChord sampling budget — ndim=8:
+#   Landscape (this script):    nlive=200  (25×ndim), num_repeats=16 (2×ndim)
+#   Publication (future rerun): nlive=400 (50×ndim), num_repeats=16
+
+set -euo pipefail
+
+bash scripts/hpc_shuttle.sh submit \
+  --template scripts/hpc_templates/polychord_intr.sbatch \
+  --name d22_shapiro_sup_v3 --ntasks 76 --time 01:00:00 \
+  --cmd 'tidal sample examples/data/torsion_gertsenshtein_general_nonminimal.json \
+    --param kappa=1.0 --param B0=0.01 \
+    --param chi=0 \
+    --prior "beta1=arctan_uniform:-89:89" \
+    --prior "beta2=arctan_uniform:-89:89" \
+    --prior "beta3=arctan_uniform:-89:89" \
+    --prior "xi=log_uniform:1e-3:1e3" \
+    --prior "delta1=arctan_uniform:-89:89" \
+    --prior "zeta1=arctan_uniform:-89:89" \
+    --prior "zeta2=arctan_uniform:-89:89" \
+    --prior "zeta3=arctan_uniform:-89:89" \
+    --likelihood "P_max:minimize" \
+    --baseline-formula "sin(kappa*B0*t_end/2)**2" \
+    --soft-floor-noise 1.0 \
+    --grid-shape 64 --bounds=0:50 --periodic \
+    --ic plane-wave --ic-component h_5 --ic-wavevector 2.0 --ic-amplitude 1e-2 \
+    --t-end 10 --snapshots 2 \
+    --measure conversion,peak_conversion --source h_5 --target a_1 \
+    --method nested --sampler polychord --nlive 200 \
+    --num-repeats 16 --precision-criterion 0.01 \
+    --output ${RESULTS_DIR}/d22_shapiro_sup_v3'

@@ -285,7 +285,7 @@ def _overlay_quality_hatching(
             ax.add_patch(rect)
 
 
-def render_sweep_1d(  # noqa: PLR0913, PLR0914, PLR0912, PLR0915, C901
+def render_sweep_1d(  # noqa: PLR0913, PLR0912, PLR0915, C901
     ax: Axes,
     results: SweepResults,
     metric: str,
@@ -551,7 +551,7 @@ def render_sweep_1d_multi(
     fig.suptitle(f"Sweep: {', '.join(metrics)} vs {param_name}")
 
 
-def render_sweep_1d_grouped(  # noqa: PLR0913, PLR0914
+def render_sweep_1d_grouped(  # noqa: PLR0913
     ax: Axes,
     results: SweepResults,
     metric: str,
@@ -827,7 +827,7 @@ def _render_2d_scattered(  # noqa: PLR0913
     ax.figure.colorbar(sc, ax=ax, label=metric)  # type: ignore[union-attr]
 
 
-def _render_2d_grid(  # noqa: PLR0913, PLR0914, C901
+def _render_2d_grid(  # noqa: PLR0913, C901
     ax: Axes,
     results: SweepResults,
     p1_name: str,
@@ -943,7 +943,7 @@ def _render_2d_grid(  # noqa: PLR0913, PLR0914, C901
         _overlay_quality_hatching(ax, p1_vals, p2_vals, quality_grid)
 
 
-def render_sweep_2d_with_overlay(  # noqa: PLR0914
+def render_sweep_2d_with_overlay(
     fig: Figure,
     results: SweepResults,
     metric: str,
@@ -1298,7 +1298,7 @@ def _is_scattered_data(results: SweepResults) -> bool:
 # -- Advanced visualization (F8) ---------------------------------------------
 
 
-def render_sweep_parallel(  # noqa: PLR0914
+def render_sweep_parallel(
     ax: Axes,
     results: SweepResults,
     metric: str,
@@ -1591,7 +1591,7 @@ def _render_tornado_range(
     ax.invert_yaxis()
 
 
-def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
+def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0915
     fig: Figure,
     results: SweepResults,
     metric: str,
@@ -1762,7 +1762,7 @@ def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
 # -- Replicate convergence diagnostic ----------------------------------------
 
 
-def render_replicate_convergence(  # noqa: PLR0914
+def render_replicate_convergence(
     ax: Axes,
     results: SweepResults,
     metric: str,

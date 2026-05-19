@@ -11,7 +11,67 @@ Applicable to any linear PDE system with:
 - Time-independent coefficients (position-dependent OK via convolution)
 - Operators with known exact Fourier multipliers
 
-Two algorithm paths are used depending on coefficient structure:
+Kinetic-coefficient (mass-matrix) handling — three primary dispatches
+---------------------------------------------------------------------
+Equations with a non-trivial ``kinetic_coefficient_symbolic`` (``M ẍ = K x``
+rather than ``ẍ = K x``) reach the solver via **three distinct code paths**
+plus the Pass 1 correction-matrix builder. All four must consume ``M``
+identically, or cross-path regressions appear silently — the latest such
+regression was GH #367, where the third dispatch (the position-dependent
+convolution path) silently dropped ``M⁻¹`` for several months until traced
+2026-05-19 and fixed in v0.42.0.
+
+1. **Fast path** — :func:`_build_per_mode_matrices` (called when
+   ``needs_reduction = False`` *and* no position-dependent coefficients).
+   Builds the first-order evolution matrix directly as
+   ``A[velocity_slot, target_slot] = M⁻¹(field) · coeff · multiplier``.
+   M⁻¹ is pre-computed once from
+   :func:`tidal.solver._kinetic.build_inverse_kinetic_diag` and folded in
+   via the shared :func:`tidal.solver._kinetic.velocity_row_scale` helper.
+
+2. **Generalized-eig path** — :func:`_build_evolution_matrices` (called
+   when the spec has constraints or time-derivative RHS operators, and no
+   position-dependent coefficients). Populates ``M_mat`` from
+   ``kinetic_coefficient_symbolic`` on the diagonal and solves
+   ``(K − λM) v = 0`` via ``scipy.linalg.eig(A, B)`` with QZ decomposition.
+   Handles rank-deficient M via null-space projection and Schur elimination
+   for hidden algebraic constraints. *Structurally distinct* from paths 1
+   and 3: writes ``M`` to the generalized eigenvalue problem rather than
+   post-multiplying a velocity-row contribution, so it intentionally does
+   NOT call :func:`velocity_row_scale`.
+
+3. **Position-dependent convolution path** — :func:`_build_convolution_matrix`
+   (called when any RHS term is marked ``position_dependent``). Builds
+   ``A[m, m'] = ĉ(m − m') · op_mult(k_{m'})`` over the full Fourier-mode
+   block, threading ``M⁻¹`` through both the constant-coefficient and the
+   convolution-coupling paths via :func:`velocity_row_scale`.
+
+Plus the Pass 1 correction-matrix builder
+:func:`_build_pass1_source_matrices` (the perturbative Duhamel correction
+path; see :class:`tidal.solver.perturbative_driver.PerturbativeSolver`),
+which also emits velocity-row entries into a per-mode source matrix and
+likewise consumes ``M⁻¹`` through :func:`velocity_row_scale`.
+
+**Cross-builder contract** (enforced by the regression test
+:class:`tests.test_solver_kinetic_consistency.TestAllModalPathsRespectKinetic`):
+any matrix builder that populates ``A[velocity_slot, target_slot]`` entries
+for a second-order equation **MUST** apply
+:func:`tidal.solver._kinetic.velocity_row_scale(field_name, m_inv)` to the
+contribution. Path 2 (generalized-eig) is the documented exception —
+it writes ``M`` to a separate matrix that participates in the eigenvalue
+problem. Adding a new matrix builder without satisfying this contract was
+exactly the GH #367 regression; please don't repeat it.
+
+The choice between dispatches is transparent to callers of :func:`solve_modal`
+but load-bearing for reviewers: all four sites must be updated together
+when the kinetic handling changes. The time-domain backends (cvode/ida/
+leapfrog/scipy) use :func:`tidal.solver._kinetic.build_inverse_kinetic_diag`
+as a shared entry point, keeping the five backends (modal-fast, modal-genEig,
+cvode, ida, leapfrog/scipy) numerically consistent per
+:mod:`tests.test_solver_kinetic_consistency`.
+
+Algorithm paths for coefficient structure
+-----------------------------------------
 - Constant coefficients: per-mode eigendecomposition with block-aware independent
   blocks (machine-precision, ~14x faster).
 - Position-dependent coefficients: Krylov matrix exponential (expm_multiply) which
@@ -31,11 +91,14 @@ References
 # ruff: noqa: PLR0913, PLR0917, PLR0914, PLR0912, PLR0911, PLR0915, PLR2004
 #   — numerical code inherently requires many arguments, local variables,
 #   return statements, statements, and literal comparisons.
-# ruff: noqa: C901, RUF001, RUF002, RUF003 — complexity and Unicode math symbols.
+# ruff: noqa: C901, RUF001, RUF003 — complexity and Unicode math symbols.
 # ruff: noqa: ERA001, ARG001 — commented-out code serves as documentation;
 #   unused args (bc, grid) kept for interface consistency with other solvers.
 # ruff: noqa: B903, PLR1702 — _OperatorDecomp uses __slots__ for memory efficiency;
 #   nested block depth is inherent to multi-field modal algebra.
+# ruff: noqa: DOC501, DOC502 — _evolve_per_mode_pade raises via nested helper;
+#   _evolve_per_mode wrapper documents the exception from the delegated call.
+# ruff: noqa: PLW2901 — y_curr intentionally overwritten in snapshot loop.
 
 from __future__ import annotations
 
@@ -190,7 +253,7 @@ in their numerically stable regime.
 """
 
 
-def _duhamel_kernel(
+def _duhamel_kernel(  # pyright: ignore[reportUnusedFunction]
     lam: complex | NDArray[np.complex128],
     mu: complex | NDArray[np.complex128],
     t: float,
@@ -694,7 +757,10 @@ def _build_evolution_matrices(
             ci = c_idx_map[eq.field_name]
             for term_idx, term in enumerate(eq.rhs_terms):
                 coeff = _resolve_constant_coeff(
-                    term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                    term,
+                    coeff_eval,
+                    eq_idx=eq_idx,
+                    term_idx=term_idx,
                 )
                 mult = multiplier_cache[term.operator]
                 decomp = _OPERATOR_DECOMP[term.operator]
@@ -733,7 +799,10 @@ def _build_evolution_matrices(
 
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                term,
+                coeff_eval,
+                eq_idx=eq_idx,
+                term_idx=term_idx,
             )
             mult = multiplier_cache[term.operator]
             decomp = _OPERATOR_DECOMP[term.operator]
@@ -893,10 +962,12 @@ def _build_evolution_matrices(
                 # V = right singular vectors (columns of M -> col basis)
                 # Σ_d = diag of positive singular values
                 V_full: NDArray[np.complex128] = np.asarray(
-                    Vh_svd.conj().T, dtype=np.complex128,
+                    Vh_svd.conj().T,
+                    dtype=np.complex128,
                 )  # (n_f, n_f)
                 U_full: NDArray[np.complex128] = np.asarray(
-                    U_svd, dtype=np.complex128,
+                    U_svd,
+                    dtype=np.complex128,
                 )  # (n_f, n_f)
                 V_d: NDArray[np.complex128] = V_full[:, dyn_mask]  # (n_f, n_mass_dyn)
                 V_c: NDArray[np.complex128] = V_full[:, con_mask]  # (n_f, n_mass_con)
@@ -904,10 +975,14 @@ def _build_evolution_matrices(
                     1.0 / S_svd[dyn_mask],
                 )  # (n_mass_dyn, n_mass_dyn)
 
-                # Rotate K, D, J: K̃ = Uᵀ · K · V
-                K_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, K_mat, V_full)
-                D_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, D_mat, V_full)
-                J_rot = np.einsum("ij,mjk,kl->mil", U_full.conj().T, J_mat, V_full)
+                # Rotate K, D, J: K̃ = Uᵀ · K · V.  Express as two
+                # 2-D × 3-D matmuls (BLAS gemm) — without
+                # ``optimize=True`` the 3-way einsum is ~70× slower
+                # than this two-step form (#327).
+                Uc_T = U_full.conj().T  # (n_f, n_f)
+                K_rot = (Uc_T @ K_mat) @ V_full
+                D_rot = (Uc_T @ D_mat) @ V_full
+                J_rot = (Uc_T @ J_mat) @ V_full
 
                 # Partition into dyn/con blocks
                 d_idx = np.where(dyn_mask)[0]
@@ -935,15 +1010,16 @@ def _build_evolution_matrices(
 
                 if has_k_con:
                     K_cc_pinv: NDArray[np.complex128] = cast(
-                        "NDArray[np.complex128]", np.linalg.pinv(K_cc),
-                    )
-                    mass_recovery = cast(
                         "NDArray[np.complex128]",
-                        -np.einsum("mij,mjk->mik", K_cc_pinv, K_cd),
+                        np.linalg.pinv(K_cc),
                     )
-                    K_eff = K_dd + np.einsum("mij,mjk->mik", K_dc, mass_recovery)
-                    D_eff = D_dd + np.einsum("mij,mjk->mik", D_dc, mass_recovery)
-                    J_eff = J_dd + np.einsum("mij,mjk->mik", J_dc, mass_recovery)
+                    # NOTE (#327 perf): batched 3D einsum 'mij,mjk->mik' is
+                    # ~9× slower than np.matmul (`@`) for our shapes; the
+                    # latter dispatches to BLAS gemm.  Bit-equivalent.
+                    mass_recovery = -(K_cc_pinv @ K_cd)
+                    K_eff = K_dd + K_dc @ mass_recovery
+                    D_eff = D_dd + D_dc @ mass_recovery
+                    J_eff = J_dd + J_dc @ mass_recovery
                 else:
                     # Null-space decouples trivially from the rest —
                     # keep only the dyn/dyn block.
@@ -951,21 +1027,23 @@ def _build_evolution_matrices(
                     D_eff = D_dd
                     J_eff = J_dd
 
-                # Invert Σ_d (diagonal): E = Σ_d⁻¹·K_eff, F = Σ_d⁻¹·D_eff
-                E = np.einsum("ij,mjk->mik", Sigma_d_inv, K_eff)
-                F = np.einsum("ij,mjk->mik", Sigma_d_inv, D_eff)
+                # Invert Σ_d (diagonal): E = Σ_d⁻¹·K_eff, F = Σ_d⁻¹·D_eff.
+                # Sigma_d_inv is (n_mass_dyn, n_mass_dyn) — broadcasts via
+                # matmul against the (n_modes, n_mass_dyn, n_mass_dyn) RHS.
+                E = Sigma_d_inv @ K_eff
+                F = Sigma_d_inv @ D_eff
 
                 # Jerk substitution: when J ≠ 0, the d3_t(x_j) term on
                 # the RHS couples third-order time derivatives. Reduce
                 # to second-order by iterating the ẍ expression once.
-                J_eff_inv = np.einsum("ij,mjk->mik", Sigma_d_inv, J_eff)
+                J_eff_inv = Sigma_d_inv @ J_eff
                 has_jerk = float(np.max(np.abs(J_eff_inv))) > 1e-15
                 if has_jerk:
                     logger.info("Jerk substitution: applying d3_t elimination")
-                    FE = np.einsum("mij,mjk->mik", F, E)
-                    K_jerk = np.einsum("mij,mjk->mik", J_eff_inv, FE)
-                    FF = np.einsum("mij,mjk->mik", F, F)
-                    D_jerk = np.einsum("mij,mjk->mik", J_eff_inv, E + FF)
+                    FE = F @ E
+                    K_jerk = J_eff_inv @ FE
+                    FF = F @ F
+                    D_jerk = J_eff_inv @ (E + FF)
                     E_final = E + K_jerk
                     F_final = F + D_jerk
                 else:
@@ -987,9 +1065,9 @@ def _build_evolution_matrices(
                 if has_k_con:
                     assert mass_recovery is not None  # set above when has_k_con is True
                     # mass_recovery: (n_modes, n_mass_con, n_mass_dyn)
+                    # 'ic,mcj->mij' = V_c @ mass_recovery (broadcast).
                     V_eff: NDArray[np.complex128] = np.asarray(
-                        V_d[np.newaxis, :, :]
-                        + np.einsum("ic,mcj->mij", V_c, mass_recovery),
+                        V_d[np.newaxis, :, :] + V_c @ mass_recovery,
                         dtype=np.complex128,
                     )  # (n_modes, n_f, n_mass_dyn)
                     # V_eff^+ = pinv(V_eff) handles rank-deficient cases
@@ -999,14 +1077,18 @@ def _build_evolution_matrices(
                     # requires inv(V_eff^H V_eff) and fails when V_eff has
                     # linearly-dependent columns.
                     V_eff_pinv: NDArray[np.complex128] = cast(
-                        "NDArray[np.complex128]", np.linalg.pinv(V_eff),
+                        "NDArray[np.complex128]",
+                        np.linalg.pinv(V_eff),
                     )  # (n_modes, n_mass_dyn, n_f)
-                    K_orig = np.einsum("mia,mab,mbj->mij", V_eff, E_final, V_eff_pinv)
-                    D_orig = np.einsum("mia,mab,mbj->mij", V_eff, F_final, V_eff_pinv)
+                    # 3-way 'mia,mab,mbj->mij' = (V_eff @ E_final) @ V_eff_pinv.
+                    K_orig = (V_eff @ E_final) @ V_eff_pinv
+                    D_orig = (V_eff @ F_final) @ V_eff_pinv
                 else:
-                    # Trivially decoupled: V_eff = V_d, V_eff⁺ = V_dᴴ
-                    K_orig = np.einsum("ia,mab,jb->mij", V_d, E_final, V_d.conj())
-                    D_orig = np.einsum("ia,mab,jb->mij", V_d, F_final, V_d.conj())
+                    # Trivially decoupled: V_eff = V_d, V_eff⁺ = V_dᴴ.
+                    # 'ia,mab,jb->mij' = (V_d @ E_final) @ V_d.conj().T.
+                    V_d_H = V_d.conj().T  # (n_mass_dyn, n_f)
+                    K_orig = (V_d @ E_final) @ V_d_H
+                    D_orig = (V_d @ F_final) @ V_d_H
 
                 # Fill A_dd velocity rows
                 for i, fname_i in enumerate(dyn_field_names):
@@ -1017,19 +1099,20 @@ def _build_evolution_matrices(
                         A_dd[:, vel_i, field_j] += K_orig[:, i, j]
                         A_dd[:, vel_i, vel_j] += D_orig[:, i, j]
             else:
-                # No singular directions — M is invertible
+                # No singular directions — M is invertible.
+                # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
                 m_inv = np.linalg.inv(M_mat)
-                eff_k = np.einsum("mij,mjk->mik", m_inv, K_mat)
-                eff_d = np.einsum("mij,mjk->mik", m_inv, D_mat)
+                eff_k = m_inv @ K_mat
+                eff_d = m_inv @ D_mat
 
                 # Jerk substitution
-                j_inv = np.einsum("mij,mjk->mik", m_inv, J_mat)
+                j_inv = m_inv @ J_mat
                 has_jerk = np.max(np.abs(j_inv)) > 1e-15
                 if has_jerk:
-                    fd_k = np.einsum("mij,mjk->mik", eff_d, eff_k)
-                    k_jerk = np.einsum("mij,mjk->mik", j_inv, fd_k)
-                    fd_d = np.einsum("mij,mjk->mik", eff_d, eff_d)
-                    d_jerk = np.einsum("mij,mjk->mik", j_inv, eff_k + fd_d)
+                    fd_k = eff_d @ eff_k
+                    k_jerk = j_inv @ fd_k
+                    fd_d = eff_d @ eff_d
+                    d_jerk = j_inv @ (eff_k + fd_d)
                     eff_k += k_jerk
                     eff_d += d_jerk
 
@@ -1082,20 +1165,21 @@ def _build_evolution_matrices(
                             A_dd[m, vi, fj] += ek_m2[i, j]
                             A_dd[m, vi, vj] += ed_m2[i, j]
     else:
-        # M is invertible for all modes — standard path
+        # M is invertible for all modes — standard path.
+        # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
         m_inv = np.linalg.inv(M_mat)
-        eff_k = np.einsum("mij,mjk->mik", m_inv, K_mat)
-        eff_d = np.einsum("mij,mjk->mik", m_inv, D_mat)
+        eff_k = m_inv @ K_mat
+        eff_d = m_inv @ D_mat
 
         # Jerk substitution
-        j_inv = np.einsum("mij,mjk->mik", m_inv, J_mat)
+        j_inv = m_inv @ J_mat
         has_jerk = np.max(np.abs(j_inv)) > 1e-15
         if has_jerk:
             logger.info("Jerk substitution: applying d3_t elimination")
-            fd_k = np.einsum("mij,mjk->mik", eff_d, eff_k)
-            k_jerk = np.einsum("mij,mjk->mik", j_inv, fd_k)
-            fd_d = np.einsum("mij,mjk->mik", eff_d, eff_d)
-            d_jerk = np.einsum("mij,mjk->mik", j_inv, eff_k + fd_d)
+            fd_k = eff_d @ eff_k
+            k_jerk = j_inv @ fd_k
+            fd_d = eff_d @ eff_d
+            d_jerk = j_inv @ (eff_k + fd_d)
             eff_k += k_jerk
             eff_d += d_jerk
 
@@ -1159,18 +1243,20 @@ def _build_evolution_matrices(
         # reconstruct h_c¹ = recovery·y_dyn¹ + S_cc_inv·[LHS-feedback +
         # order-1 RHS corr].
         Scc_inv_out: NDArray[np.complex128] | None = np.asarray(
-            S_cc_inv, dtype=np.complex128,
+            S_cc_inv,
+            dtype=np.complex128,
         )
         Scc_singular_mask_out: NDArray[np.bool_] | None = singular_mask
 
-        # Recovery: c = -S_cc⁻¹ · S_cd · d
-        recovery = -np.einsum("mij,mjk->mik", S_cc_inv, S_cd)
+        # Recovery: c = -S_cc⁻¹ · S_cd · d.
+        # Batched matmul (`@`) instead of einsum: ~9× faster (#327).
+        recovery = -(S_cc_inv @ S_cd)
 
         # Field correction: A_dc_field · recovery
-        field_correction = np.einsum("mij,mjk->mik", A_dc_field, recovery)
+        field_correction = A_dc_field @ recovery
 
         # Velocity coupling: A_dc_vel · recovery
-        vel_coupling = np.einsum("mij,mjk->mik", A_dc_vel, recovery)
+        vel_coupling = A_dc_vel @ recovery
         has_vel = np.max(np.abs(vel_coupling)) > 1e-15
 
         A_rhs = A_dd + field_correction
@@ -1233,9 +1319,10 @@ def _build_evolution_matrices(
                 fallback_count,
                 n_modes,
             )
-        v_recovery = np.einsum("mci,mij->mcj", recovery, A_eff)
+        # Batched matmul (`@`) instead of 'mci,mij->mcj' einsum (#327).
+        v_recovery = recovery @ A_eff
     elif recovery.size > 0:
-        v_recovery = np.einsum("mci,mij->mcj", recovery, A_rhs)
+        v_recovery = recovery @ A_rhs
     else:
         v_recovery = None
 
@@ -1265,6 +1352,19 @@ def _build_per_mode_matrices(
     rfft_shape: tuple[int, ...],
 ) -> NDArray[np.complex128]:
     """Build evolution matrices for the all-constant-coefficient case.
+
+    Fast path for systems without constraints and without time-derivative RHS
+    operators — directly produces the pre-solved first-order evolution matrix
+    without needing a generalized eigenvalue decomposition.
+
+    Kinetic-coefficient (mass matrix) handling: when any dynamical equation
+    carries ``kinetic_coefficient_symbolic`` (``M ẍ = K x`` form), ``M⁻¹`` is
+    pre-computed per field via
+    :func:`tidal.solver._kinetic.build_inverse_kinetic_diag` and folded into
+    the velocity-row coefficients so the emitted matrix represents
+    ``dv/dt = M⁻¹ · K(q)``. The companion generalized-eig path
+    (:func:`_build_evolution_matrices`) reads the same field into ``M_mat``
+    instead; the two paths must stay consistent (see module docstring).
 
     Returns array of shape (n_modes, n_state_slots, n_state_slots) where
     each [m, :, :] is the evolution matrix for mode m.
@@ -1299,9 +1399,28 @@ def _build_per_mode_matrices(
     # Build matrices: A[m, i, j] for each mode m
     A = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
 
+    # #301 / #302: apply M⁻¹ to velocity-row entries so dv/dt = M⁻¹ K(q) for
+    # theories with non-trivial kinetic_coefficient_symbolic. The generalised
+    # eig path (_build_evolution_matrices) reads kinetic into M_mat directly;
+    # this fast path instead folds M⁻¹ into the pre-solved evolution matrix.
+    # build_inverse_kinetic_diag returns None when every dyn M ≈ 1 (fast path).
+    # Shared `velocity_row_scale` helper enforces the cross-builder contract
+    # (see modal.py module docstring; regression guard:
+    # tests.test_solver_kinetic_consistency::TestAllModalPathsRespectKinetic).
+    from tidal.solver._kinetic import (  # noqa: PLC0415
+        build_inverse_kinetic_diag,
+        velocity_row_scale,
+    )
+
+    m_inv = build_inverse_kinetic_diag(
+        spec,
+        coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    )
+
     for _eq_idx, eq in enumerate(spec.equations):
         field_name = eq.field_name
         is_second_order = eq.time_derivative_order >= 2
+        scale = velocity_row_scale(field_name, m_inv)
 
         if is_second_order:
             # Field slot and velocity slot
@@ -1311,7 +1430,7 @@ def _build_per_mode_matrices(
             # dq/dt = v  →  A[field_slot, vel_slot] = 1
             A[:, field_slot, vel_slot] = 1.0
 
-            # dv/dt = Σ coeff * operator(target_field)
+            # dv/dt = M⁻¹ · Σ coeff * operator(target_field)
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = _resolve_target_slot(term.field)
                 if target_slot is None:
@@ -1323,10 +1442,12 @@ def _build_per_mode_matrices(
                     term_idx=_term_idx,
                 )
                 mult = multiplier_cache[term.operator]
-                A[:, vel_slot, target_slot] += coeff * mult
+                A[:, vel_slot, target_slot] += scale * coeff * mult
 
         else:
             # First-order: du/dt = Σ coeff * operator(target_field)
+            # First-order kinetic scaling is not current-scope; leave unscaled
+            # so M⁻¹ only affects 2nd-order EL velocity updates.
             this_slot = layout.field_slot_map[field_name]
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = _resolve_target_slot(term.field)
@@ -1411,9 +1532,30 @@ def _build_convolution_matrix(
 
     A = np.zeros((n_total, n_total), dtype=np.complex128)
 
+    # #301 / #302 / GH #367 fix: apply M⁻¹ to velocity-row contributions so
+    # `dv/dt = M⁻¹·K(q)` for theories with non-trivial `kinetic_coefficient_symbolic`
+    # (e.g. `-1/kappa²` on graviton h-modes in Gertsenshtein). The per-mode path
+    # `_build_per_mode_matrices` already does this; the convolution path previously
+    # did not, producing wrong-sign EOM that drove `expm_multiply` to ~10⁹× error
+    # — diagnosed 2026-05-19 as the actual root cause of GH #367 (originally
+    # believed to be a non-normal Fourier convolution artifact). Shared
+    # `velocity_row_scale` helper enforces the cross-builder contract (see
+    # modal.py module docstring; regression guard:
+    # tests.test_solver_kinetic_consistency::TestAllModalPathsRespectKinetic).
+    from tidal.solver._kinetic import (  # noqa: PLC0415
+        build_inverse_kinetic_diag,
+        velocity_row_scale,
+    )
+
+    m_inv = build_inverse_kinetic_diag(
+        spec,
+        coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    )
+
     for _eq_idx, eq in enumerate(spec.equations):
         field_name = eq.field_name
         is_second_order = eq.time_derivative_order >= 2
+        scale = velocity_row_scale(field_name, m_inv)
 
         if is_second_order:
             field_slot = layout.field_slot_map[field_name]
@@ -1425,7 +1567,7 @@ def _build_convolution_matrix(
                 col = vel_slot * n_modes + m
                 A[row, col] = 1.0
 
-            # dv/dt = Σ coeff(x) * operator(target_field)
+            # dv/dt = M⁻¹ · Σ coeff(x) * operator(target_field)
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = _resolve_target_slot(term.field)
                 if target_slot is None:
@@ -1443,7 +1585,7 @@ def _build_convolution_matrix(
                     for m in range(n_modes):
                         row = vel_slot * n_modes + m
                         col = target_slot * n_modes + m
-                        A[row, col] += coeff * mult[m]
+                        A[row, col] += scale * coeff * mult[m]
                 else:
                     # Position-dependent: convolution coupling
                     _add_convolution_coupling(
@@ -1458,9 +1600,11 @@ def _build_convolution_matrix(
                         n_modes,
                         eq_idx=_eq_idx,
                         term_idx=_term_idx,
+                        scale=scale,
                     )
         else:
-            # First-order
+            # First-order: M⁻¹ scaling not applied (kinetic normalization is a
+            # 2nd-order concept; first-order fields are direct evolution).
             this_slot = layout.field_slot_map[field_name]
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = _resolve_target_slot(term.field)
@@ -1510,6 +1654,7 @@ def _add_convolution_coupling(
     *,
     eq_idx: int = -1,
     term_idx: int = -1,
+    scale: float = 1.0,
 ) -> None:
     """Add convolution coupling from a position-dependent coefficient.
 
@@ -1518,6 +1663,11 @@ def _add_convolution_coupling(
 
     This creates off-diagonal entries in the evolution matrix coupling
     different k-modes.
+
+    ``scale`` multiplies the convolution contribution — used by the caller
+    to apply the inverse-kinetic factor `M⁻¹` for 2nd-order equations with
+    `kinetic_coefficient_symbolic != 1` (Gertsenshtein h-modes, etc.). See
+    `_build_convolution_matrix` (modal.py) for the rationale (GH #367 fix).
     """
     # Get the coefficient array on the spatial grid
     coeff_array = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
@@ -1552,10 +1702,12 @@ def _add_convolution_coupling(
         result_hat = np.fft.rfftn(product).ravel()
 
         # result_hat[m] = Σ_{k'} (1/N) ĉ_{m-k'} δ_{k',m'} = (1/N) ĉ_{m-m'}
-        # multiplied by operator multiplier at m'
+        # multiplied by operator multiplier at m' and the kinetic-inverse scale.
         row_start = row_slot * n_modes
         col = col_slot * n_modes + m_prime
-        A[row_start : row_start + n_modes, col] += result_hat * operator_mult[m_prime]
+        A[row_start : row_start + n_modes, col] += (
+            scale * result_hat * operator_mult[m_prime]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1627,7 +1779,7 @@ def _has_position_dependent_terms(spec: EquationSystem) -> bool:
     return False
 
 
-def _suppress_tachyonic_noise(
+def _suppress_tachyonic_noise(  # pyright: ignore[reportUnusedFunction]
     eig_vals: NDArray[np.complex128],
     y0_eigen: NDArray[np.complex128],
     *,
@@ -1717,6 +1869,440 @@ def _warn_eigenvalue_growth(
             )
 
 
+def _build_m_with_null_projection(
+    A_block: NDArray[np.complex128],
+    B_block: NDArray[np.complex128] | None,
+) -> NDArray[np.complex128]:
+    """Compute ``M = B^-1 · A`` per mode, handling rank-deficient ``B``.
+
+    For null directions of ``B`` (gauge / non-propagating components), the
+    evolution generator ``M`` is set to zero so those directions stay at IC
+    under ``exp(M · t)``. For ``range(B)`` we solve normally.
+
+    Parameters
+    ----------
+    A_block : ndarray, shape (n_modes, bs, bs)
+        RHS matrix per mode.
+    B_block : ndarray, shape (n_modes, bs, bs) or None
+        Kinetic matrix per mode. ``None`` means ``B = I`` (no LHS coupling),
+        in which case ``M = A`` directly.
+
+    Returns
+    -------
+    M_block : ndarray, shape (n_modes, bs, bs)
+        Evolution generator. Null(B) directions are zero (IC-frozen under
+        ``exp(M · t)``).
+    """
+    if B_block is None:
+        return A_block.copy()
+    n_modes_local, bs_local, _ = A_block.shape
+    M_block = np.zeros_like(A_block)
+    for m in range(n_modes_local):
+        A_m = A_block[m]
+        B_m = B_block[m]
+        _u, s, Vt = cast(
+            "tuple[NDArray[np.complex128], NDArray[np.float64], NDArray[np.complex128]]",
+            np.linalg.svd(B_m),
+        )
+        thresh = s[0] * 1e-10 if s.size > 0 and s[0] > 0 else 1e-14
+        rank = int(np.sum(s > thresh))
+        if rank == bs_local:
+            M_block[m] = np.linalg.solve(B_m, A_m)
+        elif rank > 0:
+            # Project onto range(B): A_red, B_red of size (rank, rank)
+            Vphys = Vt[:rank].T  # (bs, rank)
+            A_red = Vphys.conj().T @ A_m @ Vphys
+            B_red = Vphys.conj().T @ B_m @ Vphys
+            M_red = np.linalg.solve(B_red, A_red)
+            # Lift back; null directions stay at zero (IC-frozen).
+            M_block[m] = Vphys @ M_red @ Vphys.conj().T
+        # else: rank == 0 — entire block is null(B); M stays zero (IC-frozen).
+    return M_block
+
+
+def _evolve_per_mode_pade(
+    A_modes: NDArray[np.complex128],
+    y0_hat: NDArray[np.complex128],
+    t_eval: NDArray[np.float64],
+    layout: StateLayout,
+    grid: GridInfo,
+    snapshot_callback: Callable[[float, NDArray[np.float64]], None] | None,
+    progress: SimulationProgress | None,
+    *,
+    return_fourier: bool = False,
+    return_derivative_fourier: bool = False,
+    B_modes: NDArray[np.complex128] | None = None,
+    collect_pass0_state: list[dict[str, Any]] | None = None,
+) -> tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.complex128] | None,
+    NDArray[np.complex128] | None,
+]:
+    """Per-mode matrix-exponential evolution via Padé precompute + matvec (path D).
+
+    For each independent field block, computes ``M = B^-1·A`` per mode (with
+    null-space projection if ``B`` is rank-deficient), then ``exp(M·dt)`` once
+    per mode via ``scipy.linalg.expm`` (Higham 2009 Padé scaling-and-
+    squaring). The snapshot loop is pure ``O(bs^2)`` matvec, vectorised across
+    modes via einsum --- structurally identical to the eigendecomposition
+    snapshot loop, but **robust for arbitrary ``cond(V)``** and wall-time
+    competitive (0.49--1.06× across the campaign workload envelope; see
+    ``docs/tex/modal_solver.tex`` §"Robust Matrix-Exponential Evolution").
+
+    This is the default Pass 0 path. The eigendecomposition path remains
+    available via ``collect_eigendata`` for Pass 1 perturbative-Duhamel
+    callers (which need per-eigenvalue kernels) --- see
+    :func:`_evolve_per_mode` and ``perturbative_solver.tex`` §Pass~1.
+
+    References
+    ----------
+    Higham, N.J. (2009). "The scaling and squaring method for the matrix
+    exponential revisited." SIAM Review 51(4):747-764.
+    Higham, N.J. (2008). Functions of Matrices, SIAM, §2.3 (cond(V)
+    abandonment threshold).
+    """
+    import os  # noqa: PLC0415
+
+    import scipy.linalg as sla  # type: ignore[import-untyped]  # noqa: PLC0415
+
+    from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
+
+    n_slots = layout.num_slots
+    n_pts = layout.num_points
+    n_snapshots = len(t_eval)
+    n_modes = y0_hat.shape[1]
+    t0 = float(t_eval[0])
+    t_end_rel = float(t_eval[-1] - t0)
+
+    # Sparse-IC mode-skip kill-switch (#327 follow-up): when env var
+    # ``TIDAL_MODAL_SPARSE_IC=0`` is set, fall back to the legacy
+    # all-modes precompute and the all-modes expm-based divergence
+    # pre-check.  Default (unset / non-zero) enables sparse-IC +
+    # eigenvalue-based pre-check.  See
+    # ``docs/tex/stability_probe.tex`` §sec:ieee-floor for the
+    # noise-floor mechanism the eigenvalue pre-check captures.
+    sparse_ic_enabled: bool = os.environ.get("TIDAL_MODAL_SPARSE_IC", "1") != "0"
+
+    # Block detection: same as the eigendecomposition path.
+    n_check = min(3, A_modes.shape[0])
+    combined = np.max(np.abs(A_modes[:n_check]), axis=0)
+    blocks = find_independent_blocks(combined)
+
+    # Per-block precompute: M_block, exp_M_dt (uniform spacing) or M only,
+    # plus the active-modes mask used by sparse-IC (#327 follow-up).
+    # block_state entries are (slot_indices, M_block, exp_M_dt or None,
+    #                          y_curr, y0_block, active_modes).
+    # y_curr has shape (n_modes, bs) — the per-mode current Fourier state.
+    if n_snapshots > 1:
+        dts = np.diff(t_eval)
+        uniform = bool(np.allclose(dts, dts[0]))
+        dt_step = float(dts[0]) if uniform else None
+    else:
+        uniform = True
+        dt_step = None
+
+    block_state: list[
+        tuple[
+            list[int],
+            NDArray[np.complex128],  # M_block (n_modes, bs, bs)
+            NDArray[np.complex128] | None,  # exp_M_dt (n_modes, bs, bs) or None
+            NDArray[np.complex128],  # y_curr (n_modes, bs); starts as y0_block.T
+            NDArray[np.complex128],  # y0_block (bs, n_modes); kept for non-uniform path
+            NDArray[np.intp],  # active_modes — indices to evolve via expm
+        ]
+    ] = []
+    # Worst-case max real eigenvalue across all blocks/modes — drives the
+    # eigenvalue-based divergence pre-check (replaces the per-mode expm
+    # pre-check; reuses ``eigvals_diag`` already computed for the growth-
+    # rate warning).  See plan §Stage 2.
+    max_real_eig: float = 0.0
+
+    for block_slots in blocks:
+        y0_block = y0_hat[block_slots, :]  # (bs, n_modes)
+        if np.max(np.abs(y0_block)) < 1e-15:
+            continue
+        idx = np.array(block_slots)
+        A_block = A_modes[:, idx[:, None], idx[None, :]]
+        B_block = (
+            B_modes[:, idx[:, None], idx[None, :]] if B_modes is not None else None
+        )
+        M_block = _build_m_with_null_projection(A_block, B_block)
+
+        # Sparse-IC active-mode mask (#327 follow-up).  Modes whose IC
+        # amplitude is at or below the IEEE 754 FFT floor (~ N·ε ≈
+        # 10⁻¹⁴ for plane-wave IC) carry no physical signal; their
+        # ``y_curr`` evolves from noise and contributes nothing to the
+        # ifft'd output.  Skipping the per-mode ``expm`` for those bins
+        # cuts the precompute cost by 50–65× on inference workloads
+        # (plane-wave IC has ~1 active rfft bin out of N//2+1).  When
+        # ``sparse_ic_enabled`` is False the mask covers every mode,
+        # recovering legacy behaviour bit-exactly.
+        n_modes_block: int = int(M_block.shape[0])
+        if sparse_ic_enabled:
+            y0_norms = np.linalg.norm(y0_block, axis=0)  # (n_modes,)
+            norm_floor = 1e-12 * max(1.0, float(np.max(np.abs(y0_block))))
+            active_modes: NDArray[np.intp] = np.flatnonzero(
+                y0_norms > norm_floor,
+            ).astype(np.intp)
+        else:
+            active_modes = np.arange(n_modes_block, dtype=np.intp)
+
+        # Use ``zeros_like`` (not ``empty_like``) so inactive modes'
+        # ``exp_M_dt[m]`` is exactly zero — the snapshot matvec
+        # (``np.einsum("mij,mj->mi", exp_M_dt, y_curr)``) then produces
+        # 0 for those modes regardless of ``y_curr[m]``'s value, with
+        # no risk of NaN/inf garbage propagating from uninitialised
+        # memory.
+        exp_M_dt: NDArray[np.complex128] | None = None
+        if uniform and dt_step is not None and dt_step > 0:
+            exp_M_dt = np.zeros_like(M_block)
+            for m in active_modes:
+                exp_M_dt[m] = sla.expm(M_block[m] * dt_step)  # pyright: ignore[reportUnknownArgumentType]
+
+        # Diagnostic: warn if growth factor over t_end_rel exceeds exp(30).
+        # path D doesn't form eigenvectors, but eigenvalues alone are cheap
+        # and reliable for this purpose. Mirrors the eigen-path warning so
+        # downstream tests / users get the same overflow signal.  Reuse the
+        # max real eigenvalue here for the divergence pre-check (#327
+        # follow-up Stage 2) — eigvals are computed regardless, so the
+        # extra ``np.max(np.real(...))`` is cents of microseconds.
+        if t_end_rel > 0:
+            eigvals_diag = np.linalg.eigvals(M_block)
+            _warn_eigenvalue_growth(
+                eigvals_diag,  # pyright: ignore[reportArgumentType]
+                t_end_rel,
+                context="per-mode (Padé)",
+            )
+            max_real_eig = max(max_real_eig, float(np.max(np.real(eigvals_diag))))
+
+        y_curr = y0_block.T.astype(np.complex128, copy=True)  # (n_modes, bs)
+        block_state.append(
+            (list(block_slots), M_block, exp_M_dt, y_curr, y0_block, active_modes),
+        )
+
+        # Collect Pass 0 state for the augmented-exp Pass 1 solver. Replaces
+        # the legacy {V, V_inv, D_diag, alpha} eigendata schema; consumed by
+        # :func:`_evolve_duhamel_per_mode` to build the (2bs × 2bs) augmented
+        # operator [[A, S], [0, A]] without any eigendecomposition.
+        # See docs/tex/modal_solver.tex §"Robust Matrix-Exponential Evolution".
+        if collect_pass0_state is not None:
+            collect_pass0_state.append(
+                {
+                    "slot_indices": list(block_slots),
+                    "M_block": M_block.copy(),
+                    "y0_block": y0_block.copy(),
+                },
+            )
+
+    # Outputs
+    snapshots = np.zeros((n_snapshots, n_slots * n_pts))
+    times = np.zeros(n_snapshots)
+    fourier_snaps: NDArray[np.complex128] | None = (
+        np.zeros((n_snapshots, n_slots, n_modes), dtype=np.complex128)
+        if return_fourier
+        else None
+    )
+    deriv_fourier_snaps: NDArray[np.complex128] | None = (
+        np.zeros((n_snapshots, n_slots, n_modes), dtype=np.complex128)
+        if return_derivative_fourier
+        else None
+    )
+    y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
+    dy_hat_t: NDArray[np.complex128] | None = (
+        np.zeros((n_slots, n_modes), dtype=np.complex128)
+        if return_derivative_fourier
+        else None
+    )
+
+    # Divergence pre-check at t_end (#327 follow-up Stage 2).
+    #
+    # When ``sparse_ic_enabled`` (default), use the worst per-mode
+    # max real eigenvalue we already computed for the growth-rate
+    # warning: the IEEE 754 FFT floor at non-fundamental bins is
+    # ~1e-14 (see docs/tex/stability_probe.tex §sec:ieee-floor), so a
+    # tachyonic mode with eigenvalue γ at t_end_rel amplifies to
+    # ~1e-14 · exp(γ · t_end_rel).  Trip the guard if this exceeds
+    # ``divergence_threshold × initial_max_amp``.  This is bit-
+    # equivalent to the per-mode expm pre-check on tachyonic samples
+    # (sample 2860 in the docs verifies the mechanism) but cents-of-
+    # microseconds vs ~10–50 ms.
+    #
+    # When the kill-switch is set, fall back to the legacy per-mode
+    # expm pre-check.  Same physics, same numbers — slower.
+    initial_max_amp: float = 0.0
+    divergence_threshold: float = 100.0
+    if t_end_rel > 0:
+        initial_physical = _ifft_slots(y0_hat, layout, grid)
+        initial_max_amp = max(float(np.max(np.abs(initial_physical))), 1e-15)
+
+        if sparse_ic_enabled:
+            # Eigenvalue-based check.  ``ieee_fft_floor`` is the
+            # double-precision FFT round-off scaled by the IC amplitude
+            # (see stability_probe.tex Eq. for sample 2860); 1e-14 is a
+            # conservative upper bound.
+            ieee_fft_floor: float = 1e-14
+            predicted_log_growth = max_real_eig * t_end_rel
+            # Cap the exponent before ``math.exp`` to avoid overflow
+            # warnings — anything > log(1e308) is divergence by any
+            # measure.
+            log_overflow_cap = float(np.log(1e300))
+            if predicted_log_growth > log_overflow_cap:
+                predicted_floor_amp = float("inf")
+            else:
+                predicted_floor_amp = ieee_fft_floor * float(
+                    np.exp(predicted_log_growth),
+                )
+            predicted_ratio = predicted_floor_amp / initial_max_amp
+            if (
+                not np.isfinite(predicted_ratio)
+                or predicted_ratio > divergence_threshold
+            ):
+                msg = (
+                    f"Simulation predicted to diverge: max real eigenvalue "
+                    f"{max_real_eig:.4g} amplifies the IEEE 754 FFT floor "
+                    f"{ieee_fft_floor:.0e} to ratio "
+                    f"{predicted_ratio:.2e} at t={t_eval[-1]:.4g} "
+                    f"(threshold {divergence_threshold:.0e}). Fields would "
+                    f"leave the perturbative regime (linearized approximation "
+                    f"invalid).  Rejecting pre-evolution based on the "
+                    f"eigenvalue-based pre-check (#327 follow-up Stage 2)."
+                )
+                raise SimulationDivergedError(msg)
+        else:
+            # Legacy expm-based pre-check — kept under the kill-switch
+            # for bit-exact rollback on a single env var.
+            y_hat_predict = np.zeros((n_slots, n_modes), dtype=np.complex128)
+            for (
+                block_slots,
+                M_block,
+                _exp_M_dt,
+                _y_curr,
+                y0_block,
+                _active_modes,
+            ) in block_state:
+                y_pred = np.empty(
+                    (M_block.shape[0], M_block.shape[1]),
+                    dtype=np.complex128,
+                )
+                for m in range(M_block.shape[0]):
+                    y_pred[m] = (
+                        sla.expm(M_block[m] * t_end_rel) @ y0_block[:, m]  # pyright: ignore[reportUnknownArgumentType]
+                    )
+                y_hat_predict[block_slots, :] = y_pred.T
+            predicted_physical = _ifft_slots(y_hat_predict, layout, grid)
+            predicted_max = float(np.max(np.abs(predicted_physical)))
+            if (
+                not np.isfinite(predicted_max)
+                or predicted_max / initial_max_amp > divergence_threshold
+            ):
+                msg = (
+                    f"Simulation predicted to diverge: amplitude at t={t_eval[-1]:.4g} "
+                    f"would reach ratio {predicted_max / initial_max_amp:.2e} "
+                    f"(threshold {divergence_threshold:.0e}). Fields would leave "
+                    f"the perturbative regime (linearized approximation invalid). "
+                    f"Rejecting pre-evolution based on Padé matrix exponential."
+                )
+                raise SimulationDivergedError(msg)
+
+    # Time loop. For uniform spacing, advance y_curr by exp_M_dt between
+    # snapshots; for non-uniform, recompute exp(M · t_rel) per snapshot per
+    # mode (slower but correct).
+    for ti, t in enumerate(t_eval):
+        dt_from_t0 = float(t - t0)
+        y_hat_t[:] = 0.0
+        if dy_hat_t is not None:
+            dy_hat_t[:] = 0.0
+
+        for k, (
+            block_slots,
+            M_block,
+            exp_M_dt,
+            y_curr,
+            y0_block,
+            active_modes,
+        ) in enumerate(block_state):
+            if ti == 0:
+                # First snapshot: y_curr already equals y0_block.T
+                pass
+            elif uniform and exp_M_dt is not None:
+                # Advance one step: y_curr <- exp_M_dt @ y_curr.
+                # Inactive modes have ``exp_M_dt[m] == 0`` (set by
+                # ``np.zeros_like`` above) so the einsum produces 0
+                # for them — bit-exactly correct since they carried
+                # no signal at IC.
+                y_curr_new = np.einsum("mij,mj->mi", exp_M_dt, y_curr)
+                block_state[k] = (
+                    block_slots,
+                    M_block,
+                    exp_M_dt,
+                    y_curr_new,
+                    y0_block,
+                    active_modes,
+                )
+                y_curr = y_curr_new
+            else:
+                # Non-uniform spacing: compute exp(M · dt_from_t0) ·
+                # y0_block per mode.  Sparse-IC: only iterate active
+                # modes; inactive modes are zeroed in y_curr_new (the
+                # ifft sum then drops their contribution).
+                y_curr_new = np.zeros_like(y_curr)
+                for m in active_modes:
+                    y_curr_new[m] = (
+                        sla.expm(M_block[m] * dt_from_t0) @ y0_block[:, m]  # pyright: ignore[reportUnknownArgumentType]
+                    )
+                block_state[k] = (
+                    block_slots,
+                    M_block,
+                    exp_M_dt,
+                    y_curr_new,
+                    y0_block,
+                    active_modes,
+                )
+                y_curr = y_curr_new
+
+            y_hat_t[block_slots, :] = y_curr.T
+
+            if dy_hat_t is not None:
+                # dy/dt = M @ y(t) — exact, no numerical differentiation.
+                dy = np.einsum("mij,mj->mi", M_block, y_curr)
+                dy_hat_t[block_slots, :] = dy.T
+
+        if fourier_snaps is not None:
+            fourier_snaps[ti] = y_hat_t
+        if deriv_fourier_snaps is not None and dy_hat_t is not None:
+            deriv_fourier_snaps[ti] = dy_hat_t
+
+        y_physical = _ifft_slots(y_hat_t, layout, grid)
+        snapshots[ti] = y_physical
+        times[ti] = t
+
+        # Runtime divergence guard (same physics threshold as eigen path).
+        max_amp = float(np.max(np.abs(y_physical)))
+        if ti == 0:
+            initial_max_amp = max(max_amp, 1e-15)
+        elif (
+            not np.isfinite(max_amp) or max_amp / initial_max_amp > divergence_threshold
+        ):
+            msg = (
+                f"Simulation diverged at t={t:.4g}: amplitude ratio "
+                f"{max_amp / initial_max_amp:.2e} exceeds threshold "
+                f"{divergence_threshold:.0e}. Fields have left the "
+                f"perturbative regime (linearized approximation invalid)."
+            )
+            for tj in range(ti + 1, n_snapshots):
+                snapshots[tj] = y_physical
+                times[tj] = t_eval[tj]
+            raise SimulationDivergedError(msg)
+
+        if snapshot_callback is not None:
+            snapshot_callback(t, y_physical)
+        if progress is not None:
+            progress.update(t)
+
+    return times, snapshots, fourier_snaps, deriv_fourier_snaps
+
+
 def _evolve_per_mode(
     A_modes: NDArray[np.complex128],
     y0_hat: NDArray[np.complex128],
@@ -1738,357 +2324,56 @@ def _evolve_per_mode(
 ]:
     """Evolve system with per-mode independent matrices (constant coefficients).
 
-    A_modes has shape (n_modes, n_slots, n_slots).
-    y0_hat has shape (n_slots, n_modes).
+    Thin wrapper over :func:`_evolve_per_mode_pade`. The eigendecomposition
+    backend was retired in v0.31+ in favour of unconditional Padé scaling-
+    and-squaring (path D), which is robust for arbitrary ``cond(V)`` AND
+    wall-time competitive (0.49--1.06× across the campaign workload
+    envelope; see ``docs/tex/modal_solver.tex`` §"Robust Matrix-Exponential
+    Evolution").
 
-    Uses block-aware eigendecomposition: independent field blocks are detected
-    and eigendecomposed separately to prevent degenerate-eigenvalue mixing.
-    Blocks with all-zero initial conditions are skipped entirely.
+    The ``collect_eigendata`` parameter is kept for backwards compatibility
+    with Pass 1 callers but now collects ``{M_block, y0_block, slot_indices}``
+    per block instead of the legacy ``{V, V_inv, D_diag, alpha}``. Pass 1
+    consumes this via the augmented matrix exponential
+    (Al-Mohy & Higham 2011 §5.2) — see :func:`_evolve_duhamel_per_mode`.
 
-    Ref: Golub & Van Loan (1996), Matrix Computations, §4.8.
+    Parameters
+    ----------
+    A_modes : ndarray, shape (n_modes, n_slots, n_slots)
+        Per-mode RHS matrix.
+    y0_hat : ndarray, shape (n_slots, n_modes)
+        Initial condition in Fourier space.
+    B_modes : ndarray, optional, shape (n_modes, n_slots, n_slots)
+        Per-mode kinetic matrix; ``M = B^-1 A`` is solved with null-space
+        projection if ``B`` is rank-deficient (gauge / constraint).
+    collect_eigendata : list of dict, optional
+        When provided, populated per block with ``{slot_indices, M_block,
+        y0_block}`` for downstream Pass 1 augmented-exp evaluation.
 
     Raises
     ------
     SimulationDivergedError
-        If field amplitudes grow beyond 100x the initial maximum, which
-        indicates the simulation has left the perturbative regime where
-        the linearized equations are valid.
+        If field amplitudes grow beyond 100x the initial maximum (linearized
+        equations are no longer physical).
+
+    References
+    ----------
+    Higham 2009 (Padé scaling-and-squaring), Higham 2008 §2.3 (eigendecomp
+    abandonment threshold), Al-Mohy & Higham 2011 §5.2 (augmented-exp Pass 1).
     """
-    from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
-
-    n_slots = layout.num_slots
-    n_pts = layout.num_points
-    n_snapshots = len(t_eval)
-    t0 = t_eval[0]
-    dt_total = float(t_eval[-1] - t0)
-
-    # Detect independent blocks from the first mode's matrix.
-    # Block structure is k-independent for constant coefficients, so we only
-    # need to analyze one representative mode (use max across a few modes for
-    # robustness against accidental zeros at specific k).
-    n_check = min(3, A_modes.shape[0])
-    combined = np.max(np.abs(A_modes[:n_check]), axis=0)
-    blocks = find_independent_blocks(combined)
-
-    # Pre-compute eigendecomposition for each active block
-    block_data: list[
-        tuple[
-            list[int],  # slot indices
-            NDArray[np.complex128],  # eigenvalues (n_modes, block_size)
-            NDArray[np.complex128],  # V (n_modes, block_size, block_size)
-            NDArray[np.complex128],  # y0_eigen (n_modes, block_size)
-        ]
-    ] = []
-
-    for block_slots in blocks:
-        # Extract IC for this block
-        y0_block = y0_hat[block_slots, :]  # (block_size, n_modes)
-
-        # Skip blocks with all-zero IC — output stays at zero
-        if np.max(np.abs(y0_block)) < 1e-15:
-            continue
-
-        # Extract block sub-matrices: (n_modes, block_size, block_size)
-        idx = np.array(block_slots)
-        A_block = A_modes[:, idx[:, None], idx[None, :]]
-
-        if B_modes is not None:
-            # Generalized eigenvalue problem: B · d' = A · d
-            # Uses QZ decomposition via scipy.linalg.eig(A, B).
-            # Infinite eigenvalues (gauge DOF) are zeroed — they don't evolve.
-            # Essential for rank-deficient M: pre-solving via np.linalg.solve
-            # produces ill-conditioned eigenvectors (cond(V) > 1e9), whereas
-            # QZ handles rank-deficiency via the Schur form without requiring
-            # V to be well-conditioned.
-            # Ref: Golub & Van Loan (2013), Matrix Computations §7.7.6
-            import scipy.linalg as sla  # type: ignore[import-untyped]  # noqa: PLC0415
-
-            B_block = B_modes[:, idx[:, None], idx[None, :]]
-            bs = len(block_slots)
-            n_block_modes = A_block.shape[0]
-            eig_vals = np.zeros((n_block_modes, bs), dtype=np.complex128)
-            v_mat = np.zeros((n_block_modes, bs, bs), dtype=np.complex128)
-            n_gauge_total = 0
-            for m in range(A_block.shape[0]):
-                A_m = A_block[m]
-                B_m = B_block[m]
-                # Null-space projection before QZ: rank-deficient B (e.g. CDT
-                # rank-3 PGT torsion where only the trace subspace has kinetic
-                # terms) causes scipy.linalg.eig to return FINITE spurious
-                # eigenvalues not caught by the |λ|>1e12 filter.  Project A
-                # and B onto range(B) first; null directions get eigenvalue 0
-                # (frozen at IC).  See issue #257.
-                _u_b, s_b, Vt_b = cast(
-                    "tuple[NDArray[np.complex128], NDArray[np.float64], NDArray[np.complex128]]",
-                    np.linalg.svd(B_m),
-                )
-                null_thresh_b = s_b[0] * 1e-10 if s_b[0] > 0 else 1e-14
-                rank_b = int(np.sum(s_b > null_thresh_b))
-                null_dim_b = bs - rank_b
-                if null_dim_b > 0:
-                    Vphys = Vt_b[:rank_b].T  # (bs, rank_b) — physical subspace
-                    Vnull = Vt_b[rank_b:].T  # (bs, null_dim_b) — null(B)
-                    eig_r = sla.eig(  # pyright: ignore[reportUnknownVariableType]
-                        Vphys.T @ A_m @ Vphys,
-                        Vphys.T @ B_m @ Vphys,
-                        right=True,
-                    )
-                    ev_red = np.asarray(eig_r[0], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
-                    vr_red = np.asarray(eig_r[1], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
-                    # Lift eigenvectors to full space; null modes frozen at IC
-                    ev_m: NDArray[np.complex128] = np.concatenate(
-                        [ev_red, np.zeros(null_dim_b, dtype=np.complex128)],
-                    )
-                    # V_full = [Vphys @ vr_red | Vnull] is always invertible:
-                    # physical cols live in range(Vphys), null cols in null(B),
-                    # and SVD guarantees these two subspaces are orthogonal.
-                    vr_m: NDArray[np.complex128] = np.hstack([Vphys @ vr_red, Vnull])
-                    n_gauge_total += null_dim_b
-                else:
-                    eig_r2 = sla.eig(A_m, B_m, right=True)  # pyright: ignore[reportUnknownVariableType]
-                    ev_m = np.asarray(eig_r2[0], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
-                    vr_m = np.asarray(eig_r2[1], dtype=np.complex128)  # pyright: ignore[reportUnknownArgumentType]
-                # Filter any remaining infinite/very-large eigenvalues
-                # (gauge modes not caught by null-space projection).
-                gauge = ~np.isfinite(ev_m) | (np.abs(ev_m) > 1e12)
-                ev_m[gauge] = 0.0  # gauge modes frozen at IC
-                n_gauge_total += int(np.sum(gauge))
-                eig_vals[m] = ev_m
-                v_mat[m] = vr_m
-            if n_gauge_total > 0:
-                import logging as _log  # noqa: PLC0415
-
-                _log.getLogger(__name__).info(
-                    "Generalized eigenvalue: %d gauge modes zeroed across %d modes",
-                    n_gauge_total,
-                    A_block.shape[0],
-                )
-            v_inv = np.linalg.inv(v_mat)
-        else:
-            # Regular eigendecomposition for non-generalized systems.
-            eig_vals, v_mat = np.linalg.eig(A_block)
-            v_inv = np.linalg.inv(v_mat)
-
-        # Warn about potential overflow
-        _warn_eigenvalue_growth(eig_vals, dt_total, context="per-mode")
-
-        # Transform IC to eigenbasis
-        y0_eigen = np.einsum("mij,mj->mi", v_inv, y0_block.T)
-
-        # Suppress tachyonic modes with zero physical coupling.
-        # These are numerical noise amplifiers, not physics — see #222.
-        eig_vals, n_suppressed = _suppress_tachyonic_noise(eig_vals, y0_eigen)
-        if n_suppressed > 0:
-            import logging as _log_tach  # noqa: PLC0415
-
-            _log_tach.getLogger(__name__).info(
-                "Suppressed %d tachyonic modes with zero IC coupling "
-                "(numerical noise prevention)",
-                n_suppressed,
-            )
-
-        block_data.append((block_slots, eig_vals, v_mat, y0_eigen))
-
-        # Optional: expose eigendata for Pass 1 Duhamel solver (v6 Stage 3).
-        # alpha = V^-1 · y0_hat_block (eigenbasis amplitudes of the base IC).
-        # The Pass 1 solver reuses these to evaluate the closed-form Duhamel
-        # kernel without re-running the eigendecomposition.
-        if collect_eigendata is not None:
-            collect_eigendata.append(
-                {
-                    "slot_indices": list(block_slots),
-                    "V": v_mat.copy(),
-                    "D_diag": eig_vals.copy(),
-                    "V_inv": v_inv.copy(),
-                    "alpha": y0_eigen.copy(),
-                },
-            )
-
-    # Evolve at each time point.
-    # Pre-multiply V @ diag(y0_eigen) for each block so the inner loop only
-    # needs element-wise exp + matrix-vector product, not a full einsum.
-    block_evolved: list[
-        tuple[
-            list[int],  # slot indices
-            NDArray[np.complex128],  # V_y0: V * y0_eigen, (n_modes, bs, bs)
-            NDArray[np.complex128] | None,  # V_y0_deriv (n_modes, bs, bs) or None
-            NDArray[np.complex128],  # eigenvalues (n_modes, bs)
-        ]
-    ] = []
-    for block_slots, eig_vals, v_mat, y0_eigen in block_data:
-        # V_y0[m, i, j] = v_mat[m, i, j] * y0_eigen[m, j]
-        # so y(t) = V_y0 @ exp(λ*dt) is just a matvec
-        V_y0 = v_mat * y0_eigen[:, np.newaxis, :]  # (n_modes, bs, bs)
-        # V_y0_deriv[m, i, j] = V_y0[m, i, j] * λ[m, j]
-        # so y'(t) = V_y0_deriv @ exp(λ*dt) gives exact time derivative
-        V_y0_deriv = (
-            V_y0 * eig_vals[:, np.newaxis, :] if return_derivative_fourier else None
-        )
-        block_evolved.append((block_slots, V_y0, V_y0_deriv, eig_vals))
-
-    snapshots = np.zeros((n_snapshots, n_slots * n_pts))
-    times = np.zeros(n_snapshots)
-    n_modes = y0_hat.shape[1]
-
-    # Optionally collect Fourier-space snapshots (avoids re-FFT in constraint
-    # recovery — the Fourier data is already computed here).
-    fourier_snaps: NDArray[np.complex128] | None = None
-    if return_fourier:
-        fourier_snaps = np.zeros(
-            (n_snapshots, n_slots, n_modes),
-            dtype=np.complex128,
-        )
-
-    # Optionally collect Fourier-space TIME DERIVATIVE snapshots.
-    # d'(t) = V · diag(λ · exp(λt)) · y0_eigen — exact, no numerical diff.
-    # Used for machine-precision constraint velocity: v_c = recovery · d'.
-    deriv_fourier_snaps: NDArray[np.complex128] | None = None
-    dy_hat_t: NDArray[np.complex128] | None = None
-    if return_derivative_fourier:
-        deriv_fourier_snaps = np.zeros(
-            (n_snapshots, n_slots, n_modes),
-            dtype=np.complex128,
-        )
-        dy_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
-
-    # Pre-allocate buffer reused each timestep (avoids n_snapshots allocations)
-    y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
-
-    # Divergence guard: perturbation-theory validity check.
-    #
-    # Physics reasoning: the solver operates on LINEARIZED equations,
-    # derived by expanding to first order in a small perturbation
-    # parameter epsilon ~ IC amplitude.  Higher-order terms (F^4, R*F^2,
-    # torsion * F^2, ...) were dropped.  The linearized evolution is only
-    # physical while all fields remain O(epsilon) — once any field grows
-    # to O(100 * epsilon), the dropped terms become comparable to the
-    # retained ones and the physics is unreliable regardless of numerical
-    # stability.
-    #
-    # We therefore enforce: max(|y(t)|) / max(|y(0)|) <= divergence_threshold.
-    # This is a ratio check (not absolute) so it scales with IC amplitude.
-    # The threshold 100 puts us at the boundary of the perturbative regime
-    # (well before overflow).
-    #
-    # Discrimination properties:
-    #   - Normal evolution: ratio ~ O(1), passes.
-    #   - Legitimate amplification A up to ~10^5: target field grows to
-    #     sqrt(A * P_GR) * epsilon ~ a few * epsilon, ratio < 100, passes.
-    #   - Tachyonic instability: source field itself grows exponentially,
-    #     ratio rapidly exceeds 100, rejected.
-    #   - Partial blow-up (target blows up, source stays bounded): target
-    #     reaches ~100 * epsilon meaning perturbation theory has broken,
-    #     ratio exceeds 100, rejected.
-    #
-    # The threshold is chosen for physics (perturbation-theory validity),
-    # not numerics — it errs on the side of being strict about "is this
-    # still a linearized simulation" rather than "will this overflow".
-    initial_max_amp: float = 0.0
-    divergence_threshold: float = 100.0
-
-    # Pre-check: predict amplitude at t_end using the already-computed
-    # eigendecomposition and reject fast-diverging sims before entering
-    # the time loop.  This uses the SAME evolution math as the loop
-    # (not a heuristic on Re(λ)), so it's mathematically exact and
-    # immune to pseudospectral false positives that plagued the
-    # removed eigenvalue pre-check.  For pathologically unstable runs
-    # this is ~1000x faster than running to the guard trigger time.
-    #
-    # Check t_end only: for exponential growth (Re(λ) > 0), max is at
-    # t_end.  For non-normal matrices the intermediate max could be
-    # larger, but the runtime loop guard below catches that case.
-    t_end_rel = float(t_eval[-1] - t0)
-    if t_end_rel > 0:
-        initial_physical = _ifft_slots(y0_hat, layout, grid)
-        initial_max_amp = max(float(np.max(np.abs(initial_physical))), 1e-15)
-        y_hat_predict = np.zeros((n_slots, n_modes), dtype=np.complex128)
-        for block_slots, V_y0, _V_y0_deriv, eig_vals in block_evolved:
-            exp_lambda_end = np.exp(eig_vals * t_end_rel)
-            y_hat_predict[block_slots, :] = np.einsum(
-                "mij,mj->mi",
-                V_y0,
-                exp_lambda_end,
-            ).T
-        predicted_physical = _ifft_slots(y_hat_predict, layout, grid)
-        predicted_max = float(np.max(np.abs(predicted_physical)))
-        if (
-            not np.isfinite(predicted_max)
-            or predicted_max / initial_max_amp > divergence_threshold
-        ):
-            msg = (
-                f"Simulation predicted to diverge: amplitude at t={t_eval[-1]:.4g} "
-                f"would reach ratio {predicted_max / initial_max_amp:.2e} "
-                f"(threshold {divergence_threshold:.0e}). Fields would leave "
-                f"the perturbative regime (linearized approximation invalid). "
-                f"Rejecting pre-evolution based on eigendecomposition."
-            )
-            raise SimulationDivergedError(msg)
-
-    # NOTE: The eigenvalue pre-check guard (commit 2b94172) was removed.
-    # It detected modes with Re(λ) > 0 and physical IC projection, but for
-    # PGT models with constrained torsion fields, the constraint-eliminated
-    # first-order system generically has eigenmodes with large positive real
-    # parts that represent wave propagation characteristics (not physical
-    # instabilities).  The _suppress_tachyonic_noise function handles modes
-    # with zero physical coupling, and the per-snapshot divergence guard
-    # (below, in the time loop) catches genuinely diverging simulations.
-    # The pre-check was overly aggressive: it blocked the GR baseline of
-    # the nonminimal PGT model, which produces correct oscillatory P(t).
-
-    for ti, t in enumerate(t_eval):
-        dt = t - t0
-        y_hat_t[:] = 0.0
-        if dy_hat_t is not None:
-            dy_hat_t[:] = 0.0
-
-        for block_slots, V_y0, V_y0_deriv, eig_vals in block_evolved:
-            # exp_lambda shape: (n_modes, block_size)
-            exp_lambda = np.exp(eig_vals * dt)
-            # y_evolved[m, i] = Σ_j V_y0[m, i, j] * exp(λ_j * dt)
-            y_evolved = np.einsum("mij,mj->mi", V_y0, exp_lambda)
-            y_hat_t[block_slots, :] = y_evolved.T
-
-            # Exact time derivative: dy[m,i] = Σ_j V_y0_deriv[m,i,j] * exp(λ_j*dt)
-            if V_y0_deriv is not None and dy_hat_t is not None:
-                dy_evolved = np.einsum("mij,mj->mi", V_y0_deriv, exp_lambda)
-                dy_hat_t[block_slots, :] = dy_evolved.T
-
-        if fourier_snaps is not None:
-            fourier_snaps[ti] = y_hat_t
-        if deriv_fourier_snaps is not None and dy_hat_t is not None:
-            deriv_fourier_snaps[ti] = dy_hat_t
-
-        y_physical = _ifft_slots(y_hat_t, layout, grid)
-        snapshots[ti] = y_physical
-        times[ti] = t
-
-        # Divergence guard: enforce perturbation-theory validity via
-        # global amplitude ratio.  See declaration comment for physics.
-        max_amp = float(np.max(np.abs(y_physical)))
-        if ti == 0:
-            initial_max_amp = max(max_amp, 1e-15)
-        elif (
-            not np.isfinite(max_amp) or max_amp / initial_max_amp > divergence_threshold
-        ):
-            msg = (
-                f"Simulation diverged at t={t:.4g}: amplitude ratio "
-                f"{max_amp / initial_max_amp:.2e} exceeds threshold "
-                f"{divergence_threshold:.0e}. Fields have left the "
-                f"perturbative regime (linearized approximation invalid)."
-            )
-            # Fill remaining snapshots so partial results are usable
-            for tj in range(ti + 1, n_snapshots):
-                snapshots[tj] = y_physical
-                times[tj] = t_eval[tj]
-            raise SimulationDivergedError(msg)
-
-        if snapshot_callback is not None:
-            snapshot_callback(t, y_physical)
-
-        if progress is not None:
-            progress.update(t)
-
-    return times, snapshots, fourier_snaps, deriv_fourier_snaps
+    return _evolve_per_mode_pade(
+        A_modes,
+        y0_hat,
+        t_eval,
+        layout,
+        grid,
+        snapshot_callback,
+        progress,
+        return_fourier=return_fourier,
+        return_derivative_fourier=return_derivative_fourier,
+        B_modes=B_modes,
+        collect_pass0_state=collect_eigendata,
+    )
 
 
 def _evolve_full_matrix(
@@ -2105,24 +2390,26 @@ def _evolve_full_matrix(
     A_full has shape (n_total, n_total) where n_total = n_slots x n_modes.
     y0_hat has shape (n_slots, n_modes).
 
-    Uses ``scipy.sparse.linalg.expm_multiply`` to compute exp(A·t)·y₀ at each
-    output time without eigendecomposition.  This is backward-stable for
-    non-normal matrices (position-dependent gradient coupling creates non-normal
-    convolution matrices whose eigenvalues have large real parts, but the true
-    dynamics are bounded).  The algorithm uses scaling + truncated Taylor series
-    in matrix-vector products, avoiding individual exp(λ·t) overflow.
+    Uses ``scipy.sparse.linalg.expm_multiply`` (Al-Mohy & Higham 2011) to compute
+    exp(A·t)·y₀ at each output time without eigendecomposition.
 
-    **Why not eigendecomposition?**  The original full-matrix eigendecomposition
-    gave incorrect physics for localized Gertsenshtein (P=0.477 vs correct
-    P=0.3437) because non-normal convolution matrices have eigenvalues with
-    significant positive real parts despite conservative physics — individual
-    exp(λ·t) overflow while exp(A·t)·y₀ is bounded (pseudospectral phenomenon;
-    Trefethen & Embree 2005, Ch. 14).
+    **Why not eigendecomposition?**  Non-normal convolution matrices have
+    eigenvalues with positive real parts that cause exp(λ·t) overflow while
+    exp(A·t)·y₀ remains bounded.  Eigendecomposition was permanently retired
+    in v0.31 (GH #320).
 
-    **Sparse optimization:** For localized coefficients (e.g. Gaussian B₀), the
-    convolution kernel ĉ(q) decays exponentially, making the matrix effectively
-    banded.  Entries below a relative threshold (1e-14 x max|A|) are zeroed, and
-    if density < 30% the matrix is converted to sparse CSC format.  This
+    **Why not dense Padé (scipy.linalg.expm)?**  For strongly non-normal matrices
+    (GH #367: max real eigenvalue > 0 from pseudospectral Fourier truncation of
+    a localised background field), exp(A·t) has norm ~10⁹ while the physically
+    correct exp(A·t)·y₀ is ~0.005 — 12 orders of magnitude of catastrophic
+    cancellation, impossible at float64 precision.  Dense Padé computes exp(A·t)
+    correctly but the subsequent product with y₀ loses all significant digits.
+    **Workaround for this case: ``--scheme cvode``** (integrates in physical space,
+    avoids the Fourier coupling matrix entirely).
+
+    **Sparse optimization:** For Gaussian B₀(x), the convolution kernel decays
+    exponentially → effectively banded matrix.  Entries below 1e-14 × max|A|
+    are zeroed; if density < 30% the matrix converts to sparse CSC format.  This
     accelerates expm_multiply's internal matrix-vector products.
 
     Ref: Al-Mohy & Higham (2011), "Computing the Action of the Matrix
@@ -2133,10 +2420,32 @@ def _evolve_full_matrix(
         expm_multiply,  # pyright: ignore[reportUnknownVariableType]
     )
 
+    from tidal.solver._exceptions import SimulationDivergedError  # noqa: PLC0415
+
     n_slots = layout.num_slots
     n_pts = layout.num_points
     n_modes = y0_hat.shape[1]
     n_snapshots = len(t_eval)
+
+    # GH #367 NOTE: position-dependent + periodic theories with real spatial
+    # variation in the coefficient (e.g. the Gertsenshtein dual-Gaussian B-field)
+    # produce a convolution matrix A[m,m'] = ĉ(m−m')·i·k_{m'} (see
+    # _add_convolution_coupling, modal.py:1587+) whose spurious eigenvalue tracks
+    # the Nyquist wavenumber k_max = π/dx exactly (verified empirically
+    # 2026-05-18 across N ∈ {32..512}). All matrix-exponential methods give
+    # numerically-meaningless results above ~k_max·t_end > 2 (4% error grows to
+    # 10⁹× by k_max·t_end ≈ 40). The CLI (tidal/cli/_simulate.py) auto-routes
+    # pos-dep + periodic to CVODE under --scheme auto so users see correct
+    # physics by default. The post-evolution amplitude-growth check below (10⁶
+    # threshold) catches catastrophic cases when --scheme modal is forced.
+    #
+    # We do NOT pre-flight gate on k_max·t_end here because that heuristic would
+    # falsely reject tests like test_position_dependent_correctness that mark
+    # coefficients as symbolically position-dependent but analytically constant
+    # ("D*(1 + 0*x[])" at k_max·t_end ≈ 40 is correct because the convolution
+    # matrix is diagonal). Detecting the artifact properly requires computing
+    # eigenvalues of A_full (O(n³)) — more expensive than just running the solve
+    # and checking the post-evolution amplitude.
 
     # Flatten y0_hat to (n_total,) — slot-major order
     y0_flat = y0_hat.ravel()
@@ -2215,6 +2524,26 @@ def _evolve_full_matrix(
             if progress is not None:
                 progress.update(t)
 
+    # --- Post-evolution divergence check (GH #367) ----------------------------
+    # expm_multiply fails for strongly non-normal convolution matrices (localised
+    # background field + small N): exp(A·t) has large norm but exp(A·t)·y₀ is
+    # small — catastrophic cancellation at float64 precision makes the result
+    # meaningless.  Detect by comparing peak amplitudes.
+    y0_max = float(np.max(np.abs(y0_flat))) or 1.0
+    y_final_max = float(np.max(np.abs(snapshots[-1])))
+    if y_final_max > y0_max * 1e6 and t_end > t0:
+        msg = (
+            f"Simulation diverged in _evolve_full_matrix: final amplitude "
+            f"{y_final_max:.2e} is >{y_final_max / y0_max:.1e}× the initial "
+            f"amplitude {y0_max:.2e}. "
+            f"This is a known failure mode of expm_multiply for strongly "
+            f"non-normal convolution matrices at small grid sizes (GH #367). "
+            f"Workaround: rerun with --scheme cvode (or --scheme ida if "
+            f"the theory has algebraic constraints — CVODE silently freezes "
+            f"those at IC; see _setup.py:warn_frozen_constraints)."
+        )
+        raise SimulationDivergedError(msg)
+
     return times, snapshots
 
 
@@ -2237,6 +2566,7 @@ def solve_modal(
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
     progress: SimulationProgress | None = None,
     return_eigendata: bool = False,
+    _zero_nyquist: bool = True,
 ) -> SolverResult:
     """Solve a TIDAL equation system using Fourier modal decomposition.
 
@@ -2354,15 +2684,17 @@ def solve_modal(
     # This is standard practice in spectral methods — the Nyquist mode
     # aliases with its conjugate and cannot represent physical content.
     # Ref: Boyd (2001), Chebyshev & Fourier Spectral Methods, §11.5.
-    for _dim_idx, n in enumerate(grid.shape):
-        if n % 2 == 0:  # Nyquist mode exists only for even N
-            nyq_mode = n // 2  # last rfft bin
-            if len(grid.shape) == 1:
-                y0_hat[:, nyq_mode] = 0.0
-            else:
-                # Multi-D: zero along the last-axis Nyquist slice
-                rfft_last = grid.shape[-1] // 2
-                y0_hat[:, ..., rfft_last] = 0.0
+    # _zero_nyquist=False reproduces the pre-fix behaviour for benchmarking.
+    if _zero_nyquist:
+        for _dim_idx, n in enumerate(grid.shape):
+            if n % 2 == 0:  # Nyquist mode exists only for even N
+                nyq_mode = n // 2  # last rfft bin
+                if len(grid.shape) == 1:
+                    y0_hat[:, nyq_mode] = 0.0
+                else:
+                    # Multi-D: zero along the last-axis Nyquist slice
+                    rfft_last = grid.shape[-1] // 2
+                    y0_hat[:, ..., rfft_last] = 0.0
 
     has_pos_dep = _has_position_dependent_terms(spec)
     has_time_ops = _has_time_derivative_operators(spec)
@@ -2721,10 +3053,30 @@ def _build_source_matrix_k(
     # arrays for orders that actually appear.
     M_src_by_order: dict[int, NDArray[np.complex128]] = {}
 
+    # #301 / #302: Pass 1 source mirrors the Pass 0 fast-path contract —
+    # each velocity-row contribution is scaled by M₀⁻¹ for the
+    # corresponding equation's field. Without this, Pass 1 produces a
+    # source that omits the M₀⁻¹(K₁ − M₁·M₀⁻¹·K₀) factor from the
+    # perturbative identity; the error scales linearly with ε and breaks
+    # Phase-3 canonicalised theories (e.g., Euler-Heisenberg with σ in
+    # small_parameters — the synthesized corrections come out wrong).
+    # Returns None when every M ≈ 1 so the existing fast path continues
+    # with zero overhead for theories unaffected by #301.
+    from tidal.solver._kinetic import (  # noqa: PLC0415
+        build_inverse_kinetic_diag,
+        velocity_row_scale,
+    )
+
+    m_inv_src = build_inverse_kinetic_diag(
+        correction_spec,
+        coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    )
+
     def _get_m_src(n: int) -> NDArray[np.complex128]:
         if n not in M_src_by_order:
             M_src_by_order[n] = np.zeros(
-                (n_modes, n_slots, n_slots), dtype=np.complex128,
+                (n_modes, n_slots, n_slots),
+                dtype=np.complex128,
             )
         return M_src_by_order[n]
 
@@ -2793,9 +3145,19 @@ def _build_source_matrix_k(
                 )
             continue
 
+        # #301 / #302: scale every contribution by 1/M₀ for this equation.
+        # Mirrors the modal fast path's folding of M⁻¹ into the evolution
+        # matrix (see _build_per_mode_matrices). Shared `velocity_row_scale`
+        # helper enforces the cross-builder contract (see modal.py module
+        # docstring; regression guard:
+        # tests.test_solver_kinetic_consistency::TestAllModalPathsRespectKinetic).
+        eq_scale = velocity_row_scale(field_name, m_inv_src)
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = _resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                term,
+                coeff_eval,
+                eq_idx=eq_idx,
+                term_idx=term_idx,
             )
             mult = multiplier_cache[term.operator]
             # #293: route the contribution to the matrix keyed
@@ -2809,14 +3171,16 @@ def _build_source_matrix_k(
             if target_slot is not None:
                 # Dynamical target: direct write into the slot column.
                 M_n = _get_m_src(op_time_order)
-                M_n[:, row_slot, target_slot] += coeff * mult
+                M_n[:, row_slot, target_slot] += eq_scale * coeff * mult
             elif term.field in constraint_idx and recovery_matrix is not None:
                 # Constraint field: expand via Schur row.
                 # recovery_matrix[m, c_idx, j] → contributes to column j.
                 c_idx = constraint_idx[term.field]
                 # (coeff * mult[m]) * recovery_matrix[m, c_idx, j]
                 # → M_src_n[m, row_slot, j] += ...
-                term_contrib = coeff * mult[:, None] * recovery_matrix[:, c_idx, :]
+                term_contrib = (
+                    eq_scale * coeff * mult[:, None] * recovery_matrix[:, c_idx, :]
+                )
                 M_n = _get_m_src(op_time_order)
                 M_n[:, row_slot, :] += term_contrib
             else:
@@ -2852,33 +3216,45 @@ def _evolve_duhamel_per_mode(
     NDArray[np.float64],
     NDArray[np.complex128],
 ]:
-    """Evaluate Pass 1 Duhamel solution block-by-block, reusing eigendata.
+    r"""Evaluate Pass 1 inhomogeneous solution via augmented matrix exponential.
 
-    Returns ``(t, y_phys, y_hat_snap)`` where:
+    Solves ``dy⁽¹⁾/dt = A·y⁽¹⁾ + S·y⁰(t),  y⁽¹⁾(0) = 0``  where ``y⁰(t) =
+    exp(t·A)·y⁰(0)`` is the Pass 0 solution and ``S = Σ_n M_src_n · Aⁿ``
+    folds the d^n_t time-derivative orders into a single effective source
+    matrix (since ``∂ⁿ_t y⁰(t) = Aⁿ · y⁰(t)`` for time-independent ``A``).
 
-    * ``y_phys`` has shape ``(n_snapshots, n_slots * n_points)`` — the
-      flattened physical-space dynamical output in the reduced layout.
-    * ``y_hat_snap`` has shape ``(n_snapshots, n_slots, n_modes)`` — the
-      Fourier-space dynamical output. The Pass 1 constraint recovery
-      consumes this directly via ``recovery_matrix @ y_hat_snap``.
+    The closed-form solution uses the **augmented matrix exponential trick**
+    (Al-Mohy & Higham 2011 §5.2 "Inhomogeneous problems"):
 
-    ``M_src_k_by_order`` is the dict returned by
-    :func:`_build_source_matrix_k`. Each key is the time-derivative
-    order ``n`` of the correction-term operator; the per-mode source
-    contribution for that order is ``λⁿ``-scaled on the source column
-    (since ``d^n_t`` of an eigenmode ``exp(λ·τ)`` is ``λⁿ · exp(λ·τ)``).
-    See GitHub #293 for the pre-fix symptom (latent wrong Pass 1 output
-    for corrections using ``d^n_t`` on a dynamical target).
+    .. math::
 
-    Algorithm, per block, per snapshot:
+        \\exp\\!\\left(t \\begin{pmatrix} A & S \\\\ 0 & A \\end{pmatrix}\\right)
+        \\begin{pmatrix} 0 \\\\ y^0(0) \\end{pmatrix}
+        = \\begin{pmatrix} y^{(1)}(t) \\\\ y^0(t) \\end{pmatrix}
 
-    1. Project each per-order source matrix into the eigenbasis:
-       β_n = V⁻¹ · M_src_n · V.
-    2. Recover α = V⁻¹ · y⁰(0) from eigendata (already computed).
-    3. Evaluate ``z_i(t) = Σ_n Σ_j β_n,ij · (λ_j^n · α_j) ·
-       G(λ_i, λ_j; t)`` where G is the closed-form Duhamel kernel.
-    4. Transform back: y_block(t) = V · z(t).
+    Per mode-block this is one ``scipy.linalg.expm`` call on a ``(2bs × 2bs)``
+    matrix --- robust for arbitrary ``cond(A)``, no eigendecomposition, no
+    per-eigenvalue Duhamel kernel, no V/V⁻¹ projection. Replaces the legacy
+    closed-form Duhamel-kernel implementation that depended on Pass 0
+    eigendata; the augmented form has backward error bounded by the function
+    condition number, not the eigenvector condition number, matching the
+    Pass 0 path-D guarantee (``docs/tex/modal_solver.tex`` §"Robust
+    Matrix-Exponential Evolution").
+
+    Returns ``(t, y_phys, y_hat_snap)``. ``y_phys`` is the dynamical Pass 1
+    output in physical space; ``y_hat_snap`` is the Fourier-space Pass 1
+    output the constraint-recovery step consumes via
+    ``recovery_matrix @ y_hat_snap``.
+
+    References
+    ----------
+    Al-Mohy, A.H. & Higham, N.J. (2011). "Computing the action of the matrix
+    exponential." *SIAM J. Sci. Comput.* 33(2):488-511, §5.2.
+    Higham, N.J. (2009). "The scaling and squaring method for the matrix
+    exponential revisited." *SIAM Review* 51(4):747-764.
     """
+    import scipy.linalg as sla  # type: ignore[import-untyped]  # noqa: PLC0415
+
     n_slots = layout.num_slots
     n_pts = layout.num_points
     # Empty dict = no sources; still need n_modes for allocation.
@@ -2889,20 +3265,16 @@ def _evolve_duhamel_per_mode(
         rfft_last = grid.shape[-1] // 2 + 1
         n_modes = int(np.prod([*grid.shape[:-1], rfft_last]))
 
-    # rfft output shape
     rfft_shape_list = list(grid.shape)
     rfft_shape_list[-1] = grid.shape[-1] // 2 + 1
     rfft_shape = tuple(rfft_shape_list)
 
     n_snapshots = len(t_eval)
-    t0 = t_eval[0]
+    t0 = float(t_eval[0])
 
-    # Working array: full Fourier state per snapshot
     y_hat_snap = np.zeros((n_snapshots, n_slots, n_modes), dtype=np.complex128)
 
-    # Aggregate norm used for the cross-block threshold check. Must
-    # span all orders so a small d2_t source doesn't escape detection
-    # behind a larger identity source (or vice versa).
+    # Cross-block scale (same threshold logic as the legacy implementation).
     m_scale_total = 0.0
     for _M_n in M_src_k_by_order.values():
         if _M_n.size:
@@ -2910,75 +3282,118 @@ def _evolve_duhamel_per_mode(
     if m_scale_total == 0.0:
         m_scale_total = 1.0
 
+    # Detect uniform spacing for snapshot precompute.
+    if n_snapshots > 1:
+        dts = np.diff(t_eval)
+        uniform = bool(np.allclose(dts, dts[0]))
+        dt_step = float(dts[0]) if uniform else None
+    else:
+        uniform = True
+        dt_step = None
+
+    max_order = max(M_src_k_by_order.keys()) if M_src_k_by_order else 0
+
     for block in eigendata["blocks"]:
         slot_indices = list(block["slot_indices"])
-        v_mat = block["V"]  # (n_modes, bs, bs)
-        v_inv = block["V_inv"]  # (n_modes, bs, bs)
-        lam = block["D_diag"]  # (n_modes, bs)
-        alpha = block["alpha"]  # (n_modes, bs)
+        M_block = block["M_block"]  # (n_modes, bs, bs) — Pass 0 evolution generator
+        y0_block = block["y0_block"]  # (bs, n_modes) — Pass 0 IC in Fourier space
         idx = np.array(slot_indices)
+        bs = len(slot_indices)
+        n_block_modes = M_block.shape[0]
 
-        # Check for cross-block coupling: any non-zero in ANY M_src_n's
-        # rows of this block but columns outside it. If so, the
-        # decoupled block-eigenbasis ansatz is wrong. Raise early.
-        # Threshold is scale-relative (see #275) to tolerate O(1e-12)
-        # Schur-recovery tail noise on ill-conditioned multi-constraint
-        # specs.
+        # Cross-block coupling check: any non-zero in M_src_n's rows of this
+        # block but columns outside it would mean Pass 1 mixes Pass 0 sectors
+        # that were independent. Pass 0's block decomposition cannot represent
+        # that — raise early. Threshold is scale-relative (see #275).
         mask = np.ones(n_slots, dtype=bool)
         mask[idx] = False
         cross_max = 0.0
         for M_n in M_src_k_by_order.values():
             if M_n.size == 0:
                 continue
-            full_rows_n = M_n[:, idx, :]  # (n_modes, bs, n_slots)
+            full_rows_n = M_n[:, idx, :]
             cross_n = full_rows_n[:, :, mask]
             if cross_n.size > 0:
                 cross_max = max(cross_max, float(np.max(np.abs(cross_n))))
         atol = max(1e-14, m_scale_total * 1e-10)
         if cross_max > atol:
             msg = (
-                f"Pass 1 source matrix couples blocks that Pass 0 "
-                f"eigendecomposed independently "
-                f"(max|cross|={cross_max:.3e} > {atol:.3e}). Cross-block "
-                f"Duhamel is not yet implemented — the correction theory "
-                f"likely mixes previously-independent sectors, which "
-                f"Pass 0 cannot represent. Report this spec to the TIDAL "
-                f"team."
+                f"Pass 1 source matrix couples blocks that Pass 0 evolved "
+                f"independently (max|cross|={cross_max:.3e} > {atol:.3e}). "
+                f"Cross-block coupling is not supported — the correction "
+                f"theory likely mixes previously-independent sectors, which "
+                f"Pass 0 cannot represent. Report this spec to the TIDAL team."
             )
             raise NotImplementedError(msg)
 
-        # β_n = V⁻¹ · M_sub_n · V, one per time-derivative order.
-        beta_by_order: dict[int, NDArray[np.complex128]] = {}
+        # Build the effective source S = Σ_n M_src_n · Aⁿ per mode, where
+        # A = M_block. For the augmented form, S absorbs the time-derivative
+        # orders so we never need to evaluate `dⁿ_t y⁰(t)` separately.
+        # Cache M_block^n powers up to max_order.
+        if max_order > 0:
+            M_block_powers: list[NDArray[np.complex128]] = [
+                np.broadcast_to(
+                    np.eye(bs, dtype=np.complex128),
+                    (n_block_modes, bs, bs),
+                ).copy(),
+            ]
+            for _ in range(max_order):
+                # Batched matmul instead of einsum (#327).
+                M_block_powers.append(M_block_powers[-1] @ M_block)
+        else:
+            M_block_powers = [
+                np.broadcast_to(
+                    np.eye(bs, dtype=np.complex128),
+                    (n_block_modes, bs, bs),
+                ).copy(),
+            ]
+
+        S = np.zeros((n_block_modes, bs, bs), dtype=np.complex128)
         for n, M_n in M_src_k_by_order.items():
-            M_sub_n = M_n[:, idx[:, None], idx[None, :]]
-            beta_by_order[n] = np.einsum("mij,mjk,mkl->mil", v_inv, M_sub_n, v_mat)
+            M_sub_n = M_n[:, idx[:, None], idx[None, :]]  # (n_modes, bs, bs)
+            if n == 0:
+                S += M_sub_n  # pyright: ignore[reportConstantRedefinition]
+            else:
+                # Batched matmul instead of einsum (#327).
+                S += M_sub_n @ M_block_powers[n]  # pyright: ignore[reportConstantRedefinition]
 
-        for ti in range(n_snapshots):
-            dt = float(t_eval[ti] - t0)
-            if dt == 0.0:
-                continue  # y⁽¹⁾(0) = 0 by initial condition
+        # Build augmented per-mode generator Aug = [[A, S], [0, A]] of size 2bs×2bs.
+        Aug = np.zeros((n_block_modes, 2 * bs, 2 * bs), dtype=np.complex128)
+        Aug[:, :bs, :bs] = M_block
+        Aug[:, :bs, bs:] = S
+        Aug[:, bs:, bs:] = M_block
 
-            # G[m, i, j] = _duhamel_kernel(λ_i, λ_j; dt) per mode
-            lam_i = lam[:, :, None]  # (n_modes, bs, 1)
-            lam_j = lam[:, None, :]  # (n_modes, 1, bs)
-            G = _duhamel_kernel(lam_i, lam_j, dt)  # (n_modes, bs, bs)
+        # Augmented IC: [0; y⁰(0)] per mode → shape (n_modes, 2bs).
+        ic_aug = np.zeros((n_block_modes, 2 * bs), dtype=np.complex128)
+        ic_aug[:, bs:] = y0_block.T
 
-            # z_i = Σ_n Σ_j β_n,ij · (λ_j^n · α_j) · G_ij
-            # The λ_j^n factor is the exact d^n_t of the eigenmode
-            # exp(λ_j·τ) source, which the pre-fix code was missing
-            # (see #293).
-            z_eigen = np.zeros((n_modes, lam.shape[1]), dtype=np.complex128)
-            for n, beta_n in beta_by_order.items():
-                # λⁿ scaling on the source column (per-mode eigenvalue).
-                lam_pow = lam if n == 1 else (lam**n if n > 0 else np.ones_like(lam))
-                alpha_scaled = lam_pow * alpha  # (n_modes, bs)
-                z_eigen += np.einsum("mij,mj,mij->mi", beta_n, alpha_scaled, G)
-
-            # y_block_hat = V · z  (n_modes, bs)
-            y_block_hat = np.einsum("mij,mj->mi", v_mat, z_eigen)
-            # Scatter into full state
-            for local_i, slot_idx in enumerate(slot_indices):
-                y_hat_snap[ti, slot_idx] += y_block_hat[:, local_i]
+        if uniform and dt_step is not None and dt_step > 0:
+            # Precompute exp(Aug · dt) once per mode, apply iteratively.
+            exp_Aug_dt = np.empty_like(Aug)
+            for m in range(n_block_modes):
+                exp_Aug_dt[m] = sla.expm(Aug[m] * dt_step)  # pyright: ignore[reportUnknownArgumentType]
+            y_aug = ic_aug.copy()
+            for ti in range(n_snapshots):
+                if ti > 0:
+                    y_aug = np.einsum("mij,mj->mi", exp_Aug_dt, y_aug)
+                # Top half (y_aug[:, :bs]) is Pass 1; bottom half is Pass 0
+                # (validated by the augmented identity but unused here).
+                pass1_out = y_aug[:, :bs]  # (n_modes, bs)
+                for local_i, slot_idx in enumerate(slot_indices):
+                    y_hat_snap[ti, slot_idx] += pass1_out[:, local_i]
+        else:
+            # Non-uniform spacing: compute exp(Aug · dt) per snapshot per mode.
+            # Skip ti=0 (Pass 1 IC = 0 by construction).
+            for ti in range(n_snapshots):
+                dt = float(t_eval[ti] - t0)
+                if dt == 0.0:
+                    continue
+                y_aug_t = np.empty_like(ic_aug)
+                for m in range(n_block_modes):
+                    y_aug_t[m] = sla.expm(Aug[m] * dt) @ ic_aug[m]  # pyright: ignore[reportUnknownArgumentType]
+                pass1_out = y_aug_t[:, :bs]
+                for local_i, slot_idx in enumerate(slot_indices):
+                    y_hat_snap[ti, slot_idx] += pass1_out[:, local_i]
 
     # Inverse FFT each slot at each snapshot back to physical space
     y_phys = np.zeros((n_snapshots, n_slots * n_pts))
@@ -3081,7 +3496,11 @@ def solve_modal_pass1(
             )
 
     times, y_phys, y_hat_dyn = _evolve_duhamel_per_mode(
-        eigendata, M_src_k_by_order, t_eval, layout, grid,
+        eigendata,
+        M_src_k_by_order,
+        t_eval,
+        layout,
+        grid,
     )
 
     result: PerturbativePass1Result = {

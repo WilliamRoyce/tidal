@@ -23,6 +23,14 @@ echo "started=$(date -Iseconds)"
 cd {{REMOTE_ROOT}}
 source .venv/bin/activate
 
+# Per-job results directory (matches the convention in the other templates).
+export RESULTS_DIR="{{REMOTE_ROOT}}/hpc_results/${SLURM_JOB_ID}"
+mkdir -p "${RESULTS_DIR}"
+
+# Optional MPI prefix for callers that need it.
+MPIRUN_PREFIX="mpirun -n ${SLURM_NTASKS}"
+export MPIRUN_PREFIX
+
 {{COMMAND}}
 
 echo "finished=$(date -Iseconds)"

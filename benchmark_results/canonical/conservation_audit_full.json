@@ -1,0 +1,123 @@
+{
+  "metadata": {
+    "timestamp": "2026-05-13T18:42:18.770340+00:00",
+    "host": "cpu-q-488",
+    "python_version": "3.11.0",
+    "numpy_version": "2.4.4",
+    "scipy_version": "1.17.1",
+    "git_sha": "unknown",
+    "parameters": {
+      "smoke": false,
+      "examples": [
+        "gertsenshtein",
+        "coupled_scalars",
+        "gertsenshtein_proca",
+        "coupled_scattering",
+        "chern_simons_3d",
+        "conformal_kg_static",
+        "cylindrical_kg_1d",
+        "navier_cauchy_2d",
+        "gw_plane_wave_1d",
+        "torsion_gertsenshtein",
+        "torsion_gertsenshtein_nonminimal",
+        "dark_photon_plasma",
+        "torsion_dark_photon_fv"
+      ]
+    }
+  },
+  "summary": {
+    "n_examples": 13,
+    "n_ok": 7,
+    "n_failed": 6,
+    "max_drift": 0.1931555218374182,
+    "median_drift": 2.6673292187787526e-15,
+    "min_drift": 5.149342847991813e-16
+  },
+  "results": [
+    {
+      "label": "gertsenshtein",
+      "ok": true,
+      "max_abs_dE_over_E": 1.1854796527905562e-15,
+      "is_conserved": true,
+      "threshold": 0.001
+    },
+    {
+      "label": "coupled_scalars",
+      "ok": true,
+      "max_abs_dE_over_E": 1.559302000878029e-15,
+      "is_conserved": true,
+      "threshold": 0.001
+    },
+    {
+      "label": "gertsenshtein_proca",
+      "ok": true,
+      "max_abs_dE_over_E": 1.0817501831713826e-14,
+      "is_conserved": true,
+      "threshold": 0.001
+    },
+    {
+      "label": "coupled_scattering",
+      "ok": false,
+      "stage": "simulate",
+      "error": "  modal:   0%|          | t=0/30 [00:00<?]"
+    },
+    {
+      "label": "chern_simons_3d",
+      "ok": false,
+      "stage": "simulate",
+      "error": "[ERROR] Unknown component 'a_0'. Available: A_0, A_1, A_2"
+    },
+    {
+      "label": "conformal_kg_static",
+      "ok": false,
+      "stage": "simulate",
+      "error": "[ERROR] Unknown component 'phi'. Available: phi_0"
+    },
+    {
+      "label": "cylindrical_kg_1d",
+      "ok": false,
+      "stage": "simulate",
+      "error": "[ERROR] Unknown component 'phi'. Available: phi_0"
+    },
+    {
+      "label": "navier_cauchy_2d",
+      "ok": false,
+      "stage": "simulate",
+      "error": "[ERROR] Unknown component 'u_0'. Available: ux_0, uy_0"
+    },
+    {
+      "label": "gw_plane_wave_1d",
+      "ok": true,
+      "max_abs_dE_over_E": 5.149342847991813e-16,
+      "is_conserved": true,
+      "threshold": 0.001
+    },
+    {
+      "label": "torsion_gertsenshtein",
+      "ok": false,
+      "stage": "simulate",
+      "error": "  modal:   0%|          | t=0/30 [00:00<?]"
+    },
+    {
+      "label": "torsion_gertsenshtein_nonminimal",
+      "ok": true,
+      "max_abs_dE_over_E": 0.1931555218374182,
+      "is_conserved": false,
+      "threshold": 0.001
+    },
+    {
+      "label": "dark_photon_plasma",
+      "ok": true,
+      "max_abs_dE_over_E": 0.004389112751409884,
+      "is_conserved": false,
+      "threshold": 0.001
+    },
+    {
+      "label": "torsion_dark_photon_fv",
+      "ok": true,
+      "max_abs_dE_over_E": 2.6673292187787526e-15,
+      "is_conserved": true,
+      "threshold": 0.001
+    }
+  ]
+}

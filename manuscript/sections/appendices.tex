@@ -1,4 +1,21 @@
-\section{Some lengthy calculations}
-\label{sec:Appendix}
+% Appendices wrapper. Each appendix lives in its own file under
+% sections/appendices/ to keep per-appendix content isolated as it grows
+% during drafting. main.tex invokes \appendix before \input-ing this
+% wrapper, so each \section{} below receives appendix-letter numbering.
+%
+% Naming convention: appendix titles are content-bearing (matching the
+% BHL/Barker corpus — verified across 2406.12826, 2101.02645, 2506.02111,
+% 2512.25007, 2510.08201). No "Appendix N: X" prefix in titles, no stage
+% labels like "Symbolic stage" — names describe the specific
+% mathematical/methodological content of each appendix.
 
-If you have any lengthy calculations which would break the flow of the main text, you can put them here.
+\input{sections/appendices/architecture}        % App A
+\input{sections/appendices/symbolic}            % App B
+\input{sections/appendices/numerical}           % App C
+\input{sections/appendices/validation}          % App D
+\input{sections/appendices/symbolic_outputs}    % App E
+\input{sections/appendices/pgt_background}      % App F
+\input{sections/appendices/perturbative_regime} % App G
+\input{sections/appendices/constraint_barrier}  % App H
+\input{sections/appendices/pgt_enumeration}     % App I
+\input{sections/appendices/inference_architecture} % App J

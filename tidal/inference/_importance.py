@@ -163,8 +163,6 @@ def compute_parameter_importance(
     ParameterImportanceResult
         Parameter importance metrics.
     """
-    from anesthetic import NestedSamples
-
     ns = to_anesthetic_samples(result)
 
     # --- Total statistics with bootstrap ---
@@ -191,33 +189,84 @@ def compute_parameter_importance(
 
     import numpy as np
 
+    # Per-parameter marginal D_KL: histogram the posterior samples for
+    # each parameter (in its prior's natural space, so the prior is
+    # uniform), then compute the discrete KL against the uniform prior.
+    # We deliberately don't use anesthetic's NestedSamples.D_KL() on a
+    # single-column slice — that method uses only logL/weights and
+    # returns the full-joint D_KL regardless of columns, so every
+    # parameter would get the same value. See #308.
     marginal_d_kl: dict[str, float] = {}
-    logl_arr = np.asarray(
-        ns.logL.to_numpy() if hasattr(ns.logL, "to_numpy") else ns.logL,
+    weights_arr = np.asarray(
+        ns.get_weights() if hasattr(ns, "get_weights") else ns.weights,
     )
-    logl_birth_arr = None
-    if hasattr(ns, "logL_birth"):
-        logl_birth_arr = np.asarray(
-            ns.logL_birth.to_numpy()
-            if hasattr(ns.logL_birth, "to_numpy")
-            else ns.logL_birth,
-        )
+    weights_arr = weights_arr / weights_arr.sum()  # noqa: PLR6104
+
+    # Map parameter name to its prior config, if available, so we can
+    # transform log_uniform parameters into log space (where the prior
+    # is uniform and the histogram-based KL is meaningful).  Accept
+    # priors from either result.priors (direct call) or result.metadata
+    # ["priors"] (loaded from disk).
+    prior_map: dict[str, tuple[str, float, float]] = {}
+    priors_iter = getattr(result, "priors", None)
+    if priors_iter is None and hasattr(result, "metadata"):
+        priors_iter = (result.metadata or {}).get("priors")
+    if priors_iter:
+        for p in priors_iter:
+            if isinstance(p, dict):
+                pname = p.get("name")
+                pdist = p.get("distribution") or p.get("dist") or p.get("kind")
+                plo = p.get("low") if "low" in p else p.get("lo")
+                phi = p.get("high") if "high" in p else p.get("hi")
+            else:
+                pname = getattr(p, "name", None)
+                pdist = (
+                    getattr(p, "distribution", None)
+                    or getattr(p, "dist", None)
+                    or getattr(p, "kind", None)
+                )
+                plo = getattr(p, "low", None) or getattr(p, "lo", None)
+                phi = getattr(p, "high", None) or getattr(p, "hi", None)
+            if pname and pdist and plo is not None and phi is not None:
+                prior_map[str(pname)] = (str(pdist), float(plo), float(phi))
+
+    n_bins = 40
     for i, name in enumerate(result.param_names):
         try:
-            # ns.iloc[:, i] raises IndexError if out of range; let it
-            # propagate to the except below so the warning names the
-            # offending column.
             col = np.asarray(ns.iloc[:, i])
-            marginal = NestedSamples(
-                data=col.reshape(-1, 1),
-                logL=logl_arr,
-                logL_birth=logl_birth_arr,
-                columns=[name],
+            kind, lo, hi = prior_map.get(
+                name, ("uniform", float(col.min()), float(col.max()))
             )
-            marginal_d_kl[name] = float(marginal.D_KL())
+            # Transform to space where prior is uniform
+            if kind == "log_uniform":
+                x = np.log(col)
+                a, b = float(np.log(lo)), float(np.log(hi))
+            else:
+                x = col
+                a, b = lo, hi
+            hist, edges = np.histogram(
+                x,
+                bins=n_bins,
+                weights=weights_arr,
+                range=(a, b),
+            )
+            p_post = hist / hist.sum() / (edges[1] - edges[0])
+            q_prior = 1.0 / (b - a)
+            mask = p_post > 0
+            kl = float(
+                np.sum(
+                    p_post[mask]
+                    * np.log(p_post[mask] / q_prior)
+                    * (edges[1] - edges[0]),
+                )
+            )
+            marginal_d_kl[name] = kl
         except (ValueError, ZeroDivisionError, AttributeError, IndexError) as exc:
             logging.getLogger("tidal.inference").warning(
-                "marginal D_KL failed for '%s' (col %d): %s", name, i, exc,
+                "marginal D_KL failed for '%s' (col %d): %s",
+                name,
+                i,
+                exc,
             )
             marginal_d_kl[name] = float("nan")
 

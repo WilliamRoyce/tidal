@@ -1,14 +1,22 @@
-\begin{frame}{\textsc{tidal}: sweeps, inference, HPC}
-  \note{\textasciitilde 12 min mark. Close the TIDAL arc on the \emph{"it scales"} note.}
-  \textbf{Once a theory is compiled, everything downstream is declarative.}
-  \begin{itemize}
-    \item \texttt{tidal sweep} --- parameter sweeps with 13 built-in measurement types (conversion, energy, spectrum, dispersion, resonance, \ldots).
-    \item \texttt{tidal sample} --- Bayesian inference via MC or nested sampling (dynesty / PolyChord), priors, constraints, arbitrary likelihoods.
-    \item HPC integration via \texttt{scripts/hpc\_shuttle.sh} --- push $\to$ submit $\to$ pull to Cambridge's CSD3 (Sapphire / Icelake, DiRAC / SL2 / SL3).
+\begin{frame}{Causality screening built into the inference}
+  \note{\textasciitilde 12 min mark. The abstract's "causality / characteristic speeds" slide. Honest framing: what's implemented is all-mode eigenvalue stability pre-screening, not formal characteristic-speed analysis.}
+  \textbf{The challenge.} A phenomenological scan will visit Lagrangians with tachyonic / gradient-unstable modes. We need to reject those \emph{before} simulation, not after.
+
+  \vspace{0.2em}
+  \textbf{The mechanism.} For every parameter point in the scan:
+  \begin{enumerate}\small
+    \item Build the modal evolution matrix $M(k)$ at every spatial wavenumber $k$.
+    \item Compute $\max_{k}\,\mathrm{Re}\,\lambda(k)$ across the spectrum.
+    \item If $> 0$: linearisation has a growing mode --- reject the parameter point.
+  \end{enumerate}
+
+  \vspace{0.2em}
+  \textbf{Wired into the Bayesian inference prior, not as a post-hoc filter.}
+  \begin{itemize}\small
+    \item Tachyonic samples get $\log\mathcal{L} = -\infty$. PolyChord literally never samples there.
+    \item Cost: $\sim\!1$\,ms per sample; $\sim\!5$\,s for a 5000-point prior draw.
+    \item The same machinery catches tachyons and ghosts that would otherwise masquerade as amplification --- the sampler spends its entire budget on physically viable regions.
   \end{itemize}
-  \vspace{0.4em}
-  \begin{block}{}
-    \emph{The same Lagrangian that gave me a single simulation can give me a 276-point, five-parameter sweep with Bayesian uncertainty quantification --- without writing new code.}
-  \end{block}
-  \placeholder{Figure: sweep plot or CLI screenshot.}
+  \vspace{0.2em}
+  \emph{In a phenomenological scan, the cheapest sanity check has to be embedded in the prior. Otherwise the inference spends most of its time where the linearisation is invalid.}
 \end{frame}

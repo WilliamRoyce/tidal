@@ -6,8 +6,10 @@
 #SBATCH --nodes={{NODES}}
 #SBATCH --ntasks={{NTASKS}}
 #SBATCH --cpus-per-task=1
+#SBATCH --mem-per-cpu=1500
 #SBATCH --time={{TIME}}
-#SBATCH --output={{REMOTE_ROOT}}/logs/{{JOB_NAME}}_%j.log
+#SBATCH -o {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
+#SBATCH -e {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
 #SBATCH --exclude=cpu-r-10,cpu-r-15
 
 # Reusable template for PolyChord nested-sampling jobs on CSD3.
@@ -38,6 +40,19 @@ set -euo pipefail
 TIDAL_ROOT="{{REMOTE_ROOT}}"
 LOCAL_SP="/tmp/site_packages_${SLURM_JOB_ID}"
 
+# Per-job results directory.  Callers that want a stable on-HPC output
+# location for ``--output`` use ``${RESULTS_DIR}/<subdir>``; the shuttle's
+# ``pull <jobid>`` walks the recorded --output path and brings the
+# whitelisted artefacts back locally.
+export RESULTS_DIR="${TIDAL_ROOT}/hpc_results/${SLURM_JOB_ID}"
+mkdir -p "${RESULTS_DIR}"
+
+# Campaign dir: stable path shared across INTR resume runs.
+# Set by --campaign NAME in hpc_shuttle.sh submit; empty comment when not used.
+# Use ${CAMPAIGN_DIR} in --output so PolyChord finds its .resume checkpoint
+# between rounds.  All rounds must pass identical --prior/--n-live/--ntasks.
+{{CAMPAIGN_DIR_SETUP}}
+
 echo "=== Job ${SLURM_JOB_ID} on $(hostname), ntasks=${SLURM_NTASKS} ==="
 date
 
@@ -48,6 +63,12 @@ tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
 
 source "${TIDAL_ROOT}/.venv/bin/activate"
 export PYTHONPATH="${LOCAL_SP}/site-packages:${PYTHONPATH:-}"
+
+# JAX modal solver: disabled — benchmarks show JAX vmap(expm) is 3-4x SLOWER than
+# scipy per-mode expm loop for production PGT theories (N=64, 7-16 dyn slots, 33 modes).
+# Root cause: XLA's expm implementation is slower than scipy's LAPACK-based expm for
+# small matrices on CPU. Re-enable only if migrating to GPU or N ≥ 192 in 1D.
+# export TIDAL_MODAL_BACKEND=jax
 
 # MPI toolchain must be loaded inside the job too — sbatch inherits a
 # stripped environment on CSD3 and the compute node doesn't auto-load
@@ -81,11 +102,21 @@ fi
 #      --num-repeats 2*ndim         (Handley's own run_pypolychord.py)
 #      --precision-criterion 0.01   (Cobaya's expensive-likelihood rec)
 #      --no-clustering              (safe for unimodal posteriors)
+#      --max-ndead N                (REQUIRED for clean INTR exit: ensures
+#                                    inference.json is written before walltime.
+#                                    amp chains: ~25000; sup chains: ~5000.
+#                                    Measure rate from first run: nDead/min × 45.)
 #    For ntasks=1, mpirun still works as a pass-through.
 echo "--- Running tidal command (mpirun -n ${SLURM_NTASKS}) ---"
 cd "${TIDAL_ROOT}"
 MPIRUN_PREFIX="mpirun -n ${SLURM_NTASKS}"
-{{COMMAND}}
+# Auto-prefix the caller's command with mpirun so 76 SLURM tasks become
+# 76 MPI ranks coordinated by pypolychord.  Previously the template
+# defined ``MPIRUN_PREFIX`` but left it to the caller to use it; if the
+# caller forgot, SLURM spawned ``ntasks`` independent processes and
+# pypolychord's ``MPI_Init_thread`` failed (``PMI2_Job_GetId returned 14``).
+# This template is PolyChord-specific so the prefix is unconditional.
+${MPIRUN_PREFIX} {{COMMAND}}
 
 echo "=== DONE ==="
 date

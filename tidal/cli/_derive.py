@@ -368,6 +368,7 @@ def _wls_packages(
             'Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];',
             'Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];',
             'Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];',
+            'Get[FileNameJoin[{pipelinePath, "PerturbativeReduction.wl"}]];',
             'Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];',
         ),
     )
@@ -646,7 +647,7 @@ def _compute_contra_components(
     return contra
 
 
-def _wls_vector_background_substitution(  # noqa: PLR0914
+def _wls_vector_background_substitution(
     ctx: _WlsContext,
     comp_var: str,
 ) -> list[str]:
@@ -953,7 +954,10 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
                 (
                     f"(* Early DefTensor for perturbation field {mp_name} used in Lagrangian *)",
                     _generate_field_def(
-                        mp_field, ctx.prefix, ctx.manifold, head_override=mp_head,
+                        mp_field,
+                        ctx.prefix,
+                        ctx.manifold,
+                        head_override=mp_head,
                     ),
                     "",
                 ),
@@ -1082,7 +1086,7 @@ def _pert_field_dict(pert_name: str, source_field: dict[str, Any]) -> dict[str, 
 # --- WLS: Linearization (xPert) ---
 
 
-def _wls_matter_perturbation_setup(  # noqa: PLR0914
+def _wls_matter_perturbation_setup(
     ctx: _WlsContext,
     matter_perts: list[dict[str, Any]],
     eps_sym: str,
@@ -1150,7 +1154,10 @@ def _wls_matter_perturbation_setup(  # noqa: PLR0914
 
 
 def _wls_component_metadata(
-    field_name: str, fexpr: str, comp_var: str, dim: int,
+    field_name: str,
+    fexpr: str,
+    comp_var: str,
+    dim: int,
 ) -> list[str]:
     """Generate Wolfram code to build tensor component metadata for a field.
 
@@ -1196,7 +1203,7 @@ def _wls_component_metadata(
     ]
 
 
-def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
+def _wls_shorthand_cd_tensors(  # noqa: PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1421,7 +1428,7 @@ def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
     return lines
 
 
-def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1593,7 +1600,8 @@ def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0914, PLR091
                 "",
                 "On[Validate::repeated]; On[Validate::inhom];",
                 _wls_timing_end(
-                    "tCDPrecomp", "CD shorthand ComponentValue pre-computation",
+                    "tCDPrecomp",
+                    "CD shorthand ComponentValue pre-computation",
                 ),
                 "",
             ],
@@ -1773,7 +1781,8 @@ def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0914, PLR091
             "",
             "On[Validate::repeated]; On[Validate::inhom];",
             _wls_timing_end(
-                "tCDPrecomp", "CD shorthand ComponentValue pre-computation",
+                "tCDPrecomp",
+                "CD shorthand ComponentValue pre-computation",
             ),
             "",
         ],
@@ -2180,7 +2189,7 @@ def _wls_torsion_curvature_decomposition(ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0915
     ctx: _WlsContext,
     *,
     include_bg: bool = False,
@@ -2841,7 +2850,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         lines.extend(_wls_gauge_fixing_type_b(ctx))
 
     lines.append(
-        _wls_timing_end("tLinearize", "Linearization (xPert L^(2) + EOM decomposition)"),
+        _wls_timing_end(
+            "tLinearize", "Linearization (xPert L^(2) + EOM decomposition)"
+        ),
     )
     return lines
 
@@ -2885,7 +2896,8 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
         xi = entry.get("xi", 1)
         # Use perturbation head if this field is a perturbation with name collision
         pfx_field = pert_head_map.get(
-            field_name, f"{ctx.prefix}{field_name.capitalize()}",
+            field_name,
+            f"{ctx.prefix}{field_name.capitalize()}",
         )
 
         if entry["type"] == "custom":
@@ -3191,7 +3203,11 @@ def _type_b_tt_gauge(
     # Uses diagonal metric entries for curved backgrounds; flat weights for Minkowski.
     lines.extend(
         _tt_traceless_substitution(
-            dim, comp_pfx, field_name, coord_args, ctx.metric_diagonal,
+            dim,
+            comp_pfx,
+            field_name,
+            coord_args,
+            ctx.metric_diagonal,
         ),
     )
 
@@ -3736,7 +3752,8 @@ def _wls_linearization(ctx: _WlsContext, *, include_bg: bool = False) -> list[st
 
 
 def _wls_constraint_metadata(
-    cs_config: dict[str, Any], spatial_coords: list[str],
+    cs_config: dict[str, Any],
+    spatial_coords: list[str],
 ) -> list[str]:
     """Generate Wolfram metadata lines for constraint solver configuration.
 
@@ -4447,6 +4464,36 @@ def _validate_perturbation_config(
         msg = f"[perturbation].order must be a positive integer; got {order!r}."
         raise ValueError(msg)
 
+    # Scope warning: LPS handles only the standard "perturbative correction
+    # to a fully dynamical theory" case.  Constraint-promotion theories
+    # (where the small parameter promotes an algebraic constraint to a
+    # higher-derivative dynamical field, e.g. b5*Rtilde^2 in PGT torsion
+    # theories: h_4, h_7, h_9 are constraints at b5=0 and dynamical at
+    # b5!=0) trigger LPS abort.  See docs/tex/perturbative_reduction_constraint_barrier.tex
+    # and issue #321.  Banner printed once per derivation when
+    # [perturbation] is configured, regardless of whether the theory
+    # actually triggers the abort, so users are aware of the scope.
+    print()
+    print("=" * 76)
+    print("  PERTURBATIVE REDUCTION ENABLED ([perturbation] block in TOML)")
+    print("-" * 76)
+    print("  small_parameters = " + str(small_params_list) + ",  order = " + str(order))
+    print()
+    print("  Lagrangian Perturbative Substitution (LPS, v6 Phase 2) is in")
+    print("  development.  It currently handles only the case where every field")
+    print("  with higher-order time derivatives in the Lagrangian is also")
+    print("  dynamical at the leading order (e.g. Pais-Uhlenbeck, Euler-Heisenberg).")
+    print()
+    print("  For theories where the small parameter promotes an algebraic")
+    print("  constraint to a higher-derivative dynamical field (b5*Rtilde^2 in")
+    print("  PGT torsion, similar curvature-squared coupling regimes), LPS will")
+    print("  abort with a clear diagnostic.")
+    print()
+    print("  See: docs/tex/perturbative_reduction_constraint_barrier.tex")
+    print("       https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/321")
+    print("=" * 76)
+    print()
+
     return {
         "small_parameters": small_params_list,
         "order": order,
@@ -4455,7 +4502,7 @@ def _validate_perturbation_config(
     }
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0914, PLR0915
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0915
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -4480,7 +4527,8 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             bg_head = f"{p}{bf['name'].capitalize()}"
             comps_str = ", ".join(str(c) for c in bf["components"])
             contra_comps = _compute_contra_components(
-                bf["components"], ctx.metric_diagonal,
+                bf["components"],
+                ctx.metric_diagonal,
             )
             contra_str = ", ".join(contra_comps)
             bg_rules_entries.append(wl_bg_rule_entry(bg_head, comps_str, contra_str))
@@ -5033,6 +5081,61 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "(* from the FULL Lagrangian (cross-terms like dh x T contribute to π_h). *)",
             "(* The filtered H then contains only GW+EM self-energy for P(t).      *)",
             "",
+        ],
+    )
+
+    # --- Lagrangian Perturbative Substitution (LPS, Phase B+) ---
+    # For perturbative theories with declared small_parameters, substitute
+    # higher-order time derivatives in lagComp using the order-0 EOM.  This
+    # eliminates the irreducible q-double-dot residue that IBP cannot handle
+    # alone (the q-double-dot * X products from b5*R~^2-style Lagrangians).
+    # No-op for non-perturbative theories.  Runs BEFORE the IBP loop so
+    # that IBP sees only 1st-order time derivatives.
+    if ctx.perturbative_reduction is not None:
+        small_params_wl = (
+            "{" + ", ".join(ctx.perturbative_reduction["small_parameters"]) + "}"
+        )
+        reduction_order = ctx.perturbative_reduction.get("order", 1)
+        # Wrap the LPS call in Catch so a Throw (e.g., constraint-promotion case)
+        # is captured cleanly and the script aborts with a non-zero exit, rather
+        # than silently producing a pre-LPS JSON.
+        lines.extend(
+            [
+                "(* === Lagrangian Perturbative Substitution (LPS) ============== *)",
+                "(* Eliminates higher-order time derivatives in lagComp by         *)",
+                "(* substituting the order-0 EOM, before the Legendre transform.  *)",
+                "(* See tidal/wolfram/PerturbativeReduction.wl.                    *)",
+                _wls_timing_start("tLPS"),
+                "Module[{lpsResult},",
+                "  lpsResult = Catch[",
+                "    TorsionGertsenshtein`PerturbativeReduction`ReduceLagrangian[",
+                f"      lagComp, fieldEquations, compToFunc, {small_params_wl}, "
+                f"{reduction_order}]",
+                "  ];",
+                "  If[StringQ[lpsResult],",
+                '    Print["[LPS] ERROR: ", lpsResult];',
+                '    Print["[LPS] Aborting derivation — the resulting Hamiltonian "',
+                '      <> "would be physically incorrect.  Investigate the LPS "',
+                '      <> "algorithm or revise the TOML before re-deriving."];',
+                "    Exit[1]",
+                "  ];",
+                "  lagComp = lpsResult;",
+                "];",
+                _wls_timing_end("tLPS", "Lagrangian Perturbative Substitution"),
+                'Print["L after LPS: ", If[Head[lagComp]===Plus, Length[lagComp], 1], " terms"];',
+                "",
+            ],
+        )
+    else:
+        lines.extend(
+            (
+                "(* LPS skipped: no [perturbation] block in TOML — non-perturbative theory *)",
+                "",
+            )
+        )
+
+    lines.extend(
+        [
             'Print["Phase B: starting IBP (lagComp LeafCount=", LeafCount[lagComp], ", terms=", If[Head[lagComp]===Plus, Length[lagComp], 1], ")"];',
             "",
             "(* --- Integration by parts: reduce second time derivatives ---          *)",
@@ -5419,8 +5522,11 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "];",
             "",
             "(* Parse H into structured quadratic terms *)",
+            "(* Thread small_parameters through so ComputeOrderInEps tags each *)",
+            "(* Hamiltonian term symmetrically with the equation side. *)",
             _wls_timing_start("tParseH"),
             "hamiltonianTerms = ParseHamiltonianExpression[canonicalH, allCompNames,"
+            f" {('{' + ', '.join(ctx.perturbative_reduction['small_parameters']) + '}') if ctx.perturbative_reduction is not None else '{}'},"
             f' If[TrueQ[$tidalHamiltonianFilter], "{ctx.torsion["perturbation_name"] if ctx.torsion else ""}", ""]];',
             _wls_timing_end("tParseH", "ParseHamiltonianExpression"),
             'Print["Hamiltonian terms: ", Length[hamiltonianTerms]];',
@@ -5641,7 +5747,7 @@ def _wls_canonical_injection(ctx: _WlsContext) -> list[str]:
 # --- WLS: Metadata & JSON export ---
 
 
-def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0915
     config: dict[str, Any],
     ctx: _WlsContext,
 ) -> list[str]:
@@ -6319,7 +6425,9 @@ def _run_wolframscript(script_path: Path, *, timeout: int = 0) -> int:
         )
         # Clean up orphaned WolframKernel after timeout
         subprocess.run(
-            ["pkill", "-f", "WolframKernel"], capture_output=True, check=False,
+            ["pkill", "-f", "WolframKernel"],
+            capture_output=True,
+            check=False,
         )
         return 1
 
@@ -6347,7 +6455,9 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     _audit_higher_derivative_lagrangian(config)
 
     script_content = generate_wls(
-        config, output_override=args.output, config_dir=config_path.parent.resolve(),
+        config,
+        output_override=args.output,
+        config_dir=config_path.parent.resolve(),
     )
 
     if args.dry_run:
@@ -6392,11 +6502,21 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
 
     # Use temp file
     with tempfile.NamedTemporaryFile(
-        encoding="utf-8", mode="w", suffix=".wls", delete=False, prefix="tidal_derive_",
+        encoding="utf-8",
+        mode="w",
+        suffix=".wls",
+        delete=False,
+        prefix="tidal_derive_",
     ) as tmp:
         tmp.write(script_content)
         tmp_path = Path(tmp.name)
 
+    # Record JSON mtime BEFORE wolframscript so we can distinguish
+    # "JSON written by this run" from "stale JSON from a previous run"
+    # in the leniency check below.  Any wolframscript failure that does
+    # NOT touch the output JSON is a real error (e.g., LPS abort before
+    # Phase D); the existing on-disk JSON must not mask it.
+    pre_run_mtime = resolved_out.stat().st_mtime_ns if resolved_out.exists() else 0
     try:
         ret = _run_wolframscript(tmp_path, timeout=args.timeout)
     finally:
@@ -6407,21 +6527,35 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
 
     # Wolfram Engine in Docker sometimes exits with non-zero code due to
     # license cleanup errors AFTER successfully writing the JSON.  If the
-    # output file exists with valid structure, treat as success for
-    # post-processing (reduction, validation, hash injection).
+    # output file was MODIFIED during this run AND has valid structure,
+    # treat as success for post-processing.  Crucially: if the JSON's
+    # mtime did not change, the failing wolframscript never wrote a new
+    # JSON — the existing file is stale from a previous run and the
+    # error must be honoured (LPS abort, parse error, etc.).
     if ret != 0 and resolved.exists():
-        try:
-            probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
-            if probe.get("equations") and len(probe["equations"]) > 0:
-                print(
-                    f"\nNote: wolframscript exited with code {ret} but "
-                    f"JSON was exported successfully — proceeding with "
-                    f"post-processing.",
-                    file=sys.stderr,
-                )
-                ret = 0
-        except Exception:  # noqa: BLE001, S110
-            pass  # JSON missing or corrupt — honour the non-zero exit code
+        post_run_mtime = resolved.stat().st_mtime_ns
+        if post_run_mtime <= pre_run_mtime:
+            print(
+                f"\nwolframscript exited with code {ret} and the output "
+                f"JSON was NOT modified during this run.  Treating as a "
+                f"real failure (stale JSON from a previous run will not "
+                f"mask it).  See the wolframscript output above for the "
+                f"failure cause (e.g., '[LPS] ERROR: ...').",
+                file=sys.stderr,
+            )
+        else:
+            try:
+                probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
+                if probe.get("equations") and len(probe["equations"]) > 0:
+                    print(
+                        f"\nNote: wolframscript exited with code {ret} but "
+                        f"JSON was exported successfully — proceeding with "
+                        f"post-processing.",
+                        file=sys.stderr,
+                    )
+                    ret = 0
+            except Exception:  # noqa: BLE001, S110
+                pass  # JSON missing or corrupt — honour the non-zero exit code
 
     # NOTE: Plane-wave reduction (coordinate remapping, operator renaming,
     # dimension change) is now handled entirely in Wolfram via
@@ -6451,7 +6585,8 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
             spec_data = _json_mod.loads(resolved.read_text(encoding="utf-8"))
             spec_data.setdefault("metadata", {})["derivation_hash"] = script_hash
             resolved.write_text(
-                _json_mod.dumps(spec_data, indent="\t"), encoding="utf-8",
+                _json_mod.dumps(spec_data, indent="\t"),
+                encoding="utf-8",
             )
         except Exception:  # noqa: BLE001, S110
             pass  # Non-critical — derivation succeeded, hash injection is optional

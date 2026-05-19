@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -396,7 +397,9 @@ def _build_grid_info(
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
     periodic = _parse_periodic(
-        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension,
+        args.bc,
+        periodic=args.periodic,
+        spatial_dim=spec.spatial_dimension,
     )
     axis_bcs = _parse_axis_bcs(args.bc, spatial_dim=spec.spatial_dimension)
 
@@ -611,6 +614,66 @@ def _gaussian_slots(  # noqa: PLR0913, PLR0917
     return slot_data
 
 
+# Relative tolerance (fraction of the local k-scale) above which a
+# ``--ic-wavevector`` snap is considered "significant" and a user-visible Note
+# is printed.  The snap itself always fires on periodic axes; this constant
+# only controls the verbosity of the report.
+_SNAP_REPORT_REL_TOL: float = 1e-2
+
+
+def _snap_wavevector_to_grid(
+    kvec: tuple[float, ...],
+    grid_info: GridInfo,
+    bounds: list[tuple[float, float]],
+) -> tuple[tuple[float, ...], list[tuple[int, float, float]]]:
+    """Snap each component of a requested wavevector to the nearest discrete Fourier mode.
+
+    A plane wave ``cos(k·x)`` evaluated at grid points is truly monochromatic
+    in the discrete Fourier representation only when ``k_dim = 2π·n/L_dim`` for
+    integer ``n``. Off-grid ``k`` leaks amplitude onto every other discrete
+    k-mode (the FFT encodes the implicit boundary discontinuity). For models
+    with tachyonic eigenvalues at some k-modes — e.g. PGT torsion models where
+    the full-tensor state carries redundant directions with negative mass² —
+    the leakage excites those tachyons and triggers the modal solver's
+    divergence guard. Snapping eliminates the leakage at the source and gives
+    a physically well-defined periodic plane wave.
+
+    Returns the snapped kvec and a list of (dim, requested_k, snapped_k)
+    entries for every dimension where the snap changed the wavevector by
+    more than 1% (used by the caller to emit a user-visible note). Non-periodic
+    axes are passed through unchanged — Fourier modes aren't the right basis
+    for Dirichlet/Neumann/absorbing conditions.
+    """
+    snapped: list[float] = []
+    notes: list[tuple[int, float, float]] = []
+    for dim in range(len(kvec)):
+        k_req = kvec[dim]
+        if dim >= grid_info.ndim or not grid_info.periodic[dim]:
+            snapped.append(k_req)
+            continue
+        lx = bounds[dim][1] - bounds[dim][0]
+        n_pts = grid_info.shape[dim]
+        dk = 2.0 * math.pi / lx
+        # Round to nearest integer mode, clamp below Nyquist (n_pts // 2).
+        # The Nyquist mode itself aliases (cos(π·n) = (-1)^n) and carries no
+        # directional information for real signals, so we exclude it by using
+        # n_pts // 2 - 1 as the cap.  For n_pts=2 the clamp degenerates to
+        # {-0, 0} which keeps the zero-mode behaviour for trivial grids.
+        n_max = max(0, n_pts // 2 - 1)
+        n_target = round(k_req / dk)
+        n_clamped = max(-n_max, min(n_max, n_target))
+        k_snap = n_clamped * dk
+        snapped.append(k_snap)
+        # Report only significant snaps: relative change > 1%, or any change
+        # when the requested k was itself non-zero.  Exactly-on-grid inputs
+        # (k_req == k_snap) produce no note.
+        if abs(k_req - k_snap) > 0.0:
+            scale = max(abs(k_req), abs(k_snap), dk)
+            if abs(k_req - k_snap) / scale > _SNAP_REPORT_REL_TOL:
+                notes.append((dim, k_req, k_snap))
+    return tuple(snapped), notes
+
+
 def _plane_wave_slots(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec: EquationSystem,
@@ -623,6 +686,12 @@ def _plane_wave_slots(  # noqa: PLR0913, PLR0917
 
     Uses ``cos(k·x)`` for field and ``+|k|·sin(k·x)`` for velocity
     (right-mover for positive k).
+
+    On periodic axes, ``--ic-wavevector`` is automatically snapped to the
+    nearest discrete Fourier mode to eliminate spectral leakage (which can
+    excite tachyonic modes at unintended k-values, e.g. in PGT torsion
+    models).  Override with ``--ic-no-snap`` to keep the legacy behaviour
+    where ``cos(k·x)`` is evaluated verbatim at grid points.
     """
     if args.ic_wavevector is not None:
         kvec = tuple(float(k) for k in args.ic_wavevector.split(","))
@@ -631,6 +700,18 @@ def _plane_wave_slots(  # noqa: PLR0913, PLR0917
         kvec = tuple(
             2.0 * math.pi / lx if i == 0 else 0.0 for i in range(spec.spatial_dimension)
         )
+
+    snap_disabled = bool(getattr(args, "ic_no_snap", False))
+    if not snap_disabled:
+        kvec, snap_notes = _snap_wavevector_to_grid(kvec, grid_info, bounds)
+        for dim, k_req, k_snap in snap_notes:
+            _clog(
+                f"  Note: --ic-wavevector[{dim}]={k_req:g} snapped to "
+                f"{k_snap:g} (nearest discrete Fourier mode on periodic "
+                f"grid N={grid_info.shape[dim]}, L={bounds[dim][1] - bounds[dim][0]:g}). "
+                f"This eliminates spectral leakage; pass --ic-no-snap to "
+                f"disable.",
+            )
 
     coords = grid_info.cell_coords
     k_dot_x = np.zeros(grid_info.shape, dtype=np.float64)
@@ -836,7 +917,7 @@ class ResumeState:  # noqa: B903
         self.snapshot_index = snapshot_index
 
 
-def _load_resume_state(  # noqa: PLR0914
+def _load_resume_state(
     resume_dir: Path,
     spec: EquationSystem,
     snapshot_index: int | None = None,
@@ -1760,13 +1841,13 @@ def _resolve_scheme(  # noqa: C901
     eligibility_spec = spec.base_spec() if spec.has_corrections() else spec
 
     if scheme != "auto":
-        if scheme == "modal" and grid is not None:
+        if scheme in {"modal", "modal-jax"} and grid is not None:
             # Validate modal eligibility when explicitly requested
             from tidal.solver.modal import can_use_modal
 
             if not can_use_modal(eligibility_spec, grid, bc):
                 msg = (
-                    "--scheme modal requested but system is not eligible. "
+                    f"--scheme {scheme} requested but system is not eligible. "
                     "Modal solver requires: flat metric, all-periodic BCs, "
                     "time-independent coefficients, and supported spatial "
                     "operators.  Use 'auto' or another solver."
@@ -1819,7 +1900,31 @@ def _resolve_scheme(  # noqa: C901
     return "cvode"
 
 
-def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
+def _override_pos_dep_periodic_scheme(
+    scheme: str,
+    args_scheme: str,  # noqa: ARG001 — kept for backward-compatible signature
+    spec: EquationSystem,  # noqa: ARG001 — kept for backward-compatible signature
+) -> tuple[str, str | None]:
+    """No-op since v0.41.6 — kept only for backward-compatible signatures.
+
+    Previously auto-routed position-dependent + periodic theories away from
+    modal under GH #367. Root cause was traced 2026-05-19 to the convolution
+    path missing ``kinetic_coefficient_symbolic`` normalization that the
+    per-mode path already had (modal.py:1381+ vs missing in
+    _build_convolution_matrix). After that fix, modal is the correct AND
+    fastest choice for pos-dep + periodic theories with non-trivial M
+    (Gertsenshtein h-modes carry ``-1/kappa²``; without M⁻¹ scaling the
+    discrete EOM is sign-flipped, giving the apparent ``k_max`` "spurious
+    eigenvalue" that all matrix-exponential methods faithfully amplified).
+
+    The post-evolution amplitude-growth check at
+    `modal.py::_evolve_full_matrix` (threshold 10⁶) stays as a safety net
+    for any future divergence — but no longer routes anywhere.
+    """
+    return scheme, None
+
+
+def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
     args: Namespace,
     spec: EquationSystem,
     params: dict[str, float],
@@ -1934,7 +2039,9 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     # Distinguish from sweep's boolean --resume (which means "resume sweep")
     if isinstance(resume_path, str):
         resume_state = _load_resume_state(
-            Path(resume_path), spec, getattr(args, "snapshot", None),
+            Path(resume_path),
+            spec,
+            getattr(args, "snapshot", None),
         )
         _validate_resume_grid(resume_state, grid_info)
         y0 = resume_state.y0
@@ -1978,6 +2085,30 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     # Resolve solver scheme (auto-select based on equation operators)
     scheme = _resolve_scheme(args.scheme, spec, grid_info, bc)
+    scheme, override_msg = _override_pos_dep_periodic_scheme(scheme, args.scheme, spec)
+    if override_msg is not None:
+        log(override_msg)
+    # TIDAL_MODAL_BACKEND=jax overrides modal → modal-jax without touching auto-select.
+    # CPU-only conservative gate: block constraints, position-dependent coefficients,
+    # AND RHS time-derivative operators. Measured 2026-05-17: even with the Phase 2a
+    # constraint path enabled, JAX vmap(expm) is ~3.7x SLOWER than scipy's expm loop
+    # for the matrix sizes encountered in T2/T4/T5/T6 + dark_photon_plasma on CPU
+    # (XLA expm dispatch overhead dominates at 30x30 and below). The Phase 2a code
+    # remains valid for a future GPU JAX path; on CPU, force ineligibility for any
+    # theory that would route through it. See jax_modal_cpu_negative_result.md.
+    if scheme == "modal" and os.environ.get("TIDAL_MODAL_BACKEND", "") == "jax":
+        from tidal.solver.modal import (
+            _has_position_dependent_terms,  # pyright: ignore[reportPrivateUsage]
+            _has_time_derivative_operators,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        jax_eligible = not (
+            any(eq.time_derivative_order == 0 for eq in spec.equations)
+            or _has_position_dependent_terms(spec)
+            or _has_time_derivative_operators(spec)
+        )
+        if jax_eligible:
+            scheme = "modal-jax"
     if args.scheme == "auto":
         log(f"  Auto-selected solver: {scheme}")
     _cdebug(f"solver={scheme}, fd_order={fd_order}, spectral={use_spectral}")
@@ -2166,6 +2297,27 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     # 7. Disk writer (if directory output) or in-memory accumulator
     # (inference path: skip disk entirely, see issue #269).
+    #
+    # The perturbative modal solver (--perturbative-order 1) returns state
+    # vectors in base_spec layout (constraint fields demoted to algebraic).
+    # The writer must be set up with this same layout so slot indices match.
+    # Detect perturbative mode early and resolve the effective spec here,
+    # before any writer/accumulator is constructed. (#298)
+    writer_spec = spec
+    if scheme in {"modal", "modal-jax"}:
+        early_pert_meta: dict[str, Any] = spec.metadata.get("perturbation") or {}
+        early_pert_order_arg = getattr(args, "perturbative_order", None)
+        if early_pert_order_arg is not None:
+            early_pert_order = int(early_pert_order_arg)
+        else:
+            early_pert_order = 1 if early_pert_meta.get("small_parameters") else 0
+        if early_pert_order > 0 and spec.has_corrections():
+            from tidal.solver.perturbative_driver import (
+                PerturbativeSolver as _EarlyPS,
+            )
+
+            writer_spec = _EarlyPS(spec).base_spec
+
     fmt = _infer_output_format(args)
     writer: SnapshotWriter | None = None
     accumulator: Any = None
@@ -2173,7 +2325,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     if in_memory_out is not None:
         accumulator, snapshot_cb = _setup_memory_accumulator_native(
-            spec,
+            writer_spec,
             grid_info,
             params,
             snapshot_interval,
@@ -2183,7 +2335,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     elif fmt == "directory":
         writer, snapshot_cb = _setup_disk_writer_native(
             args,
-            spec,
+            writer_spec,
             grid_info,
             params,
             snapshot_interval,
@@ -2327,6 +2479,16 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 "PerturbativeResult.spec must be populated. See #276."
             )
             spec = pert_result.spec
+            # Replay snapshots through the writer/accumulator callback. The
+            # perturbative solver computes the full trajectory in memory and
+            # returns it in result["t"] / result["y"]. The writer was set up
+            # with base_spec layout (see section 7 above, #298), so each
+            # y_flat slice maps correctly to the slot indices in _disk_callback.
+            if snapshot_cb is not None:
+                t_arr = pert_result.total["t"]
+                y_arr = pert_result.total["y"]
+                for _i in range(len(t_arr)):
+                    snapshot_cb(float(t_arr[_i]), y_arr[_i])
             log(
                 f"Perturbative layout swap: full-spec fields={len(pert_result.full_spec.equations) if pert_result.full_spec else '?'} "
                 f"→ base-spec fields={len(spec.equations)} "
@@ -2391,6 +2553,26 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 snapshot_callback=snapshot_cb,
                 progress=progress,
             )
+    elif scheme == "modal-jax":
+        from tidal.solver.modal_jax import solve_modal_jax
+
+        log(
+            f"Running JAX modal solver (t={t_start} → {args.t_end}, "
+            f"{num_snapshots} snapshots)...",
+        )
+        result = solve_modal_jax(
+            spec,
+            grid_info,
+            y0,
+            t_span=(t_start, args.t_end),
+            bc=bc,
+            parameters=params,
+            rtol=args.rtol,
+            atol=args.atol,
+            num_snapshots=num_snapshots,
+            snapshot_callback=snapshot_cb,
+            progress=progress,
+        )
     else:  # leapfrog
         from tidal.solver.leapfrog import solve_leapfrog
 
@@ -2460,7 +2642,8 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         if cv:
             for c_name, c_vel_arr in cv.items():
                 accumulator.set_velocity(
-                    c_name, np.asarray(c_vel_arr, dtype=np.float64),
+                    c_name,
+                    np.asarray(c_vel_arr, dtype=np.float64),
                 )
         sim_data = accumulator.to_sim_data(spec)
     else:
@@ -2542,12 +2725,15 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, P
     """
     if getattr(args, "list_schemes", False):
         print("Available solver schemes:")
-        print("  auto      Auto-select based on equation structure (default)")
-        print("  modal     Fourier modal solver (periodic, time-independent)")
-        print("  cvode     SUNDIALS CVODE (adaptive ODE, tolerance-controlled)")
-        print("  ida       SUNDIALS IDA (DAE, algebraic constraints)")
-        print("  leapfrog  Symplectic leapfrog (exact energy conservation)")
-        print("  scipy     SciPy solve_ivp (DOP853, Radau, BDF)")
+        print("  auto       Auto-select based on equation structure (default)")
+        print("  modal      Fourier modal solver (periodic, time-independent)")
+        print(
+            "  modal-jax  JAX-accelerated modal solver (requires: uv sync --extra jax)"
+        )
+        print("  cvode      SUNDIALS CVODE (adaptive ODE, tolerance-controlled)")
+        print("  ida        SUNDIALS IDA (DAE, algebraic constraints)")
+        print("  leapfrog   Symplectic leapfrog (exact energy conservation)")
+        print("  scipy      SciPy solve_ivp (DOP853, Radau, BDF)")
         return 0
 
     if args.json_path is None:

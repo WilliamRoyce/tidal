@@ -101,24 +101,37 @@
       text width=5.8cm] (canonical) {%
     \key{canonical} \textnormal{(optional, from Wolfram pipeline)}\\[-1pt]
     \val{hamiltonian\_terms: [\{coeff, factor\_a, factor\_b\}, ...]}\\[-1pt]
-    \val{volume\_element: null | "Sqrt[Abs[Sin[y[]]{\string^}2*x[]{\string^}4]]"}};
+    \val{volume\_element: "Sqrt[Abs[...]]"}
+    \textnormal{\scriptsize\itshape\ (curved metric only)}\\[-1pt]
+    \val{wolfram\_constraint\_elimination: true | false}
+    \textnormal{\scriptsize\itshape\ (opt.)}\\[-1pt]
+    \val{eliminated\_from\_canonical: ["A\_0", ...]}
+    \textnormal{\scriptsize\itshape\ (opt.)}};
 
 \node[role=Green, right=0.2cm of canonical.north east, anchor=north west,
-      text width=3.6cm] (canroles) {%
+      text width=3.8cm] (canroles) {%
     \textbf{volume\_element}:\\
-    null $\to$ flat (modal OK)\\
-    non-null $\to$ curved metric\\[2pt]
+    absent $\to$ flat spacetime\\
+    (most examples, modal OK)\\
+    present $\to$ curved metric\\[2pt]
+    \textbf{wolfram\_constraint\_elimination}:\\
+    records if Wolfram-side\\
+    Schur elimination applied\\[2pt]
     Drives energy measurement\\
     and modal eligibility};
 
-% matrices
+% coupling
 \node[stage=Lime, below=of canonical.south west, anchor=north west,
       text width=5.8cm] (matrices) {%
-    \key{mass\_matrix}: \val{[[m\string^2, 0], [0, m\string^2]]}\\[-1pt]
-    \key{coupling\_matrix}: \val{[[0, g], [g, 0]]}};
+    \key{coupling}\\[-1pt]
+    \val{mass\_matrix\_symbolic: [[m2, 0], [0, m2]]}\\[-1pt]
+    \val{coupling\_matrix\_symbolic: [[0, g], [g, 0]]}};
 
 \node[role=LimeLine, right=0.2cm of matrices.north east, anchor=north west]
-    {validated: dimensions\\match field count};
+    {validated: dimensions\\match field count\\[2pt]
+    \textbf{\_symbolic}: retained\\
+    as strings for sweeps\\
+    without re-derivation};
 
 % ===================================================================
 % TREE CONNECTORS (root to each block)

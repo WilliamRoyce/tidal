@@ -1,0 +1,27 @@
+\begin{frame}{Nested sampling: surveying the amplification landscape}
+  For each $\theta$ we run a full PDE simulation and compute the \emph{amplification factor} relative to the GR baseline:
+
+  \vspace{-0.8em}
+  \[
+    A(\theta) = \frac{P_{\max}(\theta)}{\sin^2\! \left(\tfrac{\kappa B_0 t}{2}\right)}
+    \xrightarrow{\kappa B_0 t \,\ll\, 1}
+    \frac{c(\theta)}{c_{\,\text{\tiny GR}}},
+    \qquad
+    c \equiv \frac{P_{\max}}{{B_0}^{2}},\
+    c_{\,\text{\tiny GR}} = \left(\frac{\kappa t}{2}\right)^{2}
+  \]
+  The score function, the \emph{likelihood}, is $L(\theta) = \pm \log A(\theta)$.
+  
+  \begin{itemize}
+    \item Validity requires $P_{\max}\ll 1$ and $\kappa B_0 t \ll 1$ (else $A$ becomes $B_0$-dependent)
+
+    \item $\mathcal{Z} = \int A(\theta)\,\pi(\theta)\,\mathrm{d}\theta = \langle A\rangle_\pi$ ---
+      \textbf{prior-averaged amplification}.\\
+      $\log\mathcal{Z}\approx 0$: null (no enhancement on average);\quad
+      $\log\mathcal{Z} \gg 0$: amplification persists under prior averaging.
+
+    \item $D_{\mathrm{KL}} \bigl(p(\theta\,|\,A)\,\Vert\,\pi(\theta)\bigr)$ ---
+      \textbf{information gain}, prior to posterior. Is enhancement broadly distributed (\emph{generic}); or concentrated in a narrow coupling region (\emph{fine-tuned}).
+
+  \end{itemize}
+\end{frame}

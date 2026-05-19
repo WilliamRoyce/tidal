@@ -1,0 +1,117 @@
+# Gertsenshtein Effect: Graviton-Photon Conversion — Dual-Gaussian Background Magnetic Field
+#
+# Lagrangian: L = (1/kappa^2) R - (1/4) F_{ab} F^{ab}
+#   (Einstein-Hilbert gravity + Maxwell electrodynamics)
+#
+# Background: dual-Gaussian B-field — two equal-and-opposite Gaussian peaks
+#   B_x(z) = Bpeak * [exp(-(z-zc1)^2/(2*sigB^2)) - exp(-(z-zc2)^2/(2*sigB^2))]
+#
+# Gauge potential (integral of -B_x):
+#   Abar_y(z) = -Bpeak * sigB * Sqrt[Pi/2]
+#               * (Erf[(z-zc1)/(Sqrt[2]*sigB)] - Erf[(z-zc2)/(Sqrt[2]*sigB)])
+#
+# Key property: with zc1 + zc2 = L and sigB << zc1, both Erf terms saturate to ±1
+# at z=0 and z=L, so Abar_y(0) = Abar_y(L) (and the boundary derivative
+# dAbar_y/dz|_{0,L} ≈ 0), giving a *periodic* gauge potential eligible for the modal solver.
+#
+# Contrast with theory_localized.toml (single Gaussian, Neumann BCs):
+#   Abar_y = -Bpeak * R * Sqrt[Pi/2] * Erf[z/(Sqrt[2]*R)]
+#   goes from -1 to +1 across the box → explicitly non-periodic → modal not selectable.
+#
+# Phase E geometry (see docs/V3_PHASE_E_DESIGN.md): the dual-Gaussian setup is the
+# canonical localised-B background that unlocks the modal solver.
+#
+# NOTE: constant names must not contain underscores — Mathematica parses "X_Y" as
+# Pattern[X, Blank[Y]]. Use "sigB", "zc1", "zc2", "Bpeak".
+#
+# Recommended simulation parameters:
+#   sigB = 5    (Gaussians decay to ~e^{-12.5} ~ 4e-6 at boundaries; negligibly periodic)
+#   zc1 = 25    (L/4, left peak)
+#   zc2 = 75    (3L/4 = L - zc1, right peak; ensures zc1 + zc2 = L)
+#   L = 100
+#   t_end <= 25 (wavepacket at zc1 = 25 reaches zc2 = 75 at t ~ 50; keep t < L/4 = 25
+#                to avoid wrap-around crossing into the second region before reflection)
+#   Boundedness criterion: A(t_end=20) / A(t_end=10) < 1.05
+
+[theory]
+name = "Gertsenshtein Effect (Dual-Gaussian B-field, Phase E.0)"
+description = "Graviton-photon conversion with dual-Gaussian background B enabling periodic BCs and modal solver"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# h: metric perturbation (graviton), symmetric rank-2 tensor
+# A: full EM 4-potential (fundamental field for perturbation)
+# a: EM perturbation (photon), vector — the dynamical 1st-order variable
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Dual-Gaussian B-field background.
+# B_x(z) = Bpeak * [exp(-(z-zc1)^2/(2*sigB^2)) - exp(-(z-zc2)^2/(2*sigB^2))]
+# Abar_y(z) = -Bpeak * sigB * Sqrt[Pi/2]
+#             * (Erf[(z-zc1)/(Sqrt[2]*sigB)] - Erf[(z-zc2)/(Sqrt[2]*sigB)])
+# Check: d/dz(Abar_y) = -B_x(z) ✓  (Coulomb gauge)
+# Periodicity: Abar_y(0) ≈ Abar_y(L) when sigB << zc1, zc2 and zc1+zc2=L
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = [
+  "0",
+  "0",
+  "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1)/(Sqrt[2]*sigB)] - Erf[(z[] - zc2)/(Sqrt[2]*sigB)])",
+  "0"
+]
+
+[constants]
+names = ["kappa", "Bpeak", "sigB", "zc1", "zc2"]
+
+# Full Einstein-Maxwell Lagrangian
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+# Multi-field perturbation: g = eta + eps*h, A = Abar + eps*a
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# TT gauge for graviton
+[[gauge]]
+field = "h"
+type = "tt"
+
+# Lorenz gauge for photon perturbation
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: d/dx = d/dy = 0 → effective 1+1D along z
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/gertsenshtein_e0_dual_gaussian.json"

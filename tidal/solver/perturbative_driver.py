@@ -18,7 +18,7 @@ for the full architecture. Key guarantees:
   added cost is ~1.5x a single Pass 0 at machine precision.
 """
 
-# ruff: noqa: RUF002, RUF003, ERA001 — Unicode math symbols; shape-annotation comments.
+# ruff: noqa: RUF003, ERA001 — Unicode math symbols; shape-annotation comments.
 # ruff: noqa: PLR0913, PLR0917, PLR0914, PLR0912, PLR0915, PLR2004, C901, N806, ANN401
 #   — numerical code inherently requires many arguments, local variables, and uppercase
 #   matrix names (V, K_eff follow standard linear-algebra notation).
@@ -145,7 +145,14 @@ def _compute_validity(
     dominant_tachyon_block: int | None = None
     dominant_tachyon_slot: int | None = None
     for block_idx, block in enumerate(eigendata.get("blocks", [])):
-        lam = block["D_diag"]  # (n_modes, bs) complex
+        # post-v0.31 schema: blocks expose M_block instead of D_diag/V/V_inv.
+        # Eigenvalues are needed only for the diagnostic (validity score and
+        # base-stability check); compute via np.linalg.eigvals (no eigenvectors).
+        # Fall back to legacy D_diag if a caller still supplies the old schema.
+        if "M_block" in block:
+            lam = np.linalg.eigvals(block["M_block"])  # (n_modes, bs) complex
+        else:
+            lam = block["D_diag"]  # legacy schema
         # |λ| so damped/tachyonic modes (non-zero Re(λ)) register at
         # their full magnitude.
         omega_block = float(np.max(np.abs(lam)))
@@ -233,7 +240,8 @@ def _compute_validity(
             for name, slot in layout.velocity_slot_map.items():
                 slot_to_name[slot] = f"v_{name} (velocity slot)"
             dominant_tachyon_field = slot_to_name.get(
-                dominant_tachyon_slot, f"slot {dominant_tachyon_slot}",
+                dominant_tachyon_slot,
+                f"slot {dominant_tachyon_slot}",
             )
 
     return {
@@ -410,16 +418,21 @@ class PerturbativeSolver:
     """
 
     def __init__(self, spec: EquationSystem) -> None:
-        self.full_spec = spec
-        # Use base_spec(...) so LHS kinetic coefficients that vanish at
-        # eps=0 trigger demotion to algebraic constraint (v6 Gap B).
         # Small parameter names come from the metadata.perturbation block
         # emitted by ExportJSON.wl when [perturbation] is configured.
         pert_meta: dict[str, Any] = spec.metadata.get("perturbation", {}) or {}
         small_parameters: list[str] = list(pert_meta.get("small_parameters", []))
         self._small_parameters = small_parameters
-        self.base_spec = spec.base_spec(small_parameters)
-        self._max_order = spec.max_order()
+        # #301 Phase 3 / #303: translate kinetic-sector small-parameter
+        # dependence into equivalent Pass-1 RHS corrections so Pass 0 sees
+        # a truly ε=0 baseline. No-op for specs with no small parameters
+        # or no kinetic_coefficient_symbolic. Must run BEFORE base_spec so
+        # the derived base inherits the clean structure.
+        self.full_spec = spec.canonicalize_kinetic_for_perturbation(small_parameters)
+        # Use base_spec(...) so LHS kinetic coefficients that vanish at
+        # eps=0 trigger demotion to algebraic constraint (v6 Gap B).
+        self.base_spec = self.full_spec.base_spec(small_parameters)
+        self._max_order = self.full_spec.max_order()
 
     @property
     def max_order(self) -> int:
@@ -442,6 +455,32 @@ class PerturbativeSolver:
         small_parameters: list[str] | None = None,
     ) -> PerturbativeResult:
         """Solve iteratively to the requested order.
+
+        Semantics of the result
+        -----------------------
+        ``result.orders[n]`` is a **mathematical component** of the
+        perturbative expansion, not a physical trajectory.  ``orders[0]``
+        is the order-0 base evolution; ``orders[n]`` for ``n >= 1`` is the
+        Duhamel-integrated correction.  All physical observables (energy,
+        conversion probability, conserved quantities) **must be measured
+        on ``result.total``**, never on individual ``orders[n]``.
+
+        Scope and limitations (v6 / Phase 2)
+        ------------------------------------
+        The iterative Parker-Simon path used here resolves the equation
+        side cleanly for theories with declared ``[perturbation]``
+        small_parameters.  However, the **Lagrangian Perturbative
+        Substitution** (LPS, see ``tidal/wolfram/PerturbativeReduction.wl``)
+        that produces the canonical Hamiltonian throws on the
+        constraint-promotion case — when the small parameter promotes an
+        algebraic-constraint field at ``epsilon=0`` to a higher-derivative
+        dynamical field at ``epsilon!=0``.  The ``b5*Rtilde^2`` PGT torsion
+        family (``graviton_torsion``, ``torsion_gertsenshtein``,
+        ``torsion_gertsenshtein_combined``) triggers this abort.  Their
+        equation-side dynamics computed here remain valid; only the
+        canonical Hamiltonian is unavailable via the standard methods.
+        See ``docs/tex/perturbative_reduction_constraint_barrier.tex``
+        and issue #321.
 
         Parameters
         ----------
@@ -479,6 +518,9 @@ class PerturbativeSolver:
         NotImplementedError
             If ``order >= 2`` — Pass 2 against ``q¹(t)`` is not yet
             implemented. See #273.
+        RuntimeError
+            If a Pass-n solver call returns ``success=False``.  Failing
+            loud rather than silently producing a degraded result.
         """
         if order > self._max_order:
             msg = (
@@ -548,6 +590,8 @@ class PerturbativeSolver:
         orders: list[Any] = [pass0]
         total_y = pass0["y"].copy()
         correction_drops: list[dict[str, Any]] = []
+        # Track Pass-n solver failures so they propagate to result.success
+        # rather than silently corrupting total_y.
 
         if order >= 1 and self.has_corrections():
             from tidal.solver.state import StateLayout  # noqa: PLC0415
@@ -561,7 +605,9 @@ class PerturbativeSolver:
             # Schur recovery. Depends only on Pass 0 output + spec, so
             # it's shared across all correction orders.
             pre_demote = _pre_demote_info(
-                self.full_spec, self.base_spec, self._small_parameters,
+                self.full_spec,
+                self.base_spec,
+                self._small_parameters,
             )
             constraint_source_hat = _compute_constraint_source_hat(
                 full_spec=self.full_spec,
@@ -591,6 +637,23 @@ class PerturbativeSolver:
                     pass0["t"],
                     parameters=parameters,
                 )
+                # Fail loud and fast on Pass-n solver failure.  Returning a
+                # degraded result with only Pass 0 would silently mask the
+                # missing perturbative correction and produce physically
+                # wrong physics.  The caller must see the failure and decide
+                # whether to reduce the parameter regime, fix the spec, or
+                # treat the failure as terminal.
+                if not pass_n.get("success", False):
+                    msg = pass_n.get(
+                        "message", f"Pass {n} solver returned success=False"
+                    )
+                    msg = (
+                        f"Perturbative Pass {n} failed: {msg}. The order-{n} "
+                        f"Duhamel correction could not be computed; aborting "
+                        f"rather than returning a degraded result that would "
+                        f"give incorrect physics."
+                    )
+                    raise RuntimeError(msg)
                 correction_drops.extend(
                     {**d, "pass": n} for d in pass_n["correction_drops"]
                 )
@@ -619,7 +682,10 @@ class PerturbativeSolver:
         t_end = float(t_span[1] - t_span[0])
         if order >= 1 and self.has_corrections() and "eigendata" in pass0:
             validity = _compute_validity(
-                pass0["eigendata"], small_parameters, parameters, t_end,
+                pass0["eigendata"],
+                small_parameters,
+                parameters,
+                t_end,
             )
         else:
             validity: dict[str, Any] = {
@@ -633,6 +699,9 @@ class PerturbativeSolver:
         # CLI / caller can see when Pass 1 silently misses contributions.
         validity["correction_drops"] = correction_drops
 
+        # Pass-n failures raise immediately above; reaching here means all
+        # passes succeeded.  The total result is the sum of Pass 0 and all
+        # Pass-n corrections.
         total: dict[str, Any] = {
             "t": pass0["t"],
             "y": total_y,
@@ -830,26 +899,81 @@ def _compute_constraint_source_hat(
 
     # Precompute d^n_t(y_dyn⁰)(snap, slot, mode) for every n needed.
     # Shape: (n_snap, n_dyn, n_modes), per n.
+    #
+    # post-v0.31 augmented-exp Pass 1: blocks expose ``M_block`` and
+    # ``y0_block`` instead of ``V/V_inv/D_diag/alpha``. Identity used here:
+    # for time-independent ``A = M_block``, ``y⁰(t) = exp(M·t)·y₀`` and
+    # ``d^n_t y⁰(t) = M^n · y⁰(t)``. We precompute ``y⁰(t)`` once per snapshot
+    # via ``scipy.linalg.expm`` (path D), iterating with ``exp(M·dt)`` for
+    # uniform spacing, then apply ``M^n`` to derive each ``d^n_t y⁰`` from
+    # the same shared snapshot grid.
+    import scipy.linalg as sla  # noqa: PLC0415
+
+    # Stage 1: precompute y⁰(t) at each snapshot per block (shared across all n).
+    pass0_t_arr = np.asarray(pass0_t, dtype=np.float64)
+    n_snap_local = len(pass0_t_arr)
+    if n_snap_local > 1:
+        dts = np.diff(pass0_t_arr)
+        uniform_local = bool(np.allclose(dts, dts[0]))
+        dt_local = float(dts[0]) if uniform_local else None
+    else:
+        uniform_local = False
+        dt_local = None
+
+    block_y_evolved: list[
+        tuple[list[int], NDArray[np.complex128], NDArray[np.complex128]]
+    ] = []
+    for block in eigendata["blocks"]:
+        slots = list(block["slot_indices"])
+        M_block = block["M_block"]  # (n_modes, bs, bs)
+        y0_block = block["y0_block"]  # (bs, n_modes)
+        n_block_modes = M_block.shape[0]
+        bs = M_block.shape[1]
+
+        y_evolved = np.empty((n_snap_local, n_block_modes, bs), dtype=np.complex128)
+        t0_local = float(pass0_t_arr[0])
+        if t0_local == 0.0:
+            y_evolved[0] = y0_block.T
+        else:
+            for m in range(n_block_modes):
+                y_evolved[0, m] = sla.expm(M_block[m] * t0_local) @ y0_block[:, m]  # pyright: ignore[reportUnknownArgumentType]
+        if uniform_local and dt_local is not None and dt_local > 0:
+            exp_M_dt = np.empty_like(M_block)
+            for m in range(n_block_modes):
+                exp_M_dt[m] = sla.expm(M_block[m] * dt_local)  # pyright: ignore[reportUnknownArgumentType]
+            for ti in range(1, n_snap_local):
+                y_evolved[ti] = np.einsum("mij,mj->mi", exp_M_dt, y_evolved[ti - 1])
+        else:
+            for ti in range(1, n_snap_local):
+                t_rel = float(pass0_t_arr[ti] - pass0_t_arr[0])
+                for m in range(n_block_modes):
+                    y_evolved[ti, m] = sla.expm(M_block[m] * t_rel) @ y_evolved[0, m]  # pyright: ignore[reportUnknownArgumentType]
+
+        block_y_evolved.append((slots, M_block, y_evolved))
+
+    # Stage 2: for each needed time-derivative order n, apply M^n to y⁰(t).
     y_hat_dyn_dnt: dict[int, NDArray[np.complex128]] = {}
     for n in needed_orders:
         arr = np.zeros((n_snap, n_dyn, n_modes), dtype=np.complex128)
-        for block in eigendata["blocks"]:
-            slots = list(block["slot_indices"])
-            V = block["V"]  # (n_modes, bs, bs)
-            lam = block["D_diag"]  # (n_modes, bs)
-            alpha = block["alpha"]  # (n_modes, bs)
-            # (n_modes, bs) — λ^n per mode, per eigenmode.
-            lam_pow_n = lam**n if n else np.ones_like(lam)
-            for ti, t in enumerate(pass0_t):
-                # exp_lt[m, i] = exp(λ_i · t) per mode.
-                exp_lt = np.exp(lam * float(t))
-                # coeff_i = λ_i^n · exp(λ_i·t) · α_i     (n_modes, bs)
-                coeff = lam_pow_n * exp_lt * alpha
-                # y_hat per slot = V · coeff   shape (n_modes, bs)
-                y_hat = np.einsum("mij,mj->mi", V, coeff)
-                # Scatter into the (n_dyn,)-indexed array.
+        for slots, M_block, y_evolved in block_y_evolved:
+            n_block_modes = M_block.shape[0]
+            bs = M_block.shape[1]
+            if n == 0:
+                # d⁰_t y⁰ = y⁰; skip the matmul.
+                M_n_apply: NDArray[np.complex128] | None = None
+            else:
+                M_n = M_block.copy()
+                for _ in range(n - 1):
+                    M_n = np.einsum("mij,mjk->mik", M_n, M_block)
+                M_n_apply = M_n
+            for ti in range(n_snap):
+                y_t = y_evolved[ti]  # (n_modes, bs)
+                if M_n_apply is None:
+                    y_dnt = y_t
+                else:
+                    y_dnt = np.einsum("mij,mj->mi", M_n_apply, y_t)
                 for slot_local, slot_idx in enumerate(slots):
-                    arr[ti, slot_idx, :] += y_hat[:, slot_local]
+                    arr[ti, slot_idx, :] += y_dnt[:, slot_local]
         y_hat_dyn_dnt[n] = arr
 
     # Helper: d^n_t(h_c⁰)(ti, m) for a constraint target at time ti.
@@ -898,7 +1022,10 @@ def _compute_constraint_source_hat(
                 continue
             # Resolve numeric coefficient via modal's existing helper.
             coeff = resolve_constant_coeff(
-                term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                term,
+                coeff_eval,
+                eq_idx=eq_idx,
+                term_idx=term_idx,
             )
             mult = _spatial_multiplier(term.operator)  # (n_modes,)
             decomp = OPERATOR_DECOMP[term.operator]

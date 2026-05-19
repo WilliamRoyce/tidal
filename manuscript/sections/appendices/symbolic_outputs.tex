@@ -1,0 +1,133 @@
+% Appendix E: Symbolic-pipeline outputs for the surveyed PGT theories
+% (~700 w + long equations). Project-specific physics appendix.
+%
+% Subsection slots are intentionally theory-agnostic at scaffold time
+% (`SymbolicReference`, `SymbolicMechanism`, `SymbolicHeadline`) so they
+% can be filled with whichever theories prove most informative — the
+% eventual choice depends on campaigns still in flight. The
+% `HxAxIdentity` equation is hosted in `SymbolicMechanism` because the
+% channel-structure identity is the most stable cross-reference target
+% across the restructure.
+
+\section{Symbolic outputs for the surveyed theories}%
+\label{SymbolicOutputs}
+
+\paragraph*{Purpose and reading guide}
+% TODO: ~100 w paragraph. These are equations as produced by the TIDAL
+% Wolfram pipeline for the PGT models surveyed in §4 that are too lengthy
+% to display in the main body. Each block is the equation of motion or
+% kinetic matrix in a chosen basis. Readers reproducing a §4 result can
+% copy the equations into a Mathematica session and continue from there.
+% Each block names the source JSON path so the equations can be
+% regenerated from the pipeline.
+
+\subsection{Reference theory: minimally-coupled Einstein--Cartan}%
+\label{SymbolicReference}
+% Target ~150 w + equation block. Source JSON: examples/<reference
+% theory>/data/<file>.json. Serves as the simplest case in the survey
+% — the theory whose kinetic matrix the reader should examine first to
+% calibrate expectations for the other equation blocks.
+
+\paragraph*{Kinetic matrix}
+% TODO: introductory sentence + equation block. For long output, use
+% \lstinputlisting{...} from an external .tex file
+% (genre_conventions_software.md §(f.1)).
+\begin{align}
+  % TODO: paste from the relevant JSON. Source: examples/<reference>/data/...
+  \label{ReferenceKineticOutput}
+\end{align}
+
+\paragraph*{Structural baseline}
+% TODO: one sentence noting any structural feature that calibrates
+% comparison with the other equation blocks (e.g. which entries are
+% zero in the reference theory; which are non-zero only off-diagonal).
+
+\subsection{Observed channel pattern: propagating PGT}%
+\label{SymbolicMechanism}
+% Target ~300 w + equation blocks. Source JSON: examples/<propagating
+% PGT>/data/<file>.json. This subsection hosts the equation block that
+% the §4.3 ChannelStructure subsection cross-refs as evidence for the
+% empirical observation. Demoted from "structural-identity mechanism"
+% framing — the equation is presented as an observed pattern, not a
+% theorem; the validity caveats live in §4.3 alongside the empirical
+% claim.
+
+\paragraph*{Kinetic matrix and equations of motion}
+% TODO: introductory sentence + long equation block. State the source
+% JSON path; describe the basis (sectorial / channel-aligned) in which
+% the matrix is displayed.
+\begin{align}
+  % TODO: paste the kinetic matrix and EOMs from the propagating-PGT JSON.
+  \label{PropagatingKineticOutput}
+\end{align}
+
+% Single named paragraph hosting the equal-coefficient line. Framing is
+% "observed pattern in the symbolic output", not "structural identity"
+% — the latter would require an algebraic proof we do not have.
+\paragraph*{Observed coincidence in the $h_\times$ and ax kinetic coefficients}
+% TODO: ~80 w. State that the two relevant entries of
+% \cref{PropagatingKineticOutput} have been observed to coincide in the
+% symbolic output for the propagating-PGT theories TIDAL has run on.
+% Display the equal-coefficient line as \cref{HxAxIdentity}, presented
+% as the artefact that motivated the observation. Note that the
+% empirical scope of the observation, and the validity caveats that
+% bound it (IC choice not WLOG; TT-gauge admissibility under \Bzero
+% not formally re-derived; theory class is finite), are stated in
+% \cref{ChannelStructure} (§4.3) — not here. This subsection presents
+% only the artefact.
+\begin{align}
+  % TODO: equal-coefficient line showing hx-coefficient = ax-coefficient
+  \label{HxAxIdentity}
+\end{align}
+
+\subsection{Headline-theory equation block}%
+\label{SymbolicHeadline}
+% Target ~250 w + equation block. Source JSON: TBD — selected at
+% drafting time to match the §4.4 headline finding. If the headline
+% turns out to be a non-minimal-coupling amplification corner, this
+% subsection hosts that theory's kinetic matrix (showing the new
+% vertex that breaks the channel-structure identity). If the headline
+% is structural rather than amplification, this subsection may host
+% additional kinematic identities or wrong-sign coefficients.
+%
+% Also serves as the cross-reference target for the App D
+% `Pathological cases` paragraph if that paragraph references a
+% trace-channel kinetic-matrix excerpt.
+
+\paragraph*{Kinetic matrix}
+% TODO: introductory sentence + equation block at the headline
+% parameter point or theory class.
+\begin{align}
+  % TODO: paste from the relevant JSON.
+  \label{HeadlineKineticOutput}
+\end{align}
+
+% No-ghost inequality and trace-channel kinetic excerpt. Hosts the
+% structural sign-positivity analysis that catalogues which irreducible
+% torsion sectors exhibit wrong-sign kinetic coefficients in the surveyed
+% PGT models. The App D restructure removed the standalone
+% pathological-cases paragraph and consolidated the symbolic discussion
+% here, where the kinetic matrix that exhibits the wrong-sign coefficient
+% is also displayed.
+\paragraph*{Sign-positivity of the irreducible torsion kinetic matrices}
+% TODO: ~150 w. State the no-ghost condition as a closed inequality on
+% the diagonal entries of the kinetic matrix in the irreducible-torsion
+% basis $(\T[1], \T[2], \T[3])$. Cite \cite{sezgin1980ghostfree} for the
+% original four-parameter classification of PGT and
+% \cite{lin2019pgt,barker2021hamiltonian} for the modern PGT ghost-free
+% inequalities. Report whether the irreducible-torsion sectors of the
+% surveyed propagating-PGT theory satisfy the no-ghost condition;
+% explicitly note the sectors in which the diagonal entry is wrong-sign,
+% and cross-ref \cref{ChannelStructure} (\S4.3) for the kinematic
+% observation that these wrong-sign sectors do not couple to the active
+% $h_\times \leftrightarrow a_x$ channel.
+\begin{align}
+  % TODO: paste from the trace-channel JSON; show the diagonal entries
+  % of the kinetic matrix in the (T1, T2, T3) basis.
+  \label{TraceKineticOutput}
+\end{align}
+
+\paragraph*{Structural feature of the headline regime}
+% TODO: one paragraph noting what is visible in the equations that
+% explains the §4.4 finding (e.g. a new non-zero off-diagonal entry,
+% a wrong-sign kinetic coefficient, an algebraic relation that fails).

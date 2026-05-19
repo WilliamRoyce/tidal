@@ -151,7 +151,7 @@ class VersionBumper:
                 print(f"  3. Create tag: git tag v{self.new_version}")
                 print("  4. Push: git push && git push --tags")
 
-        except Exception as e:  # noqa: BLE001  # Intentional catch-all for rollback
+        except Exception as e:  # Intentional catch-all for rollback
             print()
             print(f"✗ Error: {e}", file=sys.stderr)
             if not self.dry_run:
@@ -225,7 +225,7 @@ class VersionBumper:
 
         print()
 
-    def update_files(self) -> None:  # noqa: PLR0912, C901
+    def update_files(self) -> None:
         """Phase 2: Update all files atomically."""
         print("Phase 2: Update Files")
 
@@ -529,9 +529,15 @@ class VersionBumper:
 
         """
         try:
-            # Stage all changes
+            # Stage only the version-related files, not all working-tree changes
+            files_to_stage = [
+                self.pyproject_toml,
+                self.citation_cff,
+                self.root / "uv.lock",
+            ]
+            files_to_stage.extend(optional for optional in [self.next_phases_md, self.roadmap_md, self.security_md] if optional.exists())
             subprocess.run(
-                ["git", "add", "-A"],
+                ["git", "add", "--", *[str(f) for f in files_to_stage]],
                 cwd=self.root,
                 check=True,
                 capture_output=True,

@@ -145,7 +145,7 @@ def resolve_time_indices(
     return [round(i * step) for i in range(n_default)]
 
 
-def _apply_cross_section(  # noqa: PLR0914
+def _apply_cross_section(
     field_data: NDArray[np.float64],
     data: SimulationData,
     cross_section: tuple[str, float],

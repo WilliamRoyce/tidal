@@ -8,11 +8,11 @@
 \subsection{Overview}
 \label{sec:modal-overview}
 
-The Fourier modal solver (\texttt{tidal/solver/modal.py}) provides exact, machine-precision solutions for linear PDE systems with periodic boundary conditions and time-independent coefficients. It transforms the spatial grid to Fourier space, builds a per-mode evolution matrix, and eigendecomposes to obtain the exact solution $y(t) = \exp(A \cdot t) \cdot y_0$ --- eliminating spatial discretization error entirely.
+The Fourier modal solver (\texttt{tidal/solver/modal.py}) provides exact, machine-precision solutions for linear PDE systems with periodic boundary conditions and time-independent coefficients. It transforms the spatial grid to Fourier space, builds a per-mode evolution matrix, and computes $\exp(A \cdot t) \cdot y_0$ via Pad\'{e} matrix-exponential (\cref{sec:modal-robust-matrix-exp}) --- eliminating spatial discretization error entirely.
 
 \textbf{Key advantages over PDE solvers (CVODE/IDA):}
 \begin{itemize}
-  \item Machine-precision accuracy (${\sim}10^{-14}$ error, limited only by eigendecomposition)
+  \item Machine-precision accuracy (${\sim}10^{-14}$ error, limited only by IEEE-754 floating-point precision; see \cref{sec:modal-snapshot-precision})
   \item No CFL condition or adaptive timestepping needed
   \item $O(N^2)$ per output time after $O(N^3)$ precomputation
   \item Exact for any time point --- no time-stepping error accumulation
@@ -23,7 +23,9 @@ The Fourier modal solver (\texttt{tidal/solver/modal.py}) provides exact, machin
   \item Requires periodic boundary conditions (FFT periodicity)
   \item Requires time-independent coefficients (evolution matrix must be constant)
   \item Requires flat (Minkowski) metric --- curved metrics couple modes via position-dependent coefficients that decay too slowly in $k$-space
-  \item Currently pure NumPy/SciPy --- no GPU acceleration
+  \item Default backend is pure NumPy/SciPy; a JAX-accelerated path
+    (\texttt{--scheme modal-jax}) is available for PolyChord inference runs
+    --- see \S\ref{sec:modal_jax}
 \end{itemize}
 
 \subsection{How It Works}
@@ -195,8 +197,8 @@ Detection: \texttt{\_has\_position\_dependent\_terms()} checks for spatially-var
 \label{par:modal-one-method}
 
 \begin{itemize}
-  \item \textbf{\texttt{expm\_multiply} for everything?} No --- eigendecomposition is ${\sim}70\times$ faster for constant-coefficient cases and gives machine precision (${\sim}10^{-14}$ error).
-  \item \textbf{Eigendecomposition for everything?} No --- it gives \textbf{wrong results} for non-normal convolution matrices (position-dependent case). This is not a precision issue but a fundamental numerical instability: individual $\exp(\lambda \cdot t)$ overflow while $\exp(A \cdot t) \cdot y_0$ is bounded (pseudospectral phenomenon).
+  \item \textbf{\texttt{expm\_multiply} for everything?} No --- for the small per-mode blocks ($bs \le 15$) of the constant-coefficient path, \texttt{expm\_multiply} carries per-call Krylov-Taylor setup overhead that vastly dominates the $O(bs^3)$ exponential cost. Precomputing $\exp(M \cdot \mathrm{d}t)$ once per mode via \texttt{scipy.linalg.expm} (Pad\'{e} path~d; see \cref{sec:modal-robust-matrix-exp}) is $0.49$--$1.06\times$ the wall time of the former eigendecomposition path while giving equivalent machine precision.
+  \item \textbf{Eigendecomposition for everything?} No --- it gives \textbf{wrong results} for non-normal convolution matrices (position-dependent case). This is not a precision issue but a fundamental numerical instability: individual $\exp(\lambda \cdot t)$ overflow while $\exp(A \cdot t) \cdot y_0$ is bounded (pseudospectral phenomenon). The eigendecomposition path for the constant-coefficient (per-mode) case was also retired in v0.31 in favour of the unconditional Pad\'{e} path (\cref{sec:modal-pade-pass1}), which is robust for any $\mathrm{cond}(V)$.
 \end{itemize}
 
 \paragraph{Sparse convolution matrix optimization.}
@@ -272,6 +274,116 @@ Position-dependent coefficients are OK (handled via convolution). The full auto-
 
 Users can explicitly request \texttt{--scheme modal} (validated for eligibility) or override with \texttt{--scheme cvode}.
 
+\subsubsection{Position-Dependent + Periodic: Root Cause and Fix (GH \#367)}
+\label{sec:modal-pos-dep-auto-route}
+
+\textbf{Resolved in v0.41.6 (2026-05-19).} Theories with
+position-dependent coefficients and a non-trivial
+\texttt{kinetic\_coefficient\_symbolic} (Gertsenshtein graviton modes
+carry $-1/\kappa^2$; massive-vector torsion carries $-\xi$) previously
+produced catastrophically wrong answers under the modal solver:
+\texttt{expm\_multiply} reported amplitudes $\sim 10^9 \times$ too large
+on the E.0 dual-Gaussian reproducer at $t_{\mathrm{end}} = 20$.
+
+\paragraph{Root cause (verified 2026-05-19).} The two convolution-free
+matrix builders in \texttt{modal.py} had drifted out of sync on the
+$M^{-1}$ (inverse kinetic coefficient) folding:
+\begin{itemize}
+  \item \texttt{\_build\_per\_mode\_matrices} (\texttt{modal.py}:1318+)
+    folds \texttt{build\_inverse\_kinetic\_diag} into the velocity-row
+    coefficient at line 1411, so the emitted matrix represents
+    $dv/dt = M^{-1} \cdot K(q)$.
+  \item \texttt{\_build\_convolution\_matrix} (\texttt{modal.py}:1454+)
+    did \emph{not} apply this scaling. For an equation with
+    $\text{kinetic\_coefficient} = -1/\kappa^2$, the discrete
+    Laplacian's diagonal at the Nyquist mode was
+    $(-1/\kappa^2) \cdot (-k_{\max}^2) = +k_{\max}^2 / \kappa^2$ — the
+    \emph{wrong sign}. The resulting 2$\times$2 state block at every
+    mode $m$ had real eigenvalues $\pm k_m / \kappa$, not the
+    physically-correct imaginary $\pm i k_m / \kappa$.
+\end{itemize}
+The visible symptom looked like a non-normal Fourier-convolution
+pseudospectral artifact (max $\Re(\lambda) = k_{\max}$ tracking the
+Nyquist wavenumber exactly), so an early diagnosis attributed it to
+``the column placement of $i k_{m'}$ in $A[m, m'] = \widehat{c}(m-m')
+\cdot i k_{m'}$''. The empirical evidence ruled that out: an mpmath
+oracle at \texttt{dps=50} gave the same wildly-wrong answer as float64,
+proving the matrix itself was wrong (not the precision); zeroing every
+off-diagonal block left $\max\Re(\lambda)$ unchanged, locating the
+bad eigenvalue on the block-diagonal Laplacian contribution rather than
+the cross-coupling; and the artifact persisted at $B_{\mathrm{peak}}=0$
+(no position-dependent variation at all), which definitively pointed
+to a constant-coefficient sign error.
+
+\paragraph{Fix.} \texttt{\_build\_convolution\_matrix} now calls
+\texttt{build\_inverse\_kinetic\_diag(spec, params)} once at the top and
+threads a per-equation \texttt{scale} kwarg through
+\texttt{\_add\_convolution\_coupling}, so every velocity-row
+contribution (constant-coefficient and position-dependent alike) is
+multiplied by $M_{ii}^{-1}$. \texttt{build\_inverse\_kinetic\_diag}
+returns \texttt{None} when every field has $M \approx 1$, so theories
+without non-trivial kinetic coefficients are unaffected.
+
+\paragraph{In-process timing on the E.0 reproducer (2026-05-19 fix).}
+At $L = 100$, dual-Gaussian background, $t_{\mathrm{end}} = 20$:
+\begin{center}
+\begin{tabular}{rrrrr}
+\toprule
+$N$ & modal & CVODE & IDA & h$_5$ err vs CVODE \\
+\midrule
+64 & 29 ms & 86 ms & 245 ms & 0.47\% \\
+128 & 48 ms & 364 ms & 1466 ms & 0.01\% \\
+256 & 130 ms & 29 ms & 47 ms & 0.00\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+The modal path is correct, $\sim$3$\times$ faster than CVODE at
+$N=64$, and $\sim$8$\times$ faster than IDA. At $N=256$ the dense
+convolution matrix grows costly enough that CVODE/IDA win; the modal
+crossover is around $N \approx 200$.
+
+\paragraph{Auto-route is now a no-op.} The
+\texttt{\_override\_pos\_dep\_periodic\_scheme} helper in
+\texttt{tidal/cli/\_simulate.py} is retained as a stub (returns
+\texttt{(scheme, None)}) for backward-compatible signatures, but no
+longer routes anywhere — modal handles pos-dep + periodic theories
+correctly in all the cases the override previously diverted. The
+post-evolution amplitude-growth check in
+\texttt{\_evolve\_full\_matrix} (threshold $10^6\times$ initial
+amplitude) stays as a defensive safety net for any future divergence.
+
+\paragraph{What was checked and rejected during the false diagnosis.}
+Recorded so future sessions don't re-investigate:
+\begin{itemize}
+  \item Arnoldi-Krylov / Sidje-Expokit / KIOPS as replacements for
+    \texttt{expm\_multiply}: a hand-coded Sidje 1998 implementation
+    ($\sim$470 LOC, adaptive sub-stepping, augmented Hessenberg error
+    estimator, DGKS reorthogonalisation) gave the same wrong answer as
+    dense Padé to 1$\times 10^{-14}$. The matrix itself was wrong,
+    so any algorithm computing $\exp(A t) y_0$ accurately on the
+    \emph{wrong} matrix returns the same wrong answer.
+  \item Hou-Li exponential filter on $\widehat{c}(q)$: rejected — the
+    artifact is on the block-diagonal Laplacian, not the
+    cross-coupling convolution kernel.
+  \item Skew-symmetric projection $A_{\mathrm{skew}} = \frac{1}{2}(A -
+    A^\dagger)$: stabilised the spectrum (purely imaginary) but
+    converged to a discretization of the wrong continuous operator
+    (72\% error at every $N$). It dropped a Hermitian correction term
+    that the physics actually needs.
+  \item Row-k recombination of identity-$B'$ + gradient-$B$ pairs in
+    the cross-coupling block: no change to the spectrum; confirmed
+    via per-block eigenvector analysis that the dominant eigenvector
+    lives on the block-diagonal (slot $\to$ velocity\_slot) Laplacian
+    contribution, not the cross-coupling.
+\end{itemize}
+The deeper lesson is that the "non-normal pseudospectral phenomenon"
+narrative was plausible but wrong: \emph{the matrix had a real
+eigenvalue at every $k$, not just at the high-$k$ Nyquist edge}, and
+that was the diagnostic signature that finally pointed to the missing
+$M^{-1}$ scaling. The Nyquist concentration of the dominant
+eigenvector was an artifact of where $k^2$ is largest, not a property
+of the underlying bug.
+
 \subsection{Usage}
 \label{sec:modal-usage}
 
@@ -303,7 +415,7 @@ Solution: $\hat{u}_k(t) = \hat{u}_k(0) \cdot \exp(-D k^2 t)$ --- exponential dec
 \subsection{Error Model}
 \label{sec:modal-error-model}
 
-The \textbf{only} error source is eigendecomposition precision (${\sim}10^{-14}$ for well-conditioned matrices). For parameter sweeps, numerical uncertainty is effectively zero --- the dominant error becomes the physics model itself.
+The dominant error source is the Pad\'{e} scaling-and-squaring backward error (${\sim}10^{-14}$ per application; Higham 2009 \S4) plus $O((k-1) \cdot u \cdot \|\exp(M \cdot \mathrm{d}t)\|^2)$ accumulated matmul roundoff for snapshot $k$ in the step-by-step path (see \cref{sec:modal-snapshot-precision}). For inference runs using $N=2$ snapshots (initial + final), the final snapshot is produced by a single matrix-exponential application with zero accumulation --- machine-precision at $t_\mathrm{end}$. For parameter sweeps, numerical uncertainty is effectively zero in all configurations --- the dominant error becomes the physics model itself.
 
 Comparison with other solvers on single-field KG ($k=1$, $m^2=1$, $N=64$, $t=1$):
 
@@ -343,11 +455,11 @@ $N=256$ & 0.003\,s & 4.27\,s & $\mathbf{1{,}451\times}$ & $6.3\times 10^{-4}$ \\
 
 Key observations:
 \begin{itemize}
-  \item \textbf{Modal time is $O(1)$ in grid size} --- eigendecomposition cost is per-mode ($4\times 4$ matrices), independent of $N$. The IFFT reconstruction is $O(N \log N)$ but negligible.
+  \item \textbf{Modal time is $O(1)$ in grid size} --- Pad\'{e} precomputation cost is per-mode ($4\times 4$ matrices), independent of $N$. The IFFT reconstruction is $O(N \log N)$ but negligible.
   \item \textbf{CVODE scales as $O(N^{2+})$} --- spatial operator evaluation is $O(N)$ per timestep, and more grid points require more timesteps to resolve the same physics.
   \item \textbf{Max diff is CVODE error, not modal error} --- modal solutions are exact to machine precision (${\sim}10^{-16}$); the $10^{-4}$ difference is entirely CVODE truncation error.
   \item \textbf{Speedup grows with $N$} --- at $N=256$ the modal solver is ${>}1000\times$ faster, making it transformative for parameter sweeps where hundreds of simulations are needed.
-  \item \textbf{Modal time is $O(1)$ in simulation time} --- eigendecomposition is done once; evaluating at any $t$ is just $\exp(\lambda \cdot \Delta t)$. CVODE must take more timesteps for longer runs. See scaling table below.
+  \item \textbf{Modal time is $O(1)$ in simulation time} --- $\exp(M \cdot \mathrm{d}t)$ is precomputed once per mode; each additional snapshot is one matvec at $O(bs^2)$. CVODE must take more timesteps for longer runs. See scaling table below.
 \end{itemize}
 
 \subsubsection{Gertsenshtein Effect (6 Fields, Gradient Coupling)}
@@ -407,7 +519,7 @@ $t_\text{end}$ & Modal & CVODE & Speedup \\
 \end{table}
 
 \begin{itemize}
-  \item \textbf{Modal cost is constant in $t_\text{end}$} (${\sim}1.5$\,s) --- eigendecomposition is done once, and evaluating $\exp(\lambda \cdot \Delta t)$ at each output time is $O(1)$ regardless of $\Delta t$. The ${\sim}1.5$\,s is Python startup + FFT + eigendecomposition overhead.
+  \item \textbf{Modal cost is constant in $t_\text{end}$} (${\sim}1.5$\,s) --- $\exp(M \cdot \mathrm{d}t)$ is precomputed once per mode, and each snapshot step is one matvec at $O(bs^2)$, $O(1)$ in $\Delta t$. The ${\sim}1.5$\,s is Python startup + FFT + Pad\'{e} precomputation overhead.
   \item \textbf{CVODE cost scales linearly with $t_\text{end}$} --- each additional unit of simulation time requires proportionally more adaptive timesteps.
   \item \textbf{Speedup grows linearly with $t_\text{end}$} --- for a 40-point parameter sweep at $t_\text{end}=500$, modal saves ${\sim}7$ minutes vs CVODE. For $t_\text{end}=5000$ (astrophysical timescales), the advantage would be ${\sim}50\times$.
 \end{itemize}
@@ -480,6 +592,42 @@ Component & Location & How Used \\
 
 \textbf{Not reused:} \texttt{constraint\_solve.py:\_MULTIPLIERS} --- uses modified wavenumbers matching FD stencils. Modal solver defines its own exact multiplier registry.
 
+\subsection{Kinetic Coefficient Handling --- Two Dispatches}
+\label{sec:modal-kinetic-dispatches}
+
+The mass matrix $M$ from \texttt{kinetic\_coefficient\_symbolic} (``$M \ddot{x} = K x$'' rather than ``$\ddot{x} = K x$'') reaches the solver through \emph{two distinct code paths} depending on whether the spec has algebraic constraints or higher-order time operators. Both paths must apply $M$ identically, or cross-path regressions appear silently (the original \#301 Bug B symptom). This section documents the contract so future changes update both paths.
+
+\textbf{Why two paths.} The fast path exists because the majority of theories (Klein--Gordon, wave equations, most multi-field systems) have neither constraints nor higher-order time operators on the RHS. For these, bypassing the generalized eigenvalue problem and producing the pre-solved first-order evolution matrix directly saves the QZ decomposition cost and avoids spurious infinite eigenvalues that appear when $B$ is exactly $I$.
+
+\begin{table}[htbp]
+\centering
+\caption{Kinetic coefficient consumption across modal code paths. The dispatch condition is computed by \texttt{solve\_modal} at line 2385 as \texttt{needs\_reduction = (has\_constraints or has\_time\_ops) and not has\_pos\_dep}.}
+\label{tab:modal-kinetic-dispatch}
+\begin{tabular}{@{}p{0.18\textwidth}p{0.32\textwidth}p{0.42\textwidth}@{}}
+\toprule
+Path & Dispatch condition & How $M$ is consumed \\
+\midrule
+Fast (\texttt{\_build\_per\_mode\_matrices}) & No constraints, no d\_t RHS ops, no pos.\ dep.\ coefficients & \texttt{build\_inverse\_kinetic\_diag(spec, params)} computes $M^{-1}$ per field; folded into velocity-row coefficients so \texttt{A[vel\_slot, target\_slot] = $M^{-1}$ · coeff · multiplier}. Single eigendecomposition of the resulting first-order matrix. \\
+Gen.\ eig (\texttt{\_build\_evolution\_matrices}) & Constraints, or d\_t RHS ops, or gauge $A_0$ demotion & \texttt{kinetic\_coefficient\_symbolic} populated on the diagonal of \texttt{M\_mat}; \texttt{scipy.linalg.eig(A, B)} with QZ handles $M$, rank-deficiency via null-space projection, hidden algebraic constraints via Schur elimination. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Shared helper.} \texttt{tidal/solver/\_kinetic.py::build\_inverse\_kinetic\_diag(spec, params)} is the single entry point consumed by:
+\begin{itemize}
+  \item Modal fast path (this path --- folds $M^{-1}$ into the evolution matrix)
+  \item \texttt{solver/scipy\_solver.py}, \texttt{solver/cvode.py}, \texttt{solver/leapfrog.py}, \texttt{solver/ida.py} (time-domain backends --- multiply RHS by $M^{-1}$ at each step; IDA absorbs it into the DAE residual)
+\end{itemize}
+The modal generalized-eig path is the exception: it reads \texttt{kinetic\_coefficient\_symbolic} directly into \texttt{M\_mat}, because the generalized eigenvalue solve needs $M$ as a matrix, not as a scalar-per-field inverse. These are two representations of the same physical input.
+
+\textbf{Fast-path trigger.} \texttt{build\_inverse\_kinetic\_diag} returns \texttt{None} when every dynamical field has $|M_{ii} - 1| < 10^{-12}$, letting every caller skip the per-step multiply. Theories without \texttt{kinetic\_coefficient\_symbolic} (the vast majority) pay zero overhead for this feature.
+
+\textbf{Sign convention.} \texttt{kinetic\_coefficient\_symbolic} carries the raw LHS coefficient sum from the Wolfram EOM (see \cref{sec:pr-eh-cd}), which may be negative (e.g., graviton $-\kappa^{-2}$). Both paths accept negative $M$ --- negative eigenvalues of the generalized problem give ghost modes, which are physically meaningful for theories like PGT with indefinite kinetic structure. The consistency test \texttt{tests/test\_solver\_kinetic\_consistency.py} validates agreement across all five backends on a theory with $M = 1.5$.
+
+\textbf{Regression guard.} Both paths must be updated together when the kinetic handling changes. The cross-backend consistency test will catch any path that stops consuming $M$ correctly.
+
+\textbf{Scope.} Current implementation handles \emph{diagonal} $M$ (one scalar per field). Off-diagonal kinetic mixing (e.g., $\delta_m F \cdot F_{\text{torsion}}$ in dark-photon plasma theories) is a separate extension tracked in issue \#305; the data structures in both paths are already $(n_{\text{fields}}, n_{\text{fields}})$-shaped so the diagonal case is a 1D slice of the general case.
+
 \subsection{Block-Aware Eigendecomposition}
 \label{sec:modal-block-aware}
 
@@ -530,7 +678,7 @@ At each output time, constraint fields are reconstructed directly from the saved
 \subsection{Generalized Mass Matrix (Higher-Derivative Theories)}
 \label{sec:modal-mass-matrix}
 
-Higher-derivative theories such as PGT with $\tilde{R}^2$ terms produce equations with implicit acceleration coupling: \texttt{d2\_t(field\_j)} appearing on the RHS of \texttt{field\_i}'s equation, meaning $\ddot{q}_j$ couples into $\ddot{q}_i$'s dynamics. After Ostrogradsky reduction (\cref{sec:ostrogradsky-reduction}), the system has the generalized form:
+Higher-derivative theories such as PGT with $\tilde{R}^2$ terms produce equations with implicit acceleration coupling: \texttt{d2\_t(field\_j)} appearing on the RHS of \texttt{field\_i}'s equation, meaning $\ddot{q}_j$ couples into $\ddot{q}_i$'s dynamics. After v6 perturbative reduction (\cref{sec:perturbative-reduction}; see also the architectural Ostrogradsky discussion in \cref{sec:ostrogradsky}), the system has the generalized form:
 \begin{equation}
   M(k) \cdot \ddot{x} = K(k) \cdot x + D(k) \cdot \dot{x} + J(k) \cdot \dddot{x}
   \label{eq:generalized-mass}
@@ -709,8 +857,138 @@ Energy conservation after all three levels: $\max|dE/E| = 0$ (machine precision)
 
   \item \textbf{Spectral operators and energy measurement}: The modal solver works in $k$-space, but the energy measurement evaluates the Hamiltonian in physical space. The \texttt{--spectral} flag is preserved (not disabled) for modal so that the energy measurement uses FFT-based gradient operators matching the modal solver's conserved Hamiltonian. Without this, FD gradients produce conservation errors that increase with $N$ (the FD Hamiltonian differs from the Fourier Hamiltonian). For gradient$\times$gradient terms in the Hamiltonian, the measurement uses direct gradient product $\langle \partial f, \partial g \rangle$ rather than IBP $\langle -f, \partial^2 g \rangle$ when spectral is active, because rfft Nyquist-mode handling creates $O(1/N)$ discrepancy between the two.
 
-  \item \textbf{Per-mode eigendecomposition conditioning}: For coupled multi-field systems where fields have similar dispersion (e.g., massless graviton-photon), the $4\times 4$ per-mode block $A = \bigl[\begin{smallmatrix} 0 & I \\ K & 0 \end{smallmatrix}\bigr]$ has near-degenerate eigenvalue pairs, causing $\mathrm{cond}(V)$ up to $10^{291}$. This limits energy conservation to ${\sim}1.5\times 10^{-5}$ (eigenvector reconstruction error). The solution (future work) is to eigendecompose the $2\times 2$ $K$ matrix and use Hamiltonian $\cos/\sin$ structure, reducing conditioning to $O(1)$.
+  \item \textbf{Per-mode eigendecomposition conditioning} (\textbf{resolved} in v0.31+; see \cref{sec:modal-robust-matrix-exp}): For coupled multi-field systems where fields have similar dispersion (e.g., massless graviton-photon, or PGT \texttt{TorsionCDT} with redundant components), the per-mode block has near-degenerate eigenvalue pairs, causing $\mathrm{cond}(V)$ up to $10^{17}$ (and up to $10^{291}$ in pathological cases). This previously caused energy-conservation degradation and path-dependent simulation results. The fix is described in the next subsection: replace the $V \cdot \mathrm{diag}(e^{\lambda t}) \cdot V^{-1}$ evolution with direct matrix-exponential evolution via Pad\'{e} scaling-and-squaring, which has backward error bounded by the function condition number rather than the eigenvector condition number.
 \end{enumerate}
+
+\subsection{Robust Matrix-Exponential Evolution}
+\label{sec:modal-robust-matrix-exp}
+
+\subsubsection{Problem: ill-conditioned eigenvector matrix \texorpdfstring{$V$}{V}}
+
+The per-mode evolution from \cref{sec:modal-block-aware} originally computed
+\begin{equation}
+y(t) = V \cdot \mathrm{diag}\bigl(e^{\lambda_k t}\bigr) \cdot V^{-1} \cdot y(0)
+\label{eq:modal-eigen-evolution}
+\end{equation}
+where $V$ is the per-mode eigenvector matrix and $\lambda_k$ are the eigenvalues of the per-mode block $A$ (or generalized eigenvalues of the pencil $(A,B)$ when \texttt{B\_modes} is non-\texttt{None}). For coupled multi-field PGT theories with redundant tensor components --- in particular, the TorsionCDT formulation of the dark-photon Lagrangian (\#318, \#320) --- the redundant degrees of freedom drive $\mathrm{cond}(V)$ up to $10^{15}\text{--}10^{17}$ at every parameter point. Per Higham 2008 Functions of Matrices, \S2.3:
+\begin{quote}
+``If $\kappa(V) \cdot u > 10^{-3}$, abandon diagonalization.''
+\end{quote}
+With IEEE-754 unit roundoff $u \approx 10^{-16}$, the abandonment threshold is $\kappa(V) > 10^{13}$. Our observed $10^{15}\text{--}10^{17}$ is two to four orders of magnitude past every published threshold. Trefethen \& Bau (1997) Lecture~33 makes the consequence concrete: at $\mathrm{cond}(V) > 10^{14}$, $V^{-1}$ has \emph{zero useful digits} in IEEE double precision. The empirical signal: identical CDT and FV (fundamental-vector, 10-field) formulations of the same physics gave inconsistent $P_\text{max}$ at the same parameter point (\(P_\text{max} = 0.571\) vs.\ \(0.063\) at $\xi = 4.5$, with FV the consistent reference per the cross-formulation cross-check).
+
+\subsubsection{Why pseudo-inverse is the wrong fix}
+\label{sec:modal-pinv-wrong}
+
+A natural patch is to replace \texttt{np.linalg.inv} with \texttt{np.linalg.pinv} (Moore--Penrose pseudo-inverse via SVD). This is mathematically incorrect for our problem because:
+\begin{enumerate}
+  \item \texttt{pinv} truncates singular values below $\mathrm{rcond} \cdot \sigma_\text{max}$ ($\mathrm{rcond} \approx 10^{-13}$ in numpy 1.26+). The discarded right-singular vectors lie in directions of physical state space; there is no guarantee these directions carry no signal at our parameter points.
+  \item The eigendecomposition $A = V \Lambda V^{-1}$ is \emph{not} an orthogonal decomposition (since $V$ is not unitary for non-normal $A$). SVD-based pseudo-inverse solves a different problem (minimum-norm least-squares of a singular linear system) and computes $f(A)$ only by accident when the discarded subspace happens to carry no signal.
+  \item Higham 2008 \S2.3 lists pinv-of-$V$ as a workaround, not a method, and warns that using it in $f(A) = V f(\Lambda) V^{+}$ produces ``results that may bear no relation to $f(A)$'' when $V$ is near-singular.
+\end{enumerate}
+
+\subsubsection{Principled replacement: matrix exponential without diagonalization}
+\label{sec:modal-pade-evolution}
+
+The fix is to evaluate $\exp(M \cdot t) \cdot y_0$ directly where $M \equiv B^{-1} A$ (one stable solve, since $\mathrm{cond}(B) \approx 1$ for our kinetic matrix), \emph{without} forming an eigenvector basis. Two production-grade scipy routines exist:
+\begin{description}
+  \item[Method A: \texttt{scipy.linalg.expm}] (Higham 2009 \emph{SIAM Review} 51(4)): Pad\'{e} scaling-and-squaring. Computes the full $\exp(M)$ matrix via diagonal Pad\'{e} approximant $r_m(M / 2^s)$ followed by $s$ squaring steps. Backward error bounded by the function condition number $\kappa_f(M, t)$, not by the eigenvector condition number $\kappa(V)$.
+  \item[Method B: \texttt{scipy.sparse.linalg.expm\_multiply}] (Al-Mohy \& Higham 2011): action of the matrix exponential, computing $\exp(t M) \cdot b$ directly via scaling and truncated Taylor series on the action vector. Already used in the \emph{position-dependent} path \texttt{\_evolve\_full\_matrix} (\cref{sec:modal-perf-optimizations}, Round~1) for non-normal convolution matrices.
+\end{description}
+
+Both methods are mathematically robust for arbitrary $\mathrm{cond}(V)$. Their wall-time characteristics differ substantially for the per-mode block sizes $bs \le 15$ relevant here, and the empirically-correct choice (Method A with precomputed $\exp(M\,\mathrm{d}t)$ + matvec in the snapshot loop) is non-obvious; \cref{tab:modal-expm-benchmark} below documents the benchmark.
+
+\subsubsection{Wall-time benchmark across campaign workloads}
+\label{sec:modal-expm-benchmark}
+
+Four paths were benchmarked on a representative four-row workload table covering Stage~A (\texttt{dark\_photon\_plasma} CDT, \texttt{torsion\_dark\_photon\_fv}) and Stages~B-E (\texttt{graviton\_torsion}, \texttt{euler\_heisenberg}). Synthetic per-mode matrices match each theory's block dimension $bs$, block count, $n_\text{modes}$, $n_\text{snapshots}$, and $\mathrm{cond}(V)$ characteristics. Measurements via \texttt{scripts/benchmark\_modal\_evolution.py}.
+
+\begin{table}[htbp]
+\centering
+\caption{Per-mode matrix-exponential evolution benchmarks. Wall time is total per-call (per-block time $\times$ \#blocks) on a single CPU core. Path~(d), the empirically-best choice, is unconditional in v0.31+. All four paths agree to $\sim10^{-12}$ relative.}
+\label{tab:modal-expm-benchmark}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lcccccccccc@{}}
+\toprule
+Theory & $bs$ & \#blk & $n_\text{mod}$ & $n_\text{snap}$ & (a) eigen & (b) ppm-em & (c) bch-em & (d) Pad\'{e}+mv & (b)/(a) & (d)/(a) \\
+\midrule
+\texttt{dark\_photon\_plasma} (CDT) & 6 & 5 & 64 & 2 & 19\,ms & 548\,ms & 629\,ms & \textbf{20\,ms} & 28.6$\times$ & \textbf{1.06$\times$} \\
+\texttt{torsion\_dark\_photon\_fv} & 6 & 3 & 64 & 2 & 33\,ms & 265\,ms & 283\,ms & \textbf{16\,ms} & 8.0$\times$ & \textbf{0.49$\times$} \\
+\texttt{graviton\_torsion} & 10 & 4 & 128 & 50 & 113\,ms & 90{,}627\,ms & 7{,}374\,ms & \textbf{111\,ms} & 803$\times$ & \textbf{0.99$\times$} \\
+\texttt{euler\_heisenberg} & 5 & 2 & 96 & 50 & 38\,ms & 17{,}951\,ms & 2{,}270\,ms & \textbf{29\,ms} & 469$\times$ & \textbf{0.75$\times$} \\
+\bottomrule
+\end{tabular}
+
+\smallskip
+\textit{Legend:} (a) eigendecomposition + $V\,\mathrm{diag}(e^{\lambda t})\,V^{-1}$ (original default); (b) per-mode \texttt{expm\_multiply}, one call per (mode,\,snapshot); (c) per-mode \texttt{expm\_multiply} with \texttt{start/stop/num} snapshot scheduling; (d) \texttt{scipy.linalg.expm($M \cdot \mathrm{d}t$)} precomputed once per mode + matvec in the snapshot loop.
+\end{table}
+
+\subsubsection{Why path (d) wins on small per-mode blocks}
+\label{sec:modal-pade-vs-expm-multiply}
+
+\texttt{scipy.sparse.linalg.expm\_multiply} (paths b, c) carries substantial per-call setup overhead: estimating $\|A\|_1$, choosing scaling parameter $s$, choosing Taylor truncation $m$, allocating Krylov-Taylor workspace. For our per-mode block sizes ($bs \le 15$), this overhead vastly dominates the actual $O(bs^3) \approx 1000$ flops of the exponential. Calling it once per mode (path b) or once per mode with snapshot scheduling (path c) means we pay that overhead $O(n_\text{modes})$ times.
+
+By contrast, \texttt{scipy.linalg.expm} (path d) is a simpler direct routine that computes the matrix exponential of an $(bs \times bs)$ matrix in one $O(bs^3)$ Pad\'{e} call. Once $\exp(M \cdot \mathrm{d}t)$ is precomputed per mode, the snapshot loop becomes pure matvec at $O(bs^2)$ per snapshot per mode, and the snapshot-time iteration is structurally identical to the eigendecomposition's vectorised einsum:
+\begin{verbatim}
+M_modes = solve(B_modes, A_modes)               # (n_modes, bs, bs), one solve
+exp_M_dt = stack(scipy.linalg.expm(M_modes[m] * dt) for m)  # (n_modes, bs, bs)
+y_curr = y0_block.copy()
+for ti in range(n_snapshots):
+    snapshots[ti] = y_curr
+    y_curr = einsum("mij,mj->mi", exp_M_dt, y_curr)
+\end{verbatim}
+
+This contrasts with \cref{sec:modal-perf-optimizations} Round~1, where the position-dependent path uses \texttt{expm\_multiply} on the full convolution matrix. There the matrix dimension is $n_\text{total} \approx n_\text{slots} \cdot n_\text{modes}$ ($\sim 10^3\text{--}10^4$), at which the per-call setup cost is amortised and \texttt{expm\_multiply}'s sparse-matrix optimization wins. The two paths --- per-mode for constant coefficients (Pad\'{e} + matvec, this section) and full-matrix for position-dependent coefficients (\texttt{expm\_multiply}, \cref{sec:modal-opt-round1}) --- are not in competition; they are tuned to different matrix-size regimes within the same canonical robust-matrix-exponential strategy.
+
+\subsubsection{No threshold gate; eigendecomposition opt-in for Pass 1}
+\label{sec:modal-pade-pass1}
+
+Because path~(d) is wall-time-competitive with eigendecomposition \emph{and} mathematically robust for arbitrary $\mathrm{cond}(V)$, the original hybrid plan (\texttt{cond(V) > 1e12} threshold $\Rightarrow$ \texttt{expm\_multiply} fallback) was unnecessary. Path~(d) is unconditional for default Pass~0 evolution.
+
+The eigendecomposition path remains opt-in for the Pass~1 perturbative-Duhamel solver (\cref{sec:perturbative-reduction}), which requires per-eigenvalue closed-form kernels $G(\lambda_i, \lambda_j; t)$ and the $V$, $V^{-1}$ projection. Callers requesting eigendata via \texttt{collect\_eigendata} retain the original codepath, with an added $\mathrm{cond}(V) > 10^{12}$ check that raises \texttt{NotImplementedError} when Pass~0 is unsound (preventing silent corruption of Pass~1 corrections). The follow-up issue \texttt{\#320-Pass1} tracks an augmented-exponential Pass~1 path (Al-Mohy \& Higham 2011 \S5.2: $\exp(t \cdot \begin{psmallmatrix} A & M_\text{src} \\ 0 & A \end{psmallmatrix}) \cdot \begin{psmallmatrix} 0 \\ y^0(0) \end{psmallmatrix}$) that removes the eigendata dependency entirely, leaving \texttt{scipy.linalg.expm} as the sole canonical Pass~0/Pass~1 backend.
+
+\subsubsection{Verification}
+\label{sec:modal-pade-verification}
+
+\begin{itemize}
+  \item \textbf{Synthetic ill-conditioned unit test} (\texttt{tests/test\_modal\_robust\_evolution.py}): a $4\times 4$ generalized-eigenvalue problem with $\mathrm{cond}(V) \approx 10^{15}$ by construction. Path~(d) gives $\exp(M \cdot t) \cdot y_0$ to $\sim 10^{-12}$ relative; the original $V \cdot \mathrm{diag} \cdot V^{-1}$ path does not.
+  \item \textbf{CDT vs.\ FV bit-exact regression}: at five random parameter points spanning the v3 amplify prior, CDT (path d) and FV (well-conditioned, also path d) give $P_\text{max}$ matching to $\Delta / P_\text{max} < 10^{-10}$.
+  \item \textbf{No regression on well-conditioned theories}: the existing test suite (\texttt{euler\_heisenberg}, \texttt{graviton\_torsion}, FV scalar/vector examples) passes unchanged --- path (d) wall time is within $1.06\times$ of eigendecomposition on every workload, and bit-exact agreement to $\sim 10^{-12}$.
+\end{itemize}
+
+\subsubsection{Strategic implication for Stages B--E}
+
+The cross-formulation cross-check (FV vs.\ CDT) was the empirical signal that triggered this investigation. For more complex PGT theories in the campaign roadmap (Stages~B--E), an FV-style alternative formulation may not exist for cross-checking. Without the unconditional path~(d) fix, those campaigns would silently produce wrong answers in any region of parameter space where the redundant tensor components drive $\mathrm{cond}(V)$ above $10^{13}$. The unconditional fix is therefore a campaign-wide robustness investment, not just a Stage~A bug fix.
+
+\textbf{References}: Higham, N.J.\ (2008). \emph{Functions of Matrices: Theory and Computation}, SIAM, \S2.3 (eigendecomposition abandonment threshold); Higham, N.J.\ (2009). ``The scaling and squaring method for the matrix exponential revisited.'' \emph{SIAM Review} 51(4):747--764; Trefethen, L.N.\ \& Bau, D.\ (1997). \emph{Numerical Linear Algebra}, SIAM, Lecture~33; Al-Mohy, A.H.\ \& Higham, N.J.\ (2011). ``Computing the action of the matrix exponential.'' \emph{SIAM J.\ Sci.\ Comput.} 33(2):488--511; Davies, P.I.\ \& Higham, N.J.\ (2003). ``A Schur--Parlett algorithm for computing matrix functions.'' \emph{SIAM J.\ Matrix Anal.\ Appl.} 25(2):464--485.
+
+\subsubsection{Snapshot output precision}
+\label{sec:modal-snapshot-precision}
+
+The modal solver produces two structurally different snapshot output paths, with different precision characteristics.
+
+\paragraph{Uniform step-by-step path (default).}
+When the requested snapshot times are equally spaced (\texttt{t\_eval = [0, dt, 2dt, \ldots]}), the solver precomputes $E \equiv \exp(M \cdot \mathrm{d}t)$ once per mode block via \texttt{scipy.linalg.expm}, then applies it iteratively:
+\begin{equation}
+y_k = E \cdot y_{k-1} = E^k \cdot y_0
+\end{equation}
+Snapshot $k$ therefore accumulates $k-1$ matrix-multiplication roundoff errors beyond the initial Pad\'{e} backward error. For $k$ steps with block size $bs$, the bound is
+\begin{equation}
+\|\delta y_k\| \lesssim (k-1) \cdot u \cdot \|E\|^2 \cdot \|y_0\|
+\end{equation}
+where $u \approx 2.2 \times 10^{-16}$ is IEEE-754 unit roundoff. For the D2.2 campaign configuration ($t_\mathrm{end}=10$, $N=21$ snapshots, $\mathrm{d}t=0.5$), the accumulated error at the final snapshot is ${\sim}19 \times u \approx 4 \times 10^{-15}$ --- negligible for all practical physics measurements.
+
+\paragraph{Non-uniform path.}
+When snapshot times are unequally spaced, each snapshot is computed independently from the initial state:
+\begin{equation}
+y(t_k) = \exp\!\bigl(M \cdot (t_k - t_0)\bigr) \cdot y_0
+\end{equation}
+Each snapshot is machine-precision at every $t_k$ with no accumulation. The cost is $n_\mathrm{snaps}$ \texttt{expm} calls per mode block, compared to one \texttt{expm} call for the uniform path.
+
+\paragraph{$N=2$ snapshot special case (inference).}
+When \texttt{--snapshots=t\_end} is passed (or equivalently \texttt{t\_eval = [0, t\_end]}), the uniform path applies with $\mathrm{d}t = t_\mathrm{end}$: $E = \exp(M \cdot t_\mathrm{end})$ is precomputed once and applied \emph{once}. This is machine-precision at $t_\mathrm{end}$ with zero accumulated error --- identical precision to the non-uniform path at every snapshot, at the cost of a single \texttt{expm} precomputation. This is the recommended configuration for PolyChord/nested-sampling inference runs where only the final state is needed (see \cref{sec:inference-snapshot-guidance}).
+
+\paragraph{Why not switch the uniform path to compute each snapshot from $y_0$?}
+For visualization workloads with $N=21$ snapshots and $n_\mathrm{modes}=128$ blocks (e.g.\ \texttt{graviton\_torsion}), switching to direct-from-$y_0$ would require $21 \times 128 = 2688$ \texttt{expm} calls vs.\ $128$ for the current uniform path --- approximately $21\times$ more \texttt{expm} calls. The resulting regression in visualization sweep wall time is not justified by the $4 \times 10^{-15}$ precision improvement. For inference runs where this matters, the $N=2$ configuration already achieves machine precision. The deliberate decision to retain the uniform path is documented in GitHub issue \#331.
 
 \subsection{Performance Optimizations}
 \label{sec:modal-perf-optimizations}
@@ -794,6 +1072,9 @@ Constraint (Proca 3D, $16^3$) & 0.136\,s & 0.078\,s & $\mathbf{1.7\times}$ \\
   \item Al-Mohy, A.H.\ \& Higham, N.J.\ (2011). ``Computing the action of the matrix exponential.'' \emph{SIAM J.\ Sci.\ Comput.}, 33(2):488--511.
   \item Trefethen, L.N.\ \& Embree, M.\ (2005). \emph{Spectra and Pseudospectra}. Princeton University Press.
   \item Van Loan, C.\ (1978). ``Computing integrals involving the matrix exponential.'' \emph{IEEE Trans.\ Automatic Control}, 23(3):395--404.
-  \item Higham, N.J.\ (2008). \emph{Functions of Matrices: Theory and Computation}. SIAM. Ch.\ 12.
+  \item Higham, N.J.\ (2008). \emph{Functions of Matrices: Theory and Computation}. SIAM. \S2.3, Ch.\ 12.
+  \item Higham, N.J.\ (2009). ``The scaling and squaring method for the matrix exponential revisited.'' \emph{SIAM Review}, 51(4):747--764.
+  \item Trefethen, L.N.\ \& Bau, D.\ (1997). \emph{Numerical Linear Algebra}. SIAM. Lecture~33.
+  \item Davies, P.I.\ \& Higham, N.J.\ (2003). ``A Schur-Parlett algorithm for computing matrix functions.'' \emph{SIAM J.\ Matrix Anal.\ Appl.}, 25(2):464--485.
   \item Yoshida, H.~\cite{yoshida1990symplectic}. Construction of higher-order symplectic integrators.
 \end{itemize}

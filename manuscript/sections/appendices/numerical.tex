@@ -1,0 +1,854 @@
+% Appendix C: Numerical evolution of the linearised system.
+% Voice anchor: Barker Hamilcar (2512.25007), sole-author software paper
+% register. Structural template: HiGGS (2206.00658) Implementation -->
+% Module sections --> Parallelisation. Per the v2 revision plan, App C
+% (a) decouples TIDAL's general capability from the present work's
+% specific application, (b) imports the pre-built solver-selection
+% flowchart and operator catalogue figures, (c) cites the broader
+% non-normal-matrix-exponential and DAE literature explicitly, and
+% (d) cross-refs the Hamiltonian-obstruction discussion in
+% \cref{PerturbativeReduction} and the perturbative-reduction pipeline in
+% \cref{LPSSubstitution}. The Fourier modal solver receives the
+% longest treatment because it is the primary backend; the others are
+% documented briefly.
+
+\section{Numerical evolution of the linearised system}%
+\label{NumericalEvolution}
+
+The numerical stage of \TIDAL{} reads the
+equation specification produced by~\cref{SymbolicComputation} and
+evolves the linearised fields on a Cartesian sampling grid,
+supporting both flat and curved spacetime metrics. The grid and
+field-container design draws on the \pypde{}
+framework~\cite{zwicker2020pypde}. \TIDAL{} provides common
+infrastructure and a dispatcher that selects
+among several solver backends from the algebraic structure of the
+equation system. The Fourier modal solver
+of~\cref{ModalSolver} is the primary backend, used
+for every survey reported in~\cref{Results}.
+
+\paragraph*{Solver selection hierarchy} The solver-backend family is
+heterogeneous because the equation systems \TIDAL{} handles span
+differential--algebraic (DAE), pure-wave, and spatially-varying-background
+regimes. DAEs from gauge sectors require simultaneous
+algebraic-and-differential solution~\cite{henneaux1992quantization};
+pure wave systems benefit from explicit symplectic integration to
+suppress secular energy drift; and time-independent
+constant-coefficient systems on periodic boundaries diagonalise
+per-wavenumber, bypassing time integration entirely. The
+dispatcher \lstinline!_resolve_scheme!~(\cref{SolverDispatchFlowchart}) selects the first applicable
+backend from the following ordered rules:
+\begin{enumerate}
+  \item \textbf{Modal} when the metric is flat ($\sqrt{|g|}$ is unity), the spatial boundaries are
+    all periodic, and the coefficients are time-independent;
+    algebraic constraints, when present, can be eliminated per-mode by
+    Schur complement (\cref{ModalSolver}).
+  \item \textbf{IDA} (Implicit Differential-Algebraic solver,
+    \SUNDIALS{}~\cite{gardner2022sundials,hindmarsh2005sundials}) when
+    any of the following holds: the system
+    carries algebraic constraints; the
+    system carries first-order equations; or any right-hand side carries a
+    $\PD{_t}$ operator.
+  \item \textbf{CVODE} (\SUNDIALS{} adaptive ODE,
+    BDF~\cite{gardner2022sundials,hindmarsh2005sundials}) when the
+    system is a pure second-order wave.
+\end{enumerate}
+The leapfrog backend (\cref{OtherBackends}) and the \SciPy{} backend
+are opt-in only via \lstinline!--scheme leapfrog! and
+\lstinline!--scheme scipy!.%; the dispatcher never auto-selects them.
+
+% Figure C.0 — Solver dispatch flowchart.
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/solver_flowchart}
+  \caption{Auto-selection decision tree for the \TIDAL{} solver
+    dispatcher \lstinline!_resolve_scheme!. Diamond nodes are predicates
+    evaluated against the equation specification and grid; rectangular
+    leaves are the available backends. The dispatcher traverses the
+    tree top-down and returns the first leaf whose ancestor predicates
+    all hold. The left-hand sub-check panel lists the conditions
+    required for modal eligibility; systems containing operators
+    without exact Fourier multipliers fall through to the
+    \IDA{}/\CVODE{} branch.}
+  \label{SolverDispatchFlowchart}
+\end{figure}
+
+\subsection{Equation substrate and state layout}%
+\label{EquationSubstrate}
+
+\paragraph*{State representation} The \TIDAL{} state vector packs each
+field's slots into a flat array, with the number of slots per field
+set by the time-derivative order of its equation of motion:
+\begin{enumerate}
+  \item \textbf{Wave fields} (\lstinline!time_order!~$=2$) contribute
+    two slots: an array of values for the field $q$ itself, and an
+    array of values for its time derivative
+    $v_q \equiv \partial_t q$ at the current time. The two arrays
+    are linked at evaluation time by
+    \begin{align}
+      \partial_t \varphi = v_\varphi
+      \, ,
+      \qquad
+      \partial_t v_\varphi = \mathcal{L}[\varphi, v_\varphi]
+      \, ,
+      \label{ELVelocityForm}
+    \end{align}
+    which advances the field from the velocity slot. The Euler--Lagrange
+    right-hand side $\mathcal{L}$ in general acts linearly on \emph{both} the field and its time
+    derivative.
+  \item \textbf{First-order fields} (\lstinline!time_order!~$=1$)
+    contribute one slot: an array of values for the field. The
+    integrator advances this array using $\partial_t q$ computed from
+    the right-hand-side specification.
+  \item \textbf{Constraint fields} (\lstinline!time_order!~$=0$)
+    contribute one slot: an array of values for the field. The values
+    are not advanced by an integrator at all; they are determined at
+    each timestep by solving the field's algebraic equation of motion
+    against the
+    current values of the other fields in the system.
+
+  An example is the Maxwell scalar
+  potential $A_0$: in the Lorenz gauge it does not propagate as a wave
+  but is instead determined at each instant by the instantaneous
+  Poisson equation $\nabla^2 A_0 = \mathcal{S}[A_i]$, with the source
+  $\mathcal{S}[A_i]$ supplied by the spatial photon components.
+\end{enumerate}
+
+\paragraph*{Equation specification and evaluator}
+The equations of motion come from the JSON specification produced
+by~\cref{SymbolicComputation} (format illustrated
+in~\cref{JSONExample}; each equation is a list of (coefficient,
+operator, target-field) triples). At each call the evaluator
+parameter-resolves the coefficients, dispatches each operator to its
+spatial implementation, and assembles the result into the callable
+that the chosen backend invokes.
+
+\paragraph*{Velocity form versus canonical phase space} Writing the
+quadratic kinetic operator $\mathcal{K}$ of~\cref{KineticMatrix} as a
+polynomial in time derivatives, its leading $\partial_t^2$ block is
+the kinetic matrix $K_{ij}$, defined as the Hessian of the linearised
+Lagrangian density with respect to the field
+velocities~\cite{henneaux1992quantization},
+\begin{align}
+  K_{ij} \equiv \frac{\partial^2 \lag}{\partial(\partial_t \varphi_i)\,
+    \partial(\partial_t \varphi_j)}
+  \, ,
+\end{align}
+evaluated at the background. The canonical momenta are defined by
+differentiation of the Lagrangian with respect to the velocities,
+\begin{align}
+  p_i \equiv \frac{\partial \lag}{\partial(\partial_t \varphi_i)}
+  \, ,
+  \label{CanonicalMomenta}
+\end{align}
+which for a Lagrangian quadratic in time derivatives gives the linear
+relation $p_i = K_{ij}\, v_j$. To express the Hamiltonian density
+$\ham = p_i\, v_i - \lag$ in terms of the canonical pair $(q, p)$
+alone one must
+eliminate the velocities through $v_i = (K^{-1})_{ij}\, p_j$.
+\TIDAL{} chooses the velocity form for three reasons. (i) It avoids
+the symbolic inversion of the kinetic matrix at derivation time. For
+non-diagonal $K$ the entries of $K^{-1}$ are rational expressions
+whose size grows combinatorially with the number of fields; the
+$7{\times}7$ block of linearised gravity, for example, already fills
+the exported equations with ${-}4/3$ and ${-}2/3$ fragments that
+further compound under perturbation theory. Keeping the velocity
+form $(q, v)$ instead passes $K$ directly to the solver, which the
+implicit \IDA{} Newton iteration handles natively without ever
+materialising $K^{-1}$. (ii) The same flat-state representation
+accommodates wave, first-order, and constraint fields, so every
+backend sees a single residual function $F(t, y, \dot y) = 0$ (for
+\IDA{}) or $\dot y = f(t, y)$ (for \CVODE{}, leapfrog, \SciPy{}).
+(iii) It is well-defined even when the kinetic matrix is singular at
+the background. A singular $K$ signals that the field variables in
+the Lagrangian are not all independent --- primary constraints from
+gauge orbits or coincident kinetic eigenvectors --- and prevents the
+canonical change of variables from $(q, v)$ to $(q, p)$, requiring
+the constrained-Hamiltonian apparatus
+of~\cite{henneaux1992quantization} to recover a canonical
+formulation. The velocity form sidesteps the change of variables entirely.
+
+\paragraph*{State layout and field views} The mapping between a
+field's component name and its slot in the flat state vector is
+captured by a frozen \lstinline!StateLayout! dataclass, with each
+component carrying a \lstinline!slot_kind! discriminator from
+the categories above. The flat state itself is
+wrapped by a \lstinline!FieldSet! container
+that exposes the named field arrays to the right-hand-side evaluator
+and the backend integrators.
+
+\paragraph*{Coefficient evaluator} Each right-hand-side term carries an
+\xAct{} symbolic coefficient,
+resolved at run time against the parameter assignments and possibly the spatial coordinate grid. The
+\lstinline!CoefficientEvaluator! class implements a cache to
+amortise these per-call evaluations. The cache (as necessary) stores pre-resolved constants;
+parsed parameter-resolved expression; spatial
+grids of coefficient values for position-dependent;\footnote{A
+leak metric detects discontinuities at periodic
+boundaries. Without this guard, integration-by-parts boundary terms in the
+Hamiltonian density spoil long-time energy
+conservation.} and per-timestep deduplication of
+any time-dependent coefficients.
+
+\subsection{Spatial discretisation and the operator catalogue}%
+\label{SpatialDiscretisation}
+
+\paragraph*{Finite-difference stencils} The default spatial
+discretisation is a central-difference scheme on a uniform Cartesian
+grid, where the stencil coefficients are those of Fornberg's algorithm~\cite{fornberg1988generation}.
+The expected algebraic convergence
+rates are realised on a smooth gradient
+test in~\cref{FDConvergence}. Boundary conditions (periodic,
+Dirichlet, Neumann, or Robin) are handled uniformly by a ghost-cell
+formula~\cite{leveque2007finite}.
+The finite-difference (FD) path is the fallback for systems on which
+neither the modal solver of~\cref{ModalSolver} nor the pseudo-spectral
+path of~\cref{OtherBackends} is eligible.
+
+% Figure C.FDConvergence — FD vs spectral spatial convergence on the smooth gradient test.
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/figC2_fd_convergence}
+  \caption{Spatial-discretisation convergence on the test function
+    $f(x)=e^{\sin x}$,
+    periodic on $[0,2\pi]$. The four curves show the Fornberg
+    finite-difference stencils at orders $2$, $4$, and $6$ and the
+    periodic-domain pseudo-spectral path. Dashed lines are log--log
+    linear regression fits to the converging segment of each FD curve;
+    the fitted slope $\hat{\alpha}$ and coefficient of determination
+    $R^2$ are quoted in the legend. The dotted horizontal line marks
+    the IEEE-754 double-precision machine epsilon
+    $\varepsilon_{\rm mach}=2^{-52}\approx2.2\times10^{-16}$~\cite{goldberg1991floating}.
+    The spectral curve converges super-algebraically~\cite{boyd2001chebyshev};
+    reaching machine precision by $N\approx32$, after
+    which accumulated FFT rounding
+    ($\mathcal{O}(\varepsilon_{\rm mach}\,N\log N)$~\cite{higham2002accuracy})
+    dominates and grows slowly with~$N$.}
+  \label{FDConvergence}
+\end{figure}
+
+\subsection{Fourier modal solver}%
+\label{ModalSolver}
+
+\paragraph*{Mode-by-mode evolution} The state $(q, v)$ is transformed
+to Fourier space, and the right-hand-side operators are
+applied as Fourier symbols. For a
+system in which every coefficient is constant, each $k$-mode
+decouples, and the evolution reduces to a finite-dimensional linear
+ODE on the state vector~$\hat y(k)$ (the column that
+stacks the Fourier amplitudes of every field slot
+$\hat\varphi^I(k)$ and every velocity slot $\hat v_\varphi^I(k)$ at
+wavenumber $k$)
+\begin{align}
+  \frac{\diff}{\diff t} \hat y(k) = M(k)\, \hat y(k)
+  \, ,
+  \quad
+  \hat y(k, t) = \exp\!\big(M(k)\, t\big)\, \hat y(k, 0)
+  .
+  \label{ModalPerMode}
+\end{align}
+The wall time is $\mathcal{O}(1)$ in the integration endpoint $t_{\rm end}$ once
+the per-mode exponentials are precomputed: every output snapshot is
+then a single matrix--vector product per mode. When some coefficients
+are position-dependent, the per-mode decoupling fails and the
+evolution is computed instead by Krylov action described later.
+
+% Figure C.PadeBenchmark — wall-time comparison.
+% Generated by scripts/figures/figC3_pade_vs_eig.py from
+% benchmark_results/canonical/pade_vs_eig.json
+% (scripts/benchmarks/pade_vs_eig.py).
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/figC3_pade_vs_eig}
+  \caption{Per-mode wall time of the Pad\'e scaling-and-squaring path
+    (\lstinline!scipy.linalg.expm!~\cite{higham2009scaling}) against the
+    retired eigendecomposition path
+    $V\,\mathrm{diag}(\exp(D\,\Delta t))\,V^{-1}$, swept over grid
+    resolution on three representative theories.
+    Markers show the mean over $N_{\rm reps}{=}20$ repetitions; error
+    bars are the per-rep standard deviation.
+    \textbf{(a)} Two-channel mixing model
+    ($\mathcal{L}{\supset}-\tfrac12\kappa^{-2}(\partial h)^2
+    -\tfrac12(\partial a)^2 - B_0 h\,\partial_x a$ with $\kappa{=}1$,
+    $B_0{=}0.1$); a scalar--photon analogue of the
+    Raffelt--Stodolsky setup~\cite{raffelt1988mixing} with plasma and
+    graviton masses set to zero, equivalent at this parameter point to
+    the Gertsenshtein scalar reduction. 1D with $4{\times}4$ per-mode
+    blocks.
+    \textbf{(b)} Einstein--Maxwell Gertsenshtein system
+    ($\kappa{=}1$, $B_0{=}0.3$), 1D with
+    $12{\times}12$ blocks.
+    \textbf{(c)} Fierz--Pauli massive gravity~\cite{fierzpauli1939relativistic,boulwaredeser1972finite,hinterbichler2012theoretical} in $2{+}1$D ($m^2{=}1$),
+    on an $N{\times}N$ grid with $7{\times}7$ blocks after
+    constraint-elimination. The Pad\'e path is at or below
+    eigendecomposition wall time at every resolution sampled; the
+    enlarged error bars on panel~(b) at $N\in\{512,1024\}$ reflect OS
+    jitter on those repetitions rather than an algorithmic regression.}
+  \label{fig:PadeBenchmark}
+\end{figure*}
+
+\paragraph*{Pad\'e scaling and squaring} The per-mode matrix
+exponential in~\cref{ModalPerMode} is computed via the Pad\'e
+scaling-and-squaring method of
+\lstinline!scipy.linalg.expm!~\cite{higham2009scaling}. We do not
+employ the eigendecomposition $M(k) = V D V^{-1}$ with
+$\exp(M t) = V \exp(D\, t) V^{-1}$ because the eigenvector matrix $V$
+becomes ill-conditioned for several cases of interest in the
+Poincar\'e gauge sector: near-degenerate eigenvalues arise from a
+variety of sources and the worst-case condition number
+$\operatorname{cond}(V)$~\cite{golub2013matrix,higham2008functions} can exceed $10^{13}$ on the multi-field
+theories of~\cref{Results}. Above this conditioning, diagonalisation
+accumulates round-off far beyond the accuracy threshold of
+backward-stable matrix-exponential
+algorithms~\cite{higham2008functions,molervanloan2003nineteen,golub2013matrix,trefethen1997numerical};
+we adopt the recommendation of Higham~\cite[\S~2.3]{higham2008functions} and
+replace it with the Pad\'e path,\footnote{The eigendecomposition path
+remains available internally for the closed-form Duhamel kernel used
+in the perturbative-reduction scheme of~\cref{PerturbativeReduction},
+which requires the per-eigenmode expansion explicitly.}
+which is robust at arbitrary
+$\operatorname{cond}(V)$~\cite{higham2009scaling,higham2008functions}.
+% The Pad\'e per-mode wall time is competitive with the former
+% eigendecomposition path across the entire regime measured on three
+% theories: the Raffelt--Stodolsky
+% plasma--graviton~\cite{raffelt1988mixing},
+% Einstein--Maxwell~\cite{gertsenshtein1962wave,boccaletti1970conversion}, and
+% Fierz--Pauli massive gravity~\cite{fierzpauli1939relativistic,boulwaredeser1972finite,hinterbichler2012theoretical} in $2{+}1$D
+% (\cref{fig:PadeBenchmark}).
+Pad\'e offers the robustness
+guarantee at no average performance cost (\cref{fig:PadeBenchmark}).
+
+\paragraph*{Block-aware union-find} The evolution matrix $M(k)$
+inherits the block structure of the underlying coupled-field
+equations. A typical multi-field theory decomposes into several
+decoupled sub-blocks % --- for example, the $h_\times\!\leftrightarrow\!
+% a_y$ graviton--photon pair separates from the trace--vector torsion
+% channel at the linear level (see~\cref{ChannelStructure} for the
+% numerical demonstration on the survey theories) --- and processing
+% such a block-diagonal matrix as a single dense object would waste
+% both wall time (since the per-mode \lstinline!expm! cost scales as
+% $\mathcal{O}(b^3)$ in the block size $b$) and conditioning.
+so we recompute the block decomposition: slots $i$ and $j$ are deemed
+coupled when either off-diagonal entry $M_{ij}$ or $M_{ji}$ exceeds
+a heuristic cut-off of $10^{-14}\,\max|M|$ in absolute value,%
+% \footnote{The kinetic matrix is not in general symmetric in field
+% space: derivative cross-couplings between fields of different
+% intrinsic parity (e.g.\ scalar--pseudoscalar gradient mixing, or
+% graviton--photon mixing in the Gertsenshtein system) contribute
+% antisymmetric off-diagonal entries.
+% These entries are the structural signature of the parity-odd sector
+% and drive the conversion processes that are the focus
+% of~\cref{Results}.}
+and a union-find with path
+compression~\cite{tarjan1975unionfind} collects the resulting
+coupling graph into connected components. The exponential is then
+applied block-by-block: replacing a single block of size $b$ by $n$
+independent blocks of size $b/n$ reduces the total per-mode cost from
+$\mathcal{O}(b^3)$~\cite{higham2009scaling} to $\mathcal{O}(b^3/n^2)$,
+we observe the speed-up~(\cref{fig:PadeBenchmark}) and find the
+conditioning to be at least as good as the unblocked path on every
+tested theory.
+% The block
+% decomposition is retained under the Pad\'e path of the previous
+% paragraph for the same reason; the union-find threshold is an
+% engineering heuristic and is deliberately conservative.
+
+\paragraph*{Constraint elimination via Fourier Schur complement}
+When the equation system carries algebraic constraints
+and is otherwise modal-eligible,
+we eliminate the constraint slots per mode by Schur complement~\cite{boydvandenberghe2004convex} before
+forming the exponential. Partitioning the per-mode state
+$\hat y(k) = (y_d, y_c)^{\mathsf{T}}$ into a dynamical part $y_d$ and
+a constraint part $y_c$, the equation
+$\partial_t \hat y(k) = M(k)\, \hat y(k)$ of~\cref{ModalPerMode} reads
+in block form
+\begin{align}
+  \begin{pmatrix} \partial_t y_d \\ \partial_t y_c \end{pmatrix}
+  = \begin{pmatrix} A(k) & \mathsf{S}_{dc}(k) \\
+    \mathsf{S}_{cd}(k) & \mathsf{S}_{cc}(k) \end{pmatrix}
+    \begin{pmatrix} y_d \\ y_c \end{pmatrix}
+  \, .
+  \label{ModalSchur}
+\end{align}
+But $\partial_t y_c = 0$, so the constraint row yields
+\begin{align}
+  y_c = -\mathsf{S}_{cc}^{-1} \mathsf{S}_{cd}\, y_d
+  \, ,
+  \label{SchurReducedConstraint}
+\end{align}
+and substitution into the dynamical block produces the reduced
+evolution matrix
+\begin{align}
+  A_{\rm red}(k) = A_{dd}(k) - A_{dc}(k)\, \mathsf{S}_{cc}^{-1}(k)\, \mathsf{S}_{cd}(k)
+  \, ,
+  \label{SchurReducedMatrix}
+\end{align}
+on $y_d$ alone. The matrix $A_{dc}$ here captures references to
+constraint \emph{field values} in dynamical equations. When this is the only constraint coupling pattern
+present, the basic Schur step~(\cref{SchurReducedMatrix}) is the
+complete elimination, and $A_{\rm red}$ is the per-mode generator the
+modal exponential acts on.
+
+A second pattern arises when the dynamical block references the
+\emph{velocity} of a constraint slot. The
+constraint equation itself is algebraic
+($\mathsf{S}_{cd}\,y_d + \mathsf{S}_{cc}\,y_c = 0$, with no explicit
+$\dot y_c$). Differentiating \emph{that algebraic
+identity} in time yields
+$\dot y_c = -\mathsf{S}_{cc}^{-1}\mathsf{S}_{cd}\,\dot y_d$ and substituting into the
+dynamical equation
+$\dot y_d = A_{\rm red}\,y_d + A_{dc,v}\,\dot y_c$ produces an
+\emph{implicit} equation in $\dot y_d$:
+\begin{align}
+  \left(I \,+\, A_{dc,v}\,\mathsf{S}_{cc}^{-1}\mathsf{S}_{cd}\right)\,
+  \dot y_d
+  \;=\; A_{\rm red}\, y_d
+  \, ,
+  \label{SchurImplicitVelocity}
+\end{align}
+which \TIDAL{} resolves per mode by a single
+\lstinline!np.linalg.solve! call across all modes simultaneously. For systems with a rank-deficient kinetic
+matrix the same reduced exponential is
+evaluated through the generalised eigenvalue problem
+$(K - \lambda M)\, v = 0$, which is solved internally by the QZ
+algorithm of Moler \& Stewart~\cite{moler1973algorithm} as exposed by
+\lstinline!scipy.linalg.eig(A, B)!. QZ handles rank-deficiency cleanly
+through the Schur form without requiring the eigenvector matrix to be
+well conditioned. The Schur-complement reduction itself is standard
+DAE practice~\cite{brenan1996numerical,hairer1996ode2}, and a unified
+entry point shared by both the modal solver and the constraint
+initial-condition machinery of~\cref{ConstraintIC} ensures that the
+same Schur operator is used in both contexts.
+
+\paragraph*{SVD null-space projection on rank-deficient kinetic matrices}%
+\label{SVDNullSpace}
+For theories whose linearised kinetic matrix $K$ is rank-deficient,
+the generalised-eigenvalue path can return
+spurious finite eigenvalues for the redundant directions before the
+QZ algorithm has a chance to identify the infinite eigenvalues.
+\TIDAL{} projects out the null space of $K$ by an SVD truncation~\cite[\S~5.5]{golub2013matrix} before forming the
+generalised eigenproblem; the
+resulting operator is rank-correct and the spurious eigenvalues are
+removed.
+% This is the bit-exact diagnostic that the cross-formulation
+% comparison in \cref{Validation} validates against the Proca-vector
+% representation.
+
+\paragraph*{Position-dependent coefficients via Krylov action}
+Position-dependent coefficients couple the per-mode systems together.
+Let $y(x)$ denote any state slot in position space and $c(x)$ a
+position-dependent coefficient that multiplies it on the right-hand
+side. In Fourier space, the product becomes a convolution. On the
+discrete grid $\{k_n\}_{n=0}^{N-1}$ this convolution reduces to a
+finite sum~\cite{cooley1965fft}:
+\begin{align}
+  (\widehat{c \cdot y})_k
+  = \frac{1}{N}\sum_{k'} \hat c_{\,k-k'}\, \hat y_{k'}
+  \;\xrightarrow[N\to\infty]{}\;
+  \int \hat c(k - k')\, \hat y(k')\, \diff k'
+  \, .
+  \label{ModalConvolution}
+\end{align}
+The per-mode decoupling of~\cref{ModalPerMode} fails: every mode
+$\hat y_k$ now receives a contribution from every other mode
+$\hat y_{k'}$ through the convolution kernel. The evolution takes the
+mode-coupled form
+\begin{align}
+  \partial_t \hat y_k
+  = \sum_{k'} M_{k k'}\, \hat y_{k'}
+  \;\xrightarrow[N\to\infty]{}\;
+  \int M(k, k')\, \hat y(k')\, \diff k'
+  \, ,
+  \label{ModalCoupled}
+\end{align}
+with each entry the sum of two contributions,
+\begin{align}
+  M_{k k'} = A(k)\,\delta_{k k'}
+  \,+\, \tfrac{1}{N}\,\hat c_{\,k-k'}\,\mathcal{L}(k')
+  \, ,
+\end{align}
+where $A(k)$ is the diagonal per-mode operator
+of~\cref{ModalPerMode}, $\hat c_{\,k-k'}$ are the discrete Fourier
+coefficients of $c(x)$, and $\mathcal{L}(k') \in \{1,i k',\cdots\}$ is the Fourier symbol
+of the relevant spatial operator~\cite{boyd2001chebyshev}.
+The matrix is dense in general, and is generally non-normal, in which
+case the eigendecomposition is inadequate: even in exact arithmetic, individual
+eigenvalues $\exp(\lambda t)$ would overflow because $\lambda$ has a
+large positive real part, while the action $\exp(M t)\, y_0$ remains
+bounded.%
+\footnote{This is the pseudospectral
+phenomenon analysed in Trefethen \& Embree~\cite[\S~15]{trefethen2005spectra},
+where the transient growth of $\|\exp(A t)\|$ for non-normal
+$A$ is controlled by the $\varepsilon$-pseudospectrum rather than by
+the spectrum itself.}
+The matrix-exponential action is computed directly via the
+Krylov scheme of \SciPy{}'s
+\lstinline!expm_multiply!~\cite{almohy2011action} ---
+which evaluates $\exp(Mt)\,y_0$ without forming $\exp(Mt)$ explicitly
+and is backward-stable on non-normal $M$.
+
+For localised coefficient profiles the convolution matrix is
+effectively banded; \TIDAL{} converts it to compressed-sparse-column
+(CSC) format~\cite{demmel1999supernodal,lidemmel2003superlu} when the
+density falls below a heuristic 30\% cut-off. \Cref{fig:SparseCSCBenchmark}
+shows the resulting orders of magnitude speed-up on the Gertsenshtein effect with a Gaussian-localised
+field~\cite{boccaletti1970conversion} as the matrix sparsifies with
+increasing grid resolution.
+
+% The resulting
+% per-snapshot cost (\cref{fig:SparseCSCBenchmark}) drops by two orders of magnitude relative to the
+% dense path on the Gertsenshtein effect with a Gaussian-localised
+% background field~\cite{boccaletti1970conversion}
+% and continues to widen as the matrix sparsifies further.
+% Above
+% $N\approx1024$ the dense path becomes infeasible as the convolution
+% matrix exceeds a gigabyte; the sparse path remains tractable.
+% Figure C.SparseCSCBenchmark — sparse-CSC vs dense expm_multiply.
+% Generated by scripts/figures/figC4_sparse_csc.py from
+% benchmark_results/canonical/sparse_csc_vs_dense.json
+% (scripts/benchmarks/sparse_csc_vs_dense.py).
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/figC4_sparse_csc}
+  \caption{Per-call wall time of \SciPy{}'s
+    \lstinline!expm_multiply!~\cite{almohy2011action}
+    on dense and compressed-sparse-column representations of the
+    mode-coupled convolution matrix for the Einstein--Maxwell
+    Gertsenshtein effect on a Gaussian-localised background field
+    $B_x(z){=}B_{\rm peak}\,e^{-z^2/(2R^2)}$~\cite{boccaletti1970conversion},
+    with $\kappa{=}1$, $B_{\rm peak}{=}0.1$, $R{=}5$ on the periodic
+    domain $[-50, 50]$. Markers show the mean over $N_{\rm reps}{=}10$
+    repetitions; error bars are the per-rep standard deviation.}
+  \label{fig:SparseCSCBenchmark}
+\end{figure}
+
+\paragraph*{Nyquist mode and energy conservation}
+% A subtlety in the
+% modal solver controls energy conservation at the level of machine
+% precision.
+The real-to-complex FFT's Nyquist bin (the $k=N/2$ mode on
+even-$N$ grids) must be purely real for real-valued
+fields~\cite{nyquist1928certain,boyd2001chebyshev}, but the per-mode evolution matrix
+has complex entries from the gradient couplings, so $\exp(M t)$
+generates an imaginary Nyquist component which \lstinline!irfft!
+silently discards on each reconstruction. We zero the Nyquist mode
+in the initial condition before evolution, which is the linear
+analogue of the dealiasing rule used by spectral codes for nonlinear
+problems~\cite{boyd2001chebyshev,burns2020dedalus}. With the Nyquist
+zero in place the relative energy drift decreases monotonically with
+resolution in \cref{fig:NyquistEnergy}; without it, the drift grows with $N$ as
+the Nyquist mode oscillates faster at finer resolution.
+% Figure C.NyquistEnergy — relative energy drift |dE/E| vs N.
+% Generated by scripts/figures/figC5_nyquist_energy.py from
+% benchmark_results/canonical/nyquist_energy.json
+% (scripts/benchmarks/nyquist_energy.py).
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/figC5_nyquist_energy}
+  \caption{Relative energy drift $|\Delta E/E|$ at
+    $T_\mathrm{end}{=}10$ on the Raffelt--Stodolsky plasma--graviton
+    scalar model~\cite{raffelt1988mixing} ($\kappa{=}1$, $B_0{=}0.1$,
+    $m_g^2{=}0$), as a function of modal-solver grid resolution
+    $N$. Colour distinguishes
+    the mass configuration (blue: massless, $\omega_P^2{=}0$; orange:
+    massive, $\omega_P^2{=}1$); linestyle and marker fill distinguish
+    the Nyquist-zero projection. The dotted horizontal line is the IEEE-754
+    machine-epsilon floor $\varepsilon_{\rm mach}{=}2^{-52}$. With the projection in
+    place the drift decreases monotonically toward
+    $\varepsilon_{\rm mach}$; without it the drift grows with $N$,
+    reflecting the linear analogue of the spectral-method
+    dealiasing rule for
+    nonlinearity~\cite{boyd2001chebyshev,burns2020dedalus}.}
+  \label{fig:NyquistEnergy}
+\end{figure}
+
+\subsection{Other backends}%
+\label{OtherBackends}
+
+\paragraph*{Pseudo-spectral evaluation}
+The Fourier modal solver of~\cref{ModalSolver} bypasses time
+integration entirely. This is available \emph{only} when every coefficient is
+time-independent and no equation carries a first-time-derivative
+term. When the system needs a time integrator for those reasons
+but every spatial boundary is still periodic, \TIDAL{} provides a
+complementary \emph{pseudo-spectral evaluation path} that the
+step-based backends below (\IDA{}, \CVODE{}, leapfrog, \SciPy{}) can
+use: spatial operators are applied as Fourier
+multipliers,%~\cite{burns2020dedalus},
+\footnote{The pseudo-spectral path uses the exact continuous wavenumber $k$ as
+a Fourier multiplier --- the same convention as the Fourier modal
+solver of~\cref{ModalSolver}. The constraint initial-condition solver
+of~\cref{ConstraintIC} instead uses the modified wavenumber
+$k_{\rm mod}^2 = -(2/\Delta x^2)(1 - \cos(k\,\Delta x))$ at order~$2$,
+with the order-$4$ and order-$6$ Fornberg
+generalisations~\cite{fornberg1988generation}. This choice keeps the
+constraint solution spectrally consistent with the FD stencils that
+drive the time evolution on those paths.}
+while the time evolution is driven by the chosen step-based backend.%
+\footnote{The path is auto-enabled in every
+solver backend except \IDA{}, whose Newton iteration uses a sparse
+linear solver to factor the DAE Jacobian $\partial F/\partial y$: the
+FD stencils produce a banded Jacobian that the sparse
+factoring exploits, whereas the spectral path produces a dense
+Jacobian in which every $k$-mode couples to every other, which the
+sparse solver cannot exploit.}
+Spectral methods give super-algebraic convergence on smooth periodic
+data~\cite{boyd2001chebyshev}: the error decays faster than any power
+of $1/N$. \Cref{FDConvergence} shows the spectral path reaching the
+round-off floor by $N\approx 32$, while the FD orders display the
+predicted algebraic rates.
+
+\paragraph*{\IDA{} --- differential--algebraic equations}
+The \IDA{} backend is the implicit differential--algebraic
+solver from \SUNDIALS{}~\cite{gardner2022sundials,hindmarsh2005sundials}, accessed via
+\lstinline!scikit-sundae!~\cite{randall2024skitsundae}.
+\IDA{} integrates a residual form $F(t, y, y') = 0$ by adaptive
+backward differentiation formulas.
+% of orders $1$ through $5$.
+\TIDAL{} populates the residual with $F_i = y_i'- R_i(y)$ for
+dynamical fields (with $R_i$ the Euler--Lagrange right-hand side),
+and with $F_i = R_i(y)$ for constraint fields, so that both classes are
+handled simultaneously. \IDA{} is
+the only \TIDAL{} backend that supports algebraic constraints natively
+at run time. Newton iteration at each implicit step requires the
+Jacobian $\partial F/\partial y + c_j\,\partial F/\partial y'$ of the
+residual; \TIDAL{} computes this analytically (see~\cref{AnalyticalJacobian}).
+
+\paragraph*{\CVODE{} --- adaptive ODE} The \CVODE{}
+backend wraps the \SUNDIALS{} ordinary-differential-equation solver of
+the same name~\cite{gardner2022sundials,hindmarsh2005sundials} through
+\lstinline!scikit-sundae!~\cite{randall2024skitsundae}.
+% , and is
+% auto-selected for pure wave systems in which every equation has
+% time order~$2$ and a canonical Hamiltonian structure is recorded in
+% the specification.
+\CVODE{} supports both BDF (for stiff
+problems~\cite{hairer1996ode2}) and the Adams family
+(non-stiff problems~\cite{hairer1993ode1}).
+% Constraint fields, when present in the equation specification but not
+% eliminable by the modal Schur path, are frozen at their
+% initial-condition values; systems with algebraic constraints therefore
+% route to \IDA{} instead.
+
+\paragraph*{Leapfrog --- symplectic St\"ormer--Verlet and Yoshida}
+The leapfrog backend implements two symplectic integrators. The first
+is the second-order St\"ormer--Verlet
+scheme~\cite{verlet1967computer,hairer2006geometric}, with a single
+force evaluation per timestep. The second is the fourth-order Yoshida composition of three
+St\"ormer--Verlet sub-steps~\cite{yoshida1990symplectic},
+% in which a
+% negative middle-step weight cancels the leading
+% $\mathcal{O}(\Delta t^2)$ error of St\"ormer--Verlet. Adjacent
+% half-kicks between the three sub-steps merge into a single combined kick
+with the Forest--Ruth fused-kick
+scheme~\cite{forestruth1990fourth}.
+%, reducing the cost from six force
+% evaluations per outer step to three plus one initialiser.
+Both integrators preserve a shadow Hamiltonian to
+machine precision $\varepsilon_{\rm mach}\approx 2.2\times 10^{-16}$
+(IEEE 754 double) and exhibit zero
+secular energy drift over arbitrary integration
+times~\cite{hairer2006geometric}. The dispatcher never selects
+leapfrog automatically: leapfrog requires a strict Hamiltonian wave
+structure, and the adaptive BDF solvers handle the wider class of
+equation systems that the dispatcher must accept without further user
+input. Leapfrog is selected explicitly via
+\lstinline!--scheme leapfrog! when long-time symplecticity is the
+dominant concern.
+
+\paragraph*{\SciPy{} --- general-purpose adaptive ODE} The \SciPy{}
+backend wraps \lstinline!scipy.integrate.solve_ivp!~\cite{virtanen2020scipy},
+with a default method of DOP853 (an eighth-order embedded
+Runge--Kutta scheme~\cite{dormand1980runge,hairer1993ode1}). Smooth non-stiff problems are
+sometimes solved more cheaply by an explicit high-order method than by
+adaptive BDF, because DOP853 requires fewer function evaluations per
+unit of accuracy. Like leapfrog, the \SciPy{} backend is opt-in only.
+
+\subsection{Initial-condition preparation}%
+\label{ICPreparation}
+
+\paragraph*{Constraint projection onto the constraint surface}%
+\label{ConstraintIC}
+When the equation specification contains
+algebraic constraints, the user-supplied initial condition
+$(q_0, v_0)$ generically lies off the constraint surface. The initial
+condition must satisfy these algebraic
+constraint equations
+% ; otherwise the system starts off the constraint
+% surface at $t=0$ and the subsequent evolution carries an arbitrary
+% constant offset (in the modal Schur path) or fails to start (in the
+% \IDA{} Newton iteration).
+\TIDAL{} resolves this by taking the
+user-supplied dynamical-slot values $(q_0, v_0)$ as authoritative and
+solving the algebraic equations of motion for the constraint slots,
+producing a self-consistent initial state. The
+\lstinline!ensure_consistent_ic! function performs this projection
+once, after the initial condition is assembled and before the chosen
+backend is invoked.
+
+\paragraph*{Three-tier solver} The projection is implemented as a
+three-tier solver. The dispatcher \lstinline!_select_method! chooses the fastest applicable
+tier from the structure recorded. The first tier handles the common case in which
+all boundaries are periodic and the constraint coefficients are
+constant: the constraint operator is diagonalised by the discrete
+Fourier transform, with FD-order-aware modified wavenumbers
+$k_{\rm mod}^2 = -(2/\Delta x^2)(1 - \cos(k\,\Delta x))$ at order~$2$
+and the analogous higher-order expressions at orders~$4$ and~$6$ so
+that the constraint solution is spectrally consistent with the FD
+stencils used during evolution; the cost is
+$\mathcal{O}(N\log N)$~\cite{cooley1965fft}. The second
+tier covers non-periodic boundaries and variable coefficients: the
+constraint Jacobian is built by impulse-probing the same
+\lstinline!RHSEvaluator! operators used during evolution, then stored as
+CSC and factored by SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu} with
+$\mathcal{O}(N^2)$ build cost and $\mathcal{O}(N)$ solve. The third tier, reserved for
+the $N>2\times 10^{5}$ regime, is a Krylov iterative scheme; it is
+implemented but not exercised in~\cref{Results},
+where the largest grids fit comfortably within tier~$2$.
+
+\paragraph*{Zero-mode regularisation} A pure Poisson constraint on a
+periodic domain has a one-dimensional null space: the zero Fourier
+mode is undetermined by the elliptic problem and must be supplied by
+an external condition. We pin the zero mode to zero as a numerical
+regularisation. For the gauge-field constraints relevant to the
+present work, physical observables are constructed from
+derivatives (the field strengths $F_{\mu\nu}$), and the zero-mode
+choice cancels in any gauge-invariant quantity.
+
+\subsection{Analytical Jacobian}%
+\label{AnalyticalJacobian}
+
+\paragraph*{Motivation} The implicit backends \IDA{} and
+\CVODE{} both rely on a Jacobian matrix $J = \partial F/\partial y +
+c_j\,\partial F/\partial y'$ to drive the Newton iteration of each
+backward-differentiation step. FD approximation of
+this matrix requires multiple residual evaluations per Newton
+iteration~\cite{gardner2022sundials,hindmarsh2005sundials}.\footnote{Specifically, the
+cost is $\mathcal{O}(n_{\rm colors})$ residual evaluations per Newton
+iteration, where $n_{\rm colors}$ is the chromatic number of the
+sparsity graph~\cite{curtispowellreid1974}: each column-colour group
+of structurally non-overlapping entries can be probed in a single
+residual evaluation.} For the multi-field systems with
+$N\!\sim\!10^4$ degrees of freedom that arise in the PGT campaigns
+of~\cref{Results}, that overhead is the dominant cost. We
+precompute the Jacobian analytically, once, from the symbolic
+equation specification, and supply
+it to the linear solver directly through the \SUNDIALS{} callback
+interface~\cite{gardner2022sundials,hindmarsh2005sundials}.
+
+\paragraph*{Three-tier dispatch} The analytical-Jacobian machinery
+maintains three distinct delivery tiers, with thresholds $N \leq
+2{,}000$ for the dense tier, $2{,}000<N\leq 200{,}000$ for the sparse
+tier, and $N>200{,}000$ for the matrix-free tier. The dense tier
+fills a two-dimensional \NumPy{} array with $\partial F/\partial y +
+c_j\,\partial F/\partial y'$ at every Newton step, which the \SUNDIALS{}
+direct linear solver factors by LAPACK LU~\cite{andersonlapack1999}; this path delivers a
+substantial wall-time speedup over FD Jacobian
+evaluation, with the per-tier comparison shown
+in~\cref{fig:AnalyticalJacobianSpeedup}. The sparse tier fills a flat
+CSC data buffer with a fixed sparsity
+pattern, which \SUNDIALS{} factors with
+SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu}.
+% ; this yields
+% a measurable speedup for both backends, larger for \IDA{}
+% (heavier per-step Jacobian cost) than for \CVODE{}.
+The matrix-free tier supplies an analytical
+Jacobian--vector product callback $J\,v = (\partial F/\partial y)\,v +
+c_j\,(\partial F/\partial y')\,v$ to the \SUNDIALS{} Krylov interface,
+which then solves the linear step by GMRES~\cite{saad1986gmres}
+without ever materialising $J$ explicitly --- this is the regime in
+which the $\mathcal{O}(n_{\rm colors})$ overhead of finite differencing would
+dominate absolutely.
+
+% Thresholds DENSE_THRESHOLD=2000, SPARSE_THRESHOLD=200000, and
+% SUPERLU_NNZ_LIMIT=100000 are defined in tidal/solver/_types.py:45--57.
+\paragraph*{Assembly cost versus solve cost}
+Figure~\ref{fig:AnalyticalJacobianSpeedup} measures only the
+Jacobian-\emph{fill} stage of each Newton iteration. In that stage,
+the sparse-CSC fill always beats the dense fill (no
+$\mathcal{O}(N^{2})$ \texttt{toarray} call) and beats the matrix-free
+GMRES path at small $N$ (one fill costs less than the inner-iteration
+mat-vecs that GMRES would accumulate). The production thresholds at
+$N{=}2{,}000$ and $N{=}200{,}000$ are not set by the fill cost: they
+are set by the linear-\emph{solve} cost of the paired \SUNDIALS{}
+direct solver. LAPACK dense LU is the fastest $\mathcal{O}(N^{3})$
+factoriser while its working set fits in cache, which on a typical
+CPU holds up to $N\!\sim\!2{,}000$. SuperLU's sparse LU is fastest
+while its triangular fill-in fits in memory, calibrated at
+$\mathrm{nnz}\!\lesssim\!10^{5}$ via the \lstinline!SUPERLU_NNZ_LIMIT!
+constant~\cite{lidemmel2003superlu,demmel1999supernodal}. Beyond
+that, matrix-free GMRES eliminates the LU factor entirely at the
+cost of per-Newton-step inner iterations. The crossover thresholds
+are therefore calibrated against full-solver wall times
+(Figs.~\ref{fig:PadeBenchmark}, \ref{fig:SparseCSCBenchmark}), not
+against the assembly cost shown in
+Figure~\ref{fig:AnalyticalJacobianSpeedup}.
+
+% Figure C.AnalyticalJacobianSpeedup — wall-time comparison vs FD Jacobian.
+% TODO: benchmark script at scripts/benchmarks/jac_speedup.py (to be written)
+%   Sweep dense (N<=2k), sparse (2k<N<=200k), GMRES (N>200k) tiers across
+%   coupled_scalars, gertsenshtein, massive_gravity_2d. Plot wall time
+%   per Newton iteration: analytical vs FD.
+% Output: benchmark_results/canonical/jac_speedup.json.
+% Figure script: scripts/figures/figC6_jac_speedup.py.
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/figC6_jac_speedup}
+  \caption{Per-Newton-iteration Jacobian-\emph{fill} wall time of the
+    three analytical-Jacobian delivery callbacks (dense
+    \texttt{jacfn}, filled circles; sparse-CSC \texttt{jacfn}, filled
+    squares; GMRES \texttt{jactimes}, filled triangles) plotted
+    against the union state-vector size $n_{\rm total}$, alongside
+    the finite-difference proxy
+    $t_{\rm FD}\!\equiv\!n_{\rm colors}\,t_{\rm matvec}$ (open
+    diamonds, grey), where $n_{\rm colors}$ is the maximum number of
+    nonzeros per column of the union sparsity pattern
+    $|\partial F/\partial y|+|\partial F/\partial y'|$ (exact
+    chromatic number for banded finite-difference stencils) and
+    $t_{\rm matvec}$ is one wall-time measurement of a sparse
+    matrix--vector product. Three theories are sampled:
+    \lstinline!coupled_scalars! (1-D, 4 slots),
+    \lstinline!gertsenshtein! (1-D, 12 slots), and
+    \lstinline!navier_cauchy_2d! (2-D $N\!\times\!N$, 4 slots).
+    Markers show the mean over $N_{\rm reps}{=}20$ repetitions;
+    error bars are the per-rep standard deviation. Vertical dashed
+    lines mark the production auto-selection thresholds at
+    $n_{\rm total}{=}2{,}000$ (dense$\to$sparse) and
+    $n_{\rm total}{=}200{,}000$ (sparse$\to$GMRES); the italicised
+    region labels on the centre panel name the corresponding tier.}
+  \label{fig:AnalyticalJacobianSpeedup}
+\end{figure*}
+
+% \paragraph*{Coordinate accumulation} The sparse Jacobian is assembled
+% efficiently in a single pass over the operator list before being
+% passed to the linear solver. The cost scales linearly with the number
+% of non-zero entries rather than with the system size.
+
+\paragraph*{Circulant operators on periodic grids} When the boundary
+conditions are all periodic and the
+coefficients are spatially constant: the spatial-operator matrices
+are then circulant. We probe a single grid point and tile
+the resulting stencil row across all $N$ rows via modular arithmetic,
+an $\mathcal{O}(\mathrm{nnz})$ construction in place of the $\mathcal{O}(N^2)$ assembly
+of the general sparse path. On the periodic-domain Einstein--Maxwell
+system this contributes an additional factor of roughly $28\times$
+in operator-matrix construction.
+
+% \subsection{Dispatch and runtime workflow}%
+% \label{Dispatch}
+
+% The JSON equation specification produced by the symbolic stage
+% of~\cref{SymbolicComputation} and read by the solvers above
+% is illustrated in~\cref{JSONExample}: it records the dynamical
+% fields (tensor type and time-derivative order), the right-hand-side
+% triples of each equation of motion (each triple carries a resolved
+% numerical coefficient, an operator name from the catalogue
+% of~\cref{SpatialDiscretisation}, and a target field name, summed
+% to form the Euler--Lagrange right-hand side), the Hamiltonian terms
+% used by the energy diagnostic, and the mass and coupling matrices
+% used by the modal solver.
+
+% \paragraph*{Output} Every backend produces simulation data in a
+% uniform format that downstream measurement and analysis subcommands
+% operate on directly, so that runs can be re-analysed without
+% re-reading the original \xAct{} session.

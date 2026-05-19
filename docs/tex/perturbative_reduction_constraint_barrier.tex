@@ -1,0 +1,1114 @@
+% The constraint-promotion barrier in perturbative reduction of higher-derivative
+% Hamiltonians.  Documents an architectural limitation hit during TIDAL's v6
+% Phase 2 (Lagrangian Perturbative Substitution, LPS); cites established
+% physics analogues (vDVZ, Boulware-Deser, Stuckelberg) and surveys methods
+% in the literature that fail for this case.
+%
+% Uses macros from preamble.tex.
+
+\section{The Constraint-Promotion Barrier in Perturbative Hamiltonian Reduction}
+\label{sec:pr-constraint-barrier}
+
+\subsection{Abstract}
+\label{sec:pr-cb-abstract}
+
+We document an architectural limitation of perturbative reduction methods for
+higher-derivative Hamiltonians, hit during TIDAL's v6 Phase~2 (Lagrangian
+Perturbative Substitution, LPS).  When a small parameter~$\varepsilon$ promotes
+an algebraic-constraint field at $\varepsilon = 0$ to a higher-derivative dynamical
+field at $\varepsilon \ne 0$, the constraint structure changes \emph{discontinuously}
+across the critical surface.  Substitution-based perturbative-reduction methods
+in the literature (Jaen--Llosa--Molina~1986 and descendants; effective-field-theory
+field redefinitions; Cayuso--Lehner~2017) all share an architectural assumption
+that excludes this case.  Faddeev--Jackiw symplectic reduction, the cubic-PGT
+redesign of Bahamonde \emph{et al.}~2025, and DHOST degeneracy conditions
+(Langlois~2018) likewise do not provide a perturbative bridge.  TIDAL's
+Phase~2 LPS therefore aborts with a clear diagnostic when the constraint-promotion
+case is detected (issue~\#321), and the affected theories
+($b_5\,\tilde{R}^2$ in \texttt{graviton\_torsion}, \texttt{torsion\_gertsenshtein},
+\texttt{torsion\_gertsenshtein\_combined}) retain their pre-LPS Hamiltonian
+JSONs.  The barrier is structurally analogous to the van~Dam--Veltman--Zakharov
+(vDVZ) discontinuity in massive gravity, the Boulware--Deser non-decoupling, and
+the Maxwell--Proca constraint reclassification at $m = 0$.  Three research
+directions are identified for future work; none has a published implementation
+for the case at hand.
+
+\subsection{Introduction}
+\label{sec:pr-cb-intro}
+
+The TIDAL pipeline (\cref{sec:perturbative-reduction}) reduces higher-derivative
+Lagrangians to physically meaningful second-order evolution via Parker--Simon
+iterative reduction~\cite{ParkerSimon1993}, generalised in v6 to multi-field
+linearised PDEs with kinetic-coefficient promotion (Gap~B/C of the v6 plan;
+\cref{sec:pr-v6}).  This iterative scheme is theory-agnostic and ghost-free
+\emph{at the level of the equations of motion}: the LHS operator at every
+order is the second-order base operator, and higher-derivative terms appear
+only as sources to a Duhamel kernel evaluated on the previous-order solution.
+
+Energy measurement and Noether consistency, however, require a Hamiltonian.
+TIDAL's v6 Phase~D extracts the canonical Hamiltonian via the standard
+Legendre transform of the (Phase~B IBP-reduced) Lagrangian.  For perturbative
+theories with $\partial_t^2$ residues that IBP cannot eliminate
+(\cref{sec:pr-cb-residue}), the v6 Phase~2 Lagrangian Perturbative Substitution
+(LPS, \cref{sec:pr-cb-lps}) was introduced to apply the order-0 EOM as a
+substitution rule on the Lagrangian, thereby producing a fully second-order
+input to the Legendre transform.
+
+This paper documents an architectural limitation of LPS encountered during
+its initial deployment.  For the family of theories central to TIDAL's
+target science --- $b_5\,\tilde{R}^2$ in Poincar\'e Gauge Theory, where
+$b_5$ is a small coupling --- the small parameter promotes algebraic-constraint
+fields at $b_5 = 0$ to fourth-order dynamical fields at $b_5 \ne 0$.  The
+substitution-based LPS algorithm cannot bridge this discontinuity because
+there is no $\partial_t^2$~term in the order-0 EOM to solve for.  A
+literature survey (Section~\ref{sec:pr-cb-methods}) confirms that every
+published reduction technique --- substitution, field redefinition,
+Faddeev--Jackiw, fixing-the-equations, DHOST, cubic redesign --- shares the
+same architectural assumption and fails in the same way.
+
+The architectural barrier is structurally analogous to several
+well-established discontinuous limits in field theory
+(Section~\ref{sec:pr-cb-analogues}): the vDVZ discontinuity in massive
+gravity, the Boulware--Deser non-decoupling, the Maxwell--Proca constraint
+reclassification.  Casting TIDAL's barrier in this established language
+clarifies what is and is not novel.
+
+The remainder of this section presents the historical context
+(Section~\ref{sec:pr-cb-history}), the architectural analysis
+(Sections~\ref{sec:pr-cb-residue}--\ref{sec:pr-cb-lps}), the discontinuous-limit
+framing (Section~\ref{sec:pr-cb-analogues}), the method survey
+(Section~\ref{sec:pr-cb-methods}), TIDAL's resolution
+(Section~\ref{sec:pr-cb-resolution}), and the open research directions
+(Section~\ref{sec:pr-cb-future}).
+
+\subsection{Historical context: a 25-year-old open problem}
+\label{sec:pr-cb-history}
+
+A multi-front literature investigation conducted alongside this write-up
+establishes that the constraint-promotion phenomenon is not new.  Three
+independent groups have each (re)discovered and named the same structural
+phenomenon over the last quarter century, and \emph{none} has produced a
+perturbative Hamiltonian across the critical surface for generic PGT
+parameter points:
+
+\begin{itemize}
+  % [audit-2026-04-27 Phase 2.4] BN 1983 framing strengthened: per direct
+  % PDF read of literature/PhysRevD.28.2455/ and literature/BF02721794/
+  % (research/perturbative_hamiltonian/notes/lead_bn1983_direct_read.md),
+  % the PRD paper covers R+T^2+R^2 PGT (eq. 2.6 contains b_5 R^2 + b_6
+  % (epsilon R)^2, including a parity-odd squared-curvature invariant
+  % structurally analogous to TIDAL's b_5 R-tilde^2).  The Nuovo Cim
+  % paper is the R+T^2 stepping-stone precursor.  Both BN 1983 papers
+  % explicitly defer the massless-tordion case --- which is precisely
+  % TIDAL's b_5 -> 0 limit.  Updated framing: not "precursor diagnostics
+  % only", but "R^2-class covered, TIDAL's massless-tordion case
+  % explicitly deferred in 1983".
+  \item \textbf{Blagojevi\'c \& Nikoli\'c (1983)}~\cite{BlagojevicNikolic1983,BlagojevicNikolic1983Nuovo}
+    --- under the name \emph{``if-constraints with critical parameters''}.
+    The PRD paper~\cite{BlagojevicNikolic1983} carries out a Dirac--Bergmann
+    Hamiltonian analysis for general PGT including $R^2$-type quadratic-curvature
+    invariants (eq.~2.6 in their notation: $b_1\,R^2_{ijkl} + \cdots + b_5\,R^2 +
+    b_6\,(\epsilon R)^2$); the parity-odd $(\epsilon R)^2$~term is the closest
+    1983-era cousin of TIDAL's $b_5\,\tilde{R}^2$.  The companion Nuovo Cimento
+    paper~\cite{BlagojevicNikolic1983Nuovo} carries out the same analysis for the
+    simpler $R + T^2$ class as a stepping-stone.  Both papers \emph{explicitly
+    defer} the massless-tordion case which is precisely TIDAL's $b_5 \to 0$
+    limit; quoting the PRD paper verbatim: ``In the case corresponding to the
+    massless tordions (with a new kind of gauge symmetry in the theory) more
+    detailed considerations are necessary for a complete understanding of the
+    situation.''\footnote{Verbatim from BN 1983 PRD; verified via
+    \texttt{pdftotext} of \texttt{literature/PhysRevD.28.2455/} during the
+    Phase~2.4 lead investigation, see
+    \texttt{research/perturbative_hamiltonian/notes/lead_bn1983_direct_read.md}.}
+    The constraint-promotion phenomenon \emph{specific to TIDAL's case} has
+    therefore been an acknowledged-as-open research question since 1983 ---
+    not 25~years (counting from BC~2018) but 40~years (counting from BN~1983
+    PRD through YNN 1999--2002 to BC~2018).
+    [Citation correction 2026-04-27: the second BN paper was previously
+    mis-cited as Nuovo Cim B \textbf{84}:25 (1984); the actual paper is
+    \emph{Hamiltonian Structure of the Theory of Gravity with $R + T^2$ Type
+    of Lagrangian}, Nuovo Cim. B \textbf{73}:258 (1983), DOI:
+    10.1007/BF02721794 (see \texttt{literature/BF02721794/}).]
+  \item \textbf{Yo, Nester \& Ni (1999--2002)}~\cite{YoNester1999,YoNester2002}
+    --- under the names \emph{``constraint bifurcation''} and
+    \emph{``field activation''}.
+  \item \textbf{Blagojevi\'c \& Cvetkovi\'c (2018)}~\cite{BlagojevicCvetkovic2018}
+    --- under the name \emph{``critical parameters''}.  Proves that the
+    spin-$J$ torsion masses go as $m^2(J) \propto 1/c_n$, so a vanishing
+    critical parameter $c_n$ pinches off the mode at infinity.
+\end{itemize}
+
+Every careful technical paper in this lineage either \emph{assumes} all
+critical parameters non-vanishing, or handles the vanishing case in a
+\emph{separate basis} (case-by-case branch analysis) --- never as a
+perturbative limit.  Most directly,
+Blagojevi\'c \& Cvetkovi\'c~\cite{BlagojevicCvetkovic2018}, the most
+authoritative recent canonical-Hamiltonian source on general PGT, state
+explicitly in Appendix~D, verbatim:
+
+% [audit-2026-04-27] BC 2018 Appendix D verbatim quote re-verified by
+% Meta-K (pdftotext of arXiv:1804.05556) and Meta-N (full Appendix D
+% retrieval).  Quote is genuine.  Original investigation TRUNCATED the
+% constructive follow-up sentence.  Per Meta-N §5: BC's parametric
+% diagonalisation is singular at b̄=0, but the physics is recovered by
+% reading F directly.  Appendix D is constructive for BC's 2nd-order
+% Dirac--ADM case but does NOT apply to TIDAL's higher-derivative
+% Ostrogradsky case (different derivative order, inverse constraint
+% topology, BC's b̄ is not TIDAL's b_5; see local TeX
+% literature/1804.05556/main.tex line 1884).
+\begin{quote}
+``\dots the diagonal matrix $D$ in (D.2) has no valid limit for
+$\bar{b} \to 0$.  Hence, the expressions for $c_n$ when $\bar{b} = 0$
+cannot be obtained by taking the limit $\bar{b} \to 0$ of the generic
+result.  However, since the matrix $F$ for $\bar{b} = 0$ is already
+diagonal, the critical parameters $c_n$ can be obtained directly from
+$F$.  The same conclusion also holds for the form of $\mathcal{H}^F_\perp$.''
+\end{quote}
+
+The BC quote is constructive within its own scope: although the
+parametric diagonalisation~(D.2) is singular at $\bar{b} \to 0$, the
+critical parameters and $\mathcal{H}^F_\perp$ are recovered directly from
+$F$ at $\bar{b} = 0$, where $F$ is already diagonal.  However, BC
+2018's framework is built on a 2nd-order Dirac--ADM Legendre transform,
+and their ``critical parameters'' are eigenvalues of small (2$\times$2)
+mixing matrices in a single irreducible spin sector.  TIDAL's case is
+structurally different on three counts.  First, TIDAL's $b_5\,\tilde{R}^2$
+generates fourth-order time derivatives for the constraint-promoted
+metric components $h_4, h_7, h_9$ (an Ostrogradsky-type rank-jump that
+sits \emph{above} BC's framework, not inside it).  Second, the
+constraint topology is inverse: BC's vanishing $c_n$ \emph{adds} a
+primary constraint, whereas TIDAL's $b_5 \neq 0$ \emph{breaks} algebraic
+constraints into propagating modes.  Third, BC's parameter $\bar{b}$ is
+a 2$\times$2 mixing coefficient, not the higher-derivative coupling of
+$\tilde{R}^2$ --- the naming collision is coincidental.  Consequently
+BC 2018 Appendix~D is a \emph{neighbouring-but-distinct} case study,
+not a published recipe for the higher-derivative-induced rank-jump that
+constitutes TIDAL's blocker.  The accurate historical statement is:
+no published Hamiltonian recipe is known for TIDAL's higher-derivative
+$b_5\,\tilde{R}^2$ case across the $b_5 = 0$ critical surface; BC 2018
+addresses the parity-violating 2$\times$2-mixing singular limit
+constructively but does not address the Ostrogradsky rank-jump.
+
+\subsection{Higher-derivative residues and integration by parts}
+\label{sec:pr-cb-residue}
+
+A linearised Lagrangian containing the curvature-squared term $\tilde{R}^2$
+expands, after component decomposition (Phase~A), to a polynomial in the
+metric perturbation components $h_{\mu\nu}$ and their partial derivatives.
+Among the resulting terms are products of the form
+\begin{equation}
+  \mathcal{L}_1 \supset b_5 \, (\partial_t^2 h_a)(\partial_t^2 h_b) \,,
+  \label{eq:pr-cb-ddtsqsq}
+\end{equation}
+which contain pure second time derivatives of the dynamical (or
+constraint-promoted) components of the metric perturbation.
+
+The standard Phase~B integration-by-parts (IBP) on the time variable
+\cite{ParkerSimon1993} converts $f \cdot \partial_t^2 g \to -(\partial_t f)\,(\partial_t g)$
+when one of the factors carries no time derivative.  IBP successfully
+reduces $f \cdot \partial_t^2 g$ products to first-order time derivatives.
+But it \emph{cannot} reduce
+\eqref{eq:pr-cb-ddtsqsq}: every IBP move on $(\partial_t^2 h_a)(\partial_t^2 h_b)$
+either leaves the time-derivative order at two (passing the derivative
+between factors, $(\partial_t^2 h_a)(\partial_t^2 h_b) \to -(\partial_t^3 h_a)(\partial_t h_b)$,
+which \emph{raises} the maximum order) or fails at the boundary terms.
+The irreducible $\partial_t^2$ residue in \eqref{eq:pr-cb-ddtsqsq} is
+fundamental to the algebraic-IBP path.
+
+In TIDAL the irreducible residues manifest as JSON Hamiltonian operators
+of the form \texttt{mixed\_2\_0\_0\_0} (encoding $\partial_t^2$ in 1+1D
+spatial indices).  Direct inspection of the affected examples
+(\cref{sec:pr-cb-resolution}) confirms 3 such operators in
+\texttt{graviton\_torsion} and \texttt{torsion\_gertsenshtein}, and 33 in
+\texttt{torsion\_gertsenshtein\_combined}, all carrying coefficient
+proportional to the small parameter ($b_5$ or one of $a_1,\dots,a_6$ in
+the combined theory).
+
+\subsection{Lagrangian Perturbative Substitution (LPS)}
+\label{sec:pr-cb-lps}
+
+To eliminate the \texttt{mixed\_2\_0\_0\_0} residues at the Lagrangian
+level (so the downstream Legendre transform operates on a strictly
+second-order input), v6 Phase~2 introduces the Lagrangian Perturbative
+Substitution module
+(\href{https://github.com/WilliamRoyce/torsion-gertsenshtein/blob/main/tidal/wolfram/PerturbativeReduction.wl}{\texttt{tidal/wolfram/PerturbativeReduction.wl}},
+commit \texttt{742c01a}).  LPS implements the algorithm:
+
+\begin{enumerate}
+  \item \emph{Extract base equations}: set every declared small parameter to
+        zero in each Phase~B Euler--Lagrange equation, yielding the order-0
+        EOM $E_{\mathrm{base}}[q] = 0$.
+  \item \emph{Solve for $\partial_t^2$}: solve the order-0 EOMs simultaneously
+        for $\partial_t^2 q_i$ for each dynamical field, producing the rule
+        $\partial_t^2 q_i \to f_i(q, \partial_t q, \partial_x q, \dots)$.
+  \item \emph{Chain higher orders}: build rules for $\partial_t^3 q_i,
+        \partial_t^4 q_i, \dots$ by differentiating $f_i$ with respect
+        to~$t$ and substituting the lower-order rules.
+  \item \emph{Apply and truncate}: apply the rules to the Lagrangian via
+        repeated replacement (\verb|//.|) and truncate the result at the
+        declared perturbative order via Series.
+\end{enumerate}
+
+For theories where every field with $\partial_t^2$ in the Lagrangian is also
+\emph{dynamical at order zero} --- the standard case described by
+Parker--Simon and the EFT-reduction literature --- this algorithm completes
+cleanly.  Pais--Uhlenbeck-style perturbations to dynamical Lagrangians
+satisfy this case~\cite{BenderMannheim2008,Woodard2015}, as does
+Euler--Heisenberg in TIDAL's representation (whose component-decomposed
+Lagrangian is naturally first-order in time after IBP).
+
+The algorithm \emph{fails} when the Lagrangian contains
+$\partial_t^2$~terms of a field~$h_c$ that has \emph{no} $\partial_t^2 h_c$
+term in its order-0 EOM~--- because Step~2 has no rule to construct.
+This is the constraint-promotion case.
+
+\subsection{The constraint-promotion case}
+\label{sec:pr-cb-promotion}
+
+\paragraph{Definition.}
+A theory exhibits \emph{constraint promotion} if a small parameter $\varepsilon$
+in the Lagrangian (with $\varepsilon = 0$ giving a healthy second-order base
+theory) raises the time-derivative order of one or more component fields'
+Euler--Lagrange equations.  Equivalently: the kinetic coefficient
+$M(\varepsilon) = M_0 + \varepsilon M_1 + \dots$ for the affected component(s)
+satisfies $M_0 = 0$, so at $\varepsilon = 0$ the time-derivative term vanishes
+and the equation becomes algebraic; for $\varepsilon \ne 0$ the leading
+$\varepsilon M_1$ term restores time evolution at higher order.
+
+\paragraph{Concrete example: $b_5\,\tilde{R}^2$ in PGT.}
+Let $\tilde{R}^{abc} \equiv \frac{1}{2}\,\varepsilon^{abcd}\, R_{de}{}^{de}$ be the
+parity-odd dual of the curvature.  The Lagrangian contribution
+$\mathcal{L}_1 = b_5\,\tilde{R}_{abc}\tilde{R}^{abc}$ produces, after component
+decomposition for the metric perturbation $h_{\mu\nu}$ with TT gauge in
+1+1D, a kinetic structure
+\begin{equation}
+  M(b_5)\,\partial_t^2 h_a = -K_a[h, \partial_x h, \dots] \,, \qquad
+  M_a(b_5) = c_a\, b_5 \quad\text{for } a \in \{4, 7, 9\}.
+  \label{eq:pr-cb-Mb5}
+\end{equation}
+The vanishing of $M_a(0) = 0$ for $a \in \{4, 7, 9\}$ is the constraint-promotion
+signature.  At $b_5 = 0$, components $h_4, h_7, h_9$ satisfy algebraic
+constraints; at $b_5 \ne 0$, they become \emph{fourth}-order dynamical fields
+(after Euler--Lagrange variation of $\tilde{R}^2$ and component decomposition).
+Direct inspection of TIDAL's v6 spec parser
+(\texttt{tidal/symbolic/json\_loader.py::canonicalize\_kinetic\_for\_perturbation})
+classifies these three fields exactly as ``constraint at base, dynamical at
+correction''.  The Phase~2 LPS detects this case via the absence of
+$\partial_t^2 h_a$ in the order-0 EOM and \emph{aborts}.
+
+\paragraph{Why algebraic substitution fails.}
+Step~2 of the LPS algorithm (\cref{sec:pr-cb-lps}) requires solving
+$E_{\mathrm{base}}[q] = 0$ for $\partial_t^2 q_i$.  For a constraint-promoted
+field $h_c$, the order-0 EOM has the form
+\begin{equation}
+  E_{\mathrm{base}}[h_c] = \alpha_c\, h_c + \beta_c[\,\text{other fields and their derivatives}\,]
+  \label{eq:pr-cb-base-algebraic}
+\end{equation}
+with no $\partial_t^2 h_c$ term.  The substitution rule
+$\partial_t^2 h_c \to (\dots)$ does not exist; one can only solve
+\eqref{eq:pr-cb-base-algebraic} for $h_c$ itself, in terms of the other
+fields:
+\begin{equation}
+  h_c \to -\beta_c / \alpha_c \,.
+\end{equation}
+Substituting this into the Lagrangian's $b_5\,(\partial_t^2 h_c)^2$ term
+introduces $\partial_t^2(\beta_c/\alpha_c)$, which by the chain rule becomes
+$\partial_t^2$ of \emph{other} fields --- which themselves must then be
+substituted using \emph{their} order-0 rules.  In a multi-field gauge
+theory the chain rule generates rapidly proliferating substitutions that
+were observed in practice (commit \texttt{742c01a}, branch attempt) to
+fail to converge within reasonable resources ($> 5$~min,~$> 2$~GB on the
+38-field \texttt{torsion\_gertsenshtein} theory).  More fundamentally, the
+chain rule converts $b_5\,(\partial_t^2 h_c)^2$ into terms that are
+\emph{fourth}-order in time derivatives of other dynamical fields ---
+exactly the obstruction LPS was meant to remove.  The barrier is
+not a performance issue but a structural one.
+
+\subsection{Established physics analogues: discontinuous limits}
+\label{sec:pr-cb-analogues}
+
+The mathematical structure --- a parameter-dependent constraint count that
+changes discontinuously across $\varepsilon = 0$ --- is well known in
+field theory under several names~\cite{deRham2014,Hinterbichler2012}.
+Following the conventions of those reviews, we adopt the term
+``\emph{discontinuous limit of the constraint structure}'' (or
+``singular limit'') and avoid the thermodynamics-flavoured ``phase
+transition'' (no order parameter is present).  This subsection presents
+the established analogues.
+
+\paragraph{The vDVZ discontinuity (massive gravity).}
+The smooth $m \to 0$ limit of Pauli--Fierz massive
+gravity~\cite{vanDamVeltman1970,Zakharov1970} does \emph{not} recover
+linearised general relativity: there is a finite mismatch in the
+predicted bending of light around the Sun (factor $4/3$).  Mechanically:
+massive spin-2 has 5 propagating degrees of freedom; massless spin-2 has
+2.  In the $m \to 0$ limit the helicity-2 (2~dof), helicity-1 (2~dof),
+and helicity-0 (1~dof) modes do \emph{not all decouple} --- the helicity-0
+scalar retains finite coupling to the trace of the stress-energy
+tensor~\cite[\S III]{Hinterbichler2012}.  The Stuckelberg trick exposes
+this systematically: auxiliary fields propagate at $m \ne 0$ but become
+pure-gauge constraints at $m = 0$.  The structural change is identical to
+TIDAL's case: $\varepsilon$ promotes a constraint to a dynamical degree of
+freedom; the limit $\varepsilon \to 0$ is non-smooth.
+
+\paragraph{The Boulware--Deser non-decoupling.}
+The 1972 paper~\cite{BoulwareDeser1972} demonstrated that the
+Pauli--Fierz tuning that gives 5~dof at quadratic order is \emph{unstable}
+under generic nonlinear extension: a 6th (ghost) mode appears off the
+Pauli--Fierz surface in coefficient space.  This is structurally identical
+to TIDAL's situation: at one fine-tuned point in coupling space the
+constraint count is one thing; perturbing the coefficients adds a
+propagating mode.  The dRGT~\cite{deRham2014} resolution requires
+fine-tuning of \emph{multiple} coefficients to preserve the constraint
+non-perturbatively --- not a generic perturbative reduction.
+
+\paragraph{The Maxwell--Proca boundary.}
+The Stuckelberg field~\cite{RueggRuizAltaba2003} provides the cleanest
+toy example: Maxwell electrodynamics has 2~first-class constraints
+(Gauss's law and tracelessness of $A_0$), giving 2~dof.  Proca theory
+($+\frac{1}{2}m^2 A_\mu A^\mu$) has 2~second-class constraints, giving
+3~dof.  At $m = 0$ first-class becomes second-class, and the constraint
+that determined $A_0$ becomes a dynamical equation.  This is the textbook
+prototype of the constraint reclassification at the boundary.
+
+\paragraph{The mathematical underpinning.}
+Henneaux \& Teitelboim~\cite[\S 1.4.3]{HenneauxTeitelboim1992} formalise
+this as an ``\emph{irregular constraint surface}'' --- a point in
+coupling-parameter space where the rank of the constraint Jacobian
+drops.  The canonical-analysis literature acknowledges this obstruction
+but does \emph{not} provide a perturbative method that crosses it.  A
+modern Faddeev--Jackiw treatment~\cite{DiazSaldivia2025} reads the same
+phenomenon off the rank of the symplectic 2-form: at the critical surface
+the rank jumps, signalling the appearance or disappearance of constraints.
+
+% [audit-2026-04-27 Phase 2.1] Recent published analogues identified by the
+% Phase 2.1 GZL forward-citation deep read (research/perturbative_hamiltonian/
+% notes/lead_glavan_zlosnik_lin.md).  These are 2024--2025 peer-reviewed
+% papers in which the constraint-promotion phenomenon is recognised for
+% metric-only quadratic gravity, with verbatim quotes verified via direct
+% TeX retrieval (literature/2510.08201/, literature/2506.07305/,
+% literature/2407.09598/, literature/2408.16818/).
+\paragraph{Recent published analogues in metric-only quadratic gravity.}
+The constraint-promotion phenomenon has been identified independently in
+the recent metric-only quadratic-gravity literature.  Barker \&
+Glavan~\cite{BarkerGlavan2025} carry out a full Hamiltonian analysis of
+pure $R^2$ gravity and observe \emph{verbatim}:
+\begin{quote}
+``the mechanism for this phenomenon is a change in the nature of the
+constraints upon linearisation: ten second-class constraints of the
+full theory become first-class. \dots Such backgrounds are surfaces of
+strong coupling in field space, where the dynamics of perturbations
+becomes nonperturbative.''
+\end{quote}
+Bellor\'in~\cite{Bellorin2025}, citing Glavan--Zlosnik--Lin
+\cite{GlavanZlosnikLin2024}, states the metric-only Stelle-quadratic-gravity
+counterpart of TIDAL's $b_5 \to 0$ obstruction \emph{verbatim}:
+\begin{quote}
+``One cannot obtain the ADM Hamiltonian of general relativity as a
+smooth limit of the case we have considered.''
+\end{quote}
+Karananas~\cite{Karananas2024a,Karananas2024b} reaches the same conclusion
+through particle-content analysis: pure $R^2$ at Minkowski is
+``infinitely strongly-coupled'' with ``(numerous) accidental gauged
+symmetries'', extending to the metric-affine $R^2$ case (which includes
+the parity-even Einstein--Cartan quadratic sector that is one corner
+of the larger PGT $b_5 \tilde{R}^2$ class).  None of these papers
+applies to TIDAL's parity-odd PGT-torsion case directly: the
+metric-only scope, the projective and Weyl symmetries used by GZL,
+and (for GZL specifically) the standard scalar-auxiliary lift's
+$f''(\varphi) \neq 0$ requirement (which becomes $f'' = 2 b_5
+\to 0$ at the critical surface) are all obstructions to direct
+transfer.  But they together establish that the constraint-promotion
+barrier is recognised in current peer-reviewed literature for adjacent
+frameworks, anchoring TIDAL's ``barrier is real'' claim in 2024--2025
+publications rather than (only) in historical PGT canonical analysis.
+
+\paragraph{Summary.}
+The constraint-promotion case is not new physics; it is a particular
+instance of a class of \emph{discontinuous (singular) limits of the
+constraint structure} that includes vDVZ, Boulware--Deser non-decoupling,
+and Stuckelberg.  In every case the perturbative expansion in
+$\varepsilon$ around $\varepsilon = 0$ does not converge to the
+$\varepsilon = 0$ theory at any finite order, because the kinematic
+phase space changes discontinuously at the boundary.
+
+\subsection{Survey of perturbative-reduction methods and why they fail}
+\label{sec:pr-cb-methods}
+
+We have surveyed the literature on perturbative reduction of higher-derivative
+Lagrangians.  Each major method is discussed below, with explicit attention
+to the constraint-promotion case.  The unifying conclusion: every method
+shares an architectural assumption --- that fields propagating at
+$\varepsilon \ne 0$ are also propagating at $\varepsilon = 0$ --- and is
+therefore structurally unable to handle constraint promotion.
+
+\paragraph{Jaen--Llosa--Molina (JLM) and descendants.}
+The original on-shell-reduction method~\cite{JLM1986} substitutes
+$\partial_t^2$~terms in the higher-derivative correction using the
+order-0 Euler--Lagrange equation.  Cheyette~\cite{Cheyette1988} adapts
+this to effective Standard Model Lagrangians; Grosse-Knetter~\cite{GrosseKnetter1994}
+extends this to electroweak higher-derivative operators and proves via the
+Ostrogradsky formalism that EOM substitution is a canonical field redefinition
+(``\emph{here, an effective higher order Lagrangian is reduced to a first order one
+without introducing extra degrees of freedom}'' \cite[\S3, p.\,6714]{GrosseKnetter1994});
+Simon~\cite{Simon1990}
+formalises the perturbative ghost-suppression argument; Eliezer \&
+Woodard~\cite{EliezerWoodard1989} prove the ghost branch contains
+``runaway pseudosolutions'' that are excised by the iterative reduction;
+Bender \& Mannheim~\cite{BenderMannheim2008} apply the framework to
+the Pais--Uhlenbeck oscillator.  All assume the $\varepsilon = 0$ theory
+is non-degenerate (every field propagates at the leading order).
+Grosse-Knetter explicitly acknowledges that the theory has ``no analytic
+limit for $\varepsilon\to 0$'' and that the EFT prescription resolves this
+\emph{only} by assuming UV cancellation at $O(\varepsilon^2)$ and above
+\cite[\S5]{GrosseKnetter1994}.
+\textbf{All these methods fail on constraint promotion} because the substitution
+rule $\partial_t^2 h_c \to \dots$ does not exist when $h_c$ is constrained
+at order zero --- Grosse-Knetter's own prerequisite (that $\mathcal{L}_0$
+must supply the wave equation $\partial_t^2\varphi = \Delta\varphi - M^2\varphi$
+as a substitution rule) is violated for TIDAL's $h_4/h_7/h_9$ at $b_5=0$.  TIDAL's v6 chose Parker--Simon~\cite{ParkerSimon1993}
+iterative source-evaluation \emph{precisely} to avoid this failure mode
+on the EOM side; a Lagrangian analogue is not yet worked out.
+
+\paragraph{EFT field redefinitions.}
+Burgess \& Williams~\cite{BurgessWilliams2014} and the modern systematic
+treatment of Solomon \& Trodden~\cite{SolomonTrodden2018} (see also
+Manohar's lectures~\cite{Manohar2018}) use field redefinitions
+$q \to q + \varepsilon\,\delta q[q, \partial q]$ to eliminate higher-derivative
+operators perturbatively.  The redefinition is constructed so that the
+shift in the Lagrangian cancels the unwanted derivative terms.
+Mathematically this is equivalent to the JLM substitution and shares the
+same architectural assumption: the leading-order kinetic matrix must be
+invertible.  Glavan~\cite{Glavan2018} compares JLM, field redefinitions,
+and Cayuso--Lehner side-by-side; all three break down at constraint
+promotion.
+
+\paragraph{Cayuso--Lehner ``fix the equations''.}
+Cayuso \& Lehner~\cite{CayusoLehner2017} propose a non-iterative numerical
+scheme that evolves the unreduced higher-derivative system with a
+parameter-dependent damping term.  The method is intended for the
+\emph{strong-coupling} regime where $\varepsilon$ is not small.  It does
+not produce a perturbative Hamiltonian for our case, and the damping
+parameter introduces theory-dependent tuning rather than an order-by-order
+expansion.
+
+\paragraph{Faddeev--Jackiw symplectic reduction.}
+Faddeev \& Jackiw~\cite{FaddeevJackiw1988} provide an alternative to
+Dirac's constraint analysis that operates directly on the symplectic
+2-form.  Iterative bordering algorithms~\cite{DiazSaldivia2025} extend
+this to systems with multiple stages of constraints.  Faddeev--Jackiw
+is computationally more efficient than Dirac for second-class systems,
+\emph{but does not avoid the Ostrogradsky degree-of-freedom count}.
+The most recent formalisation of FJ as a Schur-complement bordering
+algorithm~\cite{CaboBizetBartocci2026} makes the obstruction explicit:
+\emph{termination of the FJ algorithm requires Schur-complement
+non-degeneracy}, exactly what fails on the $b_5 = 0$ critical surface.
+For the constraint-promotion case, the Faddeev--Jackiw 2-form has rank
+deficiency at $\varepsilon = 0$ that is lifted at $\varepsilon \ne 0$ ---
+exactly the rank-jumping behaviour responsible for the discontinuity.
+\textbf{No worked example of perturbing an FJ 2-form across a parametric
+rank jump exists in the published literature.}  The structurally identical
+``discrete discontinuity'' in DOF count seen in tetrad gravity at
+$\det e = 0$~\cite{ChiouGeillerWang2022} is acknowledged but likewise
+without a perturbative recipe.
+
+\paragraph{Cubic-PGT redesign (Bahamonde \emph{et al.}~2024--2025).}
+The recent program~\cite{bahamonde2025cubic,bahamonde2025torsion}
+adds cubic curvature invariants to the quadratic-PGT action and
+fine-tunes the joint coefficients to remove the ghost
+non-perturbatively.  This is a redesign of the theory --- new dynamical
+content is added, with algebraic relations among the quadratic and
+cubic coefficients enforcing ghost-freedom.  For an experimental or
+phenomenological setting that asks ``what does the $b_5\,\tilde{R}^2$
+theory predict, perturbatively in $b_5$?'' this approach is not
+applicable; it answers a different question (``what is a related
+ghost-free PGT?'').
+
+\paragraph{DHOST degeneracy condition.}
+Beyond-Horndeski / DHOST theories~\cite{Langlois2018} are constructed by
+imposing a degeneracy condition on the kinetic matrix that ensures the
+Ostrogradsky mode is removed at the Lagrangian level by a primary
+constraint.  This is constraint-by-design: a class of theories \emph{built}
+to be free of ghosts.  The DHOST framework solves the
+\emph{inverse} problem to ours --- it tells you what to fine-tune to
+\emph{stay on} a degenerate critical surface, not how to \emph{leave it
+perturbatively}.  TIDAL's situation is the opposite: turning $b_5$ on
+\emph{breaks} the degeneracy.  DHOST does not provide a perturbative
+reduction method for a pre-existing Lagrangian whose kinetic structure
+changes across the critical surface.
+
+\paragraph{Stückelberg lifting in higher-curvature gravity.}
+The Stückelberg trick from massive gravity (which formally has the same
+shape as our case: an algebraic constraint at $m = 0$, dynamical at
+$m \ne 0$) is the most-promising methodological lead.  Two papers carry
+it out for higher-curvature gravity:
+Hinterbichler \& Saravani~\cite{HinterbichlerSaravani2015} provide a
+clean Stückelberg-bigravity decomposition for \emph{metric-only}
+quadratic gravity (Stelle's $R + R^2$);
+Aoki \& Mukohyama~\cite{aoki2020ghostfree} extend the construction to
+PGT, but \emph{only at the measure-zero Sezgin--Van Nieuwenhuizen spin-2
+tuning}, and only by adding the infinite tower
+$R(1 + R/\alpha m^2)^{-1}R$.  For a generic point in
+$(\alpha_1, \alpha_2, \alpha_3, b_5)$ parameter space --- the regime
+TIDAL surveys --- neither construction provides a perturbative
+Hamiltonian.  However, the general Stückelberg recipe of
+Lyakhovich~\cite{Lyakhovich2021} (with reducibility extension by
+Lyakhovich \& Sharapov~\cite{LyakhovichSharapov2021}) has not been
+applied to PGT $b_5 \tilde{R}^2$ in published literature, and is
+identified in Section~\ref{sec:pr-cb-future} as the most-promising
+constructive lead for future work.
+
+% [audit-2026-04-27] Path B (sectoral Stückelberg) caveats per Meta-K
+% verification of literature/2406.12826/Manuscript.tex (Barker line 109
+% footnote + line 300) and literature/2411.16928/Stueckelberg_v2.tex
+% (CRZ abstract + body).  The original investigation framed
+% Barker-conformal-embedding as ``established literature'' for the
+% trace-torsion sector and CRZ-Curtright as ``applies with caveats''
+% for the tensor-q sector; both framings are downgraded here because
+% the published constructions do not cover the parity-odd content of
+% TIDAL's b_5 R̃².
+\paragraph{Sectoral Stückelberg for trace torsion (open: parity-odd extension).}
+A separate constructive lead --- treating the trace torsion
+$T_\mu/3$ as a Stückelberg or Goldstone field for the conformal embedding
+of PGT in extended Weyl gauge theory --- has been proposed on the basis
+of Barker~\cite{barker2024poincare}.  Two facts in the published paper
+restrict the applicability for TIDAL's $b_5\,\tilde{R}^2$ case:
+(i) Barker identifies $T_\mu/3$ with the Yang--Mills-type Weyl gauge
+field (a propagating vector with a Maxwell-type kinetic), not with the
+Goldstone of broken Weyl symmetry; the Goldstone (compensator) is the
+\emph{scalar} $\phi$ (verified: \texttt{literature/2406.12826/Manuscript.tex}
+line 168, line 297).  (ii) The construction explicitly omits parity-odd
+invariants ``out of simplicity; there are no convincing theoretical
+grounds for excluding them''~\cite[footnote at line 109]{barker2024poincare}.
+TIDAL's $b_5\,\tilde{R}^2$ is parity-odd by construction, so applying
+this trace-sector recipe to TIDAL's case requires a parity-odd extension
+of Barker that has not been published.  Path B-trace is therefore
+\emph{open research}, conditional on such an extension --- not
+established literature.
+
+\paragraph{Sectoral Stückelberg for tensor torsion (open: parity-odd extension).}
+A second constructive lead --- the Stückelberg construction for massive
+mixed-symmetry tensor fields (Curtright (2,1) field) in
+Chatzistavrakidis, Ranjbar \& Zekoč~\cite{ChatzistavrakidisRanjbarZekoc2024}
+--- has been proposed for the tensor-q torsion sector.  The published
+paper handles only \emph{parity-even free-field} Lagrangians at
+linearised order, and the $m \to 0$ limit it analyses is the Goldstone
+(symmetry-breaking) limit rather than a constraint-promotion limit
+(verified: \texttt{literature/2411.16928/Stueckelberg\_v2.tex}, abstract
++ Sections 5.1--5.2).  Translating the construction to the parity-odd,
+non-free $b_5\,\tilde{R}^2$ case requires a parity-odd extension that
+does not exist in the published literature.  Path B-tensor-q is
+therefore likewise \emph{conditional} on an unpublished parity-odd
+extension of Chatzistavrakidis-Ranjbar-Zekoč 2024 --- not a verified
+construction for TIDAL's actual Lagrangian.
+
+\paragraph{Structurally identical case in modified teleparallel gravity.}
+$f(T) / f(T,B)$ teleparallel gravity has a documented DOF discontinuity:
+2~DOF at the perturbative level, 5~DOF non-perturbatively.  Recent
+work~\cite{HouCaiLi2023,CaiSaridakis2024} uses an EFT-of-cosmological-
+perturbations Stückelberg trick ($t \to t + \pi$ Goldstone field) to
+expose the strongly-coupled scalar mode and propose modifications that
+lower its appearance from cubic to quadratic order.  This is the
+closest published structural twin to TIDAL's constraint-promotion
+barrier; we cite it as a methodological template, but the construction
+is background-dependent (cosmological perturbations) and therefore not
+directly transplantable into TIDAL's flat-Minkowski theory-agnostic
+architecture.
+
+\paragraph{Stelle quadratic gravity.}
+The classical reference for the canonical Hamiltonian of quadratic
+gravity is Stelle~1977~\cite{Stelle1977}.  This treatment retains the
+Ostrogradsky ghost as a real (massive) degree of freedom and is
+\emph{non-perturbative} in the curvature-squared coupling.  It is the
+``honest'' Hamiltonian for the full quadratic theory but does not give
+a perturbative Hamiltonian valid only at small coupling.
+
+\paragraph{Conclusion of the survey.}
+No published method handles the case where $\varepsilon$ continuously
+promotes an algebraic constraint to a higher-derivative dynamical mode.
+The closest acknowledged obstruction is Henneaux \&
+Teitelboim's~\cite{HenneauxTeitelboim1992} ``irregular constraint
+surface'', identified in canonical analysis but not bridged by any
+perturbative algorithm.
+
+\subsection{TIDAL's resolution and current behaviour}
+\label{sec:pr-cb-resolution}
+
+In light of the architectural barrier, TIDAL's v6 Phase~2 LPS is
+deliberately scoped to the cases where it is mathematically justified
+and aborts \emph{loudly} on detection of the constraint-promotion case.
+
+\paragraph{Detection.}
+LPS examines the input Lagrangian for components carrying
+$\partial_t^2$ derivatives (\texttt{DetectMaxTimeOrder} in
+\texttt{PerturbativeReduction.wl}).  For each such component~$h_c$, LPS
+inspects the order-0 EOM: if the EOM contains $\partial_t^2 h_c$, $h_c$
+is dynamical at the leading order and substitution proceeds; if not,
+$h_c$ is constraint-promoted, and LPS aborts via Wolfram's
+\texttt{Throw} mechanism.
+
+\paragraph{Error behaviour.}
+The Throw is caught at the WLS-template level (commit \texttt{742c01a},
+\texttt{tidal/cli/\_derive.py}); on detection the script prints a
+clear diagnostic naming the constraint-promoted fields and exits with
+status~1.  Python's lenient handling of post-derivation JSON is
+\emph{disabled} by an mtime check: if the on-disk JSON was not modified
+during the failed run, the lenience is skipped and the failure
+propagates.  This prevents stale JSONs from masking real errors --- a
+defensive measure motivated by the principle that silent miscorrection
+is worse than loud failure, and aligned with the project policy of
+fail-loud over fall-back.
+
+\paragraph{Affected examples.}
+Three TIDAL examples trigger the abort:
+\texttt{graviton\_torsion}, \texttt{torsion\_gertsenshtein}, and
+\texttt{torsion\_gertsenshtein\_combined}.  All carry $b_5\,\tilde{R}^2$
+or analogous quadratic-curvature/torsion couplings.  Their
+pre-Phase~2 JSONs (containing residual \texttt{mixed\_2\_*} operators in
+the Hamiltonian section) remain on disk and continue to function for
+measurement paths that re-evaluate the EOM at snapshot time (rather
+than finite-differencing the velocity slot across snapshots --- a
+known instability when snapshots are widely spaced).  The \emph{equation}
+side (where Parker--Simon iterative reduction succeeds) is unaffected.
+
+\paragraph{Unaffected examples.}
+Theories without $b_5\,\tilde{R}^2$-style constraint-promotion proceed
+normally.  Notably, Euler--Heisenberg
+($\frac{\rho}{8}(F\cdot F)^2 + \frac{\sigma}{8}(\varepsilon \cdot F\cdot F)^2$)
+has a Lagrangian that is naturally first-order in time after IBP, so
+LPS is a no-op for that theory.  Pais--Uhlenbeck-style perturbations
+to dynamical Lagrangians proceed cleanly --- this is the textbook case
+that the substitution-based perturbative-reduction literature was
+designed for, and TIDAL's LPS handles it correctly (covered by
+\texttt{tests/wolfram/test\_lps.wls}).
+
+% [audit-2026-04-27] Added per Correction #9 of FINAL_ASSESSMENT.md.
+% Meta-L verified directly via reading tidal/measurement/_conversion.py
+% (file lines 1--172) and JSON inspection of
+% examples/data/torsion_gertsenshtein.json that the constraint-promotion
+% barrier does NOT block the project's headline observable.  The
+% Hamiltonian-based conversion observable in _conversion.py operates on
+% the standard-kinetic h_5 ↔ a_1 channel, sector-isolated from the
+% b5-promoted h_4/h_7/h_9 subspace.  This contextualises the barrier:
+% it constrains total system energy conservation but not the headline
+% measurement.
+\subsection{Operational primary: Hamiltonian-based conversion observable}
+\label{sec:pr-cb-operational}
+
+The constraint-promotion barrier described above is a real architectural
+limit on the \emph{total system energy budget} for theories carrying
+$b_5\,\tilde{R}^2$.  It does \emph{not}, however, block TIDAL's flagship
+graviton--photon conversion measurement.  This subsection documents
+the operational primary observable, which is in production use.
+
+\paragraph{The conversion observable.}
+The function
+\texttt{compute\_conversion\_probability} in
+\texttt{tidal/measurement/\_conversion.py} computes the
+Hamiltonian-based conversion probability
+$P(t) = E_{\rm target}(t) / E_{\rm source}(0)$, where the per-field
+energies are evaluated via
+\texttt{compute\_energy\_timeseries} (\texttt{tidal/measurement/\_energy.py}).
+The energy expression is the canonical Hamiltonian (kinetic plus
+gradient plus mass) drawn from the JSON
+\texttt{canonical.hamiltonian\_terms} block, including the spatial
+volume element $\sqrt{|g_{\rm spatial}|}$ for curved coordinates.
+This is a phase-space observable on $(q, \pi)$, not an amplitude-ratio
+heuristic: the per-field source and target energies are evaluated at
+each snapshot, and \texttt{compute\_conversion\_probability} returns
+$P(t)$, $E_{\rm src}(t)$, $E_{\rm tgt}(t)$, the total energy timeseries,
+and $|\Delta E_{\rm tot}/E_{\rm tot}(0)|$ as a conservation diagnostic.
+
+\paragraph{Why the constraint-promotion barrier does not block this.}
+For \texttt{torsion\_gertsenshtein}, the Gertsenshtein-effect headline
+sweep uses \texttt{--source h\_5 --target a\_1} (verified across all
+sweep scripts under \texttt{examples/torsion\_gertsenshtein/}).  Direct
+JSON inspection shows that $h_5$ has
+\texttt{time\_order = 2} and
+\texttt{kinetic\_coefficient\_symbolic = "-kappa\^{}(-2)"} --- a
+standard-kinetic graviton component, \emph{not} one of the
+$b_5$-promoted Pais--Uhlenbeck components $h_4, h_7, h_9$.  The
+$d_t^2(h_5)$ and $d_t^2(a_1)$ equations form a closed two-equation
+sub-system whose RHS terms reference only $\{h_5, a_1\}$.  The
+\texttt{mixed\_2\_*} self-energy terms for $h_4/h_7/h_9$
+(\texttt{hamiltonian\_terms} 75, 76, 77) do not enter the source-energy
+denominator $E_{\rm src}(0)$ used by
+\texttt{compute\_conversion\_probability}, because the denominator is
+evaluated at \emph{the source field} ($h_5$), not over the total system.
+
+\paragraph{Quantitative validation in production.}
+The 276-run dark-photon amplification campaign (memory file
+\texttt{dark\_photon\_amplification\_campaign\_v0.31.md}) reports
+agreement with the analytical Boccaletti baseline
+$P_{\rm GR} = \sin^2(\kappa B_0 t / 2)$ to a maximum residual of
+$6.7 \times 10^{-6}$ across the full sweep.  The
+\texttt{compute\_conversion\_probability} energy-ratio observable is
+therefore measurement-grade for the headline channel.
+
+\paragraph{Where the barrier still matters.}
+For \emph{total system energy conservation} diagnostics (\texttt{measure
+--what conservation}) on theories with $b_5\,\tilde{R}^2$, the
+$h_4/h_7/h_9$ self-energy terms use \texttt{mixed\_2\_0\_0\_0}
+operators that resolve via \texttt{\_compute\_acceleration\_from\_eom}
+(re-evaluating the EOM at snapshot time, see
+\texttt{tidal/measurement/\_energy.py}).  This is the
+``EOM-defines-Hamiltonian'' antipattern flagged in
+Section~\ref{sec:pr-cb-conclusion}.  The conservation observable on the
+full system is therefore not phase-space-clean for these theories;
+practitioners should treat it as a consistency check, not a primary
+measurement, until the constraint-promotion barrier is bridged for
+the metric subspace.  The
+\texttt{compute\_conversion\_probability} observable on the
+sector-clean $h_5 \leftrightarrow a_1$ channel is unaffected.
+
+\subsection{Future work}
+\label{sec:pr-cb-future}
+
+The constraint-promotion case is open research, not engineering.  Issue
+\#321 in TIDAL's tracker outlines three directions, none of which has a
+published implementation for this specific problem.
+
+\paragraph{(a) Algebraic-constraint resolution with chain-rule expansion.}
+Solve the order-0 algebraic constraint for $h_c$ in terms of dynamical
+fields, chain-differentiate twice in time, and substitute back into the
+Lagrangian.  This is what was attempted during Phase~2 development
+(commit branch reverted before merge): the procedure does converge
+mathematically, but the chain rule introduces $\partial_t^2$ of
+\emph{dynamical} fields, which then require their own substitution.
+On TIDAL's largest constraint-promotion theory
+(\texttt{torsion\_gertsenshtein}, 38 fields), the substitution failed
+to complete within reasonable resources (5+~min, 2+~GB) and
+correctness was uncertain (rule-chain convergence and Series-truncation
+interaction not formally verified).  A successful implementation would
+need both algorithmic optimisation \emph{and} a correctness proof; both
+are research-level.
+
+\paragraph{(b) Parker--Simon analogue at the Lagrangian level.}
+The v6 EOM-side success rests on Parker--Simon's iterative
+\emph{source} treatment of higher-derivative corrections: the
+correction term acts as a Duhamel source on the second-order base
+operator, never appearing in the LHS.  No published analogue exists for
+the Lagrangian, because the Lagrangian is a static functional with no
+``evolution'' to convert into a Duhamel kernel.  A novel theoretical
+construction would be needed.
+
+\paragraph{(c) Hamiltonian directly from the v6-reduced EOM.}
+Given the v6 Parker--Simon-reduced equations of motion, attempt to
+reconstruct an effective Hamiltonian by antiderivative integration:
+$H_0 = \tfrac{1}{2}\,\pi\, M_0^{-1}\, \pi + V_0(q)$ with
+$V_0(q) = -\int K_0(q)\,dq$, plus an order-1 correction
+$\varepsilon\, V_1(q)$ from the Pass-1 source.  The
+antiderivative-reconstruction step is fragile for gauge-coupled
+multi-field systems (no uniqueness guarantee, and the Pass-1 source
+$K_1 - M_1 M_0^{-1} K_0$ is not in general the gradient of a scalar
+potential).  This direction would need a constructive uniqueness or
+gauge-invariant form theorem before being implementable.
+
+\paragraph{Symplectic-perturbation lifting (FJ rank-jump).}
+A research direction not in the TIDAL issue list but suggested by the
+Faddeev--Jackiw analysis: develop a perturbation theory of the
+symplectic 2-form across rank jumps.  Standard deformation
+quantisation~\cite[for example]{HenneauxTeitelboim1992} treats
+deformations of \emph{non-degenerate} symplectic structures; the
+rank-jumping case appears in the symplectic-foliation literature but not
+as an explicit perturbation theory.  The most recent FJ formalisation
+~\cite{CaboBizetBartocci2026} confirms that termination requires
+Schur-complement non-degeneracy --- exactly what fails at the critical
+surface --- so a uniformly-valid singular-perturbation theory for FJ
+across rank jumps would have to be invented from scratch.  Producing such
+a theory is at least a year of mathematical work with high risk of
+yielding only formal statements rather than a TIDAL-applicable recipe.
+\textbf{This direction is now considered confirmed-blocked} on the
+1--6-month research-program timescale.
+
+\paragraph{(d) Krupka--Voicu canonical variational completion plus Stückelberg lifting (composite, novel).}
+A composition not present in published literature, identified during the
+multi-front literature survey conducted alongside this write-up.  Three
+ingredients:
+\begin{enumerate}
+  \item \textbf{Krupka--Voicu canonical variational completion
+    (Definition~1 of \cite{KrupkaVoicu2015})}: the Vainberg--Tonti homotopy
+    formula provides a canonical Lagrangian for any non-variational EOM
+    operator, with the Helmholtz residue measuring the obstruction.
+    % [audit-2026-04-27] Per Meta-K verification of literature/1406.6646/main.tex:
+    %   the paper has Definition 1 (Eq. 12), no Theorem 1.
+    %   Cited object is the canonical variational completion as defined
+    %   by KV; downstream "verifications" are consistency checks of this
+    %   definition, not proofs of a theorem.
+  \item \textbf{Variational
+    bootstrapping}~\cite{DucobuVoicu2024,DucobuVoicu2025}: applies
+    Krupka--Voicu to metric-affine cosmology, demonstrating the right
+    language for a PGT-style application.  Voicu~\cite{Voicu2020}
+    documents that variational completion can diverge on singular
+    limits (4D-Gauss--Bonnet) --- a direct cautionary tale.
+  \item \textbf{Stückelberg auxiliary-field
+    promotion}~\cite{Lyakhovich2021,LyakhovichSharapov2021}: when the
+    naive variational completion fails uniqueness in the constraint
+    sector, introduce auxiliary fields $\psi_c$ that absorb the
+    constraint-promoted modes, gauge-fix, and re-run the completion in
+    the enlarged field space.
+\end{enumerate}
+
+\noindent
+% [audit-2026-04-27] Per Correction #6 of FINAL_ASSESSMENT.md, Voicu
+% 2020 §4 + Appendix A (verified: literature/2009.05459/varcompl_*.tex
+% lines 242, 291, 442) identifies two independent failure modes for the
+% Vainberg--Tonti construction.  These were bundled as a single
+% ``VT convergence'' gate in the original investigation; they are split
+% out here as separate preflights.  Per Correction #7 (Review 1 C5,
+% sympy-verified in research/perturbative_hamiltonian/reviews/scripts_review/),
+% the Routhian projector denominator in $L_{\rm VT}$ contains explicit
+% $1/M_c^2$ and $1/M_c^4$ poles, so $L_{\rm VT}$ diverges at constraint-
+% mass critical surfaces.  PGT critical-mass surfaces (Karananas 2014,
+% Blagojević 2018) are exactly where direction (d) breaks.
+\textbf{Falsifiable preflight tests (three independent gates).}
+Direction~(d) is viable for a given PGT theory only if all three of
+the following gates hold for the Parker--Simon-reduced order-1 EOM
+operator:
+\begin{enumerate}
+  \item[(P1)] \textbf{Helmholtz self-adjointness}: the Helmholtz
+        residue $\delta E$ vanishes.  This is the necessary and
+        sufficient condition for the source form to be variational at
+        all.
+  \item[(P2)] \textbf{Vainberg--Tonti integral convergence}: the
+        homotopy integrand has fibre-homogeneity degree $> -1$
+        (Voicu~\cite[Sec.~3.2]{Voicu2020}; verified in
+        \texttt{literature/2009.05459/varcompl\_EPJP\_format\_Rev1\_arxFin.tex}
+        line 242).  Polynomial source forms automatically satisfy this;
+        rational-fibre source forms can fail.
+  \item[(P3)] \textbf{Linearity in highest-order derivatives}
+        (Voicu~\cite[Sec.~4 + App.~A]{Voicu2020}; verified at the same
+        source, lines 291 and 442).  Any second-order locally variational
+        PDE system must be linear in its highest derivatives; this is
+        a \emph{distinct} failure mode from VT integral convergence.
+        Linearised quadratic Lagrangians satisfy (P3) automatically;
+        beyond-quadratic PGT does not.
+\end{enumerate}
+If (P1)--(P3) all hold, Vainberg--Tonti yields a Lagrangian
+directly --- direction~(d) is viable without Stückelberg promotion at
+the toy level.  If any gate fails, Stückelberg promotion is mandatory
+--- direction~(d) reduces to direction~(e) below.
+
+\noindent
+\textbf{Constraint-mass critical-surface caveat (new pathology).}
+% [audit-2026-04-27] Review 1 C5 (sympy-verified): the Vainberg--Tonti
+% Lagrangian for higher-derivative perturbative-reduction toys (T2/T3/T4)
+% contains an explicit Routhian projector denominator $\propto 2 M_1^2
+% M_2^2 \dots$, so the construction has $1/M_c^2$ and $1/M_c^4$ poles.
+% PGT critical-mass surfaces (where one constraint mass $M_c^2 \to 0$)
+% are exactly the parameter points where Path A breaks.  This caveat is
+% independent of preflights (P1)--(P3).
+Even when the three preflights pass, the Vainberg--Tonti Lagrangian
+$L_{\rm VT}$ for the constraint-promoted sector contains a Routhian
+projector denominator proportional to a product of constraint masses
+$\prod_c M_c^2$, so $L_{\rm VT}$ contains explicit $1/M_c^2$ and
+$1/M_c^4$ poles (Review~1 C5,
+\texttt{research/perturbative\_hamiltonian/reviews/scripts\_review/C5\_routhian\_M\_to\_zero.py}).
+PGT critical-mass surfaces (where one or more
+constraint masses vanish, see~\cite{BlagojevicCvetkovic2018} for the
+relevant surfaces in quadratic PGT) are exactly the parameter points
+where direction~(d)'s constructive output is undefined.  Path~A's
+verdict is therefore conditional on $M_c^2 \neq 0$ for every
+constraint-promoted field $h_c$ at the parameter point of interest;
+the most physically interesting PGT critical cases lie on these
+surfaces, where direction~(d) fails.
+
+\noindent
+% [audit-2026-04-27 Phase 2.1] Per Phase 2.1 deep read of GZL 2024
+% (literature/2311.17459/Hamiltonian_metric-affine_R2.tex line 835),
+% GZL's standard scalar-auxiliary lift requires f''(varphi) ne 0; for
+% f = R + b_5 R^2 this is f'' = 2 b_5, which vanishes at b_5 = 0.
+% GZL's own construction is therefore non-invertible at the
+% constraint-promotion limit.  This reinforces (rather than weakens)
+% the verdict that no published technique bridges the b_5 = 0 surface.
+\textbf{Methodologically closest published paper has the same singularity.}
+The closest published Hamiltonian analysis of an $R^2$-type higher-derivative
+gravity is Glavan--Zlosnik--Lin~\cite{GlavanZlosnikLin2024}, which uses the
+standard scalar-auxiliary lift $S = \int d^Dx\sqrt{-g}\,[f(\varphi) +
+\lambda(\varphi - R)]$.  This lift requires $f''(\varphi) \neq 0$ at the
+working point.  For $f = R + b_5\, R^2$ one has $f'' = 2 b_5$, which
+vanishes precisely at $b_5 = 0$.  GZL's own construction is therefore
+\emph{non-invertible} at the constraint-promotion limit; the lift moves
+the singularity to the auxiliary-scalar-elimination step rather than
+removing it.  This reinforces the verdict that no published technique
+bridges the $b_5 = 0$ surface for higher-derivative quadratic gravity,
+including in the metric-affine and metric-only frameworks adjacent to
+TIDAL's PGT-torsion case (cf.~\cite{BarkerGlavan2025,Bellorin2025,Karananas2024a,Karananas2024b}).
+
+\noindent
+% [audit-2026-04-27 Phase 2.2] Per the Phase 2.2 production-pipeline
+% verification (research/perturbative_hamiltonian/notes/lead_recipe1_xact.md):
+% the Round 3 ``Recipe 1 PASS'' verdict was sympy-verified at the
+% q-projection schema level for the parity-odd Pontryagin density
+% epsilon^{abef} R-tilde^{abcd} R-tilde_{cd}^{ef}, while TIDAL's
+% theory.toml uses the parity-EVEN RicciScalarCDT[]^2.  The conclusion
+% (no (d^2 q)^2 at linear order) carries qualitatively because each
+% R-tilde factor is one (d K) at linear order, but the verbatim sympy
+% verification does not cover TIDAL's actual operator.  Tightening this
+% to a verbatim production-pipeline verification is a ~30-minute extension
+% of recipe1_preflight_q_projection.py adding a part (D) for the
+% parity-even case.  Production-pipeline ground truth (per
+% lead_recipe1_xact.md): three propagating t-fields t_6, t_13, t_20 with
+% time_order=2 and kinetic_coefficient_symbolic = (-25 b_5)/2; no t-field
+% has time_order >= 4.  The metric subspace h_4/h_7/h_9 has time_order=4
+% with kinetic_coefficient_symbolic = 2 b_5.  The (d^2 q)^2 PU signature
+% appears ONLY on h-fields, never on t-fields, in canonical.equations[].
+\textbf{Recipe 1 verification scope (preflight for direction (e)).}
+The Round 3 ``Recipe 1 PASS'' result --- which establishes that the
+$b_5\,\tilde{R}^2$ projection onto the q-irreducible torsion sector
+gives standard-kinetic $(\partial q)^2$ structure rather than
+Pais--Uhlenbeck $(\partial^2 q)^2$ --- was sympy-verified for the
+parity-odd Pontryagin density $\epsilon^{abef}\,\tilde{R}^{abcd}
+\tilde{R}_{cd}^{ef}$, whereas TIDAL's actual operator is the parity-even
+$\tilde{R}^2 = (\mathcal{R}_{\rm CDT})^2$ (\texttt{theory.toml} line~118
+in \texttt{torsion\_gertsenshtein/}).  At linear order each
+$\tilde{R}$-factor still contributes only one $\partial K$, so the
+qualitative conclusion ``no $(\partial^2 q)^2$'' carries; production-
+pipeline inspection of the actual JSON confirms zero t-field with
+\texttt{time\_order}~$\geq 4$ and that the $(\partial^2 q)^2$ signature
+appears only on $h$-fields (the metric subspace), never on $t$-fields.
+A verbatim sympy verification for TIDAL's specific operator (parity-even
+Ricci-scalar-squared) would require a $\sim$30-minute extension of the
+existing schema-level scripts; until then, Recipe~1 PASS at production
+level is established by direct JSON inspection rather than verbatim
+sympy match.  See \texttt{lead\_recipe1\_xact.md} for evidence.
+
+\paragraph{(e) Stückelberg lifting via Lyakhovich's general recipe (top priority).}
+The most general published Stückelberg recipe is
+Lyakhovich~\cite{Lyakhovich2021}: starting from the original (possibly
+non-involutive, non-Lagrangian) EOM, close them under derivative
+consequences, introduce one Stückelberg field per consequence with
+prescribed gauge transformation, and iteratively build a consistent
+Stückelberg-extended action.  An existence theorem accompanies the
+construction.  Combined with Hinterbichler \&
+Saravani's~\cite{HinterbichlerSaravani2015} explicit Stückelberg
+quadratic-curvature decomposition for the metric-only sector, this is a
+defensible 1--6-month research program for PGT $b_5\,\tilde{R}^2$:
+\begin{enumerate}
+  \item At $b_5 = 0$, identify $h_4, h_7, h_9$ as algebraic constraints.
+  \item At $b_5 \ne 0$, write down the lower-order consequences that
+        change class.
+  \item Introduce Stückelberg auxiliary fields $\psi_c$ per
+        Lyakhovich~\cite[\S 3]{Lyakhovich2021} with prescribed gauge
+        transformations.
+  \item Close the action via Lyakhovich's iterative procedure.
+  \item Take the $b_5 \to 0$ decoupling limit and verify
+        Hinterbichler--Saravani-style recovery of the $b_5 = 0$
+        constraint structure.
+  \item \textbf{Validate via
+        HiGGS}~\cite{Barker:2022kdk,barker2024poincare}, the
+        xAct-compatible automated PGT Hamiltonian analyser, at
+        benchmark parameter points.
+\end{enumerate}
+The principal risk is whether the involutive closure of the
+$b_5 \ne 0$ EOM is finite or requires an infinite tower (as
+Aoki--Mukohyama~\cite{aoki2020ghostfree} found for 4D
+PGT--bigravity equivalence).  This question is independent of the
+Helmholtz preflight (d) and would be the first thing established once a
+minimal PGT test theory is constructed.
+
+\paragraph{What ``solving'' the barrier looks like.}
+A successful perturbative-Hamiltonian reduction for the constraint-promotion
+case would produce, given $\mathcal{L}(q; \varepsilon) = \mathcal{L}_0(q) +
+\varepsilon\, \mathcal{L}_1(q, \partial^2 q, \dots)$ with $\varepsilon$
+promoting~$h_c$, a Hamiltonian
+$H(q, \pi; \varepsilon) = H_0(q, \pi) + \varepsilon\, H_1(q, \pi)$ such
+that:
+
+\begin{enumerate}
+  \item[(i)] $H$ depends only on $(q, \pi)$, with no Ostrogradsky higher
+        momenta.
+  \item[(ii)] Hamilton's equations from~$H$ reproduce, to order~$\varepsilon$,
+        the Parker--Simon-reduced EOM of the v6 path.
+  \item[(iii)] The reduction is well-defined for the multi-field
+        gauge-theory case relevant to PGT torsion.
+  \item[(iv)] The construction is theory-agnostic, not requiring per-theory
+        fine-tuning.
+\end{enumerate}
+
+No published method achieves all four for the constraint-promotion case.
+
+\subsection{Conclusion}
+\label{sec:pr-cb-conclusion}
+
+TIDAL's perturbative reduction has \emph{two distinct layers}, and the
+two have asymmetric impact on the project's headline observable.  The
+\textbf{equation-of-motion side} (Parker--Simon Pass~0+1) is necessary
+for simulation of higher-derivative theories like $b_5\,\tilde{R}^2$ PGT
+and works for all three affected theories.  The
+\textbf{Lagrangian/Hamiltonian side} (LPS) is necessary for
+\emph{phase-space-clean} total-system canonical observables (whole-system
+Noether checks, total energy conservation in the presence of
+$h_4/h_7/h_9$ self-energy terms) and is blocked for the
+constraint-promotion case.  However, the
+\textbf{operational primary observable}
+(Section~\ref{sec:pr-cb-operational}, Hamiltonian-based conversion
+probability $P(t) = E_{\rm target}(t)/E_{\rm source}(0)$ on the
+$h_5 \leftrightarrow a_1$ channel) does \emph{not} go through the
+constraint-promoted subspace and is unaffected by the barrier; in
+production, it agrees with the analytical Boccaletti baseline to
+$\sim 6.7 \times 10^{-6}$ across a 276-run sweep.
+% [audit-2026-04-27] Per Correction #9 / Meta-L: the constraint-promotion
+% barrier was originally framed as ``what stands between TIDAL and
+% trustworthy observables''.  Meta-L verified by direct code reading +
+% JSON inspection that the headline channel h_5 ↔ a_1 is standard-kinetic
+% and sector-clean from h_4/h_7/h_9.  Reframing accordingly.
+
+The pre-LPS $b_5\,\tilde{R}^2$ JSONs carry \texttt{mixed\_2\_*}
+operators in their \texttt{hamiltonian\_terms}, which encode
+$\partial_t^2 q$ factors that are defined \emph{by} the EOM, not by
+the canonical state.  For the $h_4/h_7/h_9$ self-energy contributions
+to total system energy, these are not phase-space-clean canonical
+observables.  The constraint-promotion barrier therefore matters as a
+research problem for two specific consumers: total-energy conservation
+diagnostics on $b_5\,\tilde{R}^2$ theories, and any future application
+that requires a fully phase-space-clean Hamiltonian on the metric
+Pais-Uhlenbeck subspace.  It does \emph{not} block the headline
+graviton--photon conversion measurement, which has been delivering
+measurement-grade $P(t)$ on the standard-kinetic channel for a year.
+
+The barrier itself is structurally analogous to the vDVZ discontinuity
+and the Maxwell--Proca constraint reclassification.  Every published
+reduction method --- substitution, field redefinition,
+fixing-the-equations, Faddeev--Jackiw, cubic-PGT redesign, DHOST ---
+shares an architectural assumption that excludes the
+constraint-promotion case.  The canonical-Hamiltonian
+analysis of general PGT~\cite{BlagojevicCvetkovic2018} states
+explicitly that the diagonalisation matrix $D$ at the parametric level
+has no valid limit $\bar{b} \to 0$ but recovers the critical parameters
+directly from the (then-diagonal) matrix $F$.  This is a constructive
+prescription for BC's 2nd-order Dirac--ADM case, but
+\emph{does not apply} to TIDAL's higher-derivative
+$b_5\,\tilde{R}^2$ Ostrogradsky rank-jump, which sits above BC's
+framework (different derivative order, inverse constraint topology;
+% [audit-2026-04-27] reframed per Meta-N §5: BC 2018 is constructive
+% within its own scope but addresses a structurally different case.
+see Section~\ref{sec:pr-cb-history}).
+For \emph{TIDAL's higher-derivative case} the same constraint-promotion
+phenomenon has been named three times across 25
+years~\cite{BlagojevicNikolic1983,BlagojevicNikolic1983Nuovo,YoNester1999,YoNester2002,BlagojevicCvetkovic2018}
+without a perturbative solution.
+
+TIDAL's v6 Phase~2 LPS therefore aborts loudly on detection of
+constraint promotion, preserving correctness over partial output.
+The affected theories continue to simulate via the pre-Phase-2 JSONs and
+the v6 EOM-side Parker--Simon path; the operational primary
+$h_5 \leftrightarrow a_1$ conversion observable
+(Section~\ref{sec:pr-cb-operational}) is sector-clean and produces
+measurement-grade $P(t)$.  Total-system energy diagnostics on these
+theories remain bounded by what can be extracted from EOM
+trajectories alone, until the constraint-promotion barrier is bridged
+for the metric subspace.
+
+This document records the architectural lesson, the literature evidence
+that the barrier is genuinely a research frontier, and the most-promising
+constructive directions for future work --- principally
+\textbf{Stückelberg lifting via Lyakhovich's general
+recipe}~\cite{Lyakhovich2021} (Section~\ref{sec:pr-cb-future}, direction
+(e)), with the Helmholtz-residue
+preflight~\cite{KrupkaVoicu2015} as a falsifiable go/no-go test.
+HiGGS~\cite{Barker:2022kdk,barker2024poincare} provides the practical
+Wolfram-side validation infrastructure for any candidate solution.
+Implementation would require novel theoretical results, not engineering
+effort, but is now the critical-path open problem for TIDAL's flagship
+$b_5\,\tilde{R}^2$ PGT physics scope.

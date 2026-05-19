@@ -1,0 +1,30 @@
+% Figure A.1 — TIDAL pipeline architecture diagram (App A).
+%
+% Schematic three-stage diagram: symbolic stage (Wolfram/xAct) --> JSON
+% handoff --> numerical stage (Python solvers). Show inputs (TOML
+% Lagrangian), intermediate artefacts (JSON spec), and outputs (simulation
+% data, measurements). Keep schematic; do not show code-level details.
+%
+% Output: manuscript/figures/figA1_architecture.pdf
+%
+% Stub at Phase 2 scaffold time. Drawing lives in the per-figure drafting
+% session. To compile standalone for development:
+%   pdflatex figA1_architecture_tikz.tex
+
+\documentclass[tikz,border=4pt]{standalone}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric}
+
+\begin{document}
+\begin{tikzpicture}
+  % TODO: pipeline diagram
+  %   - Box: TOML Lagrangian (input)
+  %   - Box: Wolfram/xAct + xPert (symbolic stage)
+  %   - Box: JSON spec (handoff)
+  %   - Box: Python solver dispatch (modal / IDA / CVODE / leapfrog / scipy)
+  %   - Box: simulation data + measurements (output)
+  %   - Arrows between adjacent boxes labelled with the action that takes
+  %     place (e.g. ``derive'', ``dispatch'', ``measure'').
+  \node {Phase 2 scaffold: figure A.1 placeholder};
+\end{tikzpicture}
+\end{document}

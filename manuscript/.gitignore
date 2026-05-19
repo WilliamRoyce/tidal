@@ -18,3 +18,8 @@
 *.ps
 *.bak
 *-blx.bib
+*Notes.bib
+
+# Allow committed source figures
+!figures/*.pdf
+!figures/*.tex

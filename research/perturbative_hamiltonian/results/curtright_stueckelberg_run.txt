@@ -1,0 +1,124 @@
+
+==============================================================================
+Phase 1: encode Curtright Stueckelberg fields and gauge transformations
+==============================================================================
+F0_{01|0} = q0(t, x) - Derivative(a1(t, x), (t, 2)) + 3*Derivative(b01(t, x), t) + Derivative(h00(t, x), x) - Derivative(h01(t, x), t) + Derivative(a0(t, x), t, x)
+F0_{01|1} = q1(t, x) + Derivative(a0(t, x), (x, 2)) + 3*Derivative(b01(t, x), x) + Derivative(h01(t, x), x) - Derivative(h11(t, x), t) - Derivative(a1(t, x), t, x)
+
+==============================================================================
+Phase 2: verify gauge invariance of F0_{mu nu | rho}
+==============================================================================
+delta F0_{01|0} = 0
+delta F0_{01|1} = 0
+PASS: F0_{mu nu | rho} is gauge-invariant under all three Stueckelberg shifts.
+
+==============================================================================
+Phase 3: PGT-like toy without auxiliaries -- demonstrate rank-jump
+==============================================================================
+L_q (no auxiliaries) = -M*(q0(t, x)**2 + q1(t, x)**2)/2 + b5*Derivative(q0(t, x), t)**2/2 + b5*Derivative(q1(t, x), x)**2/2
+pi_q0 = b5*Derivative(q0(t, x), t)
+pi_q1 = 0
+Kinetic Hessian (q-only) = Matrix([[b5, 0], [0, 0]])
+det H_kin_qonly = 0
+This vanishes at b5 = 0 -> *rank-jump*: q1 has no time derivative in this toy.
+
+==============================================================================
+Phase 4: Stueckelberg-extended toy Lagrangian and constraint structure
+==============================================================================
+L_min = -M*q0(t, x)**2/(2*b5) - lambda_a*q0(t, x)*Derivative(a0(t, x), (t, 2)) - lambda_b*q0(t, x)*Derivative(b01(t, x), t) - lambda_h*q0(t, x)*Derivative(h00(t, x), t) + Derivative(a0(t, x), t)**2/2 + Derivative(b01(t, x), t)**2/2 + Derivative(h00(t, x), t)**2/2 + Derivative(q0(t, x), t)**2/2
+L_min_IBP = -M*q0(t, x)**2/(2*b5) + lambda_a*Derivative(a0(t, x), t)*Derivative(q0(t, x), t) - lambda_b*q0(t, x)*Derivative(b01(t, x), t) - lambda_h*q0(t, x)*Derivative(h00(t, x), t) + Derivative(a0(t, x), t)**2/2 + Derivative(b01(t, x), t)**2/2 + Derivative(h00(t, x), t)**2/2 + Derivative(q0(t, x), t)**2/2
+pi_q0 = lambda_a*Derivative(a0(t, x), t) + Derivative(q0(t, x), t)
+pi_h00 = -lambda_h*q0(t, x) + Derivative(h00(t, x), t)
+pi_b01 = -lambda_b*q0(t, x) + Derivative(b01(t, x), t)
+pi_a0 = lambda_a*Derivative(q0(t, x), t) + Derivative(a0(t, x), t)
+Kinetic Hessian (4x4) = Matrix([[1, 0, 0, lambda_a], [0, 1, 0, 0], [0, 0, 1, 0], [lambda_a, 0, 0, 1]])
+det(H_kin) = 1 - lambda_a**2
+
+==============================================================================
+Phase 5: Constraint Poisson matrix and rank uniformity in b5
+==============================================================================
+EOM[q0] = -M*q0(t, x)/b5 - lambda_a*Derivative(a0(t, x), (t, 2)) - lambda_b*Derivative(b01(t, x), t) - lambda_h*Derivative(h00(t, x), t) - Derivative(q0(t, x), (t, 2))
+EOM[h00] = lambda_h*Derivative(q0(t, x), t) - Derivative(h00(t, x), (t, 2))
+EOM[b01] = lambda_b*Derivative(q0(t, x), t) - Derivative(b01(t, x), (t, 2))
+EOM[a0] = -lambda_a*Derivative(q0(t, x), (t, 2)) - Derivative(a0(t, x), (t, 2))
+det(H_kin) as function of b5 = 1 - lambda_a**2
+subs b5 -> 0: 1 - lambda_a**2
+subs b5 -> 1: 1 - lambda_a**2
+PASS: det(H_kin) is INDEPENDENT of b5. Rank uniformity holds.
+
+==============================================================================
+Phase 6: b5 -> 0 decoupling limit
+==============================================================================
+L_min_IBP at q0=0: lambda_a*Derivative(0, t)*Derivative(a0(t, x), t) + Derivative(0, t)**2/2 + Derivative(a0(t, x), t)**2/2 + Derivative(b01(t, x), t)**2/2 + Derivative(h00(t, x), t)**2/2
+Without auxiliaries, L_q at b5=0: -M*(q0(t, x)**2 + q1(t, x)**2)/2
+Reduces to -(M/2)(q0^2 + q1^2) -- pure algebraic constraint, NO kinetic terms.
+With auxiliaries, the auxiliaries take over the dynamics smoothly.
+
+==============================================================================
+Phase 7: Compare with axial-sector single-scalar lift
+==============================================================================
+Axial-sector (Agent F): 1 scalar auxiliary phi, det(M)=m_A^4 b-indep.
+Tensor-sector (Agent J): 3 auxiliaries (h, b, a), det(H_kin)=1-lam_a^2 b5-indep.
+Both: heavy field decouples with infinite mass; auxiliaries take over smoothly.
+
+==============================================================================
+Phase 8: Caveats and limitations
+==============================================================================
+1) Toy is 1+1D, not full 1+3D PGT. The Young (2,1) structure
+   collapses: 4D q has 16 components, 1+1D q has 2. The cyclic
+   constraint q_{[abc]} = 0 is non-trivial only in dim >= 3.
+
+2) The b5*Rtilde^2 PGT term contains EPSILON*R*R contractions
+   (parity-odd), giving rise to first-derivative cross-terms in
+   q (cf. R x DT block in research/lagrangian_enumeration/
+   explicit_terms_tex.txt). These are absent from the standard
+   Curtright kinetic dT*dT in the paper. The published
+   Stueckelberg construction handles parity-EVEN Curtright; the
+   PGT case may need a parity-ODD extension that is NOT in the
+   published literature.
+
+3) Combining Curtright Stueckelberg with PGT's existing
+   diffeomorphism + local Lorentz gauge structure introduces
+   gauge-fixing complications: the auxiliaries h, b, a transform
+   under both Stueckelberg shifts AND background diffeo / Lorentz.
+   At linear-flat order this is trivial (background gauge group
+   acts on perturbations linearly), but beyond linearity there is
+   non-abelian mixing.
+
+4) The cyclic constraint q_{[abc]} = 0 in 4D removes 4 components
+   from the naive 24, leaving 16 -- but the gauge transformations
+   in Eq. (57) of the paper need to PRESERVE this cyclic constraint.
+   In 4D this is non-trivial: the s_{nu rho} symmetric tensor and
+   beta_{nu rho} antisymmetric must conspire to preserve the cyclic
+   identity on T_{mu nu | rho}. Verified in the paper for 4D; we
+   merely transcribe.
+
+5) The mass term -(M/(2 b5)) q0^2 in our canonical-rescaled toy
+   is the ONLY b5-dependent piece. In the paper's original
+   (un-rescaled) form, the kinetic is (b5/2)(dq)^2 and the mass
+   is -(M/2) q^2. Both forms are equivalent under canonical
+   rescaling q -> q / sqrt(b5), modulo the b5 -> 0 limit being
+   smooth in canonical form but singular in non-canonical form.
+   This is exactly what the Stueckelberg auxiliaries fix.
+
+6) The actual TIDAL-blocking constraint promotion involves h_4,
+   h_7, h_9 components of the *metric perturbation*, which are
+   higher-derivative Pais-Uhlenbeck. Round 2 Agent G clarified
+   that these are NOT in the q-irreducible Curtright sector --
+   they are graviton-trace components hit by Hinterbichler-Saravani
+   parity-EVEN Stueckelberg, which fails on parity-ODD Rtilde^2.
+   So the Curtright Stueckelberg recipe does NOT solve the metric
+   h_4,7,9 blocker -- it solves a SEPARATE q-torsion sub-blocker
+   that Round 1 missed because its toys were Pais-Uhlenbeck.
+
+==============================================================================
+Phase 9: Verdict
+==============================================================================
+applies: APPLIES WITH CAVEATS
+rank_uniformity: Verified at the 1+1D toy level: det(H_kin) = 1 - lam_a^2 is b5-independent.
+smooth_b5_limit: Confirmed: q decouples (infinite mass), auxiliaries h, b, a inherit dynamics.
+gauge_invariance: Verified explicitly in Phase 2: F0_{mu nu | rho} is invariant under all three Stueckelberg shifts.
+parity_odd_extension_needed: True
+metric_h4_h7_h9_solved: False
+tensor_torsion_q_solved: Yes, modulo parity-odd extension and 4D vs 1+1D promotion.
+compared_to_axial_lift: Both decouple the heavy field via infinite-mass; tensor case needs 3 auxiliaries, axial 1.

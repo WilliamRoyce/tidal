@@ -1,0 +1,198 @@
+% Plane-Wave Initial Condition: Spectral-Clean Construction on Periodic Grids
+% Uses macros from preamble.tex
+
+\section{Plane-Wave Initial Conditions on Periodic Grids}
+\label{sec:plane-wave-ic}
+
+\subsection{The spectral-leakage problem}
+\label{sec:pw-leakage}
+
+The plane-wave IC \texttt{--ic plane-wave --ic-wavevector k0} constructs
+\begin{equation}
+  \psi(x_i, t=0) = A \cos(k_0 x_i), \qquad
+  \dot{\psi}(x_i, t=0) = A |k_0| \sin(k_0 x_i),
+  \label{eq:pw-ic-cont}
+\end{equation}
+evaluated at the $N$ grid points $x_i = i L / N$, $i = 0, \ldots, N-1$ over a
+periodic domain $[0, L]$. The rightward-propagating convention
+($v = +|k_0| \sin$) is fixed by the CLI; see
+\texttt{tidal/cli/\_simulate.py:\_plane\_wave\_slots}.
+
+The discrete Fourier modes available on this grid are
+\begin{equation}
+  k_n = \frac{2\pi n}{L}, \qquad n = 0, 1, \ldots, N/2,
+  \label{eq:discrete-modes}
+\end{equation}
+with $n = N/2$ being the Nyquist mode. The sampled field
+$\cos(k_0 x_i)$ is \emph{monochromatic in the discrete Fourier
+representation only when $k_0$ coincides with some $k_n$} --- that is, when
+$k_0 L / (2\pi)$ is an integer below Nyquist. For any other $k_0$, the
+continuous function $\cos(k_0 x)$ on $[0, L]$ is not actually periodic,
+and the discrete Fourier transform of the sampled values has non-zero
+amplitude on every mode, falling off as
+$\approx 1 / (k_n - k_0)$ (spectral leakage). The FFT is faithfully
+encoding the implicit boundary discontinuity that arises from treating
+a non-periodic continuous function as periodic.
+
+\textbf{Concrete example (dark-photon-plasma campaign configuration):} with
+$L = 50$, $N = 32$, the discrete modes are $k_n \approx 0.126 \cdot n$.
+Requesting $k_0 = 2.0$ gives a sampled IC whose rfft magnitude has
+\begin{center}
+\begin{tabular}{rrl}
+$k$ & $|\hat{h}(k)| / \max$ & comment \\ \hline
+$2.011$ & $1.000$ & $n = 16$ (Nyquist, peak) \\
+$1.885$ & $0.0235$ & $n = 15$ \\
+$1.759$ & $0.0113$ & $n = 14$ \\
+$1.634$ & $0.0076$ & \\
+$\vdots$ & $\vdots$ & \\
+$0$     & $0.0022$ & DC leakage \\
+\end{tabular}
+\end{center}
+Every discrete mode is excited above the $10^{-3}$ level.
+
+\subsection{Why this matters: tachyonic amplification of leakage}
+\label{sec:pw-tachyon-amplification}
+
+For theories whose linearized dispersion is everywhere stable ($\mathrm{Re}(\lambda) \le 0$
+for every generalized eigenvalue at every $k$), spectral leakage is
+benign --- each leaked mode oscillates at its own frequency, contributing
+at worst a small decoration to the observable.
+
+For theories where the coupled system has tachyonic eigenvalues at some
+$k$-modes, however, leakage onto those modes is \emph{exponentially
+amplified} over the simulation interval. The modal solver's
+perturbation-validity guard
+(\texttt{tidal/solver/modal.py::\_evolve\_per\_mode},
+\texttt{divergence\_threshold = 100}) then correctly rejects the run as
+leaving the linearized regime, even though the intended physical IC
+would have been stable.
+
+The PGT dark-photon-plasma model (\texttt{examples/data/dark\_photon\_plasma.json})
+exhibits exactly this failure mode. With $\delta_m \neq 0$ the
+$h_5 \leftrightarrow a_1$ Gertsenshtein block merges with the torsion-trace
+sub-block via the $\delta_m F_{ab} F_{\mathrm{torsion}}^{ab}$ kinetic mixing.
+The merged block inherits tachyonic eigenvalues from the redundant
+TorsionCDT state components at low $k$ ($\mathrm{Re}(\lambda) \approx 0.95$
+at $k = 0$, decaying to zero near $k \approx 1$). Spectral leakage of
+a $k_0 = 2$ IC onto these low-$k$ tachyons grows as
+$\mathrm{e}^{\mathrm{Re}(\lambda) \cdot t}$ and trips the divergence guard
+at $t = 50$ with amplitude ratio $\approx 8 \times 10^{13}$.
+
+Two parallel concerns:
+\begin{itemize}
+  \item The \emph{IC spectral leakage} is a discretization artefact on the
+        periodic grid, not physics. It can be eliminated at the IC
+        construction stage (this document).
+  \item The \emph{redundant TorsionCDT state with tachyonic mass squared}
+        is a real feature of the full-tensor derivation (the
+        fundamental-vector FV formulation projects these directions
+        out at the Lagrangian level and does not have them). Documented
+        and filed as a follow-up architectural issue; the spectrally-clean
+        IC sidesteps the symptom without requiring the redesign.
+\end{itemize}
+
+\subsection{Fix: snap \texttt{--ic-wavevector} to the nearest discrete mode}
+\label{sec:pw-snap}
+
+The plane-wave IC constructor snaps each component of the requested
+wavevector to the nearest discrete Fourier mode on periodic axes,
+clamped below Nyquist:
+\begin{equation}
+  k_{\mathrm{snap}} = \Delta k \cdot
+    \mathrm{clamp}\!\left(\round\frac{k_{\mathrm{req}}}{\Delta k},
+                          -\left(\tfrac{N}{2}-1\right),
+                          +\left(\tfrac{N}{2}-1\right)\right),
+  \qquad \Delta k = \frac{2\pi}{L}.
+  \label{eq:snap-formula}
+\end{equation}
+The Nyquist mode $n = N/2$ is excluded because $\cos(k_{N/2} x_i) = (-1)^i$
+carries no directional information for real signals
+($\sin(k_{N/2} x_i) \equiv 0$), and aliases with $n = -N/2$ under the
+rfft representation. When
+$k_{\mathrm{snap}} \neq k_{\mathrm{req}}$ by more than $1\%$ (relative), a
+\texttt{Note:} is printed so the user knows what was actually simulated.
+
+For non-periodic axes the Fourier basis is not the natural one
+(Chebyshev, sine/cosine series, etc.), so no snap is applied on those
+axes.
+
+The velocity term $v = A |k| \sin(k \cdot x)$ uses $k_{\mathrm{snap}}$
+for $|k|$ so the right-mover phase relationship is preserved.
+
+\subsubsection{Override: \texttt{--ic-no-snap}}
+
+Users who want the legacy verbatim-$k$ behaviour (e.g. reproducing a
+pre-snap simulation, or testing a theory where off-grid wavevectors
+carry physical meaning) can pass \texttt{--ic-no-snap} to disable the
+snap. The flag is available on \texttt{tidal simulate},
+\texttt{tidal sweep}, and \texttt{tidal sample}.
+
+\subsection{Physical equivalence check: FV vs TorsionCDT}
+\label{sec:pw-fv-vs-cdt}
+
+With the snap enabled, the fundamental-vector dark photon model
+(\texttt{torsion\_dark\_photon\_fv.json}, 10 fields) and the
+TorsionCDT-plasma model
+(\texttt{dark\_photon\_plasma.json}, 18 fields) give consistent
+$P_{\max}$ at the campaign parameter point
+$(m_A^2 = 0.955,\ \delta_m = 0.01,\ \xi = 0.274,\ \alpha_3 = 0.123)$ with the
+equivalence mapping $\alpha_3 = m_T^2 / 2$. Observed values:
+\begin{center}
+\begin{tabular}{lll}
+Model & $P_{\max}$ & relative difference \\ \hline
+FV        & $0.001738$ & --- \\
+TorsionCDT & $0.001759$ & $+1.2\%$ \\
+\end{tabular}
+\end{center}
+Agreement at the percent level with two structurally different state
+spaces confirms that the observables extracted from the TorsionCDT
+formulation (despite its redundant dimensional components) match the
+ghost-free FV formulation, as required by physical equivalence.
+
+\subsection{When not to rely on the snap}
+
+Three regimes where \texttt{--ic-no-snap} or careful grid design is
+preferable:
+\begin{itemize}
+  \item \textbf{Sweeps in $k$}: if the user is scanning wavevector
+        values as a physics parameter, snapping quantizes the scan
+        onto the available discrete modes. For a clean continuous
+        sweep either choose $L$ and $N$ commensurate with the target
+        $k$ range, or accept the quantization with an explicit note.
+  \item \textbf{Non-periodic simulations}: the snap only fires on
+        periodic axes. Dirichlet/Neumann/absorbing axes need a basis
+        appropriate to their boundary conditions; off-grid $k$ is not
+        resolved cleanly regardless.
+  \item \textbf{Gaussian IC with a travelling-wave factor}: gaussian
+        IC also uses \texttt{--ic-wavevector}. At the time of writing
+        the snap is applied only for \texttt{plane-wave}. Gaussian IC
+        snap is filed as a follow-up.
+\end{itemize}
+
+\subsection{Implementation details}
+
+Functions in \texttt{tidal/cli/\_simulate.py}:
+\begin{itemize}
+  \item \texttt{\_snap\_wavevector\_to\_grid(kvec, grid\_info, bounds)}:
+        returns the snapped wavevector and a list of
+        $(\mathrm{dim}, k_{\mathrm{req}}, k_{\mathrm{snap}})$ entries
+        for dimensions where the snap changed $k$ by more than $1\%$
+        (the list drives the user-visible \texttt{Note}).
+  \item \texttt{\_plane\_wave\_slots(args, \ldots)}: applies the snap
+        unless \texttt{args.ic\_no\_snap} is set.
+\end{itemize}
+
+Tests in \texttt{tests/test\_cli\_parsing.py::TestBuildInitialY0}:
+\begin{itemize}
+  \item \texttt{test\_plane\_wave\_snap\_off\_grid\_k} --- verifies
+        $k_0 = 2.0$ at $N = 32, L = 50$ snaps to $n = 15$ ($k \approx 1.885$).
+  \item \texttt{test\_plane\_wave\_snap\_on\_grid\_k\_unchanged} ---
+        exactly on-grid $k$ passes through without change.
+  \item \texttt{test\_plane\_wave\_snap\_disabled\_legacy\_behaviour} ---
+        \texttt{ic\_no\_snap=True} uses $k$ verbatim.
+  \item \texttt{test\_plane\_wave\_snap\_skips\_non\_periodic\_axes} ---
+        non-periodic axes pass through.
+  \item \texttt{test\_plane\_wave\_snap\_clamps\_below\_nyquist} ---
+        requests well beyond Nyquist are clamped to the highest
+        representable mode.
+\end{itemize}

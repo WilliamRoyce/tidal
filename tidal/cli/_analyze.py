@@ -98,7 +98,10 @@ def _run_critical_field(results: SweepResults, args: Namespace) -> int:
             return 1
         try:
             threshold = compute_reference_threshold(
-                ref_formula, ref_b, results.fixed_params, results.sim_settings,
+                ref_formula,
+                ref_b,
+                results.fixed_params,
+                results.sim_settings,
             )
         except ValueError as exc:
             _cerror(f"reference formula: {exc}")
@@ -165,6 +168,100 @@ def _print_critical_field_summary(result: CriticalFieldResult) -> None:
             print(f"1/B_min range: [{min(inv_bmins):.4g}, {max(inv_bmins):.4g}]")
 
 
+def _run_posthoc_audit(data_path: Path, args: Namespace) -> int:
+    """Run the post-hoc t-independence audit on a saved inference chain.
+
+    Re-simulates a stratified sample of the chain at ``2·t_base``,
+    classifies each via the Hwang-Noh perturbativity gate plus a
+    flag-for-review heuristic, and writes
+    ``samples.audit.csv`` / ``samples.reweighted.csv`` /
+    ``audit_summary.json`` alongside the original chain.
+    """
+    from tidal.cli._console import error as _cerror
+    from tidal.cli._console import error_with_hint
+    from tidal.measurement._posthoc_audit import run_posthoc_audit
+    from tidal.measurement._stability import PROBE_PROFILE_NAME
+
+    spec_path = Path(getattr(args, "spec", "") or "")
+    if not spec_path.exists():
+        error_with_hint(
+            "--spec PATH (equation JSON) is required for post-hoc audit.",
+            hints=[
+                "Pass the same JSON the chain was sampled against, e.g.: "
+                "`tidal analyze CHAIN_DIR --posthoc-audit "
+                "--spec examples/data/torsion_gertsenshtein_nonminimal.json`",
+            ],
+        )
+        return 1
+
+    source_str: str = getattr(args, "source", None) or ""
+    target_str: str = getattr(args, "target", None) or ""
+    if not source_str or not target_str:
+        error_with_hint(
+            "--source and --target are required for post-hoc audit.",
+            hints=["Example: `--source h_5 --target a_1`"],
+        )
+        return 1
+    source: tuple[str, ...] = tuple(source_str.split(","))
+    target: tuple[str, ...] = tuple(target_str.split(","))
+
+    # Probe defaults (formerly carried by the StabilityProfile registry,
+    # removed in #323 Stage C refactor).  ``t_base`` is the
+    # t-independence audit's reference time; ``perturbativity_p_max``
+    # is the Hwang-Noh gate threshold.  Values match the v1 profile that
+    # produced every campaign chain to date.
+    t_base: float = float(getattr(args, "t_base", 10.0))
+    perturbativity_p_max: float = 0.5
+    baseline_formula: str | None = getattr(args, "baseline_formula", None)
+    n_top: int = int(getattr(args, "n_top", 50))
+    n_stratified: int = int(getattr(args, "n_stratified", 200))
+    n_clusters: int = int(getattr(args, "n_clusters", 5))
+    rng_seed: int = int(getattr(args, "audit_seed", 0))
+
+    output_str = getattr(args, "output", None)
+    output_dir = Path(output_str) if output_str else data_path / "audit"
+
+    try:
+        summary = run_posthoc_audit(
+            data_path,
+            base_args=args,
+            spec_path=spec_path,
+            source=source,
+            target=target,
+            profile_name=PROBE_PROFILE_NAME,
+            t_base=t_base,
+            baseline_formula=baseline_formula,
+            output_dir=output_dir,
+            n_top=n_top,
+            n_stratified=n_stratified,
+            n_clusters=n_clusters,
+            perturbativity_p_max=perturbativity_p_max,
+            rng_seed=rng_seed,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        _cerror(f"post-hoc audit failed: {exc}")
+        return 1
+
+    print("\n--- Post-hoc t-independence audit ---")
+    print(f"Profile: {summary.profile_name}  t_base: {summary.t_base}")
+    print(
+        f"Audited {summary.n_samples_audited} / {summary.n_samples_total} samples; "
+        f"strategies: {', '.join(summary.selection_strategies_used)}",
+    )
+    print(
+        f"  pass: {summary.n_pass}  flag_review: {summary.n_flag_review}  "
+        f"hard_reject: {summary.n_hard_reject}  sim_failed: {summary.n_sim_failed}",
+    )
+    print(f"Contamination rate: {summary.contamination_rate * 100:.1f} %")
+    if summary.worst_sample_index is not None:
+        print(
+            f"Worst gamma_eff_posthoc: {summary.worst_gamma_eff_posthoc:.4f}/s "
+            f"(sample #{summary.worst_sample_index})",
+        )
+    print(f"\nResults written to {output_dir}/")
+    return 0
+
+
 def _run_inference_importance(data_path: Path, args: Namespace) -> int:
     """Run parameter importance analysis on nested sampling output."""
     from tidal.cli._console import error as _cerror
@@ -206,6 +303,10 @@ def analyze_command(args: Namespace) -> int:  # noqa: PLR0911
             hints=["Use `tidal sweep --output` or `tidal sample --output` directory"],
         )
         return 1
+
+    # --- Post-hoc t-independence audit path ---
+    if getattr(args, "posthoc_audit", False):
+        return _run_posthoc_audit(data_path, args)
 
     # --- Inference analysis path ---
     if getattr(args, "inference", False):

@@ -11,6 +11,7 @@ import json
 import logging
 import math
 import re
+import warnings
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
 from functools import cached_property
@@ -347,7 +348,9 @@ class BoundaryCondition:
         }
         if extra:
             logger.warning(
-                "%s BC ignores field(s): %s", bc_type, ", ".join(sorted(extra)),
+                "%s BC ignores field(s): %s",
+                bc_type,
+                ", ".join(sorted(extra)),
             )
         return cls(
             type=bc_type,
@@ -561,6 +564,13 @@ class HamiltonianTerm:
         field) or ``"interaction"`` (cross-field coupling). Defaults to
         ``"unknown"`` for older JSONs; use ``is_self_energy`` property
         which auto-classifies by comparing factor field names.
+    order_in_eps : int
+        Perturbative order of this term: total exponent in declared
+        ``small_parameters``.  Computed by Wolfram's ``ComputeOrderInEps``
+        and emitted explicitly by ``ParseSingleHamiltonianTerm``.  Defaults
+        to 0 for non-perturbative theories and direct hand-construction;
+        legacy JSONs without the explicit field are tagged via heuristic
+        (``1 if coefficient_symbolic else 0``) and should be re-derived.
     """
 
     coefficient: float
@@ -569,6 +579,10 @@ class HamiltonianTerm:
     coefficient_symbolic: str | None = None
     coordinate_dependent: tuple[str, ...] = ()
     term_class: str = "unknown"  # "self" or "interaction"
+    # Perturbative order computed by Wolfram via ComputeOrderInEps; matches the
+    # equation-side OperatorTerm.order_in_eps convention.  Default 0 covers
+    # non-perturbative theories and direct hand-construction in tests.
+    order_in_eps: int = 0
 
     @property
     def position_dependent(self) -> bool:
@@ -608,14 +622,33 @@ class HamiltonianTerm:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianTerm:
-        """Parse from JSON dict."""
+        """Parse from JSON dict.
+
+        Reads the explicit ``order_in_eps`` field emitted by Wolfram's
+        ``ComputeOrderInEps`` (single source of truth, matching the equation
+        side at ``OperatorTerm.order_in_eps``).  For legacy JSONs without the
+        explicit field, falls back to the heuristic ``1 if coefficient_symbolic
+        is not None else 0`` — correct for current EH but coincidental in
+        general.  The strict consistency check lives in ``tidal validate``.
+        """
+        coeff_sym = data.get("coefficient_symbolic")
+        if "order_in_eps" in data:
+            order = int(data["order_in_eps"])
+        else:
+            # Legacy JSON: infer via heuristic.  Coincidentally correct when
+            # every coefficient_symbolic contains a small parameter (true for
+            # Euler-Heisenberg) but not robust in general.  Re-derive the JSON
+            # via `uv run tidal derive <toml>` to obtain Wolfram-emitted
+            # rigorous tags.
+            order = 1 if coeff_sym is not None else 0
         return cls(
             coefficient=float(data["coefficient"]),
             factor_a=HamiltonianFactor.from_dict(data["factor_a"]),
             factor_b=HamiltonianFactor.from_dict(data["factor_b"]),
-            coefficient_symbolic=data.get("coefficient_symbolic"),
+            coefficient_symbolic=coeff_sym,
             coordinate_dependent=tuple(data.get("coordinate_dependent", [])),
             term_class=str(data.get("term_class", "unknown")),
+            order_in_eps=order,
         )
 
 
@@ -714,7 +747,9 @@ class ComponentEquation:
 
     @classmethod
     def from_dict(
-        cls, data: Mapping[str, Any], fields_lookup: dict[str, int],
+        cls,
+        data: Mapping[str, Any],
+        fields_lookup: dict[str, int],
     ) -> ComponentEquation:
         """Create a ComponentEquation from a dictionary.
 
@@ -886,7 +921,9 @@ class EquationSystem:
             k: float(v) for k, v in raw_params.items() if isinstance(v, (int, float))
         }
         expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
-            self.equations, self.component_names, parameters=check_params or None,
+            self.equations,
+            self.component_names,
+            parameters=check_params or None,
         )
         if (
             self.mass_matrix != expected_mass
@@ -1025,7 +1062,8 @@ class EquationSystem:
                     effective_coeff = term.coefficient
                     if term.coefficient_symbolic is not None and parameters:
                         resolved = _resolve_symbolic_coeff(
-                            term.coefficient_symbolic, parameters,
+                            term.coefficient_symbolic,
+                            parameters,
                         )
                         if resolved is not None:
                             effective_coeff = resolved
@@ -1169,7 +1207,9 @@ class EquationSystem:
         # would trigger __post_init__'s inconsistency UserWarning if
         # passed through unchanged.
         mass, coupling, mass_sym, coupling_sym = self._compute_matrices_from_terms(
-            new_eqs, self.component_names, parameters=None,
+            new_eqs,
+            self.component_names,
+            parameters=None,
         )
         return dataclasses.replace(
             self,
@@ -1199,8 +1239,142 @@ class EquationSystem:
         """
         return any(t.order_in_eps > 0 for eq in self.equations for t in eq.rhs_terms)
 
+    def canonicalize_kinetic_for_perturbation(
+        self,
+        small_parameters: Sequence[str],
+    ) -> EquationSystem:
+        """Translate small-parameter kinetic dependence into order-1 RHS terms.
+
+        Uses the perturbative identity (see #301 Phase 3 / #303)::
+
+            (M₀ + εM₁)⁻¹ (K₀ + εK₁) ≈ M₀⁻¹ K₀ + ε M₀⁻¹ (K₁ − M₁·M₀⁻¹·K₀)
+
+        so the perturbative hierarchy stays clean even when a small parameter
+        ε enters the LHS kinetic coefficient. For each equation whose
+        ``kinetic_coefficient_symbolic`` mentions a small parameter, splits
+        M(ε) into M₀ (parameter-free) and per-parameter corrections c_p·p
+        via :func:`split_small_parameter_kinetic`, stores M₀ as the new
+        kinetic coefficient, and appends synthesized order-1 RHS terms
+        ``-c_p·p·K₀/M₀`` for each base (order-0) RHS term K₀. Pass 0 then
+        sees a truly ε=0 baseline; Pass 1's existing Duhamel kernel
+        integrates both the original K₁ terms and the synthesized
+        corrections identically.
+
+        No-op for equations with:
+
+        * ``kinetic_coefficient_symbolic is None`` (M = 1 implicitly)
+        * No small parameter present in the kinetic
+        * Empty ``small_parameters`` argument
+
+        Parameters
+        ----------
+        small_parameters
+            The names declared in ``[perturbation].small_parameters`` of
+            the TOML.
+
+        Returns
+        -------
+        A new :class:`EquationSystem` with the canonicalised equations. The
+        returned spec is idempotent under this transform; calling it twice
+        produces the same result. ``self`` is unchanged.
+
+        Raises
+        ------
+        tidal.symbolic._kinetic_eval.KineticEvalError
+            If any kinetic coefficient has structure outside the
+            perturbative contract (bilinear in two small parameters,
+            quadratic in one, small-parameter denominator, parenthesised
+            sub-sum). See :func:`split_small_parameter_kinetic`.
+        """
+        from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
+            split_small_parameter_kinetic,
+        )
+
+        if not small_parameters:
+            return self
+        small_params_tuple = tuple(small_parameters)
+
+        new_eqs: list[ComponentEquation] = []
+        for eq in self.equations:
+            kin_sym = eq.kinetic_coefficient_symbolic
+            if kin_sym is None:
+                new_eqs.append(eq)
+                continue
+
+            m0_expr, c_map = split_small_parameter_kinetic(
+                kin_sym,
+                small_params_tuple,
+            )
+            # No small-param dependence in the kinetic → pass through.
+            nontrivial = any(c != "0" for c in c_map.values())
+            if not nontrivial:
+                new_eqs.append(eq)
+                continue
+            # M₀ collapses to zero (kinetic contains ONLY small parameters,
+            # e.g., "b5" with b5 ∈ small_parameters). Such equations are
+            # Gap-B demotion candidates: base_spec will turn them into
+            # algebraic constraints via lhs_collapses_to_zero. Skip
+            # synthesis here — dividing by M₀ = 0 would raise — and pass
+            # the original equation through for base_spec to handle.
+            from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
+                evaluate_at_zero,
+            )
+
+            m0_at_zero = evaluate_at_zero(m0_expr, frozenset())
+            if m0_at_zero is not None and m0_at_zero == 0.0:
+                new_eqs.append(eq)
+                continue
+
+            # Synthesize Pass-1 RHS corrections from M₁·M₀⁻¹·K₀.
+            base_rhs = tuple(t for t in eq.rhs_terms if t.order_in_eps == 0)
+            synthesized: list[OperatorTerm] = []
+            for param_name, c_expr in c_map.items():
+                if c_expr == "0":
+                    continue
+                for base_term in base_rhs:
+                    base_sym = base_term.coefficient_symbolic or str(
+                        base_term.coefficient,
+                    )
+                    # coefficient_symbolic = -(c_p) * p * (a_k) / (M₀)
+                    #   which is the order-1 source -M₁·M₀⁻¹·K₀ after Wolfram
+                    #   sign-preservation conventions. Explicit parentheses
+                    #   preserve operator precedence under evaluate_coefficient.
+                    synth_sym = (
+                        f"-(({c_expr}) * ({param_name}) * ({base_sym})) / ({m0_expr})"
+                    )
+                    # Numeric coefficient: the value of synth_sym with every
+                    # parameter set to 1.0. The solver re-evaluates
+                    # coefficient_symbolic at real parameters; the numeric
+                    # value is a convenience for unit-test assertions and
+                    # validation plots, mirroring the convention in existing
+                    # Wolfram-emitted RHS terms.
+                    synth_coef = _evaluate_synth_coefficient(
+                        synth_sym,
+                        base_term,
+                    )
+                    synthesized.append(
+                        OperatorTerm(
+                            coefficient=synth_coef,
+                            operator=base_term.operator,
+                            field=base_term.field,
+                            coefficient_symbolic=synth_sym,
+                            order_in_eps=1,
+                        ),
+                    )
+
+            new_eqs.append(
+                dataclasses.replace(
+                    eq,
+                    kinetic_coefficient_symbolic=m0_expr,
+                    rhs_terms=(*eq.rhs_terms, *synthesized),
+                ),
+            )
+
+        return dataclasses.replace(self, equations=tuple(new_eqs))
+
     def base_spec(
-        self, small_parameters: Sequence[str] | None = None,
+        self,
+        small_parameters: Sequence[str] | None = None,
     ) -> EquationSystem:
         """Return the Pass 0 base spec with LHS demoted where required.
 
@@ -1259,7 +1433,8 @@ class EquationSystem:
 
             # Step 2: check whether the LHS itself is a correction.
             demote = lhs_collapses_to_zero(
-                eq.kinetic_coefficient_symbolic, small_parameters,
+                eq.kinetic_coefficient_symbolic,
+                small_parameters,
             )
 
             if demote:
@@ -1317,7 +1492,9 @@ class EquationSystem:
         # spec.mass_matrix get stale values.
         new_eqs_t = tuple(new_eqs)
         mass, coupling, mass_sym, coupling_sym = self._compute_matrices_from_terms(
-            new_eqs_t, self.component_names, parameters=None,
+            new_eqs_t,
+            self.component_names,
+            parameters=None,
         )
 
         return dataclasses.replace(
@@ -1414,7 +1591,9 @@ class EquationSystem:
             mass_matrix_symbolic,
             coupling_matrix_symbolic,
         ) = cls._compute_matrices_from_terms(
-            equations, component_names, parameters=default_params or None,
+            equations,
+            component_names,
+            parameters=default_params or None,
         )
 
         # Extract coordinate names and metric signature
@@ -1613,10 +1792,57 @@ def load_equation_system(json_path: Path | str) -> EquationSystem:
     return EquationSystem.from_dict(data)
 
 
+def _evaluate_synth_coefficient(
+    synth_sym: str,
+    base_term: OperatorTerm,
+) -> float:
+    """Return the numeric coefficient for a synthesized Phase-3 correction term.
+
+    Evaluates ``synth_sym`` with every free name substituted by 1.0, matching
+    the Wolfram-emitter convention that a JSON term's numeric ``coefficient``
+    equals ``evaluate(coefficient_symbolic, params={name: 1.0 for ...})``. The
+    actual runtime value comes from ``CoefficientEvaluator`` using the real
+    parameters; this numeric is a convenience for validation plots and for
+    matching the dataclass contract.
+
+    Falls back to ``-base_term.coefficient`` if evaluation raises — a safe
+    default (the synthesized term is −(...)·base_coef so ``-base_coef`` is
+    the leading-sign approximation when symbolic evaluation hits an
+    unsupported node).
+    """
+    from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+    try:
+        # Collect names by parsing; substitute each to 1.0.
+        import ast  # noqa: PLC0415
+
+        normalized = synth_sym.replace("^", "**")
+        tree = ast.parse(normalized, mode="eval")
+        names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+        params = dict.fromkeys(names, 1.0)
+        value = evaluate_coefficient(synth_sym, params, ())
+        if isinstance(value, float):
+            return value
+        return float(value)
+    except Exception:  # noqa: BLE001
+        return -float(base_term.coefficient)
+
+
 def normalize_kinetic_coefficients(
-    spec: EquationSystem, params: dict[str, float],
+    spec: EquationSystem,
+    params: dict[str, float],
 ) -> EquationSystem:
     """Apply symbolic kinetic-coefficient normalization to an equation system.
+
+    .. deprecated::
+        All time-domain solver backends (cvode/ida/leapfrog/scipy) now consume
+        ``kinetic_coefficient_symbolic`` directly via
+        :func:`tidal.solver._kinetic.build_inverse_kinetic_diag`, matching the
+        modal solver's existing behaviour. The canonical spec form carries the
+        kinetic coefficient on the LHS and the un-normalized RHS; every
+        backend applies M⁻¹ at setup. This function is retained only for
+        external callers that pre-normalized specs before the root fix
+        landed (see #301, #304). It will be removed in a future release.
 
     ExportJSON.wl emits equations with a parameter-based kinetic coefficient
     (e.g. ``xi``) **un-divided** when the coefficient cannot be safely divided
@@ -1650,6 +1876,15 @@ def normalize_kinetic_coefficients(
     EquationSystem
         A new ``EquationSystem`` with all kinetic coefficients normalized.
     """
+    warnings.warn(
+        "normalize_kinetic_coefficients is deprecated. Time-domain solver "
+        "backends (cvode/ida/leapfrog/scipy) now consume "
+        "kinetic_coefficient_symbolic directly via "
+        "tidal.solver._kinetic.build_inverse_kinetic_diag, matching modal. "
+        "Drop the pre-normalization call from your code. See #301, #304.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     new_eqs: list[ComponentEquation] = []
     changed = False
 
@@ -1714,7 +1949,9 @@ def normalize_kinetic_coefficients(
     # cached matrices on spec no longer match.
     new_eqs_t = tuple(new_eqs)
     mass, coupling, mass_sym, coupling_sym = spec._compute_matrices_from_terms(  # noqa: SLF001  # type: ignore[reportPrivateUsage]
-        new_eqs_t, spec.component_names, parameters=None,
+        new_eqs_t,
+        spec.component_names,
+        parameters=None,
     )
     return dataclasses.replace(
         spec,

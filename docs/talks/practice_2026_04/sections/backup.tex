@@ -1,38 +1,68 @@
 % Backup slides --- shown only in Q&A.
 
 \begin{frame}[plain]
-  \centering\Huge Backup slides
+  \centering\Huge Appendices
 \end{frame}
 
-\begin{frame}{B1 --- Full PGT $+$ EM Lagrangian}
-  \placeholder{Full Lagrangian with each term labelled in English: Einstein-Cartan, torsion kinetics, curvature-squared, Maxwell, non-minimal couplings.}
-\end{frame}
-
-\begin{frame}{B2 --- Ghost / Ostrogradsky sketch}
-  \placeholder{Why $\tilde R^2$ and similar higher-derivative terms introduce unstable modes. Pointer to Shapiro hep-th/0103093 and Barker 2406.12826.}
-\end{frame}
-
-\begin{frame}{B3 --- \textsc{tidal} architecture deep-dive}
-  \placeholder{CoefficientEvaluator cache levels, operator library, constraint-IC solver, RHS evaluator, state layout.}
-\end{frame}
-
-\begin{frame}{B4 --- Modal solver under the hood}
-  \placeholder{Fourier diagonalisation + Krylov fallback, block-aware union-find, Schur-complement constraint elimination.}
-\end{frame}
-
-\begin{frame}{B5 --- References}
+\begin{frame}{Higher-derivative terms: $\Rt^2$ \& $F^4$ via perturbative reduction}
   \scriptsize
-  \begin{itemize}
-    \item Gertsenshtein, \emph{Sov. Phys. JETP} \textbf{14}, 84 (1962).
-    \item Boccaletti, De Sabbata, Fortini, Gualdi, \emph{Nuovo Cim. B} \textbf{70}, 129 (1970).
-    \item Raffelt \& Stodolsky, \emph{Phys. Rev. D} \textbf{37}, 1237 (1988).
-    \item Aggarwal \emph{et al.}, \emph{Living Rev.\ Relativity} \textbf{24}, 4 (2021) --- HFGW review.
-    \item Berlin, Blas, D'Agnolo, Ellis, Harnik, Kahn, Schutz, \emph{Phys. Rev. D} \textbf{105}, 116011 (2022).
-    \item Domcke \& Garcia-Cely, \emph{Phys. Rev. Lett.} \textbf{126}, 021104 (2021).
-    \item Utiyama, \emph{Phys. Rev.} \textbf{101}, 1597 (1956); Kibble, \emph{J. Math. Phys.} \textbf{2}, 212 (1961).
-    \item Hehl, von der Heyde, Kerlick, Nester, \emph{Rev. Mod. Phys.} \textbf{48}, 393 (1976) --- PGT review.
-    \item Shapiro, \emph{Phys. Rept.} \textbf{357}, 113 (2002) [hep-th/0103093].
-    \item Obukhov \& Trukhanova, arXiv:2410.01355.
-    \item Barker, arXiv:2406.12826.
-  \end{itemize}
+  \textbf{Problem.} $\Rt^2$ (and Euler--Heisenberg $(F^2)^2$) produce 4th-order time
+  derivatives in the EOMs --- generically Ostrogradsky-ghost modes.  Cannot integrate
+  the full theory directly.
+
+  \vspace{0.4em}
+  \textbf{Parker--Simon iterative reduction (1993).}  Treat $b_5$ as small;
+  the full EOM splits as $E_{\rm base}[y] + b_5\,E_{\rm corr}[y]=0$, where
+  $E_{\rm corr}$ contains the 4th-order $\Rt^2$ pieces.  Expand
+  $y(k,t) = y^{(0)} + b_5\,y^{(1)} + \cdots$ and collect by order:
+  \[
+    E_{\rm base}\bigl[y^{(0)}\bigr] = 0,\qquad
+    E_{\rm base}\bigl[y^{(n)}\bigr] = -E_{\rm corr}\bigl[y^{(n-1)}\bigr],
+    \quad n\ge 1.
+  \]
+  \emph{The 4th-order operator never acts on the unknown.}  $E_{\rm corr}$ evaluates
+  on the previous order's known trajectory, becoming a time-dependent source for the
+  next order.  The 4th-order operator is never integrated; ghost eigenvalues never enter the
+  propagator.
+
+  The sourced equation is solved analytically by \emph{Duhamel's principle}: convolve
+  the base propagator $e^{A(t-\tau)}$ against the source, evaluated analytically in
+  the order-$0$ eigenbasis, no numerical quadrature.
+
+  \vspace{0.4em}
+  \textbf{Constraint-promotion barrier.}
+  At $b_5=0$ (Einstein--Cartan), some metric components are \emph{pure algebraic
+  constraints}: non-dynamical, carrying no degrees of freedom.  The $\Rt^2$ correction
+  promotes them to propagating fields --- the number of propagating modes
+  jumps discontinuously as $b_5\to 0$. No published perturbative Hamiltonian recipe handles
+  this case; energy measurements break down across $b_5=0$.
+\end{frame}
+
+\begin{frame}{Modal solver: two structural fixes}
+  \footnotesize
+  After Fourier decomposition each spatial mode $k$ satisfies
+  $\dot{y}(t,k)=M(k)\,y(t,k)$, solved by $y(t,k)=e^{M(k)t}y_0(k)$.
+  Two main problems arise for gauge theories.
+
+  \vspace{0.3em}
+  \textbf{(i) Ill-conditioned eigenvectors.}\\
+  The standard route $V\,\mathrm{diag}(e^{\lambda t})\,V^{-1}y_0$ requires inverting the
+  eigenvector matrix $V$.  Gauge theories have degenerate and near-zero eigenvalues;
+  $\mathrm{cond}(V)$ reaches $10^{15}$--$10^{17}$, making $V^{-1}$ numerically catastrophic.\\[0.15em]
+  \textbf{Fix:} compute $e^{Mt}y_0$ directly via Pad\'e approximant --- no eigenvectors, machine-precision output.
+
+  \vspace{0.3em}
+  \textbf{(ii) Constraint fields (no time derivative).}\\
+  ``Constraints'' enter algebraically, not dynamically.
+  Per mode, partition into dynamic $d$ and constrained $c$:
+  \[
+    \begin{pmatrix}\dot{d}\\0\end{pmatrix}
+    =
+    \begin{pmatrix}S_{dd}&S_{dc}\\S_{cd}&S_{cc}\end{pmatrix}
+    \begin{pmatrix}d\\c\end{pmatrix}
+    \;\Longrightarrow\;
+    c = -S_{cc}^{-1}S_{cd}\,d,\qquad
+    \dot{d} = \underbrace{\bigl(S_{dd}-S_{dc}S_{cc}^{-1}S_{cd}\bigr)}_{M_{\rm red}}\,d.
+  \]
+  Evolve $M_{\rm red}$ by matrix exponential; recover $c$ algebraically at the end.
 \end{frame}

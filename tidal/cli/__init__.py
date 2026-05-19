@@ -265,7 +265,19 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="K[,K,K]",
         help="Wavevector for plane-wave or gaussian IC (e.g. 3 or 0.1,0.0,0.0). "
-        "With gaussian: creates a travelling wave packet (positive k = right-mover)",
+        "With gaussian: creates a travelling wave packet (positive k = right-mover). "
+        "On periodic axes, k is automatically snapped to the nearest discrete "
+        "Fourier mode to eliminate spectral leakage; use --ic-no-snap to disable.",
+    )
+    sim_parser.add_argument(
+        "--ic-no-snap",
+        action="store_true",
+        help="Disable automatic snapping of --ic-wavevector to the nearest "
+        "discrete Fourier mode on periodic grids. Legacy behaviour: the IC "
+        "is cos(k·x) evaluated verbatim at grid points, which leaks amplitude "
+        "onto every discrete k-mode when k is off-grid. Only needed for "
+        "reproducing pre-snap simulations or for theories where off-grid "
+        "wavevectors are physically meaningful.",
     )
     sim_parser.add_argument(
         "--ic-formula-velocity",
@@ -318,7 +330,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "modal-jax", "auto"],
         default="auto",
         help=(
             "Solver scheme (default: auto). "
@@ -366,7 +378,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         type=float,
         default=None,
         metavar="DT",
-        help="Snapshot interval (default: t_end/100)",
+        help=(
+            "Snapshot interval (default: t_end/20, giving 21 snapshots). "
+            "Use --snapshots=t_end for 2-snapshot inference runs."
+        ),
     )
     sim_parser.add_argument(
         "--fd-order",
@@ -976,6 +991,68 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Active panels get warm background, null panels get grey."
         ),
     )
+    plot_parser.add_argument(
+        "--priors",
+        action="append",
+        default=[],
+        metavar="NAME=DIST:LO:HI",
+        help=(
+            "For --type corner: overlay the prior density on 1D marginals. "
+            "Repeatable, one per parameter. Same syntax as `tidal sample "
+            "--prior`. Only needed for chains pulled before the prior-"
+            "in-metadata fix; newer runs auto-load from inference.json. "
+            "Example: --priors mA2=log_uniform:0.001:1.0 --priors "
+            "deltam=uniform:-0.5:0.5"
+        ),
+    )
+    plot_parser.add_argument(
+        "--show-rejected-inchain",
+        dest="show_rejected_inchain",
+        action="store_true",
+        default=True,
+        help=(
+            "For --type corner: overlay MC in-chain rejected samples "
+            "(results.csv rows with run_status='tachyonic'). Always empty for "
+            "PolyChord, which discards -inf samples upfront. Default: on."
+        ),
+    )
+    plot_parser.add_argument(
+        "--hide-rejected-inchain",
+        dest="show_rejected_inchain",
+        action="store_false",
+        help="For --type corner: do NOT overlay MC in-chain rejected samples.",
+    )
+    plot_parser.add_argument(
+        "--show-rejected-prior",
+        dest="show_rejected_prior",
+        action="store_true",
+        default=False,
+        help=(
+            "For --type corner: overlay post-hoc uniform prior-survey "
+            "samples from _rejected_prior.csv (5000 prior draws evaluated "
+            "by the stability guard). Default: off — dense and obscures "
+            "the posterior contours."
+        ),
+    )
+    plot_parser.add_argument(
+        "--hide-rejected-prior",
+        dest="show_rejected_prior",
+        action="store_false",
+        help="For --type corner: do NOT overlay prior-survey rejected samples.",
+    )
+    plot_parser.add_argument(
+        "--full-prior-bounds",
+        dest="full_prior_bounds",
+        action="store_true",
+        default=False,
+        help=(
+            "For --type corner: set every panel axis to the full prior "
+            "range, overriding anesthetic's 95%%-credible auto-scale. "
+            "Makes compactified arctan_uniform priors visually span their "
+            "full ±tan(89°) ≈ ±57.3 sample range so the user can confirm "
+            "posterior compactness. Default: off (auto-scale per panel)."
+        ),
+    )
 
     # --- sweep ---
     sweep_parser = sub.add_parser(
@@ -1124,7 +1201,15 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--ic-wavevector",
         default=None,
         metavar="K[,K,K]",
-        help="Wavevector for plane-wave or gaussian IC",
+        help="Wavevector for plane-wave or gaussian IC "
+        "(automatically snapped to nearest discrete Fourier mode on periodic "
+        "axes; use --ic-no-snap to disable)",
+    )
+    sweep_parser.add_argument(
+        "--ic-no-snap",
+        action="store_true",
+        help="Disable automatic snap of --ic-wavevector to nearest discrete "
+        "Fourier mode on periodic grids (see `tidal simulate --help`)",
     )
     sweep_parser.add_argument(
         "--ic-formula-velocity",
@@ -1166,7 +1251,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sweep_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "modal-jax", "auto"],
         default="auto",
         help="Solver scheme (default: auto)",
     )
@@ -1199,7 +1284,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         type=float,
         default=None,
         metavar="DT",
-        help="Snapshot interval (default: t_end/100)",
+        help=(
+            "Snapshot interval (default: t_end/20, giving 21 snapshots). "
+            "Use --snapshots=t_end for 2-snapshot inference runs."
+        ),
     )
     sweep_parser.add_argument(
         "--fd-order",
@@ -1506,6 +1594,155 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         dest="n_bootstrap_importance",
         help="Bootstrap samples for importance uncertainties (default: 100)",
     )
+    # --- Post-hoc t-independence audit (#323) ---
+    analyze_parser.add_argument(
+        "--posthoc-audit",
+        action="store_true",
+        default=False,
+        dest="posthoc_audit",
+        help=(
+            "Run the post-hoc t-independence audit on a saved inference "
+            "chain (re-simulate top + borderline + stratified samples at "
+            "2*t_base, classify per Hwang-Noh + A-ratio criteria). See "
+            "tidal/measurement/_posthoc_audit.py for the full classification "
+            "policy. Mitigates the false-negative regime documented in #323."
+        ),
+    )
+    analyze_parser.add_argument(
+        "--spec",
+        default=None,
+        dest="spec",
+        metavar="PATH",
+        help=(
+            "Path to the equation JSON the chain was sampled against "
+            "(required for --posthoc-audit). Example: "
+            "examples/data/torsion_gertsenshtein_nonminimal.json"
+        ),
+    )
+    analyze_parser.add_argument(
+        "--source",
+        default=None,
+        metavar="FIELD",
+        help="Source field (required for --posthoc-audit; e.g. 'h_5')",
+    )
+    analyze_parser.add_argument(
+        "--target",
+        default=None,
+        metavar="FIELD",
+        help="Target field (required for --posthoc-audit; e.g. 'a_1')",
+    )
+    analyze_parser.add_argument(
+        "--t-base",
+        type=float,
+        default=10.0,
+        dest="t_base",
+        help=(
+            "Original simulation t_end; audit re-runs at 2*t_base "
+            "(default: 10.0, matches campaign default)."
+        ),
+    )
+    analyze_parser.add_argument(
+        "--baseline-formula",
+        default=None,
+        dest="baseline_formula",
+        metavar="FORMULA",
+        help=(
+            "Time-resolved Gertsenshtein baseline P_GR(t) for the audit's "
+            "A(t) ratio. Same expression form as `tidal sample "
+            "--baseline-formula`, e.g. 'sin(kappa*B0*t_end/2)**2'."
+        ),
+    )
+    analyze_parser.add_argument(
+        "--n-top",
+        type=int,
+        default=50,
+        dest="n_top",
+        help="Top-posterior samples to audit (default: 50).",
+    )
+    analyze_parser.add_argument(
+        "--n-stratified",
+        type=int,
+        default=200,
+        dest="n_stratified",
+        help="Stratified-cluster samples to audit (default: 200).",
+    )
+    analyze_parser.add_argument(
+        "--n-clusters",
+        type=int,
+        default=5,
+        dest="n_clusters",
+        help="k-means clusters for stratified sampling (default: 5).",
+    )
+    analyze_parser.add_argument(
+        "--audit-seed",
+        type=int,
+        default=0,
+        dest="audit_seed",
+        help="Random seed for stratified sample selection (default: 0).",
+    )
+    # Simulation passthrough flags for --posthoc-audit (re-run sims at 2*t_base)
+    analyze_parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VAL",
+        help="Fixed parameters (repeatable); merged into per-sample param dict.",
+    )
+    analyze_parser.add_argument(
+        "--grid-shape",
+        default=None,
+        dest="grid_shape",
+        metavar="N",
+        help="Grid points per axis (must match the chain's run).",
+    )
+    analyze_parser.add_argument(
+        "--bounds",
+        default=None,
+        metavar="LO:HI",
+        help="Domain bounds (must match the chain's run).",
+    )
+    analyze_parser.add_argument(
+        "--periodic",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Periodic BCs (default: True).",
+    )
+    analyze_parser.add_argument(
+        "--ic",
+        choices=["gaussian", "plane-wave", "zero", "formula", "file", "noise"],
+        default="plane-wave",
+        help="Initial condition (default: plane-wave to match campaign default).",
+    )
+    analyze_parser.add_argument(
+        "--ic-component",
+        default=None,
+        dest="ic_component",
+        metavar="NAME",
+        help="IC source field (e.g. h_5).",
+    )
+    analyze_parser.add_argument(
+        "--ic-wavevector",
+        default=None,
+        dest="ic_wavevector",
+        metavar="K",
+        help="IC plane-wave wavenumber (must match the chain's run).",
+    )
+    analyze_parser.add_argument(
+        "--ic-amplitude",
+        type=float,
+        default=1e-2,
+        dest="ic_amplitude",
+        help="IC amplitude (default: 1e-2).",
+    )
+    analyze_parser.add_argument(
+        "--snapshots",
+        type=int,
+        default=11,
+        help=(
+            "Snapshot count for the audit sim. Default 11 → 5 snapshots in "
+            "[0, t_base] and 6 in [t_base, 2*t_base], covering both halves."
+        ),
+    )
 
     # --- sample (Bayesian inference) ---
     sample_parser = sub.add_parser(
@@ -1544,6 +1781,24 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Example: --prior 'alpha=uniform:0.01:10'"
         ),
     )
+    sample_parser.add_argument(
+        "--joint-prior",
+        action="append",
+        default=[],
+        dest="joint_prior",
+        metavar="SPEC",
+        help=(
+            "Joint prior over a coupling vector via the cubed-sphere chart "
+            "(currently --method nested only; one --joint-prior per "
+            "invocation). Each spec parses N coupling names plus magnitude "
+            "and angular-tile parameters. "
+            "Format: 'names=N1,N2,...;type=cubed_sphere;M=K;face=F;"
+            "sub=S1_S2_...;r_lo=L;r_hi=H[;Q=identity|random:SEED]'. "
+            "Output goes to <output>/<face_label>_tile<sub>/ for atlas "
+            "pooling. Mixable with per-parameter --prior; coupling names "
+            "must be disjoint."
+        ),
+    )
     # Constraints
     sample_parser.add_argument(
         "--constraint",
@@ -1577,6 +1832,29 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Baseline formula for extremize likelihood. "
             "Evaluated per-point with current parameter values. "
             'Example: --baseline-formula "sin(kappa * B0 * t_end / 2)**2"'
+        ),
+    )
+    # v3 likelihood architecture flags (see docs/V3_ARCHITECTURE.md)
+    sample_parser.add_argument(
+        "--gated",
+        action="store_true",
+        dest="gated",
+        help=(
+            "Reproduce v2 / canonical-probe hard-rejection: tachyonic samples "
+            "return -inf instead of being recorded as metadata. v3 default is "
+            "permissive (no probe gate)."
+        ),
+    )
+    sample_parser.add_argument(
+        "--soft-floor-noise",
+        type=float,
+        default=1.0,
+        metavar="SIGMA",
+        dest="soft_floor_noise",
+        help=(
+            "Standard deviation of the Gaussian noise added to the soft penalty "
+            "floor for sim divergence / NaN / exception (default: 1.0). "
+            "Set to 0 to disable noise (ablation tests)."
         ),
     )
     # Sampling method
@@ -1639,6 +1917,31 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help=(
             "Disable PolyChord's mode-detection clustering.  Safe for "
             "unimodal posteriors; saves ~5-10%% of likelihood evaluations."
+        ),
+    )
+    sample_parser.add_argument(
+        "--read-resume",
+        action="store_true",
+        dest="read_resume",
+        help=(
+            "Resume a previous PolyChord run from the chains in --output. "
+            "Reads tidal.resume from the output directory and continues "
+            "sampling from the last checkpoint. Only valid with --method nested "
+            "and --sampler polychord."
+        ),
+    )
+    sample_parser.add_argument(
+        "--max-ndead",
+        type=int,
+        default=None,
+        dest="max_ndead",
+        metavar="N",
+        help=(
+            "PolyChord: stop cleanly after N dead points and write all output "
+            "(inference.json, results.csv). Required for INTR jobs — ensures "
+            "output is written before SLURM walltime. Has no effect if "
+            "precision_criterion terminates the run first. "
+            "Typical values: amp chains ~25000; sup chains ~5000."
         ),
     )
     sample_parser.add_argument(
@@ -1712,6 +2015,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sample_parser.add_argument("--ic-amplitude", type=float, default=1.0)
     sample_parser.add_argument("--ic-component", default=None)
     sample_parser.add_argument("--ic-wavevector", default=None)
+    sample_parser.add_argument("--ic-no-snap", action="store_true")
     sample_parser.add_argument("--ic-formula-velocity", default=None)
     sample_parser.add_argument("--ic-field", action="append", default=[])
     sample_parser.add_argument("--ic-file", default=None)
@@ -1720,28 +2024,51 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sample_parser.add_argument("--dt", type=float, default=None)
     sample_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "modal-jax", "auto"],
         default="auto",
     )
     sample_parser.add_argument("--rtol", type=float, default=DEFAULT_RTOL)
     sample_parser.add_argument("--atol", type=float, default=DEFAULT_ATOL)
     sample_parser.add_argument(
-        "--method-solver", type=str, default=None, dest="method_solver",
+        "--method-solver",
+        type=str,
+        default=None,
+        dest="method_solver",
     )
     sample_parser.add_argument("--max-step", type=float, default=None)
-    sample_parser.add_argument("--snapshots", type=float, default=None)
+    sample_parser.add_argument(
+        "--snapshots",
+        type=float,
+        default=None,
+        metavar="DT",
+        help=(
+            "Snapshot interval passed to the simulation backend. "
+            "Default: t_end/20 (21 snapshots). For PolyChord inference with "
+            "peak_conversion in the perturbative regime, use --snapshots=t_end "
+            "for 2-snapshot machine-precision evaluation."
+        ),
+    )
     sample_parser.add_argument("--fd-order", type=int, choices=[2, 4, 6], default=4)
     sample_parser.add_argument(
-        "--leapfrog-order", type=int, choices=[2, 4], default=None,
+        "--leapfrog-order",
+        type=int,
+        choices=[2, 4],
+        default=None,
     )
     sample_parser.add_argument(
-        "--spectral", action=argparse.BooleanOptionalAction, default=None,
+        "--spectral",
+        action=argparse.BooleanOptionalAction,
+        default=None,
     )
     sample_parser.add_argument(
-        "--mode", choices=["evolve", "constraint"], default="evolve",
+        "--mode",
+        choices=["evolve", "constraint"],
+        default="evolve",
     )
     sample_parser.add_argument(
-        "--allow-inconsistent-ic", action="store_true", default=False,
+        "--allow-inconsistent-ic",
+        action="store_true",
+        default=False,
     )
     # Execution
     sample_parser.add_argument(
