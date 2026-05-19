@@ -8,6 +8,7 @@ the table/data tests. Run with:
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from typing import TYPE_CHECKING
@@ -20,7 +21,14 @@ from .conftest import MANIFEST_PATH, REPO_ROOT, iter_artefacts
 if TYPE_CHECKING:
     from pathlib import Path
 
-pytestmark = [pytest.mark.publication, pytest.mark.publication_slow]
+pytestmark = [
+    pytest.mark.publication,
+    pytest.mark.publication_slow,
+    pytest.mark.skipif(
+        shutil.which("latex") is None,
+        reason="latex binary not installed; figure scripts use matplotlib usetex=True",
+    ),
+]
 
 
 @pytest.mark.parametrize(
