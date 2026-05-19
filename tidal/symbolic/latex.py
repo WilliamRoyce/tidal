@@ -348,6 +348,35 @@ def _calligraphic_head(head_tex: str) -> str:
     return rf"\mathcal{{{head_tex.upper()}}}"
 
 
+# Match a trailing _{...} or ^{...} group (single-level, no nested braces).
+_TRAILING_SUPSUB_RE = re.compile(r"(?P<op>[_^])\{(?P<idx>[^{}]+)\}$")
+
+
+def _wrap_dot(base: str) -> str:
+    r"""Wrap ``base`` in ``\dot{...}``, lifting any trailing ``_{...}`` /
+    ``^{...}`` groups outside the dot.
+
+    Returns ``\dot{<head>}<trail>`` so ``\dot{\mathcal{A}_{2}}`` becomes
+    ``\dot{\mathcal{A}}_{2}``. Required because ``\usepackage{accents}``
+    (loaded in the manuscript macros for ``\accentset``) redefines
+    ``\dot`` to a positioning mechanism that leaks ``\mathcal`` font
+    scope into the subscript, producing
+    ``Missing character: There is no <N> in font stix-mathcal`` warnings
+    (issue #371). The ``[^{}]+`` restriction leaves nested groups
+    untouched, so genuinely-complex bases (``_{\mu\nu}`` etc.) remain
+    fully inside the dot.
+    """
+    head = base
+    trail = ""
+    while True:
+        m = _TRAILING_SUPSUB_RE.search(head)
+        if not m:
+            break
+        trail = f"{m.group('op')}{{{m.group('idx')}}}" + trail
+        head = head[: m.start()]
+    return rf"\dot{{{head}}}{trail}"
+
+
 def field_to_latex(
     name: str,
     *,
@@ -376,7 +405,7 @@ def field_to_latex(
         base = field_to_latex(
             name[2:], tensor_meta=tensor_meta, coordinates=coordinates,
         )
-        return rf"\dot{{{base}}}"
+        return _wrap_dot(base)
 
     # With tensor metadata: use proper index labels
     if tensor_meta is not None:
@@ -493,7 +522,7 @@ def operator_to_latex(operator: str, field_latex: str) -> str:
         if not op_tex:
             return field_latex
         if op_tex == "dot":
-            return rf"\dot{{{field_latex}}}"
+            return _wrap_dot(field_latex)
         return rf"{op_tex} {field_latex}"
 
     # Dynamic operator patterns

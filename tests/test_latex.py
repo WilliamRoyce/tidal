@@ -27,7 +27,8 @@ _EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "data"
 # running `tidal derive`.  Skip integration tests when absent.
 _CS_JSON = _EXAMPLES / "coupled_scalars.json"
 _needs_cs = pytest.mark.skipif(
-    not _CS_JSON.exists(), reason="coupled_scalars.json not derived",
+    not _CS_JSON.exists(),
+    reason="coupled_scalars.json not derived",
 )
 
 
@@ -163,7 +164,9 @@ class TestFieldToLatex:
     def test_with_tensor_meta_vector(self) -> None:
         meta = {"tensor_head": "a", "tensor_rank": 1, "tensor_indices": [1]}
         result = field_to_latex(
-            "a_1", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
+            "a_1",
+            tensor_meta=meta,
+            coordinates=("t", "x", "y", "z"),
         )
         assert r"\mathcal{A}" in result
         assert "x" in result
@@ -171,7 +174,9 @@ class TestFieldToLatex:
     def test_with_tensor_meta_rank2(self) -> None:
         meta = {"tensor_head": "h", "tensor_rank": 2, "tensor_indices": [2, 2]}
         result = field_to_latex(
-            "h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
+            "h_5",
+            tensor_meta=meta,
+            coordinates=("t", "x", "y", "z"),
         )
         assert r"\mathcal{H}" in result
         assert "yy" in result
@@ -185,9 +190,30 @@ class TestFieldToLatex:
     def test_velocity_with_tensor_meta(self) -> None:
         meta = {"tensor_head": "h", "tensor_rank": 2, "tensor_indices": [2, 2]}
         result = field_to_latex(
-            "v_h_5", tensor_meta=meta, coordinates=("t", "x", "y", "z"),
+            "v_h_5",
+            tensor_meta=meta,
+            coordinates=("t", "x", "y", "z"),
         )
         assert r"\dot" in result
+
+    def test_velocity_subscript_outside_dot(self) -> None:
+        # Issue #371: \dot{\mathcal{X}_{N}} triggers stix-mathcal missing-digit
+        # warnings under \usepackage{accents}; subscript must sit outside.
+        meta = {"tensor_head": "a", "tensor_rank": 1, "tensor_indices": [1]}
+        result = field_to_latex(
+            "v_a_1",
+            tensor_meta=meta,
+            coordinates=("t", "x", "y", "z"),
+        )
+        assert result == r"\dot{\mathcal{A}}_{x}"
+
+    def test_velocity_subscript_outside_dot_no_coords(self) -> None:
+        meta = {"tensor_head": "h", "tensor_rank": 2, "tensor_indices": [2, 2]}
+        result = field_to_latex("v_h_5", tensor_meta=meta)
+        assert result == r"\dot{\mathcal{H}}_{22}"
+
+    def test_velocity_no_subscript_unchanged(self) -> None:
+        assert field_to_latex("v_phi") == r"\dot{\phi}"
 
 
 # ---------------------------------------------------------------------------
@@ -229,6 +255,23 @@ class TestOperatorToLatex:
     def test_time_derivative(self) -> None:
         result = operator_to_latex("time_derivative", r"\phi")
         assert r"\dot" in result
+
+    def test_time_derivative_subscript_outside_dot(self) -> None:
+        # Issue #371: lift trailing _{N} / ^{N} out of \dot{...}.
+        assert (
+            operator_to_latex("time_derivative", r"\mathcal{A}_{2}")
+            == r"\dot{\mathcal{A}}_{2}"
+        )
+        assert (
+            operator_to_latex("time_derivative", r"\mathcal{A}^{7}")
+            == r"\dot{\mathcal{A}}^{7}"
+        )
+
+    def test_time_derivative_preserves_braced_index(self) -> None:
+        # Indices with nested braces (e.g. \mu\nu inside another group)
+        # are NOT lifted — keep accent placement correct for tensor bases.
+        result = operator_to_latex("time_derivative", r"\mathcal{T}_{\mu\nu}")
+        assert result == r"\dot{\mathcal{T}}_{\mu\nu}"
 
     def test_d2_t(self) -> None:
         result = operator_to_latex("d2_t", r"\phi")
