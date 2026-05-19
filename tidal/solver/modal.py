@@ -253,7 +253,7 @@ in their numerically stable regime.
 """
 
 
-def _duhamel_kernel(
+def _duhamel_kernel(  # pyright: ignore[reportUnusedFunction]
     lam: complex | NDArray[np.complex128],
     mu: complex | NDArray[np.complex128],
     t: float,
@@ -1779,7 +1779,7 @@ def _has_position_dependent_terms(spec: EquationSystem) -> bool:
     return False
 
 
-def _suppress_tachyonic_noise(
+def _suppress_tachyonic_noise(  # pyright: ignore[reportUnusedFunction]
     eig_vals: NDArray[np.complex128],
     y0_eigen: NDArray[np.complex128],
     *,
@@ -2070,7 +2070,7 @@ def _evolve_per_mode_pade(
         if t_end_rel > 0:
             eigvals_diag = np.linalg.eigvals(M_block)
             _warn_eigenvalue_growth(
-                eigvals_diag,
+                eigvals_diag,  # pyright: ignore[reportArgumentType]
                 t_end_rel,
                 context="per-mode (Padé)",
             )
@@ -3352,10 +3352,10 @@ def _evolve_duhamel_per_mode(
         for n, M_n in M_src_k_by_order.items():
             M_sub_n = M_n[:, idx[:, None], idx[None, :]]  # (n_modes, bs, bs)
             if n == 0:
-                S += M_sub_n
+                S += M_sub_n  # pyright: ignore[reportConstantRedefinition]
             else:
                 # Batched matmul instead of einsum (#327).
-                S += M_sub_n @ M_block_powers[n]
+                S += M_sub_n @ M_block_powers[n]  # pyright: ignore[reportConstantRedefinition]
 
         # Build augmented per-mode generator Aug = [[A, S], [0, A]] of size 2bs×2bs.
         Aug = np.zeros((n_block_modes, 2 * bs, 2 * bs), dtype=np.complex128)

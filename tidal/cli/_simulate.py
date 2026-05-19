@@ -2098,8 +2098,8 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
     # theory that would route through it. See jax_modal_cpu_negative_result.md.
     if scheme == "modal" and os.environ.get("TIDAL_MODAL_BACKEND", "") == "jax":
         from tidal.solver.modal import (
-            _has_position_dependent_terms,
-            _has_time_derivative_operators,
+            _has_position_dependent_terms,  # pyright: ignore[reportPrivateUsage]
+            _has_time_derivative_operators,  # pyright: ignore[reportPrivateUsage]
         )
 
         jax_eligible = not (

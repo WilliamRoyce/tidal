@@ -21,7 +21,13 @@ from __future__ import annotations
 
 import ast
 import operator
+import sys
 from typing import TYPE_CHECKING
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -402,10 +408,11 @@ def _substitute_names(node: ast.AST, subs: dict[str, float]) -> ast.AST:
     """
 
     class _Sub(ast.NodeTransformer):
-        def visit_Name(self, n: ast.Name) -> ast.AST:
-            if n.id in subs:
-                return ast.copy_location(ast.Constant(value=subs[n.id]), n)
-            return n
+        @override
+        def visit_Name(self, node: ast.Name) -> ast.AST:
+            if node.id in subs:
+                return ast.copy_location(ast.Constant(value=subs[node.id]), node)
+            return node
 
     return _Sub().visit(
         ast.fix_missing_locations(ast.parse(ast.unparse(node), mode="eval").body)
@@ -417,7 +424,7 @@ def _apply_sign(node: ast.AST, sign: int) -> ast.AST:
     if sign == 1:
         return node
     return ast.copy_location(
-        ast.UnaryOp(op=ast.USub(), operand=node),
+        ast.UnaryOp(op=ast.USub(), operand=node),  # pyright: ignore[reportArgumentType]
         node,
     )
 
@@ -436,9 +443,9 @@ def _terms_to_expr(terms: list[ast.AST]) -> str:
     for t in terms[1:]:
         # Collapse ``+ (-x)`` into ``- x`` for readability.
         if isinstance(t, ast.UnaryOp) and isinstance(t.op, ast.USub):
-            expr = ast.BinOp(left=expr, op=ast.Sub(), right=t.operand)
+            expr = ast.BinOp(left=expr, op=ast.Sub(), right=t.operand)  # pyright: ignore[reportArgumentType]
         else:
-            expr = ast.BinOp(left=expr, op=ast.Add(), right=t)
+            expr = ast.BinOp(left=expr, op=ast.Add(), right=t)  # pyright: ignore[reportArgumentType]
     return ast.unparse(expr)
 
 

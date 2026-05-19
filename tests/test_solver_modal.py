@@ -10,7 +10,7 @@ Tests cover:
 from __future__ import annotations
 
 import copy
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pytest
@@ -19,6 +19,9 @@ from tidal.solver.grid import GridInfo
 from tidal.solver.modal import can_use_modal, solve_modal
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import EquationSystem
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Inline specs for testing
@@ -1736,7 +1739,7 @@ class TestPositionDepAutoRoute:
     """
 
     @pytest.fixture
-    def e0_args(self, tmp_path: Path) -> list[str]:  # noqa: F821
+    def e0_args(self, tmp_path: Path) -> list[str]:
         """CLI args for the GH #367 reproducer (E.0 dual-Gaussian)."""
         output_dir = tmp_path / "out"
         return [

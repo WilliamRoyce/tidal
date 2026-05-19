@@ -983,7 +983,7 @@ def _gradient_product_parseval(  # noqa: PLR0913, PLR0917, PLR0914
             k_i = 2.0 * np.pi * np.fft.rfftfreq(shape[i], d=grid_spacing[i])
         else:
             k_i = 2.0 * np.pi * np.fft.fftfreq(shape[i], d=grid_spacing[i])
-        k_vecs.append(k_i)
+        k_vecs.append(k_i)  # pyright: ignore[reportArgumentType]
 
     # Broadcasting shapes for k_a and k_b.
     def _bcast(arr: NDArray[np.float64], axis: int) -> NDArray[np.float64]:

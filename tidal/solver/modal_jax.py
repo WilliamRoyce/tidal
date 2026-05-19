@@ -265,8 +265,7 @@ def _solve_modal_jax_constrained(  # noqa: PLR0917
 
     # --- Time axis setup -----------------------------------------------------
     t0 = float(t_eval[0])
-    t_end = float(t_eval[-1])
-    t_end - t0
+    float(t_eval[-1])
     if num_snap > 1:
         dts = np.diff(t_eval)
         uniform = bool(np.allclose(dts, dts[0]))
