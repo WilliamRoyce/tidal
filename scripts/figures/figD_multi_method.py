@@ -122,7 +122,7 @@ def _plot(data: dict, out_path: Path) -> None:
                             1,
                             1,
                             fill=False,
-                            edgecolor="0.7",
+                            edgecolor="black",
                             linewidth=0.5,
                         )
                     )

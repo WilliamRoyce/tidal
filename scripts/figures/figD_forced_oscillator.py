@@ -1,14 +1,15 @@
-r"""Figure D §3 — forced-oscillator Pass 0+1 calibration (App-C styled).
+r"""Figure D §3 — forced-oscillator order-eps^{0+1} calibration (App-C styled).
 
 Single-panel error-vs-$\varepsilon$ plot calibrating the closed-form
 Duhamel kernel against the full-$\varepsilon$ modal solution on a driven
 Klein–Gordon oscillator with an $\varepsilon$ mass-shift correction.
 
-Two curves: Pass 0 only (the bare modal solution at $\varepsilon = 0$,
-showing $\mathcal{O}(\varepsilon)$ error against the full-$\varepsilon$
-ground truth) and Pass 0 + Pass 1 (the closed-form Duhamel correction,
-showing $\mathcal{O}(\varepsilon^2)$ error). Fitted log–log slopes and
-$R^2$ values are reported in the legend.
+Two curves: $|\phi^{(0)} - \phi^\mathrm{exact}|$ (base modal solution at
+$\varepsilon = 0$, showing $\mathcal{O}(\varepsilon)$ error against the
+full-$\varepsilon$ ground truth) and
+$|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ (closed-form Duhamel
+correction, showing $\mathcal{O}(\varepsilon^2)$ error). Fitted log–log
+slopes and $R^2$ values are reported in the legend.
 
 Data:   benchmark_results/canonical/forced_oscillator.json
 Output: manuscript/figures/figD_forced_oscillator.pdf
@@ -65,7 +66,7 @@ def _plot(data: dict, out_path: Path) -> None:
         ms=5,
         lw=0,
         color="#d62728",
-        label=rf"Pass 0 only ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
+        label=rf"$|\phi^{{(0)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
     )
     ax.loglog(
         eps,
@@ -74,10 +75,10 @@ def _plot(data: dict, out_path: Path) -> None:
         ms=5,
         lw=0,
         color="#1f77b4",
-        label=rf"Pass 0 + Pass 1 ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
+        label=rf"$|\phi^{{(0)}} + \phi^{{(1)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
     )
     # O(eps^2) reference guide anchored at largest eps (distinct grey
-    # so the line doesn't merge with the Pass 0+1 trace).
+    # so the line doesn't merge with the phi^(0)+phi^(1) trace).
     ax.loglog(
         eps,
         err_c[-1] * (eps / eps[-1]) ** 2,
@@ -87,7 +88,7 @@ def _plot(data: dict, out_path: Path) -> None:
         alpha=0.7,
         label=r"$\mathcal{O}(\varepsilon^2)$ guide",
     )
-    # O(eps) reference for Pass 0
+    # O(eps) reference for the base-solution error |phi^(0) - phi^exact|
     ax.loglog(
         eps,
         err_p0[-1] * (eps / eps[-1]),

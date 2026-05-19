@@ -23,11 +23,15 @@
   \centering
   \includegraphics[width=\textwidth]{figures/figD_boccaletti_uniform}
   \caption{Boccaletti-kernel reproduction on a uniform $\Bzero$
-    background. (a) Numerical residual against the
-    Raffelt--Stodolsky two-mode formula \cref{TwoModeRabi} at
-    $t_\mathrm{end}=50$ across a 24-point $\Bzero \in [0.005, 0.25]$
-    scan on a periodic $N=512$ grid (filled circles), with the
-    analytic $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$ (dashed)
+    background. (a) Numerical residual
+    $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$ between the simulated
+    conversion probability $\Pconv \equiv P_\mathrm{TIDAL}$ and the
+    Raffelt--Stodolsky two-mode prediction
+    $\Pconv \equiv P_\mathrm{RS}$ of \cref{TwoModeRabi} at
+    $t_\mathrm{end}=50$ across a 24-point
+    $\Bzero \in [0.005, 0.25]$ scan on a periodic $N=512$ grid
+    (filled circles), with the analytic
+    $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$ (dashed)
     drawn at 400 dense $\Bzero$ values to show the $\Bzero^2$ growth
     of the bare-formula deviation from RS; the simulation residual
     sits at the numerical floor while the bare formula departs from
@@ -72,17 +76,16 @@ The two predictions coincide while
 $\kappa\Bzero t/2 \ll \pi/2$; they diverge at larger $\Bzero$ along
 the analytic $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$ curve
 overlaid in \cref{BoccalettiUniform}(a).
-\TIDAL{} evolves the full EM PDE without the dispersion and
-slowly-varying-envelope truncations that produce \cref{TwoModeRabi};
+\TIDAL{} evolves the full EM PDE without the approximations
+that produce \cref{TwoModeRabi};
 the residual $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$ then measures the
-size of the higher-order physics discarded by those truncations,
+size of the higher-order physics discarded,
 which \cref{PerturbativityHierarchy} places at $\mathcal{O}(\Bzero^4)$.
 \Cref{BoccalettiUniform}(a) shows this residual rising from
 the modal-solver IEEE double-precision floor at small $\Bzero$ into
 the range $10^{-8}$--$10^{-6}$ as $\Bzero$ grows, of the same order
 as the $(\Delta/g)^4$ prediction at those values, and panel (b)
-shows the modal/CVODE plateau at the same level for the
-grid-refinement test at $\Bzero=0.1275$. The swept range stays within the
+shows the modal/CVODE plateau at the same level. The swept range stays within the
 perturbative regime where both predictions remain valid; the
 localised-profile scan of \cref{BoccalettiLocalised} extends
 past the first quarter-period ($s > \pi/2$), where the
@@ -90,8 +93,9 @@ $P_\mathrm{conv} \ll 1$ row of \cref{PerturbativityHierarchy} fails
 and the bare path-integrated formula no longer applies.
 
 \paragraph*{Boccaletti kernel on a Gaussian profile}
-For a finite magnetised region $B_x(z)$ the Gertsenshtein
-formula generalises to the path-integrated form~\cite{raffelt1988mixing}
+For a finite magnetised region $B_x(z)$ the Gertsenshtein formula
+\cref{GertsenshteinFormula} generalises to the path-integrated
+form~\cite{raffelt1988mixing}
 \begin{equation}
   \Pconv = \sin^2\!\left(
     \frac{\kappa}{2}\int_{-\infty}^{+\infty}\!B_x(z)\,\mathrm{d}z\right),
@@ -101,22 +105,25 @@ taking the Gaussian profile
 $B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$. We
 reproduce this closed-form by scanning the
 $(B_\mathrm{peak}, R)$ plane using the derived localised
-Gertsenshtein theory. \Cref{BoccalettiLocalised}
-shows every cell of the $(B_\mathrm{peak}, R)$ scan collapsing
-onto the single curve $P = \sin^2(s)$ in the dimensionless variable
-$s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$, reproducing \cref{BoccalettiPathIntegrated}.
+Gertsenshtein theory. \Cref{BoccalettiLocalised} shows the
+$(B_\mathrm{peak}, R)$ scan collapsing onto the single curve
+$P = \sin^2(s)$ in the dimensionless variable
+$s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$ within the perturbative
+regime $s < \pi/2$, reproducing \cref{BoccalettiPathIntegrated};
+points past the first quarter-period drop below the curve as the
+bare-formula coherent approximation breaks down.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figD_boccaletti_localised}
   \caption{Path-integrated Boccaletti reproduction on the Gaussian
-    profile. Universal collapse of every cell of an
-    $8 \times 5$ $(B_\mathrm{peak}, R)$ grid onto the curve
-    $P = \sin^2(s)$ in the dimensionless variable
+    profile. The $8 \times 5$ $(B_\mathrm{peak}, R)$ grid collapses
+    onto the curve $P = \sin^2(s)$ in the dimensionless variable
     $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$, on which the
     path-integrated prediction reduces to $\sin^2(s)$ regardless of
-    the individual $(B_\mathrm{peak}, R)$ values. Points at
-    $s > \pi/2$ (past the first quarter-period) lie below
+    the individual $(B_\mathrm{peak}, R)$ values, within the
+    perturbative regime $s < \pi/2$. Points at $s > \pi/2$ (past
+    the first quarter-period) lie below
     $\sin^{2}(s)$ as the bare-formula coherent approximation breaks
     down.}
   \label{BoccalettiLocalised}
@@ -124,12 +131,12 @@ $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$, reproducing \cref{BoccalettiPathInt
 
 \paragraph*{Klein--Gordon perturbative calibration}
 The perturbative-reduction machinery of \cref{PerturbativeReduction}
-evolves the
-system as a base (order-$\varepsilon^{0}$) solution plus a correction
-(order-$\varepsilon^{1}$), denoted \emph{Pass 0} and \emph{Pass 1} in
-the figure legends of \cref{ForcedOscillator,ParkerSimon}. We test the Pass~0 + Pass~1 approximation against the exact
-full-$\varepsilon$ modal solution of a Klein--Gordon wave with a
-small mass-shift correction,
+evolves the system as a base (order-$\varepsilon^{0}$) solution
+$\phi^{(0)}$ plus a correction (order-$\varepsilon^{1}$)
+$\phi^{(1)}$. \Cref{ForcedOscillator,ParkerSimon} show the resulting
+truncation-error scaling. We test the $\phi^{(0)} + \phi^{(1)}$
+approximation against the exact full-$\varepsilon$ modal solution of
+a Klein--Gordon wave with a small mass-shift correction,
 \begin{equation}
   \partial_t^2\phi - \partial_x^2\phi + m^2\phi
   \;=\; -\varepsilon\,\phi,
@@ -138,22 +145,27 @@ small mass-shift correction,
 whose full-$\varepsilon$ modal solution is closed-form. The
 order-$\varepsilon^{0}$ solution evolves the $\varepsilon=0$ base;
 the order-$\varepsilon^{1}$ correction is integrated against the
-base trajectory; the Pass~0 + Pass~1 truncation error against the
-exact solution is $\mathcal{O}(\varepsilon^2)$ by construction. \Cref{ForcedOscillator} shows the slope of
+base trajectory; the
+$|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ truncation error
+is $\mathcal{O}(\varepsilon^2)$ by construction. \Cref{ForcedOscillator} shows the slope of
 $|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{full}|$ versus $\varepsilon$
 recovers the expected algebraic order of error scaling.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figD_forced_oscillator}
-  \caption{Perturbed-Klein--Gordon calibration of the Pass 0 + Pass 1
-    Duhamel kernel. Pass 0 error and combined Pass 0 + Pass 1 error
-    versus $\varepsilon$ for the mass-shift correction
-    \cref{KGMassShift}, sampled at eight logarithmically spaced
-    points covering $\varepsilon \in [10^{-3}, 0.2]$ at $k=1$; fitted
-    slopes and $R^2$ values are reported in the legend. The
-    Pass 0 + Pass 1 error scales as $\mathcal{O}(\varepsilon^2)$, an
-    order of magnitude per half-decade in $\varepsilon$.}
+  \caption{Perturbed-Klein--Gordon calibration of the Duhamel kernel
+    that combines the order-$\varepsilon^{0}$ base evolution
+    $\phi^{(0)}$ with the order-$\varepsilon^{1}$ correction
+    $\phi^{(1)}$. The base-solution error
+    $|\phi^{(0)} - \phi^\mathrm{exact}|$ and the corrected error
+    $|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ versus
+    $\varepsilon$ for the mass-shift correction \cref{KGMassShift},
+    sampled at eight logarithmically spaced points covering
+    $\varepsilon \in [10^{-3}, 0.2]$ at $k=1$; fitted slopes and
+    $R^2$ values are reported in the legend. The corrected error
+    scales as $\mathcal{O}(\varepsilon^2)$, an order of magnitude
+    per half-decade in $\varepsilon$.}
   \label{ForcedOscillator}
 \end{figure}
 
@@ -177,14 +189,16 @@ the base solution reaches $\sim 10^4$ at $\varepsilon=0.01$ in
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figD_parker_simon}
-  \caption{Higher-derivative perturbative calibration. Pass 0 and
-    Pass 0 + Pass 1 error versus $\varepsilon$ for the biharmonic
-    correction \cref{KGBiharmonic} on the Klein--Gordon base of
-    \cref{KGMassShift}. The combined-path error falls faster than
-    the worst-case $\mathcal{O}(\varepsilon^2)$ bound at small
-    $\varepsilon$. Points below the FD-4 spatial-discretisation
-    floor (annotated in the figure) are excluded from the slope
-    fit and shown as open markers.}
+  \caption{Higher-derivative perturbative calibration. Base-solution
+    error $|\phi^{(0)} - \phi^\mathrm{exact}|$ and corrected error
+    $|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ versus
+    $\varepsilon$ for the biharmonic correction \cref{KGBiharmonic}
+    on the Klein--Gordon base of \cref{KGMassShift}. The corrected
+    error falls faster than the worst-case
+    $\mathcal{O}(\varepsilon^2)$ bound at small $\varepsilon$.
+    Points below the FD-4 spatial-discretisation floor (annotated
+    in the figure) are excluded from the slope fit and shown as
+    open markers.}
   \label{ParkerSimon}
 \end{figure}
 
@@ -278,10 +292,7 @@ energy-conservation audit below.
     pair (right), the latter an analogue of the Raffelt--Stodolsky
     two-channel mixing model~\cite{raffelt1988mixing}. Logarithmic
     viridis colormap; cells encode
-    $|P_a - P_b|/\max(|P_a|, |P_b|)$ between backend pairs $(a, b)$;
-    the upper triangle is masked. Row \texttt{modal} (first) and
-    column \texttt{scipy\_DOP853} (last) carry no lower-triangle
-    cells and are omitted.}
+    $|P_a - P_b|/\max(|P_a|, |P_b|)$ between backend pairs $(a, b)$.}
   \label{MultiMethod}
 \end{figure*}
 

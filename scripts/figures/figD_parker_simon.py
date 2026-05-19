@@ -2,8 +2,9 @@ r"""Figure D §4 — Parker–Simon higher-derivative perturbative calibration.
 
 Single-panel App-C-style error-vs-$\varepsilon$ plot for the
 $\varepsilon\,\partial_x^4 \phi$ higher-derivative correction on a
-Klein–Gordon base. Pass 0 + Pass 1 error decreases faster than the
-worst-case $\mathcal{O}(\varepsilon^2)$ bound for this correction type.
+Klein–Gordon base. The combined $\phi^{(0)} + \phi^{(1)}$ truncation
+error decreases faster than the worst-case $\mathcal{O}(\varepsilon^2)$
+bound for this correction type.
 
 Floor-saturated points (where the error has fallen below
 $\sim 10^3 \cdot \varepsilon_{\mathrm{mach}}$) are excluded from the
@@ -95,7 +96,7 @@ def _plot(data: dict, out_path: Path) -> None:
         ms=5,
         lw=0,
         color="#d62728",
-        label=rf"Pass 0 only ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
+        label=rf"$|\phi^{{(0)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
     )
     ax.loglog(
         eps[~floor_mask],
@@ -104,7 +105,7 @@ def _plot(data: dict, out_path: Path) -> None:
         ms=5,
         lw=0,
         color="#1f77b4",
-        label=rf"Pass 0 + Pass 1 ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
+        label=rf"$|\phi^{{(0)}} + \phi^{{(1)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
     )
     if floor_mask.any():
         ax.loglog(
@@ -115,7 +116,7 @@ def _plot(data: dict, out_path: Path) -> None:
             lw=0,
             mfc="white",
             mec="#1f77b4",
-            label="Pass 0+1 (below spatial-FD floor; excluded from fit)",
+            label=r"$\phi^{(0)} + \phi^{(1)}$ (below spatial-FD floor; excluded from fit)",
         )
         # Annotate the FD-4 spatial-discretisation floor at the median
         # of the saturated points so the exclusion is visually justified.
