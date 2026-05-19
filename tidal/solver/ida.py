@@ -360,7 +360,7 @@ class _ResidualCtx:
 # ---------------------------------------------------------------------------
 
 
-def build_residual_fn(  # noqa: PLR0913
+def build_residual_fn(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
@@ -457,7 +457,7 @@ def build_residual_fn(  # noqa: PLR0913
 # ---------------------------------------------------------------------------
 
 
-def solve_ida(  # noqa: PLR0913
+def solve_ida(
     spec: EquationSystem,
     grid: GridInfo,
     y0: np.ndarray,

@@ -32,12 +32,12 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from tidal.solver.cvode import solve_cvode  # noqa: E402
-from tidal.solver.grid import GridInfo  # noqa: E402
-from tidal.solver.ida import solve_ida  # noqa: E402
-from tidal.solver.modal import solve_modal  # noqa: E402
-from tidal.solver.state import StateLayout  # noqa: E402
-from tidal.symbolic.json_loader import EquationSystem  # noqa: E402
+from tidal.solver.cvode import solve_cvode
+from tidal.solver.grid import GridInfo
+from tidal.solver.ida import solve_ida
+from tidal.solver.modal import solve_modal
+from tidal.solver.state import StateLayout
+from tidal.symbolic.json_loader import EquationSystem
 
 THEORY_JSON = REPO_ROOT / "examples/data/gertsenshtein_e0_dual_gaussian.json"
 PARAMS: dict[str, float] = {
@@ -83,7 +83,7 @@ def k_max_for_n(n: int) -> float:
 
 
 def time_solver(
-    fn: Any,  # noqa: ANN401 — solve_* signatures don't share a strict protocol
+    fn: Any,
     spec: EquationSystem,
     grid: GridInfo,
     y0: np.ndarray,

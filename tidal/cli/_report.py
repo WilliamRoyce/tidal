@@ -95,7 +95,7 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def generate_report(  # noqa: PLR0913, PLR0914, PLR0917
+def generate_report(  # noqa: PLR0913, PLR0917
     sim_data: SimulationData,
     spec: EquationSystem,
     params: dict[str, float],

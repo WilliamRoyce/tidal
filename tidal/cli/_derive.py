@@ -647,7 +647,7 @@ def _compute_contra_components(
     return contra
 
 
-def _wls_vector_background_substitution(  # noqa: PLR0914
+def _wls_vector_background_substitution(
     ctx: _WlsContext,
     comp_var: str,
 ) -> list[str]:
@@ -1086,7 +1086,7 @@ def _pert_field_dict(pert_name: str, source_field: dict[str, Any]) -> dict[str, 
 # --- WLS: Linearization (xPert) ---
 
 
-def _wls_matter_perturbation_setup(  # noqa: PLR0914
+def _wls_matter_perturbation_setup(
     ctx: _WlsContext,
     matter_perts: list[dict[str, Any]],
     eps_sym: str,
@@ -1203,7 +1203,7 @@ def _wls_component_metadata(
     ]
 
 
-def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
+def _wls_shorthand_cd_tensors(  # noqa: PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1428,7 +1428,7 @@ def _wls_shorthand_cd_tensors(  # noqa: PLR0914, PLR0915
     return lines
 
 
-def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -2189,7 +2189,7 @@ def _wls_torsion_curvature_decomposition(ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0915
     ctx: _WlsContext,
     *,
     include_bg: bool = False,
@@ -4502,7 +4502,7 @@ def _validate_perturbation_config(
     }
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0914, PLR0915
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0915
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -5747,7 +5747,7 @@ def _wls_canonical_injection(ctx: _WlsContext) -> list[str]:
 # --- WLS: Metadata & JSON export ---
 
 
-def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0915
     config: dict[str, Any],
     ctx: _WlsContext,
 ) -> list[str]:

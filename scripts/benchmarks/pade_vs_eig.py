@@ -36,15 +36,15 @@ import scipy.linalg
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from tidal.solver.coefficients import CoefficientEvaluator  # noqa: E402
-from tidal.solver.grid import GridInfo  # noqa: E402
-from tidal.solver.modal import (  # noqa: E402
+from tidal.solver.coefficients import CoefficientEvaluator
+from tidal.solver.grid import GridInfo
+from tidal.solver.modal import (
     _build_k_axes,
     _build_k_grid,
     _build_per_mode_matrices,
 )
-from tidal.solver.state import StateLayout  # noqa: E402
-from tidal.symbolic.json_loader import EquationSystem  # noqa: E402
+from tidal.solver.state import StateLayout
+from tidal.symbolic.json_loader import EquationSystem
 
 # (theory_name, json_path, grid_shapes, bounds, params, n_labels)
 # grid_shapes is a list of shapes to sweep; n_labels are the matching display

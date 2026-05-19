@@ -33,8 +33,8 @@ pytestmark = [pytest.mark.publication, pytest.mark.publication_slow]
     ],
 )
 def test_figure_script_runs(
-    appendix: str,  # noqa: ARG001
-    name: str,  # noqa: ARG001
+    appendix: str,
+    name: str,
     entry: dict,
     tmp_path: Path,
 ) -> None:

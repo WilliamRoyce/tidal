@@ -144,7 +144,7 @@ def _gaussian_ic(spec: object, grid: object) -> np.ndarray:
     return y0
 
 
-def _run_benchmark(  # noqa: PLR0915
+def _run_benchmark(
     spec: object,
     grid: object,
     y0: np.ndarray,

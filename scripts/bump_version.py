@@ -151,7 +151,7 @@ class VersionBumper:
                 print(f"  3. Create tag: git tag v{self.new_version}")
                 print("  4. Push: git push && git push --tags")
 
-        except Exception as e:  # noqa: BLE001  # Intentional catch-all for rollback
+        except Exception as e:  # Intentional catch-all for rollback
             print()
             print(f"✗ Error: {e}", file=sys.stderr)
             if not self.dry_run:
@@ -225,7 +225,7 @@ class VersionBumper:
 
         print()
 
-    def update_files(self) -> None:  # noqa: PLR0912, C901
+    def update_files(self) -> None:
         """Phase 2: Update all files atomically."""
         print("Phase 2: Update Files")
 

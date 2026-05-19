@@ -27,7 +27,7 @@ REQUIRED_METADATA_KEYS = {"timestamp", "host", "git_sha", "parameters"}
         )
     ],
 )
-def test_canonical_data_present(appendix: str, name: str, entry: dict) -> None:  # noqa: ARG001
+def test_canonical_data_present(appendix: str, name: str, entry: dict) -> None:
     if entry.get("status") == "stub":
         pytest.skip("entry marked stub")
     canon = entry.get("canonical_data")

@@ -364,7 +364,7 @@ def _parse_sim_settings(data: dict[str, Any], filename: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def load_sweep_config(path: Path) -> SweepConfig:  # noqa: PLR0914
+def load_sweep_config(path: Path) -> SweepConfig:
     """Load and validate a sweep TOML configuration file.
 
     Parameters

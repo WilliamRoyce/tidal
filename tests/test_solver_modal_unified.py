@@ -23,7 +23,7 @@ cross-`d2_t` terms in a trace-like pattern whose mass matrix is
 `[[1,1,1],[1,1,1],[1,1,1]]` (rank 1, 2 null directions).
 """
 
-# ruff: noqa: RUF002, ERA001 — math symbols in docstrings; commented stubs.
+# ruff: noqa: ERA001 — math symbols in docstrings; commented stubs.
 
 from __future__ import annotations
 

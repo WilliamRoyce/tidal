@@ -256,7 +256,7 @@ def _do_pade_rep(task: dict) -> dict:
             "eig_s_per_mode": rep["eig_s_per_mode"],
             "worker_core": _WORKER_CORE,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {
             "benchmark": "pade_vs_eig",
             "theory": task["theory"],
@@ -284,7 +284,7 @@ def _do_sparse_rep(task: dict) -> dict:
             "wall_s": rep["wall_s"],
             "worker_core": _WORKER_CORE,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {
             "benchmark": "sparse_csc_vs_dense",
             "n": task["n"],
@@ -309,7 +309,7 @@ def _do_nyquist(task: dict) -> dict:
             ),
             "worker_core": _WORKER_CORE,
         }
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return {
             "benchmark": "nyquist_energy",
             "theory": task["theory"],
@@ -884,7 +884,7 @@ def main() -> int:
                 try:
                     row = done.result()
                     all_rep_rows.append(row)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     all_rep_rows.append(
                         {
                             "benchmark": t["benchmark"],

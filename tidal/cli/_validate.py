@@ -313,7 +313,7 @@ def _run_stability_checks(
     return tachyon_errors, notes
 
 
-def validate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
+def validate_command(args: Namespace) -> int:
     """Execute the validate command.
 
     Parameters

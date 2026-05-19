@@ -96,7 +96,7 @@ def _index_priors(priors_list: list[dict[str, Any]]) -> dict[str, dict[str, Any]
     return out
 
 
-def render_table(  # noqa: PLR0914
+def render_table(
     v2: dict[str, Any],
     v3: dict[str, Any],
     *,
@@ -138,7 +138,7 @@ def render_table(  # noqa: PLR0914
             "",
             "## Per-coupling",
             "",
-            "| Param | v2 prior | v3 prior | v2 MAP | v3 MAP | MAP shift (v3 σ) | v2 D_KL | v3 D_KL |",  # noqa: RUF001
+            "| Param | v2 prior | v3 prior | v2 MAP | v3 MAP | MAP shift (v3 σ) | v2 D_KL | v3 D_KL |",
             "| --- | --- | --- | --- | --- | --- | --- | --- |",
         )
     )
@@ -175,7 +175,7 @@ def render_table(  # noqa: PLR0914
             "## Notes",
             "",
             "* log Z values are not directly comparable across architectures — v2 chains conditioned on the stability gate; v3 integrates over wider compactified support. Use the comparison as a magnitude/direction guide, not a Bayes factor.",
-            "* MAP shift in v3-σ units quantifies how far v2's MAP sits inside v3's posterior. |shift| > 2 indicates v3 found a region v2's prior couldn't sample.",  # noqa: RUF001
+            "* MAP shift in v3-σ units quantifies how far v2's MAP sits inside v3's posterior. |shift| > 2 indicates v3 found a region v2's prior couldn't sample.",
             "* Per-coupling marginal D_KL is the headline metric for v3 — measures how much each coupling carries signal-shape information.",
         )
     )

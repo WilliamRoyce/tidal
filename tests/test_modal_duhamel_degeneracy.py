@@ -13,7 +13,7 @@ References
 Al-Mohy & Higham 2011, SIAM J. Sci. Comput. 33, §3 Table 3.1.
 """
 
-# ruff: noqa: RUF002, ERA001 — math symbols in docstrings; commented stubs.
+# ruff: noqa: ERA001 — math symbols in docstrings; commented stubs.
 
 from __future__ import annotations
 

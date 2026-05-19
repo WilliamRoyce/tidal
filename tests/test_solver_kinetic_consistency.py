@@ -292,7 +292,7 @@ class TestAllModalPathsRespectKinetic:
 
     GRID_SHAPE = 64
     T_END = 0.4
-    PARAMS = {"alpha": 0.5}  # noqa: RUF012 — match existing TestKineticConsistencyAcrossBackends style
+    PARAMS = {"alpha": 0.5}
     # Tolerance: 1% — same as cross-backend test. All three modal paths
     # solve the *same* physical equation; only the matrix-builder dispatch
     # differs. Numerical tolerance only needs to accommodate FP noise from

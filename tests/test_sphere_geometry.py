@@ -143,7 +143,7 @@ def test_tile_bounds_m_one_returns_full_face() -> None:
 
 
 @pytest.mark.parametrize("M", [2, 3, 4, 8])
-def test_tile_bounds_union_covers_face(M: int) -> None:  # noqa: N803
+def test_tile_bounds_union_covers_face(M: int) -> None:
     """All M^(N-1) sub-tiles of a face partition ``[-1, 1]^(N-1)`` exactly."""
     n_dims = 4
     total = 0.0
@@ -173,7 +173,7 @@ def test_tile_bounds_rejects_zero_m() -> None:
 
 
 @pytest.mark.parametrize(("n_dims", "M"), [(2, 1), (3, 2), (4, 3), (6, 2)])
-def test_enumerate_tiles_count(n_dims: int, M: int) -> None:  # noqa: N803
+def test_enumerate_tiles_count(n_dims: int, M: int) -> None:
     tiles = list(enumerate_tiles(n_dims, M))
     assert len(tiles) == M ** (n_dims - 1)
     # All tile indices should be 1-indexed in [1, M].
@@ -183,7 +183,7 @@ def test_enumerate_tiles_count(n_dims: int, M: int) -> None:  # noqa: N803
 
 
 @pytest.mark.parametrize(("n_dims", "M"), [(2, 1), (3, 2), (4, 1), (5, 2)])
-def test_enumerate_cells_count(n_dims: int, M: int) -> None:  # noqa: N803
+def test_enumerate_cells_count(n_dims: int, M: int) -> None:
     cells = list(enumerate_cells(n_dims, M))
     assert len(cells) == 2 * n_dims * M ** (n_dims - 1)
     face_indices = {f for f, _ in cells}

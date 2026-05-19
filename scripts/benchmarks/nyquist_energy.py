@@ -34,12 +34,12 @@ import scipy
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from tidal.measurement._energy import compute_energy_timeseries  # noqa: E402
-from tidal.measurement._io import SimulationData  # noqa: E402
-from tidal.solver.grid import GridInfo  # noqa: E402
-from tidal.solver.modal import solve_modal  # noqa: E402
-from tidal.solver.state import StateLayout  # noqa: E402
-from tidal.symbolic.json_loader import EquationSystem  # noqa: E402
+from tidal.measurement._energy import compute_energy_timeseries
+from tidal.measurement._io import SimulationData
+from tidal.solver.grid import GridInfo
+from tidal.solver.modal import solve_modal
+from tidal.solver.state import StateLayout
+from tidal.symbolic.json_loader import EquationSystem
 
 THEORIES: list[tuple[str, Path, dict]] = [
     (

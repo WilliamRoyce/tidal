@@ -130,8 +130,8 @@ def _make_synthetic_cell(
     names: tuple[str, ...],
     face_idx: int,
     sub_tile: tuple[int, ...],
-    M: int,  # noqa: N803
-    Q: np.ndarray,  # noqa: N803
+    M: int,
+    Q: np.ndarray,
     n_samples: int = 200,
     seed: int = 0,
 ) -> None:

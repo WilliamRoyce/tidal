@@ -31,15 +31,15 @@ import scipy.sparse.linalg
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from tidal.solver.coefficients import CoefficientEvaluator  # noqa: E402
-from tidal.solver.grid import GridInfo  # noqa: E402
-from tidal.solver.modal import (  # noqa: E402
+from tidal.solver.coefficients import CoefficientEvaluator
+from tidal.solver.grid import GridInfo
+from tidal.solver.modal import (
     _build_convolution_matrix,
     _build_k_axes,
     _build_k_grid,
 )
-from tidal.solver.state import StateLayout  # noqa: E402
-from tidal.symbolic.json_loader import EquationSystem  # noqa: E402
+from tidal.solver.state import StateLayout
+from tidal.symbolic.json_loader import EquationSystem
 
 THEORY_JSON = REPO_ROOT / "examples" / "data" / "gertsenshtein_localized.json"
 PARAMS = {"kappa": 1.0, "Bpeak": 0.1, "R": 5.0}

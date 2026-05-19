@@ -26,8 +26,8 @@ import scipy
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from tidal.solver.grid import GridInfo  # noqa: E402
-from tidal.solver.operators import (  # noqa: E402
+from tidal.solver.grid import GridInfo
+from tidal.solver.operators import (
     get_fd_order,
     get_spectral,
     gradient,

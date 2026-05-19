@@ -72,6 +72,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 from itertools import product
 
 import numpy as np
@@ -191,7 +192,7 @@ def build_generic_q_with_constraints(label: str = "q"):
     sol = sp.linsolve(constraints, syms)
     if not sol:
         raise RuntimeError("Constraint system inconsistent")
-    sol_set = list(sol)[0]  # parameterized free-symbol tuple
+    sol_set = next(iter(sol))  # parameterized free-symbol tuple
 
     # Identify which original symbols became free parameters
     free_params = set()
@@ -383,8 +384,8 @@ DT_x_DT_TERMS = [
 
 
 def main():
-    out_dir = os.path.dirname(os.path.abspath(__file__)).replace("scripts", "results")
-    os.makedirs(out_dir, exist_ok=True)
+    out_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent.replace("scripts", "results")
+    pathlib.Path(out_dir).mkdir(exist_ok=True, parents=True)
     transcript_path = os.path.join(out_dir, "recipe1_preflight_transcript.txt")
     json_path = os.path.join(out_dir, "recipe1_q_kinetic_structure.json")
 
@@ -536,7 +537,7 @@ def main():
     emit("")
 
     # Persist transcript and JSON
-    with open(transcript_path, "w") as f:
+    with pathlib.Path(transcript_path).open("w", encoding="utf-8") as f:
         f.write("\n".join(log))
     emit(f"Transcript written to: {transcript_path}")
 
@@ -576,7 +577,7 @@ def main():
         ],
     }
 
-    with open(json_path, "w") as f:
+    with pathlib.Path(json_path).open("w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
     emit(f"Result JSON written to: {json_path}")
     emit("")

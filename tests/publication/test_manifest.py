@@ -24,7 +24,7 @@ def test_manifest_loads() -> None:
         for x in iter_artefacts(yaml.safe_load(MANIFEST_PATH.read_text()))
     ],
 )
-def test_artefact_scripts_exist(appendix: str, name: str, entry: dict) -> None:  # noqa: ARG001
+def test_artefact_scripts_exist(appendix: str, name: str, entry: dict) -> None:
     if entry.get("status") == "stub":
         pytest.skip("entry marked stub")
     kind = entry["kind"]
@@ -47,7 +47,7 @@ def test_artefact_scripts_exist(appendix: str, name: str, entry: dict) -> None: 
         )
     ],
 )
-def test_benchmark_scripts_exist(appendix: str, name: str, entry: dict) -> None:  # noqa: ARG001
+def test_benchmark_scripts_exist(appendix: str, name: str, entry: dict) -> None:
     if entry.get("status") == "stub":
         pytest.skip("entry marked stub")
     bs = entry.get("benchmark_script")

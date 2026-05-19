@@ -27,8 +27,8 @@ pytestmark = pytest.mark.publication
     ],
 )
 def test_table_script_runs(
-    appendix: str,  # noqa: ARG001
-    name: str,  # noqa: ARG001
+    appendix: str,
+    name: str,
     entry: dict,
     tmp_path: Path,
 ) -> None:

@@ -13,7 +13,7 @@ with q⁽⁰⁾ driving the Pass 1 source. See Parker & Simon 1993
 (literature/gr-qc_9211002/) and the v6 implementation plan.
 """
 
-# ruff: noqa: RUF012, RUF043 — math symbols in docstrings; ClassVar in test fixtures.
+# ruff: noqa: RUF043 — math symbols in docstrings; ClassVar in test fixtures.
 
 from __future__ import annotations
 

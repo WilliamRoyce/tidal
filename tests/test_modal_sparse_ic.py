@@ -40,7 +40,7 @@ DPP_SPEC = REPO / "examples/data/dark_photon_plasma.json"
 D1_SPEC = REPO / "examples/data/torsion_gertsenshtein_nonminimal.json"
 
 
-def _build_inference_args(  # noqa: ANN202  # internal test helper
+def _build_inference_args(  # internal test helper
     *,
     n_samples: int = 1,
     grid_shape: str = "256",
@@ -107,7 +107,7 @@ def _build_inference_args(  # noqa: ANN202  # internal test helper
     return parser.parse_args(args)
 
 
-def _run_sim_snapshots(  # noqa: ANN202  # internal test helper, returns NDArray
+def _run_sim_snapshots(  # internal test helper, returns NDArray
     *,
     sparse_ic: bool,
     overrides: dict[str, float],

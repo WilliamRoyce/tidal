@@ -46,16 +46,16 @@ import scipy.sparse
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
-from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD  # noqa: E402
-from tidal.solver.analytical_jacobian import (  # noqa: E402
+from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD
+from tidal.solver.analytical_jacobian import (
     _create_ida_jactimes,
     _create_jacfn,
     _create_sparse_jacfn,
     build_jacobian_matrices,
 )
-from tidal.solver.grid import GridInfo  # noqa: E402
-from tidal.solver.state import StateLayout  # noqa: E402
-from tidal.symbolic.json_loader import EquationSystem  # noqa: E402
+from tidal.solver.grid import GridInfo
+from tidal.solver.state import StateLayout
+from tidal.symbolic.json_loader import EquationSystem
 
 # ---------------------------------------------------------------------------
 # Benchmark configuration
@@ -561,8 +561,8 @@ def run(
     job killed by walltime still leaves partial data on disk.  If
     ``skip_existing`` is set, configs already present in ``out_path`` are
     skipped — useful for splitting the sweep across multiple INTR rounds.
-    """  # noqa: DOC501  (ValueError raised for invalid `order`)
-    rng = random.Random(seed)  # noqa: S311
+    """
+    rng = random.Random(seed)
 
     # Build all configs
     configs = []
