@@ -5,7 +5,7 @@ type) returned ``logL = -inf`` with ``run_status="non_perturbative"`` so it
 never entered the live-points pool.  Per the v3 supervisor pivot (2026-05-08,
 docs/V3_ARCHITECTURE.md), this gate is removed entirely: ``P_max`` is recorded
 faithfully at all values; downstream analysis interprets whether the
-linearised result is physically meaningful.
+linearized result is physically meaningful.
 
 The internal ``compute_log_likelihood`` keeps a NaN/Inf safeguard returning
 ``-inf`` for genuinely undefined inputs (preserves external test contract);
@@ -42,7 +42,7 @@ class TestHwangNohRemoved:
 
     def test_p_max_above_unity_returns_finite_logl(self) -> None:
         """v3 specifically removed the upper cap.  P_max > 1 is faithful
-        linearised-PDE output even though it violates probability
+        linearized-PDE output even though it violates probability
         conservation (interaction energies become negative to compensate).
         """
         lc = LikelihoodConfig(metric="P_max", likelihood_type="maximize")

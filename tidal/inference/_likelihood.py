@@ -12,7 +12,7 @@ metric-key-missing bugs.  Numerical failures (sim divergence, NaN, exception)
 return a noisy soft floor ``logL = SOFT_FLOOR_LOGL + Normal(0, sigma_explore)``
 so PolyChord sees a gradient in the failure region.  The Hwang-Noh
 perturbativity gate (``P_max > 0.5 -> -inf``) is removed entirely; large
-``P_max`` is faithful linearised-PDE output, not a probability-conservation
+``P_max`` is faithful linearized-PDE output, not a probability-conservation
 violation.  The pre-flight tachyonic probe is run as a metadata measurement
 only — its verdict no longer gates samples (``--gated`` flag preserves the
 v2 hard-rejection behaviour for reproducibility).
@@ -243,7 +243,7 @@ def compute_log_likelihood(
         return -math.inf
 
     # v3 (post-2026-05-08 supervisor pivot): no upper cap on ``P_max`` at
-    # any value.  Large ``P_max`` is faithful linearised-PDE output, not
+    # any value.  Large ``P_max`` is faithful linearized-PDE output, not
     # a probability-conservation violation — interaction energies become
     # negative to compensate.  Downstream interpretation handles physical
     # meaning; the chain records every value.  See ``docs/V3_ARCHITECTURE.md``.
@@ -626,7 +626,7 @@ def _evaluate_likelihood(
 
         # v3: no Hwang-Noh perturbativity gate.  P_max is recorded faithfully
         # at all values; downstream analysis interprets whether the
-        # linearised result is physically meaningful at that parameter point.
+        # linearized result is physically meaningful at that parameter point.
         # See ``docs/V3_ARCHITECTURE.md`` and the supervisor meeting notes
         # at ``docs/meetings/2026-05-08_supervisor.md``.
 

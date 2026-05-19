@@ -2353,7 +2353,7 @@ def _evolve_per_mode(
     Raises
     ------
     SimulationDivergedError
-        If field amplitudes grow beyond 100x the initial maximum (linearised
+        If field amplitudes grow beyond 100x the initial maximum (linearized
         equations are no longer physical).
 
     References

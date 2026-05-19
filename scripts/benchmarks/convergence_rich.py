@@ -235,7 +235,7 @@ def _dispersion_cell(cell: dict) -> dict:
     return {
         "mass2": m2,
         "k_requested": k_req,
-        "k_realised": k_real,
+        "k_realized": k_real,
         "ok": True,
         "omega_sim": omega_sim,
         "omega_analytic": omega_ana,

@@ -38,7 +38,7 @@ LABEL_MAP: dict[str, str] = {
     "conformal_kg_static": "Conformal Klein–Gordon (static)",
     "cylindrical_kg_1d": "Cylindrical Klein–Gordon (1+1D)",
     "navier_cauchy_2d": "Navier–Cauchy elasticity (2+1D)",
-    "gw_plane_wave_1d": "Linearised gravitational wave (1+1D TT)",
+    "gw_plane_wave_1d": "Linearized gravitational wave (1+1D TT)",
     "torsion_gertsenshtein": "Propagating-PGT torsion–Gertsenshtein",
     "torsion_gertsenshtein_nonminimal": "Nonminimal torsion–EM coupling",
     "dark_photon_plasma": "Dark-photon plasma (TorsionCDT)",

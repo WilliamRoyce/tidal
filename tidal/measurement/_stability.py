@@ -49,7 +49,7 @@ audited contamination samples:
 * ``v3`` candidate (consistent-ic-solve via
   ``ensure_consistent_ic`` + per-block FFT): **0/57**.
 
-The shared blind spot of v2 / v3 is that the linearised IC has zero
+The shared blind spot of v2 / v3 is that the linearized IC has zero
 overlap with non-fundamental k bins, so they never check those bins;
 but the actual numerical simulation reaches those bins anyway via
 off-grid plane-wave snap residual, snapshot rounding, and finite-

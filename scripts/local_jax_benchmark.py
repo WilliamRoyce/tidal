@@ -22,7 +22,7 @@ Profiling evidence (from code analysis and benchmark runs):
   - JAX path: jax.vmap(jax.scipy.linalg.expm) over all modes in one fused
     kernel + jax.lax.scan for the time loop → typical 3-10× speedup on CPU
     for N>=64, with JIT amortised over multiple likelihood calls in PolyChord.
-  - Sparse-IC optimisation (scipy path): skips inactive modes. JAX vmap is
+  - Sparse-IC optimization (scipy path): skips inactive modes. JAX vmap is
     always dense (all modes computed). For dense ICs the two paths are
     comparable; for single-mode plane-wave IC the scipy path wins on
     precompute cost. JAX wins on the scan evolution loop regardless.

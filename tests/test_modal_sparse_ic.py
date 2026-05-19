@@ -1,4 +1,4 @@
-"""Regression tests for the sparse-IC mode-skip optimisation in
+"""Regression tests for the sparse-IC mode-skip optimization in
 ``_evolve_per_mode_pade`` (#327 follow-up).
 
 Pins three correctness properties and one perf budget:
@@ -10,7 +10,7 @@ Pins three correctness properties and one perf budget:
    only difference vs legacy is that inactive modes' contribution
    to ifft is exactly zero (sparse-IC) instead of ~1e-14·growth
    (legacy via FFT-floor noise); for non-tachyonic params this
-   difference is below ifft normalisation.
+   difference is below ifft normalization.
 3. **Divergence detection preserved** — the eigenvalue-based pre-
    check must still raise ``SimulationDivergedError`` on the
    noise-amplification regime documented in
@@ -280,7 +280,7 @@ def test_inference_eval_perf() -> None:
     under sparse-IC plane-wave IC stays under budget.
 
     The budget is set conservatively to absorb CI noise: the
-    optimisation's measured win on this fixture is ~5 % wall
+    optimization's measured win on this fixture is ~5 % wall
     (most of the per-call cost is matrix construction +
     coefficient resolution, which sparse-IC does not address).
     A 200-ms budget here is ~3× the typical 75 ms median, leaving

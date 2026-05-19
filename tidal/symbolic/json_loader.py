@@ -1839,9 +1839,9 @@ def normalize_kinetic_coefficients(
         ``kinetic_coefficient_symbolic`` directly via
         :func:`tidal.solver._kinetic.build_inverse_kinetic_diag`, matching the
         modal solver's existing behaviour. The canonical spec form carries the
-        kinetic coefficient on the LHS and the un-normalised RHS; every
+        kinetic coefficient on the LHS and the un-normalized RHS; every
         backend applies M⁻¹ at setup. This function is retained only for
-        external callers that pre-normalised specs before the root fix
+        external callers that pre-normalized specs before the root fix
         landed (see #301, #304). It will be removed in a future release.
 
     ExportJSON.wl emits equations with a parameter-based kinetic coefficient
@@ -1881,7 +1881,7 @@ def normalize_kinetic_coefficients(
         "backends (cvode/ida/leapfrog/scipy) now consume "
         "kinetic_coefficient_symbolic directly via "
         "tidal.solver._kinetic.build_inverse_kinetic_diag, matching modal. "
-        "Drop the pre-normalisation call from your code. See #301, #304.",
+        "Drop the pre-normalization call from your code. See #301, #304.",
         DeprecationWarning,
         stacklevel=2,
     )

@@ -57,7 +57,7 @@ we set σ/ρ = 7/16 from the convention mapping. The arithmetic 4·7/16 =
 7/4 is forced by the chosen σ/ρ, so the test mostly verifies that the
 zero-crossing measurement reproduces what the JSON-derived formula
 predicts — a pipeline self-consistency check. It does NOT independently
-validate that TIDAL's Lagrangian (as linearised by Wolfram) corresponds
+validate that TIDAL's Lagrangian (as linearized by Wolfram) corresponds
 to Dunne's Lagrangian at the numeric level; the convention mapping
 gives that correspondence analytically but is a separate derivation,
 not a test result.
@@ -619,7 +619,7 @@ class TestEHPerturbativeEnergy:
       test_order1_h_ratio_matches_adler: inputs ρ=4α²/45 come from QED; expected
       H₁/H₀ = −3×(n⊥−1)_Adler is computed from Adler 1971 eq. (5.13); the
       measured value comes from the Wolfram-derived Hamiltonian coefficients.
-      If Wolfram's linearisation produced the wrong coefficient for the EH
+      If Wolfram's linearization produced the wrong coefficient for the EH
       gradient energy (e.g. −2ρB₀² instead of −3ρB₀²), the ratio would
       deviate from the Adler prediction and this test would fail.
 

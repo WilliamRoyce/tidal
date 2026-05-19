@@ -1909,7 +1909,7 @@ def _override_pos_dep_periodic_scheme(
 
     Previously auto-routed position-dependent + periodic theories away from
     modal under GH #367. Root cause was traced 2026-05-19 to the convolution
-    path missing ``kinetic_coefficient_symbolic`` normalisation that the
+    path missing ``kinetic_coefficient_symbolic`` normalization that the
     per-mode path already had (modal.py:1381+ vs missing in
     _build_convolution_matrix). After that fix, modal is the correct AND
     fastest choice for pos-dep + periodic theories with non-trivial M

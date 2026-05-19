@@ -946,7 +946,7 @@ def _plot_corner_anesthetic(
 def _force_solid_credible_fills(fig: object) -> None:
     """Render solid-fill credible regions per Planck/DES/getdist convention.
 
-    Replaces anesthetic's per-panel-normalised gradient fills with solid
+    Replaces anesthetic's per-panel-normalized gradient fills with solid
     colours per credible level.
 
     **Why**: anesthetic's default ``kde_contour_plot_2d`` renders contour

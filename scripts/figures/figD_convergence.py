@@ -51,7 +51,7 @@ def _plot_dispersion(ax, data: dict) -> None:
     rows = [r for r in data.get("dispersion", []) if r.get("ok")]
     by_m: dict[float, list[tuple[float, float]]] = {}
     for r in rows:
-        by_m.setdefault(r["mass2"], []).append((r["k_realised"], r["omega_sim"]))
+        by_m.setdefault(r["mass2"], []).append((r["k_realized"], r["omega_sim"]))
     colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
     for i, (m2, pts) in enumerate(sorted(by_m.items())):
         pts.sort()
