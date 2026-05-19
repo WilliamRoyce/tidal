@@ -14,29 +14,29 @@
 \node[data] (toml) {\texttt{theory.toml}};
 
 % --- Derive ---
-\node[stage=Pink, right=1.0cm of toml] (derive)
+\node[stage=Pink, right=0.6cm of toml] (derive)
     {Symbolic derivation\\[2pt]\scriptsize Wolfram/xAct};
 
 % --- JSON (narrow waist) ---
-\node[data, right=1.0cm of derive, minimum width=1.8cm,
+\node[data, right=0.6cm of derive, minimum width=1.8cm,
       draw=BlueLine, fill=BlueFill, fill opacity=0.35,
       font=\footnotesize\bfseries] (json)
     {\texttt{spec.json}};
 
 % --- Simulate ---
-\node[stage=Purple, right=1.0cm of json] (sim)
+\node[stage=Purple, right=0.6cm of json] (sim)
     {Numerical integration};
 
 % --- Snapshots ---
-\node[data, right=1.0cm of sim] (snaps)
+\node[data, right=0.6cm of sim] (snaps)
     {Field\\[-1pt]\scriptsize snapshots};
 
 % --- Measure ---
-\node[stage=Green, right=1.0cm of snaps] (meas)
+\node[stage=Green, right=0.6cm of snaps] (meas)
     {Post-processing};
 
 % --- Results ---
-\node[data, right=1.0cm of meas] (results)
+\node[data, right=0.6cm of meas] (results)
     {Measurement\\[-1pt]\scriptsize results};
 
 % ===================================================================
