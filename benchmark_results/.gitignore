@@ -5,3 +5,6 @@
 !.gitignore
 !canonical/
 !canonical/**
+# Transient run scratch (underscore-prefix convention): logs, fan-out summaries.
+# JSON results in canonical/ remain tracked.
+canonical/_*
