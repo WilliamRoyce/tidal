@@ -551,35 +551,40 @@ See issue \#164 for full propagator analysis (future work).
 
 \subsubsection{Position-Dependent Theory at Periodic BCs Diverges (GH \#367)}
 
-\textbf{Symptom}: A position-dependent theory (e.g.\ Gertsenshtein with a
-localised or dual-Gaussian background field) under periodic BCs gives a
-wildly divergent result --- field amplitude grows by $10^6$--$10^9 \times$
-over the simulation --- and \texttt{SimulationDivergedError} is raised with
-the message ``Simulation diverged in \_evolve\_full\_matrix\ldots
-Workaround: rerun with --scheme cvode (or --scheme ida if the theory has
-algebraic constraints).''
+\textbf{Resolved in v0.41.6 (2026-05-19).} The historical symptom was
+field-amplitude growth by $10^6$--$10^9\times$ and a
+\texttt{SimulationDivergedError} from
+\texttt{\_evolve\_full\_matrix}. If you are seeing this on a current
+tip-of-tree build, you have either pinned a pre-v0.41.6 version of
+\texttt{tidal/solver/modal.py} or hit a different bug — proceed to
+diagnostics below.
 
-\textbf{Cause}: The modal solver's Fourier convolution matrix
-$A[m, m'] = \widehat{c}(m - m') \cdot i\,k_{m'}$ is intrinsically non-normal
-and has spurious eigenvalues that track the Nyquist wavenumber
-$k_{\max} = \pi / \Delta x$. No matrix-exponential method
-(\texttt{scipy.sparse.linalg.expm\_multiply}, dense Padé, Arnoldi-Krylov)
-recovers the true physics above $k_{\max} \cdot t_{\mathrm{end}} \approx 2$
-because $\exp(A t) \cdot v$ requires more cancellation than float64
-precision provides. See \S\ref{sec:modal-pos-dep-auto-route} for the full
-analysis.
+\textbf{Root cause and fix}: \texttt{\_build\_convolution\_matrix}
+was missing the $M^{-1}$ (inverse \texttt{kinetic\_coefficient\_symbolic})
+folding that \texttt{\_build\_per\_mode\_matrices} already applied
+(\#301/\#302). Theories whose graviton or torsion modes carry a
+non-trivial kinetic coefficient (Gertsenshtein: $-1/\kappa^2$; massive
+vector torsion: $-\xi$) had a discrete Laplacian with the wrong sign
+at every $k$, giving the state matrix real eigenvalues $\pm k$ that
+$\exp(A t)$ faithfully amplified. The visible $\max\Re(\lambda) =
+k_{\max}$ was the symptom of a uniform-in-$k$ sign error, not a
+non-normal pseudospectral artifact at the Nyquist edge. See
+\S\ref{sec:modal-pos-dep-auto-route} for the full diagnosis and the
+list of rejected hypotheses.
 
-\textbf{Solution}:
+\textbf{Diagnostic checklist} if you are still hitting amplitude growth
+on a current tip-of-tree build:
 \begin{itemize}
-  \item Use \texttt{--scheme auto} (the default) --- position-dependent
-    + periodic theories are automatically routed to CVODE for
-    correctness, or to IDA when algebraic constraints
-    (\texttt{time\_order=0} equations) are present (CVODE freezes those
-    silently). See \S\ref{sec:modal-pos-dep-auto-route}.
-  \item If you explicitly passed \texttt{--scheme modal}, switch to
-    \texttt{--scheme cvode} for unconstrained theories, or
-    \texttt{--scheme ida} for theories with algebraic constraints.
-  \item Or, if your parameter regime is provably outside the artifact
-    window (e.g.\ very small $t_{\mathrm{end}}$), keep \texttt{--scheme
-    modal} and compare against CVODE/IDA to validate.
-\end{itemize}
+  \item Confirm you are on v0.41.6 or later
+    (\texttt{git log --oneline tidal/solver/modal.py | head -5}).
+  \item Run \texttt{uv run python scripts/benchmarks/modal\_vs\_ida\_inprocess.py}
+    — at $N \in \{64, 128\}$, modal should agree with CVODE on the
+    h$_5$ peak to $<$1\% at $t_{\mathrm{end}} = 20$.
+  \item If the disagreement is large, dump
+    \texttt{kinetic\_coefficient\_symbolic} on the divergent field's
+    equation — if it is non-trivial and the per-mode path also
+    disagrees with CVODE, the bug is elsewhere.
+  \item As a last-resort manual workaround: pass \texttt{--scheme
+    cvode} (no constraints) or \texttt{--scheme ida} (with
+    constraints — CVODE silently freezes those at IC).
+\end{itemize>

@@ -1,0 +1,102 @@
+# Minimal PGT with Propagating Torsion — Dual-Gaussian Localised Background
+#
+# Variant of theory_minimal_propagating.toml that replaces the uniform-B
+# background with a dual-Gaussian Erf gauge potential (E.0 geometry from
+# gertsenshtein/theory_e0_dual_gaussian.toml).
+#
+# Purpose: validate the GH #367 v0.41.6 fix on a real pos-dep + algebraic-
+# constraint case (10 constraints + 16 dynamical fields). The Erf gauge
+# potential is periodic on [0, L] with sigB << zc1 < zc2 < L-zc1.
+#
+# Lagrangian unchanged from theory_minimal_propagating.toml:
+#   L = (1/κ²) R̃ + β₁I₁ + β₂I₂ + β₃I₃ − (ξ/4)Ftorsion² − ¼F²
+#
+# Background:
+#   B_x(z) = Bpeak * [exp(-(z-zc1)²/(2*sigB²)) - exp(-(z-zc2)²/(2*sigB²))]
+#   Abar_y(z) = -Bpeak * sigB * sqrt(π/2) *
+#               (Erf[(z-zc1)/(sqrt(2)*sigB)] - Erf[(z-zc2)/(sqrt(2)*sigB)])
+#
+# Periodicity: with zc1 + zc2 = L and sigB << zc1, both Erf terms saturate
+# to ±1 at z=0 and z=L, giving a periodic gauge potential — eligible for
+# the modal solver after the v0.41.6 m_inv fix in _build_convolution_matrix.
+#
+# Recommended sim params: sigB=5, zc1=25, zc2=75, L=100, t_end<=20.
+#
+# Derivation timing: TBD (parent theory ~1m 23s wall; this variant should be
+# similar — the background field only affects coefficient evaluation, not
+# derivation).
+
+[theory]
+name = "Minimal PGT + Propagating Torsion (Barker) — E.0 dual-Gaussian"
+description = "Minimal PGT with localised dual-Gaussian background B for Phase E pos-dep + constraint validation"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[derived_fields]]
+name = "Ftorsion"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][TorsionCDT[c,-c,-b]] - CD[-b][TorsionCDT[c,-c,-a]]"
+
+# Background EM 4-potential: dual-Gaussian Erf form (same as gertsenshtein E.0)
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = [
+    "0",
+    "0",
+    "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1) / (Sqrt[2] * sigB)] - Erf[(z[] - zc2) / (Sqrt[2] * sigB)])",
+    "0",
+]
+
+[constants]
+names = ["kappa", "Bpeak", "sigB", "zc1", "zc2", "beta1", "beta2", "beta3", "xi"]
+
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_minimal_propagating_e0_dual_gaussian.json"

@@ -1902,63 +1902,26 @@ def _resolve_scheme(  # noqa: C901
 
 def _override_pos_dep_periodic_scheme(
     scheme: str,
-    args_scheme: str,
-    spec: EquationSystem,
+    args_scheme: str,  # noqa: ARG001 — kept for backward-compatible signature
+    spec: EquationSystem,  # noqa: ARG001 — kept for backward-compatible signature
 ) -> tuple[str, str | None]:
-    """Auto-route position-dependent + periodic theories away from modal (GH #367).
+    """No-op since v0.41.6 — kept only for backward-compatible signatures.
 
-    The modal solver's ``_evolve_full_matrix`` path uses
-    ``scipy.sparse.linalg.expm_multiply`` on a convolution matrix
-    ``A[m,m'] = c_hat(m-m') * i*k_m'`` whose spurious eigenvalue tracks the
-    Nyquist wavenumber ``k_max = π/dx`` exactly (verified empirically
-    2026-05-18 on E.0 dual-Gaussian for N ∈ {32..512}; max Re(λ) = N·π/L).
-    The artifact is intrinsic to the discretization
-    (``modal.py::_add_convolution_coupling``, line 1587+) — no
-    matrix-exponential method (dense Padé, ``expm_multiply``, Arnoldi-Krylov)
-    recovers the true physics. Empirically modal gives wrong answers from
-    very small t_end (E.0 N=64: 4% wrong at k_max·t=2, 18% at k_max·t=4,
-    42% at k_max·t=6, 165% at k_max·t=10, 10⁹× at k_max·t=40).
+    Previously auto-routed position-dependent + periodic theories away from
+    modal under GH #367. Root cause was traced 2026-05-19 to the convolution
+    path missing ``kinetic_coefficient_symbolic`` normalisation that the
+    per-mode path already had (modal.py:1381+ vs missing in
+    _build_convolution_matrix). After that fix, modal is the correct AND
+    fastest choice for pos-dep + periodic theories with non-trivial M
+    (Gertsenshtein h-modes carry ``-1/kappa²``; without M⁻¹ scaling the
+    discrete EOM is sign-flipped, giving the apparent ``k_max`` "spurious
+    eigenvalue" that all matrix-exponential methods faithfully amplified).
 
-    Replacement: IDA when algebraic constraints (``time_order=0`` equations)
-    are present, CVODE otherwise. CVODE would silently freeze constraints at
-    IC (``cvode.py:103-104``, ``_setup.py:warn_frozen_constraints`` only
-    warns). Phase E will localize T2-T6 with hidden mass-matrix constraints
-    (``modal.py:541-595`` Schur structure); IDA handles those natively.
-
-    Only triggers on ``--scheme auto``. Explicit ``--scheme modal`` still
-    runs the modal path; the post-evolution amplitude-growth check
-    (commit a2cdaa5, threshold 10⁶) catches catastrophic cases.
-
-    Returns
-    -------
-    tuple[str, str | None]
-        ``(new_scheme, log_message)``. ``log_message`` is ``None`` when no
-        override applies.
+    The post-evolution amplitude-growth check at
+    `modal.py::_evolve_full_matrix` (threshold 10⁶) stays as a safety net
+    for any future divergence — but no longer routes anywhere.
     """
-    if scheme != "modal" or args_scheme != "auto":
-        return scheme, None
-    from tidal.solver.modal import _has_position_dependent_terms
-
-    if not _has_position_dependent_terms(spec):
-        return scheme, None
-    has_constraints = any(eq.time_derivative_order == 0 for eq in spec.equations)
-    if has_constraints:
-        return "ida", (
-            "  Note: position-dependent + periodic theory with algebraic "
-            "constraints detected; auto-routing to IDA (GH #367 — modal "
-            "solver's Fourier-convolution matrix has discretization "
-            "artifacts; CVODE would freeze the constraints at IC). "
-            "Override with --scheme modal if you have a known-safe "
-            "parameter regime."
-        )
-    return "cvode", (
-        "  Note: position-dependent + periodic theory detected; "
-        "auto-routing to CVODE for correctness (GH #367 — modal "
-        "solver's Fourier-convolution matrix has discretization "
-        "artifacts that give wrong answers from small t_end onward). "
-        "Override with --scheme modal if you have a known-safe "
-        "parameter regime."
-    )
+    return scheme, None
 
 
 def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915

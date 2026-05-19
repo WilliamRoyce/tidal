@@ -274,125 +274,115 @@ Position-dependent coefficients are OK (handled via convolution). The full auto-
 
 Users can explicitly request \texttt{--scheme modal} (validated for eligibility) or override with \texttt{--scheme cvode}.
 
-\subsubsection{Position-Dependent + Periodic Auto-Routing (GH \#367)}
+\subsubsection{Position-Dependent + Periodic: Root Cause and Fix (GH \#367)}
 \label{sec:modal-pos-dep-auto-route}
 
-\textbf{Important exception to the eligibility rules above.} Theories with
-\emph{real spatial variation} in their position-dependent coefficients
-(e.g.\ the Gertsenshtein dual-Gaussian background field, where
-$B(x) = B_{\mathrm{peak}}[e^{-(x-z_{c1})^2/2\sigma^2} - e^{-(x-z_{c2})^2/2\sigma^2}]$)
-build a Fourier convolution matrix
-\[
-A[m, m'] = \widehat{c}(m - m') \cdot i\,k_{m'},
-\]
-implemented in \texttt{\_add\_convolution\_coupling}
-(\texttt{modal.py}:1587+). This matrix is \emph{intrinsically non-normal}
-(the gradient multiplier $i k_{m'}$ is applied column-wise while the
-convolution kernel mixes rows), and at finite $N$ it has spurious
-positive-real-part eigenvalues that track the Nyquist wavenumber
-$k_{\max} = \pi / \Delta x$ \emph{exactly}.  Empirical verification
-(2026-05-18, E.0 dual-Gaussian theory at $L=100$):
-\begin{center}
-\begin{tabular}{rrrr}
-$N$ & $n_{\mathrm{total}}$ & $\max\Re(\lambda)$ & $k_{\max} = \pi N / L$ \\
-\hline
-32  & 198  & 1.005  & 1.005  \\
-64  & 396  & 2.011  & 2.011  \\
-128 & 780  & 4.021  & 4.021  \\
-256 & 1548 & 8.042  & 8.042  \\
-512 & 3084 & 16.085 & 16.085 \\
-\end{tabular}
-\end{center}
-The spurious eigenvalue \emph{grows linearly with grid resolution}, so
-``use higher $N$'' is not a fix. Above $k_{\max} \cdot t_{\mathrm{end}}
-\approx 2$ the artifact begins to dominate the dynamics in any
-matrix-exponential method that materialises $\exp(A t)$ first;
-above $k_{\max} \cdot t_{\mathrm{end}} \approx 20$ the result is wrong by
-orders of magnitude (verified for dense Padé, \texttt{expm\_multiply}, and
-a hand-coded Arnoldi-Krylov implementation).
+\textbf{Resolved in v0.41.6 (2026-05-19).} Theories with
+position-dependent coefficients and a non-trivial
+\texttt{kinetic\_coefficient\_symbolic} (Gertsenshtein graviton modes
+carry $-1/\kappa^2$; massive-vector torsion carries $-\xi$) previously
+produced catastrophically wrong answers under the modal solver:
+\texttt{expm\_multiply} reported amplitudes $\sim 10^9 \times$ too large
+on the E.0 dual-Gaussian reproducer at $t_{\mathrm{end}} = 20$.
 
-The phenomenon is the non-normal pseudospectral transient growth of
-Trefethen and Embree (\textit{Spectra and Pseudospectra}, 2005, Ch.\ 14--15),
-inseparable from the discretization: $\partial_x \cdot B(x)$ has
-eigenvalues $i k$ (all imaginary) in the continuous limit, but its
-finite-$N$ Fourier representation acquires real-part eigenvalues that
-$\exp(A t) \cdot v$ then amplifies.
-
-\paragraph{Auto-routing under \texttt{--scheme auto}.} To prevent silent
-wrong answers, the CLI \emph{auto-routes} all
-position-dependent + periodic theories away from modal under
-\texttt{--scheme auto} (via
-\texttt{\_override\_pos\_dep\_periodic\_scheme} in
-\texttt{tidal/cli/\_simulate.py}, just after \texttt{\_resolve\_scheme}
-returns). The replacement depends on whether the theory carries algebraic
-constraints (\texttt{time\_order=0} equations):
+\paragraph{Root cause (verified 2026-05-19).} The two convolution-free
+matrix builders in \texttt{modal.py} had drifted out of sync on the
+$M^{-1}$ (inverse kinetic coefficient) folding:
 \begin{itemize}
-  \item \textbf{No constraints} $\to$ \textbf{CVODE} (default). Faster
-    than IDA; correct in physical space.
-  \item \textbf{Has constraints} $\to$ \textbf{IDA}. CVODE would
-    silently freeze the constraint fields at their initial values
-    (\texttt{cvode.py}:103--104,
-    \texttt{\_setup.py:warn\_frozen\_constraints} only warns), giving
-    wrong physics for DAE systems. Phase E's localised PGT theories
-    (T2--T6 with Erf-profile backgrounds) carry hidden mass-matrix
-    constraints from the Schur path (\texttt{modal.py}:541--595); IDA
-    handles those natively.
+  \item \texttt{\_build\_per\_mode\_matrices} (\texttt{modal.py}:1318+)
+    folds \texttt{build\_inverse\_kinetic\_diag} into the velocity-row
+    coefficient at line 1411, so the emitted matrix represents
+    $dv/dt = M^{-1} \cdot K(q)$.
+  \item \texttt{\_build\_convolution\_matrix} (\texttt{modal.py}:1454+)
+    did \emph{not} apply this scaling. For an equation with
+    $\text{kinetic\_coefficient} = -1/\kappa^2$, the discrete
+    Laplacian's diagonal at the Nyquist mode was
+    $(-1/\kappa^2) \cdot (-k_{\max}^2) = +k_{\max}^2 / \kappa^2$ — the
+    \emph{wrong sign}. The resulting 2$\times$2 state block at every
+    mode $m$ had real eigenvalues $\pm k_m / \kappa$, not the
+    physically-correct imaginary $\pm i k_m / \kappa$.
 \end{itemize}
-Both physical-space solvers avoid the Fourier convolution matrix entirely
-and give correct bounded results. Users see a one-line notice:
-\begin{lstlisting}[style=bash]
-Note: position-dependent + periodic theory detected; auto-routing
-to CVODE for correctness (GH #367 ...). Override with --scheme modal
-if you have a known-safe parameter regime.
-\end{lstlisting}
-or, for the constraint case:
-\begin{lstlisting}[style=bash]
-Note: position-dependent + periodic theory with algebraic constraints
-detected; auto-routing to IDA (GH #367 -- modal solver's
-Fourier-convolution matrix has discretization artifacts; CVODE would
-freeze the constraints at IC). Override with --scheme modal if you
-have a known-safe parameter regime.
-\end{lstlisting}
+The visible symptom looked like a non-normal Fourier-convolution
+pseudospectral artifact (max $\Re(\lambda) = k_{\max}$ tracking the
+Nyquist wavenumber exactly), so an early diagnosis attributed it to
+``the column placement of $i k_{m'}$ in $A[m, m'] = \widehat{c}(m-m')
+\cdot i k_{m'}$''. The empirical evidence ruled that out: an mpmath
+oracle at \texttt{dps=50} gave the same wildly-wrong answer as float64,
+proving the matrix itself was wrong (not the precision); zeroing every
+off-diagonal block left $\max\Re(\lambda)$ unchanged, locating the
+bad eigenvalue on the block-diagonal Laplacian contribution rather than
+the cross-coupling; and the artifact persisted at $B_{\mathrm{peak}}=0$
+(no position-dependent variation at all), which definitively pointed
+to a constant-coefficient sign error.
 
-\paragraph{Override and safety net.} Explicit \texttt{--scheme modal}
-runs the modal path normally. The post-evolution amplitude-growth check
-in \texttt{\_evolve\_full\_matrix} (commit a2cdaa5, threshold
-$10^6 \times$ initial amplitude) catches catastrophic cases and raises
-\texttt{SimulationDivergedError} with the \texttt{--scheme cvode}
-workaround in the message. The artifact is most severe at the
-$k_{\max} \cdot t_{\mathrm{end}} \approx 40$ regime that triggers GH \#367.
+\paragraph{Fix.} \texttt{\_build\_convolution\_matrix} now calls
+\texttt{build\_inverse\_kinetic\_diag(spec, params)} once at the top and
+threads a per-equation \texttt{scale} kwarg through
+\texttt{\_add\_convolution\_coupling}, so every velocity-row
+contribution (constant-coefficient and position-dependent alike) is
+multiplied by $M_{ii}^{-1}$. \texttt{build\_inverse\_kinetic\_diag}
+returns \texttt{None} when every field has $M \approx 1$, so theories
+without non-trivial kinetic coefficients are unaffected.
 
-\paragraph{IDA performance is acceptable for Phase E (measured 2026-05-18).}
-Profiling the auto-route fallback on the GH \#367 reproducer (E.0
-dual-Gaussian, no constraints) at the campaign envelope showed IDA wall
-time within 1.3$\times$ of CVODE:
+\paragraph{In-process timing on the E.0 reproducer (2026-05-19 fix).}
+At $L = 100$, dual-Gaussian background, $t_{\mathrm{end}} = 20$:
 \begin{center}
-\begin{tabular}{rrrr}
+\begin{tabular}{rrrrr}
 \toprule
-$N$ & CVODE & IDA & IDA / CVODE \\
+$N$ & modal & CVODE & IDA & h$_5$ err vs CVODE \\
 \midrule
-64 & 1.24 s & 1.23 s & 0.99$\times$ \\
-128 & 2.09 s & 2.62 s & 1.25$\times$ \\
+64 & 29 ms & 86 ms & 245 ms & 0.47\% \\
+128 & 48 ms & 364 ms & 1466 ms & 0.01\% \\
+256 & 130 ms & 29 ms & 47 ms & 0.00\% \\
 \bottomrule
 \end{tabular}
 \end{center}
-At PolyChord nested-sampling scale (10$^4$ likelihood calls per chain),
-this puts the IDA-fallback path at $\sim$25 minutes additional per chain
-vs an ideal modal-solver path -- tractable for Phase E. Adding actual
-algebraic constraints to a derived PGT theory would add Newton-iteration
-overhead but should remain well under the 3$\times$ threshold based on the
-Stage A/B campaign timings for constant-$B_0$ PGT theories. Algorithm
-work to fix the modal-solver discretization is therefore \emph{not} on
-the Phase E critical path.
+The modal path is correct, $\sim$3$\times$ faster than CVODE at
+$N=64$, and $\sim$8$\times$ faster than IDA. At $N=256$ the dense
+convolution matrix grows costly enough that CVODE/IDA win; the modal
+crossover is around $N \approx 200$.
 
-\paragraph{Future work} on the discretization itself: operator splitting
-$A = A_{\mathrm{const}} + A_{\mathrm{conv}}$ with Strang or Yoshida-4 (the
-codebase already distinguishes \texttt{term.position\_dependent} at
-\texttt{modal.py}:1522); Hou-Li exponential filter on $\widehat{c}(q)$;
-mixed real/Fourier representation that keeps the gradient in physical
-space; higher-precision arithmetic as a reference oracle. None of these
-were implemented in the GH \#367 fix or the Phase 1 followup; deferred
-until a future Phase E measurement contradicts the timing above.
+\paragraph{Auto-route is now a no-op.} The
+\texttt{\_override\_pos\_dep\_periodic\_scheme} helper in
+\texttt{tidal/cli/\_simulate.py} is retained as a stub (returns
+\texttt{(scheme, None)}) for backward-compatible signatures, but no
+longer routes anywhere — modal handles pos-dep + periodic theories
+correctly in all the cases the override previously diverted. The
+post-evolution amplitude-growth check in
+\texttt{\_evolve\_full\_matrix} (threshold $10^6\times$ initial
+amplitude) stays as a defensive safety net for any future divergence.
+
+\paragraph{What was checked and rejected during the false diagnosis.}
+Recorded so future sessions don't re-investigate:
+\begin{itemize}
+  \item Arnoldi-Krylov / Sidje-Expokit / KIOPS as replacements for
+    \texttt{expm\_multiply}: a hand-coded Sidje 1998 implementation
+    ($\sim$470 LOC, adaptive sub-stepping, augmented Hessenberg error
+    estimator, DGKS reorthogonalisation) gave the same wrong answer as
+    dense Padé to 1$\times 10^{-14}$. The matrix itself was wrong,
+    so any algorithm computing $\exp(A t) y_0$ accurately on the
+    \emph{wrong} matrix returns the same wrong answer.
+  \item Hou-Li exponential filter on $\widehat{c}(q)$: rejected — the
+    artifact is on the block-diagonal Laplacian, not the
+    cross-coupling convolution kernel.
+  \item Skew-symmetric projection $A_{\mathrm{skew}} = \frac{1}{2}(A -
+    A^\dagger)$: stabilised the spectrum (purely imaginary) but
+    converged to a discretization of the wrong continuous operator
+    (72\% error at every $N$). It dropped a Hermitian correction term
+    that the physics actually needs.
+  \item Row-k recombination of identity-$B'$ + gradient-$B$ pairs in
+    the cross-coupling block: no change to the spectrum; confirmed
+    via per-block eigenvector analysis that the dominant eigenvector
+    lives on the block-diagonal (slot $\to$ velocity\_slot) Laplacian
+    contribution, not the cross-coupling.
+\end{itemize}
+The deeper lesson is that the "non-normal pseudospectral phenomenon"
+narrative was plausible but wrong: \emph{the matrix had a real
+eigenvalue at every $k$, not just at the high-$k$ Nyquist edge}, and
+that was the diagnostic signature that finally pointed to the missing
+$M^{-1}$ scaling. The Nyquist concentration of the dominant
+eigenvector was an artifact of where $k^2$ is largest, not a property
+of the underlying bug.
 
 \subsection{Usage}
 \label{sec:modal-usage}

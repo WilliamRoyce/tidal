@@ -1498,9 +1498,26 @@ def _build_convolution_matrix(
 
     A = np.zeros((n_total, n_total), dtype=np.complex128)
 
+    # #301 / #302 / GH #367 fix: apply M⁻¹ to velocity-row contributions so
+    # `dv/dt = M⁻¹·K(q)` for theories with non-trivial `kinetic_coefficient_symbolic`
+    # (e.g. `-1/kappa²` on graviton h-modes in Gertsenshtein). The per-mode path
+    # `_build_per_mode_matrices` already does this (modal.py:1381+); the convolution
+    # path previously did not, producing wrong-sign EOM that drove `expm_multiply`
+    # to ~10⁹× error at large `t_end·k_max` — diagnosed 2026-05-19 as the actual
+    # root cause of GH #367 (originally believed to be a non-normal Fourier
+    # convolution artifact). `build_inverse_kinetic_diag` returns None when every
+    # field has M ≈ 1 so existing theories are unaffected.
+    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+    m_inv = build_inverse_kinetic_diag(
+        spec,
+        coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+    )
+
     for _eq_idx, eq in enumerate(spec.equations):
         field_name = eq.field_name
         is_second_order = eq.time_derivative_order >= 2
+        scale = 1.0 if m_inv is None else m_inv.get(field_name, 1.0)
 
         if is_second_order:
             field_slot = layout.field_slot_map[field_name]
@@ -1512,7 +1529,7 @@ def _build_convolution_matrix(
                 col = vel_slot * n_modes + m
                 A[row, col] = 1.0
 
-            # dv/dt = Σ coeff(x) * operator(target_field)
+            # dv/dt = M⁻¹ · Σ coeff(x) * operator(target_field)
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = _resolve_target_slot(term.field)
                 if target_slot is None:
@@ -1530,7 +1547,7 @@ def _build_convolution_matrix(
                     for m in range(n_modes):
                         row = vel_slot * n_modes + m
                         col = target_slot * n_modes + m
-                        A[row, col] += coeff * mult[m]
+                        A[row, col] += scale * coeff * mult[m]
                 else:
                     # Position-dependent: convolution coupling
                     _add_convolution_coupling(
@@ -1545,9 +1562,11 @@ def _build_convolution_matrix(
                         n_modes,
                         eq_idx=_eq_idx,
                         term_idx=_term_idx,
+                        scale=scale,
                     )
         else:
-            # First-order
+            # First-order: M⁻¹ scaling not applied (kinetic normalization is a
+            # 2nd-order concept; first-order fields are direct evolution).
             this_slot = layout.field_slot_map[field_name]
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = _resolve_target_slot(term.field)
@@ -1597,6 +1616,7 @@ def _add_convolution_coupling(
     *,
     eq_idx: int = -1,
     term_idx: int = -1,
+    scale: float = 1.0,
 ) -> None:
     """Add convolution coupling from a position-dependent coefficient.
 
@@ -1605,6 +1625,11 @@ def _add_convolution_coupling(
 
     This creates off-diagonal entries in the evolution matrix coupling
     different k-modes.
+
+    ``scale`` multiplies the convolution contribution — used by the caller
+    to apply the inverse-kinetic factor `M⁻¹` for 2nd-order equations with
+    `kinetic_coefficient_symbolic != 1` (Gertsenshtein h-modes, etc.). See
+    `_build_convolution_matrix` (modal.py) for the rationale (GH #367 fix).
     """
     # Get the coefficient array on the spatial grid
     coeff_array = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
@@ -1639,10 +1664,12 @@ def _add_convolution_coupling(
         result_hat = np.fft.rfftn(product).ravel()
 
         # result_hat[m] = Σ_{k'} (1/N) ĉ_{m-k'} δ_{k',m'} = (1/N) ĉ_{m-m'}
-        # multiplied by operator multiplier at m'
+        # multiplied by operator multiplier at m' and the kinetic-inverse scale.
         row_start = row_slot * n_modes
         col = col_slot * n_modes + m_prime
-        A[row_start : row_start + n_modes, col] += result_hat * operator_mult[m_prime]
+        A[row_start : row_start + n_modes, col] += (
+            scale * result_hat * operator_mult[m_prime]
+        )
 
 
 # ---------------------------------------------------------------------------

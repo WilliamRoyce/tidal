@@ -1719,13 +1719,20 @@ class TestModalJAXCorrectness:
 
 
 class TestPositionDepAutoRoute:
-    """Verify the GH #367 fix: position-dependent + periodic theories auto-route to
-    CVODE under ``--scheme auto`` because the modal solver's Fourier-convolution
-    path has discretization artifacts that give wrong answers (spurious eigenvalue
-    tracks Nyquist wavenumber k_max = π/dx; verified empirically across N).
+    """Verify the GH #367 fix (v0.41.6): the convolution-matrix path in
+    ``_build_convolution_matrix`` now applies the ``M⁻¹`` (inverse kinetic
+    coefficient) scaling that the per-mode path already had. With the fix,
+    position-dependent + periodic theories run correctly on the modal
+    solver — no auto-route to CVODE/IDA is needed.
 
-    The CLI auto-routing lives in ``tidal/cli/_simulate.py`` after
-    ``_resolve_scheme``; these tests exercise that path via the ``tidal`` CLI.
+    Root cause: ``_build_per_mode_matrices`` already folded
+    ``build_inverse_kinetic_diag`` into velocity-row coefficients (#301/#302),
+    but ``_build_convolution_matrix`` was missing that step. For Gertsenshtein-
+    class theories carrying ``kinetic_coefficient_symbolic = -1/kappa²`` on
+    graviton modes, the discrete EOM had a sign-flipped Laplacian giving
+    a real eigenvalue at every k. ``expm_multiply`` faithfully amplified
+    it — the apparent "Nyquist spurious eigenvalue" was the visible
+    high-k symptom of a uniform-in-k sign error.
     """
 
     @pytest.fixture
@@ -1778,60 +1785,58 @@ class TestPositionDepAutoRoute:
         )
         return result.returncode, result.stdout + result.stderr
 
-    def test_gh367_reproducer_auto_routes_to_cvode(self, e0_args: list[str]) -> None:
-        """GH #367 reproducer at t_end=20: --scheme auto silently routes to CVODE
-        and produces the correct decaying h_5 (≈0.005), not 25 million.
+    def test_gh367_reproducer_modal_correct(self, e0_args: list[str]) -> None:
+        """GH #367 reproducer at t_end=20: --scheme auto stays on modal
+        (no override since v0.41.6) and produces the correct decaying
+        h_5 (≈0.005), matching CVODE within 1%.
         """
         args = [*e0_args, "--t-end", "20"]
         exit_code, output = self._run_simulate(args)
         assert exit_code == 0, f"simulate failed:\n{output}"
-        # Auto-routing notice must appear
-        assert "auto-routing to CVODE" in output, (
-            f"expected auto-route notice; got:\n{output}"
+        # No auto-routing happens any more.
+        assert "auto-routing" not in output, (
+            f"unexpected auto-route after the v0.41.6 fix; got:\n{output}"
         )
-        # Scheme line confirms CVODE
-        assert "Auto-selected solver: cvode" in output, (
-            f"expected auto-selected cvode; got:\n{output}"
+        # Scheme line confirms modal.
+        assert "Auto-selected solver: modal" in output, (
+            f"expected auto-selected modal; got:\n{output}"
         )
-        # The physical result: h_5 should be ≈0.005 (CVODE truth)
-        # Format from CLI: "h_5: peak 0.0099 → 0.0050 (ratio: 0.5035)"
         import re
 
         match = re.search(r"h_5:.*→\s*([0-9.eE+-]+)", output)
         assert match is not None, f"h_5 result line not found in:\n{output}"
         h5_final = float(match.group(1))
         assert 0.003 < h5_final < 0.007, (
-            f"h_5={h5_final} not in expected CVODE range [0.003, 0.007]"
+            f"h_5={h5_final} not in expected range [0.003, 0.007] (CVODE truth ≈ 0.005)"
         )
 
-    def test_explicit_modal_at_t20_raises_diverged(self, e0_args: list[str]) -> None:
-        """--scheme modal at the broken regime hits the post-evolution divergence
-        check (commit a2cdaa5) and surfaces the cvode workaround message.
+    def test_explicit_modal_at_t20_produces_correct_h5(
+        self, e0_args: list[str]
+    ) -> None:
+        """Explicit --scheme modal at t_end=20 runs to completion and matches
+        CVODE on h_5 peak (the convolution-path m_inv fix in v0.41.6).
         """
         args = [*e0_args, "--scheme", "modal", "--t-end", "20"]
         exit_code, output = self._run_simulate(args)
-        # CLI returns non-zero on simulation failure, but the error message must
-        # mention the workaround (we don't assert on exit_code because the CLI
-        # may return 0 with [ERROR] printed — check the message itself).
-        del exit_code  # exit code semantics vary; message check is authoritative
-        assert "Simulation diverged" in output, (
-            f"expected diverged message; got:\n{output}"
+        assert exit_code == 0, f"simulate failed:\n{output}"
+        assert "Simulation diverged" not in output, (
+            f"unexpected divergence after the v0.41.6 fix; got:\n{output}"
         )
-        assert "--scheme cvode" in output, (
-            f"expected workaround message; got:\n{output}"
+        import re
+
+        match = re.search(r"h_5:.*→\s*([0-9.eE+-]+)", output)
+        assert match is not None, f"h_5 result line not found in:\n{output}"
+        h5_final = float(match.group(1))
+        assert 0.003 < h5_final < 0.007, (
+            f"h_5={h5_final} not in expected range [0.003, 0.007]"
         )
 
-    def test_explicit_modal_safe_regime_does_not_raise(
-        self, e0_args: list[str]
-    ) -> None:
-        """--scheme modal at small t_end (within the modal-solver's
-        amplitude-growth window) runs to completion without raising
-        SimulationDivergedError. The result will not match CVODE for
-        position-dependent backgrounds (the discretization artifact exists at
-        all t_end > 0), but the user has explicitly opted in to --scheme modal,
-        and the post-evolution amplitude-growth check (10⁶× threshold) does
-        not fire at small t_end. This documents the override-still-runs
-        behaviour.
+    def test_explicit_modal_safe_regime_correct(self, e0_args: list[str]) -> None:
+        """Sanity check the modal solver at small t_end is accurate.
+
+        Before the v0.41.6 fix this only verified non-divergence; with the
+        fix in place the answer must match CVODE within a few percent
+        even at very small t_end.
         """
         args = [*e0_args, "--scheme", "modal", "--t-end", "1"]
         exit_code, output = self._run_simulate(args)
@@ -1841,12 +1846,13 @@ class TestPositionDepAutoRoute:
 
 
 class TestOverridePosDepPeriodicScheme:
-    """Unit tests for ``_override_pos_dep_periodic_scheme`` (GH #367 auto-route).
+    """Unit tests for ``_override_pos_dep_periodic_scheme``.
 
-    Position-dependent + periodic theories must NOT run through the modal
-    solver's Fourier-convolution path under ``--scheme auto``. The override
-    sends them to IDA when algebraic constraints (``time_order==0``) are
-    present, or CVODE otherwise.
+    Since v0.41.6 the function is a permanent no-op — the GH #367 root cause
+    (the convolution path missing ``M⁻¹`` scaling) was fixed in
+    ``_build_convolution_matrix``, so modal is the correct choice for
+    pos-dep + periodic theories. These tests pin the no-op semantics so a
+    future regression that reintroduces the override is caught.
     """
 
     @staticmethod
@@ -1904,29 +1910,25 @@ class TestOverridePosDepPeriodicScheme:
         assert new_scheme == "modal"
         assert msg is None
 
-    def test_pos_dep_no_constraint_routes_to_cvode(self) -> None:
-        """Pos-dep + no constraint: CVODE is the correct fallback (faster
-        than IDA and correct in physical space).
+    def test_pos_dep_no_constraint_stays_on_modal(self) -> None:
+        """Pos-dep + no constraint: since v0.41.6 modal is the correct choice
+        (was: routed to CVODE under the GH #367 safety net).
         """
         from tidal.cli._simulate import _override_pos_dep_periodic_scheme
 
         spec = self._pos_dep_diffusion()
         new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
-        assert new_scheme == "cvode"
-        assert msg is not None
-        assert "auto-routing to CVODE" in msg
-        assert "GH #367" in msg
+        assert new_scheme == "modal"
+        assert msg is None
 
-    def test_pos_dep_with_constraint_routes_to_ida(self) -> None:
-        """Pos-dep + constraint: IDA is required (CVODE would freeze the
-        algebraic constraint at IC and silently produce wrong physics).
+    def test_pos_dep_with_constraint_stays_on_modal(self) -> None:
+        """Pos-dep + constraint: since v0.41.6 modal is the correct choice
+        (was: routed to IDA under the GH #367 safety net). The modal solver's
+        Schur path handles constraints natively (modal.py:541-595).
         """
         from tidal.cli._simulate import _override_pos_dep_periodic_scheme
 
         spec = self._pos_dep_with_constraint()
         new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
-        assert new_scheme == "ida"
-        assert msg is not None
-        assert "auto-routing to IDA" in msg
-        assert "constraints" in msg
-        assert "GH #367" in msg
+        assert new_scheme == "modal"
+        assert msg is None
