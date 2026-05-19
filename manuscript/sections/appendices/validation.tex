@@ -50,10 +50,9 @@
 The Gertsenshtein conversion kernel of \cref{GertsenshteinFormula}
 provides the closed-form analytic baseline against which we test
 \TIDAL{}. We sweep $\Bzero$
-over the perturbative regime with fourth-order finite-difference
-operators on a periodic grid, and overlay the calibration data on
-two analytic predictions (\Cref{BoccalettiUniform} displays the
-comparison): \cref{GertsenshteinFormula} and the
+over the perturbative regime with fourth-order FD
+operators on a periodic grid, and \cref{BoccalettiUniform} overlays the calibration data on
+two analytic predictions: \cref{GertsenshteinFormula} and the
 Raffelt--Stodolsky two-mode formula with graviton-effective-mass
 detuning~\cite{raffelt1988mixing},
 \begin{equation}
@@ -76,7 +75,7 @@ $\kappa\Bzero t/2 \ll \pi/2$; the swept $\Bzero$ range extends to
 values where the effective-mass detuning $\Delta$ of \cref{TwoModeRabi}
 becomes significant and the two predictions begin to diverge.
 The two-mode formula \cref{TwoModeRabi} is derived from the full
-Einstein--Maxwell PDE via three layered approximations: (i) projection
+EM PDE via three layered approximations: (i) projection
 onto the $(h(k), a(k))$ mode pair at a single carrier wavevector,
 dropping mode-coupling to neighbouring $k'$ in any wave-packet IC;
 (ii) leading-order expansion of the massive-graviton dispersion
@@ -241,9 +240,8 @@ $(n_\parallel - 1)/(n_\perp - 1) = 4\sigma/\rho = 7/4$.
 For complex PGT theories where no closed-form solution and no
 weak-field analytic limit is available --- the bulk of the
 \cref{SectorSurvey} campaigns --- the only available consistency
-check is to derive the same continuum action through two
-mathematically distinct field formulations and verify that the
-observables agree at the IEEE round-off limit. The
+check is to compare the same continuum action derived via two
+mathematically distinct field formulations. The
 dark-photon-plasma sector affords this comparison directly. The
 \emph{Proca} representation expresses the torsion-coupling as a
 massive vector field $t_\mu$ with a canonical Proca kinetic
@@ -256,7 +254,9 @@ term~\cite{caputo2021darkphoton,pospelov2008secluded},
   \label{LagFV}
 \end{equation}
 carrying $10$ dynamical fields with kinetic-matrix condition number
-$\operatorname{cond}(V)$~\cite{higham2008functions}~$\sim 10^{8\text{--}10}$. The
+$\operatorname{cond}(V)$~\cite{higham2008functions}~$\sim 10^{8\text{--}10}$.
+
+The
 \emph{vector-torsion} representation expresses the same theory using
 the trace of the spacetime torsion tensor evolved with the
 Maxwell-like field-strength tensor
@@ -287,10 +287,9 @@ constraint-handling, the matrix-exponential choice, and the
 absence of a modal-template cache).
 
 \paragraph*{Multi-method agreement across backends and measurement paths}
-\TIDAL{} dispatches to one of several solver backends according to
-the equation specification (see \cref{SolverDispatchFlowchart}); we
-audit the dispatcher by running each applicable backend on the
-Einstein--Maxwell baseline of \cref{GertsenshteinFormula} and on a
+We audit the \TIDAL{} dispatcher (see \cref{SolverDispatchFlowchart})
+by running each applicable backend on the
+EM baseline of \cref{GertsenshteinFormula} and on a
 gradient-coupled scalar pair analogous to the Raffelt--Stodolsky
 two-channel mixing model~\cite{raffelt1988mixing}, and checking
 pairwise relative agreement in $\Pmax$. \Cref{MultiMethod} displays
@@ -298,10 +297,7 @@ the backend-pair heatmaps; all backends agree within their default
 integration tolerances. The same calibration confirms that the
 symbolic energy $E(t)$ remains flat to the backend integration
 tolerance, reported as relative drift $|\Delta E/E_0|$ in the
-energy-conservation audit below. These are internal-consistency
-checks across independent computational paths; only the calibrations
-against external analytic predictions in the earlier paragraphs
-constitute independent reproductions.
+energy-conservation audit below.
 
 \begin{figure*}[t]
   \centering
@@ -322,7 +318,7 @@ constitute independent reproductions.
 \paragraph*{Spatial and temporal convergence}\label{ConvergenceCalibration}
 The spatial-operator catalogue is tested against analytic
 derivatives in \cref{FDConvergence}, where the Fornberg
-finite-difference orders 2, 4 and 6 recover their predicted
+FD orders recover their predicted
 algebraic rates and the pseudo-spectral path falls to the round-off
 floor by $N\approx 64$~\cite{fornberg1988generation,burns2020dedalus}.
 We extend the spatial calibration to a physical example by running
@@ -352,10 +348,7 @@ pathology to a still-uncharacterised interaction between the
 Yoshida composition and either the coupled two-field structure or
 the two well-separated frequency scales
 ($\kappa\Bzero/2 = 0.025$, $\omega_k \approx 2.0$) of the
-Einstein--Maxwell baseline; the production work in this paper uses
-Yoshida-2 for symplectic evolution. Implicit and
-tolerance-controlled backends saturate at their \texttt{rtol}
-setting and are covered in \cref{MultiMethod}.
+EM baseline.
 
 \begin{figure*}[t]
   \centering
@@ -382,20 +375,22 @@ setting and are covered in \cref{MultiMethod}.
 
 \paragraph*{Energy-conservation audit}
 Energy conservation provides a structural diagnostic that engages
-every layer of the workflow at once: a constraint solver that
-returns inconsistent initial conditions, a symbolic stage that
-loses cross-coupling terms in field decomposition, or a time
-integrator that drifts past its predicted order, all reveal
-themselves as relative energy drift. We audit the maximum relative
+every layer of the workflow.
+% at once: a constraint solver that
+% returns inconsistent initial conditions, a symbolic stage that
+% loses cross-coupling terms in field decomposition, or a time
+% integrator that drifts past its predicted order, all reveal
+% themselves as relative energy drift.
+We audit the maximum relative
 energy drift $|\Delta E/E|_\mathrm{max}$ across the theories of physical
-relevance to the \cref{Results} campaigns: the Einstein--Maxwell
-Gertsenshtein baseline of \cref{GertsenshteinFormula}, a
-gradient-coupled scalar pair (an analogue of \cref{TwoModeRabi}),
-the propagating-PGT and nonminimal-torsion variants of
-\cref{SectorSurvey}, the dark-photon-plasma sector in both the
-Proca and vector-torsion representations of the previous
-calibration, a Proca-mass photon, and a linearised gravitational
-wave in 1+1D transverse-traceless gauge. Successful examples
+relevance to the \cref{Results} campaigns.
+% the EM
+% Gertsenshtein baseline of \cref{GertsenshteinFormula}, a
+% gradient-coupled scalar pair (an analogue of \cref{TwoModeRabi}),
+% the propagating-PGT and nonminimal-torsion variants of
+% \cref{SectorSurvey}, the dark-photon-plasma sector,
+% a Proca-mass photon, and a linearised gravitational wave.
+Successful examples
 cluster at $\sim 10^{-15}$, near the IEEE-754 round-off floor of
 the modal solver. The precision floor of each row in
 \cref{ConservationAudit} is set by the backend the dispatcher
@@ -407,7 +402,7 @@ selects, which differs across theories.
     \toprule
     Theory & $|\Delta E/E|_\mathrm{max}$ \\
     \midrule
-    Propagating-PGT torsion (nonminimal)       & $1.9\times 10^{-1}$ \\
+    Propagating-PGT torsion (non-minimal)       & $1.9\times 10^{-1}$ \\
     Dark-photon plasma (vector-torsion)        & $4.4\times 10^{-3}$ \\
     Einstein--Maxwell + Proca-mass photon      & $1.1\times 10^{-14}$ \\
     Dark-photon plasma (Proca)                 & $2.7\times 10^{-15}$ \\
