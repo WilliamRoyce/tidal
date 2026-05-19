@@ -22,23 +22,20 @@ perturbative correction within the regime $\varepsilon\ll1$.
 Such higher-order operators are the low-energy residues of an unknown ultraviolet
 completion in the effective-field-theory
 interpretation~\cite{Simon:1990ic,Simon:1990jn,Donoghue:1994dn,burgess2003quantum}.
-Grosse-Knetter~\cite{Grosse-Knetter:1993tae} proves, within the canonical formalism for
-higher-derivative theories~\cite{ostrogradsky1850memoires,Woodard:2015zca}, that
-expressing the higher time derivatives in $\mathcal{L}_1$ by substituting the
-base-theory equations of motion is equivalent to a canonical field redefinition
+Grosse-Knetter~\cite{Grosse-Knetter:1993tae,ostrogradsky1850memoires,Woodard:2015zca}
+proves that expressing the higher time derivatives in $\mathcal{L}_1$ by substituting
+the base-theory equations of motion is equivalent to a canonical field redefinition
 $\varphi^{\mathcal{I}} \to \varphi^{\mathcal{I}} + \varepsilon\,\delta\varphi^{\mathcal{I}}$
 in the action.
-The redefinition preserves the Poisson bracket structure, so physical observables take
-identical form before and after the substitution.
+The redefinition preserves the Poisson bracket structure.
 The original higher-derivative Lagrangian and the perturbatively reduced one are
-therefore physically equivalent within the perturbative regime, and the order-by-order
-expansion of the equations of motion reproduces the physical predictions of
-$\mathcal{L}$ to first order in $\varepsilon$.
+therefore physically equivalent within the perturbative regime.
 This equivalence requires the base-theory equation of motion for each reduced field to
 take the form $\partial_t^2\varphi^{\mathcal{I}} = F^{\mathcal{I}}[\varphi,\partial_t\varphi,
 \nabla\varphi]$, since this equation is the substitution rule itself. Fields whose
-base-theory equation is purely algebraic violate the requirement and the canonical
-equivalence breaks down; this case is described below.
+base-theory equation is purely algebraic (in the sense of \cref{SymbolicComputation})
+violate the requirement and the canonical equivalence breaks down; this case is described
+below.
 
 The alternative --- treating $\mathcal{L}$ as an exact theory rather than a truncated
 expansion --- encounters a structural obstruction.
@@ -59,8 +56,8 @@ the scale at which $\varepsilon\,\mathcal{L}_1$ becomes comparable to $\mathcal{
 and the perturbative expansion itself breaks down; the ghost is therefore an artefact of
 extrapolating the truncated Lagrangian beyond its regime of validity, not a physical
 degree of freedom.
-We therefore treat $\mathcal{L}_0$ as the base theory and account for the effect
-of $\varepsilon\,\mathcal{L}_1$ as an iterative correction.
+We therefore treat $\mathcal{L}_0$ as the base theory and $\varepsilon\,\mathcal{L}_1$
+perturbatively.
 
 \paragraph*{Perturbative reduction of the equations of motion}
 We solve the equations of motion by the iterative order-reduction method of Parker
@@ -92,19 +89,23 @@ Ja{\'e}n--Llosa--Molina substitution~\cite{jaen1986reduction}, which substitutes
 order-zero Euler--Lagrange equation directly into the higher-derivative correction in
 the Lagrangian, has no substitution target when a field equation is purely algebraic at
 order zero, since no $\partial_t^n\varphi^{\mathcal{I}}$ is available to solve for. The
-Ostrogradsky auxiliary-field reduction~\cite{ostrogradsky1850memoires,Woodard:2015zca},
-which introduces each time-derivative order as a separate dynamical variable
-$Q_n^{\mathcal{I}} \equiv \partial_t^n\varphi^{\mathcal{I}}$ for $n = 0, 1, \ldots, N-1$
-with $N$ the order of the highest time derivative in $\mathcal{L}$, yields a first-order
-system, but the promoted ghost modes of Ostrogradsky's theorem then appear as live
-degrees of freedom and produce unphysical exponential growth in long-time simulation.
+Ostrogradsky auxiliary-field reduction~\cite{ostrogradsky1850memoires,Woodard:2015zca}
+introduces each time-derivative order as a separate dynamical variable
+$Q_n^{\mathcal{I}} \equiv \partial_t^n\varphi^{\mathcal{I}}$ for $n = 0, 1, \ldots, N-1$,
+with $N$ the order of the highest time derivative in $\mathcal{L}$, yielding a first-order
+system. This is not a perturbative method: it reformulates the full
+$\varepsilon$-finite theory rather than truncating it, and the Ostrogradsky ghost of
+the original higher-derivative Lagrangian therefore drives the same unphysical
+exponential growth under direct numerical evolution as it does in any other formulation
+of the full theory.
 
 On flat periodic domains, the Pass~0 system at wavenumber $k$ reduces to the per-mode
 ODE $\partial_t\hat{y}^{(0)} = M(k)\,\hat{y}^{(0)}$ (cf.~\cref{ModalPerMode}), where
 $\hat{y}^{(0)}$ stacks the Fourier amplitudes of every field and velocity slot.
 For the perturbative-reduction path, the eigendecomposition $M(k) = V D V^{-1}$ is
 used rather than the Pad\'e scaling-and-squaring path of \cref{ModalSolver}, since the
-per-eigenmode expansion is required explicitly for the Duhamel integral.
+per-eigenmode expansion is required explicitly for the Duhamel integral
+\cref{DuhamelIntegral}.
 With $D = \mathrm{diag}(\lambda_1,\lambda_2,\ldots)$ collecting the eigenvalues of $M(k)$
 and $V$ the right-eigenvector matrix, the Pass~0 solution at initial data
 $\hat{y}^{(0)}(0)$ is
@@ -117,8 +118,9 @@ $\hat{y}^{(0)}(0)$ is
 
 Pass~1 satisfies the inhomogeneous system
 $\partial_t\hat{y}^{(1)} = M(k)\,\hat{y}^{(1)} + C_{\mathrm{src}}\,\hat{y}^{(0)}(t)$
-with $\hat{y}^{(1)}(0) = 0$, where $C_{\mathrm{src}}$ is the source coupling matrix
-assembled from the $\varepsilon^1$ terms in the equations of motion.
+with $\hat{y}^{(1)}(0) = 0$, where $C_{\mathrm{src}}$ is the Fourier representation of
+the correction operator $E_{\mathrm{corr}}$ that appears as the order-$\varepsilon^1$
+source in \cref{EOMHierarchy}.
 Substituting $\hat{y}^{(1)} = V\hat{z}^{(1)}$ and the Pass~0 solution
 $\hat{y}^{(0)}(t) = V e^{Dt}c$ into this system and multiplying through by $V^{-1}$
 diagonalises the homogeneous part ($V^{-1}M(k)V = D$) and rotates the source into the
