@@ -201,6 +201,14 @@ of arbitrary tensor type, the equation of motion is
 \end{equation}
 where the series terminates at the highest derivative order present in
 $\lag^{(2)}$.
+% TODO: This appendix derives Euler--Lagrange equations from the linearised
+% Lagrangian but does not give the Legendre-transform / Hamiltonian
+% construction. App H (PerturbativeReduction) refers to "the standard Legendre
+% transform" of the reduced Lagrangian and to "the Hamiltonian" without a
+% local cross-reference, since no Legendre-transform discussion exists yet.
+% Add a sub-section here that takes the reduced first-order Lagrangian and
+% performs the Legendre transform to obtain the Hamiltonian, so App H can
+% cite it. See issue raised in App H tenth-pass review.
 The differentiation is performed by \xAct{}'s
 \texttt{VarD}~\cite{martingarcia2007xact}, which handles the chain rule
 and integration-by-parts for arbitrary tensor structure and arbitrary
