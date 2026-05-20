@@ -192,12 +192,13 @@ Near the degenerate limit $|(\mu-\lambda)t| \to 0$, direct evaluation of
 the threshold and term count following~\cite{almohy2011action}.
 
 \subsection{Perturbative reduction of the Hamiltonian}
-Energy measurement requires a Hamiltonian, and the standard Legendre transform applies
-once the Lagrangian contains at most first-order time derivatives.
+Energy measurement requires a Hamiltonian, and the Legendre transform
+of~\cref{LegendreTransform} applies once the reduced Lagrangian contains
+at most first-order time derivatives.
 Quadratic terms whose total time-derivative order exceeds two remain irreducible to a
 Lagrangian with at most first-order time derivatives on every factor.
 
-To reduce the Lagrangian before the Legendre transform, \TIDAL{} substitutes the
+To reduce the Lagrangian before the Legendre transform~(\cref{LegendreTransform}), \TIDAL{} substitutes the
 order-$\varepsilon^0$ equations of motion into the higher-derivative terms of
 $\varepsilon\,\mathcal{L}_1$~\cite{jaen1986reduction,Cheyette1988,Grosse-Knetter:1993tae}.
 The order-$\varepsilon^0$ equations are solved simultaneously for the second time
@@ -212,14 +213,14 @@ derivative of each field,
 where $F_i$ depends on first-order time derivatives only, but on spatial derivatives of
 any order.
 Higher spatial derivatives in $\varepsilon\,\mathcal{L}_1$ do not affect the Legendre
-transform; only higher time derivatives require reduction.
+transform~(\cref{LegendreTransform}); only higher time derivatives require reduction.
 Where the correction introduces terms with time derivatives of order greater than two,
 the rule \cref{LPSSubstitution} is extended by differentiating with respect to $t$ as
 many times as needed, substituting \cref{LPSSubstitution} for any $\partial_t^2 q_j$
 that appears at each step.
 The resulting substitution is applied to the order-$\varepsilon^1$ Lagrangian, and the
 series is truncated at $\mathcal{O}(\varepsilon^2)$; the reduced Lagrangian carries at
-most first-order time derivatives and is admissible for the standard Legendre transform.
+most first-order time derivatives and is admissible for the Legendre transform of~\cref{LegendreTransform}.
 The substitution is faithful exactly when the JLM regularity
 condition~\cite{jaen1986reduction} holds: the order-zero equation of motion for each
 reduced field must admit a $\partial_t^2\varphi^{\mathcal{I}}$ that can be isolated and
@@ -278,6 +279,34 @@ perturbative-reduction framework of this appendix to cover the constraint-promot
 case --- for example, by introducing Stückelberg-type auxiliary fields that smooth the
 $\varepsilon \to 0$ limit --- and so to recover a perturbative Hamiltonian for the
 quadratic-PGT $\tilde{R}^2$ theories.
+
+% TODO: \paragraph*{Primary constraints and singular kinetic matrix}
+% \label{DiracBergmann}
+%
+% A second obstruction to the Legendre transform of \cref{LegendreTransform}
+% arises when the kinetic matrix K_{ij} is singular from the start --- gauge
+% potentials (A_\mu), lapse/shift in linearised gravity, or any field that
+% enters the action algebraically. This is distinct from the LPS/JLM
+% constraint-promotion case above, which concerns theories whose K is
+% invertible at \varepsilon=0 but which develop new degrees of freedom when
+% \varepsilon is turned on.
+%
+% Content to write (~200 w):
+%   1. K singular => primary constraints (cite henneaux1992quantization).
+%      Naive \pi = K v not solvable; Legendre transform not invertible.
+%   2. Correct treatment: Dirac-Bergmann procedure --- identify and classify
+%      all first- and second-class constraints, project onto constraint surface,
+%      replace Poisson brackets with Dirac brackets (cite henneaux1992quantization;
+%      also dirac1950generalized if in bib, else Henneaux alone suffices).
+%   3. TIDAL's choice: retain velocity-form \ham = \sum \pi v - \lag^{(2)} of
+%      \cref{LegendreTransform} without performing the Dirac-Bergmann reduction
+%      (computationally prohibitive for the full PGT spectrum).
+%   4. Consequence: exported \ham is gauge-non-invariant; energy drift from
+%      'tidal measure --what conservation' includes gauge-artifact contribution
+%      for all gauge-field theories; drift values cited in \cref{Validation}
+%      for such theories are artifacts, not dynamical errors.
+%   5. Observable unaffected: conversion probability \cref{GertsenshteinFormula}
+%      is gauge-invariant; survey results of \cref{Results} are unaffected.
 
 \paragraph*{Failure detection}
 For the Hamiltonian, \TIDAL{} attempts the Lagrangian perturbative substitution
