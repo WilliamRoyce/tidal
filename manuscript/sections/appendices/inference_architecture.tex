@@ -1,112 +1,207 @@
-% Appendix J: Bayesian inference architecture (v3, tachyon-permissive).
-% Per genre_conventions_software.md §(h) — methodology appendix style.
-% Audience: a reader who wants to understand how TIDAL's nested-sampling
-% layer differs from PSALTer / Hamilcar and from a conventional
-% gate-based likelihood.
-%
-% Source-of-truth: docs/V3_ARCHITECTURE.md (canonical reference),
-% docs/V3_PHASE_D_DESIGN.md (manuscript update sequence), and the
-% post-2026-05-08 supervisor meeting that pivoted v2 → v3.
-%
-% DRAFT STATUS: this appendix is a scaffold with TODO stubs.  Phase 2
-% drafting fills in the prose with placeholder numbers later replaced
-% by Phase B chain results.  The architecture text itself is settled
-% and does NOT depend on Phase B / Phase E outcomes.
+% Appendix J: Bayesian inference for the coupling-space survey.
+% The appendix explains how the nested-sampling layer is used to survey
+% each PGT+EM theory's coupling space, the prior-predictive reading of
+% the Bayesian evidence and Kullback--Leibler divergence, and the
+% validity gates that bound the linearised regime.  Cross-references to
+% Apps F--H and \S4 Results anchor the diagnostics defined here.
 
 \section{Bayesian inference architecture}%
 \label{InferenceArchitecture}
 
-% Paragraph 1 — Motivation (~120 w).
-\paragraph*{Motivation}
-% TODO: state the problem v3 solves.  v2's hard-gate likelihood
-% returned $\log\mathcal{L} = -\infty$ for tachyonic samples
-% (eigenvalue probe $\gamma_{\mathrm{eff}} > 0.15$), non-perturbative
-% samples ($P_{\max} > 0.5$, the Hwang--Noh validity boundary), and
-% any numerical failure (divergence, NaN, exception).  This gives
-% PolyChord no gradient information — the sampler cannot distinguish
-% "almost stable" from "wildly unstable".  Reference the 8 May 2026
-% supervisor pivot directing three coupled changes: (i) the probe is
-% a measurement, not a gate; (ii) soft penalties replace $-\infty$
-% for numerical failures; (iii) compactified priors cover the full
-% real-line coupling support.
-% Source: docs/V3_ARCHITECTURE.md §"Why v3?", docs/meetings/2026-05-08_supervisor.md.
+This appendix describes the nested-sampling layer used to survey the
+coupling space of each PGT+EM theory studied in this work.  The
+amplification $A(\theta)$ returned by the PDE solver at coupling vector
+$\theta$ depends on the initial-condition amplitude and integration time
+chosen for the simulation, so the absolute values it reports are not
+the object of interest.  The survey instead asks structural questions:
+which couplings carry a statistically significant correlation with $A$,
+and whether the response is concentrated on a narrow parameter region
+or spread across the whole theory.  Nested
+sampling~\cite{Skilling:2004pqw,Ashton:2022grj} delivers two
+diagnostics that quantify this structure: the prior-averaged
+amplification $\mathcal{Z} = \langle A\rangle_\pi$, which the algorithm
+computes as the Bayesian evidence (\cref{EvidenceIntegral}); and the
+Kullback--Leibler divergence $D_{\mathrm{KL}}$
+(\cref{KLDivergence}) between the score-reweighted posterior and the
+prior, which measures how concentrated the posterior is and so reads
+out whether amplification (or its absence) is generic in the theory or
+specific to a fine-tuned coupling region.  Both anchor the survey
+results of \cref{Results}.
 
-% Paragraph 2 — Soft-penalty floor (~150 w + equation).
-\paragraph*{Soft-penalty floor}
-% TODO: describe the soft floor mathematically.  The replacement
-% $\log\mathcal{L} = -\infty \to \log\mathcal{L}_{\mathrm{floor}} + \mathcal{N}(0, \sigma_{\mathrm{explore}}^2)$
-% with $\log\mathcal{L}_{\mathrm{floor}} = -100$ and
-% $\sigma_{\mathrm{explore}} = 1\;\mathrm{nat}$ default.  Rationale:
-% $\exp(-100) \approx 4 \times 10^{-44}$ is small enough to act as
-% effective rejection in PolyChord's posterior weighting, but large
-% enough that the sampler sees a finite gradient
-% ($\exp(-50)/\exp(-100) \approx 10^{22}$ ratio between a typical
-% genuine sample and a floor sample).  The Gaussian noise prevents
-% the sampler from seeing a flat plateau in the failure region.
-% Discuss the seven distinct \texttt{run\_status} tags (success,
-% simulation\_diverged, simulation\_failed, metric\_nan,
-% metric\_missing, logl\_minus\_inf, below\_noise\_floor, exception,
-% tachyonic\_gated under \texttt{-{}-gated}) and that post-chain
-% analysis filters by tag.
-% Source: tidal/inference/_likelihood.py, V3_ARCHITECTURE.md soft-penalty table.
+\paragraph*{Amplification score}
+The PDE solver returns at each coupling vector $\theta$ a deterministic
+conversion probability $\Pmax(\theta)$, the peak photon amplitude
+reached during one simulation in the Einstein--Maxwell--torsion
+background of the Gertsenshtein kernel \cref{GertsenshteinFormula}.
+We work with its amplification over the Einstein--Maxwell baseline,
+\begin{equation}
+  A(\theta) \;=\; \frac{\Pmax(\theta)}{\sin^2(\kappa\Bzero t/2)},
+  \label{AmplificationScore}
+\end{equation}
+the per-coupling-vector score that drives the survey.\footnote{Distinct
+from the asymptotic survey-coefficient ratio $\Aamp$ of
+\cref{AmplificationFactor}, which is the $\Bzero\!\to\!0$ limit of the
+same comparison; the two agree to $\mathcal{O}(\Bzero^2)$ in the
+validation regime of \cref{Validation}.}  The nested-sampling
+likelihood is
+\begin{equation}
+  \log L(\theta) \;=\; \pm\log A(\theta),
+  \label{NestedScore}
+\end{equation}
+with the sign chosen to direct the survey toward amplifying ($+$) or
+suppressing ($-$) regions of coupling space; a Gaussian variant
+targeting a specified value of $\Pmax$ is also available, although the
+sign-selecting form is what we use throughout.
 
-% Paragraph 3 — Compactified priors (~120 w + table).
-\paragraph*{Compactified priors}
-% TODO: describe the prior compactification scheme.
-% \texttt{arctan\_uniform:-89:89} for sign-symmetric dimensionless
-% couplings ($\alpha_i$, $\beta_i$, $\delta_i$, $\chi$, $\zeta$):
-% angle sampled uniformly in $[-89^\circ, 89^\circ]$, physical
-% sample $x = \tan(\theta\pi/180)$ ranges over $\pm\tan(89^\circ)
-% \approx \pm 57$ with Cauchy-like density peaking at zero.
-% \texttt{log\_uniform:1e-3:1e3} for positive-definite kinetic
-% coefficients ($\alpha_3$, $\xi$, $m_A^2$): six decades of coverage
-% with $1/x\log(\mathrm{hi}/\mathrm{lo})$ density.  Show in a small
-% table or inline list.  Frame the supervisor's rationale: narrow
-% uniforms make the chain "rediscover" the natural scale by
-% concentrating its likelihood density, but the wide prior support
-% means the chain can actually \emph{explore} the high-coupling
-% regime that v2 had ruled out by fiat.
-% Source: V3_ARCHITECTURE.md compactified-prior table; tidal/inference/_prior.py.
+\paragraph*{Evidence integral}
+Nested sampling targets the Bayesian evidence
+\begin{equation}
+  \mathcal{Z} \;=\; \int L(\theta)\,\pi(\theta)\,\diff\theta,
+  \label{EvidenceIntegral}
+\end{equation}
+the prior-weighted integral of the score over the coupling space.  The
+physical content $\mathcal{Z}$ acquires under \cref{NestedScore} is
+developed in \cref{EvidencePrediction}.  In a high-dimensional coupling
+space the volume where $L$ is appreciably non-zero shrinks to a small
+corner of the prior, and a flat Monte-Carlo estimate of
+\cref{EvidenceIntegral} wastes most of its samples on uninformative
+regions.  Skilling~\cite{Skilling:2004pqw} reformulates the integral
+as a one-dimensional integral over prior volume and samples along
+likelihood contours rather than across the parameter space, producing
+posterior-weighted samples as a by-product of the evidence estimate.
 
-% Paragraph 4 — Cubed-sphere joint prior (~120 w).
+\paragraph*{PolyChord}
+We use PolyChord~\cite{Handley:2015fda,Handley:2015vkr} as the
+nested sampler throughout this work.  Its replacement step generates
+each new sample by slice sampling along $\mathcal{O}(d)$ random
+directions of the unit hypercube, giving a per-replacement cost that
+scales as $\mathcal{O}(d^2)$ in the dimensionality $d$ of the coupling
+vector.  The four-to-eight-dimensional coupling spaces we survey sit
+comfortably within this regime.  The shape of the prior $\pi(\theta)$
+is carried into the algorithm by a prior-transform map from the unit
+cube to coupling space, the construction of which we describe next.
+
+\paragraph*{Priors}
+Each scalar coupling is sampled from one of two families.  Log-uniform
+priors are used for positive-definite kinetic and mass-like
+coefficients that span several decades, giving each decade of magnitude
+equal prior weight.  Arctan-uniform priors are used for dimensionless
+couplings whose sign is not fixed a priori; they map the full real line
+onto a bounded sampling space with a density peaked at zero.  Bounds
+for each campaign's priors are listed in \cref{Results}.  Since $\mathcal{Z}$
+weights $A$ by the prior~\cref{EvidenceIntegral}, the choice of prior
+shape sets what $\mathcal{Z}$ means.  A prior concentrated on
+amplifying couplings inflates it; a prior that ranges widely across
+non-amplifying background dilutes it.  Joint priors over multiple
+couplings are usually a product of the per-coupling priors above; the
+exception, used when magnitude and direction in a coupling subspace
+should be decoupled, is the cubed-sphere construction described next.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/cubed_sphere_atlas.pdf}
+  \caption{Gnomonic cubed-sphere atlas used to sample the direction
+    $\hat{\boldsymbol\theta} \in S^{N-1}$ of a joint coupling-space
+    prior, drawn for $N=3$.  An $N$-cube is wrapped around the
+    origin in coupling space and each face is radially projected onto
+    the unit sphere; the construction extends to arbitrary $N$.  The
+    highlighted face (face $1\!\uparrow$) partitions into sub-tiles
+    whose constrained-prior chains run independently and are pooled
+    into the joint $\hat{\boldsymbol\theta}$ posterior; one such
+    sub-tile is shaded and one sample vector
+    $\boldsymbol c = r\,\hat{\boldsymbol\theta}$ is drawn from the
+    origin through it.  The chart is quasi-rectilinear and free of
+    the polar crowding of latitude--longitude grids.}
+  \label{CubedSphereAtlas}
+\end{figure}
+
 \paragraph*{Cubed-sphere joint prior}
-% TODO: describe the higher-dimensional alternative.  Following the
-% supervisor's unpublished \texttt{psalter} package, a coupling
-% vector $\boldsymbol{c} \in \mathbb{R}^N$ can be sampled as
-% $\boldsymbol{c} = r\,\hat{\boldsymbol{\theta}}$, with magnitude
-% $r$ from \texttt{log\_uniform} and direction
-% $\hat{\boldsymbol{\theta}}$ uniform on the unit sphere $S^{N-1}$
-% via a gnomonic cubed-sphere chart (one tile per face, per
-% sub-division).  The chart wraps a cube around the origin and
-% projects each face radially out to the sphere, giving a
-% quasi-rectilinear angular grid with no polar crowding.  Reference
-% the parallel-session implementation in
-% \texttt{tidal/inference/\_sphere.py} and the corresponding atlas
-% plot that pools per-tile chains into a 2N-face panel grid.
-% Source: docs/V3_PHASE_C_REFERENCE.md, tidal/inference/_sphere.py.
+A coupling vector $\boldsymbol c \in \mathbb{R}^N$ can be decomposed as
+$\boldsymbol c = r\,\hat{\boldsymbol\theta}$ with $r>0$ drawn from a
+log-uniform prior and $\hat{\boldsymbol\theta}$ drawn uniformly on the
+unit sphere $S^{N-1}$.  Direct parametrisation of $S^{N-1}$ by
+latitude--longitude angles suffers polar crowding, so we sample
+$\hat{\boldsymbol\theta}$ instead via a gnomonic cubed-sphere atlas:
+the $N$-cube is wrapped around the origin and each face is radially
+projected onto $S^{N-1}$, yielding a quasi-rectilinear angular grid
+without polar singularities~(\cref{CubedSphereAtlas}).  Each face
+partitions further into sub-tiles whose constrained-prior chains run
+independently and are pooled into the joint $\hat{\boldsymbol\theta}$
+distribution at the end.\footnote{The atlas used here is adapted from
+W.~E.~V.~Barker's unreleased extension of the \textsc{psalter}
+package~\cite{barker2024psalter,barker2025psalter2}, shared with this
+project for implementation guidance.  The underlying gnomonic
+projection is the standard cubed-sphere construction of Ronchi,
+Iacono and Paolucci (J.~Comp.~Phys.~124, 93--114, 1996).}
+Decoupling magnitude from direction lets a single decade-spanning
+radial axis coexist with a compact angular grid; the prior weight
+along $r$ and along $\hat{\boldsymbol\theta}$ is set independently and
+on physical grounds.
 
-% Paragraph 5 — Validation (~80 w).
-\paragraph*{Architecture validation}
-% TODO: D1 amp v3 smoke run (Phase B.1, HPC job 29149987) verified
-% the architecture admits the predicted parameter regions and
-% produces a 100\% \texttt{run\_status=success} chain.  Headline
-% result: log $\mathcal{Z}$ rose from $+0.72$ (v2) to
-% $+[\textrm{B.2 log Z}]$ (v3) for the D1 amplification chain, and
-% the maximum-a-posteriori value of $\delta_1$ landed outside v2's
-% narrow $[-2, +2]$ prior — a region only reachable under the
-% compactified \texttt{arctan\_uniform} scheme.  Per-coupling
-% marginal $D_{\mathrm{KL}}$ replaces log $\mathcal{Z}$ as the
-% headline metric: it measures which couplings carry
-% signal-shape information.  See \cref{Results}.
-% Source: hpc_results/29149987/, docs/comparison/d1_amp_v2_v3.md.
+\paragraph*{Evidence as a prior expectation}
+With $L(\theta) = A(\theta)$, the evidence integral
+\cref{EvidenceIntegral} reduces to a prior expectation,
+\begin{equation}
+  \mathcal{Z} \;=\; \int A(\theta)\,\pi(\theta)\,\diff\theta
+  \;=\; \langle A\rangle_\pi,
+  \label{EvidencePrediction}
+\end{equation}
+the average amplification of the Gertsenshtein conversion over the
+coupling prior.  A theory with $\log\mathcal{Z}\approx 0$ is
+General-Relativistic on average across the prior.  A theory with
+$\log\mathcal{Z}\gg 0$ has typical coupling vectors that amplify; one
+with $\log\mathcal{Z}\ll 0$ has typical coupling vectors that suppress.
+$\mathcal{Z}$ here is not a Bayes factor in the conventional sense.
+We are not comparing two models against the same observed dataset, so
+the Jeffreys-scale interpretation of $\log B_{12}$ does not apply.
+The prior dependence is intrinsic to the measurement: the prior fixes
+which coupling values the theory considers physically reasonable, and
+$\mathcal{Z}$ asks whether amplification occurs within that range.  The
+evidence does not by itself say whether the amplification is generic
+across the prior or concentrated on a specific coupling region; that
+distinction is the role of the divergence introduced next.
 
-% Paragraph 6 — Caveat (~60 w).
-\paragraph*{Linearised-theory validity}
-% TODO: caveat — large $P_{\max}$ values $\gtrsim 1$ may fall outside
-% the linearised-PDE regime in which TIDAL operates.  The v3
-% architecture does not gate on this: $P_{\max}$ is recorded
-% faithfully and the question of whether a high-$P$ region is
-% physically meaningful is downstream of inference.  Forward-reference
-% to App~G perturbative-regime analysis.
-% Source: docs/V3_PHASE_E_DESIGN.md (geometry pivot for finite
-% interaction time).
+\paragraph*{Posterior contraction}
+The nested-sampling chain returns samples from the score-weighted
+posterior
+\begin{equation}
+  p(\theta\mid A) \;\propto\; A(\theta)\,\pi(\theta),
+  \label{ScorePosterior}
+\end{equation}
+the reweighting of the prior by the amplification score.  Its
+information content relative to the prior is the Kullback--Leibler
+divergence
+\begin{equation}
+  D_{\mathrm{KL}}\big(p(\theta\mid A)\,\|\,\pi(\theta)\big)
+  \;=\; \int p(\theta\mid A)\,
+  \log\!\frac{p(\theta\mid A)}{\pi(\theta)}\,\diff\theta,
+  \label{KLDivergence}
+\end{equation}
+measured in nats.  When $D_{\mathrm{KL}}$ is small the score-weighted
+posterior is indistinguishable from the prior and the result is
+generic to the theory across the surveyed range; when $D_{\mathrm{KL}}$
+is large the posterior has contracted onto a specific coupling region
+and the result is parameter-specific.  Taken with $\mathcal{Z}$, these
+two diagnostics read the survey jointly: $\mathcal{Z}$ records the
+magnitude of the prior-averaged response, and $D_{\mathrm{KL}}$ records
+whether that response is diffuse or concentrated.  We additionally
+extract the per-coupling marginal $D_{\mathrm{KL}}$ from the chain
+output with anesthetic~\cite{Handley:2019mfs}, identifying which
+individual couplings carry the signal.  Campaign values for
+$\mathcal{Z}$, $D_{\mathrm{KL}}$, and the marginal $D_{\mathrm{KL}}$
+are reported in \cref{Results}.
+
+\paragraph*{Validity gates}
+The amplification score \cref{AmplificationScore} is meaningful only
+inside the linearised regime in which the PDE solver operates, set by
+the two conditions $\Pmax \ll 1$ and $\kappa\Bzero t \ll 1$ that keep
+the Gertsenshtein baseline in its small-angle limit.  Outside this
+regime, $A$ acquires a spurious $\Bzero$ dependence and the linearised
+conversion measurement breaks down~(\cref{PerturbativeRegime}).  Two
+physics gates encode this in the inference layer: a tachyonic-instability
+gate that excludes coupling vectors with positive-real-part
+eigenvalues, since these signal a propagating-mode pathology upstream
+of the inference question; and a perturbativity flag at $\Pmax > 0.5$
+marking samples that may lie outside the validity window of
+\cref{HwangNohBound}, derived in App~G from the Hwang--Noh
+backreaction analysis~\cite{hwangnoh2023graviton}.
