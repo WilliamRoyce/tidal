@@ -434,6 +434,34 @@ class TestEquationToLatex:
             assert "&=" in result
             assert r"\partial_t" in result
 
+    def test_lhs_kinetic_coefficient_renders(self) -> None:
+        """LHS gains the symbolic kinetic coefficient when one is set.
+
+        The Wolfram pipeline strips a non-unity kinetic coefficient
+        from the LHS (to avoid divide-by-zero on the constraint side)
+        and stores it under ``equation.lhs.kinetic_coefficient_symbolic``;
+        the renderer must restore it so the equation is mathematically
+        complete.
+        """
+        from tidal.symbolic.json_loader import load_equation_system
+
+        # gertsenshtein.json's h_5 / h_7 EOMs have kinetic_coefficient_symbolic
+        # = "-kappa^(-2)". The bare-slash converter turns that into a fraction
+        # which must appear before \partial_t in the rendered LHS.
+        spec = load_equation_system(_EXAMPLES / "gertsenshtein.json")
+        eq = next(
+            e for e in spec.equations if e.kinetic_coefficient_symbolic == "-kappa^(-2)"
+        )
+        result = equation_to_latex(eq, spec)
+        assert r"\frac{1}{\kappa^{2}}" in result, result
+        assert r"\partial_t" in result
+        # Ordering: the kinetic prefactor sits to the left of \partial_t.
+        idx_frac = result.index(r"\frac{1}{\kappa^{2}}")
+        idx_partial = result.index(r"\partial_t")
+        assert idx_frac < idx_partial, (
+            f"kinetic coefficient must precede \\partial_t: {result!r}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # hamiltonian_to_latex

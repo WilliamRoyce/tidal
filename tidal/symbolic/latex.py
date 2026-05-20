@@ -714,6 +714,36 @@ def operator_to_latex(operator: str, field_latex: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _has_top_level_sum(s: str) -> bool:
+    r"""Detect a top-level ``+`` or ``-`` term separator outside braces.
+
+    Used to decide whether a multi-term kinetic-coefficient prefactor
+    needs ``\\left(...\\right)`` wrapping when prepended to a
+    ``\\partial_t`` operator on the LHS. Walks the string tracking
+    brace depth; a ``+`` or ``-`` flanked by spaces at depth zero
+    indicates a sum the reader could otherwise mis-parse as separate
+    terms on the equation row.
+    """
+    depth = 0
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+        elif (
+            depth == 0
+            and c == " "
+            and i + 2 < len(s)
+            and s[i + 1] in "+-"
+            and s[i + 2] == " "
+        ):
+            return True
+        i += 1
+    return False
+
+
 def equation_to_latex(
     eq: ComponentEquation,
     spec: EquationSystem,
@@ -744,11 +774,33 @@ def equation_to_latex(
     )
     t_order = eq.time_derivative_order
     if t_order == 0:
+        # Constraint equation: ``0 = …``. No kinetic coefficient applies.
         lhs = "0"
-    elif t_order == 1:
-        lhs = rf"\partial_t {field_tex}"
     else:
-        lhs = rf"\partial_t^{{{t_order}}} {field_tex}"
+        partial_tex = r"\partial_t" if t_order == 1 else rf"\partial_t^{{{t_order}}}"
+        # When the original derivation produced a non-unity kinetic
+        # coefficient on the LHS, the Wolfram pipeline strips it (to
+        # avoid divide-by-zero on the constraint side) and stores it
+        # under ``equation.lhs.kinetic_coefficient_symbolic``. Restore
+        # it in the rendered LHS so the equation reads
+        # ``<coeff> \, \partial_t^n field``. Unit and minus-unity
+        # coefficients are emitted compactly (no leading factor / a
+        # bare minus sign respectively).
+        kc_raw = (eq.kinetic_coefficient_symbolic or "").strip()
+        if not kc_raw or kc_raw == "1":
+            lhs = rf"{partial_tex} {field_tex}"
+        elif kc_raw == "-1":
+            lhs = rf"-{partial_tex} {field_tex}"
+        else:
+            kc_tex = coefficient_to_latex(kc_raw)
+            # Wrap multi-term coefficients (those with a top-level ``+`` or
+            # ``-`` at brace-depth zero) in ``\left(...\right)`` so the
+            # reader can see at a glance that the whole sum multiplies the
+            # operator. Single-product coefficients like
+            # ``-\frac{1}{\kappa^{2}}`` and ``2 \, b_{5}`` need no parens.
+            if _has_top_level_sum(kc_tex):
+                kc_tex = rf"\left({kc_tex}\right)"
+            lhs = rf"{kc_tex} \, {partial_tex} {field_tex}"
 
     # RHS
     rhs_parts: list[str] = []
