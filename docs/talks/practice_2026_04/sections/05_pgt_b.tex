@@ -1,18 +1,23 @@
 \begin{frame}{Theory parameter landscape}
   \begin{columns}[c,onlytextwidth]
-    \begin{column}{0.48\textwidth}
-      PGT Lagrangian has \emph{many} free parameters. Any subsector could amplify conversion --- and hand-deriving any one is fragile.
-      \vspace{-0.3em}
+    \begin{column}{0.56\textwidth}
+      \begin{itemize}
+        \item PGT Lagrangian has \emph{many} free parameters.
+        \item Any subsector \emph{could} amplify conversion\dots
+        \item and hand-deriving any \emph{one} is fragile.
+      \end{itemize}
+        
+      \vspace{0.3em}
       \[
         \mathcal{L} \supset
           \underbrace{T^2}_{\text{mass}}
-          + \underbrace{\Rt^2}_{\text{curv. kinetics}}
+          + \underbrace{(\nabla T)^2}_{\text{kinetics}}
           + \underbrace{\Rt\times F}_{\text{non-min.}}
           + \cdots
           - \tfrac{1}{4}F^2
       \]
     \end{column}
-    \begin{column}{0.48\textwidth}
+    \begin{column}{0.40\textwidth}
       {\renewcommand{\arraystretch}{0.7}\centering\footnotesize
       \begin{tabular}{@{}c|c@{}}
         \toprule
@@ -28,13 +33,13 @@
         $\eps\cdot F^2$ & $1$ \\
         $\eps\cdot\Rt\times F$ & $3$ \\
         \midrule
-        $\del T\times F$ & $3$ \\
-        $\Rt\times\del T$ & $10$ \\
-        $(\del T)^2$ & $16$ \\
+        $\nabla T\times F$ & $3$ \\
+        $\Rt\times\nabla T$ & $10$ \\
+        $(\nabla T)^2$ & $16$ \\
         \midrule
-        $\eps\cdot\del T\times F$ & $6$ \\
-        $\eps\cdot\Rt\times\del T$ & $36$ \\
-        $\eps\cdot(\del T)^2$ & $38$ \\
+        $\eps\cdot\nabla T\times F$ & $6$ \\
+        $\eps\cdot\Rt\times\nabla T$ & $36$ \\
+        $\eps\cdot(\nabla T)^2$ & $38$ \\
         \bottomrule
       \end{tabular}}
     \end{column}

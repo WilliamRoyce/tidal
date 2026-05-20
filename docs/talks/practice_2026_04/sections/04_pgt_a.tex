@@ -7,19 +7,30 @@
     \item Spacetime has two such symmetries: \emph{local \textbf{Lorentz}} and \emph{local \textbf{translations}}.
   \end{itemize}
 
-  \vspace{0.4em}
-  \begin{center}
-    \begin{tabular}{@{}c | c c c c @{}}
-      \toprule
-      & \textbf{Gauge group} & \textbf{Connection} & \textbf{Field strength} & \\
-      \midrule
-      QED          & $U(1)$         & $A_\mu$                       & $\mathcal{F}_{\mu\nu}$                                        & ---                                                                 \\
-      Lorentz      & $SO(1,3)$      & $\tensor{\omega}{^{ij}_\mu}$  & \textbf{curvature} $\tensor{\mathcal{R}}{^{ij}_{\mu\nu}}$    & \raisebox{-0.4\height}{\includegraphics[height=1.0cm]{curvature_icon}} \\
-      Translations & $\mathbb{R}^4$ & $\tensor{e}{^i_\mu}$          & \textbf{torsion}   $\tensor{\mathcal{T}}{^i_{\mu\nu}}$       & \raisebox{-0.4\height}{\includegraphics[height=1.0cm]{torsion_icon}}   \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \centering
+      \vspace{-0.5em}
+      \begin{center}
+        \begin{tabular}{@{}c | c c @{}}
+          \toprule
+          & \textbf{Group} & \textbf{Field strength} \\
+          \midrule
+          QED          & $U(1)$         & $\mathcal{F}_{\mu\nu} = \partial_{[\mu} A_{\nu]}$ \\
+          Lorentz      & $SO(1,3)$      & \textbf{curvature} $\tensor{\mathcal{R}}{^{ij}_{\mu\nu}}$    \\
+          Translations & $\mathbb{R}^4$ & \textbf{torsion}   $\tensor{\mathcal{T}}{^i_{\mu\nu}}$       \\
+          \bottomrule
+        \end{tabular}
+      \end{center}
+      GR uses only curvature; PGT promotes torsion to a physical degree of freedom.
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \centering
+      \includegraphics[height=2.5cm]{diff_geometry}
+    \end{column}
+  \end{columns}
+  
 
-  \centering\emph{GR uses only curvature; PGT promotes torsion to a physical degree of freedom.}
+  \centering\emph{}
 
 \end{frame}
