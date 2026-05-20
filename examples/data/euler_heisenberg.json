@@ -18,7 +18,7 @@
 			"propagation_axis": "z",
 			"eliminated_fields": []
 		},
-		"derivation_hash": "549856f541b960eb7ec8cf7b404dfaa49c3ba5503215d70d88050a88be70d3d7"
+		"derivation_hash": "15d7de2581d82212236915cd269ad560b81315471055fee17ff3f8e2f2a8e8a3"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -35,22 +35,42 @@
 		{
 			"name": "a_0",
 			"index": 0,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				0
+			]
 		},
 		{
 			"name": "a_1",
 			"index": 1,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				1
+			]
 		},
 		{
 			"name": "a_2",
 			"index": 2,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				2
+			]
 		},
 		{
 			"name": "a_3",
 			"index": 3,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				3
+			]
 		}
 	],
 	"equations": [

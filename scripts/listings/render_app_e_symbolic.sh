@@ -31,6 +31,11 @@ mkdir -p "$OUT_DIR"
 # - status   : "surveyed" (must have JSON) or "planned" (placeholder ok)
 MANIFEST=(
   "baseline|examples/data/gertsenshtein.json|surveyed"
+  # Euler--Heisenberg QED 1-loop quartic correction. Non-torsion theory
+  # that exercises the perturbative-reduction (Pass 0 / Pass 1) path
+  # and reproduces the Adler 7/4 birefringence ratio (cf. validation
+  # appendix).
+  "euler_heisenberg|examples/data/euler_heisenberg.json|surveyed"
   "reference|examples/data/torsion_gertsenshtein_b5_zero.json|surveyed"
   # `mechanism` reads the EXACT (non-LPS) R²-PGT JSON. The sibling
   # `torsion_gertsenshtein.json` is the LPS-reduced canonical form used
