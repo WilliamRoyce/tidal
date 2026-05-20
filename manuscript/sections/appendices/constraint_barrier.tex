@@ -14,7 +14,7 @@ The effective-field-theory background, the equations-of-motion reduction, and th
 Lagrangian reduction used to obtain a Hamiltonian are described here.
 
 \paragraph*{Higher-order terms as effective corrections}
-For theories whose Lagrangian admits the split
+For theories whose Lagrangian admits the decomposition
 $\mathcal{L} = \mathcal{L}_0 + \varepsilon\,\mathcal{L}_1$ with $\varepsilon$ a small
 dimensionless coupling, $\varepsilon\,\mathcal{L}_1$ is treated throughout as a
 perturbative correction within the regime $\varepsilon\ll1$.
@@ -31,11 +31,9 @@ The original higher-derivative Lagrangian and the perturbatively reduced one are
 therefore physically equivalent within the perturbative regime.
 This equivalence requires the base-theory equation of motion for each reduced field to
 take the form $\partial_t^2\varphi^{\mathcal{I}} = F^{\mathcal{I}}[\varphi,\partial_t\varphi,
-\{\nabla^n\varphi\}_{n\geq 1}]$, since the substitution expresses $\partial_t^2
-\varphi^{\mathcal{I}}$ (and, by repeated application, higher time derivatives) in
-$\mathcal{L}_1$ using the right-hand side~\cite{Grosse-Knetter:1993tae}. Fields whose base-theory equation is purely
-algebraic (in the sense of \cref{SymbolicComputation}) violate the requirement and the
-canonical equivalence breaks down.
+\{\nabla^n\varphi\}_{n\geq 1}]$~\cite{Grosse-Knetter:1993tae}. Fields whose base-theory
+equation is purely algebraic (in the sense of \cref{SymbolicComputation}) violate the
+requirement: no substitution can be performed, so no reduced theory exists for them.
 
 The alternative --- treating $\mathcal{L}$ as an exact theory rather than a truncated
 expansion --- encounters Ostrogradsky's theorem.
@@ -47,8 +45,8 @@ freedom whose Hamiltonian is unbounded below.%
 and the higher-derivative terms in the Einstein--Hilbert
 Lagrangian~\cite{wald1984general} might na\"\i vely appear to be counterexamples in
 gravity. The former is topological and contributes only a boundary term, and the
-latter reduce to a total divergence after integration by
-parts~\cite{hobson2006general}; the EL equations remain of order two in both cases.}
+latter reduce to a total divergence~\cite{hobson2006general}; the EL equations remain
+of order two in both cases.}
 The theorem is non-perturbative; the ghost is present for any non-zero $\varepsilon$.
 The ghost is an artefact of extrapolating the truncated Lagrangian beyond its regime of
 validity, not a physical degree of freedom, and a perturbative treatment that respects
@@ -91,10 +89,9 @@ introduces each time-derivative order as a separate dynamical variable
 $Q_n^{\mathcal{I}} \equiv \partial_t^n\varphi^{\mathcal{I}}$ for $n = 0, 1, \ldots, N-1$,
 with $N$ the order of the highest time derivative in $\mathcal{L}$, yielding a first-order
 system. This is not a perturbative method: it treats the full $\varepsilon$-finite
-theory as an exact theory, which is precisely the treatment the EFT framing forbids.
-Direct numerical evolution then exhibits the unbounded growth of the Ostrogradsky
-ghost; the auxiliary fields $Q_n^{\mathcal{I}}$ acquire arbitrary signed contributions
-to their energy, and the trajectory has no physical interpretation in the EFT regime.
+theory as exact, in which case the Ostrogradsky ghost is part of the dynamics. Direct
+numerical evolution therefore produces unbounded ghost growth, with no physical
+interpretation in the EFT regime.
 
 \paragraph*{Modal derivation and the Duhamel kernel}
 On flat periodic domains, the Pass~0 system at wavenumber $k$ reduces to the per-mode
@@ -170,15 +167,19 @@ where the Duhamel kernel $G$ is~\cite{hochbruck2010exponential,almohy2011action}
   \end{cases}
   \label{DuhamelKernel}
 \end{equation}
-Restoring the original basis gives the closed-form Pass~1 state,
+The eigenbasis-component form is what the solver computes,
 \begin{equation}
-  \hat{y}^{(1)}_a(t)
+  \hat{z}^{(1)}_i(t)
   \;=\;
-  \sum_{i,j}\, V_{ai}\, S_{ij}\, \hat{c}_j\, G(\lambda_i,\lambda_j;\,t),
+  \sum_j S_{ij}\,\hat{c}_j\,G(\lambda_i,\lambda_j;\,t),
   \label{PassOneSolution}
 \end{equation}
-Pass~1 is therefore computed entirely from the Pass~0 eigensystem; no additional
-differential equation need be solved.
+and the original-basis Pass~1 state is recovered by rotating back:
+$\hat{y}^{(1)}(t) = V\,\hat{z}^{(1)}(t)$. Pass~1 is therefore computed entirely from
+the Pass~0 eigensystem $(V, D, \hat{y}^{(0)}(0))$; no additional differential equation
+need be solved. The $V$ and $V^{-1}$ factors implicit in $\hat{c}$ and $S$ do not
+cancel when the rotation is performed, because the kernel $G(\lambda_i,\lambda_j;\,t)$
+differs entry-by-entry in the eigenbasis.
 Near the degenerate limit $|(\mu-\lambda)t| \to 0$, direct evaluation of
 \cref{DuhamelKernel} suffers catastrophic cancellation. The Taylor expansion of
 $G(\lambda,\mu;t)$ in $(\mu-\lambda)t$ around the degenerate limit gives
@@ -229,23 +230,23 @@ drops a promoted degree of freedom.
 
 \paragraph*{Constraint promotion and perturbative-reduction failure}
 The case where the JLM condition fails arises physically as constraint promotion. For
-the quadratic-PGT theories of interest, $\varepsilon\,\mathcal{L}_1$ stands for the
-higher-curvature $\tilde{R}^2$ correction (with $\varepsilon$ playing the role of its
-coefficient); the $\varepsilon = 0$ Einstein--Cartan limit then has certain metric and
-torsion components satisfying algebraic relations and carrying no kinetic term, and
-turning on $\varepsilon$
+the quadratic-PGT theories of interest, $\varepsilon\,\mathcal{L}_1$ is the
+higher-curvature correction $\varepsilon\,\tilde{R}^2$; the $\varepsilon = 0$
+Einstein--Cartan limit then has certain metric and torsion components satisfying
+algebraic relations and carrying no kinetic term, and turning on $\varepsilon$
 infinitesimally adds higher-derivative kinetic content from $\varepsilon\,\mathcal{L}_1$
 and promotes these relations to dynamical equations. The constraint structure of the
 theory therefore changes discontinuously across $\varepsilon = 0$, and an order-by-order
-expansion in $\varepsilon$ is blind to this promotion: the new mode is absent at
-$\varepsilon = 0$ and cannot be reached by a power-series expansion.
+expansion in $\varepsilon$ cannot capture the new mode: it is absent at $\varepsilon = 0$
+and cannot be reached by a power-series expansion.
 
 The Poincar\'e gauge theory literature has documented this constraint structure
-directly. The Dirac--Bergmann Hamiltonian analysis of quadratic-torsion PGT identifies
-the primary and secondary constraints and counts the propagating degrees of freedom as
-functions of the parameters~\cite{barker2021hamiltonian}; the same physics is studied
-as strong coupling in PGT~\cite{barker2023higgs}, where the constraint structure of
-the theory changes discontinuously as parameters are varied.
+directly. The Dirac--Bergmann Hamiltonian analysis of quadratic-torsion PGT carried
+out in~\cite{barker2021hamiltonian} confirms that the propagating-mode count depends
+discontinuously on the action parameters --- the same phenomenon we describe here;
+the same physics is studied as strong coupling in PGT~\cite{barker2023higgs}, where
+the constraint structure of the theory changes discontinuously as parameters are
+varied.
 
 Three independent reduction approaches reach the same conclusion. The
 JLM substitution~\cite{jaen1986reduction} cannot execute its rule
@@ -267,8 +268,9 @@ The Boulware--Deser non-decoupling~\cite{boulware1972gravitation} extends the
 Fierz--Pauli analysis to its nonlinear completion, where a ghost-like sixth mode
 emerges.
 The Maxwell--Proca boundary is a simpler instance: at finite vector-boson mass
-the algebraic relation $\rcD{_\mu}\FieldA{^\mu} = 0$ holds as a constraint, while at
-zero mass it becomes a gauge symmetry.
+the algebraic relation $\rcD{_\mu}\FieldA{^\mu} = 0$ is enforced as a constraint by
+the equations of motion, while at zero mass it becomes the Lorenz gauge condition
+under the Maxwell $U(1)$ gauge symmetry.
 
 The Stückelberg mechanism~\cite{RueggRuizAltaba2003} smooths the Maxwell--Proca
 constraint structure across the limit through an auxiliary field.
@@ -282,25 +284,27 @@ our future work.
 A second obstruction to obtaining a Hamiltonian arises when the linearised kinetic
 matrix $\mathcal{K}$ of \cref{KineticMatrix} is singular from the start. Gauge
 potentials and other fields that enter the action algebraically contribute to such a
-singular $\mathcal{K}$, and the naive Legendre transform fails for two related
-reasons: the relation $\pi_i = \mathcal{K}_{ij} v_j$ cannot be inverted to give the
-velocities as independent functions of the momenta, and the constrained components no
-longer correspond to independent canonical pairs. The correct treatment is the
-Dirac--Bergmann procedure~\cite{Dirac:1950pj,henneaux1992quantization}, which projects
-the dynamics onto the constraint surface and replaces Poisson brackets with Dirac
-brackets; the Dirac--Bergmann analysis of quadratic-torsion PGT is reported
+singular $\mathcal{K}$, and the naive Legendre transform of \cref{LegendreTransform}
+fails for two related reasons: the relation $\pi_i = \mathcal{K}_{ij} v_j$ cannot be
+inverted to give the velocities as independent functions of the momenta, and the
+constrained components no longer correspond to independent canonical pairs. The
+correct treatment is the Dirac--Bergmann
+procedure~\cite{Dirac:1950pj,henneaux1992quantization}, which projects the dynamics
+onto the constraint surface and replaces Poisson brackets with Dirac brackets; the
+Dirac--Bergmann analysis of quadratic-torsion PGT is reported
 in~\cite{barker2021hamiltonian}, with a software implementation
 in~\cite{barker2023higgs}.
-A Dirac--Bergmann reduction is deferred to future work for \TIDAL{}; the Hamiltonian
-density exported by the symbolic stage retains the unreduced velocity-form
-$\hat{H} = \sum_i \pi_i v_i - \mathcal{L}^{(2)}$ without removing gauge directions.
-The exported Hamiltonian is therefore gauge-non-invariant, and the energy-drift
-diagnostic reported by \TIDAL{}'s conservation check for gauge-field theories mixes
-the genuine integration error with a gauge-artifact contribution; the diagnostic
-value alone cannot be interpreted as an integration-accuracy figure for these
-theories. Observables defined in terms of gauge-invariant quantities are unaffected:
-the conversion probability of \cref{GertsenshteinFormula} is gauge-invariant and the
-survey results of \cref{Results} carry no Dirac--Bergmann correction.
+\TIDAL{} does not implement the Dirac--Bergmann reduction; for theories with singular
+$\mathcal{K}$, the velocity-form Hamiltonian of \cref{LegendreTransform} retains the
+gauge directions that the reduction would project out and is therefore incorrect for
+energy measurement on those theories. Where energy diagnostics are reported in this
+work, the measurement is restricted to the gauge-invariant graviton and
+electromagnetic sectors, which lie outside the singular block of $\mathcal{K}$; the
+torsion sectors are not measured, and the singular-$\mathcal{K}$ obstruction does not
+enter the survey results. The conversion probability of \cref{GertsenshteinFormula}
+is gauge-invariant by construction and is unaffected. Theories whose energy
+measurement requires the torsion sectors are deferred to future work alongside the
+Dirac--Bergmann implementation.
 
 \paragraph*{Failure detection}
 At derivation time, \TIDAL{} detects constraint promotion by checking whether the
