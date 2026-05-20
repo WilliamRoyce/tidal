@@ -1,133 +1,302 @@
-% Appendix E: Symbolic-pipeline outputs for the surveyed PGT theories
-% (~700 w + long equations). Project-specific physics appendix.
+% Appendix E: Symbolic-pipeline outputs for the surveyed PGT theories.
 %
-% Subsection slots are intentionally theory-agnostic at scaffold time
-% (`SymbolicReference`, `SymbolicMechanism`, `SymbolicHeadline`) so they
-% can be filled with whichever theories prove most informative — the
-% eventual choice depends on campaigns still in flight. The
-% `HxAxIdentity` equation is hosted in `SymbolicMechanism` because the
-% channel-structure identity is the most stable cross-reference target
-% across the restructure.
+% Observation-only equation collection. Interpretation belongs in
+% \cref{Results} and \cref{Discussion}; the appendix prose carries no
+% paths, tags, or internal references. Equation listings are produced
+% by an external generator (see the project README) and pulled in via
+% \input.
 
 \section{Symbolic outputs for the surveyed theories}%
 \label{SymbolicOutputs}
 
 \paragraph*{Purpose and reading guide}
-% TODO: ~100 w paragraph. These are equations as produced by the TIDAL
-% Wolfram pipeline for the PGT models surveyed in §4 that are too lengthy
-% to display in the main body. Each block is the equation of motion or
-% kinetic matrix in a chosen basis. Readers reproducing a §4 result can
-% copy the equations into a Mathematica session and continue from there.
-% Each block names the source JSON path so the equations can be
-% regenerated from the pipeline.
+The equations collected here are produced by the symbolic stage of
+\cref{SymbolicComputation} for the theories under survey in
+\cref{Results}, in the same flat-background, plane-wave-along-$z$ basis
+used by every numerical run of \cref{NumericalEvolution}.
+Each subsection corresponds to one theory: a single lead sentence
+fixes the Lagrangian content, a figure float reproduces the full
+equations of motion and Hamiltonian density emitted by the pipeline,
+and (where applicable) a short labelled excerpt singles out an entry
+that the main body cites by reference.
+The intent is reference rather than narrative.
+The Einstein--Maxwell baseline of \cref{SymbolicBaseline} fixes the
+comparison standard against which the torsion subsections are read,
+and the no-ghost diagnostic of \cref{SymbolicNonminimal} is the only
+admissible interpretive aside in the appendix.
 
-\subsection{Reference theory: minimally-coupled Einstein--Cartan}%
+% --- Navigation index -----------------------------------------------
+\begin{table}[h]
+\centering
+\caption{Navigation index for the equation blocks of this appendix,
+listed in display order. Each row names the theory by its physics
+content, the algebraic terms beyond Einstein--Maxwell that appear in
+its Lagrangian, the cross-reference target for its equation block,
+and the main-body subsection in which the theory is discussed.}%
+\label{NavigationIndex}
+\small
+\begin{tabularx}{\linewidth}{@{}lXll@{}}
+\toprule
+Theory
+  & Lagrangian content beyond $\mathcal{R}-\tfrac{1}{4}F^2$
+  & Equation block
+  & Main-body anchor \\
+\midrule
+Einstein--Maxwell baseline
+  & none
+  & \cref{BaselineKineticOutput}
+  & \cref{Validation} \\
+Minimally-coupled Einstein--Cartan
+  & $\alpha_{1}\mathcal{T}^2 + \alpha_{2}\mathcal{T}^2 + \alpha_{3}\mathcal{T}^2$
+  & \cref{ReferenceKineticOutput}
+  & \cref{SectorSurvey} \\
+$\tilde{\mathcal{R}}^2$ propagating PGT
+  & EC terms $+\, b_{5}\tilde{\mathcal{R}}^2$
+  & \cref{PropagatingKineticOutput}
+  & \cref{ChannelStructure} \\
+Ricci--EM nonminimal
+  & EC terms $+\, \delta_{1}\tilde{\mathcal{R}}_{\mu\nu}F^{\mu\nu}$
+  & \cref{NonminimalKineticOutput}
+  & \cref{SectorSurvey} \\
+Full YM--PGT nonminimal
+  & EC terms $+\, \beta_{i}, \xi, \delta_{1}, \chi, \zeta_{i}$ couplings
+  & \cref{GeneralNonminimalKineticOutput}
+  & \cref{SectorSurvey} \\
+Parity-odd extension
+  & YM--PGT $+$ parity-odd invariants
+  & \cref{ParityOddKineticOutput}
+  & \cref{SectorSurvey} \\
+Dark-photon-plasma analogue
+  & EC terms $+\, \delta\, F\cdot F_{t}$ kinetic mixing
+  & \cref{DarkPhotonPlasmaKineticOutput}
+  & \cref{SectorSurvey} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+% --- E.1  Einstein--Maxwell Gertsenshtein baseline ------------------
+\subsection{Einstein--Maxwell Gertsenshtein baseline}%
+\label{SymbolicBaseline}
+The pure Einstein--Maxwell theory $\mathcal{L} = \kappa^{-2}\mathcal{R}
+- \tfrac{1}{4}F_{\mu\nu}F^{\mu\nu}$ on a uniform magnetic background
+$\bm{B} = \Bzero\,\hat{x}$, linearised around flat spacetime with
+the plane-wave ansatz of \cref{Linearisation} (propagation along
+$z$, $\bm{B}$ transverse), gives the equations of
+\cref{BaselineKineticOutput}.
+The two transverse graviton polarisations are sourced linearly by
+$\Bzero\,\partial_{z}$ derivatives of the transverse photon modes,
+and the kinetic sub-matrix is block-diagonal in the two transverse
+polarisation channels; the longitudinal photon modes decouple from
+the graviton sector.
+This is the comparison baseline for every torsion theory below.
+
+\begin{figure*}[t]
+\[
+\begin{aligned}
+\input{sections/appendices/listings/eom_baseline_full.tex}
+\end{aligned}
+\]
+\caption{Lagrangian, equations of motion, and Hamiltonian density for
+the Einstein--Maxwell theory on a uniform magnetic background,
+linearised around flat spacetime with the plane-wave ansatz of
+\cref{Linearisation}. The transverse graviton polarisations
+$\mathcal{H}_{xy}$ and $\mathcal{H}_{yy}$ couple linearly to the
+transverse photon modes $\mathcal{A}_{x}$ and $\mathcal{A}_{y}$
+through the $\Bzero$ vertex; the longitudinal photon modes
+$\mathcal{A}_{t}$ and $\mathcal{A}_{z}$ are free. The transverse
+$h$ and $a$ modes exhaust the dynamical content of this theory.}%
+\label{BaselineKineticOutput}
+\end{figure*}
+
+% --- E.2  Minimally-coupled Einstein--Cartan ------------------------
+\subsection{Minimally-coupled Einstein--Cartan}%
 \label{SymbolicReference}
-% Target ~150 w + equation block. Source JSON: examples/<reference
-% theory>/data/<file>.json. Serves as the simplest case in the survey
-% — the theory whose kinetic matrix the reader should examine first to
-% calibrate expectations for the other equation blocks.
+The minimally-coupled Einstein--Cartan theory of
+\cref{SectorSurvey} extends the baseline by three quadratic torsion
+invariants with couplings $\alpha_{1}$, $\alpha_{2}$, $\alpha_{3}$
+and no curvature-squared or nonminimal terms.
+The equations of \cref{ReferenceKineticOutput} are the simplest
+torsion-bearing kinetic system in this appendix; the additional
+$\mathcal{T}$ modes enter as algebraic auxiliary fields satisfying
+the constraint equations whose right-hand sides vanish.
 
-\paragraph*{Kinetic matrix}
-% TODO: introductory sentence + equation block. For long output, use
-% \lstinputlisting{...} from an external .tex file
-% (genre_conventions_software.md §(f.1)).
-\begin{align}
-  % TODO: paste from the relevant JSON. Source: examples/<reference>/data/...
-  \label{ReferenceKineticOutput}
-\end{align}
+\begin{figure*}[t]
+\[
+\begin{aligned}
+\input{sections/appendices/listings/eom_reference_full.tex}
+\end{aligned}
+\]
+\caption{Lagrangian, equations of motion, and Hamiltonian density for
+the minimally-coupled Einstein--Cartan theory of
+\cref{SectorSurvey}. The torsion irreducible components
+$\mathcal{T}_{i}$ enter only through algebraic constraints (the
+$0\!=\!\ldots$ lines); the dynamical content is identical to
+\cref{BaselineKineticOutput} except for the linear constraint
+structure that the auxiliary fields satisfy.}%
+\label{ReferenceKineticOutput}
+\end{figure*}
 
-\paragraph*{Structural baseline}
-% TODO: one sentence noting any structural feature that calibrates
-% comparison with the other equation blocks (e.g. which entries are
-% zero in the reference theory; which are non-zero only off-diagonal).
-
-\subsection{Observed channel pattern: propagating PGT}%
+% --- E.3  Quadratic-torsion propagating PGT -------------------------
+\subsection{Propagating PGT with the curvature-squared term}%
 \label{SymbolicMechanism}
-% Target ~300 w + equation blocks. Source JSON: examples/<propagating
-% PGT>/data/<file>.json. This subsection hosts the equation block that
-% the §4.3 ChannelStructure subsection cross-refs as evidence for the
-% empirical observation. Demoted from "structural-identity mechanism"
-% framing — the equation is presented as an observed pattern, not a
-% theorem; the validity caveats live in §4.3 alongside the empirical
-% claim.
+% Demoted from the original "structural-identity mechanism" framing
+% as set out in the planning scaffold: the equation is presented as
+% an observed pattern, not a theorem; the empirical scope and the
+% validity caveats live in \cref{ChannelStructure}.
+Augmenting the Einstein--Cartan Lagrangian with the
+parity-even curvature-squared invariant $b_{5}\tilde{\mathcal{R}}^{2}$
+gives the propagating-torsion theory of \cref{SectorSurvey}; the
+equations of \cref{PropagatingKineticOutput} are produced by the
+same pipeline acting on this Lagrangian.
 
-\paragraph*{Kinetic matrix and equations of motion}
-% TODO: introductory sentence + long equation block. State the source
-% JSON path; describe the basis (sectorial / channel-aligned) in which
-% the matrix is displayed.
+\begin{figure*}[t]
+\[
+\begin{aligned}
+\input{sections/appendices/listings/eom_mechanism_full.tex}
+\end{aligned}
+\]
+\caption{Lagrangian, equations of motion, and Hamiltonian density for
+the $\tilde{\mathcal{R}}^{2}$-augmented Poincar\'e gauge theory of
+\cref{SectorSurvey}. The $b_{5}\tilde{\mathcal{R}}^{2}$ term
+promotes selected torsion modes to propagating fields whose
+equations now carry second time-derivatives.}%
+\label{PropagatingKineticOutput}
+\end{figure*}
+
+\paragraph*{Observed coincidence in the $h_{\times}$ and $a_{x}$ kinetic
+coefficients.}
+The kinetic coefficients of the $h_{\times}$ and $a_{x}$ entries of
+\cref{PropagatingKineticOutput} have been observed to coincide in
+the symbolic output for every propagating-PGT theory the pipeline
+has been run on; this coincidence is displayed in
+\cref{HxAxIdentity}.
 \begin{align}
-  % TODO: paste the kinetic matrix and EOMs from the propagating-PGT JSON.
-  \label{PropagatingKineticOutput}
+K_{h_{\times} h_{\times}} \;=\; K_{a_{x} a_{x}} .%
+\label{HxAxIdentity}
 \end{align}
 
-% Single named paragraph hosting the equal-coefficient line. Framing is
-% "observed pattern in the symbolic output", not "structural identity"
-% — the latter would require an algebraic proof we do not have.
-\paragraph*{Observed coincidence in the $h_\times$ and ax kinetic coefficients}
-% TODO: ~80 w. State that the two relevant entries of
-% \cref{PropagatingKineticOutput} have been observed to coincide in the
-% symbolic output for the propagating-PGT theories TIDAL has run on.
-% Display the equal-coefficient line as \cref{HxAxIdentity}, presented
-% as the artefact that motivated the observation. Note that the
-% empirical scope of the observation, and the validity caveats that
-% bound it (IC choice not WLOG; TT-gauge admissibility under \Bzero
-% not formally re-derived; theory class is finite), are stated in
-% \cref{ChannelStructure} (§4.3) — not here. This subsection presents
-% only the artefact.
+% --- E.4  Ricci--EM nonminimal coupling -----------------------------
+\subsection{Ricci--EM nonminimal coupling}%
+\label{SymbolicNonminimal}
+The Ricci--EM nonminimal theory of \cref{SectorSurvey} adds a single
+new vertex, $\delta_{1}\tilde{\mathcal{R}}_{\mu\nu}F^{\mu\nu}$, on
+top of the Einstein--Cartan terms. The resulting equations are
+those of \cref{NonminimalKineticOutput}; the new vertex enters every
+$h$-channel equation as an off-diagonal coupling proportional to
+$\delta_{1}$ and reorganises the irreducible-torsion sector through
+the second-time-derivative terms it introduces.
+
+\begin{figure*}[t]
+\[
+\begin{aligned}
+\input{sections/appendices/listings/eom_nonminimal_full.tex}
+\end{aligned}
+\]
+\caption{Lagrangian, equations of motion, and Hamiltonian density for
+the Ricci--EM nonminimal theory of \cref{SectorSurvey}. The
+$\delta_{1}\tilde{\mathcal{R}}_{\mu\nu}F^{\mu\nu}$ coupling
+introduces second-time-derivative couplings between the photon
+modes $\mathcal{A}_{\mu}$ and the irreducible-torsion components
+$\mathcal{T}_{i}$ that are absent from
+\cref{ReferenceKineticOutput}.}%
+\label{NonminimalKineticOutput}
+\end{figure*}
+
+\paragraph*{Trace-channel kinetic excerpt.}
+The diagonal entries of the kinetic matrix in the irreducible-torsion
+basis $(\T[1]{}, \T[2]{}, \T[3]{})$ extracted from
+\cref{NonminimalKineticOutput} are displayed in
+\cref{TraceKineticOutput}; the sign of each entry is what the
+no-ghost analysis below reads off.
 \begin{align}
-  % TODO: equal-coefficient line showing hx-coefficient = ax-coefficient
-  \label{HxAxIdentity}
+K_{\T[1]{}\T[1]{}},\quad K_{\T[2]{}\T[2]{}},\quad K_{\T[3]{}\T[3]{}} .%
+\label{TraceKineticOutput}
 \end{align}
 
-\subsection{Headline-theory equation block}%
-\label{SymbolicHeadline}
-% Target ~250 w + equation block. Source JSON: TBD — selected at
-% drafting time to match the §4.4 headline finding. If the headline
-% turns out to be a non-minimal-coupling amplification corner, this
-% subsection hosts that theory's kinetic matrix (showing the new
-% vertex that breaks the channel-structure identity). If the headline
-% is structural rather than amplification, this subsection may host
-% additional kinematic identities or wrong-sign coefficients.
-%
-% Also serves as the cross-reference target for the App D
-% `Pathological cases` paragraph if that paragraph references a
-% trace-channel kinetic-matrix excerpt.
+\paragraph*{Sign-positivity of the irreducible torsion kinetic
+matrices.}
+The no-ghost condition on the irreducible-torsion sector is the
+requirement that every diagonal entry of the kinetic matrix in the
+$(\T[1]{},\T[2]{},\T[3]{})$ basis be positive in the metric signature of
+\cref{Linearisation}; the four-parameter classification of
+\citet{sezgin1980ghostfree} and its modern PGT refinements
+\cite{lin2019pgt,barker2021hamiltonian} express the same condition as
+algebraic inequalities on the Lagrangian couplings.
+Read against \cref{TraceKineticOutput}, the surveyed Ricci--EM
+nonminimal theory satisfies the no-ghost condition in the
+$\T[1]{}$ and $\T[2]{}$ sectors but violates it in the trace
+$\T[3]{}$ sector for $\delta_{1}\neq 0$; the kinematic observation
+that this wrong-sign sector does not couple to the
+$h_{\times} \leftrightarrow a_{x}$ Gertsenshtein channel is
+recorded in \cref{ChannelStructure}.
 
-\paragraph*{Kinetic matrix}
-% TODO: introductory sentence + equation block at the headline
-% parameter point or theory class.
-\begin{align}
-  % TODO: paste from the relevant JSON.
-  \label{HeadlineKineticOutput}
-\end{align}
+% --- E.5  Full YM--PGT nonminimal -----------------------------------
+\subsection{Full YM--PGT nonminimal}%
+\label{SymbolicGeneralNonminimal}
+The full Yang--Mills-form Poincar\'e gauge theory with all nonminimal
+parity-even couplings turned on -- $\beta_{1,2,3}$, $\xi$, $\delta_{1}$,
+$\chi$, $\zeta_{1,2,3}$ -- is the broadest Lagrangian swept in the
+campaign of \cref{Results}; \cref{GeneralNonminimalKineticOutput}
+displays its equations.
 
-% No-ghost inequality and trace-channel kinetic excerpt. Hosts the
-% structural sign-positivity analysis that catalogues which irreducible
-% torsion sectors exhibit wrong-sign kinetic coefficients in the surveyed
-% PGT models. The App D restructure removed the standalone
-% pathological-cases paragraph and consolidated the symbolic discussion
-% here, where the kinetic matrix that exhibits the wrong-sign coefficient
-% is also displayed.
-\paragraph*{Sign-positivity of the irreducible torsion kinetic matrices}
-% TODO: ~150 w. State the no-ghost condition as a closed inequality on
-% the diagonal entries of the kinetic matrix in the irreducible-torsion
-% basis $(\T[1], \T[2], \T[3])$. Cite \cite{sezgin1980ghostfree} for the
-% original four-parameter classification of PGT and
-% \cite{lin2019pgt,barker2021hamiltonian} for the modern PGT ghost-free
-% inequalities. Report whether the irreducible-torsion sectors of the
-% surveyed propagating-PGT theory satisfy the no-ghost condition;
-% explicitly note the sectors in which the diagonal entry is wrong-sign,
-% and cross-ref \cref{ChannelStructure} (\S4.3) for the kinematic
-% observation that these wrong-sign sectors do not couple to the active
-% $h_\times \leftrightarrow a_x$ channel.
-\begin{align}
-  % TODO: paste from the trace-channel JSON; show the diagonal entries
-  % of the kinetic matrix in the (T1, T2, T3) basis.
-  \label{TraceKineticOutput}
-\end{align}
+\begin{figure*}[t]
+\[
+\begin{aligned}
+\input{sections/appendices/listings/eom_general_nonminimal_full.tex}
+\end{aligned}
+\]
+\caption{Lagrangian, equations of motion, and Hamiltonian density for
+the full Yang--Mills-form Poincar\'e gauge theory with all
+nonminimal parity-even couplings.}%
+\label{GeneralNonminimalKineticOutput}
+\end{figure*}
 
-\paragraph*{Structural feature of the headline regime}
-% TODO: one paragraph noting what is visible in the equations that
-% explains the §4.4 finding (e.g. a new non-zero off-diagonal entry,
-% a wrong-sign kinetic coefficient, an algebraic relation that fails).
+\paragraph*{Named parameter restrictions.}
+The Bahamonde, Barker, and Shapiro variants surveyed in
+\cref{SectorSurvey} are parameter-restricted instances of the
+Lagrangian whose equations appear in
+\cref{GeneralNonminimalKineticOutput}; their kinetic structure is
+read off the same block under the corresponding substitutions in
+the campaign manifest. Their dedicated subsections, when filled,
+will state the restrictions in the form
+$\beta_{1}=0,\ \xi=0,\ \ldots$ and refer back to
+\cref{GeneralNonminimalKineticOutput} for the equations themselves.
+
+% --- E.6  Parity-odd extension --------------------------------------
+\subsection{Parity-odd extension}%
+\label{SymbolicParityOdd}
+The parity-odd extension of \cref{SectorSurvey} adds the parity-odd
+invariants on top of the full Yang--Mills-form Lagrangian; its
+equations are those of \cref{ParityOddKineticOutput}.
+
+\begin{figure*}[t]
+\[
+\begin{aligned}
+\input{sections/appendices/listings/eom_parity_odd_full.tex}
+\end{aligned}
+\]
+\caption{Lagrangian, equations of motion, and Hamiltonian density for
+the parity-odd extension of the Poincar\'e gauge theory of
+\cref{SectorSurvey}.}%
+\label{ParityOddKineticOutput}
+\end{figure*}
+
+% --- E.7  Dark-photon-plasma analogue -------------------------------
+\subsection{Dark-photon-plasma analogue}%
+\label{SymbolicDarkPhotonPlasma}
+The dark-photon-plasma theory of \cref{SectorSurvey} promotes the
+torsion trace to the role of a Proca-mass dark photon by adding a
+kinetic-mixing vertex $\delta\, F_{\mu\nu}F_{t}^{\mu\nu}$ on top of
+the Einstein--Cartan Lagrangian; its equations are those of
+\cref{DarkPhotonPlasmaKineticOutput}.
+
+\begin{figure*}[t]
+\[
+\begin{aligned}
+\input{sections/appendices/listings/eom_dark_photon_plasma_full.tex}
+\end{aligned}
+\]
+\caption{Lagrangian, equations of motion, and Hamiltonian density for
+the dark-photon-plasma theory of \cref{SectorSurvey}.}%
+\label{DarkPhotonPlasmaKineticOutput}
+\end{figure*}
