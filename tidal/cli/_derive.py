@@ -6055,9 +6055,52 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0915
         lines.extend(_wls_constraint_elimination(constants=ctx.constants))
 
     # Build JSON — always use multi-field builder since fieldEquations
-    # Inject tensor component metadata into metadata for LaTeX export
+    # Inject tensor component metadata into metadata for LaTeX export.
+    #
+    # The legacy `_wls_component_metadata` helper populated this map inside
+    # the matter-perturbation / single-field VarD code paths, but the
+    # Component-E-L pipeline that every theory currently exercises bypasses
+    # those paths. Build the map here from the final fieldEquations names
+    # (the only authoritative source post-Phase A / constraint-elimination)
+    # by looking up each name's Wolfram function in compToFunc, recovering
+    # the tensor head by stripping the trailing flat-index digits, and then
+    # calling EnumerateComponentTuples on the head. xTensorQ guards rank
+    # extraction so scalars degrade to rank 0 with empty indices.
     lines.extend(
         (
+            "(* Build component_metadata from final fieldEquations names *)",
+            "componentMetadata = <||>;",
+            "Module[{baseToHead = <||>, fname, parts, base, idx, headStr,"
+            " head, slots, rank, tuples, tuple},",
+            "  Do[",
+            "    fname = fieldEquations[[i, 1]];",
+            '    parts = StringSplit[fname, "_"];',
+            "    If[Length[parts] >= 2 && KeyExistsQ[compToFunc, fname],",
+            "      base = StringJoin @@ Most[parts];",
+            "      idx = ToExpression[Last[parts]];",
+            "      If[!KeyExistsQ[baseToHead, base],",
+            "        headStr = StringReplace[ToString[compToFunc[fname]],"
+            ' RegularExpression["[0-9]+$"] -> ""];',
+            "        baseToHead[base] = Symbol[headStr];",
+            "      ];",
+            "      head = baseToHead[base];",
+            "      If[xTensorQ[head],",
+            "        slots = SlotsOfTensor[head];",
+            "        rank = Length[slots];",
+            "        tuples = EnumerateComponentTuples[head, nCoords];",
+            "        If[idx + 1 <= Length[tuples],",
+            "          tuple = tuples[[idx + 1]];",
+            "          componentMetadata[fname] = <|",
+            '            "head" -> base,',
+            '            "rank" -> rank,',
+            '            "indices" -> tuple',
+            "          |>;",
+            "        ];",
+            "      ];",
+            "    ];,",
+            "    {i, Length[fieldEquations]}",
+            "  ];",
+            "];",
             "(* Inject tensor component metadata for LaTeX export *)",
             "If[Length[componentMetadata] > 0,",
             '  metadata["component_metadata"] = componentMetadata;',
