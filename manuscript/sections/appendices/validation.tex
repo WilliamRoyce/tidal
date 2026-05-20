@@ -56,8 +56,7 @@ is one of the closed-form analytic predictions we test \TIDAL{}
 against. We scan $\Bzero$ over the perturbative regime and \cref{BoccalettiUniform}
 overlays the simulation against two analytic predictions:
 \cref{GertsenshteinFormula} and the
-Raffelt--Stodolsky formula with graviton-effective-mass
-detuning~\cite{raffelt1988mixing},
+Raffelt--Stodolsky formula~\cite{raffelt1988mixing},
 \begin{equation}
   \begin{split}
     \Pconv &= \frac{g^2}{g^2 + \Delta^2}\,
@@ -69,9 +68,10 @@ detuning~\cite{raffelt1988mixing},
 \end{equation}
 where $\omega \simeq k$ is the carrier angular frequency of the photon
 mode. The graviton acquires an effective mass
-$m_h^2 = \kappa^2\Bzero^2/2$ from the $\Bzero^2$ metric
-backreaction~\cite{hwangnoh2023graviton}, detuning its dispersion
-against the massless photon by $\Delta = m_h^2/(4\omega)$.
+$m_h^2 = \kappa^2\Bzero^2/2$ from the $\Bzero^2$ metric backreaction
+(\cref{PerturbativeRegime};~\cite{hwangnoh2023graviton}), detuning
+its dispersion against the massless photon by
+$\Delta = m_h^2/(4\omega)$.
 The two predictions coincide while
 $\kappa\Bzero t/2 \ll \pi/2$; they diverge at larger $\Bzero$ along
 the analytic $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$ curve
@@ -83,8 +83,8 @@ size of the higher-order physics discarded,
 which \cref{PerturbativityHierarchy} places at $\mathcal{O}(\Bzero^4)$.
 \Cref{BoccalettiUniform}(a) shows this residual rising from
 the modal-solver IEEE double-precision floor at small $\Bzero$ into
-the range $10^{-8}$--$10^{-6}$ as $\Bzero$ grows, of the same order
-as the $(\Delta/g)^4$ prediction at those values, and panel (b)
+the range $10^{-8}$--$10^{-6}$, of the same order
+as the $(\Delta/g)^4$ prediction, and panel (b)
 shows the modal/CVODE plateau at the same level.
 
 \paragraph*{Boccaletti kernel on a Gaussian profile}
@@ -96,11 +96,11 @@ form~\cite{raffelt1988mixing}
     \frac{\kappa}{2}\int_{-\infty}^{+\infty}\!B_x(z)\,\mathrm{d}z\right),
   \label{BoccalettiPathIntegrated}
 \end{equation}
-taking the Gaussian profile
-$B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$. We
+For the Gaussian profile
+$B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$, we
 reproduce this closed-form by scanning the
-$(B_\mathrm{peak}, R)$ plane using the derived localised
-Gertsenshtein theory. \Cref{BoccalettiLocalised} shows the
+$(B_\mathrm{peak}, R)$ plane with the localised Gertsenshtein
+theory. \Cref{BoccalettiLocalised} shows the
 scan collapsing onto the single curve
 $P = \sin^2(s)$ in the dimensionless variable
 $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$ within the perturbative
@@ -109,7 +109,7 @@ The scan extends past the first quarter-period ($s > \pi/2$), where
 the $P_\mathrm{conv} \ll 1$ row of \cref{PerturbativityHierarchy}
 fails and the bare path-integrated formula no longer applies;
 points past this quarter-period deviate from the curve as the
-bare-formula coherent approximation breaks down.
+bare path-integrated formula's small-conversion assumption fails.
 
 \begin{figure}[t]
   \centering
@@ -119,8 +119,8 @@ bare-formula coherent approximation breaks down.
     onto the curve $P = \sin^2(s)$ in the dimensionless variable
     $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$, within the
     perturbative regime $s < \pi/2$. Points at $s > \pi/2$ deviate
-    from the curve as the bare-formula coherent approximation breaks
-    down.}
+    from the curve as the bare-formula's small-conversion assumption
+    fails.}
   \label{BoccalettiLocalised}
 \end{figure}
 
@@ -137,14 +137,13 @@ a Klein--Gordon wave with a small mass-shift correction,
   \;=\; -\varepsilon\,\phi,
   \label{KGMassShift}
 \end{equation}
-The order-$\varepsilon^{0}$ solution evolves the $\varepsilon=0$
-base; the order-$\varepsilon^{1}$ correction is integrated against
-the base trajectory; the
-$|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ truncation error
-is $\mathcal{O}(\varepsilon^2)$ by construction.
+for which the truncation error
+$|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ is
+$\mathcal{O}(\varepsilon^2)$ by construction.
 \Cref{ForcedOscillator} shows the slope of
-$|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ versus $\varepsilon$
-recovers the expected algebraic order of error scaling.
+$|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ versus
+$\varepsilon$ recovers the expected algebraic order of error
+scaling.
 
 \begin{figure}[t]
   \centering
@@ -212,17 +211,18 @@ is, to leading order in the field strength,
 \end{equation}
 with $\rho = 4\alpha^{2}/(45\,m_{e}^{4}\,\pi^{2})$ and
 $\sigma = 7\alpha^{2}/(90\,m_{e}^{4}\,\pi^{2})$ the standard QED
-weak-field coefficients. \TIDAL{} correctly projects the
+weak-field coefficients. \TIDAL{}'s symbolic stage projects the
 $(F_{\mu\nu}F^{\mu\nu})^{2}$ correction onto the perpendicular
-photon polarisation and the $(F_{\mu\nu}\tilde{F}^{\mu\nu})^{2}$
-correction onto the parallel polarisation; the resulting
-refractive-index shifts
-$n_\perp - 1 = (8\alpha^2/45)(B/B_c)^2$ and
-$n_\parallel - 1 = (14\alpha^2/45)(B/B_c)^2$, where $B_c = m_e^2/e$ is the
-Schwinger critical field~\cite{schwinger1951gauge}, reproduce the
-Adler birefringence ratio
-$(n_\parallel - 1)/(n_\perp - 1) = 4\sigma/\rho =
-7/4$~\cite{adler1971photon} exactly.
+photon polarisation, sourcing a refractive-index shift
+$n_\perp - 1 = (8\alpha^2/45)(B/B_c)^2$ proportional to $\rho$, and
+the $(F_{\mu\nu}\tilde{F}^{\mu\nu})^{2}$ correction onto the
+parallel polarisation, sourcing
+$n_\parallel - 1 = (14\alpha^2/45)(B/B_c)^2$ proportional to
+$\sigma$ (where $B$ is the background field strength and
+$B_c = m_e^2/e$ is the Schwinger critical
+field~\cite{schwinger1951gauge}). The resulting Adler birefringence
+ratio $(n_\parallel - 1)/(n_\perp - 1) = 14/8 = 7/4$ is reproduced
+exactly~\cite{adler1971photon}.
 
 \paragraph*{Cross-formulation equivalence: Proca versus vector-torsion}%
 \label{ProcaVTEquivalence}
@@ -288,8 +288,7 @@ derivatives in \cref{FDConvergence}, where the Fornberg
 FD orders recover their predicted
 algebraic rates and the pseudo-spectral path falls to the round-off
 floor~\cite{fornberg1988generation,burns2020dedalus}.
-We extend the spatial calibration to a physical example by checking
-\TIDAL{}'s reproduction of the free Proca dispersion relation
+\TIDAL{} reproduces the free Proca dispersion relation
 $\omega(k) = \sqrt{k^2 + m^2}$ at zero background for three values
 of $m^2 \in \{0.1, 1.0, 10.0\}$.
 % The Rabi-frequency extraction
@@ -311,12 +310,10 @@ $\Delta t$.
 % $P_\mathrm{max}$ extraction, ruling out snapshot-timing and
 % measurement-extraction artefacts; modal, \CVODE, and Yoshida-2 are
 % smooth on the same data.
-We attribute the residual Yoshida-4
-pathology to a still-uncharacterised interaction between the
-Yoshida composition and either the coupled two-field structure or
-the two well-separated frequency scales
-($\kappa\Bzero/2 = 0.025$, $\omega_k \approx 2.0$) of the
-EM baseline.
+The residual Yoshida-4 pathology is reproducible but still
+uncharacterised; the production runs in this paper use the
+auto-selected modal backend, so this scatter does not affect any
+of the survey results.
 
 \begin{figure*}[t]
   \centering
