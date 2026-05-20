@@ -23,7 +23,7 @@ The architecture is shown in~\cref{ArchitectureDiagram}.
   \includegraphics[width=\linewidth]{figures/figA1_architecture}
   \caption{\TIDAL{} architecture. The symbolic computation
     (\xAct{}/\Mathematica{}) ingests a TOML theory specification,
-    derives the Euler--Lagrange equations via \xPert{} perturbation
+    derives the Euler--Lagrange (EL) equations via \xPert{} perturbation
     theory and component-level decomposition, and exports the
     equation specification --- the portable interface between the two
     parts. The numerical integration (\Python{}) reads the
@@ -38,7 +38,7 @@ The architecture is shown in~\cref{ArchitectureDiagram}.
 The symbolic computation, written in \Mathematica{}~\cite{mathematica}
 on the \xAct{}~\cite{martingarcia2007xact} suite, expands the
 Lagrangian to quadratic order around the declared background using
-\xPert{}~\cite{brizuela2009xpert}, applies the Euler--Lagrange
+\xPert{}~\cite{brizuela2009xpert}, applies the EL
 variation, and decomposes the resulting tensor equations into their
 components with the aid of \xTras{}~\cite{nutma2014xtras}.
 A complete description of the symbolic operations is

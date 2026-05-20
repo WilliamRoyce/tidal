@@ -93,7 +93,7 @@ set by the time-derivative order of its equation of motion:
       \, ,
       \label{ELVelocityForm}
     \end{align}
-    which advances the field from the velocity slot. The Euler--Lagrange
+    which advances the field from the velocity slot. The EL
     right-hand side $\mathcal{L}$ in general acts linearly on \emph{both} the field and its time
     derivative.
   \item \textbf{First-order fields} (\lstinline!time_order!~$=1$)
@@ -606,7 +606,7 @@ solver from \SUNDIALS{}~\cite{gardner2022sundials,hindmarsh2005sundials}, access
 backward differentiation formulas.
 % of orders $1$ through $5$.
 \TIDAL{} populates the residual with $F_i = y_i'- R_i(y)$ for
-dynamical fields (with $R_i$ the Euler--Lagrange right-hand side),
+dynamical fields (with $R_i$ the EL right-hand side),
 and with $F_i = R_i(y)$ for constraint fields, so that both classes are
 handled simultaneously. \IDA{} is
 the only \TIDAL{} backend that supports algebraic constraints natively
@@ -736,6 +736,41 @@ equation specification, and supply
 it to the linear solver directly through the \SUNDIALS{} callback
 interface~\cite{gardner2022sundials,hindmarsh2005sundials}.
 
+% Figure C.AnalyticalJacobianSpeedup — wall-time comparison vs FD Jacobian.
+% TODO: benchmark script at scripts/benchmarks/jac_speedup.py (to be written)
+%   Sweep dense (N<=2k), sparse (2k<N<=200k), GMRES (N>200k) tiers across
+%   coupled_scalars, gertsenshtein, massive_gravity_2d. Plot wall time
+%   per Newton iteration: analytical vs FD.
+% Output: benchmark_results/canonical/jac_speedup.json.
+% Figure script: scripts/figures/figC6_jac_speedup.py.
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/figC6_jac_speedup}
+  \caption{Per-Newton-iteration Jacobian-\emph{fill} wall time of the
+    three analytical-Jacobian delivery callbacks (dense
+    \texttt{jacfn}, filled circles; sparse-CSC \texttt{jacfn}, filled
+    squares; GMRES \texttt{jactimes}, filled triangles) plotted
+    against the union state-vector size $n_{\rm total}$, alongside
+    the finite-difference proxy
+    $t_{\rm FD}\!\equiv\!n_{\rm colors}\,t_{\rm matvec}$ (open
+    diamonds, grey), where $n_{\rm colors}$ is the maximum number of
+    nonzeros per column of the union sparsity pattern
+    $|\partial F/\partial y|+|\partial F/\partial y'|$ (exact
+    chromatic number for banded finite-difference stencils) and
+    $t_{\rm matvec}$ is one wall-time measurement of a sparse
+    matrix--vector product. Three theories are sampled:
+    \lstinline!coupled_scalars! (1-D, 4 slots),
+    \lstinline!gertsenshtein! (1-D, 12 slots), and
+    \lstinline!navier_cauchy_2d! (2-D $N\!\times\!N$, 4 slots).
+    Markers show the mean over $N_{\rm reps}{=}20$ repetitions;
+    error bars are the per-rep standard deviation. Vertical dashed
+    lines mark the production auto-selection thresholds at
+    $n_{\rm total}{=}2{,}000$ (dense$\to$sparse) and
+    $n_{\rm total}{=}200{,}000$ (sparse$\to$GMRES); the italicised
+    region labels on the centre panel name the corresponding tier.}
+  \label{fig:AnalyticalJacobianSpeedup}
+\end{figure*}
+
 \paragraph*{Three-tier dispatch} The analytical-Jacobian machinery
 maintains three distinct delivery tiers, with thresholds $N \leq
 2{,}000$ for the dense tier, $2{,}000<N\leq 200{,}000$ for the sparse
@@ -784,41 +819,6 @@ are therefore calibrated against full-solver wall times
 against the assembly cost shown in
 Figure~\ref{fig:AnalyticalJacobianSpeedup}.
 
-% Figure C.AnalyticalJacobianSpeedup — wall-time comparison vs FD Jacobian.
-% TODO: benchmark script at scripts/benchmarks/jac_speedup.py (to be written)
-%   Sweep dense (N<=2k), sparse (2k<N<=200k), GMRES (N>200k) tiers across
-%   coupled_scalars, gertsenshtein, massive_gravity_2d. Plot wall time
-%   per Newton iteration: analytical vs FD.
-% Output: benchmark_results/canonical/jac_speedup.json.
-% Figure script: scripts/figures/figC6_jac_speedup.py.
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=\textwidth]{figures/figC6_jac_speedup}
-  \caption{Per-Newton-iteration Jacobian-\emph{fill} wall time of the
-    three analytical-Jacobian delivery callbacks (dense
-    \texttt{jacfn}, filled circles; sparse-CSC \texttt{jacfn}, filled
-    squares; GMRES \texttt{jactimes}, filled triangles) plotted
-    against the union state-vector size $n_{\rm total}$, alongside
-    the finite-difference proxy
-    $t_{\rm FD}\!\equiv\!n_{\rm colors}\,t_{\rm matvec}$ (open
-    diamonds, grey), where $n_{\rm colors}$ is the maximum number of
-    nonzeros per column of the union sparsity pattern
-    $|\partial F/\partial y|+|\partial F/\partial y'|$ (exact
-    chromatic number for banded finite-difference stencils) and
-    $t_{\rm matvec}$ is one wall-time measurement of a sparse
-    matrix--vector product. Three theories are sampled:
-    \lstinline!coupled_scalars! (1-D, 4 slots),
-    \lstinline!gertsenshtein! (1-D, 12 slots), and
-    \lstinline!navier_cauchy_2d! (2-D $N\!\times\!N$, 4 slots).
-    Markers show the mean over $N_{\rm reps}{=}20$ repetitions;
-    error bars are the per-rep standard deviation. Vertical dashed
-    lines mark the production auto-selection thresholds at
-    $n_{\rm total}{=}2{,}000$ (dense$\to$sparse) and
-    $n_{\rm total}{=}200{,}000$ (sparse$\to$GMRES); the italicised
-    region labels on the centre panel name the corresponding tier.}
-  \label{fig:AnalyticalJacobianSpeedup}
-\end{figure*}
-
 % \paragraph*{Coordinate accumulation} The sparse Jacobian is assembled
 % efficiently in a single pass over the operator list before being
 % passed to the linear solver. The cost scales linearly with the number
@@ -844,7 +844,7 @@ in operator-matrix construction.
 % triples of each equation of motion (each triple carries a resolved
 % numerical coefficient, an operator name from the catalogue
 % of~\cref{SpatialDiscretisation}, and a target field name, summed
-% to form the Euler--Lagrange right-hand side), the Hamiltonian terms
+% to form the EL right-hand side), the Hamiltonian terms
 % used by the energy diagnostic, and the mass and coupling matrices
 % used by the modal solver.
 
