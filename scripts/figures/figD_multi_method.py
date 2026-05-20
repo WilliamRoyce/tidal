@@ -36,6 +36,16 @@ THEORY_TITLE: dict[str, str] = {
     "torsion_gertsenshtein_nonminimal": "Nonminimal torsion–EM coupling",
 }
 
+# Repository-side scheme identifiers vs. publication-side display names.
+SCHEME_DISPLAY: dict[str, str] = {
+    "modal": "modal",
+    "cvode": "CVODE",
+    "ida": "IDA",
+    "leapfrog_Y2": r"leapfrog $Y_2$",
+    "leapfrog_Y4": r"leapfrog $Y_4$",
+    "scipy_DOP853": "scipy DOP853",
+}
+
 
 def _matrix(pairs: list[dict], theory: str, backends: list[str]) -> np.ndarray:
     n = len(backends)
@@ -99,12 +109,27 @@ def _plot(data: dict, out_path: Path) -> None:
         sub = rendered_full[1:, :-1]
         sub_mask = mask_upper_full[1:, :-1]
         rendered = np.ma.masked_array(sub, mask=sub_mask)
-        im = ax.imshow(rendered, norm="log", cmap=cmap, vmin=vmin, vmax=vmax)
+        im = ax.imshow(
+            rendered,
+            norm="log",
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            interpolation="nearest",
+        )
         ax.set_xticks(range(n_col))
         ax.set_yticks(range(n_row))
-        ax.set_xticklabels(col_labels, rotation=45, ha="right", fontsize=8)
+        ax.set_xticklabels(
+            [SCHEME_DISPLAY.get(b, b) for b in col_labels],
+            rotation=45,
+            ha="right",
+            fontsize=8,
+        )
         if k == 0:
-            ax.set_yticklabels(row_labels, fontsize=8)
+            ax.set_yticklabels(
+                [SCHEME_DISPLAY.get(b, b) for b in row_labels],
+                fontsize=8,
+            )
         else:
             ax.set_yticklabels([])
         ax.set_title(THEORY_TITLE.get(theory, theory), fontsize=10)
@@ -133,7 +158,12 @@ def _plot(data: dict, out_path: Path) -> None:
 
     # Single shared colorbar across both panels.
     if im is not None:
-        fig.colorbar(im, ax=axes[0, :], shrink=0.85, label="rel. diff.")
+        fig.colorbar(
+            im,
+            ax=axes[0, :],
+            shrink=0.85,
+            label=r"$|P_a - P_b|/\max(|P_a|, |P_b|)$",
+        )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, format="pdf", bbox_inches="tight")

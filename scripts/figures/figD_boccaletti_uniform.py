@@ -126,7 +126,7 @@ def _plot(data: dict, out_path: Path) -> None:
         label=r"$|\sin^2(\kappa B_0 t/2) - P_\mathrm{RS}|$ (analytic)",
     )
     ax.set_xlabel(r"$B_0$")
-    ax.set_ylabel(r"residual against Raffelt--Stodolsky")
+    ax.set_ylabel(r"$|P_{\mathrm{TIDAL}} - P_{\mathrm{RS}}|$")
     ax.legend(frameon=False, fontsize=8, loc="best")
     ax.grid(visible=True, which="both", ls=":", alpha=0.3)
     ax.set_title(rf"(a) residual at $t = {t0:g}$", fontsize=10)
