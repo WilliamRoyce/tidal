@@ -26,6 +26,11 @@
 # TOML change and the regenerated listings together.
 
 [tensor_heads]
+# Maxwell field strength (rank-2). Manuscript convention (via the
+# \FieldF macro in macros.tex) writes the photon field strength as
+# the calligraphic \mathcal{F}, not bare italic F.
+F = "\\mathcal{F}"
+
 # Torsion field strength (rank-2 antisymmetric). Wolfram emits `Ftorsion`;
 # the manuscript writes the torsion-sector kinetic tensor as \tilde F.
 Ftorsion = "\\tilde{F}"
