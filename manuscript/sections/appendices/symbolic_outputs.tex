@@ -3,7 +3,7 @@
 \section{Symbolic outputs for the surveyed theories}%
 \label{SymbolicOutputs}
 
-\begin{table}[h]
+\begin{table*}[t]
 \centering
 \caption{Theories surveyed in this work and their algebraic content
 beyond Einstein--Maxwell.}%
@@ -50,20 +50,15 @@ Dark-photon-plasma analogue
   & \cref{SectorSurvey} \\
 \bottomrule
 \end{tabularx}
-\end{table}
+\end{table*}
 
 % --- E.1  Einstein--Maxwell Gertsenshtein baseline ------------------
 \subsection{Einstein--Maxwell Gertsenshtein baseline}%
 \label{SymbolicBaseline}
-The pure Einstein--Maxwell theory
-$\mathcal{L} = \kappa^{-2}\mathcal{R} - \tfrac{1}{4}F_{\mu\nu}F^{\mu\nu}$
-on a uniform magnetic background $\bm{B} = \Bzero\,\hat{x}$ is the
-baseline against which every torsion theory below is read. The two
-transverse graviton polarisations are sourced linearly by
-$\Bzero\,\partial_{z}$ derivatives of the transverse photon modes;
-the kinetic sub-matrix is block-diagonal in the two transverse
-polarisation channels and the longitudinal photon modes decouple
-from the graviton sector.
+The pure Einstein--Maxwell Lagrangian on a uniform magnetic background
+$\bm{B} = \Bzero\,\hat{x}$ produces the equations of
+\cref{BaselineKineticOutput}. The kinetic sub-matrix is block-diagonal
+in the transverse channels.
 
 \begin{figure*}[t]
 \[
@@ -71,35 +66,19 @@ from the graviton sector.
 \input{sections/appendices/listings/eom_baseline_full.tex}
 \end{aligned}
 \]
-\caption{Transverse graviton polarisations $\mathcal{H}_{xy}$ and
-$\mathcal{H}_{yy}$ couple to the transverse photon modes
-$\mathcal{A}_{x}$ and $\mathcal{A}_{y}$ through the $\Bzero$ vertex;
-the longitudinal photon modes $\mathcal{A}_{t}$ and
-$\mathcal{A}_{z}$ are free.}%
+\caption{}%
 \label{BaselineKineticOutput}
 \end{figure*}
 
 % --- E.2  Euler--Heisenberg QED 1-loop -------------------------------
 \subsection{Euler--Heisenberg QED corrections}%
 \label{SymbolicEulerHeisenberg}
-The QED 1-loop effective action
-$\mathcal{L} \supset \tfrac{1}{8}\rho(F_{\mu\nu}F^{\mu\nu})^{2}
-+ \tfrac{1}{8}\sigma(F_{\mu\nu}\tilde{F}^{\mu\nu})^{2}$
-adds the leading parity-even and parity-odd quartic terms to
-Einstein--Maxwell~\cite{heisenberg1936consequences,schwinger1951gauge,dunne2004heisenberg}.
-The pipeline derives the linearised photon equations of motion via
-the standard Component-E--L path and tags every $O(\rho,\sigma)$
-correction for the perturbative driver (Pass 0 keeps the
-$\rho=\sigma=0$ photon, Pass 1 supplies the Duhamel correction).
-The polarisation-dependent dispersion shifts visible directly in
-the equations -- the $2\Bzero^{2}\rho$ coefficient on the
-$\mathcal{A}_{x}$ propagator versus $6\Bzero^{2}\rho$ on
-$\mathcal{A}_{y}$, with the $\sigma$ term loaded onto the parallel
-polarisation -- reproduce Adler's birefringence ratio
-$(n_{\parallel}-1)/(n_{\perp}-1) = 4\sigma/\rho =
-7/4$~\cite{adler1971photon} on the QED weak-field
-coefficients~$\rho = 4\alpha^{2}/(45 m_{e}^{4}\pi^{2})$ and
-$\sigma = 7\alpha^{2}/(90 m_{e}^{4}\pi^{2})$.
+The Euler--Heisenberg theory of \cref{LagEH} produces the equations
+of \cref{EulerHeisenbergKineticOutput}. The $\rho$-weighted
+coefficient appears as $2\Bzero^{2}\rho$ on
+$\partial_{z}^{2}\mathcal{A}_{x}$ and $6\Bzero^{2}\rho$ on
+$\partial_{z}^{2}\mathcal{A}_{y}$; the $\sigma$ contribution is
+restricted to the Hamiltonian density.
 
 \begin{figure*}[t]
 \[
@@ -107,14 +86,7 @@ $\sigma = 7\alpha^{2}/(90 m_{e}^{4}\pi^{2})$.
 \input{sections/appendices/listings/eom_euler_heisenberg_full.tex}
 \end{aligned}
 \]
-\caption{The parity-even quartic $(F^{2})^{2}$ enters every photon
-mode equation with a coefficient set by $\Bzero^{2}\rho$ and
-discriminates between propagation directions: the perpendicular
-polarisation $\mathcal{A}_{x}$ receives a factor $2\Bzero^{2}\rho$,
-the parallel polarisation $\mathcal{A}_{y}$ receives $6\Bzero^{2}\rho$.
-The parity-odd $(F\tilde{F})^{2}$ term enters only through the
-Hamiltonian density via the $\sigma$ coupling, where it loads
-exclusively onto the parallel polarisation.}%
+\caption{}%
 \label{EulerHeisenbergKineticOutput}
 \end{figure*}
 
@@ -124,8 +96,7 @@ exclusively onto the parallel polarisation.}%
 Three quadratic torsion invariants with couplings $\alpha_{1}$,
 $\alpha_{2}$, $\alpha_{3}$ are added to Einstein--Maxwell; no
 curvature-squared or nonminimal terms appear. The torsion irreducible
-components $\mathcal{T}_{i}$ enter only as algebraic auxiliary fields
-satisfying the constraint equations whose right-hand sides vanish.
+components $\mathcal{T}_{i}$ appear only in equations with LHS $=0$.
 
 \begin{figure*}[t]
 \[
@@ -133,21 +104,17 @@ satisfying the constraint equations whose right-hand sides vanish.
 \input{sections/appendices/listings/eom_reference_full.tex}
 \end{aligned}
 \]
-\caption{Torsion irreducible components $\mathcal{T}_{i}$ enter
-through algebraic constraints (the $0\!=\!\ldots$ lines); the
-dynamical content of the graviton--photon sector is identical to
-\cref{BaselineKineticOutput} once the constraints are solved for the
-auxiliary fields.}%
+\caption{}%
 \label{ReferenceKineticOutput}
 \end{figure*}
 
 % --- E.4  Propagating PGT with the curvature-squared term -----------
 \subsection{Propagating PGT with the curvature-squared term}%
 \label{SymbolicMechanism}
-Augmenting the Einstein--Cartan Lagrangian with the parity-even
-curvature-squared invariant $b_{5}\tilde{\mathcal{R}}^{2}$ promotes
-selected torsion modes to propagating fields. Their equations now
-carry second time-derivatives that scale linearly with $b_{5}$.
+The $b_{5}\tilde{\mathcal{R}}^{2}$ term adds entries proportional
+to $b_{5}$ with up to fourth-order time derivatives on the LHS;
+the $h_{4}$, $h_{7}$, $h_{9}$ kinetic coefficients carry a
+$2\,b_{5}$ factor.
 
 \begin{figure*}[t]
 \[
@@ -155,17 +122,14 @@ carry second time-derivatives that scale linearly with $b_{5}$.
 \input{sections/appendices/listings/eom_mechanism_full.tex}
 \end{aligned}
 \]
-\caption{The $b_{5}\tilde{\mathcal{R}}^{2}$ term promotes selected
-torsion modes to propagating fields whose equations now carry
-second time-derivatives, all with coefficients proportional to
-$b_{5}$.}%
+\caption{}%
 \label{PropagatingKineticOutput}
 \end{figure*}
 
 \paragraph*{Observed coincidence in the $h_{\times}$ and $a_{x}$ kinetic
 coefficients.}
 The kinetic coefficients of the $h_{\times}$ and $a_{x}$ entries of
-\cref{PropagatingKineticOutput} coincide in the symbolic output for
+\cref{PropagatingKineticOutput} have been observed to coincide in
 every propagating-PGT theory the pipeline has been run on:
 \begin{align}
 K_{h_{\times} h_{\times}} \;=\; K_{a_{x} a_{x}} .%
@@ -175,11 +139,11 @@ K_{h_{\times} h_{\times}} \;=\; K_{a_{x} a_{x}} .%
 % --- E.5  Ricci--EM nonminimal coupling -----------------------------
 \subsection{Ricci--EM nonminimal coupling}%
 \label{SymbolicNonminimal}
-A single new vertex $\delta_{1}\tilde{\mathcal{R}}_{\mu\nu}F^{\mu\nu}$
-is added to the Einstein--Cartan terms. The new vertex enters every
-$h$-channel equation as an off-diagonal coupling proportional to
-$\delta_{1}$ and reorganises the irreducible-torsion sector through
-the second-time-derivative terms it introduces.
+A single new vertex
+$\delta_{1}\tilde{\mathcal{R}}_{\mu\nu}F^{\mu\nu}$ is added to the
+Einstein--Cartan terms. The $\delta_{1}$ coupling adds entries in
+every $h$-channel equation and second-time-derivative entries in
+the irreducible-torsion sector.
 
 \begin{figure*}[t]
 \[
@@ -187,10 +151,7 @@ the second-time-derivative terms it introduces.
 \input{sections/appendices/listings/eom_nonminimal_full.tex}
 \end{aligned}
 \]
-\caption{The $\delta_{1}\tilde{\mathcal{R}}_{\mu\nu}F^{\mu\nu}$
-coupling introduces second-time-derivative couplings between the
-photon modes $\mathcal{A}_{\mu}$ and the irreducible-torsion
-components $\mathcal{T}_{i}$.}%
+\caption{}%
 \label{NonminimalKineticOutput}
 \end{figure*}
 
@@ -199,38 +160,21 @@ The diagonal entries of the kinetic matrix in the irreducible-torsion
 basis $(\T[1]{}, \T[2]{}, \T[3]{})$ extracted from
 \cref{NonminimalKineticOutput} are
 \begin{align}
-K_{\T[1]{}\T[1]{}},\quad K_{\T[2]{}\T[2]{}},\quad K_{\T[3]{}\T[3]{}} ,%
+K_{\T[1]{}\T[1]{}},\quad K_{\T[2]{}\T[2]{}},\quad K_{\T[3]{}\T[3]{}} .%
 \label{TraceKineticOutput}
 \end{align}
-and the sign of each entry is what the no-ghost analysis below reads
-off.
-
-\paragraph*{Sign-positivity of the irreducible torsion kinetic
-matrices.}
-The no-ghost condition on the irreducible-torsion sector is the
-requirement that every diagonal entry of the kinetic matrix in the
-$(\T[1]{},\T[2]{},\T[3]{})$ basis be positive in the metric signature
-of \cref{Linearisation}; the four-parameter classification of
-\citet{sezgin1980ghostfree} and its modern PGT refinements
-\cite{lin2019pgt,barker2021hamiltonian} express the same condition as
-algebraic inequalities on the Lagrangian couplings. Read against
-\cref{TraceKineticOutput}, the surveyed Ricci--EM nonminimal theory
-satisfies the no-ghost condition in the $\T[1]{}$ and $\T[2]{}$
-sectors but violates it in the trace $\T[3]{}$ sector for
-$\delta_{1}\neq 0$; the kinematic observation that this wrong-sign
-sector does not couple to the $h_{\times} \leftrightarrow a_{x}$
-Gertsenshtein channel is recorded in \cref{ChannelStructure}.
+In \cref{TraceKineticOutput}, $K_{\T[3]{}\T[3]{}}$ has the opposite
+sign of $K_{\T[1]{}\T[1]{}}$ and $K_{\T[2]{}\T[2]{}}$ for
+$\delta_{1}\neq 0$.
 
 % --- E.6  Full YM--PGT nonminimal -----------------------------------
 \subsection{Full YM--PGT nonminimal}%
 \label{SymbolicGeneralNonminimal}
-The full Yang--Mills-form Poincar\'e gauge theory turns on all
-nonminimal parity-even couplings -- $\beta_{1,2,3}$, $\xi$,
-$\delta_{1}$, $\chi$, $\zeta_{1,2,3}$ -- and is the broadest
-Lagrangian swept in the campaign of \cref{Results}. The Bahamonde,
-Barker, and Shapiro variants surveyed in \cref{SectorSurvey} are
-parameter restrictions of this Lagrangian; their kinetic structure
-is read off the same block under the corresponding substitutions.
+The full Yang--Mills-form Poincar\'e gauge Lagrangian turns on
+$\beta_{1,2,3}$, $\xi$, $\delta_{1}$, $\chi$, $\zeta_{1,2,3}$
+simultaneously. The Bahamonde, Barker, and Shapiro variants of
+\cref{SectorSurvey} are parameter restrictions of the same
+Lagrangian.
 
 \begin{figure*}[t]
 \[
@@ -238,20 +182,16 @@ is read off the same block under the corresponding substitutions.
 \input{sections/appendices/listings/eom_general_nonminimal_full.tex}
 \end{aligned}
 \]
-\caption{Full Yang--Mills-form Poincar\'e gauge theory with every
-parity-even nonminimal coupling active simultaneously.}%
+\caption{}%
 \label{GeneralNonminimalKineticOutput}
 \end{figure*}
 
 % --- E.7  Parity-odd extension --------------------------------------
 \subsection{Parity-odd extension}%
 \label{SymbolicParityOdd}
-The parity-odd extension adds twelve parity-odd invariants
-($d_{14}$--$d_{17}$, $d_{19}$--$d_{21}$, $\zeta_{T,1}$--$\zeta_{T,6}$
-in the notation of \cref{SectorSurvey}) on top of the full
-Yang--Mills-form Lagrangian. These vertices are the leading
-P-violating tree-level corrections to PGT that the campaign
-constrains.
+$d_{14}$--$d_{17}$, $d_{19}$--$d_{21}$, and
+$\zeta_{T,1}$--$\zeta_{T,6}$ are added to the full Yang--Mills-form
+Lagrangian.
 
 \begin{figure*}[t]
 \[
@@ -259,24 +199,18 @@ constrains.
 \input{sections/appendices/listings/eom_parity_odd_full.tex}
 \end{aligned}
 \]
-\caption{Parity-odd extension of the Poincar\'e gauge theory of
-\cref{SectorSurvey}; the new vertices enter every photon-mode
-equation through $\Bzero$-weighted gradient couplings to the
-irreducible-torsion components.}%
+\caption{}%
 \label{ParityOddKineticOutput}
 \end{figure*}
 
 % --- E.8  Dark-photon-plasma analogue -------------------------------
 \subsection{Dark-photon-plasma analogue}%
 \label{SymbolicDarkPhotonPlasma}
-Promoting the torsion trace to the role of a Proca-mass dark photon
-proceeds by adding a kinetic-mixing vertex
-$\delta_{m}\,F_{\mu\nu}\tilde{F}^{\mu\nu}$ on top of the
-Einstein--Cartan Lagrangian, where $\tilde{F}$ here denotes the
-torsion-trace field strength rather than the Hodge dual. The photon
-mass $M_{\mathcal{A}}^{2}$ enters the diagonal photon kinetic term;
-the kinetic mixing $\delta_{m}$ enters every photon EOM as an
-off-diagonal coupling to the irreducible-torsion sector.
+A kinetic-mixing vertex $\delta_{m}\,F_{\mu\nu}\tilde{F}^{\mu\nu}$
+(with $\tilde{F}$ the torsion-trace field strength) and a photon
+mass term $M_{\mathcal{A}}^{2}$ are added to the Einstein--Cartan
+Lagrangian. $M_{\mathcal{A}}^{2}$ enters the diagonal photon kinetic
+term; $\delta_{m}$ enters the off-diagonal photon--torsion entries.
 
 \begin{figure*}[t]
 \[
@@ -284,9 +218,6 @@ off-diagonal coupling to the irreducible-torsion sector.
 \input{sections/appendices/listings/eom_dark_photon_plasma_full.tex}
 \end{aligned}
 \]
-\caption{Dark-photon-plasma analogue. The kinetic-mixing vertex
-$\delta_{m}$ couples the photon modes $\mathcal{A}_{\mu}$ to the
-torsion-trace field strength; the Proca mass $M_{\mathcal{A}}^{2}$
-enters the diagonal photon kinetic term.}%
+\caption{}%
 \label{DarkPhotonPlasmaKineticOutput}
 \end{figure*}
