@@ -1507,7 +1507,12 @@ class EquationSystem:
         )
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, PLR0912, C901
+    def from_dict(  # noqa: PLR0914, PLR0912, C901, PLR0915
+        cls,
+        data: Mapping[str, Any],
+        *,
+        strict_v6: bool = True,
+    ) -> EquationSystem:
         """Create an EquationSystem from a dictionary (parsed JSON).
 
         Raises
@@ -1650,7 +1655,17 @@ class EquationSystem:
                 f"will automatically use `--perturbative-order 1` by "
                 f"default.\nSee docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md."
             )
-            raise ValueError(msg)
+            if strict_v6:
+                raise ValueError(msg)
+            # Inspect / LaTeX-render callers (strict_v6=False) only read the
+            # spec and never evolve it, so the Ostrogradsky-ghost concern
+            # does not apply. Emit a warning so the condition stays visible
+            # in logs.
+            warnings.warn(
+                "[json_loader] time_order > 2 fields present without "
+                "[perturbation]; loaded for read-only use. " + msg.split("\n", 1)[0],
+                stacklevel=2,
+            )
 
         return spec
 
@@ -1762,13 +1777,23 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
 # --- Public loader ---
 
 
-def load_equation_system(json_path: Path | str) -> EquationSystem:
+def load_equation_system(
+    json_path: Path | str,
+    *,
+    strict_v6: bool = True,
+) -> EquationSystem:
     """Load an equation system from a JSON file.
 
     Parameters
     ----------
     json_path : Path | str
         Path to the JSON file exported from Mathematica.
+    strict_v6 : bool, optional
+        When True (default), the v6 ``time_order > 2`` guard raises if the
+        JSON has higher-derivative fields without a ``[perturbation]``
+        section. Set to False for read-only callers (LaTeX rendering,
+        inspection) that do not evolve the system — the guard becomes a
+        warning so the spec still loads.
 
     Returns
     -------
@@ -1789,7 +1814,7 @@ def load_equation_system(json_path: Path | str) -> EquationSystem:
         data = json.load(f)
 
     validate_json_schema(data)
-    return EquationSystem.from_dict(data)
+    return EquationSystem.from_dict(data, strict_v6=strict_v6)
 
 
 def _evaluate_synth_coefficient(

@@ -13,6 +13,7 @@ from tidal.symbolic.latex import (
     field_to_latex,
     hamiltonian_to_latex,
     lagrangian_to_latex,
+    load_symbol_overrides,
     operator_to_latex,
     system_to_latex,
 )
@@ -103,7 +104,9 @@ class TestCoefficientToLatex:
     def test_tanh(self) -> None:
         result = coefficient_to_latex("Tanh[x/W]")
         assert r"\tanh" in result
-        assert "x/W" in result
+        # The bare-denominator regex in _coefficient_inner now converts the
+        # ``x/W`` slash form to a proper fraction inside the \tanh argument.
+        assert r"\frac{x}{W}" in result
 
     def test_sin(self) -> None:
         result = coefficient_to_latex("Sin[2*x]")
@@ -476,7 +479,10 @@ class TestSystemToLatex:
         result = system_to_latex(spec, output_format="align")
         assert r"\begin{align}" in result
         assert r"\end{align}" in result
-        assert r"\mathcal{L}" in result
+        # Lagrangian density now renders as \mathscr{L} (corpus convention,
+        # matching \lag in manuscript/macros.tex and the \mathscr{H} that
+        # hamiltonian_to_latex() already emits).
+        assert r"\mathscr{L}" in result
 
     def test_document_format(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
@@ -585,7 +591,137 @@ class TestAllExamplesRender:
             )
         from tidal.symbolic.json_loader import load_equation_system
 
-        spec = load_equation_system(json_file)
+        # Read-only render test — relax the v6 time_order > 2 guard so
+        # theories whose [perturbation] block is intentionally disabled
+        # (to extract the exact non-LPS EOMs) can still be rendered.
+        spec = load_equation_system(json_file, strict_v6=False)
         result = system_to_latex(spec, output_format="align")
         assert r"\begin{align}" in result
         assert r"\end{align}" in result
+
+
+# ---------------------------------------------------------------------------
+# load_symbol_overrides — tensor head & parameter rebinding
+# ---------------------------------------------------------------------------
+
+
+class TestSymbolOverrides:
+    """Project-scoped overrides for tensor heads and scalar parameters.
+
+    Loaded via ``load_symbol_overrides(path)`` from a TOML file (typically
+    ``manuscript/latex_symbols.toml``). State is module-level; each test
+    re-loads from a tmp_path so state is bounded.
+    """
+
+    @staticmethod
+    def _write(tmp_path: Path, content: str) -> Path:
+        f = tmp_path / "symbols.toml"
+        f.write_text(content, encoding="utf-8")
+        return f
+
+    def test_clear_when_path_missing(self, tmp_path: Path) -> None:
+        # Loading a file that does not exist clears existing overrides.
+        present = self._write(
+            tmp_path,
+            """
+[parameters]
+deltam = "\\\\delta_m"
+""",
+        )
+        load_symbol_overrides(present)
+        # Sanity: override active
+        assert "\\delta_m" in coefficient_to_latex("deltam")
+        # Now clear by pointing at a path that doesn't exist
+        load_symbol_overrides(tmp_path / "does_not_exist.toml")
+        # Override gone; raw "deltam" passes through (built-ins know no such name)
+        assert "\\delta_m" not in coefficient_to_latex("deltam")
+
+    def test_tensor_head_override(self, tmp_path: Path) -> None:
+        cfg = self._write(
+            tmp_path,
+            """
+[tensor_heads]
+Ftorsion = "\\\\tilde{F}"
+""",
+        )
+        load_symbol_overrides(cfg)
+        # Lagrangian-side rendering of a tensor with overridden head.
+        out = lagrangian_to_latex("Ftorsion[-a,-b]")
+        assert "\\tilde{F}" in out
+        assert "Ftorsion" not in out
+        load_symbol_overrides(tmp_path / "clear.toml")  # cleanup
+
+    def test_parameter_override_bare(self, tmp_path: Path) -> None:
+        cfg = self._write(
+            tmp_path,
+            """
+[parameters]
+deltam = "\\\\delta_m"
+""",
+        )
+        load_symbol_overrides(cfg)
+        # Bare parameter token (no trailing digits) gets the override verbatim.
+        out = coefficient_to_latex("deltam")
+        assert "\\delta_m" in out
+        assert "deltam" not in out
+        load_symbol_overrides(tmp_path / "clear.toml")
+
+    def test_parameter_override_with_subscript_auto_braces(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        cfg = self._write(
+            tmp_path,
+            """
+[parameters]
+zt = "\\\\zeta_T"
+""",
+        )
+        load_symbol_overrides(cfg)
+        # ``zt1`` is split into base ``zt`` + digits ``1`` by the existing
+        # subscript handler; the override target is auto-braced so the
+        # subscript binds to the whole ``\zeta_T`` rather than producing the
+        # ambiguous ``\zeta_T_{1}``.
+        out = coefficient_to_latex("zt1")
+        assert "{\\zeta_T}_{1}" in out
+        load_symbol_overrides(tmp_path / "clear.toml")
+
+    def test_override_does_not_break_greek(self, tmp_path: Path) -> None:
+        # Loading an override TOML must not interfere with Greek substitution
+        # of unrelated identifiers.
+        cfg = self._write(
+            tmp_path,
+            """
+[parameters]
+deltam = "\\\\delta_m"
+""",
+        )
+        load_symbol_overrides(cfg)
+        assert "\\kappa" in coefficient_to_latex("kappa")
+        assert "\\alpha_{1}" in coefficient_to_latex("alpha1")
+        load_symbol_overrides(tmp_path / "clear.toml")
+
+    def test_repeat_load_replaces_state(self, tmp_path: Path) -> None:
+        first = self._write(
+            tmp_path,
+            """
+[parameters]
+deltam = "\\\\delta_m"
+""",
+        )
+        load_symbol_overrides(first)
+        assert "\\delta_m" in coefficient_to_latex("deltam")
+
+        second = tmp_path / "second.toml"
+        second.write_text(
+            """
+[parameters]
+otherparam = "\\\\xi"
+""",
+            encoding="utf-8",
+        )
+        load_symbol_overrides(second)
+        # The first override is gone (replaced, not merged).
+        assert "\\delta_m" not in coefficient_to_latex("deltam")
+        assert "\\xi" in coefficient_to_latex("otherparam")
+        load_symbol_overrides(tmp_path / "clear.toml")

@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from pathlib import Path
 
 from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 
@@ -165,6 +166,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default="align",
         dest="latex_format",
         help="LaTeX output format (default: align). 'document' wraps in standalone .tex",
+    )
+    inspect_parser.add_argument(
+        "--symbols",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a TOML symbol-override file (e.g. manuscript/latex_symbols.toml) "
+            "binding project-specific tensor heads and parameter names to the "
+            "macros and conventions of the surrounding manuscript. See "
+            "tidal.symbolic.latex.load_symbol_overrides for the file shape."
+        ),
     )
 
     # --- simulate ---

@@ -54,5 +54,5 @@ zt = "\\zeta_T"
 # constants cannot contain underscores), not a flat-index subscript. The
 # whole-token override fires before the generic digit-suffix splitter so
 # the rendered form has the ``^2`` exponent rather than ``_{2}``.
-mA2 = "M_{\\mathcal{A}}^{2}"   # photon mass squared
-mT2 = "M_{T}^{2}"              # torsion-vector mass squared (Proca-analogue)
+mA2 = "m_{\\mathcal{A}}^{2}" # photon mass squared
+mT2 = "m_{T}^{2}"            # torsion-vector mass squared (Proca-analogue)
