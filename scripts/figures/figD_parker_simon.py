@@ -143,7 +143,7 @@ def _plot(data: dict, out_path: Path) -> None:
         )
 
     ax.set_xlabel(r"perturbation parameter $\varepsilon$")
-    ax.set_ylabel(r"error vs full-$\varepsilon$ modal solution")
+    ax.set_ylabel(r"$|\phi^\mathrm{approx} - \phi^\mathrm{exact}|$")
     ax.set_title(r"$\varepsilon\,\partial_x^4 \phi$ correction", fontsize=10)
     ax.grid(visible=True, which="both", ls=":", alpha=0.3)
     ax.legend(frameon=False, fontsize=7, loc="lower right")

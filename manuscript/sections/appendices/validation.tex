@@ -339,7 +339,8 @@ of the survey results.
 \end{figure*}
 
 \paragraph*{Energy-conservation audit}
-Energy conservation, when available, provides a diagnostic that engages
+Energy conservation, when available
+(\cref{SVDNullSpace,DiracBergmann}), provides a diagnostic that engages
 every layer of the workflow.
 % at once: a constraint solver that
 % returns inconsistent initial conditions, a symbolic stage that
@@ -379,20 +380,15 @@ selects, which differs across theories.
   \caption{Energy-conservation audit: maximum relative drift
     $|\Delta E/E|_\mathrm{max}$ across the surveyed theories, sorted
     in descending order. The four bottom rows sit at the modal
-    solver's precision floor. The propagating-PGT nonminimal sector
-    and the vector-torsion dark-photon plasma both carry
-    rank-deficient kinetic matrices
-    ($\operatorname{cond}(V) \gtrsim 10^{15}$ in the latter case)
-    with null directions that are not physical degrees of freedom.
-    The SVD null-space projection of \cref{NumericalEvolution}
-    restricts the dynamics to the physical sub-space, on which the
-    Hamiltonian is well-defined and energy is conserved at the
-    precision of the backend. The drift values quoted in the top
-    two rows are measured using the original-variable energy
-    expression, which still includes the unphysical null
-    directions; they are a measurement artifact of the
-    original-variable formula and not a failure of the dynamics
-    on the physical sub-space.}
+    solver's precision floor. For the top two rows the
+    energy-conservation diagnostic itself is incorrect (see
+    \cref{DiracBergmann}): these theories carry rank-deficient
+    kinetic matrices for which \TIDAL{}'s exported Hamiltonian is
+    gauge-non-invariant, so the drift values mix integration error
+    with a gauge artifact and cannot be interpreted as an
+    integration-accuracy figure. The dynamics is unaffected: the
+    survey conversion-probability observables of \cref{Results} are
+    gauge-invariant and carry no Dirac--Bergmann correction.}
   \label{ConservationAudit}
 \end{table}
 

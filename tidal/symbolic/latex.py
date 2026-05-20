@@ -296,16 +296,16 @@ def coefficient_to_latex(expr: str) -> str:  # noqa: C901, PLR0914
     >>> coefficient_to_latex("-(B0^2*kappa^2)")
     '-B_0^{2} \\\\kappa^{2}'
     >>> coefficient_to_latex("1/2")
-    '\\\\frac{1}{2}'
+    '\\\\tfrac{1}{2}'
     """
     if not expr:
         return ""
 
     s = expr.strip()
 
-    # Step 1: Rational[p, q] → \frac{p}{q}
+    # Step 1: Rational[p, q] → \tfrac{p}{q}
     s = _RE_RATIONAL.sub(
-        lambda m: rf"\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}",
+        lambda m: rf"\tfrac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}",
         s,
     )
 
@@ -350,7 +350,7 @@ def coefficient_to_latex(expr: str) -> str:  # noqa: C901, PLR0914
             sign_emit = "-" if sign == "-" else ""
             return f"{sign_emit}{_coefficient_inner(inner)}"
 
-    # Step 6: Numeric prefix fraction: -1/2*(rest) or 1/2*(rest) → -\frac{1}{2}(rest)
+    # Step 6: Numeric prefix fraction: -1/2*(rest) or 1/2*(rest) → -\tfrac{1}{2}(rest)
     prefix_frac = re.match(r"^(-?)(\d+)/(\d+)\*(.+)$", s)
     if prefix_frac:
         sign = prefix_frac.group(1)
@@ -359,15 +359,15 @@ def coefficient_to_latex(expr: str) -> str:  # noqa: C901, PLR0914
         rest = prefix_frac.group(4)
         rest_tex = _coefficient_inner(rest)
         return _merge_adjacent_reciprocals(
-            rf"{sign}\frac{{{num}}}{{{den}}} {rest_tex}",
+            rf"{sign}\tfrac{{{num}}}{{{den}}} {rest_tex}",
         )
 
-    # Step 7: Top-level fraction detection A/B → \frac{A}{B}
+    # Step 7: Top-level fraction detection A/B → \tfrac{A}{B}
     div_idx = _find_top_level_division(s)
     if div_idx is not None:
         numer = s[:div_idx].strip()
         denom = s[div_idx + 1 :].strip()
-        # Handle sign: -(A)/B → -\frac{A}{B}
+        # Handle sign: -(A)/B → -\tfrac{A}{B}
         sign = ""
         if numer.startswith("-") and numer[1:].strip().startswith("("):
             sign = "-"
@@ -381,7 +381,7 @@ def coefficient_to_latex(expr: str) -> str:  # noqa: C901, PLR0914
         numer_tex = _coefficient_inner(numer)
         denom_tex = _coefficient_inner(denom)
         return _merge_adjacent_reciprocals(
-            rf"{sign}\frac{{{numer_tex}}}{{{denom_tex}}}",
+            rf"{sign}\tfrac{{{numer_tex}}}{{{denom_tex}}}",
         )
 
     return _merge_adjacent_reciprocals(_coefficient_inner(s))
@@ -390,10 +390,10 @@ def coefficient_to_latex(expr: str) -> str:  # noqa: C901, PLR0914
 def _merge_adjacent_reciprocals(s: str) -> str:
     r"""Combine adjacent unit-numerator fractions into one fraction.
 
-    ``\frac{1}{A} \frac{1}{B}`` → ``\frac{1}{A \, B}``.
+    ``\tfrac{1}{A} \tfrac{1}{B}`` → ``\tfrac{1}{A \, B}``.
 
-    Applied iteratively so chains of three or more (``\frac{1}{A}
-    \frac{1}{B} \frac{1}{C}``) collapse to a single ``\frac{1}{A \, B
+    Applied iteratively so chains of three or more (``\tfrac{1}{A}
+    \tfrac{1}{B} \tfrac{1}{C}``) collapse to a single ``\tfrac{1}{A \, B
     \, C}``. Denominator content may contain one level of nested braces
     (e.g. ``\kappa^{2}``, ``B_{0}``), but not deeper structure — this
     keeps the merge safe against ``\sqrt{}`` or other multi-arg macros.
@@ -402,13 +402,13 @@ def _merge_adjacent_reciprocals(s: str) -> str:
     # groups at one level of nesting (``\kappa^{2}``, ``B_{0}``, ...).
     denom = r"(?:[^{}]|\{[^{}]*\})+"
     pattern = re.compile(
-        rf"\\frac\{{1\}}\{{({denom})\}}\s*(?:\\,\s*)?\\frac\{{1\}}\{{({denom})\}}",
+        rf"\\tfrac\{{1\}}\{{({denom})\}}\s*(?:\\,\s*)?\\tfrac\{{1\}}\{{({denom})\}}",
     )
     prev = None
     while prev != s:
         prev = s
         s = pattern.sub(
-            lambda m: rf"\frac{{1}}{{{m.group(1)} \, {m.group(2)}}}",
+            lambda m: rf"\tfrac{{1}}{{{m.group(1)} \, {m.group(2)}}}",
             s,
         )
     return s
@@ -469,31 +469,31 @@ def _coefficient_inner(s: str) -> str:
         s,
     )
 
-    # 1/(expr) → \frac{1}{expr}
-    s = re.sub(r"\b1/\(([^)]+)\)", lambda m: rf"\frac{{1}}{{{m.group(1)}}}", s)
+    # 1/(expr) → \tfrac{1}{expr}
+    s = re.sub(r"\b1/\(([^)]+)\)", lambda m: rf"\tfrac{{1}}{{{m.group(1)}}}", s)
 
-    # Negative-exponent → reciprocal-fraction: ``\kappa^{-2}`` → ``\frac{1}{\kappa^{2}}``.
+    # Negative-exponent → reciprocal-fraction: ``\kappa^{-2}`` → ``\tfrac{1}{\kappa^{2}}``.
     # Match a single atomic base (Greek command, letter run with optional
     # subscript group) followed by ``^{-N}``. Keeps the surrounding context
     # unchanged so the later ``_merge_adjacent_reciprocals`` pass can fold
     # the resulting fraction with neighbours into a common denominator.
     s = re.sub(
         r"(\\?[A-Za-z]+(?:_\{[^{}]+\})?)\^\{-(\d+)\}",
-        lambda m: rf"\frac{{1}}{{{m.group(1)}^{{{m.group(2)}}}}}",
+        lambda m: rf"\tfrac{{1}}{{{m.group(1)}^{{{m.group(2)}}}}}",
         s,
     )
 
     # Bare-denominator fractions: 1/\kappa^{2}, 1/\kappa, A/B etc. Runs AFTER
     # Greek substitution so backslash-prefixed names (\kappa, \alpha, ...)
     # are accepted in the denominator. Without this step a coefficient like
-    # ``-1/(2*kappa^2)`` ends up rendered as ``-\frac{1}{2} 1/\kappa^{2}``
+    # ``-1/(2*kappa^2)`` ends up rendered as ``-\tfrac{1}{2} 1/\kappa^{2}``
     # — half proper-fraction, half slash — because the outer 1/(2*…) split
     # leaves the inner ``1/\kappa^{2}`` for this pass to clean up.
     s = re.sub(
         r"(?<![\\{])(\d+|[A-Za-z]+|\\[A-Za-z]+(?:\^\{?\d+\}?)?)"
         r"/"
         r"(\\?[A-Za-z]+(?:\^\{?\d+\}?)?|\d+)",
-        lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}",
+        lambda m: rf"\tfrac{{{m.group(1)}}}{{{m.group(2)}}}",
         s,
     )
 
@@ -797,7 +797,7 @@ def equation_to_latex(
             # ``-`` at brace-depth zero) in ``\left(...\right)`` so the
             # reader can see at a glance that the whole sum multiplies the
             # operator. Single-product coefficients like
-            # ``-\frac{1}{\kappa^{2}}`` and ``2 \, b_{5}`` need no parens.
+            # ``-\tfrac{1}{\kappa^{2}}`` and ``2 \, b_{5}`` need no parens.
             if _has_top_level_sum(kc_tex):
                 kc_tex = rf"\left({kc_tex}\right)"
             lhs = rf"{kc_tex} \, {partial_tex} {field_tex}"
@@ -848,7 +848,7 @@ def _format_numeric_coeff(value: float) -> str:
         if frac.denominator == 1:
             return str(frac.numerator)
         sign = "-" if frac.numerator < 0 else ""
-        return rf"{sign}\frac{{{abs(frac.numerator)}}}{{{frac.denominator}}}"
+        return rf"{sign}\tfrac{{{abs(frac.numerator)}}}{{{frac.denominator}}}"
     return f"{value:g}"
 
 
@@ -1051,11 +1051,11 @@ def _replace_scalar_field(m: re.Match[str]) -> str:
 
 
 def _paren_frac(m: re.Match[str]) -> str:
-    r"""Convert parenthesized fraction (A/B) → \\frac{A}{B}."""
+    r"""Convert parenthesized fraction (A/B) → \\tfrac{A}{B}."""
     inner = m.group(1)
     slash = inner.find("/")
     if slash > 0:
-        return rf"\frac{{{inner[:slash].strip()}}}{{{inner[slash + 1 :].strip()}}}"
+        return rf"\tfrac{{{inner[:slash].strip()}}}{{{inner[slash + 1 :].strip()}}}"
     return m.group(0)
 
 
@@ -1070,12 +1070,12 @@ def _lagrangian_cleanup(s: str) -> str:
     # Convert Mathematica functions before any other processing
     s = _convert_math_functions(s)
     s = s.replace("*", r" \, ")
-    # Parenthesized fractions: (A/B) → \frac{A}{B} (before Greek, so names stay intact)
+    # Parenthesized fractions: (A/B) → \tfrac{A}{B} (before Greek, so names stay intact)
     s = re.sub(r"\(([^()]+/[^()]+)\)", _paren_frac, s)
     # Simple fractions: A/B where A,B are word tokens (before Greek substitution)
     s = re.sub(
         r"(?<![\\{])(\w+)/((?:\w+(?:\^[{\d]+}?)?))",
-        lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}",
+        lambda m: rf"\tfrac{{{m.group(1)}}}{{{m.group(2)}}}",
         s,
     )
     # User parameter overrides FIRST — before subscript splitting and Greek
@@ -1144,7 +1144,7 @@ def lagrangian_to_latex(expr: str) -> str:
 
     # Pass 1: Bracket functions
     s = _RE_RATIONAL.sub(
-        lambda m: rf"\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}",
+        lambda m: rf"\tfrac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}",
         s,
     )
     s = _RE_SQRT.sub(lambda m: rf"\sqrt{{{m.group(1)}}}", s)

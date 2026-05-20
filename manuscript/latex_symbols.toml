@@ -49,15 +49,18 @@ RiemannCDT = "\\tilde{\\mathcal{R}}"
 # underscores (parsed as Pattern[]), so the source token is `deltam`.
 deltam = "\\delta_m"
 
-# Parity-odd torsion-EM coupling family (`zt_1`, `zt_2`, ..., `zt_6`).
-# Emitted as `zt1`, `zt2`, ... by Wolfram; the override target binds the
-# integer subscript via auto-bracing.
-zt = "\\zeta_T"
+# Parity-odd torsion-EM coupling family. Wolfram emits `zt1`, `zt2`,
+# ..., `zt6`; the leading `zt` source token disambiguates Wolfram's
+# `zt` constant from the coordinate `z` — it is not a subscript.
+# Override renders to bare `\zeta`, with the integer suffix becoming
+# the only subscript (`zt1` → `{\zeta}_{1}`, identical to `\zeta_{1}`
+# after LaTeX's grouping).
+zt = "\\zeta"
 
 # Mass-squared parameters. The trailing `2` in source tokens like ``mA2``,
 # ``mT2`` is a *squared-exponent* (CamelCase-encoded because Wolfram
 # constants cannot contain underscores), not a flat-index subscript. The
 # whole-token override fires before the generic digit-suffix splitter so
 # the rendered form has the ``^2`` exponent rather than ``_{2}``.
-mA2 = "m_{\\mathcal{A}}^{2}" # photon mass squared
+mA2 = "m_{A}^{2}"            # photon mass squared
 mT2 = "m_{T}^{2}"            # torsion-vector mass squared (Proca-analogue)

@@ -63,22 +63,22 @@ class TestCoefficientToLatex:
 
     def test_simple_fraction(self) -> None:
         result = coefficient_to_latex("1/2")
-        assert r"\frac" in result
+        assert r"\tfrac" in result
 
     def test_negative_fraction(self) -> None:
         result = coefficient_to_latex("-1/2")
-        assert r"\frac" in result
+        assert r"\tfrac" in result
         assert "-" in result
 
     def test_fraction_with_param(self) -> None:
         result = coefficient_to_latex("1/(2*kappa^2)")
-        assert r"\frac" in result
+        assert r"\tfrac" in result
         assert r"\kappa" in result
 
     def test_prefix_fraction_product(self) -> None:
         """Ensure -1/2*(B0^2*kappa^2) renders as fraction times product."""
         result = coefficient_to_latex("-1/2*(B0^2*kappa^2)")
-        assert r"\frac{1}{2}" in result
+        assert r"\tfrac{1}{2}" in result
         assert r"\kappa" in result
 
     def test_coordinate_call_stripped(self) -> None:
@@ -95,7 +95,7 @@ class TestCoefficientToLatex:
 
     def test_rational(self) -> None:
         result = coefficient_to_latex("Rational[1, 3]")
-        assert r"\frac{1}{3}" in result
+        assert r"\tfrac{1}{3}" in result
 
     def test_pi(self) -> None:
         result = coefficient_to_latex("Pi")
@@ -106,7 +106,7 @@ class TestCoefficientToLatex:
         assert r"\tanh" in result
         # The bare-denominator regex in _coefficient_inner now converts the
         # ``x/W`` slash form to a proper fraction inside the \tanh argument.
-        assert r"\frac{x}{W}" in result
+        assert r"\tfrac{x}{W}" in result
 
     def test_sin(self) -> None:
         result = coefficient_to_latex("Sin[2*x]")
@@ -400,7 +400,7 @@ class TestLagrangianToLatex:
     def test_fraction_in_parens(self) -> None:
         expr = "(1/kappa^2) RicciScalarCD[]"
         result = lagrangian_to_latex(expr)
-        assert r"\frac" in result
+        assert r"\tfrac" in result
         assert "R" in result
 
 
@@ -453,10 +453,10 @@ class TestEquationToLatex:
             e for e in spec.equations if e.kinetic_coefficient_symbolic == "-kappa^(-2)"
         )
         result = equation_to_latex(eq, spec)
-        assert r"\frac{1}{\kappa^{2}}" in result, result
+        assert r"\tfrac{1}{\kappa^{2}}" in result, result
         assert r"\partial_t" in result
         # Ordering: the kinetic prefactor sits to the left of \partial_t.
-        idx_frac = result.index(r"\frac{1}{\kappa^{2}}")
+        idx_frac = result.index(r"\tfrac{1}{\kappa^{2}}")
         idx_partial = result.index(r"\partial_t")
         assert idx_frac < idx_partial, (
             f"kinetic coefficient must precede \\partial_t: {result!r}"

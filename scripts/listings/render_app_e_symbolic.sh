@@ -66,16 +66,19 @@ render_one() {
     # ` \\` at the end of every line. We strip the wrapper so the file
     # can be \input{} inside an `aligned` environment that the
     # appendix controls (figure float + caption + label). The depth-
-    # aware wrap stage is intentionally not applied (Refinement 3 of
-    # the Appendix E plan): long lines are allowed to overflow the
-    # right margin so the LHS at the left margin stays visible; the
-    # author adds manual breaks at drafting time. The wrap script and
-    # its tests are preserved in this directory for potential future
-    # use.
+    # aware wrap stage at --width 400 breaks the worst Hamiltonian
+    # densities (>500 source chars) at top-level term boundaries
+    # while leaving short Lagrangians and EOMs (≤400 chars) single-
+    # line. The appendix figure float additionally wraps each body
+    # in \adjustbox{max width=\linewidth} as a safety net for any
+    # residual overflows; together these give a Barker-style
+    # presentation (manual breaks at term boundaries + light scaling
+    # for outliers).
     uv run tidal inspect "$json" --latex --latex-format align \
         --symbols manuscript/latex_symbols.toml \
       | sed -e '/^%/d' -e '/^\\begin{align}/d' -e '/^\\end{align}/d' \
             -e 's/^  //' \
+      | python3 scripts/listings/wrap_long_lines.py --width 400 \
       > "$out"
   else
     # Placeholder for a theory whose derivation has not yet been run.
