@@ -1,0 +1,58 @@
+# Symbol overrides for `tidal inspect --latex`.
+#
+# Read by `tidal.symbolic.latex.load_symbol_overrides()` whenever
+#
+#     tidal inspect <json> --latex --symbols manuscript/latex_symbols.toml
+#
+# is invoked. The driver `scripts/listings/render_app_e_symbolic.sh` passes
+# this flag so every generated `manuscript/sections/appendices/listings/eom_*_full.tex`
+# is rendered with the conventions established in `manuscript/macros.tex`.
+#
+# Both sections are optional; either can be left empty.
+#
+#   * `[tensor_heads]` overrides the head emitted inside `\tensor{<head>}{...}`.
+#     Use when the Wolfram pipeline emits a verbose name (e.g. `RicciCDT`,
+#     `Ftorsion`) that the manuscript writes in compact tilde-form. Keys are
+#     plain identifiers (the Wolfram tensor head name); values are LaTeX.
+#
+#   * `[parameters]` overrides scalar parameter names that survive into
+#     coefficient strings (e.g. `deltam`, `zt`). Keys are word-boundary
+#     identifiers; values are LaTeX. When a parameter has a numeric subscript
+#     (e.g. `zt1`, `zt2`, ...), the override target is auto-braced so the
+#     subscript binds to the whole expression — `zt1 → {\zeta_T}_{1}`.
+#
+# When extending: add the override here, regenerate the listings via
+# `bash scripts/listings/render_app_e_symbolic.sh`, and commit both the
+# TOML change and the regenerated listings together.
+
+[tensor_heads]
+# Torsion field strength (rank-2 antisymmetric). Wolfram emits `Ftorsion`;
+# the manuscript writes the torsion-sector kinetic tensor as \tilde F.
+Ftorsion = "\\tilde{F}"
+
+# Riemann-Cartan Ricci tensor (rank-2). The Wolfram pipeline distinguishes
+# `RicciCDT` (Riemann-Cartan, the full-connection Ricci) from `RicciCD`
+# (Levi-Civita / metric-compatible Ricci).
+RicciCDT = "\\tilde{R}"
+
+# Riemann-Cartan curvature (rank-4).
+RiemannCDT = "\\tilde{\\mathcal{R}}"
+
+[parameters]
+# Mass-mixing parameter for the dark-photon-plasma analogue and adjacent
+# theories. Wolfram constraint: scalar constant names cannot contain
+# underscores (parsed as Pattern[]), so the source token is `deltam`.
+deltam = "\\delta_m"
+
+# Parity-odd torsion-EM coupling family (`zt_1`, `zt_2`, ..., `zt_6`).
+# Emitted as `zt1`, `zt2`, ... by Wolfram; the override target binds the
+# integer subscript via auto-bracing.
+zt = "\\zeta_T"
+
+# Mass-squared parameters. The trailing `2` in source tokens like ``mA2``,
+# ``mT2`` is a *squared-exponent* (CamelCase-encoded because Wolfram
+# constants cannot contain underscores), not a flat-index subscript. The
+# whole-token override fires before the generic digit-suffix splitter so
+# the rendered form has the ``^2`` exponent rather than ``_{2}``.
+mA2 = "M_{\\mathcal{A}}^{2}"   # photon mass squared
+mT2 = "M_{T}^{2}"              # torsion-vector mass squared (Proca-analogue)
