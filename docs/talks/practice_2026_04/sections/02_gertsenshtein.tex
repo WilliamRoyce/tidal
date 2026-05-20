@@ -1,17 +1,19 @@
 \begin{frame}{The Gertsenshtein effect}
-  \textbf{Setup:} Linearised GR $+$ Maxwell $+$ uniform background $B_0$.
+  \textbf{Setup:} Linearised GR $+$ Maxwell $+$ uniform background $B$.
 
   \vspace{0.3em}
-  \textbf{Why they mix:} The EM action $\propto F_{\mu\nu}F^{\mu\nu}$ contains \emph{two} metric factors $g=\eta+h$. Perturbing the metric around a $B_0$ background generates a cross-term between $h$ and $\delta A$.
+  \textbf{Why they mix:} EM action $-\frac{1}{4} F_{\mu\nu} F^{\mu\nu}$ has \textcolor{red}{two metric factors} AND two EM field strengths.  Linearise $g = \eta + \textcolor{red}{h}$ and $F = \textcolor{magenta}{\bar F} + \textcolor{blue}{\delta F}$:
+  \[
+    S_{\rm EM} \propto \int (\eta + \textcolor{red}{h})(\eta + \textcolor{red}{h})\,(\textcolor{magenta}{\bar F} + \textcolor{blue}{\delta F})(\textcolor{magenta}{\bar F} + \textcolor{blue}{\delta F})
+  \]
+  Pick \emph{one $\textcolor{red}{h}$, one $\textcolor{blue}{\delta F}$, one $\textcolor{magenta}{\bar F}$}: a direct $h \leftrightarrow \gamma$ coupling $\propto \textcolor{magenta}{\bar F} = B$.
 
   \vspace{0.3em}
   \textbf{Result:}
-  \[
-    P_{g\to\gamma}(D) = \sin^{2}\! \left(\tfrac{1}{2}\kappa B_0 D\right)
-  \]
+  {\Large\[
+    P_{g\to\gamma}(L) = \sin^{2}\! \left(\tfrac{1}{2}\kappa B L\right)
+  \]}
+  Two-state mixing; off-diagonal coupling $B$.
 
-  \begin{itemize}
-    \item Same structure as two-state QM / axion--photon conversion.
-    \item Background $B_0$ plays the role of the off-diagonal coupling.
-  \end{itemize}
+  
 \end{frame}
