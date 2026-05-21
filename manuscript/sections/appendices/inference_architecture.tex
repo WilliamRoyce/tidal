@@ -14,16 +14,22 @@ survey results of \cref{Results}.  The PGT+EM coupling space
 catalogued in \cref{PGTEnumeration} is high-dimensional, and many
 equivalent parametrisations of it appear in the
 literature~\cite{barker2024poincare,lin2019pgt,karananas2014parity,blagojevic2018hamiltonian,bahamonde2025cubic}.
-We therefore
-survey not the value of any individual coefficient but the
-combinations of invariants that carry the Gertsenshtein amplification,
-and how concentrated the response is in coupling space.  We use
-PolyChord~\cite{Handley:2015fda,Handley:2015vkr} as the nested sampler
-throughout this work.  Two diagnostics from its output summarise the
-survey: the Bayesian evidence $\mathcal{Z}$, which records the
-prior-averaged amplification of the theory, and the Kullback--Leibler
-divergence $D_{\mathrm{KL}}$~\cite{Kullback:1951zyt,Handley:2019mfs},
-which records how concentrated the response is in coupling space.
+We therefore frame the survey not around the values of individual
+coefficients --- which are conventional labels for combinations of
+underlying interactions --- but around the regions of coupling space,
+and the combinations of invariants those regions encode, that
+activate the Gertsenshtein amplification.  We use
+PolyChord~\cite{Handley:2015fda,Handley:2015vkr,Skilling:2004pqw,Ashton:2022grj}
+as the nested sampler throughout this work.  The nested-sampling
+output supports both scalar diagnostics --- the Bayesian evidence
+$\mathcal{Z}$, which records the prior-averaged amplification of the
+theory, and the Kullback--Leibler divergence
+$D_{\mathrm{KL}}$~\cite{Kullback:1951zyt,Handley:2019mfs}, which
+records how concentrated the response is in coupling space --- and
+posterior-distribution visualisations of the same chains, produced
+with anesthetic~\cite{Handley:2019mfs} as corner plots and as
+per-tile panel maps over the cubed-sphere atlas
+of~\cref{CubedSphereAtlas}.
 
 \paragraph*{Amplification score}
 The PDE solver~(\cref{NumericalEvolution}) evolves the linearised
@@ -31,22 +37,24 @@ perturbations for an integration time $t_\mathrm{end}$ and returns
 the exit conversion probability $P(\theta, t_\mathrm{end})$ at each
 coupling vector $\theta$ (the parametrisation of
 \cref{PGTEnumeration}).  We feed the nested sampler the amplification
-of this exit
-value over its Einstein--Maxwell baseline,
+of this exit value over its Einstein--Maxwell
+baseline~\cref{GertsenshteinFormula},
 \begin{equation}
   A(\theta) \;=\; \frac{P(\theta, t_\mathrm{end})}{\sin^2(\kappa\Bzero t_\mathrm{end}/2)},
   \label{AmplificationScore}
 \end{equation}
 with the baseline shown for the uniform-magnetic-background setup
 of \cref{Results}.\footnote{$A(\theta)$ and the asymptotic
-survey-coefficient ratio $\Aamp$ of \cref{AmplificationFactor} need
-not agree in general: $A(\theta)$ is the finite-time exit ratio at
-the simulation's $t_\mathrm{end}$, while $\Aamp$ is the leading-order
-Taylor coefficient extracted in the perturbatively-small-conversion
-limit.  The two coincide in the uniform-background campaigns of this
-work, where the conversion remains perturbative throughout, but
-diverge in the localised-$\Bzero$ extensions where the wave traverses
-a finite interaction region at non-perturbative $A$.}  The
+survey-coefficient ratio $\Aamp$ of \cref{AmplificationFactor} are
+different objects: $A(\theta)$ is the actual finite-time exit ratio
+at the simulation's $t_\mathrm{end}$, while $\Aamp$ is the
+leading-order Taylor coefficient extracted in the small-$\kappa\Bzero
+t$ limit.  The two agree to leading order whenever the integrated
+$A$ stays close to its short-time linear growth --- as in the
+uniform-background, perturbative-$\Pmax$ regime of this work --- and
+diverge whenever the wave has time to accumulate non-leading-order
+behaviour, as can happen once the localised-$\Bzero$ extensions
+introduce a finite interaction-region traversal time.}  The
 nested-sampling likelihood is
 \begin{equation}
   \log L(\theta) \;=\; \pm\log A(\theta),
@@ -55,42 +63,28 @@ nested-sampling likelihood is
 with the sign chosen to direct the survey toward amplifying ($+$)
 or suppressing ($-$) regions of coupling space.
 
-\paragraph*{Evidence integral}
-Nested sampling targets the Bayesian evidence
-\begin{equation}
-  \mathcal{Z} \;=\; \int L(\theta)\,\pi(\theta)\,\diff\theta,
-  \label{EvidenceIntegral}
-\end{equation}
-the prior-weighted integral of the score over the coupling space.
-The physical reading $\mathcal{Z}$ acquires under \cref{NestedScore}
-is developed in \cref{EvidencePrediction}.  The integrand of
-\cref{EvidenceIntegral} is sharply peaked in a high-dimensional
-coupling space: the volume where $L$ is appreciably non-zero shrinks
-to a small corner of the prior, and a flat Monte-Carlo estimate
-would waste most of its samples on uninformative regions.
-Skilling~\cite{Skilling:2004pqw,Ashton:2022grj} reformulates the
-integral as a one-dimensional integral over prior volume and samples
-along likelihood contours rather than across the parameter space.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/cubed_sphere_atlas.pdf}
   \caption{Gnomonic cubed-sphere atlas used to sample the direction
-    $\hat r \in S^{N-1}$ of a joint coupling-space
-    prior, drawn for $N=3$.  Axes $c_1, c_2, c_3$ are the
-    coupling-space coordinates; the unit sphere $S^{N-1}$ is shown
-    as a solid silhouette with front-side great-circle arcs drawn
-    solid and back-side arcs dashed.  An $N$-cube is wrapped around
-    the origin and each face is radially projected onto the sphere;
-    the highlighted face (face $1\!\uparrow$) partitions into
-    sub-tiles whose constrained-prior chains run independently and
-    are pooled into the joint $\hat r$ posterior.
-    One sub-tile is shaded and one sample vector
-    $\theta = r\,\hat r$ is drawn from the
-    origin: the marker at the cube face shows where the vector
-    pierces the face, and the marker on the sphere shows the
-    gnomonic image.  The chart is quasi-rectilinear and free of the
-    polar crowding of latitude--longitude grids.}
+    $\hat r \in S^{N-1}$ of a joint coupling-space prior, drawn for
+    $N=3$.  Axes $c_1, c_2, c_3$ are the coupling-space coordinates.
+    The semi-transparent grey sphere is $S^{N-1}$; an $N$-cube is
+    wrapped around the origin (blue wireframe) and each cube face is
+    radially projected onto the sphere.  The highlighted face
+    (face~$1\!\uparrow$, transparent blue) is one \emph{cube-tile} of
+    the atlas, partitioned into $3\times 3$ sub-tiles whose
+    constrained-prior chains run independently; its image on the
+    sphere is the matching \emph{sphere-tile}.  Dotted lines from the
+    origin through cube-tile anchor points are gnomonic projection
+    rays; the small disks mark where each ray meets the sphere.  The
+    green arrow is one sample vector $\theta = r\,\hat r$ through
+    the central shaded sub-tile: the dark segment inside the cube and
+    the arrow segment emerging past the face show the two-step
+    decomposition of the radial-direction prior into a magnitude $r$
+    and a direction $\hat r$.  The figure idiom
+    follows~\cite{chen2021lmars}.}
   \label{CubedSphereAtlas}
 \end{figure}
 
@@ -125,9 +119,15 @@ project for implementation guidance.  The underlying gnomonic
 projection is the standard cubed-sphere construction
 of~\cite{ronchi1996cubedsphere}.}
 
-\paragraph*{Evidence as a prior expectation}
-With $L(\theta) = A(\theta)$, the evidence integral
-\cref{EvidenceIntegral} reduces to a prior expectation,
+\paragraph*{Bayesian evidence}
+Nested sampling targets the Bayesian evidence
+\begin{equation}
+  \mathcal{Z} \;=\; \int L(\theta)\,\pi(\theta)\,\diff\theta,
+  \label{EvidenceIntegral}
+\end{equation}
+the prior-weighted integral of the score over the coupling space.
+With $L(\theta) = A(\theta)$ from \cref{NestedScore}, $\mathcal{Z}$
+becomes a prior expectation,
 \begin{equation}
   \mathcal{Z} \;=\; \int A(\theta)\,\pi(\theta)\,\diff\theta
   \;=\; \langle A\rangle_\pi,
