@@ -109,14 +109,25 @@ def _plot(data: dict, out_path: Path) -> None:
         sub = rendered_full[1:, :-1]
         sub_mask = mask_upper_full[1:, :-1]
         rendered = np.ma.masked_array(sub, mask=sub_mask)
-        im = ax.imshow(
+        # pcolormesh renders explicit polygons per cell — no antialiasing
+        # bleed at cell boundaries, unlike imshow on a raster grid.
+        xx, yy = np.meshgrid(
+            np.arange(n_col + 1) - 0.5,
+            np.arange(n_row + 1) - 0.5,
+        )
+        im = ax.pcolormesh(
+            xx,
+            yy,
             rendered,
             norm="log",
             cmap=cmap,
             vmin=vmin,
             vmax=vmax,
-            interpolation="nearest",
+            shading="flat",
+            edgecolors="none",
         )
+        ax.set_ylim(n_row - 0.5, -0.5)  # match imshow's default origin orientation
+        ax.set_aspect("equal")
         ax.set_xticks(range(n_col))
         ax.set_yticks(range(n_row))
         ax.set_xticklabels(

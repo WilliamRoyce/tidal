@@ -107,9 +107,41 @@ def _plot(data: dict, out_path: Path) -> None:
     # Panel (a): TIDAL residual against RS + analytic sin²-RS gap as smooth curve.
     ax = axes[0]
     p_rs_at = _raffelt_stodolsky(b0, kappa, t0, kwave)
+    data_residual = np.maximum(np.abs(p_final - p_rs_at), EPS_MACH)
+    analytic_residual = np.maximum(np.abs(p_bare - p_rs), EPS_MACH)
+
+    # Power-law guides drawn first so the data/curves overlay them.
+    # Anchor B0^2 to the analytic (bare-vs-RS) curve at a small-B0 point;
+    # anchor B0^4 to the data residual at the same anchor index.
+    anchor_idx = 3
+    b0_anchor = b0[anchor_idx]
+    y_b2_anchor = (
+        float(analytic_residual[np.searchsorted(b0_dense, b0_anchor)])
+        if hasattr(analytic_residual, "__len__")
+        else 1.0
+    )
+    y_b4_anchor = float(data_residual[anchor_idx])
+    ax.semilogy(
+        b0_dense,
+        y_b2_anchor * (b0_dense / b0_anchor) ** 2,
+        ls=":",
+        lw=0.7,
+        color="0.5",
+        alpha=0.6,
+        label=r"$\propto B_0^2$ guide",
+    )
+    ax.semilogy(
+        b0_dense,
+        y_b4_anchor * (b0_dense / b0_anchor) ** 4,
+        ls=":",
+        lw=0.7,
+        color="0.3",
+        alpha=0.6,
+        label=r"$\propto B_0^4$ guide",
+    )
     ax.semilogy(
         b0,
-        np.maximum(np.abs(p_final - p_rs_at), EPS_MACH),
+        data_residual,
         marker="o",
         ms=4,
         lw=0,
@@ -118,12 +150,12 @@ def _plot(data: dict, out_path: Path) -> None:
     )
     ax.semilogy(
         b0_dense,
-        np.maximum(np.abs(p_bare - p_rs), EPS_MACH),
+        analytic_residual,
         ls="--",
         lw=1.0,
         color="#888",
         alpha=0.7,
-        label=r"$|\sin^2(\kappa B_0 t/2) - P_\mathrm{RS}|$ (analytic)",
+        label=r"$|\sin^2(\kappa B_0 t/2) - P_\mathrm{RS}|$",
     )
     ax.set_xlabel(r"$B_0$")
     ax.set_ylabel(r"$|P_{\mathrm{TIDAL}} - P_{\mathrm{RS}}|$")

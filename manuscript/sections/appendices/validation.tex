@@ -43,8 +43,9 @@
     $\sim 4\times 10^{-8}$ across $N$, of the same order as the
     $(\Delta/g)^4 \sim 10^{-8}$ next-order truncation; leapfrog
     Yoshida-2 converges monotonically toward this plateau under grid
-    refinement, and Yoshida-4 shows reproducible non-monotonic
-    scatter across the surveyed $N$ range.}
+    refinement, and Yoshida-4 also decreases with $N$ but with
+    reproducible non-monotonic scatter on top of the underlying
+    convergence trend.}
   \label{BoccalettiUniform}
 \end{figure*}
 
@@ -255,7 +256,7 @@ Lagrangian appears with the dark-photon-plasma sector in
 ), carrying $18$ fields including redundant constrained
 directions ($\operatorname{cond}(V) \sim 10^{15\text{--}17}$). The
 continuum equivalence is recovered under the map
-$m_T^2 = +2\alpha_3$. The two formulations agree on $\Pmax$ at
+$m_T^2 = +2\alpha_3$. The two formulations agree on observables at
 the IEEE double-precision round-off floor.
 
 \paragraph*{Multi-method agreement across backends and measurement paths}
@@ -287,9 +288,10 @@ floor~\cite{fornberg1988generation,burns2020dedalus}.
 $\omega(k) = \sqrt{k^2 + m^2}$; \cref{ConvergenceFigure}(b) reports
 time-integration convergence for the symplectic backends, where
 Yoshida-2 recovers its formal slope to four-figure precision
-($\hat{\alpha} = 2.00$, $R^2 = 1.000$). Yoshida-4 exhibits
-reproducible non-power-law scatter spanning two orders of magnitude
-at fixed $\Delta t$; the same pattern reappears in
+($\hat{\alpha} = 2.00$, $R^2 = 1.000$). Yoshida-4 also decreases under $\Delta t$ refinement but with
+reproducible non-power-law scatter across the $\Delta t$ sweep
+spanning up to two orders of magnitude between nearby $\Delta t$
+values; the same pattern reappears in
 \cref{BoccalettiUniform}(b) under grid refinement at fixed
 $\Delta t$.
 % The scatter is bit-identical across reruns with $2$
