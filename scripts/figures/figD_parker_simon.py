@@ -116,7 +116,7 @@ def _plot(data: dict, out_path: Path) -> None:
             lw=0,
             mfc="white",
             mec="#1f77b4",
-            label=r"$\phi^{(0)} + \phi^{(1)}$ (below spatial-FD floor; excluded from fit)",
+            label="_nolegend_",
         )
         # Annotate the FD-4 spatial-discretisation floor at the median
         # of the saturated points so the exclusion is visually justified.
