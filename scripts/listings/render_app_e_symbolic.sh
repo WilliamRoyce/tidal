@@ -62,22 +62,23 @@ render_one() {
       echo "ERROR: surveyed theory '$tag' is missing its JSON spec: $json" >&2
       return 1
     fi
-    # `align` format wraps with \begin{align} … \end{align} and emits
-    # ` \\` at the end of every line. We strip the wrapper so the file
-    # can be \input{} inside an `aligned` environment that the
-    # appendix controls (figure float + caption + label). The depth-
-    # aware wrap stage at --width 400 breaks the worst Hamiltonian
-    # densities (>500 source chars) at top-level term boundaries
-    # while leaving short Lagrangians and EOMs (≤400 chars) single-
-    # line. The appendix figure float additionally wraps each body
-    # in \adjustbox{max width=\linewidth} as a safety net for any
-    # residual overflows; together these give a Barker-style
-    # presentation (manual breaks at term boundaries + light scaling
-    # for outliers).
-    uv run tidal inspect "$json" --latex --latex-format align \
+    # `gather` format wraps each top-level equation (Lagrangian, EOM,
+    # Hamiltonian) in its own `\begin{aligned}…\end{aligned}` block,
+    # separates them with `\\[1ex]`, and wraps the whole sequence in
+    # `\begin{gather*}…\end{gather*}`. We strip the outer `gather*`
+    # wrappers so the file can be \input{} inside a `gathered`
+    # environment that the appendix shell controls. The per-equation
+    # `aligned` structure breaks the global `&=` column drag — each
+    # equation centres on its own width, eliminating the "ragged
+    # right" whitespace band when short EOMs share a listing with a
+    # wide Hamiltonian. The depth-aware wrap stage at --width 400
+    # still breaks long lines at top-level term boundaries; the
+    # appendix figure float additionally wraps each body in
+    # \adjustbox{max width=\linewidth} as a safety net for any
+    # residual overflows.
+    uv run tidal inspect "$json" --latex --latex-format gather \
         --symbols manuscript/latex_symbols.toml \
-      | sed -e '/^%/d' -e '/^\\begin{align}/d' -e '/^\\end{align}/d' \
-            -e 's/^  //' \
+      | sed -e '/^%/d' -e '/^\\begin{gather\*}/d' -e '/^\\end{gather\*}/d' \
       | python3 scripts/listings/wrap_long_lines.py --width 400 \
       > "$out"
   else

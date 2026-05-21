@@ -893,21 +893,66 @@ def _render_term_coefficient(
 # ---------------------------------------------------------------------------
 
 
+_SECTOR_GW_PREFIXES: tuple[str, ...] = ("h_", "H_")
+_SECTOR_EM_PREFIXES: tuple[str, ...] = ("A_", "a_")
+_SECTOR_TORSION_PREFIXES: tuple[str, ...] = ("t_", "T_")
+
+
+def _sector(field_name: str) -> str:
+    """Bin a field name into a measurement sector.
+
+    The appendix Hamiltonian listings restrict to the self-GW and self-EM
+    sectors that the GW->EM conversion measurement consumes; cross-sector
+    interaction terms drive conversion but are not what we measure. This
+    classifier supports a render-time filter that drops cross-sector terms
+    from the displayed Hamiltonian (see ``_is_self_sector_term``).
+    """
+    if field_name.startswith(_SECTOR_GW_PREFIXES):
+        return "gw"
+    if field_name.startswith(_SECTOR_EM_PREFIXES):
+        return "em"
+    if field_name.startswith(_SECTOR_TORSION_PREFIXES):
+        return "torsion"
+    return "other"
+
+
+def _is_self_sector_term(term: HamiltonianTerm) -> bool:
+    """True for terms confined to a single self-sector (gw-gw, em-em, ...).
+
+    GW<->EM cross terms (the photon-graviton mixing that drives conversion)
+    are dropped from the rendered Hamiltonian. ``"other"`` fields (constraint
+    multipliers, residuals, ...) are kept unconditionally.
+    """
+    sa = _sector(term.factor_a.field)
+    sb = _sector(term.factor_b.field)
+    if sa == sb:
+        return True
+    return "other" in {sa, sb}
+
+
 def hamiltonian_to_latex(
     terms: list[HamiltonianTerm],
     spec: EquationSystem,
 ) -> str:
     r"""Render the Hamiltonian density as a LaTeX equation.
 
+    The rendered Hamiltonian is restricted to the self-GW + self-EM sector
+    relevant to the conversion measurement: cross-sector (GW<->EM) terms are
+    filtered out at render time, and torsion-sector terms have already been
+    dropped at JSON emission by Wolfram's ``$tidalHamiltonianFilter``. The
+    LHS therefore uses ``\\supset`` (not ``=``) to mark the displayed
+    expression as a proper subset of the full canonical density.
+
     Returns
     -------
     str
-        LaTeX for ``\\mathcal{H} = ...``.
+        LaTeX for ``\\mathscr{H} \\supset ...``.
     """
     coords = _tensor_coordinates(spec)
     axis_remap = _operator_axis_remap(spec)
+    self_terms = [t for t in terms if _is_self_sector_term(t)]
     parts: list[str] = []
-    for i, term in enumerate(terms):
+    for i, term in enumerate(self_terms):
         fa_meta = _get_field_meta(term.factor_a.field, spec)
         fb_meta = _get_field_meta(term.factor_b.field, spec)
         fa_tex = field_to_latex(
@@ -937,7 +982,7 @@ def hamiltonian_to_latex(
             parts.append(term_tex)
 
     rhs = " ".join(parts) if parts else "0"
-    result = rf"\mathscr{{H}} &= {rhs}"
+    result = rf"\mathscr{{H}} &\supset {rhs}"
 
     # Apply axis remapping for plane-wave reduced specs
     for from_axis, to_axis in axis_remap.items():
@@ -1211,8 +1256,10 @@ def system_to_latex(
     ----------
     spec : EquationSystem
         The equation system to render.
-    output_format : {"align", "document", "raw"}
-        Output format.
+    output_format : {"align", "gather", "document", "raw"}
+        Output format. ``"gather"`` emits each equation as its own
+        ``aligned`` block inside an outer ``gather*`` — used by the
+        Appendix-E driver for per-equation centering.
     include_hamiltonian : bool
         Whether to include the Hamiltonian density.
     include_lagrangian : bool
@@ -1253,6 +1300,20 @@ def system_to_latex(
 
     if output_format == "raw":
         return "\n".join(sections)
+
+    if output_format == "gather":
+        # Per-equation centering: each section wrapped in its own
+        # \begin{aligned}...\end{aligned} (so the &= / &\supset column is
+        # set per-equation, not by the widest LHS in the listing) and
+        # joined inside an outer \begin{gather*}...\end{gather*}. Short
+        # equations centre on their natural width; long ones span the
+        # page.
+        wrapped = [
+            f"  \\begin{{aligned}}\n    {s}\n  \\end{{aligned}}" for s in sections
+        ]
+        body = " \\\\[1ex]\n".join(wrapped)
+        gather_block = f"\\begin{{gather*}}\n{body}\n\\end{{gather*}}"
+        return "% Requires: \\usepackage{amsmath, tensor, mathrsfs}\n" + gather_block
 
     # Build align environment
     body = " \\\\\n  ".join(sections)

@@ -7,6 +7,13 @@ The surveyed theories are presented under a common reduction: the
 linearised equations of motion are evaluated on a uniform magnetic
 background $\bm{B} = \Bzero\,\hat{x}$ and dimensionally reduced to
 plane waves propagating along $\hat{z}$ (\cref{Linearisation}).
+Hamiltonian densities are presented as the self-GW + self-EM
+sector relevant to the conversion measurement: torsion-coupled
+terms are dropped at emission and cross-sector
+$\mathcal{H}_{\mu\nu}\!\otimes\!\mathcal{A}_{\mu}$ interaction
+terms are excluded from the rendered density, so the displayed
+$\mathscr{H} \supset \dots$ is a proper subset of the full
+canonical density (cf.\ \cref{DiracBergmann}).
 
 % --- E.1  Einstein--Maxwell Gertsenshtein baseline ------------------
 \subsection{Einstein--Maxwell Gertsenshtein baseline}%
@@ -19,12 +26,13 @@ sub-matrix in the transverse photon channels of
 \centering
 \adjustbox{max width=\linewidth}{$\displaystyle
 \setlength{\jot}{1pt}%
-\begin{aligned}
+\begin{gathered}
 \input{sections/appendices/listings/eom_baseline_full.tex}
-\end{aligned}
+\end{gathered}
 $}
 \caption{Einstein--Maxwell baseline on $\bm{B} = \Bzero\,\hat{x}$,
-plane-wave-reduced along $\hat{z}$.}%
+plane-wave-reduced along $\hat{z}$. $\mathscr{H}$ restricted to
+self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
 \label{BaselineKineticOutput}
 \end{figure*}
 
@@ -41,12 +49,14 @@ in \cref{Validation}.
 \centering
 \adjustbox{max width=\linewidth}{$\displaystyle
 \setlength{\jot}{1pt}%
-\begin{aligned}
+\begin{gathered}
 \input{sections/appendices/listings/eom_euler_heisenberg_full.tex}
-\end{aligned}
+\end{gathered}
 $}
 \caption{Euler--Heisenberg corrections on $\bm{B} = \Bzero\,\hat{x}$,
-plane-wave-reduced along $\hat{z}$; Lagrangian in \cref{LagEH}.}%
+plane-wave-reduced along $\hat{z}$; Lagrangian in \cref{LagEH}.
+$\mathscr{H}$ restricted to self-GW + self-EM
+(cf.\ \cref{DiracBergmann}).}%
 \label{EulerHeisenbergKineticOutput}
 \end{figure*}
 
@@ -63,13 +73,14 @@ with LHS $=0$ (\cref{ReferenceKineticOutput}); discussed in
 \centering
 \adjustbox{max width=\linewidth}{$\displaystyle
 \setlength{\jot}{1pt}%
-\begin{aligned}
+\begin{gathered}
 \input{sections/appendices/listings/eom_reference_full.tex}
-\end{aligned}
+\end{gathered}
 $}
 \caption{Minimally-coupled Einstein--Cartan with parameters
 $\alpha_{1,2,3}$ on $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced
-along $\hat{z}$.}%
+along $\hat{z}$. $\mathscr{H}$ restricted to self-GW + self-EM
+(cf.\ \cref{DiracBergmann}).}%
 \label{ReferenceKineticOutput}
 \end{figure*}
 
@@ -87,12 +98,14 @@ discussed in \cref{ChannelStructure}.
 \centering
 \adjustbox{max width=\linewidth}{$\displaystyle
 \setlength{\jot}{1pt}%
-\begin{aligned}
+\begin{gathered}
 \input{sections/appendices/listings/eom_mechanism_full.tex}
-\end{aligned}
+\end{gathered}
 $}
 \caption{Propagating-torsion PGT with parameter $b_{5}$ on
-$\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.}%
+$\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
+$\mathscr{H}$ restricted to self-GW + self-EM
+(cf.\ \cref{DiracBergmann}).}%
 \label{PropagatingKineticOutput}
 \end{figure*}
 
@@ -110,12 +123,14 @@ in the torsion sector; discussed in \cref{SectorSurvey}.
 \centering
 \adjustbox{max width=\linewidth}{$\displaystyle
 \setlength{\jot}{1pt}%
-\begin{aligned}
+\begin{gathered}
 \input{sections/appendices/listings/eom_nonminimal_full.tex}
-\end{aligned}
+\end{gathered}
 $}
 \caption{Ricci--EM nonminimal coupling with parameter $\delta_{1}$
-on $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.}%
+on $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
+$\mathscr{H}$ restricted to self-GW + self-EM
+(cf.\ \cref{DiracBergmann}).}%
 \label{NonminimalKineticOutput}
 \end{figure*}
 
@@ -134,13 +149,14 @@ Lagrangian; the surveyed system is collected in
 \centering
 \adjustbox{max width=\linewidth}{$\displaystyle
 \setlength{\jot}{1pt}%
-\begin{aligned}
+\begin{gathered}
 \input{sections/appendices/listings/eom_general_nonminimal_full.tex}
-\end{aligned}
+\end{gathered}
 $}
 \caption{Yang--Mills-form PGT with all parity-even nonminimal
 couplings active on $\bm{B} = \Bzero\,\hat{x}$,
-plane-wave-reduced along $\hat{z}$.}%
+plane-wave-reduced along $\hat{z}$. $\mathscr{H}$ restricted to
+self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
 \label{GeneralNonminimalKineticOutput}
 \end{figure*}
 
@@ -148,7 +164,7 @@ plane-wave-reduced along $\hat{z}$.}%
 \subsection{Parity-odd extension}%
 \label{SymbolicParityOdd}
 $d_{14}$--$d_{17}$, $d_{19}$--$d_{21}$, and
-$\zeta_{T,1}$--$\zeta_{T,6}$ are added to the full Yang--Mills-form
+$\zeta_{1}$--$\zeta_{6}$ are added to the full Yang--Mills-form
 Lagrangian (\cref{ParityOddKineticOutput}); discussed in
 \cref{SectorSurvey}.
 
@@ -156,12 +172,14 @@ Lagrangian (\cref{ParityOddKineticOutput}); discussed in
 \centering
 \adjustbox{max width=\linewidth}{$\displaystyle
 \setlength{\jot}{1pt}%
-\begin{aligned}
+\begin{gathered}
 \input{sections/appendices/listings/eom_parity_odd_full.tex}
-\end{aligned}
+\end{gathered}
 $}
 \caption{Parity-odd extension of the Yang--Mills-form PGT on
-$\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.}%
+$\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
+$\mathscr{H}$ restricted to self-GW + self-EM
+(cf.\ \cref{DiracBergmann}).}%
 \label{ParityOddKineticOutput}
 \end{figure*}
 
@@ -180,13 +198,15 @@ discussed in \cref{SectorSurvey}.
 \centering
 \adjustbox{max width=\linewidth}{$\displaystyle
 \setlength{\jot}{1pt}%
-\begin{aligned}
+\begin{gathered}
 \input{sections/appendices/listings/eom_dark_photon_plasma_full.tex}
-\end{aligned}
+\end{gathered}
 $}
 \caption{Dark-photon-plasma analogue with parameters
 $m_{A}^{2}$, $\delta_{m}$ on
-$\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.}%
+$\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
+$\mathscr{H}$ restricted to self-GW + self-EM
+(cf.\ \cref{DiracBergmann}).}%
 \label{DarkPhotonPlasmaKineticOutput}
 \end{figure*}
 

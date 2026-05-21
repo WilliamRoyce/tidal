@@ -162,10 +162,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     inspect_parser.add_argument(
         "--latex-format",
-        choices=["align", "document", "raw"],
+        choices=["align", "gather", "document", "raw"],
         default="align",
         dest="latex_format",
-        help="LaTeX output format (default: align). 'document' wraps in standalone .tex",
+        help=(
+            "LaTeX output format (default: align). "
+            "'gather' wraps each equation in its own \\begin{aligned} block "
+            "inside an outer \\begin{gather*} for per-equation centering "
+            "(used by the Appendix-E driver). "
+            "'document' wraps in standalone .tex"
+        ),
     )
     inspect_parser.add_argument(
         "--symbols",

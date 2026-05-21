@@ -1,7 +1,18 @@
-\mathscr{L} &= -\tfrac{1}{4} \tensor{\mathcal{F}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d} + \tfrac{\rho}{8} (\tensor{\mathcal{F}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d})^2 + \tfrac{\sigma}{8} (\tensor{\epsilon}{^a^b^c^d} \tensor{\mathcal{F}}{_a_b} \tensor{\mathcal{F}}{_c_d})^2 \\
-\partial_t^{2} \mathcal{A}_{t} &= - \partial_z^2 \mathcal{A}_{t} + 2 \, B_{0}^2 \, \rho \partial_z^2 \mathcal{A}_{t} -2 \, B_{0}^2 \, \rho \partial_z \dot{\mathcal{A}}_{z} \\
-\left(-1 + 2 \, B_{0}^2 \, \rho - 16 \, B_{0}^2 \, \sigma\right) \, \partial_t^{2} \mathcal{A}_{x} &= - \partial_z^2 \mathcal{A}_{x} + 2 \, B_{0}^2 \, \rho \partial_z^2 \mathcal{A}_{x} \\
-\left(-1 + 2 \, B_{0}^2 \, \rho\right) \, \partial_t^{2} \mathcal{A}_{y} &= - \partial_z^2 \mathcal{A}_{y} + 6 \, B_{0}^2 \, \rho \partial_z^2 \mathcal{A}_{y} \\
-\left(-1 + 2 \, B_{0}^2 \, \rho\right) \, \partial_t^{2} \mathcal{A}_{z} &= - \partial_z^2 \mathcal{A}_{z} + 2 \, B_{0}^2 \, \rho \partial_z \dot{\mathcal{A}}_{t} \\
-\mathscr{H} &= -\tfrac{1}{2} \partial_z \mathcal{A}_{t}^2 + B_{0}^2 \, \rho \partial_z \mathcal{A}_{t}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{x}^2 - B_{0}^2 \, \rho \partial_z \mathcal{A}_{x}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{y}^2 - 3 \, B_{0}^2 \, \rho \partial_z \mathcal{A}_{y}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{z}^2 - \tfrac{1}{2} \dot{\mathcal{A}}_{t}^2 \\
-  &\quad + \tfrac{1}{2} \dot{\mathcal{A}}_{x}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{x}^2 + 8 \, B_{0}^2 \, \sigma \dot{\mathcal{A}}_{x}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{y}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{y}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{z}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{z}^2
+  \begin{aligned}
+    \mathscr{L} &= -\tfrac{1}{4} \tensor{\mathcal{F}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d} + \tfrac{\rho}{8} (\tensor{\mathcal{F}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d})^2 + \tfrac{\sigma}{8} (\tensor{\epsilon}{^a^b^c^d} \tensor{\mathcal{F}}{_a_b} \tensor{\mathcal{F}}{_c_d})^2
+  \end{aligned} \\[1ex]
+  \begin{aligned}
+    \partial_t^{2} \mathcal{A}_{t} &= - \partial_z^2 \mathcal{A}_{t} + 2 \, B_{0}^2 \, \rho \partial_z^2 \mathcal{A}_{t} -2 \, B_{0}^2 \, \rho \partial_z \dot{\mathcal{A}}_{z}
+  \end{aligned} \\[1ex]
+  \begin{aligned}
+    \left(-1 + 2 \, B_{0}^2 \, \rho - 16 \, B_{0}^2 \, \sigma\right) \, \partial_t^{2} \mathcal{A}_{x} &= - \partial_z^2 \mathcal{A}_{x} + 2 \, B_{0}^2 \, \rho \partial_z^2 \mathcal{A}_{x}
+  \end{aligned} \\[1ex]
+  \begin{aligned}
+    \left(-1 + 2 \, B_{0}^2 \, \rho\right) \, \partial_t^{2} \mathcal{A}_{y} &= - \partial_z^2 \mathcal{A}_{y} + 6 \, B_{0}^2 \, \rho \partial_z^2 \mathcal{A}_{y}
+  \end{aligned} \\[1ex]
+  \begin{aligned}
+    \left(-1 + 2 \, B_{0}^2 \, \rho\right) \, \partial_t^{2} \mathcal{A}_{z} &= - \partial_z^2 \mathcal{A}_{z} + 2 \, B_{0}^2 \, \rho \partial_z \dot{\mathcal{A}}_{t}
+  \end{aligned} \\[1ex]
+  \begin{aligned}
+    \mathscr{H} &\supset -\tfrac{1}{2} \partial_z \mathcal{A}_{t}^2 + B_{0}^2 \, \rho \partial_z \mathcal{A}_{t}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{x}^2 -B_{0}^2 \, \rho \partial_z \mathcal{A}_{x}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{y}^2 -3 \, B_{0}^2 \, \rho \partial_z \mathcal{A}_{y}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{z}^2 -\tfrac{1}{2} \dot{\mathcal{A}}_{t}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{x}^2 -B_{0}^2 \, \rho \dot{\mathcal{A}}_{x}^2 + 8 \, B_{0}^2 \, \sigma \dot{\mathcal{A}}_{x}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{y}^2 -B_{0}^2 \, \rho \dot{\mathcal{A}}_{y}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{z}^2 -B_{0}^2 \, \rho \dot{\mathcal{A}}_{z}^2
+  \end{aligned}

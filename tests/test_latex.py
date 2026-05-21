@@ -479,7 +479,11 @@ class TestHamiltonianToLatex:
         assert spec.canonical is not None
         result = hamiltonian_to_latex(list(spec.canonical.hamiltonian_terms), spec)
         assert r"\mathscr{H}" in result
-        assert "&=" in result
+        # The rendered Hamiltonian is the self-GW + self-EM sector
+        # restriction relevant to the conversion measurement; cross-sector
+        # interaction terms and torsion contributions are dropped, so the
+        # LHS uses \supset (contains) rather than = (equality).
+        assert r"&\supset" in result
 
     @_needs_cs
     def test_coupled_scalars_hamiltonian(self) -> None:
@@ -489,6 +493,84 @@ class TestHamiltonianToLatex:
         assert spec.canonical is not None
         result = hamiltonian_to_latex(list(spec.canonical.hamiltonian_terms), spec)
         assert r"\mathscr{H}" in result
+
+
+class TestSectorFilter:
+    """Tests for the self-GW + self-EM sector filter applied at render time.
+
+    ``_sector`` and ``_is_self_sector_term`` are module-private helpers; we
+    import them inside each test to avoid auto-formatter rules that strip
+    underscore-prefixed names from the module-level import list.
+    """
+
+    def test_sector_gw_prefixes(self) -> None:
+        from tidal.symbolic.latex import _sector
+
+        assert _sector("h_xy") == "gw"
+        assert _sector("h_yy") == "gw"
+        assert _sector("H_tz") == "gw"
+
+    def test_sector_em_prefixes(self) -> None:
+        from tidal.symbolic.latex import _sector
+
+        assert _sector("A_t") == "em"
+        assert _sector("A_x") == "em"
+        assert _sector("a_phi") == "em"
+
+    def test_sector_torsion_prefixes(self) -> None:
+        from tidal.symbolic.latex import _sector
+
+        assert _sector("t_xyz") == "torsion"
+        assert _sector("T_xtx") == "torsion"
+
+    def test_sector_other(self) -> None:
+        from tidal.symbolic.latex import _sector
+
+        # Constraint multipliers, residuals, or unrecognised field names
+        # fall through to "other".
+        assert _sector("lambda_0") == "other"
+        assert _sector("phi_1") == "other"
+
+    def test_self_sector_term_same_sector(self) -> None:
+        """GW-GW and EM-EM terms pass the filter."""
+        from types import SimpleNamespace
+
+        from tidal.symbolic.latex import _is_self_sector_term
+
+        gw_gw = SimpleNamespace(
+            factor_a=SimpleNamespace(field="h_xy"),
+            factor_b=SimpleNamespace(field="h_yy"),
+        )
+        em_em = SimpleNamespace(
+            factor_a=SimpleNamespace(field="A_x"),
+            factor_b=SimpleNamespace(field="A_y"),
+        )
+        assert _is_self_sector_term(gw_gw)
+        assert _is_self_sector_term(em_em)
+
+    def test_self_sector_term_cross_sector_dropped(self) -> None:
+        """GW-EM cross terms (the conversion-driving interactions) are dropped."""
+        from types import SimpleNamespace
+
+        from tidal.symbolic.latex import _is_self_sector_term
+
+        gw_em = SimpleNamespace(
+            factor_a=SimpleNamespace(field="h_xy"),
+            factor_b=SimpleNamespace(field="A_x"),
+        )
+        assert not _is_self_sector_term(gw_em)
+
+    def test_self_sector_term_other_kept(self) -> None:
+        """Terms involving an "other"-sector field are kept unconditionally."""
+        from types import SimpleNamespace
+
+        from tidal.symbolic.latex import _is_self_sector_term
+
+        other_gw = SimpleNamespace(
+            factor_a=SimpleNamespace(field="lambda_0"),
+            factor_b=SimpleNamespace(field="h_xy"),
+        )
+        assert _is_self_sector_term(other_gw)
 
 
 # ---------------------------------------------------------------------------
@@ -511,6 +593,25 @@ class TestSystemToLatex:
         # matching \lag in manuscript/macros.tex and the \mathscr{H} that
         # hamiltonian_to_latex() already emits).
         assert r"\mathscr{L}" in result
+
+    def test_gather_format(self) -> None:
+        """`gather` wraps each equation in its own `aligned` block.
+
+        Used by the Appendix-E driver so each equation centres on its own
+        natural width — no global `&=` column drag across the listing.
+        """
+        from tidal.symbolic.json_loader import load_equation_system
+
+        spec = load_equation_system(_EXAMPLES / "coupled_scalars.json")
+        result = system_to_latex(spec, output_format="gather")
+        assert r"\begin{gather*}" in result
+        assert r"\end{gather*}" in result
+        # Each section gets its own \begin{aligned}...\end{aligned} block.
+        assert result.count(r"\begin{aligned}") >= 2
+        assert result.count(r"\begin{aligned}") == result.count(r"\end{aligned}")
+        # Equations are separated by `\\[1ex]` to give visible inter-equation
+        # spacing distinct from the tight intra-equation `\jot`.
+        assert r"\\[1ex]" in result
 
     def test_document_format(self) -> None:
         from tidal.symbolic.json_loader import load_equation_system
