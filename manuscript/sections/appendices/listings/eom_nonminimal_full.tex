@@ -7,8 +7,8 @@
   % &\quad - \tfrac{3 \, \delta_{1}}{2} \partial_z \dot{\mathcal{T}}_{yyz} + \tfrac{\delta_{1}}{2} \partial_z \dot{\mathcal{T}}_{ttz}
   % \end{aligned} \\[1ex]
   \begin{aligned}
-    \partial_t^{2} A_{x} &= B_{0} \partial_z h_{xy} + \partial_z^2 A_{x} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 \mathcal{T}_{ttx} + \tfrac{3 \, \delta_{1}}{2} \partial_z^2 \mathcal{T}_{yxy} - \tfrac{1}{2} \delta_{1} \partial_z^2 \mathcal{T}_{zxz} - 2 \, \delta_{1} \partial_z \dot{\mathcal{T}}_{ztx} - 2 \, \delta_{1} \partial_z \dot{\mathcal{T}}_{txz} \\
-  &\quad - \tfrac{1}{2} \delta_{1} \partial_t^2 \mathcal{T}_{ttx} - \tfrac{3 \, \delta_{1}}{2} \partial_t^2 \mathcal{T}_{yxy} - \tfrac{3 \, \delta_{1}}{2} \partial_t^2 \mathcal{T}_{zxz}
+    \partial_t^{2} A_{x} &= B_{0} \partial_z h_{xy} + \partial_z^2 A_{x} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 \mathcal{T}_{ttx} + \tfrac{3 \, \delta_{1}}{2} \partial_z^2 \mathcal{T}_{yxy} - \tfrac{1}{2} \delta_{1} \partial_z^2 \mathcal{T}_{zxz} \\
+    &\quad - 2 \, \delta_{1} \partial_z \dot{\mathcal{T}}_{ztx} - 2 \, \delta_{1} \partial_z \dot{\mathcal{T}}_{txz} - \tfrac{1}{2} \delta_{1} \partial_t^2 \mathcal{T}_{ttx} - \tfrac{3 \, \delta_{1}}{2} \partial_t^2 \mathcal{T}_{yxy} - \tfrac{3 \, \delta_{1}}{2} \partial_t^2 \mathcal{T}_{zxz}
   \end{aligned} \\[1ex]
   % \begin{aligned}
   %   \partial_t^{2} A_{y} &= \tfrac{B_{0}}{2} \partial_z h_{tt} - \tfrac{1}{2} B_{0} \partial_z h_{xx} + \tfrac{B_{0}}{2} \partial_z h_{yy} + \tfrac{B_{0}}{2} \partial_z h_{zz} + \partial_z^2 A_{y} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 \mathcal{T}_{tty} - \tfrac{1}{2} \delta_{1} \partial_z^2 \mathcal{T}_{zyz} \\
@@ -37,8 +37,8 @@
   % &\quad + \tfrac{1}{2 \, \kappa^2} \partial_z^2 h_{tt} - \tfrac{1}{2 \, \kappa^2} \partial_z^2 h_{yy} - \tfrac{1}{\kappa^{2}} \partial_z \dot{h}_{tz} + \tfrac{1}{2 \, \kappa^2} \partial_t^2 h_{yy} + \tfrac{1}{2 \, \kappa^2} \partial_t^2 h_{zz}
   % \end{aligned} \\[1ex]
   \begin{aligned}
-    -\tfrac{1}{\kappa^{2}} \, \partial_t^{2} h_{xy} &= \tfrac{B_{0}^2}{2} h_{xy} + B_{0} \partial_z A_{x} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_z \mathcal{T}_{ttx} + \tfrac{B_{0} \, \delta_{1}}{2} \partial_z \mathcal{T}_{yxy} + \tfrac{B_{0} \, \delta_{1}}{2} \partial_z \mathcal{T}_{zxz} - \tfrac{1}{\kappa^{2}} \partial_z^2 h_{xy} \\
-  &\quad - B_{0} \, \delta_{1} \partial_t \mathcal{T}_{txz} + B_{0} \, \delta_{1} \partial_t \mathcal{T}_{xtz}
+    -\tfrac{1}{\kappa^{2}} \, \partial_t^{2} h_{xy} &= \tfrac{B_{0}^2}{2} h_{xy} + B_{0} \partial_z A_{x} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_z \mathcal{T}_{ttx} + \tfrac{B_{0} \, \delta_{1}}{2} \partial_z \mathcal{T}_{yxy} \\
+    &\quad + \tfrac{B_{0} \, \delta_{1}}{2} \partial_z \mathcal{T}_{zxz} - \tfrac{1}{\kappa^{2}} \partial_z^2 h_{xy} - B_{0} \, \delta_{1} \partial_t \mathcal{T}_{txz} + B_{0} \, \delta_{1} \partial_t \mathcal{T}_{xtz}
   \end{aligned} \\[1ex]
   % \begin{aligned}
   %   -\tfrac{1}{\kappa^{2}} \, \partial_t^{2} h_{xz} &= \tfrac{B_{0}^2}{2} h_{xz} + B_{0} \, \delta_{1} \partial_t \mathcal{T}_{txy} -B_{0} \, \delta_{1} \partial_t \mathcal{T}_{xty} -\tfrac{1}{\kappa^{2}} \partial_z \dot{h}_{tx}
