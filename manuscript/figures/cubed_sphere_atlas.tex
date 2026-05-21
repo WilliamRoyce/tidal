@@ -25,23 +25,25 @@
 \usepackage{bm}
 \usepackage{tikz}
 \usepackage{tikz-3dplot}
+\usepackage{tidal-tikz-styles}
+
 \usetikzlibrary{arrows.meta,calc,3d}
 \tikzset{>={Stealth[length=1.6mm,width=1.6mm]}}
 
-\colorlet{FaceFill}{LightSkyBlue}
-\colorlet{FaceLine}{SteelBlue}
-\colorlet{TileFill}{Coral!70}
-\colorlet{TileLine}{OrangeRed!85!black}
-\colorlet{SphereLine}{Gray!75}
-\colorlet{RayLine}{Black!55}
-\colorlet{SampleArrow}{ForestGreen!60!black}
-\colorlet{AxisLine}{Gray!55}
+\colorlet{FaceFill}{PinkFill}
+\colorlet{FaceLine}{PinkLine}
+\colorlet{TileFill}{BlueFill}
+\colorlet{TileLine}{BlueLine}
+\colorlet{SphereLine}{GrayLine}
+\colorlet{RayLine}{Black!55!GrayLine}
+\colorlet{SampleArrow}{PurpleLine}
+\colorlet{AxisLine}{GrayLine}
 
 % Camera at inclination 70 deg (from +z) and azimuth 25 deg.  At this
 % angle the +x face is the most head-on visible face; the -y face
 % (face 2\downarrow) carries the highlight on the back-left side of
 % the cube, visible through the unfilled wireframe.
-\tdplotsetmaincoords{70}{25}
+\tdplotsetmaincoords{70}{28}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -56,30 +58,24 @@
   \pgfmathsetmacro{\ttileHi}{ 0.3333}
 
   %------------------------------------------------------------------
-  % STAGE 1 — far back layer: dashed back-side arcs of the sphere
-  %                  wireframe (3 great circles + 2 latitudes)
+  % STAGE 0a — inside-sphere axis segments (origin -> unit-sphere
+  %                  intersection).  Drawn early so the sphere
+  %                  shading overlays them; dashed + lighter to
+  %                  visually subordinate the inside portion.
   %------------------------------------------------------------------
-  \draw[SphereLine!50, very thin, dashed]
-    plot[domain=180:360, samples=64, smooth] ({cos(\x)}, {sin(\x)}, 0);
-  \draw[SphereLine!50, very thin, dashed]
-    plot[domain=90:270, samples=64, smooth] ({cos(\x)}, 0, {sin(\x)});
-  \draw[SphereLine!50, very thin, dashed]
-    plot[domain=90:270, samples=64, smooth] (0, {cos(\x)}, {sin(\x)});
-  \foreach \zlat in {0.5, -0.5}{
-    \draw[SphereLine!40, very thin, dashed]
-      plot[domain=180:360, samples=48, smooth]
-        ({0.866*cos(\x)}, {0.866*sin(\x)}, \zlat);
-  }
+  \draw[AxisLine!55, thin, dashed] (0,0,0) -- (1,0,0);
+  \draw[AxisLine!55, thin, dashed] (0,0,0) -- (0,1,0);
+  \draw[AxisLine!55, thin, dashed] (0,0,0) -- (0,0,1);
 
   %------------------------------------------------------------------
   % STAGE 2 — far back cube edges (light wireframe of hidden edges)
   %------------------------------------------------------------------
-  \draw[FaceLine!40, very thin]
+  \draw[FaceLine!40, thin]
     (-1, 1,-1) -- (1, 1,-1) -- (1, 1, 1) -- (-1, 1, 1) -- cycle;
-  \draw[FaceLine!40, very thin] (-1,-1,-1) -- (-1, 1,-1);
-  \draw[FaceLine!40, very thin] ( 1,-1,-1) -- ( 1, 1,-1);
-  \draw[FaceLine!40, very thin] ( 1,-1, 1) -- ( 1, 1, 1);
-  \draw[FaceLine!40, very thin] (-1,-1, 1) -- (-1, 1, 1);
+  \draw[FaceLine!40, thin] (-1,-1,-1) -- (-1, 1,-1);
+  \draw[FaceLine!40, thin] ( 1,-1,-1) -- ( 1, 1,-1);
+  \draw[FaceLine!40, thin] ( 1,-1, 1) -- ( 1, 1, 1);
+  \draw[FaceLine!40, thin] (-1,-1, 1) -- (-1, 1, 1);
 
   %------------------------------------------------------------------
   % STAGE 3 — sample vector segment 1 (origin -> cube-face crossing
@@ -105,27 +101,9 @@
   %                  proper ball shading) + silhouette outline
   %------------------------------------------------------------------
   \begin{scope}[tdplot_screen_coords]
-    \shade[ball color=Gray!8, opacity=0.45] (0,0) circle (1);
-    \draw[SphereLine!50, very thin] (0,0) circle (1);
+    \shade[ball color=GrayFill, opacity=0.40] (0,0) circle (1);
+    \draw[SphereLine!50, thin] (0,0) circle (1);
   \end{scope}
-
-  %------------------------------------------------------------------
-  % STAGE 5 — front-side sphere wireframe (great circles + latitudes,
-  %                  drawn solid on the visible hemisphere surface)
-  %------------------------------------------------------------------
-  \draw[SphereLine, thin]
-    plot[domain=0:180, samples=64, smooth] ({cos(\x)}, {sin(\x)}, 0);
-  \draw[SphereLine, thin]
-    plot[domain=-90:90, samples=64, smooth] ({cos(\x)}, 0, {sin(\x)});
-  \draw[SphereLine, thin]
-    plot[domain=-90:90, samples=64, smooth] (0, {cos(\x)}, {sin(\x)});
-  \foreach \zlat in {0.5, -0.5}{
-    \draw[SphereLine!75, very thin]
-      plot[domain=0:180, samples=48, smooth]
-        ({0.866*cos(\x)}, {0.866*sin(\x)}, \zlat);
-  }
-  \node[SphereLine, font=\scriptsize, anchor=south east]
-    at (1.05, 1.05, 0.7) {$S^{N-1}$};
 
   %------------------------------------------------------------------
   % STAGE 6 — gnomonic projection rays through 4 cube-face anchors
@@ -135,15 +113,19 @@
   %                  transparent -y face fill so both markers are
   %                  visible behind it.
   %------------------------------------------------------------------
-  \foreach \fx/\fz in {-0.6667/-0.6667, 0.6667/-0.6667,
-                       -0.6667/ 0.6667, 0.6667/ 0.6667}{
+  % Slight perturbations from the sub-tile centres so the 4 anchors
+  % look like a sampled scatter rather than a regular grid.
+  \foreach \fx/\fz in {-0.72/-0.58, 0.61/-0.74,
+                       -0.55/ 0.68, 0.70/ 0.62}{
     \pgfmathsetmacro{\nrm}{sqrt(\fx*\fx + 1 + \fz*\fz)}
     \pgfmathsetmacro{\sxv}{\fx/\nrm}
     \pgfmathsetmacro{\syv}{-1/\nrm}
     \pgfmathsetmacro{\szv}{\fz/\nrm}
     \draw[RayLine, thin, dotted] (0,0,0) -- (\sxv,\syv,\szv);
     \draw[RayLine, thin] (\sxv,\syv,\szv) -- (\fx, -1, \fz);
-    \fill[RayLine] (\sxv,\syv,\szv) circle (1.0pt);
+    % Sphere-image marker: white-filled ring (suggests "on surface")
+    \draw[RayLine, line width=0.6pt, fill=white]
+      (\sxv,\syv,\szv) circle (1.5pt);
     \fill[RayLine!85] (\fx, -1, \fz) circle (0.7pt);
   }
 
@@ -155,21 +137,36 @@
   %                  of the cube-tile.
   %------------------------------------------------------------------
   % Edge at x = -1, parameter t = z in [-1, 1]
-  \draw[TileLine!60, thin]
+  \draw[FaceLine, thick]
     plot[domain=-1:1, samples=32, smooth]
       ({-1/sqrt(1+1+\x*\x)}, {-1/sqrt(1+1+\x*\x)}, {\x/sqrt(1+1+\x*\x)});
   % Edge at x = +1, parameter t = z
-  \draw[TileLine!60, thin]
+  \draw[FaceLine, thick]
     plot[domain=-1:1, samples=32, smooth]
       ({1/sqrt(1+1+\x*\x)}, {-1/sqrt(1+1+\x*\x)}, {\x/sqrt(1+1+\x*\x)});
   % Edge at z = -1, parameter s = x
-  \draw[TileLine!60, thin]
+  \draw[FaceLine, thick]
     plot[domain=-1:1, samples=32, smooth]
       ({\x/sqrt(\x*\x+1+1)}, {-1/sqrt(\x*\x+1+1)}, {-1/sqrt(\x*\x+1+1)});
   % Edge at z = +1, parameter s = x
-  \draw[TileLine!60, thin]
+  \draw[FaceLine, thick]
     plot[domain=-1:1, samples=32, smooth]
       ({\x/sqrt(\x*\x+1+1)}, {-1/sqrt(\x*\x+1+1)}, {1/sqrt(\x*\x+1+1)});
+
+  %------------------------------------------------------------------
+  % STAGE 7b — dashed lines from each cube-tile corner to its
+  %                  sphere-tile corner.  These make the gnomonic
+  %                  pairing of cube-tile vertices and sphere-tile
+  %                  vertices visually explicit.
+  %------------------------------------------------------------------
+  \foreach \fx/\fz in {-1/-1, 1/-1, 1/1, -1/1}{
+    \pgfmathsetmacro{\nrm}{sqrt(\fx*\fx + 1 + \fz*\fz)}
+    \pgfmathsetmacro{\sxv}{\fx/\nrm}
+    \pgfmathsetmacro{\syv}{-1/\nrm}
+    \pgfmathsetmacro{\szv}{\fz/\nrm}
+    \draw[FaceLine!70, thin, dashed]
+      (\fx, -1, \fz) -- (\sxv, \syv, \szv);
+  }
 
   %------------------------------------------------------------------
   % STAGE 8 — highlighted -y face (transparent fill, sub-tile grid,
@@ -185,19 +182,19 @@
   }
 
   % Highlighted central sub-tile
-  \fill[TileFill, opacity=0.75]
+  \fill[TileFill, opacity=0.40]
     (\ttileLo,-1, \ttileLo) -- (\ttileHi,-1, \ttileLo) --
     (\ttileHi,-1, \ttileHi) -- (\ttileLo,-1, \ttileHi) -- cycle;
-  \draw[TileLine, thick]
+  \draw[TileLine, very thick]
     (\ttileLo,-1, \ttileLo) -- (\ttileHi,-1, \ttileLo) --
     (\ttileHi,-1, \ttileHi) -- (\ttileLo,-1, \ttileHi) -- cycle;
 
   % Face outline
-  \draw[FaceLine, thick]
+  \draw[FaceLine, very thick]
     (-1,-1,-1) -- (1,-1,-1) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
 
   \node[FaceLine, anchor=south west, font=\scriptsize]
-    at (0.9,-1.02, 0.95) {face $2\!\downarrow$};
+    at (1.02,-1.02, -0.95) {face $2\!\downarrow$};
 
   %------------------------------------------------------------------
   % STAGE 9 — sample vector segment 2 (cube-face -> sphere -> tip)
@@ -206,21 +203,25 @@
   %------------------------------------------------------------------
   \draw[->, SampleArrow, very thick]
     (\cx, -1, \cz) -- ({\rmax*\cxs}, {\rmax*\cys}, {\rmax*\czs});
-  \fill[SampleArrow, opacity=0.6]
-    (\cxs, \cys, \czs) circle (0.9pt);
+  % Sphere-image marker for the sample vector: white-filled ring,
+  % matching the projection-ray markers for "on the curved surface"
+  \draw[SampleArrow, line width=0.6pt, fill=white]
+    (\cxs, \cys, \czs) circle (1.3pt);
   \node[SampleArrow, anchor=west, font=\small]
     at ({\rmax*\cxs + 0.04}, {\rmax*\cys + 0.02}, {\rmax*\czs + 0.05})
     {$\theta = r\,\hat r$};
 
   %------------------------------------------------------------------
-  % STAGE 10 — axes + origin marker (drawn last so labels stay on top)
+  % STAGE 10 — outside-sphere axis segments + arrowheads + labels.
+  %                  Drawn last so the bold arrows sit on top of
+  %                  everything else, conveying "exits the sphere".
   %------------------------------------------------------------------
-  \draw[->, AxisLine, thin] (0,0,0) -- (1.55,0,0)
-    node[pos=1.06, AxisLine] {$c_{1}$};
-  \draw[->, AxisLine, thin] (0,0,0) -- (0,1.55,0)
-    node[pos=1.06, AxisLine] {$c_{2}$};
-  \draw[->, AxisLine, thin] (0,0,0) -- (0,0,1.55)
-    node[pos=1.06, AxisLine] {$c_{3}$};
+  \draw[->, AxisLine, thick] (1,0,0) -- (1.55,0,0)
+    node[pos=1.10, AxisLine] {$c_{1}$};
+  \draw[->, AxisLine, thick] (0,1,0) -- (0,1.55,0)
+    node[pos=1.10, AxisLine] {$c_{2}$};
+  \draw[->, AxisLine, thick] (0,0,1) -- (0,0,1.55)
+    node[pos=1.10, AxisLine] {$c_{3}$};
 
   \fill (0,0,0) circle (1pt);
   \node[anchor=north east, font=\scriptsize] at (0,0,-0.02) {$\mathbf 0$};
