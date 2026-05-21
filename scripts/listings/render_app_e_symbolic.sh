@@ -98,4 +98,8 @@ for entry in "${MANIFEST[@]}"; do
   render_one "$tag" "$json" "$status"
 done
 
+# Refresh the caption-count sidecar (EOM / constraint / term counts per
+# theory). Idempotent; reads only the listings written above.
+python3 scripts/listings/compute_appendix_counts.py
+
 echo "Done. Listings live in $OUT_DIR/."
