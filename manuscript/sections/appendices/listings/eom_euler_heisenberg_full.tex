@@ -1,5 +1,5 @@
   \begin{aligned}
-    \mathscr{L} &= -\tfrac{1}{4} \tensor{\mathcal{F}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d} + \tfrac{\rho}{8} (\tensor{\mathcal{F}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d})^2 + \tfrac{\sigma}{8} (\tensor{\epsilon}{^a^b^c^d} \tensor{\mathcal{F}}{_a_b} \tensor{\mathcal{F}}{_c_d})^2
+    \mathscr{L} &= -\tfrac{1}{4} \tensor{\mathcal{F}}{_a_b} \tensor{\mathcal{F}}{^a^b} + \tfrac{\rho}{8} (\tensor{\mathcal{F}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d})^2 + \tfrac{\sigma}{8} (\tensor{\epsilon}{^a^b^c^d} \tensor{\mathcal{F}}{_a_b} \tensor{\mathcal{F}}{_c_d})^2
   \end{aligned} \\[1ex]
   \begin{aligned}
     \partial_t^{2} \mathcal{A}_{t} &= - \partial_z^2 \mathcal{A}_{t} + 2 \, B_{0}^2 \, \rho \partial_z^2 \mathcal{A}_{t} -2 \, B_{0}^2 \, \rho \partial_z \dot{\mathcal{A}}_{z} \\
@@ -8,6 +8,7 @@
     \left(-1 + 2 \, B_{0}^2 \, \rho\right) \, \partial_t^{2} \mathcal{A}_{z} &= - \partial_z^2 \mathcal{A}_{z} + 2 \, B_{0}^2 \, \rho \partial_z \dot{\mathcal{A}}_{t}
   \end{aligned} \\[1ex]
   \begin{aligned}
-    \mathscr{H} &\supset -\tfrac{1}{2} \partial_z \mathcal{A}_{t}^2 + B_{0}^2 \, \rho \partial_z \mathcal{A}_{t}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{x}^2 - B_{0}^2 \, \rho \partial_z \mathcal{A}_{x}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{y}^2 - 3 \, B_{0}^2 \, \rho \partial_z \mathcal{A}_{y}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{z}^2 - \tfrac{1}{2} \dot{\mathcal{A}}_{t}^2 \\
-  &\quad + \tfrac{1}{2} \dot{\mathcal{A}}_{x}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{x}^2 + 8 \, B_{0}^2 \, \sigma \dot{\mathcal{A}}_{x}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{y}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{y}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{z}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{z}^2
+    \mathscr{H} &\supset -\tfrac{1}{2} \partial_z \mathcal{A}_{t}^2 + B_{0}^2 \, \rho \partial_z \mathcal{A}_{t}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{x}^2 - B_{0}^2 \, \rho \partial_z \mathcal{A}_{x}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{y}^2 \\
+    &\quad- 3 \, B_{0}^2 \, \rho \partial_z \mathcal{A}_{y}^2 + \tfrac{1}{2} \partial_z \mathcal{A}_{z}^2 - \tfrac{1}{2} \dot{\mathcal{A}}_{t}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{x}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{x}^2 \\
+  &\quad + 8 \, B_{0}^2 \, \sigma \dot{\mathcal{A}}_{x}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{y}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{y}^2 + \tfrac{1}{2} \dot{\mathcal{A}}_{z}^2 - B_{0}^2 \, \rho \dot{\mathcal{A}}_{z}^2
   \end{aligned}
