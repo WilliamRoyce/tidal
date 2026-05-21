@@ -98,6 +98,20 @@ for entry in "${MANIFEST[@]}"; do
   render_one "$tag" "$json" "$status"
 done
 
+# Post-render notation patch: the renderer emits the graviton metric
+# perturbation as \mathcal{H} and the photon vector potential as
+# \mathcal{A} (the default `_calligraphic_head` behaviour in
+# tidal/symbolic/latex.py). The appendix convention is lowercase italic
+# h_{\mu\nu} (standard GR / TT-gauge notation) and italic capital A_\mu
+# (standard EM notation), with torsion left calligraphic to keep it
+# visually distinct. We re-letter the listings in place rather than
+# changing the renderer so that other consumers (tests, ad-hoc inspect
+# calls) keep the historical default.
+sed -i \
+  -e 's/\\mathcal{H}/h/g' \
+  -e 's/\\mathcal{A}/A/g' \
+  "$OUT_DIR"/eom_*_full.tex
+
 # Refresh the caption-count sidecar (EOM / constraint / term counts per
 # theory). Idempotent; reads only the listings written above.
 python3 scripts/listings/compute_appendix_counts.py
