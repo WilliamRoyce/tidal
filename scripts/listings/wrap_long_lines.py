@@ -93,7 +93,13 @@ def _split_top_level_terms(rhs: str) -> list[tuple[str, str]]:
     return terms
 
 
-_LHS_RE = re.compile(r"^(?P<lhs>.*?)\s*&=\s*(?P<rhs>.*?)(?P<trailer>\s*\\\\\s*)?$")
+# Match either `&= RHS` (equations of motion, Lagrangians) or
+# `&\supset RHS` (Hamiltonian densities restricted to the self-GW + self-EM
+# sector; cf. tidal/symbolic/latex.py::hamiltonian_to_latex). The operator
+# is captured so the emission preserves whichever the source line used.
+_LHS_RE = re.compile(
+    r"^(?P<lhs>.*?)\s*&(?P<op>=|\\supset)\s*(?P<rhs>.*?)(?P<trailer>\s*\\\\\s*)?$"
+)
 
 
 def _join_terms(signed_terms: Iterable[tuple[str, str]]) -> str:
@@ -122,6 +128,7 @@ def wrap_line(line: str, width: int) -> str:
     if not m:
         return line
     lhs = m.group("lhs")
+    op = m.group("op")  # "=" or r"\supset"
     rhs = m.group("rhs")
     trailer = m.group("trailer") or ""
     terms = _split_top_level_terms(rhs)
@@ -133,7 +140,10 @@ def wrap_line(line: str, width: int) -> str:
     # per physical line so we make progress even when a single term is
     # near the width threshold.
     chunks: list[list[tuple[str, str]]] = [[]]
-    chunk_lengths: list[int] = [len(lhs) + 4]  # "LHS &= "
+    # First-line budget: `LHS &<op> ` (LHS + 4 for "&= " or LHS + len("&\supset ")
+    # for the Hamiltonian \supset form).
+    chunks_first_prefix = f"{lhs} &{op} "
+    chunk_lengths: list[int] = [len(chunks_first_prefix)]
     for sign, body in terms:
         candidate = (
             f" {sign} {body}" if chunks[-1] else (f"-{body}" if sign == "-" else body)
@@ -144,10 +154,10 @@ def wrap_line(line: str, width: int) -> str:
         else:
             chunk_lengths[-1] += len(candidate)
         chunks[-1].append((sign, body))
-    # Emit.
+    # Emit. Preserve the source operator (= for L/EOMs, \supset for H).
     lines: list[str] = []
     first = chunks[0]
-    lines.append(f"{lhs} &= {_join_terms(first)} \\\\")
+    lines.append(f"{lhs} &{op} {_join_terms(first)} \\\\")
     for chunk in chunks[1:]:
         # Each continuation line starts with the sign of the first term.
         head_sign, head_body = chunk[0]
