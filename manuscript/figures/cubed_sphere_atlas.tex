@@ -1,8 +1,11 @@
 % Cubed-sphere atlas schematic for App J (Bayesian inference).
-% Uses tikz-3dplot for a proper 3-D perspective view.  The sphere is
-% rendered as a semi-transparent silhouette with great circles drawn
-% on top of it.  The highlighted face is also semi-transparent so the
-% projection rays and intersection markers behind it are visible.
+% Uses tikz-3dplot for a proper 3-D perspective view.  The sphere
+% surface is conveyed by a wireframe of three great circles (xy, xz,
+% yz) plus two horizontal latitudes at z = +/- 0.5; front halves are
+% drawn solid and back halves dashed.  The highlighted face is
+% semi-transparent so the projection rays and intersection markers
+% behind it remain visible.  Each projection ray carries a marker on
+% the cube-face anchor (smaller) AND on the sphere-image (larger).
 % The sample vector is drawn in two depth-ordered segments: the
 % portion inside the cube is rendered BEFORE the transparent face
 % (so the face overlays it), and the portion emerging past the face
@@ -27,16 +30,15 @@
 \colorlet{FaceLine}{SteelBlue}
 \colorlet{TileFill}{Coral!70}
 \colorlet{TileLine}{OrangeRed!85!black}
-\colorlet{SphereFill}{Gray!18}
 \colorlet{SphereLine}{Gray!75}
 \colorlet{RayLine}{Black!55}
 \colorlet{SampleArrow}{ForestGreen!60!black}
 \colorlet{AxisLine}{Gray!55}
 
-% View angles: inclination from +z, then azimuth.  Camera at azimuth
-% 35 deg in the (+x, +y) quadrant places the +x face on the front-
-% right side facing the camera, with all three coupling axes visible
-% and non-overlapping.
+% Camera at inclination 70 deg (from +z) and azimuth 35 deg (in the
+% (+x, +y) quadrant).  This view shows the +y face as the larger
+% front-facing face and the +x face as the smaller secondary face;
+% the highlight is on +y (face 2^).
 \tdplotsetmaincoords{70}{35}
 
 \begin{document}
@@ -52,17 +54,25 @@
   \pgfmathsetmacro{\ttileHi}{ 0.3333}
 
   %------------------------------------------------------------------
-  % STAGE 1 — far back layer: dashed back-side great-circle arcs
+  % STAGE 1 — far back layer: dashed back-side arcs of the sphere
+  %                  wireframe (3 great circles + 2 latitudes)
   %------------------------------------------------------------------
   % xy-plane equator, back half (dashed)
   \draw[SphereLine!50, very thin, dashed]
-    plot[domain=0:180, samples=64, smooth] ({cos(\x)}, {sin(\x)}, 0);
-  % xz-plane, back half
+    plot[domain=180:360, samples=64, smooth] ({cos(\x)}, {sin(\x)}, 0);
+  % xz-plane meridian, back half
   \draw[SphereLine!50, very thin, dashed]
     plot[domain=90:270, samples=64, smooth] ({cos(\x)}, 0, {sin(\x)});
-  % yz-plane, back half
+  % yz-plane meridian, back half
   \draw[SphereLine!50, very thin, dashed]
     plot[domain=90:270, samples=64, smooth] (0, {cos(\x)}, {sin(\x)});
+  % Two horizontal latitudes at z = +/- 0.5, back halves (dashed)
+  % Radius in xy-plane: sqrt(1 - 0.25) = 0.866
+  \foreach \zlat in {0.5, -0.5}{
+    \draw[SphereLine!40, very thin, dashed]
+      plot[domain=180:360, samples=48, smooth]
+        ({0.866*cos(\x)}, {0.866*sin(\x)}, \zlat);
+  }
 
   %------------------------------------------------------------------
   % STAGE 2 — far back cube edges (light wireframe of hidden edges)
@@ -75,97 +85,103 @@
   \draw[FaceLine!40, very thin] (-1,-1, 1) -- (1,-1, 1);
 
   %------------------------------------------------------------------
-  % STAGE 3 — sample vector segment 1 (origin -> cube-face crossing)
-  %                  drawn BEFORE the transparent face so the face
-  %                  overlays it for the "behind" depth cue
+  % STAGE 3 — sample vector segment 1 (origin -> cube-face crossing
+  %                  on the +y face).  Drawn BEFORE the transparent
+  %                  face so the face overlays it for the "behind"
+  %                  depth cue.
   %------------------------------------------------------------------
-  \pgfmathsetmacro{\cy}{0.15}
+  \pgfmathsetmacro{\cx}{0.15}
   \pgfmathsetmacro{\cz}{0.10}
-  \pgfmathsetmacro{\cn}{sqrt(1 + \cy*\cy + \cz*\cz)}
-  \pgfmathsetmacro{\cxs}{1/\cn}
-  \pgfmathsetmacro{\cys}{\cy/\cn}
+  \pgfmathsetmacro{\cn}{sqrt(\cx*\cx + 1 + \cz*\cz)}
+  \pgfmathsetmacro{\cxs}{\cx/\cn}
+  \pgfmathsetmacro{\cys}{1/\cn}
   \pgfmathsetmacro{\czs}{\cz/\cn}
   \pgfmathsetmacro{\rmax}{1.55}
   \draw[SampleArrow, very thick]
-    (0,0,0) -- (1, \cy, \cz);
-  \fill[SampleArrow] (1, \cy, \cz) circle (1.2pt);
+    (0,0,0) -- (\cx, 1, \cz);
+  \fill[SampleArrow] (\cx, 1, \cz) circle (1.2pt);
 
   %------------------------------------------------------------------
-  % STAGE 4 — sphere fill (semi-transparent grey) + sphere silhouette
-  %                  In orthographic projection the unit-sphere
-  %                  silhouette is a unit-radius circle centred at the
-  %                  origin in screen space.  We render via canvas-
-  %                  reset scope so the circle is laid down in screen
-  %                  coordinates, then restore tdplot coords.
+  % STAGE 4 — front-side sphere wireframe (great circles + latitudes,
+  %                  drawn solid on the visible hemisphere surface)
   %------------------------------------------------------------------
-  \begin{scope}[transform canvas={scale=1}]
-    \pgfsetfillopacity{0.25}
-    \fill[SphereFill] (0,0) circle (2.0);
-    \pgfsetfillopacity{1}
-    \draw[SphereLine, thin] (0,0) circle (2.0);
-  \end{scope}
-
-  %------------------------------------------------------------------
-  % STAGE 5 — front-side great circles (solid, drawn on the visible
-  %                  hemisphere surface)
-  %------------------------------------------------------------------
+  % xy equator, front half (solid)
   \draw[SphereLine, thin]
-    plot[domain=180:360, samples=64, smooth] ({cos(\x)}, {sin(\x)}, 0);
+    plot[domain=0:180, samples=64, smooth] ({cos(\x)}, {sin(\x)}, 0);
+  % xz meridian, front half
   \draw[SphereLine, thin]
     plot[domain=-90:90, samples=64, smooth] ({cos(\x)}, 0, {sin(\x)});
+  % yz meridian, front half
   \draw[SphereLine, thin]
     plot[domain=-90:90, samples=64, smooth] (0, {cos(\x)}, {sin(\x)});
+  % Two horizontal latitudes at z = +/- 0.5, front halves
+  \foreach \zlat in {0.5, -0.5}{
+    \draw[SphereLine!75, very thin]
+      plot[domain=0:180, samples=48, smooth]
+        ({0.866*cos(\x)}, {0.866*sin(\x)}, \zlat);
+  }
   \node[SphereLine, font=\scriptsize, anchor=south east]
     at (-1.05, -1.05, 0.7) {$S^{N-1}$};
 
   %------------------------------------------------------------------
-  % STAGE 6 — gnomonic projection rays through 4 cube-face anchors
-  %                  (drawn BEFORE the transparent +x face so the rays
-  %                  are partly visible through the face)
+  % STAGE 5 — gnomonic projection rays through 4 cube-face anchors
+  %                  on the +y face.  Each ray carries a marker on
+  %                  the sphere image AND a smaller marker on the
+  %                  cube-face anchor itself.  Drawn BEFORE the
+  %                  transparent +y face fill so both markers are
+  %                  visible behind it.
   %------------------------------------------------------------------
-  \foreach \fy/\fz in {-0.6667/-0.6667, 0.6667/-0.6667,
+  \foreach \fx/\fz in {-0.6667/-0.6667, 0.6667/-0.6667,
                        -0.6667/ 0.6667, 0.6667/ 0.6667}{
-    \pgfmathsetmacro{\nrm}{sqrt(1 + \fy*\fy + \fz*\fz)}
-    \pgfmathsetmacro{\sxv}{1/\nrm}
-    \pgfmathsetmacro{\syv}{\fy/\nrm}
+    \pgfmathsetmacro{\nrm}{sqrt(\fx*\fx + 1 + \fz*\fz)}
+    \pgfmathsetmacro{\sxv}{\fx/\nrm}
+    \pgfmathsetmacro{\syv}{1/\nrm}
     \pgfmathsetmacro{\szv}{\fz/\nrm}
+    % Ray inside sphere (origin to sphere intersection)
     \draw[RayLine, thin, dotted] (0,0,0) -- (\sxv,\syv,\szv);
-    \draw[RayLine, thin] (\sxv,\syv,\szv) -- (1,\fy,\fz);
-    \fill[RayLine] (\sxv,\syv,\szv) circle (0.7pt);
+    % Ray from sphere intersection out to cube-face anchor
+    \draw[RayLine, thin] (\sxv,\syv,\szv) -- (\fx, 1, \fz);
+    % Sphere-intersection marker (larger)
+    \fill[RayLine] (\sxv,\syv,\szv) circle (1.0pt);
+    % Cube-face anchor marker (smaller)
+    \fill[RayLine!85] (\fx, 1, \fz) circle (0.7pt);
   }
 
   %------------------------------------------------------------------
-  % STAGE 7 — highlighted +x face (transparent fill, sub-tile grid,
+  % STAGE 6 — highlighted +y face (transparent fill, sub-tile grid,
   %                  highlighted central sub-tile)
   %------------------------------------------------------------------
   \fill[FaceFill, opacity=0.45]
-    (1,-1,-1) -- (1, 1,-1) -- (1, 1, 1) -- (1,-1, 1) -- cycle;
+    (-1, 1,-1) -- (1, 1,-1) -- (1, 1, 1) -- (-1, 1, 1) -- cycle;
 
+  % 3x3 sub-tile grid lines on the +y face
   \foreach \v in {\ttileLo, \ttileHi}{
-    \draw[FaceLine!70, thin] (1,\v,-1) -- (1,\v,1);
-    \draw[FaceLine!70, thin] (1,-1,\v) -- (1,1,\v);
+    \draw[FaceLine!70, thin] (\v, 1,-1) -- (\v, 1, 1);
+    \draw[FaceLine!70, thin] (-1, 1, \v) -- (1, 1, \v);
   }
 
+  % Highlighted central sub-tile
   \fill[TileFill, opacity=0.75]
-    (1,\ttileLo,\ttileLo) -- (1,\ttileHi,\ttileLo) --
-    (1,\ttileHi,\ttileHi) -- (1,\ttileLo,\ttileHi) -- cycle;
+    (\ttileLo, 1, \ttileLo) -- (\ttileHi, 1, \ttileLo) --
+    (\ttileHi, 1, \ttileHi) -- (\ttileLo, 1, \ttileHi) -- cycle;
   \draw[TileLine, thick]
-    (1,\ttileLo,\ttileLo) -- (1,\ttileHi,\ttileLo) --
-    (1,\ttileHi,\ttileHi) -- (1,\ttileLo,\ttileHi) -- cycle;
+    (\ttileLo, 1, \ttileLo) -- (\ttileHi, 1, \ttileLo) --
+    (\ttileHi, 1, \ttileHi) -- (\ttileLo, 1, \ttileHi) -- cycle;
 
+  % Face outline (drawn over the fill)
   \draw[FaceLine, thick]
-    (1,-1,-1) -- (1, 1,-1) -- (1, 1, 1) -- (1,-1, 1) -- cycle;
+    (-1, 1,-1) -- (1, 1,-1) -- (1, 1, 1) -- (-1, 1, 1) -- cycle;
 
   \node[FaceLine, anchor=south west, font=\scriptsize]
-    at (1.02, 0.9, 0.95) {face $1\!\uparrow$};
+    at (0.9, 1.02, 0.95) {face $2\!\uparrow$};
 
   %------------------------------------------------------------------
-  % STAGE 8 — sample vector segment 2 (cube-face -> sphere -> tip)
+  % STAGE 7 — sample vector segment 2 (cube-face -> sphere -> tip)
   %                  drawn AFTER the transparent face so the arrow
   %                  sits on top of the face for the "emerging" cue
   %------------------------------------------------------------------
   \draw[->, SampleArrow, very thick]
-    (1, \cy, \cz) -- ({\rmax*\cxs}, {\rmax*\cys}, {\rmax*\czs});
+    (\cx, 1, \cz) -- ({\rmax*\cxs}, {\rmax*\cys}, {\rmax*\czs});
   \fill[SampleArrow, opacity=0.6]
     (\cxs, \cys, \czs) circle (0.9pt);
   \node[SampleArrow, anchor=west, font=\small]
@@ -173,7 +189,7 @@
     {$\theta = r\,\hat r$};
 
   %------------------------------------------------------------------
-  % STAGE 9 — axes + origin marker (drawn last so labels stay on top)
+  % STAGE 8 — axes + origin marker (drawn last so labels stay on top)
   %------------------------------------------------------------------
   \draw[->, AxisLine, thin] (0,0,0) -- (1.55,0,0)
     node[pos=1.06, AxisLine] {$c_{1}$};
