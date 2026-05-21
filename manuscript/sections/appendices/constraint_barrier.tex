@@ -174,14 +174,8 @@ where the Duhamel kernel $G$ is~\cite{hochbruck2010exponential,almohy2011action}
   \end{cases}
   \label{DuhamelKernel}
 \end{equation}
-The eigenbasis-component form is what the solver computes,
-\begin{equation}
-  \hat{z}^{(1)}_i(t)
-  \;=\;
-  \sum_j S_{ij}\,\hat{c}_j\,G(\lambda_i,\lambda_j;\,t),
-  \label{PassOneSolution}
-\end{equation}
-and the original-basis Pass~1 state is recovered by rotating back:
+The eigenbasis-component form is what the solver computes, and the original-basis
+state is recovered by rotating back:
 $\hat{y}^{(1)}(t) = V\,\hat{z}^{(1)}(t)$. Pass~1 is therefore computed entirely from
 the Pass~0 eigensystem $(V, D, \hat{y}^{(0)}(0))$; no additional time-stepping is
 required.
