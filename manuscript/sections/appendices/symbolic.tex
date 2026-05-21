@@ -16,8 +16,8 @@ and the equation outputs for the surveyed theories are collected in
 \cref{SymbolicOutputs}.
 Every partial differential equation evolved by the numerical solver of
 \cref{NumericalEvolution} is the output of the symbolic stage; for
-higher-curvature theories, an additional perturbative-reduction stage
-described in \cref{PerturbativeReduction} precedes the variation.
+higher-curvature theories the Lagrangian passes through
+the reduction of \cref{PerturbativeReduction}.
 
 \paragraph*{xAct environment}
 The symbolic stage runs in \Mathematica{}~\cite{mathematica} on the
@@ -25,11 +25,8 @@ The symbolic stage runs in \Mathematica{}~\cite{mathematica} on the
 \xPert{}~\cite{brizuela2009xpert} providing the perturbation-theory
 layer and \xTras{}~\cite{nutma2014xtras} the Einstein--Cartan
 operators used throughout the PGT theories of \cref{PGTEnumeration}.
-The manifold, metric, Levi-Civita and Riemann--Cartan covariant
-derivatives, and the torsion tensor are declared once at session start;
-the Christoffel symbols, the inverse metric, and the Levi-Civita
-pseudotensor $\sqrt{-g}\,\varepsilon$ are computed once and cached
-against the declared metric.
+The Christoffel symbols, the inverse metric, and the Levi-Civita
+pseudotensor $\sqrt{-g}\,\varepsilon$ are cached against the declared metric.
 
 \begin{figure}[t]
 \begin{lstlisting}[frame=single,keepspaces=true,basicstyle=\footnotesize\ttfamily]
@@ -98,7 +95,7 @@ symmetries; any algebraically-derived tensors such as the
 electromagnetic field strength $\FieldF{_\mu_\nu}$; the background
 fields; the parameter symbol set; the Lagrangian expression in
 \xAct{} syntax; and optional blocks for gauge fixing, linearisation,
-and perturbative reduction.
+and perturbative reduction (\cref{PerturbativeReduction}).
 A representative theory file is shown in \cref{TOMLExample}.
 The symbolic stage is the map
 \begin{align*}
@@ -110,12 +107,10 @@ The symbolic stage is the map
 \end{align*}
 with $n$ labelling the $N$ dynamical fields, $a$ labelling the $P$
 scalar parameters, and $\mathcal{I}$ standing for each field's
-suppressed tensor indices (a convention used throughout this
-appendix); the internal stages occupy the rest of this appendix.
+suppressed tensor indices; the internal stages occupy the rest of this appendix.
 
 \paragraph*{Linearisation around backgrounds}
-The software implements the background-and-perturbation decomposition
-of \cref{Linearisation} by expanding the action to second order in the
+The software implements the linearisation of \cref{Linearisation} by expanding the action to second order in the
 perturbations using \xPert{}~\cite{brizuela2009xpert}, with the metric
 and any declared matter fields perturbed simultaneously.
 
@@ -139,32 +134,15 @@ matter-perturbations block of \cref{TOMLExample} yields
 The background-fields have their component values fixed by
 \texttt{xCoba}'s \texttt{ComponentValue} declarations, \eg
 the uniform magnetic background
-$\bar{A}_y = -\Bzero\,z$ of \cref{BackgroundPotential}.%
-\footnote{Antisymmetric derived tensors whose
-definition references a perturbation field --- most prominently
-$\FieldF{_\mu_\nu} = \rcD{_\mu}\FieldA{_\nu} - \rcD{_\nu}\FieldA{_\mu}$
-when $\FieldA{}$ is itself a matter perturbation --- must remain
-abstract through the perturbation expansion and be substituted only
-afterwards. Without this deferral, the canonicalisation step that
-follows collapses the antisymmetric kinetic structure to zero before
-perturbation indices are assigned, and the photon equations emerge as
-non-dynamical constraints. The software detects deferral candidates
-automatically from the TOML symmetry annotation and threads them
-through the expansion as abstract tensors with their own
-\texttt{DefTensorPerturbation} registration.}
+$\bar{A}_y = -\Bzero\,z$ of \cref{BackgroundPotential}.
 
 The resulting $\lag^{(2)}$, returned by \texttt{ExpandPerturbation},
 contains two kinds of terms: products of first-order perturbations
 (the \textsf{LI}[1] symbols of \xPert{}), which constitute the kinetic
 and coupling structure of the linearised theory, and linear couplings
-to isolated second-order perturbation tensors (the \textsf{LI}[2]
-symbols, parametrising the $\mathcal{O}(\varepsilon^{2})$ corrections
-to the fields themselves) which are dropped via the
+to isolated second-order perturbation tensors
+(the \textsf{LI}[2] symbols), which are dropped via the
 substitution rule $\textsf{LI}[2] \mapsto 0$.
-% The first kind we keep verbatim; the second we drop via the
-% substitution rule $\textsf{LI}[2] \mapsto 0$, since the linearised
-% equations of motion are obtained by variation with respect to
-% first-order fields and are unaffected by the \textsf{LI}[2] content.
 The retained
 \begin{equation*}
   \lag^{(2)}
@@ -179,13 +157,9 @@ is the linearised action of the multi-field system.
 The remaining abstract covariant derivatives of background tensors are
 resolved against the \texttt{ComponentValue} declarations during the
 chart conversion.
-On the flat Minkowski background of \cref{Linearisation} the
-Christoffel symbols vanish and the background carries no torsion, so
-the covariant derivative reduces to the partial; substituting the
-uniform background \cref{BackgroundPotential} then gives
-$\PD{_z}\bar{A}_y = -\Bzero$.
-A localised background gives a coordinate-dependent expression that
-enters the JSON specification as a position-dependent coefficient.
+On the flat Minkowski background of \cref{Linearisation} the background
+Cartan connection vanishes, so background-field covariant derivatives
+reduce to partials.
 
 \paragraph*{Euler--Lagrange derivation}
 The field equation for every dynamical perturbation is obtained by
@@ -212,8 +186,7 @@ velocity slots $v^{\mathcal{I}} = \PD{_t}\varphi^{\mathcal{I}}$
 alongside the fields; rationale and consequences for solver dispatch
 are discussed in \cref{NumericalEvolution}.
 Higher-time-derivative Lagrangians arising from small-parameter
-expansions are handled by a perturbative substitution before the
-variation, discussed with its scope and limitations in
+expansions are handled by the perturbative substitution of
 \cref{PerturbativeReduction}.
 
 \paragraph*{Legendre transform and Hamiltonian density}
@@ -229,7 +202,7 @@ where $\pi^{\mathcal{I}}_n \equiv \partial\lag^{(2)}/\partial v^{\mathcal{I}}_n$
 are the canonical momenta.
 The circumstances under which the transform is admissible, and the
 perturbative-reduction procedure that makes it available for
-higher-curvature theories, are the subject of \cref{ConstraintBarrier}.
+higher-curvature theories, are treated in \cref{HamiltonianReduction}.
 
 \paragraph*{Component decomposition}
 The abstract-index equations returned by \texttt{VarD} are reduced to
@@ -264,9 +237,8 @@ for tensors of higher rank; the general mixed-type form is
 \label{GaugeFixing}
 Gauges are fixed only where a physically motivated choice
 is available for the field content.
-When a gauge is to be fixed, \TIDAL{} implements two structurally distinct
-mechanisms: some gauges are most naturally imposed before the
-EL variation, others after.
+When a gauge is to be fixed, \TIDAL{} uses one of two mechanisms:
+some gauges are imposed before the variation, others after.
 
 The first mechanism adds a gauge-fixing term to the Lagrangian before
 variation~\cite{faddeev1967feynman}.
@@ -277,29 +249,24 @@ $\rcD{_\mu}\FieldA{^\mu} = 0$ is imposed by
   \lag \;-\; \frac{1}{2\xi}\bigl(\rcD{_\mu}\FieldA{^\mu}\bigr)^{2},
   \label{LorenzGauge}
 \end{align}
-with $\xi$ the gauge-fixing weight, defaulting to $\xi=1$
-($\xi\to 0$ recovers the hard Lorenz condition); the modified Lagrangian then enters the variational
+with $\xi$ the gauge-fixing weight; the modified Lagrangian then enters the variational
 procedure in the usual way.
 The second mechanism imposes a constraint on the field components
 after decomposition, as in the transverse-traceless prescription that
 sets $h_{0\mu} = 0$ and $h^\mu{}_\mu = 0$ on the metric-perturbation
-components --- a constraint expressible only at the component level
-because it refers to component indices, not abstract ones.
+components --- a constraint expressible only at the component level.
 
 Six named presets cover the gauges in routine use: Lorenz for vector
 fields, de Donder~\cite{wald1984general} for the metric perturbation,
 Coulomb for the spatial part of a vector field, temporal
 ($A_0 = 0$), axial ($A_3 = 0$), and transverse-traceless.
-Arbitrary user-specified gauges are declared by writing the gauge
-expression directly in the gauge block of \cref{TOMLExample}, which is
-treated as either a Lagrangian term or a component constraint
-according to a mode-selection field in the gauge block.
+Arbitrary user-specified gauges are declared in the gauge block of
+\cref{TOMLExample}.
 
 \paragraph*{JSON export}
 The symbolic stage terminates by writing a JSON specification, the
-sole interface to the numerical side of \TIDAL{}; fixing this interface
-cleanly is what allows parameter sweeps and grid changes without
-re-derivation.
+the contract between the symbolic and numerical stages; parameter sweeps
+and grid changes require no re-derivation.
 The specification has five top-level entries: a spacetime block, the
 field list with each field's time-derivative order recorded
 explicitly, the equations carried as linear combinations of named
@@ -308,12 +275,8 @@ canonical block holding the Hamiltonian density in the same operator
 format, and a metadata block recording the source Lagrangian, the
 gauge, the linearisation flag, the parameter values, and a derivation
 hash.
-\cref{JSONExample} shows a representative excerpt for the
+\Cref{JSONExample} shows a representative excerpt for the
 Einstein--Maxwell (EM) theory of \cref{TOMLExample}.
-Each term carries both its numerical coefficient and its symbolic
-expression.%, so a runtime parameter override never regenerates the
-% JSON; the equation specification is the centre arrow of
-% \cref{ArchitectureDiagram}.
 
 \begin{figure}[t]
 \begin{lstlisting}[frame=single,keepspaces=true,basicstyle=\footnotesize\ttfamily]
