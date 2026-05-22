@@ -73,26 +73,26 @@ $\rcD{_\mu}$ (\cref{MixedCovariantDerivative}).
 % Step (b): Promotion of connection to independent field. Palatini
 % formulation declared explicitly.
 \paragraph*{Independent connection in the Palatini formulation}
-The Palatini formulation~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}
-treats the metric and the affine connection as independent
-variational fields. Poincar\'{e} gauge theory (PGT) of
+The Palatini
+formulation~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}
+treats the metric and the affine connection
+$\MAGA{^\sigma_\mu_\nu}$ as independent variational fields.
+Poincar\'{e} gauge theory (PGT) of
 Kibble~\cite{kibble1961lorentz},
 Utiyama~\cite{utiyama1956invariant}, and
 Sciama~\cite{sciama1962physical}, developed
-by~\cite{trautman1972einstein,hehl1976spin,hehl1995metric},
-promotes the metric and the affine connection
-$\MAGA{^\sigma_\mu_\nu}$ to independent dynamical fields in this
-sense, with
-torsion and curvature appearing as the field strengths of spacetime
-translations and rotations respectively
-(see \cref{PGTBackground} for an explicit derivation,
+by~\cite{trautman1972einstein,hehl1976spin,hehl1995metric}, is
+formulated in this way, with torsion and curvature appearing as
+the field strengths of spacetime translations and rotations
+respectively
+(\cref{PGTBackground} collects the field-content and gauging
+conventions;
 \cite{blagojevic2002gravitation,blagojevic2003lectures,blagojevicHehl2013,hehlobukhov2007cartan}
-for textbook and lecture-note treatments,
-\cite{barker2024poincare,barker2024psalter,barker2023confinement}
-for recent applications, and~\cite{lin2019pgt,blagojevic2018hamiltonian}
-for the ghost-free and no-tachyon classifications of the linearised
-propagator, against which our empirically-constructed survey
-priors can be cross-checked%
+give textbook and lecture-note treatments;
+\cite{barker2024poincare,barker2024psalter,barker2025psalter2,barker2025hamilcar,barker2024r2,barker2025metricaffine,barker2025irfound1,barker2025irfound2,legner2025torc,bahamonde2025cubic,bahamonde2025torsion,karananas2024weyl}
+cover recent applications, and~\cite{lin2019pgt,blagojevic2018hamiltonian}
+develop the ghost-free and no-tachyon classifications of the
+linearised propagator%
 % TODO: complete the verification of survey priors against the
 % Lin / Blagojevic ghost-free classifications before final
 % submission. Per docs/tex/pgt_stability_priors.tex, partial
@@ -114,16 +114,18 @@ standard form~\cite{kibble1961lorentz,hehl1976spin,hehl1995metric,blagojevic2003
     &\equiv 2\,\MAGA{^\sigma_{[\mu\nu]}}.
   \label{Torsion}
 \end{align}
-Curvature reduces to its Riemannian limit when the antisymmetric part
-of the connection vanishes; torsion is the obstruction to that limit.
+Curvature reduces to its Riemannian limit when the antisymmetric
+part of the connection vanishes, equivalently when the torsion
+\cref{Torsion} vanishes.
 
 % Step (d): General quadratic action with named couplings.
 \paragraph*{General action}
 The most general action of Poincar\'{e} gauge theory coupled to
 electromagnetism, constructed from the gauge field
 strengths $\MAGFt{^\sigma_{\mu\nu\rho}}$, $\MAGT{^\sigma_{\mu\nu}}$,
-and $\FieldF{_{\mu\nu}}$ decomposes into
-sector blocks~\cite{lin2019pgt,blagojevic2018hamiltonian,blagojevic2003lectures,barker2024poincare,sezgin1980ghostfree,aoki2020nonlinear,bahamonde2025cubic},
+and $\FieldF{_{\mu\nu}}$, decomposes into sector blocks catalogued
+in \cref{PGTEnumeration},
+as~\cite{lin2019pgt,blagojevic2018hamiltonian,blagojevic2003lectures,barker2024poincare,sezgin1980ghostfree,aoki2020nonlinear,bahamonde2025cubic}
 \begin{multline}
   S = \int \diff^4 x\,\sqrt{-g}\,\Bigl[
         \mathcal{L}_\text{lin}
@@ -138,30 +140,25 @@ sector blocks~\cite{lin2019pgt,blagojevic2018hamiltonian,blagojevic2003lectures,
       \Bigr],
   \label{QuadraticAction}
 \end{multline}
-where $\mathcal{L}_\text{lin}$ collects the linear invariants
-(Einstein--Hilbert, cosmological constant $\Lambda$, and the Holst
-term~\cite{holst1995barbero} with Barbero--Immirzi parameter
-$\gamma_\text{BI}$~\cite{barbero1995real,immirzi1997real}); $\mathcal{L}_{\tilde{\mathcal{R}}^2}$ contains the
-parity-even curvature-squared invariants;
-$\mathcal{L}_{\mathcal{T}^2}$ holds the parity-even torsion-squared
-invariants; $\mathcal{L}_{F^2}$ is the Maxwell term and
+where $\mathcal{L}_\text{lin}$ collects the linear
+invariants~\cite{kibble1961lorentz,holst1995barbero,barbero1995real,immirzi1997real};
+$\mathcal{L}_{\tilde{\mathcal{R}}^2}$ the parity-even
+curvature-squared invariants;
+$\mathcal{L}_{\mathcal{T}^2}$ the parity-even torsion-squared
+invariants; $\mathcal{L}_{F^2}$ the Maxwell term;
 $\mathcal{L}_{\tilde{\mathcal{R}}\mathcal{F}}$ the parity-even
-curvature--electromagnetic cross-term; $\mathcal{L}_\text{odd}$
-collects the parity-odd quadratic
+curvature--electromagnetic cross-term; $\mathcal{L}_\text{odd}$ the
+parity-odd quadratic
 invariants~\cite{karananas2014parity,blagojevic2018hamiltonian};
 $\mathcal{L}_\partial$ the higher-derivative
-extensions~\cite{aoki2020nonlinear}; $\mathcal{L}_\text{cubic}$
-the cubic-order completions that contribute to the linearised
-dynamics, and those as catalogued
-in~\cite{bahamonde2025cubic};
-and $\mathcal{L}_\text{CS}$ collects the Chern--Simons torsion--EM
-couplings involving the gauge potential, motivated
-by~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion}
-and treated systematically
-in~\cite{obukhov2024electrodynamics}. The explicit sector-by-sector
-enumeration is collected in \cref{PGTEnumeration}, with
-\cref{SectorSurvey} reporting the campaign survey across the
-surveyed subsets of these sectors.
+extensions~\cite{aoki2020nonlinear}; $\mathcal{L}_\text{cubic}$ the
+cubic-order invariants~\cite{bahamonde2025cubic}; and
+$\mathcal{L}_\text{CS}$ the Chern--Simons torsion--EM couplings
+involving the gauge
+potential~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion},
+catalogued in~\cite{obukhov2024electrodynamics}.
+\Cref{SectorSurvey} reports the subsets of these sectors studied
+here.
 
 % Label-glossary sentence removed in Pass 6 (was circular per
 % user feedback): the α/β/δ/χ/ζ coupling letters are introduced
@@ -187,7 +184,9 @@ $\T[3]{^\mu} \equiv \varepsilon^{\alpha\beta\gamma\mu}\MAGT{_{\alpha\beta\gamma}
   \label{IrreducibleTorsion}
 \end{align}
 The torsion-squared sector of \cref{QuadraticAction} is equivalently
-written in the \emph{direct basis} of scalar contractions,
+written in the \emph{direct basis} of scalar contractions
+(following the convention of~\cite{lin2019pgt}; see
+also~\cite{sezgin1980ghostfree,shapiro2002torsion}),
 \begin{align}
   I_1 \equiv \MAGT{_{\alpha\beta\mu}}\MAGT{^{\alpha\beta\mu}},
   \quad
@@ -213,8 +212,14 @@ term selects.
 % sub-movement.
 
 \paragraph*{Background and perturbation ansatz}
-We linearise about a flat metric carrying a uniform static magnetic
-field $\Bzero$ along $\hat{x}$, with vanishing background torsion.
+We linearise about a flat metric carrying a static magnetic field
+along $\hat{x}$, with vanishing background torsion. In most of this
+work the background is taken to be uniform,
+$\bm{B} = \Bzero\,\hat{x}$, the standard Gertsenshtein geometry. We
+also consider localised backgrounds with $\bm{B}$ confined to a
+finite region along the propagation direction; the specific profile
+is introduced in \cref{Gertsenshtein} and used in \cref{Validation},
+with the conversion kernel generalising as discussed there.
 The metric, four-potential, and torsion are decomposed as
 \begin{gather}
   g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu},
@@ -245,17 +250,17 @@ the second term being the contortion tensor that encodes the
 torsion contribution to the connection. The linearised connection
 perturbation $\delta\MAGA{^\sigma_\mu_\nu}$ therefore inherits
 contributions from both the metric perturbation $h_{\mu\nu}$,
-through the variation of the Levi--Civita connection
-$\delta\rCon{^\sigma_\mu_\nu}$ obtained by varying the metric in
-\cref{LeviCivita}, and the torsion perturbation
+through the Levi--Civita connection variation
+$\delta\rCon{^\sigma_\mu_\nu}$, and the torsion perturbation
 $\delta\MAGT{^\sigma_\mu_\nu}$, through the contortion variation
-$\delta K^\sigma{}_{\mu\nu}$. The metric
-perturbation $h_{\mu\nu}$ enters without a $\kappa$ prefactor;
-this choice is equivalent under field redefinition to the
-canonically-normalised convention
-$g_{\mu\nu} = \eta_{\mu\nu} + \kappa\,\tilde{h}_{\mu\nu}$ used
-in~\cite{lella2024constraining}. A self-consistency bound on the
-campaign parameter choices is in \cref{PerturbativeRegime}.
+$\delta K^\sigma{}_{\mu\nu}$. The perturbation $h_{\mu\nu}$ here
+carries the dimensionful $\kappa$ implicitly, and is related by the
+field redefinition $\tilde{h}_{\mu\nu} = h_{\mu\nu}/\kappa$ to the
+canonically-normalised perturbation
+$\tilde{h}_{\mu\nu}$~\cite{lella2024constraining} via
+$g_{\mu\nu} = \eta_{\mu\nu} + \kappa\,\tilde{h}_{\mu\nu}$. The
+self-consistency bounds on the linearisation are collected in
+\cref{PerturbativeRegime}.
 
 \paragraph*{Order-counting rule}
 We work to linear order in $h_{\mu\nu}$, $\delta A_\mu$, and the
@@ -269,18 +274,19 @@ After expanding $\sqrt{-g}\,\lag$ to quadratic order in the
 perturbation fields and reducing to plane-wave dependence
 $\partial_x = \partial_y = 0$ along the propagation direction
 $\hat{z}$, perpendicular to the background magnetic field
-$\bm{B}$, which we take to be $\bm{B} = \Bzero\,\hat{x}$ --- the standard Gertsenshtein
-geometry~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,cillis1996graviton,ejlli2020graviton,palessandro2023simple,palessandro2024gertsenshtein,lella2024constraining,domcke2025scattering}%
+$\bm{B}$~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,cillis1996graviton,ejlli2020graviton,palessandro2023simple,palessandro2024gertsenshtein,lella2024constraining,domcke2025scattering}%
 % TODO: investigate WLOG vs not-WLOG status of this propagation
 % direction for derivative / parity-odd PGT sectors (relates to
 % issue #300 and the new "investigation: propagation-direction
 % WLOG status" issue created with this revision).
----
 with the photon perturbation in Lorenz gauge and the metric
 perturbation evolved without a gauge constraint%
-% TODO: cite TT-in-matter approach (await supervisor meeting
-% 2026-05-08 outcome --- see docs/meetings/2026-05-08_supervisor.md
-% for the question being raised).
+% TODO (raise at 2026-05-22 supervisor meeting): request a reference
+% (published or unpublished) for imposing
+% transverse-traceless-compatible initial conditions in a magnetised
+% vacuum pre-region prior to a localised conversion zone --- needed
+% to back up the assertion in the following parenthetical. Tracked
+% in docs/meetings/2026-05-22_supervisor.md (see App. revision plan).
 (transverse-traceless-compatible initial conditions are imposed
 in the vacuum region where the wavepacket is set up; the
 evolution through the magnetic-field region is unconstrained,
@@ -293,17 +299,24 @@ assemble into a quadratic kinetic system
 \end{align}
 for a vector $\xi$ of gauge-fixed metric, photon, and (where
 propagating) torsion fluctuations. The detailed structure of
-$\mathcal{K}$ depends on the Lagrangian chosen, and is reported
-per surveyed theory class in \cref{ChannelStructure}.
+$\mathcal{K}$ depends on the Lagrangian chosen. The canonical
+Gertsenshtein channel $h_\times \!\leftrightarrow\! a_\parallel$ is
+recovered as a sub-block of $\mathcal{K}$ across all surveyed
+theories; the diagonal trace-sector metric components $h_{ii}$,
+algebraic constraints in the Einstein--Maxwell limit, become
+dynamical once an $\tilde{\mathcal{R}}^2$ kinetic term is switched
+on. The per-theory channel structure is discussed in
+\cref{ChannelStructure}, with the underlying linearised couplings
+collected in \cref{SymbolicMechanism}.
 
-\subsection{Gertsenshtein conversion kernel and channel structure}%
+\subsection{Gertsenshtein conversion kernel}%
 \label{Gertsenshtein}
-% Target ~400 w. Combined subsection covering both the kernel display
-% (was §2.3) and the channel structure observation (was §2.4). The fold
-% addresses the BHL-subsection-weight concern: each was ~250 w on its own
-% which sits below the BHL norm; together they cover the natural single
-% topic ("how the linearised system converts gravitons to photons, and
-% which channels do so").
+% Subsection covering the conversion-kernel display: the uniform
+% Gertsenshtein formula and the path-integrated Boccaletti form.
+% An earlier draft also carried a channel-decomposition paragraph;
+% that content folded into the §2.2 kinetic-matrix paragraph, and
+% the per-theory channel observations are discussed in the Results
+% section (\cref{ChannelStructure}).
 
 % Required EM-convention paragraph BEFORE the formula, per the recent
 % style-intel refinement. Without it the §1 literature-tension framing
@@ -314,16 +327,13 @@ We work at the Lagrangian level throughout, expanding
 $\sqrt{-g}\,\lag$ to quadratic order in the perturbation fields.
 The electromagnetic sector is expressed in terms of the
 four-potential $\FieldA{_\mu}$ and the gauge field strength
-$\FieldF{_{\mu\nu}}$, and background fields enter through the
-background four-potential $\bar{A}_\mu$ rather than through any
-explicit electric/magnetic decomposition. The $\sqrt{-g}$ expansion
-automatically captures the metric-dependent contractions that
-distinguish curved-spacetime EM from its naive flat-space
-identification --- the issue addressed analytically
-by~\cite{hwangnoh2023emdef,hwangnoh2023graviton} via a covariant
-normal-frame decomposition. The corresponding gauge-consistent
-equation-of-motion structure underlies the $\Bzero \to 0$
-survey-coefficient framework set out in \cref{SurveyCoefficient}.
+$\FieldF{_{\mu\nu}}$, with background fields entering through the
+background four-potential $\bar{A}_\mu$. The metric-dependent
+contractions in the $\sqrt{-g}$ expansion incorporate the effects
+of curved-spacetime electromagnetic-field
+identification~\cite{hwangnoh2023emdef,hwangnoh2023graviton}. The
+$\Bzero \to 0$ survey-coefficient framework used to extract
+amplification ratios is set out in \cref{SurveyCoefficient}.
 
 \paragraph*{Conversion probability}
 % TODO: display the formula; one prose sentence on $\Bzero$-scaling; cite
@@ -350,31 +360,21 @@ the closed form~\cite{gertsenshtein1962wave,boccaletti1970conversion,lella2024co
 \end{align}
 which in the small-argument limit $\kappa\Bzero D \ll 1$ scales as
 $\Pconv \propto \Bzero^2$, the characteristic Gertsenshtein
-signature; the regime of validity of this linearised expression in
-the torsionful background is set out in \cref{PerturbativeRegime}.
+signature. For a finite magnetised region carrying a profile
+$B_x(z)$ along the propagation direction, \cref{GertsenshteinFormula}
+generalises to the path-integrated Boccaletti
+form~\cite{boccaletti1970conversion,raffelt1988mixing}
+\begin{align}
+  \Pconv = \sin^2\!\left(
+    \frac{\kappa}{2}\int_{-\infty}^{+\infty}\!B_x(z)\,\diff z\right),
+  \label{BoccalettiPathIntegrated}
+\end{align}
+recovering \cref{GertsenshteinFormula} when $B_x(z) = \Bzero$ is
+constant over a length $D$. The regime of validity of these
+linearised expressions in the torsionful background is set out in
+\cref{PerturbativeRegime}.
 
-The quantitative reproduction of this kernel across our validation
-grid is reported in \cref{ValidationResult}, with the full
-simulation-to-analytic comparison archived in \cref{Validation}.
+\Cref{Validation} reproduces both \cref{GertsenshteinFormula} and
+\cref{BoccalettiPathIntegrated}; the validation-grid summary is
+reported in \cref{ValidationResult}.
 
-% Channel decomposition: kinematic introduction only. The earlier draft
-% claimed an algebraic "structural identity" between hx and ax kinetic
-% coefficients; the user has correctly pushed back on this — what we
-% actually have is an empirical observation in a finite class of
-% surveyed theories, with open validity questions (IC choice not WLOG;
-% TT-gauge admissibility under B0 stress-energy not formally re-derived;
-% theory class is finite). The empirical claim therefore lives in §4.3
-% (Results) with explicit caveats, NOT in §2 (Theory). §2.3 here only
-% introduces the kinematic decomposition.
-\paragraph*{Channel decomposition}
-The linearised perturbation falls naturally into the two transverse
-tensor polarisations $h_+$ and $h_\times$, the trace sector
-$\{h_+, h_4, h_9, a_\perp\}$, and the irreducible torsion modes ---
-trace vector $\T[2]{_\mu}$ and axial pseudovector $\T[3]{^\mu}$
-where present. These are the kinematic sectors in which the
-conversion question is posed; the standard Gertsenshtein channel
-$h_\times \leftrightarrow a_\parallel$ is the canonical example~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,lella2024constraining,domcke2025scattering}.
-The empirical inter-channel structure observed across the surveyed
-theory classes is reported in \cref{ChannelStructure}, with the
-underlying linearised-coupling analysis collected in
-\cref{SymbolicMechanism}.
