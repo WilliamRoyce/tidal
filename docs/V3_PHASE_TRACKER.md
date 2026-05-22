@@ -33,24 +33,28 @@
 
 GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-zero clamp` and `[v3-A-γ] γ_conversion: P_max correlation validation` track the work.
 
-## PolyChord sampling budget reference
+## Complete theory inventory and campaign order
 
-Previous campaigns used `nlive=1500–2400` to compensate for divergence-guard rejections
-(many prior samples were rejected as tachyonic, requiring a large live set to explore the
-posterior). v3 permissive sampling removes that need — PolyChord's own recommendations apply
-directly.
+> **Breadth-first policy (2026-05-22):** ALL theories with existing JSONs must have landscape surveys before ANY pub quality runs. Pub quality requires explicit user approval after all landscapes complete.
 
-| Theory | ndim | Landscape nlive | Publication nlive | num_repeats |
-| --- | --- | --- | --- | --- |
-| D2.0 Bahamonde | 5 | **125** (25×ndim) | 250 (50×ndim) | 10 (2×ndim) |
-| D2.1 Barker | 6 | **150** | 300 | 12 |
-| D2.2 Shapiro | 8 | **200** | 400 | 16 |
-| D2.3 Full | 9 | **225** | 450 | 18 |
+| Priority | Theory / label | ndim | Landscape nlive | Pub nlive | num_repeats | grid | JSON | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ✅ 1 | D1 Ricci-EM | 4 | 100 | 200 | 8 | 512 | torsion_gertsenshtein_nonminimal.json | ✅ B.2/B.3 (nlive=1200) |
+| ✅ 2 | Stage A DPP | 4 | 100 | 200 | 8 | 64 | dark_photon_plasma.json | ✅ B.4-full (nlive=1200) |
+| ✅ 3 | D2.0 Bahamonde | 5 | 125 | 250 | 10 | 64 | torsion_gertsenshtein_general_nonminimal.json | ✅ B.5 landscape |
+| ✅ 4 | D2.1 Barker | 6 | 150 | 300 | 12 | 64 | same | ✅ B.5 landscape |
+| ✅ 5 | D2.2 Shapiro | 8 | 200 | 400 | 16 | 64 | same | ✅ B.5 landscape |
+| ✅ 6 | D2.3 Full T5 | 9 | 225 | 450 | 18 | 64 | same | ✅ B.5 landscape |
+| **➡ 7** | **T6-minimal parity-odd** | **4** | **100** | **200** | **8** | **64** | torsion_gertsenshtein_parity_odd_minimal.json | ❌ pending |
+| **➡ 8** | **T6 parity-odd YM-PGT** | **20** | **500** | **1000** | **40** | **64** | torsion_gertsenshtein_parity_odd.json | ❌ pending |
+| 9 | T7 Complete-Even PGT | ~20 | ~500 | ~1000 | ~40 | 64 | **needs derivation** | 🔧 Wolfram derivation required |
+| 10 | T8 Complete-Odd PGT | ~30+ | ~750+ | ~1500+ | ~60+ | 64 | **needs derivation** | 🔧 Conditional on T6 signal |
+| – | EH (F⁴ correction) | 1 | 25 | 50 | 2 | 64 | euler_heisenberg.json | ⚠️ EM-only JSON (no h_i fields); needs full Einstein-Maxwell+EH re-derivation |
 
-**Landscape pass** = current B.5 goal — sufficient for Bayes-factor comparison and MAP
-identification. **Publication pass** = future rerun for tighter logZ (±0.1 vs ±0.3) and
-credible-interval reporting in the manuscript. All `v3_permissive/*.sh` scripts use landscape
-settings; future scripts go in `v3_publication/`.
+**T6 parity-odd params (20):** beta1-3, xi (log_uniform:1e-3:1e3), delta1, chi, zeta1-3 + d14, d15, d17, d19-21, zt1-3, zt5-6. (d16, zt4 vanish in plane-wave 1+1D reduction.)
+**T6-minimal params (4):** beta1, beta2, beta3, d21.
+**T7 design:** T5 base + χ₂–χ₁₀ (8 from R̃×∂T sector) + α₂–α₆ from R×R (5 terms, 4 independent after Gauss-Bonnet). See `docs/campaign_plan.md §Stage E`.
+**T8 design:** T6 base + ε·R̃×∂T (≤36 χ̃ terms) + ε·R×R (13 d terms). Run only if T6 shows parity-odd signal.
 
 ## Phase B — Campaign re-runs
 
@@ -66,8 +70,13 @@ settings; future scripts go in `v3_publication/`.
 | B.4b | Stage A sup INTR smoke | ✅ done | 29199129 (22 min INTR). logZ=+4.08±0.12 (vs v2 +0.66; +3.4 nats). ESS=4961. Joint D_KL=7.30 nats. MAP mA2=605 (v2: 0.97 — massive prior shift). Per-param D_KL: deltam=3.02, xi=1.05, mA2=0.86, alpha3=0.63 nats. |
 | B.4-full-amp | Stage A amp v3 publication | ✅ done | 29205968 (standard 6h, completed 2026-05-17, wall 1h37min). logZ=+9.034±0.068, ESS=7443, nlive=1200, grid=256. Consistent with B.4a smoke (+9.31). |
 | B.4-full-sup | Stage A sup v3 publication | ✅ done | 29205982 (standard 12h, completed 2026-05-17, wall 2h47min). logZ=+2.924±0.083, ESS=10675, nlive=1200. Consistent with B.4b smoke (+4.08 — small shift from enlarged prior volume at pub nlive). |
+| B.5-stageA | Stage A (DPP) landscape pass | ✅ redundant — superseded by B.4-full (2026-05-22) | **Note:** B.4-full (29205968/29205982) at nlive=1200 (300×ndim) already provides landscape and pub quality for Stage A. The 29514476 re-run at nlive=100 was submitted before recognising B.4-full was complete. Results: amp logZ=+9.641±0.223, ESS=647; sup logZ=+4.109±0.213, ESS=1369. Consistent with B.4a/B.4b smokes. **Gold standard: use B.4-full-amp/sup (nlive=1200) for publication.** |
+| B.5-d1 | D1 (Ricci-EM) landscape pass | ✅ redundant — superseded by B.2/B.3 (2026-05-22) | **Note:** B.2 (29189748) and B.3 (29189761) at nlive=1200 (300×ndim) already provide landscape and pub quality for D1. The 29514476 Phase 2 D1 re-run was CANCELLED before completing. **Gold standard: use B.2/B.3 (nlive=1200) for publication.** |
 | B.5 | D2.0–D2.3 v3 paired re-runs (8 chains) | ✅ done (landscape pass, 2026-05-17) | **All 8 chains captured at landscape nlive=25×ndim** — replaces broken nlive=1500–2400 runs that suffered from divergence-guard-era over-resolution. **Single-theory INTR**: D2.0 amp 29229768 (logZ=+9.29±0.06), D2.1 amp 29256858 (logZ=+9.58±0.05), D2.0 sup **29468539** (9 min, logZ=+5.382±0.200, ESS=1302). **Interactive INTR batch 29468763** (5/5 sequential @ 76 ranks, ~58 min): D2.1 sup (8m, logZ=+2.415±0.170), D2.2 amp (10m, logZ=+8.889±0.135), D2.2 sup (22m, logZ=+6.212±0.176), D2.3 amp (10m, logZ=+10.034±0.142), D2.3 sup SIGTERM at walltime. **Interactive INTR batch 29471255** (Phase 1: D2.3 sup at 76 ranks 26m, logZ=+2.662±0.156, ESS=2870; Phase 2: parallel mpirun test — D2.0 sup pub + D2.1 sup pub at 38 ranks each completed in 19m, **1.7× speedup over sequential**). |
-| B.5-pub | D2.0–D2.3 v3 publication pass (50×ndim) | ⏸ PAUSED — landscape-first | **Policy change (2026-05-22):** ALL landscape (25×ndim) surveys must complete before ANY pub quality runs. Pub runs require explicit user approval to resume. Partial results captured: D2.0 sup/amp pub (✅ done — 29471255, 29507332); D2.1 sup/amp pub (✅/🟡 — 29471255, partial 63% at 29507332); D2.2/D2.3 amp pub (🟡 40% at 29511699, tidal.resume exists — awaiting approval). Remaining: D2.1 amp pub resume, D2.2/D2.3 amp pub complete, D2.2/D2.3 sup pub. **DO NOT restart until user approves.** |
+| B.5-t6 | T6-minimal + T6 parity-odd landscape pass | ❌ pending | **NEXT:** `run_landscape_batch_t6.sh`. Phase 1: T6-minimal amp+sup (76r each, ~3 min, ndim=4, nlive=100). Phase 2: T6 amp+sup (38+38, ndim=20, nlive=500, ~100 min, expect SIGTERM). Resume via `run_landscape_batch_t6_resume.sh`. |
+| B.5-t7 | T7 Complete-Even PGT landscape | ❌ blocked | Needs Wolfram derivation first. Design: T5 + χ₂–χ₁₀ + α₂–α₆ (~20 params). See `docs/campaign_plan.md §Stage E`. |
+| B.5-t8 | T8 Complete-Odd PGT landscape | ❌ conditional | Run only if T6 shows parity-odd signal (any D_KL > 0.1 nats). Needs derivation. ~30+ params. |
+| B.5-pub | D2.0–D2.3 v3 publication pass (50×ndim) | ⏸ PAUSED — awaiting T6/T7/T8 landscapes + explicit user approval | **Policy change (2026-05-22):** ALL landscape (25×ndim) surveys must complete before ANY pub quality runs. Pub runs require explicit user approval to resume. Partial results captured: D2.0 sup/amp pub (✅ done — 29471255, 29507332); D2.1 sup/amp pub (✅/🟡 — 29471255, partial 63% at 29507332); D2.2/D2.3 amp pub (🟡 40% at 29511699, tidal.resume exists — awaiting approval). Remaining: D2.1 amp pub resume, D2.2/D2.3 amp pub complete, D2.2/D2.3 sup pub. **DO NOT restart until user approves.** |
 | B.6 | Bounds-dependence cross-check at L=75 under v3 | ✅ done | 29205638 (25 min INTR). log Z=+13.18±0.12 (nearly identical to B.1's +13.29). Per-coupling D_KL essentially unchanged. **v3 washes out v2's bounds-dependence non-monotonicity** (v2 L=75 = +0.84, v2 L=100 = +0.68 — non-mono; v3 L=75 ≈ L=100). |
 
 ## Phase C — Cubed-sphere coupling-space chart (HANDLED BY PARALLEL SESSION)
