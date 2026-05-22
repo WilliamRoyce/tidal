@@ -71,3 +71,13 @@ The Maxwell coefficient is similarly renormalised by any loop involving charged 
 **Concrete proposal:** add $\kappa^{-2}$ and the Maxwell coefficient as two additional free parameters in future inference runs, and check whether the nulls in the propagating-torsion sector survive marginalisation over these.
 
 **Question for supervisors:** is there a physical argument for holding these fixed that we are missing, or would sampling over them be a straightforward extension worth including in the paper?
+
+---
+
+## TT-compatible initial conditions in a magnetised vacuum pre-region
+
+The theory section (§2.2, "Linearised kinetic matrix") asserts that transverse-traceless-compatible initial conditions are imposed in the vacuum region where the gravitational-wave wavepacket is set up, with the evolution through the magnetic-field region left unconstrained so that non-TT components can develop. The photon perturbation is in Lorenz gauge; the metric perturbation is evolved without a gauge constraint.
+
+This is currently a half-supported step — the prescription is physically reasonable (TT is well-defined in vacuum, and the magnetised region sources non-TT components), but it lacks a literature anchor.
+
+**Question for supervisors:** do you have a published or unpublished reference for imposing transverse-traceless-compatible initial conditions in a magnetised vacuum pre-region prior to a localised conversion zone? A citation here would back the assertion in the report; otherwise we should flag the prescription explicitly as our own modelling choice.
