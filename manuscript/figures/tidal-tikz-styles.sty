@@ -71,8 +71,8 @@
     % --- Solver outcome box (bold label) ---
     % Usage: solver=Purple, solver=Orange, etc.
     solver/.style={
-        rectangle, rounded corners=2pt, minimum width=3.2cm,
-        minimum height=0.9cm, draw=#1Line,
+        rectangle, rounded corners=2pt, minimum width=2.2cm,
+        minimum height=0.6cm, draw=#1Line,
         fill=#1Fill!40,
         font=\footnotesize\bfseries, align=center,
         text opacity=1, text=black
@@ -80,9 +80,9 @@
     solver/.default={Gray},
     % --- Decision diamonds ---
     decision/.style={
-        diamond, aspect=2.2, minimum width=1.6cm,
+        diamond, aspect=1.8, minimum width=1.2cm,
         draw=black!70, fill=white, font=\footnotesize,
-        align=center, inner sep=2pt, text width=2.0cm
+        align=center, inner sep=0.5pt, text width=1.6cm
     },
     % --- Dashed check / condition box ---
     check/.style={
