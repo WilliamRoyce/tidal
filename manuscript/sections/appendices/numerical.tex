@@ -76,8 +76,8 @@ field's slots into a flat array, with the number of slots per field
 set by the time-derivative order of its equation of motion:
 \begin{enumerate}
   \item \textbf{Wave fields} (\lstinline!time_order!~$=2$) contribute
-    two slots: an array of values for the field $q$ itself, and an
-    array of values for its time derivative
+    two slots: values for the field $q$ itself, and
+    values for its time derivative
     $v_q \equiv \partial_t q$ at the current time. The two arrays
     are linked at evaluation time by
     \begin{align}
@@ -90,11 +90,11 @@ set by the time-derivative order of its equation of motion:
     \end{align}
     which advances the field from the velocity slot.
   \item \textbf{First-order fields} (\lstinline!time_order!~$=1$)
-    contribute one slot: an array of values for the field. The
+    contribute one slot: values for the field. The
     integrator advances this array using $\partial_t q$ computed from
     the right-hand-side specification.
   \item \textbf{Constraint fields} (\lstinline!time_order!~$=0$)
-    contribute one slot: an array of values for the field. The values
+    contribute one slot: values for the field. The values
     are not advanced by an integrator at all; they are determined at
     each timestep by solving the field's algebraic equation of motion
     against the
@@ -110,8 +110,7 @@ set by the time-derivative order of its equation of motion:
 \paragraph*{Equation specification and evaluator}
 The equations of motion come from the JSON specification produced
 by~\cref{SymbolicComputation} (format illustrated
-in~\cref{JSONExample}; each equation is a list of (coefficient,
-operator, target-field) triples). At each call the evaluator
+in~\cref{JSONExample}). At each call the evaluator
 parameter-resolves the coefficients, dispatches each operator to its
 implementation, and assembles the backend's callable.
 
@@ -131,13 +130,13 @@ evaluated at the background. The canonical momenta are
   \, ,
   \label{CanonicalMomenta}
 \end{align}
-which for a Lagrangian quadratic in time derivatives gives the linear
+which gives the linear
 relation $p_i = K_{ij}\, v_j$. To express the Hamiltonian density
 $\ham = p_i\, v_i - \lag$ in terms of the canonical pair $(q, p)$
 alone one must
 eliminate the velocities through $v_i = (K^{-1})_{ij}\, p_j$.
 \TIDAL{} chooses the velocity form for three reasons. (i) It avoids
-the symbolic inversion of the kinetic matrix at derivation time. For
+the symbolic inversion at derivation time. For
 non-diagonal $K$ the entries of $K^{-1}$ are rational expressions
 whose term count grows combinatorially with the number of fields.
 Keeping the velocity form $(q, v)$ instead passes $K$ directly to the
@@ -147,12 +146,11 @@ backend sees a single residual function $F(t, y, \dot y) = 0$ (for
 \IDA{}) or $\dot y = f(t, y)$ (for \CVODE{}, leapfrog, \SciPy{}).
 (iii) It is well-defined even when the kinetic matrix is singular at
 the background. A singular $K$ signals that the field variables in
-the Lagrangian are not all independent --- primary constraints from
-gauge orbits or coincident kinetic eigenvectors --- and prevents the
-canonical change of variables from $(q, v)$ to $(q, p)$; the
+the Lagrangian are not all independent and prevents the
+change of variables from $(q, v)$ to $(q, p)$; the
 canonical formulation must instead be recovered by the
-Dirac--Bergmann constraint analysis of~\cref{DiracBergmann}. The
-velocity form sidesteps the change of variables entirely.
+Dirac--Bergmann constraint analysis of~\cref{DiracBergmann}.
+% The velocity form sidesteps the change of variables entirely.
 
 \paragraph*{State layout and field views} The mapping between a
 field's component name and its slot in the flat state vector is
@@ -178,8 +176,9 @@ discretisation is a central-difference scheme on a uniform Cartesian
 grid, where the stencil coefficients are those of Fornberg's algorithm~\cite{fornberg1988generation}.
 The expected algebraic convergence
 rates are realised on a smooth gradient
-test in~\cref{FDConvergence}. Boundary conditions (periodic,
-Dirichlet, Neumann, or Robin) are handled uniformly by a ghost-cell
+test in~\cref{FDConvergence}. Boundary conditions
+% (periodic, Dirichlet, Neumann, or Robin)
+are handled uniformly by a ghost-cell
 formula~\cite{leveque2007finite}.
 The finite-difference (FD) path is the fallback for systems on which
 neither the modal solver of~\cref{ModalSolver} nor the pseudo-spectral
@@ -192,8 +191,8 @@ path of~\cref{OtherBackends} is eligible.
   \caption{Spatial-discretisation convergence on the test function
     $f(x)=e^{\sin x}$,
     periodic on $[0,2\pi]$. The four curves show the Fornberg
-    finite-difference stencils at orders $2$, $4$, and $6$ and the
-    periodic-domain pseudo-spectral path. Dashed lines are log--log
+    finite-difference (FD) stencils at orders $2$, $4$, and $6$ and the
+    periodic-domain pseudo-spectral path. Dashed lines are
     linear regression fits to the converging segment of each FD curve;
     the fitted slope $\hat{\alpha}$ and coefficient of determination
     $R^2$ are quoted in the legend. The dotted horizontal line marks
@@ -210,15 +209,14 @@ path of~\cref{OtherBackends} is eligible.
 \subsection{Fourier modal solver}%
 \label{ModalSolver}
 
-\paragraph*{Mode-by-mode evolution} The state $(q, v)$ is transformed
+\paragraph*{Modal evolution} The state $(q, v)$ is transformed
 to Fourier space, and the right-hand-side operators are
 applied as Fourier symbols. For a
-system in which every coefficient is constant, each $k$-mode
+system with constant coefficients, each $k$-mode
 decouples, and the evolution reduces to a finite-dimensional linear
 ODE on the state vector~$\hat y(k)$ (the column that
-stacks the Fourier amplitudes of every field slot
-$\hat\varphi^I(k)$ and every velocity slot $\hat v_\varphi^I(k)$ at
-wavenumber $k$)
+stacks the amplitudes of every field
+$\hat\varphi^I(k)$ and velocity $\hat v_\varphi^I(k)$)
 \begin{align}
   \frac{\diff}{\diff t} \hat y(k) = M(k)\, \hat y(k)
   \, ,
@@ -272,7 +270,7 @@ scaling-and-squaring method of
 \lstinline!scipy.linalg.expm!~\cite{higham2009scaling}. We do not
 employ the eigendecomposition $M(k) = V D V^{-1}$ with
 $\exp(M t) = V \exp(D\, t) V^{-1}$ because the eigenvector matrix $V$
-becomes ill-conditioned for several cases of interest in the
+becomes ill-conditioned in the
 Poincar\'e gauge sector: near-degenerate eigenvalues arise from a
 variety of sources and the worst-case condition number
 $\operatorname{cond}(V)$~\cite{golub2013matrix,higham2008functions} can exceed $10^{13}$ on the
@@ -306,9 +304,9 @@ decoupled sub-blocks % --- for example, the $h_\times\!\leftrightarrow\!
 % such a block-diagonal matrix as a single dense object would waste
 % both wall time (since the per-mode \lstinline!expm! cost scales as
 % $\mathcal{O}(b^3)$ in the block size $b$) and conditioning.
-so we compute the block decomposition: slots $i$ and $j$ are deemed
+so we compute the block decomposition. Slots $i$ and $j$ are deemed
 coupled when either off-diagonal entry $M_{ij}$ or $M_{ji}$ exceeds
-a heuristic cut-off of $10^{-14}\,\max|M|$ in absolute value,
+$10^{-14}\,\max|M|$ in absolute value,
 % \footnote{The kinetic matrix is not in general symmetric in field
 % space: derivative cross-couplings between fields of different
 % intrinsic parity (e.g.\ scalar--pseudoscalar gradient mixing, or
@@ -329,9 +327,8 @@ conditioning to be at least as good as the unblocked path.
 % paragraph for the same reason; the union-find threshold is an
 % engineering heuristic and is deliberately conservative.
 
-\paragraph*{Constraint elimination via Fourier Schur complement}
-When the system carries algebraic constraints,
-we eliminate the constraints per mode by Schur complement~\cite{boydvandenberghe2004convex} before
+\paragraph*{Constraint elimination via Schur complement}
+We eliminate any algebraic constraints per mode by Schur complement~\cite{boydvandenberghe2004convex} before
 forming the exponential. Partitioning the per-mode state
 $\hat y(k) = (y_d, y_c)^{\mathsf{T}}$ into a dynamical ($y_d$) and
 a constraint part ($y_c$), the equation
@@ -359,13 +356,13 @@ evolution matrix
   \label{SchurReducedMatrix}
 \end{align}
 on $y_d$ alone. The matrix $A_{dc}$ here captures references to
-constraint \emph{field values} in dynamical equations. Absent any
-velocity coupling, $A_{\rm red}$ is the per-mode generator the modal
-exponential acts on.
+constraint \emph{field values} in dynamical equations.% Absent any
+% velocity coupling, $A_{\rm red}$ is the per-mode generator the modal
+% exponential acts on.
 
 A second pattern arises when the dynamical block references the
-\emph{velocity} of a constraint slot. Differentiating the constraint
-relation~(\cref{SchurReducedConstraint}) in time yields
+\emph{velocity} of a constraint field. Differentiating
+\cref{SchurReducedConstraint} in time yields
 $\dot y_c = -\mathsf{S}_{cc}^{-1}\mathsf{S}_{cd}\,\dot y_d$ and substituting into the
 dynamical equation
 $\dot y_d = A_{\rm red}\,y_d + A_{dc,v}\,\dot y_c$ produces an
@@ -379,8 +376,7 @@ $\dot y_d = A_{\rm red}\,y_d + A_{dc,v}\,\dot y_c$ produces an
 \end{align}
 which \TIDAL{} resolves per mode, recovering an explicit generator
 $\dot y_d = M_{\rm red}(k)\,y_d$ that the Pad\'e exponential then acts
-on. Rank-deficient kinetic matrices are handled separately, by the
-null-space projection of the next paragraph. The Schur-complement
+on. The Schur-complement
 reduction is standard DAE
 practice~\cite{brenan1996numerical,hairer1996ode2}; the same reduction
 is reused by the constraint initial-condition solver
@@ -400,11 +396,9 @@ exponential, leaving a rank-correct generator for the Pad\'e path.
 
 \paragraph*{Position-dependent coefficients via Krylov action}
 Position-dependent coefficients couple the per-mode systems together.
-Let $y(x)$ denote any state slot in position space and $c(x)$ a
-position-dependent coefficient that multiplies it on the right-hand
-side. In Fourier space, the product becomes a convolution. On the
-discrete grid $\{k_n\}_{n=0}^{N-1}$ this convolution reduces to a
-finite sum~\cite{cooley1965fft}:
+Let $y(x)$ denote any state slot in position space and $c(x)$ its
+position-dependent coefficient. On the discrete grid $\{k_n\}_{n=0}^{N-1}$
+in Fourier space, this convolution reduces to a finite sum~\cite{cooley1965fft}:
 \begin{align}
   (\widehat{c \cdot y})_k
   = \frac{1}{N}\sum_{k'} \hat c_{\,k-k'}\, \hat y_{k'}
@@ -445,7 +439,7 @@ where the transient growth of $\|\exp(A t)\|$ for non-normal
 $A$ is controlled by the $\varepsilon$-pseudospectrum rather than by
 the spectrum itself.}
 The matrix-exponential action is computed directly via the
-Krylov scheme of \SciPy{}'s
+\SciPy{}'s Krylov scheme
 \lstinline!expm_multiply!~\cite{almohy2011action} ---
 which evaluates $\exp(Mt)\,y_0$ without forming $\exp(Mt)$ explicitly
 and stays accurate when $M$ is non-normal.
@@ -453,9 +447,8 @@ and stays accurate when $M$ is non-normal.
 For localised coefficient profiles the convolution matrix is
 effectively banded; \TIDAL{} converts it to compressed-sparse-column
 (CSC) format~\cite{demmel1999supernodal,lidemmel2003superlu} when the
-density falls below a heuristic 30\% cut-off. \Cref{fig:SparseCSCBenchmark}
-shows the resulting orders of magnitude speed-up on the Gertsenshtein effect with a Gaussian-localised
-field~\cite{boccaletti1970conversion} as the matrix sparsifies with
+density falls below 30\%. \Cref{fig:SparseCSCBenchmark}
+shows the resulting orders of magnitude speed-up as the matrix sparsifies with
 increasing grid resolution.
 
 % The resulting
