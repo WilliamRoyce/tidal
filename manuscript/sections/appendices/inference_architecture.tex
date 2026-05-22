@@ -23,14 +23,14 @@ maps over the atlas of \cref{CubedSphereAtlas}.  From the sampler we
 obtain the prior-averaged amplification $\mathcal{Z}$
 (\cref{EvidenceIntegral}) and the Kullback--Leibler divergence
 $D_{\mathrm{KL}}$~\cite{Kullback:1951zyt,Handley:2019mfs}, which
-captures how concentrated the score-weighted posterior is on a
-particular region of coupling space.  The survey then reports which
-regions activate the Gertsenshtein amplification, and which
-invariant combinations they encode.
+measures how tightly the amplification is concentrated onto
+particular couplings.  The survey then maps where in coupling
+space the Gertsenshtein conversion is most strongly amplified, and
+which combinations of invariants drive it.
 
 \paragraph*{Amplification score}
-The PDE solver~(\cref{NumericalEvolution}) evolves the linearised
-perturbations for an integration time $t_\mathrm{end}$ and returns
+The PDE solver~(\cref{NumericalEvolution}) evolves the system
+for an integration time $t_\mathrm{end}$ and returns
 the exit conversion probability $P(\theta, t_\mathrm{end})$ at each
 coupling vector $\theta$ (the parametrisation of
 \cref{PGTEnumeration}).  The score function for the nested sampler
@@ -41,8 +41,8 @@ baseline~\cref{GertsenshteinFormula},
   \label{AmplificationScore}
 \end{equation}
 with the baseline shown for the uniform-magnetic-background setup
-of \cref{Results}; for a localised-$\Bzero$ configuration the
-baseline becomes the path-integrated form
+of \cref{Results}; for a localised-$\Bzero$ configuration we
+use the path-integrated form
 \cref{BoccalettiPathIntegrated}, with the surrounding analysis
 otherwise unchanged.\footnote{$A(\theta)$ and the asymptotic
 survey-coefficient ratio $\Aamp$ of \cref{AmplificationFactor} are
@@ -74,15 +74,14 @@ or suppressing ($-$) regions of coupling space.
     wrapped around the origin (blue wireframe) and each cube face is
     radially projected onto the sphere.  The highlighted face
     (face~$2\!\downarrow$, transparent blue) is one \emph{cube-tile} of
-    the atlas, partitioned into $4\times 4$ sub-tiles whose
-    constrained-prior chains run independently; the curves on the
+    the atlas, partitioned into a $4\times 4$ grid of sub-tile
+    cells, each sampled by an independent constrained-prior chain;
+    the curves on the
     sphere bound the \emph{sphere-tile} --- the gnomonic image of the
     cube-tile --- and the projected gridlines within it carry the
     sub-tile partition onto the curved surface, with one sphere
     sub-tile highlighted in blue to match its cube-face pre-image.
-    Dotted lines from the origin through cube-tile anchor points are
-    gnomonic projection rays; the small ring markers show where each
-    ray meets the sphere.  The green arrow is one sample vector
+    The green arrow is one sample vector
     $\theta = r\,\hat n$ through the highlighted sub-tile: the dark
     segment inside the cube and the arrow segment emerging past the
     face show the two-step decomposition of the radial-direction
@@ -97,20 +96,28 @@ or suppressing ($-$) regions of coupling space.
 The natural objects of the survey are the directions in the invariant
 space rather than the values of any individual coefficient, so we
 decompose a coupling vector $\theta \in \mathbb{R}^N$ as
-$\theta = r\,\hat n$, with $r>0$ the overall
-perturbation magnitude away from the Einstein--Maxwell baseline and
-$\hat n \in S^{N-1}$ the direction in the
-parametrisation of \cref{PGTEnumeration}.  The survey question
-becomes which direction $\hat n$ at fixed $r$
-activates the Gertsenshtein amplification.  We sample $\hat n$
+$\theta = r\,\hat n$.  The magnitude $r>0$ sets how far the theory
+sits from the Einstein--Maxwell base theory: it is the overall
+strength of the couplings beyond it, treated as perturbative
+corrections in the effective-field-theory
+regime~(\cref{PerturbativeReduction}).  The unit vector
+$\hat n \in S^{N-1}$ gives the direction in the parametrisation of
+\cref{PGTEnumeration}.  The survey question becomes which direction
+$\hat n$ at fixed $r$ most strongly amplifies the Gertsenshtein
+conversion.  We sample $\hat n$
 uniformly on
 $S^{N-1}$ via a gnomonic cubed-sphere atlas: the $N$-cube wrapped
 around the origin is radially projected onto $S^{N-1}$, yielding a
 quasi-rectilinear angular grid without polar
-singularities~(\cref{CubedSphereAtlas}).  Each face partitions
-further into sub-tiles whose constrained-prior chains run
-independently and are pooled into the joint $\hat n$
-distribution at the end.  In the limit of fine sub-tile resolution
+singularities~(\cref{CubedSphereAtlas}).  Each face is subdivided
+into sub-tile cells, each sampled by its own independent
+constrained-prior chain.  The subdivision fans the survey out into
+independent parallel runs, and because each chain explores only its
+own cell, a narrow amplifying direction within that cell is
+resolved rather than under-sampled across a much larger prior.  The
+cells of a face are then combined into that face's panel in the
+atlas, and all cells together form the joint $\hat n$ distribution.
+In the limit of fine sub-tile resolution
 each tile becomes locally rectilinear and the chart approaches a
 flat Cartesian one on the sphere, so the construction interpolates
 smoothly between a coarse global parametrisation of $S^{N-1}$ and
@@ -137,11 +144,10 @@ amplification on average across the prior; a theory with
 $\log\mathcal{Z}\gg 0$ has typical coupling vectors that amplify the
 conversion above its Einstein--Maxwell baseline; one with
 $\log\mathcal{Z}\ll 0$ has $\langle A\rangle_\pi \ll 1$.  The
-absolute value of $\mathcal{Z}$ is controlled by the choice of prior
-support and is not the load-bearing output of the survey; what we
-report from $\mathcal{Z}$ is the sign and order of magnitude of
-$\log\mathcal{Z}$, with the corresponding structural information
-carried jointly by $D_{\mathrm{KL}}$, introduced next.
+magnitude of $\log\mathcal{Z}$ is sensitive to the choice of prior
+support, whereas its sign, and the ordering of $\log\mathcal{Z}$
+across theories, are not; these are what the survey draws on,
+together with $D_{\mathrm{KL}}$, introduced next.
 
 \paragraph*{Posterior contraction}
 Nested sampling produces samples from the score-reweighted posterior
@@ -162,16 +168,15 @@ measured in nats.  Small $D_{\mathrm{KL}}$ means the posterior is
 indistinguishable from the prior and the response is generic to the
 theory across the surveyed range; large $D_{\mathrm{KL}}$ means the
 posterior has contracted onto a specific coupling region and the
-response is parameter-specific.  $D_{\mathrm{KL}}$ depends only on the contraction of the prior into
-the posterior, not on the absolute prior volume that scales
-$\mathcal{Z}$.  When $D_{\mathrm{KL}}$ is large at small
-$\mathcal{Z}$ the theory is generically non-amplifying over the
+response is parameter-specific.  When $D_{\mathrm{KL}}$ is large at
+small $\mathcal{Z}$ the theory is generically non-amplifying over the
 surveyed prior while a small region of coupling space \emph{is}
 amplifying and the chain has contracted onto it.  The per-coupling
 marginal $D_{\mathrm{KL}}$ extracted with
 anesthetic~\cite{Handley:2019mfs} then picks out which invariants
 the chain has contracted along, telling us not just \emph{that} a
 region of coupling space carries the response but \emph{which
-directions in operator space} it spans.  Campaign values for
+directions in operator space} it spans.  Values of
 $\mathcal{Z}$, $D_{\mathrm{KL}}$, and the marginal
-$D_{\mathrm{KL}}$ are reported in \cref{Results}.
+$D_{\mathrm{KL}}$ for each surveyed theory are reported in
+\cref{Results}.

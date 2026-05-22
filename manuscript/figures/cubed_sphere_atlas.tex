@@ -3,11 +3,10 @@
 % surface is rendered as a 3-D shaded ball (\shade[ball color]) in
 % tdplot_screen_coords with great-circle / latitude wireframe overlaid;
 % front-half arcs solid, back-half arcs dashed.  The highlighted face
-% is semi-transparent so the projection rays and intersection markers
-% behind it remain visible.  Each projection ray carries a marker on
-% the cube-face anchor (smaller) AND on the sphere-image (larger).
-% Four curved arcs on the sphere bound the sphere-tile (the gnomonic
-% image of the highlighted cube-face's edges).
+% is semi-transparent so the sphere surface and the sample vector
+% behind it remain visible.  Four curved arcs on the sphere bound the
+% sphere-tile (the gnomonic image of the highlighted cube-face's
+% edges).
 % The sample vector is drawn in two depth-ordered segments: the
 % portion inside the cube is rendered BEFORE the transparent face
 % (so the face overlays it), and the portion emerging past the face
@@ -35,7 +34,6 @@
 \colorlet{TileFill}{BlueFill}
 \colorlet{TileLine}{BlueLine}
 \colorlet{SphereLine}{GrayLine}
-\colorlet{RayLine}{Black!55!GrayLine}
 \colorlet{SampleArrow}{PurpleLine}
 \colorlet{AxisLine}{GrayLine}
 
@@ -53,10 +51,11 @@
     scale=2.0
   ]
 
-  % Useful sub-tile geometry: the highlighted cell of the 4x4 grid
-  % spans x in [0, 0.5], z in [0, 0.5] (one near-centre sub-tile).
-  \pgfmathsetmacro{\ttileLo}{0.0}
-  \pgfmathsetmacro{\ttileHi}{0.5}
+  % Useful sub-tile geometry: \ttileLo and \ttileHi delimit the
+  % highlighted cell of the 4x4 grid (x and z both in
+  % [\ttileLo, \ttileHi]).  Move the cell by editing these two only.
+  \pgfmathsetmacro{\ttileLo}{-0.5}
+  \pgfmathsetmacro{\ttileHi}{0.0}
 
   %------------------------------------------------------------------
   % STAGE 0a — inside-sphere axis segments (origin -> unit-sphere
@@ -86,13 +85,13 @@
   %                  face so the face overlays it for the "behind"
   %                  depth cue.
   %------------------------------------------------------------------
-  \pgfmathsetmacro{\cx}{0.30}
-  \pgfmathsetmacro{\cz}{0.25}
+  \pgfmathsetmacro{\cx}{-0.25}
+  \pgfmathsetmacro{\cz}{-0.35}
   \pgfmathsetmacro{\cn}{sqrt(\cx*\cx + 1 + \cz*\cz)}
   \pgfmathsetmacro{\cxs}{\cx/\cn}
   \pgfmathsetmacro{\cys}{-1/\cn}
   \pgfmathsetmacro{\czs}{\cz/\cn}
-  \pgfmathsetmacro{\rmax}{2.30}
+  \pgfmathsetmacro{\rmax}{1.30}
   \draw[SampleArrow, very thick]
     (0,0,0) -- (\cx, -1, \cz);
   \fill[SampleArrow] (\cx, -1, \cz) circle (1.2pt);
@@ -107,30 +106,6 @@
     \shade[ball color=GrayFill, opacity=0.40] (0,0) circle (1);
     \draw[SphereLine!50, thin] (0,0) circle (1);
   \end{scope}
-
-  %------------------------------------------------------------------
-  % STAGE 6 — gnomonic projection rays through 4 cube-face anchors
-  %                  on the -y face.  Each ray carries a marker on
-  %                  the sphere image AND a smaller marker on the
-  %                  cube-face anchor itself.  Drawn BEFORE the
-  %                  transparent -y face fill so both markers are
-  %                  visible behind it.
-  %------------------------------------------------------------------
-  % Slight perturbations from the sub-tile centres so the 4 anchors
-  % look like a sampled scatter rather than a regular grid.
-  \foreach \fx/\fz in {-0.72/-0.58, 0.61/-0.74,
-                       -0.55/ 0.68, 0.70/ 0.62}{
-    \pgfmathsetmacro{\nrm}{sqrt(\fx*\fx + 1 + \fz*\fz)}
-    \pgfmathsetmacro{\sxv}{\fx/\nrm}
-    \pgfmathsetmacro{\syv}{-1/\nrm}
-    \pgfmathsetmacro{\szv}{\fz/\nrm}
-    \draw[RayLine, thin, dotted] (0,0,0) -- (\sxv,\syv,\szv);
-    \draw[RayLine, thin] (\sxv,\syv,\szv) -- (\fx, -1, \fz);
-    % Sphere-image marker: white-filled ring (suggests "on surface")
-    \draw[RayLine, line width=0.6pt, fill=white]
-      (\sxv,\syv,\szv) circle (1.5pt);
-    \fill[RayLine!85] (\fx, -1, \fz) circle (0.7pt);
-  }
 
   %------------------------------------------------------------------
   % STAGE 7 — sphere-tile boundary curves.  These are the four edges
@@ -180,27 +155,35 @@
          {\x/sqrt(\xline*\xline + 1 + \x*\x)});
   }
 
-  % Highlighted sphere sub-tile: the gnomonic image of the cube cell
-  % x in [0, 0.5], z in [0, 0.5].  Drawn in TileLine to pair it with
-  % the highlighted cube sub-tile of stage 8.
-  % Edge at x = 0, z in [0, 0.5]
+  % Highlighted sphere sub-tile: the gnomonic image of the
+  % highlighted cube cell (x, z in [\ttileLo, \ttileHi]).  Drawn in
+  % TileLine to pair it with the highlighted cube sub-tile of
+  % stage 8.  Parametrised by \ttileLo/\ttileHi so it tracks the
+  % cube cell automatically.
+  % Edge at x = \ttileLo
   \draw[TileLine, very thick]
-    plot[domain=0:0.5, samples=16, smooth]
-      ({0}, {-1/sqrt(1+\x*\x)}, {\x/sqrt(1+\x*\x)});
-  % Edge at x = 0.5, z in [0, 0.5]
+    plot[domain=\ttileLo:\ttileHi, samples=16, smooth]
+      ({\ttileLo/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
+       {-1/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
+       {\x/sqrt(\ttileLo*\ttileLo+1+\x*\x)});
+  % Edge at x = \ttileHi
   \draw[TileLine, very thick]
-    plot[domain=0:0.5, samples=16, smooth]
-      ({0.5/sqrt(0.25+1+\x*\x)}, {-1/sqrt(0.25+1+\x*\x)},
-       {\x/sqrt(0.25+1+\x*\x)});
-  % Edge at z = 0, x in [0, 0.5]
+    plot[domain=\ttileLo:\ttileHi, samples=16, smooth]
+      ({\ttileHi/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
+       {-1/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
+       {\x/sqrt(\ttileHi*\ttileHi+1+\x*\x)});
+  % Edge at z = \ttileLo
   \draw[TileLine, very thick]
-    plot[domain=0:0.5, samples=16, smooth]
-      ({\x/sqrt(\x*\x+1)}, {-1/sqrt(\x*\x+1)}, {0});
-  % Edge at z = 0.5, x in [0, 0.5]
+    plot[domain=\ttileLo:\ttileHi, samples=16, smooth]
+      ({\x/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
+       {-1/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
+       {\ttileLo/sqrt(\x*\x+1+\ttileLo*\ttileLo)});
+  % Edge at z = \ttileHi
   \draw[TileLine, very thick]
-    plot[domain=0:0.5, samples=16, smooth]
-      ({\x/sqrt(\x*\x+1+0.25)}, {-1/sqrt(\x*\x+1+0.25)},
-       {0.5/sqrt(\x*\x+1+0.25)});
+    plot[domain=\ttileLo:\ttileHi, samples=16, smooth]
+      ({\x/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
+       {-1/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
+       {\ttileHi/sqrt(\x*\x+1+\ttileHi*\ttileHi)});
 
   %------------------------------------------------------------------
   % STAGE 7b — dashed lines from each cube-tile corner to its
@@ -231,7 +214,7 @@
     \draw[FaceLine!70, thin] (-1,-1,\v) -- ( 1,-1, \v);
   }
 
-  % Highlighted sub-tile (cube cell x in [0,0.5], z in [0,0.5])
+  % Highlighted sub-tile (cube cell x, z in [\ttileLo, \ttileHi])
   \fill[TileFill, opacity=0.40]
     (\ttileLo,-1, \ttileLo) -- (\ttileHi,-1, \ttileLo) --
     (\ttileHi,-1, \ttileHi) -- (\ttileLo,-1, \ttileHi) -- cycle;
