@@ -9,25 +9,24 @@
 \section{Bayesian inference architecture}%
 \label{InferenceArchitecture}
 
-The Bayesian inference layer producing the survey results of
-\cref{Results} is built on
-PolyChord~\cite{Handley:2015fda,Handley:2015vkr,Skilling:2004pqw,Ashton:2022grj}.
-The PGT+EM coupling space catalogued in \cref{PGTEnumeration} is
-high-dimensional, and many equivalent parametrisations of it appear
-in the
-literature~\cite{barker2024poincare,lin2019pgt,karananas2014parity,blagojevic2018hamiltonian,bahamonde2025cubic}.
-Individual coefficient values are conventional labels for
-combinations of underlying interactions.  The survey reports which
-regions of coupling space activate the Gertsenshtein amplification,
-and which invariant combinations those regions encode.  From the
-chain output we obtain the Bayesian evidence $\mathcal{Z}$
-(\cref{EvidenceIntegral}) for the prior-averaged amplification, the
-Kullback--Leibler divergence
-$D_{\mathrm{KL}}$~\cite{Kullback:1951zyt,Handley:2019mfs} between the
-score-weighted posterior and the prior, and the chain samples
-themselves, which anesthetic~\cite{Handley:2019mfs} renders as
-corner plots and as per-tile panel maps over the atlas
-of~\cref{CubedSphereAtlas}.
+The inference layer producing the survey results of
+\cref{Results} explores the high-dimensional PGT+EM coupling space
+catalogued in \cref{PGTEnumeration}, where many equivalent
+parametrisations of the same physics appear in the
+literature~\cite{barker2024poincare,lin2019pgt,karananas2014parity,blagojevic2018hamiltonian,bahamonde2025cubic}
+and individual coefficient values are conventional labels for
+combinations of underlying interactions.  We use
+PolyChord~\cite{Handley:2015fda,Handley:2015vkr,Skilling:2004pqw,Ashton:2022grj}
+for the nested sampling, with anesthetic~\cite{Handley:2019mfs} for
+the posterior visualisation as corner plots and as per-tile panel
+maps over the atlas of \cref{CubedSphereAtlas}.  From the sampler we
+obtain the prior-averaged amplification $\mathcal{Z}$
+(\cref{EvidenceIntegral}) and the Kullback--Leibler divergence
+$D_{\mathrm{KL}}$~\cite{Kullback:1951zyt,Handley:2019mfs}, which
+captures how concentrated the score-weighted posterior is on a
+particular region of coupling space.  The survey then reports which
+regions activate the Gertsenshtein amplification, and which
+invariant combinations they encode.
 
 \paragraph*{Amplification score}
 The PDE solver~(\cref{NumericalEvolution}) evolves the linearised
@@ -43,8 +42,9 @@ baseline~\cref{GertsenshteinFormula},
 \end{equation}
 with the baseline shown for the uniform-magnetic-background setup
 of \cref{Results}; for a localised-$\Bzero$ configuration the
-baseline becomes the appropriate path-integrated Boccaletti kernel,
-with the surrounding analysis otherwise unchanged.\footnote{$A(\theta)$ and the asymptotic
+baseline becomes the path-integrated form
+\cref{BoccalettiPathIntegrated}, with the surrounding analysis
+otherwise unchanged.\footnote{$A(\theta)$ and the asymptotic
 survey-coefficient ratio $\Aamp$ of \cref{AmplificationFactor} are
 different objects: $A(\theta)$ is the actual finite-time exit ratio
 at the simulation's $t_\mathrm{end}$, while $\Aamp$ is the
@@ -68,24 +68,28 @@ or suppressing ($-$) regions of coupling space.
   \centering
   \includegraphics[width=\linewidth]{figures/cubed_sphere_atlas.pdf}
   \caption{Gnomonic cubed-sphere atlas used to sample the direction
-    $\hat r \in S^{N-1}$ of a joint coupling-space prior, drawn for
+    $\hat n \in S^{N-1}$ of a joint coupling-space prior, drawn for
     $N=3$.  Axes $c_1, c_2, c_3$ are the coupling-space coordinates.
     The semi-transparent grey sphere is $S^{N-1}$; an $N$-cube is
     wrapped around the origin (blue wireframe) and each cube face is
     radially projected onto the sphere.  The highlighted face
     (face~$2\!\downarrow$, transparent blue) is one \emph{cube-tile} of
-    the atlas, partitioned into $3\times 3$ sub-tiles whose
-    constrained-prior chains run independently; the orange-coloured
-    curves on the sphere bound the \emph{sphere-tile} --- the
-    gnomonic image of the highlighted cube-tile's edges.  Dotted
-    lines from the origin through cube-tile anchor points are
-    gnomonic projection rays; the small disks mark where each ray
-    meets the sphere.  The green arrow is one sample vector
-    $\theta = r\,\hat r$ through the central shaded sub-tile: the
-    dark segment inside the cube and the arrow segment emerging past
-    the face show the two-step decomposition of the radial-direction
-    prior into a magnitude $r$ and a direction $\hat r$.  The figure
-    idiom follows~\cite{chen2021lmars}.}
+    the atlas, partitioned into $4\times 4$ sub-tiles whose
+    constrained-prior chains run independently; the curves on the
+    sphere bound the \emph{sphere-tile} --- the gnomonic image of the
+    cube-tile --- and the projected gridlines within it carry the
+    sub-tile partition onto the curved surface, with one sphere
+    sub-tile highlighted in blue to match its cube-face pre-image.
+    Dotted lines from the origin through cube-tile anchor points are
+    gnomonic projection rays; the small ring markers show where each
+    ray meets the sphere.  The green arrow is one sample vector
+    $\theta = r\,\hat n$ through the highlighted sub-tile: the dark
+    segment inside the cube and the arrow segment emerging past the
+    face show the two-step decomposition of the radial-direction
+    prior into a magnitude $r$ and a direction $\hat n$, with the
+    filled disc marking where the vector pierces the face and the
+    ring marker where it crosses $S^{N-1}$.  The figure idiom
+    follows~\cite{chen2021lmars}.}
   \label{CubedSphereAtlas}
 \end{figure}
 
@@ -93,19 +97,19 @@ or suppressing ($-$) regions of coupling space.
 The natural objects of the survey are the directions in the invariant
 space rather than the values of any individual coefficient, so we
 decompose a coupling vector $\theta \in \mathbb{R}^N$ as
-$\theta = r\,\hat r$, with $r>0$ the overall
+$\theta = r\,\hat n$, with $r>0$ the overall
 perturbation magnitude away from the Einstein--Maxwell baseline and
-$\hat r \in S^{N-1}$ the direction in the
+$\hat n \in S^{N-1}$ the direction in the
 parametrisation of \cref{PGTEnumeration}.  The survey question
-becomes which direction $\hat r$ at fixed $r$
-activates the Gertsenshtein amplification.  We sample $\hat r$
+becomes which direction $\hat n$ at fixed $r$
+activates the Gertsenshtein amplification.  We sample $\hat n$
 uniformly on
 $S^{N-1}$ via a gnomonic cubed-sphere atlas: the $N$-cube wrapped
 around the origin is radially projected onto $S^{N-1}$, yielding a
 quasi-rectilinear angular grid without polar
 singularities~(\cref{CubedSphereAtlas}).  Each face partitions
 further into sub-tiles whose constrained-prior chains run
-independently and are pooled into the joint $\hat r$
+independently and are pooled into the joint $\hat n$
 distribution at the end.  In the limit of fine sub-tile resolution
 each tile becomes locally rectilinear and the chart approaches a
 flat Cartesian one on the sphere, so the construction interpolates
@@ -119,30 +123,25 @@ projection is the standard cubed-sphere construction
 of~\cite{ronchi1996cubedsphere}.}
 
 \paragraph*{Bayesian evidence}
-Nested sampling targets the Bayesian evidence
-\begin{equation}
-  \mathcal{Z} \;=\; \int L(\theta)\,\pi(\theta)\,\diff\theta,
-  \label{EvidenceIntegral}
-\end{equation}
-the prior-weighted integral of the score over the coupling space.
-With $L(\theta) = A(\theta)$ from \cref{NestedScore}, $\mathcal{Z}$
-becomes a prior expectation,
+With $L(\theta) = A(\theta)$ from \cref{NestedScore}, the Bayesian
+evidence targeted by the nested sampler is a prior expectation over
+the amplification score,
 \begin{equation}
   \mathcal{Z} \;=\; \int A(\theta)\,\pi(\theta)\,\diff\theta
   \;=\; \langle A\rangle_\pi,
-  \label{EvidencePrediction}
+  \label{EvidenceIntegral}
 \end{equation}
 the average amplification of the Gertsenshtein conversion over the
 coupling prior.  A theory with $\log\mathcal{Z}\approx 0$ offers no
 amplification on average across the prior; a theory with
 $\log\mathcal{Z}\gg 0$ has typical coupling vectors that amplify the
 conversion above its Einstein--Maxwell baseline; one with
-$\log\mathcal{Z}\ll 0$ has $\langle A\rangle_\pi \ll 1$, meaning the
-typical coupling vector produces a smaller conversion probability
-than the Einstein--Maxwell baseline.
-We use $\mathcal{Z}$ in this work as the survey-level prior-averaged
-amplification --- the analogue of an expected effect size --- and
-read it together with $D_{\mathrm{KL}}$, introduced next.
+$\log\mathcal{Z}\ll 0$ has $\langle A\rangle_\pi \ll 1$.  The
+absolute value of $\mathcal{Z}$ is controlled by the choice of prior
+support and is not the load-bearing output of the survey; what we
+report from $\mathcal{Z}$ is the sign and order of magnitude of
+$\log\mathcal{Z}$, with the corresponding structural information
+carried jointly by $D_{\mathrm{KL}}$, introduced next.
 
 \paragraph*{Posterior contraction}
 Nested sampling produces samples from the score-reweighted posterior
@@ -165,13 +164,14 @@ theory across the surveyed range; large $D_{\mathrm{KL}}$ means the
 posterior has contracted onto a specific coupling region and the
 response is parameter-specific.  $D_{\mathrm{KL}}$ depends only on the contraction of the prior into
 the posterior, not on the absolute prior volume that scales
-$\mathcal{Z}$.  The useful combination is a large $D_{\mathrm{KL}}$
-at small $\mathcal{Z}$: the theory is generically non-amplifying
-over the surveyed prior, but a small region of coupling space
-\emph{is} amplifying, and the chain has contracted onto it.  This
-is the signature of a fine-tuned amplifier in an otherwise quiet
-theory.  The per-coupling marginal
-$D_{\mathrm{KL}}$ extracted with anesthetic~\cite{Handley:2019mfs}
-identifies which individual invariants carry the signal.  Campaign
-values for $\mathcal{Z}$, $D_{\mathrm{KL}}$, and the marginal
+$\mathcal{Z}$.  When $D_{\mathrm{KL}}$ is large at small
+$\mathcal{Z}$ the theory is generically non-amplifying over the
+surveyed prior while a small region of coupling space \emph{is}
+amplifying and the chain has contracted onto it.  The per-coupling
+marginal $D_{\mathrm{KL}}$ extracted with
+anesthetic~\cite{Handley:2019mfs} then picks out which invariants
+the chain has contracted along, telling us not just \emph{that} a
+region of coupling space carries the response but \emph{which
+directions in operator space} it spans.  Campaign values for
+$\mathcal{Z}$, $D_{\mathrm{KL}}$, and the marginal
 $D_{\mathrm{KL}}$ are reported in \cref{Results}.

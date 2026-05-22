@@ -53,19 +53,22 @@
     scale=2.0
   ]
 
-  % Useful sub-tile geometry
-  \pgfmathsetmacro{\ttileLo}{-0.3333}
-  \pgfmathsetmacro{\ttileHi}{ 0.3333}
+  % Useful sub-tile geometry: the highlighted cell of the 4x4 grid
+  % spans x in [0, 0.5], z in [0, 0.5] (one near-centre sub-tile).
+  \pgfmathsetmacro{\ttileLo}{0.0}
+  \pgfmathsetmacro{\ttileHi}{0.5}
 
   %------------------------------------------------------------------
   % STAGE 0a — inside-sphere axis segments (origin -> unit-sphere
   %                  intersection).  Drawn early so the sphere
-  %                  shading overlays them; dashed + lighter to
-  %                  visually subordinate the inside portion.
+  %                  shading overlays them; thin solid (subordinate
+  %                  to the thick solid outside-sphere segments, but
+  %                  no dashes — the thin/thick step at the sphere
+  %                  surface marks where the axis emerges).
   %------------------------------------------------------------------
-  \draw[AxisLine!55, thin, dashed] (0,0,0) -- (1,0,0);
-  \draw[AxisLine!55, thin, dashed] (0,0,0) -- (0,1,0);
-  \draw[AxisLine!55, thin, dashed] (0,0,0) -- (0,0,1);
+  \draw[AxisLine!70, thin] (0,0,0) -- (1,0,0);
+  \draw[AxisLine!70, thin] (0,0,0) -- (0,1,0);
+  \draw[AxisLine!70, thin] (0,0,0) -- (0,0,1);
 
   %------------------------------------------------------------------
   % STAGE 2 — far back cube edges (light wireframe of hidden edges)
@@ -83,13 +86,13 @@
   %                  face so the face overlays it for the "behind"
   %                  depth cue.
   %------------------------------------------------------------------
-  \pgfmathsetmacro{\cx}{0.15}
-  \pgfmathsetmacro{\cz}{0.10}
+  \pgfmathsetmacro{\cx}{0.30}
+  \pgfmathsetmacro{\cz}{0.25}
   \pgfmathsetmacro{\cn}{sqrt(\cx*\cx + 1 + \cz*\cz)}
   \pgfmathsetmacro{\cxs}{\cx/\cn}
   \pgfmathsetmacro{\cys}{-1/\cn}
   \pgfmathsetmacro{\czs}{\cz/\cn}
-  \pgfmathsetmacro{\rmax}{1.55}
+  \pgfmathsetmacro{\rmax}{2.30}
   \draw[SampleArrow, very thick]
     (0,0,0) -- (\cx, -1, \cz);
   \fill[SampleArrow] (\cx, -1, \cz) circle (1.2pt);
@@ -154,6 +157,52 @@
       ({\x/sqrt(\x*\x+1+1)}, {-1/sqrt(\x*\x+1+1)}, {1/sqrt(\x*\x+1+1)});
 
   %------------------------------------------------------------------
+  % STAGE 7c — sphere-side gridlines: project each internal cube-tile
+  %                  gridline onto the sphere surface.  These are the
+  %                  gnomonic images of the 4x4 sub-tile boundaries,
+  %                  carrying the cube-face partition onto the curved
+  %                  surface.
+  %------------------------------------------------------------------
+  % Horizontal lines (constant z on the cube face)
+  \foreach \zline in {-0.5, 0, 0.5}{
+    \draw[FaceLine!55, very thin]
+      plot[domain=-1:1, samples=24, smooth]
+        ({\x/sqrt(\x*\x + 1 + \zline*\zline)},
+         {-1/sqrt(\x*\x + 1 + \zline*\zline)},
+         {\zline/sqrt(\x*\x + 1 + \zline*\zline)});
+  }
+  % Vertical lines (constant x on the cube face)
+  \foreach \xline in {-0.5, 0, 0.5}{
+    \draw[FaceLine!55, very thin]
+      plot[domain=-1:1, samples=24, smooth]
+        ({\xline/sqrt(\xline*\xline + 1 + \x*\x)},
+         {-1/sqrt(\xline*\xline + 1 + \x*\x)},
+         {\x/sqrt(\xline*\xline + 1 + \x*\x)});
+  }
+
+  % Highlighted sphere sub-tile: the gnomonic image of the cube cell
+  % x in [0, 0.5], z in [0, 0.5].  Drawn in TileLine to pair it with
+  % the highlighted cube sub-tile of stage 8.
+  % Edge at x = 0, z in [0, 0.5]
+  \draw[TileLine, very thick]
+    plot[domain=0:0.5, samples=16, smooth]
+      ({0}, {-1/sqrt(1+\x*\x)}, {\x/sqrt(1+\x*\x)});
+  % Edge at x = 0.5, z in [0, 0.5]
+  \draw[TileLine, very thick]
+    plot[domain=0:0.5, samples=16, smooth]
+      ({0.5/sqrt(0.25+1+\x*\x)}, {-1/sqrt(0.25+1+\x*\x)},
+       {\x/sqrt(0.25+1+\x*\x)});
+  % Edge at z = 0, x in [0, 0.5]
+  \draw[TileLine, very thick]
+    plot[domain=0:0.5, samples=16, smooth]
+      ({\x/sqrt(\x*\x+1)}, {-1/sqrt(\x*\x+1)}, {0});
+  % Edge at z = 0.5, x in [0, 0.5]
+  \draw[TileLine, very thick]
+    plot[domain=0:0.5, samples=16, smooth]
+      ({\x/sqrt(\x*\x+1+0.25)}, {-1/sqrt(\x*\x+1+0.25)},
+       {0.5/sqrt(\x*\x+1+0.25)});
+
+  %------------------------------------------------------------------
   % STAGE 7b — dashed lines from each cube-tile corner to its
   %                  sphere-tile corner.  These make the gnomonic
   %                  pairing of cube-tile vertices and sphere-tile
@@ -175,13 +224,14 @@
   \fill[FaceFill, opacity=0.45]
     (-1,-1,-1) -- (1,-1,-1) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
 
-  % 3x3 sub-tile grid lines on the -y face
-  \foreach \v in {\ttileLo, \ttileHi}{
+  % 4x4 sub-tile grid lines on the -y face (interior lines at
+  % x, z = -0.5, 0, 0.5)
+  \foreach \v in {-0.5, 0, 0.5}{
     \draw[FaceLine!70, thin] (\v,-1,-1) -- (\v,-1, 1);
     \draw[FaceLine!70, thin] (-1,-1,\v) -- ( 1,-1, \v);
   }
 
-  % Highlighted central sub-tile
+  % Highlighted sub-tile (cube cell x in [0,0.5], z in [0,0.5])
   \fill[TileFill, opacity=0.40]
     (\ttileLo,-1, \ttileLo) -- (\ttileHi,-1, \ttileLo) --
     (\ttileHi,-1, \ttileHi) -- (\ttileLo,-1, \ttileHi) -- cycle;
@@ -209,7 +259,7 @@
     (\cxs, \cys, \czs) circle (1.3pt);
   \node[SampleArrow, anchor=west, font=\small]
     at ({\rmax*\cxs + 0.04}, {\rmax*\cys + 0.02}, {\rmax*\czs + 0.05})
-    {$\theta = r\,\hat r$};
+    {$\theta = r\,\hat n$};
 
   %------------------------------------------------------------------
   % STAGE 10 — outside-sphere axis segments + arrowheads + labels.
