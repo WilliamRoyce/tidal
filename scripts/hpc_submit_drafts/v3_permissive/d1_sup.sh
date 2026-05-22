@@ -14,9 +14,14 @@
 
 set -euo pipefail
 
+# PolyChord sampling budget — ndim=4:
+#   Landscape (this script): nlive=100  (25×ndim), num_repeats=8 (2×ndim)
+#   Publication (done):      nlive=200  (50×ndim) via standard queue job 29189761
+#                            (logZ=+11.395±0.097, ESS=5224 — supersedes this script)
+
 bash scripts/hpc_shuttle.sh submit \
-  --template scripts/hpc_templates/polychord_standard.sbatch \
-  --name d1_sup_v3 --ntasks 76 --time 12:00:00 \
+  --template scripts/hpc_templates/polychord_intr.sbatch \
+  --name d1_sup_v3 --ntasks 76 \
   --cmd 'tidal sample examples/data/torsion_gertsenshtein_nonminimal.json \
     --prior "alpha1=arctan_uniform:-89:89" \
     --prior "alpha2=arctan_uniform:-89:89" \
@@ -30,6 +35,6 @@ bash scripts/hpc_shuttle.sh submit \
     --ic plane-wave --ic-component h_5 --ic-wavevector 0.06283185307179587 --ic-amplitude 1e-2 \
     --t-end 10 --snapshots 2 \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
-    --method nested --sampler polychord --nlive 1200 \
+    --method nested --sampler polychord --nlive 100 --num-repeats 8 \
     --precision-criterion 0.01 \
     --output ${RESULTS_DIR}/d1_sup_v3'
