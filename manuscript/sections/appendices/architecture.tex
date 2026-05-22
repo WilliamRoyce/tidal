@@ -13,8 +13,7 @@ for Any Lagrangian} (\TIDAL{}), the computer-algebra and numerical
 software with which we obtained the results of \cref{Results}.
 \TIDAL{} comprises two parts: a symbolic computation that derives the
 linearised field equations from an arbitrary tensor Lagrangian on a
-flat or curved background, and a numerical integration that evolves
-them in time.
+flat or curved background, and a numerical integration in time.
 The architecture is shown in~\cref{ArchitectureDiagram}.
 
 % Figure A.1 — TIDAL architecture diagram.
@@ -22,15 +21,15 @@ The architecture is shown in~\cref{ArchitectureDiagram}.
   \centering
   \includegraphics[width=\linewidth]{figures/figA1_architecture}
   \caption{\TIDAL{} architecture. The symbolic computation
-    (\xAct{}/\Mathematica{}) ingests a TOML theory specification,
+    (\xAct{}/\Mathematica{}) ingests a theory specification,
     derives the Euler--Lagrange (EL) equations via \xPert{} perturbation
     theory and component-level decomposition, and exports the
     equation specification --- the portable interface between the two
     parts. The numerical integration (\Python{}) reads the
-    specification, auto-selects a solver backend from five options
-    based on the structure of the equations
-    (\cref{NumericalEvolution}), and produces simulation data from
-    which the physics observables of interest are extracted.}
+    specification, auto-selects a solver backend based on the
+    structure of the equations (\cref{NumericalEvolution}), and
+    produces simulation data from which the physics observables of
+    interest are extracted.}
   \label{ArchitectureDiagram}
 \end{figure*}
 
@@ -45,11 +44,14 @@ A complete description of the symbolic operations is
 given in \cref{SymbolicComputation}.
 
 \paragraph*{Equation specification}
-The equation specification is the sole interface between the symbolic
-and numerical parts of \TIDAL{}.
+The equation specification, shown in \cref{ArchitectureDiagram}, is
+the sole interface between the symbolic and numerical parts of
+\TIDAL{}.
 It records each field's equation of motion as a sum of differential
 operators with parameter-dependent coefficients, the Hamiltonian
-density in the same form, and the time-derivative order of each field's equation.
+density in the same form, and the time-derivative order of each
+field's equation, used by the solver dispatch of
+\cref{NumericalEvolution}.
 Decoupling the two parts in this way allows the same derivation to
 support arbitrary grids, boundary conditions, initial conditions,
 and parameter choices without re-derivation, which is what makes
@@ -57,27 +59,28 @@ parameter surveys of the kind reported in \cref{Results} both fast
 and feasible.
 
 \paragraph*{Numerical integration}
-The numerical integration evolves the equations in time.
 \TIDAL{} dispatches automatically between several solver backends
 from the algebraic structure of the equations; the backends and the
 dispatch logic are described in \cref{NumericalEvolution}.
-For all surveys reported in \cref{Results}, the Fourier modal solver
-was used.
+The Fourier modal solver (\cref{ModalSolver}) was used throughout
+\cref{Results}.
 
 % TODO (placement reminder, surfaced during §3 drafting): the
-% "Observables" paragraph below describes \Pconv(t) and \Pmax, which
-% are physics quantities defined in \cref{Theory} (or \cref{Results}),
-% not software-architecture facts.  Consider, in a later pass, moving
+% "Observables" paragraph below describes \Pconv(t), a physics
+% quantity defined in \cref{Theory} (or \cref{Results}), not a
+% software-architecture fact.  Consider, in a later pass, moving
 % this paragraph to §2 Theoretical framework where the conversion
-% probability is first introduced, or to §4 Results where \Pmax
-% becomes the comparison quantity.  We did not move it as part of the
-% §3 drafting because relocation requires §2's notation and §4's
-% metric-definition convention to be settled first.
+% probability is first introduced, or to §4 Results where the
+% comparison quantity becomes relevant.  We did not move it as part
+% of the §3 drafting because relocation requires §2's notation and
+% §4's metric-definition convention to be settled first.  Note the
+% comparison metric is geometry-dependent (late-time limit for
+% localised backgrounds; small-time limit for uniform backgrounds)
+% and is left to §4 to define.
 
 \paragraph*{Observables}
 The numerical integration produces field snapshots at each saved
 timestep, from which physics observables are extracted.
 For the surveys of \cref{Results}, the observable is the
-graviton–photon conversion probability $\Pconv(t)$; the run-maximum
-$\Pmax$ provides the quantity compared between theories in the
-sector-by-sector study of \cref{SectorSurvey}.
+graviton–photon conversion probability $\Pconv(t)$, compared between
+theories in \cref{SectorSurvey}.
