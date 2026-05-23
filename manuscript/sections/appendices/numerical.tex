@@ -47,7 +47,8 @@ backend from the following ordered rules:
     any of the following holds: the system
     carries algebraic constraints; the
     system carries first-order equations; or any right-hand side carries a
-    $\PD{_t}$ operator.
+    $\PD{_t}$ operator acting on another field (a dissipative
+    cross-coupling).
   \item \textbf{CVODE} (\SUNDIALS{} adaptive ODE,
     BDF~\cite{gardner2022sundials,hindmarsh2005sundials}) when the
     system is a pure second-order wave.
@@ -138,7 +139,7 @@ eliminate the velocities through $v_i = (K^{-1})_{ij}\, p_j$.
 \TIDAL{} chooses the velocity form for three reasons. (i) It avoids
 the symbolic inversion at derivation time. For
 non-diagonal $K$ the entries of $K^{-1}$ are rational expressions
-whose term count grows combinatorially with the number of fields.
+whose symbolic size grows factorially with the number of fields.
 Keeping the velocity form $(q, v)$ instead passes $K$ directly to the
 solver, with no inversion at any stage. (ii) The same flat-state representation
 accommodates wave, first-order, and constraint fields, so every
@@ -317,11 +318,13 @@ $10^{-14}\,\max|M|$ in absolute value,
 % of~\cref{Results}.}
 and a union-find~\cite{tarjan1975unionfind} collects the resulting
 coupling graph into connected components. The exponential is then
-applied block-by-block: replacing a single block of size $b$ by $n$
-independent blocks of size $b/n$ reduces the total per-mode cost from
-$\mathcal{O}(b^3)$~\cite{higham2009scaling} to $\mathcal{O}(b^3/n^2)$,
-we observe the speed-up~(\cref{fig:PadeBenchmark}) and find the
-conditioning to be at least as good as the unblocked path.
+applied block-by-block. The dense per-mode \lstinline!expm! cost
+scales as $\mathcal{O}(b^3)$ in the block size
+$b$~\cite{higham2009scaling}; splitting a size-$b$ block into $n$
+sub-blocks of size $b/n$ gives
+$n\!\times\!\mathcal{O}((b/n)^3)=\mathcal{O}(b^3/n^2)$, a
+factor-$1/n^2$ saving visible in~\cref{fig:PadeBenchmark}, with
+conditioning at least as good as the unblocked path.
 % The block
 % decomposition is retained under the Pad\'e path of the previous
 % paragraph for the same reason; the union-find threshold is an
@@ -378,16 +381,14 @@ which \TIDAL{} resolves per mode, recovering an explicit generator
 $\dot y_d = M_{\rm red}(k)\,y_d$ that the Pad\'e exponential then acts
 on. The Schur-complement
 reduction is standard DAE
-practice~\cite{brenan1996numerical,hairer1996ode2}; the same reduction
-is reused by the constraint initial-condition solver
-of~\cref{ConstraintIC}.
+practice~\cite{brenan1996numerical,hairer1996ode2}.
 
 \paragraph*{SVD null-space projection on rank-deficient kinetic matrices}%
 \label{SVDNullSpace}
 For theories whose linearised kinetic matrix $K$
 of~\cref{KineticMatrixDef} is rank-deficient, the redundant directions
-of $K$ carry no dynamics. \TIDAL{} identifies them from the small
-singular values of $K$ and projects them out by an SVD
+of $K$ carry no dynamics. \TIDAL{} identifies its null space and
+projects it out by an SVD
 truncation~\cite[\S~5.5]{golub2013matrix} before forming the
 exponential, leaving a rank-correct generator for the Pad\'e path.
 % This is the bit-exact diagnostic that the cross-formulation
@@ -421,11 +422,11 @@ mode-coupled form
 \end{align}
 with each entry the sum of two contributions,
 \begin{align}
-  M_{k k'} = A(k)\,\delta_{k k'}
+  M_{k k'} = M(k)\,\delta_{k k'}
   \,+\, \tfrac{1}{N}\,\hat c_{\,k-k'}\,\mathcal{L}(k')
   \, ,
 \end{align}
-where $A(k)$ is the diagonal per-mode operator
+where $M(k)$ is the per-mode operator
 of~\cref{ModalPerMode}, $\hat c_{\,k-k'}$ are the discrete Fourier
 coefficients of $c(x)$, and $\mathcal{L}(k') \in \{1,i k',\cdots\}$ is the Fourier symbol
 of the relevant spatial operator~\cite{boyd2001chebyshev}.
@@ -433,11 +434,9 @@ The matrix is dense in general, and is generally non-normal, in which
 case the eigendecomposition is inadequate: individual terms
 $\exp(\lambda t)$ overflow when $\lambda$ has a large positive real
 part, even though the full action $\exp(M t)\, y_0$ stays bounded.%
-\footnote{This is the pseudospectral
-phenomenon analysed in Trefethen \& Embree~\cite[\S~15]{trefethen2005spectra},
-where the transient growth of $\|\exp(A t)\|$ for non-normal
-$A$ is controlled by the $\varepsilon$-pseudospectrum rather than by
-the spectrum itself.}
+\footnote{For non-normal $A$ the transient growth of $\|\exp(A t)\|$
+is not predicted by the eigenvalues alone; this phenomenon is
+analysed by Trefethen \& Embree~\cite[\S~15]{trefethen2005spectra}.}
 The matrix-exponential action is computed directly via the
 \SciPy{}'s Krylov scheme
 \lstinline!expm_multiply!~\cite{almohy2011action} ---
@@ -469,8 +468,9 @@ increasing grid resolution.
   \caption{Per-call wall time of \SciPy{}'s
     \lstinline!expm_multiply!~\cite{almohy2011action}
     on dense and compressed-sparse-column representations of the
-    mode-coupled convolution matrix for the Einstein--Maxwell
-    Gertsenshtein effect on a Gaussian-localised background field
+    mode-coupling matrix $M_{kk'}$ of~\cref{ModalCoupled} ---
+    the matrix that arises when the Einstein--Maxwell Gertsenshtein
+    effect runs on a Gaussian-localised background field
     $B_x(z){=}B_{\rm peak}\,e^{-z^2/(2R^2)}$~\cite{boccaletti1970conversion},
     with $\kappa{=}1$, $B_{\rm peak}{=}0.1$, $R{=}5$ on the periodic
     domain $[-50, 50]$. Markers show the mean over $N_{\rm reps}{=}10$
