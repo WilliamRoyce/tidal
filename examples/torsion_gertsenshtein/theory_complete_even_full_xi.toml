@@ -1,0 +1,188 @@
+# Complete-Even PGT + Full (∇T)² Kinetic Sector + All R̃×∂T Couplings (T9)
+#
+# Extends T7 (theory_complete_even.toml) by replacing Barker's single ξ
+# (= specific LC of ξ₆,ξ₇,ξ₁₂,ξ₁₆) with all 16 independent (∇T)² kinetic terms ξ₁-ξ₁₆.
+#
+# Lagrangian sectors:
+#   L_grav      = (1/κ²)R̃ + β₁I₁ + β₂I₂ + β₃I₃
+#   L_kinetic   = ξ₁(∂T)₁ + ξ₂(∂T)₂ + ... + ξ₁₆(∂T)₁₆  (full (∇T)² kinetic, 16 terms)
+#   L_coupling  = δ₁R̃_{[μν]}F^{μν}
+#               + ζ₁(∇_a T^b_{bc})F^{ac}
+#               + ζ₂(∇^a T_a^{bc})F_{bc}
+#               + ζ₃(∇^a T^b_{ac})F_{bc}
+#   L_chi       = χ₁-χ₁₀ (full R̃×∂T sector, same as T7)
+#   L_EM        = −¼F²
+#
+# All ghost-free parity-even sectors are included:
+#   β₁,β₂,β₃  (T² mass, 3 terms)          ✅
+#   ξ₁-ξ₁₆    ((∇T)² kinetic, 16 terms)    ✅  NEW (T7 had only Barker's single ξ)
+#   δ₁         (Ricci-EM)                   ✅
+#   ζ₁,ζ₂,ζ₃  (∇T×F, 3 terms)              ✅
+#   χ₁-χ₁₀    (R̃×∂T, 10 terms)             ✅
+#
+# Barker's single ξ = LC{ξ₆,ξ₇,ξ₁₂,ξ₁₆} is NOT a separate param here;
+# it is the intersection of the full ξ₁-ξ₁₆ space (already included).
+#
+# 33 free parameters: β₁,β₂,β₃, ξ₁-ξ₁₆, δ₁, ζ₁,ζ₂,ζ₃, χ₁-χ₁₀
+# (kappa, B0 fixed at simulation time)
+# ndim=32 after plane-wave reduction: ξ₁₁ vanishes (all others survive)
+# Landscape: nlive = 25×32 = 800, num_repeats = 64, ~38r per chain
+# Derivation timing: ~7m wall (last verified: 2026-05-23, 38 fields, 48 H terms, v0.42.3)
+#
+# Refs:
+#   research/lagrangian_enumeration/general_quadratic_lagrangian.tex §(∂T)² kinetic
+#   research/lagrangian_enumeration/explicit_terms_raw.txt — DT×DT block, 16 terms
+#   examples/torsion_gertsenshtein/theory_complete_even.toml — T7 base (chi1-10 pattern)
+
+[theory]
+name = "Complete-Even PGT (full xi kinetic + full chi coupling)"
+description = "T9: complete parity-even sector with all 16 (dT)^2 kinetic terms and full chi1-10"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0",
+         "beta1", "beta2", "beta3",
+         "xi1", "xi2", "xi3", "xi4", "xi5", "xi6", "xi7", "xi8",
+         "xi9", "xi10", "xi11", "xi12", "xi13", "xi14", "xi15", "xi16",
+         "delta1", "zeta1", "zeta2", "zeta3",
+         "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10"]
+
+# ξ₁-ξ₁₆ xAct expressions (DT×DT notation → xAct, from explicit_terms_raw.txt DT×DT block):
+#
+# ξ₁:  DT[-a,d,-c,-d]*DT[a,b,-b,c]  = (∂T)_a^d_{cd}·(∂T)^{ab}_b^c
+#      CD[-a][TorsionCDT[d,-c,-d]] CD[-e][TorsionCDT[b,-b,-f]] eta[a,e] eta[c,f]
+#
+# ξ₂:  DT[-a,-b,-c,-d]*DT[a,b,c,d]  = (∂T)_{abcd}·(∂T)^{abcd}
+#      CD[-a][TorsionCDT[-b,-c,-d]] CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h]
+#
+# ξ₃:  DT[-a,-c,-b,-d]*DT[a,b,c,d]  = (∂T)_{acbd}·(∂T)^{abcd}
+#      CD[-a][TorsionCDT[-c,-b,-d]] CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h]
+#
+# ξ₄:  DT[a,b,c,d]*DT[-b,-a,-c,-d]  = (∂T)^{abcd}·(∂T)_{bacd}
+#      CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] CD[-b][TorsionCDT[-a,-c,-d]]
+#
+# ξ₅:  DT[a,b,c,d]*DT[-b,-c,-a,-d]  = (∂T)^{abcd}·(∂T)_{bcad}
+#      CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] CD[-b][TorsionCDT[-c,-a,-d]]
+#
+# ξ₆:  DT[a,-a,b,c]*DT[-b,d,-c,-d]  = (∂T)^a_a^{bc}·(∂T)_b^d_{cd}
+#      CD[-e][TorsionCDT[-a,-f,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-b][TorsionCDT[d,-c,-d]]
+#
+# ξ₇:  DT[a,b,-a,c]*DT[-b,d,-c,-d]  = (∂T)^{ab}_a^c·(∂T)_b^d_{cd}
+#      CD[-e][TorsionCDT[-f,-a,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-b][TorsionCDT[d,-c,-d]]
+#
+# ξ₈:  DT[a,b,c,d]*DT[-c,-b,-a,-d]  = (∂T)^{abcd}·(∂T)_{cbad}
+#      CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] CD[-c][TorsionCDT[-b,-a,-d]]
+#
+# ξ₉:  DT[a,b,c,d]*DT[-c,-d,-a,-b]  = (∂T)^{abcd}·(∂T)_{cdab}
+#      CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] CD[-c][TorsionCDT[-d,-a,-b]]
+#
+# ξ₁₀: DT[a,b,-b,c]*DT[-c,d,-a,-d]  = (∂T)^{ab}_b^c·(∂T)_c^d_{ad}
+#      CD[-e][TorsionCDT[b,-b,-f]] eta[a,e] eta[c,f] CD[-c][TorsionCDT[d,-a,-d]]
+#
+# ξ₁₁: DT[a,b,-a,c]*DT[-c,d,-b,-d]  = (∂T)^{ab}_a^c·(∂T)_c^d_{bd}
+#      CD[-e][TorsionCDT[-f,-a,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-c][TorsionCDT[d,-b,-d]]
+#
+# ξ₁₂: DT[a,b,-a,-b]*DT[c,d,-c,-d]  = (∂T)^{ab}_{ab}·(∂T)^{cd}_{cd}
+#      CD[-e][TorsionCDT[-f,-a,-b]] eta[a,e] eta[b,f] CD[-i][TorsionCDT[-j,-c,-d]] eta[c,i] eta[d,j]
+#
+# ξ₁₃: DT[a,-a,b,c]*DT[d,-b,-c,-d]  = (∂T)^a_a^{bc}·(∂T)^d_{bcd}
+#      CD[-e][TorsionCDT[-a,-f,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-h][TorsionCDT[-b,-c,-d]] eta[d,h]
+#
+# ξ₁₄: DT[a,b,-a,c]*DT[d,-b,-c,-d]  = (∂T)^{ab}_a^c·(∂T)^d_{bcd}
+#      CD[-e][TorsionCDT[-f,-a,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-h][TorsionCDT[-b,-c,-d]] eta[d,h]
+#
+# ξ₁₅: DT[a,b,-a,c]*DT[d,-c,-b,-d]  = (∂T)^{ab}_a^c·(∂T)^d_{cbd}
+#      CD[-e][TorsionCDT[-f,-a,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-h][TorsionCDT[-c,-b,-d]] eta[d,h]
+#
+# ξ₁₆: DT[a,-a,b,c]*DT[d,-d,-b,-c]  = (∂T)^a_a^{bc}·(∂T)^d_{dbc}
+#      CD[-e][TorsionCDT[-a,-f,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-h][TorsionCDT[-d,-b,-c]] eta[d,h]
+
+[lagrangian]
+expression = """(
+  (1/kappa^2) RicciScalarCDT[]
+  + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f]
+  + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f]
+  + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d]
+  + xi1 CD[-a][TorsionCDT[d,-c,-d]] CD[-e][TorsionCDT[b,-b,-f]] eta[a,e] eta[c,f]
+  + xi2 CD[-a][TorsionCDT[-b,-c,-d]] CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h]
+  + xi3 CD[-a][TorsionCDT[-c,-b,-d]] CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h]
+  + xi4 CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] CD[-b][TorsionCDT[-a,-c,-d]]
+  + xi5 CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] CD[-b][TorsionCDT[-c,-a,-d]]
+  + xi6 CD[-e][TorsionCDT[-a,-f,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-b][TorsionCDT[d,-c,-d]]
+  + xi7 CD[-e][TorsionCDT[-f,-a,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-b][TorsionCDT[d,-c,-d]]
+  + xi8 CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] CD[-c][TorsionCDT[-b,-a,-d]]
+  + xi9 CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] CD[-c][TorsionCDT[-d,-a,-b]]
+  + xi10 CD[-e][TorsionCDT[b,-b,-f]] eta[a,e] eta[c,f] CD[-c][TorsionCDT[d,-a,-d]]
+  + xi11 CD[-e][TorsionCDT[-f,-a,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-c][TorsionCDT[d,-b,-d]]
+  + xi12 CD[-e][TorsionCDT[-f,-a,-b]] eta[a,e] eta[b,f] CD[-i][TorsionCDT[-j,-c,-d]] eta[c,i] eta[d,j]
+  + xi13 CD[-e][TorsionCDT[-a,-f,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-h][TorsionCDT[-b,-c,-d]] eta[d,h]
+  + xi14 CD[-e][TorsionCDT[-f,-a,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-h][TorsionCDT[-b,-c,-d]] eta[d,h]
+  + xi15 CD[-e][TorsionCDT[-f,-a,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-h][TorsionCDT[-c,-b,-d]] eta[d,h]
+  + xi16 CD[-e][TorsionCDT[-a,-f,-g]] eta[a,e] eta[b,f] eta[c,g] CD[-h][TorsionCDT[-d,-b,-c]] eta[d,h]
+  + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d]
+  + zeta1 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e]
+  + zeta2 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e]
+  + zeta3 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e]
+  + chi1 CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] RiemannCDT[-a,-b,-c,-d]
+  + chi2 CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] RiemannCDT[-a,-c,-b,-d]
+  + chi3 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] RiemannCDT[-d,f,-e,-f]
+  + chi4 CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] RiemannCDT[-b,-c,-a,-d]
+  + chi5 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] RiemannCDT[-d,f,-e,-f]
+  + chi6 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] RiemannCDT[-d,f,-e,-f]
+  + chi7 CD[-e][TorsionCDT[-f,-g,-h]] eta[a,e] eta[b,f] eta[c,g] eta[d,h] RiemannCDT[-c,-d,-a,-b]
+  + chi8 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] RiemannCDT[-e,f,-d,-f]
+  + chi9 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] RiemannCDT[-e,f,-d,-f]
+  + chi10 CD[-a][TorsionCDT[-b,a,b]] RiemannCDT[c,d,-c,-d]
+  - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]
+)"""
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_complete_even_full_xi.json"
