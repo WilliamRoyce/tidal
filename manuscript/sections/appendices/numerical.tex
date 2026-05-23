@@ -487,10 +487,9 @@ mode $N-k$ are complex conjugates.
 The Nyquist mode ($k=N/2$ on even-$N$ grids) is its
 own conjugate, so \emph{must} stay real. The gradient
 couplings make $\exp(M(k)\,t)$ complex at the Nyquist
-wavenumber;
-% , driving that amplitude off the real axis;
-\lstinline!irfft! then discards the imaginary part, leaking energy on
-every reconstruction.
+wavenumber: each step rotates a fraction of the real amplitude into
+the imaginary part, which \lstinline!irfft! then discards on
+reconstruction --- the energy carried by that imaginary part is lost.
 % (the zero mode is likewise self-conjugate but
 % unaffected, the gradient couplings vanishing at $k=0$).
 We zero the Nyquist mode
@@ -536,14 +535,15 @@ step-based backends
 can use: spatial operators are applied as Fourier
 multipliers,%~\cite{burns2020dedalus},
 \footnote{The pseudo-spectral path uses the exact continuous wavenumber $k$
---- the same convention as the Fourier modal
-solver of~\cref{ModalSolver}. The constraint initial-condition solver
-of~\cref{ConstraintIC} instead uses the modified wavenumber
-$k_{\rm mod}^2 = -(2/\Delta x^2)(1 - \cos(k\,\Delta x))$ at order~$2$,
-with the Fornberg
-generalisations~\cite{fornberg1988generation}. The
-constraint solution remains spectrally consistent with the FD stencils that
-drive the time evolution on those paths.}
+--- the same convention as the Fourier modal solver
+of~\cref{ModalSolver}. The constraint initial-condition solver
+of~\cref{ConstraintIC} matches the wavenumber convention of the
+active spatial path: exact $k$ for the pseudo-spectral path, and the
+FD-stencil dispersion relation $k_{\rm mod}^2 = -(2/\Delta x^2)(1 -
+\cos(k\,\Delta x))$ at order~$2$ (with the Fornberg
+generalisations~\cite{fornberg1988generation} at higher orders) for
+the FD path, so the constraint solution is spectrally consistent with
+the spatial operators used during evolution.}
 while the time evolution is driven by the chosen backend.
 % \footnote{The path is auto-enabled in every
 % solver backend except \IDA{}, whose Newton iteration uses a sparse
@@ -571,9 +571,11 @@ and with $F_i = R_i(y)$ for constraint fields, so that both classes are
 handled simultaneously. \IDA{} is the only \TIDAL{} backend that
 solves algebraic constraints at run time: the constraint residual
 rows $F_i = R_i(y)$ above are carried in the same Newton iteration as
-the differential ones. Newton iteration at each implicit step requires the
-Jacobian $\partial F/\partial y + c_j\,\partial F/\partial y'$ of the
-residual; \TIDAL{} computes this analytically (see~\cref{AnalyticalJacobian}).
+the differential ones. The Newton iteration needs the Jacobian
+$\partial F/\partial y + c_j\,\partial F/\partial y'$ of the residual
+at each implicit step; \SUNDIALS{} can finite-difference one from
+$F$, but \TIDAL{} supplies an analytical version
+(\cref{AnalyticalJacobian}) to avoid that overhead.
 
 \paragraph*{\CVODE{} --- adaptive ODE} The \CVODE{}
 backend wraps the \SUNDIALS{} ordinary-differential-equation solver of
@@ -617,10 +619,8 @@ the dominant concern.
 \paragraph*{\SciPy{} --- general-purpose adaptive ODE} The \SciPy{}
 backend wraps \lstinline!scipy.integrate.solve_ivp!~\cite{virtanen2020scipy},
 with a default method of DOP853 (an eighth-order embedded
-Runge--Kutta scheme~\cite{dormand1980runge,hairer1993ode1}). Smooth non-stiff problems are
-sometimes solved more cheaply by an explicit high-order method than by
-adaptive BDF, because DOP853 requires fewer function evaluations per
-unit of accuracy. Like leapfrog, the \SciPy{} backend is opt-in only.
+Runge--Kutta scheme~\cite{dormand1980runge,hairer1993ode1}). On smooth non-stiff problems DOP853 can beat adaptive BDF, since
+BDF's per-step implicit solve is only useful for stiff problems. Like leapfrog, the \SciPy{} backend is opt-in only.
 
 \subsection{Initial-condition preparation}%
 \label{ICPreparation}
@@ -644,11 +644,14 @@ chooses the fastest applicable solver tier for projection.
 The first tier handles the case in which
 all boundaries are periodic and the constraint coefficients are
 constant: the constraint operator is diagonalised by the discrete
-Fourier transform, with FD-order-aware modified wavenumbers
+Fourier transform, with wavenumber multipliers matching the active
+spatial path --- exact $k$ for the pseudo-spectral path, and the
+FD-stencil dispersion relation
 $k_{\rm mod}^2 = -(2/\Delta x^2)(1 - \cos(k\,\Delta x))$ at order~$2$
-and the analogous higher-order expressions~\cite{fornberg1988generation} so
-that the constraint solution is spectrally consistent with the FD
-stencils used during evolution; the cost is
+(with the analogous higher-order Fornberg
+expressions~\cite{fornberg1988generation}) for the FD path --- so the
+constraint solution carries the wavenumber convention of the spatial
+operators that drive evolution; the cost is
 $\mathcal{O}(N\log N)$~\cite{cooley1965fft}. The second
 tier covers non-periodic boundaries and variable coefficients: the
 constraint Jacobian is assembled column-by-column by impulse-probing
