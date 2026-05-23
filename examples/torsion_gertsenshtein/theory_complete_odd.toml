@@ -4,6 +4,8 @@
 # of the ε·R̃×∂T sector (xt1..xt36). No ε·R̃×R̃ terms (R² theories known
 # non-viable, per campaign policy 2026-05-22).
 #
+# Derivation timing: ~97m wall (last verified: 2026-05-23, 38 fields, 48 H terms, v0.42.1)
+#
 # Lagrangian sectors:
 #   L_grav      = (1/κ²)R̃ + β₁I₁ + β₂I₂ + β₃I₃ − (ξ/4)Ftorsion²
 #   L_T6_base   = all T6 coupling terms (delta1, chi, zeta1-3, d14-17, d19-21, zt1-6)
