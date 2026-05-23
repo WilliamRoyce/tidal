@@ -29,7 +29,7 @@
 # (kappa, B0 fixed at simulation time)
 #
 # Landscape: nlive = 25×18 = 450, num_repeats = 36, ~100-120 min at 38r
-# Derivation timing: ~5m wall (last verified: 2026-05-22, 38 fields, 48 H terms, v0.42.1)
+# Derivation timing: ~5m wall (last verified: 2026-05-23, 38 fields, 48 H terms, v0.42.1)
 #
 # Refs:
 #   research/lagrangian_enumeration/general_quadratic_lagrangian.tex §R̃×∂T
