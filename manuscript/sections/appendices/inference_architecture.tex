@@ -12,19 +12,21 @@
 The inference layer producing the survey results of
 \cref{Results} explores the high-dimensional PGT+EM coupling space
 catalogued in \cref{PGTEnumeration}, where many equivalent
-parametrisations of the same physics appear in the
-literature~\cite{barker2024poincare,lin2019pgt,karananas2014parity,blagojevic2018hamiltonian,bahamonde2025cubic}
-and individual coefficient values are conventional labels for
-combinations of underlying interactions.  We use
+parametrisations appear in the
+literature~\cite{barker2024poincare,lin2019pgt,karananas2014parity,blagojevic2018hamiltonian,bahamonde2025cubic},
+and each coefficient is an arbitrary, parametrisation-dependent
+grouping of the underlying interactions rather than a single
+fundamental quantity.  We use
 PolyChord~\cite{Handley:2015fda,Handley:2015vkr,Skilling:2004pqw,Ashton:2022grj}
 for the nested sampling, with anesthetic~\cite{Handley:2019mfs} for
-the posterior visualisation as corner plots and as per-tile panel
-maps over the atlas of \cref{CubedSphereAtlas}.  From the sampler we
-obtain the prior-averaged amplification $\mathcal{Z}$
+the posterior visualisation.
+%  as corner plots and as per-tile panel
+% maps over the atlas of \cref{CubedSphereAtlas}. 
+We obtain the prior-averaged amplification $\mathcal{Z}$
 (\cref{EvidenceIntegral}) and the Kullback--Leibler divergence
 $D_{\mathrm{KL}}$~\cite{Kullback:1951zyt,Handley:2019mfs}, which
 measures how tightly the amplification is concentrated onto
-particular couplings.  The survey then maps where in coupling
+particular couplings. We map where in coupling
 space the Gertsenshtein conversion is most strongly amplified, and
 which combinations of invariants drive it.
 
@@ -43,15 +45,14 @@ baseline~\cref{GertsenshteinFormula},
 with the baseline shown for the uniform-magnetic-background setup
 of \cref{Results}; for a localised-$\Bzero$ configuration we
 use the path-integrated form
-\cref{BoccalettiPathIntegrated}, with the surrounding analysis
-otherwise unchanged.\footnote{$A(\theta)$ and the asymptotic
+\cref{BoccalettiPathIntegrated}.\footnote{$A(\theta)$ and the asymptotic
 survey-coefficient ratio $\Aamp$ of \cref{AmplificationFactor} are
 different objects: $A(\theta)$ is the actual finite-time exit ratio
 at the simulation's $t_\mathrm{end}$, while $\Aamp$ is the
 leading-order Taylor coefficient extracted in the small-$\kappa\Bzero
-t$ limit.  The two agree to leading order whenever the integrated
-$A$ stays close to its short-time linear growth --- as in the
-uniform-background, perturbative-$\Pmax$ regime of this work --- and
+t$ limit.  The two agree to leading order whenever the perturbative regime
+$\kappa\Bzero t \ll 1$ holds --- as in the uniform-background,
+perturbative-$\Pmax$ regime of this work --- and
 diverge whenever the wave has time to accumulate non-leading-order
 behaviour, as can happen once the localised-$\Bzero$ extensions
 introduce a finite interaction-region traversal time.}  The
@@ -93,10 +94,8 @@ or suppressing ($-$) regions of coupling space.
 \end{figure}
 
 \paragraph*{Cubed-sphere joint prior}
-The natural objects of the survey are the directions in the invariant
-space rather than the values of any individual coefficient, so we
-decompose a coupling vector $\theta \in \mathbb{R}^N$ as
-$\theta = r\,\hat n$.  The magnitude $r>0$ sets how far the theory
+We decompose a coupling vector $\theta \in \mathbb{R}^N$ as
+$\theta = r\,\hat n$, sampling magnitude and direction separately.  The magnitude $r>0$ sets how far the theory
 sits from the Einstein--Maxwell base theory: it is the overall
 strength of the couplings beyond it, treated as perturbative
 corrections in the effective-field-theory
