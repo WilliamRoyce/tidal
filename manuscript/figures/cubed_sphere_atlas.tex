@@ -212,6 +212,23 @@
   }
 
   %------------------------------------------------------------------
+  % STAGE 7d — dashed lines from each corner of the highlighted cube
+  %                  sub-tile to its sphere image, drawn in TileLine
+  %                  (blue) to match the highlighted-cell pairing of
+  %                  stages 7c and 8.  Same pattern as stage 7b but
+  %                  for the four corners of the highlighted cell.
+  %------------------------------------------------------------------
+  \foreach \cnrx/\cnrz in {\ttileLo/\ttileLo, \ttileHi/\ttileLo,
+                           \ttileHi/\ttileHi, \ttileLo/\ttileHi}{
+    \pgfmathsetmacro{\nrm}{sqrt(\cnrx*\cnrx + 1 + \cnrz*\cnrz)}
+    \pgfmathsetmacro{\sxv}{\cnrx/\nrm}
+    \pgfmathsetmacro{\syv}{-1/\nrm}
+    \pgfmathsetmacro{\szv}{\cnrz/\nrm}
+    \draw[TileLine!70, thin, dashed]
+      (\cnrx, -1, \cnrz) -- (\Rsphere*\sxv, \Rsphere*\syv, \Rsphere*\szv);
+  }
+
+  %------------------------------------------------------------------
   % STAGE 8 — highlighted -y face (transparent fill, sub-tile grid,
   %                  highlighted central sub-tile)
   %------------------------------------------------------------------
