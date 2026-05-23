@@ -148,12 +148,16 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     # tunes the Normal(0, sigma) noise on the soft penalty floor.
     gated: bool = bool(getattr(args, "gated", False))
     soft_floor_noise: float = float(getattr(args, "soft_floor_noise", 1.0))
+    from tidal.inference._likelihood import SOFT_FLOOR_LOGL
+
+    soft_floor_logl: float = float(getattr(args, "soft_floor_logl", SOFT_FLOOR_LOGL))
     try:
         likelihood_config = parse_likelihood(
             likelihood_spec,
             baseline_formula=baseline_formula,
             permissive=(not gated),
             soft_floor_noise_sigma=soft_floor_noise,
+            soft_floor_logl=soft_floor_logl,
         )
     except ValueError as e:
         error_with_hint(str(e), ["Check --likelihood format: METRIC:TYPE[:ARGS]"])

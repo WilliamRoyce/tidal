@@ -1875,6 +1875,20 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Set to 0 to disable noise (ablation tests)."
         ),
     )
+    sample_parser.add_argument(
+        "--soft-floor-logl",
+        type=float,
+        default=-100.0,
+        metavar="LOGL",
+        dest="soft_floor_logl",
+        help=(
+            "Position of the soft penalty floor for sim divergence / NaN / exception "
+            "(default: -100). For baseline-normalised maximize/minimize runs the "
+            "natural physics logL is near 0, so -100 drags logZ to -100 and makes "
+            "the PolyChord precision criterion unreachable. Use -15 (or similar) "
+            "to keep logZ in a sensible range. See issue #372."
+        ),
+    )
     # Sampling method
     sample_parser.add_argument(
         "--method",
