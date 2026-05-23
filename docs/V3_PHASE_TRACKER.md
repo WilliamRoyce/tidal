@@ -49,7 +49,7 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 | ✅ 8 | T6 parity-odd YM-PGT | 20 | 500 | 1000 | 40 | 64 | torsion_gertsenshtein_parity_odd.json | ✅ B.5-t6 landscape (29567416, floor-dominated → amplification candidates for Phase E) |
 | ✅ 9 | T7 Complete-Even PGT | 18 | 450 | 900 | 36 | 64 | torsion_gertsenshtein_complete_even.json | ✅ B.5-t7 landscape (29588680, floor-dominated → amplification candidates for Phase E) |
 | ⏸ 10 | T8 Complete-Odd PGT | ~54 | ~1350 | ~2700 | ~108 | 64 | torsion_gertsenshtein_complete_odd.json | ⏸ deferred to Phase E |
-| ✅ | T9 Complete-Even + full ξ kinetic | 32 | 800 | 1600 | 64 | 64 | torsion_gertsenshtein_complete_even_full_xi.json | ✅ JSON derived 2026-05-23 (38 fields, 48 H-terms, ~7m); xi11 vanishes in plane-wave reduction. GR smoke ✓. Landscape: submit sbatch t9. |
+| 🔄 | T9 Complete-Even + full ξ kinetic | 32 | 800 | 1600 | 64 | 64 | torsion_gertsenshtein_complete_even_full_xi.json | 🔄 B.5-t9 landscape **29596287** (INTR, 76r, nlive=800, nrep=64); JSON derived 2026-05-23 (38 fields, 48 H-terms). xi11 vanishes in reduction. GR smoke ✓. |
 | – | EH (F⁴ correction) | 1 | 25 | 50 | 2 | 64 | euler_heisenberg.json | ⚠️ EM-only JSON (no h_i fields); needs full Einstein-Maxwell+EH re-derivation |
 
 **T6 parity-odd params (20):** beta1-3, xi (log_uniform:1e-3:1e3), delta1, chi, zeta1-3 + d14, d15, d17, d19-21, zt1-3, zt5-6. (d16, zt4 vanish in plane-wave 1+1D reduction.)
