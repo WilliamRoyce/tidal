@@ -18,7 +18,7 @@
 % (J. Comp. Phys. 124, 93--114, 1996); the cubed-sphere construction
 % adapted to coupling-space sampling follows W. E. V. Barker's
 % unreleased PSALTer extension shared with this project.
-\documentclass[border=3pt,tikz,svgnames]{standalone}
+\documentclass[border=1pt,tikz,svgnames]{standalone}
 \usepackage{stix}
 \usepackage{amsmath}
 \usepackage{bm}
@@ -29,19 +29,20 @@
 \usetikzlibrary{arrows.meta,calc,3d}
 \tikzset{>={Stealth[length=1.6mm,width=1.6mm]}}
 
-\colorlet{FaceFill}{PinkFill}
-\colorlet{FaceLine}{PinkLine}
-\colorlet{TileFill}{BlueFill}
-\colorlet{TileLine}{BlueLine}
+\colorlet{FaceFill}{PurpleFill}
+\colorlet{FaceLine}{PurpleLine}
+\colorlet{ProjLine}{PurpleLine}
+\colorlet{TileFill}{OrangeFill}
+\colorlet{TileLine}{OrangeLine}
 \colorlet{SphereLine}{GrayLine}
-\colorlet{SampleArrow}{PurpleLine}
-\colorlet{AxisLine}{GrayLine}
+\colorlet{SphereFill}{GrayFill}
+\colorlet{AxisLine}{Black}
 
 % Camera at inclination 70 deg (from +z) and azimuth 25 deg.  At this
 % angle the +x face is the most head-on visible face; the -y face
 % (face 2\downarrow) carries the highlight on the back-left side of
 % the cube, visible through the unfilled wireframe.
-\tdplotsetmaincoords{70}{28}
+\tdplotsetmaincoords{70}{32}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -72,19 +73,27 @@
   %                  no dashes — the thin/thick step at the sphere
   %                  surface marks where the axis emerges).
   %------------------------------------------------------------------
-  \draw[AxisLine!70, thin] (0,0,0) -- (\Rsphere,0,0);
-  \draw[AxisLine!70, thin] (0,0,0) -- (0,\Rsphere,0);
-  \draw[AxisLine!70, thin] (0,0,0) -- (0,0,\Rsphere);
+
+  \draw[AxisLine, thick] (-\Rsphere*1.14,0,0) -- (-1,0,0);
+  \draw[AxisLine, thick] (0,-\Rsphere,0) -- (0,-1,0);
+  \draw[AxisLine, thick] (0,0,-\Rsphere*1.06) -- (0,0,-1);
+
+  \draw[->, AxisLine, thick] (0,\Rsphere*1.665,0) -- (0,1.55,0)
+    node[right, AxisLine] {$c_{2}$};
+
+  \draw[AxisLine!20, thick] (-\Rsphere*1.14,0,0) -- (\Rsphere,0,0);
+  \draw[AxisLine!20, thick] (0,-\Rsphere,0) -- (0,\Rsphere*1.63,0);
+  \draw[AxisLine!20, thick] (0,0,-\Rsphere*1.06) -- (0,0,\Rsphere);
 
   %------------------------------------------------------------------
   % STAGE 2 — far back cube edges (light wireframe of hidden edges)
   %------------------------------------------------------------------
-  \draw[FaceLine!40, thin]
+  \draw[FaceLine!40, thick]
     (-1, 1,-1) -- (1, 1,-1) -- (1, 1, 1) -- (-1, 1, 1) -- cycle;
-  \draw[FaceLine!40, thin] (-1,-1,-1) -- (-1, 1,-1);
-  \draw[FaceLine!40, thin] ( 1,-1,-1) -- ( 1, 1,-1);
-  \draw[FaceLine!40, thin] ( 1,-1, 1) -- ( 1, 1, 1);
-  \draw[FaceLine!40, thin] (-1,-1, 1) -- (-1, 1, 1);
+  \draw[FaceLine!40, thick] (-1,-1,-1) -- (-1, 1,-1);
+  \draw[FaceLine!40, thick] ( 1,-1,-1) -- ( 1, 1,-1);
+  \draw[FaceLine!40, thick] ( 1,-1, 1) -- ( 1, 1, 1);
+  \draw[FaceLine!40, thick] (-1,-1, 1) -- (-1, 1, 1);
 
   %------------------------------------------------------------------
   % STAGE 3 — sample vector segment 1 (origin -> cube-face crossing
@@ -99,9 +108,6 @@
   \pgfmathsetmacro{\cys}{-1/\cn}
   \pgfmathsetmacro{\czs}{\cz/\cn}
   \pgfmathsetmacro{\rmax}{1.30}
-  \draw[SampleArrow, very thick]
-    (0,0,0) -- (\cx, -1, \cz);
-  \fill[SampleArrow] (\cx, -1, \cz) circle (1.2pt);
 
   %------------------------------------------------------------------
   % STAGE 4 — sphere surface: 3-D shaded ball base (rendered in
@@ -110,8 +116,8 @@
   %                  proper ball shading) + silhouette outline
   %------------------------------------------------------------------
   \begin{scope}[tdplot_screen_coords]
-    \shade[ball color=GrayFill, opacity=0.40] (0,0) circle (\Rsphere);
-    \draw[SphereLine!50, thin] (0,0) circle (\Rsphere);
+    \shade[ball color=SphereFill, opacity=0.40] (0,0) circle (\Rsphere);
+    \draw[SphereLine, thin] (0,0) circle (\Rsphere);
   \end{scope}
 
   %------------------------------------------------------------------
@@ -122,23 +128,23 @@
   %                  of the cube-tile.
   %------------------------------------------------------------------
   % Edge at x = -1, parameter t = z in [-1, 1]
-  \draw[FaceLine, thick]
-    plot[domain=-1:1, samples=32, smooth]
+  \draw[ProjLine, thick]
+    plot[domain=-1:1, samples=12, smooth]
       ({-\Rsphere/sqrt(1+1+\x*\x)}, {-\Rsphere/sqrt(1+1+\x*\x)},
        {\Rsphere*\x/sqrt(1+1+\x*\x)});
   % Edge at x = +1, parameter t = z
-  \draw[FaceLine, thick]
-    plot[domain=-1:1, samples=32, smooth]
+  \draw[ProjLine, thick]
+    plot[domain=-1:1, samples=12, smooth]
       ({\Rsphere/sqrt(1+1+\x*\x)}, {-\Rsphere/sqrt(1+1+\x*\x)},
        {\Rsphere*\x/sqrt(1+1+\x*\x)});
   % Edge at z = -1, parameter s = x
-  \draw[FaceLine, thick]
-    plot[domain=-1:1, samples=32, smooth]
+  \draw[ProjLine, thick]
+    plot[domain=-1:1, samples=12, smooth]
       ({\Rsphere*\x/sqrt(\x*\x+1+1)}, {-\Rsphere/sqrt(\x*\x+1+1)},
        {-\Rsphere/sqrt(\x*\x+1+1)});
   % Edge at z = +1, parameter s = x
-  \draw[FaceLine, thick]
-    plot[domain=-1:1, samples=32, smooth]
+  \draw[ProjLine, thick]
+    plot[domain=-1:1, samples=12, smooth]
       ({\Rsphere*\x/sqrt(\x*\x+1+1)}, {-\Rsphere/sqrt(\x*\x+1+1)},
        {\Rsphere/sqrt(\x*\x+1+1)});
 
@@ -151,16 +157,16 @@
   %------------------------------------------------------------------
   % Horizontal lines (constant z on the cube face)
   \foreach \zline in {-0.5, 0, 0.5}{
-    \draw[FaceLine!55, very thin]
-      plot[domain=-1:1, samples=24, smooth]
+    \draw[ProjLine, thin]
+      plot[domain=-1:1, samples=12, smooth]
         ({\Rsphere*\x/sqrt(\x*\x + 1 + \zline*\zline)},
          {-\Rsphere/sqrt(\x*\x + 1 + \zline*\zline)},
          {\Rsphere*\zline/sqrt(\x*\x + 1 + \zline*\zline)});
   }
   % Vertical lines (constant x on the cube face)
   \foreach \xline in {-0.5, 0, 0.5}{
-    \draw[FaceLine!55, very thin]
-      plot[domain=-1:1, samples=24, smooth]
+    \draw[ProjLine, thin]
+      plot[domain=-1:1, samples=12, smooth]
         ({\Rsphere*\xline/sqrt(\xline*\xline + 1 + \x*\x)},
          {-\Rsphere/sqrt(\xline*\xline + 1 + \x*\x)},
          {\Rsphere*\x/sqrt(\xline*\xline + 1 + \x*\x)});
@@ -172,44 +178,49 @@
   % stage 8.  Parametrised by \ttileLo/\ttileHi so it tracks the
   % cube cell automatically.
   % Edge at x = \ttileLo
+
+  \fill[TileFill, opacity=0.4]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\ttileLo/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
+       {-\Rsphere/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
+       {\Rsphere*\x/sqrt(\ttileLo*\ttileLo+1+\x*\x)}) --
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\ttileHi/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
+       {-\Rsphere/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
+       {\Rsphere*\x/sqrt(\ttileHi*\ttileHi+1+\x*\x)}) --
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\x/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
+       {-\Rsphere/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
+       {\Rsphere*\ttileLo/sqrt(\x*\x+1+\ttileLo*\ttileLo)}) --
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\x/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
+       {-\Rsphere/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
+       {\Rsphere*\ttileHi/sqrt(\x*\x+1+\ttileHi*\ttileHi)});
+       
   \draw[TileLine, very thick]
-    plot[domain=\ttileLo:\ttileHi, samples=16, smooth]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\ttileLo/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
        {-\Rsphere/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
        {\Rsphere*\x/sqrt(\ttileLo*\ttileLo+1+\x*\x)});
   % Edge at x = \ttileHi
   \draw[TileLine, very thick]
-    plot[domain=\ttileLo:\ttileHi, samples=16, smooth]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\ttileHi/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
        {-\Rsphere/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
        {\Rsphere*\x/sqrt(\ttileHi*\ttileHi+1+\x*\x)});
   % Edge at z = \ttileLo
   \draw[TileLine, very thick]
-    plot[domain=\ttileLo:\ttileHi, samples=16, smooth]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\x/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
        {-\Rsphere/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
        {\Rsphere*\ttileLo/sqrt(\x*\x+1+\ttileLo*\ttileLo)});
   % Edge at z = \ttileHi
   \draw[TileLine, very thick]
-    plot[domain=\ttileLo:\ttileHi, samples=16, smooth]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\x/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
        {-\Rsphere/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
        {\Rsphere*\ttileHi/sqrt(\x*\x+1+\ttileHi*\ttileHi)});
 
-  %------------------------------------------------------------------
-  % STAGE 7b — dashed lines from each cube-tile corner to its
-  %                  sphere-tile corner.  These make the gnomonic
-  %                  pairing of cube-tile vertices and sphere-tile
-  %                  vertices visually explicit.
-  %------------------------------------------------------------------
-  \foreach \fx/\fz in {-1/-1, 1/-1, 1/1, -1/1}{
-    \pgfmathsetmacro{\nrm}{sqrt(\fx*\fx + 1 + \fz*\fz)}
-    \pgfmathsetmacro{\sxv}{\fx/\nrm}
-    \pgfmathsetmacro{\syv}{-1/\nrm}
-    \pgfmathsetmacro{\szv}{\fz/\nrm}
-    \draw[FaceLine!70, thin, dashed]
-      (\fx, -1, \fz) -- (\Rsphere*\sxv, \Rsphere*\syv, \Rsphere*\szv);
-  }
 
   %------------------------------------------------------------------
   % STAGE 7d — dashed lines from each corner of the highlighted cube
@@ -224,8 +235,8 @@
     \pgfmathsetmacro{\sxv}{\cnrx/\nrm}
     \pgfmathsetmacro{\syv}{-1/\nrm}
     \pgfmathsetmacro{\szv}{\cnrz/\nrm}
-    \draw[TileLine!70, thin, dashed]
-      (\cnrx, -1, \cnrz) -- (\Rsphere*\sxv, \Rsphere*\syv, \Rsphere*\szv);
+    \draw[TileLine!70, thick, dotted]
+      (\Rsphere*\sxv, \Rsphere*\syv, \Rsphere*\szv) -- (\cnrx, -1, \cnrz);
   }
 
   %------------------------------------------------------------------
@@ -238,8 +249,8 @@
   % 4x4 sub-tile grid lines on the -y face (interior lines at
   % x, z = -0.5, 0, 0.5)
   \foreach \v in {-0.5, 0, 0.5}{
-    \draw[FaceLine!70, thin] (\v,-1,-1) -- (\v,-1, 1);
-    \draw[FaceLine!70, thin] (-1,-1,\v) -- ( 1,-1, \v);
+    \draw[FaceLine, thin] (\v,-1,-1) -- (\v,-1, 1);
+    \draw[FaceLine, thin] (-1,-1,\v) -- ( 1,-1, \v);
   }
 
   % Highlighted sub-tile (cube cell x, z in [\ttileLo, \ttileHi])
@@ -254,23 +265,9 @@
   \draw[FaceLine, very thick]
     (-1,-1,-1) -- (1,-1,-1) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
 
-  \node[FaceLine, anchor=south west, font=\scriptsize]
-    at (1.02,-1.02, -0.95) {face $2\!\downarrow$};
+  \node[ProjLine, anchor=south west, font=\scriptsize]
+    at (1.02,-1.02, -0.75) {face $2\!\downarrow$};
 
-  %------------------------------------------------------------------
-  % STAGE 9 — sample vector segment 2 (cube-face -> sphere -> tip)
-  %                  drawn AFTER the transparent face so the arrow
-  %                  sits on top of the face for the "emerging" cue
-  %------------------------------------------------------------------
-  \draw[->, SampleArrow, very thick]
-    (\cx, -1, \cz) -- ({\rmax*\cxs}, {\rmax*\cys}, {\rmax*\czs});
-  % Sphere-image marker for the sample vector: white-filled ring,
-  % matching the projection-ray markers for "on the curved surface"
-  \draw[SampleArrow, line width=0.6pt, fill=white]
-    (\Rsphere*\cxs, \Rsphere*\cys, \Rsphere*\czs) circle (1.3pt);
-  \node[SampleArrow, anchor=west, font=\small]
-    at ({\rmax*\cxs + 0.04}, {\rmax*\cys + 0.02}, {\rmax*\czs + 0.05})
-    {$\theta = r\,\hat n$};
 
   %------------------------------------------------------------------
   % STAGE 10 — outside-sphere axis segments + arrowheads + labels.
@@ -278,14 +275,9 @@
   %                  everything else, conveying "exits the sphere".
   %------------------------------------------------------------------
   \draw[->, AxisLine, thick] (\Rsphere,0,0) -- (1.55,0,0)
-    node[pos=1.05, AxisLine] {$c_{1}$};
-  \draw[->, AxisLine, thick] (0,\Rsphere,0) -- (0,1.55,0)
-    node[pos=1.05, AxisLine] {$c_{2}$};
+    node[right, AxisLine] {$c_{1}$};
   \draw[->, AxisLine, thick] (0,0,\Rsphere) -- (0,0,1.55)
-    node[pos=1.05, AxisLine] {$c_{3}$};
-
-  \fill (0,0,0) circle (1pt);
-  \node[anchor=north east, font=\scriptsize] at (0,0,-0.02) {$\mathbf 0$};
+    node[right, AxisLine] {$c_{3}$};
 
 \end{tikzpicture}
 \end{document}
