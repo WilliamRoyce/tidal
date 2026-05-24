@@ -1,8 +1,8 @@
 # Phase E Tracker — Localised-Field HPC Campaign
 
-**Last updated:** 2026-05-24 (session: stage1-cal-iteration)
-**Current stage:** Stage 1 — derivations in progress; E.cal complete and verified (PASS verdict on positive control)
-**Next action:** derive E.EH (`uv run tidal derive examples/euler_heisenberg/theory_e_dual_gaussian.toml`, ~10 min) while drafting Phase E HPC submit script templates.
+**Last updated:** 2026-05-24 (session: stage1-pipeline)
+**Current stage:** Stage 1 → Stage 2 pipelined: E.cal/T1/T2/T4/T5.3/T7s derivations complete (6 of 7); E.T8s deriving in background (long); E.T2 amp running on HPC (jobid **29640051**)
+**Next action:** wait for E.T2 amp completion → pull results → submit E.T2 sup → submit E.T1/E.T4/E.T5/E.NP amp+sup pairs sequentially. E.T8s derivation finishes in parallel.
 
 ## Quick handoff (read this first if resuming cold)
 
@@ -48,12 +48,12 @@
 
 - [x] 1.1 E.cal `gertsenshtein/theory_ungauged_e_dual_gaussian.toml` (~5 min — DONE; 14 components, 73KB JSON; PASS verdict on stability diagnostics, P/h0² ≈ 0.0036 matches Boccaletti sin²(0.063) ≈ 0.0039 within ~10%)
 - [~] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` — **DEFERRED**: derivation completes (4 fields, 29 H terms) but coefficient `E^((zc1²+zc2²+x²)/sigB²)/...` overflows at box edges; multi-exp denominator beyond current `_invert_exp_denominator`. See [#378](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/378). Non-blocking for the PGT roster.
-- [ ] 1.2 E.T1 `dark_photon_plasma/theory_e_dual_gaussian.toml` (~10 min)
-- [ ] 1.3 E.T2 `torsion_gertsenshtein/theory_einstein_cartan_e_dual_gaussian.toml` (~10 min)
-- [ ] 1.4 E.T4 `torsion_gertsenshtein/theory_nonminimal_e_dual_gaussian.toml` (~30 min)
-- [ ] 1.5 E.T5.3 `torsion_gertsenshtein/theory_general_nonminimal_e_dual_gaussian.toml` (~30–60 min; reused by T5/T5.1/T5.2/NP)
-- [ ] 1.6 E.T7s `theory_complete_even_minus_R2_e_dual_gaussian.toml` (~30–60 min)
-- [ ] 1.7 E.T8s `theory_complete_odd_minus_R2_e_dual_gaussian.toml` (~30–60 min)
+- [x] 1.2 E.T1 `dark_photon_plasma/theory_e_dual_gaussian.toml` — DONE (26 fields, 86 H terms)
+- [x] 1.3 E.T2 `torsion_gertsenshtein/theory_einstein_cartan_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms; smoke PASS)
+- [x] 1.4 E.T4 `torsion_gertsenshtein/theory_nonminimal_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms)
+- [x] 1.5 E.T5.3 `torsion_gertsenshtein/theory_general_nonminimal_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms; reused by T5/T5.1/T5.2/NP)
+- [x] 1.6 E.T7s `theory_complete_even_e_dual_gaussian.toml` — DONE (38 fields; renamed: no "minus_R2" suffix because complete_even is already R̃²-free)
+- [ ] 1.7 E.T8s `theory_complete_odd_e_dual_gaussian.toml` — derivation running (up to ~97 min based on prior version)
 
 ### Stage 2 — Calibration (HARD GATE — must PASS before Stage 3)
 
@@ -111,16 +111,16 @@ Stability column: `PASS` / `SOFT-PENALIZED` / `CATASTROPHIC`.
 |-------|--------|------------|------------|------------|-------|-----------|---------|
 | E.cal | gertsenshtein_ungauged | ☑ (2026-05-24) | ☑ local (no free params) | n/a | n/a (positive control) | PASS | calibration ✓ |
 | E.EH  | Euler-Heisenberg + EM (σ, ρ) | ☑ (derived but solver-blocked) | n/a | n/a | n/a | DEFERRED | DEFERRED — see #378 |
-| E.T1  | DP-plasma | ☐ | ☐ jobid | ☐ jobid | ☐ jobid | — | — |
-| E.T2  | Einstein-Cartan minimal | ☐ | ☐ jobid | ☐ jobid | ☐ jobid | — | — |
-| E.T4  | Ricci-EM nonminimal (δ₁) | ☐ | ☐ jobid | ☐ jobid | n/a (1D) | — | — |
-| E.T5  | Bahamonde 5D | ☐ (uses E.T5.3) | ☐ jobid | ☐ jobid | ☐ jobid (5D) | — | — |
+| E.T1  | DP-plasma | ☑ (26 fields) | ☐ jobid | ☐ jobid | ☐ jobid | — | — |
+| E.T2  | Einstein-Cartan minimal | ☑ (38 fields) | ☐ **29640051** running | ☐ jobid | ☐ jobid | — | — |
+| E.T4  | Ricci-EM nonminimal (δ₁) | ☑ (38 fields) | ☐ jobid | ☐ jobid | n/a (1D) | — | — |
+| E.T5  | Bahamonde 5D | ☑ (uses E.T5.3) | ☐ jobid | ☐ jobid | ☐ jobid (5D) | — | — |
 | E.T5.1 | Barker 6D | reuses E.T5.3 | ☐ jobid | ☐ jobid | n/a | — | — |
 | E.T5.2 | Shapiro 8D | reuses E.T5.3 | ☐ jobid | ☐ jobid | n/a | — | — |
-| E.T5.3 | Complete 9D | ☐ | ☐ jobid | ☐ jobid | n/a | — | — |
+| E.T5.3 | Complete 9D | ☑ (38 fields) | ☐ jobid | ☐ jobid | n/a | — | — |
 | E.NP  | Non-prop (ξ=0 prior on E.T5.3) | reuses E.T5.3 | ☐ jobid | ☐ jobid | n/a | — | — |
-| E.T7s | Complete-even minus R²/R̃² | ☐ | ☐ jobid | ☐ jobid | (≤5D only) | — | — |
-| E.T8s | Complete-odd minus R²/R̃² | ☐ | ☐ jobid | ☐ jobid | (≤5D only) | — | — |
+| E.T7s | Complete-even (already R̃²-free; no stripping needed) | ☑ (38 fields) | ☐ jobid | ☐ jobid | (≤5D only) | — | — |
+| E.T8s | Complete-odd (already R̃²-free; no stripping needed) | ☐ deriving | ☐ jobid | ☐ jobid | (≤5D only) | — | — |
 
 ## Per-theory artefact index (append per HPC pull)
 

@@ -1,0 +1,107 @@
+# Einstein-Cartan Minimal + Dual-Gaussian B-field (Phase E.T2)
+#
+# Strips the b5·R̃² term from torsion_gertsenshtein/theory.toml — torsion becomes
+# purely algebraic (no kinetic terms; non-propagating Einstein-Cartan limit).
+# Drops the uniform-B0 background in favour of the Phase E dual-Gaussian.
+#
+# Lagrangian:
+#   L = (1/kappa^2) R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3
+#       - (1/4) F_{ab} F^{ab}
+#
+# where R̃ uses the torsionful (Cartan) connection and the Iα are the three
+# independent T² mass invariants for the irreducible torsion sectors:
+#   I1 = T_{abc} T^{abc}          (tensor sector — "tentor")
+#   I2 = T_{abc} T^{bac}          (mixed contraction — "trator")
+#   I3 = T^a_{ab} T^{cb}_{c}      (trace sector — "axitor")
+#
+# Why this is the Phase E "non-propagating torsion baseline":
+#   Without b5·R̃² or Maxwell-like vector-torsion kinetic, torsion is purely
+#   algebraic — solved instantly by the constraint solver, no DOF promotion,
+#   no ghosts. Any conversion enhancement here is mediated by the *graviton*
+#   sector (mass-induced impedance), not by propagating torsion DOFs.
+#
+# Free coupling parameters for inference:
+#   alpha1, alpha2, alpha3  — three irreducible torsion mass coefficients
+# Total 3D coupling space → atlas-eligible (6 faces × 1 tile).
+#
+# Geometry parameters: must match _geometry.env (Bpeak=0.01, sigB=5, zc1=50, zc2=150).
+#
+# Per issue #167: NO TT gauge on h (theory unconstrained); TT enforced at IC.
+#
+# Refs:
+#   Cartan (1922) — original Einstein-Cartan theory
+#   Hayashi & Shirafuji (1979) — PGT propagating modes (b5=0 = non-propagating)
+#
+# Derivation timing: ~1-2 min wall (expected; pre-#246 baseline was ~2 min for
+# the full b5-included theory).
+
+[theory]
+name = "Einstein-Cartan Minimal + Dual-Gaussian B (Phase E.T2)"
+description = "Einstein-Maxwell + algebraic torsion (three irreducible mass sectors), no kinetic torsion terms, localised dual-Gaussian B"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Dual-Gaussian B-field background (Phase E.0 validated).
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = [
+  "0",
+  "0",
+  "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1)/(Sqrt[2]*sigB)] - Erf[(z[] - zc2)/(Sqrt[2]*sigB)])",
+  "0"
+]
+
+[constants]
+names = ["kappa", "Bpeak", "sigB", "zc1", "zc2", "alpha1", "alpha2", "alpha3"]
+
+# Einstein-Cartan (no b5*R̃² kinetic) + algebraic torsion masses + Maxwell.
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# NO TT gauge on h — per issue #167. TT-IC + unconstrained dynamics.
+# Lorenz gauge on photon a only.
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_einstein_cartan_e_dual_gaussian.json"

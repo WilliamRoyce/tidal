@@ -1,0 +1,119 @@
+# General Nonminimal PGT (all safe couplings) + Dual-Gaussian B (Phase E.T5/T5.1/T5.2/T5.3/NP)
+#
+# Phase E variant of torsion_gertsenshtein/theory_general_nonminimal.toml.
+# Swaps uniform B0 background for the Phase E dual-Gaussian. Otherwise identical
+# Lagrangian (the safe Bahamonde family — no R̃², no Ostrogradsky ghosts).
+#
+# Lagrangian:
+#   L = (1/kappa^2) R̃                                       (Einstein-Cartan)
+#       + beta1 I1 + beta2 I2 + beta3 I3                     (algebraic torsion masses)
+#       - (1/4) xi Ftorsion²                                 (Maxwell-like vector-torsion kinetic; SAFE, no R̃²)
+#       + delta1 R̃_{[μν]} F^{μν}                            (Ricci-EM nonminimal coupling)
+#       + chi R̃_{[μν]} Ftorsion^{μν}                        (Barker kinetic mixing)
+#       + zeta1 ∇_a V_b F^{ab} + zeta2 ∇_a T^{a}_{bc} F^{bc} + zeta3 ∇_a T_{bc}^a F^{bc}
+#                                                            (Shapiro derivative couplings)
+#       - (1/4) F²                                           (Maxwell)
+#
+# This is the headline Phase E theory:
+#   - E.T5    (Bahamonde 5D subspace):    sample beta1, beta2, beta3, xi, delta1
+#   - E.T5.1 (Barker 6D):                  + chi
+#   - E.T5.2 (Shapiro 8D):                 + zeta1, zeta2, zeta3
+#   - E.T5.3 (Complete 9D):                all couplings free
+#   - E.NP   (Non-prop torsion, 8D):       all couplings free EXCEPT xi (pin to 0)
+#                                          → vector torsion becomes algebraic
+#
+# Per the "Critical correction" section of the plan: this Lagrangian is SAFE
+# (no R²/R̃² Ostrogradsky-ghost terms; vector torsion gets its kinetic energy
+# from -ξ·F_torsion² which is Maxwell-like). All five sub-models share THIS
+# JSON, differing only in PolyChord prior restrictions.
+#
+# Geometry parameters: must match _geometry.env (Bpeak=0.01, sigB=5, zc1=50, zc2=150).
+#
+# Per issue #167: NO TT gauge on h.
+#
+# Refs:
+#   Bahamonde (2025), arXiv:2507.02362 — δ₁R̃F + ξ Ftorsion² baseline
+#   Barker et al — χ kinetic mixing extension
+#   Shapiro — ζ₁₋₃ derivative couplings
+#
+# Derivation timing: ~10-30 min wall (expected; v3 chain results: ~5-7 min for D2.3).
+
+[theory]
+name = "General Nonminimal PGT + Dual-Gaussian B (Phase E.T5/NP)"
+description = "Bahamonde family safe propagating-vector-torsion + non-minimal couplings, localised dual-Gaussian B; covers E.T5/T5.1/T5.2/T5.3/NP via prior restriction"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Torsion-trace vector field strength: Ftorsion_{ab} = d_a V_b - d_b V_a
+# where V_mu = TorsionCDT^b_{b,mu} is the vector torsion trace.
+# This carries the Maxwell-like kinetic term (the SAFE propagating mechanism).
+[[derived_fields]]
+name = "Ftorsion"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][TorsionCDT[c,-c,-b]] - CD[-b][TorsionCDT[c,-c,-a]]"
+
+# Dual-Gaussian B-field background (Phase E.0 validated).
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = [
+  "0",
+  "0",
+  "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1)/(Sqrt[2]*sigB)] - Erf[(z[] - zc2)/(Sqrt[2]*sigB)])",
+  "0"
+]
+
+[constants]
+names = ["kappa", "Bpeak", "sigB", "zc1", "zc2", "beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3"]
+
+# Full Bahamonde-family safe Lagrangian (no R²/R̃²).
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + chi RicciCDT[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + zeta1 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e] + zeta2 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e] + zeta3 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# NO TT gauge on h — per issue #167.
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_general_nonminimal_e_dual_gaussian.json"

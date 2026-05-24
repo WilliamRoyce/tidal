@@ -1,0 +1,100 @@
+# Ricci-EM Nonminimal (delta1 only) + Dual-Gaussian B-field (Phase E.T4)
+#
+# Phase E variant of torsion_gertsenshtein/theory_nonminimal.toml. Strips the
+# uniform-B0 background in favour of the dual-Gaussian. Otherwise identical:
+# Einstein-Cartan + algebraic torsion masses (alpha1, alpha2, alpha3) +
+# nonminimal Ricci-EM coupling (delta1 * R̃_{[μν]} F^{μν}) + Maxwell.
+#
+# Lagrangian:
+#   L = (1/kappa^2) R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3
+#       + delta1 R̃_{[μν]} F^{μν}      (nonminimal Ricci-EM coupling, T4 channel)
+#       - (1/4) F_{ab} F^{ab}
+#
+# delta1 R̃_{[μν]} F^{μν} is the "T4" Ricci-EM coupling — the first non-trivial
+# direct curvature-EM cross term. Antisymmetric part of the Ricci-Cartan tensor
+# contracts with F via η to give a parity-even contact term.
+#
+# Free coupling parameters for inference:
+#   alpha1, alpha2, alpha3 — algebraic torsion masses
+#   delta1                 — nonminimal Ricci-EM coupling (the T4 channel)
+# 4D coupling space → atlas-eligible (8 faces × 1 tile).
+#
+# Geometry parameters: must match _geometry.env (Bpeak=0.01, sigB=5, zc1=50, zc2=150).
+#
+# Per issue #167: NO TT gauge on h.
+#
+# Refs:
+#   Bahamonde (2025), arXiv:2507.02362 — δ₁ R̃F coupling derivation
+#   Phase B/D v3 result: T4 amplification posterior at MAP α≈1.16 in unit-prior coords
+#
+# Derivation timing: ~5-10 min wall (expected; nonminimal coupling adds cross terms).
+
+[theory]
+name = "Ricci-EM Nonminimal (T4) + Dual-Gaussian B (Phase E.T4)"
+description = "Einstein-Cartan + algebraic torsion + delta1 Ricci-EM nonminimal contact term, localised dual-Gaussian B"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Dual-Gaussian B-field background (Phase E.0 validated).
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = [
+  "0",
+  "0",
+  "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1)/(Sqrt[2]*sigB)] - Erf[(z[] - zc2)/(Sqrt[2]*sigB)])",
+  "0"
+]
+
+[constants]
+names = ["kappa", "Bpeak", "sigB", "zc1", "zc2", "alpha1", "alpha2", "alpha3", "delta1"]
+
+# Einstein-Cartan + algebraic torsion + delta1 R̃F nonminimal + Maxwell.
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# NO TT gauge on h — per issue #167.
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_nonminimal_e_dual_gaussian.json"
