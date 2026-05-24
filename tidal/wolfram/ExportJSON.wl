@@ -513,13 +513,46 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
       -1
     ];
     If[Abs[lhsCoeff] =!= 1,
-      If[!NumericQ[lhsCoeff] && FreeQ[lhsCoeff, _[]],
-        (* Pure-parameter kinetic coeff (e.g., xi): keep RHS unnormalized.           *)
-        (* Python normalizes at runtime so xi=0 can be handled as a constraint.     *)
-        rhs = -rhs;
-        kineticCoeffStr = ToString[lhsCoeff, InputForm],
-        (* Coordinate-dependent (e.g., 1/Omega^2) or numeric: divide here as before *)
-        rhs = -rhs / lhsCoeff
+      Module[{hasSmallParam, normalisedLhs, m0Sign},
+        (* GH #380: a coord-dep kinetic coefficient that ALSO contains a
+           small parameter (e.g. EH `1 - 2*Bpeak²·G(x)·(ρ-8σ)`) must NOT be
+           divided through — dividing hides the perturbative structure
+           inside `1/(1-εX)` so every RHS coefficient gets tagged
+           order_in_eps=0 even though it carries O(ε), O(ε²), … pieces.
+           Keep un-normalised in that case too; Python's
+           canonicalize_kinetic_for_perturbation (#301 Phase 3) splits
+           M = M₀ + εM₁ and synthesises the Pass-1 RHS corrections. *)
+        hasSmallParam = !NumericQ[lhsCoeff] &&
+          AnyTrue[smallParams, !FreeQ[lhsCoeff, #] &];
+        If[hasSmallParam || (!NumericQ[lhsCoeff] && FreeQ[lhsCoeff, _[]]),
+          (* Pure parameter (e.g. xi), OR coord-dep + small-param (e.g. EH):
+             keep RHS un-normalised, emit kinetic_coefficient_symbolic.
+             #380 follow-up: normalise sign so M₀ > 0. If lhsCoeff evaluates
+             negative at smallParams = 0 (e.g. EH where xAct produces
+             M = -1 + ε·X for spatial photon components), multiply the
+             whole equation by -1: emit -lhsCoeff and skip the `rhs = -rhs`
+             flip. Without this the modal solver's generalised eigenvalue
+             M·d²ₜa = K·a returns real eigenvalues at zero-small-param
+             baseline even though K/M is the standard wave operator. *)
+          m0Sign = If[hasSmallParam,
+            Module[{m0Val},
+              m0Val = Quiet[N[lhsCoeff /. Thread[smallParams -> 0]]];
+              If[NumericQ[m0Val], Sign[m0Val], +1]
+            ],
+            Sign[Quiet[N[lhsCoeff]]]
+          ];
+          If[m0Sign === -1,
+            normalisedLhs = -lhsCoeff
+            (* rhs unchanged (cancellation: M·d²ₜa = -RHS, then *-1 gives
+               -M·d²ₜa = RHS, i.e. normalisedLhs·d²ₜa = +rhs = original rhs) *),
+            normalisedLhs = lhsCoeff;
+            rhs = -rhs
+          ];
+          kineticCoeffStr = ToString[normalisedLhs, InputForm],
+          (* Coord-dep with no small params (e.g. 1/Omega^2 for FRW) or
+             pure numeric: divide here as before. *)
+          rhs = -rhs / lhsCoeff
+        ]
       ]
     ];
     (* ALWAYS Expand the RHS to ensure Plus structure for ParseMultiFieldRHS.

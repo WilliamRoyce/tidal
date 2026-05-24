@@ -1352,12 +1352,24 @@ class EquationSystem:
                         synth_sym,
                         base_term,
                     )
+                    # GH #380: when split_small_parameter_kinetic translated
+                    # `x[]` → `x` in c_expr / m0_expr (for ast.parse), the
+                    # resulting synth_sym carries bare coord names. The
+                    # downstream OperatorTerm.position_dependent auto-detect
+                    # only matches `x[]`-style xCoba calls, so we must set
+                    # coordinate_dependent explicitly — otherwise the modal
+                    # source-evaluation call will not pass coord_arrays and
+                    # eval() raises NameError on the bare coord.
+                    detected_coords: list[str] = [coord_name for coord_name in ("t", "x", "y", "z") if re.search(rf"\b{coord_name}\b", synth_sym)]
+                    inherited = tuple(base_term.coordinate_dependent or ())
+                    coord_dep = tuple(dict.fromkeys((*inherited, *detected_coords)))
                     synthesized.append(
                         OperatorTerm(
                             coefficient=synth_coef,
                             operator=base_term.operator,
                             field=base_term.field,
                             coefficient_symbolic=synth_sym,
+                            coordinate_dependent=coord_dep,
                             order_in_eps=1,
                         ),
                     )

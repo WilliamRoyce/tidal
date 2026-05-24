@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import ast
 import operator
+import re
 import sys
 from typing import TYPE_CHECKING
 
@@ -109,7 +110,12 @@ def evaluate_with_substitutions(
             f"evaluate_with_substitutions: expected a str, got {type(expr).__name__!r}"
         )
         raise KineticEvalError(msg)
+    # Wolfram InputForm to Python-AST: ^ → **, and strip nullary xCoba
+    # coordinate calls like `x[]` (ast.parse rejects empty subscripts).
+    # Coords are then bare names; if a caller provides a substitution for
+    # them they're evaluated, otherwise the term stays symbolic. See #380.
     normalized = expr.replace("^", "**")
+    normalized = re.sub(r"(\b\w+)\s*\[\s*\]", r"\1", normalized)
 
     try:
         tree = ast.parse(normalized, mode="eval")
@@ -251,7 +257,13 @@ def split_small_parameter_kinetic(
         raise KineticEvalError(msg)
 
     small_set = frozenset(small_parameters)
+    # Wolfram InputForm conventions to Python-AST: caret to **, and
+    # nullary xCoba coordinate calls like `x[]` to bare `x` (ast.parse
+    # rejects empty subscripts). The renamed `x` flows through to the
+    # synthesised RHS coefficient strings and downstream evaluator;
+    # mathematica_to_python is idempotent on bare coord names. See GH #380.
     normalized = expr.replace("^", "**")
+    normalized = re.sub(r"(\b\w+)\s*\[\s*\]", r"\1", normalized)
     try:
         tree = ast.parse(normalized, mode="eval")
     except SyntaxError as e:
@@ -321,20 +333,41 @@ def _flatten_summands(
 
 
 def _reject_inner_addition(node: ast.AST) -> None:
-    """Raise if any Add/Sub BinOp appears inside a summand (i.e. a parenthesised sum).
+    """Raise if any Add/Sub BinOp appears in *multiplicative* position inside a summand.
 
-    ``Expand`` on the Wolfram side removes these. If one survives, the splitter
-    cannot reliably attribute the sub-terms to base vs. small-parameter
-    corrections and must fail loud.
+    ``Expand`` on the Wolfram side distributes ``(a+b)*c`` and ``(a+b)/c`` and
+    ``(a+b)^2`` into monomials, so a surviving Add/Sub in those positions
+    means input was not properly Expand'd. But Add/Sub inside a ``Pow.right``
+    (e.g. ``E**((zc1-x)**2/sigB**2)``) or a ``Call`` argument is transcendental
+    — Expand doesn't reduce it — and represents a coord-dependent atomic
+    factor. Walk multiplicative structure only; treat Pow exponents and Call
+    args as opaque. See GH #380.
     """
-    for child in ast.walk(node):
-        if isinstance(child, ast.BinOp) and isinstance(child.op, (ast.Add, ast.Sub)):
-            msg = (
-                "split_small_parameter_kinetic: parenthesised sub-sum "
-                f"{ast.unparse(child)!r} inside a monomial is not supported "
-                "(expected Expand'd input)."
-            )
-            raise KineticEvalError(msg)
+
+    def walk(n: ast.AST) -> None:
+        if isinstance(n, ast.BinOp):
+            if isinstance(n.op, (ast.Add, ast.Sub)):
+                msg = (
+                    "split_small_parameter_kinetic: parenthesised sub-sum "
+                    f"{ast.unparse(n)!r} inside a monomial is not supported "
+                    "(expected Expand'd input)."
+                )
+                raise KineticEvalError(msg)
+            if isinstance(n.op, ast.Pow):
+                # Base is in multiplicative position; exponent is opaque.
+                walk(n.left)
+                return
+            # Mult / Div / etc.: both sides multiplicative.
+            walk(n.left)
+            walk(n.right)
+            return
+        if isinstance(n, ast.UnaryOp):
+            walk(n.operand)
+            return
+        # Call args, Name, Constant: opaque/leaf — no further descent.
+        return
+
+    walk(node)
 
 
 def _count_small_parameters(
