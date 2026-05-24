@@ -1,8 +1,8 @@
 # Phase E Tracker — Localised-Field HPC Campaign
 
-**Last updated:** 2026-05-24 (session: stage0-bootstrap)
-**Current stage:** Stage 0 — infrastructure prep in progress
-**Next action:** finish Stage 0 (tasks 0.5–0.9), commit, then start the pipelined Stage 1+2 (E.cal derive → push → submit → derive E.EH while E.cal runs).
+**Last updated:** 2026-05-24 (session: stage1-cal-iteration)
+**Current stage:** Stage 1 — derivations in progress; E.cal complete and verified (PASS verdict on positive control)
+**Next action:** derive E.EH (`uv run tidal derive examples/euler_heisenberg/theory_e_dual_gaussian.toml`, ~10 min) while drafting Phase E HPC submit script templates.
 
 ## Quick handoff (read this first if resuming cold)
 
@@ -24,7 +24,8 @@
 | 2026-05-24 | `BPEAK=0.01` | κ·Bpeak·σ_B·√(2π)/2 ≈ 0.063 — perturbative, far from any Boccaletti node at nπ (n≥1) | stage0-bootstrap |
 | 2026-05-24 | `R_ATLAS=0.4` | brackets ~35% of T4 v3 MAP magnitude (\|MAP\|≈1.16); near-perturbative, small enough not to swamp tachyonic boundaries | stage0-bootstrap |
 | 2026-05-24 | `K_CARRIER=3` | k·σ_B = 15 → high-frequency Gertsenshtein regime; 5.4 cells/λ at Δz=0.39 | stage0-bootstrap |
-| 2026-05-24 | `T_END=60`, `T_CHECK_1=40`, `T_CHECK_2=60` | wavepacket front clears B-field at t≈50; t_check_1 is mid-transit (A-plateau diagnostic), t_check_2 is post-transit | stage0-bootstrap |
+| 2026-05-24 | ~~`T_END=60`, `T_CHECK_1=40`, `T_CHECK_2=60`~~ → `T_END=80`, `T_CHECK_1=60`, `T_CHECK_2=80` | Mid-transit `t_check_1` made the A-plateau diagnostic spurious (still-converting samples flagged as growth). Both checkpoints now POST-transit so A-plateau cleanly distinguishes saturation from in-vacuum growth. Wavepacket back clears field at t≈55; new window gives 25 units of post-transit margin. Verified on E.cal: ratio = 1.011 (well within 5% tol) | stage1-cal-iteration |
+| 2026-05-24 | Post-transit norm window now tracks `x_c + t_check_2 ± 3σ_w` instead of fixed `[zc1+3σ_B, L/2-σ_w]` | Old window assumed wavepacket at L/2; with the new t_check_2=80 the wavepacket center is at z=95, partly past the old upper bound (norm_ratio fell to 0.47 from clipping). Tracking the moving centre gives 0.9989 norm conservation on E.cal | stage1-cal-iteration |
 | 2026-05-24 | `BC=periodic` + dual-Gaussian B-field | required for modal solver (post-#367 fix in v0.42.0/0.42.1); periodicity preserved by `zc1 + zc2 = L` | stage0-bootstrap |
 | 2026-05-24 | TT-IC + theory unconstrained (no TT gauge) | per issue #167; validated pattern in `examples/gertsenshtein/theory_ungauged.toml` | stage0-bootstrap |
 | 2026-05-24 | R²/R̃² family explicitly stripped from theory roster | Ostrogradsky ghosts via constraint promotion; not unblocked by geometry change. Stripped variants of T7/T8 retained (parity-odd safe couplings) | stage0-bootstrap |
@@ -45,8 +46,8 @@
 
 ### Stage 1 — Wolfram derivations (interleaved with Stage 2+)
 
-- [ ] 1.1 E.cal `gertsenshtein/theory_ungauged_e_dual_gaussian.toml` (~5 min)
-- [ ] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` (~10 min)
+- [x] 1.1 E.cal `gertsenshtein/theory_ungauged_e_dual_gaussian.toml` (~5 min — DONE; 14 components, 73KB JSON; PASS verdict on stability diagnostics, P/h0² ≈ 0.0036 matches Boccaletti sin²(0.063) ≈ 0.0039 within ~10%)
+- [~] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` — **DEFERRED**: derivation completes (4 fields, 29 H terms) but coefficient `E^((zc1²+zc2²+x²)/sigB²)/...` overflows at box edges; multi-exp denominator beyond current `_invert_exp_denominator`. See [#378](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/378). Non-blocking for the PGT roster.
 - [ ] 1.2 E.T1 `dark_photon_plasma/theory_e_dual_gaussian.toml` (~10 min)
 - [ ] 1.3 E.T2 `torsion_gertsenshtein/theory_einstein_cartan_e_dual_gaussian.toml` (~10 min)
 - [ ] 1.4 E.T4 `torsion_gertsenshtein/theory_nonminimal_e_dual_gaussian.toml` (~30 min)
@@ -108,8 +109,8 @@ Stability column: `PASS` / `SOFT-PENALIZED` / `CATASTROPHIC`.
 
 | Stage | Theory | Derivation | Corner amp | Corner sup | Atlas | Stability | Verdict |
 |-------|--------|------------|------------|------------|-------|-----------|---------|
-| E.cal | gertsenshtein_ungauged | ☐ | ☐ jobid | ☐ jobid | n/a (positive control) | — | — |
-| E.EH  | Euler-Heisenberg + EM (σ, ρ) | ☐ | ☐ jobid | ☐ jobid | ☐ jobid (2D atlas) | — | — |
+| E.cal | gertsenshtein_ungauged | ☑ (2026-05-24) | ☑ local (no free params) | n/a | n/a (positive control) | PASS | calibration ✓ |
+| E.EH  | Euler-Heisenberg + EM (σ, ρ) | ☑ (derived but solver-blocked) | n/a | n/a | n/a | DEFERRED | DEFERRED — see #378 |
 | E.T1  | DP-plasma | ☐ | ☐ jobid | ☐ jobid | ☐ jobid | — | — |
 | E.T2  | Einstein-Cartan minimal | ☐ | ☐ jobid | ☐ jobid | ☐ jobid | — | — |
 | E.T4  | Ricci-EM nonminimal (δ₁) | ☐ | ☐ jobid | ☐ jobid | n/a (1D) | — | — |
@@ -127,7 +128,7 @@ _None yet — fill as `hpc_results/<jobid>/phase_e/<theory>/README.md` files lan
 
 ## Open blockers (dated, drop when resolved)
 
-- [ ] (none yet)
+- [ ] **2026-05-24** [#378](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/378) — E.EH derivation produces multi-exp denominator that overflows in coefficient evaluation. `_invert_exp_denominator` only handles single-exp case. Non-blocking for PGT roster; E.EH deferred from Wave 1.
 
 ## Resolved blockers (archive)
 

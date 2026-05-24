@@ -48,8 +48,8 @@ GEOM = {
     "sigB": 5.0,
     "x_c": 15.0,
     "sigma_w": 5.0,
-    "t_check_1": 40.0,
-    "t_check_2": 60.0,
+    "t_check_1": 60.0,
+    "t_check_2": 80.0,
     "h0": 0.01,
 }
 
@@ -78,16 +78,16 @@ def test_clean_wavepacket_passes() -> None:
     z = np.linspace(0.0, 200.0, 512)
     # IC at x_c=15 with h0=0.01
     src_ic = _gaussian(z, centre=GEOM["x_c"], width=GEOM["sigma_w"], amp=GEOM["h0"])
-    # Mid-transit (t_check_1=40, group velocity c=1): centre at 15+40=55, partially in B-field
-    src_t1 = _gaussian(z, centre=55.0, width=GEOM["sigma_w"], amp=GEOM["h0"])
-    # Post-transit (t_check_2=60): centre at 15+60=75, well past B-field at zc1=50
-    src_t2 = _gaussian(z, centre=75.0, width=GEOM["sigma_w"], amp=GEOM["h0"])
-    # Target is small (small conversion), saturated by t_check_2
+    # Post-transit at t_check_1=60 (group velocity c=1): centre at 15+60=75, well past B-field
+    src_t1 = _gaussian(z, centre=75.0, width=GEOM["sigma_w"], amp=GEOM["h0"])
+    # Late post-transit at t_check_2=80: centre at 15+80=95
+    src_t2 = _gaussian(z, centre=95.0, width=GEOM["sigma_w"], amp=GEOM["h0"])
+    # Target conversion saturated post-transit (same A at both checkpoints)
     tgt_t0 = np.zeros_like(z)
-    tgt_t1 = _gaussian(z, centre=55.0, width=GEOM["sigma_w"], amp=GEOM["h0"] * 0.01)
-    tgt_t2 = _gaussian(z, centre=75.0, width=GEOM["sigma_w"], amp=GEOM["h0"] * 0.01)
+    tgt_t1 = _gaussian(z, centre=75.0, width=GEOM["sigma_w"], amp=GEOM["h0"] * 0.01)
+    tgt_t2 = _gaussian(z, centre=95.0, width=GEOM["sigma_w"], amp=GEOM["h0"] * 0.01)
     sim = _make_sim(
-        [src_ic, src_t1, src_t2], [tgt_t0, tgt_t1, tgt_t2], [0.0, 40.0, 60.0]
+        [src_ic, src_t1, src_t2], [tgt_t0, tgt_t1, tgt_t2], [0.0, 60.0, 80.0]
     )
 
     result = compute_transit_diagnostics(
@@ -111,7 +111,7 @@ def test_catastrophic_vacuum_growth_flagged() -> None:
     src_t1 = _gaussian(z, centre=55.0, width=GEOM["sigma_w"], amp=GEOM["h0"]) + 0.1
     src_t2 = _gaussian(z, centre=75.0, width=GEOM["sigma_w"], amp=GEOM["h0"]) + 0.5
     tgt = np.zeros_like(z)
-    sim = _make_sim([src_ic, src_t1, src_t2], [tgt, tgt, tgt], [0.0, 40.0, 60.0])
+    sim = _make_sim([src_ic, src_t1, src_t2], [tgt, tgt, tgt], [0.0, 60.0, 80.0])
 
     result = compute_transit_diagnostics(
         sim, source_field="h_5", target_field="a_1", **GEOM
@@ -134,7 +134,7 @@ def test_persistent_growth_soft_penalty() -> None:
         z, centre=75.0, width=GEOM["sigma_w"], amp=GEOM["h0"] * 0.05
     )  # 5x growth
     sim = _make_sim(
-        [src_ic, src_t1, src_t2], [tgt_t0, tgt_t1, tgt_t2], [0.0, 40.0, 60.0]
+        [src_ic, src_t1, src_t2], [tgt_t0, tgt_t1, tgt_t2], [0.0, 60.0, 80.0]
     )
 
     result = compute_transit_diagnostics(
@@ -155,7 +155,7 @@ def test_sup_norm_overflow_flagged() -> None:
     src_t1 = _gaussian(z, centre=55.0, width=GEOM["sigma_w"], amp=GEOM["h0"])
     src_t2 = np.ones_like(z) * 1e12  # overflowed
     tgt = np.zeros_like(z)
-    sim = _make_sim([src_ic, src_t1, src_t2], [tgt, tgt, tgt], [0.0, 40.0, 60.0])
+    sim = _make_sim([src_ic, src_t1, src_t2], [tgt, tgt, tgt], [0.0, 60.0, 80.0])
 
     result = compute_transit_diagnostics(
         sim, source_field="h_5", target_field="a_1", **GEOM
@@ -171,7 +171,7 @@ def test_write_stability_json_roundtrip(tmp_path: Path) -> None:
     src_ic = _gaussian(z, centre=GEOM["x_c"], width=GEOM["sigma_w"], amp=GEOM["h0"])
     src_t = _gaussian(z, centre=75.0, width=GEOM["sigma_w"], amp=GEOM["h0"])
     tgt = np.zeros_like(z)
-    sim = _make_sim([src_ic, src_t, src_t], [tgt, tgt, tgt], [0.0, 40.0, 60.0])
+    sim = _make_sim([src_ic, src_t, src_t], [tgt, tgt, tgt], [0.0, 60.0, 80.0])
     result = compute_transit_diagnostics(
         sim, source_field="h_5", target_field="a_1", **GEOM
     )

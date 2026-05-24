@@ -230,11 +230,12 @@ def compute_transit_diagnostics(  # noqa: PLR0913, PLR0914
     # ------------------------------------------------------------------
     # IC window: ±3·sigma_w around x_c.
     ic_lo, ic_hi = x_c - 3.0 * sigma_w, x_c + 3.0 * sigma_w
-    # Post-transit window: from right edge of first B-field to L/2 minus
-    # the envelope tail, so we capture the wavepacket but not the second
-    # B-field region (~3·sigB before zc2).
-    post_lo = zc1 + 3.0 * sigB
-    post_hi = max(post_lo + sigma_w, 0.5 * L - sigma_w)
+    # Post-transit window: ±3·sigma_w around the wavepacket centre at
+    # t_check_2. With c=1 group velocity for relativistic GWs, centre is
+    # at x_c + t_check_2. Clamp to box so we never sample beyond [0, L].
+    centre_t2 = x_c + t_check_2
+    post_lo = max(0.0, centre_t2 - 3.0 * sigma_w)
+    post_hi = min(L, centre_t2 + 3.0 * sigma_w)
     norm_ic = _integrate_norm_window(src_ic, z, ic_lo, ic_hi)
     norm_post = _integrate_norm_window(src_t2, z, post_lo, post_hi)
     norm_ratio = norm_post / norm_ic if norm_ic > 0 else float("nan")
