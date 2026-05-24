@@ -13,7 +13,7 @@
 ## Geometry (FROZEN — change only with explicit re-baselining decision)
 
 - Single source of truth: [scripts/hpc_submit_drafts/v3e_localised/_geometry.env](../scripts/hpc_submit_drafts/v3e_localised/_geometry.env)
-- Frozen on 2026-05-24 (commit hash will be added when Stage 0 lands).
+- Frozen on 2026-05-24 (commit `ee110d8`).
 - Pre-flight check: `python scripts/v3e_boccaletti_preflight.py` (must exit 0 before any HPC submit).
 - Any change here invalidates all completed Phase E runs and requires a re-baseline.
 
