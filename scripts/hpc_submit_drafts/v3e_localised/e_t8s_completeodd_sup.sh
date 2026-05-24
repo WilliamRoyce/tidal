@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-# Phase E.T8s amp — Complete-odd PGT (already R̃²-free; verified)
+# Phase E.T8s sup — Complete-odd PGT (already R̃²-free; verified)
 #
-# IMPORTANT scope: complete-odd Lagrangian has 58 free couplings
-# (β,ξ,δ,χ,ζ + d14-21 + zt1-6 + xt1-36). nlive=25*58=1450, num_repeats=2*58=116
-# blows past the 1-h INTR limit. This script samples ONLY the SHARED-WITH-T7s
-# 18-param subset (β,ξ,δ,ζ,χ-equivalent); the parity-odd-only couplings
-# (d14-21, zt1-6, xt1-36) are PINNED to 0 via --param. The full 58D version
-# would need a standard-queue job (out of scope for Wave 3 INTR).
+# Scope: same 18-param subset as amp (Bahamonde-family shared with T7s),
+# parity-odd-only couplings (d14-21, zt1-6, xt1-36) pinned to 0. Full 58D
+# version requires standard-queue, out of scope for INTR.
 
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/_geometry.env"
@@ -14,7 +11,7 @@ python "$(git rev-parse --show-toplevel)/scripts/v3e_boccaletti_preflight.py" ||
 
 bash scripts/hpc_shuttle.sh submit \
   --template scripts/hpc_templates/polychord_intr.sbatch \
-  --name e_t8s_amp --ntasks 76 \
+  --name e_t8s_sup --ntasks 76 \
   --cmd "tidal sample examples/data/torsion_gertsenshtein_complete_odd_e_dual_gaussian.json \
     --prior 'beta1=arctan_uniform:-89:89' \
     --prior 'beta2=arctan_uniform:-89:89' \
@@ -34,7 +31,7 @@ bash scripts/hpc_shuttle.sh submit \
     --prior 'chi8=arctan_uniform:-89:89' \
     --prior 'chi9=arctan_uniform:-89:89' \
     --prior 'chi10=arctan_uniform:-89:89' \
-    --likelihood 'P_max:maximize' \
+    --likelihood 'P_max:minimize' \
     --baseline-formula 'sin(kappa*Bpeak*sigB*sqrt(2*pi)/2)**2' \
     --soft-floor-noise 1.0 \
     --param kappa=1.0 --param Bpeak=${BPEAK} --param sigB=${SIGB} --param zc1=${ZC1} --param zc2=${ZC2} \
@@ -44,4 +41,4 @@ bash scripts/hpc_shuttle.sh submit \
     --measure conversion,peak_conversion --source h_5 --target a_1 \
     --method nested --sampler polychord --nlive 450 --num-repeats 36 \
     --precision-criterion 0.01 \
-    --output \${RESULTS_DIR}/e_t8s_amp"
+    --output \${RESULTS_DIR}/e_t8s_sup"
