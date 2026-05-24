@@ -22,10 +22,9 @@ The architecture is shown in~\cref{ArchitectureDiagram}.
   \includegraphics[width=\linewidth]{figures/figA1_architecture}
   \caption{\TIDAL{} architecture. The symbolic computation
     (\xAct{}/\Mathematica{}) ingests a theory specification,
-    derives the Euler--Lagrange (EL) equations via \xPert{} perturbation
+    derives the Euler--Lagrange equations via \xPert{} perturbation
     theory and component-level decomposition, and exports the
-    equation specification --- the portable interface between the two
-    parts. The numerical integration (\Python{}) reads the
+    equation specification. The numerical integration (\Python{}) reads the
     specification, auto-selects a solver backend based on the
     structure of the equations (\cref{NumericalEvolution}), and
     produces simulation data from which the physics observables of
@@ -37,7 +36,7 @@ The architecture is shown in~\cref{ArchitectureDiagram}.
 The symbolic computation, written in \Mathematica{}~\cite{mathematica}
 on the \xAct{}~\cite{martingarcia2007xact} suite, expands the
 Lagrangian to quadratic order around the declared background using
-\xPert{}~\cite{brizuela2009xpert}, applies the EL
+\xPert{}~\cite{brizuela2009xpert}, applies the Euler--Lagrange (EL)
 variation, and decomposes the resulting tensor equations into their
 components with the aid of \xTras{}~\cite{nutma2014xtras}.
 A complete description of the symbolic operations is
@@ -45,7 +44,7 @@ given in \cref{SymbolicComputation}.
 
 \paragraph*{Equation specification}
 The equation specification, shown in \cref{ArchitectureDiagram}, is
-the sole interface between the symbolic and numerical parts of
+the interface between the symbolic and numerical parts of
 \TIDAL{}.
 It records each field's equation of motion as a sum of differential
 operators with parameter-dependent coefficients, the Hamiltonian
@@ -55,7 +54,7 @@ field's equation, used by the solver dispatch of
 Decoupling the two parts in this way allows the same derivation to
 support arbitrary grids, boundary conditions, initial conditions,
 and parameter choices without re-derivation, which is what makes
-parameter surveys of the kind reported in \cref{Results} both fast
+parameter surveys of the kind reported in \cref{Results} fast
 and feasible.
 
 \paragraph*{Numerical integration}
