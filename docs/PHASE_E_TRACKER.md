@@ -50,7 +50,7 @@
 ### Stage 1 — Wolfram derivations (interleaved with Stage 2+)
 
 - [x] 1.1 E.cal `gertsenshtein/theory_ungauged_e_dual_gaussian.toml` (~5 min — DONE; 14 components, 73KB JSON; PASS verdict on stability diagnostics, P/h0² ≈ 0.0036 matches Boccaletti sin²(0.063) ≈ 0.0039 within ~10%)
-- [~] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` — **DEFERRED**: derivation completes (4 fields, 29 H terms) but coefficient `E^((zc1²+zc2²+x²)/sigB²)/...` overflows at box edges; multi-exp denominator beyond current `_invert_exp_denominator`. See [#378](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/378). Non-blocking for the PGT roster.
+- [~] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` — **PARTIAL**: derivation unblocked (#378 fixed via Wolfram-side `CanonicalizeExpFraction` in `ExportJSON.wl`); JSON now has 0 overflow patterns and CVODE smoke runs end-to-end with no NaN/Inf. **Modal-perturbative path still blocked** by [#380](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/380) (`solve_modal(return_eigendata=True)` NotImplementedError on position-dependent coefficients). Non-blocking for the PGT roster.
 - [x] 1.2 E.T1 `dark_photon_plasma/theory_e_dual_gaussian.toml` — DONE (26 fields, 86 H terms)
 - [x] 1.3 E.T2 `torsion_gertsenshtein/theory_einstein_cartan_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms; smoke PASS)
 - [x] 1.4 E.T4 `torsion_gertsenshtein/theory_nonminimal_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms)

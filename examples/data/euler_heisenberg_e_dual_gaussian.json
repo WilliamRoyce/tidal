@@ -310,7 +310,7 @@
 						"coefficient": 4.0,
 						"operator": "gradient_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*rho*zc1)/(sigB^2*(E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) - 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) - 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) + 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma)))",
+						"coefficient_symbolic": "(4*Bpeak^2*rho*zc1)/(E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))*sigB^2*(1 - (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) - (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) + (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -320,7 +320,7 @@
 						"coefficient": -4.0,
 						"operator": "gradient_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(-4*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*rho*zc1)/(sigB^2*(E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) - 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) - 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) + 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma)))",
+						"coefficient_symbolic": "(-4*Bpeak^2*rho*zc1)/(E^((zc1 - x[])^2/sigB^2)*sigB^2*(1 - (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) - (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) + (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -330,7 +330,7 @@
 						"coefficient": 4.0,
 						"operator": "gradient_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*rho*zc2)/(sigB^2*(E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) - 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) - 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) + 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma)))",
+						"coefficient_symbolic": "(4*Bpeak^2*rho*zc2)/(E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))*sigB^2*(1 - (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) - (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) + (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -340,7 +340,7 @@
 						"coefficient": -4.0,
 						"operator": "gradient_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(-4*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*rho*zc2)/(sigB^2*(E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) - 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) - 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) + 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma)))",
+						"coefficient_symbolic": "(-4*Bpeak^2*rho*zc2)/(E^((zc2 - x[])^2/sigB^2)*sigB^2*(1 - (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) - (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) + (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -350,7 +350,7 @@
 						"coefficient": -8.0,
 						"operator": "gradient_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(-8*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*rho*x[])/(sigB^2*(E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) - 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) - 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) + 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma)))",
+						"coefficient_symbolic": "(-8*Bpeak^2*rho*x[])/(E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))*sigB^2*(1 - (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) - (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) + (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -360,7 +360,7 @@
 						"coefficient": 4.0,
 						"operator": "gradient_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(4*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*rho*x[])/(sigB^2*(E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) - 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) - 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) + 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma)))",
+						"coefficient_symbolic": "(4*Bpeak^2*rho*x[])/(E^((zc1 - x[])^2/sigB^2)*sigB^2*(1 - (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) - (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) + (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -370,7 +370,7 @@
 						"coefficient": 4.0,
 						"operator": "gradient_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(4*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*rho*x[])/(sigB^2*(E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) - 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) - 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) + 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma)))",
+						"coefficient_symbolic": "(4*Bpeak^2*rho*x[])/(E^((zc2 - x[])^2/sigB^2)*sigB^2*(1 - (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) - (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) + (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -380,7 +380,7 @@
 						"coefficient": 1.0,
 						"operator": "laplacian_x",
 						"field": "a_1",
-						"coefficient_symbolic": "E^((zc1^2 + zc2^2 + x[]^2)/sigB^2)/(E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) - 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) - 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) + 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma))",
+						"coefficient_symbolic": "(1 - (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) - (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) + (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2)))^(-1)",
 						"coordinate_dependent": [
 							"x"
 						]
@@ -389,7 +389,7 @@
 						"coefficient": -4.0,
 						"operator": "laplacian_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(-4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*rho)/(-E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) + 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) + 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) - 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma))",
+						"coefficient_symbolic": "(-4*Bpeak^2*rho)/(E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))*(-1 + (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) + (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) - (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -399,7 +399,7 @@
 						"coefficient": 2.0,
 						"operator": "laplacian_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*rho)/(-E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) + 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) + 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) - 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma))",
+						"coefficient_symbolic": "(2*Bpeak^2*rho)/(E^((zc1 - x[])^2/sigB^2)*(-1 + (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) + (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) - (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
@@ -409,7 +409,7 @@
 						"coefficient": 2.0,
 						"operator": "laplacian_x",
 						"field": "a_1",
-						"coefficient_symbolic": "(2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*rho)/(-E^((zc1^2 + zc2^2 + x[]^2)/sigB^2) + 2*Bpeak^2*E^((zc2^2 + 2*zc1*x[])/sigB^2)*(rho - 8*sigma) + 2*Bpeak^2*E^((zc1^2 + 2*zc2*x[])/sigB^2)*(rho - 8*sigma) - 4*Bpeak^2*E^((zc1^2 + zc2^2 + 2*zc1*x[] + 2*zc2*x[])/(2*sigB^2))*(rho - 8*sigma))",
+						"coefficient_symbolic": "(2*Bpeak^2*rho)/(E^((zc2 - x[])^2/sigB^2)*(-1 + (2*Bpeak^2*(rho - 8*sigma))/E^((zc1 - x[])^2/sigB^2) + (2*Bpeak^2*(rho - 8*sigma))/E^((zc2 - x[])^2/sigB^2) - (4*Bpeak^2*(rho - 8*sigma))/E^((zc1^2 + zc2^2 - 2*zc1*x[] - 2*zc2*x[] + 2*x[]^2)/(2*sigB^2))))",
 						"coordinate_dependent": [
 							"x"
 						],
