@@ -1,8 +1,7 @@
 % App F: Poincaré gauge theory — field content and conventions.
 % Pedagogical lecture-notes-style walk-through of the gauging
 % procedure and the irreducible torsion decomposition, supporting
-% \cref{Theory}, \cref{PGTframework}, \cref{Linearisation},
-% \cref{TorsionDirectBasis}, \cref{IrreducibleTorsion}, and
+% \cref{Theory}, \cref{PGTframework}, \cref{Linearisation}, and
 % \cref{PalatiniDecomposition}. The sector-by-sector enumeration
 % of invariants and the cross-author coupling-constant translation
 % table live in \cref{PGTEnumeration}.
@@ -398,16 +397,34 @@ $\T[1]{^\lambda_\lambda_\mu} = 0$ and
 $\varepsilon^{\alpha\beta\gamma\delta}\T[1]{_{\alpha\beta\gamma}} = 0$.\footnote{Shapiro's
 letter labels $T_\mu, S^\mu, q_{\alpha\beta\mu}$~\cite{shapiro2002torsion}
 for the same three components appear in the older literature.}
-The reconstruction formula \cref{IrreducibleTorsion}
+The reconstruction formula
+\begin{align}
+  \MAGT{_{\alpha\beta\mu}}
+    = \tfrac{1}{3}\bigl(\T[2]{_\beta}\,\g{_{\alpha\mu}}
+                       - \T[2]{_\mu}\,\g{_{\alpha\beta}}\bigr)
+    - \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\,\T[3]{^\nu}
+    + \T[1]{_{\alpha\beta\mu}},
+  \label{IrreducibleTorsion}
+\end{align}
 expresses the torsion in terms of its irreducible parts.
 
 The torsion-squared sector of the action admits two equivalent
 parameterisations. In the irreducible basis it reads $a\,(\T[1]{})^2 +
 b\,(\T[3]{})^2 + c\,(\T[2]{})^2$, with $(\T[1]{})^2 \equiv
 \T[1]{_{\alpha\beta\mu}}\T[1]{^{\alpha\beta\mu}}$ and the other
-squared norms defined analogously; in the direct basis of scalar
-contractions of \cref{TorsionDirectBasis} it reads $\beta_1 I_1 +
-\beta_2 I_2 + \beta_3 I_3$. Substituting
+squared norms defined analogously. Equivalently, in the
+\emph{direct basis} of scalar contractions (following the convention
+of~\cite{lin2019pgt}; see
+also~\cite{sezgin1980ghostfree,shapiro2002torsion})
+\begin{align}
+  I_1 \equiv \MAGT{_{\alpha\beta\mu}}\MAGT{^{\alpha\beta\mu}},
+  \quad
+  I_2 \equiv \MAGT{_{\alpha\beta\mu}}\MAGT{^{\beta\alpha\mu}},
+  \quad
+  I_3 \equiv \MAGT{^\alpha_\alpha_\mu}\MAGT{^\beta_\beta^\mu},
+  \label{TorsionDirectBasis}
+\end{align}
+it reads $\beta_1 I_1 + \beta_2 I_2 + \beta_3 I_3$. Substituting
 \cref{IrreducibleTorsion} into the direct-basis
 contractions and using the orthogonality of the three irreducible
 parts gives the linear
@@ -422,4 +439,8 @@ map~\cite{sezgin1980ghostfree,hehl1995metric,lin2019pgt}
      \begin{pmatrix} \beta_1 \\ \beta_2 \\ \beta_3 \end{pmatrix},
   \label{DirectIrreducibleTransform}
 \end{align}
-which is invertible.
+which is invertible. Coupling-constant labels and basis orderings
+differ across the PGT literature ---
+\cite{lin2019pgt} and~\cite{sezgin1980ghostfree} use distinct
+conventions, and the explicit translation table is collected in
+\cref{PGTEnumeration}.

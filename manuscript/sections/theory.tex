@@ -166,46 +166,6 @@ here.
 % them. The convention-translation table lives in
 % \cref{DirectIrreducibleTranslation}.
 
-% Step (e): Irreducible torsion decomposition introduced AFTER the action.
-% This is also the cross-reference target for App E.
-\paragraph*{Irreducible torsion decomposition}
-The torsion tensor admits a unique decomposition into irreducible
-$\mathrm{O}(3,1)$ representations~\cite{hehl1976spin,hehl1995metric,shapiro2002torsion,blagojevic2003lectures,obukhov2024electrodynamics,barker2024poincare}:
-a traceless tensor part $\T[1]{_{\alpha\beta\mu}}$, a trace vector
-$\T[2]{_\mu} \equiv \MAGT{^\lambda_\lambda_\mu}$, and an axial
-pseudovector
-$\T[3]{^\mu} \equiv \varepsilon^{\alpha\beta\gamma\mu}\MAGT{_{\alpha\beta\gamma}}$,
-\begin{align}
-  \MAGT{_{\alpha\beta\mu}}
-    = \tfrac{1}{3}\bigl(\T[2]{_\beta}\,\g{_{\alpha\mu}}
-                       - \T[2]{_\mu}\,\g{_{\alpha\beta}}\bigr)
-    - \tfrac{1}{6}\,\varepsilon_{\alpha\beta\mu\nu}\,\T[3]{^\nu}
-    + \T[1]{_{\alpha\beta\mu}}.
-  \label{IrreducibleTorsion}
-\end{align}
-The torsion-squared sector of \cref{QuadraticAction} is equivalently
-written in the \emph{direct basis} of scalar contractions
-(following the convention of~\cite{lin2019pgt}; see
-also~\cite{sezgin1980ghostfree,shapiro2002torsion}),
-\begin{align}
-  I_1 \equiv \MAGT{_{\alpha\beta\mu}}\MAGT{^{\alpha\beta\mu}},
-  \quad
-  I_2 \equiv \MAGT{_{\alpha\beta\mu}}\MAGT{^{\beta\alpha\mu}},
-  \quad
-  I_3 \equiv \MAGT{^\alpha_\alpha_\mu}\MAGT{^\beta_\beta^\mu},
-  \label{TorsionDirectBasis}
-\end{align}
-with $\{I_1,I_2,I_3\}$ related to the irreducible squared-norms
-$\{(\T[1]{})^2,\,(\T[2]{})^2,\,(\T[3]{})^2\}$ by an invertible linear transformation collected
-in \cref{PGTBackground}~\cite{shapiro2002torsion}. Coupling-constant
-labels and basis orderings differ across the PGT literature ---
-\cite{lin2019pgt} and~\cite{sezgin1980ghostfree} use distinct
-conventions, and the explicit translation table is collected in
-\cref{PGTEnumeration}. Throughout this work we use the direct basis
-$\{I_1,I_2,I_3\}$ computationally and the irreducible decomposition
-for naming the physical degrees of freedom that each interaction
-term selects.
-
 \subsection{Linearisation around the magnetic background}%
 \label{Linearisation}
 % Target ~350 w. Per genre_conventions_theory.md §(f) linearisation
