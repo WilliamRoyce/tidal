@@ -186,17 +186,23 @@ def overlay_corner(
     # (set in load_chains above) — no per-axis label-loop required here.
 
     # High-D tick fixes: for corners with ≥ HIGH_DIM_THRESHOLD parameters,
-    # apply 45° diagonal rotation on x-tick labels (the original convention;
-    # 90° vertical was an over-correction that the user reverted) and limit
-    # major-tick density to 3 ticks per axis. Combined with the reduced
-    # xtick/ytick.labelsize=6 in RCPARAMS this keeps T7 (18D) and T9 (32D)
-    # tick labels legible without overlap.
+    # apply 45° diagonal rotation on x-tick labels and limit major-tick
+    # density to 3 ticks per axis. Tick labels (the numeric values) are
+    # shrunk per-panel because the panel width on a \textwidth figure
+    # scales as 1/n_params; without the shrinkage, tick numerals overlap
+    # by ~20 panels. The PARAMETER labels ($\beta_1$, $\chi_3$, etc.) are
+    # NOT shrunk — they read at the RCPARAMS \axes.labelsize\ default and
+    # must stay at that size for legibility.
+    #   12–19 params (T7 18D, NP.T7 17D): tick labels 5 pt
+    #   ≥ 20 params  (T9 32D, T6 20D):    tick labels 4 pt
     if len(params) >= HIGH_DIM_THRESHOLD:
+        tick_label_pt = 4 if len(params) >= 20 else 5
         for ax in axes.values.flatten():
             if ax is None:
                 continue
             ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
             ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
+            ax.tick_params(axis="both", labelsize=tick_label_pt)
             for label in ax.get_xticklabels():
                 label.set_rotation(45)
                 label.set_horizontalalignment("right")
