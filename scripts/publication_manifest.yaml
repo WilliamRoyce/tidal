@@ -118,26 +118,3 @@ appendix_D:
     output: manuscript/figures/fig1_boccaletti_validation.pdf
     appendix_ref: manuscript/sections/results.tex (§4.1 ValidationResult)
 
-  figD1_stageA_heatmap:
-    kind: figure
-    figure_script: scripts/figures/figD1_stageA_heatmap.py
-    canonical_data: hpc_results/campaigns/d20_bahamonde_amp_rerun_v2/run/results.csv
-    output: manuscript/figures/figD1_stageA_heatmap.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.2 SectorSurveyTable)
-    status: stub  # current campaign data is nested-sampling output; a parameter-plane (m_A, eps) heatmap needs grid-sweep data not yet collected
-
-  figD2_stageB_sweep:
-    kind: figure
-    figure_script: scripts/figures/figD2_stageB_sweep.py
-    canonical_data: hpc_results/campaigns/d21_barker_sup/run/results.csv
-    output: manuscript/figures/figD2_stageB_sweep.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.2 SectorSurveyTable)
-    status: stub  # depends on sweep-scatter data with simulated P_max column
-
-  figD3_channel_comparison:
-    kind: figure
-    figure_script: scripts/figures/figD3_channel_comparison.py
-    canonical_data: TBD
-    output: manuscript/figures/figD3_channel_comparison.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.3 ChannelStructure)
-    status: stub

@@ -49,13 +49,10 @@
   \label{BoccalettiUniform}
 \end{figure*}
 
-\paragraph*{Boccaletti kernel on a uniform background}
-The Gertsenshtein conversion kernel of \cref{GertsenshteinFormula}
-is one of the closed-form analytic predictions we test \TIDAL{}
-against. We scan $\Bzero$ over the perturbative regime and \cref{BoccalettiUniform}
-overlays the simulation against two analytic predictions:
-\cref{GertsenshteinFormula} and the
-Raffelt--Stodolsky formula~\cite{raffelt1988mixing},
+\paragraph*{Two-mode formula and uniform-background sweep}
+The two-mode formula that supersedes the bare Boccaletti kernel at
+finite $\Bzero$ (see \cref{ValidationResult}) is the
+Raffelt--Stodolsky expression~\cite{raffelt1988mixing}
 \begin{equation}
   \begin{split}
     \Pconv &= \frac{g^2}{g^2 + \Delta^2}\,
@@ -65,42 +62,30 @@ Raffelt--Stodolsky formula~\cite{raffelt1988mixing},
   \end{split}
   \label{TwoModeRabi}
 \end{equation}
-where $\omega \simeq k$ is the carrier angular frequency of the photon
-mode. The graviton acquires an effective mass
-$m_h^2 = \kappa^2\Bzero^2/2$ from the $\Bzero^2$ metric backreaction
-(\cref{PerturbativeRegime};~\cite{hwangnoh2023graviton}), detuning
-its dispersion against the massless photon by
-$\Delta = m_h^2/(4\omega)$.
-The two predictions coincide while
-$\kappa\Bzero t/2 \ll \pi/2$; they diverge at larger $\Bzero$ along
-the analytic $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$ curve
-overlaid in \cref{BoccalettiUniform}(a).
-The residual $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$ then measures the
-size of the higher-order physics discarded by \cref{TwoModeRabi} but captured by \TIDAL{},
-which \cref{PerturbativityHierarchy} places at $\mathcal{O}(\Bzero^4)$.
-\Cref{BoccalettiUniform}(a) shows this residual rising from
-the modal-solver IEEE double-precision floor at small $\Bzero$ into
-the range $10^{-8}$--$10^{-6}$, of the same order
-as the $(\Delta/g)^4$ prediction, and panel (b)
-shows the modal/CVODE plateau at the same level.
+where $\omega \simeq k$ is the carrier angular frequency of the
+photon mode. The detuning $\Delta = m_h^2/(4\omega)$ arises from the
+graviton effective mass $m_h^2 = \kappa^2\Bzero^2/2$ acquired through
+the $\Bzero^2$ metric backreaction
+(\cref{PerturbativeRegime};~\cite{hwangnoh2023graviton}); the
+$(\Delta/g)^4$ truncation that \cref{TwoModeRabi} drops is at
+$\mathcal{O}(\Bzero^4)$ per \cref{PerturbativityHierarchy}.
+\Cref{BoccalettiUniform}(a) overlays the simulation against both
+\cref{GertsenshteinFormula} and \cref{TwoModeRabi} across the
+$\Bzero$ sweep, and panel (b) shows the modal/\CVODE{}
+grid-refinement plateau at the corresponding $(\Delta/g)^4$ level.
 
-\paragraph*{Boccaletti kernel on a Gaussian profile}
+\paragraph*{Path-integrated kernel on a Gaussian profile}
 The path-integrated Boccaletti form \cref{BoccalettiPathIntegrated}
 is the closed-form benchmark for the localised-source runs. For the
 Gaussian profile
-$B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$, we
-reproduce this closed-form by scanning the
-$(B_\mathrm{peak}, R)$ plane with the localised Gertsenshtein
-theory. \Cref{BoccalettiLocalised} shows the
-scan collapsing onto the single curve
-$P = \sin^2(s)$ in the dimensionless variable
+$B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$, the
+$(B_\mathrm{peak}, R)$ scan of \cref{BoccalettiLocalised} collapses
+onto the single curve $P = \sin^2(s)$ in the dimensionless variable
 $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$ within the perturbative
-regime $s < \pi/2$, reproducing \cref{BoccalettiPathIntegrated}.
-The scan extends past the first quarter-period ($s > \pi/2$), where
-the $P_\mathrm{conv} \ll 1$ row of \cref{PerturbativityHierarchy}
-fails and the bare path-integrated formula no longer applies;
-points past this quarter-period deviate from the curve as the
-bare path-integrated formula's small-conversion assumption fails.
+regime $s < \pi/2$. The scan extends past the first quarter-period
+($s > \pi/2$), where the $P_\mathrm{conv} \ll 1$ row of
+\cref{PerturbativityHierarchy} fails and the bare path-integrated
+formula's small-conversion assumption no longer applies.
 
 \begin{figure}[t]
   \centering
@@ -241,13 +226,11 @@ $\FieldFT{_{\mu\nu}} \equiv 2\,\partial_{[\mu} T_{\nu]}$ of the
 propagating vector-torsion construction of~\cite{barker2024poincare},
 with the torsion trace $T_\mu \equiv T^\nu{}_{\nu\mu}$ promoted to a
 propagating vector field,
-%TODO replace prose description with a direct cref to the propagating-vector-torsion sector definition once that lands in results.tex.
 kinetic prefactor $\xi$,
-gauge-coupling shift $\alpha_3$, and mass mixing $\delta_m$ (the
-Lagrangian appears with the dark-photon-plasma sector in
-\cref{SectorSurvey}%
-%TODO replace with explicit equation cref once the vector-torsion Lagrangian lands in results.tex
-), carrying $18$ fields including redundant constrained
+gauge-coupling shift $\alpha_3$, and mass mixing $\delta_m$
+(equivalent to the Proca-form Lagrangian
+\cref{DarkPhotonPlasmaLagrangian}),
+carrying $18$ fields including redundant constrained
 directions ($\operatorname{cond}(V) \sim 10^{15\text{--}17}$). The
 continuum equivalence is recovered under the map
 $m_T^2 = +2\alpha_3$. The two formulations agree on observables at
@@ -379,40 +362,3 @@ selects, which differs across theories.
   \label{ConservationAudit}
 \end{table}
 
-% Detail figures D1–D3 are stubs pending sector-survey campaigns
-% registered in scripts/publication_manifest.yaml:
-%   - figD1_stageA_heatmap: Stage-A (m_A^2, delta_m) grid-sweep with
-%     simulated P_max — pending a dedicated grid-sweep campaign (the
-%     current Stage-A artefacts are nested-sampling outputs).
-%   - figD2_stageB_sweep: Stage-B sweep-scatter — pending campaign
-%     output with the simulated P_max column.
-%   - figD3_channel_comparison: h_x <-> a_x vs trace-channel time
-%     evolution — pending generation of the side-by-side simulation.
-% Captions are placeholders. Replace once the corresponding
-% campaigns land and the figure scripts produce a PDF; the section-4
-% drafting session is responsible for matching the captions to the
-% data actually rendered.
-\begin{figure}[t]
-  \centering
-  %TODO \includegraphics[width=\linewidth]{figures/figD1_stageA_heatmap}
-  \caption{Stage A parameter-plane heatmap supporting the
-    \cref{SectorSurveyTable} row for the dark-photon-plasma sector.}
-  \label{StageAHeatmap}
-\end{figure}
-
-\begin{figure}[t]
-  \centering
-  %TODO \includegraphics[width=\linewidth]{figures/figD2_stageB_sweep}
-  \caption{Stage B scan scatter supporting the
-    \cref{SectorSurveyTable} row for the torsion-coupling sector.}
-  \label{StageBSweep}
-\end{figure}
-
-\begin{figure}[t]
-  \centering
-  %TODO \includegraphics[width=\linewidth]{figures/figD3_channel_comparison}
-  \caption{Channel comparison supporting \cref{ChannelStructure}:
-    $h_\times \leftrightarrow a_x$ time evolution vs the trace
-    channel at the same $\Bzero$.}
-  \label{ChannelComparison}
-\end{figure}
