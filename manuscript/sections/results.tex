@@ -277,7 +277,8 @@ of~\cite{caputo2021darkphoton} at $\Bzero \to 0$,
       &&\text{[Proca mass]} \nonumber \\
     &\quad + \xi\,\T[2]{_\mu}\PD{_\nu}\FieldF{^{\mu\nu}}
       &&\text{[kinetic mixing]} \nonumber \\
-    &\quad + \delta_m\,\T[2]{_\mu}\T[2]{^\mu}\,\FieldF{}^{2}
+    &\quad + \delta_m\,\T[2]{_\mu}\T[2]{^\mu}\,
+              \FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}}
       &&\text{[plasma detuning]} \, ,
   \label{DarkPhotonPlasmaLagrangian}
 \end{align}
@@ -293,11 +294,6 @@ formulation-independent. The publication-quality chain returns
 $\log\mathcal{Z}_+ = +9.03 \pm 0.07$ against
 $\log\mathcal{Z}_- = +2.92 \pm 0.08$ ($\log B = +6.11$) under the
 plane-wave benchmark.
-\emph{Plasma-mediated dark-photon mixing
-breaks the Holdom-trivialisation of the conversion channel in the
-amplification direction under the plane-wave benchmark, with the
-genuine-amplification versus background-instability distinction
-addressed in \cref{Discussion}.}
 
 % Figure 2 — dark-photon-plasma corner plot.
 % Rendered from scripts/figures/corner_t1_dark_photon_plasma.py.
@@ -324,14 +320,14 @@ linear and torsion-squared sectors,
 \begin{align}
   \lag_\text{rf}
     &= -\frac{1}{\kappa^2}\,\MAGFt{}
-      + \Alp{1} I_1 + \Alp{2} I_2 + \Alp{3} I_3
+      + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3
       - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}} \nonumber \\
     &\quad + \Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}
       &&\text{[Ricci--EM cross-term]} \, ,
   \label{RicciEMLagrangian}
 \end{align}
 giving a four-dimensional prior over
-$\{\Alp{1}, \Alp{2}, \Alp{3}, \Del{1}\}$. The cross-term sources the
+$\{\Bet{1}, \Bet{2}, \Bet{3}, \Del{1}\}$. The cross-term sources the
 linearised conversion amplitude directly at order $\Bzero$, providing
 a $\Del{1}$-linear correction to the Gertsenshtein channel that does
 not require torsion to propagate; the sign-symmetric $\Del{1}$ is
@@ -342,10 +338,6 @@ plane-wave benchmark. The overlaid posterior of \cref{CornerT4}
 resolves the dominant direction: amplification regions extend
 broadly in $\Del{1}$ at large $\Alp{3}$, while suppression regions
 are tightly localised at $\Del{1} \approx 0$ and small $\Alp{i}$.
-\emph{The Ricci--electromagnetism cross-term opens a vertex
-that polarises the conversion channel along $\Del{1}$ at linear
-order in $\Bzero$; whether the polarisation is genuine amplification
-or a background-instability artefact is treated in \cref{Discussion}.}
 
 \begin{figure}[t]
   \centering
@@ -374,16 +366,22 @@ takes the nine-parameter union
 $\{\Bet{1\!-\!3}, \xi, \Del{1}, \chi, \zeta_{1\!-\!3}\}$,
 \begin{align}
   \lag_\text{nm}
-    &= \lag_\text{rf}\bigl|_{\Alp{i}\to\Bet{i}} \nonumber \\
-    &\quad + \xi\,(\nabla\mathcal{T})^2
-      &&\text{[torsion kinetic, $(\nabla\mathcal{T})^2$]} \nonumber \\
-    &\quad + \chi\,\mathcal{T}\,\nabla\mathcal{F}
+    &= \lag_\text{rf}
+      - \tfrac{1}{4}\xi\,
+              \mathcal{F}^{(T)}_{\alpha\beta}\,
+              \mathcal{F}^{(T)\,\alpha\beta}
+      &&\text{[Barker torsion kinetic]} \nonumber \\
+    &\quad + \chi\,\MAGFt{_{[\alpha\beta]}}\,
+              \mathcal{F}^{(T)\,\alpha\beta}
       &&\text{[Barker derivative mixing]} \nonumber \\
-    &\quad + \zeta_1\,\mathcal{T}^{(1)}\,\mathcal{F}\,\nabla\mathcal{F}
+    &\quad + \zeta_1\,\rcD{_\alpha}\mathcal{T}^{\beta}{}_{\beta\gamma}\,
+              \FieldF{^{\alpha\gamma}}
       &&\text{[Shapiro 1]} \nonumber \\
-    &\quad + \zeta_2\,\mathcal{T}^{(2)}\,\mathcal{F}\,\nabla\mathcal{F}
+    &\quad + \zeta_2\,\rcD{_\alpha}\mathcal{T}^{\alpha}{}_{\beta\gamma}\,
+              \FieldF{^{\beta\gamma}}
       &&\text{[Shapiro 2]} \nonumber \\
-    &\quad + \zeta_3\,\mathcal{T}^{(3)}\,\mathcal{F}\,\nabla\mathcal{F}
+    &\quad + \zeta_3\,\rcD{_\alpha}\mathcal{T}_{\beta}{}^{\alpha}{}_{\gamma}\,
+              \FieldF{^{\beta\gamma}}
       &&\text{[Shapiro 3]} \, ,
   \label{NonMinimalLagrangian}
 \end{align}
@@ -407,12 +405,6 @@ accumulates these features. Only Barker's single $\chi$ is included
 in the derivative class probed here; the full $\xi_1$--$\xi_{16}$
 ghost-free kinetic basis~\cite{barker2024poincare} is closed
 separately in the kinetic-closure sector of \cref{FrontierAndNulls}.
-\emph{Across the Yang--Mills--PGT non-minimal progression the
-Bayes factor strengthens monotonically with non-minimal coupling
-space under the plane-wave benchmark, reaching $\log B = +7.37$ at
-the full nine-parameter union; the methodological distinction
-between this Bayes-factor signal and unbounded background-tachyon
-growth is addressed in \cref{Discussion}.}
 
 \begin{figure}[t]
   \centering
@@ -482,7 +474,9 @@ sector on top of the Yang--Mills--PGT non-minimal base,
         \tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}\bigr|_{i} \, ,
   \label{ChiClosureLagrangian}
 \end{align}
-giving an eighteen-dimensional prior. The chain returns
+giving an eighteen-dimensional prior; the ten independent
+$\tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}$ contractions are
+collected in \cref{SymbolicGeneralNonminimal}. The chain returns
 $\log\mathcal{Z}_+ = +10.30 \pm 0.08$ against
 $\log\mathcal{Z}_- = -3.18 \pm 0.07$ ($\log B = +13.48$) under the
 plane-wave benchmark — the survey maximum, more than five nats above
@@ -490,12 +484,6 @@ the nine-parameter non-minimal base. The overlaid posterior of
 \cref{CornerT7} shows the amplification concentration along the
 $\chi$ directions with the suppression posterior tightly localised at
 small $\chi$.
-\emph{Closing the full $\chi$-sector beyond Barker's single derivative
-mixing sharpens the amplification signal of the plane-wave benchmark
-by more than five nats over the nine-parameter non-minimal base; the
-methodological distinction between this Bayes-factor signal and
-unbounded background-tachyon growth that a finite-extent geometry
-would saturate is addressed in \cref{Discussion}.}
 
 \begin{figure*}[t]
   \centering
@@ -561,11 +549,6 @@ checks of the companion paragraph below constrain the remaining
 non-ghost alternatives; the definitive disambiguation between genuine
 channel mixing and the remaining instability modes defers to the
 finite-extent geometry treated in \cref{Discussion}.
-\emph{The plane-wave-benchmark amplification signal survives the
-removal of the torsion kinetic term with the Bayes factor essentially
-unchanged — strong supporting evidence for genuine Gertsenshtein
-channel mixing rather than a torsion-ghost-mediated artefact,
-conditional on the finite-extent confirmation.}
 
 \begin{figure}[t]
   \centering
@@ -638,7 +621,9 @@ $(\nabla\mathcal{T})^2$ class, on top of the complete
 $\chi_1$--$\chi_{10}$ $\tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}$ basis. One
 invariant, $\xi_{11}$, vanishes in the plane-wave reduction; fifteen
 propagating $\xi$-couplings plus the ten $\chi$-couplings and the
-seven non-minimal-base couplings give a thirty-two-dimensional prior.
+seven non-minimal-base couplings give a thirty-two-dimensional prior;
+the explicit $(\nabla\mathcal{T})^2$ contractions are collected in
+\cref{SymbolicGeneralNonminimal} alongside the $\chi$-closure basis.
 The chain returns $\log\mathcal{Z}_+ = -0.18 \pm 0.07$ against
 $\log\mathcal{Z}_- = -9.61 \pm 0.09$ ($\log B = +9.43$); both
 $\log\mathcal{Z}$ are negative, indicating partial floor contamination
@@ -646,11 +631,6 @@ from the extended $\xi_{11}$--$\xi_{16}$ sub-sector beyond Barker's
 single $\xi = \mathrm{LC}\{\xi_6, \xi_7, \xi_{12}, \xi_{16}\}$, so the
 $+9.43$ nat Bayes factor is a lower bound on the genuine amplification
 of the parity-even kinetic closure under the plane-wave benchmark.
-\emph{Closing the $\xi_1$--$\xi_{16}$ kinetic basis beyond Barker's
-single $\xi$ preserves the amplification preference at $\log B \geq +9$
-under partial-rescue contamination; the full unrestricted Bayes
-factor is recovered only once the finite-extent geometry of
-\cref{Discussion} saturates the floor.}
 
 \begin{figure*}[t]
   \centering
@@ -688,10 +668,12 @@ The R$^2$-PGT extension retains a single curvature-squared invariant
 on top of the Einstein--Cartan baseline,
 \begin{align}
   \lag_{\mathrm{R^2}}
-    = -\frac{1}{\kappa^2}\,\MAGFt{}
-    + \Alp{1}\,\MAGFt{}^2
-    + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3
-    - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}},
+    &= -\frac{1}{\kappa^2}\,\MAGFt{}
+       + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3
+       - \tfrac{1}{4}\FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}}
+       \nonumber \\
+    &\quad + \Alp{1}\,\MAGFt{}\,\MAGFt{}
+       &&\text{[Ricci-scalar squared]}\, ,
   \label{R2PGTLagrangian}
 \end{align}
 giving a four-dimensional prior over $\{\Alp{1}, \Bet{1}, \Bet{2},
@@ -711,9 +693,6 @@ full $\Alp{1}$ prior, independent of the $\Alp{1}$ numerical value;
 the symbolic kinetic matrix of \cref{PropagatingKineticOutput} exhibits
 the decoupling explicitly as a vanishing off-diagonal entry coupling
 $\Alp{1}$ to the $h_\times \!\leftrightarrow\! a_\times$ channel.
-\emph{The $\Alp{1}\MAGFt{}^2$ curvature-squared sector decouples
-analytically from the transverse-traceless Gertsenshtein channel under
-the plane-wave benchmark.}
 
 \paragraph*{The Einstein--Cartan baseline}
 The minimal Einstein--Cartan baseline retains the three parity-even
@@ -726,8 +705,6 @@ $\{\Bet{i}\}$, so the sector is not separately scanned in the present
 benchmark. The symbolic kinetic matrix at this parameter point is
 archived in \cref{ReferenceKineticOutput} and serves as the reference
 against which all per-class kinetic-matrix outputs are compared.
-\emph{Einstein--Cartan minimal acts as the auxiliary-torsion reference
-baseline for the survey rather than a separately scanned theory.}
 
 \paragraph*{The parity-odd minimal sub-sector}
 A four-dimensional parity-odd sub-sector
@@ -739,8 +716,6 @@ $\log\mathcal{Z}_- = +11.33 \pm 0.31$ ($\log B = -6.33$) under the
 plane-wave benchmark. The overlaid posterior of \cref{CornerT6Min}
 resolves the asymmetry along $d_{21}$, in contrast with the
 parity-even sectors of \cref{InformativeAmplification}.
-\emph{The parity-odd minimal sub-sector is the unique surveyed sector
-favouring suppression at the plane-wave benchmark.}
 
 \begin{figure}[t]
   \centering
@@ -779,8 +754,9 @@ twenty-parameter parity-odd full sector
 $\{d_{14}, d_{15}, d_{17}, d_{19}, d_{20}, d_{21},
 \tilde\zeta_{1,2,3,5,6}\}$ on top of the Yang--Mills--PGT non-minimal
 base, and the fifty-three-parameter complete parity-odd closure
-$\{xt_1, \ldots, xt_{36}\}$ of
-$\varepsilon\cdot\tilde{\mathcal{R}}\times\nabla\mathcal{T}$ on top of
+$\{\tilde\chi_1, \ldots, \tilde\chi_{36}\}$ of
+$\varepsilon\!\cdot\!\tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}$
+(\cref{SymbolicParityOdd}) on top of
 the parity-odd-full base --- fail to admit a finite-amplitude
 posterior under the plane-wave uniform-$\Bzero$ ansatz at any
 horizon. The eigenvalues of the linearised conversion system grow
@@ -803,11 +779,6 @@ $\tilde{\mathcal{R}}$--$\nabla\mathcal{T}$ couplings) generate
 exponential mode amplification in the unbounded plane-wave
 background --- a pathology the bounded interaction time of a
 finite-extent geometry (\cref{Discussion}) would not permit.
-\emph{The parity-odd PGT torsion--electromagnetism sectors of the
-plane-wave benchmark are geometrically incompatible with the
-uniform-$\Bzero$ ansatz at any viable horizon, requiring the
-localised-geometry treatment of the discussion section for any
-meaningful posterior.}
 
 % Discussion preserved (planning directive 2026-05-25):
 % EH+Gert is a parallel survey axis (QED-EFT F⁴ corrections to
@@ -855,12 +826,6 @@ level by the Euler--Lagrange derivation pipeline
 (\cref{SymbolicEulerHeisenberg}); the symbolic-derivation outcome is the
 publishable validation and no extended-prior chain over a $\lambda_\text{top}$
 direction is needed.
-\emph{Euler--Heisenberg $F^4$ corrections are inert for the
-Gertsenshtein conversion at the surveyed field strengths; together
-with the non-propagating-torsion control of
-\cref{InformativeAmplification} they bracket the genuine-amplification
-interpretation against both the torsion-ghost artefact and the
-QED-EFT artefact.}
 
 \begin{figure}[t]
   \centering

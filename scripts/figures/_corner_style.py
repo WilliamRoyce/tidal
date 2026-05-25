@@ -34,8 +34,8 @@ RCPARAMS = {
     "font.size": 10,  # was 9 — matches caption body
     "axes.labelsize": 11,  # was 9 — parameter labels (β, χ, ξ) prominent over caption body
     "legend.fontsize": 9,  # was 8 — matches caption body
-    "xtick.labelsize": 8,  # unchanged — high-D tick density needs small ticks
-    "ytick.labelsize": 8,  # unchanged — same rationale
+    "xtick.labelsize": 6,  # reduced from 8 — diagonal labels on dense corners must not overlap
+    "ytick.labelsize": 6,  # matched to xtick
     "lines.linewidth": 1.0,
     "axes.linewidth": 0.5,
 }
@@ -186,9 +186,11 @@ def overlay_corner(
     # (set in load_chains above) — no per-axis label-loop required here.
 
     # High-D tick fixes: for corners with ≥ HIGH_DIM_THRESHOLD parameters,
-    # apply 90° vertical rotation on x-tick labels (avoids diagonal-overlap
-    # mode) and limit major-tick density to 3 ticks per axis. This keeps
-    # T6 full (20D), T7 (18D), T9 (32D) legible.
+    # apply 45° diagonal rotation on x-tick labels (the original convention;
+    # 90° vertical was an over-correction that the user reverted) and limit
+    # major-tick density to 3 ticks per axis. Combined with the reduced
+    # xtick/ytick.labelsize=6 in RCPARAMS this keeps T7 (18D) and T9 (32D)
+    # tick labels legible without overlap.
     if len(params) >= HIGH_DIM_THRESHOLD:
         for ax in axes.values.flatten():
             if ax is None:
@@ -196,8 +198,8 @@ def overlay_corner(
             ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
             ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
             for label in ax.get_xticklabels():
-                label.set_rotation(90)
-                label.set_horizontalalignment("center")
+                label.set_rotation(45)
+                label.set_horizontalalignment("right")
 
     # Legend hosted INSIDE the empty upper-right region of the corner-plot
     # grid, anchored to the topmost diagonal axis (axes.iloc[0,0]) in its
