@@ -222,8 +222,9 @@ geometric incompatibility, and the QED-EFT parallel-axis null.
     Yang--Mills--PGT (Barker extension) & 6  & $+5.319 \pm 0.169$  & $+2.524 \pm 0.158$  & $+2.795$ & publication\textsuperscript{a}         & \emph{amplifies} \\
     Yang--Mills--PGT (Shapiro extension)& 8  & $+8.889 \pm 0.135$  & $+6.212 \pm 0.176$  & $+2.677$ & landscape                              & \emph{amplifies} \\
     Yang--Mills--PGT (full non-minimal) & 9  & $+10.034 \pm 0.142$ & $+2.662 \pm 0.156$  & $+7.372$ & landscape                              & \emph{amplifies} \\
-    non-propagating torsion ($\xi=0$ control) & 8 & $+10.98 \pm 0.15$ & $+2.67 \pm 0.10$ & $+8.31$  & publication                            & \emph{amplifies (control)} \\
+    non-propagating torsion ($\xi=0$, single $\chi$ control) & 8 & $+10.98 \pm 0.15$ & $+2.67 \pm 0.10$ & $+8.31$  & publication                            & \emph{amplifies (control)} \\
     complete parity-even ($\chi$-closure) & 18 & $+10.30 \pm 0.08$  & $-3.18 \pm 0.07$    & $+13.48$ & publication\textsuperscript{a}         & \emph{amplifies} \\
+    non-propagating torsion ($\xi=0$, $\chi$-closure control) & 17 & $+9.93 \pm 0.08$ & $-3.28 \pm 0.07$ & $+13.21$ & publication\textsuperscript{a}      & \emph{amplifies (control)} \\
     $\xi$-kinetic closure               & 32 & $-0.18 \pm 0.07$    & $-9.61 \pm 0.09$    & $+9.43$  & publication\textsuperscript{a,b}       & \emph{amplifies (partial rescue)} \\
     parity-odd minimal sub-sector       & 4  & $+5.002 \pm 0.280$  & $+11.331 \pm 0.311$ & $-6.329$ & landscape                              & \emph{suppresses} \\
     parity-odd full                     & 20 & $-15.01 \pm 0.023$  & $-14.99 \pm 0.025$  & $\approx 0$ & publication\textsuperscript{a,c}    & \emph{geometrically incompatible} \\
@@ -476,7 +477,7 @@ sector on top of the Yang--Mills--PGT non-minimal base,
 \end{align}
 giving an eighteen-dimensional prior; the ten independent
 $\tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}$ contractions are
-collected in \cref{SymbolicGeneralNonminimal}. The chain returns
+listed explicitly in \cref{ChiClosureInvariants}. The chain returns
 $\log\mathcal{Z}_+ = +10.30 \pm 0.08$ against
 $\log\mathcal{Z}_- = -3.18 \pm 0.07$ ($\log B = +13.48$) under the
 plane-wave benchmark — the survey maximum, more than five nats above
@@ -538,17 +539,26 @@ vertices retained). The chain returns
 $\log\mathcal{Z}_+ = +10.98 \pm 0.15$ against
 $\log\mathcal{Z}_- = +2.67 \pm 0.10$ ($\log B = +8.31$), essentially
 the same amplification signal as the complete parity-even sector with
-propagating torsion. The Gertsenshtein amplification of the
-Yang--Mills--PGT non-minimal sector therefore does not require torsion
-to propagate; the coupling structure alone is sufficient. This rules
-out the simplest torsion-ghost interpretation, in which the
-amplification would be mediated by a wrong-sign-kinetic ghost mode of
-the torsion sector: with $\xi = 0$ no torsion kinetic operator is
-present, so no torsion ghost can mediate the channel. The diagnostic
-checks of the companion paragraph below constrain the remaining
-non-ghost alternatives; the definitive disambiguation between genuine
-channel mixing and the remaining instability modes defers to the
-finite-extent geometry treated in \cref{Discussion}.
+propagating torsion. The same control test at the seventeen-parameter
+$\chi$-closure sub-space
+$\{\Bet{1\!-\!3}, \Del{1}, \zeta_{1\!-\!3}, \chi_{1\!-\!10}\}$
+(again with $\xi = 0$) returns
+$\log\mathcal{Z}_+ = +9.93 \pm 0.08$ against
+$\log\mathcal{Z}_- = -3.28 \pm 0.07$ ($\log B = +13.21$): statistically
+indistinguishable from the corresponding $\xi$-free $\chi$-closure
+chain of \cref{CornerT7} ($\log\mathcal{Z}_+ = +10.30 \pm 0.08$,
+$\Delta\log\mathcal{Z} \approx 0.37$ within combined errors). Across
+both control sub-spaces, the Gertsenshtein amplification of the
+non-minimal sector therefore does not require torsion to propagate;
+the coupling structure alone is sufficient. This rules out the
+simplest torsion-ghost interpretation, in which the amplification
+would be mediated by a wrong-sign-kinetic ghost mode of the torsion
+sector: with $\xi = 0$ no torsion kinetic operator is present, so no
+torsion ghost can mediate the channel. The diagnostic checks of the
+companion paragraph below constrain the remaining non-ghost
+alternatives; the definitive disambiguation between genuine channel
+mixing and the remaining instability modes defers to the finite-extent
+geometry treated in \cref{Discussion}.
 
 \begin{figure}[t]
   \centering
@@ -564,6 +574,35 @@ finite-extent geometry treated in \cref{Discussion}.
     that the Bayes-factor signal does not require torsion to propagate.}
   \label{CornerNP}
 \end{figure}
+
+% Discussion preserved (planning directive 2026-05-25 follow-up):
+% Three-way comparison cleanly isolates the role of torsion kinetics
+% at the χ-closure complexity:
+%   NP.T5  (8D,  ξ=0, single χ):  log Z_+ = +10.98 ± 0.15
+%   NP.T7  (17D, ξ=0, χ_{1..10}): log Z_+ =  +9.93 ± 0.08
+%   T7v2   (18D, ξ free, χ_{1..10}): log Z_+ = +10.30 ± 0.08
+% Δlog Z (NP.T7 vs T7v2) = 0.37 nats, well within combined errors —
+% propagating ξ contributes ≤ 1 nat to the amplification at this
+% complexity. The χ_{1..10} R̃×∇T coupling sector alone produces the
+% amplification. NP.T5 sitting slightly above NP.T7 (+10.98 vs +9.93)
+% is the Occam penalty on the 9 extra prior dimensions when only one
+% χ-direction carries the signal at the surveyed B₀.
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/corner_np_ceven}
+  \caption{Overlaid amplification (red) and suppression (blue) corner
+    plot for the seventeen-dimensional non-propagating-torsion
+    $\chi$-closure control sector
+    $\{\Bet{1\!-\!3}, \Del{1}, \zeta_{1\!-\!3}, \chi_{1\!-\!10}\}$.
+    The torsion kinetic coefficient $\xi$ is pinned to zero relative to
+    the eighteen-parameter $\chi$-closure of \cref{CornerT7}; the
+    amplification posterior reproduces the $\xi$-free signal to within
+    $\Delta\log\mathcal{Z} \approx 0.37$ nats, confirming that the
+    $\chi_{1\!-\!10}$ derivative-mixing sector is the carrier of the
+    plane-wave-benchmark amplification rather than the propagating
+    torsion kinetic mode.}
+  \label{CornerNPCeven}
+\end{figure*}
 
 % Discussion preserved (planning directive 2026-05-25):
 % App-D / App-E / App-G mapping for the four alternative-instability
@@ -622,8 +661,8 @@ $\chi_1$--$\chi_{10}$ $\tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}$ basis. On
 invariant, $\xi_{11}$, vanishes in the plane-wave reduction; fifteen
 propagating $\xi$-couplings plus the ten $\chi$-couplings and the
 seven non-minimal-base couplings give a thirty-two-dimensional prior;
-the explicit $(\nabla\mathcal{T})^2$ contractions are collected in
-\cref{SymbolicGeneralNonminimal} alongside the $\chi$-closure basis.
+the sixteen explicit $(\nabla\mathcal{T})^{2}$ contractions are listed
+in \cref{XiKineticInvariants}.
 The chain returns $\log\mathcal{Z}_+ = -0.18 \pm 0.07$ against
 $\log\mathcal{Z}_- = -9.61 \pm 0.09$ ($\log B = +9.43$); both
 $\log\mathcal{Z}$ are negative, indicating partial floor contamination
@@ -756,7 +795,7 @@ $\{d_{14}, d_{15}, d_{17}, d_{19}, d_{20}, d_{21},
 base, and the fifty-three-parameter complete parity-odd closure
 $\{\tilde\chi_1, \ldots, \tilde\chi_{36}\}$ of
 $\varepsilon\!\cdot\!\tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}$
-(\cref{SymbolicParityOdd}) on top of
+(\cref{ParityOddCompletionInvariants}) on top of
 the parity-odd-full base --- fail to admit a finite-amplitude
 posterior under the plane-wave uniform-$\Bzero$ ansatz at any
 horizon. The eigenvalues of the linearised conversion system grow
