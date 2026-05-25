@@ -361,3 +361,70 @@ class TestAllModalPathsRespectKinetic:
             "cross-builder contract in tidal/solver/modal.py module docstring "
             "(GH #367, fixed v0.42.0; helper hoisted in v0.42.1)."
         )
+
+
+# ---------------------------------------------------------------------------
+# GH #382: position-dependent kinetic_coefficient_symbolic on time-domain
+# backends. Pre-fix, build_inverse_kinetic_diag didn't pass coord_arrays to
+# evaluate_coefficient, so any kinetic with x[] raised NameError.
+# ---------------------------------------------------------------------------
+
+
+class TestGH382PositionDependentKinetic:
+    """build_inverse_kinetic_diag must handle position-dependent kinetic
+    when a grid is supplied. Returns per-grid-point inverse arrays.
+    """
+
+    def test_position_dep_kinetic_returns_array(self) -> None:
+        from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+        spec = _make_kg_spec_with_kinetic("1 + 0.1*x[]**2")
+        grid = GridInfo(
+            bounds=((0.0, 2.0),),
+            shape=(64,),
+            periodic=(True,),
+        )
+        result = build_inverse_kinetic_diag(spec, {}, grid=grid)
+        assert result is not None
+        assert "phi_0" in result
+        val = result["phi_0"]
+        assert isinstance(val, np.ndarray), (
+            f"expected ndarray for position-dependent kinetic; got {type(val)}"
+        )
+        assert val.shape == (64,)
+        # Sanity: matches analytical inverse at cell centres
+        x_centred = grid.axes_coords(0)
+        expected = 1.0 / (1.0 + 0.1 * x_centred**2)
+        assert np.allclose(val, expected, atol=1e-12)
+
+    def test_position_dep_kinetic_constant_path_unchanged(self) -> None:
+        """Constant kinetic must still return scalar even when grid supplied,
+        preserving the M=1 fast path for non-#382 callers.
+        """
+        from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+        spec = _make_kg_spec_with_kinetic("2.0")
+        grid = GridInfo(bounds=((0.0, 2.0),), shape=(64,), periodic=(True,))
+        result = build_inverse_kinetic_diag(spec, {}, grid=grid)
+        assert result == {"phi_0": 0.5}
+
+    def test_no_grid_back_compat(self) -> None:
+        """Pre-#382 callers (grid=None) must still work for constant kinetic."""
+        from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+        spec = _make_kg_spec_with_kinetic("1 + alpha")
+        result = build_inverse_kinetic_diag(spec, {"alpha": 0.5})
+        # 1 / (1+0.5) = 2/3
+        assert result is not None
+        assert abs(result["phi_0"] - 2 / 3) < 1e-12
+
+    def test_position_dep_kinetic_no_grid_raises(self) -> None:
+        """Without grid, a position-dependent kinetic must raise via
+        evaluate_coefficient's NameError-on-undefined-coord. This documents
+        the existing failure mode and motivates the fix.
+        """
+        from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+
+        spec = _make_kg_spec_with_kinetic("1 + 0.1*x[]**2")
+        with pytest.raises((ValueError, NameError)):
+            build_inverse_kinetic_diag(spec, {})

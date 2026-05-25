@@ -420,7 +420,7 @@ def build_residual_fn(
     # the M=I fast path.
     from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
 
-    m_inv = build_inverse_kinetic_diag(spec, parameters or {})
+    m_inv = build_inverse_kinetic_diag(spec, parameters or {}, grid=grid)
 
     ctx = _ResidualCtx(
         spec=spec,

@@ -338,7 +338,7 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
     # for theories with non-trivial mass matrix. None triggers the M=I fast path.
     from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
 
-    m_inv = build_inverse_kinetic_diag(spec, parameters or {})
+    m_inv = build_inverse_kinetic_diag(spec, parameters or {}, grid=grid)
 
     # Initialize state
     y = y0.copy()
