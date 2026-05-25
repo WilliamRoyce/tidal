@@ -47,8 +47,8 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 | ✅ 6 | D2.3 Full T5 | 9 | 225 | 450 | 18 | 64 | same | ✅ B.5 landscape |
 | ✅ 7 | T6-minimal parity-odd | 4 | 100 | 200 | 8 | 64 | torsion_gertsenshtein_parity_odd_minimal.json | ✅ B.5-t6 landscape (29515407) |
 | ✅ 8 | T6 parity-odd YM-PGT | 20 | 500 | 1000 | 40 | 64 | torsion_gertsenshtein_parity_odd.json | ✅ B.5-t6 landscape (29567416, floor-dominated). **⚠️ v1 overflow-contaminated: t_end=10 → expm overflow at γ>71, not physics.** v2 rescue at t_end=1 → B.5-rescue. |
-| ✅ 9 | T7 Complete-Even PGT | 18 | 450 | 900 | 36 | 64 | torsion_gertsenshtein_complete_even.json | ✅ B.5-t7 landscape (29588680, floor-dominated). **⚠️ v1 overflow-contaminated: t_end=10 → expm overflow at γ>71, not physics.** v2 rescue at t_end=1 → B.5-rescue. |
-| 🔄 10 | T8 Complete-Odd PGT | 53 | 1325 | 2650 | 106 | 64 | torsion_gertsenshtein_complete_odd.json | 🔄 B.5-rescue (t_end=1, standard queue, first attempt). ndim=53 confirmed (d16/xt24/xt32/xt34/zt4/kappa vanish in plane-wave reduction). |
+| ✅ 9 | T7 Complete-Even PGT | 18 | 450 | 900 | 36 | 64 | torsion_gertsenshtein_complete_even.json | ✅ B.5-t7 landscape (29588680, floor-dominated). **⚠️ v1 overflow-contaminated.** ✅ v2 rescue (29682868, TIMEOUT 1hr): **amp logZ=+10.30±0.077, sup logZ=−3.18±0.067** (still-active at timeout; genuine amplification evidence, dramatic improvement over v1). |
+| 🔄 10 | T8 Complete-Odd PGT | 53 | 1325 | 2650 | 106 | 64 | torsion_gertsenshtein_complete_odd.json | 🔄 B.5-rescue (29684804, RUNNING INTR, t_end=1). ndim=53 confirmed (d16/xt24/xt32/xt34/zt4/kappa vanish in plane-wave reduction). |
 | ✅ | T9 Complete-Even + full ξ kinetic | 32 | 800 | 1600 | 64 | 64 | torsion_gertsenshtein_complete_even_full_xi.json | ✅ B.5-t9 landscape (29596287, TIMEOUT 1hr). logZ=-15.70±0.025 (amp), -15.68±0.026 (sup). **⚠️ v1 overflow-contaminated: t_end=10 → expm overflow at γ>71, not physics.** v2 rescue at t_end=1 → B.5-rescue. xi11 vanishes in reduction. |
 | 🔄 | EH+Gert (F⁴+Gertsenshtein) | 2 | 50 | 100 | 4 | 64 | gertsenshtein_eh.json (to derive) | 🔄 B.5-rescue. New theory: GR+Maxwell Gertsenshtein + EH F⁴ corrections. Both h_ij (graviton) and A_μ (photon) fields; ndim=2 (ρ,σ). Needs derivation from `examples/gertsenshtein/theory_eh.toml`. Note: `euler_heisenberg.json` has NO graviton fields and cannot test conversion. |
 
@@ -83,6 +83,12 @@ GH issues `[v3-A-γ] γ_conversion: refactored definition + multi-t_test + log-z
 | B.5-rescue | Uniform-field rescue at t_end=1 (T6v2, T7v2, T8v1, T9v2, EH+Gert) | 🔄 in progress | t_end=10 v1 runs identified as overflow-contaminated: modal solver's expm overflows float64 when max_eigenvalue × t_end > 708. At t_end=10 this triggers at γ>71 → 74–100% floor rates for T6/T7/T9. Modal solver expm cost is O(1) in t_end (empirically confirmed: ~0.1ms across t_end ∈ [0.1,10]). Rescue at t_end=1 safe to γ>709 with same machine-precision A=P/P_GR quality. |
 | B.5-pub | D2.0–D2.3 v3 publication pass (50×ndim) | ⏸ PAUSED — awaiting T6/T7/T8 landscapes + explicit user approval | **Policy change (2026-05-22):** ALL landscape (25×ndim) surveys must complete before ANY pub quality runs. Pub runs require explicit user approval to resume. Partial results captured: D2.0 sup/amp pub (✅ done — 29471255, 29507332); D2.1 sup/amp pub (✅/🟡 — 29471255, partial 63% at 29507332); D2.2/D2.3 amp pub (🟡 40% at 29511699, tidal.resume exists — awaiting approval). Remaining: D2.1 amp pub resume, D2.2/D2.3 amp pub complete, D2.2/D2.3 sup pub. **DO NOT restart until user approves.** |
 | B.6 | Bounds-dependence cross-check at L=75 under v3 | ✅ done | 29205638 (25 min INTR). log Z=+13.18±0.12 (nearly identical to B.1's +13.29). Per-coupling D_KL essentially unchanged. **v3 washes out v2's bounds-dependence non-monotonicity** (v2 L=75 = +0.84, v2 L=100 = +0.68 — non-mono; v3 L=75 ≈ L=100). |
+
+## Phase B.5-post — Forward plan (after rescue campaign)
+
+| Idea | Description | Gate |
+| --- | --- | --- |
+| EH+Gert atlas pilot | EH+Gert (ndim=2) is an ideal Phase C atlas proof-of-concept: 6 faces × 4 ranks = 24 ranks, fits one INTR slot; all faces in parallel (~10 min). Maps QED line σ/ρ=7/16 across atlas faces. | EH+Gert landscape gives valid (non-floor) logZ |
 
 ## Phase C — Cubed-sphere coupling-space chart (HANDLED BY PARALLEL SESSION)
 
