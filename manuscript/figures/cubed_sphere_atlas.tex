@@ -243,8 +243,14 @@
   % STAGE 8 — highlighted -y face (transparent fill, sub-tile grid,
   %                  highlighted central sub-tile)
   %------------------------------------------------------------------
-  \fill[FaceFill, opacity=0.45]
-    (-1,-1,-1) -- (1,-1,-1) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
+  \fill[FaceFill, opacity=0.4]
+    (-1,-1,-1) -- (1,-1,-1) -- (1,-1, -0.5) -- (-1,-1, -0.5) -- cycle;
+  \fill[FaceFill, opacity=0.4]
+    (-1,-1,0) -- (1,-1,0) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
+  \fill[FaceFill, opacity=0.4]
+    (-1,-1,-0.5) -- (-0.5,-1,-0.5) -- (-0.5,-1, 0) -- (-1,-1, 0) -- cycle;
+  \fill[FaceFill, opacity=0.4]
+    (0,-1,-0.5) -- (1,-1,-0.5) -- (1,-1, 0) -- (0,-1, 0) -- cycle;
 
   % 4x4 sub-tile grid lines on the -y face (interior lines at
   % x, z = -0.5, 0, 0.5)
