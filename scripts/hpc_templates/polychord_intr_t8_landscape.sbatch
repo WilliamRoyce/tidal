@@ -2,32 +2,33 @@
 #SBATCH -J {{JOB_NAME}}
 #SBATCH -A {{ACCOUNT}}
 #SBATCH -p icelake
+#SBATCH --qos=intr
 #SBATCH --nodes={{NODES}}
 #SBATCH --ntasks={{NTASKS}}
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=1500
-#SBATCH --time=08:00:00
+#SBATCH --time={{TIME}}
 #SBATCH -o {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
 #SBATCH -e {{REMOTE_ROOT}}/slurm_logs/slurm-%j.out
 #SBATCH --exclude=cpu-r-10,cpu-r-15
 
-# T8 Complete-Odd PGT landscape — first attempt, standard queue, t_end=1.
+# T8 Complete-Odd PGT landscape — INTR queue, t_end=1, first attempt.
 #
 # ndim=53 (d16/xt24/xt32/xt34/zt4/kappa vanish in plane-wave reduction).
 # nlive=1325 (25×ndim), num_repeats=106 (2×ndim).
-# t_end=1: modal solver expm safe to γ>709. Standard queue (8hr limit) used
-# because T8's ~1.5-2hr convergence time exceeds the 1hr INTR wall limit.
+# t_end=1: modal solver expm safe to γ>709. Amp+sup run in parallel (2×38 ranks).
+#
+# If the 1hr INTR wall is hit before convergence, resubmit a follow-up
+# pointing --output at this job's results dir and add --read-resume.
 #
 # Theory: torsion_gertsenshtein_complete_odd.json
 #   T6 base (beta1-3, xi, delta1, chi, zeta1-3, d14-15, d17, d19-21, zt1-3, zt5-6)
-#   + xt1-36 (ε·R̃×∂T sector, 36 terms — 6 vanish: xt24/xt32/xt34 excluded).
-#   Total active: beta1-3(3) + xi(1) + delta1(1) + chi(1) + zeta1-3(3)
-#               + d14-15,d17,d19-21(6) + zt1-3,zt5-6(5)
-#               + xt1-23(23) + xt25-31(7) + xt33(1) + xt35-36(2) = 53 params.
+#   + xt1-36 (ε·R̃×∂T sector; xt24/xt32/xt34 vanish).
+#   Total active params: 53.
 #
 # Submit via:
 #   bash scripts/hpc_shuttle.sh submit \
-#     --template scripts/hpc_templates/polychord_standard_t8_landscape.sbatch \
+#     --template scripts/hpc_templates/polychord_intr_t8_landscape.sbatch \
 #     --ntasks 76 --nodes 1 --name t8-landscape \
 #     --account HANDLEY-SL3-CPU --cmd true
 #
@@ -83,7 +84,6 @@ PHYS_ARGS="--param kappa=1.0 --param B0=0.01
   --method nested --sampler polychord --precision-criterion 0.01"
 
 # 53 priors — d16/xt24/xt32/xt34/zt4/kappa excluded (vanish in plane-wave reduction)
-# xi uses log_uniform (Barker kinetic positivity constraint); all others arctan_uniform
 PRIOR_ARGS="--prior beta1=arctan_uniform:-89:89
   --prior beta2=arctan_uniform:-89:89
   --prior beta3=arctan_uniform:-89:89
@@ -142,7 +142,7 @@ NTASKS_PER_CHAIN=$(( SLURM_NTASKS / 2 ))
 
 echo "--- Launching T8 amp (${NTASKS_PER_CHAIN}r) + T8 sup (${NTASKS_PER_CHAIN}r) in parallel ---"
 echo "    ndim=53, nlive=1325, num_repeats=106, t_end=1, soft_floor_logl=-15"
-echo "    Est. convergence: ~2650 dead pts ≈ 1.5-2 hrs"
+echo "    Est. convergence: ~3300 dead pts"
 
 # shellcheck disable=SC2086
 mpirun -n "${NTASKS_PER_CHAIN}" tidal sample ${DATA} ${PHYS_ARGS} ${PRIOR_ARGS} \
