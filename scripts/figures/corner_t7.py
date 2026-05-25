@@ -1,15 +1,16 @@
-r"""Corner plot for T7 complete-even sector (18D) — v1 landscape partial chains.
+r"""Corner plot for T7 complete-even sector (18D) — v2 rescue chains.
 
-Amplification and suppression posteriors (both from job 29588680, partial
-chains under PolyChord TIMEOUT) overlaid in the App J \\cref{NestedScore}
-sign convention. Eighteen-dimensional prior over the complete parity-even
-sector with the full $\\chi_1$--$\\chi_{10}$ R̃×∂T basis; 74% of dead points
-at the soft-floor noise band, geometric incompatibility under the plane-wave
-benchmark.
+Amplification and suppression posteriors (job 29682868, t_end=1 rescue under
+the overflow-safe horizon) overlaid in the App J \\cref{NestedScore} sign
+convention. Eighteen-dimensional prior over the complete parity-even sector
+with the full $\\chi_1$--$\\chi_{10}$ R̃×∂T basis. The v1 partial chains at
+t_end=10 hit the modal-solver expm-overflow ceiling
+(max_eigenvalue × t_end > 708); the v2 rescue at t_end=1 returns
+log Z_+ = +10.30, log Z_- = −3.18, log B = +13.48 — the survey maximum.
 
 Data sources:
-  hpc_results/29588680/t7_amp_v1/  (partial chain)
-  hpc_results/29588680/t7_sup_v1/  (partial chain)
+  hpc_results/29682868/t7_amp_v2/
+  hpc_results/29682868/t7_sup_v2/
 Output:
   manuscript/figures/corner_t7.pdf
 """
@@ -25,8 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _corner_style import overlay_corner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_AMP = REPO_ROOT / "hpc_results" / "29588680" / "t7_amp_v1"
-DEFAULT_SUP = REPO_ROOT / "hpc_results" / "29588680" / "t7_sup_v1"
+DEFAULT_AMP = REPO_ROOT / "hpc_results" / "29682868" / "t7_amp_v2"
+DEFAULT_SUP = REPO_ROOT / "hpc_results" / "29682868" / "t7_sup_v2"
 DEFAULT_OUT = REPO_ROOT / "manuscript" / "figures" / "corner_t7.pdf"
 
 PARAMS = [

@@ -1,20 +1,24 @@
-r"""Corner plot for T9 complete-even + full $\xi$-kinetic closure (32D) — v1 landscape partial chains.
+r"""Corner plot for T9 complete-even + full $\xi$-kinetic closure (32D) — v2 rescue chains.
 
-Amplification and suppression posteriors (both from job 29596287, partial
-chains under PolyChord TIMEOUT) overlaid in the App J \cref{NestedScore}
-sign convention. Thirty-two-dimensional prior over the complete parity-even
+Amplification and suppression posteriors (job 29694142, t_end=1 rescue under
+the overflow-safe horizon) overlaid in the App J \cref{NestedScore} sign
+convention. Thirty-two-dimensional prior over the complete parity-even
 sector with the full $\xi_1$--$\xi_{16}$ kinetic-invariant basis ($\xi_{11}$
-vanishes in plane-wave reduction; 15 surviving) on top of the T7 complete
-$\chi_1$--$\chi_{10}$ R̃×∂T basis. 100\% of dead points at the soft-penalty
-noise band — same geometric-incompatibility mechanism as T6 full and T7.
+vanishes in plane-wave reduction; 15 surviving) on top of the complete
+$\chi_1$--$\chi_{10}$ R̃×∂T basis.
+
+The v2 rescue returns log Z_+ = −0.18, log Z_- = −9.61 (log B = +9.43);
+both log Z negative indicates partial floor contamination from the
+extended $\xi_{11}$–$\xi_{16}$ sub-sector, so the Bayes factor is a LOWER
+BOUND on the genuine amplification of the parity-even kinetic closure.
 
 T9 closes the $\xi_1$--$\xi_{16}$ kinetic-sector gap (Barker's single $\xi$
 $=$ LC$\{\xi_6, \xi_7, \xi_{12}, \xi_{16}\}$ is now the intersection of the
 full surveyed basis rather than the survey scope).
 
 Data sources:
-  hpc_results/29596287/t9_amp_v1/  (partial chain, 818 dead points / 800 nlive)
-  hpc_results/29596287/t9_sup_v1/  (partial chain)
+  hpc_results/29694142/t9_amp_v2/
+  hpc_results/29694142/t9_sup_v2/
 Output:
   manuscript/figures/corner_t9.pdf
 """
@@ -30,8 +34,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _corner_style import overlay_corner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_AMP = REPO_ROOT / "hpc_results" / "29596287" / "t9_amp_v1"
-DEFAULT_SUP = REPO_ROOT / "hpc_results" / "29596287" / "t9_sup_v1"
+DEFAULT_AMP = REPO_ROOT / "hpc_results" / "29694142" / "t9_amp_v2"
+DEFAULT_SUP = REPO_ROOT / "hpc_results" / "29694142" / "t9_sup_v2"
 DEFAULT_OUT = REPO_ROOT / "manuscript" / "figures" / "corner_t9.pdf"
 
 # Parameter order matches the derivation pipeline's column convention
