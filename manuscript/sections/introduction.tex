@@ -34,30 +34,25 @@
 \paragraph*{High-frequency gravitational waves and the gauge-gravity sector}
 Gravitational-wave observation now spans roughly ten decades
 in frequency, from the nanohertz pulsar-timing band, where
-evidence of a stochastic background has now been
+evidence of a stochastic background has been
 reported~\cite{nanograv2023fifteen}, through the millihertz
 reach of LISA~\cite{amaro2017lisa} to the kilohertz audio
 sensitivity of LIGO--Virgo--KAGRA~\cite{abbott2023gwtc3}.
-Above a few kilohertz the dedicated instrumentation thins to
-nothing, leaving the megahertz--gigahertz window observationally
-empty even as that window covers the source range expected
-from primordial black-hole mergers, cosmic strings, preheating
-after inflation, and direct production in the very early
-Universe~\cite{Aggarwal:2020olq, Aggarwal:2025noe}. With no
-operating interferometer sensitive in this band, a programme
-of indirect detection has developed that reads out the
-gravitational signal through its electromagnetic conversion
-rather than through metric strain, exploiting bulk-acoustic-wave
-resonators, reinterpreted axion haloscopes, and
-cosmic-photon-background bounds in galactic and intergalactic
+Above a few kilohertz no operating interferometer is
+sensitive, leaving the megahertz--gigahertz window --- the
+band of primordial black-hole mergers, cosmic strings,
+preheating after inflation, and very-early-Universe
+production~\cite{Aggarwal:2020olq, Aggarwal:2025noe} ---
+observationally empty. Indirect-detection programmes therefore
+exploit graviton--photon conversion in cosmic and laboratory
 magnetic fields~\cite{lella2024constraining, Domcke:2020yzq, Berlin:2021txa, Goryachev:2021zzn, Aggarwal:2025noe}.
 The simplest such mechanism is the Gertsenshtein effect: the
 resonant mixing of a gravitational wave with a photon mode in
 an external magnetic
 background~\cite{gertsenshtein1962wave, boccaletti1970conversion}.
-Even the general-relativistic baseline of this conversion has
-been the subject of recent corrections and
-reanalyses~\cite{hwangnoh2023graviton, hwangnoh2023emdef, palessandro2023simple, tomomatsu2025gertsenshtein};
+Even the general-relativistic baseline has been corrected and
+reanalysed in recent
+work~\cite{hwangnoh2023graviton, hwangnoh2023emdef, palessandro2023simple, tomomatsu2025gertsenshtein};
 and while non-minimal torsion--electromagnetic couplings and
 torsion-modified light propagation have been studied within
 Poincar\'e gauge theory~\cite{hehl2000electromagnetic, itin2004maxwell, rubilar2003torsion, Kruglov:2008cv, Gaete:2008vb, Gaete:2009dd, obukhov2024electrodynamics, bahamonde2025torsion},
@@ -66,16 +61,16 @@ a PGT background carrying propagating torsion has not been
 performed.
 
 \paragraph*{Torsion theory space and the spin-1 ghost restriction}
-The obstacle to such a calculation is twofold. The first is
-one of scale: the quadratic Poincar\'e gauge Lagrangian
-defines a multi-parameter operator space whose Gertsenshtein
-channel structure must be computed sector by
-sector~\cite{sezgin1980ghostfree, Sezgin:1981xs, lin2019pgt, blagojevic2018hamiltonian, barker2024poincare},
-and manual derivation across this space is infeasible for
-more than one or two models at a time --- the same scaling
-argument that has motivated the spectrum-level PGT
-pipelines~\cite{barker2024psalter, barker2025hamilcar}. The
-second is a sharp consistency restriction. The canonical
+The quadratic Poincar\'e gauge Lagrangian defines a
+multi-parameter operator space whose Gertsenshtein channel
+structure must be computed sector by
+sector~\cite{sezgin1980ghostfree, Sezgin:1981xs, lin2019pgt, blagojevic2018hamiltonian, barker2024poincare};
+the dimensionality of this space, together with the
+requirement that any candidate calculation recover the
+Einstein--Maxwell Boccaletti result as a benchmark, sets the
+scope of any survey-level treatment. Within that space, a
+sharp consistency restriction further constrains where
+torsion is allowed to propagate at all: the canonical
 Yo--Nester no-go theorem~\cite{Yo:1999ex, Yo:2001sy}, since
 reproduced and extended by exhaustive Hamiltonian
 studies~\cite{blagojevic2018hamiltonian, BeltranJimenez:2019hrm, Aoki:2020zqm},
@@ -93,67 +88,42 @@ electromagnetism in a background magnetic field.
 \paragraph*{The Gertsenshtein channel: prior derivations and their tensions}
 Graviton--photon conversion in a static magnetic background
 is a classical result of general relativity coupled to Maxwell
-electrodynamics; the closed-form conversion probability has
-been known since the early
+electrodynamics; the closed-form conversion probability dates
+from the early
 1970s~\cite{gertsenshtein1962wave, boccaletti1970conversion, DeLogi:1977qe},
 with the mechanism understood as the spin-two analogue of
-axion--photon mixing~\cite{raffelt1988mixing}. The same result
-has subsequently been recovered by exact resummation in a
-constant background~\cite{ejlli2020graviton, Ejlli:2018hke}
-and by a two-state quantum-mechanical mixing
+axion--photon mixing~\cite{raffelt1988mixing}. Subsequent work
+has rederived this result by exact resummation in a constant
+background~\cite{ejlli2020graviton, Ejlli:2018hke} and by a
+two-state mixing
 argument~\cite{palessandro2023simple, palessandro2024gertsenshtein},
-with constraint analyses based on the inverse process placing
-upper limits on stochastic gravitational-wave backgrounds at
-ultra-high frequencies~\cite{Ejlli:2019bqj, lella2024constraining}.
+and inverted it to bound stochastic gravitational-wave
+backgrounds at ultra-high
+frequencies~\cite{Ejlli:2019bqj, lella2024constraining}.
 However, the derivational landscape carries unresolved
 tensions: recent reanalyses have surfaced inconsistencies in
 the metric-coupling treatment of the electromagnetic field and
 in the consistency of the magnetic background with its own
 gravitational backreaction~\cite{hwangnoh2023graviton, hwangnoh2023emdef, hwangnoh2024nonlinear, tomomatsu2025gertsenshtein},
-motivating the load-bearing numerical validation reported
+motivating the numerical validation we report
 in~\cref{Results}.
 
-\paragraph*{The high-frequency gravitational-wave window and its astrophysical anchors}
-The window in which graviton--photon conversion has
-observational reach is the high-frequency range above a few
-kilohertz, where no operating interferometer is sensitive and
-the expected source population --- mergers of light primordial
-black holes, cosmic-string cusps and kinks, preheating after
-inflation, and direct radiation from very-early-Universe
-processes --- lies beyond the Standard
-Model~\cite{Aggarwal:2020olq, Aggarwal:2025noe}.
-Conversion sensitivity in this window grows with the
-product of the gravitational coupling, the background
-field strength, and the coherent propagation length, so the
-astrophysical scales of interest cover many decades: from
-galactic regular fields of order $10^{-10}\,\mathrm{T}$ across
-kiloparsec baselines~\cite{Domcke:2020yzq, Domcke:2022rgu, lella2024constraining}
+\paragraph*{Astrophysical anchors}
+The product of background field strength and coherent
+propagation length sets the observational reach of any
+Gertsenshtein-class measurement, and the scales of interest
+cover many decades: from galactic regular fields of order
+$10^{-10}\,\mathrm{T}$ over kiloparsec
+baselines~\cite{Domcke:2020yzq, Domcke:2022rgu, lella2024constraining}
 to magnetar surface fields of order $10^{11}\,\mathrm{T}$ over
-kilometre extents~\cite{Aggarwal:2020olq}. The intervening
-laboratory regime, in which static magnetic fields of order
-ten Tesla can be sustained over metre-scale path lengths, is
-many orders of magnitude short of either astrophysical anchor;
-the laboratory conversion probability across a single coherent
-traversal is correspondingly negligible, and the observational
-reach of the channel rests on astrophysical baseline lengths
-rather than on controllable field strength. Reanalysis of
-cosmic photon backgrounds in galactic and intergalactic
-magnetic fields --- treating the radio-through-gamma-ray
-spectrum as the upper limit on what an inverse Gertsenshtein
-process could have produced --- already constrains the
-stochastic high-frequency gravitational-wave spectrum at
-$\Omega_{\mathrm{GW}} \lesssim 10^{-6}$ across several decades
-of the megahertz-to-exahertz range~\cite{lella2024constraining, He:2023xoh},
-while complementary direct-detection proposals based on
-bulk-acoustic-wave resonators~\cite{Goryachev:2021zzn, Lasky:2021naa, Campbell:2025mks}
-and axion-haloscope reinterpretation~\cite{Berlin:2021txa} now
-extend the experimental programme into the same window. Any
-correction to the Einstein--Maxwell graviton--photon vertex
-that arises from a torsion-carrying gravity theory therefore
-enters a phenomenology with established observational
-infrastructure and upper limits tight enough to discriminate
-order-unity corrections in several decades of the
-high-frequency spectrum.
+kilometre extents~\cite{Aggarwal:2020olq}. Reanalyses of
+cosmic photon backgrounds --- treating the
+radio-through-gamma-ray spectrum as an upper limit on what an
+inverse Gertsenshtein process could have produced --- already
+constrain the stochastic high-frequency gravitational-wave
+spectrum at $\Omega_{\mathrm{GW}} \lesssim 10^{-6}$ across
+several decades of the megahertz-to-exahertz
+range~\cite{lella2024constraining, He:2023xoh}.
 
 \paragraph*{Poincar\'e gauge theory and adjacent prior work}
 The gauge-theoretic completion of general relativity, in which
@@ -191,32 +161,32 @@ through projective-symmetry-induced photon couplings~\cite{Janssen:2018exh};
 the propagating-mode and polarisation phenomenology of PGT
 gravitational waves themselves has been developed in
 parallel~\cite{Obukhov:2017pxa, Alves:2023rxs, BeltranJimenez:2019hrm, Katanaev:2020xdv}.
-Of the available torsion-carrying gravity frameworks, PGT is
-the one in which the connection between gauge structure and
-propagating spectrum has been most thoroughly worked out and
-in which the ghost-freedom classifications have been carried
-furthest~\cite{Yo:1999ex, Yo:2001sy, lin2019pgt, blagojevic2018hamiltonian, barker2024poincare};
-it is therefore the framework in which the Gertsenshtein
-channel can be addressed against an existing PGT phenomenology
-and stability literature. However, the Gertsenshtein channel
-structure in any PGT background carrying propagating torsion
-has not previously been computed.
+However, the Gertsenshtein channel structure in any PGT
+background carrying propagating torsion has not previously
+been computed.
 
 \paragraph*{In this report}
-The calculation
-is carried out within \TIDAL{}, a symbolic--numerical pipeline
-that derives the linearised equations of motion from a
-quadratic PGT-plus-Maxwell Lagrangian and integrates them on a
-Fourier modal solver auto-selected for flat-background
-periodic-domain configurations; like \PSALTer{} and
-\Hamilcar{} for spectrum-level PGT analyses~\cite{barker2024psalter, barker2025psalter2, barker2025hamilcar},
-\TIDAL{} extends the symbolic--numerical PGT toolchain to the
-coupled graviton--photon system. The survey itself works in
-the plane-wave and uniform-magnetic-field benchmark standard
-in the Gertsenshtein literature. We use
-\TIDAL{} to span the PGT operator inventory catalogued
-in~\cref{Results}.
-% TODO(results): single-sentence headline survey finding to be inserted here once the Stage A+B+C+D HPC campaigns close. Provisional placeholder: the campaign confirms torsion-independence of the conversion to within $A < \epsilon$ across the surveyed parameter plane, with $\epsilon$ and the surveyed-region boundary set after the final HPC run.
+In this work we derive the linearised graviton--photon mixing
+kernel for the general quadratic Poincar\'e gauge theory
+coupled to Maxwell electrodynamics, and show that the kinetic
+matrix decouples the hx and ax gravitational-wave polarisations
+from the torsion fields at linear order in $\Bzero$,
+independently of the quadratic coupling
+constants~(\cref{HxAxIdentity}). The calculation is carried
+out within \TIDAL{}, a symbolic--numerical pipeline that
+derives the linearised equations of motion from a quadratic
+PGT-plus-Maxwell
+Lagrangian~\cite{barker2024psalter, barker2025psalter2, barker2025hamilcar}.
+We use \TIDAL{} to span the PGT operator inventory catalogued
+in~\cref{Results}, working in the plane-wave and
+uniform-magnetic-field benchmark standard in the Gertsenshtein
+literature.
+% TODO(results): single-sentence headline survey finding to be
+% inserted here once the Stage A+B+C+D HPC campaigns close.
+% Provisional placeholder: the campaign confirms
+% torsion-independence of the conversion to within $A<\epsilon$
+% across the surveyed parameter plane, with $\epsilon$ and the
+% surveyed-region boundary set after the final HPC run.
 
 \paragraph*{Structure of this report}
 \Cref{Theory} sets out the PGT-plus-Maxwell action, the
