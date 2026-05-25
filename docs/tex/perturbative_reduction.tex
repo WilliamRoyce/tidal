@@ -76,6 +76,20 @@ The bracketed quantities are built from Pass~0 output alone: $\partial_t^n h_c^{
 
 Pre-v0.33.2 (issue~\#290) only the first term was computed, which produced \emph{identically zero} Pass~1 output for theories where every $O(\varepsilon^1)$ correction lives on a constraint-field row --- the flagship $\tilde{R}^2$ PGT case. The augmented recovery was explicitly anticipated in Stage~4.6 of the v6 plan (``deferred to Stage~5'') but never landed until v0.33.2. The synthetic algebraic-constraint regression (\verb|tests/test_perturbative_algebraic_constraint.py|) now matches the analytical light-mode eigenvector $h/\phi = g/(1 + \varepsilon\, \omega^2) \approx g\,(1 - \varepsilon\, \omega^2)$ to machine precision at $\varepsilon = 10^{-3}$; pre-R8 the output was $h/\phi \equiv g$ independent of $\varepsilon$ (14~orders of magnitude off).
 
+\subsection{Constant-Coefficient Base Requirement}
+\label{sec:pr-constant-coeff-base}
+
+The Pass~1 Duhamel kernel (Section~\ref{sec:pr-duhamel}) operates in the eigenbasis $A = V D V^{-1}$ of the base operator and requires both~$V$ and~$D$. The modal solver supplies them via the per-mode P\'ad\'e path used for constant-coefficient bases. For position-dependent bases the solver falls back to the Krylov \texttt{expm\_multiply} path, which evaluates $\exp(A \cdot t)\,y_0$ as a matrix action without producing an explicit eigendecomposition --- and \texttt{solve\_modal(\ldots,\ return\_eigendata=True)} raises \texttt{NotImplementedError} on that path. The \texttt{PerturbativeSolver} therefore requires the base spec (\verb|order_in_eps == 0| terms after \verb|canonicalize_kinetic_for_perturbation|) to be constant-coefficient.
+
+The check fires at \texttt{PerturbativeSolver.\_\_init\_\_} so the user sees an actionable message before a derive + simulate reaches the deep raise. Theories with legitimately position-dependent O(0) physics (e.g.\ gravitational mixing through a localised background as part of the leading-order EOM) have three alternatives:
+\begin{enumerate}
+  \item Drop the \texttt{[perturbation]} block and run plain modal --- the Krylov path handles position-dependent bases directly without perturbative corrections.
+  \item Use a non-perturbative time-domain solver (\texttt{--scheme cvode} or \texttt{--scheme ida}).
+  \item If the position-dependence is meant to be O($\varepsilon$) but is being tagged O($0$) by the Wolfram pipeline (e.g.\ a $1/(1-\varepsilon X)$ shape that hides perturbative structure inside an order-0 RHS coefficient), fix the upstream order tagging --- the GH~\#380 fix is the precedent for the kinetic-canonicalisation case.
+\end{enumerate}
+
+No current Phase E theory hits this restriction: \texttt{E.EH} is the only \texttt{[perturbation]}-using theory in the roster, and its base became constant-coefficient post-GH~\#380.
+
 \subsection{Closed-Form Duhamel Kernel}
 \label{sec:pr-duhamel}
 

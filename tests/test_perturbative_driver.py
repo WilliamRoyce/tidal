@@ -1140,3 +1140,61 @@ class TestGH380CoordDepSmallParamKinetic:
                     f"base spec must be constant-coefficient; "
                     f"term {t!r} has bare x coord in coefficient_symbolic={cs!r}"
                 )
+
+
+# ---------------------------------------------------------------------------
+# GH #380 follow-up: PerturbativeSolver must raise an actionable error when
+# the base spec has legitimately-position-dependent terms (i.e. not just the
+# 1/(1-εX) shape that #380 canonicalises away).
+# ---------------------------------------------------------------------------
+
+_KG_WITH_POS_DEP_BASE: dict[str, object] = {
+    "metadata": {
+        "source": "inline-test",
+        "parameters": {"m2": 1.0, "alpha": 0.05},
+        "perturbation": {"small_parameters": ["alpha"], "order": 1},
+    },
+    "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+    "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+    "equations": [
+        {
+            "field": "phi_0",
+            "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    # Genuinely position-dependent at order_in_eps=0 (not via a
+                    # 1/(1-εX) kinetic shape). canonicalize_kinetic_for_perturbation
+                    # will pass this through unchanged.
+                    {
+                        "coefficient": 1.0,
+                        "operator": "laplacian_x",
+                        "field": "phi_0",
+                        "coefficient_symbolic": "1.0 + 0.1 * x[]**2",
+                        "coordinate_dependent": ["x"],
+                        "order_in_eps": 0,
+                    },
+                ],
+            },
+        },
+    ],
+    "coupling": {},
+}
+
+
+class TestGH380PerturbativeRejectsPosDepBase:
+    """PerturbativeSolver should fail loudly at construction when the base
+    spec is position-dependent (after canonicalisation), with a message that
+    points the user at non-perturbative alternatives instead of letting them
+    hit the deep modal.py NotImplementedError after a slow simulate setup.
+    """
+
+    def test_init_raises_with_actionable_message(self) -> None:
+        spec = _make_spec(_KG_WITH_POS_DEP_BASE)
+        with pytest.raises(NotImplementedError) as exc_info:
+            PerturbativeSolver(spec)
+        msg = str(exc_info.value)
+        # Must mention the alternative paths so the user knows what to do.
+        assert "modal" in msg.lower()
+        assert "cvode" in msg.lower() or "ida" in msg.lower()
+        assert "position" in msg.lower()
