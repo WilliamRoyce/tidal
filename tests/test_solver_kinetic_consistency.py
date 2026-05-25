@@ -376,7 +376,7 @@ class TestGH382PositionDependentKinetic:
     """
 
     def test_position_dep_kinetic_returns_array(self) -> None:
-        from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+        from tidal.solver._kinetic import build_inverse_kinetic_diag
 
         spec = _make_kg_spec_with_kinetic("1 + 0.1*x[]**2")
         grid = GridInfo(
@@ -401,7 +401,7 @@ class TestGH382PositionDependentKinetic:
         """Constant kinetic must still return scalar even when grid supplied,
         preserving the M=1 fast path for non-#382 callers.
         """
-        from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+        from tidal.solver._kinetic import build_inverse_kinetic_diag
 
         spec = _make_kg_spec_with_kinetic("2.0")
         grid = GridInfo(bounds=((0.0, 2.0),), shape=(64,), periodic=(True,))
@@ -410,7 +410,7 @@ class TestGH382PositionDependentKinetic:
 
     def test_no_grid_back_compat(self) -> None:
         """Pre-#382 callers (grid=None) must still work for constant kinetic."""
-        from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+        from tidal.solver._kinetic import build_inverse_kinetic_diag
 
         spec = _make_kg_spec_with_kinetic("1 + alpha")
         result = build_inverse_kinetic_diag(spec, {"alpha": 0.5})
@@ -423,7 +423,7 @@ class TestGH382PositionDependentKinetic:
         evaluate_coefficient's NameError-on-undefined-coord. This documents
         the existing failure mode and motivates the fix.
         """
-        from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
+        from tidal.solver._kinetic import build_inverse_kinetic_diag
 
         spec = _make_kg_spec_with_kinetic("1 + 0.1*x[]**2")
         with pytest.raises((ValueError, NameError)):
