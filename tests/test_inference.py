@@ -1015,6 +1015,36 @@ class TestParameterImportance:
         assert "D_KL" in table
         assert "d_G" in table
 
+    def test_cross_kl(self, nested_result: InferenceResult) -> None:
+        """Cross-KL is zero between a chain and itself; positive between
+        different chains.  Identifies which parameters distinguish the two
+        posteriors.
+        """
+        pytest.importorskip("anesthetic")
+        import numpy as np
+
+        from tidal.inference._importance import compute_cross_kl
+
+        ns = nested_result.to_anesthetic()
+        params = list(nested_result.param_names)
+
+        # Self-cross-KL must be 0 (modulo histogram quantisation noise).
+        self_cross = compute_cross_kl(ns, ns, params, n_bins=40)
+        for name in params:
+            assert math.isfinite(self_cross[name])
+            assert self_cross[name] < 0.05, f"self cross-KL for {name} should be ~0"
+
+        # Cross-KL against a shifted copy of the same chain is positive.
+        # Build a shifted version by adding a constant to one column.
+        ns_shift = ns.copy()
+        shift_param = params[0]
+        shift = 2.0 * float(np.std(np.asarray(ns[shift_param])))
+        ns_shift[shift_param] = np.asarray(ns_shift[shift_param]) + shift
+        cross = compute_cross_kl(ns, ns_shift, params, n_bins=40)
+        assert cross[shift_param] > 0.1, (
+            f"shifted cross-KL for {shift_param} should be > 0.1, got {cross[shift_param]}"
+        )
+
     def test_from_directory_roundtrip(
         self,
         nested_result: InferenceResult,

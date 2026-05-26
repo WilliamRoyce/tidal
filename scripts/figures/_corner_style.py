@@ -49,11 +49,11 @@ FIG_WIDTH = 7.0
 COLUMN_WIDTH = 3.375
 HIGH_DIM_THRESHOLD = 12  # n_params at which the high-D tick fixes apply
 
-# Posterior colours. Red = amplification-rewarding likelihood (+log A);
-# blue = suppression-rewarding likelihood (-log A); per App J
-# \cref{NestedScore}.
-AMP_COLOR = "#d62728"
-SUP_COLOR = "#1f77b4"
+# Posterior colours sourced from the central IBM colorblind palette.
+# Orange = amplification-rewarding likelihood (+log A);
+# blue   = suppression-rewarding likelihood (-log A); per App J
+# \cref{NestedScore}.  See `_palette.py` for the full palette.
+from _palette import AMP_COLOR, SUP_COLOR
 
 # Filled contour levels: 2sigma then 1sigma (anesthetic ≥2.0.0-beta.10
 # requires descending order, outermost-to-innermost).
@@ -123,6 +123,7 @@ def overlay_corner(
     title: str | None = None,
     height_ratio: float = 0.95,
     fig_width: float = FIG_WIDTH,
+    prior_samples=None,
 ) -> None:
     """Render an overlaid amp+sup corner plot to PDF.
 
@@ -134,15 +135,26 @@ def overlay_corner(
     corner plots (≤ 9D) should pass ``fig_width=COLUMN_WIDTH`` so the
     absolute-pt axis labels read proportionally larger on the rendered
     figure. Default is two-column ``FIG_WIDTH``.
+
+    ``prior_samples`` (optional) is an anesthetic ``Samples``/``NestedSamples``
+    object holding samples from the prior; when provided, the prior is drawn
+    as a low-alpha bottom layer (Legner ``fig:TorCprior`` template). Default
+    is ``None`` — for our arctan-uniform / log-uniform priors the visual
+    contribution is marginal, so the prior overlay is opt-in.
     """
+    from _palette import PRIOR_ALPHA, PRIOR_COLOR
+
     apply_style()
     sources = []
+    if prior_samples is not None:
+        sources.append(("prior", prior_samples, PRIOR_COLOR, PRIOR_ALPHA))
     if amp_chains_dir is not None:
         sources.append(
             (
                 "amp",
                 load_chains(amp_chains_dir, params=params, param_labels=param_labels),
                 AMP_COLOR,
+                OVERLAY_ALPHA,
             )
         )
     if sup_chains_dir is not None:
@@ -151,16 +163,19 @@ def overlay_corner(
                 "sup",
                 load_chains(sup_chains_dir, params=params, param_labels=param_labels),
                 SUP_COLOR,
+                OVERLAY_ALPHA,
             )
         )
     if not sources:
         msg = "At least one of amp_chains_dir / sup_chains_dir is required"
         raise ValueError(msg)
 
-    # Initialise axes from the first available posterior, then overlay any
-    # additional posteriors on the same axes. Anesthetic's plot_2d returns
-    # an AxesDataFrame (pandas-like), not a (fig, axes) tuple.
-    _, first_ns, first_color = sources[0]
+    # Initialise axes from the first available source, then overlay any
+    # additional sources on the same axes. Anesthetic's plot_2d returns
+    # an AxesDataFrame (pandas-like), not a (fig, axes) tuple.  Each source
+    # in `sources` is a (tag, samples, color, alpha) 4-tuple so the prior
+    # overlay can use a faint alpha while amp/sup keep their primary alpha.
+    _, first_ns, first_color, first_alpha = sources[0]
     # Corner plots show ONLY the lower triangle + diagonal marginals; the
     # upper triangle would just mirror the same 2D distributions and adds
     # no new information. The 'kde' shortcut puts 1D KDE on the diagonal
@@ -170,15 +185,15 @@ def overlay_corner(
         kinds="kde",
         levels=CONTOUR_LEVELS,
         color=first_color,
-        alpha=OVERLAY_ALPHA,
+        alpha=first_alpha,
     )
-    for _, ns, color in sources[1:]:
+    for _, ns, color, alpha in sources[1:]:
         ns.plot_2d(
             axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
             color=color,
-            alpha=OVERLAY_ALPHA,
+            alpha=alpha,
         )
 
     fig = axes.iloc[0, 0].figure
@@ -217,11 +232,15 @@ def overlay_corner(
     # robust to bbox_inches='tight' cropping because the anchor scales with
     # the axes grid itself, not the figure margins.
     legend_handles = []
-    if any(tag == "amp" for tag, _, _ in sources):
+    if any(tag == "prior" for tag, *_ in sources):
+        legend_handles.append(
+            mpatches.Patch(color=PRIOR_COLOR, alpha=PRIOR_ALPHA, label="prior")
+        )
+    if any(tag == "amp" for tag, *_ in sources):
         legend_handles.append(
             mpatches.Patch(color=AMP_COLOR, alpha=OVERLAY_ALPHA, label="amplification")
         )
-    if any(tag == "sup" for tag, _, _ in sources):
+    if any(tag == "sup" for tag, *_ in sources):
         legend_handles.append(
             mpatches.Patch(color=SUP_COLOR, alpha=OVERLAY_ALPHA, label="suppression")
         )
