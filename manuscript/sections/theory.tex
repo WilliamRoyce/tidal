@@ -86,9 +86,7 @@ by~\cite{trautman1972einstein,hehl1976spin,hehl1995metric}, is
 formulated in this way, with torsion and curvature appearing as
 the field strengths of spacetime translations and rotations
 respectively
-(\cref{PGTBackground} collects the field-content and gauging
-conventions;
-\cite{blagojevic2002gravitation,blagojevic2003lectures,blagojevicHehl2013,hehlobukhov2007cartan}
+(\cite{blagojevic2002gravitation,blagojevic2003lectures,blagojevicHehl2013,hehlobukhov2007cartan}
 give textbook and lecture-note treatments;
 \cite{barker2024poincare,barker2024psalter,barker2025psalter2,barker2025hamilcar,barker2024r2,barker2025metricaffine,barker2025irfound1,barker2025irfound2,legner2025torc,bahamonde2025cubic,bahamonde2025torsion,karananas2024weyl}
 cover recent applications, and~\cite{lin2019pgt,blagojevic2018hamiltonian}
@@ -99,7 +97,7 @@ linearised propagator%
 % submission. Per docs/tex/pgt_stability_priors.tex, partial
 % verification has been done for the early-stage models; the
 % later-stage models are pending.
-). The full field-variable formalism is collected in
+). The full field-variable formalism and gauging conventions are collected in
 \cref{PGTBackground}.
 
 % Step (c): Paired curvature and torsion field-strength definitions.
@@ -178,9 +176,10 @@ along $\hat{x}$, with vanishing background torsion. In most of this
 work the background is taken to be uniform,
 $\bm{B} = \Bzero\,\hat{x}$, the standard Gertsenshtein geometry. We
 also consider localised backgrounds with $\bm{B}$ confined to a
-finite region along the propagation direction; the specific profile
-is introduced in \cref{Gertsenshtein} and used in \cref{Validation},
-with the conversion kernel generalising as discussed there.
+finite region along the propagation direction.
+% ; the specific profile
+% is introduced in \cref{Gertsenshtein} and used in \cref{Validation},
+% with the conversion kernel generalising as discussed there.
 The metric, four-potential, and torsion are decomposed as
 \begin{gather}
   g_{\mu\nu} = \eta_{\mu\nu} + h_{\mu\nu},
@@ -207,23 +206,24 @@ as~\cite{hehl1976spin,shapiro2002torsion,hehlobukhov2007cartan,blagojevic2003lec
       \bigr),
   \label{PalatiniDecomposition}
 \end{align}
-the second term being the contortion tensor that encodes the
-torsion contribution to the connection. The linearised connection
+the second term being the contortion tensor. The linearised connection
 perturbation $\delta\MAGA{^\sigma_\mu_\nu}$ therefore inherits
 contributions from both the metric perturbation $h_{\mu\nu}$,
-through the Levi--Civita connection variation
-$\delta\rCon{^\sigma_\mu_\nu}$, and the torsion perturbation
-$\delta\MAGT{^\sigma_\mu_\nu}$, through the contortion variation
-$\delta K^\sigma{}_{\mu\nu}$. The perturbation $h_{\mu\nu}$ here
+% through the Levi--Civita connection variation
+% $\delta\rCon{^\sigma_\mu_\nu}$,
+and the torsion perturbation
+$\delta\MAGT{^\sigma_\mu_\nu}$.
+% , through the contortion variation
+% $\delta K^\sigma{}_{\mu\nu}$.
+The perturbation $h_{\mu\nu}$ here
 carries the dimensionful $\kappa$ implicitly, and is related by the
 field redefinition $\tilde{h}_{\mu\nu} = h_{\mu\nu}/\kappa$ to the
 canonically-normalised perturbation
 $\tilde{h}_{\mu\nu}$~\cite{lella2024constraining} via
-$g_{\mu\nu} = \eta_{\mu\nu} + \kappa\,\tilde{h}_{\mu\nu}$. The
-self-consistency bounds on the linearisation are collected in
+$g_{\mu\nu} = \eta_{\mu\nu} + \kappa\,\tilde{h}_{\mu\nu}$.
+Self-consistency bounds on the linearisation are detailed in
 \cref{PerturbativeRegime}.
 
-\paragraph*{Order-counting rule}
 We work to linear order in $h_{\mu\nu}$, $\delta A_\mu$, and the
 torsion fluctuation $\delta\MAGT{^\sigma_\mu_\nu}$, and to first
 order in $\Bzero$.
@@ -235,20 +235,20 @@ After expanding $\sqrt{-g}\,\lag$ to quadratic order in the
 perturbation fields and reducing to plane-wave dependence
 $\partial_x = \partial_y = 0$ along the propagation direction
 $\hat{z}$, perpendicular to the background magnetic field
-$\bm{B}$~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,cillis1996graviton,ejlli2020graviton,palessandro2023simple,palessandro2024gertsenshtein,lella2024constraining,domcke2025scattering}%
+$\bm{B}$~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,cillis1996graviton,ejlli2020graviton,palessandro2023simple,palessandro2024gertsenshtein,lella2024constraining,domcke2025scattering}
 % TODO: investigate WLOG vs not-WLOG status of this propagation
 % direction for derivative / parity-odd PGT sectors (relates to
 % issue #300 and the new "investigation: propagation-direction
 % WLOG status" issue created with this revision).
 with the photon perturbation in Lorenz gauge and the metric
-perturbation evolved without a gauge constraint
-(transverse-traceless-compatible initial conditions are imposed
+perturbation evolved without a gauge constraint,
+\footnote{
+Transverse-traceless-compatible initial conditions are imposed
 in the vacuum region where the wavepacket is set up; the
 evolution through the magnetic-field region is unconstrained,
 allowing non-TT components to develop; see
-\cref{TTGaugeAdmissibility} for the admissibility argument and
-the underlying breakdown of the TT gauge in the presence of
-matter), the surviving degrees of freedom
+\cref{TTGaugeAdmissibility}.}
+the surviving degrees of freedom
 assemble into a quadratic kinetic system
 \begin{align}
   \lag^{(2)} = \tfrac{1}{2}\,\xi^\mathsf{T}\,
