@@ -1,3 +1,4 @@
+% !TEX root = ../main.tex
 % Results scaffold (Phase 3): four-subsection architecture compiled from the
 % v3 post-unblock-filter HPC survey under the plane-wave uniform-Bzero
 % benchmark.  The plane-wave benchmark is the first pass of a multi-pass
@@ -46,23 +47,16 @@
 To survey the Gertsenshtein conversion across the Poincar\'{e} gauge
 theory of \cref{QuadraticAction} we partition the general quadratic
 action by sector and probe each restriction in turn. The operator
-inventory across the parity-even and parity-odd quadratic,
-derivative-extension, cubic, and Chern--Simons sectors is collected
+inventory is collected
 in \cref{MasterParameterCount}; the perturbative-regime conditions
 under which the linearised treatment remains self-consistent are set
 out in \cref{PerturbativeRegime}; and the nested-sampling layer with
 which we infer per-sector amplification or suppression is detailed in
 \cref{InferenceArchitecture}. Throughout, the per-sample conversion
 score $A(\theta)$ of \cref{AmplificationScore} drives the Bayesian
-likelihood and anchors the dimensionless comparison against the
-Einstein--Maxwell baseline established in \cref{ValidationResult}
-below; the small-$\Bzero$ asymptotic ratio $\Aamp$ of
+likelihood; the small-$\Bzero$ asymptotic ratio $\Aamp$ of
 \cref{AmplificationFactor} additionally applies to the plane-wave
-uniform-$\Bzero$ benchmark, where the Taylor coefficient
-$C_0$ of \cref{SurveyCoefficient} is extractable. A
-non-propagating-torsion control test (\cref{InformativeAmplification})
-disambiguates the amplification mechanism against the simplest
-propagating-torsion instability alternative.
+uniform-$\Bzero$.
 
 \subsection{Validation against the Einstein--Maxwell baseline}%
 \label{ValidationResult}
@@ -73,14 +67,12 @@ propagating-torsion instability alternative.
 
 \paragraph*{Validation setup}
 We anchor the survey on a reproduction of the Boccaletti conversion
-kernel \cref{GertsenshteinFormula} in pure Einstein--Maxwell, the
-regime in which the formula was originally derived. The validation
+kernel \cref{GertsenshteinFormula} in pure Einstein--Maxwell. The validation
 sweep evolves the linearised system on a periodic $N = 512$ grid
-covering a propagation distance $D = 100$ in natural units, with
+covering a propagation distance $D = 100$, with
 horizon $t_\text{end} = 50$ and photon carrier wavenumber
 $k = 2.011$. We scan a 24-point grid in $\Bzero \in [0.005, 0.25]$
-and integrate using the Fourier modal backend, the primary numerical
-innovation underlying every result that follows (\cref{ModalSolver}).
+and integrate using the Fourier modal backend (\cref{ModalSolver}).
 
 \paragraph*{Reproduction of the Boccaletti kernel}
 \TIDAL{} recovers the Boccaletti kernel \cref{GertsenshteinFormula}
@@ -97,9 +89,7 @@ round-off floor across the sweep, confirming that the bare-formula
 deviation reflects retained physics rather than numerical error.
 The path-integrated kernel for a Gaussian magnetic profile of
 finite extent is recovered to the same precision
-(\cref{BoccalettiLocalised}), and the energy-conservation audit
-across every theory class considered in this work is collected in
-\cref{ConservationAudit}.
+(\cref{BoccalettiLocalised}).
 
 \paragraph*{Survey observables}
 The validation also fixes the per-sample conversion score reported
@@ -111,12 +101,9 @@ $A(\theta) = \Pmax(\theta)/\sin^2(\kappa\Bzero t/2)$ of
 Einstein--Maxwell baseline and serves as the nested-sampling
 likelihood. The asymptotic small-$\Bzero$ ratio $\Aamp$ of
 \cref{AmplificationFactor} additionally provides a
-$\Bzero$-independent figure of merit when the Taylor coefficient
-$C_0$ of \cref{SurveyCoefficient} is extractable; this asymptotic
-form applies in the plane-wave uniform-$\Bzero$ benchmark on which
-the survey below is built but is not generally applicable to the
-finite-extent geometry that occupies the discussion in
-\cref{Discussion}.
+$\Bzero$-independent figure; this asymptotic
+form applies in the plane-wave uniform-$\Bzero$ but is not generally
+applicable to the finite-extent geometry.
 
 % Figure 1 — Boccaletti validation. Rendered from
 % scripts/figures/fig1_boccaletti_validation.py using
@@ -130,10 +117,9 @@ finite-extent geometry that occupies the discussion in
     horizon $t_\text{end} = 50$, on a periodic $N = 512$ grid. Upper
     panel: simulated $P_\text{final}(\Bzero)$ (filled circles)
     overlaid with the analytic $\sin^2(\kappa\Bzero t_\text{end}/2)$
-    kernel (dashed line) sampled at 400 dense $\Bzero$ values. Lower
+    kernel (dashed line). Lower
     panel: signed residual $P_\text{TIDAL} - P_\text{bare}$ on the
-    same axis. The detailed two-mode comparison and the
-    $\Bzero^2$-scaling of the bare-formula deviation are given in
+    same axis. The detailed two-mode comparison is given in
     \cref{BoccalettiUniform}.}
   \label{BoccalettiValidation}
 \end{figure}
@@ -166,15 +152,14 @@ geometrically incompatible with the plane-wave ansatz at any viable
 horizon (eigenvalues exceed the modal-solver overflow ceiling
 \cref{NestedScore}), one parallel QED-EFT axis is a clean null, and
 the Einstein--Cartan baseline reduces analytically to the
-Einstein--Maxwell limit. Bayes factors across the amplification-favouring
-sectors range from $\log B \approx +2$ in the Ricci--electromagnetism
-cross-term to $\log B \approx +13$ in the complete parity-even sector
-after the full $\chi$-derivative basis is closed; the
-non-propagating-torsion control retains $\log B \approx +8$ when the
-torsion kinetic mode is removed, supporting the genuine-channel-mixing
-interpretation over a propagating-torsion-instability artefact (the
-definitive disambiguation defers to the finite-extent geometry of
-\cref{Discussion}). Whether the surviving amplification preferences
+Einstein--Maxwell limit.
+% the
+% non-propagating-torsion control retains $\log B \approx +8$ when the
+% torsion kinetic mode is removed, supporting the genuine-channel-mixing
+% interpretation over a propagating-torsion-instability artefact (the
+% definitive disambiguation defers to the finite-extent geometry of
+% \cref{Discussion}).
+Whether the surviving amplification preferences
 reflect genuine amplification of the conversion channel or unbounded
 growth on the tachyonic plane-wave background that a finite-extent
 geometry would saturate is a methodological distinction that occupies
@@ -264,7 +249,7 @@ a coordinate direction in any one variable, and the dominant
 direction migrates progressively as the non-minimal coupling space
 is extended.
 
-\paragraph*{The dark-photon-plasma sector}
+\subsubsection{The dark-photon-plasma}
 The dark-photon-plasma extension promotes the trace-vector torsion
 $\T[2]{_\mu}$ to a Proca field with kinetic mixing to the photon,
 recovering the standard dark-photon phenomenology
@@ -315,7 +300,7 @@ the amp/sup separation ($D_\mathrm{KL}(P_+\|P_-) = 3.4$ nats).
   \label{CornerT1}
 \end{figure}
 
-\paragraph*{The Ricci--electromagnetism cross-term sector}
+\subsubsection{The Ricci--electromagnetism cross-term sector}
 The Ricci--electromagnetism cross-term sector retains the
 $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ coupling of
 \cref{ParityEvenQuadraticAction} as the only operator beyond the
@@ -500,7 +485,7 @@ small $\chi$.  Per-parameter $D_\mathrm{KL}$ resolves the carrier
 structure further: $\chi_1$ alone accounts for
 $D_\mathrm{KL}(P_+\|P_-) = 4.2$ nats — five times larger than any
 other coupling — identifying the
-$\rcD^\alpha\mathcal{T}^{\beta\gamma\delta}\,\tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$
+$\rcD{^\alpha}\mathcal{T}^{\beta\gamma\delta}\,\tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$
 contraction (\cref{ChiClosureInvariants}) as the dominant carrier of
 the parity-even amp/sup distinction.  The six-parameter carrier
 sub-corner is collected in \cref{CarrierChiClosure}.
@@ -527,7 +512,7 @@ sub-corner is collected in \cref{CarrierChiClosure}.
     marginal-amp / marginal-sup / cross-amp-sup $D_\mathrm{KL}$.  The
     amplification (orange) and suppression (blue) marginals separate
     most strongly along $\chi_1$, the
-    $\rcD^\alpha\mathcal{T}^{\beta\gamma\delta}
+    $\rcD{^\alpha}\mathcal{T}^{\beta\gamma\delta}
      \,\tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$ contraction.
     Full ranking in \cref{KLPerTheory}.}
   \label{CarrierChiClosure}
