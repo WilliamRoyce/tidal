@@ -1725,46 +1725,148 @@ def _add_convolution_coupling(
     to apply the inverse-kinetic factor `M⁻¹` for 2nd-order equations with
     `kinetic_coefficient_symbolic != 1` (Gertsenshtein h-modes, etc.). See
     `_build_convolution_matrix` (modal.py) for the rationale (GH #367 fix).
-    """
-    # Get the coefficient array on the spatial grid
-    coeff_array = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
-    if isinstance(coeff_array, (int, float)):
-        coeff_array = np.full(grid.shape, float(coeff_array))
 
-    # For each pair of output mode m and input mode m',
-    # the coupling is (1/N) * ĉ(m-m') * mult(m')
-    # This is a Toeplitz-like structure in 1D.
-    #
-    # Build via outer product approach for efficiency:
-    # We compute the full convolution matrix using FFT properties.
-    #
-    # For rfftn: the convolution of real functions in rfft space requires
-    # care with the Hermitian symmetry. We use the identity:
-    # FFT[c·u]_k = (1/N) Σ_{k'} ĉ_{k-k'} · û_{k'}
-    #
-    # Build the convolution matrix C where C[k, k'] = (1/N) * ĉ_{k-k'}
-    # using probe vectors (unit impulse per mode).
+    GH #384 Phase A′: for BSM-separable terms the block of size
+    (n_modes × n_modes) is independent of the BSM scalar and reusable
+    across PolyChord likelihood calls. The cache layer in
+    ``tidal/solver/_conv_block_cache.py`` memoises it.
+    """
+    block = _compute_conv_block_cached_or_fresh(
+        term,
+        operator_mult,
+        coeff_eval,
+        grid,
+        rfft_shape,
+        n_modes,
+        eq_idx=eq_idx,
+        term_idx=term_idx,
+    )
+    # Accumulate: A[row_block, col_block] += scale * block
+    row_start = row_slot * n_modes
+    col_start = col_slot * n_modes
+    A[row_start : row_start + n_modes, col_start : col_start + n_modes] += scale * block
+
+
+def _compute_conv_block_uncached(
+    coeff_array: NDArray[np.float64] | float,
+    operator_mult: NDArray[np.complex128],
+    grid_shape: tuple[int, ...],
+    rfft_shape: tuple[int, ...],
+    n_modes: int,
+) -> NDArray[np.complex128]:
+    """Build the (n_modes × n_modes) convolution-matrix block at scale=1.
+
+    Pure function of ``(coeff_array, operator_mult, grid_shape)``. Used by
+    both ``_add_convolution_coupling`` and ``_term_conv_block`` (the latter
+    nested inside ``_build_convolution_matrix_with_constraints``).
+
+    For constant coefficients, returns a diagonal block ``diag(c · mult)``.
+    For position-dependent coefficients, runs the probe-vector loop:
+    for each input mode ``m'``, irfft the unit impulse, multiply by
+    ``coeff_array`` in physical space, rfft, and write the resulting
+    column into ``block[:, m']`` multiplied by ``mult[m']``.
+
+    GH #384 Phase A′: this function is the cache target. Its output for
+    a BSM-separable term is identical across PolyChord likelihood calls.
+    """
+    if isinstance(coeff_array, (int, float)):
+        block = np.zeros((n_modes, n_modes), dtype=np.complex128)
+        scaled = float(coeff_array)
+        for m in range(n_modes):
+            block[m, m] = scaled * operator_mult[m]
+        return block
+
+    block = np.zeros((n_modes, n_modes), dtype=np.complex128)
     for m_prime in range(n_modes):
-        # Probe: unit impulse at mode m_prime
         probe_hat = np.zeros(n_modes, dtype=np.complex128)
         probe_hat[m_prime] = 1.0
-
-        # Reconstruct to physical space, multiply by coefficient, FFT back
         probe_physical = np.fft.irfftn(
             probe_hat.reshape(rfft_shape),
-            s=grid.shape,
-            axes=list(range(len(grid.shape))),
+            s=grid_shape,
+            axes=list(range(len(grid_shape))),
         )
         product = coeff_array * probe_physical
         result_hat = np.fft.rfftn(product).ravel()
+        block[:, m_prime] = result_hat * operator_mult[m_prime]
+    return block
 
-        # result_hat[m] = Σ_{k'} (1/N) ĉ_{m-k'} δ_{k',m'} = (1/N) ĉ_{m-m'}
-        # multiplied by operator multiplier at m' and the kinetic-inverse scale.
-        row_start = row_slot * n_modes
-        col = col_slot * n_modes + m_prime
-        A[row_start : row_start + n_modes, col] += (
-            scale * result_hat * operator_mult[m_prime]
+
+def _compute_conv_block_cached_or_fresh(
+    term: OperatorTerm,
+    operator_mult: NDArray[np.complex128],
+    coeff_eval: CoefficientEvaluator,
+    grid: GridInfo,
+    rfft_shape: tuple[int, ...],
+    n_modes: int,
+    *,
+    eq_idx: int = -1,
+    term_idx: int = -1,
+) -> NDArray[np.complex128]:
+    """Compute the convolution-matrix block for ``term``, using cache when possible.
+
+    GH #384 Phase A′ entry point. For BSM-separable terms (identified by
+    ``coeff_eval.bsm_separable_factors``), the block is computed once per
+    (geometry, term) and stored in the module-level
+    ``_conv_block_cache``; subsequent PolyChord likelihood calls multiply
+    by the new BSM scalar. For non-separable or non-BSM-tagged terms,
+    every call computes fresh (same as pre-#384).
+    """
+    from tidal.solver._conv_block_cache import (  # noqa: PLC0415
+        get_or_compute,
+        make_geometry_hash,
+        make_key,
+    )
+    from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+    factors = coeff_eval.bsm_separable_factors(eq_idx, term_idx)
+    if factors is None:
+        # No BSM separability info → compute fresh (no cache benefit, but
+        # correctness preserved). Path taken for non-separable terms and
+        # non-PolyChord callers that don't tag sampled params.
+        coeff_array = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
+        return _compute_conv_block_uncached(
+            coeff_array, operator_mult, grid.shape, rfft_shape, n_modes
         )
+
+    bsm_str, geom_str = factors
+    # Build the cache key. geometry_hash depends only on non-BSM params,
+    # so PolyChord calls at varying BSM sample the same cached block.
+    bsm_set = set(
+        coeff_eval._spec.metadata.get("_inference_sampled_params", ())  # noqa: SLF001
+    )
+    geom_hash = make_geometry_hash(
+        coeff_eval._parameters,  # noqa: SLF001
+        bsm_set,
+    )
+    key = make_key(geom_str, term.operator, tuple(grid.shape), geom_hash)
+
+    def _compute() -> NDArray[np.complex128]:
+        # Evaluate the BSM-stripped geometric expression on the grid. The
+        # result is an N-element array (1D) for position-dependent terms.
+        coeff_array = evaluate_coefficient(
+            geom_str,
+            coeff_eval._parameters,  # noqa: SLF001
+            coeff_eval._coordinates,  # noqa: SLF001
+            coeff_eval._coord_arrays,  # noqa: SLF001
+            0.0,
+        )
+        return _compute_conv_block_uncached(
+            coeff_array, operator_mult, grid.shape, rfft_shape, n_modes
+        )
+
+    block_unit = get_or_compute(key, _compute)
+
+    # Multiply by current BSM scalar to recover the full block.
+    if bsm_str and bsm_str != "1":
+        bsm_val = evaluate_coefficient(
+            bsm_str,
+            coeff_eval._parameters,  # noqa: SLF001
+            coeff_eval._coordinates,  # noqa: SLF001
+            None,  # bsm_str has no coord deps by construction
+            0.0,
+        )
+        return complex(bsm_val) * block_unit
+    return block_unit
 
 
 # ---------------------------------------------------------------------------
@@ -1928,9 +2030,16 @@ def _build_convolution_matrix_with_constraints(
         eq_idx: int = -1,
         term_idx: int = -1,
     ) -> NDArray[np.complex128]:
-        """Build the (n_modes × n_modes) convolution block for a single term."""
-        block = np.zeros((n_modes, n_modes), dtype=np.complex128)
+        """Build the (n_modes × n_modes) convolution block for a single term.
+
+        Delegates to the shared cache-aware helper
+        ``_compute_conv_block_cached_or_fresh`` (GH #384 Phase A′).
+        For BSM-separable terms the block lives in
+        ``tidal.solver._conv_block_cache`` keyed on the geometry and is
+        reused across PolyChord likelihood calls.
+        """
         if not term.position_dependent:
+            block = np.zeros((n_modes, n_modes), dtype=np.complex128)
             coeff = _resolve_constant_coeff(
                 term,
                 coeff_eval,
@@ -1940,27 +2049,18 @@ def _build_convolution_matrix_with_constraints(
             scaled = scale * coeff
             for m in range(n_modes):
                 block[m, m] = scaled * mult[m]
-        else:
-            coeff_array = coeff_eval.resolve(
-                term,
-                0.0,
-                eq_idx=eq_idx,
-                term_idx=term_idx,
-            )
-            if isinstance(coeff_array, (int, float)):
-                coeff_array = np.full(grid.shape, float(coeff_array))
-            for m_prime in range(n_modes):
-                probe_hat = np.zeros(n_modes, dtype=np.complex128)
-                probe_hat[m_prime] = 1.0
-                probe_phys = np.fft.irfftn(
-                    probe_hat.reshape(rfft_shape),
-                    s=grid.shape,
-                    axes=list(range(len(grid.shape))),
-                )
-                product = coeff_array * probe_phys
-                result_hat = np.fft.rfftn(product).ravel()
-                block[:, m_prime] = scale * result_hat * mult[m_prime]
-        return block
+            return block
+        block_unit = _compute_conv_block_cached_or_fresh(
+            term,
+            mult,
+            coeff_eval,
+            grid,
+            rfft_shape,
+            n_modes,
+            eq_idx=eq_idx,
+            term_idx=term_idx,
+        )
+        return scale * block_unit
 
     # ---- Allocate matrices ----------------------------------------------
     n_dyn_tot = n_dyn_slots * n_modes

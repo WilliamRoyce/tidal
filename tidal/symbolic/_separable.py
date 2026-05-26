@@ -58,9 +58,16 @@ def _split_top_level_mult(
     Returns ``None`` if any BSM symbol appears in a non-separable position
     (inside Pow.exponent, Call.args, Pow.base with non-integer exponent,
     or Div.denominator).
+
+    Tracks an overall sign accumulator: every USub flips it. If the final
+    sign is negative, a ``Constant(-1)`` is prepended to the geom factors
+    (NOT the BSM factors — a minus sign is not a BSM scalar). Without this,
+    expressions like ``-(α·x)`` lose the leading minus and the reconstructed
+    block has the wrong sign vs the original.
     """
     bsm_factors: list[ast.AST] = []
     geom_factors: list[ast.AST] = []
+    sign_state = [1]  # accumulator flipped by every USub during descent
 
     def visit(n: ast.AST, in_numerator: bool) -> bool:  # noqa: PLR0911, PLR0912
         """Return True if separable; populate the lists by side-effect."""
@@ -119,8 +126,15 @@ def _split_top_level_mult(
                 return True
             return False
         if isinstance(n, ast.UnaryOp):
-            if isinstance(n.op, (ast.USub, ast.UAdd)):
-                # -X or +X: descend into operand; the sign is a coefficient.
+            if isinstance(n.op, ast.USub):
+                # -X: flip the overall sign accumulator (resolved at the end
+                # by prepending Constant(-1) to geom_factors), then descend.
+                # Without this, -(α·x) loses its minus and the reconstructed
+                # convolution block has the wrong sign.
+                sign_state[0] = -sign_state[0]
+                return visit(n.operand, in_numerator)
+            if isinstance(n.op, ast.UAdd):
+                # +X: no-op; descend.
                 return visit(n.operand, in_numerator)
             return False
         if isinstance(n, ast.Name):
@@ -143,6 +157,10 @@ def _split_top_level_mult(
 
     if not visit(node, in_numerator=True):
         return None
+    if sign_state[0] == -1:
+        # Prepend -1 as a numeric geom factor so the reconstructed product
+        # carries the overall sign accumulated through USub descents.
+        geom_factors.insert(0, ast.Constant(value=-1))
     return bsm_factors, geom_factors
 
 
@@ -151,6 +169,7 @@ def _split_top_level_mult(
 # "* <factor>". This encodes the Mult/Div distinction in the flat factor list.
 class _DivMarker:
     __slots__ = ()
+
     def __repr__(self) -> str:
         return "<DIV>"
 
@@ -163,6 +182,13 @@ def _emit_factor_product(factors: list[ast.AST]) -> str:
 
     Each entry is either an AST node (multiplied in) or ``_DIV_MARKER`` which
     converts the previously-appended factor into a division.
+
+    Output is in Mathematica InputForm-compatible style (``^`` for exponents,
+    not Python's ``**``) so the downstream ``evaluate_coefficient`` ->
+    ``mathematica_to_python`` pipeline can apply ``_invert_exp_denominator``
+    (which keys on ``1/E^(arg)`` patterns to avoid overflow). If we emit
+    Python ``**`` directly the InputForm-detection regex misses, and
+    ``1/E**(positive)`` overflows at the box edges. See GH #384 Phase A′.
     """
     if not factors:
         return "1"
@@ -172,17 +198,32 @@ def _emit_factor_product(factors: list[ast.AST]) -> str:
         f = factors[i]
         # Look ahead for div marker
         op = "*"
-        if i + 1 < len(factors) and factors[i + 1] is _DIV_MARKER:
+        is_div = i + 1 < len(factors) and factors[i + 1] is _DIV_MARKER
+        if is_div:
             op = "/"
             i += 1
         if parts:
             parts.append(op)
-        parts.append(ast.unparse(f))
+        rendered = ast.unparse(f)
+        # ast.unparse omits outer parens. For a / b where b is itself a
+        # Mult/Add/etc., the result "a / b * c" parses as (a/b)*c — wrong
+        # precedence. Wrap the denominator if it's not already atomic.
+        if is_div and isinstance(f, ast.BinOp):
+            rendered = f"({rendered})"
+        parts.append(rendered)
         i += 1
     # Trim leading "*"
     if parts and parts[0] == "*":
         parts = parts[1:]
-    return " ".join(parts) if parts else "1"
+    joined = " ".join(parts) if parts else "1"
+    # Convert Python ` ** ` → Mathematica `^` so downstream parsers route
+    # through _invert_exp_denominator (key step for E^(positive) overflows).
+    # Strip surrounding spaces — mathematica_to_python's `\bE\^` regex requires
+    # NO space between E and ^ to convert `E^X` to `exp(X)`. With spaces left
+    # in, ast.unparse-style "E ** X" → "E ^ X" wouldn't match and would
+    # fall through to the generic ^→** replacement, producing literal `E**X`
+    # via numpy.power which overflows for large X.
+    return re.sub(r"\s*\*\*\s*", "^", joined)
 
 
 def extract_separable_bsm_factors(

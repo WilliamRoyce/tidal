@@ -58,6 +58,20 @@ def _load_spec_and_params() -> tuple[object, dict[str, float], object, object]:
         spec_dict = json.load(f)
     spec = EquationSystem.from_dict(spec_dict)
 
+    # GH #384 Phase A′: stash sampled-BSM-symbols on spec.metadata so the
+    # modal solver's convolution-block cache engages on PolyChord-style
+    # calls (varying alpha1..delta1, geometry fixed). Without this, the
+    # cache misses on every call and we measure baseline performance.
+    import dataclasses as _dc
+
+    spec = _dc.replace(
+        spec,
+        metadata={
+            **spec.metadata,
+            "_inference_sampled_params": ("alpha1", "alpha2", "alpha3", "delta1"),
+        },
+    )
+
     # Canonical Phase E geometry (FROZEN — see scripts/hpc_submit_drafts/v3e_localised/_geometry.env)
     base_params = {
         "kappa": 1.0,
@@ -152,10 +166,8 @@ def _profile_breakdown(spec, params, grid, y0) -> dict[str, float]:
             or "_build_evolution_matrices" in fn_name
         ):
             buckets["fill"] += tt
-        elif (
-            fn_name in {"solve", "lu_factor", "lu_solve"}
-            or ("linalg" in path_str
-            and "expm" not in fn_name)
+        elif fn_name in {"solve", "lu_factor", "lu_solve"} or (
+            "linalg" in path_str and "expm" not in fn_name
         ):
             buckets["solve"] += tt
         elif "expm_multiply" in fn_name or "expm" in fn_name:

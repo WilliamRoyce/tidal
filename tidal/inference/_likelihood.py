@@ -570,21 +570,38 @@ def _evaluate_likelihood(
 
     try:
         if backend == "memory":
+            # GH #384 Phase B: pass the already-cached spec through so
+            # run_inference_step doesn't reload+parse it on every call.
+            # load_spec_cached is keyed on (path, mtime) → per-rank singleton.
+            # GH #384 Phase A′: stash the sampled (BSM) parameter names on
+            # the spec's metadata so the modal convolution-block cache can
+            # identify which symbols vary per call (BSM) vs which are
+            # geometry-fixed. EquationSystem is frozen, so we
+            # dataclasses.replace to a new wrapper carrying the augmented
+            # metadata (~µs allocation, irrelevant vs the ~2 s simulate).
+            import dataclasses as _dc
+
             from tidal.cli._sweep import (
                 _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
                 run_inference_step,
             )
+            from tidal.symbolic._spec_cache import (
+                load_spec_cached,
+            )
 
-            # GH #384 Phase B: pass the already-cached spec through so
-            # run_inference_step doesn't reload+parse it on every call.
-            # load_spec_cached is keyed on (path, mtime) → per-rank singleton.
-            from tidal.symbolic._spec_cache import load_spec_cached
-
+            raw_spec = load_spec_cached(spec_path)
+            spec_with_bsm = _dc.replace(
+                raw_spec,
+                metadata={
+                    **raw_spec.metadata,
+                    "_inference_sampled_params": tuple(param_names),
+                },
+            )
             sim_data = run_inference_step(
                 base_args,
                 spec_path,
                 param_overrides,
-                spec=load_spec_cached(spec_path),
+                spec=spec_with_bsm,
             )
             spec = sim_data.spec
             metrics = _measure_from_sim_data(
