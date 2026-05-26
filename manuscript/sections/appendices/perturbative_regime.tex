@@ -132,7 +132,7 @@ Lagrangian of \cref{PGTBackground} \wrt $\MAGT{}$
 --- collects contributions from every Lagrangian term that depends on
 $\MAGT{}$, either directly or through the Riemann--Cartan curvature
 \begin{align}
-  \MAGFt{} \;=\; \rR{} \,+\, \rcD{}K \,+\, K{\cdot}K ,
+  \MAGFt{} \;\sim\; \rR{} \,+\, \rcD{}\MAGT{} \,+\, \MAGT{^2} ,
   \label{RiemannCartanDecomp}
 \end{align}
 where $\rR{}$ is the Riemannian curvature of the Levi-Civita connection.
@@ -142,11 +142,11 @@ every term type in the Lagrangian vanishes.
 % quadratic in $\MAGT{}$, so vanish at $\bar{\MAGT{}}=0$.
 % The pure-curvature terms ($\MAGFt{}^2$) vanish as a product because
 % $\MAGFt{}|_{\eta,\,\bar{\MAGT{}}=0}=0$ identically.
-The non-minimal coupling $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$
-has two torsion-dependent pieces through $K$ \cref{RiemannCartanDecomp}.
-The $\rcD{}K$ term of \cref{RiemannCartanDecomp} is handled by integration by parts: the covariant
-derivative is transferred onto $\bar{\FieldF{}}$, and
-$\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$ on the externally-prescribed
+% The non-minimal coupling $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$
+% has two torsion-dependent pieces through $K$ \cref{RiemannCartanDecomp}.
+The $\rcD{}\MAGT{}$ term of \cref{RiemannCartanDecomp} is handled by integration by parts,
+% the covariant derivative is transferred onto $\bar{\FieldF{}}$,
+and $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$ on the externally-prescribed
 uniform background (\cref{Linearisation}).
 % The $K{\cdot}K$ piece vanishes at $\bar{\MAGT{}}=0$ directly because
 % its variation is proportional to $K|_{\bar{\MAGT{}}=0}=0$.
@@ -163,15 +163,14 @@ With $\bar{\MAGT{}}=0$ at the background, expand the Cartan equation
 to first order in the perturbations
 $\{h_{\mu\nu},\delta\FieldA{_\mu},\delta\MAGT{}\}$ to bound the
 torsion perturbation $\delta\MAGT{}$.
-The $\rcD{}K$ term of \cref{RiemannCartanDecomp} contracted with $\bar{\FieldF{}}$
-cancels at first order by the same integration by parts as in the
-preceding paragraph: $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$.
+The $\rcD{}\MAGT{}$ term of \cref{RiemannCartanDecomp} contracted with $\bar{\FieldF{}}$
+cancels at first order by integration by parts.
 The dominant source therefore comes from varying
 $\Del{1}\MAGFt{_{[\mu\nu]}}\bar{\FieldF{}}^{\mu\nu}$ \wrt
 $\delta\MAGT{}$ using the Palatini split
 (\cref{PalatiniDecomposition}), which produces a source
 $\mathcal{S}\propto\Del{1}\bar{\FieldF{}}\,\partial h$.%
-\footnote{The same $\rcD{}K$ piece contracted with $\delta\FieldF{}$
+\footnote{The same $\rcD{}\MAGT{}$ piece contracted with $\delta\FieldF{}$
 instead of $\bar{\FieldF{}}$ gives an additional first-order source
 $\propto\Del{1}\,\partial\delta\FieldA{}$ that is $\Bzero$-independent;
 in the conversion regime $|\delta\FieldA{}|\sim\Bzero|h|$
@@ -186,7 +185,7 @@ $2\Alp{}\,\delta\MAGT{} = -\mathcal{S}$;
 giving $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
 for a graviton of dimensionless amplitude $A$.
 The linearised Cartan equation drops $(\delta\MAGT{})^2$ corrections
-from the $K{\cdot}K$ term of \cref{RiemannCartanDecomp}: these become
+from the $\MAGT{^2}$ term of \cref{RiemannCartanDecomp}: these become
 comparable to the linear $2\Alp{}\,\delta\MAGT{}$ term when
 $|\delta\MAGT{}|/\Alp{}\sim 1$, so the linearised treatment is
 self-consistent only when $|\delta\MAGT{}|/\Alp{}\ll 1$.
@@ -221,7 +220,7 @@ argument applies with two extensions.
 First, \cref{PerturbativeBound} with $\Del{1}\to g_{\mathrm{NM}}$ and
 $\Alp{}\to m_T^2$ gives
 $|\delta\MAGT{}|\sim(g_{\mathrm{NM}}/m_T^2)\,\Bzero A$;
-the $K{\cdot}K$ term of \cref{RiemannCartanDecomp} then contributes a
+the $\MAGT{^2}$ term of \cref{RiemannCartanDecomp} then contributes a
 correction of order
 $(\delta\MAGT{})^2 \sim (g_{\mathrm{NM}}/m_T^2)^2\,\Bzero^2$ to the
 linearised Cartan equation, placing the nonlinear torsion correction
