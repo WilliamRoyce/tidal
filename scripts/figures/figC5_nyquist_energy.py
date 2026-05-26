@@ -22,6 +22,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 mpl.rcParams.update(
     {
@@ -47,12 +48,12 @@ _FIG_HEIGHT = 2.65
 
 _THEORY_STYLE = {
     "coupled_scalars": {
-        "color": "#1f77b4",
+        "color": IBM_PALETTE["blue"],
         "marker": "o",
         "label": r"Plasma--graviton, $\omega_P^2{=}0$",
     },
     "coupled_scalars_massive": {
-        "color": "#ff7f0e",
+        "color": IBM_PALETTE["orange"],
         "marker": "s",
         "label": r"Plasma--graviton, $\omega_P^2{=}1$",
     },

@@ -29,6 +29,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 mpl.rcParams.update(
     {
@@ -64,10 +65,10 @@ _TITLES = {
 _DENSE_THRESHOLD = 2_000
 _SPARSE_THRESHOLD = 200_000
 
-_DENSE_COLOR = "#1f77b4"  # blue  — filled circles
-_SPARSE_COLOR = "#ff7f0e"  # orange — filled squares
-_GMRES_COLOR = "#2ca02c"  # green  — filled triangles
-_FD_COLOR = "#888888"  # grey   — open diamonds
+_DENSE_COLOR = IBM_PALETTE["blue"]  # filled circles
+_SPARSE_COLOR = IBM_PALETTE["orange"]  # filled squares
+_GMRES_COLOR = IBM_PALETTE["purple"]  # filled triangles (tab:green → IBM purple)
+_FD_COLOR = "#888888"  # grey — open diamonds
 
 
 def _plot(data: dict, out_path: Path) -> None:
