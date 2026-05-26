@@ -12,13 +12,6 @@
 \section{Poincar\'{e} gauge theory and the Gertsenshtein kernel}%
 \label{Theory}
 
-% Conventions named paragraph (Step 0): signature, indices, units, M_P,
-% kappa convention, Levi-Civita epsilon. The kappa note must reference
-% \cref{sec:kappa-conventions} — the canonical disambiguation in
-% docs/tex/gertsenshtein_formula.tex — to resolve the two-meanings-of-kappa
-% ambiguity (issue #338). The label sec:kappa-conventions retains its
-% prefix because it is defined in docs/tex/, not the manuscript scaffolding;
-% see STYLE_GUIDE.md §(c).
 \paragraph*{Conventions}
 We work in the metric signature $(-,+,+,+)$ with natural units
 $\hbar = c = 1$. Greek indices $\mu,\nu,\dots$ denote spacetime
@@ -35,18 +28,13 @@ $\kappa$ defined by $\kappa^2 = 16\pi G$.\footnote{%
     $[\kappa_{(\mathrm{E})}] = [\mathrm{Mass}]^{-2}$, used as the
     prefactor of $\MAGFt{}$
     in~\cite{barker2024poincare,barker2023confinement,barker2024psalter}.
-    A non-canonical kinetic normalisation in the derivations
-    of~\cite{palessandro2023simple,palessandro2024gertsenshtein}
-    propagates this ambiguity into a factor-of-$\sqrt{4\pi}$ error
-    in the conversion-formula argument, while the convention
-    adopted in~\cite{lella2024constraining} agrees with ours.
     The two normalisations are related by
     $\kappa^2 = 2\kappa_{(\mathrm{E})}$.
 } This is the linearised graviton--photon vertex coupling, and the
-action prefactor $\kappa^{-2}\,\MAGFt{}$ corresponds to a canonical
-graviton kinetic term under the field redefinition
-$\tilde{h}_{\mu\nu} = h_{\mu\nu}/\kappa$ used
-in~\cite{lella2024constraining}. The totally antisymmetric
+field redefinition $\tilde{h}_{\mu\nu} = h_{\mu\nu}/\kappa$ used
+in~\cite{lella2024constraining} converts the prefactor
+$\kappa^{-2}\,\MAGFt{}$ into the canonical kinetic form
+$\tfrac{1}{2}(\partial\tilde{h})^2$. The totally antisymmetric
 Levi--Civita tensor $\varepsilon^{\mu\nu\rho\sigma}$ is normalised to
 $\varepsilon^{0123} = +1$.
 
@@ -78,12 +66,8 @@ The Palatini
 formulation~\cite{palatini1919deduzione,ferraris1982variational,barker2024palatini}
 treats the metric and the affine connection
 $\MAGA{^\sigma_\mu_\nu}$ as independent variational fields.
-Poincar\'{e} gauge theory (PGT) of
-Kibble~\cite{kibble1961lorentz},
-Utiyama~\cite{utiyama1956invariant}, and
-Sciama~\cite{sciama1962physical}, developed
-by~\cite{trautman1972einstein,hehl1976spin,hehl1995metric}, is
-formulated in this way, with torsion and curvature appearing as
+PGT~\cite{utiyama1956invariant,kibble1961lorentz,sciama1962physical,hayashi1979new,trautman1972einstein,hehl1976spin,hehl1995metric,blagojevic2002gravitation}
+is formulated in this way, with torsion and curvature appearing as
 the field strengths of spacetime translations and rotations
 respectively
 (\cite{blagojevic2002gravitation,blagojevic2003lectures,blagojevicHehl2013,hehlobukhov2007cartan}
@@ -142,22 +126,22 @@ as~\cite{lin2019pgt,blagojevic2018hamiltonian,blagojevic2003lectures,barker2024p
 where $\mathcal{L}_\text{lin}$ collects the linear
 invariants~\cite{kibble1961lorentz,holst1995barbero,barbero1995real,immirzi1997real};
 $\mathcal{L}_{\tilde{\mathcal{R}}^2}$ the parity-even
-curvature-squared invariants;
-$\mathcal{L}_{\mathcal{T}^2}$ the parity-even torsion-squared
-invariants; $\mathcal{L}_{F^2}$ the Maxwell term;
+curvature-squared sector;
+$\mathcal{L}_{\mathcal{T}^2}$ the parity-even torsion-squared sector;
+$\mathcal{L}_{F^2}$ the Maxwell kinetic term;
 $\mathcal{L}_{\tilde{\mathcal{R}}\mathcal{F}}$ the parity-even
-curvature--electromagnetic cross-term; $\mathcal{L}_\text{odd}$ the
-parity-odd quadratic
-invariants~\cite{karananas2014parity,blagojevic2018hamiltonian};
+curvature--electromagnetic cross-couplings; $\mathcal{L}_\text{odd}$
+the parity-odd quadratic
+operators~\cite{karananas2014parity,blagojevic2018hamiltonian};
 $\mathcal{L}_\partial$ the higher-derivative
 extensions~\cite{aoki2020nonlinear}; $\mathcal{L}_\text{cubic}$ the
-cubic-order invariants~\cite{bahamonde2025cubic}; and
+cubic-order operators~\cite{bahamonde2025cubic}; and
 $\mathcal{L}_\text{CS}$ the Chern--Simons torsion--EM couplings
 involving the gauge
 potential~\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion},
 catalogued in~\cite{obukhov2024electrodynamics}.
-\Cref{SectorSurvey} reports the subsets of these sectors studied
-here.
+The subsets surveyed in this work are reported in
+\cref{SectorSurvey}.
 
 % Label-glossary sentence removed in Pass 6 (was circular per
 % user feedback): the α/β/δ/χ/ζ coupling letters are introduced
@@ -241,40 +225,32 @@ $\bm{B}$~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing,
 % issue #300 and the new "investigation: propagation-direction
 % WLOG status" issue created with this revision).
 with the photon perturbation in Lorenz gauge and the metric
-perturbation evolved without a gauge constraint,
-\footnote{
+perturbation evolved without a gauge constraint,\footnote{
 Transverse-traceless-compatible initial conditions are imposed
-in the vacuum region where the wavepacket is set up; the
-evolution through the magnetic-field region is unconstrained,
+in the vacuum region; the
+evolution through the magnetic-field is unconstrained,
 allowing non-TT components to develop; see
-\cref{TTGaugeAdmissibility}.}
-the surviving degrees of freedom
+\cref{TTGaugeAdmissibility}.} the surviving degrees of freedom
 assemble into a quadratic kinetic system
 \begin{align}
   \lag^{(2)} = \tfrac{1}{2}\,\xi^\mathsf{T}\,
     \mathcal{K}(\partial_t,\partial_z)\,\xi,
   \label{KineticMatrix}
 \end{align}
-for a vector $\xi$ of gauge-fixed metric, photon, and (where
-propagating) torsion fluctuations. The detailed structure of
-$\mathcal{K}$ depends on the Lagrangian chosen. The canonical
-Gertsenshtein channel $h_\times \!\leftrightarrow\! a_\parallel$ is
-recovered as a sub-block of $\mathcal{K}$ across all surveyed
-theories; the diagonal trace-sector metric components $h_{ii}$,
-algebraic constraints in the Einstein--Maxwell limit, become
-dynamical once an $\tilde{\mathcal{R}}^2$ kinetic term is switched
-on. The per-theory channel structure is discussed in
-\cref{ChannelStructure}, with the underlying linearised couplings
-collected in \cref{SymbolicMechanism}.
+for a vector $\xi$ of metric, photon, and (where
+propagating) torsion perturbations. The detailed structure of
+$\mathcal{K}$ --- and in particular whether the canonical
+Gertsenshtein modes $h_\times,\,a_\parallel$ are coupled, mixed
+with torsion or trace-metric modes, or left decoupled --- depends
+on the Lagrangian chosen. Per-theory results are presented in
+\cref{Results}; explicit kinetic-matrix outputs for representative
+theories are reported in \cref{SymbolicMechanism}.
 
 \subsection{Gertsenshtein conversion kernel}%
 \label{Gertsenshtein}
 % Subsection covering the conversion-kernel display: the uniform
 % Gertsenshtein formula and the path-integrated Boccaletti form.
-% An earlier draft also carried a channel-decomposition paragraph;
-% that content folded into the §2.2 kinetic-matrix paragraph, and
-% the per-theory channel observations are discussed in the Results
-% section (\cref{ChannelStructure}).
+% Per-theory results live in \cref{Results}.
 
 % Required EM-convention paragraph BEFORE the formula, per the recent
 % style-intel refinement. Without it the §1 literature-tension framing
@@ -318,7 +294,15 @@ the closed form~\cite{gertsenshtein1962wave,boccaletti1970conversion,lella2024co
 \end{align}
 which in the small-argument limit $\kappa\Bzero D \ll 1$ scales as
 $\Pconv \propto \Bzero^2$, the characteristic Gertsenshtein
-signature. For a finite magnetised region carrying a profile
+signature.\footnote{%
+    Refs.~\cite{palessandro2023simple,palessandro2024gertsenshtein}
+    quote $\Pconv = \sin^2(\sqrt{G}\,\Bzero\,D)$, which differs
+    from \cref{GertsenshteinFormula} by a factor of $\sqrt{4\pi}$
+    in the sine argument;~\cite{lella2024constraining} provides an
+    independent derivation in our convention,
+    and~\cite{hwangnoh2023graviton} provides an independent
+    critique of the P\&R derivation.
+} For a finite magnetised region carrying a profile
 $B_x(z)$ along the propagation direction, \cref{GertsenshteinFormula}
 generalises to the path-integrated Boccaletti
 form~\cite{boccaletti1970conversion,raffelt1988mixing}
