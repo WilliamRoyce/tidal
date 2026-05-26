@@ -29,11 +29,9 @@
 \usetikzlibrary{arrows.meta,calc,3d}
 \tikzset{>={Stealth[length=1.6mm,width=1.6mm]}}
 
-\colorlet{FaceFill}{PurpleFill}
-\colorlet{FaceLine}{PurpleLine}
-\colorlet{ProjLine}{PurpleLine}
-\colorlet{TileFill}{OrangeFill}
-\colorlet{TileLine}{OrangeLine}
+\colorlet{Face}{IBMblue}
+\colorlet{Proj}{IBMindigo}
+\colorlet{Tile}{IBMmagenta}
 \colorlet{SphereLine}{GrayLine}
 \colorlet{SphereFill}{GrayFill}
 \colorlet{AxisLine}{Black}
@@ -88,12 +86,12 @@
   %------------------------------------------------------------------
   % STAGE 2 — far back cube edges (light wireframe of hidden edges)
   %------------------------------------------------------------------
-  \draw[FaceLine!40, thick]
+  \draw[Face!40, thick]
     (-1, 1,-1) -- (1, 1,-1) -- (1, 1, 1) -- (-1, 1, 1) -- cycle;
-  \draw[FaceLine!40, thick] (-1,-1,-1) -- (-1, 1,-1);
-  \draw[FaceLine!40, thick] ( 1,-1,-1) -- ( 1, 1,-1);
-  \draw[FaceLine!40, thick] ( 1,-1, 1) -- ( 1, 1, 1);
-  \draw[FaceLine!40, thick] (-1,-1, 1) -- (-1, 1, 1);
+  \draw[Face!40, thick] (-1,-1,-1) -- (-1, 1,-1);
+  \draw[Face!40, thick] ( 1,-1,-1) -- ( 1, 1,-1);
+  \draw[Face!40, thick] ( 1,-1, 1) -- ( 1, 1, 1);
+  \draw[Face!40, thick] (-1,-1, 1) -- (-1, 1, 1);
 
   %------------------------------------------------------------------
   % STAGE 3 — sample vector segment 1 (origin -> cube-face crossing
@@ -128,22 +126,22 @@
   %                  of the cube-tile.
   %------------------------------------------------------------------
   % Edge at x = -1, parameter t = z in [-1, 1]
-  \draw[ProjLine, thick]
+  \draw[Proj, thick]
     plot[domain=-1:1, samples=12, smooth]
       ({-\Rsphere/sqrt(1+1+\x*\x)}, {-\Rsphere/sqrt(1+1+\x*\x)},
        {\Rsphere*\x/sqrt(1+1+\x*\x)});
   % Edge at x = +1, parameter t = z
-  \draw[ProjLine, thick]
+  \draw[Proj, thick]
     plot[domain=-1:1, samples=12, smooth]
       ({\Rsphere/sqrt(1+1+\x*\x)}, {-\Rsphere/sqrt(1+1+\x*\x)},
        {\Rsphere*\x/sqrt(1+1+\x*\x)});
   % Edge at z = -1, parameter s = x
-  \draw[ProjLine, thick]
+  \draw[Proj, thick]
     plot[domain=-1:1, samples=12, smooth]
       ({\Rsphere*\x/sqrt(\x*\x+1+1)}, {-\Rsphere/sqrt(\x*\x+1+1)},
        {-\Rsphere/sqrt(\x*\x+1+1)});
   % Edge at z = +1, parameter s = x
-  \draw[ProjLine, thick]
+  \draw[Proj, thick]
     plot[domain=-1:1, samples=12, smooth]
       ({\Rsphere*\x/sqrt(\x*\x+1+1)}, {-\Rsphere/sqrt(\x*\x+1+1)},
        {\Rsphere/sqrt(\x*\x+1+1)});
@@ -157,7 +155,7 @@
   %------------------------------------------------------------------
   % Horizontal lines (constant z on the cube face)
   \foreach \zline in {-0.5, 0, 0.5}{
-    \draw[ProjLine, thin]
+    \draw[Proj, thin]
       plot[domain=-1:1, samples=12, smooth]
         ({\Rsphere*\x/sqrt(\x*\x + 1 + \zline*\zline)},
          {-\Rsphere/sqrt(\x*\x + 1 + \zline*\zline)},
@@ -165,7 +163,7 @@
   }
   % Vertical lines (constant x on the cube face)
   \foreach \xline in {-0.5, 0, 0.5}{
-    \draw[ProjLine, thin]
+    \draw[Proj, thin]
       plot[domain=-1:1, samples=12, smooth]
         ({\Rsphere*\xline/sqrt(\xline*\xline + 1 + \x*\x)},
          {-\Rsphere/sqrt(\xline*\xline + 1 + \x*\x)},
@@ -174,12 +172,12 @@
 
   % Highlighted sphere sub-tile: the gnomonic image of the
   % highlighted cube cell (x, z in [\ttileLo, \ttileHi]).  Drawn in
-  % TileLine to pair it with the highlighted cube sub-tile of
+  % Tile to pair it with the highlighted cube sub-tile of
   % stage 8.  Parametrised by \ttileLo/\ttileHi so it tracks the
   % cube cell automatically.
   % Edge at x = \ttileLo
 
-  \fill[TileFill, opacity=0.4]
+  \fill[Tile, opacity=0.4]
     plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\ttileLo/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
        {-\Rsphere/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
@@ -197,25 +195,25 @@
        {-\Rsphere/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
        {\Rsphere*\ttileHi/sqrt(\x*\x+1+\ttileHi*\ttileHi)});
        
-  \draw[TileLine, very thick]
+  \draw[Tile, very thick]
     plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\ttileLo/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
        {-\Rsphere/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
        {\Rsphere*\x/sqrt(\ttileLo*\ttileLo+1+\x*\x)});
   % Edge at x = \ttileHi
-  \draw[TileLine, very thick]
+  \draw[Tile, very thick]
     plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\ttileHi/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
        {-\Rsphere/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
        {\Rsphere*\x/sqrt(\ttileHi*\ttileHi+1+\x*\x)});
   % Edge at z = \ttileLo
-  \draw[TileLine, very thick]
+  \draw[Tile, very thick]
     plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\x/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
        {-\Rsphere/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
        {\Rsphere*\ttileLo/sqrt(\x*\x+1+\ttileLo*\ttileLo)});
   % Edge at z = \ttileHi
-  \draw[TileLine, very thick]
+  \draw[Tile, very thick]
     plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
       ({\Rsphere*\x/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
        {-\Rsphere/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
@@ -224,7 +222,7 @@
 
   %------------------------------------------------------------------
   % STAGE 7d — dashed lines from each corner of the highlighted cube
-  %                  sub-tile to its sphere image, drawn in TileLine
+  %                  sub-tile to its sphere image, drawn in Tile
   %                  (blue) to match the highlighted-cell pairing of
   %                  stages 7c and 8.  Same pattern as stage 7b but
   %                  for the four corners of the highlighted cell.
@@ -235,7 +233,7 @@
     \pgfmathsetmacro{\sxv}{\cnrx/\nrm}
     \pgfmathsetmacro{\syv}{-1/\nrm}
     \pgfmathsetmacro{\szv}{\cnrz/\nrm}
-    \draw[TileLine!70, thick, dotted]
+    \draw[Tile!70, thick, dotted]
       (\Rsphere*\sxv, \Rsphere*\syv, \Rsphere*\szv) -- (\cnrx, -1, \cnrz);
   }
 
@@ -243,35 +241,35 @@
   % STAGE 8 — highlighted -y face (transparent fill, sub-tile grid,
   %                  highlighted central sub-tile)
   %------------------------------------------------------------------
-  \fill[FaceFill, opacity=0.4]
+  \fill[Face, opacity=0.4]
     (-1,-1,-1) -- (1,-1,-1) -- (1,-1, -0.5) -- (-1,-1, -0.5) -- cycle;
-  \fill[FaceFill, opacity=0.4]
+  \fill[Face, opacity=0.4]
     (-1,-1,0) -- (1,-1,0) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
-  \fill[FaceFill, opacity=0.4]
+  \fill[Face, opacity=0.4]
     (-1,-1,-0.5) -- (-0.5,-1,-0.5) -- (-0.5,-1, 0) -- (-1,-1, 0) -- cycle;
-  \fill[FaceFill, opacity=0.4]
+  \fill[Face, opacity=0.4]
     (0,-1,-0.5) -- (1,-1,-0.5) -- (1,-1, 0) -- (0,-1, 0) -- cycle;
 
   % 4x4 sub-tile grid lines on the -y face (interior lines at
   % x, z = -0.5, 0, 0.5)
   \foreach \v in {-0.5, 0, 0.5}{
-    \draw[FaceLine, thin] (\v,-1,-1) -- (\v,-1, 1);
-    \draw[FaceLine, thin] (-1,-1,\v) -- ( 1,-1, \v);
+    \draw[Face, thin] (\v,-1,-1) -- (\v,-1, 1);
+    \draw[Face, thin] (-1,-1,\v) -- ( 1,-1, \v);
   }
 
   % Highlighted sub-tile (cube cell x, z in [\ttileLo, \ttileHi])
-  \fill[TileFill, opacity=0.40]
+  \fill[Tile, opacity=0.40]
     (\ttileLo,-1, \ttileLo) -- (\ttileHi,-1, \ttileLo) --
     (\ttileHi,-1, \ttileHi) -- (\ttileLo,-1, \ttileHi) -- cycle;
-  \draw[TileLine, very thick]
+  \draw[Tile, very thick]
     (\ttileLo,-1, \ttileLo) -- (\ttileHi,-1, \ttileLo) --
     (\ttileHi,-1, \ttileHi) -- (\ttileLo,-1, \ttileHi) -- cycle;
 
   % Face outline
-  \draw[FaceLine, very thick]
+  \draw[Face, very thick]
     (-1,-1,-1) -- (1,-1,-1) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
 
-  \node[ProjLine, anchor=south west, font=\scriptsize]
+  \node[Proj, anchor=south west, font=\scriptsize]
     at (1.02,-1.02, -0.75) {face $2\!\downarrow$};
 
 

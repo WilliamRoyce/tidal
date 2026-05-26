@@ -11,12 +11,7 @@
 \contourlength{0.6pt}
 \tikzset{>={Stealth[length=1.2mm,width=1.2mm]}} % default arrow tip for -> etc.
 
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\usepackage{tidal-tikz-styles}
 \colorlet{GrayFill}{LightGray!60!OldLace}
 \colorlet{GrayLine}{RosyBrown!50!Silver}
 
@@ -50,9 +45,9 @@
     \def\R{2.2}
     \def\L{0.6*\R}
 
-    \fill[thick, draw=PurpleLine, fill=PurpleFill, fill opacity=0.4] (90:\L) circle (\R);
-    \fill[thick, draw=GreenLine, fill=GreenFill, fill opacity=0.4] (-30:\L) circle (\R);
-    \fill[thick, draw=OrangeLine, fill=OrangeFill, fill opacity=0.4] (-150:\L) circle (\R);
+    \fill[thick, draw=IBMblue, fill=IBMblue, fill opacity=0.4] (90:\L) circle (\R);
+    \fill[thick, draw=IBMmagenta, fill=IBMmagenta, fill opacity=0.4] (-30:\L) circle (\R);
+    \fill[thick, draw=IBMyellow, fill=IBMyellow, fill opacity=0.4] (-150:\L) circle (\R);
 
     \node[align=center] at (0,-0.07*\R) {Metric--Affine\\$(L_4,g)$};
     
@@ -78,9 +73,9 @@
             column sep=3pt,
             row sep=3pt
             ] {
-            |[legendswatch, fill=PurpleFill!40, draw=PurpleLine]| {} & $\mathcal R \neq 0$ \\
-            |[legendswatch, fill=OrangeFill!40, draw=OrangeLine]| {} & $\mathcal T \neq 0$ \\
-            |[legendswatch, fill=GreenFill!40, draw=GreenLine]| {} & $\mathcal Q \neq 0$ \\
+            |[legendswatch, fill=IBMblue!40, draw=IBMblue]| {} & $\mathcal R \neq 0$ \\
+            |[legendswatch, fill=IBMyellow!40, draw=IBMyellow]| {} & $\mathcal T \neq 0$ \\
+            |[legendswatch, fill=IBMmagenta!40, draw=IBMmagenta]| {} & $\mathcal Q \neq 0$ \\
             };
         \end{tikzpicture}%
     };

@@ -27,7 +27,7 @@
 \node[decision, right=of d0] (d1) {Modal\\eligible?};
 
 % --- Modal solver ---
-\node[solver=Purple, below=of d1] (modal)
+\node[solver, draw=IBMmagenta, fill=IBMmagenta!40, below=of d1] (modal)
     {Modal solver};
 
 % --- D2: Constraint eqs? ---
@@ -36,7 +36,7 @@
 %     (a2) {zeroth-order in $t$\\(elliptic / algebraic DAE)};
 
 % --- IDA (constraint) ---
-\node[solver=Orange, below=of d2] (ida1) {IDA};
+\node[solver, draw=IBMyellow, fill=IBMyellow!40, below=of d2] (ida1) {IDA};
 
 % --- D3: First-order eqs? ---
 \node[decision, right=of d2] (d3) {First-order\\equations?};
@@ -44,7 +44,7 @@
 %     (a3) {first-order in $t$\\(diffusion / transport) \\ (implicit BDF)};
 
 % --- IDA (first-order) ---
-\node[solver=Orange, below=of d3] (ida2) {IDA};
+\node[solver, draw=IBMyellow, fill=IBMyellow!40, below=of d3] (ida2) {IDA};
 
 % --- D4: Dissipation? ---
 \node[decision, right=of d3] (d4) {Dissipation?};
@@ -52,10 +52,10 @@
 %     (a4) {dissipative $\partial_t$ terms\\(breaks symplecticity)};
 
 % --- IDA (dissipation) ---
-\node[solver=Orange, below=0.6cm of d4] (ida3) {IDA};
+\node[solver, draw=IBMyellow, fill=IBMyellow!40, below=0.6cm of d4] (ida3) {IDA};
 
 % --- Default: CVODE ---
-\node[solver=Green, right=0.6cm of d4] (cvode)
+\node[solver, draw=IBMblue, fill=IBMblue!40, right=0.6cm of d4] (cvode)
     {CVODE};
 % \node[annot, below left=0.1cm and -0.5cm of d5.west, anchor=north east]
 %     (a6) {Pure wave, Hamiltonian\\(adaptive BDF)};

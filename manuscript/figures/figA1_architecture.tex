@@ -14,17 +14,16 @@
 \node[data] (toml) {Lagrangian};
 
 % --- Derive ---
-\node[stage=Pink, right=0.6cm of toml] (derive)
+\node[stage, draw=IBMblue, fill=IBMblue!40, right=0.6cm of toml] (derive)
     {Symbolic derivation};
 
 % --- JSON (narrow waist) ---
 \node[data, right=0.6cm of derive, minimum width=2.6cm,
-      draw=BlueLine, fill=BlueFill, fill opacity=0.35,
       font=\footnotesize\bfseries] (json)
     {Equation specification};
 
 % --- Simulate ---
-\node[stage=Purple, right=0.6cm of json] (sim)
+\node[stage, draw=IBMindigo, fill=IBMindigo!40, right=0.6cm of json] (sim)
     {Numerical integration};
 
 % --- Snapshots ---
@@ -32,7 +31,7 @@
     {Field\\[-1pt]\scriptsize snapshots};
 
 % --- Measure ---
-\node[stage=Green, right=0.6cm of snaps] (meas)
+\node[stage, draw=IBMindigo, fill=IBMindigo!40, right=0.6cm of snaps] (meas)
     {Post-processing};
 
 % --- Results ---
@@ -54,20 +53,16 @@
 % BRACE: Symbolic vs Numerical separation at JSON
 % ===================================================================
 \draw[decorate, decoration={brace, amplitude=6pt, raise=2pt},
-      PinkLine, thick]
+      IBMblue, thick]
     (toml.west |- derive.north) -- (derive.north east)
-    node[midway, above=10pt, font=\scriptsize\bfseries, text=PinkLine]
+    node[midway, above=10pt, font=\scriptsize\bfseries, text=IBMblue]
     {Symbolic (CAS)};
 
 \draw[decorate, decoration={brace, amplitude=6pt, raise=2pt},
-      PurpleLine, thick]
+      IBMindigo, thick]
     (sim.north west) -- (meas.north east)
-    node[midway, above=10pt, font=\scriptsize\bfseries, text=PurpleLine]
+    node[midway, above=10pt, font=\scriptsize\bfseries, text=IBMindigo]
     {Numerical (PDE)};
-
-% JSON label
-\node[above=0.25cm of json, font=\scriptsize\bfseries, text=BlueLine]
-    {portable contract};
 
 \end{tikzpicture}
 \end{document}
