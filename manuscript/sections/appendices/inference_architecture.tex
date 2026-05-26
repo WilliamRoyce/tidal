@@ -65,6 +65,29 @@ nested-sampling likelihood is
 with the sign chosen to direct the survey toward amplifying ($+$)
 or suppressing ($-$) regions of coupling space.
 
+\paragraph*{Theory-agnostic acceptance of exponentially-growing modes}
+The modal-solver evolution that produces $P(\theta, t_\mathrm{end})$
+does not pre-filter exponentially-growing modes from the linearised
+system: whatever modes the input Lagrangian propagates are integrated
+through and contribute to the exit conversion probability. Earlier
+iterations of the pipeline truncated such modes on the assumption
+that exponential growth always indicates an unphysical pathology, but
+this choice is not theory-agnostic --- a numerical pipeline cannot in
+general decide whether exponential linearised growth is a genuine
+amplification mechanism, a non-ghost tachyonic instability of an
+unbounded background ansatz, or a wrong-sign-kinetic ghost. The
+distinction depends on the specific term subset and parameter values
+in the input theory and is the subject of an extensive
+literature~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,lin2019pgt,Yo:1999ex,Yo:2001sy}.
+We therefore report what the input Lagrangian produces and defer
+the discrimination of physical amplification from instability
+artefacts to (i) the finite-extent geometry of \cref{Discussion},
+which saturates any genuine instability while preserving channel
+mixing, and (ii) the full Hamiltonian particle-spectrum analysis
+provided by the PSALTer
+tool~\cite{barker2024psalter,barker2025psalter2}, integration with
+which we identify as future work.
+
 
 \begin{figure}[t]
   \centering
@@ -199,6 +222,7 @@ identifying the carrier operators in each surveyed sector.
 
 \begin{table}[h]
   \centering
+  \label{KLPerTheory}
   \begin{tabular}{l | c c c}
   \toprule
   & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
