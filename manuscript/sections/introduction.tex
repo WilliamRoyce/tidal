@@ -1,4 +1,124 @@
 % !TEX root = ../main.tex
+% Introduction — round-10 v10 (2026-05-26).
+% Round-10 revisions over v9 (comprehensive critical-revision pass
+% addressing user's ~25 + ~22 point critique across two re-reads):
+%   - Stage 1 p1 frontier: "Advanced LIGO/Advanced Virgo/KAGRA" ->
+%     single "Advanced LIGO, Virgo, and KAGRA network" with
+%     three-cite group at end. "planned millihertz reach of LISA"
+%     -> "scheduled for launch in 2035", anchored by new bib entry
+%     LISA:2024hlh (Colpi 2024 Definition Study) alongside
+%     amaro2017lisa.
+%   - Stage 1 p1 HFGW sources: per-mechanism primary citations
+%     added next to umbrella reviews -- Easther:2006gt (preheating),
+%     Grojean:2006bp (phase transitions), Dolgov:2012be (light-PBH).
+%     Easther and Grojean are new bib entries this round.
+%   - Stage 1 p1 indirect-detection cluster: full rewrite. "in
+%     laboratory apparatus where a known magnetic field acts as the
+%     conversion medium" -> "reinterpretations of dark-matter cavity
+%     haloscopes --- ADMX, HAYSTAC, and ABRACADABRA --- as
+%     Gertsenshtein-channel searches", with three new instrument
+%     citations (ADMX:2025vom, HAYSTAC:2025nrt, Salemi:2019xgl).
+%     Goryachev split into its own sentence as "a complementary
+%     route runs the apparatus directly as a megahertz HFGW
+%     search ... reports two transient events of unestablished
+%     origin". "proposed or operated" -> "proposed", with Goryachev
+%     as the one direct-search exception. Final declarative "no
+%     confirmed Gertsenshtein detection has been reported".
+%   - Stage 1 p1 Einstein--Maxwell sentence: "For Einstein--Maxwell"
+%     -> "For Einstein--Maxwell theory" (missing noun); "only of
+%     order 10^6 km" -> "around 10^6 km" plus explicit "vast
+%     laboratory baseline yet small on astrophysical scales"
+%     framing; "coherent propagation length" -> "propagation
+%     length"; dropped "remains small without astrophysical
+%     baselines, and any modified-gravity calculation must be
+%     assessed against this benchmark" -> "the probability stays
+%     small unless the conversion path traverses an astrophysical
+%     magnetic environment".
+%   - Stage 1 p2 modern-Gertsenshtein cluster: the dangling
+%     "and corrections to the metric-coupling treatment of the
+%     electromagnetic field" list item split into its own sentence
+%     naming Hwang--Noh and Tomomatsu, with explicit verb-object
+%     completion "finding that it shifts the conversion probability
+%     at leading order".
+%   - Stage 1 p2 torsion cluster: "to enter the action through
+%     non-minimal torsion--photon coupling terms" -> "admits
+%     non-minimal photon--torsion couplings at the same Lagrangian
+%     order" -- clarifies these are Lagrangian-level admissible
+%     structures, not phenomenologically established interactions.
+%     "However" dropped from the closer; sentence now declarative.
+%   - Stage 2 no-go cluster: "The standard no-go theorem" -> "The
+%     Yo--Nester theorem" (corpus-attested compound). Dropped
+%     Yo:1999ex (scalar paper, mis-cited for vector no-go). Lead
+%     with Yo:2001sy (vector paper). Reproduction roles split:
+%     "reproduced via Hamiltonian analysis [Blagojevic] and via
+%     post-Riemannian expansion [BeltranJimenez/Aoki]".
+%   - Stage 2 scale-invariant restoration: collapsed v9 double
+%     "scale-invariant extensions ... within an extended Weyl
+%     framework" to a single clean sentence; no information loss.
+%   - Stage 3b scales sentence: restructured to make clear it's
+%     BACKGROUND MAGNETIC FIELDS that span many decades, not
+%     "scales of interest" generically. "coherent propagation
+%     length" -> "propagation length".
+%   - Stage 3b NEW SENTENCE on cosmological-propagation suppression:
+%     Anninos:2024esx (2401.08346, new bib entry) cited with the
+%     honest finding (mixing length > Hubble radius; oscillations
+%     damp out). Caution against naive product-of-scales reasoning.
+%   - Stage 3c PGT-and-adjacent-prior-work paragraph: FULL REWRITE
+%     to narrative pattern per BHL corpus survey (each cite earns
+%     its place via a function-and-finding clause rather than
+%     appearing in a bare list). Named-author founder list KEPT at
+%     v9 length (Utiyama / Kibble / Sciama / Hehl) per user
+%     direction this round; only the cite-cluster expanded with
+%     additional founder-class entries (Hayashi, Trautman,
+%     hehl1995metric, blagojevic2002gravitation, hehlobukhov2007cartan).
+%     Sezgin / Lin / Blagojevic / Aoki / Barker now each carry a
+%     reproduction-method-or-finding clause. Dropped inline $F^2T^2$
+%     notation (intro stays text-only).
+%   - Stage 3c Cembranos rewrite: now states the concrete content
+%     of Cembranos:2018jxo (mixing probability in Horndeski/f(R))
+%     and Cembranos:2023ere (cosmological extension; expansion
+%     attenuates conversion via decoherence). Dropped "extends that
+%     programme" framing (user: wrong tone, not directly following);
+%     replaced with "The same question is posed here for a
+%     different degree-of-freedom class".
+%   - Stage 3c "Other adjacent results" sentence (AI register
+%     opener): replaced with "Adjacent threads include" --
+%     declarative. "metric-affine gravity via projective-symmetry-
+%     induced photon couplings" -> "photon couplings arising in
+%     metric-affine extensions of gravity" -- drop projective-
+%     symmetry technicality. Moved Kruglov / Gaete cites out of
+%     this paragraph (already in Stage 1 p2 torsion cluster);
+%     moved BeltranJimenez:2019hrm out (already in Stage 2 no-go
+%     cluster).
+%   - Stage 3c gap-closer: "However, the Gertsenshtein channel
+%     structure ... has not previously been computed" simplified to
+%     "The Gertsenshtein channel structure has not been computed
+%     for any PGT background carrying propagating torsion".
+%   - Stage 4 "In this report": FULL REWRITE. Dropped the v9
+%     "derive the linearised graviton-photon mixing kernel" headline
+%     (user: not what we do) and the "kinetic matrix decouples the
+%     hx and ax polarisations ... \cref{HxAxIdentity}" claim (broken
+%     cref to non-existent label). New headline: "We find both
+%     amplification and suppression of the conversion relative to
+%     the Einstein--Maxwell baseline. The surviving sectors are
+%     ghost-free at linear order, so the modification is a genuine
+%     torsion-induced effect." Direct claim, no "rather than"
+%     hedging (corpus pattern: certitude from method scope).
+%     "PGT-plus-Maxwell" -> "the Lagrangian" (TIDAL is Lagrangian-
+%     generic); "symbolic--numerical pipeline" -> "symbolic--
+%     numerical software package" (BHL corpus naming). Dropped
+%     the "plane-wave and uniform-B benchmark" implementation
+%     detail and the TODO(results) placeholder block.
+%   - Stage 5 structure map: "pipeline" -> "software package"
+%     (consistent with Stage 4); "the validation, the sector-
+%     level survey" -> "the validation and the sector-level
+%     survey" (comma-fragment fixed); "identifies the constructive
+%     paths along which the present null can be extended" ->
+%     "outlines directions for their further development".
+%   - New bib entries (7): Easther:2006gt, Grojean:2006bp,
+%     LISA:2024hlh, Anninos:2024esx, ADMX:2025vom, HAYSTAC:2025nrt,
+%     Salemi:2019xgl.
+%
 % Introduction — round-9 v9 (2026-05-26).
 % Round-9 revisions over v8:
 %   - Stage 3b: appended one sentence carrying the new GZ-process
@@ -57,15 +177,21 @@
 Gravitational-wave observation now extends across twelve
 decades in frequency, with principal operating instruments in
 the nanohertz pulsar-timing band~\cite{nanograv2023fifteen},
-the kilohertz Advanced LIGO~\cite{LIGOScientific:2014pky},
-Advanced Virgo~\cite{VIRGO:2014yos}, and KAGRA~\cite{KAGRA:2020tym}
-network, and the planned millihertz reach of LISA~\cite{amaro2017lisa}.
+the kilohertz Advanced LIGO, Virgo, and KAGRA
+network~\cite{LIGOScientific:2014pky, VIRGO:2014yos, KAGRA:2020tym},
+and the millihertz reach of the LISA mission, scheduled for
+launch in 2035~\cite{amaro2017lisa, LISA:2024hlh}.
 % Frontier-band citations:
 %   nanograv2023fifteen: NANOGrav 15-yr stochastic-background detection.
 %   LIGOScientific:2014pky: Advanced LIGO instrument paper (1411.4547).
 %   VIRGO:2014yos: Advanced Virgo instrument paper (1408.3978).
 %   KAGRA:2020tym: KAGRA overview (2005.05574).
-%   amaro2017lisa: LISA mission proposal.
+%   amaro2017lisa: LISA mission proposal (2017).
+%   LISA:2024hlh: LISA Definition Study Report (Colpi et al. 2024,
+%     2402.07571) -- anchors the 2024 ESA adoption + 2035 launch
+%     status. Added round-10 because amaro2017lisa is the original
+%     concept paper, not the mission-status reference; "planned"
+%     wording dropped accordingly.
 % "Twelve decades" = nHz (10^-9 Hz) to kHz (10^3 Hz). Phrasing is
 %   synthesised, not corpus-quoted; arithmetic is self-evident from
 %   the band labels.
@@ -75,49 +201,89 @@ The megahertz--gigahertz band lies above the upper frequency
 of any known astrophysical source~\cite{Aggarwal:2020olq, Aggarwal:2025noe},
 so any source in this window must be of primordial or
 beyond-Standard-Model origin --- for instance inflationary
-preheating, first-order phase transitions, or mergers of light
-primordial black holes.
+preheating~\cite{Easther:2006gt}, first-order phase
+transitions~\cite{Grojean:2006bp}, or mergers of light
+primordial black holes~\cite{Dolgov:2012be}.
 % Source-list provenance: Aggarwal 2020 intro names "primordial
 %   black holes ... phase transitions, preheating after inflation,
 %   oscillons, cosmic strings" verbatim as HF-GW source motivation.
 %   Three indicative examples retained here; full enumeration
 %   belongs in a review paper.
+% Per-mechanism primary citations (added round 10):
+%   Easther:2006gt (astro-ph/0601617): Easther & Lim, stochastic GW
+%     production after inflation via preheating; first paper of the
+%     preheating-GW programme cited in Aggarwal:2020olq intro.
+%   Grojean:2006bp (hep-ph/0607107): Grojean & Servant, first-order
+%     phase-transition GWs at electroweak scale and beyond.
+%   Dolgov:2012be (1211.0500): Dolgov & Ejlli, light-PBH-evaporation
+%     and PBH-binary-coalescence GWs in the GHz range.
 % v7-cut: dropped the v6 source-list "cosmic strings" because the
 %   verifier showed cosmic strings actually peak at nHz, not MHz-GHz.
-Several indirect-detection schemes have been proposed or
-operated for this band, exploiting the conversion of
-gravitational waves to photons in magnetic fields --- a
-standard general-relativistic process known as the
-Gertsenshtein effect~\cite{gertsenshtein1962wave, boccaletti1970conversion}
---- either in astrophysical magnetic-field environments through
-cosmic photon-background reanalyses~\cite{lella2024constraining, Domcke:2020yzq}
-or in laboratory apparatus where a known magnetic field acts
-as the conversion medium~\cite{Berlin:2021txa, Domcke:2022rgu, Goryachev:2021zzn};
-no confirmed detection has been reported.
+Several indirect-detection schemes have been proposed for this
+band, exploiting the conversion of gravitational waves to
+photons in magnetic fields --- a standard general-relativistic
+process known as the Gertsenshtein
+effect~\cite{gertsenshtein1962wave, boccaletti1970conversion}.
+Two routes have been explored: reanalyses of astrophysical
+backgrounds in which the galactic or extragalactic magnetic
+field acts as the conversion
+medium~\cite{lella2024constraining, Domcke:2020yzq}; and
+reinterpretations of dark-matter cavity haloscopes --- ADMX,
+HAYSTAC, and
+ABRACADABRA~\cite{ADMX:2025vom, HAYSTAC:2025nrt, Salemi:2019xgl}
+--- as Gertsenshtein-channel
+searches~\cite{Berlin:2021txa, Domcke:2022rgu}. A complementary
+route runs the apparatus directly as a megahertz
+high-frequency-gravitational-wave search; the cryogenic
+acoustic-wave detector of Goryachev~\textit{et al.}\ reports
+two transient events of unestablished
+origin~\cite{Goryachev:2021zzn}. No confirmed Gertsenshtein
+detection has been reported.
 % Scheme status (verifier-confirmed):
 %   lella2024constraining: cosmic-photon-background reanalysis using
 %     Galactic magnetic-field model; sets upper bounds, no detection.
 %   Domcke:2020yzq: dark-ages CMB-distortion proposal (EDGES/ARCADE2).
-%   Berlin:2021txa: ADMX/HAYSTAC microwave-cavity reinterpretation.
-%   Domcke:2022rgu: ABRACADABRA/SHAFT/DMRadio haloscope reanalysis.
-%   Goryachev:2021zzn: cryogenic BAW resonator (5-8 MHz); operating
-%     apparatus; reports two transient events but "no certain claim
-%     could be made on the origins of these events" (paper abstract).
+%   Berlin:2021txa: ADMX/HAYSTAC microwave-cavity reinterpretation
+%     for HFGW sensitivity (proposal; no new apparatus built).
+%   Domcke:2022rgu: ABRACADABRA/SHAFT/DMRadio haloscope reanalysis
+%     for HFGW sensitivity (proposal).
+%   Goryachev:2021zzn: cryogenic BAW resonator at 5.506 MHz; 153-day
+%     run in 2019; observed two transient events but explicitly
+%     declined to claim HFGW origin (abstract: "we do not claim
+%     that they were HFGWs of any source"). Cited as the one
+%     direct-search operating instrument in our band; the no-confirmed-
+%     Gertsenshtein-detection statement follows directly.
+% Haloscope-instrument citations (added round 10): cite the actual
+%   ADMX, HAYSTAC, ABRACADABRA experimental apparatus papers that
+%   Berlin and Domcke reinterpret, giving credit to the original
+%   instrument programmes. Three representative entries from the
+%   most recent collaboration outputs:
+%     ADMX:2025vom (2504.07279): ADMX 1.1-1.3 GHz axion search 2025.
+%     HAYSTAC:2025nrt (2510.15848): HAYSTAC 16.96-19.52 micro-eV
+%       dark-photon search 2026 (same apparatus as axion runs).
+%     Salemi:2019xgl (1905.06882): ABRACADABRA-10cm first results
+%       proceedings (no journal version under same collaboration).
+%   SHAFT, DMRadio cited indirectly via Domcke:2022rgu.
 % "Standard general-relativistic process": inline qualifier
 %   separating the MECHANISM (standard GR) from the SOURCE (which
 %   must be exotic). Resolves the BSM/Gertsenshtein contradiction
 %   user flagged in round 7.
-% "Laboratory apparatus ... acts as the conversion medium":
-%   describes the role of lab B-fields as conversion media for
-%   cosmologically-sourced HF-GWs that traverse them, without
-%   claiming labs MEASURE Gertsenshtein directly.
-For Einstein--Maxwell the conversion probability grows with
-the magnetic-field strength and the coherent propagation
-length, but even at magnetar fields the gravitational mixing
-length is only of order $10^6\,\mathrm{km}$~\cite{palessandro2023simple},
-so the unmodified result remains small without astrophysical
-baselines, and any modified-gravity calculation must be
-assessed against this benchmark.
+% v10-cut: dropped v9 "in laboratory apparatus where a known
+%   magnetic field acts as the conversion medium" -- user-flagged
+%   as ambiguous (Berlin/Domcke are reinterpretations of dark-matter
+%   haloscopes, not dedicated Gertsenshtein apparatus); reframed
+%   honestly per source intent.
+% v10-cut: "proposed or operated" -> "proposed", with Goryachev as
+%   the one direct-search exception in its own sentence; user
+%   round-10 flagged the original wording as implying an operating
+%   fleet of Gertsenshtein detectors, which is inaccurate.
+For Einstein--Maxwell theory the conversion probability grows
+with the magnetic-field strength and the propagation length,
+but even at magnetar fields the mixing length is around
+$10^6\,\mathrm{km}$~\cite{palessandro2023simple} --- a vast
+laboratory baseline yet small on astrophysical scales, so the
+probability stays small unless the conversion path traverses an
+astrophysical magnetic environment.
 % Numerical-provenance: Palessandro-Rothman 2023 states verbatim
 %   "Around a magnetar, the field can be ~ 10^14 G, leading to a
 %   mixing length of only ~ 10^6 km" (intro, after eq. 223).
@@ -130,15 +296,32 @@ assessed against this benchmark.
 % No inline math formulae in prose per BHL convention; the
 %   conversion probability scaling is described verbally. The
 %   formula and derivation live in section II.
+% v10-fix: dropped v9 "only of order" -- 10^6 km is enormous in
+%   absolute terms; "only" was misleading. Replaced with "around"
+%   plus an explicit "vast laboratory baseline yet small on
+%   astrophysical scales" framing that makes the comparison clear.
+% v10-fix: dropped "coherent" before "propagation length" -- our
+%   formulas include detuning effects, so the bare length need not
+%   be coherent.
+% v10-fix: dropped v9 "remains small without astrophysical
+%   baselines, and any modified-gravity calculation must be
+%   assessed against this benchmark" -- self-referential framing
+%   claim without physical content. Replaced with a concrete
+%   consequence: the conversion path must traverse an astrophysical
+%   B-field environment.
 
 The mechanism is the spin-two analogue of axion--photon
 mixing~\cite{raffelt1988mixing}, and has been re-examined in
 standard general relativity through exact solutions in a
 constant background~\cite{ejlli2020graviton}, perturbative
-approaches~\cite{Ejlli:2018hke}, two-state mixing
-formulations~\cite{palessandro2023simple, palessandro2024gertsenshtein},
-and corrections to the metric-coupling treatment of the
-electromagnetic field~\cite{hwangnoh2023graviton, hwangnoh2023emdef, hwangnoh2024nonlinear, tomomatsu2025gertsenshtein}.
+treatments~\cite{Ejlli:2018hke}, and two-state mixing
+formulations following the neutrino-oscillation
+analogy~\cite{palessandro2023simple, palessandro2024gertsenshtein}.
+Hwang and Noh, and more recently Tomomatsu and collaborators,
+have revisited the metric-dependent coupling between the
+electromagnetic field and the background metric, finding that
+it shifts the conversion probability at leading
+order~\cite{hwangnoh2023graviton, hwangnoh2023emdef, hwangnoh2024nonlinear, tomomatsu2025gertsenshtein}.
 % Modern-Gertsenshtein cluster (split by technique):
 %   ejlli2020graviton: exact analytic solution of coupled EOM in
 %     constant B. (Ejlli's term: "exact solution", NOT "resummation".)
@@ -154,10 +337,11 @@ electromagnetic field~\cite{hwangnoh2023graviton, hwangnoh2023emdef, hwangnoh202
 %     not stated in prose: round-7 user critique was that the
 %     "backreaction enters at same order" detail is too detail-level
 %     for an intro.]
-In Poincar\'e gauge theory, torsion has separately been shown
-to alter photon propagation~\cite{rubilar2003torsion, obukhov2024electrodynamics, Kruglov:2008cv}
-and to enter the action through non-minimal torsion--photon
-coupling terms~\cite{hehl2000electromagnetic, itin2004maxwell, Gaete:2008vb, Gaete:2009dd, bahamonde2025torsion}.
+In Poincar\'e gauge theory, torsion has been shown to alter
+photon propagation~\cite{rubilar2003torsion, obukhov2024electrodynamics, Kruglov:2008cv},
+and admits non-minimal photon--torsion couplings at the same
+Lagrangian
+order~\cite{hehl2000electromagnetic, itin2004maxwell, Gaete:2008vb, Gaete:2009dd, bahamonde2025torsion}.
 % Torsion-EM cluster split by physical content (user round-7
 % item: prior cluster was monolithic; the split makes the
 % distinction from graviton-photon mixing concrete):
@@ -176,12 +360,13 @@ coupling terms~\cite{hehl2000electromagnetic, itin2004maxwell, Gaete:2008vb, Gae
 %       static confinement potentials.
 %     bahamonde2025torsion: F^{munu} R_tilde_{munu} coupling;
 %       BH solutions with torsion-spin charge.
-However, the graviton--photon mixing calculation in a PGT
-background carrying propagating torsion has not been performed.
-% Closer: standard BHL "However" gap-identification. Two strands
-%   above study propagation through and coupling to torsion
-%   separately; neither addresses the coupled graviton-photon-
-%   torsion three-field mixing this work computes.
+The graviton--photon mixing calculation in a PGT background
+carrying propagating torsion has not been performed.
+% Closer: standard BHL gap-identification, declarative without
+%   "However" (round-10 user item: declarative reads cleaner).
+%   Two strands above study propagation through and coupling to
+%   torsion separately; neither addresses the coupled graviton--
+%   photon--torsion three-field mixing this work computes.
 
 \paragraph*{Torsion theory space and the spin-1 ghost restriction}
 The quadratic Poincar\'e gauge Lagrangian carries a
@@ -196,28 +381,34 @@ restricted.
 %     ghost-tachyon classifications.
 %   barker2024poincare: BHL conformal-PGT framework (cited again
 %     below for the scale-invariant reopening).
-The standard no-go theorem on vector-torsion
-propagation~\cite{Yo:1999ex, Yo:2001sy}, since reproduced and
-extended by exhaustive Hamiltonian studies~\cite{blagojevic2018hamiltonian, BeltranJimenez:2019hrm, Aoki:2020zqm},
+The Yo--Nester theorem on vector-torsion
+propagation~\cite{Yo:2001sy}, reproduced via Hamiltonian
+analysis~\cite{blagojevic2018hamiltonian} and via
+post-Riemannian expansion~\cite{BeltranJimenez:2019hrm, Aoki:2020zqm},
 rules out generic vector-torsion propagation in a quadratic
 PGT background, leaving only the scalar-torsion sector ghost-
 and tachyon-free at linear order.
-% "No-go theorem" phrasing: verbatim corpus-standard per Barker
-%   2024 (literal section heading "No-go theorem for vector
-%   torsion" plus prose "this no-go theorem"). Yo & Nester cited
-%   bracketed per BHL citation-placement convention.
-% Yo-Nester engagement confirmed (verifier reading):
-%   BeltranJimenez:2019hrm (1910.07506) cites Yo:1999ex/2001sy
-%     in stability analysis.
-%   Aoki:2020zqm explicitly names "Yo-Nester (YN) ghosts" and
-%     seeks ghost-free non-linear extensions.
-%   blagojevic2018hamiltonian: ghost-tachyon classification
-%     reproducing the no-go via Hamiltonian analysis.
-This restriction has recently been reopened by the observation
-that scale-invariant extensions of the gauge group naturally
-introduce a Maxwell-type kinetic term for vector torsion,
-restoring its propagating character within an extended Weyl
-framework~\cite{barker2024poincare}.
+% Yo-Nester naming: corpus-attested as the compound name
+%   ("Yo--Nester unit tests", Barker 2206.00658). Use as a named
+%   theorem rather than "the standard no-go theorem".
+% v10 cluster change:
+%   Drop Yo:1999ex -- that paper is about SCALAR torsion modes
+%     ("Hamiltonian analysis of PGT scalar modes"), not the vector
+%     no-go. User round-10 flagged the mis-citation.
+%   Keep Yo:2001sy ("higher spin modes") -- the actual vector-
+%     torsion paper.
+%   blagojevic2018hamiltonian: full PGT Hamiltonian analysis
+%     reproducing the no-go in the canonical-formalism framework.
+%   BeltranJimenez:2019hrm: post-Riemannian-expansion stability
+%     analysis confirming Yo's conclusions in a different
+%     formalism; verbatim "imposing ghost-freedom generically
+%     leads to a non-dynamical torsion".
+%   Aoki:2020zqm: names "Yo-Nester (YN) ghosts" verbatim; seeks
+%     ghost-free non-linear extensions.
+This restriction has recently been reopened by scale-invariant
+extensions of the gauge group, which introduce a Maxwell-type
+kinetic term for vector torsion and restore its propagating
+character~\cite{barker2024poincare}.
 % barker2024poincare: "Every Poincare gauge theory is conformal"
 %   shows that the unique scale-invariant embedding of PGT
 %   introduces a Maxwell kinetic term for vector torsion, making
@@ -234,14 +425,18 @@ content of the chosen PGT sector.
 
 \paragraph*{Astrophysical scales and observational bounds}
 The reach of any Gertsenshtein-class measurement is bounded by
-the product of background field strength and coherent
-propagation length, and the scales of interest span many
-decades: galactic regular fields of order
-$10^{-10}\,\mathrm{T}$ over kiloparsec
-baselines~\cite{Domcke:2020yzq, Domcke:2022rgu, lella2024constraining}
+the product of background magnetic-field strength and
+propagation length. Background magnetic fields available to
+indirect-detection schemes span many decades: galactic regular
+fields of order $10^{-10}\,\mathrm{T}$ over kiloparsec
+baselines~\cite{Domcke:2020yzq, Domcke:2022rgu, lella2024constraining},
 and magnetar surface fields of order $10^{11}\,\mathrm{T}$ over
-kilometre extents~\cite{Aggarwal:2020olq} bracket the regimes
-available to indirect-detection schemes.
+kilometre extents~\cite{Aggarwal:2020olq}.
+Propagation through cosmological backgrounds does not amplify
+this product: Anninos~\textit{et al.}\ find that in FLRW and
+de~Sitter universes the mixing length exceeds the Hubble radius
+across the parameter ranges of interest, and oscillations damp
+out~\cite{Anninos:2024esx}.
 At magnetar fields the bare graviton--photon conversion factor
 is of order $10^{-8}$, so observability requires an additional
 astrophysical amplification stage~\cite{kushwaha2022magnetar, mcdonald2024magnetar, tomomatsu2025gertsenshtein, Wu:2026nds};
@@ -253,6 +448,25 @@ FRB~20190425A~\cite{Wu:2026nds}.
 %   supervisor's grounding-numbers anchor.
 % v7-cut: the Omega_GW upper-limit sentence (h_c bound now in
 %   Stage 1 alongside the inverse-process discussion).
+% v10-fix: "scales of interest span many decades" reframed as
+%   "Background magnetic fields available to indirect-detection
+%   schemes span many decades" -- user round-10 flagged that the
+%   v9 wording was ambiguous about WHAT span many decades. Restruc-
+%   tured into two short sentences so the "bracket the regimes"
+%   reading is no longer a back-loaded clause.
+% v10-fix: dropped "coherent" before "propagation length" --
+%   detuning effects in our formulas do not require coherence.
+% Anninos:2024esx (2401.08346): Gertsenshtein in FLRW/de Sitter.
+%   Honest finding: mixing length > Hubble radius in all surveyed
+%   parameter ranges; oscillations damp out; charged-particle
+%   screening adds further suppression. Cited here as a caution
+%   against naive (B-field strength) x (astrophysical path length)
+%   product reasoning -- expanding-universe propagation does not
+%   amplify the bare conversion, it suppresses it. Earlier round-
+%   10 user prompt recalled this as a "12 orders amplification"
+%   paper; the memory is inverted -- the paper's result is
+%   suppression. Verbatim abstract: "in all our models the mixing
+%   length is larger than the Hubble radius".
 % GZ-magnetosphere cluster (added round 9):
 %   Active 2022-2026 research line: ~10 papers across 7-8 groups,
 %   growing trajectory, contemporaneous with the recent PGT activity
@@ -288,81 +502,144 @@ The gauge-theoretic completion of general relativity, in which
 the local Poincar\'e symmetry of special relativity is gauged
 on the same footing as the internal symmetries of the Standard
 Model, dates to the work of Utiyama, Kibble, Sciama, and Hehl
-and collaborators~\cite{utiyama1956invariant, kibble1961lorentz, sciama1962physical, hehl1976spin, shapiro2002torsion, blagojevicHehl2013}.
-Viable subspaces have been catalogued in a sustained line of
-recent work~\cite{barker2024poincare, lin2019pgt, blagojevic2018hamiltonian, Aoki:2020zqm};
-constructive directions for ghost-free phenomenology include
-non-minimal $F^2T^2$-type couplings of the photon to
-torsion~\cite{hehl2000electromagnetic, rubilar2003torsion, itin2004maxwell},
-Weyl-symmetric embeddings that restore propagating modes by
-enlarging the gauge group~\cite{karananas2024weyl, legner2025torc},
-and cubic-curvature extensions that cancel quadratic ghosts at
+and their
+collaborators~\cite{utiyama1956invariant, kibble1961lorentz, sciama1962physical, hayashi1979new, trautman1972einstein, hehl1976spin, hehl1995metric, blagojevic2002gravitation, blagojevicHehl2013, hehlobukhov2007cartan, shapiro2002torsion}.
+The quadratic-action operator inventory was first charted in
+the ghost-free and tachyon-free analyses of Sezgin--van
+Nieuwenhuizen and the modern Hamiltonian classifications of
+Lin--Nester and
+Blagojevi\'c~\cite{sezgin1980ghostfree, Sezgin:1981xs, lin2019pgt, blagojevic2018hamiltonian};
+Aoki and collaborators have since systematised the viability
+conditions~\cite{Aoki:2020zqm}, and Barker and collaborators
+have argued that scale-invariant embeddings reopen the
+vector-torsion sector~\cite{barker2024poincare}. Constructive
+proposals for ghost-free phenomenology have followed three
+directions: non-minimal photon--torsion couplings introduced at
+Lagrangian
+level~\cite{hehl2000electromagnetic, rubilar2003torsion, itin2004maxwell};
+Weyl-symmetric extensions that restore propagating modes by
+enlarging the gauge group~\cite{karananas2024weyl, legner2025torc};
+and cubic-curvature terms that cancel quadratic ghosts at
 higher order~\cite{bahamonde2025cubic}.
-% v7-cut: dropped "are developed in Section V" forward-reference
-%   (overstated; §5's three-paths block is implications-level,
-%   not derivation-level).
+% v10 founder-cluster expansion (round-10 user direction): keep
+%   the named-author list at v9 length (Utiyama / Kibble / Sciama /
+%   Hehl) -- do NOT expand the prose name list. Expand only the
+%   cite-cluster with the additional founder-class entries already
+%   in the bib: hayashi1979new, trautman1972einstein, hehl1995metric,
+%   blagojevic2002gravitation, hehlobukhov2007cartan.
+% Stage-3c narrative pattern (round-10 user direction): each cite
+%   earns its place via a function-and-finding clause rather than
+%   appearing in a bare list:
+%   Sezgin/Lin/Blagojevic: ghost-free + tachyon-free analyses;
+%     modern Hamiltonian classifications.
+%   Aoki: systematised viability conditions.
+%   Barker: argued that scale-invariant embeddings reopen the
+%     vector-torsion sector (echoes Stage 2's no-go-reopening
+%     pointer to barker2024poincare).
+% v10-fix: drop inline $F^2 T^2$ notation -- intro prose stays
+%   text-only; the operator class is described in words ("non-
+%   minimal photon--torsion couplings introduced at Lagrangian
+%   level").
 
-The closest prior treatment of graviton--photon mixing in a
-modified-gravity background is the scalar--tensor and $f(R)$
-extension of Cembranos and
-collaborators~\cite{Cembranos:2018jxo, Cembranos:2023ere},
-which the present PGT calculation extends to theories with
-dynamical torsion, beyond the metric-only frameworks those
-papers cover.
-% Cembranos sentence reworded from v7 awkward "along the torsion
-%   direction those metric-only frameworks cannot reach"
-%   (round-8 user item: strange wording).
+The closest modified-gravity precedent is the analysis of
+Cembranos and collaborators, who derive the graviton--photon
+mixing probability in scalar--tensor and $f(R)$
+backgrounds~\cite{Cembranos:2018jxo} and extend it to
+cosmological FLRW expansion, where they find that the
+additional scalar degree of freedom can enhance or suppress the
+conversion while expansion attenuates it via
+decoherence~\cite{Cembranos:2023ere}. The same question --- how
+a modified-gravity sector reshapes the Gertsenshtein channel
+--- is posed here for a different degree-of-freedom class: PGT
+backgrounds carrying dynamical torsion, which are not
+accessible within metric-only frameworks.
+% Cembranos rewrite (round-10):
+%   Cembranos:2018jxo (1806.11020): derives graviton-photon mixing
+%     probability for Horndeski/f(R); additional scalar DOF
+%     modifies effective refractive index.
+%   Cembranos:2023ere (2302.08186): extends to FLRW expanding-
+%     universe backgrounds; expansion attenuates conversion via
+%     decoherence; additional scalar DOF can enhance or suppress.
+% v10-fix: drop v9 "extends that programme to theories with
+%   dynamical torsion" -- user-flagged as wrong tone (we are not
+%   directly following Cembranos's programme). Replace with "The
+%   same question is posed here for a different degree-of-freedom
+%   class" -- independent posing.
 
-Two further strands of adjacent prior work bear on the
-calculation. Torsion--photon coupling in magnetic backgrounds
-has been considered in higher-derivative quantum
-gravity~\cite{Kruglov:2008cv} and in path-dependent
-gauge-invariant formalisms~\cite{Gaete:2008vb, Gaete:2009dd}.
-Graviton--photon mixing has been generalised to cosmological
-backgrounds with stochastic magnetic fields~\cite{Addazi:2024kbq},
-to astrophysical blazar-jet environments~\cite{Matsuo:2025blj},
-and to metric-affine gravity via projective-symmetry-induced
-photon couplings~\cite{Janssen:2018exh}. PGT
-gravitational-wave propagation and polarisation phenomenology
-has been developed in
-parallel~\cite{Obukhov:2017pxa, Alves:2023rxs, BeltranJimenez:2019hrm, Katanaev:2020xdv}.
-% v7-cut: the v6/v7 long semicolon-joined "Two further strands"
-%   sentence is split into three short sentences per round-8
-%   user sentence-length concern.
+Adjacent threads include cosmological and astrophysical
+graviton--photon mixing in stochastic
+backgrounds~\cite{Addazi:2024kbq} and in blazar-jet
+environments~\cite{Matsuo:2025blj}, photon couplings arising in
+metric-affine extensions of gravity~\cite{Janssen:2018exh}, and
+PGT gravitational-wave propagation and polarisation
+phenomenology developed in
+parallel~\cite{Obukhov:2017pxa, Alves:2023rxs, Katanaev:2020xdv}.
+% v10-fix: dropped v9 opener "Two further strands of adjacent
+%   prior work bear on the calculation" -- user-flagged AI register.
+%   Replace with "Adjacent threads include" -- short, declarative.
+% v10-fix: "metric-affine gravity via projective-symmetry-induced
+%   photon couplings" -> "photon couplings arising in metric-affine
+%   extensions of gravity" -- drop the projective-symmetry techni-
+%   cality which loses meaning out of context.
+% v10-cut: moved Kruglov:2008cv and Gaete:2008vb/2009dd OUT of this
+%   paragraph -- they belong in the Stage 1 paragraph-2 torsion
+%   cluster (already cited there in v9, no duplication).
+% v10-cut: moved BeltranJimenez:2019hrm OUT of this paragraph --
+%   already cited in the Stage 2 Yo-Nester cluster.
 
-However, the Gertsenshtein channel structure in any PGT
-background carrying propagating torsion has not previously
-been computed.
+The Gertsenshtein channel structure has not been computed for
+any PGT background carrying propagating torsion.
 
 \paragraph*{In this report}
-In this work we derive the linearised graviton--photon mixing
-kernel for the general quadratic Poincar\'e gauge theory
-coupled to Maxwell electrodynamics, and show that the kinetic
-matrix decouples the hx and ax gravitational-wave polarisations
-from the torsion fields at linear order in $\Bzero$,
-independently of the quadratic coupling
-constants~(\cref{HxAxIdentity}). The calculation is carried
-out within \TIDAL{}, a symbolic--numerical pipeline that
-derives the linearised equations of motion from a quadratic
-PGT-plus-Maxwell
+We compute the Gertsenshtein conversion across the admissible
+operator inventory of the quadratic Poincar\'e gauge action,
+using \textit{\TIDAL{}}, a symbolic--numerical software package
+that derives the linearised equations of motion directly from
+the
 Lagrangian~\cite{barker2024psalter, barker2025psalter2, barker2025hamilcar}.
-We use \TIDAL{} to span the PGT operator inventory catalogued
-in~\cref{Results}, working in the plane-wave and
-uniform-magnetic-field benchmark standard in the Gertsenshtein
-literature.
-% TODO(results): single-sentence headline survey finding to be
-% inserted here once the Stage A+B+C+D HPC campaigns close.
-% Provisional placeholder: the campaign confirms
-% torsion-independence of the conversion to within $A<\epsilon$
-% across the surveyed parameter plane, with $\epsilon$ and the
-% surveyed-region boundary set after the final HPC run.
+We find both amplification and suppression of the conversion
+relative to the Einstein--Maxwell baseline. The surviving
+sectors are ghost-free at linear order, so the modification is
+a genuine torsion-induced effect.
+% v10 rewrite (round-10 user direction):
+%   Drop "we derive the linearised graviton-photon mixing kernel"
+%     -- user-flagged: not what we actually do.
+%   Drop "show that the kinetic matrix decouples the hx and ax
+%     gravitational-wave polarisations ... \cref{HxAxIdentity}"
+%     -- broken cref to non-existent label, and user-flagged not
+%     the right intro-grade headline. Label HxAxIdentity does not
+%     exist anywhere in the manuscript.
+%   Replace headline with: amplification AND suppression both
+%     occur, surviving sectors are ghost-free -> genuine torsion-
+%     induced effect. Direct claim, no "rather than X" hedging.
+%   "PGT-plus-Maxwell" -> "the Lagrangian" (TIDAL is Lagrangian-
+%     generic, not tied to one specific action).
+%   "symbolic--numerical pipeline" -> "symbolic--numerical software
+%     package" (BHL corpus naming: package / implementation /
+%     software; "pipeline" not corpus-attested).
+%   Drop "working in the plane-wave and uniform-magnetic-field
+%     benchmark standard in the Gertsenshtein literature" --
+%     implementation detail; benchmark is set in §3/§4.
+%   Drop the TODO(results) placeholder block -- superseded by the
+%     finalised headline finding.
+%   No theory-label names (no T1/T4/T5/T7) -- physics-mechanism
+%     framing only.
 
 \paragraph*{Structure of this report}
 \Cref{Theory} sets out the PGT-plus-Maxwell action, the
 linearised equations of motion, and the Einstein--Maxwell
 validation target; \cref{ComputationalApproach} describes
-the \TIDAL{} pipeline; \cref{Results} reports the validation,
-the sector-level survey; \cref{Discussion}
-situates the result in the modified-gravity landscape and
-identifies the constructive paths along which the present null
-can be extended.
+the \TIDAL{} software package; \cref{Results} reports the
+validation and the sector-level survey; \cref{Discussion}
+situates the amplifying and suppressing sectors in the
+modified-gravity landscape and outlines directions for their
+further development.
+% v10 fixes (round-10):
+%   "pipeline" -> "software package" (consistent with Stage 4).
+%   "the validation, the sector-level survey" -> "the validation
+%     and the sector-level survey" -- v9 comma-fragment fixed.
+%   "identifies the constructive paths along which the present
+%     null can be extended" -> "outlines directions for their
+%     further development" -- "constructive paths" was vague;
+%     "the present null" inconsistent with the new headline
+%     finding (which is no longer a null result).
