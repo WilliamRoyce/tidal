@@ -20,7 +20,6 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from _palette import ibm_sequential_cmap
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "benchmark_results" / "canonical" / "multi_method.json"
@@ -87,7 +86,7 @@ def _plot(data: dict, out_path: Path) -> None:
     vmax = max(visible_diffs, default=1e-2)
     vmin = min(visible_diffs, default=EPS_MACH)
 
-    cmap = ibm_sequential_cmap().copy()
+    cmap = plt.get_cmap("cividis").copy()
     cmap.set_bad(color="white")
 
     # The lower-triangle mask leaves row 0 (modal) and the last column
