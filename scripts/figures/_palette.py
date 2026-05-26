@@ -42,3 +42,19 @@ RESERVED_COLOR = IBM_PALETTE["purple"]
 AMP_ALPHA = 0.5
 SUP_ALPHA = 0.5
 PRIOR_ALPHA = 0.15
+
+
+def ibm_sequential_cmap(name: str = "IBMwarm"):
+    """Sequential colormap built from the IBM palette: yellow → orange → magenta.
+
+    Perceptually monotonic in luminance (yellow brightest, magenta darkest),
+    colorblind-safe, and tonally consistent with the IBM categorical palette
+    used elsewhere in the manuscript. Use as a drop-in for viridis/cividis
+    on sequential log-scale heatmaps.
+    """
+    from matplotlib.colors import LinearSegmentedColormap
+
+    return LinearSegmentedColormap.from_list(
+        name,
+        [IBM_PALETTE["yellow"], IBM_PALETTE["orange"], IBM_PALETTE["magenta"]],
+    )
