@@ -645,13 +645,8 @@ chooses the fastest applicable solver tier for projection.
 The first tier handles the case in which
 all boundaries are periodic and the constraint coefficients are
 constant: the constraint operator is diagonalised by the discrete
-Fourier transform, with wavenumber multipliers matching the active
-spatial path --- exact $k$ for the pseudo-spectral path, and the
-FD-stencil dispersion relation
-$k_{\rm mod}^2 = -(2/\Delta x^2)(1 - \cos(k\,\Delta x))$ at order~$2$
-(with the analogous higher-order Fornberg
-expressions~\cite{fornberg1988generation}) for the FD path --- so the
-constraint solution carries the wavenumber convention of the spatial
+Fourier transform, with wavenumber multipliers matching the
+convention of the spatial
 operators that drive evolution; the cost is
 $\mathcal{O}(N\log N)$~\cite{cooley1965fft}. The second
 tier covers non-periodic boundaries and variable coefficients: the
