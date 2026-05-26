@@ -575,7 +575,17 @@ def _evaluate_likelihood(
                 run_inference_step,
             )
 
-            sim_data = run_inference_step(base_args, spec_path, param_overrides)
+            # GH #384 Phase B: pass the already-cached spec through so
+            # run_inference_step doesn't reload+parse it on every call.
+            # load_spec_cached is keyed on (path, mtime) → per-rank singleton.
+            from tidal.symbolic._spec_cache import load_spec_cached
+
+            sim_data = run_inference_step(
+                base_args,
+                spec_path,
+                param_overrides,
+                spec=load_spec_cached(spec_path),
+            )
             spec = sim_data.spec
             metrics = _measure_from_sim_data(
                 sim_data,
