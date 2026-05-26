@@ -19,6 +19,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = (
@@ -64,7 +65,7 @@ def _plot(data: dict, out_path: Path) -> None:
 
     fig, ax = plt.subplots(figsize=(max(7.5, 0.55 * n), 4.4))
     x = np.arange(n)
-    ax.bar(x, drifts, color="#1f77b4", alpha=0.85)
+    ax.bar(x, drifts, color=IBM_PALETTE["blue"], alpha=0.85)
     ax.set_yscale("log")
     ax.axhline(
         1e-3,

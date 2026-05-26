@@ -86,7 +86,7 @@ def _plot(data: dict, out_path: Path) -> None:
     vmax = max(visible_diffs, default=1e-2)
     vmin = min(visible_diffs, default=EPS_MACH)
 
-    cmap = plt.get_cmap("viridis").copy()
+    cmap = plt.get_cmap("cividis").copy()
     cmap.set_bad(color="white")
 
     # The lower-triangle mask leaves row 0 (modal) and the last column

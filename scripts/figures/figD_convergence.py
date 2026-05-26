@@ -30,6 +30,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "benchmark_results" / "canonical" / "convergence_rich.json"
@@ -52,7 +53,7 @@ def _plot_dispersion(ax, data: dict) -> None:
     by_m: dict[float, list[tuple[float, float]]] = {}
     for r in rows:
         by_m.setdefault(r["mass2"], []).append((r["k_realized"], r["omega_sim"]))
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
+    colors = [IBM_PALETTE["blue"], IBM_PALETTE["orange"], IBM_PALETTE["purple"]]
     for i, (m2, pts) in enumerate(sorted(by_m.items())):
         pts.sort()
         ks = np.array([p[0] for p in pts])
@@ -86,7 +87,7 @@ def _plot_rabi(ax, data: dict) -> None:
         marker="o",
         ms=5,
         lw=1.0,
-        color="#1f77b4",
+        color=IBM_PALETTE["blue"],
         label=r"$|\Omega_{\mathrm{eff}}/\Omega_{\mathrm{theory}} - 1|$",
     )
     # If the data is flat (FFT-extraction floor reached at every N),
@@ -99,7 +100,7 @@ def _plot_rabi(ax, data: dict) -> None:
             plateau,
             ls="-.",
             lw=0.9,
-            color="#1f77b4",
+            color=IBM_PALETTE["blue"],
             alpha=0.5,
             label=rf"FFT-extraction floor $\approx {plateau:.1e}$",
         )
@@ -142,7 +143,7 @@ def _plot_tio(ax, data: dict) -> None:
     by_scheme: dict[str, list[dict]] = {}
     for r in rows:
         by_scheme.setdefault(r["scheme"], []).append(r)
-    colors = {"leapfrog_Y2": "#1f77b4", "leapfrog_Y4": "#ff7f0e"}
+    colors = {"leapfrog_Y2": IBM_PALETTE["blue"], "leapfrog_Y4": IBM_PALETTE["orange"]}
     markers = {"leapfrog_Y2": "o", "leapfrog_Y4": "s"}
     for scheme, srows in sorted(by_scheme.items()):
         srows.sort(key=operator.itemgetter("dt"))

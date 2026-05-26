@@ -36,6 +36,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = (
@@ -116,7 +117,7 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="o",
         ms=4,
         lw=0,
-        color="#1f77b4",
+        color=IBM_PALETTE["blue"],
         label=r"$|P_\mathrm{TIDAL} - P_\mathrm{RS}|$",
     )
     ax.semilogy(
@@ -144,10 +145,10 @@ def _plot(data: dict, out_path: Path) -> None:
     # reduction itself drops), giving a meaningful convergence diagnostic.
     ax = axes[1]
     scheme_styles = {
-        "modal": ("#1f77b4", "o", "modal"),
-        "cvode": ("#2ca02c", "s", "CVODE"),
-        "leapfrog_Y2": ("#ff7f0e", "^", "leapfrog $Y_2$"),
-        "leapfrog_Y4": ("#d62728", "D", "leapfrog $Y_4$"),
+        "modal": (IBM_PALETTE["blue"], "o", "modal"),
+        "cvode": (IBM_PALETTE["purple"], "s", "CVODE"),
+        "leapfrog_Y2": (IBM_PALETTE["orange"], "^", "leapfrog $Y_2$"),
+        "leapfrog_Y4": (IBM_PALETTE["magenta"], "D", "leapfrog $Y_4$"),
     }
     # Resolve the regime point (B0, t_end) once from any convergence row.
     any_conv_row = next(iter(schemes.values()))[0] if schemes else None

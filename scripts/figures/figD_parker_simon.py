@@ -24,6 +24,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "benchmark_results" / "canonical" / "parker_simon_flrw.json"
@@ -95,7 +96,7 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="o",
         ms=5,
         lw=0,
-        color="#d62728",
+        color=IBM_PALETTE["magenta"],
         label=rf"$|\phi^{{(0)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
     )
     ax.loglog(
@@ -104,7 +105,7 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="s",
         ms=5,
         lw=0,
-        color="#1f77b4",
+        color=IBM_PALETTE["blue"],
         label=rf"$|\phi^{{(0)}} + \phi^{{(1)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
     )
     if floor_mask.any():
@@ -115,7 +116,7 @@ def _plot(data: dict, out_path: Path) -> None:
             ms=5,
             lw=0,
             mfc="white",
-            mec="#1f77b4",
+            mec=IBM_PALETTE["blue"],
             label="_nolegend_",
         )
         # Annotate the FD-4 spatial-discretisation floor at the median
@@ -137,7 +138,7 @@ def _plot(data: dict, out_path: Path) -> None:
             err_c[idx] * (eps / eps[idx]) ** 2,
             ls=":",
             lw=0.8,
-            color="#1f77b4",
+            color=IBM_PALETTE["blue"],
             alpha=0.5,
             label=r"$\mathcal{O}(\varepsilon^2)$ worst-case guide",
         )

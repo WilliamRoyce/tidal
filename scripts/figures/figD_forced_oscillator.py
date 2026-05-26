@@ -25,6 +25,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "benchmark_results" / "canonical" / "forced_oscillator.json"
@@ -65,7 +66,7 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="o",
         ms=5,
         lw=0,
-        color="#d62728",
+        color=IBM_PALETTE["magenta"],
         label=rf"$|\phi^{{(0)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
     )
     ax.loglog(
@@ -74,7 +75,7 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="s",
         ms=5,
         lw=0,
-        color="#1f77b4",
+        color=IBM_PALETTE["blue"],
         label=rf"$|\phi^{{(0)}} + \phi^{{(1)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
     )
     # O(eps^2) reference guide anchored at largest eps (distinct grey

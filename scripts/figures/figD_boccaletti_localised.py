@@ -25,6 +25,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = (
@@ -58,7 +59,7 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="o",
         ms=4,
         lw=0,
-        color="#1f77b4",
+        color=IBM_PALETTE["blue"],
         label=r"$\mathit{TIDAL}$",
     )
     ax.set_xlabel(r"$s = \kappa\,B_{\mathrm{peak}}\,R\,\sqrt{\pi/2}$")

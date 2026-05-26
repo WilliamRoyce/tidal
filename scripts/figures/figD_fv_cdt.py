@@ -18,6 +18,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "benchmark_results" / "canonical" / "fv_cdt_equivalence.json"
@@ -36,7 +37,7 @@ def _plot(data: dict, out_path: Path) -> None:
     ax.bar(
         x,
         rels,
-        color="#2ca02c",
+        color=IBM_PALETTE["purple"],
         alpha=0.85,
         label=rf"$|\Delta P_{{\max}}|/P_{{\max}}$  (max $= {max_rel:.2e}$)",
     )
