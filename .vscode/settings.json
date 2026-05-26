@@ -1,0 +1,27 @@
+{
+  "latex-workshop.latex.rootFile.doNotPrompt": true,
+  "latex-workshop.latex.rootFile.useSubFile": false,
+  "latex-workshop.latex.autoBuild.run": "never",
+  "latex-workshop.latex.recipe.default": "latexmk",
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "latexmk",
+      "tools": ["latexmk"]
+    }
+  ],
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk",
+      "command": "latexmk",
+      "args": [
+        "-pdf",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-synctex=1",
+        "%DOC%"
+      ]
+    }
+  ],
+  "latex-workshop.latex.clean.subfolder.enabled": true,
+  "latex-workshop.latex.outDir": "%DIR%"
+}
