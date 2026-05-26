@@ -17,10 +17,9 @@ parametrisations appear in the
 literature~\cite{barker2024poincare,lin2019pgt,karananas2014parity,blagojevic2018hamiltonian,bahamonde2025cubic},
 and each coefficient is an arbitrary, parametrisation-dependent
 grouping of the underlying interactions rather than a single
-fundamental quantity.  We use
-PolyChord~\cite{Handley:2015fda,Handley:2015vkr,Skilling:2004pqw,Ashton:2022grj}
-for the nested sampling, with anesthetic~\cite{Handley:2019mfs} for
-the posterior visualisation.
+fundamental quantity.  We use PolyChord~\cite{Handley:2015fda,Handley:2015vkr} for the nested
+sampling~\cite{Skilling:2006gxv,Feroz:2008xx,Brewer:2010,Brewer:2016scw,Speagle:2019ivv},
+with anesthetic~\cite{Handley:2019mfs} for the posterior visualisation.
 %  as corner plots and as per-tile panel
 % maps over the atlas of \cref{CubedSphereAtlas}. 
 We obtain the prior-averaged amplification $\mathcal{Z}$
@@ -29,7 +28,8 @@ $D_{\mathrm{KL}}$~\cite{Kullback:1951zyt,Handley:2019mfs}, which
 measures how tightly the amplification is concentrated onto
 particular couplings. We map where in coupling
 space the Gertsenshtein conversion is most strongly amplified, and
-which combinations of invariants drive it.
+which combinations of invariants drive it. For further detail on
+Bayesian inference and nested sampling, see~\cite{MacKay:2003,Hobson:2010,Trotta:2017wnx,Sivia:2006,Ashton:2022grj}.
 
 \paragraph*{Amplification score}
 The PDE solver~(\cref{NumericalEvolution}) evolves the system
@@ -174,32 +174,28 @@ $\mathcal{Z}$, $D_{\mathrm{KL}}$, and the marginal
 $D_{\mathrm{KL}}$ for each surveyed theory are reported in
 \cref{Results}.
 
-\paragraph*{Information gain and per-parameter $D_\mathrm{KL}$}%
+\paragraph*{Information gain and per-coupling $D_\mathrm{KL}$}%
 \label{KLMethods}
-The \emph{per-direction marginal} $D_\mathrm{KL}(P_\pm(\theta_i)
-\,\|\, \pi(\theta_i))$ measures  how much the posterior has contracted relative
-to its prior. Bootstrap uncertainties are propagated from
-PolyChord's nested-sampling estimator.
-
-The \emph{cross-amp-sup} divergence $D_\mathrm{KL}(P_+(\theta_i)
-\,\|\, P_-(\theta_i))$ measures how much the
-amplification posterior differs from the suppression posterior.
-This quantity identifies the
-parameters that distinguish the two likelihood directions, independent of
-the prior baseline.
-% Together with the directional $\mathrm{ATLAS}$
-% decomposition of \cref{CubedSphereAtlas},
-The marginal and cross divergences
-isolate the carrier operators in each surveyed sector; see
-\cref{KLPerTheory} for the per-theory tables.
-
-Each ranked sub-table lists the top-$k$
-parameters by combined marginal-amp / marginal-sup / cross-amp-sup
-$D_\mathrm{KL}$, with $D_\mathrm{KL,+}(\theta_i)$ measuring the
-contraction of the amplification posterior relative to the prior,
-$D_\mathrm{KL,-}(\theta_i)$ the same for the suppression posterior,
-and $D_\mathrm{KL}(P_+\|P_-)$ the per-parameter divergence
-distinguishing the two posteriors.
+The per-coupling marginal $D_\mathrm{KL}$ extracted with
+anesthetic~\cite{Handley:2019mfs} resolves the joint contraction of
+\cref{KLDivergence} onto each coupling $\theta_i$. Writing $P_\pm$
+for the posteriors of the two sign choices in \cref{NestedScore}
+and $P_\pm(\theta_i)$ for their marginals,
+\begin{align}
+  D_{\mathrm{KL},\pm}(\theta_i) &\;\equiv\;
+    D_\mathrm{KL}\!\big(P_\pm(\theta_i)\,\|\,\pi(\theta_i)\big),
+    \notag\\
+  D_\mathrm{KL}(P_+\|P_-)(\theta_i) &\;\equiv\;
+    D_\mathrm{KL}\!\big(P_+(\theta_i)\,\|\,P_-(\theta_i)\big).
+  \label{PerCouplingKL}
+\end{align}
+The two marginals measure the per-coupling compression from the
+prior to the amplification and suppression posteriors; the cross
+divergence measures how the two posteriors differ in $\theta_i$,
+isolating the couplings that distinguish amplification from
+suppression independently of the prior baseline. The per-theory
+tables that follow rank the top-$k$ couplings by these quantities,
+identifying the carrier operators in each surveyed sector.
 
 \begin{table}[h]
   \centering

@@ -2066,20 +2066,103 @@
 }
 
 % Nested-sampling foundations and associated software cited from App J
-% (Bayesian inference appendix).  Skilling 2004 is the original nested-
-% sampling algorithm; Speagle 2020 (dynesty) is the development-fallback
-% pure-Python implementation; Handley 2019 (anesthetic) is the
-% backend-agnostic visualisation and KL/d_G analysis library used on the
-% PolyChord chain output.
-@article{Skilling:2004pqw,
+% (Bayesian inference appendix).  The seven-reference NS group below
+% follows the citation pattern of Handley arXiv:1908.09139: Skilling
+% 2006 is the methodology paper, and MultiNest / Diffusive NS / DNest4
+% / dynesty are the alternative implementations (Handley 2015a,b above
+% being PolyChord).  Handley 2019 (anesthetic) is the backend-agnostic
+% visualisation and KL/d_G analysis library used on the PolyChord chain
+% output.  Entries fetched from INSPIRE-HEP (arXiv-indexed) and from
+% Crossref/OpenLibrary (Brewer 2010 + the three pedagogical books).
+@article{Skilling:2006gxv,
     author = "Skilling, John",
-    title = "{Nested Sampling}",
-    doi = "10.1063/1.1835238",
-    journal = "AIP Conf. Proc.",
-    volume = "735",
-    number = "1",
-    pages = "395--405",
-    year = "2004"
+    title = "{Nested sampling for general Bayesian computation}",
+    doi = "10.1214/06-BA127",
+    journal = "Bayesian Analysis",
+    volume = "1",
+    number = "4",
+    pages = "833--859",
+    year = "2006"
+}
+
+@article{Feroz:2008xx,
+    author = "Feroz, F. and Hobson, M. P. and Bridges, M.",
+    title = "{MultiNest: an efficient and robust Bayesian inference tool for cosmology and particle physics}",
+    eprint = "0809.3437",
+    archivePrefix = "arXiv",
+    primaryClass = "astro-ph",
+    doi = "10.1111/j.1365-2966.2009.14548.x",
+    journal = "Mon. Not. Roy. Astron. Soc.",
+    volume = "398",
+    pages = "1601--1614",
+    year = "2009"
+}
+
+@article{Brewer:2010,
+    author = "Brewer, Brendon J. and P{\'a}rtay, Livia B. and Cs{\'a}nyi, G{\'a}bor",
+    title = "{Diffusive nested sampling}",
+    doi = "10.1007/s11222-010-9198-8",
+    journal = "Statistics and Computing",
+    volume = "21",
+    number = "4",
+    pages = "649--656",
+    year = "2010"
+}
+
+@article{Brewer:2016scw,
+    author = "Brewer, Brendon J. and Foreman-Mackey, Daniel",
+    title = "{DNest4: Diffusive Nested Sampling in C++ and Python}",
+    eprint = "1606.03757",
+    archivePrefix = "arXiv",
+    primaryClass = "stat.CO",
+    year = "2016"
+}
+
+@inproceedings{Trotta:2017wnx,
+    author = "Trotta, Roberto",
+    title = "{Bayesian Methods in Cosmology}",
+    eprint = "1701.01467",
+    archivePrefix = "arXiv",
+    primaryClass = "astro-ph.CO",
+    year = "2017"
+}
+
+% Pedagogical references for the "for further detail on Bayesian
+% inference" hand-off in App J.  Books (MacKay, Hobson, Sivia--Skilling)
+% are not in INSPIRE; metadata pulled from Crossref (DOIs where present)
+% and from OpenLibrary (LCCN / OCLC / full author lists where the DOI
+% record is incomplete, e.g.\ the OUP DOI for Sivia--Skilling lists only
+% one author).
+@book{MacKay:2003,
+    author = "MacKay, David J. C.",
+    title = "{Information Theory, Inference, and Learning Algorithms}",
+    publisher = "Cambridge University Press",
+    address = "Cambridge",
+    year = "2003",
+    isbn = "9780521642989",
+    lccn = "2003055133",
+    pages = "628"
+}
+
+@book{Hobson:2010,
+    editor = "Hobson, Michael P. and Jaffe, Andrew H. and Liddle, Andrew R. and Mukherjee, Pia and Parkinson, David",
+    title = "{Bayesian Methods in Cosmology}",
+    publisher = "Cambridge University Press",
+    address = "Cambridge",
+    year = "2010",
+    doi = "10.1017/CBO9780511802461",
+    isbn = "9780521887946"
+}
+
+@book{Sivia:2006,
+    author = "Sivia, D. S. and Skilling, John",
+    title = "{Data Analysis: A Bayesian Tutorial}",
+    edition = "2",
+    publisher = "Oxford University Press",
+    address = "Oxford",
+    year = "2006",
+    doi = "10.1093/oso/9780198568315.001.0001",
+    isbn = "9780198568315"
 }
 
 @article{Speagle:2019ivv,
