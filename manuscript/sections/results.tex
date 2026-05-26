@@ -256,16 +256,13 @@ recovering the standard dark-photon phenomenology
 of~\cite{caputo2021darkphoton} at $\Bzero \to 0$,
 \begin{align}
   \lag_\text{dp}
-    &= -\frac{1}{\kappa^2}\,\MAGFt{}
+    = -\frac{1}{\kappa^2}\,\MAGFt{}
       + \Bet{3} I_3
-      - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}} \nonumber \\
-    &\quad - \tfrac{1}{2}m_A^2\,\T[2]{_\mu}\T[2]{^\mu}
-      &&\text{[Proca mass]} \nonumber \\
-    &\quad + \xi\,\T[2]{_\mu}\PD{_\nu}\FieldF{^{\mu\nu}}
-      &&\text{[kinetic mixing]} \nonumber \\
-    &\quad + \delta_m\,\T[2]{_\mu}\T[2]{^\mu}\,
-              \FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}}
-      &&\text{[plasma detuning]} \, ,
+      - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
+    - \tfrac{1}{2}m_A^2\,\T[2]{_\mu}\T[2]{^\mu}
+    + \xi\,\T[2]{_\mu}\PD{_\nu}\FieldF{^{\mu\nu}}
+    + \delta_m\,\T[2]{_\mu}\T[2]{^\mu}\,
+              \FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}} \, ,
   \label{DarkPhotonPlasmaLagrangian}
 \end{align}
 giving a four-dimensional prior over
@@ -273,10 +270,7 @@ $\{m_A^2, \xi, \delta_m, \Bet{3}\}$. The positive-definite
 kinetic-mixing parameter $\xi$ and Proca mass $m_A^2$ are sampled
 from log-uniform priors over six decades; the sign-symmetric detuning
 $\delta_m$ uses the arctan-uniform construction of
-\cref{InferenceArchitecture}. The two equivalent formulations of this
-Lagrangian agree to the modal-evolution round-off floor
-(\cref{ProcaVTEquivalence}), so the survey result is
-formulation-independent. The publication-quality chain returns
+\cref{InferenceArchitecture}. The publication-quality chain returns
 $\log\mathcal{Z}_+ = +9.03 \pm 0.07$ against
 $\log\mathcal{Z}_- = +2.92 \pm 0.08$ ($\log B = +6.11$) under the
 plane-wave benchmark.  Per-parameter $D_\mathrm{KL}$
@@ -307,11 +301,10 @@ $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ coupling of
 linear and torsion-squared sectors,
 \begin{align}
   \lag_\text{rf}
-    &= -\frac{1}{\kappa^2}\,\MAGFt{}
+    = -\frac{1}{\kappa^2}\,\MAGFt{}
       + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3
-      - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}} \nonumber \\
-    &\quad + \Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}
-      &&\text{[Ricci--EM cross-term]} \, ,
+      - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
+      + \Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}} \, ,
   \label{RicciEMLagrangian}
 \end{align}
 giving a four-dimensional prior over
@@ -358,23 +351,18 @@ takes the nine-parameter union
 $\{\Bet{1\!-\!3}, \xi, \Del{1}, \chi, \zeta_{1\!-\!3}\}$,
 \begin{align}
   \lag_\text{nm}
-    &= \lag_\text{rf}
+    = \lag_\text{rf}
       - \tfrac{1}{4}\xi\,
               \mathcal{F}^{(T)}_{\alpha\beta}\,
               \mathcal{F}^{(T)\,\alpha\beta}
-      &&\text{[Barker torsion kinetic]} \nonumber \\
-    &\quad + \chi\,\MAGFt{_{[\alpha\beta]}}\,
+    + \chi\,\MAGFt{_{[\alpha\beta]}}\,
               \mathcal{F}^{(T)\,\alpha\beta}
-      &&\text{[Barker derivative mixing]} \nonumber \\
-    &\quad + \zeta_1\,\rcD{_\alpha}\mathcal{T}^{\beta}{}_{\beta\gamma}\,
+    + \zeta_1\,\rcD{_\alpha}\mathcal{T}^{\beta}{}_{\beta\gamma}\,
               \FieldF{^{\alpha\gamma}}
-      &&\text{[Shapiro 1]} \nonumber \\
-    &\quad + \zeta_2\,\rcD{_\alpha}\mathcal{T}^{\alpha}{}_{\beta\gamma}\,
+    + \zeta_2\,\rcD{_\alpha}\mathcal{T}^{\alpha}{}_{\beta\gamma}\,
               \FieldF{^{\beta\gamma}}
-      &&\text{[Shapiro 2]} \nonumber \\
-    &\quad + \zeta_3\,\rcD{_\alpha}\mathcal{T}_{\beta}{}^{\alpha}{}_{\gamma}\,
-              \FieldF{^{\beta\gamma}}
-      &&\text{[Shapiro 3]} \, ,
+    + \zeta_3\,\rcD{_\alpha}\mathcal{T}_{\beta}{}^{\alpha}{}_{\gamma}\,
+              \FieldF{^{\beta\gamma}} \, ,
   \label{NonMinimalLagrangian}
 \end{align}
 The Shapiro non-minimal derivative class to which $\chi$ and
@@ -467,7 +455,7 @@ parameter by retaining the full ten-parameter $\chi_1$--$\chi_{10}$
 sector on top of the Yang--Mills--PGT non-minimal base,
 \begin{align}
   \lag_\chi
-    &= \lag_\text{nm}\bigl|_{\chi\to 0}
+    = \lag_\text{nm}\bigl|_{\chi\to 0}
        + \sum_{i=1}^{10}\chi_i\,
         \tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}\bigr|_{i} \, ,
   \label{ChiClosureLagrangian}
@@ -622,10 +610,7 @@ uncertainty.
     The torsion kinetic coefficient $\xi$ is pinned to zero relative to
     the eighteen-parameter $\chi$-closure of \cref{CornerT7}; the
     amplification posterior reproduces the $\xi$-free signal to within
-    $\Delta\log\mathcal{Z} \approx 0.37$ nats, confirming that the
-    $\chi_{1\!-\!10}$ derivative-mixing sector is the carrier of the
-    plane-wave-benchmark amplification rather than the propagating
-    torsion kinetic mode.}
+    $\Delta\log\mathcal{Z} \approx 0.37$ nats.}
   \label{CornerNPCeven}
 \end{figure*}
 
@@ -877,12 +862,10 @@ corrections to Einstein--Maxwell retains the two physical couplings
 of~\cite{adler1971photon,dunne2004heisenberg},
 \begin{align}
   \lag_\text{EH}
-    &= -\frac{1}{\kappa^2}\,\MAGFt{}
-       - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}} \nonumber \\
-    &\quad + \rho\,(\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}})^{2}
-         &&\text{[QED $F^4$ scalar]} \nonumber \\
-    &\quad + \sigma\,(\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}})^{2}
-         &&\text{[QED $F^4$ pseudoscalar]} \, ,
+    = -\frac{1}{\kappa^2}\,\MAGFt{}
+       - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
+    + \rho\,(\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}})^{2}
+    + \sigma\,(\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}})^{2} \, ,
   \label{EHGertLagrangian}
 \end{align}
 giving a two-dimensional prior. The chain returns
@@ -894,9 +877,7 @@ indistinguishable from the Einstein--Maxwell baseline at the surveyed
 $\Bzero = 10^{-2}$. The single $F\cdot\tilde F$ Pontryagin topological
 term is correctly identified as a total derivative at the symbolic
 level by the Euler--Lagrange derivation pipeline
-(\cref{SymbolicEulerHeisenberg}); the symbolic-derivation outcome is the
-publishable validation and no extended-prior chain over a $\lambda_\text{top}$
-direction is needed.  The per-parameter $D_\mathrm{KL}$ accordingly
+(\cref{SymbolicEulerHeisenberg}).  The per-parameter $D_\mathrm{KL}$ accordingly
 yields $D_\mathrm{KL}(P_+\|P_-) < 1.7$ nats for both couplings
 (\cref{KLPerTheory}), consistent with the null verdict.
 
