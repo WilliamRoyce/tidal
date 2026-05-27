@@ -9,23 +9,20 @@
 \label{Discussion}
 
 \paragraph*{Interpretation of exponential mode growth}
-The amplification ratios themselves are not the headline result of the
-survey: they are produced by linearised exponential growth on the
-unbounded plane-wave background, and so scale with the simulation
-horizon --- running the modal solver longer would inflate the same
-ratios arbitrarily. The structure --- which operators mediate
-amplification and suppression, and how that mediation migrates across
-the surveyed sectors --- is what the survey delivers; physical-magnitude
-statements about conversion efficiency require finite-extent,
-localised-$\Bzero$ simulations that bound the interaction time and
-saturate the linearised growth without destroying the channel mixing.
-The pipeline accepts these exponentially-growing modes through the
-modal-solver evolution by design (\cref{InferenceArchitecture}):
-prejudging which mode behaviours are unphysical for an input theory is
-not the role of a theory-agnostic survey. The remaining interpretive
-question is whether each growth represents a physical amplification, a
-non-ghost tachyonic-instability artefact of the unbounded plane-wave
-ansatz, or a wrong-sign kinetic-mode ghost. Several precedents in the
+The amplification ratios themselves grow with the simulation horizon,
+because the modes are linearised on the unbounded plane-wave background
+and the modal solver compounds exponential growth indefinitely.
+Physical-magnitude statements about conversion efficiency require
+finite-extent, localised-$\Bzero$ simulations that bound the
+interaction time and saturate the linearised growth without destroying
+the channel mixing. We accept these exponentially-growing modes by
+design: prejudging which mode behaviours are unphysical for an input
+theory is not the role of a theory-agnostic survey pipeline. The
+remaining interpretive question is whether each growth represents a
+physical amplification, an artifact of the plane-wave ansatz, or a
+pathology of the Lagrangian.
+
+Several precedents in the
 literature show that linearised exponential or tachyonic modes need
 not be fatal pathologies. In the Standard Model the Higgs field
 appears tachyonic about the unbroken vacuum but is perfectly unitary
@@ -40,6 +37,7 @@ disqualify a sector; we do not claim that our surveyed Lagrangians
 necessarily realise such a condensation, only that the choice of
 vacuum around which the modes are evaluated can change the unitarity
 verdict.
+
 Higher-derivative gravity theories that exhibit Ostrogradsky ghosts at
 the linearised level can be non-linearly ghost-free when appropriate
 torsion or higher-curvature terms are
@@ -86,8 +84,7 @@ non-propagating-torsion $\chi$-closure control, and the
 thirty-two-parameter $\xi$-kinetic closure --- the $\chi_1$ contraction
 $\rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\,
 \MAGFt{_{\alpha\beta\gamma\delta}}$ carries the dominant
-$D_\mathrm{KL}(P_+\|P_-)$ contribution, at $4.2$, $5.8$, and
-$4.4$~nats respectively. Robustness across the propagating sector, its
+$D_\mathrm{KL}(P_+\|P_-)$ contribution. Robustness across the propagating sector, its
 non-propagating control, and an extended-kinetic-closure embedding
 singles out $\chi_1$ as the operator that most consistently informs
 the amplification--suppression distinction in the parity-even survey.
@@ -104,10 +101,9 @@ condition; the per-coupling $D_\mathrm{KL}$ figures are projections
 onto the chosen priors, with the broad log-uniform priors of the
 dark-photon sector diluting marginal figures relative to the centred
 priors used elsewhere. The twenty-parameter parity-odd full and
-fifty-three-parameter complete parity-odd closure could not be sampled
-at finite amplitude because their linearised eigenvalues exceed the
-modal-solver overflow ceiling. The $\xi$-kinetic closure returned both
-log-evidences negative under partial floor contamination from the
-extended $\xi_{11\!-\!16}$ sub-sector; only the $D_\mathrm{KL}$
-ranking, which is preserved by the uniform additive shift, is
-reported. The cubic-PGT sector has not been surveyed.
+fifty-three-parameter complete parity-odd closure, together with the
+thirty-two-parameter $\xi$-kinetic closure, did not yield clean
+sampling output: the parity-odd sectors overflowed the modal-solver
+eigenvalue ceiling, and the $\xi$-kinetic closure ran into the noise
+floor.
+The cubic-PGT sector has not been surveyed.
