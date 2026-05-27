@@ -47,6 +47,60 @@
 % Plain language; do not retrospectively hedge, but also do not
 % upgrade the §4.3 observation into a theorem.
 
+\paragraph*{Interpretation of exponential mode growth}
+The amplification ratios themselves are not the headline result of the
+survey: they are produced by linearised exponential growth on the
+unbounded plane-wave background, and so scale with the simulation
+horizon --- running the modal solver longer would inflate the same
+ratios arbitrarily. The structure --- which operators mediate
+amplification and suppression, and how that mediation migrates across
+the surveyed sectors --- is what the survey delivers; physical-magnitude
+statements about conversion efficiency require finite-extent,
+localised-$\Bzero$ simulations that bound the interaction time and
+saturate the linearised growth without destroying the channel mixing.
+The pipeline accepts these exponentially-growing modes through the
+modal-solver evolution by design (\cref{InferenceArchitecture}):
+prejudging which mode behaviours are unphysical for an input theory is
+not the role of a theory-agnostic survey. The remaining interpretive
+question is whether each growth represents a physical amplification, a
+non-ghost tachyonic-instability artefact of the unbounded plane-wave
+ansatz, or a wrong-sign kinetic-mode ghost. Several precedents in the
+literature show that linearised exponential or tachyonic modes need
+not be fatal pathologies. In the Standard Model the Higgs field
+appears tachyonic about the unbroken vacuum but is perfectly unitary
+about its symmetry-broken ground state~\cite{legner2025torc};
+analogously, in PGT the spin-connection modes can be massive in the
+ultraviolet and integrate out at the infrared to recover general
+relativity as the low-energy effective theory, so linearised tachyons
+can be a signature of the wrong vacuum rather than a fatal pathology.
+Higher-derivative gravity theories that exhibit Ostrogradsky ghosts at
+the linearised level can be non-linearly ghost-free when appropriate
+torsion or higher-curvature terms are present~\cite{aoki2020nonlinear}.
+Recent metric-affine catalogues show that ghost-tachyon tunings
+constructed at the linearised level break down nonlinearly, and that
+the only unitarity-protected branches are those where a gauge symmetry
+rather than a parameter choice removes the
+ghost~\cite{barker2025irfound1,barker2025irfound2}; this is precisely
+the branch that the non-propagating-torsion control sits in. These
+precedents do not prove that the linearised exponential growth we
+observe is physical, but they establish that it is not automatically
+fatal, and that resolution belongs to either finite-extent geometry or
+a future \PSALTer{}-based particle-spectrum analysis.
+
+\paragraph*{Parity-odd geometric incompatibility}
+The same plane-wave embedding makes the parity-odd full and complete
+sectors of \cref{ParityOddGeomIncomp} structurally incompatible with
+finite-amplitude inference: the $\varepsilon$-tensor-mediated
+contractions $\varepsilon\!\cdot\!\MAGT{}\!\cdot\!\FieldF{}$ and
+$\varepsilon\!\cdot\!\MAGFt{}\!\cdot\!\nabla\MAGT{}$ generate
+exponential mode amplification on an unbounded plane-wave background
+that no choice of integration horizon resolves while keeping the
+conversion above the noise floor. A bounded interaction time, set by a
+finite-extent geometry, would cap the growth at a finite envelope and
+restore a finite-amplitude posterior --- which is the same hypothesis
+the localised-geometry programme would test for the amplifying
+parity-even sectors.
+
 % Move 2: Implications (~250 w total across three named paragraphs,
 % one per constructive path). Each path is named, not derived; brief.
 %

@@ -87,7 +87,7 @@ The path-integrated kernel \cref{BoccalettiPathIntegrated} is recovered in
 % Figure 1 — Boccaletti validation. Rendered from
 % scripts/figures/fig1_boccaletti_validation.py using
 % benchmark_results/canonical/boccaletti_uniform_rich.json.
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/fig1_boccaletti_validation}
   \caption{Boccaletti validation for the Einstein--Maxwell baseline
@@ -281,7 +281,7 @@ peaks symmetric about the origin, while the amplification posterior
 extends broadly along $\Del{1}$. The suppression preference is therefore
 symmetric under $\Del{1} \to -\Del{1}$.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   % TODO(hpc, GH issue #387): re-run the EM--RC chain with matched
   % \Bet{1,2,3} priors. The current chain used a one-sided broad prior
@@ -359,7 +359,7 @@ on $\Del{1}$ ($D_\mathrm{KL}(P_+\|P_-) = 20.8$~nats; \cref{KLTableEMRCParityPair
 Bayes factor is amplification-dominated at $\log B = +1.98$. In the
 parity-odd twin the vertex contribution drops to
 $D_\mathrm{KL}(P_+\|P_-) = 8.8$~nats and the two torsion-mass directions
-$\Bet{1}$ ($5.4$~nats) and $\Bet{2}$ ($4.4$~nats) become comparable.
+$\Bet{1}$ and $\Bet{2}$ become comparable.
 The parity-odd minimal is the only sector we
 report in the survey where suppression dominates, with the Bayes factor $\log B = -6.33$.
 % , and the only one whose amp/sup
@@ -367,7 +367,7 @@ report in the survey where suppression dominates, with the Bayes factor $\log B 
 % minimal-base $\Bet{i}$ axes rather than concentrated on the vertex
 % alone.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_parity_odd_minimal}
   \caption{Posterior marginals for the four-dimensional parity-odd
@@ -379,6 +379,7 @@ report in the survey where suppression dominates, with the Bayes factor $\log B 
 \end{figure}
 
 \subsubsection{The Yang--Mills--PGT}
+\label{YangMillsPGT}
 Many authors have introduced non-minimal operators into PGT with
 different physical motivations, and the $\Del{1}$ vertex of
 \cref{RicciEMLagrangian} is just one of several that could break the
@@ -443,7 +444,7 @@ other vertices are switched on.
 % $\chi_{1\!-\!10}$ closure is the subject of the complete parity-even sector
 % below.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_bahamonde}
   \caption{Posterior marginals for the five-dimensional Bahamonde base
@@ -454,7 +455,7 @@ other vertices are switched on.
   \label{CornerT5D20}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_barker}
   \caption{Posterior marginals for the six-dimensional Barker extension
@@ -465,7 +466,7 @@ other vertices are switched on.
   \label{CornerT5D21}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_shapiro}
   \caption{Posterior marginals for the eight-dimensional Shapiro
@@ -476,7 +477,7 @@ other vertices are switched on.
   \label{CornerT5D22}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_full_nonminimal}
   \caption{Posterior marginals for the nine-dimensional non-minimal
@@ -558,7 +559,7 @@ posteriors. The $D_\mathrm{KL}$-ranked sub-corner is
 non-propagating-torsion control of the same sector appears below in
 \cref{KLTableChiClosureComparison} (\cref{NonPropagatingControl}).
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_chi_closure}
   \caption{Carrier sub-corner of the eighteen-dimensional $\chi$-closure
@@ -588,35 +589,36 @@ The amplifying parameter regions identified above produce exponential
 mode growth in the linearised plane-wave evolution. The modal solver
 evolves the state via the matrix exponential
 $y(t) = \exp(M(k)\,t)\,y_0$ (\cref{ModalCoupledEntry}); a single
-eigenvalue $\lambda$ of $M(k)$ with $\mathrm{Re}\,\lambda > 0$ on any
+eigenvalue $\lambda$ of $M(k)$ with $\Re\,\{\lambda\} > 0$ on any
 field component feeds exponential growth into every coupled field
 through the off-diagonal entries of $\exp(M(k)\,t)$.
-Distinguishing a genuine new amplification mechanism from a non-ghost
+Distinguishing a genuine new amplification mechanism from a
 tachyonic instability of the unbounded plane-wave ansatz, or from a
-wrong-sign kinetic-mode ghost --- a negative-norm mode in the
-linearised propagating spectrum that would violate unitarity --- is
+ghost is
 not straightforward from the survey output alone. The unitarity
 conditions for parity-even PGT are catalogued as inequalities on the
 coupling
 combinations~\cite{karananas2014parity,blagojevic2018hamiltonian,sezgin1980ghostfree,lin2019pgt,Yo:1999ex,Yo:2001sy};
-for the parity-violating extensions they are obtained numerically
-through the Hamiltonian particle-spectrum analysis of
+% for the parity-violating extensions they are obtained numerically
+and through the Hamiltonian particle-spectrum analysis of
 \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}. Integration
-with that tool is the natural next step but is deferred to future work.
+with \PSALTer{} is deferred to future work.
 
 To bound the ghost branch from below \emph{without} \PSALTer{} we run
-a control test: the same Yang--Mills--PGT non-minimal sector with the
-torsion kinetic coefficient $\xi$ pinned to zero. The Lagrangian then
-introduces no new kinetic operator for any field beyond the
-Einstein--Maxwell baseline; torsion is determined algebraically and the
-no-ghost classification is trivially satisfied --- there is no kinetic
-operator whose sign needs checking. The dominant $D_\mathrm{KL}$
-contributions identified above for the propagating YM--PGT sectors were
-all anchored to
+a control test: the same Yang--Mills--PGT from \cref{YangMillsPGT} with the
+torsion kinetic coefficient $\xi$ pinned to zero. The Lagrangian
+\cref{NonMinimalLagrangian} then introduces no new kinetic operator for
+any field beyond the Einstein--Maxwell baseline; torsion is determined
+algebraically and the no-ghost classification is trivially satisfied
+--- there is no kinetic operator whose sign needs checking. The dominant
+$D_\mathrm{KL}$ contributions identified above for the propagating
+YM--PGT sectors were all anchored to
 exponential-mode-growth regions of parameter space, so a natural
-expectation was that removing the propagating-torsion modes --- which
-carry the positive-$\mathrm{Re}\,\lambda$ eigenvalues responsible for
-that growth --- would collapse the amplification corner entirely. The
+expectation was that removing the propagating-torsion modes
+% --- which
+% carry the positive-$\Re\,\{\lambda\}$ eigenvalues responsible for
+% that growth ---
+would collapse the amplification corner entirely. However, the
 eight-dimensional control returns
 \begin{equation*}
   \logZ_+ = +10.98 \pm 0.15
@@ -624,7 +626,7 @@ eight-dimensional control returns
   \logZ_- = +2.67 \pm 0.10,
 \end{equation*}
 ($\log B = +8.31$), essentially reproducing the propagating-torsion
-result. The amplification preference is therefore not contingent on the
+result. The amplification preference is therefore \emph{not} contingent on the
 torsion kinetic sector being active; switching off the
 propagating-torsion modes does not quench it.
 
@@ -688,53 +690,24 @@ comparison against the propagating chain is
   \label{KLTableChiClosureComparison}
 \end{table}
 
-\paragraph*{Interpretation of exponential mode growth}
-The pipeline accepts these exponentially-growing modes through the
-modal-solver evolution by design (\cref{InferenceArchitecture}):
-prejudging which mode behaviours are unphysical for an input theory
-is not the role of a theory-agnostic survey. The remaining
-interpretive question is whether the growth represents a physical
-amplification --- which a finite-extent geometry would saturate while
-preserving channel mixing --- or a non-ghost tachyonic-instability
-artefact of the unbounded plane-wave ansatz. Several precedents in
-the literature show that linearised exponential / tachyonic modes
-need not be fatal pathologies. In the Standard Model the Higgs field
-appears tachyonic about the unbroken vacuum but is perfectly unitary
-about its symmetry-broken ground
-state~\cite{legner2025torc}; analogously, in PGT the spin-connection
-modes can be massive in the ultraviolet and integrate out at the
-infrared to recover general relativity as the low-energy effective
-theory, so linearised tachyons can be a signature of the wrong
-vacuum rather than of a fatal pathology. Higher-derivative gravity
-theories that exhibit Ostrogradsky ghosts at the linearised level
-can be non-linearly ghost-free when appropriate
-torsion or higher-curvature
-terms are present~\cite{aoki2020nonlinear}. Recent metric-affine
-catalogues show that ghost-tachyon tunings constructed at the
-linearised level break down nonlinearly, and that the only
-unitarity-protected branches are those where a gauge symmetry rather
-than a parameter choice removes the ghost~\cite{barker2025irfound1,barker2025irfound2};
-this is precisely the branch that the non-propagating-torsion control
-sits in. These precedents do not prove that the linearised
-exponential growth we observe is physical; they establish that it is
-not automatically fatal, and that resolution belongs to either the
-finite-extent geometry of \cref{Discussion} or to a future
-\PSALTer-based particle-spectrum analysis.
-
 A small set of supporting diagnostics is consistent with the
 channel-mixing interpretation in the non-propagating-torsion sector:
 the algebraic torsion field remains bounded relative to the
 metric/photon perturbations at the maximum-a-posteriori point of the
 chain, ruling out a constraint-divergence pathology; the linearised
 eigenvalue spectrum at that point shows no
-$\mathrm{Re}(\lambda) > 0$ modes in the pure metric channel; and the
+$\Re\,\{\lambda\} > 0$ modes in the pure metric channel; and the
 perturbativity envelope of \cref{PerturbativeBound} is satisfied
 across the posterior support. The corresponding $D_\mathrm{KL}$-ranked
 sub-corners are
 \cref{CornerNP} (eight-parameter control) and \cref{CornerNPCeven}
-(seventeen-parameter $\chi$-closure control).
+(seventeen-parameter $\chi$-closure control). The interpretation of
+the exponentially-growing modes themselves --- whether they correspond
+to a physical amplification that a finite-extent geometry would
+saturate, to a non-ghost tachyonic instability, or to a wrong-sign
+kinetic-mode ghost --- is taken up in \cref{Discussion}.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_np_t5}
   \caption{Posterior marginals for the eight-dimensional
@@ -747,7 +720,7 @@ sub-corners are
   \label{CornerNP}
 \end{figure}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_np_chi_closure}
   \caption{$D_\mathrm{KL}$-ranked sub-corner of the seventeen-dimensional
@@ -803,7 +776,7 @@ $D_\mathrm{KL}(P_+\|P_-) = 4.4$ and $3.5$~nats; the $\xi_{15}$ contraction
 is $\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 \rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_xi_kinetic_closure}
   \caption{$D_\mathrm{KL}$-ranked sub-corner of the thirty-two-dimensional
@@ -862,45 +835,38 @@ at any viable propagation time; this is discussed in
 % (max_eigenvalue × t_end < 708) in coupling space rather than a
 % physical stability boundary, and would visually conflate the
 % overflow-threshold artefact with the parity-even posterior content.
-\subsubsection{Parity-odd geometric incompatibility}%
+\subsubsection{Parity-odd full and complete sectors}%
 \label{ParityOddGeomIncomp}
-The two parity-odd torsion--electromagnetism coupling sectors --- the
-twenty-parameter parity-odd full sector
+The twenty-parameter parity-odd full sector
 $\{d_{14}, d_{15}, d_{17}, d_{19\!-\!21},
 \tilde\zeta_{1,2,3,5,6}\}$ on top of the Yang--Mills--PGT non-minimal
-base, and the fifty-three-parameter complete parity-odd closure that
-additionally retains the
+base, and the fifty-three-parameter complete parity-odd closure
+adding the
 $\varepsilon\!\cdot\!\MAGFt{}\!\times\!\nabla\MAGT{}$
-basis $\{\tilde\chi_1, \ldots, \tilde\chi_{36}\}$ on top of the
-parity-odd-full base --- fail to admit a finite-amplitude posterior
-under the plane-wave uniform-$\Bzero$ ansatz at any horizon. The
-eigenvalues of the linearised conversion system grow unbounded in
-these coupling directions: they reach above
-the modal-solver overflow ceiling at
-$t_\text{end} = 1$. The would-be
-safe horizon for the latter is $t_\text{end} \lesssim 10^{-3}$, at
-which the Gertsenshtein conversion amplitude
-$P \propto (\kappa\Bzero t/2)^2$ drops below the noise
-floor by orders of magnitude. The parity-odd full sector returns
-$\logZ_\pm \approx -15$ with $\log B \approx 0$, the
-soft-penalty noise signature, and the complete parity-odd closure
-returns zero dead points within the available compute. The structural
-origin is geometric: the parity-odd
-$\varepsilon$-tensor-mediated contractions
-$\varepsilon\!\cdot\!\MAGT{}\!\cdot\!\FieldF{}$ and
-$\varepsilon\!\cdot\!\MAGFt{}\!\cdot\!\nabla\MAGT{}$
-generate exponential mode amplification in the unbounded plane-wave
-background --- a pathology the bounded interaction time of a
-finite-extent geometry (\cref{Discussion}) would not permit.
+basis $\{\tilde\chi_1, \ldots, \tilde\chi_{36}\}$, do not admit
+finite-amplitude posteriors under the plane-wave uniform-$\Bzero$
+ansatz at any safe horizon. The 20D chain returns
+$\logZ_\pm \approx -15$ with $\log B \approx 0$ (the soft-floor
+signature, \cref{CornerParityOddFull}); the 53D chain returns zero
+live points within the available compute. The linearised eigenvalues
+of the conversion system reach above the modal-solver overflow ceiling
+at $t_\text{end} = 1$ in these coupling directions; the would-be safe
+horizon $t_\text{end} \lesssim 10^{-3}$ places the conversion
+amplitude $P \propto (\kappa\Bzero t/2)^2$ below the noise floor by
+orders of magnitude. Whether this reflects a pathology of the
+unbounded plane-wave ansatz, which a finite-extent geometry could
+saturate, or a fatal pathology of the theories themselves is taken up
+in \cref{Discussion}.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_parity_odd_full}
   \caption{$D_\mathrm{KL}$-ranked sub-corner for the twenty-dimensional
     parity-odd full sector. The amplification and suppression marginals
-    are coincident across the plotted parameters, the soft-floor
-    signature of the geometric incompatibility discussed in the
-    text; nested sampling gives $\logZ_\pm \approx -15$.}
+    are coincident across the plotted parameters --- the soft-floor
+    signature returned when the linearised eigenvalues exceed the
+    modal-solver overflow ceiling. Nested sampling gives
+    $\logZ_\pm \approx -15$.}
   \label{CornerParityOddFull}
 \end{figure}
 
@@ -964,7 +930,7 @@ torsion-electromagnetism coupling phenomenon, and is largely
 orthogonal to the non-minimal PGT extensions of
 \cref{InformativeAmplification}.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_dark_photon_plasma}
   \caption{Posterior marginals for the four-dimensional dark-photon
@@ -1014,9 +980,11 @@ orthogonal to the non-minimal PGT extensions of
 % EH+Gert rules out the QED-EFT artefact (we did not unconsciously
 % import an EM-EFT correction that mimics gravitational amplification).
 \subsubsection{Euler--Heisenberg effective action}
-A parallel survey axis along the QED-effective-field-theory $F^4$
-corrections to Einstein--Maxwell retains the two physical couplings
-of~\cite{adler1971photon,dunne2004heisenberg},
+The Einstein--Maxwell baseline receives QED effective-field-theory
+corrections at the $F^4$
+level~\cite{adler1971photon,dunne2004heisenberg}, which can themselves
+source non-linear photon--photon and photon--graviton interactions in a
+magnetic background. Three EH operators enter,
 \begin{align}
   \lag_\text{EH}
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
@@ -1026,24 +994,26 @@ of~\cite{adler1971photon,dunne2004heisenberg},
     + \sigma\,(\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}})^{2} \, ,
   \label{EHGertLagrangian}
 \end{align}
-giving a two-dimensional prior. The two-dimensional posterior is
+of which the $F\cdot\tilde F$ Pontryagin term is a total covariant
+derivative and drops out of the equations of motion at the symbolic
+level (\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
+over $(\rho, \sigma)$. The $F^4$ corrections scale with the background
+field to a higher power than the leading PGT vertices, so at the small
+$\Bzero = 10^{-2}$ required by the linear regime of the survey
+(\cref{Linearisation}) they are expected to be subdominant. The
+posterior is
 \begin{align*}
   \logZ_+ = +0.184 \pm 0.001 \, , \quad
   \logZ_- = -0.185 \pm 0.0004 \, ,
 \end{align*}
-and $\log B = +0.37$.
-
-a symmetric and tight null, with the QED reference point
-$\sigma/\rho = 7/16$~\cite{adler1971photon,dunne2004heisenberg}
-indistinguishable from the Einstein--Maxwell baseline at the surveyed
-$\Bzero = 10^{-2}$. The single $F\cdot\tilde F$ Pontryagin topological
-term is correctly identified as a total derivative at the symbolic
-level by the Euler--Lagrange derivation pipeline
-(\cref{SymbolicEulerHeisenberg}).  The per-parameter $D_\mathrm{KL}$ (\cref{KLTableEH})
+and $\log B = +0.37$, a symmetric and tight null. The QED reference
+point $\sigma/\rho = 7/16$~\cite{adler1971photon,dunne2004heisenberg}
+is indistinguishable from the Einstein--Maxwell baseline at the
+surveyed $\Bzero$. The per-parameter $D_\mathrm{KL}$ (\cref{KLTableEH})
 yields $D_\mathrm{KL}(P_+\|P_-) < 1.7$ nats for both couplings,
 consistent with the null verdict.
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_eh_gertsenshtein}
   \caption{Posterior marginals for the two-dimensional
