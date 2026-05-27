@@ -359,8 +359,8 @@ Bayes factor is amplification-dominated at $\log B = +1.98$. In the
 parity-odd twin the vertex contribution drops to
 $D_\mathrm{KL}(P_+\|P_-) = 8.8$~nats and the two torsion-mass directions
 $\Bet{1}$ and $\Bet{2}$ become comparable.
-The parity-odd minimal is the only sector we
-report in the survey where suppression dominates, with the Bayes factor $\log B = -6.33$.
+This parity-odd theory is the only sector we
+found where suppression dominates, with the Bayes factor $\log B = -6.33$.
 % , and the only one whose amp/sup
 % separation is shared between the non-minimal vertex and the
 % minimal-base $\Bet{i}$ axes rather than concentrated on the vertex
@@ -397,24 +397,22 @@ of vector torsion absent from earlier PGT formulations.
 The Shapiro extension~\cite{shapiro2002torsion} adds the three
 $\zeta_{1,2,3}\,\rcD{}\MAGT{}{\cdot}\FieldF{}$ contractions.
 Their union combines all three families simultaneously,
-\begin{widetext}
-\begin{align}
+\begin{multline}
   \lag_\text{YM--PGT}
     = \lag_\text{EM--RC}
       - \tfrac{1}{4}\xi\,
               \mathcal{F}^{(T)}_{\mu\nu}\,
               \mathcal{F}^{(T)\,\mu\nu}
     + \chi\,\MAGFt{_{[\mu\nu]}}\,
-              \mathcal{F}^{(T)\,\mu\nu}
+              \mathcal{F}^{(T)\,\mu\nu} \\
     + \zeta_1\,\rcD{_\mu}\MAGT{^{\nu}_{\nu\rho}}\,
               \FieldF{^{\mu\rho}}
     + \zeta_2\,\rcD{_\mu}\MAGT{^{\mu}_{\nu\rho}}\,
-              \FieldF{^{\nu\rho}}
+              \FieldF{^{\nu\rho}} \\
     + \zeta_3\,\rcD{_\mu}\MAGT{_{\nu}^{\mu}_{\rho}}\,
               \FieldF{^{\nu\rho}} \, ,
   \label{NonMinimalLagrangian}
-\end{align}
-\end{widetext}
+\end{multline}
 % The $\chi$ and $\zeta_{1,2,3}$ derivative-mixing operators above (and the
 % extended $\chi_{2\!-\!10}$ deferred to the next subsection) are particular
 % contractions drawn from the complete basis of
@@ -552,16 +550,16 @@ suppression loses likelihood weight relative to the prior,
 indicating that closing the $\chi_i$
 basis confines suppression to small $\chi$ rather than opening
 additional suppression corners. Per-parameter $D_\mathrm{KL}$ resolves the
-structure further: $\chi_1$ alone accounts for $D_\mathrm{KL}(P_+\|P_-) = 4.2$
-nats --- five times larger than any other coupling --- identifying
-$\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
-\MAGFt{_{\mu\nu\rho\sigma}}$ as the operator that drives the
-parity-even separation between the %amplification and suppression
+structure further: $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
+\MAGFt{_{\mu\nu\rho\sigma}}$ alone accounts for $D_\mathrm{KL}(P_+\|P_-) = 4.2$
+nats (\cref{KLTableChiClosureComparison}) as the dominant operator driving the
+separation between the %amplification and suppression
 posteriors. The full posterior corner is \cref{CornerChiClosure} and a
 restricted sub-corner over the dominant directions is
-\cref{CarrierChiClosure}; the full per-coupling comparison against the
-non-propagating-torsion control of the same sector appears below in
-\cref{KLTableChiClosureComparison} (\cref{NonPropagatingControl}).
+\cref{CarrierChiClosure}.
+% ; the full per-coupling comparison against the
+% non-propagating-torsion control of the same sector appears below in
+% \cref{KLTableChiClosureComparison} (\cref{NonPropagatingControl}).
 
 \begin{figure*}[!htbp]
   \centering
@@ -674,8 +672,8 @@ comparison against the propagating chain is
   \setlength{\tabcolsep}{4pt}
   \begin{tabular}{l | ccc | ccc}
   \toprule
-    & \multicolumn{3}{c|}{NP control ($\xi=0$, 17D)}
-    & \multicolumn{3}{c}{Propagating ($\xi$ free, 18D)} \\
+    & \multicolumn{3}{c|}{NP control ($\xi=0$)}
+    & \multicolumn{3}{c}{Propagating (18D)} \\
   \cmidrule(lr){2-4}\cmidrule(lr){5-7}
   Coupling & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ \\
   \midrule
@@ -699,7 +697,7 @@ comparison against the propagating chain is
     and amplification-vs-suppression
     $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in nats. ``--'' marks a
     coupling present but below the per-chain top-ten $D_\mathrm{KL}$ cutoff.
-    Corresponding posterior corners: \cref{CornerNPCeven}
+    Corresponding posterior corner plots: \cref{CornerNPCeven}
     (NP control) and \cref{CornerChiClosure} (propagating).}
   \label{KLTableChiClosureComparison}
 \end{table}
@@ -851,10 +849,9 @@ $\varepsilon\!\cdot\!\MAGFt{}\!\times\!\nabla\MAGT{}$
 basis $\{\tilde\chi_{1\!-\!36}\}$ (all 36 contractions
 survive at the linearised level), do not admit finite-amplitude
 posteriors under the plane-wave uniform-$\Bzero$ ansatz at any safe
-horizon. The 20D chain returns
-$\logZ_\pm \approx -15$ with $\log B \approx 0$ (the soft-floor
-signature, \cref{CornerParityOddFull}); the 53D chain returns zero
-live points within the available compute. The linearised eigenvalues
+horizon. The 20D chain returns $\logZ_\pm \approx -15$ with
+$\log B \approx 0$ (the soft-floor signature); the 53D chain returns
+zero live points within the available compute. The linearised eigenvalues
 of the conversion system reach above the modal-solver overflow ceiling
 at $t_\text{end} = 1$ in these coupling directions; the would-be safe
 horizon $t_\text{end} \lesssim 10^{-3}$ places the conversion
@@ -863,17 +860,6 @@ orders of magnitude. Whether this reflects a pathology of the
 unbounded plane-wave ansatz, which a finite-extent geometry could
 saturate, or a fatal pathology of the theories themselves is taken up
 in \cref{Discussion}.
-
-\begin{figure*}[!htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figures/corner_t6_full}
-  \caption{Posterior marginals for the twenty-dimensional parity-odd
-    full sector. The amplification and suppression marginals are
-    coincident across all parameters --- the soft-floor signature
-    returned when the linearised eigenvalues exceed the modal-solver
-    overflow ceiling. Nested sampling gives $\logZ_\pm \approx -15$.}
-  \label{CornerParityOddFull}
-\end{figure*}
 
 \subsubsection{Dark-photon plasma}
 
@@ -1011,9 +997,10 @@ posterior is
 and $\log B = +0.37$, a symmetric and tight null. The QED reference
 point $\sigma/\rho = 7/16$~\cite{adler1971photon,dunne2004heisenberg}
 is indistinguishable from the Einstein--Maxwell baseline at the
-surveyed $\Bzero$. The per-parameter $D_\mathrm{KL}$ (\cref{KLTableEH})
-yields $D_\mathrm{KL}(P_+\|P_-) < 1.7$ nats for both couplings,
-consistent with the null verdict.
+surveyed $\Bzero$.
+% The per-parameter $D_\mathrm{KL}$ (\cref{KLTableEH})
+% yields $D_\mathrm{KL}(P_+\|P_-) < 1.7$ nats for both couplings,
+% consistent with the null verdict.
 
 \begin{figure}[!htbp]
   \centering
@@ -1027,17 +1014,17 @@ consistent with the null verdict.
   \label{CornerEHGert}
 \end{figure}
 
-\begin{table}[h]
-  \centering
-  \begin{tabular}{l | c c c}
-  \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
-  \midrule
-  $\rho$  & 2.64 & 2.70 & 0.45 \\
-  $\sigma$ & 2.41 & 2.64 & 1.66 \\
-  \bottomrule
-  \end{tabular}
-  \caption{Euler--Heisenberg sector: per-coupling $D_\mathrm{KL}$
-    per-coupling $D_\mathrm{KL}$ ranking for the plane-wave-benchmark survey.}
-  \label{KLTableEH}
-\end{table}
+% \begin{table}[h]
+%   \centering
+%   \begin{tabular}{l | c c c}
+%   \toprule
+%   & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
+%   \midrule
+%   $\rho$  & 2.64 & 2.70 & 0.45 \\
+%   $\sigma$ & 2.41 & 2.64 & 1.66 \\
+%   \bottomrule
+%   \end{tabular}
+%   \caption{Euler--Heisenberg sector: per-coupling $D_\mathrm{KL}$
+%     per-coupling $D_\mathrm{KL}$ ranking for the plane-wave-benchmark survey.}
+%   \label{KLTableEH}
+% \end{table}
