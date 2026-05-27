@@ -70,7 +70,7 @@ formula (\cref{GertsenshteinFormula}) in Einstein--Maxwell theory.
 A uniform background field $\Bzero$ fills a periodic domain of length
 $L=100$; the linearised system is initialised as a plane wave on a
 $N=512$ grid and evolved to $t_\text{end}=50$, with photon carrier
-wavenumber $k\approx2.011$ (the nearest $2\pi n/L$ mode, $n=32$),
+wavenumber $k\approx2.011$ ($2\pi n/L$ mode, $n=32$),
 sampling $\Bzero$ at 24 uniformly spaced values in $[0.005,0.25]$.
 
 \paragraph*{Reproduction of the Boccaletti kernel}
@@ -80,10 +80,10 @@ round-off floor of $\sim 10^{-8}$. As $\Bzero$ grows
 the simulation departs from the bare formula by $\mathcal{O}(\Bzero^2)$
 due to the graviton effective-mass detuning; against the two-mode
 prediction of~\cite{raffelt1988mixing} that includes this detuning,
-the signed residual remains $\lesssim 10^{-8}$ across the grid
+the residual remains $\lesssim 10^{-8}$ across the grid
 (\cref{BoccalettiValidation,BoccalettiUniform}).
-The path-integrated kernel \cref{BoccalettiPathIntegrated} is recovered to the same precision
-(\cref{BoccalettiLocalised}).
+The path-integrated kernel \cref{BoccalettiPathIntegrated} is recovered in
+\cref{BoccalettiLocalised}.
 
 
 % Figure 1 — Boccaletti validation. Rendered from
@@ -203,15 +203,15 @@ geometry would saturate is discussed in \cref{Discussion}.
 \phantomsection\label{FrontierAndNulls}
 
 \subsubsection{The $\MAGFt{}^2$-PGT sector}
-We open with the $\MAGFt{}^2$-PGT sector, the simplest PGT extension in which torsion
-propagates as a dynamical field. The Lagrangian retains the three
+We open with the $\MAGFt{}^2$-PGT sector, the minimal coupling GR extension
+that promotes torsion to a dynamical field. The Lagrangian retains the three
 parity-even torsion-squared invariants $I_{1,2,3}$ of
 \cite{shapiro2002torsion,hayashi1979new} together with the
 $\Alp{1}\MAGFt{}^{2}$ curvature-squared term,
 \begin{align}
   \lag_{R^2}
     = -\frac{1}{\kappa^2}\,\MAGFt{}
-       + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3
+       + \sum_{i=1}^{3} \Bet{i} I_i
     - \tfrac{1}{4}\FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}}
        + \Alp{1}\,\MAGFt{}^{2} \, ,
   \label{R2PGTLagrangian}
@@ -221,7 +221,7 @@ $\{\Bet{1\!-\!3}, \Alp{1}\}$. The Gertsenshtein channel is unaffected
 by the $\Alp{1}$ coupling at linear order: the $\Alp{1}$-weighted
 terms are absent from the channel equations
 (\cref{ChannelEqAx,ChannelEqHxy}) that mediate the standard
-$h_\times \leftrightarrow a_\parallel$ conversion,
+$h_{xy} \leftrightarrow a_x$ conversion,
 as the equations of motion in \cref{PropagatingKineticOutput} confirm
 directly:
 \begin{align}
@@ -231,27 +231,26 @@ directly:
     + B_0 \partial_z A_x - \kappa^{-2} \partial_z^2 h_{xy}.
     \label{ChannelEqHxy}
 \end{align}
-The $\Alp{1}\MAGFt{}^{2}$ term does promote the metric-perturbation
-sector to a fourth-order system, which places this theory outside the
+The $\Alp{1}\MAGFt{}^{2}$ term promotes the metric-perturbation
+sector to a fourth-order system, placing this theory outside the
 scope of the numerical pipeline
-(\cref{PerturbativeReduction,SymbolicMechanism}); no published
-constraint-promotion Hamiltonian recipe exists for the
-$\Alp{1}\MAGFt{}^{2}$ case~\cite{blagojevic2018hamiltonian}.
-Torsion-field components appear in the linearised equations but couple
+(\cref{PerturbativeReduction,SymbolicMechanism}).
+% ; no published
+% constraint-promotion Hamiltonian recipe exists for the
+% $\Alp{1}\MAGFt{}^{2}$ case~\cite{blagojevic2018hamiltonian}.
+Torsion components appear coupled
 only into the trace sector of the metric perturbation, not into the
-transverse-traceless channel $h_{xy} \leftrightarrow A_x$ that
-mediates the standard Gertsenshtein conversion; the
-$\Alp{1}$-weighted fourth-order time derivatives introduce Ostrogradsky
-ghost modes in the trace
-sector~\cite{Woodard:2015zca,blagojevic2018hamiltonian,lin2019pgt}, a
-structural consequence of any non-degenerate Lagrangian of order
-greater than two. We conclude that the minimal-PGT family does not
+channels that
+mediate the standard Gertsenshtein conversion. However, the fourth-order time
+derivatives in that sector introduce Ostrogradsky
+ghost modes~\cite{Woodard:2015zca,blagojevic2018hamiltonian,lin2019pgt}.
+We conclude that the minimal-PGT family does not stably
 couple torsion to the Gertsenshtein channel at linear order.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ricci_em}
-  \caption{Overlaid amplification (red) and suppression (blue) corner
+  \caption{Overlaid amplification (yellow) and suppression (magenta) corner
     plot for the EM--RC curvature coupling sector at the
     publication-quality chain. The $\Del{1}$ marginal separates
     cleanly: amplification extends broadly across
@@ -268,15 +267,15 @@ non-minimal vertex: the direct coupling
 $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ between the
 antisymmetric Riemann--Cartan Ricci tensor and the electromagnetic
 field strength, introduced by~\cite{bahamonde2025torsion} as a
-non-minimal coupling linear in $\FieldF{_{\mu\nu}}$ and not
+non-minimal linear coupling and not
 previously investigated in this context.
-This vertex sources the linearised conversion amplitude
-directly at order $\Bzero$ without promoting torsion to a propagating
-field --- torsion remains algebraic. The lagrangian is
+This theory sources the linearised conversion amplitude
+directly at order $\Bzero$ \emph{without} propagating torsion.
+The lagrangian is
 \begin{align}
-  \lag_\text{rf}
-    = -\frac{1}{\kappa^2}\,\MAGFt{}
-      + \sum_{i=1}^3 \Bet{i} I_{i}
+  \lag_\text{EM--RC}
+    = -\tfrac{1}{\kappa^2}\,\MAGFt{}
+      + \Bet{i} I_{i}
       - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
       + \Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}} \, ,
   \label{RicciEMLagrangian}
@@ -288,7 +287,7 @@ $\{\Bet{1\!-\!3}, \Del{1}\}$. Nested sampling gives
   \quad \text{and} \quad
   \log\mathcal{Z}_- = +11.40 \pm 0.10,
 \end{equation*}
-both directions show informative evidence, so the vertex supports both
+thus both directions show informative evidence, so the vertex supports both
 significant amplification and suppression of the conversion at different parameter values.
 The Bayes factor $\log B = +1.98$ records that the prior-weighted integral is
 marginally amplification-dominated. The $\Del{1}$-direction
@@ -298,13 +297,30 @@ magnitude above any other coupling; the
 $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ operator is what drives
 the bidirectional behaviour.
 
-\subsubsection{The Yang--Mills--PGT non-minimal progression}
-The non-minimal vertex tested in the $\Del{1}$ sector above is one of
-several distinct operator families introduced into PGT by different
-authors with different physical motivations. To probe what each family
-contributes to the Gertsenshtein conversion we run a nested progression
-of four sub-theories that each turn on one further family on top of the
-previous, isolating the per-family effect. The progression is
+\begin{table}[h]
+  \centering
+  \begin{tabular}{l | ccc}
+  \toprule
+  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
+  \midrule
+  $\delta_1$ & 1.43 & 3.00 & 20.78 \\
+  $\Bet{1}$ & 3.18 & 2.87 & 0.71 \\
+  $\Bet{2}$ & 2.94 & 2.77 & 0.54 \\
+  $\Bet{3}$ & 0.00 & 0.15 & 0.20 \\
+  \bottomrule
+  \end{tabular}
+  \caption{Ricci--EM cross-term. Per-theory $D_\mathrm{KL}$ carrier identification for the
+    plane-wave-benchmark survey.}
+\end{table}
+
+\subsubsection{The Yang--Mills--PGT}
+Many authors have introduced non-minimal operators into PGT with different physical
+motivations, and the $\Del{1}$ vertex above is just one of several that could break
+the minimal decoupling. To probe what each family contributes to the Gertsenshtein
+conversion we consider four nested sub-theories that each turn on one
+further family, isolating their effect.
+
+The progression is
 \textit{Bahamonde base} (adding the torsion kinetic operator
 $\xi(\nabla\mathcal{T})^2$ to the $\Del{1}$
 vertex of~\cite{bahamonde2025torsion}; this is the first sub-theory in
@@ -316,13 +332,16 @@ completion required to expose the Yang--Mills-like kinetic structure
 of vector torsion missing from earlier PGT formulations);
 \textit{Shapiro extension} (adding the three
 $\zeta_{1,2,3}\,\rcD{_\alpha}\mathcal{T}{\cdot}\FieldF{}$
-contractions of~\cite{shapiro2002torsion}, motivated as the
-non-minimal terms induced by renormalisation of matter on
-torsion--curved spacetime); and the \textit{full non-minimal} union of
+contractions of~\cite{shapiro2002torsion});
+% , motivated as the
+% non-minimal terms induced by renormalisation of matter on
+% torsion--curved spacetime);
+and the \textit{full non-minimal} union of
 all three families. The combined Lagrangian is
+\begin{widetext}
 \begin{align}
-  \lag_\text{nm}
-    = \lag_\text{rf}
+  \lag_\text{YM--PGT}
+    = \lag_\text{EM--RC}
       - \tfrac{1}{4}\xi\,
               \mathcal{F}^{(T)}_{\alpha\beta}\,
               \mathcal{F}^{(T)\,\alpha\beta}
@@ -336,6 +355,7 @@ all three families. The combined Lagrangian is
               \FieldF{^{\beta\gamma}} \, ,
   \label{NonMinimalLagrangian}
 \end{align}
+\end{widetext}
 enumerated against the full
 $\rcD{}\mathcal{T}{\times}\FieldF{}$ class in
 \cref{DerivativeExtensions}. Across the four sub-theories, nested sampling gives amplification log-evidences
@@ -549,7 +569,7 @@ sector on top of the Yang--Mills--PGT non-minimal
 base~\cite{barker2024poincare},
 \begin{align}
   \lag_\chi
-    = \lag_\text{nm}\bigl|_{\chi\to 0}
+    = \lag_\text{YM--PGT}\bigl|_{\chi\to 0}
        + \sum_{i=1}^{10}\chi_i\,
         \tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}\bigr|_{i} \, ,
   \label{ChiClosureLagrangian}
@@ -581,7 +601,7 @@ carrier sub-corner is \cref{CarrierChiClosure}.
   \caption{Carrier sub-corner for the eighteen-dimensional
     $\chi$-closure: the six parameters ranked highest by combined
     marginal-amp / marginal-sup / cross-amp-sup $D_\mathrm{KL}$.  The
-    amplification (orange) and suppression (blue) marginals separate
+    amplification (yellow) and suppression (magenta) marginals separate
     most strongly along $\chi_1$, the
     $\rcD{^\alpha}\mathcal{T}^{\beta\gamma\delta}
      \,\tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$ contraction.
@@ -674,9 +694,9 @@ the single dominant carrier of the suppression preference.
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_parity_odd_minimal}
   \caption{Overlaid corner plot for the four-dimensional parity-odd
     minimal sub-sector $\{\Bet{1\!-\!3}, d_{21}\}$ at
-    the landscape chain. The suppression posterior (blue) concentrates
+    the landscape chain. The suppression posterior (magenta) concentrates
     at small $\{\Bet{i}\}$ and small $|d_{21}|$ while the
-    amplification posterior (red) is broader and offset, giving the
+    amplification posterior (yellow) is broader and offset, giving the
     survey's only clear suppression preference.}
   \label{CornerT6Min}
 \end{figure}
@@ -741,7 +761,7 @@ finite-extent geometry (\cref{Discussion}) would not permit.
   \label{CornerParityOddFull}
 \end{figure}
 
-\subsubsection{Dark-photon plasma analogue}
+\subsubsection{Dark-photon plasma }
 The dark-photon-plasma analogue probes a distinct survey axis from
 the PGT extensions above: the trace-vector torsion $\T[2]{_\mu}$ is
 promoted to a Proca field with kinetic mixing to the photon and a
@@ -756,9 +776,10 @@ We therefore added the Proca mass $m_A^2$ to lift the degeneracy and
 open the mixing channel, with detuning coupling $\delta_m$
 controlling the deviation of the photon mode from the
 Proca-trace mode,
+\begin{widetext}
 \begin{align}
   \lag_\text{dp}
-    = -\frac{1}{\kappa^2}\,\MAGFt{}
+    = -\tfrac{1}{\kappa^2}\,\MAGFt{}
       + \Bet{3} I_3
       - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
       - \tfrac{1}{2}m_A^2\,\T[2]{_\mu}\T[2]{^\mu}
@@ -767,14 +788,14 @@ Proca-trace mode,
               \FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}} \, ,
   \label{DarkPhotonPlasmaLagrangian}
 \end{align}
+\end{widetext}
 giving a four-dimensional prior over
 $\{m_A^2, \xi, \delta_m, \Bet{3}\}$. Nested sampling gives
 \begin{align}
   \log\mathcal{Z}_+ = +9.03 \pm 0.07 \, , \quad
-  \log\mathcal{Z}_- = +2.92 \pm 0.08 \, , \quad
-  \log B = +6.11 \, .
+  \log\mathcal{Z}_- = +2.92 \pm 0.08
 \end{align}
-The
+($\log B = +6.11$). The
 amplification log-evidence dominates the suppression log-evidence,
 but per-parameter $D_\mathrm{KL}$ in \cref{KLPerTheory} identifies
 the plasma-mass coupling $\delta_m$ as the dominant carrier
@@ -789,9 +810,9 @@ orthogonal to the non-minimal PGT extensions of
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_dark_photon_plasma}
   \caption{Carrier sub-corner for the four-dimensional dark-photon
-    plasma analogue. The amplification posterior (orange)
+    plasma analogue. The amplification posterior (yellow)
     concentrates at non-zero plasma mass $m_A^2$ and detuning
-    $\delta_m$; the suppression posterior (blue) is broader,
+    $\delta_m$; the suppression posterior (magenta) is broader,
     consistent with the dominant amplification preference.}
   \label{CornerT1}
 \end{figure}
@@ -835,6 +856,7 @@ giving a two-dimensional prior. Nested sampling gives
   \log\mathcal{Z}_- = -0.185 \pm 0.0004 \, , \quad
   \log B = +0.37 \, .
 \end{align}
+
 a symmetric and tight null, with the QED reference point
 $\sigma/\rho = 7/16$~\cite{adler1971photon,dunne2004heisenberg}
 indistinguishable from the Einstein--Maxwell baseline at the surveyed
@@ -848,7 +870,7 @@ yields $D_\mathrm{KL}(P_+\|P_-) < 1.7$ nats for both couplings
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_eh_gertsenshtein}
-  \caption{Overlaid amplification (red) and suppression (blue) corner
+  \caption{Overlaid amplification (yellow) and suppression (magenta) corner
     plot for the two-dimensional Euler--Heisenberg $F^4$ extension
     of Einstein--Maxwell, in the couplings $\rho$ of $(F\!\cdot\! F)^2$
     and $\sigma$ of $(F\!\cdot\!\tilde F)^2$. The amplification and
