@@ -18,12 +18,18 @@ from __future__ import annotations
 import argparse
 import json
 import operator
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "scripts" / "figures"))
+
+from _corner_style import COLUMN_WIDTH, apply_style
+from _palette import AMP_COLOR, HIGHLIGHT_COLOR
+
 DEFAULT_DATA = (
     REPO_ROOT / "benchmark_results" / "canonical" / "boccaletti_uniform_rich.json"
 )
@@ -31,6 +37,8 @@ DEFAULT_OUT = REPO_ROOT / "manuscript" / "figures" / "fig1_boccaletti_validation
 
 
 def _plot(data: dict, out_path: Path) -> None:
+    apply_style()
+
     params = data["metadata"]["parameters"]
     kappa = params["kappa"]
     grid = data.get("grid") or data.get("results") or []
@@ -50,7 +58,7 @@ def _plot(data: dict, out_path: Path) -> None:
     fig, (ax_top, ax_res) = plt.subplots(
         2,
         1,
-        figsize=(5.2, 4.4),
+        figsize=(COLUMN_WIDTH, COLUMN_WIDTH * 0.85),
         sharex=True,
         gridspec_kw={"height_ratios": [3, 1], "hspace": 0.08},
     )
@@ -59,19 +67,18 @@ def _plot(data: dict, out_path: Path) -> None:
         p_ana_dense,
         ls="--",
         lw=1.0,
-        color="#666",
+        color="#888",
         label=r"$\sin^2(\kappa B_0 t/2)$",
     )
     ax_top.plot(
-        b0, p_sim, marker="o", ms=4, lw=0, color="#1f77b4", label=r"\textit{TIDAL}"
+        b0, p_sim, marker="o", ms=4, lw=0, color=AMP_COLOR, label=r"\textit{TIDAL}"
     )
     ax_top.set_ylabel(r"$P_{g\gamma}$")
-    ax_top.legend(frameon=False, fontsize=9, loc="best")
     ax_top.grid(visible=True, ls=":", alpha=0.3)
 
     residual = p_sim - p_bare
     ax_res.axhline(0.0, color="#999", lw=0.6, ls=":")
-    ax_res.plot(b0, residual, marker="o", ms=4, lw=1.0, color="#d62728")
+    ax_res.plot(b0, residual, marker="o", ms=4, lw=1.0, color=HIGHLIGHT_COLOR)
     ax_res.set_xlabel(r"$B_0$")
     ax_res.set_ylabel(r"$P_\mathrm{TIDAL} - P_\mathrm{bare}$")
     ax_res.grid(visible=True, ls=":", alpha=0.3)
