@@ -67,19 +67,17 @@ uniform-$\Bzero$.
 
 \paragraph*{Validation setup}
 We anchor the survey on a reproduction of the Boccaletti conversion
-kernel \cref{GertsenshteinFormula} in pure Einstein--Maxwell. The validation
-sweep evolves the linearised system on a periodic $N = 512$ grid
-covering a propagation distance $D = 100$, with
+kernel \cref{GertsenshteinFormula} in Einstein--Maxwell theory. The
+linearised system on a periodic $N = 512$ grid
+is evolved over a propagation distance $D = 100$, with
 horizon $t_\text{end} = 50$ and photon carrier wavenumber
-$k = 2.011$. We scan a 24-point grid in $\Bzero \in [0.005, 0.25]$
-and integrate using the Fourier modal backend (\cref{ModalSolver}).
+$k = 2.011$. We scan a 24-point grid in $\Bzero \in [0.005, 0.25]$.
 
 \paragraph*{Reproduction of the Boccaletti kernel}
 \TIDAL{} recovers the Boccaletti kernel \cref{GertsenshteinFormula}
-in the small-$\Bzero$ limit, reproducing the analytic conversion
-probability $\sin^2(\kappa\Bzero t/2)$ to the modal-evolution
+in the small-$\Bzero$ limit to the modal-evolution
 round-off floor of $\sim 10^{-8}$ across the validation grid
-(\cref{BoccalettiValidation}, \cref{BoccalettiUniform}). As
+(\cref{BoccalettiValidation,BoccalettiUniform}). As
 $\Bzero$ grows the simulation departs from the bare formula by
 $\mathcal{O}(\Bzero^2)$, capturing the graviton effective-mass
 detuning that the bare formula drops but the full PDE retains;
@@ -235,7 +233,7 @@ geometric incompatibility, and the QED-EFT parallel-axis null.
 
 \subsection{Informative amplification under the plane-wave benchmark}%
 \label{InformativeAmplification}%
-\label{ChannelStructure}% Compatibility carry-over for theory.tex line 377 cross-ref.
+% \label{ChannelStructure}% Compatibility carry-over for theory.tex line 377 cross-ref.
 
 The per-theory paragraphs below walk through the surveyed sectors in
 the order they entered the investigation: from the minimal-PGT
@@ -261,23 +259,22 @@ We open with R$^2$-PGT, the simplest PGT extension in which torsion
 propagates as a dynamical field. The Lagrangian retains the three
 parity-even torsion-squared invariants $I_{1,2,3}$ of
 \cite{shapiro2002torsion,hayashi1979new} together with the
-$b_5\MAGFt{}\MAGFt{}$ curvature-squared term whose coefficient turns
+$b_5\MAGFt{^2}$ curvature-squared term whose coefficient turns
 on the torsion kinetic mode,
 \begin{align}
   \lag_{R^2}
-    &= -\frac{1}{\kappa^2}\,\MAGFt{}
-       + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3 \nonumber \\
-    &\quad - \tfrac{1}{4}\FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}}
-       + b_5\,\MAGFt{}\,\MAGFt{} \, ,
+    = -\frac{1}{\kappa^2}\,\MAGFt{}
+       + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3
+    - \tfrac{1}{4}\FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}}
+       + b_5\,\MAGFt{^2} \, ,
   \label{R2PGTLagrangian}
 \end{align}
 giving a four-dimensional prior over
-$\{\Bet{1\!-\!3}, b_5\}$. The $b_5\MAGFt{}^{2}$ term promotes the
+$\{\Bet{1\!-\!3}, b_5\}$. The $b_5\MAGFt{^2}$ term promotes the
 metric-perturbation sector to a fourth-order system, which falls
 outside the constraint-promotion Hamiltonian-reduction recipe
-implemented in our solver \cite{blagojevic2018hamiltonian}, so no
-chain was scanned for this theory; the analytic null result reported
-below is read directly from the symbolic kinetic matrix in
+implemented in our solver \cite{blagojevic2018hamiltonian}; the analytic null result
+is read directly from the symbolic kinetic matrix in
 \cref{PropagatingKineticOutput}. Under the plane-wave
 transverse-traceless graviton initial condition on the uniform
 $\Bzero$ background, the torsion-field components of $\MAGFt{}$
@@ -857,6 +854,7 @@ of~\cite{adler1971photon,dunne2004heisenberg},
   \lag_\text{EH}
     = -\frac{1}{\kappa^2}\,\MAGFt{}
        - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
+    + \lambda_\text{top}\,\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}}
     + \rho\,(\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}})^{2}
     + \sigma\,(\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}})^{2} \, ,
   \label{EHGertLagrangian}
@@ -870,7 +868,7 @@ indistinguishable from the Einstein--Maxwell baseline at the surveyed
 $\Bzero = 10^{-2}$. The single $F\cdot\tilde F$ Pontryagin topological
 term is correctly identified as a total derivative at the symbolic
 level by the Euler--Lagrange derivation pipeline
-(\cref{SymbolicEulerHeisenberg}).  The per-parameter $D_\mathrm{KL}$ accordingly
+(\cref{SymbolicEulerHeisenberg}).  The per-parameter $D_\mathrm{KL}$
 yields $D_\mathrm{KL}(P_+\|P_-) < 1.7$ nats for both couplings
 (\cref{KLPerTheory}), consistent with the null verdict.
 
