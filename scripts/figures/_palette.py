@@ -9,15 +9,15 @@ Palette source: https://www.color-hex.com/color-palette/1044488
 IBM colour blind friendly palette for the color scheme used in the figures").
 
 Role assignment for our overlay-corner figures:
-- AMP (amplification posterior, +log A direction)  → ORANGE
-- SUP (suppression posterior, -log A direction)    → BLUE
-- PRIOR (optional third overlay layer)             → MAGENTA at low alpha
-- HIGHLIGHT (carrier-parameter accent in tables)   → YELLOW
-- RESERVED (future fourth overlay, e.g. localised) → PURPLE
+- AMP (amplification posterior, +log A direction)  → YELLOW
+- SUP (suppression posterior, -log A direction)    → MAGENTA
+- PRIOR (optional third overlay layer)             → PURPLE (indigo) at low alpha
+- HIGHLIGHT (carrier-parameter accent in tables)   → ORANGE
+- RESERVED (future fourth overlay, e.g. localised) → BLUE
 
-The amp / sup assignment replaces the previous matplotlib-default
-`#d62728 / #1f77b4` red/blue pair with the colorblind-safe orange/blue
-variant; same semantic role, accessibility improved.
+The yellow/magenta pairing follows Legner–Handley–Barker (2507.09228) and
+gives stronger contrast than the previous orange/blue pair; the purple
+(indigo) prior layer reads as a distinct underlay behind both posteriors.
 """
 
 from __future__ import annotations
@@ -31,11 +31,11 @@ IBM_PALETTE = {
     "blue": "#648fff",
 }
 
-AMP_COLOR = IBM_PALETTE["orange"]
-SUP_COLOR = IBM_PALETTE["blue"]
-PRIOR_COLOR = IBM_PALETTE["magenta"]
-HIGHLIGHT_COLOR = IBM_PALETTE["yellow"]
-RESERVED_COLOR = IBM_PALETTE["purple"]
+AMP_COLOR = IBM_PALETTE["yellow"]
+SUP_COLOR = IBM_PALETTE["magenta"]
+PRIOR_COLOR = IBM_PALETTE["purple"]
+HIGHLIGHT_COLOR = IBM_PALETTE["orange"]
+RESERVED_COLOR = IBM_PALETTE["blue"]
 
 # Default alphas tuned for the overlay-corner visual: amp / sup carry the
 # primary signal; prior (when drawn) is a faint reference cloud.
