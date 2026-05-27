@@ -174,7 +174,9 @@ def _process(entry: dict) -> None:
 
     # For wide (high-D) carrier corners apply the same tick-density and
     # tick-label-size fixes as overlay_corner() does for full-chain plots.
-    if n_params >= HIGH_DIM_THRESHOLD:
+    # Only applies when wide=true — column-width figures have ≤6 params in
+    # the sub-corner and don't need reduced tick labels.
+    if entry.get("wide") and n_params >= HIGH_DIM_THRESHOLD:
         from matplotlib.ticker import MaxNLocator
 
         tick_label_pt = 5 if n_params >= 20 else 6
@@ -195,12 +197,18 @@ def _process(entry: dict) -> None:
         mpatches.Patch(color=SUP_COLOR, alpha=OVERLAY_ALPHA, label="suppression"),
     ]
     ax_anchor = axes.iloc[0, 0]
+    n_plot = len(plot_params)
+    loc = "upper left" if n_plot <= 3 else "upper right"
+    anchor = (1.05, 1.0) if n_plot <= 3 else (n_plot - 0.5, 1.0)
     ax_anchor.legend(
         handles=legend_handles,
-        loc="upper right",
-        bbox_to_anchor=(len(plot_params) - 0.5, 1.0),
+        loc=loc,
+        bbox_to_anchor=anchor,
         bbox_transform=ax_anchor.transAxes,
-        frameon=False,
+        frameon=True,
+        facecolor="none",
+        edgecolor="#aaaaaa",
+        framealpha=1.0,
         fontsize=mpl.rcParams["legend.fontsize"],
     )
 

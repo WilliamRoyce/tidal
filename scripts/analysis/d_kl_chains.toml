@@ -88,7 +88,6 @@ geometry = "plane_wave"
 jobid = "29705560"
 amp_path = "hpc_results/29705560/np_ceven_amp_v1"
 sup_path = "hpc_results/29705560/np_ceven_sup_v1"
-wide = true  # included at \textwidth (figure*) in §4 — generate at FIG_WIDTH
 param_names = ["beta1", "beta2", "beta3", "delta1", "zeta1", "zeta2", "zeta3", "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10"]
 
 [[chain]]
@@ -97,7 +96,6 @@ geometry = "plane_wave"
 jobid = "29694142"
 amp_path = "hpc_results/29694142/t9_amp_v2"
 sup_path = "hpc_results/29694142/t9_sup_v2"
-wide = true  # included at \textwidth (figure*) in §4 — generate at FIG_WIDTH
 param_names = ["beta1", "beta2", "beta3", "xi1", "xi2", "xi3", "xi4", "xi5", "xi6", "xi7", "xi8", "xi9", "xi10", "xi12", "xi13", "xi14", "xi15", "xi16", "delta1", "zeta1", "zeta2", "zeta3", "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10"]
 
 [[chain]]

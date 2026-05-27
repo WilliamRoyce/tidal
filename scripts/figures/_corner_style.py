@@ -254,12 +254,11 @@ def overlay_corner(
         ax_anchor = axes.iloc[0, 0]
         n_params = len(params)
         # Default: anchor the legend inside the empty upper-right region.
-        # For very small grids (≤ 3 params) the upper-right cell is only one
-        # panel wide; the legend can bleed into the 2D joint panel below it.
-        # Place it above the figure instead (y > 1 in transAxes → above the
-        # top edge; bbox_inches='tight' then includes it cleanly).
+        # For very small grids (≤ 3 params) the single empty cell is narrow;
+        # anchor from the left edge of that cell so the legend sits flush
+        # inside it without bleeding into the 2D joint panel below.
         if n_params <= 3:
-            loc, anchor = "lower center", (0.5, 1.08)
+            loc, anchor = "upper left", (1.05, 1.0)
         else:
             loc, anchor = "upper right", (n_params - 0.5, 1.0)
         leg_kw: dict = {
@@ -267,7 +266,10 @@ def overlay_corner(
             "loc": loc,
             "bbox_to_anchor": anchor,
             "bbox_transform": ax_anchor.transAxes,
-            "frameon": False,
+            "frameon": True,
+            "facecolor": "none",
+            "edgecolor": "#aaaaaa",
+            "framealpha": 1.0,
             "fontsize": mpl.rcParams["legend.fontsize"],
         }
         if legend_kw:
