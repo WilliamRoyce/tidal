@@ -32,7 +32,11 @@ geometry = "plane_wave"
 jobid = "29189748+29189761"
 amp_path = "hpc_results/29189748/d1_amp_v3"
 sup_path = "hpc_results/29189761/d1_sup_v3"
-param_names = ["alpha1", "alpha2", "alpha3", "delta1"]
+# alpha{1,2,3} in the source chain are physically the torsion masses
+# β{1,2,3}; renamed here so the figure axes show β consistent with the
+# rest of §4. TODO(hpc): re-run with matched β1,β2,β3 priors (currently
+# β3 used a one-sided broad prior, see TODO note in results.tex).
+param_names = ["beta1", "beta2", "beta3", "delta1"]
 
 [[chain]]
 theory = "ym_pgt_bahamonde"
