@@ -69,19 +69,32 @@ literature show that linearised exponential or tachyonic modes need
 not be fatal pathologies. In the Standard Model the Higgs field
 appears tachyonic about the unbroken vacuum but is perfectly unitary
 about its symmetry-broken ground state~\cite{legner2025torc};
-analogously, in PGT the spin-connection modes can be massive in the
-ultraviolet and integrate out at the infrared to recover general
-relativity as the low-energy effective theory, so linearised tachyons
-can be a signature of the wrong vacuum rather than a fatal pathology.
+analogously, in the TorC model~\cite{legner2025torc} the linearised
+tachyons around $T = 0$ are benign because the physical ground state
+is a torsion-condensed phase at $T^2 \sim M_P$, with the
+Einstein--Hilbert term itself emerging from a post-Riemannian
+$R\,T^2$ cross-term in that condensed vacuum. The parallel is a
+precedent that linearised exponential modes do not by themselves
+disqualify a sector; we do not claim that our surveyed Lagrangians
+necessarily realise such a condensation, only that the choice of
+vacuum around which the modes are evaluated can change the unitarity
+verdict.
 Higher-derivative gravity theories that exhibit Ostrogradsky ghosts at
 the linearised level can be non-linearly ghost-free when appropriate
-torsion or higher-curvature terms are present~\cite{aoki2020nonlinear}.
-Recent metric-affine catalogues show that ghost-tachyon tunings
-constructed at the linearised level break down nonlinearly, and that
-the only unitarity-protected branches are those where a gauge symmetry
-rather than a parameter choice removes the
-ghost~\cite{barker2025irfound1,barker2025irfound2}; this is precisely
-the branch that the non-propagating-torsion control sits in. These
+torsion or higher-curvature terms are
+present~\cite{aoki2020nonlinear,bahamonde2025cubic}.
+Recent metric-affine catalogues~\cite{barker2025irfound1,barker2025irfound2}
+argue that a no-ghost / no-tachyon condition that is imposed by hand
+as an equality among couplings is not stable against quantum
+corrections to those same couplings: the corrected coupling values
+violate the tuning, and the ghost or tachyon reappears. By contrast,
+when the absence of a ghost mode follows from a gauge symmetry of the
+Lagrangian itself, no choice of coupling values can violate it, and
+unitarity is structurally protected. The non-propagating-torsion
+control of \cref{NonPropagatingControl} is a particularly clean
+example of the latter: with $\xi$ pinned to zero there is no new
+kinetic operator at all, so no wrong-sign coefficient can appear in
+the first place. These
 precedents do not prove that the linearised exponential growth we
 observe is physical, but they establish that it is not automatically
 fatal, and that resolution belongs to either finite-extent geometry or
@@ -92,14 +105,18 @@ The same plane-wave embedding makes the parity-odd full and complete
 sectors of \cref{ParityOddGeomIncomp} structurally incompatible with
 finite-amplitude inference: the $\varepsilon$-tensor-mediated
 contractions $\varepsilon\!\cdot\!\MAGT{}\!\cdot\!\FieldF{}$ and
-$\varepsilon\!\cdot\!\MAGFt{}\!\cdot\!\nabla\MAGT{}$ generate
-exponential mode amplification on an unbounded plane-wave background
-that no choice of integration horizon resolves while keeping the
-conversion above the noise floor. A bounded interaction time, set by a
-finite-extent geometry, would cap the growth at a finite envelope and
-restore a finite-amplitude posterior --- which is the same hypothesis
-the localised-geometry programme would test for the amplifying
-parity-even sectors.
+$\varepsilon\!\cdot\!\MAGFt{}\!\cdot\!\nabla\MAGT{}$ produce linearised
+eigenvalues so large that the matrix-exponential overflow ceiling is
+breached at essentially any propagation time accessible to the modal
+solver. A bounded interaction time, set by a finite-extent geometry,
+would cap the growth at a finite envelope and restore a
+finite-amplitude posterior --- which is the same hypothesis the
+localised-geometry programme would test for the amplifying parity-even
+sectors. The same finite-extent programme would also probe physics
+inaccessible to the plane-wave ansatz, including $k$-mode interactions
+across the bounded interaction region and realistic background
+geometries that allow physical-magnitude amplification estimates for
+actual astrophysical events.
 
 % Move 2: Implications (~250 w total across three named paragraphs,
 % one per constructive path). Each path is named, not derived; brief.
@@ -169,14 +186,3 @@ parity-even sectors.
 % specific theory class and parameter regime in which it was observed.
 % Avoid bullet lists per genre_conventions_theory.md §(h)
 % anti-patterns.
-
-% Conclusion paragraph — short, confident closing of the report.
-\paragraph*{Closing remarks}
-% TODO: ~70 w. Two-sentence closing summarising what the report
-% delivers (a survey of the Gertsenshtein channel across [N] PGT
-% theory classes, an observed channel pattern within the surveyed
-% class that — where it holds — explains the corresponding survey
-% nulls, and a positive [or null] headline finding) and one
-% forward-looking sentence about the natural extension. The closing
-% sentence is definitive (per style_analysis.md §(a)), not
-% aspirational.

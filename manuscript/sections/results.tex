@@ -467,16 +467,16 @@ other vertices are switched on.
   \label{CornerT5D21}
 \end{figure}
 
-\begin{figure*}[!htbp]
+\begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/corner_t5_d22_shapiro}
+  \includegraphics[width=\columnwidth]{figures/corner_t5_d22_shapiro}
   \caption{Posterior marginals for the eight-dimensional Shapiro
     extension $\{\Bet{1\!-\!3},\Del{1},\xi,\zeta_{1\!-\!3}\}$ of the
     Yang--Mills--PGT family. Diagonal: 1D marginals (amplification:
     magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
     the 68\% and 95\% credible contours.}
   \label{CornerT5D22}
-\end{figure*}
+\end{figure}
 
 \begin{figure}[!htbp]
   \centering
@@ -843,12 +843,12 @@ at any viable propagation time; this is discussed in
 \label{ParityOddGeomIncomp}
 The twenty-parameter parity-odd full sector
 $\{d_{14}, d_{15}, d_{17}, d_{19\!-\!21},
-\tilde\zeta_{1,2,3,5,6}\}$ on top of the Yang--Mills--PGT non-minimal
+\tilde\zeta_{1\!-\!6}\}$ on top of the Yang--Mills--PGT non-minimal
 base (with $d_{16}$ and $\tilde\zeta_4$ vanishing in the plane-wave
 reduction), and the fifty-three-parameter complete parity-odd closure
 adding the
 $\varepsilon\!\cdot\!\MAGFt{}\!\times\!\nabla\MAGT{}$
-basis $\{\tilde\chi_1, \ldots, \tilde\chi_{36}\}$ (all 36 contractions
+basis $\{\tilde\chi_{1\!-\!36}\}$ (all 36 contractions
 survive at the linearised level), do not admit finite-amplitude
 posteriors under the plane-wave uniform-$\Bzero$ ansatz at any safe
 horizon. The 20D chain returns
@@ -877,60 +877,60 @@ in \cref{Discussion}.
 
 \subsubsection{Dark-photon plasma}
 
-Beyond the PGT geometric hierarchy, \TIDAL{}'s theory-agnostic
-architecture admits any Lagrangian as input; we use this to test
-whether the conversion signal could arise from effective interactions
-described in the explicit gauge-theoretic language of the dark-photon
-phenomenology rather than the PGT geometric construction. The
-dark-photon-plasma analogue promotes the trace-vector torsion
-$\T[2]{_\mu}$ to a Proca field that kinetically mixes with the
-photon~\cite{Holdom:1985ag,caputo2021darkphoton}, recovering the
-standard dark-photon limit of~\cite{caputo2021darkphoton} at
-$\Bzero \to 0$. The Einstein--Cartan $\Bet{3} I_3$ term of the
-YM--PGT base already carries a Proca-like torsion mass, so the
-kinetic-mixing operator is non-trivial in the Holdom
-sense~\cite{Holdom:1985ag}; the linearised system nevertheless has
-two propagating eigenmodes --- a pure photon mode and a
-photon-plus-trace-vector-torsion mixture --- and our
-initial-condition setup excites only the first, leaving no torsion
-content to source Gertsenshtein conversion. An additional photon
-plasma mass $m_A^2$ shifts the eigenmode structure so that the
-IC-excited mode acquires torsion content. A further detuning
-coupling $\Del{m}$ gives the photon and trace-vector torsion
-different masses and so different dispersion relations: when
-$\Del{m}$ is small the conversion remains coherent; when $\Del{m}$
-is large the dispersion mismatch detunes the Gertsenshtein
-resonance,
+The surveys above all sit within the PGT family, but \TIDAL{} accepts
+any Lagrangian as input. Plasma models, in which the photon acquires
+an effective mass at the perturbation level, and dark-photon models,
+in which a second U(1) field kinetically mixes with the photon via
+the Holdom mechanism~\cite{Holdom:1985ag,caputo2021darkphoton}, are
+both of independent interest. We combine them in a single sector by
+promoting the trace-vector torsion $\T[2]{_\mu}$ to a Proca field that
+kinetically mixes with the photon, with a photon plasma mass added at
+the perturbation level. The Einstein--Cartan $\Bet{3} I_3$ term of the
+YM--PGT base already gives the trace-vector torsion a Proca-like mass,
+so the kinetic-mixing operator is non-trivial in the Holdom
+sense~\cite{Holdom:1985ag}; the eigenvalue and coupling structure of
+the linearised system is nevertheless such that the graviton initial
+condition cannot excite torsion-coupled amplification without further
+mass structure. An additional photon plasma mass $m_A^2$ enters at the
+perturbation level and, together with the kinetic-mixing operator
+$\delta_m\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu}$ that allows
+the photon and $\mathcal{F}^{(T)}$ to mix, gives the Lagrangian
 \begin{multline}
-  \lag_\text{dp}
+  \lag_\text{Dark-photon}
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
       + \Bet{3} I_3
       - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
-      - \tfrac{1}{2}m_A^2\,\T[2]{_\mu}\T[2]{^\mu} \\
-      + \xi\,\T[2]{_\mu}\PD{_\nu}\FieldF{^{\mu\nu}}
-      + \Del{m}\,\T[2]{_\mu}\T[2]{^\mu}\,
-              \FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}} \, ,
+      - \tfrac{1}{2}\,m_A^2\,a_\mu a^\mu \\
+      - \tfrac{1}{4}\,\xi\,
+              \mathcal{F}^{(T)}_{\mu\nu}\mathcal{F}^{(T)\,\mu\nu}
+      + \Del{m}\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu} \, ,
   \label{DarkPhotonPlasmaLagrangian}
 \end{multline}
-giving a four-dimensional prior over
-$\{m_A^2, \xi, \Del{m}, \Bet{3}\}$. We find
+where $\mathcal{F}^{(T)}_{\mu\nu}$ is the field strength of
+$\T[2]{_\mu}$ and $a_\mu$ is the photon perturbation field, giving a
+four-dimensional prior over $\{m_A^2, \xi, \Del{m}, \Bet{3}\}$. We
+find
 \begin{align*}
   \logZ_+ = +9.03 \pm 0.07
   \qand
   \logZ_- = +2.92 \pm 0.08,
 \end{align*}
-with $\log B = +6.11$. The
-amplification log-evidence dominates the suppression log-evidence,
-but per-parameter $D_\mathrm{KL}$ (\cref{KLTableDarkPhoton}) identifies
-the detuning coupling $\Del{m}$ as the dominant
-$D_\mathrm{KL}(P_+\|P_-)$ contribution at $3.4$~nats; the kinetic
-mixing $\xi$ adds little structure beyond it. The dominant
-contribution comes from $\Del{m}$ controlling whether the photon and
-trace-vector torsion sit in a coherent dispersion regime (amplifying)
-or a mismatched one (suppressing) rather than from any genuine
-torsion--electromagnetism vertex; this sector is therefore largely
-orthogonal to the non-minimal PGT extensions of
-\cref{InformativeAmplification}.
+with $\log B = +6.11$. The amplification log-evidence dominates the
+suppression log-evidence, and the per-parameter $D_\mathrm{KL}$
+figures of \cref{KLTableDarkPhoton} place $\Del{m}$ (kinetic mixing,
+$3.4$~nats) above $m_A^2$ (photon plasma mass, $1.45$~nats). This
+ordering should be read against the broad log-uniform priors used for
+$m_A^2$, $\xi$, and $\Bet{3}$ (six decades each), which dilute their
+marginal $D_\mathrm{KL}$ figures relative to the arctan-uniform prior
+on $\Del{m}$. Pre-sampling parameter-sweep tests of this sector found
+that the dark-photon kinetic mixing adds little to the base
+plasma-mass model either way: the conversion structure is controlled
+by the photon plasma mass $m_A^2$, which shifts the photon dispersion
+away from the (effectively massless at the surveyed scales)
+trace-vector-torsion dispersion and detunes coherent Gertsenshtein
+conversion. The nominal $D_\mathrm{KL}$ ordering reported here
+therefore understates the role of $m_A^2$ because of the prior
+breadth.
 
 \begin{figure}[!htbp]
   \centering
