@@ -306,7 +306,7 @@ symmetric under $\Del{1} \to -\Del{1}$.
     & \multicolumn{3}{c|}{Parity-even EM--RC ($\Del{1}$)}
     & \multicolumn{3}{c}{Parity-odd ($d_{21}$)} \\
   \cmidrule(lr){2-4}\cmidrule(lr){5-7}
-  Coupling & $D_+$ & $D_-$ & $D_{+\|-}$ & $D_+$ & $D_-$ & $D_{+\|-}$ \\
+  Coupling & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ \\
   \midrule
   $\Del{1}$ & 1.43 & 3.00 & 20.78 & --   & --   & --   \\
   $d_{21}$  & --   & --   & --    & 1.79 & 3.04 & 8.83 \\
@@ -319,8 +319,8 @@ symmetric under $\Del{1} \to -\Del{1}$.
     $\Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ sector
     (\cref{RicciEMLagrangian}) and its parity-odd $\varepsilon$-twin
     $d_{21}\,\varepsilon^{\mu\nu\rho\sigma}\MAGFt{_{\mu\nu}}\FieldF{_{\rho\sigma}}$.
-    Sub-columns are amplification-only $D_+ = D_\mathrm{KL,+}$,
-    suppression-only $D_- = D_\mathrm{KL,-}$, and
+    Sub-columns are amplification-only $D_\mathrm{KL,+}$,
+    suppression-only $D_\mathrm{KL,-}$, and
     amplification-vs-suppression
     $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in nats. ``--'' marks a
     coupling absent from that sector's Lagrangian.}
@@ -426,13 +426,15 @@ $\log B = +1.84$ (Bahamonde), $+2.80$ (Barker),
 $+2.68$ (Shapiro), and $+7.37$ (union).
 The Barker and Shapiro single-family extensions give comparable Bayes
 factors, while the union gives a substantially larger amplification
-preference. Across all four sub-theories the suppression log-evidences sit between
-$+2.5$ and $+6.2$, well above the prior baseline: the suppression
-region of parameter space remains likelihood-weighted in every
-sub-theory, and the amplification dominance reflects a larger $\logZ_+$
-at finite $\logZ_-$ rather than a vanishing suppression region. Each of the four sub-theories concentrates its
-separation between the amplification and suppression posteriors onto a
-single coupling, but it is a different coupling each time
+preference. Across all four sub-theories
+% the suppression log-evidences sit between
+% $+2.5$ and $+6.2$, well above the prior baseline: the suppression
+% region of parameter space remains likelihood-weighted in every
+% sub-theory, and
+the amplification dominance reflects a larger $\logZ_+$
+rather than a vanishing suppression region. Each of the four sub-theories concentrates its
+separation between the posteriors onto a
+single coupling, but it is a \emph{different} coupling each time
 (\cref{KLTableYMUnified}): the torsion kinetic operator
 $\xi(\nabla\MAGT{})^2$ in the Bahamonde and Barker sectors, the torsion
 mass $\Bet{1}$ in the Shapiro sector, and the derivative-mixing operator
@@ -498,9 +500,9 @@ other vertices are switched on.
     & \multicolumn{3}{c|}{Shapiro}   & \multicolumn{3}{c|}{Union}
     & \multicolumn{3}{c}{NP control ($\xi=0$)} \\
   \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}\cmidrule(lr){14-16}
-  Coupling & $D_+$ & $D_-$ & $D_{+\|-}$ & $D_+$ & $D_-$ & $D_{+\|-}$
-           & $D_+$ & $D_-$ & $D_{+\|-}$ & $D_+$ & $D_-$ & $D_{+\|-}$
-           & $D_+$ & $D_-$ & $D_{+\|-}$ \\
+  Coupling & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$
+           & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$
+           & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ \\
   \midrule
   $\Del{1}$  & 3.02 & 3.06 & 0.08 & 3.09 & 2.98 & 0.52 & 2.87 & 2.94 & 0.20 & 2.93 & 2.71 & 0.17 & 2.76 & 2.73 & 0.26 \\
   $\xi$      & 1.20 & 1.77 & 5.55 & 2.65 & 1.59 & 4.87 & ---  & ---  & ---  & ---  & ---  & ---  & $\dagger$ & $\dagger$ & $\dagger$ \\
@@ -515,7 +517,7 @@ other vertices are switched on.
   \end{tabular}
   \caption{Yang--Mills--PGT family: per-coupling $D_\mathrm{KL}$ across the
     five chains. Sub-columns are amplification-only
-    $D_+ = D_\mathrm{KL,+}$, suppression-only $D_- = D_\mathrm{KL,-}$, and
+    $D_\mathrm{KL,+}$, suppression-only $D_\mathrm{KL,-}$, and
     amplification-vs-suppression $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in
     nats. ``---'' marks a coupling absent from that sub-theory's
     Lagrangian; ``--'' marks one present but below the per-chain top-five
@@ -543,17 +545,19 @@ giving an eighteen-dimensional prior. The posterior gives
   \qand
   \logZ_- = -3.18 \pm 0.07,
 \end{equation*}
-($\log B = +13.48$) under the plane-wave approximation. The
-suppression log-evidence drops below zero --- the only sector in the
-parity-even hierarchy where the suppression direction loses likelihood
-weight relative to the prior --- indicating that closing the $\chi_i$
+so $\log B = +13.48$. The
+suppression loses likelihood weight relative to the prior,
+% --- the only sector in the
+% parity-even hierarchy where the suppression direction loses likelihood
+% weight relative to the prior ---
+indicating that closing the $\chi_i$
 basis confines suppression to small $\chi$ rather than opening
 additional suppression corners. Per-parameter $D_\mathrm{KL}$ resolves the
 structure further: $\chi_1$ alone accounts for $D_\mathrm{KL}(P_+\|P_-) = 4.2$
-nats --- five times larger than any other coupling --- identifying the
-explicit contraction $\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
+nats --- five times larger than any other coupling --- identifying
+$\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
 \MAGFt{_{\mu\nu\rho\sigma}}$ as the operator that drives the
-parity-even separation between the amplification and suppression
+parity-even separation between the %amplification and suppression
 posteriors. The $D_\mathrm{KL}$-ranked sub-corner is
 \cref{CarrierChiClosure}; the full per-coupling comparison against the
 non-propagating-torsion control of the same sector appears below in
@@ -589,18 +593,16 @@ The amplifying parameter regions identified above produce exponential
 mode growth in the linearised plane-wave evolution. The modal solver
 evolves the state via the matrix exponential
 $y(t) = \exp(M(k)\,t)\,y_0$ (\cref{ModalCoupledEntry}); a single
-eigenvalue $\lambda$ of $M(k)$ with $\Re\,\{\lambda\} > 0$ on any
+eigenvalue $\lambda$ of $M(k)$ with $\Re\{\lambda\} > 0$ on any
 field component feeds exponential growth into every coupled field
 through the off-diagonal entries of $\exp(M(k)\,t)$.
 Distinguishing a genuine new amplification mechanism from a
-tachyonic instability of the unbounded plane-wave ansatz, or from a
+tachyonic instability or a
 ghost is
-not straightforward from the survey output alone. The unitarity
-conditions for parity-even PGT are catalogued as inequalities on the
-coupling
-combinations~\cite{karananas2014parity,blagojevic2018hamiltonian,sezgin1980ghostfree,lin2019pgt,Yo:1999ex,Yo:2001sy};
+not straightforward. The unitarity
+conditions for PGT are catalogued in~\cite{karananas2014parity,blagojevic2018hamiltonian,sezgin1980ghostfree,lin2019pgt,Yo:1999ex,Yo:2001sy};
 % for the parity-violating extensions they are obtained numerically
-and through the Hamiltonian particle-spectrum analysis of
+and obtained through the Hamiltonian particle-spectrum analysis of
 \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}. Integration
 with \PSALTer{} is deferred to future work.
 
@@ -616,7 +618,7 @@ YM--PGT sectors were all anchored to
 exponential-mode-growth regions of parameter space, so a natural
 expectation was that removing the propagating-torsion modes
 % --- which
-% carry the positive-$\Re\,\{\lambda\}$ eigenvalues responsible for
+% carry the positive-$\Re\{\lambda\}$ eigenvalues responsible for
 % that growth ---
 would collapse the amplification corner entirely. However, the
 eight-dimensional control returns
@@ -663,7 +665,7 @@ comparison against the propagating chain is
     & \multicolumn{3}{c|}{NP control ($\xi=0$, 17D)}
     & \multicolumn{3}{c}{Propagating ($\xi$ free, 18D)} \\
   \cmidrule(lr){2-4}\cmidrule(lr){5-7}
-  Coupling & $D_+$ & $D_-$ & $D_{+\|-}$ & $D_+$ & $D_-$ & $D_{+\|-}$ \\
+  Coupling & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ \\
   \midrule
   $\chi_{1}$  & 1.72 & 2.82 & 5.78 & 1.68 & 2.82 & 4.18 \\
   $\chi_{2}$  & 2.39 & 2.78 & 0.89 & 2.37 & 2.66 & 0.85 \\
@@ -681,7 +683,7 @@ comparison against the propagating chain is
   \end{tabular}
   \caption{$\chi$-closure sector: per-coupling $D_\mathrm{KL}$ across
     the two chains. Sub-columns are amplification-only
-    $D_+ = D_\mathrm{KL,+}$, suppression-only $D_- = D_\mathrm{KL,-}$,
+    $D_\mathrm{KL,+}$, suppression-only $D_\mathrm{KL,-}$,
     and amplification-vs-suppression
     $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in nats. ``--'' marks a
     coupling present but below the per-chain top-ten $D_\mathrm{KL}$ cutoff.
@@ -696,7 +698,7 @@ the algebraic torsion field remains bounded relative to the
 metric/photon perturbations at the maximum-a-posteriori point of the
 chain, ruling out a constraint-divergence pathology; the linearised
 eigenvalue spectrum at that point shows no
-$\Re\,\{\lambda\} > 0$ modes in the pure metric channel; and the
+$\Re\{\lambda\} > 0$ modes in the pure metric channel; and the
 perturbativity envelope of \cref{PerturbativeBound} is satisfied
 across the posterior support. The corresponding $D_\mathrm{KL}$-ranked
 sub-corners are
@@ -870,8 +872,10 @@ in \cref{Discussion}.
   \label{CornerParityOddFull}
 \end{figure}
 
-Beyond the PGT geometric hierarchy, \TIDAL{}
-theory-agnostic architecture admits any Lagrangian as input;
+\subsubsection{Dark-photon plasma }
+
+Beyond the PGT geometric hierarchy, \TIDAL{}'s
+theory-agnostic architecture admits any Lagrangian input;
 two phenomenologically motivated survey axes probe whether
 the conversion signals observed above could arise from effective
 interactions outside the PGT framework.
@@ -879,11 +883,7 @@ The dark-photon-plasma analogue asks whether a Proca-like torsion mass
 term can reproduce the amplification signal, bridging from the PGT
 geometric language to the effective dark-photon phenomenology
 of~\cite{caputo2021darkphoton}.
-A parallel QED-EFT axis along the Euler--Heisenberg $F^4$ corrections
-tests whether the amplification could be an artefact of nonlinear
-electromagnetic corrections at the surveyed field strengths.
 
-\subsubsection{Dark-photon plasma }
 The dark-photon-plasma analogue probes a distinct survey axis from
 the PGT extensions above: the trace-vector torsion $\T[2]{_\mu}$ is
 promoted to a Proca field with kinetic mixing to the photon and a
@@ -898,19 +898,17 @@ We therefore added the Proca mass $m_A^2$ to lift the degeneracy and
 open the mixing channel, with detuning coupling $\Del{m}$
 controlling the deviation of the photon mode from the
 Proca-trace mode,
-\begin{widetext}
-\begin{align}
+\begin{multline}
   \lag_\text{dp}
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
       + \Bet{3} I_3
       - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
-      - \tfrac{1}{2}m_A^2\,\T[2]{_\mu}\T[2]{^\mu}
+      - \tfrac{1}{2}m_A^2\,\T[2]{_\mu}\T[2]{^\mu} \\
       + \xi\,\T[2]{_\mu}\PD{_\nu}\FieldF{^{\mu\nu}}
       + \Del{m}\,\T[2]{_\mu}\T[2]{^\mu}\,
               \FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}} \, ,
   \label{DarkPhotonPlasmaLagrangian}
-\end{align}
-\end{widetext}
+\end{multline}
 giving a four-dimensional prior over
 $\{m_A^2, \xi, \Del{m}, \Bet{3}\}$. We find
 \begin{align*}
@@ -985,15 +983,15 @@ corrections at the $F^4$
 level~\cite{adler1971photon,dunne2004heisenberg}, which can themselves
 source non-linear photon--photon and photon--graviton interactions in a
 magnetic background. Three EH operators enter,
-\begin{align}
+\begin{multline}
   \lag_\text{EH}
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
        - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
-    + \lambda_\text{top}\,\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}}
+    + \lambda_\text{top}\,\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}} \\
     + \rho\,(\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}})^{2}
     + \sigma\,(\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}})^{2} \, ,
   \label{EHGertLagrangian}
-\end{align}
+\end{multline}
 of which the $F\cdot\tilde F$ Pontryagin term is a total covariant
 derivative and drops out of the equations of motion at the symbolic
 level (\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
