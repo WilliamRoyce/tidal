@@ -30,6 +30,8 @@ import math
 import sys
 from pathlib import Path
 
+import matplotlib as mpl
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "scripts" / "figures"))
 sys.path.insert(0, str(REPO_ROOT))
@@ -44,6 +46,7 @@ from _corner_style import (
     COLUMN_WIDTH,
     CONTOUR_LEVELS,
     FIG_WIDTH,
+    HIGH_DIM_THRESHOLD,
     OVERLAY_ALPHA,
     SUP_COLOR,
     apply_style,
@@ -141,11 +144,17 @@ def _process(entry: dict) -> None:
     full_params = list(entry["param_names"])
     full_labels = {name: _label(name) for name in full_params}
 
+    # wide=true in the TOML means the figure is included at \textwidth (figure*)
+    # in the manuscript; all others are included at \columnwidth.  The figure
+    # must be generated at the matching width so that absolute-pt font sizes
+    # land at the intended pt values in the final PDF rather than being
+    # halved by a 7in→3.375in scale-down.
+    fig_w = FIG_WIDTH if entry.get("wide") else COLUMN_WIDTH
+
     apply_style()
     amp_ns = load_chains(amp_path, params=full_params, param_labels=full_labels)
     sup_ns = load_chains(sup_path, params=full_params, param_labels=full_labels)
 
-    fig_w = COLUMN_WIDTH if len(plot_params) <= 4 else FIG_WIDTH
     log.info("[%s] rendering top-%d carrier sub-corner: %s", theory, k, plot_params)
     axes = amp_ns.plot_2d(
         plot_params,
@@ -163,7 +172,24 @@ def _process(entry: dict) -> None:
     )
     fig = axes.iloc[0, 0].figure
 
+    # For wide (high-D) carrier corners apply the same tick-density and
+    # tick-label-size fixes as overlay_corner() does for full-chain plots.
+    if n_params >= HIGH_DIM_THRESHOLD:
+        from matplotlib.ticker import MaxNLocator
+
+        tick_label_pt = 5 if n_params >= 20 else 6
+        for ax in axes.values.flatten():
+            if ax is None:
+                continue
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
+            ax.tick_params(axis="both", labelsize=tick_label_pt)
+            for label in ax.get_xticklabels():
+                label.set_rotation(45)
+                label.set_horizontalalignment("right")
+
     # Add legend anchored to the top-right of the corner grid.
+
     legend_handles = [
         mpatches.Patch(color=AMP_COLOR, alpha=OVERLAY_ALPHA, label="amplification"),
         mpatches.Patch(color=SUP_COLOR, alpha=OVERLAY_ALPHA, label="suppression"),
@@ -175,6 +201,7 @@ def _process(entry: dict) -> None:
         bbox_to_anchor=(len(plot_params) - 0.5, 1.0),
         bbox_transform=ax_anchor.transAxes,
         frameon=False,
+        fontsize=mpl.rcParams["legend.fontsize"],
     )
 
     out_pdf = REPO_ROOT / "manuscript" / "figures" / f"kl_carrier_corner_{theory}.pdf"

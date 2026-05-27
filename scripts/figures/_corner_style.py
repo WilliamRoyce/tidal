@@ -4,8 +4,8 @@ All per-theory scripts in ``scripts/figures/corner_*.py`` import from this
 module. Changes here propagate to every corner plot, ensuring style
 consistency across the §4 figure set.
 
-The amplification-rewarding (``+log A``) posterior is drawn in red and the
-suppression-rewarding (``-log A``) posterior in blue, per the App J
+The amplification-rewarding (``+log A``) posterior is drawn in IBM magenta and the
+suppression-rewarding (``-log A``) posterior in IBM yellow, per the App J
 convention of \\cref{NestedScore} (see
 ``manuscript/sections/appendices/inference_architecture.tex``).
 """
@@ -24,18 +24,19 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 # Manuscript style — absolute pt sizes set the physical text size on the
-# rendered PDF and DO NOT scale with figure inches. Parameter (axis) labels
-# are slightly larger than caption body so they read as prominent on the
-# rendered figure, even when the figure is rendered at single-column width.
+# rendered PDF and DO NOT scale with figure inches.
+# All sizes are chosen for figures rendered at their native width (COLUMN_WIDTH
+# or FIG_WIDTH) so that they appear at these pt sizes in the final PDF.
+# High-D corners apply a post-hoc tick-label shrink in overlay_corner().
 RCPARAMS = {
     "text.usetex": True,
     "text.latex.preamble": r"\usepackage{amsmath}\usepackage{stix}",
     "font.family": "serif",
-    "font.size": 10,  # was 9 — matches caption body
-    "axes.labelsize": 11,  # was 9 — parameter labels (β, χ, ξ) prominent over caption body
-    "legend.fontsize": 9,  # was 8 — matches caption body
-    "xtick.labelsize": 6,  # reduced from 8 — diagonal labels on dense corners must not overlap
-    "ytick.labelsize": 6,  # matched to xtick
+    "font.size": 10,  # matches caption body
+    "axes.labelsize": 12,  # parameter labels (β, χ, ξ) comfortably above body text
+    "legend.fontsize": 10,  # matches body text — no longer tiny relative to figure
+    "xtick.labelsize": 8,  # adequate for small corners; high-D post-processing shrinks further
+    "ytick.labelsize": 8,  # matched to xtick
     "lines.linewidth": 1.0,
     "axes.linewidth": 0.5,
 }
@@ -50,8 +51,8 @@ COLUMN_WIDTH = 3.375
 HIGH_DIM_THRESHOLD = 12  # n_params at which the high-D tick fixes apply
 
 # Posterior colours sourced from the central IBM colorblind palette.
-# Orange = amplification-rewarding likelihood (+log A);
-# blue   = suppression-rewarding likelihood (-log A); per App J
+# Magenta = amplification-rewarding likelihood (+log A);
+# yellow  = suppression-rewarding likelihood (-log A); per App J
 # \cref{NestedScore}.  See `_palette.py` for the full palette.
 from _palette import AMP_COLOR, SUP_COLOR
 
@@ -124,6 +125,7 @@ def overlay_corner(
     height_ratio: float = 0.95,
     fig_width: float = FIG_WIDTH,
     prior_samples=None,
+    legend_kw: dict | None = None,
 ) -> None:
     """Render an overlaid amp+sup corner plot to PDF.
 
@@ -141,6 +143,11 @@ def overlay_corner(
     as a low-alpha bottom layer (Legner ``fig:TorCprior`` template). Default
     is ``None`` — for our arctan-uniform / log-uniform priors the visual
     contribution is marginal, so the prior overlay is opt-in.
+
+    ``legend_kw`` (optional) overrides any keyword arguments forwarded to
+    ``ax.legend()``.  Use to reposition the legend for unusual grid shapes
+    (e.g. 2-parameter plots where the default upper-right anchor overlaps the
+    plotted panels).
     """
     from _palette import PRIOR_ALPHA, PRIOR_COLOR
 
@@ -206,12 +213,11 @@ def overlay_corner(
     # shrunk per-panel because the panel width on a \textwidth figure
     # scales as 1/n_params; without the shrinkage, tick numerals overlap
     # by ~20 panels. The PARAMETER labels ($\beta_1$, $\chi_3$, etc.) are
-    # NOT shrunk — they read at the RCPARAMS \axes.labelsize\ default and
-    # must stay at that size for legibility.
-    #   12–19 params (T7 18D, NP.T7 17D): tick labels 5 pt
-    #   ≥ 20 params  (T9 32D, T6 20D):    tick labels 4 pt
+    # NOT shrunk — they read at the RCPARAMS axes.labelsize default.
+    #   12–19 params (T7 18D, NP.T7 17D): tick labels 6 pt
+    #   ≥ 20 params  (T9 32D, T6 20D):    tick labels 5 pt
     if len(params) >= HIGH_DIM_THRESHOLD:
-        tick_label_pt = 4 if len(params) >= 20 else 5
+        tick_label_pt = 5 if len(params) >= 20 else 6
         for ax in axes.values.flatten():
             if ax is None:
                 continue
@@ -247,14 +253,26 @@ def overlay_corner(
     if legend_handles:
         ax_anchor = axes.iloc[0, 0]
         n_params = len(params)
-        ax_anchor.legend(
-            handles=legend_handles,
-            loc="upper right",
-            bbox_to_anchor=(n_params - 0.5, 1.0),
-            bbox_transform=ax_anchor.transAxes,
-            frameon=False,
-            fontsize=mpl.rcParams["legend.fontsize"],
-        )
+        # Default: anchor the legend inside the empty upper-right region.
+        # For very small grids (≤ 3 params) the upper-right cell is only one
+        # panel wide; the legend can bleed into the 2D joint panel below it.
+        # Place it above the figure instead (y > 1 in transAxes → above the
+        # top edge; bbox_inches='tight' then includes it cleanly).
+        if n_params <= 3:
+            loc, anchor = "lower center", (0.5, 1.08)
+        else:
+            loc, anchor = "upper right", (n_params - 0.5, 1.0)
+        leg_kw: dict = {
+            "handles": legend_handles,
+            "loc": loc,
+            "bbox_to_anchor": anchor,
+            "bbox_transform": ax_anchor.transAxes,
+            "frameon": False,
+            "fontsize": mpl.rcParams["legend.fontsize"],
+        }
+        if legend_kw:
+            leg_kw.update(legend_kw)
+        ax_anchor.legend(**leg_kw)
 
     if title is not None:
         fig.suptitle(title, y=1.02)
