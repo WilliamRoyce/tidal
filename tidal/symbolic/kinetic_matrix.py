@@ -66,19 +66,42 @@ class KineticMatrixCell:
 class KineticMatrix:
     """Assembled kinetic matrix for an EquationSystem.
 
-    ``fields`` is the row/column label list (one entry per
-    dynamical equation in the spec). ``cells`` is an
-    ``len(fields) x len(fields)`` 2D tuple of
-    :class:`KineticMatrixCell` instances.
+    The matrix may be rectangular for theories that carry
+    velocity-pair fields (``v_<X>``) on the right-hand side of
+    EOMs. Rows are indexed by the q-fields with equations
+    (one per :attr:`EquationSystem.equations` entry); columns
+    are indexed by the union of q-fields and any v-fields
+    referenced on a RHS, with q-fields first.
+
+    Attributes
+    ----------
+    row_fields
+        Field name for each row (length ``n_rows``). Matches
+        the q-field of the corresponding equation.
+    column_fields
+        Field name for each column (length ``n_cols``). The
+        first ``n_rows`` entries match ``row_fields`` (q-fields
+        in equation order); any trailing entries are v-fields
+        ordered by first appearance on a RHS.
+    cells
+        ``n_rows x n_cols`` grid of :class:`KineticMatrixCell`.
     """
 
-    fields: tuple[str, ...]
+    row_fields: tuple[str, ...]
+    column_fields: tuple[str, ...]
     cells: tuple[tuple[KineticMatrixCell, ...], ...]
 
-    def field_index(self, name: str) -> int | None:
-        """Return the matrix index of ``name``, or ``None`` if absent."""
+    def row_index(self, name: str) -> int | None:
+        """Return the row index of ``name``, or ``None`` if absent."""
         try:
-            return self.fields.index(name)
+            return self.row_fields.index(name)
+        except ValueError:
+            return None
+
+    def column_index(self, name: str) -> int | None:
+        """Return the column index of ``name``, or ``None`` if absent."""
+        try:
+            return self.column_fields.index(name)
         except ValueError:
             return None
 
@@ -86,8 +109,31 @@ class KineticMatrix:
         return self.cells[row][col]
 
     @property
+    def n_rows(self) -> int:
+        return len(self.row_fields)
+
+    @property
+    def n_cols(self) -> int:
+        return len(self.column_fields)
+
+    @property
+    def is_square(self) -> bool:
+        return self.n_rows == self.n_cols
+
+    # Backwards-compatible aliases for the pre-rectangular API.
+    # ``fields`` and ``field_index`` previously did double duty
+    # for both row and column lookup; map them to the column
+    # variants (the wider list).
+    @property
+    def fields(self) -> tuple[str, ...]:
+        return self.column_fields
+
+    def field_index(self, name: str) -> int | None:
+        return self.column_index(name)
+
+    @property
     def n(self) -> int:
-        return len(self.fields)
+        return self.n_cols
 
 
 # Map LHS time-order → operator label that the existing
@@ -144,47 +190,76 @@ def _coefficient_string(coefficient: float, coefficient_symbolic: str | None) ->
 def build_kinetic_matrix(spec: EquationSystem) -> KineticMatrix:
     r"""Assemble $\mathcal{K}$ from the equation system.
 
-    The row/column labels are taken from the field of each
-    component equation in :attr:`spec.equations`. Each cell
-    aggregates the operator-polynomial contributions to that
-    (row-equation, column-field) pair:
+    Rows are the dynamical EOMs in :attr:`spec.equations`
+    (one per equation, indexed by ``eq.field_name``). Columns are
+    the union of:
 
-    - **LHS contribution** lands on the diagonal $\mathcal{K}_{ii}$.
-      The LHS reads `kinetic_coeff * d^{time_order}_t phi_i`; we
-      encode it as a single ``(d^k_t, +kinetic_coeff)`` entry.
+    1. the same q-fields as the rows (in equation order), and
+    2. any *velocity-pair* fields ``v_<X>`` referenced on a RHS,
+       ordered by first appearance.
+
+    The matrix is rectangular when (2) is non-empty: theories
+    with first-time-derivative couplings (e.g. the
+    $\delta_1$-weighted ``gradient_z(v_X)``
+    $= \partial_z\partial_t X$ terms in the R²/nonminimal
+    sectors) acquire extra columns labelled $\dot{X}$ in the
+    rendered matrix.
+
+    Cell semantics:
+
+    - **LHS contribution** lands on the q-diagonal cell
+      $\mathcal{K}_{ii_q}$ where $i_q$ is the column index of
+      ``eq.field_name``. The LHS reads
+      ``kinetic_coeff * d^{time_order}_t phi_i``; encoded as
+      ``(d^k_t, +kinetic_coeff)``.
     - **RHS contributions** are negated when moved to the LHS to
-      put the EOM in the form $\mathcal{K}\xi = 0$. So each
-      RHS term ``(coeff, op, field=j)`` contributes
-      ``(op, -coeff)`` to $\mathcal{K}_{ij}$.
-
-    Sign convention follows the LHS=RHS form emitted by the
-    Wolfram pipeline; rearranging to $\mathcal{K}\xi = 0$ flips
-    the RHS sign.
+      put the EOM in the form $\mathcal{K}\xi = 0$. Each RHS
+      term ``(coeff, op, field=j)`` contributes
+      ``(op, -coeff)`` to $\mathcal{K}_{ij}$ where $j$ is the
+      column index of ``term.field`` (possibly a v-field).
     """
-    field_names = tuple(eq.field_name for eq in spec.equations)
-    n = len(field_names)
-    field_to_idx: dict[str, int] = {name: i for i, name in enumerate(field_names)}
+    row_fields = tuple(eq.field_name for eq in spec.equations)
+    q_set = set(row_fields)
 
-    # Accumulator: mutable list of entries per (i, j) cell.
-    accum: list[list[list[CellEntry]]] = [[[] for _ in range(n)] for _ in range(n)]
+    # Pass 1: discover any v-fields referenced on RHS but not
+    # already in the row/q list. Order by first appearance.
+    extra_columns: list[str] = []
+    seen_extras: set[str] = set()
+    for eq in spec.equations:
+        for term in eq.rhs_terms:
+            if term.field in q_set or term.field in seen_extras:
+                continue
+            extra_columns.append(term.field)
+            seen_extras.add(term.field)
+
+    column_fields = row_fields + tuple(extra_columns)
+    col_to_idx: dict[str, int] = {name: i for i, name in enumerate(column_fields)}
+
+    # Pass 2: assemble. Accumulator is n_rows × n_cols.
+    n_rows = len(row_fields)
+    n_cols = len(column_fields)
+    accum: list[list[list[CellEntry]]] = [
+        [[] for _ in range(n_cols)] for _ in range(n_rows)
+    ]
 
     for i, eq in enumerate(spec.equations):
-        # LHS → diagonal cell K_ii.
+        # LHS → q-diagonal cell K[i, col_of(eq.field_name)].
+        diag_col = col_to_idx[eq.field_name]
         lhs_op = _LHS_OPERATOR_BY_TIME_ORDER.get(
             eq.time_derivative_order,
             f"d{eq.time_derivative_order}_t",
         )
         lhs_coeff = eq.kinetic_coefficient_symbolic or "1"
-        accum[i][i].append((lhs_op, lhs_coeff))
+        accum[i][diag_col].append((lhs_op, lhs_coeff))
 
-        # RHS → entries K_ij with negated coefficient.
+        # RHS → entries K[i, j] with negated coefficient.
         for term in eq.rhs_terms:
-            j = field_to_idx.get(term.field)
+            j = col_to_idx.get(term.field)
             if j is None:
+                # Defensive: should be unreachable after Pass 1.
                 _log.warning(
                     "kinetic_matrix: equation %r RHS references field %r "
-                    "which is not in spec.equations (eliminated or "
-                    "constraint-only); skipping term.",
+                    "which is missing from column list; skipping term.",
                     eq.field_name,
                     term.field,
                 )
@@ -196,4 +271,6 @@ def build_kinetic_matrix(spec: EquationSystem) -> KineticMatrix:
     cells = tuple(
         tuple(KineticMatrixCell(entries=tuple(col)) for col in row) for row in accum
     )
-    return KineticMatrix(fields=field_names, cells=cells)
+    return KineticMatrix(
+        row_fields=row_fields, column_fields=column_fields, cells=cells
+    )

@@ -39,12 +39,15 @@ $\mathcal{L}^{(2)} = \tfrac{1}{2}\xi^\mathsf{T}\mathcal{K}\xi$
 collapsed into a single display. The matrix exposes the channel
 structure at a glance: diagonal entries carry the kinetic,
 gradient, and mass terms per field; off-diagonal entries are the
-inter-field couplings. Theories with torsion-velocity-pair fields
-have those terms folded into mixed-derivative cell entries where
-the rendering is unambiguous, and otherwise dropped (with a
-pipeline warning) --- so for theories with extensive
-velocity-pair structure the displayed matrix is a faithful
-representation only of the second-order subsystem.
+inter-field couplings. Theories with velocity-pair fields admit
+first-time-derivative contributions on the RHS; these appear as
+additional columns labelled $\dot{X}$ for each q-field $X$
+whose velocity is referenced. The matrix therefore acts on the
+augmented state vector $\Xi = (q, \dot{q})^\mathsf{T}$ for those
+theories, and the rendered matrix is rectangular
+($n_{\mathrm{eq}} \times (n_q + n_v)$). Reading the matrix as a
+system: row $i$ contracted with $\Xi$ gives equation $i$ in the
+form $\mathcal{K}_{ij}\Xi_j = 0$.
 
 % --- E.1  Einstein--Maxwell Gertsenshtein baseline ------------------
 \subsection{Einstein--Maxwell Gertsenshtein baseline}%

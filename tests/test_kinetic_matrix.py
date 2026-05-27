@@ -98,7 +98,7 @@ class TestBaselineKineticMatrix:
 
 @_needs_baseline
 class TestKineticMatrixToLatex:
-    """The rendered LaTeX is valid bmatrix and includes the expected entries."""
+    """The rendered LaTeX uses a labelled array and includes the expected entries."""
 
     def test_baseline_render(self) -> None:
         import tidal.symbolic.latex as L
@@ -117,9 +117,66 @@ class TestKineticMatrixToLatex:
             L._metric_symbol = saved_metric
 
         assert r"\mathcal{K}" in out
-        assert r"\begin{bmatrix}" in out
-        assert r"\end{bmatrix}" in out
+        # Labelled array wrapper (replaces the earlier bare bmatrix).
+        assert r"\begin{array}" in out
+        assert r"\end{array}" in out
         # Gertsenshtein off-diagonal: -B_0 ∂_z (after axis remap to z).
         assert r"-B_{0} \, \partial_z" in out
         # Diagonal photon kinetic: ∂_t^2 - ∂_z^2 entries present.
         assert r"\partial_t^2 - \partial_z^2" in out
+        # Field labels: \mathcal{A}_{t} appears as both row and column
+        # label for the baseline (calligraphic at render time; the
+        # appendix-side sed re-letters to italic A in the published
+        # listing).
+        assert r"\mathcal{A}_{t}" in out
+
+
+_NONMINIMAL = _EXAMPLES / "torsion_gertsenshtein_nonminimal.json"
+_needs_nonminimal = pytest.mark.skipif(
+    not _NONMINIMAL.exists(),
+    reason="examples/data/torsion_gertsenshtein_nonminimal.json not derived",
+)
+
+
+@_needs_nonminimal
+class TestVelocityPairColumns:
+    """Acceptance for the rectangular extension: v-fields show up as columns
+    so first-time-derivative couplings (gradient_z(v_X), etc.) are not
+    silently dropped from the displayed matrix.
+    """
+
+    def setup_method(self) -> None:
+        self.spec = load_equation_system(_NONMINIMAL)
+        self.km = build_kinetic_matrix(self.spec)
+
+    def test_matrix_is_rectangular(self) -> None:
+        """The nonminimal theory uses velocity-pair fields on the RHS;
+        the matrix grows in columns (not rows).
+        """
+        assert self.km.n_cols > self.km.n_rows
+        assert not self.km.is_square
+
+    def test_all_rhs_v_fields_have_columns(self) -> None:
+        """Every v_<X> referenced on any RHS now has a dedicated
+        column — no skipped terms.
+        """
+        v_refs = {
+            term.field
+            for eq in self.spec.equations
+            for term in eq.rhs_terms
+            if term.field.startswith("v_")
+        }
+        column_set = set(self.km.column_fields)
+        assert v_refs.issubset(column_set), f"missing v-columns: {v_refs - column_set}"
+
+    def test_v_columns_appear_after_q_columns(self) -> None:
+        """Convention: column ordering is q-fields first (one per
+        equation), then v-fields ordered by first RHS appearance.
+        """
+        n_q = self.km.n_rows
+        head = self.km.column_fields[:n_q]
+        tail = self.km.column_fields[n_q:]
+        # q head matches row_fields exactly.
+        assert head == self.km.row_fields
+        # All trailing columns are v-fields.
+        assert all(name.startswith("v_") for name in tail)

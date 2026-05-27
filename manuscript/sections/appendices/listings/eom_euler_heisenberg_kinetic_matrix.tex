@@ -1,6 +1,9 @@
-\mathcal{K}(\partial_t,\partial_z) = \begin{bmatrix}
-  \partial_t^2 - \partial_z^2 + 2 \, B_{0}^2 \, \rho \, \partial_z^2 & 0 & 0 & 0 \\
-  0 & 1 - 2 \, B_{0}^2 \, \rho + 16 \, B_{0}^2 \, \sigma \, \partial_t^2 - \partial_z^2 + 2 \, B_{0}^2 \, \rho \, \partial_z^2 & 0 & 0 \\
-  0 & 0 & 1 - 2 \, B_{0}^2 \, \rho \, \partial_t^2 - \partial_z^2 + 6 \, B_{0}^2 \, \rho \, \partial_z^2 & 0 \\
-  0 & 0 & 0 & 1 - 2 \, B_{0}^2 \, \rho \, \partial_t^2 - \partial_z^2
-\end{bmatrix}
+\mathcal{K}(\partial_t,\partial_z) = 
+\begin{array}{c|cccccc}
+   & A_{t} & A_{x} & A_{y} & A_{z} & \dot{A}_{z} & \dot{A}_{t} \\
+  \hline
+  A_{t} & \partial_t^2 - \partial_z^2 + 2 \, B_{0}^2 \, \rho \, \partial_z^2 & 0 & 0 & 0 & -2 \, B_{0}^2 \, \rho \, \partial_z & 0 \\
+  A_{x} & 0 & 1 - 2 \, B_{0}^2 \, \rho + 16 \, B_{0}^2 \, \sigma \, \partial_t^2 - \partial_z^2 + 2 \, B_{0}^2 \, \rho \, \partial_z^2 & 0 & 0 & 0 & 0 \\
+  A_{y} & 0 & 0 & 1 - 2 \, B_{0}^2 \, \rho \, \partial_t^2 - \partial_z^2 + 6 \, B_{0}^2 \, \rho \, \partial_z^2 & 0 & 0 & 0 \\
+  A_{z} & 0 & 0 & 0 & 1 - 2 \, B_{0}^2 \, \rho \, \partial_t^2 - \partial_z^2 & 0 & 2 \, B_{0}^2 \, \rho \, \partial_z
+\end{array}

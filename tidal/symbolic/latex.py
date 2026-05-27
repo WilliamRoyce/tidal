@@ -1049,36 +1049,59 @@ def _render_kinetic_cell(cell, spec) -> str:  # noqa: ANN001 (KineticMatrixCell,
 
 
 def kinetic_matrix_to_latex(km, spec: EquationSystem) -> str:  # noqa: ANN001
-    r"""Render an assembled :class:`KineticMatrix` as a labelled bmatrix.
+    r"""Render an assembled :class:`KineticMatrix` as a labelled array.
 
-    Produces a TeX expression of the form
+    The matrix may be rectangular for theories with velocity-pair
+    columns: rows are indexed by the q-field equations
+    (``km.row_fields``), columns include both q-fields and any
+    ``v_<X>`` referenced on RHS terms (``km.column_fields``).
 
-    .. code-block:: latex
-
-        \mathcal{K}(\partial_t,\partial_z) = \begin{bmatrix}
-          K_{00} & K_{01} & \cdots \\
-          K_{10} & K_{11} & \cdots \\
-          \cdots
-        \end{bmatrix}
-
-    where each cell is the differential-operator polynomial
-    acting on the column field. Reuses
-    :func:`operator_to_latex` and :func:`coefficient_to_latex`
-    for per-cell rendering — so the operators visible here render
-    identically to the EOM listings. Plane-wave axis remapping
-    is applied as a post-pass.
+    Output wraps the cell grid in an ``array`` environment with
+    explicit row and column labels — column labels in the first
+    header row, row labels in a leading column — so the reader
+    can identify which equation and which column-field each cell
+    refers to. Reuses :func:`operator_to_latex`,
+    :func:`coefficient_to_latex`, and :func:`field_to_latex` for
+    cell and label rendering, so the operators and field names
+    here render identically to the EOM listings. Plane-wave axis
+    remapping is applied as a post-pass.
     """
     axis_remap = _operator_axis_remap(spec)
-    rows: list[str] = []
-    for i in range(km.n):
+    coords = _tensor_coordinates(spec)
+
+    def _field_label(name: str) -> str:
+        tensor_meta = _get_field_meta(name, spec)
+        return field_to_latex(name, tensor_meta=tensor_meta, coordinates=coords)
+
+    row_labels = [_field_label(f) for f in km.row_fields]
+    col_labels = [_field_label(f) for f in km.column_fields]
+
+    # Build the labelled array. Format:
+    #   \begin{array}{c|cccc}
+    #          & col_0 & col_1 & ... \\
+    #     \hline
+    #     row_0 & K_{00} & K_{01} & ... \\
+    #     row_1 & K_{10} & K_{11} & ... \\
+    #     \cdots
+    #   \end{array}
+    n_cols = km.n_cols
+    col_spec = "c|" + "c" * n_cols
+    header = " & " + " & ".join(col_labels) + r" \\"
+    body_rows: list[str] = []
+    for i, row_label in enumerate(row_labels):
         rendered_cells = [
-            _render_kinetic_cell(km.cells[i][j], spec) for j in range(km.n)
+            _render_kinetic_cell(km.cells[i][j], spec) for j in range(n_cols)
         ]
-        rows.append(" & ".join(rendered_cells))
-    body = " \\\\\n  ".join(rows)
+        body_rows.append(row_label + " & " + " & ".join(rendered_cells))
+    body = " \\\\\n  ".join(body_rows)
     result = (
         r"\mathcal{K}(\partial_t,\partial_z) = "
-        rf"\begin{{bmatrix}}{chr(10)}  {body}{chr(10)}\end{{bmatrix}}"
+         "\n"
+         rf"\begin{{array}}{{{col_spec}}}{chr(10)}"
+         f"  {header}{chr(10)}"
+         f"  \\hline{chr(10)}"
+         f"  {body}{chr(10)}"
+         r"\end{array}"
     )
     for from_axis, to_axis in axis_remap.items():
         result = result.replace(rf"\partial_{from_axis}", rf"\partial_{to_axis}")
