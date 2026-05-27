@@ -2241,7 +2241,7 @@ wheels = [
 
 [[package]]
 name = "tidal"
-version = "0.45.11"
+version = "0.45.12"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
