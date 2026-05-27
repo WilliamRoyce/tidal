@@ -9,8 +9,8 @@ Palette source: https://www.color-hex.com/color-palette/1044488
 IBM colour blind friendly palette for the color scheme used in the figures").
 
 Role assignment for our overlay-corner figures:
-- AMP (amplification posterior, +log A direction)  → YELLOW
-- SUP (suppression posterior, -log A direction)    → MAGENTA
+- AMP (amplification posterior, +log A direction)  → MAGENTA
+- SUP (suppression posterior, -log A direction)    → YELLOW
 - PRIOR (optional third overlay layer)             → PURPLE (indigo) at low alpha
 - HIGHLIGHT (carrier-parameter accent in tables)   → ORANGE
 - RESERVED (future fourth overlay, e.g. localised) → BLUE
@@ -31,8 +31,8 @@ IBM_PALETTE = {
     "blue": "#648fff",
 }
 
-AMP_COLOR = IBM_PALETTE["yellow"]
-SUP_COLOR = IBM_PALETTE["magenta"]
+AMP_COLOR = IBM_PALETTE["magenta"]
+SUP_COLOR = IBM_PALETTE["yellow"]
 PRIOR_COLOR = IBM_PALETTE["purple"]
 HIGHLIGHT_COLOR = IBM_PALETTE["orange"]
 RESERVED_COLOR = IBM_PALETTE["blue"]
