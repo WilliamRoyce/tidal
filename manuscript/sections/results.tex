@@ -288,7 +288,7 @@ symmetric under $\Del{1} \to -\Del{1}$.
   % on \Bet{3} only, so the \Bet{3} marginal in this figure is not
   % directly comparable to the parity-odd twin \cref{CornerT6Min} where
   % all three \Bet{i} priors are matched.
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ricci_em}
+  \includegraphics[width=\columnwidth]{figures/corner_t4_ricci_em}
   \caption{Posterior marginals for the four-dimensional EM--RC
     curvature-coupling sector $\{\Bet{1\!-\!3},\Del{1}\}$ of
     \cref{RicciEMLagrangian}. Diagonal: 1D marginals (amplification:
@@ -369,7 +369,7 @@ report in the survey where suppression dominates, with the Bayes factor $\log B 
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_parity_odd_minimal}
+  \includegraphics[width=\columnwidth]{figures/corner_t6_minimal}
   \caption{Posterior marginals for the four-dimensional parity-odd
     minimal sub-sector $\{\Bet{1\!-\!3}, d_{21}\}$. Diagonal: 1D
     marginals (amplification: magenta; suppression: yellow).
@@ -448,7 +448,7 @@ other vertices are switched on.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_bahamonde}
+  \includegraphics[width=\columnwidth]{figures/corner_t5_d20_bahamonde}
   \caption{Posterior marginals for the five-dimensional Bahamonde base
     $\{\Bet{1\!-\!3},\Del{1},\xi\}$ of the Yang--Mills--PGT family.
     Diagonal: 1D marginals (amplification: magenta; suppression:
@@ -459,7 +459,7 @@ other vertices are switched on.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_barker}
+  \includegraphics[width=\columnwidth]{figures/corner_t5_d21_barker}
   \caption{Posterior marginals for the six-dimensional Barker extension
     $\{\Bet{1\!-\!3},\Del{1},\xi,\chi\}$ of the Yang--Mills--PGT family.
     Diagonal: 1D marginals (amplification: magenta; suppression:
@@ -468,27 +468,27 @@ other vertices are switched on.
   \label{CornerT5D21}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_shapiro}
+  \includegraphics[width=\textwidth]{figures/corner_t5_d22_shapiro}
   \caption{Posterior marginals for the eight-dimensional Shapiro
     extension $\{\Bet{1\!-\!3},\Del{1},\xi,\zeta_{1\!-\!3}\}$ of the
     Yang--Mills--PGT family. Diagonal: 1D marginals (amplification:
     magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
     the 68\% and 95\% credible contours.}
   \label{CornerT5D22}
-\end{figure}
+\end{figure*}
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_full_nonminimal}
+  \includegraphics[width=\textwidth]{figures/corner_t5_d23_full}
   \caption{Posterior marginals for the nine-dimensional non-minimal
     union $\{\Bet{1\!-\!3},\Del{1},\xi,\chi,\zeta_{1\!-\!3}\}$ of the
     Yang--Mills--PGT family. Diagonal: 1D marginals (amplification:
     magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
     the 68\% and 95\% credible contours.}
   \label{CornerT5D23}
-\end{figure}
+\end{figure*}
 
 \begin{table*}[t]
   \centering
@@ -558,21 +558,35 @@ nats --- five times larger than any other coupling --- identifying
 $\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
 \MAGFt{_{\mu\nu\rho\sigma}}$ as the operator that drives the
 parity-even separation between the %amplification and suppression
-posteriors. The $D_\mathrm{KL}$-ranked sub-corner is
+posteriors. The full posterior corner is \cref{CornerChiClosure} and a
+restricted sub-corner over the dominant directions is
 \cref{CarrierChiClosure}; the full per-coupling comparison against the
 non-propagating-torsion control of the same sector appears below in
 \cref{KLTableChiClosureComparison} (\cref{NonPropagatingControl}).
 
+\begin{figure*}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/corner_t7}
+  \caption{Posterior marginals for the eighteen-dimensional
+    $\chi$-closure $\{\Bet{1\!-\!3},\Del{1},\xi,\zeta_{1\!-\!3},
+    \chi_{1\!-\!10}\}$ of \cref{ChiClosureLagrangian}. Diagonal: 1D
+    marginals (amplification: magenta; suppression: yellow).
+    Off-diagonal: 2D joint marginals at the 68\% and 95\% credible
+    contours.}
+  \label{CornerChiClosure}
+\end{figure*}
+
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_chi_closure}
-  \caption{Carrier sub-corner of the eighteen-dimensional $\chi$-closure
-    $\{\Bet{1\!-\!3},\Del{1},\xi,\zeta_{1\!-\!3},\chi_{1\!-\!10}\}$ of
-    \cref{ChiClosureLagrangian}, restricted to the six parameters
-    ranked highest by combined per-coupling $D_\mathrm{KL}$
-    (\cref{PerCouplingKL}). Diagonal: 1D marginals (amplification:
-    magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
-    the 68\% and 95\% credible contours. Full ranking in
+  \caption{Restricted sub-corner of the eighteen-dimensional
+    $\chi$-closure, plotting only the top-$K = 6$ parameters ranked by
+    combined per-coupling $D_\mathrm{KL}$ (\cref{PerCouplingKL}).
+    $\chi_1$ dominates at $D_\mathrm{KL}(P_+\|P_-) = 4.2$~nats --- five
+    times the next strongest contribution --- identifying
+    $\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,\MAGFt{_{\mu\nu\rho\sigma}}$ as
+    the operator driving the parity-even separation between the
+    amplification and suppression posteriors. Full ranking in
     \cref{KLTableChiClosureComparison}.}
   \label{CarrierChiClosure}
 \end{figure}
@@ -606,13 +620,16 @@ and obtained through the Hamiltonian particle-spectrum analysis of
 \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}. Integration
 with \PSALTer{} is deferred to future work.
 
-To bound the ghost branch from below \emph{without} \PSALTer{} we run
-a control test: the same Yang--Mills--PGT from \cref{YangMillsPGT} with the
-torsion kinetic coefficient $\xi$ pinned to zero. The Lagrangian
-\cref{NonMinimalLagrangian} then introduces no new kinetic operator for
-any field beyond the Einstein--Maxwell baseline; torsion is determined
-algebraically and the no-ghost classification is trivially satisfied
---- there is no kinetic operator whose sign needs checking. The dominant
+To test whether a wrong-sign kinetic-mode ghost in the torsion sector
+is responsible for the amplifications --- without invoking the full
+\PSALTer{} particle-spectrum analysis --- we run a control: the same
+Yang--Mills--PGT from \cref{YangMillsPGT} with the
+torsion kinetic coefficient $\xi$ zeroed. The Lagrangian
+\cref{NonMinimalLagrangian} then introduces no new kinetic operator;
+% for
+% any field beyond the Einstein--Maxwell baseline;
+torsion is determined
+algebraically and the no-ghost classification is trivially satisfied. The dominant
 $D_\mathrm{KL}$ contributions identified above for the propagating
 YM--PGT sectors were all anchored to
 exponential-mode-growth regions of parameter space, so a natural
@@ -642,17 +659,14 @@ $\xi = 0$ returns
 \end{equation*}
 ($\log B = +13.21$), close to the
 bootstrap uncertainty of the propagating $\chi$-closure chain. The
-amplification therefore does not require torsion to propagate; the
-non-minimal torsion--electromagnetism vertices alone reproduce the
+amplification therefore does \emph{not} require torsion to propagate; the
+non-minimal couplings alone reproduce the
 structure of the propagating theory. Per-parameter
 $D_\mathrm{KL}$ resolves the dominant operator: $\Bet{1}$ dominates the
-eight-parameter control (\cref{KLTableYMUnified}, last block;
-$D_\mathrm{KL}(P_+\|P_-) = 3.5$ nats), and the seventeen-parameter
-$\chi$-closure control returns $\chi_1$ as the dominant
-$D_\mathrm{KL}(P_+\|P_-)$ contribution
-($5.8$ nats), the explicit contraction
-$\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
-\MAGFt{_{\mu\nu\rho\sigma}}$; the full per-coupling
+Yang--Mills--PGT control (\cref{KLTableYMUnified}), and the
+$\chi$-closure control returns $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
+\MAGFt{_{\mu\nu\rho\sigma}}$ as the dominant
+$D_\mathrm{KL}(P_+\|P_-)$ contribution; the full per-coupling
 comparison against the propagating chain is
 \cref{KLTableChiClosureComparison}.
 
@@ -687,8 +701,8 @@ comparison against the propagating chain is
     and amplification-vs-suppression
     $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in nats. ``--'' marks a
     coupling present but below the per-chain top-ten $D_\mathrm{KL}$ cutoff.
-    Carrier sub-corners: \cref{CornerNPCeven}
-    (NP control) and \cref{CarrierChiClosure} (propagating).}
+    Corresponding posterior corners: \cref{CornerNPCeven}
+    (NP control) and \cref{CornerChiClosure} (propagating).}
   \label{KLTableChiClosureComparison}
 \end{table}
 
@@ -700,8 +714,7 @@ chain, ruling out a constraint-divergence pathology; the linearised
 eigenvalue spectrum at that point shows no
 $\Re\{\lambda\} > 0$ modes in the pure metric channel; and the
 perturbativity envelope of \cref{PerturbativeBound} is satisfied
-across the posterior support. The corresponding $D_\mathrm{KL}$-ranked
-sub-corners are
+across the posterior support. The corresponding posterior corners are
 \cref{CornerNP} (eight-parameter control) and \cref{CornerNPCeven}
 (seventeen-parameter $\chi$-closure control). The interpretation of
 the exponentially-growing modes themselves --- whether they correspond
@@ -709,9 +722,9 @@ to a physical amplification that a finite-extent geometry would
 saturate, to a non-ghost tachyonic instability, or to a wrong-sign
 kinetic-mode ghost --- is taken up in \cref{Discussion}.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_np_t5}
+  \includegraphics[width=\textwidth]{figures/corner_np}
   \caption{Posterior marginals for the eight-dimensional
     non-propagating-torsion control sector
     $\{\Bet{1\!-\!3},\Del{1},\chi,\zeta_{1\!-\!3}\}$, obtained by pinning
@@ -720,19 +733,30 @@ kinetic-mode ghost --- is taken up in \cref{Discussion}.
     magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
     the 68\% and 95\% credible contours.}
   \label{CornerNP}
-\end{figure}
+\end{figure*}
+
+\begin{figure*}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/corner_np_ceven}
+  \caption{Posterior marginals for the seventeen-dimensional
+    non-propagating-torsion $\chi$-closure control ($\xi\!=\!0$ pinned
+    in the eighteen-parameter base of \cref{CornerChiClosure}).
+    Diagonal: 1D marginals (amplification: magenta; suppression:
+    yellow). Off-diagonal: 2D joint marginals at the 68\% and 95\%
+    credible contours.}
+  \label{CornerNPCeven}
+\end{figure*}
 
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_np_chi_closure}
-  \caption{$D_\mathrm{KL}$-ranked sub-corner of the seventeen-dimensional
-    non-propagating-torsion $\chi$-closure ($\xi\!=\!0$ pinned in
-    \cref{CarrierChiClosure}'s eighteen-parameter base), restricted to
-    the parameters ranked highest by combined per-coupling
-    $D_\mathrm{KL}$ (\cref{PerCouplingKL}). Diagonal: 1D marginals
-    (amplification: magenta; suppression: yellow). Off-diagonal: 2D
-    joint marginals at the 68\% and 95\% credible contours.}
-  \label{CornerNPCeven}
+  \caption{Restricted sub-corner of the seventeen-dimensional
+    non-propagating-torsion $\chi$-closure, plotting only the top-$K = 6$
+    parameters ranked by combined per-coupling $D_\mathrm{KL}$
+    (\cref{PerCouplingKL}). $\chi_1$ is the dominant
+    $D_\mathrm{KL}(P_+\|P_-)$ contribution at $5.8$~nats; the
+    propagating result is reproduced within bootstrap uncertainty.}
+  \label{CarrierNPCevenRestricted}
 \end{figure}
 
 % Discussion preserved (planning directive 2026-05-25):
@@ -778,16 +802,28 @@ $D_\mathrm{KL}(P_+\|P_-) = 4.4$ and $3.5$~nats; the $\xi_{15}$ contraction
 is $\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 \rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$.
 
+\begin{figure*}[!htbp]
+  \centering
+  \includegraphics[width=\textwidth]{figures/corner_t9}
+  \caption{Posterior marginals for the thirty-two-dimensional
+    $\xi$-kinetic closure. Diagonal: 1D marginals (amplification:
+    magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
+    the 68\% and 95\% credible contours.}
+  \label{CornerT9}
+\end{figure*}
+
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_xi_kinetic_closure}
-  \caption{$D_\mathrm{KL}$-ranked sub-corner of the thirty-two-dimensional
-    $\xi$-kinetic closure, restricted to the ten parameters ranked
+  \caption{Restricted sub-corner of the thirty-two-dimensional
+    $\xi$-kinetic closure, plotting only the ten parameters ranked
     highest by combined per-coupling $D_\mathrm{KL}$
-    (\cref{PerCouplingKL}). Diagonal: 1D marginals (amplification: magenta;
-    suppression: yellow). Off-diagonal: 2D joint marginals at the 68\%
-    and 95\% credible contours.}
-  \label{CornerT9}
+    (\cref{PerCouplingKL}). $\chi_1$
+    ($D_\mathrm{KL}(P_+\|P_-) = 4.4$~nats) and $\xi_{15}$ ($3.5$~nats)
+    are co-dominant contributions; the extended $\xi_{11\!-\!16}$ kinetic
+    invariants each contribute at the $\sim\!0.5\!-\!1.4$~nats level
+    (full ranking in \cref{KLTableXiClosure}).}
+  \label{CarrierT9Restricted}
 \end{figure}
 
 \begin{table}[h]
@@ -860,17 +896,16 @@ unbounded plane-wave ansatz, which a finite-extent geometry could
 saturate, or a fatal pathology of the theories themselves is taken up
 in \cref{Discussion}.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_parity_odd_full}
-  \caption{$D_\mathrm{KL}$-ranked sub-corner for the twenty-dimensional
-    parity-odd full sector. The amplification and suppression marginals
-    are coincident across the plotted parameters --- the soft-floor
-    signature returned when the linearised eigenvalues exceed the
-    modal-solver overflow ceiling. Nested sampling gives
-    $\logZ_\pm \approx -15$.}
+  \includegraphics[width=\textwidth]{figures/corner_t6_full}
+  \caption{Posterior marginals for the twenty-dimensional parity-odd
+    full sector. The amplification and suppression marginals are
+    coincident across all parameters --- the soft-floor signature
+    returned when the linearised eigenvalues exceed the modal-solver
+    overflow ceiling. Nested sampling gives $\logZ_\pm \approx -15$.}
   \label{CornerParityOddFull}
-\end{figure}
+\end{figure*}
 
 \subsubsection{Dark-photon plasma }
 
@@ -930,7 +965,7 @@ orthogonal to the non-minimal PGT extensions of
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_dark_photon_plasma}
+  \includegraphics[width=\columnwidth]{figures/corner_t1_dark_photon_plasma}
   \caption{Posterior marginals for the four-dimensional dark-photon
     plasma analogue $\{m_A^2,\xi,\Del{m},\Bet{3}\}$ of
     \cref{DarkPhotonPlasmaLagrangian}. Diagonal: 1D marginals
@@ -1013,7 +1048,7 @@ consistent with the null verdict.
 
 \begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_eh_gertsenshtein}
+  \includegraphics[width=\columnwidth]{figures/corner_eh_gert}
   \caption{Posterior marginals for the two-dimensional
     Euler--Heisenberg $F^4$ extension $\{\rho,\sigma\}$ of
     \cref{EHGertLagrangian}, the QED-EFT survey axis. Diagonal: 1D
