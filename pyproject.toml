@@ -1,6 +1,6 @@
 [project]
 name = "tidal"
-version = "0.45.8"
+version = "0.45.9"
 description = "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
 readme = "README.md"
 requires-python = ">=3.11"
