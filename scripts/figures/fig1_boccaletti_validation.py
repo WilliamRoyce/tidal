@@ -62,7 +62,9 @@ def _plot(data: dict, out_path: Path) -> None:
         color="#666",
         label=r"$\sin^2(\kappa B_0 t/2)$",
     )
-    ax_top.plot(b0, p_sim, marker="o", ms=4, lw=0, color="#1f77b4", label="TIDAL")
+    ax_top.plot(
+        b0, p_sim, marker="o", ms=4, lw=0, color="#1f77b4", label=r"\textit{TIDAL}"
+    )
     ax_top.set_ylabel(r"$P_{g\gamma}$")
     ax_top.legend(frameon=False, fontsize=9, loc="best")
     ax_top.grid(visible=True, ls=":", alpha=0.3)

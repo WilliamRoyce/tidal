@@ -65,38 +65,26 @@ uniform-$\Bzero$.
 % §4.2–§4.4.
 
 \paragraph*{Validation setup}
-We first validate on the Boccaletti conversion
-formula \cref{GertsenshteinFormula} in Einstein--Maxwell theory. The
-linearised system on a periodic $N = 512$ grid
-is evolved over a propagation distance $D = 100$, with
-propagation time $t_\text{end} = 50$ and photon carrier wavenumber
-$k \approx 2.011$ (the nearest $2\pi n/D$ mode),
-sampling $\Bzero$ in $[0.005, 0.25]$.
+We validate the pipeline on the Boccaletti conversion
+formula (\cref{GertsenshteinFormula}) in Einstein--Maxwell theory.
+A uniform background field $\Bzero$ fills a periodic domain of length
+$L=100$; the linearised system is initialised as a plane wave on a
+$N=512$ grid and evolved to $t_\text{end}=50$, with photon carrier
+wavenumber $k\approx2.011$ (the nearest $2\pi n/L$ mode, $n=32$),
+sampling $\Bzero$ at 24 uniformly spaced values in $[0.005,0.25]$.
 
 \paragraph*{Reproduction of the Boccaletti kernel}
 \TIDAL{} recovers the Boccaletti kernel \cref{GertsenshteinFormula}
 in the small-$\Bzero$ limit to the modal-evolution
-round-off floor of $\sim 10^{-8}$ across the validation grid
-(\cref{BoccalettiValidation,BoccalettiUniform}). As $\Bzero$ grows
+round-off floor of $\sim 10^{-8}$. As $\Bzero$ grows
 the simulation departs from the bare formula by $\mathcal{O}(\Bzero^2)$
 due to the graviton effective-mass detuning; against the two-mode
-prediction of~\cite{raffelt1988mixing} that includes this detuning.
+prediction of~\cite{raffelt1988mixing} that includes this detuning,
+the signed residual remains $\lesssim 10^{-8}$ across the grid
+(\cref{BoccalettiValidation,BoccalettiUniform}).
 The path-integrated kernel \cref{BoccalettiPathIntegrated} is recovered to the same precision
 (\cref{BoccalettiLocalised}).
 
-\paragraph*{Survey observables}
-The validation also fixes the per-sample conversion score reported
-throughout \cref{SurveySummary,InformativeAmplification,FrontierAndNulls}.
-At each posterior sample $\theta$ the inference layer evaluates the
-finite-$\Bzero$, finite-$t$ score
-$A(\theta) = \Pmax(\theta)/\sin^2(\kappa\Bzero t/2)$ of
-\cref{AmplificationScore}, which recovers $A=1$ on the
-Einstein--Maxwell baseline and serves as the nested-sampling
-likelihood. The asymptotic small-$\Bzero$ ratio $\Aamp$ of
-\cref{AmplificationFactor} additionally provides a
-$\Bzero$-independent figure; this asymptotic
-form applies in the plane-wave uniform-$\Bzero$ but is not generally
-applicable to the finite-extent geometry.
 
 % Figure 1 — Boccaletti validation. Rendered from
 % scripts/figures/fig1_boccaletti_validation.py using
@@ -106,19 +94,19 @@ applicable to the finite-extent geometry.
   \includegraphics[width=\columnwidth]{figures/fig1_boccaletti_validation}
   \caption{Boccaletti validation for the Einstein--Maxwell baseline
     on a flat Minkowski background with uniform
-    $\Bzero \in [0.005, 0.25]$, propagation distance $D = 100$,
+    $\Bzero \in [0.005, 0.25]$, domain length $L=100$,
     propagation time $t_\text{end} = 50$, carrier wavenumber
-    $k \approx 2.011$, on a periodic $N = 512$ grid. Upper
+    $k \approx 2.011$ ($n=32$, $2\pi n/L$), on a periodic $N = 512$ grid. Upper
     panel: simulated $P_\text{final}(\Bzero)$ (filled circles)
     overlaid with the analytic $\sin^2(\kappa\Bzero t_\text{end}/2)$
     kernel (dashed line). Lower
-    panel: signed residual $P_\text{TIDAL} - P_\text{bare}$ on the
+    panel: signed residual $P_{\textit{TIDAL}} - P_\text{bare}$ on the
     same axis. The detailed two-mode comparison is given in
     \cref{BoccalettiUniform}.}
   \label{BoccalettiValidation}
 \end{figure}
 
-\subsection{Survey summary under the plane-wave approximation}%
+\subsection{Survey summary under the plane-wave approximation (\cref{Linearisation})}%
 \label{SurveySummary}%
 \label{SectorSurvey}% Compatibility carry-over for theory.tex / App~D / App~F / App~G legacy cross-refs.
 
@@ -135,34 +123,15 @@ applicable to the finite-extent geometry.
 % ghost-mediated interpretation was the most damaging counter-argument to a
 % positive Gertsenshtein prediction in the propagating-torsion theories;
 % ruling it out promotes NP to load-bearing headline status.
-Under the plane-wave approximation we obtain the
-Bayes-factor partition of the surveyed PGT hierarchy collected in
+Under the plane-wave approximation (\cref{Linearisation}) the
+surveyed PGT hierarchy yields the Bayes-factor partition collected in
 \cref{SurveyResultsTable}. The Bayes factor
 $\log B = \log\mathcal{Z}_+ - \log\mathcal{Z}_-$~\cite{Skilling:2006gxv}
 quantifies amplification preference ($\log B > 0$) or suppression
 preference ($\log B < 0$) relative to the Einstein--Maxwell baseline.
-The surveyed sectors partition into parity-even non-minimal extensions
-with informative amplification evidence, two sectors where the
-plane-wave linearised regime fails at any viable propagation time,
-and two parallel test axes --- one showing suppression preference,
-one a null. Two of the highest-dimensional parity-odd sectors cannot
-produce an informative posterior under the plane-wave ansatz at any
-viable propagation time: the linearised eigenvalues grow too rapidly
-for the modal-solver evolution to complete before numerical overflow,
-and whether this growth reflects a genuine instability or an artefact
-of the unbounded plane-wave geometry requires the finite-extent
-treatment of \cref{Discussion}.
-% the
-% non-propagating-torsion control retains $\log B \approx +8$ when the
-% torsion kinetic mode is removed, supporting the genuine-channel-mixing
-% interpretation over a propagating-torsion-instability artefact (the
-% definitive disambiguation defers to the finite-extent geometry of
-% \cref{Discussion}).
-Whether the surviving amplification preferences
-reflect genuine amplification of the conversion channel or unbounded
-growth on the tachyonic plane-wave background that a finite-extent
-geometry would saturate is a methodological distinction that occupies
-the discussion in \cref{Discussion}.
+Whether the surviving amplification preferences reflect genuine
+conversion-channel enhancement or tachyonic growth that a finite-extent
+geometry would saturate is discussed in \cref{Discussion}.
 
 % Survey results table.  Sourced from V3_PHASE_TRACKER.md and the
 % inference.json files of each listed chain.  Where landscape and
@@ -197,7 +166,7 @@ the discussion in \cref{Discussion}.
     Theory class & $d$ & $\log\mathcal{Z}_+ \pm \sigma$ & $\log\mathcal{Z}_- \pm \sigma$ & $\log B$ & quality & verdict \\
     \hline
     dark-photon plasma                  & 4  & $+9.034 \pm 0.068$  & $+2.924 \pm 0.083$  & $+6.110$ & publication                            & \emph{amplifies} \\
-    Ricci--EM cross-term                & 4  & $+13.374 \pm 0.060$ & $+11.395 \pm 0.097$ & $+1.979$ & publication                            & \emph{amplifies} \\
+    EM--RC curvature coupling ($\Del{1}$) & 4  & $+13.374 \pm 0.060$ & $+11.395 \pm 0.097$ & $+1.979$ & publication                            & \emph{amplifies} \\
     Yang--Mills--PGT (Bahamonde base)   & 5  & $+7.680 \pm 0.150$  & $+5.837 \pm 0.143$  & $+1.843$ & publication                            & \emph{amplifies} \\
     Yang--Mills--PGT (Barker extension) & 6  & $+5.319 \pm 0.169$  & $+2.524 \pm 0.158$  & $+2.795$ & publication\textsuperscript{a}         & \emph{amplifies} \\
     Yang--Mills--PGT (Shapiro extension)& 8  & $+8.889 \pm 0.135$  & $+6.212 \pm 0.176$  & $+2.677$ & landscape                              & \emph{amplifies} \\
@@ -216,7 +185,7 @@ the discussion in \cref{Discussion}.
    $t_\text{end} = 1$; the lower-dimensional sectors above use
    $t_\text{end} = 10$.\quad
    \textsuperscript{b} Both $\log\mathcal{Z}$ negative indicates partial
-   floor contamination from the extended $\xi_{11}$--$\xi_{16}$ sub-sector;
+   floor contamination from the extended $\xi_{11\!-\!16}$ sub-sector;
    the quoted $\log B$ is a lower bound on the genuine amplification.\quad
    \textsuperscript{c} Maximum eigenvalue $\mathrm{Re}\,\lambda \approx
    1.4 \times 10^{3}$ at $t_\text{end} = 1$ — still above the
@@ -233,8 +202,8 @@ the discussion in \cref{Discussion}.
 \phantomsection\label{ChannelStructure}%
 \phantomsection\label{FrontierAndNulls}
 
-\subsubsection{The quadratic-curvature theory (R$^2$-PGT)}
-We open with R$^2$-PGT, the simplest PGT extension in which torsion
+\subsubsection{The $\MAGFt{}^2$-PGT sector}
+We open with the $\MAGFt{}^2$-PGT sector, the simplest PGT extension in which torsion
 propagates as a dynamical field. The Lagrangian retains the three
 parity-even torsion-squared invariants $I_{1,2,3}$ of
 \cite{shapiro2002torsion,hayashi1979new} together with the
@@ -248,22 +217,13 @@ $\Alp{1}\MAGFt{}^{2}$ curvature-squared term,
   \label{R2PGTLagrangian}
 \end{align}
 giving a four-dimensional prior over
-$\{\Bet{1\!-\!3}, \Alp{1}\}$. The $\Alp{1}\MAGFt{}^{2}$ term promotes the
-metric-perturbation sector to a fourth-order system, which places this
-theory outside the scope of the numerical pipeline
-(\cref{PerturbativeReduction,SymbolicMechanism}); no published
-constraint-promotion Hamiltonian recipe exists for the
-$\Alp{1}\MAGFt{}^{2}$ case~\cite{blagojevic2018hamiltonian}, and the
-null result is read directly from the equations of motion in
-\cref{PropagatingKineticOutput}. Torsion-field components appear in
-the linearised equations but couple only into the trace sector of the
-metric perturbation, not into the transverse-traceless $h_{xy}$ channel
-that drives the conversion; the $\Alp{1}$-weighted fourth-order time
-derivatives introduce Ostrogradsky ghost modes in the trace
-sector~\cite{Woodard:2015zca,blagojevic2018hamiltonian,lin2019pgt}, a
-structural consequence of any non-degenerate Lagrangian of order
-greater than two. The decoupling of the conversion channel is
-confirmed directly by the equations of motion in \cref{PropagatingKineticOutput}:
+$\{\Bet{1\!-\!3}, \Alp{1}\}$. The Gertsenshtein channel is unaffected
+by the $\Alp{1}$ coupling at linear order: the $\Alp{1}$-weighted
+terms are absent from the channel equations
+(\cref{ChannelEqAx,ChannelEqHxy}) that mediate the standard
+$h_\times \leftrightarrow a_\parallel$ conversion,
+as the equations of motion in \cref{PropagatingKineticOutput} confirm
+directly:
 \begin{align}
   \partial_t^2 A_x &= B_0 \partial_z h_{xy} + \partial_z^2 A_x,
     \label{ChannelEqAx} \\
@@ -271,58 +231,28 @@ confirmed directly by the equations of motion in \cref{PropagatingKineticOutput}
     + B_0 \partial_z A_x - \kappa^{-2} \partial_z^2 h_{xy}.
     \label{ChannelEqHxy}
 \end{align}
-The $\Alp{1}$-weighted terms are absent from
-\cref{ChannelEqAx,ChannelEqHxy}; the conversion channel is unaffected
-by the $\Alp{1}$ coupling at linear order. The Einstein--Cartan limit
-$\Alp{1} \to 0$ is subsumed by this analysis --- the algebraic
-torsion constraint then reduces the linearised channel to its
-Einstein--Maxwell baseline at all $\{\beta_i\}$. We conclude that the
-minimal-PGT family does not couple torsion to the Gertsenshtein channel
-at linear order. The remainder of \S4 explores non-minimal extensions
-in which this decoupling is broken.
-
-\subsubsection{The Ricci--electromagnetism cross-term}
-To break the decoupling of R$^2$-PGT we turn to the first
-non-minimal vertex: the direct coupling
-$\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ between the
-antisymmetric part of the Ricci tensor of the Riemann--Cartan
-connection and the electromagnetic field strength, introduced
-by~\cite{bahamonde2025cubic} as the simplest geometrically natural
-torsion--electromagnetism coupling that is linear in $\FieldF{_{\mu\nu}}$.
-Crucially this vertex sources the linearised conversion amplitude
-directly at order $\Bzero$ without promoting torsion to a propagating
-field --- torsion remains algebraically determined by the Cartan
-equation. The action is
-\begin{align}
-  \lag_\text{rf}
-    = -\frac{1}{\kappa^2}\,\MAGFt{}
-      + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3
-      - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
-      + \Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}} \, ,
-  \label{RicciEMLagrangian}
-\end{align}
-giving a four-dimensional prior over
-$\{\Bet{1\!-\!3}, \Del{1}\}$. The chain returns
-\begin{equation*}
-  \log\mathcal{Z}_+ = +13.37 \pm 0.06
-  \quad \text{and} \quad
-  \log\mathcal{Z}_- = +11.40 \pm 0.10,
-\end{equation*}
-both directions show informative evidence, so the vertex supports both
-significant amplification and suppression of the conversion at different parameter values.
-The Bayes factor $\log B = +1.98$ records that the prior-weighted integral is
-marginally amplification-dominated. The
-$\Del{1}$ direction carries $D_\mathrm{KL}(P_+\|P_-) = 20.8$~nats of
-distinction between the two directions, more than an order of
-magnitude above any other coupling; the
-$\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ operator is what drives
-the bidirectional behaviour.
+The $\Alp{1}\MAGFt{}^{2}$ term does promote the metric-perturbation
+sector to a fourth-order system, which places this theory outside the
+scope of the numerical pipeline
+(\cref{PerturbativeReduction,SymbolicMechanism}); no published
+constraint-promotion Hamiltonian recipe exists for the
+$\Alp{1}\MAGFt{}^{2}$ case~\cite{blagojevic2018hamiltonian}.
+Torsion-field components appear in the linearised equations but couple
+only into the trace sector of the metric perturbation, not into the
+transverse-traceless channel $h_{xy} \leftrightarrow A_x$ that
+mediates the standard Gertsenshtein conversion; the
+$\Alp{1}$-weighted fourth-order time derivatives introduce Ostrogradsky
+ghost modes in the trace
+sector~\cite{Woodard:2015zca,blagojevic2018hamiltonian,lin2019pgt}, a
+structural consequence of any non-degenerate Lagrangian of order
+greater than two. We conclude that the minimal-PGT family does not
+couple torsion to the Gertsenshtein channel at linear order.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ricci_em}
   \caption{Overlaid amplification (red) and suppression (blue) corner
-    plot for the Ricci--electromagnetism cross-term sector at the
+    plot for the EM--RC curvature coupling sector at the
     publication-quality chain. The $\Del{1}$ marginal separates
     cleanly: amplification extends broadly across
     $\Del{1} \in [-15, +15]$ while suppression concentrates sharply
@@ -332,17 +262,52 @@ the bidirectional behaviour.
   \label{CornerT4}
 \end{figure}
 
+\subsubsection{Electromagnetic coupling to the Riemann--Cartan curvature}
+To break the decoupling identified above we turn to the first
+non-minimal vertex: the direct coupling
+$\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ between the
+antisymmetric Riemann--Cartan Ricci tensor and the electromagnetic
+field strength, introduced by~\cite{bahamonde2025torsion} as a
+non-minimal coupling linear in $\FieldF{_{\mu\nu}}$ and not
+previously investigated in this context.
+This vertex sources the linearised conversion amplitude
+directly at order $\Bzero$ without promoting torsion to a propagating
+field --- torsion remains algebraic. The lagrangian is
+\begin{align}
+  \lag_\text{rf}
+    = -\frac{1}{\kappa^2}\,\MAGFt{}
+      + \sum_{i=1}^3 \Bet{i} I_{i}
+      - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
+      + \Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}} \, ,
+  \label{RicciEMLagrangian}
+\end{align}
+giving a four-dimensional prior over
+$\{\Bet{1\!-\!3}, \Del{1}\}$. Nested sampling gives
+\begin{equation*}
+  \log\mathcal{Z}_+ = +13.37 \pm 0.06
+  \quad \text{and} \quad
+  \log\mathcal{Z}_- = +11.40 \pm 0.10,
+\end{equation*}
+both directions show informative evidence, so the vertex supports both
+significant amplification and suppression of the conversion at different parameter values.
+The Bayes factor $\log B = +1.98$ records that the prior-weighted integral is
+marginally amplification-dominated. The $\Del{1}$-direction
+carries $D_\mathrm{KL}(P_+\|P_-) = 20.8$~nats of
+distinction between the two directions, more than an order of
+magnitude above any other coupling; the
+$\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ operator is what drives
+the bidirectional behaviour.
+
 \subsubsection{The Yang--Mills--PGT non-minimal progression}
-The non-minimal torsion--electromagnetism vertex tested in the
-Ricci--EM cross-term above is one of several distinct operator
-families introduced into PGT by different authors with different
-physical motivations. To probe what each family contributes to the
-Gertsenshtein conversion we run a nested progression of four
-sub-theories that each turn on one further family on top of the
+The non-minimal vertex tested in the $\Del{1}$ sector above is one of
+several distinct operator families introduced into PGT by different
+authors with different physical motivations. To probe what each family
+contributes to the Gertsenshtein conversion we run a nested progression
+of four sub-theories that each turn on one further family on top of the
 previous, isolating the per-family effect. The progression is
 \textit{Bahamonde base} (adding the torsion kinetic operator
-$\xi(\nabla\mathcal{T})^2$ to the Ricci--EM
-vertex of~\cite{bahamonde2025cubic}; this is the first sub-theory in
+$\xi(\nabla\mathcal{T})^2$ to the $\Del{1}$
+vertex of~\cite{bahamonde2025torsion}; this is the first sub-theory in
 which torsion propagates as a dynamical field);
 \textit{Barker extension} (adding the
 derivative-mixing operator $\chi\MAGFt{_{[\alpha\beta]}}\mathcal{F}^{(T)\,\alpha\beta}$
@@ -373,12 +338,11 @@ all three families. The combined Lagrangian is
 \end{align}
 enumerated against the full
 $\rcD{}\mathcal{T}{\times}\FieldF{}$ class in
-\cref{DerivativeExtensions}. Across the four sub-theories the chains
-return amplification log-evidences
+\cref{DerivativeExtensions}. Across the four sub-theories, nested sampling gives amplification log-evidences
 ($\log\mathcal{Z}_+$) climbing from $+7.68$ at the Bahamonde base to
 $+10.03$ at the full non-minimal union, while the suppression
 log-evidences vary between $+2.5$ and $+6.2$: both directions remain
-informatively populated as in the Ricci--EM cross-term, with the
+informatively populated as in the $\Del{1}$ sector, with the
 amplification direction increasingly dominant as the coupling space
 is extended. The Bayes factors $\log B = +1.84, +2.80, +2.68, +7.37$
 correspondingly grow as each new operator family adds a further
@@ -390,7 +354,7 @@ Shapiro chain by the torsion-squared coefficient $\Bet{1}$, and the
 full non-minimal sector by the Barker $\chi$ vertex
 ($D_\mathrm{KL}(P_+\|P_-) = 3.9$ nats). Only the single Barker $\chi$
 appears in the derivative class probed at this nine-parameter level;
-the full $\chi_1$--$\chi_{10}$ closure of the same class is the
+the full $\chi_{1\!-\!10}$ closure of the same class is the
 subject of the complete parity-even sector below.
 
 \begin{figure}[t]
@@ -461,29 +425,36 @@ that propagate, and whether any of them carries the wrong sign,
 depends on the term subset and the
 parameter values~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,lin2019pgt,Yo:1999ex,Yo:2001sy};
 robust resolution requires the full Hamiltonian particle-spectrum
-analysis carried out by the PSALTer
+analysis carried out by the \PSALTer
 tool~\cite{barker2024psalter,barker2025psalter2}, integration with
 which we defer to future work.
 
-To bound the ghost branch from below \emph{without} PSALTer we run a
+To bound the ghost branch from below \emph{without} \PSALTer we run a
 control test: the same Yang--Mills--PGT non-minimal sector with the
 torsion kinetic coefficient $\xi$ pinned to zero. The Lagrangian then
 introduces no new kinetic operator for any field beyond the
 Einstein--Maxwell baseline; torsion is determined algebraically by
 the Cartan equation. The no-ghost classification is trivially
 satisfied --- there is no kinetic operator whose sign needs checking.
-Informed by the Ricci--EM cross-term result above (where switching
+Informed by the $\Del{1}$ sector result above (where switching
 on a non-propagating vertex produced suppression-dominated structure
 on narrower prior support) we expected the control to collapse the
-amplification corner. Instead the chain returns
-$\log\mathcal{Z}_+ = +10.98 \pm 0.15$ and
-$\log\mathcal{Z}_- = +2.67 \pm 0.10$ ($\log B = +8.31$), essentially
+amplification corner. Instead nested sampling gives
+\begin{equation*}
+  \log\mathcal{Z}_+ = +10.98 \pm 0.15
+  \quad \text{and} \quad
+  \log\mathcal{Z}_- = +2.67 \pm 0.10,
+\end{equation*}
+($\log B = +8.31$), essentially
 reproducing the propagating-torsion result. Repeating the test at
 the seventeen-parameter $\chi$-closure sub-space
 $\{\Bet{1\!-\!3}, \Del{1}, \zeta_{1\!-\!3}, \chi_{1\!-\!10}\}$ with
 $\xi = 0$ returns
-$\log\mathcal{Z}_+ = +9.93 \pm 0.08$ and
-$\log\mathcal{Z}_- = -3.28 \pm 0.07$ ($\log B = +13.21$), within the
+\begin{equation*}
+  \log\mathcal{Z}_+ = +9.93 \pm 0.08 \, , \quad
+  \log\mathcal{Z}_- = -3.28 \pm 0.07 \, ,
+\end{equation*}
+($\log B = +13.21$), within the
 bootstrap uncertainty of the propagating $\chi$-closure chain. The
 amplification therefore does not require torsion to propagate; the
 non-minimal torsion--electromagnetism vertices alone reproduce the
@@ -526,7 +497,7 @@ sits in. These precedents do not prove that the linearised
 exponential growth we observe is physical; they establish that it is
 not automatically fatal, and that resolution belongs to either the
 finite-extent geometry of \cref{Discussion} or to a future
-PSALTer-based particle-spectrum analysis.
+\PSALTer-based particle-spectrum analysis.
 
 A small set of supporting diagnostics is consistent with the
 channel-mixing interpretation in the non-propagating-torsion sector:
@@ -573,7 +544,7 @@ across the posterior support. The carrier sub-corners are
 The complete parity-even sector closes the
 $\tilde{\mathcal{R}}\times\nabla\mathcal{T}$ basis of
 \cref{DerivativeExtensions} beyond Barker's single derivative-mixing
-parameter by retaining the full ten-parameter $\chi_1$--$\chi_{10}$
+parameter by retaining the full ten-parameter $\chi_{1\!-\!10}$
 sector on top of the Yang--Mills--PGT non-minimal
 base~\cite{barker2024poincare},
 \begin{align}
@@ -583,9 +554,13 @@ base~\cite{barker2024poincare},
         \tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}\bigr|_{i} \, ,
   \label{ChiClosureLagrangian}
 \end{align}
-giving an eighteen-dimensional prior. The chain returns
-$\log\mathcal{Z}_+ = +10.30 \pm 0.08$ against
-$\log\mathcal{Z}_- = -3.18 \pm 0.07$ ($\log B = +13.48$) under the
+giving an eighteen-dimensional prior. Nested sampling gives
+\begin{equation*}
+  \log\mathcal{Z}_+ = +10.30 \pm 0.08
+  \quad \text{and} \quad
+  \log\mathcal{Z}_- = -3.18 \pm 0.07,
+\end{equation*}
+($\log B = +13.48$) under the
 plane-wave approximation: the amplification log-evidence is comparable
 to the nine-parameter non-minimal base, while the suppression
 log-evidence drops below zero, indicating that closing the
@@ -637,8 +612,13 @@ $\tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}$ basis. One
 invariant, $\xi_{11}$, vanishes in the plane-wave reduction; fifteen
 propagating $\xi$-couplings plus the ten $\chi$-couplings and the
 seven non-minimal-base couplings give a thirty-two-dimensional prior.
-The chain returns $\log\mathcal{Z}_+ = -0.18 \pm 0.07$ against
-$\log\mathcal{Z}_- = -9.61 \pm 0.09$ ($\log B = +9.43$); both
+Nested sampling gives
+\begin{equation*}
+  \log\mathcal{Z}_+ = +10.30 \pm 0.08
+  \quad \text{and} \quad
+  \log\mathcal{Z}_- = -0.18 \pm 0.07,
+\end{equation*}
+($\log B = +9.43$); both
 $\log\mathcal{Z}$ are negative, indicating partial floor contamination
 from the extended $\xi_{11\!-\!16}$ sub-sector beyond Barker's
 single $\xi = \mathrm{LC}\{\xi_6, \xi_7, \xi_{12}, \xi_{16}\}$, so
@@ -675,9 +655,13 @@ corrections is a clean null at the surveyed field strengths.
 A four-dimensional parity-odd sub-sector
 $\{\Bet{1\!-\!3}, d_{21}\}$, retaining the single
 Chern--Simons-type Nieh--Yan coupling $d_{21}$ on top of the
-Einstein--Cartan minimal base, was scanned at landscape quality. The
-chain returns $\log\mathcal{Z}_+ = +5.00 \pm 0.28$ against
-$\log\mathcal{Z}_- = +11.33 \pm 0.31$ ($\log B = -6.33$) under the
+Einstein--Cartan minimal base, was scanned at landscape quality. Nested sampling gives
+\begin{equation*}
+  \log\mathcal{Z}_+ = +5.00 \pm 0.28
+  \quad \text{and} \quad
+  \log\mathcal{Z}_- = +11.33 \pm 0.31,
+\end{equation*}
+($\log B = -6.33$) under the
 plane-wave approximation. The overlaid posterior of \cref{CornerT6Min}
 resolves the asymmetry along $d_{21}$, in contrast with the
 parity-even sectors of \cref{InformativeAmplification}.  The
@@ -719,7 +703,7 @@ the single dominant carrier of the suppression preference.
 \subsubsection{Parity-odd geometric incompatibility}
 The two parity-odd torsion--electromagnetism coupling sectors --- the
 twenty-parameter parity-odd full sector
-$\{d_{14}, d_{15}, d_{17}, d_{19}, d_{20}, d_{21},
+$\{d_{14}, d_{15}, d_{17}, d_{19\!-\!21},
 \tilde\zeta_{1,2,3,5,6}\}$ on top of the Yang--Mills--PGT non-minimal
 base, and the fifty-three-parameter complete parity-odd closure that
 additionally retains the
@@ -728,15 +712,13 @@ basis $\{\tilde\chi_1, \ldots, \tilde\chi_{36}\}$ on top of the
 parity-odd-full base --- fail to admit a finite-amplitude posterior
 under the plane-wave uniform-$\Bzero$ ansatz at any horizon. The
 eigenvalues of the linearised conversion system grow unbounded in
-these coupling directions: the parity-odd full sector reaches
-$\mathrm{Re}\,\lambda \approx 1.4 \times 10^{3}$ at
-$t_\text{end} = 1$ in the survey region, and the complete parity-odd
-closure reaches $\mathrm{Re}\,\lambda \approx 5.5 \times 10^{5}$,
-both above the $\exp(708)$ modal-solver overflow ceiling. The would-be
+these coupling directions: they reach above
+the modal-solver overflow ceiling at
+$t_\text{end} = 1$. The would-be
 safe horizon for the latter is $t_\text{end} \lesssim 10^{-3}$, at
 which the Gertsenshtein conversion amplitude
-$P \propto (\kappa\Bzero t/2)^2$ drops below the soft-penalty noise
-floor by many orders of magnitude. The parity-odd full sector returns
+$P \propto (\kappa\Bzero t/2)^2$ drops below the noise
+floor by orders of magnitude. The parity-odd full sector returns
 $\log\mathcal{Z}_\pm \approx -15$ with $\log B \approx 0$, the
 soft-penalty noise signature, and the complete parity-odd closure
 returns zero dead points within the available compute. The structural
@@ -755,7 +737,7 @@ finite-extent geometry (\cref{Discussion}) would not permit.
     full sector. The amplification and suppression marginals are
     coincident across the carrier parameters, the soft-floor
     signature of the geometric incompatibility discussed in the
-    text; the chains return $\log\mathcal{Z}_\pm \approx -15$.}
+    text; nested sampling gives $\log\mathcal{Z}_\pm \approx -15$.}
   \label{CornerParityOddFull}
 \end{figure}
 
@@ -768,7 +750,7 @@ phenomenology of~\cite{caputo2021darkphoton} at $\Bzero \to 0$. The
 bare kinetic-mixing model alone produced no conversion signal: the
 modal eigendecomposition of the linearised system has a degeneracy
 between the photon mode and the Proca-trace mode that closes the
-mixing channel at leading order, so the chain returns the
+mixing channel at leading order, so the inference returns the
 Einstein--Maxwell baseline regardless of the kinetic-mixing strength.
 We therefore added the Proca mass $m_A^2$ to lift the degeneracy and
 open the mixing channel, with detuning coupling $\delta_m$
@@ -786,9 +768,13 @@ Proca-trace mode,
   \label{DarkPhotonPlasmaLagrangian}
 \end{align}
 giving a four-dimensional prior over
-$\{m_A^2, \xi, \delta_m, \Bet{3}\}$. The chain returns
-$\log\mathcal{Z}_+ = +9.03 \pm 0.07$ against
-$\log\mathcal{Z}_- = +2.92 \pm 0.08$ ($\log B = +6.11$). The
+$\{m_A^2, \xi, \delta_m, \Bet{3}\}$. Nested sampling gives
+\begin{align}
+  \log\mathcal{Z}_+ = +9.03 \pm 0.07 \, , \quad
+  \log\mathcal{Z}_- = +2.92 \pm 0.08 \, , \quad
+  \log B = +6.11 \, .
+\end{align}
+The
 amplification log-evidence dominates the suppression log-evidence,
 but per-parameter $D_\mathrm{KL}$ in \cref{KLPerTheory} identifies
 the plasma-mass coupling $\delta_m$ as the dominant carrier
@@ -843,10 +829,13 @@ of~\cite{adler1971photon,dunne2004heisenberg},
     + \sigma\,(\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}})^{2} \, ,
   \label{EHGertLagrangian}
 \end{align}
-giving a two-dimensional prior. The chain returns
-$\log\mathcal{Z}_+ = +0.184 \pm 0.001$ against
-$\log\mathcal{Z}_- = -0.185 \pm 0.0004$ ($\log B = +0.37$): a
-symmetric and tight null, with the QED reference point
+giving a two-dimensional prior. Nested sampling gives
+\begin{align}
+  \log\mathcal{Z}_+ = +0.184 \pm 0.001 \, , \quad
+  \log\mathcal{Z}_- = -0.185 \pm 0.0004 \, , \quad
+  \log B = +0.37 \, .
+\end{align}
+a symmetric and tight null, with the QED reference point
 $\sigma/\rho = 7/16$~\cite{adler1971photon,dunne2004heisenberg}
 indistinguishable from the Einstein--Maxwell baseline at the surveyed
 $\Bzero = 10^{-2}$. The single $F\cdot\tilde F$ Pontryagin topological
