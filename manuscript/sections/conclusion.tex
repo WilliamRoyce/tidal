@@ -1,0 +1,69 @@
+% !TEX root = ../main.tex
+% Conclusion — drafted per manuscript/planning/conclusion_drafting_spec.md
+% Composition: 1α + 2α + 3α + 4β + Fusion A (5E.1 + 5F.2). ≈ 380 w.
+% No equations, no figures, no \cref to figures. Two \cite to keys already
+% present in references.bib and already cited in results.tex / discussion.tex.
+
+\section{Conclusions}%
+\label{Conclusions}
+
+The extensions of general relativity that gravitational-wave observatories
+will probe in the coming decade proliferate a multi-dimensional coupling
+space whose Gertsenshtein channel structure has, until now, been
+accessible only one Lagrangian at a time. This thesis develops
+\TIDAL{}, a symbolic--numerical pipeline that automates the linearised
+channel computation for any quadratic gauge-gravity Lagrangian, and
+applies it to the quadratic Poincar\'{e}-gauge + electromagnetic action
+as a Bayesian survey at the coupling level.
+
+Across the surveyed quadratic operator space, a small set of named
+Lagrangian couplings carries the Gertsenshtein amplification verdict.
+The non-minimal EM--Riemann--Cartan curvature coupling $\Del{1}$ and the
+derivative-mixing coupling $\chi_1$ emerge as the load-bearing amplifying
+directions, robust across the propagating, non-propagating-torsion, and
+$\xi$-kinetic-closure embeddings; the parity-odd minimal sub-sector
+$\{\Bet{1\!-\!3}, d_{21}\}$ is the only sector that suppresses.
+Crucially, the amplification does not require torsion to propagate: the
+non-propagating-torsion controls reproduce the amplification corner at
+the same coupling content, so the structural ingredient is the
+non-minimal coupling itself, not the propagating-torsion kinetic sector.
+The amplifying configurations are ghost-free at the linear-order
+Hamiltonian level.
+
+Whether the exponential mode growth that drives the amplification
+verdicts represents a physical amplification, a non-ghost tachyonic
+instability of the unbounded plane-wave embedding, or a wrong-sign
+kinetic ghost is not resolved at the linearised Bayesian-survey level
+alone. The natural structural route to that resolution is a Hamiltonian
+particle-spectrum analysis of the surviving amplifying directions via
+\PSALTer{}~\cite{barker2024psalter,barker2025psalter2}. Integration of
+\TIDAL{}'s coupling-level identifications with the \PSALTer{} no-ghost
+/ no-tachyon classification at each $\Del{1}$, $\chi_1$ point of
+interest is the analytic counterpart of the operational extensions
+outlined below.
+
+Two extensions are necessary to convert the structural verdicts of the
+present survey into physical predictions. The localised-geometry
+re-run, on the dual-Gaussian + wavepacket background already supported
+by the inference architecture, bounds the interaction time, saturates
+the linearised exponential growth without removing the channel mixing,
+restores the parity-odd full and complete sectors that overflow under
+the plane-wave embedding, and replaces coupling-level verdicts with
+magnitude estimates that are physically comparable with detector
+sensitivities. The atlas-based direction-sampling machinery, also
+already in place, extends the survey from axis-aligned coupling scans
+to the full operator space, localising any non-trivial channel
+structure that a coarse scan would miss. Both extensions sit inside the
+existing \TIDAL{} architecture and are the natural input to the next
+phase of the programme.
+
+The non-minimal coupling sector of the quadratic Poincar\'{e}-gauge
+action is, on the present evidence, the structural carrier of the
+linearised Gertsenshtein channel mixing --- a role the
+propagating-torsion kinetic sector contributes to the spectrum of the
+theory but does not, in itself, supply. Whether each amplifying
+coupling identified here drives physical amplification or a
+vacuum-dependent instability is a question the linearised survey
+cannot, by construction, decide; what it does decide is which operators
+of the quadratic gauge-gravity action are even candidates for that
+question.
