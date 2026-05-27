@@ -32,6 +32,20 @@ from the rendered density, so the displayed
 $\mathscr{H} \supset \dots$ is a proper subset of the full
 canonical density (cf.\ \cref{DiracBergmann}).
 
+Each theory is also accompanied by its linearised kinetic
+matrix $\mathcal{K}(\partial_t, \partial_z)$ of
+\cref{KineticMatrix} --- the wave-operator matrix from
+$\mathcal{L}^{(2)} = \tfrac{1}{2}\xi^\mathsf{T}\mathcal{K}\xi$
+collapsed into a single display. The matrix exposes the channel
+structure at a glance: diagonal entries carry the kinetic,
+gradient, and mass terms per field; off-diagonal entries are the
+inter-field couplings. Theories with torsion-velocity-pair fields
+have those terms folded into mixed-derivative cell entries where
+the rendering is unambiguous, and otherwise dropped (with a
+pipeline warning) --- so for theories with extensive
+velocity-pair structure the displayed matrix is a faithful
+representation only of the second-order subsystem.
+
 % --- E.1  Einstein--Maxwell Gertsenshtein baseline ------------------
 \subsection{Einstein--Maxwell Gertsenshtein baseline}%
 \label{SymbolicBaseline}
@@ -56,6 +70,22 @@ plane-wave-reduced along $\hat{z}$. Full pipeline output:
 RHS terms. $\mathscr{H}$ restricted to self-GW + self-EM
 (cf.\ \cref{DiracBergmann}).}%
 \label{BaselineKineticOutput}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\adjustbox{max width=\linewidth}{$\displaystyle
+\setlength{\jot}{0.5pt}%
+\input{sections/appendices/listings/eom_baseline_kinetic_matrix.tex}
+$}
+\caption{Linearised kinetic matrix
+$\mathcal{K}(\partial_t,\partial_z)$ for the Einstein--Maxwell
+baseline. Row/column ordering follows
+\cref{BaselineKineticOutput}; the off-diagonal entries are the
+Gertsenshtein couplings
+$\mathcal{K}_{h_{xy}A_x} = \mathcal{K}_{A_xh_{xy}} = -\Bzero\,\partial_z$
+(and the symmetric pair $h_{yy}\!\leftrightarrow\!A_y$).}%
+\label{BaselineKineticMatrix}
 \end{figure}
 
 % --- E.2  Euler--Heisenberg QED 1-loop -------------------------------
@@ -85,6 +115,21 @@ to self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
 \label{EulerHeisenbergKineticOutput}
 \end{figure}
 
+\begin{figure}[t]
+\centering
+\adjustbox{max width=\linewidth}{$\displaystyle
+\setlength{\jot}{0.5pt}%
+\input{sections/appendices/listings/eom_euler_heisenberg_kinetic_matrix.tex}
+$}
+\caption{Linearised kinetic matrix
+$\mathcal{K}(\partial_t,\partial_z)$ for Euler--Heisenberg.
+The $\rho$ correction enters the diagonal photon entries with
+its characteristic $2\Bzero^{2}$ and $6\Bzero^{2}$ prefactors on
+the $A_x$ and $A_y$ kinetic terms respectively; off-diagonal
+EM-only structure remains absent.}%
+\label{EulerHeisenbergKineticMatrix}
+\end{figure}
+
 % --- E.3  Minimally-coupled Einstein--Cartan ------------------------
 \subsection{Minimally-coupled Einstein--Cartan}%
 \label{SymbolicReference}
@@ -110,6 +155,22 @@ equations of motion (\ReferenceConstraintCount{} constraints),
 \ReferenceTermCount{} RHS terms. $\mathscr{H}$ restricted to
 self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
 \label{ReferenceKineticOutput}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\adjustbox{max width=\linewidth}{$\displaystyle
+\setlength{\jot}{0.5pt}%
+\input{sections/appendices/listings/eom_reference_kinetic_matrix.tex}
+$}
+\caption{Linearised kinetic matrix
+$\mathcal{K}(\partial_t,\partial_z)$ for minimally-coupled
+Einstein--Cartan. The dynamical $h$ and $A$ sector retains the
+Einstein--Maxwell channel structure of
+\cref{BaselineKineticMatrix}; torsion components enter only
+through algebraic constraint rows ($\mathcal{K}\xi = 0$ with
+no $\partial_t$).}%
+\label{ReferenceKineticMatrix}
 \end{figure*}
 
 % --- E.4  Propagating PGT with the curvature-squared term -----------
@@ -159,6 +220,24 @@ inspection-only theory, see prose.}%
 \label{PropagatingKineticOutput}
 \end{figure}
 
+\begin{figure*}[t]
+\centering
+\adjustbox{max width=\linewidth}{$\displaystyle
+\setlength{\jot}{0.5pt}%
+\input{sections/appendices/listings/eom_mechanism_kinetic_matrix.tex}
+$}
+\caption{Linearised kinetic matrix
+$\mathcal{K}(\partial_t,\partial_z)$ for the R²-PGT theory.
+The 4th-order $b_5$ contributions are visible as
+$\partial_t^{2}$-bearing entries on the diagonal $h_{ii}$
+cells; the $h_{xy} \leftrightarrow A_x$ channel is structurally
+identical to the baseline (see
+\cref{BaselineKineticMatrix}), exposing by inspection that the
+$b_5$ coupling does not alter the linear-order Gertsenshtein
+conversion.}%
+\label{PropagatingKineticMatrix}
+\end{figure*}
+
 % --- E.5  Ricci--EM nonminimal coupling -----------------------------
 \subsection{Ricci--EM nonminimal coupling}%
 \label{SymbolicNonminimal}
@@ -186,6 +265,21 @@ Full pipeline output: \NonminimalEomCount{} equations of motion
 self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
 \label{NonminimalKineticOutput}
 \end{figure}
+
+\begin{figure*}[t]
+\centering
+\adjustbox{max width=\linewidth}{$\displaystyle
+\setlength{\jot}{0.5pt}%
+\input{sections/appendices/listings/eom_nonminimal_kinetic_matrix.tex}
+$}
+\caption{Linearised kinetic matrix
+$\mathcal{K}(\partial_t,\partial_z)$ for the Ricci--EM
+nonminimal coupling. The $\delta_{1}$ vertex generates
+off-diagonal $h \leftrightarrow A$ entries beyond the baseline
+$-\Bzero\partial_z$ Gertsenshtein coupling, modifying the
+conversion channel structure.}%
+\label{NonminimalKineticMatrix}
+\end{figure*}
 
 % --- E.6  Full YM--PGT nonminimal -----------------------------------
 \subsection{Full YM--PGT nonminimal}%
@@ -215,6 +309,20 @@ plane-wave-reduced along $\hat{z}$. Full pipeline output:
 \GeneralNonminimalTermCount{} RHS terms. $\mathscr{H}$ restricted
 to self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
 \label{GeneralNonminimalKineticOutput}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\adjustbox{max width=\linewidth}{$\displaystyle
+\setlength{\jot}{0.5pt}%
+\input{sections/appendices/listings/eom_general_nonminimal_kinetic_matrix.tex}
+$}
+\caption{Linearised kinetic matrix
+$\mathcal{K}(\partial_t,\partial_z)$ for the full Yang--Mills
+PGT with all parity-even nonminimal couplings active. The
+Bahamonde, Barker, and Shapiro variants of \cref{SectorSurvey}
+are parameter restrictions of this matrix.}%
+\label{GeneralNonminimalKineticMatrix}
 \end{figure*}
 
 % --- E.7  Parity-odd extension --------------------------------------
@@ -254,6 +362,21 @@ RHS terms. $\mathscr{H}$ restricted to self-GW + self-EM
 \label{ParityOddKineticOutput}
 \end{figure*}
 
+\begin{figure*}[t]
+\centering
+\adjustbox{max width=\linewidth}{$\displaystyle
+\setlength{\jot}{0.5pt}%
+\input{sections/appendices/listings/eom_parity_odd_kinetic_matrix.tex}
+$}
+\caption{Linearised kinetic matrix
+$\mathcal{K}(\partial_t,\partial_z)$ for the parity-odd
+extension. The parity-odd invariants contribute through
+$\epsilon$-tensor-mediated entries; the self-energy diagonal
+sector remains as in
+\cref{GeneralNonminimalKineticMatrix}.}%
+\label{ParityOddKineticMatrix}
+\end{figure*}
+
 % --- E.8  Dark-photon-plasma analogue -------------------------------
 \subsection{Dark-photon-plasma analogue}%
 \label{SymbolicDarkPhotonPlasma}
@@ -283,6 +406,21 @@ motion (\DarkPhotonPlasmaConstraintCount{} constraints),
 \DarkPhotonPlasmaTermCount{} RHS terms. $\mathscr{H}$ restricted
 to self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
 \label{DarkPhotonPlasmaKineticOutput}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\adjustbox{max width=\linewidth}{$\displaystyle
+\setlength{\jot}{0.5pt}%
+\input{sections/appendices/listings/eom_dark_photon_plasma_kinetic_matrix.tex}
+$}
+\caption{Linearised kinetic matrix
+$\mathcal{K}(\partial_t,\partial_z)$ for the dark-photon-plasma
+analogue. The $\delta_{m}$ kinetic-mixing vertex produces
+off-diagonal photon--torsion entries explicitly visible in the
+$A \leftrightarrow T$ block; the photon-mass term $m_A^{2}$
+enters the diagonal $A_\mu$ cells.}%
+\label{DarkPhotonPlasmaKineticMatrix}
 \end{figure*}
 
 \FloatBarrier

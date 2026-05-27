@@ -992,6 +992,100 @@ def hamiltonian_to_latex(
 
 
 # ---------------------------------------------------------------------------
+# Kinetic matrix rendering (issue #372)
+# ---------------------------------------------------------------------------
+
+
+def _render_kinetic_cell(cell, spec) -> str:  # noqa: ANN001 (KineticMatrixCell, EquationSystem)
+    r"""Render one $\mathcal{K}_{ij}$ cell as a sum of (coeff)(op) terms.
+
+    ``cell.entries`` is a list of ``(operator_label, coefficient_symbolic)``
+    pairs encoding the differential-operator polynomial. Empty cell
+    renders as ``0``.
+    """
+    if not cell.entries:
+        return "0"
+
+    parts: list[str] = []
+    for k, (op_label, coeff_sym) in enumerate(cell.entries):
+        coeff_tex = coefficient_to_latex(coeff_sym)
+        # operator_to_latex returns "{op_tex} {field}"; with empty
+        # field arg we get "{op_tex} " (bare operator + trailing
+        # space) for non-trivial ops, or "" for identity.
+        op_tex = operator_to_latex(op_label, "").rstrip()
+
+        # Compose the term: coefficient * operator. Cases:
+        #  - identity operator: emit just the coefficient
+        #  - coefficient == "1": emit just the operator
+        #  - coefficient == "-1": emit "-" + operator
+        #  - otherwise: coefficient + operator, joined by an
+        #    invisible product (\, for separation)
+        if not op_tex:
+            term = coeff_tex
+        elif coeff_tex in {"1", ""}:
+            term = op_tex
+        elif coeff_tex == "-1":
+            term = rf"-{op_tex}"
+        else:
+            # Wrap negative-leading or sum coefficients in parens to
+            # avoid "-frac ..." parsing as a subtraction at the cell
+            # boundary level.
+            if coeff_tex.lstrip().startswith("-") and len(cell.entries) > 1:
+                # Standalone negative coefficient is fine inside a
+                # cell; the separator logic below will turn it into a
+                # minus sign between terms.
+                pass
+            term = rf"{coeff_tex} \, {op_tex}"
+
+        # Join with the previous term using sign-aware separator.
+        if k == 0:
+            parts.append(term)
+        elif term.lstrip().startswith("-"):
+            parts.append(rf" - {term.lstrip()[1:].lstrip()}")
+        else:
+            parts.append(rf" + {term}")
+
+    return "".join(parts)
+
+
+def kinetic_matrix_to_latex(km, spec: EquationSystem) -> str:  # noqa: ANN001
+    r"""Render an assembled :class:`KineticMatrix` as a labelled bmatrix.
+
+    Produces a TeX expression of the form
+
+    .. code-block:: latex
+
+        \mathcal{K}(\partial_t,\partial_z) = \begin{bmatrix}
+          K_{00} & K_{01} & \cdots \\
+          K_{10} & K_{11} & \cdots \\
+          \cdots
+        \end{bmatrix}
+
+    where each cell is the differential-operator polynomial
+    acting on the column field. Reuses
+    :func:`operator_to_latex` and :func:`coefficient_to_latex`
+    for per-cell rendering — so the operators visible here render
+    identically to the EOM listings. Plane-wave axis remapping
+    is applied as a post-pass.
+    """
+    axis_remap = _operator_axis_remap(spec)
+    rows: list[str] = []
+    for i in range(km.n):
+        rendered_cells = [
+            _render_kinetic_cell(km.cells[i][j], spec) for j in range(km.n)
+        ]
+        rows.append(" & ".join(rendered_cells))
+    body = " \\\\\n  ".join(rows)
+    result = (
+        r"\mathcal{K}(\partial_t,\partial_z) = "
+        rf"\begin{{bmatrix}}{chr(10)}  {body}{chr(10)}\end{{bmatrix}}"
+    )
+    for from_axis, to_axis in axis_remap.items():
+        result = result.replace(rf"\partial_{from_axis}", rf"\partial_{to_axis}")
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Lagrangian rendering (xAct notation → LaTeX with \tensor{})
 # ---------------------------------------------------------------------------
 

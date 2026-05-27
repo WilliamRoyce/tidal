@@ -162,7 +162,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     inspect_parser.add_argument(
         "--latex-format",
-        choices=["align", "gather", "document", "raw"],
+        choices=["align", "gather", "kinetic-matrix", "document", "raw"],
         default="align",
         dest="latex_format",
         help=(
@@ -170,6 +170,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "'gather' wraps each equation in its own \\begin{aligned} block "
             "inside an outer \\begin{gather*} for per-equation centering "
             "(used by the Appendix-E driver). "
+            "'kinetic-matrix' emits the linearised kinetic matrix "
+            "\\mathcal{K}(\\partial_t, \\partial_z) as a bmatrix "
+            "(used by the Appendix-E driver second pass). "
             "'document' wraps in standalone .tex"
         ),
     )

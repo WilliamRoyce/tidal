@@ -81,11 +81,22 @@ render_one() {
       | sed -e '/^%/d' -e '/^\\begin{gather\*}/d' -e '/^\\end{gather\*}/d' \
       | python3 scripts/listings/wrap_long_lines.py --width 400 \
       > "$out"
+
+    # Second pass: emit the kinetic-matrix listing (issue #372). The
+    # matrix is assembled from the same JSON via
+    # tidal/symbolic/kinetic_matrix.py and rendered as a bmatrix by
+    # tidal/symbolic/latex.py::kinetic_matrix_to_latex. Each theory
+    # gets eom_<tag>_kinetic_matrix.tex alongside the EOM listing.
+    local km_out="$OUT_DIR/eom_${tag}_kinetic_matrix.tex"
+    uv run tidal inspect "$json" --latex --latex-format kinetic-matrix \
+        --symbols manuscript/latex_symbols.toml \
+      > "$km_out"
   else
     # Placeholder for a theory whose derivation has not yet been run.
     # Keeps the subsection's \input target valid; replaced when the
     # JSON lands.
     printf '%%%% Placeholder: %s — derivation pending.\n\\text{Equations of motion to be added when the derivation completes.}\n' "$tag" > "$out"
+    printf '%%%% Placeholder: %s kinetic matrix — derivation pending.\n\\text{Kinetic matrix to be added when the derivation completes.}\n' "$tag" > "$OUT_DIR/eom_${tag}_kinetic_matrix.tex"
   fi
   local lines
   lines=$(wc -l <"$out")
@@ -110,7 +121,8 @@ done
 sed -i \
   -e 's/\\mathcal{H}/h/g' \
   -e 's/\\mathcal{A}/A/g' \
-  "$OUT_DIR"/eom_*_full.tex
+  "$OUT_DIR"/eom_*_full.tex \
+  "$OUT_DIR"/eom_*_kinetic_matrix.tex
 
 # Refresh the caption-count sidecar (EOM / constraint / term counts per
 # theory). Idempotent; reads only the listings written above.

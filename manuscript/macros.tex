@@ -11,6 +11,10 @@
 % Mathematics
 \usepackage{amssymb}
 \usepackage{amsmath}
+% Allow up to 50-column bmatrix for the Appendix-E kinetic-matrix
+% figures (parity-odd / general_nonminimal listings need ~40 columns).
+% Default amsmath value is 10.
+\setcounter{MaxMatrixCols}{50}
 \usepackage{mathtools}
 \usepackage{stix}
 \usepackage{mathrsfs}
