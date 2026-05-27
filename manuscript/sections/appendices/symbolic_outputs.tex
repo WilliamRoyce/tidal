@@ -115,25 +115,19 @@ self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
 % --- E.4  Propagating PGT with the curvature-squared term -----------
 \subsection{Propagating PGT with the curvature-squared term}%
 \label{SymbolicMechanism}
-% TODO (per §4.3 R²-PGT decoupling discussion): extract and display the
-% explicit kinetic matrix for the R²-PGT case at the figure environment
-% below so the off-diagonal-only nature of the b_5 contributions is
-% visible at a glance.  The decoupling claim currently rests on the
-% prose; the kinetic matrix itself is the load-bearing evidence for
-% the §4.3 opening narrative and deserves explicit display.
 Linearised around a uniform magnetic background
-$\bm{B} = \Bzero\,\hat{x}$. The $b_{5}\tilde{\mathcal{R}}^{2}$
+$\bm{B} = \Bzero\,\hat{x}$. The $\Alp{1}\MAGFt{}^{2}$
 curvature-squared term promotes the metric-perturbation sector to
 a fourth-order system. We include this theory \emph{for
 inspection} of the resulting equation-of-motion structure rather
-than as part of the simulated-theory campaign: the $b_5$-weighted
+than as part of the simulated-theory campaign: the $\Alp{1}$-weighted
 contributions land only on the diagonal $h_{ii}$ kinetic equations
-(see the $2\,b_5\,\partial_t^{4}h_{xx}$ representative displayed
+(see the $2\,\Alp{1}\,\partial_t^{4}h_{xx}$ representative displayed
 in \cref{PropagatingKineticOutput}) and are absent from the
 off-diagonal $h_{xy}$ equation that mediates the Gertsenshtein
 channel $h_\times \!\leftrightarrow\! a_\parallel$. Linear-order
 $h_{xy}\!\leftrightarrow\!A_{x}$ conversion is therefore
-unaffected by the $b_5$ coupling, a null result we read directly
+unaffected by the $\Alp{1}$ coupling, a null result we read directly
 from the equations rather than confirm by simulation; discussed in
 \cref{ChannelStructure}.
 
@@ -141,7 +135,7 @@ The Hamiltonian density is suppressed for this figure. The
 fourth-order time derivatives lie outside the domain of v6's
 no-Ostrogradsky-reduction policy, no published constraint-
 promotion Hamiltonian recipe exists for the
-$b_5 \tilde{\mathcal{R}}^{2}$ case (Blagojevi\'c and Cvetkovi\'c
+$\Alp{1} \MAGFt{}^{2}$ case (Blagojevi\'c and Cvetkovi\'c
 2018, App.\,D), and the pipeline's
 \verb|ParseHamiltonianExpression| filter does not cover the
 4th-order sector. The partial expression the pipeline emits for
@@ -156,7 +150,7 @@ reference but is not rendered.
 \input{sections/appendices/listings/eom_mechanism_full.tex}
 \end{gathered}
 $}
-\caption{Propagating-torsion PGT with parameter $b_{5}$ on
+\caption{Propagating-torsion PGT with parameter $\Alp{1}$ on
 $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
 Full pipeline output: \MechanismEomCount{} equations of motion
 (\MechanismConstraintCount{} constraints),

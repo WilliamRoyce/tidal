@@ -48,10 +48,9 @@ To survey the Gertsenshtein conversion across the Poincar\'{e} gauge
 theory of \cref{QuadraticAction} we partition the general quadratic
 action by sector and probe each restriction in turn. The operator
 inventory is collected
-in \cref{MasterParameterCount}; the perturbative-regime conditions
+in \cref{PGTEnumeration}; the perturbative-regime conditions
 under which the linearised treatment remains self-consistent are set
-out in \cref{PerturbativeRegime}; and the nested-sampling layer with
-which we infer per-sector amplification or suppression is detailed in
+out in \cref{PerturbativeRegime}; and the Bayesian inference methodology is described in
 \cref{InferenceArchitecture}. Throughout, the per-sample conversion
 score $A(\theta)$ of \cref{AmplificationScore} drives the Bayesian
 likelihood; the small-$\Bzero$ asymptotic ratio $\Aamp$ of
@@ -66,25 +65,23 @@ uniform-$\Bzero$.
 % §4.2–§4.4.
 
 \paragraph*{Validation setup}
-We anchor the survey on a reproduction of the Boccaletti conversion
-kernel \cref{GertsenshteinFormula} in Einstein--Maxwell theory. The
+We validate the pipeline on the Boccaletti conversion
+formula \cref{GertsenshteinFormula} in Einstein--Maxwell theory. The
 linearised system on a periodic $N = 512$ grid
 is evolved over a propagation distance $D = 100$, with
-horizon $t_\text{end} = 50$ and photon carrier wavenumber
-$k = 2.011$. We scan a 24-point grid in $\Bzero \in [0.005, 0.25]$.
+propagation time $t_\text{end} = 50$ and photon carrier wavenumber
+$k \approx 2.011$ (the nearest $2\pi n/L$ mode at $N = 512$, $L = 100$),
+sampling $\Bzero$ at 24 uniformly spaced values in $[0.005, 0.25]$.
 
 \paragraph*{Reproduction of the Boccaletti kernel}
 \TIDAL{} recovers the Boccaletti kernel \cref{GertsenshteinFormula}
 in the small-$\Bzero$ limit to the modal-evolution
 round-off floor of $\sim 10^{-8}$ across the validation grid
-(\cref{BoccalettiValidation,BoccalettiUniform}). As
-$\Bzero$ grows the simulation departs from the bare formula by
-$\mathcal{O}(\Bzero^2)$, capturing the graviton effective-mass
-detuning that the bare formula drops but the full PDE retains;
-against the two-mode prediction of~\cite{raffelt1988mixing} that
-includes this physics, the simulation residual returns to the
-round-off floor across the sweep, confirming that the bare-formula
-deviation reflects retained physics rather than numerical error.
+(\cref{BoccalettiValidation,BoccalettiUniform}). As $\Bzero$ grows
+the simulation departs from the bare formula by $\mathcal{O}(\Bzero^2)$
+due to the graviton effective-mass detuning; against the two-mode
+prediction of~\cite{raffelt1988mixing} that includes this detuning,
+the signed residual is $\lesssim 10^{-8}$ across the grid.
 The path-integrated kernel for a Gaussian magnetic profile of
 finite extent is recovered to the same precision
 (\cref{BoccalettiLocalised}).
@@ -112,7 +109,8 @@ applicable to the finite-extent geometry.
   \caption{Boccaletti validation for the Einstein--Maxwell baseline
     on a flat Minkowski background with uniform
     $\Bzero \in [0.005, 0.25]$, propagation distance $D = 100$,
-    horizon $t_\text{end} = 50$, on a periodic $N = 512$ grid. Upper
+    propagation time $t_\text{end} = 50$, carrier wavenumber
+    $k \approx 2.011$, on a periodic $N = 512$ grid. Upper
     panel: simulated $P_\text{final}(\Bzero)$ (filled circles)
     overlaid with the analytic $\sin^2(\kappa\Bzero t_\text{end}/2)$
     kernel (dashed line). Lower
@@ -122,7 +120,7 @@ applicable to the finite-extent geometry.
   \label{BoccalettiValidation}
 \end{figure}
 
-\subsection{Survey summary under the plane-wave benchmark}%
+\subsection{Survey summary under the plane-wave approximation}%
 \label{SurveySummary}%
 \label{SectorSurvey}% Compatibility carry-over for theory.tex / App~D / App~F / App~G legacy cross-refs.
 
@@ -139,18 +137,23 @@ applicable to the finite-extent geometry.
 % ghost-mediated interpretation was the most damaging counter-argument to a
 % positive Gertsenshtein prediction in the propagating-torsion theories;
 % ruling it out promotes NP to load-bearing headline status.
-Under the plane-wave uniform-$\Bzero$ benchmark we obtain the
-partition of the surveyed PGT hierarchy by Bayes factor collected in
-\cref{SurveyResultsTable}: of the thirteen sectors traversed at this
-benchmark, seven show informative posteriors favouring amplification
-($\log B = \log\mathcal{Z}_+ - \log\mathcal{Z}_- > 0$), one
-(the parity-odd minimal sub-sector) shows a clean suppression
-preference, two of the highest-dimensional parity-odd sectors are
-geometrically incompatible with the plane-wave ansatz at any viable
-horizon (eigenvalues exceed the modal-solver overflow ceiling
-\cref{NestedScore}), one parallel QED-EFT axis is a clean null, and
-the Einstein--Cartan baseline reduces analytically to the
-Einstein--Maxwell limit.
+Under the plane-wave approximation we obtain the
+Bayes-factor partition of the surveyed PGT hierarchy collected in
+\cref{SurveyResultsTable}. The Bayes factor
+$\log B = \log\mathcal{Z}_+ - \log\mathcal{Z}_-$~\cite{Skilling:2006gxv}
+quantifies amplification preference ($\log B > 0$) or suppression
+preference ($\log B < 0$) relative to the Einstein--Maxwell baseline.
+The surveyed sectors partition into parity-even non-minimal extensions
+with informative amplification evidence, two sectors where the
+plane-wave linearised regime fails at any viable propagation time,
+and two parallel test axes --- one showing suppression preference,
+one a null. Two of the highest-dimensional parity-odd sectors cannot
+produce an informative posterior under the plane-wave ansatz at any
+viable propagation time: the linearised eigenvalues grow too rapidly
+for the modal-solver evolution to complete before numerical overflow,
+and whether this growth reflects a genuine instability or an artefact
+of the unbounded plane-wave geometry requires the finite-extent
+treatment of \cref{Discussion}.
 % the
 % non-propagating-torsion control retains $\log B \approx +8$ when the
 % torsion kinetic mode is removed, supporting the genuine-channel-mixing
@@ -161,11 +164,7 @@ Whether the surviving amplification preferences
 reflect genuine amplification of the conversion channel or unbounded
 growth on the tachyonic plane-wave background that a finite-extent
 geometry would saturate is a methodological distinction that occupies
-the discussion in \cref{Discussion}. \Cref{InformativeAmplification}
-walks through the per-sector posteriors that exhibit the
-amplification preference and \cref{FrontierAndNulls} reports the
-analytic null, the suppression preference, the parity-odd
-geometric incompatibility, and the QED-EFT parallel-axis null.
+the discussion in \cref{Discussion}.
 
 % Survey results table.  Sourced from V3_PHASE_TRACKER.md and the
 % inference.json files of each listed chain.  Where landscape and
@@ -173,13 +172,13 @@ geometric incompatibility, and the QED-EFT parallel-axis null.
 % numbers are reported and the landscape source noted in the footnote.
 \begin{table*}[t]
   \centering
-  \caption{Plane-wave-benchmark survey-results summary across the
+  \caption{Plane-wave survey results across the
     surveyed sectors of the PGT hierarchy. Columns: theory class, prior
     dimension, log evidence of the amplification-rewarding model
     $\log\mathcal{Z}_+$ (per \cref{NestedScore} with $+\log A$), log
     evidence of the suppression-rewarding model $\log\mathcal{Z}_-$
     (with $-\log A$), Bayes factor $\log B = \log\mathcal{Z}_+ -
-    \log\mathcal{Z}_-$, quality label, and the qualitative verdict.
+    \log\mathcal{Z}_-$~\cite{Skilling:2006gxv}, quality label, and the qualitative verdict.
     Errors $\sigma_{\log\mathcal{Z}}$ from the PolyChord
     nested-sampling estimator. Landscape runs use
     $n_\text{live} = 25\,d$ in the coupling dimension; publication
@@ -210,8 +209,8 @@ geometric incompatibility, and the QED-EFT parallel-axis null.
     non-propagating torsion ($\xi=0$, $\chi$-closure control) & 17 & $+9.93 \pm 0.08$ & $-3.28 \pm 0.07$ & $+13.21$ & publication\textsuperscript{a}      & \emph{amplifies (control)} \\
     $\xi$-kinetic closure               & 32 & $-0.18 \pm 0.07$    & $-9.61 \pm 0.09$    & $+9.43$  & publication\textsuperscript{a,b}       & \emph{amplifies (partial rescue)} \\
     parity-odd minimal sub-sector       & 4  & $+5.002 \pm 0.280$  & $+11.331 \pm 0.311$ & $-6.329$ & landscape                              & \emph{suppresses} \\
-    parity-odd full                     & 20 & $-15.01 \pm 0.023$  & $-14.99 \pm 0.025$  & $\approx 0$ & publication\textsuperscript{a,c}    & \emph{geometrically incompatible} \\
-    complete parity-odd                 & 53 & --                  & --                  & --       & publication\textsuperscript{a,d}       & \emph{geometrically incompatible} \\
+    parity-odd full                     & 20 & $-15.01 \pm 0.023$  & $-14.99 \pm 0.025$  & $\approx 0$ & publication\textsuperscript{a,c}    & \emph{plane-wave overflow} \\
+    complete parity-odd                 & 53 & --                  & --                  & --       & publication\textsuperscript{a,d}       & \emph{plane-wave overflow} \\
     Euler--Heisenberg + Gertsenshtein   & 2  & $+0.184 \pm 0.001$  & $-0.185 \pm 0.0004$ & $+0.37$  & publication                            & \emph{null (QED-EFT inert)} \\
     \hline\hline
   \end{tabular}\\[1ex]
@@ -231,64 +230,60 @@ geometric incompatibility, and the QED-EFT parallel-axis null.
    soft-floor noise band.\par}
 \end{table*}
 
-\subsection{Informative amplification under the plane-wave benchmark}%
+\subsection{Surveyed sectors}%
 \label{InformativeAmplification}%
-% \label{ChannelStructure}% Compatibility carry-over for theory.tex line 377 cross-ref.
-
-The per-theory paragraphs below walk through the surveyed sectors in
-the order they entered the investigation: from the minimal-PGT
-construction in which the torsion sector decouples from the
-Gertsenshtein channel, through successive non-minimal couplings that
-break the decoupling, to the high-dimensional closures of the
-parity-even derivative-mixing and torsion-kinetic operator classes.
-Each entry reports the chain's amplification and suppression
-evidence in turn (rather than only the net Bayes factor), since the
-two directions carry distinct physical content: $\log\mathcal{Z}_+$
-quantifies the prior-averaged amplification of the conversion above
-its Einstein--Maxwell baseline, and $\log\mathcal{Z}_-$ quantifies
-the prior-averaged suppression below it. Sectors in which both are
-large express genuinely bidirectional structure --- the same theory
-supports amplification at some parameter combinations and
-suppression at others; sectors in which one is small reduce to a
-single-direction verdict. The per-parameter $D_\mathrm{KL}$
-diagnostics of \cref{KLPerTheory} additionally identify which
-operators carry that structure.
+\phantomsection\label{ChannelStructure}%
+\phantomsection\label{FrontierAndNulls}
 
 \subsubsection{The quadratic-curvature theory (R$^2$-PGT)}
 We open with R$^2$-PGT, the simplest PGT extension in which torsion
 propagates as a dynamical field. The Lagrangian retains the three
 parity-even torsion-squared invariants $I_{1,2,3}$ of
 \cite{shapiro2002torsion,hayashi1979new} together with the
-$b_5\MAGFt{^2}$ curvature-squared term whose coefficient turns
+$\Alp{1}\MAGFt{}^{2}$ curvature-squared term whose coefficient turns
 on the torsion kinetic mode,
 \begin{align}
   \lag_{R^2}
     = -\frac{1}{\kappa^2}\,\MAGFt{}
        + \Bet{1} I_1 + \Bet{2} I_2 + \Bet{3} I_3
     - \tfrac{1}{4}\FieldF{_{\alpha\beta}}\FieldF{^{\alpha\beta}}
-       + b_5\,\MAGFt{^2} \, ,
+       + \Alp{1}\,\MAGFt{}^{2} \, ,
   \label{R2PGTLagrangian}
 \end{align}
 giving a four-dimensional prior over
-$\{\Bet{1\!-\!3}, b_5\}$. The $b_5\MAGFt{^2}$ term promotes the
-metric-perturbation sector to a fourth-order system, which falls
-outside the constraint-promotion Hamiltonian-reduction recipe
-implemented in our solver \cite{blagojevic2018hamiltonian}; the analytic null result
-is read directly from the symbolic kinetic matrix in
-\cref{PropagatingKineticOutput}. Under the plane-wave
-transverse-traceless graviton initial condition on the uniform
-$\Bzero$ background, the torsion-field components of $\MAGFt{}$
-vanish identically at zeroth order; the $b_5$-weighted contributions
-land only on the diagonal $h_{ii}$ kinetic equations and are absent
-from the off-diagonal $h_{xy}$ that mediates the cross-polarisation
-channel $h_\times \!\leftrightarrow\! a_\parallel$. The
-Einstein--Cartan limit $b_5 \to 0$ is subsumed by this analysis ---
-the algebraic torsion constraint inherited from variation against
-the Riemann--Cartan connection then reduces the linearised channel
-to its Einstein--Maxwell baseline at all $\{\beta_i\}$. We conclude
-that the minimal-PGT family does not couple torsion to the
-Gertsenshtein channel at linear order. The remainder of \S4 explores
-non-minimal extensions in which this decoupling is broken.
+$\{\Bet{1\!-\!3}, \Alp{1}\}$. The $\Alp{1}\MAGFt{}^{2}$ term promotes the
+metric-perturbation sector to a fourth-order system, which places this
+theory outside the scope of the numerical pipeline
+(\cref{PerturbativeReduction,SymbolicMechanism}); no published
+constraint-promotion Hamiltonian recipe exists for the
+$\Alp{1}\MAGFt{}^{2}$ case~\cite{blagojevic2018hamiltonian}, and the
+null result is read directly from the equations of motion in
+\cref{PropagatingKineticOutput}. Torsion-field components appear in
+the linearised equations but couple only into the trace sector of the
+metric perturbation, not into the transverse-traceless $h_{xy}$ channel
+that drives the conversion; the $\Alp{1}$-weighted fourth-order time
+derivatives introduce Ostrogradsky ghost modes in the trace
+sector~\cite{Woodard:2015zca,blagojevic2018hamiltonian,lin2019pgt}, a
+structural consequence of any non-degenerate Lagrangian of order
+greater than two. The decoupling of the conversion channel is
+confirmed directly by the equations of motion:
+\begin{align}
+  \partial_t^2 A_x &= B_0 \partial_z h_{xy} + \partial_z^2 A_x,
+    \label{ChannelEqAx} \\
+  -\kappa^{-2} \partial_t^2 h_{xy} &= \tfrac{B_0^2}{2} h_{xy}
+    + B_0 \partial_z A_x - \kappa^{-2} \partial_z^2 h_{xy}.
+    \label{ChannelEqHxy}
+\end{align}
+The $\Alp{1}$-weighted terms ($2\Alp{1}\partial_t^4 h_{xx}$ etc.\
+appear in the diagonal metric equations) are entirely absent from
+\cref{ChannelEqAx,ChannelEqHxy}; the conversion channel is unaffected
+by the $\Alp{1}$ coupling at linear order. The Einstein--Cartan limit
+$\Alp{1} \to 0$ is subsumed by this analysis --- the algebraic
+torsion constraint then reduces the linearised channel to its
+Einstein--Maxwell baseline at all $\{\beta_i\}$. We conclude that the
+minimal-PGT family does not couple torsion to the Gertsenshtein channel
+at linear order. The remainder of \S4 explores non-minimal extensions
+in which this decoupling is broken.
 
 \subsubsection{The Ricci--electromagnetism cross-term}
 To break the decoupling of R$^2$-PGT we turn to the first
@@ -447,7 +442,7 @@ subject of the complete parity-even sector below.
     the Yang--Mills--PGT progression at the landscape chain. The
     accumulated amplification structure across all nine couplings
     yields the strongest Bayes factor of the parity-even progression
-    under the plane-wave benchmark ($\log B = +7.37$).}
+    under the plane-wave approximation ($\log B = +7.37$).}
   \label{CornerT5D23}
 \end{figure}
 
@@ -598,7 +593,7 @@ base~\cite{barker2024poincare},
 giving an eighteen-dimensional prior. The chain returns
 $\log\mathcal{Z}_+ = +10.30 \pm 0.08$ against
 $\log\mathcal{Z}_- = -3.18 \pm 0.07$ ($\log B = +13.48$) under the
-plane-wave benchmark: the amplification log-evidence is comparable
+plane-wave approximation: the amplification log-evidence is comparable
 to the nine-parameter non-minimal base, while the suppression
 log-evidence drops below zero, indicating that closing the
 $\chi_i$ basis tightens the constraint that suppression is confined
@@ -642,9 +637,9 @@ carrier sub-corner is \cref{CarrierChiClosure}.
 \subsubsection{The $\xi$-kinetic closure}
 The $\xi$-kinetic closure replaces Barker's single kinetic
 coefficient $\xi$ with the full sixteen-parameter
-$\xi_1$--$\xi_{16}$ basis of the $(\nabla\mathcal{T})^2$
+$\xi_{1\!-\!16}$ basis of the $(\nabla\mathcal{T})^2$
 class~\cite{barker2024poincare}, on top of the complete
-$\chi_1$--$\chi_{10}$
+$\chi_{1\!-\!10}$
 $\tilde{\mathcal{R}}\!\times\!\nabla\mathcal{T}$ basis. One
 invariant, $\xi_{11}$, vanishes in the plane-wave reduction; fifteen
 propagating $\xi$-couplings plus the ten $\chi$-couplings and the
@@ -652,11 +647,11 @@ seven non-minimal-base couplings give a thirty-two-dimensional prior.
 The chain returns $\log\mathcal{Z}_+ = -0.18 \pm 0.07$ against
 $\log\mathcal{Z}_- = -9.61 \pm 0.09$ ($\log B = +9.43$); both
 $\log\mathcal{Z}$ are negative, indicating partial floor contamination
-from the extended $\xi_{11}$--$\xi_{16}$ sub-sector beyond Barker's
+from the extended $\xi_{11\!-\!16}$ sub-sector beyond Barker's
 single $\xi = \mathrm{LC}\{\xi_6, \xi_7, \xi_{12}, \xi_{16}\}$, so
 the $+9.43$ nat Bayes factor is a lower bound on the genuine
 amplification of the parity-even kinetic closure under the
-plane-wave benchmark. Per-parameter $D_\mathrm{KL}$ in
+plane-wave approximation. Per-parameter $D_\mathrm{KL}$ in
 \cref{KLPerTheory} again identifies $\chi_1$ as the dominant amp/sup
 carrier ($D_\mathrm{KL}(P_+\|P_-) = 4.4$ nats), with the strongest
 $\xi$-direction contribution arriving through $\xi_{15}$
@@ -674,27 +669,23 @@ is $\rcD{^\alpha}\mathcal{T}^{\beta}{}_\alpha{}^\gamma\,
   \label{CornerT9}
 \end{figure*}
 
-\subsection{Frontier nulls under the plane-wave benchmark}%
-\label{FrontierAndNulls}
-
 The remaining surveyed sectors resolve to nulls under the plane-wave
-benchmark for structurally distinct reasons: the parity-odd minimal
+approximation for structurally distinct reasons: the parity-odd minimal
 sub-sector $\{\Bet{1\!-\!3}, d_{21}\}$ exhibits a clean suppression
-preference; the full and complete parity-odd sectors are
-geometrically incompatible with the plane-wave uniform-$\Bzero$
-ansatz at any viable horizon; the dark-photon-plasma analogue
+preference; the full and complete parity-odd sectors exhibit plane-wave overflow
+at any viable propagation time; the dark-photon-plasma analogue
 isolates a suppression that is essentially Proca-mass-driven; and a
 parallel QED-EFT survey axis along the Euler--Heisenberg $F^4$
 corrections is a clean null at the surveyed field strengths.
 
 \subsubsection{The parity-odd minimal sub-sector}
 A four-dimensional parity-odd sub-sector
-$\{\Bet{1}, \Bet{2}, \Bet{3}, d_{21}\}$, retaining the single
+$\{\Bet{1\!-\!3}, d_{21}\}$, retaining the single
 Chern--Simons-type Nieh--Yan coupling $d_{21}$ on top of the
 Einstein--Cartan minimal base, was scanned at landscape quality. The
 chain returns $\log\mathcal{Z}_+ = +5.00 \pm 0.28$ against
 $\log\mathcal{Z}_- = +11.33 \pm 0.31$ ($\log B = -6.33$) under the
-plane-wave benchmark. The overlaid posterior of \cref{CornerT6Min}
+plane-wave approximation. The overlaid posterior of \cref{CornerT6Min}
 resolves the asymmetry along $d_{21}$, in contrast with the
 parity-even sectors of \cref{InformativeAmplification}.  The
 $d_{21}$ direction carries $D_\mathrm{KL}(P_+\|P_-) = 8.8$ nats of
@@ -705,7 +696,7 @@ the single dominant carrier of the suppression preference.
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_parity_odd_minimal}
   \caption{Overlaid corner plot for the four-dimensional parity-odd
-    minimal sub-sector $\{\Bet{1}, \Bet{2}, \Bet{3}, d_{21}\}$ at
+    minimal sub-sector $\{\Bet{1\!-\!3}, d_{21}\}$ at
     the landscape chain. The suppression posterior (blue) concentrates
     at small $\{\Bet{i}\}$ and small $|d_{21}|$ while the
     amplification posterior (red) is broader and offset, giving the

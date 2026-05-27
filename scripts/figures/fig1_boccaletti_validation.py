@@ -71,7 +71,7 @@ def _plot(data: dict, out_path: Path) -> None:
     ax_res.axhline(0.0, color="#999", lw=0.6, ls=":")
     ax_res.plot(b0, residual, marker="o", ms=4, lw=1.0, color="#d62728")
     ax_res.set_xlabel(r"$B_0$")
-    ax_res.set_ylabel("sim − ana")
+    ax_res.set_ylabel(r"$P_\mathrm{TIDAL} - P_\mathrm{bare}$")
     ax_res.grid(visible=True, ls=":", alpha=0.3)
     if residual.size and np.any(residual != 0):
         scale = max(np.max(np.abs(residual)) * 1.3, 1e-8)
