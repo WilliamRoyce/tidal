@@ -188,6 +188,7 @@ The path-integrated kernel \cref{BoccalettiPathIntegrated} is recovered in
 
 \subsection{Surveyed sectors}%
 \label{SectorSurvey}%
+\label{InformativeAmplification}%
 
 % Under the plane-wave approximation (\cref{Linearisation}) the
 % surveyed PGT hierarchy yields the Bayes-factor partition collected in
@@ -198,7 +199,10 @@ quantifies amplification preference ($\log B > 0$) or suppression
 preference ($\log B < 0$) relative to the Einstein--Maxwell baseline.
 Whether the surviving amplification preferences reflect genuine
 conversion-channel enhancement or tachyonic growth that a finite-extent
-geometry would saturate is discussed in \cref{Discussion}.
+geometry would saturate is discussed in \cref{Discussion}. Nested
+sampling for every sector below was performed with
+PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; corner figures were
+generated with anesthetic~\cite{Handley:2019mfs}.
 
 \subsubsection{The $\MAGFt{}^2$-PGT sector}
 We open with the $\MAGFt{}^2$-PGT sector, the minimal-coupling GR extension
@@ -239,16 +243,6 @@ ghost modes~\cite{Woodard:2015zca,blagojevic2018hamiltonian,lin2019pgt}.
 We conclude that the minimal-PGT family does not stably
 couple torsion to the Gertsenshtein effect at linear order.
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ricci_em}
-  \caption{Overlaid amplification (magenta) and suppression (yellow) corner
-    plot for the EM--RC curvature coupling sector. The $\Del{1}$ marginal separates
-    cleanly: amplification extends broadly while suppression concentrates sharply
-    at $\Del{1} \approx 0$.}
-  \label{CornerT4}
-\end{figure}
-
 \subsubsection{Electromagnetic coupling to the Riemann--Cartan curvature}
 To break this decoupling we introduce the first
 non-minimal vertex: the direct coupling
@@ -282,7 +276,27 @@ carries $D_\mathrm{KL}(P_+\|P_-) = 20.8$~nats of
 distinction between the two directions, over an order of
 magnitude above any other coupling; the
 $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ operator itself is what drives
-the bidirectional behaviour.
+the bidirectional behaviour. The corner plot of \cref{CornerEMRC} resolves
+this: the suppression posterior concentrates sharply at
+$\Del{1}\!\approx\!0$ while the amplification posterior extends broadly
+along $\Del{1}$, with the $\Bet{i}$ marginals essentially overlapping
+between the two posteriors. The $\Del{1}$ vertex is the operator that
+opens the bidirectional structure; the $I_i$ minimal-base couplings sit
+on the same posterior support in both directions.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ricci_em}
+  \caption{Posterior marginals for the four-dimensional EM--RC
+    curvature-coupling sector $\{\Bet{1\!-\!3},\Del{1}\}$ of
+    \cref{RicciEMLagrangian}. Diagonal: 1D marginals (amplification:
+    magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
+    the 68\% and 95\% credible contours. The $\Del{1}$ direction
+    separates the two posteriors at $D_\mathrm{KL}(P_+\|P_-) = 20.8$~nats
+    --- over an order of magnitude above any $\Bet{i}$ --- identifying
+    $\Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ as the carrier.}
+  \label{CornerEMRC}
+\end{figure}
 
 \begin{table}[h]
   \centering
@@ -302,34 +316,57 @@ the bidirectional behaviour.
 \end{table}
 
 \subsubsection{The parity-odd minimal sub-sector}
-A four-dimensional parity-odd sub-sector
-$\{\Bet{1\!-\!3}, d_{21}\}$, retaining the single
-Chern--Simons-type Nieh--Yan coupling $d_{21}$ on top of the
-Einstein--Cartan minimal base, was scanned at landscape quality. Nested sampling gives
+The EM--RC vertex above broke the minimal decoupling with a single
+parity-even non-minimal operator. Its parity-odd companion is the
+natural next test: still non-propagating, still a single non-minimal
+operator added to the Einstein--Cartan minimal base, but with an
+$\varepsilon$-contraction that flips the parity. The relevant operator
+is the $\varepsilon$-twin of the EM--RC vertex itself,
+\begin{equation*}
+  d_{21}\,\varepsilon^{\mu\nu\rho\sigma}\,
+    \tilde{\mathcal{R}}_{\mu\nu}\,\FieldF{_{\rho\sigma}},
+\end{equation*}
+drawn from the three parity-odd
+$\varepsilon\!\cdot\!\tilde{\mathcal{R}}\!\cdot\!\FieldF{}$ contractions
+enumerated in
+\cref{ParityOddQuadratic}~\cite{karananas2014parity,blagojevic2018hamiltonian}.
+The four-dimensional sub-sector $\{\Bet{1\!-\!3}, d_{21}\}$ was scanned at
+landscape chain quality. Nested sampling gives
 \begin{equation*}
   \log\mathcal{Z}_+ = +5.00 \pm 0.28
   \qand
   \log\mathcal{Z}_- = +11.33 \pm 0.31,
 \end{equation*}
-($\log B = -6.33$). The overlaid posterior of \cref{CornerT6Min}
-resolves the asymmetry along $d_{21}$, in sharp contrast with the
-parity-even sectors surveyed below.  The
-$d_{21}$ direction carries $D_\mathrm{KL}(P_+\|P_-) = 8.8$ nats of
-amp/sup separation (\cref{KLTableParityOddMin}) --- the Nieh--Yan
-invariant is the single dominant carrier of the suppression
-preference.
+($\log B = -6.33$). \Cref{CornerT6Min} shows the amplification posterior
+extending broadly across $d_{21}$ while the suppression posterior
+concentrates near $d_{21}\!\approx\!0$ --- the same qualitative pattern as
+the parity-even EM--RC sector of \cref{CornerEMRC}. The two non-minimal
+operators (parity-even
+$\Del{1}\,\tilde{\mathcal{R}}\!\cdot\!\FieldF{}$ and its parity-odd
+$\varepsilon$-twin $d_{21}\,\varepsilon\!\cdot\!\tilde{\mathcal{R}}\!\cdot\!\FieldF{}$)
+drive comparable bidirectional structure, but the magnitudes differ:
+$d_{21}$ carries $D_\mathrm{KL}(P_+\|P_-) = 8.8$~nats and the suppression
+dominates ($\log B = -6.33$), while $\Del{1}$ carries $20.8$~nats and the
+amplification dominates ($\log B = +1.98$). The parity-odd minimal is the
+only sub-sector across the survey where the suppression log-evidence
+dominates; the $\Bet{1}$ ($5.4$) and $\Bet{2}$ ($4.4$~nats) co-carriers
+(\cref{KLTableParityOddMin}) indicate the suppression preference is a
+joint statement about the $\varepsilon$-twin direction and the
+minimal-base $\Bet{i}$ axes, not a single-operator effect.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_parity_odd_minimal}
-  \caption{Carrier sub-corner for the four-dimensional parity-odd
-    minimal sub-sector $\{\Bet{1\!-\!3}, d_{21}\}$ at
-    the landscape chain. The top-$K$ parameters ranked by combined
-    marginal-amp / marginal-sup / cross-amp-sup $D_\mathrm{KL}$ are
-    plotted; the suppression posterior concentrates
-    at small $\{\Bet{i}\}$ and small $|d_{21}|$ while the
-    amplification posterior is broader and offset, giving the
-    survey's only clear suppression preference among the parity-odd
+  \caption{Posterior marginals for the four-dimensional parity-odd
+    minimal sub-sector $\{\Bet{1\!-\!3}, d_{21}\}$. Diagonal: 1D
+    marginals (amplification: magenta; suppression: yellow).
+    Off-diagonal: 2D joint marginals at the 68\% and 95\% credible
+    contours. The parity-odd
+    $\varepsilon\!\cdot\!\tilde{\mathcal{R}}\!\cdot\!\FieldF{}$ vertex
+    $d_{21}$ carries $D_\mathrm{KL}(P_+\|P_-) = 8.8$~nats, with
+    $\Bet{1}$ ($5.4$) and $\Bet{2}$ ($4.4$) contributing substantively
+    --- a co-dominant carrier set rather than a singleton --- and gives
+    the survey's only clear suppression preference among the parity-odd
     sectors examined here.}
   \label{CornerT6Min}
 \end{figure}
@@ -356,10 +393,12 @@ $\beta_3$ & 2.53 & 2.57 & 0.81 \\
 Many authors have introduced non-minimal operators into PGT with different physical
 motivations, and the $\Del{1}$ vertex in \cref{RicciEMLagrangian} is just one of several that could break
 the minimal decoupling. To probe what each family contributes to the Gertsenshtein
-conversion we consider four nested sub-theories that each turn on one
-further family, isolating their effect.
+conversion we run four chains over four sub-theories: the Bahamonde base
+($\xi$ only), the Barker extension ($\xi+\chi$), the Shapiro extension
+($\xi+\zeta_{1,2,3}$), and the union that turns all three families on
+simultaneously.
 
-The progression opens with the \textit{Bahamonde base}~\cite{bahamonde2025torsion},
+We open with the \textit{Bahamonde base}~\cite{bahamonde2025torsion},
 which extends the $\Del{1}$ vertex by the torsion kinetic operator
 $\xi(\nabla\mathcal{T})^2$, making torsion a dynamical propagating field for the
 first time in the hierarchy.
@@ -389,149 +428,120 @@ The combined Lagrangian is
   \label{NonMinimalLagrangian}
 \end{align}
 \end{widetext}
-enumerated against the full
-$\rcD{}\mathcal{T}{\times}\FieldF{}$ class in
-\cref{DerivativeExtensions}. Across the four sub-theories the amplification
-preference strengthens monotonically as the coupling space expands: the
-Bayes factors $\log B = +1.84$, $+2.80$, $+2.68$, $+7.37$ grow as each
-new operator family adds a further amplification corner. Both directions
-remain informatively populated throughout --- suppression log-evidences lie
-between $+2.5$ and $+6.2$ --- indicating amplification dominance without
-the suppression corner collapsing. The carrier directions migrate across the
-progression (tables below): the Bahamonde and Barker sub-theories are
-dominated by the $\xi(\nabla\mathcal{T})^2$ kinetic direction (${\approx}5$
-nats), the Shapiro sub-theory by $\Bet{1}$, and the non-minimal union by the
-Barker $\chi$ vertex ($D_\mathrm{KL}(P_+\|P_-) = 3.9$ nats). Only the single
-Barker $\chi$ appears at nine-parameter level; the full $\chi_{1\!-\!10}$
-closure is the subject of the complete parity-even sector below.
+The $\chi$ and $\zeta_{1,2,3}$ derivative-mixing operators above (and the
+extended $\chi_{2\!-\!10}$ deferred to the next subsection) are particular
+contractions drawn from the complete basis of
+$\rcD{}\mathcal{T}{\times}\FieldF{}$ invariants enumerated in
+\cref{DerivativeExtensions}. Across the four chains the Bayes factors are
+$\log B = +1.84$ (Bahamonde, $\xi$ only), $+2.80$ (Barker, $\xi+\chi$),
+$+2.68$ (Shapiro, $\xi+\zeta_{1,2,3}$), and $+7.37$ (non-minimal union).
+The Barker and Shapiro single-family extensions give comparable Bayes
+factors, while the union --- combining both --- opens a substantially larger
+amplification preference. Both directions remain informatively populated
+throughout --- suppression log-evidences sit between $+2.5$ and $+6.2$ ---
+indicating amplification dominance without the suppression corner
+collapsing. The dominant carrier migrates across the four chains
+(\cref{KLTableYMUnified}): the Bahamonde and Barker chains are carried by
+the $\xi(\nabla\mathcal{T})^2$ kinetic direction
+($D_\mathrm{KL}(P_+\|P_-) \approx 5$~nats), the Shapiro chain by $\Bet{1}$
+($4.8$~nats), and the union by the Barker $\chi$ vertex ($3.9$~nats). Only
+the single Barker $\chi$ appears at the nine-parameter level; the full
+$\chi_{1\!-\!10}$ closure is the subject of the complete parity-even sector
+below.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_bahamonde}
-  \caption{Carrier sub-corner for the Bahamonde base of the
-    Yang--Mills--PGT progression at the publication-quality chain.
-    The top-$K$ parameters ranked by combined marginal-amp /
-    marginal-sup / cross-amp-sup $D_\mathrm{KL}$ are plotted.
-    The amplification posterior concentrates at low $\xi$ with broad
-    $\Del{1}$, while the suppression posterior covers a wider $\xi$
-    band but is sharply localised at $\Del{1} \approx 0$.}
+  \caption{Posterior marginals for the five-dimensional Bahamonde base
+    $\{\Bet{1\!-\!3},\Del{1},\xi\}$ of the Yang--Mills--PGT family.
+    Diagonal: 1D marginals (amplification: magenta; suppression:
+    yellow). Off-diagonal: 2D joint marginals at the 68\% and 95\%
+    credible contours. The torsion kinetic coefficient $\xi$ is the
+    dominant carrier at $D_\mathrm{KL}(P_+\|P_-) = 5.6$~nats;
+    amplification concentrates at low $\xi$ with broad $\Del{1}$, while
+    suppression covers a wider $\xi$ band but localises sharply at
+    $\Del{1}\!\approx\!0$.}
   \label{CornerT5D20}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_barker}
-  \caption{Carrier sub-corner for the Barker extension of the
-    Yang--Mills--PGT progression at the publication-quality chain.
-    The top-$K$ parameters ranked by combined marginal-amp /
-    marginal-sup / cross-amp-sup $D_\mathrm{KL}$ are plotted.
-    The added $\chi$ direction broadens the amplification posterior
-    into a non-axis-aligned region in the $(\Del{1}, \chi)$ plane.}
+  \caption{Posterior marginals for the six-dimensional Barker extension
+    $\{\Bet{1\!-\!3},\Del{1},\xi,\chi\}$ of the Yang--Mills--PGT family.
+    Diagonal: 1D marginals (amplification: magenta; suppression:
+    yellow). Off-diagonal: 2D joint marginals at the 68\% and 95\%
+    credible contours. The torsion kinetic coefficient $\xi$ remains the
+    dominant carrier at $D_\mathrm{KL}(P_+\|P_-) = 4.9$~nats; the added
+    $\chi$ direction broadens the amplification posterior into a
+    non-axis-aligned region in the $(\Del{1},\chi)$ plane.}
   \label{CornerT5D21}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_shapiro}
-  \caption{Carrier sub-corner for the Shapiro extension of the
-    Yang--Mills--PGT progression at the landscape chain.
-    The top-$K$ parameters ranked by combined marginal-amp /
-    marginal-sup / cross-amp-sup $D_\mathrm{KL}$ are plotted.
-    The Shapiro derivative couplings $\zeta_{1,2,3}$ tighten
-    the suppression sub-region near $\zeta_i \approx 0$ while
-    leaving the amplification posterior structure inherited from
-    the Bahamonde base largely unchanged.}
+  \caption{Posterior marginals for the eight-dimensional Shapiro
+    extension $\{\Bet{1\!-\!3},\Del{1},\xi,\zeta_{1\!-\!3}\}$ of the
+    Yang--Mills--PGT family. Diagonal: 1D marginals (amplification:
+    magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
+    the 68\% and 95\% credible contours. $\Bet{1}$ is the dominant
+    carrier at $D_\mathrm{KL}(P_+\|P_-) = 4.8$~nats; the
+    $\zeta_{1,2,3}$ derivative couplings tighten the suppression
+    sub-region near $\zeta_i\!\approx\!0$.}
   \label{CornerT5D22}
 \end{figure}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_ym_pgt_full_nonminimal}
-  \caption{Carrier sub-corner for the non-minimal union of the
-    Yang--Mills--PGT progression at the landscape chain. The top-$K$
-    parameters ranked by combined marginal-amp / marginal-sup /
-    cross-amp-sup $D_\mathrm{KL}$ are plotted. The accumulated
-    amplification structure across all nine couplings yields the
-    strongest Bayes factor of the parity-even progression under the
-    plane-wave approximation ($\log B = +7.37$).}
+  \caption{Posterior marginals for the nine-dimensional non-minimal
+    union $\{\Bet{1\!-\!3},\Del{1},\xi,\chi,\zeta_{1\!-\!3}\}$ of the
+    Yang--Mills--PGT family. Diagonal: 1D marginals (amplification:
+    magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
+    the 68\% and 95\% credible contours. The Barker $\chi$ vertex
+    emerges as the dominant carrier at $D_\mathrm{KL}(P_+\|P_-) =
+    3.9$~nats, and the union returns the strongest parity-even Bayes
+    factor $\log B = +7.37$.}
   \label{CornerT5D23}
 \end{figure}
 
-\begin{table}[h]
+\begin{table*}[t]
   \centering
-  \begin{tabular}{l | c c c}
+  \footnotesize
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{l | ccc | ccc | ccc | ccc | ccc}
   \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
+    & \multicolumn{3}{c|}{Bahamonde} & \multicolumn{3}{c|}{Barker}
+    & \multicolumn{3}{c|}{Shapiro}   & \multicolumn{3}{c|}{Union}
+    & \multicolumn{3}{c}{NP control ($\xi=0$)} \\
+  \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}\cmidrule(lr){14-16}
+  Coupling & $D_+$ & $D_-$ & $D_{+\|-}$ & $D_+$ & $D_-$ & $D_{+\|-}$
+           & $D_+$ & $D_-$ & $D_{+\|-}$ & $D_+$ & $D_-$ & $D_{+\|-}$
+           & $D_+$ & $D_-$ & $D_{+\|-}$ \\
   \midrule
-$\xi$      & 1.20 & 1.77 & 5.55 \\
-$\delta_1$ & 3.02 & 3.06 & 0.08 \\
-$\beta_1$  & 2.93 & 2.93 & 0.94 \\
-$\beta_2$  & 2.67 & 2.88 & 0.52 \\
-$\beta_3$  & 2.82 & 2.50 & 0.24 \\
+  $\Del{1}$  & 3.02 & 3.06 & 0.08 & 3.09 & 2.98 & 0.52 & 2.87 & 2.94 & 0.20 & 2.93 & 2.71 & 0.17 & 2.76 & 2.73 & 0.26 \\
+  $\xi$      & 1.20 & 1.77 & 5.55 & 2.65 & 1.59 & 4.87 & ---  & ---  & ---  & ---  & ---  & ---  & $\dagger$ & $\dagger$ & $\dagger$ \\
+  $\chi$     & ---  & ---  & ---  & 3.00 & 3.11 & 0.64 & ---  & ---  & ---  & 2.31 & 3.01 & 3.86 & 2.81 & 2.89 & 0.57 \\
+  $\zeta_1$  & ---  & ---  & ---  & ---  & ---  & ---  & --   & --   & --   & --   & --   & --   & 2.82 & 2.56 & 0.23 \\
+  $\zeta_2$  & ---  & ---  & ---  & ---  & ---  & ---  & 2.96 & 2.97 & 0.16 & 2.81 & 2.86 & 0.25 & 2.99 & 2.05 & 0.74 \\
+  $\zeta_3$  & ---  & ---  & ---  & ---  & ---  & ---  & 2.63 & 2.80 & 0.25 & 2.71 & 2.72 & 0.27 & --   & --   & --   \\
+  $\Bet{1}$  & 2.93 & 2.93 & 0.94 & 2.36 & 2.83 & 1.30 & 2.37 & 3.04 & 4.77 & 2.56 & 2.80 & 0.77 & 2.19 & 2.68 & 3.48 \\
+  $\Bet{2}$  & 2.67 & 2.88 & 0.52 & --   & --   & --   & 2.48 & 2.83 & 1.14 & --   & --   & --   & --   & --   & --   \\
+  $\Bet{3}$  & 2.82 & 2.50 & 0.24 & 2.97 & 2.55 & 0.22 & --   & --   & --   & --   & --   & --   & --   & --   & --   \\
   \bottomrule
   \end{tabular}
-  \caption{Yang--Mills--PGT (Bahamonde base): per-coupling $D_\mathrm{KL}$
-    carrier identification for the plane-wave-benchmark survey
-    (\cref{CornerT5D20} shows the top-$K$ carrier parameters).}
-  \label{KLTableYMBahamonde}
-\end{table}
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{l | c c c}
-  \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
-  \midrule
-$\xi$      & 2.65 & 1.59 & 4.87 \\
-$\chi$     & 3.00 & 3.11 & 0.64 \\
-$\delta_1$ & 3.09 & 2.98 & 0.52 \\
-$\beta_3$  & 2.97 & 2.55 & 0.22 \\
-$\beta_1$  & 2.36 & 2.83 & 1.30 \\
-  \bottomrule
-  \end{tabular}
-  \caption{Yang--Mills--PGT (Barker extension): per-coupling $D_\mathrm{KL}$
-    carrier identification for the plane-wave-benchmark survey
-    (\cref{CornerT5D21} shows the top-$K$ carrier parameters).}
-  \label{KLTableYMBarker}
-\end{table}
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{l | c c c}
-  \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
-  \midrule
-$\beta_1$  & 2.37 & 3.04 & 4.77 \\
-$\zeta_2$  & 2.96 & 2.97 & 0.16 \\
-$\delta_1$ & 2.87 & 2.94 & 0.20 \\
-$\beta_2$  & 2.48 & 2.83 & 1.14 \\
-$\zeta_3$  & 2.63 & 2.80 & 0.25 \\
-  \bottomrule
-  \end{tabular}
-  \caption{Yang--Mills--PGT (Shapiro extension): per-coupling $D_\mathrm{KL}$
-    carrier identification for the plane-wave-benchmark survey
-    (\cref{CornerT5D22} shows the top-$K$ carrier parameters).}
-  \label{KLTableYMShapiro}
-\end{table}
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{l | c c c}
-  \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
-  \midrule
-$\chi$     & 2.31 & 3.01 & 3.86 \\
-$\delta_1$ & 2.93 & 2.71 & 0.17 \\
-$\zeta_2$  & 2.81 & 2.86 & 0.25 \\
-$\beta_1$  & 2.56 & 2.80 & 0.77 \\
-$\zeta_3$  & 2.71 & 2.72 & 0.27 \\
-  \bottomrule
-  \end{tabular}
-  \caption{Yang--Mills--PGT (non-minimal union): per-coupling $D_\mathrm{KL}$
-    carrier identification for the plane-wave-benchmark survey
-    (\cref{CornerT5D23} shows the top-$K$ carrier parameters).}
-  \label{KLTableYMFull}
-\end{table}
+  \caption{Yang--Mills--PGT family: per-coupling $D_\mathrm{KL}$ across the
+    five chains. Sub-columns are amplification-only
+    $D_+ = D_\mathrm{KL,+}$, suppression-only $D_- = D_\mathrm{KL,-}$, and
+    amplification-vs-suppression $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in
+    nats. ``---'' marks a coupling absent from that sub-theory's
+    Lagrangian; ``--'' marks one present but below the per-chain top-five
+    carrier cutoff used in the source data; $\dagger$ marks $\xi=0$ pinned
+    by construction in the NP control. Carrier sub-corners:
+    \cref{CornerT5D20,CornerT5D21,CornerT5D22,CornerT5D23,CornerNP}.}
+  \label{KLTableYMUnified}
+\end{table*}
 
 % Discussion preserved (planning directive 2026-05-25):
 % Rescue logic: the v1 chain at t_end=10 saturated the modal-solver
@@ -591,13 +601,15 @@ bootstrap uncertainty of the propagating $\chi$-closure chain. The
 amplification therefore does not require torsion to propagate; the
 non-minimal torsion--electromagnetism vertices alone reproduce the
 amp-vs-sup structure of the propagating theory. Per-parameter
-$D_\mathrm{KL}$ (tables below) resolves the carrier:
-$\Bet{1}$ dominates the eight-parameter control
-($D_\mathrm{KL}(P_+\|P_-) = 3.5$ nats), and the seventeen-parameter
+$D_\mathrm{KL}$ resolves the carrier: $\Bet{1}$ dominates the
+eight-parameter control (\cref{KLTableYMUnified}, last block;
+$D_\mathrm{KL}(P_+\|P_-) = 3.5$ nats), and the seventeen-parameter
 $\chi$-closure control returns $\chi_1$ as the dominant carrier
-($D_\mathrm{KL}(P_+\|P_-) = 5.8$ nats), with the explicit
-contraction $\rcD{^\alpha}\mathcal{T}^{\beta\gamma\delta}\,
-\tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$.
+($D_\mathrm{KL}(P_+\|P_-) = 5.8$ nats), the explicit contraction
+$\rcD{^\alpha}\mathcal{T}^{\beta\gamma\delta}\,
+\tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$; the full per-coupling
+comparison against the propagating chain is
+\cref{KLTableChiClosureComparison}.
 
 \paragraph*{Interpretation of exponential mode growth}
 The pipeline accepts these exponentially-growing modes through the
@@ -649,70 +661,36 @@ across the posterior support. The carrier sub-corners are
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_np_t5}
-  \caption{Carrier sub-corner for the eight-dimensional
-    non-propagating-torsion control sector. The torsion kinetic
-    coefficient $\xi$ is pinned to zero relative to the full
-    nine-parameter non-minimal sector of \cref{CornerT5D23}, leaving
-    the torsion field algebraically determined by the Cartan
-    equation. The top-$K$ parameters ranked by combined marginal-amp
-    / marginal-sup / cross-amp-sup $D_\mathrm{KL}$ are plotted.}
+  \caption{Posterior marginals for the eight-dimensional
+    non-propagating-torsion control sector
+    $\{\Bet{1\!-\!3},\Del{1},\chi,\zeta_{1\!-\!3}\}$, obtained by pinning
+    $\xi\!=\!0$ in the non-minimal union of \cref{CornerT5D23} so
+    torsion is algebraic. Diagonal: 1D marginals (amplification:
+    magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
+    the 68\% and 95\% credible contours. $\Bet{1}$ is the dominant
+    carrier at $D_\mathrm{KL}(P_+\|P_-) = 3.5$~nats; the amp/sup
+    structure of the propagating sector is essentially reproduced,
+    evidence that the amplification is not a torsion-kinetic artefact.}
   \label{CornerNP}
 \end{figure}
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{l | c c c}
-  \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
-  \midrule
-$\beta_1$  & 2.19 & 2.68 & 3.48 \\
-$\zeta_2$  & 2.99 & 2.05 & 0.74 \\
-$\chi$     & 2.81 & 2.89 & 0.57 \\
-$\zeta_1$  & 2.82 & 2.56 & 0.23 \\
-$\delta_1$ & 2.76 & 2.73 & 0.26 \\
-  \bottomrule
-  \end{tabular}
-  \caption{Non-propagating torsion ($\xi=0$ control): per-coupling $D_\mathrm{KL}$
-    carrier identification for the plane-wave-benchmark survey
-    (\cref{CornerNP} shows the top-$K$ carrier parameters).}
-  \label{KLTableNP}
-\end{table}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_np_chi_closure}
-  \caption{Carrier sub-corner for the seventeen-dimensional
-    non-propagating-torsion $\chi$-closure control. The torsion
-    kinetic coefficient $\xi$ is pinned to zero relative to the
-    eighteen-parameter $\chi$-closure of \cref{CarrierChiClosure};
-    the carrier-parameter structure essentially reproduces the
-    propagating result.}
+  \caption{Carrier sub-corner of the seventeen-dimensional
+    non-propagating-torsion $\chi$-closure ($\xi\!=\!0$ pinned in
+    \cref{CarrierChiClosure}'s eighteen-parameter base), restricted to
+    the parameters ranked highest by combined marginal-amp /
+    marginal-sup / cross-amp-sup $D_\mathrm{KL}$. Diagonal: 1D
+    marginals (amplification: magenta; suppression: yellow).
+    Off-diagonal: 2D joint marginals at the 68\% and 95\% credible
+    contours. $\chi_1$ is the dominant carrier at
+    $D_\mathrm{KL}(P_+\|P_-) = 5.8$~nats --- the explicit contraction
+    $\rcD{^\alpha}\mathcal{T}^{\beta\gamma\delta}\,
+    \tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$ --- and the
+    propagating result is reproduced within bootstrap uncertainty.}
   \label{CornerNPCeven}
 \end{figure}
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{l | c c c}
-  \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
-  \midrule
-$\chi_{1}$  & 1.72 & 2.82 & 5.78 \\
-$\chi_{7}$  & 2.37 & 2.80 & 1.44 \\
-$\chi_{2}$  & 2.39 & 2.78 & 0.89 \\
-$\beta_1$   & 2.60 & 2.76 & 0.57 \\
-$\chi_{10}$ & 2.72 & 2.54 & 0.29 \\
-$\chi_{9}$  & 2.55 & 2.70 & 0.49 \\
-$\beta_2$   & 2.50 & 2.68 & 0.77 \\
-$\zeta_1$   & 2.68 & 2.51 & 0.31 \\
-$\chi_{5}$  & 2.68 & 2.63 & 0.27 \\
-$\zeta_2$   & 2.62 & 2.51 & 0.38 \\
-  \bottomrule
-  \end{tabular}
-  \caption{Non-propagating torsion ($\xi=0$, $\chi$-closure control): per-coupling $D_\mathrm{KL}$
-    carrier identification for the plane-wave-benchmark survey
-    (\cref{CornerNPCeven} shows the top-$K$ carrier parameters).}
-  \label{KLTableNPChiClosure}
-\end{table}
 
 \subsubsection{The complete parity-even sector ($\chi$-closure)}
 The complete parity-even sector closes the
@@ -740,7 +718,7 @@ to the nine-parameter non-minimal union, while the suppression
 log-evidence drops below zero, indicating that closing the
 $\chi_i$ basis tightens the constraint that suppression is confined
 to small $\chi$ rather than opening additional suppression
-corners. Per-parameter $D_\mathrm{KL}$ (\cref{KLTableChiClosure})
+corners. Per-parameter $D_\mathrm{KL}$ (\cref{KLTableChiClosureComparison})
 resolves the carrier structure further: $\chi_1$ alone accounts for
 $D_\mathrm{KL}(P_+\|P_-) = 4.2$ nats --- five times larger than any
 other coupling --- identifying the explicit contraction
@@ -752,40 +730,60 @@ carrier sub-corner is \cref{CarrierChiClosure}.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_chi_closure}
-  \caption{Carrier sub-corner for the eighteen-dimensional
-    $\chi$-closure: the six parameters ranked highest by combined
-    marginal-amp / marginal-sup / cross-amp-sup $D_\mathrm{KL}$.  The
-    amplification (magenta) and suppression (yellow) marginals separate
-    most strongly along $\chi_1$, the
-    $\rcD{^\alpha}\mathcal{T}^{\beta\gamma\delta}
-     \,\tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$ contraction.
-    full $D_\mathrm{KL}$ carrier ranking is in \cref{KLTableChiClosure}.}
+  \caption{Carrier sub-corner of the eighteen-dimensional $\chi$-closure
+    $\{\Bet{1\!-\!3},\Del{1},\xi,\zeta_{1\!-\!3},\chi_{1\!-\!10}\}$ of
+    \cref{ChiClosureLagrangian}, restricted to the six parameters
+    ranked highest by combined marginal-amp / marginal-sup /
+    cross-amp-sup $D_\mathrm{KL}$. Diagonal: 1D marginals
+    (amplification: magenta; suppression: yellow). Off-diagonal: 2D
+    joint marginals at the 68\% and 95\% credible contours. $\chi_1$
+    dominates at $D_\mathrm{KL}(P_+\|P_-) = 4.2$~nats --- five times
+    the next strongest carrier --- identifying
+    $\rcD{^\alpha}\mathcal{T}^{\beta\gamma\delta}\,
+    \tilde{\mathcal{R}}_{\alpha\beta\gamma\delta}$ as the parity-even
+    amp/sup driver; full ranking in \cref{KLTableChiClosureComparison}.}
   \label{CarrierChiClosure}
 \end{figure}
 \label{CornerT7}% legacy compatibility — the CarrierChiClosure figure supersedes the previous full-corner figure
 
 \begin{table}[h]
   \centering
-  \begin{tabular}{l | c c c}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{l | ccc | ccc}
   \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
+    & \multicolumn{3}{c|}{NP control ($\xi=0$, 17D)}
+    & \multicolumn{3}{c}{Propagating ($\xi$ free, 18D)} \\
+  \cmidrule(lr){2-4}\cmidrule(lr){5-7}
+  Coupling & $D_+$ & $D_-$ & $D_{+\|-}$ & $D_+$ & $D_-$ & $D_{+\|-}$ \\
   \midrule
-$\chi_{1}$  & 1.68 & 2.82 & 4.18 \\
-$\chi_{7}$  & 2.38 & 2.81 & 0.66 \\
-$\chi_{5}$  & 2.74 & 2.55 & 0.22 \\
-$\beta_1$   & 2.59 & 2.73 & 0.52 \\
-$\beta_2$   & 2.67 & 2.73 & 0.46 \\
-$\zeta_1$   & 2.72 & 2.60 & 0.35 \\
-$\chi_{9}$  & 2.44 & 2.70 & 0.78 \\
-$\chi_{6}$  & 2.50 & 2.68 & 0.30 \\
-$\beta_3$   & 2.68 & 2.61 & 0.40 \\
-$\chi_{2}$  & 2.37 & 2.66 & 0.85 \\
+  $\chi_{1}$  & 1.72 & 2.82 & 5.78 & 1.68 & 2.82 & 4.18 \\
+  $\chi_{2}$  & 2.39 & 2.78 & 0.89 & 2.37 & 2.66 & 0.85 \\
+  $\chi_{5}$  & 2.68 & 2.63 & 0.27 & 2.74 & 2.55 & 0.22 \\
+  $\chi_{6}$  & --   & --   & --   & 2.50 & 2.68 & 0.30 \\
+  $\chi_{7}$  & 2.37 & 2.80 & 1.44 & 2.38 & 2.81 & 0.66 \\
+  $\chi_{9}$  & 2.55 & 2.70 & 0.49 & 2.44 & 2.70 & 0.78 \\
+  $\chi_{10}$ & 2.72 & 2.54 & 0.29 & --   & --   & --   \\
+  $\Bet{1}$   & 2.60 & 2.76 & 0.57 & 2.59 & 2.73 & 0.52 \\
+  $\Bet{2}$   & 2.50 & 2.68 & 0.77 & 2.67 & 2.73 & 0.46 \\
+  $\Bet{3}$   & --   & --   & --   & 2.68 & 2.61 & 0.40 \\
+  $\zeta_1$   & 2.68 & 2.51 & 0.31 & 2.72 & 2.60 & 0.35 \\
+  $\zeta_2$   & 2.62 & 2.51 & 0.38 & --   & --   & --   \\
   \bottomrule
   \end{tabular}
-  \caption{Complete parity-even ($\chi$-closure) sector: per-coupling $D_\mathrm{KL}$
-    carrier identification for the plane-wave-benchmark survey
-    (\cref{CarrierChiClosure} shows the top-$K$ carrier parameters).}
-  \label{KLTableChiClosure}
+  \caption{$\chi$-closure sector: per-coupling $D_\mathrm{KL}$ across the
+    two chains. Sub-columns are amplification-only
+    $D_+ = D_\mathrm{KL,+}$, suppression-only $D_- = D_\mathrm{KL,-}$, and
+    amplification-vs-suppression $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in
+    nats. ``--'' marks a coupling present but below the per-chain top-ten
+    carrier cutoff. The two columns isolate the effect of switching on
+    the torsion kinetic mode: $\chi_1$ remains the dominant carrier in
+    both, with the NP-control value $\sim 1.4\times$ larger than the
+    propagating value, consistent with the kinetic mode redistributing
+    some amp/sup weight from $\chi_1$ onto $\chi_7$. Carrier sub-corners:
+    \cref{CornerNPCeven} (NP control) and \cref{CarrierChiClosure}
+    (propagating).}
+  \label{KLTableChiClosureComparison}
 \end{table}
 
 
@@ -824,19 +822,24 @@ from the extended $\xi_{11\!-\!16}$ sub-sector, so
 the $+9.43$ nat Bayes factor is a lower bound on the genuine
 amplification of the parity-even kinetic closure under the
 plane-wave approximation. Per-parameter $D_\mathrm{KL}$ (\cref{KLTableXiClosure}) again identifies
-$\chi_1$ as the dominant amp/sup carrier ($D_\mathrm{KL}(P_+\|P_-) = 4.4$ nats),
-with the strongest $\xi$-direction contribution arriving through $\xi_{15}$
-($D_\mathrm{KL}(P_+\|P_-) = 3.5$ nats), whose explicit contraction
+$\chi_1$ and $\xi_{15}$ as co-dominant amp/sup carriers at
+$D_\mathrm{KL}(P_+\|P_-) = 4.4$ and $3.5$~nats; the $\xi_{15}$ contraction
 is $\rcD{^\alpha}\mathcal{T}^{\beta}{}_\alpha{}^\gamma\,
 \rcD{^\delta}\mathcal{T}_{\gamma\beta\delta}$.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_xi_kinetic_closure}
-  \caption{Carrier sub-corner for the thirty-two-dimensional
-    $\xi$-kinetic closure. The top-$K$ parameters by combined
-    marginal-amp / marginal-sup / cross-amp-sup $D_\mathrm{KL}$ are
-    plotted; full $D_\mathrm{KL}$ carrier ranking in \cref{KLTableXiClosure}.}
+  \caption{Carrier sub-corner of the thirty-two-dimensional
+    $\xi$-kinetic closure, restricted to the ten parameters ranked
+    highest by combined marginal-amp / marginal-sup / cross-amp-sup
+    $D_\mathrm{KL}$. Diagonal: 1D marginals (amplification: magenta;
+    suppression: yellow). Off-diagonal: 2D joint marginals at the 68\%
+    and 95\% credible contours. $\chi_1$
+    ($D_\mathrm{KL}(P_+\|P_-) = 4.4$~nats) and $\xi_{15}$ ($3.5$~nats)
+    are co-dominant carriers; the extended $\xi_{11\!-\!16}$ kinetic
+    invariants each contribute at the $\sim\!0.5\!-\!1.4$~nats level
+    (full ranking in \cref{KLTableXiClosure}).}
   \label{CornerT9}
 \end{figure}
 
@@ -846,16 +849,16 @@ is $\rcD{^\alpha}\mathcal{T}^{\beta}{}_\alpha{}^\gamma\,
   \toprule
   & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
   \midrule
-$\chi_{1}$  & 2.02 & 2.73 & 4.40 \\
-$\xi_{15}$  & 2.47 & 2.59 & 3.47 \\
-$\chi_{8}$  & 2.92 & 2.58 & 0.54 \\
-$\chi_{7}$  & 2.39 & 2.91 & 2.40 \\
-$\beta_1$   & 2.89 & 2.63 & 0.60 \\
-$\xi_{8}$   & 2.87 & 2.30 & 0.50 \\
-$\xi_{14}$  & 2.86 & 2.45 & 0.75 \\
-$\xi_{9}$   & 2.86 & 2.47 & 1.36 \\
-$\xi_{7}$   & 2.81 & 2.63 & 0.69 \\
-$\xi_{6}$   & 2.81 & 2.54 & 0.73 \\
+  $\chi_{1}$  & 2.02 & 2.73 & 4.40 \\
+  $\xi_{15}$  & 2.47 & 2.59 & 3.47 \\
+  $\chi_{8}$  & 2.92 & 2.58 & 0.54 \\
+  $\chi_{7}$  & 2.39 & 2.91 & 2.40 \\
+  $\beta_1$   & 2.89 & 2.63 & 0.60 \\
+  $\xi_{8}$   & 2.87 & 2.30 & 0.50 \\
+  $\xi_{14}$  & 2.86 & 2.45 & 0.75 \\
+  $\xi_{9}$   & 2.86 & 2.47 & 1.36 \\
+  $\xi_{7}$   & 2.81 & 2.63 & 0.69 \\
+  $\xi_{6}$   & 2.81 & 2.54 & 0.73 \\
   \bottomrule
   \end{tabular}
   \caption{$\xi$-kinetic closure sector: per-coupling $D_\mathrm{KL}$
@@ -972,7 +975,8 @@ Proca-trace mode,
 giving a four-dimensional prior over
 $\{m_A^2, \xi, \delta_m, \Bet{3}\}$. Nested sampling gives
 \begin{align}
-  \log\mathcal{Z}_+ = +9.03 \pm 0.07 \, , \quad
+  \log\mathcal{Z}_+ = +9.03 \pm 0.07
+  \qand
   \log\mathcal{Z}_- = +2.92 \pm 0.08
 \end{align}
 ($\log B = +6.11$). The
@@ -989,11 +993,15 @@ orthogonal to the non-minimal PGT extensions of
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_dark_photon_plasma}
-  \caption{Carrier sub-corner for the four-dimensional dark-photon
-    plasma analogue. The amplification posterior (magenta)
-    concentrates at non-zero plasma mass $m_A^2$ and detuning
-    $\delta_m$; the suppression posterior (yellow) is broader,
-    consistent with the dominant amplification preference.}
+  \caption{Posterior marginals for the four-dimensional dark-photon
+    plasma analogue $\{m_A^2,\xi,\delta_m,\Bet{3}\}$ of
+    \cref{DarkPhotonPlasmaLagrangian}. Diagonal: 1D marginals
+    (amplification: magenta; suppression: yellow). Off-diagonal: 2D
+    joint marginals at the 68\% and 95\% credible contours. The
+    plasma-mass coupling $\delta_m$ is the dominant carrier at
+    $D_\mathrm{KL}(P_+\|P_-) = 3.4$~nats; the kinetic mixing $\xi$ adds
+    no separation, identifying this as a Proca-mass photon-mode-shift
+    effect rather than a torsion--electromagnetism phenomenon.}
   \label{CornerT1}
 \end{figure}
 
@@ -1051,9 +1059,9 @@ of~\cite{adler1971photon,dunne2004heisenberg},
 giving a two-dimensional prior. Nested sampling gives
 \begin{align}
   \log\mathcal{Z}_+ = +0.184 \pm 0.001 \, , \quad
-  \log\mathcal{Z}_- = -0.185 \pm 0.0004 \, , \quad
-  \log B = +0.37 \, .
+  \log\mathcal{Z}_- = -0.185 \pm 0.0004 \, ,
 \end{align}
+and $\log B = +0.37$.
 
 a symmetric and tight null, with the QED reference point
 $\sigma/\rho = 7/16$~\cite{adler1971photon,dunne2004heisenberg}
@@ -1068,14 +1076,16 @@ consistent with the null verdict.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_eh_gertsenshtein}
-  \caption{Overlaid amplification (magenta) and suppression (yellow) corner
-    plot for the two-dimensional Euler--Heisenberg $F^4$ extension
-    of Einstein--Maxwell, in the couplings $\rho$ of $(F\!\cdot\! F)^2$
-    and $\sigma$ of $(F\!\cdot\!\tilde F)^2$. The amplification and
-    suppression posteriors are symmetric and tightly localised about
-    the origin, consistent with the QED reference point
+  \caption{Posterior marginals for the two-dimensional
+    Euler--Heisenberg $F^4$ extension $\{\rho,\sigma\}$ of
+    \cref{EHGertLagrangian}, the QED-EFT survey axis. Diagonal: 1D
+    marginals (amplification: magenta; suppression: yellow).
+    Off-diagonal: 2D joint marginals at the 68\% and 95\% credible
+    contours. Both posteriors are symmetric and tightly localised
+    about the origin: $D_\mathrm{KL}(P_+\|P_-) < 1.7$~nats for both
+    couplings, consistent with the QED reference point
     $\sigma/\rho = 7/16$~\cite{adler1971photon,dunne2004heisenberg}
-    being indistinguishable from the Einstein--Maxwell baseline at
+    sitting indistinguishably on the Einstein--Maxwell baseline at
     $\Bzero = 10^{-2}$.}
   \label{CornerEHGert}
 \end{figure}
