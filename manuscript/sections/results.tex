@@ -278,8 +278,7 @@ $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ operator itself is what drives
 the bidirectional behaviour. The corner plot of \cref{CornerEMRC}
 shows a bimodal suppression marginal in $\Del{1}$, with two narrow
 peaks symmetric about the origin, while the amplification posterior
-extends broadly along $\Del{1}$. The suppression preference is therefore
-symmetric under $\Del{1} \to -\Del{1}$.
+extends broadly along $\Del{1}$.
 
 \begin{figure}[!htbp]
   \centering
@@ -479,16 +478,16 @@ other vertices are switched on.
   \label{CornerT5D22}
 \end{figure*}
 
-\begin{figure*}[!htbp]
+\begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/corner_t5_d23_full}
+  \includegraphics[width=\columnwidth]{figures/corner_t5_d23_full}
   \caption{Posterior marginals for the nine-dimensional non-minimal
     union $\{\Bet{1\!-\!3},\Del{1},\xi,\chi,\zeta_{1\!-\!3}\}$ of the
     Yang--Mills--PGT family. Diagonal: 1D marginals (amplification:
     magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
     the 68\% and 95\% credible contours.}
   \label{CornerT5D23}
-\end{figure*}
+\end{figure}
 
 \begin{table*}[t]
   \centering
@@ -620,9 +619,8 @@ and obtained through the Hamiltonian particle-spectrum analysis of
 \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}. Integration
 with \PSALTer{} is deferred to future work.
 
-To test whether a wrong-sign kinetic-mode ghost in the torsion sector
-is responsible for the amplifications --- without invoking the full
-\PSALTer{} particle-spectrum analysis --- we run a control: the same
+To test whether a torsion ghost is responsible for the amplifications,
+\emph{without} \PSALTer{}, we run a control: the same
 Yang--Mills--PGT from \cref{YangMillsPGT} with the
 torsion kinetic coefficient $\xi$ zeroed. The Lagrangian
 \cref{NonMinimalLagrangian} then introduces no new kinetic operator;
@@ -722,9 +720,9 @@ to a physical amplification that a finite-extent geometry would
 saturate, to a non-ghost tachyonic instability, or to a wrong-sign
 kinetic-mode ghost --- is taken up in \cref{Discussion}.
 
-\begin{figure*}[!htbp]
+\begin{figure}[!htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/corner_np}
+  \includegraphics[width=\columnwidth]{figures/corner_np}
   \caption{Posterior marginals for the eight-dimensional
     non-propagating-torsion control sector
     $\{\Bet{1\!-\!3},\Del{1},\chi,\zeta_{1\!-\!3}\}$, obtained by pinning
@@ -733,7 +731,7 @@ kinetic-mode ghost --- is taken up in \cref{Discussion}.
     magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
     the 68\% and 95\% credible contours.}
   \label{CornerNP}
-\end{figure*}
+\end{figure}
 
 \begin{figure*}[!htbp]
   \centering
@@ -782,24 +780,16 @@ $\MAGFt{}\!\times\!\nabla\MAGT{}$ basis. One
 invariant, $\xi_{11}$, vanishes in the plane-wave reduction; fifteen
 propagating $\xi$-couplings plus the ten $\chi$-couplings and the
 seven non-minimal-base couplings give a thirty-two-dimensional prior.
-Sampling returns
-\begin{equation*}
-  \logZ_+ = -0.18 \pm 0.07
-  \qand
-  \logZ_- = -9.61 \pm 0.09,
-\end{equation*}
-($\log B = +9.43$); both
-$\logZ$ are negative, indicating partial floor contamination
-from the extended $\xi_{11\!-\!16}$ sub-sector.
-% , so
-% the $+9.43$ nat Bayes factor is a lower bound on the genuine
-% amplification of the parity-even kinetic closure under the
-% plane-wave approximation.
-Per-parameter $D_\mathrm{KL}$ (\cref{KLTableXiClosure}) again identifies
-$\chi_1$ and $\xi_{15}$ as co-dominant $D_\mathrm{KL}(P_+\|P_-)$
-contributions at
-$D_\mathrm{KL}(P_+\|P_-) = 4.4$ and $3.5$~nats; the $\xi_{15}$ contraction
-is $\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
+Sampling returns both $\logZ_\pm$ negative, indicating partial floor
+contamination from the extended $\xi_{11\!-\!16}$ sub-sector at the
+chain's $t_\text{end}$ horizon; the exact log-evidence values are not
+informative under floor contamination, but the per-coupling ranking of
+$D_\mathrm{KL}$ contributions is preserved by the uniform additive shift
+and the dominant directions can still be read off the posterior.
+$\chi_1$ and $\xi_{15}$ emerge as co-dominant
+$D_\mathrm{KL}(P_+\|P_-)$ contributions, consistent with $\chi_1$'s
+role across the parity-even hierarchy; the $\xi_{15}$ contraction is
+$\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 \rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$.
 
 \begin{figure*}[!htbp]
@@ -818,37 +808,13 @@ is $\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
   \caption{Restricted sub-corner of the thirty-two-dimensional
     $\xi$-kinetic closure, plotting only the ten parameters ranked
     highest by combined per-coupling $D_\mathrm{KL}$
-    (\cref{PerCouplingKL}). $\chi_1$
-    ($D_\mathrm{KL}(P_+\|P_-) = 4.4$~nats) and $\xi_{15}$ ($3.5$~nats)
-    are co-dominant contributions; the extended $\xi_{11\!-\!16}$ kinetic
-    invariants each contribute at the $\sim\!0.5\!-\!1.4$~nats level
-    (full ranking in \cref{KLTableXiClosure}).}
+    (\cref{PerCouplingKL}). $\chi_1$ and $\xi_{15}$ emerge as
+    co-dominant contributions; per-coupling $D_\mathrm{KL}$ values are
+    not headlined because the underlying chain is partially
+    floor-contaminated, but the ranking is preserved by the uniform
+    additive shift.}
   \label{CarrierT9Restricted}
 \end{figure}
-
-\begin{table}[h]
-  \centering
-  \begin{tabular}{l | c c c}
-  \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
-  \midrule
-  $\chi_{1}$  & 2.02 & 2.73 & 4.40 \\
-  $\xi_{15}$  & 2.47 & 2.59 & 3.47 \\
-  $\chi_{8}$  & 2.92 & 2.58 & 0.54 \\
-  $\chi_{7}$  & 2.39 & 2.91 & 2.40 \\
-  $\Bet{1}$   & 2.89 & 2.63 & 0.60 \\
-  $\xi_{8}$   & 2.87 & 2.30 & 0.50 \\
-  $\xi_{14}$  & 2.86 & 2.45 & 0.75 \\
-  $\xi_{9}$   & 2.86 & 2.47 & 1.36 \\
-  $\xi_{7}$   & 2.81 & 2.63 & 0.69 \\
-  $\xi_{6}$   & 2.81 & 2.54 & 0.73 \\
-  \bottomrule
-  \end{tabular}
-  \caption{$\xi$-kinetic closure sector: per-coupling $D_\mathrm{KL}$
-    per-coupling $D_\mathrm{KL}$ ranking for the plane-wave-benchmark survey
-    (\cref{CornerT9} shows the top-$K$ parameters by $D_\mathrm{KL}$).}
-  \label{KLTableXiClosure}
-\end{table}
 
 The full and complete parity-odd sectors exhibit plane-wave overflow
 at any viable propagation time; this is discussed in
@@ -878,12 +844,14 @@ at any viable propagation time; this is discussed in
 The twenty-parameter parity-odd full sector
 $\{d_{14}, d_{15}, d_{17}, d_{19\!-\!21},
 \tilde\zeta_{1,2,3,5,6}\}$ on top of the Yang--Mills--PGT non-minimal
-base, and the fifty-three-parameter complete parity-odd closure
+base (with $d_{16}$ and $\tilde\zeta_4$ vanishing in the plane-wave
+reduction), and the fifty-three-parameter complete parity-odd closure
 adding the
 $\varepsilon\!\cdot\!\MAGFt{}\!\times\!\nabla\MAGT{}$
-basis $\{\tilde\chi_1, \ldots, \tilde\chi_{36}\}$, do not admit
-finite-amplitude posteriors under the plane-wave uniform-$\Bzero$
-ansatz at any safe horizon. The 20D chain returns
+basis $\{\tilde\chi_1, \ldots, \tilde\chi_{36}\}$ (all 36 contractions
+survive at the linearised level), do not admit finite-amplitude
+posteriors under the plane-wave uniform-$\Bzero$ ansatz at any safe
+horizon. The 20D chain returns
 $\logZ_\pm \approx -15$ with $\log B \approx 0$ (the soft-floor
 signature, \cref{CornerParityOddFull}); the 53D chain returns zero
 live points within the available compute. The linearised eigenvalues
@@ -907,32 +875,32 @@ in \cref{Discussion}.
   \label{CornerParityOddFull}
 \end{figure*}
 
-\subsubsection{Dark-photon plasma }
+\subsubsection{Dark-photon plasma}
 
-Beyond the PGT geometric hierarchy, \TIDAL{}'s
-theory-agnostic architecture admits any Lagrangian input;
-two phenomenologically motivated survey axes probe whether
-the conversion signals observed above could arise from effective
-interactions outside the PGT framework.
-The dark-photon-plasma analogue asks whether a Proca-like torsion mass
-term can reproduce the amplification signal, bridging from the PGT
-geometric language to the effective dark-photon phenomenology
-of~\cite{caputo2021darkphoton}.
-
-The dark-photon-plasma analogue probes a distinct survey axis from
-the PGT extensions above: the trace-vector torsion $\T[2]{_\mu}$ is
-promoted to a Proca field with kinetic mixing to the photon and a
-plasma-mass coupling, recovering the standard dark-photon
-phenomenology of~\cite{caputo2021darkphoton} at $\Bzero \to 0$. The
-bare kinetic-mixing model alone produced no conversion signal: the
-modal eigendecomposition of the linearised system has a degeneracy
-between the photon mode and the Proca-trace mode that closes the
-mixing channel at leading order, so the inference returns the
-Einstein--Maxwell baseline regardless of the kinetic-mixing strength.
-We therefore added the Proca mass $m_A^2$ to lift the degeneracy and
-open the mixing channel, with detuning coupling $\Del{m}$
-controlling the deviation of the photon mode from the
-Proca-trace mode,
+Beyond the PGT geometric hierarchy, \TIDAL{}'s theory-agnostic
+architecture admits any Lagrangian as input; we use this to test
+whether the conversion signal could arise from effective interactions
+described in the explicit gauge-theoretic language of the dark-photon
+phenomenology rather than the PGT geometric construction. The
+dark-photon-plasma analogue promotes the trace-vector torsion
+$\T[2]{_\mu}$ to a Proca field that kinetically mixes with the
+photon~\cite{Holdom:1985ag,caputo2021darkphoton}, recovering the
+standard dark-photon limit of~\cite{caputo2021darkphoton} at
+$\Bzero \to 0$. The Einstein--Cartan $\Bet{3} I_3$ term of the
+YM--PGT base already carries a Proca-like torsion mass, so the
+kinetic-mixing operator is non-trivial in the Holdom
+sense~\cite{Holdom:1985ag}; the linearised system nevertheless has
+two propagating eigenmodes --- a pure photon mode and a
+photon-plus-trace-vector-torsion mixture --- and our
+initial-condition setup excites only the first, leaving no torsion
+content to source Gertsenshtein conversion. An additional photon
+plasma mass $m_A^2$ shifts the eigenmode structure so that the
+IC-excited mode acquires torsion content. A further detuning
+coupling $\Del{m}$ gives the photon and trace-vector torsion
+different masses and so different dispersion relations: when
+$\Del{m}$ is small the conversion remains coherent; when $\Del{m}$
+is large the dispersion mismatch detunes the Gertsenshtein
+resonance,
 \begin{multline}
   \lag_\text{dp}
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
@@ -954,12 +922,13 @@ $\{m_A^2, \xi, \Del{m}, \Bet{3}\}$. We find
 with $\log B = +6.11$. The
 amplification log-evidence dominates the suppression log-evidence,
 but per-parameter $D_\mathrm{KL}$ (\cref{KLTableDarkPhoton}) identifies
-the plasma-mass coupling $\Del{m}$ as the dominant
+the detuning coupling $\Del{m}$ as the dominant
 $D_\mathrm{KL}(P_+\|P_-)$ contribution at $3.4$~nats; the kinetic
-mixing $\xi$
-adds little structure beyond it. The result is therefore essentially
-a Proca-mass-induced photon-mode-shift effect rather than a
-torsion-electromagnetism coupling phenomenon, and is largely
+mixing $\xi$ adds little structure beyond it. The dominant
+contribution comes from $\Del{m}$ controlling whether the photon and
+trace-vector torsion sit in a coherent dispersion regime (amplifying)
+or a mismatched one (suppressing) rather than from any genuine
+torsion--electromagnetism vertex; this sector is therefore largely
 orthogonal to the non-minimal PGT extensions of
 \cref{InformativeAmplification}.
 
