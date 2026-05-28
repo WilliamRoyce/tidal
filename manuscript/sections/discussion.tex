@@ -9,15 +9,15 @@
 \label{Discussion}
 
 \paragraph*{Interpretation of exponential mode growth}
-The amplification ratios themselves grow with the simulation horizon,
-because the modes are linearised on the unbounded plane-wave background
-and the modal solver compounds exponential growth indefinitely.
+The amplification ratios themselves grow with the simulation duration,
+because the exponential growth compounds indefinitely
+on the unbounded plane-wave background.
 Physical-magnitude statements about conversion efficiency require
 finite-extent, localised-$\Bzero$ simulations that bound the
-interaction time and saturate the linearised growth without destroying
-the channel mixing. We accept these exponentially-growing modes by
-design: prejudging which mode behaviours are unphysical for an input
-theory is not the role of a theory-agnostic survey pipeline. The
+interaction time and saturate the linearised growth.
+We accept the exponentially-growing modes: prejudging which
+mode behaviours are unphysical is not the role of a theory-agnostic
+software. The
 remaining interpretive question is whether each growth represents a
 physical amplification, an artifact of the uniform unbounded
 background, or a pathology of the Lagrangian.
@@ -26,72 +26,64 @@ Several precedents in the
 literature show that linearised exponential or tachyonic modes need
 not be fatal pathologies. In the Standard Model the Higgs field
 appears tachyonic about the unbroken vacuum but is perfectly unitary
-about its symmetry-broken ground state~\cite{legner2025torc};
-analogously, in the TorC model~\cite{legner2025torc} the linearised
+about its symmetry-broken ground state~\cite{legner2025torc}.
+In the TorC model~\cite{legner2025torc} the linearised
 tachyons around $\MAGT{} = 0$ are benign because the physical ground state
-is a torsion-condensed phase at $\MAGT{^2} \sim \MPl$. These examples
-show that linearised exponential modes do not by themselves disqualify
-a sector; we do not claim that our surveyed Lagrangians
-necessarily realise such a condensation, only that the choice of
-vacuum around which the modes are evaluated can change the unitarity
-verdict.
+is a torsion-condensed phase at $\MAGT{^2} \sim \MPl^2$.
+Linearised exponential modes do not by themselves disqualify
+a sector; but we do not claim that our surveyed Lagrangians
+necessarily realise such a condensation, only that our observations
+are not necessarily a pathological.
+% the choice of
+% vacuum around which the modes are evaluated can change the unitarity
+% verdict.
 
 Higher-derivative gravity theories that exhibit Ostrogradsky ghosts at
 the linearised level can be non-linearly ghost-free when appropriate
 torsion or higher-curvature terms are
 present~\cite{aoki2020nonlinear,bahamonde2025cubic}.
-Recent infrared-foundations work~\cite{barker2025irfound1,barker2025irfound2}
-argues that a no-ghost / no-tachyon condition that is imposed by hand
-as an equality among couplings is not stable against quantum
-corrections: the corrected coupling values
-violate the tuning, and the ghost or tachyon reappears. By contrast,
+Recent analysis~\cite{barker2025irfound1,barker2025irfound2}
+argues that a no-ghost-no-tachyon condition that is imposed by hand
+on couplings is not stable against radiative
+corrections. However,
 when the absence of a ghost mode follows from a gauge symmetry of the
-Lagrangian itself, no choice of coupling values can violate it, and
-unitarity is structurally protected. The non-propagating-torsion
-control of \cref{NonPropagatingControl} is a particularly clean
-example of the latter: with $\xi$ pinned to zero there is no new
-kinetic operator at all, so no wrong-sign coefficient can appear in
-the first place. These
-precedents do not prove that the linearised exponential growth we
-observe is physical, but they establish that it is not automatically
-fatal, and that resolution belongs to either finite-extent geometry or
-a future \PSALTer{}-based particle-spectrum analysis.
+Lagrangian itself, the unitarity is protected.
+% The non-propagating-torsion
+% control of \cref{NonPropagatingControl} is a particularly clean
+% example of the latter: with $\xi$ pinned to zero there is no new
+% kinetic operator at all, so no wrong-sign coefficient can appear in
+% the first place.
+This supports the interpretation that the exponential growth we observe is not
+automatically fatal.
 
-\paragraph*{Sectors that overflow the modal solver}
-The uniform unbounded background makes three of the largest sectors
-in the survey --- the parity-odd full and complete parity-odd closure
-of \cref{ParityOddGeomIncomp}, and the $\xi$-kinetic closure --- yield
-linearised eigenvalues so large that the matrix-exponential overflow
-ceiling is breached at essentially any propagation time accessible to
-the modal solver. A bounded interaction time, set by a finite-extent
-geometry, would cap the growth at a finite envelope and restore a
-finite-amplitude posterior --- which is the same hypothesis the
-localised-geometry programme would test for the amplifying sectors
-that did resolve. The same finite-extent programme would also probe
-physics inaccessible to the uniform background, including $k$-mode
-interactions across the bounded interaction region and realistic
-background geometries that allow physical-magnitude amplification
+\paragraph*{Solver overflow}
+The sectors in \cref{ParityOddGeomIncomp,XiKineticClosure} yield
+eigenvalues so large that the matrix-exponential overflow
+ceiling is hit at essentially any accessible propagation time.
+A finite interaction time, set by a localised
+BGMF, would bound the growth at and restore a
+finite-amplitude posterior. The same finite-extent programme would also probe
+physics inaccessible to the current setup, including $k$-mode
+interactions and realistic geometries that allow physical-magnitude amplification
 estimates for actual astrophysical events.
 
-\paragraph*{The $\chi_1$ direction across the parity-even sectors}
-$\chi_1\,\rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\,
-\MAGFt{_{\alpha\beta\gamma\delta}}$ carries the dominant
-$D_\mathrm{KL}(P_+\|P_-)$ contribution in all three parity-even
-sectors that contain it, regardless of whether the torsion sector
-propagates or the $\chi_i$ basis is closed. The reason this
-contraction privileges itself over the other $\chi_{2\!-\!10}$
-contractions and over the $\xi_i$ kinetic invariants is not visible
-in the inference output and requires an analytic diagnosis of the
-linearised conversion equations.
+\paragraph*{The $\chi_1$ direction}
+It is surprising that the $\chi_1\,\rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\,
+\MAGFt{_{\alpha\beta\gamma\delta}}$ coupling is always the dominant
+amplification distinction whenever present, regardless of
+whether the torsion sector propagates. The privilege of this
+contraction over the other $\chi_{2\!-\!10}$
+and the $\xi_i$ kinetic invariants requires an analysis
+of the structure of the conversion equations that is not
+considered here.
 
 \paragraph*{Scope and limitations}
 The results sit in the linearised regime at first order in $\Bzero$
-on an unbounded plane-wave background with a graviton initial
-condition; the per-coupling $D_\mathrm{KL}$ figures are read against
-the prior choices and should not be compared across sectors that
-adopt different priors. The largest theories in the survey produced
+on an unbounded BGMF with a plane-wave graviton initial
+condition. The largest theories in the survey produced
 linearised eigenvalues too extreme for the uniform plane-wave setup
 to resolve: a substantial fraction of sample points hit modal-solver
-overflow in three sectors, and resolving them requires the
-localised-geometry programme. The cubic-PGT sector has not been
-surveyed.
+overflow in the largest sectors, and resolving them requires the
+localised-geometry programme. Interpretation of the exponential growth
+may require a \PSALTer{} particle-spectrum analysis.
+The cubic-PGT sector has not been surveyed.
