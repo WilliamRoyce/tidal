@@ -271,7 +271,7 @@ thus both directions show informative evidence, and the vertex supports both
 significant amplification and suppression at different parameter values.
 The Bayes factor $\log B = +1.98$ records that the prior-weighted integral is
 marginally amplification-dominated. The $\Del{1}$-direction
-carries $D_\mathrm{KL}(P_+\|P_-) = 20.8$~nats of
+carries $\D(P_+\|P_-) = 20.8$~nats of
 distinction between the two directions, over an order of
 magnitude above any other coupling; the
 $\Del{1}\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ operator itself is what drives
@@ -305,7 +305,7 @@ extends broadly along $\Del{1}$.
     & \multicolumn{3}{c|}{Parity-even EM--RC ($\Del{1}$)}
     & \multicolumn{3}{c}{Parity-odd ($d_{21}$)} \\
   \cmidrule(lr){2-4}\cmidrule(lr){5-7}
-  Coupling & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ \\
+  Coupling & $\Dp$ & $\Dm$ & $D_{+\|-}$ & $\Dp$ & $\Dm$ & $D_{+\|-}$ \\
   \midrule
   $\Del{1}$ & 1.43 & 3.00 & 20.78 & --   & --   & --   \\
   $d_{21}$  & --   & --   & --    & 1.79 & 3.04 & 8.83 \\
@@ -318,10 +318,10 @@ extends broadly along $\Del{1}$.
     $\Del{1}\,\MAGFt{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ sector
     (\cref{RicciEMLagrangian}) and its parity-odd $\varepsilon$-twin
     $d_{21}\,\varepsilon^{\mu\nu\rho\sigma}\MAGFt{_{\mu\nu}}\FieldF{_{\rho\sigma}}$.
-    Sub-columns are amplification-only $D_\mathrm{KL,+}$,
-    suppression-only $D_\mathrm{KL,-}$, and
+    Sub-columns are amplification-only $\Dp$,
+    suppression-only $\Dm$, and
     amplification-vs-suppression
-    $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in nats. ``--'' marks a
+    $D_{+\|-} = \D(P_+\|P_-)$, in nats. ``--'' marks a
     coupling absent from that sector's Lagrangian.}
   \label{KLTableEMRCParityPair}
 \end{table}
@@ -351,13 +351,13 @@ peaks symmetric about $d_{21} = 0$, the same structure observed along
 the $\Del{1}$ axis of the parity-even sector.
 
 The parity-even and parity-odd vertices yield comparable amplitudes but
-redistribute the per-coupling $D_\mathrm{KL}$ weight in markedly
+redistribute the per-coupling $\D$ weight in markedly
 different ways. In the
 parity-even sector the separation concentrates almost entirely
-on $\Del{1}$ ($D_\mathrm{KL}(P_+\|P_-) = 20.8$~nats; \cref{KLTableEMRCParityPair}), and the
+on $\Del{1}$ ($\D(P_+\|P_-) = 20.8$~nats; \cref{KLTableEMRCParityPair}), and the
 Bayes factor is amplification-dominated at $\log B = +1.98$. In the
 parity-odd twin the vertex contribution drops to
-$D_\mathrm{KL}(P_+\|P_-) = 8.8$~nats and the two torsion-mass directions
+$\D(P_+\|P_-) = 8.8$~nats and the two torsion-mass directions
 $\Bet{1}$ and $\Bet{2}$ become comparable.
 This parity-odd theory is the only sector we
 found where suppression dominates, with the Bayes factor $\log B = -6.33$.
@@ -502,9 +502,9 @@ other vertices are switched on.
     & \multicolumn{3}{c|}{Shapiro}   & \multicolumn{3}{c|}{Union}
     & \multicolumn{3}{c}{NP control ($\xi=0$)} \\
   \cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}\cmidrule(lr){14-16}
-  Coupling & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$
-           & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$
-           & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ \\
+  Coupling & $\Dp$ & $\Dm$ & $D_{+\|-}$ & $\Dp$ & $\Dm$ & $D_{+\|-}$
+           & $\Dp$ & $\Dm$ & $D_{+\|-}$ & $\Dp$ & $\Dm$ & $D_{+\|-}$
+           & $\Dp$ & $\Dm$ & $D_{+\|-}$ \\
   \midrule
   $\Del{1}$  & 3.02 & 3.06 & 0.08 & 3.09 & 2.98 & 0.52 & 2.87 & 2.94 & 0.20 & 2.93 & 2.71 & 0.17 & 2.76 & 2.73 & 0.26 \\
   $\xi$      & 1.20 & 1.77 & 5.55 & 2.65 & 1.59 & 4.87 & ---  & ---  & ---  & ---  & ---  & ---  & $\dagger$ & $\dagger$ & $\dagger$ \\
@@ -517,13 +517,13 @@ other vertices are switched on.
   $\Bet{3}$  & 2.82 & 2.50 & 0.24 & 2.97 & 2.55 & 0.22 & --   & --   & --   & --   & --   & --   & --   & --   & --   \\
   \bottomrule
   \end{tabular}
-  \caption{Yang--Mills--PGT family: per-coupling $D_\mathrm{KL}$ across the
+  \caption{Yang--Mills--PGT family: per-coupling $\D$ across the
     five chains. Sub-columns are amplification-only
-    $D_\mathrm{KL,+}$, suppression-only $D_\mathrm{KL,-}$, and
-    amplification-vs-suppression $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in
+    $\Dp$, suppression-only $\Dm$, and
+    amplification-vs-suppression $D_{+\|-} = \D(P_+\|P_-)$, in
     nats. ``---'' marks a coupling absent from that sub-theory's
     Lagrangian; ``--'' marks one present but below the per-chain top-five
-    $D_\mathrm{KL}$ cutoff used in the source data; $\dagger$ marks $\xi=0$ pinned
+    $\D$ cutoff used in the source data; $\dagger$ marks $\xi=0$ pinned
     by construction in the NP control.}
   \label{KLTableYMUnified}
 \end{table*}
@@ -554,9 +554,9 @@ suppression loses likelihood weight relative to the prior,
 % weight relative to the prior ---
 indicating that closing the $\chi_i$
 basis confines suppression to small $\chi$ rather than opening
-additional suppression corners. Per-parameter $D_\mathrm{KL}$ resolves the
+additional suppression corners. Per-parameter $\D$ resolves the
 structure further: $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
-\MAGFt{_{\mu\nu\rho\sigma}}$ alone accounts for $D_\mathrm{KL}(P_+\|P_-) = 4.2$
+\MAGFt{_{\mu\nu\rho\sigma}}$ alone accounts for $\D(P_+\|P_-) = 4.2$
 nats (\cref{KLTableChiClosureComparison}) as the dominant operator driving the
 separation between the %amplification and suppression
 posteriors. The full posterior corner is \cref{CornerChiClosure} and a
@@ -586,7 +586,7 @@ the dominant directions is \cref{CornerChiClosurePair}.
   \includegraphics[width=\textwidth]{figures/overlay_chi_closure_pair_restricted}
   \caption{Restricted overlay of the $\chi$-closure sector with its
     $\xi=0$ non-propagating-torsion control: top-6 parameters ranked
-    by combined per-coupling $D_\mathrm{KL}$ (\cref{PerCouplingKL})
+    by combined per-coupling $\D$ (\cref{PerCouplingKL})
     on the propagating amplification chain. Magenta: amplification
     (propagating); yellow: suppression (propagating); purple:
     amplification ($\xi=0$ control); orange: suppression ($\xi=0$
@@ -635,7 +635,7 @@ torsion kinetic coefficient $\xi$ zeroed. The Lagrangian
 % any field beyond the Einstein--Maxwell baseline;
 torsion is determined
 algebraically and the no-ghost classification is trivially satisfied. The dominant
-$D_\mathrm{KL}$ contributions identified above for the propagating
+$\D$ contributions identified above for the propagating
 YM--PGT sectors were all anchored to
 exponential-mode-growth regions of parameter space, so a natural
 expectation was that removing the propagating-torsion modes
@@ -659,7 +659,8 @@ Repeating the test at the seventeen-parameter $\chi$-closure sub-space
 $\{\Bet{1\!-\!3}, \Del{1}, \zeta_{1\!-\!3}, \chi_{1\!-\!10}\}$ with
 $\xi = 0$ returns
 \begin{equation*}
-  \logZ_+ = +9.93 \pm 0.08 \, , \quad
+  \logZ_+ = +9.93 \pm 0.08 \,
+  \qand
   \logZ_- = -3.28 \pm 0.07 \, ,
 \end{equation*}
 ($\log B = +13.21$), close to the
@@ -667,11 +668,11 @@ bootstrap uncertainty of the propagating $\chi$-closure chain. The
 amplification therefore does \emph{not} require torsion to propagate; the
 non-minimal couplings alone reproduce the
 structure of the propagating theory. Per-parameter
-$D_\mathrm{KL}$ resolves the dominant operator: $\Bet{1}$ dominates the
+$\D$ resolves the dominant operator: $\Bet{1}$ dominates the
 Yang--Mills--PGT control (\cref{KLTableYMUnified}), and the
 $\chi$-closure control returns $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
 \MAGFt{_{\mu\nu\rho\sigma}}$ as the dominant
-$D_\mathrm{KL}(P_+\|P_-)$ contribution; the full per-coupling
+$\D(P_+\|P_-)$ contribution; the full per-coupling
 comparison against the propagating chain is
 \cref{KLTableChiClosureComparison}.
 
@@ -684,7 +685,7 @@ comparison against the propagating chain is
     & \multicolumn{3}{c|}{NP control ($\xi=0$)}
     & \multicolumn{3}{c}{Propagating (18D)} \\
   \cmidrule(lr){2-4}\cmidrule(lr){5-7}
-  Coupling & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_{+\|-}$ \\
+  Coupling & $\Dp$ & $\Dm$ & $D_{+\|-}$ & $\Dp$ & $\Dm$ & $D_{+\|-}$ \\
   \midrule
   $\chi_{1}$  & 1.72 & 2.82 & 5.78 & 1.68 & 2.82 & 4.18 \\
   $\chi_{2}$  & 2.39 & 2.78 & 0.89 & 2.37 & 2.66 & 0.85 \\
@@ -700,12 +701,12 @@ comparison against the propagating chain is
   $\zeta_2$   & 2.62 & 2.51 & 0.38 & --   & --   & --   \\
   \bottomrule
   \end{tabular}
-  \caption{$\chi$-closure sector: per-coupling $D_\mathrm{KL}$ across
+  \caption{$\chi$-closure sector: per-coupling $\D$ across
     the two chains. Sub-columns are amplification-only
-    $D_\mathrm{KL,+}$, suppression-only $D_\mathrm{KL,-}$,
+    $\Dp$, suppression-only $\Dm$,
     and amplification-vs-suppression
-    $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in nats. ``--'' marks a
-    coupling present but below the per-chain top-ten $D_\mathrm{KL}$ cutoff.
+    $D_{+\|-} = \D(P_+\|P_-)$, in nats. ``--'' marks a
+    coupling present but below the per-chain top-ten $\D$ cutoff.
     Corresponding posterior corner plots: \cref{CornerChiClosure}
     (NP control) and \cref{CornerChiClosure} (propagating).}
   \label{KLTableChiClosureComparison}
@@ -747,7 +748,7 @@ propagating $\xi$-couplings give a now thirty-two-dimensional prior.
 The extended
 $\xi_{11\!-\!16}$ sub-sector drives a substantial fraction of sample
 points into modal-solver overflow; the log-evidence values and
-per-coupling $D_\mathrm{KL}$
+per-coupling $\D$
 figures are therefore not quantitatively meaningful in this sector.
 $\chi_1$ and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 \rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$ are the apparent dominant directions.
@@ -767,11 +768,11 @@ $\chi_1$ and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_xi_kinetic_closure}
   \caption{Restricted sub-corner of the thirty-two-dimensional
     $\xi$-kinetic closure, plotting only the ten parameters ranked
-    highest by combined per-coupling $D_\mathrm{KL}$
+    highest by combined per-coupling $\D$
     (\cref{PerCouplingKL}). $\chi_1$ and $\xi_{15}$ emerge as the
     apparent dominant directions, but a substantial fraction of sample
     points hit modal-solver overflow, so the per-coupling
-    $D_\mathrm{KL}$ values are not quantitatively meaningful.}
+    $\D$ values are not quantitatively meaningful.}
   \label{CarrierT9Restricted}
 \end{figure}
 
@@ -807,18 +808,15 @@ base (with $d_{16}$ and $\tilde\zeta_4$ vanishing in the plane-wave
 reduction), and the fifty-three-parameter complete parity-odd closure
 adding the
 $\varepsilon\!\cdot\!\MAGFt{}\!\times\!\nabla\MAGT{}$
-basis $\{\tilde\chi_{1\!-\!36}\}$ (all 36 contractions
-survive at the linearised level), do not admit finite-amplitude
+basis $\{\tilde\chi_{1\!-\!36}\}$, do not admit finite-amplitude
 posteriors under the plane-wave uniform-$\Bzero$ ansatz at any safe
-horizon. The 20D chain returns $\logZ_\pm \approx -15$ with
-$\log B \approx 0$ (the soft-floor signature); the 53D chain returns
-zero live points within the available compute. The linearised eigenvalues
+horizon. The linearised eigenvalues
 of the conversion system reach above the modal-solver overflow ceiling
 at $t_\text{end} = 1$ in these coupling directions; the would-be safe
 horizon $t_\text{end} \lesssim 10^{-3}$ places the conversion
 amplitude $P \propto (\kappa\Bzero t/2)^2$ below the noise floor by
 orders of magnitude. Whether this reflects a pathology of the
-unbounded plane-wave ansatz, which a finite-extent geometry could
+unbounded BGMF ansatz, which a finite-extent geometry could
 saturate, or a fatal pathology of the theories themselves is taken up
 in \cref{Discussion}.
 
@@ -848,14 +846,14 @@ giving the Lagrangian
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
       + \Bet{3} I_3
       - \tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}
-      - \tfrac{1}{2}\,m_A^2\,a_\mu a^\mu \\
+      - \tfrac{1}{2}\,m_A^2\,A_\mu A^\mu \\
       - \tfrac{1}{4}\,\xi\,
               \mathcal{F}^{(T)}_{\mu\nu}\mathcal{F}^{(T)\,\mu\nu}
       + \Del{m}\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu} \, ,
   \label{DarkPhotonPlasmaLagrangian}
 \end{multline}
 where $\mathcal{F}^{(T)}_{\mu\nu}$ is the field strength of
-$\T[2]{_\mu}$ and $a_\mu$ is the photon perturbation field, giving a
+$\T[2]{_\mu}$ and $A_\mu$ is the photon perturbation field, giving a
 four-dimensional prior over $\{m_A^2, \xi, \Del{m}, \Bet{3}\}$. We
 find
 \begin{align*}
@@ -864,17 +862,17 @@ find
   \logZ_- = +2.92 \pm 0.08,
 \end{align*}
 with $\log B = +6.11$. The amplification log-evidence dominates the
-suppression log-evidence, and the per-parameter $D_\mathrm{KL}$
+suppression log-evidence, and the per-parameter $\D$
 figures of \cref{KLTableDarkPhoton} place $\Del{m}$ above $m_A^2$. This
 ordering should be read against the broad log-uniform priors used for
 $m_A^2$, $\xi$, and $\Bet{3}$ (six decades each), which dilute their
-marginal $D_\mathrm{KL}$ figures relative to the arctan-uniform prior
+marginal $\D$ figures relative to the arctan-uniform prior
 on $\Del{m}$. Pre-sampling tests of this sector found
 that the dark-photon kinetic mixing adds little to the base
 plasma-mass model either way: the conversion is controlled
 by the photon plasma mass $m_A^2$, which shifts the photon dispersion
 and detunes coherent Gertsenshtein
-conversion. The nominal $D_\mathrm{KL}$ ordering reported here
+conversion. The nominal $\D$ ordering reported here
 understates the role of $m_A^2$ because of the prior breadth.
 
 \begin{figure}[!htbp]
@@ -892,7 +890,7 @@ understates the role of $m_A^2$ because of the prior breadth.
   \centering
   \begin{tabular}{l | c c c}
   \toprule
-  & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
+  & $\Dp$ & $\Dm$ & $\D(P_+\|P_-)$ \\
   \midrule
   $\Del{m}$    & 2.77 & 2.98 & 3.38 \\
   $m_A^{2}$    & 0.50 & 1.25 & 1.45 \\
@@ -900,9 +898,9 @@ understates the role of $m_A^2$ because of the prior breadth.
   $\Bet{3}$    & 0.66 & 0.67 & 0.49 \\
   \bottomrule
   \end{tabular}
-  \caption{Dark-photon plasma analogue: per-coupling $D_\mathrm{KL}$
-    per-coupling $D_\mathrm{KL}$ ranking for the plane-wave-benchmark survey
-    (\cref{CornerT1} shows the top-$K$ parameters by $D_\mathrm{KL}$).}
+  \caption{Dark-photon plasma analogue: per-coupling $\D$
+    per-coupling $\D$ ranking for the plane-wave-benchmark survey
+    (\cref{CornerT1} shows the top-$K$ parameters by $\D$).}
   \label{KLTableDarkPhoton}
 \end{table}
 
@@ -928,7 +926,7 @@ understates the role of $m_A^2$ because of the prior breadth.
 % import an EM-EFT correction that mimics gravitational amplification).
 \subsubsection{Euler--Heisenberg effective action}
 The Einstein--Maxwell baseline receives QED effective-field-theory
-corrections at the $F^4$ level~\cite{adler1971photon,dunne2004heisenberg}, which can themselves
+corrections at the $\FieldF{^4}$ level~\cite{adler1971photon,dunne2004heisenberg}, which can themselves
 source further photon--graviton interactions in a
 magnetic background. We include three EFT couplings,
 \begin{multline}
@@ -940,10 +938,10 @@ magnetic background. We include three EFT couplings,
     + \sigma\,(\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}})^{2} \, ,
   \label{EHGertLagrangian}
 \end{multline}
-of which the $F\!\cdot\!\tilde F$ topological term is a total covariant
+of which the $\FieldF{}\!\cdot\!\FieldFtilde{}$ topological term is a total covariant
 derivative absent from the equations of motion
 (\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
-over $(\rho, \sigma)$. The $F^4$ corrections scale with the background
+over $(\rho, \sigma)$. The $\FieldF{^4}$ corrections scale with the background
 field to a higher power than the leading PGT vertices, so
 they are expected to be subdominant. The posterior has
 \begin{align*}
@@ -951,12 +949,12 @@ they are expected to be subdominant. The posterior has
   \logZ_- = -0.185 \pm 0.0004 \, ,
 \end{align*}
 and $\log B = +0.37$, a symmetric and tight null at the surveyed
-$\Bzero=10^{-2}$. The QED one-loop EH
+$\Bzero=10^{-2}$. The one-loop EH
 coefficients~\cite{adler1971photon,dunne2004heisenberg} would
-not mimic the Gertsenshtein signal at any background field accessible
-to the survey.
-% The per-parameter $D_\mathrm{KL}$ (\cref{KLTableEH})
-% yields $D_\mathrm{KL}(P_+\|P_-) < 1.7$ nats for both couplings,
+not significantly alter the Gertsenshtein signal at any accessible
+BGMF.
+% The per-parameter $\D$ (\cref{KLTableEH})
+% yields $\D(P_+\|P_-) < 1.7$ nats for both couplings,
 % consistent with the null verdict.
 
 \begin{figure}[!htbp]
@@ -975,13 +973,13 @@ to the survey.
 %   \centering
 %   \begin{tabular}{l | c c c}
 %   \toprule
-%   & $D_\mathrm{KL,+}$ & $D_\mathrm{KL,-}$ & $D_\mathrm{KL}(P_+\|P_-)$ \\
+%   & $\Dp$ & $\Dm$ & $\D(P_+\|P_-)$ \\
 %   \midrule
 %   $\rho$  & 2.64 & 2.70 & 0.45 \\
 %   $\sigma$ & 2.41 & 2.64 & 1.66 \\
 %   \bottomrule
 %   \end{tabular}
-%   \caption{Euler--Heisenberg sector: per-coupling $D_\mathrm{KL}$
-%     per-coupling $D_\mathrm{KL}$ ranking for the plane-wave-benchmark survey.}
+%   \caption{Euler--Heisenberg sector: per-coupling $\D$
+%     per-coupling $\D$ ranking for the plane-wave-benchmark survey.}
 %   \label{KLTableEH}
 % \end{table}
