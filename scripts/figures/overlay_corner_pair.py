@@ -26,18 +26,17 @@ from __future__ import annotations
 import json
 import logging
 import math
+import sys
 from pathlib import Path
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 
-import sys
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _corner_style import (  # noqa: E402
+from _corner_style import (
     AMP_COLOR,
     COLUMN_WIDTH,
     CONTOUR_LEVELS,
@@ -48,7 +47,7 @@ from _corner_style import (  # noqa: E402
     apply_style,
     load_chains,
 )
-from _palette import IBM_PALETTE  # noqa: E402
+from _palette import IBM_PALETTE
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("overlay_corner_pair")
@@ -94,9 +93,7 @@ def _top_k(amp_imp_path: Path, k: int, allowed: list[str]) -> list[str]:
     sup = imp.get("sup", {}).get("marginal_d_kl", {}) or {}
     cross = imp.get("cross_amp_sup_kl", {}) or {}
     allowed_set = set(allowed)
-    names = [n for n in amp.keys() if n in allowed_set] or [
-        n for n in sup.keys() if n in allowed_set
-    ]
+    names = [n for n in amp if n in allowed_set] or [n for n in sup if n in allowed_set]
 
     def score(n: str) -> float:
         vals = [amp.get(n, 0.0), sup.get(n, 0.0), cross.get(n, 0.0)]
@@ -120,12 +117,28 @@ def render_overlay_pair(
 ) -> None:
     apply_style()
 
-    labels = {n: _label(n) for n in plot_params}
+    {n: _label(n) for n in plot_params}
 
-    prop_amp = load_chains(prop_amp_dir, params=prop_param_names, param_labels={n: _label(n) for n in prop_param_names})
-    prop_sup = load_chains(prop_sup_dir, params=prop_param_names, param_labels={n: _label(n) for n in prop_param_names})
-    np_amp = load_chains(np_amp_dir, params=np_param_names, param_labels={n: _label(n) for n in np_param_names})
-    np_sup = load_chains(np_sup_dir, params=np_param_names, param_labels={n: _label(n) for n in np_param_names})
+    prop_amp = load_chains(
+        prop_amp_dir,
+        params=prop_param_names,
+        param_labels={n: _label(n) for n in prop_param_names},
+    )
+    prop_sup = load_chains(
+        prop_sup_dir,
+        params=prop_param_names,
+        param_labels={n: _label(n) for n in prop_param_names},
+    )
+    np_amp = load_chains(
+        np_amp_dir,
+        params=np_param_names,
+        param_labels={n: _label(n) for n in np_param_names},
+    )
+    np_sup = load_chains(
+        np_sup_dir,
+        params=np_param_names,
+        param_labels={n: _label(n) for n in np_param_names},
+    )
 
     # All four are plotted on the same `plot_params` columns. The NP chains
     # do not contain xi so plot_params must be a subset of np_param_names.
@@ -164,10 +177,22 @@ def render_overlay_pair(
                 label.set_horizontalalignment("right")
 
     legend_handles = [
-        mpatches.Patch(color=AMP_COLOR, alpha=OVERLAY_ALPHA, label="amplification (propagating)"),
-        mpatches.Patch(color=SUP_COLOR, alpha=OVERLAY_ALPHA, label="suppression (propagating)"),
-        mpatches.Patch(color=NP_AMP_COLOR, alpha=OVERLAY_ALPHA, label=r"amplification ($\xi=0$ control)"),
-        mpatches.Patch(color=NP_SUP_COLOR, alpha=OVERLAY_ALPHA, label=r"suppression ($\xi=0$ control)"),
+        mpatches.Patch(
+            color=AMP_COLOR, alpha=OVERLAY_ALPHA, label="amplification (propagating)"
+        ),
+        mpatches.Patch(
+            color=SUP_COLOR, alpha=OVERLAY_ALPHA, label="suppression (propagating)"
+        ),
+        mpatches.Patch(
+            color=NP_AMP_COLOR,
+            alpha=OVERLAY_ALPHA,
+            label=r"amplification ($\xi=0$ control)",
+        ),
+        mpatches.Patch(
+            color=NP_SUP_COLOR,
+            alpha=OVERLAY_ALPHA,
+            label=r"suppression ($\xi=0$ control)",
+        ),
     ]
     ax_anchor = axes.iloc[0, 0]
     n = len(plot_params)
@@ -198,14 +223,47 @@ def main() -> None:
 
     # Pair A: chi-closure (18D propagating) vs NP-chi-closure (17D control)
     chi_prop_params = [
-        "beta1", "beta2", "beta3", "xi", "delta1", "zeta1", "zeta2", "zeta3",
-        "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10",
+        "beta1",
+        "beta2",
+        "beta3",
+        "xi",
+        "delta1",
+        "zeta1",
+        "zeta2",
+        "zeta3",
+        "chi1",
+        "chi2",
+        "chi3",
+        "chi4",
+        "chi5",
+        "chi6",
+        "chi7",
+        "chi8",
+        "chi9",
+        "chi10",
     ]
     chi_np_params = [
-        "beta1", "beta2", "beta3", "delta1", "zeta1", "zeta2", "zeta3",
-        "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10",
+        "beta1",
+        "beta2",
+        "beta3",
+        "delta1",
+        "zeta1",
+        "zeta2",
+        "zeta3",
+        "chi1",
+        "chi2",
+        "chi3",
+        "chi4",
+        "chi5",
+        "chi6",
+        "chi7",
+        "chi8",
+        "chi9",
+        "chi10",
     ]
-    chi_full_plot = chi_np_params  # 17 axes; the 18th (xi) is excluded since NP has no xi
+    chi_full_plot = (
+        chi_np_params  # 17 axes; the 18th (xi) is excluded since NP has no xi
+    )
     chi_prop_amp = REPO_ROOT / "hpc_results/29682868/t7_amp_v2"
     chi_prop_sup = REPO_ROOT / "hpc_results/29682868/t7_sup_v2"
     chi_np_amp = REPO_ROOT / "hpc_results/29705560/np_ceven_amp_v1"
@@ -236,15 +294,30 @@ def main() -> None:
         np_amp_dir=chi_np_amp,
         np_sup_dir=chi_np_sup,
         np_param_names=chi_np_params,
-        fig_width=COLUMN_WIDTH,
+        fig_width=FIG_WIDTH,
     )
 
     # Pair B: YM-PGT non-minimal union (9D propagating) vs NP control (8D)
     union_prop_params = [
-        "beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3",
+        "beta1",
+        "beta2",
+        "beta3",
+        "xi",
+        "delta1",
+        "chi",
+        "zeta1",
+        "zeta2",
+        "zeta3",
     ]
     union_np_params = [
-        "beta1", "beta2", "beta3", "delta1", "chi", "zeta1", "zeta2", "zeta3",
+        "beta1",
+        "beta2",
+        "beta3",
+        "delta1",
+        "chi",
+        "zeta1",
+        "zeta2",
+        "zeta3",
     ]
     union_full_plot = union_np_params  # 8 axes
     union_prop_amp = REPO_ROOT / "hpc_results/29468763/d23_full_amp_v3"
@@ -261,7 +334,7 @@ def main() -> None:
         np_amp_dir=union_np_amp,
         np_sup_dir=union_np_sup,
         np_param_names=union_np_params,
-        fig_width=COLUMN_WIDTH,
+        fig_width=FIG_WIDTH,
     )
 
     union_top = _top_k(union_prop_amp / "parameter_importance.json", 6, union_np_params)

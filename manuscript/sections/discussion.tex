@@ -19,8 +19,8 @@ the channel mixing. We accept these exponentially-growing modes by
 design: prejudging which mode behaviours are unphysical for an input
 theory is not the role of a theory-agnostic survey pipeline. The
 remaining interpretive question is whether each growth represents a
-physical amplification, an artifact of the plane-wave ansatz, or a
-pathology of the Lagrangian.
+physical amplification, an artifact of the uniform unbounded
+background, or a pathology of the Lagrangian.
 
 Several precedents in the
 literature show that linearised exponential or tachyonic modes need
@@ -29,11 +29,9 @@ appears tachyonic about the unbroken vacuum but is perfectly unitary
 about its symmetry-broken ground state~\cite{legner2025torc};
 analogously, in the TorC model~\cite{legner2025torc} the linearised
 tachyons around $\MAGT{} = 0$ are benign because the physical ground state
-is a torsion-condensed phase at $\MAGT{^2} \sim \MPl$, with the
-Einstein--Hilbert term itself emerging from a post-Riemannian
-$\MAGFt{}\,\MAGT{^2}$ cross-term in that condensed vacuum. The parallel is a
-precedent that linearised exponential modes do not by themselves
-disqualify a sector; we do not claim that our surveyed Lagrangians
+is a torsion-condensed phase at $\MAGT{^2} \sim \MPl$. These examples
+show that linearised exponential modes do not by themselves disqualify
+a sector; we do not claim that our surveyed Lagrangians
 necessarily realise such a condensation, only that the choice of
 vacuum around which the modes are evaluated can change the unitarity
 verdict.
@@ -42,8 +40,8 @@ Higher-derivative gravity theories that exhibit Ostrogradsky ghosts at
 the linearised level can be non-linearly ghost-free when appropriate
 torsion or higher-curvature terms are
 present~\cite{aoki2020nonlinear,bahamonde2025cubic}.
-Recent metric-affine catalogues~\cite{barker2025irfound1,barker2025irfound2}
-argue that a no-ghost / no-tachyon condition that is imposed by hand
+Recent infrared-foundations work~\cite{barker2025irfound1,barker2025irfound2}
+argues that a no-ghost / no-tachyon condition that is imposed by hand
 as an equality among couplings is not stable against quantum
 corrections: the corrected coupling values
 violate the tuning, and the ghost or tachyon reappears. By contrast,
@@ -59,37 +57,32 @@ observe is physical, but they establish that it is not automatically
 fatal, and that resolution belongs to either finite-extent geometry or
 a future \PSALTer{}-based particle-spectrum analysis.
 
-\paragraph*{Parity-odd geometric incompatibility}
-The same plane-wave embedding makes the parity-odd full and complete
-sectors of \cref{ParityOddGeomIncomp} structurally incompatible with
-finite-amplitude inference: the $\varepsilon$-tensor-mediated
-contractions $\varepsilon\!\cdot\!\MAGT{}\!\cdot\!\FieldF{}$ and
-$\varepsilon\!\cdot\!\MAGFt{}\!\cdot\!\nabla\MAGT{}$ produce linearised
-eigenvalues so large that the matrix-exponential overflow ceiling is
-breached at essentially any propagation time accessible to the modal
-solver. A bounded interaction time, set by a finite-extent geometry,
-would cap the growth at a finite envelope and restore a
+\paragraph*{Sectors that overflow the modal solver}
+The uniform unbounded background makes three of the largest sectors
+in the survey --- the parity-odd full and complete parity-odd closure
+of \cref{ParityOddGeomIncomp}, and the $\xi$-kinetic closure --- yield
+linearised eigenvalues so large that the matrix-exponential overflow
+ceiling is breached at essentially any propagation time accessible to
+the modal solver. A bounded interaction time, set by a finite-extent
+geometry, would cap the growth at a finite envelope and restore a
 finite-amplitude posterior --- which is the same hypothesis the
-localised-geometry programme would test for the amplifying parity-even
-sectors. The same finite-extent programme would also probe physics
-inaccessible to the plane-wave ansatz, including $k$-mode interactions
-across the bounded interaction region and realistic background
-geometries that allow physical-magnitude amplification estimates for
-actual astrophysical events.
+localised-geometry programme would test for the amplifying sectors
+that did resolve. The same finite-extent programme would also probe
+physics inaccessible to the uniform background, including $k$-mode
+interactions across the bounded interaction region and realistic
+background geometries that allow physical-magnitude amplification
+estimates for actual astrophysical events.
 
 \paragraph*{The $\chi_1$ direction across the parity-even sectors}
-Across the three parity-even sectors that contain it, $\chi_1
-\rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\,
+$\chi_1\,\rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\,
 \MAGFt{_{\alpha\beta\gamma\delta}}$ carries the dominant
-$D_\mathrm{KL}(P_+\|P_-)$ contribution. The same operator dominates whether or not the torsion sector
-propagates and whether or not the kinetic basis is closed,
-identifying $\chi_1$ as the most consistently informative direction in
-the parity-even survey.
-The reason that this particular contraction privileges itself over the
-other $\chi_{2\!-\!10}$ contractions and over the $\xi_i$ kinetic
-invariants is not addressed by the inference output alone; an analytic
-diagnosis at the level of the linearised conversion equations in the
-sectors that contain $\chi_1$ would be the natural follow-up.
+$D_\mathrm{KL}(P_+\|P_-)$ contribution in all three parity-even
+sectors that contain it, regardless of whether the torsion sector
+propagates or the $\chi_i$ basis is closed. The reason this
+contraction privileges itself over the other $\chi_{2\!-\!10}$
+contractions and over the $\xi_i$ kinetic invariants is not visible
+in the inference output and requires an analytic diagnosis of the
+linearised conversion equations.
 
 \paragraph*{Scope and limitations}
 The results sit in the linearised regime at first order in $\Bzero$

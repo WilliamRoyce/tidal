@@ -476,16 +476,21 @@ other vertices are switched on.
   \label{CornerT5D22}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/corner_t5_d23_full}
-  \caption{Posterior marginals for the nine-dimensional non-minimal
-    union $\{\Bet{1\!-\!3},\Del{1},\xi,\chi,\zeta_{1\!-\!3}\}$ of the
-    Yang--Mills--PGT family. Diagonal: 1D marginals (amplification:
-    magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
-    the 68\% and 95\% credible contours.}
-  \label{CornerT5D23}
-\end{figure}
+  \includegraphics[width=\textwidth]{figures/overlay_ym_union_pair_full}
+  \caption{Posterior marginals for the Yang--Mills--PGT non-minimal
+    union overlaid with its $\xi=0$ non-propagating-torsion control.
+    All eight NP-control parameters
+    $\{\Bet{1\!-\!3},\Del{1},\chi,\zeta_{1\!-\!3}\}$ are shown; the
+    propagating union's additional $\xi$ direction is omitted because
+    the NP-control chain has $\xi=0$. Magenta: amplification
+    (propagating); yellow: suppression (propagating); purple:
+    amplification ($\xi=0$ control); orange: suppression ($\xi=0$
+    control). Diagonal: 1D marginals. Off-diagonal: 2D joint marginals
+    at the 68\% and 95\% credible contours.}
+  \label{CornerYMUnionPair}
+\end{figure*}
 
 \begin{table*}[t]
   \centering
@@ -555,8 +560,8 @@ structure further: $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
 nats (\cref{KLTableChiClosureComparison}) as the dominant operator driving the
 separation between the %amplification and suppression
 posteriors. The full posterior corner is \cref{CornerChiClosure} and a
-restricted sub-corner over the dominant directions is
-\cref{CarrierChiClosure}.
+restricted overlay against the non-propagating-torsion control over
+the dominant directions is \cref{CornerChiClosurePair}.
 % ; the full per-coupling comparison against the
 % non-propagating-torsion control of the same sector appears below in
 % \cref{KLTableChiClosureComparison} (\cref{NonPropagatingControl}).
@@ -573,20 +578,21 @@ restricted sub-corner over the dominant directions is
   \label{CornerChiClosure}
 \end{figure*}
 
-\begin{figure}[!htbp]
+\begin{figure*}[!htbp]
   \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_chi_closure}
-  \caption{Restricted sub-corner of the eighteen-dimensional
-    $\chi$-closure, plotting only the top-$K = 6$ parameters ranked by
-    combined per-coupling $D_\mathrm{KL}$ (\cref{PerCouplingKL}).
-    $\chi_1$ dominates at $D_\mathrm{KL}(P_+\|P_-) = 4.2$~nats --- five
-    times the next strongest contribution --- identifying
-    $\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,\MAGFt{_{\mu\nu\rho\sigma}}$ as
-    the operator driving the parity-even separation between the
-    amplification and suppression posteriors. Full ranking in
-    \cref{KLTableChiClosureComparison}.}
-  \label{CarrierChiClosure}
-\end{figure}
+  \includegraphics[width=\textwidth]{figures/overlay_chi_closure_pair_restricted}
+  \caption{Restricted overlay of the $\chi$-closure sector with its
+    $\xi=0$ non-propagating-torsion control: top-6 parameters ranked
+    by combined per-coupling $D_\mathrm{KL}$ (\cref{PerCouplingKL})
+    on the propagating amplification chain. Magenta: amplification
+    (propagating); yellow: suppression (propagating); purple:
+    amplification ($\xi=0$ control); orange: suppression ($\xi=0$
+    control). Diagonal: 1D marginals. Off-diagonal: 2D joint marginals
+    at the 68\% and 95\% credible contours. $\chi_1$ dominates the
+    propagating-amplification posterior; the full propagating ranking
+    is in \cref{KLTableChiClosureComparison}.}
+  \label{CornerChiClosurePair}
+\end{figure*}
 \label{CornerT7}% legacy compatibility — the CarrierChiClosure figure supersedes the previous full-corner figure
 
 % Discussion preserved (planning directive 2026-05-25):
@@ -711,25 +717,13 @@ eigenvalue spectrum at that point shows no
 $\Re\{\lambda\} > 0$ modes in the pure metric channel; and the
 perturbativity envelope of \cref{PerturbativeBound} is satisfied
 across the posterior support. The corresponding posterior corners are
-\cref{CornerNP} (eight-parameter control) and \cref{CornerNPCeven}
+the overlay of \cref{CornerYMUnionPair} (eight-parameter control,
+overlaid with the propagating YM--PGT union) and \cref{CornerNPCeven}
 (seventeen-parameter $\chi$-closure control). The interpretation of
 the exponentially-growing modes themselves --- whether they correspond
 to a physical amplification that a finite-extent geometry would
 saturate, to a non-ghost tachyonic instability, or to a wrong-sign
 kinetic-mode ghost --- is taken up in \cref{Discussion}.
-
-\begin{figure}[!htbp]
-  \centering
-  \includegraphics[width=\columnwidth]{figures/corner_np}
-  \caption{Posterior marginals for the eight-dimensional
-    non-propagating-torsion control sector
-    $\{\Bet{1\!-\!3},\Del{1},\chi,\zeta_{1\!-\!3}\}$, obtained by pinning
-    $\xi\!=\!0$ in the non-minimal union of \cref{CornerT5D23} so
-    torsion is algebraic. Diagonal: 1D marginals (amplification:
-    magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
-    the 68\% and 95\% credible contours.}
-  \label{CornerNP}
-\end{figure}
 
 \begin{figure*}[!htbp]
   \centering
@@ -742,16 +736,6 @@ kinetic-mode ghost --- is taken up in \cref{Discussion}.
     credible contours.}
   \label{CornerNPCeven}
 \end{figure*}
-
-\begin{figure}[!htbp]
-  \centering
-  \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_np_chi_closure}
-  \caption{Restricted sub-corner of the seventeen-dimensional
-    non-propagating-torsion $\chi$-closure, plotting only the top-$K = 6$
-    parameters ranked by combined per-coupling $D_\mathrm{KL}$
-    (\cref{PerCouplingKL}).}
-  \label{CarrierNPCevenRestricted}
-\end{figure}
 
 % Discussion preserved (planning directive 2026-05-25):
 % T9 v2 partial-rescue caveat: both log Z negative (+10.30 amp vs
@@ -859,23 +843,24 @@ in \cref{Discussion}.
 \subsubsection{Dark-photon plasma}
 
 % The surveys above all sit within the PGT family, but
-\TIDAL{} accepts any Lagrangian as input. Plasma models, in which the photon acquires
-an effective mass at the perturbation level, and dark-photon models,
-in which a second U(1) field kinetically mixes with the photon via
-the Holdom mechanism~\cite{Holdom:1985ag,caputo2021darkphoton}, are
-both of independent interest. We combine them in a single sector by
-promoting the trace-vector torsion $\T[2]{_\mu}$ to a Proca field that
-kinetically mixes with the photon, with a photon plasma mass added at
-the perturbation level. The Einstein--Cartan $\Bet{3} I_3$ term of the
-YM--PGT base already gives the trace-vector torsion a Proca-like mass,
-so the kinetic-mixing operator is non-trivial in the Holdom
+\TIDAL{} accepts any Lagrangian as input. Effective plasma models, in
+which the photon acquires an effective mass at the perturbation
+level~\cite{raffelt1988mixing,domcke2025scattering}, and dark-photon
+models, in which a second U(1) field kinetically mixes with the photon
+via the Holdom mechanism~\cite{Holdom:1985ag,caputo2021darkphoton},
+are both of independent interest. The Einstein--Cartan $\Bet{3} I_3$
+term of the YM--PGT base already gives the trace-vector torsion a
+Proca-like mass, so a kinetic-mixing operator between the photon and
+the trace-vector torsion field strength is non-trivial in the Holdom
 sense~\cite{Holdom:1985ag}; the eigenvalue and coupling structure of
 the linearised system is nevertheless such that the graviton initial
 condition cannot excite torsion-coupled amplification without further
-mass structure. An additional photon plasma mass $m_A^2$ enters at the
-perturbation level and, together with the kinetic-mixing operator
-$\delta_m\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu}$ that allows
-the photon and $\mathcal{F}^{(T)}$ to mix, gives the Lagrangian
+mass structure. We therefore combine the two effective models into a
+single sector by promoting the trace-vector torsion $\T[2]{_\mu}$ to a
+Proca field that kinetically mixes with the photon via
+$\delta_m\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu}$, with an
+additional photon plasma mass $m_A^2$ added at the perturbation level,
+giving the Lagrangian
 \begin{multline}
   \lag_\text{Dark-photon}
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
@@ -963,7 +948,7 @@ understates the role of $m_A^2$ because of the prior breadth.
 The Einstein--Maxwell baseline receives QED effective-field-theory
 corrections at the $F^4$ level~\cite{adler1971photon,dunne2004heisenberg}, which can themselves
 source further photon--graviton interactions in a
-magnetic background. We include three EH-like operators,
+magnetic background. We include three EFT couplings,
 \begin{multline}
   \lag_\text{EH}
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
@@ -974,21 +959,20 @@ magnetic background. We include three EH-like operators,
   \label{EHGertLagrangian}
 \end{multline}
 of which the $F\!\cdot\!\tilde F$ topological term is a total covariant
-derivative and drops out of the equations of motion at the symbolic
-level (\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
+derivative absent from the equations of motion
+(\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
 over $(\rho, \sigma)$. The $F^4$ corrections scale with the background
-field to a higher power than the leading PGT vertices, so at the small
-$\Bzero = 10^{-2}$ required by the linear regime of the survey
-(\cref{Linearisation}) they are expected to be subdominant. The
-posterior is
+field to a higher power than the leading PGT vertices, so
+they are expected to be subdominant. The posterior has
 \begin{align*}
   \logZ_+ = +0.184 \pm 0.001 \, , \quad
   \logZ_- = -0.185 \pm 0.0004 \, ,
 \end{align*}
-and $\log B = +0.37$, a symmetric and tight null. The QED reference
-point $\sigma/\rho = 7/16$~\cite{adler1971photon,dunne2004heisenberg}
-is indistinguishable from the Einstein--Maxwell baseline at the
-surveyed $\Bzero$.
+and $\log B = +0.37$, a symmetric and tight null at the surveyed
+$\Bzero=10^{-2}$. The QED one-loop EH
+coefficients~\cite{adler1971photon,dunne2004heisenberg} would
+not mimic the Gertsenshtein signal at any background field accessible
+to the survey.
 % The per-parameter $D_\mathrm{KL}$ (\cref{KLTableEH})
 % yields $D_\mathrm{KL}(P_+\|P_-) < 1.7$ nats for both couplings,
 % consistent with the null verdict.
