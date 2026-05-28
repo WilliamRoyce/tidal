@@ -85,20 +85,44 @@ def _label(name: str) -> str:
     return rf"$\mathtt{{{name}}}$"
 
 
+def _score_from_imp(imp: dict, name: str) -> float:
+    amp = imp.get("amp", {}).get("marginal_d_kl", {}) or {}
+    sup = imp.get("sup", {}).get("marginal_d_kl", {}) or {}
+    cross = imp.get("cross_amp_sup_kl", {}) or {}
+    vals = [amp.get(name, 0.0), sup.get(name, 0.0), cross.get(name, 0.0)]
+    vals = [v if v is not None and math.isfinite(v) else 0.0 for v in vals]
+    return max(vals)
+
+
 def _top_k(amp_imp_path: Path, k: int, allowed: list[str]) -> list[str]:
     """Pick top-K parameters by combined max(amp marginal, sup marginal, cross)."""
     with amp_imp_path.open() as fh:
         imp = json.load(fh)
-    amp = imp.get("amp", {}).get("marginal_d_kl", {}) or {}
-    sup = imp.get("sup", {}).get("marginal_d_kl", {}) or {}
-    cross = imp.get("cross_amp_sup_kl", {}) or {}
     allowed_set = set(allowed)
-    names = [n for n in amp if n in allowed_set] or [n for n in sup if n in allowed_set]
+    names = [n for n in imp.get("amp", {}).get("marginal_d_kl", {}) if n in allowed_set]
+    return sorted(names, key=lambda n: -_score_from_imp(imp, n))[:k]
+
+
+def _top_k_union(paths: list[Path], k: int, allowed: list[str]) -> list[str]:
+    """Pick top-K parameters by max of scores across multiple chains.
+
+    For each parameter in `allowed`, score = max over all chains of that
+    chain's combined max(amp_marginal, sup_marginal, cross). Returns the
+    top-K names ranked by this max-score.
+    """
+    imps = []
+    for p in paths:
+        with p.open() as fh:
+            imps.append(json.load(fh))
+    allowed_set = set(allowed)
+    names = set()
+    for imp in imps:
+        names.update(
+            n for n in imp.get("amp", {}).get("marginal_d_kl", {}) if n in allowed_set
+        )
 
     def score(n: str) -> float:
-        vals = [amp.get(n, 0.0), sup.get(n, 0.0), cross.get(n, 0.0)]
-        vals = [v if v is not None and math.isfinite(v) else 0.0 for v in vals]
-        return max(vals)
+        return max(_score_from_imp(imp, n) for imp in imps)
 
     return sorted(names, key=lambda n: -score(n))[:k]
 
@@ -140,8 +164,12 @@ def render_overlay_pair(
         param_labels={n: _label(n) for n in np_param_names},
     )
 
-    # All four are plotted on the same `plot_params` columns. The NP chains
-    # do not contain xi so plot_params must be a subset of np_param_names.
+    # The canvas spans the full propagating parameter list (which may
+    # include xi); NP chains plot only on their available subset, so
+    # propagating-only columns (xi) show propagating contours only.
+    [p for p in plot_params if p not in np_param_names]
+    np_plot_params = [p for p in plot_params if p in np_param_names]
+
     axes = prop_amp.plot_2d(
         plot_params,
         kinds="kde",
@@ -149,16 +177,28 @@ def render_overlay_pair(
         color=AMP_COLOR,
         alpha=OVERLAY_ALPHA,
     )
-    for ns, color in [
-        (prop_sup, SUP_COLOR),
-        (np_amp, NP_AMP_COLOR),
-        (np_sup, NP_SUP_COLOR),
-    ]:
-        ns.plot_2d(
-            axes,
+    prop_sup.plot_2d(
+        axes,
+        kinds="kde",
+        levels=CONTOUR_LEVELS,
+        color=SUP_COLOR,
+        alpha=OVERLAY_ALPHA,
+    )
+    # NP chains: plot only on the subset of axes for which they have data.
+    if np_plot_params:
+        np_axes = axes.loc[np_plot_params, np_plot_params]
+        np_amp.plot_2d(
+            np_axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=color,
+            color=NP_AMP_COLOR,
+            alpha=OVERLAY_ALPHA,
+        )
+        np_sup.plot_2d(
+            np_axes,
+            kinds="kde",
+            levels=CONTOUR_LEVELS,
+            color=NP_SUP_COLOR,
             alpha=OVERLAY_ALPHA,
         )
 
@@ -262,7 +302,7 @@ def main() -> None:
         "chi10",
     ]
     chi_full_plot = (
-        chi_np_params  # 17 axes; the 18th (xi) is excluded since NP has no xi
+        chi_prop_params  # 18 axes; xi column shows propagating-only contours
     )
     chi_prop_amp = REPO_ROOT / "hpc_results/29682868/t7_amp_v2"
     chi_prop_sup = REPO_ROOT / "hpc_results/29682868/t7_sup_v2"
@@ -282,8 +322,18 @@ def main() -> None:
         fig_width=FIG_WIDTH,
     )
 
-    # Restricted top-K overlay (K=6) — rank by propagating amp's parameter_importance
-    chi_top = _top_k(chi_prop_amp / "parameter_importance.json", 6, chi_np_params)
+    # Restricted top-K overlay (K=6) — rank by max across propagating amp
+    # and NP amp parameter_importance.json, so the chosen subset includes
+    # the most-structured couplings from both chains rather than only the
+    # propagating chain's top.
+    chi_top = _top_k_union(
+        [
+            chi_prop_amp / "parameter_importance.json",
+            chi_np_amp / "parameter_importance.json",
+        ],
+        6,
+        chi_np_params,
+    )
     log.info("[chi_pair] top-6 carrier params: %s", chi_top)
     render_overlay_pair(
         out_path=figs_dir / "overlay_chi_closure_pair_restricted.pdf",
@@ -319,7 +369,9 @@ def main() -> None:
         "zeta2",
         "zeta3",
     ]
-    union_full_plot = union_np_params  # 8 axes
+    union_full_plot = (
+        union_prop_params  # 9 axes; xi column shows propagating-only contours
+    )
     union_prop_amp = REPO_ROOT / "hpc_results/29468763/d23_full_amp_v3"
     union_prop_sup = REPO_ROOT / "hpc_results/29471255/d23_full_sup_v3"
     union_np_amp = REPO_ROOT / "hpc_results/29700462/np_amp_v1"
@@ -337,7 +389,14 @@ def main() -> None:
         fig_width=FIG_WIDTH,
     )
 
-    union_top = _top_k(union_prop_amp / "parameter_importance.json", 6, union_np_params)
+    union_top = _top_k_union(
+        [
+            union_prop_amp / "parameter_importance.json",
+            union_np_amp / "parameter_importance.json",
+        ],
+        6,
+        union_np_params,
+    )
     log.info("[union_pair] top-6 carrier params: %s", union_top)
     render_overlay_pair(
         out_path=figs_dir / "overlay_ym_union_pair_restricted.pdf",

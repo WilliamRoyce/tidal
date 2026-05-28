@@ -568,13 +568,17 @@ the dominant directions is \cref{CornerChiClosurePair}.
 
 \begin{figure*}[!htbp]
   \centering
-  \includegraphics[width=\textwidth]{figures/corner_t7}
+  \includegraphics[width=\textwidth]{figures/overlay_chi_closure_pair_full}
   \caption{Posterior marginals for the eighteen-dimensional
     $\chi$-closure $\{\Bet{1\!-\!3},\Del{1},\xi,\zeta_{1\!-\!3},
-    \chi_{1\!-\!10}\}$ of \cref{ChiClosureLagrangian}. Diagonal: 1D
-    marginals (amplification: magenta; suppression: yellow).
-    Off-diagonal: 2D joint marginals at the 68\% and 95\% credible
-    contours.}
+    \chi_{1\!-\!10}\}$ of \cref{ChiClosureLagrangian} overlaid with
+    its $\xi=0$ non-propagating-torsion control; the $\xi$
+    row/column shows propagating contours only because the NP-control
+    chain has $\xi=0$. Magenta: amplification (propagating); yellow:
+    suppression (propagating); purple: amplification ($\xi=0$
+    control); orange: suppression ($\xi=0$ control). Diagonal: 1D
+    marginals. Off-diagonal: 2D joint marginals at the 68\% and 95\%
+    credible contours.}
   \label{CornerChiClosure}
 \end{figure*}
 
@@ -703,7 +707,7 @@ comparison against the propagating chain is
     and amplification-vs-suppression
     $D_{+\|-} = D_\mathrm{KL}(P_+\|P_-)$, in nats. ``--'' marks a
     coupling present but below the per-chain top-ten $D_\mathrm{KL}$ cutoff.
-    Corresponding posterior corner plots: \cref{CornerNPCeven}
+    Corresponding posterior corner plots: \cref{CornerChiClosure}
     (NP control) and \cref{CornerChiClosure} (propagating).}
   \label{KLTableChiClosureComparison}
 \end{table}
@@ -718,24 +722,12 @@ $\Re\{\lambda\} > 0$ modes in the pure metric channel; and the
 perturbativity envelope of \cref{PerturbativeBound} is satisfied
 across the posterior support. The corresponding posterior corners are
 the overlay of \cref{CornerYMUnionPair} (eight-parameter control,
-overlaid with the propagating YM--PGT union) and \cref{CornerNPCeven}
+overlaid with the propagating YM--PGT union) and \cref{CornerChiClosure}
 (seventeen-parameter $\chi$-closure control). The interpretation of
 the exponentially-growing modes themselves --- whether they correspond
 to a physical amplification that a finite-extent geometry would
 saturate, to a non-ghost tachyonic instability, or to a wrong-sign
 kinetic-mode ghost --- is taken up in \cref{Discussion}.
-
-\begin{figure*}[!htbp]
-  \centering
-  \includegraphics[width=\textwidth]{figures/corner_np_ceven}
-  \caption{Posterior marginals for the seventeen-dimensional
-    non-propagating-torsion $\chi$-closure control ($\xi\!=\!0$ pinned
-    in the eighteen-parameter base of \cref{CornerChiClosure}).
-    Diagonal: 1D marginals (amplification: magenta; suppression:
-    yellow). Off-diagonal: 2D joint marginals at the 68\% and 95\%
-    credible contours.}
-  \label{CornerNPCeven}
-\end{figure*}
 
 % Discussion preserved (planning directive 2026-05-25):
 % T9 v2 partial-rescue caveat: both log Z negative (+10.30 amp vs
