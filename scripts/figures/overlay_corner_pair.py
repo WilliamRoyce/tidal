@@ -164,10 +164,13 @@ def render_overlay_pair(
         param_labels={n: _label(n) for n in np_param_names},
     )
 
-    # The canvas spans the full propagating parameter list (which may
-    # include xi); NP chains plot only on their available subset, so
-    # propagating-only columns (xi) show propagating contours only.
-    [p for p in plot_params if p not in np_param_names]
+    # Canvas spans the full `plot_params` list. NP chains may lack some
+    # columns (e.g. xi). When every plot_params entry is in the NP list
+    # (restricted-corner case) we plot NP directly on `axes`, matching
+    # the original behaviour. When some columns are propagating-only
+    # (full-corner case with xi) we slice axes to the NP subset so the
+    # propagating-only column shows propagating contours only.
+    prop_only_cols = [p for p in plot_params if p not in np_param_names]
     np_plot_params = [p for p in plot_params if p in np_param_names]
 
     axes = prop_amp.plot_2d(
@@ -184,8 +187,9 @@ def render_overlay_pair(
         color=SUP_COLOR,
         alpha=OVERLAY_ALPHA,
     )
-    # NP chains: plot only on the subset of axes for which they have data.
-    if np_plot_params:
+    if prop_only_cols:
+        # Full-corner case (some columns propagating-only): slice axes
+        # so NP only overlays the columns it has data for.
         np_axes = axes.loc[np_plot_params, np_plot_params]
         np_amp.plot_2d(
             np_axes,
@@ -196,6 +200,23 @@ def render_overlay_pair(
         )
         np_sup.plot_2d(
             np_axes,
+            kinds="kde",
+            levels=CONTOUR_LEVELS,
+            color=NP_SUP_COLOR,
+            alpha=OVERLAY_ALPHA,
+        )
+    else:
+        # Restricted case (all plot_params in NP list): plot NP directly
+        # on the same `axes` object, matching the pre-round-15 behaviour.
+        np_amp.plot_2d(
+            axes,
+            kinds="kde",
+            levels=CONTOUR_LEVELS,
+            color=NP_AMP_COLOR,
+            alpha=OVERLAY_ALPHA,
+        )
+        np_sup.plot_2d(
+            axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
             color=NP_SUP_COLOR,
