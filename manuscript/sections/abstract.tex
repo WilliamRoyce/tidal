@@ -1,27 +1,44 @@
 % !TEX root = ../main.tex
-% Abstract scaffold (Phase 2): four placeholder slots per
-% genre_conventions_theory.md §(b). Total target ~180 words. Written last;
-% all quantitative values (e.g. percentage agreement) are filled during
-% the abstract drafting session, not at scaffold time.
+% Abstract --- drafted 2026-05-28 against
+% manuscript/planning/abstract_drafting_spec.md
+% (companion spec to conclusion_drafting_spec.md).
 %
-% Slot 1 — Phenomenon (~30 w): Gertsenshtein effect, GW–EM mixing in B0,
-%                              high-frequency-GW context.
-% Slot 2 — Tool + capability (~40 w): TIDAL automates the Gertsenshtein
-%                              channel computation for any quadratic PGT+EM
-%                              Lagrangian.
-% Slot 3 — Results (~70 w): one short sentence per finding — Boccaletti
-%                              validation; sector-level constraints; the
-%                              hx<->ax torsion-independence (the central
-%                              positive structural finding); ghost diagnosis.
-% Slot 4 — Closing (~40 w): definitive scope statement (per
-%                              style_analysis.md §(a) closing convention),
-%                              not a forward pointer or limitation.
+% Variant choices per slot:
+%   Slot 1 (phenomenon):  phenomenon-first, BHL default
+%   Slot 2 (tool):        PSALTer 'infeasible' framing,
+%                         inline PGT introduction
+%   Slot 3 (findings):    decoupling-first, sweep-second;
+%                         chi_1 identification moved to Slot 4
+%                         to remove duplication (Option B)
+%   Slot 4 (closing):     'we find evidence' + dual verdict,
+%                         structural-finding register
+%
+% Supervisor directions this session (binding):
+%   - chi_1 named; delta_1 dropped (chi_1 is dominant in the
+%     multi-coupling regime; delta_1 was key only in isolation)
+%   - no magnitude qualifiers; plane-wave growth is tunable, so
+%     physical magnitudes deferred to localised-geometry follow-up
+%     per Discussion + Conclusion
+%   - suppression NOT confined to parity-odd minimal coupling;
+%     suppression is generic across the surveyed theory space
 \begin{abstract}
-% TODO Slot 1: phenomenon and HFGW context.
-%
-% TODO Slot 2: TIDAL announcement and capability statement.
-%
-% TODO Slot 3: results summary (one sentence per finding).
-%
-% TODO Slot 4: definitive scope statement (closing).
+The Gertsenshtein effect --- the conversion of gravitational waves
+into photons in a background magnetic field --- provides one of the
+few channels through which high-frequency gravitational radiation
+could be observed. Manual derivation of the conversion channel
+across the operator space of Poincar\'e gauge theory (PGT) is
+infeasible; we present \TIDAL{} (Tensor Integration and Derivation
+for Any Lagrangian), a symbolic--numerical pipeline that derives
+the linearised equations of motion of any quadratic gauge-gravity
+Lagrangian and propagates them in a chosen background. We find
+that torsion decouples from the Gertsenshtein channel at minimal
+coupling, so the conversion structure is carried entirely by
+non-minimal Lagrangian operators. The quadratic PGT action is
+then swept through single-coupling, multi-coupling, and full
+sector-closure parameterisations, with each configuration's
+modification of the conversion channel quantified relative to the
+Einstein--Maxwell baseline. These configurations admit both
+ghost-free amplification and suppression of the Gertsenshtein
+channel, with the $\chi_1$ derivative coupling identified as the
+dominant amplifying operator.
 \end{abstract}
