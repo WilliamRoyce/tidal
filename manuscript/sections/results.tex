@@ -749,9 +749,7 @@ kinetic-mode ghost --- is taken up in \cref{Discussion}.
   \caption{Restricted sub-corner of the seventeen-dimensional
     non-propagating-torsion $\chi$-closure, plotting only the top-$K = 6$
     parameters ranked by combined per-coupling $D_\mathrm{KL}$
-    (\cref{PerCouplingKL}). $\chi_1$ is the dominant
-    $D_\mathrm{KL}(P_+\|P_-)$ contribution at $5.8$~nats; the
-    propagating result is reproduced within bootstrap uncertainty.}
+    (\cref{PerCouplingKL}).}
   \label{CarrierNPCevenRestricted}
 \end{figure}
 
@@ -778,15 +776,13 @@ $\MAGFt{}\!\times\!\nabla\MAGT{}$ basis. One
 invariant, $\xi_{11}$, vanishes in the plane-wave reduction; fifteen
 propagating $\xi$-couplings plus the ten $\chi$-couplings and the
 seven non-minimal-base couplings give a thirty-two-dimensional prior.
-Sampling returns both $\logZ_\pm$ negative, indicating partial floor
-contamination from the extended $\xi_{11\!-\!16}$ sub-sector at the
-chain's $t_\text{end}$ horizon; the exact log-evidence values are not
-informative under floor contamination, but the per-coupling ranking of
-$D_\mathrm{KL}$ contributions is preserved by the uniform additive shift
-and the dominant directions can still be read off the posterior.
-$\chi_1$ and $\xi_{15}$ emerge as co-dominant
-$D_\mathrm{KL}(P_+\|P_-)$ contributions, consistent with $\chi_1$'s
-role across the parity-even hierarchy; the $\xi_{15}$ contraction is
+Sampling returns both $\logZ_\pm$ negative because the extended
+$\xi_{11\!-\!16}$ sub-sector drives a substantial fraction of sample
+points into modal-solver overflow at the chain's $t_\text{end}$
+horizon; the log-evidence values and per-coupling $D_\mathrm{KL}$
+figures are therefore not quantitatively meaningful in this sector.
+$\chi_1$ and $\xi_{15}$ are the apparent dominant directions, the
+latter the contraction
 $\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 \rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$.
 
@@ -806,11 +802,10 @@ $\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
   \caption{Restricted sub-corner of the thirty-two-dimensional
     $\xi$-kinetic closure, plotting only the ten parameters ranked
     highest by combined per-coupling $D_\mathrm{KL}$
-    (\cref{PerCouplingKL}). $\chi_1$ and $\xi_{15}$ emerge as
-    co-dominant contributions; per-coupling $D_\mathrm{KL}$ values are
-    not headlined because the underlying chain is partially
-    floor-contaminated, but the ranking is preserved by the uniform
-    additive shift.}
+    (\cref{PerCouplingKL}). $\chi_1$ and $\xi_{15}$ emerge as the
+    apparent dominant directions, but a substantial fraction of sample
+    points hit modal-solver overflow, so the per-coupling
+    $D_\mathrm{KL}$ values are not quantitatively meaningful.}
   \label{CarrierT9Restricted}
 \end{figure}
 
@@ -863,8 +858,8 @@ in \cref{Discussion}.
 
 \subsubsection{Dark-photon plasma}
 
-The surveys above all sit within the PGT family, but \TIDAL{} accepts
-any Lagrangian as input. Plasma models, in which the photon acquires
+% The surveys above all sit within the PGT family, but
+\TIDAL{} accepts any Lagrangian as input. Plasma models, in which the photon acquires
 an effective mass at the perturbation level, and dark-photon models,
 in which a second U(1) field kinetically mixes with the photon via
 the Holdom mechanism~\cite{Holdom:1985ag,caputo2021darkphoton}, are
@@ -903,20 +898,17 @@ find
 \end{align*}
 with $\log B = +6.11$. The amplification log-evidence dominates the
 suppression log-evidence, and the per-parameter $D_\mathrm{KL}$
-figures of \cref{KLTableDarkPhoton} place $\Del{m}$ (kinetic mixing,
-$3.4$~nats) above $m_A^2$ (photon plasma mass, $1.45$~nats). This
+figures of \cref{KLTableDarkPhoton} place $\Del{m}$ above $m_A^2$. This
 ordering should be read against the broad log-uniform priors used for
 $m_A^2$, $\xi$, and $\Bet{3}$ (six decades each), which dilute their
 marginal $D_\mathrm{KL}$ figures relative to the arctan-uniform prior
-on $\Del{m}$. Pre-sampling parameter-sweep tests of this sector found
+on $\Del{m}$. Pre-sampling tests of this sector found
 that the dark-photon kinetic mixing adds little to the base
-plasma-mass model either way: the conversion structure is controlled
+plasma-mass model either way: the conversion is controlled
 by the photon plasma mass $m_A^2$, which shifts the photon dispersion
-away from the (effectively massless at the surveyed scales)
-trace-vector-torsion dispersion and detunes coherent Gertsenshtein
+and detunes coherent Gertsenshtein
 conversion. The nominal $D_\mathrm{KL}$ ordering reported here
-therefore understates the role of $m_A^2$ because of the prior
-breadth.
+understates the role of $m_A^2$ because of the prior breadth.
 
 \begin{figure}[!htbp]
   \centering
@@ -969,10 +961,9 @@ breadth.
 % import an EM-EFT correction that mimics gravitational amplification).
 \subsubsection{Euler--Heisenberg effective action}
 The Einstein--Maxwell baseline receives QED effective-field-theory
-corrections at the $F^4$
-level~\cite{adler1971photon,dunne2004heisenberg}, which can themselves
-source non-linear photon--photon and photon--graviton interactions in a
-magnetic background. Three EH operators enter,
+corrections at the $F^4$ level~\cite{adler1971photon,dunne2004heisenberg}, which can themselves
+source further photon--graviton interactions in a
+magnetic background. We include three EH-like operators,
 \begin{multline}
   \lag_\text{EH}
     = -\tfrac{1}{\kappa^2}\,\MAGFt{}
@@ -982,7 +973,7 @@ magnetic background. Three EH operators enter,
     + \sigma\,(\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}})^{2} \, ,
   \label{EHGertLagrangian}
 \end{multline}
-of which the $F\cdot\tilde F$ Pontryagin term is a total covariant
+of which the $F\!\cdot\!\tilde F$ topological term is a total covariant
 derivative and drops out of the equations of motion at the symbolic
 level (\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
 over $(\rho, \sigma)$. The $F^4$ corrections scale with the background
