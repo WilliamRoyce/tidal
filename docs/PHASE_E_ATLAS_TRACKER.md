@@ -37,7 +37,13 @@
 - [x] A0.4 `docs/PHASE_E_ATLAS_TRACKER.md` skeleton (this file)
 - [ ] A0.5 PAUSED banner on `docs/PHASE_E_TRACKER.md`
 - [ ] A0.6 push to HPC + verify version aligned
-- [ ] A0.7 commit Stage A0 infrastructure
+- [x] A0.7 commit Stage A0 infrastructure
+
+### Stage A0b — fixes uncovered during first launch
+
+- [x] CLI: add "atlas" to `--type` choices in `tidal/cli/__init__.py` (dispatch existed in `_plot_command.py:322` but choices list rejected it)
+- [x] Runner: source venv + load modules + use absolute path `${TIDAL_ROOT}/.venv/bin/tidal` so srun's PMI handoff can exec
+- [x] Runner: `--output` path is the SURVEY directory not face-specific; `tidal sample --joint-prior` writes to `<survey>/<face_label>_tile<sub>/` automatically (psalter convention)
 
 ### Stage A1 — Phase α (INTR; v3 order; HARD GATE between slots)
 
@@ -65,8 +71,8 @@
 
 | Theory | ndim | faces | jobid | r_lo | r_hi | n_completed | atlas.pdf | verdict |
 |--------|------|-------|-------|------|------|-------------|-----------|---------|
-| T4 | 4 | 8 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
-| T1 | 4 | 8 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
+| T4 | 4 | 8 | 29855408 (S1) | 0.35 | 0.45 | 8/8 | ☑ atlas_t4.pdf | informative-amp; δ₁ dir suppressed (logZ=−1.82 face 4) |
+| T1 | 4 | 8 | 29855408 (S1) | 0.35 | 0.45 | 8/8 | ☑ atlas_t1.pdf | strong amp; mA² dir face 02m suppressed (logZ=−0.01 vs +9) |
 | T5.0 | 5 | 10 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
 | T5.1 | 6 | 12 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
 | T5.2 (bonus) | 8 | 16 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |

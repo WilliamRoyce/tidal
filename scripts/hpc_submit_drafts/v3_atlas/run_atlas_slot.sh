@@ -25,6 +25,32 @@ source "${CONFIG_ENV}"
 
 cd "${TIDAL_ROOT}"
 
+# Module + venv setup (nohup ssh runs a non-interactive non-login shell so
+# nothing is auto-sourced). Mirrors what hpc_shuttle.sh attach does plus the
+# MPI toolchain needed for pypolychord's PolyChord MPI ranks.
+. /etc/profile.d/modules.sh 2>/dev/null || true
+module purge                              2>/dev/null || true
+module load rhel8/default-sar             2>/dev/null || true
+module load python/3.11.0-icl             2>/dev/null || true
+module load intel/2019.3.199              2>/dev/null || true
+module load intel-oneapi-mpi              2>/dev/null || true
+
+# shellcheck disable=SC1091
+source "${TIDAL_ROOT}/.venv/bin/activate"
+
+# Full path to tidal — srun's exec ranks don't inherit PATH reliably across
+# the SLURM PMI handoff, so always invoke via absolute path.
+TIDAL_BIN="${TIDAL_ROOT}/.venv/bin/tidal"
+
+# Sanity check before launching any srun: confirm tidal is executable.
+if [[ ! -x "${TIDAL_BIN}" ]]; then
+  echo "ERROR: ${TIDAL_BIN} is not executable" >&2
+  ls -la "${TIDAL_BIN}" >&2 || true
+  exit 1
+fi
+echo "tidal binary: ${TIDAL_BIN}"
+"${TIDAL_BIN}" --version 2>&1 | head -3 || true
+
 : "${RESULTS_DIR:?RESULTS_DIR must be set by INTR slot setup (hpc_shuttle.sh attach exports it)}"
 
 if [[ $# -lt 1 ]]; then
@@ -126,16 +152,19 @@ launch_face() {
   local tag="$1" face="$2"
   local sub
   sub="$(build_sub_string "${NDIM}")"
-  local outdir="${RESULTS_DIR}/atlas_${tag}/face_${face}_tile_${sub}"
+  # tidal sample --joint-prior writes results to <output>/<face_label>_tile<sub>/
+  # automatically (psalter convention). So point --output at the survey dir
+  # and let the cubed-sphere prior code create the face_label subdirectory.
+  local outdir="${RESULTS_DIR}/atlas_${tag}"
   local logfile="${RESULTS_DIR}/atlas_${tag}/face_${face}.log"
-  mkdir -p "$(dirname "${outdir}")"
+  mkdir -p "${outdir}"
 
   local nlive=$((25 * NDIM))
   local num_repeats=$((2 * NDIM))
 
   # shellcheck disable=SC2086
   srun --exclusive --ntasks="${RANKS}" --cpus-per-task=1 --mem-per-cpu=1500 --mpi=pmi2 \
-    tidal sample "${JSON_PATH}" \
+    "${TIDAL_BIN}" sample "${JSON_PATH}" \
     --joint-prior "names=${BSM_NAMES};type=cubed_sphere;M=${M_TILES};face=${face};sub=${sub};r_lo=${R_LO};r_hi=${R_HI}" \
     --likelihood "P_max:maximize" \
     "${COMMON_PHYS[@]}" \

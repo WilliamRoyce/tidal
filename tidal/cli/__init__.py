@@ -754,6 +754,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "convergence",
             "replicate-convergence",
             "corner",
+            "atlas",
         ],
         help="Plot type to generate",
     )
