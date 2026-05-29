@@ -1,5 +1,14 @@
 # Phase E Tracker — Localised-Field HPC Campaign
 
+> **⏸ PAUSED 2026-05-29 — pivoted to atlas-on-uniform until 2026-06-01 deadline.**
+>
+> The localised campaign is on hold because the per-eval cost makes landscape
+> PolyChord on 38-field PGT-torsion theories infeasible in the remaining 3 days
+> (jobs 29714807 / 29715239 hit walltime without converging). All localised
+> infrastructure below is preserved unchanged and will resume after the paper.
+> See **[`PHASE_E_ATLAS_TRACKER.md`](PHASE_E_ATLAS_TRACKER.md)** for the active
+> uniform-field cubed-sphere atlas campaign.
+
 **Last updated:** 2026-05-24 (session: stage1-pipeline)
 **Current stage:** Stage 1 → Stage 2 pipelined: E.cal/T1/T2/T4/T5.3/T7s derivations complete (6 of 7); E.T8s deriving in background (long); E.T2 amp running on HPC (jobid **29640051**)
 **Next action:** wait for E.T2 amp completion → pull results → submit E.T2 sup → submit E.T1/E.T4/E.T5/E.NP amp+sup pairs sequentially. E.T8s derivation finishes in parallel.
