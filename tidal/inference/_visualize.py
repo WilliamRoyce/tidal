@@ -704,52 +704,10 @@ def _plot_corner_anesthetic(
             columns=result.param_names,
         )
 
-    # Append log10(A) as a final column where A = P_max / P_GR is the
-    # physical amplification factor.  Same definition across maximize and
-    # minimize runs (amplify finds large A; suppress finds small A) — a
-    # single shared interpretation, unlike raw logL which means opposite
-    # things in the two modes.  Anesthetic's weight-aware KDE handles
-    # the new column transparently because we set it on the
-    # WeightedLabelledDataFrame.  Cosmology convention: derived parameters
-    # appear alongside sampled ones (Planck Omega_m-H_0 panels, DES Y3 S_8).
+    # Corner plot shows the SAMPLED parameters only — no derived columns.
+    # Per supervisor direction (2026-05-29): the prior log10(A) overlay was
+    # confusing and non-standard; remove it from all corner plots.
     plot_params: list[str] = list(result.param_names)
-    log10_a = _compute_log10_amplification(result, samples)
-    if log10_a is not None:
-        try:
-            # Clip to posterior-weighted 0.1%-99.9% range BEFORE plot_2d so
-            # anesthetic's KDE is calibrated for the posterior scale, not
-            # the full prior-exploration chain.  Dead-point samples spanning
-            # the full prior range would otherwise produce an over-smooth KDE
-            # that appears as a wedge when the axis is zoomed to the posterior.
-            log10_a_plot = _clip_to_posterior_range(
-                log10_a,
-                result.weights if result.weights is not None else None,
-            )
-            # anesthetic may have dropped rows with logL <= logL_birth
-            # (PolyChord exit-state artefact, issue #362); align the
-            # derived column to samples' (possibly post-drop) index
-            # rather than the full result.samples length.
-            if len(log10_a_plot) != len(samples):
-                if len(log10_a_plot) > len(samples) and hasattr(samples, "index"):
-                    # samples.index may be a positional or label index
-                    # into the original chain; try positional first
-                    getattr(samples, "index", None)
-                    try:
-                        log10_a_plot = log10_a_plot[: len(samples)]
-                    except (TypeError, ValueError):
-                        log10_a_plot = None
-                else:
-                    log10_a_plot = None
-            if log10_a_plot is not None:
-                samples["log10_A"] = log10_a_plot
-                samples.set_label("log10_A", r"$\log_{10} A$")
-                plot_params.append("log10_A")
-        except (AttributeError, KeyError, TypeError, ValueError):
-            pass
-    elif "logL" in samples.columns:
-        # Fallback: if we can't derive A (no P_max metric, no baseline
-        # formula), still append logL so something useful shows up.
-        plot_params.append("logL")
 
     # anesthetic >= 2.0: plot_2d returns an AxesDataFrame whose cells
     # expose .get_figure().  Older versions returned (fig, axes).  Handle
@@ -856,17 +814,8 @@ def _plot_corner_anesthetic(
             result.weights,
             skip=tuple(logged_params),
         )
-        # log10_A (derived column) — tighten its axes to the same
-        # 95%-credible + 5%-pad treatment so the bottom row contours
-        # sit at the panel edge without large whitespace margins.
-        if log10_a is not None and "log10_A" in plot_params:
-            _set_derived_axis_limits(
-                axes_df,
-                plot_params,
-                "log10_A",
-                log10_a,
-                result.weights,
-            )
+        # log10_A handling removed per supervisor direction (2026-05-29):
+        # derived amplification column was confusing and non-standard.
     # Re-apply log scale at the very end — overlays (priors, MAP, CI)
     # internally save/restore xlim around their plot() calls which on
     # some matplotlib versions silently reverts the scale to linear.
@@ -904,16 +853,10 @@ def _plot_corner_anesthetic(
             )
         else:
             headline_parts.append(f"log Z = {result.log_evidence:.3f}")
-    # Headline amplification range: prefer the derived `log10_A` column
-    # (consistent meaning across amplify and suppress runs) and report
-    # both extremes.  Falls back to mode-aware max(exp(logL)) for older
-    # chains lacking the simulation_params metadata.
-    if log10_a is not None:
-        finite_a = log10_a[np.isfinite(log10_a)]
-        if finite_a.size > 0:
-            max_a = float(10 ** np.max(finite_a))
-            min_a = float(10 ** np.min(finite_a))
-            headline_parts.append(f"A ∈ [{min_a:.2e}, {max_a:.2e}]")
+    # Headline: report mode-aware max(exp(logL)) headline as fallback;
+    # the log10_A-based summary was removed per supervisor direction.
+    if False:
+        pass
     else:
         finite_logl = result.log_likelihood[np.isfinite(result.log_likelihood)]
         if finite_logl.size > 0:

@@ -220,21 +220,48 @@ def _render_face_panel(
                 ax.set_xticks([])
                 ax.set_yticks([])
                 continue
-            # 2D histogram on the [-1, 1]^2 face cube
+            # Smoothed KDE contours on the [-1, 1]^2 face cube.
+            # Coarse 32-bin histogram then Gaussian-smoothed for
+            # robustness against sparse cells; renders as filled
+            # contours at the 68%/95% credible levels (cosmology
+            # convention — Planck/DES corner plots).
             hist, _xe, _ye = np.histogram2d(
                 chi[:, j],
                 chi[:, i],
                 bins=32,
                 range=((-1.0, 1.0), (-1.0, 1.0)),
             )
-            ax.imshow(
-                hist.T,
-                origin="lower",
-                extent=(-1.0, 1.0, -1.0, 1.0),
-                aspect="auto",
-                cmap="Blues",
-                interpolation="bilinear",
-            )
+            try:
+                from scipy.ndimage import gaussian_filter
+
+                smoothed = gaussian_filter(hist.T, sigma=1.2)
+            except ImportError:
+                smoothed = hist.T
+
+            total = smoothed.sum()
+            if total > 0:
+                flat = np.sort(smoothed.flatten())[::-1]
+                cumsum = np.cumsum(flat) / total
+                # Levels enclosing 68% and 95% of total density
+                idx68 = np.searchsorted(cumsum, 0.68)
+                idx95 = np.searchsorted(cumsum, 0.95)
+                lvl68 = flat[min(idx68, len(flat) - 1)]
+                lvl95 = flat[min(idx95, len(flat) - 1)]
+                levels = sorted({float(lvl95), float(lvl68), float(smoothed.max())})
+                if len(levels) >= 2:
+                    xcenters = np.linspace(-1.0, 1.0, smoothed.shape[1])
+                    ycenters = np.linspace(-1.0, 1.0, smoothed.shape[0])
+                    X, Y = np.meshgrid(xcenters, ycenters)
+                    ax.contourf(X, Y, smoothed, levels=levels, cmap="Blues", alpha=0.85)
+                    ax.contour(
+                        X,
+                        Y,
+                        smoothed,
+                        levels=levels,
+                        colors="k",
+                        linewidths=0.5,
+                        alpha=0.6,
+                    )
             ax.set_xlim(-1, 1)
             ax.set_ylim(-1, 1)
             ax.set_xticks([])
