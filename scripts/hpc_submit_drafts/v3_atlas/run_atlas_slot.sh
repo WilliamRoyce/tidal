@@ -94,7 +94,7 @@ lookup_theory() {
       JSON_PATH="examples/data/torsion_gertsenshtein_general_nonminimal.json"
       NDIM=6
       FACES=12
-      RANKS=4           # Slot S2: 12 * 4 = 48 cores
+      RANKS=6           # Smart-pack resume: T5.1 (12*6=72) + T5.0 (10*4=40) = 112 cores exactly
       BSM_NAMES="beta1,beta2,beta3,xi,delta1,chi"
       PARAMS_PIN="--param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0"
       ;;
@@ -162,6 +162,14 @@ launch_face() {
   local nlive=$((25 * NDIM))
   local num_repeats=$((2 * NDIM))
 
+  # Optional resume: if TIDAL_READ_RESUME env var is set to 1, append
+  # --read-resume so PolyChord picks up from the existing .resume
+  # checkpoint in <outdir>/<face_label>_tile<sub>/_chains/tidal.resume.
+  local resume_flag=()
+  if [[ "${TIDAL_READ_RESUME:-0}" == "1" ]]; then
+    resume_flag=(--read-resume)
+  fi
+
   # shellcheck disable=SC2086
   srun --exclusive --ntasks="${RANKS}" --cpus-per-task=1 --mem-per-cpu=1500 --mpi=pmi2 \
     "${TIDAL_BIN}" sample "${JSON_PATH}" \
@@ -171,6 +179,7 @@ launch_face() {
     ${PARAMS_PIN} \
     --nlive "${nlive}" --num-repeats "${num_repeats}" \
     --output "${outdir}" \
+    "${resume_flag[@]}" \
     > "${logfile}" 2>&1 &
 }
 
