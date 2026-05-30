@@ -446,7 +446,7 @@ and stays accurate when $M$ is non-normal.
 
 For localised coefficients the convolution matrix is
 effectively banded; \TIDAL{} converts it to compressed-sparse-column
-(CSC) format~\cite{demmel1999supernodal,lidemmel2003superlu} when the
+(CSC) format~\cite{demmel1999supernodal,demmel1999superlumt} when the
 density falls below 30\%. \Cref{fig:SparseCSCBenchmark}
 shows the resulting orders of magnitude speed-up as the matrix sparsifies with
 increasing grid resolution.
@@ -656,7 +656,7 @@ $\O(N\log N)$~\cite{cooley1965fft}. The second
 tier covers non-periodic boundaries and variable coefficients: the
 constraint Jacobian is assembled column-by-column by impulse-probing
 each operator, then stored as
-CSC and factored by SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu},
+CSC and factored by SuperLU~\cite{demmel1999supernodal,demmel1999superlumt},
 with $\O(N^2)$ build cost and $\O(N)$ solve. The third tier, reserved for
 the $N>2\times 10^{5}$ regime, is a Krylov iterative scheme; it is
 implemented but not exercised in~\cref{Results},
@@ -725,7 +725,7 @@ interface~\cite{gardner2022sundials,hindmarsh2005sundials}.
 maintains three tiers, selected on the total state-vector size $N$: a
 dense tier for $N\le2{,}000$, a sparse tier for
 $2{,}000<N\le200{,}000$, and a matrix-free tier for $N>200{,}000$. The dense tier
-fills a two-dimensional \NumPy{} array with $\partial F/\partial y +
+fills a two-dimensional \NumPy{}~\cite{harris2020numpy} array with $\partial F/\partial y +
 c_j\,\partial F/\partial y'$ at every Newton step, which the \SUNDIALS{}
 direct linear solver factors by LAPACK LU~\cite{andersonlapack1999}; this path delivers a
 substantial wall-time speedup over FD Jacobian
@@ -733,7 +733,7 @@ evaluation, with the per-tier comparison shown
 in~\cref{fig:AnalyticalJacobianSpeedup}. The sparse tier fills a flat
 CSC data buffer with a fixed sparsity
 pattern, which \SUNDIALS{} factors with
-SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu}.
+SuperLU~\cite{demmel1999supernodal,demmel1999superlumt}.
 % ; this yields
 % a measurable speedup for both solvers, larger for \IDA{}
 % (heavier per-step Jacobian cost) than for \CVODE{}.
@@ -758,7 +758,7 @@ production tier thresholds, however, are set by the cost of the
 fastest while its working set is cache-resident
 ($N\!\lesssim\!2{,}000$); SuperLU's sparse LU is fastest while its
 fill-in fits in memory
-($\mathrm{nnz}\!\lesssim\!10^{5}$~\cite{lidemmel2003superlu,demmel1999supernodal});
+($\mathrm{nnz}\!\lesssim\!10^{5}$~\cite{demmel1999superlumt,demmel1999supernodal});
 beyond that the matrix-free GMRES tier avoids the factor entirely.
 The dense and sparse tiers thus win on solve cost at their respective
 sizes even though the fill timings in

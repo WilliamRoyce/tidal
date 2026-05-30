@@ -2,15 +2,20 @@
 
 > Live status for the two-part manuscript citation audit (Task 1: BibTeX entry
 > verification; Task 2: citation-usage verification). Source of truth for progress
-> is the inline `%@audit` / `%@cite` markers in `manuscript/references.bib` — run
+> is the inline `% AUDIT` / `% CITE` markers in `manuscript/references.bib` — run
 > `uv run python -m scripts.bibaudit.audit_status` any time for the live tally.
 
-**Last updated:** 2026-05-30 (session: Task 1 applied)
-**Current phase:** Task 1 markers/normalization APPLIED to all 231 (`audit_status` 231/231).
-Remaining Task 1: 12 PENDING (Google Books mop-up), 20 NOTFOUND/NOID (manual), 39 uncited (decide).
-Next major phase: **Task 2** (per-key content verification).
-**Verdict tally (applied):** MATCH 38 · MINOR 144 · ENRICHED 8 · FIXED 6 · REVIEWED 3 · NOID 16 · NOTFOUND 4 · PENDING 12
-**Compile:** latexmk exit 0, 0 undefined citations/refs; BibTeX 0 errors (13 pre-existing missing-journal warnings).
+**Last updated:** 2026-05-30 (session: Task 1 COMPLETE)
+**Current phase:** Task 1 DONE (all 230 active entries audited; latexmk exit 0) → **Task 2 next**.
+**Verdict tally (230 active):** MATCH 38 · MINOR 143 · ENRICHED 17 · FIXED 9 · REVIEWED 11 · NOID 4 · NOTFOUND 3 · PENDING 4 · UNCITED 1
+**Compile:** latexmk exit 0, 0 undefined citations/refs; BibTeX 0 errors (12 pre-existing missing-journal warnings).
+
+### Task 1 closeout
+- **Books**: 9 enriched w/ Crossref-verified DOIs (higham, henneaux, leveque, davis, hobson, blagojevic2002, hairer ODE-I/ODE-II/geometric); 4 REVIEWED (boyd/roache/misner/MacKay — no DOI / Crossref false-match); 5 pre-arXiv historical REVIEWED (complete, predate DOIs). User did golub/trefethen×2/brenan/mathematica/randall. **Manual residual for user: NONE.**
+- **xAct**: retyped `martingarcia2007xact`→@misc; added canonical **xPerm** `martingarcia2008xperm`; cited both at 3 suite sites.
+- **SuperLU**: added SuperLU_MT `demmel1999superlumt` (the variant TIDAL uses), swapped into 4 cites; deleted wrong-variant SuperLU_DIST.
+- **NumPy** `harris2020numpy` cited at numerical.tex. **Duplicates removed**: mekki2023skitsundae, blagojevic2013gauge (cite redirected).
+- **QZ/`moler1973algorithm`** PARKed (no QZ/generalized-eigenvalue text in manuscript) — flagged for user.
 **Plan:** `/home/vscode/.claude/plans/working-on-the-manuscript-glimmering-knuth.md`
 
 ## ▶ Quick handoff (read first if resuming cold)

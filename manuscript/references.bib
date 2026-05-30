@@ -7,7 +7,8 @@
 % Gertsenshtein Effect
 % =====================================================================
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! pre-arXiv (Sov. Phys. JETP 1962); complete vol/pages; no DOI/arXiv exists
 @article{gertsenshtein1962wave,
   author  = {Gertsenshtein, M. E.},
   title   = {Wave resonance of light and gravitational waves},
@@ -283,14 +284,9 @@
   doi           = {10.1016/j.cpc.2014.02.006}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOTFOUND
-@book{blagojevic2013gauge,
-  author    = {Blagojevi\'c, Milutin and Hehl, Friedrich W.},
-  title     = {Gauge Theories of Gravitation: A Reader with Commentaries},
-  publisher = {Imperial College Press},
-  year      = {2013},
-  isbn      = {978-1-84816-726-1}
-}
+% REMOVED 2026-05-30: bibkey blagojevic2013gauge was a duplicate of blagojevicHehl2013
+%   (same ISBN 978-1-84816-726-1); its single cite was redirected. Deleted (in git history).
+
 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2406.12826&format=bibtex verdict=MINOR
 @article{barker2024poincare,
@@ -459,14 +455,9 @@
   note   = {Champaign, IL, 2025}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
-@misc{mekki2023skitsundae,
-  author       = {Mekki, J. B.},
-  title        = {{scikit-sundae}},
-  howpublished = {\url{https://github.com/jbmekki/scikit-sundae}},
-  note         = {Accessed: 2026-05-07},
-  year         = {2023}
-}
+% REMOVED 2026-05-30: bibkey mekki2023skitsundae was a duplicate scikit-sundae entry;
+%   randall2024skitsundae is the canonical one. Deleted (in git history).
+
 
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOTFOUND
 @misc{randall2024skitsundae,
@@ -580,6 +571,19 @@
   doi     = {10.1137/S0895479895291765}
 }
 
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137/S0895479897317685 verdict=FIXED
+%! TIDAL uses SuperLU_MT (shared-memory); added the SuperLU_MT paper. Replaces the SuperLU_DIST cite [[lidemmel2003superlu]] (wrong variant) at the 4 sites in numerical.tex.
+@article{demmel1999superlumt,
+  author  = {Demmel, James W. and Gilbert, John R. and Li, Xiaoye S.},
+  title   = {An Asynchronous Parallel Supernodal Algorithm for Sparse {Gaussian} Elimination},
+  journal = {SIAM J. Matrix Anal. Appl.},
+  volume  = {20},
+  number  = {4},
+  pages   = {915--952},
+  year    = {1999},
+  doi     = {10.1137/S0895479897317685}
+}
+
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
 @book{golub2013matrix,
   author    = {Golub, Gene H. and Van Loan, Charles F.},
@@ -675,7 +679,8 @@
 % Numerical Methods — Textbooks
 % =====================================================================
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007/3-540-30666-8 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{hairer2006geometric,
   author    = {Hairer, Ernst and Lubich, Christian and Wanner, Gerhard},
   title     = {Geometric Numerical Integration: Structure-Preserving Algorithms for Ordinary Differential Equations},
@@ -683,10 +688,12 @@
   publisher = {Springer},
   year      = {2006},
   series    = {Springer Series in Computational Mathematics},
-  volume    = {31}
+  volume    = {31},
+  doi       = {10.1007/3-540-30666-8}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007/978-3-540-78862-1 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{hairer1993ode1,
   author    = {Hairer, Ernst and N{\o}rsett, Syvert P. and Wanner, Gerhard},
   title     = {Solving Ordinary Differential Equations {I}: Nonstiff Problems},
@@ -694,10 +701,12 @@
   publisher = {Springer},
   year      = {1993},
   series    = {Springer Series in Computational Mathematics},
-  volume    = {8}
+  volume    = {8},
+  doi       = {10.1007/978-3-540-78862-1}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007/978-3-642-05221-7 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{hairer1996ode2,
   author    = {Hairer, Ernst and Wanner, Gerhard},
   title     = {Solving Ordinary Differential Equations {II}: Stiff and Differential-Algebraic Problems},
@@ -705,10 +714,12 @@
   publisher = {Springer},
   year      = {1996},
   series    = {Springer Series in Computational Mathematics},
-  volume    = {14}
+  volume    = {14},
+  doi       = {10.1007/978-3-642-05221-7}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! no DOI (Dover 2001 reprint); complete book citation
 @book{boyd2001chebyshev,
   author    = {Boyd, John P.},
   title     = {Chebyshev and {Fourier} Spectral Methods},
@@ -717,7 +728,8 @@
   year      = {2001}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! no DOI (Hermosa 1998); complete book citation
 @book{roache1998verification,
   author    = {Roache, Patrick J.},
   title     = {Verification and Validation in Computational Science and Engineering},
@@ -729,12 +741,29 @@
 % Software & Codebases
 % =====================================================================
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
-@article{martingarcia2007xact,
-  author = {Mart\'in-Garc\'ia, Jos\'e M. and Portugal, Renato and Manssur, Leo R. U.},
-  title  = {{xAct}: Efficient tensor computer algebra for {Mathematica}},
-  year   = {2007},
-  url    = {http://www.xact.es}
+% AUDIT v=1 date=2026-05-30 src=http://www.xact.es verdict=FIXED
+%! retyped to a misc/webpage entry (it is the xAct webpage, by Martin-Garcia); removed Invar-paper co-authors. The xAct authors ask users to cite this page + the xPerm paper (martingarcia2008xperm).
+@misc{martingarcia2007xact,
+  author       = {Mart\'in-Garc\'ia, Jos\'e M.},
+  title        = {{xAct}: Efficient tensor computer algebra for {Mathematica}},
+  howpublished = {\url{http://www.xact.es}},
+  year         = {2002}
+}
+
+% AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv:0803.0862&format=bibtex verdict=FIXED
+%! canonical xAct algorithm paper (xPerm), added per the xAct citation request
+@article{martingarcia2008xperm,
+  author        = {Mart\'in-Garc\'ia, Jos\'e M.},
+  title         = {{xPerm}: fast index canonicalization for tensor computer algebra},
+  journal       = {Comput. Phys. Commun.},
+  volume        = {179},
+  number        = {8},
+  pages         = {597--603},
+  year          = {2008},
+  eprint        = {0803.0862},
+  archiveprefix = {arXiv},
+  primaryclass  = {cs.SC},
+  doi           = {10.1016/j.cpc.2008.05.009}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A0807.0824&format=bibtex verdict=ENRICHED
@@ -943,7 +972,8 @@
   doi     = {10.1103/PhysRev.101.1597}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! complete incollection (Infeld ed., Pergamon 1962); no DOI/arXiv
 @incollection{sciama1962physical,
   author    = {Sciama, D. W.},
   title     = {On the analogy between charge and spin in general relativity},
@@ -955,7 +985,8 @@
   pages     = {415--439}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! pre-arXiv (Bull. Acad. Pol. Sci. 1972); complete; no DOI/arXiv
 @article{trautman1972einstein,
   author  = {Trautman, Andrzej},
   title   = {On the {Einstein--Cartan} equations {I}},
@@ -1018,14 +1049,16 @@
   doi           = {10.1103/PhysRevD.102.124049}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1201/9781420034264 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{blagojevic2002gravitation,
   author    = {Blagojevi\'{c}, Milutin},
   title     = {Gravitation and Gauge Symmetries},
   publisher = {Institute of Physics Publishing},
   address   = {Bristol},
   year      = {2002},
-  isbn      = {978-0-7503-0767-3}
+  isbn      = {978-0-7503-0767-3},
+  doi       = {10.1201/9781420034264}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142/p781 verdict=REVIEWED
@@ -1621,13 +1654,15 @@
   doi           = {10.1016/j.dark.2024.101534}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137/1.9780898717778 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{higham2008functions,
   author    = {Higham, Nicholas J.},
   title     = {Functions of Matrices: Theory and Computation},
   publisher = {SIAM},
   year      = {2008},
-  isbn      = {978-0-89871-646-7}
+  isbn      = {978-0-89871-646-7},
+  doi       = {10.1137/1.9780898717778}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137%2FS00361445024180 verdict=MINOR
@@ -1687,7 +1722,8 @@
 % All entries verified against INSPIRE-HEP.
 % =====================================================================
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! historical (1850); complete vol/pages; no DOI
 @article{ostrogradsky1850memoires,
   author  = {Ostrogradsky, M.},
   title   = {M{\'e}moires sur les {\'e}quations diff{\'e}rentielles, relatives au probl{\`e}me des isop{\'e}rim{\`e}tres},
@@ -1789,7 +1825,8 @@
   doi     = {10.1016/0550-3213(70)90416-5}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! pre-arXiv (JETP Lett. 1970); complete; no DOI/arXiv
 @article{zakharov1970linearized,
   author  = {Zakharov, V. I.},
   title   = {Linearized gravitation theory and the graviton mass},
@@ -1810,14 +1847,16 @@
   doi     = {10.1103/PhysRevD.6.3368}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1515/9780691213866 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{henneaux1992quantization,
   author    = {Henneaux, Marc and Teitelboim, Claudio},
   title     = {Quantization of Gauge Systems},
   publisher = {Princeton University Press},
   address   = {Princeton, NJ},
   year      = {1992},
-  isbn      = {0-691-08775-X}
+  isbn      = {0-691-08775-X},
+  doi       = {10.1515/9780691213866}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1145%2F321879.321884 verdict=MINOR
@@ -1832,7 +1871,8 @@
   doi     = {10.1145/321879.321884}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137/1.9780898717839 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{leveque2007finite,
   author    = {LeVeque, Randall J.},
   title     = {Finite Difference Methods for Ordinary and Partial Differential Equations: Steady-State and Time-Dependent Problems},
@@ -1840,7 +1880,8 @@
   address   = {Philadelphia},
   year      = {2007},
   series    = {Classics in Applied Mathematics},
-  isbn      = {978-0-89871-629-0}
+  isbn      = {978-0-89871-629-0},
+  doi       = {10.1137/1.9780898717839}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0167-2789%2890%2990019-L verdict=MINOR
@@ -1855,18 +1896,9 @@
   doi     = {10.1016/0167-2789(90)90019-L}
 }
 
-% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1145/779359.779361 verdict=REVIEWED
-%! Crossref returned a truncated title ("SuperLU_DIST"); the local full title is correct. No change.
-@article{lidemmel2003superlu,
-  author  = {Li, Xiaoye S. and Demmel, James W.},
-  title   = {{SuperLU\_DIST}: A scalable distributed-memory sparse direct solver for unsymmetric linear systems},
-  journal = {ACM Transactions on Mathematical Software},
-  volume  = {29},
-  number  = {2},
-  pages   = {110--140},
-  year    = {2003},
-  doi     = {10.1145/779359.779361}
-}
+% REMOVED 2026-05-30: bibkey lidemmel2003superlu was SuperLU_DIST (distributed-memory) —
+%   NOT the variant TIDAL uses (SuperLU_MT, demmel1999superlumt). The 4 cites were
+%   redirected; entry deleted to avoid mis-citing the wrong SuperLU paper (in git history).
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.2307%2F2003354 verdict=MINOR
 @article{cooley1965fft,
@@ -1892,7 +1924,8 @@
   doi     = {10.1109/T-AIEE.1928.5055024}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137/1.9780898718881 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{davis2006sparse,
   author    = {Davis, Timothy A.},
   title     = {Direct Methods for Sparse Linear Systems},
@@ -1900,7 +1933,8 @@
   address   = {Philadelphia},
   year      = {2006},
   series    = {Fundamentals of Algorithms},
-  isbn      = {978-0-89871-613-9}
+  isbn      = {978-0-89871-613-9},
+  doi       = {10.1137/1.9780898718881}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fimamat%2F13.1.117 verdict=MINOR
@@ -1936,14 +1970,16 @@
   doi       = {10.7208/chicago/9780226870373.001.0001}
 }
 
-% AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
+% AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1017/cbo9780511790904 verdict=ENRICHED
+%! added DOI (Crossref-verified book record)
 @book{hobson2006general,
   author    = {Hobson, Michael Paul and Efstathiou, George and Lasenby, Anthony N.},
   title     = {General Relativity: An Introduction for Physicists},
   publisher = {Cambridge University Press},
   address   = {Cambridge},
   year      = {2006},
-  isbn      = {9780521829519}
+  isbn      = {9780521829519},
+  doi       = {10.1017/cbo9780511790904}
 }
 
 % Maggiore: gravitational-wave theory and experiments. Cited for the
@@ -1959,11 +1995,8 @@
   isbn      = {978-0-19-852074-0}
 }
 
-% Misner, Thorne & Wheeler --- the classic reference. Cited in App H
-% (TT-gauge admissibility) for Box 35.1 and §35.4, the canonical "TT
-% gauge for radiation outside the source" statement.
-% Bibtex from INSPIRE-HEP texkey Misner:1973prb.
-% AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! Crossref title-search false match; ISBN correct, no DOI
 @book{misner1973gravitation,
   author    = {Misner, Charles W. and Thorne, Kip S. and Wheeler, John A.},
   title     = {Gravitation},
@@ -2377,13 +2410,8 @@
   year          = {2017}
 }
 
-% Pedagogical references for the "for further detail on Bayesian
-% inference" hand-off in App J.  Books (MacKay, Hobson, Sivia--Skilling)
-% are not in INSPIRE; metadata pulled from Crossref (DOIs where present)
-% and from OpenLibrary (LCCN / OCLC / full author lists where the DOI
-% record is incomplete, e.g.\ the OUP DOI for Sivia--Skilling lists only
-% one author).
-% AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
+% AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
+%! Crossref title-search false match; ISBN correct, no DOI
 @book{MacKay:2003,
   author    = {MacKay, David J. C.},
   title     = {{Information Theory, Inference, and Learning Algorithms}},
