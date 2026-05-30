@@ -188,7 +188,6 @@ The path-integrated kernel \cref{BoccalettiPathIntegrated} is recovered in
 
 \subsection{Surveyed sectors}%
 \label{SectorSurvey}%
-\label{InformativeAmplification}%
 
 % Under the plane-wave approximation (\cref{Linearisation}) the
 % surveyed PGT hierarchy yields the Bayes-factor partition collected in
@@ -197,8 +196,7 @@ The Bayes factor
 $\log B = \logZ_+ -\, \logZ_-$~\cite{Skilling:2006gxv}
 quantifies amplification preference ($\log B > 0$) or suppression
 preference ($\log B < 0$) relative to the Einstein--Maxwell baseline.
-We return to the physical interpretation of the surviving amplification
-preferences in \cref{Discussion}. Nested sampling for every sector below
+Nested sampling for every sector below
 was performed with PolyChord~\cite{Handley:2015fda,Handley:2015vkr};
 corner figures were generated with
 anesthetic~\cite{Handley:2019mfs}.
@@ -481,10 +479,10 @@ other vertices are switched on.
   \includegraphics[width=\textwidth]{figures/overlay_ym_union_pair_full}
   \caption{Posterior marginals for the Yang--Mills--PGT non-minimal
     union overlaid with its $\xi=0$ non-propagating-torsion control.
-    All eight NP-control parameters
-    $\{\Bet{1\!-\!3},\Del{1},\chi,\zeta_{1\!-\!3}\}$ are shown; the
-    propagating union's additional $\xi$ direction is omitted because
-    the NP-control chain has $\xi=0$. Magenta: amplification
+    All nine propagating-union parameters
+    $\{\Bet{1\!-\!3},\Del{1},\xi,\chi,\zeta_{1\!-\!3}\}$ are shown;
+    the $\xi$ column carries propagating contours only because the
+    NP-control chain has $\xi=0$ pinned. Magenta: amplification
     (propagating); yellow: suppression (propagating); purple:
     amplification ($\xi=0$ control); orange: suppression ($\xi=0$
     control). Diagonal: 1D marginals. Off-diagonal: 2D joint marginals
@@ -707,8 +705,9 @@ comparison against the propagating chain is
     and amplification-vs-suppression
     $D_{+\|-} = \D(P_+\|P_-)$, in nats. ``--'' marks a
     coupling present but below the per-chain top-ten $\D$ cutoff.
-    Corresponding posterior corner plots: \cref{CornerChiClosure}
-    (NP control) and \cref{CornerChiClosure} (propagating).}
+    Corresponding posterior corner plot: \cref{CornerChiClosure}
+    (full 18-dimensional overlay; restricted top-6 in
+    \cref{CornerChiClosurePair}).}
   \label{KLTableChiClosureComparison}
 \end{table}
 
@@ -768,12 +767,11 @@ $\chi_1$ and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
   \centering
   \includegraphics[width=\columnwidth]{figures/kl_carrier_corner_xi_kinetic_closure}
   \caption{Restricted sub-corner of the thirty-two-dimensional
-    $\xi$-kinetic closure, plotting only the ten parameters ranked
-    highest by combined per-coupling $\D$
-    (\cref{PerCouplingKL}). $\chi_1$ and $\xi_{15}$ emerge as the
-    apparent dominant directions, but a substantial fraction of sample
-    points hit modal-solver overflow, so the per-coupling
-    $\D$ values are not quantitatively meaningful.}
+    $\xi$-kinetic closure: top-10 parameters ranked by combined
+    per-coupling $\D$ (\cref{PerCouplingKL}). $\chi_1$ and $\xi_{15}$
+    emerge as the apparent dominant directions, but a substantial
+    fraction of sample points hit modal-solver overflow, so the
+    per-coupling $\D$ values are not quantitatively meaningful.}
   \label{CarrierT9Restricted}
 \end{figure}
 
@@ -817,9 +815,8 @@ at $t_\text{end} = 1$ in these coupling directions; the would-be safe
 horizon $t_\text{end} \lesssim 10^{-3}$ places the conversion
 amplitude $P \propto (\kappa\Bzero t/2)^2$ below the noise floor by
 orders of magnitude. Whether this reflects a pathology of the
-unbounded BGMF ansatz, which a finite-extent geometry could
-saturate, or a fatal pathology of the theories themselves is taken up
-in \cref{Discussion}.
+unbounded BGMF ansatz or a fatal pathology of the theories themselves
+is an interpretive question (\cref{Discussion}).
 
 \subsubsection{Dark-photon plasma}
 
@@ -900,7 +897,7 @@ understates the role of $m_A^2$ because of the prior breadth.
   \bottomrule
   \end{tabular}
   \caption{Dark-photon plasma analogue: per-coupling $\D$
-    per-coupling $\D$ ranking for the survey.}
+    ranking for the survey.}
   \label{KLTableDarkPhoton}
 \end{table}
 
@@ -950,9 +947,11 @@ they are expected to be subdominant. The posterior has
 \end{align*}
 and $\log B = +0.37$, a symmetric and tight null at the surveyed
 $\Bzero=10^{-2}$. The one-loop EH
-coefficients~\cite{adler1971photon,dunne2004heisenberg} would
-not significantly alter the Gertsenshtein signal at any accessible
-BGMF.
+coefficients~\cite{adler1971photon,dunne2004heisenberg} are
+loop-suppressed below the prior scales sampled here; the QED
+contribution to the Gertsenshtein signal lies below the survey's
+resolution at any background field accessible to the linearised
+treatment.
 % The per-parameter $\D$ (\cref{KLTableEH})
 % yields $\D(P_+\|P_-) < 1.7$ nats for both couplings,
 % consistent with the null verdict.
