@@ -12,12 +12,8 @@
 The amplification ratios themselves grow with the simulation duration,
 because the exponential growth compounds indefinitely
 on the unbounded plane-wave background.
-Physical-magnitude statements about conversion efficiency require
-finite-extent, localised-$\Bzero$ simulations that bound the
-interaction time and saturate the linearised growth.
-We accept the exponentially-growing modes: prejudging which
-mode behaviours are unphysical is not the role of a theory-agnostic
-software. The
+We accept the exponentially-growing modes: a theory-agnostic
+framework must report whatever the input Lagrangian produces. The
 remaining interpretive question is whether each growth represents a
 physical amplification, an artifact of the uniform unbounded
 background, or a pathology of the Lagrangian.
@@ -32,11 +28,8 @@ tachyons around $\MAGT{} = 0$ are benign because the physical ground state
 is a torsion-condensed phase at $\MAGT{^2} \sim \MPl^2$.
 Linearised exponential modes do not by themselves disqualify
 a sector; but we do not claim that our surveyed Lagrangians
-necessarily realise such a condensation, only that our observations
-are not necessarily a pathological.
-% the choice of
-% vacuum around which the modes are evaluated can change the unitarity
-% verdict.
+necessarily realise such a condensation, only that exponential growth
+need not signal a Lagrangian pathology.
 
 Higher-derivative gravity theories that exhibit Ostrogradsky ghosts at
 the linearised level can be non-linearly ghost-free when appropriate
@@ -47,25 +40,14 @@ argues that a no-ghost-no-tachyon condition that is imposed by hand
 on couplings is not stable against radiative
 corrections. However,
 when the absence of a ghost mode follows from a gauge symmetry of the
-Lagrangian itself, the unitarity is protected.
-% The non-propagating-torsion
-% control of \cref{NonPropagatingControl} is a particularly clean
-% example of the latter: with $\xi$ pinned to zero there is no new
-% kinetic operator at all, so no wrong-sign coefficient can appear in
-% the first place.
+Lagrangian itself, unitarity is protected.
 This supports the interpretation that the exponential growth we observe is not
 automatically fatal.
 
-\paragraph*{Solver overflow}
+\paragraph*{Eigenvalue overflow}
 The sectors in \cref{ParityOddGeomIncomp,XiKineticClosure} yield
 eigenvalues so large that the matrix-exponential overflow
 ceiling is hit at essentially any accessible propagation time.
-A finite interaction time, set by a localised
-BGMF, would bound the growth at and restore a
-finite-amplitude posterior. The same finite-extent programme would also probe
-physics inaccessible to the current setup, including $k$-mode
-interactions and realistic geometries that allow physical-magnitude amplification
-estimates for actual astrophysical events.
 
 \paragraph*{The $\chi_1$ direction}
 It is surprising that the $\chi_1\,\rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\,
@@ -80,10 +62,14 @@ considered here.
 \paragraph*{Scope and limitations}
 The results sit in the linearised regime at first order in $\Bzero$
 on an unbounded BGMF with a plane-wave graviton initial
-condition. The largest theories in the survey produced
-linearised eigenvalues too extreme for the uniform plane-wave setup
-to resolve: a substantial fraction of sample points hit modal-solver
-overflow in the largest sectors, and resolving them requires the
-localised-geometry programme. Interpretation of the exponential growth
-may require a \PSALTer{} particle-spectrum analysis.
-The cubic-PGT sector has not been surveyed.
+condition. A substantial fraction of sample points in the largest
+sectors hit modal-solver overflow, leaving those parameter regions
+unresolved. Three resolution paths remain open: a localised-geometry
+programme, in which a finite-extent $\Bzero$ bounds the interaction
+time and restores finite-amplitude posteriors in the overflow sectors
+while also enabling physical-magnitude conversion estimates against
+realistic astrophysical geometries; a \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}
+particle-spectrum analysis, to interpret the exponentially-growing modes
+against the linearised unitarity verdict; and a survey of the
+cubic-PGT sector~\cite{bahamonde2025cubic}, which lies beyond the
+quadratic action that bounds the present work.

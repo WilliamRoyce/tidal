@@ -75,6 +75,7 @@ Remove these from every draft:
 | "interesting" (as standalone adjective) | describe *why* it is interesting |
 | "novel" (in abstract or intro) | describe specifically what is new |
 | "state of the art" | cite the specific frontier work |
+| "pipeline" (when referring to TIDAL itself) | "framework" (algorithmic / theoretical scope), "package" (concrete computational artefact), "implementation" (operational running prose), or "software" (generic noun, no indefinite article) — corpus precedent: `\PSALTer{}`, HiGGS, Hamilcar use these four exclusively |
 
 ---
 
@@ -173,7 +174,7 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 **Template papers:** 2406.12826 §V (conformal PGT results); 2303.11094 §III–IV (null + constraint framing); 2510.17094 §IV (competing-effects result).
 
-**Opening:** One sentence mapping the four subsections. "§4.1 validates TIDAL against the Boccaletti formula; §4.2–4.3 present the null results for the T1 and T2 sectors; §4.4–4.5 present the propagating-torsion findings."
+**Opening:** A subsection roadmap sentence is *optional*, not mandatory. Corpus papers in this genre (2506.21662, 2510.08201) skip the roadmap and open directly on a finding or definition; use the roadmap only when §4 has many subsections (5+) and the reader genuinely needs the map. For a §4 with 2–4 subsections, prefer a direct opening such as "We open with the Boccaletti validation…" or recall the action being studied. Example roadmap (when needed): "§4.1 validates TIDAL against the Boccaletti formula; §4.2–4.3 present the null results for the T1 and T2 sectors; §4.4–4.5 present the propagating-torsion findings."
 
 **§4.1 Boccaletti validation:** Lead with the formula. Show fig. 1 (simulation vs. analytic). State: "TIDAL reproduces the Boccaletti conversion probability to 0.04%." This is the positive result that validates everything downstream.
 
