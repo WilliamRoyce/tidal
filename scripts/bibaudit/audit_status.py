@@ -1,9 +1,9 @@
 """Progress dashboard for the citation audit (READ-ONLY).
 
-Parses the ``%@audit`` and ``%@cite`` marker comments in ``references.bib`` and
+Parses the ``% AUDIT`` and ``% CITE`` marker comments in ``references.bib`` and
 reports how much of the audit is done — ``bib: X/231`` and ``cites: Y/192`` — plus
 the outstanding STOP list and any unmapped journals. This is the source of truth
-for resuming: an entry already carrying a ``%@audit`` line is done. Run it any time
+for resuming: an entry already carrying a ``% AUDIT`` line is done. Run it any time
 to see exactly what remains, independent of chat context.
 """
 

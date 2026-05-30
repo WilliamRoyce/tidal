@@ -18,7 +18,7 @@ the full plan.
 | `fetch_canonical.py` | INSPIRE → Crossref → Google Books, cached + rate-limited | yes |
 | `compare.py` | Task 1 driver: classify all 231, write `cache/report.json` + proposed edits | yes |
 | `extract_cites.py` | Task 2 worklist: every `\cite{}` grouped by key, with claim context | no |
-| `audit_status.py` | progress dashboard: parses `%@audit`/`%@cite` markers → X/231, Y/192 | no |
+| `audit_status.py` | progress dashboard: parses `% AUDIT`/`% CITE` markers → X/231, Y/192 | no |
 
 ## Usage
 
@@ -48,8 +48,8 @@ making every run idempotent and resumable. Pass `--refresh` to force re-fetch.
 ## Marker schema (written to references.bib via Edit, above each entry)
 
 ```bibtex
-%@audit v=1 date=YYYY-MM-DD src=<url> verdict=MATCH
-%@cite v=1 status=SUPPORTS
+% AUDIT v=1 date=YYYY-MM-DD src=<url> verdict=MATCH
+% CITE v=1 status=SUPPORTS
 %! purpose: <what this paper backs>
 %! used: results.tex (§4.1), theory.tex (§2.3)
 %! checked: literature/<id> [abstract+§3], YYYY-MM-DD

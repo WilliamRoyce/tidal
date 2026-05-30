@@ -232,6 +232,117 @@ def googlebooks(isbn: str, *, refresh: bool = False) -> dict | None:
     return payload
 
 
+# --- book resolution (title+author search; no usable id on the entry) ----------
+
+
+def crossref_search(title: str, author: str, *, rows: int = 3) -> list[dict]:
+    """Crossref bibliographic search restricted to book-like types -> candidates."""
+    q = urllib.parse.quote(f"{title} {author}".strip())
+    url = (
+        f"https://api.crossref.org/works?query.bibliographic={q}"
+        "&filter=type:book,type:monograph,type:reference-book,type:edited-book"
+        f"&rows={rows}&mailto=wr286@cam.ac.uk"
+    )
+    r = _get(url, accept="application/json")
+    if r is None or r.status_code != 200:
+        return []
+    out = []
+    for m in r.json().get("message", {}).get("items", []):
+        out.append(
+            {
+                "doi": m.get("DOI", ""),
+                "title": (m.get("title") or [""])[0],
+                "author": ", ".join(a.get("family", "") for a in m.get("author", [])),
+                "year": str(
+                    (m.get("issued", {}).get("date-parts") or [[None]])[0][0] or ""
+                ),
+                "publisher": m.get("publisher", ""),
+                "isbn": (m.get("ISBN") or [""])[0],
+                "type": m.get("type", ""),
+            }
+        )
+    return out
+
+
+def googlebooks_search(title: str, author: str) -> list[dict]:
+    """Google Books title+author search -> candidates (for ISBN / publisher / year)."""
+    q = urllib.parse.quote(f"intitle:{title} inauthor:{author}")
+    url = f"https://www.googleapis.com/books/v1/volumes?q={q}&maxResults=3"
+    r = _get(url, accept="application/json")
+    if r is None or r.status_code != 200:
+        return []
+    out = []
+    for it in r.json().get("items", []):
+        vi = it.get("volumeInfo", {})
+        isbns = {
+            x.get("type"): x.get("identifier")
+            for x in vi.get("industryIdentifiers", [])
+        }
+        out.append(
+            {
+                "title": vi.get("title", "")
+                + (f": {vi['subtitle']}" if vi.get("subtitle") else ""),
+                "author": ", ".join(vi.get("authors", [])),
+                "year": (vi.get("publishedDate", "") or "")[:4],
+                "publisher": vi.get("publisher", ""),
+                "isbn13": isbns.get("ISBN_13", ""),
+                "isbn10": isbns.get("ISBN_10", ""),
+            }
+        )
+    return out
+
+
+def resolve_books(*, refresh: bool = False) -> dict:
+    """For every book-like entry, gather Crossref + Google Books candidates by
+    title+author so a human/agent can verify + enrich. Writes cache/books/<key>.json
+    and prints a per-book candidate report. Does NOT edit the bib.
+    """
+    entries = load_bib("manuscript/references.bib")
+    booklike = {"book", "inbook", "incollection"}
+    out = {}
+    for e in entries:
+        if e.type not in booklike:
+            continue
+        title = e.fields.get("title", "")
+        author = e.fields.get("author", e.fields.get("editor", ""))
+        lead = author.split(" and ")[0].split(",")[0].strip()
+        cr = crossref_search(title[:80], lead)
+        gb = googlebooks_search(title[:60], lead)
+        rec = {
+            "key": e.key,
+            "local": {
+                k: e.fields.get(k, "")
+                for k in (
+                    "title",
+                    "author",
+                    "editor",
+                    "year",
+                    "publisher",
+                    "isbn",
+                    "doi",
+                )
+            },
+            "crossref": cr,
+            "googlebooks": gb,
+        }
+        out[e.key] = rec
+        cdoi = cr[0]["doi"] if cr else "-"
+        gisbn = (gb[0]["isbn13"] or gb[0]["isbn10"]) if gb else "-"
+        print(
+            f"\n=== {e.key} ({e.type}) — local doi={e.fields.get('doi', '-')} isbn={e.fields.get('isbn', '-')}"
+        )
+        print(
+            f"    crossref[0]: doi={cdoi} | {cr[0]['title'][:60] if cr else '-'} | {cr[0]['author'][:40] if cr else ''} ({cr[0]['year'] if cr else ''})"
+        )
+        print(
+            f"    gbooks[0]:   isbn={gisbn} | {gb[0]['title'][:60] if gb else '-'} | {gb[0]['author'][:40] if gb else ''} ({gb[0]['year'] if gb else ''})"
+        )
+    (CACHE / "books").mkdir(parents=True, exist_ok=True)
+    (CACHE / "books" / "candidates.json").write_text(json.dumps(out, indent=2))
+    print(f"\n{len(out)} book-like entries; candidates -> cache/books/candidates.json")
+    return out
+
+
 # --- dispatch ------------------------------------------------------------------
 
 
@@ -288,6 +399,9 @@ def fetch_for_entry(entry, *, refresh: bool = False) -> dict:
 
 def main(argv: list[str]) -> int:
     refresh = "--refresh" in argv
+    if "--mode" in argv and argv[argv.index("--mode") + 1] == "books":
+        resolve_books(refresh=refresh)
+        return 0
     bib = "manuscript/references.bib"
     entries = load_bib(bib)
     found = notfound = noid = 0

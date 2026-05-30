@@ -4,7 +4,7 @@ READ-ONLY w.r.t. the manuscript. Produces:
   1. a human report on stdout, grouped by verdict;
   2. ``cache/report.json`` with full per-entry detail (verdict, source URL,
      canonical fields, substantive/minor/enrich diffs) and *proposed* exact
-     ``(old_line -> new_line)`` edits + the ``%@audit`` marker line.
+     ``(old_line -> new_line)`` edits + the ``% AUDIT`` marker line.
 
 Nothing here edits ``references.bib``. Application of the proposed edits happens
 separately, one at a time, through the Edit tool (exact string replacement that
@@ -60,7 +60,7 @@ def _replace_value_line(raw: str, field: str, new_value: str) -> tuple[str, str]
 
 def _marker(canon: dict, verdict: str) -> str:
     # NB: BibTeX does NOT treat % as a comment and scans for '@' to start entries,
-    # so marker lines must contain NO '@' (no '%@audit' prefix, no mailto e-mail).
+    # so marker lines must contain NO '@' (no '% AUDIT' prefix, no mailto e-mail).
     src = canon.get("url", "manual").replace("?mailto=wr286@cam.ac.uk", "")
     return f"% AUDIT v=1 date={TODAY} src={src} verdict={verdict}"
 
@@ -179,11 +179,11 @@ def summarize(report: list[dict]) -> None:
 
 
 def _has_marker_above(text: str, idx: int) -> bool:
-    """True if a %@audit marker is in the contiguous comment block above ``idx``."""
+    """True if a ``% AUDIT`` marker is in the contiguous comment block above ``idx``."""
     for ln in reversed(text[:idx].rstrip("\n").splitlines()):
         s = ln.lstrip()
         if s.startswith("%"):
-            if s.startswith("%@audit"):
+            if s.replace(" ", "").upper().startswith("%AUDIT"):
                 return True
         elif s == "":
             continue
@@ -214,8 +214,8 @@ def apply_all(report: list[dict], bib_path: str, *, dry_run: bool) -> dict:
     """Apply markers + journal/pages edits + enrichment via exact block replacement.
 
     Each entry's verbatim block is located (must be unique), edits applied to it,
-    the %@audit marker prepended, and the block swapped in. Entries that already
-    carry a %@audit marker are skipped (idempotent). Aborts a single entry on any
+    the % AUDIT marker prepended, and the block swapped in. Entries that already
+    carry a % AUDIT marker are skipped (idempotent). Aborts a single entry on any
     mismatch rather than guessing.
     """
     text = Path(bib_path).read_text(encoding="utf-8")
