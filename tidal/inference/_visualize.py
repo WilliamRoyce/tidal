@@ -664,7 +664,7 @@ def _render_anesthetic_corner_into(
     samples: object,
     param_names: list[str],
     *,
-    subplot_spec: object | None = None,
+    target_fig: object | None = None,
     labels: dict[str, str] | None = None,
     ticks: str | None = "inner",
     show_diagonal: bool = True,
@@ -673,12 +673,12 @@ def _render_anesthetic_corner_into(
     """Render a two-tone anesthetic corner plot.
 
     Used both by :func:`_plot_corner_anesthetic` (standalone full figure;
-    ``subplot_spec=None`` — anesthetic's ``plot_2d`` builds its own
+    ``target_fig=None`` — anesthetic's ``plot_2d`` builds its own
     Figure, preserving the standalone path bit-identically) and by the
-    cubed-sphere atlas (each face panel passes a
-    :class:`matplotlib.gridspec.SubplotSpec` covering one cell of the
-    atlas's outer 2 x N grid; the helper then explicitly builds axes via
-    :func:`anesthetic.make_2d_axes` so they live inside the parent grid).
+    cubed-sphere atlas (each face panel passes its matplotlib
+    :class:`~matplotlib.figure.SubFigure`; the helper then explicitly
+    builds axes via :func:`anesthetic.make_2d_axes` so they live inside
+    the SubFigure rather than in a fresh top-level Figure).
 
     The function does ONLY the minimal common core: invoke anesthetic
     plotting (with the degenerate-posterior fallbacks) and apply the
@@ -694,15 +694,17 @@ def _render_anesthetic_corner_into(
     param_names : list of str
         Column names in ``samples`` to plot, in the desired corner-plot
         order.
-    subplot_spec : SubplotSpec, optional
-        A matplotlib SubplotSpec cell to render into.  None means the
-        standalone path — ``samples.plot_2d(param_names)`` builds its
-        own figure (bit-identical to the pre-refactor behaviour).  When
-        provided, axes are built explicitly via
-        :func:`anesthetic.make_2d_axes` inside the spec.
+    target_fig : Figure or SubFigure, optional
+        A matplotlib Figure / SubFigure to render the axes into.  None
+        means the standalone path — ``samples.plot_2d(param_names)``
+        builds its own figure (bit-identical to the pre-refactor
+        behaviour).  When provided, axes are built explicitly via
+        :func:`anesthetic.make_2d_axes` inside ``target_fig`` (passed
+        through anesthetic's ``fig=`` fig_kw); the axes fill the entire
+        SubFigure.
     labels : dict, optional
         Mapping ``param_name -> LaTeX label`` for axis labels.  Only
-        consulted on the composable (subplot_spec) path; the standalone
+        consulted on the composable (target_fig) path; the standalone
         path uses anesthetic's defaults.
     ticks : {"inner", "outer", None}, optional
         Anesthetic ``ticks`` mode for the composable path.  ``None``
@@ -719,15 +721,62 @@ def _render_anesthetic_corner_into(
     Returns
     -------
     fig : Figure
-        The matplotlib Figure containing the rendered axes.
+        The matplotlib Figure / SubFigure containing the rendered axes.
     axes_df : AxesDataFrame
         The anesthetic axes DataFrame, suitable for further overlay
         operations (priors, MAP markers, log axes, etc.).
     """
     import numpy as np
 
-    if subplot_spec is not None:
-        # Composable path: axes live inside the caller's gridspec slot.
+    def _plot_with_fallback(axes_arg: object) -> object:
+        """Run ``samples.plot_2d`` with the degenerate-posterior fallbacks.
+
+        Two failure modes from anesthetic's KDE machinery on near-flat /
+        lower-dimensional posteriors:
+          - qhull Delaunay triangulation: 'singular input data'
+          - scipy gaussian_kde: 'singular data covariance matrix'
+        Both fall back to KDE diagonals + scatter cross-panels.
+        """
+        try:
+            return samples.plot_2d(axes_arg, label="68% / 95% CL")
+        except (RuntimeError, ValueError, np.linalg.LinAlgError) as e:
+            msg = str(e).lower()
+            if (
+                "qhull" not in msg
+                and "singular" not in msg
+                and "lower-dimensional" not in msg
+            ):
+                raise
+            try:
+                return samples.plot_2d(
+                    axes_arg,
+                    label="samples",
+                    kinds={
+                        "diagonal": "kde_1d",
+                        "lower": "scatter_2d",
+                        "upper": "scatter_2d",
+                    },
+                )
+            except (RuntimeError, ValueError, np.linalg.LinAlgError):
+                return samples.plot_2d(
+                    axes_arg,
+                    label="samples",
+                    kinds={
+                        "diagonal": "hist_1d",
+                        "lower": "scatter_2d",
+                        "upper": "scatter_2d",
+                    },
+                )
+
+    fig: object
+    axes_df: object
+    if target_fig is not None:
+        # Composable path: axes live inside the caller-provided figure
+        # (typically a SubFigure of an outer atlas grid).  Passing
+        # ``fig=target_fig`` to ``make_2d_axes`` short-circuits the
+        # ``plt.figure(**fig_kw)`` fallback at anesthetic plot.py:748,
+        # so the new axes are added to ``target_fig`` rather than a
+        # fresh hidden top-level Figure.
         from anesthetic import make_2d_axes
 
         fig, axes_df = make_2d_axes(
@@ -737,62 +786,25 @@ def _render_anesthetic_corner_into(
             lower=True,
             diagonal=show_diagonal,
             upper=False,
-            subplot_spec=subplot_spec,
+            fig=target_fig,
         )
-        axes_arg: object = axes_df
-        own_figure = False
+        _plot_with_fallback(axes_df)
+        if labels is not None:
+            # ``plot_2d`` overwrites the LaTeX labels set by
+            # ``make_2d_axes(labels=...)`` with the raw column names
+            # (anesthetic plot.py: AxesDataFrame.__init__ calls set_labels
+            # but plot_2d re-applies index/columns as labels).  Re-apply
+            # via the public ``set_labels`` method post-render.
+            axes_df.set_labels(labels)  # type: ignore[attr-defined]
     else:
         # Standalone path: bit-identical to the pre-refactor behaviour —
         # let anesthetic.plot_2d build its own figure and axes from the
-        # parameter list.  axes_arg is the list of names; the AxesDataFrame
-        # is extracted from the return value.
-        axes_arg = param_names
-        own_figure = True
-
-    # Degenerate-posterior fallback chain — mirrors the original
-    # _plot_corner_anesthetic logic.  Two failure modes from anesthetic's
-    # KDE machinery on near-flat / lower-dimensional posteriors:
-    #   - qhull Delaunay triangulation: 'singular input data'
-    #   - scipy gaussian_kde: 'singular data covariance matrix'
-    try:
-        ret = samples.plot_2d(axes_arg, label="68% / 95% CL")
-    except (RuntimeError, ValueError, np.linalg.LinAlgError) as e:
-        msg = str(e).lower()
-        if (
-            "qhull" not in msg
-            and "singular" not in msg
-            and "lower-dimensional" not in msg
-        ):
-            raise
-        try:
-            ret = samples.plot_2d(
-                axes_arg,
-                label="samples",
-                kinds={
-                    "diagonal": "kde_1d",
-                    "lower": "scatter_2d",
-                    "upper": "scatter_2d",
-                },
-            )
-        except (RuntimeError, ValueError, np.linalg.LinAlgError):
-            ret = samples.plot_2d(
-                axes_arg,
-                label="samples",
-                kinds={
-                    "diagonal": "hist_1d",
-                    "lower": "scatter_2d",
-                    "upper": "scatter_2d",
-                },
-            )
-
-    if own_figure:
-        # Extract fig + axes_df from anesthetic's return.  ``plot_2d``
-        # returns either ``(fig, axes_df)`` (older versions) or just the
-        # AxesDataFrame (>= 2.0) — in the latter case the figure is
-        # recoverable from any cell.
+        # parameter list.  Extract fig + axes_df from anesthetic's
+        # return value: either ``(fig, axes_df)`` (older versions) or
+        # just the AxesDataFrame (>= 2.0).
+        ret = _plot_with_fallback(param_names)
         if isinstance(ret, tuple) and len(ret) == 2:
-            fig = ret[0]
-            axes_df = ret[1]
+            fig, axes_df = ret[0], ret[1]
         else:
             axes_df = ret
             cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
@@ -860,7 +872,7 @@ def _plot_corner_anesthetic(
     fig, axes_df = _render_anesthetic_corner_into(
         samples,
         plot_params,
-        subplot_spec=None,
+        target_fig=None,
         labels=None,
         ticks="inner",
         show_diagonal=True,

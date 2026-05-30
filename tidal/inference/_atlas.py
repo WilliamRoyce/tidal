@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import json
 import logging
-import math
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -115,6 +114,28 @@ def _load_cell_samples(
     return samples
 
 
+def _load_cell_weights(cell_dir: Path) -> NDArray[np.float64] | None:
+    """Load the posterior ``weight`` column from one cell's ``results.csv``.
+
+    Nested-sampling chains have a ``weight`` column for posterior-weighted
+    plotting; MC chains do not.  Returns ``None`` when the column is
+    absent so the caller can fall back to uniform weights.
+    """
+    csv_path = cell_dir / "results.csv"
+    if not csv_path.exists():
+        return None
+    import csv
+
+    with csv_path.open() as f:
+        reader = csv.DictReader(f)
+        if reader.fieldnames is None or "weight" not in reader.fieldnames:
+            return None
+        weights = [float(row["weight"]) for row in reader]
+    if not weights:
+        return None
+    return np.asarray(weights, dtype=np.float64)
+
+
 def _physical_to_face_local(
     c: NDArray[np.float64],
     face_idx: int,
@@ -157,25 +178,32 @@ def _physical_to_face_local(
 # ----------------------------------------------------------------------
 
 
-def _grid_shape(faces: int) -> tuple[int, int]:
-    """Pick (rows, cols) close to square with rows * cols >= faces.
+def _grid_shape(n_dims: int) -> tuple[int, int]:
+    """``(rows, cols) = (2, n_dims)`` — top row positive faces, bottom row negative.
 
-    Hard-codes the supervisor's example layout for the most common cases.
+    Replaces the prior auto-sized layout.  The 2 x N grid puts the ``+k``
+    face of axis ``k`` at ``(row=0, col=k-1)`` and the ``-k`` face at
+    ``(row=1, col=k-1)``, so the up/down pair for each coupling axis is
+    vertically stacked in a single column.  Generalises across N (8
+    faces -> 2 x 4, 10 -> 2 x 5, 12 -> 2 x 6, 14 -> 2 x 7).
     """
-    layouts: dict[int, tuple[int, int]] = {
-        4: (2, 2),
-        6: (2, 3),
-        8: (2, 4),
-        10: (2, 5),
-        12: (3, 4),
-        14: (2, 7),
-        16: (4, 4),
-    }
-    if faces in layouts:
-        return layouts[faces]
-    rows = max(1, math.floor(math.sqrt(faces)))
-    cols = math.ceil(faces / rows)
-    return rows, cols
+    if n_dims < 2:
+        msg = f"n_dims must be >= 2; got {n_dims}"
+        raise ValueError(msg)
+    return 2, n_dims
+
+
+def _face_to_slot(face_idx: int) -> tuple[int, int]:
+    """``face_idx`` (1-indexed) -> ``(row, col)`` in the 2 x N layout.
+
+    Convention matches :func:`face_to_axis_sign`: face ``2k - 1`` is the
+    ``+k`` ("up") face -> ``(0, k - 1)``; face ``2k`` is the ``-k``
+    ("down") face -> ``(1, k - 1)``.
+    """
+    axis_one_indexed, sign = face_to_axis_sign(face_idx)
+    row = 0 if sign > 0 else 1
+    col = axis_one_indexed - 1
+    return row, col
 
 
 # ----------------------------------------------------------------------
@@ -188,17 +216,88 @@ def _render_face_panel(
     face_idx: int,
     chi: NDArray[np.float64] | None,
     n_dims: int,
+    weights: NDArray[np.float64] | None = None,
 ) -> None:
-    """Render one face panel: lower-triangle 2D histograms.
+    """Render one face panel via anesthetic — same visual style as the standalone corner plot.
 
-    Diagonal hidden, upper triangle blank, face label top-right.
+    Each panel is an ``(N-1) x (N-1)`` lower-triangle 2D KDE corner plot
+    of the face-local cube coordinates ``chi_1, ..., chi_{N-1}``, with
+    a 1D KDE marginal on the diagonal — two-tone Planck-blue fills
+    (``#aac8e9`` / ``#3877b8``) identical to the standalone per-face
+    corner plots.  Numeric tick marks are stripped (``ticks=None``) but
+    the LaTeX axis labels ``chi_i^{face↑/↓}`` are kept on the leftmost
+    column / bottom row to identify the face-local coordinate.  A
+    ``Face k↑`` / ``Face k↓`` text annotation is drawn in the panel's
+    upper-right whitespace.
+
+    Composability is via :func:`anesthetic.make_2d_axes`'s
+    ``subplot_spec`` argument, exposed through
+    :func:`tidal.inference._visualize._render_anesthetic_corner_into`.
     """
-    n_chi = n_dims - 1
-    axes = fig.subplots(n_chi, n_chi, sharex=False, sharey=False)
-    # Collapse axes to 2-D array for uniform indexing even when n_chi == 1.
-    axes = np.atleast_2d(axes)
+    from tidal.inference._visualize import _render_anesthetic_corner_into
 
+    n_chi = n_dims - 1
     fm = face_label_math(face_idx)
+
+    # Empty / sparse cells: draw an empty placeholder + face label and bail.
+    # anesthetic's KDE requires a non-trivial sample (>= ~5 finite points
+    # spanning at least 2D), and a face with no live tile would otherwise
+    # explode.
+    if chi is None or len(chi) < 5:
+        ax = fig.subplots(1, 1)
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(-1, 1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.text(
+            0.5,
+            0.5,
+            "(no samples)",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+            fontsize=8,
+            color="0.5",
+        )
+        fig.text(
+            0.99,
+            0.99,
+            rf"$\mathrm{{Face}}\ {fm}$",
+            ha="right",
+            va="top",
+            fontsize=10,
+        )
+        return
+
+    # Build an anesthetic Samples object over the face-local chi columns.
+    # Column names are kept legal-identifier (chi_1, ..., chi_{N-1}); the
+    # face-aware LaTeX labels are passed via the ``labels`` dict so they
+    # appear on the axes without polluting the underlying column index.
+    from anesthetic import MCMCSamples
+
+    col_names = [f"chi_{i + 1}" for i in range(n_chi)]
+    latex_labels = {col_names[i]: rf"$\chi_{{{i + 1}}}^{{{fm}}}$" for i in range(n_chi)}
+    data = {col_names[i]: chi[:, i] for i in range(n_chi)}
+    if weights is not None and len(weights) == len(chi):
+        # Drop columns to constructor + set weights post-hoc; anesthetic's
+        # MCMCSamples accepts a ``weights`` kwarg directly.
+        samples = MCMCSamples(data=data, weights=weights)
+    else:
+        samples = MCMCSamples(data=data)
+
+    # Render into the SubFigure passed in by the atlas driver.
+    # ``ticks=None`` strips numeric tick marks; the axis labels live in
+    # the ``labels`` mapping (face-aware LaTeX from face_label_math).
+    _render_anesthetic_corner_into(
+        samples,
+        col_names,
+        target_fig=fig,
+        labels=latex_labels,
+        ticks=None,
+        show_diagonal=True,
+        fill_two_tone=True,
+    )
+
     fig.text(
         0.99,
         0.99,
@@ -207,77 +306,6 @@ def _render_face_panel(
         va="top",
         fontsize=10,
     )
-
-    for i in range(n_chi):
-        for j in range(n_chi):
-            ax = axes[i, j]
-            if j > i or i == j:
-                ax.set_visible(False)
-                continue
-            if chi is None or len(chi) < 5:
-                ax.set_xlim(-1, 1)
-                ax.set_ylim(-1, 1)
-                ax.set_xticks([])
-                ax.set_yticks([])
-                continue
-            # Smoothed KDE contours on the [-1, 1]^2 face cube.
-            # Coarse 32-bin histogram then Gaussian-smoothed for
-            # robustness against sparse cells; renders as filled
-            # contours at the 68%/95% credible levels (cosmology
-            # convention — Planck/DES corner plots).
-            hist, _xe, _ye = np.histogram2d(
-                chi[:, j],
-                chi[:, i],
-                bins=32,
-                range=((-1.0, 1.0), (-1.0, 1.0)),
-            )
-            try:
-                from scipy.ndimage import gaussian_filter
-
-                smoothed = gaussian_filter(hist.T, sigma=1.2)
-            except ImportError:
-                smoothed = hist.T
-
-            total = smoothed.sum()
-            if total > 0:
-                flat = np.sort(smoothed.flatten())[::-1]
-                cumsum = np.cumsum(flat) / total
-                # Levels enclosing 68% and 95% of total density
-                idx68 = np.searchsorted(cumsum, 0.68)
-                idx95 = np.searchsorted(cumsum, 0.95)
-                lvl68 = flat[min(idx68, len(flat) - 1)]
-                lvl95 = flat[min(idx95, len(flat) - 1)]
-                levels = sorted({float(lvl95), float(lvl68), float(smoothed.max())})
-                if len(levels) >= 2:
-                    xcenters = np.linspace(-1.0, 1.0, smoothed.shape[1])
-                    ycenters = np.linspace(-1.0, 1.0, smoothed.shape[0])
-                    X, Y = np.meshgrid(xcenters, ycenters)
-                    ax.contourf(X, Y, smoothed, levels=levels, cmap="Blues", alpha=0.85)
-                    ax.contour(
-                        X,
-                        Y,
-                        smoothed,
-                        levels=levels,
-                        colors="k",
-                        linewidths=0.5,
-                        alpha=0.6,
-                    )
-            ax.set_xlim(-1, 1)
-            ax.set_ylim(-1, 1)
-            ax.set_xticks([])
-            ax.set_yticks([])
-
-    # LaTeX axis labels on the leftmost column and bottom row.
-    for i in range(n_chi):
-        ax = axes[i, 0]
-        if not ax.get_visible():
-            continue
-        ax.set_ylabel(rf"$\chi_{{{i + 2}}}^{{{fm}}}$", fontsize=8)
-    for j in range(n_chi):
-        ax = axes[n_chi - 1, j]
-        if not ax.get_visible():
-            continue
-        ax.set_xlabel(rf"$\chi_{{{j + 1}}}^{{{fm}}}$", fontsize=8)
 
 
 # ----------------------------------------------------------------------
@@ -346,8 +374,14 @@ def plot_atlas(
         )
         raise ValueError(msg)
 
-    # Pool by face.  Determine N from the first cell's metadata.
+    # Pool by face.  Determine N from the first cell's metadata.  Parallel
+    # ``by_face_weights`` carries the per-sample posterior weight column
+    # (when the chain has one) so the panel KDE is posterior-weighted —
+    # an unweighted KDE on a nested-sampling chain misrepresents the
+    # posterior because dead points carry exp(logZ) weights that vary by
+    # many orders of magnitude.
     by_face: dict[int, list[NDArray[np.float64]]] = {}
+    by_face_weights: dict[int, list[NDArray[np.float64]]] = {}
     n_dims: int | None = None
     for face_idx, _sub_tile, cell_dir in cells:
         meta = _load_cell_metadata(cell_dir)
@@ -398,6 +432,9 @@ def plot_atlas(
 
         chi = _physical_to_face_local(c, face_idx, Q)
         by_face.setdefault(face_idx, []).append(chi)
+        w = _load_cell_weights(cell_dir)
+        if w is not None and len(w) == len(c):
+            by_face_weights.setdefault(face_idx, []).append(w)
 
     if n_dims is None:
         msg = (
@@ -407,7 +444,17 @@ def plot_atlas(
         raise ValueError(msg)
 
     n_faces_total = n_faces(n_dims)
-    rows, cols = _grid_shape(n_faces_total)
+    rows, cols = _grid_shape(n_dims)
+
+    # Seed numpy's legacy RNG so KDE sample-compression in anesthetic
+    # (anesthetic.utils.triangular_sample_compression_2d uses bare
+    # `np.random.choice` without a Generator) is deterministic across
+    # renders.  Without this, repeated atlas renders of the same survey
+    # produce pixel-different output, which is bad for review diffs.
+    # The legacy global API is required here because anesthetic does not
+    # accept an RNG / Generator handle to thread through; NPY002 cannot
+    # be addressed at this layer.
+    np.random.seed(0)  # noqa: NPY002
 
     # Layout figure.
     panel_in = 1.6  # inches per face panel; gives ~5x6 inch atlas for N=6
@@ -418,14 +465,19 @@ def plot_atlas(
     subfigs = np.atleast_2d(subfigs)
 
     for face_idx in range(1, n_faces_total + 1):
-        slot = face_idx - 1  # 0-indexed slot in the grid
-        r = slot // cols
-        c_idx = slot % cols
+        # 2 x N up/down layout: face 2k - 1 -> (row=0, col=k-1) (positive
+        # axis); face 2k -> (row=1, col=k-1) (negative axis).  See
+        # _face_to_slot for details.
+        r, c_idx = _face_to_slot(face_idx)
         sub = subfigs[r, c_idx]
         chunks = by_face.get(face_idx)
         chi: NDArray[np.float64] | None
         chi = np.concatenate(chunks, axis=0) if chunks else None
-        _render_face_panel(sub, face_idx, chi, n_dims)
+        weights = by_face_weights.get(face_idx)
+        w_arr: NDArray[np.float64] | None = (
+            np.concatenate(weights, axis=0) if weights else None
+        )
+        _render_face_panel(sub, face_idx, chi, n_dims, weights=w_arr)
 
     fig.savefig(output_path, bbox_inches="tight", dpi=150)
     if show:

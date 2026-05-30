@@ -107,17 +107,26 @@ def test_physical_to_face_local_handles_random_q() -> None:
 
 
 @pytest.mark.parametrize(
-    ("faces", "expected"),
-    [(4, (2, 2)), (6, (2, 3)), (8, (2, 4)), (10, (2, 5)), (12, (3, 4))],
+    ("n_dims", "expected"),
+    [(2, (2, 2)), (3, (2, 3)), (4, (2, 4)), (5, (2, 5)), (6, (2, 6)), (7, (2, 7))],
 )
-def test_grid_shape_known_layouts(faces: int, expected: tuple[int, int]) -> None:
-    assert _grid_shape(faces) == expected
+def test_grid_shape_is_2_by_n(n_dims: int, expected: tuple[int, int]) -> None:
+    """2 x N up/down layout — top row positive faces, bottom row negative."""
+    assert _grid_shape(n_dims) == expected
 
 
-def test_grid_shape_generic_covers_all_faces() -> None:
-    for f in (2, 18, 20, 22):
-        rows, cols = _grid_shape(f)
-        assert rows * cols >= f
+def test_grid_shape_rejects_n_dims_below_2() -> None:
+    with pytest.raises(ValueError, match="n_dims must be >= 2"):
+        _grid_shape(1)
+
+
+def test_face_to_slot_up_down_columns() -> None:
+    """Face 2k - 1 (positive axis k) -> (0, k - 1); face 2k -> (1, k - 1)."""
+    from tidal.inference._atlas import _face_to_slot
+
+    for k in range(1, 7):
+        assert _face_to_slot(2 * k - 1) == (0, k - 1)
+        assert _face_to_slot(2 * k) == (1, k - 1)
 
 
 # ----------------------------------------------------------------------
@@ -227,6 +236,79 @@ def test_plot_atlas_handles_partial_coverage(tmp_path: Path) -> None:
     result = plot_atlas(survey_dir, out_pdf)
     assert result == out_pdf
     assert out_pdf.exists()
+
+
+def test_render_face_panel_uses_no_matplotlib_histogram(tmp_path: Path) -> None:
+    """Regression: the panel renderer must not fall back to the
+    pre-refactor ``np.histogram2d`` + ``contourf`` path.  Atlas now goes
+    through ``_render_anesthetic_corner_into`` so panels match the
+    standalone corner plot style (two-tone fills + diagonal marginals).
+    """
+    import re
+    from pathlib import Path as _Path
+
+    src = _Path(
+        "/workspaces/torsion-gertsenshtein/tidal/inference/_atlas.py",
+    ).read_text(encoding="utf-8")
+    # Strip docstrings + comments so the check looks at actual call sites only.
+    code_only = re.sub(r'""".*?"""', "", src, flags=re.DOTALL)
+    code_only = re.sub(r"#.*", "", code_only)
+    assert "histogram2d" not in code_only, (
+        "_atlas.py contains a histogram2d call — refactor regressed to "
+        "the manual matplotlib path"
+    )
+    assert "contourf" not in code_only, (
+        "_atlas.py contains a contourf call — atlas should render via "
+        "anesthetic's KDE pipeline, not raw matplotlib contours"
+    )
+    assert "gaussian_filter" not in code_only, (
+        "_atlas.py contains a scipy.ndimage.gaussian_filter call — "
+        "atlas should defer KDE smoothing to anesthetic"
+    )
+
+
+def test_plot_atlas_calls_helper_with_ticks_none(tmp_path: Path) -> None:
+    """Atlas panels must call the composable helper with ``ticks=None``
+    so numeric tick labels are suppressed (the face-local LaTeX axis
+    labels remain).  We mock-patch the helper to capture its kwargs.
+    """
+    n = 3
+    names = ("a", "b", "c")
+    Q = np.eye(n)
+    survey_dir = tmp_path / "survey"
+    survey_dir.mkdir()
+    for face_idx, sub_tile in enumerate_cells(n_dims=n, M=1):
+        cd = survey_dir / cell_label(face_idx, sub_tile)
+        _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
+
+    import tidal.inference._visualize as _viz
+
+    real_helper = _viz._render_anesthetic_corner_into
+    seen_kwargs: list[dict[str, object]] = []
+
+    def _spy(*args: object, **kwargs: object) -> object:
+        seen_kwargs.append(dict(kwargs))
+        return real_helper(*args, **kwargs)  # type: ignore[arg-type]
+
+    _viz._render_anesthetic_corner_into = _spy  # type: ignore[attr-defined]
+    try:
+        plot_atlas(survey_dir, survey_dir / "atlas.pdf")
+    finally:
+        _viz._render_anesthetic_corner_into = real_helper  # type: ignore[attr-defined]
+
+    # The helper should have been called at least once per face (6 for N=3).
+    assert len(seen_kwargs) >= n_faces(n)
+    # Every call must have ticks=None and target_fig set (composable path).
+    for kw in seen_kwargs:
+        assert kw["ticks"] is None
+        assert kw["target_fig"] is not None
+        # Face-aware LaTeX labels must be wired in.
+        labels = kw["labels"]
+        assert isinstance(labels, dict)
+        for v in labels.values():
+            assert isinstance(v, str)
+            assert "\\chi" in v
+            assert "\\uparrow" in v or "\\downarrow" in v
 
 
 def test_plot_atlas_rejects_empty_dir(tmp_path: Path) -> None:
