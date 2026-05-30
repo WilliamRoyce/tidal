@@ -10,7 +10,7 @@
 % (d) cross-refs the Hamiltonian-obstruction discussion in
 % \cref{PerturbativeReduction} and the perturbative-reduction pipeline in
 % \cref{LPSSubstitution}. The Fourier modal solver receives the
-% longest treatment because it is the primary backend; the others are
+% longest treatment because it is the primary solver; the others are
 % documented briefly.
 
 \section{Numerical evolution of the linearised system}%
@@ -22,12 +22,12 @@ evolves the linearised fields on a Cartesian sampling grid,
 supporting both flat and curved spacetime metrics. The grid and
 field-container design draws on the \pypde{}
 framework~\cite{zwicker2020pypde}. \TIDAL{} provides common
-infrastructure and a dispatcher that selects
-among several solver backends from the algebraic structure of the
+infrastructure and a selector that chooses
+among several solvers from the algebraic structure of the
 equation system. \Cref{Results} uses the Fourier modal solver
 of~\cref{ModalSolver}.
 
-\paragraph*{Solver selection hierarchy} The solver-backend family is
+\paragraph*{Solver selection hierarchy} The solver family is
 heterogeneous because the equation systems \TIDAL{} handles span
 differential--algebraic (DAE), pure-wave, and spatially-varying-background
 regimes. DAEs from gauge sectors require simultaneous
@@ -35,8 +35,8 @@ algebraic-and-differential solution~\cite{henneaux1992quantization};
 pure wave systems admit explicit symplectic integration; and
 time-independent systems on periodic boundaries are eligible for the
 spectral modal solver. The
-dispatcher~(\cref{SolverDispatchFlowchart}) selects the first applicable
-backend from the ordered rules:
+selector~(\cref{SolverDispatchFlowchart}) chooses the first applicable
+solver from the ordered rules:
 \begin{enumerate}
   \item \textbf{Modal} when the metric is flat ($\sqrt{|g|}$ is unity), the spatial boundaries are
     all periodic, and the coefficients are time-independent;
@@ -53,18 +53,18 @@ backend from the ordered rules:
     BDF~\cite{gardner2022sundials,hindmarsh2005sundials}) when the
     system is a pure second-order wave.
 \end{enumerate}
-The leapfrog (\cref{OtherBackends}) and \SciPy{} backends are opt-in only.
+The leapfrog (\cref{OtherBackends}) and \SciPy{} solvers are opt-in only.
 % via \lstinline!--scheme leapfrog! and
-%\lstinline!--scheme scipy!.%; the dispatcher never auto-selects them.
+%\lstinline!--scheme scipy!.%; the selector never auto-selects them.
 
-% Figure C.0 — Solver dispatch flowchart.
+% Figure C.0 — Solver selection flowchart.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/solver_flowchart}
-  \caption{Auto-selection decision tree for the \TIDAL{} solver
-    dispatcher \lstinline!_resolve_scheme!. Decisions are
+  \caption{Selection decision tree for the \TIDAL{} solver
+    selector \lstinline!_resolve_scheme!. Decisions are
     evaluated against the equation specification and grid; leaves
-    are the available backends. The dispatcher traverses the
+    are the available solvers. The selector traverses the
     tree left-to-right and returns the first acceptable leaf.}
   \label{SolverDispatchFlowchart}
 \end{figure*}
@@ -111,8 +111,8 @@ set by the time-derivative order of its equation of motion:
 \paragraph*{Equation specification and evaluator}
 The equations of motion come from the JSON specification (\cref{JSONExample})
 produced by~\cref{SymbolicComputation}. At each call the evaluator
-parameter-resolves the coefficients, dispatches each operator to its
-implementation, and assembles the backend's callable.
+parameter-resolves the coefficients, applies each operator using its
+implementation, and assembles the solver's callable.
 
 \paragraph*{Velocity form versus canonical phase space}
 The kinetic matrix $K_{ij}$ is the Hessian of the linearised
@@ -142,7 +142,7 @@ whose symbolic size grows factorially with the number of fields.
 Keeping the velocity form $(q, v)$ instead passes $K$ directly to the
 solver, with no inversion. (ii) The same flat-state representation
 accommodates wave, first-order, and constraint fields, so every
-backend sees a single residual function $F(t, y, \dot y) = 0$ or
+solver sees a single residual function $F(t, y, \dot y) = 0$ or
 $\dot y = f(t, y)$.
 (iii) It is well-defined even when the kinetic matrix is singular.
 A singular $K$ signals that the field variables in
@@ -157,7 +157,7 @@ Dirac--Bergmann constraint analysis of~\cref{DiracBergmann}.
 % captured by a frozen \lstinline!StateLayout! dataclass, with each
 % component carrying a \lstinline!slot_kind! discriminator from
 % the categories above. A \lstinline!FieldSet! view wraps the flat state so that evaluator
-% and backend code can address each field by name.
+% and solver code can address each field by name.
 
 \paragraph*{Coefficient evaluator} Each right-hand-side term carries an
 \xAct{} symbolic coefficient,
@@ -523,7 +523,7 @@ the Nyquist mode oscillates faster at finer resolution.
   \label{fig:NyquistEnergy}
 \end{figure}
 
-\subsection{Other backends}%
+\subsection{Other solvers}%
 \label{OtherBackends}
 
 \paragraph*{Pseudo-spectral evaluation}
@@ -531,7 +531,7 @@ When a system is ineligible for the modal solver
 of~\cref{ModalSolver} but still has periodic spatial boundaries,
 \TIDAL{} provides a
 \emph{pseudo-spectral} path that the
-step-based backends
+step-based solvers
 %(\IDA{}, \CVODE{}, leapfrog, \SciPy{})
 can use: spatial operators are applied as Fourier
 multipliers,%~\cite{burns2020dedalus},
@@ -545,9 +545,9 @@ FD-stencil dispersion relation $k_{\rm mod}^2 = -(2/\Delta x^2)(1 -
 generalisations~\cite{fornberg1988generation} at higher orders) for
 the FD path, so the constraint solution is spectrally consistent with
 the spatial operators used during evolution.}
-while the time evolution is driven by the chosen backend.
+while the time evolution is driven by the chosen solver.
 % \footnote{The path is auto-enabled in every
-% solver backend except \IDA{}, whose Newton iteration uses a sparse
+% solver except \IDA{}, whose Newton iteration uses a sparse
 % linear solver to factor the DAE Jacobian $\partial F/\partial y$: the
 % FD stencils produce a banded Jacobian that the sparse
 % factoring exploits, whereas the spectral path produces a dense
@@ -560,7 +560,7 @@ round-off floor by $N\approx 32$, while the FD orders display the
 predicted algebraic rates.
 
 \paragraph*{\IDA{} --- differential--algebraic equations}
-The \IDA{} backend is the implicit differential--algebraic
+The \IDA{} solver is the implicit differential--algebraic
 solver from \SUNDIALS{}~\cite{gardner2022sundials,hindmarsh2005sundials}, accessed via
 \lstinline!scikit-sundae!~\cite{randall2024skitsundae}.
 \IDA{} integrates a residual form $F(t, y, y') = 0$
@@ -569,7 +569,7 @@ solver from \SUNDIALS{}~\cite{gardner2022sundials,hindmarsh2005sundials}, access
 \TIDAL{} populates with $F_i = y_i'- R_i(y)$ for
 dynamical fields (with $R_i$ the EL right-hand side),
 and with $F_i = R_i(y)$ for constraint fields, so that both classes are
-handled simultaneously. \IDA{} is the only \TIDAL{} backend that
+handled simultaneously. \IDA{} is the only \TIDAL{} solver that
 solves algebraic constraints at run time: the constraint residual
 rows $F_i = R_i(y)$ above are carried in the same Newton iteration as
 the differential ones. The Newton iteration needs the Jacobian
@@ -579,7 +579,7 @@ $F$, but \TIDAL{} supplies an analytical version
 (\cref{AnalyticalJacobian}) to avoid that overhead.
 
 \paragraph*{\CVODE{} --- adaptive ODE} The \CVODE{}
-backend wraps the \SUNDIALS{} ordinary-differential-equation solver of
+solver wraps the \SUNDIALS{} ordinary-differential-equation solver of
 the same name~\cite{gardner2022sundials,hindmarsh2005sundials} through
 \lstinline!scikit-sundae!~\cite{randall2024skitsundae}.
 % , and is
@@ -595,7 +595,7 @@ problems~\cite{hairer1996ode2}) and the Adams family
 % route to \IDA{} instead.
 
 \paragraph*{Leapfrog --- symplectic St\"ormer--Verlet and Yoshida}
-The leapfrog backend implements two symplectic integrators. The first
+The leapfrog solver implements two symplectic integrators. The first
 is the second-order St\"ormer--Verlet
 scheme~\cite{verlet1967computer,hairer2006geometric}.
 % , with a single force evaluation per timestep.
@@ -618,10 +618,10 @@ times~\cite{hairer2006geometric}. It is opt-in via
 the dominant concern.
 
 \paragraph*{\SciPy{} --- general-purpose adaptive ODE} The \SciPy{}
-backend wraps \lstinline!scipy.integrate.solve_ivp!~\cite{virtanen2020scipy},
+solver wraps \lstinline!scipy.integrate.solve_ivp!~\cite{virtanen2020scipy},
 with a default method of DOP853 (an eighth-order embedded
 Runge--Kutta scheme~\cite{dormand1980runge,hairer1993ode1}). On smooth non-stiff problems DOP853 can beat adaptive BDF, since
-BDF's per-step implicit solve is only useful for stiff problems. Like leapfrog, the \SciPy{} backend is opt-in only.
+BDF's per-step implicit solve is only useful for stiff problems. Like leapfrog, the \SciPy{} solver is opt-in only.
 
 \subsection{Initial-condition preparation}%
 \label{ICPreparation}
@@ -638,9 +638,9 @@ solving the constraints for the constraint-slot
 values, producing a self-consistent initial state. The
 \lstinline!ensure_consistent_ic! function performs this projection
 once, after the initial condition is assembled and before the chosen
-backend is invoked.
+solver is invoked.
 
-\paragraph*{Three-tier solver} The dispatcher \lstinline!_select_method!
+\paragraph*{Three-tier solver} The selector \lstinline!_select_method!
 chooses the fastest applicable solver tier for projection.
 The first tier handles the case in which
 all boundaries are periodic and the constraint coefficients are
@@ -671,7 +671,7 @@ choice cancels in any gauge-invariant quantity.
 \subsection{Analytical Jacobian}%
 \label{AnalyticalJacobian}
 
-\paragraph*{Motivation} The implicit backends \IDA{} and
+\paragraph*{Motivation} The implicit solvers \IDA{} and
 \CVODE{} both rely on a Jacobian matrix $J = \partial F/\partial y +
 c_j\,\partial F/\partial y'$ to drive the Newton iteration of each
 backward-differentiation step. FD approximation of
@@ -721,7 +721,7 @@ interface~\cite{gardner2022sundials,hindmarsh2005sundials}.
   \label{fig:AnalyticalJacobianSpeedup}
 \end{figure*}
 
-\paragraph*{Three-tier dispatch} The analytical-Jacobian path
+\paragraph*{Three-tier selection} The analytical-Jacobian path
 maintains three tiers, selected on the total state-vector size $N$: a
 dense tier for $N\le2{,}000$, a sparse tier for
 $2{,}000<N\le200{,}000$, and a matrix-free tier for $N>200{,}000$. The dense tier
@@ -735,7 +735,7 @@ CSC data buffer with a fixed sparsity
 pattern, which \SUNDIALS{} factors with
 SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu}.
 % ; this yields
-% a measurable speedup for both backends, larger for \IDA{}
+% a measurable speedup for both solvers, larger for \IDA{}
 % (heavier per-step Jacobian cost) than for \CVODE{}.
 The matrix-free tier supplies an analytical
 Jacobian--vector product callback $J\,v = (\partial F/\partial y)\,v +
@@ -794,7 +794,7 @@ in operator-matrix construction.
 % used by the energy diagnostic, and the mass and coupling matrices
 % used by the modal solver.
 
-% \paragraph*{Output} Every backend produces simulation data in a
+% \paragraph*{Output} Every solver produces simulation data in a
 % uniform format that downstream measurement and analysis subcommands
 % operate on directly, so that runs can be re-analysed without
 % re-reading the original \xAct{} session.

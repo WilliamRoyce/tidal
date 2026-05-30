@@ -40,7 +40,7 @@
     $|P_\mathrm{final}^\mathrm{sim} - P_\mathrm{RS}|$ --- the residual
     against the two-mode prediction \cref{TwoModeRabi} with the
     corrected detuning --- at the regime point $\Bzero = 0.1275$ for
-    four backends. Modal and \CVODE{} reach a plateau of
+    four solvers. Modal and \CVODE{} reach a plateau of
     $\sim 4\times 10^{-8}$ across $N$, of the same order as the
     $(\Delta/g)^4 \sim 10^{-8}$ next-order truncation; leapfrog
     Yoshida-2 converges monotonically toward this plateau under grid
@@ -237,22 +237,22 @@ continuum equivalence is recovered under the map
 $m_T^2 = +2\alpha_3$. The two formulations agree on observables at
 the IEEE double-precision round-off floor.
 
-\paragraph*{Multi-method agreement across backends and measurement paths}
-We cross-check pairwise agreement between each applicable \TIDAL{} backend (see \cref{NumericalEvolution})
+\paragraph*{Multi-method agreement across solvers and measurement paths}
+We cross-check pairwise agreement between each applicable \TIDAL{} solver (see \cref{NumericalEvolution})
 on the
 EM baseline of \cref{GertsenshteinFormula} and on a
 gradient-coupled scalar pair model~\cite{raffelt1988mixing}. \Cref{MultiMethod} displays
-the backend-pair heatmaps; all backends agree within their default
+the solver-pair heatmaps; all solvers agree within their default
 integration tolerances.
 
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_multi_method}
-  \caption{Multi-method agreement across solver backends. Pairwise
+  \caption{Multi-method agreement across solvers. Pairwise
     $\Pmax$ relative-difference heatmaps on the Einstein--Maxwell
     Gertsenshtein baseline (left) and the gradient-coupled scalar
     Raffelt--Stodolsky mixing model~\cite{raffelt1988mixing} (right). Cells encode
-    $|P_a - P_b|/\max(|P_a|, |P_b|)$ between backend pairs $(a, b)$.}
+    $|P_a - P_b|/\max(|P_a|, |P_b|)$ between solver pairs $(a, b)$.}
   \label{MultiMethod}
 \end{figure*}
 
@@ -264,7 +264,7 @@ algebraic rates and the pseudo-spectral path falls to the round-off
 floor~\cite{fornberg1988generation,burns2020dedalus}.
 \Cref{ConvergenceFigure}(a) reproduces the free Proca dispersion relation
 $\omega(k) = \sqrt{k^2 + m^2}$; \cref{ConvergenceFigure}(b) reports
-time-integration convergence for the symplectic backends, where
+time-integration convergence for the symplectic solvers, where
 Yoshida-2 recovers its formal slope to four-figure precision
 ($\hat{\alpha} = 2.00$, $R^2 = 1.000$). Yoshida-4 also decreases under $\Delta t$ refinement but with
 reproducible non-power-law scatter across the $\Delta t$ sweep
@@ -280,7 +280,7 @@ $\Delta t$.
 The residual Yoshida-4 pathology is reproducible but still
 uncharacterised.
 % ; the production runs in this paper use the
-% auto-selected modal backend, so this scatter does not affect any
+% auto-selected modal solver, so this scatter does not affect any
 % of the survey results.
 
 \begin{figure*}[t]
@@ -326,8 +326,8 @@ relevance to the \cref{Results} campaigns.
 Successful examples
 cluster at $\sim 10^{-15}$, near $\varepsilon_\mathrm{mach}$ of the
 modal solver. The precision floor of each row in
-\cref{ConservationAudit} is set by the backend the dispatcher
-selects, which differs across theories.
+\cref{ConservationAudit} is set by the solver chosen for that
+theory, which differs across theories.
 
 \begin{table}[h]
   \centering
