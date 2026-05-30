@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -343,6 +344,91 @@ def resolve_books(*, refresh: bool = False) -> dict:
     return out
 
 
+# --- abstract pre-fetch (Task 2 Stage 2; primes cache so parallel agents do no network) -
+
+_TAG = re.compile(r"<[^>]+>")
+
+
+def arxiv_abstract(arxiv_id: str, *, refresh: bool = False) -> dict:
+    ident = f"arxiv_{arxiv_id}"
+    cached = None if refresh else _load_cache("abstracts", ident)
+    if cached is not None:
+        return cached
+    url = f"http://export.arxiv.org/api/query?id_list={urllib.parse.quote(arxiv_id)}&max_results=1"
+    r = _get(url)
+    if r is None or r.status_code != 200:
+        return {"found": False, "transient": True, "ident": ident}
+    m = re.search(r"<summary>(.*?)</summary>", r.text, re.DOTALL)
+    t = re.search(r"<title>(.*?)</title>", r.text, re.DOTALL)
+    abs = _TAG.sub(" ", m.group(1)).strip() if m else ""
+    payload = {
+        "found": bool(abs),
+        "ident": ident,
+        "source": f"arxiv:{arxiv_id}",
+        "title": (t.group(1).strip() if t else ""),
+        "abstract": " ".join(abs.split()),
+    }
+    _save_cache("abstracts", ident, payload)
+    return payload
+
+
+def crossref_abstract(doi: str, *, refresh: bool = False) -> dict:
+    ident = f"doi_{doi}"
+    cached = None if refresh else _load_cache("abstracts", ident)
+    if cached is not None:
+        return cached
+    url = (
+        "https://api.crossref.org/works/"
+        + urllib.parse.quote(doi, safe="")
+        + "?mailto=wr286@cam.ac.uk"
+    )
+    r = _get(url, accept="application/json")
+    if r is None or r.status_code not in {200, 404}:
+        return {"found": False, "transient": True, "ident": ident}
+    if r.status_code == 404:
+        payload = {"found": False, "ident": ident, "source": f"doi:{doi}"}
+        _save_cache("abstracts", ident, payload)
+        return payload
+    msg = r.json().get("message", {})
+    abs_raw = msg.get("abstract", "")
+    abs_txt = " ".join(_TAG.sub(" ", abs_raw).split())
+    payload = {
+        "found": bool(abs_txt),
+        "ident": ident,
+        "source": f"doi:{doi}",
+        "title": (msg.get("title") or [""])[0],
+        "abstract": abs_txt,
+    }
+    _save_cache("abstracts", ident, payload)
+    return payload
+
+
+def prefetch_abstracts(*, refresh: bool = False) -> dict:
+    """Serial abstract pre-fetch for tier-B (arXiv) and tier-C (DOI) keys, from the
+    Stage-1 worklist. Tier A reads offline literature/; D/E have no abstract source.
+    """
+    wl = json.loads((CACHE / "cites_worklist.json").read_text())
+    got = miss = 0
+    for w in wl["keys"]:
+        if w["tier"] == "B" and w.get("eprint"):
+            p = arxiv_abstract(w["eprint"].strip(), refresh=refresh)
+        elif w["tier"] == "C" and w.get("doi"):
+            p = crossref_abstract(w["doi"].strip(), refresh=refresh)
+        else:
+            continue
+        if p.get("found"):
+            got += 1
+        else:
+            miss += 1
+        print(
+            f"  {w['key']:38s} {w['tier']} {'OK' if p.get('found') else 'no-abstract/' + ('transient' if p.get('transient') else 'none')}"
+        )
+    print(
+        f"\nabstracts: {got} fetched, {miss} missing (tier B+C); A reads offline, D/E none"
+    )
+    return {"got": got, "miss": miss}
+
+
 # --- dispatch ------------------------------------------------------------------
 
 
@@ -399,9 +485,14 @@ def fetch_for_entry(entry, *, refresh: bool = False) -> dict:
 
 def main(argv: list[str]) -> int:
     refresh = "--refresh" in argv
-    if "--mode" in argv and argv[argv.index("--mode") + 1] == "books":
-        resolve_books(refresh=refresh)
-        return 0
+    if "--mode" in argv:
+        mode = argv[argv.index("--mode") + 1]
+        if mode == "books":
+            resolve_books(refresh=refresh)
+            return 0
+        if mode == "abstracts":
+            prefetch_abstracts(refresh=refresh)
+            return 0
     bib = "manuscript/references.bib"
     entries = load_bib(bib)
     found = notfound = noid = 0
