@@ -86,7 +86,7 @@ lookup_theory() {
       JSON_PATH="examples/data/torsion_gertsenshtein_general_nonminimal.json"
       NDIM=5
       FACES=10
-      RANKS=4           # Slot S2: 10 * 4 = 40 cores
+      RANKS=11          # Solo fresh: 10 * 11 = 110 cores (one chain per face, single-theory slot)
       BSM_NAMES="beta1,beta2,beta3,xi,delta1"
       PARAMS_PIN="--param chi=0.0 --param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0"
       ;;
@@ -94,7 +94,7 @@ lookup_theory() {
       JSON_PATH="examples/data/torsion_gertsenshtein_general_nonminimal.json"
       NDIM=6
       FACES=12
-      RANKS=6           # Smart-pack resume: T5.1 (12*6=72) + T5.0 (10*4=40) = 112 cores exactly
+      RANKS=9           # Solo fresh: 12 * 9 = 108 cores
       BSM_NAMES="beta1,beta2,beta3,xi,delta1,chi"
       PARAMS_PIN="--param zeta1=0.0 --param zeta2=0.0 --param zeta3=0.0"
       ;;
@@ -168,6 +168,29 @@ launch_face() {
   local resume_flag=()
   if [[ "${TIDAL_READ_RESUME:-0}" == "1" ]]; then
     resume_flag=(--read-resume)
+  fi
+
+  # Optional FRESH mode: if TIDAL_FRESH=1, delete the existing _chains/ dir
+  # for this face so PolyChord starts from scratch (prevents
+  # --read-resume from silently kicking in and avoids stale-state hangs).
+  # Use case: prior resume attempts left chains stuck in re-verification.
+  if [[ "${TIDAL_FRESH:-0}" == "1" ]]; then
+    # face_label_tile<sub> dir; tidal sample writes into a child dir whose
+    # name depends on the cubed_sphere face label — easier to wipe the whole
+    # outdir/<face_label>* glob safely (only matches this theory's tiles).
+    local face_label
+    case "${face}" in
+      1) face_label="01p" ;; 2) face_label="01m" ;;
+      3) face_label="02p" ;; 4) face_label="02m" ;;
+      5) face_label="03p" ;; 6) face_label="03m" ;;
+      7) face_label="04p" ;; 8) face_label="04m" ;;
+      9) face_label="05p" ;; 10) face_label="05m" ;;
+      11) face_label="06p" ;; 12) face_label="06m" ;;
+      *) face_label="" ;;
+    esac
+    if [[ -n "${face_label}" ]]; then
+      rm -rf "${outdir}/${face_label}_tile${sub}"
+    fi
   fi
 
   # shellcheck disable=SC2086
