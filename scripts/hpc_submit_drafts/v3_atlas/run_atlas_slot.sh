@@ -134,6 +134,27 @@ build_sub_string() {
   printf '%s' "$sub"
 }
 
+# ─── Face list override per theory ──────────────────────────────────────────
+# Default: launch faces 1..FACES (whole atlas).  Set TIDAL_FACES_<TAG_UPPER>
+# to a space-separated list to run only a subset — e.g.
+#   TIDAL_FACES_T5_0="1 2 3 4 6"
+# launches only the incomplete face indices and skips the converged ones.
+# Use case: an earlier slot left some chains with inference.json (done) and
+# some still incomplete; reschedule only the incomplete ones in this slot.
+
+get_face_list() {
+  local tag="$1"
+  # bash ${var^^} → uppercase; e.g. t5_0 → T5_0
+  local tag_upper="${tag^^}"
+  local env_var="TIDAL_FACES_${tag_upper}"
+  local list="${!env_var:-}"
+  if [[ -n "${list}" ]]; then
+    echo "${list}"
+  else
+    seq 1 "${FACES}"
+  fi
+}
+
 # ─── Common physics flags (uniform-field v3 geometry) ────────────────────────
 COMMON_PHYS=(
   --baseline-formula 'sin(kappa*B0*t_end/2)**2'
@@ -162,35 +183,32 @@ launch_face() {
   local nlive=$((25 * NDIM))
   local num_repeats=$((2 * NDIM))
 
-  # Optional resume: if TIDAL_READ_RESUME env var is set to 1, append
-  # --read-resume so PolyChord picks up from the existing .resume
-  # checkpoint in <outdir>/<face_label>_tile<sub>/_chains/tidal.resume.
-  local resume_flag=()
-  if [[ "${TIDAL_READ_RESUME:-0}" == "1" ]]; then
-    resume_flag=(--read-resume)
+  # Compute face_label (psalter convention: 01p=face 1, 01m=face 2, ...)
+  local face_label
+  case "${face}" in
+    1) face_label="01p" ;; 2) face_label="01m" ;;
+    3) face_label="02p" ;; 4) face_label="02m" ;;
+    5) face_label="03p" ;; 6) face_label="03m" ;;
+    7) face_label="04p" ;; 8) face_label="04m" ;;
+    9) face_label="05p" ;; 10) face_label="05m" ;;
+    11) face_label="06p" ;; 12) face_label="06m" ;;
+    *) face_label="" ;;
+  esac
+  local face_dir="${outdir}/${face_label}_tile${sub}"
+
+  # Optional FRESH mode: if TIDAL_FRESH=1, delete this face's chain dir so
+  # PolyChord starts from scratch (defends against stale .resume hangs).
+  if [[ "${TIDAL_FRESH:-0}" == "1" && -n "${face_label}" ]]; then
+    rm -rf "${face_dir}"
   fi
 
-  # Optional FRESH mode: if TIDAL_FRESH=1, delete the existing _chains/ dir
-  # for this face so PolyChord starts from scratch (prevents
-  # --read-resume from silently kicking in and avoids stale-state hangs).
-  # Use case: prior resume attempts left chains stuck in re-verification.
-  if [[ "${TIDAL_FRESH:-0}" == "1" ]]; then
-    # face_label_tile<sub> dir; tidal sample writes into a child dir whose
-    # name depends on the cubed_sphere face label — easier to wipe the whole
-    # outdir/<face_label>* glob safely (only matches this theory's tiles).
-    local face_label
-    case "${face}" in
-      1) face_label="01p" ;; 2) face_label="01m" ;;
-      3) face_label="02p" ;; 4) face_label="02m" ;;
-      5) face_label="03p" ;; 6) face_label="03m" ;;
-      7) face_label="04p" ;; 8) face_label="04m" ;;
-      9) face_label="05p" ;; 10) face_label="05m" ;;
-      11) face_label="06p" ;; 12) face_label="06m" ;;
-      *) face_label="" ;;
-    esac
-    if [[ -n "${face_label}" ]]; then
-      rm -rf "${outdir}/${face_label}_tile${sub}"
-    fi
+  # Auto-detect resume: if TIDAL_READ_RESUME=1 AND a .resume file ALREADY
+  # exists for this face, append --read-resume. Skip --read-resume if no
+  # checkpoint exists yet (PolyChord errors on missing resume; this lets us
+  # mix RESUMED and FRESH theories in the same sequential slot).
+  local resume_flag=()
+  if [[ "${TIDAL_READ_RESUME:-0}" == "1" && -f "${face_dir}/_chains/tidal.resume" ]]; then
+    resume_flag=(--read-resume)
   fi
 
   # shellcheck disable=SC2086
@@ -206,34 +224,65 @@ launch_face() {
     > "${logfile}" 2>&1 &
 }
 
-# ─── Main: launch all faces of all requested theories in parallel ────────────
+# ─── Main: launch theories ───────────────────────────────────────────────────
+# Default: all theories launched in parallel (max throughput when they fit).
+# TIDAL_SEQUENTIAL=1: run theories one at a time — each theory's faces still
+#   run in parallel within the theory, but the next theory only starts after
+#   the previous theory's chains all return. Use this to (a) get full node
+#   cores per theory, (b) maximize one theory's converge-rate, (c) avoid
+#   the simultaneous-resume contention seen in slot 29878165.
 
-echo "=== [$(date +%H:%M:%S)] ATLAS SLOT START — theories: $* ==="
+echo "=== [$(date +%H:%M:%S)] ATLAS SLOT START — theories: $* (sequential=${TIDAL_SEQUENTIAL:-0}) ==="
 
-PIDS=()
-total_cores=0
-for tag in "$@"; do
-  lookup_theory "${tag}"
-  echo "  ${tag}: ndim=${NDIM} faces=${FACES} ranks/face=${RANKS} (=${RANKS}*${FACES}=$((RANKS * FACES)) cores)"
-  total_cores=$((total_cores + RANKS * FACES))
-  for ((f = 1; f <= FACES; f++)); do
-    launch_face "${tag}" "${f}"
-    PIDS+=("$!")
-  done
-done
-
-echo "=== [$(date +%H:%M:%S)] Launched ${#PIDS[@]} chains, total cores=${total_cores} ==="
-
-# Wait for all chains
 failures=0
-for pid in "${PIDS[@]}"; do
-  if ! wait "${pid}"; then
-    failures=$((failures + 1))
-  fi
-done
+
+if [[ "${TIDAL_SEQUENTIAL:-0}" == "1" ]]; then
+  # Sequential mode: launch one theory, wait for it, then next.
+  for tag in "$@"; do
+    lookup_theory "${tag}"
+    echo "=== [$(date +%H:%M:%S)] starting theory ${tag}: ndim=${NDIM} faces=${FACES} ranks/face=${RANKS} ==="
+    THEORY_PIDS=()
+    for f in $(get_face_list "${tag}"); do
+      launch_face "${tag}" "${f}"
+      THEORY_PIDS+=("$!")
+    done
+    echo "=== [$(date +%H:%M:%S)] ${tag} launched ${#THEORY_PIDS[@]} chains; waiting ==="
+    theory_fail=0
+    for pid in "${THEORY_PIDS[@]}"; do
+      if ! wait "${pid}"; then
+        theory_fail=$((theory_fail + 1))
+      fi
+    done
+    failures=$((failures + theory_fail))
+    echo "=== [$(date +%H:%M:%S)] ${tag} done — ${theory_fail} chain failures ==="
+    # Per-theory sentinel for the mid-slot monitor + downstream pipelines
+    touch "${RESULTS_DIR}/${tag}_DONE"
+  done
+else
+  # Parallel mode: launch all theories' chains at once, wait for everything.
+  PIDS=()
+  total_cores=0
+  for tag in "$@"; do
+    lookup_theory "${tag}"
+    face_list_str="$(get_face_list "${tag}" | tr '\n' ' ')"
+    n_faces=$(echo "${face_list_str}" | wc -w)
+    echo "  ${tag}: ndim=${NDIM} faces=${n_faces} (${face_list_str% }) ranks/face=${RANKS} (=${RANKS}*${n_faces}=$((RANKS * n_faces)) cores)"
+    total_cores=$((total_cores + RANKS * n_faces))
+    for f in ${face_list_str}; do
+      launch_face "${tag}" "${f}"
+      PIDS+=("$!")
+    done
+  done
+  echo "=== [$(date +%H:%M:%S)] Launched ${#PIDS[@]} chains, total cores=${total_cores} ==="
+  for pid in "${PIDS[@]}"; do
+    if ! wait "${pid}"; then
+      failures=$((failures + 1))
+    fi
+  done
+fi
 
 echo
-echo "=== [$(date +%H:%M:%S)] ATLAS SLOT DONE — ${#PIDS[@]} chains, ${failures} failed ==="
+echo "=== [$(date +%H:%M:%S)] ATLAS SLOT DONE — ${failures} chain failures ==="
 # BATCH_DONE sentinel for the external file-existence wait
 touch "${RESULTS_DIR}/BATCH_DONE"
 date

@@ -1,14 +1,14 @@
 # Phase E Atlas Tracker — Uniform-Field Cubed-Sphere Campaign
 
-**Last updated:** 2026-05-30 (session: stage-a1-s3-fresh-solo)
-**Current stage:** Stage A1 S3 — FRESH SOLO per theory (T5.0 then T5.1)
-**Next action:** book INTR slot, launch T5.0 fresh-solo (10 chains × 11 ranks = 110 cores), monitor mid-slot
+**Last updated:** 2026-05-30 (session: stage-a1-s4-standard-queue)
+**Current stage:** Stage A1 — T4/T1/T5.0 DONE; T5.1/T5.2/T5.3 running in standard-queue
+**Next action:** monitor 29890992-29890994 (sapphire standard); pull + render as each completes
 
 ## Quick handoff (read first if resuming cold)
 
-1. **Where we are**: T4 + T1 atlases delivered (S1, jobid 29855408). T5.0 + T5.1 had 3 failed resume attempts due to PolyChord re-verification contention with 22 simultaneous srun steps. Pivoting to FRESH SOLO per theory.
-2. **What's running**: nothing (last slot 29878165 expired 11:21 BST).
-3. **What to do next**: edit runner for FRESH mode + solo ranks, push, book INTR slot, launch T5.0 alone, **actively monitor mid-slot every 15 min**.
+1. **Where we are**: T4, T1, **T5.0** atlases all DELIVERED. T5.1/T5.2/T5.3 submitted to standard-queue sapphire (single-node each, validated runner). 4 INTR slots taught us: 22-simultaneous resume contention is real, ~10·nlive convergence (not 5·nlive), one INTR slot can't finish ndim ≥ 5 atlases — hence standard-queue.
+2. **What's running**: 29890992 (t5_1, 6h), 29890993 (t5_2, 9h), 29890994 (t5_3, 12h) — all RUNNING since 16:55 BST 2026-05-30.
+3. **What to do next**: poll periodically (file-existence on slurm log + inference.json count); pull each as it completes; render atlas + per-face corners; commit per-theory.
 
 ## Context
 
@@ -53,7 +53,38 @@
 - [x] **S2**: `submit_atlas_slot.sh t5_0 t5_1` — jobid **29855408** (S2 phase, packed 4 ranks/face) — hit walltime, all 22 chains have .resume
 - [x] **S2 resume #1**: jobid **29858312** (1h INTR, 4 ranks/face uniform) — T5.0 +260 ndead, T5.1 +220 ndead; none completed
 - [x] **S2 resume #2**: jobid **29878165** (1h INTR, smart-pack T5.1=6 ranks, T5.0=4 ranks) — only ~12 of 22 chains progressed; ~10 chains stuck in resume-verification for the whole slot. **Diagnosis: 22 simultaneous `srun --exclusive --read-resume` steps starve each other during PolyChord's live-point re-verification phase.**
-- [ ] **S3 strategy B (FRESH SOLO per theory)**: T5.0 alone (10×11=110 cores) → T5.1 alone (12×9=108 cores)
+- [x] **S3a T5.0 FRESH SOLO**: jobid **29879757** (1h INTR, 10 × 11 ranks = 110 cores, cpu-r-12). All 10 chains advanced cleanly (20-30 ndead/min/chain, no stalls). Final ndead 686-1466. **0/10 inference.json** — slot hit walltime before precision_criterion=0.01 triggered. Rich .resume checkpoints from uncontended fresh run.
+- [x] **S3b T5.0 RESUME + T5.1 FRESH sequential**: jobid **29882283** (1h INTR, cpu-r-111, TIDAL_SEQUENTIAL=1, runner added auto-detect resume). **5/10 T5.0 chains COMPLETED** (03p, 04m, 04p, 05m, 05p have inference.json). 5 incomplete (01m=1108, 01p=1146, 02m=1068, 02p=968, 03m=1104). T5.1 never started — T5.0 dominated the slot.
+- [x] **S3c T5.0 RESUME-FINISH (5 incomplete only)**: slot **29884704** with `TIDAL_FACES_T5_0="1 2 3 4 6"` override — **5/5 chains converged** (ndead 1956-2116). t5_0_DONE sentinel triggered; T5.1 fresh started at 15:43 BST with ~5 min progress (ndead 150-310) before slot expiry.
+
+### Stage A1b — Phase β (standard-queue sapphire, FRESH per theory, single-node)
+
+- [x] **β.1 T5.1**: jobid **29890992** — `submit_atlas_standard.sh t5_1` (108 cores, 6h walltime, sapphire). RUNNING since 2026-05-30 16:55 BST.
+- [x] **β.2 T5.2**: jobid **29890993** — same wrapper, t5_2 (112 cores, 9h walltime). RUNNING since 2026-05-30 16:55 BST.
+- [x] **β.3 T5.3**: jobid **29890994** — same wrapper, t5_3 (108 cores, 12h walltime). RUNNING since 2026-05-30 16:55 BST.
+- [ ] β.4: poll periodically (file-existence + sacct one-shot); pull + render each as it completes.
+- [ ] β.5: render atlas + per-face corners per theory (mirror T5.0 figure pattern).
+
+#### S4 standard-queue strategy notes
+
+- **One sbatch per theory**: independent scheduling, isolated failure modes. All 3 submitted in <30s and all started RUNNING immediately (no queue wait under HANDLEY-SL3-CPU).
+- **Single sapphire node per theory**: avoids multi-node MPI complexity (which had caused PMI issues in past hpc work).
+- **TIDAL_FRESH=1**: defensive clean start; no resume-contention risk (the issue that killed slot 29878165).
+- **Parallel mode within sbatch** (not sequential): each theory's faces all run concurrently; no cross-theory contention since they're in different sbatches.
+- **Walltime cushion**: 33-50% beyond T5.0-extrapolated estimate. T5.0 took ~3h total at 11 ranks/face; T5.3 at 6 ranks/face with 1.5× more work per dead point is the conservative 12h ceiling.
+
+#### S3 additional learnings (slot 29882283)
+
+- **PolyChord precision_criterion=0.01 convergence ndead ≈ 1700+ for T5.0 (ndim=5, nlive=125)** — that is ~14·nlive, NOT 5·nlive. Heuristic was way too optimistic. Use 10·nlive minimum for budget planning; expect up to 15·nlive.
+- **Sequential mode validated**: T5.0 ran cleanly through its waitloop; T5.1 was correctly queued and never launched (no contention).
+- **Cross-chain ndead variance is large**: 04p completed first (resume started at 1466, converged ~1675). 02p was slowest (969 final). Same nlive/num_repeats, same likelihood, but different starting random state → different number of iterations needed. Budget for the slowest chain.
+- **Auto-detect resume works**: chains with .resume staged in atlas_t5_0/ correctly resumed; T5.1 (no staged dirs) would have started fresh if the slot had reached it.
+
+#### S3 LEARNINGS so far (apply to S3b/c)
+
+- **FRESH SOLO works**: 10 chains × 11 ranks/face with no other-theory contention → all chains advanced cleanly at 20-30 ndead/min/chain. No stuck chains. This validates the strategy.
+- **PolyChord precision_criterion=0.01 needs more dead points than 5·nlive heuristic suggests**: with nlive=125, the heuristic said convergence at ndead~625, but at ndead=1466 some chains still hadn't converged. Plan for ~10·nlive worst-case wall time.
+- **Mid-slot monitoring caught the success**: iter 1→6 trajectory showed all chains advancing in lockstep (~+140 ndead per 5 min for working chains). Compare to S2 resume slots where some chains showed flat ndead — the diff is obvious in 5-min cadence and lets us react.
 
 #### Learnings from S2 (CRITICAL — apply to all future multi-chain INTR slots)
 
@@ -82,8 +113,10 @@
 |--------|------|-------|-------|------|------|-------------|-----------|---------|
 | T4 | 4 | 8 | 29855408 (S1) | 0.35 | 0.45 | 8/8 | ☑ atlas_t4.pdf | informative-amp; δ₁ dir suppressed (logZ=−1.82 face 4) |
 | T1 | 4 | 8 | 29855408 (S1) | 0.35 | 0.45 | 8/8 | ☑ atlas_t1.pdf | strong amp; mA² dir face 02m suppressed (logZ=−0.01 vs +9) |
-| T5.0 | 5 | 10 | 29855408 (S2) + 29858312 + 29878165 (3 INTR slots, all hit walltime) | 0.35 | 0.45 | 0/10 (~4 chains at/past target ndead 625) | ☐ | pending S3 fresh-solo |
-| T5.1 | 6 | 12 | 29855408 (S2) + 29858312 + 29878165 (3 INTR slots, all hit walltime) | 0.35 | 0.45 | 0/12 (~5 chains at/past target ndead 750) | ☐ | pending S3 fresh-solo |
+| T5.0 | 5 | 10 | 29879757 (fresh-solo) + 29882283 (resume-seq, 5/10) + 29884704 (resume-finish, 5/10) | 0.35 | 0.45 | **10/10** | ☑ atlas_t5_0.pdf | DELIVERED — see hpc_results/29884704/figures/ |
+| T5.1 | 6 | 12 | 29890992 (standard-queue sapphire, 6h, 108 cores) | 0.35 | 0.45 | RUNNING | ☐ | RUNNING since 2026-05-30 16:55 BST |
+| T5.2 (bonus) | 8 | 16 | 29890993 (standard-queue sapphire, 9h, 112 cores) | 0.35 | 0.45 | RUNNING | ☐ | RUNNING since 2026-05-30 16:55 BST |
+| T5.3 (bonus) | 9 | 18 | 29890994 (standard-queue sapphire, 12h, 108 cores) | 0.35 | 0.45 | RUNNING | ☐ | RUNNING since 2026-05-30 16:55 BST |
 | T5.2 (bonus) | 8 | 16 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
 | T5.3 (bonus) | 9 | 18 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
 
