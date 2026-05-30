@@ -101,7 +101,7 @@ Use these when drafting each section. Each entry names the closest-match templat
 1. Open with a living research tension, not a historical overview. The tension is: GW detectors are probing new physics, but the gauge-gravity sector they probe is theoretically vast and poorly constrained.
 2. State the deep problem in one paragraph: the Gertsenshtein channel structure in PGT is unknown, and computing it manually is infeasible for more than one model at a time.
 3. Survey prior art: Gertsenshtein/Boccaletti (mechanism), BHL (PGT landscape), PSALTer/Hamilcar (spectrum tools), TIDAL (this work). Dense citation cluster here (8–15 refs in 2–3 sentences is normal in BHL intros). Identify the gap: no systematic channel decomposition for PGT + EM has been done.
-4. Hook: "We present TIDAL, a symbolic–numerical pipeline that automates this calculation for any quadratic PGT+EM Lagrangian. We apply it to..." One paragraph.
+4. Hook: "We present TIDAL, a symbolic–numerical software package that automates this calculation for any quadratic PGT+EM Lagrangian. We apply it to..." One paragraph.
 5. Close with one sentence per remaining section (the structural map).
 
 **Sentence-level pattern for opening:** Begin with the phenomenon, not the history. Compare: ✗ "The Gertsenshtein effect was discovered by..." vs ✓ "When gravitational and electromagnetic waves propagate through a background magnetic field, they mix — a phenomenon with direct consequences for high-frequency GW detection."
@@ -203,7 +203,7 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 ## (i) Appendix Structure Rule
 
-Every appendix carries a semantic title that states its content (not "Appendix A: Technical details" but "Appendix A: TIDAL pipeline architecture"). Each appendix opens with a single declarative sentence stating its purpose and what it contains — this is the appendix's equivalent of the section opening rule (a).
+Every appendix carries a semantic title that states its content (not "Appendix A: Technical details" but "Appendix A: TIDAL software architecture"). Each appendix opens with a single declarative sentence stating its purpose and what it contains — this is the appendix's equivalent of the section opening rule (a).
 
 Appendix subsections are numbered A.1, A.2, etc. Each subsection opens with a declarative sentence. Appendix figures are numbered in sequence with main-body figures (not restarted at A.1).
 
