@@ -130,7 +130,7 @@ field~\cite{blagojevic2002gravitation,lasenby2016scale}: were the connection
 trivial the commutator would vanish, so the commutator is linear
 in the field strength. For
 electrodynamics this gives the familiar relation
-$[\nabla_\mu,\nabla_\nu]\phi = i e\,\mathcal{F}_{\mu\nu}\phi$ on a
+$[\nabla_\mu,\nabla_\nu]\phi = i e\,\FieldF{_{\mu\nu}}\phi$ on a
 matter field. In PGT the analogous
 calculation produces two terms, one for each generator
 type~\cite[eq.~(1.11)]{blagojevic2003lectures},
@@ -245,7 +245,7 @@ in other gauge field theories: the QED kinetic
 action $-\tfrac{1}{4}\FieldF{_{\mu\nu}}\FieldF{^{\mu\nu}}$ is the
 unique Lorentz scalar quadratic in the field strength up to a
 total derivative,\footnote{The parity-odd
-$\FieldF{_{\mu\nu}}\tensor{\tilde{\mathcal{F}}}{^{\mu\nu}}$ being topological.} and the
+$\FieldF{_{\mu\nu}}\FieldFtilde{^{\mu\nu}}$ being topological.} and the
 PGT analogue is the set of all independent contractions
 of $\MAGFt{}$ and $\MAGT{}$ with one
 another~\cite{barker2024poincare,sezgin1980ghostfree,hehl1995metric}.
@@ -259,25 +259,25 @@ non-metricity define the standard metric-affine spacetime
 hierarchy. \Cref{MetricAffineClasses} shows the
 classification: the most general space is metric-affine
 $(L_4, \g{})$, and setting subsets of
-$\mathcal{R}, \mathcal{T}, \mathcal{Q}$ to zero recovers the named
+$\MAGF{}, \MAGT{}, \mathcal{Q}$ to zero recovers the named
 special cases. PGT inhabits the Riemann--Cartan space $U_4$
 defined by $\mathcal{Q} = 0$.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{figures/metric_affine_classes.pdf}
   \caption{Classification of metric-affine spacetime geometries by
-    which of the three obstructions --- curvature $\mathcal{R}$,
-    torsion $\mathcal{T}$, and non-metricity $\mathcal{Q}$ --- are
+    which of the three obstructions --- curvature $\MAGF{}$,
+    torsion $\MAGT{}$, and non-metricity $\mathcal{Q}$ --- are
     non-zero. The outer region is the most general metric-affine
     space $(L_4, \g{})$. General relativity inhabits the
-    Riemannian space $V_4$ ($\mathcal{T} = \mathcal{Q} = 0$);
+    Riemannian space $V_4$ ($\MAGT{} = \mathcal{Q} = 0$);
     Poincar\'{e} gauge theory inhabits the Riemann--Cartan space
     $U_4$ ($\mathcal{Q} = 0$); the flat-connection (teleparallel)
-    case $W_4$ has $\mathcal{R} = 0$, with the metric-teleparallel
-    ($\mathcal{R} = \mathcal{Q} = 0$, the classical Weitzenb\"{o}ck
+    case $W_4$ has $\MAGF{} = 0$, with the metric-teleparallel
+    ($\MAGF{} = \mathcal{Q} = 0$, the classical Weitzenb\"{o}ck
     space) and symmetric-teleparallel
-    ($\mathcal{R} = \mathcal{T} = 0$) sub-cases obtained by
-    additionally setting $\mathcal{Q} = 0$ or $\mathcal{T} = 0$;
+    ($\MAGF{} = \MAGT{} = 0$) sub-cases obtained by
+    additionally setting $\mathcal{Q} = 0$ or $\MAGT{} = 0$;
     setting all three obstructions to zero recovers Minkowski
     $\mathbb{M}^4$. Adapted from
     figure~3 of~\cite{bahamonde2021teleparallel}.}
@@ -354,9 +354,9 @@ Blagojevi\'{c}~\cite[Table~1]{blagojevic2003lectures}.
        & $D_\mu(\omega)\,e^i{}_\nu = \MAGA{^\rho_{\nu\mu}}\,e^i{}_\rho$ \\
     $\nabla_\mu \eta_{ij} = 0$ metricity
        & $D_\mu(\Gamma)\,\g{_{\nu\lambda}} = 0$ metricity \\
-    $\mathcal{F}^i{}_{\mu\nu}$ translation field strength
+    $\FieldF{^i_{\mu\nu}}$ translation field strength
        & $\MAGT{^i_{\mu\nu}}$ torsion \\
-    $\mathcal{F}^{ij}{}_{\mu\nu}$ Lorentz field strength
+    $\FieldF{^{ij}_{\mu\nu}}$ Lorentz field strength
        & $\MAGFt{^{ij}_{\mu\nu}}$ curvature \\
     \bottomrule
   \end{tabular}

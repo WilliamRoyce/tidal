@@ -9,22 +9,22 @@
 \section{Perturbative reduction in higher-curvature Lagrangians}%
 \label{PerturbativeReduction}
 
-\TIDAL{} treats a correction $\varepsilon\,\mathcal{L}_1$ to a well-posed base
-Lagrangian $\mathcal{L}_0$ as a perturbative shift to the base-theory dynamics.
+\TIDAL{} treats a correction $\varepsilon\,\lag_1$ to a well-posed base
+Lagrangian $\lag_0$ as a perturbative shift to the base-theory dynamics.
 The effective-field-theory background, the equations-of-motion reduction, and the
 Lagrangian reduction used to obtain a Hamiltonian are described here.
 
 \paragraph*{Higher-order terms as effective corrections}
 For theories whose Lagrangian admits the decomposition
-$\mathcal{L} = \mathcal{L}_0 + \varepsilon\,\mathcal{L}_1$ with $\varepsilon$ a small
-dimensionless coupling, $\varepsilon\,\mathcal{L}_1$ is treated throughout as a
+$\lag = \lag_0 + \varepsilon\,\lag_1$ with $\varepsilon$ a small
+dimensionless coupling, $\varepsilon\,\lag_1$ is treated throughout as a
 perturbative correction within the regime $\varepsilon\ll1$.
 
 Such higher-order operators are the low-energy residues of an unknown ultraviolet
 completion in the effective-field-theory
 interpretation~\cite{Simon:1990ic,Simon:1990jn,Donoghue:1994dn,burgess2003quantum}.
 Grosse-Knetter~\cite{Grosse-Knetter:1993tae,ostrogradsky1850memoires,Woodard:2015zca}
-proves that expressing the higher time derivatives in $\mathcal{L}_1$ by substituting
+proves that expressing the higher time derivatives in $\lag_1$ by substituting
 the base-theory equations of motion is equivalent to a canonical field redefinition
 $\varphi^{\mathcal{I}} \to \varphi^{\mathcal{I}} + \varepsilon\,\delta\varphi^{\mathcal{I}}$
 that preserves the Poisson bracket structure.
@@ -36,7 +36,7 @@ take the form $\partial_t^2\varphi^{\mathcal{I}} = F^{\mathcal{I}}[\varphi,\part
 equation is purely algebraic (in the sense of \cref{SymbolicComputation}) violate the
 requirement, and the perturbative-reduction framework then fails.
 
-The alternative --- treating $\mathcal{L}$ as a fundamental theory ---
+The alternative --- treating $\lag$ as a fundamental theory ---
 encounters Ostrogradsky's theorem.
 Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Pais:1950za} states
 that any non-degenerate Lagrangian whose EL equations are of differential
@@ -57,7 +57,7 @@ The ghost is an artefact of extrapolating the truncated Lagrangian beyond its re
 validity, not a physical degree of freedom, and a perturbative treatment within
 $\varepsilon \omega t \ll 1$~\cite{parker1993reduced} never
 encounters it.
-We therefore treat $\mathcal{L}_0$ as the base theory and $\varepsilon\,\mathcal{L}_1$
+We therefore treat $\lag_0$ as the base theory and $\varepsilon\,\lag_1$
 perturbatively.
 
 \subsection{Perturbative reduction of the equations of motion}
@@ -71,7 +71,7 @@ the full equation of motion as $E[q;\,\varepsilon] = 0$~\cite{parker1993reduced,
 jaen1986reduction},
 the base operator is $E_{\mathrm{base}}[q] \equiv E[q;\,\varepsilon{=}0]$ and the correction operator
 is $E_{\mathrm{corr}}[q] \equiv \partial_\varepsilon E[q;\,\varepsilon]\big|_{\varepsilon=0}$
-from $\mathcal{L}_1$, which may carry derivatives of \emph{any} order.
+from $\lag_1$, which may carry derivatives of \emph{any} order.
 Expanding $q = q^{(0)} + \varepsilon\,q^{(1)} + \cdots$ and collecting by order:
 \begin{align}
   \mathcal{O}(\varepsilon^0) &:\quad
@@ -81,7 +81,7 @@ Expanding $q = q^{(0)} + \varepsilon\,q^{(1)} + \cdots$ and collecting by order:
   \label{EOMHierarchy}
 \end{align}
 At every order the left-hand-side operator is the ghost-free second-order base operator
-$E_{\mathrm{base}}$; the higher-derivative contributions from $\mathcal{L}_1$ appear
+$E_{\mathrm{base}}$; the higher-derivative contributions from $\lag_1$ appear
 only as sources evaluated on the previous-order solution.
 We call the order-$\varepsilon^0$ solution \emph{Pass~0} and the
 order-$\varepsilon^1$ correction \emph{Pass~1}.
@@ -93,7 +93,7 @@ $\varepsilon^0$, since no $\partial_t^n\varphi^{\mathcal{I}}$ is available to so
 Ostrogradsky auxiliary-field reduction~\cite{ostrogradsky1850memoires,Woodard:2015zca}
 introduces each time-derivative order as a separate dynamical variable
 $Q_n^{\mathcal{I}} \equiv \partial_t^n\varphi^{\mathcal{I}}$ for $n = 0, 1, \ldots, N-1$,
-with $N$ the order of the highest time derivative in $\mathcal{L}$, yielding a first-order
+with $N$ the order of the highest time derivative in $\lag$, yielding a first-order
 system. This treats the full $\varepsilon$-finite
 theory as exact, in which case the Ostrogradsky ghost is part of the dynamics. Direct
 numerical evolution therefore produces unbounded ghost growth, with no physical
@@ -204,7 +204,7 @@ Lagrangian with at most first-order time derivatives.% on every factor.
 
 To reduce the Lagrangian, \TIDAL{} substitutes the
 order-$\varepsilon^0$ equations of motion into the higher-derivative terms of
-$\varepsilon\,\mathcal{L}_1$~\cite{jaen1986reduction,Cheyette1988,Grosse-Knetter:1993tae}.
+$\varepsilon\,\lag_1$~\cite{jaen1986reduction,Cheyette1988,Grosse-Knetter:1993tae}.
 The order-$\varepsilon^0$ equations are solved simultaneously for the second time
 derivative of each field,
 \begin{equation}
@@ -216,7 +216,7 @@ derivative of each field,
 \end{equation}
 where $F_i$ depends on first-order time derivatives only, but on spatial derivatives of
 any order.
-Higher spatial derivatives in $\varepsilon\,\mathcal{L}_1$ do not affect the Legendre
+Higher spatial derivatives in $\varepsilon\,\lag_1$ do not affect the Legendre
 transform; only higher \emph{time} derivatives require reduction.
 Where the correction introduces terms with time derivatives of order greater than two,
 the rule \cref{LPSSubstitution} is extended by differentiating with respect to $t$ as
@@ -236,7 +236,7 @@ a reduced Lagrangian that omits the promoted degree of freedom.
 \paragraph*{Constraint promotion and perturbative-reduction failure}
 The case where the JLM condition fails arises physically as constraint promotion. In
 the quadratic-PGT theories where constraint promotion arises,
-$\varepsilon\,\mathcal{L}_1 = \varepsilon\,\tilde{R}^2$; the $\varepsilon = 0$
+$\varepsilon\,\lag_1 = \varepsilon\,\tilde{R}^2$; the $\varepsilon = 0$
 Einstein--Cartan limit has metric and torsion components satisfying algebraic
 relations. Turning on $\varepsilon$ infinitesimally adds kinetic content that promotes
 these relations to dynamical equations. The constraint structure of the theory
