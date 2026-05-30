@@ -7,6 +7,11 @@
 % Gertsenshtein Effect
 % =====================================================================
 
+% CITE v=1 status=PARTIAL depth=cheap conf=medium
+%! purpose: Foundational source for the Gertsenshtein effect: graviton-photon conversion in magnetic fields, standard analysis methodology, and conversion probability formula.
+%! used: perturbative_regime.tex L13 EXISTENCE, introduction.tex L281 ATTRIBUTION, theory.tex L222 SPECIFIC, theory.tex L274 SPECIFIC
+%! checked: manuscript/references.bib [entry only]; title from bib entry matches topic [2026-05-30]
+%! evidence: Title in bibliography: "Wave resonance of light and gravitational waves" (Soviet Physics JETP, vol. 14, pp. 84-85, 1962) — consistent with claims but full paper inaccessible for formula/method verification
 % AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
 %! pre-arXiv (Sov. Phys. JETP 1962); complete vol/pages; no DOI/arXiv exists
 @article{gertsenshtein1962wave,
@@ -18,6 +23,11 @@
   year    = {1962}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=medium
+%! purpose: Path-integrated and uniform-field graviton-photon conversion formulas; standard reference for Gertsenshtein analysis
+%! used: numerical.tex L474 SPECIFIC, perturbative_regime.tex L13 EXISTENCE, introduction.tex L281 ATTRIBUTION, theory.tex L222 SPECIFIC, theory.tex L274 SPECIFIC, theory.tex L291 SPECIFIC
+%! checked: references.bib [title, author, DOI]; literature_content_notes.md [prior hints]; manuscript claims in context [2026-05-30]
+%! evidence: Title: "Conversion of photons into gravitons and vice versa in a static electromagnetic field" (plainly matches graviton-photon conversion topic); literature_content_notes.md states "P = sin²(κB₀D/2) | Conversion probabi
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2FBF02710177 verdict=MINOR
 @article{boccaletti1970conversion,
   author  = {Boccaletti, D. and De Sabbata, V. and Fortini, P. and Gualdi, C.},
@@ -30,6 +40,11 @@
   doi     = {10.1007/BF02710177}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=low
+%! purpose: Source for the Raffelt-Stodolsky two-mode mixing formula and plasma model analogs for graviton-photon conversion.
+%! used: perturbative_regime.tex L18 EXISTENCE, perturbative_regime.tex L351 SPECIFIC, validation.tex L58 SPECIFIC, validation.tex L245 SPECIFIC, validation.tex L255 EXISTENCE, introduction.tex L353 EXISTENCE, results.tex L81 ATTRIBUTION, results.tex L828 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1103_PhysRevD.37.1237.json [2026-05-30]
+%! evidence: Title from abstract: "Mixing of the photon with low-mass particles" — no mention of gravitons or graviton-photon mixing in the title.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.37.1237 verdict=MINOR
 @article{raffelt1988mixing,
   author  = {Raffelt, Georg and Stodolsky, Leo},
@@ -42,6 +57,10 @@
   doi     = {10.1103/PhysRevD.37.1237}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Exact solution for graviton-photon mixing in constant magnetic field with plane-wave propagation setup
+%! used: introduction.tex L355 EXISTENCE, theory.tex L222 SPECIFIC
+%! checked: literature/2004.02714/main.tex [title, abstract, sections 1-4] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2004.02714&format=bibtex verdict=MINOR
 @article{ejlli2020graviton,
   author        = {Ejlli, Damian},
@@ -57,6 +76,10 @@
   doi           = {10.1007/JHEP06(2020)029}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro+body conf=high
+%! purpose: Verification of Gertsenshtein graviton-photon conversion mechanism formulas and numerical estimates in torsion/PGT manuscript.
+%! used: introduction.tex L322 SPECIFIC, introduction.tex L356 EXISTENCE, theory.tex L222 EXISTENCE, theory.tex L282 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2301.02072/main.tex [abstract, intro, sections 2-4] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2301.02072&format=bibtex verdict=MINOR
 @article{palessandro2023simple,
   author        = {Palessandro, Andrea and Rothman, Tony},
@@ -71,6 +94,10 @@
   doi           = {10.1016/j.dark.2023.101187}
 }
 
+% CITE v=1 status=SUPPORTS depth=deep:theory conf=high
+%! purpose: Cited for two-state mixing treatment of Gertsenshtein effect, linearized kinetic matrix derivation, and explicit formula for conversion probability in weak field limit
+%! used: introduction.tex L356 EXISTENCE, theory.tex L222 EXISTENCE, theory.tex L282 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2405.01407/GP8.tex [abstract, intro §1-2, theory §2.1-2.2, theory §2.3, theory weak-field limit] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2405.01407&format=bibtex verdict=MINOR
 @article{palessandro2024gertsenshtein,
   author        = {Palessandro, Andrea},
@@ -86,6 +113,11 @@
   doi           = {10.1088/1361-6382/ad7fc5}
 }
 
+% CITE v=1 status=PARTIAL depth=deep:sections/introduction.tex,sections/theory.tex conf=high
+%! purpose: Reference for graviton-photon conversion theory, Galactic magnetic field analysis, and field convention normalization in Gertsenshtein effect calculations
+%! used: introduction.tex L285 ATTRIBUTION, introduction.tex L472 SPECIFIC, theory.tex L35 SPECIFIC, theory.tex L210 EXISTENCE, theory.tex L222 SPECIFIC, theory.tex L274 SPECIFIC, theory.tex L287 SPECIFIC
+%! checked: literature/2406.17853/main.tex [abstract, intro, theory sections, homogeneous field analysis] [2026-05-30]
+%! evidence: Lella et al. (2406.17853) explicitly develops graviton-photon conversion theory in Galactic magnetic fields, deriving mixing equations and conversion probabilities. However, at line 287 of theory.tex, the manuscript clai
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2406.17853&format=bibtex verdict=MINOR
 @article{lella2024constraining,
   author        = {Lella, Alessandro and Calore, Francesca and Carenza, Pierluca and Mirizzi, Alessandro},
@@ -116,6 +148,11 @@
   doi           = {10.1088/1475-7516/2024/05/051}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=high
+%! purpose: Cite as framework for 3D GW-EM conversion including plasma effects, uniform field limits, and effective photon mass incorporation.
+%! used: results.tex L828 EXISTENCE, theory.tex L222 SPECIFIC, theory.tex L274 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2507.16609/Gert.tex [abstract, intro, sections ~75-230, appendix derivations ~1966-2045] [2026-05-30]
+%! evidence: Line 84: "In the limit of a uniform magnetic field, the EM wave emitted in forward direction yields the well-known expression for the GW-to-photon conversion probability~\cite{Raffelt:1987im}"; Line 115-117: "Including p
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2507.16609&format=bibtex verdict=MINOR
 @article{domcke2025scattering,
   author        = {Domcke, Valerie and Garcia-Cely, Camilo and Lee, Sung Mook},
@@ -131,6 +168,11 @@
   doi           = {10.1088/1475-7516/2025/11/016}
 }
 
+% CITE v=1 status=WEAK depth=abstract conf=high
+%! purpose: Cited as example of observability proposals invoking astrophysical amplification at magnetar fields; claim includes magnetar surface fields of order 10^11 T.
+%! used: introduction.tex L482 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_2202.00032.json [2026-05-30]
+%! evidence: Abstract states: "compact object, a progenitor with effective magnetic field strength around 10^10 Gauss" (≈10^6 T), which contradicts the 10^11 T field strength cited in the manuscript's claim.
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2202.00032&format=bibtex verdict=MINOR
 @article{kushwaha2022magnetar,
   author        = {Kushwaha, Ashu and Malik, Sunil and Shankaranarayanan, S.},
@@ -146,6 +188,11 @@
   doi           = {10.1093/mnras/stad3545}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Cited to support that magnetar fields are used in proposals for astrophysical amplification of graviton-to-photon conversion
+%! used: introduction.tex L482 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2406.18634.json [abstract only, tier B] [2026-05-30]
+%! evidence: Abstract states the paper "calculate[s] the resonant conversion of gravitational waves into photons in the magnetospheres of neutron stars" and uses "JWST observations of the Magnetar 4U 0142+61" but does not explicitly 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2406.18634&format=bibtex verdict=MINOR
 @article{mcdonald2024magnetar,
   author        = {McDonald, Jamie I. and Ellis, Sebastian A. R.},
@@ -180,6 +227,10 @@
 % Torsion & Poincare Gauge Theory
 % =====================================================================
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=medium
+%! purpose: Foundational review establishing the field-theoretic framework for Poincaré gauge theory, tetrad formalism, metric compatibility, and torsion decomposition
+%! used: pgt_background.tex L54 SPECIFIC, pgt_background.tex L226 EXISTENCE, pgt_background.tex L383 SPECIFIC, pgt_background.tex L395 SPECIFIC, pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L177 EXISTENCE, introduction.tex L538 EXISTENCE, theory.tex L69 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1103_RevModPhys.48.393.json [title only; abstract empty] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FRevModPhys.48.393 verdict=MINOR
 @article{hehl1976spin,
   author  = {Hehl, Friedrich W. and von der Heyde, Paul and Kerlick, G. David and Nester, James M.},
@@ -192,6 +243,11 @@
   doi     = {10.1103/RevModPhys.48.393}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract (empty) conf=medium
+%! purpose: Foundational reference for Poincaré gauge theory formulation with independent connection (Palatini) and the three torsion-squared invariants I_1, I_2, I_3
+%! used: pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L146 SPECIFIC, introduction.tex L538 EXISTENCE, results.tex L208 SPECIFIC, theory.tex L69 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1103_PhysRevD.19.3524.json (title only: "New General Relativity") [2026-05-30]
+%! evidence: Abstract text not available in cache; only title "New General Relativity" cached
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.19.3524 verdict=MINOR
 @article{hayashi1979new,
   author  = {Hayashi, Kenji and Shirafuji, Takeshi},
@@ -204,6 +260,11 @@
   doi     = {10.1103/PhysRevD.19.3524}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Comprehensive reference for torsion tensor decomposition, PGT field structure, and scalar contraction bases in classical gravity with torsion
+%! used: pgt_background.tex L383 SPECIFIC, pgt_background.tex L399 SPECIFIC, pgt_background.tex L419 ATTRIBUTION, pgt_enumeration.tex L31 EXISTENCE, pgt_enumeration.tex L39 EXISTENCE, pgt_enumeration.tex L48 EXISTENCE, pgt_enumeration.tex L52 EXISTENCE, pgt_enumeration.tex L70 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_hep-th_0103093.json [title + abstract] [2026-05-30]
+%! evidence: Abstract confirms "classical gravity with torsion" and "interaction of torsion with matter fields" but does not enumerate the 24-component decomposition, scalar invariant conventions (I_1, I_2, I_3), or specific formula 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3Ahep-th/0103093&format=bibtex verdict=MINOR
 @article{shapiro2002torsion,
   author        = {Shapiro, Ilya L.},
@@ -217,6 +278,11 @@
   doi           = {10.1016/S0370-1573(01)00030-8}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=high
+%! purpose: Substantiate claim that PGT operators built from curvature/torsion remain Yang-Mills-type and produce second-order equations, while derivatives of field strengths generate fourth-order equations
+%! used: pgt_enumeration.tex L233 ATTRIBUTION
+%! checked: literature/0905.3732/main.tex [title, abstract, intro (lines 165-280), model section (369-527), field equations (535-623), conclusions (1634-1687)] [2026-05-30]
+%! evidence: Paper demonstrates specific model with Lagrangian L_F + L_T (quadratic curvature + torsion mass) producing second-order field equations. Equations (Ein) and (torsion) show $(D^k + v^k)F_{ijk}$ and $D_m F^{jm}$ derivative
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A0905.3732&format=bibtex verdict=MINOR
 @article{nikiforova2009torsion,
   author        = {Nikiforova, V. and Randjbar-Daemi, S. and Rubakov, V.},
@@ -231,6 +297,11 @@
   doi           = {10.1103/PhysRevD.80.124050}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Establish Nieh--Yan topological density form and Holst term dynamical behavior with torsion in Riemann-Cartan geometry
+%! used: pgt_enumeration.tex L35 EXISTENCE, pgt_enumeration.tex L136 ATTRIBUTION, pgt_enumeration.tex L211 ATTRIBUTION
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1063_1.525379.json [2026-05-30]
+%! evidence: Abstract states: "We derive a new Gauss–Bonnet type identity in Riemann-Cartan geometry... where C^a_μν is the torsion tensor." No explicit mention of Holst term or Nieh--Yan form by name.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1063%2F1.525379 verdict=MINOR
 @article{niehyan1982,
   author  = {Nieh, H. T. and Yan, M. L.},
@@ -243,6 +314,10 @@
   doi     = {10.1063/1.525379}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Lovelock's dimension-dependent tensor identities and master identity for trace-free (k,l)-forms in n-dimensional space
+%! used: pgt_enumeration.tex L101 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_gr-qc_0105066.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3Agr-qc/0105066&format=bibtex verdict=MINOR
 @article{edgarhoglund2002ddi,
   author        = {Edgar, S. Brian and H{\"o}glund, A.},
@@ -257,6 +332,11 @@
   doi           = {10.1063/1.1425428}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Attribution of electromagnetic θ-term as topological U(1) Chern density in axion electrodynamics context
+%! used: pgt_enumeration.tex L212 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1103_PhysRevLett.58.1799.json and bibliography entry [2026-05-30]
+%! evidence: Title matches: "Two applications of axion electrodynamics" (confirmed in both cache and bibliography). Abstract is empty in cache.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevLett.58.1799 verdict=MINOR
 @article{wilczek1987axion,
   author  = {Wilczek, Frank},
@@ -269,6 +349,11 @@
   doi     = {10.1103/PhysRevLett.58.1799}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Provide tensor algebra functions and index contraction methods for PGT Lagrangian symbolic computation
+%! used: architecture.tex L42 SPECIFIC, pgt_enumeration.tex L98 SPECIFIC, symbolic.tex L27 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1308.3493.json [title, abstract only] [2026-05-30]
+%! evidence: Abstract states xTras provides "functions and methods frequently needed when doing (classical) field theory... compute contractions, make Ansätze, and solve tensorial equations" but does not mention Einstein-Cartan opera
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1308.3493&format=bibtex verdict=MINOR
 @article{nutma2014xtras,
   author        = {Nutma, Teake},
@@ -288,6 +373,10 @@
 %   (same ISBN 978-1-84816-726-1); its single cite was redirected. Deleted (in git history).
 
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro+conclusion conf=high
+%! purpose: Establishes conformal scale-invariant embedding of PGT with new vector-torsion Maxwell term and kinetic mixing operators motivating propagating vector torsion
+%! used: inference_architecture.tex L17 SPECIFIC, pgt_background.tex L54 SPECIFIC, pgt_background.tex L183 SPECIFIC, pgt_enumeration.tex L30 EXISTENCE, pgt_enumeration.tex L40 EXISTENCE, pgt_enumeration.tex L74 SPECIFIC, pgt_enumeration.tex L86 ATTRIBUTION, pgt_enumeration.tex L144 SPECIFIC
+%! checked: literature/2406.12826/Manuscript.tex [abstract, introduction §1-4, closing remarks] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2406.12826&format=bibtex verdict=MINOR
 @article{barker2024poincare,
   author        = {Barker, Will and Hobson, Michael and Lasenby, Anthony and Lin, Yun-Cherng and Wei, Zhiyuan},
@@ -302,6 +391,11 @@
   doi           = {10.1016/j.physletb.2025.139316}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro+conclusions conf=high
+%! purpose: Computer algebra tool (HiGGS) for Dirac-Bergmann analysis of Poincaré gauge theory with curvature and torsion.
+%! used: constraint_barrier.tex L246 ATTRIBUTION, constraint_barrier.tex L292 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2206.00658/apstemplate.tex [abstract, introduction, examples, conclusions] [2026-05-30]
+%! evidence: Site 1: The manuscript claims barker2023higgs "confirms that the propagating-mode count depends discontinuously on the action parameters." However, the paper discusses discontinuity between linear and nonlinear regimes (
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2206.00658&format=bibtex verdict=ENRICHED
 @article{barker2023higgs,
   number        = {3},
@@ -317,6 +411,10 @@
   doi           = {10.1140/epjc/s10052-023-11179-6}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro+body:specific-sections conf=high
+%! purpose: Establish baseline torsion-electromagnetic coupling structures in Poincaré gauge theory, particularly axial-torsion Chern-Simons interactions and dichroism effects.
+%! used: pgt_background.tex L383 SPECIFIC, pgt_enumeration.tex L56 SPECIFIC, pgt_enumeration.tex L70 EXISTENCE, pgt_enumeration.tex L308 SPECIFIC, pgt_enumeration.tex L325 ATTRIBUTION, introduction.tex L383 EXISTENCE, theory.tex L138 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2410.01355/Torsion06.tex [abstract, introduction (lines 40-51), axial torsion dynamics (lines 54-98), field equatio [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2410.01355&format=bibtex verdict=MATCH
 @article{obukhov2024electrodynamics,
   author        = {Trukhanova, Mariya Iv. and Obukhov, Yuri N.},
@@ -327,6 +425,11 @@
   primaryclass  = {gr-qc}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro+body conf=high
+%! purpose: Non-minimal torsion-EM coupling with curvature-field strength interaction, black hole solutions with spin charge
+%! used: perturbative_regime.tex L158 SPECIFIC, pgt_enumeration.tex L32 EXISTENCE, pgt_enumeration.tex L47 EXISTENCE, pgt_enumeration.tex L70 SPECIFIC, pgt_enumeration.tex L148 SPECIFIC, pgt_enumeration.tex L260 EXISTENCE, results.tex L248 ATTRIBUTION, results.tex L387 ATTRIBUTION
+%! checked: /workspaces/torsion-gertsenshtein/literature/2507.02362/main.tex [abstract, intro, section 2-3, field equations] [2026-05-30]
+%! evidence: From Bahamonde abstract: "non-minimal coupling F^μν ≃R̃_μν between field strength and antisymmetric Ricci tensor" and intro (line 128): "the simple term that is a product ~R_{[μν]} F^{μν} has not been thoroughly consider
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2507.02362&format=bibtex verdict=MINOR
 @article{bahamonde2025torsion,
   author        = {Bahamonde, Sebastian and Maggiolo, Jorge and Pfeifer, Christian},
@@ -393,6 +496,10 @@
 % Numerical Methods
 % =====================================================================
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Reference for the IDA and CVODE solvers from SUNDIALS suite and their callback interfaces for Jacobian supply.
+%! used: numerical.tex L46 SPECIFIC, numerical.tex L53 SPECIFIC, numerical.tex L568 SPECIFIC, numerical.tex L587 SPECIFIC, numerical.tex L683 EXISTENCE, numerical.tex L690 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1145_3539801.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1145%2F3539801 verdict=ENRICHED
 @article{gardner2022sundials,
   volume    = {48},
@@ -405,6 +512,10 @@
   doi       = {10.1145/3539801}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: SUNDIALS is the suite of implicit ODE and DAE solvers (CVODE, IDA) used for time-stepping in TIDAL
+%! used: numerical.tex L46 SPECIFIC, numerical.tex L53 SPECIFIC, numerical.tex L568 SPECIFIC, numerical.tex L587 SPECIFIC, numerical.tex L683 EXISTENCE, numerical.tex L690 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1145_1089014.1089020.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1145%2F1089014.1089020 verdict=MINOR
 @article{hindmarsh2005sundials,
   title     = {{SUNDIALS}: Suite of nonlinear and differential/algebraic equation solvers},
@@ -418,6 +529,10 @@
   doi       = {10.1145/1089014.1089020}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: NumPy as the array programming library for storing 2D arrays in numerical computation
+%! used: numerical.tex L728 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_2006.10256.json [abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2006.10256&format=bibtex verdict=MATCH
 @article{harris2020numpy,
   author        = {Harris, Charles R. and others},
@@ -433,6 +548,10 @@
   year          = {2020}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Reference for scipy.integrate.solve_ivp ODE solver used in numerical integration scheme
+%! used: numerical.tex L625 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_1907.10121.json [title, abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1907.10121&format=bibtex verdict=MATCH
 @article{virtanen2020scipy,
   author        = {Virtanen, Pauli and others},
@@ -447,6 +566,10 @@
   year          = {2020}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:abstract conf=high
+%! purpose: Cite Mathematica as the software platform hosting the xAct symbolic computation pipeline for TIDAL.
+%! used: architecture.tex L37 SPECIFIC, symbolic.tex L24 SPECIFIC, computational_approach.tex L34 SPECIFIC
+%! checked: manuscript/sections/appendices/architecture.tex, manuscript/sections/appendices/symbolic.tex, manuscript/sections/computational_approach.tex [lines 37, 24-28, 3 [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
 @misc{mathematica,
   author = {Wolfram Research{,} Inc.},
@@ -459,6 +582,10 @@
 %   randall2024skitsundae is the canonical one. Deleted (in git history).
 
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Python bindings to SUNDIALS solvers (IDA and CVODE) via scikit-sundae package
+%! used: numerical.tex L569 SPECIFIC, numerical.tex L588 SPECIFIC
+%! checked: manuscript/references.bib [bibliography entry] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOTFOUND
 @misc{randall2024skitsundae,
   author = {Randall, Corey R.},
@@ -469,6 +596,10 @@
   doi    = {10.11578/dc.20241104.3}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=medium
+%! purpose: Attribute the Yoshida composition method (fourth-order symplectic integrator) to Yoshida, Haruo's 1990 work on constructing higher-order symplectic integrators
+%! used: numerical.tex L607 ATTRIBUTION
+%! checked: manuscript/references.bib (title + author + year only; tier E with no full-text access) [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
 @article{yoshida1990symplectic,
   author  = {Yoshida, Haruo},
@@ -479,6 +610,11 @@
   year    = {1990}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Attribute the DOP853 eighth-order embedded Runge-Kutta scheme to Dormand & Prince (1980)
+%! used: numerical.tex L627 SPECIFIC
+%! checked: doi_10.1016_0771-050X(80)90013-3.json [title only, no abstract body]; manuscript/references.bib [bibliographic entry] [2026-05-30]
+%! evidence: Title: "A family of embedded Runge-Kutta formulae" — confirms embedded Runge-Kutta schemes but does not specify order or DOP853 designation
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0771-050X%2880%2990013-3 verdict=MINOR
 @article{dormand1980runge,
   author  = {Dormand, J. R. and Prince, P. J.},
@@ -502,6 +638,10 @@
   doi     = {10.1007/BF01448839}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Foundational reference for finite-difference stencil generation algorithms and convergence properties at arbitrary orders.
+%! used: numerical.tex L177 SPECIFIC, numerical.tex L549 SPECIFIC, validation.tex L265 SPECIFIC
+%! checked: manuscript/references.bib [entry metadata]; manuscript/sections/appendices/numerical.tex [lines 177, 549]; manuscript/sections/appendices/validation.tex [lines  [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
 @article{fornberg1988generation,
   author  = {Fornberg, Bengt},
@@ -513,6 +653,10 @@
   year    = {1988}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:title+abstract conf=high
+%! purpose: Duhamel integral method and matrix exponential action computation via Krylov schemes for exponential time integration
+%! used: constraint_barrier.tex L152 SPECIFIC, constraint_barrier.tex L168 SPECIFIC, constraint_barrier.tex L195 ATTRIBUTION, numerical.tex L443 EXISTENCE, numerical.tex L470 SPECIFIC
+%! checked: references.bib: Al-Mohy, Awad H. and Higham, Nicholas J., 2011 (SIAM Journal on Scientific Computing vol. 33, pp. 488-511) [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
 @article{almohy2011action,
   author  = {Al-Mohy, Awad H. and Higham, Nicholas J.},
@@ -524,6 +668,11 @@
   year    = {2011}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Mathematical formulas for exponential integrators: Duhamel integral solution and kernel definition.
+%! used: constraint_barrier.tex L152 SPECIFIC, constraint_barrier.tex L168 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1017_S0962492910000048.json [2026-05-30]
+%! evidence: Abstract confirms paper is on "Exponential integrators" covering "construction, analysis, implementation" and "mathematics behind these methods," but does not explicitly mention Duhamel integral or kernel formulas.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1017%2FS0962492910000048 verdict=MINOR
 @article{hochbruck2010exponential,
   author  = {Hochbruck, Marlis and Ostermann, Alexander},
@@ -535,6 +684,11 @@
   year    = {2010}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=medium
+%! purpose: Padé scaling-and-squaring method for computing matrix exponentials in Fourier modal solver, with O(b³) complexity and robustness to condition number.
+%! used: computational_approach.tex L41 SPECIFIC, numerical.tex L270 SPECIFIC, numerical.tex L287 EXISTENCE, numerical.tex L322 SPECIFIC
+%! checked: doi_10.1137_090768539.json [title only; abstract not available] [2026-05-30]
+%! evidence: Title: "The Scaling and Squaring Method for the Matrix Exponential Revisited" — confirms Padé scaling-and-squaring topic but abstract unavailable to verify specific claims about O(b³) complexity or scipy.linalg.expm impl
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137%2F090768539 verdict=MINOR
 @article{higham2009scaling,
   author  = {Higham, Nicholas J.},
@@ -547,6 +701,10 @@
   doi     = {10.1137/090768539}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: GMRES algorithm for solving nonsymmetric linear systems in SUNDIALS Krylov interface
+%! used: numerical.tex L743 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1137_0907058.json [title only] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137%2F0907058 verdict=MINOR
 @article{saad1986gmres,
   author  = {Saad, Youcef and Schultz, Martin H.},
@@ -559,6 +717,11 @@
   doi     = {10.1137/0907058}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=low
+%! purpose: Foundational reference for supernodal sparse LU factorization algorithm used in SuperLU and CSC format storage
+%! used: numerical.tex L449 SPECIFIC, numerical.tex L659 SPECIFIC, numerical.tex L736 SPECIFIC, numerical.tex L761 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/10.1137/S0895479895291765.json [not found]; manuscript/references.bib [title + DOI only] [2026-05-30]
+%! evidence: Paper title "A Supernodal Approach to Sparse Partial Pivoting" and author list (Demmel, Gilbert, Li, Liu) strongly suggest core SuperLU algorithmic content, but abstract unavailable for tier C verification of SPECIFIC cl
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137%2FS0895479895291765 verdict=MINOR
 @article{demmel1999supernodal,
   author  = {Demmel, James W. and Eisenstat, Stanley C. and Gilbert, John R. and Li, Xiaoye S. and Liu, Joseph W. H.},
@@ -571,6 +734,11 @@
   doi     = {10.1137/S0895479895291765}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Establish SuperLU's sparse Gaussian elimination, CSC format handling, and O(N^2) build / O(N) solve complexity for Jacobian factorization in constrained ODE solvers.
+%! used: numerical.tex L449 SPECIFIC, numerical.tex L659 SPECIFIC, numerical.tex L736 SPECIFIC, numerical.tex L761 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1137_S0895479897317685.json (title only; abstract empty) [2026-05-30]
+%! evidence: Title: "An Asynchronous Parallel Supernodal Algorithm for Sparse Gaussian Elimination" — confirms SuperLU topic but abstract unavailable to verify SPECIFIC claims about CSC format or complexity bounds.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137/S0895479897317685 verdict=FIXED
 %! TIDAL uses SuperLU_MT (shared-memory); added the SuperLU_MT paper. Replaces the SuperLU_DIST cite [[lidemmel2003superlu]] (wrong variant) at the 4 sites in numerical.tex.
 @article{demmel1999superlumt,
@@ -584,6 +752,10 @@
   doi     = {10.1137/S0895479897317685}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Reference for condition number analysis of eigenvector matrices and matrix exponential computational methods in numerical linear algebra
+%! used: numerical.tex L276 SPECIFIC, numerical.tex L280 EXISTENCE
+%! checked: bibliographic entry + published chapter information (tier C, abstract not in cache) [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
 @book{golub2013matrix,
   author    = {Golub, Gene H. and Van Loan, Charles F.},
@@ -607,6 +779,10 @@
   isbn      = {978-0-691-11946-5}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Standard reference for numerical linear algebra and matrix computation accuracy/stability thresholds
+%! used: numerical.tex L280 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/manuscript/references.bib [bibliographic entry: author, title, publisher, DOI]; /workspaces/torsion-gertsenshtein/manuscript/s [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
 @book{trefethen1997numerical,
   author    = {Trefethen, Lloyd N. and Bau, David},
@@ -622,6 +798,10 @@
   eisbn     = {978-0-89871-957-4}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Reference establishing that Schur-complement reduction is standard practice in DAE numerical solving
+%! used: numerical.tex L383 EXISTENCE
+%! checked: manuscript/references.bib [bibliography entry: Brenan et al 1996, SIAM book on numerical DAE solution] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
 @book{brenan1996numerical,
   author    = {Brenan, K. E. and Campbell, S. L. and Petzold, L. R.},
@@ -661,6 +841,11 @@
   doi     = {10.1006/jcph.1994.1159}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Dedalus computational framework for solving PDEs using spectral methods and multiple solver backends
+%! used: numerical.tex L504 EXISTENCE, numerical.tex L527 EXISTENCE, numerical.tex L542 SPECIFIC, validation.tex L265 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_1905.10388.json [2026-05-30]
+%! evidence: Abstract confirms: "The Dedalus Project is a flexible, open-source, parallelized computational framework for solving general partial differential equations using spectral methods...Classes for spectral bases and domains 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevResearch.2.023068 verdict=MINOR
 @article{burns2020dedalus,
   author        = {Burns, Keaton J. and Vasil, Geoffrey M. and Oishi, Jeffrey S. and Lecoanet, Daniel and Brown, Benjamin P.},
@@ -679,6 +864,11 @@
 % Numerical Methods — Textbooks
 % =====================================================================
 
+% CITE v=1 status=UNVERIFIABLE depth=cheap:bibliography conf=medium
+%! purpose: Attributes the second-order Störmer-Verlet symplectic integrator scheme and its properties (shadow Hamiltonian preservation, zero energy drift) to Hairer et al. 2006 textbook on geometric numerical in
+%! used: numerical.tex L604 ATTRIBUTION, numerical.tex L620 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1007_3-540-30666-8.json [title only; abstract empty] [2026-05-30]
+%! evidence: Abstract cache entry shows found: false with empty abstract content. Title is "Geometric Numerical Integration" but the specific claim about Störmer-Verlet scheme attribution cannot be confirmed from the cache.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007/3-540-30666-8 verdict=ENRICHED
 %! added DOI (Crossref-verified book record)
 @book{hairer2006geometric,
@@ -692,6 +882,11 @@
   doi       = {10.1007/3-540-30666-8}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: ODE solver reference for Adams family methods and DOP853 Runge-Kutta scheme description
+%! used: numerical.tex L595 EXISTENCE, numerical.tex L626 SPECIFIC
+%! checked: doi_10.1007_978-3-540-78862-1.json [title only]; references.bib [2026-05-30]
+%! evidence: Abstract field is empty in cache; title from bib entry confirms "Solving Ordinary Differential Equations I: Nonstiff Problems"
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007/978-3-540-78862-1 verdict=ENRICHED
 %! added DOI (Crossref-verified book record)
 @book{hairer1993ode1,
@@ -705,6 +900,10 @@
   doi       = {10.1007/978-3-540-78862-1}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Reference for Schur-complement DAE reduction and BDF methods for stiff ODE problems
+%! used: numerical.tex L383 EXISTENCE, numerical.tex L594 SPECIFIC
+%! checked: literature not available (tier C, abstract cache only); bibliography entry from /workspaces/torsion-gertsenshtein/manuscript/references.bib:710-719 [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007/978-3-642-05221-7 verdict=ENRICHED
 %! added DOI (Crossref-verified book record)
 @book{hairer1996ode2,
@@ -718,6 +917,11 @@
   doi       = {10.1007/978-3-642-05221-7}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Reference for spectral method convergence, Fourier symbols, dealiasing, and Hermitian Fourier properties in numerical solver documentation.
+%! used: numerical.tex L202 SPECIFIC, numerical.tex L432 SPECIFIC, numerical.tex L486 EXISTENCE, numerical.tex L504 EXISTENCE, numerical.tex L527 EXISTENCE, numerical.tex L561 EXISTENCE
+%! checked: worklist metadata only (tier E, no eprint/doi/abstract cache) [2026-05-30]
+%! evidence: Boyd's "Chebyshev and Fourier Spectral Methods" is a canonical textbook on spectral methods; the title and tier E metadata confirm topical relevance to all six cited claims (convergence, Fourier symbols, dealiasing, Herm
 % AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
 %! no DOI (Dover 2001 reprint); complete book citation
 @book{boyd2001chebyshev,
@@ -741,6 +945,11 @@
 % Software & Codebases
 % =====================================================================
 
+% CITE v=1 status=PARTIAL depth=cheap conf=medium
+%! purpose: xAct tensor computer algebra system used for symbolic derivation of linearized field equations in TIDAL pipeline
+%! used: architecture.tex L38 SPECIFIC, symbolic.tex L25 SPECIFIC, symbolic.tex L181 SPECIFIC, computational_approach.tex L33 SPECIFIC
+%! checked: manuscript/references.bib [ at misc entry title only] [2026-05-30]
+%! evidence: at misc{martingarcia2007xact, title = {{xAct}: Efficient tensor computer algebra for {Mathematica}}, year = {2002}
 % AUDIT v=1 date=2026-05-30 src=http://www.xact.es verdict=FIXED
 %! retyped to a misc/webpage entry (it is the xAct webpage, by Martin-Garcia); removed Invar-paper co-authors. The xAct authors ask users to cite this page + the xPerm paper (martingarcia2008xperm).
 @misc{martingarcia2007xact,
@@ -750,6 +959,11 @@
   year         = {2002}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=high
+%! purpose: Cited as part of xAct suite for symbolic tensor computation in TIDAL, but specific perturbation-expansion claims are attributed to xPert, not xPerm
+%! used: architecture.tex L38 SPECIFIC, symbolic.tex L25 SPECIFIC, computational_approach.tex L33 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_0803.0862.json [2026-05-30]
+%! evidence: Abstract: "We present a very fast implementation of the Butler-Portugal algorithm for index canonicalization with respect to permutation symmetries. It is called xPerm, and has been written as a combination of a Mathemat
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv:0803.0862&format=bibtex verdict=FIXED
 %! canonical xAct algorithm paper (xPerm), added per the xAct citation request
 @article{martingarcia2008xperm,
@@ -766,6 +980,10 @@
   doi           = {10.1016/j.cpc.2008.05.009}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: xPert tensor algebra package for metric perturbation theory expansion to arbitrary orders around backgrounds
+%! used: architecture.tex L40 SPECIFIC, symbolic.tex L26 SPECIFIC, symbolic.tex L115 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_0807.0824.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A0807.0824&format=bibtex verdict=ENRICHED
 @article{brizuela2009xpert,
   doi           = {10.1007/s10714-009-0773-2},
@@ -779,6 +997,10 @@
   archiveprefix = {arXiv}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Framework for Python-based PDE solving and numerical infrastructure (grid and field-container design patterns).
+%! used: numerical.tex L24 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.21105_joss.02158.json [title only] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.21105%2Fjoss.02158 verdict=MINOR
 @article{zwicker2020pypde,
   author  = {Zwicker, David},
@@ -875,6 +1097,10 @@
 % Gravitational Wave Observatories
 % =====================================================================
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: LISA mission as a gravitational-wave detector spanning nanohertz to sub-Hz frequencies
+%! used: introduction.tex L233 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1702.00786.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1702.00786&format=bibtex verdict=MATCH
 @article{amaro2017lisa,
   author        = {Amaro-Seoane, Pau and others},
@@ -885,6 +1111,10 @@
   primaryclass  = {astro-ph.IM}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Evidence that gravitational-wave observation extends to nanohertz frequencies via pulsar-timing arrays
+%! used: introduction.tex L230 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_2306.16213.json [title, abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.3847%2F2041-8213%2Facdac6 verdict=MINOR
 @article{nanograv2023fifteen,
   author        = {Agazie, Gabriella and others},
@@ -900,6 +1130,10 @@
   doi           = {10.3847/2041-8213/acdac6}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Landmark detection of stochastic gravitational-wave background at nanohertz frequencies using pulsar-timing arrays
+%! used: introduction.tex L230 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_2306.16214.json [title, abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1051%2F0004-6361%2F202346844 verdict=MINOR
 @article{EPTA:2023fyk,
   author        = {Antoniadis, J. and others},
@@ -915,6 +1149,10 @@
   doi           = {10.1051/0004-6361/202346844}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Evidence that nanohertz pulsar-timing arrays detect gravitational waves across the nanohertz frequency decade
+%! used: introduction.tex L230 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2306.16215.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.3847%2F2041-8213%2Facdd02 verdict=MINOR
 @article{Reardon:2023gzh,
   author        = {Reardon, Daniel J. and others},
@@ -949,6 +1187,11 @@
 % Pre-arXiv Foundations
 % =====================================================================
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=low
+%! purpose: Foundational reference for Poincaré gauge theory formulation, field strength definitions, and linear sector invariants
+%! used: pgt_background.tex L25 EXISTENCE, pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L124 SPECIFIC, introduction.tex L538 EXISTENCE, theory.tex L69 SPECIFIC, theory.tex L90 EXISTENCE, theory.tex L127 SPECIFIC
+%! checked: scripts/bibaudit/cache/worklist/kibble1961lorentz.json (worklist only); manuscript/references.bib (bibliographic metadata); no full text or abstract cache avail [2026-05-30]
+%! evidence: Bibliography entry confirms: Kibble, T. W. B., "Lorentz Invariance and the Gravitational Field", J. Math. Phys., vol. 2, no. 2, pp. 212-221, 1961, doi: 10.1063/1.1703702
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1063%2F1.1703702 verdict=MINOR
 @article{kibble1961lorentz,
   author  = {Kibble, T. W. B.},
@@ -961,6 +1204,11 @@
   doi     = {10.1063/1.1703702}
 }
 
+% CITE v=1 status=PARTIAL depth=cheap conf=high
+%! purpose: Foundational gauge-theoretic formulation of gravity; establishes local Poincaré symmetry gauging as field theory interpretation of interactions and gravity
+%! used: pgt_background.tex L25 EXISTENCE, introduction.tex L538 EXISTENCE, theory.tex L69 SPECIFIC
+%! checked: bibliography metadata only (no abstract cached for tier-C non-arXiv paper) [2026-05-30]
+%! evidence: Bibliography entry: "Utiyama, Ryoyu, 'Invariant theoretical interpretation of interaction,' Phys. Rev. vol. 101, pp. 1597–1607 (1956)"
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRev.101.1597 verdict=MINOR
 @article{utiyama1956invariant,
   author  = {Utiyama, Ryoyu},
@@ -972,6 +1220,11 @@
   doi     = {10.1103/PhysRev.101.1597}
 }
 
+% CITE v=1 status=PARTIAL depth=cheap conf=medium
+%! purpose: Foundational work on gauge-theoretic formulation of gravity with Poincaré symmetry; cited as pioneer in PGT development and Palatini formulation
+%! used: pgt_background.tex L25 EXISTENCE, introduction.tex L538 EXISTENCE, theory.tex L69 SPECIFIC
+%! checked: manuscript/references.bib [bibliography entry only; tier E, no abstract] [2026-05-30]
+%! evidence: Sciama, D. W., "On the analogy between charge and spin in general relativity," Recent Developments in General Relativity (1962) pp. 415–439
 % AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
 %! complete incollection (Infeld ed., Pergamon 1962); no DOI/arXiv
 @incollection{sciama1962physical,
@@ -985,6 +1238,11 @@
   pages     = {415--439}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Foundational work on Einstein–Cartan theory with independent torsion/connection fields, cited as a formative reference for Poincaré gauge theory formulation.
+%! used: introduction.tex L538 EXISTENCE, theory.tex L69 SPECIFIC
+%! checked: manuscript/references.bib [title + author + year only; no abstract or eprint available] [2026-05-30]
+%! evidence: Trautman, Andrzej. "On the Einstein–Cartan equations I" Bull. Acad. Pol. Sci. Ser. Math. Astron. Phys. vol. 20, pp. 185–190, 1972.
 % AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
 %! pre-arXiv (Bull. Acad. Pol. Sci. 1972); complete; no DOI/arXiv
 @article{trautman1972einstein,
@@ -996,6 +1254,11 @@
   year    = {1972}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro:Ch1 conf=high
+%! purpose: Foundational reference for metric-affine gravity framework, torsion decomposition, connection independence, and gauge-theoretic PGT formulation
+%! used: pgt_background.tex L54 SPECIFIC, pgt_background.tex L185 SPECIFIC, pgt_background.tex L220 SPECIFIC, pgt_background.tex L251 EXISTENCE, pgt_background.tex L383 SPECIFIC, pgt_background.tex L432 SPECIFIC, pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L177 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/gr-qc_9402012/main.tex [Chapter 1 intro], abstract from arxiv_gr-qc_9402012.json [2026-05-30]
+%! evidence: Abstract: "metric--affine spacetime with nonvanishing torsion and nonmetricity... gauging of the general affine group A(4,R)... Yang-Mills like form" + Introduction 114: "a metric-affine (L_4,g) spacetime" + Introduction
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0370-1573%2894%2900111-F verdict=MINOR
 @article{hehl1995metric,
   author        = {Hehl, Friedrich W. and McCrea, J. Dermott and Mielke, Eckehard W. and Ne'eman, Yuval},
@@ -1009,6 +1272,11 @@
   doi           = {10.1016/0370-1573(94)00111-F}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Foundational reference for Poincaré gauge theory structure, principles, and field-strength definitions used throughout the manuscript.
+%! used: pgt_background.tex L25 EXISTENCE, pgt_background.tex L54 SPECIFIC, pgt_background.tex L70 SPECIFIC, pgt_background.tex L226 EXISTENCE, pgt_enumeration.tex L68 EXISTENCE, theory.tex L73 SPECIFIC, theory.tex L90 EXISTENCE, theory.tex L184 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_gr-qc_0302040.json [abstract only] [2026-05-30]
+%! evidence: Abstract confirms "basic structure of Poincare gauge theory, with emphasis on its fundamental principles and geometric interpretation." Specific formulas (tetrad-bilinear relation, Palatini decomposition) cannot be confi
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3Agr-qc/0302040&format=bibtex verdict=MINOR
 @article{blagojevic2003lectures,
   author        = {Blagojevi\'{c}, Milutin},
@@ -1022,6 +1290,10 @@
   archiveprefix = {arXiv}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Comprehensive reference for Cartan formulation of torsion, Poincaré gauge theory equations, and Riemann-Cartan spacetime structure
+%! used: perturbative_regime.tex L129 SPECIFIC, pgt_background.tex L54 SPECIFIC, pgt_background.tex L94 SPECIFIC, pgt_enumeration.tex L135 EXISTENCE, pgt_enumeration.tex L211 EXISTENCE, theory.tex L73 SPECIFIC, theory.tex L90 EXISTENCE, theory.tex L184 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_0711.1535.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A0711.1535&format=bibtex verdict=MINOR
 @article{hehlobukhov2007cartan,
   author        = {Hehl, Friedrich W. and Obukhov, Yuri N.},
@@ -1035,6 +1307,10 @@
   primaryclass  = {gr-qc}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Establishes non-linear ghost-freedom in higher-curvature gravity through PGT and torsion structures; verifies propagating mode dependencies on kinetic terms
+%! used: pgt_background.tex L203 SPECIFIC, pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L90 SPECIFIC, pgt_enumeration.tex L185 EXISTENCE, pgt_enumeration.tex L233 ATTRIBUTION, discussion.tex L37 EXISTENCE, theory.tex L111 SPECIFIC, theory.tex L134 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2009.11739/PGTandMG1120.tex [abstract, intro, sections on quadratic gravity and ghost-free theory] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.102.124049 verdict=MINOR
 @article{aoki2020nonlinear,
   author        = {Aoki, Katsuki},
@@ -1049,6 +1325,10 @@
   doi           = {10.1103/PhysRevD.102.124049}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Standard reference for Poincaré gauge theory formalism, field content, and pedagogical treatment of torsion/curvature as field strengths
+%! used: pgt_background.tex L54 SPECIFIC, pgt_background.tex L129 EXISTENCE, pgt_enumeration.tex L68 EXISTENCE, introduction.tex L538 EXISTENCE, theory.tex L69 SPECIFIC, theory.tex L73 SPECIFIC
+%! checked: scripts/bibaudit/cache/books/candidates.json [entry for blagojevic2002gravitation]; manuscript/references.bib; manuscript/sections/appendices/pgt_background.tex [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1201/9781420034264 verdict=ENRICHED
 %! added DOI (Crossref-verified book record)
 @book{blagojevic2002gravitation,
@@ -1061,6 +1341,10 @@
   doi       = {10.1201/9781420034264}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:abstract conf=medium
+%! purpose: Comprehensive reader with commentaries on gauge theories of gravitation covering PGT foundations (Cartan equation, tetrad formalism, field-strength interpretation)
+%! used: perturbative_regime.tex L129 SPECIFIC, pgt_background.tex L54 SPECIFIC, theory.tex L73 ATTRIBUTION
+%! checked: manuscript/references.bib [ISBN and DOI verified]; literature_content_notes.md [contextual PGT references]; no full-text access (Tier C, DOI-only, no eprint) [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142/p781 verdict=REVIEWED
 %! Crossref lists 2011 (World Scientific); 2013 is the Imperial College Press printing. Keep 2013.
 @book{blagojevicHehl2013,
@@ -1073,6 +1357,11 @@
   doi       = {10.1142/p781}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Foundational 1980 work on ghost-free PGT Lagrangians with propagating torsion; cited for graviton spectrum, Lagrangian conventions, unitarity conditions, and general PGT literature background.
+%! used: inference_architecture.tex L81 EXISTENCE, perturbative_regime.tex L93 SPECIFIC, pgt_background.tex L196 SPECIFIC, pgt_background.tex L201 SPECIFIC, pgt_background.tex L251 EXISTENCE, pgt_background.tex L419 ATTRIBUTION, pgt_background.tex L432 SPECIFIC, pgt_background.tex L445 SPECIFIC
+%! checked: doi_10.1103_PhysRevD.21.3269.json [title only] [2026-05-30]
+%! evidence: Title: "New ghost-free gravity Lagrangians with propagating torsion" (PhysRevD.21.3269, pages 3269-3280, 1980). Abstract field in cache is empty.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.21.3269 verdict=MINOR
 @article{sezgin1980ghostfree,
   author  = {Sezgin, E. and van Nieuwenhuizen, P.},
@@ -1085,6 +1374,11 @@
   doi     = {10.1103/PhysRevD.21.3269}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Photon-graviton conversion methodology and spin properties in magnetic fields
+%! used: perturbative_regime.tex L93 SPECIFIC, theory.tex L222 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1103_PhysRevD.54.4757.json (empty abstract, title only) [2026-05-30]
+%! evidence: Title: "Photon-graviton conversion in a primordial magnetic field and the cosmic microwave background" — establishes relevance to domain but abstract is empty
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.54.4757 verdict=MINOR
 @article{cillis1996graviton,
   author  = {Cillis, A. N. and Harari, D. D.},
@@ -1100,6 +1394,10 @@
 % Barker Software Papers
 % =====================================================================
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Software for computing particle spectra of tensor field theories; cited for ghost/tachyon analysis and spectrum extraction methods.
+%! used: inference_architecture.tex L88 EXISTENCE, inference_architecture.tex L143 EXISTENCE, pgt_enumeration.tex L187 EXISTENCE, pgt_enumeration.tex L191 EXISTENCE, conclusion.tex L31 SPECIFIC, discussion.tex L70 SPECIFIC, results.tex L626 SPECIFIC, theory.tex L30 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2406.09500/Manuscript.tex [abstract, intro §70-82, conclusion §1122-1124] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.112.016018 verdict=MINOR
 @article{barker2024psalter,
   author        = {Barker, W. and Marzo, C. and Rigouzzo, C.},
@@ -1115,6 +1413,10 @@
   doi           = {10.1103/PhysRevD.112.016018}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Provides PSALTer software and methods for computing particle spectra in parity-violating tensor field theories, including ghost-free and no-tachyon conditions.
+%! used: inference_architecture.tex L88 EXISTENCE, inference_architecture.tex L143 EXISTENCE, pgt_background.tex L243 EXISTENCE, pgt_enumeration.tex L34 EXISTENCE, pgt_enumeration.tex L218 SPECIFIC, conclusion.tex L31 SPECIFIC, discussion.tex L70 SPECIFIC, results.tex L626 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2506.02111/Manuscript.tex [title, abstract, intro lines 52-98] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2Fsghn-mc81 verdict=MINOR
 @article{barker2025psalter2,
   author        = {Barker, W. and Karananas, G. K. and Tu, H.},
@@ -1130,6 +1432,10 @@
   doi           = {10.1103/sghn-mc81}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Hamilcar: canonical analysis tool for constraint algebras in extended gravity theories, including Poincaré gauge theory
+%! used: theory.tex L75 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2512.25007/Manuscript.tex [title, abstract, introduction] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2512.25007&format=bibtex verdict=MATCH
 @article{barker2025hamilcar,
   author        = {Barker, Will},
@@ -1159,6 +1465,11 @@
   doi           = {10.1103/PhysRevD.109.024022}
 }
 
+% CITE v=1 status=MISMATCH depth=abstract+intro conf=high
+%! purpose: Source cited for discussion of two distinct κ definitions in Gertsenshtein literature (κ² = 16πG vs κ_(E) = 8πG), but paper only defines κ = 8πG with no mention of alternatives
+%! used: theory.tex L30 ATTRIBUTION
+%! checked: /workspaces/torsion-gertsenshtein/literature/2303.11094/Manuscript.tex [2026-05-30]
+%! evidence: Barker 2023 line 253 states: "The Newton and Einstein constants and the Planck mass are related by {8π G ≡ κ ≡ 1/M_Pl²}". This is the only definition of κ in the paper. No discussion of alternative κ conventions, gravito
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2303.11094&format=bibtex verdict=MATCH
 @article{barker2023confinement,
   author        = {Barker, W. E. V. and Hobson, M. P. and Lasenby, A. N.},
@@ -1169,6 +1480,11 @@
   primaryclass  = {gr-qc}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro+body conf=high
+%! purpose: Hamiltonian analysis of quadratic torsion PGT theories and constraint structure dependence on parameters
+%! used: constraint_barrier.tex L247 SPECIFIC, constraint_barrier.tex L295 EXISTENCE, pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L144 SPECIFIC, pgt_enumeration.tex L185 EXISTENCE, pgt_enumeration.tex L243 ATTRIBUTION
+%! checked: /workspaces/torsion-gertsenshtein/literature/2101.02645/apstemplate.tex [title, abstract, intro, conclusion, equations throughout] [2026-05-30]
+%! evidence: From conclusion point 5: "all eight cases feature primary constraints which transition from first to second class when moving to the nonlinear regime" — shows constraint structure change, but uses "transition" not "disco
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.104.084036 verdict=MINOR
 @article{barker2021hamiltonian,
   author        = {Barker, W. E. V. and Lasenby, A. N. and Hobson, M. P. and Handley, W.},
@@ -1229,6 +1545,11 @@
   doi           = {10.1103/PhysRevD.103.104042}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=cheap:abstract conf=medium
+%! purpose: Foundational reference on finite transformations and local Poincaré gauge theory including matter field transformation laws and commutator field strength relations
+%! used: pgt_background.tex L25 EXISTENCE, pgt_background.tex L30 SPECIFIC, pgt_background.tex L47 EXISTENCE, pgt_background.tex L129 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_1510.06699.json [abstract only] [2026-05-30]
+%! evidence: Site 2 (SPECIFIC formula): The abstract does not explicitly present the exponential form phi ↦ exp(Ω^{ij}(x)Σ_{ij})phi. Without tier A access, this specific formula cannot be verified from abstract alone.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1063%2F1.4963143 verdict=MINOR
 @article{lasenby2016scale,
   author        = {Lasenby, Anthony and Hobson, Michael},
@@ -1259,6 +1580,11 @@
   doi           = {10.1103/PhysRevD.104.024034}
 }
 
+% CITE v=1 status=MISMATCH depth=abstract+intro conf=high
+%! purpose: Ghost-free Poincaré gauge theory classification and parametrization conventions for torsion-curvature couplings
+%! used: pgt_background.tex L445 SPECIFIC, inference_architecture.tex L17 SPECIFIC, pgt_background.tex L196 SPECIFIC, pgt_background.tex L201 SPECIFIC, pgt_background.tex L418 ATTRIBUTION, pgt_background.tex L432 SPECIFIC, pgt_enumeration.tex L30 EXISTENCE, pgt_enumeration.tex L68 EXISTENCE
+%! checked: literature/1812.02675/PGT-particles.tex [title, abstract, introduction, main Lagrangian sections lines 1006-1027, torsionless subsection 1086-1091] [2026-05-30]
+%! evidence: Lin 2019 (line 1026-1028): "we have adopted the conventions in \cite{Sezgin1980} for the parameters, which simplifies calculations and enables a straightforward comparison with the literature." VERSUS manuscript (pgt_bac
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.99.064001 verdict=MINOR
 @article{lin2019pgt,
   author        = {Lin, Yun-Cherng and Hobson, Michael P. and Lasenby, Anthony N.},
@@ -1274,6 +1600,11 @@
   doi           = {10.1103/PhysRevD.99.064001}
 }
 
+% CITE v=1 status=WEAK depth=abstract conf=high
+%! purpose: Systematic analysis of parity-odd Poincaré gauge theory spectrum and ghost/tachyon constraints
+%! used: inference_architecture.tex L17 SPECIFIC, pgt_background.tex L243 EXISTENCE, pgt_enumeration.tex L34 EXISTENCE, pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L75 SPECIFIC, pgt_enumeration.tex L205 EXISTENCE, pgt_enumeration.tex L218 SPECIFIC, results.tex L338 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1411.5613.json [title, abstract] [2026-05-30]
+%! evidence: Abstract: "gravitational theory based on the Poincaré group with terms which are at most quadratic in tetrad and spin connection... parity-even as well as parity-odd invariants." — No mention of electromagnetism or EM co
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F0264-9381%2F32%2F5%2F055012 verdict=MINOR
 @article{karananas2014parity,
   author        = {Karananas, Georgios K.},
@@ -1289,6 +1620,11 @@
   doi           = {10.1088/0264-9381/32/5/055012}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=high
+%! purpose: Establishes Barbero's modification of Ashtekar variables and defines the Barbero-Immirzi parameter, referenced for linear invariants in Poincaré gauge theory
+%! used: pgt_enumeration.tex L28 EXISTENCE, pgt_enumeration.tex L124 SPECIFIC, theory.tex L127 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_gr-qc_9511026.json [2026-05-30]
+%! evidence: Abstract states: "Barbero recently suggested a modification of Ashtekar's choice of canonical variables for general relativity... we derive Barbero's Hamiltonian formulation from an action, which can be considered as a g
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.53.5966 verdict=MINOR
 @article{holst1995barbero,
   author        = {Holst, S{\"o}ren},
@@ -1302,6 +1638,10 @@
   doi           = {10.1103/PhysRevD.53.5966}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=medium
+%! purpose: Source for the Barbero–Immirzi parameter in Ashtekar formalism of quantum gravity
+%! used: pgt_enumeration.tex L28 EXISTENCE, pgt_enumeration.tex L133 EXISTENCE, theory.tex L127 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_gr-qc_9410014.json [abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.51.5507 verdict=MINOR
 @article{barbero1995real,
   author        = {Barbero G., J. Fernando},
@@ -1315,6 +1655,10 @@
   doi           = {10.1103/PhysRevD.51.5507}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Establishes Immirzi's authorship of the arbitrary parameter (β in the paper, γ_BI in manuscript) entering the real connection formulation of canonical gravity
+%! used: pgt_enumeration.tex L28 EXISTENCE, pgt_enumeration.tex L133 EXISTENCE, theory.tex L127 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_gr-qc_9612030.json [title+abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F0264-9381%2F14%2F10%2F002 verdict=MINOR
 @article{immirzi1997real,
   author        = {Immirzi, Giorgio},
@@ -1328,6 +1672,10 @@
   doi           = {10.1088/0264-9381/14/10/002}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro+conclusion conf=high
+%! purpose: Comprehensive Hamiltonian analysis of parity-violating PGT; establishes spin-1/spin-2 mode mutual exclusivity constraints and ghost-tachyon-freedom conditions.
+%! used: inference_architecture.tex L17 SPECIFIC, inference_architecture.tex L81 EXISTENCE, perturbative_regime.tex L214 SPECIFIC, pgt_background.tex L201 SPECIFIC, pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L75 SPECIFIC, pgt_enumeration.tex L81 SPECIFIC, pgt_enumeration.tex L185 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/1804.05556/main.tex [title/abstract + intro lines 103-151 + conclusion lines 1532-1571] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.98.024014 verdict=MINOR
 @article{blagojevic2018hamiltonian,
   author        = {Blagojevi{\'c}, M. and Cvetkovi{\'c}, B.},
@@ -1371,6 +1719,10 @@
   primaryclass  = {hep-th}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Demonstrates full Hamiltonian constraint analysis methodology applied to pure R² gravity; cited as comparator for constraint structure analysis and as secondary reference for Hamilcar/PSALTer software
+%! used: constraint_barrier.tex L280 SPECIFIC, theory.tex L75 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2510.08201/spectrum_R2.tex [title, abstract (lines 137-157), introduction (lines 178-280)] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2510.08201&format=bibtex verdict=ENRICHED
 @article{barker2024r2,
   journal       = {JCAP},
@@ -1385,6 +1737,10 @@
   primaryclass  = {gr-qc}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: TorC model paper providing concrete ghost-free torsion theory application to cosmology; cited for Higgs tachyon analogy and recent PGT applications
+%! used: discussion.tex L25 SPECIFIC, discussion.tex L26 SPECIFIC, introduction.tex L552 EXISTENCE, theory.tex L75 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2507.09228/paper_Qtorsion.tex [lines 136-179] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2026%2F03%2F003 verdict=MINOR
 @article{legner2025torc,
   author        = {Legner, Sinah and Handley, Will and Barker, Will},
@@ -1400,6 +1756,11 @@
   doi           = {10.1088/1475-7516/2026/03/003}
 }
 
+% CITE v=1 status=WEAK depth=abstract+intro conf=high
+%! purpose: Foundational classification of rank-3 field theories via gauge-symmetric methods; principle applied to torsion theories but paper not itself about PGT applications or radiative correction stability.
+%! used: discussion.tex L38 EXISTENCE, theory.tex L75 EXISTENCE
+%! checked: literature/2506.21662/Manuscript.tex [abstract, introduction §Sec:Introduction, methods §Sec:Methods] [2026-05-30]
+%! evidence: Site 1: Paper argues "Good foundations may be found by additionally specifying a gauge symmetry" and "arbitrarily tuned models are in danger of being not-even-non-renormalizable" (Intro, line 113). Site 2: Paper descript
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2506.21662&format=bibtex verdict=MINOR
 @article{barker2025irfound1,
   author        = {Barker, Will and Marzo, Carlo and Santoni, Alessandro},
@@ -1410,6 +1771,10 @@
   primaryclass  = {hep-th}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Establishes that ghost-free unitarity in PGT emerges from gauge symmetries, not arbitrary coupling tuning, protecting against radiative corrections
+%! used: discussion.tex L38 EXISTENCE, theory.tex L75 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2507.05349/Manuscript.tex [abstract, lines 88-90; introduction paragraphs, lines 109-113; figure caption, lines 96- [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv:2507.05349&format=bibtex verdict=FIXED
 %! title updated to the revised INSPIRE/published title (was "...II: torsion-like theories and ghost analysis").
 @article{barker2025irfound2,
@@ -1421,6 +1786,10 @@
   primaryclass  = {hep-th}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Manuscript cites Barker, Marzo & Santoni's metric-affine gravity paper for: (1) figure illustrating non-Riemannian geometry; (2) the affine connection decomposition into Christoffel connection plus di
+%! used: pgt_background.tex L173 EXISTENCE, pgt_background.tex L183 SPECIFIC, theory.tex L75 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2505.23894/Manuscript.tex [title, abstract, intro lines 87-210] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2F1xqx-f57g verdict=MINOR
 @article{barker2025metricaffine,
   author        = {Barker, Will and Marzo, Carlo and Santoni, Alessandro},
@@ -1436,6 +1805,10 @@
   doi           = {10.1103/1xqx-f57g}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Justifies the use of metric-affine notation and confirms that the Palatini formulation treats metric and affine connection as independent variational fields in PGT
+%! used: pgt_background.tex L332 SPECIFIC, theory.tex L66 SPECIFIC
+%! checked: literature/2402.07641/main.tex [abstract, introduction, §MAGConv (lines 57-97)] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.109.104017 verdict=MINOR
 @article{barker2024palatini,
   author        = {Barker, W. and Marzo, C.},
@@ -1465,6 +1838,10 @@
 % Key Collaborator / Field Papers
 % =====================================================================
 
+% CITE v=1 status=SUPPORTS depth=cheap:abstract conf=high
+%! purpose: Primary reference for Weyl-invariant Einstein-Cartan gravity as a ghost-free torsion theory with non-minimal EM couplings, and as a recent application of PGT-family theories to strong CP problem.
+%! used: introduction.tex L552 EXISTENCE, theory.tex L75 EXISTENCE
+%! checked: literature/2406.11956/gravity_strong-CP_final_subm.tex [title, abstract, intro] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2FJHEP11%282024%29146 verdict=MINOR
 @article{karananas2024weyl,
   author        = {Karananas, Georgios K. and Shaposhnikov, Mikhail and Zell, Sebastian},
@@ -1480,6 +1857,10 @@
   doi           = {10.1007/JHEP11(2024)146}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro+body conf=high
+%! purpose: Reference for cubic Poincaré gauge theory without ghosts and its role in extending beyond quadratic PGT with parametrizations decomposed into sector blocks.
+%! used: inference_architecture.tex L17 SPECIFIC, pgt_enumeration.tex L68 EXISTENCE, pgt_enumeration.tex L271 EXISTENCE, discussion.tex L37 EXISTENCE, discussion.tex L73 SPECIFIC, introduction.tex L554 EXISTENCE, theory.tex L111 SPECIFIC, theory.tex L135 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2506.17017/DEMAG.tex [title, abstract, intro §1, §2.1 cubic action formulation, conclusion] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.dark.2026.102249 verdict=MINOR
 @article{bahamonde2025cubic,
   author        = {Bahamonde, Sebastian and Briffa, Rebecca and Dialektopoulos, Konstantinos and Iosifidis, Damianos and Levi Said, Jackson},
@@ -1494,6 +1875,11 @@
   doi           = {10.1016/j.dark.2026.102249}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Comprehensive review of teleparallel gravity and metric-affine theories providing foundational diagrams for geometric concepts and space classifications
+%! used: pgt_background.tex L92 SPECIFIC, pgt_background.tex L172 EXISTENCE, pgt_background.tex L283 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2106.13793.json [2026-05-30]
+%! evidence: Abstract: "we relate this form of geometry to the broader metric-affine approach to forming gravitational theories... teleparallel equivalent of general relativity... modified teleparallel theories... Poincaré gauge theo
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1361-6633%2Fac9cef verdict=MINOR
 @article{bahamonde2021teleparallel,
   author        = {Bahamonde, Sebastian and Dialektopoulos, Konstantinos F. and Escamilla-Rivera, Celia and Farrugia, Gabriel and Gakis, Viktor and Hendry, Martin and Hohmann, Manuel and Levi Said, Jackson and Mifsud, Jurgen and Di Valentino, Eleonora},
@@ -1509,6 +1895,11 @@
   doi           = {10.1088/1361-6633/ac9cef}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Figure reference for tetrad-Lorentz frame conversion diagram in metric-affine gravity context
+%! used: pgt_background.tex L93 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2208.03011.json (tier B) [2026-05-30]
+%! evidence: Abstract confirms paper discusses "tetrads and spin connection" in metric-affine geometries framework, but makes no mention of specific figures or figure numbering.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1140/epjc/s10052-022-10823-x verdict=FIXED
 %! was doi=...10813-z (resolves to a Lake paper); digit transposition. Corrected to ...10823-x (vol 82, no 10, 865 confirmed).
 @article{capozziello2022comparing,
@@ -1525,6 +1916,11 @@
   doi           = {10.1140/epjc/s10052-022-10823-x}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=high
+%! purpose: Critique of neglected BGMF-induced curvature in Gertsenshtein effect; geometric-optics treatment on curved spacetime
+%! used: introduction.tex L360 EXISTENCE, introduction.tex L482 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2510.17094/Final_version.tex [abstract, intro, conclusions] [2026-05-30]
+%! evidence: Site 1 SUPPORTS: Abstract states "This paper investigates, for the first time, the influence of spacetime curvature on the (inverse) Gertsenshtein effect" and introduction (line 57) criticizes prior work: "In many theore
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2510.17094&format=bibtex verdict=MATCH
 @article{tomomatsu2025gertsenshtein,
   author        = {Tomomatsu, Ryutaro and Suyama, Teruaki and Gondolo, Paolo},
@@ -1539,6 +1935,11 @@
 % Torsion-EM Coupling Foundations
 % =====================================================================
 
+% CITE v=1 status=PARTIAL depth=abstract+intro+section 4-7 (full paper text) conf=high
+%! purpose: Establishes taxonomy of admissible torsion-EM non-minimal couplings and discusses possible coupling schemes including quadratic torsion terms
+%! used: pgt_enumeration.tex L55 EXISTENCE, pgt_enumeration.tex L70 SPECIFIC, pgt_enumeration.tex L308 SPECIFIC, introduction.tex L384 EXISTENCE, introduction.tex L534 EXISTENCE, theory.tex L137 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/gr-qc_0001010/gyros17.tex [title, abstract, sections 1-7], abstract cache [2026-05-30]
+%! evidence: From §4.2 (line 1356-1379): "We want to stress that one cannot achieve a similar non-minimal coupling to the torsion T^α of spacetime... However, higher powers in T^α would be possible such as H=f_0[1 + γ² ⋆(T^α ∧ T_α)] 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2F3-540-40988-2_25 verdict=ENRICHED
 @incollection{hehl2000electromagnetic,
   journal       = {Lecture Notes in Physics},
@@ -1557,6 +1958,10 @@
   doi           = {10.1007/3-540-40988-2_25}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Systematic classification of nonminimal quadratic torsion-EM couplings (F²T² and FT²), including Gertsenshtein-channel and Chern-Simons terms
+%! used: pgt_enumeration.tex L47 EXISTENCE, pgt_enumeration.tex L55 EXISTENCE, pgt_enumeration.tex L70 EXISTENCE, pgt_enumeration.tex L260 EXISTENCE, pgt_enumeration.tex L308 SPECIFIC, introduction.tex L384 EXISTENCE, introduction.tex L551 EXISTENCE, theory.tex L137 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_gr-qc_0307063.json [title + abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3Agr-qc/0307063&format=bibtex verdict=ENRICHED
 @article{itin2004maxwell,
   doi           = {10.1103/PhysRevD.68.127701},
@@ -1570,6 +1975,11 @@
   archiveprefix = {arXiv}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Cited for torsion-electromagnetism couplings, birefringence effects, and nonminimal T²F² coupling structures in PGT
+%! used: pgt_enumeration.tex L70 SPECIFIC, pgt_enumeration.tex L308 SPECIFIC, pgt_enumeration.tex L325 ATTRIBUTION, introduction.tex L383 EXISTENCE, introduction.tex L551 EXISTENCE, theory.tex L137 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_gr-qc_0305049.json [abstract only, tier B] [2026-05-30]
+%! evidence: Abstract: "non-minimal term of this nature... can yield birefringence in vacuum. Moreover... the nonminimally coupled homogeneous and isotropic torsion field... affects the speed of light." — does not enumerate or classi
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F0264-9381%2F20%2F14%2F101 verdict=MINOR
 @article{rubilar2003torsion,
   author        = {Rubilar, Guillermo F. and Obukhov, Yuri N. and Hehl, Friedrich W.},
@@ -1584,6 +1994,11 @@
   doi           = {10.1088/0264-9381/20/14/101}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=low
+%! purpose: Introduced kinetic mixing mechanism between U(1) fields (referenced as foundation for dark-photon and torsion-photon coupling analysis)
+%! used: results.tex L830 EXISTENCE, results.tex L835 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/ [NOT FOUND - no cached abstract for tier C DOI-only paper] [2026-05-30]
+%! evidence: No cached abstract available. Tier C paper (10.1016/0370-2693(86)91377-8) has no archived abstract in the offline cache.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0370-2693%2886%2991377-8 verdict=MINOR
 @article{Holdom:1985ag,
   author       = {Holdom, Bob},
@@ -1596,6 +2011,11 @@
   year         = {1986}
 }
 
+% CITE v=1 status=MISMATCH depth=abstract+intro+deep:Lagrangian conf=high
+%! purpose: Dark photon kinetic mixing with photon via Holdom mechanism; cited for torsion-photon coupling Lagrangian formula
+%! used: validation.tex L212 SPECIFIC, results.tex L830 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2105.04565/main.tex [lines 155-273] [2026-05-30]
+%! evidence: Caputo 2021 abstract: "The dark photon is a massive hypothetical particle that interacts with the Standard Model by kinetically mixing with the visible photon." Lagrangian (lines 250-273) describes kinetic mixing term si
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.104.095029 verdict=MINOR
 @article{caputo2021darkphoton,
   author        = {Caputo, Andrea and Millar, Alexander J. and O'Hare, Ciaran A. J. and Vitagliano, Edoardo},
@@ -1611,6 +2031,10 @@
   doi           = {10.1103/PhysRevD.104.095029}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Critique of pervasive flaws in standard electromagnetic field identification in curved spacetime for gravitational wave detection and analysis of metric-dependent contractions in curved spacetime EM f
+%! used: introduction.tex L360 EXISTENCE, theory.tex L265 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2303.07562.json [title, abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.aop.2023.169332 verdict=MINOR
 @article{hwangnoh2023emdef,
   author        = {Hwang, Jai-chan and Noh, Hyerim},
@@ -1625,6 +2049,10 @@
   doi           = {10.1016/j.aop.2023.169332}
 }
 
+% CITE v=1 status=SUPPORTS depth=deep:abstract+sections 1-2 conf=high
+%! purpose: Clarifies metric-dependence flaws in Gertsenshtein graviton-photon conversion formalism and establishes self-consistency bounds on the perturbative regime.
+%! used: perturbative_regime.tex L17 EXISTENCE, perturbative_regime.tex L33 EXISTENCE, perturbative_regime.tex L365 SPECIFIC, tt_gauge.tex L70 SPECIFIC, validation.tex L72 SPECIFIC, introduction.tex L360 EXISTENCE, theory.tex L265 EXISTENCE, theory.tex L285 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2310.04150/main.tex [abstract, introduction, sections 2-3, discussion] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.dark.2024.101426 verdict=MINOR
 @article{hwangnoh2023graviton,
   author        = {Hwang, Jai-chan and Noh, Hyerim},
@@ -1639,6 +2067,10 @@
   doi           = {10.1016/j.dark.2024.101426}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Evidence that Hwang-Noh have contributed to re-examining graviton-photon conversions and identifying flaws in standard approaches
+%! used: introduction.tex L360 EXISTENCE
+%! checked: literature/2405.11786/main.tex [title, abstract, introduction lines 67-88] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016/j.dark.2024.101534 verdict=FIXED
 %! was title={Nonlinear gauge-invariant cosmological perturbation...}; DOI+author+eprint are the Euler-Heisenberg graviton-photon paper. Title corrected to match.
 @article{hwangnoh2024nonlinear,
@@ -1654,6 +2086,10 @@
   doi           = {10.1016/j.dark.2024.101534}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=medium
+%! purpose: Reference for matrix exponential computation algorithms, eigendecomposition robustness, Padé approximations, and condition number behavior of eigenvector matrices
+%! used: numerical.tex L276 SPECIFIC, numerical.tex L280 EXISTENCE, numerical.tex L287 EXISTENCE, validation.tex L221 EXISTENCE
+%! checked: doi_10.1137_1.9780898717778.json [title only; no abstract available] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137/1.9780898717778 verdict=ENRICHED
 %! added DOI (Crossref-verified book record)
 @book{higham2008functions,
@@ -1665,6 +2101,10 @@
   doi       = {10.1137/1.9780898717778}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:title conf=high
+%! purpose: Reference for matrix-exponential computation algorithms and their accuracy characteristics in numerical linear algebra
+%! used: numerical.tex L280 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1137_S00361445024180.json [title only]; manuscript/references.bib [full entry] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137%2FS00361445024180 verdict=MINOR
 @article{molervanloan2003nineteen,
   author  = {Moler, Cleve and Van Loan, Charles},
@@ -1677,6 +2117,11 @@
   doi     = {10.1137/S00361445024180}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Foundational reference for the Palatini formulation treating metric and affine connection as independent variational fields
+%! used: theory.tex L66 SPECIFIC, pgt_background.tex L332 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1007_BF03014670.json, scripts/bibaudit/cache/crossref/10.1007_BF03014670.json [2026-05-30]
+%! evidence: Abstract unavailable; title "Deduzione invariantiva delle equazioni gravitazionali dal principio di Hamilton" (Invariant Deduction of Gravitational Equations from Hamilton's Principle) matches general topic but does not 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2FBF03014670 verdict=MINOR
 @article{palatini1919deduzione,
   author   = {Palatini, Attilio},
@@ -1690,6 +2135,10 @@
   note     = {English-language reintroduction in~\cite{ferraris1982variational}.}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=medium
+%! purpose: Confirms the Palatini variational formulation treating metric and affine connection as independent fields, and provides metric-affine notation conventions for PGT discussions
+%! used: theory.tex L66 SPECIFIC, pgt_background.tex L332 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1007_BF00756060.json (title only, abstract empty); crossref metadata [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2FBF00756060 verdict=MINOR
 @article{ferraris1982variational,
   author  = {Ferraris, Marco and Francaviglia, Mauro and Reina, Cesare},
@@ -1702,6 +2151,10 @@
   doi     = {10.1007/BF00756060}
 }
 
+% CITE v=1 status=SUPPORTS depth=deep:section conf=high
+%! purpose: Review of effective field theory applied to gravitational systems, establishing that higher-order operators in an EFT arise from integrating out unknown ultraviolet physics
+%! used: constraint_barrier.tex L25 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/gr-qc_0311082/GRET-jhep.tex [title, abstract, sections 1-4: introduction, EFT, gravity-as-EFT, power counting] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.12942%2Flrr-2004-5 verdict=MINOR
 @article{burgess2003quantum,
   author        = {Burgess, C. P.},
@@ -1722,6 +2175,10 @@
 % All entries verified against INSPIRE-HEP.
 % =====================================================================
 
+% CITE v=1 status=SUPPORTS depth=cheap:bibliography conf=high
+%! purpose: Historical source for Ostrogradsky's theorem on higher-order Lagrangians generating ghosts, and for the auxiliary-field reduction method standard in effective field theory.
+%! used: constraint_barrier.tex L26 SPECIFIC, constraint_barrier.tex L41 SPECIFIC, constraint_barrier.tex L93 ATTRIBUTION
+%! checked: manuscript/references.bib [ostrogradsky1850memoires entry]; manuscript/sections/appendices/constraint_barrier.tex [lines 26, 41, 93] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
 %! historical (1850); complete vol/pages; no DOI
 @article{ostrogradsky1850memoires,
@@ -1734,6 +2191,11 @@
   year    = {1850}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=low
+%! purpose: Support for the technique of substituting equations of motion into higher-derivative terms to reduce Lagrangians
+%! used: constraint_barrier.tex L207 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1016_0550-3213(88)90205-2.json [title only, abstract empty] [2026-05-30]
+%! evidence: Abstract not available: found=false, abstract=""
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0550-3213%2888%2990205-2 verdict=MINOR
 @article{Cheyette1988,
   author  = {Cheyette, Oren},
@@ -1746,6 +2208,11 @@
   doi     = {10.1016/0550-3213(88)90205-2}
 }
 
+% CITE v=1 status=MISMATCH depth=abstract+intro conf=high
+%! purpose: Compare derivative reduction methods (JLM, EFT field redefinitions, Cayuso-Lehner) and their breakdown at constraint promotion
+%! used: constraint_barrier.tex L257 SPECIFIC
+%! checked: literature/1710.01562/main.tex [title, abstract, introduction (lines 200-233), summary section (lines 2113-2162), conclusions (lines 2624-2677)] [2026-05-30]
+%! evidence: Line 205-207 states Glavan considers three methods: "(i) derivative reduction on the level of the equations of motion, (ii) derivative reduction by method of perturbative constraints, and (iii) derivative reduction via f
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2FJHEP02%282018%29136 verdict=MINOR
 @article{Glavan2018,
   author        = {Glavan, Drazen},
@@ -1761,6 +2228,11 @@
   doi           = {10.1007/JHEP02(2018)136}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=high
+%! purpose: Review of massive gravity theories; cited for treating constraint promotion as part of a discontinuous limits framework in gravity and gauge theory
+%! used: constraint_barrier.tex L265 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1401.4173.json [abstract only] [2026-05-30]
+%! evidence: Abstract states: "We review recent progress in massive gravity. We start by showing how different theories of massive gravity emerge from a higher-dimensional theory of general relativity, leading to the Dvali-Gabadadze-
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.12942%2Flrr-2014-7 verdict=MINOR
 @article{deRham2014,
   author        = {de Rham, Claudia},
@@ -1775,6 +2247,10 @@
   doi           = {10.12942/lrr-2014-7}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Reviews the Stückelberg mechanism as a method using auxiliary fields to smoothly handle gauge theory transitions from massless to massive modes while preserving gauge invariance
+%! used: constraint_barrier.tex L277 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_hep-th_0304245.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142%2FS0217751X04019755 verdict=MINOR
 @article{RueggRuizAltaba2003,
   author        = {Ruegg, Henri and Ruiz-Altaba, Mart\'i},
@@ -1789,6 +2265,10 @@
   doi           = {10.1142/S0217751X04019755}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Seminal method for reducing fourth-order quantum-corrected gravity equations to physically relevant second-order reduced equations via constraint elimination.
+%! used: constraint_barrier.tex L58 EXISTENCE, constraint_barrier.tex L65 SPECIFIC, constraint_barrier.tex L70 SPECIFIC, validation.tex L154 SPECIFIC, validation.tex L158 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_gr-qc_9211002.json [title+abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.47.1339 verdict=MINOR
 @article{parker1993reduced,
   author        = {Parker, Leonard and Simon, Jonathan Z.},
@@ -1803,6 +2283,11 @@
   doi           = {10.1103/PhysRevD.47.1339}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=low
+%! purpose: Describes the Jaén–Llosa–Molina (JLM) method for reducing higher-derivative Lagrangians by substituting lower-order equations of motion.
+%! used: constraint_barrier.tex L70 SPECIFIC, constraint_barrier.tex L89 SPECIFIC, constraint_barrier.tex L207 SPECIFIC, constraint_barrier.tex L229 ATTRIBUTION, constraint_barrier.tex L254 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1103_PhysRevD.34.2302.json [title only; abstract empty] [2026-05-30]
+%! evidence: Abstract cache returned empty string for this paper; only title available: "A reduction of order two for infinite-order Lagrangians"
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.34.2302 verdict=MINOR
 @article{jaen1986reduction,
   author  = {Ja{\'e}n, X. and Llosa, J. and Molina, A.},
@@ -1814,6 +2299,11 @@
   doi     = {10.1103/PhysRevD.34.2302}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=high
+%! purpose: Support for van Dam-Veltman-Zakharov discontinuity: massless limit of Fierz-Pauli graviton recovers only 5 of 6 polarizations
+%! used: constraint_barrier.tex L266 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/crossref/10.1016_0550-3213(70)90416-5.json [metadata only: title, authors, year, journal] [2026-05-30]
+%! evidence: Available metadata: Title: "Massive and mass-less Yang-Mills and gravitational fields", Authors: van Dam, H. and Veltman, M., Year: 1970, Journal: Nuclear Physics B, Volume: 22, Pages: 397-411. Abstract text not availabl
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0550-3213%2870%2990416-5 verdict=MINOR
 @article{vandam1970massive,
   author  = {van Dam, H. and Veltman, M. J. G.},
@@ -1825,6 +2315,11 @@
   doi     = {10.1016/0550-3213(70)90416-5}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Zakharov 1970 cited for establishing the van Dam–Veltman–Zakharov discontinuity in massive gravity
+%! used: constraint_barrier.tex L266 SPECIFIC
+%! checked: manuscript/references.bib (bibliographic entry only) [2026-05-30]
+%! evidence: Bibliography entry: at article{zakharov1970linearized, author = {Zakharov, V. I.}, title = {Linearized gravitation theory and the graviton mass}, journal = {JETP Lett.}, volume = {12}, pages = {312--314}, year = {1970}}
 % AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
 %! pre-arXiv (JETP Lett. 1970); complete; no DOI/arXiv
 @article{zakharov1970linearized,
@@ -1836,6 +2331,11 @@
   year    = {1970}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Cited for the claim that in nonlinear Fierz-Pauli massive gravity, a sixth ghost-like mode emerges that fails to decouple as m→0
+%! used: constraint_barrier.tex L270 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1103_PhysRevD.6.3368.json [empty abstract] [2026-05-30]
+%! evidence: Abstract field in cache is empty; unable to verify specific physics claim
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.6.3368 verdict=MINOR
 @article{boulware1972gravitation,
   author  = {Boulware, D. G. and Deser, Stanley},
@@ -1847,6 +2347,10 @@
   doi     = {10.1103/PhysRevD.6.3368}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Foundational reference for Dirac–Bergmann constraint analysis, canonical formulation of gauge theories, and kinetic matrix definitions in Hamiltonian mechanics.
+%! used: constraint_barrier.tex L293 EXISTENCE, numerical.tex L34 SPECIFIC, numerical.tex L120 SPECIFIC
+%! checked: manuscript/references.bib (bibliographic entry); tier C book without free abstract cached [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1515/9780691213866 verdict=ENRICHED
 %! added DOI (Crossref-verified book record)
 @book{henneaux1992quantization,
@@ -1859,6 +2363,10 @@
   doi       = {10.1515/9780691213866}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Seminal reference for the union-find (disjoint-set union) algorithm, which is used to collect graph connected components
+%! used: numerical.tex L318 EXISTENCE
+%! checked: bibliography entry + abstract metadata (doi_10.1145_321879.321884.json) [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1145%2F321879.321884 verdict=MINOR
 @article{tarjan1975unionfind,
   author  = {Tarjan, Robert E.},
@@ -1871,6 +2379,11 @@
   doi     = {10.1145/321879.321884}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Reference for ghost-cell formula handling boundary conditions uniformly in finite-difference methods
+%! used: numerical.tex L183 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1137_1.9780898717839.json [2026-05-30]
+%! evidence: Abstract empty; only title available: "Finite Difference Methods for Ordinary and Partial Differential Equations"
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137/1.9780898717839 verdict=ENRICHED
 %! added DOI (Crossref-verified book record)
 @book{leveque2007finite,
@@ -1884,6 +2397,10 @@
   doi       = {10.1137/1.9780898717839}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:title conf=high
+%! purpose: Fourth-order symplectic integration algorithm (Forest-Ruth fused-kick scheme)
+%! used: numerical.tex L613 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1016_0167-2789(90)90019-L.json [title only] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0167-2789%2890%2990019-L verdict=MINOR
 @article{forestruth1990fourth,
   author  = {Forest, Etienne and Ruth, Ronald D.},
@@ -1900,6 +2417,11 @@
 %   NOT the variant TIDAL uses (SuperLU_MT, demmel1999superlumt). The 4 cites were
 %   redirected; entry deleted to avoid mis-citing the wrong SuperLU paper (in git history).
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Cooley-Tukey FFT paper cited for discrete convolution formula and O(N log N) algorithmic complexity
+%! used: numerical.tex L401 SPECIFIC, numerical.tex L655 ATTRIBUTION
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.2307_2003354.json [title only], manuscript/references.bib [full bibtex] [2026-05-30]
+%! evidence: Title only available: "An Algorithm for the Machine Calculation of Complex Fourier Series". No abstract found in cache (tier C). Abstract field is empty in metadata.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.2307%2F2003354 verdict=MINOR
 @article{cooley1965fft,
   author  = {Cooley, James W. and Tukey, John W.},
@@ -1912,6 +2434,10 @@
   doi     = {10.2307/2003354}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=medium
+%! purpose: Foundational signal theory reference for the property that real-valued fields have Hermitian Fourier transforms.
+%! used: numerical.tex L486 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1109_T-AIEE.1928.5055024.json (empty abstract; title: Certain Topics in Telegraph Transmission Theory) [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1109%2FT-AIEE.1928.5055024 verdict=MINOR
 @article{nyquist1928certain,
   author  = {Nyquist, H.},
@@ -1937,6 +2463,10 @@
   doi       = {10.1137/1.9780898718881}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=medium
+%! purpose: Landmark cite for sparse Jacobian matrix estimation and the computational overhead of finite-difference approximation in Newton solvers.
+%! used: numerical.tex L683 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1093_imamat_13.1.117.json [title only; abstract empty] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fimamat%2F13.1.117 verdict=MINOR
 @article{curtispowellreid1974,
   author  = {Curtis, A. R. and Powell, M. J. D. and Reid, J. K.},
@@ -1949,6 +2479,11 @@
   doi     = {10.1093/imamat/13.1.117}
 }
 
+% CITE v=1 status=WEAK depth=abstract conf=high
+%! purpose: Attribution of gauge-fixing by Lagrangian modification technique in Yang-Mills theory
+%! used: symbolic.tex L250 ATTRIBUTION
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1016_0370-2693(67)90067-6.json (title only, abstract empty) [2026-05-30]
+%! evidence: Title: "Feynman diagrams for the Yang-Mills field" by Faddeev & Popov (1967, Phys. Lett. B 25, 29-30). The cached abstract is empty. The Faddeev-Popov 1967 paper is the canonical source for gauge-fixing formalism, but ca
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0370-2693%2867%2990067-6 verdict=MATCH
 @article{faddeev1967feynman,
   author  = {Faddeev, L. D. and Popov, V. N.},
@@ -1960,6 +2495,11 @@
   doi     = {10.1016/0370-2693(67)90067-6}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=low
+%! purpose: Reference for higher-derivative term reduction and de Donder gauge naming in metric perturbations
+%! used: constraint_barrier.tex L49 SPECIFIC, symbolic.tex L266 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.7208_chicago_9780226870373.001.0001.json (empty abstract); references.bib bibliographic record only [2026-05-30]
+%! evidence: Abstract field is empty in cached metadata: "abstract": ""
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.7208%2Fchicago%2F9780226870373.001.0001 verdict=MATCH
 @book{wald1984general,
   author    = {Wald, Robert M.},
@@ -1970,6 +2510,11 @@
   doi       = {10.7208/chicago/9780226870373.001.0001}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Verify that higher-derivative terms in the Einstein–Hilbert Lagrangian reduce to a total divergence
+%! used: constraint_barrier.tex L50 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1017_cbo9780511790904.json (title + abstract only) [2026-05-30]
+%! evidence: Abstract states: "the book concludes with a brief discussion of classical field theory and the derivation of general relativity from a variational principle." — relevant topic but does not explicitly confirm the specific
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1017/cbo9780511790904 verdict=ENRICHED
 %! added DOI (Crossref-verified book record)
 @book{hobson2006general,
@@ -2023,6 +2568,11 @@
   archiveprefix = {arXiv}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Establish that the Gauss-Bonnet term in 4D is topological and contributes only a boundary term
+%! used: constraint_barrier.tex L47 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1063_1.1665613.json [title, abstract] [2026-05-30]
+%! evidence: The abstract states: "The number of independent tensors of this type depends crucially on the dimension of the space, and, in the four dimensional case, the only tensors with these properties are the metric and the Einst
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1063%2F1.1665613 verdict=MATCH
 @article{Lovelock:1971yv,
   author  = {Lovelock, D.},
@@ -2034,6 +2584,10 @@
   doi     = {10.1063/1.1665613}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Defines IEEE-754 double-precision machine epsilon as 2^-52 ≈ 2.2×10^-16
+%! used: numerical.tex L201 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1145_103162.103163.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1145%2F103162.103163 verdict=MINOR
 @article{goldberg1991floating,
   author  = {Goldberg, David},
@@ -2047,6 +2601,10 @@
   doi     = {10.1145/103162.103163}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:title conf=high
+%! purpose: Source for QED Euler-Heisenberg effective action, photon birefringence ratio (7/4), and one-loop QED coefficients in strong magnetic fields
+%! used: validation.tex L180 EXISTENCE, validation.tex L204 SPECIFIC, results.tex L928 EXISTENCE, results.tex L952 SPECIFIC
+%! checked: manuscript/references.bib (bibliographic metadata) [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0003-4916%2871%2990154-0 verdict=MATCH
 @article{adler1971photon,
   author  = {Adler, Stephen L.},
@@ -2058,6 +2616,11 @@
   doi     = {10.1016/0003-4916(71)90154-0}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Historical source for the QED Euler-Heisenberg effective action in weak-field limit
+%! used: validation.tex L180 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_physics_0605038.json [2026-05-30]
+%! evidence: According to Dirac's theory of the positron, an electromagnetic field tends to create pairs of particles which leads to a change of Maxwell's equations in the vacuum.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007/BF01343663 verdict=REVIEWED
 %! Local uses the standard English title; original German is "Folgerungen aus der Diracschen Theorie des Positrons". Keep English.
 @article{heisenberg1936consequences,
@@ -2073,6 +2636,10 @@
   doi           = {10.1007/BF01343663}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=medium
+%! purpose: Foundational source for QED vacuum polarization effects and the Schwinger critical field strength in QED
+%! used: validation.tex L180 SPECIFIC, validation.tex L202 SPECIFIC
+%! checked: doi_10.1103_PhysRev.82.664 (abstract cache, empty); bibliography entry verification [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRev.82.664 verdict=MINOR
 @article{schwinger1951gauge,
   author  = {Schwinger, Julian S.},
@@ -2095,6 +2662,11 @@
   doi     = {10.1007/BF01448839}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Support for Proca Lagrangian representation of dark-photon sector in Poincaré gauge theory
+%! used: validation.tex L212 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_0711.4866.json [2026-05-30]
+%! evidence: Abstract: "We consider a generic mechanism via which thermal relic WIMP dark matter may be decoupled from the Standard Model, namely through a combination of WIMP annihilation to metastable mediators with subsequent dela
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.physletb.2008.02.052 verdict=MATCH
 @article{pospelov2008secluded,
   author        = {Pospelov, Maxim and Ritz, Adam and Voloshin, Mikhail B.},
@@ -2109,6 +2681,10 @@
   doi           = {10.1016/j.physletb.2008.02.052}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: QED Euler-Heisenberg effective action and one-loop corrections in electromagnetic backgrounds
+%! used: validation.tex L180 SPECIFIC, results.tex L928 EXISTENCE, results.tex L952 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_hep-th_0406216.json [title, abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142%2F9789812775344_0014 verdict=ENRICHED
 @inbook{dunne2004heisenberg,
   journal       = {From Fields to Strings: Circumnavigating Theoretical Physics},
@@ -2123,6 +2699,11 @@
   doi           = {10.1142/9789812775344_0014}
 }
 
+% CITE v=1 status=WEAK depth=abstract conf=high
+%! purpose: Cited as foundational source for Fierz--Pauli massive gravity theory in numerical benchmark section
+%! used: numerical.tex L260 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1098_rspa.1939.0140.json [title + abstract] [2026-05-30]
+%! evidence: Title: "On relativistic wave equations for particles of arbitrary spin in an electromagnetic field"; Abstract discusses wave equations, second quantization, and EM fields — no mention of gravity, gravitational theory, or
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1098%2Frspa.1939.0140 verdict=MATCH
 @article{fierzpauli1939relativistic,
   author  = {Fierz, M. and Pauli, W.},
@@ -2135,6 +2716,11 @@
   doi     = {10.1098/rspa.1939.0140}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract+intro conf=medium
+%! purpose: Reference for Fierz--Pauli massive gravity as a numerical test case
+%! used: numerical.tex L260 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1103_PhysRevD.6.3368.json; /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/cr [2026-05-30]
+%! evidence: Title is "Can Gravitation Have a Finite Range?" — strongly suggestive of massive gravity theory, but the abstract field is empty (not retrieved). Cannot confirm specific discussion of Fierz--Pauli formalism from availabl
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.6.3368 verdict=MINOR
 @article{boulwaredeser1972finite,
   author  = {Boulware, D. G. and Deser, S.},
@@ -2146,6 +2732,10 @@
   doi     = {10.1103/PhysRevD.6.3368}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Reference for massive gravity theory, discontinuous limits in gravity/gauge theory, and Fierz-Pauli formalism
+%! used: constraint_barrier.tex L265 SPECIFIC, numerical.tex L260 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1105.3735.json [title + abstract only] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FRevModPhys.84.671 verdict=MINOR
 @article{hinterbichler2012theoretical,
   author        = {Hinterbichler, Kurt},
@@ -2160,6 +2750,10 @@
   primaryclass  = {hep-th}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Attributes the second-order Störmer–Verlet integration scheme to Verlet's 1967 classical fluids paper.
+%! used: numerical.tex L604 ATTRIBUTION
+%! checked: Tier C canonical paper: DOI 10.1103/PhysRev.159.98 (Verlet 1967) — not cached but historically verified [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRev.159.98 verdict=MINOR
 @article{verlet1967computer,
   author  = {Verlet, L.},
@@ -2172,6 +2766,10 @@
   doi     = {10.1103/PhysRev.159.98}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Reference for Schur complement matrix method used for algebraic constraint elimination in modal PDE solver
+%! used: numerical.tex L333 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1017_CBO9780511804441.json [title, fields]; scripts/bibaudit/cache/crossref/10.1017_CBO9780511804441.json [metadata] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1017%2FCBO9780511804441 verdict=MINOR
 @book{boydvandenberghe2004convex,
   author    = {Boyd, Stephen and Vandenberghe, Lieven},
@@ -2181,6 +2779,11 @@
   doi       = {10.1017/CBO9780511804441}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Reference for accumulated FFT rounding error complexity O(ε_mach * N*log N) in spectral methods
+%! used: numerical.tex L205 SPECIFIC
+%! checked: doi_10.1137_1.9780898718027.json [empty abstract]; manuscript/references.bib [bibliographic entry confirmed] [2026-05-30]
+%! evidence: Abstract is empty; the book title and publication on numerical algorithm accuracy are topically appropriate, but the specific O(ε_mach * N*log N) formula cannot be verified from the cached abstract.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137%2F1.9780898718027 verdict=MATCH
 @book{higham2002accuracy,
   author    = {Higham, Nicholas J.},
@@ -2191,6 +2794,10 @@
   doi       = {10.1137/1.9780898718027}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Reference for LAPACK LU factorization capability used by SUNDIALS linear solver
+%! used: numerical.tex L730 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1137_1.9780898719604.json [title only] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137%2F1.9780898719604 verdict=MATCH
 @book{andersonlapack1999,
   author    = {Anderson, E. and Bai, Z. and Bischof, C. and Blackford, S.
@@ -2205,6 +2812,10 @@
 
 % ---- EFT interpretation of higher-derivative corrections (perturbative reduction) ----
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Establishes EFT framework for interpreting higher-order operators as low-energy residues of unknown UV completion
+%! used: constraint_barrier.tex L25 SPECIFIC
+%! checked: 10.1103/PhysRevD.41.3720 [title+Crossref metadata] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.41.3720 verdict=MINOR
 @article{Simon:1990ic,
   author       = {Simon, Jonathan Z.},
@@ -2217,6 +2828,11 @@
   year         = {1990}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=medium
+%! purpose: Cites Simon et al. for the principle that higher-order operators represent low-energy residues from UV completion in effective field theory
+%! used: constraint_barrier.tex L25 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1103_PhysRevD.43.3308.json [2026-05-30]
+%! evidence: Abstract unavailable (empty JSON). Title: "Stability of flat space, semiclassical gravity, and higher derivatives"
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.43.3308 verdict=MINOR
 @article{Simon:1990jn,
   author       = {Simon, Jonathan Z.},
@@ -2229,6 +2845,10 @@
   year         = {1991}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=low
+%! purpose: Foundational reference for the Dirac–Bergmann procedure for treating constrained Hamiltonian systems
+%! used: constraint_barrier.tex L293 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.4153_CJM-1950-012-1.json [title + abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.4153%2FCJM-1950-012-1 verdict=MINOR
 @article{Dirac:1950pj,
   author  = {Dirac, Paul A. M.},
@@ -2240,6 +2860,10 @@
   year    = {1950}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Establishes the existence of the Cayuso-Lehner non-perturbative scheme for fixing extended gravity theories by promoting auxiliary fields to ensure well-posedness in the nonlinear regime.
+%! used: constraint_barrier.tex L259 SPECIFIC
+%! checked: literature/1706.07421/higherderivpaper.tex [title, abstract, introduction] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.96.084043 verdict=MINOR
 @article{CayusoLehner2017,
   author        = {Cayuso, Juan and Ortiz, N\'estor and Lehner, Luis},
@@ -2255,6 +2879,10 @@
   doi           = {10.1103/PhysRevD.96.084043}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Effective field theory treatment of gravity showing separation of low-energy effects from unknown high-energy contributions, supporting the claim that higher-order operators are low-energy residues of
+%! used: constraint_barrier.tex L25 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_gr-qc_9405057.json [abstract only, tier B] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.50.3874 verdict=MINOR
 @article{Donoghue:1994dn,
   author        = {Donoghue, John F.},
@@ -2269,6 +2897,10 @@
   year          = {1994}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro+conclusion+body conf=high
+%! purpose: Comprehensive reference for Ostrogradsky's theorem, the auxiliary-field reduction technique, and the instability of non-degenerate higher-derivative Lagrangians
+%! used: constraint_barrier.tex L26 SPECIFIC, constraint_barrier.tex L43 SPECIFIC, constraint_barrier.tex L93 ATTRIBUTION, results.tex L239 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/1506.02210/main.tex [full read: abstract, introduction (§1), sections 2-3, conclusion (§6)] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.4249%2Fscholarpedia.32243 verdict=MINOR
 @article{Woodard:2015zca,
   author        = {Woodard, Richard P.},
@@ -2285,6 +2917,11 @@
   year          = {2015}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract|intro conf=low
+%! purpose: Cited as source for the statement that Ostrogradsky's theorem proves any non-degenerate Lagrangian with higher-order EL equations has a ghost instability
+%! used: constraint_barrier.tex L41 SPECIFIC
+%! checked: doi_10.1103_PhysRev.79.145.json [title only, abstract empty] [2026-05-30]
+%! evidence: Title available: "On Field Theories with Non-Localized Action" — topically relevant to higher-derivative Lagrangians, but abstract not available to confirm the specific theorem attribution
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRev.79.145 verdict=MINOR
 @article{Pais:1950za,
   author  = {Pais, A. and Uhlenbeck, G. E.},
@@ -2296,6 +2933,11 @@
   doi     = {10.1103/PhysRev.79.145}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=high
+%! purpose: Proves field redefinitions using equations of motion are physically equivalent in higher-derivative theories, establishing canonical equivalence via Ostrogradsky formalism
+%! used: constraint_barrier.tex L26 SPECIFIC, constraint_barrier.tex L35 SPECIFIC, constraint_barrier.tex L207 SPECIFIC, constraint_barrier.tex L256 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_hep-ph_9306321.json [abstract] [2026-05-30]
+%! evidence: The abstract confirms field transformations using derivatives eliminate higher order time derivatives and are shown to be physically equivalent in Hamiltonian formalism, but does not explicitly mention preservation of Po
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.49.6709 verdict=MINOR
 @article{Grosse-Knetter:1993tae,
   author        = {Grosse-Knetter, Carsten},
@@ -2310,6 +2952,10 @@
   year          = {1994}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: PolyChord nested sampling algorithm for Bayesian parameter exploration and inference
+%! used: inference_architecture.tex L20 SPECIFIC, computational_approach.tex L45 SPECIFIC, results.tex L200 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1502.01856.json [2026-05-30]
 % PolyChord nested-sampling implementation.  The PolyChord README
 % (https://github.com/PolyChord/PolyChordLite) requires citation of
 % BOTH papers below.
@@ -2328,6 +2974,10 @@
   year          = {2015}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Nested sampling algorithm used for parameter exploration in cosmological inference
+%! used: inference_architecture.tex L20 SPECIFIC, computational_approach.tex L45 SPECIFIC, results.tex L200 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1506.00171.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fmnras%2Fstv1911 verdict=MATCH
 @article{Handley:2015vkr,
   author        = {Handley, W. J. and Hobson, M. P. and Lasenby, A. N.},
@@ -2343,6 +2993,11 @@
   year          = {2015}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Nested sampling methodology and Bayes factor definition for Bayesian inference in PGT coupling-space survey
+%! used: inference_architecture.tex L21 SPECIFIC, results.tex L196 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/doi_10.1214_06-BA127.json (title only; abstract field empty) [2026-05-30]
+%! evidence: Title: "Nested sampling for general Bayesian computation"
 % Nested-sampling foundations and associated software cited from App J
 % (Bayesian inference appendix).  The seven-reference NS group below
 % follows the citation pattern of Handley arXiv:1908.09139: Skilling
@@ -2364,6 +3019,10 @@
   year    = {2006}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Present the MultiNest multimodal nested sampling algorithm and demonstrate its sampling efficiency improvements
+%! used: inference_architecture.tex L21 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_0809.3437.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1111%2Fj.1365-2966.2009.14548.x verdict=MATCH
 @article{Feroz:2008xx,
   author        = {Feroz, F. and Hobson, M. P. and Bridges, M.},
@@ -2378,6 +3037,10 @@
   year          = {2009}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Foundational nested sampling methodology (diffusive variant) for Bayesian inference architecture
+%! used: inference_architecture.tex L21 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1007_s11222-010-9198-8.json, manuscript/references.bib line 2382-2391 [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2Fs11222-010-9198-8 verdict=MINOR
 @article{Brewer:2010,
   author  = {Brewer, Brendon J. and P{\'a}rtay, Livia B. and Cs{\'a}nyi, G{\'a}bor},
@@ -2390,6 +3053,10 @@
   year    = {2010}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Reference for nested sampling methodology used in Bayesian inference for the coupling-space survey
+%! used: inference_architecture.tex L21 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_1606.03757.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1606.03757&format=bibtex verdict=MATCH
 @article{Brewer:2016scw,
   author        = {Brewer, Brendon J. and Foreman-Mackey, Daniel},
@@ -2400,6 +3067,10 @@
   year          = {2016}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Provides overview of Bayesian inference methods including nested sampling for statistical analysis
+%! used: inference_architecture.tex L32 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1701.01467.json [title, abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1701.01467&format=bibtex verdict=MATCH
 @inproceedings{Trotta:2017wnx,
   author        = {Trotta, Roberto},
@@ -2410,6 +3081,10 @@
   year          = {2017}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=low
+%! purpose: Textbook reference for background on Bayesian inference and learning algorithms
+%! used: inference_architecture.tex L32 EXISTENCE
+%! checked: manuscript/references.bib (bibliography entry only; tier D, no abstract cache) [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=manual verdict=REVIEWED
 %! Crossref title-search false match; ISBN correct, no DOI
 @book{MacKay:2003,
@@ -2423,6 +3098,10 @@
   pages     = {628}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:abstract conf=high
+%! purpose: Reference book on Bayesian methods in cosmology, cited for further detail on Bayesian inference and nested sampling techniques.
+%! used: inference_architecture.tex L32 EXISTENCE
+%! checked: manuscript/references.bib [title, year, publisher metadata] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1017%2FCBO9780511802461 verdict=MINOR
 @book{Hobson:2010,
   editor    = {Hobson, Michael P. and Jaffe, Andrew H. and Liddle, Andrew R. and Mukherjee, Pia and Parkinson, David},
@@ -2434,6 +3113,10 @@
   isbn      = {9780521887946}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Reference for Bayesian inference and nested sampling methods in statistical data analysis
+%! used: inference_architecture.tex L32 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1093_oso_9780198568315.001.0001.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Foso%2F9780198568315.001.0001 verdict=MINOR
 @book{Sivia:2006,
   author    = {Sivia, D. S. and Skilling, John},
@@ -2446,6 +3129,10 @@
   isbn      = {9780198568315}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Reference for dynesty, a dynamic nested sampling package used in Bayesian parameter estimation
+%! used: inference_architecture.tex L21 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/manuscript/references.bib [line 2450-2461] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fmnras%2Fstaa278 verdict=MATCH
 @article{Speagle:2019ivv,
   author        = {Speagle, Joshua S.},
@@ -2461,6 +3148,11 @@
   year          = {2020}
 }
 
+% CITE v=1 status=UNVERIFIABLE depth=abstract conf=high
+%! purpose: anesthetic: Python package for processing nested sampling runs and posterior visualization
+%! used: inference_architecture.tex L22 SPECIFIC, inference_architecture.tex L27 SPECIFIC, inference_architecture.tex L191 EXISTENCE, inference_architecture.tex L202 SPECIFIC, results.tex L202 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1905.04768.json [2026-05-30]
+%! evidence: anesthetic is a Python package for processing nested sampling runs, and will be useful for any scientist or statistician who uses nested sampling software. anesthetic unifies many existing tools and techniques in an exte
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.21105%2Fjoss.01414 verdict=MATCH
 @article{Handley:2019mfs,
   author        = {Handley, Will},
@@ -2476,6 +3168,10 @@
   year          = {2019}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:title+metadata conf=high
+%! purpose: Reference for Bayesian inference and nested sampling methodology in the inference architecture section
+%! used: inference_architecture.tex L32 EXISTENCE
+%! checked: references.bib entry + arXiv metadata (2205.15570) — title, journal, classification confirm scope [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1038%2Fs43586-022-00121-x verdict=MINOR
 @article{Ashton:2022grj,
   author        = {Ashton, Greg and others},
@@ -2490,6 +3186,10 @@
   year          = {2022}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Seminal definition of the Kullback-Leibler divergence as an information-theoretic measure between probability distributions.
+%! used: inference_architecture.tex L27 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1214_aoms_1177729694.json [title]; manuscript/references.bib [full citation] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1214%2Faoms%2F1177729694 verdict=MINOR
 @article{Kullback:1951zyt,
   author  = {Kullback, S. and Leibler, R. A.},
@@ -2502,6 +3202,10 @@
   year    = {1951}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Establishes the cubed-sphere coordinate system as the standard construction for solving PDEs in spherical geometry
+%! used: inference_architecture.tex L145 EXISTENCE
+%! checked: manuscript/references.bib (title from bibliography entry) [2026-05-30]
 % Gnomonic cubed-sphere construction underlying the joint coupling-space
 % prior described in App~J.  Cited via Crossref DOI; not indexed in INSPIRE.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1006%2Fjcph.1996.0047 verdict=MATCH
@@ -2516,6 +3220,11 @@
   doi     = {10.1006/jcph.1996.0047}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=medium
+%! purpose: Source for cubed-sphere atlas visualization idiom using gnomonic projection and grid partitioning
+%! used: inference_architecture.tex L109 SPECIFIC
+%! checked: scripts/bibaudit/cache/abstracts/doi_10.1029_2020MS002280.json [abstract] [2026-05-30]
+%! evidence: Abstract confirms "gnomonic cubed-sphere grids" and "grid projections" but does not explicitly mention the figure idiom or visualization style cited
 % Cubed-sphere visualisation reference for App~J figure: Chen's J. Adv.
 % Modeling Earth Systems paper has the figure idiom (cube-tile and
 % sphere-tile, gnomonic projection ray) that we adapt in Fig.~34.
@@ -2536,6 +3245,10 @@
 % inspire_novelty_search.md for the context behind each entry.
 % ==================================================================
 
+% CITE v=1 status=SUPPORTS depth=cheap:abstract conf=high
+%! purpose: Demonstrates torsion-photon mixing and vacuum birefringence/dichroism effects in Poincaré gauge theory with background magnetic field
+%! used: introduction.tex L383 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/0804.4011/main.tex [title, abstract, introduction lines 1-100] [2026-05-30]
 % --- arXiv:0804.4011 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1140%2Fepjc%2Fs10052-009-1110-3 verdict=MATCH
 @article{Kruglov:2008cv,
@@ -2551,6 +3264,10 @@
   year          = {2009}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Example of non-minimal photon-torsion coupling in gauge theory
+%! used: introduction.tex L384 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/0810.2989/main.tex [abstract, intro, section 2] [2026-05-30]
 % --- arXiv:0810.2989 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142%2FS021773231003183X verdict=MINOR
 @article{Gaete:2008vb,
@@ -2567,6 +3284,10 @@
   year          = {2010}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Example of non-minimal photon-torsion couplings studied in Poincaré gauge theory; demonstrates how torsion alters electromagnetic behavior in external field backgrounds.
+%! used: introduction.tex L384 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/0912.3767/main.tex [title, abstract, introduction] [2026-05-30]
 % --- arXiv:0912.3767 ---
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A0912.3767&format=bibtex verdict=MATCH
 @article{Gaete:2009dd,
@@ -2579,6 +3300,10 @@
   year          = {2009}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Source for gravitational wave emission from coalescence of primordial black holes in the mega-gigahertz band
+%! used: introduction.tex L261 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/1211.0500/conversion-gw-gamma10.tex [lines 1-95] [2026-05-30]
 % --- arXiv:1211.0500 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2012%2F12%2F003 verdict=MINOR
 @article{Dolgov:2012be,
@@ -2594,6 +3319,10 @@
   year          = {2012}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Provides foundational description of Poincaré gauge theory as BSM physics with new gravitational fields and spin-torsion couplings
+%! used: introduction.tex L583 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/1702.05185/main.tex [lines 42-56] [2026-05-30]
 % --- arXiv:1702.05185 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.95.084028 verdict=MINOR
 @article{Obukhov:2017pxa,
@@ -2610,6 +3339,11 @@
   year          = {2017}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro+body conf=high
+%! purpose: First derivation of graviton-photon mixing probability in alternative theories of gravity, emphasizing scalar-tensor (Horndeski) theory; applies to ATG framework more broadly but does not explicitly t
+%! used: introduction.tex L578 SPECIFIC
+%! checked: literature/1806.11020/conversion_cqg_vf.tex [abstract, intro, sections 2-4, discussion] [2026-05-30]
+%! evidence: Line 54: "Up to the best of our knowledge, this is the first attempt to address graviton-photon oscillation in the framework of ATGs. Nevertheless, we would like to mention some interesting works in related topics... the
 % --- arXiv:1806.11020 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1361-6382%2Faae1d9 verdict=MATCH
 @article{Cembranos:2018jxo,
@@ -2626,6 +3360,11 @@
   year          = {2018}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=high
+%! purpose: Support the mechanism by which projective symmetry of the connection induces photon couplings in metric-affine gravity
+%! used: introduction.tex L604 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/1807.10168/template.tex [title, abstract, introduction §1-3] [2026-05-30]
+%! evidence: Paper abstract: "We present a framework in which the projective symmetry of the Einstein-Hilbert action in metric-affine gravity is used to induce an effective coupling between the Dirac lagrangian and the Maxwell field.
 % --- arXiv:1807.10168 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.physletb.2018.10.032 verdict=MATCH
 @article{Janssen:2018exh,
@@ -2641,6 +3380,10 @@
   year          = {2018}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Establishes that quadratic Poincaré gauge Lagrangians have vast torsion-curvature coupling space but torsion propagation is heavily constrained by ghost-freedom requirements.
+%! used: introduction.tex L428 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/1910.07506/StabilityPGTsEJPC.tex [abstract, title, introduction, section 2] [2026-05-30]
 % --- arXiv:1910.07506 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1140%2Fepjc%2Fs10052-020-8163-8 verdict=MINOR
 @article{BeltranJimenez:2019hrm,
@@ -2657,6 +3400,11 @@
   year          = {2020}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=high
+%! purpose: Ghost-free inflationary cosmology in quadratic PGT; studies torsion operator space constraints.
+%! used: introduction.tex L428 EXISTENCE, introduction.tex L544 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2003.00664/Weyl_inv_cosmo0427.tex [abstract lines 84-85, intro lines 99-115] [2026-05-30]
+%! evidence: Abstract: "In addition to the massless spin-2 graviton, the model contains four non-ghost massive particle species...We then transform the minisuperspace action to a quasi-Einstein frame...We also study linear tensor per
 % --- arXiv:2003.00664 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2020%2F06%2F004 verdict=MINOR
 @article{Aoki:2020zqm,
@@ -2673,6 +3421,11 @@
   year          = {2020}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=high
+%! purpose: Demonstrates Gertsenshtein effect applied to astrophysical magnetic fields; proposes CMB-distortion detection method using cosmic fields in pG-nG range, not galactic fields at μG scales.
+%! used: introduction.tex L285 ATTRIBUTION, introduction.tex L472 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2006.01161/text.tex [abstract, intro (lines 70-194)] [2026-05-30]
+%! evidence: Paper discusses cosmic magnetic fields with "lower limit of order 10^{-16} G [from blazars]...upper bound in the pG-nG range [from CMB]" (line 80), corresponding to 10^{-20} to 10^{-9} T. No mention of galactic fields at
 % --- arXiv:2006.01161 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevLett.126.021104 verdict=MINOR
 @article{Domcke:2020yzq,
@@ -2690,6 +3443,11 @@
   year          = {2021}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=high
+%! purpose: Cited for: (1) mega-gigahertz band above known sources; (2) magnetar surface field strength of order 10^11 T over kilometre extents.
+%! used: introduction.tex L256 EXISTENCE, introduction.tex L474 SPECIFIC
+%! checked: literature/2011.12414/Manuscript.tex [abstract, intro, section on "Miscellaneous" with magnetars at line 811] [2026-05-30]
+%! evidence: Aggarwal on unknown sources: "there are no known astrophysical objects which are small and dense enough to emit at frequencies beyond 10 kHz" (line 191). Aggarwal on magnetar fields: "magnetars are neutron stars that fea
 % --- arXiv:2011.12414 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2Fs41114-021-00032-5 verdict=MINOR
 @article{Aggarwal:2020olq,
@@ -2723,6 +3481,10 @@
   year          = {2021}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Establishes that Poincaré gauge theory with dynamical torsion introduces new fields and couplings beyond metric-only frameworks.
+%! used: introduction.tex L607 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2109.09546/main.tex [title, abstract, introduction] [2026-05-30]
 % --- arXiv:2109.09546 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1361-6382%2Fabcbe0 verdict=MINOR
 @article{Katanaev:2020xdv,
@@ -2755,6 +3517,10 @@
   year          = {2021}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:abstract+intro conf=high
+%! purpose: Demonstrates that cavity haloscopes (ADMX, HAYSTAC) can be reanalyzed as detectors for high-frequency gravitational waves via the Gertsenshtein effect
+%! used: introduction.tex L289 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2112.11465/main_v2.tex [lines 84, 115-118, 127-149] [2026-05-30]
 % --- arXiv:2112.11465 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.105.116011 verdict=MINOR
 @article{Berlin:2021txa,
@@ -2772,6 +3538,11 @@
   year          = {2022}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract+intro conf=high
+%! purpose: Cited for Gertsenshtein-channel GW searches and BGMF field strengths available to indirect-detection schemes
+%! used: introduction.tex L289 EXISTENCE, introduction.tex L472 SPECIFIC
+%! checked: literature/2202.00695/GWaxion.tex [title, abstract, intro, body sections on Gertsenshtein effect] [2026-05-30]
+%! evidence: Domcke:2022rgu discusses laboratory-based Gertsenshtein-effect GW detection via lumped-element axion haloscopes (ABRACADABRA, SHAFT, DMRadio) but does not discuss astrophysical indirect-detection schemes or galactic/magn
 % --- arXiv:2202.00695 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevLett.129.041101 verdict=MINOR
 @article{Domcke:2022rgu,
@@ -2805,6 +3576,11 @@
   year          = {2022}
 }
 
+% CITE v=1 status=MISMATCH depth=deep:introduction+abstract+body conf=high
+%! purpose: Cited as reference for PGT gravitational-wave propagation and polarisation phenomenology
+%! used: introduction.tex L607 SPECIFIC
+%! checked: literature/2308.09178/article.tex [abstract, intro (lines 81-120), body (lines 358-673)] [2026-05-30]
+%! evidence: Abstract: "We apply the formalism to General Relativity, scalar-tensor theories, $f(R)$-gravity, and a wide class of quadratic gravity." Introduction (line 808): "Eq. (\ref{eq dydt}) is valid for all four-dimensional met
 % --- arXiv:2308.09178 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.109.104054 verdict=MINOR
 @article{Alves:2023rxs,
@@ -2837,6 +3613,10 @@
   year          = {2024}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Cited as an example of related work on Gertsenshtein conversion in stochastic magnetic field backgrounds.
+%! used: introduction.tex L603 EXISTENCE
+%! checked: literature/2401.15965/GWPH-Longv8-Arxiv.tex [title, abstract] [2026-05-30]
 % --- arXiv:2401.15965 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.dark.2025.101844 verdict=MATCH
 @article{Addazi:2024kbq,
@@ -2852,6 +3632,10 @@
   year          = {2025}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro conf=high
+%! purpose: Establishes that the mega-gigahertz band lacks known astrophysical GW sources, motivating BSM physics searches
+%! used: introduction.tex L256 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/literature/2501.11723 [titlepage, sec1-introduction, sec5-conclusions] [2026-05-30]
 % --- arXiv:2501.11723 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2Fs41114-025-00060-5 verdict=MINOR
 @article{Aggarwal:2025noe,
@@ -2869,6 +3653,10 @@
   year          = {2025}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro+conclusion conf=high
+%! purpose: Gertsenshtein graviton-photon conversion in stochastic gravitational waves and blazar-jet magnetic field backgrounds
+%! used: introduction.tex L603 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2505.08457/main.tex [title, abstract, intro:lines 43-82, conclusion:lines 533-556] [2026-05-30]
 % --- arXiv:2505.08457 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2025%2F10%2F061 verdict=MINOR
 @article{Matsuo:2025blj,
@@ -2909,6 +3697,10 @@
 % See round-3 cluster catalogue for placement guidance.
 % ==================================================================
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Analysis of viable dynamic modes and constraints in Poincaré gauge theory using Hamiltonian formalism.
+%! used: inference_architecture.tex L81 EXISTENCE, results.tex L622 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_gr-qc_9902032.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142%2FS021827189900033X verdict=MINOR
 @article{Yo:1999ex,
   author        = {Yo, Hwei-jang and Nester, James M.},
@@ -2922,6 +3714,10 @@
   year          = {1999}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Examines constraint structure and field activation in higher-spin Poincaré gauge theory modes to test viability of PGT formulations
+%! used: inference_architecture.tex L81 EXISTENCE, introduction.tex L426 EXISTENCE, results.tex L622 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_gr-qc_0112030.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142%2FS0218271802001998 verdict=MINOR
 @article{Yo:2001sy,
   author        = {Yo, Hwei-Jang and Nester, James M.},
@@ -2935,6 +3731,10 @@
   year          = {2002}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract+intro+conclusion conf=high
+%! purpose: Demonstrates that graviton-photon mixing probability in alternative theories extends to FLRW cosmologies, where scalar degree of freedom can enhance or suppress mixing while cosmic expansion provides 
+%! used: introduction.tex L582 SPECIFIC
+%! checked: literature/2302.08186/conversionDef4arxiv.tex [abstract, intro §1, sections II-III, conclusion] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.108.104001 verdict=MINOR
 @article{Cembranos:2023ere,
   author        = {Cembranos, Jos{\'e} A. R. and Ortiz, Miguel Gonz{\'a}lez and Mart{\'\i}n-Moruno, Prado},
@@ -2951,6 +3751,10 @@
   year          = {2023}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Provides perturbative treatments and solutions for graviton-photon mixing in magnetic fields
+%! used: introduction.tex L356 EXISTENCE
+%! checked: literature/1807.00171/GRAPH_mixing.tex [title, abstract, intro, section 4] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.99.044022 verdict=MINOR
 @article{Ejlli:2018hke,
   author        = {Ejlli, Damian and Thandlam, Venugopal R.},
@@ -2992,6 +3796,10 @@
   year    = {1977}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Foundational work on ghost-free quadratic Poincaré gauge theory with torsion propagation
+%! used: introduction.tex L415 EXISTENCE, introduction.tex L543 EXISTENCE
+%! checked: doi_10.1103_PhysRevD.24.1677.json [title only; tier C abstract unavailable] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.24.1677 verdict=MINOR
 @article{Sezgin:1981xs,
   author       = {Sezgin, E.},
@@ -3011,6 +3819,10 @@
 % which is a network-results paper).
 % ==================================================================
 
+% CITE v=1 status=SUPPORTS depth=cheap:title conf=high
+%! purpose: Documents the Advanced LIGO detector as a kilohertz-band gravitational-wave observatory in the multi-decade frequency spectrum observation network.
+%! used: introduction.tex L232 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/manuscript/references.bib [LIGOScientific:2014pky entry]; title "Advanced LIGO", LIGO Scientific Collaboration [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F0264-9381%2F32%2F7%2F074001 verdict=MINOR
 @article{LIGOScientific:2014pky,
   author        = {Aasi, J. and others},
@@ -3026,6 +3838,10 @@
   year          = {2015}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Advanced Virgo second-generation interferometric gravitational wave detector in the kilohertz network alongside LIGO and KAGRA
+%! used: introduction.tex L232 EXISTENCE
+%! checked: literature/1408.3978 [title, abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F0264-9381%2F32%2F2%2F024001 verdict=MINOR
 @article{VIRGO:2014yos,
   author        = {Acernese, F. and others},
@@ -3042,6 +3858,10 @@
   year          = {2015}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:abstract conf=high
+%! purpose: Establish KAGRA as a functioning gravitational-wave detector in the LIGO-Virgo-KAGRA network
+%! used: introduction.tex L232 EXISTENCE
+%! checked: literature/2005.05574/ptep01_main.tex [title, abstract, introduction] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fptep%2Fptaa125 verdict=MINOR
 @article{KAGRA:2020tym,
   author        = {Akutsu, T. and others},
@@ -3058,6 +3878,11 @@
   year          = {2021}
 }
 
+% CITE v=1 status=WEAK depth=abstract+intro conf=high
+%! purpose: Cited as example GW-to-EM amplification mechanism (GW190425/FRB 20190425A magnetar scenario), but not as source of BGMF survey values
+%! used: introduction.tex L482 SPECIFIC, introduction.tex L485 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/literature/2604.12775/GZ20260413.tex [title, abstract, lines 1-125] [2026-05-30]
+%! evidence: Wu abstract: "The kiloherz GWs generated by the merger are converted into kiloherz electromagnetic (EM) radiation via the Gertsenshtein–Zel'dovich (GZ) effect near the magnetar." Wu does not survey BGMF strengths or cite
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2604.12775&format=bibtex verdict=MATCH
 @article{Wu:2026nds,
   author        = {Wu, Shao-Qin and Zhang, Jing-Rui and Cai, Rong-Gen and Zhang, Bing and Zhang, Yun-Long},
@@ -3069,6 +3894,10 @@
   year          = {2026}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap:abstract conf=high
+%! purpose: Demonstrates that preheating after inflation produces stochastic gravitational waves in frequency ranges detectable by direct detection experiments from laboratory to solar system scales.
+%! used: introduction.tex L259 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_astro-ph_0601617.json [abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2006%2F04%2F010 verdict=MINOR
 @article{Easther:2006gt,
   author        = {Easther, Richard and Lim, Eugene A.},
@@ -3082,6 +3911,10 @@
   year          = {2006}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Establish that first-order phase transitions in the early universe produce stochastic gravitational wave backgrounds detectable by interferometers
+%! used: introduction.tex L260 EXISTENCE
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_hep-ph_0607107.json [title + abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.75.043507 verdict=MINOR
 @article{Grojean:2006bp,
   author        = {Grojean, Christophe and Servant, Geraldine},
@@ -3096,6 +3929,10 @@
   year          = {2007}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Verify LISA's millihertz gravitational-wave frequency band capability for contextual frequency-band comparison
+%! used: introduction.tex L233 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_2402.07571.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2402.07571&format=bibtex verdict=MATCH
 @article{LISA:2024hlh,
   author        = {Colpi, Monica and others},
@@ -3108,6 +3945,10 @@
   year          = {2024}
 }
 
+% CITE v=1 status=SUPPORTS depth=abstract conf=high
+%! purpose: Supports the claim that cosmological mixing lengths exceed the Hubble radius and graviton oscillations are damped in FLRW and de Sitter universes
+%! used: introduction.tex L478 SPECIFIC
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2401.08346.json [abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.dark.2024.101480 verdict=MATCH
 @article{Anninos:2024esx,
   author        = {Anninos, Peter and Rothman, Tony and Palessandro, Andrea},
@@ -3122,6 +3963,10 @@
   year          = {2024}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: Primary citation for ADMX haloscope apparatus; reinterpreted in follow-up work as Gertsenshtein-channel search for high-frequency gravitational waves
+%! used: introduction.tex L287 EXISTENCE
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_2504.07279.json [title, abstract] [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2Fd7mg-6sqq verdict=MINOR
 @article{ADMX:2025vom,
   author        = {Carosi, G. and others},
@@ -3139,6 +3984,11 @@
   year          = {2025}
 }
 
+% CITE v=1 status=PARTIAL depth=abstract conf=high
+%! purpose: Evidence that HAYSTAC operates a dark-matter cavity haloscope conducting dark photon searches, which can be reinterpreted as Gertsenshtein-channel detection.
+%! used: introduction.tex L287 ATTRIBUTION
+%! checked: /workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2510.15848.json [2026-05-30]
+%! evidence: HAYSTAC abstract reports "dark photon results... covering a region between 19.46--19.52 μeV" from "a dataset" using "previously reported axion searches" apparatus. No mention of Gertsenshtein effect or theoretical reinte
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2F3txs-dz63 verdict=MINOR
 @article{HAYSTAC:2025nrt,
   author        = {Bai, Xiran and others},
@@ -3155,6 +4005,10 @@
   year          = {2026}
 }
 
+% CITE v=1 status=SUPPORTS depth=cheap conf=high
+%! purpose: ABRACADABRA-10cm haloscope apparatus paper providing first results from the prototype detector, cited as a basis for Gertsenshtein-channel reinterpretations.
+%! used: introduction.tex L287 ATTRIBUTION
+%! checked: scripts/bibaudit/cache/abstracts/arxiv_1905.06882.json [2026-05-30]
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1905.06882&format=bibtex verdict=MATCH
 @inproceedings{Salemi:2019xgl,
   author        = {Salemi, Chiara P.},
