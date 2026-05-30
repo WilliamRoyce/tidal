@@ -251,8 +251,116 @@ def apply_all(report: list[dict], bib_path: str, *, dry_run: bool) -> dict:
     return {"applied": applied, "skipped": skipped, "failed": failed}
 
 
+def _sanitize(s: str) -> str:
+    """Strip BibTeX-hazardous '@' and newlines from comment text."""
+    return (s or "").replace("@", " at ").replace("\n", " ").replace("  ", " ").strip()
+
+
+def _cite_block(rec: dict) -> str:
+    """Build a BibTeX-safe ``% CITE`` block (no '@') from a Task-2 verdict."""
+    sites = rec.get("sites") or []
+    used = ", ".join(
+        f"{(s.get('file', '') or '').split('/')[-1]} L{s.get('line', '')} {s.get('role', '')}"
+        for s in sites[:8]
+    )
+    lines = [
+        f"% CITE v=1 status={rec.get('status', '?')} "
+        f"depth={_sanitize(rec.get('depth_reached', ''))} conf={rec.get('confidence', '')}",
+        f"%! purpose: {_sanitize(rec.get('purpose', ''))[:200]}",
+    ]
+    if used:
+        lines.append(f"%! used: {_sanitize(used)[:300]}")
+    if rec.get("source_checked"):
+        lines.append(f"%! checked: {_sanitize(rec['source_checked'])[:160]} [{TODAY}]")
+    if rec.get("status") != "SUPPORTS" and rec.get("evidence_quote"):
+        lines.append(f"%! evidence: {_sanitize(rec['evidence_quote'])[:220]}")
+    return "\n".join(lines) + "\n"
+
+
+def apply_cites(verify: list[dict], bib_path: str, *, dry_run: bool) -> dict:
+    """Prepend a ``% CITE`` block above each entry's contiguous comment block (above
+    the existing ``% AUDIT`` line). Idempotent: skips entries already carrying ``% CITE``.
+    Exact-span replacement; aborts an entry on any non-uniqueness.
+    """
+    text = Path(bib_path).read_text(encoding="utf-8")
+    entries = {e.key: e for e in load_bib(bib_path)}
+    applied, skipped, failed = 0, 0, []
+    for rec in verify:
+        key = rec.get("key")
+        e = entries.get(key)
+        if not e:
+            failed.append((key, "key not in bib"))
+            continue
+        raw = e.raw
+        if text.count(raw) != 1:
+            failed.append((key, f"block not unique (count={text.count(raw)})"))
+            continue
+        idx = text.find(raw)
+        pre = text[:idx].rstrip("\n").split("\n") if idx > 0 else []
+        nmark = 0
+        for ln in reversed(pre):
+            if ln.lstrip().startswith("%"):
+                nmark += 1
+            else:
+                break
+        block_lines = pre[len(pre) - nmark :] if nmark else []
+        if any("% CITE" in ln for ln in block_lines):
+            skipped += 1
+            continue
+        old = ("\n".join(block_lines) + "\n" if nmark else "") + raw
+        if text.count(old) != 1:
+            failed.append((key, "span not unique"))
+            continue
+        text = text.replace(old, _cite_block(rec) + old, 1)
+        applied += 1
+    if not dry_run:
+        Path(bib_path).write_text(text, encoding="utf-8")
+    print(
+        f"\n{'DRY-RUN ' if dry_run else ''}cites-apply: {applied} applied, "
+        f"{skipped} skipped (already annotated), {len(failed)} failed"
+    )
+    for key, why in failed:
+        print(f"  FAIL {key}: {why}")
+    return {"applied": applied, "skipped": skipped, "failed": failed}
+
+
+def cites_summary(verify: list[dict]) -> None:
+    """Print the Task-2 STOP list: MISMATCH / WEAK / PARTIAL / UNVERIFIABLE groups."""
+    from collections import Counter
+
+    tally = Counter(r.get("status") for r in verify)
+    print("\n=== citation-support tally ===")
+    for s in ["SUPPORTS", "PARTIAL", "WEAK", "MISMATCH", "UNVERIFIABLE"]:
+        if tally.get(s):
+            print(f"  {s:13s} {tally[s]}")
+    for grp in ["MISMATCH", "WEAK", "PARTIAL"]:
+        rows = [r for r in verify if r.get("status") == grp]
+        if rows:
+            print(f"\n=== {grp} — review with user ({len(rows)}) ===")
+            for r in rows:
+                rc = r.get("recheck") or {}
+                tag = f" [recheck={rc.get('status')}]" if rc else ""
+                print(f"  - {r.get('key')}{tag}: {(r.get('purpose') or '')[:70]}")
+                if r.get("evidence_quote"):
+                    print(f"      evidence: {r['evidence_quote'][:140]}")
+
+
 def main(argv: list[str]) -> int:
     refresh = "--refresh" in argv
+    if (
+        "--cites-apply" in argv
+        or "--cites-dry-run" in argv
+        or "--cites-summary" in argv
+    ):
+        data = json.loads((CACHE / "cite_verify.json").read_text())
+        recs = data.get("results", data) if isinstance(data, dict) else data
+        if "--cites-summary" in argv:
+            cites_summary(recs)
+        else:
+            apply_cites(
+                recs, "manuscript/references.bib", dry_run=("--cites-apply" not in argv)
+            )
+        return 0
     if "--summary-only" in argv and (CACHE / "report.json").exists():
         report = json.loads((CACHE / "report.json").read_text())
     else:
