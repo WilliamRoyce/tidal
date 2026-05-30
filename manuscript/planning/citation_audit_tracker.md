@@ -6,7 +6,23 @@
 > `uv run python -m scripts.bibaudit.audit_status` any time for the live tally.
 
 **Last updated:** 2026-05-30 (session: Task 1 COMPLETE)
-**Current phase:** Task 1 DONE (all 230 active entries audited; latexmk exit 0) → **Task 2 next**.
+**Current phase:** ✅ **AUDIT COMPLETE** (Task 1 + Task 2 + deepen-pass). latexmk exit 0.
+**Task 2 final tally (193 cited keys):** SUPPORTS 113 · PARTIAL 43 · WEAK 6 · MISMATCH 7 · UNVERIFIABLE 24.
+**Citation problems found + fixed:** Alves:2023rxs (metric≠PGT), Glavan2018 (Cayuso–Lehner over-attribution),
+lin2019pgt (Lin adopts Sezgin), martingarcia2008xperm (xPerm over-cited — self-caught by deepen).
+**False-alarm cluster cites (investigated, kept):** barker2023confinement, kushwaha2022magnetar,
+fierzpauli1939relativistic, pospelov2008secluded, hehl2000/rubilar2003 @ pgt_enumeration.
+**24 UNVERIFIABLE** = books / DOI-only journals with no free full text (honest "couldn't confirm offline").
+**Prior live status (kept for history):** Task 2 verification workflow Stage 3-4.
+- Stage 1 (triage) ✓ `cache/cites_worklist.json` (193 keys; A57/B55/C69/D1/E11; 147 need deep).
+- Stage 2 (abstract pre-fetch) ✓ `cache/abstracts/` (tier-A reads offline literature/; B arXiv; C Crossref where available).
+- Stage 3-4: `scripts/bibaudit/verify_citations.mjs` workflow (run `wf_d6e68330-435`) → verdicts.
+- Stage 5-6 applier is BUILT (`compare.py --cites-apply/--cites-dry-run/--cites-summary`).
+  **Resume when the workflow completes:** (1) write its returned `{results:[...]}` to
+  `scripts/bibaudit/cache/cite_verify.json`; (2) `python -m scripts.bibaudit.compare --cites-summary`
+  (review MISMATCH/WEAK STOP list with user); (3) `--cites-dry-run` then `--cites-apply`
+  (prepends `% CITE` blocks); (4) `latexmk` check; (5) deepen-pass for UNVERIFIABLE-specific keys.
+- UNVERIFIABLE-with-specific-claim keys (mostly tier-C no-abstract) = the targeted "deepen" list for a full-text pass.
 **Verdict tally (230 active):** MATCH 38 · MINOR 143 · ENRICHED 17 · FIXED 9 · REVIEWED 11 · NOID 4 · NOTFOUND 3 · PENDING 4 · UNCITED 1
 **Compile:** latexmk exit 0, 0 undefined citations/refs; BibTeX 0 errors (12 pre-existing missing-journal warnings).
 
