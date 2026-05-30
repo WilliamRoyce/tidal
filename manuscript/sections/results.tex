@@ -65,7 +65,7 @@ uniform-$\Bzero$.
 % §4.2–§4.4.
 
 \paragraph*{Validation setup}
-We validate the pipeline on the Boccaletti conversion
+We validate the implementation on the Boccaletti conversion
 formula (\cref{GertsenshteinFormula}) in Einstein--Maxwell theory.
 A uniform background field $\Bzero$ fills a periodic domain of length
 $L=100$; the linearised system is initialised as a plane wave on a
@@ -228,7 +228,7 @@ Gertsenshtein conversion,
 \Cref{PropagatingKineticOutput} shows the full symbolic output.
 The $\Alp{1}\MAGFt{}^{2}$ term promotes the metric-perturbation
 sector to a fourth-order system, placing this theory outside the
-scope of the numerical pipeline
+scope of the numerical framework
 (\cref{PerturbativeReduction,SymbolicMechanism}).
 % ; no published
 % constraint-promotion Hamiltonian recipe exists for the
@@ -530,7 +530,7 @@ other vertices are switched on.
 The complete parity-even sector closes the
 $\MAGFt{}\times\nabla\MAGT{}$ basis of
 \cref{DerivativeExtensions} beyond Barker's single
-parameter by retaining the full ten-parameter $\chi_{1\!-\!10}$
+parameter~\cite{barker2024poincare} by retaining the full ten-parameter $\chi_{1\!-\!10}$
 sector on top of the Yang--Mills--PGT base~\cref{NonMinimalLagrangian},
 \begin{align}
   \lag_\chi
@@ -617,11 +617,13 @@ through the off-diagonal entries of $\exp(M(k)\,t)$.
 Distinguishing a genuine new amplification mechanism from a
 tachyonic instability or a
 ghost is
-not straightforward (\cref{Discussion}). The unitarity
-conditions for PGT are catalogued in~\cite{karananas2014parity,blagojevic2018hamiltonian,sezgin1980ghostfree,lin2019pgt,Yo:1999ex,Yo:2001sy};
-% for the parity-violating extensions they are obtained numerically
-and obtained through the Hamiltonian particle-spectrum analysis of
-\PSALTer{}~\cite{barker2024psalter,barker2025psalter2}. Integration
+not straightforward (\cref{Discussion}). The unitarity conditions
+for parity-even PGT are catalogued
+in~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,lin2019pgt,Yo:1999ex,Yo:2001sy};
+the parity-violating extensions are addressed
+in~\cite{karananas2014parity}. The current frontier method for
+spectrum analysis is the Hamiltonian particle-spectrum analysis of
+\PSALTer{}~\cite{barker2024psalter,barker2025psalter2}; integration
 with \PSALTer{} is deferred to future work.
 
 To test whether a torsion ghost is responsible for the amplifications,

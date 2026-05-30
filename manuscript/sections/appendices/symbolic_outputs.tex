@@ -22,7 +22,7 @@ channel together with the equations of motion for any torsion
 components that couple into them (so the displayed sub-system is
 dynamically closed); equations of motion for the orthogonal
 polarisation, gauge modes, and the uncoupled constraint sub-block
-are computed by the pipeline but pruned from the figures below.
+are computed by the framework but pruned from the figures below.
 
 Hamiltonian densities are presented as the self-GW + self-EM
 sector relevant to the conversion measurement: torsion-coupled
@@ -67,7 +67,7 @@ channels of \cref{BaselineKineticOutput}; discussed in
 \end{gathered}
 $}
 \caption{Einstein--Maxwell baseline on $\bm{B} = \Bzero\,\hat{x}$,
-plane-wave-reduced along $\hat{z}$. Full pipeline output:
+plane-wave-reduced along $\hat{z}$. Full symbolic output:
 \BaselineEomCount{} equations of motion
 (\BaselineConstraintCount{} constraints), \BaselineTermCount{}
 RHS terms. $\mathscr{H}$ restricted to self-GW + self-EM
@@ -111,7 +111,7 @@ $\partial_{z}^{2}A_{y}$; discussed in \cref{Validation}.
 $}
 \caption{Euler--Heisenberg corrections on $\bm{B} = \Bzero\,\hat{x}$,
 plane-wave-reduced along $\hat{z}$; Lagrangian in \cref{LagEH}.
-Full pipeline output: \EulerHeisenbergEomCount{} equations of
+Full symbolic output: \EulerHeisenbergEomCount{} equations of
 motion (\EulerHeisenbergConstraintCount{} constraints),
 \EulerHeisenbergTermCount{} RHS terms. $\mathscr{H}$ restricted
 to self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
@@ -153,7 +153,7 @@ components enter only in equations with LHS $=0$
 $}
 \caption{Minimally-coupled Einstein--Cartan with parameters
 $\beta_{1,2,3}$ on $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced
-along $\hat{z}$. Full pipeline output: \ReferenceEomCount{}
+along $\hat{z}$. Full symbolic output: \ReferenceEomCount{}
 equations of motion (\ReferenceConstraintCount{} constraints),
 \ReferenceTermCount{} RHS terms. $\mathscr{H}$ restricted to
 self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
@@ -200,9 +200,9 @@ fourth-order time derivatives lie outside the domain of v6's
 no-Ostrogradsky-reduction policy, no published constraint-
 promotion Hamiltonian recipe exists for the
 $\Alp{1} \MAGFt{}^{2}$ case (Blagojevi\'c and Cvetkovi\'c
-2018, App.\,D), and the pipeline's
+2018, App.\,D), and the framework's
 \verb|ParseHamiltonianExpression| filter does not cover the
-4th-order sector. The partial expression the pipeline emits for
+4th-order sector. The partial expression the framework emits for
 this theory is preserved as a comment in the listing file for
 reference but is not rendered.
 
@@ -216,7 +216,7 @@ reference but is not rendered.
 $}
 \caption{Propagating-torsion PGT with parameter $\Alp{1}$ on
 $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
-Full pipeline output: \MechanismEomCount{} equations of motion
+Full symbolic output: \MechanismEomCount{} equations of motion
 (\MechanismConstraintCount{} constraints),
 \MechanismTermCount{} RHS terms. $\mathscr{H}$ suppressed ---
 inspection-only theory, see prose.}%
@@ -262,7 +262,7 @@ sector; discussed in \cref{SectorSurvey}.
 $}
 \caption{Ricci--EM nonminimal coupling with parameter $\delta_{1}$
 on $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
-Full pipeline output: \NonminimalEomCount{} equations of motion
+Full symbolic output: \NonminimalEomCount{} equations of motion
 (\NonminimalConstraintCount{} constraints),
 \NonminimalTermCount{} RHS terms. $\mathscr{H}$ restricted to
 self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
@@ -306,7 +306,7 @@ collected in \cref{GeneralNonminimalKineticOutput}; discussed in
 $}
 \caption{Yang--Mills-form PGT with all parity-even nonminimal
 couplings active on $\bm{B} = \Bzero\,\hat{x}$,
-plane-wave-reduced along $\hat{z}$. Full pipeline output:
+plane-wave-reduced along $\hat{z}$. Full symbolic output:
 \GeneralNonminimalEomCount{} equations of motion
 (\GeneralNonminimalConstraintCount{} constraints),
 \GeneralNonminimalTermCount{} RHS terms. $\mathscr{H}$ restricted
@@ -358,7 +358,7 @@ sector itself is unchanged.
 $}
 \caption{Parity-odd extension of the Yang--Mills-form PGT on
 $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
-Full pipeline output: \ParityOddEomCount{} equations of motion
+Full symbolic output: \ParityOddEomCount{} equations of motion
 (\ParityOddConstraintCount{} constraints), \ParityOddTermCount{}
 RHS terms. $\mathscr{H}$ restricted to self-GW + self-EM
 (cf.\ \cref{DiracBergmann}).}%
@@ -404,7 +404,7 @@ $}
 \caption{Dark-photon-plasma analogue with parameters
 $m_{A}^{2}$, $\delta_{m}$ on
 $\bm{B} = \Bzero\,\hat{x}$, plane-wave-reduced along $\hat{z}$.
-Full pipeline output: \DarkPhotonPlasmaEomCount{} equations of
+Full symbolic output: \DarkPhotonPlasmaEomCount{} equations of
 motion (\DarkPhotonPlasmaConstraintCount{} constraints),
 \DarkPhotonPlasmaTermCount{} RHS terms. $\mathscr{H}$ restricted
 to self-GW + self-EM (cf.\ \cref{DiracBergmann}).}%
