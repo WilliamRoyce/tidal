@@ -10,18 +10,18 @@
 \label{PerturbativeReduction}
 
 \TIDAL{} treats a correction $\varepsilon\,\lag_1$ to a well-posed base
-Lagrangian $\lag_0$ as a perturbative shift to the base-theory dynamics.
-The effective-field-theory background, the equations-of-motion reduction, and the
-Lagrangian reduction used to obtain a Hamiltonian are described here.
+Lagrangian $\lag_0$ as a perturbative shift to the base-theory dynamics. This
+appendix documents the reduction, which acts on both the equations of motion and
+the Lagrangian; the corresponding obstructions in each case are set out below.
 
-\paragraph*{Higher-order terms as effective corrections}
+\paragraph*{Effective higher-order corrections}
 For theories whose Lagrangian admits the decomposition
 $\lag = \lag_0 + \varepsilon\,\lag_1$ with $\varepsilon$ a small
 dimensionless coupling, $\varepsilon\,\lag_1$ is treated throughout as a
 perturbative correction within the regime $\varepsilon\ll1$.
 
 Such higher-order operators are the low-energy residues of an unknown ultraviolet
-completion in the effective-field-theory
+completion in the EFT
 interpretation~\cite{Simon:1990ic,Simon:1990jn,Donoghue:1994dn,burgess2003quantum}.
 Grosse-Knetter~\cite{Grosse-Knetter:1993tae,ostrogradsky1850memoires,Woodard:2015zca}
 proves that expressing the higher time derivatives in $\lag_1$ by substituting
@@ -125,9 +125,10 @@ where $C_{\mathrm{corr}}$ is the Fourier representation of the correction operat
 $E_{\mathrm{corr}}$ that appears as the order-$\varepsilon^1$ source in
 \cref{EOMHierarchy}.
 Substituting $\hat{y}^{(1)} = V\hat{z}^{(1)}$ and the Pass~0 solution
-$\hat{y}^{(0)}(t) = V e^{Dt}\hat{c}$ into this system and multiplying through by $V^{-1}$
-diagonalises the homogeneous part ($V^{-1}M(k)V = D$) and rotates the source into the
-eigenbasis ($V^{-1}C_{\mathrm{corr}}V \equiv S$), giving
+$\hat{y}^{(0)}(t) = V e^{Dt}\hat{c}$ into \cref{PassOneSystem} and multiplying
+through by $V^{-1}$ diagonalises the homogeneous part ($V^{-1}M(k)V = D$) and
+rotates the source into the eigenbasis ($V^{-1}C_{\mathrm{corr}}V \equiv S$),
+giving
 \begin{equation}
   \partial_t\hat{z}^{(1)}
   \;=\;
@@ -136,7 +137,8 @@ eigenbasis ($V^{-1}C_{\mathrm{corr}}V \equiv S$), giving
   \qquad \hat{z}^{(1)}(0) = 0.
   \label{EigenODESystem}
 \end{equation}
-Component-wise this is a set of decoupled scalar inhomogeneous ODEs,
+Component-wise \cref{EigenODESystem} reduces to a set of decoupled scalar
+inhomogeneous ODEs,
 \begin{equation}
   \partial_t\hat{z}^{(1)}_i
   \;=\;
@@ -145,10 +147,7 @@ Component-wise this is a set of decoupled scalar inhomogeneous ODEs,
   \qquad \hat{z}^{(1)}_i(0) = 0.
   \label{EigenODE}
 \end{equation}
-Multiplying through by $e^{-\lambda_i t}$;
-% converts the left side to
-% $\tfrac{d}{dt}[e^{-\lambda_i t}\hat{z}^{(1)}_i]$;
-integrating both sides from $0$ to
+Multiplying through by $e^{-\lambda_i t}$ and integrating both sides from $0$ to
 $t$~\cite{hochbruck2010exponential,almohy2011action} then gives
 \begin{equation}
   e^{-\lambda_i t}\hat{z}^{(1)}_i(t)
@@ -180,9 +179,6 @@ state is recovered by rotating back:
 $\hat{y}^{(1)}(t) = V\,\hat{z}^{(1)}(t)$. Pass~1 is therefore computed entirely from
 the Pass~0 eigensystem $(V, D, \hat{y}^{(0)}(0))$; no additional time-stepping is
 required.
-% The $V$ and $V^{-1}$ factors implicit in $\hat{c}$ and $S$ do not
-% cancel when the rotation is performed, because the kernel $G(\lambda_i,\lambda_j;\,t)$
-% differs entry-by-entry in the eigenbasis.
 Near the degenerate limit $|(\mu-\lambda)t| \to 0$, direct evaluation of
 \cref{DuhamelKernel} suffers catastrophic cancellation. The Taylor expansion of
 $G(\lambda,\mu;t)$ in $(\mu-\lambda)t$ around the degenerate limit gives
@@ -233,7 +229,7 @@ substituted; equivalently, the leading-order kinetic matrix must be invertible.
 Algebraic equations of motion fail this condition, and the substitution then produces
 a reduced Lagrangian that omits the promoted degree of freedom.
 
-\paragraph*{Constraint promotion and perturbative-reduction failure}
+\paragraph*{Constraint promotion}
 The case where the JLM condition fails arises physically as constraint promotion. In
 the quadratic-PGT theories where constraint promotion arises,
 $\varepsilon\,\lag_1 = \varepsilon\,\tilde{R}^2$; the $\varepsilon = 0$
@@ -262,28 +258,41 @@ non-perturbative Cayuso--Lehner scheme~\cite{CayusoLehner2017} shares the same
 prerequisite. All therefore break down at constraint promotion, where the
 leading-order kinetic matrix (\cref{KineticMatrix}) ceases to be invertible.
 
+% Original elaborated discussion (preserved here as reference; tightened to a
+% single paragraph below for App-H register consistency):
+%
+% Constraint promotion belongs to a wider class of discontinuous limits in gravity
+% and gauge theory~\cite{deRham2014,hinterbichler2012theoretical}. The
+% van Dam--Veltman--Zakharov discontinuity~\cite{vandam1970massive,zakharov1970linearized}
+% shows that the massless limit of a Fierz--Pauli graviton recovers only five of
+% the six general-relativistic polarisations: the sixth arises through a constraint
+% promoted at non-zero mass. In the nonlinear completion of Fierz--Pauli massive
+% gravity, a sixth mode emerges that is ghost-like and does not decouple as
+% $m \to 0$~\cite{boulware1972gravitation}. At the Maxwell--Proca boundary, massive
+% Proca propagates three polarisations while massless Maxwell propagates only two;
+% the third (longitudinal) mode becomes pure gauge as $m \to 0$ and is removed by
+% the Maxwell $U(1)$ gauge symmetry. The mode count therefore changes
+% discontinuously at $m = 0$, even though the family of Lagrangians is smooth
+% in $m$. The St\"uckelberg mechanism~\cite{RueggRuizAltaba2003} smooths the
+% Maxwell--Proca constraint structure across the limit through an auxiliary field.
+% A non-perturbative Hamiltonian analysis of the pure $R^2$ analogue has been
+% carried out~\cite{barker2024r2}, but extending the perturbative-reduction
+% framework of this appendix to cover the constraint-promotion case in a
+% theory-agnostic way remains for our future work.
+
 \paragraph*{Structural analogues}
-Constraint promotion belongs to a wider class of discontinuous limits in gravity and
-gauge theory~\cite{deRham2014,hinterbichler2012theoretical}. The van Dam--Veltman--Zakharov
-discontinuity~\cite{vandam1970massive,zakharov1970linearized} shows that the massless
-limit of a Fierz--Pauli graviton recovers only five of the six general-relativistic
-polarisations: the sixth arises through a constraint promoted at non-zero mass.
-In the nonlinear completion of Fierz--Pauli massive gravity, a sixth mode emerges
-that is ghost-like and does not decouple as $m \to 0$~\cite{boulware1972gravitation}.
-At the Maxwell--Proca boundary, massive Proca propagates three polarisations while
-massless Maxwell propagates only two; the third (longitudinal) mode becomes pure
-gauge as $m \to 0$ and is removed by the Maxwell $U(1)$ gauge symmetry. The mode
-count therefore changes discontinuously at $m = 0$, even though the family of
-Lagrangians is smooth in $m$.
+Constraint-rank discontinuities recur across gauge and gravitational
+theories~\cite{deRham2014,hinterbichler2012theoretical}: the
+van Dam--Veltman--Zakharov discontinuity of linear Fierz--Pauli
+gravity~\cite{vandam1970massive,zakharov1970linearized}, the Boulware--Deser ghost
+of its nonlinear completion~\cite{boulware1972gravitation}, the Maxwell--Proca
+mode-count jump at $m=0$, and the St\"uckelberg-mechanism smoothing of the
+latter~\cite{RueggRuizAltaba2003}. A non-perturbative Hamiltonian analysis of the
+pure $R^2$ analogue has been carried out~\cite{barker2024r2}; a theory-agnostic
+extension of the present reduction to constraint-promoted Lagrangians remains a
+direction for our future work.
 
-The St\"uckelberg mechanism~\cite{RueggRuizAltaba2003} smooths the Maxwell--Proca
-constraint structure across the limit through an auxiliary field.
-A non-perturbative Hamiltonian analysis of the pure $R^2$ analogue has been carried
-out~\cite{barker2024r2}, but extending the perturbative-reduction framework of this
-appendix to cover the constraint-promotion case in a theory-agnostic way remains for
-our future work.
-
-\paragraph*{Primary constraints and singular kinetic matrix}\label{DiracBergmann}
+\paragraph*{Singular kinetic matrix}\label{DiracBergmann}
 A second obstruction to obtaining a Hamiltonian arises when the linearised kinetic
 matrix $\mathcal{K}$ of \cref{KineticMatrix} is singular from the start. Gauge
 potentials and other fields that enter the action algebraically contribute to such a
@@ -301,25 +310,11 @@ are reported in this work, the measurement is restricted to configurations in wh
 the Legendre transform of the relevant sector is well-defined, so the
 singular-$\mathcal{K}$ obstruction does not enter. The conversion probability of
 \cref{GertsenshteinFormula} is gauge-invariant by construction and is unaffected.
-% Theories whose energy
-% measurement requires the torsion sectors are deferred to future work alongside the
-% Dirac--Bergmann implementation.
 
 \paragraph*{Failure detection}
-\TIDAL{} detects constraint promotion by checking whether the
-order-$\varepsilon^0$ momentum kernel changes rank when $\varepsilon$ is set to a
-non-zero test value; a rank jump signals constraint promotion.
-%  and the software emits a
-% diagnostic that marks the theory as having no reduced Hamiltonian.
+\TIDAL{} detects constraint promotion by checking whether the rank of the
+order-$\varepsilon^0$ kinetic matrix \cref{KineticMatrix} changes when
+$\varepsilon$ is set to a non-zero test value; a rank jump signals constraint
+promotion.
 The conversion-and-energy analysis of the affected theories (\ie those carrying
 the $\tilde{R}^2$ correction) is deferred to future work.
-
-% \paragraph*{Implications for the surveys}
-% The EOM and Hamiltonian reductions have different scopes, and the surveys of
-% \cref{Results} are structured accordingly. For theories without constraint promotion,
-% the Pass~0/Pass~1 field trajectories combine with the reduced Hamiltonian to give the
-% conversion probability of \cref{GertsenshteinFormula}, and the iterative reduction of
-% \cref{EOMHierarchy} delivers the full per-theory analysis. Theories that carry the
-% $\tilde{R}^2$ correction are deferred to future work. Theories without higher-curvature
-% terms are unaffected and use the standard linearised methodology of
-% \cref{SymbolicComputation} throughout.
