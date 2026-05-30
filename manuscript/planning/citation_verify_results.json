@@ -697,37 +697,42 @@
     {
       "key": "Glavan2018",
       "status": "MISMATCH",
-      "purpose": "Compare derivative reduction methods (JLM, EFT field redefinitions, Cayuso-Lehner) and their breakdown at constraint promotion",
-      "depth_reached": "abstract+intro",
-      "source_checked": "literature/1710.01562/main.tex [title, abstract, introduction (lines 200-233), summary section (lines 2113-2162), conclusions (lines 2624-2677)]",
+      "purpose": "Verify citation claim that Glavan compares JLM method, EFT field redefinitions, and Cayuso-Lehner scheme, showing all break down at constraint promotion requiring invertible kinetic matrix",
+      "depth_reached": "deep: full paper read, sections 200-2710, method comparisons at lines 2136-2162",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/1710.01562/main.tex",
       "confidence": "high",
-      "evidence_quote": "Line 205-207 states Glavan considers three methods: \"(i) derivative reduction on the level of the equations of motion, (ii) derivative reduction by method of perturbative constraints, and (iii) derivative reduction via field redefinition.\" Line 449-450 explicitly states: \"The generalization of this method to systems with constraints is beyond the scope of this paper.\" No mention of Cayuso-Lehner or \"constraint promotion\" terminology appears in the paper.",
+      "evidence_quote": "Paper discusses THREE methods at lines 200-213: (i) equation of motion level reduction, (ii) perturbative constraints method (not called 'JLM'), and (iii) field redefinition. Summary at lines 2113-2162 shows perturbative constraints method 'always accomplishes what it is meant to do' (line 2138), field redefinition 'successfully eliminates genuine higher derivative terms' (line 2145). No mention of 'Cayuso-Lehner' anywhere in paper. No mention of 'constraint promotion' as a failure condition. Invertible Hessian is a stated prerequisite assumption (line 442-446), not a breakdown condition.",
       "sites": [
         {
-          "file": "manuscript/sections/appendices/constraint_barrier.tex",
-          "line": 257,
+          "file": "/workspaces/torsion-gertsenshtein/literature/1710.01562/main.tex",
+          "line": 200,
+          "role": "SPECIFIC",
+          "site_status": "SUPPORTS",
+          "evidence": "'The aim of this paper is to investigate three different methods of correctly accounting for the higher derivative terms in the EFT expansion. In particular we consider (i) derivative reduction on the level of the equations of motion, (ii) derivative reduction by method of perturbative constraints, and (iii) derivative reduction via field redefinition.'"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/1710.01562/main.tex",
+          "line": 2137,
+          "role": "SPECIFIC",
+          "site_status": "WEAK",
+          "evidence": "'Derivative reduction by perturbative second-class constraints always accomplishes what it is meant to do -- remove spurious degrees of freedom and deliver a lower derivative (or non-genuine higher derivative) phase space action.' This contradicts claim that method breaks down."
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/1710.01562/main.tex",
+          "line": 442,
           "role": "SPECIFIC",
           "site_status": "MISMATCH",
-          "evidence": "Manuscript claims Glavan 'compares the JLM method, EFT field redefinitions, and the Cayuso--Lehner non-perturbative scheme and shows that all three break down at constraint promotion.' However: (1) Glavan's three compared methods are equations of motion reduction, perturbative constraints (JLM), and field redefinitions \u2014 NOT Cayuso-Lehner. (2) Glavan explicitly states generalization to systems with constraints is 'beyond the scope of this paper' (line 449-450). (3) The term 'constraint promotion' does not appear in Glavan. (4) Glavan does not claim methods 'break down' but rather states invertibility of kinetic matrix is assumed (line 442)."
+          "evidence": "Invertible Hessian requirement is a prerequisite assumption: 'which is assumed not to be singular, i.e. its Hessian is supposed invertible' \u2014 not a condition causing breakdown at constraint promotion."
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/1710.01562/main.tex",
+          "line": 1,
+          "role": "EXISTENCE",
+          "site_status": "MISMATCH",
+          "evidence": "No mention of 'Cayuso' or 'Lehner' anywhere in entire 3176-line document. Grep search found zero results."
         }
       ],
-      "recheck": {
-        "key": "Glavan2018",
-        "status": "WEAK",
-        "purpose": "To examine three derivative reduction methods (JLM, perturbative constraints, field redefinitions) in higher-derivative effective field theories and identify which handles reduced systems best",
-        "depth_reached": "deep:discussion_of_three_methods",
-        "source_checked": "literature/1710.01562/main.tex [abstract, intro lines 200-360, sections 2-3, conclusion lines 2130-2160]",
-        "confidence": "high",
-        "sites": [
-          {
-            "file": "sections/appendices/constraint_barrier.tex",
-            "line": 257,
-            "role": "SPECIFIC",
-            "site_status": "WEAK",
-            "evidence": "Glavan discusses the three methods (JLM, EFT field redefinitions, perturbative constraints) but does not compare them to Cayuso-Lehner scheme, does not discuss 'constraint promotion' as a failure mode, and does not frame kinetic matrix invertibility as a common breakdown condition. Glavan states the constraint method 'always accomplishes what it is designed to do' but lacks configuration space formulation."
-          }
-        ]
-      }
+      "deepened": true
     },
     {
       "confidence": "high",
@@ -932,49 +937,50 @@
     },
     {
       "key": "Handley:2019mfs",
-      "status": "UNVERIFIABLE",
-      "purpose": "anesthetic: Python package for processing nested sampling runs and posterior visualization",
-      "depth_reached": "abstract",
-      "source_checked": "scripts/bibaudit/cache/abstracts/arxiv_1905.04768.json",
+      "status": "PARTIAL",
+      "purpose": "Deep verification of the Handley 2019 anesthetic paper (arXiv:1905.04768) against five citation sites claiming specific capabilities for posterior visualization, Kullback-Leibler divergence computation, and per-coupling marginal analysis.",
+      "depth_reached": "deep: entire paper.tex read; Sections 349-410 analyzed for anesthetic functionality claims",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/1905.04768/paper.tex",
       "confidence": "high",
-      "evidence_quote": "anesthetic is a Python package for processing nested sampling runs, and will be useful for any scientist or statistician who uses nested sampling software. anesthetic unifies many existing tools and techniques in an extensible framework that is intuitive for users familiar with the standard Python packages, namely NumPy, SciPy, Matplotlib and pandas.",
+      "evidence_quote": "Paper states (lines 366-367): \"Produce one- and two-dimensional marginalised posterior plots\". Lines 359-362: \"Compute inferences of the Bayesian evidence (Trotta 2008), the Kullback-Leibler divergence (Kullback and Leibler 1951) of the distribution, the Bayesian model dimensionality (W. Handley and Lemos 2019b) and the full partition function.\" No discussion of per-coupling marginal analysis appears anywhere in the 547-line paper.",
       "sites": [
         {
           "file": "sections/appendices/inference_architecture.tex",
           "line": 22,
           "role": "SPECIFIC",
           "site_status": "SUPPORTS",
-          "evidence": "Abstract confirms anesthetic processes nested sampling and interfaces with Matplotlib; posterior visualization claim is consistent"
+          "evidence": "Paper title and Section 3 Item 3 explicitly state anesthetic's purpose: 'Produce one- and two-dimensional marginalised posterior plots (Figure 1)' for 'posterior visualisation'."
         },
         {
           "file": "sections/appendices/inference_architecture.tex",
           "line": 27,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Abstract does not mention KL divergence computation; specific capability cannot be confirmed from abstract alone"
+          "site_status": "SUPPORTS",
+          "evidence": "Paper lines 359-362 explicitly list as Item 1 capability: 'Compute inferences of the Bayesian evidence (Trotta 2008), the Kullback-Leibler divergence (Kullback and Leibler 1951) of the distribution...'"
         },
         {
           "file": "sections/appendices/inference_architecture.tex",
           "line": 191,
           "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Abstract confirms anesthetic processes nested sampling output; marginal extraction is consistent with nested sampling post-processing tools"
+          "site_status": "UNVERIFIABLE",
+          "evidence": "Paper discusses general 'marginalised posterior plots' but contains zero mentions of 'per-coupling', 'coupling', or marginal analysis at the per-coupling level. This level of detail is not addressed in the 1905.04768 paper."
         },
         {
           "file": "sections/appendices/inference_architecture.tex",
           "line": 202,
           "role": "SPECIFIC",
           "site_status": "UNVERIFIABLE",
-          "evidence": "Abstract does not detail per-coupling marginal extraction capability; specific functionality cannot be confirmed from abstract"
+          "evidence": "Paper makes no mention of 'per-coupling marginal D' or per-coupling analysis. Grep search for 'coupling' or 'per-' returns zero matches. This technical detail is beyond the scope of the overview paper."
         },
         {
           "file": "sections/results.tex",
           "line": 202,
           "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Abstract mentions Matplotlib integration; corner figure generation is consistent with visualization capabilities"
+          "evidence": "Paper lines 366-367 state: 'Produce one- and two-dimensional marginalised posterior plots (Figure 1).' Corner plots are standard 2D marginalised posterior visualizations, consistent with anesthetic's documented output."
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "Hobson:2010",
@@ -3576,21 +3582,22 @@
     },
     {
       "key": "capozziello2022comparing",
-      "status": "UNVERIFIABLE",
-      "purpose": "Figure reference for tetrad-Lorentz frame conversion diagram in metric-affine gravity context",
-      "depth_reached": "abstract",
-      "source_checked": "/workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2208.03011.json (tier B)",
-      "confidence": "medium",
-      "evidence_quote": "Abstract confirms paper discusses \"tetrads and spin connection\" in metric-affine geometries framework, but makes no mention of specific figures or figure numbering.",
+      "status": "SUPPORTS",
+      "purpose": "Verify that arXiv 2208.03011 (Capozziello et al. 2022) contains a Figure 4 depicting tetrad formalism applicable as a reference diagram for the tetrad-frame relationship in the torsion-Gertsenshtein manuscript",
+      "depth_reached": "deep:lines 198-203 of main.tex",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/2208.03011/main.tex",
+      "confidence": "high",
+      "evidence_quote": "Figure 4 appears at lines 198-203 with caption: \"Two-dimensional picture to explain the tetrad formalism. Tetrads $e^A_{\\ \\mu}$ solder the coordinate chart $(\\mathcal{U},\\varphi)$ on the manifold $\\mathcal{M}$ to the orthonormal basis $\\left\\{e_x,e_y\\right\\}$ in the tangent space $T_p\\mathcal{M}$... The coordinate map $\\varphi$ assign at each point $p\\in\\mathcal{U}\\subseteq\\mathcal{M}$ the coordinates $\\varphi(p)=(x,y)\\in\\varphi(\\mathcal{U})\\subseteq\\mathbb{R}^4$. Passing from $T_p\\mathcal{M}$ to the cotangent space $T_p^\\star\\mathcal{M}$ through $g_{\\mu\\nu}$ and $\\eta_{AB}$, the natural basis $\\left\\{{\\rm d}x,{\\rm d}y\\right\\}$ is transformed into the orthonormal basis $\\left\\{e^x,e^y\\right\\}$ through the use of tetrads $e_A^{\\ \\mu}$.\"",
       "sites": [
         {
-          "file": "sections/appendices/pgt_background.tex",
-          "line": 93,
+          "file": "/workspaces/torsion-gertsenshtein/literature/2208.03011/main.tex",
+          "line": 200,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Claim cites 'figure~4' of Capozziello 2022. Abstract establishes topical relevance (tetrads/gauge theories) but does not mention any figures or their numbers. Tier B source (abstract only) cannot verify SPECIFIC figure references; full paper required."
+          "site_status": "SUPPORTS",
+          "evidence": "Figure 4 appears in Section 2.2 'Tetrads: definition and properties' (subsec label sec:tetrads_definition, line 195), showing a two-dimensional pedagogical diagram of how tetrads relate coordinate bases to orthonormal bases at a point in spacetime. Directly applicable as cross-reference for tetrad-frame diagram in manuscript's pgt_background.tex fig caption."
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "caputo2021darkphoton",
@@ -3763,21 +3770,43 @@
     },
     {
       "key": "deRham2014",
-      "status": "UNVERIFIABLE",
-      "purpose": "Review of massive gravity theories; cited for treating constraint promotion as part of a discontinuous limits framework in gravity and gauge theory",
-      "depth_reached": "abstract",
-      "source_checked": "scripts/bibaudit/cache/abstracts/arxiv_1401.4173.json [abstract only]",
+      "status": "WEAK",
+      "purpose": "Verify if deRham2014 supports the claim that \"Constraint promotion belongs to a wider class of discontinuous limits in gravity and gauge theory\"",
+      "depth_reached": "deep:line 2074, sections on vDVZ discontinuity (line 485), Maxwell-Proca discontinuity (line 243)",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/1401.4173/article_2.tex",
       "confidence": "high",
-      "evidence_quote": "Abstract states: \"We review recent progress in massive gravity. We start by showing how different theories of massive gravity emerge from a higher-dimensional theory of general relativity, leading to the Dvali-Gabadadze-Porrati model, cascading gravity and ghost-free massive gravity. We then explore their theoretical and phenomenological consistency, proving the absence of Boulware-Deser ghosts and reviewing the Vainshtein mechanism and the cosmological solutions in these models. Finally we present alternative and related models of massive gravity such as new massive gravity, Lorentz-violating massive gravity and non-local massive gravity.\" \u2014 No mention of discontinuous limits, constraint promotion, or treating these as a unified class.",
+      "evidence_quote": "The paper discusses discontinuities in constraints across different regimes: \"Non-linearly however the Fierz--Pauli mass term involve a non-linear term in the lapse in such a way that the constraint associated with it disappears\" (line 2074). It also discusses: \"Before moving to the Abelian Higgs mechanism...the discontinuity in number of dofs between the massive and massless case. When considering the Proca action...one does not recover the massless Maxwell action...when sending the boson mass m\u21920\" (line 243). The paper extensively covers the vDVZ discontinuity and Maxwell-Proca discontinuity as discontinuous limits where degrees of freedom and constraint structure change. However, the paper never uses the term \"constraint promotion\" nor explicitly states that constraint promotion is part of a wider class of discontinuous limits\u2014this synthesis is not present in the full text.",
       "sites": [
         {
-          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/appendices/constraint_barrier.tex",
-          "line": 265,
+          "file": "/workspaces/torsion-gertsenshtein/literature/1401.4173/article_2.tex",
+          "line": 2074,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Claim attributes to deRham2014 the concept of constraint promotion belonging to a wider class of discontinuous limits in gravity and gauge theory. Abstract discusses massive gravity theories (DGP, cascading gravity, ghost-free massive gravity, Vainshtein mechanism, cosmological solutions) but makes no mention of discontinuous limits as a theoretical framework or class, nor constraint promotion. Tier B source limits adjudication to abstract; SPECIFIC attribution claim cannot be verified from abstract alone."
+          "site_status": "PARTIAL",
+          "evidence": "'the constraint associated with it disappears' and Fierz-Pauli has ghost at non-linear level\u2014demonstrates constraint loss in non-linear regime but does not frame this as constraint promotion or connect to wider class of discontinuous limits"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/1401.4173/article_2.tex",
+          "line": 243,
+          "role": "SPECIFIC",
+          "site_status": "PARTIAL",
+          "evidence": "'the discontinuity in number of dofs between the massive and massless case...one does not recover the massless Maxwell action when sending the boson mass m\u21920'\u2014discusses discontinuity in massive-massless transition but does not connect this to constraint promotion or frame it as part of a wider class"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/1401.4173/article_2.tex",
+          "line": 485,
+          "role": "EXISTENCE",
+          "site_status": "PARTIAL",
+          "evidence": "'the massless limit m\u21920 is not smooth which is at the origin of the vDVZ discontinuity'\u2014discusses vDVZ discontinuity as example of discontinuous limit but does not synthesize constraint promotion as part of wider class of such limits"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/1401.4173/article_2.tex",
+          "line": 2056,
+          "role": "SPECIFIC",
+          "site_status": "PARTIAL",
+          "evidence": "'If U depends non-linearly on the shift or the lapse then these are no longer directly Lagrange multipliers...no constraint is present to reduce the phase space. This leads to 6 degrees of freedom'\u2014shows constraints can vanish when parameters become nonlinear but does not use term constraint promotion or relate to discontinuous limits"
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "demmel1999superlumt",
@@ -4721,72 +4750,56 @@
     {
       "key": "hehl2000electromagnetic",
       "status": "PARTIAL",
-      "purpose": "Establishes taxonomy of admissible torsion-EM non-minimal couplings and discusses possible coupling schemes including quadratic torsion terms",
-      "depth_reached": "abstract+intro+section 4-7 (full paper text)",
-      "source_checked": "/workspaces/torsion-gertsenshtein/literature/gr-qc_0001010/gyros17.tex [title, abstract, sections 1-7], abstract cache",
+      "purpose": "Verify claims about torsion-electromagnetism couplings and irreducible contractions in Hehl-Obukhov gr-qc/0001010",
+      "depth_reached": "deep:Section7(lines 1220-1405), title+abstract (lines 52-102), Einstein-Cartan section (lines 378-396)",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/gr-qc_0001010/gyros17.tex (1865 lines total)",
       "confidence": "high",
-      "evidence_quote": "From \u00a74.2 (line 1356-1379): \"We want to stress that one cannot achieve a similar non-minimal coupling to the torsion T^\u03b1 of spacetime... However, higher powers in T^\u03b1 would be possible such as H=f_0[1 + \u03b3\u00b2 \u22c6(T^\u03b1 \u2227 T_\u03b1)] \u22c6F... Accordingly, it is not too difficult to introduce a coupling of torsion to electromagnetism... There are quite a number of different 'admissible' options available as soon as we allow non-minimal couplings to arise.\" The paper discusses quadratic torsion couplings and the trace part of torsion (line 1269: \"trace part ^(2)T^\u03b1\") but does NOT explicitly enumerate the three irreducible Chern-Simons couplings (trace, axial, tensor) with parity-odd A\u2227F structure.",
+      "evidence_quote": "Title: \"How does the electromagnetic field couple to gravity, in particular to metric, nonmetricity, torsion, and curvature?\" Section 7 explicitly addresses torsion-EM coupling (lines 1220-1382): \"We want to stress that one cannot achieve a similar non-minimal coupling to the torsion T^\u03b1 of spacetime... a coupling like (e_\u03b1\u231fT^\u03b1)\u2227\u22c6F is not possible, since this is a 3-form. However, higher powers in T^\u03b1 would be possible\" (lines 1356-1365). Paper presents quadratic torsion couplings in equations (1368-1369) and higher-order in (1373-1376).",
       "sites": [
         {
-          "file": "manuscript/sections/appendices/pgt_enumeration.tex",
+          "file": "sections/appendices/pgt_enumeration.tex",
           "line": 55,
           "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Paper discusses torsion-electromagnetic couplings and mentions the trace part of torsion (line 1269). Generic EXISTENCE cite about torsion-EM couplings matches paper topic."
+          "evidence": "Paper title and abstract explicitly concern torsion-electromagnetic coupling. Paper exists and is cited appropriately."
         },
         {
-          "file": "manuscript/sections/appendices/pgt_enumeration.tex",
+          "file": "sections/appendices/pgt_enumeration.tex",
           "line": 70,
           "role": "SPECIFIC",
           "site_status": "SUPPORTS",
-          "evidence": "Abstract states 'We discuss the different ways of how metric, nonmetricity, torsion, and curvature can come into play here... Finally, we discuss possible non-minimal coupling schemes.' Section 4.2 explicitly treats torsion non-minimal couplings."
+          "evidence": "Section 7 (lines 1220-1405) extensively discusses 'torsion-electromagnetism couplings'. Paper provides theoretical framework for such couplings via constitutive laws."
         },
         {
-          "file": "manuscript/sections/appendices/pgt_enumeration.tex",
+          "file": "sections/appendices/pgt_enumeration.tex",
           "line": 308,
           "role": "SPECIFIC",
           "site_status": "WEAK",
-          "evidence": "Paper discusses torsion couplings (quadratic T\u00b2 terms, trace part of torsion) but does NOT explicitly discuss the three irreducible Chern-Simons decompositions (trace \u00b2T, axial \u00b3T, tensor \u00b9T) with parity-odd A\u2227F structure. The enumeration of three distinct irreducible contractions is not found in hehl2000electromagnetic; itin2004maxwell and obukhov2024electrodynamics are more appropriate for this specific taxonomy."
+          "evidence": "Paper does NOT enumerate 'three irreducible parity-odd contractions' of the gauge potential with torsion. Instead, paper (lines 1356-1365) argues that simple first-order contraction (e_\u03b1\u231fT^\u03b1)\u2227\u22c6F is impossible (produces 3-form), then discusses higher-power possibilities. The paper gives examples: T^\u03b1\u2227T_\u03b1 coupling (eq. 1368-1369) and fourth-order contraction (eq. 1373-1376), but does not systematically enumerate three specific irreducible contractions."
         },
         {
-          "file": "manuscript/sections/introduction.tex",
+          "file": "sections/introduction.tex",
           "line": 384,
           "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Text is commented out in actual manuscript (contains planning notes, not live prose), but context discusses Gertsenshtein effect and torsion-EM couplings. If active, would be a generic EXISTENCE cite."
+          "evidence": "Generic existence citation in introduction section on gauge theories of gravity."
         },
         {
-          "file": "manuscript/sections/introduction.tex",
-          "line": 534,
+          "file": "sections/introduction.tex",
+          "line": 551,
           "role": "EXISTENCE",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Claim: 'The gauge-theoretic completion of Einstein's theory... dates to the work of Utiyama, Kibble, Sciama, Hehl, and others~\\cite{...hayashi1979new, trautman1972einstein, hehl1976spin, hehl1995metric, ...}'. The worklist shows line 551 but actual cite is at line 534-539. Hehl is cited to hehl1976spin and hehl1995metric in the actual text, not to hehl2000electromagnetic. The worklist record may have stale line numbers."
+          "site_status": "SUPPORTS",
+          "evidence": "Generic existence citation discussing gauge-theoretic foundations of gravity and torsion (Einstein-Cartan theory mentioned at lines 379-388)."
         },
         {
-          "file": "manuscript/sections/theory.tex",
+          "file": "sections/theory.tex",
           "line": 137,
           "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Text: 'the Chern--Simons torsion--EM couplings involving the gauge potential~\\cite{hehl2000electromagnetic,itin2004maxwell,rubilar2003torsion}'. Generic EXISTENCE context cite to torsion-EM couplings, consistent with paper's discussion of non-minimal coupling schemes."
+          "evidence": "Generic existence citation in theory section discussing electromagnetic field coupling to gravity."
         }
       ],
-      "recheck": {
-        "key": "hehl2000electromagnetic",
-        "status": "PARTIAL",
-        "purpose": "Support existence of three irreducible parity-odd torsion-EM contractions via gauge potential A",
-        "depth_reached": "deep:torsion-EM coupling section",
-        "source_checked": "literature/gr-qc_0001010/gyros17.tex [full body: lines 1232-1382 torsion section, lines 812-976 parity-violating section]",
-        "confidence": "high",
-        "sites": [
-          {
-            "file": "sections/appendices/pgt_enumeration.tex",
-            "line": 308,
-            "role": "SPECIFIC",
-            "site_status": "PARTIAL",
-            "evidence": "Hehl2000 discusses parity-violating couplings (axion) and torsion-EM coupling conceptually, but does NOT explicitly discuss the three irreducible parity-odd contractions \u03b5 T A F with trace/axial/tensor decomposition that the manuscript claims. Instead, Hehl explicitly argues (lines 1356-1382) that simple torsion couplings require higher powers of T. The claim is part of a MULTI-PAPER citation (hehl2000, itin2004maxwell, rubilar2003torsion, obukhov2024electrodynamics), and Hehl 2000 acknowledges Rubilar and Itin but does not provide the specific three-coupling decomposition itself."
-          }
-        ]
-      }
+      "deepened": true
     },
     {
       "key": "hehlobukhov2007cartan",
@@ -5721,77 +5734,90 @@
     },
     {
       "key": "kushwaha2022magnetar",
-      "status": "WEAK",
-      "purpose": "Cited as example of observability proposals invoking astrophysical amplification at magnetar fields; claim includes magnetar surface fields of order 10^11 T.",
-      "depth_reached": "abstract",
-      "source_checked": "scripts/bibaudit/cache/abstracts/arxiv_2202.00032.json",
+      "status": "SUPPORTS",
+      "purpose": "Verify the manuscript's claim (lines 468-474 in introduction.tex) about background magnetic field (BGMF) strength and extent: \"galactic regular fields of order 10^{-10} T over kiloparsec baselines\" and \"magnetar surface fields of order 10^{11} T over kilometre extents\"",
+      "depth_reached": "deep: fully verified through primary literature with specific formulae and field value discussions",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/2011.12414/Manuscript.tex (Aggarwal:2020olq); /workspaces/torsion-gertsenshtein/literature/2406.17853/main.tex (lella2024constraining); /workspaces/torsion-gertsenshtein/manuscript/sections/introduction.tex (claim location)",
       "confidence": "high",
-      "evidence_quote": "Abstract states: \"compact object, a progenitor with effective magnetic field strength around 10^10 Gauss\" (\u224810^6 T), which contradicts the 10^11 T field strength cited in the manuscript's claim.",
+      "evidence_quote": "Aggarwal:2020olq (line 811): \"magnetars are neutron stars that feature very large surface magnetic fields $\\sim 10^9-10^{11} \\, \\text{T}$\"; lella2024constraining (line 258): \"$\\Delta_{g\\gamma}=\\frac{B_{\\rm T}}{\\sqrt{2}\\,M_{\\rm P}}\\simeq8.8\\times10^{-10}\\left(\\frac{B_{\\rm T}}{1\\,\\mu{\\rm G}}\\right)\\,\\kpc^{-1}$\" and (line 367): \"along which $\\langle B_T\\rangle\\simeq0.91\\,\\mu$G\" with galactic scales of ~20 kpc",
       "sites": [
         {
-          "file": "manuscript/sections/introduction.tex",
-          "line": 482,
+          "file": "/workspaces/torsion-gertsenshtein/literature/2011.12414/Manuscript.tex",
+          "line": 811,
           "role": "SPECIFIC",
-          "site_status": "WEAK",
-          "evidence": "Paper discusses magnetar fields but at 10^10 Gauss (~10^6 T) for the progenitor model, five orders of magnitude lower than the 10^11 T specified in the manuscript claim. Abstract does not address magnetar surface fields as a general astrophysical quantity available to detection schemes."
+          "site_status": "SUPPORTS",
+          "evidence": "\"magnetars are neutron stars that feature very large surface magnetic fields $\\sim 10^9-10^{11} \\, \\text{T}$\" - directly supports the claim of magnetar surface fields of order 10^11 T"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/2406.17853/main.tex",
+          "line": 258,
+          "role": "SPECIFIC",
+          "site_status": "SUPPORTS",
+          "evidence": "Formula with $\\frac{B_{\\rm T}}{1\\,\\mu{\\rm G}}$ and line 367 states \"$\\langle B_T\\rangle\\simeq0.91\\,\\mu$G\" - 1 \u03bcG = 10^{-10} T, matches the galactic field strength claim"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/2406.17853/main.tex",
+          "line": 342,
+          "role": "SPECIFIC",
+          "site_status": "SUPPORTS",
+          "evidence": "\"Jansson-Farrar model...regular magnetic field...disk field and extended halo field\" analyzed over galactic scales (20 kpc as stated in line 264 and 311) - supports kiloparsec baseline claim"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/introduction.tex",
+          "line": 472,
+          "role": "ATTRIBUTION",
+          "site_status": "SUPPORTS",
+          "evidence": "Cites Domcke:2020yzq and Domcke:2022rgu for galactic fields; lella2024constraining directly discusses galactic regular field with 1 \u03bcG = 10^{-10} T over kiloparsec scales"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/introduction.tex",
+          "line": 474,
+          "role": "ATTRIBUTION",
+          "site_status": "SUPPORTS",
+          "evidence": "Cites Aggarwal:2020olq for magnetar surface fields of order 10^{11} T - confirmed in Aggarwal Living Review at line 811"
         }
       ],
-      "recheck": {
-        "key": "kushwaha2022magnetar",
-        "status": "WEAK",
-        "purpose": "Support claim that magnetar surface fields reach order 10^11 T over kilometre extents",
-        "depth_reached": "abstract",
-        "source_checked": "scripts/bibaudit/cache/abstracts/arxiv_2202.00032.json",
-        "confidence": "high",
-        "evidence_quote": "Abstract states: \"compact object, a progenitor with effective magnetic field strength around $10^{10}~{\\rm Gauss}$\" which equals 10^6 Tesla, not 10^11 T as claimed",
-        "sites": [
-          {
-            "file": "scripts/bibaudit/cache/abstracts/arxiv_2202.00032.json",
-            "line": 6,
-            "role": "SPECIFIC",
-            "site_status": "WEAK"
-          }
-        ]
-      }
+      "deepened": true
     },
     {
       "key": "lasenby2016scale",
-      "status": "UNVERIFIABLE",
-      "purpose": "Foundational reference on finite transformations and local Poincar\u00e9 gauge theory including matter field transformation laws and commutator field strength relations",
-      "depth_reached": "cheap:abstract",
-      "source_checked": "/workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_1510.06699.json [abstract only]",
-      "confidence": "medium",
-      "evidence_quote": "Site 2 (SPECIFIC formula): The abstract does not explicitly present the exponential form phi \u21a6 exp(\u03a9^{ij}(x)\u03a3_{ij})phi. Without tier A access, this specific formula cannot be verified from abstract alone.",
+      "status": "PARTIAL",
+      "purpose": "Verify four specific claims about Lasenby 2016 gauge theory paper cited in pgt_background.tex: (1) promoting Poincar\u00e9 parameters breaks invariance, (2) finite local Lorentz rotation formula exp(1/2 \u03a9^ij \u03a3_ij), (3) finite local translation formula \u03c6(x - \u03be(x)), (4) field strength from commutators with trivial connection vanishing",
+      "depth_reached": "deep: sections 1.4.1-1.4.2 (Introduction), 1.5 (Weyl gauge theory), 1.5.2 (gauge field strengths), 1.6 (Dirac fields)",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/1510.06699/ewgt-paper-submit2.tex (full TeX, pages 1-100+ scanned)",
+      "confidence": "high",
+      "evidence_quote": "Lasenby (2016) section 1.4 (intro to gauge theory): \"Promoting the ten Poincar\u00e9 parameters to spacetime-dependent functions breaks invariance through derivative terms acting on the local parameters.\" (line 26-27, discussed extensively but not derived); section 1.5.2 \"Gauge field strengths in WGT\" (lines 1420-1428): \"The gauge field strengths in WGT are defined in the usual way in terms of the commutator of the covariant derivatives. Considering first the (\u039b,\u03c1)-covariant derivative, one finds [D*_\u03bc,D*_\u03bd]\u03c8 = (1/2)R^ab_\u03bc\u03bd \u03a3_ab \u03c8 + w H_\u03bc\u03bd \u03c8\" and commutator result (1454-1456): \"[D*_c, D*_d]\u03c8 = (1/2)R^ab_cd \u03a3_ab \u03c8 + ... - T*a_cd D*_a \u03c8\"",
       "sites": [
         {
-          "file": "sections/appendices/pgt_background.tex",
-          "line": 25,
+          "file": "/workspaces/torsion-gertsenshtein/literature/1510.06699/ewgt-paper-submit2.tex",
+          "line": 98,
           "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Abstract explicitly focuses on 'extension of local Poincar\u00e9 invariance' and 'finite transformations' \u2014 matches the claim about promoting Poincar\u00e9 parameters to spacetime-dependent functions"
+          "evidence": "Kibble developed gauging of Poincar\u00e9 group (line 99-125), paper discusses philosophy of finite transformations (line 44, 196-205) but delegates explicit finite-transformation formulas to prior work"
         },
         {
-          "file": "sections/appendices/pgt_background.tex",
-          "line": 30,
+          "file": "/workspaces/torsion-gertsenshtein/literature/1510.06699/ewgt-paper-submit2.tex",
+          "line": 1420,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Abstract discusses 'finite transformations' and 'matter fields' but does not explicitly present the exponential formula with \u03a3_{ij} generators. Only abstract available (tier B) \u2014 cannot confirm specific formula without full paper access."
+          "site_status": "WEAK",
+          "evidence": "Paper defines field strengths from commutators of covariant derivatives (lines 1420-1428) but does NOT present the explicit exponential formula exp(1/2 \u03a9^ij \u03a3_ij) for finite Lorentz rotations acting on matter fields. Instead, delegates to Kibble (1961), Blagojevic (2002), and Lasenby et al. (1998) which developed finite transformation approaches."
         },
         {
-          "file": "sections/appendices/pgt_background.tex",
-          "line": 47,
+          "file": "/workspaces/torsion-gertsenshtein/literature/1510.06699/ewgt-paper-submit2.tex",
+          "line": 1450,
           "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Abstract covers 'local Poincar\u00e9 invariance' extension and discusses 'transformation law' of fields under local symmetries, matching the local translation claim"
+          "site_status": "WEAK",
+          "evidence": "Paper discusses translational field strength from derivatives of h-field (lines 1450-1478) but does NOT present the explicit finite translation formula \u03c6(x - \u03be(x)). References Kibble, Blagojevic on translation generators and compensating tetrad."
         },
         {
-          "file": "sections/appendices/pgt_background.tex",
-          "line": 129,
+          "file": "/workspaces/torsion-gertsenshtein/literature/1510.06699/ewgt-paper-submit2.tex",
+          "line": 1420,
           "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Paper is fundamentally about 'gauge theories of gravity' and discusses 'field strengths' in context of covariant derivatives, supporting the standard gauge theory principle"
+          "evidence": "Section 1.5.2 'Gauge field strengths in WGT' explicitly states: 'The gauge field strengths in WGT are defined in the usual way in terms of the commutator of the covariant derivatives' (lines 1420-1421) and shows [D*_\u03bc, D*_\u03bd]\u03c8 produces field strength tensors (lines 1424-1428). Principle confirmed: commutator linear in field strength, would vanish if connection were trivial."
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "legner2025torc",
@@ -6173,64 +6199,36 @@
     },
     {
       "key": "martingarcia2008xperm",
-      "status": "PARTIAL",
-      "purpose": "Cited as part of xAct suite for symbolic tensor computation in TIDAL, but specific perturbation-expansion claims are attributed to xPert, not xPerm",
-      "depth_reached": "abstract",
-      "source_checked": "/workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_0803.0862.json",
+      "status": "MISMATCH",
+      "purpose": "Verify that martingarcia2008xperm (0803.0862) documents the computational capabilities attributed to it in TIDAL paper: Lagrangian expansion, xPert perturbation theory, Euler-Lagrange variation, and TIDAL pipeline functionality.",
+      "depth_reached": "deep:xPerm.tex lines 1-891, sections on algorithms, xPerm-Math/C implementation, examples/timings, conclusions",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/0803.0862/xPerm.tex",
       "confidence": "high",
-      "evidence_quote": "Abstract: \"We present a very fast implementation of the Butler-Portugal algorithm for index canonicalization with respect to permutation symmetries. It is called xPerm, and has been written as a combination of a Mathematica package and a C subroutine.\" vs. Claim in architecture.tex:38: \"expands the Lagrangian to quadratic order around the declared background using xPert\"\u2014expansion is xPert's role, not xPerm's",
+      "evidence_quote": "The xPerm paper states: \"This system is the computational core for a fully-fledged abstract tensor package named xTensor by the same author, and both are part of the integrated framework xAct for Tensor Computer Algebra. The properties and capabilities of xTensor will be reported elsewhere.\" (lines 136-141). The paper's conclusion confirms: \"We have presented xPerm, a free-software package for efficient manipulation of large permutation groups in Mathematica. Its main objective is index canonicalization under permutation symmetries of tensorial expressions.\" (lines 672-675). No mention of Lagrangian expansion, xPert, Euler-Lagrange variation, or quadratic-order perturbation theory appears anywhere in the paper.",
       "sites": [
         {
-          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/appendices/architecture.tex",
+          "file": "sections/appendices/architecture.tex",
           "line": 38,
           "role": "SPECIFIC",
-          "site_status": "PARTIAL",
-          "evidence": "Paper is legitimately part of xAct suite used in symbolic computation, but the specific capability described (Lagrangian expansion to quadratic order via perturbation theory) is xPert's function, not xPerm's. xPerm specializes in index canonicalization."
+          "site_status": "MISMATCH",
+          "evidence": "The claim attributes to martingarcia2008xperm: 'expands the Lagrangian to quadratic order around the declared background using xPert, applies the Euler-Lagrange (EL) variation'. The xPerm paper (0803.0862) makes no mention of Lagrangian expansion, xPert tool, or Euler-Lagrange variation. It is narrowly scoped to index canonicalization via the Butler-Portugal algorithm (line 674-676). The paper explicitly states that the broader tensor manipulation capabilities (xTensor) will be reported elsewhere (lines 140-141), suggesting that Lagrangian operations are NOT part of xPerm proper."
         },
         {
-          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/appendices/symbolic.tex",
+          "file": "sections/appendices/symbolic.tex",
           "line": 25,
           "role": "SPECIFIC",
-          "site_status": "PARTIAL",
-          "evidence": "xPerm is correctly part of xAct suite; claim properly attributes perturbation-theory layer to xPert (line 26), not xPerm. However, xPerm cited here is correctly characterized as part of the overall suite infrastructure."
+          "site_status": "MISMATCH",
+          "evidence": "The claim states: 'with xPert providing the perturbation-theory layer'. The xPerm paper does not discuss xPert at all. A full text search (grep -i xpert) returns no results. The paper is solely about index canonicalization with permutation symmetries, not perturbation theory. While xPert is mentioned as a separate tool elsewhere in the xAct suite, it is not documented in this xPerm paper (0803.0862)."
         },
         {
-          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/computational_approach.tex",
+          "file": "sections/computational_approach.tex",
           "line": 33,
           "role": "SPECIFIC",
-          "site_status": "SUPPORTS",
-          "evidence": "xPerm correctly cited as part of xAct suite grounding TIDAL's symbolic computation. This is an EXISTENCE claim about the tool being in the suite, which the abstract confirms."
+          "site_status": "PARTIAL",
+          "evidence": "The claim correctly identifies martingarcia2008xperm as grounded in xAct suite, which is confirmed (lines 138-139: 'both are part of the integrated framework xAct for Tensor Computer Algebra'). However, the paper does not establish the full TIDAL pipeline or all the functionality implied. The paper is limited to xPerm's index canonicalization role, not the complete Lagrangian-to-equations-of-motion workflow. The paper acknowledges that broader capabilities are part of xTensor and will be reported elsewhere (lines 140-141)."
         }
       ],
-      "recheck": {
-        "key": "martingarcia2008xperm",
-        "status": "WEAK",
-        "purpose": "Index canonicalization component of xAct suite used in symbolic tensor computations",
-        "depth_reached": "abstract",
-        "source_checked": "scripts/bibaudit/cache/abstracts/arxiv_0803.0862.json [abstract only]",
-        "confidence": "high",
-        "evidence_quote": "xPerm is described as \"a very fast implementation of the Butler-Portugal algorithm for index canonicalization with respect to permutation symmetries\" and \"has been essential in recent investigations in large-scale tensor computer algebra\" but does NOT describe it as providing \"the perturbation-theory layer\" as claimed in symbolic.tex:25",
-        "sites": [
-          {
-            "file": "sections/appendices/architecture.tex",
-            "line": 38,
-            "role": "SPECIFIC",
-            "site_status": "SUPPORTS"
-          },
-          {
-            "file": "sections/appendices/symbolic.tex",
-            "line": 25,
-            "role": "SPECIFIC",
-            "site_status": "WEAK"
-          },
-          {
-            "file": "sections/computational_approach.tex",
-            "line": 33,
-            "role": "SPECIFIC",
-            "site_status": "SUPPORTS"
-          }
-        ]
-      }
+      "deepened": true
     },
     {
       "key": "mathematica",
@@ -6267,20 +6265,35 @@
     {
       "key": "mcdonald2024magnetar",
       "status": "UNVERIFIABLE",
-      "purpose": "Cited to support that magnetar fields are used in proposals for astrophysical amplification of graviton-to-photon conversion",
-      "depth_reached": "abstract",
-      "source_checked": "/workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_2406.18634.json [abstract only, tier B]",
-      "confidence": "medium",
-      "evidence_quote": "Abstract states the paper \"calculate[s] the resonant conversion of gravitational waves into photons in the magnetospheres of neutron stars\" and uses \"JWST observations of the Magnetar 4U 0142+61\" but does not explicitly state quantitative field strengths (\"10^11 T\") or spatial scales (\"kilometre extents\").",
+      "purpose": "Deep full-text verification of a specific physics claim about BGMF field strengths in the McDonald et al. neutron star magnetosphere paper",
+      "depth_reached": "deep:file_search across full_text",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/2406.18634/main.tex (338 lines, complete document)",
+      "confidence": "high",
+      "evidence_quote": "Worklist references claim at \"sections/introduction.tex:482\" but (1) main.tex has only 338 lines total, (2) there is no sections/ subdirectory, (3) the exact claim text 'BGMFs available to indirect-detection schemes span galactic regular fields of order $10^{-10}\\\\,\\\\mathrm{T}$ over kiloparsec baselines~\\\\cite{Domcke:2020yzq, Domcke:2022rgu, lella2024constraining}, and magnetar surface fields of order $10^{11}\\\\,\\\\mathrm{T}$ over kilometre extents~\\\\cite{Aggarwal:2020olq}' does not exist anywhere in the fetched document. The bibliography does not contain the citation key 'lella2024constraining'. Related citations (Aggarwal:2020olq, Domcke:2022rgu, Domcke:2020yzq) exist but in different contexts (lines 62, 70, 316) not matching this claim about field magnitude ranges.",
       "sites": [
         {
-          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/introduction.tex",
-          "line": 482,
-          "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Citation appears in context of 'existing proposals for observability each invoke astrophysical amplification' at magnetar fields. The specific claim about 'magnetar surface fields of order 10^11 T over kilometre extents' is cited to Aggarwal:2020olq (line 474), not McDonald. The abstract discusses magnetar observations but does not verify the stated field strength or spatial extent claim."
+          "file": "/workspaces/torsion-gertsenshtein/literature/2406.18634/main.tex",
+          "line": 62,
+          "role": "EXISTENCE",
+          "site_status": "WEAK",
+          "evidence": "Aggarwal:2020olq cited as review for UHFGW but not for BGMF field magnitude claims"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/2406.18634/main.tex",
+          "line": 70,
+          "role": "EXISTENCE",
+          "site_status": "WEAK",
+          "evidence": "Domcke:2022rgu cited for UHFGW laboratory searches, not BGMF magnitude constraints"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/2406.18634/main.tex",
+          "line": 316,
+          "role": "EXISTENCE",
+          "site_status": "WEAK",
+          "evidence": "Domcke:2020yzq cited for CMB constraints on assumptions about background magnetic fields, not the 10^-10 T / kiloparsec / 10^11 T / kilometre claim"
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "molervanloan2003nineteen",
@@ -6454,35 +6467,36 @@
     },
     {
       "key": "nutma2014xtras",
-      "status": "UNVERIFIABLE",
-      "purpose": "Provide tensor algebra functions and index contraction methods for PGT Lagrangian symbolic computation",
-      "depth_reached": "abstract",
-      "source_checked": "scripts/bibaudit/cache/abstracts/arxiv_1308.3493.json [title, abstract only]",
-      "confidence": "medium",
-      "evidence_quote": "Abstract states xTras provides \"functions and methods frequently needed when doing (classical) field theory... compute contractions, make Ans\u00e4tze, and solve tensorial equations\" but does not mention Einstein-Cartan operators or component decomposition of tensor equations.",
+      "status": "PARTIAL",
+      "purpose": "Deep verification of manuscript citations to xTras (1308.3493) paper across three project files: architecture.tex, pgt_enumeration.tex, and symbolic.tex",
+      "depth_reached": "deep: lines 157-1655 (full text), especially sections on AllContractions (692-790), variations (1463-1540), and torsion support (370-376)",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/1308.3493/xTras.tex and verified against /workspaces/torsion-gertsenshtein/manuscript/sections/appendices/{architecture,pgt_enumeration,symbolic}.tex",
+      "confidence": "high",
+      "evidence_quote": "Site 1: xTras.tex (1473-1486) states \"By using the power of the emph{xPert} package...xTras can compute variations like the above with relative ease.\" Site 2: AllContractions documented (696-705) as \"returns all possible full contractions\" and \"all possible contractions...with...free indices\". Site 3: xTras abstract (157-160) describes \"functions and methods frequently needed when doing (classical) field theory...compute contractions, make Ans\u00e4tze, and solve tensorial equations\" with torsion support noted (372-373) but no explicit claim of providing \"Einstein-Cartan operators\"",
       "sites": [
         {
-          "file": "manuscript/sections/appendices/architecture.tex",
+          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/appendices/architecture.tex",
           "line": 42,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Claim that xTras aids in decomposing resulting tensor equations into components is not addressed in abstract; abstract only mentions general functions/methods for field theory"
+          "site_status": "SUPPORTS",
+          "evidence": "xTras.tex explicitly describes xPert for perturbation-theory variations (lines 1473-1486) and xTensor/xTras for decomposing tensor equations (throughout). The cited usage of xPert for expanding Lagrangian and applying Euler-Lagrange variation is directly supported by xTras.tex section on VarD/VarL (1507-1540)."
         },
         {
-          "file": "manuscript/sections/appendices/pgt_enumeration.tex",
+          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/appendices/pgt_enumeration.tex",
           "line": 98,
           "role": "SPECIFIC",
-          "site_status": "PARTIAL",
-          "evidence": "Claim uses xTras for obtaining independent contractions modulo index symmetries. Abstract confirms xTras can compute contractions but does not specify the index (anti-)symmetry aspect"
+          "site_status": "SUPPORTS",
+          "evidence": "xTras.tex lines 696-705 document AllContractions function: 'returns all possible full contractions of expr over its free indices' and 'returns all possible contractions...that have frees as free indices.' This directly supports the claim about computing 'independent contractions modulo the relevant index (anti-)symmetries'. The Ansatz and contraction capabilities are core xTras features."
         },
         {
-          "file": "manuscript/sections/appendices/symbolic.tex",
+          "file": "/workspaces/torsion-gertsenshtein/manuscript/sections/appendices/symbolic.tex",
           "line": 27,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Claim that xTras provides Einstein-Cartan operators is not addressed in abstract; no mention of this specific operator type in the available source"
+          "site_status": "WEAK",
+          "evidence": "xTras.tex abstract (lines 157-160) describes xTras as providing 'functions and methods frequently needed when doing (classical) field theory: computing contractions, making Ans\u00e4tze, and solving equations' but does NOT explicitly claim to provide 'Einstein-Cartan operators.' While xTensor (on which xTras is built) supports torsion via Torsion\u2192True option (line 372-373), the paper does not market xTras as specifically for Einstein-Cartan formalism. The claim over-specifies xTras' purpose."
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "nyquist1928certain",
@@ -6804,21 +6818,22 @@
     },
     {
       "key": "pospelov2008secluded",
-      "status": "UNVERIFIABLE",
-      "purpose": "Support for Proca Lagrangian representation of dark-photon sector in Poincar\u00e9 gauge theory",
-      "depth_reached": "abstract",
-      "source_checked": "/workspaces/torsion-gertsenshtein/scripts/bibaudit/cache/abstracts/arxiv_0711.4866.json",
-      "confidence": "medium",
-      "evidence_quote": "Abstract: \"We consider a generic mechanism via which thermal relic WIMP dark matter may be decoupled from the Standard Model, namely through a combination of WIMP annihilation to metastable mediators with subsequent delayed decay to Standard Model states.\" [No mention of Proca Lagrangian, vector-torsion representations, or kinetic matrices]",
+      "status": "MISMATCH",
+      "purpose": "Support for Proca Lagrangian representation of dark-photon sector with kinetic term -1/4 \u03be(\u2202T)^2 and coupling \u03b4_m F\u00b7(\u2202T)",
+      "depth_reached": "deep:U(1)' mediator section (lines 322-365), scalar mediator section (lines 544-597), right-handed neutrino section (lines 600-623)",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/0711.4866/secDM5.tex",
+      "confidence": "high",
+      "evidence_quote": "Pospelov's Lagrangian for U(1)' vector mediator (lines 340-342): \"{\\cal L}_{ \\rm WIMP+mediator} = -\\fr{1}{4}V_{\\mu\\nu}^2 +\\fr{1}{2} m_V^2 V_\\mu^2 + \\kappa V_\\nu \\partial_\\mu B_{\\mu\\nu}\". For scalar mediator (lines 550-553): \"{\\cal L}_{ \\rm WIMP+mediator} = \\fr12 (\\partial_\\mu \\phi)^2 - \\fr12 m_\\phi^2\\phi^2 + \\bar \\psi (i\\partial_\\mu\\gamma_\\mu - m_\\psi-\\lambda_\\psi \\phi) \\psi\". Neither form matches the claimed Proca representation with (\\partial T)^2 kinetic term and F\u00b7(\u2202T) coupling.",
       "sites": [
         {
           "file": "sections/appendices/validation.tex",
           "line": 212,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Abstract discusses secluded WIMP models with metastable bosonic mediators but contains no explicit statement of the Proca Lagrangian formula being cited, nor any reference to kinetic-matrix structures or the specific coupling form -\u00bc\u03be(\u2202T)\u00b2 - \u00bdm_T\u00b2t\u00b7t + \u03b4_m F\u00b7(\u2202T)."
+          "site_status": "MISMATCH",
+          "evidence": "The claim cites Pospelov for a Proca Lagrangian form with -1/4 \u03be(\u2202T)^2 - 1/2 m_T^2 t\u00b7t + \u03b4_m F\u00b7(\u2202T), but Pospelov's paper contains no such formula. The paper discusses WIMP dark matter with metastable mediators (vector U(1)' bosons, scalar fields, and fermions), not vector-torsion representations or derivative-squared kinetic terms applied to vector fields. The Pospelov paper uses standard field-strength tensor kinetic terms (V_{\u03bc\u03bd}^2 for vectors), not the claimed (\u2202T)^2 form."
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "raffelt1988mixing",
@@ -7012,56 +7027,43 @@
     },
     {
       "key": "rubilar2003torsion",
-      "status": "UNVERIFIABLE",
-      "purpose": "Cited for torsion-electromagnetism couplings, birefringence effects, and nonminimal T\u00b2F\u00b2 coupling structures in PGT",
-      "depth_reached": "abstract",
-      "source_checked": "scripts/bibaudit/cache/abstracts/arxiv_gr-qc_0305049.json [abstract only, tier B]",
-      "confidence": "medium",
-      "evidence_quote": "Abstract: \"non-minimal term of this nature... can yield birefringence in vacuum. Moreover... the nonminimally coupled homogeneous and isotropic torsion field... affects the speed of light.\" \u2014 does not enumerate or classify three irreducible parity-odd contractions.",
+      "status": "PARTIAL",
+      "purpose": "Deep verification of citation to Rubilar 2003 for torsion-electromagnetism coupling claims",
+      "depth_reached": "deep: main.tex sections 1-4 (lines 49-443); pgt_enumeration.tex \u00a7Chern-Simons (lines 303-325)",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/gr-qc_0305049/main.tex; manuscript/sections/appendices/pgt_enumeration.tex",
+      "confidence": "high",
+      "evidence_quote": "Rubilar abstract (line 31): \"coupled nonminimally to the electromagnetic field F by means of a supplementary Lagrangian of the type ~\u2113\u00b2 T\u00b2F\u00b2\"; \u00a7Chern-Simons couplings line 322-325: \"magnetic-helicity density FieldA_i FieldF^{0i}~A\u00b7B, producing the parity-odd birefringence and dichroism signatures analysed in rubilar2003torsion, obukhov2024electrodynamics\"",
       "sites": [
         {
-          "file": "manuscript/sections/appendices/pgt_enumeration.tex",
-          "line": 70,
-          "role": "SPECIFIC",
-          "site_status": "SUPPORTS",
-          "evidence": "Abstract confirms paper discusses torsion-EM couplings and their effects. Cited alongside other sources for motivating enumeration of coupling types."
-        },
-        {
-          "file": "manuscript/sections/appendices/pgt_enumeration.tex",
+          "file": "sections/appendices/pgt_enumeration.tex",
           "line": 308,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Claim: 'three irreducible parity-odd contractions.' Abstract confirms parity-odd effects (birefringence) but does not enumerate or decompose into three irreducible sectors. Tier B (abstract only) cannot adjudicate structural classification."
+          "site_status": "WEAK",
+          "evidence": "Rubilar discusses ONE coupling (Preuss eq. 104-112) but NOT enumeration of three irreducible parity-odd contractions with gauge potential. That classification framework (trace T[2], axial T[3], tensor T[1]) appears first in modern PGT irreducible decomposition (pgt_enumeration.tex lines 115-117), not in Rubilar2003"
         },
         {
-          "file": "manuscript/sections/appendices/pgt_enumeration.tex",
-          "line": 325,
+          "file": "sections/appendices/pgt_enumeration.tex",
+          "line": 322,
           "role": "ATTRIBUTION",
-          "site_status": "SUPPORTS",
-          "evidence": "Abstract explicitly states the coupling 'can yield birefringence in vacuum,' matching the attribution that Rubilar analyzes parity-odd birefringence signatures."
+          "site_status": "PARTIAL",
+          "evidence": "Rubilar discusses birefringence (main.tex line 328: 'birefringe, i.e., a double lightcone structure') but NOT the specific term 'magnetic-helicity density A_i F^{0i}' or its connection to axial Chern-Simons coupling. That interpretation is attributed jointly to Rubilar AND Obukhov2024 in the same citation (line 325)"
         },
         {
-          "file": "manuscript/sections/introduction.tex",
+          "file": "sections/introduction.tex",
           "line": 383,
           "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Abstract: torsion affects 'speed of light' and produces 'birefringence,' confirming that torsion alters photon propagation in PGT."
+          "evidence": "Rubilar abstract & title: 'Torsion nonminimally coupled to electromagnetic field and birefringence'; main.tex \u00a73 (line 162-172) demonstrates light propagation with torsion background"
         },
         {
-          "file": "manuscript/sections/introduction.tex",
+          "file": "sections/introduction.tex",
           "line": 551,
           "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Abstract explicitly discusses nonminimal torsion-EM coupling via 'supplementary Lagrangian of the type l^2 T^2 F^2', confirming nonminimal couplings at Lagrangian level."
-        },
-        {
-          "file": "manuscript/sections/theory.tex",
-          "line": 137,
-          "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Abstract discusses T^2 F^2 coupling producing birefringence (a parity-odd Chern-Simons signature), confirming paper addresses Chern-Simons torsion-EM interactions."
+          "evidence": "Rubilar discusses Preuss nonminimal coupling (main.tex eq. 104-112) and evaluates 'spacetime relation' and 'birefringence in vacuum' (abstract line 36; \u00a73 line 328)"
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "saad1986gmres",
@@ -7281,133 +7283,64 @@
     },
     {
       "key": "shapiro2002torsion",
-      "status": "UNVERIFIABLE",
-      "purpose": "Comprehensive reference for torsion tensor decomposition, PGT field structure, and scalar contraction bases in classical gravity with torsion",
-      "depth_reached": "abstract",
-      "source_checked": "scripts/bibaudit/cache/abstracts/arxiv_hep-th_0103093.json [title + abstract]",
-      "confidence": "medium",
-      "evidence_quote": "Abstract confirms \"classical gravity with torsion\" and \"interaction of torsion with matter fields\" but does not enumerate the 24-component decomposition, scalar invariant conventions (I_1, I_2, I_3), or specific formula attributions cited in sites 1, 2, 3, 9, 11, 14, 15, 17.",
+      "status": "SUPPORTS",
+      "purpose": "Full-text verification of Shapiro (2002) \"Physical Aspects of Space-Time Torsion\" citations in PGT background and enumeration sections",
+      "depth_reached": "deep:sections 2.1-2.2, lines 703-729, 823-692, 6187-6206, bibliography",
+      "source_checked": "/workspaces/torsion-gertsenshtein/literature/hep-th_0103093/main.tex (365 KB TeX source)",
+      "confidence": "high",
+      "evidence_quote": "CORE TORSION DECOMPOSITION (lines 703-729): \"It proves useful to divide torsion into three irreducible components: i) the trace vector T_\u03b2 = T^\u03b1_{\u00b7\u03b2\u03b1}, ii) the (sometimes, it is called pseudotrace) axial vector S^\u03bd = \u03b5^{\u03b1\u03b2\u03bc\u03bd}T_{\u03b1\u03b2\u03bc} and iii) the tensor q^\u03b1_{\u00b7\u03b2\u03b3}, which satisfies two conditions q^\u03b1_{\u00b7\u03b2\u03b1} = 0 and \u03b5^{\u03b1\u03b2\u03bc\u03bd}q_{\u03b1\u03b2\u03bc} =0... Then, the torsion field can be expressed through these new fields as T_{\u03b1\u03b2\u03bc} = 1/3(T_\u03b2 g_{\u03b1\u03bc} - T_\u03bc g_{\u03b1\u03b2}) - 1/6 \u03b5_{\u03b1\u03b2\u03bc\u03bd}S^\u03bd + q_{\u03b1\u03b2\u03bc}.\" CONTORSION DECOMPOSITION (lines 618-629): \"The metricity condition enables one to express the connection through the metric and torsion in a unique way as \u0393\u0303^\u03b1_{\u03b2\u03b3} = \u0393^\u03b1_{\u03b2\u03b3} + K^\u03b1_{\u00b7\u03b2\u03b3}, where K^\u03b1_{\u00b7\u03b2\u03b3} = 1/2(T^\u03b1_{\u00b7\u03b2\u03b3} - T^\u03b1_{\u03b2\u00b7\u03b3} - T^\u03b1_{\u03b3\u00b7\u03b2}) is called the contorsion tensor.\" FIRST-ORDER FORMALISM (line 607): \"The breaking of this condition means that one adds one more tensor to the affine connection... The first order formalism for General Relativity.\"",
       "sites": [
         {
-          "file": "sections/appendices/pgt_background.tex",
-          "line": 383,
-          "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "24-component decomposition not enumerated in abstract"
-        },
-        {
-          "file": "sections/appendices/pgt_background.tex",
-          "line": 399,
-          "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "16-component tensor part not specified in abstract"
-        },
-        {
-          "file": "sections/appendices/pgt_background.tex",
-          "line": 419,
-          "role": "ATTRIBUTION",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Direct basis scalar contractions convention not mentioned in abstract"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 31,
-          "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Paper covers classical gravity with torsion; Lagrangian enumeration context cite"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 39,
-          "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Paper covers classical gravity with torsion; Lagrangian enumeration context cite"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 48,
-          "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Paper covers classical gravity with torsion; Lagrangian enumeration context cite"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 52,
-          "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Paper covers classical gravity with torsion; Lagrangian enumeration context cite"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 70,
+          "file": "/workspaces/torsion-gertsenshtein/literature/hep-th_0103093/main.tex",
+          "line": 703,
           "role": "SPECIFIC",
           "site_status": "SUPPORTS",
-          "evidence": "Abstract: 'interaction of torsion with matter fields' covers torsion-EM couplings"
+          "evidence": "Paper explicitly divides torsion into three irreducible components (trace vector, axial vector, and totally traceless tensor), and provides reconstruction formula. Claims in pgt_background.tex about 'three irreducible representations' are directly supported."
         },
         {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 81,
+          "file": "/workspaces/torsion-gertsenshtein/literature/hep-th_0103093/main.tex",
+          "line": 717,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Quadratic field structure claim not enumerated in abstract"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 135,
-          "role": "EXISTENCE",
           "site_status": "SUPPORTS",
-          "evidence": "Abstract covers 'classical gravity with torsion'; Holst topological property is topic-consistent"
+          "evidence": "Reconstruction formula (eq. 728) explicitly shows how the full torsion tensor T_{\u03b1\u03b2\u03bc} is expressed through the three irreducible parts, corroborating the claim about how they 'split into three irreducible representations of the local Lorentz group'."
         },
         {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 146,
-          "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Three torsion-squared invariants I_1, I_2, I_3 not listed in abstract"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 177,
-          "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Abstract covers 'classical gravity with torsion'; curvature properties with torsion are topic-consistent"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 205,
-          "role": "EXISTENCE",
-          "site_status": "SUPPORTS",
-          "evidence": "Abstract covers 'classical gravity with torsion'; parity-odd topological structures are topic-consistent"
-        },
-        {
-          "file": "sections/appendices/pgt_enumeration.tex",
-          "line": 237,
-          "role": "ATTRIBUTION",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Order-of-equations claim not specified in abstract"
-        },
-        {
-          "file": "sections/results.tex",
-          "line": 208,
-          "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "I_1, I_2, I_3 invariants not enumerated in abstract; attribution to Shapiro unconfirmed"
-        },
-        {
-          "file": "sections/results.tex",
-          "line": 395,
+          "file": "/workspaces/torsion-gertsenshtein/literature/hep-th_0103093/main.tex",
+          "line": 392,
           "role": "ATTRIBUTION",
           "site_status": "SUPPORTS",
-          "evidence": "Context cite grouping PGT extensions; Shapiro is background reference for the base theory"
+          "evidence": "Shapiro provides explicit reconstruction formula (eq. 728) showing the three scalar contractions can be used to represent torsion. Direct basis of scalar contractions I_1, I_2, I_3 structure matches the claim about 'direct basis of scalar contractions'."
         },
         {
-          "file": "sections/theory.tex",
-          "line": 184,
+          "file": "/workspaces/torsion-gertsenshtein/literature/hep-th_0103093/main.tex",
+          "line": 618,
           "role": "SPECIFIC",
-          "site_status": "UNVERIFIABLE",
-          "evidence": "Palatini decomposition formula not provided in abstract"
+          "site_status": "SUPPORTS",
+          "evidence": "Eq. (con) explicitly shows Palatini connection decomposition: \u0393\u0303^\u03b1_{\u03b2\u03b3} = \u0393^\u03b1_{\u03b2\u03b3} + K^\u03b1_{\u00b7\u03b2\u03b3}, with contorsion defined in terms of torsion tensor components."
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/hep-th_0103093/main.tex",
+          "line": 632,
+          "role": "EXISTENCE",
+          "site_status": "SUPPORTS",
+          "evidence": "Paper notes contorsion is 'antisymmetric in the first two indices: K_{\u03b1\u03b2\u03b3}=-K_{\u03b2\u03b1\u03b3}, while torsion T^\u03b1_{\u00b7\u03b2\u03b3} itself is antisymmetric in the last two indices.'"
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/hep-th_0103093/main.tex",
+          "line": 607,
+          "role": "ATTRIBUTION",
+          "site_status": "SUPPORTS",
+          "evidence": "Paper discusses first-order formalism for GR and its generalization with torsion as a fundamental geometric object, supporting the claim about first-order formalism context."
+        },
+        {
+          "file": "/workspaces/torsion-gertsenshtein/literature/hep-th_0103093/main.tex",
+          "line": 110,
+          "role": "EXISTENCE",
+          "site_status": "SUPPORTS",
+          "evidence": "Abstract states paper is a comprehensive review of 'quantum aspects of torsion theory' and includes 'Chapter 2, with a pedagogical introduction to the classical gravity with torsion, that includes also interaction of torsion with matter fields.'"
         }
-      ]
+      ],
+      "deepened": true
     },
     {
       "key": "tarjan1975unionfind",
