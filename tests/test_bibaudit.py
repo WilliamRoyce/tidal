@@ -26,7 +26,9 @@ pytestmark = pytest.mark.skipif(
 
 def test_all_entries_extract_cleanly():
     entries = load_bib(BIB)
-    assert len(entries) == 231
+    # 230 active entries after the audit (removed 3 duplicates/wrong-variant: mekki2023skitsundae,
+    # blagojevic2013gauge, lidemmel2003superlu; added 2: martingarcia2008xperm, demmel1999superlumt)
+    assert len(entries) == 230
     for e in entries:
         assert e.fields, f"{e.key}: no fields extracted"
         for name, val in e.fields.items():
