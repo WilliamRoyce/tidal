@@ -399,8 +399,8 @@
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1145%2F3539801 verdict=ENRICHED
 @article{gardner2022sundials,
-  volume        = {48},
-  pages         = {1-24},
+  volume    = {48},
+  pages     = {1-24},
   title     = {Enabling new flexibility in the {SUNDIALS} suite of nonlinear and differential/algebraic equation solvers},
   author    = {Gardner, David J and Reynolds, Daniel R and Woodward, Carol S and Balos, Cody J},
   journal   = {ACM Trans. Math. Softw.},
@@ -453,10 +453,10 @@
 
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
 @misc{mathematica,
-  author       = {{Wolfram Research, Inc.}},
-  title        = {Mathematica, {Version} 14.0},
-  howpublished = {Champaign, IL},
-  year         = {2024}
+  author = {Wolfram Research{,} Inc.},
+  title  = {Mathematica, {V}ersion 14.3},
+  url    = {https://www.wolfram.com/mathematica},
+  note   = {Champaign, IL, 2025}
 }
 
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
@@ -470,13 +470,12 @@
 
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOTFOUND
 @misc{randall2024skitsundae,
-  author       = {Randall, Corey R.},
-  title        = {{scikit-SUNDAE: Python bindings to SUNDIALS Differential Algebraic Equation solvers [SWR-24-137]}},
-  howpublished = {National Renewable Energy Laboratory},
-  month        = {Oct.},
-  year         = {2024},
-  doi          = {10.11578/dc.20241104.3},
-  url          = {github.com/NatLabRockies/scikit-sundae}
+  author = {Randall, Corey R.},
+  title  = {{scikit-SUNDAE: Python bindings to SUNDIALS Differential Algebraic Equation solvers [SWR-24-137]}},
+  url    = {github.com/NatLabRockies/scikit-sundae},
+  month  = {Oct.},
+  year   = {2024},
+  doi    = {10.11578/dc.20241104.3}
 }
 
 % AUDIT v=1 date=2026-05-30 src=manual verdict=NOID
@@ -584,12 +583,13 @@
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
 @book{golub2013matrix,
   author    = {Golub, Gene H. and Van Loan, Charles F.},
-  title     = {Matrix Computations},
+  title     = {Matrix Computations - 4th Edition},
   edition   = {4th},
   publisher = {Johns Hopkins University Press},
-  address   = {Baltimore, MD},
+  address   = {Philadelphia, PA},
   year      = {2013},
-  isbn      = {978-1-4214-0794-4}
+  isbn      = {978-1-4214-0794-4},
+  doi       = {10.1137/1.9781421407944}
 }
 
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
@@ -599,17 +599,23 @@
   publisher = {Princeton University Press},
   address   = {Princeton, NJ},
   year      = {2005},
-  isbn      = {0-691-11946-5}
+  pages     = {606},
+  isbn      = {978-0-691-11946-5}
 }
 
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
 @book{trefethen1997numerical,
   author    = {Trefethen, Lloyd N. and Bau, David},
   title     = {Numerical Linear Algebra},
+  series    = {Other Titles in Applied Mathematics},
+  volume    = {50},
   publisher = {SIAM},
   address   = {Philadelphia},
   year      = {1997},
-  isbn      = {0-89871-361-7}
+  pages     = {xii+361},
+  doi       = {10.1137/1.9780898719574},
+  isbn      = {978-0-89871-361-9},
+  eisbn     = {978-0-89871-957-4}
 }
 
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
@@ -621,7 +627,10 @@
   publisher = {SIAM},
   address   = {Philadelphia},
   year      = {1996},
-  isbn      = {0-89871-353-6}
+  pages     = {268},
+  doi       = {10.1137/1.9781611971224},
+  isbn      = {978-0-89871-353-4},
+  eisbn     = {978-1-61197-122-4}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1137%2F0710024 verdict=MINOR
@@ -1544,14 +1553,14 @@
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2F0370-2693%2886%2991377-8 verdict=MINOR
 @article{Holdom:1985ag,
-    author = "Holdom, Bob",
-    title = "{Two U(1)'s and Epsilon Charge Shifts}",
-    reportNumber = "UTPT-85-30",
-    doi = "10.1016/0370-2693(86)91377-8",
-    journal = "Phys. Lett. B",
-    volume = "166",
-    pages = "196--198",
-    year = "1986"
+  author       = {Holdom, Bob},
+  title        = {{Two U(1)'s and Epsilon Charge Shifts}},
+  reportnumber = {UTPT-85-30},
+  doi          = {10.1016/0370-2693(86)91377-8},
+  journal      = {Phys. Lett. B},
+  volume       = {166},
+  pages        = {196--198},
+  year         = {1986}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.104.095029 verdict=MINOR
@@ -1934,7 +1943,7 @@
   publisher = {Cambridge University Press},
   address   = {Cambridge},
   year      = {2006},
-  isbn      = {9780521829519},
+  isbn      = {9780521829519}
 }
 
 % Maggiore: gravitational-wave theory and experiments. Cited for the
@@ -1947,7 +1956,7 @@
   publisher = {Oxford University Press},
   year      = {2007},
   doi       = {10.1093/acprof:oso/9780198570745.001.0001},
-  isbn      = {978-0-19-852074-0},
+  isbn      = {978-0-19-852074-0}
 }
 
 % Misner, Thorne & Wheeler --- the classic reference. Cited in App H
@@ -1961,7 +1970,7 @@
   publisher = {W. H. Freeman},
   address   = {San Francisco},
   year      = {1973},
-  isbn      = {978-0-7167-0344-0},
+  isbn      = {978-0-7167-0344-0}
 }
 
 % Flanagan & Hughes review article: the basics of gravitational wave
@@ -1970,15 +1979,15 @@
 % Bibtex from INSPIRE-HEP texkey Flanagan:2005yc (arXiv:gr-qc/0501041).
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1367-2630%2F7%2F1%2F204 verdict=MINOR
 @article{flanaganhughes2005basics,
-  author       = {Flanagan, \'{E}anna \'{E}. and Hughes, Scott A.},
-  title        = {{The basics of gravitational wave theory}},
-  journal      = {New J. Phys.},
-  volume       = {7},
-  pages        = {204-204},
-  year         = {2005},
-  doi          = {10.1088/1367-2630/7/1/204},
-  eprint       = {gr-qc/0501041},
-  archivePrefix = {arXiv},
+  author        = {Flanagan, \'{E}anna \'{E}. and Hughes, Scott A.},
+  title         = {{The basics of gravitational wave theory}},
+  journal       = {New J. Phys.},
+  volume        = {7},
+  pages         = {204-204},
+  year          = {2005},
+  doi           = {10.1088/1367-2630/7/1/204},
+  eprint        = {gr-qc/0501041},
+  archiveprefix = {arXiv}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1063%2F1.1665613 verdict=MATCH
@@ -1989,7 +1998,7 @@
   volume  = {12},
   pages   = {498--501},
   year    = {1971},
-  doi     = {10.1063/1.1665613},
+  doi     = {10.1063/1.1665613}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1145%2F103162.103163 verdict=MINOR
@@ -2165,107 +2174,107 @@
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.41.3720 verdict=MINOR
 @article{Simon:1990ic,
-    author = "Simon, Jonathan Z.",
-    title = "{Higher Derivative Lagrangians, Nonlocality, Problems and Solutions}",
-    reportNumber = "UCSB-TH-89-50",
-    doi = "10.1103/PhysRevD.41.3720",
-    journal = "Phys. Rev. D",
-    volume = "41",
-    pages = {3720-3733},
-    year = "1990"
+  author       = {Simon, Jonathan Z.},
+  title        = {{Higher Derivative Lagrangians, Nonlocality, Problems and Solutions}},
+  reportnumber = {UCSB-TH-89-50},
+  doi          = {10.1103/PhysRevD.41.3720},
+  journal      = {Phys. Rev. D},
+  volume       = {41},
+  pages        = {3720-3733},
+  year         = {1990}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.43.3308 verdict=MINOR
 @article{Simon:1990jn,
-    author = "Simon, Jonathan Z.",
-    title = "{The Stability of flat space, semiclassical gravity, and higher derivatives}",
-    reportNumber = "UCSB-TH-90-43",
-    doi = "10.1103/PhysRevD.43.3308",
-    journal = "Phys. Rev. D",
-    volume = "43",
-    pages = "3308--3316",
-    year = "1991"
+  author       = {Simon, Jonathan Z.},
+  title        = {{The Stability of flat space, semiclassical gravity, and higher derivatives}},
+  reportnumber = {UCSB-TH-90-43},
+  doi          = {10.1103/PhysRevD.43.3308},
+  journal      = {Phys. Rev. D},
+  volume       = {43},
+  pages        = {3308--3316},
+  year         = {1991}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.4153%2FCJM-1950-012-1 verdict=MINOR
 @article{Dirac:1950pj,
-    author = "Dirac, Paul A. M.",
-    title = "{Generalized Hamiltonian dynamics}",
-    doi = "10.4153/CJM-1950-012-1",
-    journal = "Can. J. Math.",
-    volume = "2",
-    pages = "129--148",
-    year = "1950"
+  author  = {Dirac, Paul A. M.},
+  title   = {{Generalized Hamiltonian dynamics}},
+  doi     = {10.4153/CJM-1950-012-1},
+  journal = {Can. J. Math.},
+  volume  = {2},
+  pages   = {129--148},
+  year    = {1950}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.96.084043 verdict=MINOR
 @article{CayusoLehner2017,
-    author        = {Cayuso, Juan and Ortiz, N\'estor and Lehner, Luis},
-    title         = {Fixing extensions to general relativity in the non-linear regime},
-    journal       = {Phys. Rev. D},
-    volume        = {96},
-    number        = {8},
-    pages         = {084043},
-    year          = {2017},
-    eprint        = {1706.07421},
-    archiveprefix = {arXiv},
-    primaryclass  = {gr-qc},
-    doi           = {10.1103/PhysRevD.96.084043}
+  author        = {Cayuso, Juan and Ortiz, N\'estor and Lehner, Luis},
+  title         = {Fixing extensions to general relativity in the non-linear regime},
+  journal       = {Phys. Rev. D},
+  volume        = {96},
+  number        = {8},
+  pages         = {084043},
+  year          = {2017},
+  eprint        = {1706.07421},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1103/PhysRevD.96.084043}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.50.3874 verdict=MINOR
 @article{Donoghue:1994dn,
-    author = "Donoghue, John F.",
-    title = "{General relativity as an effective field theory: The leading quantum corrections}",
-    eprint = "gr-qc/9405057",
-    archivePrefix = "arXiv",
-    reportNumber = "UMHEP-408",
-    doi = "10.1103/PhysRevD.50.3874",
-    journal = "Phys. Rev. D",
-    volume = "50",
-    pages = "3874--3888",
-    year = "1994"
+  author        = {Donoghue, John F.},
+  title         = {{General relativity as an effective field theory: The leading quantum corrections}},
+  eprint        = {gr-qc/9405057},
+  archiveprefix = {arXiv},
+  reportnumber  = {UMHEP-408},
+  doi           = {10.1103/PhysRevD.50.3874},
+  journal       = {Phys. Rev. D},
+  volume        = {50},
+  pages         = {3874--3888},
+  year          = {1994}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.4249%2Fscholarpedia.32243 verdict=MINOR
 @article{Woodard:2015zca,
-    author = "Woodard, Richard P.",
-    title = "{Ostrogradsky's theorem on Hamiltonian instability}",
-    eprint = "1506.02210",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-th",
-    reportNumber = "UFIFT-QG-15-03",
-    doi = "10.4249/scholarpedia.32243",
-    journal = "Scholarpedia",
-    volume = "10",
-    number = "8",
-    pages = "32243",
-    year = "2015"
+  author        = {Woodard, Richard P.},
+  title         = {{Ostrogradsky's theorem on Hamiltonian instability}},
+  eprint        = {1506.02210},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-th},
+  reportnumber  = {UFIFT-QG-15-03},
+  doi           = {10.4249/scholarpedia.32243},
+  journal       = {Scholarpedia},
+  volume        = {10},
+  number        = {8},
+  pages         = {32243},
+  year          = {2015}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRev.79.145 verdict=MINOR
 @article{Pais:1950za,
-    author = "Pais, A. and Uhlenbeck, G. E.",
-    title = "{On Field theories with nonlocalized action}",
-    journal = "Phys. Rev.",
-    volume = "79",
-    pages = "145--165",
-    year = "1950",
-    doi = "10.1103/PhysRev.79.145"
+  author  = {Pais, A. and Uhlenbeck, G. E.},
+  title   = {{On Field theories with nonlocalized action}},
+  journal = {Phys. Rev.},
+  volume  = {79},
+  pages   = {145--165},
+  year    = {1950},
+  doi     = {10.1103/PhysRev.79.145}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.49.6709 verdict=MINOR
 @article{Grosse-Knetter:1993tae,
-    author = "Grosse-Knetter, Carsten",
-    title = "{Effective Lagrangians with higher derivatives and equations of motion}",
-    eprint = "hep-ph/9306321",
-    archivePrefix = "arXiv",
-    reportNumber = "BI-TP-93-29",
-    doi = "10.1103/PhysRevD.49.6709",
-    journal = "Phys. Rev. D",
-    volume = "49",
-    pages = "6709--6719",
-    year = "1994"
+  author        = {Grosse-Knetter, Carsten},
+  title         = {{Effective Lagrangians with higher derivatives and equations of motion}},
+  eprint        = {hep-ph/9306321},
+  archiveprefix = {arXiv},
+  reportnumber  = {BI-TP-93-29},
+  doi           = {10.1103/PhysRevD.49.6709},
+  journal       = {Phys. Rev. D},
+  volume        = {49},
+  pages         = {6709--6719},
+  year          = {1994}
 }
 
 % PolyChord nested-sampling implementation.  The PolyChord README
@@ -2273,32 +2282,32 @@
 % BOTH papers below.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fmnrasl%2Fslv047 verdict=MATCH
 @article{Handley:2015fda,
-    author = "Handley, W. J. and Hobson, M. P. and Lasenby, A. N.",
-    title = "{PolyChord: nested sampling for cosmology}",
-    eprint = "1502.01856",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.CO",
-    doi = "10.1093/mnrasl/slv047",
-    journal = "Mon. Not. Roy. Astron. Soc.",
-    volume = "450",
-    number = "1",
-    pages = "L61--L65",
-    year = "2015"
+  author        = {Handley, W. J. and Hobson, M. P. and Lasenby, A. N.},
+  title         = {{PolyChord: nested sampling for cosmology}},
+  eprint        = {1502.01856},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.CO},
+  doi           = {10.1093/mnrasl/slv047},
+  journal       = {Mon. Not. Roy. Astron. Soc.},
+  volume        = {450},
+  number        = {1},
+  pages         = {L61--L65},
+  year          = {2015}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fmnras%2Fstv1911 verdict=MATCH
 @article{Handley:2015vkr,
-    author = "Handley, W. J. and Hobson, M. P. and Lasenby, A. N.",
-    title = "{polychord: next-generation nested sampling}",
-    eprint = "1506.00171",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.IM",
-    doi = "10.1093/mnras/stv1911",
-    journal = "Mon. Not. Roy. Astron. Soc.",
-    volume = "453",
-    number = "4",
-    pages = "4385--4399",
-    year = "2015"
+  author        = {Handley, W. J. and Hobson, M. P. and Lasenby, A. N.},
+  title         = {{polychord: next-generation nested sampling}},
+  eprint        = {1506.00171},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.IM},
+  doi           = {10.1093/mnras/stv1911},
+  journal       = {Mon. Not. Roy. Astron. Soc.},
+  volume        = {453},
+  number        = {4},
+  pages         = {4385--4399},
+  year          = {2015}
 }
 
 % Nested-sampling foundations and associated software cited from App J
@@ -2312,60 +2321,60 @@
 % Crossref/OpenLibrary (Brewer 2010 + the three pedagogical books).
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1214%2F06-BA127 verdict=MINOR
 @article{Skilling:2006gxv,
-    author = "Skilling, John",
-    title = "{Nested sampling for general Bayesian computation}",
-    doi = "10.1214/06-BA127",
-    journal = {Bayesian Anal.},
-    volume = "1",
-    number = "4",
-    pages = "833--859",
-    year = "2006"
+  author  = {Skilling, John},
+  title   = {{Nested sampling for general Bayesian computation}},
+  doi     = {10.1214/06-BA127},
+  journal = {Bayesian Anal.},
+  volume  = {1},
+  number  = {4},
+  pages   = {833--859},
+  year    = {2006}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1111%2Fj.1365-2966.2009.14548.x verdict=MATCH
 @article{Feroz:2008xx,
-    author = "Feroz, F. and Hobson, M. P. and Bridges, M.",
-    title = "{MultiNest: an efficient and robust Bayesian inference tool for cosmology and particle physics}",
-    eprint = "0809.3437",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph",
-    doi = "10.1111/j.1365-2966.2009.14548.x",
-    journal = "Mon. Not. Roy. Astron. Soc.",
-    volume = "398",
-    pages = "1601--1614",
-    year = "2009"
+  author        = {Feroz, F. and Hobson, M. P. and Bridges, M.},
+  title         = {{MultiNest: an efficient and robust Bayesian inference tool for cosmology and particle physics}},
+  eprint        = {0809.3437},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph},
+  doi           = {10.1111/j.1365-2966.2009.14548.x},
+  journal       = {Mon. Not. Roy. Astron. Soc.},
+  volume        = {398},
+  pages         = {1601--1614},
+  year          = {2009}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2Fs11222-010-9198-8 verdict=MINOR
 @article{Brewer:2010,
-    author = "Brewer, Brendon J. and P{\'a}rtay, Livia B. and Cs{\'a}nyi, G{\'a}bor",
-    title = "{Diffusive nested sampling}",
-    doi = "10.1007/s11222-010-9198-8",
-    journal = {Stat. Comput.},
-    volume = "21",
-    number = "4",
-    pages = "649--656",
-    year = "2010"
+  author  = {Brewer, Brendon J. and P{\'a}rtay, Livia B. and Cs{\'a}nyi, G{\'a}bor},
+  title   = {{Diffusive nested sampling}},
+  doi     = {10.1007/s11222-010-9198-8},
+  journal = {Stat. Comput.},
+  volume  = {21},
+  number  = {4},
+  pages   = {649--656},
+  year    = {2010}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1606.03757&format=bibtex verdict=MATCH
 @article{Brewer:2016scw,
-    author = "Brewer, Brendon J. and Foreman-Mackey, Daniel",
-    title = "{DNest4: Diffusive Nested Sampling in C++ and Python}",
-    eprint = "1606.03757",
-    archivePrefix = "arXiv",
-    primaryClass = "stat.CO",
-    year = "2016"
+  author        = {Brewer, Brendon J. and Foreman-Mackey, Daniel},
+  title         = {{DNest4: Diffusive Nested Sampling in C++ and Python}},
+  eprint        = {1606.03757},
+  archiveprefix = {arXiv},
+  primaryclass  = {stat.CO},
+  year          = {2016}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1701.01467&format=bibtex verdict=MATCH
 @inproceedings{Trotta:2017wnx,
-    author = "Trotta, Roberto",
-    title = "{Bayesian Methods in Cosmology}",
-    eprint = "1701.01467",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.CO",
-    year = "2017"
+  author        = {Trotta, Roberto},
+  title         = {{Bayesian Methods in Cosmology}},
+  eprint        = {1701.01467},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.CO},
+  year          = {2017}
 }
 
 % Pedagogical references for the "for further detail on Bayesian
@@ -2376,107 +2385,107 @@
 % one author).
 % AUDIT v=1 date=2026-05-30 src=manual verdict=PENDING
 @book{MacKay:2003,
-    author = "MacKay, David J. C.",
-    title = "{Information Theory, Inference, and Learning Algorithms}",
-    publisher = "Cambridge University Press",
-    address = "Cambridge",
-    year = "2003",
-    isbn = "9780521642989",
-    lccn = "2003055133",
-    pages = "628"
+  author    = {MacKay, David J. C.},
+  title     = {{Information Theory, Inference, and Learning Algorithms}},
+  publisher = {Cambridge University Press},
+  address   = {Cambridge},
+  year      = {2003},
+  isbn      = {9780521642989},
+  lccn      = {2003055133},
+  pages     = {628}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1017%2FCBO9780511802461 verdict=MINOR
 @book{Hobson:2010,
-    editor = "Hobson, Michael P. and Jaffe, Andrew H. and Liddle, Andrew R. and Mukherjee, Pia and Parkinson, David",
-    title = "{Bayesian Methods in Cosmology}",
-    publisher = "Cambridge University Press",
-    address = "Cambridge",
-    year = "2010",
-    doi = "10.1017/CBO9780511802461",
-    isbn = "9780521887946"
+  editor    = {Hobson, Michael P. and Jaffe, Andrew H. and Liddle, Andrew R. and Mukherjee, Pia and Parkinson, David},
+  title     = {{Bayesian Methods in Cosmology}},
+  publisher = {Cambridge University Press},
+  address   = {Cambridge},
+  year      = {2010},
+  doi       = {10.1017/CBO9780511802461},
+  isbn      = {9780521887946}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Foso%2F9780198568315.001.0001 verdict=MINOR
 @book{Sivia:2006,
-    author = "Sivia, D. S. and Skilling, John",
-    title = "{Data Analysis: A Bayesian Tutorial}",
-    edition = "2",
-    publisher = "Oxford University Press",
-    address = "Oxford",
-    year = "2006",
-    doi = "10.1093/oso/9780198568315.001.0001",
-    isbn = "9780198568315"
+  author    = {Sivia, D. S. and Skilling, John},
+  title     = {{Data Analysis: A Bayesian Tutorial}},
+  edition   = {2},
+  publisher = {Oxford University Press},
+  address   = {Oxford},
+  year      = {2006},
+  doi       = {10.1093/oso/9780198568315.001.0001},
+  isbn      = {9780198568315}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fmnras%2Fstaa278 verdict=MATCH
 @article{Speagle:2019ivv,
-    author = "Speagle, Joshua S.",
-    title = "{dynesty: a dynamic nested sampling package for estimating Bayesian posteriors and evidences}",
-    eprint = "1904.02180",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.IM",
-    doi = "10.1093/mnras/staa278",
-    journal = "Mon. Not. Roy. Astron. Soc.",
-    volume = "493",
-    number = "3",
-    pages = "3132--3158",
-    year = "2020"
+  author        = {Speagle, Joshua S.},
+  title         = {{dynesty: a dynamic nested sampling package for estimating Bayesian posteriors and evidences}},
+  eprint        = {1904.02180},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.IM},
+  doi           = {10.1093/mnras/staa278},
+  journal       = {Mon. Not. Roy. Astron. Soc.},
+  volume        = {493},
+  number        = {3},
+  pages         = {3132--3158},
+  year          = {2020}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.21105%2Fjoss.01414 verdict=MATCH
 @article{Handley:2019mfs,
-    author = "Handley, Will",
-    title = "{anesthetic: nested sampling visualisation}",
-    eprint = "1905.04768",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.IM",
-    doi = "10.21105/joss.01414",
-    journal = "J. Open Source Softw.",
-    volume = "4",
-    number = "37",
-    pages = "1414",
-    year = "2019"
+  author        = {Handley, Will},
+  title         = {{anesthetic: nested sampling visualisation}},
+  eprint        = {1905.04768},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.IM},
+  doi           = {10.21105/joss.01414},
+  journal       = {J. Open Source Softw.},
+  volume        = {4},
+  number        = {37},
+  pages         = {1414},
+  year          = {2019}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1038%2Fs43586-022-00121-x verdict=MINOR
 @article{Ashton:2022grj,
-    author = "Ashton, Greg and others",
-    title = "{Nested sampling for physical scientists}",
-    eprint = "2205.15570",
-    archivePrefix = "arXiv",
-    primaryClass = "stat.CO",
-    doi = "10.1038/s43586-022-00121-x",
-    journal = "Nature Rev. Methods Primers",
-    volume = "2",
-    pages = "39",
-    year = "2022"
+  author        = {Ashton, Greg and others},
+  title         = {{Nested sampling for physical scientists}},
+  eprint        = {2205.15570},
+  archiveprefix = {arXiv},
+  primaryclass  = {stat.CO},
+  doi           = {10.1038/s43586-022-00121-x},
+  journal       = {Nature Rev. Methods Primers},
+  volume        = {2},
+  pages         = {39},
+  year          = {2022}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1214%2Faoms%2F1177729694 verdict=MINOR
 @article{Kullback:1951zyt,
-    author = "Kullback, S. and Leibler, R. A.",
-    title = "{On Information and Sufficiency}",
-    doi = "10.1214/aoms/1177729694",
-    journal = {Ann. Math. Stat.},
-    volume = "22",
-    number = "1",
-    pages = "79--86",
-    year = "1951"
+  author  = {Kullback, S. and Leibler, R. A.},
+  title   = {{On Information and Sufficiency}},
+  doi     = {10.1214/aoms/1177729694},
+  journal = {Ann. Math. Stat.},
+  volume  = {22},
+  number  = {1},
+  pages   = {79--86},
+  year    = {1951}
 }
 
 % Gnomonic cubed-sphere construction underlying the joint coupling-space
 % prior described in App~J.  Cited via Crossref DOI; not indexed in INSPIRE.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1006%2Fjcph.1996.0047 verdict=MATCH
 @article{ronchi1996cubedsphere,
-    author    = "Ronchi, C. and Iacono, R. and Paolucci, P. S.",
-    title     = "{The ``Cubed Sphere'': A New Method for the Solution of Partial Differential Equations in Spherical Geometry}",
-    journal   = "J. Comput. Phys.",
-    volume    = "124",
-    number    = "1",
-    pages     = "93--114",
-    year      = "1996",
-    doi       = "10.1006/jcph.1996.0047"
+  author  = {Ronchi, C. and Iacono, R. and Paolucci, P. S.},
+  title   = {{The ``Cubed Sphere'': A New Method for the Solution of Partial Differential Equations in Spherical Geometry}},
+  journal = {J. Comput. Phys.},
+  volume  = {124},
+  number  = {1},
+  pages   = {93--114},
+  year    = {1996},
+  doi     = {10.1006/jcph.1996.0047}
 }
 
 % Cubed-sphere visualisation reference for App~J figure: Chen's J. Adv.
@@ -2484,13 +2493,13 @@
 % sphere-tile, gnomonic projection ray) that we adapt in Fig.~34.
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1029%2F2020MS002280 verdict=MINOR
 @article{chen2021lmars,
-    author    = "Chen, Xi",
-    title     = "{The LMARS Based Shallow-Water Dynamical Core on Generic Gnomonic Cubed-Sphere Geometry}",
-    journal   = {J. Adv. Model. Earth Syst.},
-    volume    = "13",
-    number    = "1",
-    year      = "2021",
-    doi       = "10.1029/2020MS002280"
+  author  = {Chen, Xi},
+  title   = {{The LMARS Based Shallow-Water Dynamical Core on Generic Gnomonic Cubed-Sphere Geometry}},
+  journal = {J. Adv. Model. Earth Syst.},
+  volume  = {13},
+  number  = {1},
+  year    = {2021},
+  doi     = {10.1029/2020MS002280}
 }
 
 % ==================================================================
@@ -2502,366 +2511,366 @@
 % --- arXiv:0804.4011 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1140%2Fepjc%2Fs10052-009-1110-3 verdict=MATCH
 @article{Kruglov:2008cv,
-    author = "Kruglov, S. I.",
-    title = "{On Possible Light-Torsion Mixing in Background Magnetic Field}",
-    eprint = "0804.4011",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-ph",
-    doi = "10.1140/epjc/s10052-009-1110-3",
-    journal = "Eur. Phys. J. C",
-    volume = "63",
-    pages = "343--347",
-    year = "2009"
+  author        = {Kruglov, S. I.},
+  title         = {{On Possible Light-Torsion Mixing in Background Magnetic Field}},
+  eprint        = {0804.4011},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-ph},
+  doi           = {10.1140/epjc/s10052-009-1110-3},
+  journal       = {Eur. Phys. J. C},
+  volume        = {63},
+  pages         = {343--347},
+  year          = {2009}
 }
 
 % --- arXiv:0810.2989 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142%2FS021773231003183X verdict=MINOR
 @article{Gaete:2008vb,
-    author = "Gaete, Patricio and Helayel-Neto, Jose A.",
-    title = "{Confining potential from interacting magnetic and torsion fields}",
-    eprint = "0810.2989",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-th",
-    reportNumber = "USM-TH-237",
-    doi = "10.1142/S021773231003183X",
-    journal = "Mod. Phys. Lett. A",
-    volume = "25",
-    pages = "471--478",
-    year = "2010"
+  author        = {Gaete, Patricio and Helayel-Neto, Jose A.},
+  title         = {{Confining potential from interacting magnetic and torsion fields}},
+  eprint        = {0810.2989},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-th},
+  reportnumber  = {USM-TH-237},
+  doi           = {10.1142/S021773231003183X},
+  journal       = {Mod. Phys. Lett. A},
+  volume        = {25},
+  pages         = {471--478},
+  year          = {2010}
 }
 
 % --- arXiv:0912.3767 ---
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A0912.3767&format=bibtex verdict=MATCH
 @article{Gaete:2009dd,
-    author = "Gaete, Patricio and Helayel-Neto, Jose A.",
-    title = "{On the interplay between screening and confinement from interacting electromagnetic and torsion fields}",
-    eprint = "0912.3767",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-th",
-    month = "12",
-    year = "2009"
+  author        = {Gaete, Patricio and Helayel-Neto, Jose A.},
+  title         = {{On the interplay between screening and confinement from interacting electromagnetic and torsion fields}},
+  eprint        = {0912.3767},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-th},
+  month         = {12},
+  year          = {2009}
 }
 
 % --- arXiv:1211.0500 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2012%2F12%2F003 verdict=MINOR
 @article{Dolgov:2012be,
-    author = "Dolgov, Alexander D. and Ejlli, Damian",
-    title = "{Conversion of relic gravitational waves into photons in cosmological magnetic fields}",
-    eprint = "1211.0500",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1088/1475-7516/2012/12/003",
-    journal = "JCAP",
-    volume = "12",
-    pages = {003-003},
-    year = "2012"
+  author        = {Dolgov, Alexander D. and Ejlli, Damian},
+  title         = {{Conversion of relic gravitational waves into photons in cosmological magnetic fields}},
+  eprint        = {1211.0500},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1088/1475-7516/2012/12/003},
+  journal       = {JCAP},
+  volume        = {12},
+  pages         = {003-003},
+  year          = {2012}
 }
 
 % --- arXiv:1702.05185 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.95.084028 verdict=MINOR
 @article{Obukhov:2017pxa,
-    author = "Obukhov, Yuri N.",
-    title = "{Gravitational waves in Poincar{\'e} gauge gravity theory}",
-    eprint = "1702.05185",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1103/PhysRevD.95.084028",
-    journal = "Phys. Rev. D",
-    volume = "95",
-    number = "8",
-    pages = "084028",
-    year = "2017"
+  author        = {Obukhov, Yuri N.},
+  title         = {{Gravitational waves in Poincar{\'e} gauge gravity theory}},
+  eprint        = {1702.05185},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1103/PhysRevD.95.084028},
+  journal       = {Phys. Rev. D},
+  volume        = {95},
+  number        = {8},
+  pages         = {084028},
+  year          = {2017}
 }
 
 % --- arXiv:1806.11020 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1361-6382%2Faae1d9 verdict=MATCH
 @article{Cembranos:2018jxo,
-    author = "Cembranos, Jose A. R. and Diaz, Mario Coma and Martin-Moruno, Prado",
-    title = "{Graviton-photon oscillation in alternative theories of gravity}",
-    eprint = "1806.11020",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1088/1361-6382/aae1d9",
-    journal = "Class. Quant. Grav.",
-    volume = "35",
-    number = "20",
-    pages = "205008",
-    year = "2018"
+  author        = {Cembranos, Jose A. R. and Diaz, Mario Coma and Martin-Moruno, Prado},
+  title         = {{Graviton-photon oscillation in alternative theories of gravity}},
+  eprint        = {1806.11020},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1088/1361-6382/aae1d9},
+  journal       = {Class. Quant. Grav.},
+  volume        = {35},
+  number        = {20},
+  pages         = {205008},
+  year          = {2018}
 }
 
 % --- arXiv:1807.10168 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.physletb.2018.10.032 verdict=MATCH
 @article{Janssen:2018exh,
-    author = "Janssen, Bert and Jim{\'e}nez-Cano, Alejandro",
-    title = "{Projective symmetries and induced electromagnetism in metric-affine gravity}",
-    eprint = "1807.10168",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1016/j.physletb.2018.10.032",
-    journal = "Phys. Lett. B",
-    volume = "786",
-    pages = "462--465",
-    year = "2018"
+  author        = {Janssen, Bert and Jim{\'e}nez-Cano, Alejandro},
+  title         = {{Projective symmetries and induced electromagnetism in metric-affine gravity}},
+  eprint        = {1807.10168},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1016/j.physletb.2018.10.032},
+  journal       = {Phys. Lett. B},
+  volume        = {786},
+  pages         = {462--465},
+  year          = {2018}
 }
 
 % --- arXiv:1910.07506 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1140%2Fepjc%2Fs10052-020-8163-8 verdict=MINOR
 @article{BeltranJimenez:2019hrm,
-    author = "Beltr{\'a}n Jim{\'e}nez, Jose and Maldonado Torralba, Francisco Jos{\'e}",
-    title = "{Revisiting the stability of quadratic Poincar{\'e} gauge gravity}",
-    eprint = "1910.07506",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1140/epjc/s10052-020-8163-8",
-    journal = "Eur. Phys. J. C",
-    volume = "80",
-    number = "7",
-    pages = "611",
-    year = "2020"
+  author        = {Beltr{\'a}n Jim{\'e}nez, Jose and Maldonado Torralba, Francisco Jos{\'e}},
+  title         = {{Revisiting the stability of quadratic Poincar{\'e} gauge gravity}},
+  eprint        = {1910.07506},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1140/epjc/s10052-020-8163-8},
+  journal       = {Eur. Phys. J. C},
+  volume        = {80},
+  number        = {7},
+  pages         = {611},
+  year          = {2020}
 }
 
 % --- arXiv:2003.00664 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2020%2F06%2F004 verdict=MINOR
 @article{Aoki:2020zqm,
-    author = "Aoki, Katsuki and Mukohyama, Shinji",
-    title = "{Consistent inflationary cosmology from quadratic gravity with dynamical torsion}",
-    eprint = "2003.00664",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-th",
-    reportNumber = "YITP-20-23, IPMU20-0019",
-    doi = "10.1088/1475-7516/2020/06/004",
-    journal = "JCAP",
-    volume = "06",
-    pages = {004-004},
-    year = "2020"
+  author        = {Aoki, Katsuki and Mukohyama, Shinji},
+  title         = {{Consistent inflationary cosmology from quadratic gravity with dynamical torsion}},
+  eprint        = {2003.00664},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-th},
+  reportnumber  = {YITP-20-23, IPMU20-0019},
+  doi           = {10.1088/1475-7516/2020/06/004},
+  journal       = {JCAP},
+  volume        = {06},
+  pages         = {004-004},
+  year          = {2020}
 }
 
 % --- arXiv:2006.01161 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevLett.126.021104 verdict=MINOR
 @article{Domcke:2020yzq,
-    author = "Domcke, Valerie and Garcia-Cely, Camilo",
-    title = "{Potential of radio telescopes as high-frequency gravitational wave detectors}",
-    eprint = "2006.01161",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.CO",
-    reportNumber = "DESY-20-097, CERN-TH-2020-082",
-    doi = "10.1103/PhysRevLett.126.021104",
-    journal = "Phys. Rev. Lett.",
-    volume = "126",
-    number = "2",
-    pages = "021104",
-    year = "2021"
+  author        = {Domcke, Valerie and Garcia-Cely, Camilo},
+  title         = {{Potential of radio telescopes as high-frequency gravitational wave detectors}},
+  eprint        = {2006.01161},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.CO},
+  reportnumber  = {DESY-20-097, CERN-TH-2020-082},
+  doi           = {10.1103/PhysRevLett.126.021104},
+  journal       = {Phys. Rev. Lett.},
+  volume        = {126},
+  number        = {2},
+  pages         = {021104},
+  year          = {2021}
 }
 
 % --- arXiv:2011.12414 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2Fs41114-021-00032-5 verdict=MINOR
 @article{Aggarwal:2020olq,
-    author = "Aggarwal, Nancy and others",
-    title = "{Challenges and opportunities of gravitational-wave searches at MHz to GHz frequencies}",
-    eprint = "2011.12414",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    reportNumber = "CERN-TH-2020-185, HIP-2020-28/TH, DESY 20-195, CERN-TH-2020-185, HIP-2020-28/TH, DESY 20-195",
-    doi = "10.1007/s41114-021-00032-5",
-    journal = "Living Rev. Rel.",
-    volume = "24",
-    number = "1",
-    pages = "4",
-    year = "2021"
+  author        = {Aggarwal, Nancy and others},
+  title         = {{Challenges and opportunities of gravitational-wave searches at MHz to GHz frequencies}},
+  eprint        = {2011.12414},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  reportnumber  = {CERN-TH-2020-185, HIP-2020-28/TH, DESY 20-195, CERN-TH-2020-185, HIP-2020-28/TH, DESY 20-195},
+  doi           = {10.1007/s41114-021-00032-5},
+  journal       = {Living Rev. Rel.},
+  volume        = {24},
+  number        = {1},
+  pages         = {4},
+  year          = {2021}
 }
 
 % --- arXiv:2102.05859 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevLett.127.071102 verdict=MINOR
 @article{Goryachev:2021zzn,
-    author = "Goryachev, Maxim and Campbell, William M. and Heng, Ik Siong and Galliou, Serge and Ivanov, Eugene N. and Tobar, Michael E.",
-    title = "{Rare Events Detected with a Bulk Acoustic Wave High Frequency Gravitational Wave Antenna}",
-    eprint = "2102.05859",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1103/PhysRevLett.127.071102",
-    journal = "Phys. Rev. Lett.",
-    volume = "127",
-    number = "7",
-    pages = "071102",
-    year = "2021"
+  author        = {Goryachev, Maxim and Campbell, William M. and Heng, Ik Siong and Galliou, Serge and Ivanov, Eugene N. and Tobar, Michael E.},
+  title         = {{Rare Events Detected with a Bulk Acoustic Wave High Frequency Gravitational Wave Antenna}},
+  eprint        = {2102.05859},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1103/PhysRevLett.127.071102},
+  journal       = {Phys. Rev. Lett.},
+  volume        = {127},
+  number        = {7},
+  pages         = {071102},
+  year          = {2021}
 }
 
 % --- arXiv:2109.09546 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1361-6382%2Fabcbe0 verdict=MINOR
 @article{Katanaev:2020xdv,
-    author = "Katanaev, M. O.",
-    title = "{Gravity with dynamical torsion}",
-    eprint = "2109.09546",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1088/1361-6382/abcbe0",
-    journal = "Class. Quant. Grav.",
-    volume = "38",
-    number = "1",
-    pages = "015014",
-    year = "2021"
+  author        = {Katanaev, M. O.},
+  title         = {{Gravity with dynamical torsion}},
+  eprint        = {2109.09546},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1088/1361-6382/abcbe0},
+  journal       = {Class. Quant. Grav.},
+  volume        = {38},
+  number        = {1},
+  pages         = {015014},
+  year          = {2021}
 }
 
 % --- arXiv:2110.13319 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.104.103017 verdict=MINOR
 @article{Lasky:2021naa,
-    author = "Lasky, Paul D. and Thrane, Eric",
-    title = "{Did Goryachev et al. detect megahertz gravitational waves?}",
-    eprint = "2110.13319",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1103/PhysRevD.104.103017",
-    journal = "Phys. Rev. D",
-    volume = "104",
-    number = "10",
-    pages = "103017",
-    year = "2021"
+  author        = {Lasky, Paul D. and Thrane, Eric},
+  title         = {{Did Goryachev et al. detect megahertz gravitational waves?}},
+  eprint        = {2110.13319},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1103/PhysRevD.104.103017},
+  journal       = {Phys. Rev. D},
+  volume        = {104},
+  number        = {10},
+  pages         = {103017},
+  year          = {2021}
 }
 
 % --- arXiv:2112.11465 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.105.116011 verdict=MINOR
 @article{Berlin:2021txa,
-    author = {Berlin, Asher and Blas, Diego and Tito D'Agnolo, Raffaele and Ellis, Sebastian A. R. and Harnik, Roni and Kahn, Yonatan and Sch{\"u}tte-Engel, Jan},
-    title = "{Detecting high-frequency gravitational waves with microwave cavities}",
-    eprint = "2112.11465",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-ph",
-    reportNumber = "FERMILAB-PUB-21-724-SQMS-T",
-    doi = "10.1103/PhysRevD.105.116011",
-    journal = "Phys. Rev. D",
-    volume = "105",
-    number = "11",
-    pages = "116011",
-    year = "2022"
+  author        = {Berlin, Asher and Blas, Diego and Tito D'Agnolo, Raffaele and Ellis, Sebastian A. R. and Harnik, Roni and Kahn, Yonatan and Sch{\"u}tte-Engel, Jan},
+  title         = {{Detecting high-frequency gravitational waves with microwave cavities}},
+  eprint        = {2112.11465},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-ph},
+  reportnumber  = {FERMILAB-PUB-21-724-SQMS-T},
+  doi           = {10.1103/PhysRevD.105.116011},
+  journal       = {Phys. Rev. D},
+  volume        = {105},
+  number        = {11},
+  pages         = {116011},
+  year          = {2022}
 }
 
 % --- arXiv:2202.00695 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevLett.129.041101 verdict=MINOR
 @article{Domcke:2022rgu,
-    author = "Domcke, Valerie and Garcia-Cely, Camilo and Rodd, Nicholas L.",
-    title = "{Novel Search for High-Frequency Gravitational Waves with Low-Mass Axion Haloscopes}",
-    eprint = "2202.00695",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-ph",
-    reportNumber = "DESY-22-017, CERN-TH-2022-010",
-    doi = "10.1103/PhysRevLett.129.041101",
-    journal = "Phys. Rev. Lett.",
-    volume = "129",
-    number = "4",
-    pages = "041101",
-    year = "2022"
+  author        = {Domcke, Valerie and Garcia-Cely, Camilo and Rodd, Nicholas L.},
+  title         = {{Novel Search for High-Frequency Gravitational Waves with Low-Mass Axion Haloscopes}},
+  eprint        = {2202.00695},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-ph},
+  reportnumber  = {DESY-22-017, CERN-TH-2022-010},
+  doi           = {10.1103/PhysRevLett.129.041101},
+  journal       = {Phys. Rev. Lett.},
+  volume        = {129},
+  number        = {4},
+  pages         = {041101},
+  year          = {2022}
 }
 
 % --- arXiv:2204.06302 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fmnras%2Fstac2947 verdict=MATCH
 @article{Paoletti:2022gsn,
-    author = "Paoletti, D. and Chluba, J. and Finelli, F. and Rubi{\~n}o-Martin, J. A.",
-    title = "{Constraints on primordial magnetic fields from their impact on the ionization history with Planck 2018}",
-    eprint = "2204.06302",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.CO",
-    doi = "10.1093/mnras/stac2947",
-    journal = "Mon. Not. Roy. Astron. Soc.",
-    volume = "517",
-    number = "3",
-    pages = "3916--3927",
-    year = "2022"
+  author        = {Paoletti, D. and Chluba, J. and Finelli, F. and Rubi{\~n}o-Martin, J. A.},
+  title         = {{Constraints on primordial magnetic fields from their impact on the ionization history with Planck 2018}},
+  eprint        = {2204.06302},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.CO},
+  doi           = {10.1093/mnras/stac2947},
+  journal       = {Mon. Not. Roy. Astron. Soc.},
+  volume        = {517},
+  number        = {3},
+  pages         = {3916--3927},
+  year          = {2022}
 }
 
 % --- arXiv:2308.09178 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.109.104054 verdict=MINOR
 @article{Alves:2023rxs,
-    author = "Alves, M{\'a}rcio E. S.",
-    title = "{Testing gravity with gauge-invariant polarization states of gravitational waves: Theory and pulsar timing sensitivity}",
-    eprint = "2308.09178",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1103/PhysRevD.109.104054",
-    journal = "Phys. Rev. D",
-    volume = "109",
-    number = "10",
-    pages = "104054",
-    year = "2024"
+  author        = {Alves, M{\'a}rcio E. S.},
+  title         = {{Testing gravity with gauge-invariant polarization states of gravitational waves: Theory and pulsar timing sensitivity}},
+  eprint        = {2308.09178},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1103/PhysRevD.109.104054},
+  journal       = {Phys. Rev. D},
+  volume        = {109},
+  number        = {10},
+  pages         = {104054},
+  year          = {2024}
 }
 
 % --- arXiv:2312.17636 ---
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2312.17636&format=bibtex verdict=MATCH
 @article{He:2023xoh,
-    author = "He, Yutong and Giri, Sambit K. and Sharma, Ramkishor and Mtchedlidze, Salome and Georgiev, Ivelin",
-    title = "{Inverse Gertsenshtein effect as a probe of high-frequency gravitational waves}",
-    eprint = "2312.17636",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.CO",
-    reportNumber = "NORDITA-2023-066",
-    doi = "10.1088/1475-7516/2024/05/051",
-    journal = "JCAP",
-    volume = "05",
-    pages = "051",
-    year = "2024"
+  author        = {He, Yutong and Giri, Sambit K. and Sharma, Ramkishor and Mtchedlidze, Salome and Georgiev, Ivelin},
+  title         = {{Inverse Gertsenshtein effect as a probe of high-frequency gravitational waves}},
+  eprint        = {2312.17636},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.CO},
+  reportnumber  = {NORDITA-2023-066},
+  doi           = {10.1088/1475-7516/2024/05/051},
+  journal       = {JCAP},
+  volume        = {05},
+  pages         = {051},
+  year          = {2024}
 }
 
 % --- arXiv:2401.15965 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.dark.2025.101844 verdict=MATCH
 @article{Addazi:2024kbq,
-    author = "Addazi, Andrea and Capozziello, Salvatore and Gan, Qingyu",
-    title = "{Resonant graviton{\textendash}photon conversion with stochastic magnetic field in the expanding universe}",
-    eprint = "2401.15965",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1016/j.dark.2025.101844",
-    journal = "Phys. Dark Univ.",
-    volume = "48",
-    pages = "101844",
-    year = "2025"
+  author        = {Addazi, Andrea and Capozziello, Salvatore and Gan, Qingyu},
+  title         = {{Resonant graviton{\textendash}photon conversion with stochastic magnetic field in the expanding universe}},
+  eprint        = {2401.15965},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1016/j.dark.2025.101844},
+  journal       = {Phys. Dark Univ.},
+  volume        = {48},
+  pages         = {101844},
+  year          = {2025}
 }
 
 % --- arXiv:2501.11723 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1007%2Fs41114-025-00060-5 verdict=MINOR
 @article{Aggarwal:2025noe,
-    author = "Aggarwal, Nancy and others",
-    title = "{Challenges and opportunities of gravitational-wave searches above 10 kHz}",
-    eprint = "2501.11723",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    reportNumber = "CERN-TH-2025-014, DESY-25-007",
-    doi = "10.1007/s41114-025-00060-5",
-    journal = "Living Rev. Rel.",
-    volume = "28",
-    number = "1",
-    pages = "10",
-    year = "2025"
+  author        = {Aggarwal, Nancy and others},
+  title         = {{Challenges and opportunities of gravitational-wave searches above 10 kHz}},
+  eprint        = {2501.11723},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  reportnumber  = {CERN-TH-2025-014, DESY-25-007},
+  doi           = {10.1007/s41114-025-00060-5},
+  journal       = {Living Rev. Rel.},
+  volume        = {28},
+  number        = {1},
+  pages         = {10},
+  year          = {2025}
 }
 
 % --- arXiv:2505.08457 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2025%2F10%2F061 verdict=MINOR
 @article{Matsuo:2025blj,
-    author = "Matsuo, Himeka and Ito, Asuka",
-    title = "{Graviton-photon conversion in blazar jets as a probe of high-frequency gravitational waves}",
-    eprint = "2505.08457",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    reportNumber = "KOBE-COSMO-25-07",
-    doi = "10.1088/1475-7516/2025/10/061",
-    journal = "JCAP",
-    volume = "10",
-    pages = "061",
-    year = "2025"
+  author        = {Matsuo, Himeka and Ito, Asuka},
+  title         = {{Graviton-photon conversion in blazar jets as a probe of high-frequency gravitational waves}},
+  eprint        = {2505.08457},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  reportnumber  = {KOBE-COSMO-25-07},
+  doi           = {10.1088/1475-7516/2025/10/061},
+  journal       = {JCAP},
+  volume        = {10},
+  pages         = {061},
+  year          = {2025}
 }
 
 % --- arXiv:2506.03609 ---
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2Fc1kj-rj3c verdict=MATCH
 @article{Campbell:2025mks,
-    author = "Campbell, William M. and Mariani, Leonardo and Tobar, Michael E. and Goryachev, Maxim",
-    title = "{Experimental Limits on Planetary Mass Primordial Black Hole Mergers}",
-    eprint = "2506.03609",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1103/c1kj-rj3c",
-    journal = "Phys. Rev. Lett.",
-    volume = "135",
-    number = "25",
-    pages = "251402",
-    year = "2025"
+  author        = {Campbell, William M. and Mariani, Leonardo and Tobar, Michael E. and Goryachev, Maxim},
+  title         = {{Experimental Limits on Planetary Mass Primordial Black Hole Mergers}},
+  eprint        = {2506.03609},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1103/c1kj-rj3c},
+  journal       = {Phys. Rev. Lett.},
+  volume        = {135},
+  number        = {25},
+  pages         = {251402},
+  year          = {2025}
 }
 
 
@@ -2874,97 +2883,97 @@
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142%2FS021827189900033X verdict=MINOR
 @article{Yo:1999ex,
-    author = "Yo, Hwei-jang and Nester, James M.",
-    title = "{Hamiltonian analysis of Poincare gauge theory scalar modes}",
-    eprint = "gr-qc/9902032",
-    archivePrefix = "arXiv",
-    doi = "10.1142/S021827189900033X",
-    journal = "Int. J. Mod. Phys. D",
-    volume = "8",
-    pages = "459--479",
-    year = "1999"
+  author        = {Yo, Hwei-jang and Nester, James M.},
+  title         = {{Hamiltonian analysis of Poincare gauge theory scalar modes}},
+  eprint        = {gr-qc/9902032},
+  archiveprefix = {arXiv},
+  doi           = {10.1142/S021827189900033X},
+  journal       = {Int. J. Mod. Phys. D},
+  volume        = {8},
+  pages         = {459--479},
+  year          = {1999}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1142%2FS0218271802001998 verdict=MINOR
 @article{Yo:2001sy,
-    author = "Yo, Hwei-Jang and Nester, James M.",
-    title = "{Hamiltonian analysis of Poincare gauge theory: Higher spin modes}",
-    eprint = "gr-qc/0112030",
-    archivePrefix = "arXiv",
-    doi = "10.1142/S0218271802001998",
-    journal = "Int. J. Mod. Phys. D",
-    volume = "11",
-    pages = {747-779},
-    year = "2002"
+  author        = {Yo, Hwei-Jang and Nester, James M.},
+  title         = {{Hamiltonian analysis of Poincare gauge theory: Higher spin modes}},
+  eprint        = {gr-qc/0112030},
+  archiveprefix = {arXiv},
+  doi           = {10.1142/S0218271802001998},
+  journal       = {Int. J. Mod. Phys. D},
+  volume        = {11},
+  pages         = {747-779},
+  year          = {2002}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.108.104001 verdict=MINOR
 @article{Cembranos:2023ere,
-    author = "Cembranos, Jos{\'e} A. R. and Ortiz, Miguel Gonz{\'a}lez and Mart{\'\i}n-Moruno, Prado",
-    title = "{Graviton-photon oscillation in a cosmic background for a general theory of gravity}",
-    eprint = "2302.08186",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    reportNumber = "IPARCOS-UCM-23-012",
-    doi = "10.1103/PhysRevD.108.104001",
-    journal = "Phys. Rev. D",
-    volume = "108",
-    number = "10",
-    pages = "104001",
-    year = "2023"
+  author        = {Cembranos, Jos{\'e} A. R. and Ortiz, Miguel Gonz{\'a}lez and Mart{\'\i}n-Moruno, Prado},
+  title         = {{Graviton-photon oscillation in a cosmic background for a general theory of gravity}},
+  eprint        = {2302.08186},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  reportnumber  = {IPARCOS-UCM-23-012},
+  doi           = {10.1103/PhysRevD.108.104001},
+  journal       = {Phys. Rev. D},
+  volume        = {108},
+  number        = {10},
+  pages         = {104001},
+  year          = {2023}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.99.044022 verdict=MINOR
 @article{Ejlli:2018hke,
-    author = "Ejlli, Damian and Thandlam, Venugopal R.",
-    title = "{Graviton-photon mixing}",
-    eprint = "1807.00171",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1103/PhysRevD.99.044022",
-    journal = "Phys. Rev. D",
-    volume = "99",
-    number = "4",
-    pages = "044022",
-    year = "2019"
+  author        = {Ejlli, Damian and Thandlam, Venugopal R.},
+  title         = {{Graviton-photon mixing}},
+  eprint        = {1807.00171},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1103/PhysRevD.99.044022},
+  journal       = {Phys. Rev. D},
+  volume        = {99},
+  number        = {4},
+  pages         = {044022},
+  year          = {2019}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1140%2Fepjc%2Fs10052-019-7542-5 verdict=MATCH
 @article{Ejlli:2019bqj,
-    author = "Ejlli, Aldo and Ejlli, Damian and Cruise, Adrian Mike and Pisano, Giampaolo and Grote, Hartmut",
-    title = "{Upper limits on the amplitude of ultra-high-frequency gravitational waves from graviton to photon conversion}",
-    eprint = "1908.00232",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1140/epjc/s10052-019-7542-5",
-    journal = "Eur. Phys. J. C",
-    volume = "79",
-    number = "12",
-    pages = "1032",
-    year = "2019"
+  author        = {Ejlli, Aldo and Ejlli, Damian and Cruise, Adrian Mike and Pisano, Giampaolo and Grote, Hartmut},
+  title         = {{Upper limits on the amplitude of ultra-high-frequency gravitational waves from graviton to photon conversion}},
+  eprint        = {1908.00232},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1140/epjc/s10052-019-7542-5},
+  journal       = {Eur. Phys. J. C},
+  volume        = {79},
+  number        = {12},
+  pages         = {1032},
+  year          = {2019}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.16.2915 verdict=MINOR
 @article{DeLogi:1977qe,
-    author = "De Logi, W. K. and Mickelson, A. R.",
-    title = "{Electrogravitational Conversion Cross-Sections in Static Electromagnetic Fields}",
-    doi = "10.1103/PhysRevD.16.2915",
-    journal = "Phys. Rev. D",
-    volume = "16",
-    pages = "2915--2927",
-    year = "1977"
+  author  = {De Logi, W. K. and Mickelson, A. R.},
+  title   = {{Electrogravitational Conversion Cross-Sections in Static Electromagnetic Fields}},
+  doi     = {10.1103/PhysRevD.16.2915},
+  journal = {Phys. Rev. D},
+  volume  = {16},
+  pages   = {2915--2927},
+  year    = {1977}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.24.1677 verdict=MINOR
 @article{Sezgin:1981xs,
-    author = "Sezgin, E.",
-    title = "{Class of Ghost Free Gravity Lagrangians With Massive or Massless Propagating Torsion}",
-    reportNumber = "ITP-SB-80-59",
-    doi = "10.1103/PhysRevD.24.1677",
-    journal = "Phys. Rev. D",
-    volume = "24",
-    pages = "1677--1680",
-    year = "1981"
+  author       = {Sezgin, E.},
+  title        = {{Class of Ghost Free Gravity Lagrangians With Massive or Massless Propagating Torsion}},
+  reportnumber = {ITP-SB-80-59},
+  doi          = {10.1103/PhysRevD.24.1677},
+  journal      = {Phys. Rev. D},
+  volume       = {24},
+  pages        = {1677--1680},
+  year         = {1981}
 }
 
 
@@ -2976,158 +2985,158 @@
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F0264-9381%2F32%2F7%2F074001 verdict=MINOR
 @article{LIGOScientific:2014pky,
-    author = "Aasi, J. and others",
-    collaboration = "LIGO Scientific",
-    title = "{Advanced LIGO}",
-    eprint = "1411.4547",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1088/0264-9381/32/7/074001",
-    journal = "Class. Quant. Grav.",
-    volume = "32",
-    pages = "074001",
-    year = "2015"
+  author        = {Aasi, J. and others},
+  collaboration = {LIGO Scientific},
+  title         = {{Advanced LIGO}},
+  eprint        = {1411.4547},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1088/0264-9381/32/7/074001},
+  journal       = {Class. Quant. Grav.},
+  volume        = {32},
+  pages         = {074001},
+  year          = {2015}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F0264-9381%2F32%2F2%2F024001 verdict=MINOR
 @article{VIRGO:2014yos,
-    author = "Acernese, F. and others",
-    collaboration = "VIRGO",
-    title = "{Advanced Virgo: a second-generation interferometric gravitational wave detector}",
-    eprint = "1408.3978",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1088/0264-9381/32/2/024001",
-    journal = "Class. Quant. Grav.",
-    volume = "32",
-    number = "2",
-    pages = "024001",
-    year = "2015"
+  author        = {Acernese, F. and others},
+  collaboration = {VIRGO},
+  title         = {{Advanced Virgo: a second-generation interferometric gravitational wave detector}},
+  eprint        = {1408.3978},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1088/0264-9381/32/2/024001},
+  journal       = {Class. Quant. Grav.},
+  volume        = {32},
+  number        = {2},
+  pages         = {024001},
+  year          = {2015}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1093%2Fptep%2Fptaa125 verdict=MINOR
 @article{KAGRA:2020tym,
-    author = "Akutsu, T. and others",
-    collaboration = "KAGRA",
-    title = "{Overview of KAGRA: Detector design and construction history}",
-    eprint = "2005.05574",
-    archivePrefix = "arXiv",
-    primaryClass = "physics.ins-det",
-    doi = "10.1093/ptep/ptaa125",
-    journal = "PTEP",
-    volume = "2021",
-    number = "5",
-    pages = "05A101",
-    year = "2021"
+  author        = {Akutsu, T. and others},
+  collaboration = {KAGRA},
+  title         = {{Overview of KAGRA: Detector design and construction history}},
+  eprint        = {2005.05574},
+  archiveprefix = {arXiv},
+  primaryclass  = {physics.ins-det},
+  doi           = {10.1093/ptep/ptaa125},
+  journal       = {PTEP},
+  volume        = {2021},
+  number        = {5},
+  pages         = {05A101},
+  year          = {2021}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2604.12775&format=bibtex verdict=MATCH
 @article{Wu:2026nds,
-    author = "Wu, Shao-Qin and Zhang, Jing-Rui and Cai, Rong-Gen and Zhang, Bing and Zhang, Yun-Long",
-    title = "{Gravitational Gertsenshtein-Zeldovich mechanism for the Association between GW190425 and FRB 20190425A}",
-    eprint = "2604.12775",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.HE",
-    month = "4",
-    year = "2026"
+  author        = {Wu, Shao-Qin and Zhang, Jing-Rui and Cai, Rong-Gen and Zhang, Bing and Zhang, Yun-Long},
+  title         = {{Gravitational Gertsenshtein-Zeldovich mechanism for the Association between GW190425 and FRB 20190425A}},
+  eprint        = {2604.12775},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.HE},
+  month         = {4},
+  year          = {2026}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1088%2F1475-7516%2F2006%2F04%2F010 verdict=MINOR
 @article{Easther:2006gt,
-    author = "Easther, Richard and Lim, Eugene A.",
-    title = "{Stochastic gravitational wave production after inflation}",
-    eprint = "astro-ph/0601617",
-    archivePrefix = "arXiv",
-    doi = "10.1088/1475-7516/2006/04/010",
-    journal = "JCAP",
-    volume = "04",
-    pages = {010-010},
-    year = "2006"
+  author        = {Easther, Richard and Lim, Eugene A.},
+  title         = {{Stochastic gravitational wave production after inflation}},
+  eprint        = {astro-ph/0601617},
+  archiveprefix = {arXiv},
+  doi           = {10.1088/1475-7516/2006/04/010},
+  journal       = {JCAP},
+  volume        = {04},
+  pages         = {010-010},
+  year          = {2006}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2FPhysRevD.75.043507 verdict=MINOR
 @article{Grojean:2006bp,
-    author = "Grojean, Christophe and Servant, Geraldine",
-    title = "{Gravitational Waves from Phase Transitions at the Electroweak Scale and Beyond}",
-    eprint = "hep-ph/0607107",
-    archivePrefix = "arXiv",
-    reportNumber = "CERN-PH-TH-2006-125",
-    doi = "10.1103/PhysRevD.75.043507",
-    journal = "Phys. Rev. D",
-    volume = "75",
-    pages = "043507",
-    year = "2007"
+  author        = {Grojean, Christophe and Servant, Geraldine},
+  title         = {{Gravitational Waves from Phase Transitions at the Electroweak Scale and Beyond}},
+  eprint        = {hep-ph/0607107},
+  archiveprefix = {arXiv},
+  reportnumber  = {CERN-PH-TH-2006-125},
+  doi           = {10.1103/PhysRevD.75.043507},
+  journal       = {Phys. Rev. D},
+  volume        = {75},
+  pages         = {043507},
+  year          = {2007}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A2402.07571&format=bibtex verdict=MATCH
 @article{LISA:2024hlh,
-    author = "Colpi, Monica and others",
-    collaboration = "LISA",
-    title = "{LISA Definition Study Report}",
-    eprint = "2402.07571",
-    archivePrefix = "arXiv",
-    primaryClass = "astro-ph.CO",
-    month = "2",
-    year = "2024"
+  author        = {Colpi, Monica and others},
+  collaboration = {LISA},
+  title         = {{LISA Definition Study Report}},
+  eprint        = {2402.07571},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.CO},
+  month         = {2},
+  year          = {2024}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1016%2Fj.dark.2024.101480 verdict=MATCH
 @article{Anninos:2024esx,
-    author = "Anninos, Peter and Rothman, Tony and Palessandro, Andrea",
-    title = "{Graviton-photon oscillations in an expanding universe}",
-    eprint = "2401.08346",
-    archivePrefix = "arXiv",
-    primaryClass = "gr-qc",
-    doi = "10.1016/j.dark.2024.101480",
-    journal = "Phys. Dark Univ.",
-    volume = "44",
-    pages = "101480",
-    year = "2024"
+  author        = {Anninos, Peter and Rothman, Tony and Palessandro, Andrea},
+  title         = {{Graviton-photon oscillations in an expanding universe}},
+  eprint        = {2401.08346},
+  archiveprefix = {arXiv},
+  primaryclass  = {gr-qc},
+  doi           = {10.1016/j.dark.2024.101480},
+  journal       = {Phys. Dark Univ.},
+  volume        = {44},
+  pages         = {101480},
+  year          = {2024}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2Fd7mg-6sqq verdict=MINOR
 @article{ADMX:2025vom,
-    author = "Carosi, G. and others",
-    collaboration = "ADMX",
-    title = "{Search for Axion Dark Matter from 1.1 to 1.3~GHz with ADMX}",
-    eprint = "2504.07279",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-ex",
-    reportNumber = "FERMILAB-PUB-25-0298-PPD",
-    doi = "10.1103/d7mg-6sqq",
-    journal = "Phys. Rev. Lett.",
-    volume = "135",
-    number = "19",
-    pages = "191001",
-    year = "2025"
+  author        = {Carosi, G. and others},
+  collaboration = {ADMX},
+  title         = {{Search for Axion Dark Matter from 1.1 to 1.3~GHz with ADMX}},
+  eprint        = {2504.07279},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-ex},
+  reportnumber  = {FERMILAB-PUB-25-0298-PPD},
+  doi           = {10.1103/d7mg-6sqq},
+  journal       = {Phys. Rev. Lett.},
+  volume        = {135},
+  number        = {19},
+  pages         = {191001},
+  year          = {2025}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://api.crossref.org/works/10.1103%2F3txs-dz63 verdict=MINOR
 @article{HAYSTAC:2025nrt,
-    author = "Bai, Xiran and others",
-    collaboration = "HAYSTAC",
-    title = "{Search for dark photons between 16.96--19.52~$\mu$eV with the HAYSTAC experiment}",
-    eprint = "2510.15848",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-ex",
-    doi = "10.1103/3txs-dz63",
-    journal = "Phys. Rev. D",
-    volume = "113",
-    number = "1",
-    pages = "012010",
-    year = "2026"
+  author        = {Bai, Xiran and others},
+  collaboration = {HAYSTAC},
+  title         = {{Search for dark photons between 16.96--19.52~$\mu$eV with the HAYSTAC experiment}},
+  eprint        = {2510.15848},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-ex},
+  doi           = {10.1103/3txs-dz63},
+  journal       = {Phys. Rev. D},
+  volume        = {113},
+  number        = {1},
+  pages         = {012010},
+  year          = {2026}
 }
 
 % AUDIT v=1 date=2026-05-30 src=https://inspirehep.net/api/literature?q=arxiv%3A1905.06882&format=bibtex verdict=MATCH
 @inproceedings{Salemi:2019xgl,
-    author = "Salemi, Chiara P.",
-    collaboration = "ABRACADABRA",
-    title = "{First Results from ABRACADABRA-10cm: A Search for Low-Mass Axion Dark Matter}",
-    booktitle = "{54th Rencontres de Moriond on Electroweak Interactions and Unified Theories}",
-    eprint = "1905.06882",
-    archivePrefix = "arXiv",
-    primaryClass = "hep-ex",
-    pages = "229--234",
-    year = "2019"
+  author        = {Salemi, Chiara P.},
+  collaboration = {ABRACADABRA},
+  title         = {{First Results from ABRACADABRA-10cm: A Search for Low-Mass Axion Dark Matter}},
+  booktitle     = {{54th Rencontres de Moriond on Electroweak Interactions and Unified Theories}},
+  eprint        = {1905.06882},
+  archiveprefix = {arXiv},
+  primaryclass  = {hep-ex},
+  pages         = {229--234},
+  year          = {2019}
 }
 
