@@ -74,9 +74,9 @@ is $E_{\mathrm{corr}}[q] \equiv \partial_\varepsilon E[q;\,\varepsilon]\big|_{\v
 from $\lag_1$, which may carry derivatives of \emph{any} order.
 Expanding $q = q^{(0)} + \varepsilon\,q^{(1)} + \cdots$ and collecting by order:
 \begin{align}
-  \mathcal{O}(\varepsilon^0) &:\quad
+  \O(\varepsilon^0) &:\quad
     E_{\mathrm{base}}\bigl[q^{(0)}\bigr] = 0, \notag \\[2pt]
-  \mathcal{O}(\varepsilon^1) &:\quad
+  \O(\varepsilon^1) &:\quad
     E_{\mathrm{base}}\bigl[q^{(1)}\bigr] = -E_{\mathrm{corr}}\bigl[q^{(0)}\bigr].
   \label{EOMHierarchy}
 \end{align}
@@ -211,7 +211,7 @@ derivative of each field,
   \partial_t^2 q_i
   \;=\;
   F_i\!\bigl[q,\,\partial_t q,\,\{\nabla^n q\}_{n\geq 1}\bigr]
-  \;+\; \mathcal{O}(\varepsilon),
+  \;+\; \O(\varepsilon),
   \label{LPSSubstitution}
 \end{equation}
 where $F_i$ depends on first-order time derivatives only, but on spatial derivatives of
@@ -223,7 +223,7 @@ the rule \cref{LPSSubstitution} is extended by differentiating with respect to $
 many times as needed, substituting \cref{LPSSubstitution} for any $\partial_t^2 q_j$
 that appears at each step.
 The resulting substitution is applied to the order-$\varepsilon^1$ Lagrangian,
-truncating at $\mathcal{O}(\varepsilon^2)$; the reduced Lagrangian carries at
+truncating at $\O(\varepsilon^2)$; the reduced Lagrangian carries at
 most first-order time derivatives and is admissible for the Legendre transform of~\cref{LegendreTransform}.
 The substitution is faithful exactly when the JLM regularity
 condition~\cite{jaen1986reduction} holds: the $\varepsilon^0$ equation of motion for

@@ -201,7 +201,7 @@ path of~\cref{OtherBackends} is eligible.
     The spectral curve converges super-algebraically~\cite{boyd2001chebyshev};
     reaching machine precision by $N\approx32$, after
     which accumulated FFT rounding
-    ($\mathcal{O}(\varepsilon_{\rm mach}\,N\log N)$~\cite{higham2002accuracy})
+    ($\O(\varepsilon_{\rm mach}\,N\log N)$~\cite{higham2002accuracy})
     dominates and grows with~$N$.}
   \label{FDConvergence}
 \end{figure}
@@ -301,7 +301,7 @@ decoupled sub-blocks % --- for example, the $h_\times\!\leftrightarrow\!
 % numerical demonstration on the survey theories) --- and processing
 % such a block-diagonal matrix as a single dense object would waste
 % both wall time (since the per-mode \lstinline!expm! cost scales as
-% $\mathcal{O}(b^3)$ in the block size $b$) and conditioning.
+% $\O(b^3)$ in the block size $b$) and conditioning.
 so we compute the block decomposition. Slots $i$ and $j$ are deemed
 coupled when either off-diagonal entry $M_{ij}$ or $M_{ji}$ exceeds
 $10^{-14}\,\max|M|$ in absolute value,
@@ -316,10 +316,10 @@ $10^{-14}\,\max|M|$ in absolute value,
 and a union-find~\cite{tarjan1975unionfind} collects the resulting
 coupling graph into connected components. The exponential is then
 applied block-by-block. The dense per-mode \lstinline!expm! cost
-scales as $\mathcal{O}(b^3)$ in the block size
+scales as $\O(b^3)$ in the block size
 $b$~\cite{higham2009scaling}; splitting a size-$b$ block into $n$
 sub-blocks gives
-$n\!\times\!\mathcal{O}((b/n)^3)=\mathcal{O}(b^3/n^2)$,
+$n\!\times\!\O((b/n)^3)=\O(b^3/n^2)$,
 visible in~\cref{fig:PadeBenchmark}, with
 conditioning at least as good as the unblocked path.
 % The block
@@ -603,7 +603,7 @@ The second is the fourth-order Yoshida composition of three
 St\"ormer--Verlet sub-steps~\cite{yoshida1990symplectic},
 % in which a
 % negative middle-step weight cancels the leading
-% $\mathcal{O}(\Delta t^2)$ error of St\"ormer--Verlet. Adjacent
+% $\O(\Delta t^2)$ error of St\"ormer--Verlet. Adjacent
 % half-kicks between the three sub-steps merge into a single combined kick
 with the Forest--Ruth fused-kick
 scheme~\cite{forestruth1990fourth}.
@@ -648,12 +648,12 @@ constant: the constraint operator is diagonalised by the discrete
 Fourier transform, with wavenumber multipliers matching the
 convention of the spatial
 operators that drive evolution; the cost is
-$\mathcal{O}(N\log N)$~\cite{cooley1965fft}. The second
+$\O(N\log N)$~\cite{cooley1965fft}. The second
 tier covers non-periodic boundaries and variable coefficients: the
 constraint Jacobian is assembled column-by-column by impulse-probing
 each operator, then stored as
 CSC and factored by SuperLU~\cite{demmel1999supernodal,lidemmel2003superlu},
-with $\mathcal{O}(N^2)$ build cost and $\mathcal{O}(N)$ solve. The third tier, reserved for
+with $\O(N^2)$ build cost and $\O(N)$ solve. The third tier, reserved for
 the $N>2\times 10^{5}$ regime, is a Krylov iterative scheme; it is
 implemented but not exercised in~\cref{Results},
 where the largest grids fit comfortably within tier~$2$.
@@ -677,7 +677,7 @@ c_j\,\partial F/\partial y'$ to drive the Newton iteration of each
 backward-differentiation step. FD approximation of
 this matrix requires multiple residual evaluations per Newton
 iteration~\cite{gardner2022sundials,hindmarsh2005sundials}.\footnote{Specifically, the
-cost is $\mathcal{O}(n_{\rm colors})$ residual evaluations per Newton
+cost is $\O(n_{\rm colors})$ residual evaluations per Newton
 iteration, where $n_{\rm colors}$ is the chromatic number of the
 sparsity graph~\cite{curtispowellreid1974}: each column-colour group
 of structurally non-overlapping entries can be probed in a single
@@ -750,7 +750,7 @@ Newton step, would dominate the cost absolutely.
 \paragraph*{Assembly cost versus solve cost}
 Figure~\ref{fig:AnalyticalJacobianSpeedup} times only the
 Jacobian-\emph{fill} stage of each Newton iteration, where the
-sparse-CSC callback always wins --- it skips the $\mathcal{O}(N^{2})$
+sparse-CSC callback always wins --- it skips the $\O(N^{2})$
 dense \texttt{toarray}, and at small $N$ a single fill is cheaper than
 the inner mat-vecs a matrix-free GMRES step would accumulate. The
 production tier thresholds, however, are set by the cost of the
@@ -775,7 +775,7 @@ conditions are all periodic and the
 coefficients are spatially constant: the spatial-operator matrices
 are then circulant. We probe a single grid point and tile
 the resulting stencil row across all $N$ rows via modular arithmetic,
-an $\mathcal{O}(\mathrm{nnz})$ construction in place of the $\mathcal{O}(N^2)$ assembly
+an $\O(\mathrm{nnz})$ construction in place of the $\O(N^2)$ assembly
 of the general sparse path. On the periodic-domain EM
 system this contributes an additional factor of roughly $28\times$
 in operator-matrix construction.
