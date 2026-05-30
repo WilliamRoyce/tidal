@@ -660,6 +660,149 @@ def _set_full_prior_axis_limits(
                 ax.set_ylim(x_lo, x_hi)
 
 
+def _render_anesthetic_corner_into(
+    samples: object,
+    param_names: list[str],
+    *,
+    subplot_spec: object | None = None,
+    labels: dict[str, str] | None = None,
+    ticks: str | None = "inner",
+    show_diagonal: bool = True,
+    fill_two_tone: bool = True,
+) -> tuple[object, object]:
+    """Render a two-tone anesthetic corner plot.
+
+    Used both by :func:`_plot_corner_anesthetic` (standalone full figure;
+    ``subplot_spec=None`` — anesthetic's ``plot_2d`` builds its own
+    Figure, preserving the standalone path bit-identically) and by the
+    cubed-sphere atlas (each face panel passes a
+    :class:`matplotlib.gridspec.SubplotSpec` covering one cell of the
+    atlas's outer 2 x N grid; the helper then explicitly builds axes via
+    :func:`anesthetic.make_2d_axes` so they live inside the parent grid).
+
+    The function does ONLY the minimal common core: invoke anesthetic
+    plotting (with the degenerate-posterior fallbacks) and apply the
+    two-tone Planck-blue solid fill patch.  Standalone-specific
+    decoration (prior overlay, MAP marker, CI band, log axes, axis
+    limits, rejected overlay, legend, suptitle) is layered on by the
+    caller.
+
+    Parameters
+    ----------
+    samples : anesthetic.Samples-like
+        A NestedSamples / MCMCSamples object exposing ``plot_2d``.
+    param_names : list of str
+        Column names in ``samples`` to plot, in the desired corner-plot
+        order.
+    subplot_spec : SubplotSpec, optional
+        A matplotlib SubplotSpec cell to render into.  None means the
+        standalone path — ``samples.plot_2d(param_names)`` builds its
+        own figure (bit-identical to the pre-refactor behaviour).  When
+        provided, axes are built explicitly via
+        :func:`anesthetic.make_2d_axes` inside the spec.
+    labels : dict, optional
+        Mapping ``param_name -> LaTeX label`` for axis labels.  Only
+        consulted on the composable (subplot_spec) path; the standalone
+        path uses anesthetic's defaults.
+    ticks : {"inner", "outer", None}, optional
+        Anesthetic ``ticks`` mode for the composable path.  ``None``
+        strips tick marks entirely (the atlas's setting).  Ignored on
+        the standalone path (anesthetic uses "inner" by default).
+    show_diagonal : bool, optional
+        Whether the diagonal 1D KDE marginals are drawn.  True by
+        default.  Only honoured on the composable path.
+    fill_two_tone : bool, optional
+        Apply :func:`_force_solid_credible_fills` after rendering to
+        replace anesthetic's per-panel-normalized gradient with the
+        cosmology-standard solid Planck-blue two-tone palette.
+
+    Returns
+    -------
+    fig : Figure
+        The matplotlib Figure containing the rendered axes.
+    axes_df : AxesDataFrame
+        The anesthetic axes DataFrame, suitable for further overlay
+        operations (priors, MAP markers, log axes, etc.).
+    """
+    import numpy as np
+
+    if subplot_spec is not None:
+        # Composable path: axes live inside the caller's gridspec slot.
+        from anesthetic import make_2d_axes
+
+        fig, axes_df = make_2d_axes(
+            param_names,
+            labels=labels,
+            ticks=ticks,
+            lower=True,
+            diagonal=show_diagonal,
+            upper=False,
+            subplot_spec=subplot_spec,
+        )
+        axes_arg: object = axes_df
+        own_figure = False
+    else:
+        # Standalone path: bit-identical to the pre-refactor behaviour —
+        # let anesthetic.plot_2d build its own figure and axes from the
+        # parameter list.  axes_arg is the list of names; the AxesDataFrame
+        # is extracted from the return value.
+        axes_arg = param_names
+        own_figure = True
+
+    # Degenerate-posterior fallback chain — mirrors the original
+    # _plot_corner_anesthetic logic.  Two failure modes from anesthetic's
+    # KDE machinery on near-flat / lower-dimensional posteriors:
+    #   - qhull Delaunay triangulation: 'singular input data'
+    #   - scipy gaussian_kde: 'singular data covariance matrix'
+    try:
+        ret = samples.plot_2d(axes_arg, label="68% / 95% CL")
+    except (RuntimeError, ValueError, np.linalg.LinAlgError) as e:
+        msg = str(e).lower()
+        if (
+            "qhull" not in msg
+            and "singular" not in msg
+            and "lower-dimensional" not in msg
+        ):
+            raise
+        try:
+            ret = samples.plot_2d(
+                axes_arg,
+                label="samples",
+                kinds={
+                    "diagonal": "kde_1d",
+                    "lower": "scatter_2d",
+                    "upper": "scatter_2d",
+                },
+            )
+        except (RuntimeError, ValueError, np.linalg.LinAlgError):
+            ret = samples.plot_2d(
+                axes_arg,
+                label="samples",
+                kinds={
+                    "diagonal": "hist_1d",
+                    "lower": "scatter_2d",
+                    "upper": "scatter_2d",
+                },
+            )
+
+    if own_figure:
+        # Extract fig + axes_df from anesthetic's return.  ``plot_2d``
+        # returns either ``(fig, axes_df)`` (older versions) or just the
+        # AxesDataFrame (>= 2.0) — in the latter case the figure is
+        # recoverable from any cell.
+        if isinstance(ret, tuple) and len(ret) == 2:
+            fig = ret[0]
+            axes_df = ret[1]
+        else:
+            axes_df = ret
+            cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
+            fig = cell.get_figure()
+
+    if fill_two_tone:
+        _force_solid_credible_fills(fig)
+    return fig, axes_df
+
+
 def _plot_corner_anesthetic(
     result: InferenceResult,
     output_path: Path | None = None,
@@ -709,63 +852,20 @@ def _plot_corner_anesthetic(
     # confusing and non-standard; remove it from all corner plots.
     plot_params: list[str] = list(result.param_names)
 
-    # anesthetic >= 2.0: plot_2d returns an AxesDataFrame whose cells
-    # expose .get_figure().  Older versions returned (fig, axes).  Handle
-    # both without version-gating.  ``label`` is consumed by anesthetic's
-    # contour code (plot.py:1314) which adds a Rectangle patch to the
-    # legend describing the 68%/95% CL contours.
-    def _plot_with_kinds(plot_params: list[str], kinds: dict[str, str] | None = None):
-        if kinds is None:
-            return samples.plot_2d(plot_params, label="68% / 95% CL")
-        return samples.plot_2d(plot_params, label="samples", kinds=kinds)
-
-    try:
-        ret = _plot_with_kinds(plot_params)
-    except (RuntimeError, ValueError, np.linalg.LinAlgError) as e:
-        # Degenerate-posterior fallback (e.g. genuine-null chains like
-        # D2.1 Barker where the posterior is essentially flat).  Two
-        # failure modes from anesthetic's KDE machinery:
-        # - qhull Delaunay triangulation: 'singular input data'
-        # - scipy gaussian_kde: 'singular data covariance matrix'
-        # Both are downstream of "data spans a lower-dimensional subspace"
-        # which is exactly what a flat posterior looks like.  Fall back
-        # to histogram diagonals + scatter cross-panels — no covariance
-        # estimation needed.  See GH issue #362.
-        msg = str(e).lower()
-        if (
-            "qhull" not in msg
-            and "singular" not in msg
-            and "lower-dimensional" not in msg
-        ):
-            raise
-        # First fallback: KDE on diagonals (works for moderately-flat
-        # posteriors with enough samples for bandwidth selection).
-        try:
-            ret = _plot_with_kinds(
-                plot_params,
-                {"diagonal": "kde_1d", "lower": "scatter_2d", "upper": "scatter_2d"},
-            )
-        except (RuntimeError, ValueError, np.linalg.LinAlgError):
-            # Final fallback for severely-degenerate chains (e.g.
-            # under-converged 474-sample chain with all samples at
-            # identical logL): drop the derived log10_A column (whose
-            # post-clip values may be all-NaN for null chains) and use
-            # hist_1d on the remaining params + scatter_2d cross-panels.
-            params_no_derived = [p for p in plot_params if p in result.param_names]
-            ret = _plot_with_kinds(
-                params_no_derived,
-                {"diagonal": "hist_1d", "lower": "scatter_2d", "upper": "scatter_2d"},
-            )
-            plot_params = params_no_derived
-    if isinstance(ret, tuple) and len(ret) == 2:
-        fig = ret[0]
-        axes_df = ret[1]
-    else:
-        axes_df = ret
-        cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
-        fig = cell.get_figure()
-
-    _force_solid_credible_fills(fig)
+    # Core render: make_2d_axes + plot_2d + two-tone fill patch.  The
+    # standalone path passes ``subplot_spec=None`` so anesthetic builds
+    # its own Figure; the atlas variant passes a SubplotSpec for one
+    # panel of the outer 2 x N grid.  Both paths share the same KDE +
+    # fallback + fill logic.
+    fig, axes_df = _render_anesthetic_corner_into(
+        samples,
+        plot_params,
+        subplot_spec=None,
+        labels=None,
+        ticks="inner",
+        show_diagonal=True,
+        fill_two_tone=True,
+    )
     # Set log axes for log_uniform-prior parameters FIRST — before
     # prior/MAP overlays — so the overlays are drawn in the correct
     # log space, not against linear axes that get re-scaled later.
