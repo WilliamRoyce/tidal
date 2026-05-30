@@ -111,9 +111,10 @@ scalar parameters, and $\mathcal{I}$ standing for each field's
 suppressed tensor indices; the internal stages occupy the rest of this appendix.
 
 \paragraph*{Linearisation around backgrounds}
-The software implements the linearisation of \cref{Linearisation} by expanding the action to second order in the
-perturbations using \xPert{}~\cite{brizuela2009xpert}, with the metric
-and any declared matter fields perturbed simultaneously.
+The action is expanded to second order in the perturbations by
+\xPert{}~\cite{brizuela2009xpert} in the background decomposition of
+\cref{Linearisation}, with the metric and any declared matter fields perturbed
+simultaneously.
 
 Each dynamical field is declared with its own
 \texttt{DefTensorPerturbation} call (the metric carries one through
@@ -164,16 +165,16 @@ reduce to partials.
 
 \paragraph*{Euler--Lagrange derivation}
 The field equation for every dynamical perturbation is obtained by
-variational differentiation of the quadratic action $\lag^{(2)}$
-above: for fields $\varphi^{\mathcal{I}}$
+variational differentiation of the quadratic Lagrangian $\lag^{(2)}$:
+for fields $\varphi^{\mathcal{I}}$
 of arbitrary tensor type, the equation of motion is
-\begin{equation}
+\begin{equation*}
   \frac{\partial \lag^{(2)}}{\partial \varphi^{\mathcal{I}}}
   \;-\; \rcD{_\mu} \frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\varphi^{\mathcal{I}})}
   \;+\; \rcD{_\mu}\rcD{_\nu} \frac{\partial \lag^{(2)}}{\partial(\rcD{_\mu}\rcD{_\nu}\varphi^{\mathcal{I}})}
   \;-\; \cdots \;=\; 0,
-  \label{EulerLagrange}
-\end{equation}
+  % \label{EulerLagrange}
+\end{equation*}
 where the series terminates at the highest derivative order present in
 $\lag^{(2)}$.
 The differentiation is performed by \xAct{}'s
@@ -194,7 +195,7 @@ expansions are handled by the perturbative substitution of
 The Hamiltonian density is the Legendre transform of $\lag^{(2)}$
 with respect to the velocity slots $v^{\mathcal{I}}_n$,
 \begin{equation}
-  \ham^{(2)}
+  \ham
   \;\equiv\;
   \sum_n \pi^{\mathcal{I}}_n\,v^{\mathcal{I}}_n \;-\; \lag^{(2)},
   \label{LegendreTransform}
@@ -233,13 +234,17 @@ where $\MAGA{}$ is the full Cartan connection of
 \cref{PalatiniDecomposition}, with one such term per coordinate slot
 for tensors of higher rank; the general mixed-type form is
 \cref{MixedCovariantDerivative}.
+The result is a set of scalar equations in the chart coordinates, with
+explicit component indices and numerical coefficients, as required by the
+numerical evolution of \cref{NumericalEvolution}.
 
 \paragraph*{Gauge fixing}%
 \label{GaugeFixing}
 Gauges are fixed only where a physically motivated choice
 is available for the field content.
-When a gauge is to be fixed, \TIDAL{} uses one of two mechanisms:
-some gauges are imposed before the variation, others after.
+Two mechanisms are available: some gauges are imposed by modifying the
+Lagrangian before variation; others are applied as component constraints after
+decomposition.
 
 The first mechanism adds a gauge-fixing term to the Lagrangian before
 variation~\cite{faddeev1967feynman}.
@@ -265,7 +270,7 @@ Arbitrary user-specified gauges are declared in the gauge block of
 \cref{TOMLExample}.
 
 \paragraph*{JSON export}
-The symbolic stage terminates by writing a JSON specification, the
+The symbolic stage terminates by writing a JSON specification,
 the contract between the symbolic and numerical stages; parameter sweeps
 and grid changes require no re-derivation.
 The specification has five top-level entries: a spacetime block, the
