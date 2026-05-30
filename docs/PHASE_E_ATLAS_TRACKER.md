@@ -1,14 +1,14 @@
 # Phase E Atlas Tracker — Uniform-Field Cubed-Sphere Campaign
 
-**Last updated:** 2026-05-29 (session: stage-a0-bootstrap)
-**Current stage:** Stage A0 — infrastructure
-**Next action:** push v3_atlas/ to HPC, then submit Phase α S1 (T4 + T1).
+**Last updated:** 2026-05-30 (session: stage-a1-s3-fresh-solo)
+**Current stage:** Stage A1 S3 — FRESH SOLO per theory (T5.0 then T5.1)
+**Next action:** book INTR slot, launch T5.0 fresh-solo (10 chains × 11 ranks = 110 cores), monitor mid-slot
 
 ## Quick handoff (read first if resuming cold)
 
-1. **Where we are**: Stage A0 infrastructure (config + runner + wrapper) committed locally; not yet pushed to HPC.
-2. **What's running**: nothing.
-3. **What to do next**: `bash scripts/hpc_shuttle.sh push`, then `bash scripts/hpc_submit_drafts/v3_atlas/submit_atlas_slot.sh t4 t1`.
+1. **Where we are**: T4 + T1 atlases delivered (S1, jobid 29855408). T5.0 + T5.1 had 3 failed resume attempts due to PolyChord re-verification contention with 22 simultaneous srun steps. Pivoting to FRESH SOLO per theory.
+2. **What's running**: nothing (last slot 29878165 expired 11:21 BST).
+3. **What to do next**: edit runner for FRESH mode + solo ranks, push, book INTR slot, launch T5.0 alone, **actively monitor mid-slot every 15 min**.
 
 ## Context
 
@@ -47,11 +47,20 @@
 
 ### Stage A1 — Phase α (INTR; v3 order; HARD GATE between slots)
 
-- [ ] **S1**: book INTR + launch `submit_atlas_slot.sh t4 t1` (jobid: ☐)
-- [ ] **S1 verify**: per-tile inference.json ≥75% faces complete; atlas.pdf renders for both theories
-- [ ] **HARD GATE**: at least one valid atlas.pdf from S1 before proceeding
-- [ ] **S2**: `submit_atlas_slot.sh t5_0 t5_1` (jobid: ☐)
-- [ ] **S2 verify**: render atlas.pdfs; check `.resume` if any chains incomplete
+- [x] **S1**: `submit_atlas_slot.sh t4 t1` — jobid **29855408**, both atlases rendered, T4 + T1 informative
+- [x] **S1 verify**: 8/8 + 8/8 complete; atlas_t4.pdf + atlas_t1.pdf in `hpc_results/29855408/figures/`; per-face corners rendered
+- [x] **HARD GATE**: passed (T4 + T1 atlases delivered)
+- [x] **S2**: `submit_atlas_slot.sh t5_0 t5_1` — jobid **29855408** (S2 phase, packed 4 ranks/face) — hit walltime, all 22 chains have .resume
+- [x] **S2 resume #1**: jobid **29858312** (1h INTR, 4 ranks/face uniform) — T5.0 +260 ndead, T5.1 +220 ndead; none completed
+- [x] **S2 resume #2**: jobid **29878165** (1h INTR, smart-pack T5.1=6 ranks, T5.0=4 ranks) — only ~12 of 22 chains progressed; ~10 chains stuck in resume-verification for the whole slot. **Diagnosis: 22 simultaneous `srun --exclusive --read-resume` steps starve each other during PolyChord's live-point re-verification phase.**
+- [ ] **S3 strategy B (FRESH SOLO per theory)**: T5.0 alone (10×11=110 cores) → T5.1 alone (12×9=108 cores)
+
+#### Learnings from S2 (CRITICAL — apply to all future multi-chain INTR slots)
+
+1. **Do not launch >16 simultaneous srun-resume steps on a single node**. PolyChord re-verifies all live points after `--read-resume`, and 22 chains × 4-6 ranks competing for cores+memory means most chains never finish re-verification within 1h walltime.
+2. **For FRESH chains**, the bottleneck is per-chain compute (likelihood evals), so packing is fine — but stick to ≤12 chains per slot at higher ranks.
+3. **Active mid-slot monitoring is mandatory**: every 15 min check that all chains' `_chains/tidal.stats` timestamps are advancing. If any chain's stats hasn't updated in 30+ min while others have, that chain is stuck — react (cancel + rebook with different strategy).
+4. **Smart-pack the rank distribution by per-theory ndim and convergence target, not by total core count alone**. Lesson: 22 cores fit on 112-core node mathematically but contention is real.
 
 ### Stage A1b — Phase β (overnight standard-queue, ONLY after Phase α succeeds)
 
@@ -73,8 +82,8 @@
 |--------|------|-------|-------|------|------|-------------|-----------|---------|
 | T4 | 4 | 8 | 29855408 (S1) | 0.35 | 0.45 | 8/8 | ☑ atlas_t4.pdf | informative-amp; δ₁ dir suppressed (logZ=−1.82 face 4) |
 | T1 | 4 | 8 | 29855408 (S1) | 0.35 | 0.45 | 8/8 | ☑ atlas_t1.pdf | strong amp; mA² dir face 02m suppressed (logZ=−0.01 vs +9) |
-| T5.0 | 5 | 10 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
-| T5.1 | 6 | 12 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
+| T5.0 | 5 | 10 | 29855408 (S2) + 29858312 + 29878165 (3 INTR slots, all hit walltime) | 0.35 | 0.45 | 0/10 (~4 chains at/past target ndead 625) | ☐ | pending S3 fresh-solo |
+| T5.1 | 6 | 12 | 29855408 (S2) + 29858312 + 29878165 (3 INTR slots, all hit walltime) | 0.35 | 0.45 | 0/12 (~5 chains at/past target ndead 750) | ☐ | pending S3 fresh-solo |
 | T5.2 (bonus) | 8 | 16 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
 | T5.3 (bonus) | 9 | 18 | ☐ | 0.35 | 0.45 | ☐ | ☐ | ☐ |
 
