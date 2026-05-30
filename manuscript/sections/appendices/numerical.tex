@@ -124,7 +124,7 @@ velocities~\cite{henneaux1992quantization},
   \, ,
   \label{KineticMatrixDef}
 \end{align}
-evaluated at the background. The canonical momenta are
+evaluated at the background. The canonical momenta are defined by
 \begin{align}
   p_i \equiv \frac{\partial \lag}{\partial(\partial_t \varphi_i)}
   \, ,
@@ -135,6 +135,7 @@ relation $p_i = K_{ij}\, v_j$. To express the Hamiltonian density
 $\ham = p_i\, v_i - \lag$ in terms of the canonical coordinates $(q, p)$
 one must
 eliminate the velocities $v_i = (K^{-1})_{ij}\, p_j$.
+
 \TIDAL{} chooses the velocity form for three reasons. (i) It avoids
 the symbolic inversion at derivation time. For
 non-diagonal $K$ the entries of $K^{-1}$ are rational expressions
@@ -225,6 +226,7 @@ $\hat\varphi^I(k)$ and velocity $\hat v_\varphi^I(k)$)
   .
   \label{ModalPerMode}
 \end{align}
+
 Because $\exp(M(k)\,t_{\rm end})$ reaches the endpoint in a single
 application, the wall time is independent of the integration endpoint
 $t_{\rm end}$. Each output snapshot is one matrix--vector product per
@@ -417,7 +419,7 @@ mode-coupled form
   \, ,
   \label{ModalCoupled}
 \end{align}
-with each entry the sum of two contributions,
+with each entry given by
 \begin{align}
   M_{k k'} = M(k)\,\delta_{k k'}
   \,+\, \tfrac{1}{N}\,\hat c_{\,k-k'}\,\mathcal{L}(k')
@@ -428,6 +430,7 @@ where $M(k)$ is the per-mode operator
 of~\cref{ModalPerMode}, $\hat c_{\,k-k'}$ are the discrete Fourier
 coefficients of $c(x)$, and $\mathcal{L}(k') \in \{1,i k',\cdots\}$ is the relevant
 Fourier symbol~\cite{boyd2001chebyshev}.
+
 The matrix is dense in general, and is generally non-normal, in which
 case the eigendecomposition is inadequate: individual terms
 $\exp(\lambda t)$ overflow when $\lambda$ has a large positive real
@@ -485,6 +488,7 @@ mode $N-k$ are complex conjugates.
 % A generic mode is free to be
 % complex --- its conjugate partner keeps the field real --- so the
 % complex per-mode propagator $\exp(M(k)\,t)$ does it no harm.
+
 The Nyquist mode ($k=N/2$ on even-$N$ grids) is its
 own conjugate, so \emph{must} stay real. The gradient
 couplings make $\exp(M(k)\,t)$ complex at the Nyquist
@@ -493,6 +497,7 @@ the imaginary part, which \lstinline!irfft! then discards on
 reconstruction --- the energy carried by that imaginary part is lost.
 % (the zero mode is likewise self-conjugate but
 % unaffected, the gradient couplings vanishing at $k=0$).
+
 We zero the Nyquist mode
 in the initial condition before evolution, which is the linear
 analogue of the spectral dealiasing
@@ -536,15 +541,14 @@ step-based solvers
 can use: spatial operators are applied as Fourier
 multipliers,%~\cite{burns2020dedalus},
 \footnote{The pseudo-spectral path uses the exact continuous wavenumber $k$
---- the same convention as the Fourier modal solver
-of~\cref{ModalSolver}. The constraint initial-condition solver
-of~\cref{ConstraintIC} matches the wavenumber convention of the
-active spatial path: exact $k$ for the pseudo-spectral path, and the
-FD-stencil dispersion relation $k_{\rm mod}^2 = -(2/\Delta x^2)(1 -
-\cos(k\,\Delta x))$ at order~$2$ (with the Fornberg
-generalisations~\cite{fornberg1988generation} at higher orders) for
-the FD path, so the constraint solution is spectrally consistent with
-the spatial operators used during evolution.}
+as a Fourier multiplier --- the same convention as the Fourier modal
+solver of~\cref{ModalSolver}. The constraint initial-condition
+solver of~\cref{ConstraintIC} matches the active spatial path:
+exact $k$ for the pseudo-spectral path, and the FD-stencil dispersion
+$k_{\rm mod}^2 = -(2/\Delta x^2)(1-\cos(k\Delta x))$ for the FD path
+(with Fornberg generalisations~\cite{fornberg1988generation} at
+higher orders), so the constraint IC is spectrally consistent with
+the active evolution.}
 while the time evolution is driven by the chosen solver.
 % \footnote{The path is auto-enabled in every
 % solver except \IDA{}, whose Newton iteration uses a sparse
@@ -676,15 +680,11 @@ choice cancels in any gauge-invariant quantity.
 c_j\,\partial F/\partial y'$ to drive the Newton iteration of each
 backward-differentiation step. FD approximation of
 this matrix requires multiple residual evaluations per Newton
-iteration~\cite{gardner2022sundials,hindmarsh2005sundials}.\footnote{Specifically, the
-cost is $\O(n_{\rm colors})$ residual evaluations per Newton
-iteration, where $n_{\rm colors}$ is the chromatic number of the
-sparsity graph~\cite{curtispowellreid1974}: each column-colour group
-of structurally non-overlapping entries can be probed in a single
-residual evaluation.} For the multi-field systems with
+iteration~\cite{gardner2022sundials,hindmarsh2005sundials,curtispowellreid1974}. For the multi-field systems with
 $N\!\sim\!10^4$ degrees of freedom that arise in the PGT campaigns
-of~\cref{Results}, that overhead is the dominant cost. We
-precompute the Jacobian analytically, once, from the symbolic
+of~\cref{Results}, that overhead is the dominant cost.
+
+We precompute the Jacobian analytically, once, from the symbolic
 equation specification, and supply
 it to the linear solver directly through the \SUNDIALS{} callback
 interface~\cite{gardner2022sundials,hindmarsh2005sundials}.
