@@ -78,14 +78,6 @@ appendix_D:
     output: manuscript/figures/figD_parker_simon.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §4)
 
-  figD_fv_cdt:
-    kind: figure
-    figure_script: scripts/figures/figD_fv_cdt.py
-    benchmark_script: scripts/benchmarks/fv_cdt_equivalence.py
-    canonical_data: benchmark_results/canonical/fv_cdt_equivalence.json
-    output: manuscript/figures/figD_fv_cdt.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D §5)
-
   figD_multi_method:
     kind: figure
     figure_script: scripts/figures/figD_multi_method.py
@@ -101,14 +93,6 @@ appendix_D:
     canonical_data: benchmark_results/canonical/convergence_rich.json
     output: manuscript/figures/figD_convergence.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §7)
-
-  figD_conservation:
-    kind: figure
-    figure_script: scripts/figures/figD_conservation.py
-    benchmark_script: scripts/benchmarks/conservation_audit_full.py
-    canonical_data: benchmark_results/canonical/conservation_audit_full.json
-    output: manuscript/figures/figD_conservation.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D §8)
 
   fig1_boccaletti_validation:
     kind: figure

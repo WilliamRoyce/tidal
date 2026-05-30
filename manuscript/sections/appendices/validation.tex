@@ -20,6 +20,10 @@
 \section{Calibration against analytic limits and reference models}%
 \label{Validation}
 
+\TIDAL{} reproduces every closed-form, perturbative, and
+cross-formulation reference point surveyed here to within the
+precision floor of the solver chosen for each calibration.
+
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_boccaletti_uniform}
@@ -43,10 +47,8 @@
     four solvers. Modal and \CVODE{} reach a plateau of
     $\sim 4\times 10^{-8}$ across $N$, of the same order as the
     $(\Delta/g)^4 \sim 10^{-8}$ next-order truncation; leapfrog
-    Yoshida-2 converges monotonically toward this plateau under grid
-    refinement, and Yoshida-4 also decreases with $N$ but with
-    reproducible non-monotonic scatter on top of the underlying
-    convergence trend.}
+    Yoshida-2 converges monotonically toward this plateau; Yoshida-4
+    decreases with $N$ but with reproducible non-monotonic scatter.}
   \label{BoccalettiUniform}
 \end{figure*}
 
@@ -69,7 +71,7 @@ graviton effective mass $m_h^2 = \kappa^2\Bzero^2/2$ acquired through
 the $\Bzero^2$ metric backreaction
 (\cref{PerturbativeRegime};~\cite{hwangnoh2023graviton}); the
 $(\Delta/g)^4$ truncation that \cref{TwoModeRabi} drops is at
-$\O(\Bzero^4)$ per \cref{PerturbativityHierarchy}.
+$\O(\Bzero^4)$.
 \Cref{BoccalettiUniform}(a) overlays the simulation against both
 \cref{GertsenshteinFormula} and \cref{TwoModeRabi} across the
 $\Bzero$ sweep, and panel (b) shows the modal/\CVODE{}
@@ -201,8 +203,7 @@ field~\cite{schwinger1951gauge}). The resulting Adler birefringence
 ratio $(n_\parallel - 1)/(n_\perp - 1) = 7/4$ is reproduced
 exactly~\cite{adler1971photon}.
 
-\paragraph*{Cross-formulation equivalence: Proca versus vector-torsion}%
-\label{ProcaVTEquivalence}
+\paragraph*{Cross-formulation equivalence: Proca versus vector-torsion}
 For complex PGT theories where no closed-form solution is available,
 the only available consistency check is to compare the same
 continuum action derived via two mathematically distinct field
@@ -256,7 +257,7 @@ integration tolerances.
   \label{MultiMethod}
 \end{figure*}
 
-\paragraph*{Spatial and temporal convergence}\label{ConvergenceCalibration}
+\paragraph*{Spatial and temporal convergence}
 The spatial-operator catalogue is tested against analytic
 derivatives in \cref{FDConvergence}, where the Fornberg
 FD orders recover their predicted
@@ -266,22 +267,13 @@ floor~\cite{fornberg1988generation,burns2020dedalus}.
 $\omega(k) = \sqrt{k^2 + m^2}$; \cref{ConvergenceFigure}(b) reports
 time-integration convergence for the symplectic solvers, where
 Yoshida-2 recovers its formal slope to four-figure precision
-($\hat{\alpha} = 2.00$, $R^2 = 1.000$). Yoshida-4 also decreases under $\Delta t$ refinement but with
-reproducible non-power-law scatter across the $\Delta t$ sweep
-spanning up to two orders of magnitude between nearby $\Delta t$
-values; the same pattern reappears in
-\cref{BoccalettiUniform}(b) under grid refinement at fixed
-$\Delta t$.
-% The scatter is bit-identical across reruns with $2$
-% versus $20$ snapshots and across $P_\mathrm{final}$ versus
-% $P_\mathrm{max}$ extraction, ruling out snapshot-timing and
-% measurement-extraction artefacts; modal, \CVODE, and Yoshida-2 are
-% smooth on the same data.
-The residual Yoshida-4 pathology is reproducible but still
-uncharacterised.
-% ; the production runs in this paper use the
-% auto-selected modal solver, so this scatter does not affect any
-% of the survey results.
+($\hat{\alpha} = 2.00$, $R^2 = 1.000$). The Yoshida-4 scatter
+reproduces across grid refinement (\cref{BoccalettiUniform}(b))
+and across $\Delta t$ refinement (\cref{ConvergenceFigure}(b)) at
+fixed counterpart resolution, so it is not an integration-step or
+grid artefact; the underlying mechanism remains uncharacterised, and
+the survey campaigns in \cref{Results} therefore use the
+auto-selected modal solver rather than Yoshida-4.
 
 \begin{figure*}[t]
   \centering
@@ -308,22 +300,9 @@ uncharacterised.
 \paragraph*{Energy-conservation audit}
 Energy conservation, when available
 (\cref{SVDNullSpace,DiracBergmann}), provides a diagnostic that engages
-every layer of the workflow.
-% at once: a constraint solver that
-% returns inconsistent initial conditions, a symbolic stage that
-% loses cross-coupling terms in field decomposition, or a time
-% integrator that drifts past its predicted order, all reveal
-% themselves as relative energy drift.
-We audit the maximum relative
+every layer of the workflow. We audit the maximum relative
 energy drift $|\Delta E/E|_\mathrm{max}$ across the theories of physical
-relevance to the \cref{Results} campaigns.
-% the EM
-% Gertsenshtein baseline of \cref{GertsenshteinFormula}, a
-% gradient-coupled scalar pair (an analogue of \cref{TwoModeRabi}),
-% the propagating-PGT and nonminimal-torsion variants of
-% \cref{SectorSurvey}, the dark-photon-plasma sector,
-% a Proca-mass photon, and a linearised gravitational wave.
-Successful examples
+relevance to the \cref{Results} campaigns. Successful examples
 cluster at $\sim 10^{-15}$, near $\varepsilon_\mathrm{mach}$ of the
 modal solver. The precision floor of each row in
 \cref{ConservationAudit} is set by the solver chosen for that
@@ -349,17 +328,8 @@ theory, which differs across theories.
     in descending order. The four bottom rows sit at the modal
     solver's precision floor. For the top two rows the
     energy-conservation diagnostic itself is incorrect (see
-    \cref{DiracBergmann})
-    % : these theories carry rank-deficient
-    % kinetic matrices for which \TIDAL{}'s exported Hamiltonian is
-    % gauge-non-invariant, so the drift values mix integration error
-    % with a gauge artifact
-    and cannot be interpreted as an
-    integration-accuracy figure. The dynamics are unaffected.
-    % : the
-    % survey conversion-probability observables of \cref{Results} are
-    % gauge-invariant and carry no Dirac--Bergmann correction.
-    }
+    \cref{DiracBergmann}) and cannot be interpreted as an
+    integration-accuracy figure. The dynamics are unaffected.}
   \label{ConservationAudit}
 \end{table}
 
