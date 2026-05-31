@@ -8,58 +8,57 @@
 \label{Conclusions}
 
 The extensions of general relativity that gravitational-wave
-observatories will probe carry many additional operators, each with
-couplings; the Gertsenshtein channel structure across
-this coupling space has, until now, been mapped only model by model.
-We have presented \TIDAL{}, a symbolic--numerical software package
-that automates the linearised conversion analysis for any tensor
-Lagrangian, and applied it to the quadratic Poincar\'{e}-gauge action
-coupled to electromagnetism.
+observatories will probe introduce many new interactions, whose effect
+on the Gertsenshtein channel has not, until now, been systematically
+explored. We have presented \TIDAL{}, a symbolic--numerical software
+package that derives the linearised equations of motion directly from
+the Lagrangian, and applied it to the quadratic Poincar\'{e}-gauge
+action coupled to electromagnetism.
 
-The strongest amplifying directions identified across the surveyed
-operator space are concentrated on a small set of Lagrangian
-couplings, with the derivative-mixing coupling
+Across the surveyed operator space we find that the Gertsenshtein
+conversion responds to the full coupling content of each Lagrangian,
+but a few operators are robustly dominant --- amplifying the
+conversion no matter what other terms are present. The most consistent
+of these is the derivative-mixing contraction
 \begin{equation}
-    \lag \supset \rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\, \MAGF{_{\alpha\beta\gamma\delta}}
+    \lag \supset \rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\, \MAGF{_{\alpha\beta\gamma\delta}},
 \end{equation}
-as the
-dominant amplifying direction. Significant suppression of conversion
-also appears across most of the surveyed theories. The amplification
-persists without propagating-torsion, so purely
-ghost-driven growth cannot explain it.\wb{That is a nice result}
+which is also the dominant operator-level distinction between
+amplifying and suppressing parameter regions; for most other operators
+those regions largely overlap. The amplification persists without
+propagating-torsion, so purely ghost-driven growth cannot explain
+it.\wb{That is a nice result}
 
-Whether the exponential mode growth that drives these amplifying
-directions represents physical amplification, a tachyonic instability,
-or a ghost is not decided at the linearised level. A
-particle-spectrum analysis via
+Whether the exponential mode growth behind these amplifications
+corresponds to a physical amplification, a tachyonic instability, or a
+wrong-sign kinetic ghost is a question the present survey does not
+address. A particle-spectrum analysis via
 \PSALTer{}~\cite{barker2024psalter,barker2025psalter2} would determine
-which of the three applies for each amplifying direction identified
-above.
+which of the three applies for each amplifying direction.
 
 Re-running the survey on a finite-extent magnetic background would
-give the propagating wave only a finite interaction time,
-bounding the exponential growth that otherwise compounds
-indefinitely. The sectors that overflow
-under that embedding would then re-enter the survey at finite
-amplitude, and the coupling-level landscape of this survey could
-be replaced by physical amplification magnitudes comparable with
-detector sensitivities. A second extension is to
-sample along directions in the coupling space rather than along the
-bare-coupling axes the present survey uses; this would identify which
-combinations of operators drive the amplification,
+give the propagating wave only a finite interaction time, bounding the
+exponential growth that otherwise compounds indefinitely. The sectors
+that overflow under that embedding would then re-enter the survey at
+finite amplitude, and the present coupling-level identifications would
+be replaced by physical conversion magnitudes comparable with current
+indirect-detection thresholds for the Gertsenshtein signal. A second
+extension is to sample the direction of each coupling vector
+independently of its magnitude (\cref{CubedSphereAtlas}); this would
+identify which combinations of operators drive the amplification,
 independently of the basis in which the action is written.
 
-The non-minimal coupling sector of the quadratic Poincar\'{e}-gauge
-action is, on the present evidence, the structural locus of the
-Gertsenshtein channel amplification. Pending the proposed follow-up analyses,
-the search for Gertsenshtein amplification in extensions of general
-relativity moves from the propagating-torsion sector to the non-minimal
-coupling content of the action. Whether each amplifying coupling identified here drives
-physical amplification or a vacuum-dependent instability is a question
-the linearised survey cannot, by construction, decide; what it does
+Gertsenshtein channel amplification is distributed across the operator
+content of the action beyond Einstein--Maxwell, with a few robustly
+dominant operators carrying the conversion no matter what else is
+present. Because the amplification persists without propagating
+torsion, future analyses can sidestep the difficult problem of which
+modes propagate and focus directly on the operator content of the
+action. Whether each amplifying coupling identified here corresponds
+to a physical amplification or to a vacuum-dependent instability is a
+question the survey cannot, by construction, decide; what it does
 decide is which operators of the quadratic gauge-gravity action are
 candidates for that question at all --- and therefore which couplings
-any high-frequency gravitational-wave search for the Gertsenshtein
-signal will need to constrain.
+any future bound on the Gertsenshtein signal would target.
 
 \wb{OK, so the main thing that is missing here is a concrete discussion of how large the effects are in real terms. You open with astrophysics, and with scales and numbers, but most of the results are expressed somewhat obscurely in terms of evidence. Is there a concrete connection between the plots and the degree to which the effect has been amplified? How can an astrophysicist decide whether a model selected from your catalogue will provide effects at a specified physical scale? You probably want to add a `translation' paragraph here in the conclusions, that allows someone to take a point from the plots and say `this is the degree of amplification I get for a magnetic field of such-and-such strength, and a gravitational wave of such-and-such frequency'.}
