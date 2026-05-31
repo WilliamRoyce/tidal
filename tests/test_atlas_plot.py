@@ -577,6 +577,118 @@ def test_plot_atlas_labels_only_on_outer_edges(tmp_path: Path) -> None:
     assert seen_flags[8] == (True, False)
 
 
+# ----------------------------------------------------------------------
+# Overlay up-down (K.2 manuscript-figure mode)
+# ----------------------------------------------------------------------
+
+
+def test_plot_atlas_overlay_up_down_n_panels(tmp_path: Path) -> None:
+    """When overlay_up_down=True the figure has N (one per axis) panels
+    arranged in a 2 x ceil(N/2) grid, not 2N (one per face).  Counts the
+    SubFigure cells.
+    """
+    import matplotlib.figure as mfig
+
+    n = 4
+    names = ("a", "b", "c", "d")
+    Q = np.eye(n)
+    survey_dir = tmp_path / "survey"
+    survey_dir.mkdir()
+    for face_idx, sub_tile in enumerate_cells(n_dims=n, M=1):
+        cd = survey_dir / cell_label(face_idx, sub_tile)
+        _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
+
+    captured: dict[str, object] = {}
+    real_savefig = mfig.Figure.savefig
+
+    def _capture(self: mfig.Figure, *a: object, **kw: object) -> None:
+        captured["fig"] = self
+        real_savefig(self, *a, **kw)
+
+    mfig.Figure.savefig = _capture  # type: ignore[method-assign]
+    try:
+        plot_atlas(
+            survey_dir,
+            survey_dir / "atlas.pdf",
+            overlay_up_down=True,
+            color_up="#dc267f",
+            color_down="#ffb000",
+        )
+    finally:
+        mfig.Figure.savefig = real_savefig  # type: ignore[method-assign]
+
+    fig = captured["fig"]
+    assert fig is not None
+    # Count SubFigures (each axis panel is one SubFigure).  For N=4 the
+    # 2 x ceil(N/2) = 2 x 2 layout gives exactly 4 SubFigures.
+    subfigs = fig.subfigs  # type: ignore[attr-defined]
+    assert len(subfigs) == n
+
+
+def test_plot_atlas_overlay_renders_both_posteriors(tmp_path: Path) -> None:
+    """In overlay mode each axis panel must trigger TWO ``samples.plot_2d``
+    calls (up + down) with their respective colours, not one.  The
+    canonical pattern from ``scripts/figures/_corner_style.py``.
+    """
+    n = 3
+    names = ("a", "b", "c")
+    Q = np.eye(n)
+    survey_dir = tmp_path / "survey"
+    survey_dir.mkdir()
+    for face_idx, sub_tile in enumerate_cells(n_dims=n, M=1):
+        cd = survey_dir / cell_label(face_idx, sub_tile)
+        _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
+
+    # Mock-patch anesthetic's MCMCSamples.plot_2d so we can capture the
+    # colour kwargs per call.  Patching at the class level is brittle
+    # across anesthetic versions; instead, spy on the up/down inputs by
+    # spying on _render_axis_panel and recording how often it gets
+    # called and with which colours.
+    from tidal.inference import _atlas
+
+    real_panel = _atlas._render_axis_panel
+    seen: list[tuple[str, str]] = []
+
+    def _spy(*args: object, **kwargs: object) -> None:
+        seen.append(
+            (kwargs.get("color_up"), kwargs.get("color_down"))  # type: ignore[arg-type]
+        )
+        return real_panel(*args, **kwargs)  # type: ignore[arg-type]
+
+    _atlas._render_axis_panel = _spy  # type: ignore[attr-defined]
+    try:
+        plot_atlas(
+            survey_dir,
+            survey_dir / "atlas.pdf",
+            overlay_up_down=True,
+            color_up="#dc267f",
+            color_down="#ffb000",
+        )
+    finally:
+        _atlas._render_axis_panel = real_panel  # type: ignore[attr-defined]
+
+    # One call per axis (N=3 axes → 3 calls).
+    assert len(seen) == n
+    for cu, cd in seen:
+        assert cu == "#dc267f"
+        assert cd == "#ffb000"
+
+
+def test_plot_atlas_overlay_requires_color_up_and_color_down(tmp_path: Path) -> None:
+    """``overlay_up_down=True`` without both colours raises ``ValueError``."""
+    n = 3
+    names = ("a", "b", "c")
+    Q = np.eye(n)
+    survey_dir = tmp_path / "survey"
+    survey_dir.mkdir()
+    for face_idx, sub_tile in enumerate_cells(n_dims=n, M=1):
+        cd = survey_dir / cell_label(face_idx, sub_tile)
+        _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
+
+    with pytest.raises(ValueError, match="color_up and color_down"):
+        plot_atlas(survey_dir, survey_dir / "atlas.pdf", overlay_up_down=True)
+
+
 def test_plot_atlas_rejects_empty_dir(tmp_path: Path) -> None:
     survey_dir = tmp_path / "empty"
     survey_dir.mkdir()

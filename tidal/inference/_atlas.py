@@ -315,8 +315,8 @@ def _render_face_panel(
     # per face.
     from anesthetic import MCMCSamples
 
-    col_names = [f"theta_{i + 1}" for i in range(n_chi)]
-    latex_labels = {col_names[i]: rf"$\theta_{{{i + 1}}}$" for i in range(n_chi)}
+    col_names = [f"chi_{i + 1}" for i in range(n_chi)]
+    latex_labels = {col_names[i]: rf"$\chi_{{{i + 1}}}$" for i in range(n_chi)}
     data = {col_names[i]: chi[:, i] for i in range(n_chi)}
     if weights is not None and len(weights) == len(chi):
         # Drop columns to constructor + set weights post-hoc; anesthetic's
@@ -379,6 +379,173 @@ def _render_face_panel(
     )
 
 
+def _render_axis_panel(
+    fig: object,  # matplotlib Figure | SubFigure
+    axis_idx: int,
+    chi_up: NDArray[np.float64] | None,
+    chi_down: NDArray[np.float64] | None,
+    n_dims: int,
+    *,
+    weights_up: NDArray[np.float64] | None = None,
+    weights_down: NDArray[np.float64] | None = None,
+    show_xlabels: bool = True,
+    show_ylabels: bool = True,
+    color_up: str,
+    color_down: str,
+    color_alpha: float = 0.5,
+) -> None:
+    r"""Render one axis panel via anesthetic — overlay of up- and down-face posteriors.
+
+    Parallel to :func:`_render_face_panel`, but pools the positive-sign
+    (``+x_k`` = face ``2k - 1``) and negative-sign (``-x_k`` = face
+    ``2k``) face-local chi data into a single panel.  Up posterior is
+    drawn first in ``color_up`` (typically IBM magenta ``#dc267f``);
+    down is overlaid second in ``color_down`` (typically IBM yellow
+    ``#ffb000``) — both at ``color_alpha = 0.5`` so overlapping support
+    reads as a darker mix.
+
+    Panel title is ``Axis k ↑↓`` with the ↑ glyph in ``color_up`` and
+    the ↓ glyph in ``color_down`` so the title doubles as a per-panel
+    legend.
+    """
+    n_chi = n_dims - 1
+
+    # Empty / sparse panel: at least one of (chi_up, chi_down) must carry
+    # enough samples for anesthetic's KDE.  If both are empty, draw a
+    # placeholder and bail.
+    have_up = chi_up is not None and len(chi_up) >= 5
+    have_down = chi_down is not None and len(chi_down) >= 5
+    if not have_up and not have_down:
+        ax = fig.subplots(1, 1)
+        ax.set_xlim(-1, 1)
+        ax.set_ylim(-1, 1)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.text(
+            0.5,
+            0.5,
+            "(no samples)",
+            ha="center",
+            va="center",
+            transform=ax.transAxes,
+            fontsize=8,
+            color="0.5",
+        )
+        _draw_axis_title(fig, axis_idx, color_up, color_down)
+        return
+
+    from anesthetic import MCMCSamples, make_2d_axes
+
+    col_names = [f"chi_{i + 1}" for i in range(n_chi)]
+    latex_labels = {col_names[i]: rf"$\chi_{{{i + 1}}}$" for i in range(n_chi)}
+
+    # Build the axes grid once for both overlays.
+    _, axes_df = make_2d_axes(
+        col_names,
+        labels=latex_labels,
+        ticks=None,
+        lower=True,
+        diagonal=True,
+        upper=False,
+        fig=fig,
+    )
+
+    # Overlay each posterior on the same axes_df.  anesthetic's plot_2d
+    # accepts an explicit AxesDataFrame to render into; calling it twice
+    # paints both posteriors on the same panel.  Order matters
+    # cosmetically only: down drawn second sits on top of up where they
+    # overlap, which mixes the two alphas into a darker tone.
+    for chi, weights, color, present in (
+        (chi_up, weights_up, color_up, have_up),
+        (chi_down, weights_down, color_down, have_down),
+    ):
+        if not present or chi is None:
+            continue
+        data = {col_names[i]: chi[:, i] for i in range(n_chi)}
+        if weights is not None and len(weights) == len(chi):
+            samples = MCMCSamples(data=data, weights=weights)
+        else:
+            samples = MCMCSamples(data=data)
+        samples.plot_2d(axes_df, color=color, alpha=color_alpha)
+
+    # ``plot_2d`` overwrites the LaTeX labels with the column names;
+    # re-apply via the public ``set_labels`` method.
+    axes_df.set_labels(latex_labels)  # type: ignore[attr-defined]
+
+    # Tighten the SubFigure's internal layout (same constants as the
+    # single-face renderer; the 2x4 outer grid gives each panel ~3.5x
+    # the area of the previous 4x4 case so margins are not pinched).
+    fig.subplots_adjust(
+        left=0.10,
+        right=0.98,
+        bottom=0.10,
+        top=0.98,
+        wspace=0.0,
+        hspace=0.0,
+    )
+
+    # Suppress non-edge labels.
+    if not show_xlabels or not show_ylabels:
+        for ax in axes_df.values.flatten():  # type: ignore[attr-defined]
+            if ax is None:
+                continue
+            if not show_xlabels:
+                ax.xaxis.label.set_visible(False)
+            if not show_ylabels:
+                ax.yaxis.label.set_visible(False)
+
+    _draw_axis_title(fig, axis_idx, color_up, color_down)
+
+
+def _draw_axis_title(
+    fig: object,
+    axis_idx: int,
+    color_up: str,
+    color_down: str,
+) -> None:
+    r"""Draw ``Axis k ↑↓`` in the panel's upper-right whitespace.
+
+    The ↑ glyph renders in ``color_up`` and the ↓ glyph in ``color_down``,
+    so the title doubles as a per-panel legend for the two-posterior
+    overlay below.
+
+    Implemented as three matplotlib ``fig.text`` calls (axis number in
+    black, ↑ in colour_up, ↓ in colour_down) rather than one LaTeX
+    ``\textcolor`` call because matplotlib's mathtext renderer does
+    not honour ``\textcolor`` without a full ``text.usetex=True``
+    config; per-text ``color=`` kwargs work in every backend.
+    """
+    # Layout: centred around x=0.73, y=0.78 in subfigure coords, with
+    # the three glyphs ("Axis k", "↑", "↓") packed horizontally inside
+    # the empty upper-right triangle of the lower-triangle corner plot.
+    fig.text(
+        0.65,
+        0.78,
+        rf"$\mathrm{{Axis}}\ {axis_idx}$",
+        ha="center",
+        va="center",
+        fontsize=9,
+    )
+    fig.text(
+        0.76,
+        0.78,
+        r"$\uparrow$",
+        ha="center",
+        va="center",
+        fontsize=11,
+        color=color_up,
+    )
+    fig.text(
+        0.81,
+        0.78,
+        r"$\downarrow$",
+        ha="center",
+        va="center",
+        fontsize=11,
+        color=color_down,
+    )
+
+
 # ----------------------------------------------------------------------
 # Public API
 # ----------------------------------------------------------------------
@@ -393,6 +560,9 @@ def plot_atlas(
     fill_colors: tuple[str, str] | None = None,
     color: str | None = None,
     color_alpha: float = 0.5,
+    overlay_up_down: bool = False,
+    color_up: str | None = None,
+    color_down: str | None = None,
 ) -> Path:
     """Render the cubed-sphere atlas for a survey directory.
 
@@ -437,8 +607,28 @@ def plot_atlas(
         ``scripts/figures/_corner_style.py``.  ``None`` (default) keeps
         anesthetic's default palette.
     color_alpha : float
-        Alpha for single-tone ``color``.  Defaults to 0.5, matching the
-        manuscript's ``OVERLAY_ALPHA`` from ``_corner_style.py``.
+        Alpha for single-tone ``color`` and for ``overlay_up_down``
+        overlays.  Defaults to 0.5, matching the manuscript's
+        ``OVERLAY_ALPHA`` from ``_corner_style.py``.
+    overlay_up_down : bool
+        When True, render N panels (one per coupling axis) with the
+        positive-axis face overlay in ``color_up`` and the
+        negative-axis face overlay in ``color_down``.  Halves the panel
+        count vs. the default single-face-per-panel mode and is the
+        rendering used by the bespoke K.2 manuscript figure.  When
+        False (default), retains the per-face rendering and
+        ``color_up`` / ``color_down`` are ignored.  ``layout_cols`` is
+        ignored in overlay mode (layout fixed at ``2 x ceil(N/2)``).
+        ``color`` and ``fill_colors`` are also ignored in overlay mode
+        (the up/down pair carries the colouring).
+    color_up : str or None
+        Hex colour for the positive-axis (``+x_k``, "up") face overlay.
+        Used only when ``overlay_up_down=True``.  Recommend IBM
+        colorblind magenta ``#dc267f`` (``_palette.AMP_COLOR``).
+    color_down : str or None
+        Hex colour for the negative-axis (``-x_k``, "down") face
+        overlay.  Used only when ``overlay_up_down=True``.  Recommend
+        IBM colorblind yellow ``#ffb000`` (``_palette.SUP_COLOR``).
 
     Returns
     -------
@@ -544,7 +734,20 @@ def plot_atlas(
         raise ValueError(msg)
 
     n_faces_total = n_faces(n_dims)
-    rows, cols = _grid_shape(n_dims, layout_cols)
+    if overlay_up_down:
+        if color_up is None or color_down is None:
+            msg = (
+                "overlay_up_down=True requires color_up and color_down "
+                "(IBM colorblind magenta/yellow recommended); got "
+                f"color_up={color_up!r}, color_down={color_down!r}"
+            )
+            raise ValueError(msg)
+        # 2 x ceil(N/2) grid: top row axes 1..ceil(N/2), bottom row
+        # axes ceil(N/2)+1..N.  For N=8 this is 2x4.
+        rows = 2
+        cols = math.ceil(n_dims / 2)
+    else:
+        rows, cols = _grid_shape(n_dims, layout_cols)
 
     # Seed numpy's legacy RNG so KDE sample-compression in anesthetic
     # (anesthetic.utils.triangular_sample_compression_2d uses bare
@@ -564,38 +767,81 @@ def plot_atlas(
     subfigs = fig.subfigures(rows, cols, wspace=0.0, hspace=0.0)
     subfigs = np.atleast_2d(subfigs)
 
-    for face_idx in range(1, n_faces_total + 1):
-        # 2 x N up/down layout: face 2k - 1 -> (row=0, col=k-1) (positive
-        # axis); face 2k -> (row=1, col=k-1) (negative axis).  When
-        # layout_cols is set, the block-pair rule kicks in — see
-        # _face_to_slot for details.
-        r, c_idx = _face_to_slot(face_idx, layout_cols)
-        sub = subfigs[r, c_idx]
-        chunks = by_face.get(face_idx)
-        chi: NDArray[np.float64] | None
-        chi = np.concatenate(chunks, axis=0) if chunks else None
-        weights = by_face_weights.get(face_idx)
-        w_arr: NDArray[np.float64] | None = (
-            np.concatenate(weights, axis=0) if weights else None
-        )
-        # Show x-axis labels only on the bottom row of the outer grid
-        # and y-axis labels only on the leftmost column.  At 4x4 atlas
-        # size, per-panel labels become visual noise; outer-edge-only
-        # labelling preserves identification without repetition.
-        show_xlabels = r == rows - 1
-        show_ylabels = c_idx == 0
-        _render_face_panel(
-            sub,
-            face_idx,
-            chi,
-            n_dims,
-            weights=w_arr,
-            show_xlabels=show_xlabels,
-            show_ylabels=show_ylabels,
-            fill_colors=fill_colors,
-            color=color,
-            color_alpha=color_alpha,
-        )
+    if overlay_up_down:
+        # One panel per axis k: pool face 2k-1 (up) and face 2k (down).
+        for axis_idx in range(1, n_dims + 1):
+            # 2 x ceil(N/2) layout: top row holds axes 1..ceil(N/2),
+            # bottom row holds the rest.
+            r = (axis_idx - 1) // cols
+            c_idx = (axis_idx - 1) % cols
+            sub = subfigs[r, c_idx]
+            face_up = 2 * axis_idx - 1
+            face_down = 2 * axis_idx
+            chunks_up = by_face.get(face_up)
+            chunks_down = by_face.get(face_down)
+            chi_up: NDArray[np.float64] | None = (
+                np.concatenate(chunks_up, axis=0) if chunks_up else None
+            )
+            chi_down: NDArray[np.float64] | None = (
+                np.concatenate(chunks_down, axis=0) if chunks_down else None
+            )
+            w_up_chunks = by_face_weights.get(face_up)
+            w_down_chunks = by_face_weights.get(face_down)
+            w_up: NDArray[np.float64] | None = (
+                np.concatenate(w_up_chunks, axis=0) if w_up_chunks else None
+            )
+            w_down: NDArray[np.float64] | None = (
+                np.concatenate(w_down_chunks, axis=0) if w_down_chunks else None
+            )
+            show_xlabels = r == rows - 1
+            show_ylabels = c_idx == 0
+            _render_axis_panel(
+                sub,
+                axis_idx,
+                chi_up,
+                chi_down,
+                n_dims,
+                weights_up=w_up,
+                weights_down=w_down,
+                show_xlabels=show_xlabels,
+                show_ylabels=show_ylabels,
+                color_up=color_up,
+                color_down=color_down,
+                color_alpha=color_alpha,
+            )
+    else:
+        for face_idx in range(1, n_faces_total + 1):
+            # 2 x N up/down layout: face 2k - 1 -> (row=0, col=k-1) (positive
+            # axis); face 2k -> (row=1, col=k-1) (negative axis).  When
+            # layout_cols is set, the block-pair rule kicks in — see
+            # _face_to_slot for details.
+            r, c_idx = _face_to_slot(face_idx, layout_cols)
+            sub = subfigs[r, c_idx]
+            chunks = by_face.get(face_idx)
+            chi: NDArray[np.float64] | None
+            chi = np.concatenate(chunks, axis=0) if chunks else None
+            weights = by_face_weights.get(face_idx)
+            w_arr: NDArray[np.float64] | None = (
+                np.concatenate(weights, axis=0) if weights else None
+            )
+            # Show x-axis labels only on the bottom row of the outer grid
+            # and y-axis labels only on the leftmost column.  At 4x4 atlas
+            # size, per-panel labels become visual noise; outer-edge-only
+            # labelling preserves identification without repetition.
+            show_xlabels = r == rows - 1
+            show_ylabels = c_idx == 0
+            _render_face_panel(
+                sub,
+                face_idx,
+                chi,
+                n_dims,
+                weights=w_arr,
+                show_xlabels=show_xlabels,
+                show_ylabels=show_ylabels,
+                fill_colors=fill_colors,
+                color=color,
+                color_alpha=color_alpha,
+            )
 
     fig.savefig(output_path, bbox_inches="tight", dpi=150)
     if show:
