@@ -624,7 +624,8 @@ the dominant concern.
 \paragraph*{\SciPy{} --- general-purpose adaptive ODE} The \SciPy{}
 solver wraps \lstinline!scipy.integrate.solve_ivp!~\cite{virtanen2020scipy},
 with a default method of DOP853 (an eighth-order embedded
-Runge--Kutta scheme~\cite{dormand1980runge,hairer1993ode1}). On smooth non-stiff problems DOP853 can beat adaptive BDF, since
+Runge--Kutta scheme~\cite{hairer1993ode1} in the Dormand--Prince
+family~\cite{dormand1980runge}). On smooth non-stiff problems DOP853 can beat adaptive BDF, since
 BDF's per-step implicit solve is only useful for stiff problems. Like leapfrog, the \SciPy{} solver is opt-in only.
 
 \subsection{Initial-condition preparation}%
