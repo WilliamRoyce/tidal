@@ -378,24 +378,16 @@ found where suppression dominates, with the Bayes factor $\log B = -6.33$.
 
 \paragraph*{The Yang--Mills--PGT}
 \label{YangMillsPGT}
-Many authors have introduced non-minimal operators into PGT with
-different physical motivations, and the $\Del{1}$ vertex of
-\cref{RicciEMLagrangian} is just one of several that could break the
-minimal decoupling. We extend it next by three further families of
-operators, studying each family in isolation on top of the EM--RC base
-before turning them on simultaneously.
-
-We open with the Bahamonde base~\cite{bahamonde2025torsion},
-which extends the $\Del{1}$ vertex by the torsion kinetic operator
-$\xi(\nabla\MAGT{})^2$, making torsion a dynamical propagating field for the
-first time in the hierarchy.
-The Barker extension~\cite{barker2024poincare} adds the derivative-mixing
-operator $\chi\MAGF{_{[\mu\nu]}}\mathcal{F}^{(T)\,\mu\nu}$, identified
-as the completion that exposes the Yang--Mills-like kinetic structure
-of vector torsion absent from earlier PGT formulations.
-The Shapiro extension~\cite{shapiro2002torsion} adds the three
-$\zeta_{1,2,3}\,\rcD{}\MAGT{}{\cdot}\FieldF{}$ contractions.
-Their union combines all three families simultaneously,
+The $\Del{1}$ vertex of \cref{RicciEMLagrangian} is one of several
+non-minimal operators introduced in PGT. We survey three further
+extensions of standing interest. The
+Bahamonde~\cite{bahamonde2025torsion} extension adds the torsion
+kinetic operator $\xi(\nabla\MAGT{})^2$, making torsion dynamical.
+The Barker~\cite{barker2024poincare} extension adds the
+derivative-mixing operator $\chi\MAGF{_{[\mu\nu]}}\mathcal{F}^{(T)\,\mu\nu}$.
+The Shapiro~\cite{shapiro2002torsion} extension adds the three
+$\zeta_{1,2,3}\,\rcD{}\MAGT{}{\cdot}\FieldF{}$ contractions. We
+study each on top of the EM--RC base, then their union,
 \begin{multline}
   \lag_\text{YM--PGT}
     = \lag_\text{EM--RC}
@@ -417,26 +409,16 @@ Their union combines all three families simultaneously,
 % contractions drawn from the complete basis of
 % $\rcD{}\MAGT{}{\times}\FieldF{}$ invariants enumerated in
 %~\cref{DerivativeExtensions}.
-Across the four theories, the Bayes factors are
-$\log B = +1.84$ (Bahamonde), $+2.80$ (Barker),
-$+2.68$ (Shapiro), and $+7.37$ (union).
-The Barker and Shapiro single-family extensions give comparable Bayes
-factors, while the union gives a substantially larger amplification
-preference. Across all four sub-theories
-% the suppression log-evidences sit between
-% $+2.5$ and $+6.2$, well above the prior baseline: the suppression
-% region of parameter space remains likelihood-weighted in every
-% sub-theory, and
-the amplification dominance reflects a larger $\logZ_+$
-rather than a vanishing suppression region. Each of the four sub-theories concentrates its
-separation between the posteriors onto a
-single coupling, but it is a \emph{different} coupling each time
-(\cref{KLTableYMUnified}): the torsion kinetic operator
-$\xi(\nabla\MAGT{})^2$ in the Bahamonde and Barker sectors, the torsion
-mass $\Bet{1}$ in the Shapiro sector, and the derivative-mixing operator
-$\chi$ in the union. No single operator drives the parity-even
-separation between amplification and suppression across the family; which vertex dominates depends on which
-other vertices are switched on.
+The Bayes factors are $\log B = +1.84$ (Bahamonde), $+2.80$ (Barker),
+$+2.68$ (Shapiro), and $+7.37$ (union). In every case the
+amplification preference comes from each theory carrying regions of
+strongly-amplifying coupling values rather than from suppressed
+regions disappearing. The per-coupling separation between
+amplification and suppression concentrates onto a \emph{different}
+coupling in each sub-theory (\cref{KLTableYMUnified}): $\xi$ in
+Bahamonde and Barker, $\Bet{1}$ in Shapiro, $\chi$ in the union.
+Which vertex dominates depends on which other vertices are switched
+on.
 % Only
 % the single Barker $\chi$ appears at the nine-parameter level; the full
 % $\chi_{1\!-\!10}$ closure is the subject of the complete parity-even sector
@@ -608,69 +590,42 @@ the dominant directions is~\cref{CornerChiClosurePair}.
 % full nine-parameter non-minimal sector.
 \paragraph*{Non-propagating-torsion control}%
 \label{NonPropagatingControl}%
-The amplifying parameter regions identified above produce exponential
-mode growth in the linearised plane-wave evolution. The modal solver
-evolves the state via the matrix exponential
-$y(t) = \exp(M(k)\,t)\,y_0$ (\cref{ModalCoupledEntry}); a single
-eigenvalue $\lambda$ of $M(k)$ with $\Re\{\lambda\} > 0$ on any
-field component feeds exponential growth into every coupled field
-through the off-diagonal entries of $\exp(M(k)\,t)$.
-Distinguishing a genuine new amplification mechanism from a
-tachyonic instability or a
-ghost is
-not straightforward (\cref{Discussion}). The unitarity conditions
-for parity-even PGT are catalogued
+The amplifying regions above produce exponential mode growth: an
+eigenvalue $\lambda$ of $M(k)$ with $\Re\{\lambda\} > 0$ grows its
+eigenvector exponentially in time (see~\cref{ModalCoupledEntry}).
+Whether this indicates a genuine amplification mechanism, a
+tachyonic instability, or a ghost is not decided at the linearised
+level (see~\cref{Discussion}). The unitarity conditions for
+parity-even PGT are catalogued
 in~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,lin2019pgt,Yo:1999ex,Yo:2001sy};
-the parity-violating extensions are addressed
+the parity-violating extensions
 in~\cite{karananas2014parity}. The current frontier method for
-spectrum analysis is the Lagrangian-level particle-spectrum analysis of
+particle-spectrum analysis is
 \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}; integration
-with \PSALTer{} is deferred to future work.
+is deferred to future work.
 
-To test whether a torsion ghost is responsible for the amplifications,
-\emph{without} \PSALTer{}, we run a control: the same
-Yang--Mills--PGT from~\cref{YangMillsPGT} with the
-torsion kinetic coefficient $\xi$ zeroed. The Lagrangian
-\cref{NonMinimalLagrangian} then introduces no new kinetic operator;
-% for
-% any field beyond the Einstein--Maxwell baseline;
-torsion is determined
-algebraically and the no-ghost classification is trivially satisfied. The dominant
-$\D$ contributions identified above for the propagating
-YM--PGT sectors were all anchored to
-exponential-mode-growth regions of parameter space, so a natural
-expectation was that removing the propagating-torsion modes
-% --- which
-% carry the positive-$\Re\{\lambda\}$ eigenvalues responsible for
-% that growth ---
-would collapse the amplification corner entirely. However, the
-control returns
-\begin{equation*}
-  \logZ_+ = +10.98 \pm 0.15
-  \qand
-  \logZ_- = +2.67 \pm 0.10,
-\end{equation*}
-($\log B = +8.31$), essentially reproducing the propagating-torsion
-result. The amplification preference is therefore \emph{not} contingent on the
-torsion kinetic sector being active; switching off the
-propagating-torsion modes does not quench it.
+As a control we re-run the Yang--Mills--PGT of~\cref{YangMillsPGT}
+with the torsion kinetic coefficient $\xi$ zeroed. The Lagrangian
+\cref{NonMinimalLagrangian} then introduces no new kinetic operator,
+torsion is determined algebraically, and the no-ghost classification
+is trivially satisfied. We obtain $\logZ_+ = +10.98 \pm 0.15$ and
+$\logZ_- = +2.67 \pm 0.10$ ($\log B = +8.31$), essentially
+reproducing the propagating-torsion result. Amplification therefore
+does not require the torsion kinetic sector to be active.
 
-\paragraph*{$\chi$-closure control}
-Repeating the test at the seventeen-parameter $\chi$-closure sub-space
-$\{\Bet{1\!-\!3}, \Del{1}, \zeta_{1\!-\!3}, \chi_{1\!-\!10}\}$ with
-$\xi = 0$ returns $\logZ_+ = +9.93 \pm 0.08$ and
-$\logZ_- = -3.28 \pm 0.07$ ($\log B = +13.21$), close to the
-bootstrap uncertainty of the propagating $\chi$-closure chain. The
-amplification therefore does \emph{not} require torsion to propagate; the
-non-minimal couplings alone reproduce the
-structure of the propagating theory. Per-parameter
-$\D$ resolves the dominant operator: $\Bet{1}$ dominates the
-Yang--Mills--PGT control (\cref{KLTableYMUnified}), and the
-$\chi$-closure control returns $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
-\MAGF{_{\mu\nu\rho\sigma}}$ as the dominant
-$\D(P_+\|P_-)$ contribution; the full per-coupling
-comparison against the propagating chain is
-\cref{KLTableChiClosureComparison}.
+\paragraph*{Complete parity-even closure control}
+The same control at the seventeen-parameter complete parity-even
+closure ($\{\Bet{1\!-\!3}, \Del{1}, \zeta_{1\!-\!3}, \chi_{1\!-\!10}\}$
+with $\xi = 0$) returns $\logZ_+ = +9.93 \pm 0.08$ and
+$\logZ_- = -3.28 \pm 0.07$ ($\log B = +13.21$), within the bootstrap
+uncertainty of the propagating-torsion result. The amplification
+therefore does not require torsion to propagate; the non-minimal
+couplings alone reproduce the structure of the propagating theory.
+Per-parameter $\D$ resolves the dominant operator: $\Bet{1}$ in the
+YM--PGT control (\cref{KLTableYMUnified}), and
+$\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,\MAGF{_{\mu\nu\rho\sigma}}$
+in the complete parity-even closure control (full comparison in
+\cref{KLTableChiClosureComparison}).
 
 \begin{table}[h]
   \centering
@@ -819,23 +774,23 @@ is an interpretive question (see~\cref{Discussion}).
 \paragraph*{Dark-photon plasma}
 
 % The surveys above all sit within the PGT family, but
-\TIDAL{} accepts any Lagrangian as input. Effective plasma models, in
-which the photon acquires an effective mass at the perturbation
-level~\cite{raffelt1988mixing,domcke2025scattering}, and dark-photon
-models, in which a second U(1) field kinetically mixes with the photon
-via the Holdom mechanism~\cite{Holdom:1985ag,caputo2021darkphoton},
-are both of independent interest. The Einstein--Cartan $\Bet{3} I_3$
-term of the YM--PGT base already gives the trace-vector torsion a
-Proca-like mass, so a kinetic-mixing operator between the photon and
-the trace-vector torsion field strength is non-trivial in the Holdom
-sense~\cite{Holdom:1985ag}; the eigenvalue and coupling structure of
-the linearised system is nevertheless such that the graviton initial
-condition cannot excite torsion-coupled amplification without further
-mass structure. We therefore combine the two effective models into a
-single sector by promoting the trace-vector torsion $\T[2]{_\mu}$ to a
-Proca field that kinetically mixes with the photon via
-$\delta_m\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu}$, with an
-additional photon plasma mass $m_A^2$ added at the perturbation level,
+\TIDAL{} accepts any Lagrangian as input, so the survey reach
+extends beyond PGT to other models of interest in the
+gravitational-wave context. As one example, we combine an
+astrophysical plasma photon mass with a Holdom-style kinetic mixing
+between the photon and the trace-vector
+torsion~\cite{Holdom:1985ag,caputo2021darkphoton}. The
+Einstein--Cartan $\Bet{3} I_3$ term of the YM--PGT base already
+gives the trace-vector torsion a Proca-like mass, so the mixing
+operator is non-trivial in the Holdom sense, but without additional
+mass structure the graviton initial condition does not excite the
+torsion channel. We therefore add the kinetic mixing
+$\delta_m\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu}$ between the
+photon and the trace-vector torsion (treated as a Proca field at the
+perturbation level) together with a plasma photon mass $m_A^2$,
+following the EOM-level treatment
+of~\cite{raffelt1988mixing,domcke2025scattering} (the full Proca
+background is not a solution of the combined gauge-gravity action),
 giving the Lagrangian
 \begin{multline}
   \lag_\text{Dark-photon}
