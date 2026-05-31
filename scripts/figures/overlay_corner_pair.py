@@ -41,7 +41,6 @@ from _corner_style import (
     COLUMN_WIDTH,
     CONTOUR_LEVELS,
     FIG_WIDTH,
-    HIGH_DIM_THRESHOLD,
     OVERLAY_ALPHA,
     SUP_COLOR,
     apply_style,
@@ -225,17 +224,20 @@ def render_overlay_pair(
 
     fig = axes.iloc[0, 0].figure
 
-    if len(plot_params) >= HIGH_DIM_THRESHOLD:
-        tick_label_pt = 5 if len(plot_params) >= 20 else 6
+    remove_tick_labels = (len(plot_params) > 10 and fig_width > COLUMN_WIDTH) or (
+        len(plot_params) > 5 and fig_width <= COLUMN_WIDTH
+    )
+    if remove_tick_labels:
+        if fig_width > COLUMN_WIDTH:
+            for ax in axes.values.flatten():
+                if ax is None:
+                    continue
+                ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
+                ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
         for ax in axes.values.flatten():
             if ax is None:
                 continue
-            ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-            ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-            ax.tick_params(axis="both", labelsize=tick_label_pt)
-            for label in ax.get_xticklabels():
-                label.set_rotation(45)
-                label.set_horizontalalignment("right")
+            ax.tick_params(labelbottom=False, labelleft=False)
 
     legend_handles = [
         mpatches.Patch(
