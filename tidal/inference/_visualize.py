@@ -669,6 +669,9 @@ def _render_anesthetic_corner_into(
     ticks: str | None = "inner",
     show_diagonal: bool = True,
     fill_two_tone: bool = True,
+    fill_colors: tuple[str, str] | None = None,
+    color: str | None = None,
+    color_alpha: float = 0.5,
 ) -> tuple[object, object]:
     """Render a two-tone anesthetic corner plot.
 
@@ -728,6 +731,16 @@ def _render_anesthetic_corner_into(
     """
     import numpy as np
 
+    # When a single-tone colour is requested, forward (color, alpha) so
+    # anesthetic colours every artist uniformly — 1D diagonal KDE curves,
+    # 2D fills, and contour outlines all read in the same colour family.
+    # This matches the manuscript's results-section corner-plot style
+    # (`scripts/figures/_corner_style.py`'s `overlay_corner`).
+    plot_2d_kwargs: dict[str, object] = {}
+    if color is not None:
+        plot_2d_kwargs["color"] = color
+        plot_2d_kwargs["alpha"] = color_alpha
+
     def _plot_with_fallback(axes_arg: object) -> object:
         """Run ``samples.plot_2d`` with the degenerate-posterior fallbacks.
 
@@ -741,7 +754,11 @@ def _render_anesthetic_corner_into(
         All fall back to KDE diagonals + scatter cross-panels.
         """
         try:
-            return samples.plot_2d(axes_arg, label="68% / 95% CL")
+            return samples.plot_2d(
+                axes_arg,
+                label="68% / 95% CL",
+                **plot_2d_kwargs,
+            )
         except (RuntimeError, ValueError, np.linalg.LinAlgError) as e:
             msg = str(e).lower()
             if (
@@ -760,6 +777,7 @@ def _render_anesthetic_corner_into(
                         "lower": "scatter_2d",
                         "upper": "scatter_2d",
                     },
+                    **plot_2d_kwargs,
                 )
             except (RuntimeError, ValueError, np.linalg.LinAlgError):
                 return samples.plot_2d(
@@ -770,6 +788,7 @@ def _render_anesthetic_corner_into(
                         "lower": "scatter_2d",
                         "upper": "scatter_2d",
                     },
+                    **plot_2d_kwargs,
                 )
 
     fig: object
@@ -814,8 +833,12 @@ def _render_anesthetic_corner_into(
             cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
             fig = cell.get_figure()
 
-    if fill_two_tone:
-        _force_solid_credible_fills(fig)
+    # Two-tone fill override is mutually exclusive with single-tone
+    # ``color``: when ``color`` is set, anesthetic has already painted
+    # every artist uniformly, and a post-hoc facecolor override would
+    # only fight that.
+    if fill_two_tone and color is None:
+        _force_solid_credible_fills(fig, palette=fill_colors)
     return fig, axes_df
 
 
@@ -1002,7 +1025,10 @@ def _plot_corner_anesthetic(
     plt.close(fig)
 
 
-def _force_solid_credible_fills(fig: object) -> None:
+def _force_solid_credible_fills(
+    fig: object,
+    palette: tuple[str, str] | None = None,
+) -> None:
     """Render solid-fill credible regions per Planck/DES/getdist convention.
 
     Replaces anesthetic's per-panel-normalized gradient fills with solid
@@ -1026,24 +1052,34 @@ def _force_solid_credible_fills(fig: object) -> None:
 
     **How**: walk each axis's ``ContourSet`` collections (anesthetic
     creates exactly one per panel for the 2D KDE fill), and override
-    the face colours to a fixed two-tone Planck-blue palette.  The
-    associated contour *line* collections (also drawn by anesthetic)
-    are left untouched so the boundaries remain crisp.
+    the face colours to the supplied two-tone palette (default
+    Planck-blue).  The associated contour *line* collections (also drawn
+    by anesthetic) are left untouched so the boundaries remain crisp.
 
     This post-hoc patch keeps anesthetic's KDE computation and contour
     *placement* intact; we only override the rendered fill colours.
+
+    Parameters
+    ----------
+    fig : Figure or SubFigure
+        Walked via ``fig.axes`` to find filled ContourSet collections.
+    palette : (str, str) or None
+        ``(outer_95_colour, inner_68_colour)`` hex pair.  ``None``
+        (default) uses Planck-blue ``("#aac8e9", "#3877b8")``.  The
+        bespoke K.2 atlas passes the IBM Carbon magenta 30/70 pair
+        ``("#ffafd2", "#9f1853")``.
     """
     import matplotlib.contour as mcontour
     from matplotlib import colors as mcolors
 
-    # Two-tone palette: light blue for the 95% credible band, darker for
-    # the 68%.  Matches the standard Planck-blue scheme via getdist.
-    # anesthetic uses `iso_probability_contours([0.95, 0.68])` which
-    # returns levels in *increasing* density order [c95, c68], producing
-    # `contourf` bands [c95, c68] (95% band: between c95 and c68 — the
-    # "outer" annular ring) and [c68, max] (68% core).  So palette index
-    # 0 is the 95% band (light), index 1 is the 68% core (dark).
-    fill_palette = ["#aac8e9", "#3877b8"]
+    # Two-tone palette: light outer for the 95% credible band, darker
+    # inner for the 68% core.  anesthetic uses
+    # `iso_probability_contours([0.95, 0.68])` which returns levels in
+    # *increasing* density order [c95, c68], producing `contourf` bands
+    # [c95, c68] (the "outer" annular ring) and [c68, max] (the 68%
+    # core).  Palette index 0 is the 95% band (light), index 1 is the
+    # 68% core (dark).
+    fill_palette = list(palette) if palette is not None else ["#aac8e9", "#3877b8"]
     if not hasattr(fig, "axes"):
         return
     for ax in fig.axes:
@@ -1079,10 +1115,22 @@ def _apply_solid_fill(
         if colls:
             for j, col in enumerate(colls):
                 if hasattr(col, "set_facecolor"):
+                    # Modern matplotlib carries a scalar-to-cmap mapping
+                    # that wins over set_facecolor at draw time; clearing
+                    # the scalar array first removes that competition.
+                    if hasattr(col, "set_array"):
+                        col.set_array(None)
                     col.set_facecolor(colour_for(j))
                     col.set_edgecolor("none")
             return
         n_bands = max(len(getattr(cs, "levels", [])) - 1, 1)
+        # Same scalar-array-vs-facecolor race: clear the array first so
+        # the explicit facecolors actually reach the renderer.  Without
+        # this, anesthetic's default Blues cmap (set via `set_array(P)`
+        # in kde_contour_plot_2d) silently wins and the override looks
+        # like a no-op despite get_facecolor() reporting the new colors.
+        if hasattr(cs, "set_array"):
+            cs.set_array(None)  # type: ignore[attr-defined]
         cs.set_facecolor([colour_for(j) for j in range(n_bands)])  # type: ignore[attr-defined]
         cs.set_edgecolor("none")  # type: ignore[attr-defined]
     except (AttributeError, TypeError):
