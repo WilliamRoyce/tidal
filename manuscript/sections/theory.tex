@@ -107,7 +107,7 @@ The most general action of Poincar\'{e} gauge theory coupled to
 electromagnetism, constructed from the gauge field
 strengths $\MAGFt{^\sigma_{\mu\nu\rho}}$, $\MAGT{^\sigma_{\mu\nu}}$,
 and $\FieldF{_{\mu\nu}}$, decomposes into sector blocks catalogued
-in \cref{PGTEnumeration},
+in~\cref{PGTEnumeration},
 as~\cite{lin2019pgt,blagojevic2018hamiltonian,barker2024poincare,sezgin1980ghostfree,aoki2020nonlinear,bahamonde2025cubic}
 \begin{multline}
   \act = \int \diff^4 x\,\sqrt{-g}\,\Bigl[
@@ -182,18 +182,19 @@ order in $\Bzero$.
 The Palatini connection
 decomposes
 as~\cite{hehl1976spin,shapiro2002torsion,hehlobukhov2007cartan,blagojevic2003lectures}
+\begin{subequations}
+\label{PalatiniDecomposition}
 \begin{align}
   \MAGA{^\sigma_\mu_\nu}
-    = \rCon{^\sigma_\mu_\nu} \!+ K^\sigma{}_{\mu\nu},
-  \quad
+    &= \rCon{^\sigma_\mu_\nu} + K^\sigma{}_{\mu\nu}, \\
   K^\sigma{}_{\mu\nu}
-    = \tfrac{1}{2}\bigl(
+    &= \tfrac{1}{2}\bigl(
         \MAGT{^\sigma_\mu_\nu}
-        \!\!+ \MAGT{_\mu^\sigma_\nu}
-        \!+ \MAGT{_\nu^\sigma_\mu}\!
+        + \MAGT{_\mu^\sigma_\nu}
+        + \MAGT{_\nu^\sigma_\mu}
       \bigr),
-  \label{PalatiniDecomposition}
 \end{align}
+\end{subequations}
 the second term being the contortion tensor. The linearised connection
 perturbation $\delta\MAGA{^\sigma_\mu_\nu}$ therefore inherits
 contributions from both the metric perturbation $h_{\mu\nu}$,
@@ -241,7 +242,7 @@ for a vector $\xi$ of metric, photon, and (where
 propagating) torsion perturbations. The detailed structure of
 $\mathcal{K}$ --- and the coupling between the metric, photon, and
 torsion sectors --- depends on the Lagrangian chosen. Per-theory
-results are presented in \cref{Results}; explicit kinetic-matrix
+results are presented in~\cref{Results}; explicit kinetic-matrix
 outputs for representative theories are reported in
 \cref{SymbolicMechanism}.
 
@@ -264,12 +265,12 @@ contractions in the $\sqrt{-g}$ expansion incorporate the effects
 of curved-spacetime electromagnetic-field
 identification~\cite{hwangnoh2023emdef,hwangnoh2023graviton}. The
 $\Bzero \to 0$ survey-coefficient framework used to extract
-amplification ratios is set out in \cref{SurveyCoefficient}.
+amplification ratios is set out in~\cref{SurveyCoefficient}.
 
 \paragraph*{Conversion probability}
-The conversion probability --- defined as the energy fraction
+The conversion probability, defined as the energy fraction
 transferred from the graviton sector to the photon sector over
-the propagation distance $D$~\cite{raffelt1988mixing} --- for
+the propagation distance $D$~\cite{raffelt1988mixing}, for
 a graviton traversing a region of uniform $\Bzero$ takes
 the closed form~\cite{boccaletti1970conversion,lella2024constraining}
 \begin{align}
@@ -279,14 +280,14 @@ the closed form~\cite{boccaletti1970conversion,lella2024constraining}
 which in the small-argument limit $\kappa\Bzero D \ll 1$ scales as
 $\Pconv \propto \Bzero^2$, the characteristic Gertsenshtein
 signature.\footnote{%
-    The derivations of \cite{palessandro2023simple,palessandro2024gertsenshtein}
+    The derivations of~\cite{palessandro2023simple,palessandro2024gertsenshtein}
     produce $\Pconv = \sin^2(\sqrt{G}\,\Bzero\,D)$, whose argument differs
-    from \cref{GertsenshteinFormula} by a factor of $\sqrt{4\pi}$;
+    from~\cref{GertsenshteinFormula} by a factor of $\sqrt{4\pi}$;
     a further independent critique is provided by~\cite{hwangnoh2023graviton}.
     An independent derivation in our convention is
     provided by~\cite{lella2024constraining}.
 } For a finite magnetised region carrying a profile
-$B_x(z)$ along the propagation direction, \cref{GertsenshteinFormula}
+$B_x(z)$ along the propagation direction,~\cref{GertsenshteinFormula}
 generalises to the path-integrated Boccaletti
 form~\cite{boccaletti1970conversion,raffelt1988mixing}
 \begin{align}
@@ -294,11 +295,11 @@ form~\cite{boccaletti1970conversion,raffelt1988mixing}
     \frac{\kappa}{2}\int_{-\infty}^{+\infty}\!B_x(z)\,\diff z\right),
   \label{BoccalettiPathIntegrated}
 \end{align}
-recovering \cref{GertsenshteinFormula} when $B_x(z) = \Bzero$ is
+recovering~\cref{GertsenshteinFormula} when $B_x(z) = \Bzero$ is
 constant over a length $D$. The regime of validity of these
-linearised expressions in the torsionful background is set out in
-\cref{PerturbativeRegime}. \Cref{Validation} reproduces both \cref{GertsenshteinFormula} and
-\cref{BoccalettiPathIntegrated}.
+linearised expressions in the torsionful background is set out
+in~\cref{PerturbativeRegime}. \Cref{Validation} reproduces
+both~\cref{GertsenshteinFormula} and~\cref{BoccalettiPathIntegrated}.
 % ; the validation-grid summary is
 % reported in \cref{ValidationResult}.
 
