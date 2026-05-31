@@ -45,9 +45,17 @@ This supports the interpretation that the exponential growth we observe is not
 automatically fatal.
 
 \paragraph*{Eigenvalue overflow}
-The sectors in~\cref{ParityOddGeomIncomp,XiKineticClosure} yield
-eigenvalues so large that the matrix-exponential overflow
-ceiling is hit at essentially any accessible propagation time.\wb{What does this mean in real terms?}
+Some linearised theories predict eigenvalues with $\max|\Re\{\lambda\}|\sim 10^3$--$10^5$
+for the survey setup.
+Conversion amplitudes in those regions predict exponential growth by
+many orders of magnitude over the propagation time: in a
+finite-extent BGMF the growth would saturate at a
+(possibly very large) amplitude whereas
+on the unbounded plane-wave background the growth has no upper
+bound, and standard floating-point precision cannot represent it
+at the $t_\text{end}$ used in \cref{SectorSurvey}. Re-running these
+theories at even smaller $t_\text{end}$ may contain
+the growth further.
 
 \paragraph*{The $\chi_1$ direction}
 It is surprising that the $\chi_1\,\rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\,
