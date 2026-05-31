@@ -7,9 +7,10 @@
 \section{Perturbative-regime bound in the torsionful background}
 \label{PerturbativeRegime}
 
-This appendix establishes the perturbative-regime self-consistency conditions
-for the linearised graviton-photon conversion calculation and defines the
-leading-order conversion coefficient that anchors the sector survey of
+This appendix establishes the self-consistency conditions
+for the linearised graviton-photon conversion calculation in the
+standard Gertsenshtein geometry and defines the
+leading-order amplification factor for
 \cref{SectorSurvey}.
 
 \paragraph*{Background-perturbativity in Einstein--Maxwell}
@@ -19,54 +20,48 @@ analysis~\cite{gertsenshtein1962wave,boccaletti1970conversion,raffelt1988mixing}
 takes the magnetic field $\Bzero$ as
 externally prescribed rather than self-consistently sourcing the
 background metric.
-Hwang \& Noh~\cite{hwangnoh2023graviton} examine the
-self-consistency of this linear-on-flat-background analysis:
-including the metric perturbation in the EM stress-energy
+Hwang \& Noh~\cite{hwangnoh2023graviton} show that
+including the metric perturbation in the stress-energy
 produces a tachyonic mass-like term $-(\kappa^2/2)\Bzero^2$ for
 the graviton, but the regime in which this
 term would drive an exponential instability coincides with the
-regime in which the gravity of the BGMF can
-no longer be ignored.
+regime in which the gravitational field of the BGMF cannot be neglected.
 The linear analysis therefore cannot self-consistently establish
 the instability, and the framework remains internally consistent
 within its regime of validity.
 There is a critical scale $\lambda_B = 2\pi/k_B$, with
-$k_B = \sqrt{8\pi G}\,\Bzero/c^2$, above which the dimensionless
-backreaction parameter $D^2/\lambda_B^2$ ceases to be small ---
-the assumption that the magnetic field's own
-gravitational field is negligible breaks down.
+$k_B = \sqrt{8\pi G}\,\Bzero/c^2$, above which the
+backreaction parameter $D^2/\lambda_B^2$ ceases to be small.
 Hwang \& Noh show~\cite{hwangnoh2023graviton} that the backreaction parameter is proportional to
-the conversion probability $\Pconv$ of \cref{GertsenshteinFormula}:
-\begin{align}
-  \frac{D^2}{\lambda_B^2}
-  \;\sim\; \Pconv.
-  \label{HwangNohBound}
-\end{align}
-Since $D^2/\lambda_B^2 \propto \Bzero^2 \to 0$, the bound holds
-trivially in the small-$\Bzero$ limit;
-equivalently, $\kappa\Bzero D\ll 1$, \ie $\Pconv\ll 1$.\footnote{Hwang \& Noh estimate the energy ratio from the peak amplitude,
+the conversion probability $\Pconv$ of \cref{GertsenshteinFormula}:\footnote{Hwang \& Noh estimate the energy ratio from the peak amplitude,
 treating the graviton amplitude as building linearly with distance
 $h\sim\kappa\Bzero D$; the exact formula has $h\propto\sin(\kappa\Bzero D/2)$,
 giving $\Pconv = \sin^2(\kappa\Bzero D/2)$ and a factor of four difference.}
+\begin{align}
+  \frac{D^2}{\lambda_B^2}
+  \;\sim\; \Pconv,
+  \label{HwangNohBound}
+\end{align}
+and the bound holds in the small-$\Bzero$ limit ($\Pconv \ll 1$).
 
 \paragraph*{Self-consistency at vanishing background field}
 
 PGT coupled to electromagnetism adds a torsion perturbation
 $\delta\MAGT{^\sigma_\mu_\nu}$ alongside the graviton $h_{\mu\nu}$
 and photon perturbation $\delta\FieldA{_\mu}$ (\cref{Linearisation}).
-The Taylor expansion of $\Pconv$, established in the next paragraph, is centred on $\Bzero=0$,
-where the configuration $g_{\mu\nu}=\eta_{\mu\nu}$,
+The Taylor expansion of $\Pconv$ is centred on $\Bzero=0$,
+where $g_{\mu\nu}=\eta_{\mu\nu}$,
 $\bar{\FieldA{_\mu}}=0$,%
 \footnote{$\bar{\FieldF{}}=\diff\bar{\FieldA{}}=0$ fixes
 $\bar{\FieldA{}}$ only up to a gauge transformation;
 $\bar{\FieldA{}}=0$ is a valid gauge on the flat, simply-connected
 background of \cref{Linearisation}.}
-$\bar{\MAGT{}}=0$ trivially solves the full nonlinear field equations.
-The Taylor coefficient $c_2 = \lim_{\Bzero\to 0}\Pconv/\Bzero^2$ is read
-off in the limit $\Bzero\to 0$, where the Hwang--Noh tachyonic
-mass-like dispersion shift $-(\kappa^2/2)\Bzero^2 h$
---- itself contributing to $\Pconv$ only at $\O(\Bzero^4)$ ---
-vanishes.
+$\bar{\MAGT{}}=0$ solves the full field equations.
+% The Taylor coefficient $c_2 = \lim_{\Bzero\to 0}\Pconv/\Bzero^2$ is read
+% off in the limit $\Bzero\to 0$, where the Hwang--Noh tachyonic
+% mass-like dispersion shift $-(\kappa^2/2)\Bzero^2 h$
+% --- itself contributing to $\Pconv$ only at $\O(\Bzero^4)$ ---
+% vanishes.
 We now examine whether the torsion sector remains within
 the linearised regime at finite $\Bzero$.
 
@@ -74,14 +69,14 @@ the linearised regime at finite $\Bzero$.
 
 At $\Bzero=0$ the system is rotationally invariant about the
 propagation axis $\hat{z}$, so the linearised theory conserves the
-angular momentum projected on $\hat{z}$ (helicity).
+angular momentum projection (helicity).
 The transverse graviton is
 spin-2~\cite{sezgin1980ghostfree,barker2024poincare,cillis1996graviton}
-and the transverse photon is spin-1, so at $\Bzero=0$ they live
-in disjoint sectors and $\Pconv(\Bzero=0)=0$.
+and the transverse photon is spin-1, so at $\Bzero=0$ they are
+disconnected and $\Pconv(\Bzero=0)=0$.
 Switching on $\Bzero$ introduces a background tensor
 $\bar{\FieldF{}}\propto\Bzero\hat{x}$ (\cref{BackgroundPotential}) that breaks the rotational symmetry
-and lifts the helicity-conservation selection rule
+and lifts the helicity selection rule
 forbidding graviton-photon transitions.
 The kinetic matrix $\mathcal{K}$ of \cref{KineticMatrix} acquires an
 explicit $\Bzero$-dependence
@@ -97,9 +92,7 @@ relabelling that sends $\bm{B}\to-\bm{B}$: the rotated frame describes
 the same physical system with the parameter $\Bzero$ replaced by
 $-\Bzero$.
 Since $\Pconv$ is a coordinate-invariant observable, this gives
-$\Pconv(-\Bzero)=\Pconv(\Bzero)$, so $\Pconv$ is even in $\Bzero$.
-Combined with $\Pconv(\Bzero=0)=0$ and analyticity, $\Pconv$ starts at
-$\Bzero^2$ with only even powers:
+$\Pconv(-\Bzero)=\Pconv(\Bzero)$, so $\Pconv$ is even in $\Bzero$:
 \begin{align}
   \Pconv \;=\; c_2\Bzero^2 + c_4\Bzero^4 + \cdots ,
   \label{TaylorPconv}
@@ -112,23 +105,19 @@ defined below in \cref{SurveyCoefficient}.
 
 On the uniform-field flat background,
 $\partial_\mu\bar{\FieldF{}}_{\nu\rho}=0$.
-The Cartan equation~\cite{blagojevicHehl2013,hehlobukhov2007cartan}
---- the field equation for torsion, obtained by varying the PGT
-Lagrangian of \cref{PGTBackground} \wrt $\MAGT{}$
---- collects contributions from every Lagrangian term that depends on
-$\MAGT{}$, either directly or through the Riemann--Cartan curvature
+The field equation for torsion collects contributions
+directly or through the Riemann--Cartan curvature
 \begin{align}
   \MAGFt{} \;\sim\; \rR{} \,+\, \rcD{}\MAGT{} \,+\, \MAGT{^2} ,
   \label{RiemannCartanDecomp}
 \end{align}
-where $\rR{}$ is the Riemannian curvature of the Levi-Civita connection.
+where $\rR{}$ is the Riemannian curvature.
 At the background $(\eta_{\mu\nu},\,\bar{\FieldF{}},\,\bar{\MAGT{}}=0)$,
 every term type in the Lagrangian vanishes.
 The $\rcD{}\MAGT{}$ term of \cref{RiemannCartanDecomp} is handled by integration by parts,
-and $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$ on the externally-prescribed
-uniform background (\cref{Linearisation}).
-Thus $\bar{\MAGT{}}=0$ solves the Cartan equation on this background
-exactly for the parity-even quadratic theory class.%
+since $\rcD{_\rho}\bar{\FieldF{^{\mu\nu}}}=0$ on the uniform BGMF.
+Thus $\bar{\MAGT{}}=0$ is an exact solution on this background
+for the quadratic theory class.%
 \footnote{This conclusion relies on $\partial_\mu\bar{\FieldF{}}=0$:
 for non-uniform fields or curved backgrounds
 $\rcD{}\bar{\FieldF{}}\neq 0$ and $\bar{\MAGT{}}=0$ need not
@@ -136,105 +125,89 @@ hold~\cite{bahamonde2025torsion}.}
 
 \paragraph*{Torsion-perturbation bound}
 
-With $\bar{\MAGT{}}=0$ at the background, we expand the Cartan equation
+With $\bar{\MAGT{}}=0$ at the background, we expand the field equation
 to first order in the perturbations
 $\{h_{\mu\nu},\delta\FieldA{_\mu},\delta\MAGT{}\}$ to bound the
 torsion perturbation $\delta\MAGT{}$.
-The $\rcD{}\MAGT{}$ term of \cref{RiemannCartanDecomp} contracted with $\bar{\FieldF{}}$
-cancels at first order by integration by parts.
-The dominant source therefore comes from varying
+% The $\rcD{}\MAGT{}$ term of \cref{RiemannCartanDecomp} contracted with $\bar{\FieldF{}}$
+% cancels at first order by integration by parts.
+The dominant source comes from varying
 $\Del{1}\MAGFt{_{[\mu\nu]}}\bar{\FieldF{}}^{\mu\nu}$ \wrt
-$\delta\MAGT{}$ using the Palatini split
-(\cref{PalatiniDecomposition}), which produces a source
-$\mathcal{S}\propto\Del{1}\bar{\FieldF{}}\,\partial h$.%
+$\delta\MAGT{}$ using \cref{RiemannCartanDecomp}, which produces a source
+$\mathcal{S}\propto\Del{1}\bar{\FieldF{}}\, h$.%
 \footnote{Contracting the $\rcD{}\MAGT{}$ term with $\delta\FieldF{}$ instead gives
 an additional source $\propto\Del{1}\,\partial\delta\FieldA{}$ that is $\Bzero$-independent;
 the conversion regime $|\delta\FieldA{}|\sim\Bzero|h|$ (\cref{GertsenshteinFormula})
 makes this the same order as the dominant source $\propto\Del{1}\bar{\FieldF{}}\,\partial h$,
 leaving \cref{PerturbativeBound} unchanged.}
 In the algebraic-torsion form,
-$2\Alp{}\,\delta\MAGT{} = -\mathcal{S}$,
-giving $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$
+$\Alp{}|\delta\MAGT{}|\sim|\Del{1}| \,\Bzero A$
 for a graviton of dimensionless amplitude $A$.
-The linearised Cartan equation drops $(\delta\MAGT{})^2$ corrections
-from the $\MAGT{^2}$ term of \cref{RiemannCartanDecomp}: these become
+The linearised field equation drops $(\delta\MAGT{})^2$ corrections:
+% from the $\MAGT{^2}$ term of \cref{RiemannCartanDecomp}:
+these become
 comparable to the linear $2\Alp{}\,\delta\MAGT{}$ term when
 $|\delta\MAGT{}|/\Alp{}\sim 1$, so the linearised treatment is
-self-consistent only when $|\delta\MAGT{}|/\Alp{}\ll 1$.
-Substituting $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$ into this requirement gives
+self-consistent only when% $|\delta\MAGT{}|/\Alp{}\ll 1$.
+% Substituting $|\delta\MAGT{}|\sim(|\Del{1}|/\Alp{})\,\Bzero A$ into this requirement gives
 \begin{align}
   |\delta\MAGT{}|\ll\Alp{}
   \quad\Longleftrightarrow\quad
   |\Del{1}|\,\Bzero\,A \;\ll\; \Alp{}^{\,2} .
   \label{PerturbativeBound}
 \end{align}
-The same dimensional argument applies when the torsion-derivative
-kinetic term
-$(\rcD{}\MAGT{})^2$~(\cref{PGTEnumeration})
-is active and
-$\delta\MAGT{}$ propagates: the algebraic inversion is
-then replaced by a Green's function inversion, but the magnitude of
-the response and the scaling of the bound are unchanged with $\Alp{}$
-generalised to the dominant torsion mass scale.
+% The same dimensional argument applies when the torsion-derivative
+% kinetic term
+% $(\rcD{}\MAGT{})^2$
+% is active and
+% $\delta\MAGT{}$ propagates: the algebraic inversion is
+% then replaced by a Green's function inversion, but the magnitude of
+% the response and the scaling of the bound are unchanged with $\Alp{}$
+% generalised to the dominant torsion mass scale.
 
 \paragraph*{Generality beyond the algebraic-torsion theory}
 
-The vanishing of $\bar{\MAGT{}}$ and the bound \cref{PerturbativeBound} were established for the parity-even
+The vanishing of $\bar{\MAGT{}}$ and the bound \cref{PerturbativeBound} were established for the
 quadratic theory class with the $\Del{1}\MAGFt{}\FieldF{}$
 non-minimal coupling; the same argument extends to the broader
 ghost-safe polynomial PGT class spanned by the
 survey~\cite{blagojevic2018hamiltonian} with the two modifications
 detailed below.
-The bound \cref{PerturbativeBound} fixes specific values
-$\Del{1}$ and $\Alp{}$ within the algebraic-torsion sub-class.
-Across the surveyed parameter space, the same integration-by-parts inversion
-argument applies with two extensions.
+% The bound \cref{PerturbativeBound} fixes specific values
+% $\Del{1}$ and $\Alp{}$ within the algebraic-torsion sub-class.
+% Across the surveyed parameter space, the same integration-by-parts inversion
+% argument applies with two extensions.
 First, \cref{PerturbativeBound} with $\Del{1}\to g_{\mathrm{NM}}$ and
 $\Alp{}\to m_T^2$ gives
 $|\delta\MAGT{}|\sim(g_{\mathrm{NM}}/m_T^2)\,\Bzero A$;
-the $\MAGT{^2}$ term of \cref{RiemannCartanDecomp} then contributes a
+the $\MAGT{^2}$ term then contributes a
 correction of order
-$(\delta\MAGT{})^2 \sim (g_{\mathrm{NM}}/m_T^2)^2\,\Bzero^2$ to the
-linearised Cartan equation, placing the nonlinear torsion correction
-to $\Pconv$ at
-$\O\!\left(\Bzero^4(g_{\mathrm{NM}}/m_T^2)^2\right)$
-and the correction to $C=\Pconv/\Bzero^2$ at
+$(\delta\MAGT{})^2 \sim (g_{\mathrm{NM}}/m_T^2)^2\,\Bzero^2$,
+placing the nonlinear torsion correction to $C=\Pconv/\Bzero^2$ at
 $\O\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$.
 Second, when the torsion-derivative kinetic term is active and
-$\delta\MAGT{}$ propagates, the linearised Cartan equation takes
-the form $[\mathcal{D}(\partial)+\Alp{}]\,\delta\MAGT{} = -\mathcal{S}$,
-where $\mathcal{D}(\partial)$ is the second-order kinetic operator;
+$\delta\MAGT{}$ propagates,
+% the linearised Cartan equation takes
+% the form $[\mathcal{D}(\partial)+\Alp{}]\,\delta\MAGT{} = -\mathcal{S}$,
+% where $\mathcal{D}(\partial)$ is the second-order kinetic operator;
 the algebraic inversion of \cref{PerturbativeBound} is then replaced
-by a Green's function inversion
-$\delta\MAGT{} = \int G\,\mathcal{S}$,
-$G = [\mathcal{D}(\partial)+\Alp{}]^{-1}$.
+by a Green's function inversion.
+% $\delta\MAGT{} = \int G\,\mathcal{S}$,
+% $G = [\mathcal{D}(\partial)+\Alp{}]^{-1}$.
 The magnitude of $\delta\MAGT{}$ is set by the dominant mass-squared
-scale of $G$, and the same
+scale, and the same
 $\O\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$ scaling
-controls the correction with $m_T$ the realised torsion mass scale
-at each survey point.
+controls the correction.
+% with $m_T$ the realised torsion mass scale
+% at each survey point.
 For theories without non-minimal coupling the torsion sector
 decouples at $\Bzero=0$ and contributes nothing.
-
-\paragraph*{Self-consistency of the sector survey}
-
-The survey operates in the $\Bzero\to 0$ limit by construction,
-ensuring the first, third, and fourth conditions hold trivially,
-and the second ($\Pconv\ll 1$) holds as $\Bzero^2\to 0$.
-The four linearisation conditions and their dependence on $\Bzero$
-are summarised in \cref{PerturbativityHierarchy}.
-Numerical verification across the surveyed parameter regions is
-reported in \cref{SectorSurvey}.
 
 \begin{table}[htbp]
   \centering
   \caption{Linearisation conditions for the linearised Gertsenshtein
     calculation in the torsionful background and their dependence
-    on the BGMF $\Bzero$.
-    The first and fourth conditions are set by the geometry and
-    perturbation choices of \cref{Linearisation};
-    the middle two are satisfied as $\Bzero\to 0$
-    at fixed graviton amplitude.}
+    on the BGMF $\Bzero$.}
   \label{PerturbativityHierarchy}
   \begin{tabular}{@{}lll@{}}
     \toprule
@@ -256,10 +229,19 @@ reported in \cref{SectorSurvey}.
   \end{tabular}
 \end{table}
 
+\paragraph*{Self-consistency of the sector survey}
+
+% ensuring the first, third, and fourth conditions of \cref{PerturbativityHierarchy} hold trivially,
+% and the second ($\Pconv\ll 1$) holds as $\Bzero^2\to 0$.
+The four conditions and their dependence on $\Bzero$
+are summarised in \cref{PerturbativityHierarchy}, the
+surveys in \cref{SectorSurvey} operate in the $\Bzero\to 0$ limit.
+% Numerical verification across the surveyed parameter regions is
+% reported in \cref{SectorSurvey}.
+
 \paragraph*{The survey coefficient}
 
-The parameter survey of \cref{SectorSurvey} evaluates the limiting
-survey coefficient
+The parameter survey of \cref{SectorSurvey} evaluates
 \begin{align}
   \Czero \;\equiv\; \lim_{\Bzero\to 0}\,\frac{\Pconv}{\Bzero^2}
   \;=\; c_2 ,
@@ -270,51 +252,34 @@ the leading Taylor coefficient of \cref{TaylorPconv}.
 In the EM limit $\Czero$ reduces to $(\kappa D/2)^2$
 from \cref{GertsenshteinFormula}; in the torsionful theory $\Czero=c_2$
 is the total graviton-photon conversion coefficient at leading order in
-$\Bzero$, taking a value determined by the full kinetic matrix of
-\cref{KineticMatrix} and differing from $\Czero^{\mathrm{EM}}$ when
-torsion couplings are active.
+$\Bzero$.
+% , taking a value determined by the full kinetic matrix of
+% \cref{KineticMatrix} and differing from $\Czero^{\mathrm{EM}}$ when
+% torsion couplings are active.
 The amplification factor
 \begin{align}
   \Aamp \;\equiv\; \sqrt{\Czero^{\mathrm{torsion}}/\Czero^{\mathrm{EM}}},
   \label{AmplificationFactor}
 \end{align}
 reported in \cref{SectorSurvey}, measures this deviation and is
-$\Bzero$-independent to $\O(\Bzero^2)$ by the same limit
-argument.
-
+$\Bzero$-independent to $\O(\Bzero^2)$.
 The torsion signal --- the deviation of $\Czero$ from its
 EM value $(\kappa D/2)^2$ --- is contained in $c_2$
-itself: each surveyed theory realises its own $c_2$, set by the full
-torsionful kinetic matrix at $\Bzero=0$, and the survey reads off
+itself,
+% : each surveyed theory realises its own $c_2$, set by the full
+% torsionful kinetic matrix at $\Bzero=0$
+and the survey reads off
 this value via \cref{SurveyCoefficient}.
-Two further mechanisms also contribute to $\Pconv$ but not to $c_2$:
-the metric-backreaction detuning $\Delta\propto\Bzero^2$ enters
-$\Pconv$ as $(\Delta/g)^2\propto\Bzero^2$ on top of the leading
-$\Bzero^2$ amplitude, where $g\propto\Bzero$ is the
-graviton-photon coupling strength of the two-mode mixing formula
-below;
-the torsion-sector nonlinearity contributes at
-$\O((\delta\MAGT{})^2)\propto\Bzero^2$ relative to the linear
-$\delta\MAGT{}$ response of \cref{PerturbativeBound}.
-Both place their contribution at $\O(\Bzero^4)$ in $\Pconv$
-and $\O(\Bzero^2)$ in $C$, strictly subleading to $c_2$;
-the exact-limit definition extracts $\Czero$ free of either.
-The discrete integer-power structure of the Taylor expansion
-separates $c_2$ from the higher Taylor coefficients exactly:
-the survey coefficient $\Czero$ isolates the linear-response
-torsion signal from the metric-backreaction and torsion-nonlinearity
-corrections.
 
 \paragraph*{Two-mode reduction}
 
-The metric backreaction enters via the tachyonic-mass term
-$-(\kappa^2/2)\Bzero^2 h$, giving the graviton effective mass
-$m_h^2 = (\kappa^2/2)\Bzero^2$ and detuning the dispersion against
-the massless photon partner. The relativistic two-mode reduction
-$\Delta = (\omega_h - \omega_a)/2 \simeq m_h^2/(4\omega)$ then yields
+The metric backreaction contributes the graviton effective mass
+$m_h^2 = (\kappa^2/2)\Bzero^2$, detuning the dispersion against
+the massless photon. The relativistic two-mode reduction
+$\Delta \simeq m_h^2/(4\omega)$ then gives
 \begin{align*}
-  g \;=\; \frac{\kappa\Bzero}{2},
-  \qquad
+  g \;=\; \frac{\kappa\Bzero}{2}
+  \qand
   \Delta \;=\; \frac{\kappa^2 \Bzero^2}{8\omega} ,
 \end{align*}
 with $\omega \simeq k$ the carrier frequency of the photon mode.
@@ -325,16 +290,31 @@ formula~\cite{raffelt1988mixing}
   \Pconv \;=\; \frac{g^2}{g^2+\Delta^2}
   \,\sin^2\!\!\left(\!\sqrt{g^2+\Delta^2}\,D\right) ;
 \end{align*}
-substituting $\Delta/g = \kappa\Bzero/(4\omega) \propto\Bzero$ gives
-a correction to $C$ at $\O(\Bzero^2)$, consistent with the
-analyticity bound.
+giving a correction to $C$ at $\O(\Bzero^2)$.
 The torsion nonlinearity contributes at
 $\O\!\left(\Bzero^2(g_{\mathrm{NM}}/m_T^2)^2\right)$ from
 squaring the linearised solution of \cref{PerturbativeBound},
 again consistent.
+% Two further mechanisms also contribute to $\Pconv$ but not to $c_2$:
+% the metric-backreaction detuning $\Delta\propto\Bzero^2$ enters
+% $\Pconv$ as $(\Delta/g)^2\propto\Bzero^2$ on top of the leading
+% $\Bzero^2$ amplitude, where $g\propto\Bzero$ is the
+% graviton-photon coupling strength of the two-mode mixing formula
+% below;
+% The torsion-sector nonlinearity contributes at
+% $\O((\delta\MAGT{})^2)\propto\Bzero^2$ relative to the linear
+% $\delta\MAGT{}$ response of \cref{PerturbativeBound}.
+% Both place their contribution at $\O(\Bzero^4)$ in $\Pconv$
+% and $\O(\Bzero^2)$ in $C$, strictly subleading to $c_2$;
+The limit \cref{SurveyCoefficient} extracts $\Czero$ free of either.
+% The discrete integer-power structure of the Taylor expansion
+% separates $c_2$ from the higher Taylor coefficients exactly:
+% the survey coefficient $\Czero$ isolates the linear-response
+% torsion signal from the metric-backreaction and torsion-nonlinearity
+% corrections.
 
-The limiting coefficient $\Czero^{\mathrm{EM}}$ matches the
-potential-formulation derivation of~\cite{hwangnoh2023graviton},
-in which the graviton-photon coupling is exactly linear in $\Bzero$:
-$\Czero^{\mathrm{EM}}$ therefore has no $\Bzero$-independent
-backreaction shift.
+% The limiting coefficient $\Czero^{\mathrm{EM}}$ matches the
+% potential-formulation derivation of~\cite{hwangnoh2023graviton},
+% in which the graviton-photon coupling is exactly linear in $\Bzero$:
+% $\Czero^{\mathrm{EM}}$ therefore has no $\Bzero$-independent
+% backreaction shift.
