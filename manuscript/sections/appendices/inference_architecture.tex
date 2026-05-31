@@ -88,62 +88,6 @@ provided by the PSALTer
 tool~\cite{barker2024psalter,barker2025psalter2}, integration with
 which we identify as future work.
 
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\linewidth]{figures/cubed_sphere_atlas.pdf}
-  \caption{Gnomonic cubed-sphere atlas used to sample the direction
-    $\hat n \in S^{N-1}$ of a joint coupling-space prior, drawn for
-    $N=3$.  Axes $c_1, c_2, c_3$ are the coupling-space coordinates.
-    The sphere is $S^{N-1}$; an $N$-cube is
-    wrapped around the origin (purple wireframe) and each cube face is
-    radially projected onto the sphere.  The highlighted face
-    (face~$2\!\downarrow$, transparent purple) is one \emph{cube-tile} of
-    the atlas, partitioned into a $4\times 4$ grid of sub-tile
-    cells, each sampled by an independent constrained-prior chain.
-    The curves on the
-    sphere bound the \emph{sphere-tile} (the gnomonic image of the
-    cube-tile) and the projected gridlines within it carry the
-    sub-tile partition onto the curved surface, with one sphere
-    sub-tile highlighted in orange to match its cube-face pre-image.
-    The figure idiom follows~\cite{chen2021lmars}.}
-  \label{CubedSphereAtlas}
-\end{figure}
-
-\paragraph*{Cubed-sphere joint prior}
-We decompose a coupling vector $\theta \in \mathbb{R}^N$ as
-$\theta = r\,\hat n$, sampling magnitude and direction separately.  The magnitude $r>0$ sets how far the theory
-sits from the Einstein--Maxwell base theory: it is the overall
-strength of the couplings beyond it, treated as perturbative
-corrections in the effective-field-theory
-regime~(\cref{PerturbativeReduction}).  The unit vector
-$\hat n \in S^{N-1}$ gives the direction in the parametrisation of
-\cref{PGTEnumeration}.  The survey question becomes which direction
-$\hat n$ at fixed $r$ most strongly amplifies the Gertsenshtein
-conversion.  We sample $\hat n$
-uniformly on
-$S^{N-1}$ via a gnomonic cubed-sphere atlas: the $N$-cube wrapped
-around the origin is radially projected onto $S^{N-1}$, yielding a
-quasi-rectilinear angular grid without polar
-singularities~(\cref{CubedSphereAtlas}).  Each face is subdivided
-into sub-tile cells, each sampled by its own independent
-constrained-prior chain.  The subdivision fans the survey out into
-independent parallel runs, and because each chain explores only its
-own cell, a narrow amplifying direction within that cell is
-resolved rather than under-sampled across a much larger prior.  The
-cells of a face are then combined into that face's panel in the
-atlas, and all cells together form the joint $\hat n$ distribution.
-In the limit of fine sub-tile resolution
-each tile becomes locally rectilinear and the chart approaches a
-flat Cartesian one on the sphere, so the construction interpolates
-smoothly between a coarse global parametrisation of $S^{N-1}$ and
-the local-flat limit familiar from Cartesian coupling-space
-sampling.\footnote{The atlas used here is adapted from
-W.~E.~V.~Barker's unreleased extension of the \textsc{psalter}
-package~\cite{barker2024psalter,barker2025psalter2}. The underlying gnomonic
-projection is the standard cubed-sphere construction
-of~\cite{ronchi1996cubedsphere}.}
-
 \paragraph*{Bayesian evidence}
 With $L(\theta) = A(\theta)$ from~\cref{NestedScore}, the Bayesian
 evidence targeted by the nested sampler is a prior expectation over
@@ -217,6 +161,61 @@ divergence measures how the two posteriors differ in $\theta_i$,
 isolating the couplings that distinguish amplification from
 suppression independently of the prior baseline.
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/cubed_sphere_atlas.pdf}
+  \caption{Gnomonic cubed-sphere atlas used to sample the direction
+    $\hat n \in S^{N-1}$ of a joint coupling-space prior, drawn for
+    $N=3$.  Axes $c_1, c_2, c_3$ are the coupling-space coordinates.
+    The sphere is $S^{N-1}$; an $N$-cube is
+    wrapped around the origin (purple wireframe) and each cube face is
+    radially projected onto the sphere.  The highlighted face
+    (face~$2\!\downarrow$, transparent purple) is one \emph{cube-tile} of
+    the atlas, partitioned into a $4\times 4$ grid of sub-tile
+    cells, each sampled by an independent constrained-prior chain.
+    The curves on the
+    sphere bound the \emph{sphere-tile} (the gnomonic image of the
+    cube-tile) and the projected gridlines within it carry the
+    sub-tile partition onto the curved surface, with one sphere
+    sub-tile highlighted in orange to match its cube-face pre-image.
+    The figure idiom follows~\cite{chen2021lmars}.}
+  \label{CubedSphereAtlas}
+\end{figure}
+
+\paragraph*{Cubed-sphere joint prior}
+We decompose a coupling vector $\theta \in \mathbb{R}^N$ as
+$\theta = r\,\hat n$, sampling magnitude and direction separately.  The magnitude $r>0$ sets how far the theory
+sits from the Einstein--Maxwell base theory: it is the overall
+strength of the couplings beyond it, treated as perturbative
+corrections in the effective-field-theory
+regime~(\cref{PerturbativeReduction}).  The unit vector
+$\hat n \in S^{N-1}$ gives the direction in the parametrisation of
+\cref{PGTEnumeration}.  The survey question becomes which direction
+$\hat n$ at fixed $r$ most strongly amplifies the Gertsenshtein
+conversion.  We sample $\hat n$
+uniformly on
+$S^{N-1}$ via a gnomonic cubed-sphere atlas: the $N$-cube wrapped
+around the origin is radially projected onto $S^{N-1}$, yielding a
+quasi-rectilinear angular grid without polar
+singularities~(\cref{CubedSphereAtlas}).  Each face is subdivided
+into sub-tile cells, each sampled by its own independent
+constrained-prior chain.  The subdivision fans the survey out into
+independent parallel runs, and because each chain explores only its
+own cell, a narrow amplifying direction within that cell is
+resolved rather than under-sampled across a much larger prior.  The
+cells of a face are then combined into that face's panel in the
+atlas, and all cells together form the joint $\hat n$ distribution.
+In the limit of fine sub-tile resolution
+each tile becomes locally rectilinear and the chart approaches a
+flat Cartesian one on the sphere, so the construction interpolates
+smoothly between a coarse global parametrisation of $S^{N-1}$ and
+the local-flat limit familiar from Cartesian coupling-space
+sampling.\footnote{The atlas used here is adapted from
+W.~E.~V.~Barker's unreleased extension of the \textsc{psalter}
+package~\cite{barker2024psalter,barker2025psalter2}. The underlying gnomonic
+projection is the standard cubed-sphere construction
+of~\cite{ronchi1996cubedsphere}.}
+
 \paragraph*{Direction at fixed magnitude}
 The construction of~\cref{CubedSphereAtlas} answers a specific
 question about the amplification landscape: at a fixed
@@ -256,11 +255,16 @@ posteriors for the YM--PGT sector
 of~\cref{NonMinimalLagrangian} ($N = 8$ BSM couplings). Each
 panel is the lower-triangle 2D kernel-density estimate of the
 face-local cube coordinates
-$\chi_i^{k\uparrow/\downarrow} \in [-1, 1]^{N-1}$ on its face,
-with the diagonal carrying the 1D marginal of each $\chi_i$.
-Up- and down-facing panels for the same axis sit vertically
-stacked, so the eight coupling axes occupy four columns in a
-$4\times 4$ block layout.
+$\chi_1, \ldots, \chi_{N-1} \in [-1, 1]^{N-1}$ on its face, with
+the diagonal carrying the 1D marginal of each $\chi_i$. Up- and
+down-facing panels for the same axis sit vertically stacked, so
+the eight coupling axes occupy four columns in a $4\times 4$
+block layout. Note that $\chi_i$ represents a \emph{different}
+physical coupling on each face: the dominant axis (pinned at
+$\pm 1$ by the gnomonic projection) cycles through the eight
+couplings face-to-face, so $\chi_1$ on face $1\!\uparrow$ encodes
+coupling $2$, while $\chi_1$ on face $2\!\uparrow$ encodes
+coupling $1$, and so on.
 
 \begin{figure*}[t]
   \centering
@@ -271,8 +275,13 @@ $4\times 4$ block layout.
     layout: the top two rows hold axes 1--4 with up/down paired
     column-wise, and the bottom two rows hold axes 5--8
     similarly. Each panel is the lower-triangle KDE of the
-    face-local cube coordinates
-    $\chi_i^{k\uparrow/\downarrow} \in [-1, 1]^{N-1}$, rendered
-    through anesthetic at $68\%/95\%$ credibility.}
+    face-local cube coordinates $\chi_1, \ldots, \chi_{N-1}
+    \in [-1, 1]^{N-1}$, rendered through anesthetic at
+    $68\%/95\%$ credibility (IBM Carbon magenta 30/70 two-tone
+    fills).  $\chi_i$ refers to a different physical coupling on
+    each face: the dominant axis pinned at $\pm 1$ cycles
+    through all eight couplings, so the eight panels in each
+    row together project the same eight-dimensional direction
+    posterior onto eight distinct $(N-1)$-dimensional slices.}
   \label{AtlasMethodologyYMPGT}
 \end{figure*}
