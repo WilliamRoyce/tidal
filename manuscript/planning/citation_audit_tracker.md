@@ -5,14 +5,17 @@
 > is the inline `% AUDIT` / `% CITE` markers in `manuscript/references.bib` — run
 > `uv run python -m scripts.bibaudit.audit_status` any time for the live tally.
 
-**Last updated:** 2026-05-30 (session: Task 1 COMPLETE)
-**Current phase:** ✅ **AUDIT COMPLETE** (Task 1 + Task 2 + deepen-pass). latexmk exit 0.
-**Task 2 final tally (193 cited keys):** SUPPORTS 113 · PARTIAL 43 · WEAK 6 · MISMATCH 7 · UNVERIFIABLE 24.
-**Citation problems found + fixed:** Alves:2023rxs (metric≠PGT), Glavan2018 (Cayuso–Lehner over-attribution),
-lin2019pgt (Lin adopts Sezgin), martingarcia2008xperm (xPerm over-cited — self-caught by deepen).
-**False-alarm cluster cites (investigated, kept):** barker2023confinement, kushwaha2022magnetar,
-fierzpauli1939relativistic, pospelov2008secluded, hehl2000/rubilar2003 @ pgt_enumeration.
-**24 UNVERIFIABLE** = books / DOI-only journals with no free full text (honest "couldn't confirm offline").
+**Last updated:** 2026-05-30 (session: DEEP-COMPLETION)
+**Current phase:** ✅ **FULLY COMPLETE** (Task 1 + Task 2 + 2 deepen passes). latexmk exit 0; 231/231 audited; 194/194 cite-annotated.
+**FINAL tally (194 cited keys, recheck-final):** SUPPORTS 182 · PARTIAL 12 · **0 MISMATCH/WEAK/UNVERIFIABLE**.
+**Deep-completion (2026-05-30):** fixed the %CITE first-pass-vs-recheck bug (blocks now show recheck-final);
+expanded sources (INSPIRE-by-DOI abstracts + Semantic Scholar abstract/tldr/OA-PDF + Google Books) so all
+52 flagged keys got a real source → deep full-text re-verify collapsed UNVERIFIABLE/WEAK/MISMATCH to 0.
+**10 genuine fixes total (all user-approved):** Alves (metric≠PGT), Glavan (Cayuso–Lehner over-attr),
+lin (adopts Sezgin), xPerm (over-cited), + cillis title, DOP853→hairer, tomomatsu magnetar-cluster,
+gertsenshtein/domcke2025 'closed form', Cembranos f(R), xTras 'EC operators'.
+**12 PARTIAL** = defensible (topic-match / sub-class inclusion / abstract-only); nuance recorded in each %CITE.
+New tooling: gather_sources.py, verify_flagged.mjs, fetch_fulltext.py, compare.py --cites-apply --force.
 **Prior live status (kept for history):** Task 2 verification workflow Stage 3-4.
 - Stage 1 (triage) ✓ `cache/cites_worklist.json` (193 keys; A57/B55/C69/D1/E11; 147 need deep).
 - Stage 2 (abstract pre-fetch) ✓ `cache/abstracts/` (tier-A reads offline literature/; B arXiv; C Crossref where available).
