@@ -32,7 +32,7 @@ precision floor of the solver chosen for each calibration.
     $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$ between the simulated
     conversion probability $\Pconv \equiv P_\mathrm{TIDAL}$ and the
     Raffelt--Stodolsky
-    $\Pconv \equiv P_\mathrm{RS}$ of \cref{TwoModeRabi} at
+    $\Pconv \equiv P_\mathrm{RS}$ of~\cref{TwoModeRabi} at
     $t_\mathrm{end}=50$ on an $N=512$ grid
     (filled circles), with the analytic
     $|\sin^2(\kappa\Bzero t/2) - P_\mathrm{RS}|$ overlaid as a dashed
@@ -42,7 +42,7 @@ precision floor of the solver chosen for each calibration.
     $\Bzero$.
     (b) Grid-refinement convergence of
     $|P_\mathrm{final}^\mathrm{sim} - P_\mathrm{RS}|$ --- the residual
-    against the two-mode prediction \cref{TwoModeRabi} with the
+    against the two-mode prediction~\cref{TwoModeRabi} with the
     corrected detuning --- at the regime point $\Bzero = 0.1275$ for
     four solvers. Modal and \CVODE{} reach a plateau of
     $\sim 4\times 10^{-8}$ across $N$, of the same order as the
@@ -54,7 +54,7 @@ precision floor of the solver chosen for each calibration.
 
 \paragraph*{Two-mode formula and uniform-background sweep}
 The two-mode formula that supersedes the bare Boccaletti kernel at
-finite $\Bzero$ (see \cref{ValidationResult}) is the
+finite $\Bzero$ (see~\cref{ValidationResult}) is the
 Raffelt--Stodolsky expression~\cite{raffelt1988mixing}
 \begin{equation}
   \begin{split}
@@ -70,19 +70,19 @@ photon mode. The detuning $\Delta = m_h^2/(4\omega)$ arises from the
 graviton effective mass $m_h^2 = \kappa^2\Bzero^2/2$ acquired through
 the $\Bzero^2$ metric backreaction
 (\cref{PerturbativeRegime};~\cite{hwangnoh2023graviton}); the
-$(\Delta/g)^4$ truncation that \cref{TwoModeRabi} drops is at
+$(\Delta/g)^4$ truncation that~\cref{TwoModeRabi} drops is at
 $\O(\Bzero^4)$.
 \Cref{BoccalettiUniform}(a) overlays the simulation against both
-\cref{GertsenshteinFormula} and \cref{TwoModeRabi} across the
+\cref{GertsenshteinFormula} and~\cref{TwoModeRabi} across the
 $\Bzero$ sweep, and panel (b) shows the modal/\CVODE{}
 grid-refinement plateau at the corresponding $(\Delta/g)^4$ level.
 
 \paragraph*{Path-integrated kernel on a Gaussian profile}
-The path-integrated Boccaletti form \cref{BoccalettiPathIntegrated}
+The path-integrated Boccaletti form~\cref{BoccalettiPathIntegrated}
 is the closed-form benchmark for the localised-source runs. For the
 Gaussian profile
 $B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$, the
-$(B_\mathrm{peak}, R)$ scan of \cref{BoccalettiLocalised} collapses
+$(B_\mathrm{peak}, R)$ scan of~\cref{BoccalettiLocalised} collapses
 onto the single curve $P = \sin^2(s)$ in the dimensionless variable
 $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$ within the perturbative
 regime $s < \pi/2$. The scan extends past the first quarter-period
@@ -104,10 +104,10 @@ formula's small-conversion assumption no longer applies.
 \end{figure}
 
 \paragraph*{Klein--Gordon perturbative calibration}
-The perturbative-reduction machinery of \cref{PerturbativeReduction}
+The perturbative-reduction machinery of~\cref{PerturbativeReduction}
 evolves the system as a base (order-$\varepsilon^{0}$) solution
 $\phi^{(0)}$ plus a correction (order-$\varepsilon^{1}$)
-$\phi^{(1)}$. \Cref{ForcedOscillator,ParkerSimon} show the resulting
+$\phi^{(1)}$.~\Cref{ForcedOscillator,ParkerSimon} show the resulting
 truncation-error scaling. We test the $\phi^{(0)} + \phi^{(1)}$
 approximation against the exact full-$\varepsilon$ modal solution of
 a Klein--Gordon wave with a small mass-shift correction,
@@ -133,7 +133,7 @@ scaling.
     $\phi^{(1)}$. The base-solution error
     $|\phi^{(0)} - \phi^\mathrm{exact}|$ and the corrected error
     $|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ versus
-    $\varepsilon$ for the mass-shift correction \cref{KGMassShift},
+    $\varepsilon$ for the mass-shift correction~\cref{KGMassShift},
     sampled at eight logarithmically spaced points covering
     $\varepsilon \in [10^{-3}, 0.2]$ at $k=1$; fitted slopes and
     $R^2$ values are reported in the legend. The corrected error
@@ -165,8 +165,8 @@ the base solution reaches $\sim 10^4$ at $\varepsilon=0.01$ in
   \caption{Higher-derivative perturbative calibration. Base-solution
     error $|\phi^{(0)} - \phi^\mathrm{exact}|$ and corrected error
     $|\phi^{(0)} + \phi^{(1)} - \phi^\mathrm{exact}|$ versus
-    $\varepsilon$ for the biharmonic correction \cref{KGBiharmonic}
-    on the Klein--Gordon base of \cref{KGMassShift}. The corrected
+    $\varepsilon$ for the biharmonic correction~\cref{KGBiharmonic}
+    on the Klein--Gordon base of~\cref{KGMassShift}. The corrected
     error falls faster than the worst-case
     $\O(\varepsilon^2)$ bound at small $\varepsilon$.
     Points below the FD-4 spatial-discretisation floor (annotated
@@ -207,7 +207,7 @@ exactly~\cite{adler1971photon}.
 For complex PGT theories where no closed-form solution is available,
 the only available consistency check is to compare the same
 continuum action derived via two mathematically distinct field
-formulations. The dark-photon-plasma sector of \cref{SectorSurvey}
+formulations. The dark-photon-plasma sector of~\cref{SectorSurvey}
 affords this directly: its \emph{Proca}
 representation~\cite{caputo2021darkphoton,pospelov2008secluded},
 \begin{equation}
@@ -239,10 +239,10 @@ $m_T^2 = +2\alpha_3$. The two formulations agree on observables at
 the IEEE double-precision round-off floor.
 
 \paragraph*{Multi-method agreement across solvers and measurement paths}
-We cross-check pairwise agreement between each applicable \TIDAL{} solver (see \cref{NumericalEvolution})
+We cross-check pairwise agreement between each applicable \TIDAL{} solver (see~\cref{NumericalEvolution})
 on the
-EM baseline of \cref{GertsenshteinFormula} and on a
-gradient-coupled scalar pair model~\cite{raffelt1988mixing}. \Cref{MultiMethod} displays
+EM baseline of~\cref{GertsenshteinFormula} and on a
+gradient-coupled scalar pair model~\cite{raffelt1988mixing}.~\Cref{MultiMethod} displays
 the solver-pair heatmaps; all solvers agree within their default
 integration tolerances.
 
@@ -259,12 +259,12 @@ integration tolerances.
 
 \paragraph*{Spatial and temporal convergence}
 The spatial-operator catalogue is tested against analytic
-derivatives in \cref{FDConvergence}, where the Fornberg
+derivatives in~\cref{FDConvergence}, where the Fornberg
 FD orders recover their predicted
 algebraic rates and the pseudo-spectral path falls to the round-off
 floor~\cite{fornberg1988generation,burns2020dedalus}.
 \Cref{ConvergenceFigure}(a) reproduces the free Proca dispersion relation
-$\omega(k) = \sqrt{k^2 + m^2}$; \cref{ConvergenceFigure}(b) reports
+$\omega(k) = \sqrt{k^2 + m^2}$;~\cref{ConvergenceFigure}(b) reports
 time-integration convergence for the symplectic solvers, where
 Yoshida-2 recovers its formal slope to four-figure precision
 ($\hat{\alpha} = 2.00$, $R^2 = 1.000$). The Yoshida-4 scatter
@@ -272,7 +272,7 @@ reproduces across grid refinement (\cref{BoccalettiUniform}(b))
 and across $\Delta t$ refinement (\cref{ConvergenceFigure}(b)) at
 fixed counterpart resolution, so it is not an integration-step or
 grid artefact; the underlying mechanism remains uncharacterised, and
-the survey campaigns in \cref{Results} therefore use the
+the survey campaigns in~\cref{Results} therefore use the
 auto-selected modal solver rather than Yoshida-4.
 
 \begin{figure*}[t]
@@ -302,7 +302,7 @@ Energy conservation, when available
 (\cref{SVDNullSpace,DiracBergmann}), provides a diagnostic that engages
 every layer of the workflow. We audit the maximum relative
 energy drift $|\Delta E/E|_\mathrm{max}$ across the theories of physical
-relevance to the \cref{Results} campaigns. Successful examples
+relevance to the~\cref{Results} campaigns. Successful examples
 cluster at $\sim 10^{-15}$, near $\varepsilon_\mathrm{mach}$ of the
 modal solver. The precision floor of each row in
 \cref{ConservationAudit} is set by the solver chosen for that
@@ -328,7 +328,7 @@ theory, which differs across theories.
     in descending order. The four bottom rows sit at the modal
     solver's precision floor. For the top two rows the
     energy-conservation diagnostic itself is incorrect (see
-    \cref{DiracBergmann}) and cannot be interpreted as an
+   ~\cref{DiracBergmann}) and cannot be interpreted as an
     integration-accuracy figure. The dynamics are unaffected.}
   \label{ConservationAudit}
 \end{table}

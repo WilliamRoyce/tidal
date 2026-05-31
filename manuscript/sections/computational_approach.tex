@@ -1,7 +1,7 @@
 % !TEX root = ../main.tex
 % Computational approach: minimal BHL-style mention of the pipeline,
 % the modal solver, and nested sampling.  All elaboration is deferred
-% to App A--J via inline \cref{} -- no architectural breakdown, no
+% to App A--J via inline~\cref{} -- no architectural breakdown, no
 % solver enumeration, no validation paragraph, no inference design
 % justification, no inference-mechanism enumeration, no closing
 % "deferred" paragraph.  Target ~80 words.
@@ -15,7 +15,7 @@
 % scipy.linalg.expm, NOT eigendecomposition; see
 % appendices/numerical.tex:315-344 for the rationale (eigendecomposition
 % abandoned because cond(V) > 1e13 for the multi-field PGT theories of
-% \cref{Results}).
+%~\cref{Results}).
 %
 % Reminder comments for the deferred material live in
 % sections/discussion.tex (App H / EFT placement) and
@@ -27,7 +27,7 @@
 
 \paragraph*{\TIDAL{}}
 We obtain the linearised field equations for every theory surveyed
-in \cref{Results} with the \emph{Tensor Integration and Derivation
+in~\cref{Results} with the \emph{Tensor Integration and Derivation
 for Any Lagrangian} (\TIDAL{},
 \cref{Architecture,SymbolicComputation,NumericalEvolution}), grounded
 in the \xAct{}~\cite{martingarcia2007xact,martingarcia2008xperm} suite for
@@ -43,4 +43,4 @@ scaling-and-squaring~\cite{higham2009scaling}.
 \paragraph*{Parameter inference}
 Parameter exploration is by nested sampling with
 PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; the inference
-architecture is documented in \cref{InferenceArchitecture}.
+architecture is documented in~\cref{InferenceArchitecture}.

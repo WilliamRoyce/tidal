@@ -225,7 +225,9 @@ def overlay_corner(
         for ax in axes.values.flatten():
             if ax is None:
                 continue
-            ax.tick_params(labelbottom=False, labelleft=False)
+            # Remove both numeric tick labels and the tick marks themselves
+            # (supervisor feedback on CornerT9: "cleaner if you remove ticks").
+            ax.tick_params(labelbottom=False, labelleft=False, bottom=False, left=False)
 
     # Legend hosted INSIDE the empty upper-right region of the corner-plot
     # grid, anchored to the topmost diagonal axis (axes.iloc[0,0]) in its

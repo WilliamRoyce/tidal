@@ -11,7 +11,7 @@
 \paragraph*{Overview}
 In this appendix we describe \emph{Tensor Integration and Derivation
 for Any Lagrangian} (\TIDAL{}), the computer-algebra and numerical
-software with which we obtained the results of \cref{Results}.
+software with which we obtained the results of~\cref{Results}.
 \TIDAL{} comprises two parts: a symbolic computation that derives the
 linearised field equations from an arbitrary tensor Lagrangian on a
 flat or curved background, and a numerical integration in time.
@@ -41,10 +41,10 @@ Lagrangian to quadratic order around the declared background using
 variation, and decomposes the resulting tensor equations into their
 components with the aid of \xTras{}~\cite{nutma2014xtras}.
 A complete description of the symbolic operations is
-given in \cref{SymbolicComputation}.
+given in~\cref{SymbolicComputation}.
 
 \paragraph*{Equation specification}
-The equation specification, shown in \cref{ArchitectureDiagram}, is
+The equation specification, shown in~\cref{ArchitectureDiagram}, is
 the interface between the symbolic and numerical parts of
 \TIDAL{}.
 It records each field's equation of motion as a sum of differential
@@ -55,17 +55,17 @@ field's equation, used by the solver selection of
 Decoupling the two parts in this way allows the same derivation to
 support arbitrary grids, boundary conditions, initial conditions,
 and parameter choices without re-derivation, which is what makes
-parameter surveys of the kind reported in \cref{Results} fast
+parameter surveys of the kind reported in~\cref{Results} fast
 and feasible.
 
 \paragraph*{Numerical integration}
 \TIDAL{} selects an appropriate solver from the algebraic structure
 of the equations; the solvers and the selection logic are described
-in \cref{NumericalEvolution}.
+in~\cref{NumericalEvolution}.
 The Fourier modal solver (\cref{ModalSolver}) was used throughout
 \cref{Results}.
 
 \paragraph*{Observables}
-For the surveys of \cref{Results}, the observable extracted from the
+For the surveys of~\cref{Results}, the observable extracted from the
 numerical evolution is the graviton–photon conversion probability
-$\Pconv(t)$, compared between theories in \cref{SectorSurvey}.
+$\Pconv(t)$, compared between theories in~\cref{SectorSurvey}.

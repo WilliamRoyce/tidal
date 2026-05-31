@@ -33,7 +33,7 @@ therefore physically equivalent within the perturbative regime.
 This equivalence requires the base-theory equation of motion for each field undergoing the reduction to
 take the form $\partial_t^2\varphi^{\mathcal{I}} = F^{\mathcal{I}}[\varphi,\partial_t\varphi,
 \{\nabla^n\varphi\}_{n\geq 1}]$~\cite{Grosse-Knetter:1993tae}. Fields whose base-theory
-equation is algebraic (in the sense of \cref{SymbolicComputation}) violate the
+equation is algebraic (in the sense of~\cref{SymbolicComputation}) violate the
 requirement, and the perturbative-reduction framework then fails.
 
 The alternative --- treating $\lag$ as a fundamental theory ---
@@ -64,7 +64,7 @@ and Simon~\cite{parker1993reduced}, applied here to multiple perturbation
 fields evolving under a quadratic Lagrangian.
 
 Using $q = \{\varphi^{\mathcal{I}}\}$ to denote the collection of dynamical fields
-that remain after the constraint-elimination step of \cref{ModalSchur} and writing
+that remain after the constraint-elimination step of~\cref{ModalSchur} and writing
 the full equation of motion as $E[q;\,\varepsilon] = 0$~\cite{parker1993reduced,
 jaen1986reduction},
 the base operator is $E_{\mathrm{base}}[q] \equiv E[q;\,\varepsilon{=}0]$ and the correction operator
@@ -99,12 +99,12 @@ interpretation in the EFT regime.
 
 \paragraph*{Modal derivation and the Duhamel kernel}
 On flat periodic domains, the Pass~0 system at wavenumber $k$ reduces to the per-mode
-ODE $\partial_t\hat{y}^{(0)} = M(k)\,\hat{y}^{(0)}$ (see \cref{ModalPerMode}), where
+ODE $\partial_t\hat{y}^{(0)} = M(k)\,\hat{y}^{(0)}$ (see~\cref{ModalPerMode}), where
 $\hat{y}^{(0)}$ stacks the Fourier amplitudes of every field and velocity slot.
 % For the perturbative-reduction path, the eigendecomposition $M(k) = V D V^{-1}$ is
-% used rather than the Pad\'e path of \cref{ModalSolver}, since the
+% used rather than the Pad\'e path of~\cref{ModalSolver}, since the
 % per-eigenmode expansion is required for the Duhamel integral
-% \cref{DuhamelIntegral,DuhamelSolution,DuhamelKernel}.
+%~\cref{DuhamelIntegral,DuhamelSolution,DuhamelKernel}.
 With $D = \mathrm{diag}(\lambda_1,\lambda_2,\ldots)$ collecting the eigenvalues of $M(k)$
 and $V$ the right-eigenvector matrix, the initial data $\hat{y}^{(0)}(0)$ is projected
 into the eigenbasis as $\hat{c} = V^{-1}\hat{y}^{(0)}(0)$ such that
@@ -123,7 +123,7 @@ where $C_{\mathrm{corr}}$ is the Fourier representation of the correction operat
 $E_{\mathrm{corr}}$ that appears as the order-$\varepsilon^1$ source in
 \cref{EOMHierarchy}.
 Substituting $\hat{y}^{(1)} = V\hat{z}^{(1)}$ and the Pass~0 solution
-$\hat{y}^{(0)}(t) = V e^{Dt}\hat{c}$ into \cref{PassOneSystem} and multiplying
+$\hat{y}^{(0)}(t) = V e^{Dt}\hat{c}$ into~\cref{PassOneSystem} and multiplying
 through by $V^{-1}$ gives
 \begin{equation}
   \partial_t\hat{z}^{(1)}
@@ -134,7 +134,7 @@ through by $V^{-1}$ gives
   \label{EigenODESystem}
 \end{equation}
 where $S \equiv V^{-1}C_{\mathrm{corr}}V$.
-Component-wise \cref{EigenODESystem} reduces to a set of decoupled scalar
+Component-wise~\cref{EigenODESystem} reduces to a set of decoupled scalar
 inhomogeneous ODEs,
 \begin{equation}
   \partial_t\hat{z}^{(1)}_i
@@ -209,8 +209,8 @@ any order.
 % Higher spatial derivatives in $\varepsilon\,\lag_1$ do not affect the Legendre
 % transform; only higher \emph{time} derivatives require reduction.
 Where the correction introduces terms with time derivatives of order greater than two,
-the rule \cref{LPSSubstitution} is extended by differentiating \wrt $t$,
-substituting \cref{LPSSubstitution} for any $\partial_t^2 q_j$
+the rule~\cref{LPSSubstitution} is extended by differentiating \wrt $t$,
+substituting~\cref{LPSSubstitution} for any $\partial_t^2 q_j$
 that appears at each stage.
 The resulting substitution is applied to the order-$\varepsilon^1$ Lagrangian,
 truncating at $\O(\varepsilon^2)$; the reduced Lagrangian carries at
@@ -280,9 +280,9 @@ direction for our future work.
 
 \paragraph*{Singular kinetic matrix}\label{DiracBergmann}
 A second obstruction to obtaining a Hamiltonian arises when the linearised kinetic
-matrix $\mathcal{K}$ of \cref{KineticMatrix} is singular from the start. Gauge
+matrix $\mathcal{K}$ of~\cref{KineticMatrix} is singular from the start. Gauge
 potentials and other fields that enter the action algebraically contribute to such a
-singular $\mathcal{K}$, and the naive Legendre transform of \cref{LegendreTransform}
+singular $\mathcal{K}$, and the naive Legendre transform of~\cref{LegendreTransform}
 fails for two related reasons: the relation $\pi_i = \mathcal{K}_{ij} v_j$ cannot be
 inverted to give the velocities as independent functions of the momenta, and the
 constrained components no longer correspond to independent canonical pairs. The
@@ -292,11 +292,11 @@ procedure~\cite{Dirac:1950pj,henneaux1992quantization,barker2021hamiltonian,bark
 are reported in this work, the measurement is restricted to configurations in which
 the Legendre transform is well-defined.
 % The conversion probability of
-% \cref{GertsenshteinFormula} is gauge-invariant by construction and is unaffected.
+%~\cref{GertsenshteinFormula} is gauge-invariant by construction and is unaffected.
 
 \paragraph*{Failure detection}
 \TIDAL{} detects constraint promotion by checking whether the rank of the
-order-$\varepsilon^0$ kinetic matrix \cref{KineticMatrix} changes when
+order-$\varepsilon^0$ kinetic matrix~\cref{KineticMatrix} changes when
 $\varepsilon$ is set to a non-zero test value; a rank jump signals constraint
 promotion.
 % The conversion-and-energy analysis of the affected theories (\ie those carrying

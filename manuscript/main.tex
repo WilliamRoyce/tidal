@@ -26,6 +26,13 @@
 \input{sections/acknowledgements}
 
 \appendix
+% Appendix label prefixes: A/B/C... on sections, A.N on equations/figures/tables
+% so cross-refs into the appendix render as e.g. "figure A.3", "equation B.2",
+% making it visually obvious when a reference points into the appendices
+% (per supervisor feedback on results.tex:228a).
+\renewcommand{\theequation}{\thesection.\arabic{equation}}
+\renewcommand{\thefigure}{\thesection.\arabic{figure}}
+\renewcommand{\thetable}{\thesection.\arabic{table}}
 \input{sections/appendices}
 
 \bibliographystyle{apsrev4-1}

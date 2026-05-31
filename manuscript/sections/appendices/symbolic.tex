@@ -12,13 +12,13 @@
 From a Lagrangian, a background ansatz, and a parameter set, the
 symbolic computation produces the linearised
 field equations and the Hamiltonian density.
-The high-level architecture is shown in \cref{ArchitectureDiagram},
+The high-level architecture is shown in~\cref{ArchitectureDiagram},
 and the equation outputs for the surveyed theories are collected in
 \cref{SymbolicOutputs}.
 Every partial differential equation evolved by the numerical solver of
 \cref{NumericalEvolution} is the output of the symbolic stage; for
 higher-curvature theories the Lagrangian passes through
-the reduction of \cref{PerturbativeReduction}.
+the reduction of~\cref{PerturbativeReduction}.
 
 \paragraph*{xAct environment}
 The symbolic stage runs in \Mathematica{}~\cite{mathematica} on the
@@ -26,7 +26,7 @@ The symbolic stage runs in \Mathematica{}~\cite{mathematica} on the
 \xPert{}~\cite{brizuela2009xpert} providing the perturbation-theory
 layer and \xTras{}~\cite{nutma2014xtras} the tensor-manipulation
 operators (contractions, variations, ans\"atze) used throughout the
-PGT theories of \cref{PGTEnumeration}.
+PGT theories of~\cref{PGTEnumeration}.
 The Christoffel symbols, the inverse metric, and the Levi-Civita
 pseudotensor $\sqrt{-g}\,\varepsilon$ are cached against the declared metric.
 
@@ -81,8 +81,8 @@ spacetime, the dynamical fields (metric perturbation, electromagnetic
 potential), the algebraically-derived field strength, the background
 magnetic vector, the parameter set, the Lagrangian in \xAct{} syntax,
 the matter-perturbation block that drives the multi-field linearisation
-of \cref{Linearisation}, and the Lorenz gauge. All other theories
-in the surveys of \cref{Results} share this structure and differ only
+of~\cref{Linearisation}, and the Lorenz gauge. All other theories
+in the surveys of~\cref{Results} share this structure and differ only
 in their declared fields and Lagrangian.}
 \label{TOMLExample}
 \end{figure}
@@ -98,7 +98,7 @@ electromagnetic field strength $\FieldF{_\mu_\nu}$; the background
 fields; the parameter symbol set; the Lagrangian expression in
 \xAct{} syntax; and optional blocks for gauge fixing, linearisation,
 and perturbative reduction (\cref{PerturbativeReduction}).
-A representative theory file is shown in \cref{TOMLExample}.
+A representative theory file is shown in~\cref{TOMLExample}.
 The symbolic stage is the map
 \begin{align*}
   \textsc{TOML} \bigl[\lag,\,\{\varphi^{\mathcal{I}}_n\}_{n=1}^{N},
@@ -124,7 +124,7 @@ single operation applying \texttt{Perturbation} of
 order two to $\sqrt{-g}\,\lag$, producing every bilinear product of
 first-order perturbations.
 Each matter field $\varphi^{\mathcal{I}}$ declared in the
-matter-perturbations block of \cref{TOMLExample} yields
+matter-perturbations block of~\cref{TOMLExample} yields
 \begin{align}
   g_{\mu\nu} = \eta_{\mu\nu} + \varepsilon\,h_{\mu\nu},
   \qquad
@@ -137,7 +137,7 @@ matter-perturbations block of \cref{TOMLExample} yields
 The background-fields have their component values fixed by
 \texttt{xCoba}'s \texttt{ComponentValue} declarations, \eg
 the uniform magnetic background
-$\bar{A}_y = -\Bzero\,z$ of \cref{BackgroundPotential}.
+$\bar{A}_y = -\Bzero\,z$ of~\cref{BackgroundPotential}.
 
 The resulting $\lag^{(2)}$, returned by \texttt{ExpandPerturbation},
 contains two kinds of terms: products of first-order perturbations
@@ -160,7 +160,7 @@ is the linearised action of the multi-field system.
 The remaining abstract covariant derivatives of background tensors are
 resolved against the \texttt{ComponentValue} declarations during the
 chart conversion.
-On the flat Minkowski background of \cref{Linearisation} the background
+On the flat Minkowski background of~\cref{Linearisation} the background
 Cartan connection vanishes, so background-field covariant derivatives
 reduce to partials.
 
@@ -187,7 +187,7 @@ before any component reduction.
 The equations are kept in second-order velocity form, with explicit
 velocity slots $v^{\mathcal{I}} = \PD{_t}\varphi^{\mathcal{I}}$
 alongside the fields; rationale and consequences for solver selection
-are discussed in \cref{NumericalEvolution}.
+are discussed in~\cref{NumericalEvolution}.
 Higher-time-derivative Lagrangians arising from small-parameter
 expansions are handled by the perturbative substitution of
 \cref{PerturbativeReduction}.
@@ -205,7 +205,7 @@ where $\pi^{\mathcal{I}}_n \equiv \partial\lag^{(2)}/\partial v^{\mathcal{I}}_n$
 are the canonical momenta.
 The circumstances under which the transform is admissible, and the
 perturbative-reduction procedure that makes it available for
-higher-curvature theories, are treated in \cref{HamiltonianReduction}.
+higher-curvature theories, are treated in~\cref{HamiltonianReduction}.
 
 \paragraph*{Component decomposition}
 The abstract-index equations returned by \texttt{VarD} are reduced to
@@ -237,7 +237,7 @@ for tensors of higher rank; the general mixed-type form is
 \cref{MixedCovariantDerivative}.
 The result is a set of scalar equations in the chart coordinates, with
 explicit component indices and numerical coefficients, as required by the
-numerical evolution of \cref{NumericalEvolution}.
+numerical evolution of~\cref{NumericalEvolution}.
 
 \paragraph*{Gauge fixing}%
 \label{GaugeFixing}
@@ -283,7 +283,7 @@ format, and a metadata block recording the source Lagrangian, the
 gauge, the linearisation flag, the parameter values, and a derivation
 hash.
 \Cref{JSONExample} shows a representative excerpt for the
-Einstein--Maxwell (EM) theory of \cref{TOMLExample}.
+Einstein--Maxwell (EM) theory of~\cref{TOMLExample}.
 
 \begin{figure}[t]
 \begin{lstlisting}[frame=single,keepspaces=true,basicstyle=\footnotesize\ttfamily]
@@ -316,7 +316,7 @@ Einstein--Maxwell (EM) theory of \cref{TOMLExample}.
 }
 \end{lstlisting}
 \caption{Representative JSON output: the Einstein--Maxwell
-specification produced from \cref{TOMLExample}. The fields list
+specification produced from~\cref{TOMLExample}. The fields list
 records each component with its time-derivative order; the equations
 list carries each right-hand side as a linear combination of named
 differential operators with parameter-dependent coefficients; the
