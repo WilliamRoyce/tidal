@@ -119,6 +119,17 @@ lookup_theory() {
       exit 2
       ;;
   esac
+
+  # Optional per-theory RANKS override via TIDAL_RANKS_<TAG_UPPER>.
+  # Use case: a small straggler-finish slot can bump ranks/face when only
+  # a few chains run (e.g. TIDAL_RANKS_T5_1=28 with TIDAL_FACES_T5_1="11 12"
+  # gives 2*28=56 cores per theory, fitting 4 chains in 112 sapphire cores).
+  local tag_upper="${tag^^}"
+  local ranks_env_var="TIDAL_RANKS_${tag_upper}"
+  local ranks_override="${!ranks_env_var:-}"
+  if [[ -n "${ranks_override}" ]]; then
+    RANKS="${ranks_override}"
+  fi
 }
 
 # ─── Build cubed-sphere sub-tile string ─────────────────────────────────────
