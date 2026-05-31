@@ -327,8 +327,9 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
             if getattr(args, "output", None)
             else data_path / "atlas.pdf"
         )
+        layout_cols = getattr(args, "layout_cols", None)
         try:
-            plot_atlas(data_path, out_path)
+            plot_atlas(data_path, out_path, layout_cols=layout_cols)
         except (FileNotFoundError, ValueError) as exc:
             error_with_hint(
                 f"atlas plot failed: {exc}",

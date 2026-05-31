@@ -130,6 +130,116 @@ def test_face_to_slot_up_down_columns() -> None:
 
 
 # ----------------------------------------------------------------------
+# layout_cols block-pair rule
+# ----------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("n_dims", "cols", "expected"),
+    [
+        (8, 4, (4, 4)),  # YM-PGT 4x4 case
+        (6, 3, (4, 3)),  # 2 blocks of 3
+        (6, 4, (4, 4)),  # 6 over 4 cols -> 2 blocks (with trailing empties)
+        (5, 5, (2, 5)),  # 1 block of 5, equivalent to default
+        (10, 5, (4, 5)),  # 2 blocks of 5
+        (12, 6, (4, 6)),  # 2 blocks of 6
+        (16, 4, (8, 4)),  # 4 blocks of 4 — tall layout
+    ],
+)
+def test_grid_shape_layout_cols(
+    n_dims: int, cols: int, expected: tuple[int, int]
+) -> None:
+    """Block-pair layout: 2 * ceil(n_dims/cols) rows x cols columns."""
+    assert _grid_shape(n_dims, cols=cols) == expected
+
+
+def test_grid_shape_layout_cols_none_preserves_2_by_n() -> None:
+    """Default behaviour (cols=None) is unchanged from the 2 x N rule."""
+    assert _grid_shape(5, cols=None) == (2, 5)
+    assert _grid_shape(8, cols=None) == (2, 8)
+
+
+def test_grid_shape_rejects_cols_below_1() -> None:
+    with pytest.raises(ValueError, match="cols must be >= 1"):
+        _grid_shape(8, cols=0)
+
+
+def test_face_to_slot_layout_cols_4_for_n8() -> None:
+    """The YM-PGT case: N=8 in a 4x4 block-pair layout.
+
+    Top two rows hold axes 1-4 (axis k = (0, k-1) up, (1, k-1) down).
+    Bottom two rows hold axes 5-8 (axis k = (2, k-5) up, (3, k-5) down).
+    """
+    from tidal.inference._atlas import _face_to_slot
+
+    # Axes 1-4: block 0, rows 0 (up) / 1 (down)
+    assert _face_to_slot(1, cols=4) == (0, 0)  # face 1 = +x_1
+    assert _face_to_slot(2, cols=4) == (1, 0)  # face 2 = -x_1
+    assert _face_to_slot(3, cols=4) == (0, 1)  # face 3 = +x_2
+    assert _face_to_slot(7, cols=4) == (0, 3)  # face 7 = +x_4
+    assert _face_to_slot(8, cols=4) == (1, 3)  # face 8 = -x_4
+
+    # Axes 5-8: block 1, rows 2 (up) / 3 (down)
+    assert _face_to_slot(9, cols=4) == (2, 0)  # face 9 = +x_5
+    assert _face_to_slot(10, cols=4) == (3, 0)  # face 10 = -x_5
+    assert _face_to_slot(15, cols=4) == (2, 3)  # face 15 = +x_8
+    assert _face_to_slot(16, cols=4) == (3, 3)  # face 16 = -x_8
+
+
+def test_face_to_slot_layout_cols_default_matches_no_cols() -> None:
+    """cols=None and the no-cols call agree on every face for the 2 x N rule."""
+    from tidal.inference._atlas import _face_to_slot
+
+    for k in range(1, 9):
+        for sign_idx in (2 * k - 1, 2 * k):
+            assert _face_to_slot(sign_idx) == _face_to_slot(sign_idx, cols=None)
+
+
+def test_face_to_slot_layout_cols_trailing_empty_block() -> None:
+    """N=6, cols=4 -> first block holds axes 1-4, second block holds axes 5-6
+    with the last two columns of the second block empty.
+    """
+    from tidal.inference._atlas import _face_to_slot
+
+    # Axes 1-4: block 0
+    assert _face_to_slot(1, cols=4) == (0, 0)
+    assert _face_to_slot(8, cols=4) == (1, 3)
+    # Axes 5-6: block 1, only first two columns populated
+    assert _face_to_slot(9, cols=4) == (2, 0)  # +x_5
+    assert _face_to_slot(10, cols=4) == (3, 0)  # -x_5
+    assert _face_to_slot(11, cols=4) == (2, 1)  # +x_6
+    assert _face_to_slot(12, cols=4) == (3, 1)  # -x_6
+
+
+def test_face_to_slot_layout_cols_rejects_zero() -> None:
+    from tidal.inference._atlas import _face_to_slot
+
+    with pytest.raises(ValueError, match="cols must be >= 1"):
+        _face_to_slot(1, cols=0)
+
+
+def test_plot_atlas_layout_cols_smoke_render(tmp_path: Path) -> None:
+    """End-to-end: synthetic N=4 survey with layout_cols=2 produces a 4 x 2
+    grid PDF without exception.  Asserts that plot_atlas accepts the
+    layout_cols kwarg and writes a non-empty PDF.
+    """
+    n = 4
+    names = ("a", "b", "c", "d")
+    Q = np.eye(n)
+    survey_dir = tmp_path / "survey"
+    survey_dir.mkdir()
+    for face_idx, sub_tile in enumerate_cells(n_dims=n, M=1):
+        cd = survey_dir / cell_label(face_idx, sub_tile)
+        _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
+
+    out_pdf = survey_dir / "atlas_2cols.pdf"
+    result = plot_atlas(survey_dir, out_pdf, layout_cols=2)
+    assert result == out_pdf
+    assert out_pdf.exists()
+    assert out_pdf.stat().st_size > 0
+
+
+# ----------------------------------------------------------------------
 # Synthetic survey -> atlas PDF
 # ----------------------------------------------------------------------
 

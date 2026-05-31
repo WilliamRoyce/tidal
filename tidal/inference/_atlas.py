@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -178,31 +179,57 @@ def _physical_to_face_local(
 # ----------------------------------------------------------------------
 
 
-def _grid_shape(n_dims: int) -> tuple[int, int]:
-    """``(rows, cols) = (2, n_dims)`` — top row positive faces, bottom row negative.
+def _grid_shape(n_dims: int, cols: int | None = None) -> tuple[int, int]:
+    """``(rows, cols)`` for the atlas layout.
 
-    Replaces the prior auto-sized layout.  The 2 x N grid puts the ``+k``
-    face of axis ``k`` at ``(row=0, col=k-1)`` and the ``-k`` face at
-    ``(row=1, col=k-1)``, so the up/down pair for each coupling axis is
-    vertically stacked in a single column.  Generalises across N (8
-    faces -> 2 x 4, 10 -> 2 x 5, 12 -> 2 x 6, 14 -> 2 x 7).
+    Default (``cols=None``) gives the ``2 x n_dims`` layout: top row
+    positive faces, bottom row negative faces, column ``k - 1`` = axis
+    ``k``.  Used for survey theories where ``2 * n_dims`` panels fit
+    naturally side-by-side (N=2..6).
+
+    With ``cols=K`` the layout becomes ``2 * ceil(n_dims / K) x K``: the
+    axes are split into ``ceil(n_dims / K)`` blocks of ``K`` consecutive
+    axes, each block occupying two rows (up over down).  Used for high-N
+    theories where ``2 x n_dims`` is too wide for a single page; e.g.
+    N=8 with ``cols=4`` becomes a 4x4 square layout.
+
+    Raises ``ValueError`` if ``n_dims < 2`` or ``cols < 1``.
     """
     if n_dims < 2:
         msg = f"n_dims must be >= 2; got {n_dims}"
         raise ValueError(msg)
-    return 2, n_dims
+    if cols is None:
+        return 2, n_dims
+    if cols < 1:
+        msg = f"cols must be >= 1; got {cols}"
+        raise ValueError(msg)
+    blocks = math.ceil(n_dims / cols)
+    return 2 * blocks, cols
 
 
-def _face_to_slot(face_idx: int) -> tuple[int, int]:
-    """``face_idx`` (1-indexed) -> ``(row, col)`` in the 2 x N layout.
+def _face_to_slot(face_idx: int, cols: int | None = None) -> tuple[int, int]:
+    """``face_idx`` (1-indexed) -> ``(row, col)`` in the atlas layout.
 
-    Convention matches :func:`face_to_axis_sign`: face ``2k - 1`` is the
+    Default (``cols=None``) is the 2 x N rule: face ``2k - 1`` is the
     ``+k`` ("up") face -> ``(0, k - 1)``; face ``2k`` is the ``-k``
     ("down") face -> ``(1, k - 1)``.
+
+    With ``cols=K`` (block-pair layout): axis ``k`` sits in block
+    ``(k - 1) // K`` at column ``(k - 1) % K``; up-faces go to the top
+    row of the block, down-faces to the bottom row.  Final row =
+    ``2 * block + (0 if up else 1)``.
     """
     axis_one_indexed, sign = face_to_axis_sign(face_idx)
-    row = 0 if sign > 0 else 1
-    col = axis_one_indexed - 1
+    if cols is None:
+        row = 0 if sign > 0 else 1
+        col = axis_one_indexed - 1
+        return row, col
+    if cols < 1:
+        msg = f"cols must be >= 1; got {cols}"
+        raise ValueError(msg)
+    block = (axis_one_indexed - 1) // cols
+    col = (axis_one_indexed - 1) % cols
+    row = 2 * block + (0 if sign > 0 else 1)
     return row, col
 
 
@@ -318,6 +345,7 @@ def plot_atlas(
     output_path: Path | None = None,
     *,
     show: bool = False,
+    layout_cols: int | None = None,
 ) -> Path:
     """Render the cubed-sphere atlas for a survey directory.
 
@@ -327,8 +355,14 @@ def plot_atlas(
     face-local cube coordinates ``chi`` for each sample, and renders a
     lower-triangle 2D-histogram panel per face.  Diagonal panels are
     hidden; the upper triangle is blank; the face label is drawn in the
-    top-right corner of each panel.  Panels are arranged in an
-    auto-sized grid (3 rows x 4 cols for N=6).
+    top-right corner of each panel.
+
+    Layout: default ``layout_cols=None`` produces the ``2 x N`` grid
+    (top row +k faces, bottom row -k faces, column = axis).  Pass
+    ``layout_cols=K`` to use the ``2 * ceil(N / K) x K`` block-pair
+    layout — used for high-N theories where the default 2 x N strip is
+    too wide for a single page (e.g. N=8 with ``layout_cols=4`` gives a
+    4 x 4 square).
 
     Parameters
     ----------
@@ -339,6 +373,9 @@ def plot_atlas(
         Where to write the PDF.  Defaults to ``survey_dir / atlas.pdf``.
     show : bool
         If True, display the figure interactively (blocks).
+    layout_cols : int or None
+        Column count for the block-pair layout (see above).  ``None``
+        (default) preserves the ``2 x n_dims`` layout.
 
     Returns
     -------
@@ -444,7 +481,7 @@ def plot_atlas(
         raise ValueError(msg)
 
     n_faces_total = n_faces(n_dims)
-    rows, cols = _grid_shape(n_dims)
+    rows, cols = _grid_shape(n_dims, layout_cols)
 
     # Seed numpy's legacy RNG so KDE sample-compression in anesthetic
     # (anesthetic.utils.triangular_sample_compression_2d uses bare
@@ -466,9 +503,10 @@ def plot_atlas(
 
     for face_idx in range(1, n_faces_total + 1):
         # 2 x N up/down layout: face 2k - 1 -> (row=0, col=k-1) (positive
-        # axis); face 2k -> (row=1, col=k-1) (negative axis).  See
+        # axis); face 2k -> (row=1, col=k-1) (negative axis).  When
+        # layout_cols is set, the block-pair rule kicks in — see
         # _face_to_slot for details.
-        r, c_idx = _face_to_slot(face_idx)
+        r, c_idx = _face_to_slot(face_idx, layout_cols)
         sub = subfigs[r, c_idx]
         chunks = by_face.get(face_idx)
         chi: NDArray[np.float64] | None

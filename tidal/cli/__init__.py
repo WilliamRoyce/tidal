@@ -1075,6 +1075,19 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "posterior compactness. Default: off (auto-scale per panel)."
         ),
     )
+    plot_parser.add_argument(
+        "--layout-cols",
+        dest="layout_cols",
+        type=int,
+        default=None,
+        help=(
+            "For --type atlas: override the default 2 x N grid layout "
+            "with a 2 * ceil(N / K) x K block-pair layout, where K is the "
+            "column count.  Useful for high-N theories where 2 x N is too "
+            "wide for one page; e.g. N=8 with --layout-cols=4 gives a "
+            "4 x 4 square."
+        ),
+    )
 
     # --- sweep ---
     sweep_parser = sub.add_parser(
