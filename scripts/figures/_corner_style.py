@@ -228,6 +228,15 @@ def overlay_corner(
                 label.set_rotation(45)
                 label.set_horizontalalignment("right")
 
+    # Single-column figures with >5 params: numeric tick values become
+    # illegible at COLUMN_WIDTH; remove them entirely. Parameter name
+    # labels (β₁, χ, etc.) on the axes are kept.
+    if len(params) > 5 and fig_width <= COLUMN_WIDTH:
+        for ax in axes.values.flatten():
+            if ax is None:
+                continue
+            ax.tick_params(labelbottom=False, labelleft=False)
+
     # Legend hosted INSIDE the empty upper-right region of the corner-plot
     # grid, anchored to the topmost diagonal axis (axes.iloc[0,0]) in its
     # transAxes coordinates. The horizontal offset (n_params − 0.5) is in

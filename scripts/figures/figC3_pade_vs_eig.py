@@ -112,7 +112,7 @@ def _plot(data: dict, out_path: Path) -> None:
             elinewidth=0.7,
             capsize=2.0,
             capthick=0.7,
-            label="Eigendecomp.",
+            label="Eigendecomposition",
         )
 
         ax.set_xscale("log")
