@@ -731,11 +731,14 @@ def _render_anesthetic_corner_into(
     def _plot_with_fallback(axes_arg: object) -> object:
         """Run ``samples.plot_2d`` with the degenerate-posterior fallbacks.
 
-        Two failure modes from anesthetic's KDE machinery on near-flat /
+        Three failure modes from anesthetic's KDE machinery on near-flat /
         lower-dimensional posteriors:
           - qhull Delaunay triangulation: 'singular input data'
           - scipy gaussian_kde: 'singular data covariance matrix'
-        Both fall back to KDE diagonals + scatter cross-panels.
+          - matplotlib tricontour: 'Triangulation is invalid' (samples too
+            concentrated for matplotlib's Delaunay; observed on Phase E
+            atlas T5.1/T5.2 corner panels where one chain hit a sharp peak)
+        All fall back to KDE diagonals + scatter cross-panels.
         """
         try:
             return samples.plot_2d(axes_arg, label="68% / 95% CL")
@@ -745,6 +748,7 @@ def _render_anesthetic_corner_into(
                 "qhull" not in msg
                 and "singular" not in msg
                 and "lower-dimensional" not in msg
+                and "triangulation" not in msg
             ):
                 raise
             try:
