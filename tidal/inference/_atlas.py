@@ -472,6 +472,21 @@ def _render_axis_panel(
     # re-apply via the public ``set_labels`` method.
     axes_df.set_labels(latex_labels)  # type: ignore[attr-defined]
 
+    # Anesthetic auto-scales each panel to its sample range, which
+    # gives the visual impression of a hard cutoff when the posterior
+    # falls short of the cube edge.  The cube coordinates are by
+    # construction in [-1, 1], so force every panel axis to show the
+    # full extent.
+    for ax in axes_df.values.flatten():  # type: ignore[attr-defined]
+        if ax is None:
+            continue
+        ax.set_xlim(-1.0, 1.0)
+        if hasattr(ax, "position") and ax.position == "diagonal":
+            # Diagonal cells carry 1D KDEs; only x is bounded by [-1, 1],
+            # the y-axis is density-scaled so leave it alone.
+            continue
+        ax.set_ylim(-1.0, 1.0)
+
     # Tighten the SubFigure's internal layout (same constants as the
     # single-face renderer; the 2x4 outer grid gives each panel ~3.5x
     # the area of the previous 4x4 case so margins are not pinched).
@@ -515,33 +530,37 @@ def _draw_axis_title(
     not honour ``\textcolor`` without a full ``text.usetex=True``
     config; per-text ``color=`` kwargs work in every backend.
     """
-    # Layout: centred around x=0.73, y=0.78 in subfigure coords, with
-    # the three glyphs ("Axis k", "↑", "↓") packed horizontally inside
-    # the empty upper-right triangle of the lower-triangle corner plot.
+    # Layout: three text elements packed left-to-right inside the empty
+    # upper-right triangle of the lower-triangle corner plot.  All three
+    # use ``ha="left"`` from successive anchor x-positions so the glyphs
+    # do not overlap (matplotlib's mathtext ``ha="center"`` was tight
+    # enough at small panel size that ↑↓ collided with the trailing axis
+    # digit).  Single consistent fontsize keeps the arrows in line with
+    # the axis number.
     fig.text(
-        0.65,
+        0.60,
         0.78,
         rf"$\mathrm{{Axis}}\ {axis_idx}$",
-        ha="center",
+        ha="left",
         va="center",
         fontsize=9,
     )
     fig.text(
-        0.76,
+        0.85,
         0.78,
         r"$\uparrow$",
-        ha="center",
+        ha="left",
         va="center",
-        fontsize=11,
+        fontsize=10,
         color=color_up,
     )
     fig.text(
-        0.81,
+        0.92,
         0.78,
         r"$\downarrow$",
-        ha="center",
+        ha="left",
         va="center",
-        fontsize=11,
+        fontsize=10,
         color=color_down,
     )
 
