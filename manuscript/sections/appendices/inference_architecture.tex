@@ -166,7 +166,7 @@ suppression independently of the prior baseline.
   \includegraphics[width=\linewidth]{figures/cubed_sphere_atlas.pdf}
   \caption{Gnomonic cubed-sphere atlas used to sample the direction
     $\hat n \in S^{N-1}$ of a joint coupling-space prior, drawn for
-    $N=3$.  Axes $c_1, c_2, c_3$ are the coupling-space coordinates.
+    $N=3$.  Axes $\theta_1, \theta_2, \theta_3$ are the coupling-space coordinates.
     The sphere is $S^{N-1}$; an $N$-cube is
     wrapped around the origin (purple wireframe) and each cube face is
     radially projected onto the sphere.  The highlighted face
@@ -190,9 +190,7 @@ strength of the couplings beyond it, treated as perturbative
 corrections in the effective-field-theory
 regime~(\cref{PerturbativeReduction}).  The unit vector
 $\hat n \in S^{N-1}$ gives the direction in the parametrisation of
-\cref{PGTEnumeration}.  The survey question becomes which direction
-$\hat n$ at fixed $r$ most strongly amplifies the Gertsenshtein
-conversion.  We sample $\hat n$
+\cref{PGTEnumeration}.  We sample $\hat n$
 uniformly on
 $S^{N-1}$ via a gnomonic cubed-sphere atlas: the $N$-cube wrapped
 around the origin is radially projected onto $S^{N-1}$, yielding a
@@ -275,10 +273,10 @@ coupling $1$, and so on.
     layout: the top two rows hold axes 1--4 with up/down paired
     column-wise, and the bottom two rows hold axes 5--8
     similarly. Each panel is the lower-triangle KDE of the
-    face-local cube coordinates $\chi_1, \ldots, \chi_{N-1}
+    face-local cube coordinates $\theta_1, \ldots, \theta_{N-1}
     \in [-1, 1]^{N-1}$, rendered through anesthetic at
-    $68\%/95\%$ credibility (IBM Carbon magenta 30/70 two-tone
-    fills).  $\chi_i$ refers to a different physical coupling on
+    $68\%/95\%$ credibility.
+    $\theta_i$ refers to a different physical coupling on
     each face: the dominant axis pinned at $\pm 1$ cycles
     through all eight couplings, so the eight panels in each
     row together project the same eight-dimensional direction
