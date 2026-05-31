@@ -1,5 +1,25 @@
 % !TEX root = ../main.tex
-% Introduction — round-11 v11 (2026-05-26).
+% Introduction — round-13 v13 (2026-05-31).
+% Round-13 revisions — supervisor structural reorganisation:
+%   - Paragraph heading shortened: "High-frequency gravitational
+%     waves and gauge-gravity" -> "Gravitational waves" (supervisor
+%     at line 227: keep para titles very short).
+%   - "Torsion theory space and the spin-1 ghost restriction" ->
+%     "Torsion theory space"; "Astrophysical scales and observational
+%     bounds" -> "Astrophysical scales"; "Poincare gauge theory and
+%     adjacent prior work" -> "Prior work".
+%   - Structural reorder (supervisor at line 621: do all astro first,
+%     then transition to PGT): old paragraph order was P1-astro /
+%     P2-theory / P3-astro / P4-prior-art. New order is P1-astro /
+%     P2-astro / P3-theory / P4-prior-art. Moves:
+%     (a) Old P3 "Astrophysical scales" moved to immediately after P1.
+%     (b) Old P1 PGT-photon sub-para (torsion alters photon propagation
+%         + non-minimal couplings + gap statement) moved to end of new
+%         P3 "Torsion theory space".
+%     (c) Three-sentence transition added at start of new P3 to bridge
+%         from astro to PGT motivation; introduces (PGT) abbreviation.
+%
+% Introduction — round-12 v12 (2026-05-31).
 % Round-11 revisions over v10 (~17-point critique):
 %   - Stage 1 p1 frontier: "principal operating instruments in the
 %     nanohertz pulsar-timing band" -> "nanohertz pulsar-timing arrays";
@@ -224,7 +244,7 @@
 \section{Introduction}%
 \label{Introduction}
 
-\paragraph*{High-frequency gravitational waves and gauge-gravity}
+\paragraph*{Gravitational waves}
 Gravitational-wave observation now extends across twelve
 decades in frequency, with nanohertz pulsar-timing
 arrays~\cite{nanograv2023fifteen, EPTA:2023fyk, Reardon:2023gzh},
@@ -379,37 +399,60 @@ formula~\cite{hwangnoh2023emdef, hwangnoh2023graviton, hwangnoh2024nonlinear, to
 %   identifying flaws in the foundational arguments and restricted
 %   validity regimes" -- captures the methodological nature of the
 %   critique rather than a specific numerical result.
-In Poincar\'e gauge theory (PGT), torsion has been shown to alter
-photon propagation~\cite{rubilar2003torsion, obukhov2024electrodynamics, Kruglov:2008cv},
-and admits non-minimal photon--torsion couplings~\cite{hehl2000electromagnetic, itin2004maxwell, Gaete:2008vb, Gaete:2009dd, bahamonde2025torsion}.
-% Torsion-EM cluster split by physical content (user round-7
-% item: prior cluster was monolithic; the split makes the
-% distinction from graviton-photon mixing concrete):
-%   Propagation modifications:
-%     rubilar2003torsion: vacuum birefringence from Preuss coupling
-%       (T^2 F^2 / spacetime constitutive tensor).
-%     obukhov2024electrodynamics: planar EM-wave dichroism from
-%       axial-torsion coupling.
-%     Kruglov:2008cv: photon-torsion mixing in B-field from
-%       higher-derivative QG.
-%   Vertex-level non-minimal couplings:
-%     hehl2000electromagnetic: foundational classification of
-%       EM-gravity-torsion couplings.
-%     itin2004maxwell: complete F^2 T^2 invariant classification.
-%     Gaete:2008vb/2009dd: path-dependent EM in torsion background;
-%       static confinement potentials.
-%     bahamonde2025torsion: F^{munu} R_tilde_{munu} coupling;
-%       BH solutions with torsion-spin charge.
+% v13: PGT-photon sub-para moved to "Torsion theory space" paragraph.
 
-% Closer: standard BHL gap-identification, declarative without
-%   "However" (round-10 user item: declarative reads cleaner).
-% v11-fix: "carrying propagating torsion" dropped, consistent with
-%   the Stage 3c gap-closer broadening to "any PGT theory".
-%   Two strands above study propagation through and coupling to
-%   torsion separately; neither addresses the coupled graviton--
-%   photon--torsion three-field mixing this work computes.
+\paragraph*{Astrophysical scales}
+The reach of any Gertsenshtein-class measurement is bounded by
+the product of background magnetic-field (BGMF) strength and
+propagation length. BGMFs available to
+indirect-detection schemes span galactic regular
+fields of order $10^{-10}\,\mathrm{T}$ over kiloparsec
+baselines~\cite{Domcke:2020yzq, Domcke:2022rgu, lella2024constraining},
+and magnetar surface fields of order $10^{11}\,\mathrm{T}$ over
+kilometre extents~\cite{Aggarwal:2020olq}.
+Propagation through cosmological backgrounds does not amplify
+this product: Anninos~\etal find that, in FLRW and
+de~Sitter universes, the mixing length exceeds the Hubble radius,
+and oscillations are damped~\cite{Anninos:2024esx}.
+At magnetar fields, the bare conversion factor
+is of order $10^{-8}$, so existing proposals for observability
+each invoke astrophysical
+amplification~\cite{kushwaha2022magnetar, mcdonald2024magnetar, Wu:2026nds};
+a candidate setting is the binary neutron star merger /
+magnetar coincidence proposed for GW190425 and
+FRB~20190425A~\cite{Wu:2026nds}.
+% v13: paragraph moved before "Torsion theory space" so all
+%   astrophysical material precedes PGT theory discussion,
+%   per supervisor comment at line 621 of original.
+% Title shortened from "Astrophysical scales and observational
+%   bounds" to "Astrophysical scales" per supervisor's heading-
+%   length note.
+% v10-fix: dropped "coherent" before "propagation length".
+% Anninos:2024esx (2401.08346): Gertsenshtein in FLRW/de Sitter.
+%   Honest finding: mixing length > Hubble radius in all surveyed
+%   parameter ranges; oscillations damp out.
+% GZ-magnetosphere cluster:
+%   kushwaha2022magnetar (2202.00032): foundational GZ-as-FRB
+%     proposal.
+%   mcdonald2024magnetar (2406.18634): 3D resonant conversion in
+%     NS-magnetosphere plasma.
+%   Wu:2026nds (2604.12775): BNS-merger / magnetar coincidence for
+%     GW190425 + FRB 20190425A; bare GZ conversion alpha~4.4e-8.
+% Number-in-prose policy: only the bare conversion factor 10^-8
+%   appears in the prose itself.
 
-\paragraph*{Torsion theory space and the spin-1 ghost restriction}
+\paragraph*{Torsion theory space}
+These astrophysical limits apply to the Einstein--Maxwell
+baseline. The Gertsenshtein conversion probability is sensitive,
+however, to the structure of the gravitational theory: new
+field content and non-minimal couplings can shift the mixing
+kernel. Poincar\'e gauge theory (PGT) is a natural setting in
+which to investigate this sensitivity, introducing torsion and
+curvature as independent gravitational field strengths alongside
+the metric.
+% v13 transition: bridges astro block to theory block, per
+%   supervisor's request. Introduces the (PGT) abbreviation
+%   (previously introduced in old Para 1's PGT-photon sub-para).
 The quadratic Poincar\'e gauge Lagrangian carries a
 vast operator space of admissible torsion--curvature
 couplings~\cite{sezgin1980ghostfree, Sezgin:1981xs, lin2019pgt, blagojevic2018hamiltonian, barker2024poincare},
@@ -432,105 +475,40 @@ and tachyon-free at linear order.
 %   ("Yo--Nester unit tests", Barker 2206.00658). Use as a named
 %   theorem rather than "the standard no-go theorem".
 % v10 cluster change:
-%   Drop Yo:1999ex -- that paper is about SCALAR torsion modes
-%     ("Hamiltonian analysis of PGT scalar modes"), not the vector
-%     no-go. User round-10 flagged the mis-citation.
 %   Keep Yo:2001sy ("higher spin modes") -- the actual vector-
 %     torsion paper.
-%   blagojevic2018hamiltonian: full PGT Hamiltonian analysis
-%     reproducing the no-go in the canonical-formalism framework.
+%   blagojevic2018hamiltonian: full PGT Hamiltonian analysis.
 %   BeltranJimenez:2019hrm: post-Riemannian-expansion stability
-%     analysis confirming Yo's conclusions in a different
-%     formalism; verbatim "imposing ghost-freedom generically
+%     analysis; verbatim "imposing ghost-freedom generically
 %     leads to a non-dynamical torsion".
-%   Aoki:2020zqm: names "Yo-Nester (YN) ghosts" verbatim; seeks
-%     ghost-free non-linear extensions.
+%   Aoki:2020zqm: names "Yo-Nester (YN) ghosts" verbatim.
 This restriction was recently reopened by scale-invariant
 extensions of the gauge group, which introduce a Maxwell-type
 kinetic term for vector torsion to restore its propagating
 character~\cite{barker2024poincare}.
-% barker2024poincare: "Every Poincare gauge theory is conformal"
-%   shows that the unique scale-invariant embedding of PGT
-%   introduces a Maxwell kinetic term for vector torsion, making
-%   it ghost-free and propagating in eWGT. Verbatim closer:
-%   "vector torsion is back on the menu".
+% barker2024poincare: introduces Maxwell kinetic term for vector
+%   torsion; verbatim closer: "vector torsion is back on the menu".
 Whether and how the Gertsenshtein channel is modified in PGT
 depends both on the form of the
 torsion--electromagnetic couplings and on the propagating-mode
 content.
-% Closer: direct "depends on X and Y" formulation. No "lives at
-%   the intersection" metaphor (round-7 user item: AI register)
-%   and no "non-propagating cases serving as a control" hedge
-%   (round-8 user item).
+% Closer: direct "depends on X and Y" formulation.
+In PGT, torsion has been shown to alter
+photon propagation~\cite{rubilar2003torsion, obukhov2024electrodynamics, Kruglov:2008cv},
+and admits non-minimal photon--torsion couplings~\cite{hehl2000electromagnetic, itin2004maxwell, Gaete:2008vb, Gaete:2009dd, bahamonde2025torsion}.
+% v13: PGT-photon cluster moved here from old Para 1 so that
+%   all PGT-theory content is grouped after the astro material.
+%   Propagation modifications: rubilar2003torsion (birefringence),
+%   obukhov2024electrodynamics (dichroism), Kruglov:2008cv (mixing).
+%   Non-minimal couplings: hehl2000electromagnetic, itin2004maxwell,
+%   Gaete:2008vb/2009dd, bahamonde2025torsion.
+The graviton--photon mixing calculation in a PGT background
+has not been performed.
+% Gap statement moved with the PGT-photon cluster. The
+%   broader gap-closer in "Prior work" ("The Gertsenshtein
+%   effect has not been computed for any PGT theory") remains.
 
-\paragraph*{Astrophysical scales and observational bounds}
-The reach of any Gertsenshtein-class measurement is bounded by
-the product of background magnetic-field (BGMF) strength and
-propagation length. BGMFs available to
-indirect-detection schemes span galactic regular
-fields of order $10^{-10}\,\mathrm{T}$ over kiloparsec
-baselines~\cite{Domcke:2020yzq, Domcke:2022rgu, lella2024constraining},
-and magnetar surface fields of order $10^{11}\,\mathrm{T}$ over
-kilometre extents~\cite{Aggarwal:2020olq}.
-Propagation through cosmological backgrounds does not amplify
-this product: Anninos~\etal find that, in FLRW and
-de~Sitter universes, the mixing length exceeds the Hubble radius,
-and oscillations are damped~\cite{Anninos:2024esx}.
-At magnetar fields, the bare conversion factor
-is of order $10^{-8}$, so existing proposals for observability
-each invoke astrophysical
-amplification~\cite{kushwaha2022magnetar, mcdonald2024magnetar, Wu:2026nds};
-a candidate setting is the binary neutron star merger /
-magnetar coincidence proposed for GW190425 and
-FRB~20190425A~\cite{Wu:2026nds}.
-% Title renamed from v6 "Astrophysical anchors" (round-7 user:
-%   not formal). Field-strength scales retained as the
-%   supervisor's grounding-numbers anchor.
-% v7-cut: the Omega_GW upper-limit sentence (h_c bound now in
-%   Stage 1 alongside the inverse-process discussion).
-% v10-fix: "scales of interest span many decades" reframed as
-%   "Background magnetic fields available to indirect-detection
-%   schemes span many decades" -- user round-10 flagged that the
-%   v9 wording was ambiguous about WHAT span many decades. Restruc-
-%   tured into two short sentences so the "bracket the regimes"
-%   reading is no longer a back-loaded clause.
-% v10-fix: dropped "coherent" before "propagation length" --
-%   detuning effects in our formulas do not require coherence.
-% Anninos:2024esx (2401.08346): Gertsenshtein in FLRW/de Sitter.
-%   Honest finding: mixing length > Hubble radius in all surveyed
-%   parameter ranges; oscillations damp out; charged-particle
-%   screening adds further suppression. Cited here as a caution
-%   against naive (B-field strength) x (astrophysical path length)
-%   product reasoning -- expanding-universe propagation does not
-%   amplify the bare conversion, it suppresses it. Earlier round-
-%   10 user prompt recalled this as a "12 orders amplification"
-%   paper; the memory is inverted -- the paper's result is
-%   suppression. Verbatim abstract: "in all our models the mixing
-%   length is larger than the Hubble radius".
-% GZ-magnetosphere cluster (added round 9):
-%   Active 2022-2026 research line: ~10 papers across 7-8 groups,
-%   growing trajectory, contemporaneous with the recent PGT activity
-%   cited in Stages 2-3.
-%   kushwaha2022magnetar (2202.00032): foundational GZ-as-FRB
-%     proposal; title establishes the "Gertsenshtein-Zel'dovich (GZ)
-%     effect" binomial.
-%   mcdonald2024magnetar (2406.18634): 3D resonant graviton-photon
-%     conversion in NS-magnetosphere plasma.
-%   tomomatsu2025gertsenshtein (2510.17094): geometric-optics with
-%     background-B self-curvature; plane-wave focus-vs-Gertsenshtein
-%     cancellation, spherical-wave Gertsenshtein-dominant attenuation.
-%   Wu:2026nds (2604.12775): 2026 BNS-merger / magnetar coincidence
-%     for GW190425 + FRB 20190425A. B = 6.1e15 G; magnetar at 18 AU;
-%     bare GZ conversion alpha ~ 4.4e-8; ICS upconversion gamma^2 ~ 1e5
-%     to GHz FRB band; predicted flux ~19 Jy at 156 Mpc; L_ICS ~ 2.2e41
-%     erg/s. Abstract uses "Gertsenshtein-Zel'dovich (GZ) effect"
-%     verbatim.
-% Number-in-prose policy: only the bare conversion factor 10^-8
-%   appears in the prose itself. gamma^2 ~ 10^5 upconversion and the
-%   19 Jy / 18 AU geometry stay in this comment (BHL: Stage 1 carries
-%   scale magnitudes, not author-specific predictions).
-
-\paragraph*{Poincar\'e gauge theory and adjacent prior work}
+\paragraph*{Prior work}
 The gauge-theoretic completion of Einstein's theory, wherein
 the local Poincar\'e symmetry is gauged
 on the same footing as the internal symmetries of the Standard
