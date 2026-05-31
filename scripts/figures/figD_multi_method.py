@@ -129,6 +129,7 @@ def _plot(data: dict, out_path: Path) -> None:
             vmax=vmax,
             shading="flat",
             edgecolors="none",
+            alpha=0.65,
         )
         ax.set_ylim(n_row - 0.5, -0.5)  # match imshow's default origin orientation
         ax.set_aspect("equal")
