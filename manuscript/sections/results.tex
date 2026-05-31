@@ -51,11 +51,11 @@ inventory is collected
 in~\cref{PGTEnumeration}; the perturbative-regime conditions
 under which the linearised treatment remains self-consistent are set
 out in~\cref{PerturbativeRegime}; and the Bayesian inference methodology is described in
-\cref{InferenceArchitecture}. Throughout, the per-sample conversion
-score $A(\theta)$ of~\cref{AmplificationScore} drives the Bayesian
+\cref{InferenceArchitecture}. The per-sample conversion score
+$A(\theta)$ of~\cref{AmplificationScore} drives the Bayesian
 likelihood; the small-$\Bzero$ asymptotic ratio $\Aamp$ of
-\cref{AmplificationFactor} additionally applies to the plane-wave
-uniform-$\Bzero$.
+\cref{AmplificationFactor} applies to the plane-wave uniform-$\Bzero$
+setup.
 
 \subsection{Validation against the Einstein--Maxwell baseline}%
 \label{ValidationResult}
@@ -75,11 +75,12 @@ sampling $\Bzero$ at 24 uniformly spaced values in $[0.005,0.25]$.
 
 \paragraph*{Reproduction of the Boccaletti kernel}
 \TIDAL{} recovers the Boccaletti kernel~\cref{GertsenshteinFormula}
-in the small-$\Bzero$ limit: the signed residual $P_{\TIDAL} - P_\text{bare}$
-lies at the modal-evolution round-off floor\wb{Some bits begin to smell like AI wrote them. In case that's true, it might be good to check that you can explain all the terms that are introduced by your agent.} of $\lesssim 10^{-8}$
-(\cref{BoccalettiValidation}); the full two-mode comparison against
-the detuning formula of~\cite{raffelt1988mixing} is in
-\cref{BoccalettiUniform}.
+in the small-$\Bzero$ limit to the double-precision arithmetic limit
+of the modal evolution
+($|P_{\TIDAL} - P_\text{bare}| \lesssim 10^{-8}$,
+see~\cref{BoccalettiValidation}); the full two-mode comparison
+against the detuning formula of~\cite{raffelt1988mixing} is
+in~\cref{BoccalettiUniform}.
 The path-integrated kernel~\cref{BoccalettiPathIntegrated} is recovered in
 \cref{BoccalettiLocalised}.
 
@@ -217,9 +218,8 @@ $\Alp{1}\MAGF{^2}$ curvature-squared term,
   % \label{R2PGTLagrangian}
 \end{align*}
 giving a four-dimensional prior over
-$\{\Bet{1\!-\!3}, \Alp{1}\}$. The Gertsenshtein channel is unaffected
-by the $\Alp{1}$ coupling at linear order: the $\Alp{1}$-weighted
-terms are absent from the channel equations that mediate the standard
+$\{\Bet{1\!-\!3}, \Alp{1}\}$. The $\Alp{1}$-weighted terms vanish
+from the linearised equations of motion that source the
 Gertsenshtein conversion,
 \begin{align*}
   \partial_t^2 A_x &= B_0 \, \partial_z h_{xy} + \partial_z^2 A_x, \\
@@ -246,8 +246,7 @@ To break this decoupling we introduce the first
 non-minimal vertex: the direct coupling
 $\Del{1}\MAGF{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ between the
 antisymmetric Riemann--Cartan Ricci tensor and the electromagnetic
-field strength, introduced by~\cite{bahamonde2025torsion} and not
-previously investigated in this context.
+field strength, introduced by~\cite{bahamonde2025torsion}.
 This theory sources the linearised conversion amplitude
 directly at $\O(\Bzero)$ \emph{without} propagating torsion.
 The lagrangian is
@@ -528,14 +527,9 @@ giving an eighteen-dimensional prior. The posterior gives
   \qand
   \logZ_- = -3.18 \pm 0.07,
 \end{equation*}
-so $\log B = +13.48$. The
-suppression loses likelihood weight relative to the prior,
-% --- the only sector in the
-% parity-even hierarchy where the suppression direction loses likelihood
-% weight relative to the prior ---
-indicating that closing the $\chi_i$
-basis confines suppression to small $\chi$ rather than opening
-additional suppression corners. Per-parameter $\D$ resolves the
+so $\log B = +13.48$. The suppression occupies less prior-weighted
+volume than the baseline: closing the $\chi_i$ basis confines it to
+small $\chi$. Per-parameter $\D$ resolves the
 structure further: $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
 \MAGF{_{\mu\nu\rho\sigma}}$ alone accounts for $\D(P_+\|P_-) = 4.2$
 nats (\cref{KLTableChiClosureComparison}) as the dominant operator driving the
@@ -669,11 +663,10 @@ the overlay of~\cref{CornerYMUnionPair} (eight-parameter control,
 overlaid with the propagating YM--PGT union) and~\cref{CornerChiClosure}
 (seventeen-parameter $\chi$-closure control).
 
-In the non-propagating-torsion sector:
-the algebraic torsion field remains bounded relative to the
-metric/photon perturbations at the maximum-a-posteriori point of the
-chain, ruling out a constraint-divergence pathology; and the linearised
-eigenvalue spectrum at that point shows no
+At the strongest-amplifying sample of the non-propagating-torsion
+sector, the algebraic torsion field remains bounded relative to the
+metric/photon perturbations (ruling out a constraint-divergence
+pathology) and the linearised eigenvalue spectrum shows no
 $\Re\{\lambda\} > 0$ modes in the pure metric channel.
 
 % Discussion preserved (planning directive 2026-05-25):
@@ -695,14 +688,20 @@ $\{\xi_6, \xi_7, \xi_{12}, \xi_{16}\}$) with the full
 sixteen-parameter $\xi_{1\!-\!16}$ basis of the $(\nabla\MAGT{})^2$
 class (\cref{DerivativeExtensions}), on top of the complete
 $\chi_{1\!-\!10}$
-$\MAGF{}\!\times\!\nabla\MAGT{}$ basis. One
-invariant, $\xi_{11}$, vanishes in the plane-wave reduction; fifteen
-propagating $\xi$-couplings give a now thirty-two-dimensional prior.
-The extended
-$\xi_{11\!-\!16}$ sub-sector drives a substantial fraction of sample
-points into modal-solver overflow; the log-evidence values and
-per-coupling $\D$
-figures are therefore not quantitatively meaningful in this sector.
+$\MAGF{}\!\times\!\nabla\MAGT{}$ basis. $\xi_{11}$ does not appear
+in the linearised equations under plane-wave reduction, leaving a
+thirty-two-dimensional prior over the fifteen surviving
+$\xi$-couplings together with the $\chi_{1\!-\!10}$ and the EM--RC
+base parameters. The extended $\xi_{11\!-\!16}$ sub-sector drives a
+substantial fraction of sample points into modal-solver overflow, so
+the log-evidence and per-coupling $\D$ figures for this sector are
+not quantitatively meaningful.%
+% TODO(Phase E NS-interpretation round): the "not quantitatively
+% meaningful" phrasing inherits the inference-language framing this
+% paragraph also uses. Revisit once the landscape-search framing is
+% finalised; the substantive point may be better phrased as e.g.
+% "the prior-weighted landscape this sector reports is dominated by
+% the overflow regions and is not a clean amplification ranking."
 $\chi_1$ and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 \rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$ are the apparent dominant directions.
 
@@ -814,17 +813,15 @@ find
 \end{align*}
 with $\log B = +6.11$. The amplification log-evidence dominates the
 suppression log-evidence, and the per-parameter $\D$
-figures of~\cref{KLTableDarkPhoton} place $\Del{m}$ above $m_A^2$. This
-ordering should be read against the broad log-uniform priors used for
-$m_A^2$, $\xi$, and $\Bet{3}$ (six decades each), which dilute their
-marginal $\D$ figures relative to the arctan-uniform prior
-on $\Del{m}$. Pre-sampling tests of this sector found
-that the dark-photon kinetic mixing adds little to the base
-plasma-mass model either way: the conversion is controlled
-by the photon plasma mass $m_A^2$, which shifts the photon dispersion
-and detunes coherent Gertsenshtein
-conversion. The nominal $\D$ ordering reported here
-understates the role of $m_A^2$ because of the prior breadth.
+figures of~\cref{KLTableDarkPhoton} place $\Del{m}$ above $m_A^2$.
+The conversion is controlled by the photon plasma mass $m_A^2$,
+which shifts the photon dispersion and detunes coherent
+Gertsenshtein conversion; the dark-photon kinetic mixing adds little
+either way. The marginal $\D$ values above are computed against the
+prior shapes specific to each parameter and are not directly
+cross-comparable; $m_A^2$'s physical role in the conversion is more
+significant than its marginal $\D$ position relative to $\Del{m}$
+shows.
 
 \begin{figure}[!htbp]
   \centering
@@ -891,9 +888,9 @@ magnetic background. We include three EFT couplings,
 of which the $\FieldF{}\!\cdot\!\FieldFtilde{}$ topological term is a total covariant
 derivative absent from the equations of motion
 (\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
-over $(\rho, \sigma)$. The $\FieldF{^4}$ corrections scale with the background
-field to a higher power than the leading PGT vertices, so
-they are expected to be subdominant. The posterior has
+over $(\rho, \sigma)$. The $\FieldF{^4}$ corrections scale with the
+background field to a higher power than the leading PGT vertices
+and are subdominant in this regime. The posterior has
 \begin{align*}
   \logZ_+ = +0.184 \pm 0.001 \, , \quad
   \logZ_- = -0.185 \pm 0.0004 \, ,
