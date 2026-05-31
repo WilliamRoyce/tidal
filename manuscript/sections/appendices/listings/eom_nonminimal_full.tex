@@ -1,6 +1,6 @@
 % !TEX root = ../../../main.tex
   \begin{aligned}
-    \mathscr{L} &= \tfrac{1}{\kappa^2} \tilde{\mathcal{R}} + \alpha_{1} \tensor{T}{_a_b_c} \tensor{g}{^a^d} \tensor{g}{^b^e} \tensor{g}{^c^f} \tensor{T}{_d_e_f} + \alpha_{2} \tensor{T}{_a_b_c} \tensor{g}{^b^d} \tensor{g}{^a^e} \tensor{g}{^c^f} \tensor{T}{_d_e_f} + \alpha_{3} \tensor{T}{^b_b_a} \tensor{g}{^a^d} \tensor{T}{^c_c_d} \\
+    \mathscr{L} &= \tfrac{1}{\kappa^2} \tilde{\mathcal{R}} + \Bet{1} \tensor{T}{_a_b_c} \tensor{g}{^a^d} \tensor{g}{^b^e} \tensor{g}{^c^f} \tensor{T}{_d_e_f} + \Bet{2} \tensor{T}{_a_b_c} \tensor{g}{^b^d} \tensor{g}{^a^e} \tensor{g}{^c^f} \tensor{T}{_d_e_f} + \Bet{3} \tensor{T}{^b_b_a} \tensor{g}{^a^d} \tensor{T}{^c_c_d} \\
   &\quad + \delta_{1} \tensor{\tilde{R}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d} - \tfrac{1}{4} \tensor{\mathcal{F}}{_a_b} \tensor{g}{^a^c} \tensor{g}{^b^d} \tensor{\mathcal{F}}{_c_d}
   \end{aligned} \\[1ex]
   % \begin{aligned}
@@ -57,92 +57,92 @@
   % &\quad + \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z \mathcal{T}_{xxy} + B_{0} \, \delta_{1} \partial_t \mathcal{T}_{zty} + B_{0} \, \delta_{1} \partial_t \mathcal{T}_{tyz} + \tfrac{1}{2 \, \kappa^2} \partial_t^2 h_{xx} + \tfrac{1}{2 \, \kappa^2} \partial_t^2 h_{yy}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= 4 \, \alpha_{1} \mathcal{T}_{ttx} + 2 \, \alpha_{2} \mathcal{T}_{ttx} + 2 \, \alpha_{3} \mathcal{T}_{ttx} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{ttx} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{xyz} - 2 \, \alpha_{3} \mathcal{T}_{yxy} + \tfrac{3}{\kappa^2} \mathcal{T}_{yxy} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{yxz} \\
-  % &\quad - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{zxy} - 2 \, \alpha_{3} \mathcal{T}_{zxz} + \tfrac{3}{\kappa^2} \mathcal{T}_{zxz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_z h_{xy} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 A_{x} - \tfrac{1}{2} \delta_{1} \partial_t^2 A_{x}
+  %   0 &= 4 \, \Bet{1} \mathcal{T}_{ttx} + 2 \, \Bet{2} \mathcal{T}_{ttx} + 2 \, \Bet{3} \mathcal{T}_{ttx} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{ttx} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{xyz} - 2 \, \Bet{3} \mathcal{T}_{yxy} + \tfrac{3}{\kappa^2} \mathcal{T}_{yxy} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{yxz} \\
+  % &\quad - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{zxy} - 2 \, \Bet{3} \mathcal{T}_{zxz} + \tfrac{3}{\kappa^2} \mathcal{T}_{zxz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_z h_{xy} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 A_{x} - \tfrac{1}{2} \delta_{1} \partial_t^2 A_{x}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= 4 \, \alpha_{1} \mathcal{T}_{tty} + 2 \, \alpha_{2} \mathcal{T}_{tty} + 2 \, \alpha_{3} \mathcal{T}_{tty} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{tty} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{yyz} - 2 \, \alpha_{3} \mathcal{T}_{zyz} + \tfrac{3}{\kappa^2} \mathcal{T}_{zyz} + 2 \, \alpha_{3} \mathcal{T}_{xxy} - \tfrac{3}{\kappa^2} \mathcal{T}_{xxy} \\
+  %   0 &= 4 \, \Bet{1} \mathcal{T}_{tty} + 2 \, \Bet{2} \mathcal{T}_{tty} + 2 \, \Bet{3} \mathcal{T}_{tty} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{tty} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{yyz} - 2 \, \Bet{3} \mathcal{T}_{zyz} + \tfrac{3}{\kappa^2} \mathcal{T}_{zyz} + 2 \, \Bet{3} \mathcal{T}_{xxy} - \tfrac{3}{\kappa^2} \mathcal{T}_{xxy} \\
   % &\quad + \tfrac{B_{0} \, \delta_{1}}{4} \partial_z h_{tt} + \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z h_{xx} - \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z h_{yy} - \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z h_{zz} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 A_{y} - \tfrac{1}{2} B_{0} \, \delta_{1} \partial_t h_{tz} \\
   % &\quad - \tfrac{1}{2} \delta_{1} \partial_t^2 A_{y}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= 4 \, \alpha_{1} \mathcal{T}_{xxz} + 2 \, \alpha_{2} \mathcal{T}_{xxz} + 2 \, \alpha_{3} \mathcal{T}_{xxz} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{xxz} + 2 \, \alpha_{3} \mathcal{T}_{yyz} - \tfrac{3}{\kappa^2} \mathcal{T}_{yyz} + 2 \, \alpha_{3} \mathcal{T}_{ttz} - \tfrac{3}{\kappa^2} \mathcal{T}_{ttz} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{zyz} \\
+  %   0 &= 4 \, \Bet{1} \mathcal{T}_{xxz} + 2 \, \Bet{2} \mathcal{T}_{xxz} + 2 \, \Bet{3} \mathcal{T}_{xxz} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{xxz} + 2 \, \Bet{3} \mathcal{T}_{yyz} - \tfrac{3}{\kappa^2} \mathcal{T}_{yyz} + 2 \, \Bet{3} \mathcal{T}_{ttz} - \tfrac{3}{\kappa^2} \mathcal{T}_{ttz} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{zyz} \\
   % &\quad - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_t h_{ty} - \tfrac{3 \, \delta_{1}}{2} \partial_z \dot{A}_{t} + \tfrac{3 \, \delta_{1}}{2} \partial_t^2 A_{z}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{ttx} + 4 \, \alpha_{1} \mathcal{T}_{xyz} + \tfrac{2}{\kappa^2} \mathcal{T}_{xyz} -2 \, B_{0} \, \delta_{1} \mathcal{T}_{yxy} + 2 \, \alpha_{2} \mathcal{T}_{yxz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{yxz} -2 \, \alpha_{2} \mathcal{T}_{zxy} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{zxy} -2 \, B_{0} \, \delta_{1} \mathcal{T}_{zxz}
+  %   0 &= \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{ttx} + 4 \, \Bet{1} \mathcal{T}_{xyz} + \tfrac{2}{\kappa^2} \mathcal{T}_{xyz} -2 \, B_{0} \, \delta_{1} \mathcal{T}_{yxy} + 2 \, \Bet{2} \mathcal{T}_{yxz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{yxz} -2 \, \Bet{2} \mathcal{T}_{zxy} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{zxy} -2 \, B_{0} \, \delta_{1} \mathcal{T}_{zxz}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -4 \, \alpha_{1} \mathcal{T}_{ytx} -\tfrac{2}{\kappa^2} \mathcal{T}_{ytx} -2 \, \alpha_{2} \mathcal{T}_{txy} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{txy} -\tfrac{1}{2} B_{0} \, \delta_{1} \mathcal{T}_{txz} -2 \, \alpha_{2} \mathcal{T}_{xty} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xty} -\tfrac{1}{2} B_{0} \, \delta_{1} \mathcal{T}_{xtz}
+  %   0 &= -4 \, \Bet{1} \mathcal{T}_{ytx} -\tfrac{2}{\kappa^2} \mathcal{T}_{ytx} -2 \, \Bet{2} \mathcal{T}_{txy} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{txy} -\tfrac{1}{2} B_{0} \, \delta_{1} \mathcal{T}_{txz} -2 \, \Bet{2} \mathcal{T}_{xty} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xty} -\tfrac{1}{2} B_{0} \, \delta_{1} \mathcal{T}_{xtz}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -4 \, \alpha_{1} \mathcal{T}_{yty} - 2 \, \alpha_{2} \mathcal{T}_{yty} - 2 \, \alpha_{3} \mathcal{T}_{yty} - \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{yty} + B_{0} \, \delta_{1} \mathcal{T}_{ytz} - B_{0} \, \delta_{1} \mathcal{T}_{zty} - 2 \, \alpha_{3} \mathcal{T}_{ztz} + \tfrac{3}{\kappa^2} \mathcal{T}_{ztz} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{tyz} - 2 \, \alpha_{3} \mathcal{T}_{xtx} \\
+  %   0 &= -4 \, \Bet{1} \mathcal{T}_{yty} - 2 \, \Bet{2} \mathcal{T}_{yty} - 2 \, \Bet{3} \mathcal{T}_{yty} - \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{yty} + B_{0} \, \delta_{1} \mathcal{T}_{ytz} - B_{0} \, \delta_{1} \mathcal{T}_{zty} - 2 \, \Bet{3} \mathcal{T}_{ztz} + \tfrac{3}{\kappa^2} \mathcal{T}_{ztz} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{tyz} - 2 \, \Bet{3} \mathcal{T}_{xtx} \\
   % &\quad + \tfrac{3}{\kappa^2} \mathcal{T}_{xtx} - \tfrac{1}{2} B_{0} \, \delta_{1} \partial_z h_{ty} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 A_{t} - B_{0} \, \delta_{1} \partial_t h_{yz} + \tfrac{3 \, \delta_{1}}{2} \partial_z \dot{A}_{z}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= B_{0} \, \delta_{1} \mathcal{T}_{yty} - 4 \, \alpha_{1} \mathcal{T}_{ytz} - \tfrac{2}{\kappa^2} \mathcal{T}_{ytz} - 2 \, \alpha_{2} \mathcal{T}_{zty} - \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{zty} + B_{0} \, \delta_{1} \mathcal{T}_{ztz} + 2 \, \alpha_{2} \mathcal{T}_{tyz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{tyz} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{xtx} \\
+  %   0 &= B_{0} \, \delta_{1} \mathcal{T}_{yty} - 4 \, \Bet{1} \mathcal{T}_{ytz} - \tfrac{2}{\kappa^2} \mathcal{T}_{ytz} - 2 \, \Bet{2} \mathcal{T}_{zty} - \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{zty} + B_{0} \, \delta_{1} \mathcal{T}_{ztz} + 2 \, \Bet{2} \mathcal{T}_{tyz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{tyz} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{xtx} \\
   % &\quad + B_{0} \, \delta_{1} \partial_t h_{yy}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -2 \, \alpha_{3} \mathcal{T}_{ttx} + \tfrac{3}{\kappa^2} \mathcal{T}_{ttx} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{xyz} + 4 \, \alpha_{1} \mathcal{T}_{yxy} + 2 \, \alpha_{2} \mathcal{T}_{yxy} + 2 \, \alpha_{3} \mathcal{T}_{yxy} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{yxy} - B_{0} \, \delta_{1} \mathcal{T}_{yxz} + B_{0} \, \delta_{1} \mathcal{T}_{zxy} + 2 \, \alpha_{3} \mathcal{T}_{zxz} \\
+  %   0 &= -2 \, \Bet{3} \mathcal{T}_{ttx} + \tfrac{3}{\kappa^2} \mathcal{T}_{ttx} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{xyz} + 4 \, \Bet{1} \mathcal{T}_{yxy} + 2 \, \Bet{2} \mathcal{T}_{yxy} + 2 \, \Bet{3} \mathcal{T}_{yxy} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{yxy} - B_{0} \, \delta_{1} \mathcal{T}_{yxz} + B_{0} \, \delta_{1} \mathcal{T}_{zxy} + 2 \, \Bet{3} \mathcal{T}_{zxz} \\
   % &\quad - \tfrac{3}{\kappa^2} \mathcal{T}_{zxz} + \tfrac{B_{0} \, \delta_{1}}{2} \partial_z h_{xy} + \tfrac{3 \, \delta_{1}}{2} \partial_z^2 A_{x} - \tfrac{3 \, \delta_{1}}{2} \partial_t^2 A_{x}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{ttx} + 2 \, \alpha_{2} \mathcal{T}_{xyz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xyz} -B_{0} \, \delta_{1} \mathcal{T}_{yxy} + 4 \, \alpha_{1} \mathcal{T}_{yxz} + \tfrac{2}{\kappa^2} \mathcal{T}_{yxz} + 2 \, \alpha_{2} \mathcal{T}_{zxy} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{zxy} -B_{0} \, \delta_{1} \mathcal{T}_{zxz}
+  %   0 &= \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{ttx} + 2 \, \Bet{2} \mathcal{T}_{xyz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xyz} -B_{0} \, \delta_{1} \mathcal{T}_{yxy} + 4 \, \Bet{1} \mathcal{T}_{yxz} + \tfrac{2}{\kappa^2} \mathcal{T}_{yxz} + 2 \, \Bet{2} \mathcal{T}_{zxy} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{zxy} -B_{0} \, \delta_{1} \mathcal{T}_{zxz}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= 3 \, B_{0} \, \delta_{1} \mathcal{T}_{tty} + 2 \, \alpha_{3} \mathcal{T}_{xxz} - \tfrac{3}{\kappa^2} \mathcal{T}_{xxz} + 4 \, \alpha_{1} \mathcal{T}_{yyz} + 2 \, \alpha_{2} \mathcal{T}_{yyz} + 2 \, \alpha_{3} \mathcal{T}_{yyz} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{yyz} + 2 \, \alpha_{3} \mathcal{T}_{ttz} - \tfrac{3}{\kappa^2} \mathcal{T}_{ttz} \\
+  %   0 &= 3 \, B_{0} \, \delta_{1} \mathcal{T}_{tty} + 2 \, \Bet{3} \mathcal{T}_{xxz} - \tfrac{3}{\kappa^2} \mathcal{T}_{xxz} + 4 \, \Bet{1} \mathcal{T}_{yyz} + 2 \, \Bet{2} \mathcal{T}_{yyz} + 2 \, \Bet{3} \mathcal{T}_{yyz} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{yyz} + 2 \, \Bet{3} \mathcal{T}_{ttz} - \tfrac{3}{\kappa^2} \mathcal{T}_{ttz} \\
   % &\quad + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{xxy} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_t h_{ty} - \tfrac{3 \, \delta_{1}}{2} \partial_z \dot{A}_{t} + \tfrac{3 \, \delta_{1}}{2} \partial_t^2 A_{z}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -4 \, \alpha_{1} \mathcal{T}_{ztx} -\tfrac{2}{\kappa^2} \mathcal{T}_{ztx} + \tfrac{B_{0} \, \delta_{1}}{2} \mathcal{T}_{txy} -2 \, \alpha_{2} \mathcal{T}_{txz} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{txz} + \tfrac{B_{0} \, \delta_{1}}{2} \mathcal{T}_{xty} -2 \, \alpha_{2} \mathcal{T}_{xtz} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xtz} -2 \, \delta_{1} \partial_z \dot{A}_{x}
+  %   0 &= -4 \, \Bet{1} \mathcal{T}_{ztx} -\tfrac{2}{\kappa^2} \mathcal{T}_{ztx} + \tfrac{B_{0} \, \delta_{1}}{2} \mathcal{T}_{txy} -2 \, \Bet{2} \mathcal{T}_{txz} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{txz} + \tfrac{B_{0} \, \delta_{1}}{2} \mathcal{T}_{xty} -2 \, \Bet{2} \mathcal{T}_{xtz} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xtz} -2 \, \delta_{1} \partial_z \dot{A}_{x}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -B_{0} \, \delta_{1} \mathcal{T}_{yty} - 2 \, \alpha_{2} \mathcal{T}_{ytz} - \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ytz} - 4 \, \alpha_{1} \mathcal{T}_{zty} - \tfrac{2}{\kappa^2} \mathcal{T}_{zty} - B_{0} \, \delta_{1} \mathcal{T}_{ztz} - 2 \, \alpha_{2} \mathcal{T}_{tyz} - \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{tyz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{xtx} \\
+  %   0 &= -B_{0} \, \delta_{1} \mathcal{T}_{yty} - 2 \, \Bet{2} \mathcal{T}_{ytz} - \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ytz} - 4 \, \Bet{1} \mathcal{T}_{zty} - \tfrac{2}{\kappa^2} \mathcal{T}_{zty} - B_{0} \, \delta_{1} \mathcal{T}_{ztz} - 2 \, \Bet{2} \mathcal{T}_{tyz} - \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{tyz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{xtx} \\
   % &\quad - B_{0} \, \delta_{1} \partial_t h_{zz} - 2 \, \delta_{1} \partial_z \dot{A}_{y}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= 2 \, \alpha_{3} \mathcal{T}_{xxz} - \tfrac{3}{\kappa^2} \mathcal{T}_{xxz} + 2 \, \alpha_{3} \mathcal{T}_{yyz} - \tfrac{3}{\kappa^2} \mathcal{T}_{yyz} + 4 \, \alpha_{1} \mathcal{T}_{ttz} + 2 \, \alpha_{2} \mathcal{T}_{ttz} + 2 \, \alpha_{3} \mathcal{T}_{ttz} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{ttz} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{zyz} \\
+  %   0 &= 2 \, \Bet{3} \mathcal{T}_{xxz} - \tfrac{3}{\kappa^2} \mathcal{T}_{xxz} + 2 \, \Bet{3} \mathcal{T}_{yyz} - \tfrac{3}{\kappa^2} \mathcal{T}_{yyz} + 4 \, \Bet{1} \mathcal{T}_{ttz} + 2 \, \Bet{2} \mathcal{T}_{ttz} + 2 \, \Bet{3} \mathcal{T}_{ttz} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{ttz} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{zyz} \\
   % &\quad + \tfrac{B_{0} \, \delta_{1}}{2} \partial_t h_{ty} + \tfrac{\delta_{1}}{2} \partial_z \dot{A}_{t} - \tfrac{1}{2} \delta_{1} \partial_t^2 A_{z}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -2 \, \alpha_{3} \mathcal{T}_{yty} + \tfrac{3}{\kappa^2} \mathcal{T}_{yty} + B_{0} \, \delta_{1} \mathcal{T}_{ytz} - B_{0} \, \delta_{1} \mathcal{T}_{zty} - 4 \, \alpha_{1} \mathcal{T}_{ztz} - 2 \, \alpha_{2} \mathcal{T}_{ztz} - 2 \, \alpha_{3} \mathcal{T}_{ztz} - \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{ztz} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{tyz} - 2 \, \alpha_{3} \mathcal{T}_{xtx} \\
+  %   0 &= -2 \, \Bet{3} \mathcal{T}_{yty} + \tfrac{3}{\kappa^2} \mathcal{T}_{yty} + B_{0} \, \delta_{1} \mathcal{T}_{ytz} - B_{0} \, \delta_{1} \mathcal{T}_{zty} - 4 \, \Bet{1} \mathcal{T}_{ztz} - 2 \, \Bet{2} \mathcal{T}_{ztz} - 2 \, \Bet{3} \mathcal{T}_{ztz} - \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{ztz} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{tyz} - 2 \, \Bet{3} \mathcal{T}_{xtx} \\
   % &\quad + \tfrac{3}{\kappa^2} \mathcal{T}_{xtx} - \tfrac{1}{2} B_{0} \, \delta_{1} \partial_z h_{ty} + \tfrac{\delta_{1}}{2} \partial_z^2 A_{t} + B_{0} \, \delta_{1} \partial_t h_{yz} - \tfrac{1}{2} \delta_{1} \partial_z \dot{A}_{z}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -\tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{ttx} -2 \, \alpha_{2} \mathcal{T}_{xyz} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xyz} + B_{0} \, \delta_{1} \mathcal{T}_{yxy} + 2 \, \alpha_{2} \mathcal{T}_{yxz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{yxz} + 4 \, \alpha_{1} \mathcal{T}_{zxy} + \tfrac{2}{\kappa^2} \mathcal{T}_{zxy} + B_{0} \, \delta_{1} \mathcal{T}_{zxz}
+  %   0 &= -\tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{ttx} -2 \, \Bet{2} \mathcal{T}_{xyz} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xyz} + B_{0} \, \delta_{1} \mathcal{T}_{yxy} + 2 \, \Bet{2} \mathcal{T}_{yxz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{yxz} + 4 \, \Bet{1} \mathcal{T}_{zxy} + \tfrac{2}{\kappa^2} \mathcal{T}_{zxy} + B_{0} \, \delta_{1} \mathcal{T}_{zxz}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -2 \, \alpha_{3} \mathcal{T}_{ttx} + \tfrac{3}{\kappa^2} \mathcal{T}_{ttx} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{xyz} + 2 \, \alpha_{3} \mathcal{T}_{yxy} - \tfrac{3}{\kappa^2} \mathcal{T}_{yxy} - B_{0} \, \delta_{1} \mathcal{T}_{yxz} + B_{0} \, \delta_{1} \mathcal{T}_{zxy} + 4 \, \alpha_{1} \mathcal{T}_{zxz} + 2 \, \alpha_{2} \mathcal{T}_{zxz} + 2 \, \alpha_{3} \mathcal{T}_{zxz} \\
+  %   0 &= -2 \, \Bet{3} \mathcal{T}_{ttx} + \tfrac{3}{\kappa^2} \mathcal{T}_{ttx} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{xyz} + 2 \, \Bet{3} \mathcal{T}_{yxy} - \tfrac{3}{\kappa^2} \mathcal{T}_{yxy} - B_{0} \, \delta_{1} \mathcal{T}_{yxz} + B_{0} \, \delta_{1} \mathcal{T}_{zxy} + 4 \, \Bet{1} \mathcal{T}_{zxz} + 2 \, \Bet{2} \mathcal{T}_{zxz} + 2 \, \Bet{3} \mathcal{T}_{zxz} \\
   % &\quad + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{zxz} + \tfrac{B_{0} \, \delta_{1}}{2} \partial_z h_{xy} - \tfrac{1}{2} \delta_{1} \partial_z^2 A_{x} - \tfrac{3 \, \delta_{1}}{2} \partial_t^2 A_{x}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -2 \, \alpha_{3} \mathcal{T}_{tty} + \tfrac{3}{\kappa^2} \mathcal{T}_{tty} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{xxz} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{ttz} + 4 \, \alpha_{1} \mathcal{T}_{zyz} + 2 \, \alpha_{2} \mathcal{T}_{zyz} + 2 \, \alpha_{3} \mathcal{T}_{zyz} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{zyz} - 2 \, \alpha_{3} \mathcal{T}_{xxy} \\
+  %   0 &= -2 \, \Bet{3} \mathcal{T}_{tty} + \tfrac{3}{\kappa^2} \mathcal{T}_{tty} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{xxz} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{ttz} + 4 \, \Bet{1} \mathcal{T}_{zyz} + 2 \, \Bet{2} \mathcal{T}_{zyz} + 2 \, \Bet{3} \mathcal{T}_{zyz} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{zyz} - 2 \, \Bet{3} \mathcal{T}_{xxy} \\
   % &\quad + \tfrac{3}{\kappa^2} \mathcal{T}_{xxy} + \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z h_{tt} - \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z h_{xx} - \tfrac{1}{4} B_{0} \, \delta_{1} \partial_z h_{yy} - \tfrac{1}{4} B_{0} \, \delta_{1} \partial_z h_{zz} - \tfrac{1}{2} \delta_{1} \partial_z^2 A_{y} \\
   % &\quad - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_t h_{tz} - \tfrac{3 \, \delta_{1}}{2} \partial_t^2 A_{y}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -2 \, \alpha_{2} \mathcal{T}_{ytx} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ytx} + \tfrac{B_{0} \, \delta_{1}}{2} \mathcal{T}_{ztx} -4 \, \alpha_{1} \mathcal{T}_{txy} -\tfrac{2}{\kappa^2} \mathcal{T}_{txy} + 2 \, \alpha_{2} \mathcal{T}_{xty} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xty} -B_{0} \, \delta_{1} \partial_z h_{tx} + B_{0} \, \delta_{1} \partial_t h_{xz}
+  %   0 &= -2 \, \Bet{2} \mathcal{T}_{ytx} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ytx} + \tfrac{B_{0} \, \delta_{1}}{2} \mathcal{T}_{ztx} -4 \, \Bet{1} \mathcal{T}_{txy} -\tfrac{2}{\kappa^2} \mathcal{T}_{txy} + 2 \, \Bet{2} \mathcal{T}_{xty} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xty} -B_{0} \, \delta_{1} \partial_z h_{tx} + B_{0} \, \delta_{1} \partial_t h_{xz}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -\tfrac{1}{2} B_{0} \, \delta_{1} \mathcal{T}_{ytx} -2 \, \alpha_{2} \mathcal{T}_{ztx} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ztx} -4 \, \alpha_{1} \mathcal{T}_{txz} -\tfrac{2}{\kappa^2} \mathcal{T}_{txz} + 2 \, \alpha_{2} \mathcal{T}_{xtz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xtz} -B_{0} \, \delta_{1} \partial_t h_{xy} -2 \, \delta_{1} \partial_z \dot{A}_{x}
+  %   0 &= -\tfrac{1}{2} B_{0} \, \delta_{1} \mathcal{T}_{ytx} -2 \, \Bet{2} \mathcal{T}_{ztx} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ztx} -4 \, \Bet{1} \mathcal{T}_{txz} -\tfrac{2}{\kappa^2} \mathcal{T}_{txz} + 2 \, \Bet{2} \mathcal{T}_{xtz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{xtz} -B_{0} \, \delta_{1} \partial_t h_{xy} -2 \, \delta_{1} \partial_z \dot{A}_{x}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -2 \, B_{0} \, \delta_{1} \mathcal{T}_{yty} + 2 \, \alpha_{2} \mathcal{T}_{ytz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ytz} - 2 \, \alpha_{2} \mathcal{T}_{zty} - \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{zty} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{ztz} - 4 \, \alpha_{1} \mathcal{T}_{tyz} - \tfrac{2}{\kappa^2} \mathcal{T}_{tyz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{xtx} \\
+  %   0 &= -2 \, B_{0} \, \delta_{1} \mathcal{T}_{yty} + 2 \, \Bet{2} \mathcal{T}_{ytz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ytz} - 2 \, \Bet{2} \mathcal{T}_{zty} - \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{zty} - 2 \, B_{0} \, \delta_{1} \mathcal{T}_{ztz} - 4 \, \Bet{1} \mathcal{T}_{tyz} - \tfrac{2}{\kappa^2} \mathcal{T}_{tyz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{xtx} \\
   % &\quad - B_{0} \, \delta_{1} \partial_t h_{yy} - B_{0} \, \delta_{1} \partial_t h_{zz} - 2 \, \delta_{1} \partial_z \dot{A}_{y}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -2 \, \alpha_{3} \mathcal{T}_{yty} + \tfrac{3}{\kappa^2} \mathcal{T}_{yty} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{ytz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{zty} - 2 \, \alpha_{3} \mathcal{T}_{ztz} + \tfrac{3}{\kappa^2} \mathcal{T}_{ztz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{tyz} - 4 \, \alpha_{1} \mathcal{T}_{xtx} - 2 \, \alpha_{2} \mathcal{T}_{xtx} \\
-  % &\quad - 2 \, \alpha_{3} \mathcal{T}_{xtx} - \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{xtx} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_z h_{ty} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 A_{t} + \tfrac{3 \, \delta_{1}}{2} \partial_z \dot{A}_{z}
+  %   0 &= -2 \, \Bet{3} \mathcal{T}_{yty} + \tfrac{3}{\kappa^2} \mathcal{T}_{yty} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{ytz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{zty} - 2 \, \Bet{3} \mathcal{T}_{ztz} + \tfrac{3}{\kappa^2} \mathcal{T}_{ztz} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \mathcal{T}_{tyz} - 4 \, \Bet{1} \mathcal{T}_{xtx} - 2 \, \Bet{2} \mathcal{T}_{xtx} \\
+  % &\quad - 2 \, \Bet{3} \mathcal{T}_{xtx} - \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{xtx} - \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_z h_{ty} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 A_{t} + \tfrac{3 \, \delta_{1}}{2} \partial_z \dot{A}_{z}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -2 \, \alpha_{2} \mathcal{T}_{ytx} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ytx} + \tfrac{B_{0} \, \delta_{1}}{2} \mathcal{T}_{ztx} + 2 \, \alpha_{2} \mathcal{T}_{txy} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{txy} -4 \, \alpha_{1} \mathcal{T}_{xty} -\tfrac{2}{\kappa^2} \mathcal{T}_{xty} + B_{0} \, \delta_{1} \partial_z h_{tx} -B_{0} \, \delta_{1} \partial_t h_{xz}
+  %   0 &= -2 \, \Bet{2} \mathcal{T}_{ytx} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ytx} + \tfrac{B_{0} \, \delta_{1}}{2} \mathcal{T}_{ztx} + 2 \, \Bet{2} \mathcal{T}_{txy} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{txy} -4 \, \Bet{1} \mathcal{T}_{xty} -\tfrac{2}{\kappa^2} \mathcal{T}_{xty} + B_{0} \, \delta_{1} \partial_z h_{tx} -B_{0} \, \delta_{1} \partial_t h_{xz}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= -\tfrac{1}{2} B_{0} \, \delta_{1} \mathcal{T}_{ytx} -2 \, \alpha_{2} \mathcal{T}_{ztx} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ztx} + 2 \, \alpha_{2} \mathcal{T}_{txz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{txz} -4 \, \alpha_{1} \mathcal{T}_{xtz} -\tfrac{2}{\kappa^2} \mathcal{T}_{xtz} + B_{0} \, \delta_{1} \partial_t h_{xy}
+  %   0 &= -\tfrac{1}{2} B_{0} \, \delta_{1} \mathcal{T}_{ytx} -2 \, \Bet{2} \mathcal{T}_{ztx} -\tfrac{3}{2 \, \kappa^2} \mathcal{T}_{ztx} + 2 \, \Bet{2} \mathcal{T}_{txz} + \tfrac{3}{2 \, \kappa^2} \mathcal{T}_{txz} -4 \, \Bet{1} \mathcal{T}_{xtz} -\tfrac{2}{\kappa^2} \mathcal{T}_{xtz} + B_{0} \, \delta_{1} \partial_t h_{xy}
   % \end{aligned} \\[1ex]
   % \begin{aligned}
-  %   0 &= 2 \, \alpha_{3} \mathcal{T}_{tty} - \tfrac{3}{\kappa^2} \mathcal{T}_{tty} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{yyz} - 2 \, \alpha_{3} \mathcal{T}_{zyz} + \tfrac{3}{\kappa^2} \mathcal{T}_{zyz} + 4 \, \alpha_{1} \mathcal{T}_{xxy} + 2 \, \alpha_{2} \mathcal{T}_{xxy} + 2 \, \alpha_{3} \mathcal{T}_{xxy} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{xxy} \\
+  %   0 &= 2 \, \Bet{3} \mathcal{T}_{tty} - \tfrac{3}{\kappa^2} \mathcal{T}_{tty} + 3 \, B_{0} \, \delta_{1} \mathcal{T}_{yyz} - 2 \, \Bet{3} \mathcal{T}_{zyz} + \tfrac{3}{\kappa^2} \mathcal{T}_{zyz} + 4 \, \Bet{1} \mathcal{T}_{xxy} + 2 \, \Bet{2} \mathcal{T}_{xxy} + 2 \, \Bet{3} \mathcal{T}_{xxy} + \tfrac{1}{2 \, \kappa^2} \mathcal{T}_{xxy} \\
   % &\quad - \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z h_{tt} - \tfrac{1}{4} B_{0} \, \delta_{1} \partial_z h_{xx} - \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z h_{yy} - \tfrac{3 \, B_{0} \, \delta_{1}}{4} \partial_z h_{zz} - \tfrac{3 \, \delta_{1}}{2} \partial_z^2 A_{y} + \tfrac{3 \, B_{0} \, \delta_{1}}{2} \partial_t h_{tz} \\
   % &\quad + \tfrac{3 \, \delta_{1}}{2} \partial_t^2 A_{y}
   % \end{aligned} \\[1ex]
