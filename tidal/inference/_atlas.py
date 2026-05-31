@@ -315,8 +315,8 @@ def _render_face_panel(
     # per face.
     from anesthetic import MCMCSamples
 
-    col_names = [f"chi_{i + 1}" for i in range(n_chi)]
-    latex_labels = {col_names[i]: rf"$\chi_{{{i + 1}}}$" for i in range(n_chi)}
+    col_names = [f"theta_{i + 1}" for i in range(n_chi)]
+    latex_labels = {col_names[i]: rf"$\theta_{{{i + 1}}}$" for i in range(n_chi)}
     data = {col_names[i]: chi[:, i] for i in range(n_chi)}
     if weights is not None and len(weights) == len(chi):
         # Drop columns to constructor + set weights post-hoc; anesthetic's
