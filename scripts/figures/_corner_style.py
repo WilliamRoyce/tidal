@@ -18,7 +18,6 @@ import matplotlib as mpl
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 from anesthetic import read_chains
-from matplotlib.ticker import MaxNLocator
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -207,27 +206,12 @@ def overlay_corner(
     # Anesthetic propagates param_labels via the labels= kwarg to read_chains
     # (set in load_chains above) — no per-axis label-loop required here.
 
-    # Tick-label removal for dense corner plots. Parameter-name axis labels
-    # (β₁, χ, etc.) are always kept; only the numeric tick values are removed.
-    # For dense double-column plots also reduce tick density to 3 per axis.
-    #   Double-column, >10 params (T7 18D, NP.T7 17D, T6 20D, T9 32D): remove
-    #   Single-column, >5 params (Barker 6D, Shapiro 8D, full-NM 9D, NP 8D): remove
-    remove_tick_labels = (len(params) > 10 and fig_width > COLUMN_WIDTH) or (
-        len(params) > 5 and fig_width <= COLUMN_WIDTH
-    )
-    if remove_tick_labels:
-        if fig_width > COLUMN_WIDTH:
-            for ax in axes.values.flatten():
-                if ax is None:
-                    continue
-                ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-                ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-        for ax in axes.values.flatten():
-            if ax is None:
-                continue
-            # Remove both numeric tick labels and the tick marks themselves
-            # (supervisor feedback on CornerT9: "cleaner if you remove ticks").
-            ax.tick_params(labelbottom=False, labelleft=False, bottom=False, left=False)
+    # Remove all ticks and tick labels from every panel. Corner plots convey
+    # posterior structure, not precise numerical values; clean axes read better.
+    for ax in axes.values.flatten():
+        if ax is None:
+            continue
+        ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
 
     # Legend hosted INSIDE the empty upper-right region of the corner-plot
     # grid, anchored to the topmost diagonal axis (axes.iloc[0,0]) in its

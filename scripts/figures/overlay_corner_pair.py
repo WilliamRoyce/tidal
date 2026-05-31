@@ -31,7 +31,6 @@ from pathlib import Path
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -224,20 +223,10 @@ def render_overlay_pair(
 
     fig = axes.iloc[0, 0].figure
 
-    remove_tick_labels = (len(plot_params) > 10 and fig_width > COLUMN_WIDTH) or (
-        len(plot_params) > 5 and fig_width <= COLUMN_WIDTH
-    )
-    if remove_tick_labels:
-        if fig_width > COLUMN_WIDTH:
-            for ax in axes.values.flatten():
-                if ax is None:
-                    continue
-                ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-                ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-        for ax in axes.values.flatten():
-            if ax is None:
-                continue
-            ax.tick_params(labelbottom=False, labelleft=False)
+    for ax in axes.values.flatten():
+        if ax is None:
+            continue
+        ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
 
     legend_handles = [
         mpatches.Patch(

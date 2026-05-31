@@ -46,7 +46,6 @@ from _corner_style import (
     COLUMN_WIDTH,
     CONTOUR_LEVELS,
     FIG_WIDTH,
-    HIGH_DIM_THRESHOLD,
     OVERLAY_ALPHA,
     SUP_COLOR,
     apply_style,
@@ -172,30 +171,10 @@ def _process(entry: dict) -> None:
     )
     fig = axes.iloc[0, 0].figure
 
-    # For wide (high-D) carrier corners apply the same tick-density and
-    # tick-label-size fixes as overlay_corner() does for full-chain plots.
-    # Only applies when wide=true — column-width figures carrying ≤6 params
-    # in the sub-corner get tick labels removed instead (see block below).
-    if entry.get("wide") and n_params >= HIGH_DIM_THRESHOLD:
-        from matplotlib.ticker import MaxNLocator
-
-        tick_label_pt = 5 if n_params >= 20 else 6
-        for ax in axes.values.flatten():
-            if ax is None:
-                continue
-            ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-            ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-            ax.tick_params(axis="both", labelsize=tick_label_pt)
-            for label in ax.get_xticklabels():
-                label.set_rotation(45)
-                label.set_horizontalalignment("right")
-
-    # Single-column sub-corners showing >5 params: remove numeric tick labels.
-    if k > 5 and not entry.get("wide"):
-        for ax in axes.values.flatten():
-            if ax is None:
-                continue
-            ax.tick_params(labelbottom=False, labelleft=False)
+    for ax in axes.values.flatten():
+        if ax is None:
+            continue
+        ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
 
     # Add legend anchored to the top-right of the corner grid.
 
