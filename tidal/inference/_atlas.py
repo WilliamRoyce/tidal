@@ -244,18 +244,27 @@ def _render_face_panel(
     chi: NDArray[np.float64] | None,
     n_dims: int,
     weights: NDArray[np.float64] | None = None,
+    *,
+    show_xlabels: bool = True,
+    show_ylabels: bool = True,
+    fill_colors: tuple[str, str] | None = None,
+    color: str | None = None,
+    color_alpha: float = 0.5,
 ) -> None:
-    """Render one face panel via anesthetic — same visual style as the standalone corner plot.
+    r"""Render one face panel via anesthetic — same visual style as the standalone corner plot.
 
     Each panel is an ``(N-1) x (N-1)`` lower-triangle 2D KDE corner plot
     of the face-local cube coordinates ``chi_1, ..., chi_{N-1}``, with
-    a 1D KDE marginal on the diagonal — two-tone Planck-blue fills
-    (``#aac8e9`` / ``#3877b8``) identical to the standalone per-face
-    corner plots.  Numeric tick marks are stripped (``ticks=None``) but
-    the LaTeX axis labels ``chi_i^{face↑/↓}`` are kept on the leftmost
-    column / bottom row to identify the face-local coordinate.  A
-    ``Face k↑`` / ``Face k↓`` text annotation is drawn in the panel's
-    upper-right whitespace.
+    a 1D KDE marginal on the diagonal — two-tone fills (default
+    Planck-blue ``#aac8e9`` / ``#3877b8``; override via ``fill_colors``).
+    Numeric tick marks are stripped (``ticks=None``).  The
+    ``\\chi_1, \\chi_2, ..., \\chi_{N-1}`` LaTeX axis labels are kept
+    on the leftmost column / bottom row of each panel BUT only when
+    ``show_xlabels`` / ``show_ylabels`` are True — the atlas driver
+    sets these so labels appear only on the outer edges of the whole
+    atlas grid (bottom row of the outer grid for x-labels, leftmost
+    column for y-labels).  A ``Face k↑`` / ``Face k↓`` text annotation
+    is drawn in the panel's upper-right whitespace.
 
     Composability is via :func:`anesthetic.make_2d_axes`'s
     ``subplot_spec`` argument, exposed through
@@ -287,23 +296,27 @@ def _render_face_panel(
             color="0.5",
         )
         fig.text(
-            0.99,
-            0.99,
+            0.72,
+            0.78,
             rf"$\mathrm{{Face}}\ {fm}$",
-            ha="right",
-            va="top",
-            fontsize=10,
+            ha="center",
+            va="center",
+            fontsize=9,
         )
         return
 
     # Build an anesthetic Samples object over the face-local chi columns.
     # Column names are kept legal-identifier (chi_1, ..., chi_{N-1}); the
-    # face-aware LaTeX labels are passed via the ``labels`` dict so they
-    # appear on the axes without polluting the underlying column index.
+    # plain-chi LaTeX labels are passed via the ``labels`` dict.  We
+    # deliberately drop the face superscript: at 4x4 atlas size
+    # \chi_i^{k\uparrow/\downarrow} is unreadable and the face identity
+    # is already carried by the panel-title annotation below.  The
+    # caption explains that chi_i means a different physical coupling
+    # per face.
     from anesthetic import MCMCSamples
 
     col_names = [f"chi_{i + 1}" for i in range(n_chi)]
-    latex_labels = {col_names[i]: rf"$\chi_{{{i + 1}}}^{{{fm}}}$" for i in range(n_chi)}
+    latex_labels = {col_names[i]: rf"$\chi_{{{i + 1}}}$" for i in range(n_chi)}
     data = {col_names[i]: chi[:, i] for i in range(n_chi)}
     if weights is not None and len(weights) == len(chi):
         # Drop columns to constructor + set weights post-hoc; anesthetic's
@@ -314,8 +327,8 @@ def _render_face_panel(
 
     # Render into the SubFigure passed in by the atlas driver.
     # ``ticks=None`` strips numeric tick marks; the axis labels live in
-    # the ``labels`` mapping (face-aware LaTeX from face_label_math).
-    _render_anesthetic_corner_into(
+    # the ``labels`` mapping.
+    _, axes_df = _render_anesthetic_corner_into(
         samples,
         col_names,
         target_fig=fig,
@@ -323,15 +336,46 @@ def _render_face_panel(
         ticks=None,
         show_diagonal=True,
         fill_two_tone=True,
+        fill_colors=fill_colors,
+        color=color,
+        color_alpha=color_alpha,
     )
 
+    # Tighten the SubFigure's internal layout so the corner-plot grid
+    # fills nearly the whole panel: anesthetic's default GridSpec leaves
+    # generous left/right/top/bottom margins which, with 16 panels in
+    # the YM--PGT atlas, compounds into a lot of dead whitespace.  Leave
+    # enough bottom/left margin for outer-edge axis labels (handled by
+    # the show_xlabels / show_ylabels flags above) but otherwise push
+    # the grid flush to the SubFigure boundary.
+    fig.subplots_adjust(
+        left=0.10,
+        right=0.98,
+        bottom=0.10,
+        top=0.98,
+        wspace=0.0,
+        hspace=0.0,
+    )
+
+    # Suppress non-edge labels.  ``set_visible(False)`` skips layout
+    # allocation entirely; setting the text to "" would leave a blank
+    # padding band of approximately the label height.
+    if not show_xlabels or not show_ylabels:
+        for ax in axes_df.values.flatten():  # type: ignore[attr-defined]
+            if ax is None:
+                continue
+            if not show_xlabels:
+                ax.xaxis.label.set_visible(False)
+            if not show_ylabels:
+                ax.yaxis.label.set_visible(False)
+
     fig.text(
-        0.99,
-        0.99,
+        0.72,
+        0.78,
         rf"$\mathrm{{Face}}\ {fm}$",
-        ha="right",
-        va="top",
-        fontsize=10,
+        ha="center",
+        va="center",
+        fontsize=9,
     )
 
 
@@ -346,6 +390,9 @@ def plot_atlas(
     *,
     show: bool = False,
     layout_cols: int | None = None,
+    fill_colors: tuple[str, str] | None = None,
+    color: str | None = None,
+    color_alpha: float = 0.5,
 ) -> Path:
     """Render the cubed-sphere atlas for a survey directory.
 
@@ -376,6 +423,22 @@ def plot_atlas(
     layout_cols : int or None
         Column count for the block-pair layout (see above).  ``None``
         (default) preserves the ``2 x n_dims`` layout.
+    fill_colors : (str, str) or None
+        ``(outer_95, inner_68)`` hex pair overriding the default
+        two-tone fills.  Mutually exclusive with ``color`` (the
+        single-tone path wins; ``fill_colors`` is ignored when
+        ``color`` is set).  ``None`` (default) preserves the existing
+        Planck-blue palette.
+    color : str or None
+        Single hex colour applied uniformly to every artist (1D KDE
+        curves, 2D fills, contour outlines) via anesthetic's
+        ``samples.plot_2d(color=...)``.  Matches the manuscript's
+        results-section corner-plot style — see
+        ``scripts/figures/_corner_style.py``.  ``None`` (default) keeps
+        anesthetic's default palette.
+    color_alpha : float
+        Alpha for single-tone ``color``.  Defaults to 0.5, matching the
+        manuscript's ``OVERLAY_ALPHA`` from ``_corner_style.py``.
 
     Returns
     -------
@@ -498,7 +561,7 @@ def plot_atlas(
     fig = plt.figure(
         figsize=(cols * panel_in, rows * panel_in), constrained_layout=False
     )
-    subfigs = fig.subfigures(rows, cols, wspace=0.05, hspace=0.05)
+    subfigs = fig.subfigures(rows, cols, wspace=0.0, hspace=0.0)
     subfigs = np.atleast_2d(subfigs)
 
     for face_idx in range(1, n_faces_total + 1):
@@ -515,7 +578,24 @@ def plot_atlas(
         w_arr: NDArray[np.float64] | None = (
             np.concatenate(weights, axis=0) if weights else None
         )
-        _render_face_panel(sub, face_idx, chi, n_dims, weights=w_arr)
+        # Show x-axis labels only on the bottom row of the outer grid
+        # and y-axis labels only on the leftmost column.  At 4x4 atlas
+        # size, per-panel labels become visual noise; outer-edge-only
+        # labelling preserves identification without repetition.
+        show_xlabels = r == rows - 1
+        show_ylabels = c_idx == 0
+        _render_face_panel(
+            sub,
+            face_idx,
+            chi,
+            n_dims,
+            weights=w_arr,
+            show_xlabels=show_xlabels,
+            show_ylabels=show_ylabels,
+            fill_colors=fill_colors,
+            color=color,
+            color_alpha=color_alpha,
+        )
 
     fig.savefig(output_path, bbox_inches="tight", dpi=150)
     if show:

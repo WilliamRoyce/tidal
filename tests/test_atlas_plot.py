@@ -378,9 +378,11 @@ def test_render_face_panel_uses_no_matplotlib_histogram(tmp_path: Path) -> None:
 
 
 def test_plot_atlas_calls_helper_with_ticks_none(tmp_path: Path) -> None:
-    """Atlas panels must call the composable helper with ``ticks=None``
-    so numeric tick labels are suppressed (the face-local LaTeX axis
-    labels remain).  We mock-patch the helper to capture its kwargs.
+    r"""Atlas panels must call the composable helper with ``ticks=None``
+    so numeric tick labels are suppressed.  The labels dict carries the
+    plain LaTeX ``\\chi_i`` (no face superscript, per the refinement
+    that dropped them) and the helper receives no ``fill_colors``
+    override on the default CLI path.
     """
     n = 3
     names = ("a", "b", "c")
@@ -409,16 +411,170 @@ def test_plot_atlas_calls_helper_with_ticks_none(tmp_path: Path) -> None:
     # The helper should have been called at least once per face (6 for N=3).
     assert len(seen_kwargs) >= n_faces(n)
     # Every call must have ticks=None and target_fig set (composable path).
+    # On the default CLI path no fill_colors override is passed.
     for kw in seen_kwargs:
         assert kw["ticks"] is None
         assert kw["target_fig"] is not None
-        # Face-aware LaTeX labels must be wired in.
+        assert kw.get("fill_colors") is None
+        # Plain chi LaTeX labels — no face superscript.
         labels = kw["labels"]
         assert isinstance(labels, dict)
         for v in labels.values():
             assert isinstance(v, str)
             assert "\\chi" in v
-            assert "\\uparrow" in v or "\\downarrow" in v
+            assert "\\uparrow" not in v
+            assert "\\downarrow" not in v
+
+
+def test_plot_atlas_threads_fill_colors_through(tmp_path: Path) -> None:
+    """When called with ``fill_colors=(...)`` the bespoke pair must reach
+    :func:`_render_anesthetic_corner_into` for every panel.
+    """
+    n = 3
+    names = ("a", "b", "c")
+    Q = np.eye(n)
+    survey_dir = tmp_path / "survey"
+    survey_dir.mkdir()
+    for face_idx, sub_tile in enumerate_cells(n_dims=n, M=1):
+        cd = survey_dir / cell_label(face_idx, sub_tile)
+        _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
+
+    from tidal.inference import _visualize as _viz
+
+    real_helper = _viz._render_anesthetic_corner_into
+    seen_fill_colors: list[object] = []
+
+    def _spy(*args: object, **kwargs: object) -> object:
+        seen_fill_colors.append(kwargs.get("fill_colors"))
+        return real_helper(*args, **kwargs)  # type: ignore[arg-type]
+
+    _viz._render_anesthetic_corner_into = _spy  # type: ignore[attr-defined]
+    try:
+        plot_atlas(
+            survey_dir,
+            survey_dir / "atlas.pdf",
+            fill_colors=("#ffafd2", "#9f1853"),
+        )
+    finally:
+        _viz._render_anesthetic_corner_into = real_helper  # type: ignore[attr-defined]
+
+    assert len(seen_fill_colors) >= n_faces(n)
+    for fc in seen_fill_colors:
+        assert fc == ("#ffafd2", "#9f1853")
+
+
+def test_plot_atlas_threads_single_tone_color_through(tmp_path: Path) -> None:
+    """When ``color=`` is provided, the K.2 manuscript-figure style: the
+    single hex colour and its alpha must reach
+    :func:`_render_anesthetic_corner_into` for every panel.  Matches the
+    convention in ``scripts/figures/_corner_style.py`` of single-tone
+    ``samples.plot_2d(color=..., alpha=...)`` so every artist (1D KDE
+    diagonals, 2D fills, contour outlines) reads in the same colour.
+    """
+    n = 3
+    names = ("a", "b", "c")
+    Q = np.eye(n)
+    survey_dir = tmp_path / "survey"
+    survey_dir.mkdir()
+    for face_idx, sub_tile in enumerate_cells(n_dims=n, M=1):
+        cd = survey_dir / cell_label(face_idx, sub_tile)
+        _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
+
+    from tidal.inference import _visualize as _viz
+
+    real_helper = _viz._render_anesthetic_corner_into
+    seen_colors: list[tuple[object, object]] = []
+
+    def _spy(*args: object, **kwargs: object) -> object:
+        seen_colors.append((kwargs.get("color"), kwargs.get("color_alpha")))
+        return real_helper(*args, **kwargs)  # type: ignore[arg-type]
+
+    _viz._render_anesthetic_corner_into = _spy  # type: ignore[attr-defined]
+    try:
+        plot_atlas(
+            survey_dir,
+            survey_dir / "atlas.pdf",
+            color="#dc267f",
+            color_alpha=0.5,
+        )
+    finally:
+        _viz._render_anesthetic_corner_into = real_helper  # type: ignore[attr-defined]
+
+    assert len(seen_colors) >= n_faces(n)
+    for c, a in seen_colors:
+        assert c == "#dc267f"
+        assert a == 0.5
+
+
+def test_plot_atlas_labels_only_on_outer_edges(tmp_path: Path) -> None:
+    """For the 4x4 block-pair layout (N=4, layout_cols=2 produces a 4x2
+    grid; here we use the default 2x4 with N=4) only the bottom row of
+    the atlas grid carries x-labels and only the leftmost column
+    carries y-labels.  Panels strictly interior to the grid have neither.
+    """
+    from tidal.inference import _atlas
+
+    n = 4
+    names = ("a", "b", "c", "d")
+    Q = np.eye(n)
+    survey_dir = tmp_path / "survey"
+    survey_dir.mkdir()
+    for face_idx, sub_tile in enumerate_cells(n_dims=n, M=1):
+        cd = survey_dir / cell_label(face_idx, sub_tile)
+        _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
+
+    real_panel = _atlas._render_face_panel
+    seen_flags: dict[int, tuple[bool, bool]] = {}
+
+    def _spy(
+        fig: object,
+        face_idx: int,
+        chi: object,
+        n_dims: int,
+        weights: object = None,
+        *,
+        show_xlabels: bool = True,
+        show_ylabels: bool = True,
+        fill_colors: object = None,
+        color: object = None,
+        color_alpha: float = 0.5,
+    ) -> None:
+        seen_flags[face_idx] = (show_xlabels, show_ylabels)
+        return real_panel(
+            fig,
+            face_idx,
+            chi,
+            n_dims,
+            weights=weights,
+            show_xlabels=show_xlabels,
+            show_ylabels=show_ylabels,
+            fill_colors=fill_colors,  # type: ignore[arg-type]
+            color=color,  # type: ignore[arg-type]
+            color_alpha=color_alpha,
+        )
+
+    _atlas._render_face_panel = _spy  # type: ignore[attr-defined]
+    try:
+        plot_atlas(survey_dir, survey_dir / "atlas.pdf")
+    finally:
+        _atlas._render_face_panel = real_panel  # type: ignore[attr-defined]
+
+    # Default 2 x 4 layout for N=4: row 0 is up-faces (1, 3, 5, 7) and
+    # row 1 is down-faces (2, 4, 6, 8).  rows-1 = 1, so x-labels only on
+    # down-faces.  cols=N=4, so y-labels only on column 0 (axis 1, faces
+    # 1 and 2).
+    # Face 1 (+x_1, top row, col 0): show_ylabels but NOT show_xlabels
+    assert seen_flags[1] == (False, True)
+    # Face 2 (-x_1, bottom row, col 0): both True
+    assert seen_flags[2] == (True, True)
+    # Face 3 (+x_2, top row, col 1): neither
+    assert seen_flags[3] == (False, False)
+    # Face 4 (-x_2, bottom row, col 1): show_xlabels but NOT show_ylabels
+    assert seen_flags[4] == (True, False)
+    # Face 7 (+x_4, top row, col 3): neither
+    assert seen_flags[7] == (False, False)
+    # Face 8 (-x_4, bottom row, col 3): show_xlabels only
+    assert seen_flags[8] == (True, False)
 
 
 def test_plot_atlas_rejects_empty_dir(tmp_path: Path) -> None:

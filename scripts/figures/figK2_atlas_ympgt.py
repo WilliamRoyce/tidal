@@ -33,6 +33,17 @@ DEFAULT_SURVEY = REPO_ROOT / "hpc_results" / "29890993" / "atlas_t5_2"
 DEFAULT_OUT = REPO_ROOT / "manuscript" / "figures" / "figK2_atlas_ympgt.pdf"
 LAYOUT_COLS = 4  # 4x4 block-pair layout for N=8
 
+# IBM colorblind-palette purple/indigo `#785ef0` at alpha 0.5 — same
+# palette family as the manuscript's results-section corner plots
+# (`scripts/figures/_palette.py` -> `IBM_PALETTE["purple"]`).  Indigo
+# gives more visual weight per panel than the magenta at this small
+# atlas-cell size where the single-tone fills would otherwise read as
+# washed-out pink.  Anesthetic's `samples.plot_2d(color=..., alpha=...)`
+# colours every artist (1D KDE diagonals, 2D fills, contour outlines)
+# uniformly.
+COLOR = "#785ef0"
+COLOR_ALPHA = 0.5
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -66,7 +77,13 @@ def main() -> None:
     # --help message above.
     from tidal.inference._atlas import plot_atlas
 
-    plot_atlas(args.survey_dir, args.output, layout_cols=LAYOUT_COLS)
+    plot_atlas(
+        args.survey_dir,
+        args.output,
+        layout_cols=LAYOUT_COLS,
+        color=COLOR,
+        color_alpha=COLOR_ALPHA,
+    )
     print(f"Wrote {args.output}")
 
 
