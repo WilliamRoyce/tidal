@@ -310,3 +310,34 @@
 %   - Action prefactor on Ricci scalar: -(1/2) m_P^2 R  (BHL joint convention)
 %   Convention: MacrosMAG.tex (2406.12826); BHL joint papers
 %   Macro: \MPl
+
+% -----------------------------------------------------------------------------
+% Run-in paragraph headings (imported from project-talos manuscript preamble).
+% Renders \paragraph*{Heading} as a bold italic run-in lead-in followed by
+% "<Heading>.   ---" so paragraph headings read as strong inline section cues.
+% Both manuscripts share the revtex4-2 (aps,prd,reprint) class, so this is a
+% faithful transplant. The \@startsection redefine sets the spacing that
+% titlesec then inherits; \titleformat sets the run-in typography. \pea is the
+% post-heading lead-in separator (emphasised heading + bold period + em-dash).
+\makeatletter
+\renewcommand{\paragraph}{%
+\@startsection{paragraph}{4}%
+{\z@}{1.21ex \@plus 1ex \@minus .2ex}{0.9em}%
+{\normalfont\normalsize\bfseries}%
+}
+\usepackage{titlesec}
+\newrobustcmd{\pea}[1]{\emph{#1}\textbf{.\ \ \ ---}}
+\titleformat{\paragraph}[runin]{\normalfont\normalsize\bfseries}{\emph\theparagraph}{1em}{\pea}
+\makeatother
+
+% -----------------------------------------------------------------------------
+% Supervisor comments (William Barker). Renders "WB: <text>" in green.
+% Strip before submission.
+%
+% To show literal code/regex with special chars (% $ ~ _ \ { } etc.) inside a
+% comment, prefix the call with \cprotect and use \verb -- no escaping needed:
+%     \cprotect\wb{... run \verb|:%s/ $/~$/g| ...}
+% (cprotect lets \verb survive inside another command's braced argument; plain
+% \verb cannot, and \string only stringifies the single next token.)
+\usepackage{cprotect}
+\newcommand{\wb}[1]{{\color{green!55!black}\textbf{WB:} #1}}
