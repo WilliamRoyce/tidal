@@ -89,7 +89,7 @@ def _plot(data: dict, out_path: Path) -> None:
     from matplotlib.colors import LinearSegmentedColormap
 
     cmap = LinearSegmentedColormap.from_list(
-        "ibm_heatmap", ["#fe6100", "#dc267f", "#785ef0"]
+        "ibm_heatmap", ["#785ef0", "#dc267f", "#fe6100"]
     ).copy()
     cmap.set_bad(color="white")
 
