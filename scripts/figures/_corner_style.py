@@ -207,31 +207,21 @@ def overlay_corner(
     # Anesthetic propagates param_labels via the labels= kwarg to read_chains
     # (set in load_chains above) — no per-axis label-loop required here.
 
-    # High-D tick fixes: for corners with ≥ HIGH_DIM_THRESHOLD parameters,
-    # apply 45° diagonal rotation on x-tick labels and limit major-tick
-    # density to 3 ticks per axis. Tick labels (the numeric values) are
-    # shrunk per-panel because the panel width on a \textwidth figure
-    # scales as 1/n_params; without the shrinkage, tick numerals overlap
-    # by ~20 panels. The PARAMETER labels ($\beta_1$, $\chi_3$, etc.) are
-    # NOT shrunk — they read at the RCPARAMS axes.labelsize default.
-    #   12–19 params (T7 18D, NP.T7 17D): tick labels 6 pt
-    #   ≥ 20 params  (T9 32D, T6 20D):    tick labels 5 pt
-    if len(params) >= HIGH_DIM_THRESHOLD:
-        tick_label_pt = 5 if len(params) >= 20 else 6
-        for ax in axes.values.flatten():
-            if ax is None:
-                continue
-            ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-            ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
-            ax.tick_params(axis="both", labelsize=tick_label_pt)
-            for label in ax.get_xticklabels():
-                label.set_rotation(45)
-                label.set_horizontalalignment("right")
-
-    # Single-column figures with >5 params: numeric tick values become
-    # illegible at COLUMN_WIDTH; remove them entirely. Parameter name
-    # labels (β₁, χ, etc.) on the axes are kept.
-    if len(params) > 5 and fig_width <= COLUMN_WIDTH:
+    # Tick-label removal for dense corner plots. Parameter-name axis labels
+    # (β₁, χ, etc.) are always kept; only the numeric tick values are removed.
+    # For dense double-column plots also reduce tick density to 3 per axis.
+    #   Double-column, >10 params (T7 18D, NP.T7 17D, T6 20D, T9 32D): remove
+    #   Single-column, >5 params (Barker 6D, Shapiro 8D, full-NM 9D, NP 8D): remove
+    remove_tick_labels = (len(params) > 10 and fig_width > COLUMN_WIDTH) or (
+        len(params) > 5 and fig_width <= COLUMN_WIDTH
+    )
+    if remove_tick_labels:
+        if fig_width > COLUMN_WIDTH:
+            for ax in axes.values.flatten():
+                if ax is None:
+                    continue
+                ax.xaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
+                ax.yaxis.set_major_locator(MaxNLocator(nbins=3, prune="both"))
         for ax in axes.values.flatten():
             if ax is None:
                 continue
