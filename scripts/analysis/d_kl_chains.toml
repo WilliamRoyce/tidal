@@ -1,0 +1,135 @@
+# Inventory of every surveyed PolyChord chain that feeds the §4 D_KL
+# parameter-importance analysis.  scripts/analysis/recompute_parameter_kl.py
+# walks this list and emits parameter_importance.json into each chain
+# subdirectory.  scripts/analysis/extract_d_kl.py reads the emitted JSONs
+# to produce the §4 / App J TeX fragments.
+#
+# Add new chains (e.g. forthcoming localized-geometry runs) by appending
+# [[chain]] tables here — no code changes needed.
+#
+# Schema per entry:
+#   theory      — short name used to key the per-theory listings
+#   geometry    — plane_wave | dual_gaussian | wavepacket (future)
+#   jobid       — HPC SLURM job id (numeric string)
+#   amp_path    — relative path to amp PolyChord subdir
+#   sup_path    — relative path to sup PolyChord subdir
+#   param_names — ordered list of parameter labels matching the chain columns
+#
+# Priors are read from <amp_path>/inference.json when available; chains that
+# pre-date the inference.json schema must supply a [chain.priors] override.
+
+[[chain]]
+theory = "dark_photon_plasma"
+geometry = "plane_wave"
+jobid = "29205968+29205982"
+amp_path = "hpc_results/29205968/stage_a_amp_v3_pub"
+sup_path = "hpc_results/29205982/stage_a_sup_v3_pub"
+param_names = ["mA2", "deltam", "xi", "alpha3"]
+
+[[chain]]
+theory = "ricci_em"
+geometry = "plane_wave"
+jobid = "29189748+29189761"
+amp_path = "hpc_results/29189748/d1_amp_v3"
+sup_path = "hpc_results/29189761/d1_sup_v3"
+# alpha{1,2,3} in the source chain are physically the torsion masses
+# β{1,2,3}; renamed here so the figure axes show β consistent with the
+# rest of §4. TODO(hpc): re-run with matched β1,β2,β3 priors (currently
+# β3 used a one-sided broad prior, see TODO note in results.tex).
+param_names = ["beta1", "beta2", "beta3", "delta1"]
+
+[[chain]]
+theory = "ym_pgt_bahamonde"
+geometry = "plane_wave"
+jobid = "29507332"
+amp_path = "hpc_results/29507332/d20_bahamonde_amp_v3_pub"
+sup_path = "hpc_results/29471255/d20_bahamonde_sup_v3_pub"
+param_names = ["beta1", "beta2", "beta3", "xi", "delta1"]
+
+[[chain]]
+theory = "ym_pgt_barker"
+geometry = "plane_wave"
+jobid = "29507332"
+amp_path = "hpc_results/29507332/d21_barker_amp_v3_pub"
+sup_path = "hpc_results/29471255/d21_barker_sup_v3_pub"
+param_names = ["beta1", "beta2", "beta3", "xi", "delta1", "chi"]
+
+[[chain]]
+theory = "ym_pgt_shapiro"
+geometry = "plane_wave"
+jobid = "29468763"
+amp_path = "hpc_results/29468763/d22_shapiro_amp_v3"
+sup_path = "hpc_results/29468763/d22_shapiro_sup_v3"
+param_names = ["beta1", "beta2", "beta3", "xi", "delta1", "zeta1", "zeta2", "zeta3"]
+
+[[chain]]
+theory = "ym_pgt_full_nonminimal"
+geometry = "plane_wave"
+jobid = "29468763"
+amp_path = "hpc_results/29468763/d23_full_amp_v3"
+sup_path = "hpc_results/29471255/d23_full_sup_v3"
+param_names = ["beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3"]
+
+[[chain]]
+theory = "np_t5"
+geometry = "plane_wave"
+jobid = "29700462"
+amp_path = "hpc_results/29700462/np_amp_v1"
+sup_path = "hpc_results/29700462/np_sup_v1"
+param_names = ["beta1", "beta2", "beta3", "delta1", "chi", "zeta1", "zeta2", "zeta3"]
+
+[[chain]]
+theory = "chi_closure"
+geometry = "plane_wave"
+jobid = "29682868"
+amp_path = "hpc_results/29682868/t7_amp_v2"
+sup_path = "hpc_results/29682868/t7_sup_v2"
+param_names = ["beta1", "beta2", "beta3", "xi", "delta1", "zeta1", "zeta2", "zeta3", "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10"]
+
+[[chain]]
+theory = "np_chi_closure"
+geometry = "plane_wave"
+jobid = "29705560"
+amp_path = "hpc_results/29705560/np_ceven_amp_v1"
+sup_path = "hpc_results/29705560/np_ceven_sup_v1"
+param_names = ["beta1", "beta2", "beta3", "delta1", "zeta1", "zeta2", "zeta3", "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10"]
+
+[[chain]]
+theory = "xi_kinetic_closure"
+geometry = "plane_wave"
+jobid = "29694142"
+amp_path = "hpc_results/29694142/t9_amp_v2"
+sup_path = "hpc_results/29694142/t9_sup_v2"
+param_names = ["beta1", "beta2", "beta3", "xi1", "xi2", "xi3", "xi4", "xi5", "xi6", "xi7", "xi8", "xi9", "xi10", "xi12", "xi13", "xi14", "xi15", "xi16", "delta1", "zeta1", "zeta2", "zeta3", "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10"]
+
+[[chain]]
+theory = "parity_odd_minimal"
+geometry = "plane_wave"
+jobid = "29515407"
+amp_path = "hpc_results/29515407/t6_minimal_amp_v3"
+sup_path = "hpc_results/29515407/t6_minimal_sup_v3"
+param_names = ["beta1", "beta2", "beta3", "d21"]
+
+[[chain]]
+theory = "parity_odd_full"
+geometry = "plane_wave"
+jobid = "29687506"
+amp_path = "hpc_results/29687506/t6_amp_v2"
+sup_path = "hpc_results/29687506/t6_sup_v2"
+param_names = ["beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3", "d14", "d15", "d17", "d19", "d20", "d21", "tildezeta1", "tildezeta2", "tildezeta3", "tildezeta5", "tildezeta6"]
+
+[[chain]]
+theory = "complete_parity_odd"
+geometry = "plane_wave"
+jobid = "29684804"
+amp_path = "hpc_results/29684804/t8_amp_v1"
+sup_path = "hpc_results/29684804/t8_sup_v1"
+param_names = ["beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3", "d14", "d15", "d17", "d19", "d20", "d21", "tildezeta1", "tildezeta2", "tildezeta3", "tildezeta5", "tildezeta6", "tildechi1", "tildechi2", "tildechi3", "tildechi4", "tildechi5", "tildechi6", "tildechi7", "tildechi8", "tildechi9", "tildechi10", "tildechi11", "tildechi12", "tildechi13", "tildechi14", "tildechi15", "tildechi16", "tildechi17", "tildechi18", "tildechi19", "tildechi20", "tildechi21", "tildechi22", "tildechi23", "tildechi24", "tildechi25", "tildechi26", "tildechi27", "tildechi28", "tildechi29", "tildechi30", "tildechi31", "tildechi32", "tildechi33", "tildechi34", "tildechi35", "tildechi36"]
+
+[[chain]]
+theory = "eh_gertsenshtein"
+geometry = "plane_wave"
+jobid = "29700083"
+amp_path = "hpc_results/29700083/eh_gert_amp_v1"
+sup_path = "hpc_results/29700083/eh_gert_sup_v1"
+param_names = ["rho", "sigma"]

@@ -9,12 +9,7 @@
 \usepackage{tikz}
 \usetikzlibrary{decorations.markings,arrows.meta,calc}
 \tikzset{>={Stealth[length=1.2mm,width=1.2mm]}} % default arrow tip for -> etc.
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\usepackage{tidal-tikz-styles}
 
 \tikzset{
   DashedArrows/.style 2 args={
@@ -38,16 +33,16 @@
         \def\Ry{0.45*\Ly}
         \coordinate (O) at (0,-0.2*\Ly);
         \draw[DashedArrows={0.17}{0.62}] (0,-0.2*\Ly) ellipse ({\Rx} and {\Ry});
-        \fill[OrangeFill, opacity=0.4] (\Rx,0.3*\Ly) arc(0:-90:{\Rx} and {\Ry}) --++ (0,-0.5*\Ly) arc(-90:0:{\Rx} and {\Ry}) -- cycle;
-        \fill[OrangeFill, opacity=0.4] (\Rx,0.3*\Ly) arc(0:180:{1.05*\Rx} and {0.95*\Ry}) -- (-1.1*\Rx,0.3*\Ly) to[out=-90,in=103] (-\Rx,-0.2*\Ly) arc(180:0:{\Rx} and {\Ry}) -- cycle;
-        \fill[OrangeFill, opacity=0.4] ($(O)+(0,-\Ry)$) arc(-90:-180:{\Rx} and {\Ry}) to[out=103,in=-90] (-1.1*\Rx,0.3*\Ly) to[out=-90,in=180] ($(O)+(0,-\Ry)+(115:0.4*\Ly)$) -- cycle;
+        \fill[IBMblue, opacity=0.4] (\Rx,0.3*\Ly) arc(0:-90:{\Rx} and {\Ry}) --++ (0,-0.5*\Ly) arc(-90:0:{\Rx} and {\Ry}) -- cycle;
+        \fill[IBMblue, opacity=0.4] (\Rx,0.3*\Ly) arc(0:180:{1.05*\Rx} and {0.95*\Ry}) -- (-1.1*\Rx,0.3*\Ly) to[out=-90,in=103] (-\Rx,-0.2*\Ly) arc(180:0:{\Rx} and {\Ry}) -- cycle;
+        \fill[IBMblue, opacity=0.4] ($(O)+(0,-\Ry)$) arc(-90:-180:{\Rx} and {\Ry}) to[out=103,in=-90] (-1.1*\Rx,0.3*\Ly) to[out=-90,in=180] ($(O)+(0,-\Ry)+(115:0.4*\Ly)$) -- cycle;
 
-        \draw[OrangeLine, DashedArrows={0.17}{0.62}] ($(O)+(0,0.5*\Ly-\Ry)$) arc(-90:0:{\Rx} and {\Ry}) arc(0:180:{1.05*\Rx} and {0.95*\Ry}) to[out=-90,in=180] ($(O)+(0,-\Ry)+(115:0.4*\Ly)$);
+        \draw[IBMblue, DashedArrows={0.17}{0.62}] ($(O)+(0,0.5*\Ly-\Ry)$) arc(-90:0:{\Rx} and {\Ry}) arc(0:180:{1.05*\Rx} and {0.95*\Ry}) to[out=-90,in=180] ($(O)+(0,-\Ry)+(115:0.4*\Ly)$);
 
-        \draw[OrangeLine, thick, ->] ($(O)+(0,-\Ry)$) --++ (0,0.5*\Ly);
-        \draw[OrangeLine, thick, ->] ($(O)+(0,-\Ry)$) --++ (115:0.4*\Ly);
+        \draw[IBMblue, thick, ->] ($(O)+(0,-\Ry)$) --++ (0,0.5*\Ly);
+        \draw[IBMblue, thick, ->] ($(O)+(0,-\Ry)$) --++ (115:0.4*\Ly);
 
-        \node at (0,0) {$\mathcal{F}$};
+        \node at (0,0) {$\mathcal{R}$};
     \end{scope}
 
     \begin{scope}[shift={(2*\Lx,0)}]
@@ -58,15 +53,15 @@
         \coordinate (Q) at ($(O)+(5:0.9*\Lx)$);
         \coordinate (Qv) at ($(O)+(5:0.9*\Lx)+(85:0.7*\Lx)$);
 
-        \draw[PurpleLine, thick, ->] (O) -- (R);
-        \draw[PurpleLine, thick, ->] (O) -- (Q);
-        \draw[PurpleLine, thick, ->] (R) -- (Ru);
-        \draw[PurpleLine, thick, ->] (Q) -- (Qv);
-        \draw[PurpleLine, dashed, thin] (Q) to[bend right=15] (Ru);
-        \draw[PurpleLine, dashed, thin] (R) to[bend left=15] (Qv);
+        \draw[IBMyellow, thick, ->] (O) -- (R);
+        \draw[IBMyellow, thick, ->] (O) -- (Q);
+        \draw[IBMyellow, thick, ->] (R) -- (Ru);
+        \draw[IBMyellow, thick, ->] (Q) -- (Qv);
+        \draw[IBMyellow, dashed, thin] (Q) to[bend right=15] (Ru);
+        \draw[IBMyellow, dashed, thin] (R) to[bend left=15] (Qv);
 
-        \fill[PurpleFill, opacity=0.2] (O) -- (Q) to[bend right=15] (Ru) -- (R) -- cycle;
-        \fill[PurpleFill, opacity=0.2] (O) -- (R) to[bend left=15] (Qv) -- (Q) -- cycle;
+        \fill[IBMyellow, opacity=0.2] (O) -- (Q) to[bend right=15] (Ru) -- (R) -- cycle;
+        \fill[IBMyellow, opacity=0.2] (O) -- (R) to[bend left=15] (Qv) -- (Q) -- cycle;
 
         \draw[densely dashed, thin,->] (-0.45*\Lx,-0.95*\Ly) to[bend left=12] (-0.43*\Lx,0.99*\Ly);
         \draw[densely dashed, thin,->] (-0.8*\Lx,-0.7*\Ly) to[bend left=15] (0.8*\Lx,-0.9*\Ly);
@@ -92,12 +87,12 @@
         \coordinate (M) at (-0.3*\Lx,-0.64*\Ly);
         \coordinate (N) at ($(B)+(-75:\Lx)$);
 
-        \fill[GreenFill, opacity=0.3] (N) -- (B) to[out=-20, in=170] (C) to[out=-10, in=-160] (D) to[out=20, in=-120] (E) -- (G) to[out=-170, in=-70] (H) to[out=110, in=-60] (I) to[out=120, in=100] (J) to[out=-80, in=10] (K) to[out=-170, in=-60] (L) to[out=120, in=105] (M) to[out=-85, in=20] (N);
+        \fill[IBMmagenta, opacity=0.4] (N) -- (B) to[out=-20, in=170] (C) to[out=-10, in=-160] (D) to[out=20, in=-120] (E) -- (G) to[out=-170, in=-70] (H) to[out=110, in=-60] (I) to[out=120, in=100] (J) to[out=-80, in=10] (K) to[out=-170, in=-60] (L) to[out=120, in=105] (M) to[out=-85, in=20] (N);
 
-        \draw[GreenLine, thick, ->] (B) --++(-75:\Lx);
-        \draw[GreenLine, thick, ->] (E) -- (G);
+        \draw[IBMmagenta, thick, ->] (B) --++(-75:\Lx);
+        \draw[IBMmagenta, thick, ->] (E) -- (G);
 
-        \draw[GreenLine, dashed, thin] (G) to[out=-170, in=-70] (H) to[out=110, in=-60] (I) to[out=120, in=100] (J) to[out=-80, in=10] (K) to[out=-170, in=-60] (L) to[out=120, in=105] (M) to[out=-85, in=20] (N);
+        \draw[IBMmagenta, dashed, thin] (G) to[out=-170, in=-70] (H) to[out=110, in=-60] (I) to[out=120, in=100] (J) to[out=-80, in=10] (K) to[out=-170, in=-60] (L) to[out=120, in=105] (M) to[out=-85, in=20] (N);
 
         \draw[DashedArrows={0.22}{0.75}] (A) to[out=-35, in=160] (B) to[out=-20, in=170] (C) to[out=-10, in=-160] (D) to[out=20, in=-120] (E) to[out=60, in=-160] (F);
 

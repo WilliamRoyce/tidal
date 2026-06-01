@@ -1,0 +1,104 @@
+# Gertsenshtein Effect: Ungauged Graviton + Dual-Gaussian B-field (Phase E.cal)
+#
+# Combines two prior validated patterns:
+#   - theory_ungauged.toml — NO TT gauge on h (per issue #167; TT-compliant
+#     ICs but unconstrained dynamics so all metric components evolve freely)
+#   - theory_e0_dual_gaussian.toml — dual-Gaussian B-field profile, modal-
+#     solver-compatible on periodic BCs after #367 fix (v0.42.0/v0.42.1)
+#
+# Role in Phase E:
+#   Positive control / ratio denominator. The amplification factor
+#   A = P_theory / P_gertsenshtein for every other Phase E theory is taken
+#   relative to *this* measurement at the *same* geometry. Boccaletti
+#   formula P_GR = sin^2(kappa * Bpeak * sigB * sqrt(2*pi) / 2) gives the
+#   leading-order analytic check; TIDAL captures higher-order corrections
+#   so we do NOT expect an exact match.
+#
+# Geometry parameters (must match scripts/hpc_submit_drafts/v3e_localised/_geometry.env):
+#   kappa = 1.0, Bpeak = 0.01, sigB = 5, zc1 = 50, zc2 = 150 (L=200 box)
+#
+# Pre-flight check: scripts/v3e_boccaletti_preflight.py must PASS before
+# any HPC submit; verifies (kappa * Bpeak * sigB * sqrt(2*pi) / 2) is in
+# the perturbative window and well clear of any sin^2 node.
+#
+# Ref: Gertsenshtein (1962), JETP 14:84
+#
+# Derivation timing: ~3m wall (last verified: 2026-05-24, 14 fields, 90 H terms, v0.43.1)
+
+[theory]
+name = "Gertsenshtein Effect (Ungauged graviton + Dual-Gaussian B, Phase E.cal)"
+description = "Einstein-Maxwell with TT-IC + unconstrained graviton dynamics; localised dual-Gaussian B background; modal-solver-compatible periodic geometry"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# h: metric perturbation (graviton), symmetric rank-2 tensor — ALL 10 components
+# A: full EM 4-potential
+# a: EM perturbation (photon)
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Dual-Gaussian B-field background (validated in Phase E.0).
+# B_x(z) = Bpeak * [exp(-(z-zc1)^2/(2*sigB^2)) - exp(-(z-zc2)^2/(2*sigB^2))]
+# Abar_y(z) = -Bpeak * sigB * Sqrt[Pi/2]
+#             * (Erf[(z-zc1)/(Sqrt[2]*sigB)] - Erf[(z-zc2)/(Sqrt[2]*sigB)])
+# Periodicity: Abar_y(0) ≈ Abar_y(L) for sigB << zc1, zc2 and zc1+zc2=L.
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = [
+  "0",
+  "0",
+  "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1)/(Sqrt[2]*sigB)] - Erf[(z[] - zc2)/(Sqrt[2]*sigB)])",
+  "0"
+]
+
+[constants]
+names = ["kappa", "Bpeak", "sigB", "zc1", "zc2"]
+
+# Full Einstein-Maxwell Lagrangian
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+# Multi-field perturbation: g = eta + eps*h, A = Abar + eps*a
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# NO TT gauge on h — all 10 metric components survive (TT enforced only at IC
+# time via --ic-component selecting the h_+ slot; dynamics are unconstrained).
+# Lorenz gauge on a only.
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: d/dx = d/dy = 0 → effective 1+1D along z
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/gertsenshtein_ungauged_e_dual_gaussian.json"

@@ -7,12 +7,12 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `tidal/wolfram/` -- Wolfram pipeline modules (EulerLagrange.wl, ComponentDecompose.wl, ExportJSON.wl, CommonUtilities.wl, GaugeFix.wl)
 - `tidal/solver/` -- PDE solver backends (ida.py, cvode.py, leapfrog.py, fields.py, operators.py, grid.py, coefficients.py, rhs.py, state.py, constraint_solve.py)
 - `tidal/symbolic/` -- Python symbolic pipeline (_derive.py, json_loader.py)
-- `tidal/cli/` -- CLI entry points (10 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze, sample)
+- `tidal/cli/` -- CLI entry points (11 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze, sample, doctor)
 - `tidal/inference/` -- Bayesian inference (priors, likelihood, constraints, MC, nested sampling via dynesty/PolyChord)
 - `tidal/measurement/` -- Physics measurements (energy, conversion, mixing, spectra)
 - `examples/` -- 20 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
 - `research/` -- General quadratic PGT+EM Lagrangian enumeration (xAct/xTras scripts, TeX document, classification JSONs)
-- `tests/` -- ~1,721 Python tests + ~115 Wolfram tests
+- `tests/` -- ~2,400 Python tests (76 files) + ~260 Wolfram test cases (tests/wolfram/*.wls)
 - `docs/` -- Architecture docs (MEMORY.md is the main reference)
 
 ## Key Commands
@@ -44,7 +44,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 
 - **After completing any code change**, run relevant tests before moving on. Source→test mapping: `tidal/solver/X.py` → `tests/test_solver_X.py`, `tidal/cli/_X.py` → `tests/test_cli.py`, `tidal/measurement/` → `tests/test_measurement.py`. Unsure → full suite: `uv run pytest tests/ -x -q`
 - **After completing a feature/fix**, commit promptly with conventional format (feat:/fix:/refactor:/test:/docs:). No Co-Authored-By trailer. Separate unrelated changes into distinct commits.
-- **Fix lint/type/spell errors immediately** — `uv run ruff check --fix && uv run ruff format` after code changes. Fix pyright errors. Add domain terms to `.cspell.json`, fix genuine typos.
+- **Fix lint/type/spell errors immediately** — `uv run ruff check --fix && uv run ruff format` after code changes. Fix pyright errors. Add domain terms to `cspell.json`, fix genuine typos.
 - **Wolfram pipeline integrity**: ALL symbolic processing stays in Wolfram — never post-process equations in Python. Never skip/bypass the canonical pipeline; fix root causes.
 - **Run long commands in background**: Use `run_in_background: true` on the Bash tool for any command that takes more than a few seconds — derivations (`tidal derive`), simulations (`tidal simulate`), sweeps (`tidal sweep`), and full test suites (`pytest tests/`). Continue other work while waiting; you'll be notified on completion. Do NOT poll or sleep.
 - **Only ONE wolframscript at a time** — single engine license. NEVER run `tidal derive` in parallel.

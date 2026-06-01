@@ -27,6 +27,8 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from numpy.typing import NDArray
+
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
@@ -48,7 +50,7 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     grid: GridInfo,
     bc: BCSpec | None,
     rhs_eval: RHSEvaluator,
-    m_inv: dict[str, float] | None,
+    m_inv: dict[str, float | NDArray[np.float64]] | None,
     progress: SimulationProgress | None = None,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``.
@@ -173,7 +175,7 @@ def solve_scipy(  # noqa: PLR0913
     # for theories with non-trivial mass matrix. None triggers the M=I fast path.
     from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
 
-    m_inv = build_inverse_kinetic_diag(spec, parameters or {})
+    m_inv = build_inverse_kinetic_diag(spec, parameters or {}, grid=grid)
 
     # Build RHS closure (with optional progress tracking)
     rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval, m_inv, progress=progress)

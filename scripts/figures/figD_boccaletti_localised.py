@@ -25,6 +25,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = (
@@ -40,7 +41,7 @@ def _plot(data: dict, out_path: Path) -> None:
         [KAPPA * r["Bpeak"] * r["R"] * math.sqrt(math.pi / 2.0) for r in rows]
     )
     p_sim_flat = np.array([r["P_sim"] for r in rows])
-    n_cells = len(rows)
+    len(rows)
 
     fig, ax = plt.subplots(figsize=(5.2, 4.0))
     s_dense = np.linspace(0.0, max(s_vals.max() * 1.05, 0.1), 400)
@@ -58,8 +59,8 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="o",
         ms=4,
         lw=0,
-        color="#1f77b4",
-        label=rf"TIDAL ($N = {n_cells}$ cells)",
+        color=IBM_PALETTE["blue"],
+        label=r"$\mathit{TIDAL}$",
     )
     ax.set_xlabel(r"$s = \kappa\,B_{\mathrm{peak}}\,R\,\sqrt{\pi/2}$")
     ax.set_ylabel(r"$P_{g\gamma}$")

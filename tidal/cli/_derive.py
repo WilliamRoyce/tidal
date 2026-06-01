@@ -1528,7 +1528,7 @@ def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0915
     # heads or Derivative[...][field_i][t,x,y,z]) returns zero fields.
     #
     # Gate: run the pre-computation whenever
-    #   (a) we have >= 2 dyn fields (existing behaviour), OR
+    #   (a) we have >= 2 dyn fields (existing behavior), OR
     #   (b) any dyn field appears as ``CD[...][name[...]]`` in the Lagrangian,
     #       i.e. derivative-only dependence that needs ComponentValue resolution.
     # Otherwise keep the fast-path skip (scalar/direct-tensor theories).
@@ -6055,9 +6055,52 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0915
         lines.extend(_wls_constraint_elimination(constants=ctx.constants))
 
     # Build JSON — always use multi-field builder since fieldEquations
-    # Inject tensor component metadata into metadata for LaTeX export
+    # Inject tensor component metadata into metadata for LaTeX export.
+    #
+    # The legacy `_wls_component_metadata` helper populated this map inside
+    # the matter-perturbation / single-field VarD code paths, but the
+    # Component-E-L pipeline that every theory currently exercises bypasses
+    # those paths. Build the map here from the final fieldEquations names
+    # (the only authoritative source post-Phase A / constraint-elimination)
+    # by looking up each name's Wolfram function in compToFunc, recovering
+    # the tensor head by stripping the trailing flat-index digits, and then
+    # calling EnumerateComponentTuples on the head. xTensorQ guards rank
+    # extraction so scalars degrade to rank 0 with empty indices.
     lines.extend(
         (
+            "(* Build component_metadata from final fieldEquations names *)",
+            "componentMetadata = <||>;",
+            "Module[{baseToHead = <||>, fname, parts, base, idx, headStr,"
+            " head, slots, rank, tuples, tuple},",
+            "  Do[",
+            "    fname = fieldEquations[[i, 1]];",
+            '    parts = StringSplit[fname, "_"];',
+            "    If[Length[parts] >= 2 && KeyExistsQ[compToFunc, fname],",
+            "      base = StringJoin @@ Most[parts];",
+            "      idx = ToExpression[Last[parts]];",
+            "      If[!KeyExistsQ[baseToHead, base],",
+            "        headStr = StringReplace[ToString[compToFunc[fname]],"
+            ' RegularExpression["[0-9]+$"] -> ""];',
+            "        baseToHead[base] = Symbol[headStr];",
+            "      ];",
+            "      head = baseToHead[base];",
+            "      If[xTensorQ[head],",
+            "        slots = SlotsOfTensor[head];",
+            "        rank = Length[slots];",
+            "        tuples = EnumerateComponentTuples[head, nCoords];",
+            "        If[idx + 1 <= Length[tuples],",
+            "          tuple = tuples[[idx + 1]];",
+            "          componentMetadata[fname] = <|",
+            '            "head" -> base,',
+            '            "rank" -> rank,',
+            '            "indices" -> tuple',
+            "          |>;",
+            "        ];",
+            "      ];",
+            "    ];,",
+            "    {i, Length[fieldEquations]}",
+            "  ];",
+            "];",
             "(* Inject tensor component metadata for LaTeX export *)",
             "If[Length[componentMetadata] > 0,",
             '  metadata["component_metadata"] = componentMetadata;',
@@ -6555,7 +6598,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
                     )
                     ret = 0
             except Exception:  # noqa: BLE001, S110
-                pass  # JSON missing or corrupt — honour the non-zero exit code
+                pass  # JSON missing or corrupt — honor the non-zero exit code
 
     # NOTE: Plane-wave reduction (coordinate remapping, operator renaming,
     # dimension change) is now handled entirely in Wolfram via

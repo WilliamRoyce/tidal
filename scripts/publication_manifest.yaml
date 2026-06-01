@@ -1,14 +1,14 @@
-# Publication artefact manifest.
+# Publication artifact manifest.
 #
 # Maps each manuscript figure/table to its producing script(s), data
 # dependencies, and appendix reference. Read by:
 #   - tests/publication/* (validates round-trip script -> data -> output)
 #   - scripts/run_benchmarks.sh (enumerates benchmark jobs)
 #
-# Each entry under appendix_<X> is keyed by the artefact's manuscript label.
+# Each entry under appendix_<X> is keyed by the artifact's manuscript label.
 # `kind` is one of: figure, table, static_tikz.
 # `appendix_ref` is the source-line citation pointing at the TODO this
-# artefact satisfies.
+# artifact satisfies.
 
 appendix_C:
 
@@ -78,14 +78,6 @@ appendix_D:
     output: manuscript/figures/figD_parker_simon.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §4)
 
-  figD_fv_cdt:
-    kind: figure
-    figure_script: scripts/figures/figD_fv_cdt.py
-    benchmark_script: scripts/benchmarks/fv_cdt_equivalence.py
-    canonical_data: benchmark_results/canonical/fv_cdt_equivalence.json
-    output: manuscript/figures/figD_fv_cdt.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D §5)
-
   figD_multi_method:
     kind: figure
     figure_script: scripts/figures/figD_multi_method.py
@@ -102,14 +94,6 @@ appendix_D:
     output: manuscript/figures/figD_convergence.pdf
     appendix_ref: manuscript/sections/appendices/validation.tex (App D §7)
 
-  figD_conservation:
-    kind: figure
-    figure_script: scripts/figures/figD_conservation.py
-    benchmark_script: scripts/benchmarks/conservation_audit_full.py
-    canonical_data: benchmark_results/canonical/conservation_audit_full.json
-    output: manuscript/figures/figD_conservation.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D §8)
-
   fig1_boccaletti_validation:
     kind: figure
     figure_script: scripts/figures/fig1_boccaletti_validation.py
@@ -118,26 +102,3 @@ appendix_D:
     output: manuscript/figures/fig1_boccaletti_validation.pdf
     appendix_ref: manuscript/sections/results.tex (§4.1 ValidationResult)
 
-  figD1_stageA_heatmap:
-    kind: figure
-    figure_script: scripts/figures/figD1_stageA_heatmap.py
-    canonical_data: hpc_results/campaigns/d20_bahamonde_amp_rerun_v2/run/results.csv
-    output: manuscript/figures/figD1_stageA_heatmap.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.2 SectorSurveyTable)
-    status: stub  # current campaign data is nested-sampling output; a parameter-plane (m_A, eps) heatmap needs grid-sweep data not yet collected
-
-  figD2_stageB_sweep:
-    kind: figure
-    figure_script: scripts/figures/figD2_stageB_sweep.py
-    canonical_data: hpc_results/campaigns/d21_barker_sup/run/results.csv
-    output: manuscript/figures/figD2_stageB_sweep.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.2 SectorSurveyTable)
-    status: stub  # depends on sweep-scatter data with simulated P_max column
-
-  figD3_channel_comparison:
-    kind: figure
-    figure_script: scripts/figures/figD3_channel_comparison.py
-    canonical_data: TBD
-    output: manuscript/figures/figD3_channel_comparison.pdf
-    appendix_ref: manuscript/sections/appendices/validation.tex (App D, supports §4.3 ChannelStructure)
-    status: stub

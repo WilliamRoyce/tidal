@@ -1274,7 +1274,7 @@ class EquationSystem:
 
         Returns
         -------
-        A new :class:`EquationSystem` with the canonicalised equations. The
+        A new :class:`EquationSystem` with the canonicalized equations. The
         returned spec is idempotent under this transform; calling it twice
         produces the same result. ``self`` is unchanged.
 
@@ -1283,7 +1283,7 @@ class EquationSystem:
         tidal.symbolic._kinetic_eval.KineticEvalError
             If any kinetic coefficient has structure outside the
             perturbative contract (bilinear in two small parameters,
-            quadratic in one, small-parameter denominator, parenthesised
+            quadratic in one, small-parameter denominator, parenthesized
             sub-sum). See :func:`split_small_parameter_kinetic`.
         """
         from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
@@ -1352,12 +1352,24 @@ class EquationSystem:
                         synth_sym,
                         base_term,
                     )
+                    # GH #380: when split_small_parameter_kinetic translated
+                    # `x[]` → `x` in c_expr / m0_expr (for ast.parse), the
+                    # resulting synth_sym carries bare coord names. The
+                    # downstream OperatorTerm.position_dependent auto-detect
+                    # only matches `x[]`-style xCoba calls, so we must set
+                    # coordinate_dependent explicitly — otherwise the modal
+                    # source-evaluation call will not pass coord_arrays and
+                    # eval() raises NameError on the bare coord.
+                    detected_coords: list[str] = [coord_name for coord_name in ("t", "x", "y", "z") if re.search(rf"\b{coord_name}\b", synth_sym)]
+                    inherited = tuple(base_term.coordinate_dependent or ())
+                    coord_dep = tuple(dict.fromkeys((*inherited, *detected_coords)))
                     synthesized.append(
                         OperatorTerm(
                             coefficient=synth_coef,
                             operator=base_term.operator,
                             field=base_term.field,
                             coefficient_symbolic=synth_sym,
+                            coordinate_dependent=coord_dep,
                             order_in_eps=1,
                         ),
                     )
@@ -1507,7 +1519,12 @@ class EquationSystem:
         )
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, PLR0912, C901
+    def from_dict(  # noqa: PLR0914, PLR0912, C901, PLR0915
+        cls,
+        data: Mapping[str, Any],
+        *,
+        strict_v6: bool = True,
+    ) -> EquationSystem:
         """Create an EquationSystem from a dictionary (parsed JSON).
 
         Raises
@@ -1583,7 +1600,7 @@ class EquationSystem:
                 raise TypeError(msg)
 
         # Auto-compute mass/coupling matrices from identity operator terms.
-        # This is the authoritative source — JSON values are ignored in favour
+        # This is the authoritative source — JSON values are ignored in favor
         # of values derived from the equation terms themselves.
         (
             mass_matrix,
@@ -1650,7 +1667,17 @@ class EquationSystem:
                 f"will automatically use `--perturbative-order 1` by "
                 f"default.\nSee docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md."
             )
-            raise ValueError(msg)
+            if strict_v6:
+                raise ValueError(msg)
+            # Inspect / LaTeX-render callers (strict_v6=False) only read the
+            # spec and never evolve it, so the Ostrogradsky-ghost concern
+            # does not apply. Emit a warning so the condition stays visible
+            # in logs.
+            warnings.warn(
+                "[json_loader] time_order > 2 fields present without "
+                "[perturbation]; loaded for read-only use. " + msg.split("\n", 1)[0],
+                stacklevel=2,
+            )
 
         return spec
 
@@ -1762,13 +1789,23 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
 # --- Public loader ---
 
 
-def load_equation_system(json_path: Path | str) -> EquationSystem:
+def load_equation_system(
+    json_path: Path | str,
+    *,
+    strict_v6: bool = True,
+) -> EquationSystem:
     """Load an equation system from a JSON file.
 
     Parameters
     ----------
     json_path : Path | str
         Path to the JSON file exported from Mathematica.
+    strict_v6 : bool, optional
+        When True (default), the v6 ``time_order > 2`` guard raises if the
+        JSON has higher-derivative fields without a ``[perturbation]``
+        section. Set to False for read-only callers (LaTeX rendering,
+        inspection) that do not evolve the system — the guard becomes a
+        warning so the spec still loads.
 
     Returns
     -------
@@ -1789,7 +1826,7 @@ def load_equation_system(json_path: Path | str) -> EquationSystem:
         data = json.load(f)
 
     validate_json_schema(data)
-    return EquationSystem.from_dict(data)
+    return EquationSystem.from_dict(data, strict_v6=strict_v6)
 
 
 def _evaluate_synth_coefficient(
@@ -1838,7 +1875,7 @@ def normalize_kinetic_coefficients(
         All time-domain solver backends (cvode/ida/leapfrog/scipy) now consume
         ``kinetic_coefficient_symbolic`` directly via
         :func:`tidal.solver._kinetic.build_inverse_kinetic_diag`, matching the
-        modal solver's existing behaviour. The canonical spec form carries the
+        modal solver's existing behavior. The canonical spec form carries the
         kinetic coefficient on the LHS and the un-normalized RHS; every
         backend applies M⁻¹ at setup. This function is retained only for
         external callers that pre-normalized specs before the root fix

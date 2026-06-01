@@ -1,7 +1,8 @@
+% !TEX root = ../main.tex
 % Computational approach: minimal BHL-style mention of the pipeline,
 % the modal solver, and nested sampling.  All elaboration is deferred
-% to App A--J via inline \cref{} -- no architectural breakdown, no
-% backend enumeration, no validation paragraph, no inference design
+% to App A--J via inline~\cref{} -- no architectural breakdown, no
+% solver enumeration, no validation paragraph, no inference design
 % justification, no inference-mechanism enumeration, no closing
 % "deferred" paragraph.  Target ~80 words.
 %
@@ -14,23 +15,22 @@
 % scipy.linalg.expm, NOT eigendecomposition; see
 % appendices/numerical.tex:315-344 for the rationale (eigendecomposition
 % abandoned because cond(V) > 1e13 for the multi-field PGT theories of
-% \cref{Results}).
+%~\cref{Results}).
 %
 % Reminder comments for the deferred material live in
-% sections/discussion.tex (App H / EFT placement),
+% sections/discussion.tex (App H / EFT placement) and
 % sections/results.tex (amplification-vs-instability framing and the
-% inference-mechanism details that surface in \S4), and
-% sections/appendices/architecture.tex (observables-paragraph
-% relocation).
+% inference-mechanism details that surface in \S4).
 
 \section{Computational approach}%
 \label{ComputationalApproach}
 
 \paragraph*{\TIDAL{}}
 We obtain the linearised field equations for every theory surveyed
-in \cref{Results} with \TIDAL{} (\emph{Tensor Integration and
-Derivation for Any Lagrangian}; \cref{Architecture,SymbolicComputation,NumericalEvolution}), grounded
-in the \xAct{}~\cite{martingarcia2007xact} suite for
+in~\cref{Results} with the \emph{Tensor Integration and Derivation
+for Any Lagrangian} (\TIDAL{},
+\cref{Architecture,SymbolicComputation,NumericalEvolution}), grounded
+in the \xAct{}~\cite{martingarcia2007xact,martingarcia2008xperm} suite for
 \Mathematica{}~\cite{mathematica}.
 
 \paragraph*{Numerical evolution}
@@ -40,7 +40,9 @@ Each Fourier mode is propagated by a single application of its
 matrix exponential, computed via Pad\'e
 scaling-and-squaring~\cite{higham2009scaling}.
 
-\paragraph*{Parameter inference}
-Parameter exploration is by nested sampling with
-PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; the inference
-architecture is documented in \cref{InferenceArchitecture}.
+\paragraph*{Coupling-space exploration}
+The coupling-space landscape is mapped by nested
+sampling~\cite{Skilling:2006gxv} with
+PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; the
+landscape-exploration architecture is documented
+in~\cref{InferenceArchitecture}.

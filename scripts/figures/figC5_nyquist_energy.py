@@ -22,6 +22,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 mpl.rcParams.update(
     {
@@ -47,12 +48,12 @@ _FIG_HEIGHT = 2.65
 
 _THEORY_STYLE = {
     "coupled_scalars": {
-        "color": "#1f77b4",
+        "color": IBM_PALETTE["blue"],
         "marker": "o",
         "label": r"Plasma--graviton, $\omega_P^2{=}0$",
     },
     "coupled_scalars_massive": {
-        "color": "#ff7f0e",
+        "color": IBM_PALETTE["orange"],
         "marker": "s",
         "label": r"Plasma--graviton, $\omega_P^2{=}1$",
     },
@@ -66,7 +67,7 @@ def _plot(data: dict, out_path: Path) -> None:
     for rows in by_theory.values():
         rows.sort(key=operator.itemgetter("n"))
 
-    fp_eps = 2.0**-52
+    2.0**-52
     fig, ax = plt.subplots(figsize=(_FIG_WIDTH, _FIG_HEIGHT))
 
     n_vals_all: list[int] = []
@@ -87,7 +88,7 @@ def _plot(data: dict, out_path: Path) -> None:
             color=style["color"],
             ls="none",
             ms=4,
-            label=f"{style['label']} (w/ proj.)",
+            label=f"{style['label']} (with proj.)",
         )
         # "Without proj" — open marker (the bad case)
         ax.plot(
@@ -98,21 +99,10 @@ def _plot(data: dict, out_path: Path) -> None:
             color=style["color"],
             ls="none",
             ms=4,
-            label=f"{style['label']} (w/o proj.)",
+            label=f"{style['label']} (without proj.)",
         )
 
-    # Machine-epsilon floor reference.
     n_vals_sorted = sorted(set(n_vals_all))
-    ax.axhline(fp_eps, color="gray", ls=":", lw=0.6, alpha=0.6)
-    ax.text(
-        n_vals_sorted[-1] * 1.3,
-        fp_eps * 2.5,
-        r"$\varepsilon_{\rm mach}$",
-        color="gray",
-        fontsize=6.5,
-        ha="right",
-        va="bottom",
-    )
 
     ax.set_xscale("log")
     ax.set_yscale("log")

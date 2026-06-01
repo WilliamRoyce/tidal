@@ -1,3 +1,4 @@
+% !TEX root = ../../main.tex
 % Appendix H: Perturbative reduction in higher-curvature Lagrangians (~2100 w).
 %
 % Supersedes the "Constraint promotion in higher-curvature PGT" first draft.
@@ -8,171 +9,158 @@
 \section{Perturbative reduction in higher-curvature Lagrangians}%
 \label{PerturbativeReduction}
 
-\TIDAL{} treats a correction $\varepsilon\,\mathcal{L}_1$ to a well-posed base
-Lagrangian $\mathcal{L}_0$ as a perturbative shift to the base-theory dynamics.
-The effective-field-theory background, the %order-by-order
-equations-of-motion reduction, and the Lagrangian perturbative substitution used
-for Hamiltonian analysis
-%  --- together with the conditions under which it fails ---
-are described here.
+\TIDAL{} treats a correction $\varepsilon\,\lag_1$ to a well-posed base
+Lagrangian $\lag_0$ as a perturbative shift to the base-theory dynamics. This
+appendix documents the reduction, which acts on both the EOM and
+the Lagrangian, and the corresponding obstructions in each case.
 
-\paragraph*{Higher-order terms as effective corrections}
-For theories whose Lagrangian admits the split
-$\mathcal{L} = \mathcal{L}_0 + \varepsilon\,\mathcal{L}_1$ with $\varepsilon$ a small
-dimensionless coupling, the correction $\varepsilon\,\mathcal{L}_1$ is treated
-throughout as a perturbative correction to the dynamics of $\mathcal{L}_0$,
-not as an independent dynamical source.
+\paragraph*{Effective higher-order corrections}
+For theories whose Lagrangian admits the decomposition
+$\lag = \lag_0 + \varepsilon\,\lag_1$ with $\varepsilon$ a small
+dimensionless coupling, $\varepsilon\,\lag_1$ is treated throughout as a
+perturbative correction within the regime $\varepsilon\ll1$.
 
-Within effective field theory, terms of this form are the low-energy residues of an
-unknown ultraviolet completion, encoding perturbative corrections to base-theory
-observables and not independent dynamics in their own right~\cite{Simon:1990ic,
-Simon:1990jn,Donoghue:1994dn,burgess2003quantum}.
-Grosse-Knetter~\cite{Grosse-Knetter:1993tae} proves, within the canonical formalism for
-higher-derivative theories~\cite{ostrogradsky1850memoires,Woodard:2015zca}, that
-expressing the higher time derivatives in $\mathcal{L}_1$ by substituting the
-base-theory equations of motion
-% --- which solve for $\partial_t^2\varphi^{\mathcal{I}}$
-% as a function of fields and first derivatives --- 
-is equivalent to a field redefinition
+Such higher-order operators are the low-energy residues of an unknown ultraviolet
+completion in the EFT
+interpretation~\cite{Simon:1990ic,Simon:1990jn,Donoghue:1994dn,burgess2003quantum}.
+Grosse-Knetter~\cite{Grosse-Knetter:1993tae,ostrogradsky1850memoires,Woodard:2015zca}
+proves that expressing the higher time derivatives in $\lag_1$ by substituting
+the base-theory EOM is equivalent to a canonical field redefinition
 $\varphi^{\mathcal{I}} \to \varphi^{\mathcal{I}} + \varepsilon\,\delta\varphi^{\mathcal{I}}$
-in the action.
-Such a redefinition is a canonical transformation: it preserves the Poisson bracket
-relations between coordinates and momenta, so that Hamilton's equations and all physical
-observables take identical form in the new variables.
-The original higher-derivative Lagrangian and the perturbatively reduced one are therefore
-physically equivalent within the perturbative regime, and the order-by-order expansion of
-\cref{EOMHierarchy} reproduces the physical predictions of $\mathcal{L}$ to first order
-in $\varepsilon$.
-This equivalence requires that the base-theory equation of motion for each reduced field
+that preserves the Poisson bracket structure.
+The original and reduced Lagrangians are
+therefore physically equivalent within the perturbative regime.
+This equivalence requires the base-theory equation of motion for each field undergoing the reduction to
 take the form $\partial_t^2\varphi^{\mathcal{I}} = F^{\mathcal{I}}[\varphi,\partial_t\varphi,
-\nabla\varphi]$, since this equation is the substitution rule itself; fields whose
-base-theory equation is purely algebraic violate the requirement and the canonical
-equivalence breaks down --- the failure mode addressed below.
+\{\nabla^n\varphi\}_{n\geq 1}]$~\cite{Grosse-Knetter:1993tae}. Fields whose base-theory
+equation is algebraic (in the sense of~\cref{SymbolicComputation}) violate the
+requirement, and the perturbative-reduction framework then fails.
 
-The alternative --- treating $\mathcal{L}$ as an exact theory rather than a truncated
-expansion --- encounters a structural obstruction.
-Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Pais:1950za,Woodard:2015zca} states
-that any non-degenerate Lagrangian whose Euler--Lagrange equations are of differential
-order greater than two has a Hamiltonian unbounded below: the momentum conjugate to the
-highest time derivative enters the Hamiltonian linearly so that the energy is unbounded
-below for arbitrary sign of that momentum, and the corresponding mode is a ghost.%
-\footnote{Apparent counterexamples in gravity --- the Gauss--Bonnet term in four
-spacetime dimensions~\cite{Lovelock:1971yv} and the higher-derivative terms in the
-Einstein--Hilbert Lagrangian~\cite{hobson2006general,wald1984general} --- are excluded:
-the former is topological and contributes only a boundary term, and the latter reduce to
-a total divergence after integration by parts, leaving the Euler--Lagrange equations of
-order two in both cases.}
+The alternative --- treating $\lag$ as a fundamental theory ---
+encounters Ostrogradsky's theorem.
+Ostrogradsky's theorem~\cite{ostrogradsky1850memoires,Pais:1950za} states
+that any non-degenerate Lagrangian whose EL equations are of differential
+order greater than two has a ghost~\cite{Woodard:2015zca}: a dynamical degree of
+freedom whose Hamiltonian is unbounded below.%
+\footnote{Some Lagrangians appear to contain higher-derivative terms but do not
+generate higher-order EL equations. The Gauss--Bonnet term in four spacetime
+dimensions~\cite{Lovelock:1971yv} is topological and contributes only a boundary
+term, and the higher-derivative terms in the Einstein--Hilbert
+Lagrangian reduce to a total
+divergence~\cite{hobson2006general}; the EL equations remain of order two in both
+cases. The non-degeneracy condition excludes Lagrangians whose
+higher derivatives are an artefact of variable choice.}
 The theorem is non-perturbative; the ghost is present for any non-zero $\varepsilon$.
-The ghost mode has characteristic frequency $\sim 1/\sqrt{\varepsilon}$, exactly
-the scale at which $\varepsilon\,\mathcal{L}_1$ becomes comparable to $\mathcal{L}_0$
-and the perturbative expansion itself breaks down; the ghost is therefore an artefact of
-extrapolating the truncated Lagrangian beyond its regime of validity, not a physical
-degree of freedom.
-We therefore treat $\mathcal{L}_0$ as the base theory and account for the effect
-of $\varepsilon\,\mathcal{L}_1$ as an iterative correction.
+The ghost is an artefact of extrapolating the truncated Lagrangian beyond its regime of
+validity, not a physical degree of freedom~\cite{Simon:1990jn,Donoghue:1994dn}, and a perturbative treatment within
+$\varepsilon \omega t \ll 1$~\cite{parker1993reduced} never
+encounters it.
+We therefore treat $\lag_0$ as the base theory and $\varepsilon\,\lag_1$
+perturbatively.
 
-\paragraph*{Perturbative reduction of the equations of motion}
-We solve the equations of motion by the iterative order-reduction method of Parker
-and Simon~\cite{parker1993reduced}, generalised to the multi-field linearised-PDE
-regime of \TIDAL{}.
+\subsection{Perturbative reduction of the equations of motion}
+We solve the EOM by the iterative order-reduction method of Parker
+and Simon~\cite{parker1993reduced}, applied here to multiple perturbation
+fields evolving under a quadratic Lagrangian.
 
-Using $q = \{\varphi^{\mathcal{I}}\}$ to denote the collection of perturbation fields
-and writing the full equation of motion as $E[q;\,\varepsilon] = 0$~\cite{parker1993reduced,
+Using $q = \{\varphi^{\mathcal{I}}\}$ to denote the collection of dynamical fields
+that remain after the constraint-elimination step of~\cref{ModalSchur} and writing
+the full equation of motion as $E[q;\,\varepsilon] = 0$~\cite{parker1993reduced,
 jaen1986reduction},
 the base operator is $E_{\mathrm{base}}[q] \equiv E[q;\,\varepsilon{=}0]$ and the correction operator
 is $E_{\mathrm{corr}}[q] \equiv \partial_\varepsilon E[q;\,\varepsilon]\big|_{\varepsilon=0}$
-from $\mathcal{L}_1$, which may carry higher time derivatives.
+from $\lag_1$, which may carry derivatives of \emph{any} order.
 Expanding $q = q^{(0)} + \varepsilon\,q^{(1)} + \cdots$ and collecting by order:
 \begin{align}
-  \mathcal{O}(\varepsilon^0) &:\quad
+  \O(\varepsilon^0) &:\quad
     E_{\mathrm{base}}\bigl[q^{(0)}\bigr] = 0, \notag \\[2pt]
-  \mathcal{O}(\varepsilon^1) &:\quad
+  \O(\varepsilon^1) &:\quad
     E_{\mathrm{base}}\bigl[q^{(1)}\bigr] = -E_{\mathrm{corr}}\bigl[q^{(0)}\bigr].
   \label{EOMHierarchy}
 \end{align}
-The essential property is that the left-hand side operator at every order is always the
-ghost-free second-order base operator $E_{\mathrm{base}}$; the higher-derivative
-contributions from $\mathcal{L}_1$ appear only as sources evaluated on the
-previous-order solution.
+At every order the left-hand-side operator is the ghost-free second-order
+$E_{\mathrm{base}}$; the higher-derivative contributions from $\lag_1$ appear
+only as sources evaluated on the previous-order solution.
 We call the order-$\varepsilon^0$ solution \emph{Pass~0} and the
 order-$\varepsilon^1$ correction \emph{Pass~1}.
 
-Two alternatives were investigated and rejected: Lagrangian-level substitution of the
-order-zero equations of motion directly into the higher-derivative
-correction~\cite{jaen1986reduction} --- expressing each $\partial_t^n\varphi^{\mathcal{I}}$
-via repeated differentiation of the base-theory equations --- has no substitution target
-when a field equation is purely algebraic at order zero; and
-introducing each time-derivative order of the fields as a separate dynamical
-variable~\cite{ostrogradsky1850memoires,Woodard:2015zca} ---
-$Q_n^{\mathcal{I}} \equiv \partial_t^n\varphi^{\mathcal{I}}$ for $n = 0, 1, \ldots, N-1$
-with $N$ the order of the highest time derivative in $\mathcal{L}$ --- to reduce the
-system to a first-order form promotes the ghost modes predicted by Ostrogradsky's
-theorem to live degrees of freedom, producing unphysical exponential growth in long-time
-simulation.
+The Ja{\'e}n--Llosa--Molina (JLM) substitution~\cite{jaen1986reduction}, which substitutes the
+$\varepsilon^0$ EL equation directly into the higher-derivative correction in
+the Lagrangian, has no substitution target when a field equation is purely algebraic at
+$\varepsilon^0$, since no $\partial_t^n\varphi^{\mathcal{I}}$ is available to solve for. The
+Ostrogradsky auxiliary-field reduction~\cite{ostrogradsky1850memoires,Woodard:2015zca}
+introduces each time-derivative order as a separate dynamical variable
+$Q_n^{\mathcal{I}} \equiv \partial_t^n\varphi^{\mathcal{I}}$ for $n = 0, 1, \ldots, N-1$,
+with $N$ the order of the highest time derivative in $\lag$, yielding a first-order
+system. This treats the full
+theory as exact, involving the Ostrogradsky ghost in the dynamics. Direct
+numerical evolution produces unbounded growth, with no physical
+interpretation in the EFT regime.
 
+\paragraph*{Modal derivation and the Duhamel kernel}
 On flat periodic domains, the Pass~0 system at wavenumber $k$ reduces to the per-mode
-ODE $\partial_t\hat{y}^{(0)} = M(k)\,\hat{y}^{(0)}$ (cf.~\cref{ModalPerMode}), where
+ODE $\partial_t\hat{y}^{(0)} = M(k)\,\hat{y}^{(0)}$ (see~\cref{ModalPerMode}), where
 $\hat{y}^{(0)}$ stacks the Fourier amplitudes of every field and velocity slot.
-For the perturbative-reduction path, the eigendecomposition $M(k) = V D V^{-1}$ is
-used rather than the Pad\'e scaling-and-squaring path of \cref{ModalSolver}, since the
-per-eigenmode expansion is required explicitly for the Duhamel integral.
+% For the perturbative-reduction path, the eigendecomposition $M(k) = V D V^{-1}$ is
+% used rather than the Pad\'e path of~\cref{ModalSolver}, since the
+% per-eigenmode expansion is required for the Duhamel integral
+%~\cref{DuhamelIntegral,DuhamelSolution,DuhamelKernel}.
 With $D = \mathrm{diag}(\lambda_1,\lambda_2,\ldots)$ collecting the eigenvalues of $M(k)$
-and $V$ the right-eigenvector matrix, the Pass~0 solution at initial data
-$\hat{y}^{(0)}(0)$ is
+and $V$ the right-eigenvector matrix, the IC $\hat{y}^{(0)}(0)$ is projected
+into the eigenbasis as $\hat{c} = V^{-1}\hat{y}^{(0)}(0)$ such that
 \begin{equation}
-  \hat{y}^{(0)}(t) = V\,e^{Dt}\,\alpha,
-  \qquad
-  \alpha = V^{-1}\hat{y}^{(0)}(0).
+  \hat{y}^{(0)}(t) = V\,e^{Dt}\,\hat{c}.
   \label{PassZeroSolution}
 \end{equation}
 
 Pass~1 satisfies the inhomogeneous system
-$\partial_t\hat{y}^{(1)} = M(k)\,\hat{y}^{(1)} + C_{\mathrm{src}}\,\hat{y}^{(0)}(t)$
-with $\hat{y}^{(1)}(0) = 0$, where $C_{\mathrm{src}}$ is the source coupling matrix
-assembled from the $\varepsilon^1$ terms in the equations of motion.
-Substituting $\hat{y}^{(1)} = V\hat{z}^{(1)}$ and the Pass~0 solution
-$\hat{y}^{(0)}(t) = V e^{Dt}\alpha$ into this system and multiplying through by $V^{-1}$
-diagonalises the homogeneous part ($V^{-1}M(k)V = D$) and rotates the source into the
-eigenbasis ($V^{-1}C_{\mathrm{src}}V \equiv \beta$), giving
 \begin{equation}
-  \dot{\hat{z}}^{(1)}
+  \partial_t\hat{y}^{(1)} = M(k)\,\hat{y}^{(1)} + C_{\mathrm{corr}}\,\hat{y}^{(0)}(t),
+  \qquad \hat{y}^{(1)}(0) = 0,
+  \label{PassOneSystem}
+\end{equation}
+where $C_{\mathrm{corr}}$ is the Fourier representation of the correction operator
+$E_{\mathrm{corr}}$ that appears as the order-$\varepsilon^1$ source in
+\cref{EOMHierarchy}.
+Substituting $\hat{y}^{(1)} = V\hat{z}^{(1)}$ and the Pass~0 solution
+$\hat{y}^{(0)}(t) = V e^{Dt}\hat{c}$ into~\cref{PassOneSystem} and multiplying
+through by $V^{-1}$ gives
+\begin{equation}
+  \partial_t\hat{z}^{(1)}
   \;=\;
   D\,\hat{z}^{(1)}
-  \;+\; \beta\,e^{Dt}\,\alpha,
-  \qquad \hat{z}^{(1)}(0) = 0.
+  \;+\; S\,e^{Dt}\,\hat{c},
+  \qquad \hat{z}^{(1)}(0) = 0,
   \label{EigenODESystem}
 \end{equation}
-Component-wise this is a set of decoupled scalar inhomogeneous ODEs,
+where $S \equiv V^{-1}C_{\mathrm{corr}}V$.
+Component-wise~\cref{EigenODESystem} reduces to a set of decoupled scalar
+inhomogeneous ODEs,
 \begin{equation}
-  \dot{\hat{z}}^{(1)}_i
+  \partial_t\hat{z}^{(1)}_i
   \;=\;
   \lambda_i\,\hat{z}^{(1)}_i
-  \;+\; \sum_j\beta_{ij}\,\alpha_j\,e^{\lambda_j t},
-  \qquad \hat{z}^{(1)}_i(0) = 0,
+  \;+\; \sum_j S_{ij}\,\hat{c}_j\,e^{\lambda_j t},
+  \qquad \hat{z}^{(1)}_i(0) = 0.
   \label{EigenODE}
 \end{equation}
-the homogeneous term carrying the eigenvalue $\lambda_i$ of mode $i$ and the source term
-expressing the rotated coupling of every Pass~0 mode $j$ into the Pass~1 evolution of
-mode $i$.
-Multiplying through by $e^{-\lambda_i t}$ converts the left side to
-$\tfrac{d}{dt}[e^{-\lambda_i t}\hat{z}^{(1)}_i]$; integrating both sides from $0$ to
+Multiplying through by $e^{-\lambda_i t}$ and integrating both sides from $0$ to
 $t$~\cite{hochbruck2010exponential,almohy2011action} then gives
 \begin{equation}
   e^{-\lambda_i t}\hat{z}^{(1)}_i(t)
   \;=\;
-  \sum_j \beta_{ij}\,\alpha_j
-  \int_0^t e^{(\lambda_j - \lambda_i)\tau}\,\mathrm{d}\tau,
+  \sum_j S_{ij}\,\hat{c}_j
+  \int_0^t e^{(\lambda_j - \lambda_i)\tau}\,\diff\tau.
   \label{DuhamelIntegral}
 \end{equation}
-in which the exponential integrand evaluates in closed form.
-Restoring the factor $e^{\lambda_i t}$ gives
+Restoring the factor $e^{\lambda_i t}$ gives a closed-form solution
 \begin{equation}
   \hat{z}^{(1)}_i(t)
   \;=\;
-  \sum_j \beta_{ij}\,\alpha_j\,G(\lambda_i,\lambda_j;\,t),
+  \sum_j S_{ij}\,\hat{c}_j\,G(\lambda_i,\lambda_j;\,t),
   \label{DuhamelSolution}
 \end{equation}
-where the Duhamel kernel $G$ is
+where the Duhamel kernel $G$ is~\cite{hochbruck2010exponential,almohy2011action}
 \begin{equation}
   G(\lambda,\mu;\,t)
   \;=\;
@@ -182,175 +170,134 @@ where the Duhamel kernel $G$ is
   \end{cases}
   \label{DuhamelKernel}
 \end{equation}
-and the full Pass~1 state is recovered as $\hat{y}^{(1)}(t) = V\,\hat{z}^{(1)}(t)$.
-Pass~1 is therefore computed entirely from the Pass~0 eigensystem; no additional
-differential equation need be solved.
+The eigenbasis-component form is what the solver computes, and the original-basis
+state is recovered by rotating back:
+$\hat{y}^{(1)}(t) = V\,\hat{z}^{(1)}(t)$. Pass~1 is computed entirely from
+the Pass~0 eigensystem withoutadditional time-stepping, preserving the modal solver's accuracy.
 Near the degenerate limit $|(\mu-\lambda)t| \to 0$, direct evaluation of
-\cref{DuhamelKernel} suffers catastrophic cancellation; setting $z = (\mu-\lambda)t$,
-\TIDAL{} uses the Taylor expansion~\cite{almohy2011action}
+\cref{DuhamelKernel} suffers catastrophic cancellation, demanding the use of the Taylor expansion of
 \begin{equation}
-  G\bigl|_{|z|<10^{-5}}
+  G(\lambda,\mu;t)\bigl|_{|(\mu-\lambda)t|<10^{-5}}
   \;=\;
-  t\,e^{\lambda t}\sum_{j=0}^{12}\frac{z^{j}}{(j+1)!},
+  t\,e^{\lambda t}\sum_{j=0}^{12}\frac{[(\mu-\lambda)t]^{j}}{(j+1)!},
   \label{DuhamelTaylor}
 \end{equation}
 the threshold and term count following~\cite{almohy2011action}.
 
-The iterative approximation holds while the cumulative phase error satisfies
-$\varepsilon\,\omega\,t_{\mathrm{end}} \ll 1$~\cite{parker1993reduced}, monitored
-at run time by \TIDAL{}'s validity diagnostic.
+\subsection{Perturbative reduction of the Hamiltonian}%
+\label{HamiltonianReduction}
+Energy measurement requires a Hamiltonian, and the Legendre transform
+of~\cref{LegendreTransform} applies once the reduced Lagrangian contains
+at most first-order time derivatives.
+Quadratic terms whose total time-derivative order exceeds two remain irreducible to such a
+Lagrangian.
 
-\subsection{Perturbative reduction of the Hamiltonian}
-Energy measurement and Noether consistency require a Hamiltonian, and the standard
-Legendre transform applies once the Lagrangian contains at most first-order time
-derivatives.
-Integration by parts reduces most higher-derivative products, but certain residues
-are irreducible: a term such as
-$(\partial_t^2 h_a)(\partial_t^2 h_b)$ leaves a second-time-derivative product
-after any finite sequence of integration-by-parts moves.
-
-To reduce the Lagrangian before the Legendre transform, \TIDAL{} implements
-\emph{Lagrangian perturbative substitution} (LPS).
-The order-$\varepsilon^0$ equations of motion are solved simultaneously for the
-second time derivative of each field,
+To reduce the Lagrangian, \TIDAL{} substitutes the
+order-$\varepsilon^0$ EOM into the higher-derivative terms of
+$\varepsilon\,\lag_1$~\cite{jaen1986reduction,Cheyette1988,Grosse-Knetter:1993tae}.
+The order-$\varepsilon^0$ equations are solved simultaneously for the second time
+derivative of each field,
 \begin{equation}
   \partial_t^2 q_i
   \;=\;
-  F_i\!\bigl[q,\,\partial_t q,\,\nabla q\bigr]
-  \;+\; \mathcal{O}(\varepsilon),
+  F_i\!\bigl[q,\,\partial_t q,\,\{\nabla^n q\}_{n\geq 1}\bigr]
+  \;+\; \O(\varepsilon),
   \label{LPSSubstitution}
 \end{equation}
-where $F_i$ depends only on first-order time derivatives and spatial derivatives.
-Where the correction $\varepsilon\,\mathcal{L}_1$ introduces terms with time derivatives
-of order greater than two the rule \cref{LPSSubstitution} is extended by
-differentiating with respect to $t$ as many times as needed, substituting
-\cref{LPSSubstitution} for any $\partial_t^2 q_j$ that appears at each step.
-The resulting substitution is applied to the order-$\varepsilon^1$ Lagrangian, and the
-series is truncated at $\mathcal{O}(\varepsilon^2)$; the reduced Lagrangian carries at
-most first-order time derivatives and is admissible for the standard Legendre transform
-of \cref{EulerLagrange}.
-LPS is faithful exactly when the Ja{\'e}n--Llosa--Molina regularity
-condition holds~\cite{jaen1986reduction}: the order-zero equations must contain a
-time-derivative term to solve for.
-When the condition fails, the substitution silently drops a promoted degree of
-freedom and the reduced theory loses physical content.
-The limit of LPS is the subject of the paragraphs that follow.
+where $F_i$ depends on first-order time derivatives only, but on spatial derivatives of
+any order.
+% Higher spatial derivatives in $\varepsilon\,\lag_1$ do not affect the Legendre
+% transform; only higher \emph{time} derivatives require reduction.
+Where the correction introduces terms with time derivatives of order greater than two,
+the rule~\cref{LPSSubstitution} is extended by differentiating \wrt $t$,
+substituting~\cref{LPSSubstitution} for any $\partial_t^2 q_j$
+that appears at each stage.
+The resulting substitution is applied to the order-$\varepsilon^1$ Lagrangian,
+truncating at $\O(\varepsilon^2)$; the reduced Lagrangian carries at
+most first-order time derivatives and is admissible for the Legendre transform of~\cref{LegendreTransform}.
+The substitution is faithful exactly when the JLM regularity
+condition~\cite{jaen1986reduction} holds: the $\varepsilon^0$ equation of motion for
+each field undergoing the reduction must admit a $\partial_t^2\varphi^{\mathcal{I}}$
+that can be isolated and
+substituted; equivalently, the leading-order kinetic matrix must be invertible.
+Algebraic EOM fail this condition, the substitution would omit
+the promoted degree of freedom.
 
-\paragraph*{Constraint promotion and perturbative-reduction failure}
-Constraint promotion arises when the small coupling $\varepsilon$
-promotes an algebraic constraint of the base theory to a propagating degree of
-freedom.
-In the Einstein--Cartan limit $\varepsilon = 0$, certain metric-perturbation
-components satisfy algebraic relations and carry no kinetic term.
-Turning on $\varepsilon$ infinitesimally promotes these relations to dynamical
-equations and introduces new propagating modes; the constraint structure of the
-theory changes discontinuously across $\varepsilon = 0$.
-An order-by-order expansion in $\varepsilon$ is blind to this promotion because
-the new mode is absent at $\varepsilon = 0$ and cannot be reached by a power-series
-expansion.
-Constraint promotion therefore implies that no perturbative expansion in $\varepsilon$
-connects the base theory to the small-$\varepsilon$ theory once a constraint has
-been promoted.
+\paragraph*{Constraint promotion}
+The failure of the JLM condition is a discontinuity in the constraint structure.
+In the PGT theories where $\varepsilon\,\lag_1 = \varepsilon\,\MAGF{^2}$; the $\varepsilon = 0$
+Einstein--Cartan limit has metric and torsion components satisfying algebraic
+relations. Infinitesimal $\varepsilon$ adds kinetic content that promotes
+these relations to dynamical equations. The Dirac--Bergmann Hamiltonian algorithm has been implemented for
+PGT theories in~\cite{barker2021hamiltonian,barker2023higgs}, wherein
+the constraint structures of these theories change discontinuously across $\varepsilon = 0$.
 
-\paragraph*{Failure mode I: Ostrogradsky}
-The Ostrogradsky theorem~\cite{ostrogradsky1850memoires,Woodard:2015zca} is the
-cleanest statement of the barrier at the Lagrangian level: a non-degenerate
-higher-derivative kinetic structure produces a Hamiltonian unbounded below.
-In the quadratic-PGT theories carrying the $\tilde{R}^2$ correction, the higher-curvature
-term generates fourth-order time derivatives of the metric perturbation, and the
-Ostrogradsky diagnosis applies directly.
-The theorem is non-perturbative; it holds for any non-zero value of the coupling,
-and it is the mechanism by which constraint promotion enters the Hamiltonian analysis
-at the Lagrangian level.
+% Three independent reduction approaches reach the same conclusion. The
+JLM substitution~\cite{jaen1986reduction} cannot execute its rule
+without a $\partial_t^2\varphi^{\mathcal{I}}$ to isolate. Grosse-Knetter's
+canonical-equivalence result~\cite{Grosse-Knetter:1993tae} requires the same
+substitution to define the field redefinition. Glavan~\cite{Glavan2018} establishes
+that field redefinitions are the appropriate way to reduce derivative order in an
+effective field theory, a procedure that again presupposes a $\partial_t^2\varphi^{\mathcal{I}}$ to isolate.
+% The non-perturbative Cayuso--Lehner scheme~\cite{CayusoLehner2017} shares the same
+% prerequisite.
+All break down at constraint promotion, where the
+leading-order kinetic matrix (\cref{KineticMatrix}) ceases to be invertible.
 
-\paragraph*{Failure mode II: order-by-order substitution}
-The same order-by-order substitution strategy that drives the EOM reduction of
-\cref{EOMHierarchy} was also investigated for Hamiltonian order-reduction.
-Parker and Simon~\cite{parker1993reduced} identified the precise boundary of its
-validity in semi-classical gravity: the procedure is faithful when the
-higher-derivative correction perturbs a well-posed lower-order theory, and it
-fails when the correction introduces degrees of freedom with no lower-order
-analogue.
-In the Hamiltonian setting, LPS cannot execute \cref{LPSSubstitution} for a
-field whose order-zero equation is algebraic rather than differential, because
-there is no $\partial_t^n\varphi$ term on the left-hand side to solve for.
-The substitution step is therefore undefined whenever the base-theory equation is
-algebraic, and LPS cannot bridge the discontinuity that the Ostrogradsky
-diagnosis already identifies at the Lagrangian level.
-
-\paragraph*{Failure mode III: the Ja{\'e}n--Llosa--Molina obstruction}
-Ja{\'e}n, Llosa and Molina~\cite{jaen1986reduction} formalised the failure for
-the general higher-derivative Lagrangian.
-They showed that a finite-order reduction by repeated use of the order-zero
-equation of motion can in principle be constructed, provided the Lagrangian
-satisfies a regularity condition; that condition fails precisely when an
-algebraic constraint of the unperturbed theory is promoted to a dynamical
-equation at first order in $\varepsilon$.
-Their result fits the PGT structure exactly: the order-zero theory is the
-Einstein--Cartan system with algebraic torsion constraints, and the
-higher-curvature operators in the quadratic-PGT action promote some of those
-constraints to propagating fields.
-Grosse-Knetter's canonical-equivalence result~\cite{Grosse-Knetter:1993tae}
-reaches the same conclusion from the Hamiltonian side: the field redefinition
-that realises the perturbative substitution requires the base-theory equation
-of motion to contain a $\partial_t^2\varphi^{\mathcal{I}}$ term to solve for ---
-the same prerequisite that the Ja{\'e}n--Llosa--Molina condition formalises ---
-and is therefore equally inapplicable to algebraically constrained fields.
-The Ja{\'e}n--Llosa--Molina obstruction gives the sharpest analytical
-criterion, distinguishing theories where LPS is faithful from those where it
-loses physical content.
+% Original elaborated discussion (preserved here as reference; tightened to a
+% single paragraph below for App-H register consistency):
+%
+% Constraint promotion belongs to a wider class of discontinuous limits in gravity
+% and gauge theory~\cite{deRham2014,hinterbichler2012theoretical}. The
+% van Dam--Veltman--Zakharov discontinuity~\cite{vandam1970massive,zakharov1970linearized}
+% shows that the massless limit of a Fierz--Pauli graviton recovers only five of
+% the six general-relativistic polarisations: the sixth arises through a constraint
+% promoted at non-zero mass. In the nonlinear completion of Fierz--Pauli massive
+% gravity, a sixth mode emerges that is ghost-like and does not decouple as
+% $m \to 0$~\cite{boulware1972gravitation}. At the Maxwell--Proca boundary, massive
+% Proca propagates three polarisations while massless Maxwell propagates only two;
+% the third (longitudinal) mode becomes pure gauge as $m \to 0$ and is removed by
+% the Maxwell $U(1)$ gauge symmetry. The mode count therefore changes
+% discontinuously at $m = 0$, even though the family of Lagrangians is smooth
+% in $m$. The St\"uckelberg mechanism~\cite{RueggRuizAltaba2003} smooths the
+% Maxwell--Proca constraint structure across the limit through an auxiliary field.
+% A non-perturbative Hamiltonian analysis of the pure $R^2$ analogue has been
+% carried out~\cite{barker2024r2}, but extending the perturbative-reduction
+% framework of this appendix to cover the constraint-promotion case in a
+% theory-agnostic way remains for our future work.
 
 \paragraph*{Structural analogues}
-Constraint promotion belongs to a wider class of discontinuous
-limits in gravity and gauge theory.
-The van Dam--Veltman--Zakharov
-discontinuity~\cite{vandam1970massive,zakharov1970linearized} shows that the
-massless limit of a Fierz--Pauli graviton recovers only five of the six
-general-relativistic polarisations: the sixth arises through a constraint
-promoted at non-zero mass.
-The Boulware--Deser non-decoupling~\cite{boulware1972gravitation} extends this
-to the non-linear theory by identifying a ghost-like sixth mode once the
-Fierz--Pauli tuning is broken.
-The Maxwell--Proca boundary is the simplest instance: at finite vector-boson
-mass the algebraic relation $\rcD{_\mu}\FieldA{^\mu} = 0$ holds as a
-constraint, while at zero mass it becomes a gauge symmetry; no perturbative
-expansion in the mass encodes the transition.
-The quadratic-PGT case is the quadratic-curvature analogue of
-this structural pattern.
+Constraint-rank discontinuities recur across gauge and gravitational
+theories~\cite{deRham2014,hinterbichler2012theoretical}: the
+van DVZ discontinuity of linear Fierz--Pauli
+gravity~\cite{vandam1970massive,zakharov1970linearized}, the Boulware--Deser ghost
+of its nonlinear completion~\cite{boulware1972gravitation}, the analogous
+Maxwell--Proca mode-count jump at $m=0$, and the St\"uckelberg-mechanism smoothing of the
+latter~\cite{RueggRuizAltaba2003}. A full Hamiltonian analysis of the
+pure $\MAGF{^2}$ gravity has been carried out~\cite{barker2024r2}; a theory-agnostic
+extension of the present reduction to constraint-promoted Lagrangians remains a
+direction for our future work.
 
-\paragraph*{Software implementation and failure detection}
-\TIDAL{} handles both sides of the perturbative-reduction framework
-automatically.
-For the equations of motion, the Wolfram derivation stage tags each operator
-term with an \texttt{order\_in\_eps} integer; at simulation time,
-\texttt{PerturbativeSolver} separates base-theory terms from correction terms
-and runs Pass~0 followed by Pass~1 via the Duhamel kernel of
-\cref{DuhamelKernel}, without theory-specific code.
+\paragraph*{Singular kinetic matrix}\label{DiracBergmann}
+A second obstruction to obtaining a Hamiltonian arises when the linearised kinetic
+matrix $\mathcal{K}$ of~\cref{KineticMatrix} is singular from the start. Gauge
+potentials and other fields that enter the action algebraically contribute to such a
+singular $\mathcal{K}$, and the naive Legendre transform of~\cref{LegendreTransform}
+fails for two related reasons: the relation $\pi_i = \mathcal{K}_{ij} v_j$ cannot be
+inverted to give the velocities as independent functions of the momenta, and the
+constrained components no longer correspond to independent canonical pairs. The
+correct treatment is the Dirac--Bergmann
+procedure~\cite{Dirac:1950pj,henneaux1992quantization,barker2021hamiltonian,barker2023higgs}.
+\TIDAL{} does not implement the Dirac--Bergmann reduction; where energy diagnostics
+are reported in this work, the measurement is restricted to configurations in which
+the Legendre transform is well-defined.
+% The conversion probability of
+%~\cref{GertsenshteinFormula} is gauge-invariant by construction and is unaffected.
 
-For the Hamiltonian, \TIDAL{} attempts LPS symbolically at derivation time.
-Failure is detected by checking whether the order-$\varepsilon^0$ momentum
-kernel changes rank when $\varepsilon$ is set to a non-zero test value; a rank
-jump signals constraint promotion and the software emits a diagnostic that
-marks the theory as having no LPS-reduced Hamiltonian.
-The three affected theories --- \texttt{graviton\_torsion},
-\texttt{torsion\_gertsenshtein}, and \texttt{torsion\_gertsenshtein\_combined},
-all carrying $\tilde{R}^2$ --- retain their pre-LPS Hamiltonians, and
-their energy diagnostics are recorded separately rather than alongside
-conversion results.
-
-\paragraph*{Implications for the surveys}
-The EOM and Hamiltonian reductions have different scopes, and the surveys of
-\cref{Results} are structured accordingly.
-The iterative EOM reduction of \cref{EOMHierarchy} succeeds for all surveyed
-theories, including the $\tilde{R}^2$ quadratic-PGT theories: conversion
-probabilities are computed from field trajectories evolved by Pass~0 and
-Pass~1, and no Hamiltonian is required for that computation.
-Constraint promotion applies only to the Hamiltonian side and only
-for the three theories named above; their energy diagnostics are not presented
-alongside the conversion amplitudes.
-Theories without higher-curvature terms are unaffected and use the standard
-linearised methodology of \cref{SymbolicComputation} throughout.
-The Ja{\'e}n--Llosa--Molina obstruction is therefore a precise statement of
-which analyses the linearised methodology can perform for each theory class,
-not a defect of the software; the non-perturbative treatment needed to go
-further is outlined in \cref{Discussion}.
+\paragraph*{Failure detection}
+\TIDAL{} detects constraint promotion by checking whether the rank of the
+order-$\varepsilon^0$ kinetic matrix~\cref{KineticMatrix} changes when
+$\varepsilon$ is set to a non-zero test value; a rank jump signals constraint
+promotion.
+% The conversion-and-energy analysis of the affected theories (\ie those carrying
+% the $\tilde{R}^2$ correction) is deferred to future work.

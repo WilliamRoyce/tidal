@@ -75,6 +75,7 @@ Remove these from every draft:
 | "interesting" (as standalone adjective) | describe *why* it is interesting |
 | "novel" (in abstract or intro) | describe specifically what is new |
 | "state of the art" | cite the specific frontier work |
+| "pipeline" (when referring to TIDAL itself) | "framework" (algorithmic / theoretical scope), "package" (concrete computational artefact), "implementation" (operational running prose), or "software" (generic noun, no indefinite article) — corpus precedent: `\PSALTer{}`, HiGGS, Hamilcar use these four exclusively |
 
 ---
 
@@ -100,7 +101,7 @@ Use these when drafting each section. Each entry names the closest-match templat
 1. Open with a living research tension, not a historical overview. The tension is: GW detectors are probing new physics, but the gauge-gravity sector they probe is theoretically vast and poorly constrained.
 2. State the deep problem in one paragraph: the Gertsenshtein channel structure in PGT is unknown, and computing it manually is infeasible for more than one model at a time.
 3. Survey prior art: Gertsenshtein/Boccaletti (mechanism), BHL (PGT landscape), PSALTer/Hamilcar (spectrum tools), TIDAL (this work). Dense citation cluster here (8–15 refs in 2–3 sentences is normal in BHL intros). Identify the gap: no systematic channel decomposition for PGT + EM has been done.
-4. Hook: "We present TIDAL, a symbolic–numerical pipeline that automates this calculation for any quadratic PGT+EM Lagrangian. We apply it to..." One paragraph.
+4. Hook: "We present TIDAL, a symbolic–numerical software package that automates this calculation for any quadratic PGT+EM Lagrangian. We apply it to..." One paragraph.
 5. Close with one sentence per remaining section (the structural map).
 
 **Sentence-level pattern for opening:** Begin with the phenomenon, not the history. Compare: ✗ "The Gertsenshtein effect was discovered by..." vs ✓ "When gravitational and electromagnetic waves propagate through a background magnetic field, they mix — a phenomenon with direct consequences for high-frequency GW detection."
@@ -130,18 +131,42 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 ### §3 Computational Approach
 
-**Template papers:** 2206.00658 §III (HiGGS overview paragraph); 2406.09500 §I-B (PSALTer pipeline overview).
+**Template papers (revised 2026-05-30 after wider corpus audit).** The genuine comparators are physics-first papers that USE software, not standalone software papers.  Verified examples with direct quotations:
 
-**Single section, no subsections.** Target: 600 words (~5 paragraphs of 120 words each).
+- **2101.02645** (Barker+Lasenby+Hobson+Handley, uses HiGGS) — HiGGS is mentioned briefly in §I; implementation lives in §II–§III (~3000 w inline because that paper has no comprehensive appendix).
+- **2206.00658:168** (HiGGS software paper, introductory-sentence pattern) — *"The core of the implementation is (version 1.0.0 of~\cite{supp2}) the \emph{Hamiltonian Gauge Gravity Surveyor} (HiGGS), a Mathematica package grounded in the popular open-source xAct tensor manipulation suite~\cite{Martin-Garcia:2007bqa}."*
+- **2406.12826:331** (BHL letter using PSALTer) — *"The particle spectra are obtained using the Particle Spectrum for Any Tensor Lagrangian (PSALTer) software~\cite{…}."*  Single sentence in methodology.
+- **2510.08201:466** (R² gravity using Cadabra) — single-sentence footnote: *"…is greatly facilitated by the use of Cadabra~\cite{…}."*
 
-**Structural moves:**
-1. One paragraph (~120 words): what TIDAL is (symbolic–numerical pipeline: xAct/Wolfram → JSON → Python PDE solver), what it automates, why automation is necessary (scale of the PGT theory space, manual calculation infeasible for more than one model). Name both components by their standard acronyms/names: \textit{xAct}, \textit{Wolfram}.
-2. One paragraph (~120 words): the Fourier modal solver as the key numerical innovation. Lead with what it achieves (machine-precision eigendecomposition, auto-selected for flat periodic domains) before any implementation detail. Do NOT describe the algorithm — that is App C. State capability: "TIDAL auto-selects the Fourier modal backend for flat-metric, periodic-boundary systems and delivers machine-precision eigendecompositions."
-3. One paragraph (~80 words): the other solver backends — IDA, CVODE, leapfrog, scipy — each in one sentence as context and fallback. Do not describe their algorithms.
-4. One paragraph (~80 words): validation strategy (`\cref{app:validation}`) and HPC scale (`\cref{app:hpc}`). One sentence each. Do not give benchmark numbers here.
-5. Closing sentence: "Full implementation details, validation suite, and reproducibility materials are in Apps A–E."
+**Single section, no subsections.** Target: ~80 words, 3 named paragraphs of 1–2 sentences each.
 
-**Do not** describe the algorithm in §3. That belongs in App C. §3 states that the algorithm exists, what it achieves, and where to find it.
+**Why so brief (corpus + word-budget argument).** Software-first paper conventions (HiGGS abstract, PSALTer §I "Previous advances", PSALTer v2 "computational barriers") prescribe heavy motivation, but those are *standalone software papers* where the tool IS the contribution.  In physics-first papers that USE software (the comparators above), tool motivation is essentially absent in the main body — and our ~8000 w App A–J carries the implementation in full, so §3 does not need to.  The MSci 5000 w cap also forces brevity: §1 (800) + §2 (1200) + §4 (1700) + §5 (600) already consume ~4300 w; §3 at ~80 w fits the remaining envelope.  The 2101.02645 inline-methodology pattern (~3000 w in main body) is structurally unavailable to us.
+
+**Voice (verified empirically across the corpus).** Passive structural is the dominant voice in tool-mention paragraphs in physics-first papers (2406.12826:331, 2510.08201:466 are both passive; 2206.00658:168 is declarative-structural).  Active first-person plural ("we [verb]") is acceptable when claiming methodological agency (2206.00658:150, 2510.08201:214).  Mixed voice within a section is corpus-attested (2206.00658 itself mixes within a paragraph).  For §3: ¶1 may open active ("We obtain…") or passive ("The equations are obtained…"); ¶2 and ¶3 typically open passive.  Both are valid; do not over-prescribe.
+
+**Acronym introduction order (verified BHL convention).** Use **Full Name (Acronym)** on first mention, NOT Acronym (Full Name).  Per 2206.00658:168: *"the \emph{Hamiltonian Gauge Gravity Surveyor} (HiGGS), a Mathematica package…"*  Italicise the full name with `\emph{}`; the acronym is plain.  If a parenthetical needs to carry both the acronym and a `\cref{}` cluster, separate them with a **comma**, not a semicolon (no surveyed BHL parenthetical uses an internal semicolon for this).
+
+**Structural moves (3 paragraphs):**
+
+1. **¶1 — TIDAL (~32 w, 1 sentence).**  Single sentence in the HiGGS line-168 pattern: name the tool with **Full Name in `\emph{}` followed by acronym in parens**, foundation cite for `\xAct{}~\cite{martingarcia2007xact}` and `\Mathematica{}~\cite{mathematica}`.  Optionally include the App A/B/C cref cluster in the same parenthetical, separated from the acronym by a comma.
+2. **¶2 — Numerical evolution (~28 w, 2 sentences).**  Passive structural opening: *"The linearised equations are evolved with \TIDAL{}'s Fourier modal solver (\cref{ModalSolver})."*  Second sentence on the technical method: per-Fourier-mode matrix exponentials computed by **Padé scaling-and-squaring** via `scipy.linalg.expm`, cite `higham2009scaling`.
+3. **¶3 — Parameter inference (~18 w, 1 sentence with semicolon).**  Passive: *"Parameter exploration is by nested sampling with PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; the inference architecture is documented in \cref{InferenceArchitecture}."*  Both PolyChord papers cited per the PolyChordLite README requirement.
+
+**Do NOT include in §3** (each item explicitly vetoed during the four-round revision investigation; preserving these vetoes is the purpose of this section):
+
+- **Architectural breakdown of the symbolic→numerical pipeline** — App A's job.  §3 just names TIDAL and cross-refs.
+- **"Why automation is necessary" sentence** — corpus shows tier-2 physics papers omit it.  Methodological-scope motivation belongs in §1 Stage 2 (template: 2101.02645's *"singular kinetic Hessian incentivises the Hamiltonian approach"*), not §3.
+- **Fallback solver enumeration (IDA, CVODE, leapfrog, scipy)** — all §4 results used the modal solver; defer to App C.
+- **"Auto-selected on flat-metric, periodic, time-independent systems" eligibility qualifier** — App C eligibility conditions, not main-paper material.  Say the modal solver is *used*, not that the dispatcher *chose* it.
+- **"Machine-precision evolution over the long integration windows"** — TECHNICALLY MISLEADING.  The modal solver is O(1) in `t_end` (single matrix-exponential application per mode), not stepped.  Use "single application of its matrix exponential" instead.  App C `numerical.tex:275-277` is explicit.
+- **"Per-mode eigendecomposition" claim** — TECHNICALLY INCORRECT.  TIDAL explicitly abandons eigendecomposition because `cond(V) > 1e13` in the multi-field PGT regime; uses Padé scaling-and-squaring instead.  See App C `numerical.tex:315-344`.
+- **Validation paragraph** — belongs in §4.1 (Boccaletti calibration anchors §4.1 directly).
+- **"tachyon-permissive" inference label, or enumeration of compactified priors / soft-floor likelihood / `run_status` tags** — defer to App J (the inference-architecture appendix) and §4 (where the inference outputs need the language).
+- **Closing "Detail deferred" paragraph** — none of the BHL comparators contain a standalone "deferred to appendix X" closing.  Spending words to announce non-content is the wrong move.
+- **"see X" connector before crefs** — BHL writes bare inline anchors (verified across 2406.12826, 2101.02645).
+- **PSALTer / Hamilcar / HiGGS peer citations** — BHL convention cites the foundation (xAct) as the only software dependency, never sibling tools as ecosystem positioning.
+
+**Note on §(i) Appendix Rule cref-anchor requirement.** The codified §(i) Appendix Rule below says *"every main-text cross-reference to an appendix includes a one-clause explanation of what is deferred"*.  The empirical corpus does NOT support this rule for brief tool-mention contexts — 2206.00658:168 has no anchor on `~\cite{Martin-Garcia:2007bqa}`; 2406.12826:331 cites PSALTer without anchor.  The rule should be read as **"optional anchor for brief tool-mention crefs; required anchor for substantive main-text deferrals to results subsections or appendix derivations"**.  Bare `\cref{}` in §3 parentheticals is corpus-attested and acceptable.
 
 ---
 
@@ -149,7 +174,7 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 **Template papers:** 2406.12826 §V (conformal PGT results); 2303.11094 §III–IV (null + constraint framing); 2510.17094 §IV (competing-effects result).
 
-**Opening:** One sentence mapping the four subsections. "§4.1 validates TIDAL against the Boccaletti formula; §4.2–4.3 present the null results for the T1 and T2 sectors; §4.4–4.5 present the propagating-torsion findings."
+**Opening:** A subsection roadmap sentence is *optional*, not mandatory. Corpus papers in this genre (2506.21662, 2510.08201) skip the roadmap and open directly on a finding or definition; use the roadmap only when §4 has many subsections (5+) and the reader genuinely needs the map. For a §4 with 2–4 subsections, prefer a direct opening such as "We open with the Boccaletti validation…" or recall the action being studied. Example roadmap (when needed): "§4.1 validates TIDAL against the Boccaletti formula; §4.2–4.3 present the null results for the T1 and T2 sectors; §4.4–4.5 present the propagating-torsion findings."
 
 **§4.1 Boccaletti validation:** Lead with the formula. Show fig. 1 (simulation vs. analytic). State: "TIDAL reproduces the Boccaletti conversion probability to 0.04%." This is the positive result that validates everything downstream.
 
@@ -178,7 +203,7 @@ Use these when drafting each section. Each entry names the closest-match templat
 
 ## (i) Appendix Structure Rule
 
-Every appendix carries a semantic title that states its content (not "Appendix A: Technical details" but "Appendix A: TIDAL pipeline architecture"). Each appendix opens with a single declarative sentence stating its purpose and what it contains — this is the appendix's equivalent of the section opening rule (a).
+Every appendix carries a semantic title that states its content (not "Appendix A: Technical details" but "Appendix A: TIDAL software architecture"). Each appendix opens with a single declarative sentence stating its purpose and what it contains — this is the appendix's equivalent of the section opening rule (a).
 
 Appendix subsections are numbered A.1, A.2, etc. Each subsection opens with a declarative sentence. Appendix figures are numbered in sequence with main-body figures (not restarted at A.1).
 

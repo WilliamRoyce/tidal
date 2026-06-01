@@ -1,6 +1,6 @@
 [project]
 name = "tidal"
-version = "0.42.1"
+version = "0.47.9"
 description = "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -101,7 +101,9 @@ ignore = [
     "DOC201",
     "DOC402",
     "PD",
+    "RUF001",  # physics code intentionally uses Unicode Greek/math symbols in strings
     "RUF002",  # physics docstrings intentionally use Unicode Greek/math symbols
+    "RUF003",  # physics code intentionally uses Unicode Greek/math symbols in comments
 ]
 fixable = ["ALL"]
 unfixable = ["T201"]
@@ -127,6 +129,7 @@ unfixable = ["T201"]
     "PLR2004",
     "FBT001",
     "FBT002",
+    "N802",
     "N803",
     "N806",
     "RUF001",
@@ -163,6 +166,14 @@ unfixable = ["T201"]
 "tidal/cli/_validate.py" = ["C901", "PLR0912", "PLR2004"]
 "tidal/symbolic/_kinetic_eval.py" = ["DOC501", "PLR6301"]
 "tidal/symbolic/json_loader.py" = ["DOC502"]
+# Recursive symbolic-expression parser: irreducibly branchy by nature.
+"tidal/symbolic/_separable.py" = ["C901", "PLR0911", "FBT001"]
+# Trivial frozen-dataclass accessors (self-documenting); class-level docs cover them.
+"tidal/symbolic/kinetic_matrix.py" = ["D102", "PLR2004", "PLR0914"]
+"tidal/solver/_kinetic.py" = ["C901"]
+"tidal/symbolic/latex.py" = ["PLR0914"]
+# Citation-audit network tooling: intentional URL opens + subprocess use.
+"scripts/bibaudit/**" = ["S310", "S404"]
 "tidal/solver/ida.py" = ["PLR0913", "PLR0917", "RUF003"]
 "scripts/**/*" = [
     "INP001",
@@ -214,7 +225,7 @@ unfixable = ["T201"]
     "SIM105",
     "SIM113",
     "SLF001",
-    # Path/encoding modernisations not enforced on one-off scripts
+    # Path/encoding modernizations not enforced on one-off scripts
     "PTH100",
     "PTH103",
     "PTH118",

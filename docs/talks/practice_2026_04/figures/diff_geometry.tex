@@ -40,7 +40,7 @@
         \draw[OrangeLine, thick, ->] ($(O)+(0,-\Ry)$) --++ (0,0.5*\Ly);
         \draw[OrangeLine, thick, ->] ($(O)+(0,-\Ry)$) --++ (115:0.4*\Ly);
 
-        \node at (0,0) {$\mathcal{F}$};
+        \node at (0,0) {$\mathcal{R}$};
     \end{scope}
 
     \begin{scope}[shift={(2*\Lx,0)}]
@@ -65,36 +65,6 @@
         \draw[densely dashed, thin,->] (-0.8*\Lx,-0.7*\Ly) to[bend left=15] (0.8*\Lx,-0.9*\Ly);
 
         \node at (0,0) {$\mathcal{T}$};
-    \end{scope}
-
-    \begin{scope}[shift={(4*\Lx,0)}]
-        \path[use as bounding box] (-\Lx,-\Ly) rectangle (\Lx,\Ly);
-        \coordinate (A) at (-0.8*\Lx,0.66*\Ly);
-        \coordinate (B) at (-0.61*\Lx,0.51*\Ly);
-        \coordinate (C) at (-0.4*\Lx,0.46*\Ly);
-        \coordinate (D) at (0.37*\Lx,0.26*\Ly);
-        \coordinate (E) at (0.58*\Lx,0.50*\Ly);
-        \coordinate (F) at (0.8*\Lx,0.76*\Ly);
-
-        \coordinate (G) at ($(E)+(-75:0.7*\Lx)$);
-        \coordinate (H) at (0.65*\Lx,-0.34*\Ly);
-        \coordinate (I) at (0.54*\Lx,-0.17*\Ly);
-        \coordinate (J) at (0.37*\Lx,-0.22*\Ly);
-        \coordinate (K) at (0.2*\Lx,-0.54*\Ly);
-        \coordinate (L) at (-0.05*\Lx,-0.44*\Ly);
-        \coordinate (M) at (-0.3*\Lx,-0.64*\Ly);
-        \coordinate (N) at ($(B)+(-75:\Lx)$);
-
-        \fill[GreenFill, opacity=0.3] (N) -- (B) to[out=-20, in=170] (C) to[out=-10, in=-160] (D) to[out=20, in=-120] (E) -- (G) to[out=-170, in=-70] (H) to[out=110, in=-60] (I) to[out=120, in=100] (J) to[out=-80, in=10] (K) to[out=-170, in=-60] (L) to[out=120, in=105] (M) to[out=-85, in=20] (N);
-
-        \draw[GreenLine, thick, ->] (B) --++(-75:\Lx);
-        \draw[GreenLine, thick, ->] (E) -- (G);
-
-        \draw[GreenLine, dashed, thin] (G) to[out=-170, in=-70] (H) to[out=110, in=-60] (I) to[out=120, in=100] (J) to[out=-80, in=10] (K) to[out=-170, in=-60] (L) to[out=120, in=105] (M) to[out=-85, in=20] (N);
-
-        \draw[DashedArrows={0.22}{0.75}] (A) to[out=-35, in=160] (B) to[out=-20, in=170] (C) to[out=-10, in=-160] (D) to[out=20, in=-120] (E) to[out=60, in=-160] (F);
-
-        \node at (0,0) {$\mathcal{Q}$};
     \end{scope}
 \end{tikzpicture}
 

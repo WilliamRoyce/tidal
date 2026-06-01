@@ -15,25 +15,23 @@
                   minimum height=0.9cm,minimum width=1.9cm,inner sep=3pt},
       arr/.style={-{Latex[length=2mm]},thick},
     ]
-      \node[box] (toml)   {\texttt{theory.toml}\\\tiny Lagrangian};
-      \node[box,right=of toml]   (wolf) {Mathematica\\xAct / xTras};
-      \node[box,right=of wolf]   (json) {JSON spec};
-      \node[box,right=of json]   (num)  {Python\\numerics};
-      \node[box,right=of num]    (out)  {sweeps\\inference\\plots};
-      \draw[arr] (toml)--(wolf);
-      \draw[arr] (wolf)--(json);
-      \draw[arr] (json)--(num);
+      \node[box] (lag)   {Lagrangian};
+      \node[box,right=of lag]   (sym) {Symbolic\\computation};
+      \node[box,right=of sym]   (num)  {Numerical\\solver};
+      \node[box,right=of num]    (out)  {Scans \&\\inference};
+      \draw[arr] (lag)--(sym);
+      \draw[arr] (sym)--(num);
       \draw[arr] (num)--(out);
     \end{tikzpicture}
   \end{center}
 
   \vspace{0.2em}
   \emph{Every equation in the numerical solver is derived
-  symbolically from a single Lagrangian declaration.} Automatic Euler--Lagrange variation, multi-field perturbation, and the covariant-derivative expansion.
+  symbolically from a single Lagrangian declaration.}
 
-  \vspace{0.2em}
-  PGT surveys vary the Lagrangian
-  across dozens of operator combinations. At this level of generality, the associated tensor calculus become intractable by hand
-  --- symbolic computation is the only viable route.
-
+  \begin{itemize}
+    \item Lagrangian varied across \emph{dozens} of operator combinations.
+    \item At this level of generality, the tensor calculus becomes intractable by hand
+    \item \emph{Symbolic computation} is the only viable route.
+  \end{itemize}
 \end{frame}

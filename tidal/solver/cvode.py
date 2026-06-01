@@ -37,6 +37,8 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from numpy.typing import NDArray
+
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
@@ -56,7 +58,7 @@ def _build_rhsfn(  # noqa: PLR0913, PLR0917
     grid: GridInfo,
     bc: BCSpec | None,
     rhs_eval: RHSEvaluator,
-    m_inv: dict[str, float] | None,
+    m_inv: dict[str, float | NDArray[np.float64]] | None,
 ) -> Callable[[float, np.ndarray, np.ndarray], None]:
     """Build the CVODE RHS closure: ``rhsfn(t, y, yp)``.
 
@@ -177,7 +179,7 @@ def solve_cvode(  # noqa: PLR0913
     # for theories with non-trivial mass matrix. None triggers the M=I fast path.
     from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
 
-    m_inv = build_inverse_kinetic_diag(spec, parameters or {})
+    m_inv = build_inverse_kinetic_diag(spec, parameters or {}, grid=grid)
 
     # Build RHS closure
     rhsfn = _build_rhsfn(spec, layout, grid, bc, rhs_eval, m_inv)

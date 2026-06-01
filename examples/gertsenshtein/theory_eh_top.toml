@@ -1,0 +1,89 @@
+# Gertsenshtein Effect + Euler-Heisenberg + Topological Control Term
+#
+# Lagrangian: L = (1/kappa^2) R - (1/4) F_{ab} F^{ab}
+#             + (rho/8) (F_{ab} F^{ab})^2          [EH scalar]
+#             + (sigma/8) (F_{ab} F~^{ab})^2        [EH pseudoscalar]
+#             + lambdatop * F_{ab} F~^{ab}           [Pontryagin topological density]
+#
+# The lambdatop term is a single (un-squared) F*F~ = F_{ab} F~^{ab}.
+# This is a total covariant derivative (Pontryagin/Chern-Simons density)
+# and therefore contributes NOTHING to the equations of motion.
+#
+# Methodological control: the posterior in lambdatop must be exactly flat
+# (prior recovery, D_KL = 0). If the posterior is NOT flat, this signals
+# a bug in the symbolic pipeline or integration.
+#
+# ndim = 3 (rho, sigma, lambdatop).
+# Expected result: rho/sigma constrained as in gertsenshtein_eh.json;
+#   lambdatop posterior = prior (flat, uniform KDE).
+#
+# Derivation timing: ~5 min wall (estimated, similar to gertsenshtein_eh.json)
+#
+# Refs:
+#   Pontryagin (1951) — topological 4-form F*F~ = d(A dA + ...)
+#   Dunne (2012), arXiv:1202.1557 — EH conventions
+
+[theory]
+name = "Gertsenshtein Effect + Euler-Heisenberg + Topological Control"
+description = "EH+Gert with Pontryagin density lambdatop*F*F~ as methodological null control"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "rho", "sigma", "lambdatop"]
+
+# EH+Gert Lagrangian + Pontryagin topological density
+# lambdatop * F_{ab} F~^{ab} is a total derivative → absent from EOM
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + rho/8 (F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])^2 + sigma/8 (epsiloneta[a,b,c,d] F[-a,-b] F[-c,-d])^2 + lambdatop epsiloneta[a,b,c,d] F[-a,-b] F[-c,-d]"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "h"
+type = "tt"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/gertsenshtein_eh_top.json"

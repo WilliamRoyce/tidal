@@ -1,0 +1,212 @@
+# Complete-Odd PGT + Full ε·R̃×∂T Sector (T8)
+#
+# Extends the parity-odd model (T6) with all 36 independent basis terms
+# of the ε·R̃×∂T sector (xt1..xt36). No ε·R̃×R̃ terms (R² theories known
+# non-viable, per campaign policy 2026-05-22).
+#
+# Derivation timing: ~97m wall (last verified: 2026-05-23, 38 fields, 48 H terms, v0.42.1)
+#
+# Lagrangian sectors:
+#   L_grav      = (1/κ²)R̃ + β₁I₁ + β₂I₂ + β₃I₃ − (ξ/4)Ftorsion²
+#   L_T6_base   = all T6 coupling terms (delta1, chi, zeta1-3, d14-17, d19-21, zt1-6)
+#   L_xt        = xt1..xt36  (ε·R̃×∂T full basis)
+#   L_EM        = −¼F²
+#
+# xt1..xt36 map to the 36 ε·R̃×∂T terms in:
+#   research/lagrangian_enumeration/explicit_terms_raw.txt (lines 122-157)
+#
+# Raw → xAct translation rules (all indices):
+#   epsiloneta always ALL UP; TorsionCDT always ALL DOWN;
+#   DT UP-index-to-eps: leave DOWN in TorsionCDT, put UP in epsiloneta;
+#   DT UP-index-to-R: leave DOWN in TorsionCDT / CD, R index stays DOWN in RiemannCDT;
+#   R UP indices: appear as DOWN in RiemannCDT, UP in epsiloneta (dummy pairing);
+#   Internal Riemann trace: repeated abstract index UP+DOWN within RiemannCDT.
+#
+# Trace DT forms:
+#   DT[a,b,-b,c]  → CD[-a][TorsionCDT[b,-b,-c]]   (T1+T2 trace; free: a,c)
+#   DT[a,-a,b,c]  → CD[-a][TorsionCDT[a,-b,-c]]   (deriv+T1 trace; free: b,c)
+#   DT[a,b,-a,c]  → CD[-a][TorsionCDT[-b,a,-c]]   (deriv+T2 trace; free: b,c)
+#   DT[a,b,-a,-b] → CD[-a][TorsionCDT[-b,a,b]]    (double trace; no free DT indices)
+#
+# 60 named constants: kappa, B0, + 58 free params
+# Landscape: nlive = 25×58 = 1450, num_repeats = ~46
+# Derivation timing: unknown (expected >60 min); use --timeout 0
+#
+# Refs:
+#   research/lagrangian_enumeration/explicit_terms_raw.txt — ε·R̃×∂T InputForms
+#   examples/torsion_gertsenshtein/theory_parity_odd.toml — T6 base
+#   docs/campaign_plan.md §Stage E
+
+[theory]
+name = "Complete-Odd PGT (full epsilon·R-tilde×dT sector)"
+description = "T6 + complete 36-term xt basis for epsilon·R̃×∂T, no R² terms"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[derived_fields]]
+name = "Ftorsion"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][TorsionCDT[c,-c,-b]] - CD[-b][TorsionCDT[c,-c,-a]]"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0", "beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3", "d14", "d15", "d16", "d17", "d19", "d20", "d21", "zt1", "zt2", "zt3", "zt4", "zt5", "zt6", "xt1", "xt2", "xt3", "xt4", "xt5", "xt6", "xt7", "xt8", "xt9", "xt10", "xt11", "xt12", "xt13", "xt14", "xt15", "xt16", "xt17", "xt18", "xt19", "xt20", "xt21", "xt22", "xt23", "xt24", "xt25", "xt26", "xt27", "xt28", "xt29", "xt30", "xt31", "xt32", "xt33", "xt34", "xt35", "xt36"]
+
+# xAct Lagrangian: T6 base (unchanged) + 36 xt terms.
+#
+# xt term index key (matching explicit_terms_raw.txt lines 122-157):
+#
+# Full-DT terms (DT[a,b,c,d] = CD[-a][TorsionCDT[-b,-c,-d]]):
+#   xt1:  eps[c,d,e,f] R[-a,-b,-e,-f]     DT-ab→R,  DT-cd→eps, R-ef→eps
+#   xt2:  eps[b,d,e,f] R[-a,-c,-e,-f]     DT-ac→R,  DT-bd→eps
+#   xt4:  eps[c,d,e,f] R[-a,-e,-b,-f]     DT-ab→R,  DT-cd→eps, R mixed
+#   xt5:  eps[b,d,e,f] R[-a,-e,-c,-f]
+#   xt6:  eps[b,c,d,f] Riemann[-a,e,-e,-f]  (Ricci trace pos 2,3)
+#   xt7:  eps[a,d,e,f] R[-b,-c,-e,-f]     DT-bc→R
+#   xt10: eps[c,d,e,f] R[-b,-e,-a,-f]
+#   xt11: eps[a,d,e,f] R[-b,-e,-c,-f]
+#   xt12: eps[a,c,d,f] Riemann[-b,e,-e,-f]
+#   xt13: eps[a,b,e,f] R[-c,-d,-e,-f]
+#   xt16: eps[b,d,e,f] R[-c,-e,-a,-f]
+#   xt17: eps[a,d,e,f] R[-c,-e,-b,-f]
+#   xt18: eps[a,b,e,f] R[-c,-e,-d,-f]
+#   xt19: eps[a,b,d,f] Riemann[-c,e,-e,-f]
+#   xt29: eps[c,d,e,f] R[-e,-f,-a,-b]
+#   xt30: eps[b,d,e,f] R[-e,-f,-a,-c]
+#   xt31: eps[b,c,d,f] Riemann[e,-f,-a,-e]  (trace pos 1,4)
+#   xt32: eps[a,d,e,f] R[-e,-f,-b,-c]
+#   xt33: eps[a,c,d,f] Riemann[e,-f,-b,-e]
+#   xt34: eps[a,b,e,f] R[-e,-f,-c,-d]
+#   xt35: eps[a,b,d,f] Riemann[e,-f,-c,-e]
+#   xt36: eps[a,b,c,d] * RicciScalarCDT
+#
+# Traced-DT terms:
+#   xt3:  DT[a,b,-b,c] eps[c,d,e,f] R[-a,-d,-e,-f]
+#   xt8:  DT[a,-a,b,c] eps[c,d,e,f] R[-b,-d,-e,-f]
+#   xt9:  DT[a,b,-a,c] eps[c,d,e,f] R[-b,-d,-e,-f]
+#   xt14: DT[a,b,-b,c] eps[a,d,e,f] R[-c,-d,-e,-f]
+#   xt15: DT[a,b,-a,c] eps[b,d,e,f] R[-c,-d,-e,-f]
+#   xt21: DT[a,b,-b,c] eps[c,d,e,f] R[-d,-e,-a,-f]
+#   xt22: DT[a,-a,b,c] eps[c,d,e,f] R[-d,-e,-b,-f]
+#   xt23: DT[a,b,-a,c] eps[c,d,e,f] R[-d,-e,-b,-f]
+#   xt24: DT[a,b,-b,c] eps[a,d,e,f] R[-d,-e,-c,-f]
+#   xt25: DT[a,b,-a,c] eps[b,d,e,f] R[-d,-e,-c,-f]
+#   xt26: DT[a,b,-b,c] eps[a,c,e,f] Riemann[d,-e,-d,-f]  (R trace pos 1,3)
+#   xt27: DT[a,-a,b,c] eps[b,c,e,f] Riemann[d,-e,-d,-f]
+#   xt28: DT[a,b,-a,c] eps[b,c,e,f] Riemann[d,-e,-d,-f]
+#   xt20: DT[a,b,-a,-b] eps[c,d,e,f] R[-c,-d,-e,-f]  (double-trace DT)
+
+[lagrangian]
+expression = """(
+  (1/kappa^2) RicciScalarCDT[]
+  + beta1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f]
+  + beta2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f]
+  + beta3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d]
+  - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d]
+  + delta1 RicciCDT[-a,-b] eta[a,c] eta[b,d] F[-c,-d]
+  + chi RicciCDT[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d]
+  + zeta1 CD[-a][TorsionCDT[b,-b,-c]] eta[a,d] eta[c,e] F[-d,-e]
+  + zeta2 CD[-a][TorsionCDT[a,-b,-c]] eta[b,d] eta[c,e] F[-d,-e]
+  + zeta3 CD[-a][TorsionCDT[-b,a,-c]] eta[b,d] eta[c,e] F[-d,-e]
+  + d14 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-b] TorsionCDT[-e,-c,-d]
+  + d15 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-c] TorsionCDT[-e,-b,-d]
+  + d16 epsiloneta[a,b,c,d] eta[e,f] TorsionCDT[-a,-e,-f] TorsionCDT[-b,-c,-d]
+  + d17 epsiloneta[a,b,c,d] TorsionCDT[e,-a,-e] TorsionCDT[-b,-c,-d]
+  + d19 epsiloneta[a,b,c,d] RiemannCDT[-a,-b,-c,e] F[-d,-e]
+  + d20 epsiloneta[a,b,c,d] RiemannCDT[-a,-c,-b,e] F[-d,-e]
+  + d21 epsiloneta[a,b,c,d] RicciCDT[-a,-b] F[-c,-d]
+  + zt1 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[b,c,d,e] eta[a,f] F[-f,-e]
+  + zt2 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,c,d,e] eta[b,f] F[-f,-e]
+  + zt3 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,b,d,e] eta[c,f] F[-f,-e]
+  + zt4 CD[-a][TorsionCDT[b,-b,-c]] epsiloneta[a,c,d,e] F[-d,-e]
+  + zt5 CD[-a][TorsionCDT[a,-b,-c]] epsiloneta[b,c,d,e] F[-d,-e]
+  + zt6 CD[-a][TorsionCDT[-b,a,-c]] epsiloneta[b,c,d,e] F[-d,-e]
+  + xt1 CD[-g][TorsionCDT[-h,-c,-d]] eta[a,g] eta[b,h] epsiloneta[c,d,e,f] RiemannCDT[-a,-b,-e,-f]
+  + xt2 CD[-g][TorsionCDT[-b,-h,-d]] eta[a,g] eta[c,h] epsiloneta[b,d,e,f] RiemannCDT[-a,-c,-e,-f]
+  + xt3 CD[-g][TorsionCDT[b,-b,-c]] eta[a,g] epsiloneta[c,d,e,f] RiemannCDT[-a,-d,-e,-f]
+  + xt4 CD[-g][TorsionCDT[-h,-c,-d]] eta[a,g] eta[b,h] epsiloneta[c,d,e,f] RiemannCDT[-a,-e,-b,-f]
+  + xt5 CD[-g][TorsionCDT[-b,-h,-d]] eta[a,g] eta[c,h] epsiloneta[b,d,e,f] RiemannCDT[-a,-e,-c,-f]
+  + xt6 CD[-g][TorsionCDT[-b,-c,-d]] eta[a,g] epsiloneta[b,c,d,f] RiemannCDT[-a,e,-e,-f]
+  + xt7 CD[-a][TorsionCDT[-g,-h,-d]] eta[b,g] eta[c,h] epsiloneta[a,d,e,f] RiemannCDT[-b,-c,-e,-f]
+  + xt8 CD[-a][TorsionCDT[a,-g,-c]] eta[b,g] epsiloneta[c,d,e,f] RiemannCDT[-b,-d,-e,-f]
+  + xt9 CD[-a][TorsionCDT[-g,a,-c]] eta[b,g] epsiloneta[c,d,e,f] RiemannCDT[-b,-d,-e,-f]
+  + xt10 CD[-g][TorsionCDT[-h,-c,-d]] eta[a,g] eta[b,h] epsiloneta[c,d,e,f] RiemannCDT[-b,-e,-a,-f]
+  + xt11 CD[-a][TorsionCDT[-g,-h,-d]] eta[b,g] eta[c,h] epsiloneta[a,d,e,f] RiemannCDT[-b,-e,-c,-f]
+  + xt12 CD[-a][TorsionCDT[-g,-c,-d]] eta[b,g] epsiloneta[a,c,d,f] RiemannCDT[-b,e,-e,-f]
+  + xt13 CD[-a][TorsionCDT[-b,-g,-h]] eta[c,g] eta[d,h] epsiloneta[a,b,e,f] RiemannCDT[-c,-d,-e,-f]
+  + xt14 CD[-a][TorsionCDT[b,-b,-g]] eta[c,g] epsiloneta[a,d,e,f] RiemannCDT[-c,-d,-e,-f]
+  + xt15 CD[-a][TorsionCDT[-b,a,-g]] eta[c,g] epsiloneta[b,d,e,f] RiemannCDT[-c,-d,-e,-f]
+  + xt16 CD[-g][TorsionCDT[-b,-h,-d]] eta[a,g] eta[c,h] epsiloneta[b,d,e,f] RiemannCDT[-c,-e,-a,-f]
+  + xt17 CD[-a][TorsionCDT[-g,-h,-d]] eta[b,g] eta[c,h] epsiloneta[a,d,e,f] RiemannCDT[-c,-e,-b,-f]
+  + xt18 CD[-a][TorsionCDT[-b,-g,-h]] eta[c,g] eta[d,h] epsiloneta[a,b,e,f] RiemannCDT[-c,-e,-d,-f]
+  + xt19 CD[-a][TorsionCDT[-b,-g,-d]] eta[c,g] epsiloneta[a,b,d,f] RiemannCDT[-c,e,-e,-f]
+  + xt20 CD[-a][TorsionCDT[-b,a,b]] epsiloneta[c,d,e,f] RiemannCDT[-c,-d,-e,-f]
+  + xt21 CD[-g][TorsionCDT[b,-b,-c]] eta[a,g] epsiloneta[c,d,e,f] RiemannCDT[-d,-e,-a,-f]
+  + xt22 CD[-a][TorsionCDT[a,-g,-c]] eta[b,g] epsiloneta[c,d,e,f] RiemannCDT[-d,-e,-b,-f]
+  + xt23 CD[-a][TorsionCDT[-g,a,-c]] eta[b,g] epsiloneta[c,d,e,f] RiemannCDT[-d,-e,-b,-f]
+  + xt24 CD[-a][TorsionCDT[b,-b,-g]] eta[c,g] epsiloneta[a,d,e,f] RiemannCDT[-d,-e,-c,-f]
+  + xt25 CD[-a][TorsionCDT[-b,a,-g]] eta[c,g] epsiloneta[b,d,e,f] RiemannCDT[-d,-e,-c,-f]
+  + xt26 CD[-a][TorsionCDT[b,-b,-c]] epsiloneta[a,c,e,f] RiemannCDT[d,-e,-d,-f]
+  + xt27 CD[-a][TorsionCDT[a,-b,-c]] epsiloneta[b,c,e,f] RiemannCDT[d,-e,-d,-f]
+  + xt28 CD[-a][TorsionCDT[-b,a,-c]] epsiloneta[b,c,e,f] RiemannCDT[d,-e,-d,-f]
+  + xt29 CD[-g][TorsionCDT[-h,-c,-d]] eta[a,g] eta[b,h] epsiloneta[c,d,e,f] RiemannCDT[-e,-f,-a,-b]
+  + xt30 CD[-g][TorsionCDT[-b,-h,-d]] eta[a,g] eta[c,h] epsiloneta[b,d,e,f] RiemannCDT[-e,-f,-a,-c]
+  + xt31 CD[-g][TorsionCDT[-b,-c,-d]] eta[a,g] epsiloneta[b,c,d,f] RiemannCDT[e,-f,-a,-e]
+  + xt32 CD[-a][TorsionCDT[-g,-h,-d]] eta[b,g] eta[c,h] epsiloneta[a,d,e,f] RiemannCDT[-e,-f,-b,-c]
+  + xt33 CD[-a][TorsionCDT[-g,-c,-d]] eta[b,g] epsiloneta[a,c,d,f] RiemannCDT[e,-f,-b,-e]
+  + xt34 CD[-a][TorsionCDT[-b,-g,-h]] eta[c,g] eta[d,h] epsiloneta[a,b,e,f] RiemannCDT[-e,-f,-c,-d]
+  + xt35 CD[-a][TorsionCDT[-b,-g,-d]] eta[c,g] epsiloneta[a,b,d,f] RiemannCDT[e,-f,-c,-e]
+  + xt36 CD[-a][TorsionCDT[-b,-c,-d]] epsiloneta[a,b,c,d] RicciScalarCDT[]
+  - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]
+)"""
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/torsion_gertsenshtein_complete_odd.json"

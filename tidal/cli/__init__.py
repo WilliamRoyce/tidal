@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from pathlib import Path
 
 from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 
@@ -161,10 +162,30 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     inspect_parser.add_argument(
         "--latex-format",
-        choices=["align", "document", "raw"],
+        choices=["align", "gather", "kinetic-matrix", "document", "raw"],
         default="align",
         dest="latex_format",
-        help="LaTeX output format (default: align). 'document' wraps in standalone .tex",
+        help=(
+            "LaTeX output format (default: align). "
+            "'gather' wraps each equation in its own \\begin{aligned} block "
+            "inside an outer \\begin{gather*} for per-equation centering "
+            "(used by the Appendix-E driver). "
+            "'kinetic-matrix' emits the linearized kinetic matrix "
+            "\\mathcal{K}(\\partial_t, \\partial_z) as a bmatrix "
+            "(used by the Appendix-E driver second pass). "
+            "'document' wraps in standalone .tex"
+        ),
+    )
+    inspect_parser.add_argument(
+        "--symbols",
+        type=Path,
+        default=None,
+        help=(
+            "Path to a TOML symbol-override file (e.g. manuscript/latex_symbols.toml) "
+            "binding project-specific tensor heads and parameter names to the "
+            "macros and conventions of the surrounding manuscript. See "
+            "tidal.symbolic.latex.load_symbol_overrides for the file shape."
+        ),
     )
 
     # --- simulate ---
@@ -273,7 +294,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--ic-no-snap",
         action="store_true",
         help="Disable automatic snapping of --ic-wavevector to the nearest "
-        "discrete Fourier mode on periodic grids. Legacy behaviour: the IC "
+        "discrete Fourier mode on periodic grids. Legacy behavior: the IC "
         "is cos(k·x) evaluated verbatim at grid points, which leaks amplitude "
         "onto every discrete k-mode when k is off-grid. Only needed for "
         "reproducing pre-snap simulations or for theories where off-grid "
@@ -733,6 +754,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "convergence",
             "replicate-convergence",
             "corner",
+            "atlas",
         ],
         help="Plot type to generate",
     )
@@ -988,7 +1010,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="RULE",
         help=(
             "Classify campaign subplots (e.g. 'active:A>1.01'). "
-            "Active panels get warm background, null panels get grey."
+            "Active panels get warm background, null panels get gray."
         ),
     )
     plot_parser.add_argument(
@@ -1051,6 +1073,19 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Makes compactified arctan_uniform priors visually span their "
             "full ±tan(89°) ≈ ±57.3 sample range so the user can confirm "
             "posterior compactness. Default: off (auto-scale per panel)."
+        ),
+    )
+    plot_parser.add_argument(
+        "--layout-cols",
+        dest="layout_cols",
+        type=int,
+        default=None,
+        help=(
+            "For --type atlas: override the default 2 x N grid layout "
+            "with a 2 * ceil(N / K) x K block-pair layout, where K is the "
+            "column count.  Useful for high-N theories where 2 x N is too "
+            "wide for one page; e.g. N=8 with --layout-cols=4 gives a "
+            "4 x 4 square."
         ),
     )
 
@@ -1857,6 +1892,20 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Set to 0 to disable noise (ablation tests)."
         ),
     )
+    sample_parser.add_argument(
+        "--soft-floor-logl",
+        type=float,
+        default=-100.0,
+        metavar="LOGL",
+        dest="soft_floor_logl",
+        help=(
+            "Position of the soft penalty floor for sim divergence / NaN / exception "
+            "(default: -100). For baseline-normalized maximize/minimize runs the "
+            "natural physics logL is near 0, so -100 drags logZ to -100 and makes "
+            "the PolyChord precision criterion unreachable. Use -15 (or similar) "
+            "to keep logZ in a sensible range. See issue #372."
+        ),
+    )
     # Sampling method
     sample_parser.add_argument(
         "--method",
@@ -1907,7 +1956,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help=(
             "Per-evaluation pipeline: 'memory' skips the simulate/measure disk "
             "round-trip (default, ~2x faster for nested sampling — see #269); "
-            "'disk' preserves the legacy behaviour for bisectability."
+            "'disk' preserves the legacy behavior for bisectability."
         ),
     )
     sample_parser.add_argument(

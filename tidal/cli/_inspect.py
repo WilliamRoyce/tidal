@@ -357,7 +357,15 @@ def inspect_command(args: Namespace) -> int:
         )
         return 1
 
-    spec = load_equation_system(json_path)
+    # `tidal inspect` is read-only — never evolves the system — so the v6
+    # higher-time-order guard is relaxed to a warning when ``--latex`` (or
+    # other read-only output flags) is requested. This lets us render
+    # equations for theories whose [perturbation] block was intentionally
+    # disabled to extract the exact (non-LPS) EOMs.
+    strict_v6 = not bool(getattr(args, "latex", False)) and not bool(
+        getattr(args, "json_output", False)
+    )
+    spec = load_equation_system(json_path, strict_v6=strict_v6)
 
     if args.json_output:
         data = _build_json_output(spec, show_params=args.params)
@@ -365,7 +373,24 @@ def inspect_command(args: Namespace) -> int:
         return 0
 
     if args.latex:
-        from tidal.symbolic.latex import system_to_latex
+        from tidal.symbolic.latex import (
+            kinetic_matrix_to_latex,
+            load_symbol_overrides,
+            system_to_latex,
+        )
+
+        if getattr(args, "symbols", None) is not None:
+            load_symbol_overrides(args.symbols)
+
+        if args.latex_format == "kinetic-matrix":
+            from tidal.symbolic.kinetic_matrix import build_kinetic_matrix
+
+            # system_to_latex sets the metric symbol as a side effect;
+            # call it just to prime the module state, but we discard
+            # the output and emit only the kinetic matrix.
+            _ = system_to_latex(spec, output_format="raw")
+            print(kinetic_matrix_to_latex(build_kinetic_matrix(spec), spec))
+            return 0
 
         print(system_to_latex(spec, output_format=args.latex_format))
         return 0

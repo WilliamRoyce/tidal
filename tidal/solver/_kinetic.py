@@ -17,9 +17,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from tidal.symbolic._eval_utils import evaluate_coefficient
 
 if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
 
@@ -29,7 +34,8 @@ _UNIT_TOLERANCE = 1e-12
 def build_inverse_kinetic_diag(
     spec: EquationSystem,
     params: dict[str, float],
-) -> dict[str, float] | None:
+    grid: GridInfo | None = None,
+) -> dict[str, float | NDArray[np.float64]] | None:
     """Return per-field inverse kinetic coefficients, or ``None`` for the fast path.
 
     Iterates over every dynamical equation (``time_derivative_order > 0``) and
@@ -51,11 +57,20 @@ def build_inverse_kinetic_diag(
         Parsed equation system (post ``base_spec`` in perturbative flows).
     params
         Runtime parameter values, e.g. ``{"B0": 1.0, "rho": 0.01}``.
+    grid
+        Optional grid. When provided, per-coordinate arrays are built from
+        ``grid.coord_arrays()`` and passed to ``evaluate_coefficient`` so
+        position-dependent kinetic coefficients (post-GH #380:
+        kinetic_coefficient_symbolic containing ``x[]``, ``y[]``, …) evaluate
+        to per-grid-point arrays. ``None`` (the default) preserves the
+        constant-coefficient behavior. See GH #382.
 
     Returns
     -------
     ``None`` if every dynamical field has ``M_ii ≈ 1``; else a dict
-    ``{field_name: 1 / M_ii}`` with only the non-trivial entries.
+    ``{field_name: 1 / M_ii}`` with only the non-trivial entries. Per-field
+    values are scalars for constant kinetics and ``NDArray[float64]`` for
+    position-dependent kinetics (when ``coord_arrays`` is supplied).
 
     Raises
     ------
@@ -64,8 +79,21 @@ def build_inverse_kinetic_diag(
         The caller should use modal, which demotes the field via Schur
         elimination rather than producing division-by-zero.
     """
-    result: dict[str, float] = {}
+    result: dict[str, float | NDArray[np.float64]] = {}
     nontrivial = False
+
+    # Build per-coordinate grid arrays once (only if a grid was provided).
+    # The same loop is used by CoefficientEvaluator (coefficients.py:88-93).
+    coord_arrays: dict[str, NDArray[np.float64]] | None
+    if grid is not None:
+        coord_arrays = {}
+        grid_coords = grid.coord_arrays()
+        spatial = [c for c in spec.effective_coordinates if c != "t"]
+        for i, name in enumerate(spatial):
+            if i < len(grid_coords):
+                coord_arrays[name] = grid_coords[i]
+    else:
+        coord_arrays = None
 
     for eq in spec.equations:
         if eq.time_derivative_order <= 0:
@@ -75,11 +103,35 @@ def build_inverse_kinetic_diag(
         if kin_sym is None:
             continue
 
-        value = evaluate_coefficient(kin_sym, params, spec.effective_coordinates)
-        if not isinstance(value, float):
-            value = float(value)  # type: ignore[arg-type]
+        value = evaluate_coefficient(
+            kin_sym,
+            params,
+            spec.effective_coordinates,
+            coord_arrays,
+        )
 
-        if value == 0.0:
+        if isinstance(value, np.ndarray):
+            # Position-dependent kinetic. Zero-anywhere is a singular-M failure
+            # at that grid point — same diagnostic as the scalar case.
+            if (value == 0.0).any():
+                msg = (
+                    f"Kinetic coefficient for field '{eq.field_name}' evaluates "
+                    f"to zero at at least one grid point ({kin_sym!r}). A "
+                    "time-domain solver (cvode/ida/leapfrog/scipy) cannot "
+                    "handle a singular mass matrix. Use modal, which demotes "
+                    "zero-kinetic fields to constraints via Schur elimination."
+                )
+                raise ValueError(msg)
+            inv = 1.0 / value
+            # Only count as non-trivial if it actually departs from M=1
+            # anywhere on the grid — otherwise treat as the fast-path identity.
+            if not np.allclose(inv, 1.0, atol=_UNIT_TOLERANCE):
+                result[eq.field_name] = inv.astype(np.float64)
+                nontrivial = True
+            continue
+
+        scalar = float(value)
+        if scalar == 0.0:
             msg = (
                 f"Kinetic coefficient for field '{eq.field_name}' evaluates to "
                 f"zero at the given parameters ({kin_sym!r}). A time-domain "
@@ -89,8 +141,8 @@ def build_inverse_kinetic_diag(
             )
             raise ValueError(msg)
 
-        if abs(value - 1.0) > _UNIT_TOLERANCE:
-            result[eq.field_name] = 1.0 / value
+        if abs(scalar - 1.0) > _UNIT_TOLERANCE:
+            result[eq.field_name] = 1.0 / scalar
             nontrivial = True
 
     return result if nontrivial else None
@@ -98,8 +150,8 @@ def build_inverse_kinetic_diag(
 
 def velocity_row_scale(
     field_name: str,
-    m_inv: dict[str, float] | None,
-) -> float:
+    m_inv: dict[str, float | NDArray[np.float64]] | None,
+) -> float | NDArray[np.float64]:
     """Return the ``M⁻¹`` scale for a 2nd-order field's velocity-row contributions.
 
     Single source of truth for the ``kinetic_coefficient_symbolic`` consumption
@@ -108,7 +160,7 @@ def velocity_row_scale(
     this rather than inline the lookup, so the contract is reviewable from
     the function definition and so the regression guard in
     :class:`tests.test_solver_kinetic_consistency.TestAllModalPathsRespectKinetic`
-    can pin all callers to the same behaviour.
+    can pin all callers to the same behavior.
 
     ``m_inv`` is the dict returned by :func:`build_inverse_kinetic_diag`.
     ``None`` (every field has ``M ≈ 1``) and missing-from-dict (this field
@@ -128,16 +180,22 @@ def velocity_row_scale(
     field_name : str
         Name of the dynamical (2nd-order) field whose velocity-row
         contribution is being assembled.
-    m_inv : dict[str, float] | None
+    m_inv : dict[str, float | NDArray[np.float64]] | None
         Output of :func:`build_inverse_kinetic_diag`. ``None`` denotes the
         fast path (no theory in the spec has non-trivial ``M``); a missing
-        key denotes that this specific field has ``M ≈ 1``.
+        key denotes that this specific field has ``M ≈ 1``. Values can be
+        scalars (constant kinetic) or arrays (position-dependent kinetic
+        when GH #382's ``coord_arrays`` path is exercised).
 
     Returns
     -------
-    float
+    float | NDArray[np.float64]
         Multiplicative factor to apply to every velocity-row contribution
-        for ``field_name``. ``1.0`` for the no-op path.
+        for ``field_name``. ``1.0`` for the no-op path. Modal solver paths
+        that pre-build complex per-mode matrices may receive an array here
+        and need to either reduce it (e.g. take ``.ravel()[0]`` for the
+        constant-coefficient approximation) or fail loudly — see
+        ``modal.py:732`` for the current per-mode-Padé behavior.
 
     See Also
     --------

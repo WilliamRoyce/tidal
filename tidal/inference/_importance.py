@@ -282,6 +282,94 @@ def compute_parameter_importance(
     )
 
 
+def compute_cross_kl(
+    amp_samples: Any,
+    sup_samples: Any,
+    params: list[str],
+    n_bins: int = 80,
+) -> dict[str, float]:
+    r"""Per-parameter KL divergence between amp and sup posteriors.
+
+    Computes :math:`D_{\\mathrm{KL}}(P_{+}(\\theta_i) \\| P_{-}(\\theta_i))` for
+    each parameter by histogramming the 1D marginal of each posterior over a
+    common binning grid spanning the union of both supports, then summing
+    :math:`P_{+} \\log (P_{+}/P_{-})\\,d\\theta`.  Useful for identifying
+    which parameters distinguish the amplification posterior from the
+    suppression posterior — complementing the per-direction marginal D_KL
+    against the prior computed by :func:`compute_parameter_importance`.
+
+    Parameters
+    ----------
+    amp_samples
+        Anesthetic ``Samples``/``NestedSamples`` for the amplification
+        likelihood (positive ``+log A`` direction).
+    sup_samples
+        Anesthetic ``Samples``/``NestedSamples`` for the suppression
+        likelihood (negative ``-log A`` direction).
+    params
+        Parameter names to compute the cross-KL for.  Each name must be a
+        column in both samples objects.
+    n_bins
+        Number of histogram bins shared between the two posteriors.
+
+    Returns
+    -------
+    dict[str, float]
+        ``{param_name: cross_kl_nats}``.  NaN entries indicate a parameter
+        whose histogram could not be computed (e.g. zero weight or
+        degenerate support).
+    """
+    import numpy as np
+
+    amp_weights = np.asarray(
+        amp_samples.get_weights()
+        if hasattr(amp_samples, "get_weights")
+        else amp_samples.weights,
+    )
+    amp_weights = amp_weights / amp_weights.sum()  # noqa: PLR6104  (anesthetic weights are read-only)
+    sup_weights = np.asarray(
+        sup_samples.get_weights()
+        if hasattr(sup_samples, "get_weights")
+        else sup_samples.weights,
+    )
+    sup_weights = sup_weights / sup_weights.sum()  # noqa: PLR6104  (anesthetic weights are read-only)
+
+    cross: dict[str, float] = {}
+    for name in params:
+        try:
+            amp_col = np.asarray(amp_samples[name])
+            sup_col = np.asarray(sup_samples[name])
+            # Shared binning grid: union of both supports so both
+            # marginals live on the same axis when we compare.
+            lo = float(min(amp_col.min(), sup_col.min()))
+            hi = float(max(amp_col.max(), sup_col.max()))
+            if not (hi > lo):
+                cross[name] = float("nan")
+                continue
+            edges = np.linspace(lo, hi, n_bins + 1)
+            p_hist, _ = np.histogram(amp_col, bins=edges, weights=amp_weights)
+            q_hist, _ = np.histogram(sup_col, bins=edges, weights=sup_weights)
+            # Normalize to densities.
+            dx = edges[1] - edges[0]
+            p = p_hist / max(p_hist.sum(), 1e-300) / dx
+            q = q_hist / max(q_hist.sum(), 1e-300) / dx
+            # Smooth zero bins of q so D_KL stays finite: replace zeros
+            # with the smallest non-zero density in q, scaled by 1/n_bins.
+            q_floor = max(q[q > 0].min() if np.any(q > 0) else 1e-12, 1e-12) / n_bins
+            q = np.where(q > 0, q, q_floor)
+            mask = p > 0
+            cross[name] = float(np.sum(p[mask] * np.log(p[mask] / q[mask]) * dx))
+        except (ValueError, KeyError, AttributeError, IndexError) as exc:
+            import logging
+
+            logging.getLogger("tidal.inference").warning(
+                "cross-KL failed for '%s': %s", name, exc
+            )
+            cross[name] = float("nan")
+
+    return cross
+
+
 def format_importance_table(result: ParameterImportanceResult) -> str:
     """Format parameter importance as a human-readable table.
 

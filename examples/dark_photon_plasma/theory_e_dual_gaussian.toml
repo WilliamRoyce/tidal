@@ -1,0 +1,116 @@
+# Dark Photon in Plasma + Dual-Gaussian B-field (Phase E.T1)
+#
+# Phase E variant of dark_photon_plasma/theory.toml. Two changes from base:
+#   1. NO TT gauge fixing on h (per issue #167; TT enforced only at IC time
+#      via --ic-component h_5; dynamics evolve all 10 metric components freely).
+#   2. Uniform B0 background → dual-Gaussian B-field (modal-solver compatible
+#      on periodic BCs after #367 fix, v0.42.0/v0.42.1).
+#
+# Physics unchanged: Einstein-Maxwell + PGT I3 torsion-trace mass + Maxwell-like
+# vector-torsion kinetic + kinetic mixing F·Ftorsion + plasma photon mass.
+# Per the FV ↔ CDT equivalence map (#318): m_torsion² = +2·alpha3, stable
+# Proca regime for alpha3 > 0.
+#
+# Free coupling parameters for inference:
+#   alpha3 — torsion-trace mass parameter (Proca)
+#   xi     — torsion-trace kinetic coefficient (Maxwell-like)
+#   deltam — F·Ftorsion kinetic mixing
+#   mA2    — effective photon mass (plasma proxy)
+# Total 4D coupling space → atlas-eligible (8 faces × 1 tile).
+#
+# Geometry parameters: must match scripts/hpc_submit_drafts/v3e_localised/_geometry.env
+#   Bpeak = 0.01, sigB = 5, zc1 = 50, zc2 = 150 (L=200 box)
+#
+# Refs:
+#   Holdom (1986) — kinetic mixing triviality
+#   Pospelov (2008), arXiv:0811.1030 — dark photon portal
+#   FV ↔ CDT equivalence: feedback_fv_cdt_equivalence_verified.md, issue #318
+#
+# Derivation timing: ~5-10 min wall (last verified: 2026-05-24)
+
+[theory]
+name = "Dark Photon in Plasma + Dual-Gaussian B (Phase E.T1)"
+description = "PGT torsion-trace dark photon with kinetic mixing and plasma mass, in localised dual-Gaussian B-field"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# PGT torsion: rank-3 tensor perturbation t_{abc}.
+[torsion]
+perturbation_name = "t"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Torsion trace field strength: Ftorsion_{ab} = d_a V_b - d_b V_a
+# where V_mu = TorsionCDT^b_{b,mu} is the torsion trace vector.
+[[derived_fields]]
+name = "Ftorsion"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][TorsionCDT[c,-c,-b]] - CD[-b][TorsionCDT[c,-c,-a]]"
+
+# Dual-Gaussian B-field background (Phase E.0 validated).
+# B_x(z) = Bpeak * [exp(-(z-zc1)^2/(2*sigB^2)) - exp(-(z-zc2)^2/(2*sigB^2))]
+# Abar_y(z) = -Bpeak * sigB * Sqrt[Pi/2]
+#             * (Erf[(z-zc1)/(Sqrt[2]*sigB)] - Erf[(z-zc2)/(Sqrt[2]*sigB)])
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = [
+  "0",
+  "0",
+  "-Bpeak * sigB * Sqrt[Pi/2] * (Erf[(z[] - zc1)/(Sqrt[2]*sigB)] - Erf[(z[] - zc2)/(Sqrt[2]*sigB)])",
+  "0"
+]
+
+[constants]
+names = ["kappa", "Bpeak", "sigB", "zc1", "zc2", "alpha3", "xi", "deltam", "mA2"]
+
+# Lagrangian: Einstein + Maxwell + PGT torsion (I3 mass + kinetic) + kinetic mixing + plasma.
+# alpha3 is the I3 coefficient: mass^2 = +2*alpha3 (stable Proca for alpha3 > 0).
+# mA2 is on the PERTURBATION field a (not full A) to avoid Abar^2 contamination (Issue #142).
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCD[] - alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d] - 1/4 xi Ftorsion[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] + deltam F[-a,-b] eta[a,c] eta[b,d] Ftorsion[-c,-d] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] - 1/2 mA2 a[-a] eta[a,b] a[-b])"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# NO TT gauge on h — per issue #167. TT enforced at IC time only.
+# Lorenz gauge on photon a.
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: propagation along z-axis
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/dark_photon_plasma_e_dual_gaussian.json"

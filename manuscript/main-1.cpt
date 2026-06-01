@@ -1,0 +1,1 @@
+Before you submit, I'd recommend asking your Claude to do some tex linting. Could you tell it for example to run \verb|:%s/ \$/\~\$/g| in vim terms, and \verb|:%s/ \\cref/\~\\cref/g| and also \verb|:%s/ \\cite/\~\\cite/g|. Probably it would try to use sed.^^E^^L 

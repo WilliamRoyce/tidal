@@ -16,7 +16,7 @@
 				"h_4"
 			]
 		},
-		"derivation_hash": "b8a5ea2c1c6cf62194b49f80a8229da8f5d8f9940b3bf181fbe771c13a98524a"
+		"derivation_hash": "ff044715c5e822b67be0541b54e56249d06ed71772b61ffacb301578c198f8ef"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -33,32 +33,64 @@
 		{
 			"name": "a_0",
 			"index": 0,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				0
+			]
 		},
 		{
 			"name": "a_1",
 			"index": 1,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				1
+			]
 		},
 		{
 			"name": "a_2",
 			"index": 2,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				2
+			]
 		},
 		{
 			"name": "a_3",
 			"index": 3,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				3
+			]
 		},
 		{
 			"name": "h_5",
 			"index": 4,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				1,
+				2
+			]
 		},
 		{
 			"name": "h_7",
 			"index": 5,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				2,
+				2
+			]
 		}
 	],
 	"equations": [
@@ -75,7 +107,7 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -1.0,
+						"coefficient": 1.0,
 						"operator": "laplacian_x",
 						"field": "a_0"
 					}
@@ -288,6 +320,7 @@
 					"operator": "identity"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "B0^2/4"
 			},
 			{
@@ -301,6 +334,7 @@
 					"operator": "identity"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "B0^2/4"
 			},
 			{
@@ -313,7 +347,8 @@
 					"field": "a_0",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -326,6 +361,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "interaction",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "B0"
 			},
 			{
@@ -338,7 +374,8 @@
 					"field": "a_1",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -351,6 +388,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "interaction",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "B0"
 			},
 			{
@@ -363,7 +401,8 @@
 					"field": "a_2",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 0.5,
@@ -375,7 +414,8 @@
 					"field": "a_3",
 					"operator": "gradient_x"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -388,6 +428,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
@@ -401,6 +442,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
@@ -413,7 +455,8 @@
 					"field": "a_0",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 0.5,
@@ -425,7 +468,8 @@
 					"field": "a_1",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 0.5,
@@ -437,7 +481,8 @@
 					"field": "a_2",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 0.5,
@@ -449,7 +494,8 @@
 					"field": "a_3",
 					"operator": "time_derivative"
 				},
-				"term_class": "self"
+				"term_class": "self",
+				"order_in_eps": 0
 			},
 			{
 				"coefficient": 1.0,
@@ -462,6 +508,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
@@ -475,6 +522,7 @@
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
+				"order_in_eps": 0,
 				"coefficient_symbolic": "1/(2*kappa^2)"
 			}
 		],

@@ -1,0 +1,287 @@
+% Cubed-sphere atlas schematic for App J (Bayesian inference).
+% Uses tikz-3dplot for a proper 3-D perspective view.  The sphere
+% surface is rendered as a 3-D shaded ball (\shade[ball color]) in
+% tdplot_screen_coords with great-circle / latitude wireframe overlaid;
+% front-half arcs solid, back-half arcs dashed.  The highlighted face
+% is semi-transparent so the sphere surface and the sample vector
+% behind it remain visible.  Four curved arcs on the sphere bound the
+% sphere-tile (the gnomonic image of the highlighted cube-face's
+% edges).
+% The sample vector is drawn in two depth-ordered segments: the
+% portion inside the cube is rendered BEFORE the transparent face
+% (so the face overlays it), and the portion emerging past the face
+% is rendered AFTER (so it sits on top).
+%
+% The figure idiom (cube-tile / sphere-tile naming, gnomonic
+% projection ray rendering) follows Chen 2021 (doi:10.1029/2020MS002280).
+% The underlying gnomonic projection is Ronchi, Iacono and Paolucci
+% (J. Comp. Phys. 124, 93--114, 1996); the cubed-sphere construction
+% adapted to coupling-space sampling follows W. E. V. Barker's
+% unreleased PSALTer extension shared with this project.
+\documentclass[border=1pt,tikz,svgnames]{standalone}
+\usepackage{stix}
+\usepackage{amsmath}
+\usepackage{bm}
+\usepackage{tikz}
+\usepackage{tikz-3dplot}
+\usepackage{tidal-tikz-styles}
+
+\usetikzlibrary{arrows.meta,calc,3d}
+\tikzset{>={Stealth[length=1.6mm,width=1.6mm]}}
+
+\colorlet{Face}{IBMblue}
+\colorlet{Proj}{IBMindigo}
+\colorlet{Tile}{IBMmagenta}
+\colorlet{SphereLine}{GrayLine}
+\colorlet{SphereFill}{GrayFill}
+\colorlet{AxisLine}{Black}
+
+% Camera at inclination 70 deg (from +z) and azimuth 25 deg.  At this
+% angle the +x face is the most head-on visible face; the -y face
+% (face 2\downarrow) carries the highlight on the back-left side of
+% the cube, visible through the unfilled wireframe.
+\tdplotsetmaincoords{70}{32}
+
+\begin{document}
+\begin{tikzpicture}[
+    tdplot_main_coords,
+    line cap=round, line join=round,
+    font=\footnotesize,
+    scale=2.0
+  ]
+
+  % Useful sub-tile geometry: \ttileLo and \ttileHi delimit the
+  % highlighted cell of the 4x4 grid (x and z both in
+  % [\ttileLo, \ttileHi]).  Move the cell by editing these two only.
+  \pgfmathsetmacro{\ttileLo}{-0.5}
+  \pgfmathsetmacro{\ttileHi}{0.0}
+
+  % Sphere radius (cube half-width = 1).  Drawn smaller than the cube
+  % so the origin -> sphere -> cube-face structure of each gnomonic ray
+  % is visually distinct.  Cascades through every stage that uses the
+  % sphere surface (axes, sphere-tile, gridlines, highlight, corner
+  % mapping, sample-vector ring marker).
+  \pgfmathsetmacro{\Rsphere}{0.65}
+
+  %------------------------------------------------------------------
+  % STAGE 0a — inside-sphere axis segments (origin -> unit-sphere
+  %                  intersection).  Drawn early so the sphere
+  %                  shading overlays them; thin solid (subordinate
+  %                  to the thick solid outside-sphere segments, but
+  %                  no dashes — the thin/thick step at the sphere
+  %                  surface marks where the axis emerges).
+  %------------------------------------------------------------------
+
+  \draw[AxisLine, thick] (-\Rsphere*1.14,0,0) -- (-1,0,0);
+  \draw[AxisLine, thick] (0,-\Rsphere,0) -- (0,-1,0);
+  \draw[AxisLine, thick] (0,0,-\Rsphere*1.06) -- (0,0,-1);
+
+  \draw[->, AxisLine, thick] (0,\Rsphere*1.665,0) -- (0,1.55,0)
+    node[right, AxisLine] {$\theta_{2}$};
+
+  \draw[AxisLine!20, thick] (-\Rsphere*1.14,0,0) -- (\Rsphere,0,0);
+  \draw[AxisLine!20, thick] (0,-\Rsphere,0) -- (0,\Rsphere*1.63,0);
+  \draw[AxisLine!20, thick] (0,0,-\Rsphere*1.06) -- (0,0,\Rsphere);
+
+  %------------------------------------------------------------------
+  % STAGE 2 — far back cube edges (light wireframe of hidden edges)
+  %------------------------------------------------------------------
+  \draw[Face!40, thick]
+    (-1, 1,-1) -- (1, 1,-1) -- (1, 1, 1) -- (-1, 1, 1) -- cycle;
+  \draw[Face!40, thick] (-1,-1,-1) -- (-1, 1,-1);
+  \draw[Face!40, thick] ( 1,-1,-1) -- ( 1, 1,-1);
+  \draw[Face!40, thick] ( 1,-1, 1) -- ( 1, 1, 1);
+  \draw[Face!40, thick] (-1,-1, 1) -- (-1, 1, 1);
+
+  %------------------------------------------------------------------
+  % STAGE 3 — sample vector segment 1 (origin -> cube-face crossing
+  %                  on the -y face).  Drawn BEFORE the transparent
+  %                  face so the face overlays it for the "behind"
+  %                  depth cue.
+  %------------------------------------------------------------------
+  \pgfmathsetmacro{\cx}{-0.25}
+  \pgfmathsetmacro{\cz}{-0.35}
+  \pgfmathsetmacro{\cn}{sqrt(\cx*\cx + 1 + \cz*\cz)}
+  \pgfmathsetmacro{\cxs}{\cx/\cn}
+  \pgfmathsetmacro{\cys}{-1/\cn}
+  \pgfmathsetmacro{\czs}{\cz/\cn}
+  \pgfmathsetmacro{\rmax}{1.30}
+
+  %------------------------------------------------------------------
+  % STAGE 4 — sphere surface: 3-D shaded ball base (rendered in
+  %                  tdplot_screen_coords so the orthographic sphere
+  %                  silhouette appears as a screen-space circle with
+  %                  proper ball shading) + silhouette outline
+  %------------------------------------------------------------------
+  \begin{scope}[tdplot_screen_coords]
+    \shade[ball color=SphereFill, opacity=0.40] (0,0) circle (\Rsphere);
+    \draw[SphereLine, thin] (0,0) circle (\Rsphere);
+  \end{scope}
+
+  %------------------------------------------------------------------
+  % STAGE 7 — sphere-tile boundary curves.  These are the four edges
+  %                  of the highlighted (-y) cube-face projected onto
+  %                  the sphere by radial normalisation.  Together
+  %                  they outline the sphere-tile, the gnomonic image
+  %                  of the cube-tile.
+  %------------------------------------------------------------------
+  % Edge at x = -1, parameter t = z in [-1, 1]
+  \draw[Proj, thick]
+    plot[domain=-1:1, samples=12, smooth]
+      ({-\Rsphere/sqrt(1+1+\x*\x)}, {-\Rsphere/sqrt(1+1+\x*\x)},
+       {\Rsphere*\x/sqrt(1+1+\x*\x)});
+  % Edge at x = +1, parameter t = z
+  \draw[Proj, thick]
+    plot[domain=-1:1, samples=12, smooth]
+      ({\Rsphere/sqrt(1+1+\x*\x)}, {-\Rsphere/sqrt(1+1+\x*\x)},
+       {\Rsphere*\x/sqrt(1+1+\x*\x)});
+  % Edge at z = -1, parameter s = x
+  \draw[Proj, thick]
+    plot[domain=-1:1, samples=12, smooth]
+      ({\Rsphere*\x/sqrt(\x*\x+1+1)}, {-\Rsphere/sqrt(\x*\x+1+1)},
+       {-\Rsphere/sqrt(\x*\x+1+1)});
+  % Edge at z = +1, parameter s = x
+  \draw[Proj, thick]
+    plot[domain=-1:1, samples=12, smooth]
+      ({\Rsphere*\x/sqrt(\x*\x+1+1)}, {-\Rsphere/sqrt(\x*\x+1+1)},
+       {\Rsphere/sqrt(\x*\x+1+1)});
+
+  %------------------------------------------------------------------
+  % STAGE 7c — sphere-side gridlines: project each internal cube-tile
+  %                  gridline onto the sphere surface.  These are the
+  %                  gnomonic images of the 4x4 sub-tile boundaries,
+  %                  carrying the cube-face partition onto the curved
+  %                  surface.
+  %------------------------------------------------------------------
+  % Horizontal lines (constant z on the cube face)
+  \foreach \zline in {-0.5, 0, 0.5}{
+    \draw[Proj, thin]
+      plot[domain=-1:1, samples=12, smooth]
+        ({\Rsphere*\x/sqrt(\x*\x + 1 + \zline*\zline)},
+         {-\Rsphere/sqrt(\x*\x + 1 + \zline*\zline)},
+         {\Rsphere*\zline/sqrt(\x*\x + 1 + \zline*\zline)});
+  }
+  % Vertical lines (constant x on the cube face)
+  \foreach \xline in {-0.5, 0, 0.5}{
+    \draw[Proj, thin]
+      plot[domain=-1:1, samples=12, smooth]
+        ({\Rsphere*\xline/sqrt(\xline*\xline + 1 + \x*\x)},
+         {-\Rsphere/sqrt(\xline*\xline + 1 + \x*\x)},
+         {\Rsphere*\x/sqrt(\xline*\xline + 1 + \x*\x)});
+  }
+
+  % Highlighted sphere sub-tile: the gnomonic image of the
+  % highlighted cube cell (x, z in [\ttileLo, \ttileHi]).  Drawn in
+  % Tile to pair it with the highlighted cube sub-tile of
+  % stage 8.  Parametrised by \ttileLo/\ttileHi so it tracks the
+  % cube cell automatically.
+  % Edge at x = \ttileLo
+
+  \fill[Tile, opacity=0.4]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\ttileLo/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
+       {-\Rsphere/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
+       {\Rsphere*\x/sqrt(\ttileLo*\ttileLo+1+\x*\x)}) --
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\ttileHi/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
+       {-\Rsphere/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
+       {\Rsphere*\x/sqrt(\ttileHi*\ttileHi+1+\x*\x)}) --
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\x/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
+       {-\Rsphere/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
+       {\Rsphere*\ttileLo/sqrt(\x*\x+1+\ttileLo*\ttileLo)}) --
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\x/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
+       {-\Rsphere/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
+       {\Rsphere*\ttileHi/sqrt(\x*\x+1+\ttileHi*\ttileHi)});
+       
+  \draw[Tile, very thick]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\ttileLo/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
+       {-\Rsphere/sqrt(\ttileLo*\ttileLo+1+\x*\x)},
+       {\Rsphere*\x/sqrt(\ttileLo*\ttileLo+1+\x*\x)});
+  % Edge at x = \ttileHi
+  \draw[Tile, very thick]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\ttileHi/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
+       {-\Rsphere/sqrt(\ttileHi*\ttileHi+1+\x*\x)},
+       {\Rsphere*\x/sqrt(\ttileHi*\ttileHi+1+\x*\x)});
+  % Edge at z = \ttileLo
+  \draw[Tile, very thick]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\x/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
+       {-\Rsphere/sqrt(\x*\x+1+\ttileLo*\ttileLo)},
+       {\Rsphere*\ttileLo/sqrt(\x*\x+1+\ttileLo*\ttileLo)});
+  % Edge at z = \ttileHi
+  \draw[Tile, very thick]
+    plot[domain=\ttileLo:\ttileHi, samples=6, smooth]
+      ({\Rsphere*\x/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
+       {-\Rsphere/sqrt(\x*\x+1+\ttileHi*\ttileHi)},
+       {\Rsphere*\ttileHi/sqrt(\x*\x+1+\ttileHi*\ttileHi)});
+
+
+  %------------------------------------------------------------------
+  % STAGE 7d — dashed lines from each corner of the highlighted cube
+  %                  sub-tile to its sphere image, drawn in Tile
+  %                  (blue) to match the highlighted-cell pairing of
+  %                  stages 7c and 8.  Same pattern as stage 7b but
+  %                  for the four corners of the highlighted cell.
+  %------------------------------------------------------------------
+  \foreach \cnrx/\cnrz in {\ttileLo/\ttileLo, \ttileHi/\ttileLo,
+                           \ttileHi/\ttileHi, \ttileLo/\ttileHi}{
+    \pgfmathsetmacro{\nrm}{sqrt(\cnrx*\cnrx + 1 + \cnrz*\cnrz)}
+    \pgfmathsetmacro{\sxv}{\cnrx/\nrm}
+    \pgfmathsetmacro{\syv}{-1/\nrm}
+    \pgfmathsetmacro{\szv}{\cnrz/\nrm}
+    \draw[Tile!70, thick, dotted]
+      (\Rsphere*\sxv, \Rsphere*\syv, \Rsphere*\szv) -- (\cnrx, -1, \cnrz);
+  }
+
+  %------------------------------------------------------------------
+  % STAGE 8 — highlighted -y face (transparent fill, sub-tile grid,
+  %                  highlighted central sub-tile)
+  %------------------------------------------------------------------
+  \fill[Face, opacity=0.4]
+    (-1,-1,-1) -- (1,-1,-1) -- (1,-1, -0.5) -- (-1,-1, -0.5) -- cycle;
+  \fill[Face, opacity=0.4]
+    (-1,-1,0) -- (1,-1,0) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
+  \fill[Face, opacity=0.4]
+    (-1,-1,-0.5) -- (-0.5,-1,-0.5) -- (-0.5,-1, 0) -- (-1,-1, 0) -- cycle;
+  \fill[Face, opacity=0.4]
+    (0,-1,-0.5) -- (1,-1,-0.5) -- (1,-1, 0) -- (0,-1, 0) -- cycle;
+
+  % 4x4 sub-tile grid lines on the -y face (interior lines at
+  % x, z = -0.5, 0, 0.5)
+  \foreach \v in {-0.5, 0, 0.5}{
+    \draw[Face, thin] (\v,-1,-1) -- (\v,-1, 1);
+    \draw[Face, thin] (-1,-1,\v) -- ( 1,-1, \v);
+  }
+
+  % Highlighted sub-tile (cube cell x, z in [\ttileLo, \ttileHi])
+  \fill[Tile, opacity=0.40]
+    (\ttileLo,-1, \ttileLo) -- (\ttileHi,-1, \ttileLo) --
+    (\ttileHi,-1, \ttileHi) -- (\ttileLo,-1, \ttileHi) -- cycle;
+  \draw[Tile, very thick]
+    (\ttileLo,-1, \ttileLo) -- (\ttileHi,-1, \ttileLo) --
+    (\ttileHi,-1, \ttileHi) -- (\ttileLo,-1, \ttileHi) -- cycle;
+
+  % Face outline
+  \draw[Face, very thick]
+    (-1,-1,-1) -- (1,-1,-1) -- (1,-1, 1) -- (-1,-1, 1) -- cycle;
+
+  \node[Proj, anchor=south west, font=\scriptsize]
+    at (1.02,-1.02, -0.75) {face $2\!\downarrow$};
+
+
+  %------------------------------------------------------------------
+  % STAGE 10 — outside-sphere axis segments + arrowheads + labels.
+  %                  Drawn last so the bold arrows sit on top of
+  %                  everything else, conveying "exits the sphere".
+  %------------------------------------------------------------------
+  \draw[->, AxisLine, thick] (\Rsphere,0,0) -- (1.55,0,0)
+    node[below, AxisLine] {$\theta_{1}$};
+  \draw[->, AxisLine, thick] (0,0,\Rsphere) -- (0,0,1.55)
+    node[below right, AxisLine] {$\theta_{3}$};
+
+\end{tikzpicture}
+\end{document}

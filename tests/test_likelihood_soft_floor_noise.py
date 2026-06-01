@@ -34,7 +34,7 @@ class TestSoftFloorLogL:
     def test_default_sigma_produces_distribution_around_floor(self) -> None:
         """Default sigma=1.0 noise samples a Normal around -100."""
         rng = np.random.default_rng(seed=42)
-        samples = [_soft_floor_logl(1.0, rng) for _ in range(2000)]
+        samples = [_soft_floor_logl(1.0, rng=rng) for _ in range(2000)]
         mean = sum(samples) / len(samples)
         assert abs(mean - SOFT_FLOOR_LOGL) < 0.1, (
             f"sample mean {mean} drifted too far from {SOFT_FLOOR_LOGL}"
@@ -66,15 +66,15 @@ class TestSoftFloorLogL:
         """Passing the same RNG seed twice should give identical floors."""
         rng1 = np.random.default_rng(seed=123)
         rng2 = np.random.default_rng(seed=123)
-        v1 = _soft_floor_logl(1.0, rng1)
-        v2 = _soft_floor_logl(1.0, rng2)
+        v1 = _soft_floor_logl(1.0, rng=rng1)
+        v2 = _soft_floor_logl(1.0, rng=rng2)
         assert v1 == v2
 
     @pytest.mark.parametrize("sigma", [0.5, 1.0, 2.0, 5.0])
     def test_noise_scales_with_sigma(self, sigma: float) -> None:
         """The empirical std of the noise should match the sigma parameter."""
         rng = np.random.default_rng(seed=999)
-        samples = [_soft_floor_logl(sigma, rng) for _ in range(2000)]
+        samples = [_soft_floor_logl(sigma, rng=rng) for _ in range(2000)]
         std = float(np.std(np.array(samples)))
         # 10% tolerance on a 2000-sample empirical std
         assert abs(std - sigma) / sigma < 0.1, (

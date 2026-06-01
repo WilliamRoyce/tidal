@@ -1,0 +1,94 @@
+% !TEX root = ../../main.tex
+% App H: Transverse-traceless gauge admissibility in the presence of matter.
+% Forward-reference targets:
+%  ~\cref{TTGaugeAdmissibility} from theory.tex §2.2 and discussion.tex §4
+%   (when the open-questions paragraph is drafted).
+
+\section{Transverse-traceless gauge in the presence of matter}%
+\label{TTGaugeAdmissibility}
+
+The standard derivation of the
+transverse-traceless~(TT) gauge for the metric perturbation
+$\FieldH{_\mu_\nu}$ fails in the presence of matter,
+justifying the gauge-free evolution adopted in~\cref{Linearisation}.
+We follow Hobson~\etal~\cite[Ch.~17--18]{hobson2006general}, with the same result in
+Maggiore~\cite[\S1.2]{maggiore2007gravitational} and Misner~\etal~\cite[Box~35.1]{misner1973gravitation}.
+
+\paragraph*{Lorenz gauge}
+Writing $g_{\mu\nu} = \eta_{\mu\nu} + \FieldH{_\mu_\nu}$, where $|\FieldH{_\mu_\nu}| \ll 1$
+\cite[eq.~(17.1)]{hobson2006general}, an infinitesimal
+coordinate transformation $x^{\mu}\to x^{\mu}+\xi^{\mu}(x)$ acts on
+the perturbation as
+\begin{align}
+  h'_{\mu\nu} &= h_{\mu\nu}
+    - \partial_{\mu}\xi_{\nu} - \partial_{\nu}\xi_{\mu} ,
+  \label{TTGGaugeTransform}
+\end{align}
+\cite[eq.~(17.4)]{hobson2006general}. With the trace-reversed
+perturbation
+$\bar{h}_{\mu\nu}\equiv\FieldH{_\mu_\nu}-\tfrac{1}{2}\eta_{\mu\nu}h$,
+the gauge transformation
+\cref{TTGGaugeTransform} shifts
+$\partial^{\mu}\bar{h}_{\mu\nu}\to\partial^{\mu}\bar{h}_{\mu\nu}-\Box^{2}\xi_{\nu}$.
+Choosing $\xi^{\mu}$ to satisfy
+$\Box^{2}\xi^{\mu}=\partial_{\rho}\bar{h}^{\mu\rho}$ imposes the
+Lorenz condition $\partial^{\mu}\bar{h}_{\mu\nu}=0$~\cite[eq. (17.14)]{hobson2006general} while reducing the
+linearised Einstein field
+equation~\cite[eq.~(17.11)]{hobson2006general} to
+\begin{align}
+  \Box^{2}\bar{h}^{\mu\nu} &= -2\kappa_{(\mathrm{E})}\,T^{\mu\nu} .
+  \label{TTGLorenzWaveEq}
+\end{align}
+
+\paragraph*{Failure in the presence of matter}
+In vacuum, further residual
+gauge transformations preserving $\Box^{2}\xi^{\mu}=0$ set four
+linear combinations of $\bar{h}_{\mu\nu}$ to zero, yielding the TT
+gauge $\bar{h}_{\mathrm{TT}}^{\,0i}=\bar{h}_{\mathrm{TT}}=0$~\cite[\S18.3,~eq.~(18.8)]{hobson2006general}.
+In the presence of matter~\cref{TTGLorenzWaveEq} sources an
+inhomogeneous solution for $\bar{h}_{\mu\nu}$, and the residual gauge
+transformations cannot annul the same combinations of the entire
+$\bar{h}_{\mu\nu}$ solution.
+
+For the standard Gertsenshtein configuration of~\cref{Linearisation} the
+matter is the static external field $\bar{\bm{B}}=\Bzero\hat{x}$,
+with
+\begin{align*}
+  T_{00} &= \tfrac{1}{2}\Bzero^{2} , &
+  T_{0i} &= 0 , &
+  T_{ij} &= \tfrac{1}{2}\Bzero^{2}\delta_{ij}
+           - \bar{B}_{i}\bar{B}_{j} , &
+  T^{\mu}{}_{\mu} &= 0 .
+  % \label{TTGMaxwellStress}
+\end{align*}
+The gravitational wave equation
+\cref{TTGLorenzWaveEq} for $\bar{h}_{ij}$ acquires a
+$h$-dependent source $\delta T_{ij}\supset\tfrac{1}{2}\bar{B}^{2}
+h_{ij}$~\cite[eq. (13)]{hwangnoh2023graviton}.
+The conventional TT-gauge
+result survives this back-reaction only in the limit of a
+plane wave on a uniform background.
+
+\paragraph*{Independent failure in $\MAGFt{}^{2}$ theories}
+In GR, $\bar{h}_{\mu\nu}$ obeys $\Box^{2}\bar{h}_{\mu\nu}=0$ in vacuum, and the residual
+gauge generators $\xi^{\mu}$ satisfy the same second-order equation;
+per Fourier mode the four free components of $\xi^{\mu}$ are exactly
+the right count to remove four $\bar{h}_{\mu\nu}$ combinations.
+A curvature-squared term in the action gives $\bar{h}_{\mu\nu}$ a
+higher-derivative equation of motion while $\xi^{\mu}$ stays
+second-order; the new equation propagates an additional scalar mode
+that the residual gauge choice cannot
+remove~\cite{sotiriou2010fr,sezgin1980ghostfree,lin2019pgt}.
+Setting \eg~$h^{i}{}_{i}=0$ in such a theory therefore removes a
+physical degree of freedom.
+
+An issue raised by
+Ejlli~\cite[footnote on p.~2]{ejlli2020graviton} is whether imposing
+the gauge conditions in the action and on the EOM give
+the same graviton--photon dynamics.
+% A Lagrangian-level substitution
+% discards the non-radiative components the constraint equations and
+% the magnetised stress-energy would otherwise source, so any
+% difference between the two routes resides in those components.
+\TIDAL{} can derive both and provides a direct empirical resolution;
+however, this is beyond the scope of the present work.

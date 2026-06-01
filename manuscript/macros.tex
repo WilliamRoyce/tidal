@@ -11,6 +11,10 @@
 % Mathematics
 \usepackage{amssymb}
 \usepackage{amsmath}
+% Allow up to 50-column bmatrix for the Appendix-E kinetic-matrix
+% figures (parity-odd / general_nonminimal listings need ~40 columns).
+% Default amsmath value is 10.
+\setcounter{MaxMatrixCols}{50}
 \usepackage{mathtools}
 \usepackage{stix}
 \usepackage{mathrsfs}
@@ -27,6 +31,8 @@
 
 % Graphics
 \usepackage{graphicx}
+\usepackage{adjustbox}
+\usepackage{placeins}
 \usepackage{tikz}
 
 % Text processing
@@ -79,9 +85,17 @@
 
 \newcommand*{\ie}{i.e.,\@\xspace}
 \newcommand*{\eg}{e.g.,\@\xspace}
+\newcommand*{\cf}{cf.\@\xspace}
 \newcommand*{\wrt}{w.r.t.\@\xspace}
 \newcommand*{\eq}{eq.\@\xspace}
 \newcommand*{\eqs}{eqs.\@\xspace}
+
+% === Common math operators ===
+\newcommand*{\qand}{\quad\text{and}\quad}
+\newcommand*{\logZ}{\log\mathcal{Z}}
+\newcommand*{\D}{D_\mathrm{KL}}
+\newcommand*{\Dp}{D_\mathrm{KL,+}}
+\newcommand*{\Dm}{D_\mathrm{KL,-}}
 
 % === Software names ===
 % Convention: MacrosNames.tex (2512.25007); MacrosMAG.tex (2406.12826)
@@ -159,16 +173,17 @@
 % convention, do not conflate. Full discussion: GitHub issue #338.
 
 \renewcommand{\kappa}{\varkappa}
+\renewcommand{\O}{\mathcal{O}}
 
 % === PGT quadratic action coupling constants ===
 % General quadratic PGT: a_0 R + a_1 (1)T^2 + a_2 (2)T^2 + a_3 (3)T^2 + b_1 R^2 + ...
 % Convention: MacrosMAG.tex (2406.12826); Barker 2101.02645 §II
 % Usage: \Alp{1}, \Bet{2}, \Gam{3}  (subscript placed by tensor package)
 
-\newrobustcmd{\Alp}[1]{\tensor{\alpha}{_{#1}}}
-\newrobustcmd{\Bet}[1]{\tensor{\beta}{_{#1}}}
-\newrobustcmd{\Gam}[1]{\tensor{\gamma}{_{#1}}}
-\newrobustcmd{\Del}[1]{\tensor{\delta}{_{#1}}}  % R-tilde-F cross-term coupling
+\newrobustcmd{\Alp}[1]{\alpha_{#1}}
+\newrobustcmd{\Bet}[1]{\beta_{#1}}
+\newrobustcmd{\Gam}[1]{\gamma_{#1}}
+\newrobustcmd{\Del}[1]{\delta_{#1}}  % R-tilde-F cross-term coupling
 
 % === Differential ===
 % Convention: MacrosMAG.tex (2406.12826) — upright d for differentials.
@@ -206,6 +221,7 @@
 \newrobustcmd{\FieldA}[1]{\tensor{A}{#1}}              % EM 4-potential
 \newrobustcmd{\FieldF}[1]{\tensor{\mathcal{F}}{#1}}    % EM field strength (calligraphic F)
 \newrobustcmd{\FieldFtilde}[1]{\tensor{\tilde{\mathcal{F}}}{#1}}  % EM dual field strength
+\newrobustcmd{\FieldFT}[1]{\mathcal{F}^{(T)}#1}  % torsion field strength: F^(T) with label on symbol; index passes through, e.g. \FieldFT{_{\mu\nu}}
 \newrobustcmd{\FieldH}[1]{\tensor{h}{#1}}              % metric perturbation (TT gauge)
 
 % === Partial derivative ===
@@ -254,6 +270,7 @@
 
 \newcommand{\lag}{\mathscr{L}}
 \newcommand{\ham}{\mathscr{H}}
+\newcommand{\act}{\mathscr{S}}
 
 % =====================================================================
 % Agreed notation set for MSci report — sourced from BHL/Barker corpus
@@ -293,3 +310,34 @@
 %   - Action prefactor on Ricci scalar: -(1/2) m_P^2 R  (BHL joint convention)
 %   Convention: MacrosMAG.tex (2406.12826); BHL joint papers
 %   Macro: \MPl
+
+% -----------------------------------------------------------------------------
+% Run-in paragraph headings (imported from project-talos manuscript preamble).
+% Renders \paragraph*{Heading} as a bold italic run-in lead-in followed by
+% "<Heading>.   ---" so paragraph headings read as strong inline section cues.
+% Both manuscripts share the revtex4-2 (aps,prd,reprint) class, so this is a
+% faithful transplant. The \@startsection redefine sets the spacing that
+% titlesec then inherits; \titleformat sets the run-in typography. \pea is the
+% post-heading lead-in separator (emphasised heading + bold period + em-dash).
+\makeatletter
+\renewcommand{\paragraph}{%
+\@startsection{paragraph}{4}%
+{\z@}{1.21ex \@plus 1ex \@minus .2ex}{0.9em}%
+{\normalfont\normalsize\bfseries}%
+}
+\usepackage{titlesec}
+\newrobustcmd{\pea}[1]{\emph{#1}\textbf{.\ \ \ ---}}
+\titleformat{\paragraph}[runin]{\normalfont\normalsize\bfseries}{\emph\theparagraph}{1em}{\pea}
+\makeatother
+
+% -----------------------------------------------------------------------------
+% Supervisor comments (William Barker). Renders "WB: <text>" in green.
+% Strip before submission.
+%
+% To show literal code/regex with special chars (% $ ~ _ \ { } etc.) inside a
+% comment, prefix the call with \cprotect and use \verb -- no escaping needed:
+%     \cprotect\wb{... run \verb|:%s/ $/~$/g| ...}
+% (cprotect lets \verb survive inside another command's braced argument; plain
+% \verb cannot, and \string only stringifies the single next token.)
+\usepackage{cprotect}
+\newcommand{\wb}[1]{{\color{green!55!black}\textbf{WB:} #1}}

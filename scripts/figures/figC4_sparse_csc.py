@@ -1,5 +1,5 @@
 """Figure C.4 — Sparse-CSC vs dense `expm_multiply` wall time on the
-localised-Gertsenshtein convolution matrix.
+localized-Gertsenshtein convolution matrix.
 
 Single log-log panel. Dense and sparse paths are plotted as separate
 series; the vertical gap between them at any N is the speedup.
@@ -21,6 +21,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 mpl.rcParams.update(
     {
@@ -68,7 +69,7 @@ def _plot(data: dict, out_path: Path) -> None:
             t_d,
             yerr=s_d,
             marker="o",
-            color="#1f77b4",
+            color=IBM_PALETTE["blue"],
             ls="none",
             ms=4,
             elinewidth=0.7,
@@ -86,7 +87,7 @@ def _plot(data: dict, out_path: Path) -> None:
             yerr=s_s,
             marker="s",
             mfc="none",
-            color="#ff7f0e",
+            color=IBM_PALETTE["orange"],
             ls="none",
             ms=4,
             elinewidth=0.7,

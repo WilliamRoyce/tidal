@@ -1,8 +1,8 @@
 # Phase E — Localised wavepacket + localised B-field geometry
 
 **Created:** 2026-05-10
-**Status:** E.0 empirical validation complete (2026-05-16). E.1–E.6 still deferred pending Phase B convergence.
-**Companion to:** [V3_ARCHITECTURE.md](V3_ARCHITECTURE.md)
+**Status:** E.0 empirical validation complete (2026-05-16). **E.1–E.3 IN PROGRESS** (Stage 0 infrastructure landing 2026-05-24; pipelined execution starts immediately after). E.4–E.6 follow after Wave 2 derivations.
+**Companion to:** [V3_ARCHITECTURE.md](V3_ARCHITECTURE.md), [PHASE_E_TRACKER.md](PHASE_E_TRACKER.md) (live status — checkbox tracker)
 
 ## Problem
 
@@ -12,6 +12,26 @@ Phase A/B ship with the v2 geometry: plane-wave IC at the source field + spatial
 2. Larger t_end gives larger P_max for tachyonic samples, so the headline A_max is t_end-conventional rather than physical.
 
 The Phase 6 boundary-attractor analysis (`docs/PHASE_6_COMPARISON.md` §"Phase 6.L") quantified this for the v2-gated chains: A_chain(t_end) = A_static × exp(γ_eff·t_end) with γ_eff ≈ 0.137 at the v2 D1 amp MAP, giving an exp(1.37) ≈ 4× residual growth contribution on top of the t-independent A_static ≈ 10.
+
+## Frequency regime (added 2026-05-24)
+
+Phase E commits to the **high-frequency Gertsenshtein regime**: λ_GW ≪ L_field with perturbative κ·B·D ≪ 1. The canonical parameter point in `_geometry.env` realises:
+
+| Dimensionless quantity | Value | Interpretation |
+|------------------------|-------|----------------|
+| `k_carrier · σ_B`       | ≈ 15  | Carrier wavelength much shorter than B-field region → adiabatic/Boccaletti regime applies, conversion efficiency well-defined |
+| `λ_carrier / σ_B`       | ≈ 0.42| Carrier oscillates many times during transit; near-monochromatic measurement of P(κ,B,D) |
+| `σ_w · k_carrier`       | ≈ 15  | Wavepacket envelope contains ~5 carrier wavelengths; near-monochromatic in k-space (σ_k/k ≈ 7%) |
+| `κ · Bpeak · σ_B · √(2π)/2` | ≈ 0.063 | Perturbative: P_GR ≈ argument² ≈ 4×10⁻³, well away from any sin² node at nπ (n≥1) |
+| `h₀² / (κ · Bpeak)²`    | ≈ 1   | Source amplitude balanced against coupling so signal sits above noise but below nonlinear scale |
+
+**Real-world analogue:** GHz GW (Berlin-class detectors) traversing a magnetar-scale field region (km–10 km). Other regimes (long-wavelength / Born scattering, comparable-scale adiabatic) are out of scope for Phase E — folded back in as follow-up sweeps if Wave 1 motivates.
+
+### TT-IC + theory unconstrained (issue #167 pattern)
+
+Per the validated `examples/gertsenshtein/theory_ungauged.toml` pattern: ICs are set in the TT-projected metric components only (e.g. `h_5` for the + polarization), but the *theory* keeps no TT gauge constraint. This lets the dynamics evolve all metric components freely while still starting from a physical (TT-gauge-compliant in vacuum) initial state.
+
+Why: imposing TT on the theory kills the R̃² channel for PGT theories. The IC vs theory distinction is exactly what issue #167 calls for.
 
 ## Physical resolution: localised geometry
 
@@ -97,11 +117,13 @@ Measured with `--scheme cvode`, grid=256, bounds=0:100, Bpeak=0.1, sigB=5, zc1=2
 
 Full conversion: P_max = 0.003475 at t = 18.0 s (then decays as wavepacket exits interaction region).
 
-### Modal solver caveat (GH #367)
+### Modal solver caveat (GH #367) — RESOLVED v0.42.0/v0.42.1
 
-The dual-Gaussian theory has position-dependent coefficients (Erf background). `can_use_modal()` still returns True (periodic BCs + flat metric + supported operators). However, `_has_position_dependent_terms()` returns True, routing dispatch to `_evolve_full_matrix()`, which calls `expm_multiply` on a non-normal convolution matrix. The convolution matrix has positive-real eigenvalues (max ~+0.5 at N=16) — a pseudospectral artifact — causing `expm_multiply` to diverge catastrophically (h_5 → 10⁶⁰ by t=20).
+**Previously:** the dual-Gaussian theory triggered a divergence in `_evolve_full_matrix` because the convolution-path code was missing the M⁻¹ kinetic-coefficient scaling, giving the wrong sign on every Laplacian mode. Workaround was `--scheme cvode`.
 
-**Workaround: always use `--scheme cvode` for Phase E runs.** CVODE gives correct bounded results. Issue #367 tracks the fix.
+**Now (v0.42.0+):** **fixed in commits `c2b4e00` (v0.42.0) + `7dceb0c` (v0.42.1).** The convolution path now correctly applies `velocity_row_scale` (hoisted from `_build_per_mode_matrices`). Modal solver auto-selects on Phase E dual-Gaussian theories and is 3–8× faster than CVODE on position-dependent + periodic geometry. The cross-path regression test pins this behavior.
+
+Phase E runs use the default modal solver — no `--scheme` override needed.
 
 ## Tasks
 
@@ -132,7 +154,7 @@ names = [..., "Bpeak", "sigB", "zc1", "zc2"]
 
 Re-derive the affected theories via `tidal derive` (Wolfram pipeline). Expected wall: ~30 min per theory.
 
-Use `sigB = 5` (validated in E.0) with `zc1 = L/4`, `zc2 = 3L/4`. Cap `t_end ≤ 25` to keep the wavepacket inside the interaction region before it wraps. All Phase E simulations must use `--scheme cvode` until GH #367 is resolved (modal solver auto-selects but diverges for position-dependent Erf backgrounds).
+Use `sigB = 5` (validated in E.0) with `zc1 = L/4`, `zc2 = 3L/4`. Cap `t_end ≤ 25` to keep the wavepacket inside the interaction region before it wraps. Phase E simulations now use the default modal solver (#367 fixed in v0.42.0/v0.42.1; 3–8× faster than CVODE on position-dependent + periodic geometry).
 
 ### E.3 — Tuning σ_w and σ_B
 

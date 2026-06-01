@@ -20,6 +20,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 from scipy.stats import linregress
 
 # Match the manuscript: revtex4-2/PRD, \usepackage{stix}, single-column 3.375 in.
@@ -47,10 +48,10 @@ _FIG_WIDTH = 3.375
 _FIG_HEIGHT = 2.65
 
 SCHEME_STYLE = {
-    "fd_o2": {"label": "FD order 2", "marker": "o", "color": "#1f77b4"},
-    "fd_o4": {"label": "FD order 4", "marker": "s", "color": "#ff7f0e"},
-    "fd_o6": {"label": "FD order 6", "marker": "^", "color": "#2ca02c"},
-    "spectral": {"label": "Spectral", "marker": "D", "color": "#d62728"},
+    "fd_o2": {"label": "FD order 2", "marker": "o", "color": IBM_PALETTE["blue"]},
+    "fd_o4": {"label": "FD order 4", "marker": "s", "color": IBM_PALETTE["orange"]},
+    "fd_o6": {"label": "FD order 6", "marker": "^", "color": IBM_PALETTE["purple"]},
+    "spectral": {"label": "Spectral", "marker": "D", "color": IBM_PALETTE["magenta"]},
 }
 
 # Threshold for regression segment only — points at or below this value are
@@ -95,7 +96,11 @@ def _plot(data: dict, out_path: Path) -> None:
 
     # Dashed regression lines (converging segment only) plotted before markers.
     computed_labels: dict[str, str] = {}
-    for order, color in [(2, "#1f77b4"), (4, "#ff7f0e"), (6, "#2ca02c")]:
+    for order, color in [
+        (2, IBM_PALETTE["blue"]),
+        (4, IBM_PALETTE["orange"]),
+        (6, IBM_PALETTE["purple"]),
+    ]:
         scheme = f"fd_o{order}"
         if scheme not in grouped:
             continue

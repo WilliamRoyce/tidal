@@ -16,15 +16,92 @@ Primary public entry point:
 from __future__ import annotations
 
 import re
+import tomllib
 from fractions import Fraction
+from pathlib import Path as _Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from tidal.symbolic.json_loader import (
         ComponentEquation,
         EquationSystem,
         HamiltonianTerm,
     )
+    from tidal.symbolic.kinetic_matrix import KineticMatrix, KineticMatrixCell
+
+
+# ---------------------------------------------------------------------------
+# Project-scoped symbol overrides
+# ---------------------------------------------------------------------------
+# The built-in tables below cover Greek letters and the small set of named
+# tensors known to the pipeline (``RicciScalarCDT``, ``TorsionCDT``, ...).
+# Project-specific symbol names (``Ftorsion``, ``deltam``, parity-odd ``zt``
+# coupling families, etc.) are not in those tables and would render as bare
+# identifiers. Callers can load an override TOML — typically
+# ``manuscript/latex_symbols.toml`` alongside ``manuscript/macros.tex`` — via
+# :func:`load_symbol_overrides` to extend the maps for a given render pass.
+#
+# Two override tables:
+#
+# * ``_USER_TENSOR_OVERRIDES``: tensor-head substitutions consulted by
+#   :func:`_tensor_head_to_latex` before the built-in
+#   ``_TENSOR_NAME_MAP``. Example: a TOML entry like
+#   ``Ftorsion = "\\tilde{F}"`` rebinds the Wolfram tensor head.
+#
+# * ``_USER_PARAMETER_OVERRIDES``: scalar-parameter substitutions consulted
+#   by :func:`_subscript_token` (and other bare-identifier sites) before the
+#   built-in Greek substitution. The override target is auto-braced when
+#   followed by a numeric subscript so e.g. ``zt1 → \zeta_{T,1}`` rather
+#   than the ambiguous ``\zeta_T_{1}``.
+_USER_TENSOR_OVERRIDES: dict[str, str] = {}
+_USER_PARAMETER_OVERRIDES: dict[str, str] = {}
+
+
+def load_symbol_overrides(path: Path | str) -> None:
+    r"""Load tensor-head / parameter-name overrides from a TOML file.
+
+    The file shape is::
+
+        [tensor_heads]
+        Ftorsion = "\\\\tilde{F}"
+
+        [parameters]
+        deltam = "\\\\delta_m"
+
+    Both sections are optional. Calling this function replaces the previous
+    override state; pass an empty/missing file to clear.
+    """
+    p = _Path(path)
+    data: dict[str, dict[str, str]] = {}
+    if p.exists():
+        with p.open("rb") as fh:
+            data = tomllib.load(fh)  # type: ignore[assignment]
+
+    _USER_TENSOR_OVERRIDES.clear()
+    _USER_PARAMETER_OVERRIDES.clear()
+    _USER_TENSOR_OVERRIDES.update(data.get("tensor_heads", {}))
+    _USER_PARAMETER_OVERRIDES.update(data.get("parameters", {}))
+
+
+def _apply_user_subscript_override(base: str, digits: str | None) -> str | None:
+    """Look up ``base`` in the user parameter overrides and format with subscript.
+
+    Returns ``None`` if no override is registered. When ``digits`` is non-empty
+    the override target is wrapped in braces ``{...}`` so that subsequent
+    subscript composition produces the unambiguous ``{<override>}_{digits}``
+    form. When ``digits`` is empty/None the override is returned verbatim.
+    """
+    if base not in _USER_PARAMETER_OVERRIDES:
+        return None
+    target = _USER_PARAMETER_OVERRIDES[base]
+    if digits:
+        # Brace the target so the subscript binds to the whole override
+        # rather than to the trailing token of the override expression.
+        return rf"{{{target}}}_{{{digits}}}"
+    return target
+
 
 # ---------------------------------------------------------------------------
 # Greek letter mapping (lowercase + uppercase used in physics)
@@ -126,7 +203,8 @@ def _convert_math_functions(s: str) -> str:
     s = _RE_ABS.sub(r"\\left| \1 \\right|", s)
     # General functions: FuncName[expr] → \funcname(expr)
     return _RE_MATH_FUNC.sub(
-        lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})", s,
+        lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})",
+        s,
     )
 
 
@@ -211,7 +289,7 @@ def _strip_outer_parens(s: str) -> str:
     return s
 
 
-def coefficient_to_latex(expr: str) -> str:
+def coefficient_to_latex(expr: str) -> str:  # noqa: C901
     r"""Convert a Mathematica-style symbolic coefficient to LaTeX.
 
     Examples
@@ -219,16 +297,17 @@ def coefficient_to_latex(expr: str) -> str:
     >>> coefficient_to_latex("-(B0^2*kappa^2)")
     '-B_0^{2} \\\\kappa^{2}'
     >>> coefficient_to_latex("1/2")
-    '\\\\frac{1}{2}'
+    '\\\\tfrac{1}{2}'
     """
     if not expr:
         return ""
 
     s = expr.strip()
 
-    # Step 1: Rational[p, q] → \frac{p}{q}
+    # Step 1: Rational[p, q] → \tfrac{p}{q}
     s = _RE_RATIONAL.sub(
-        lambda m: rf"\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}", s,
+        lambda m: rf"\tfrac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}",
+        s,
     )
 
     # Step 2: Sqrt[expr] → \sqrt{expr}
@@ -247,7 +326,32 @@ def coefficient_to_latex(expr: str) -> str:
     s = _RE_ABS.sub(r"\\left| \1 \\right|", s)
     s = _RE_MATH_FUNC.sub(lambda m: rf"{_MATH_FUNC_LATEX[m.group(1)]}({m.group(2)})", s)
 
-    # Step 6: Numeric prefix fraction: -1/2*(rest) or 1/2*(rest) → -\frac{1}{2}(rest)
+    # Step 5c: Sign-prefixed paren product: ``-(A*B)`` → ``-A*B``. The parens
+    # are only required when the inner expression has a top-level sum (so
+    # the sign would otherwise distribute incorrectly); for a single product
+    # they are redundant noise the reader has to mentally strip.
+    sign_paren = re.match(r"^([+-])\((.+)\)\s*$", s)
+    if sign_paren:
+        sign = sign_paren.group(1)
+        inner = sign_paren.group(2)
+        depth = 0
+        balanced = True
+        has_top_level_sum = False
+        for ch in inner:
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth < 0:
+                    balanced = False
+                    break
+            elif depth == 0 and ch in "+-":
+                has_top_level_sum = True
+        if balanced and depth == 0 and not has_top_level_sum:
+            sign_emit = "-" if sign == "-" else ""
+            return f"{sign_emit}{_coefficient_inner(inner)}"
+
+    # Step 6: Numeric prefix fraction: -1/2*(rest) or 1/2*(rest) → -\tfrac{1}{2}(rest)
     prefix_frac = re.match(r"^(-?)(\d+)/(\d+)\*(.+)$", s)
     if prefix_frac:
         sign = prefix_frac.group(1)
@@ -255,14 +359,16 @@ def coefficient_to_latex(expr: str) -> str:
         den = prefix_frac.group(3)
         rest = prefix_frac.group(4)
         rest_tex = _coefficient_inner(rest)
-        return rf"{sign}\frac{{{num}}}{{{den}}} {rest_tex}"
+        return _merge_adjacent_reciprocals(
+            rf"{sign}\tfrac{{{num}}}{{{den}}} {rest_tex}",
+        )
 
-    # Step 7: Top-level fraction detection A/B → \frac{A}{B}
+    # Step 7: Top-level fraction detection A/B → \tfrac{A}{B}
     div_idx = _find_top_level_division(s)
     if div_idx is not None:
         numer = s[:div_idx].strip()
         denom = s[div_idx + 1 :].strip()
-        # Handle sign: -(A)/B → -\frac{A}{B}
+        # Handle sign: -(A)/B → -\tfrac{A}{B}
         sign = ""
         if numer.startswith("-") and numer[1:].strip().startswith("("):
             sign = "-"
@@ -275,9 +381,38 @@ def coefficient_to_latex(expr: str) -> str:
             numer = numer[1:].strip()
         numer_tex = _coefficient_inner(numer)
         denom_tex = _coefficient_inner(denom)
-        return rf"{sign}\frac{{{numer_tex}}}{{{denom_tex}}}"
+        return _merge_adjacent_reciprocals(
+            rf"{sign}\tfrac{{{numer_tex}}}{{{denom_tex}}}",
+        )
 
-    return _coefficient_inner(s)
+    return _merge_adjacent_reciprocals(_coefficient_inner(s))
+
+
+def _merge_adjacent_reciprocals(s: str) -> str:
+    r"""Combine adjacent unit-numerator fractions into one fraction.
+
+    ``\tfrac{1}{A} \tfrac{1}{B}`` → ``\tfrac{1}{A \, B}``.
+
+    Applied iteratively so chains of three or more (``\tfrac{1}{A}
+    \tfrac{1}{B} \tfrac{1}{C}``) collapse to a single ``\tfrac{1}{A \, B
+    \, C}``. Denominator content may contain one level of nested braces
+    (e.g. ``\kappa^{2}``, ``B_{0}``), but not deeper structure — this
+    keeps the merge safe against ``\sqrt{}`` or other multi-arg macros.
+    """
+    # Denominator pattern: any sequence of non-brace chars OR brace-balanced
+    # groups at one level of nesting (``\kappa^{2}``, ``B_{0}``, ...).
+    denom = r"(?:[^{}]|\{[^{}]*\})+"
+    pattern = re.compile(
+        rf"\\tfrac\{{1\}}\{{({denom})\}}\s*(?:\\,\s*)?\\tfrac\{{1\}}\{{({denom})\}}",
+    )
+    prev = None
+    while prev != s:
+        prev = s
+        s = pattern.sub(
+            lambda m: rf"\tfrac{{1}}{{{m.group(1)} \, {m.group(2)}}}",
+            s,
+        )
+    return s
 
 
 def _coefficient_inner(s: str) -> str:
@@ -296,15 +431,29 @@ def _coefficient_inner(s: str) -> str:
     s = _GREEK_RE.sub(lambda m: _GREEK_MAP[m.group(1)], s)
 
     # Parameter name subscripts: B0 → B_0, mA2 → m_{A2}
-    # Process word tokens individually
+    # Process word tokens individually.
+    # User overrides (loaded via load_symbol_overrides) are consulted *before*
+    # the built-in Greek substitution so project-specific parameter symbols
+    # (e.g. ``deltam → \delta_m``) take precedence; if the override target
+    # itself ends in a script, the trailing digit subscript binds to the whole
+    # override via :func:`_apply_user_subscript_override`.
     def _subscript_token(m: re.Match[str]) -> str:
         token = m.group(0)
         # Skip if it's a Greek command
         if token.startswith("\\"):
             return token
+        # Whole-token override FIRST. Lets the TOML map names like ``mA2``
+        # whose trailing digit is a squared-exponent (mass-squared parameter),
+        # not a flat-index subscript. Without this check the digit-suffix
+        # splitter below would always win and render ``mA2`` as ``mA_{2}``.
+        if token in _USER_PARAMETER_OVERRIDES:
+            return _USER_PARAMETER_OVERRIDES[token]
         dm = _RE_DIGIT_SUFFIX.match(token)
         if dm:
             base, digits = dm.group(1), dm.group(2)
+            overridden = _apply_user_subscript_override(base, digits)
+            if overridden is not None:
+                return overridden
             # Apply Greek to base if applicable
             base_tex = _GREEK_RE.sub(lambda gm: _GREEK_MAP[gm.group(1)], base)
             return rf"{base_tex}_{{{digits}}}"
@@ -317,11 +466,37 @@ def _coefficient_inner(s: str) -> str:
 
     # Simple powers: ^N (multi-digit) → ^{N}
     s = _RE_POWER_SIMPLE.sub(
-        lambda m: f"^{{{m.group(1)}}}" if len(m.group(1)) > 1 else f"^{m.group(1)}", s,
+        lambda m: f"^{{{m.group(1)}}}" if len(m.group(1)) > 1 else f"^{m.group(1)}",
+        s,
     )
 
-    # 1/(expr) → \frac{1}{expr}
-    s = re.sub(r"\b1/\(([^)]+)\)", lambda m: rf"\frac{{1}}{{{m.group(1)}}}", s)
+    # 1/(expr) → \tfrac{1}{expr}
+    s = re.sub(r"\b1/\(([^)]+)\)", lambda m: rf"\tfrac{{1}}{{{m.group(1)}}}", s)
+
+    # Negative-exponent → reciprocal-fraction: ``\kappa^{-2}`` → ``\tfrac{1}{\kappa^{2}}``.
+    # Match a single atomic base (Greek command, letter run with optional
+    # subscript group) followed by ``^{-N}``. Keeps the surrounding context
+    # unchanged so the later ``_merge_adjacent_reciprocals`` pass can fold
+    # the resulting fraction with neighbors into a common denominator.
+    s = re.sub(
+        r"(\\?[A-Za-z]+(?:_\{[^{}]+\})?)\^\{-(\d+)\}",
+        lambda m: rf"\tfrac{{1}}{{{m.group(1)}^{{{m.group(2)}}}}}",
+        s,
+    )
+
+    # Bare-denominator fractions: 1/\kappa^{2}, 1/\kappa, A/B etc. Runs AFTER
+    # Greek substitution so backslash-prefixed names (\kappa, \alpha, ...)
+    # are accepted in the denominator. Without this step a coefficient like
+    # ``-1/(2*kappa^2)`` ends up rendered as ``-\tfrac{1}{2} 1/\kappa^{2}``
+    # — half proper-fraction, half slash — because the outer 1/(2*…) split
+    # leaves the inner ``1/\kappa^{2}`` for this pass to clean up.
+    s = re.sub(
+        r"(?<![\\{])(\d+|[A-Za-z]+|\\[A-Za-z]+(?:\^\{?\d+\}?)?)"
+        r"/"
+        r"(\\?[A-Za-z]+(?:\^\{?\d+\}?)?|\d+)",
+        lambda m: rf"\tfrac{{{m.group(1)}}}{{{m.group(2)}}}",
+        s,
+    )
 
     # Multiplication: * → \, (thin space, implicit multiplication)
     return s.replace("*", r" \, ")
@@ -346,6 +521,34 @@ def _calligraphic_head(head_tex: str) -> str:
     if head_tex.startswith("\\"):
         return head_tex  # Already a LaTeX command (Greek)
     return rf"\mathcal{{{head_tex.upper()}}}"
+
+
+# Match a trailing _{...} or ^{...} group (single-level, no nested braces).
+_TRAILING_SUPSUB_RE = re.compile(r"(?P<op>[_^])\{(?P<idx>[^{}]+)\}$")
+
+
+def _wrap_dot(base: str) -> str:
+    r"""Wrap ``base`` in ``\dot{...}`` with trailing subscripts lifted outside.
+
+    Returns ``\dot{<head>}<trail>`` so ``\dot{\mathcal{A}_{2}}`` becomes
+    ``\dot{\mathcal{A}}_{2}``. Required because ``\usepackage{accents}``
+    (loaded in the manuscript macros for ``\accentset``) redefines
+    ``\dot`` to a positioning mechanism that leaks ``\mathcal`` font
+    scope into the subscript, producing
+    ``Missing character: There is no <N> in font stix-mathcal`` warnings
+    (issue #371). The ``[^{}]+`` restriction leaves nested groups
+    untouched, so genuinely-complex bases (``_{\mu\nu}`` etc.) remain
+    fully inside the dot.
+    """
+    head = base
+    trail = ""
+    while True:
+        m = _TRAILING_SUPSUB_RE.search(head)
+        if not m:
+            break
+        trail = f"{m.group('op')}{{{m.group('idx')}}}" + trail
+        head = head[: m.start()]
+    return rf"\dot{{{head}}}{trail}"
 
 
 def field_to_latex(
@@ -374,9 +577,11 @@ def field_to_latex(
     # Velocity prefix: v_phi_0 → \dot{base}
     if name.startswith("v_"):
         base = field_to_latex(
-            name[2:], tensor_meta=tensor_meta, coordinates=coordinates,
+            name[2:],
+            tensor_meta=tensor_meta,
+            coordinates=coordinates,
         )
-        return rf"\dot{{{base}}}"
+        return _wrap_dot(base)
 
     # With tensor metadata: use proper index labels
     if tensor_meta is not None:
@@ -493,7 +698,7 @@ def operator_to_latex(operator: str, field_latex: str) -> str:
         if not op_tex:
             return field_latex
         if op_tex == "dot":
-            return rf"\dot{{{field_latex}}}"
+            return _wrap_dot(field_latex)
         return rf"{op_tex} {field_latex}"
 
     # Dynamic operator patterns
@@ -508,6 +713,36 @@ def operator_to_latex(operator: str, field_latex: str) -> str:
 # ---------------------------------------------------------------------------
 # Equation rendering
 # ---------------------------------------------------------------------------
+
+
+def _has_top_level_sum(s: str) -> bool:
+    r"""Detect a top-level ``+`` or ``-`` term separator outside braces.
+
+    Used to decide whether a multi-term kinetic-coefficient prefactor
+    needs ``\\left(...\\right)`` wrapping when prepended to a
+    ``\\partial_t`` operator on the LHS. Walks the string tracking
+    brace depth; a ``+`` or ``-`` flanked by spaces at depth zero
+    indicates a sum the reader could otherwise mis-parse as separate
+    terms on the equation row.
+    """
+    depth = 0
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+        elif (
+            depth == 0
+            and c == " "
+            and i + 2 < len(s)
+            and s[i + 1] in "+-"
+            and s[i + 2] == " "
+        ):
+            return True
+        i += 1
+    return False
 
 
 def equation_to_latex(
@@ -534,28 +769,56 @@ def equation_to_latex(
 
     # LHS
     field_tex = field_to_latex(
-        eq.field_name, tensor_meta=field_meta, coordinates=coords,
+        eq.field_name,
+        tensor_meta=field_meta,
+        coordinates=coords,
     )
     t_order = eq.time_derivative_order
     if t_order == 0:
+        # Constraint equation: ``0 = …``. No kinetic coefficient applies.
         lhs = "0"
-    elif t_order == 1:
-        lhs = rf"\partial_t {field_tex}"
     else:
-        lhs = rf"\partial_t^{{{t_order}}} {field_tex}"
+        partial_tex = r"\partial_t" if t_order == 1 else rf"\partial_t^{{{t_order}}}"
+        # When the original derivation produced a non-unity kinetic
+        # coefficient on the LHS, the Wolfram pipeline strips it (to
+        # avoid divide-by-zero on the constraint side) and stores it
+        # under ``equation.lhs.kinetic_coefficient_symbolic``. Restore
+        # it in the rendered LHS so the equation reads
+        # ``<coeff> \, \partial_t^n field``. Unit and minus-unity
+        # coefficients are emitted compactly (no leading factor / a
+        # bare minus sign respectively).
+        kc_raw = (eq.kinetic_coefficient_symbolic or "").strip()
+        if not kc_raw or kc_raw == "1":
+            lhs = rf"{partial_tex} {field_tex}"
+        elif kc_raw == "-1":
+            lhs = rf"-{partial_tex} {field_tex}"
+        else:
+            kc_tex = coefficient_to_latex(kc_raw)
+            # Wrap multi-term coefficients (those with a top-level ``+`` or
+            # ``-`` at brace-depth zero) in ``\left(...\right)`` so the
+            # reader can see at a glance that the whole sum multiplies the
+            # operator. Single-product coefficients like
+            # ``-\tfrac{1}{\kappa^{2}}`` and ``2 \, b_{5}`` need no parens.
+            if _has_top_level_sum(kc_tex):
+                kc_tex = rf"\left({kc_tex}\right)"
+            lhs = rf"{kc_tex} \, {partial_tex} {field_tex}"
 
     # RHS
     rhs_parts: list[str] = []
     for i, term in enumerate(eq.rhs_terms):
         term_field_meta = _get_field_meta(term.field, spec)
         tf_tex = field_to_latex(
-            term.field, tensor_meta=term_field_meta, coordinates=coords,
+            term.field,
+            tensor_meta=term_field_meta,
+            coordinates=coords,
         )
         op_tex = operator_to_latex(term.operator, tf_tex)
 
         # Coefficient
         coeff_str = _render_term_coefficient(
-            term.coefficient, term.coefficient_symbolic, is_first=(i == 0),
+            term.coefficient,
+            term.coefficient_symbolic,
+            is_first=(i == 0),
         )
         if coeff_str:
             rhs_parts.append(f"{coeff_str} {op_tex}")
@@ -586,12 +849,15 @@ def _format_numeric_coeff(value: float) -> str:
         if frac.denominator == 1:
             return str(frac.numerator)
         sign = "-" if frac.numerator < 0 else ""
-        return rf"{sign}\frac{{{abs(frac.numerator)}}}{{{frac.denominator}}}"
+        return rf"{sign}\tfrac{{{abs(frac.numerator)}}}{{{frac.denominator}}}"
     return f"{value:g}"
 
 
 def _render_term_coefficient(
-    numeric: float, symbolic: str | None, *, is_first: bool,
+    numeric: float,
+    symbolic: str | None,
+    *,
+    is_first: bool,
 ) -> str:
     """Render a term's coefficient for display in an equation.
 
@@ -628,34 +894,85 @@ def _render_term_coefficient(
 # ---------------------------------------------------------------------------
 
 
+_SECTOR_GW_PREFIXES: tuple[str, ...] = ("h_", "H_")
+_SECTOR_EM_PREFIXES: tuple[str, ...] = ("A_", "a_")
+_SECTOR_TORSION_PREFIXES: tuple[str, ...] = ("t_", "T_")
+
+
+def _sector(field_name: str) -> str:
+    """Bin a field name into a measurement sector.
+
+    The appendix Hamiltonian listings restrict to the self-GW and self-EM
+    sectors that the GW->EM conversion measurement consumes; cross-sector
+    interaction terms drive conversion but are not what we measure. This
+    classifier supports a render-time filter that drops cross-sector terms
+    from the displayed Hamiltonian (see ``_is_self_sector_term``).
+    """
+    if field_name.startswith(_SECTOR_GW_PREFIXES):
+        return "gw"
+    if field_name.startswith(_SECTOR_EM_PREFIXES):
+        return "em"
+    if field_name.startswith(_SECTOR_TORSION_PREFIXES):
+        return "torsion"
+    return "other"
+
+
+def _is_self_sector_term(term: HamiltonianTerm) -> bool:
+    """Return ``True`` for terms confined to a single self-sector (gw-gw, em-em, ...).
+
+    GW<->EM cross terms (the photon-graviton mixing that drives conversion)
+    are dropped from the rendered Hamiltonian. ``"other"`` fields (constraint
+    multipliers, residuals, ...) are kept unconditionally.
+    """
+    sa = _sector(term.factor_a.field)
+    sb = _sector(term.factor_b.field)
+    if sa == sb:
+        return True
+    return "other" in {sa, sb}
+
+
 def hamiltonian_to_latex(
     terms: list[HamiltonianTerm],
     spec: EquationSystem,
 ) -> str:
     r"""Render the Hamiltonian density as a LaTeX equation.
 
+    The rendered Hamiltonian is restricted to the self-GW + self-EM sector
+    relevant to the conversion measurement: cross-sector (GW<->EM) terms are
+    filtered out at render time, and torsion-sector terms have already been
+    dropped at JSON emission by Wolfram's ``$tidalHamiltonianFilter``. The
+    LHS therefore uses ``\\supset`` (not ``=``) to mark the displayed
+    expression as a proper subset of the full canonical density.
+
     Returns
     -------
     str
-        LaTeX for ``\\mathcal{H} = ...``.
+        LaTeX for ``\\mathscr{H} \\supset ...``.
     """
     coords = _tensor_coordinates(spec)
     axis_remap = _operator_axis_remap(spec)
+    self_terms = [t for t in terms if _is_self_sector_term(t)]
     parts: list[str] = []
-    for i, term in enumerate(terms):
+    for i, term in enumerate(self_terms):
         fa_meta = _get_field_meta(term.factor_a.field, spec)
         fb_meta = _get_field_meta(term.factor_b.field, spec)
         fa_tex = field_to_latex(
-            term.factor_a.field, tensor_meta=fa_meta, coordinates=coords,
+            term.factor_a.field,
+            tensor_meta=fa_meta,
+            coordinates=coords,
         )
         fb_tex = field_to_latex(
-            term.factor_b.field, tensor_meta=fb_meta, coordinates=coords,
+            term.factor_b.field,
+            tensor_meta=fb_meta,
+            coordinates=coords,
         )
         fa_op = operator_to_latex(term.factor_a.operator, fa_tex)
         fb_op = operator_to_latex(term.factor_b.operator, fb_tex)
 
         coeff = _render_term_coefficient(
-            term.coefficient, term.coefficient_symbolic, is_first=(i == 0),
+            term.coefficient,
+            term.coefficient_symbolic,
+            is_first=(i == 0),
         )
         # Quadratic form: coeff * factor_a * factor_b
         term_tex = rf"{fa_op}^2" if fa_op == fb_op else rf"{fa_op} \, {fb_op}"
@@ -666,12 +983,123 @@ def hamiltonian_to_latex(
             parts.append(term_tex)
 
     rhs = " ".join(parts) if parts else "0"
-    result = rf"\mathscr{{H}} &= {rhs}"
+    result = rf"\mathscr{{H}} &\supset {rhs}"
 
     # Apply axis remapping for plane-wave reduced specs
     for from_axis, to_axis in axis_remap.items():
         result = result.replace(rf"\partial_{from_axis}", rf"\partial_{to_axis}")
 
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Kinetic matrix rendering (issue #372)
+# ---------------------------------------------------------------------------
+
+
+def _render_kinetic_cell(cell: KineticMatrixCell) -> str:
+    r"""Render one $\mathcal{K}_{ij}$ cell as a sum of (coeff)(op) terms.
+
+    ``cell.entries`` is a list of ``(operator_label, coefficient_symbolic)``
+    pairs encoding the differential-operator polynomial. Empty cell
+    renders as ``0``.
+    """
+    if not cell.entries:
+        return "0"
+
+    parts: list[str] = []
+    for k, (op_label, coeff_sym) in enumerate(cell.entries):
+        coeff_tex = coefficient_to_latex(coeff_sym)
+        # operator_to_latex returns "{op_tex} {field}"; with empty
+        # field arg we get "{op_tex} " (bare operator + trailing
+        # space) for non-trivial ops, or "" for identity.
+        op_tex = operator_to_latex(op_label, "").rstrip()
+
+        # Compose the term: coefficient * operator. Cases:
+        #  - identity operator: emit just the coefficient
+        #  - coefficient == "1": emit just the operator
+        #  - coefficient == "-1": emit "-" + operator
+        #  - otherwise: coefficient + operator, joined by an
+        #    invisible product (\, for separation)
+        if not op_tex:
+            term = coeff_tex
+        elif coeff_tex in {"1", ""}:
+            term = op_tex
+        elif coeff_tex == "-1":
+            term = rf"-{op_tex}"
+        else:
+            # Wrap negative-leading or sum coefficients in parens to
+            # avoid "-frac ..." parsing as a subtraction at the cell
+            # boundary level.
+            if coeff_tex.lstrip().startswith("-") and len(cell.entries) > 1:
+                # Standalone negative coefficient is fine inside a
+                # cell; the separator logic below will turn it into a
+                # minus sign between terms.
+                pass
+            term = rf"{coeff_tex} \, {op_tex}"
+
+        # Join with the previous term using sign-aware separator.
+        if k == 0:
+            parts.append(term)
+        elif term.lstrip().startswith("-"):
+            parts.append(rf" - {term.lstrip()[1:].lstrip()}")
+        else:
+            parts.append(rf" + {term}")
+
+    return "".join(parts)
+
+
+def kinetic_matrix_to_latex(km: KineticMatrix, spec: EquationSystem) -> str:
+    r"""Render an assembled :class:`KineticMatrix` as a labelled array.
+
+    The matrix may be rectangular for theories with velocity-pair
+    columns: rows are indexed by the q-field equations
+    (``km.row_fields``), columns include both q-fields and any
+    ``v_<X>`` referenced on RHS terms (``km.column_fields``).
+
+    Output wraps the cell grid in an ``array`` environment with
+    explicit row and column labels — column labels in the first
+    header row, row labels in a leading column — so the reader
+    can identify which equation and which column-field each cell
+    refers to. Reuses :func:`operator_to_latex`,
+    :func:`coefficient_to_latex`, and :func:`field_to_latex` for
+    cell and label rendering, so the operators and field names
+    here render identically to the EOM listings. Plane-wave axis
+    remapping is applied as a post-pass.
+    """
+    axis_remap = _operator_axis_remap(spec)
+    coords = _tensor_coordinates(spec)
+
+    def _field_label(name: str) -> str:
+        tensor_meta = _get_field_meta(name, spec)
+        return field_to_latex(name, tensor_meta=tensor_meta, coordinates=coords)
+
+    row_labels = [_field_label(f) for f in km.row_fields]
+    col_labels = [_field_label(f) for f in km.column_fields]
+
+    # Build the labelled array: an `array{c|cc...}` whose first row holds the
+    # column field labels (after a leading empty corner cell and an \hline),
+    # then one row per row-field prefixed by its label, with cell (i, j)
+    # holding the rendered K_{ij} entry.
+    n_cols = km.n_cols
+    col_spec = "c|" + "c" * n_cols
+    header = " & " + " & ".join(col_labels) + r" \\"
+    body_rows: list[str] = []
+    for i, row_label in enumerate(row_labels):
+        rendered_cells = [_render_kinetic_cell(km.cells[i][j]) for j in range(n_cols)]
+        body_rows.append(row_label + " & " + " & ".join(rendered_cells))
+    body = " \\\\\n  ".join(body_rows)
+    result = (
+        r"\mathcal{K}(\partial_t,\partial_z) = "
+        "\n"
+        rf"\begin{{array}}{{{col_spec}}}{chr(10)}"
+        f"  {header}{chr(10)}"
+        f"  \\hline{chr(10)}"
+        f"  {body}{chr(10)}"
+        r"\end{array}"
+    )
+    for from_axis, to_axis in axis_remap.items():
+        result = result.replace(rf"\partial_{from_axis}", rf"\partial_{to_axis}")
     return result
 
 
@@ -739,7 +1167,15 @@ def _indices_to_tensor_spec(indices_str: str) -> str:
 
 
 def _tensor_head_to_latex(name: str) -> str:
-    """Map a tensor head name to its LaTeX representation."""
+    """Map a tensor head name to its LaTeX representation.
+
+    User-supplied overrides (loaded via :func:`load_symbol_overrides`) take
+    precedence over the built-in tables so project-specific tensor heads such
+    as ``Ftorsion`` or ``RicciCDT`` can be rebound to the conventions of
+    ``manuscript/macros.tex`` without touching the source code here.
+    """
+    if name in _USER_TENSOR_OVERRIDES:
+        return _USER_TENSOR_OVERRIDES[name]
     if name == "eta":
         return _metric_symbol
     if name in _TENSOR_NAME_MAP:
@@ -772,11 +1208,11 @@ def _replace_scalar_field(m: re.Match[str]) -> str:
 
 
 def _paren_frac(m: re.Match[str]) -> str:
-    r"""Convert parenthesized fraction (A/B) → \\frac{A}{B}."""
+    r"""Convert parenthesized fraction (A/B) → \\tfrac{A}{B}."""
     inner = m.group(1)
     slash = inner.find("/")
     if slash > 0:
-        return rf"\frac{{{inner[:slash].strip()}}}{{{inner[slash + 1 :].strip()}}}"
+        return rf"\tfrac{{{inner[:slash].strip()}}}{{{inner[slash + 1 :].strip()}}}"
     return m.group(0)
 
 
@@ -791,14 +1227,28 @@ def _lagrangian_cleanup(s: str) -> str:
     # Convert Mathematica functions before any other processing
     s = _convert_math_functions(s)
     s = s.replace("*", r" \, ")
-    # Parenthesized fractions: (A/B) → \frac{A}{B} (before Greek, so names stay intact)
+    # Parenthesized fractions: (A/B) → \tfrac{A}{B} (before Greek, so names stay intact)
     s = re.sub(r"\(([^()]+/[^()]+)\)", _paren_frac, s)
     # Simple fractions: A/B where A,B are word tokens (before Greek substitution)
     s = re.sub(
         r"(?<![\\{])(\w+)/((?:\w+(?:\^[{\d]+}?)?))",
-        lambda m: rf"\frac{{{m.group(1)}}}{{{m.group(2)}}}",
+        lambda m: rf"\tfrac{{{m.group(1)}}}{{{m.group(2)}}}",
         s,
     )
+    # User parameter overrides FIRST — before subscript splitting and Greek
+    # substitution. This lets a TOML mapping like ``mA2 → M_{\mathcal{A}}^2``
+    # win over the generic digit-suffix-as-subscript heuristic (which would
+    # otherwise render ``mA2`` as ``mA_{2}``). Also catches names like
+    # ``deltam`` whose ``delta`` prefix would be Greek-substituted in the
+    # later step.
+    if _USER_PARAMETER_OVERRIDES:
+        s = re.sub(
+            r"(?<!\\)\b("
+            + "|".join(sorted(_USER_PARAMETER_OVERRIDES, key=len, reverse=True))
+            + r")(?=\b|[_{]|$)",
+            lambda m: _USER_PARAMETER_OVERRIDES[m.group(1)],
+            s,
+        )
     # Greek prefix extraction: omegaP2 → omega P2, so Greek + subscript work
     # Inserts a space between a Greek name and a trailing uppercase letter.
     for greek in sorted(_GREEK_MAP, key=len, reverse=True):
@@ -851,7 +1301,8 @@ def lagrangian_to_latex(expr: str) -> str:
 
     # Pass 1: Bracket functions
     s = _RE_RATIONAL.sub(
-        lambda m: rf"\frac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}", s,
+        lambda m: rf"\tfrac{{{m.group(1).strip()}}}{{{m.group(2).strip()}}}",
+        s,
     )
     s = _RE_SQRT.sub(lambda m: rf"\sqrt{{{m.group(1)}}}", s)
     s = _RE_E_POWER.sub(r"e^", s)
@@ -917,8 +1368,10 @@ def system_to_latex(
     ----------
     spec : EquationSystem
         The equation system to render.
-    output_format : {"align", "document", "raw"}
-        Output format.
+    output_format : {"align", "gather", "document", "raw"}
+        Output format. ``"gather"`` emits each equation as its own
+        ``aligned`` block inside an outer ``gather*`` — used by the
+        Appendix-E driver for per-equation centering.
     include_hamiltonian : bool
         Whether to include the Hamiltonian density.
     include_lagrangian : bool
@@ -940,11 +1393,13 @@ def system_to_latex(
 
     sections: list[str] = []
 
-    # Lagrangian
+    # Lagrangian — script-L matches the corpus convention (manuscript/macros.tex
+    # `\lag` -> `\mathscr{L}`) and pairs symmetrically with `\mathscr{H}` for the
+    # Hamiltonian density that hamiltonian_to_latex() emits below.
     lagrangian_expr = spec.metadata.get("lagrangian_expr", "")
     if include_lagrangian and lagrangian_expr:
         lag_tex = lagrangian_to_latex(lagrangian_expr)
-        sections.append(rf"\mathcal{{L}} &= {lag_tex}")
+        sections.append(rf"\mathscr{{L}} &= {lag_tex}")
 
     # Equations of motion
     sections.extend(equation_to_latex(eq, spec) for eq in spec.equations)
@@ -957,6 +1412,20 @@ def system_to_latex(
 
     if output_format == "raw":
         return "\n".join(sections)
+
+    if output_format == "gather":
+        # Per-equation centering: each section wrapped in its own
+        # \begin{aligned}...\end{aligned} (so the &= / &\supset column is
+        # set per-equation, not by the widest LHS in the listing) and
+        # joined inside an outer \begin{gather*}...\end{gather*}. Short
+        # equations center on their natural width; long ones span the
+        # page.
+        wrapped = [
+            f"  \\begin{{aligned}}\n    {s}\n  \\end{{aligned}}" for s in sections
+        ]
+        body = " \\\\[1ex]\n".join(wrapped)
+        gather_block = f"\\begin{{gather*}}\n{body}\n\\end{{gather*}}"
+        return "% Requires: \\usepackage{amsmath, tensor, mathrsfs}\n" + gather_block
 
     # Build align environment
     body = " \\\\\n  ".join(sections)
@@ -989,16 +1458,23 @@ def system_to_latex(
 
 
 def _get_field_meta(
-    field_name: str, spec: EquationSystem,
+    field_name: str,
+    spec: EquationSystem,
 ) -> dict[str, list[int] | int | str] | None:
-    """Look up tensor metadata for a field from the EquationSystem.
+    r"""Look up tensor metadata for a field from the EquationSystem.
+
+    Velocity-prefixed names (``v_h_3``, ``v_phi_0``, ...) are stripped of
+    their ``v_`` prefix before the lookup so the underlying field's tensor
+    metadata is found. Without this strip the rendered output drops back
+    to integer-index subscripts inside ``\\dot{...}`` accents.
 
     Returns None if metadata is not available (backward compat with old JSONs).
     """
     tensor_metadata = spec.metadata.get("tensor_metadata")
     if tensor_metadata is None:
         return None
-    return tensor_metadata.get(field_name)  # type: ignore[no-any-return]
+    lookup_name = field_name.removeprefix("v_")
+    return tensor_metadata.get(lookup_name)  # type: ignore[no-any-return]
 
 
 #: Default axis letters for coordinate labelling (matching AXIS_LETTERS in json_loader).

@@ -1,34 +1,36 @@
 \begin{frame}{Poincar\'e gauge theory and torsion}
 
-  \textbf{Spacetime has two \emph{independent} local symmetries.}
-  Local Lorentz and coordinate freedoms are \emph{gauge redundancies} of the Poincar\'e group --- motivating a gauge treatment of gravity.
+  \begin{itemize}
+    \item A \textbf{local} symmetry transforms \emph{independently at each spacetime point}.
+    \item \emph{Connection} field restores covariance after varying the transformation parameter.
+    \item Its field strength is the \emph{new physical content}.
+    \item Spacetime has two such symmetries: \emph{local \textbf{Lorentz}} and \emph{local \textbf{translations}}.
+  \end{itemize}
 
-  \vspace{0.3em}
-  \begin{center}
-    \begin{tabular}{@{}llll@{}}
-      \toprule
-      & Gauge group & Connection & Field strength \\
-      \midrule
-      QED          & $U(1)$             & $A_\mu$             & $\mathcal{F}_{\mu\nu}$ \\
-      Lorentz      & $SO(1,3)$          & $\tensor{\omega}{^{ij}_\mu}$ & \textbf{curvature} $\tensor{\mathcal{R}}{^{ij}_{\mu\nu}}$ \\
-      Translations & $\mathbb{R}^4$     & $\tensor{e}{^i_\mu}$         & \textbf{torsion}   $\tensor{\mathcal{T}}{^i_{\mu\nu}}$ \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-
-  \vspace{1.0em}
-  \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.42\textwidth}
-      {\begin{tabular}{@{}l@{\;}r@{,\;}r@{,\;}l@{}}
-        GR ($V_4$):  & $\mathcal{R}\neq 0$ & $\mathcal{T}=0$    & $\mathcal{Q}=0$. \\[0.1em]
-        PGT ($U_4$): & $\mathcal{R}\neq 0$ & $\mathcal{T}\neq 0$ & $\mathcal{Q}=0$.
-      \end{tabular}\\[0.15em]
-      \emph{Torsion is the new degree of freedom.}}
+  \begin{columns}
+    \begin{column}{0.5\textwidth}
+      \centering
+      \vspace{-0.5em}
+      \begin{center}
+        \begin{tabular}{@{}c | c c @{}}
+          \toprule
+          & \textbf{Group} & \textbf{Field strength} \\
+          \midrule
+          QED          & $U(1)$         & $\mathcal{F}_{\mu\nu} = \partial_{[\mu} A_{\nu]}$ \\
+          Lorentz      & $SO(1,3)$      & \textbf{curvature} $\tensor{\mathcal{R}}{^{ij}_{\mu\nu}}$    \\
+          Translations & $\mathbb{R}^4$ & \textbf{torsion}   $\tensor{\mathcal{T}}{^i_{\mu\nu}}$       \\
+          \bottomrule
+        \end{tabular}
+      \end{center}
+      GR uses only curvature; PGT promotes torsion to a physical degree of freedom.
     \end{column}
-    \begin{column}{0.54\textwidth}
-      \vspace{-0.6em}
-      \includegraphics[width=\linewidth]{figures/diff_geometry.pdf}
+    \begin{column}{0.5\textwidth}
+      \centering
+      \includegraphics[height=2.5cm]{diff_geometry}
     \end{column}
   \end{columns}
+  
+
+  \centering\emph{}
 
 \end{frame}

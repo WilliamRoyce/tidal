@@ -2,8 +2,9 @@ r"""Figure D §4 — Parker–Simon higher-derivative perturbative calibration.
 
 Single-panel App-C-style error-vs-$\varepsilon$ plot for the
 $\varepsilon\,\partial_x^4 \phi$ higher-derivative correction on a
-Klein–Gordon base. Pass 0 + Pass 1 error decreases faster than the
-worst-case $\mathcal{O}(\varepsilon^2)$ bound for this correction type.
+Klein–Gordon base. The combined $\phi^{(0)} + \phi^{(1)}$ truncation
+error decreases faster than the worst-case $\mathcal{O}(\varepsilon^2)$
+bound for this correction type.
 
 Floor-saturated points (where the error has fallen below
 $\sim 10^3 \cdot \varepsilon_{\mathrm{mach}}$) are excluded from the
@@ -23,6 +24,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATA = REPO_ROOT / "benchmark_results" / "canonical" / "parker_simon_flrw.json"
@@ -31,7 +33,7 @@ EPS_MACH = 2.220446049250313e-16
 # Saturation detection: a point is saturated when its log-log slope to
 # the next-smaller-eps point is less than this threshold. The
 # perturbative theorem predicts slope >= 2 in the asymptotic regime;
-# anything below ~1 indicates the spatial-discretisation noise floor
+# anything below ~1 indicates the spatial-discretization noise floor
 # has been reached.
 SAT_SLOPE_THRESH = 1.0
 
@@ -94,8 +96,8 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="o",
         ms=5,
         lw=0,
-        color="#d62728",
-        label=rf"Pass 0 only ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
+        color=IBM_PALETTE["magenta"],
+        label=rf"$|\phi^{{(0)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_p0:.2f}$, $R^2 = {r2_p0:.3f}$)",
     )
     ax.loglog(
         eps[~floor_mask],
@@ -103,8 +105,8 @@ def _plot(data: dict, out_path: Path) -> None:
         marker="s",
         ms=5,
         lw=0,
-        color="#1f77b4",
-        label=rf"Pass 0 + Pass 1 ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
+        color=IBM_PALETTE["blue"],
+        label=rf"$|\phi^{{(0)}} + \phi^{{(1)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
     )
     if floor_mask.any():
         ax.loglog(
@@ -114,10 +116,10 @@ def _plot(data: dict, out_path: Path) -> None:
             ms=5,
             lw=0,
             mfc="white",
-            mec="#1f77b4",
-            label="Pass 0+1 (below spatial-FD floor; excluded from fit)",
+            mec=IBM_PALETTE["blue"],
+            label="_nolegend_",
         )
-        # Annotate the FD-4 spatial-discretisation floor at the median
+        # Annotate the FD-4 spatial-discretization floor at the median
         # of the saturated points so the exclusion is visually justified.
         floor_val = float(np.median(np.maximum(err_c[floor_mask], EPS_MACH)))
         ax.axhline(
@@ -136,13 +138,13 @@ def _plot(data: dict, out_path: Path) -> None:
             err_c[idx] * (eps / eps[idx]) ** 2,
             ls=":",
             lw=0.8,
-            color="#1f77b4",
+            color=IBM_PALETTE["blue"],
             alpha=0.5,
             label=r"$\mathcal{O}(\varepsilon^2)$ worst-case guide",
         )
 
     ax.set_xlabel(r"perturbation parameter $\varepsilon$")
-    ax.set_ylabel(r"error vs full-$\varepsilon$ modal solution")
+    ax.set_ylabel(r"$|\phi^\mathrm{approx} - \phi^\mathrm{exact}|$")
     ax.set_title(r"$\varepsilon\,\partial_x^4 \phi$ correction", fontsize=10)
     ax.grid(visible=True, which="both", ls=":", alpha=0.3)
     ax.legend(frameon=False, fontsize=7, loc="lower right")

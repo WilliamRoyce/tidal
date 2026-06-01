@@ -178,6 +178,7 @@ a separate later effort. See plan archived as
 - [x] Update `manuscript/main.tex` to `\input` the new computational-approach file
 - [x] Scaffold `manuscript/sections/results.tex` (5 subsections, 3 figure placeholders, ghost-condition equation label)
 - [x] Scaffold `manuscript/sections/discussion.tex` (3 discussion subsections + Conclusion)
+- [x] §6 Conclusion drafted per [`conclusion_drafting_spec.md`](conclusion_drafting_spec.md): `\section{Conclusions}` in `manuscript/sections/conclusion.tex`, 5 paragraphs, ≈ 450 w (1α + 2α + 3α + 4β + Fusion-A 5E.1+5F.2 closing). Compiles cleanly; main-body 3002 / 5000 w.
 - [x] Scaffold `manuscript/sections/appendices.tex` (5 appendices A–E with subsections, named paragraphs, equation labels, figure placeholders)
 - [x] Keep `manuscript/sections/acknowledgements.tex` unchanged (Barker boilerplate is correct as-is)
 

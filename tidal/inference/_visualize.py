@@ -188,7 +188,7 @@ def plot_importance(
     plt.close(fig)
 
 
-def _compute_log10_amplification(
+def _compute_log10_amplification(  # pyright: ignore[reportUnusedFunction]
     result: InferenceResult,
     samples: object,
 ) -> np.ndarray | None:
@@ -251,7 +251,7 @@ def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
 
     Samples flagged with ``run_status='tachyonic'`` by the pre-flight
     stability guard.  Returns ``None`` if no metadata or no rejections.
-    Following anesthetic conventions for visualising inaccessible regions
+    Following anesthetic conventions for visualizing inaccessible regions
     of parameter space (Handley 2019 JOSS).  See also
     ``_rejected_prior.csv`` produced by Phase 4 for nested-sampling output.
     """
@@ -267,7 +267,7 @@ def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
     return result.samples[mask]
 
 
-def _clip_to_posterior_range(
+def _clip_to_posterior_range(  # pyright: ignore[reportUnusedFunction]
     values: np.ndarray,
     weights: np.ndarray | None,
     q_low: float = 0.001,
@@ -325,7 +325,7 @@ def _clip_to_posterior_range(
     return out
 
 
-def _set_derived_axis_limits(
+def _set_derived_axis_limits(  # pyright: ignore[reportUnusedFunction]
     axes_df: object,
     plot_params: list[str],
     col_name: str,
@@ -660,6 +660,188 @@ def _set_full_prior_axis_limits(
                 ax.set_ylim(x_lo, x_hi)
 
 
+def _render_anesthetic_corner_into(
+    samples: object,
+    param_names: list[str],
+    *,
+    target_fig: object | None = None,
+    labels: dict[str, str] | None = None,
+    ticks: str | None = "inner",
+    show_diagonal: bool = True,
+    fill_two_tone: bool = True,
+    fill_colors: tuple[str, str] | None = None,
+    color: str | None = None,
+    color_alpha: float = 0.5,
+) -> tuple[object, object]:
+    """Render a two-tone anesthetic corner plot.
+
+    Used both by :func:`_plot_corner_anesthetic` (standalone full figure;
+    ``target_fig=None`` — anesthetic's ``plot_2d`` builds its own
+    Figure, preserving the standalone path bit-identically) and by the
+    cubed-sphere atlas (each face panel passes its matplotlib
+    :class:`~matplotlib.figure.SubFigure`; the helper then explicitly
+    builds axes via :func:`anesthetic.make_2d_axes` so they live inside
+    the SubFigure rather than in a fresh top-level Figure).
+
+    The function does ONLY the minimal common core: invoke anesthetic
+    plotting (with the degenerate-posterior fallbacks) and apply the
+    two-tone Planck-blue solid fill patch.  Standalone-specific
+    decoration (prior overlay, MAP marker, CI band, log axes, axis
+    limits, rejected overlay, legend, suptitle) is layered on by the
+    caller.
+
+    Parameters
+    ----------
+    samples : anesthetic.Samples-like
+        A NestedSamples / MCMCSamples object exposing ``plot_2d``.
+    param_names : list of str
+        Column names in ``samples`` to plot, in the desired corner-plot
+        order.
+    target_fig : Figure or SubFigure, optional
+        A matplotlib Figure / SubFigure to render the axes into.  None
+        means the standalone path — ``samples.plot_2d(param_names)``
+        builds its own figure (bit-identical to the pre-refactor
+        behavior).  When provided, axes are built explicitly via
+        :func:`anesthetic.make_2d_axes` inside ``target_fig`` (passed
+        through anesthetic's ``fig=`` fig_kw); the axes fill the entire
+        SubFigure.
+    labels : dict, optional
+        Mapping ``param_name -> LaTeX label`` for axis labels.  Only
+        consulted on the composable (target_fig) path; the standalone
+        path uses anesthetic's defaults.
+    ticks : {"inner", "outer", None}, optional
+        Anesthetic ``ticks`` mode for the composable path.  ``None``
+        strips tick marks entirely (the atlas's setting).  Ignored on
+        the standalone path (anesthetic uses "inner" by default).
+    show_diagonal : bool, optional
+        Whether the diagonal 1D KDE marginals are drawn.  True by
+        default.  Only honoured on the composable path.
+    fill_two_tone : bool, optional
+        Apply :func:`_force_solid_credible_fills` after rendering to
+        replace anesthetic's per-panel-normalized gradient with the
+        cosmology-standard solid Planck-blue two-tone palette.
+
+    Returns
+    -------
+    fig : Figure
+        The matplotlib Figure / SubFigure containing the rendered axes.
+    axes_df : AxesDataFrame
+        The anesthetic axes DataFrame, suitable for further overlay
+        operations (priors, MAP markers, log axes, etc.).
+    """
+    import numpy as np
+
+    # When a single-tone color is requested, forward (color, alpha) so
+    # anesthetic colors every artist uniformly — 1D diagonal KDE curves,
+    # 2D fills, and contour outlines all read in the same color family.
+    # This matches the manuscript's results-section corner-plot style
+    # (`scripts/figures/_corner_style.py`'s `overlay_corner`).
+    plot_2d_kwargs: dict[str, object] = {}
+    if color is not None:
+        plot_2d_kwargs["color"] = color
+        plot_2d_kwargs["alpha"] = color_alpha
+
+    def _plot_with_fallback(axes_arg: object) -> object:
+        """Run ``samples.plot_2d`` with the degenerate-posterior fallbacks.
+
+        Three failure modes from anesthetic's KDE machinery on near-flat /
+        lower-dimensional posteriors:
+          - qhull Delaunay triangulation: 'singular input data'
+          - scipy gaussian_kde: 'singular data covariance matrix'
+          - matplotlib tricontour: 'Triangulation is invalid' (samples too
+            concentrated for matplotlib's Delaunay; observed on Phase E
+            atlas T5.1/T5.2 corner panels where one chain hit a sharp peak)
+        All fall back to KDE diagonals + scatter cross-panels.
+        """
+        try:
+            return samples.plot_2d(
+                axes_arg,
+                label="68% / 95% CL",
+                **plot_2d_kwargs,
+            )
+        except (RuntimeError, ValueError, np.linalg.LinAlgError) as e:
+            msg = str(e).lower()
+            if (
+                "qhull" not in msg
+                and "singular" not in msg
+                and "lower-dimensional" not in msg
+                and "triangulation" not in msg
+            ):
+                raise
+            try:
+                return samples.plot_2d(
+                    axes_arg,
+                    label="samples",
+                    kinds={
+                        "diagonal": "kde_1d",
+                        "lower": "scatter_2d",
+                        "upper": "scatter_2d",
+                    },
+                    **plot_2d_kwargs,
+                )
+            except (RuntimeError, ValueError, np.linalg.LinAlgError):
+                return samples.plot_2d(
+                    axes_arg,
+                    label="samples",
+                    kinds={
+                        "diagonal": "hist_1d",
+                        "lower": "scatter_2d",
+                        "upper": "scatter_2d",
+                    },
+                    **plot_2d_kwargs,
+                )
+
+    fig: object
+    axes_df: object
+    if target_fig is not None:
+        # Composable path: axes live inside the caller-provided figure
+        # (typically a SubFigure of an outer atlas grid).  Passing
+        # ``fig=target_fig`` to ``make_2d_axes`` short-circuits the
+        # ``plt.figure(**fig_kw)`` fallback at anesthetic plot.py:748,
+        # so the new axes are added to ``target_fig`` rather than a
+        # fresh hidden top-level Figure.
+        from anesthetic import make_2d_axes
+
+        fig, axes_df = make_2d_axes(
+            param_names,
+            labels=labels,
+            ticks=ticks,
+            lower=True,
+            diagonal=show_diagonal,
+            upper=False,
+            fig=target_fig,
+        )
+        _plot_with_fallback(axes_df)
+        if labels is not None:
+            # ``plot_2d`` overwrites the LaTeX labels set by
+            # ``make_2d_axes(labels=...)`` with the raw column names
+            # (anesthetic plot.py: AxesDataFrame.__init__ calls set_labels
+            # but plot_2d re-applies index/columns as labels).  Re-apply
+            # via the public ``set_labels`` method post-render.
+            axes_df.set_labels(labels)  # type: ignore[attr-defined]
+    else:
+        # Standalone path: bit-identical to the pre-refactor behavior —
+        # let anesthetic.plot_2d build its own figure and axes from the
+        # parameter list.  Extract fig + axes_df from anesthetic's
+        # return value: either ``(fig, axes_df)`` (older versions) or
+        # just the AxesDataFrame (>= 2.0).
+        ret = _plot_with_fallback(param_names)
+        if isinstance(ret, tuple) and len(ret) == 2:
+            fig, axes_df = ret[0], ret[1]
+        else:
+            axes_df = ret
+            cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
+            fig = cell.get_figure()
+
+    # Two-tone fill override is mutually exclusive with single-tone
+    # ``color``: when ``color`` is set, anesthetic has already painted
+    # every artist uniformly, and a post-hoc facecolor override would
+    # only fight that.
+    if fill_two_tone and color is None:
+        _force_solid_credible_fills(fig, palette=fill_colors)
+    return fig, axes_df
+
+
 def _plot_corner_anesthetic(
     result: InferenceResult,
     output_path: Path | None = None,
@@ -704,110 +886,25 @@ def _plot_corner_anesthetic(
             columns=result.param_names,
         )
 
-    # Append log10(A) as a final column where A = P_max / P_GR is the
-    # physical amplification factor.  Same definition across maximize and
-    # minimize runs (amplify finds large A; suppress finds small A) — a
-    # single shared interpretation, unlike raw logL which means opposite
-    # things in the two modes.  Anesthetic's weight-aware KDE handles
-    # the new column transparently because we set it on the
-    # WeightedLabelledDataFrame.  Cosmology convention: derived parameters
-    # appear alongside sampled ones (Planck Omega_m-H_0 panels, DES Y3 S_8).
+    # Corner plot shows the SAMPLED parameters only — no derived columns.
+    # Per supervisor direction (2026-05-29): the prior log10(A) overlay was
+    # confusing and non-standard; remove it from all corner plots.
     plot_params: list[str] = list(result.param_names)
-    log10_a = _compute_log10_amplification(result, samples)
-    if log10_a is not None:
-        try:
-            # Clip to posterior-weighted 0.1%-99.9% range BEFORE plot_2d so
-            # anesthetic's KDE is calibrated for the posterior scale, not
-            # the full prior-exploration chain.  Dead-point samples spanning
-            # the full prior range would otherwise produce an over-smooth KDE
-            # that appears as a wedge when the axis is zoomed to the posterior.
-            log10_a_plot = _clip_to_posterior_range(
-                log10_a,
-                result.weights if result.weights is not None else None,
-            )
-            # anesthetic may have dropped rows with logL <= logL_birth
-            # (PolyChord exit-state artefact, issue #362); align the
-            # derived column to samples' (possibly post-drop) index
-            # rather than the full result.samples length.
-            if len(log10_a_plot) != len(samples):
-                if len(log10_a_plot) > len(samples) and hasattr(samples, "index"):
-                    # samples.index may be a positional or label index
-                    # into the original chain; try positional first
-                    getattr(samples, "index", None)
-                    try:
-                        log10_a_plot = log10_a_plot[: len(samples)]
-                    except (TypeError, ValueError):
-                        log10_a_plot = None
-                else:
-                    log10_a_plot = None
-            if log10_a_plot is not None:
-                samples["log10_A"] = log10_a_plot
-                samples.set_label("log10_A", r"$\log_{10} A$")
-                plot_params.append("log10_A")
-        except (AttributeError, KeyError, TypeError, ValueError):
-            pass
-    elif "logL" in samples.columns:
-        # Fallback: if we can't derive A (no P_max metric, no baseline
-        # formula), still append logL so something useful shows up.
-        plot_params.append("logL")
 
-    # anesthetic >= 2.0: plot_2d returns an AxesDataFrame whose cells
-    # expose .get_figure().  Older versions returned (fig, axes).  Handle
-    # both without version-gating.  ``label`` is consumed by anesthetic's
-    # contour code (plot.py:1314) which adds a Rectangle patch to the
-    # legend describing the 68%/95% CL contours.
-    def _plot_with_kinds(plot_params: list[str], kinds: dict[str, str] | None = None):
-        if kinds is None:
-            return samples.plot_2d(plot_params, label="68% / 95% CL")
-        return samples.plot_2d(plot_params, label="samples", kinds=kinds)
-
-    try:
-        ret = _plot_with_kinds(plot_params)
-    except (RuntimeError, ValueError, np.linalg.LinAlgError) as e:
-        # Degenerate-posterior fallback (e.g. genuine-null chains like
-        # D2.1 Barker where the posterior is essentially flat).  Two
-        # failure modes from anesthetic's KDE machinery:
-        # - qhull Delaunay triangulation: 'singular input data'
-        # - scipy gaussian_kde: 'singular data covariance matrix'
-        # Both are downstream of "data spans a lower-dimensional subspace"
-        # which is exactly what a flat posterior looks like.  Fall back
-        # to histogram diagonals + scatter cross-panels — no covariance
-        # estimation needed.  See GH issue #362.
-        msg = str(e).lower()
-        if (
-            "qhull" not in msg
-            and "singular" not in msg
-            and "lower-dimensional" not in msg
-        ):
-            raise
-        # First fallback: KDE on diagonals (works for moderately-flat
-        # posteriors with enough samples for bandwidth selection).
-        try:
-            ret = _plot_with_kinds(
-                plot_params,
-                {"diagonal": "kde_1d", "lower": "scatter_2d", "upper": "scatter_2d"},
-            )
-        except (RuntimeError, ValueError, np.linalg.LinAlgError):
-            # Final fallback for severely-degenerate chains (e.g.
-            # under-converged 474-sample chain with all samples at
-            # identical logL): drop the derived log10_A column (whose
-            # post-clip values may be all-NaN for null chains) and use
-            # hist_1d on the remaining params + scatter_2d cross-panels.
-            params_no_derived = [p for p in plot_params if p in result.param_names]
-            ret = _plot_with_kinds(
-                params_no_derived,
-                {"diagonal": "hist_1d", "lower": "scatter_2d", "upper": "scatter_2d"},
-            )
-            plot_params = params_no_derived
-    if isinstance(ret, tuple) and len(ret) == 2:
-        fig = ret[0]
-        axes_df = ret[1]
-    else:
-        axes_df = ret
-        cell = ret.iloc[0, 0] if hasattr(ret, "iloc") else next(iter(ret))
-        fig = cell.get_figure()
-
-    _force_solid_credible_fills(fig)
+    # Core render: make_2d_axes + plot_2d + two-tone fill patch.  The
+    # standalone path passes ``subplot_spec=None`` so anesthetic builds
+    # its own Figure; the atlas variant passes a SubplotSpec for one
+    # panel of the outer 2 x N grid.  Both paths share the same KDE +
+    # fallback + fill logic.
+    fig, axes_df = _render_anesthetic_corner_into(
+        samples,
+        plot_params,
+        target_fig=None,
+        labels=None,
+        ticks="inner",
+        show_diagonal=True,
+        fill_two_tone=True,
+    )
     # Set log axes for log_uniform-prior parameters FIRST — before
     # prior/MAP overlays — so the overlays are drawn in the correct
     # log space, not against linear axes that get re-scaled later.
@@ -856,17 +953,8 @@ def _plot_corner_anesthetic(
             result.weights,
             skip=tuple(logged_params),
         )
-        # log10_A (derived column) — tighten its axes to the same
-        # 95%-credible + 5%-pad treatment so the bottom row contours
-        # sit at the panel edge without large whitespace margins.
-        if log10_a is not None and "log10_A" in plot_params:
-            _set_derived_axis_limits(
-                axes_df,
-                plot_params,
-                "log10_A",
-                log10_a,
-                result.weights,
-            )
+        # log10_A handling removed per supervisor direction (2026-05-29):
+        # derived amplification column was confusing and non-standard.
     # Re-apply log scale at the very end — overlays (priors, MAP, CI)
     # internally save/restore xlim around their plot() calls which on
     # some matplotlib versions silently reverts the scale to linear.
@@ -904,16 +992,10 @@ def _plot_corner_anesthetic(
             )
         else:
             headline_parts.append(f"log Z = {result.log_evidence:.3f}")
-    # Headline amplification range: prefer the derived `log10_A` column
-    # (consistent meaning across amplify and suppress runs) and report
-    # both extremes.  Falls back to mode-aware max(exp(logL)) for older
-    # chains lacking the simulation_params metadata.
-    if log10_a is not None:
-        finite_a = log10_a[np.isfinite(log10_a)]
-        if finite_a.size > 0:
-            max_a = float(10 ** np.max(finite_a))
-            min_a = float(10 ** np.min(finite_a))
-            headline_parts.append(f"A ∈ [{min_a:.2e}, {max_a:.2e}]")
+    # Headline: report mode-aware max(exp(logL)) headline as fallback;
+    # the log10_A-based summary was removed per supervisor direction.
+    if False:
+        pass
     else:
         finite_logl = result.log_likelihood[np.isfinite(result.log_likelihood)]
         if finite_logl.size > 0:
@@ -943,48 +1025,61 @@ def _plot_corner_anesthetic(
     plt.close(fig)
 
 
-def _force_solid_credible_fills(fig: object) -> None:
+def _force_solid_credible_fills(
+    fig: object,
+    palette: tuple[str, str] | None = None,
+) -> None:
     """Render solid-fill credible regions per Planck/DES/getdist convention.
 
     Replaces anesthetic's per-panel-normalized gradient fills with solid
-    colours per credible level.
+    colors per credible level.
 
     **Why**: anesthetic's default ``kde_contour_plot_2d`` renders contour
     fills via ``ax.contourf(P, levels=[c95, c68], cmap=cmap, vmin=0,
     vmax=P.max())``.  Because ``vmax`` is the *per-panel* peak density,
     the same iso-probability levels (68%, 95%) land at different cmap
     positions in different panels, producing visually inconsistent fill
-    colours across the corner plot.  See
+    colors across the corner plot.  See
     ``.venv/.../anesthetic/plot.py:1311``.
 
     The cosmology community standard (Planck 2018, DES Y3, ACT DR6,
     SPT-3G, Euclid forecasts; produced via ``getdist`` with ``filled=
-    True``) uses **solid two-tone fills** — one colour for the 95%
-    credible region, a darker colour for the 68% region — identical
+    True``) uses **solid two-tone fills** — one color for the 95%
+    credible region, a darker color for the 68% region — identical
     across every panel.  This is what we want: a reader extracting
-    credible-region boundaries is not misled by panel-to-panel colour
+    credible-region boundaries is not misled by panel-to-panel color
     drift.
 
     **How**: walk each axis's ``ContourSet`` collections (anesthetic
     creates exactly one per panel for the 2D KDE fill), and override
-    the face colours to a fixed two-tone Planck-blue palette.  The
-    associated contour *line* collections (also drawn by anesthetic)
-    are left untouched so the boundaries remain crisp.
+    the face colors to the supplied two-tone palette (default
+    Planck-blue).  The associated contour *line* collections (also drawn
+    by anesthetic) are left untouched so the boundaries remain crisp.
 
     This post-hoc patch keeps anesthetic's KDE computation and contour
-    *placement* intact; we only override the rendered fill colours.
+    *placement* intact; we only override the rendered fill colors.
+
+    Parameters
+    ----------
+    fig : Figure or SubFigure
+        Walked via ``fig.axes`` to find filled ContourSet collections.
+    palette : (str, str) or None
+        ``(outer_95_colour, inner_68_colour)`` hex pair.  ``None``
+        (default) uses Planck-blue ``("#aac8e9", "#3877b8")``.  The
+        bespoke K.2 atlas passes the IBM Carbon magenta 30/70 pair
+        ``("#ffafd2", "#9f1853")``.
     """
     import matplotlib.contour as mcontour
     from matplotlib import colors as mcolors
 
-    # Two-tone palette: light blue for the 95% credible band, darker for
-    # the 68%.  Matches the standard Planck-blue scheme via getdist.
-    # anesthetic uses `iso_probability_contours([0.95, 0.68])` which
-    # returns levels in *increasing* density order [c95, c68], producing
-    # `contourf` bands [c95, c68] (95% band: between c95 and c68 — the
-    # "outer" annular ring) and [c68, max] (68% core).  So palette index
-    # 0 is the 95% band (light), index 1 is the 68% core (dark).
-    fill_palette = ["#aac8e9", "#3877b8"]
+    # Two-tone palette: light outer for the 95% credible band, darker
+    # inner for the 68% core.  anesthetic uses
+    # `iso_probability_contours([0.95, 0.68])` which returns levels in
+    # *increasing* density order [c95, c68], producing `contourf` bands
+    # [c95, c68] (the "outer" annular ring) and [c68, max] (the 68%
+    # core).  Palette index 0 is the 95% band (light), index 1 is the
+    # 68% core (dark).
+    fill_palette = list(palette) if palette is not None else ["#aac8e9", "#3877b8"]
     if not hasattr(fig, "axes"):
         return
     for ax in fig.axes:
@@ -1002,7 +1097,7 @@ def _apply_solid_fill(
     palette: list[str],
     mcolors: object,
 ) -> None:
-    """Override one ContourSet's fill colours with a solid palette.
+    """Override one ContourSet's fill colors with a solid palette.
 
     Handles both old matplotlib (< 3.8: ``.collections`` attribute holds
     one PathCollection per band) and new matplotlib (≥ 3.8: ContourSet
@@ -1020,10 +1115,22 @@ def _apply_solid_fill(
         if colls:
             for j, col in enumerate(colls):
                 if hasattr(col, "set_facecolor"):
+                    # Modern matplotlib carries a scalar-to-cmap mapping
+                    # that wins over set_facecolor at draw time; clearing
+                    # the scalar array first removes that competition.
+                    if hasattr(col, "set_array"):
+                        col.set_array(None)
                     col.set_facecolor(colour_for(j))
                     col.set_edgecolor("none")
             return
         n_bands = max(len(getattr(cs, "levels", [])) - 1, 1)
+        # Same scalar-array-vs-facecolor race: clear the array first so
+        # the explicit facecolors actually reach the renderer.  Without
+        # this, anesthetic's default Blues cmap (set via `set_array(P)`
+        # in kde_contour_plot_2d) silently wins and the override looks
+        # like a no-op despite get_facecolor() reporting the new colors.
+        if hasattr(cs, "set_array"):
+            cs.set_array(None)  # type: ignore[attr-defined]
         cs.set_facecolor([colour_for(j) for j in range(n_bands)])  # type: ignore[attr-defined]
         cs.set_edgecolor("none")  # type: ignore[attr-defined]
     except (AttributeError, TypeError):

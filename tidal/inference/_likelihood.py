@@ -15,7 +15,7 @@ perturbativity gate (``P_max > 0.5 -> -inf``) is removed entirely; large
 ``P_max`` is faithful linearized-PDE output, not a probability-conservation
 violation.  The pre-flight tachyonic probe is run as a metadata measurement
 only — its verdict no longer gates samples (``--gated`` flag preserves the
-v2 hard-rejection behaviour for reproducibility).
+v2 hard-rejection behavior for reproducibility).
 """
 
 from __future__ import annotations
@@ -46,19 +46,23 @@ SOFT_FLOOR_LOGL: float = -100.0
 
 def _soft_floor_logl(
     sigma_explore: float,
+    floor: float = SOFT_FLOOR_LOGL,
     rng: np.random.Generator | None = None,
 ) -> float:
     """Return the soft penalty floor with optional exploration noise.
 
-    Returns ``SOFT_FLOOR_LOGL + Normal(0, sigma_explore)``.  When
-    ``sigma_explore <= 0`` the noise is disabled and the bare floor is
-    returned (useful for ablation tests via ``--soft-floor-noise=0``).
+    Returns ``floor + Normal(0, sigma_explore)``.  When ``sigma_explore <= 0``
+    the noise is disabled and the bare floor is returned (useful for ablation
+    tests via ``--soft-floor-noise=0``).  The floor defaults to
+    ``SOFT_FLOOR_LOGL`` but can be overridden per-run via
+    ``--soft-floor-logl`` when the default -100 contaminates logZ for
+    baseline-normalized likelihoods (see issue #372).
     """
     if sigma_explore <= 0.0:
-        return SOFT_FLOOR_LOGL
+        return floor
     if rng is None:
         rng = np.random.default_rng()
-    return SOFT_FLOOR_LOGL + float(rng.normal(0.0, sigma_explore))
+    return floor + float(rng.normal(0.0, sigma_explore))
 
 
 @dataclass(frozen=True)
@@ -93,12 +97,20 @@ class LikelihoodConfig:
     permissive: bool = True
     """v3 default: don't gate on the pre-flight probe.  When False,
     tachyonic samples return ``-inf`` (preserves v2 / canonical-probe
-    behaviour, opt-in via ``--gated`` CLI flag for reproducibility)."""
+    behavior, opt-in via ``--gated`` CLI flag for reproducibility)."""
     soft_floor_noise_sigma: float = 1.0
     """Standard deviation of the Gaussian noise added to the soft penalty
     floor (sim divergence / NaN / exception).  Default 1.0 gives the
     sampler a finite gradient in the failure region; set to 0 via
     ``--soft-floor-noise 0`` to disable noise for ablation tests."""
+    soft_floor_logl: float = SOFT_FLOOR_LOGL
+    """Position of the soft penalty floor (default: -100).  When the prior
+    contains many tachyonic / failing samples and the natural physics logL
+    is near 0 (e.g. baseline-normalized ``maximize`` runs), -100 drags logZ
+    to -100 and makes the PolyChord precision criterion unreachable.  Use
+    ``--soft-floor-logl -15`` (or similar) to keep logZ in a sensible range
+    so that ``precision_criterion × |logZ|`` stays achievable.
+    See issue #372."""
 
     def __post_init__(self) -> None:
         valid = {"gaussian", "threshold", "maximize", "minimize", "extremize"}
@@ -122,6 +134,7 @@ def parse_likelihood(
     baseline_formula: str | None = None,
     permissive: bool = True,
     soft_floor_noise_sigma: float = 1.0,
+    soft_floor_logl: float = SOFT_FLOOR_LOGL,
 ) -> LikelihoodConfig:
     """Parse a CLI likelihood specification string.
 
@@ -146,7 +159,7 @@ def parse_likelihood(
         v3 default ``True``: pre-flight tachyonic probe is recorded as
         metadata only, doesn't gate samples.  Set to ``False`` (via the
         ``--gated`` CLI flag) to reproduce v2 / canonical-probe hard-
-        rejection behaviour.
+        rejection behavior.
     soft_floor_noise_sigma : float
         Standard deviation of the Gaussian noise added to the soft penalty
         floor (sim divergence / NaN / exception).  Default 1.0; set to 0
@@ -168,6 +181,7 @@ def parse_likelihood(
     common = {
         "permissive": permissive,
         "soft_floor_noise_sigma": soft_floor_noise_sigma,
+        "soft_floor_logl": soft_floor_logl,
     }
 
     if ltype == "gaussian":
@@ -538,7 +552,7 @@ def _evaluate_likelihood(
             }
             if not stability.stable and not likelihood_config.permissive:
                 # Gated mode (``--gated`` CLI flag) reproduces the v2 / canonical-
-                # probe hard-rejection behaviour for reproducibility.  Default v3
+                # probe hard-rejection behavior for reproducibility.  Default v3
                 # is permissive: sim continues, tachyon-permissive sampling maps
                 # the structure of the unstable regions.
                 return -math.inf, {
@@ -556,12 +570,39 @@ def _evaluate_likelihood(
 
     try:
         if backend == "memory":
+            # GH #384 Phase B: pass the already-cached spec through so
+            # run_inference_step doesn't reload+parse it on every call.
+            # load_spec_cached is keyed on (path, mtime) → per-rank singleton.
+            # GH #384 Phase A′: stash the sampled (BSM) parameter names on
+            # the spec's metadata so the modal convolution-block cache can
+            # identify which symbols vary per call (BSM) vs which are
+            # geometry-fixed. EquationSystem is frozen, so we
+            # dataclasses.replace to a new wrapper carrying the augmented
+            # metadata (~µs allocation, irrelevant vs the ~2 s simulate).
+            import dataclasses as _dc
+
             from tidal.cli._sweep import (
                 _measure_from_sim_data,  # pyright: ignore[reportPrivateUsage]
                 run_inference_step,
             )
+            from tidal.symbolic._spec_cache import (
+                load_spec_cached,
+            )
 
-            sim_data = run_inference_step(base_args, spec_path, param_overrides)
+            raw_spec = load_spec_cached(spec_path)
+            spec_with_bsm = _dc.replace(
+                raw_spec,
+                metadata={
+                    **raw_spec.metadata,
+                    "_inference_sampled_params": tuple(param_names),
+                },
+            )
+            sim_data = run_inference_step(
+                base_args,
+                spec_path,
+                param_overrides,
+                spec=spec_with_bsm,
+            )
             spec = sim_data.spec
             metrics = _measure_from_sim_data(
                 sim_data,
@@ -583,7 +624,10 @@ def _evaluate_likelihood(
             if exit_code != 0:
                 # v3 soft floor: Normal(SOFT_FLOOR_LOGL, sigma_explore) so the
                 # chain learns "this region fails" without a flat plateau.
-                return _soft_floor_logl(likelihood_config.soft_floor_noise_sigma), {
+                return _soft_floor_logl(
+                    likelihood_config.soft_floor_noise_sigma,
+                    likelihood_config.soft_floor_logl,
+                ), {
                     "run_status": "simulation_failed",
                     "exit_code": int(exit_code),
                     **stability_meta,
@@ -618,7 +662,10 @@ def _evaluate_likelihood(
         # inspect what the sim was doing.  Soft floor + noise.
         metric_value_f = float(metric_value)
         if math.isnan(metric_value_f) or math.isinf(metric_value_f):
-            return _soft_floor_logl(likelihood_config.soft_floor_noise_sigma), {
+            return _soft_floor_logl(
+                likelihood_config.soft_floor_noise_sigma,
+                likelihood_config.soft_floor_logl,
+            ), {
                 "run_status": "metric_nan",
                 likelihood_config.metric: metric_value_f,
                 **stability_meta,
@@ -671,7 +718,10 @@ def _evaluate_likelihood(
         # Route any residual ``-inf`` to the soft floor with a distinct
         # ``logl_minus_inf`` tag so post-chain analysis can locate them.
         if math.isinf(logl) and logl < 0:
-            return _soft_floor_logl(likelihood_config.soft_floor_noise_sigma), {
+            return _soft_floor_logl(
+                likelihood_config.soft_floor_noise_sigma,
+                likelihood_config.soft_floor_logl,
+            ), {
                 **success_meta,
                 "run_status": "logl_minus_inf",
             }
@@ -696,9 +746,9 @@ def _evaluate_likelihood(
         # v3 soft floor: never -inf for numerical exception.  Sampler can
         # still reject these in practice (exp(-100) ~ 4e-44) but sees a
         # gradient in the failure region.
-        return _soft_floor_logl(likelihood_config.soft_floor_noise_sigma), {
-            "run_status": "exception"
-        }
+        return _soft_floor_logl(
+            likelihood_config.soft_floor_noise_sigma, likelihood_config.soft_floor_logl
+        ), {"run_status": "exception"}
 
     finally:
         if run_dir is not None and not keep_sims and run_dir.exists():

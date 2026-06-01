@@ -197,6 +197,12 @@ When smallParams is a non-empty list of Wolfram symbols, orderInEps is the total
 ExtractTermCoefficient::symbolic =
   "Symbolic (non-numeric) coefficient `1` found for field `2`. Storing as symbolic coefficient in JSON.";
 
+CanonicalizeExpFraction::usage =
+  "CanonicalizeExpFraction[expr] cancels any common Power[E, _] factor between numerator \
+and denominator of a rational expression. No-op when expr is FreeQ of Power[E, _]. Used to \
+avoid float64 overflow at evaluation time when Wolfram serializes a kinetic-matrix-inverted \
+coefficient as E^A/(E^A - small) instead of the equivalent 1/(1 - small/E^A). See GH #378.";
+
 ClassifyOperatorType::usage =
   "ClassifyOperatorType[term] classifies the differential operator in a term. Returns \
 a list {operatorName, isMixedTimeSpace} where operatorName is one of: \"identity\", \
@@ -498,7 +504,7 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
       Module[{rawSum},
         rawSum = Total[ExtractLHSCoefficient /@ timeDerivTerm];
         (* Expand rather than Simplify so the emitted string is a sum of
-           monomials (no parenthesised sub-sums). The Python-side
+           monomials (no parenthesized sub-sums). The Python-side
            split_small_parameter_kinetic helper (#301 Phase 3) walks the
            AST term-by-term and cannot handle (a + b)*c forms — Expand
            distributes such structures up front. *)
@@ -506,14 +512,59 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
       ],
       -1
     ];
-    If[Abs[lhsCoeff] =!= 1,
-      If[!NumericQ[lhsCoeff] && FreeQ[lhsCoeff, _[]],
-        (* Pure-parameter kinetic coeff (e.g., xi): keep RHS unnormalized.           *)
-        (* Python normalizes at runtime so xi=0 can be handled as a constraint.     *)
-        rhs = -rhs;
-        kineticCoeffStr = ToString[lhsCoeff, InputForm],
-        (* Coordinate-dependent (e.g., 1/Omega^2) or numeric: divide here as before *)
-        rhs = -rhs / lhsCoeff
+    If[NumericQ[lhsCoeff],
+      (* Numeric lhsCoeff (any sign). Unified path: rhs = -rhs / lhsCoeff
+         normalizes the equation from LHS-form (M·d²ₜa + rhs_lhs_form = 0)
+         to RHS-form (d²ₜa = -rhs_lhs_form / M). This is correct for
+         lhsCoeff = +1 (gives rhs = -rhs_lhs_form), lhsCoeff = -1 (gives
+         rhs = +rhs_lhs_form), and any other numeric M. Pre-GH-#381 the
+         guard was `Abs[lhsCoeff] =!= 1` which silently passed lhsCoeff=-1
+         through without normalization, producing a wrong-sign coefficient
+         on the RHS for the timelike photon component a_0 (where the
+         (-,+,+,+) metric makes xAct emit `-d²ₜa_0 + ∇²a_0 = 0` with
+         lhsCoeff=-1). See GH #381 for the empirical sign-pattern table.
+         lhsCoeff=0 should never reach here (constraint reclassification
+         at line 477 catches it); a safety guard would be reasonable but
+         a divide-by-zero here flags the genuine bug clearly. *)
+      rhs = -rhs / lhsCoeff,
+      Module[{hasSmallParam, normalizedLhs, m0Sign},
+        (* Symbolic lhsCoeff. GH #380: a coord-dep kinetic coefficient that
+           ALSO contains a small parameter (e.g. EH `1 - 2*Bpeak²·G(x)·(ρ-8σ)`)
+           must NOT be divided through — dividing hides the perturbative
+           structure inside `1/(1-εX)` so every RHS coefficient gets tagged
+           order_in_eps=0 even though it carries O(ε), O(ε²), … pieces.
+           Keep un-normalized in that case too; Python's
+           canonicalize_kinetic_for_perturbation (#301 Phase 3) splits
+           M = M₀ + εM₁ and synthesizes the Pass-1 RHS corrections. *)
+        hasSmallParam = AnyTrue[smallParams, !FreeQ[lhsCoeff, #] &];
+        If[hasSmallParam || FreeQ[lhsCoeff, _[]],
+          (* Pure parameter (e.g. xi), OR coord-dep + small-param (e.g. EH):
+             keep RHS un-normalized, emit kinetic_coefficient_symbolic.
+             #380 follow-up: normalize sign so M₀ > 0. If lhsCoeff evaluates
+             negative at smallParams = 0, multiply the whole equation by -1:
+             emit -lhsCoeff and skip the `rhs = -rhs` flip. Without this the
+             modal solver's generalized eigenvalue M·d²ₜa = K·a returns real
+             eigenvalues at zero-small-param baseline even though K/M is the
+             standard wave operator. *)
+          m0Sign = If[hasSmallParam,
+            Module[{m0Val},
+              m0Val = Quiet[N[lhsCoeff /. Thread[smallParams -> 0]]];
+              If[NumericQ[m0Val], Sign[m0Val], +1]
+            ],
+            Sign[Quiet[N[lhsCoeff]]]
+          ];
+          If[m0Sign === -1,
+            normalizedLhs = -lhsCoeff
+            (* rhs unchanged (cancellation: M·d²ₜa = -RHS, then *-1 gives
+               -M·d²ₜa = RHS, i.e. normalizedLhs·d²ₜa = +rhs = original rhs) *),
+            normalizedLhs = lhsCoeff;
+            rhs = -rhs
+          ];
+          kineticCoeffStr = ToString[normalizedLhs, InputForm],
+          (* Coord-dep with no small params (e.g. 1/Omega^2 for FRW):
+             divide here as before. *)
+          rhs = -rhs / lhsCoeff
+        ]
       ]
     ];
     (* ALWAYS Expand the RHS to ensure Plus structure for ParseMultiFieldRHS.
@@ -1047,6 +1098,78 @@ MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] :
 (* Returns {numericCoeff, symbolicCoeff, isTimeDependent, coordDeps} *)
 (* where symbolicCoeff is None or a string, isTimeDependent is True/False, *)
 (* coordDeps is a list of coordinate name strings e.g. {"t"}, {"x", "y"} *)
+(* Cancel the dominant Power[E, _] factor from a rational expression with
+   additive Power[E, _]-bearing denominator. Wolfram's solve-for-v̇ step
+   (EulerLagrange.wl, ~line 522) can leave coefficients of shape
+   c·E^B / (E^A − small·E^C − …) where E^A is the dominant exponent at
+   large coordinate values; evaluating either E^A or E^(B>0) at box edges
+   overflows float64 (EH dual-Gaussian, GH #378). We can't rely on
+   `Cancel`: it requires polynomial generators and treats
+   Power[E, expr-involving-x[]] as opaque. Instead, we identify the
+   dominant exponent across the entire expression (the one with the
+   highest total polynomial degree in spatial-coordinate functions
+   like x[], y[], z[]) and divide numerator and denominator through by it.
+   Times-auto-flattening then merges E^a · E^(−A) → E^(a−A) for every a,
+   producing exponent differences that are bounded Gaussian envelopes. *)
+CanonicalizeExpFraction[expr_] := Module[
+  {n, d, dPlus, dRest, coordFuncs, exps, score, commonExp, factor,
+   dTerms, dSimplified, nNew},
+  If[FreeQ[expr, Power[E, _]], Return[expr]];
+  n = Numerator[expr];
+  d = Denominator[expr];
+  (* The additive structure carrying Power[E, _] summands may be wrapped
+     in a multiplicative outer factor — e.g. d = sigB^2 * Plus[E^A, ...].
+     Peel off the surrounding Times so we can act on the Plus. *)
+  Which[
+    Head[d] === Plus,
+      dPlus = d; dRest = 1,
+    Head[d] === Times,
+      Module[{plusParts, otherParts},
+        plusParts = Cases[d, _Plus];
+        otherParts = DeleteCases[d, _Plus];
+        If[Length[plusParts] === 1 && !FreeQ[plusParts[[1]], Power[E, _]],
+          dPlus = plusParts[[1]];
+          dRest = otherParts,
+          Return[expr]
+        ]
+      ],
+    True, Return[expr]
+  ];
+  (* xCoba coordinates appear as nullary function applications like x[],
+     y[], z[]. We want the Power[E, _] whose exponent grows fastest toward
+     +∞ as the coords get large — only those overflow. Score = sum over
+     coords of (Exponent · sign of leading coefficient), with sign probed
+     by substituting all other symbols with +1 (a safe proxy because
+     physical params Bpeak, sigB, zc1, zc2 are real). Exps with negative
+     leading sign (e.g. E^(-(x-zc)²/sigB²) — well-behaved Gaussians) get
+     a non-positive score and are not factored. *)
+  coordFuncs = Union[Cases[expr, h_Symbol[] :> h[], {0, Infinity}]];
+  exps = Cases[expr, Power[E, a_] :> a, {0, Infinity}];
+  score[a_] := If[coordFuncs === {}, LeafCount[a],
+    Total[Module[{deg, lead, vars, sub},
+      deg = Exponent[a, #];
+      lead = Coefficient[a, #, deg];
+      (* Substitute every user symbol in `lead` with +1.0 so Sign can
+         evaluate. `Variables` correctly excludes built-in heads like
+         Power, Times, Plus — using a bare `s_Symbol :> 1` rule would
+         clobber those heads and silently break the ranking. *)
+      vars = Variables[lead];
+      sub = Thread[vars -> ConstantArray[1.0, Length[vars]]];
+      deg * Sign[lead /. sub]
+    ] & /@ coordFuncs]];
+  commonExp = First[SortBy[exps, -score[#] &]];
+  (* If no exp has positive growth (every E^_ in the expression already
+     decays at large coords), there is no overflow to cancel. *)
+  If[score[commonExp] <= 0, Return[expr]];
+  factor = Power[E, -commonExp];
+  dTerms = (# * factor) & /@ (List @@ dPlus);
+  dSimplified = Total[dTerms] /. Power[E, a_] :>
+    Power[E, If[LeafCount[a] < 200, Simplify[a], a]];
+  nNew = (n * factor) /. Power[E, a_] :>
+    Power[E, If[LeafCount[a] < 200, Simplify[a], a]];
+  nNew / (dRest * dSimplified)
+];
+
 ExtractTermCoefficient[term_, fieldHead_String, targetField_String, smallParams_List:{}] := Module[
   {rawCoeff, coefficient = 1.0, symbolicCoeff = None,
    isTimeDependent = False, coordDeps = {}, orderInEps = 0},
@@ -1058,6 +1181,7 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String, smallParams_
     f_Symbol[__] /; ToString[f] === fieldHead :> 1
   };
   If[!NumericQ[rawCoeff] && LeafCount[rawCoeff] < 500, rawCoeff = Simplify[rawCoeff]];
+  rawCoeff = CanonicalizeExpFraction[rawCoeff];
 
   (* Compute total order in small parameters before string conversion         *)
   (* (needs the raw symbolic expression, not its ToString representation).    *)

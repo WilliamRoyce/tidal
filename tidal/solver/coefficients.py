@@ -112,7 +112,8 @@ class CoefficientEvaluator:
 
         # L3: Per-timestep cache
         self._timestep_cache: dict[
-            tuple[int, int, float], float | NDArray[np.float64],
+            tuple[int, int, float],
+            float | NDArray[np.float64],
         ] = {}
 
         # Pre-check: skip begin_timestep() cache clear when all
@@ -124,6 +125,20 @@ class CoefficientEvaluator:
 
         # Diagnostic: warn about mass sign changes
         self._check_mass_sign()
+
+        # GH #384 Phase A′: BSM-separability classification for the
+        # convolution-block cache. Auto-populated when the spec carries
+        # `_inference_sampled_params` metadata (set by SimulationLikelihood).
+        # Maps (eq_idx, term_idx) → (c_BSM_str, c_geom_str) for terms that
+        # factor cleanly as <BSM scalar> × <BSM-free residual>.
+        self._bsm_separability: dict[tuple[int, int], tuple[str, str]] = {}
+        bsm_hint = (
+            spec.metadata.get("_inference_sampled_params", ())
+            if hasattr(spec, "metadata")
+            else ()
+        )
+        if bsm_hint:
+            self.classify_bsm_separability(set(bsm_hint))
 
     def resolve(
         self,
@@ -182,6 +197,47 @@ class CoefficientEvaluator:
             self._timestep_cache[ts_key] = result
 
         return result
+
+    def classify_bsm_separability(self, bsm_symbols: set[str]) -> None:
+        """Detect which position-dependent RHS terms factor as c_BSM(α) · c_geom(x).
+
+        Populates ``self._bsm_separability`` with ``(eq_idx, term_idx) →
+        (c_BSM_str, c_geom_str)`` for separable terms. Non-separable terms
+        and constant-coefficient terms are not entered (the caller's cache
+        lookup will miss for them, falling back to the existing path).
+
+        GH #384 Phase A′ infrastructure. Re-run if ``bsm_symbols`` changes.
+        See ``tidal/symbolic/_separable.py`` for the AST-walker contract.
+        """
+        from tidal.symbolic._separable import (  # noqa: PLC0415
+            extract_separable_bsm_factors,
+        )
+
+        self._bsm_separability.clear()
+        for eq_idx, eq in enumerate(self._spec.equations):
+            for term_idx, term in enumerate(eq.rhs_terms):
+                if not term.position_dependent:
+                    continue
+                if term.coefficient_symbolic is None:
+                    continue
+                bsm_expr, geom_expr = extract_separable_bsm_factors(
+                    term.coefficient_symbolic,
+                    bsm_symbols,
+                )
+                if bsm_expr is not None:
+                    self._bsm_separability[eq_idx, term_idx] = (
+                        bsm_expr,
+                        geom_expr,
+                    )
+
+    def bsm_separable_factors(
+        self, eq_idx: int, term_idx: int
+    ) -> tuple[str, str] | None:
+        """Return ``(c_BSM_str, c_geom_str)`` if the term was classified separable.
+
+        Populated by a prior ``classify_bsm_separability`` call; else ``None``.
+        """
+        return self._bsm_separability.get((eq_idx, term_idx))
 
     def begin_timestep(self, t: float) -> None:  # noqa: ARG002
         """Clear per-timestep cache (L3).
@@ -309,7 +365,9 @@ class CoefficientEvaluator:
                 self._evaluate_symbolic(term, 0.0)
 
     def _evaluate_symbolic(
-        self, term: OperatorTerm, t: float,
+        self,
+        term: OperatorTerm,
+        t: float,
     ) -> float | NDArray[np.float64]:
         """Evaluate a symbolic coefficient expression."""
         sym = term.coefficient_symbolic
@@ -320,7 +378,11 @@ class CoefficientEvaluator:
         coord_arrays = self._coord_arrays if term.position_dependent else None
 
         return evaluate_coefficient(
-            sym, self._parameters, self._coordinates, coord_arrays, t,
+            sym,
+            self._parameters,
+            self._coordinates,
+            coord_arrays,
+            t,
         )
 
     def _check_mass_sign(self) -> None:
@@ -444,7 +506,7 @@ class CoefficientEvaluator:
                 # Leak metric: product of relative jump and boundary significance.
                 # IBP leak ~ |β(L)-β(0)| * |f(L)|².  For localized problems both
                 # the coefficient jump and field amplitude are small at boundaries.
-                # We use boundary_magnitude/scale as a proxy for field localisation
+                # We use boundary_magnitude/scale as a proxy for field localization
                 # (localized coefficients ↔ localized fields), giving:
                 #   leak ~ (jump/scale) * (boundary_magnitude/scale)
                 # This naturally suppresses false positives for localized

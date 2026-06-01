@@ -22,6 +22,7 @@ from pathlib import Path
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+from _palette import IBM_PALETTE
 
 mpl.rcParams.update(
     {
@@ -71,8 +72,8 @@ def _plot(data: dict, out_path: Path) -> None:
 
     fig, axes = plt.subplots(1, 3, figsize=(_FIG_WIDTH, _FIG_HEIGHT), sharey=True)
 
-    pade_color = "#1f77b4"
-    eig_color = "#ff7f0e"
+    pade_color = IBM_PALETTE["blue"]
+    eig_color = IBM_PALETTE["orange"]
 
     for ax, theory in zip(axes, _THEORY_ORDER, strict=True):
         rows = by_theory.get(theory, [])
@@ -111,7 +112,7 @@ def _plot(data: dict, out_path: Path) -> None:
             elinewidth=0.7,
             capsize=2.0,
             capthick=0.7,
-            label="Eigendecomp.",
+            label="Eigendecomposition",
         )
 
         ax.set_xscale("log")
@@ -120,18 +121,23 @@ def _plot(data: dict, out_path: Path) -> None:
         ax.set_xlabel("$N$")
         # Label only the power-of-two N values; intermediate N values
         # (192, 384, 768, …) still show markers but their ticks are
-        # unlabelled to avoid crowding.
+        # unlabeled to avoid crowding.
 
         def is_pow2(v):
             return v > 0 and (round(v) & (round(v) - 1)) == 0
 
         def is_pow2_sq(v):
             return is_pow2(round(v**0.5))  # 2D theories
+
         tick_filter = is_pow2_sq if "2+1" in _TITLES[theory] else is_pow2
         major_ticks = [n for n in ns if tick_filter(round(n))]
-        major_labels = [lbl for n, lbl in zip(ns, labels, strict=False) if tick_filter(round(n))]
+        major_labels = [
+            lbl for n, lbl in zip(ns, labels, strict=False) if tick_filter(round(n))
+        ]
         ax.set_xticks(major_ticks)
-        ax.set_xticklabels([f"${lbl}$" for lbl in major_labels], fontsize=7)
+        ax.set_xticklabels(
+            [f"${round(_n_to_float(lbl))}$" for lbl in major_labels], fontsize=7
+        )
         # Intermediate N values: keep them as minor ticks (no label).
         minor_ticks = [n for n in ns if not tick_filter(round(n))]
         ax.set_xticks(minor_ticks, minor=True)

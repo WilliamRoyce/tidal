@@ -1,0 +1,67 @@
+% !TEX root = ../main.tex
+% Conclusion — drafted per manuscript/planning/conclusion_drafting_spec.md
+% Composition: 1α + 2α + 3α + 4β + Fusion A (5E.1 + 5F.2). ≈ 380 w.
+% No equations, no figures, no \cref to figures. Two \cite to keys already
+% present in references.bib and already cited in results.tex / discussion.tex.
+
+\section{Conclusions}%
+\label{Conclusions}
+
+The extensions of general relativity that gravitational-wave
+observatories will probe introduce many new interactions, whose effect
+on the Gertsenshtein channel has not, until now, been systematically
+explored. We have presented \TIDAL{}, a symbolic--numerical software
+package that derives the linearised equations of motion directly from
+the Lagrangian, and applied it to the quadratic Poincar\'{e}-gauge
+action coupled to electromagnetism.
+
+Across the surveyed operator space we find that the Gertsenshtein
+conversion responds to the full coupling content of each Lagrangian,
+but a few operators are robustly dominant --- amplifying the
+conversion no matter what other terms are present. The most consistent
+of these is the derivative-mixing contraction
+\begin{equation*}
+    \lag \; \supset \; \rcD{^\alpha}\MAGT{^{\beta\gamma\delta}}\, \MAGF{_{\alpha\beta\gamma\delta}} \,,
+\end{equation*}
+which also has the greatest distinction between
+amplifying and suppressing parameter regions; for most other operators
+those regions largely overlap. The amplification persists without
+propagating-torsion, so purely ghost-driven growth cannot explain
+it.
+
+Whether the exponential mode growth behind these amplifications
+corresponds to a physical amplification, a tachyonic instability, or a
+kinetic ghost is a question this paper does not address. A
+particle-spectrum analysis via \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}
+would determine which of the three applies for each amplifying direction.
+
+The survey reports the structure of where amplification lives in
+coupling space, not detectable conversion probabilities, since
+the amplification score has no standalone meaning. The survey
+delivers which operators carry the amplification and its
+structure within the interaction landscape.
+A finite-extent BGMF would
+give the propagating wave only a finite interaction time, bounding the
+exponential growth that otherwise compounds indefinitely. The sectors
+that currently overflow would then re-enter with
+finite amplitude, presenting physical conversion magnitudes comparable with current
+indirect-detection thresholds for the Gertsenshtein signal; the operators that rank
+highest across this
+survey are the inputs that calculation needs. A second
+extension is to sample the direction of each coupling vector
+independently of its magnitude (see \cref{InferenceArchitecture}); this would
+identify which combinations of operators drive the amplification,
+independently of the basis in which the action is written.
+
+Gertsenshtein channel amplification is distributed across the new operator
+content of the action, with a few robustly
+dominant operators carrying the conversion no matter what else is
+present. Because the amplification persists without propagating
+torsion, future analyses can sidestep the difficult problem of which
+modes propagate and focus directly on the operator content.
+Whether each amplifying coupling identified here corresponds
+to a physical amplification or to an instability is a
+question the survey cannot, by construction, decide; what it does
+decide is which operators of the quadratic gauge-gravity action are
+candidates for that question at all --- and therefore which couplings
+any future bound on the Gertsenshtein signal would target.

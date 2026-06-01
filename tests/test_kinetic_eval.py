@@ -283,11 +283,11 @@ class TestSplitSmallParameterKinetic:
         with pytest.raises(KineticEvalError, match="denominator"):
             split_small_parameter_kinetic("1 + 1/rho", ["rho"])
 
-    def test_rejects_parenthesised_sum(self) -> None:
+    def test_rejects_parenthesized_sum(self) -> None:
         """Mult over a sum like ``2*B0^2*(rho - 8*sigma)`` must be ``Expand``'d
         on the Wolfram side before it reaches this helper.
         """
-        with pytest.raises(KineticEvalError, match="parenthesised sub-sum"):
+        with pytest.raises(KineticEvalError, match="parenthesized sub-sum"):
             split_small_parameter_kinetic(
                 "-1 + 2*B0^2*(rho - 8*sigma)",
                 ["rho", "sigma"],
