@@ -26,14 +26,14 @@ $\kappa$ defined by $\kappa^2 = 16\pi G$.\footnote{%
     the Einstein constant which we denote
     $\kappa_{(\mathrm{E})}\equiv 8\pi G$,
     $[\kappa_{(\mathrm{E})}] = [\mathrm{Mass}]^{-2}$, used as the
-    prefactor of $\MAGFt{}$
+    prefactor of $\MAGF{}$
     in~\cite{barker2024poincare,barker2023confinement,barker2024psalter}.
     The two normalisations are related by
     $\kappa^2 = 2\kappa_{(\mathrm{E})}$.
 } This is the linearised graviton--photon vertex coupling, and the
 field redefinition $\tilde{h}_{\mu\nu} = h_{\mu\nu}/\kappa$ used
 in~\cite{lella2024constraining} converts the prefactor
-$\kappa^{-2}\,\MAGFt{}$ into the canonical kinetic form
+$\tfrac{1}{\kappa^2}\,\MAGF{}$ into the canonical kinetic form
 $\tfrac{1}{2}(\partial\tilde{h})^2$. The totally antisymmetric
 Levi--Civita tensor $\varepsilon^{\mu\nu\rho\sigma}$ is normalised to
 $\varepsilon^{0123} = +1$.
@@ -89,7 +89,7 @@ linearised propagator%
 The translational and rotational gauge field strengths are defined
 by%~\cite{kibble1961lorentz,hehl1976spin,hehl1995metric,blagojevic2003lectures,hehlobukhov2007cartan,barker2024poincare}
 \begin{align}
-  \MAGFt{^\sigma_\mu_\nu_\rho}
+  \MAGF{^\sigma_\mu_\nu_\rho}
     &\equiv 2\,\PD{_{[\mu}}\MAGA{^\sigma_{\nu]}_\rho}
        + 2\,\MAGA{^\sigma_{[\mu|\lambda|}}\MAGA{^\lambda_{\nu]}_\rho},
   \label{Curvature} \\
@@ -105,17 +105,17 @@ part of the connection vanishes, equivalently when the torsion
 \paragraph*{General action}
 The most general action of Poincar\'{e} gauge theory coupled to
 electromagnetism, constructed from the gauge field
-strengths $\MAGFt{^\sigma_{\mu\nu\rho}}$, $\MAGT{^\sigma_{\mu\nu}}$,
+strengths $\MAGF{^\sigma_{\mu\nu\rho}}$, $\MAGT{^\sigma_{\mu\nu}}$,
 and $\FieldF{_{\mu\nu}}$, decomposes into sector blocks catalogued
 in~\cref{PGTEnumeration},
 as~\cite{lin2019pgt,blagojevic2018hamiltonian,barker2024poincare,sezgin1980ghostfree,aoki2020nonlinear,bahamonde2025cubic}
 \begin{multline}
   \act = \int \diff^4 x\,\sqrt{-g}\,\Bigl[
         \lag_\text{lin}
-        + \lag_{\MAGFt{^2}}
+        + \lag_{\MAGF{^2}}
         + \lag_{\MAGT{^2}}
         + \lag_{F^2}
-        + \lag_{\MAGFt{}\FieldF{}} \\[-0.5em]
+        + \lag_{\MAGF{}\FieldF{}} \\[-0.5em]
         + \lag_\text{odd}
         + \lag_\partial
         + \lag_\text{cubic}
@@ -125,9 +125,9 @@ as~\cite{lin2019pgt,blagojevic2018hamiltonian,barker2024poincare,sezgin1980ghost
 \end{multline}
 where $\lag_\text{lin}$ collects the linear
 invariants~\cite{kibble1961lorentz,holst1995barbero,barbero1995real,immirzi1997real};
-$\lag_{\MAGFt{^2}}$ the curvature-squared sector;
+$\lag_{\MAGF{^2}}$ the curvature-squared sector;
 $\lag_{\MAGT{^2}}$ the torsion-squared sector;
-$\lag_{F^2}$ the Maxwell kinetic term; $\lag_{\MAGFt{}\FieldF{}}$ the
+$\lag_{F^2}$ the Maxwell kinetic term; $\lag_{\MAGF{}\FieldF{}}$ the
 curvature--electromagnetic cross-couplings; $\lag_\text{odd}$
 the parity-odd quadratic operators~\cite{karananas2014parity,blagojevic2018hamiltonian};
 $\lag_\partial$ the higher-derivative
