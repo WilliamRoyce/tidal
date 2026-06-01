@@ -1,7 +1,7 @@
 % !TEX root = ../../main.tex
 % Appendix E: Symbolic-pipeline outputs for the surveyed theories.
 
-\section{Symbolic outputs for the surveyed theories}%
+\section{Symbolic outputs}%
 \label{SymbolicOutputs}
 
 % Per-theory equation/constraint/term counts used in figure captions.
@@ -16,19 +16,19 @@ wave on $h_{xy}$, whose conversion product is $A_x$ at the rate
 $\sin^{2}(\kappa \Bzero\,t / 2)$~\cite{boccaletti1970conversion}.
 We show representative equations for the conversion-relevant
 channel; equations of motion for the orthogonal polarisation, gauge
-modes, and constraint fields are computed but not displayed.
+modes, and constraint fields are computed but not always displayed here.
 
-We present Hamiltonian densities restricted to the gravitational-wave
+We present Hamiltonian densities restricted to the graviton
 and photon self-energy sector: torsion contributions are suppressed
-at emission and cross-sector interaction terms are excluded from the
-rendered density, so the displayed $\mathscr{H} \supset \dots$ is a
+and interaction terms are excluded,
+so the displayed $\mathscr{H} \supset \dots$ is a
 proper subset of the full canonical density (\cf~\cref{DiracBergmann}).
 
 We also display the linearised kinetic matrix
-$\mathcal{K}(\partial_t, \partial_z)$ of~\cref{KineticMatrix}
-as a single display per theory. Theories with velocity-pair fields
+$\mathcal{K}(\partial_t, \partial_z)$ of~\cref{KineticMatrix}.
+Theories with velocity-pair fields
 admit first-time-derivative contributions; these appear as
-additional columns labelled $\dot{X}$ for each q-field $X$
+additional columns labelled $\dot{X}$ for each $q$-field $X$
 whose velocity is referenced on a right-hand side. For those
 theories the matrix is rectangular: $n_{\mathrm{eq}}$ rows (one
 per equation of motion) and $n_q + n_v$ columns (one per dynamical
@@ -37,16 +37,14 @@ with the augmented state $\xi = (q, \dot{q})^\mathsf{T}$ gives
 equation $i$ as $\mathcal{K}_{ij}\xi_j = 0$.
 
 % --- E.1  Einstein--Maxwell Gertsenshtein baseline ------------------
-\subsection{Einstein--Maxwell Gertsenshtein baseline}%
+\subsection{Einstein--Maxwell Gertsenshtein}%
 \label{SymbolicBaseline}
 Linearised around a uniform magnetic background
 $\bm{B} = \Bzero\,\hat{x}$. The pure Einstein--Maxwell Lagrangian
 gives a block-diagonal kinetic sub-matrix in the transverse photon
 channels (\cref{Validation}). The symbolic output comprises
 \BaselineEomCount{} equations of motion (\BaselineConstraintCount{}
-constraints) with \BaselineTermCount{} RHS terms; $\mathscr{H}$ is
-restricted to the gravitational-wave and photon self-energy sector
-(cf.\ \cref{DiracBergmann}).
+constraints) with \BaselineTermCount{} RHS terms.
 
 \medskip
 \noindent\adjustbox{max width=\linewidth}{$\displaystyle
@@ -70,18 +68,13 @@ $}
 \medskip
 
 % --- E.2  Euler--Heisenberg QED 1-loop -------------------------------
-\subsection{Euler--Heisenberg QED corrections}%
+\subsection{Euler--Heisenberg QED}%
 \label{SymbolicEulerHeisenberg}
-Linearised around a uniform magnetic background
-$\bm{B} = \Bzero\,\hat{x}$. The Euler--Heisenberg corrections
-of~\cref{LagEH} (\cref{Validation}) yield $\rho$ couplings of
-$2\Bzero^{2}\rho$ on $\partial_{z}^{2}A_{x}$ and
-$6\Bzero^{2}\rho$ on $\partial_{z}^{2}A_{y}$. The symbolic output
+The Euler--Heisenberg corrections
+of~\cref{LagEH} (\cref{Validation}) yield a symbolic output
 comprises \EulerHeisenbergEomCount{} equations of motion
 (\EulerHeisenbergConstraintCount{} constraints) with
-\EulerHeisenbergTermCount{} RHS terms; $\mathscr{H}$ is restricted
-to the gravitational-wave and photon self-energy sector
-(cf.\ \cref{DiracBergmann}).
+\EulerHeisenbergTermCount{} RHS terms.
 
 \medskip
 \noindent\adjustbox{max width=\linewidth}{$\displaystyle
@@ -96,15 +89,12 @@ $}
 % --- E.3  Minimally-coupled Einstein--Cartan ------------------------
 \subsection{Minimally-coupled Einstein--Cartan}%
 \label{SymbolicReference}
-Linearised around a uniform magnetic background
-$\bm{B} = \Bzero\,\hat{x}$. Three quadratic torsion invariants with
-couplings $\beta_{1,2,3}$ are added to Einstein--Maxwell; no
-curvature-squared or nonminimal terms appear, and the torsion
-components enter only in equations with LHS $=0$ (\cref{SectorSurvey}).
+Three quadratic torsion invariants with
+couplings $\beta_{1,2,3}$ are added to Einstein--Maxwell; the torsion
+components enter only in algebraic equations with LHS $=0$ (\cref{SectorSurvey}).
 The symbolic output comprises \ReferenceEomCount{} equations of motion
 (\ReferenceConstraintCount{} constraints) with \ReferenceTermCount{}
-RHS terms; $\mathscr{H}$ is restricted to the gravitational-wave and
-photon self-energy sector (cf.\ \cref{DiracBergmann}).
+RHS terms.
 
 \medskip
 \noindent\adjustbox{max width=\linewidth}{$\displaystyle
@@ -117,21 +107,17 @@ $}
 
 
 % --- E.4  Propagating PGT with the curvature-squared term -----------
-\subsection{Propagating PGT with the curvature-squared term}%
+\subsection{$\MAGFt{^2}$--PGT}%
 \label{SymbolicMechanism}
-Linearised around a uniform magnetic background
-$\bm{B} = \Bzero\,\hat{x}$. The $\Alp{1}\MAGFt{}^{2}$
+The $\Alp{1}\MAGFt{^2}$
 curvature-squared term promotes the metric-perturbation sector to
 a fourth-order system. We include this theory \emph{for
 inspection} of the resulting equation-of-motion structure rather
-than as a simulated theory: the $\Alp{1}$-weighted
+than as a simulated theory. The $\Alp{1}$-weighted
 contributions land only on the diagonal $h_{ii}$ kinetic equations
 (see, for instance, the $2\,\Alp{1}\,\partial_t^{4}h_{xx}$ term) and are absent from the
 off-diagonal $h_{xy}$ equation that mediates the Gertsenshtein
-channel $h_\times \!\leftrightarrow\! a_\parallel$. Linear-order
-$h_{xy}\!\leftrightarrow\!A_{x}$ conversion is therefore
-unaffected by the $\Alp{1}$ coupling, a null result we read directly
-from the equations rather than confirm by simulation (\cref{SectorSurvey}).
+channel.
 
 The Hamiltonian density is suppressed;
 see~\cref{PerturbativeReduction}. The symbolic output comprises
@@ -149,18 +135,14 @@ $}
 
 
 % --- E.5  Ricci--EM nonminimal coupling -----------------------------
-\subsection{Ricci--EM nonminimal coupling}%
+\subsection{Riemann--Cartan electromagnetic coupling}%
 \label{SymbolicNonminimal}
-Linearised around a uniform magnetic background
-$\bm{B} = \Bzero\,\hat{x}$. A single new vertex
+A single new vertex
 $\delta_{1}\MAGFt{_{\mu\nu}}\FieldA{^{\mu\nu}}$ is added to the
-Einstein--Cartan terms. The $\delta_{1}$ coupling generates entries
-in every $h_{\mu\nu}$ equation and second-time-derivative entries in
-the torsion sector (\cref{SectorSurvey}). The symbolic output
+Einstein--Cartan terms. The symbolic output
 comprises \NonminimalEomCount{} equations of motion
 (\NonminimalConstraintCount{} constraints) with \NonminimalTermCount{}
-RHS terms; $\mathscr{H}$ is restricted to the gravitational-wave and
-photon self-energy sector (cf.\ \cref{DiracBergmann}).
+RHS terms.
 
 \medskip
 \noindent\adjustbox{max width=\linewidth}{$\displaystyle
@@ -173,20 +155,17 @@ $}
 
 
 % --- E.6  Full YM--PGT nonminimal -----------------------------------
-\subsection{Yang--Mills-form PGT: all parity-even nonminimal couplings}%
+\subsection{Yang--Mills--PGT}%
 \label{SymbolicGeneralNonminimal}
-Linearised around a uniform magnetic background
-$\bm{B} = \Bzero\,\hat{x}$. The full Yang--Mills-form Poincar\'e
+ The full Yang--Mills-form Poincar\'e
 gauge Lagrangian turns on $\beta_{1,2,3}$, $\xi$, $\delta_{1}$,
 $\chi$, $\zeta_{1,2,3}$ simultaneously. The Bahamonde et al.~\cite{bahamonde2025torsion},
 Barker~\cite{barker2024poincare}, and Shapiro~\cite{shapiro2002torsion}
 variants of~\cref{SectorSurvey} are parameter restrictions of
-\cref{QuadraticAction} (\cref{SectorSurvey}). The symbolic output
+\cref{NonMinimalLagrangian} (\cref{SectorSurvey}). The symbolic output
 comprises \GeneralNonminimalEomCount{} equations of motion
 (\GeneralNonminimalConstraintCount{} constraints) with
-\GeneralNonminimalTermCount{} RHS terms; $\mathscr{H}$ is restricted
-to the gravitational-wave and photon self-energy sector
-(cf.\ \cref{DiracBergmann}).
+\GeneralNonminimalTermCount{} RHS terms.
 
 \medskip
 \noindent\adjustbox{max width=\linewidth}{$\displaystyle
@@ -201,24 +180,18 @@ $}
 % --- E.7  Parity-odd extension --------------------------------------
 \subsection{Parity-odd extension}%
 \label{SymbolicParityOdd}
-Linearised around a uniform magnetic background
-$\bm{B} = \Bzero\,\hat{x}$. $d_{14}$--$d_{17}$,
-$d_{19}$--$d_{21}$, and $\zeta_{1}$--$\zeta_{6}$ are added to the
-full Yang--Mills-form Lagrangian (\cref{SectorSurvey}).
+\Cref{ParityOdd20D} introduces a twenty-parameter parity-odd non-minimal sector on top of the
+Yang--Mills--PGT base.
 
 Under the self-sector restriction of~\cref{DiracBergmann}, the
 self-sector Hamiltonian for this theory is identical in form to
 the YM--PGT Hamiltonian of~\cref{SymbolicGeneralNonminimal}. This
 is expected: the parity-odd invariants contribute only to
-cross-sector interaction terms --- which the self-sector filter
-removes --- and to an additional constraint equation, which is
-suppressed alongside the rest of the constraint sub-block.
+cross-sector interaction terms and to an additional constraint equation.
 The self-energy diagonal sector itself is unchanged.
 The symbolic output comprises \ParityOddEomCount{} equations of
 motion (\ParityOddConstraintCount{} constraints) with
-\ParityOddTermCount{} RHS terms; $\mathscr{H}$ is restricted to
-the gravitational-wave and photon self-energy sector
-(cf.\ \cref{DiracBergmann}).
+\ParityOddTermCount{} RHS terms.
 
 \medskip
 \noindent\adjustbox{max width=\linewidth}{$\displaystyle
@@ -231,21 +204,18 @@ $}
 
 
 % --- E.8  Dark-photon-plasma analogue -------------------------------
-\subsection{Dark-photon-plasma analogue}%
+\subsection{Dark-photon-plasma}%
 \label{SymbolicDarkPhotonPlasma}
-Linearised around a uniform magnetic background
-$\bm{B} = \Bzero\,\hat{x}$. A kinetic-mixing vertex
+A kinetic-mixing vertex
 $\delta_{m}\,F_{\mu\nu}\tilde{F}^{\mu\nu}$ (with $\tilde{F}$ the
 torsion-trace field strength) and a photon mass term
-$m_{A}^{2}$ are added to the Einstein--Cartan Lagrangian.
+$m_{A}^{2}$ are added in \cref{DarkPhotonPlasmaLagrangian}.
 $m_{A}^{2}$ enters the diagonal photon kinetic term;
 $\delta_{m}$ enters the off-diagonal photon--torsion entries
 (\cref{SectorSurvey}). The symbolic output comprises
 \DarkPhotonPlasmaEomCount{} equations of motion
 (\DarkPhotonPlasmaConstraintCount{} constraints) with
-\DarkPhotonPlasmaTermCount{} RHS terms; $\mathscr{H}$ is restricted
-to the gravitational-wave and photon self-energy sector
-(cf.\ \cref{DiracBergmann}).
+\DarkPhotonPlasmaTermCount{} RHS terms.
 
 \medskip
 \noindent\adjustbox{max width=\linewidth}{$\displaystyle
@@ -256,14 +226,14 @@ to the gravitational-wave and photon self-energy sector
 $}
 \medskip
 
-The $\delta_{m}$ kinetic-mixing vertex produces off-diagonal
-photon--torsion entries explicitly visible in the
-$A \leftrightarrow T$ block of the kinetic matrix below;
-the photon-mass term $m_A^{2}$ enters the diagonal $A_\mu$ cells.
+% The $\delta_{m}$ kinetic-mixing vertex produces off-diagonal
+% photon--torsion entries explicitly visible in the
+% $A \leftrightarrow T$ block of the kinetic matrix below;
+% the photon-mass term $m_A^{2}$ enters the diagonal $A_\mu$ cells.
 
-\medskip
-\noindent\adjustbox{max width=\linewidth}{$\displaystyle
-\setlength{\jot}{0.5pt}%
-\input{sections/appendices/listings/eom_dark_photon_plasma_kinetic_matrix.tex}
-$}
-\medskip
+% \medskip
+% \noindent\adjustbox{max width=\linewidth}{$\displaystyle
+% \setlength{\jot}{0.5pt}%
+% \input{sections/appendices/listings/eom_dark_photon_plasma_kinetic_matrix.tex}
+% $}
+% \medskip
