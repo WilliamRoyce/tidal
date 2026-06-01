@@ -52,7 +52,7 @@ precision floor of the solver chosen for each calibration.
   \label{BoccalettiUniform}
 \end{figure*}
 
-\paragraph*{Two-mode formula and uniform-background sweep}
+\paragraph*{Two-channel mixing}
 The two-mode formula that supersedes the bare Boccaletti kernel at
 finite $\Bzero$ (see~\cref{ValidationResult}) is the
 Raffelt--Stodolsky expression~\cite{raffelt1988mixing}
@@ -77,7 +77,7 @@ $\O(\Bzero^4)$.
 $\Bzero$ sweep, and panel (b) shows the modal/\CVODE{}
 grid-refinement plateau at the corresponding $(\Delta/g)^4$ level.
 
-\paragraph*{Path-integrated kernel on a Gaussian profile}
+\paragraph*{Path-integrated kernel}
 The path-integrated Boccaletti form~\cref{BoccalettiPathIntegrated}
 is the closed-form benchmark for the localised-source runs. For the
 Gaussian profile
@@ -103,7 +103,7 @@ formula's small-conversion assumption no longer applies.
   \label{BoccalettiLocalised}
 \end{figure}
 
-\paragraph*{Klein--Gordon perturbative calibration}
+\paragraph*{Klein--Gordon perturbation}
 The perturbative-reduction machinery of~\cref{PerturbativeReduction}
 evolves the system as a base (order-$\varepsilon^{0}$) solution
 $\phi^{(0)}$ plus a correction (order-$\varepsilon^{1}$)
@@ -142,7 +142,7 @@ scaling.
   \label{ForcedOscillator}
 \end{figure}
 
-\paragraph*{Higher-derivative perturbative calibration}
+\paragraph*{Higher-derivative perturbation}
 A second perturbative calibration replaces the mass shift of
 \cref{KGMassShift} with a fourth-order spatial correction,
 \begin{equation}
@@ -175,7 +175,7 @@ the base solution reaches $\sim 10^4$ at $\varepsilon=0.01$ in
   \label{ParkerSimon}
 \end{figure}
 
-\paragraph*{Euler--Heisenberg birefringence ratio}
+\paragraph*{Euler--Heisenberg}
 The QED Euler--Heisenberg effective action in the weak-field
 limit~\cite{heisenberg1936consequences,schwinger1951gauge,dunne2004heisenberg,adler1971photon}
 is, to leading order in the field strength,
@@ -203,7 +203,7 @@ field~\cite{schwinger1951gauge}). The resulting Adler birefringence
 ratio $(n_\parallel - 1)/(n_\perp - 1) = 7/4$ is reproduced
 exactly~\cite{adler1971photon}.
 
-\paragraph*{Cross-formulation equivalence: Proca versus vector-torsion}
+\paragraph*{Cross-formulation equivalence}
 For complex PGT theories where no closed-form solution is available,
 the only available consistency check is to compare the same
 continuum action derived via two mathematically distinct field
@@ -238,7 +238,7 @@ continuum equivalence is recovered under the map
 $m_T^2 = +2\alpha_3$. The two formulations agree on observables at
 the IEEE double-precision round-off floor.
 
-\paragraph*{Multi-method agreement across solvers and measurement paths}
+\paragraph*{Multi-method agreement}
 We cross-check pairwise agreement between each applicable \TIDAL{} solver (see~\cref{NumericalEvolution})
 on the
 EM baseline of~\cref{GertsenshteinFormula} and on a
@@ -297,7 +297,7 @@ auto-selected modal solver rather than Yoshida-4.
   \label{ConvergenceFigure}
 \end{figure*}
 
-\paragraph*{Energy-conservation audit}
+\paragraph*{Energy-conservation}
 Energy conservation, when available
 (\cref{SVDNullSpace,DiracBergmann}), provides a diagnostic that engages
 every layer of the workflow. We audit the maximum relative
