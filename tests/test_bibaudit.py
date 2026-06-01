@@ -26,10 +26,11 @@ pytestmark = pytest.mark.skipif(
 
 def test_all_entries_extract_cleanly():
     entries = load_bib(BIB)
-    # 231 active entries after the audit (removed 3 duplicates/wrong-variant: mekki2023skitsundae,
-    # blagojevic2013gauge, lidemmel2003superlu; added martingarcia2008xperm, demmel1999superlumt,
-    # and sotiriou2010fr [f(R) review, added during manuscript editing])
-    assert len(entries) == 231
+    # Exact-count guard against accidental entry loss/duplication. Bump this
+    # deliberately when references.bib grows (uniqueness is separately pinned
+    # by test_no_duplicate_keys). Currently 236 active entries after the
+    # citation audit + manuscript-editing additions.
+    assert len(entries) == 236
     for e in entries:
         assert e.fields, f"{e.key}: no fields extracted"
         for name, val in e.fields.items():
