@@ -185,7 +185,7 @@ def _has_marker_above(text: str, idx: int) -> bool:
         if s.startswith("%"):
             if s.replace(" ", "").upper().startswith("%AUDIT"):
                 return True
-        elif s == "":
+        elif not s:
             continue
         else:
             break

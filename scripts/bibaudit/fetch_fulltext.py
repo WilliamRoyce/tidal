@@ -41,16 +41,18 @@ def fetch_eprint(arxiv_id: str) -> str:
                     data = tf.extractfile(m).read()
                     (dest / Path(m.name).name).write_bytes(data)
                     n += 1
-        return f"tar: {n} tex/bbl files"
     except tarfile.ReadError:
         pass
+    else:
+        return f"tar: {n} tex/bbl files"
     try:
         text = gzip.decompress(raw)
         (dest / f"{safe}.tex").write_bytes(text)
-        return "single-gz tex"
     except Exception:
         (dest / f"{safe}.raw").write_bytes(raw)
         return "raw (unrecognised format)"
+    else:
+        return "single-gz tex"
 
 
 def main(ids: list[str]) -> int:

@@ -233,8 +233,9 @@ class CoefficientEvaluator:
     def bsm_separable_factors(
         self, eq_idx: int, term_idx: int
     ) -> tuple[str, str] | None:
-        """Return ``(c_BSM_str, c_geom_str)`` if the term was classified
-        separable by a prior ``classify_bsm_separability`` call; else ``None``.
+        """Return ``(c_BSM_str, c_geom_str)`` if the term was classified separable.
+
+        Populated by a prior ``classify_bsm_separability`` call; else ``None``.
         """
         return self._bsm_separability.get((eq_idx, term_idx))
 

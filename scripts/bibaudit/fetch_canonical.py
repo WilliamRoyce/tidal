@@ -293,7 +293,7 @@ def googlebooks_search(title: str, author: str) -> list[dict]:
     return out
 
 
-def resolve_books(*, refresh: bool = False) -> dict:
+def resolve_books() -> dict:
     """For every book-like entry, gather Crossref + Google Books candidates by
     title+author so a human/agent can verify + enrich. Writes cache/books/<key>.json
     and prints a per-book candidate report. Does NOT edit the bib.
@@ -360,13 +360,13 @@ def arxiv_abstract(arxiv_id: str, *, refresh: bool = False) -> dict:
         return {"found": False, "transient": True, "ident": ident}
     m = re.search(r"<summary>(.*?)</summary>", r.text, re.DOTALL)
     t = re.search(r"<title>(.*?)</title>", r.text, re.DOTALL)
-    abs = _TAG.sub(" ", m.group(1)).strip() if m else ""
+    abstract = _TAG.sub(" ", m.group(1)).strip() if m else ""
     payload = {
-        "found": bool(abs),
+        "found": bool(abstract),
         "ident": ident,
         "source": f"arxiv:{arxiv_id}",
         "title": (t.group(1).strip() if t else ""),
-        "abstract": " ".join(abs.split()),
+        "abstract": " ".join(abstract.split()),
     }
     _save_cache("abstracts", ident, payload)
     return payload
@@ -488,7 +488,7 @@ def main(argv: list[str]) -> int:
     if "--mode" in argv:
         mode = argv[argv.index("--mode") + 1]
         if mode == "books":
-            resolve_books(refresh=refresh)
+            resolve_books()
             return 0
         if mode == "abstracts":
             prefetch_abstracts(refresh=refresh)

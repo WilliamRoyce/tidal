@@ -114,7 +114,7 @@ References
 # ruff: noqa: PLR0913, PLR0917, PLR0914, PLR0912, PLR0911, PLR0915, PLR2004
 #   — numerical code inherently requires many arguments, local variables,
 #   return statements, statements, and literal comparisons.
-# ruff: noqa: C901, RUF001, RUF003 — complexity and Unicode math symbols.
+# ruff: noqa: C901 — complexity and Unicode math symbols.
 # ruff: noqa: ERA001, ARG001 — commented-out code serves as documentation;
 #   unused args (bc, grid) kept for interface consistency with other solvers.
 # ruff: noqa: B903, PLR1702 — _OperatorDecomp uses __slots__ for memory efficiency;

@@ -101,20 +101,20 @@ class TestKineticMatrixToLatex:
     """The rendered LaTeX uses a labelled array and includes the expected entries."""
 
     def test_baseline_render(self) -> None:
-        import tidal.symbolic.latex as L
+        import tidal.symbolic.latex as latex_mod
         from tidal.symbolic.latex import kinetic_matrix_to_latex, system_to_latex
 
         spec = load_equation_system(_BASELINE)
         # system_to_latex mutates the module-level metric symbol as a
         # side effect; save and restore so this test does not leak
         # state into subsequent tests that assert flat-metric \eta.
-        saved_metric = L._metric_symbol
+        saved_metric = latex_mod._metric_symbol
         try:
             _ = system_to_latex(spec, output_format="raw")
             km = build_kinetic_matrix(spec)
             out = kinetic_matrix_to_latex(km, spec)
         finally:
-            L._metric_symbol = saved_metric
+            latex_mod._metric_symbol = saved_metric
 
         assert r"\mathcal{K}" in out
         # Labelled array wrapper (replaces the earlier bare bmatrix).

@@ -109,8 +109,9 @@ def get_or_compute(
 
 
 def clear() -> None:
-    """Drop all cached blocks and reset stats. Call between independent
-    chains in tests; not needed for normal use.
+    """Drop all cached blocks and reset stats.
+
+    Call between independent chains in tests; not needed for normal use.
     """
     with _LOCK:
         _CACHE.clear()

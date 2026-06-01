@@ -45,12 +45,13 @@ class TestSeparableCases:
             "5*Bpeak^2/E^(x[]^2)", {"alpha1", "delta1"}
         )
         # Empty product means the BSM scalar is constant 1
-        assert bsm in ("", "1") or bsm is not None
-        assert "alpha1" not in geom and "delta1" not in geom
+        assert bsm in {"", "1"} or bsm is not None
+        assert "alpha1" not in geom
+        assert "delta1" not in geom
 
     def test_addsub_summands_share_same_bsm(self) -> None:
         # delta1 * X + delta1 * Y is separable as delta1 * (X + Y)
-        bsm, geom = extract_separable_bsm_factors(
+        bsm, _geom = extract_separable_bsm_factors(
             "delta1*x[] + delta1*Bpeak", {"delta1"}
         )
         assert bsm == "delta1"
@@ -67,19 +68,17 @@ class TestNonSeparableCases:
 
     def test_bsm_inside_exponential(self) -> None:
         # E^(alpha1*x) — BSM inside exponent
-        bsm, geom = extract_separable_bsm_factors("E^(alpha1*x[])", {"alpha1"})
+        bsm, _geom = extract_separable_bsm_factors("E^(alpha1*x[])", {"alpha1"})
         assert bsm is None
 
     def test_bsm_in_one_summand_only(self) -> None:
         # alpha1 + x[] : different BSM-products per summand
-        bsm, geom = extract_separable_bsm_factors("alpha1 + x[]", {"alpha1"})
+        bsm, _geom = extract_separable_bsm_factors("alpha1 + x[]", {"alpha1"})
         assert bsm is None
 
     def test_bsm_in_denominator(self) -> None:
         # 1/(1 + alpha1*X) — BSM in denominator
-        bsm, geom = extract_separable_bsm_factors(
-            "1/(1 + alpha1*x[])", {"alpha1"}
-        )
+        bsm, _geom = extract_separable_bsm_factors("1/(1 + alpha1*x[])", {"alpha1"})
         assert bsm is None
 
 
@@ -87,7 +86,7 @@ class TestNumericalRoundTrip:
     """Verify c_BSM · c_geom evaluates identically to the original expression."""
 
     @pytest.mark.parametrize(
-        "expr,bsm_set,params,coord_arrays",
+        ("expr", "bsm_set", "params", "coord_arrays"),
         [
             (
                 "alpha1*x[]",
@@ -122,7 +121,5 @@ class TestNumericalRoundTrip:
         geom_val = evaluate_coefficient(
             geom_expr, params, ("t", "x"), coord_arrays, 0.0
         )
-        product = bsm_val * geom_val if not isinstance(geom_val, np.ndarray) else (
-            bsm_val * geom_val
-        )
+        product = bsm_val * geom_val
         assert np.allclose(orig, product, rtol=1e-12)

@@ -18,7 +18,7 @@ for the full architecture. Key guarantees:
   added cost is ~1.5x a single Pass 0 at machine precision.
 """
 
-# ruff: noqa: RUF003, ERA001 — Unicode math symbols; shape-annotation comments.
+# ruff: noqa: ERA001 — Unicode math symbols; shape-annotation comments.
 # ruff: noqa: PLR0913, PLR0917, PLR0914, PLR0912, PLR0915, PLR2004, C901, N806, ANN401
 #   — numerical code inherently requires many arguments, local variables, and uppercase
 #   matrix names (V, K_eff follow standard linear-algebra notation).

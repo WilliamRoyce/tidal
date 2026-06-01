@@ -288,7 +288,7 @@ def _strip_outer_parens(s: str) -> str:
     return s
 
 
-def coefficient_to_latex(expr: str) -> str:  # noqa: C901, PLR0914
+def coefficient_to_latex(expr: str) -> str:  # noqa: C901
     r"""Convert a Mathematica-style symbolic coefficient to LaTeX.
 
     Examples
@@ -917,7 +917,7 @@ def _sector(field_name: str) -> str:
 
 
 def _is_self_sector_term(term: HamiltonianTerm) -> bool:
-    """True for terms confined to a single self-sector (gw-gw, em-em, ...).
+    """Return ``True`` for terms confined to a single self-sector (gw-gw, em-em, ...).
 
     GW<->EM cross terms (the photon-graviton mixing that drives conversion)
     are dropped from the rendered Hamiltonian. ``"other"`` fields (constraint
@@ -996,7 +996,7 @@ def hamiltonian_to_latex(
 # ---------------------------------------------------------------------------
 
 
-def _render_kinetic_cell(cell, spec) -> str:  # noqa: ANN001 (KineticMatrixCell, EquationSystem)
+def _render_kinetic_cell(cell) -> str:  # noqa: ANN001 (KineticMatrixCell)
     r"""Render one $\mathcal{K}_{ij}$ cell as a sum of (coeff)(op) terms.
 
     ``cell.entries`` is a list of ``(operator_label, coefficient_symbolic)``
@@ -1076,32 +1076,26 @@ def kinetic_matrix_to_latex(km, spec: EquationSystem) -> str:  # noqa: ANN001
     row_labels = [_field_label(f) for f in km.row_fields]
     col_labels = [_field_label(f) for f in km.column_fields]
 
-    # Build the labelled array. Format:
-    #   \begin{array}{c|cccc}
-    #          & col_0 & col_1 & ... \\
-    #     \hline
-    #     row_0 & K_{00} & K_{01} & ... \\
-    #     row_1 & K_{10} & K_{11} & ... \\
-    #     \cdots
-    #   \end{array}
+    # Build the labelled array: an `array{c|cc...}` whose first row holds the
+    # column field labels (after a leading empty corner cell and an \hline),
+    # then one row per row-field prefixed by its label, with cell (i, j)
+    # holding the rendered K_{ij} entry.
     n_cols = km.n_cols
     col_spec = "c|" + "c" * n_cols
     header = " & " + " & ".join(col_labels) + r" \\"
     body_rows: list[str] = []
     for i, row_label in enumerate(row_labels):
-        rendered_cells = [
-            _render_kinetic_cell(km.cells[i][j], spec) for j in range(n_cols)
-        ]
+        rendered_cells = [_render_kinetic_cell(km.cells[i][j]) for j in range(n_cols)]
         body_rows.append(row_label + " & " + " & ".join(rendered_cells))
     body = " \\\\\n  ".join(body_rows)
     result = (
         r"\mathcal{K}(\partial_t,\partial_z) = "
-         "\n"
-         rf"\begin{{array}}{{{col_spec}}}{chr(10)}"
-         f"  {header}{chr(10)}"
-         f"  \\hline{chr(10)}"
-         f"  {body}{chr(10)}"
-         r"\end{array}"
+        "\n"
+        rf"\begin{{array}}{{{col_spec}}}{chr(10)}"
+        f"  {header}{chr(10)}"
+        f"  \\hline{chr(10)}"
+        f"  {body}{chr(10)}"
+        r"\end{array}"
     )
     for from_axis, to_axis in axis_remap.items():
         result = result.replace(rf"\partial_{from_axis}", rf"\partial_{to_axis}")

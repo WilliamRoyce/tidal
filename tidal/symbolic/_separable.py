@@ -69,7 +69,7 @@ def _split_top_level_mult(
     geom_factors: list[ast.AST] = []
     sign_state = [1]  # accumulator flipped by every USub during descent
 
-    def visit(n: ast.AST, in_numerator: bool) -> bool:  # noqa: PLR0911, PLR0912
+    def visit(n: ast.AST, in_numerator: bool) -> bool:  # noqa: PLR0912
         """Return True if separable; populate the lists by side-effect."""
         # Mult / Div: descend into both operands. Div numerator: in_numerator;
         # Div denominator: BSM forbidden.
