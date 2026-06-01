@@ -1,11 +1,16 @@
 % !TEX root = ../../main.tex
-% Appendix J: Bayesian inference for the coupling-space survey.
-% Six paragraphs covering: opening + amplification score + evidence
-% integral + cubed-sphere joint prior + evidence as prior expectation
-% + posterior contraction.  PolyChord and per-scalar prior families
-% are deliberately not given their own paragraphs (the cubed-sphere
-% is the project's prior architecture; PolyChord is cited in the
-% opening only).
+% Appendix: Coupling-space exploration with nested sampling.
+% Reframes PolyChord as a landscape-exploration tool driven by the
+% synthetic score A(theta), not a Bayesian inference engine.  The
+% two descriptors the results section reports are the corner-plot
+% 2D marginals and the per-coupling marginal D_KL ranking; log Z
+% and log B are defined here (Prior-averaged amplification) but
+% explicitly not quoted in the results prose (cross-truncation
+% incomparability + t_end sensitivity on exp-growing-mode sectors).
+% Paragraph order: Amplification score, Theory-agnostic acceptance
+% of exp-growing modes, Prior-averaged amplification, Total
+% information gain D_KL, Per-coupling information gain, Cubed-sphere
+% joint prior, Direction at fixed magnitude.
 
 \section{Coupling-space exploration with nested sampling}%
 \label{InferenceArchitecture}
@@ -28,7 +33,7 @@ literature~\cite{Partay:2021materials,Martiniani:2014sens,Burkoff:2012protein},
 where it maps potential-energy surfaces, and in
 beyond-the-Standard-Model phenomenology and cosmological parameter
 estimation~\cite{GAMBIT:2017zdo,Giani:2023gfq}, where it scans
-constraint-satisfaction landscapes over high-dimensional coupling
+constraint-satisfaction regions over high-dimensional coupling
 spaces; the field survey of~\cite{Ashton:2022grj} discusses both.
 PolyChord delivers samples from the score-reweighted distribution
 $p(\theta\mid A) \propto A(\theta)\,\pi(\theta)$, visualised with
@@ -140,16 +145,8 @@ and on the simulation horizon $t_\mathrm{end}$ when the score grows
 multi-modally and exponentially, so $\D$ is not a cross-truncation
 comparator. The operator-resolved per-coupling marginal $\D$
 of the next paragraph is the descriptor the results prose leans on.
-The per-coupling marginal $D_{\mathrm{KL}}$ extracted with
-anesthetic~\cite{Handley:2019mfs} picks out which invariants
-the chain has contracted along, telling us not just \emph{that} a
-region of coupling space carries the response but \emph{which
-directions in operator space} it spans. Per-coupling
-$D_{\mathrm{KL}}$ values for each surveyed truncation are reported
-in~\cref{Results}.
 
-\paragraph*{Per-coupling information gain}%
-\label{KLMethods}
+\paragraph*{Per-coupling information gain}
 The per-coupling marginal $\D$ extracted with
 anesthetic~\cite{Handley:2019mfs} resolves the joint contraction of
 \cref{KLDivergence} onto each coupling $\theta_i$. Writing $P_\pm$
