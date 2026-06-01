@@ -87,7 +87,7 @@ in their declared fields and Lagrangian.}
 \label{TOMLExample}
 \end{figure}
 
-\paragraph*{Lagrangian input from TOML}
+\paragraph*{Lagrangian input}
 The theory is specified by a single TOML file, which isolates
 everything theory-dependent from the derivation so the same code can
 serve any quadratic Lagrangian without per-theory editing.
@@ -111,7 +111,7 @@ with $n$ labelling the $N$ dynamical fields, $a$ labelling the $P$
 scalar parameters, and $\mathcal{I}$ standing for each field's
 suppressed tensor indices; the internal stages occupy the rest of this appendix.
 
-\paragraph*{Linearisation around backgrounds}
+\paragraph*{Linearisation}
 The action is expanded to second order in the perturbations by
 \xPert{}~\cite{brizuela2009xpert} in the background decomposition of
 \cref{Linearisation}, with the metric and any declared matter fields perturbed
@@ -132,7 +132,7 @@ matter-perturbations block of~\cref{TOMLExample} yields
                           + \varepsilon\,\delta\varphi^{\mathcal{I}},
   \label{MultiFieldPerturbation}
 \end{align}
-\cref{MultiFieldPerturbation} is the symbolic-stage reading of
+the symbolic-stage reading of
 \cref{PerturbationAnsatz}.
 The background-fields have their component values fixed by
 \texttt{xCoba}'s \texttt{ComponentValue} declarations, \eg
@@ -164,7 +164,7 @@ On the flat Minkowski background of~\cref{Linearisation} the background
 Cartan connection vanishes, so background-field covariant derivatives
 reduce to partials.
 
-\paragraph*{Euler--Lagrange derivation}
+\paragraph*{Euler--Lagrange variation}
 The field equation for every dynamical perturbation is obtained by
 variational differentiation of the quadratic Lagrangian $\lag^{(2)}$:
 for fields $\varphi^{\mathcal{I}}$
@@ -192,7 +192,7 @@ Higher-time-derivative Lagrangians arising from small-parameter
 expansions are handled by the perturbative substitution of
 \cref{PerturbativeReduction}.
 
-\paragraph*{Legendre transform and Hamiltonian density}
+\paragraph*{Hamiltonian density}
 The Hamiltonian density is the Legendre transform of $\lag^{(2)}$
 with respect to the velocity slots $v^{\mathcal{I}}_n$,
 \begin{equation}
