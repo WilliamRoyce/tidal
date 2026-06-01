@@ -20,27 +20,20 @@ action coupling space catalogued in~\cref{PGTEnumeration} for
 regions of strongly amplified Gertsenshtein conversion. Many
 equivalent parametrisations of that space appear in the
 literature~\cite{barker2024poincare,lin2019pgt,karananas2014parity,blagojevic2018hamiltonian,bahamonde2025cubic};
-each coefficient is an arbitrary, parametrisation-dependent
-combination of the underlying interactions rather than a fundamental
-quantity. We sample with nested
+each parametrisation is an arbitrary choice of coordinates on the underlying space of
+interactions rather than a fundamental object. We sample with nested
 sampling~\cite{Skilling:2006gxv,Feroz:2008xx,Brewer:2010,Brewer:2016scw,Speagle:2019ivv}
 as implemented in PolyChord~\cite{Handley:2015fda,Handley:2015vkr},
 applied here as a coupling-space exploration tool driven by the
 score $A(\theta)$ of~\cref{AmplificationScore}. Nested sampling
 has been used for parameter-space search in both the
-statistical-mechanics
-literature~\cite{Partay:2021materials,Martiniani:2014sens,Burkoff:2012protein,Ashton:2022grj},
-where it maps potential-energy surfaces, and in
-beyond-the-Standard-Model phenomenology and cosmological parameter
-estimation~\cite{GAMBIT:2017zdo,Giani:2023gfq,Ashton:2022grj}.
-PolyChord delivers samples from the score-reweighted posterior
-$p(\theta\mid A) \propto A(\theta)\,\pi(\theta)$, visualised with
+statistical-mechanics~\cite{Partay:2021materials,Martiniani:2014sens,Burkoff:2012protein,Ashton:2022grj},
+and in BSM phenomenology and cosmology~\cite{GAMBIT:2017zdo,Giani:2023gfq,Ashton:2022grj}.
+PolyChord delivers samples from the score-reweighted posterior, visualised with
 anesthetic~\cite{Handley:2019mfs} as corner-plot 2D marginals over
-each operator pair; from those same samples anesthetic also
+each operator pair; from those same samples anesthetic \cite{Handley:2019mfs} also
 computes the per-coupling marginal information gain
-$\D$~\cite{Kullback:1951zyt,Handley:2019mfs}. The corner-plot
-projections and per-coupling $\D$ rankings are the two descriptors
-the results section reports. For further detail on nested sampling
+$\D$~\cite{Kullback:1951zyt}. For further detail on nested sampling
 generally, see~\cite{MacKay:2003,Hobson:2010,Trotta:2017wnx,Sivia:2006}.
 
 \paragraph*{Amplification score}
@@ -86,17 +79,14 @@ estimates the prior-averaged amplification
   \label{EvidenceIntegral}
 \end{equation}
 the average amplification of the Gertsenshtein conversion over the
-coupling prior. In standard Bayesian usage $\log\mathcal{Z}$ is the
-marginal likelihood that drives model comparison. For the present
-synthetic score it is neither cross-truncation comparable (each
-truncation has its own prior support and parametrisation) nor
+coupling prior. In standard Bayesian usage $\logZ$ is the
+marginal likelihood that drives model comparison. For our
+synthetic score it is neither comparable nor
 stable on the exponentially-growing-mode sectors
-of~\cref{ParityOddGeomIncomp,XiKineticClosure} (where $A(\theta)$
-depends on $t_\mathrm{end}$). We therefore do not quote
-$\log\mathcal{Z}$ or its directional difference
-$\log B = \log\mathcal{Z}_+ - \log\mathcal{Z}_-$ in the results
-prose; the corner-plot projections and per-coupling
-information-gain rankings of~\cref{Results} are what the survey
+of~\cref{SectorSurvey} (where $A(\theta)$
+depends on $t_\mathrm{end}$). We do not quote
+$\logZ$ in the results prose; the corner-plots and per-coupling
+information-gain rankings are what \cref{Results}
 reports.
 
 \paragraph*{Total information gain $\D$}
@@ -115,11 +105,10 @@ has contracted from the prior. Small $\D$ means the
 score-reweighted posterior is close to the prior --- the
 response is generic over coupling space; large $\D$ means the
 response concentrates on a specific subset of the prior support.
-Its absolute value depends on the prior support of each truncation
+Its absolute value depends on the prior support of each sector
 and on the simulation horizon $t_\mathrm{end}$ when the score grows
-multi-modally and exponentially, so $\D$ is not a cross-truncation
-comparator. The operator-resolved per-coupling marginal $\D$
-of the next paragraph is the descriptor the results prose leans on.
+exponentially, so $\D$ is \emph{not} a meaningful cross-sector
+comparator.
 
 \paragraph*{Per-coupling information gain}
 The per-coupling marginal $\D$ extracted with
@@ -145,9 +134,9 @@ suppression independently of the prior baseline.
   \centering
   \includegraphics[width=\linewidth]{figures/cubed_sphere_atlas.pdf}
   \caption{Gnomonic cubed-sphere atlas used to sample the direction
-    $\hat n \in S^{N-1}$ of a joint coupling-space prior, drawn for
+    $\hat n \in \mathbb{S}^{N-1}$ of a joint coupling-space prior, drawn for
     $N=3$.  Axes $\theta_1, \theta_2, \theta_3$ are the coupling-space coordinates.
-    The sphere is $S^{N-1}$; an $N$-cube is
+    The sphere is $\mathbb{S}^{N-1}$; an $N$-cube is
     wrapped around the origin (purple wireframe) and each cube face is
     radially projected onto the sphere.  The highlighted face
     (face~$2\!\downarrow$, transparent purple) is one \emph{cube-tile} of
@@ -165,18 +154,18 @@ suppression independently of the prior baseline.
 \paragraph*{Cubed-sphere joint prior}
 We decompose a coupling vector $\theta \in \mathbb{R}^N$ as
 $\theta = r\,\hat n$, with magnitude $r > 0$ and unit vector
-$\hat n \in S^{N-1}$ giving the direction in the parametrisation
-of \cref{PGTEnumeration}. We sample $\hat n$ uniformly on $S^{N-1}$
+$\hat n \in \mathbb{S}^{N-1}$ giving the direction in the parametrisation
+of \cref{PGTEnumeration}. We sample $\hat n$ uniformly on $\mathbb{S}^{N-1}$
 via a gnomonic cubed-sphere atlas: the $N$-cube wrapped around the
-origin is radially projected onto $S^{N-1}$, yielding a
+origin is radially projected onto $\mathbb{S}^{N-1}$, yielding a
 quasi-rectilinear angular grid without polar singularities
 (\cref{CubedSphereAtlas}). Each face is subdivided into sub-tile
 cells sampled by independent constrained-prior chains in parallel,
 with the cells of a face combining into that face's panel of the
-atlas. In the limit of fine sub-tile resolution each tile becomes
+atlas (see \cref{AtlasMethodologyYMPGT}). In the limit of fine sub-tile resolution each tile becomes
 locally rectilinear and the chart approaches a flat Cartesian one
 on the sphere, so the construction interpolates smoothly between a
-coarse global parametrisation of $S^{N-1}$ and the local-flat
+coarse global parametrisation of $\mathbb{S}^{N-1}$ and the local-flat
 limit familiar from Cartesian coupling-space
 sampling.\footnote{The atlas used here is adapted from
 W.~E.~V.~Barker's unreleased extension of the \PSALTer
@@ -186,10 +175,9 @@ of~\cite{ronchi1996cubedsphere}.}
 
 \paragraph*{Direction at fixed magnitude}
 The amplification landscape is the dependence of $A(\theta)$ on
-the direction $\hat n \in S^{N-1}$ at fixed magnitude $r$, and the
-decomposition $\theta = r\,\hat n$ exposes it directly: a
-per-coupling product prior --- uniform on each $\theta_i$
-independently --- mixes direction and magnitude in its $\theta_i$
+the direction $\hat n \in \mathbb{S}^{N-1}$ at fixed magnitude $r$, and the
+decomposition $\theta = r\,\hat n$ exposes it directly. A
+per-coupling prior mixes direction and magnitude in its $\theta_i$
 marginals, so any narrow amplifying ridge along a direction
 misaligned with the coordinate axes is buried in the
 higher-dimensional joint. Holding $r$ small restricts the survey
@@ -197,26 +185,19 @@ to the perturbative regime $|\theta| \ll 1$ within which the
 linearised PDE underlying $P(\theta, t_\mathrm{end})$ is valid
 (\cref{PerturbativeReduction}). The magnitude dependence is
 deferred to a separate study. We sample $\hat n$ uniformly on
-$S^{N-1}$ via the gnomonic cubed-sphere chart
-of~\cref{CubedSphereAtlas}, which gives a non-singular angular
-parametrisation that decouples direction from magnitude.
-\cref{AtlasMethodologyYMPGT} shows the per-axis posteriors for the
-YM--PGT sector of \cref{NonMinimalLagrangian} ($N = 8$ BSM
-couplings) with the positive- ($\uparrow$) and negative-
-($\downarrow$) sign faces of each axis overlaid in one panel ---
-positive in magenta, negative in yellow, following the convention
-of the results-section corner plots. Each panel is the
-lower-triangle 2D kernel density of the face-local cube
-coordinates $\theta_1, \ldots, \theta_{N-1} \in [-1, 1]^{N-1}$ with
-the diagonal carrying the 1D marginal of each $\theta_i$; $\theta_i$
+$\mathbb{S}^{N-1}$ via the gnomonic cubed-sphere chart
+of~\cref{CubedSphereAtlas} that decouples direction from magnitude.
+\Cref{AtlasMethodologyYMPGT} shows the atlas for the
+Yang--Mills--PGT sector of \cref{NonMinimalLagrangian}
+with the positive- ($\uparrow$) and negative-
+($\downarrow$) sign faces of each axis overlaid. Each panel is the
+corner-plot of the face-local cube
+coordinates $\theta_1, \ldots, \theta_{N-1} \in [-1, 1]^{N-1}$; $\theta_i$
 refers to a different physical coupling on each panel because the
 dominant axis pinned at $\pm 1$ by the gnomonic projection cycles
-through the eight couplings. The panels show recognisable structure
---- pairwise coupling correlations, sharply asymmetric
-amplifying-versus-suppressing supports on some axes, large
-near-empty regions on others --- confirming that the apparatus
-surfaces the kind of operator-resolved structural diagnostics the
-results section then leans on.
+through the couplings. The panels show recognisable 
+coupling correlations, confirming that the apparatus
+surfaces new operator-resolved structural diagnostics.
 
 \begin{figure*}[t]
   \centering
