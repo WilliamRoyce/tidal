@@ -380,7 +380,7 @@ def test_render_face_panel_uses_no_matplotlib_histogram(tmp_path: Path) -> None:
 def test_plot_atlas_calls_helper_with_ticks_none(tmp_path: Path) -> None:
     r"""Atlas panels must call the composable helper with ``ticks=None``
     so numeric tick labels are suppressed.  The labels dict carries the
-    plain LaTeX ``\\chi_i`` (no face superscript, per the refinement
+    plain LaTeX ``\\theta_i`` (no face superscript, per the refinement
     that dropped them) and the helper receives no ``fill_colors``
     override on the default CLI path.
     """
@@ -421,7 +421,7 @@ def test_plot_atlas_calls_helper_with_ticks_none(tmp_path: Path) -> None:
         assert isinstance(labels, dict)
         for v in labels.values():
             assert isinstance(v, str)
-            assert "\\chi" in v
+            assert "\\theta" in v
             assert "\\uparrow" not in v
             assert "\\downarrow" not in v
 
