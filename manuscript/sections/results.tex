@@ -111,88 +111,6 @@ The path-integrated kernel~\cref{PathIntegratedFormula} is recovered in
   \label{BoccalettiValidation}
 \end{figure}
 
-% \subsection{Survey summary under the plane-wave approximation (\cref{Linearisation})}%
-% \label{SurveySummary}%
-
-% Discussion preserved as comment block (per planning directive 2026-05-25):
-% The headline log B range expanded to +13 once T7 v2 (complete parity-even
-% χ-closure, 18D) was rescued at t_end=1 from the t_end=10 modal-solver
-% overflow ceiling (max_eigenvalue × t_end > 708). The parity-split insight
-% is the load-bearing physics: parity-even sectors have bounded eigenvalues
-% on the plane-wave background and rescue cleanly under t_end=1, while
-% parity-odd sectors (T6, T8) generate unbounded eigenvalue growth at any
-% viable horizon (Re λ ≈ 1.4e3 for T6 at t_end=1, ≈ 5.5e5 for T8) —
-% structural geometric incompatibility rather than methodology failure.
-% NP (ξ=0) is co-headlined despite being labelled a "control" because the
-% ghost-mediated interpretation was the most damaging counter-argument to a
-% positive Gertsenshtein prediction in the propagating-torsion theories;
-% ruling it out promotes NP to load-bearing headline status.
-
-
-% Survey results table.  Sourced from V3_PHASE_TRACKER.md and the
-% inference.json files of each listed chain.  Where landscape and
-% pub-quality runs both exist for the same sub-theory, the pub-quality
-% numbers are reported and the landscape source noted in the footnote.
-% \begin{table*}[t]
-%   \centering
-%   \caption{Plane-wave survey results across the
-%     surveyed sectors of the PGT hierarchy. Columns: theory class, prior
-%     dimension, log evidence of the amplification-rewarding model
-%     $\logZ_+$ (per~\cref{NestedScore} with $+\log A$), log
-%     evidence of the suppression-rewarding model $\logZ_-$
-%     (with $-\log A$), Bayes factor $\log B = \logZ_+ -
-%     \logZ_-$~\cite{Skilling:2006gxv}, quality label, and the qualitative verdict.
-%     Errors $\sigma_{\logZ}$ from the PolyChord
-%     nested-sampling estimator. Landscape runs use
-%     $n_\text{live} = 25\,d$ in the coupling dimension; publication
-%     runs use $n_\text{live} \geq 50\,d$ or the values quoted in
-%    ~\cref{InferenceArchitecture}. Higher-dimensional parity-even
-%     sectors (the complete $\chi$-closure, the $\xi$-kinetic closure)
-%     and the parity-odd sectors use the overflow-safe horizon
-%     $t_\text{end} = 1$ rather than the publication horizon
-%     $t_\text{end} = 10$ used by the lower-dimensional sectors; the
-%     per-sample conversion score $A(\theta)$ of
-%    ~\cref{AmplificationScore} is $t_\text{end}$-independent within
-%     the perturbative regime of~\cref{PerturbativityHierarchy}, so
-%     Bayes factors are mutually comparable across the two settings.}
-%   \label{SurveyResultsTable}%
-%   \label{SectorSurveyTable}%
-%   \begin{tabular}{lcrrrll}
-%     \hline\hline
-%     Theory class & $d$ & $\logZ_+ \pm \sigma$ & $\logZ_- \pm \sigma$ & $\log B$ & quality & verdict \\
-%     \hline
-%     dark-photon plasma                  & 4  & $+9.034 \pm 0.068$  & $+2.924 \pm 0.083$  & $+6.110$ & publication                            & \emph{amplifies} \\
-%     EM--RC curvature coupling ($\Del{1}$) & 4  & $+13.374 \pm 0.060$ & $+11.395 \pm 0.097$ & $+1.979$ & publication                            & \emph{amplifies} \\
-%     Yang--Mills--PGT (Bahamonde base)   & 5  & $+7.680 \pm 0.150$  & $+5.837 \pm 0.143$  & $+1.843$ & publication                            & \emph{amplifies} \\
-%     Yang--Mills--PGT (Barker extension) & 6  & $+5.319 \pm 0.169$  & $+2.524 \pm 0.158$  & $+2.795$ & publication\textsuperscript{a}         & \emph{amplifies} \\
-%     Yang--Mills--PGT (Shapiro extension)& 8  & $+8.889 \pm 0.135$  & $+6.212 \pm 0.176$  & $+2.677$ & landscape                              & \emph{amplifies} \\
-%     Yang--Mills--PGT (non-minimal union) & 9  & $+10.034 \pm 0.142$ & $+2.662 \pm 0.156$  & $+7.372$ & landscape                              & \emph{amplifies} \\
-%     non-propagating torsion ($\xi=0$, single $\chi$ control) & 8 & $+10.98 \pm 0.15$ & $+2.67 \pm 0.10$ & $+8.31$  & publication                            & \emph{amplifies (control)} \\
-%     complete parity-even ($\chi$-closure) & 18 & $+10.30 \pm 0.08$  & $-3.18 \pm 0.07$    & $+13.48$ & publication\textsuperscript{a}         & \emph{amplifies} \\
-%     non-propagating torsion ($\xi=0$, $\chi$-closure control) & 17 & $+9.93 \pm 0.08$ & $-3.28 \pm 0.07$ & $+13.21$ & publication\textsuperscript{a}      & \emph{amplifies (control)} \\
-%     $\xi$-kinetic closure               & 32 & $-0.18 \pm 0.07$    & $-9.61 \pm 0.09$    & $+9.43$  & publication\textsuperscript{a,b}       & \emph{amplifies (partial rescue)} \\
-%     parity-odd minimal sub-sector       & 4  & $+5.002 \pm 0.280$  & $+11.331 \pm 0.311$ & $-6.329$ & landscape                              & \emph{suppresses} \\
-%     parity-odd full                     & 20 & $-15.01 \pm 0.023$  & $-14.99 \pm 0.025$  & $\approx 0$ & publication\textsuperscript{a,c}    & \emph{plane-wave overflow} \\
-%     complete parity-odd                 & 53 & --                  & --                  & --       & publication\textsuperscript{a,d}       & \emph{plane-wave overflow} \\
-%     Euler--Heisenberg + Gertsenshtein   & 2  & $+0.184 \pm 0.001$  & $-0.185 \pm 0.0004$ & $+0.37$  & publication                            & \emph{null (QED-EFT inert)} \\
-%     \hline\hline
-%   \end{tabular}\\[1ex]
-%   {\footnotesize \textsuperscript{a} Run at the overflow-safe horizon
-%    $t_\text{end} = 1$; the lower-dimensional sectors above use
-%    $t_\text{end} = 10$.\quad
-%    \textsuperscript{b} Both $\logZ$ negative indicates partial
-%    floor contamination from the extended $\xi_{11\!-\!16}$ sub-sector;
-%    the quoted $\log B$ is a lower bound on the genuine amplification.\quad
-%    \textsuperscript{c} Maximum eigenvalue $\mathrm{Re}\,\lambda \approx
-%    1.4 \times 10^{3}$ at $t_\text{end} = 1$ — still above the
-%    $\exp(708)$ modal-solver overflow ceiling; both posteriors collapse
-%    to the soft-floor noise band.\quad
-%    \textsuperscript{d} 0 dead points: $\mathrm{Re}\,\lambda \approx
-%    5.5 \times 10^{5}$, requiring $t_\text{end} \lesssim 10^{-3}$ at
-%    which $P \propto (\kappa\Bzero t/2)^2$ falls many orders below the
-%    soft-floor noise band.\par}
-% \end{table*}
-
 \subsection{Surveyed sectors}%
 \label{SectorSurvey}%
 
@@ -209,9 +127,9 @@ pair, showing the shape, multimodality, and ridges of the
 distribution directly. The per-coupling marginal information
 gain~$\D$ of~\cref{PerCouplingKL}
 (\cref{KLTableEMRCParityPair,KLTableYMUnified,KLTableChiClosureComparison,KLTableDarkPhoton})
-ranks operators by how strongly the score-reweighted marginal on
-each individual coupling axis differs from the prior; the cross
-divergence~$\D(P_+\|P_-)$ of the same definition isolates the
+ranks operators by how strongly each score-reweighted marginal
+differs from the prior; the cross
+divergence~$\D(P_+\|P_-)=D_{+\|-}$ isolates the
 operators that distinguish amplification from suppression. Posterior
 samples are drawn by PolyChord~\cite{Handley:2015fda,Handley:2015vkr}
 on the synthetic score~$\pm\log A(\theta)$ of~\cref{NestedScore} and
@@ -282,7 +200,7 @@ marginal has two sharp peaks at symmetric $\pm\Del{1}$ values, while
 the amplifying marginal extends broadly to large $|\Del{1}|$ in both
 directions --- unlike most of
 the surveyed couplings, whose amplifying posteriors concentrate
-near the origin. The cross divergence $\D(P_+\|P_-) = 20.8$~nats
+near the origin. The cross divergence $D_{+\|-} = 20.8$~nats
 places $\Del{1}$ above the other three couplings by an order of
 magnitude (\cref{KLTableEMRCParityPair}); the same vertex
 $\Del{1}\MAGF{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ sources amplification
@@ -331,7 +249,7 @@ and suppression at different $\Del{1}$ values.
     Sub-columns are amplification-only $\Dp$,
     suppression-only $\Dm$, and
     amplification-vs-suppression
-    $D_{+\|-} = \D(P_+\|P_-)$, in nats. ``--'' marks a
+    $D_{+\|-}$, in nats. ``--'' marks a
     coupling absent from that sector's Lagrangian.}
   \label{KLTableEMRCParityPair}
 \end{table}
@@ -352,16 +270,16 @@ The four-dimensional posterior over $\{\Bet{1\!-\!3}, d_{21}\}$ is
 shown in~\cref{CornerT6Min}. The suppressing $d_{21}$ marginal again
 has two sharp peaks at symmetric $\pm d_{21}$ values, and the
 amplifying marginal has a broader pair of peaks at the same
-locations. Unlike the parity-even amplification, however, the
-parity-odd amplifying peaks tail back to zero rather than extending
+locations. However, the
+parity-\emph{odd} amplifying peaks tail back to zero rather than extending
 to large $|d_{21}|$.
 
 The parity-even and parity-odd vertices redistribute the
 per-coupling $\D$ weight in markedly different ways. In the
 parity-even sector the separation concentrates almost entirely on
-$\Del{1}$ ($\D(P_+\|P_-) = 20.8$~nats;~\cref{KLTableEMRCParityPair}).
+$\Del{1}$ ($D_{+\|-} = 20.8$~nats;~\cref{KLTableEMRCParityPair}).
 In the parity-odd twin the vertex contribution drops to
-$\D(P_+\|P_-) = 8.8$~nats and the two torsion-mass directions
+$D_{+\|-} = 8.8$~nats and the two torsion-mass directions
 $\Bet{1}$ and $\Bet{2}$ become comparable
 (\cref{KLTableEMRCParityPair}).
 % , and the only one whose amp/sup
@@ -515,7 +433,7 @@ $\xi=0$ non-propagating-torsion control, in~\cref{CornerYMUnionPair}.
   \caption{Yang--Mills--PGT family: per-coupling $\D$ across the
     five chains. Sub-columns are amplification-only
     $\Dp$, suppression-only $\Dm$, and
-    amplification-vs-suppression $D_{+\|-} = \D(P_+\|P_-)$, in
+    amplification-vs-suppression $D_{+\|-}$, in
     nats. ``---'' marks a coupling absent from that sub-theory's
     Lagrangian; ``--'' marks one present but below the per-chain top-five
     $\D$ cutoff used in the source data; $\dagger$ marks $\xi=0$ pinned
@@ -541,14 +459,11 @@ giving an eighteen-dimensional prior. The 18D corner
 the amplification--suppression structure; per-coupling $\D$
 (\cref{KLTableChiClosureComparison}) gives
 $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
-\MAGF{_{\mu\nu\rho\sigma}}$ the largest $\D(P_+\|P_-) = 4.2$. The amplifying marginal
+\MAGF{_{\mu\nu\rho\sigma}}$ the largest $D_{+\|-} = 4.2$. The amplifying marginal
 on $\chi_1$ loses its localisation: its density is lifted across
 nearly the entire $\chi_1$ prior range. The suppression marginal,
-by contrast, retains a sharp peak; the cross divergence is driven
-by this qualitative shape change between the two marginals rather
-than by a position shift along $\chi_1$. The restricted
-overlay over the
-dominant directions is in~\cref{CornerChiClosurePair}.
+by contrast, retains a sharp peak. The restricted
+overlay over the dominant directions is in~\cref{CornerChiClosurePair}.
 % ; the full per-coupling comparison against the
 % non-propagating-torsion control of the same sector appears below in
 %~\cref{KLTableChiClosureComparison} (\cref{NonPropagatingControl}).
@@ -616,8 +531,8 @@ is deferred to future work.
 As a control we re-run the Yang--Mills--PGT of~\cref{YangMillsPGT}
 with the torsion kinetic coefficient $\xi$ zeroed, leaving the
 torsion sector algebraic and non-propagating (NP). The Lagrangian
-\cref{NonMinimalLagrangian} then introduces no new kinetic operator,
-torsion is determined algebraically, and the no-ghost classification
+\cref{NonMinimalLagrangian} then contains no new kinetic operator,
+and the no-ghost classification
 is trivially satisfied. The NP-control posterior overlays the
 propagating-torsion result in~\cref{CornerYMUnionPair}, matching it
 within the bootstrap uncertainty of the per-coupling marginal $\D$
@@ -627,14 +542,16 @@ kinetic sector to be active.
 
 \paragraph*{Complete parity-even closure control}
 The same control at the seventeen-parameter complete parity-even
-closure ($\{\Bet{1\!-\!3}, \Del{1}, \zeta_{1\!-\!3}, \chi_{1\!-\!10}\}$
+closure (\cref{ChiClosureLagrangian}
 with $\xi = 0$) overlays the 18D propagating-torsion result within
 the per-coupling marginal $\D$ across every shared operator
 direction (\cref{KLTableChiClosureComparison} NP-control column;
 \cref{CornerChiClosure}: $\xi=0$ control overlay). The
-amplification therefore does not require torsion to propagate; the
+amplification again does not require torsion to propagate; the
 non-minimal couplings alone reproduce the structure of the
-propagating theory. Per-coupling $\D$ resolves the dominant
+propagating theory.
+
+Per-coupling $\D$ resolves the dominant
 operator: $\Bet{1}$ in the YM--PGT control
 (\cref{KLTableYMUnified}), and
 $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,\MAGF{_{\mu\nu\rho\sigma}}$
@@ -670,7 +587,7 @@ in the complete parity-even closure control
     the two chains. Sub-columns are amplification-only
     $\Dp$, suppression-only $\Dm$,
     and amplification-vs-suppression
-    $D_{+\|-} = \D(P_+\|P_-)$, in nats. ``--'' marks a
+    $D_{+\|-}$, in nats. ``--'' marks a
     coupling present but below the per-chain top-ten $\D$ cutoff.
     Corresponding posterior corner plot:~\cref{CornerChiClosure}
     (full 18-dimensional overlay; restricted top-6 in
@@ -712,18 +629,18 @@ of~\cref{ChiClosureLagrangian},
 \end{align*}
 giving a thirty-two-dimensional prior. $\xi_{11}$ does not appear
 in the linearised equations under plane-wave reduction, leaving
-fifteen surviving $\xi$-couplings. The extended $\xi_{11\!-\!16}$
-sub-sector drives a substantial fraction of sample points into
+fifteen surviving $\xi$-couplings. The extended kinetic
+sector drives a substantial fraction of sample points into
 modal-solver overflow, so the per-coupling $\D$ figures for this
-sector are not quantitatively meaningful.%
+sector are not quantitatively meaningful.
 % TODO(Phase E NS-interpretation round): the "not quantitatively
 % meaningful" phrasing inherits the inference-language framing this
 % paragraph also uses. Revisit once the landscape-search framing is
 % finalised; the substantive point may be better phrased as e.g.
 % "the prior-weighted landscape this sector reports is dominated by
 % the overflow regions and is not a clean amplification ranking."
-$\chi_1$ again and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
-\rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$ are the apparent dominant directions.
+We find $\chi_1$ again and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
+\rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$ as the apparent dominant directions.
 
 \begin{figure*}[!htbp]
   \centering
@@ -788,7 +705,7 @@ Yang--Mills--PGT base,
   % \label{ParityOdd20D}
 \end{multline*}
 and the fifty-three-parameter sector that further adds the
-$\varepsilon\!\cdot\!\MAGF{}\!\times\!\rcD{}\MAGT{}$ basis,
+$\varepsilon\!\cdot\!\MAGF{}\,\rcD{}\MAGT{}$ basis,
 \begin{align*}
   \lag_{53\text{D}}
     = \lag_{20\text{D}}
@@ -814,9 +731,9 @@ between the photon and the trace-vector
 torsion~\cite{Holdom:1985ag,caputo2021darkphoton}. The
 Einstein--Cartan $\Bet{3} I_3$ term of the YM--PGT base already
 gives the trace-vector torsion a Proca-like mass, so the mixing
-operator is non-trivial in the Holdom sense, but without additional
-mass structure the graviton initial condition does not excite the
-torsion channel. We therefore add the kinetic mixing
+operator is non-trivial in the Holdom sense~\cite{Holdom:1985ag}, but without additional
+mass structure the graviton IC does not interact with the
+torsion channel. We add the kinetic mixing
 $\delta_m\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu}$ between the
 photon and the trace-vector torsion together with a plasma photon mass $m_A^2$
 (at the perturbation level~\cite{raffelt1988mixing,domcke2025scattering})
@@ -845,7 +762,7 @@ dark-photon mixing adds little either way. The marginal
 $\D$ values above are computed against the prior shapes specific to
 each parameter and are not directly cross-comparable; $m_A^2$'s
 physical role in the conversion is more significant than its
-marginal $\D$ position relative to $\Del{m}$ shows.
+$\D$ relative to $\Del{m}$ shows.
 
 \begin{figure}[!htbp]
   \centering
@@ -872,8 +789,7 @@ marginal $\D$ position relative to $\Del{m}$ shows.
   $\Bet{3}$    & 0.66 & 0.67 & 0.49 \\
   \bottomrule
   \end{tabular}
-  \caption{Dark-photon plasma analogue: per-coupling $\D$
-    ranking for the survey.}
+  \caption{Dark-photon plasma: per-coupling $\D$ ranking.}
   \label{KLTableDarkPhoton}
 \end{table}
 
