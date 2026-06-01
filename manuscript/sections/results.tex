@@ -234,7 +234,7 @@ $\Alp{1}\MAGF{^2}$ curvature-squared term,
 \end{align*}
 giving a four-dimensional prior over
 $\{\Bet{1\!-\!3}, \Alp{1}\}$. The $\Alp{1}$-weighted terms vanish
-from the linearised equations of motion that source the
+from the linearised equations of motion (EOM) that source the
 Gertsenshtein conversion,
 \begin{align*}
   \partial_t^2 A_x &= B_0 \, \partial_z h_{xy} + \partial_z^2 A_x, \\
@@ -540,15 +540,14 @@ sector on top of the Yang--Mills--PGT base~\cref{NonMinimalLagrangian},
 giving an eighteen-dimensional prior. The 18D corner
 (\cref{CornerChiClosure}) shows the amplifying posterior
 concentrated along $\chi_1$; per-coupling $\D$
-(\cref{KLTableChiClosureComparison}) places
+(\cref{KLTableChiClosureComparison}) gives
 $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
-\MAGF{_{\mu\nu\rho\sigma}}$ at $\D(P_+\|P_-) = 4.2$ nats of cross
-divergence, the largest in the truncation. The suppression marginal
+\MAGF{_{\mu\nu\rho\sigma}}$ the largest $\D(P_+\|P_-) = 4.2$. The suppression marginal
 on $\chi_1$ does not localise: its density is comparable across the
 entire $\chi_1$ prior range, including the edges, with no clean
 separation between high and low $\chi_1$ values. The amplifying
 posterior, by contrast, concentrates at a single $\chi_1$ peak. The restricted
-overlay against the non-propagating-torsion control over the
+overlay over the
 dominant directions is in~\cref{CornerChiClosurePair}.
 % ; the full per-coupling comparison against the
 % non-propagating-torsion control of the same sector appears below in
@@ -602,16 +601,15 @@ dominant directions is in~\cref{CornerChiClosurePair}.
 \paragraph*{Non-propagating-torsion control}%
 \label{NonPropagatingControl}%
 The amplifying regions above produce exponential mode growth: an
-eigenvalue $\lambda$ of $M(k)$ with $\Re\{\lambda\} > 0$ grows its
-eigenvector exponentially in time (see~\cref{ModalCoupledEntry}).
+eigenvalue $\lambda$ of $M(k)$ (see~\cref{ModalCoupledEntry})
+with $\Re\{\lambda\} > 0$ grows its
+eigenvector exponentially in time.
 Whether this indicates a genuine amplification mechanism, a
 tachyonic instability, or a ghost is not decided at the linearised
 level (see~\cref{Discussion}). The unitarity conditions for
-parity-even PGT are catalogued
-in~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,lin2019pgt,Yo:1999ex,Yo:2001sy};
-the parity-violating extensions
-in~\cite{karananas2014parity}. The current frontier method for
-particle-spectrum analysis is
+PGT are catalogued
+in~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,lin2019pgt,Yo:1999ex,Yo:2001sy,karananas2014parity}.
+The current frontier method for particle-spectrum analysis is
 \PSALTer{}~\cite{barker2024psalter,barker2025psalter2}; integration
 is deferred to future work.
 
@@ -624,7 +622,7 @@ is trivially satisfied. The NP-control posterior overlaid with the
 propagating-torsion result of~\cref{CornerYMUnionPair} matches it
 within the bootstrap uncertainty of the per-coupling marginal $\D$
 in every operator direction (\cref{KLTableYMUnified}, NP-control
-column). Amplification therefore does not require the torsion
+column). Amplification therefore does \emph{not} require the torsion
 kinetic sector to be active.
 
 \paragraph*{Complete parity-even closure control}
@@ -719,7 +717,7 @@ sector are not quantitatively meaningful.%
 % finalised; the substantive point may be better phrased as e.g.
 % "the prior-weighted landscape this sector reports is dominated by
 % the overflow regions and is not a clean amplification ranking."
-$\chi_1$ and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
+$\chi_1$ again and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 \rcD{^\sigma}\MAGT{_{\rho\nu\sigma}}$ are the apparent dominant directions.
 
 \begin{figure*}[!htbp]
@@ -803,11 +801,8 @@ operator is non-trivial in the Holdom sense, but without additional
 mass structure the graviton initial condition does not excite the
 torsion channel. We therefore add the kinetic mixing
 $\delta_m\,\FieldF{_{\mu\nu}}\mathcal{F}^{(T)\,\mu\nu}$ between the
-photon and the trace-vector torsion (treated as a Proca field at the
-perturbation level) together with a plasma photon mass $m_A^2$,
-following the EOM-level treatment
-of~\cite{raffelt1988mixing,domcke2025scattering} (the full Proca
-background is not a solution of the combined gauge-gravity action),
+photon and the trace-vector torsion together with a plasma photon mass $m_A^2$
+(at the perturbation level~\cite{raffelt1988mixing,domcke2025scattering})
 giving the Lagrangian
 \begin{multline}
   \lag_\text{Dark-photon}
@@ -826,10 +821,10 @@ four-dimensional prior over $\{m_A^2, \xi, \Del{m}, \Bet{3}\}$. The
 4D corner (\cref{CornerT1}) shows the amplifying posterior sharply
 localised along the $m_A^2$ direction. Per-coupling $\D$
 (\cref{KLTableDarkPhoton}) places $\Del{m}$ at 3.4 nats and $m_A^2$
-at 1.5 nats, ranking $\Del{m}$ first. The conversion is controlled
+at 1.5 nats. The conversion is controlled
 by the photon plasma mass $m_A^2$, which shifts the photon
 dispersion and detunes coherent Gertsenshtein conversion; the
-dark-photon kinetic mixing adds little either way. The marginal
+dark-photon mixing adds little either way. The marginal
 $\D$ values above are computed against the prior shapes specific to
 each parameter and are not directly cross-comparable; $m_A^2$'s
 physical role in the conversion is more significant than its
@@ -900,7 +895,7 @@ magnetic background. We include three EFT couplings,
   \label{EHGertLagrangian}
 \end{multline}
 of which the $\FieldF{}\!\cdot\!\FieldFtilde{}$ topological term is a total covariant
-derivative absent from the equations of motion
+derivative absent from the EOM
 (\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
 over $(\rho, \sigma)$. The $\FieldF{^4}$ corrections scale with the
 background field to a higher power than the leading PGT vertices
@@ -910,10 +905,9 @@ suppression marginals on both $\rho$ and $\sigma$ are statistically
 indistinguishable from the prior at the surveyed
 $\Bzero=10^{-2}$. The one-loop EH
 coefficients~\cite{adler1971photon,dunne2004heisenberg} are
-loop-suppressed below the prior scales sampled here; the QED
-contribution to the Gertsenshtein signal lies below the survey's
-resolution at any background field accessible to the linearised
-treatment.
+suppressed on the prior scales sampled here; the QED
+contribution to the Gertsenshtein signal is negligible
+at any background field accessible to the linearised treatment.
 % The per-parameter $\D$ (\cref{KLTableEH})
 % yields $\D(P_+\|P_-) < 1.7$ nats for both couplings,
 % consistent with the null verdict.
