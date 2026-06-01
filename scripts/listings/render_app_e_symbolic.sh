@@ -69,7 +69,7 @@ render_one() {
     # wrappers so the file can be \input{} inside a `gathered`
     # environment that the appendix shell controls. The per-equation
     # `aligned` structure breaks the global `&=` column drag — each
-    # equation centres on its own width, eliminating the "ragged
+    # equation centers on its own width, eliminating the "ragged
     # right" whitespace band when short EOMs share a listing with a
     # wide Hamiltonian. The depth-aware wrap stage at --width 400
     # still breaks long lines at top-level term boundaries; the
@@ -111,7 +111,7 @@ done
 
 # Post-render notation patch: the renderer emits the graviton metric
 # perturbation as \mathcal{H} and the photon vector potential as
-# \mathcal{A} (the default `_calligraphic_head` behaviour in
+# \mathcal{A} (the default `_calligraphic_head` behavior in
 # tidal/symbolic/latex.py). The appendix convention is lowercase italic
 # h_{\mu\nu} (standard GR / TT-gauge notation) and italic capital A_\mu
 # (standard EM notation), with torsion left calligraphic to keep it

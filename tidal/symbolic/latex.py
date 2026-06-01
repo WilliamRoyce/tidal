@@ -477,7 +477,7 @@ def _coefficient_inner(s: str) -> str:
     # Match a single atomic base (Greek command, letter run with optional
     # subscript group) followed by ``^{-N}``. Keeps the surrounding context
     # unchanged so the later ``_merge_adjacent_reciprocals`` pass can fold
-    # the resulting fraction with neighbours into a common denominator.
+    # the resulting fraction with neighbors into a common denominator.
     s = re.sub(
         r"(\\?[A-Za-z]+(?:_\{[^{}]+\})?)\^\{-(\d+)\}",
         lambda m: rf"\tfrac{{1}}{{{m.group(1)}^{{{m.group(2)}}}}}",
@@ -1418,7 +1418,7 @@ def system_to_latex(
         # \begin{aligned}...\end{aligned} (so the &= / &\supset column is
         # set per-equation, not by the widest LHS in the listing) and
         # joined inside an outer \begin{gather*}...\end{gather*}. Short
-        # equations centre on their natural width; long ones span the
+        # equations center on their natural width; long ones span the
         # page.
         wrapped = [
             f"  \\begin{{aligned}}\n    {s}\n  \\end{{aligned}}" for s in sections

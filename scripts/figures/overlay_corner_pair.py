@@ -50,7 +50,7 @@ from _palette import IBM_PALETTE
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger("overlay_corner_pair")
 
-# Four-colour scheme: existing AMP/SUP for propagating; IBM purple/orange for NP control.
+# Four-color scheme: existing AMP/SUP for propagating; IBM purple/orange for NP control.
 NP_AMP_COLOR = IBM_PALETTE["purple"]
 NP_SUP_COLOR = IBM_PALETTE["orange"]
 
@@ -165,7 +165,7 @@ def render_overlay_pair(
     # Canvas spans the full `plot_params` list. NP chains may lack some
     # columns (e.g. xi). When every plot_params entry is in the NP list
     # (restricted-corner case) we plot NP directly on `axes`, matching
-    # the original behaviour. When some columns are propagating-only
+    # the original behavior. When some columns are propagating-only
     # (full-corner case with xi) we slice axes to the NP subset so the
     # propagating-only column shows propagating contours only.
     prop_only_cols = [p for p in plot_params if p not in np_param_names]
@@ -205,7 +205,7 @@ def render_overlay_pair(
         )
     else:
         # Restricted case (all plot_params in NP list): plot NP directly
-        # on the same `axes` object, matching the pre-round-15 behaviour.
+        # on the same `axes` object, matching the pre-round-15 behavior.
         np_amp.plot_2d(
             axes,
             kinds="kde",

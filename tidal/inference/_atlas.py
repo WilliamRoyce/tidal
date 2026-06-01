@@ -161,7 +161,7 @@ def _physical_to_face_local(
         msg = f"c has {c.shape[1]} cols, expected {n}"
         raise ValueError(msg)
 
-    # v_unit[i] = (Q @ c[i]) / |c[i]|; vectorise across samples.
+    # v_unit[i] = (Q @ c[i]) / |c[i]|; vectorize across samples.
     norms = np.linalg.norm(c, axis=1, keepdims=True)
     safe = np.where(norms > 0, norms, 1.0)
     v_unit = c @ q_arr.T / safe  # shape (n_samples, N)
@@ -527,7 +527,7 @@ def _draw_axis_title(
     Implemented as three matplotlib ``fig.text`` calls (axis number in
     black, ↑ in colour_up, ↓ in colour_down) rather than one LaTeX
     ``\textcolor`` call because matplotlib's mathtext renderer does
-    not honour ``\textcolor`` without a full ``text.usetex=True``
+    not honor ``\textcolor`` without a full ``text.usetex=True``
     config; per-text ``color=`` kwargs work in every backend.
     """
     # Layout: three text elements packed left-to-right inside the empty
@@ -619,7 +619,7 @@ def plot_atlas(
         ``color`` is set).  ``None`` (default) preserves the existing
         Planck-blue palette.
     color : str or None
-        Single hex colour applied uniformly to every artist (1D KDE
+        Single hex color applied uniformly to every artist (1D KDE
         curves, 2D fills, contour outlines) via anesthetic's
         ``samples.plot_2d(color=...)``.  Matches the manuscript's
         results-section corner-plot style — see
@@ -639,13 +639,13 @@ def plot_atlas(
         ``color_up`` / ``color_down`` are ignored.  ``layout_cols`` is
         ignored in overlay mode (layout fixed at ``2 x ceil(N/2)``).
         ``color`` and ``fill_colors`` are also ignored in overlay mode
-        (the up/down pair carries the colouring).
+        (the up/down pair carries the coloring).
     color_up : str or None
-        Hex colour for the positive-axis (``+x_k``, "up") face overlay.
+        Hex color for the positive-axis (``+x_k``, "up") face overlay.
         Used only when ``overlay_up_down=True``.  Recommend IBM
         colorblind magenta ``#dc267f`` (``_palette.AMP_COLOR``).
     color_down : str or None
-        Hex colour for the negative-axis (``-x_k``, "down") face
+        Hex color for the negative-axis (``-x_k``, "down") face
         overlay.  Used only when ``overlay_up_down=True``.  Recommend
         IBM colorblind yellow ``#ffb000`` (``_palette.SUP_COLOR``).
 

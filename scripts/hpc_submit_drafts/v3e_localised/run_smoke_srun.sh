@@ -67,7 +67,7 @@ echo
 echo "=== sup log tail ==="
 tail -15 "${RESULTS_DIR}/smoke_t4_sup.log" 2>&1
 echo
-echo "=== artefacts ==="
+echo "=== artifacts ==="
 ls -la "${RESULTS_DIR}/smoke_t4_amp/" "${RESULTS_DIR}/smoke_t4_sup/" 2>&1 | tail -20
 
 if [ "${amp_status}" -eq 0 ] && [ "${sup_status}" -eq 0 ] && \

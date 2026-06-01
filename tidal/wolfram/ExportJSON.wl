@@ -504,7 +504,7 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
       Module[{rawSum},
         rawSum = Total[ExtractLHSCoefficient /@ timeDerivTerm];
         (* Expand rather than Simplify so the emitted string is a sum of
-           monomials (no parenthesised sub-sums). The Python-side
+           monomials (no parenthesized sub-sums). The Python-side
            split_small_parameter_kinetic helper (#301 Phase 3) walks the
            AST term-by-term and cannot handle (a + b)*c forms — Expand
            distributes such structures up front. *)
@@ -514,12 +514,12 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     ];
     If[NumericQ[lhsCoeff],
       (* Numeric lhsCoeff (any sign). Unified path: rhs = -rhs / lhsCoeff
-         normalises the equation from LHS-form (M·d²ₜa + rhs_lhs_form = 0)
+         normalizes the equation from LHS-form (M·d²ₜa + rhs_lhs_form = 0)
          to RHS-form (d²ₜa = -rhs_lhs_form / M). This is correct for
          lhsCoeff = +1 (gives rhs = -rhs_lhs_form), lhsCoeff = -1 (gives
          rhs = +rhs_lhs_form), and any other numeric M. Pre-GH-#381 the
          guard was `Abs[lhsCoeff] =!= 1` which silently passed lhsCoeff=-1
-         through without normalisation, producing a wrong-sign coefficient
+         through without normalization, producing a wrong-sign coefficient
          on the RHS for the timelike photon component a_0 (where the
          (-,+,+,+) metric makes xAct emit `-d²ₜa_0 + ∇²a_0 = 0` with
          lhsCoeff=-1). See GH #381 for the empirical sign-pattern table.
@@ -527,23 +527,23 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
          at line 477 catches it); a safety guard would be reasonable but
          a divide-by-zero here flags the genuine bug clearly. *)
       rhs = -rhs / lhsCoeff,
-      Module[{hasSmallParam, normalisedLhs, m0Sign},
+      Module[{hasSmallParam, normalizedLhs, m0Sign},
         (* Symbolic lhsCoeff. GH #380: a coord-dep kinetic coefficient that
            ALSO contains a small parameter (e.g. EH `1 - 2*Bpeak²·G(x)·(ρ-8σ)`)
            must NOT be divided through — dividing hides the perturbative
            structure inside `1/(1-εX)` so every RHS coefficient gets tagged
            order_in_eps=0 even though it carries O(ε), O(ε²), … pieces.
-           Keep un-normalised in that case too; Python's
+           Keep un-normalized in that case too; Python's
            canonicalize_kinetic_for_perturbation (#301 Phase 3) splits
-           M = M₀ + εM₁ and synthesises the Pass-1 RHS corrections. *)
+           M = M₀ + εM₁ and synthesizes the Pass-1 RHS corrections. *)
         hasSmallParam = AnyTrue[smallParams, !FreeQ[lhsCoeff, #] &];
         If[hasSmallParam || FreeQ[lhsCoeff, _[]],
           (* Pure parameter (e.g. xi), OR coord-dep + small-param (e.g. EH):
-             keep RHS un-normalised, emit kinetic_coefficient_symbolic.
-             #380 follow-up: normalise sign so M₀ > 0. If lhsCoeff evaluates
+             keep RHS un-normalized, emit kinetic_coefficient_symbolic.
+             #380 follow-up: normalize sign so M₀ > 0. If lhsCoeff evaluates
              negative at smallParams = 0, multiply the whole equation by -1:
              emit -lhsCoeff and skip the `rhs = -rhs` flip. Without this the
-             modal solver's generalised eigenvalue M·d²ₜa = K·a returns real
+             modal solver's generalized eigenvalue M·d²ₜa = K·a returns real
              eigenvalues at zero-small-param baseline even though K/M is the
              standard wave operator. *)
           m0Sign = If[hasSmallParam,
@@ -554,13 +554,13 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
             Sign[Quiet[N[lhsCoeff]]]
           ];
           If[m0Sign === -1,
-            normalisedLhs = -lhsCoeff
+            normalizedLhs = -lhsCoeff
             (* rhs unchanged (cancellation: M·d²ₜa = -RHS, then *-1 gives
-               -M·d²ₜa = RHS, i.e. normalisedLhs·d²ₜa = +rhs = original rhs) *),
-            normalisedLhs = lhsCoeff;
+               -M·d²ₜa = RHS, i.e. normalizedLhs·d²ₜa = +rhs = original rhs) *),
+            normalizedLhs = lhsCoeff;
             rhs = -rhs
           ];
-          kineticCoeffStr = ToString[normalisedLhs, InputForm],
+          kineticCoeffStr = ToString[normalizedLhs, InputForm],
           (* Coord-dep with no small params (e.g. 1/Omega^2 for FRW):
              divide here as before. *)
           rhs = -rhs / lhsCoeff

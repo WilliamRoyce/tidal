@@ -4,7 +4,7 @@
 # subdirectory.  scripts/analysis/extract_d_kl.py reads the emitted JSONs
 # to produce the §4 / App J TeX fragments.
 #
-# Add new chains (e.g. forthcoming localised-geometry runs) by appending
+# Add new chains (e.g. forthcoming localized-geometry runs) by appending
 # [[chain]] tables here — no code changes needed.
 #
 # Schema per entry:

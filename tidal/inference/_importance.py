@@ -349,7 +349,7 @@ def compute_cross_kl(
             edges = np.linspace(lo, hi, n_bins + 1)
             p_hist, _ = np.histogram(amp_col, bins=edges, weights=amp_weights)
             q_hist, _ = np.histogram(sup_col, bins=edges, weights=sup_weights)
-            # Normalise to densities.
+            # Normalize to densities.
             dx = edges[1] - edges[0]
             p = p_hist / max(p_hist.sum(), 1e-300) / dx
             q = q_hist / max(q_hist.sum(), 1e-300) / dx

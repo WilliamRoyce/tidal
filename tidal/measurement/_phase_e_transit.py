@@ -8,8 +8,8 @@ underlying literature on Gertsenshtein conversion. Per-file noqa lifts
 the lowercase rule so identifiers stay one-to-one with the env file.
 
 
-Post-simulation analysis of a localised wavepacket passing through a
-localised B-field region. Distinguishes between
+Post-simulation analysis of a localized wavepacket passing through a
+localized B-field region. Distinguishes between
 
 * a *finite-interaction-time* growth (tachyonic-during-transit; the
   conversion factor saturates once the wavepacket exits the field) and
@@ -188,11 +188,11 @@ def compute_transit_diagnostics(  # noqa: PLR0913, PLR0914
         Position and width of the first B-field peak. The post-transit
         window starts at ``zc1 + 3·sigB`` (right edge of the field).
     x_c, sigma_w
-        Wavepacket centre and envelope width at t=0.
+        Wavepacket center and envelope width at t=0.
     t_check_1, t_check_2
         Check times in code units.
     h0
-        IC amplitude (for normalising the vacuum-floor threshold).
+        IC amplitude (for normalizing the vacuum-floor threshold).
     sup_norm_limit
         Above this, flag catastrophic overflow.
     norm_ratio_limit
@@ -230,8 +230,8 @@ def compute_transit_diagnostics(  # noqa: PLR0913, PLR0914
     # ------------------------------------------------------------------
     # IC window: ±3·sigma_w around x_c.
     ic_lo, ic_hi = x_c - 3.0 * sigma_w, x_c + 3.0 * sigma_w
-    # Post-transit window: ±3·sigma_w around the wavepacket centre at
-    # t_check_2. With c=1 group velocity for relativistic GWs, centre is
+    # Post-transit window: ±3·sigma_w around the wavepacket center at
+    # t_check_2. With c=1 group velocity for relativistic GWs, center is
     # at x_c + t_check_2. Clamp to box so we never sample beyond [0, L].
     centre_t2 = x_c + t_check_2
     post_lo = max(0.0, centre_t2 - 3.0 * sigma_w)

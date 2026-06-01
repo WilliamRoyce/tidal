@@ -3,7 +3,7 @@ r"""Figure D §6 — multi-method agreement (App-C styled).
 Two heatmaps side-by-side (`figure*`) of the pairwise relative
 difference $|P_a - P_b|/\max(|P_a|, |P_b|)$ across backend pairs on
 two representative theories. Log-scale viridis colormap; the IEEE
-floor is included in the lower colour bound for anchoring.
+floor is included in the lower color bound for anchoring.
 
 Annotated `min / max / median` rel_diff per theory in the in-figure
 text.

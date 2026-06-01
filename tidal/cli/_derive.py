@@ -1528,7 +1528,7 @@ def _wls_precompute_cd_component_values(  # noqa: C901, PLR0912, PLR0915
     # heads or Derivative[...][field_i][t,x,y,z]) returns zero fields.
     #
     # Gate: run the pre-computation whenever
-    #   (a) we have >= 2 dyn fields (existing behaviour), OR
+    #   (a) we have >= 2 dyn fields (existing behavior), OR
     #   (b) any dyn field appears as ``CD[...][name[...]]`` in the Lagrangian,
     #       i.e. derivative-only dependence that needs ComponentValue resolution.
     # Otherwise keep the fast-path skip (scalar/direct-tensor theories).
@@ -6598,7 +6598,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
                     )
                     ret = 0
             except Exception:  # noqa: BLE001, S110
-                pass  # JSON missing or corrupt — honour the non-zero exit code
+                pass  # JSON missing or corrupt — honor the non-zero exit code
 
     # NOTE: Plane-wave reduction (coordinate remapping, operator renaming,
     # dimension change) is now handled entirely in Wolfram via

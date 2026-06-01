@@ -2,7 +2,7 @@
 # Phase E interactive amp+sup parallel runner
 #
 # Runs the amp + sup PolyChord chains for one or more Phase E theories in
-# PARALLEL inside a single INTR sapphire allocation, maximising HPC throughput.
+# PARALLEL inside a single INTR sapphire allocation, maximizing HPC throughput.
 #
 # Usage (from local devcontainer):
 #   1. Book a sapphire INTR slot (1 hour):

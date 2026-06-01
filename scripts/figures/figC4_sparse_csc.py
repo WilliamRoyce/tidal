@@ -1,5 +1,5 @@
 """Figure C.4 — Sparse-CSC vs dense `expm_multiply` wall time on the
-localised-Gertsenshtein convolution matrix.
+localized-Gertsenshtein convolution matrix.
 
 Single log-log panel. Dense and sparse paths are plotted as separate
 series; the vertical gap between them at any N is the speedup.

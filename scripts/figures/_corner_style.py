@@ -49,7 +49,7 @@ FIG_WIDTH = 7.0
 COLUMN_WIDTH = 3.375
 HIGH_DIM_THRESHOLD = 12  # n_params at which the high-D tick fixes apply
 
-# Posterior colours sourced from the central IBM colorblind palette.
+# Posterior colors sourced from the central IBM colorblind palette.
 # Magenta = amplification-rewarding likelihood (+log A);
 # yellow  = suppression-rewarding likelihood (-log A); per App J
 # \cref{NestedScore}.  See `_palette.py` for the full palette.
@@ -130,7 +130,7 @@ def overlay_corner(
 
     Either ``amp_chains_dir`` or ``sup_chains_dir`` may be ``None`` for
     single-posterior plots (e.g. partial campaigns with only one direction
-    completed); the function then renders a single-colour plot.
+    completed); the function then renders a single-color plot.
 
     ``fig_width`` controls the rendered figure width in inches; small-N
     corner plots (≤ 9D) should pass ``fig_width=COLUMN_WIDTH`` so the

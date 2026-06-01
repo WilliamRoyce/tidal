@@ -9,7 +9,7 @@ Two-panel `figure*`:
       \sin^2(\kappa B_0 t/2)|$ versus $\Delta t$ for leapfrog
       Yoshida-2 and Yoshida-4. Fitted log–log slopes and $R^2$
       annotated in the legend. Implicit schemes are deliberately
-      excluded (their flat-at-rtol behaviour is covered in App D §6).
+      excluded (their flat-at-rtol behavior is covered in App D §6).
 
 The Rabi-frequency grid-convergence panel that previously sat in
 position (b) has been dropped: the data is FFT-bin-width bounded

@@ -27,7 +27,7 @@
 #
 # Soft floor: -15 (consistent with T7 campaign).
 #   T9 extends T7 with kinetic sector → expect similar floor-hit fraction until
-#   Phase E localised geometry resolves amplification candidates.
+#   Phase E localized geometry resolves amplification candidates.
 #
 # Submit via:
 #   bash scripts/hpc_shuttle.sh submit \

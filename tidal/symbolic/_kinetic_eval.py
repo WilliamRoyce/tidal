@@ -218,7 +218,7 @@ def split_small_parameter_kinetic(
     --------
     - Input must be a sum of monomials (post-``Expand`` on the Wolfram side;
       :func:`tidal.wolfram.ExportJSON.EquationToJSONMultiField` uses
-      ``Expand`` for this reason). Parenthesised sub-sums raise.
+      ``Expand`` for this reason). Parenthesized sub-sums raise.
     - Each summand contains each small parameter *at most linearly* (exponent
       exactly 1, in the numerator of any division, and not raised to a Power).
       Bilinear terms (``rho*sigma``), quadratic terms (``rho^2``), and
@@ -260,7 +260,7 @@ def split_small_parameter_kinetic(
     # Wolfram InputForm conventions to Python-AST: caret to **, and
     # nullary xCoba coordinate calls like `x[]` to bare `x` (ast.parse
     # rejects empty subscripts). The renamed `x` flows through to the
-    # synthesised RHS coefficient strings and downstream evaluator;
+    # synthesized RHS coefficient strings and downstream evaluator;
     # mathematica_to_python is idempotent on bare coord names. See GH #380.
     normalized = expr.replace("^", "**")
     normalized = re.sub(r"(\b\w+)\s*\[\s*\]", r"\1", normalized)
@@ -348,7 +348,7 @@ def _reject_inner_addition(node: ast.AST) -> None:
         if isinstance(n, ast.BinOp):
             if isinstance(n.op, (ast.Add, ast.Sub)):
                 msg = (
-                    "split_small_parameter_kinetic: parenthesised sub-sum "
+                    "split_small_parameter_kinetic: parenthesized sub-sum "
                     f"{ast.unparse(n)!r} inside a monomial is not supported "
                     "(expected Expand'd input)."
                 )

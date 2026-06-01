@@ -1,6 +1,6 @@
 r"""Kinetic-matrix assembly from a derived EquationSystem.
 
-Reorganises the per-equation JSON output into the
+Reorganizes the per-equation JSON output into the
 $\mathcal{K}(\partial_t, \partial_z)$ wave-operator matrix defined in
 `manuscript/sections/theory.tex` (label `KineticMatrix`):
 
@@ -11,7 +11,7 @@ $\mathcal{K}(\partial_t, \partial_z)$ wave-operator matrix defined in
 
 i.e., each row $i$ and column $j$ of $\mathcal{K}$ is the
 differential-operator polynomial acting on $\phi_j$ in the
-linearised equation of motion for $\phi_i$. The diagonal $i = j$
+linearized equation of motion for $\phi_i$. The diagonal $i = j$
 collects the LHS kinetic prefactor and any RHS self-terms; the
 off-diagonal entries collect inter-field couplings (Gertsenshtein
 $h \leftrightarrow A$, dark-photon $A \leftrightarrow T$, etc.).

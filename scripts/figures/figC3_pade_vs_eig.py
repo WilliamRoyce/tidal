@@ -121,7 +121,7 @@ def _plot(data: dict, out_path: Path) -> None:
         ax.set_xlabel("$N$")
         # Label only the power-of-two N values; intermediate N values
         # (192, 384, 768, …) still show markers but their ticks are
-        # unlabelled to avoid crowding.
+        # unlabeled to avoid crowding.
 
         def is_pow2(v):
             return v > 0 and (round(v) & (round(v) - 1)) == 0

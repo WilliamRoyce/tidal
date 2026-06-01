@@ -1,19 +1,19 @@
 r"""Central IBM colorblind-friendly palette for §4 figures.
 
-All figure scripts in `scripts/figures/` should import their colours from this
+All figure scripts in `scripts/figures/` should import their colors from this
 module rather than hardcoding hex values, so the palette stays consistent
 across the manuscript.
 
 Palette source: https://www.color-hex.com/color-palette/1044488
 (also cited by Legner–Handley–Barker 2507.09228 "SL would like to thank the
-IBM colour blind friendly palette for the color scheme used in the figures").
+IBM color blind friendly palette for the color scheme used in the figures").
 
 Role assignment for our overlay-corner figures:
 - AMP (amplification posterior, +log A direction)  → MAGENTA
 - SUP (suppression posterior, -log A direction)    → YELLOW
 - PRIOR (optional third overlay layer)             → PURPLE (indigo) at low alpha
 - HIGHLIGHT (carrier-parameter accent in tables)   → ORANGE
-- RESERVED (future fourth overlay, e.g. localised) → BLUE
+- RESERVED (future fourth overlay, e.g. localized) → BLUE
 
 The yellow/magenta pairing follows Legner–Handley–Barker (2507.09228) and
 gives stronger contrast than the previous orange/blue pair; the purple
@@ -22,7 +22,7 @@ gives stronger contrast than the previous orange/blue pair; the purple
 
 from __future__ import annotations
 
-# Five-colour IBM colorblind palette (hex, RGB).
+# Five-color IBM colorblind palette (hex, RGB).
 IBM_PALETTE = {
     "yellow": "#ffb000",
     "orange": "#fe6100",

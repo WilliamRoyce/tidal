@@ -754,7 +754,7 @@ def _build_evolution_matrices(
                 )
             except Exception:  # noqa: BLE001
                 # Fall back to the old hardcoded value if resolution fails.
-                # Matches the behaviour of normalize_kinetic_coefficients
+                # Matches the behavior of normalize_kinetic_coefficients
                 # which skips normalization in this case.
                 M_mat[:, fi, fi] = 1.0
                 continue
@@ -965,7 +965,7 @@ def _build_evolution_matrices(
             # is NOT symmetric in general (each equation has its own
             # LHS kinetic coefficient, and the off-diagonal d2_t
             # cross-couplings between distinct fields don't
-            # antisymmetrise), so eigh silently symmetrized via
+            # antisymmetrize), so eigh silently symmetrized via
             # (M + Mᵀ)/2 and gave a wrong eigenbasis for rank-deficient
             # cases (leading to the torsion dark-photon null result).
             #
@@ -1162,7 +1162,7 @@ def _build_evolution_matrices(
                 M_m = M_mat[m]
                 # Use SVD (not eigh) for rank detection since M may be
                 # asymmetric per the non-uniform kinetic-coefficient
-                # convention; eigh would silently symmetrise it.
+                # convention; eigh would silently symmetrize it.
                 sv_m = np.linalg.svd(M_m, compute_uv=False)
                 tol = 1e-10 * max(1.0, float(np.max(sv_m)) if sv_m.size else 1.0)
                 dyn_m = sv_m > tol
@@ -1432,7 +1432,7 @@ def _build_per_mode_matrices(
     A = np.zeros((n_modes, n_slots, n_slots), dtype=np.complex128)
 
     # #301 / #302: apply M⁻¹ to velocity-row entries so dv/dt = M⁻¹ K(q) for
-    # theories with non-trivial kinetic_coefficient_symbolic. The generalised
+    # theories with non-trivial kinetic_coefficient_symbolic. The generalized
     # eig path (_build_evolution_matrices) reads kinetic into M_mat directly;
     # this fast path instead folds M⁻¹ into the pre-solved evolution matrix.
     # build_inverse_kinetic_diag returns None when every dyn M ≈ 1 (fast path).
@@ -1729,7 +1729,7 @@ def _add_convolution_coupling(
     GH #384 Phase A′: for BSM-separable terms the block of size
     (n_modes × n_modes) is independent of the BSM scalar and reusable
     across PolyChord likelihood calls. The cache layer in
-    ``tidal/solver/_conv_block_cache.py`` memoises it.
+    ``tidal/solver/_conv_block_cache.py`` memoizes it.
     """
     block = _compute_conv_block_cached_or_fresh(
         term,
@@ -2701,7 +2701,7 @@ def _evolve_per_mode_pade(
     For each independent field block, computes ``M = B^-1·A`` per mode (with
     null-space projection if ``B`` is rank-deficient), then ``exp(M·dt)`` once
     per mode via ``scipy.linalg.expm`` (Higham 2009 Padé scaling-and-
-    squaring). The snapshot loop is pure ``O(bs^2)`` matvec, vectorised across
+    squaring). The snapshot loop is pure ``O(bs^2)`` matvec, vectorized across
     modes via einsum --- structurally identical to the eigendecomposition
     snapshot loop, but **robust for arbitrary ``cond(V)``** and wall-time
     competitive (0.49--1.06× across the campaign workload envelope; see
@@ -2794,7 +2794,7 @@ def _evolve_per_mode_pade(
         # cuts the precompute cost by 50–65× on inference workloads
         # (plane-wave IC has ~1 active rfft bin out of N//2+1).  When
         # ``sparse_ic_enabled`` is False the mask covers every mode,
-        # recovering legacy behaviour bit-exactly.
+        # recovering legacy behavior bit-exactly.
         n_modes_block: int = int(M_block.shape[0])
         if sparse_ic_enabled:
             y0_norms = np.linalg.norm(y0_block, axis=0)  # (n_modes,)
@@ -2809,7 +2809,7 @@ def _evolve_per_mode_pade(
         # ``exp_M_dt[m]`` is exactly zero — the snapshot matvec
         # (``np.einsum("mij,mj->mi", exp_M_dt, y_curr)``) then produces
         # 0 for those modes regardless of ``y_curr[m]``'s value, with
-        # no risk of NaN/inf garbage propagating from uninitialised
+        # no risk of NaN/inf garbage propagating from uninitialized
         # memory.
         exp_M_dt: NDArray[np.complex128] | None = None
         if uniform and dt_step is not None and dt_step > 0:
@@ -3082,7 +3082,7 @@ def _evolve_per_mode(
     """Evolve system with per-mode independent matrices (constant coefficients).
 
     Thin wrapper over :func:`_evolve_per_mode_pade`. The eigendecomposition
-    backend was retired in v0.31+ in favour of unconditional Padé scaling-
+    backend was retired in v0.31+ in favor of unconditional Padé scaling-
     and-squaring (path D), which is robust for arbitrary ``cond(V)`` AND
     wall-time competitive (0.49--1.06× across the campaign workload
     envelope; see ``docs/tex/modal_solver.tex`` §"Robust Matrix-Exponential
@@ -3157,7 +3157,7 @@ def _evolve_full_matrix(
 
     **Why not dense Padé (scipy.linalg.expm)?**  For strongly non-normal matrices
     (GH #367: max real eigenvalue > 0 from pseudospectral Fourier truncation of
-    a localised background field), exp(A·t) has norm ~10⁹ while the physically
+    a localized background field), exp(A·t) has norm ~10⁹ while the physically
     correct exp(A·t)·y₀ is ~0.005 — 12 orders of magnitude of catastrophic
     cancellation, impossible at float64 precision.  Dense Padé computes exp(A·t)
     correctly but the subsequent product with y₀ loses all significant digits.
@@ -3454,7 +3454,7 @@ def solve_modal(
     # This is standard practice in spectral methods — the Nyquist mode
     # aliases with its conjugate and cannot represent physical content.
     # Ref: Boyd (2001), Chebyshev & Fourier Spectral Methods, §11.5.
-    # _zero_nyquist=False reproduces the pre-fix behaviour for benchmarking.
+    # _zero_nyquist=False reproduces the pre-fix behavior for benchmarking.
     if _zero_nyquist:
         for _dim_idx, n in enumerate(grid.shape):
             if n % 2 == 0:  # Nyquist mode exists only for even N
@@ -3961,7 +3961,7 @@ def _build_source_matrix_k(
     # corresponding equation's field. Without this, Pass 1 produces a
     # source that omits the M₀⁻¹(K₁ − M₁·M₀⁻¹·K₀) factor from the
     # perturbative identity; the error scales linearly with ε and breaks
-    # Phase-3 canonicalised theories (e.g., Euler-Heisenberg with σ in
+    # Phase-3 canonicalized theories (e.g., Euler-Heisenberg with σ in
     # small_parameters — the synthesized corrections come out wrong).
     # Returns None when every M ≈ 1 so the existing fast path continues
     # with zero overhead for theories unaffected by #301.

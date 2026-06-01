@@ -526,7 +526,7 @@ class TestSectorFilter:
     def test_sector_other(self) -> None:
         from tidal.symbolic.latex import _sector
 
-        # Constraint multipliers, residuals, or unrecognised field names
+        # Constraint multipliers, residuals, or unrecognized field names
         # fall through to "other".
         assert _sector("lambda_0") == "other"
         assert _sector("phi_1") == "other"
@@ -597,7 +597,7 @@ class TestSystemToLatex:
     def test_gather_format(self) -> None:
         """`gather` wraps each equation in its own `aligned` block.
 
-        Used by the Appendix-E driver so each equation centres on its own
+        Used by the Appendix-E driver so each equation centers on its own
         natural width — no global `&=` column drag across the listing.
         """
         from tidal.symbolic.json_loader import load_equation_system

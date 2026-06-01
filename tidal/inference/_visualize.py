@@ -251,7 +251,7 @@ def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
 
     Samples flagged with ``run_status='tachyonic'`` by the pre-flight
     stability guard.  Returns ``None`` if no metadata or no rejections.
-    Following anesthetic conventions for visualising inaccessible regions
+    Following anesthetic conventions for visualizing inaccessible regions
     of parameter space (Handley 2019 JOSS).  See also
     ``_rejected_prior.csv`` produced by Phase 4 for nested-sampling output.
     """
@@ -701,7 +701,7 @@ def _render_anesthetic_corner_into(
         A matplotlib Figure / SubFigure to render the axes into.  None
         means the standalone path — ``samples.plot_2d(param_names)``
         builds its own figure (bit-identical to the pre-refactor
-        behaviour).  When provided, axes are built explicitly via
+        behavior).  When provided, axes are built explicitly via
         :func:`anesthetic.make_2d_axes` inside ``target_fig`` (passed
         through anesthetic's ``fig=`` fig_kw); the axes fill the entire
         SubFigure.
@@ -731,9 +731,9 @@ def _render_anesthetic_corner_into(
     """
     import numpy as np
 
-    # When a single-tone colour is requested, forward (color, alpha) so
-    # anesthetic colours every artist uniformly — 1D diagonal KDE curves,
-    # 2D fills, and contour outlines all read in the same colour family.
+    # When a single-tone color is requested, forward (color, alpha) so
+    # anesthetic colors every artist uniformly — 1D diagonal KDE curves,
+    # 2D fills, and contour outlines all read in the same color family.
     # This matches the manuscript's results-section corner-plot style
     # (`scripts/figures/_corner_style.py`'s `overlay_corner`).
     plot_2d_kwargs: dict[str, object] = {}
@@ -820,7 +820,7 @@ def _render_anesthetic_corner_into(
             # via the public ``set_labels`` method post-render.
             axes_df.set_labels(labels)  # type: ignore[attr-defined]
     else:
-        # Standalone path: bit-identical to the pre-refactor behaviour —
+        # Standalone path: bit-identical to the pre-refactor behavior —
         # let anesthetic.plot_2d build its own figure and axes from the
         # parameter list.  Extract fig + axes_df from anesthetic's
         # return value: either ``(fig, axes_df)`` (older versions) or
@@ -1032,32 +1032,32 @@ def _force_solid_credible_fills(
     """Render solid-fill credible regions per Planck/DES/getdist convention.
 
     Replaces anesthetic's per-panel-normalized gradient fills with solid
-    colours per credible level.
+    colors per credible level.
 
     **Why**: anesthetic's default ``kde_contour_plot_2d`` renders contour
     fills via ``ax.contourf(P, levels=[c95, c68], cmap=cmap, vmin=0,
     vmax=P.max())``.  Because ``vmax`` is the *per-panel* peak density,
     the same iso-probability levels (68%, 95%) land at different cmap
     positions in different panels, producing visually inconsistent fill
-    colours across the corner plot.  See
+    colors across the corner plot.  See
     ``.venv/.../anesthetic/plot.py:1311``.
 
     The cosmology community standard (Planck 2018, DES Y3, ACT DR6,
     SPT-3G, Euclid forecasts; produced via ``getdist`` with ``filled=
-    True``) uses **solid two-tone fills** — one colour for the 95%
-    credible region, a darker colour for the 68% region — identical
+    True``) uses **solid two-tone fills** — one color for the 95%
+    credible region, a darker color for the 68% region — identical
     across every panel.  This is what we want: a reader extracting
-    credible-region boundaries is not misled by panel-to-panel colour
+    credible-region boundaries is not misled by panel-to-panel color
     drift.
 
     **How**: walk each axis's ``ContourSet`` collections (anesthetic
     creates exactly one per panel for the 2D KDE fill), and override
-    the face colours to the supplied two-tone palette (default
+    the face colors to the supplied two-tone palette (default
     Planck-blue).  The associated contour *line* collections (also drawn
     by anesthetic) are left untouched so the boundaries remain crisp.
 
     This post-hoc patch keeps anesthetic's KDE computation and contour
-    *placement* intact; we only override the rendered fill colours.
+    *placement* intact; we only override the rendered fill colors.
 
     Parameters
     ----------
@@ -1097,7 +1097,7 @@ def _apply_solid_fill(
     palette: list[str],
     mcolors: object,
 ) -> None:
-    """Override one ContourSet's fill colours with a solid palette.
+    """Override one ContourSet's fill colors with a solid palette.
 
     Handles both old matplotlib (< 3.8: ``.collections`` attribute holds
     one PathCollection per band) and new matplotlib (≥ 3.8: ContourSet

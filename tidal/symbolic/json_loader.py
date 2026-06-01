@@ -1274,7 +1274,7 @@ class EquationSystem:
 
         Returns
         -------
-        A new :class:`EquationSystem` with the canonicalised equations. The
+        A new :class:`EquationSystem` with the canonicalized equations. The
         returned spec is idempotent under this transform; calling it twice
         produces the same result. ``self`` is unchanged.
 
@@ -1283,7 +1283,7 @@ class EquationSystem:
         tidal.symbolic._kinetic_eval.KineticEvalError
             If any kinetic coefficient has structure outside the
             perturbative contract (bilinear in two small parameters,
-            quadratic in one, small-parameter denominator, parenthesised
+            quadratic in one, small-parameter denominator, parenthesized
             sub-sum). See :func:`split_small_parameter_kinetic`.
         """
         from tidal.symbolic._kinetic_eval import (  # noqa: PLC0415
@@ -1600,7 +1600,7 @@ class EquationSystem:
                 raise TypeError(msg)
 
         # Auto-compute mass/coupling matrices from identity operator terms.
-        # This is the authoritative source — JSON values are ignored in favour
+        # This is the authoritative source — JSON values are ignored in favor
         # of values derived from the equation terms themselves.
         (
             mass_matrix,
@@ -1875,7 +1875,7 @@ def normalize_kinetic_coefficients(
         All time-domain solver backends (cvode/ida/leapfrog/scipy) now consume
         ``kinetic_coefficient_symbolic`` directly via
         :func:`tidal.solver._kinetic.build_inverse_kinetic_diag`, matching the
-        modal solver's existing behaviour. The canonical spec form carries the
+        modal solver's existing behavior. The canonical spec form carries the
         kinetic coefficient on the LHS and the un-normalized RHS; every
         backend applies M⁻¹ at setup. This function is retained only for
         external callers that pre-normalized specs before the root fix

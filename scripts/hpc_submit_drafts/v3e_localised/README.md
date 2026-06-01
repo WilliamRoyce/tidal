@@ -1,4 +1,4 @@
-# Phase E — Localised wavepacket + dual-Gaussian B-field submit scripts
+# Phase E — Localized wavepacket + dual-Gaussian B-field submit scripts
 
 Companion to `docs/PHASE_E_TRACKER.md` (primary tracker) and
 `docs/V3_PHASE_E_DESIGN.md` (design rationale).

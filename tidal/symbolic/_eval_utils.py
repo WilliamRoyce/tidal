@@ -523,7 +523,7 @@ def mathematica_to_python(
 # shallow-copy per call.
 _STATIC_EVAL_NAMESPACE: dict[str, object] = {
     # `E` constant for Python-form `E**x` expressions that survive into
-    # coefficient strings (e.g. synthesised RHS corrections from
+    # coefficient strings (e.g. synthesized RHS corrections from
     # canonicalize_kinetic_for_perturbation under GH #380). Mathematica
     # InputForm coefficients use `E^x` and are translated to `exp(x)` by
     # mathematica_to_python; this entry handles the Python-form sibling.

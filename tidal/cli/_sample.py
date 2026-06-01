@@ -350,7 +350,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
         # Record priors in metadata so post-hoc analysis (e.g. correct
         # marginal D_KL per parameter, #308) can transform each column
         # into the space where its prior is uniform.  Mixed priors are
-        # serialised by type so the loader can reconstruct each component.
+        # serialized by type so the loader can reconstruct each component.
         import numpy as np
 
         prior_records: list[dict[str, object]] = []

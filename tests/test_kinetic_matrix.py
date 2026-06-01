@@ -71,7 +71,7 @@ class TestBaselineKineticMatrix:
         assert cell_T.entries == ((op, coeff),)
 
     def test_orthogonal_polarization_decoupled(self) -> None:
-        """K[h_xy, h_yy] and K[A_x, A_y] are empty — the two polarisations
+        """K[h_xy, h_yy] and K[A_x, A_y] are empty — the two polarizations
         evolve in independent channels at the kinetic level.
         """
         i_hxy = self.km.field_index("h_5")

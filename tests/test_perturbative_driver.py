@@ -1042,7 +1042,7 @@ class TestPhase3HierarchyPreservation:
 # ---------------------------------------------------------------------------
 # GH #380: Pass 0 must be constant-coefficient even when the kinetic
 # coefficient is BOTH coordinate-dependent AND carries a small parameter
-# (e.g. Euler-Heisenberg in a localised B background).
+# (e.g. Euler-Heisenberg in a localized B background).
 # ---------------------------------------------------------------------------
 
 _KG_WITH_POS_DEP_KINETIC_EPS: dict[str, object] = {
@@ -1077,8 +1077,8 @@ _KG_WITH_POS_DEP_KINETIC_EPS: dict[str, object] = {
 
 
 class TestGH380CoordDepSmallParamKinetic:
-    """Coord-dep + small-param kinetic must canonicalise the same way as
-    pure-parameter does (M = M₀ + ε·M₁ split, Pass-1 RHS synthesised). The
+    """Coord-dep + small-param kinetic must canonicalize the same way as
+    pure-parameter does (M = M₀ + ε·M₁ split, Pass-1 RHS synthesized). The
     Wolfram side must NOT divide the RHS through by such a kinetic
     coefficient (else everything collapses into order_in_eps=0 RHS terms
     with 1/(1-εX) shapes — see #380).
@@ -1096,8 +1096,8 @@ class TestGH380CoordDepSmallParamKinetic:
         spec = _make_spec(_KG_WITH_POS_DEP_KINETIC_EPS)
         canon = spec.canonicalize_kinetic_for_perturbation(["alpha"])
         order1 = [t for t in canon.equations[0].rhs_terms if t.order_in_eps == 1]
-        assert order1, "expected synthesised order-1 term from coord-dep kinetic"
-        # Synthesised coeff: -((-x[]^2) * alpha * 1) / 1 → +alpha*x[]^2,
+        assert order1, "expected synthesized order-1 term from coord-dep kinetic"
+        # Synthesized coeff: -((-x[]^2) * alpha * 1) / 1 → +alpha*x[]^2,
         # carrying the coordinate x[] in coefficient_symbolic.
         synth = [
             t for t in order1 if t.operator == "laplacian_x" and t.field == "phi_0"
@@ -1105,20 +1105,20 @@ class TestGH380CoordDepSmallParamKinetic:
         assert synth, f"expected laplacian_x(phi_0) synthesis; got {order1!r}"
         joined = " ".join((t.coefficient_symbolic or "") for t in synth)
         # split_small_parameter_kinetic translates `x[]` → `x` before
-        # ast.parse (#380); the renamed form propagates into the synthesised
+        # ast.parse (#380); the renamed form propagates into the synthesized
         # coefficient string. mathematica_to_python at eval time is
         # idempotent on bare coord names, so this is safe.
         import re as _re
 
         assert _re.search(r"\bx\b", joined), (
-            f"synthesised term must carry x coordinate; got {joined!r}"
+            f"synthesized term must carry x coordinate; got {joined!r}"
         )
         assert "alpha" in joined, (
-            f"synthesised term must carry alpha small param; got {joined!r}"
+            f"synthesized term must carry alpha small param; got {joined!r}"
         )
 
     def test_base_spec_is_constant_coefficient(self) -> None:
-        """After canonicalisation, base_spec must have no coord dependence
+        """After canonicalization, base_spec must have no coord dependence
         in any order_in_eps=0 RHS coefficient — the heart of the #380 fix.
         If this fails, modal+perturbative will hit NotImplementedError at
         Pass 0.
@@ -1145,7 +1145,7 @@ class TestGH380CoordDepSmallParamKinetic:
 # ---------------------------------------------------------------------------
 # GH #380 follow-up: PerturbativeSolver must raise an actionable error when
 # the base spec has legitimately-position-dependent terms (i.e. not just the
-# 1/(1-εX) shape that #380 canonicalises away).
+# 1/(1-εX) shape that #380 canonicalizes away).
 # ---------------------------------------------------------------------------
 
 _KG_WITH_POS_DEP_BASE: dict[str, object] = {
@@ -1184,7 +1184,7 @@ _KG_WITH_POS_DEP_BASE: dict[str, object] = {
 
 class TestGH380PerturbativeRejectsPosDepBase:
     """PerturbativeSolver should fail loudly at construction when the base
-    spec is position-dependent (after canonicalisation), with a message that
+    spec is position-dependent (after canonicalization), with a message that
     points the user at non-perturbative alternatives instead of letting them
     hit the deep modal.py NotImplementedError after a slow simulate setup.
     """

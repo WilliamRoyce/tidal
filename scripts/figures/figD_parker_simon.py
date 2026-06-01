@@ -33,7 +33,7 @@ EPS_MACH = 2.220446049250313e-16
 # Saturation detection: a point is saturated when its log-log slope to
 # the next-smaller-eps point is less than this threshold. The
 # perturbative theorem predicts slope >= 2 in the asymptotic regime;
-# anything below ~1 indicates the spatial-discretisation noise floor
+# anything below ~1 indicates the spatial-discretization noise floor
 # has been reached.
 SAT_SLOPE_THRESH = 1.0
 
@@ -119,7 +119,7 @@ def _plot(data: dict, out_path: Path) -> None:
             mec=IBM_PALETTE["blue"],
             label="_nolegend_",
         )
-        # Annotate the FD-4 spatial-discretisation floor at the median
+        # Annotate the FD-4 spatial-discretization floor at the median
         # of the saturated points so the exclusion is visually justified.
         floor_val = float(np.median(np.maximum(err_c[floor_mask], EPS_MACH)))
         ax.axhline(

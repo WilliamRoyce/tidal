@@ -13,7 +13,7 @@ infrastructure plus the new `compute_cross_kl` to capture:
 
 Priors are read from each chain's `inference.json` when available; the
 TOML config provides param_names per chain so the column ordering matches
-the on-disk chain files.  Add new chains (e.g. localised geometry runs)
+the on-disk chain files.  Add new chains (e.g. localized geometry runs)
 by appending [[chain]] entries to `d_kl_chains.toml` — no code edits.
 
 Run from the repo root:

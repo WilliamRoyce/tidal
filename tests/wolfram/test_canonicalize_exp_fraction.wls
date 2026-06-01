@@ -53,14 +53,14 @@ ehParams = {x[] -> Null, Bpeak -> 0.01, sigB -> 5.0, zc1 -> 50.0,
 ehParams = DeleteCases[ehParams, x[] -> _];  (* x[] substituted per-test below *)
 
 (* At x = zc1, original form still evaluates (exp(2500) is huge but finite ratio). *)
-TestTrue["EH: numeric agreement at x = 50 (Gaussian centre)",
+TestTrue["EH: numeric agreement at x = 50 (Gaussian center)",
   Module[{a, b},
     a = N[ehCoeff /. Join[{x[] -> 50.0}, ehParams], 30];
     b = N[ehCoeffCanon /. Join[{x[] -> 50.0}, ehParams], 30];
     Abs[(a - b)/a] < 1.0*^-10
   ]];
 
-(* At x = 100 (box edge for L=200 centred at 0), un-canonicalised form
+(* At x = 100 (box edge for L=200 centered at 0), un-canonicalized form
    overflows machine doubles; canonical form must remain finite and close
    to 1 (no Gaussian support there). *)
 TestTrue["EH: canonical form finite at box edge x=100",

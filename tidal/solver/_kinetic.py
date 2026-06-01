@@ -63,7 +63,7 @@ def build_inverse_kinetic_diag(
         position-dependent kinetic coefficients (post-GH #380:
         kinetic_coefficient_symbolic containing ``x[]``, ``y[]``, …) evaluate
         to per-grid-point arrays. ``None`` (the default) preserves the
-        constant-coefficient behaviour. See GH #382.
+        constant-coefficient behavior. See GH #382.
 
     Returns
     -------
@@ -160,7 +160,7 @@ def velocity_row_scale(
     this rather than inline the lookup, so the contract is reviewable from
     the function definition and so the regression guard in
     :class:`tests.test_solver_kinetic_consistency.TestAllModalPathsRespectKinetic`
-    can pin all callers to the same behaviour.
+    can pin all callers to the same behavior.
 
     ``m_inv`` is the dict returned by :func:`build_inverse_kinetic_diag`.
     ``None`` (every field has ``M ≈ 1``) and missing-from-dict (this field
@@ -195,7 +195,7 @@ def velocity_row_scale(
         that pre-build complex per-mode matrices may receive an array here
         and need to either reduce it (e.g. take ``.ravel()[0]`` for the
         constant-coefficient approximation) or fail loudly — see
-        ``modal.py:732`` for the current per-mode-Padé behaviour.
+        ``modal.py:732`` for the current per-mode-Padé behavior.
 
     See Also
     --------

@@ -434,7 +434,7 @@ class PerturbativeSolver:
         self.base_spec = self.full_spec.base_spec(small_parameters)
         self._max_order = self.full_spec.max_order()
         # GH #380 follow-up: detect legitimately-position-dependent base specs
-        # (after canonicalisation) and fail loudly with an actionable message.
+        # (after canonicalization) and fail loudly with an actionable message.
         # The v6 Pass 1 Duhamel kernel requires Pass 0 eigendata, which only
         # the constant-coefficient modal paths can provide; the Krylov
         # expm_multiply path used for position-dependent systems has no
@@ -446,7 +446,7 @@ class PerturbativeSolver:
                 "PerturbativeSolver requires a constant-coefficient base "
                 "(order_in_eps=0) spec. The provided theory has position-"
                 "dependent terms in the base spec even after kinetic "
-                "canonicalisation — v6 Pass 1 Duhamel cannot evaluate "
+                "canonicalization — v6 Pass 1 Duhamel cannot evaluate "
                 "the augmented matrix exponential without per-mode "
                 "eigendata, which the Krylov expm_multiply path for "
                 "position-dependent systems does not provide. "
@@ -458,7 +458,7 @@ class PerturbativeSolver:
                 "If the position-dependence ought to be perturbative "
                 "(O(ε)) but is being tagged O(0), check the Wolfram "
                 "derivation's order_in_eps tagging — see GH #380 for the "
-                "kinetic-canonicalisation case."
+                "kinetic-canonicalization case."
             )
             raise NotImplementedError(msg)
 

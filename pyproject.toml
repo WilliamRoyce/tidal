@@ -225,7 +225,7 @@ unfixable = ["T201"]
     "SIM105",
     "SIM113",
     "SLF001",
-    # Path/encoding modernisations not enforced on one-off scripts
+    # Path/encoding modernizations not enforced on one-off scripts
     "PTH100",
     "PTH103",
     "PTH118",

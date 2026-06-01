@@ -154,7 +154,7 @@ def test_grid_shape_layout_cols(
 
 
 def test_grid_shape_layout_cols_none_preserves_2_by_n() -> None:
-    """Default behaviour (cols=None) is unchanged from the 2 x N rule."""
+    """Default behavior (cols=None) is unchanged from the 2 x N rule."""
     assert _grid_shape(5, cols=None) == (2, 5)
     assert _grid_shape(8, cols=None) == (2, 8)
 
@@ -465,11 +465,11 @@ def test_plot_atlas_threads_fill_colors_through(tmp_path: Path) -> None:
 
 def test_plot_atlas_threads_single_tone_color_through(tmp_path: Path) -> None:
     """When ``color=`` is provided, the K.2 manuscript-figure style: the
-    single hex colour and its alpha must reach
+    single hex color and its alpha must reach
     :func:`_render_anesthetic_corner_into` for every panel.  Matches the
     convention in ``scripts/figures/_corner_style.py`` of single-tone
     ``samples.plot_2d(color=..., alpha=...)`` so every artist (1D KDE
-    diagonals, 2D fills, contour outlines) reads in the same colour.
+    diagonals, 2D fills, contour outlines) reads in the same color.
     """
     n = 3
     names = ("a", "b", "c")
@@ -627,7 +627,7 @@ def test_plot_atlas_overlay_up_down_n_panels(tmp_path: Path) -> None:
 
 def test_plot_atlas_overlay_renders_both_posteriors(tmp_path: Path) -> None:
     """In overlay mode each axis panel must trigger TWO ``samples.plot_2d``
-    calls (up + down) with their respective colours, not one.  The
+    calls (up + down) with their respective colors, not one.  The
     canonical pattern from ``scripts/figures/_corner_style.py``.
     """
     n = 3
@@ -640,10 +640,10 @@ def test_plot_atlas_overlay_renders_both_posteriors(tmp_path: Path) -> None:
         _make_synthetic_cell(cd, names, face_idx, sub_tile, M=1, Q=Q)
 
     # Mock-patch anesthetic's MCMCSamples.plot_2d so we can capture the
-    # colour kwargs per call.  Patching at the class level is brittle
+    # color kwargs per call.  Patching at the class level is brittle
     # across anesthetic versions; instead, spy on the up/down inputs by
     # spying on _render_axis_panel and recording how often it gets
-    # called and with which colours.
+    # called and with which colors.
     from tidal.inference import _atlas
 
     real_panel = _atlas._render_axis_panel
@@ -675,7 +675,7 @@ def test_plot_atlas_overlay_renders_both_posteriors(tmp_path: Path) -> None:
 
 
 def test_plot_atlas_overlay_requires_color_up_and_color_down(tmp_path: Path) -> None:
-    """``overlay_up_down=True`` without both colours raises ``ValueError``."""
+    """``overlay_up_down=True`` without both colors raises ``ValueError``."""
     n = 3
     names = ("a", "b", "c")
     Q = np.eye(n)

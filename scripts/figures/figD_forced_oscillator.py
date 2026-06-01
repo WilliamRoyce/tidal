@@ -78,7 +78,7 @@ def _plot(data: dict, out_path: Path) -> None:
         color=IBM_PALETTE["blue"],
         label=rf"$|\phi^{{(0)}} + \phi^{{(1)}} - \phi^\mathrm{{exact}}|$ ($\hat{{\alpha}} = {s_c:.2f}$, $R^2 = {r2_c:.3f}$)",
     )
-    # O(eps^2) reference guide anchored at largest eps (distinct grey
+    # O(eps^2) reference guide anchored at largest eps (distinct gray
     # so the line doesn't merge with the phi^(0)+phi^(1) trace).
     ax.loglog(
         eps,

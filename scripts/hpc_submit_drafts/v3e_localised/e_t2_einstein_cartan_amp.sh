@@ -2,7 +2,7 @@
 # Phase E.T2 amp — Einstein-Cartan minimal (algebraic torsion masses only)
 #
 # Free couplings (3): alpha1, alpha2, alpha3 — three irreducible torsion mass
-# sectors (tentor, trator, axitor). Phase E geometry: localised wavepacket +
+# sectors (tentor, trator, axitor). Phase E geometry: localized wavepacket +
 # dual-Gaussian B-field, modal-solver compatible.
 #
 # v3 architecture: tachyon-permissive sampling + soft floor (no Hwang-Noh gate).

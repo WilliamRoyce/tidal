@@ -32,7 +32,7 @@
 #   T5.2: 16 chains × 7 ranks = 112 cores, ~5-6h wall  (--time 09:00:00)
 #   T5.3: 18 chains × 6 ranks = 108 cores, ~8-10h wall (--time 12:00:00)
 #
-# OOM defence: uniform-field grid is tiny (~100 KB/rank state). 1500 MB/cpu
+# OOM defense: uniform-field grid is tiny (~100 KB/rank state). 1500 MB/cpu
 # is overkill but matches the validated INTR runs.
 
 set -euo pipefail

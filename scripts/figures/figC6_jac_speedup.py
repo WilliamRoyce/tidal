@@ -8,7 +8,7 @@ representative theories.
 Layout: 1×3 row of subplots (one per theory), spanning \textwidth via
 \begin{figure*}.  Within each panel four series are plotted on log–log axes:
 dense (filled circles), sparse (filled squares), GMRES (filled triangles), and
-FD proxy (open diamonds, grey).  Vertical dashed lines mark the production
+FD proxy (open diamonds, gray).  Vertical dashed lines mark the production
 auto-selection boundaries at n_total = 2 000 (dense→sparse) and
 n_total = 200 000 (sparse→GMRES).  Shaded tier-label bands are drawn in the
 first panel only to avoid clutter.
@@ -68,7 +68,7 @@ _SPARSE_THRESHOLD = 200_000
 _DENSE_COLOR = IBM_PALETTE["blue"]  # filled circles
 _SPARSE_COLOR = IBM_PALETTE["orange"]  # filled squares
 _GMRES_COLOR = IBM_PALETTE["purple"]  # filled triangles (tab:green → IBM purple)
-_FD_COLOR = "#888888"  # grey — open diamonds
+_FD_COLOR = "#888888"  # gray — open diamonds
 
 
 def _plot(data: dict, out_path: Path) -> None:
@@ -198,7 +198,7 @@ def _plot(data: dict, out_path: Path) -> None:
             if global_x_lo < n_thresh < global_x_hi:
                 ax.axvline(n_thresh, ls="--", lw=0.7, color="#555555", zorder=2)
 
-        # Tier-zone labels: italicised, near the bottom of the centre panel
+        # Tier-zone labels: italicized, near the bottom of the center panel
         # only.  Avoids the title-clash and shading-ambiguity issues of the
         # previous design.
         if ax_idx == 1:

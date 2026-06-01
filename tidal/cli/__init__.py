@@ -170,7 +170,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "'gather' wraps each equation in its own \\begin{aligned} block "
             "inside an outer \\begin{gather*} for per-equation centering "
             "(used by the Appendix-E driver). "
-            "'kinetic-matrix' emits the linearised kinetic matrix "
+            "'kinetic-matrix' emits the linearized kinetic matrix "
             "\\mathcal{K}(\\partial_t, \\partial_z) as a bmatrix "
             "(used by the Appendix-E driver second pass). "
             "'document' wraps in standalone .tex"
@@ -294,7 +294,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--ic-no-snap",
         action="store_true",
         help="Disable automatic snapping of --ic-wavevector to the nearest "
-        "discrete Fourier mode on periodic grids. Legacy behaviour: the IC "
+        "discrete Fourier mode on periodic grids. Legacy behavior: the IC "
         "is cos(k·x) evaluated verbatim at grid points, which leaks amplitude "
         "onto every discrete k-mode when k is off-grid. Only needed for "
         "reproducing pre-snap simulations or for theories where off-grid "
@@ -1010,7 +1010,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="RULE",
         help=(
             "Classify campaign subplots (e.g. 'active:A>1.01'). "
-            "Active panels get warm background, null panels get grey."
+            "Active panels get warm background, null panels get gray."
         ),
     )
     plot_parser.add_argument(
@@ -1900,7 +1900,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         dest="soft_floor_logl",
         help=(
             "Position of the soft penalty floor for sim divergence / NaN / exception "
-            "(default: -100). For baseline-normalised maximize/minimize runs the "
+            "(default: -100). For baseline-normalized maximize/minimize runs the "
             "natural physics logL is near 0, so -100 drags logZ to -100 and makes "
             "the PolyChord precision criterion unreachable. Use -15 (or similar) "
             "to keep logZ in a sensible range. See issue #372."
@@ -1956,7 +1956,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help=(
             "Per-evaluation pipeline: 'memory' skips the simulate/measure disk "
             "round-trip (default, ~2x faster for nested sampling — see #269); "
-            "'disk' preserves the legacy behaviour for bisectability."
+            "'disk' preserves the legacy behavior for bisectability."
         ),
     )
     sample_parser.add_argument(

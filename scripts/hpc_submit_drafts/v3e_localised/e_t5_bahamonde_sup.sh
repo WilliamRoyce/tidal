@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase E.T5 sup — companion to e_t5_bahamonde_amp.sh (minimise P_max).
+# Phase E.T5 sup — companion to e_t5_bahamonde_amp.sh (minimize P_max).
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/_geometry.env"
 python "$(git rev-parse --show-toplevel)/scripts/v3e_boccaletti_preflight.py" || exit 1

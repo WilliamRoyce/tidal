@@ -15,7 +15,7 @@ Per-theory $K$ values:
   - $K = 6$ otherwise.
 
 Driven by the same `d_kl_chains.toml` config as the recompute walker
-so it picks up new chains (e.g. localised geometry) without code edits.
+so it picks up new chains (e.g. localized geometry) without code edits.
 
 Run from the repo root:
     uv run python scripts/figures/kl_carrier_corner.py

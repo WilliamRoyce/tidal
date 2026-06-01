@@ -50,7 +50,7 @@ def fetch_eprint(arxiv_id: str) -> str:
         (dest / f"{safe}.tex").write_bytes(text)
     except Exception:
         (dest / f"{safe}.raw").write_bytes(raw)
-        return "raw (unrecognised format)"
+        return "raw (unrecognized format)"
     else:
         return "single-gz tex"
 

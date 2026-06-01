@@ -19,7 +19,7 @@ Non-separable patterns this rejects:
 - BSM inside one summand but not another: ``α + x[]``.
 - BSM mixed with coord/geometry inside ``Pow.base`` with non-integer exponent.
 
-Mathematica-form input is normalised via ``^→**`` and ``x[]→x`` before
+Mathematica-form input is normalized via ``^→**`` and ``x[]→x`` before
 ``ast.parse``, mirroring the convention in ``tidal/symbolic/_kinetic_eval.py``.
 """
 

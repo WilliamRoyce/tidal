@@ -1,14 +1,14 @@
-# Publication artefact manifest.
+# Publication artifact manifest.
 #
 # Maps each manuscript figure/table to its producing script(s), data
 # dependencies, and appendix reference. Read by:
 #   - tests/publication/* (validates round-trip script -> data -> output)
 #   - scripts/run_benchmarks.sh (enumerates benchmark jobs)
 #
-# Each entry under appendix_<X> is keyed by the artefact's manuscript label.
+# Each entry under appendix_<X> is keyed by the artifact's manuscript label.
 # `kind` is one of: figure, table, static_tikz.
 # `appendix_ref` is the source-line citation pointing at the TODO this
-# artefact satisfies.
+# artifact satisfies.
 
 appendix_C:
 

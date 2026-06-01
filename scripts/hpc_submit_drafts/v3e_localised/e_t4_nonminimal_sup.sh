@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase E.T4 sup — companion to e_t4_nonminimal_amp.sh (minimise P_max).
+# Phase E.T4 sup — companion to e_t4_nonminimal_amp.sh (minimize P_max).
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/_geometry.env"
 python "$(git rev-parse --show-toplevel)/scripts/v3e_boccaletti_preflight.py" || exit 1

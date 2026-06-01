@@ -506,7 +506,7 @@ class CoefficientEvaluator:
                 # Leak metric: product of relative jump and boundary significance.
                 # IBP leak ~ |β(L)-β(0)| * |f(L)|².  For localized problems both
                 # the coefficient jump and field amplitude are small at boundaries.
-                # We use boundary_magnitude/scale as a proxy for field localisation
+                # We use boundary_magnitude/scale as a proxy for field localization
                 # (localized coefficients ↔ localized fields), giving:
                 #   leak ~ (jump/scale) * (boundary_magnitude/scale)
                 # This naturally suppresses false positives for localized

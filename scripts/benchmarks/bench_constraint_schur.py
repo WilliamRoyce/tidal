@@ -253,7 +253,7 @@ def main() -> None:
     print("\nGate decision:")
     print(f"  solve = {solve_pct:.1f}%")
     if solve_pct < 20:
-        print("  → Phase A (fill-side optimisation) is the right target. PROCEED.")
+        print("  → Phase A (fill-side optimization) is the right target. PROCEED.")
     elif solve_pct > 70:
         print("  → Solve dominates. Phase A only saves a small fraction.")
         print("    Pause and replan: target sparse LU or preconditioned iterative.")

@@ -31,12 +31,12 @@ The cache key carries everything that affects the block contents:
 
 Public API
 ----------
-- ``get_or_compute(key, compute_fn)``: standard memoise.
+- ``get_or_compute(key, compute_fn)``: standard memoize.
 - ``clear()``: drop all cached blocks (test isolation).
 - ``stats()``: return ``{"hits": ..., "misses": ..., "bytes": ...}``.
 
-Linked: GH #379 (the constraint-Schur path being optimised),
-GH #384 (this optimisation), the [[gh384-conv-block-cache]] memory.
+Linked: GH #379 (the constraint-Schur path being optimized),
+GH #384 (this optimization), the [[gh384-conv-block-cache]] memory.
 """
 
 from __future__ import annotations

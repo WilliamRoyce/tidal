@@ -392,7 +392,7 @@ class TestGH382PositionDependentKinetic:
             f"expected ndarray for position-dependent kinetic; got {type(val)}"
         )
         assert val.shape == (64,)
-        # Sanity: matches analytical inverse at cell centres
+        # Sanity: matches analytical inverse at cell centers
         x_centred = grid.axes_coords(0)
         expected = 1.0 / (1.0 + 0.1 * x_centred**2)
         assert np.allclose(val, expected, atol=1e-12)

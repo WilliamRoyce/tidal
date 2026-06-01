@@ -1028,7 +1028,7 @@ class TestParameterImportance:
         ns = nested_result.to_anesthetic()
         params = list(nested_result.param_names)
 
-        # Self-cross-KL must be 0 (modulo histogram quantisation noise).
+        # Self-cross-KL must be 0 (modulo histogram quantization noise).
         self_cross = compute_cross_kl(ns, ns, params, n_bins=40)
         for name in params:
             assert math.isfinite(self_cross[name])

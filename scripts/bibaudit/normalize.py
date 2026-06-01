@@ -5,7 +5,7 @@ to decide, for each entry, whether the local fields match the canonical INSPIRE 
 Crossref record and — if not — whether the difference is cosmetic (MINOR),
 fillable (ENRICHED), or a real attribution problem (SUBSTANTIVE).
 
-The normalization is the false-positive defence: it must treat "Physical Review D"
+The normalization is the false-positive defense: it must treat "Physical Review D"
 == "Phys. Rev. D", "Poincar\\'e" == "Poincaré" == "Poincare", "84--85" == "84-85",
 and "{Exact}" == "Exact" as equal, while still catching a swapped author or a
 wrong title/year (the documented mis-attribution class).

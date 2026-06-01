@@ -15,7 +15,7 @@ perturbativity gate (``P_max > 0.5 -> -inf``) is removed entirely; large
 ``P_max`` is faithful linearized-PDE output, not a probability-conservation
 violation.  The pre-flight tachyonic probe is run as a metadata measurement
 only — its verdict no longer gates samples (``--gated`` flag preserves the
-v2 hard-rejection behaviour for reproducibility).
+v2 hard-rejection behavior for reproducibility).
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def _soft_floor_logl(
     tests via ``--soft-floor-noise=0``).  The floor defaults to
     ``SOFT_FLOOR_LOGL`` but can be overridden per-run via
     ``--soft-floor-logl`` when the default -100 contaminates logZ for
-    baseline-normalised likelihoods (see issue #372).
+    baseline-normalized likelihoods (see issue #372).
     """
     if sigma_explore <= 0.0:
         return floor
@@ -97,7 +97,7 @@ class LikelihoodConfig:
     permissive: bool = True
     """v3 default: don't gate on the pre-flight probe.  When False,
     tachyonic samples return ``-inf`` (preserves v2 / canonical-probe
-    behaviour, opt-in via ``--gated`` CLI flag for reproducibility)."""
+    behavior, opt-in via ``--gated`` CLI flag for reproducibility)."""
     soft_floor_noise_sigma: float = 1.0
     """Standard deviation of the Gaussian noise added to the soft penalty
     floor (sim divergence / NaN / exception).  Default 1.0 gives the
@@ -106,7 +106,7 @@ class LikelihoodConfig:
     soft_floor_logl: float = SOFT_FLOOR_LOGL
     """Position of the soft penalty floor (default: -100).  When the prior
     contains many tachyonic / failing samples and the natural physics logL
-    is near 0 (e.g. baseline-normalised ``maximize`` runs), -100 drags logZ
+    is near 0 (e.g. baseline-normalized ``maximize`` runs), -100 drags logZ
     to -100 and makes the PolyChord precision criterion unreachable.  Use
     ``--soft-floor-logl -15`` (or similar) to keep logZ in a sensible range
     so that ``precision_criterion × |logZ|`` stays achievable.
@@ -159,7 +159,7 @@ def parse_likelihood(
         v3 default ``True``: pre-flight tachyonic probe is recorded as
         metadata only, doesn't gate samples.  Set to ``False`` (via the
         ``--gated`` CLI flag) to reproduce v2 / canonical-probe hard-
-        rejection behaviour.
+        rejection behavior.
     soft_floor_noise_sigma : float
         Standard deviation of the Gaussian noise added to the soft penalty
         floor (sim divergence / NaN / exception).  Default 1.0; set to 0
@@ -552,7 +552,7 @@ def _evaluate_likelihood(
             }
             if not stability.stable and not likelihood_config.permissive:
                 # Gated mode (``--gated`` CLI flag) reproduces the v2 / canonical-
-                # probe hard-rejection behaviour for reproducibility.  Default v3
+                # probe hard-rejection behavior for reproducibility.  Default v3
                 # is permissive: sim continues, tachyon-permissive sampling maps
                 # the structure of the unstable regions.
                 return -math.inf, {
