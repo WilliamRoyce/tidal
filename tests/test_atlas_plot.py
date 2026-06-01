@@ -357,9 +357,9 @@ def test_render_face_panel_uses_no_matplotlib_histogram(tmp_path: Path) -> None:
     import re
     from pathlib import Path as _Path
 
-    src = _Path(
-        "/workspaces/torsion-gertsenshtein/tidal/inference/_atlas.py",
-    ).read_text(encoding="utf-8")
+    import tidal.inference._atlas as _atlas_mod
+
+    src = _Path(_atlas_mod.__file__).read_text(encoding="utf-8")
     # Strip docstrings + comments so the check looks at actual call sites only.
     code_only = re.sub(r'""".*?"""', "", src, flags=re.DOTALL)
     code_only = re.sub(r"#.*", "", code_only)
