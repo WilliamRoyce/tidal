@@ -7,45 +7,41 @@
 % and log B are defined here (Prior-averaged amplification) but
 % explicitly not quoted in the results prose (cross-truncation
 % incomparability + t_end sensitivity on exp-growing-mode sectors).
-% Paragraph order: Amplification score, Theory-agnostic acceptance
-% of exp-growing modes, Prior-averaged amplification, Total
-% information gain D_KL, Per-coupling information gain, Cubed-sphere
-% joint prior, Direction at fixed magnitude.
+% Paragraph order: Amplification score, Prior-averaged
+% amplification, Total information gain D_KL, Per-coupling
+% information gain, Cubed-sphere joint prior, Direction at fixed
+% magnitude.
 
 \section{Coupling-space exploration with nested sampling}%
 \label{InferenceArchitecture}
 
-This appendix documents how we explore the PGT+EM coupling space
-catalogued in~\cref{PGTEnumeration} for regions of strong
-Gertsenshtein conversion. Many equivalent parametrisations of that
-space appear in the
+This appendix documents how we explore the Poincar\'{e} gauge
+action coupling space catalogued in~\cref{PGTEnumeration} for
+regions of strongly amplified Gertsenshtein conversion. Many
+equivalent parametrisations of that space appear in the
 literature~\cite{barker2024poincare,lin2019pgt,karananas2014parity,blagojevic2018hamiltonian,bahamonde2025cubic};
 each coefficient is an arbitrary, parametrisation-dependent
 combination of the underlying interactions rather than a fundamental
-quantity. We sample with nested sampling~\cite{Skilling:2006gxv,Feroz:2008xx,Brewer:2010,Brewer:2016scw,Speagle:2019ivv}
+quantity. We sample with nested
+sampling~\cite{Skilling:2006gxv,Feroz:2008xx,Brewer:2010,Brewer:2016scw,Speagle:2019ivv}
 as implemented in PolyChord~\cite{Handley:2015fda,Handley:2015vkr},
 applied here as a coupling-space exploration tool driven by the
-synthetic score $A(\theta)$ of~\cref{AmplificationScore} rather
-than by a data-derived likelihood. Nested sampling on a synthetic
-or composite score for parameter-space search is established in
-both the statistical-mechanics
-literature~\cite{Partay:2021materials,Martiniani:2014sens,Burkoff:2012protein},
+score $A(\theta)$ of~\cref{AmplificationScore}. Nested sampling
+has been used for parameter-space search in both the
+statistical-mechanics
+literature~\cite{Partay:2021materials,Martiniani:2014sens,Burkoff:2012protein,Ashton:2022grj},
 where it maps potential-energy surfaces, and in
 beyond-the-Standard-Model phenomenology and cosmological parameter
-estimation~\cite{GAMBIT:2017zdo,Giani:2023gfq}, where it scans
-constraint-satisfaction regions over high-dimensional coupling
-spaces; the field survey of~\cite{Ashton:2022grj} discusses both.
-PolyChord delivers samples from the score-reweighted distribution
+estimation~\cite{GAMBIT:2017zdo,Giani:2023gfq,Ashton:2022grj}.
+PolyChord delivers samples from the score-reweighted posterior
 $p(\theta\mid A) \propto A(\theta)\,\pi(\theta)$, visualised with
 anesthetic~\cite{Handley:2019mfs} as corner-plot 2D marginals over
-each operator pair; from those same samples anesthetic computes the
-per-coupling marginal information gain $\D$
-\cite{Kullback:1951zyt,Handley:2019mfs} ranking the operator axes
-by how narrowly the amplifying region projects onto each individual
-coupling axis.
-The corner-plot projections and per-coupling $\D$ rankings are the
-two descriptors the results section reports. For further detail on
-nested sampling generally, see~\cite{MacKay:2003,Hobson:2010,Trotta:2017wnx,Sivia:2006}.
+each operator pair; from those same samples anesthetic also
+computes the per-coupling marginal information gain
+$\D$~\cite{Kullback:1951zyt,Handley:2019mfs}. The corner-plot
+projections and per-coupling $\D$ rankings are the two descriptors
+the results section reports. For further detail on nested sampling
+generally, see~\cite{MacKay:2003,Hobson:2010,Trotta:2017wnx,Sivia:2006}.
 
 \paragraph*{Amplification score}
 The PDE solver~(\cref{NumericalEvolution}) evolves the system
@@ -81,29 +77,6 @@ nested-sampling likelihood is
 with the sign chosen to direct the survey toward amplifying ($+$)
 or suppressing ($-$) regions of coupling space.
 
-\paragraph*{Theory-agnostic acceptance of exponentially-growing modes}
-The modal-solver evolution that produces $P(\theta, t_\mathrm{end})$
-does not pre-filter exponentially-growing modes from the linearised
-system: whatever modes the input Lagrangian propagates are integrated
-through and contribute to the exit conversion probability. Earlier
-iterations of the implementation truncated such modes on the assumption
-that exponential growth always indicates an unphysical pathology, but
-this choice is not theory-agnostic --- a numerical framework cannot in
-general decide whether exponential linearised growth is a genuine
-amplification mechanism, a non-ghost tachyonic instability of an
-unbounded background ansatz, or a wrong-sign-kinetic ghost. The
-distinction depends on the specific term subset and parameter values
-in the input theory and is the subject of an extensive
-literature~\cite{sezgin1980ghostfree,blagojevic2018hamiltonian,lin2019pgt,Yo:1999ex,Yo:2001sy}.
-We therefore report what the input Lagrangian produces and defer
-the discrimination of physical amplification from instability
-artefacts to (i) the finite-extent geometry of~\cref{Discussion},
-which saturates any genuine instability while preserving channel
-mixing, and (ii) the full Lagrangian-level particle-spectrum analysis
-provided by the \PSALTer
-tool~\cite{barker2024psalter,barker2025psalter2}, integration with
-which we identify as future work.
-
 \paragraph*{Prior-averaged amplification}
 With $L(\theta) = A(\theta)$ from~\cref{NestedScore}, PolyChord
 estimates the prior-averaged amplification
@@ -127,18 +100,19 @@ information-gain rankings of~\cref{Results} are what the survey
 reports.
 
 \paragraph*{Total information gain $\D$}
-The Kullback--Leibler divergence of the score-reweighted
-distribution $p(\theta\mid A)\propto A(\theta)\,\pi(\theta)$ from
-the prior,
+The Kullback--Leibler
+divergence~\cite{Kullback:1951zyt,Handley:2019mfs} of the
+score-reweighted posterior
+$p(\theta\mid A)\propto A(\theta)\,\pi(\theta)$ from the prior,
 \begin{equation}
   D_{\mathrm{KL}}
   \;=\; \int p(\theta\mid A)\,
   \log\!\frac{p(\theta\mid A)}{\pi(\theta)}\,\diff\theta = \Big\langle\log \frac{p}{\pi}\Big\rangle_{p},
   \label{KLDivergence}
 \end{equation}
-in nats, summarises how sharply the score-reweighted distribution
+in nats, summarises how sharply the score-reweighted posterior
 has contracted from the prior. Small $\D$ means the
-score-reweighted distribution is close to the prior --- the
+score-reweighted posterior is close to the prior --- the
 response is generic over coupling space; large $\D$ means the
 response concentrates on a specific subset of the prior support.
 Its absolute value depends on the prior support of each truncation
@@ -221,13 +195,11 @@ misaligned with the coordinate axes is buried in the
 higher-dimensional joint. Holding $r$ small restricts the survey
 to the perturbative regime $|\theta| \ll 1$ within which the
 linearised PDE underlying $P(\theta, t_\mathrm{end})$ is valid
-(\cref{PerturbativeReduction}); the magnitude dependence --- at
-what overall coupling strength the amplification turns on --- we
-defer to a separate study. We take the prior on $\hat n$ to be
-uniform on $S^{N-1}$ and sample it via the gnomonic cubed-sphere
-chart of \cref{CubedSphereAtlas}: spherical polar coordinates
-carry pole singularities, and uniform Cartesian sampling on
-$\mathbb{R}^N$ over-samples large-$|\theta|$ regions.
+(\cref{PerturbativeReduction}). The magnitude dependence is
+deferred to a separate study. We sample $\hat n$ uniformly on
+$S^{N-1}$ via the gnomonic cubed-sphere chart
+of~\cref{CubedSphereAtlas}, which gives a non-singular angular
+parametrisation that decouples direction from magnitude.
 \cref{AtlasMethodologyYMPGT} shows the per-axis posteriors for the
 YM--PGT sector of \cref{NonMinimalLagrangian} ($N = 8$ BSM
 couplings) with the positive- ($\uparrow$) and negative-
@@ -239,7 +211,12 @@ coordinates $\theta_1, \ldots, \theta_{N-1} \in [-1, 1]^{N-1}$ with
 the diagonal carrying the 1D marginal of each $\theta_i$; $\theta_i$
 refers to a different physical coupling on each panel because the
 dominant axis pinned at $\pm 1$ by the gnomonic projection cycles
-through the eight couplings.
+through the eight couplings. The panels show recognisable structure
+--- pairwise coupling correlations, sharply asymmetric
+amplifying-versus-suppressing supports on some axes, large
+near-empty regions on others --- confirming that the apparatus
+surfaces the kind of operator-resolved structural diagnostics the
+results section then leans on.
 
 \begin{figure*}[t]
   \centering
