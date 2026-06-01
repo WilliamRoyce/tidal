@@ -2,7 +2,7 @@ r"""Corner plot for T4 Ricci--electromagnetism cross-term — D1 v3 publication 
 
 Amplification (29189748) and suppression (29189761) posteriors overlaid in the
 App J \\cref{NestedScore} sign convention. Four-dimensional prior
-$\\{\\alpha_1, \\alpha_2, \\alpha_3, \\delta_1\\}$.
+$\\{\\beta_1, \\beta_2, \\beta_3, \\delta_1\\}$.
 
 Data sources:
   hpc_results/29189748/d1_amp_v3/
@@ -28,9 +28,9 @@ DEFAULT_OUT = REPO_ROOT / "manuscript" / "figures" / "corner_t4_ricci_em.pdf"
 
 PARAMS = ["alpha1", "alpha2", "alpha3", "delta1"]
 PARAM_LABELS = {
-    "alpha1": r"$\alpha_1$",
-    "alpha2": r"$\alpha_2$",
-    "alpha3": r"$\alpha_3$",
+    "alpha1": r"$\beta_1$",
+    "alpha2": r"$\beta_2$",
+    "alpha3": r"$\beta_3$",
     "delta1": r"$\delta_1$",
 }
 
