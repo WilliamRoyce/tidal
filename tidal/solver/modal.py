@@ -1711,7 +1711,7 @@ def _add_convolution_coupling(
     *,
     eq_idx: int = -1,
     term_idx: int = -1,
-    scale: float = 1.0,
+    scale: complex | NDArray[np.float64] = 1.0,
 ) -> None:
     """Add convolution coupling from a position-dependent coefficient.
 
@@ -1831,11 +1831,12 @@ def _compute_conv_block_cached_or_fresh(
     bsm_str, geom_str = factors
     # Build the cache key. geometry_hash depends only on non-BSM params,
     # so PolyChord calls at varying BSM sample the same cached block.
-    bsm_set = set(
-        coeff_eval._spec.metadata.get("_inference_sampled_params", ())  # noqa: SLF001
+    sampled: tuple[str, ...] = coeff_eval._spec.metadata.get(  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+        "_inference_sampled_params", ()
     )
+    bsm_set = set(sampled)
     geom_hash = make_geometry_hash(
-        coeff_eval._parameters,  # noqa: SLF001
+        coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
         bsm_set,
     )
     key = make_key(geom_str, term.operator, tuple(grid.shape), geom_hash)
@@ -1845,9 +1846,9 @@ def _compute_conv_block_cached_or_fresh(
         # result is an N-element array (1D) for position-dependent terms.
         coeff_array = evaluate_coefficient(
             geom_str,
-            coeff_eval._parameters,  # noqa: SLF001
-            coeff_eval._coordinates,  # noqa: SLF001
-            coeff_eval._coord_arrays,  # noqa: SLF001
+            coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+            coeff_eval._coordinates,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+            coeff_eval._coord_arrays,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
             0.0,
         )
         return _compute_conv_block_uncached(
@@ -1860,8 +1861,8 @@ def _compute_conv_block_cached_or_fresh(
     if bsm_str and bsm_str != "1":
         bsm_val = evaluate_coefficient(
             bsm_str,
-            coeff_eval._parameters,  # noqa: SLF001
-            coeff_eval._coordinates,  # noqa: SLF001
+            coeff_eval._parameters,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
+            coeff_eval._coordinates,  # noqa: SLF001  # type: ignore[reportPrivateUsage]
             None,  # bsm_str has no coord deps by construction
             0.0,
         )
@@ -1989,7 +1990,7 @@ def _build_convolution_matrix_with_constraints(
         col_block: int,
         term: OperatorTerm,
         mult: NDArray[np.complex128],
-        scale: complex = 1.0,
+        scale: complex | NDArray[np.float64] = 1.0,
         eq_idx: int = -1,
         term_idx: int = -1,
     ) -> None:
@@ -2026,7 +2027,7 @@ def _build_convolution_matrix_with_constraints(
     def _term_conv_block(
         term: OperatorTerm,
         mult: NDArray[np.complex128],
-        scale: complex = 1.0,
+        scale: complex | NDArray[np.float64] = 1.0,
         eq_idx: int = -1,
         term_idx: int = -1,
     ) -> NDArray[np.complex128]:
@@ -2458,7 +2459,12 @@ def _build_convolution_matrix_with_constraints(
                 target,
             )
 
-    return A_reduced, recovery, constraint_field_names, orig_to_reduced
+    return (
+        A_reduced.astype(np.complex128, copy=False),
+        recovery.astype(np.complex128, copy=False),
+        constraint_field_names,
+        orig_to_reduced,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -65,6 +65,8 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from numpy.typing import NDArray
+
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.progress import SimulationProgress
@@ -193,7 +195,7 @@ def _half_kick(
     force: np.ndarray,
     dt: float,
     layout: StateLayout,
-    m_inv: dict[str, float] | None = None,
+    m_inv: dict[str, float | NDArray[np.float64]] | None = None,
 ) -> None:
     """Apply half-kick: v += (dt/2) M⁻¹ F(q), in-place.
 
@@ -215,7 +217,7 @@ def _weighted_kick(
     force: np.ndarray,
     weight_dt: float,
     layout: StateLayout,
-    m_inv: dict[str, float] | None = None,
+    m_inv: dict[str, float | NDArray[np.float64]] | None = None,
 ) -> None:
     """Apply weighted kick: v += weight_dt * M⁻¹ F(q), in-place.
 

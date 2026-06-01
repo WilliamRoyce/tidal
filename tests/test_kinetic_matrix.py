@@ -78,6 +78,10 @@ class TestBaselineKineticMatrix:
         i_hyy = self.km.field_index("h_7")
         i_ax = self.km.field_index("a_1")
         i_ay = self.km.field_index("a_2")
+        assert i_hxy is not None
+        assert i_hyy is not None
+        assert i_ax is not None
+        assert i_ay is not None
         assert self.km.cells[i_hxy][i_hyy].is_zero()
         assert self.km.cells[i_ax][i_ay].is_zero()
 
@@ -87,6 +91,7 @@ class TestBaselineKineticMatrix:
         magnetic mass (-B₀²/2)·1.
         """
         i = self.km.field_index("h_5")
+        assert i is not None
         entries = self.km.cells[i][i].entries
         ops_present = {op for op, _ in entries}
         assert "d2_t" in ops_present

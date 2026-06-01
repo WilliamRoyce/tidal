@@ -11,7 +11,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from typing import TYPE_CHECKING  # noqa: E402
 
-import v3e_boccaletti_preflight as preflight  # noqa: E402
+import v3e_boccaletti_preflight as preflight  # noqa: E402  # pyright: ignore[reportMissingImports]
 
 if TYPE_CHECKING:
     import pytest

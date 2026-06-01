@@ -32,6 +32,8 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from numpy.typing import NDArray
+
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.progress import SimulationProgress
@@ -62,7 +64,7 @@ class _ResidualCtx:
         grid: GridInfo,
         bc: BCSpec | None,
         rhs_eval: RHSEvaluator | None = None,
-        m_inv: dict[str, float] | None = None,
+        m_inv: dict[str, float | NDArray[np.float64]] | None = None,
     ) -> None:
         self.spec = spec
         self.layout = layout

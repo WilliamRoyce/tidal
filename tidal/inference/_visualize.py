@@ -188,7 +188,7 @@ def plot_importance(
     plt.close(fig)
 
 
-def _compute_log10_amplification(
+def _compute_log10_amplification(  # pyright: ignore[reportUnusedFunction]
     result: InferenceResult,
     samples: object,
 ) -> np.ndarray | None:
@@ -267,7 +267,7 @@ def _rejected_samples_array(result: InferenceResult) -> np.ndarray | None:
     return result.samples[mask]
 
 
-def _clip_to_posterior_range(
+def _clip_to_posterior_range(  # pyright: ignore[reportUnusedFunction]
     values: np.ndarray,
     weights: np.ndarray | None,
     q_low: float = 0.001,
@@ -325,7 +325,7 @@ def _clip_to_posterior_range(
     return out
 
 
-def _set_derived_axis_limits(
+def _set_derived_axis_limits(  # pyright: ignore[reportUnusedFunction]
     axes_df: object,
     plot_params: list[str],
     col_name: str,

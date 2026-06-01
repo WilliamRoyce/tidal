@@ -27,7 +27,13 @@ from __future__ import annotations
 
 import ast
 import re
+import sys
 from typing import TYPE_CHECKING
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -52,7 +58,7 @@ def _collect_names(node: ast.AST) -> set[str]:
 def _split_top_level_mult(
     node: ast.AST,
     bsm_symbols: frozenset[str],
-) -> tuple[list[ast.AST], list[ast.AST]] | None:
+) -> tuple[list[ast.AST], list[_Factor]] | None:
     """Walk down a top-level Mult/Div chain, partition into (BSM factors, geom factors).
 
     Returns ``None`` if any BSM symbol appears in a non-separable position
@@ -66,7 +72,7 @@ def _split_top_level_mult(
     block has the wrong sign vs the original.
     """
     bsm_factors: list[ast.AST] = []
-    geom_factors: list[ast.AST] = []
+    geom_factors: list[_Factor] = []
     sign_state = [1]  # accumulator flipped by every USub during descent
 
     def visit(n: ast.AST, in_numerator: bool) -> bool:  # noqa: PLR0912
@@ -170,14 +176,19 @@ def _split_top_level_mult(
 class _DivMarker:
     __slots__ = ()
 
+    @override
     def __repr__(self) -> str:
         return "<DIV>"
 
 
 _DIV_MARKER = _DivMarker()
 
+# A flat factor-list entry: either an AST node (multiplied in) or the sentinel
+# marking the preceding factor as a Div denominator.
+_Factor = ast.AST | _DivMarker
 
-def _emit_factor_product(factors: list[ast.AST]) -> str:
+
+def _emit_factor_product(factors: list[_Factor]) -> str:
     """Reconstruct a multiplicative product from flat factor list.
 
     Each entry is either an AST node (multiplied in) or ``_DIV_MARKER`` which
@@ -196,6 +207,12 @@ def _emit_factor_product(factors: list[ast.AST]) -> str:
     i = 0
     while i < len(factors):
         f = factors[i]
+        # A bare marker is always consumed as the look-ahead of the preceding
+        # factor below, so it is never the current factor here; guard anyway to
+        # keep `f` an AST node for the unparse/precedence handling that follows.
+        if isinstance(f, _DivMarker):
+            i += 1
+            continue
         # Look ahead for div marker
         op = "*"
         is_div = i + 1 < len(factors) and factors[i + 1] is _DIV_MARKER
@@ -268,7 +285,7 @@ def extract_separable_bsm_factors(
     if isinstance(tree, ast.BinOp) and isinstance(tree.op, (ast.Add, ast.Sub)):
         summands: list[tuple[int, ast.AST]] = []
         _flatten_addsub(tree, +1, summands)
-        per_summand: list[tuple[set[str], list[ast.AST], int]] = []
+        per_summand: list[tuple[set[str], list[_Factor], int]] = []
         for sign, summand in summands:
             split = _split_top_level_mult(summand, bsm_set)
             if split is None:

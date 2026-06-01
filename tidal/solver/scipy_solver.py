@@ -27,6 +27,8 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from numpy.typing import NDArray
+
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
@@ -48,7 +50,7 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     grid: GridInfo,
     bc: BCSpec | None,
     rhs_eval: RHSEvaluator,
-    m_inv: dict[str, float] | None,
+    m_inv: dict[str, float | NDArray[np.float64]] | None,
     progress: SimulationProgress | None = None,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``.

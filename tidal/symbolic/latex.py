@@ -29,6 +29,7 @@ if TYPE_CHECKING:
         EquationSystem,
         HamiltonianTerm,
     )
+    from tidal.symbolic.kinetic_matrix import KineticMatrix, KineticMatrixCell
 
 
 # ---------------------------------------------------------------------------
@@ -996,7 +997,7 @@ def hamiltonian_to_latex(
 # ---------------------------------------------------------------------------
 
 
-def _render_kinetic_cell(cell) -> str:  # noqa: ANN001 (KineticMatrixCell)
+def _render_kinetic_cell(cell: KineticMatrixCell) -> str:
     r"""Render one $\mathcal{K}_{ij}$ cell as a sum of (coeff)(op) terms.
 
     ``cell.entries`` is a list of ``(operator_label, coefficient_symbolic)``
@@ -1048,7 +1049,7 @@ def _render_kinetic_cell(cell) -> str:  # noqa: ANN001 (KineticMatrixCell)
     return "".join(parts)
 
 
-def kinetic_matrix_to_latex(km, spec: EquationSystem) -> str:  # noqa: ANN001
+def kinetic_matrix_to_latex(km: KineticMatrix, spec: EquationSystem) -> str:
     r"""Render an assembled :class:`KineticMatrix` as a labelled array.
 
     The matrix may be rectangular for theories with velocity-pair
