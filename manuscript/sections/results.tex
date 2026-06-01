@@ -45,19 +45,18 @@
 % infrastructure (App I, G, J) and introduces both amplification
 % quantities (\Aamp from App G, A(θ) from App J) used throughout §4.
 We explore the Poincar\'{e} gauge action coupling space for regions
-of strong Gertsenshtein conversion above the Einstein--Maxwell
-baseline. The truncations we cover draw their operators from the
-inventory catalogued in~\cref{PGTEnumeration}; the perturbative-regime
-conditions under which the linearised treatment remains
-self-consistent are set out in~\cref{PerturbativeRegime}; the
-coupling-space exploration apparatus is documented
-in~\cref{InferenceArchitecture}. On the uniform plane-wave
-$\Bzero$ setup of this work, the amplification score
+of strongly modified Gertsenshtein conversion relative to the
+Einstein--Maxwell baseline. The truncations we cover draw their
+operators from the inventory catalogued in~\cref{PGTEnumeration};
+the perturbative-regime conditions under which the linearised
+treatment remains self-consistent are set out
+in~\cref{PerturbativeRegime}; the coupling-space exploration method
+is documented in~\cref{InferenceArchitecture}. On the uniform
+plane-wave $\Bzero$ setup of this work, the amplification score
 $A(\theta)$ of~\cref{AmplificationScore} grows exponentially in the
 simulation horizon $t_\mathrm{end}$ for any sector with
 positive-real-part linearised eigenvalues, so the numerical value
-of the score at a given coupling vector carries no physical content
-on its own. The survey reports instead the \emph{shape} of the
+of the score carries no physical content on its own. The survey reports instead the \emph{shape} of the
 amplification distribution over coupling space: which operators
 carry the amplification, where the amplifying regions sit in
 operator space, and how multimodal they are. The small-$\Bzero$
@@ -208,11 +207,11 @@ nested sampler. The corner-plot 2D marginals
 project the amplifying region of coupling space onto each operator
 pair, showing the shape, multimodality, and ridges of the
 distribution directly. The per-coupling marginal information
-gain~$\D$
+gain~$\D$ of~\cref{PerCouplingKL}
 (\cref{KLTableEMRCParityPair,KLTableYMUnified,KLTableChiClosureComparison,KLTableDarkPhoton})
-ranks operators by how narrowly the amplifying region projects onto
-each individual coupling axis; the cross
-divergence~$\D(P_+\|P_-)$ of~\cref{PerCouplingKL} isolates the
+ranks operators by how strongly the score-reweighted marginal on
+each individual coupling axis differs from the prior; the cross
+divergence~$\D(P_+\|P_-)$ of the same definition isolates the
 operators that distinguish amplification from suppression. Posterior
 samples are drawn by PolyChord~\cite{Handley:2015fda,Handley:2015vkr}
 on the synthetic score~$\pm\log A(\theta)$ of~\cref{NestedScore} and
