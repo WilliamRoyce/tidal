@@ -201,20 +201,22 @@ The path-integrated kernel~\cref{PathIntegratedFormula} is recovered in
 % surveyed PGT hierarchy yields the Bayes-factor partition collected in
 %~\cref{SurveyResultsTable}.
 \paragraph*{Landscape descriptors}
-We report the amplification structure of each truncation through two
-deliverables. The corner-plot 2D marginals
-(e.g.~\cref{CornerEMRC,CornerChiClosure,CornerT1}) project the
-amplifying region of coupling space onto each operator pair, showing
-the shape, multimodality, and ridges of the distribution directly.
-The per-coupling marginal information gain~$\D$
+For each truncation we report the shape of the amplification
+distribution over its coupling space, through two outputs of the
+nested sampler. The corner-plot 2D marginals
+(\cref{CornerEMRC,CornerT6Min,CornerT5D20,CornerT5D21,CornerT5D22,CornerYMUnionPair,CornerChiClosure,CornerChiClosurePair,CornerT9,CarrierT9Restricted,CornerT1,CornerEHGert})
+project the amplifying region of coupling space onto each operator
+pair, showing the shape, multimodality, and ridges of the
+distribution directly. The per-coupling marginal information
+gain~$\D$
 (\cref{KLTableEMRCParityPair,KLTableYMUnified,KLTableChiClosureComparison,KLTableDarkPhoton})
-ranks operators by how sharply each individual coupling axis
-contracts under the amplification score; the cross
-divergence~$\D(P_+\|P_-)$ isolates the operators that distinguish
-amplification from suppression. Posterior samples are drawn by
-PolyChord~\cite{Handley:2015fda,Handley:2015vkr} on the synthetic
-score~$\pm\log A(\theta)$ of~\cref{NestedScore} and visualised with
-anesthetic~\cite{Handley:2019mfs}.
+ranks operators by how narrowly the amplifying region projects onto
+each individual coupling axis; the cross
+divergence~$\D(P_+\|P_-)$ of~\cref{PerCouplingKL} isolates the
+operators that distinguish amplification from suppression. Posterior
+samples are drawn by PolyChord~\cite{Handley:2015fda,Handley:2015vkr}
+on the synthetic score~$\pm\log A(\theta)$ of~\cref{NestedScore} and
+visualised with anesthetic~\cite{Handley:2019mfs}.
 
 \paragraph*{The $\MAGF{^2}$-PGT sector}
 We open with the $\MAGF{^2}$-PGT sector, the minimal-coupling GR extension
