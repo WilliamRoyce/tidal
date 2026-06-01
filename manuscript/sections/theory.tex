@@ -271,7 +271,7 @@ The conversion probability, defined as the energy fraction
 transferred from the graviton sector to the photon sector over
 the propagation distance $D$~\cite{raffelt1988mixing}, for
 a graviton traversing a region of uniform $\Bzero$ takes
-the closed form~\cite{boccaletti1970conversion,lella2024constraining}
+the closed form~\cite{raffelt1988mixing,lella2024constraining}
 \begin{align}
   \Pconv = \sin^2\!\left(\frac{\kappa\,\Bzero\,D}{2}\right),
   \label{GertsenshteinFormula}
@@ -287,18 +287,28 @@ signature.\footnote{%
     provided by~\cite{lella2024constraining}.
 } For a finite magnetised region carrying a profile
 $B_x(z)$ along the propagation direction,~\cref{GertsenshteinFormula}
-generalises to the path-integrated Boccaletti
-form~\cite{boccaletti1970conversion,raffelt1988mixing}
+generalises to the path-integrated form~\cite{raffelt1988mixing,lella2024constraining}
 \begin{align}
   \Pconv = \sin^2\!\left(
     \frac{\kappa}{2}\int_{-\infty}^{+\infty}\!B_x(z)\,\diff z\right),
-  \label{BoccalettiPathIntegrated}
+  \label{PathIntegratedFormula}
 \end{align}
-recovering~\cref{GertsenshteinFormula} when $B_x(z) = \Bzero$ is
-constant over a length $D$. The regime of validity of these
+This follows from the linearised equations of motion, replacing the
+constant-field path $\kappa\Bzero D/2$ with the path integral
+$(\kappa/2)\int B_x\,\diff z$, recovering~\cref{GertsenshteinFormula}
+when $B_x(z) = \Bzero$ is constant over a length $D$.
+The regime of validity of these
 linearised expressions in the torsionful background is set out
 in~\cref{PerturbativeRegime}.~\Cref{Validation} reproduces
-both~\cref{GertsenshteinFormula} and~\cref{BoccalettiPathIntegrated}.
+both~\cref{GertsenshteinFormula} and~\cref{PathIntegratedFormula}.
+% Path-integrated form: derived from the coupled EOMs by replacing
+%   the constant-field path B₀D with ∫B_x dz. Exact for massless
+%   fields (no plasma detuning). raffelt1988mixing cited for the
+%   general variable-field WKB framework; lella2024constraining for
+%   the independent derivation in our convention.
+%   NOTE: boccaletti1970conversion does NOT contain this formula
+%   (user verified; Palessandro 2023 §3 treats only uniform B).
+%   "Path-integrated Boccaletti form" name and label removed.
 % ; the validation-grid summary is
 % reported in~\cref{ValidationResult}.
 

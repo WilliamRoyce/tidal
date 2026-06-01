@@ -27,7 +27,7 @@ precision floor of the solver chosen for each calibration.
 \begin{figure*}[t]
   \centering
   \includegraphics[width=\textwidth]{figures/figD_boccaletti_uniform}
-  \caption{Boccaletti-kernel reproduction on a uniform $\Bzero$
+  \caption{Gertsenshtein-formula reproduction on a uniform $\Bzero$
     background. (a) Numerical residual
     $|P_\mathrm{TIDAL} - P_\mathrm{RS}|$ between the simulated
     conversion probability $\Pconv \equiv P_\mathrm{TIDAL}$ and the
@@ -53,7 +53,7 @@ precision floor of the solver chosen for each calibration.
 \end{figure*}
 
 \paragraph*{Two-channel mixing}
-The two-mode formula that supersedes the bare Boccaletti kernel at
+The two-mode formula that supersedes the bare Gertsenshtein formula at
 finite $\Bzero$ (see~\cref{ValidationResult}) is the
 Raffelt--Stodolsky expression~\cite{raffelt1988mixing}
 \begin{equation}
@@ -78,7 +78,7 @@ $\Bzero$ sweep, and panel (b) shows the modal/\CVODE{}
 grid-refinement plateau at the corresponding $(\Delta/g)^4$ level.
 
 \paragraph*{Path-integrated kernel}
-The path-integrated Boccaletti form~\cref{BoccalettiPathIntegrated}
+The path-integrated form~\cref{PathIntegratedFormula}
 is the closed-form benchmark for the localised-source runs. For the
 Gaussian profile
 $B_x(z) = B_\mathrm{peak}\exp(-z^2/(2R^2))$, the
@@ -93,7 +93,7 @@ formula's small-conversion assumption no longer applies.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{figures/figD_boccaletti_localised}
-  \caption{Path-integrated Boccaletti reproduction on the Gaussian
+  \caption{Path-integrated Gertsenshtein reproduction on the Gaussian
     profile. The $8 \times 5$ $(B_\mathrm{peak}, R)$ grid collapses
     onto the curve $P = \sin^2(s)$ in the dimensionless variable
     $s = \kappa B_\mathrm{peak}\,R\sqrt{\pi/2}$, within the

@@ -72,7 +72,7 @@ the plane-wave uniform-$\Bzero$ setup.
 % §4.2–§4.4.
 
 \paragraph*{Validation setup}
-We validate the implementation on the Boccaletti conversion
+We validate the implementation on the Gertsenshtein conversion
 formula (\cref{GertsenshteinFormula}) in Einstein--Maxwell theory.
 A uniform background field $\Bzero$ fills a periodic domain of length
 $L=100$; the linearised system is initialised as a plane wave on a
@@ -80,15 +80,15 @@ $N=512$ grid and evolved to $t_\text{end}=50$, with photon carrier
 wavenumber $k\approx2.011$ ($2\pi n/L$ mode, $n=32$),
 sampling $\Bzero$ at 24 uniformly spaced values in $[0.005,0.25]$.
 
-\paragraph*{Reproduction of the Boccaletti kernel}
-\TIDAL{} recovers the Boccaletti kernel~\cref{GertsenshteinFormula}
+\paragraph*{Reproduction of the Gertsenshtein formula}
+\TIDAL{} recovers the Gertsenshtein formula~\cref{GertsenshteinFormula}
 in the small-$\Bzero$ limit to the double-precision arithmetic limit
 of the modal evolution
 ($|P_{\TIDAL} - P_\text{bare}| \lesssim 10^{-8}$,
 see~\cref{BoccalettiValidation}); the full two-mode comparison
 against the detuning formula of~\cite{raffelt1988mixing} is
 in~\cref{BoccalettiUniform}.
-The path-integrated kernel~\cref{BoccalettiPathIntegrated} is recovered in
+The path-integrated kernel~\cref{PathIntegratedFormula} is recovered in
 \cref{BoccalettiLocalised}.
 
 
@@ -98,7 +98,7 @@ The path-integrated kernel~\cref{BoccalettiPathIntegrated} is recovered in
 \begin{figure}[!htbp]
   \centering
   \includegraphics[width=\columnwidth]{figures/fig1_boccaletti_validation}
-  \caption{Boccaletti validation for the Einstein--Maxwell baseline
+  \caption{Gertsenshtein conversion validation for the Einstein--Maxwell baseline
     on a flat Minkowski background with uniform
     $\Bzero \in [0.005, 0.25]$, domain length $L=100$,
     propagation time $t_\text{end} = 50$, carrier wavenumber
