@@ -698,16 +698,21 @@ $\Re\{\lambda\} > 0$ modes in the pure metric channel.
 \paragraph*{The torsion kinetic closure}
 \label{XiKineticClosure}
 The torsion kinetic closure replaces the single
-coefficient $\xi$~\cite{bahamonde2025torsion} (a linear combination of
-$\{\xi_6, \xi_7, \xi_{12}, \xi_{16}\}$) with the full
-sixteen-parameter $\xi_{1\!-\!16}$ basis of the $(\nabla\MAGT{})^2$
-class (\cref{DerivativeExtensions}), on top of the complete
-$\chi_{1\!-\!10}$
-$\MAGF{}\!\times\!\nabla\MAGT{}$ basis. $\xi_{11}$ does not appear
-in the linearised equations under plane-wave reduction, leaving a
-thirty-two-dimensional prior over the fifteen surviving
-$\xi$-couplings together with the $\chi_{1\!-\!10}$ and the YM--PGT
-base of~\cref{NonMinimalLagrangian}. The extended $\xi_{11\!-\!16}$
+coefficient $\xi$~\cite{bahamonde2025torsion} with the full
+sixteen-parameter $\xi_{1\!-\!16}$ basis of the
+$(\rcD{}\!\times\!\MAGT{})^2$ class (\cref{DerivativeExtensions}),
+on top of the complete $\chi_{1\!-\!10}$ closure
+of~\cref{ChiClosureLagrangian},
+\begin{align}
+  \lag_\xi
+    = \lag_\chi\bigl|_{\xi \to 0}
+       + \sum_{i=1}^{16}\xi_i\,
+        (\rcD{}\!\times\!\MAGT{})^2\bigr|_{i} \, ,
+  \label{XiClosureLagrangian}
+\end{align}
+giving a thirty-two-dimensional prior. $\xi_{11}$ does not appear
+in the linearised equations under plane-wave reduction, leaving
+fifteen surviving $\xi$-couplings. The extended $\xi_{11\!-\!16}$
 sub-sector drives a substantial fraction of sample points into
 modal-solver overflow, so the per-coupling $\D$ figures for this
 sector are not quantitatively meaningful.%
@@ -769,22 +774,34 @@ $\chi_1$ again and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 % overflow-threshold artefact with the parity-even posterior content.
 \paragraph*{Parity-odd sectors that overflow}%
 \label{ParityOddGeomIncomp}
-The twenty-parameter parity-odd non-minimal sector
-$\{d_{14}, d_{15}, d_{17}, d_{19\!-\!21},\tilde\zeta_{1\!-\!6}\}$
-on top of the Yang--Mills--PGT base (with $d_{16}$ and
-$\tilde\zeta_4$ vanishing in the plane-wave reduction), and the
-fifty-three-parameter closure that further adds the
-$\varepsilon\!\cdot\!\MAGF{}\!\times\!\nabla\MAGT{}$
-basis $\{\tilde\chi_{1\!-\!36}\}$, do not admit finite-amplitude
-posteriors under the plane-wave uniform-$\Bzero$ ansatz at any safe
-horizon. The linearised eigenvalues
-of the conversion system reach above the modal-solver overflow ceiling
-at $t_\text{end} = 1$ in these coupling directions; the would-be safe
-horizon $t_\text{end} \lesssim 10^{-3}$ places the conversion
-amplitude $P \propto (\kappa\Bzero t/2)^2$ below the noise floor by
-orders of magnitude. Whether this reflects a pathology of the
-unbounded BGMF ansatz or a fatal pathology of the theories themselves
-is an interpretive question (see~\cref{Discussion}).
+The twenty-parameter parity-odd non-minimal sector on top of the
+Yang--Mills--PGT base,
+\begin{multline}
+  \lag_{20\text{D}}
+    = \lag_\text{YM--PGT}
+      + \!\!\sum_{i \in \{14,15,17\}}\!\!
+        d_i\,\varepsilon\!\cdot\!\MAGT{^2}\bigr|_{i} \\
+      + \!\!\sum_{i \in \{19,20,21\}}\!\!
+        d_i\,\varepsilon\!\cdot\!\MAGF{}\,\FieldF{}\bigr|_{i}
+      + \sum_{i=1}^{6}\tilde\zeta_i\,
+        \varepsilon\!\cdot\!\rcD{}\MAGT{}\!\times\!\FieldF{}\bigr|_{i} \, ,
+  \label{ParityOdd20D}
+\end{multline}
+and the fifty-three-parameter closure that further adds the
+$\varepsilon\!\cdot\!\MAGF{}\!\times\!\rcD{}\MAGT{}$ basis,
+\begin{align}
+  \lag_{53\text{D}}
+    = \lag_{20\text{D}}
+       + \sum_{i=1}^{36}\tilde\chi_i\,
+        \varepsilon\!\cdot\!\MAGF{}\!\times\!\rcD{}\MAGT{}\bigr|_{i} \, ,
+  \label{ParityOdd53D}
+\end{align}
+do not admit finite-amplitude posteriors under the plane-wave
+uniform-$\Bzero$ ansatz at any safe horizon ($d_{16}$ and
+$\tilde\zeta_4$ vanish in the plane-wave reduction). The linearised
+eigenvalues of the conversion system reach above the modal-solver
+overflow ceiling at $t_\text{end} = 1$ in these coupling directions;
+this is addressed in~\cref{Discussion}.
 
 \paragraph*{Dark-photon plasma}
 
