@@ -40,7 +40,9 @@ Each Fourier mode is propagated by a single application of its
 matrix exponential, computed via Pad\'e
 scaling-and-squaring~\cite{higham2009scaling}.
 
-\paragraph*{Parameter inference}
-Parameter exploration is by nested sampling with
-PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; the inference
-architecture is documented in~\cref{InferenceArchitecture}.
+\paragraph*{Coupling-space exploration}
+The coupling-space landscape is mapped by nested
+sampling~\cite{Skilling:2006gxv} with
+PolyChord~\cite{Handley:2015fda,Handley:2015vkr}; the
+landscape-exploration architecture is documented
+in~\cref{InferenceArchitecture}.

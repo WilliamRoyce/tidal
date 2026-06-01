@@ -44,18 +44,25 @@
 % study).  No TOC-style subsection enumeration.  Anchors the appendix
 % infrastructure (App I, G, J) and introduces both amplification
 % quantities (\Aamp from App G, A(θ) from App J) used throughout §4.
-To survey the Gertsenshtein conversion across the Poincar\'{e} gauge
-theory of~\cref{QuadraticAction} we partition the general quadratic
-action by sector and probe each restriction in turn.\wb{Almost certainly the assessor will pick up on this, as it does not sound consistent with the principles of high-dimensional sampling} The operator
-inventory is collected
-in~\cref{PGTEnumeration}; the perturbative-regime conditions
-under which the linearised treatment remains self-consistent are set
-out in~\cref{PerturbativeRegime}; and the Bayesian inference methodology is described in
-\cref{InferenceArchitecture}. The per-sample conversion score
-$A(\theta)$ of~\cref{AmplificationScore} drives the Bayesian
-likelihood; the small-$\Bzero$ asymptotic ratio $\Aamp$ of
-\cref{AmplificationFactor} applies to the plane-wave uniform-$\Bzero$
-setup.
+We explore the Poincar\'{e} gauge action coupling space for regions
+of strong Gertsenshtein conversion above the Einstein--Maxwell
+baseline. The truncations we cover draw their operators from the
+inventory catalogued in~\cref{PGTEnumeration}; the perturbative-regime
+conditions under which the linearised treatment remains
+self-consistent are set out in~\cref{PerturbativeRegime}; the
+coupling-space exploration apparatus is documented
+in~\cref{InferenceArchitecture}. On the uniform plane-wave
+$\Bzero$ setup of this work, the amplification score
+$A(\theta)$ of~\cref{AmplificationScore} grows exponentially in the
+simulation horizon $t_\mathrm{end}$ for any sector with
+positive-real-part linearised eigenvalues, so the numerical value
+of the score at a given coupling vector carries no physical content
+on its own. The survey reports instead the \emph{shape} of the
+amplification distribution over coupling space: which operators
+carry the amplification, where the amplifying regions sit in
+operator space, and how multimodal they are. The small-$\Bzero$
+asymptotic ratio $\Aamp$ of~\cref{AmplificationFactor} applies to
+the plane-wave uniform-$\Bzero$ setup.
 
 \subsection{Validation against the Einstein--Maxwell baseline}%
 \label{ValidationResult}
@@ -193,14 +200,20 @@ The path-integrated kernel~\cref{BoccalettiPathIntegrated} is recovered in
 % Under the plane-wave approximation (\cref{Linearisation}) the
 % surveyed PGT hierarchy yields the Bayes-factor partition collected in
 %~\cref{SurveyResultsTable}.
-\paragraph*{Bayes-factor convention}
-The Bayes factor
-$\log B = \logZ_+ -\, \logZ_-$~\cite{Skilling:2006gxv}
-quantifies amplification preference ($\log B > 0$) or suppression
-preference ($\log B < 0$) relative to the Einstein--Maxwell baseline.
-Nested sampling for every sector below
-was performed with PolyChord~\cite{Handley:2015fda,Handley:2015vkr};
-corner figures were generated with
+\paragraph*{Landscape descriptors}
+We report the amplification structure of each truncation through two
+deliverables. The corner-plot 2D marginals
+(e.g.~\cref{CornerEMRC,CornerChiClosure,CornerT1}) project the
+amplifying region of coupling space onto each operator pair, showing
+the shape, multimodality, and ridges of the distribution directly.
+The per-coupling marginal information gain~$\D$
+(\cref{KLTableEMRCParityPair,KLTableYMUnified,KLTableChiClosureComparison,KLTableDarkPhoton})
+ranks operators by how sharply each individual coupling axis
+contracts under the amplification score; the cross
+divergence~$\D(P_+\|P_-)$ isolates the operators that distinguish
+amplification from suppression. Posterior samples are drawn by
+PolyChord~\cite{Handley:2015fda,Handley:2015vkr} on the synthetic
+score~$\pm\log A(\theta)$ of~\cref{NestedScore} and visualised with
 anesthetic~\cite{Handley:2019mfs}.
 
 \paragraph*{The $\MAGF{^2}$-PGT sector}
@@ -226,7 +239,7 @@ Gertsenshtein conversion,
   -\tfrac{1}{\kappa^2} \partial_t^2 h_{xy} &= \tfrac{1}{2} B_0^2 \, h_{xy}
     + B_0 \, \partial_z A_x - \tfrac{1}{\kappa^2} \partial_z^2 h_{xy}.
 \end{align*}
-\Cref{PropagatingKineticOutput} shows the full symbolic output.\wb{Firstly, you can get the tex to allocate A/B/C-prefixes to labelled content in the appendices. This is helpful, since it makes it obvious that you are pointing to contnent that is added for completeness/reproducibility rather than something essential to the narrative flow of the body. Secondly, how come equations are included as figures? I'm sure your agent can typeset them no matter how large.}
+\Cref{PropagatingKineticOutput} shows the full symbolic output.\wb{Secondly, how come equations are included as figures? I'm sure your agent can typeset them no matter how large.}
 The $\Alp{1}\MAGF{^2}$ term promotes the metric-perturbation
 sector to a fourth-order system, placing this theory outside the
 scope of the numerical framework
@@ -259,20 +272,15 @@ The lagrangian is
    \label{RicciEMLagrangian}
 \end{align}
 giving a four-dimensional prior over
-$\{\Bet{1\!-\!3}, \Del{1}\}$. We find
-\begin{equation*}
-  \logZ_+ = +13.37 \pm 0.06
-  \qand
-  \logZ_- = +11.40 \pm 0.10,
-\end{equation*}
-thus both directions show informative evidence,\wb{I'd be very careful about the use of evidence when applying NS in this way. The point is that NS was introduced as a tool to do Bayesian inference, and PolyChord provides output in that language. However, it is here being used as a means to estimate the distribution of volume of some quantity (in Bayesian terms the likelihood). By dressing that distribution in a lot of statistical language, you raise some questions. There may be a way to connect the evidence to what has been learned about the Gertsenshtein effect in PGT, but if that is the case, I'm not sure it has been really worked out. You might want to give this some thought, and perhaps make an appendix where you explain how to relate the two sets of concepts.} and the vertex supports both
-significant amplification and suppression at different parameter values.
-The Bayes factor $\log B = +1.98$ records that the prior-weighted integral is
-marginally amplification-dominated. The $\Del{1}$-direction
-carries $\D(P_+\|P_-) = 20.8$~nats of
-distinction between the two directions, over an order of
-magnitude above any other coupling; the
-$\Del{1}\MAGF{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ operator itself is what drives
+$\{\Bet{1\!-\!3}, \Del{1}\}$. The amplifying and suppressing
+posteriors both concentrate strongly along the $\Del{1}$ axis
+(\cref{CornerEMRC,KLTableEMRCParityPair}): the $\Del{1}$ marginal is
+bimodal under the suppressing score and broad under the amplifying
+score, with the cross divergence $\D(P_+\|P_-) = 20.8$~nats placing
+$\Del{1}$ above the other three couplings by an order of magnitude.
+The same vertex sources amplification and suppression at different
+$\Del{1}$ values; the
+$\Del{1}\MAGF{_{[\mu\nu]}}\FieldF{^{\mu\nu}}$ operator itself drives
 the bidirectional behaviour. The corner plot of~\cref{CornerEMRC}
 shows a bimodal suppression marginal in $\Del{1}$, with two narrow
 peaks symmetric about the origin, while the amplification posterior
@@ -336,29 +344,22 @@ drawn from the three
 $\varepsilon\!\cdot\!\MAGF{}\!\cdot\!\FieldF{}$ contractions
 enumerated in
 \cref{ParityOddQuadratic}~\cite{karananas2014parity,blagojevic2018hamiltonian}.
-The four-dimensional posterior over
-$\{\Bet{1\!-\!3}, d_{21}\}$ yields
-\begin{equation*}
-  \logZ_+ = +5.00 \pm 0.28
-  \qand
-  \logZ_- = +11.33 \pm 0.31,
-\end{equation*}
-\Cref{CornerT6Min} shows the amplification posterior extending broadly
-across $d_{21}$ and a bimodal suppression marginal with two narrow
-peaks symmetric about $d_{21} = 0$, the same structure observed along
-the $\Del{1}$ axis of the parity-even sector.
+The four-dimensional posterior over $\{\Bet{1\!-\!3}, d_{21}\}$
+shows the same broad-amplification / bimodal-suppression structure
+along $d_{21}$ that the parity-even sector shows along $\Del{1}$
+(\cref{CornerT6Min}): the amplification marginal extends broadly
+across $d_{21}$ while the suppression marginal is bimodal with two
+narrow peaks symmetric about $d_{21} = 0$.
 
-The parity-even and parity-odd vertices yield comparable amplitudes but
-redistribute the per-coupling $\D$ weight in markedly
-different ways. In the
-parity-even sector the separation concentrates almost entirely
-on $\Del{1}$ ($\D(P_+\|P_-) = 20.8$~nats;~\cref{KLTableEMRCParityPair}), and the
-Bayes factor is amplification-dominated at $\log B = +1.98$. In the
-parity-odd twin the vertex contribution drops to
-$\D(P_+\|P_-) = 8.8$~nats and the two torsion-mass directions\wb{Actually by this point I wold say that the use of evidence is likely to be a central point of discussion in the viva.}
-$\Bet{1}$ and $\Bet{2}$ become comparable.
-This parity-odd theory is the only sector we
-found where suppression dominates, with the Bayes factor $\log B = -6.33$.
+The parity-even and parity-odd vertices redistribute the
+per-coupling $\D$ weight in markedly different ways. In the
+parity-even sector the separation concentrates almost entirely on
+$\Del{1}$ ($\D(P_+\|P_-) = 20.8$~nats;~\cref{KLTableEMRCParityPair}).
+In the parity-odd twin the vertex contribution drops to
+$\D(P_+\|P_-) = 8.8$~nats and the two torsion-mass directions
+$\Bet{1}$ and $\Bet{2}$ become comparable. The parity-odd theory is
+the only surveyed sector whose suppressing posterior is more
+structured than its amplifying one.
 % , and the only one whose amp/sup
 % separation is shared between the non-minimal vertex and the
 % minimal-base $\Bet{i}$ axes rather than concentrated on the vertex
@@ -408,16 +409,13 @@ study each on top of the EM--RC base, then their union,
 % contractions drawn from the complete basis of
 % $\rcD{}\MAGT{}{\times}\FieldF{}$ invariants enumerated in
 %~\cref{DerivativeExtensions}.
-The Bayes factors are $\log B = +1.84$ (Bahamonde), $+2.80$ (Barker),
-$+2.68$ (Shapiro), and $+7.37$ (union). In every case the
-amplification preference comes from each theory carrying regions of
-strongly-amplifying coupling values rather than from suppressed
-regions disappearing. The per-coupling separation between
-amplification and suppression concentrates onto a \emph{different}
-coupling in each sub-theory (\cref{KLTableYMUnified}): $\xi$ in
-Bahamonde and Barker, $\Bet{1}$ in Shapiro, $\chi$ in the union.
-Which vertex dominates depends on which other vertices are switched
-on.
+Each of the four truncations concentrates its per-coupling $\D$
+onto a different operator (\cref{KLTableYMUnified}): the torsion
+kinetic operator $\xi(\nabla\MAGT{})^2$ in Bahamonde and Barker, the
+torsion mass $\Bet{1}$ in Shapiro, and the derivative-mixing
+operator $\chi$ in the union. No single operator dominates the
+amplification across the YM--PGT family; which vertex concentrates
+the posterior depends on which other vertices are switched on.
 % Only
 % the single Barker $\chi$ appears at the nine-parameter level; the full
 % $\chi_{1\!-\!10}$ closure is the subject of the complete parity-even sector
@@ -521,22 +519,17 @@ sector on top of the Yang--Mills--PGT base~\cref{NonMinimalLagrangian},
         \MAGF{}\!\times\!\nabla\MAGT{}\bigr|_{i} \, ,
   \label{ChiClosureLagrangian}
 \end{align}
-giving an eighteen-dimensional prior. The posterior gives
-\begin{equation*}
-  \logZ_+ = +10.30 \pm 0.08
-  \qand
-  \logZ_- = -3.18 \pm 0.07,
-\end{equation*}
-so $\log B = +13.48$. The suppression occupies less prior-weighted
-volume than the baseline: closing the $\chi_i$ basis confines it to
-small $\chi$. Per-parameter $\D$ resolves the
-structure further: $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
-\MAGF{_{\mu\nu\rho\sigma}}$ alone accounts for $\D(P_+\|P_-) = 4.2$
-nats (\cref{KLTableChiClosureComparison}) as the dominant operator driving the
-separation between the %amplification and suppression
-posteriors. The full posterior corner is~\cref{CornerChiClosure} and a
-restricted overlay against the non-propagating-torsion control over
-the dominant directions is~\cref{CornerChiClosurePair}.
+giving an eighteen-dimensional prior. The 18D corner
+(\cref{CornerChiClosure}) shows the amplifying posterior
+concentrated along $\chi_1$; per-coupling $\D$
+(\cref{KLTableChiClosureComparison}) places
+$\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,
+\MAGF{_{\mu\nu\rho\sigma}}$ at $\D(P_+\|P_-) = 4.2$ nats of cross
+divergence, the largest in the truncation. The suppression marginal
+is comparably narrow on $\chi_1$ but offset from the amplification,
+with two well-separated regions of $\chi_1$ values. The restricted
+overlay against the non-propagating-torsion control over the
+dominant directions is in~\cref{CornerChiClosurePair}.
 % ; the full per-coupling comparison against the
 % non-propagating-torsion control of the same sector appears below in
 %~\cref{KLTableChiClosureComparison} (\cref{NonPropagatingControl}).
@@ -604,30 +597,33 @@ As a control we re-run the Yang--Mills--PGT of~\cref{YangMillsPGT}
 with the torsion kinetic coefficient $\xi$ zeroed. The Lagrangian
 \cref{NonMinimalLagrangian} then introduces no new kinetic operator,
 torsion is determined algebraically, and the no-ghost classification
-is trivially satisfied. We obtain $\logZ_+ = +10.98 \pm 0.15$ and
-$\logZ_- = +2.67 \pm 0.10$ ($\log B = +8.31$), essentially
-reproducing the propagating-torsion result. Amplification therefore
-does not require the torsion kinetic sector to be active.
+is trivially satisfied. The control's corner
+(\cref{CornerYMUnionPair}) overlays the propagating-torsion result
+within the per-coupling marginal $\D$ to within the bootstrap
+uncertainty in every operator direction (\cref{KLTableYMUnified}
+NP-control column). Amplification therefore does not require the
+torsion kinetic sector to be active.
 
 \paragraph*{Complete parity-even closure control}
 The same control at the seventeen-parameter complete parity-even
 closure ($\{\Bet{1\!-\!3}, \Del{1}, \zeta_{1\!-\!3}, \chi_{1\!-\!10}\}$
-with $\xi = 0$) returns $\logZ_+ = +9.93 \pm 0.08$ and
-$\logZ_- = -3.28 \pm 0.07$ ($\log B = +13.21$), within the bootstrap
-uncertainty of the propagating-torsion result. The amplification
-therefore does not require torsion to propagate; the non-minimal
-couplings alone reproduce the structure of the propagating theory.
-Per-parameter $\D$ resolves the dominant operator: $\Bet{1}$ in the
-YM--PGT control (\cref{KLTableYMUnified}), and
+with $\xi = 0$) overlays the 18D propagating-torsion result within
+the per-coupling marginal $\D$ across every shared operator
+direction (\cref{KLTableChiClosureComparison} NP-control column;
+\cref{CornerChiClosure}: $\xi=0$ control overlay). The
+amplification therefore does not require torsion to propagate; the
+non-minimal couplings alone reproduce the structure of the
+propagating theory. Per-coupling $\D$ resolves the dominant
+operator: $\Bet{1}$ in the YM--PGT control
+(\cref{KLTableYMUnified}), and
 $\chi_1\rcD{^\mu}\MAGT{^{\nu\rho\sigma}}\,\MAGF{_{\mu\nu\rho\sigma}}$
-in the complete parity-even closure control (full comparison in
-\cref{KLTableChiClosureComparison}).
+in the complete parity-even closure control.
 
 \begin{table}[h]
   \centering
   \footnotesize
   \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{l | ccc | ccc}
+  \begin{tabular}{c | ccc | ccc}
   \toprule
     & \multicolumn{3}{c|}{NP control ($\xi=0$)}
     & \multicolumn{3}{c}{Propagating (18D)} \\
@@ -710,7 +706,7 @@ $\chi_1$ and $\xi_{15}\rcD{^\mu}\MAGT{^{\nu}_{\mu}^{\rho}}\,
 \begin{figure*}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{figures/corner_t9}
-  \caption{Posterior marginals for the thirty-two-dimensional\wb{Might possibly be cleaner if you remove ticks.}
+  \caption{Posterior marginals for the thirty-two-dimensional
     torsion kinetic closure. Diagonal: 1D marginals (amplification:
     magenta; suppression: yellow). Off-diagonal: 2D joint marginals at
     the 68\% and 95\% credible contours.}
@@ -806,24 +802,18 @@ giving the Lagrangian
 \end{multline}
 where $\mathcal{F}^{(T)}_{\mu\nu}$ is the field strength of
 $\T[2]{_\mu}$ and $A_\mu$ is the photon perturbation field, giving a
-four-dimensional prior over $\{m_A^2, \xi, \Del{m}, \Bet{3}\}$. We
-find
-\begin{align*}
-  \logZ_+ = +9.03 \pm 0.07
-  \qand
-  \logZ_- = +2.92 \pm 0.08,
-\end{align*}
-with $\log B = +6.11$. The amplification log-evidence dominates the
-suppression log-evidence, and the per-parameter $\D$
-figures of~\cref{KLTableDarkPhoton} place $\Del{m}$ above $m_A^2$.
-The conversion is controlled by the photon plasma mass $m_A^2$,
-which shifts the photon dispersion and detunes coherent
-Gertsenshtein conversion; the dark-photon kinetic mixing adds little
-either way. The marginal $\D$ values above are computed against the
-prior shapes specific to each parameter and are not directly
-cross-comparable; $m_A^2$'s physical role in the conversion is more
-significant than its marginal $\D$ position relative to $\Del{m}$
-shows.
+four-dimensional prior over $\{m_A^2, \xi, \Del{m}, \Bet{3}\}$. The
+4D corner (\cref{CornerT1}) shows the amplifying posterior sharply
+localised along the $m_A^2$ direction. Per-coupling $\D$
+(\cref{KLTableDarkPhoton}) places $\Del{m}$ at 3.4 nats and $m_A^2$
+at 1.5 nats, ranking $\Del{m}$ first. The conversion is controlled
+by the photon plasma mass $m_A^2$, which shifts the photon
+dispersion and detunes coherent Gertsenshtein conversion; the
+dark-photon kinetic mixing adds little either way. The marginal
+$\D$ values above are computed against the prior shapes specific to
+each parameter and are not directly cross-comparable; $m_A^2$'s
+physical role in the conversion is more significant than its
+marginal $\D$ position relative to $\Del{m}$ shows.
 
 \begin{figure}[!htbp]
   \centering
@@ -838,7 +828,7 @@ shows.
 
 \begin{table}[h]
   \centering
-  \begin{tabular}{l | c c c}
+  \begin{tabular}{c | c c c}
   \toprule
   & $\Dp$ & $\Dm$ & $\D(P_+\|P_-)$ \\
   \midrule
@@ -892,12 +882,10 @@ derivative absent from the equations of motion
 (\cref{SymbolicEulerHeisenberg}), leaving a two-dimensional prior
 over $(\rho, \sigma)$. The $\FieldF{^4}$ corrections scale with the
 background field to a higher power than the leading PGT vertices
-and are subdominant in this regime. The posterior has
-\begin{align*}
-  \logZ_+ = +0.184 \pm 0.001 \, , \quad
-  \logZ_- = -0.185 \pm 0.0004 \, ,
-\end{align*}
-and $\log B = +0.37$, a symmetric and tight null at the surveyed
+and are subdominant in this regime. The 2D corner
+(\cref{CornerEHGert}) is a tight, symmetric null: amplification and
+suppression marginals on both $\rho$ and $\sigma$ are statistically
+indistinguishable from the prior at the surveyed
 $\Bzero=10^{-2}$. The one-loop EH
 coefficients~\cite{adler1971photon,dunne2004heisenberg} are
 loop-suppressed below the prior scales sampled here; the QED
