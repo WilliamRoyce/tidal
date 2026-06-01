@@ -135,7 +135,9 @@ def _plot(data: dict, out_path: Path) -> None:
             lbl for n, lbl in zip(ns, labels, strict=False) if tick_filter(round(n))
         ]
         ax.set_xticks(major_ticks)
-        ax.set_xticklabels([f"${lbl}$" for lbl in major_labels], fontsize=7)
+        ax.set_xticklabels(
+            [f"${round(_n_to_float(lbl))}$" for lbl in major_labels], fontsize=7
+        )
         # Intermediate N values: keep them as minor ticks (no label).
         minor_ticks = [n for n in ns if not tick_filter(round(n))]
         ax.set_xticks(minor_ticks, minor=True)

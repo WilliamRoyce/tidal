@@ -24,7 +24,7 @@ field-container design draws on the \pypde{}
 framework~\cite{zwicker2020pypde}. \TIDAL{} provides common
 infrastructure and a selector that chooses
 among several solvers from the algebraic structure of the
-equation system.~\Cref{Results} uses the Fourier modal solver
+equation system. \Cref{Results} uses the Fourier modal solver
 of~\cref{ModalSolver}.
 
 \paragraph*{Solver selection hierarchy} The solver family is
@@ -163,16 +163,16 @@ Dirac--Bergmann constraint analysis of~\cref{DiracBergmann}.
 \paragraph*{Coefficient evaluator} Each right-hand-side term carries an
 \xAct{} symbolic coefficient,
 resolved at run time against the parameter assignments and possibly the spatial coordinate grid. The
-\lstinline!CoefficientEvaluator! class implements a cache to
+We implements a cache to
 amortise these per-call evaluations. The cache (as necessary) stores pre-resolved constants;
 parsed parameter-resolved expressions; spatial
-grids of position-dependentcoefficient values; and per-timestep
+grids of position-dependent coefficient values; and per-timestep
 deduplication of time-dependent coefficients.
 
 \subsection{Spatial discretisation}%
 \label{SpatialDiscretisation}
 
-\paragraph*{Finite-difference stencils} The default spatial
+\paragraph*{Finite-difference} The default spatial
 discretisation is a central-difference scheme on a uniform Cartesian
 grid, where the stencil coefficients are those of Fornberg's algorithm~\cite{fornberg1988generation}.
 The expected algebraic convergence
@@ -260,7 +260,9 @@ evolution is computed instead by Krylov action described later.
     \textbf{(c)} Fierz--Pauli massive gravity~\cite{fierzpauli1939relativistic,boulwaredeser1972finite,hinterbichler2012theoretical} in $2{+}1$D ($m^2{=}1$),
     with $7{\times}7$ blocks after
     constraint-elimination. The Pad\'e path is at or below
-    eigendecomposition wall time at every resolution.}
+    eigendecomposition wall time at every resolution.
+    Panel~(c) is on a $2{+}1$-dimensional grid; $N$ is the total cell count
+    $n^2$ for an $n{\times}n$ grid, so its x-axis range differs from the $1{+}1$D panels.}
   \label{fig:PadeBenchmark}
 \end{figure*}
 
@@ -280,9 +282,8 @@ matrix-exponential
 algorithms~\cite{higham2008functions,molervanloan2003nineteen,golub2013matrix,trefethen1997numerical};
 we adopt the recommendation of Higham~\cite[\S~2.3]{higham2008functions} and
 replace it with the Pad\'e path,\footnote{The eigendecomposition path
-remains available internally for the closed-form Duhamel kernel used
-in the perturbative-reduction scheme of~\cref{PerturbativeReduction},
-which requires the per-eigenmode expansion explicitly.}
+remains available for the closed-form Duhamel kernel used
+in the perturbative-reduction scheme of~\cref{PerturbativeReduction}.}
 which is robust at arbitrary
 $\operatorname{cond}(V)$~\cite{higham2009scaling,higham2008functions}
 % The Pad\'e per-mode wall time is competitive with the former
@@ -319,10 +320,8 @@ and a union-find~\cite{tarjan1975unionfind} collects the resulting
 coupling graph into connected components. The exponential is then
 applied block-by-block. The dense per-mode \lstinline!expm! cost
 scales as $\O(b^3)$ in the block size
-$b$~\cite{higham2009scaling}; splitting a size-$b$ block into $n$
-sub-blocks gives
-$n\!\times\!\O((b/n)^3)=\O(b^3/n^2)$,
-visible in~\cref{fig:PadeBenchmark}, with
+$b$~\cite{higham2009scaling}; splitting into $n$
+sub-blocks gives $n\!\times\!\O((b/n)^3)=\O(b^3/n^2)$, with
 conditioning at least as good as the unblocked path.
 % The block
 % decomposition is retained under the Pad\'e path of the previous
@@ -436,8 +435,7 @@ case the eigendecomposition is inadequate: individual terms
 $\exp(\lambda t)$ overflow when $\lambda$ has a large positive real
 part, even though the full action $\exp(M t)\, y_0$ stays bounded.%
 \footnote{For non-normal $A$ the transient growth of $\|\exp(A t)\|$
-is not predicted by the eigenvalues alone; this phenomenon is
-analysed by Trefethen \& Embree~\cite[\S~15]{trefethen2005spectra}.}
+is not predicted by the eigenvalues alone~\cite[\S~15]{trefethen2005spectra}.}
 The matrix-exponential action is computed directly via the
 \SciPy{}'s Krylov scheme
 \lstinline!expm_multiply!~\cite{almohy2011action} ---
@@ -447,7 +445,7 @@ and stays accurate when $M$ is non-normal.
 For localised coefficients the convolution matrix is
 effectively banded; \TIDAL{} converts it to compressed-sparse-column
 (CSC) format~\cite{demmel1999supernodal,demmel1999superlumt} when the
-density falls below 30\%.~\Cref{fig:SparseCSCBenchmark}
+density falls below 30\%. \Cref{fig:SparseCSCBenchmark}
 shows the resulting orders of magnitude speed-up as the matrix sparsifies with
 increasing grid resolution.
 
@@ -488,18 +486,19 @@ mode $N-k$ are complex conjugates.
 % A generic mode is free to be
 % complex --- its conjugate partner keeps the field real --- so the
 % complex per-mode propagator $\exp(M(k)\,t)$ does it no harm.
-
 The Nyquist mode ($k=N/2$ on even-$N$ grids) is its
 own conjugate, so \emph{must} stay real. The gradient
 couplings make $\exp(M(k)\,t)$ complex at the Nyquist
-wavenumber: each step rotates a fraction of the real amplitude into
-the imaginary part, which \lstinline!irfft! then discards on
-reconstruction --- the energy carried by that imaginary part is lost.
+wavenumber:
+% each step rotates a fraction of the real amplitude into
+% the imaginary part, which \lstinline!irfft! then discards on
+% reconstruction ---
+the energy carried by that imaginary part is lost.
 % (the zero mode is likewise self-conjugate but
 % unaffected, the gradient couplings vanishing at $k=0$).
 
 We zero the Nyquist mode
-in the initial condition before evolution, which is the linear
+in the initial condition (IC) before evolution, which is the linear
 analogue of the spectral dealiasing
 rule~\cite{boyd2001chebyshev,burns2020dedalus}. With this
 projection the relative energy drift decreases monotonically with
@@ -535,21 +534,21 @@ the Nyquist mode oscillates faster at finer resolution.
 When a system is ineligible for the modal solver
 of~\cref{ModalSolver} but still has periodic spatial boundaries,
 \TIDAL{} provides a
-\emph{pseudo-spectral} path that the
-step-based solvers
+\emph{pseudo-spectral} path for the
+step-based solvers:
 %(\IDA{}, \CVODE{}, leapfrog, \SciPy{})
-can use: spatial operators are applied as Fourier
+operators are applied as Fourier
 multipliers,%~\cite{burns2020dedalus},
-\footnote{The pseudo-spectral path uses the exact continuous wavenumber $k$
-as a Fourier multiplier --- the same convention as the Fourier modal
-solver of~\cref{ModalSolver}. The constraint initial-condition
+\footnote{The pseudo-spectral path uses the exact continuous wavenumber $k$,
+the same convention as the Fourier modal
+solver of~\cref{ModalSolver}. The constraint IC
 solver of~\cref{ConstraintIC} matches the active spatial path:
 exact $k$ for the pseudo-spectral path, and the FD-stencil dispersion
 $k_{\rm mod}^2 = -(2/\Delta x^2)(1-\cos(k\Delta x))$ for the FD path
 (with Fornberg generalisations~\cite{fornberg1988generation} at
 higher orders), so the constraint IC is spectrally consistent with
 the active evolution.}
-while the time evolution is driven by the chosen solver.
+while the time evolution is driven by the selected solver.
 % \footnote{The path is auto-enabled in every
 % solver except \IDA{}, whose Newton iteration uses a sparse
 % linear solver to factor the DAE Jacobian $\partial F/\partial y$: the
@@ -559,7 +558,7 @@ while the time evolution is driven by the chosen solver.
 % sparse solver cannot exploit.}
 Spectral methods give super-algebraic convergence on smooth periodic
 data~\cite{boyd2001chebyshev}: the error decays faster than any power
-of $1/N$.~\Cref{FDConvergence} shows the spectral path reaching the
+of $1/N$. \Cref{FDConvergence} shows the spectral path reaching the
 round-off floor by $N\approx 32$, while the FD orders display the
 predicted algebraic rates.
 
@@ -632,38 +631,33 @@ BDF's per-step implicit solve is only useful for stiff problems. Like leapfrog, 
 \paragraph*{Constraint projection}%
 \label{ConstraintIC}
 When the equation specification contains
-algebraic constraints, the user-supplied initial condition
-$(q_0, v_0)$ generically lies off the constraint surface. The initial
-condition \emph{must} satisfy these constraints.
+algebraic constraints, the user-supplied IC
+$(q_0, v_0)$ generically lies off the constraint surface. The IC
+\emph{must} satisfy these constraints.
 \TIDAL{} enforces this by taking the
 user-supplied dynamical-slot values $(q_0, v_0)$ as authoritative and
 solving the constraints for the constraint-slot
 values, producing a self-consistent initial state. The
 \lstinline!ensure_consistent_ic! function performs this projection
-once, after the initial condition is assembled and before the chosen
+once, after the IC is assembled and before the chosen
 solver is invoked.
 
-\paragraph*{Three-tier selection} The selector \lstinline!_select_method!
-chooses the fastest applicable solver tier for projection.
-The first tier handles the case in which
-all boundaries are periodic and the constraint coefficients are
+\paragraph*{Three-tier selection} We
+select the fastest applicable solver for projection.
+When all boundaries are periodic and the constraint coefficients are
 constant: the constraint operator is diagonalised by the discrete
-Fourier transform, with wavenumber multipliers matching the
-convention of the spatial
-operators that drive evolution; the cost is
-$\O(N\log N)$~\cite{cooley1965fft}. The second
-tier covers non-periodic boundaries and variable coefficients: the
+Fourier transform; the cost is $\O(N\log N)$~\cite{cooley1965fft}.
+With non-periodic boundaries and variable coefficients: the
 constraint Jacobian is assembled column-by-column by impulse-probing
 each operator, then stored as
 CSC and factored by SuperLU~\cite{demmel1999supernodal,demmel1999superlumt},
-with $\O(N^2)$ build cost and $\O(N)$ solve. The third tier, reserved for
-the $N>2\times 10^{5}$ regime, is a Krylov iterative scheme; it is
-implemented but not exercised in~\cref{Results},
-where the largest grids fit comfortably within tier~$2$.
+($\O(N^2)$ build cost and $\O(N)$ solve). A Krylov iterative scheme, reserved for
+$N>2\times 10^{5}$ is
+implemented but not required in~\cref{Results}.
 
 \paragraph*{Zero-mode regularisation} A pure Poisson constraint on a
 periodic domain has a one-dimensional null space: the zero Fourier
-mode is undetermined by the elliptic problem and must be supplied by
+mode is undetermined and must be supplied by
 an external condition. We pin the zero mode to zero as a numerical
 regularisation.
 % For the gauge-field constraints relevant to the present work,
@@ -679,14 +673,13 @@ choice cancels in any gauge-invariant quantity.
 c_j\,\partial F/\partial y'$ to drive the Newton iteration of each
 backward-differentiation step. FD approximation of
 this matrix requires multiple residual evaluations per Newton
-iteration~\cite{gardner2022sundials,hindmarsh2005sundials,curtispowellreid1974}. For the multi-field systems with
-$N\!\sim\!10^4$ degrees of freedom that arise in the PGT campaigns
-of~\cref{Results}, that overhead is the dominant cost.
+iteration~\cite{gardner2022sundials,hindmarsh2005sundials,curtispowellreid1974}. For the systems with
+$N\!\sim\!10^4$ degrees of freedom that arise in~\cref{Results},
+that overhead is the dominant cost.
 
 We precompute the Jacobian analytically, once, from the symbolic
 equation specification, and supply
-it to the linear solver directly through the \SUNDIALS{} callback
-interface~\cite{gardner2022sundials,hindmarsh2005sundials}.
+it to the linear solver directly through the \SUNDIALS{}~\cite{gardner2022sundials,hindmarsh2005sundials}.
 
 % Figure C.AnalyticalJacobianSpeedup — wall-time comparison vs FD Jacobian.
 % TODO: benchmark script at scripts/benchmarks/jac_speedup.py (to be written)
@@ -726,9 +719,9 @@ dense tier for $N\le2{,}000$, a sparse tier for
 $2{,}000<N\le200{,}000$, and a matrix-free tier for $N>200{,}000$. The dense tier
 fills a two-dimensional \NumPy{}~\cite{harris2020numpy} array with $\partial F/\partial y +
 c_j\,\partial F/\partial y'$ at every Newton step, which the \SUNDIALS{}
-direct linear solver factors by LAPACK LU~\cite{andersonlapack1999}; this path delivers a
-substantial wall-time speedup over FD Jacobian
-evaluation, with the per-tier comparison shown
+direct linear solver factors by LAPACK LU~\cite{andersonlapack1999}; delivering
+speedup over FD Jacobian
+evaluation, with the full comparison shown
 in~\cref{fig:AnalyticalJacobianSpeedup}. The sparse tier fills a flat
 CSC data buffer with a fixed sparsity
 pattern, which \SUNDIALS{} factors with
@@ -749,19 +742,19 @@ Newton step, would dominate the cost absolutely.
 \paragraph*{Solve cost}
 Figure~\ref{fig:AnalyticalJacobianSpeedup} times only the
 Jacobian-\emph{fill} stage of each Newton iteration, where the
-sparse-CSC callback always wins --- it skips the $\O(N^{2})$
-dense \texttt{toarray}, and at small $N$ a single fill is cheaper than
-the inner mat-vecs a matrix-free GMRES step would accumulate. The
+sparse-CSC callback always wins.
+%  --- it skips the $\O(N^{2})$
+% dense \texttt{toarray}, and at small $N$ a single fill is cheaper than
+% the inner mat-vecs a matrix-free GMRES step would accumulate.
+% The
 production tier thresholds, however, are set by the cost of the
-\emph{linear solve} that consumes the Jacobian: LAPACK dense LU is
+\emph{solve}: LAPACK dense LU is
 fastest while its working set is cache-resident
-($N\!\lesssim\!2{,}000$); SuperLU's sparse LU is fastest while its
-fill-in fits in memory
-($\mathrm{nnz}\!\lesssim\!10^{5}$~\cite{demmel1999superlumt,demmel1999supernodal});
-beyond that the matrix-free GMRES tier avoids the factor entirely.
-The dense and sparse tiers thus win on solve cost at their respective
-sizes even though the fill timings in
-Figure~\ref{fig:AnalyticalJacobianSpeedup} would, on their own,
+($N\!\lesssim\!2{,}000$); SuperLU's sparse LU is fastest while it
+fits in memory ($\mathrm{nnz}\!\lesssim\!10^{5}$~\cite{demmel1999superlumt,demmel1999supernodal});
+beyond that the matrix-free GMRES wins.
+The dense and sparse tiers can win on solve cost
+even though~\cref{fig:AnalyticalJacobianSpeedup} would, on its own,
 favour sparse everywhere.
 
 % \paragraph*{Coordinate accumulation} The sparse Jacobian is assembled
@@ -775,9 +768,10 @@ coefficients are spatially constant: the spatial-operator matrices
 are then circulant. We probe a single grid point and tile
 the resulting stencil row across all $N$ rows via modular arithmetic,
 an $\O(\mathrm{nnz})$ construction in place of the $\O(N^2)$ assembly
-of the general sparse path. On the periodic-domain EM
-system this contributes an additional factor of roughly $28\times$
-in operator-matrix construction.
+of the general sparse path.
+% On the periodic-domain EM
+% system this contributes an additional factor of roughly $28\times$
+% in operator-matrix construction.
 
 % \subsection{Dispatch and runtime workflow}%
 % \label{Dispatch}
