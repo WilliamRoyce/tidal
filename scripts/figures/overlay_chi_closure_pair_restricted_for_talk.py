@@ -185,8 +185,8 @@ def main() -> None:
         strip_xlabels=True,
         ylabel_rotation=0,
         rcparams_overrides={
-            "axes.labelsize": 40,
-            "legend.fontsize": 48,
+            "axes.labelsize": 18,
+            "legend.fontsize": 18,
         },
     )
 
