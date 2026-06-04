@@ -49,19 +49,21 @@
 % ---- Notation (extracted from ../macros.tex) -------------------------------
 \input{poster-macros.tex}
 
-% ---- Block body padding: indent text inside the filled (contained) boxes ----
-% Gemini's standard block body has no side padding; add it so the light-blue
-% boxes read as properly contained (the alerted/example blocks already pad).
+% ---- Block template: standard-blue title bar, a THICK warm-blue rule flush at
+% its bottom (separating header from body, like the talk frametitle), then a
+% padded light-blue body. The Gemini default nests the separator inside the title
+% box and pulls it up with \vskip-1.25ex (landing part-way through the bar); we
+% move it OUT into its own full-width box so it sits cleanly at the bottom.
 \setbeamertemplate{block begin}{
-  \begin{beamercolorbox}[colsep*=0ex,dp=2ex,center]{block title}
-    \vskip0pt
+  \begin{beamercolorbox}[colsep*=0ex,dp=1ex,center]{block title}
+    \vskip0.4ex
     \usebeamerfont{block title}\insertblocktitle
-    \vskip-1.25ex
-    \begin{beamercolorbox}[colsep=0.025ex]{block separator}\end{beamercolorbox}
+    \vskip0.4ex
   \end{beamercolorbox}
-  {\parskip0pt\par}
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\linewidth,ht=0.55ex,sep=0pt]{block separator}\end{beamercolorbox}
+  \nointerlineskip
   \usebeamerfont{block body}
-  \vskip-0.5ex
   \begin{beamercolorbox}[colsep*=0ex]{block body}
   \justifying
   \begin{adjustwidth}{1.5ex}{1.5ex}
@@ -79,7 +81,7 @@
 % ---- Header typography: large full-width title ------------------------------
 \setbeamerfont{headline title}{size=\fontsize{104}{116}\selectfont,series=\bfseries}
 \setbeamerfont{headline author}{size=\LARGE,series=\bfseries}
-\setbeamerfont{headline institute}{size=\large}
+\setbeamerfont{headline institute}{size=\normalsize}
 
 % ---- Custom headline: standard-blue top bar -> light-blue title field ->
 %      BOLD warm-blue separation rule (mirrors the Cambridge talk frametitle). ----
@@ -89,14 +91,14 @@
   \nointerlineskip
   % (2) light-blue header field with title / author / institute
   \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline}%
-    \vskip2.0ex
+    \vskip5.0ex                 % larger gap below the top bar (title lower)
     \centering
     {\usebeamerfont{headline title}\usebeamercolor[fg]{headline title}\inserttitle\par}
-    \vskip1.6ex
+    \vskip3.4ex                 % larger gap from title to author name
     {\usebeamerfont{headline author}\usebeamercolor[fg]{headline author}\insertauthor\par}
-    \vskip0.7ex
+    \vskip0.9ex
     {\usebeamerfont{headline institute}\usebeamercolor[fg]{headline institute}\insertinstitute\par}
-    \vskip2.0ex
+    \vskip2.4ex
   \end{beamercolorbox}%
   \nointerlineskip
   % (3) BOLD warm-blue rule separating header from body
@@ -181,7 +183,7 @@
 
 \vfill
 
-% ---- Row 2: highlights (1 col) + graphical abstract (2 cols) ----------------
+% ---- Row 2: highlights (1 col) + background (2 cols) ------------------------
 \begin{columns}[t]
   \separatorcolumn
   \begin{column}{\colwidth}
@@ -189,7 +191,7 @@
   \end{column}
   \separatorcolumn
   \begin{column}{\dimexpr2\colwidth+\sepwidth\relax}
-    \input{sections/02_graphical_abstract.tex}
+    \input{sections/02_background.tex}
   \end{column}
   \separatorcolumn
 \end{columns}
@@ -200,11 +202,11 @@
 \begin{columns}[t]
   \separatorcolumn
   \begin{column}{\colwidth}
-    \input{sections/03_why.tex}
+    \input{sections/03_pgt.tex}
   \end{column}
   \separatorcolumn
   \begin{column}{\colwidth}
-    \input{sections/04_how.tex}
+    \input{sections/04_methods.tex}
   \end{column}
   \separatorcolumn
   \begin{column}{\colwidth}

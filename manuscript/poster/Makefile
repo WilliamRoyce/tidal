@@ -16,6 +16,7 @@ $(MAIN).pdf: $(MAIN).tex sections/*.tex poster-macros.tex theme/*.sty figures/*.
 figures:
 	cd scripts && python pipeline_schematic.py && python result_landscape.py
 	cd figures && latexmk -pdf -interaction=nonstopmode magnetar_conversion.tex && latexmk -c magnetar_conversion.tex
+	cd figures && latexmk -pdf -interaction=nonstopmode pgt_geometry.tex && latexmk -c pgt_geometry.tex
 
 watch:
 	latexmk -lualatex -pvc -interaction=nonstopmode $(MAIN).tex
