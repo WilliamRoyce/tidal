@@ -19,7 +19,7 @@
 \setbeamercolor{special page frame number}{parent=part title,fg=white!75}
 \setbeamerfont{special page frame number}{size=\tiny}
 
-\setbeamerfont{date}{size=\tiny,series=\bfseries}
+\setbeamerfont{date}{size=\small,series=\bfseries}
 \setbeamerfont{part title}{size=\LARGE}
 \setbeamerfont{part name}{size=\LARGE}
 \setbeamerfont{abstract title}{size=\LARGE}
@@ -105,7 +105,9 @@
   \begin{beamercolorbox}[wd=\oversized@paperwidth,sep=0.5\cam@inner@pitch,leftskip=1.5\cam@inner@pitch,rightskip=1.5\cam@inner@pitch,#1]{title page date}
     \hfill\usebeamerfont{date}\insertdate
   \end{beamercolorbox}
-  \vskip-\cam@inner@pitch % HACK: Not sure why we need this?
+  % (removed legacy `\vskip-\cam@inner@pitch` HACK — under the larger title
+  % font and Cambridge24 colour roles it was pulling the date strip below
+  % the visible page boundary, clipping the date.)
 }
 
 % Part page

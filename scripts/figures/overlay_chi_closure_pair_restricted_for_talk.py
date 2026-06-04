@@ -156,8 +156,8 @@ def main() -> None:
     # apply_style() merges into existing rcParams via mpl.rcParams.update.
     mpl.rcParams.update(
         {
-            "axes.labelsize": 18,
-            "legend.fontsize": 20,
+            "axes.labelsize": 20,
+            "legend.fontsize": 24,
         }
     )
 
