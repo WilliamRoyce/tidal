@@ -160,8 +160,8 @@ def main() -> None:
     # apply_style() merges into existing rcParams via mpl.rcParams.update.
     mpl.rcParams.update(
         {
-            "axes.labelsize": 28,
-            "legend.fontsize": 32,
+            "axes.labelsize": 36,
+            "legend.fontsize": 40,
         }
     )
 
@@ -189,7 +189,9 @@ def main() -> None:
         transparent=True,
         colours=CAMBRIDGE_OVERLAY_COLOURS,
         legend_labels=LEGEND_LABELS,
-        strip_ylabels=True,
+        strip_ylabels=False,
+        strip_xlabels=True,
+        ylabel_rotation=0,
     )
 
 

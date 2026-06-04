@@ -141,6 +141,8 @@ def render_overlay_pair(
     colours: dict[str, str] | None = None,
     legend_labels: dict[str, str] | None = None,
     strip_ylabels: bool = False,
+    strip_xlabels: bool = False,
+    ylabel_rotation: float | None = None,
 ) -> None:
     apply_style()
 
@@ -244,6 +246,13 @@ def render_overlay_pair(
         ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
         if strip_ylabels:
             ax.set_ylabel("")
+        if strip_xlabels:
+            ax.set_xlabel("")
+        if ylabel_rotation is not None and ax.get_ylabel():
+            ax.yaxis.label.set_rotation(ylabel_rotation)
+            ax.yaxis.label.set_horizontalalignment("right")
+            ax.yaxis.label.set_verticalalignment("center")
+            ax.yaxis.labelpad = 10
 
     ll = legend_labels or {}
     lbl_prop_amp = ll.get("prop_amp", "amplification (propagating)")
