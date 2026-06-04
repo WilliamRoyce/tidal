@@ -26,10 +26,12 @@ CAM = {
 }
 
 # ---- Figure-coherent accent pair (secondary families) -----------------------
-CHERRY = "#CD3572"  # amplification (pink/magenta)
+CHERRY = "#CD3572"  # amplification, propagating (pink/magenta)
 CHERRY_DARK = "#911449"
-CREST = "#FD8153"  # suppression (coral/orange)
+WARM_CHERRY = "#E18AAC"  # amplification, non-propagating control (light cherry)
+CREST = "#FD8153"  # suppression, propagating (coral/orange)
 CREST_DARK = "#DD3025"
+WARM_CREST = "#FFC392"  # suppression, non-propagating control (light crest)
 
 # ---- Role aliases (match _palette.py interface) -----------------------------
 AMP_COLOR = CHERRY
@@ -59,8 +61,12 @@ POSTER_RCPARAMS = {
     "legend.fontsize": 16,
     "lines.linewidth": 2.0,
     "axes.linewidth": 1.0,
-    "figure.facecolor": "white",
-    "savefig.facecolor": "white",
+    # Math labels (T^2, R~ grad T) in a sans font consistent with Lato.
+    "mathtext.fontset": "dejavusans",
+    # Light-blue background so the figure blends into its light-blue poster box.
+    "figure.facecolor": CAM["light_blue"],
+    "savefig.facecolor": CAM["light_blue"],
+    "axes.facecolor": CAM["light_blue"],
 }
 
 

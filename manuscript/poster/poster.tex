@@ -43,6 +43,7 @@
 \usetikzlibrary{arrows.meta,positioning,decorations.pathmorphing,calc}
 \usepackage{qrcode}
 \usepackage{anyfontsize}   % arbitrary title sizes
+\usepackage{eso-pic}       % single-pass absolute logo placement (no remember picture)
 \graphicspath{{figures/}{theme/}}
 
 % ---- Notation (extracted from ../macros.tex) -------------------------------
@@ -121,18 +122,49 @@
   {\normalfont\itshape Supervised by} W.~E.~V.~Barker, M.~P.~Hobson \& A.~N.~Lasenby\\[0.2ex]
   Astrophysics Group, Cavendish Laboratory, University of Cambridge}}
 
-% Logo overlaid on the right, LOWERED to sit in the free space beside the centred
-% author/affiliation block (the title now uses the full width above it).
-\addtobeamertemplate{headline}{}{%
-  \begin{tikzpicture}[remember picture,overlay]
-    \node[anchor=north east, inner sep=0pt]
-      at ([xshift=-4cm,yshift=-8.5cm]current page.north east)
-      {\includegraphics[height=4.4cm]{uc-cmyk}};
-  \end{tikzpicture}%
+% Logo placed at the BOTTOM-LEFT of the header, in the free space left of the
+% centred author block. Uses eso-pic (single-pass, absolute) so it renders on a
+% one-pass IDE build -- the old remember-picture overlay needed 2 passes and
+% silently vanished on single-pass builds.
+\AddToShipoutPictureFG*{%
+  \AtPageUpperLeft{\put(\LenToUnit{3cm},\LenToUnit{-13.8cm}){%
+    \includegraphics[height=4.4cm]{uc-cmyk}}}%
 }
 
-% Footer band is rendered as the lowest content section (Cambridge-Blue band with
-% warm-blue top rule + QR), so the Gemini bottom footline strip is left empty.
+% ---- Full-bleed footer band (warm-blue rule + Cambridge-Blue band, QR corner),
+%      rendered via the footline so it is full-width and pinned to the page bottom.
+\setbeamertemplate{footline}{%
+  \begin{beamercolorbox}[wd=\paperwidth,ht=1.1ex,sep=0pt]{footer rule}\end{beamercolorbox}%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,sep=2.5ex]{footer band}%
+    \hspace{\sepwidth}%
+    \begin{minipage}{\dimexpr\paperwidth-3\sepwidth\relax}
+      \begin{columns}[T]
+        \begin{column}{0.60\linewidth}
+          {\large\bfseries Outlook}\\[0.4ex]
+          A magnetic field of \emph{finite extent} gives the wave a finite
+          interaction time, turning these amplifications into physical conversion
+          magnitudes --- the operators ranked here are the inputs that calculation
+          needs. A particle-spectrum analysis (\PSALTer{}) will then classify each
+          amplifying direction.
+        \end{column}
+        \begin{column}{0.26\linewidth}
+          {\large\bfseries References}\\[0.4ex]
+          {\small
+           Gertsenshtein, \emph{JETP}, 1962.\\
+           Boccaletti \etal, \emph{Nuovo Cim.}, 1970.\\
+           Barker \etal, \emph{PSALTer}, 2024, arXiv:2406.09500.}
+        \end{column}
+        \begin{column}{0.12\linewidth}
+          \centering
+          \colorbox{white}{\qrcode[height=3.4cm]{https://github.com/WilliamRoyce/torsion-gertsenshtein}}\\[0.3ex]
+          {\small Code \& data}
+        \end{column}
+      \end{columns}
+    \end{minipage}%
+    \hspace{\sepwidth}%
+  \end{beamercolorbox}%
+}
 
 % ============================================================================
 \begin{document}
@@ -147,6 +179,8 @@
   \separatorcolumn
 \end{columns}
 
+\vfill
+
 % ---- Row 2: highlights (1 col) + graphical abstract (2 cols) ----------------
 \begin{columns}[t]
   \separatorcolumn
@@ -159,6 +193,8 @@
   \end{column}
   \separatorcolumn
 \end{columns}
+
+\vfill
 
 % ---- Row 3: the three main sections ----------------------------------------
 \begin{columns}[t]
@@ -177,14 +213,11 @@
   \separatorcolumn
 \end{columns}
 
-% ---- Row 4: outlook + references -------------------------------------------
-\begin{columns}[t]
-  \separatorcolumn
-  \begin{column}{\dimexpr\paperwidth-2\sepwidth\relax}
-    \input{sections/06_outlook_refs.tex}
-  \end{column}
-  \separatorcolumn
-\end{columns}
+\vfill
+
+% Outlook + references + QR are rendered as the full-bleed footer band (see the
+% custom \setbeamertemplate{footline} above) so they reach the page edges and sit
+% pinned to the bottom.
 
 \end{frame}
 \end{document}

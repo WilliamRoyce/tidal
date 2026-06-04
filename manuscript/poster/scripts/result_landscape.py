@@ -1,18 +1,19 @@
-r"""Hero result: amplification-vs-suppression landscape for the poster.
+r"""Hero result for the poster — the talk's chi-closure restricted corner.
 
-Regenerates the dominant parity-even (chi-closure / T7) sector's amp-vs-sup
-overlay corner in the modern Cambridge poster palette (Cherry = amplification,
-Crest = suppression), restricted to the genuinely most-informative couplings.
+Replicates the content of the talk figure
+(scripts/figures/overlay_chi_closure_pair_restricted_for_talk.py): the chi-closure
+sector restricted to the principled top-6 couplings, with FOUR overlaid posteriors
+-- propagating amplification/suppression + the non-propagating (xi=0) control --
+so the plot is not sparse.
 
-The restricted axis set is the principled top-6 from `_top_k_union`
-(scripts/figures/overlay_corner_pair.py) -- ranked by max(amp marginal, sup
-marginal, cross amp/sup KL) across the propagating + non-propagating chains. This
-is the SAME ranking the manuscript's restricted chi-closure figure uses; chi1
-(the full curvature-torsion contraction) ranks #1 via its amp/sup cross-distinction.
+Poster styling (differs from the talk/report):
+- plain SCHEMATIC family labels (R~ grad-T, T^2 ...), not explicit contractions;
+- sans fonts consistent with the poster (Lato; mathtext dejavusans; no usetex);
+- light-blue (#D1F9F1) figure + panel background to blend into the poster box;
+- Cambridge 4-colour scheme (prop = Cherry/Crest, control = WarmCherry/WarmCrest).
 
-Only the propagating amp/sup posteriors are drawn (the xi=0 control is a verbal
-discussion point, kept off the poster). Report figures in manuscript/figures/ are
-untouched -- we only reuse the loaders.
+Report figures in manuscript/figures/ are untouched -- only the loaders/ranking
+helper are reused.
 
 Output: manuscript/poster/figures/result_landscape.pdf
 """
@@ -34,38 +35,40 @@ sys.path.insert(0, str(REPORT_FIG_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _corner_style import CONTOUR_LEVELS, load_chains
-from _poster_palette import CHERRY, CREST, apply_poster_style
+from _poster_palette import (
+    CAM,
+    CHERRY,
+    CREST,
+    WARM_CHERRY,
+    WARM_CREST,
+    apply_poster_style,
+)
 from overlay_corner_pair import _top_k_union
 
-# Chi-closure (T7) propagating amp/sup chains + the NP amp importance used by the
-# principled ranking.
-AMP = REPO_ROOT / "hpc_results" / "29682868" / "t7_amp_v2"
-SUP = REPO_ROOT / "hpc_results" / "29682868" / "t7_sup_v2"
+# Chi-closure (T7) propagating + non-propagating chains (same as the talk figure).
+PROP_AMP = REPO_ROOT / "hpc_results" / "29682868" / "t7_amp_v2"
+PROP_SUP = REPO_ROOT / "hpc_results" / "29682868" / "t7_sup_v2"
 NP_AMP = REPO_ROOT / "hpc_results" / "29705560" / "np_ceven_amp_v1"
+NP_SUP = REPO_ROOT / "hpc_results" / "29705560" / "np_ceven_sup_v1"
 OUT = Path(__file__).resolve().parents[1] / "figures" / "result_landscape.pdf"
 
-# Full 18-param column list for the T7 chains (column naming for the loader).
-ALL_PARAMS = [
+PROP_PARAMS = [
     "beta1", "beta2", "beta3", "xi", "delta1",
     "zeta1", "zeta2", "zeta3",
     "chi1", "chi2", "chi3", "chi4", "chi5",
     "chi6", "chi7", "chi8", "chi9", "chi10",
 ]
-NP_PARAMS = [p for p in ALL_PARAMS if p != "xi"]
+NP_PARAMS = [p for p in PROP_PARAMS if p != "xi"]
 
-# Schematic operator-contraction labels (no bare parameter names), reused from the
-# talk-deck restricted figure.
-LABELS = {
-    "beta1": r"$T_{abc}T^{abc}$",
-    "beta2": r"$T_{abc}T^{bac}$",
-    "beta3": r"$T_a T^a$",
-    "delta1": r"$\tilde{R}_{[\mu\nu]}F^{\mu\nu}$",
-    "zeta1": r"$\nabla T\!\cdot\!F$",
-    "chi1": r"$\nabla T\!\cdot\!\tilde{R}$",
-    "chi2": r"$\nabla T\!\cdot\!\tilde{R}\,(acbd)$",
-    "chi5": r"$\mathrm{tr}\,\nabla T\!\cdot\!\tilde{R}$",
-    "chi7": r"$\nabla T\!\cdot\!\tilde{R}\,(cdab)$",
+# Plain schematic family labels (suppressed indices); repeats allowed (per user).
+SCHEMATIC = {
+    "beta1": r"$T^2$", "beta2": r"$T^2$", "beta3": r"$T^2$",
+    "delta1": r"$\tilde{R}F$",
+    "zeta1": r"$F\nabla T$", "zeta2": r"$F\nabla T$", "zeta3": r"$F\nabla T$",
 }
+for _c in range(1, 11):
+    SCHEMATIC[f"chi{_c}"] = r"$\tilde{R}\nabla T$"
+
 OVERLAY_ALPHA = 0.55
 
 
@@ -73,42 +76,54 @@ def main() -> None:
     apply_poster_style()
     OUT.parent.mkdir(parents=True, exist_ok=True)
 
-    # Principled top-6 axes (same ranking as the manuscript restricted figure).
     top = _top_k_union(
-        [AMP / "parameter_importance.json", NP_AMP / "parameter_importance.json"],
+        [PROP_AMP / "parameter_importance.json", NP_AMP / "parameter_importance.json"],
         6,
         NP_PARAMS,
     )
     print(f"top-6 carrier params: {top}")
-    labels = {n: LABELS.get(n, n) for n in ALL_PARAMS}
 
-    amp = load_chains(AMP, params=ALL_PARAMS, param_labels=labels)
-    sup = load_chains(SUP, params=ALL_PARAMS, param_labels=labels)
+    prop_labels = {n: SCHEMATIC.get(n, n) for n in PROP_PARAMS}
+    np_labels = {n: SCHEMATIC.get(n, n) for n in NP_PARAMS}
 
-    axes = amp.plot_2d(top, kinds="kde", levels=CONTOUR_LEVELS,
-                       color=CHERRY, alpha=OVERLAY_ALPHA)
-    sup.plot_2d(axes, kinds="kde", levels=CONTOUR_LEVELS,
-                color=CREST, alpha=OVERLAY_ALPHA)
+    prop_amp = load_chains(PROP_AMP, params=PROP_PARAMS, param_labels=prop_labels)
+    prop_sup = load_chains(PROP_SUP, params=PROP_PARAMS, param_labels=prop_labels)
+    np_amp = load_chains(NP_AMP, params=NP_PARAMS, param_labels=np_labels)
+    np_sup = load_chains(NP_SUP, params=NP_PARAMS, param_labels=np_labels)
+
+    axes = prop_amp.plot_2d(top, kinds="kde", levels=CONTOUR_LEVELS,
+                            color=CHERRY, alpha=OVERLAY_ALPHA)
+    prop_sup.plot_2d(axes, kinds="kde", levels=CONTOUR_LEVELS,
+                     color=CREST, alpha=OVERLAY_ALPHA)
+    np_amp.plot_2d(axes, kinds="kde", levels=CONTOUR_LEVELS,
+                   color=WARM_CHERRY, alpha=OVERLAY_ALPHA)
+    np_sup.plot_2d(axes, kinds="kde", levels=CONTOUR_LEVELS,
+                   color=WARM_CREST, alpha=OVERLAY_ALPHA)
 
     fig = axes.iloc[0, 0].figure
     for ax in axes.values.flatten():
         if ax is not None:
+            ax.set_facecolor(CAM["light_blue"])
             ax.tick_params(bottom=False, left=False,
                            labelbottom=False, labelleft=False)
 
     handles = [
         mpatches.Patch(color=CHERRY, alpha=OVERLAY_ALPHA, label="amplification"),
         mpatches.Patch(color=CREST, alpha=OVERLAY_ALPHA, label="suppression"),
+        mpatches.Patch(color=WARM_CHERRY, alpha=OVERLAY_ALPHA,
+                       label=r"amplification ($\xi=0$)"),
+        mpatches.Patch(color=WARM_CREST, alpha=OVERLAY_ALPHA,
+                       label=r"suppression ($\xi=0$)"),
     ]
     n = len(top)
     axes.iloc[0, 0].legend(handles=handles, loc="upper right",
-                           bbox_to_anchor=(n - 0.5, 1.0),
+                           bbox_to_anchor=(n - 0.4, 1.0),
                            bbox_transform=axes.iloc[0, 0].transAxes,
-                           frameon=True, facecolor="white",
-                           edgecolor="#B5BDC8", framealpha=1.0, fontsize=22)
+                           frameon=True, facecolor=CAM["light_blue"],
+                           edgecolor=CAM["slate2"], framealpha=1.0, fontsize=20)
 
     fig.set_size_inches(9.5, 9.0)
-    fig.savefig(OUT, bbox_inches="tight")
+    fig.savefig(OUT, bbox_inches="tight", facecolor=CAM["light_blue"])
     plt.close(fig)
     print(f"wrote {OUT}")
 
