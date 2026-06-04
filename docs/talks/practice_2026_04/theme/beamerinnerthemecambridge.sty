@@ -28,8 +28,10 @@
 \setbeamerfont{title}{size=\Huge,series=\bfseries}
 \setbeamerfont{subtitle}{size=\Large,series=\bfseries}
 
-% Frame titles: visibly larger and bolder than body text.
-\setbeamerfont{frametitle}{size=\LARGE,series=\bfseries}
+% Frame titles: visibly larger than body text.  Series left as default
+% (Latin Modern Sans has no bold + small-caps combination — using
+% \bfseries breaks \textsc{tidal:} small-caps rendering on the TIDAL slide).
+\setbeamerfont{frametitle}{size=\LARGE}
 
 \setbeamercolor{title page canvas}{parent=normal text}
 \setbeamercolor{title page author}{parent=author}
