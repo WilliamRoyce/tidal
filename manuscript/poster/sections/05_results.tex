@@ -1,19 +1,27 @@
-% Section 3 — What we found.
+% Section 3 — What we found (double-width box: big figure left, text/eqn right).
 \begin{block}{3.\quad What we found}
-  \centering
-  \includegraphics[width=\linewidth]{result_landscape.pdf}\\[0.5ex]
-  \raggedright
-  Scanning the coupling space, the conversion responds to the full content of
-  each theory --- but a few operators are \textbf{robustly dominant}. The most
-  consistent amplifier is the curvature--torsion derivative coupling
-  \begin{exampleblock}{}
-    \centering\large
-    $\lag \;\supset\; \rcD{^{\alpha}}\MAGT{^{\beta\gamma\delta}}\,
-                       \MAGF{_{\alpha\beta\gamma\delta}}$
-  \end{exampleblock}
-  \vspace{0.5ex}
-  Both \textcolor{CamCherryDark}{\textbf{amplification}} and
-  \textcolor{CamCrestDark}{\textbf{suppression}} occur, and the amplification is
-  \textbf{ghost-free}. This maps out exactly which interactions a future bound on
-  the Gertsenshtein signal would target.
+  \begin{columns}[c]
+    % --- big corner figure ---
+    \begin{column}{0.60\linewidth}
+      \centering
+      \includegraphics[width=\linewidth]{result_landscape.pdf}
+    \end{column}
+    % --- interpretation + dominant operator ---
+    \begin{column}{0.38\linewidth}
+      \raggedright
+      Scanning the coupling space, the conversion responds to the full content of
+      each theory --- but a few operators are \textbf{robustly dominant}. The most
+      consistent amplifier is the curvature--torsion derivative coupling
+      \begin{exampleblock}{}
+        \centering\large
+        $\lag \;\supset\; \rcD{^{\alpha}}\MAGT{^{\beta\gamma\delta}}\,
+                           \MAGF{_{\alpha\beta\gamma\delta}}$
+      \end{exampleblock}
+      \vspace{0.4ex}
+      Both \textcolor{CamCherryDark}{\textbf{amplification}} and
+      \textcolor{CamCrestDark}{\textbf{suppression}} occur, and the amplification
+      is \textbf{ghost-free} --- mapping out exactly which interactions a future
+      bound on the Gertsenshtein signal would target.
+    \end{column}
+  \end{columns}
 \end{block}

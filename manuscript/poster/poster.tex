@@ -78,30 +78,71 @@
   \vspace*{2ex}
 }
 
+% ---- Alert block (cherry key-finding): same separator fix -- thick dark-cherry
+% rule flush at the bottom of the cherry title bar (was nested part-way through).
+\setbeamertemplate{block alerted begin}{
+  \begin{beamercolorbox}[colsep*=0ex,dp=1ex,center]{block title alerted}
+    \vskip0.4ex
+    \usebeamerfont{block title}\insertblocktitle
+    \vskip0.4ex
+  \end{beamercolorbox}
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\linewidth,ht=0.55ex,sep=0pt]{block separator alerted}\end{beamercolorbox}
+  \nointerlineskip
+  \usebeamerfont{block body}
+  \begin{beamercolorbox}[colsep*=0ex]{block body alerted}
+  \justifying
+  \begin{adjustwidth}{1.5ex}{1.5ex}
+  \setlength{\parskip}{1ex}
+  \vskip0.5ex
+}
+\setbeamertemplate{block alerted end}{
+  \vskip0.5ex
+  \end{adjustwidth}
+  \end{beamercolorbox}
+  \vskip0pt
+  \vspace*{2ex}
+}
+
 % ---- Header typography: large full-width title ------------------------------
 \setbeamerfont{headline title}{size=\fontsize{104}{116}\selectfont,series=\bfseries}
 \setbeamerfont{headline author}{size=\LARGE,series=\bfseries}
 \setbeamerfont{headline institute}{size=\normalsize}
 
-% ---- Custom headline: standard-blue top bar -> light-blue title field ->
-%      BOLD warm-blue separation rule (mirrors the Cambridge talk frametitle). ----
+% ---- Custom headline: two separate strips with a gap --
+%   (1) standard-blue strip with the title,
+%   (2) gap (page background),
+%   (3) light-blue strip with logo + author + affiliation,
+%   (4) BOLD warm-blue rule before the body.
 \setbeamertemplate{headline}{%
-  % (1) standard-blue bar across the very top
-  \begin{beamercolorbox}[wd=\paperwidth,ht=1.6ex,sep=0pt]{headline topbar}\end{beamercolorbox}%
-  \nointerlineskip
-  % (2) light-blue header field with title / author / institute
-  \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline}%
-    \vskip5.0ex                 % larger gap below the top bar (title lower)
+  % (1) standard-blue title strip (full width)
+  \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline title strip}%
+    \vskip3.2ex
     \centering
-    {\usebeamerfont{headline title}\usebeamercolor[fg]{headline title}\inserttitle\par}
-    \vskip3.4ex                 % larger gap from title to author name
-    {\usebeamerfont{headline author}\usebeamercolor[fg]{headline author}\insertauthor\par}
-    \vskip0.9ex
-    {\usebeamerfont{headline institute}\usebeamercolor[fg]{headline institute}\insertinstitute\par}
-    \vskip2.4ex
+    {\usebeamerfont{headline title}\inserttitle\par}
+    \vskip3.2ex
+  \end{beamercolorbox}%
+  % (2) gap (page background shows through)
+  \vskip2.4ex
+  % (3) light-blue strip: logo (left) + author/affiliation (centred)
+  \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline}%
+    \vskip2.6ex
+    \begin{columns}[c]
+      \begin{column}{0.20\paperwidth}
+        \hspace{2.5cm}\includegraphics[height=4.2cm]{uc-cmyk}
+      \end{column}
+      \begin{column}{0.60\paperwidth}
+        \centering
+        {\usebeamerfont{headline author}\insertauthor\par}
+        \vskip0.9ex
+        {\usebeamerfont{headline institute}\insertinstitute\par}
+      \end{column}
+      \begin{column}{0.20\paperwidth}\mbox{}\end{column}
+    \end{columns}
+    \vskip2.6ex
   \end{beamercolorbox}%
   \nointerlineskip
-  % (3) BOLD warm-blue rule separating header from body
+  % (4) BOLD warm-blue rule separating header from body
   \begin{beamercolorbox}[wd=\paperwidth,ht=1.1ex,sep=0pt]{headline rule}\end{beamercolorbox}%
 }
 
@@ -118,20 +159,14 @@
 \title{\parbox{0.92\paperwidth}{\centering
   Amplifying graviton--photon conversion\\ with spacetime torsion}}
 \author{William Royce}
-% Affiliation constrained to 70% width (centred) so the long lines clear the
-% logo sitting in the free top-right corner of the header.
-\institute{\parbox{0.60\paperwidth}{\centering
+% Affiliation; width handled by the centred 0.60\paperwidth column in the
+% light-blue header strip (logo sits in the left column).
+\institute{%
   {\normalfont\itshape Supervised by} W.~E.~V.~Barker, M.~P.~Hobson \& A.~N.~Lasenby\\[0.2ex]
-  Astrophysics Group, Cavendish Laboratory, University of Cambridge}}
+  Astrophysics Group, Cavendish Laboratory, University of Cambridge}
 
-% Logo placed at the BOTTOM-LEFT of the header, in the free space left of the
-% centred author block. Uses eso-pic (single-pass, absolute) so it renders on a
-% one-pass IDE build -- the old remember-picture overlay needed 2 passes and
-% silently vanished on single-pass builds.
-\AddToShipoutPictureFG*{%
-  \AtPageUpperLeft{\put(\LenToUnit{3cm},\LenToUnit{-13.8cm}){%
-    \includegraphics[height=4.4cm]{uc-cmyk}}}%
-}
+% (Logo is placed directly inside the light-blue header strip above -- no eso-pic
+% overlay needed.)
 
 % ---- Full-bleed footer band (warm-blue rule + Cambridge-Blue band, QR corner),
 %      rendered via the footline so it is full-width and pinned to the page bottom.
@@ -160,7 +195,8 @@
         \begin{column}{0.12\linewidth}
           \centering
           \colorbox{white}{\qrcode[height=3.4cm]{https://github.com/WilliamRoyce/torsion-gertsenshtein}}\\[0.3ex]
-          {\small Code \& data}
+          {\small Scan for code \& data}\\[0.2ex]
+          {\small Contact: \texttt{wr286@cam.ac.uk}}
         \end{column}
       \end{columns}
     \end{minipage}%
@@ -198,18 +234,16 @@
 
 \vfill
 
-% ---- Row 3: the three main sections ----------------------------------------
+% ---- Row 3: col 1 stacks PGT (top) + Methods (bottom); cols 2-3 = big Results
 \begin{columns}[t]
   \separatorcolumn
   \begin{column}{\colwidth}
     \input{sections/03_pgt.tex}
-  \end{column}
-  \separatorcolumn
-  \begin{column}{\colwidth}
+    \vspace{1ex}
     \input{sections/04_methods.tex}
   \end{column}
   \separatorcolumn
-  \begin{column}{\colwidth}
+  \begin{column}{\dimexpr2\colwidth+\sepwidth\relax}
     \input{sections/05_results.tex}
   \end{column}
   \separatorcolumn

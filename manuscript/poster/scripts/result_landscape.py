@@ -23,9 +23,9 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import matplotlib
+import matplotlib as mpl
 
-matplotlib.use("Agg")
+mpl.use("Agg")
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
@@ -53,21 +53,44 @@ NP_SUP = REPO_ROOT / "hpc_results" / "29705560" / "np_ceven_sup_v1"
 OUT = Path(__file__).resolve().parents[1] / "figures" / "result_landscape.pdf"
 
 PROP_PARAMS = [
-    "beta1", "beta2", "beta3", "xi", "delta1",
-    "zeta1", "zeta2", "zeta3",
-    "chi1", "chi2", "chi3", "chi4", "chi5",
-    "chi6", "chi7", "chi8", "chi9", "chi10",
+    "beta1",
+    "beta2",
+    "beta3",
+    "xi",
+    "delta1",
+    "zeta1",
+    "zeta2",
+    "zeta3",
+    "chi1",
+    "chi2",
+    "chi3",
+    "chi4",
+    "chi5",
+    "chi6",
+    "chi7",
+    "chi8",
+    "chi9",
+    "chi10",
 ]
 NP_PARAMS = [p for p in PROP_PARAMS if p != "xi"]
 
-# Plain schematic family labels (suppressed indices); repeats allowed (per user).
+# Explicit operator-contraction labels (no parameter-name prefixes, per the
+# no-parameter-name rule). The double-width Results box gives room for these.
 SCHEMATIC = {
-    "beta1": r"$T^2$", "beta2": r"$T^2$", "beta3": r"$T^2$",
-    "delta1": r"$\tilde{R}F$",
-    "zeta1": r"$F\nabla T$", "zeta2": r"$F\nabla T$", "zeta3": r"$F\nabla T$",
+    "beta1": r"$T_{abc}T^{abc}$",
+    "beta2": r"$T_{abc}T^{bac}$",
+    "beta3": r"$T_a T^a$",
+    "delta1": r"$\tilde{R}_{[\mu\nu]}F^{\mu\nu}$",
+    "zeta1": r"$(\nabla T)\!\cdot\!F$",
+    "zeta2": r"$(\nabla T)\!\cdot\!F\,'$",
+    "zeta3": r"$(\nabla T)\!\cdot\!F\,''$",
+    "chi1": r"$(\nabla T)\!\cdot\!\tilde{R}$",
+    "chi2": r"$(\nabla T)\!\cdot\!\tilde{R}\,(acbd)$",
+    "chi5": r"$\mathrm{tr}(\nabla T)\!\cdot\!\tilde{R}$",
+    "chi7": r"$(\nabla T)\!\cdot\!\tilde{R}\,(cdab)$",
 }
 for _c in range(1, 11):
-    SCHEMATIC[f"chi{_c}"] = r"$\tilde{R}\nabla T$"
+    SCHEMATIC.setdefault(f"chi{_c}", r"$(\nabla T)\!\cdot\!\tilde{R}$")
 
 OVERLAY_ALPHA = 0.55
 
@@ -91,38 +114,49 @@ def main() -> None:
     np_amp = load_chains(NP_AMP, params=NP_PARAMS, param_labels=np_labels)
     np_sup = load_chains(NP_SUP, params=NP_PARAMS, param_labels=np_labels)
 
-    axes = prop_amp.plot_2d(top, kinds="kde", levels=CONTOUR_LEVELS,
-                            color=CHERRY, alpha=OVERLAY_ALPHA)
-    prop_sup.plot_2d(axes, kinds="kde", levels=CONTOUR_LEVELS,
-                     color=CREST, alpha=OVERLAY_ALPHA)
-    np_amp.plot_2d(axes, kinds="kde", levels=CONTOUR_LEVELS,
-                   color=WARM_CHERRY, alpha=OVERLAY_ALPHA)
-    np_sup.plot_2d(axes, kinds="kde", levels=CONTOUR_LEVELS,
-                   color=WARM_CREST, alpha=OVERLAY_ALPHA)
+    axes = prop_amp.plot_2d(
+        top, kinds="kde", levels=CONTOUR_LEVELS, color=CHERRY, alpha=OVERLAY_ALPHA
+    )
+    prop_sup.plot_2d(
+        axes, kinds="kde", levels=CONTOUR_LEVELS, color=CREST, alpha=OVERLAY_ALPHA
+    )
+    np_amp.plot_2d(
+        axes, kinds="kde", levels=CONTOUR_LEVELS, color=WARM_CHERRY, alpha=OVERLAY_ALPHA
+    )
+    np_sup.plot_2d(
+        axes, kinds="kde", levels=CONTOUR_LEVELS, color=WARM_CREST, alpha=OVERLAY_ALPHA
+    )
 
     fig = axes.iloc[0, 0].figure
     for ax in axes.values.flatten():
         if ax is not None:
             ax.set_facecolor(CAM["light_blue"])
-            ax.tick_params(bottom=False, left=False,
-                           labelbottom=False, labelleft=False)
+            ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
 
     handles = [
         mpatches.Patch(color=CHERRY, alpha=OVERLAY_ALPHA, label="amplification"),
         mpatches.Patch(color=CREST, alpha=OVERLAY_ALPHA, label="suppression"),
-        mpatches.Patch(color=WARM_CHERRY, alpha=OVERLAY_ALPHA,
-                       label=r"amplification ($\xi=0$)"),
-        mpatches.Patch(color=WARM_CREST, alpha=OVERLAY_ALPHA,
-                       label=r"suppression ($\xi=0$)"),
+        mpatches.Patch(
+            color=WARM_CHERRY, alpha=OVERLAY_ALPHA, label=r"amplification ($\xi=0$)"
+        ),
+        mpatches.Patch(
+            color=WARM_CREST, alpha=OVERLAY_ALPHA, label=r"suppression ($\xi=0$)"
+        ),
     ]
     n = len(top)
-    axes.iloc[0, 0].legend(handles=handles, loc="upper right",
-                           bbox_to_anchor=(n - 0.4, 1.0),
-                           bbox_transform=axes.iloc[0, 0].transAxes,
-                           frameon=True, facecolor=CAM["light_blue"],
-                           edgecolor=CAM["slate2"], framealpha=1.0, fontsize=20)
+    axes.iloc[0, 0].legend(
+        handles=handles,
+        loc="upper right",
+        bbox_to_anchor=(n - 0.4, 1.0),
+        bbox_transform=axes.iloc[0, 0].transAxes,
+        frameon=True,
+        facecolor=CAM["light_blue"],
+        edgecolor=CAM["slate2"],
+        framealpha=1.0,
+        fontsize=20,
+    )
 
-    fig.set_size_inches(9.5, 9.0)
+    fig.set_size_inches(13.0, 12.0)
     fig.savefig(OUT, bbox_inches="tight", facecolor=CAM["light_blue"])
     plt.close(fig)
     print(f"wrote {OUT}")
