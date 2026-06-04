@@ -125,6 +125,7 @@ def overlay_corner(
     fig_width: float = FIG_WIDTH,
     prior_samples=None,
     legend_kw: dict | None = None,
+    transparent: bool = False,
 ) -> None:
     """Render an overlaid amp+sup corner plot to PDF.
 
@@ -264,5 +265,7 @@ def overlay_corner(
     if title is not None:
         fig.suptitle(title, y=1.02)
     fig.set_size_inches(fig_width, fig_width * height_ratio)
-    fig.savefig(out_path, format="pdf", bbox_inches="tight")
+    if transparent:
+        fig.patch.set_alpha(0.0)
+    fig.savefig(out_path, format="pdf", bbox_inches="tight", transparent=transparent)
     plt.close(fig)

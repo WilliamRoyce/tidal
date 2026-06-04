@@ -136,30 +136,44 @@ def render_overlay_pair(
     np_sup_dir: Path,
     np_param_names: list[str],
     fig_width: float,
+    param_label_overrides: dict[str, str] | None = None,
+    transparent: bool = False,
+    colours: dict[str, str] | None = None,
+    legend_labels: dict[str, str] | None = None,
 ) -> None:
     apply_style()
 
-    {n: _label(n) for n in plot_params}
+    # Resolve four overlay colours (prop_amp, prop_sup, np_amp, np_sup),
+    # defaulting to module-level constants when not overridden.
+    amp = (colours or {}).get("prop_amp", AMP_COLOR)
+    sup = (colours or {}).get("prop_sup", SUP_COLOR)
+    np_amp_ = (colours or {}).get("np_amp", NP_AMP_COLOR)
+    np_sup_ = (colours or {}).get("np_sup", NP_SUP_COLOR)
+
+    def _resolve_label(name: str) -> str:
+        if param_label_overrides and name in param_label_overrides:
+            return param_label_overrides[name]
+        return _label(name)
 
     prop_amp = load_chains(
         prop_amp_dir,
         params=prop_param_names,
-        param_labels={n: _label(n) for n in prop_param_names},
+        param_labels={n: _resolve_label(n) for n in prop_param_names},
     )
     prop_sup = load_chains(
         prop_sup_dir,
         params=prop_param_names,
-        param_labels={n: _label(n) for n in prop_param_names},
+        param_labels={n: _resolve_label(n) for n in prop_param_names},
     )
     np_amp = load_chains(
         np_amp_dir,
         params=np_param_names,
-        param_labels={n: _label(n) for n in np_param_names},
+        param_labels={n: _resolve_label(n) for n in np_param_names},
     )
     np_sup = load_chains(
         np_sup_dir,
         params=np_param_names,
-        param_labels={n: _label(n) for n in np_param_names},
+        param_labels={n: _resolve_label(n) for n in np_param_names},
     )
 
     # Canvas spans the full `plot_params` list. NP chains may lack some
@@ -175,14 +189,14 @@ def render_overlay_pair(
         plot_params,
         kinds="kde",
         levels=CONTOUR_LEVELS,
-        color=AMP_COLOR,
+        color=amp,
         alpha=OVERLAY_ALPHA,
     )
     prop_sup.plot_2d(
         axes,
         kinds="kde",
         levels=CONTOUR_LEVELS,
-        color=SUP_COLOR,
+        color=sup,
         alpha=OVERLAY_ALPHA,
     )
     if prop_only_cols:
@@ -193,14 +207,14 @@ def render_overlay_pair(
             np_axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=NP_AMP_COLOR,
+            color=np_amp_,
             alpha=OVERLAY_ALPHA,
         )
         np_sup.plot_2d(
             np_axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=NP_SUP_COLOR,
+            color=np_sup_,
             alpha=OVERLAY_ALPHA,
         )
     else:
@@ -210,14 +224,14 @@ def render_overlay_pair(
             axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=NP_AMP_COLOR,
+            color=np_amp_,
             alpha=OVERLAY_ALPHA,
         )
         np_sup.plot_2d(
             axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=NP_SUP_COLOR,
+            color=np_sup_,
             alpha=OVERLAY_ALPHA,
         )
 
@@ -228,23 +242,16 @@ def render_overlay_pair(
             continue
         ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
 
+    ll = legend_labels or {}
+    lbl_prop_amp = ll.get("prop_amp", "amplification (propagating)")
+    lbl_prop_sup = ll.get("prop_sup", "suppression (propagating)")
+    lbl_np_amp = ll.get("np_amp", r"amplification ($\xi=0$ control)")
+    lbl_np_sup = ll.get("np_sup", r"suppression ($\xi=0$ control)")
     legend_handles = [
-        mpatches.Patch(
-            color=AMP_COLOR, alpha=OVERLAY_ALPHA, label="amplification (propagating)"
-        ),
-        mpatches.Patch(
-            color=SUP_COLOR, alpha=OVERLAY_ALPHA, label="suppression (propagating)"
-        ),
-        mpatches.Patch(
-            color=NP_AMP_COLOR,
-            alpha=OVERLAY_ALPHA,
-            label=r"amplification ($\xi=0$ control)",
-        ),
-        mpatches.Patch(
-            color=NP_SUP_COLOR,
-            alpha=OVERLAY_ALPHA,
-            label=r"suppression ($\xi=0$ control)",
-        ),
+        mpatches.Patch(color=amp, alpha=OVERLAY_ALPHA, label=lbl_prop_amp),
+        mpatches.Patch(color=sup, alpha=OVERLAY_ALPHA, label=lbl_prop_sup),
+        mpatches.Patch(color=np_amp_, alpha=OVERLAY_ALPHA, label=lbl_np_amp),
+        mpatches.Patch(color=np_sup_, alpha=OVERLAY_ALPHA, label=lbl_np_sup),
     ]
     ax_anchor = axes.iloc[0, 0]
     n = len(plot_params)
@@ -265,7 +272,9 @@ def render_overlay_pair(
 
     fig.set_size_inches(fig_width, fig_width * 0.95)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, format="pdf", bbox_inches="tight")
+    if transparent:
+        fig.patch.set_alpha(0.0)
+    fig.savefig(out_path, format="pdf", bbox_inches="tight", transparent=transparent)
     plt.close(fig)
     log.info("[overlay_pair] wrote %s", out_path)
 
