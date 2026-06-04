@@ -1,0 +1,163 @@
+% ============================================================================
+% Conference poster — Part III/MASt project conference (17 June 2026)
+% "Amplifying graviton-photon conversion with spacetime torsion"
+% William Royce, Cavendish Astrophysics.
+%
+% Build: LuaLaTeX (Gemini theme uses fontspec). Use `make` or
+%   latexmk -lualatex poster.tex
+% Theme on TEXINPUTS via .latexmkrc / Makefile (./theme).
+% ============================================================================
+\documentclass[final]{beamer}
+
+% ---- Poster size: A0 portrait ----------------------------------------------
+\usepackage[size=a0,orientation=portrait,scale=1.15]{beamerposter}
+\usetheme{gemini}
+\usecolortheme{cam}
+
+% ---- Math (no stix: amssymb \varkappa, mathrsfs \mathscr) -------------------
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{tensor}
+\usepackage{accents}
+
+% ---- Macro helpers required by poster-macros.tex ---------------------------
+\usepackage{etoolbox}
+\usepackage{xspace}
+\usepackage{xstring}
+
+% ---- Graphics / QR ---------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,decorations.pathmorphing,calc}
+\usepackage{qrcode}
+\usepackage{anyfontsize}   % arbitrary title sizes
+\graphicspath{{figures/}{theme/}}
+
+% ---- Notation (extracted from ../macros.tex) -------------------------------
+\input{poster-macros.tex}
+
+% ---- Block body padding: indent text inside the filled (contained) boxes ----
+% Gemini's standard block body has no side padding; add it so the light-blue
+% boxes read as properly contained (the alerted/example blocks already pad).
+\setbeamertemplate{block begin}{
+  \begin{beamercolorbox}[colsep*=0ex,dp=2ex,center]{block title}
+    \vskip0pt
+    \usebeamerfont{block title}\insertblocktitle
+    \vskip-1.25ex
+    \begin{beamercolorbox}[colsep=0.025ex]{block separator}\end{beamercolorbox}
+  \end{beamercolorbox}
+  {\parskip0pt\par}
+  \usebeamerfont{block body}
+  \vskip-0.5ex
+  \begin{beamercolorbox}[colsep*=0ex]{block body}
+  \justifying
+  \begin{adjustwidth}{1.5ex}{1.5ex}
+  \setlength{\parskip}{1ex}
+  \vskip0.5ex
+}
+\setbeamertemplate{block end}{
+  \vskip0.5ex
+  \end{adjustwidth}
+  \end{beamercolorbox}
+  \vskip0pt
+  \vspace*{2ex}
+}
+
+% ---- Header typography: enlarge the title so it fills the banner ------------
+\setbeamerfont{headline title}{size=\fontsize{78}{90}\selectfont,series=\bfseries}
+\setbeamerfont{headline author}{size=\LARGE,series=\bfseries}
+\setbeamerfont{headline institute}{size=\large}
+
+% ---- Layout lengths (3-column grid) ----------------------------------------
+\newlength{\sepwidth}
+\newlength{\colwidth}
+\setlength{\sepwidth}{0.025\paperwidth}
+\setlength{\colwidth}{0.300\paperwidth}
+\newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
+
+% ---- Metadata --------------------------------------------------------------
+% Title constrained to 70% width (centred) so its lines never reach the
+% top-corner logo; forced 2-line break for balance.
+\title{\parbox{0.70\paperwidth}{\centering
+  Amplifying graviton--photon conversion\\ with spacetime torsion\\[0.6ex]
+  {\normalsize\normalfont\itshape
+   Can modified gravity turn gravitational waves into light?}}}
+\author{William Royce}
+\institute{%
+  {\normalfont\itshape Supervised by} W.~E.~V.~Barker, M.~P.~Hobson \& A.~N.~Lasenby\\[0.2ex]
+  Astrophysics Group, Cavendish Laboratory, University of Cambridge}
+
+% Logo overlaid in the top-right corner of the banner instead of \logoright,
+% which would reserve column width and compress the title (gemini-cam pattern).
+% Sized + inset to clear the constrained title block.
+\addtobeamertemplate{headline}{}{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east, inner sep=0pt]
+      at ([xshift=-2.5cm,yshift=-2.5cm]current page.north east)
+      {\includegraphics[height=4.6cm]{uc-cmyk}};
+  \end{tikzpicture}%
+}
+
+\footercontent{
+  \emph{Can modified gravity turn gravitational waves into light?}
+  \hfill
+  Code \& data: \texttt{github.com/WilliamRoyce/torsion-gertsenshtein}
+  \hfill
+  Part III/MASt Project Conference 2026}
+
+% ============================================================================
+\begin{document}
+\begin{frame}[t]
+
+% ---- Row 1: full-width key finding -----------------------------------------
+\begin{columns}[t]
+  \separatorcolumn
+  \begin{column}{\dimexpr\paperwidth-2\sepwidth\relax}
+    \input{sections/00_keyfinding.tex}
+  \end{column}
+  \separatorcolumn
+\end{columns}
+
+% ---- Row 2: highlights (1 col) + graphical abstract (2 cols) ----------------
+\begin{columns}[t]
+  \separatorcolumn
+  \begin{column}{\colwidth}
+    \input{sections/01_highlights.tex}
+  \end{column}
+  \separatorcolumn
+  \begin{column}{\dimexpr2\colwidth+\sepwidth\relax}
+    \input{sections/02_graphical_abstract.tex}
+  \end{column}
+  \separatorcolumn
+\end{columns}
+
+% ---- Row 3: the three main sections ----------------------------------------
+\begin{columns}[t]
+  \separatorcolumn
+  \begin{column}{\colwidth}
+    \input{sections/03_why.tex}
+  \end{column}
+  \separatorcolumn
+  \begin{column}{\colwidth}
+    \input{sections/04_how.tex}
+  \end{column}
+  \separatorcolumn
+  \begin{column}{\colwidth}
+    \input{sections/05_results.tex}
+  \end{column}
+  \separatorcolumn
+\end{columns}
+
+% ---- Row 4: outlook + references -------------------------------------------
+\begin{columns}[t]
+  \separatorcolumn
+  \begin{column}{\dimexpr\paperwidth-2\sepwidth\relax}
+    \input{sections/06_outlook_refs.tex}
+  \end{column}
+  \separatorcolumn
+\end{columns}
+
+\end{frame}
+\end{document}

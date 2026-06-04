@@ -1,0 +1,67 @@
+% ============================================================================
+% poster-macros.tex
+% Notation macros EXTRACTED from ../macros.tex for the poster build.
+% Only the \newcommand notation is carried over -- the report's stix/RevTeX
+% font stack is intentionally NOT loaded here (it clashes with the Gemini
+% LuaLaTeX + Lato font setup). \varkappa comes from amssymb; \mathscr from
+% mathrsfs. Assumes the poster preamble has loaded: amsmath, amssymb,
+% mathtools, mathrsfs, tensor, accents, etoolbox, xspace, xstring.
+% ============================================================================
+
+% --- Abbreviations -----------------------------------------------------------
+\newcommand*{\ie}{i.e.,\@\xspace}
+\newcommand*{\eg}{e.g.,\@\xspace}
+
+% --- Common math operators ---------------------------------------------------
+\newcommand*{\qand}{\quad\text{and}\quad}
+\newcommand*{\D}{D_\mathrm{KL}}
+\newcommand*{\Dp}{D_\mathrm{KL,+}}
+\newcommand*{\Dm}{D_\mathrm{KL,-}}
+
+% --- Software names (italic, per Barker corpus) -------------------------------
+\newrobustcmd{\TIDAL}{\textit{TIDAL}\xspace}
+\newrobustcmd{\PSALTer}{\textit{PSALTer}\xspace}
+\newrobustcmd{\etal}{\textit{et al.}\xspace}
+\newrobustcmd{\xAct}{\textit{xAct}\xspace}
+\newrobustcmd{\Mathematica}{\textit{Mathematica}\xspace}
+\newrobustcmd{\Python}{\textit{Python}\xspace}
+
+% --- Gravitational coupling --------------------------------------------------
+% kappa -> varkappa (amssymb); P = sin^2(kappa B_0 D / 2)
+\renewcommand{\kappa}{\varkappa}
+\renewcommand{\O}{\mathcal{O}}
+
+% --- PGT coupling constants --------------------------------------------------
+\newrobustcmd{\Alp}[1]{\alpha_{#1}}
+\newrobustcmd{\Bet}[1]{\beta_{#1}}
+\newrobustcmd{\Gam}[1]{\gamma_{#1}}
+\newrobustcmd{\Del}[1]{\delta_{#1}}
+
+% --- Differential ------------------------------------------------------------
+\newcommand{\diff}{\mathrm{d}}
+
+% --- Covariant derivatives ---------------------------------------------------
+\newrobustcmd{\rD}[1]{\tensor{\mathring{\nabla}}{#1}}   % Riemannian nabla
+\newrobustcmd{\rcD}[1]{\tensor{\nabla}{#1}}             % Riemann-Cartan nabla
+
+% --- PGT fields: torsion, curvature ------------------------------------------
+\newrobustcmd{\MAGA}[1]{\tensor{\Gamma}{#1}}                    % RC connection
+\newrobustcmd{\MAGT}[1]{\tensor{\mathcal{T}}{#1}}              % torsion (cal T)
+\newrobustcmd{\MAGTTilde}[1]{\tensor{\tilde{\mathcal{T}}}{#1}} % traceless torsion
+\newrobustcmd{\MAGF}[1]{\tensor{\mathcal{R}}{#1}}             % curvature (cal R)
+\newrobustcmd{\MAGFt}[1]{\tensor{\tilde{\mathcal{R}}}{#1}}    % RC curvature (tilde)
+
+% --- Electromagnetic fields --------------------------------------------------
+\newrobustcmd{\FieldA}[1]{\tensor{A}{#1}}             % EM 4-potential
+\newrobustcmd{\FieldF}[1]{\tensor{\mathcal{F}}{#1}}   % EM field strength (cal F)
+\newrobustcmd{\FieldH}[1]{\tensor{h}{#1}}             % metric perturbation
+
+% --- Gertsenshtein effect ----------------------------------------------------
+\newcommand{\Bzero}{B_0}              % background magnetic field
+\newcommand{\Pconv}{P_{g\gamma}}      % photon-graviton conversion probability
+\newcommand{\Pmax}{P_\mathrm{max}}    % maximum conversion probability
+
+% --- Lagrangian / Hamiltonian densities --------------------------------------
+\newcommand{\lag}{\mathscr{L}}
+\newcommand{\ham}{\mathscr{H}}
+\newcommand{\act}{\mathscr{S}}

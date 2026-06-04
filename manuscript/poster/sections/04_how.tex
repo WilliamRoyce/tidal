@@ -1,0 +1,16 @@
+% Section 2 — How: scan any theory (TIDAL).
+\begin{block}{2.\quad How: scan any theory}
+  The space of gravity theories with torsion (\emph{Poincar\'e gauge theory}) is
+  vast --- far too large to work through by hand. We built \TIDAL{}, which
+  automates the whole chain:
+  \vspace{1ex}
+  \begin{center}
+    \includegraphics[width=\linewidth]{pipeline_schematic.pdf}
+  \end{center}
+  \vspace{0.5ex}
+  Starting from a \emph{Lagrangian}, \TIDAL{} derives the linearised equations
+  of motion symbolically (\xAct{}), evolves them with a fast spectral solver,
+  and uses Bayesian nested sampling to map \emph{where} in coupling space the
+  conversion is amplified versus suppressed, relative to the Einstein--Maxwell
+  baseline.
+\end{block}
