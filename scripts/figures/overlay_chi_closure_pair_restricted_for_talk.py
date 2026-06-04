@@ -188,6 +188,7 @@ def main() -> None:
             "axes.labelsize": 18,
             "legend.fontsize": 18,
         },
+        legend_anchor=(6.5, 1.0),
     )
 
 

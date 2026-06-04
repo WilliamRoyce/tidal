@@ -144,6 +144,7 @@ def render_overlay_pair(
     strip_xlabels: bool = False,
     ylabel_rotation: float | None = None,
     rcparams_overrides: dict | None = None,
+    legend_anchor: tuple[float, float] | None = None,
 ) -> None:
     apply_style()
     # Apply caller's rcparams overrides AFTER apply_style() so they actually
@@ -276,7 +277,9 @@ def render_overlay_pair(
     ]
     ax_anchor = axes.iloc[0, 0]
     n = len(plot_params)
-    if n <= 3:
+    if legend_anchor is not None:
+        loc, anchor = "upper right", legend_anchor
+    elif n <= 3:
         loc, anchor = "upper left", (1.05, 1.0)
     else:
         loc, anchor = "upper right", (n - 0.5, 1.0)
