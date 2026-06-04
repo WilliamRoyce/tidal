@@ -2,8 +2,14 @@
 \usepackage{tikz}
 \usetikzlibrary{decorations.markings,arrows.meta,calc}
 \tikzset{>={Stealth[length=1.2mm,width=1.2mm]}}
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
+% 2024 Cambridge brand palette — Crest family.
+% Use the brand colours directly (no percent-blends).
+\definecolor{Cambridge24LightCrest}{HTML}{FFE2C8}
+\definecolor{Cambridge24WarmCrest}{HTML}{FFC392}
+\definecolor{Cambridge24Crest}{HTML}{FD8153}
+\definecolor{Cambridge24DarkCrest}{HTML}{DD3025}
+\colorlet{OrangeFill}{Cambridge24WarmCrest}
+\colorlet{OrangeLine}{Cambridge24DarkCrest}
 
 \tikzset{
   DashedArrows/.style 2 args={

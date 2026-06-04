@@ -1,9 +1,12 @@
 \usepackage{cambridgecolours}
 
 \def\beamer@theme@base@blue{
-  \definecolor{CambridgeCore}{named}{CambridgeCoreBlue}
-  \definecolor{CambridgeLight}{named}{CambridgeLightBlue}
-  \definecolor{CambridgeDark}{named}{CambridgeDarkBlue}
+  % 2024 Cambridge brand palette (Johnson Banks refresh).
+  % Source: cam.ac.uk/brand-resources/guidelines/colour.
+  % Core = light-turquoise anchor; Light = pale tint; Dark = dark-teal accent.
+  \definecolor{CambridgeCore}{named}{Cambridge24Blue}
+  \definecolor{CambridgeLight}{named}{Cambridge24LightBlue}
+  \definecolor{CambridgeDark}{named}{Cambridge24DarkBlue}
 }
 \def\beamer@theme@base@orange{
   \definecolor{CambridgeCore}{named}{CambridgeCoreOrange}
@@ -32,30 +35,46 @@
 
 \mode<presentation>
 
-\setbeamercolor*{normal text}{fg=CambridgeDark,bg=CambridgeLight!20!white}
+% Accessibility constraints from the 2024 Cambridge brand guidelines:
+%   - no Cambridge-Blue (turquoise) text on white;
+%   - no white text on a Cambridge-Blue fill;
+%   - body text in Slate 4, not pure black;
+%   - headers / titles on light fills use Cambridge Dark Blue.
+\setbeamercolor*{normal text}{fg=Cambridge24Slate4,bg=CambridgeLight!20!white}
 \setbeamercolor*{structure}{fg=CambridgeDark}
 
-\setbeamercolor*{palette primary}{fg=white,bg=CambridgeLight}
+\setbeamercolor*{palette primary}{fg=CambridgeDark,bg=CambridgeLight}
 \setbeamercolor*{palette secondry}{fg=white,bg=CambridgeDark}
-\setbeamercolor*{palette tertiary}{fg=white,bg=CambridgeLight!40!black}
-\setbeamercolor*{palette quaternary}{fg=white,bg=CambridgeLight!40!white}
+\setbeamercolor*{palette tertiary}{fg=white,bg=CambridgeDark!80!black}
+\setbeamercolor*{palette quaternary}{fg=CambridgeDark,bg=CambridgeLight!40!white}
 
-\setbeamercolor*{title}{fg=white,bg=CambridgeLight!50!CambridgeCore}
-\setbeamercolor*{author}{fg=white,bg=CambridgeLight!40!black}
+% Title-slide three-stripe layout:
+%   - overall canvas (title page canvas) : Cambridge Light Blue (pale tint)
+%   - title strip                        : Cambridge Warm Blue (mid teal)
+%   - lower author/date strip            : Cambridge Blue (turquoise anchor)
+% All fg=Cambridge Dark Blue for accessibility (no white-on-turquoise).
+\setbeamercolor*{title}{fg=Cambridge24DarkBlue,bg=Cambridge24WarmBlue}
+\setbeamercolor*{author}{fg=Cambridge24DarkBlue,bg=CambridgeCore}
 \setbeamercolor*{institute}{parent=author}
-\setbeamercolor*{date}{fg=white,bg=CambridgeLight}
+\setbeamercolor*{date}{fg=Cambridge24DarkBlue,bg=CambridgeCore}
 \setbeamercolor*{abstract}{parent=author}
 
-\setbeamercolor*{lower separation line head}{fg=white,bg=CambridgeLight!80!black}
+\setbeamercolor*{lower separation line head}{fg=CambridgeDark,bg=CambridgeCore}
 
 \setbeamercolor*{special page canvas}{bg=CambridgeLight}
 \setbeamercolor*{special page separator upper}{bg=CambridgeLight!40!white}
-\setbeamercolor*{special page separator lower}{bg=CambridgeLight!40!black}
-\setbeamercolor*{special page title}{fg=white,bg=CambridgeLight!80!white}
+\setbeamercolor*{special page separator lower}{bg=CambridgeDark!40!white}
+\setbeamercolor*{special page title}{fg=CambridgeDark,bg=CambridgeCore}
 
-\setbeamercolor*{block body}{bg=CambridgeCore!20!normal text.bg,fg=CambridgeDark}
+\setbeamercolor*{block body}{bg=CambridgeLight!50!normal text.bg,fg=Cambridge24Slate4}
 \setbeamercolor*{block title}{bg=CambridgeDark,fg=white}
 
-\setbeamercolor*{alerted text}{fg=CambridgeCore}
+% Alerted text: Dark Crest (warm orange-red) so the accent contrasts the
+% turquoise / teal core and matches the figure-overlay highlight colour.
+\setbeamercolor*{alerted text}{fg=Cambridge24DarkCrest}
+
+% Frame title: Cambridge Dark Blue (matches "structure" role) — larger,
+% bolder font is applied via beamerinnerthemecambridge.sty.
+\setbeamercolor*{frametitle}{fg=Cambridge24DarkBlue}
 
 \mode<all>

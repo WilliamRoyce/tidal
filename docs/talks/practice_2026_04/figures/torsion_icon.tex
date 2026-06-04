@@ -2,8 +2,14 @@
 \usepackage{tikz}
 \usetikzlibrary{decorations.markings,arrows.meta,calc}
 \tikzset{>={Stealth[length=1.2mm,width=1.2mm]}}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+% 2024 Cambridge brand palette — Cherry family.
+% Use the brand colours directly (no percent-blends).
+\definecolor{Cambridge24LightCherry}{HTML}{F2CAD8}
+\definecolor{Cambridge24WarmCherry}{HTML}{E18AAC}
+\definecolor{Cambridge24Cherry}{HTML}{CD3572}
+\definecolor{Cambridge24DarkCherry}{HTML}{911449}
+\colorlet{PurpleFill}{Cambridge24WarmCherry}
+\colorlet{PurpleLine}{Cambridge24DarkCherry}
 
 \begin{document}
 
