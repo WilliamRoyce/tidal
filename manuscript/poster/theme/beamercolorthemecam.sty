@@ -40,32 +40,37 @@
 \setbeamercolor{structure}{fg=CamDarkBlue}
 
 % ---- Headline (title band) --------------------------------------------------
-% Full-width Cambridge Blue banner with Dark Blue text (brand-safe dark-on-light),
-% closed by a Dark Blue separation rule that divides header from body (mirrors the
-% talk theme's "lower separation line head").
-\setbeamercolor{headline}{fg=CamDarkBlue,bg=CamBlue}
+% Talk-frametitle style: a light-blue header field, a standard-blue bar across the
+% very top (headline topbar), and a BOLD warm-blue rule separating header from body
+% (headline rule). Dark Blue title text.
+\setbeamercolor{headline}{fg=CamDarkBlue,bg=CamLightBlue}
 \setbeamercolor{headline title}{fg=CamDarkBlue}
 \setbeamercolor{headline author}{fg=CamDarkBlue}
 \setbeamercolor{headline institute}{fg=CamDarkBlue}
-\setbeamercolor{headline rule}{bg=CamDarkBlue}   % underline under the banner
+\setbeamercolor{headline topbar}{bg=CamBlue}     % standard-blue bar at the very top
+\setbeamercolor{headline rule}{bg=CamWarmBlue}   % BOLD warm-blue separation rule
 
 % ---- Section headings -------------------------------------------------------
 \setbeamercolor{heading}{fg=CamDarkBlue}
 
-% ---- Standard block: dark title bar + light-blue contained body ------------
-\setbeamercolor{block title}{fg=white,bg=CamDarkBlue}
-\setbeamercolor{block separator}{bg=CamWarmBlue}    % underline below the title bar
+% ---- Standard block: warm-blue title bar + light-blue contained body --------
+\setbeamercolor{block title}{fg=white,bg=CamWarmBlue}
+\setbeamercolor{block separator}{bg=CamBlue}        % standard-blue line below title
 \setbeamercolor{block body}{fg=Slate4,bg=CamLightBlue}
 
-% ---- Alert block (Highlights + key-finding): Cherry title bar ---------------
+% ---- Alert block (Key-finding only): Cherry title bar ----------------------
 \setbeamercolor{block title alerted}{fg=white,bg=CamCherry}
 \setbeamercolor{block separator alerted}{bg=CamCherryDark}
 \setbeamercolor{block body alerted}{fg=Slate4,bg=CamLightCherry}
 
 % ---- Example block (key equation mini-box): Warm Blue title bar -------------
 \setbeamercolor{block title example}{fg=white,bg=CamWarmBlue}
-\setbeamercolor{block separator example}{bg=CamDarkBlue}
+\setbeamercolor{block separator example}{bg=CamBlue}
 \setbeamercolor{block body example}{fg=Slate4,bg=CamLightBlue}
+
+% ---- Footer band (lowest section): Cambridge Blue with warm-blue top rule ----
+\setbeamercolor{footer band}{fg=CamDarkBlue,bg=CamBlue}
+\setbeamercolor{footer rule}{bg=CamWarmBlue}
 
 % ---- Itemize bullets, captions ---------------------------------------------
 \setbeamercolor{item}{fg=CamWarmBlue}

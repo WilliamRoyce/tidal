@@ -12,8 +12,10 @@ $(MAIN).pdf: $(MAIN).tex sections/*.tex poster-macros.tex theme/*.sty figures/*.
 	latexmk -lualatex -interaction=nonstopmode -halt-on-error $(MAIN).tex
 
 # Regenerate the bespoke poster figures (Cherry/Crest palette).
+# Schematics + result corner (Python), then the magnetar graphical abstract (TikZ).
 figures:
-	cd scripts && python conversion_schematic.py && python pipeline_schematic.py && python result_landscape.py
+	cd scripts && python pipeline_schematic.py && python result_landscape.py
+	cd figures && latexmk -pdf -interaction=nonstopmode magnetar_conversion.tex && latexmk -c magnetar_conversion.tex
 
 watch:
 	latexmk -lualatex -pvc -interaction=nonstopmode $(MAIN).tex

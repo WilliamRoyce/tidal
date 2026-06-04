@@ -1,13 +1,23 @@
+% !TEX program = lualatex
 % ============================================================================
 % Conference poster — Part III/MASt project conference (17 June 2026)
 % "Amplifying graviton-photon conversion with spacetime torsion"
 % William Royce, Cavendish Astrophysics.
 %
-% Build: LuaLaTeX (Gemini theme uses fontspec). Use `make` or
+% Build: LuaLaTeX REQUIRED (Gemini theme uses fontspec). The `% !TEX program`
+% line above tells editors to use lualatex. From the CLI use `make` or
 %   latexmk -lualatex poster.tex
-% Theme on TEXINPUTS via .latexmkrc / Makefile (./theme).
+% The theme/ dir is added to \input@path below so \usetheme finds the local
+% theme files without needing TEXINPUTS set.
 % ============================================================================
 \documentclass[final]{beamer}
+
+% Make the local theme/ directory discoverable by \usetheme / \usecolortheme
+% (so a direct `lualatex poster.tex` works without TEXINPUTS=./theme).
+\makeatletter
+\providecommand\input@path{}
+\g@addto@macro\input@path{{theme/}}
+\makeatother
 
 % ---- Poster size: A0 portrait ----------------------------------------------
 \usepackage[size=a0,orientation=portrait,scale=1.15]{beamerposter}
@@ -65,10 +75,32 @@
   \vspace*{2ex}
 }
 
-% ---- Header typography: enlarge the title so it fills the banner ------------
-\setbeamerfont{headline title}{size=\fontsize{78}{90}\selectfont,series=\bfseries}
+% ---- Header typography: large full-width title ------------------------------
+\setbeamerfont{headline title}{size=\fontsize{104}{116}\selectfont,series=\bfseries}
 \setbeamerfont{headline author}{size=\LARGE,series=\bfseries}
 \setbeamerfont{headline institute}{size=\large}
+
+% ---- Custom headline: standard-blue top bar -> light-blue title field ->
+%      BOLD warm-blue separation rule (mirrors the Cambridge talk frametitle). ----
+\setbeamertemplate{headline}{%
+  % (1) standard-blue bar across the very top
+  \begin{beamercolorbox}[wd=\paperwidth,ht=1.6ex,sep=0pt]{headline topbar}\end{beamercolorbox}%
+  \nointerlineskip
+  % (2) light-blue header field with title / author / institute
+  \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline}%
+    \vskip2.0ex
+    \centering
+    {\usebeamerfont{headline title}\usebeamercolor[fg]{headline title}\inserttitle\par}
+    \vskip1.6ex
+    {\usebeamerfont{headline author}\usebeamercolor[fg]{headline author}\insertauthor\par}
+    \vskip0.7ex
+    {\usebeamerfont{headline institute}\usebeamercolor[fg]{headline institute}\insertinstitute\par}
+    \vskip2.0ex
+  \end{beamercolorbox}%
+  \nointerlineskip
+  % (3) BOLD warm-blue rule separating header from body
+  \begin{beamercolorbox}[wd=\paperwidth,ht=1.1ex,sep=0pt]{headline rule}\end{beamercolorbox}%
+}
 
 % ---- Layout lengths (3-column grid) ----------------------------------------
 \newlength{\sepwidth}
@@ -78,34 +110,29 @@
 \newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
 
 % ---- Metadata --------------------------------------------------------------
-% Title constrained to 70% width (centred) so its lines never reach the
-% top-corner logo; forced 2-line break for balance.
-\title{\parbox{0.70\paperwidth}{\centering
-  Amplifying graviton--photon conversion\\ with spacetime torsion\\[0.6ex]
-  {\normalsize\normalfont\itshape
-   Can modified gravity turn gravitational waves into light?}}}
+% Title spans (almost) the full width; forced 2-line break for balance. No
+% subtitle in the header.
+\title{\parbox{0.92\paperwidth}{\centering
+  Amplifying graviton--photon conversion\\ with spacetime torsion}}
 \author{William Royce}
-\institute{%
+% Affiliation constrained to 70% width (centred) so the long lines clear the
+% logo sitting in the free top-right corner of the header.
+\institute{\parbox{0.60\paperwidth}{\centering
   {\normalfont\itshape Supervised by} W.~E.~V.~Barker, M.~P.~Hobson \& A.~N.~Lasenby\\[0.2ex]
-  Astrophysics Group, Cavendish Laboratory, University of Cambridge}
+  Astrophysics Group, Cavendish Laboratory, University of Cambridge}}
 
-% Logo overlaid in the top-right corner of the banner instead of \logoright,
-% which would reserve column width and compress the title (gemini-cam pattern).
-% Sized + inset to clear the constrained title block.
+% Logo overlaid on the right, LOWERED to sit in the free space beside the centred
+% author/affiliation block (the title now uses the full width above it).
 \addtobeamertemplate{headline}{}{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[anchor=north east, inner sep=0pt]
-      at ([xshift=-2.5cm,yshift=-2.5cm]current page.north east)
-      {\includegraphics[height=4.6cm]{uc-cmyk}};
+      at ([xshift=-4cm,yshift=-8.5cm]current page.north east)
+      {\includegraphics[height=4.4cm]{uc-cmyk}};
   \end{tikzpicture}%
 }
 
-\footercontent{
-  \emph{Can modified gravity turn gravitational waves into light?}
-  \hfill
-  Code \& data: \texttt{github.com/WilliamRoyce/torsion-gertsenshtein}
-  \hfill
-  Part III/MASt Project Conference 2026}
+% Footer band is rendered as the lowest content section (Cambridge-Blue band with
+% warm-blue top rule + QR), so the Gemini bottom footline strip is left empty.
 
 % ============================================================================
 \begin{document}
