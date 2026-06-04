@@ -143,8 +143,17 @@ def render_overlay_pair(
     strip_ylabels: bool = False,
     strip_xlabels: bool = False,
     ylabel_rotation: float | None = None,
+    rcparams_overrides: dict | None = None,
 ) -> None:
     apply_style()
+    # Apply caller's rcparams overrides AFTER apply_style() so they actually
+    # stick — apply_style() unconditionally updates mpl.rcParams from RCPARAMS
+    # which would otherwise overwrite any rcParams set by the caller before
+    # the render call.
+    if rcparams_overrides:
+        import matplotlib as mpl
+
+        mpl.rcParams.update(rcparams_overrides)
 
     # Resolve four overlay colours (prop_amp, prop_sup, np_amp, np_sup),
     # defaulting to module-level constants when not overridden.

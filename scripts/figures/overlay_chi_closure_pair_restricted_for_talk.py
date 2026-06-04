@@ -29,7 +29,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import matplotlib as mpl
 from _corner_style import FIG_WIDTH
 from _palette import CAMBRIDGE_PALETTE
 from overlay_corner_pair import _top_k_union, render_overlay_pair
@@ -158,13 +157,6 @@ def main() -> None:
     # Simplest path: update rcParams now, render, then matplotlib resets per
     # process exit.  rcParams set here propagate through apply_style() because
     # apply_style() merges into existing rcParams via mpl.rcParams.update.
-    mpl.rcParams.update(
-        {
-            "axes.labelsize": 36,
-            "legend.fontsize": 40,
-        }
-    )
-
     chi_top = _top_k_union(
         [
             CHI_PROP_AMP / "parameter_importance.json",
@@ -192,6 +184,10 @@ def main() -> None:
         strip_ylabels=False,
         strip_xlabels=True,
         ylabel_rotation=0,
+        rcparams_overrides={
+            "axes.labelsize": 40,
+            "legend.fontsize": 48,
+        },
     )
 
 
