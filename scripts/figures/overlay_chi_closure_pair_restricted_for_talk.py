@@ -42,29 +42,33 @@ log = logging.getLogger("overlay_chi_closure_pair_restricted_for_talk")
 # shows the actual index contraction the parameter multiplies, in the
 # notation used by the manuscript source (general_quadratic_lagrangian.tex
 # eq:r_dt_explicit / eq:torsion_squared / eq:curv_em).
+# Schematic class-name labels (not specific contractions) so the labels
+# stay legible at presentation distance and the audience reads "which
+# sector dominates" rather than parsing index-permutation differences.
+# Multiple panels may share the same label by design.
 LABEL_OVERRIDES: dict[str, str] = {
-    # T^2 torsion-mass sector — calligraphic T (matches manuscript notation)
-    "beta1": r"$\mathcal{T}_{abc}\mathcal{T}^{abc}$",
-    "beta2": r"$\mathcal{T}_{abc}\mathcal{T}^{bac}$",
-    "beta3": r"$\mathcal{T}_a \mathcal{T}^a$",
-    # Non-minimal Riemann-Cartan x EM — calligraphic R (no tilde)
-    "delta1": r"$\mathcal{R}_{[\mu\nu]} F^{\mu\nu}$",
-    # Derivative torsion x EM (placeholders if any appear in top-K)
-    "zeta1": r"$(\nabla\mathcal{T})_{\!\cdot\!} F\,(1)$",
-    "zeta2": r"$(\nabla\mathcal{T})_{\!\cdot\!} F\,(2)$",
-    "zeta3": r"$(\nabla\mathcal{T})_{\!\cdot\!} F\,(3)$",
-    # R x nabla T sector — literal index contractions from eq:r_dt_explicit,
-    # in calligraphic notation (no R-tilde, no plain T).
-    "chi1": r"$(\nabla\mathcal{T})^{abcd}\mathcal{R}_{abcd}$",
-    "chi2": r"$(\nabla\mathcal{T})^{abcd}\mathcal{R}_{acbd}$",
-    "chi3": r"$(\nabla\mathcal{T})^{ab}{}_b{}^c\,\mathcal{R}_a{}^d{}_{cd}$",
-    "chi4": r"$(\nabla\mathcal{T})^{abcd}\mathcal{R}_{bcad}$",
-    "chi5": r"$(\nabla\mathcal{T})^a{}_a{}^{bc}\,\mathcal{R}_b{}^d{}_{cd}$",
-    "chi6": r"$(\nabla\mathcal{T})^{ab}{}_a{}^c\,\mathcal{R}_b{}^d{}_{cd}$",
-    "chi7": r"$(\nabla\mathcal{T})^{abcd}\mathcal{R}_{cdab}$",
-    "chi8": r"$(\nabla\mathcal{T})^{ab}{}_b{}^c\,\mathcal{R}_c{}^d{}_{ad}$",
-    "chi9": r"$(\nabla\mathcal{T})^{ab}{}_a{}^c\,\mathcal{R}_c{}^d{}_{bd}$",
-    "chi10": r"$(\nabla\mathcal{T})^{ab}{}_{ab}\,\mathcal{R}^{cd}{}_{cd}$",
+    # T^2 torsion-mass class
+    "beta1": r"$\mathcal{T}^2$",
+    "beta2": r"$\mathcal{T}^2$",
+    "beta3": r"$\mathcal{T}^2$",
+    # Non-minimal Riemann-Cartan x EM
+    "delta1": r"$\mathcal{R}\!\cdot\! F$",
+    # Derivative torsion x EM
+    "zeta1": r"$\nabla\mathcal{T}\!\cdot\! F$",
+    "zeta2": r"$\nabla\mathcal{T}\!\cdot\! F$",
+    "zeta3": r"$\nabla\mathcal{T}\!\cdot\! F$",
+    # Curvature x derivative-torsion class (every chi_i collapses to the same
+    # schematic class).
+    "chi1": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi2": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi3": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi4": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi5": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi6": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi7": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi8": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi9": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
+    "chi10": r"$\mathcal{R}\!\cdot\!\nabla\mathcal{T}$",
 }
 
 
@@ -156,8 +160,8 @@ def main() -> None:
     # apply_style() merges into existing rcParams via mpl.rcParams.update.
     mpl.rcParams.update(
         {
-            "axes.labelsize": 20,
-            "legend.fontsize": 24,
+            "axes.labelsize": 28,
+            "legend.fontsize": 32,
         }
     )
 
@@ -185,6 +189,7 @@ def main() -> None:
         transparent=True,
         colours=CAMBRIDGE_OVERLAY_COLOURS,
         legend_labels=LEGEND_LABELS,
+        strip_ylabels=True,
     )
 
 

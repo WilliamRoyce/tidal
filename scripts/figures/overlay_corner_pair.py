@@ -140,6 +140,7 @@ def render_overlay_pair(
     transparent: bool = False,
     colours: dict[str, str] | None = None,
     legend_labels: dict[str, str] | None = None,
+    strip_ylabels: bool = False,
 ) -> None:
     apply_style()
 
@@ -241,6 +242,8 @@ def render_overlay_pair(
         if ax is None:
             continue
         ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
+        if strip_ylabels:
+            ax.set_ylabel("")
 
     ll = legend_labels or {}
     lbl_prop_amp = ll.get("prop_amp", "amplification (propagating)")
