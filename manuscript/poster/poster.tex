@@ -115,16 +115,16 @@
 %   (3) light-blue strip with logo + author + affiliation,
 %   (4) BOLD warm-blue rule before the body.
 \setbeamertemplate{headline}{%
-  % (1) standard-blue title strip (full width) -- taller, with more room around
+  % (1) standard-blue title strip (full width) -- tall, generous title whitespace
   \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline title strip}%
-    \vskip5.5ex
+    \vskip8ex
     \centering
     {\usebeamerfont{headline title}\inserttitle\par}
-    \vskip5.5ex
+    \vskip8ex
   \end{beamercolorbox}%
-  % (2) gap (page background shows through)
-  \vskip2.4ex
-  % (3) light-blue strip: logo (left) + author/affiliation (centred)
+  \nointerlineskip
+  % (2) light-blue strip flush below the title strip (no white gap):
+  %     logo (left) + author/affiliation (centred)
   \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline}%
     \vskip2.6ex
     \begin{columns}[c]

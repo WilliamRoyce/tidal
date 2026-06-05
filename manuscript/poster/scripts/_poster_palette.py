@@ -32,6 +32,9 @@ WARM_CHERRY = "#E18AAC"  # amplification, non-propagating control (light cherry)
 CREST = "#FD8153"  # suppression, propagating (coral/orange)
 CREST_DARK = "#DD3025"
 WARM_CREST = "#FFC392"  # suppression, non-propagating control (light crest)
+# Cambridge secondary families for the 4-overlay corner (match the talk figure):
+PURPLE = "#A368DF"
+INDIGO = "#5366E0"
 
 # ---- Role aliases (match _palette.py interface) -----------------------------
 AMP_COLOR = CHERRY

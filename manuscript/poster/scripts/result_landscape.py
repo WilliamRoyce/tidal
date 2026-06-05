@@ -3,14 +3,19 @@ r"""Hero result for the poster — the talk's chi-closure restricted corner.
 Replicates the content of the talk figure
 (scripts/figures/overlay_chi_closure_pair_restricted_for_talk.py): the chi-closure
 sector restricted to the principled top-6 couplings, with FOUR overlaid posteriors
--- propagating amplification/suppression + the non-propagating (xi=0) control --
-so the plot is not sparse.
+-- propagating amplification/suppression + the non-propagating control -- so the
+plot is not sparse.
 
-Poster styling (differs from the talk/report):
-- plain SCHEMATIC family labels (R~ grad-T, T^2 ...), not explicit contractions;
-- sans fonts consistent with the poster (Lato; mathtext dejavusans; no usetex);
-- light-blue (#D1F9F1) figure + panel background to blend into the poster box;
-- Cambridge 4-colour scheme (prop = Cherry/Crest, control = WarmCherry/WarmCrest).
+Determinism note: anesthetic's 2-D contour plotting randomly subsamples the weighted
+chains (triangular_sample_compression_2d -> np.random.choice, unseeded), so contours
+otherwise vary every render. We seed np.random and pass a large `ncompress` so the
+contours use (near-)all samples -> stable, smooth, true-density contours.
+
+Poster styling (matches the talk figure):
+- schematic family labels (R . grad-T, T^2);
+- the talk's four DISTINCT Cambridge colours (Crest/Purple/Cherry/Indigo);
+- (propagating)/(non-propagating) legend;
+- light-blue (#D1F9F1) figure + panel background to blend into the poster box.
 
 Report figures in manuscript/figures/ are untouched -- only the loaders/ranking
 helper are reused.
@@ -24,6 +29,7 @@ import sys
 from pathlib import Path
 
 import matplotlib as mpl
+import numpy as np
 
 mpl.use("Agg")
 import matplotlib.patches as mpatches
@@ -35,14 +41,7 @@ sys.path.insert(0, str(REPORT_FIG_DIR))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _corner_style import CONTOUR_LEVELS, load_chains
-from _poster_palette import (
-    CAM,
-    CHERRY,
-    CREST,
-    WARM_CHERRY,
-    WARM_CREST,
-    apply_poster_style,
-)
+from _poster_palette import CAM, CHERRY, CREST, INDIGO, PURPLE, apply_poster_style
 from overlay_corner_pair import _top_k_union
 
 # Chi-closure (T7) propagating + non-propagating chains (same as the talk figure).
@@ -51,6 +50,11 @@ PROP_SUP = REPO_ROOT / "hpc_results" / "29682868" / "t7_sup_v2"
 NP_AMP = REPO_ROOT / "hpc_results" / "29705560" / "np_ceven_amp_v1"
 NP_SUP = REPO_ROOT / "hpc_results" / "29705560" / "np_ceven_sup_v1"
 OUT = Path(__file__).resolve().parents[1] / "figures" / "result_landscape.pdf"
+
+# Reproducibility + faithful contours: fixed seed, and use ~all samples (the
+# chains hold ~1300-1400 samples, so 1000 is safely below every population).
+SEED = 1
+NCOMPRESS = 1000
 
 PROP_PARAMS = [
     "beta1",
@@ -74,31 +78,31 @@ PROP_PARAMS = [
 ]
 NP_PARAMS = [p for p in PROP_PARAMS if p != "xi"]
 
-# Explicit operator-contraction labels (no parameter-name prefixes, per the
-# no-parameter-name rule). The double-width Results box gives room for these.
-# Explicit operator contractions in calligraphic R/T (no tilde, no parameter
-# names). mathtext-safe: a math core ($...$) + a plain-text qualifier suffix
-# (mathtext does NOT support \! / \, so they are avoided entirely).
+# Schematic family labels (calligraphic, suppressed indices) -- matches the talk
+# figure. Every chi_i collapses to R . grad-T; beta_i to T^2. mathtext-safe (no \!).
 SCHEMATIC = {
-    "beta1": r"$\mathcal{T}_{abc}\mathcal{T}^{abc}$",
-    "beta2": r"$\mathcal{T}_{abc}\mathcal{T}^{bac}$",
-    "beta3": r"$\mathcal{T}_a \mathcal{T}^a$",
-    "delta1": r"$\mathcal{R}_{[\mu\nu]}F^{\mu\nu}$",
-    "zeta1": r"$(\nabla\mathcal{T})\cdot F$",
-    "zeta2": r"$(\nabla\mathcal{T})\cdot F$ (II)",
-    "zeta3": r"$(\nabla\mathcal{T})\cdot F$ (III)",
-    "chi1": r"$(\nabla\mathcal{T})\cdot\mathcal{R}$",
-    "chi2": r"$(\nabla\mathcal{T})\cdot\mathcal{R}$ (acbd)",
-    "chi5": r"tr$(\nabla\mathcal{T})\cdot\mathcal{R}$",
-    "chi7": r"$(\nabla\mathcal{T})\cdot\mathcal{R}$ (cdab)",
+    "beta1": r"$\mathcal{T}^2$",
+    "beta2": r"$\mathcal{T}^2$",
+    "beta3": r"$\mathcal{T}^2$",
+    "delta1": r"$\mathcal{R}\cdot F$",
+    "zeta1": r"$\nabla\mathcal{T}\cdot F$",
+    "zeta2": r"$\nabla\mathcal{T}\cdot F$",
+    "zeta3": r"$\nabla\mathcal{T}\cdot F$",
 }
 for _c in range(1, 11):
-    SCHEMATIC.setdefault(f"chi{_c}", r"$(\nabla\mathcal{T})\cdot\mathcal{R}$")
+    SCHEMATIC[f"chi{_c}"] = r"$\mathcal{R}\cdot\nabla\mathcal{T}$"
 
 OVERLAY_ALPHA = 0.55
 
+# Four DISTINCT Cambridge colours, matching the talk figure's assignment.
+COL_PROP_AMP = CREST
+COL_PROP_SUP = PURPLE
+COL_NP_AMP = CHERRY
+COL_NP_SUP = INDIGO
+
 
 def main() -> None:
+    np.random.seed(SEED)  # deterministic anesthetic subsampling
     apply_poster_style()
     OUT.parent.mkdir(parents=True, exist_ok=True)
 
@@ -117,18 +121,13 @@ def main() -> None:
     np_amp = load_chains(NP_AMP, params=NP_PARAMS, param_labels=np_labels)
     np_sup = load_chains(NP_SUP, params=NP_PARAMS, param_labels=np_labels)
 
-    axes = prop_amp.plot_2d(
-        top, kinds="kde", levels=CONTOUR_LEVELS, color=CHERRY, alpha=OVERLAY_ALPHA
-    )
-    prop_sup.plot_2d(
-        axes, kinds="kde", levels=CONTOUR_LEVELS, color=CREST, alpha=OVERLAY_ALPHA
-    )
-    np_amp.plot_2d(
-        axes, kinds="kde", levels=CONTOUR_LEVELS, color=WARM_CHERRY, alpha=OVERLAY_ALPHA
-    )
-    np_sup.plot_2d(
-        axes, kinds="kde", levels=CONTOUR_LEVELS, color=WARM_CREST, alpha=OVERLAY_ALPHA
-    )
+    kw = {
+        "kinds": "kde", "levels": CONTOUR_LEVELS, "alpha": OVERLAY_ALPHA, "ncompress": NCOMPRESS
+    }
+    axes = prop_amp.plot_2d(top, color=COL_PROP_AMP, **kw)
+    prop_sup.plot_2d(axes, color=COL_PROP_SUP, **kw)
+    np_amp.plot_2d(axes, color=COL_NP_AMP, **kw)
+    np_sup.plot_2d(axes, color=COL_NP_SUP, **kw)
 
     fig = axes.iloc[0, 0].figure
     for ax in axes.values.flatten():
@@ -138,20 +137,18 @@ def main() -> None:
 
     handles = [
         mpatches.Patch(
-            color=CHERRY, alpha=OVERLAY_ALPHA, label="amplification (propagating)"
+            color=COL_PROP_AMP, alpha=OVERLAY_ALPHA, label="amplification (propagating)"
         ),
         mpatches.Patch(
-            color=CREST, alpha=OVERLAY_ALPHA, label="suppression (propagating)"
+            color=COL_PROP_SUP, alpha=OVERLAY_ALPHA, label="suppression (propagating)"
         ),
         mpatches.Patch(
-            color=WARM_CHERRY,
+            color=COL_NP_AMP,
             alpha=OVERLAY_ALPHA,
             label="amplification (non-propagating)",
         ),
         mpatches.Patch(
-            color=WARM_CREST,
-            alpha=OVERLAY_ALPHA,
-            label="suppression (non-propagating)",
+            color=COL_NP_SUP, alpha=OVERLAY_ALPHA, label="suppression (non-propagating)"
         ),
     ]
     n = len(top)

@@ -39,6 +39,7 @@
 
 
 \begin{document}
+\pagecolor{CamLightBlue}
 
 \begin{tikzpicture}[
     line cap=round,
@@ -81,28 +82,26 @@
         \draw[BcolFL, thick] (0,0) -- (0,\ymax);
         \draw[BcolFL, thick] (0,0) -- (0,-\ymax);
 
-    \draw[line width=1.5pt, white] (\tilt+90:1.1*\ymax) -- (\tilt-90:1.1*\ymax);
+    % Neutron star: shaded sphere (no tilted magnetic-axis line)
+    \shade[ball color=CamWarmBlue] (0,0) circle (\E);
+    \draw[very thin, Corona] (0,0) circle (\E);
 
-    \draw[very thin,Corona,fill=CamDarkBlue] (0,0) circle (\E); % Star
-    \draw[thick, draw=Corona,ball color=CamDarkBlue,fill opacity=0.15] (0,0) circle (\E);
-    \draw[dashed, thick, CamDarkBlue] (\tilt+90:1.1*\ymax) -- (\tilt-90:1.1*\ymax);
-
-    \node[CamDarkBlue] at (0.203*\xmax,0.87*\ymax) {\contour{white}{Magnetosphere}};
-    \node[CamDarkBlue] at (0.24*\xmax,-0.315*\ymax) {\contour{white}{Neutron star}};
+    \node[CamDarkBlue] at (0.203*\xmax,0.87*\ymax) {\contour{CamLightBlue}{Magnetosphere}};
+    \node[CamDarkBlue] at (0.24*\xmax,-0.315*\ymax) {\contour{CamLightBlue}{Neutron star}};
 
     \foreach \i[evaluate={\y=\i*0.2*\ymax;}] in {-1,0,1}{
         \draw[gw] (-0.9*\xmax,\y) -- (-2*\E,\y);
     }
-    \node[GW] at (-0.65*\xmax,0.4*\ymax) {\contour{white}{Gravitational waves}};
+    \node[GW] at (-0.65*\xmax,0.4*\ymax) {\contour{CamLightBlue}{Gravitational waves}};
 
     \coordinate (EM) at (2*\E,0);
     \foreach \i [evaluate={\r={\i*0.57*\xmax/\N};}] in {1,...,\N}{
-        \draw[line width=2.5pt, white] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
+        \draw[line width=2.5pt, CamLightBlue] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
         \draw[line width=1.75pt, Photon, opacity=0.12] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
         \draw[thick, Photon] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
     }
 
-    \node[Photon,align=center] at (0.81*\xmax,0.55*\ymax) {\contour{white}{Photon} \\ \contour{white}{(Fast Radio Burst)}};
+    \node[Photon,align=center] at (0.81*\xmax,0.55*\ymax) {\contour{CamLightBlue}{Photon} \\ \contour{CamLightBlue}{(Fast Radio Burst)}};
 \end{tikzpicture}
 
 \end{document}
