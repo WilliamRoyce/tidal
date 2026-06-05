@@ -76,21 +76,24 @@ NP_PARAMS = [p for p in PROP_PARAMS if p != "xi"]
 
 # Explicit operator-contraction labels (no parameter-name prefixes, per the
 # no-parameter-name rule). The double-width Results box gives room for these.
+# Explicit operator contractions in calligraphic R/T (no tilde, no parameter
+# names). mathtext-safe: a math core ($...$) + a plain-text qualifier suffix
+# (mathtext does NOT support \! / \, so they are avoided entirely).
 SCHEMATIC = {
-    "beta1": r"$T_{abc}T^{abc}$",
-    "beta2": r"$T_{abc}T^{bac}$",
-    "beta3": r"$T_a T^a$",
-    "delta1": r"$\tilde{R}_{[\mu\nu]}F^{\mu\nu}$",
-    "zeta1": r"$(\nabla T)\!\cdot\!F$",
-    "zeta2": r"$(\nabla T)\!\cdot\!F\,'$",
-    "zeta3": r"$(\nabla T)\!\cdot\!F\,''$",
-    "chi1": r"$(\nabla T)\!\cdot\!\tilde{R}$",
-    "chi2": r"$(\nabla T)\!\cdot\!\tilde{R}\,(acbd)$",
-    "chi5": r"$\mathrm{tr}(\nabla T)\!\cdot\!\tilde{R}$",
-    "chi7": r"$(\nabla T)\!\cdot\!\tilde{R}\,(cdab)$",
+    "beta1": r"$\mathcal{T}_{abc}\mathcal{T}^{abc}$",
+    "beta2": r"$\mathcal{T}_{abc}\mathcal{T}^{bac}$",
+    "beta3": r"$\mathcal{T}_a \mathcal{T}^a$",
+    "delta1": r"$\mathcal{R}_{[\mu\nu]}F^{\mu\nu}$",
+    "zeta1": r"$(\nabla\mathcal{T})\cdot F$",
+    "zeta2": r"$(\nabla\mathcal{T})\cdot F$ (II)",
+    "zeta3": r"$(\nabla\mathcal{T})\cdot F$ (III)",
+    "chi1": r"$(\nabla\mathcal{T})\cdot\mathcal{R}$",
+    "chi2": r"$(\nabla\mathcal{T})\cdot\mathcal{R}$ (acbd)",
+    "chi5": r"tr$(\nabla\mathcal{T})\cdot\mathcal{R}$",
+    "chi7": r"$(\nabla\mathcal{T})\cdot\mathcal{R}$ (cdab)",
 }
 for _c in range(1, 11):
-    SCHEMATIC.setdefault(f"chi{_c}", r"$(\nabla T)\!\cdot\!\tilde{R}$")
+    SCHEMATIC.setdefault(f"chi{_c}", r"$(\nabla\mathcal{T})\cdot\mathcal{R}$")
 
 OVERLAY_ALPHA = 0.55
 
@@ -134,13 +137,21 @@ def main() -> None:
             ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
 
     handles = [
-        mpatches.Patch(color=CHERRY, alpha=OVERLAY_ALPHA, label="amplification"),
-        mpatches.Patch(color=CREST, alpha=OVERLAY_ALPHA, label="suppression"),
         mpatches.Patch(
-            color=WARM_CHERRY, alpha=OVERLAY_ALPHA, label=r"amplification ($\xi=0$)"
+            color=CHERRY, alpha=OVERLAY_ALPHA, label="amplification (propagating)"
         ),
         mpatches.Patch(
-            color=WARM_CREST, alpha=OVERLAY_ALPHA, label=r"suppression ($\xi=0$)"
+            color=CREST, alpha=OVERLAY_ALPHA, label="suppression (propagating)"
+        ),
+        mpatches.Patch(
+            color=WARM_CHERRY,
+            alpha=OVERLAY_ALPHA,
+            label="amplification (non-propagating)",
+        ),
+        mpatches.Patch(
+            color=WARM_CREST,
+            alpha=OVERLAY_ALPHA,
+            label="suppression (non-propagating)",
         ),
     ]
     n = len(top)

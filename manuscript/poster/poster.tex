@@ -105,7 +105,7 @@
 }
 
 % ---- Header typography: large full-width title ------------------------------
-\setbeamerfont{headline title}{size=\fontsize{104}{116}\selectfont,series=\bfseries}
+\setbeamerfont{headline title}{size=\fontsize{122}{134}\selectfont,series=\bfseries}
 \setbeamerfont{headline author}{size=\LARGE,series=\bfseries}
 \setbeamerfont{headline institute}{size=\normalsize}
 
@@ -115,12 +115,12 @@
 %   (3) light-blue strip with logo + author + affiliation,
 %   (4) BOLD warm-blue rule before the body.
 \setbeamertemplate{headline}{%
-  % (1) standard-blue title strip (full width)
+  % (1) standard-blue title strip (full width) -- taller, with more room around
   \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline title strip}%
-    \vskip3.2ex
+    \vskip5.5ex
     \centering
     {\usebeamerfont{headline title}\inserttitle\par}
-    \vskip3.2ex
+    \vskip5.5ex
   \end{beamercolorbox}%
   % (2) gap (page background shows through)
   \vskip2.4ex
@@ -129,7 +129,7 @@
     \vskip2.6ex
     \begin{columns}[c]
       \begin{column}{0.20\paperwidth}
-        \hspace{2.5cm}\includegraphics[height=4.2cm]{uc-cmyk}
+        \hspace{5cm}\includegraphics[height=4.2cm]{uc-cmyk}
       \end{column}
       \begin{column}{0.60\paperwidth}
         \centering
@@ -173,30 +173,30 @@
 \setbeamertemplate{footline}{%
   \begin{beamercolorbox}[wd=\paperwidth,ht=1.1ex,sep=0pt]{footer rule}\end{beamercolorbox}%
   \nointerlineskip
-  \begin{beamercolorbox}[wd=\paperwidth,sep=2.5ex]{footer band}%
+  \begin{beamercolorbox}[wd=\paperwidth,sep=2.0ex]{footer band}%
     \hspace{\sepwidth}%
     \begin{minipage}{\dimexpr\paperwidth-3\sepwidth\relax}
-      \begin{columns}[T]
-        \begin{column}{0.60\linewidth}
-          {\large\bfseries Outlook}\\[0.4ex]
-          A magnetic field of \emph{finite extent} gives the wave a finite
-          interaction time, turning these amplifications into physical conversion
-          magnitudes --- the operators ranked here are the inputs that calculation
-          needs. A particle-spectrum analysis (\PSALTer{}) will then classify each
-          amplifying direction.
-        \end{column}
-        \begin{column}{0.26\linewidth}
+      \begin{columns}[c]
+        % --- condensed references (left) ---
+        \begin{column}{0.72\linewidth}
           {\large\bfseries References}\\[0.4ex]
           {\small
-           Gertsenshtein, \emph{JETP}, 1962.\\
-           Boccaletti \etal, \emph{Nuovo Cim.}, 1970.\\
-           Barker \etal, \emph{PSALTer}, 2024, arXiv:2406.09500.}
+           [1] Gertsenshtein, \emph{Sov.\ Phys.\ JETP}, 1962. \quad
+           [2] Boccaletti \etal, \emph{Nuovo Cim.\ B}, 1970. \quad
+           [3] Domcke \& Garcia-Cely, \emph{PRL}, 2021. \\{}
+           [4] Berlin \etal, \emph{PRD}, 2022. \quad
+           [5] Lella \etal, \emph{PRD}, 2024. \quad
+           [6] Barker \etal\ (\emph{PSALTer}), \emph{PRD}, 2025.}
         \end{column}
-        \begin{column}{0.12\linewidth}
-          \centering
-          \colorbox{white}{\qrcode[height=3.4cm]{https://github.com/WilliamRoyce/torsion-gertsenshtein}}\\[0.3ex]
-          {\small Scan for code \& data}\\[0.2ex]
-          {\small Contact: \texttt{wr286@cam.ac.uk}}
+        % --- contact (left of QR) + full-height QR (right corner) ---
+        \begin{column}{0.26\linewidth}
+          \raggedleft
+          \begin{minipage}[c]{0.52\linewidth}
+            \raggedleft\small
+            \textbf{Scan for code \& data}\\[0.3ex]
+            Contact:\\ \texttt{wr286@cam.ac.uk}
+          \end{minipage}\hspace{0.5em}%
+          \colorbox{white}{\qrcode[height=6cm]{https://github.com/WilliamRoyce/torsion-gertsenshtein}}%
         \end{column}
       \end{columns}
     \end{minipage}%
@@ -245,6 +245,8 @@
   \separatorcolumn
   \begin{column}{\dimexpr2\colwidth+\sepwidth\relax}
     \input{sections/05_results.tex}
+    \vspace{1ex}
+    \input{sections/06_outlook.tex}
   \end{column}
   \separatorcolumn
 \end{columns}
