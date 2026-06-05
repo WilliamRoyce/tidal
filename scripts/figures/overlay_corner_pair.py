@@ -145,6 +145,8 @@ def render_overlay_pair(
     ylabel_rotation: float | None = None,
     rcparams_overrides: dict | None = None,
     legend_anchor: tuple[float, float] | None = None,
+    seed: int | None = None,
+    ncompress: int | None = None,
 ) -> None:
     apply_style()
     # Apply caller's rcparams overrides AFTER apply_style() so they actually
@@ -155,6 +157,18 @@ def render_overlay_pair(
         import matplotlib as mpl
 
         mpl.rcParams.update(rcparams_overrides)
+
+    # Deterministic contours: anesthetic's 2-D plotting randomly subsamples the
+    # weighted chains (triangular_sample_compression_2d -> np.random.choice,
+    # unseeded), so contours otherwise drift every render. Seed np.random and
+    # pass ncompress (~all samples) for stable, smooth, true-density contours.
+    if seed is not None:
+        import numpy as np
+
+        np.random.seed(seed)
+    plot_kwargs_extra: dict = {}
+    if ncompress is not None:
+        plot_kwargs_extra["ncompress"] = ncompress
 
     # Resolve four overlay colours (prop_amp, prop_sup, np_amp, np_sup),
     # defaulting to module-level constants when not overridden.
@@ -204,6 +218,7 @@ def render_overlay_pair(
         levels=CONTOUR_LEVELS,
         color=amp,
         alpha=OVERLAY_ALPHA,
+        **plot_kwargs_extra,
     )
     prop_sup.plot_2d(
         axes,
@@ -211,6 +226,7 @@ def render_overlay_pair(
         levels=CONTOUR_LEVELS,
         color=sup,
         alpha=OVERLAY_ALPHA,
+        **plot_kwargs_extra,
     )
     if prop_only_cols:
         # Full-corner case (some columns propagating-only): slice axes
@@ -222,6 +238,7 @@ def render_overlay_pair(
             levels=CONTOUR_LEVELS,
             color=np_amp_,
             alpha=OVERLAY_ALPHA,
+            **plot_kwargs_extra,
         )
         np_sup.plot_2d(
             np_axes,
@@ -229,6 +246,7 @@ def render_overlay_pair(
             levels=CONTOUR_LEVELS,
             color=np_sup_,
             alpha=OVERLAY_ALPHA,
+            **plot_kwargs_extra,
         )
     else:
         # Restricted case (all plot_params in NP list): plot NP directly
@@ -239,6 +257,7 @@ def render_overlay_pair(
             levels=CONTOUR_LEVELS,
             color=np_amp_,
             alpha=OVERLAY_ALPHA,
+            **plot_kwargs_extra,
         )
         np_sup.plot_2d(
             axes,
@@ -246,6 +265,7 @@ def render_overlay_pair(
             levels=CONTOUR_LEVELS,
             color=np_sup_,
             alpha=OVERLAY_ALPHA,
+            **plot_kwargs_extra,
         )
 
     fig = axes.iloc[0, 0].figure

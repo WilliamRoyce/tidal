@@ -189,6 +189,12 @@ def main() -> None:
             "legend.fontsize": 18,
         },
         legend_anchor=(7.5, 1.0),
+        # Deterministic, true-density contours: anesthetic randomly subsamples
+        # the weighted chains (triangular_sample_compression_2d) so contours
+        # otherwise drift run-to-run.  Seed + ncompress ≈ all samples (chains
+        # hold ~1300–1400) -> pixel-identical, smooth, faithful contours.
+        seed=1,
+        ncompress=1000,
     )
 
 
