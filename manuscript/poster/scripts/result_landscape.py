@@ -164,7 +164,10 @@ def main() -> None:
     axes.iloc[0, 0].legend(
         handles=handles,
         loc="upper right",
-        bbox_to_anchor=(n - 0.4, 1.0),
+        # Push the legend into the empty upper-right region (clear of the panels);
+        # its right edge sits at the grid's right edge rather than overlapping the
+        # diagonal/contour panels.
+        bbox_to_anchor=(n + 0.5, 1.0),
         bbox_transform=axes.iloc[0, 0].transAxes,
         frameon=True,
         facecolor=CAM["light_blue"],
