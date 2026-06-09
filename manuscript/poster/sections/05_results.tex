@@ -18,9 +18,12 @@
       % beamercolorbox, so the display equation cannot escape below the fill).
       {\centering
        \begin{beamercolorbox}[wd=\linewidth,sep=1.6ex,center]{eqn box}
-         \large
-         $\lag \;\supset\; \rcD{^{\alpha}}\MAGT{^{\beta\gamma\delta}}\,
-                            \MAGF{_{\alpha\beta\gamma\delta}}$
+         % \resizebox scales the equation to the box width on a SINGLE line --
+         % maximally large for emphasis, and guaranteed never to wrap (the column
+         % is too narrow for a fixed \Huge/\huge, which broke after \supset).
+         \resizebox{0.92\linewidth}{!}{%
+           $\lag \;\supset\; \rcD{^{\alpha}}\MAGT{^{\beta\gamma\delta}}\,
+                             \MAGF{_{\alpha\beta\gamma\delta}}$}
        \end{beamercolorbox}\par}
       \vspace{0.8ex}
       Both \textbf{amplification} and \textbf{suppression} occur, and the

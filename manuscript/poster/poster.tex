@@ -117,10 +117,10 @@
 \setbeamertemplate{headline}{%
   % (1) standard-blue title strip (full width) -- tall, generous title whitespace
   \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline title strip}%
-    \vskip8ex
+    \vskip12ex
     \centering
     {\usebeamerfont{headline title}\inserttitle\par}
-    \vskip8ex
+    \vskip12ex
   \end{beamercolorbox}%
   \nointerlineskip
   % (2) light-blue strip flush below the title strip (no white gap):
@@ -129,7 +129,11 @@
     \vskip2.6ex
     \begin{columns}[c]
       \begin{column}{0.20\paperwidth}
-        \hspace{5cm}\includegraphics[height=4.2cm]{uc-cmyk}
+        % \mbox forces restricted horizontal mode: a leading \hspace* at the start
+        % of a column body otherwise begins a paragraph and TeX discards the leading
+        % glue (which is why \hspace{5cm}/{8cm} never moved the logo). Inside an
+        % \mbox the kern is always kept, so this reliably insets the logo.
+        \mbox{\hspace*{2.5cm}\includegraphics[height=4.0cm]{uc-cmyk}}
       \end{column}
       \begin{column}{0.60\paperwidth}
         \centering
@@ -219,31 +223,25 @@
 
 \vfill
 
-% ---- Row 2: highlights (1 col) + background (2 cols) ------------------------
+% ---- Single two-column layout below the key finding. Each column flows
+%      top-to-bottom independently, so the short Highlights box no longer leaves a
+%      gap before the PGT box (the tall Background box used to set a shared row
+%      height). Left column = Highlights -> 1. PGT -> 2. Methods; right column
+%      (double width) = Background -> 3. Results -> Outlook. Reading order is
+%      guided by the numbered headers (Highlights, then 1->2 down the left, 3 right).
 \begin{columns}[t]
   \separatorcolumn
   \begin{column}{\colwidth}
     \input{sections/01_highlights.tex}
-  \end{column}
-  \separatorcolumn
-  \begin{column}{\dimexpr2\colwidth+\sepwidth\relax}
-    \input{sections/02_background.tex}
-  \end{column}
-  \separatorcolumn
-\end{columns}
-
-\vfill
-
-% ---- Row 3: col 1 stacks PGT (top) + Methods (bottom); cols 2-3 = big Results
-\begin{columns}[t]
-  \separatorcolumn
-  \begin{column}{\colwidth}
+    \vspace{1ex}
     \input{sections/03_pgt.tex}
     \vspace{1ex}
     \input{sections/04_methods.tex}
   \end{column}
   \separatorcolumn
   \begin{column}{\dimexpr2\colwidth+\sepwidth\relax}
+    \input{sections/02_background.tex}
+    \vspace{1ex}
     \input{sections/05_results.tex}
     \vspace{1ex}
     \input{sections/06_outlook.tex}

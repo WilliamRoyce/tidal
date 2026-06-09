@@ -54,7 +54,7 @@ POSTER_RCPARAMS = {
     "font.family": "sans-serif",
     "font.sans-serif": ["Lato", "DejaVu Sans", "Arial"],
     "font.size": 16,
-    "axes.labelsize": 18,
+    "axes.labelsize": 30,  # corner-plot parameter labels -- large for A0 viewing
     "axes.titlesize": 20,
     "axes.edgecolor": CAM["slate4"],
     "axes.labelcolor": CAM["slate4"],

@@ -122,7 +122,10 @@ def main() -> None:
     np_sup = load_chains(NP_SUP, params=NP_PARAMS, param_labels=np_labels)
 
     kw = {
-        "kinds": "kde", "levels": CONTOUR_LEVELS, "alpha": OVERLAY_ALPHA, "ncompress": NCOMPRESS
+        "kinds": "kde",
+        "levels": CONTOUR_LEVELS,
+        "alpha": OVERLAY_ALPHA,
+        "ncompress": NCOMPRESS,
     }
     axes = prop_amp.plot_2d(top, color=COL_PROP_AMP, **kw)
     prop_sup.plot_2d(axes, color=COL_PROP_SUP, **kw)
@@ -130,10 +133,16 @@ def main() -> None:
     np_sup.plot_2d(axes, color=COL_NP_SUP, **kw)
 
     fig = axes.iloc[0, 0].figure
+    # Explicitly force the schematic axis-label size AFTER the corner is built, so
+    # anesthetic/matplotlib cannot silently reset it to a default (rcParams alone
+    # was unreliable here). Large for A0 viewing distance.
+    LABEL_FONTSIZE = 28
     for ax in axes.values.flatten():
         if ax is not None:
             ax.set_facecolor(CAM["light_blue"])
             ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
+            ax.xaxis.label.set_fontsize(LABEL_FONTSIZE)
+            ax.yaxis.label.set_fontsize(LABEL_FONTSIZE)
 
     handles = [
         mpatches.Patch(
@@ -161,7 +170,7 @@ def main() -> None:
         facecolor=CAM["light_blue"],
         edgecolor=CAM["slate2"],
         framealpha=1.0,
-        fontsize=20,
+        fontsize=26,
     )
 
     fig.set_size_inches(13.0, 12.0)
