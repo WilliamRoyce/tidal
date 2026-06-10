@@ -82,8 +82,15 @@
         \draw[BcolFL, thick] (0,0) -- (0,\ymax);
         \draw[BcolFL, thick] (0,0) -- (0,-\ymax);
 
-    % Neutron star: shaded sphere (no tilted magnetic-axis line)
-    \shade[ball color=CamWarmBlue] (0,0) circle (\E);
+    % Neutron star: soft sphere -- an OFFSET radial palette gradient (no white
+    % highlight or black rim, unlike `ball color`), so it matches the soft corona
+    % and field-line tones rather than standing out. The bright tone sits up-left
+    % (gentle illumination) and deepens to a teal toward the lower-right edge.
+    \begin{scope}
+        \clip (0,0) circle (\E);
+        \shade[inner color=CamBlue, outer color=CamDarkBlue!70!CamWarmBlue]
+              (-0.32*\E,0.32*\E) circle (1.5*\E);
+    \end{scope}
     \draw[very thin, Corona] (0,0) circle (\E);
 
     \node[CamDarkBlue] at (0.203*\xmax,0.87*\ymax) {\contour{CamLightBlue}{Magnetosphere}};

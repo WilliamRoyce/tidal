@@ -117,10 +117,10 @@
 \setbeamertemplate{headline}{%
   % (1) standard-blue title strip (full width) -- tall, generous title whitespace
   \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline title strip}%
-    \vskip16ex
+    \vskip20ex
     \centering
     {\usebeamerfont{headline title}\inserttitle\par}
-    \vskip16ex
+    \vskip20ex
   \end{beamercolorbox}%
   \nointerlineskip
   % (2) light-blue strip flush below the title strip (no white gap):
@@ -211,6 +211,11 @@
 % ============================================================================
 \begin{document}
 \begin{frame}[t]
+
+% Leading \vfill so the whitespace ABOVE the key-finding box equals the whitespace
+% below it: with this plus the two \vfill's lower down, the three leftover gaps
+% (above cherry / below cherry / page bottom) are distributed equally.
+\vfill
 
 % ---- Row 1: full-width key finding -----------------------------------------
 \begin{columns}[t]
