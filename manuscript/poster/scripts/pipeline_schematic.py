@@ -38,10 +38,13 @@ TITLES = {
     "BL": "Nested\nsampling",
 }
 
-# Box geometry (data units).
-BOX_W, BOX_H = 3.6, 1.7
-GX, GY = 1.3, 1.0  # horizontal / vertical gaps between boxes
-MARGIN = 0.3
+# Box geometry (data units). Tight around the (fixed-pt) labels: the figure uses a
+# constant data-unit -> inch scale (figsize = (xlim, ylim) below), so shrinking these
+# genuinely hugs the text rather than rescaling everything (a fixed-width figsize
+# would keep the box:text ratio constant).
+BOX_W, BOX_H = 2.6, 0.85
+GX, GY = 0.9, 0.85  # horizontal / vertical gaps between boxes
+MARGIN = 0.25
 # FancyBboxPatch padding -- the visible rounded box extends this far beyond its
 # rect on every side, so arrows must start/end OUTSIDE it to avoid overlapping,
 # and the axis limits must clear it so no box edge is clipped.
@@ -65,7 +68,9 @@ def main() -> None:
         "BL": (col0, bot),
     }
 
-    fig, ax = plt.subplots(figsize=(8.0, 8.0 * ylim / xlim))
+    # Constant data-unit -> inch scale so box size is set relative to the fixed-pt
+    # text (see the BOX_W/BOX_H note): 1 data unit = 1 inch.
+    fig, ax = plt.subplots(figsize=(xlim, ylim))
     ax.set_xlim(0, xlim)
     ax.set_ylim(0, ylim)
     ax.axis("off")
@@ -92,7 +97,7 @@ def main() -> None:
             ha="center",
             va="center",
             color=CAM["dark_blue"],
-            fontsize=26,
+            fontsize=20,
             fontweight="bold",
             linespacing=1.05,
         )

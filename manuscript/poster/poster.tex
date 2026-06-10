@@ -105,7 +105,10 @@
 }
 
 % ---- Header typography: large full-width title ------------------------------
-\setbeamerfont{headline title}{size=\fontsize{122}{134}\selectfont,series=\bfseries}
+% 124pt keeps line 1 ("Amplifying graviton--photon conversion") on a single line
+% within the 0.92\paperwidth title parbox (130 overflowed to a 3rd line); the larger
+% \baselineskip (170) opens the gap between the two title lines.
+\setbeamerfont{headline title}{size=\fontsize{124}{170}\selectfont,series=\bfseries}
 \setbeamerfont{headline author}{size=\LARGE,series=\bfseries}
 \setbeamerfont{headline institute}{size=\normalsize}
 
