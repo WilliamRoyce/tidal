@@ -143,6 +143,8 @@ def main() -> None:
             ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
             ax.xaxis.label.set_fontsize(LABEL_FONTSIZE)
             ax.yaxis.label.set_fontsize(LABEL_FONTSIZE)
+            ax.xaxis.label.set_color(CAM["dark_blue"])
+            ax.yaxis.label.set_color(CAM["dark_blue"])
 
     handles = [
         mpatches.Patch(
@@ -171,7 +173,8 @@ def main() -> None:
         bbox_transform=axes.iloc[0, 0].transAxes,
         frameon=True,
         facecolor=CAM["light_blue"],
-        edgecolor=CAM["slate2"],
+        edgecolor=CAM["blue"],
+        labelcolor=CAM["dark_blue"],
         framealpha=1.0,
         fontsize=26,
     )

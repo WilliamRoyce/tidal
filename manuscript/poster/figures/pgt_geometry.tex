@@ -10,11 +10,13 @@
 \definecolor{Cambridge24DarkCrest}{HTML}{DD3025}
 \definecolor{Cambridge24Cherry}{HTML}{CD3572}
 \definecolor{Cambridge24DarkCherry}{HTML}{911449}
+\definecolor{Cambridge24DarkBlue}{HTML}{133844} % structural ink (CamDarkBlue)
 
 \colorlet{OrangeFill}{Cambridge24Crest}
 \colorlet{OrangeLine}{Cambridge24DarkCrest}
 \colorlet{PurpleFill}{Cambridge24Cherry}
 \colorlet{PurpleLine}{Cambridge24DarkCherry}
+\colorlet{InkBlue}{Cambridge24DarkBlue} % neutral transport paths + R/T labels
 
 \tikzset{
   DashedArrows/.style 2 args={
@@ -36,7 +38,7 @@
     \def\Rx{0.7*\Lx}
     \def\Ry{0.45*\Ly}
     \coordinate (O) at (0,-0.2*\Ly);
-    \draw[DashedArrows={0.17}{0.62}] (0,-0.2*\Ly) ellipse ({\Rx} and {\Ry});
+    \draw[InkBlue, DashedArrows={0.17}{0.62}] (0,-0.2*\Ly) ellipse ({\Rx} and {\Ry});
     \fill[OrangeFill, opacity=0.5] (\Rx,0.3*\Ly) arc(0:-90:{\Rx} and {\Ry}) --++ (0,-0.5*\Ly) arc(-90:0:{\Rx} and {\Ry}) -- cycle;
     \fill[OrangeFill, opacity=0.5] (\Rx,0.3*\Ly) arc(0:180:{1.05*\Rx} and {0.95*\Ry}) -- (-1.1*\Rx,0.3*\Ly) to[out=-90,in=103] (-\Rx,-0.2*\Ly) arc(180:0:{\Rx} and {\Ry}) -- cycle;
     \fill[OrangeFill, opacity=0.5] ($(O)+(0,-\Ry)$) arc(-90:-180:{\Rx} and {\Ry}) to[out=103,in=-90] (-1.1*\Rx,0.3*\Ly) to[out=-90,in=180] ($(O)+(0,-\Ry)+(115:0.4*\Ly)$) -- cycle;
@@ -46,7 +48,7 @@
     \draw[OrangeLine, thick, ->] ($(O)+(0,-\Ry)$) --++ (0,0.5*\Ly);
     \draw[OrangeLine, thick, ->] ($(O)+(0,-\Ry)$) --++ (115:0.4*\Ly);
 
-    \node at (0,0) {$\mathcal{R}$};
+    \node[InkBlue] at (0,0) {$\mathcal{R}$};
   \end{scope}
 
   \begin{scope}[shift={(1.8*\Lx,0)}]
@@ -66,10 +68,10 @@
     \fill[PurpleFill, opacity=0.3] (O) -- (Q) to[bend right=15] (Ru) -- (R) -- cycle;
     \fill[PurpleFill, opacity=0.3] (O) -- (R) to[bend left=15] (Qv) -- (Q) -- cycle;
 
-    \draw[densely dashed, thin,->] (-0.45*\Lx,-0.95*\Ly) to[bend left=12] (-0.43*\Lx,0.99*\Ly);
-    \draw[densely dashed, thin,->] (-0.8*\Lx,-0.7*\Ly) to[bend left=15] (0.8*\Lx,-0.9*\Ly);
+    \draw[InkBlue, densely dashed, thin,->] (-0.45*\Lx,-0.95*\Ly) to[bend left=12] (-0.43*\Lx,0.99*\Ly);
+    \draw[InkBlue, densely dashed, thin,->] (-0.8*\Lx,-0.7*\Ly) to[bend left=15] (0.8*\Lx,-0.9*\Ly);
 
-    \node at (0,0) {$\mathcal{T}$};
+    \node[InkBlue] at (0,0) {$\mathcal{T}$};
   \end{scope}
 \end{tikzpicture}
 
