@@ -1,0 +1,84 @@
+% ============================================================================
+% beamercolorthemecam.sty
+% Modern University of Cambridge palette (2024 Johnson Banks refresh) for the
+% Gemini beamerposter theme. Source of hex values:
+%   https://www.cam.ac.uk/brand-resources/guidelines/colour
+% Replaces Gemini's default colours. Defines every beamer colour the Gemini
+% theme references (headline*, heading, block*{title,body,separator}, footline,
+% headline rule) plus the figure-coherent accent pair used for the
+% amplification/suppression colour-coding.
+%
+% Accessibility (brand-mandated): never Cambridge-Blue text on white, never white
+% text on a Cambridge-Blue fill. Body text uses Slate 4, headers use Dark Blue.
+% ============================================================================
+
+\mode<presentation>
+
+\RequirePackage{xcolor}
+
+% ---- Core Cambridge palette ------------------------------------------------
+\definecolor{CamBlue}{HTML}{8EE8D8}      % anchor / signature (light turquoise)
+\definecolor{CamLightBlue}{HTML}{D1F9F1} % subtle tints / block backgrounds
+\definecolor{CamWarmBlue}{HTML}{00BDB6}  % rules / secondary accent
+\definecolor{CamDarkBlue}{HTML}{133844}  % header text / strong accent
+\definecolor{Slate4}{HTML}{232830}       % body text (brand: not pure black)
+\definecolor{Slate2}{HTML}{B5BDC8}       % light grey rules / muted text
+
+% ---- Figure-coherent accent pair (secondary families) ----------------------
+% Amplification = Cherry; Suppression = Crest. Kept identical to the Python
+% figure palette (_poster_palette.py) so plots and text agree.
+\definecolor{CamCherry}{HTML}{CD3572}      % amplification (pink/magenta)
+\definecolor{CamCherryDark}{HTML}{911449}
+\definecolor{CamLightCherry}{HTML}{F2CAD8} % alert-block tinted body
+\definecolor{CamCrest}{HTML}{FD8153}       % suppression (coral/orange)
+\definecolor{CamCrestDark}{HTML}{DD3025}
+
+% ---- Background / base text -------------------------------------------------
+\setbeamercolor{background canvas}{bg=white}
+\setbeamercolor{normal text}{fg=Slate4,bg=white}
+\setbeamercolor{alert}{fg=CamCherryDark}
+\setbeamercolor{structure}{fg=CamDarkBlue}
+
+% ---- Headline (title band) --------------------------------------------------
+% Talk-frametitle style: a light-blue header field, a standard-blue bar across the
+% very top (headline topbar), and a BOLD warm-blue rule separating header from body
+% (headline rule). Dark Blue title text.
+\setbeamercolor{headline}{fg=CamDarkBlue,bg=CamLightBlue}
+\setbeamercolor{headline title}{fg=CamDarkBlue}
+\setbeamercolor{headline author}{fg=CamDarkBlue}
+\setbeamercolor{headline institute}{fg=CamDarkBlue}
+\setbeamercolor{headline topbar}{bg=CamBlue}     % (legacy) standard-blue bar
+\setbeamercolor{headline title strip}{fg=CamDarkBlue,bg=CamBlue} % std-blue title strip
+\setbeamercolor{headline rule}{bg=CamWarmBlue}   % BOLD warm-blue separation rule
+
+% ---- Section headings -------------------------------------------------------
+\setbeamercolor{heading}{fg=CamDarkBlue}
+
+% ---- Standard block: standard-blue title bar + warm-blue rule + light body --
+\setbeamercolor{block title}{fg=CamDarkBlue,bg=CamBlue}     % standard-blue header bar
+\setbeamercolor{block separator}{bg=CamWarmBlue}            % warm-blue rule below title
+\setbeamercolor{block body}{fg=Slate4,bg=CamLightBlue}      % light-blue body
+
+% ---- Alert block (Key-finding only): Cherry title bar ----------------------
+\setbeamercolor{block title alerted}{fg=white,bg=CamCherry}
+\setbeamercolor{block separator alerted}{bg=CamCherryDark}
+\setbeamercolor{block body alerted}{fg=Slate4,bg=CamLightCherry}
+
+% ---- Example block (key equation mini-box): standard-blue title bar ---------
+\setbeamercolor{block title example}{fg=CamDarkBlue,bg=CamBlue}
+\setbeamercolor{block separator example}{bg=CamWarmBlue}
+\setbeamercolor{block body example}{fg=Slate4,bg=CamLightBlue}
+
+% ---- Dominant-operator equation box (distinct standard-blue fill so it reads
+%      as a contained box on the light-blue results body) ---------------------
+\setbeamercolor{eqn box}{fg=CamDarkBlue,bg=CamBlue}
+
+% ---- Footer band (lowest section): Cambridge Blue with warm-blue top rule ----
+\setbeamercolor{footer band}{fg=CamDarkBlue,bg=CamBlue}
+\setbeamercolor{footer rule}{bg=CamWarmBlue}
+
+% ---- Itemize bullets, captions ---------------------------------------------
+\setbeamercolor{item}{fg=CamWarmBlue}
+\setbeamercolor{caption name}{fg=CamDarkBlue}
+
+\mode<all>

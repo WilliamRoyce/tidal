@@ -17,7 +17,30 @@ from typing import TYPE_CHECKING
 import matplotlib as mpl
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import numpy as np
 from anesthetic import read_chains
+
+# Reproducibility seed for anesthetic's triangular_sample_compression_2d
+# (which calls np.random.choice). We additionally pass ncompress = chain
+# length to the plot_2d calls so every weighted sample contributes to the
+# 2D KDE (no random subsampling); reseeding before each plot_2d is a
+# belt-and-braces guard against any other unseeded np.random consumer
+# inside the anesthetic call path.
+RNG_SEED = 1
+
+# Upper bound for anesthetic's per-source ncompress.  Anesthetic's
+# triangular_sample_compression_2d (anesthetic/utils.py:840) skips its
+# weighted np.random.choice subsample and triangulates ALL samples when
+# ncompress >= n_samples; this crashes matplotlib's Delaunay routine on
+# chains with degenerate sample configurations (e.g. T5 Bahamonde, T1
+# dark-photon-plasma).  Capping at MAX_NCOMPRESS forces the
+# random.choice path so anesthetic always returns a triangulable
+# subset.  1000 matches the talk-proven value (verified pixel-identical
+# across re-runs in overlay_chi_closure_pair_restricted_for_talk.py)
+# and the anesthetic default; it is also fast for high-D corners
+# (e.g. T9 at 32D has 496 lower-triangle panels, so per-panel
+# ncompress doubling costs ~5x wall-clock).
+MAX_NCOMPRESS = 1000
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -125,6 +148,7 @@ def overlay_corner(
     fig_width: float = FIG_WIDTH,
     prior_samples=None,
     legend_kw: dict | None = None,
+    transparent: bool = False,
 ) -> None:
     """Render an overlaid amp+sup corner plot to PDF.
 
@@ -181,25 +205,42 @@ def overlay_corner(
     # an AxesDataFrame (pandas-like), not a (fig, axes) tuple.  Each source
     # in `sources` is a (tag, samples, color, alpha) 4-tuple so the prior
     # overlay can use a faint alpha while amp/sup keep their primary alpha.
+    #
+    # ncompress = max(1, len(samples) - 1) per source.  Anesthetic's
+    # triangular_sample_compression_2d uses ALL indices (skipping the
+    # weighted np.random.choice) when ncompress >= n_samples (see
+    # anesthetic/utils.py:840) — but the resulting matplotlib
+    # Triangulation crashes on some chains with degenerate sample
+    # configurations.  Setting ncompress = len-1 forces the
+    # random.choice path (seeded → deterministic), drops a single
+    # sample per chain (negligible), and guarantees a valid
+    # triangulation. np.random.seed is reseeded before each plot_2d
+    # for both the random.choice subsample selection and as a
+    # belt-and-braces guard against other unseeded consumers inside
+    # anesthetic.
     _, first_ns, first_color, first_alpha = sources[0]
     # Corner plots show ONLY the lower triangle + diagonal marginals; the
     # upper triangle would just mirror the same 2D distributions and adds
     # no new information. The 'kde' shortcut puts 1D KDE on the diagonal
     # and 2D KDE in the lower triangle (no upper triangle).
+    np.random.seed(RNG_SEED)  # noqa: NPY002 -- must set the legacy global RNG anesthetic reads
     axes = first_ns.plot_2d(
         params,
         kinds="kde",
         levels=CONTOUR_LEVELS,
         color=first_color,
         alpha=first_alpha,
+        ncompress=min(MAX_NCOMPRESS, max(1, len(first_ns) - 1)),
     )
     for _, ns, color, alpha in sources[1:]:
+        np.random.seed(RNG_SEED)  # noqa: NPY002 -- see rationale above
         ns.plot_2d(
             axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
             color=color,
             alpha=alpha,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(ns) - 1)),
         )
 
     fig = axes.iloc[0, 0].figure
@@ -264,5 +305,7 @@ def overlay_corner(
     if title is not None:
         fig.suptitle(title, y=1.02)
     fig.set_size_inches(fig_width, fig_width * height_ratio)
-    fig.savefig(out_path, format="pdf", bbox_inches="tight")
+    if transparent:
+        fig.patch.set_alpha(0.0)
+    fig.savefig(out_path, format="pdf", bbox_inches="tight", transparent=transparent)
     plt.close(fig)

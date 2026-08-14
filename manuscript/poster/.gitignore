@@ -1,0 +1,8 @@
+# Poster build artifacts (inherits *.pdf etc. from manuscript/.gitignore).
+# Re-include the committed source assets the poster needs to build:
+!figures/*.pdf
+!theme/*.pdf
+!theme/*.eps
+
+# ...but never commit the build output PDF.
+poster.pdf

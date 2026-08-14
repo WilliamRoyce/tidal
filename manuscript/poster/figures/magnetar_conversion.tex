@@ -1,0 +1,114 @@
+% Magnetar graphical abstract for the poster — adapted from
+% manuscript/figures/gertsenshtein_zeldovich_star.tex and recoloured to the
+% modern Cambridge poster palette:
+%   incoming gravitational wave -> Dark Blue
+%   dipole magnetic field lines -> dark teal (Warm/Dark Blue)
+%   neutron star                -> Dark Blue
+%   magnetosphere / corona      -> Light Blue
+%   outgoing photon / FRB       -> Cherry (the amplification colour)
+\documentclass[border=3pt,tikz]{standalone}
+\usepackage{bm}
+\usepackage{tikz,pgfplots}
+\usetikzlibrary{arrows.meta}
+\tikzset{>=latex}
+\pgfplotsset{compat=1.13}
+\usetikzlibrary{decorations.markings,intersections,calc}
+\usepackage{ifthen}
+\usepackage[outline]{contour}  % xcolor already loaded by the standalone 'tikz' option
+
+% ---- modern Cambridge palette ----
+\definecolor{CamBlue}{HTML}{8EE8D8}
+\definecolor{CamLightBlue}{HTML}{D1F9F1}
+\definecolor{CamWarmBlue}{HTML}{00BDB6}
+\definecolor{CamDarkBlue}{HTML}{133844}
+\definecolor{CamCherry}{HTML}{CD3572}
+
+\colorlet{Bcol}{CamWarmBlue}
+\colorlet{BcolFL}{CamDarkBlue!78!CamWarmBlue}  % dipole field lines: dark teal
+\colorlet{Corona}{CamBlue}                     % magnetosphere halo
+\colorlet{GW}{CamDarkBlue}                      % incoming gravitational wave
+\colorlet{Photon}{CamCherry}                    % outgoing photon / FRB
+\contourlength{1.2pt}
+
+\usetikzlibrary{fadings}
+\begin{tikzfadingfrompicture}[name=halo]
+  \shade[inner color=transparent!0,outer color=transparent!100] (0,0) circle (0.9);
+\end{tikzfadingfrompicture}
+
+\tikzstyle{gw}=[-{Latex[length=2mm,width=1.5mm]}, GW, thick,decorate, decoration={snake,amplitude=3,segment length=8,post length=8}, path fading=east]
+
+
+\begin{document}
+\pagecolor{CamLightBlue}
+
+\begin{tikzpicture}[
+    line cap=round,
+    line join=round]
+    \def\xmax{8}
+    \def\ymax{2}
+    \def\E{0.7}
+    \def\N{13}
+    \def\cone{27}
+    \def\tilt{8}
+
+    \fill[path fading=halo,Corona] (0,0) circle (2*\E); % Halo/corona
+
+    \draw[thick, dotted, Corona] (0,0) ellipse ({2*\E} and {1.7*\E});
+    \fill[CamWarmBlue, opacity=0.075] (0,0) ellipse ({2*\E} and {1.7*\E});
+
+    \clip (-\xmax,-\ymax) rectangle (\xmax,\ymax);
+        \foreach \i [evaluate={\r=\i*\xmax;}] in {0.15, 0.3, 0.6, 0.99}{
+            \draw[BcolFL, thick, domain=0:360, smooth, samples=50, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+        }
+        \foreach \i/\ang [evaluate={\r=\i*\xmax;}] in {0.15/5, 0.3/2.6, 0.6/1.5, 0.99/0.8}{
+            \draw[BcolFL, -{Latex[length=2mm,width=1.5mm]}, thin, domain=0:90+\ang, smooth, samples=20, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL, -{Latex[length=2mm,width=1.5mm]}, thin, domain=360:270-\ang, smooth, samples=20, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+        }
+        \foreach \i/\ang [evaluate={\r=\i*\xmax;}] in {1.6/30, 3.0/20, 6.0/15, 20.0/10, 70.0/5}{
+            \draw[BcolFL, thick, domain=0:\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL, thick, domain=180-\ang:180, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL, thick, domain=180:180+\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL, thick, domain=360-\ang:360, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+        }
+        \foreach \i/\ang [evaluate={\r=\i*\xmax;}] in {0.3/58, 0.6/36.2, 1.6/20.83, 6.0/10.55}{
+            \draw[BcolFL,-{Latex[length=2mm,width=1.5mm]}, thin, domain=0:\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL,-{Latex[length=2mm,width=1.5mm]}, thin, domain=90:180-\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL,-{Latex[length=2mm,width=1.5mm]}, thin, domain=270:180+\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+            \draw[BcolFL,-{Latex[length=2mm,width=1.5mm]}, thin, domain=360:360-\ang, smooth, samples=10, variable=\t] plot ({\r*sin(\t)*sin(\t)*sin(\t)},{\r*sin(\t)*sin(\t)*cos(\t)});
+        }
+        \draw[BcolFL, -{Latex[length=2mm,width=1.5mm]}, thin] (0,0) -- (0,0.803*\ymax);
+        \draw[BcolFL, -{Latex[length=2mm,width=1.5mm]}, thin] (0,-\ymax) -- (0,-0.803*\ymax);
+
+        \draw[BcolFL, thick] (0,0) -- (0,\ymax);
+        \draw[BcolFL, thick] (0,0) -- (0,-\ymax);
+
+    % Neutron star: soft sphere -- an OFFSET radial palette gradient (no white
+    % highlight or black rim, unlike `ball color`), so it matches the soft corona
+    % and field-line tones rather than standing out. The bright tone sits up-left
+    % (gentle illumination) and deepens to a teal toward the lower-right edge.
+    \begin{scope}
+        \clip (0,0) circle (\E);
+        \shade[inner color=CamBlue, outer color=CamDarkBlue!70!CamWarmBlue]
+              (-0.32*\E,0.32*\E) circle (1.5*\E);
+    \end{scope}
+    \draw[very thin, Corona] (0,0) circle (\E);
+
+    \node[CamDarkBlue] at (0.203*\xmax,0.87*\ymax) {\contour{CamLightBlue}{Magnetosphere}};
+    \node[CamDarkBlue] at (0.24*\xmax,-0.315*\ymax) {\contour{CamLightBlue}{Neutron star}};
+
+    \foreach \i[evaluate={\y=\i*0.2*\ymax;}] in {-1,0,1}{
+        \draw[gw] (-0.9*\xmax,\y) -- (-2*\E,\y);
+    }
+    \node[GW] at (-0.65*\xmax,0.4*\ymax) {\contour{CamLightBlue}{Gravitational waves}};
+
+    \coordinate (EM) at (2*\E,0);
+    \foreach \i [evaluate={\r={\i*0.57*\xmax/\N};}] in {1,...,\N}{
+        \draw[line width=2.5pt, CamLightBlue] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
+        \draw[line width=1.75pt, Photon, opacity=0.12] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
+        \draw[thick, Photon] ($(EM)+(+\cone:{\r} and {0.5*\r})$) arc(+\cone:-\cone:{\r} and {0.5*\r});
+    }
+
+    \node[Photon,align=center] at (0.81*\xmax,0.80*\ymax) {\contour{CamLightBlue}{Photon} \\ \contour{CamLightBlue}{(Fast Radio Burst)}};
+\end{tikzpicture}
+
+\end{document}

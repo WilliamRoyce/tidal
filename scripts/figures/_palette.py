@@ -42,3 +42,37 @@ RESERVED_COLOR = IBM_PALETTE["blue"]
 AMP_ALPHA = 0.5
 SUP_ALPHA = 0.5
 PRIOR_ALPHA = 0.15
+
+
+# 2024 Cambridge brand palette (Johnson Banks refresh).
+# Source: cam.ac.uk/brand-resources/guidelines/colour.
+# Used by the talk-deck figure variants so the corner-plot accents match
+# the slide accents; manuscript figures continue to use IBM_PALETTE.
+CAMBRIDGE_PALETTE = {
+    # Core palette
+    "blue": "#8EE8D8",
+    "light_blue": "#D1F9F1",
+    "warm_blue": "#00BDB6",
+    "dark_blue": "#133844",
+    "slate4": "#232830",
+    # Crest family (orange / coral)
+    "light_crest": "#FFE2C8",
+    "warm_crest": "#FFC392",
+    "crest": "#FD8153",
+    "dark_crest": "#DD3025",
+    # Cherry family (pink / red)
+    "light_cherry": "#F2CAD8",
+    "warm_cherry": "#E18AAC",
+    "cherry": "#CD3572",
+    "dark_cherry": "#911449",
+    # Purple family
+    "light_purple": "#F2ECF8",
+    "warm_purple": "#D1B7EB",
+    "purple": "#A368DF",
+    "dark_purple": "#681FB1",
+    # Indigo family
+    "light_indigo": "#EBEDFB",
+    "warm_indigo": "#B0B9F1",
+    "indigo": "#5366E0",
+    "dark_indigo": "#29347A",
+}

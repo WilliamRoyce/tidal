@@ -40,6 +40,7 @@ from _corner_style import (
     COLUMN_WIDTH,
     CONTOUR_LEVELS,
     FIG_WIDTH,
+    MAX_NCOMPRESS,
     OVERLAY_ALPHA,
     SUP_COLOR,
     apply_style,
@@ -136,30 +137,71 @@ def render_overlay_pair(
     np_sup_dir: Path,
     np_param_names: list[str],
     fig_width: float,
+    param_label_overrides: dict[str, str] | None = None,
+    transparent: bool = False,
+    colours: dict[str, str] | None = None,
+    legend_labels: dict[str, str] | None = None,
+    strip_ylabels: bool = False,
+    strip_xlabels: bool = False,
+    ylabel_rotation: float | None = None,
+    rcparams_overrides: dict | None = None,
+    legend_anchor: tuple[float, float] | None = None,
+    seed: int | None = 1,
+    ncompress: int | None = None,  # deprecated; dynamic per-chain ncompress wins
 ) -> None:
     apply_style()
+    # Apply caller's rcparams overrides AFTER apply_style() so they actually
+    # stick — apply_style() unconditionally updates mpl.rcParams from RCPARAMS
+    # which would otherwise overwrite any rcParams set by the caller before
+    # the render call.
+    if rcparams_overrides:
+        import matplotlib as mpl
 
-    {n: _label(n) for n in plot_params}
+        mpl.rcParams.update(rcparams_overrides)
+
+    # Deterministic, full-detail contours. Anesthetic's 2-D plotting
+    # randomly subsamples the weighted chains
+    # (triangular_sample_compression_2d -> np.random.choice, unseeded);
+    # passing ncompress = len(chain) per call makes that subsample a
+    # no-op so EVERY weighted sample contributes to the 2D KDE. Reseed
+    # np.random before each plot_2d as a belt-and-braces guard against
+    # any other unseeded np.random consumer inside anesthetic.
+    import numpy as np
+
+    seed_value = seed if seed is not None else 1
+    _ = ncompress  # accepted for backwards compat with talk-script caller; ignored in favour of dynamic per-chain value
+
+    # Resolve four overlay colours (prop_amp, prop_sup, np_amp, np_sup),
+    # defaulting to module-level constants when not overridden.
+    amp = (colours or {}).get("prop_amp", AMP_COLOR)
+    sup = (colours or {}).get("prop_sup", SUP_COLOR)
+    np_amp_ = (colours or {}).get("np_amp", NP_AMP_COLOR)
+    np_sup_ = (colours or {}).get("np_sup", NP_SUP_COLOR)
+
+    def _resolve_label(name: str) -> str:
+        if param_label_overrides and name in param_label_overrides:
+            return param_label_overrides[name]
+        return _label(name)
 
     prop_amp = load_chains(
         prop_amp_dir,
         params=prop_param_names,
-        param_labels={n: _label(n) for n in prop_param_names},
+        param_labels={n: _resolve_label(n) for n in prop_param_names},
     )
     prop_sup = load_chains(
         prop_sup_dir,
         params=prop_param_names,
-        param_labels={n: _label(n) for n in prop_param_names},
+        param_labels={n: _resolve_label(n) for n in prop_param_names},
     )
     np_amp = load_chains(
         np_amp_dir,
         params=np_param_names,
-        param_labels={n: _label(n) for n in np_param_names},
+        param_labels={n: _resolve_label(n) for n in np_param_names},
     )
     np_sup = load_chains(
         np_sup_dir,
         params=np_param_names,
-        param_labels={n: _label(n) for n in np_param_names},
+        param_labels={n: _resolve_label(n) for n in np_param_names},
     )
 
     # Canvas spans the full `plot_params` list. NP chains may lack some
@@ -171,54 +213,66 @@ def render_overlay_pair(
     prop_only_cols = [p for p in plot_params if p not in np_param_names]
     np_plot_params = [p for p in plot_params if p in np_param_names]
 
+    np.random.seed(seed_value)  # noqa: NPY002 -- must set the legacy global RNG anesthetic reads
     axes = prop_amp.plot_2d(
         plot_params,
         kinds="kde",
         levels=CONTOUR_LEVELS,
-        color=AMP_COLOR,
+        color=amp,
         alpha=OVERLAY_ALPHA,
+        ncompress=min(MAX_NCOMPRESS, max(1, len(prop_amp) - 1)),
     )
+    np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
     prop_sup.plot_2d(
         axes,
         kinds="kde",
         levels=CONTOUR_LEVELS,
-        color=SUP_COLOR,
+        color=sup,
         alpha=OVERLAY_ALPHA,
+        ncompress=min(MAX_NCOMPRESS, max(1, len(prop_sup) - 1)),
     )
     if prop_only_cols:
         # Full-corner case (some columns propagating-only): slice axes
         # so NP only overlays the columns it has data for.
         np_axes = axes.loc[np_plot_params, np_plot_params]
+        np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
         np_amp.plot_2d(
             np_axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=NP_AMP_COLOR,
+            color=np_amp_,
             alpha=OVERLAY_ALPHA,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(np_amp) - 1)),
         )
+        np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
         np_sup.plot_2d(
             np_axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=NP_SUP_COLOR,
+            color=np_sup_,
             alpha=OVERLAY_ALPHA,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(np_sup) - 1)),
         )
     else:
         # Restricted case (all plot_params in NP list): plot NP directly
         # on the same `axes` object, matching the pre-round-15 behavior.
+        np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
         np_amp.plot_2d(
             axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=NP_AMP_COLOR,
+            color=np_amp_,
             alpha=OVERLAY_ALPHA,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(np_amp) - 1)),
         )
+        np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
         np_sup.plot_2d(
             axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
-            color=NP_SUP_COLOR,
+            color=np_sup_,
             alpha=OVERLAY_ALPHA,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(np_sup) - 1)),
         )
 
     fig = axes.iloc[0, 0].figure
@@ -227,28 +281,32 @@ def render_overlay_pair(
         if ax is None:
             continue
         ax.tick_params(bottom=False, left=False, labelbottom=False, labelleft=False)
+        if strip_ylabels:
+            ax.set_ylabel("")
+        if strip_xlabels:
+            ax.set_xlabel("")
+        if ylabel_rotation is not None and ax.get_ylabel():
+            ax.yaxis.label.set_rotation(ylabel_rotation)
+            ax.yaxis.label.set_horizontalalignment("right")
+            ax.yaxis.label.set_verticalalignment("center")
+            ax.yaxis.labelpad = 10
 
+    ll = legend_labels or {}
+    lbl_prop_amp = ll.get("prop_amp", "amplification (propagating)")
+    lbl_prop_sup = ll.get("prop_sup", "suppression (propagating)")
+    lbl_np_amp = ll.get("np_amp", r"amplification ($\xi=0$ control)")
+    lbl_np_sup = ll.get("np_sup", r"suppression ($\xi=0$ control)")
     legend_handles = [
-        mpatches.Patch(
-            color=AMP_COLOR, alpha=OVERLAY_ALPHA, label="amplification (propagating)"
-        ),
-        mpatches.Patch(
-            color=SUP_COLOR, alpha=OVERLAY_ALPHA, label="suppression (propagating)"
-        ),
-        mpatches.Patch(
-            color=NP_AMP_COLOR,
-            alpha=OVERLAY_ALPHA,
-            label=r"amplification ($\xi=0$ control)",
-        ),
-        mpatches.Patch(
-            color=NP_SUP_COLOR,
-            alpha=OVERLAY_ALPHA,
-            label=r"suppression ($\xi=0$ control)",
-        ),
+        mpatches.Patch(color=amp, alpha=OVERLAY_ALPHA, label=lbl_prop_amp),
+        mpatches.Patch(color=sup, alpha=OVERLAY_ALPHA, label=lbl_prop_sup),
+        mpatches.Patch(color=np_amp_, alpha=OVERLAY_ALPHA, label=lbl_np_amp),
+        mpatches.Patch(color=np_sup_, alpha=OVERLAY_ALPHA, label=lbl_np_sup),
     ]
     ax_anchor = axes.iloc[0, 0]
     n = len(plot_params)
-    if n <= 3:
+    if legend_anchor is not None:
+        loc, anchor = "upper right", legend_anchor
+    elif n <= 3:
         loc, anchor = "upper left", (1.05, 1.0)
     else:
         loc, anchor = "upper right", (n - 0.5, 1.0)
@@ -265,7 +323,9 @@ def render_overlay_pair(
 
     fig.set_size_inches(fig_width, fig_width * 0.95)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, format="pdf", bbox_inches="tight")
+    if transparent:
+        fig.patch.set_alpha(0.0)
+    fig.savefig(out_path, format="pdf", bbox_inches="tight", transparent=transparent)
     plt.close(fig)
     log.info("[overlay_pair] wrote %s", out_path)
 

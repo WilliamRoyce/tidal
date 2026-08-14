@@ -1,0 +1,259 @@
+% !TEX program = lualatex
+% ============================================================================
+% Conference poster — Part III/MASt project conference (17 June 2026)
+% "Amplifying graviton-photon conversion with spacetime torsion"
+% William Royce, Cavendish Astrophysics.
+%
+% Build: LuaLaTeX REQUIRED (Gemini theme uses fontspec). The `% !TEX program`
+% line above tells editors to use lualatex. From the CLI use `make` or
+%   latexmk -lualatex poster.tex
+% The theme/ dir is added to \input@path below so \usetheme finds the local
+% theme files without needing TEXINPUTS set.
+% ============================================================================
+\documentclass[final]{beamer}
+
+% Make the local theme/ directory discoverable by \usetheme / \usecolortheme
+% (so a direct `lualatex poster.tex` works without TEXINPUTS=./theme).
+\makeatletter
+\providecommand\input@path{}
+\g@addto@macro\input@path{{theme/}}
+\makeatother
+
+% ---- Poster size: A0 portrait ----------------------------------------------
+\usepackage[size=a0,orientation=portrait,scale=1.15]{beamerposter}
+\usetheme{gemini}
+\usecolortheme{cam}
+
+% ---- Math (no stix: amssymb \varkappa, mathrsfs \mathscr) -------------------
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{mathrsfs}
+\usepackage{tensor}
+\usepackage{accents}
+
+% ---- Macro helpers required by poster-macros.tex ---------------------------
+\usepackage{etoolbox}
+\usepackage{xspace}
+\usepackage{xstring}
+
+% ---- Graphics / QR ---------------------------------------------------------
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,decorations.pathmorphing,calc}
+\usepackage{qrcode}
+\usepackage{anyfontsize}   % arbitrary title sizes
+\usepackage{eso-pic}       % single-pass absolute logo placement (no remember picture)
+\graphicspath{{figures/}{theme/}}
+
+% ---- Notation (extracted from ../macros.tex) -------------------------------
+\input{poster-macros.tex}
+
+% ---- Block template: standard-blue title bar, a THICK warm-blue rule flush at
+% its bottom (separating header from body, like the talk frametitle), then a
+% padded light-blue body. The Gemini default nests the separator inside the title
+% box and pulls it up with \vskip-1.25ex (landing part-way through the bar); we
+% move it OUT into its own full-width box so it sits cleanly at the bottom.
+\setbeamertemplate{block begin}{
+  \begin{beamercolorbox}[colsep*=0ex,dp=1ex,center]{block title}
+    \vskip0.4ex
+    \usebeamerfont{block title}\insertblocktitle
+    \vskip0.4ex
+  \end{beamercolorbox}
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\linewidth,ht=0.55ex,sep=0pt]{block separator}\end{beamercolorbox}
+  \nointerlineskip
+  \usebeamerfont{block body}
+  \begin{beamercolorbox}[colsep*=0ex]{block body}
+    \justifying
+    \begin{adjustwidth}{1.5ex}{1.5ex}
+      \setlength{\parskip}{1ex} \vskip0.5ex } \setbeamertemplate{block end}{ \vskip0.5ex
+    \end{adjustwidth}
+  \end{beamercolorbox}
+  \vskip0pt
+  \vspace*{2ex}
+}
+
+% ---- Alert block (cherry key-finding): same separator fix -- thick dark-cherry
+% rule flush at the bottom of the cherry title bar (was nested part-way through).
+\setbeamertemplate{block alerted begin}{
+  \begin{beamercolorbox}[colsep*=0ex,dp=1ex,center]{block title alerted}
+    \vskip0.4ex
+    \usebeamerfont{block title}\insertblocktitle
+    \vskip0.4ex
+  \end{beamercolorbox}
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\linewidth,ht=0.55ex,sep=0pt]{block separator alerted}\end{beamercolorbox}
+  \nointerlineskip
+  \usebeamerfont{block body}
+  \begin{beamercolorbox}[colsep*=0ex]{block body alerted}
+    \justifying
+    \begin{adjustwidth}{1.5ex}{1.5ex}
+      \setlength{\parskip}{1ex} \vskip0.5ex } \setbeamertemplate{block alerted end}{ \vskip0.5ex
+    \end{adjustwidth}
+  \end{beamercolorbox}
+  \vskip0pt
+  \vspace*{2ex}
+}
+
+% ---- Header typography: large full-width title ------------------------------
+% 124pt keeps line 1 ("Amplifying graviton--photon conversion") on a single line
+% within the 0.92\paperwidth title parbox (130 overflowed to a 3rd line); the larger
+% \baselineskip (170) opens the gap between the two title lines.
+\setbeamerfont{headline title}{size=\fontsize{124}{170}\selectfont,series=\bfseries}
+\setbeamerfont{headline author}{size=\LARGE,series=\bfseries}
+\setbeamerfont{headline institute}{size=\normalsize}
+
+% ---- Custom headline: two separate strips with a gap --
+%   (1) standard-blue strip with the title,
+%   (2) gap (page background),
+%   (3) light-blue strip with logo + author + affiliation,
+%   (4) BOLD warm-blue rule before the body.
+\setbeamertemplate{headline}{%
+  % (1) standard-blue title strip (full width) -- tall, generous title whitespace
+  \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline title strip}%
+    \vskip20ex
+    \centering
+    {\usebeamerfont{headline title}\inserttitle\par}
+    \vskip20ex
+  \end{beamercolorbox}%
+  \nointerlineskip
+  % (2) light-blue strip flush below the title strip (no white gap):
+  %     logo (left) + author/affiliation (centred)
+  \begin{beamercolorbox}[wd=\paperwidth,sep=0pt]{headline}%
+    \vskip2.6ex
+    \begin{columns}[c]
+      \begin{column}{0.20\paperwidth}
+        % \mbox forces restricted horizontal mode: a leading \hspace* at the start
+        % of a column body otherwise begins a paragraph and TeX discards the leading
+        % glue (which is why \hspace{5cm}/{8cm} never moved the logo). Inside an
+        % \mbox the kern is always kept, so this reliably insets the logo.
+        \mbox{\hspace*{2.5cm}\includegraphics[height=4.0cm]{uc-cmyk}}
+      \end{column}
+      \begin{column}{0.60\paperwidth}
+        \centering
+        {\usebeamerfont{headline author}\insertauthor\par}
+        \vskip0.9ex
+        {\usebeamerfont{headline institute}\insertinstitute\par}
+      \end{column}
+      \begin{column}{0.20\paperwidth}\mbox{}\end{column}
+    \end{columns}
+    \vskip2.6ex
+  \end{beamercolorbox}%
+  \nointerlineskip
+  % (4) BOLD warm-blue rule separating header from body
+  \begin{beamercolorbox}[wd=\paperwidth,ht=1.1ex,sep=0pt]{headline rule}\end{beamercolorbox}%
+}
+
+% ---- Layout lengths (3-column grid) ----------------------------------------
+\newlength{\sepwidth}
+\newlength{\colwidth}
+\setlength{\sepwidth}{0.025\paperwidth}
+\setlength{\colwidth}{0.300\paperwidth}
+\newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
+
+% ---- Metadata --------------------------------------------------------------
+% Title spans (almost) the full width; forced 2-line break for balance. No
+% subtitle in the header.
+\title{\parbox{0.92\paperwidth}{\centering Amplifying graviton--photon conversion\\ with
+    spacetime torsion}} \author{William Royce}
+% Affiliation; width handled by the centred 0.60\paperwidth column in the
+% light-blue header strip (logo sits in the left column).
+\institute{%
+  Supervised by W.~E.~V.~Barker, M.~P.~Hobson \& A.~N.~Lasenby\\[0.2ex]
+  Astrophysics Group, Cavendish Laboratory, University of Cambridge}
+
+% (Logo is placed directly inside the light-blue header strip above -- no eso-pic
+% overlay needed.)
+
+% ---- Full-bleed footer band (warm-blue rule + Cambridge-Blue band, QR corner),
+%      rendered via the footline so it is full-width and pinned to the page bottom.
+\setbeamertemplate{footline}{%
+  \begin{beamercolorbox}[wd=\paperwidth,ht=1.1ex,sep=0pt]{footer rule}\end{beamercolorbox}%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,sep=2.0ex]{footer band}%
+    \hspace{\sepwidth}%
+    \begin{minipage}{\dimexpr\paperwidth-3\sepwidth\relax}
+      \begin{columns}[c]
+        % --- condensed references (left) ---
+        \begin{column}{0.72\linewidth}
+          {\large\bfseries References}\\[0.4ex]
+          {\small
+          [1] Gertsenshtein, \emph{Sov.\ Phys.\ JETP}, 1962. \quad
+          [2] Boccaletti \etal, \emph{Nuovo Cim.\ B}, 1970. \quad
+          [3] Domcke \& Garcia-Cely, \emph{PRL}, 2021. \\{}
+          [4] Lella \etal, \emph{PRD}, 2024. \quad
+          [5] Berlin \etal, \emph{PRD}, 2022. \quad
+          [6] Wu \etal, arXiv:2604.12775, 2026. \\{}
+          [7] Barker \etal\ (\emph{PSALTer}), \emph{PRD}, 2025.}
+        \end{column}
+        % --- contact (left of QR) + full-height QR (right corner) ---
+        \begin{column}{0.26\linewidth}
+          \raggedleft
+          \begin{minipage}[c]{0.52\linewidth}
+            \raggedleft\small
+            \textbf{Scan for code \& data}\\[0.3ex]
+            Contact:\\ \texttt{wr286@cam.ac.uk}
+          \end{minipage}\hspace{0.5em}%
+          \colorbox{white}{\qrcode[height=6cm]{https://github.com/WilliamRoyce/torsion-gertsenshtein}}%
+        \end{column}
+      \end{columns}
+    \end{minipage}%
+    \hspace{\sepwidth}%
+  \end{beamercolorbox}%
+}
+
+% ============================================================================
+\begin{document}
+\begin{frame}[t]
+
+  % Leading \vfill so the whitespace ABOVE the key-finding box equals the whitespace
+  % below it: with this plus the two \vfill's lower down, the three leftover gaps
+  % (above cherry / below cherry / page bottom) are distributed equally.
+  \vfill
+
+  % ---- Row 1: full-width key finding -----------------------------------------
+  \begin{columns}[t]
+    \separatorcolumn
+    \begin{column}{\dimexpr\paperwidth-2\sepwidth\relax}
+      \input{sections/00_keyfinding.tex}
+    \end{column}
+    \separatorcolumn
+  \end{columns}
+
+  \vfill
+
+  % ---- Single two-column layout below the key finding. Each column flows
+  %      top-to-bottom independently, so the short Highlights box no longer leaves a
+  %      gap before the PGT box (the tall Background box used to set a shared row
+  %      height). Left column = Highlights -> 1. PGT -> 2. Methods; right column
+  %      (double width) = Background -> 3. Results -> Outlook. Reading order is
+  %      guided by the numbered headers (Highlights, then 1->2 down the left, 3 right).
+  \begin{columns}[t]
+    \separatorcolumn
+    \begin{column}{\colwidth}
+      \input{sections/01_highlights.tex}
+      \vspace{1ex}
+      \input{sections/03_pgt.tex}
+      \vspace{1ex}
+      \input{sections/04_methods.tex}
+    \end{column}
+    \separatorcolumn
+    \begin{column}{\dimexpr2\colwidth+\sepwidth\relax}
+      \input{sections/02_background.tex}
+      \vspace{1ex}
+      \input{sections/05_results.tex}
+      \vspace{1ex}
+      \input{sections/06_outlook.tex}
+    \end{column}
+    \separatorcolumn
+  \end{columns}
+
+  \vfill
+
+  % Outlook + references + QR are rendered as the full-bleed footer band (see the
+  % custom \setbeamertemplate{footline} above) so they reach the page edges and sit
+  % pinned to the bottom.
+
+\end{frame}
+\end{document}
