@@ -49,7 +49,7 @@ MARGIN = 0.25
 # rect on every side, so arrows must start/end OUTSIDE it to avoid overlapping,
 # and the axis limits must clear it so no box edge is clipped.
 BOX_PAD = 0.08
-ARROW_CLEAR = 0.14  # gap between an arrow tip/tail and the box edge
+ARROW_CLEAR = 0.04  # gap between an arrow tip/tail and the box edge
 
 
 def main() -> None:
