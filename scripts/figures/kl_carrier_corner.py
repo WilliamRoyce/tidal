@@ -46,6 +46,7 @@ from _corner_style import (
     COLUMN_WIDTH,
     CONTOUR_LEVELS,
     FIG_WIDTH,
+    MAX_NCOMPRESS,
     OVERLAY_ALPHA,
     SUP_COLOR,
     apply_style,
@@ -117,9 +118,10 @@ def _pick_top_k(importance: dict, k: int) -> list[str]:
     return sorted(names, key=lambda n: -score(n))[:k]
 
 
-def _process(entry: dict) -> None:
+def _process(entry: dict, seed: int = 1) -> None:
     import matplotlib.patches as mpatches
     import matplotlib.pyplot as plt
+    import numpy as np
 
     theory = entry["theory"]
     amp_path = REPO_ROOT / entry["amp_path"]
@@ -155,19 +157,28 @@ def _process(entry: dict) -> None:
     sup_ns = load_chains(sup_path, params=full_params, param_labels=full_labels)
 
     log.info("[%s] rendering top-%d carrier sub-corner: %s", theory, k, plot_params)
+    # Deterministic, full-detail contours: ncompress = len(chain) so
+    # anesthetic's triangular_sample_compression_2d retains every
+    # weighted sample (no random subsampling). np.random.seed reseeds
+    # before each plot_2d as a belt-and-braces guard against any other
+    # unseeded np.random consumer inside the anesthetic call path.
+    np.random.seed(seed)
     axes = amp_ns.plot_2d(
         plot_params,
         kinds="kde",
         levels=CONTOUR_LEVELS,
         color=AMP_COLOR,
         alpha=OVERLAY_ALPHA,
+        ncompress=min(MAX_NCOMPRESS, max(1, len(amp_ns) - 1)),
     )
+    np.random.seed(seed)
     sup_ns.plot_2d(
         axes,
         kinds="kde",
         levels=CONTOUR_LEVELS,
         color=SUP_COLOR,
         alpha=OVERLAY_ALPHA,
+        ncompress=min(MAX_NCOMPRESS, max(1, len(sup_ns) - 1)),
     )
     fig = axes.iloc[0, 0].figure
 

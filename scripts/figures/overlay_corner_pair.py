@@ -40,6 +40,7 @@ from _corner_style import (
     COLUMN_WIDTH,
     CONTOUR_LEVELS,
     FIG_WIDTH,
+    MAX_NCOMPRESS,
     OVERLAY_ALPHA,
     SUP_COLOR,
     apply_style,
@@ -145,8 +146,8 @@ def render_overlay_pair(
     ylabel_rotation: float | None = None,
     rcparams_overrides: dict | None = None,
     legend_anchor: tuple[float, float] | None = None,
-    seed: int | None = None,
-    ncompress: int | None = None,
+    seed: int | None = 1,
+    ncompress: int | None = None,  # deprecated; dynamic per-chain ncompress wins
 ) -> None:
     apply_style()
     # Apply caller's rcparams overrides AFTER apply_style() so they actually
@@ -158,17 +159,17 @@ def render_overlay_pair(
 
         mpl.rcParams.update(rcparams_overrides)
 
-    # Deterministic contours: anesthetic's 2-D plotting randomly subsamples the
-    # weighted chains (triangular_sample_compression_2d -> np.random.choice,
-    # unseeded), so contours otherwise drift every render. Seed np.random and
-    # pass ncompress (~all samples) for stable, smooth, true-density contours.
-    if seed is not None:
-        import numpy as np
+    # Deterministic, full-detail contours. Anesthetic's 2-D plotting
+    # randomly subsamples the weighted chains
+    # (triangular_sample_compression_2d -> np.random.choice, unseeded);
+    # passing ncompress = len(chain) per call makes that subsample a
+    # no-op so EVERY weighted sample contributes to the 2D KDE. Reseed
+    # np.random before each plot_2d as a belt-and-braces guard against
+    # any other unseeded np.random consumer inside anesthetic.
+    import numpy as np
 
-        np.random.seed(seed)
-    plot_kwargs_extra: dict = {}
-    if ncompress is not None:
-        plot_kwargs_extra["ncompress"] = ncompress
+    seed_value = seed if seed is not None else 1
+    _ = ncompress  # accepted for backwards compat with talk-script caller; ignored in favour of dynamic per-chain value
 
     # Resolve four overlay colours (prop_amp, prop_sup, np_amp, np_sup),
     # defaulting to module-level constants when not overridden.
@@ -212,60 +213,66 @@ def render_overlay_pair(
     prop_only_cols = [p for p in plot_params if p not in np_param_names]
     np_plot_params = [p for p in plot_params if p in np_param_names]
 
+    np.random.seed(seed_value)
     axes = prop_amp.plot_2d(
         plot_params,
         kinds="kde",
         levels=CONTOUR_LEVELS,
         color=amp,
         alpha=OVERLAY_ALPHA,
-        **plot_kwargs_extra,
+        ncompress=min(MAX_NCOMPRESS, max(1, len(prop_amp) - 1)),
     )
+    np.random.seed(seed_value)
     prop_sup.plot_2d(
         axes,
         kinds="kde",
         levels=CONTOUR_LEVELS,
         color=sup,
         alpha=OVERLAY_ALPHA,
-        **plot_kwargs_extra,
+        ncompress=min(MAX_NCOMPRESS, max(1, len(prop_sup) - 1)),
     )
     if prop_only_cols:
         # Full-corner case (some columns propagating-only): slice axes
         # so NP only overlays the columns it has data for.
         np_axes = axes.loc[np_plot_params, np_plot_params]
+        np.random.seed(seed_value)
         np_amp.plot_2d(
             np_axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
             color=np_amp_,
             alpha=OVERLAY_ALPHA,
-            **plot_kwargs_extra,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(np_amp) - 1)),
         )
+        np.random.seed(seed_value)
         np_sup.plot_2d(
             np_axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
             color=np_sup_,
             alpha=OVERLAY_ALPHA,
-            **plot_kwargs_extra,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(np_sup) - 1)),
         )
     else:
         # Restricted case (all plot_params in NP list): plot NP directly
         # on the same `axes` object, matching the pre-round-15 behavior.
+        np.random.seed(seed_value)
         np_amp.plot_2d(
             axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
             color=np_amp_,
             alpha=OVERLAY_ALPHA,
-            **plot_kwargs_extra,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(np_amp) - 1)),
         )
+        np.random.seed(seed_value)
         np_sup.plot_2d(
             axes,
             kinds="kde",
             levels=CONTOUR_LEVELS,
             color=np_sup_,
             alpha=OVERLAY_ALPHA,
-            **plot_kwargs_extra,
+            ncompress=min(MAX_NCOMPRESS, max(1, len(np_sup) - 1)),
         )
 
     fig = axes.iloc[0, 0].figure
