@@ -223,7 +223,7 @@ def overlay_corner(
     # upper triangle would just mirror the same 2D distributions and adds
     # no new information. The 'kde' shortcut puts 1D KDE on the diagonal
     # and 2D KDE in the lower triangle (no upper triangle).
-    np.random.seed(RNG_SEED)
+    np.random.seed(RNG_SEED)  # noqa: NPY002 -- must set the legacy global RNG anesthetic reads
     axes = first_ns.plot_2d(
         params,
         kinds="kde",
@@ -233,7 +233,7 @@ def overlay_corner(
         ncompress=min(MAX_NCOMPRESS, max(1, len(first_ns) - 1)),
     )
     for _, ns, color, alpha in sources[1:]:
-        np.random.seed(RNG_SEED)
+        np.random.seed(RNG_SEED)  # noqa: NPY002 -- see rationale above
         ns.plot_2d(
             axes,
             kinds="kde",

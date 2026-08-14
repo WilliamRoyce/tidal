@@ -102,7 +102,7 @@ COL_NP_SUP = INDIGO
 
 
 def main() -> None:
-    np.random.seed(SEED)  # deterministic anesthetic subsampling
+    np.random.seed(SEED)  # noqa: NPY002 -- must set the legacy global RNG anesthetic reads
     apply_poster_style()
     OUT.parent.mkdir(parents=True, exist_ok=True)
 

@@ -162,7 +162,7 @@ def _process(entry: dict, seed: int = 1) -> None:
     # weighted sample (no random subsampling). np.random.seed reseeds
     # before each plot_2d as a belt-and-braces guard against any other
     # unseeded np.random consumer inside the anesthetic call path.
-    np.random.seed(seed)
+    np.random.seed(seed)  # noqa: NPY002 -- must set the legacy global RNG anesthetic reads
     axes = amp_ns.plot_2d(
         plot_params,
         kinds="kde",
@@ -171,7 +171,7 @@ def _process(entry: dict, seed: int = 1) -> None:
         alpha=OVERLAY_ALPHA,
         ncompress=min(MAX_NCOMPRESS, max(1, len(amp_ns) - 1)),
     )
-    np.random.seed(seed)
+    np.random.seed(seed)  # noqa: NPY002 -- see rationale above
     sup_ns.plot_2d(
         axes,
         kinds="kde",

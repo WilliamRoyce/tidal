@@ -213,7 +213,7 @@ def render_overlay_pair(
     prop_only_cols = [p for p in plot_params if p not in np_param_names]
     np_plot_params = [p for p in plot_params if p in np_param_names]
 
-    np.random.seed(seed_value)
+    np.random.seed(seed_value)  # noqa: NPY002 -- must set the legacy global RNG anesthetic reads
     axes = prop_amp.plot_2d(
         plot_params,
         kinds="kde",
@@ -222,7 +222,7 @@ def render_overlay_pair(
         alpha=OVERLAY_ALPHA,
         ncompress=min(MAX_NCOMPRESS, max(1, len(prop_amp) - 1)),
     )
-    np.random.seed(seed_value)
+    np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
     prop_sup.plot_2d(
         axes,
         kinds="kde",
@@ -235,7 +235,7 @@ def render_overlay_pair(
         # Full-corner case (some columns propagating-only): slice axes
         # so NP only overlays the columns it has data for.
         np_axes = axes.loc[np_plot_params, np_plot_params]
-        np.random.seed(seed_value)
+        np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
         np_amp.plot_2d(
             np_axes,
             kinds="kde",
@@ -244,7 +244,7 @@ def render_overlay_pair(
             alpha=OVERLAY_ALPHA,
             ncompress=min(MAX_NCOMPRESS, max(1, len(np_amp) - 1)),
         )
-        np.random.seed(seed_value)
+        np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
         np_sup.plot_2d(
             np_axes,
             kinds="kde",
@@ -256,7 +256,7 @@ def render_overlay_pair(
     else:
         # Restricted case (all plot_params in NP list): plot NP directly
         # on the same `axes` object, matching the pre-round-15 behavior.
-        np.random.seed(seed_value)
+        np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
         np_amp.plot_2d(
             axes,
             kinds="kde",
@@ -265,7 +265,7 @@ def render_overlay_pair(
             alpha=OVERLAY_ALPHA,
             ncompress=min(MAX_NCOMPRESS, max(1, len(np_amp) - 1)),
         )
-        np.random.seed(seed_value)
+        np.random.seed(seed_value)  # noqa: NPY002 -- see rationale above
         np_sup.plot_2d(
             axes,
             kinds="kde",

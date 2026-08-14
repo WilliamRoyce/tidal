@@ -175,7 +175,10 @@ unfixable = ["T201"]
 # Citation-audit network tooling: intentional URL opens + subprocess use.
 "scripts/bibaudit/**" = ["S310", "S404"]
 "tidal/solver/ida.py" = ["PLR0913", "PLR0917", "RUF003"]
-"scripts/**/*" = [
+# manuscript/poster/scripts/ holds the same kind of one-off figure-generation
+# scripts as scripts/ (run standalone via `python scriptname.py`, not imported
+# as a package), so it gets the identical relaxations.
+"{scripts,manuscript/poster/scripts}/**/*" = [
     "INP001",
     "T201",
     "D101",
