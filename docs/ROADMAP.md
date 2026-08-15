@@ -2,8 +2,8 @@
 
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
-**Last Updated:** April 2026 (v0.33.9)
-**Project Status:** Phase 13+ Complete; perturbative reduction v6 complete (Stage 7 closed 2026-04-20, issue #271 resolved). Euler–Heisenberg quartic-EM path fully supported; matter-only derivative-only theories now unblocked. 1,991 Python tests + ~115 Wolfram tests.
+**Last Updated:** August 2026 (v0.47.9)
+**Project Status:** Phase 13+ Complete; perturbative reduction v6 complete (Stage 7 closed 2026-04-20, issue #271 resolved). Euler–Heisenberg quartic-EM path fully supported; matter-only derivative-only theories now unblocked. 2,449 Python tests + 133 Wolfram test cases.
 
 ## Overview
 
@@ -214,10 +214,10 @@ Issues should be tagged with appropriate labels:
 - ✅ Gauge fixing: optional per-field Lorenz/de Donder/Coulomb/temporal/axial (Phase B)
 - ✅ Constraint pre-solve: FFT/sparse three-tier solver (Phase J)
 - ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 12 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
-- ✅ CLI (`tidal` command) implemented: 9 subcommands, zero new dependencies
+- ✅ CLI (`tidal` command) implemented: 11 subcommands, zero new dependencies
 - ✅ Measurement module: 12 types (energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
-- ✅ 20 working examples spanning 1+1D through 3+1D
-- ✅ 1,700 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- ✅ 19 working examples spanning 1+1D through 3+1D
+- ✅ 2,449 Python tests + 133 Wolfram test cases passing, 0 ruff violations, 0 pyright errors
 - ✅ 21 of 25 original issues resolved (84%)
 - ✅ **Phase D (Gertsenshtein):** Complete — all physical regimes validated, torsion-independence proven for minimal PGT
 - 🔄 **Primary remaining focus:** Non-minimal torsion-EM coupling investigation (T·F terms), ghost-free parameter conditions

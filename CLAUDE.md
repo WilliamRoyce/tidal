@@ -10,7 +10,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `tidal/cli/` -- CLI entry points (11 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze, sample, doctor)
 - `tidal/inference/` -- Bayesian inference (priors, likelihood, constraints, MC, nested sampling via dynesty/PolyChord)
 - `tidal/measurement/` -- Physics measurements (energy, conversion, mixing, spectra)
-- `examples/` -- 20 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
+- `examples/` -- 19 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
 - `research/` -- General quadratic PGT+EM Lagrangian enumeration (xAct/xTras scripts, TeX document, classification JSONs)
 - `tests/` -- ~2,400 Python tests (76 files) + ~260 Wolfram test cases (tests/wolfram/*.wls)
 - `docs/` -- Architecture docs (MEMORY.md is the main reference)
