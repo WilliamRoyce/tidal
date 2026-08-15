@@ -14,39 +14,129 @@
 
 </p>
 
-View the `tidal` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
+## About
 
-A symbolic-to-numerical framework for **linearized field theory** — define a Lagrangian, derive the PDEs automatically, and simulate. Built for the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion; [Domcke & Garcia-Cely 2023](https://arxiv.org/abs/2301.02072)) and **torsion wave physics** (Poincare gauge theory). The graviton-photon conversion probability P = sin²(κB₀D/2) has been validated against the Boccaletti (1970) formula. The repository includes:
+TIDAL derives and integrates the linearized equations of motion of **any tensorial Lagrangian** on a given background. You write the Lagrangian in a TOML file; TIDAL performs the variation symbolically in Mathematica/xAct, decomposes the result into components, exports a JSON specification, and evolves it numerically. The numerical layer contains no physics — every equation it solves was derived from your Lagrangian.
 
-- A **symbolic derivation pipeline** (Mathematica/xAct) that derives linearized field equations from any Lagrangian and exports them as JSON specifications — zero hardcoded physics.
-- **Five solver backends** (SUNDIALS IDA/CVODE, Fourier modal, leapfrog, scipy) with analytical Jacobians, FFT spectral operators, and 2nd/4th/6th-order FD stencils.
-- **20 working examples** spanning 1+1D to 3+1D: scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, curved spacetimes, background-field scattering, graviton-photon conversion, and graviton-torsion mixing.
-- **1,721 Python tests + ~115 Wolfram tests**, 0 ruff violations, 0 pyright errors (strict mode).
+Fields may be scalars, vectors or tensors up to rank 3, in 1+1D through 3+1D, on flat or curved spacetimes, with background fields, gauge fixing, and Poincaré gauge theory (propagating torsion) supported directly in the theory specification.
 
-> Define a Lagrangian in TOML → derive linearized PDEs symbolically → simulate with adaptive solvers → measure conversion, spectra, and scattering.
+> Define a Lagrangian in TOML → derive linearized PDEs symbolically → simulate with adaptive solvers → measure conversion, spectra and scattering → sweep or sample over parameter space.
 
----
+Written by William Royce (`wr286@cantab.ac.uk`), developed in the Astrophysics Group, Cavendish Laboratory, University of Cambridge.
 
-## Community & Support
+API documentation: <https://williamroyce.github.io/torsion-gertsenshtein/>
 
-- **Questions & Ideas**: [GitHub Discussions](https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions) — Ask questions, share use cases, discuss physics
-- **Bug Reports**: [Issue Tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues) — Report bugs with the `bug` label
-- **Feature Requests**: [Issue Tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues) — Propose features with the `enhancement` label
-- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and workflow
+## Citing TIDAL
 
-For more, visit the [Documentation](https://williamroyce.github.io/torsion-gertsenshtein/).
+A software paper describing TIDAL is in preparation. Until it appears, please cite this repository:
 
----
+```text
+W. Royce, "TIDAL: Tensor Integration and Derivation for Any Lagrangian",
+https://github.com/WilliamRoyce/torsion-gertsenshtein
+```
 
-## Capabilities
+`tidal --cite` prints this along with the citations for SUNDIALS, SciPy, NumPy and xAct, which you should cite alongside TIDAL when you use the corresponding components. Physics work using TIDAL is also in preparation.
 
-### Symbolic Pipeline (`tidal.symbolic`, `tidal.wolfram`)
+## Example
 
-Complete Lagrangian-to-PDE derivation: TOML config → Mathematica/xAct (Euler-Lagrange, linearization via xPert, component decomposition) → JSON specification → Python solvers. Supports `[[derived_fields]]` (e.g., field strength tensors), `[[background_fields]]` (external magnetic fields, potentials), `[[gauge]]` (Lorenz, de Donder, Coulomb, temporal, axial), and `[torsion]` (Poincare gauge theory with propagating torsion). All equations derived symbolically — the numerical layer contains zero physics.
+A complete run, from Lagrangian to measured physics. The theory is an effective 1+1D graviton–photon system — two scalars coupled by a gradient term `B0 * h * ∂ₓa` — for which the conversion probability has a known closed form.
 
-### Solver Architecture (`tidal.solver`)
+**1. Derive the equations of motion** from `examples/coupled_scalars/theory.toml`:
 
-Five time-integration backends with automatic selection based on equation structure:
+```bash
+tidal derive examples/coupled_scalars/theory.toml
+```
+
+**2. Inspect what came out of the symbolic pipeline:**
+
+```console
+$ tidal inspect examples/data/coupled_scalars.json
+
+Spacetime:
+  Dimension: 2 (1+1D)
+  Coordinates: ('t', 'x')
+
+Fields (2 components):
+  a_0          dynamical    time_order=2
+  h_0          dynamical    time_order=2
+
+Equations:
+  d2_t(a_0) = [-omegaP2] identity(a_0) [B0] gradient_x(h_0) +1 laplacian_x(a_0)
+  d2_t(h_0) = [B0^2] identity(h_0) [mg2/kappa^2] identity(h_0) [B0] gradient_x(a_0) [-kappa^(-2)] laplacian_x(h_0)
+
+Required parameters:
+  B0  (in: a_0, h_0)
+  kappa  (in: h_0)
+  mg2  (in: h_0)
+  omegaP2  (in: a_0)
+```
+
+**3. Simulate.** The solver is chosen automatically from the structure of the equations:
+
+```console
+$ tidal simulate examples/data/coupled_scalars.json \
+    --param kappa=1.0 --param B0=0.1 --param omegaP2=0.0 --param mg2=0.0 \
+    --grid-shape 256 --bounds 0:100 --periodic \
+    --ic plane-wave --ic-component h_0 --ic-wavevector 2.0 --ic-amplitude 0.1 \
+    --t-end 50.0 --output run/
+
+  Auto-selected solver: modal
+  21 snapshots stored
+
+  a_0: peak 0.0000 → 0.0560
+  h_0: peak 0.0924 → 0.0750 (ratio: 0.8115)
+```
+
+**4. Measure.** Energy transfer from one field to the other, and a conservation diagnostic:
+
+```console
+$ tidal measure run/ --what conversion,conservation --source h_0 --target a_0 \
+    --param kappa=1.0 --param B0=0.1 --param omegaP2=0.0 --param mg2=0.0
+
+Energy Conservation: PASS
+  max |dE/E|           2.57e-15
+  threshold            1e-03
+
+Conversion (h_0 -> a_0):
+  Peak P(t)            0.995633
+  at t                 32.50
+```
+
+The analytic result for this system is `P(t) = sin²(κB₀t/2)`, peaking at `t = π/(κB₀) ≈ 31.4`. Nothing about that formula appears anywhere in the code.
+
+## General use
+
+### Defining a theory
+
+A `theory.toml` specifies the spacetime, the fields, the constants and the Lagrangian:
+
+```toml
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["m2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - m2/2 phi[]^2"
+```
+
+Optional sections extend this:
+
+- `[[derived_fields]]` — intermediate tensors, e.g. a field strength `F_ab = CD[-a][A[-b]] - CD[-b][A[-a]]`
+- `[[background_fields]]` — external fields (magnetic fields, potentials, vectors) giving position-dependent coefficients
+- `[[gauge]]` — per-field gauge fixing: Lorenz, de Donder, Coulomb, temporal, axial
+- `[torsion]` — Poincaré gauge theory with propagating torsion
+- `[parameters]` — runtime defaults, overridable with `--param`
+
+### Solver backends
+
+Five time-integration backends, selected automatically from the structure of the equations:
 
 | Backend      | Library         | Use Case                                    | Key Feature                                   |
 | ------------ | --------------- | ------------------------------------------- | --------------------------------------------- |
@@ -56,342 +146,174 @@ Five time-integration backends with automatic selection based on equation struct
 | **Leapfrog** | numpy           | Symplectic                                  | Exact energy conservation (Yoshida 4th-order) |
 | **scipy**    | scipy.integrate | General-purpose                             | DOP853, Radau, BDF via `solve_ivp`            |
 
-Spatial operators: 2nd/4th/6th-order finite-difference stencils + FFT spectral operators (auto-enabled for all-periodic BCs). Three-tier constraint IC pre-solve (FFT → sparse matrix → automatic). Analytical Jacobian with three active tiers: dense (N ≤ 2K), sparse CSC with SuperLU_MT (N ≤ 200K), and GMRES with JVP (N > 200K).
+Spatial operators: 2nd/4th/6th-order finite-difference stencils and FFT spectral operators (auto-enabled for all-periodic BCs). Analytical Jacobians in three tiers — dense, sparse CSC with SuperLU_MT, and GMRES with a Jacobian-vector product for the largest systems. Constraint initial conditions are pre-solved automatically.
 
-### CLI (`tidal` command)
-
-Unified command-line interface with 10 subcommands:
+### Commands
 
 | Command                     | Description                                                           |
 | --------------------------- | --------------------------------------------------------------------- |
 | `tidal derive theory.toml`  | Generate .wls from TOML, run wolframscript to produce JSON            |
-| `tidal simulate spec.json`  | Full simulation with plotting (`--param`, `--ic`, `--bc`, `--scheme`) |
-| `tidal measure result_dir/` | Extract physics measurements (energy, conversion, mixing, spectra)    |
-| `tidal inspect spec.json`   | Display equation system info (fields, operators, parameters)          |
-| `tidal list`                | Discover all available JSON specs in `examples/data/`                 |
-| `tidal validate spec.json`  | Validate JSON equation specification structure                        |
-| `tidal plot result_dir/`    | Standalone plotting from simulation output directories                |
+| `tidal simulate spec.json`  | Run a simulation (`--param`, `--ic`, `--bc`, `--scheme`)              |
+| `tidal measure result_dir/` | Extract physics measurements from simulation output                   |
 | `tidal sweep spec.json`     | Parameter sweeps, convergence studies, adaptive sampling              |
+| `tidal sample spec.json`    | Bayesian inference — Monte Carlo or nested sampling                   |
 | `tidal analyze sweep_dir/`  | Post-hoc sensitivity analysis (Sobol/Morris) of sweep results         |
+| `tidal plot result_dir/`    | Standalone plotting from simulation output directories                |
+| `tidal inspect spec.json`   | Display equation system info (fields, operators, parameters)          |
+| `tidal validate spec.json`  | Validate a JSON equation specification                                |
+| `tidal list`                | Discover available JSON specs in `examples/data/`                     |
 | `tidal doctor`              | Environment diagnostics (Wolfram, dependencies, xAct)                 |
 
-Supports `theory.toml` configs with `[[derived_fields]]`, `[[background_fields]]`, optional `[[gauge]]`, and `[torsion]` sections. Zero new dependencies (stdlib argparse + tomllib).
+Measurements available through `tidal measure`: energy, conversion `P(t)`, mixing length, spectrum, spectral conversion `P(k,t)`, dispersion `ω(k)`, conservation diagnostics, effective mass, asymptotic scattering, peak conversion, group/phase velocity, and resonance analysis.
 
-### Measurement Module (`tidal.measurement`)
+`tidal sample` performs Bayesian parameter estimation over a theory's coupling space, with priors, inequality constraints, and either Monte Carlo or nested sampling (dynesty or PolyChord). Install with `pip install tidal[inference]`.
 
-13 post-hoc analysis types: summary, energy, conversion P(t), mixing length, spectrum, spectral conversion P(k,t), dispersion ω(k), conservation diagnostics, effective mass, asymptotic scattering, peak conversion, group/phase velocity, and resonance analysis. Critical field analysis for theory comparison (amplification factors). Disk-backed snapshot storage for long simulations via `SnapshotWriter`.
+### Worked examples
 
----
+Each directory under `examples/` contains a `theory.toml`, the generated `.wls`, and a `run.sh` showing the full derive → inspect → simulate → measure workflow.
 
-## Research Results
+| Example                    | Dim  | Key Features                                                         |
+| -------------------------- | ---- | -------------------------------------------------------------------- |
+| `chern_simons/`            | 2+1D | Epsilon tensor, topological mass, `A_0` constraint                   |
+| `coupled_scalars/`         | 1+1D | Cross-field gradient coupling, mass matrix, energy transfer          |
+| `coupled_scattering/`      | 3+1D | Position-dependent Gaussian coupling, background fields, scattering  |
+| `curved_spacetime/`        | 1+1D | de Sitter and conformal static metrics, Hubble friction              |
+| `dark_photon_plasma/`      | 3+1D | Torsion dark photon with kinetic mixing and photon plasma mass       |
+| `elasticity/`              | 2+1D | Navier–Cauchy, anisotropic laplacian, cross-derivative operators     |
+| `euler_heisenberg/`        | 3+1D | Vacuum birefringence, quartic `(F·F)²` QED correction                |
+| `gertsenshtein/`           | 3+1D | Einstein–Maxwell graviton–photon conversion, multi-field xPert       |
+| `gertsenshtein_proca/`     | 3+1D | Graviton–photon conversion with a photon effective mass              |
+| `gravitational_waves/`     | 3+1D | xPert linearization, TT gauge, constraints                           |
+| `graviton_torsion/`        | 3+1D | General quadratic PGT, torsion perturbation, graviton–torsion mixing |
+| `massive_3form/`           | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction                      |
+| `massive_gravity/`         | 2+1D | Fierz–Pauli mass, xPert, coupled constraints                         |
+| `proca_background/`        | 2+1D | Two massive vectors, Lorentzian scalar background                    |
+| `scalar_vector_coupling/`  | 2+1D | Mixed-rank cross-field coupling, Chern–Simons and divergence terms   |
+| `spherical_kg_1d/`         | 3+1D | Spherical coordinates, plane-wave dimensional reduction              |
+| `torsion_dark_photon/`     | 3+1D | Propagating torsion, kinetic mixing, non-minimal coupling            |
+| `torsion_dark_photon_fv/`  | 3+1D | Massive Proca dark photon with kinetic mixing                        |
+| `torsion_gertsenshtein/`   | 3+1D | Graviton–photon conversion with PGT torsion                          |
 
-### Gertsenshtein Effect (Validated)
+Run one directly:
 
-The standard graviton-photon conversion has been derived from the Einstein-Maxwell Lagrangian L = (1/κ²)R − (1/4)F² via the TIDAL pipeline and validated:
-
-- **Uniform B-field**: P = sin²(κB₀D/2) confirmed to 0.36% RMS across a 40-point B₀ sweep (N=1024, κ=1)
-- **Localized Gaussian B-field**: Boccaletti (1970) formula P = sin²(κ/2 × ∫B₀ dz) confirmed to 0.04% across a 48-point 2D sweep
-- **Literature comparison**: Identifies and documents the √(4π) normalization error in Palessandro & Rothman (2023); independently confirmed by Dandoy, Lella et al. (2024)
-
-See `docs/tex/gertsenshtein.tex`, `docs/tex/gertsenshtein_formula.tex`, and `docs/tex/gertsenshtein_localized.tex` for the full physics, derivation, and validation.
-
-### Torsion-Gertsenshtein Investigation (Complete, v0.22.8)
-
-The combined PGT + Einstein-Maxwell system (R̃ + α_I T² + b₅R̃² − ¼F²) has been derived and simulated with 23 component fields, yielding the project's central physics result:
-
-- **Torsion-independence of standard Gertsenshtein**: The h× ↔ a_x (graviton-photon) conversion channel contains NO torsion parameters — algebraically identical to the EM-only case for any vacuum gravitational wave initial conditions.
-- **Polarization block-diagonal structure**: The system decomposes into two completely decoupled channels: (1) h× ↔ a_x (torsion-free, stable), (2) trace ↔ a_y ↔ torsion (torsion-dependent, ghost-unstable from Ostrogradsky).
-- **Coupling-instability tension**: The b₅R̃² term simultaneously enables torsion propagation AND creates ghost instabilities — a structural consequence of Ostrogradsky's theorem.
-
-See `docs/tex/gertsenshtein.tex` §Torsion-Independence and `docs/tex/torsion.tex` §Combined PGT+EM System for the full analysis.
-
-### General Quadratic Lagrangian Enumeration
-
-The `research/` directory contains a systematic enumeration of all independent scalar invariants in the most general quadratic PGT+EM Lagrangian using xAct/xTras: **35 core coupling constants** (11 parity-even quadratic + 20 parity-odd quadratic + 3 linear + 1 topological), with derivative extensions adding up to ~109 further terms. All terms classified by ghost status, parity, and mixing channel. See `research/general_quadratic_lagrangian.tex`.
-
-### Current Research Frontier
-
-- **Non-minimal torsion-EM coupling** (T·F, T·(*F)): Required to break the polarization block-diagonal structure; direct photon-torsion interaction bypasses the decoupled channels. Prototype theory exists (`examples/torsion_gertsenshtein/theory_nonminimal.toml`).
-- **Ghost-free parameter conditions**: Identify parameter windows where the trace channel is stable (Sezgin & van Nieuwenhuizen 1980, Barker 2024).
-- **Magnetar/FRB scattering** (Phase F3): Dipolar B(r) ∝ 1/r³ in radial coordinates.
-
----
-
-# Development Environment
+```bash
+cd examples/coupled_scalars && bash run.sh
+```
 
 ## Quickstart
 
-This project uses **uv** for Python version/venv/dependencies and is container-first.
+TIDAL uses **uv** for Python version, environment and dependency management, and is container-first. Python 3.11 is required (numba/llvmlite compatibility).
 
 ```bash
-# Ensure Python 3.11 is used (numba/llvmlite friendly)
 uv python pin 3.11
-
-# Install runtime + (optional) dev dependencies from pyproject.toml
 uv sync --all-extras
-
-# Smoke test: can we import the package?
 uv run python -c "import tidal; print('OK')"
 ```
 
-## Dev Container (VS Code / Codespaces)
+Simulation, measurement, plotting, sweeps and inference all work with this alone. Deriving new equations from a Lagrangian additionally requires Wolfram Engine and xAct — see below.
 
-This repo includes a Debian-based **VS Code Dev Container**. It ensures a consistent toolchain and avoids host-machine drift.
+### Dev container (VS Code / Codespaces)
+
+The repository includes a Debian-based dev container, which is the supported path for a consistent toolchain:
 
 - Open the folder in VS Code
 - Command Palette → Dev Containers: Reopen in Container
-- Once inside the container:
+- Inside the container: `uv python pin 3.11 && uv sync --all-extras`
+
+### Optional: video output
+
+For MP4 output via Matplotlib's `FFMpegWriter`:
 
 ```bash
-uv python pin 3.11
-uv sync --all-extras
-```
-
-Common CLI tools pre-installed in the container: `git`, `node`, `npm`, `eslint`, `apt`, `dpkg`, `curl`, `wget`, `ssh`, `rsync`, `gpg`, `tree`, `find`, `grep`, `zip`, `tar`, `gzip`, etc.
-
-## Running the Examples
-
-### Lagrangian-to-PDE Pipeline Examples
-
-The repository includes **20 working examples** covering scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, curved spacetimes, background-field scattering, and graviton-photon/torsion conversion.
-
-```bash
-# Each example has a run.sh showing the full derive → inspect → simulate workflow:
-cd examples/coupled_scalars && bash run.sh
-
-# Or use the CLI directly:
-tidal derive examples/coupled_scalars/theory.toml    # derive equations from Lagrangian
-tidal inspect examples/data/coupled_scalars.json      # inspect equation structure
-tidal simulate examples/data/coupled_scalars.json \   # simulate
-  --param m2=1.0 --ic gaussian --t-end 20
-tidal list                                             # discover all available JSON specs
-tidal validate examples/data/coupled_scalars.json      # validate JSON spec structure
-```
-
-**TOML Configuration** (`theory.toml`):
-
-- Define spacetime dimension, metric, fields, constants, and Lagrangian expression
-- `[[derived_fields]]` section for intermediate tensors (e.g., field strength `F_ab = CD[-a][A[-b]] - CD[-b][A[-a]]`)
-- `[[background_fields]]` for external fields (magnetic field, potentials) with position-dependent coefficients
-- `[[gauge]]` for per-field gauge fixing (Lorenz, de Donder, Coulomb, temporal, axial)
-- `[torsion]` for Poincare gauge theory with propagating torsion
-- Runtime parameters with default values in `[parameters]` section
-
-**Pipeline Examples:**
-
-| Example                   | Dim  | Key Features                                                               |
-| ------------------------- | ---- | -------------------------------------------------------------------------- |
-| `chern_simons/`           | 2+1D | Epsilon tensor, topological mass, A_0 constraint                           |
-| `coupled_proca/`          | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs           |
-| `coupled_scalars/`        | 1+1D | Cross-field coupling, mass matrix, energy transfer                         |
-| `coupled_scattering/`     | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering   |
-| `curved_spacetime/`       | 2+1D | De Sitter, Hubble friction, time-dependent coefficients                    |
-| `cylindrical_kg/`         | 3+1D | Cylindrical coordinates, mixed curved/flat                                 |
-| `cylindrical_kg_1d/`      | 1+1D | Cylindrical coordinates, plane-wave dimensional reduction                  |
-| `elasticity/`             | 2+1D | Anisotropic laplacian, cross_derivative_xy                                 |
-| `gertsenshtein/`          | 1+1D | Einstein-Maxwell graviton-photon conversion, multi-field perturbation      |
-| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                                 |
-| `gravitational_waves_1d/` | 1+1D | Linearized gravity, plane-wave 1D reduction                                |
-| `graviton_torsion/`       | 3+1D | PGT Lagrangian, torsion perturbations, graviton-torsion mixing             |
-| `massive_3form/`          | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction                            |
-| `massive_gravity/`        | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints   |
-| `polar_kg/`               | 2+1D | Polar coordinates, Christoffel auto-detection                              |
-| `proca_background/`       | 2+1D | Lorentzian scalar background, two Proca vectors, constraint+BG integration |
-| `scalar_potential_well/`  | 1+1D | Background potential well, `[[background_fields]]`, bound states           |
-| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants, CS+coupling           |
-| `sphere_kg/`              | 2+1D | KG on S², position-dependent coefficients                                  |
-| `spherical_kg_1d/`        | 1+1D | Spherical coordinates, plane-wave dimensional reduction                    |
-
-## (Optional) Video Support
-
-For MP4 via Matplotlib's FFMpegWriter:
-
-```bash
-# inside the dev container
 sudo apt-get update && sudo apt-get install -y ffmpeg
 ```
 
-If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
+Without `ffmpeg`, animations fall back to GIF via Pillow.
 
-## Tests
+## Symbolic computing setup
 
-The project includes a comprehensive test suite with **1,721 Python tests + ~115 Wolfram tests**.
-
-### Python Tests (1,701 tests)
+Required only for `tidal derive` — deriving linearized field equations from a Lagrangian. Everything downstream of a JSON specification runs without it.
 
 ```bash
-# Run all Python tests with pytest
-uv run pytest -v
+# 1. Download the Wolfram Engine installer from https://www.wolfram.com/engine/
+#    and place it in third_party/
 
-# Run a specific test module
-uv run pytest tests/test_json_loader.py -v
+# 2. Install and activate Wolfram Engine
+sudo ./scripts/install-wolfram-engine.sh
+./scripts/activate-wolfram.sh
 
-# Run with coverage report (HTML)
-uv run pytest --cov=tidal --cov-report=html
-open htmlcov/index.html  # View detailed HTML report
+# 3. Install the xAct/xCoba tensor algebra packages
+./scripts/install-xact-xcoba.sh
 
-# Run with coverage report (terminal)
-uv run pytest --cov=tidal --cov-report=term-missing
-
-# Run with coverage report (XML for CI)
-uv run pytest --cov=tidal --cov-report=xml
+# 4. Verify the complete setup
+./scripts/verify-wolfram-setup.sh
 ```
 
-### Wolfram Tests (~121 tests)
+The verification script checks Wolfram Engine activation, xAct package installation (xCore, xPerm, xTensor, xCoba, xPert), xPerm binary GLIBC compatibility, and runs a smoke test with tensor operations. `tidal doctor` performs the same diagnosis at any time.
 
-```bash
-# Run all Wolfram unit tests
-./scripts/run_wolfram_tests.sh
+Note that a Wolfram Engine license permits **one** `wolframscript` session at a time; do not run `tidal derive` in parallel.
 
-# Run individual test files
-wolframscript -file tests/wolfram/test_euler_lagrange.wls
-wolframscript -file tests/wolfram/test_common_utilities.wls
-wolframscript -file tests/wolfram/test_export_json.wls
-```
+## Logging and profiling
 
-### Complete Test Suite
-
-```bash
-# Run both Python and Wolfram tests
-./scripts/full_test.sh
-
-# Validate end-to-end pipeline (Lagrangian → JSON → simulation)
-./scripts/validate_pipeline.sh
-
-# Check Wolfram module syntax
-./scripts/lint_wolfram.sh
-```
-
-**Test Coverage:**
-
-- Symbolic derivation (Euler-Lagrange, component decomposition, JSON export)
-- PDE construction and operator identification
-- Initial conditions and boundary conditions
-- Multi-field coupling and energy transfer
-- Parameter sweep and convergence analysis
-- 13 measurement types (energy, conversion, spectrum, sensitivity analysis, etc.)
-- Edge cases (empty grids, invalid bounds, division by zero)
-- Path traversal protection and validation
-
-See [`scripts/README.md`](scripts/README.md) for detailed documentation of utility scripts.
-
----
-
-## Documentation
-
-### LaTeX Technical Documentation (`docs/tex/`)
-
-25 self-contained LaTeX fragments covering physics, architecture, features, and operational guides. Each file uses shared macros from `preamble.tex` and can be included in an Overleaf report via `\input{fragment_name}`. See [`docs/README.md`](docs/README.md) for the complete index.
-
-### Sphinx API Documentation
-
-The repo builds Sphinx docs and deploys to GitHub Pages via Actions.
-
-```bash
-# auto-generate API docs
-uv run sphinx-apidoc --force --module-first -o docs/source/ tidal/
-
-# build HTML
-( cd docs && make html )
-
-# open locally (container users: use $BROWSER to open in host browser)
-python -m http.server -d docs/build/html 8000
-# then navigate to http://localhost:8000 or run:
-# $BROWSER http://localhost:8000
-```
-
-On push to `main`, CI builds the docs and deploys to:
-
-```bash
-https://williamroyce.github.io/torsion-gertsenshtein/
-```
-
-Use `$BROWSER <url>` (from within the devcontainer) to open the project documentation link in the host browser.
-
----
-
-## Logging and Profiling
-
-The library uses Python's `logging` module (no print statements). To see info-level logs (solver progress, profiling summaries):
+The library uses Python's `logging` module and never prints from library code. To see solver progress and profiling summaries:
 
 ```python
 import logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 ```
 
-Run examples with `profile=True` in the `run` call to see timing breakdowns (initialization delay, solver overhead, etc.).
-
----
-
-## Symbolic Computing Setup
-
-For symbolic tensor algebra computations (deriving linearized field equations):
-
-```bash
-# 1. Download Wolfram Engine installer
-#    Visit https://www.wolfram.com/engine/
-#    Place installer in third_party/ directory
-
-# 2. Install and activate Wolfram Engine
-sudo ./scripts/install-wolfram-engine.sh
-./scripts/activate-wolfram.sh
-
-# 3. Install xAct/xCoba tensor algebra packages
-./scripts/install-xact-xcoba.sh
-
-# 4. Verify complete setup
-./scripts/verify-wolfram-setup.sh
-```
-
-The verification script checks Wolfram Engine activation, xAct package installation (xCore, xPerm, xTensor, xCoba, xPert), xPerm binary GLIBC compatibility, and runs a full smoke test with tensor operations.
-
-See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
-
----
+Pass `profile=True` to a `run` call for a timing breakdown.
 
 ## Troubleshooting
 
-- **Import errors in VS Code** (e.g., numpy not found): ensure the interpreter is the repo's venv (`.venv/bin/python3`), then reload the window.
-- **`llvmlite/numba` build failures**: stick to **Python 3.11** (`uv python pin 3.11`).
-- **FileNotFoundError: ffmpeg** — install ffmpeg (see apt command above) or let the example produce a GIF.
-- **Type-checker warnings about third-party stubs** — run examples anyway; code uses TYPE_CHECKING guards and runtime-safe casts where necessary.
-- **Pages 404 or deploy errors**: ensure Settings → Pages → Source = GitHub Actions and Actions → Workflow permissions = Read/Write.
-- **Animation has low frame count**: ensure `snapshot_interval` in the `run` call matches your desired temporal resolution (e.g., set to `dt` for every integrator step). Increase `fps` in `choose_writer_and_out` for smoother playback.
-- **Logging messages not visible**: call `logging.basicConfig(level=logging.INFO, ...)` at the start of your script or in `main()`.
-- **Wolfram Engine not activated**: run `./scripts/activate-wolfram.sh` and enter your Wolfram ID credentials (free account at wolfram.com).
+- **Import errors in VS Code** (e.g. numpy not found): ensure the interpreter is the repository venv (`.venv/bin/python3`), then reload the window.
+- **`llvmlite`/`numba` build failures**: use Python 3.11 (`uv python pin 3.11`).
+- **`FileNotFoundError: ffmpeg`**: install ffmpeg as above, or let the example produce a GIF.
+- **Type-checker warnings about third-party stubs**: run anyway; the code uses `TYPE_CHECKING` guards and runtime-safe casts where necessary.
+- **GitHub Pages 404 or deploy errors**: Settings → Pages → Source must be GitHub Actions, and Actions → Workflow permissions must be Read/Write.
+- **Animation has too few frames**: match `snapshot_interval` in the `run` call to your desired temporal resolution, and increase `fps` in `choose_writer_and_out`.
+- **Logging messages not visible**: call `logging.basicConfig(level=logging.INFO, ...)` at the start of your script.
+- **Wolfram Engine not activated**: run `./scripts/activate-wolfram.sh` and enter your Wolfram ID (a free account suffices).
 - **xPerm GLIBC errors** (`GLIBC_2.38 not found`): run `./scripts/install-xact-xcoba.sh` to recompile the binary for your system.
-- **xAct packages not loading**: ensure xAct is installed in `~/.WolframEngine/Applications/xAct/` — run verification script for diagnosis.
-- **Environment diagnostics**: run `tidal doctor` for a comprehensive check of Wolfram, Python dependencies, and xAct installation.
+- **xAct packages not loading**: xAct must be installed in `~/.WolframEngine/Applications/xAct/`; run the verification script to diagnose.
+- **Anything else**: `tidal doctor` checks Wolfram, Python dependencies and xAct in one pass.
 
-See `docs/tex/troubleshooting.tex` for a comprehensive error encyclopedia covering Wolfram/xAct and Python solver issues.
+## Origins
 
----
+TIDAL was written for a Cambridge Part III / MSci project in the Astrophysics Group, Cavendish Laboratory, investigating graviton–photon conversion in Poincaré gauge theory. The project was assessed at 97.03% and nominated by the examiners for both the Theory and Computing prizes.
+
+> "A truly remarkable project — hugely ambitious and brilliantly executed."
+>
+> "Both the supervisor and the assessor have been PtIII project assessors for many years and have never before encountered such an outstanding project."
+>
+> — Cambridge Part III examiners' joint report, June 2026
+
+Development continues, towards a distributable package and the associated publications.
+
+## Getting help
+
+- **Questions and ideas**: [GitHub Discussions](https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions)
+- **Bugs**: [Issue tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues), with the `bug` label
+- **Feature requests**: [Issue tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues), with the `enhancement` label
+- **API reference**: <https://williamroyce.github.io/torsion-gertsenshtein/>
 
 ## Contributing
 
-- Open an issue or submit a PR.
-- **Test requirements**: All changes must maintain 100% test pass rate (1,701 Python + ~121 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
-- Run `./scripts/full_test.sh` before submitting PRs to verify all tests pass.
-- Follow the project's type-checking and linting conventions (keyword-only booleans, explicit type annotations, no print in library code).
-
----
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, coding standards and the PR checklist. In short: run `./scripts/full_test.sh` before submitting, keep the test suite green, and add tests in both the Python and Wolfram layers where applicable.
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
----
+MIT. See [LICENSE](LICENSE).
 
 ## Acknowledgements
 
 This project builds on:
 
 - [SUNDIALS](https://computing.llnl.gov/projects/sundials) — IDA (DAE) and CVODE (BDF) solvers via [scikit-sundae](https://github.com/NREL/scikit-sundae) (Hindmarsh et al. 2005).
-- The [xAct/xTensor ecosystem](http://www.xact.es/) — symbolic tensor algebra (Martin-Garcia et al.) powering the Lagrangian-to-PDE derivation pipeline.
+- The [xAct/xTensor ecosystem](http://www.xact.es/) — symbolic tensor algebra (Martín-García et al.) powering the Lagrangian-to-PDE derivation pipeline.
 - [xPert](https://www.researchgate.net/publication/1740524) — metric perturbation theory (Brizuela et al. 2009) for linearization.
+- [PolyChord](https://github.com/PolyChord/PolyChordLite) (Handley, Hobson & Lasenby 2015) and [dynesty](https://github.com/joshspeagle/dynesty) (Speagle 2020) — nested sampling; [anesthetic](https://github.com/handley-lab/anesthetic) (Handley 2019) for posterior analysis.
 - [`uv`](https://github.com/astral-sh/uv) — fast Python environment management.
-- Originally built on [py-pde](https://py-pde.readthedocs.io/) (Zwicker, JOSS 2020); finite-difference stencil conventions retained in TIDAL's native operators.
+- Originally built on [py-pde](https://py-pde.readthedocs.io/) (Zwicker, JOSS 2020); finite-difference stencil conventions are retained in TIDAL's native operators.
 
-Design decisions are informed by [Dedalus](https://arxiv.org/abs/1905.10388) (Burns et al. 2020), [MEEP](https://meep.readthedocs.io/) (Oskooi et al. 2010), and [FEniCS](https://fenicsproject.org/) (Baratta et al. 2023). The core physics targets the Gertsenshtein effect (Gertsenshtein 1962; [Domcke & Garcia-Cely 2023](https://arxiv.org/abs/2301.02072)). See [`docs/references.md`](docs/references.md) and `docs/tex/references.bib` for the full citation list.
-
-[`uv`]: https://github.com/astral-sh/uv
+Design decisions are informed by [Dedalus](https://arxiv.org/abs/1905.10388) (Burns et al. 2020), [MEEP](https://meep.readthedocs.io/) (Oskooi et al. 2010) and [FEniCS](https://fenicsproject.org/) (Baratta et al. 2023). The physics targets the Gertsenshtein effect (Gertsenshtein 1962; [Domcke & Garcia-Cely 2023](https://arxiv.org/abs/2301.02072)).
