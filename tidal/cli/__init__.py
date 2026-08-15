@@ -654,8 +654,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="TYPE[,TYPE,...]",
         help=(
             "Measurements to run (comma-separated). "
-            "Options: summary, energy, conversion, mixing, spectrum, dispersion, conservation. "
-            "Default: summary"
+            "Options: summary, energy, conversion, mixing, spectrum, dispersion, "
+            "conservation, effective_mass, asymptotic, peak_conversion, velocity, "
+            "resonance. Default: summary"
         ),
     )
     measure_parser.add_argument(

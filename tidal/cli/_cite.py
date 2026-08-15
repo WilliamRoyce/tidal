@@ -5,8 +5,8 @@ from __future__ import annotations
 _CITATION = """\
 If you use TIDAL in your research, please cite:
 
-  TIDAL: Tensor Integration and Derivation for Any Lagrangian
-  https://github.com/your-org/tidal
+  Royce, W. "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
+  https://github.com/WilliamRoyce/torsion-gertsenshtein
 
 Dependencies you may also wish to cite:
 
