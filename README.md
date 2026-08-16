@@ -16,15 +16,14 @@
 
 ## About
 
+By William Royce (`wr286@cantab.ac.uk`) — developed in the Astrophysics Group, Cavendish Laboratory, University of Cambridge.
+Documentation: <https://williamroyce.github.io/torsion-gertsenshtein/>
+
 TIDAL derives and integrates the linearized equations of motion of **any tensorial Lagrangian** on a given background. You write the Lagrangian in a TOML file; TIDAL performs the variation symbolically in Mathematica/xAct, decomposes the result into components, exports a JSON specification, and evolves it numerically. The numerical layer contains no physics — every equation it solves was derived from your Lagrangian.
 
-Fields may be scalars, vectors or tensors up to rank 3, in 1+1D through 3+1D, on flat or curved spacetimes, with background fields, gauge fixing, and Poincaré gauge theory (propagating torsion) supported directly in the theory specification.
+Fields may be scalars, vectors or tensors up to rank 3, in 1+1D through 3+1D, on flat or curved spacetimes. Background fields, gauge fixing and Riemann–Cartan geometry — a connection with torsion, as in Poincaré gauge theory — are all declared directly in the theory specification.
 
 > Define a Lagrangian in TOML → derive linearized PDEs symbolically → simulate with adaptive solvers → measure conversion, spectra and scattering → sweep or sample over parameter space.
-
-Written by William Royce (`wr286@cantab.ac.uk`), developed in the Astrophysics Group, Cavendish Laboratory, University of Cambridge.
-
-API documentation: <https://williamroyce.github.io/torsion-gertsenshtein/>
 
 ## Citing TIDAL
 
@@ -39,15 +38,46 @@ https://github.com/WilliamRoyce/torsion-gertsenshtein
 
 ## Example
 
-A complete run, from Lagrangian to measured physics. The theory is an effective 1+1D graviton–photon system — two scalars coupled by a gradient term `B0 * h * ∂ₓa` — for which the conversion probability has a known closed form.
+A complete run, from Lagrangian to measured physics. The theory is an effective 1+1D graviton–photon system — two scalars `h` and `a` coupled by a gradient term `B0 * h * ∂ₓa` — for which the conversion probability has a known closed form.
 
-**1. Derive the equations of motion** from `examples/coupled_scalars/theory.toml`:
+**1. Write the theory.** This is the physics content of `examples/coupled_scalars/theory.toml` (comments and the `[theory]`/`[output]` metadata blocks omitted). `CD[-a][...]` is a covariant derivative and `eta[a, b]` the inverse metric, following xAct's index conventions; `n` is a background unit vector picking out the spatial direction in the coupling term:
+
+```toml
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]           # graviton mode
+name = "h"
+type = "scalar"
+
+[[fields]]           # photon mode
+name = "a"
+type = "scalar"
+
+[[background_fields]]  # n^a = (0, 1), selects ∂_x
+name = "n"
+type = "vector"
+components = ["0", "1"]
+
+[constants]
+names = ["kappa", "B0", "omegaP2", "mg2"]
+
+[lagrangian]
+expression = """
+  -1/(2*kappa^2) CD[-a][h[]] eta[a, b] CD[-b][h[]] - (B0^2 + mg2/kappa^2)/2 * h[]^2
+  - 1/2 CD[-a][a[]] eta[a, b] CD[-b][a[]] - omegaP2/2 * a[]^2
+  - B0 * h[] * n[a] * CD[-a][a[]]
+"""
+```
+
+**2. Derive the equations of motion.** This is the only step that needs Wolfram Engine and xAct ([setup below](#symbolic-computing-setup)). The derived JSON for this example is committed, as it is for nearly all the bundled examples, so you can skip straight to step 3 without them:
 
 ```bash
 tidal derive examples/coupled_scalars/theory.toml
 ```
 
-**2. Inspect what came out of the symbolic pipeline:**
+**3. Inspect what came out of the symbolic pipeline:**
 
 ```console
 $ tidal inspect examples/data/coupled_scalars.json
@@ -71,7 +101,7 @@ Required parameters:
   omegaP2  (in: a_0)
 ```
 
-**3. Simulate.** The solver is chosen automatically from the structure of the equations:
+**4. Simulate.** The solver is chosen automatically from the structure of the equations — here the modal solver, since the system is periodic with time-independent coefficients:
 
 ```console
 $ tidal simulate examples/data/coupled_scalars.json \
@@ -87,7 +117,7 @@ $ tidal simulate examples/data/coupled_scalars.json \
   h_0: peak 0.0924 → 0.0750 (ratio: 0.8115)
 ```
 
-**4. Measure.** Energy transfer from one field to the other, and a conservation diagnostic:
+**5. Measure.** Energy transfer from one field to the other, and a conservation diagnostic:
 
 ```console
 $ tidal measure run/ --what conversion,conservation --source h_0 --target a_0 \
@@ -106,47 +136,36 @@ The analytic result for this system is `P(t) = sin²(κB₀t/2)`, peaking at `t 
 
 ## General use
 
-### Defining a theory
+### The theory file
 
-A `theory.toml` specifies the spacetime, the fields, the constants and the Lagrangian:
-
-```toml
-[spacetime]
-dimension = 2
-metric = "minkowski"
-
-[[fields]]
-name = "phi"
-type = "scalar"
-
-[constants]
-names = ["m2"]
-
-[lagrangian]
-expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - m2/2 phi[]^2"
-```
-
-Optional sections extend this:
+Beyond `[spacetime]`, `[[fields]]`, `[constants]` and `[lagrangian]` shown in the example, these sections are available:
 
 - `[[derived_fields]]` — intermediate tensors, e.g. a field strength `F_ab = CD[-a][A[-b]] - CD[-b][A[-a]]`
 - `[[background_fields]]` — external fields (magnetic fields, potentials, vectors) giving position-dependent coefficients
 - `[[gauge]]` — per-field gauge fixing: Lorenz, de Donder, Coulomb, temporal, axial
-- `[torsion]` — Poincaré gauge theory with propagating torsion
+- `[torsion]` — declares a torsion perturbation, making the connection Riemann–Cartan rather than Levi-Civita. Whether torsion *propagates* is a property of your Lagrangian, not of this section: without a kinetic term it is non-dynamical (Einstein–Cartan), and adding one (for instance `b5 R̃²`) makes it dynamical
 - `[parameters]` — runtime defaults, overridable with `--param`
+- `[linearization]` with `[[linearization.matter_perturbations]]` — multi-field perturbation via xPert
+- `[reduction]` — dimensional reduction (e.g. plane-wave reduction to 1+1D)
+- `[perturbation]`, `[constraint_solver]` — perturbative order and constraint-elimination strategy
+- `[output]` — where the generated JSON specification is written
 
-### Solver backends
+### The modal solver
 
-Five time-integration backends, selected automatically from the structure of the equations:
+The modal solver is TIDAL's primary engine and where most of its development has gone. It transforms the spatial grid to Fourier space, builds a per-mode evolution matrix, and eigendecomposes it to obtain the exact solution `y(t) = exp(A·t)·y₀`. This removes spatial discretization error entirely: for a time-independent linear system the result is exact to machine precision at any `t`, with no timestep to choose and no accumulation of integration error. The energy conservation of `2.57e-15` in the example above is a consequence of this, not a tuned tolerance.
 
-| Backend      | Library         | Use Case                                    | Key Feature                                   |
-| ------------ | --------------- | ------------------------------------------- | --------------------------------------------- |
-| **IDA**      | SUNDIALS        | DAE (algebraic constraints)                 | Implicit Newton, 3-tier analytical Jacobian   |
-| **CVODE**    | SUNDIALS        | Adaptive ODE (waves)                        | BDF, tolerance control, sparse Jacobian       |
-| **Modal**    | numpy/scipy     | Exact spectral (periodic, time-independent) | Machine-precision via eigendecomposition      |
-| **Leapfrog** | numpy           | Symplectic                                  | Exact energy conservation (Yoshida 4th-order) |
-| **scipy**    | scipy.integrate | General-purpose                             | DOP853, Radau, BDF via `solve_ivp`            |
+It applies to any linear system with a flat metric, all-periodic boundary conditions, time-independent coefficients, and operators having known exact Fourier multipliers. Position-dependent coefficients are supported through convolution, and algebraic constraints through Fourier Schur-complement elimination. Theories with a non-trivial kinetic (mass) matrix — `M ẍ = K x` rather than `ẍ = K x` — are handled by a generalized eigenvalue solve with QZ decomposition, including rank-deficient `M` via null-space projection.
 
-Spatial operators: 2nd/4th/6th-order finite-difference stencils and FFT spectral operators (auto-enabled for all-periodic BCs). Analytical Jacobians in three tiers — dense, sparse CSC with SuperLU_MT, and GMRES with a Jacobian-vector product for the largest systems. Constraint initial conditions are pre-solved automatically.
+When the modal solver does not apply, TIDAL falls back automatically:
+
+| Backend      | Library         | Used when                                        |
+| ------------ | --------------- | ------------------------------------------------ |
+| **IDA**      | SUNDIALS        | Differential-algebraic systems with constraints  |
+| **CVODE**    | SUNDIALS        | Adaptive ODE integration, BDF with error control |
+| **Leapfrog** | native          | Symplectic evolution, Yoshida 4th-order          |
+| **scipy**    | scipy.integrate | General fallback — DOP853, Radau, BDF            |
+
+Supporting these: 2nd/4th/6th-order finite-difference stencils, FFT spectral operators (auto-enabled for all-periodic BCs), analytical Jacobians in three tiers (dense, sparse CSC with SuperLU_MT, and GMRES with a Jacobian-vector product for the largest systems), and automatic pre-solving of constraint initial conditions.
 
 ### Commands
 
