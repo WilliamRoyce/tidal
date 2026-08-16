@@ -65,9 +65,9 @@ names = ["kappa", "B0", "omegaP2", "mg2"]
 
 [lagrangian]
 expression = """
-  -1/(2*kappa^2) CD[-a][h[]] eta[a, b] CD[-b][h[]] - (B0^2 + mg2/kappa^2)/2 * h[]^2
+( -1/(2*kappa^2) CD[-a][h[]] eta[a, b] CD[-b][h[]] - (B0^2 + mg2/kappa^2)/2 * h[]^2
   - 1/2 CD[-a][a[]] eta[a, b] CD[-b][a[]] - omegaP2/2 * a[]^2
-  - B0 * h[] * n[a] * CD[-a][a[]]
+  - B0 * h[] * n[a] * CD[-a][a[]] )
 """
 ```
 
