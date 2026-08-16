@@ -1,3 +1,8 @@
+# Derivation timing: ~18s wall (last verified: 2026-08-16, 1 field, 3 H terms, v0.47.9)
+#
+# NOTE: energy conservation currently fails for this example (|dE/E| ~ 1.6e-1,
+# independent of grid resolution and boundary condition) — see GH #393.
+
 [theory]
 name = "Spherical Klein-Gordon (radial plane wave)"
 
