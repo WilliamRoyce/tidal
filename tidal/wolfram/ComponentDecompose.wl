@@ -122,7 +122,13 @@ equations from a COMPONENT (scalar) Lagrangian by standard variational calculus.
 Each field function (e.g., tidalH0, tidalT5) is varied independently via D[] with \
 integration by parts for higher-order derivatives. Returns a list of EOM expressions \
 (one per field function, in the same order as fieldFuncs). \
-For quadratic Lagrangians, produces linear equations.";
+For quadratic Lagrangians, produces linear equations. \
+Option \"Measure\" -> sqrtDetG supplies the volume factor for curved metrics: the \
+variation is performed on the DENSITY Measure*lagrangian and the result divided back \
+through by Measure. This is REQUIRED for any metric whose sqrt|g| is not constant — \
+omitting it drops Christoffel first-derivative terms that arise solely from the \
+measure (issue #394). Default \"Measure\" -> 1 reproduces the flat-metric behaviour \
+exactly.";
 
 (* Error messages *)
 DecomposeToComponents::badopt =
@@ -2132,11 +2138,29 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
 (* basis decomposition for complete bases).                               *)
 (* ====================================================================== *)
 
-ComponentEulerLagrange[lagrangian_, fieldFuncs_List, coords_List] := Module[
-  {nFields = Length[fieldFuncs], nCoords = Length[coords], eom,
-   q, L = lagrangian, derivTerms, maxOrder, contribution},
+Options[ComponentEulerLagrange] = {"Measure" -> 1};
 
-  Print["ComponentEulerLagrange: ", nFields, " fields, ", nCoords, " coordinates"];
+ComponentEulerLagrange[lagrangian_, fieldFuncs_List, coords_List,
+                       opts : OptionsPattern[]] := Module[
+  {nFields = Length[fieldFuncs], nCoords = Length[coords], eom,
+   q, L, measure, weighted, derivTerms, maxOrder, contribution},
+
+  (* The Euler-Lagrange formula below is only valid for a Lagrangian     *)
+  (* DENSITY.  For a curved metric the density is sqrt|g| * L, and any   *)
+  (* first-derivative (Christoffel) term arising solely from sqrt|g| is  *)
+  (* lost — or given the wrong sign — if the measure is omitted.         *)
+  (* See issue #394.                                                     *)
+  (*                                                                     *)
+  (* A measure free of the coordinate symbols (flat, sqrt|g| = 1; or     *)
+  (* constant-conformal, sqrt|g| = const) factors straight back out of   *)
+  (* the linear E-L operator, so we skip the weighting entirely and take *)
+  (* a bit-identical path to the pre-#394 behaviour.                     *)
+  measure = OptionValue["Measure"];
+  weighted = !FreeQ[measure, Alternatives @@ coords];
+  L = If[weighted, Expand[measure * lagrangian], lagrangian];
+
+  Print["ComponentEulerLagrange: ", nFields, " fields, ", nCoords, " coordinates",
+        If[weighted, ", measure: " <> ToString[measure, InputForm], ""]];
 
   (* Collect all derivative orders appearing in the Lagrangian *)
   (* for each field function.  This determines the maximum     *)
@@ -2190,7 +2214,17 @@ ComponentEulerLagrange[lagrangian_, fieldFuncs_List, coords_List] := Module[
       {orders, derivTerms}
     ];
 
-    eom[[i]] = Expand[contribution];
+    (* Divide the density-weighted EOM back through by the measure.      *)
+    (* The overall factor does not change the physics, but keeps the     *)
+    (* coefficients in the normalised form the exporter expects.         *)
+    (* Expand alone fully distributes the division — verified on the 4D  *)
+    (* spherical case (Csc/Cot coefficients) to give a result identical  *)
+    (* to Expand[Simplify[...]], so Simplify is not used here: it costs  *)
+    (* unpredictable time on large Lagrangians for no benefit.           *)
+    eom[[i]] = If[weighted,
+      Expand[contribution / measure],
+      Expand[contribution]
+    ];
     Print["    EOM terms: ", If[Head[eom[[i]]] === Plus, Length[eom[[i]]], 1]];
   , {i, nFields}];
 
