@@ -400,8 +400,18 @@ class CoefficientEvaluator:
         )
 
     def _check_mass_sign(self) -> None:
-        """Warn if position-dependent mass-like terms change sign on grid."""
+        """Warn if a field's total position-dependent mass changes sign on the grid.
+
+        The test is on the **sum** of a field's ``identity`` self-terms, not on
+        each one separately.  A component can carry several — the dual-Gaussian
+        backgrounds carry three apiece — and only their sum is the physical
+        mass, so per-term testing both invents warnings (one term crosses zero
+        while the sum does not) and misses real ones (each term is single-signed
+        but the sum is not).
+        """
         for eq in self._spec.equations:
+            total = None
+            labels: list[str] = []
             for term in eq.rhs_terms:
                 if (
                     term.operator != "identity"
@@ -417,18 +427,24 @@ class CoefficientEvaluator:
                 if cache_key is None:
                     continue
                 arr = self._spatial_cache[cache_key]
-                if float(arr.min()) * float(arr.max()) < 0:
-                    warnings.warn(
-                        f"Position-dependent mass term "
-                        f"'{term.coefficient_symbolic}' for field "
-                        f"'{eq.field_name}' changes sign across "
-                        f"the grid (min={float(arr.min()):.4g}, "
-                        f"max={float(arr.max()):.4g}). This may "
-                        f"cause tachyonic instability at locations "
-                        f"where the effective mass² is negative.",
-                        UserWarning,
-                        stacklevel=2,
-                    )
+                total = arr.copy() if total is None else total + arr
+                labels.append(term.coefficient_symbolic)
+
+            if total is None:
+                continue
+            low, high = float(total.min()), float(total.max())
+            if low * high < 0:
+                warnings.warn(
+                    f"Position-dependent mass term "
+                    f"'{' + '.join(labels)}' for field "
+                    f"'{eq.field_name}' changes sign across "
+                    f"the grid (min={low:.4g}, "
+                    f"max={high:.4g}). This may "
+                    f"cause tachyonic instability at locations "
+                    f"where the effective mass² is negative.",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
     def check_periodic_coefficient_continuity(
         self,

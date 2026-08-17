@@ -14,6 +14,9 @@ from typing import TYPE_CHECKING
 from tidal.solver.operators import operator_min_dim
 
 if TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
+
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
@@ -122,40 +125,73 @@ def check_cfl_stability(
     return warnings
 
 
+def _summed_self_mass_profile(
+    coeff_eval: CoefficientEvaluator,
+    spec: EquationSystem,
+    eq_idx: int,
+) -> tuple[NDArray[np.float64] | None, str]:
+    """Return an equation's total position-dependent self-mass profile.
+
+    A component can carry several ``identity`` terms acting on its own field —
+    in the dual-Gaussian backgrounds each carries three — and the physical mass
+    is their **sum**.  Testing them one at a time can warn about a term that
+    crosses zero while the sum never does, or stay silent when each term is
+    single-signed but the sum is not.
+
+    Returns ``(None, "")`` when the equation has no position-dependent
+    self-mass, otherwise the summed profile and a label naming the terms.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    eq = spec.equations[eq_idx]
+    total: NDArray[np.float64] | None = None
+    labels: list[str] = []
+
+    for term_idx, term in enumerate(eq.rhs_terms):
+        if (
+            term.operator != "identity"
+            or term.field != eq.field_name
+            or term.coefficient_symbolic is None
+            or not term.position_dependent
+            or term.time_dependent
+        ):
+            continue
+        resolved = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
+        if not isinstance(resolved, np.ndarray):
+            continue
+        total = resolved.copy() if total is None else total + resolved
+        labels.append(term.coefficient_symbolic)
+
+    if total is None:
+        return None, ""
+    return total, " + ".join(labels)
+
+
 def check_mass_sign(
     coeff_eval: CoefficientEvaluator,
     spec: EquationSystem,
 ) -> list[str]:
     """Check for sign-changing position-dependent mass terms.
 
+    The check is on the **summed** self-mass of each equation, not on individual
+    terms: several ``identity`` terms may act on the same field, and only their
+    sum is the physical mass.
+
     Returns a list of warning strings for tachyonic diagnostics.
     """
-    import numpy as np  # noqa: PLC0415
-
     warnings: list[str] = []
     for eq_idx, eq in enumerate(spec.equations):
-        for term_idx, term in enumerate(eq.rhs_terms):
-            if (
-                term.operator != "identity"
-                or term.field != eq.field_name
-                or term.coefficient_symbolic is None
-                or not term.position_dependent
-                or term.time_dependent
-            ):
-                continue
-
-            result = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
-            if (
-                isinstance(result, np.ndarray)
-                and float(result.min()) * float(result.max()) < 0
-            ):
-                warnings.append(
-                    f"Position-dependent mass term "
-                    f"'{term.coefficient_symbolic}' for field "
-                    f"'{eq.field_name}' changes sign across "
-                    f"the grid (min={float(result.min()):.4g}, "
-                    f"max={float(result.max()):.4g}).",
-                )
+        profile, label = _summed_self_mass_profile(coeff_eval, spec, eq_idx)
+        if profile is None:
+            continue
+        low, high = float(profile.min()), float(profile.max())
+        if low * high < 0:
+            warnings.append(
+                f"Position-dependent mass term "
+                f"'{label}' for field "
+                f"'{eq.field_name}' changes sign across "
+                f"the grid (min={low:.4g}, max={high:.4g}).",
+            )
     return warnings
 
 
