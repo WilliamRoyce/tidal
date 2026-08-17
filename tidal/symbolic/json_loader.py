@@ -804,6 +804,33 @@ class ComponentEquation:
 # --- Symbolic coefficient resolution ---
 
 
+def _accumulate_symbolic(existing: str | None, addition: str) -> str:
+    """Sum a symbolic matrix contribution onto whatever is already there.
+
+    A component can carry several ``identity`` terms acting on the same field —
+    a base mass plus a background correction, say — and the matrix entry is
+    their **sum**.  The numeric matrices have always accumulated; the symbolic
+    ones used to overwrite, silently keeping only the last term (GH #403).
+
+    Parameters
+    ----------
+    existing : str | None
+        Expression accumulated so far, or ``None`` for the first contribution.
+    addition : str
+        The term's ``coefficient_symbolic``.
+
+    Returns
+    -------
+    str
+        ``addition`` when this is the first contribution, else ``"(a) + (b)"``.
+        Operands are parenthesised so that summing e.g. ``-1 + 2*B0^2*rho``
+        with ``-xi`` cannot re-associate into something else.
+    """
+    if existing is None:
+        return addition
+    return f"({existing}) + ({addition})"
+
+
 def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float | None:
     """Resolve a symbolic coefficient string with parameter values.
 
@@ -1015,19 +1042,40 @@ class EquationSystem:
         Scans each equation's RHS terms for ``identity`` operators acting on
         known field names (not velocity references like ``v_N``).
 
-        Convention: ``matrix[i][j] = -(coefficient)`` where ``coefficient``
-        is the numeric coefficient of the ``identity(field_j)`` term in
-        equation *i*.  This makes mass² positive for the standard Lagrangian
-        sign convention ``∂²_t φ = … - m² φ``.
+        .. warning::
+
+           **The numeric and symbolic matrices use opposite sign conventions**
+           (GH #404).  Both are returned here, and each must be read with its
+           own convention:
+
+           * ``mass``/``coupling`` (numeric) — ``matrix[i][j] = -(coefficient)``
+             of the ``identity(field_j)`` term in equation *i*.  The negation
+             makes mass² positive for the standard Lagrangian sign convention
+             ``∂²_t φ = … - m² φ``.
+           * ``mass_sym``/``coupling_sym`` (symbolic) — the term's
+             ``coefficient_symbolic`` **verbatim, un-negated**, so that it can
+             be resolved at runtime against real parameter values.
+
+           Concretely, an identity term ``B0^2/8`` yields ``mass = -0.125`` but
+           ``mass_sym = 'B0^2/8'``.  A caller who applies the numeric
+           convention to the symbolic matrix gets the sign wrong;
+           ``tidal/measurement/_energy.py`` compensates explicitly for this.
+           Unifying the two requires a matching change in ``ExportJSON.wl``
+           plus re-deriving every spec, so it is deferred — see #404.
+
+        Neither matrix is normalised by the LHS ``kinetic_coefficient_symbolic``.
+        For an effective mass², divide by it; see
+        :func:`tidal.symbolic.spec_query.effective_coefficient`, which is the
+        one implementation of that (#237, #258, #302).
+
+        Contributions **accumulate**: a component may carry several ``identity``
+        terms acting on the same field, and the entry is their sum, symbolic
+        entries included (GH #403).
 
         When *parameters* are provided and a term has ``coefficient_symbolic``,
         the symbolic expression is resolved with the parameter values to
         produce the correct numeric matrix entry. Without parameters, the
         raw numeric coefficient (a shape-factor like ±1.0) is used.
-
-        Symbolic expressions are always preserved as-is from the term (not
-        evaluated) so that they can be resolved at runtime with actual
-        parameter values.
 
         Parameters
         ----------
@@ -1071,12 +1119,18 @@ class EquationSystem:
                     if i == j:
                         mass[i][j] += neg_coeff
                         if term.coefficient_symbolic is not None:
-                            mass_sym[i][j] = term.coefficient_symbolic
+                            mass_sym[i][j] = _accumulate_symbolic(
+                                mass_sym[i][j],
+                                term.coefficient_symbolic,
+                            )
                             has_symbolic = True
                     else:
                         coupling[i][j] += neg_coeff
                         if term.coefficient_symbolic is not None:
-                            coupling_sym[i][j] = term.coefficient_symbolic
+                            coupling_sym[i][j] = _accumulate_symbolic(
+                                coupling_sym[i][j],
+                                term.coefficient_symbolic,
+                            )
                             has_symbolic = True
 
         mass_sym_t: tuple[tuple[str | None, ...], ...] = ()
@@ -1360,7 +1414,11 @@ class EquationSystem:
                     # coordinate_dependent explicitly — otherwise the modal
                     # source-evaluation call will not pass coord_arrays and
                     # eval() raises NameError on the bare coord.
-                    detected_coords: list[str] = [coord_name for coord_name in ("t", "x", "y", "z") if re.search(rf"\b{coord_name}\b", synth_sym)]
+                    detected_coords: list[str] = [
+                        coord_name
+                        for coord_name in ("t", "x", "y", "z")
+                        if re.search(rf"\b{coord_name}\b", synth_sym)
+                    ]
                     inherited = tuple(base_term.coordinate_dependent or ())
                     coord_dep = tuple(dict.fromkeys((*inherited, *detected_coords)))
                     synthesized.append(

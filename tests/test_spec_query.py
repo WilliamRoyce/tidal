@@ -42,38 +42,6 @@ EXAMPLES = REPO / "examples" / "data"
 # signature. Pinned as a set so a re-derivation that fixes one shows up here.
 EXPECTED_CONFLICT_FILES = 19
 
-# Specs where `mass_matrix_symbolic` drops identity terms because the loader
-# overwrites rather than accumulates -- open bug #403. Pinned so the suite
-# reacts both if the bug spreads and when it is fixed.
-SPECS_AFFECTED_BY_403 = {
-    "coupled_scalars.json",
-    "dark_photon_plasma_e_dual_gaussian.json",
-    "gertsenshtein_e0_dual_gaussian.json",
-    "gertsenshtein_eh.json",
-    "gertsenshtein_eh_top.json",
-    "gertsenshtein_ungauged_e_dual_gaussian.json",
-    "graviton_torsion.json",
-    "torsion_gertsenshtein.json",
-    "torsion_gertsenshtein_b5_zero.json",
-    "torsion_gertsenshtein_combined.json",
-    "torsion_gertsenshtein_complete_even.json",
-    "torsion_gertsenshtein_complete_even_e_dual_gaussian.json",
-    "torsion_gertsenshtein_complete_even_full_xi.json",
-    "torsion_gertsenshtein_complete_odd.json",
-    "torsion_gertsenshtein_complete_odd_e_dual_gaussian.json",
-    "torsion_gertsenshtein_einstein_cartan_e_dual_gaussian.json",
-    "torsion_gertsenshtein_exact.json",
-    "torsion_gertsenshtein_general_nonminimal.json",
-    "torsion_gertsenshtein_general_nonminimal_e_dual_gaussian.json",
-    "torsion_gertsenshtein_minimal_propagating.json",
-    "torsion_gertsenshtein_minimal_propagating_e0_dual_gaussian.json",
-    "torsion_gertsenshtein_nonminimal.json",
-    "torsion_gertsenshtein_nonminimal_e_dual_gaussian.json",
-    "torsion_gertsenshtein_parity_odd.json",
-    "torsion_gertsenshtein_parity_odd_minimal.json",
-    "torsion_gertsenshtein_propagating.json",
-}
-
 
 def _load(name: str) -> EquationSystem:
     """Load a committed example spec.
@@ -304,43 +272,36 @@ class TestCoefficientProvenance(unittest.TestCase):
         with pytest.raises(KeyError):
             coefficient_provenance(spec, "not_a_field", "h_5", "identity")
 
-    def test_matrix_encoding_disagreement_matches_known_bug_403(self) -> None:
-        """Pin the specs where the symbolic mass matrix drops identity terms.
+    def test_matrix_encoding_agrees_corpus_wide(self) -> None:
+        """The redundant matrix encoding matches the summed identity terms everywhere.
 
-        This is a **characterization test of a real, open bug** (#403), not an
-        assertion that the corpus is clean.  ``_compute_matrices_from_terms``
-        accumulates into the numeric matrix (``+=``) but overwrites the
-        symbolic one (``=``), so a component with several ``identity`` self-
-        terms keeps only the last.  26 of the 48 committed specs are affected.
+        This replaces a characterization test that pinned 26 specs as failing
+        while GH #403 was open: ``_compute_matrices_from_terms`` accumulated
+        into the numeric matrix (``+=``) but overwrote the symbolic one (``=``),
+        so a component with several ``identity`` self-terms kept only the last.
+        Both now accumulate, and the invariant holds across the corpus.
 
-        Pinning the set means the suite reacts to movement in either direction:
-        it fails if the bug spreads to another spec, and it fails when #403 is
-        fixed — at which point this test should be replaced by the clean
-        assertion ``matrix_encoding_agrees(spec) == ()`` for every spec.
-
-        Nothing else enforces this redundancy: the loader recomputes both
+        Nothing else enforces this redundancy — the loader recomputes both
         matrices and ignores the values stored in the JSON, and #274 records
-        them drifting apart once already.
+        them drifting apart once already — so this is the enforcement.
         """
-        affected = {
-            path.name
-            for path in sorted(EXAMPLES.glob("*.json"))
-            if matrix_encoding_agrees(_load(path.stem))
-        }
-        self.assertEqual(
-            affected,
-            SPECS_AFFECTED_BY_403,
-            "set of specs affected by #403 changed; if it shrank to empty the "
-            "bug is fixed and this test should assert cleanliness instead",
-        )
-
-    def test_unaffected_specs_have_a_consistent_matrix_encoding(self) -> None:
-        """Specs outside the #403 set do satisfy the redundancy invariant."""
         for path in sorted(EXAMPLES.glob("*.json")):
-            if path.name in SPECS_AFFECTED_BY_403:
-                continue
             with self.subTest(spec=path.name):
                 self.assertEqual(matrix_encoding_agrees(_load(path.stem)), ())
+
+    def test_multi_term_identity_is_summed_not_truncated(self) -> None:
+        """A component with several identity terms keeps all of them (GH #403).
+
+        ``coupled_scalars`` ``h_0`` carries both ``B0^2`` and ``mg2/kappa^2``;
+        before the fix the symbolic matrix held only the second.
+        """
+        spec = _load("coupled_scalars")
+        index = spec.equation_map["h_0"]
+        entry = spec.mass_matrix_symbolic[index][index]
+        self.assertIsNotNone(entry)
+        assert entry is not None
+        for part in ("B0^2", "mg2/kappa^2"):
+            self.assertIn(part, entry)
 
 
 class TestCorpusGolden(unittest.TestCase):
