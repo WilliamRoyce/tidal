@@ -142,6 +142,195 @@ def _parse_validate_params(raw: list[str], spec: EquationSystem) -> dict[str, fl
     return params
 
 
+def _leading_sign(value: object) -> int:
+    """Sign of a coefficient that may be numeric or a symbolic expression.
+
+    Accepts ``None`` (treated as ``+1``, i.e. an implicit unit coefficient),
+    a float, or a string such as ``"-1 + 2*B0^2*rho"``.  Only the leading
+    sign is inspected -- enough to compare orientations, and robust against
+    expressions we cannot evaluate without parameter values.
+    """
+    if value is None:
+        return 1
+    if isinstance(value, (int, float)):
+        return 1 if value > 0 else (-1 if value < 0 else 0)
+    text = str(value).strip().lstrip("(").strip()
+    return -1 if text.startswith("-") else 1
+
+
+# NOTE(GH #401): duplicates logic that belongs on the model.  Refactor onto
+# the shared semantic accessors on ComponentEquation once they land.
+def _effective_self_sign(equation: object, operator_prefix: str) -> int | None:
+    """Orientation of a field's own ``operator_prefix`` terms in its equation.
+
+    Returns ``sign(sum of matching self-terms) * sign(kinetic coefficient)``,
+    or ``None`` when the field has no such term.
+
+    Three details matter, each of which produced a wrong answer during the
+    GH #397 investigation when omitted:
+
+    * **Normalise by the kinetic coefficient.** Euler-Heisenberg photons carry
+      ``lap = -1`` with ``kin = -1 + 2*B0^2*rho``, i.e. orientation ``+1``.
+      Comparing raw coefficients marks them inconsistent when they are correct.
+    * **Sum every matching term.** EH components have a base term *and* a
+      ``B0^2*rho`` correction; taking a single term gives the wrong sign.
+    * **Symbolic coefficients count.** Torsion self-laplacians appear as
+      ``-xi``; skipping non-numeric coefficients misses them entirely.
+    """
+    total = 0
+    found = False
+    for term in equation.rhs_terms:  # type: ignore[attr-defined]
+        if term.field != equation.field_name:  # type: ignore[attr-defined]
+            continue
+        if not term.operator.startswith(operator_prefix):
+            continue
+        found = True
+        raw = term.coefficient_symbolic
+        total += _leading_sign(raw if raw is not None else term.coefficient)
+    if not found:
+        return None
+    kin = _leading_sign(equation.kinetic_coefficient_symbolic)  # type: ignore[attr-defined]
+    return (1 if total > 0 else (-1 if total < 0 else 0)) * kin
+
+
+def _check_volume_element_consistency(spec: object) -> list[str]:
+    """Require Christoffel gradient terms when the volume element is non-constant (GH #394).
+
+    ``ComponentEulerLagrange`` varies a Lagrangian *density*.  When the metric
+    has a non-constant ``sqrt|g|`` the equations must carry the first-derivative
+    terms it generates.  If ``canonical.volume_element`` is non-constant but no
+    equation has a spatial gradient term, the measure was dropped during
+    derivation and the energy integral no longer matches the operator that
+    evolves the fields -- exactly the #393/#394 failure.
+    """
+    from tidal.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        return []
+    canonical = spec.canonical
+    if canonical is None or canonical.volume_element is None:
+        return []
+
+    ve = str(canonical.volume_element)
+    coords = set(spec.coordinates)
+    if not any(f"{c}[]" in ve for c in coords):
+        return []  # constant measure: factors out, nothing to check
+
+    has_gradient = any(
+        term.operator.startswith("gradient")
+        for eq in spec.equations
+        for term in eq.rhs_terms
+    )
+    if has_gradient:
+        return []
+    return [
+        f"Non-constant volume_element '{ve}' but no spatial gradient term in any "
+        "equation. The sqrt|g| measure was likely dropped during Euler-Lagrange "
+        "variation, so the energy integral will not match the evolution operator "
+        "(see GH #394).",
+    ]
+
+
+def _check_temporal_component_sign(spec: object) -> list[str]:
+    """Check that a vector field's temporal and spatial components agree in sign (GH #397).
+
+    ``Box A_mu = 0`` acts identically on every component, so a rank-1 field's
+    temporal component must carry the same effective self-laplacian orientation
+    as its spatial siblings.  Pre-GH-#381 exports left the temporal component
+    un-normalised (``lhsCoeff = -1`` never divided through), producing
+    ``d2_t a_0 = -laplacian a_0`` -- a temporal-only tachyon.
+
+    Deliberately narrow, because each restriction prevents a real false positive:
+
+    * **Bare ``d2_t`` LHS only.** ``h_5`` carries ``laplacian = -kappa^(-2)``
+      matched by its stored kinetic coefficient and is correctly normalised;
+      constraint equations have a conventional overall sign.
+    * **Rank-1 families only.** Torsion is rank 3 and its irreducible components
+      legitimately carry different normalisations -- that non-uniformity is
+      physical and must not be reported.
+    """
+    from tidal.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        return []
+
+    tensor_meta = spec.metadata.get("tensor_metadata")
+    has_meta = isinstance(tensor_meta, dict) and bool(tensor_meta)
+
+    by_head: dict[str, dict[int, object]] = {}
+    for eq in spec.equations:
+        if eq.time_derivative_order != 2 or eq.kinetic_coefficient_symbolic is not None:
+            continue
+
+        if has_meta:
+            meta = tensor_meta.get(eq.field_name)  # type: ignore[union-attr]
+            if not isinstance(meta, dict) or meta.get("tensor_rank") != 1:
+                continue
+            indices = meta.get("tensor_indices") or []
+            if len(indices) != 1:
+                continue
+            head, component = str(meta.get("tensor_head")), int(indices[0])
+        else:
+            # Pre-78374c1 exports carry no tensor metadata, and those are the
+            # OLDEST specs -- precisely the ones most likely to predate the
+            # GH #381 fix.  Skipping them would blind the guard to its main
+            # target, so fall back to the "<head>_<index>" naming convention.
+            #
+            # Restricted to families whose indices are exactly 0..dim-1, which
+            # identifies a rank-1 field: a rank-2 or rank-3 field in the same
+            # notation spans far more components (h_0..h_9, t_0..t_23), so it
+            # cannot be mistaken for a vector.
+            name = eq.field_name
+            if "_" not in name:
+                continue
+            head, _, suffix = name.rpartition("_")
+            if not suffix.isdigit():
+                continue
+            component = int(suffix)
+
+        by_head.setdefault(head, {})[component] = eq
+
+    if not has_meta:
+        # Discriminate rank by index range against the UNREDUCED dimension: a
+        # rank-1 field spans 0..D-1, while rank-2 spans 0..D^2-1 and rank-3
+        # far more.  Using the max index rather than the full set keeps this
+        # correct when some components were filtered out above.
+        #
+        # `spacetime.dimension` is the *reduced* dimension for plane-wave
+        # specs (2), while the field indices still run over the original 4 --
+        # so prefer metadata.reduction.original_dimension where present.
+        reduction = spec.metadata.get("reduction")
+        dim = spec.dimension
+        if isinstance(reduction, dict):
+            dim = int(reduction.get("original_dimension", dim) or dim)
+        by_head = {h: c for h, c in by_head.items() if c and max(c) < dim}
+
+    errors: list[str] = []
+    for head, comps in sorted(by_head.items()):
+        temporal = comps.get(0)
+        if temporal is None or len(comps) < 2:
+            continue
+        t_sign = _effective_self_sign(temporal, "laplacian")
+        if not t_sign:
+            continue
+        spatial = {
+            i: _effective_self_sign(eq, "laplacian")
+            for i, eq in comps.items()
+            if i != 0
+        }
+        opposed = sorted(i for i, s in spatial.items() if s and s * t_sign < 0)
+        if opposed and len(opposed) == len([s for s in spatial.values() if s]):
+            errors.append(
+                f"Field '{head}' temporal component "
+                f"'{temporal.field_name}' has self-laplacian sign opposite to its "  # type: ignore[attr-defined]
+                f"spatial components {[comps[i].field_name for i in opposed]}. "  # type: ignore[attr-defined]
+                "Box A_mu = 0 acts identically on all components, so this is a "
+                "temporal-only tachyon -- the spec predates the GH #381 LHS "
+                "normalisation fix and needs re-deriving (see GH #397).",
+            )
+    return errors
+
+
 def _check_perturbative_consistency(spec: object) -> tuple[list[str], list[str]]:
     """Check perturbative-reduction scope for theories with [perturbation].
 
@@ -383,6 +572,13 @@ def validate_command(args: Namespace) -> int:
 
     # Check 5: Parameters (warnings, not errors)
     warnings.extend(_check_parameters(spec))
+
+    # Check 5c: Derivation-integrity guards.  Both catch defects that are
+    # silent at derivation time and only surface as wrong physics later --
+    # a dropped sqrt|g| measure (#394) and an un-normalised temporal
+    # component (#397).
+    errors.extend(_check_volume_element_consistency(spec))
+    errors.extend(_check_temporal_component_sign(spec))
 
     # Check 5b: Perturbative-reduction scope (warnings).  Active when the
     # spec has [perturbation]; flags constraint-promotion theories where
