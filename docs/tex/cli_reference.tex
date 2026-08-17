@@ -98,6 +98,73 @@ tidal inspect examples/data/chern_simons.json
 
 Output includes: spacetime dimension, field names, equation count, operator types, mass/coupling matrices.
 
+\paragraph{Semantic queries.}
+Four flags read \emph{part} of a spec through the vetted accessors in
+\texttt{tidal/symbolic/spec\_query.py} rather than leaving the reader to
+interpret raw JSON. They exist because doing that by hand produced six
+confidently wrong diagnoses (GH \#401).
+
+\begin{lstlisting}[style=bash]
+# One equation, with effective coefficients
+tidal inspect spec.json --equation h_5
+
+# One coefficient and every place it is recorded
+tidal inspect spec.json --coefficient 'h_5:identity(h_5)'
+
+# Tensor families, classified by tensor_indices (not by name suffix)
+tidal inspect spec.json --families
+
+# Compare two specs, separating real changes from rescalings
+tidal inspect old.json --diff new.json
+\end{lstlisting}
+
+An \emph{effective} coefficient is the sum of \emph{every} matching RHS term,
+divided by the LHS kinetic coefficient. Both halves matter: components
+routinely carry several terms with the same operator-field key, and ignoring
+the kinetic coefficient has been re-implemented wrong five separate times in
+this codebase (\#237, \#258, \#302, and twice in \#401).
+
+\texttt{--coefficient} is a provenance report, not a sign oracle. It
+distinguishes \emph{parts} of the coefficient (several RHS terms, plus the
+LHS divisor) from \emph{redundant re-encodings} (the mass matrix) and from
+the \emph{related but distinct} Hamiltonian term, which is a different number
+in a different formalism.
+
+Sign verdicts are sound by construction: a definite answer is returned only
+when proven, otherwise \texttt{unknown}. Each verdict prints the deciding
+tactic and any assumptions used. \texttt{--assume-nonzero} declares a
+parameter non-vanishing without claiming a sign --- appropriate for
+\texttt{kappa}, whose vanishing would remove the Einstein--Hilbert term ---
+and sharpens \texttt{kappa\^{}2} from \texttt{0+} to \texttt{+}. Parameters
+that genuinely reach zero here (\texttt{xi}, \texttt{b5}) keep the cautious
+reading unless declared.
+
+\begin{table}[H]
+\centering
+\caption{\texttt{tidal inspect} exit codes.}
+\begin{tabular}{ll}
+\toprule
+Code & Meaning \\
+\midrule
+0 & Success; for \texttt{--diff}, no real changes \\
+1 & \texttt{--diff} found real changes (a declared outcome, as in \texttt{diff(1)}) \\
+2 & Usage or lookup error \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+With \texttt{--json} the output is an \texttt{\{"items": [\ldots]\}} envelope
+on stdout, with diagnostics on stderr, so it pipes cleanly through
+\texttt{jq}. \texttt{--fields} projects the record to named keys, which
+matters for large specs --- a torsion spec has 32 components.
+
+\paragraph{Corpus-level questions.}
+\texttt{tests/data/spec\_semantics.txt} is a committed summary of every spec
+in \texttt{examples/data/}: families, index structure, and any proven sign
+conflicts. Read it instead of writing a fresh scan. Regenerate with
+\texttt{python -m scripts.spec\_semantics\_report}; a test asserts it stays
+current, so semantic drift appears as a reviewable diff.
+
 \subsubsection{\texttt{tidal list} --- Discover available JSON specs}
 
 Searches for JSON specification files in \texttt{examples/data/}.
