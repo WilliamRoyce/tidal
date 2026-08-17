@@ -120,6 +120,9 @@ def _make_2field_3d_spec() -> dict[str, Any]:
             },
         },
     )
+    # A legacy 2x2 section, deliberately kept so that
+    # TestReduceSpec.test_coupling_section_is_dropped exercises removal of a
+    # section sized for the unreduced field list.
     spec["coupling"]["mass_matrix_symbolic"].append(["-m2"])
     spec["coupling"]["mass_matrix_symbolic"][0].append("0")
     return spec
@@ -541,14 +544,20 @@ class TestReduceSpec:
         with pytest.raises(ValueError, match="killed coordinate"):
             reduce_spec(spec, {"type": "plane_wave", "propagation_axis": "z"})
 
-    def test_coupling_matrix_reduced(self) -> None:
-        """Coupling matrices are filtered to surviving fields."""
+    def test_coupling_section_is_dropped(self) -> None:
+        """The vestigial `coupling` section is removed, not resized.
+
+        Mass/coupling matrices are derived from the identity terms in
+        ``equations``; the loader has not read this section since c407240d and
+        the exporter no longer writes it (GH #403, #404). An older spec still
+        carries one sized for the *unreduced* field list, so reduction drops it
+        rather than leaving a stale, wrongly-sized copy behind.
+        """
         spec = _make_2field_3d_spec()
+        assert "coupling" in spec, "fixture should exercise the legacy section"
         result = reduce_spec(spec, {"type": "plane_wave", "propagation_axis": "z"})
 
-        matrix = result["coupling"]["mass_matrix_symbolic"]
-        assert len(matrix) == 1
-        assert len(matrix[0]) == 1
+        assert "coupling" not in result
 
     def test_deep_copy_input_unchanged(self) -> None:
         """Input spec_data is not mutated."""

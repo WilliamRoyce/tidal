@@ -29,7 +29,7 @@ from tidal.symbolic.spec_query import (
     diff_systems,
     effective_coefficient,
     field_families,
-    matrix_encoding_agrees,
+    matrix_matches_summed_terms,
     self_terms,
     sibling_sign_conflicts,
     terms_for,
@@ -272,22 +272,18 @@ class TestCoefficientProvenance(unittest.TestCase):
         with pytest.raises(KeyError):
             coefficient_provenance(spec, "not_a_field", "h_5", "identity")
 
-    def test_matrix_encoding_agrees_corpus_wide(self) -> None:
-        """The redundant matrix encoding matches the summed identity terms everywhere.
+    def test_derived_matrix_matches_summed_terms_corpus_wide(self) -> None:
+        """The two Python derivations of the mass matrix agree everywhere.
 
-        This replaces a characterization test that pinned 26 specs as failing
-        while GH #403 was open: ``_compute_matrices_from_terms`` accumulated
-        into the numeric matrix (``+=``) but overwrote the symbolic one (``=``),
-        so a component with several ``identity`` self-terms kept only the last.
-        Both now accumulate, and the invariant holds across the corpus.
-
-        Nothing else enforces this redundancy — the loader recomputes both
-        matrices and ignores the values stored in the JSON, and #274 records
-        them drifting apart once already — so this is the enforcement.
+        ``_compute_matrices_from_terms`` builds the matrix while scanning the
+        equations; ``effective_coefficient`` sums the matching terms on demand.
+        They must never disagree. This replaces a characterization test that
+        pinned 26 specs as failing while GH #403 was open, when the matrix
+        builder overwrote multi-term coefficients instead of accumulating them.
         """
         for path in sorted(EXAMPLES.glob("*.json")):
             with self.subTest(spec=path.name):
-                self.assertEqual(matrix_encoding_agrees(_load(path.stem)), ())
+                self.assertEqual(matrix_matches_summed_terms(_load(path.stem)), ())
 
     def test_multi_term_identity_is_summed_not_truncated(self) -> None:
         """A component with several identity terms keeps all of them (GH #403).

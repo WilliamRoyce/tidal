@@ -79,6 +79,7 @@ __all__ = [
     "diff_systems",
     "effective_coefficient",
     "field_families",
+    "matrix_matches_summed_terms",
     "self_terms",
     "terms_for",
 ]
@@ -851,24 +852,25 @@ def sibling_sign_conflicts(
     return tuple(conflicts)
 
 
-def matrix_encoding_agrees(spec: EquationSystem) -> tuple[ConsistencyCheck, ...]:
-    """Check the redundant mass-matrix encoding against the identity terms.
+def matrix_matches_summed_terms(spec: EquationSystem) -> tuple[ConsistencyCheck, ...]:
+    """Cross-check the derived mass matrix against the summed identity terms.
 
-    ``EquationSystem.from_dict`` recomputes the mass and coupling matrices from
-    the equation terms and *ignores* the values stored in the JSON, so the two
-    encodings can drift apart unnoticed — #274 records exactly that happening
-    after ``base_spec``.  This makes the redundancy checkable.
+    Two Python derivations of the same quantity are compared:
+    :meth:`EquationSystem._compute_matrices_from_terms`, which builds
+    ``mass_matrix_symbolic`` while scanning the equations, and
+    :func:`effective_coefficient`, which sums the matching terms on demand.
+    They should never disagree, and when they did it was because the matrix
+    builder overwrote multi-term coefficients instead of accumulating them
+    (GH #403).
 
-    .. warning::
+    This reads the **derived** ``spec.mass_matrix_symbolic``, not the JSON: the
+    loader has not read a stored ``coupling`` section since c407240d, and the
+    exporter no longer writes one, so there is no stored encoding left to
+    compare against.
 
-       The numeric and symbolic matrices use **opposite sign conventions**.
-       ``_compute_matrices_from_terms`` negates the coefficient for the numeric
-       matrix (``mass[i][j] = -coefficient``) but stores
-       ``coefficient_symbolic`` **verbatim** in the symbolic matrix.  So for an
-       identity term ``B0^2/8`` the entries are ``mass_matrix = -0.125`` and
-       ``mass_matrix_symbolic = 'B0^2/8'``.  The class docstring's
-       ``matrix[i][j] = -(coefficient)`` describes only the numeric one.  Each
-       is checked against its own convention here.
+    The symbolic matrix stores ``coefficient_symbolic`` verbatim while the
+    numeric one negates it, so the comparison here is against the un-negated
+    sum.
 
     Parameters
     ----------
@@ -887,18 +889,17 @@ def matrix_encoding_agrees(spec: EquationSystem) -> tuple[ConsistencyCheck, ...]
         row = spec.equation_map[equation.field_name]
         for col, field in enumerate(spec.component_names):
             eff = effective_coefficient(equation, field, "identity")
-            stored = spec.mass_matrix_symbolic[row][col]
-            if stored is None or not eff.exists:
+            derived = spec.mass_matrix_symbolic[row][col]
+            if derived is None or not eff.exists:
                 continue
-            # Symbolic convention: stored verbatim, NOT negated.
-            if constant_ratio(stored, eff.numerator) != 1:
+            if constant_ratio(derived, eff.numerator) != 1:
                 problems.append(
                     ConsistencyCheck(
                         name="matrix-vs-terms",
                         status="undecided",
                         detail=(
-                            f"{equation.field_name}/{field}: symbolic matrix entry "
-                            f"{stored!r} is not provably equal to the summed "
+                            f"{equation.field_name}/{field}: derived matrix entry "
+                            f"{derived!r} is not provably equal to the summed "
                             f"identity term {eff.numerator!r}"
                         ),
                     ),

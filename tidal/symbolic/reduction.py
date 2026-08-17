@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import copy
 import re
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -354,42 +354,25 @@ def _reduce_volume_element(
         canonical["volume_element"] = new_vol
 
 
-def _filter_coupling_matrices(
-    result: dict[str, Any],
-    surviving_indices: list[int],
-) -> None:
-    """Remove rows/columns for eliminated fields from coupling matrices.
+def _drop_coupling_section(result: dict[str, Any]) -> None:
+    """Remove the vestigial ``coupling`` section from a reduced spec.
+
+    The mass and coupling matrices are fully determined by the identity-operator
+    terms in ``equations``, and ``EquationSystem.from_dict`` derives them from
+    there — it has not read this section since c407240d (2026-02-07).  The
+    exporter no longer writes it (GH #403, #404).
+
+    Older specs still carry one, and it is sized for the *unreduced* field list.
+    This used to slice it to match the survivors; dropping it outright is better,
+    because a reduced spec should not carry a stale copy of data nothing reads,
+    and slicing implied the values were meaningful.
 
     Parameters
     ----------
     result : dict
-        Spec dict containing a ``"coupling"`` section.
-    surviving_indices : list[int]
-        Original field indices that survive (in order).
+        Spec dict, modified in place.
     """
-    coupling: dict[str, Any] = result.get("coupling", {})
-    if not coupling:
-        return
-
-    for matrix_key in (
-        "mass_matrix",
-        "coupling_matrix",
-        "mass_matrix_symbolic",
-        "coupling_matrix_symbolic",
-    ):
-        if matrix_key not in coupling:
-            continue
-        raw = coupling[matrix_key]
-        if not isinstance(raw, list) or not raw:
-            continue
-        matrix = cast("list[list[Any]]", raw)
-        new_matrix: list[list[Any]] = []
-        for i in surviving_indices:
-            if i < len(matrix):
-                row = matrix[i]
-                new_row: list[Any] = [row[j] for j in surviving_indices if j < len(row)]
-                new_matrix.append(new_row)
-        coupling[matrix_key] = new_matrix
+    result.pop("coupling", None)
 
 
 def reduce_spec(
@@ -445,12 +428,7 @@ def reduce_spec(
     spacetime["signature"] = [-1, 1]
     spacetime["coordinates"] = ["t", "x"]
 
-    surviving_indices = [
-        i
-        for i, eq in enumerate(spec_data.get("equations", []))
-        if str(eq.get("field", "")) in surviving_fields
-    ]
-    _filter_coupling_matrices(result, surviving_indices)
+    _drop_coupling_section(result)
 
     metadata: dict[str, Any] = result.get("metadata", {})
     metadata["reduction"] = {

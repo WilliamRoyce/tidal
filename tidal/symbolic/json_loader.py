@@ -1042,26 +1042,29 @@ class EquationSystem:
         Scans each equation's RHS terms for ``identity`` operators acting on
         known field names (not velocity references like ``v_N``).
 
-        .. warning::
+        **This is the only implementation.** The matrices are *derived* from
+        ``equations`` and are never stored: ``ExportJSON.wl`` used to emit a
+        ``coupling`` section computed the same way in Wolfram, and the loader
+        stopped reading it in c407240d (2026-02-07) without the export stopping.
+        Two copies of one calculation then drifted apart unnoticed for six
+        months — both truncating multi-term coefficients, and disagreeing on
+        sign (GH #403, #404). The export was removed rather than repaired,
+        because derived data does not belong in the file.
 
-           **The numeric and symbolic matrices use opposite sign conventions**
-           (GH #404).  Both are returned here, and each must be read with its
-           own convention:
+        The numeric and symbolic matrices describe the same quantity under
+        different conventions, which is deliberate and load-bearing:
 
-           * ``mass``/``coupling`` (numeric) — ``matrix[i][j] = -(coefficient)``
-             of the ``identity(field_j)`` term in equation *i*.  The negation
-             makes mass² positive for the standard Lagrangian sign convention
-             ``∂²_t φ = … - m² φ``.
-           * ``mass_sym``/``coupling_sym`` (symbolic) — the term's
-             ``coefficient_symbolic`` **verbatim, un-negated**, so that it can
-             be resolved at runtime against real parameter values.
+        * ``mass``/``coupling`` (numeric) — ``matrix[i][j] = -(coefficient)`` of
+          the ``identity(field_j)`` term in equation *i*. The negation makes
+          mass² positive for the standard Lagrangian sign convention
+          ``∂²_t φ = … - m² φ``.
+        * ``mass_sym``/``coupling_sym`` (symbolic) — the term's
+          ``coefficient_symbolic`` **verbatim, un-negated**, so it can be
+          resolved at runtime against real parameter values.
 
-           Concretely, an identity term ``B0^2/8`` yields ``mass = -0.125`` but
-           ``mass_sym = 'B0^2/8'``.  A caller who applies the numeric
-           convention to the symbolic matrix gets the sign wrong;
-           ``tidal/measurement/_energy.py`` compensates explicitly for this.
-           Unifying the two requires a matching change in ``ExportJSON.wl``
-           plus re-deriving every spec, so it is deferred — see #404.
+        So an identity term ``B0^2/8`` gives ``mass = -0.125`` and
+        ``mass_sym = 'B0^2/8'``. A caller applying the numeric convention to the
+        symbolic matrix gets the sign wrong; negate it explicitly.
 
         Neither matrix is normalised by the LHS ``kinetic_coefficient_symbolic``.
         For an effective mass², divide by it; see
