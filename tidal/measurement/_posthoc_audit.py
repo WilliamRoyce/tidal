@@ -514,7 +514,9 @@ def _eval_baseline_at_times(
     for i, t in enumerate(times):
         ns: dict[str, object] = {**FORMULA_NAMESPACE, **parameters, "t_end": float(t)}
         try:
-            val = float(eval(formula, {"__builtins__": {}}, ns))  # noqa: S307
+            from tidal.cli._simulate import safe_formula_eval
+
+            val = float(safe_formula_eval(formula, ns))  # type: ignore[arg-type]
         except Exception:  # noqa: BLE001
             val = float("nan")
         out[i] = val if math.isfinite(val) else float("nan")

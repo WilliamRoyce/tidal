@@ -640,6 +640,7 @@ class SweepResults:
 
         from tidal.cli._simulate import (  # noqa: PLC0415
             FORMULA_NAMESPACE,  # pyright: ignore[reportPrivateUsage]
+            safe_formula_eval,
         )
 
         for row in self.rows:
@@ -662,7 +663,7 @@ class SweepResults:
             # Evaluate baseline
             try:
                 p_em = float(
-                    eval(baseline_formula, {"__builtins__": {}}, ns),  # noqa: S307
+                    safe_formula_eval(baseline_formula, ns),  # type: ignore[arg-type]
                 )
             except Exception:  # noqa: BLE001
                 p_em = _math.nan
@@ -891,7 +892,8 @@ class SweepResults:
         data["total_runs"] = self.metadata.get("total_runs", self.n_runs)
 
         path.write_text(
-            json.dumps(data, indent=2, default=_json_default), encoding="utf-8",
+            json.dumps(data, indent=2, default=_json_default),
+            encoding="utf-8",
         )
 
     # ------------------------------------------------------------------

@@ -182,7 +182,9 @@ def _evaluate_sweep_overlay(
 
     ns: dict[str, object] = {**FORMULA_NAMESPACE, **scalar_params, **param_arrays}
     try:
-        result = eval(formula, {"__builtins__": {}}, ns)  # noqa: S307
+        from tidal.cli._simulate import safe_formula_eval
+
+        result = safe_formula_eval(formula, ns)
     except Exception as exc:
         msg = f"Error evaluating overlay formula {formula!r}: {exc}"
         raise ValueError(msg) from exc
@@ -542,7 +544,12 @@ def render_sweep_1d_multi(
     for i, metric in enumerate(metrics):
         ax = axes[i, 0]
         _plot_1d_metric(
-            ax, results, param_name, metric, colors[i % len(colors)], log_y=log_y,
+            ax,
+            results,
+            param_name,
+            metric,
+            colors[i % len(colors)],
+            log_y=log_y,
         )
         ax.set_ylabel(metric)
         ax.grid(visible=True, alpha=0.3)
@@ -772,12 +779,18 @@ def _render_2d_scattered(  # noqa: PLR0913
 
     if len(metric_vals) == 0:
         ax.text(
-            0.5, 0.5, f"No valid data for {metric}", transform=ax.transAxes, ha="center",
+            0.5,
+            0.5,
+            f"No valid data for {metric}",
+            transform=ax.transAxes,
+            ha="center",
         )
         return
 
     norm = _build_norm(
-        metric_vals, log_scale=log_scale, divergent_center=divergent_center,
+        metric_vals,
+        log_scale=log_scale,
+        divergent_center=divergent_center,
     )
 
     # Interpolation background (if enough points)
@@ -1023,7 +1036,12 @@ def render_sweep_2d_with_overlay(
     # Panel 0: TIDAL numerical
     ax0 = axes[0]
     im0 = ax0.pcolormesh(
-        p1_vals, p2_vals, z_num, shading="nearest", cmap="viridis", norm=norm,
+        p1_vals,
+        p2_vals,
+        z_num,
+        shading="nearest",
+        cmap="viridis",
+        norm=norm,
     )
     ax0.set_xlabel(p1_name)
     ax0.set_ylabel(p2_name)
@@ -1210,7 +1228,11 @@ def render_convergence(
     mask = np.isfinite(values) & (values > 0)
     if not np.any(mask):
         ax.text(
-            0.5, 0.5, f"No valid data for {metric}", transform=ax.transAxes, ha="center",
+            0.5,
+            0.5,
+            f"No valid data for {metric}",
+            transform=ax.transAxes,
+            ha="center",
         )
         return
 
@@ -1235,7 +1257,13 @@ def render_convergence(
         ax.set_xscale("log")
     else:
         ax.loglog(
-            n, y, "o-", color="tab:blue", linewidth=1.5, markersize=6, label="measured",
+            n,
+            y,
+            "o-",
+            color="tab:blue",
+            linewidth=1.5,
+            markersize=6,
+            label="measured",
         )
 
     # Fit convergence order
@@ -1827,7 +1855,13 @@ def render_replicate_convergence(
 
         color = cmap(gi / max(n_groups - 1, 1))
         ax.plot(
-            ks, running_sem, "o-", color=color, markersize=4, linewidth=1.2, label=label,
+            ks,
+            running_sem,
+            "o-",
+            color=color,
+            markersize=4,
+            linewidth=1.2,
+            label=label,
         )
 
     # Reference: 1/sqrt(k) scaled to typical SEM at k=2
