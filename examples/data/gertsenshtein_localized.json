@@ -16,7 +16,7 @@
 				"h_4"
 			]
 		},
-		"derivation_hash": "ecb5d949cffa3b8f2f48c9b34e03a22f8a8910401424d55c493a3cec5f197ade"
+		"derivation_hash": "c0091e25ab269bf6550f13e989b13e049244ee5f28e969a407fec9895904b56c"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -33,32 +33,64 @@
 		{
 			"name": "a_0",
 			"index": 0,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				0
+			]
 		},
 		{
 			"name": "a_1",
 			"index": 1,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				1
+			]
 		},
 		{
 			"name": "a_2",
 			"index": 2,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				2
+			]
 		},
 		{
 			"name": "a_3",
 			"index": 3,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "a",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				3
+			]
 		},
 		{
 			"name": "h_5",
 			"index": 4,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				1,
+				2
+			]
 		},
 		{
 			"name": "h_7",
 			"index": 5,
-			"is_dynamical": true
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				2,
+				2
+			]
 		}
 	],
 	"equations": [
@@ -75,7 +107,7 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": -1.0,
+						"coefficient": 1.0,
 						"operator": "laplacian_x",
 						"field": "a_0"
 					}

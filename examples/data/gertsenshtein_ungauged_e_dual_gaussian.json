@@ -11,7 +11,7 @@
 			"propagation_axis": "z",
 			"eliminated_fields": []
 		},
-		"derivation_hash": "949db31db543a396fcc83f596cea5c3a3113992a2c2c0f53872bbe8fa7f809b5"
+		"derivation_hash": "048cddbcefb9f645822dd9bae24de64535fa0836304656414eb55a851f14c9db"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -190,10 +190,28 @@
 				"type": "linear_combination",
 				"terms": [
 					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "h_2",
+						"coefficient_symbolic": "(Bpeak*zc1)/(E^((zc1 - x[])^2/(2*sigB^2))*sigB^2)",
+						"coordinate_dependent": [
+							"x"
+						]
+					},
+					{
 						"coefficient": -1.0,
 						"operator": "identity",
 						"field": "h_2",
-						"coefficient_symbolic": "-((Bpeak*zc1)/(E^((zc1 - x[])^2/(2*sigB^2))*sigB^2))",
+						"coefficient_symbolic": "-((Bpeak*zc2)/(E^((zc2 - x[])^2/(2*sigB^2))*sigB^2))",
+						"coordinate_dependent": [
+							"x"
+						]
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "h_2",
+						"coefficient_symbolic": "-((Bpeak*x[])/(E^((zc1 - x[])^2/(2*sigB^2))*sigB^2))",
 						"coordinate_dependent": [
 							"x"
 						]
@@ -202,34 +220,7 @@
 						"coefficient": 1.0,
 						"operator": "identity",
 						"field": "h_2",
-						"coefficient_symbolic": "(Bpeak*zc2)/(E^((zc2 - x[])^2/(2*sigB^2))*sigB^2)",
-						"coordinate_dependent": [
-							"x"
-						]
-					},
-					{
-						"coefficient": 1.0,
-						"operator": "identity",
-						"field": "h_2",
-						"coefficient_symbolic": "(Bpeak*x[])/(E^((zc1 - x[])^2/(2*sigB^2))*sigB^2)",
-						"coordinate_dependent": [
-							"x"
-						]
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "identity",
-						"field": "h_2",
-						"coefficient_symbolic": "-((Bpeak*x[])/(E^((zc2 - x[])^2/(2*sigB^2))*sigB^2))",
-						"coordinate_dependent": [
-							"x"
-						]
-					},
-					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "h_2",
-						"coefficient_symbolic": "-(Bpeak/E^((zc1 - x[])^2/(2*sigB^2)))",
+						"coefficient_symbolic": "(Bpeak*x[])/(E^((zc2 - x[])^2/(2*sigB^2))*sigB^2)",
 						"coordinate_dependent": [
 							"x"
 						]
@@ -238,13 +229,22 @@
 						"coefficient": 1.0,
 						"operator": "gradient_x",
 						"field": "h_2",
-						"coefficient_symbolic": "Bpeak/E^((zc2 - x[])^2/(2*sigB^2))",
+						"coefficient_symbolic": "Bpeak/E^((zc1 - x[])^2/(2*sigB^2))",
 						"coordinate_dependent": [
 							"x"
 						]
 					},
 					{
 						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "h_2",
+						"coefficient_symbolic": "-(Bpeak/E^((zc2 - x[])^2/(2*sigB^2)))",
+						"coordinate_dependent": [
+							"x"
+						]
+					},
+					{
+						"coefficient": 1.0,
 						"operator": "laplacian_x",
 						"field": "a_0"
 					}
@@ -1882,7 +1882,7 @@
 				null,
 				null,
 				null,
-				"-((Bpeak*x[])/(E^((zc2 - x[])^2/(2*sigB^2))*sigB^2))",
+				"(Bpeak*x[])/(E^((zc2 - x[])^2/(2*sigB^2))*sigB^2)",
 				null,
 				null,
 				null,
