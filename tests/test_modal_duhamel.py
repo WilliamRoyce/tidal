@@ -64,7 +64,6 @@ _KG_BASE: dict[str, object] = {
             },
         },
     ],
-    "coupling": {"mass_matrix_symbolic": [["-m2 - eps"]]},
 }
 
 
@@ -412,7 +411,6 @@ _CROSS_BLOCK_SPEC: dict[str, object] = {
             },
         },
     ],
-    "coupling": {},
 }
 
 
@@ -773,7 +771,6 @@ class TestPass1TimeDerivativeTargetingDynamical:
                 },
             },
         ],
-        "coupling": {},
     }
 
     def test_first_derivative_t_on_dynamical_target_scales_by_lambda(

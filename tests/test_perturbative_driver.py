@@ -57,7 +57,6 @@ _KG_WITH_EPS: dict[str, object] = {
             },
         },
     ],
-    "coupling": {},
 }
 
 
@@ -83,7 +82,6 @@ _KG_BASELINE_NO_PERT: dict[str, object] = {
             },
         },
     ],
-    "coupling": {},
 }
 
 
@@ -520,7 +518,6 @@ _PROCA_WITH_EPS_SPEC: dict[str, object] = {
             },
         },
     ],
-    "coupling": {},
 }
 
 
@@ -791,7 +788,6 @@ class TestPerturbativeDefensiveHardening:
                     },
                 },
             ],
-            "coupling": {},
         }
         spec = _make_spec(data)
         solver = PerturbativeSolver(spec)
@@ -886,7 +882,6 @@ _KG_WITH_KINETIC_EPS: dict[str, object] = {
             },
         },
     ],
-    "coupling": {},
 }
 
 
@@ -1072,7 +1067,6 @@ _KG_WITH_POS_DEP_KINETIC_EPS: dict[str, object] = {
             },
         },
     ],
-    "coupling": {},
 }
 
 
@@ -1178,7 +1172,6 @@ _KG_WITH_POS_DEP_BASE: dict[str, object] = {
             },
         },
     ],
-    "coupling": {},
 }
 
 
