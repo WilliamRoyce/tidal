@@ -859,25 +859,23 @@ def sign_of(
     )
 
 
-def _as_constant(node: ast.expr) -> Fraction | None:  # noqa: PLR0911
-    """Return the exact rational value of *node* if it reduces to a constant."""
+def _as_constant(node: ast.expr) -> Fraction | None:
+    """Return the exact rational value of *node* if it reduces to a constant.
+
+    The numerator and denominator are compared as polynomials, so a symbolic
+    expression that cancels — ``(-xi)/(-xi)``, the shape a kinetic-normalised
+    self-term routinely takes — reduces to a constant even though neither side
+    is one on its own.
+    """
     try:
         ratio = _to_ratio(node)
     except (_NotPolynomialError, KineticEvalError):
         return None
-    if not ratio.den or not _poly_is_monomial(ratio.den):
-        return None
-    ((den_mono, den_coeff),) = ratio.den.items()
-    if den_mono:
+    if not ratio.den:
         return None
     if not ratio.num:
         return Fraction(0)
-    if not _poly_is_monomial(ratio.num):
-        return None
-    ((num_mono, num_coeff),) = ratio.num.items()
-    if num_mono:
-        return None
-    return num_coeff / den_coeff
+    return _poly_quotient_constant(ratio.num, ratio.den)
 
 
 def evaluate_numeric(
