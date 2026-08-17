@@ -19,6 +19,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from tidal.symbolic._eval_utils import evaluate_coefficient
+from tidal.symbolic._kinetic_eval import (
+    KineticEvalError,
+    evaluate_with_substitutions,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -831,6 +835,10 @@ def _accumulate_symbolic(existing: str | None, addition: str) -> str:
     return f"({existing}) + ({addition})"
 
 
+class _UnresolvableCoefficientError(Exception):
+    """Internal signal that a coefficient could not be reduced to a number."""
+
+
 def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float | None:
     """Resolve a symbolic coefficient string with parameter values.
 
@@ -838,6 +846,20 @@ def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float 
     compound expressions (``"-2*m2"``).  Returns *None* if the expression
     cannot be evaluated with the given parameters, so the caller can fall
     back to the raw numeric coefficient.
+
+    Two results are preserved deliberately, because callers depend on the
+    ``None`` fallback rather than on an exception:
+
+    * a division by zero (``"m2/0"``) returns ``None``, though the underlying
+      evaluator raises;
+    * a non-finite result (``"1e309"``) returns ``None``, since mass and
+      coupling entries must be finite reals.
+
+    Raises
+    ------
+    _UnresolvableCoefficientError
+        Never propagates; raised internally to funnel an unresolved free
+        parameter into the same ``None`` fallback as an evaluation failure.
     """
     # Fast path: negated parameter name
     if sym.startswith("-") and sym[1:] in parameters:
@@ -845,12 +867,17 @@ def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float 
     # Fast path: direct parameter name
     if sym in parameters:
         return parameters[sym]
-    # Compound expression: e.g., "-2*m2", "3*lambda"
+    # Compound expression: e.g., "-2*m2", "3*lambda".
+    #
+    # Evaluated through the restricted-AST evaluator rather than eval(): these
+    # strings come from JSON spec files, and `{"__builtins__": {}}` narrows the
+    # namespace without restricting the grammar (GH #406).
     try:
-        py_expr = sym.replace("^", "**")
-        result = eval(py_expr, {"__builtins__": {}}, dict(parameters))  # noqa: S307
-        value = float(result)
-    except (NameError, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+        resolved = evaluate_with_substitutions(sym, dict(parameters))
+        if resolved is None:  # a free parameter survived
+            raise _UnresolvableCoefficientError  # noqa: TRY301
+        value = float(resolved)
+    except (KineticEvalError, _UnresolvableCoefficientError, TypeError, ValueError):
         logger.debug(
             "Could not resolve symbolic coefficient '%s' with parameters %s; "
             "matrix entry will use raw numeric coefficient",

@@ -20,6 +20,7 @@ Building blocks (also used directly by ``coefficients.CoefficientEvaluator``):
 
 from __future__ import annotations
 
+import ast
 import re
 from typing import TYPE_CHECKING
 
@@ -27,6 +28,8 @@ import numpy as np
 from scipy import special  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
+    from types import CodeType
+
     from numpy.typing import NDArray
 
 
@@ -495,7 +498,7 @@ def mathematica_to_python(
         result = pat.sub(py_func, result)
 
     # Pi → np.pi
-    result = _RE_PI.sub("np.pi", result)
+    result = _RE_PI.sub("pi", result)
 
     # Mathematica brackets → Python parens
     result = result.replace("[", "(").replace("]", ")")
@@ -528,6 +531,7 @@ _STATIC_EVAL_NAMESPACE: dict[str, object] = {
     # InputForm coefficients use `E^x` and are translated to `exp(x)` by
     # mathematica_to_python; this entry handles the Python-form sibling.
     "E": float(np.e),
+    "pi": float(np.pi),
     "exp": np.exp,
     "sin": np.sin,
     "cos": np.cos,
@@ -556,10 +560,125 @@ _STATIC_EVAL_NAMESPACE: dict[str, object] = {
     "erf": special.erf,
     "jv": special.jv,
     "yv": special.yv,
-    "np": np,
     "True": True,
     "False": False,
 }
+
+
+class UnsafeExpressionError(ValueError):
+    """Raised when a converted expression uses a construct outside the safe subset."""
+
+
+# AST nodes permitted in a converted coefficient expression. Deliberately
+# excludes ast.Attribute: after `Pi` began converting to a bare `pi`, nothing
+# the converter emits needs attribute access, so banning it outright removes a
+# whole class of escape rather than trying to allowlist safe attributes.
+_SAFE_EXPR_NODES: tuple[type[ast.AST], ...] = (
+    ast.Expression,
+    ast.Constant,
+    ast.Name,
+    ast.Load,
+    ast.BinOp,
+    ast.UnaryOp,
+    ast.BoolOp,
+    ast.Compare,
+    ast.IfExp,
+    ast.Call,
+    ast.Tuple,
+    ast.List,
+    # Arithmetic / logical operators
+    ast.Add,
+    ast.Sub,
+    ast.Mult,
+    ast.Div,
+    ast.FloorDiv,
+    ast.Mod,
+    ast.Pow,
+    ast.USub,
+    ast.UAdd,
+    ast.Not,
+    ast.And,
+    ast.Or,
+    # Comparisons (piecewise conditions)
+    ast.Eq,
+    ast.NotEq,
+    ast.Lt,
+    ast.LtE,
+    ast.Gt,
+    ast.GtE,
+)
+
+# expression source -> compiled code object.
+_COMPILED_EXPR_CACHE: dict[str, CodeType] = {}
+
+
+def compile_checked_expression(py_expr: str) -> CodeType:
+    """Validate a converted expression and return a cached code object.
+
+    Coefficient strings come from JSON spec files, which are committed, shared
+    and pulled from HPC — so they are file input, not trusted literals. Before
+    this check the expression was handed straight to :func:`eval` against a
+    namespace that bound the live :mod:`numpy` module, which made any
+    ``np.<func>(...)`` reachable.
+
+    Two rules make that impossible:
+
+    * **No attribute access at all.** Every function the converter emits is
+      available as a bare name in :data:`_STATIC_EVAL_NAMESPACE`.
+    * **Calls by name only**, so a call target cannot be built at runtime.
+
+    Name *resolution* is left to the evaluation namespace: an unknown name
+    raises ``NameError`` there, which the caller already reports. That keeps
+    this check independent of the parameter set, so one compiled object can be
+    reused across every parameter value — which is what preserves hot-path
+    speed, since validation happens once per distinct expression.
+
+    Parameters
+    ----------
+    py_expr : str
+        Python-form expression from :func:`mathematica_to_python`.
+
+    Returns
+    -------
+    CodeType
+        Compiled expression, ready for ``eval``.
+
+    Raises
+    ------
+    UnsafeExpressionError
+        If the expression fails to parse or uses a construct outside the
+        safe subset.
+    """
+    cached = _COMPILED_EXPR_CACHE.get(py_expr)
+    if cached is not None:
+        return cached
+
+    try:
+        tree = ast.parse(py_expr, mode="eval")
+    except SyntaxError as exc:
+        msg = f"cannot parse expression {py_expr!r}: {exc}"
+        raise UnsafeExpressionError(msg) from exc
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Attribute):
+            msg = (
+                f"attribute access is not allowed in coefficient expressions "
+                f"(got '.{node.attr}' in {py_expr!r})"
+            )
+            raise UnsafeExpressionError(msg)
+        if isinstance(node, ast.Call) and not isinstance(node.func, ast.Name):
+            msg = f"only direct function calls are allowed in {py_expr!r}"
+            raise UnsafeExpressionError(msg)
+        if not isinstance(node, _SAFE_EXPR_NODES):
+            msg = (
+                f"unsupported construct {type(node).__name__} "
+                f"in coefficient expression {py_expr!r}"
+            )
+            raise UnsafeExpressionError(msg)
+
+    code = compile(tree, "<coefficient>", "eval")
+    _COMPILED_EXPR_CACHE[py_expr] = code
+    return code
 
 
 def build_eval_namespace(parameters: dict[str, float]) -> dict[str, object]:
@@ -628,7 +747,8 @@ def evaluate_coefficient(
         namespace.update(coord_arrays)
 
     try:
-        result = eval(py_expr, {"__builtins__": {}}, namespace)  # noqa: S307
+        code = compile_checked_expression(py_expr)
+        result = eval(code, {"__builtins__": {}}, namespace)  # noqa: S307
     except Exception as e:
         msg = (
             f"Cannot evaluate symbolic coefficient '{symbolic_expr}' "
