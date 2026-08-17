@@ -1042,14 +1042,28 @@ class EquationSystem:
         Scans each equation's RHS terms for ``identity`` operators acting on
         known field names (not velocity references like ``v_N``).
 
-        **This is the only implementation.** The matrices are *derived* from
-        ``equations`` and are never stored: ``ExportJSON.wl`` used to emit a
-        ``coupling`` section computed the same way in Wolfram, and the loader
-        stopped reading it in c407240d (2026-02-07) without the export stopping.
-        Two copies of one calculation then drifted apart unnoticed for six
-        months — both truncating multi-term coefficients, and disagreeing on
-        sign (GH #403, #404). The export was removed rather than repaired,
-        because derived data does not belong in the file.
+        The matrices are *derived* from ``equations`` and are never stored:
+        ``ExportJSON.wl`` used to emit a ``coupling`` section computed the same
+        way in Wolfram, and the loader stopped reading it in c407240d
+        (2026-02-07) without the export stopping. Two copies of one calculation
+        then drifted apart unnoticed for six months — both truncating
+        multi-term coefficients, and disagreeing on sign (GH #403, #404). The
+        export was removed rather than repaired, because derived data does not
+        belong in the file.
+
+        The truncation was a real defect, not a cosmetic one: the entry held
+        only the *last* contributing term, so ``coupled_scalars`` ``h_0`` read
+        ``mg2/kappa^2`` with its ``B0^2`` contribution silently gone, across 26
+        of 48 specs. It changed no simulation result only because these
+        matrices are display-only — solvers build their own from the terms, and
+        energy uses ``canonical.hamiltonian_terms``. Wrong data, shown by
+        ``tidal inspect``, never fed into a result.
+
+        **Summing the terms has one implementation**, and it is not here:
+        the symbolic entry is delegated to
+        :func:`tidal.symbolic.spec_query.effective_coefficient`. See that
+        module's docstring for why the summation belongs to the reader rather
+        than to the Wolfram derivation.
 
         The numeric and symbolic matrices describe the same quantity under
         different conventions, which is deliberate and load-bearing:

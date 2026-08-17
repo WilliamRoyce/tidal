@@ -40,6 +40,37 @@ The questions, and the trap in each (GH #401 records one wrong answer per row):
 All sign and equality reasoning delegates to :mod:`tidal.symbolic.sign_algebra`,
 which answers only when it can prove an answer.  Anything undecided is reported
 as such and never guessed.
+
+Why this layer is Python and not Wolfram
+----------------------------------------
+
+Summing a component's terms looks like symbolic work, and this project keeps
+symbolic work in Wolfram.  The distinction is that this module **reads**
+already-derived output to answer a question; it never derives, and never writes
+back.  Three facts fix the boundary:
+
+* **Its results never re-enter the pipeline.**  ``effective_coefficient`` has
+  exactly two consumers — the ``tidal inspect`` query surface, and
+  ``EquationSystem._compute_matrices_from_terms``, whose matrices are themselves
+  display-only.  Nothing it produces reaches a solver or is written to a spec
+  file.  It does compose strings (``"(a) + (b)"``, ``"(num)/(kin)"``), and that
+  is safe precisely because the composed expression is consumed by analysis and
+  display, never fed back into the derivation.
+* **Merging the duplicate terms upstream in Wolfram was considered and
+  rejected.**  Of 6460 multi-term ``(field, operator)`` keys in the committed
+  corpus, 6367 are identical in every attribute and *could* be merged at export
+  — but 93 differ in ``order_in_eps``, and the perturbative driver depends on
+  that split (``EquationSystem.filter_by_order(0)`` must still see only the
+  base term).  Merging would break it and would not remove the need to sum.
+* **Term-level identity is load-bearing for the solver.**
+  ``CoefficientEvaluator`` caches per ``(eq_idx, term_idx)`` and keeps an
+  ``id(term)`` reverse index, so terms are addressed individually.  Separate
+  terms also carry provenance: ``1.0`` (base Maxwell) and ``-2*B0^2*rho`` (the
+  Euler-Heisenberg correction) are physically distinct contributions, and
+  collapsing them at export would discard that.
+
+So the summation belongs to the reader, not to the derivation — which is why it
+lives here, and why there is exactly one implementation of it (GH #403, #404).
 """
 
 from __future__ import annotations
@@ -241,6 +272,15 @@ def effective_coefficient(
 
     Sums every matching term and records the kinetic coefficient, so callers
     cannot accidentally use one term of several, or forget the LHS divisor.
+
+    **Sums across perturbative orders.** Terms are summed regardless of their
+    ``order_in_eps``, so for Euler-Heisenberg ``a_0`` this returns
+    ``(1.0) + (-2*B0^2*rho)`` — the ε⁰ base term plus the ε¹ correction.  That
+    is the coefficient of the equation as given.  Order selection is a
+    *spec-level* operation performed upstream: call
+    :meth:`~tidal.symbolic.json_loader.EquationSystem.filter_by_order` first and
+    read the coefficient off the filtered spec, which for the same component
+    yields just ``1.0``.
 
     Parameters
     ----------
