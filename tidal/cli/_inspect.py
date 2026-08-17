@@ -332,7 +332,7 @@ def _build_json_output(spec: object, *, show_params: bool) -> dict[str, Any]:
     return result
 
 
-def inspect_command(args: Namespace) -> int:
+def inspect_command(args: Namespace) -> int:  # noqa: C901
     """Execute the inspect command.
 
     Parameters
@@ -362,10 +362,23 @@ def inspect_command(args: Namespace) -> int:
     # other read-only output flags) is requested. This lets us render
     # equations for theories whose [perturbation] block was intentionally
     # disabled to extract the exact (non-LPS) EOMs.
-    strict_v6 = not bool(getattr(args, "latex", False)) and not bool(
-        getattr(args, "json_output", False)
+    # The semantic query flags (#401) are read-only in the same sense as
+    # --latex, so they relax the guard too: analysis never evolves the system.
+    query_flags = ("equation", "coefficient", "families", "diff")
+    is_query = any(getattr(args, name, None) for name in query_flags)
+    strict_v6 = (
+        not bool(getattr(args, "latex", False))
+        and not bool(getattr(args, "json_output", False))
+        and not is_query
     )
     spec = load_equation_system(json_path, strict_v6=strict_v6)
+
+    if is_query:
+        from tidal.cli._inspect_query import run_query
+
+        result = run_query(args, spec)
+        if result is not None:
+            return result
 
     if args.json_output:
         data = _build_json_output(spec, show_params=args.params)

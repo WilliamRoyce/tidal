@@ -129,6 +129,206 @@ class TestInspectCommand:
         assert len(data["fields"]) == 2
 
 
+class TestInspectSemanticQueries:
+    """The ``tidal inspect`` query flags added for #401.
+
+    These exercise the CLI contract a program depends on — exit codes, the
+    JSON envelope, stream separation — as well as the physics rendering.
+    """
+
+    EXAMPLES: ClassVar[Path] = Path(__file__).resolve().parent.parent / "examples/data"
+
+    def test_coefficient_sums_terms_and_shows_kinetic(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`gertsenshtein_eh` a_1 has two terms and a kinetic coefficient (#401 rows 1, 3)."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--coefficient",
+                "a_1:laplacian_x(a_1)",
+            ],
+        )
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "from 2 RHS term(s)" in out
+        assert "-1 + 2*B0^2*rho - 16*B0^2*sigma" in out
+
+    def test_coefficient_separates_hamiltonian_as_distinct(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The Hamiltonian counterpart is labelled distinct, not 'the same coefficient'."""
+        main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                "--coefficient",
+                "h_5:identity(h_5)",
+            ],
+        )
+        out = capsys.readouterr().out
+        assert "RELATED BUT DISTINCT" in out
+        assert "NOT the same number" in out
+
+    def test_families_reports_temporal_index_structure(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Rank-3 torsion is split by temporal-index count, not by name suffix."""
+        ret = main(
+            ["inspect", str(self.EXAMPLES / "torsion_dark_photon.json"), "--families"],
+        )
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "rank=3" in out
+        assert "2 temporal index/indices" in out
+
+    def test_json_output_uses_items_envelope(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Structured output is an object, never a bare array."""
+        import json
+
+        main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "torsion_dark_photon.json"),
+                "--families",
+                "--json",
+            ],
+        )
+        data = json.loads(capsys.readouterr().out)
+        assert isinstance(data, dict)
+        assert isinstance(data["items"], list)
+
+    def test_fields_projects_json_output(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """``--fields`` bounds output size, which matters for a 32-component spec."""
+        import json
+
+        main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "a_1",
+                "--json",
+                "--fields",
+                "operator,expression",
+            ],
+        )
+        data = json.loads(capsys.readouterr().out)
+        assert data["items"]
+        assert set(data["items"][0]) == {"operator", "expression"}
+
+    def test_diff_exit_codes_are_declared_outcomes(self, tmp_path: Path) -> None:
+        """``--diff`` exits 1 on real change, 0 when unchanged — the diff(1) contract.
+
+        The fixture is the real re-derivation from #397: ``a_0`` changed, while
+        ``h_5``/``h_6``/``h_8`` were merely rescaled and must not count.
+        """
+        relative = "examples/data/gertsenshtein_ungauged.json"
+        old = tmp_path / "old.json"
+        old.write_text(
+            subprocess.run(
+                ["git", "show", f"7b779288^:{relative}"],  # noqa: S607
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=Path(__file__).resolve().parent.parent,
+            ).stdout,
+        )
+        current = str(self.EXAMPLES / "gertsenshtein_ungauged.json")
+
+        assert main(["inspect", str(old), "--diff", current]) == 1
+        assert main(["inspect", current, "--diff", current]) == 0
+
+    def test_diff_classifies_rescaling_as_representational(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The three false 'fixes' are reported as representational, not real."""
+        relative = "examples/data/gertsenshtein_ungauged.json"
+        old = tmp_path / "old.json"
+        old.write_text(
+            subprocess.run(
+                ["git", "show", f"7b779288^:{relative}"],  # noqa: S607
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=Path(__file__).resolve().parent.parent,
+            ).stdout,
+        )
+        main(
+            [
+                "inspect",
+                str(old),
+                "--diff",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+            ],
+        )
+        out = capsys.readouterr().out
+        real_section = out.split("REPRESENTATIONAL")[0]
+        assert "a_0" in real_section
+        for field in ("h_5", "h_6", "h_8"):
+            assert field not in real_section
+
+    def test_unknown_component_errors_with_hints(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A bad name fails cleanly on stderr with the valid options listed."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "not_a_field",
+            ],
+        )
+        assert ret == 2
+        captured = capsys.readouterr()
+        assert not captured.out
+        assert "Hint:" in captured.err
+
+    def test_malformed_selector_errors(self) -> None:
+        """A malformed ``--coefficient`` selector is rejected, not guessed at."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--coefficient",
+                "nonsense",
+            ],
+        )
+        assert ret == 2
+
+    def test_assume_nonzero_sharpens_a_verdict(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Declaring kappa non-zero moves a verdict from '0+' to a definite sign."""
+        args = [
+            "inspect",
+            str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+            "--coefficient",
+            "h_5:identity(h_5)",
+        ]
+        main(args)
+        default_out = capsys.readouterr().out
+        main([*args, "--assume-nonzero", "B0"])
+        assumed_out = capsys.readouterr().out
+        assert "assuming B0" in assumed_out
+        assert default_out != assumed_out
+
+
 class TestListCommand:
     def test_list_default_dir(self, capsys: pytest.CaptureFixture[str]) -> None:
         ret = main(["list"])

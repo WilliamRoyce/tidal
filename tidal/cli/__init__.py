@@ -187,6 +187,84 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "tidal.symbolic.latex.load_symbol_overrides for the file shape."
         ),
     )
+    # --- semantic query flags (#401) ---
+    inspect_query = inspect_parser.add_argument_group(
+        "semantic queries",
+        "Read part of a spec through vetted accessors instead of by eye. "
+        "Every sign verdict reports the tactic that decided it, and says "
+        "'unknown' rather than guessing when it cannot prove an answer.",
+    )
+    inspect_query.add_argument(
+        "--equation",
+        metavar="FIELD",
+        default=None,
+        help=(
+            "Show one component's equation with effective coefficients "
+            "(all matching terms summed, kinetic coefficient divided out)"
+        ),
+    )
+    inspect_query.add_argument(
+        "--coefficient",
+        metavar="SELECTOR",
+        default=None,
+        help=(
+            "Show one coefficient and every place it is recorded, e.g. "
+            "'h_5:laplacian_x(h_5)'. Separates parts of the coefficient from "
+            "redundant re-encodings and from the related-but-distinct "
+            "Hamiltonian term"
+        ),
+    )
+    inspect_query.add_argument(
+        "--families",
+        action="store_true",
+        help=(
+            "Group components into tensor families from tensor_head/tensor_indices "
+            "metadata, flagging families whose grouping had to be guessed"
+        ),
+    )
+    inspect_query.add_argument(
+        "--diff",
+        metavar="OTHER_JSON",
+        default=None,
+        help=(
+            "Compare against another spec, separating real physics changes from "
+            "equations merely rescaled. Exits 1 when real changes are found"
+        ),
+    )
+    inspect_query.add_argument(
+        "--param",
+        action="append",
+        metavar="KEY=VALUE",
+        default=None,
+        help=(
+            "Parameter value for numeric corroboration (repeatable). Reported "
+            "separately; never used to justify a structural verdict"
+        ),
+    )
+    inspect_query.add_argument(
+        "--assume-positive",
+        dest="assume_positive",
+        metavar="NAMES",
+        default=None,
+        help="Comma-separated parameters to assume strictly positive",
+    )
+    inspect_query.add_argument(
+        "--assume-nonzero",
+        dest="assume_nonzero",
+        metavar="NAMES",
+        default=None,
+        help=(
+            "Comma-separated parameters to assume non-vanishing without claiming "
+            "a sign (e.g. kappa, whose vanishing would remove the Einstein-Hilbert "
+            "term). Sharpens kappa^2 from '0+' to '+'"
+        ),
+    )
+    inspect_query.add_argument(
+        "--fields",
+        metavar="NAMES",
+        default=None,
+        help="Comma-separated output fields to keep, to bound --json output size",
+    )
 
     # --- simulate ---
     sim_parser = sub.add_parser(
