@@ -41,10 +41,10 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 | Issue                                                      | Priority    | Type    | Status       |
 | ---------------------------------------------------------- | ----------- | ------- | ------------ |
-| [#TBD] Add Animation Module Test Coverage                  | 🟠 High     | Testing | 🔄 Remaining |
+| [#73] Add Animation Module Test Coverage                   | 🟠 High     | Testing | ⛔ Obsolete  |
 | [#74] Add Code Coverage Reporting to CI                    | 🟠 High     | CI/CD   | ✅ Done      |
-| [#TBD] Add Wolfram Tests to GitHub Actions CI              | 🔴 Critical | CI/CD   | 🔄 Remaining |
-| [#TBD] Add Tests for Observers, Profiling, Runners Modules | 🟡 Medium   | Testing | 🔄 Remaining |
+| [#69] Add Wolfram Tests to GitHub Actions CI               | 🔴 Critical | CI/CD   | 🔄 Remaining |
+| [#78] Add Tests for Observers, Profiling, Runners Modules  | 🟡 Medium   | Testing | ⛔ Obsolete  |
 
 **Delivered so far:**
 
@@ -55,10 +55,14 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 **Still needed:**
 
-- `test_animation_builder.py` with 10-15 test cases
 - codecov.io integration for dynamic badge and PR reports
-- Optional Wolfram test workflow (label-triggered or weekly)
-- ~20-30 tests for observers, profiling, runners modules
+- Optional Wolfram test workflow (label-triggered or weekly) — [#69]
+
+**No longer applicable:** the animation, observers, profiling and runners test items
+covered modules in the `kgsim` subpackage, which was deleted in `3940efdf`. Where the
+functionality survived it is already covered (`tidal/measurement/_energy.py`,
+`tidal/solver/progress.py`, the `tidal/solver/` backends); animation and profiling have
+no successor module. Issues [#73] and [#78] are closed accordingly.
 
 ---
 
