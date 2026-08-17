@@ -29,6 +29,8 @@ from tidal.symbolic._eval_utils import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from numpy.typing import NDArray
 
     from tidal.solver.grid import GridInfo
@@ -139,6 +141,18 @@ class CoefficientEvaluator:
         )
         if bsm_hint:
             self.classify_bsm_separability(set(bsm_hint))
+
+    @property
+    def parameters(self) -> Mapping[str, float]:
+        """Read-only view of the parameter values this evaluator resolves against.
+
+        Exposed so callers that need the same values for a separate calculation
+        — the kinetic-coefficient scaling in
+        :func:`tidal.solver.validation.check_pointwise_mass_stability`, for
+        instance — can reuse them instead of reaching into private state or
+        threading a second copy through their signature.
+        """
+        return self._parameters
 
     def resolve(
         self,

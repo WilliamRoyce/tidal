@@ -112,7 +112,13 @@ def build_report() -> str:
         if any("CONFLICT" in line for line in spec_lines):
             conflicted += 1
         lines.extend(spec_lines)
-    lines.extend(("\n## summary", f"  specs analysed: {len(paths)}", f"  specs with a proven sign conflict: {conflicted}"))
+    lines.extend(
+        (
+            "\n## summary",
+            f"  specs analysed: {len(paths)}",
+            f"  specs with a proven sign conflict: {conflicted}",
+        )
+    )
     return "\n".join(lines) + "\n"
 
 
