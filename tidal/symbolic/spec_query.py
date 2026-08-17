@@ -50,7 +50,6 @@ from typing import TYPE_CHECKING, Any
 from tidal.symbolic.sign_algebra import (
     Sign,
     are_equal,
-    constant_ratio,
     evaluate_numeric,
     ratio_sign,
     sign_of,
@@ -79,7 +78,6 @@ __all__ = [
     "diff_systems",
     "effective_coefficient",
     "field_families",
-    "matrix_matches_summed_terms",
     "self_terms",
     "terms_for",
 ]
@@ -850,58 +848,3 @@ def sibling_sign_conflicts(
             if verdict.sign is Sign.NEGATIVE:
                 conflicts.append((family.head, reference[0], member))
     return tuple(conflicts)
-
-
-def matrix_matches_summed_terms(spec: EquationSystem) -> tuple[ConsistencyCheck, ...]:
-    """Cross-check the derived mass matrix against the summed identity terms.
-
-    Two Python derivations of the same quantity are compared:
-    :meth:`EquationSystem._compute_matrices_from_terms`, which builds
-    ``mass_matrix_symbolic`` while scanning the equations, and
-    :func:`effective_coefficient`, which sums the matching terms on demand.
-    They should never disagree, and when they did it was because the matrix
-    builder overwrote multi-term coefficients instead of accumulating them
-    (GH #403).
-
-    This reads the **derived** ``spec.mass_matrix_symbolic``, not the JSON: the
-    loader has not read a stored ``coupling`` section since c407240d, and the
-    exporter no longer writes one, so there is no stored encoding left to
-    compare against.
-
-    The symbolic matrix stores ``coefficient_symbolic`` verbatim while the
-    numeric one negates it, so the comparison here is against the un-negated
-    sum.
-
-    Parameters
-    ----------
-    spec : EquationSystem
-        The system to check.
-
-    Returns
-    -------
-    tuple[ConsistencyCheck, ...]
-        One check per disagreeing entry, empty when all agree.
-    """
-    if not spec.mass_matrix_symbolic:
-        return ()
-    problems: list[ConsistencyCheck] = []
-    for equation in spec.equations:
-        row = spec.equation_map[equation.field_name]
-        for col, field in enumerate(spec.component_names):
-            eff = effective_coefficient(equation, field, "identity")
-            derived = spec.mass_matrix_symbolic[row][col]
-            if derived is None or not eff.exists:
-                continue
-            if constant_ratio(derived, eff.numerator) != 1:
-                problems.append(
-                    ConsistencyCheck(
-                        name="matrix-vs-terms",
-                        status="undecided",
-                        detail=(
-                            f"{equation.field_name}/{field}: derived matrix entry "
-                            f"{derived!r} is not provably equal to the summed "
-                            f"identity term {eff.numerator!r}"
-                        ),
-                    ),
-                )
-    return tuple(problems)

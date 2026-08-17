@@ -808,33 +808,6 @@ class ComponentEquation:
 # --- Symbolic coefficient resolution ---
 
 
-def _accumulate_symbolic(existing: str | None, addition: str) -> str:
-    """Sum a symbolic matrix contribution onto whatever is already there.
-
-    A component can carry several ``identity`` terms acting on the same field —
-    a base mass plus a background correction, say — and the matrix entry is
-    their **sum**.  The numeric matrices have always accumulated; the symbolic
-    ones used to overwrite, silently keeping only the last term (GH #403).
-
-    Parameters
-    ----------
-    existing : str | None
-        Expression accumulated so far, or ``None`` for the first contribution.
-    addition : str
-        The term's ``coefficient_symbolic``.
-
-    Returns
-    -------
-    str
-        ``addition`` when this is the first contribution, else ``"(a) + (b)"``.
-        Operands are parenthesised so that summing e.g. ``-1 + 2*B0^2*rho``
-        with ``-xi`` cannot re-associate into something else.
-    """
-    if existing is None:
-        return addition
-    return f"({existing}) + ({addition})"
-
-
 class _UnresolvableCoefficientError(Exception):
     """Internal signal that a coefficient could not be reduced to a number."""
 
@@ -1054,7 +1027,7 @@ class EquationSystem:
                 raise ValueError(msg)
 
     @staticmethod
-    def _compute_matrices_from_terms(
+    def _compute_matrices_from_terms(  # noqa: C901
         equations: tuple[ComponentEquation, ...],
         component_names: tuple[str, ...],
         parameters: Mapping[str, float] | None = None,
@@ -1131,6 +1104,16 @@ class EquationSystem:
         name_to_idx = {name: i for i, name in enumerate(component_names)}
         has_symbolic = False
 
+        # Summing a component's identity terms is done in exactly one place:
+        # spec_query.effective_coefficient. Building the summed expression here
+        # too is what let the Wolfram and Python matrix builders drift apart
+        # (GH #403, #404), so the symbolic entry is delegated rather than
+        # re-derived. Only the numeric accumulation, which has its own
+        # per-term parameter-resolution fallback, is done inline.
+        from tidal.symbolic.spec_query import effective_coefficient  # noqa: PLC0415
+
+        symbolic_keys: set[tuple[int, int]] = set()
+
         for i, eq in enumerate(equations):
             for term in eq.rhs_terms:
                 if term.operator == "identity" and term.field in name_to_idx:
@@ -1148,20 +1131,24 @@ class EquationSystem:
                     neg_coeff = -effective_coeff
                     if i == j:
                         mass[i][j] += neg_coeff
-                        if term.coefficient_symbolic is not None:
-                            mass_sym[i][j] = _accumulate_symbolic(
-                                mass_sym[i][j],
-                                term.coefficient_symbolic,
-                            )
-                            has_symbolic = True
                     else:
                         coupling[i][j] += neg_coeff
-                        if term.coefficient_symbolic is not None:
-                            coupling_sym[i][j] = _accumulate_symbolic(
-                                coupling_sym[i][j],
-                                term.coefficient_symbolic,
-                            )
-                            has_symbolic = True
+                    if term.coefficient_symbolic is not None:
+                        symbolic_keys.add((i, j))
+                        has_symbolic = True
+
+        for i, j in symbolic_keys:
+            # The un-negated sum: the symbolic matrices store
+            # coefficient_symbolic verbatim, while the numeric ones negate.
+            summed = effective_coefficient(
+                equations[i],
+                component_names[j],
+                "identity",
+            ).numerator
+            if i == j:
+                mass_sym[i][j] = summed
+            else:
+                coupling_sym[i][j] = summed
 
         mass_sym_t: tuple[tuple[str | None, ...], ...] = ()
         coupling_sym_t: tuple[tuple[str | None, ...], ...] = ()
