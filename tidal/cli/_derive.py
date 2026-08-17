@@ -6540,7 +6540,18 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         config_dir=config_path.parent.resolve(),
     )
 
+    # --- Save the generated script (GH #398) ---
+    # This runs BEFORE the --dry-run and cache-hit early returns.  Both of those
+    # are precisely the cases where you want the script without paying for a
+    # derivation, and silently ignoring an explicit flag is worse than either.
+    if args.save_script:
+        save_path = Path(args.save_script)
+        save_path.write_text(script_content, encoding="utf-8")
+        print(f"Saved script to: {save_path.resolve()}")
+
     if args.dry_run:
+        # --save-script has already written the file above; --dry-run only
+        # suppresses execution.
         print(script_content)
         return 0
 
@@ -6571,8 +6582,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
 
     if args.save_script:
         save_path = Path(args.save_script)
-        save_path.write_text(script_content, encoding="utf-8")
-        print(f"Saved script to: {save_path.resolve()}")
+        # Already written above; reuse the path for the wolframscript run.
         if shutil.which("wolframscript") is None:
             print(
                 "Note: wolframscript not found. Run the script manually when available.",
