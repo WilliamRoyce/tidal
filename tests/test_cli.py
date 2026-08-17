@@ -329,6 +329,95 @@ class TestInspectSemanticQueries:
         assert default_out != assumed_out
 
 
+class TestDerivationIntegrityGuard:
+    """`_check_temporal_component_sign` after its refactor onto the shared layer.
+
+    The guard used to carry its own sign helpers (`_leading_sign`,
+    `_effective_self_sign`), which were unsound: they treated
+    ``-1 + 2*B0^2*rho`` as negative although it flips sign, and summed per-term
+    *signs* rather than the terms themselves. Both are gone; the guard now
+    delegates to `spec_query.sibling_sign_conflicts` (GH #401).
+    """
+
+    EXAMPLES: ClassVar[Path] = Path(__file__).resolve().parent.parent / "examples/data"
+
+    # The specs whose photon components carry the GH #397 signature. Pinned as
+    # a count so the refactor is verifiably behaviour-preserving.
+    EXPECTED_FLAGGED: ClassVar[int] = 19
+
+    @staticmethod
+    def _flagged(examples: Path) -> list[str]:
+        import warnings
+
+        from tidal.cli._validate import _check_temporal_component_sign
+        from tidal.symbolic.json_loader import load_equation_system
+
+        names: list[str] = []
+        for path in sorted(examples.glob("*.json")):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                spec = load_equation_system(path, strict_v6=False)
+            if _check_temporal_component_sign(spec):
+                names.append(path.name)
+        return names
+
+    def test_flags_the_known_affected_specs(self) -> None:
+        """The refactor preserved exactly which specs are reported."""
+        assert len(self._flagged(self.EXAMPLES)) == self.EXPECTED_FLAGGED
+
+    def test_euler_heisenberg_is_not_flagged(self) -> None:
+        """EH must pass on its merits, not by an accidental tie.
+
+        The old helper summed per-term signs, so EH's two self-laplacians
+        cancelled to 0 and the caller skipped the spec. The shared layer
+        divides by the kinetic coefficient and finds no proven conflict.
+        """
+        flagged = self._flagged(self.EXAMPLES)
+        assert "gertsenshtein_eh.json" not in flagged
+        assert "gertsenshtein_eh_top.json" not in flagged
+
+    def test_message_makes_no_spectral_claim(self) -> None:
+        """The finding is derivation integrity, not a tachyon diagnosis.
+
+        A sign comparison cannot establish that a mode is tachyonic — that
+        needs the full kinetic and mass sectors (GH #360). The message must
+        promise only what the check verifies.
+        """
+        import warnings
+
+        from tidal.cli._validate import _check_temporal_component_sign
+        from tidal.symbolic.json_loader import load_equation_system
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            spec = load_equation_system(
+                self.EXAMPLES / "torsion_gertsenshtein_complete_even.json",
+                strict_v6=False,
+            )
+        errors = _check_temporal_component_sign(spec)
+        assert errors
+        message = errors[0]
+        assert "tachyon" not in message.lower().split("ghost and tachyon")[0]
+        assert "derivation-integrity" in message
+        assert "#360" in message
+
+    def test_message_names_temporal_role_from_metadata(self) -> None:
+        """Where tensor metadata exists, the message says which component is temporal."""
+        import warnings
+
+        from tidal.cli._validate import _check_temporal_component_sign
+        from tidal.symbolic.json_loader import load_equation_system
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            spec = load_equation_system(
+                self.EXAMPLES / "torsion_gertsenshtein_complete_even.json",
+                strict_v6=False,
+            )
+        message = _check_temporal_component_sign(spec)[0]
+        assert "temporal index/indices" in message
+
+
 class TestListCommand:
     def test_list_default_dir(self, capsys: pytest.CaptureFixture[str]) -> None:
         ret = main(["list"])
