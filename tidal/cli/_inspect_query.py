@@ -123,16 +123,16 @@ def show_equation(  # noqa: PLR0913
     int
         ``EXIT_OK``, or ``EXIT_ERROR`` if the component is unknown.
     """
-    from tidal.cli._console import error_with_hint
     from tidal.symbolic.spec_query import effective_coefficient
 
     index = spec.equation_map.get(field)
     if index is None:
-        error_with_hint(
+        return _fail(
+            "unknown_component",
             f"unknown component: {field!r}",
-            hints=[f"Components: {', '.join(spec.component_names)}"],
+            f"Components: {', '.join(spec.component_names)}",
+            as_json=as_json,
         )
-        return EXIT_ERROR
 
     equation = spec.equations[index]
     keys = sorted({(t.operator, t.field) for t in equation.rhs_terms})
@@ -204,29 +204,27 @@ def show_coefficient(  # noqa: PLR0913, C901
     int
         ``EXIT_OK``, or ``EXIT_ERROR`` on a bad selector or unknown component.
     """
-    from tidal.cli._console import error_with_hint
     from tidal.symbolic.spec_query import coefficient_provenance
 
     try:
         equation_field, operator, field = parse_coefficient_key(selector)
     except ValueError as exc:
-        error_with_hint(
+        return _fail(
+            "invalid_selector",
             str(exc),
-            hints=[
-                "Example: --coefficient 'h_5:laplacian_x(h_5)'",
-                "Use `tidal inspect SPEC --equation FIELD` to list a component's terms",
-            ],
+            "Example: --coefficient 'h_5:laplacian_x(h_5)'",
+            as_json=as_json,
         )
-        return EXIT_ERROR
 
     try:
         prov = coefficient_provenance(spec, equation_field, field, operator)
     except KeyError:
-        error_with_hint(
+        return _fail(
+            "unknown_component",
             f"unknown component: {equation_field!r}",
-            hints=[f"Components: {', '.join(spec.component_names)}"],
+            f"Components: {', '.join(spec.component_names)}",
+            as_json=as_json,
         )
-        return EXIT_ERROR
 
     eff = prov.effective
     result = eff.sign(
@@ -487,8 +485,6 @@ def run_query(args: Namespace, spec: EquationSystem) -> int | None:  # noqa: PLR
         Exit code, or ``None`` when no query flag is active so the caller
         falls through to the default display.
     """
-    from tidal.cli._console import error_with_hint
-
     as_json = bool(getattr(args, "json_output", False))
     fields = _split_names(getattr(args, "fields", None))
     assume_positive = _split_names(getattr(args, "assume_positive", None))
@@ -498,8 +494,12 @@ def run_query(args: Namespace, spec: EquationSystem) -> int | None:  # noqa: PLR
     try:
         parameters = parse_params(raw_params, spec) if raw_params else None
     except ValueError as exc:
-        error_with_hint(str(exc), hints=["Example: --param B0=0.01"])
-        return EXIT_ERROR
+        return _fail(
+            "invalid_parameter",
+            str(exc),
+            "Example: --param B0=0.01",
+            as_json=as_json,
+        )
 
     if getattr(args, "families", False):
         return show_families(spec, as_json=as_json, fields=fields)
@@ -533,22 +533,52 @@ def run_query(args: Namespace, spec: EquationSystem) -> int | None:  # noqa: PLR
 
         other_path = Path(args.diff)
         if not other_path.exists():
-            error_with_hint(
+            return _fail(
+                "file_not_found",
                 f"file not found: {other_path}",
-                hints=["Pass the JSON spec to compare against"],
+                "Pass the JSON spec to compare against",
+                as_json=as_json,
             )
-            return EXIT_ERROR
         other = load_equation_system(other_path, strict_v6=False)
         return show_diff(spec, other, as_json=as_json, fields=fields)
 
     return None
 
 
-def emit_json_error(kind: str, message: str, hint: str) -> None:
-    """Write a machine-readable error envelope as the last line of stderr.
+def _fail(
+    kind: str,
+    message: str,
+    hint: str,
+    *,
+    as_json: bool,
+) -> int:
+    """Report an error and return :data:`EXIT_ERROR`.
 
-    Mirrors ``error_with_hint`` for programs rather than people: a stable
-    ``kind`` lets a caller branch without matching on prose.
+    Always prints the human form via ``error_with_hint``. Under ``--json`` it
+    additionally writes a machine-readable envelope as the last line of stderr,
+    so a caller can branch on a stable ``kind`` instead of matching on prose.
+    Data stays on stdout, so a ``| jq`` pipeline is unaffected either way.
+
+    Parameters
+    ----------
+    kind : str
+        Stable, machine-readable error classification.
+    message : str
+        Human-readable description.
+    hint : str
+        Actionable suggestion.
+    as_json : bool
+        Whether structured output was requested.
+
+    Returns
+    -------
+    int
+        ``EXIT_ERROR``, so callers can ``return _fail(...)``.
     """
-    payload = {"error": {"kind": kind, "message": message, "hint": hint}}
-    print(json.dumps(payload), file=sys.stderr)
+    from tidal.cli._console import error_with_hint
+
+    error_with_hint(message, hints=[hint])
+    if as_json:
+        payload = {"error": {"kind": kind, "message": message, "hint": hint}}
+        print(json.dumps(payload), file=sys.stderr)
+    return EXIT_ERROR

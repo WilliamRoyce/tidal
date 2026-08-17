@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import ClassVar
 
@@ -156,6 +157,30 @@ class TestInspectSemanticQueries:
         assert "from 2 RHS term(s)" in out
         assert "-1 + 2*B0^2*rho - 16*B0^2*sigma" in out
 
+    def test_equation_text_mode_shows_effective_coefficients(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`--equation` without `--json` renders the human view.
+
+        Each row shows the effective coefficient and the deciding tactic, and
+        a multi-term key is labelled as summed rather than silently collapsed.
+        """
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "a_1",
+            ],
+        )
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "kinetic =" in out
+        assert "laplacian_x(a_1)" in out
+        assert "terms summed" in out
+        assert "via" in out  # the deciding tactic is always reported
+
     def test_coefficient_separates_hamiltonian_as_distinct(
         self,
         capsys: pytest.CaptureFixture[str],
@@ -280,6 +305,94 @@ class TestInspectSemanticQueries:
         for field in ("h_5", "h_6", "h_8"):
             assert field not in real_section
 
+    def test_diff_json_envelope_carries_component_deltas(self) -> None:
+        """`--diff --json` reports verdicts plus components unique to either side."""
+        import contextlib
+        import io
+        import json
+
+        relative = "examples/data/gertsenshtein_ungauged.json"
+        old = Path(tempfile.mkdtemp()) / "old.json"
+        old.write_text(
+            subprocess.run(
+                ["git", "show", f"7b779288^:{relative}"],  # noqa: S607
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=Path(__file__).resolve().parent.parent,
+            ).stdout,
+        )
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            ret = main(
+                [
+                    "inspect",
+                    str(old),
+                    "--diff",
+                    str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                    "--json",
+                ],
+            )
+        assert ret == 1  # real changes: a declared outcome, not an error
+        data = json.loads(buf.getvalue())
+        assert data["has_real_changes"] is True
+        assert "only_left" in data
+        assert "only_right" in data
+        verdicts = {i["field"]: i["verdict"] for i in data["items"]}
+        assert verdicts["a_0"] == "real"
+        assert verdicts["h_5"] == "representational"
+
+    def test_param_values_give_numeric_corroboration(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`--param` supplies a numeric value beside the structural verdict."""
+        import json
+
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                "--coefficient",
+                "h_5:identity(h_5)",
+                "--param",
+                "B0=0.25",
+                "--param",
+                "kappa=2.0",
+                "--json",
+            ],
+        )
+        assert ret == 0
+        record = json.loads(capsys.readouterr().out)["items"][0]
+        # (B0^2/2) / (-kappa^(-2)) at B0=0.25, kappa=2 -> 0.03125 / -0.25
+        assert record["numeric"] == pytest.approx(-0.125)
+
+    def test_malformed_param_errors_cleanly(self) -> None:
+        """A `--param` without '=' exits with the usage code, not a traceback."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                "--families",
+                "--param",
+                "nonsense",
+            ],
+        )
+        assert ret == 2
+
+    def test_diff_against_missing_file_errors(self) -> None:
+        """`--diff` on a non-existent spec reports an error, not a crash."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                "--diff",
+                "/nonexistent/spec.json",
+            ],
+        )
+        assert ret == 2
+
     def test_unknown_component_errors_with_hints(
         self,
         capsys: pytest.CaptureFixture[str],
@@ -297,6 +410,50 @@ class TestInspectSemanticQueries:
         captured = capsys.readouterr()
         assert not captured.out
         assert "Hint:" in captured.err
+
+    def test_json_errors_emit_a_machine_readable_envelope(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Under `--json`, failures carry a stable `kind` on stderr.
+
+        A caller should branch on the classification rather than match on
+        prose, and stdout must stay clean so a `| jq` pipeline is unaffected.
+        """
+        import json
+
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "nope",
+                "--json",
+            ],
+        )
+        assert ret == 2
+        captured = capsys.readouterr()
+        assert not captured.out
+        envelope = json.loads(captured.err.strip().splitlines()[-1])
+        assert envelope["error"]["kind"] == "unknown_component"
+        assert envelope["error"]["hint"]
+
+    def test_text_mode_errors_carry_no_json(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Without `--json` the envelope is not emitted, only the human form."""
+        main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "nope",
+            ],
+        )
+        err = capsys.readouterr().err
+        assert "Hint:" in err
+        assert '"kind"' not in err
 
     def test_malformed_selector_errors(self) -> None:
         """A malformed ``--coefficient`` selector is rejected, not guessed at."""
