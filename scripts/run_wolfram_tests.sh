@@ -14,14 +14,20 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 echo "=== Running Wolfram Tests ==="
 echo ""
 
-# Discover all test files
-TESTS=(
-    "tests/wolfram/test_euler_lagrange.wls"
-    "tests/wolfram/test_common_utilities.wls"
-    "tests/wolfram/test_export_json.wls"
-    "tests/wolfram/test_component_decompose.wls"
-    "tests/wolfram/test_linearize.wls"
-)
+# Discover all test files.
+#
+# Previously a hardcoded list, which silently omitted four suites that existed
+# on disk but were never executed (test_canonicalize_exp_fraction,
+# test_gauge_fix, test_lps, test_metric_component_values).  Globbing means a
+# new tests/wolfram/test_*.wls is picked up automatically and cannot be
+# forgotten.  test_harness.wl is a library, not a suite, and is excluded by
+# the test_*.wls pattern requiring the .wls extension.
+mapfile -t TESTS < <(find tests/wolfram -maxdepth 1 -name 'test_*.wls' | sort)
+
+if [ ${#TESTS[@]} -eq 0 ]; then
+    echo "No test files found under tests/wolfram/" >&2
+    exit 1
+fi
 
 PASSED=0
 FAILED=0
