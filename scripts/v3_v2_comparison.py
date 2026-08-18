@@ -104,7 +104,7 @@ def render_table(
     v2_jobid: str,
     v3_jobid: str,
 ) -> str:
-    """Format the comparison as GitHub-flavoured markdown."""
+    """Format the comparison as GitHub-flavored markdown."""
     lines: list[str] = []
     lines.extend(
         (

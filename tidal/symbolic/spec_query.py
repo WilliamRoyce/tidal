@@ -364,7 +364,7 @@ class FieldFamily:
         classes that the flat ``t_0..t_23`` numbering completely obscures.
 
         Do **not** restrict sign comparisons to within a group.  Each equation
-        is normalised by its own kinetic coefficient, so every evolution
+        is normalized by its own kinetic coefficient, so every evolution
         equation in a family should agree in sign regardless of index
         structure — and the #397 defect is precisely a temporal component
         disagreeing with its spatial siblings, which a within-group comparison
@@ -471,13 +471,13 @@ class CoefficientProvenance:
     Attributes
     ----------
     effective : EffectiveCoefficient
-        The coefficient itself, summed and kinetic-normalised.
+        The coefficient itself, summed and kinetic-normalized.
     order_spread : dict[int, tuple[str, ...]]
         Contributing term expressions grouped by ``order_in_eps``.
     matrix_entry : str | float | None
         The mass/coupling matrix encoding, for ``identity`` operators.  Note
         the matrix convention is ``matrix[i][j] = -(coefficient)`` and is
-        **not** normalised by the kinetic coefficient.
+        **not** normalized by the kinetic coefficient.
     hamiltonian_terms : tuple[HamiltonianTerm, ...]
         Hamiltonian terms mentioning the same field pair — related, distinct.
     checks : tuple[ConsistencyCheck, ...]

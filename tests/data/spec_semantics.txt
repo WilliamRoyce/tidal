@@ -301,5 +301,5 @@
   CONFLICT a: a_3 opposes a_0 (self laplacian_x)
 
 ## summary
-  specs analysed: 48
+  specs analyzed: 48
   specs with a proven sign conflict: 19

@@ -110,10 +110,10 @@ tidal plot "${OUTPUT}" --type sweep-tornado \
   --title "Dark photon torsion: parameter sensitivity (P_max)" \
   --output "${OUTPUT}/plot_tornado.png" --quiet
 
-# Scatter matrix: all parameter pairs coloured by P_max
+# Scatter matrix: all parameter pairs colored by P_max
 tidal plot "${OUTPUT}" --type sweep-scatter \
   --metric P_max \
-  --title "Dark photon torsion: parameter space (coloured by P_max)" \
+  --title "Dark photon torsion: parameter space (colored by P_max)" \
   --output "${OUTPUT}/plot_scatter.png" --quiet
 
 # C₀ = P/B₀² analysis with arctan-mapped scatter plots
@@ -131,7 +131,7 @@ echo "=== Sweep complete ==="
 echo "Results: ${OUTPUT}"
 echo "Plots:"
 echo "  ${OUTPUT}/plot_tornado.png   [parameter sensitivity ranking]"
-echo "  ${OUTPUT}/plot_scatter.png   [pairwise scatter, coloured by P_max]"
+echo "  ${OUTPUT}/plot_scatter.png   [pairwise scatter, colored by P_max]"
 echo "  ${OUTPUT}/plot_parallel.png  [parallel coordinates]"
 echo "  ${OUTPUT}/analysis_C0.png    [C₀ relative deviation with arctan axes]"
 echo ""

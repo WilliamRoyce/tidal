@@ -12,7 +12,7 @@
 #      module pollutes CC with icx, which distutils can't introspect).
 #   3. Injects the built extension into the project venv's
 #      site-packages so `import pypolychord` works without any
-#      per-job PYTHONPATH juggling.  The layout honours the compiled
+#      per-job PYTHONPATH juggling.  The layout honors the compiled
 #      rpath `$ORIGIN/pypolychord/lib`.
 #
 # Usage:

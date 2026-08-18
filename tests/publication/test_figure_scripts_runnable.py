@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 import pytest
 import yaml
 
-from .conftest import MANIFEST_PATH, REPO_ROOT, iter_artefacts
+from .conftest import MANIFEST_PATH, REPO_ROOT, iter_artifacts
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -35,7 +35,7 @@ pytestmark = [
     ("appendix", "name", "entry"),
     [
         pytest.param(*x, id=f"{x[0]}/{x[1]}")
-        for x in iter_artefacts(
+        for x in iter_artifacts(
             yaml.safe_load(MANIFEST_PATH.read_text()), kinds=("figure",)
         )
     ],

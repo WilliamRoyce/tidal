@@ -1078,7 +1078,7 @@ class TestGH380CoordDepSmallParamKinetic:
     with 1/(1-εX) shapes — see #380).
     """
 
-    def test_canonicalisation_strips_small_param_from_kinetic(self) -> None:
+    def test_canonicalization_strips_small_param_from_kinetic(self) -> None:
         spec = _make_spec(_KG_WITH_POS_DEP_KINETIC_EPS)
         canon = spec.canonicalize_kinetic_for_perturbation(["alpha"])
         kin = canon.equations[0].kinetic_coefficient_symbolic
@@ -1086,7 +1086,7 @@ class TestGH380CoordDepSmallParamKinetic:
         assert "alpha" not in kin
         assert kin.strip() in {"1", "1.0"}
 
-    def test_canonicalisation_synthesises_pos_dep_correction(self) -> None:
+    def test_canonicalization_synthesizes_pos_dep_correction(self) -> None:
         spec = _make_spec(_KG_WITH_POS_DEP_KINETIC_EPS)
         canon = spec.canonicalize_kinetic_for_perturbation(["alpha"])
         order1 = [t for t in canon.equations[0].rhs_terms if t.order_in_eps == 1]

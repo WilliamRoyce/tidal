@@ -10,15 +10,15 @@ This document is the canonical architecture reference for the v3 era. It survive
 
 ## Why v3?
 
-The 8-May-2026 supervisor meeting (notes [§3](meetings/2026-05-08_supervisor.md#3-stability-filtering-in-the-linearised-regime)) explicitly raised whether the v2 hard tachyonic rejection (τ=0.15 probe gate) is over-conservative. In conversation the supervisor went further and asked for three coupled architectural changes that supersede the canonical-probe direction:
+The 8-May-2026 supervisor meeting (notes [§3](meetings/2026-05-08_supervisor.md#3-stability-filtering-in-the-linearized-regime)) explicitly raised whether the v2 hard tachyonic rejection (τ=0.15 probe gate) is over-conservative. In conversation the supervisor went further and asked for three coupled architectural changes that supersede the canonical-probe direction:
 
-1. **Compactify the parameter space** — replace narrow uniform priors (e.g. α₁ ∈ [-1,1]) with priors covering the full real line, density concentrated near zero. Whiteboard sketch: extract a scale factor from a group of couplings, parameterise the remainder as angles on a sphere, project a cube wireframe onto the sphere for a quasi-rectilinear angular grid. The supervisor sent his unpublished `psalter` Python package (in `psalter.tar.gz`, gitignored) as the canonical reference for this scheme; a parallel session is implementing it (see "Parallel session" below).
+1. **Compactify the parameter space** — replace narrow uniform priors (e.g. α₁ ∈ [-1,1]) with priors covering the full real line, density concentrated near zero. Whiteboard sketch: extract a scale factor from a group of couplings, parameterize the remainder as angles on a sphere, project a cube wireframe onto the sphere for a quasi-rectilinear angular grid. The supervisor sent his unpublished `psalter` Python package (in `psalter.tar.gz`, gitignored) as the canonical reference for this scheme; a parallel session is implementing it (see "Parallel session" below).
 2. **Soft penalty instead of `-inf`** — graded penalties for sim divergence/NaN/exception so PolyChord sees a stability gradient. Optional Gaussian noise on the floor (`logL = floor + Normal(0, σ_explore)`) prevents the sampler from seeing a flat plateau in failure regions.
-3. **Tachyon-permissive sampling** — don't gate on growing modes. Map the structure of the amplification landscape including unstable regions; downstream interpretation handles whether each growth mode is real physics or a linearisation artefact.
+3. **Tachyon-permissive sampling** — don't gate on growing modes. Map the structure of the amplification landscape including unstable regions; downstream interpretation handles whether each growth mode is real physics or a linearization artifact.
 
 Two further refinements emerged during planning:
 
-4. **Hwang-Noh validity is not a sim-correctness criterion.** P_max < 1 is a statement about whether the linearised theory is *physically meaningful*, not numerical correctness. The Hwang-Noh inline gate (`P_max > 0.5 → -inf`) is removed entirely. P_max is recorded faithfully across all samples; downstream analysis interprets.
+4. **Hwang-Noh validity is not a sim-correctness criterion.** P_max < 1 is a statement about whether the linearized theory is *physically meaningful*, not numerical correctness. The Hwang-Noh inline gate (`P_max > 0.5 → -inf`) is removed entirely. P_max is recorded faithfully across all samples; downstream analysis interprets.
 5. **Don't prune the Lagrangian with analytical inertness arguments.** Operators currently omitted as boundary terms (e.g. parity-odd FF̃) should be included with free coefficients; the chain's null verdict on a known-inert operator is a *positive* methodology demonstration. Increases dimensionality of D2 parity-odd (was 22 free params) and possibly EH; compactified priors handle the inflation gracefully.
 
 The campaign output shifts from headline log Z and A_max numbers to per-coupling marginal D_KL on the chain posterior — "this operator gives structure / this operator doesn't do much" rather than "A_max = 38".
@@ -35,7 +35,7 @@ The campaign output shifts from headline log Z and A_max numbers to per-coupling
 | Metric missing from sim output | `-inf` | `-inf` (genuine bug, not parameter-space signal) | `metric_missing` |
 | Sim returns finite logL **below** `SOFT_FLOOR_LOGL` | n/a (no analogue in v2) | logL kept verbatim (no clamp); distinct tag so post-chain analysis can filter sub-noise-floor samples from "physical" min/max summaries. Issue #356. | `below_noise_floor` |
 
-Default `σ_explore = 1.0` nat; tunable via `--soft-floor-noise SIGMA`. The `--gated` flag preserves v2 hard-rejection behaviour for reproducibility.
+Default `σ_explore = 1.0` nat; tunable via `--soft-floor-noise SIGMA`. The `--gated` flag preserves v2 hard-rejection behavior for reproducibility.
 
 `below_noise_floor` is observational metadata only — sample weights at logL ≈ −101 are ~1e−50 (vs ~1e−2 at MAP), so posterior inference is unaffected. The tag protects diagnostic summaries (corner-plot A-range, headline tables) from quoting numerical-noise floors as physical bounds. The simulation's effective noise floor scales with IC amplitude and solver precision; for typical IC=1e−2 and double-precision modal solver, P_max ≈ 1e−34 is the natural threshold and SOFT_FLOOR_LOGL = −100 (P_max ≈ 1e−44) provides a comfortable margin.
 
@@ -71,7 +71,7 @@ These files are **owned by that session** — do not edit from this session.
 
 See [V3_PHASE_TRACKER.md](V3_PHASE_TRACKER.md).
 
-## Phase E (localised geometry, deferred)
+## Phase E (localized geometry, deferred)
 
 See [V3_PHASE_E_DESIGN.md](V3_PHASE_E_DESIGN.md). Gated on Phase B convergence — provides physical regulator for unbounded P_max in tachyonic regions.
 
@@ -107,6 +107,6 @@ The architecture as deployed in Phase B chains carries two architectural comprom
 - [CAMPAIGN.md](../CAMPAIGN.md) — overall campaign log
 - [docs/V3_PHASE_TRACKER.md](V3_PHASE_TRACKER.md) — per-phase progress
 - [docs/V3_PHASE_D_DESIGN.md](V3_PHASE_D_DESIGN.md) — manuscript update sequence
-- [docs/V3_PHASE_E_DESIGN.md](V3_PHASE_E_DESIGN.md) — localised geometry design (deferred)
+- [docs/V3_PHASE_E_DESIGN.md](V3_PHASE_E_DESIGN.md) — localized geometry design (deferred)
 - [docs/V3_2_DESIGN_INVESTIGATION.md](V3_2_DESIGN_INVESTIGATION.md) — v3.2 design investigation (symmetric priors + PSALTer)
 - `docs/V3_PHASE_C_REFERENCE.md` (parallel session) — cubed-sphere reference

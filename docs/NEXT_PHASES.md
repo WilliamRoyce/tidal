@@ -23,7 +23,7 @@
   $-2 B_0^2 \rho$, $-6 B_0^2 \rho$. Full regression matrix in
   `docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md` Stage-7 closure entry.
   Documentation subsections added to `perturbative_reduction.tex` §Power-of-Contraction
-  Normalisation and Matter-Only Derivative Dependence, and the engineer-facing
+  Normalization and Matter-Only Derivative Dependence, and the engineer-facing
   counterpart in `perturbative_reduction_design.tex`. Both .tex files now wired
   into `main.tex` (previously orphan inputs).
 
@@ -32,7 +32,7 @@
 
 TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 20 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (12 types: energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
 
-The project's core research motivation is the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion in external magnetic fields). The project operates exclusively in the **linearised regime** — all Lagrangians are quadratic, producing linear PDEs. The phases below are ordered by their impact toward enabling realistic Gertsenshtein simulations, while also broadening TIDAL's general utility as a linearised field theory simulation framework.
+The project's core research motivation is the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion in external magnetic fields). The project operates exclusively in the **linearized regime** — all Lagrangians are quadratic, producing linear PDEs. The phases below are ordered by their impact toward enabling realistic Gertsenshtein simulations, while also broadening TIDAL's general utility as a linearized field theory simulation framework.
 
 Design decisions and feature choices below are informed by established scientific codebases — principally **Dedalus** (Burns et al. 2020), **MEEP** (Oskooi et al. 2010), and **FEniCS** (Baratta et al. 2023) — and by the Gertsenshtein-effect literature. Full citations are maintained in [`docs/references.md`](references.md).
 
@@ -216,7 +216,7 @@ This is the integration example that combines Phase A (and optionally Phase B) i
 
 Combined PGT + Einstein-Maxwell theory derived (`examples/torsion_gertsenshtein/theory.toml`, 38 components under v0.33.0+ pipeline; pre-v0.33.0 used Ostrogradsky-reduced 23-component representation, now removed). Key findings:
 
-- **Polarisation block-diagonal structure (#200):** The plane-wave reduced equations decompose into two completely decoupled channels with zero cross-talk:
+- **Polarization block-diagonal structure (#200):** The plane-wave reduced equations decompose into two completely decoupled channels with zero cross-talk:
   - **h× ↔ a_x** (h_5 ↔ a_1): torsion-independent, stable, P = sin²(κB₀D/2) unchanged
   - **trace ↔ a_y** (h_4/h_7/h_9 ↔ a_2 ↔ torsion): torsion-dependent, but ghost-unstable from R̃² (Ostrogradsky's theorem; iterative Parker–Simon path #301 evolves only the physical branch)
 - **Torsion-independence of standard Gertsenshtein (#199):** The h× ↔ a_x equations contain NO torsion parameters (α₁, α₂, α₃, b₅). Algebraically identical to EM-only.
@@ -227,7 +227,7 @@ Combined PGT + Einstein-Maxwell theory derived (`examples/torsion_gertsenshtein/
 
 ### Dark Photon Torsion Model (active — v0.24)
 
-Non-minimal torsion-EM theory derived (`examples/torsion_dark_photon/theory.toml`). Torsion trace T_μ treated as dark photon; kinetic mixing δ F·F_T breaks the polarisation block-diagonal structure found in minimal PGT.
+Non-minimal torsion-EM theory derived (`examples/torsion_dark_photon/theory.toml`). Torsion trace T_μ treated as dark photon; kinetic mixing δ F·F_T breaks the polarization block-diagonal structure found in minimal PGT.
 
 Lagrangian: L = (1/κ²)R̃ + αI₃ − (ξ/4)F_T² + δ F·F_T − (1/4)F²
 
@@ -253,13 +253,13 @@ Key results (see #235):
 - **Smart constraint elimination** (#234): Fixed 1/parameter singularity in Wolfram constraint solver. Symbolic coefficients preserved.
 - **Eigenvalue pre-check**: Modal solver catches unstable runs at t=0 before evolution (no escaped diverged runs).
 
-Propagating model (Ftorsion² + R̃[μν]F, #236): gradient instability at δ₁≠0 (k-dependent growth rate). Stability scan in progress over (xi, δ₁, α₂, α₃) to determine if any parameter combination stabilises propagating torsion with R̃[μν]F.
+Propagating model (Ftorsion² + R̃[μν]F, #236): gradient instability at δ₁≠0 (k-dependent growth rate). Stability scan in progress over (xi, δ₁, α₂, α₃) to determine if any parameter combination stabilizes propagating torsion with R̃[μν]F.
 
 ### Remaining / Blocked
 
 - **Radial dipolar (Phase F3a)**: `theory_radial.toml` derived (spherical coords). BLOCKED on compute.
 - **Plasma detuning (Phase F1)**: BLOCKED — xPert spurious z²-terms from background 4-potential.
-- **Propagating torsion + R̃[μν]F**: Gradient instability found (#236). Stability scan over (xi, α₂, α₃, δ₁) in progress. May require additional Lagrangian terms (cubic operators, higher-derivative corrections) for stabilisation.
+- **Propagating torsion + R̃[μν]F**: Gradient instability found (#236). Stability scan over (xi, α₂, α₃, δ₁) in progress. May require additional Lagrangian terms (cubic operators, higher-derivative corrections) for stabilization.
 - **Ghost-free parameter conditions:** Literature (Sezgin & van Nieuwenhuizen 1980, Nikiforova et al. 2009, Barker 2024) provides sector-specific conditions. No universal closed-form for general (α₁, α₂, α₃, b₅). xi=0 limit now provides exact control check.
 
 ### References
@@ -269,7 +269,7 @@ Propagating model (Ftorsion² + R̃[μν]F, #236): gradient instability at δ₁
 - Hwang & Noh (2023), "On graviton-photon conversions in magnetic environments", [arXiv:2310.04150](https://arxiv.org/abs/2310.04150) — proper EM field definitions, graviton mass term
 - Dandoy & Lella (2024), "Graviton-photon oscillations", [arXiv:2406.17853](https://arxiv.org/abs/2406.17853) — confirms correct coupling normalization
 - Berlin et al. (2024), "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865)
-- Sezgin & van Nieuwenhuizen (1980), "New ghost-free gravity Lagrangians", Phys. Rev. D 21:3269 — linearised PGT ghost conditions
+- Sezgin & van Nieuwenhuizen (1980), "New ghost-free gravity Lagrangians", Phys. Rev. D 21:3269 — linearized PGT ghost conditions
 - Nikiforova et al. (2009), "Stability of the massive torsion modes", [arXiv:0905.4007](https://arxiv.org/abs/0905.4007)
 - Barker (2024), "Every Poincaré gauge theory is conformal", [arXiv:2406.12826](https://arxiv.org/abs/2406.12826) — no-ghost β₃ > 0
 
@@ -277,7 +277,7 @@ Propagating model (Ftorsion² + R̃[μν]F, #236): gradient instability at δ₁
 
 ---
 
-## Phase E: Spectral (Fourier) Spatial Discretisation ✓
+## Phase E: Spectral (Fourier) Spatial Discretization ✓
 
 **Priority: MEDIUM — significant accuracy and performance improvement**
 **Status:** Complete (FFT operators); Chebyshev remaining
@@ -374,7 +374,7 @@ The Perfectly Matched Layer (PML) technique (Bérenger 1994) is the gold standar
 
 ### What and Why
 
-TIDAL currently uses raw numpy memory-mapped arrays for disk-backed storage. While efficient, this format is not interoperable with standard scientific visualisation tools (ParaView, VisIt, yt). The HDF5 + XDMF combination is the de facto standard for PDE simulation output — used by Dedalus, FEniCS, and most production codes. Adopting it enables direct post-processing in established toolchains without format conversion.
+TIDAL currently uses raw numpy memory-mapped arrays for disk-backed storage. While efficient, this format is not interoperable with standard scientific visualization tools (ParaView, VisIt, yt). The HDF5 + XDMF combination is the de facto standard for PDE simulation output — used by Dedalus, FEniCS, and most production codes. Adopting it enables direct post-processing in established toolchains without format conversion.
 
 ### What It Enables
 
@@ -409,9 +409,9 @@ TIDAL currently uses raw numpy memory-mapped arrays for disk-backed storage. Whi
 
 ### What and Why
 
-For the torsion PGT (Poincaré Gauge Theory) research goal, it is essential to identify which parameter windows support propagating (non-tachyonic, non-ghost) modes before committing to expensive time-domain simulations. An eigenvalue solver computes the dispersion relation ω(k) directly from the linearised equation system, revealing mode speeds, stability boundaries, and resonance conditions.
+For the torsion PGT (Poincaré Gauge Theory) research goal, it is essential to identify which parameter windows support propagating (non-tachyonic, non-ghost) modes before committing to expensive time-domain simulations. An eigenvalue solver computes the dispersion relation ω(k) directly from the linearized equation system, revealing mode speeds, stability boundaries, and resonance conditions.
 
-Dedalus (Burns et al. 2020) provides a native eigenvalue problem (EVP) capability that has proven invaluable for hydrodynamic stability analysis. TIDAL's linearised structure — mass matrices, coupling matrices, and spatial operators already extracted — is well-suited for a similar capability.
+Dedalus (Burns et al. 2020) provides a native eigenvalue problem (EVP) capability that has proven invaluable for hydrodynamic stability analysis. TIDAL's linearized structure — mass matrices, coupling matrices, and spatial operators already extracted — is well-suited for a similar capability.
 
 ### What It Enables
 
@@ -423,7 +423,7 @@ Dedalus (Burns et al. 2020) provides a native eigenvalue problem (EVP) capabilit
 
 ### Implementation Details
 
-1. **New module** `tidal/analysis/dispersion.py`: Constructs the generalised eigenvalue problem (M − ω² I) u = 0 from the JSON spec's mass and coupling matrices plus spatial operator eigenvalues
+1. **New module** `tidal/analysis/dispersion.py`: Constructs the generalized eigenvalue problem (M − ω² I) u = 0 from the JSON spec's mass and coupling matrices plus spatial operator eigenvalues
 2. **CLI**: `tidal dispersion spec.json --k-range "0:10:100" --param "m2=1.0"`
 3. **Output**: ω(k) curves as JSON + optional matplotlib plots
 4. **Validation**: Compare ω(k) against known analytic results (e.g., ω² = k² + m² for Klein-Gordon)
@@ -455,15 +455,15 @@ When a DAE system has algebraic constraints (time_order=0 fields like A_0 in ele
 2. **Tier 2: Operator Probing → Sparse Matrix (O(N²) build, O(N) solve)** — universal fallback for non-periodic BCs, position-dependent self-coefficients, or unknown operators. Probes `apply_operator()` with unit vectors to build the exact operator matrix.
 3. **Automatic selection**: `_select_method()` checks periodicity, coefficient constancy, and multiplier availability to choose the fastest applicable tier.
 
-**Gauge regularisation for singular Poisson (periodic BCs):**
+**Gauge regularization for singular Poisson (periodic BCs):**
 - Pure-Laplacian constraints with periodic BCs have a null space (constant functions)
 - FFT: sets zero-mode `u_hat[0,...,0] = 0` (zero-mean gauge)
 - IDA: auto-detects via `_is_pure_laplacian()` and pins one DOF (`A_0[0] = 0`) in the residual
-- This is numerical regularisation, not physics gauge fixing — observables (E, B) depend on derivatives of A_0, not A_0 itself (standard FEniCS/Firedrake/PETSc practice)
+- This is numerical regularization, not physics gauge fixing — observables (E, B) depend on derivatives of A_0, not A_0 itself (standard FEniCS/Firedrake/PETSc practice)
 
 **Key files:**
 - **NEW** `tidal/solver/constraint_solve.py` (~450 lines) — three-tier solver
-- **MODIFIED** `tidal/solver/ida.py` — pre-solve integration + gauge regularisation
+- **MODIFIED** `tidal/solver/ida.py` — pre-solve integration + gauge regularization
 - **NEW** `tests/test_solver_constraint_solve.py` — 25 tests (unit + integration + IDA)
 
 ### References
@@ -476,7 +476,7 @@ When a DAE system has algebraic constraints (time_order=0 fields like A_0 in ele
 
 ## Known Limitations
 
-1. ~~**Chern-Simons IDA failure**~~: **Resolved by Phase J.** Constraint pre-solve + gauge regularisation handles all DAE systems, including those with nontrivially violated algebraic constraints and singular Laplacian Jacobians.
+1. ~~**Chern-Simons IDA failure**~~: **Resolved by Phase J.** Constraint pre-solve + gauge regularization handles all DAE systems, including those with nontrivially violated algebraic constraints and singular Laplacian Jacobians.
 
 2. **Non-periodic BCs for constraint mode**: The `--mode constraint` path works with periodic BCs but may fail with Dirichlet/Neumann BCs for certain systems. Phase J's Tier 2 (operator probing) supports non-periodic BCs for the pre-solve step.
 

@@ -19,7 +19,7 @@
 #   goes from -1 to +1 across the box → explicitly non-periodic → modal not selectable.
 #
 # Phase E geometry (see docs/V3_PHASE_E_DESIGN.md): the dual-Gaussian setup is the
-# canonical localised-B background that unlocks the modal solver.
+# canonical localized-B background that unlocks the modal solver.
 #
 # NOTE: constant names must not contain underscores — Mathematica parses "X_Y" as
 # Pattern[X, Blank[Y]]. Use "sigB", "zc1", "zc2", "Bpeak".

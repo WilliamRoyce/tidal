@@ -195,5 +195,5 @@ Gertsenshtein independent of torsion; relevant for IAXO/CAST comparisons.
   results summary
 - Issue #299 — b5 decouples from TT channel (Stage C expected null)
 - Issue #300 — TT plane-wave IC is not WLOG (future: run with torsion IC too)
-- Issue #307 — P_max > 2.0 likelihood cap (defence against stability-guard misses)
+- Issue #307 — P_max > 2.0 likelihood cap (defense against stability-guard misses)
 - Issue #308 — marginal D_KL bug (fixed)

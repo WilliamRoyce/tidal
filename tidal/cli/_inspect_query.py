@@ -288,7 +288,7 @@ def show_coefficient(  # noqa: PLR0913, C901
         print()
         print("  REDUNDANT RE-ENCODING (same quantity, different convention)")
         print(f"    mass/coupling matrix : {prov.matrix_entry!r}")
-        print("      note: stored verbatim, un-normalised by the kinetic coefficient;")
+        print("      note: stored verbatim, un-normalized by the kinetic coefficient;")
         print("      the numeric matrix negates it (see GH #404)")
 
     if prov.hamiltonian_terms:

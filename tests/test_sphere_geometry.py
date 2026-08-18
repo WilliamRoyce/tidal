@@ -85,16 +85,16 @@ def test_face_to_direction_unit_norm() -> None:
             np.testing.assert_allclose(np.linalg.norm(x), 1.0, atol=1e-12)
 
 
-def test_face_to_direction_face_centre_is_axis() -> None:
+def test_face_to_direction_face_center_is_axis() -> None:
     """``u = 0`` on face k+ projects to ``+e_k``; on face k- to ``-e_k``."""
     n = 4
     Q = np.eye(n)
-    u_centre = np.zeros(n - 1)
+    u_center = np.zeros(n - 1)
     for k in range(1, n + 1):
         face_plus = 2 * (k - 1) + 1
         face_minus = 2 * (k - 1) + 2
-        x_plus = face_to_direction(face_plus, u_centre, Q)
-        x_minus = face_to_direction(face_minus, u_centre, Q)
+        x_plus = face_to_direction(face_plus, u_center, Q)
+        x_minus = face_to_direction(face_minus, u_center, Q)
         expected_plus = np.zeros(n)
         expected_plus[k - 1] = 1.0
         np.testing.assert_allclose(x_plus, expected_plus, atol=1e-12)
@@ -222,7 +222,7 @@ def test_random_rotation_different_seeds_differ() -> None:
 
 
 # ----------------------------------------------------------------------
-# Cell labelling
+# Cell labeling
 # ----------------------------------------------------------------------
 
 

@@ -101,7 +101,7 @@ def test_base_spec_demotes_h_4_h_7_h_9(rtilde_spec: Any) -> None:
 def _photon_ic(solver: PerturbativeSolver, grid: GridInfo) -> np.ndarray:
     """Non-gauge photon IC on a_2 that couples to gravitons via B₀.
 
-    a_2 is a dynamical photon polarisation; the b5=0 base theory
+    a_2 is a dynamical photon polarization; the b5=0 base theory
     has a Gertsenshtein-style coupling between a_2 and the demoted
     h_{0,4,7,9} constraint fields via the background B₀ (identity
     terms with coefficient ``±B0/2``, ``±B0²/8``). Exciting a_2

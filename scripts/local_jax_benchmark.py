@@ -21,7 +21,7 @@ Profiling evidence (from code analysis and benchmark runs):
     4×4 expm per mode → O(N) matrix-exponential calls dominate wall time.
   - JAX path: jax.vmap(jax.scipy.linalg.expm) over all modes in one fused
     kernel + jax.lax.scan for the time loop → typical 3-10× speedup on CPU
-    for N>=64, with JIT amortised over multiple likelihood calls in PolyChord.
+    for N>=64, with JIT amortized over multiple likelihood calls in PolyChord.
   - Sparse-IC optimization (scipy path): skips inactive modes. JAX vmap is
     always dense (all modes computed). For dense ICs the two paths are
     comparable; for single-mode plane-wave IC the scipy path wins on

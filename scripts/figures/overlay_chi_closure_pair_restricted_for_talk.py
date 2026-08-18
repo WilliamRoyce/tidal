@@ -10,7 +10,7 @@ talk:
     `beta_i:` / `chi_i:` prefix), drawn verbatim from the manuscript
     enumeration in research/lagrangian_enumeration/general_quadratic_lagrangian.tex
   - bumps in-figure font sizes for presentation distance
-  - swaps the four overlay colours from IBM to the 2024 Cambridge palette
+  - swaps the four overlay colors from IBM to the 2024 Cambridge palette
     (Dark Crest / Dark Purple / Dark Cherry / Dark Indigo) so the corner
     accents match the slide accents
   - saves with transparent figure background so the corner sits cleanly
@@ -77,7 +77,7 @@ LABEL_OVERRIDES: dict[str, str] = {
 #   propagating sup  -> Purple
 #   NP-control amp   -> Cherry  (warm-pair with Crest)
 #   NP-control sup   -> Indigo
-CAMBRIDGE_OVERLAY_COLOURS = {
+CAMBRIDGE_OVERLAY_COLORS = {
     "prop_amp": CAMBRIDGE_PALETTE["crest"],
     "prop_sup": CAMBRIDGE_PALETTE["purple"],
     "np_amp": CAMBRIDGE_PALETTE["cherry"],
@@ -179,7 +179,7 @@ def main() -> None:
         fig_width=FIG_WIDTH,
         param_label_overrides=LABEL_OVERRIDES,
         transparent=True,
-        colours=CAMBRIDGE_OVERLAY_COLOURS,
+        colors=CAMBRIDGE_OVERLAY_COLORS,
         legend_labels=LEGEND_LABELS,
         strip_ylabels=False,
         strip_xlabels=True,

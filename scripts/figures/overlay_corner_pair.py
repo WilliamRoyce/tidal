@@ -139,7 +139,7 @@ def render_overlay_pair(
     fig_width: float,
     param_label_overrides: dict[str, str] | None = None,
     transparent: bool = False,
-    colours: dict[str, str] | None = None,
+    colors: dict[str, str] | None = None,
     legend_labels: dict[str, str] | None = None,
     strip_ylabels: bool = False,
     strip_xlabels: bool = False,
@@ -169,14 +169,14 @@ def render_overlay_pair(
     import numpy as np
 
     seed_value = seed if seed is not None else 1
-    _ = ncompress  # accepted for backwards compat with talk-script caller; ignored in favour of dynamic per-chain value
+    _ = ncompress  # accepted for backwards compat with talk-script caller; ignored in favor of dynamic per-chain value
 
-    # Resolve four overlay colours (prop_amp, prop_sup, np_amp, np_sup),
+    # Resolve four overlay colors (prop_amp, prop_sup, np_amp, np_sup),
     # defaulting to module-level constants when not overridden.
-    amp = (colours or {}).get("prop_amp", AMP_COLOR)
-    sup = (colours or {}).get("prop_sup", SUP_COLOR)
-    np_amp_ = (colours or {}).get("np_amp", NP_AMP_COLOR)
-    np_sup_ = (colours or {}).get("np_sup", NP_SUP_COLOR)
+    amp = (colors or {}).get("prop_amp", AMP_COLOR)
+    sup = (colors or {}).get("prop_sup", SUP_COLOR)
+    np_amp_ = (colors or {}).get("np_amp", NP_AMP_COLOR)
+    np_sup_ = (colors or {}).get("np_sup", NP_SUP_COLOR)
 
     def _resolve_label(name: str) -> str:
         if param_label_overrides and name in param_label_overrides:

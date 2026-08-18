@@ -115,7 +115,7 @@ def build_report() -> str:
     lines.extend(
         (
             "\n## summary",
-            f"  specs analysed: {len(paths)}",
+            f"  specs analyzed: {len(paths)}",
             f"  specs with a proven sign conflict: {conflicted}",
         )
     )

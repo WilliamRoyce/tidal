@@ -138,7 +138,7 @@ def _source_wavevector(
         ⟨k⟩_flux = Σ_k k · Im[v̂*(k) · φ̂(k)]
 
     This is proportional to the momentum density ``T^{0i} = -v · ∂_i φ`` and
-    correctly identifies the propagation direction for travelling waves while
+    correctly identifies the propagation direction for traveling waves while
     returning zero for standing waves.
 
     Summed over all source fields for group covariance.
@@ -194,7 +194,7 @@ def _directional_split(  # noqa: PLR0914
     gives ~50/50 because |φ̂(k)|² = |φ̂(-k)|².  The flux-based approach
     correctly handles real fields because the directional flux uses the
     cross-spectrum ``Im[v̂* · φ̂]`` which is antisymmetric: for a rightward
-    travelling wave, both the +k and -k modes have positive directional
+    traveling wave, both the +k and -k modes have positive directional
     flux and are both attributed to the forward direction.
 
     Parameters

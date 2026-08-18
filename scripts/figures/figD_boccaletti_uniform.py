@@ -94,7 +94,7 @@ def _plot(data: dict, out_path: Path) -> None:
 
     # Convergence rows, grouped by scheme. Older smoke runs may have
     # a single (modal) trace with no `scheme` field; treat that as
-    # one scheme labelled 'modal'.
+    # one scheme labeled 'modal'.
     conv_all = data.get("convergence", [])
     schemes: dict[str, list[dict]] = {}
     for row in conv_all:

@@ -30,7 +30,7 @@
 
 [theory]
 name = "Dark Photon in Plasma + Dual-Gaussian B (Phase E.T1)"
-description = "PGT torsion-trace dark photon with kinetic mixing and plasma mass, in localised dual-Gaussian B-field"
+description = "PGT torsion-trace dark photon with kinetic mixing and plasma mass, in localized dual-Gaussian B-field"
 
 [spacetime]
 dimension = 4

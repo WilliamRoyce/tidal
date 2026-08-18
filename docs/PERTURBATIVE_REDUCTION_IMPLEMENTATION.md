@@ -63,7 +63,7 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 - [x] **1.6** Deleted `_wls_phase_c_perturbative_reduction` function and its call site in `_derive.py`.
 - [x] **1.7** Deleted `tidal/wolfram/PerturbativeReduction.wl` (525 lines, v5 JLM module).
 - [x] **1.8** Deleted `tests/wolfram/test_perturbative_reduction.wl`.
-- [x] **1.9** Rewrote `tests/test_phase_c_integration.py::TestWlsGeneration` — asserts metadata carries `"small_parameters" -> {...}` and `"perturbation_order" -> N` when `[perturbation]` configured; asserts no JLM artefacts remain.
+- [x] **1.9** Rewrote `tests/test_phase_c_integration.py::TestWlsGeneration` — asserts metadata carries `"small_parameters" -> {...}` and `"perturbation_order" -> N` when `[perturbation]` configured; asserts no JLM artifacts remain.
 - [ ] **1.10** Re-derive `torsion_gertsenshtein` and verify `order_in_eps` tags — deferred to Stage 6 (empirical validation block) to avoid derivation churn before Python side (Stages 2-5) can consume the tags.
 
 ### Smoke tests (2026-04-19)
@@ -111,7 +111,7 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 - [x] **3.2** When `return_eigendata=True`, the returned `SolverResult` carries an `"eigendata"` dict with keys: `blocks` (list of per-block dicts with `slot_indices`, `V`, `D_diag`, `V_inv`, `alpha = V_inv @ y0_hat`), `mode_k` (the k-grid), `state_layout` (the *reduced* layout when Schur eliminate runs; full layout otherwise).
 - [x] **3.3** `schur_ops` sub-dict emitted when the constraint-field path runs: `recovery_matrix` (the `-S_cc⁻¹·S_cd` per mode, already computed at modal.py:1020-1099), `constraint_field_names` tuple, and `orig_to_reduced` slot-index map. Pass 1 (Stage 4) uses this to Schur-substitute constraint-field references when assembling `M_src(k)`.
 - [x] **3.4** Six-test suite at `tests/test_solver_modal.py::TestEigendataExport`:
-  - `test_eigendata_key_absent_by_default` — baseline no-eigendata behaviour
+  - `test_eigendata_key_absent_by_default` — baseline no-eigendata behavior
   - `test_eigendata_structure_present_when_requested` — shape of the dict
   - `test_eigendata_invertibility` — `V @ V_inv ≈ I` per mode
   - `test_eigendata_alpha_matches_vinv_y0` — α derivation correct
@@ -225,7 +225,7 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 
 ### Tasks
 
-- [x] **7.1** Rewrite `docs/tex/perturbative_reduction.tex` to v6 iterative approach. Move JLM discussion to historical appendix. (Completed 2026-04-19; extended 2026-04-20 with §Power-of-Contraction Normalisation and Matter-Only Derivative Dependence for issue #271.)
+- [x] **7.1** Rewrite `docs/tex/perturbative_reduction.tex` to v6 iterative approach. Move JLM discussion to historical appendix. (Completed 2026-04-19; extended 2026-04-20 with §Power-of-Contraction Normalization and Matter-Only Derivative Dependence for issue #271.)
 - [x] **7.2** Create `docs/tex/perturbative_reduction_design.tex` — iterative driver, modal Duhamel derivation, constraint-field Schur substitution, validity monitoring. (Filename finalised as `perturbative_reduction_design.tex`; engineer-facing companion to §7.1. Both files wired into `main.tex` 2026-04-20.)
 - [x] **7.3** Update `docs/tex/architecture.tex` — Phase C is now order tagging + solver driver (not JLM).
 - [x] **7.4** Update MEMORY.md / `perturbative_reduction_research.md` — mark v6 complete.
@@ -242,7 +242,7 @@ Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM 
 
 **Supplementary fix — `$CDShorthandReverseRules` safety net.** These rules (generated at `_derive.py:1407` since v0.28) were never applied. Added application to `lagComp` before Component-E-L field-function detection (lines 5857–5869), FreeQ-gated to keep it O(LeafCount) when the precompute already resolved everything.
 
-**Documentation.** §Power-of-Contraction Normalisation and Matter-Only Derivative Dependence in [`docs/tex/perturbative_reduction.tex`](../docs/tex/perturbative_reduction.tex); engineer-facing counterpart §Power-of-Contraction Normalisation — Implementation Details in [`docs/tex/perturbative_reduction_design.tex`](../docs/tex/perturbative_reduction_design.tex); timing row in [`docs/tex/derivation_performance.tex`](../docs/tex/derivation_performance.tex) §Post-v6 Reference Timings.
+**Documentation.** §Power-of-Contraction Normalization and Matter-Only Derivative Dependence in [`docs/tex/perturbative_reduction.tex`](../docs/tex/perturbative_reduction.tex); engineer-facing counterpart §Power-of-Contraction Normalization — Implementation Details in [`docs/tex/perturbative_reduction_design.tex`](../docs/tex/perturbative_reduction_design.tex); timing row in [`docs/tex/derivation_performance.tex`](../docs/tex/derivation_performance.tex) §Post-v6 Reference Timings.
 
 **Verification.**
 

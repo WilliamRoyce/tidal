@@ -364,7 +364,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="K[,K,K]",
         help="Wavevector for plane-wave or gaussian IC (e.g. 3 or 0.1,0.0,0.0). "
-        "With gaussian: creates a travelling wave packet (positive k = right-mover). "
+        "With gaussian: creates a traveling wave packet (positive k = right-mover). "
         "On periodic axes, k is automatically snapped to the nearest discrete "
         "Fourier mode to eliminate spectral leakage; use --ic-no-snap to disable.",
     )

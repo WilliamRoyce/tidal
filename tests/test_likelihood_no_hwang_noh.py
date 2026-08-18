@@ -53,7 +53,7 @@ class TestHwangNohRemoved:
 
     def test_p_max_above_two_no_longer_capped(self) -> None:
         """v2 had a hard cap at P_max > 2.0 (the "non-perturbative regime"
-        artefact protection).  v3 removed it entirely.
+        artifact protection).  v3 removed it entirely.
         """
         lc = LikelihoodConfig(metric="P_max", likelihood_type="maximize")
         # In v2, compute_log_likelihood(3.0, lc) would have been -inf.  In v3:
@@ -92,7 +92,7 @@ class TestHwangNohRemoved:
         """The ``--gated`` CLI flag controls the upstream tachyonic gate, not
         the value-level Hwang-Noh check.  In v3 the value cap is gone in
         both modes — there's no separate "gated" code path that re-enables
-        the P_max>0.5 -> -inf behaviour at the compute level.
+        the P_max>0.5 -> -inf behavior at the compute level.
         """
         lc_permissive = LikelihoodConfig(
             metric="P_max",

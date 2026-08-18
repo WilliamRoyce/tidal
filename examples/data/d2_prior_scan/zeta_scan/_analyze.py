@@ -181,7 +181,7 @@ def _find_threshold(csv_path: Path) -> float | None:
 
 
 def _joint_zeta_values(threshold: float | None) -> tuple[float, ...]:
-    """5 ζ values centred on 0: {0, ±half, ±full}."""
+    """5 ζ values centered on 0: {0, ±half, ±full}."""
     if threshold is None:
         # benign alone up to max scan range — use a conservative round number
         half = 0.5
@@ -359,7 +359,7 @@ def _classify_pairwise(csv_path: Path, zi_name: str, zj_name: str) -> str:
     )
 
 
-def _summarise(
+def _summarize(
     joint_paths: dict[str, Path],
     pair_paths: dict[tuple[str, str], Path],
     corner_path: Path,
@@ -513,7 +513,7 @@ def main() -> None:
     print(f"  wrote {corner_path.name} ({n} rows)")
 
     # --- Summary ---
-    _summarise(
+    _summarize(
         joint_paths,
         pair_paths,
         corner_path,

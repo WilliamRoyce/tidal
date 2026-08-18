@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from .conftest import MANIFEST_PATH, REPO_ROOT, iter_artefacts
+from .conftest import MANIFEST_PATH, REPO_ROOT, iter_artifacts
 
 pytestmark = pytest.mark.publication
 
@@ -21,10 +21,10 @@ def test_manifest_loads() -> None:
     ("appendix", "name", "entry"),
     [
         pytest.param(*x, id=f"{x[0]}/{x[1]}")
-        for x in iter_artefacts(yaml.safe_load(MANIFEST_PATH.read_text()))
+        for x in iter_artifacts(yaml.safe_load(MANIFEST_PATH.read_text()))
     ],
 )
-def test_artefact_scripts_exist(appendix: str, name: str, entry: dict) -> None:
+def test_artifact_scripts_exist(appendix: str, name: str, entry: dict) -> None:
     if entry.get("status") == "stub":
         pytest.skip("entry marked stub")
     kind = entry["kind"]
@@ -42,7 +42,7 @@ def test_artefact_scripts_exist(appendix: str, name: str, entry: dict) -> None:
     ("appendix", "name", "entry"),
     [
         pytest.param(*x, id=f"{x[0]}/{x[1]}")
-        for x in iter_artefacts(
+        for x in iter_artifacts(
             yaml.safe_load(MANIFEST_PATH.read_text()), kinds=("figure", "table")
         )
     ],

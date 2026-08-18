@@ -70,7 +70,7 @@ PARAM_NAMES = list(PRIOR_BOUNDS.keys())
 
 
 def _draw(rng: np.random.Generator, n: int) -> dict[str, np.ndarray]:
-    """Draw n samples from the composed prior — vectorised."""
+    """Draw n samples from the composed prior — vectorized."""
     out: dict[str, np.ndarray] = {}
     for name, (kind, lo, hi) in PRIOR_BOUNDS.items():
         if kind == "uniform":

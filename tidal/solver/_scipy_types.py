@@ -158,7 +158,7 @@ def sparse_solve(
     matrix: SparseMatrix,
     rhs: NDArray[np.float64],
 ) -> NDArray[np.float64]:
-    """Solve ``matrix @ x = rhs`` via sparse direct factorisation.
+    """Solve ``matrix @ x = rhs`` via sparse direct factorization.
 
     Wraps ``scipy.sparse.linalg.spsolve`` with a typed signature.
 

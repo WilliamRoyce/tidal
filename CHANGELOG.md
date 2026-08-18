@@ -14,7 +14,7 @@ retroactively covered; see `git log` for the full history.
 
 Changelog maintenance lapsed during the PGT survey campaign and the MSci
 write-up (April–August 2026). The work in this range covers the v3 inference
-architecture, the coupling-space survey and its HPC tooling, the localised-field
+architecture, the coupling-space survey and its HPC tooling, the localized-field
 and cubed-sphere campaigns, solver stability guards, and the manuscript, poster
 and talk build infrastructure. `git log v0.33.4..v0.47.9` is the authoritative
 record for this window; entries below resume the per-version trail.

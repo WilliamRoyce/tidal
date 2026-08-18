@@ -74,7 +74,7 @@ ANCHORS: dict[str, dict[str, float]] = {
 
 # χ values used by the single-anchor scan.  Covers the prior interior
 # at fine resolution (0.005 step in [0, 0.025]) and the wide range up
-# to 0.5 to confirm the δ₁=0 invariance generalises beyond the
+# to 0.5 to confirm the δ₁=0 invariance generalizes beyond the
 # immediate prior.  Includes the cited prior-edge values.
 CHI_VALUES: tuple[float, ...] = (
     0.0,
@@ -288,7 +288,7 @@ def run_corner_verification(spec: object) -> Path:
     return out
 
 
-def _summarise(out_paths: dict[str, Path]) -> None:
+def _summarize(out_paths: dict[str, Path]) -> None:
     """Print a compact summary tying each output back to its TeX claim."""
     print("\n=== TeX-cited numbers — reproducibility check ===\n")
 
@@ -369,7 +369,7 @@ def main() -> None:
         n_rows = sum(1 for _ in path.open(encoding="utf-8")) - 1  # minus header
         print(f"  wrote {path.name} ({n_rows} rows) [{label}]")
 
-    _summarise(out_paths)
+    _summarize(out_paths)
 
 
 if __name__ == "__main__":

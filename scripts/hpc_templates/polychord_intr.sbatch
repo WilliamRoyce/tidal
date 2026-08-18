@@ -43,7 +43,7 @@ LOCAL_SP="/tmp/site_packages_${SLURM_JOB_ID}"
 # Per-job results directory.  Callers that want a stable on-HPC output
 # location for ``--output`` use ``${RESULTS_DIR}/<subdir>``; the shuttle's
 # ``pull <jobid>`` walks the recorded --output path and brings the
-# whitelisted artefacts back locally.
+# whitelisted artifacts back locally.
 export RESULTS_DIR="${TIDAL_ROOT}/hpc_results/${SLURM_JOB_ID}"
 mkdir -p "${RESULTS_DIR}"
 

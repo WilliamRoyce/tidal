@@ -205,7 +205,7 @@ class TestPass0SchurRecovery:
         The constraint IC solver is expected to project: it replaces
         the user-provided h with ``g·phi`` at t=0 so the evolution
         starts on the constraint manifold. This test documents that
-        behaviour as the observed contract.
+        behavior as the observed contract.
         """
         _spec, solver, grid, y0, layout = _setup()
         n_grid = grid.num_points

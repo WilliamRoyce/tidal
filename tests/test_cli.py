@@ -172,7 +172,7 @@ class TestInspectSemanticQueries:
         """`--equation` without `--json` renders the human view.
 
         Each row shows the effective coefficient and the deciding tactic, and
-        a multi-term key is labelled as summed rather than silently collapsed.
+        a multi-term key is labeled as summed rather than silently collapsed.
         """
         ret = main(
             [
@@ -193,7 +193,7 @@ class TestInspectSemanticQueries:
         self,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """The Hamiltonian counterpart is labelled distinct, not 'the same coefficient'."""
+        """The Hamiltonian counterpart is labeled distinct, not 'the same coefficient'."""
         main(
             [
                 "inspect",
@@ -476,7 +476,7 @@ class TestDerivationIntegrityGuard:
     EXAMPLES: ClassVar[Path] = Path(__file__).resolve().parent.parent / "examples/data"
 
     # The specs whose photon components carry the GH #397 signature. Pinned as
-    # a count so the refactor is verifiably behaviour-preserving.
+    # a count so the refactor is verifiably behavior-preserving.
     EXPECTED_FLAGGED: ClassVar[int] = 19
 
     @staticmethod
@@ -503,7 +503,7 @@ class TestDerivationIntegrityGuard:
         """EH must pass on its merits, not by an accidental tie.
 
         The old helper summed per-term signs, so EH's two self-laplacians
-        cancelled to 0 and the caller skipped the spec. The shared layer
+        canceled to 0 and the caller skipped the spec. The shared layer
         divides by the kinetic coefficient and finds no proven conflict.
         """
         flagged = self._flagged(self.EXAMPLES)

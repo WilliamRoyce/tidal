@@ -202,7 +202,7 @@ def build_kinetic_matrix(spec: EquationSystem) -> KineticMatrix:
     with first-time-derivative couplings (e.g. the
     $\delta_1$-weighted ``gradient_z(v_X)``
     $= \partial_z\partial_t X$ terms in the R²/nonminimal
-    sectors) acquire extra columns labelled $\dot{X}$ in the
+    sectors) acquire extra columns labeled $\dot{X}$ in the
     rendered matrix.
 
     Cell semantics:

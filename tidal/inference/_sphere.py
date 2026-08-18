@@ -9,7 +9,7 @@ crowding.
 
 The geometry follows the standard cubed-sphere construction (gnomonic
 projection — Ronchi, Iacono & Paolucci 1996).  Face indexing, sub-tile
-labelling, and orientation conventions match those of the supervisor's
+labeling, and orientation conventions match those of the supervisor's
 reference implementation so per-tile outputs and labels are
 interchangeable for cross-checking.
 

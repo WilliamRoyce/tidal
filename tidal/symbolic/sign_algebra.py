@@ -863,7 +863,7 @@ def _as_constant(node: ast.expr) -> Fraction | None:
     """Return the exact rational value of *node* if it reduces to a constant.
 
     The numerator and denominator are compared as polynomials, so a symbolic
-    expression that cancels — ``(-xi)/(-xi)``, the shape a kinetic-normalised
+    expression that cancels — ``(-xi)/(-xi)``, the shape a kinetic-normalized
     self-term routinely takes — reduces to a constant even though neither side
     is one on its own.
     """
@@ -887,7 +887,7 @@ def evaluate_numeric(
     Delegates to :func:`tidal.symbolic._kinetic_eval.evaluate_with_substitutions`,
     the repository's existing restricted-AST evaluator, rather than reimplementing
     evaluation here.  ``E`` is bound to Euler's number so that ``E**u`` terms
-    from localised-background coefficients evaluate.
+    from localized-background coefficients evaluate.
 
     This result is only ever *corroboration*: it is reported alongside a
     structural verdict and never used to justify one, because a value at one
@@ -980,7 +980,7 @@ def _poly_quotient_monomial(
 ) -> tuple[Fraction, _Monomial] | None:
     """Return ``(c, m)`` if ``lhs == c * m * rhs`` for a monomial *m*, else ``None``.
 
-    This generalises :func:`_poly_quotient_constant` to the case where the two
+    This generalizes :func:`_poly_quotient_constant` to the case where the two
     polynomials differ by a common monomial factor as well as a rational one —
     ``-4*beta1^2*P`` over ``2*P`` is ``-2 * beta1^2``.  A candidate ``(c, m)``
     is *guessed* from one pair of terms and then **verified** by reconstructing

@@ -2,7 +2,7 @@
 # Phase 6.M — D1 amp at t_end=3 (perturbativity-window cross-check)
 #
 # Phase 6.L found that all v2 amp MAPs (τ=0.15) sit at the boundary
-# attractor γ_eff ≈ 0.13–0.15, so the chain's A_chain(t_end=10) factorises as
+# attractor γ_eff ≈ 0.13–0.15, so the chain's A_chain(t_end=10) factorizes as
 #
 #     A_chain(t_end) = A_static × exp(γ_eff · t_end)
 #                       │            │

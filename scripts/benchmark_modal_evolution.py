@@ -38,7 +38,7 @@ WHY (d) IS COMPETITIVE WITH EIGENDECOMPOSITION
 direct routine that avoids the iterative-action overhead — it produces
 `exp(M·dt)` in one O(bs³) call. Once `exp(M·dt)` is precomputed per mode,
 the snapshot loop becomes pure matvec at O(bs²) per snapshot per mode,
-identical in cost to eigendecomposition's vectorised einsum. The matrix
+identical in cost to eigendecomposition's vectorized einsum. The matrix
 exponential then propagates uniformly: `y[ti+1] = exp_M_dt @ y[ti]`.
 
 Path (d) is **mathematically robust for arbitrary cond(V)** (Higham 2009 §3:
@@ -93,7 +93,7 @@ def make_block(
             gap = 10 ** (-np.log10(cond_target) / 2)
             eigs[1] = eigs[0] * (1 + gap) + 1j * gap
         # Build A = P · diag(eigs) · P⁻¹ with P having the desired conditioning
-        # by skew-symmetrising a perturbed identity.
+        # by skew-symmetrizing a perturbed identity.
         P = np.eye(bs, dtype=np.complex128) + 0.3 * (
             rng.standard_normal((bs, bs)) + 1j * rng.standard_normal((bs, bs))
         )
@@ -178,7 +178,7 @@ def path_c_expm_batched(
                 dt = float(t - t0)
                 out[ti, m] = y0[m] if dt == 0.0 else expm_multiply(M * dt, y0[m])
         else:
-            # scipy's vectorised path
+            # scipy's vectorized path
             ys = expm_multiply(M, y0[m], start=t0, stop=t_end, num=n_snap)
             out[:, m, :] = ys
     return out

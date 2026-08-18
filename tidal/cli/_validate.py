@@ -149,7 +149,7 @@ def _describe_conflict(spec: EquationSystem, head: str, left: str, right: str) -
     that two components of the same tensor family carry opposite effective
     self-laplacian orientation, which for a field whose wave operator acts
     identically on every component means the export is internally inconsistent
-    -- the signature of a spec predating the GH #381 LHS normalisation fix.
+    -- the signature of a spec predating the GH #381 LHS normalization fix.
 
     Whether any resulting mode is genuinely tachyonic is a spectral question
     requiring the full kinetic and mass sectors, which this does not examine;
@@ -171,7 +171,7 @@ def _describe_conflict(spec: EquationSystem, head: str, left: str, right: str) -
         f"Field '{head}': components '{left}' and '{right}' have opposite "
         f"effective self-laplacian orientation{roles}. The wave operator acts "
         "identically on every component of a family, so this spec is "
-        "internally inconsistent -- it predates the GH #381 LHS normalisation "
+        "internally inconsistent -- it predates the GH #381 LHS normalization "
         "fix and needs re-deriving (see GH #397). This is a derivation-"
         "integrity finding, not a spectral one: use GH #360 for ghost and "
         "tachyon analysis."
@@ -220,9 +220,9 @@ def _check_temporal_component_sign(spec: object) -> list[str]:
     """Check that a tensor family's components agree in self-laplacian sign (GH #397).
 
     The wave operator acts identically on every component of a family, so once
-    each equation is normalised by its own kinetic coefficient they must share
+    each equation is normalized by its own kinetic coefficient they must share
     a self-laplacian orientation.  Pre-GH-#381 exports left the temporal
-    component un-normalised (``lhsCoeff = -1`` never divided through), giving
+    component un-normalized (``lhsCoeff = -1`` never divided through), giving
     ``d2_t a_0 = -laplacian a_0`` while ``a_1..a_3`` kept ``+laplacian``.
 
     Reports a **derivation-integrity** defect -- an internally inconsistent
@@ -231,7 +231,7 @@ def _check_temporal_component_sign(spec: object) -> list[str]:
     mass sectors; see GH #360 (PSALTer) for that work.
 
     All reasoning is delegated to
-    :func:`tidal.symbolic.spec_query.sibling_sign_conflicts`, which normalises
+    :func:`tidal.symbolic.spec_query.sibling_sign_conflicts`, which normalizes
     by the kinetic coefficient, sums every matching term, and reports a
     conflict only when the opposing sign is *proven* -- returning nothing
     rather than guessing when it cannot decide.  This guard previously carried
@@ -496,7 +496,7 @@ def validate_command(args: Namespace) -> int:
 
     # Check 5c: Derivation-integrity guards.  Both catch defects that are
     # silent at derivation time and only surface as wrong physics later --
-    # a dropped sqrt|g| measure (#394) and an un-normalised temporal
+    # a dropped sqrt|g| measure (#394) and an un-normalized temporal
     # component (#397).
     errors.extend(_check_volume_element_consistency(spec))
     errors.extend(_check_temporal_component_sign(spec))

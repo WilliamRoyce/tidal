@@ -489,7 +489,7 @@ class TestFormulaSandbox:
         assert np.all(np.isfinite(result))
 
     def test_numpy_module_is_not_reachable(self) -> None:
-        """The namespace holds a shim, not numpy — defence beyond validation."""
+        """The namespace holds a shim, not numpy — defense beyond validation."""
         import types
 
         from tidal.cli._simulate import FORMULA_NAMESPACE

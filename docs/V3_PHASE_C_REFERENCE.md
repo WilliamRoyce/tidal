@@ -23,12 +23,12 @@ The cubed-sphere chart is initially confusing because the face panels' axes are 
 
 **3. Radial projection cube → sphere (gnomonic).** For each point on the cube surface, draw a ray from the origin through it and record where it hits the unit sphere. That hit is the corresponding point on `S^(N-1)`. Each face's `[-1, 1]^(N-1)` cube patch becomes a quasi-rectilinear chart of the sphere region "where coupling k dominates with sign ±". The 2N face charts together cover the whole sphere with mostly-uniform spacing — that's the cubed-sphere's selling point over latitude/longitude (which crowds at the poles).
 
-**4. What each face panel shows.** For Face 1 ↑, the panel's axes are the face-local cube coordinates `chi_1^{1↑}` through `chi_{N-1}^{1↑}`, each in `[-1, 1]`. A 2D KDE filled contour `chi_2^{1↑}` vs `chi_1^{1↑}` shows the marginal posterior at positions on the cube face — i.e., what direction-on-the-sphere-near-the-+x_1-pole the sampler concluded was favoured. Reading a contour peak at `(chi_1, chi_2, chi_3, chi_4, chi_5) = (0.3, -0.5, 0.1, 0.2, 0)` on Face 1 ↑ means: build the cube vector `(+1, 0.3, -0.5, 0.1, 0.2, 0)`, normalise to unit length, that's the favoured `theta_hat` — corresponding to physical-coupling *relative pattern* `(0.847, 0.254, -0.423, 0.085, 0.169, 0)`.
+**4. What each face panel shows.** For Face 1 ↑, the panel's axes are the face-local cube coordinates `chi_1^{1↑}` through `chi_{N-1}^{1↑}`, each in `[-1, 1]`. A 2D KDE filled contour `chi_2^{1↑}` vs `chi_1^{1↑}` shows the marginal posterior at positions on the cube face — i.e., what direction-on-the-sphere-near-the-+x_1-pole the sampler concluded was favored. Reading a contour peak at `(chi_1, chi_2, chi_3, chi_4, chi_5) = (0.3, -0.5, 0.1, 0.2, 0)` on Face 1 ↑ means: build the cube vector `(+1, 0.3, -0.5, 0.1, 0.2, 0)`, normalize to unit length, that's the favored `theta_hat` — corresponding to physical-coupling *relative pattern* `(0.847, 0.254, -0.423, 0.085, 0.169, 0)`.
 
 **5. What the axes' "scales" mean.** The face-local axes are NOT individual coupling values — they are cube chart coordinates with fixed range `[-1, 1]` per axis. To recover individual physical couplings `c_i` from a sample at position `chi` on Face k ↑/↓:
 
 1. Build the cube vector `v` with `v_k = ±1` and `v_j = chi_j^{k±}` for the other N-1 slots.
-2. Normalise: `theta_hat = v / |v|`.
+2. Normalize: `theta_hat = v / |v|`.
 3. Multiply by the magnitude: `c = r · theta_hat`.
 
 So `c_i = r · v_i / |v|`. The chi axes encode the *relative* sign-and-weight of each coupling; the dominant coupling's contribution to `theta_hat` is `±1/|v|`. The inverse direction (chain → face-local chi) is implemented in `tidal.inference._atlas._physical_to_face_local`.
@@ -38,7 +38,7 @@ So `c_i = r · v_i / |v|`. The chi axes encode the *relative* sign-and-weight of
 **Concrete example for N=6.** Suppose the chain finds two distinct regions:
 
 - Peak A: `c = (1.0, 0.2, -0.3, 0, 0, 0)` → `r_A ≈ 1.063`, `theta_hat_A ≈ (0.941, 0.188, -0.282, 0, 0, 0)`. Dominant axis +x_1 → lives on Face 1 ↑ at face coords `(0.2, -0.3, 0, 0, 0)`. KDE peak there.
-- Peak B: `c = (0, 0, 0, 0, 0, 5.0)` → `r_B = 5.0`, `theta_hat_B = (0, 0, 0, 0, 0, +1)`. Dominant axis +x_6 → lives on Face 6 ↑ at face coords `(0, 0, 0, 0, 0)` (face centre). KDE peak at the centre.
+- Peak B: `c = (0, 0, 0, 0, 0, 5.0)` → `r_B = 5.0`, `theta_hat_B = (0, 0, 0, 0, 0, +1)`. Dominant axis +x_6 → lives on Face 6 ↑ at face coords `(0, 0, 0, 0, 0)` (face center). KDE peak at the center.
 - The `log r` posterior is bimodal: hump at `log 1.063 ≈ 0` and hump at `log 5 ≈ 0.7`.
 
 You read the science off the joint plot: **which face panels show density** = which coupling-direction combinations the sampler likes; **the 1D `log r` plot** = at what overall strength. Faces with no density = sphere regions the chain ruled out.
@@ -60,7 +60,7 @@ Per the supervisor's two-message reply (10 May 2026) — initial directive then 
 - **Standard kinetic prefactors (Einstein-Hilbert, Maxwell)** are **carved out** of the sphere. This is a deliberate dimensionality reduction (walltime win); the physical roles of these couplings are well-established, so spending sphere dimensions on them costs nothing scientific.
 - **All non-standard / BSM operators** go on the cubed-sphere on equal footing. No further grouping by symmetry class, SPO sector, or parity. Physical meaning of each BSM coupling emerges from the sampling outcomes.
 
-In current TIDAL practice, the carve-out is *already realised*: `kappa` lives in the `[constants]` block of theory TOMLs fixed at 1.0, and the Maxwell term is hard-coded as `-1/4 F_{ab} F^{ab}` with no free prefactor. Current campaign scripts (e.g. `scripts/hpc_submit_drafts/d1_*.sh`) only `--prior` over the BSM couplings. The cubed-sphere prior shipped here therefore operates over *exactly* the set of couplings that already get `--prior` flags.
+In current TIDAL practice, the carve-out is *already realized*: `kappa` lives in the `[constants]` block of theory TOMLs fixed at 1.0, and the Maxwell term is hard-coded as `-1/4 F_{ab} F^{ab}` with no free prefactor. Current campaign scripts (e.g. `scripts/hpc_submit_drafts/d1_*.sh`) only `--prior` over the BSM couplings. The cubed-sphere prior shipped here therefore operates over *exactly* the set of couplings that already get `--prior` flags.
 
 ## Drop-in replacement for current `--prior` blocks
 
@@ -95,7 +95,7 @@ Items the parallel agent should **keep** on their plan:
 
 - Phase A.2 per-param `arctan_uniform` rewrites — separate stopgap; both compactifications coexist, campaigns choose `--prior` (A.2 path) or `--joint-prior` (this) per run.
 - Phase A.3 corner-plot upper-triangle hide at `tidal/inference/_visualize.py:758-789` — orthogonal to atlas plot; still relevant for non-cubed-sphere posteriors.
-- Phases A.0 GitHub issues, A.1 soft-penalty refactor, A.4 tests, A.5 D1 v1 replay, A.6 commit/version bump, A-γ γ_conversion, B campaign re-runs, D manuscript, E localised geometry — untouched.
+- Phases A.0 GitHub issues, A.1 soft-penalty refactor, A.4 tests, A.5 D1 v1 replay, A.6 commit/version bump, A-γ γ_conversion, B campaign re-runs, D manuscript, E localized geometry — untouched.
 
 ## Verification
 

@@ -648,7 +648,7 @@ def _gaussian_slots(  # noqa: PLR0913, PLR0917
 ) -> dict[str, np.ndarray]:
     """Compute Gaussian IC as slot_data dict.
 
-    When ``--ic-wavevector`` is provided, creates a travelling wave packet:
+    When ``--ic-wavevector`` is provided, creates a traveling wave packet:
     a Gaussian envelope modulated by a carrier wave, with matching velocity
     for unidirectional propagation.  Positive wavevector gives a right-mover.
 
@@ -741,7 +741,7 @@ def _snap_wavevector_to_grid(
         # The Nyquist mode itself aliases (cos(π·n) = (-1)^n) and carries no
         # directional information for real signals, so we exclude it by using
         # n_pts // 2 - 1 as the cap.  For n_pts=2 the clamp degenerates to
-        # {-0, 0} which keeps the zero-mode behaviour for trivial grids.
+        # {-0, 0} which keeps the zero-mode behavior for trivial grids.
         n_max = max(0, n_pts // 2 - 1)
         n_target = round(k_req / dk)
         n_clamped = max(-n_max, min(n_max, n_target))
@@ -773,7 +773,7 @@ def _plane_wave_slots(  # noqa: PLR0913, PLR0917
     On periodic axes, ``--ic-wavevector`` is automatically snapped to the
     nearest discrete Fourier mode to eliminate spectral leakage (which can
     excite tachyonic modes at unintended k-values, e.g. in PGT torsion
-    models).  Override with ``--ic-no-snap`` to keep the legacy behaviour
+    models).  Override with ``--ic-no-snap`` to keep the legacy behavior
     where ``cos(k·x)`` is evaluated verbatim at grid points.
     """
     if args.ic_wavevector is not None:
@@ -823,7 +823,7 @@ def _formula_slots(
     """Compute formula-based IC as slot_data dict.
 
     Supports optional ``--ic-formula-velocity`` for setting the velocity
-    slot alongside the field, enabling custom travelling wave ICs.
+    slot alongside the field, enabling custom traveling wave ICs.
 
     Raises
     ------
@@ -1619,7 +1619,7 @@ def _setup_memory_accumulator_native(  # noqa: PLR0913, PLR0917
 
     Produces an :class:`InMemoryAccumulator` and a ``(t, y_flat, yp_flat)``
     callback that writes to it.  Intended for the inference likelihood
-    path: the accumulator is materialised into a ``SimulationData`` at
+    path: the accumulator is materialized into a ``SimulationData`` at
     the end of ``_simulate`` and never touches disk.
     """
     from tidal.measurement._writer import InMemoryAccumulator, compute_snapshot_count
@@ -2207,7 +2207,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
             log("  Note: IDA requires FD operators; spectral auto-disabled")
         elif args.scheme == "auto":
             # User explicitly requested --spectral, scheme auto-selected IDA
-            # → switch to CVODE to honour spectral request
+            # → switch to CVODE to honor spectral request
             scheme = "cvode"
             log("  Note: --spectral incompatible with IDA; switching to CVODE")
         else:

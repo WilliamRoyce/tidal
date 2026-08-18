@@ -1,4 +1,4 @@
-# Benchmark scripts for publication artefacts
+# Benchmark scripts for publication artifacts
 
 Each script in this directory measures one quantity used by an App C figure
 or table in the manuscript. The convention mirrors `scripts/figures/`:
@@ -48,6 +48,6 @@ gesture is what changes the appendix.
 
 Benchmark reruns can be slow (minutes). Figure/table regeneration must be
 fast (seconds) so reviewers regenerating from a fresh checkout get the
-same artefacts without paying the benchmark cost. The committed canonical
+same artifacts without paying the benchmark cost. The committed canonical
 JSON is the single source of truth; benchmark scripts exist to reproduce
 those numbers, not to be re-run on every figure build.

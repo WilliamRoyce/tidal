@@ -10,7 +10,7 @@ Key workstreams since the last meeting:
 
 1. **Survey progress and roadmap.** The effective dark-photon model, the minimal Einstein-Cartan theory, the Ricci-EM model, and the entire propagating-torsion nonminimal sector (five nested sub-theories up to the full 9-D joint) are complete. Parity-odd, complete-PGT, and higher-curvature EM remain.
 2. **Perturbative reduction — major new research direction.** Handling theories with higher-derivative corrections required developing a novel approach after all standard Hamiltonian methods failed. The equations of motion can now be solved correctly without ghost contamination. For the specific case where the small parameter promotes a non-dynamical field to dynamical, however, the measurement and inference pipeline has not yet been extended — so physics results from that class remain outstanding.
-3. **Stability filtering in the linearised regime — open question.** A key methodological decision was made to exclude exponentially-growing modes from the inference. But the physical validity of that choice is an open question.
+3. **Stability filtering in the linearized regime — open question.** A key methodological decision was made to exclude exponentially-growing modes from the inference. But the physical validity of that choice is an open question.
 4. **Practice talk written.** The talk is now ready to schedule and give.
 
 ---
@@ -29,7 +29,7 @@ The three torsion-mass invariants $\alpha_{1,2,3}$ plus a single nonminimal coup
 
 | Run      | $\log Z$          | joint $D_{\rm KL}$ | Posterior signal                                                                                                |
 | -------- | ----------------- | ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| Amplify  | $-2.26 \pm 0.07$  | 1.79 nats          | $A_{\max}=1.26$; Bayes factor 0.10 vs null — **model disfavoured 10:1 for amplification**                       |
+| Amplify  | $-2.26 \pm 0.07$  | 1.79 nats          | $A_{\max}=1.26$; Bayes factor 0.10 vs null — **model disfavored 10:1 for amplification**                       |
 | Suppress | $+15.92 \pm 0.13$ | 8.91 nats          | $A_{\min} \approx 4\times 10^{-12}$ at MAP; valley reaches $\sim 5\times 10^{-9}$ across $(\alpha_i, \delta_1)$ |
 
 - $\delta_1$'s marginal $D_{\rm KL}$ is **96% of the joint** in amplify — a single coupling carries the entire signal. In suppress, $\delta_1$ leads but $\alpha_{1,2,3}$ each contribute $\sim 0.25$–$0.30$ nats: the deepest suppression valley needs all four parameters to coordinate.
@@ -42,7 +42,7 @@ The three torsion-mass invariants $\alpha_{1,2,3}$ plus a single nonminimal coup
 
 ### Theory partition
 
-Organising the completed theories by whether torsion propagates and whether nonminimal couplings are present gives a useful summary of results so far:
+Organizing the completed theories by whether torsion propagates and whether nonminimal couplings are present gives a useful summary of results so far:
 
 |                                      | constraint torsion       | propagating torsion                              |
 | ------------------------------------ | ------------------------ | ------------------------------------------------ |
@@ -127,17 +127,17 @@ The torsion trace vector acts as a Proca dark photon kinetically mixed with the 
 
 ---
 
-## 3. Stability filtering in the linearised regime
+## 3. Stability filtering in the linearized regime
 
-To run inference on the Ricci-EM class we had to address a fundamental issue: the Padé matrix-exponential that evaluates the field equations is robust for well-conditioned systems, but the eigendecomposition-based path used previously catastrophically rejected all parameter points in the Ricci-EM prior (including physically clean ones) due to ill-conditioning. After switching to a conditioning-robust method, the approach is to compute the growth rate of the solution directly and _exclude_ any parameter point where the linearised fields grow exponentially.
+To run inference on the Ricci-EM class we had to address a fundamental issue: the Padé matrix-exponential that evaluates the field equations is robust for well-conditioned systems, but the eigendecomposition-based path used previously catastrophically rejected all parameter points in the Ricci-EM prior (including physically clean ones) due to ill-conditioning. After switching to a conditioning-robust method, the approach is to compute the growth rate of the solution directly and _exclude_ any parameter point where the linearized fields grow exponentially.
 
 This choice — excluding samples with any exponential growth above a threshold — enabled all the Ricci-EM results above. But it raises a question worth discussing:
 
-**Physical question**: In the linearised regime, an exponentially growing mode will eventually violate the linearisation assumption ($\delta g \ll g_{\rm background}$). But should all such modes be discarded? One could argue:
+**Physical question**: In the linearized regime, an exponentially growing mode will eventually violate the linearization assumption ($\delta g \ll g_{\rm background}$). But should all such modes be discarded? One could argue:
 
-- Large amplification of the Gertsenshtein signal may _require_ some resonant growth to accumulate — the very mechanism by which the photon channel is enhanced might look like tachyonic instability in the linearised equations.
-- Some apparent instabilities may be artefacts of the linearised approximation that are cut off in the full nonlinear theory (e.g. by backreaction on the background field, or by nonlinear saturation).
-- There may be a middle ground: instabilities that grow slowly enough that the linearised solution remains valid over the physical propagation length of interest, and for which the accumulated conversion is what we actually want to measure.
+- Large amplification of the Gertsenshtein signal may _require_ some resonant growth to accumulate — the very mechanism by which the photon channel is enhanced might look like tachyonic instability in the linearized equations.
+- Some apparent instabilities may be artifacts of the linearized approximation that are cut off in the full nonlinear theory (e.g. by backreaction on the background field, or by nonlinear saturation).
+- There may be a middle ground: instabilities that grow slowly enough that the linearized solution remains valid over the physical propagation length of interest, and for which the accumulated conversion is what we actually want to measure.
 
 Currently we treat any growth rate above $\sim 0.15\,\text{s}^{-1}$ as unphysical and return $\log\mathcal{L} = -\infty$. The question is whether this threshold is too conservative, and whether some of the discarded parameter space represents genuine physics.
 
@@ -181,17 +181,17 @@ The talk covering this project has been written and is ready to schedule. The st
 
 ### 1. Stability filtering — how conservative should we be?
 
-We currently exclude all parameter points where linearised fields grow exponentially above a threshold. This enabled the Ricci-EM inference results. But:
+We currently exclude all parameter points where linearized fields grow exponentially above a threshold. This enabled the Ricci-EM inference results. But:
 
 - [ ] Can large amplification of the Gertsenshtein signal occur _without_ some resonant growth? If the conversion mechanism is fundamentally a resonance, the very signal we are looking for might live in the excluded region.
-- [ ] Are some of the apparent instabilities artefacts of the linearised approximation, stopped by nonlinear effects in the full theory?
-- [ ] Is there a physically motivated threshold below which growth is acceptable — e.g. growth slow enough that amplitudes remain in the linearised regime over the propagation distance?
+- [ ] Are some of the apparent instabilities artifacts of the linearized approximation, stopped by nonlinear effects in the full theory?
+- [ ] Is there a physically motivated threshold below which growth is acceptable — e.g. growth slow enough that amplitudes remain in the linearized regime over the propagation distance?
 
 ### 2. Is a Hamiltonian analysis possible at all for the constraint-promotion case?
 
 As described in §4, both JLM substitution and LPS/Dirac–Bergmann fail on the constraint-promotion case ($b_5\tilde R^2$ PGT: h₄, h₇, h₉ becoming dynamical). The failure is not a matter of practical complexity — it is structural. Blagojević and Cvetković (2018) prove it explicitly: "the expressions for $c_n$ when $\bar{b} = 0$ cannot be obtained by taking the limit $\bar{b} \to 0$ of the generic result" — the perturbative Hamiltonian does not exist in this limit.
 
-This has been identified as a named open problem three times in 25 years (Blagojević–Nikolić 1983; Yo–Nester–Ni 1999–2002; Blagojević–Cvetković 2018). We have the Duhamel-source equations of motion (ghost-free, numerically verified to $10^{-12}$), but without a Hamiltonian we have no formal ghost-freedom guarantee beyond leading order and no proper degree-of-freedom count. The most promising lead in the literature is Lyakhovich (2021, arXiv:2102.10579), which has an existence theorem for a generalised Stückelberg recipe — but it has not been applied to PGT curvature-squared theories.
+This has been identified as a named open problem three times in 25 years (Blagojević–Nikolić 1983; Yo–Nester–Ni 1999–2002; Blagojević–Cvetković 2018). We have the Duhamel-source equations of motion (ghost-free, numerically verified to $10^{-12}$), but without a Hamiltonian we have no formal ghost-freedom guarantee beyond leading order and no proper degree-of-freedom count. The most promising lead in the literature is Lyakhovich (2021, arXiv:2102.10579), which has an existence theorem for a generalized Stückelberg recipe — but it has not been applied to PGT curvature-squared theories.
 
 - [ ] Do you know of any framework that handles the case where the number of dynamical degrees of freedom changes order-by-order in perturbation theory? Is there a route — even in principle — to perform a Hamiltonian analysis for this class?
 

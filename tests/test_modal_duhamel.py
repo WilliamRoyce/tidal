@@ -240,7 +240,7 @@ class TestPass1Resonance:
     """Phase 6C.3 (renamed R5.3 / #282): Pass 1 kernel stability when the
     correction source resonates with the base eigenfrequency.
 
-    Pre-R5.3 this class was mis-labelled ``TestPass1NearDegeneracy``,
+    Pre-R5.3 this class was mis-labeled ``TestPass1NearDegeneracy``,
     but it actually tests *resonance* (correction sources a mode that
     matches the base frequency), not *near-degeneracy* (two base
     eigenvalues close to each other). They are unrelated in general.
@@ -270,7 +270,7 @@ class TestPass1Resonance:
         base_spec = spec.filter_by_order(0)
         correction_spec = spec.filter_by_order(1)
 
-        # Large t to stress the long-time behaviour.
+        # Large t to stress the long-time behavior.
         t_end = 5.0
         pass0 = cast(
             "dict[str, Any]",
@@ -858,7 +858,7 @@ class TestPass1TimeDerivativeTargetingDynamical:
         rel_err = max_diff / (max_analytic + 1e-30)
 
         # O(γ²) truncation error is ~gamma² = 1e-6 relative; allow 1e-3
-        # to tolerate the Duhamel snapshot discretisation.
+        # to tolerate the Duhamel snapshot discretization.
         assert rel_err < 1e-3, (
             f"Pass 1 first_derivative_t correction does not match the "
             f"damped-oscillator expansion. max_diff={max_diff:.3e}, "

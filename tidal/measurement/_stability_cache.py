@@ -9,7 +9,7 @@ recomputes a handful of structural objects on every call:
 
 None of these depend on the parameter dict.  In an MCMC chain with
 ~10⁵ probe calls per worker, recomputing them on every call is pure
-overhead.  This module memoises them per ``(id(spec), grid-tuple,
+overhead.  This module memoizes them per ``(id(spec), grid-tuple,
 source)`` so subsequent calls are O(dict-lookup).
 
 Performance budget contributions (measured at the

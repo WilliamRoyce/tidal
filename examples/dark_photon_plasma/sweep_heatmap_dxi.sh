@@ -61,7 +61,7 @@ tidal sweep "${SPEC}" \
 echo ""
 echo "--- Generating plots ---"
 
-# 2D heatmap coloured by amplification A
+# 2D heatmap colored by amplification A
 tidal plot "${OUTPUT}" --type sweep \
   --metric A \
   --baseline-formula "sin(kappa * B0 * ${T_END} / 2)**2" \

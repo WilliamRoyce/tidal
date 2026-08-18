@@ -4,10 +4,10 @@ The v3 architecture (post-2026-05-08 supervisor pivot, see
 ``docs/V3_ARCHITECTURE.md``) defaults to ``permissive=True``: the pre-flight
 tachyonic probe runs as a metadata measurement only — its verdict no longer
 gates samples.  ``--gated`` (i.e. ``permissive=False``) preserves the v2 /
-canonical-probe hard-rejection behaviour for reproducibility.
+canonical-probe hard-rejection behavior for reproducibility.
 
 These tests verify the LikelihoodConfig surface and parser plumbing; the
-end-to-end behaviour with a real simulation lives in the integration suite.
+end-to-end behavior with a real simulation lives in the integration suite.
 """
 
 from __future__ import annotations
@@ -109,7 +109,7 @@ class TestParseLikelihoodPlumbing:
 class TestRunStatusTags:
     """Document the distinct ``run_status`` tags surfaced by v3.
 
-    These are smoke checks — the actual tagging behaviour exercises the
+    These are smoke checks — the actual tagging behavior exercises the
     full simulation pipeline and lives in the integration tests.  Here we
     just enumerate the tags so the v3 architecture's commitment to
     distinct post-chain filtering is documented in code.

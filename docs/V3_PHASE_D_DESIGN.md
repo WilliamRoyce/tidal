@@ -51,7 +51,7 @@ Updates needed:
 
 - Acknowledge the methodology shift in framing (v2 chains conditioned on stability; v3 integrates over wider support)
 - Address the **log Z incomparability across architectures** (footnote: v3 includes prior support v2 excluded, so log Z differences mix posterior shape with prior compactness)
-- The supervisor's framing question: when the v3 architecture admits previously-rejected regions, what does the resulting posterior *mean* physically? Discussion section is where the linearised-theory-validity caveats appear
+- The supervisor's framing question: when the v3 architecture admits previously-rejected regions, what does the resulting posterior *mean* physically? Discussion section is where the linearized-theory-validity caveats appear
 - If Phase E results are in: discuss geometry-dependence and which numbers headline
 - If Phase A-γ results are in: discuss γ_conversion as a fast proxy and its validation
 
@@ -87,18 +87,18 @@ Live exemplar: [docs/comparison/d1_amp_v2_v3.md](comparison/d1_amp_v2_v3.md).
 
 - Compute per-coupling D_KL shift `|D_KL_E - D_KL_B|` per coupling
 - If max shift < 0.5 nats: Phase B (plane-wave) numbers headline; Phase E appears as appendix sanity-check
-- If max shift ≥ 0.5 nats: Phase E (localised wavepacket) numbers headline; Phase B appears as plane-wave-conditioned reference
+- If max shift ≥ 0.5 nats: Phase E (localized wavepacket) numbers headline; Phase B appears as plane-wave-conditioned reference
 
 **If Phase E does not land before submission:**
 
 - Phase B numbers headline with explicit "plane-wave geometry" qualifier in §results
-- Discussion section explicitly flags the unbounded-growth artefact for tachyonic samples (γ_eff·t_end exponential) as a known limitation to be resolved by Phase E in follow-up work
+- Discussion section explicitly flags the unbounded-growth artifact for tachyonic samples (γ_eff·t_end exponential) as a known limitation to be resolved by Phase E in follow-up work
 
 ## Chain-pull workflow (post-HPC-job)
 
 Every HPC chain that lands must be processed through the same workflow to ensure consistency:
 
-1. **Pull artefacts**: `bash scripts/hpc_shuttle.sh pull <jobid> --src /rds/user/wr286/hpc-work/tidal/hpc_results/<jobid>/<chain_name>` → drops files in `hpc_results/<jobid>/`
+1. **Pull artifacts**: `bash scripts/hpc_shuttle.sh pull <jobid> --src /rds/user/wr286/hpc-work/tidal/hpc_results/<jobid>/<chain_name>` → drops files in `hpc_results/<jobid>/`
 2. **Generate corner plot** (mandatory): `uv run tidal plot hpc_results/<jobid> --type corner --show-rejected-prior --output hpc_results/<jobid>/corner_v3.png`
 3. **Verify chain health**: inspect `inference.json` (log Z, ESS, MAP, per-coupling D_KL) and `results.csv` for `run_status` fraction breakdown — flag any > 5% non-success fraction (excluding `below_noise_floor`)
 4. **Generate v2-vs-v3 comparison** (when v2 reference exists): `uv run python scripts/v3_v2_comparison.py --v2 hpc_results/<v2_jobid> --v3 hpc_results/<v3_jobid> --label "<model>" --output docs/comparison/<model>_v2_v3.md`

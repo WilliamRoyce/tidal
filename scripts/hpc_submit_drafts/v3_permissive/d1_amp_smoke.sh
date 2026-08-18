@@ -8,7 +8,7 @@
 #   * Four run_status fractions logged; any > 30% → investigate before Phase B.2.
 #
 # v3 architecture (post-2026-05-08 supervisor pivot):
-#   * Probe is metadata only (no gate); --gated would re-enable v2 behaviour.
+#   * Probe is metadata only (no gate); --gated would re-enable v2 behavior.
 #   * No Hwang-Noh perturbativity gate; no upper P_max cap.
 #   * Soft floor logL = -100 + Normal(0, 1.0) for sim failure / NaN / exception.
 #   * Compactified priors via arctan_uniform (full real line, Cauchy density at 0).

@@ -196,7 +196,7 @@ class TestStageCTruthTable:
 
 
 @pytest.mark.slow
-class TestProbeBehaviour:
+class TestProbeBehavior:
     @pytest.fixture(scope="class")
     def d1(self) -> tuple[EquationSystem, GridInfo]:
         return _load_d1()

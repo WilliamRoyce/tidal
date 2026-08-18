@@ -160,7 +160,7 @@ no successor module. Issues [#73] and [#78] are closed accordingly.
 | Simulation progress bar — tqdm-based `SimulationProgress` class, auto-suppressed in sweep inner runs | ✅ Complete |
 | Simulation resume — `--resume DIR [--snapshot N] [--t-additional T]` checkpoint loading | ✅ Complete |
 | Gertsenshtein effect (Phase D) — graviton-photon conversion validated: uniform B₀ (sin²(κB₀t/2)), localized Gaussian (Boccaletti formula). **Torsion-independence proven**: minimal PGT coupling cannot amplify Gertsenshtein for any vacuum GW (#199, #200) | ✅ Complete |
-| Torsion-Gertsenshtein investigation — combined PGT+EM theory (23 components), polarisation block-diagonal structure, field-filtered energy measurement for Ostrogradsky theories | ✅ Complete |
+| Torsion-Gertsenshtein investigation — combined PGT+EM theory (23 components), polarization block-diagonal structure, field-filtered energy measurement for Ostrogradsky theories | ✅ Complete |
 
 ---
 
@@ -255,7 +255,7 @@ Issues should be tagged with appropriate labels:
    - Yang-Mills equations (linearized sector)
    - SU(2) and SU(3) gauge groups
 
-4. **Spectral Spatial Discretisation (Phase E)** — ✅ FFT COMPLETE
+4. **Spectral Spatial Discretization (Phase E)** — ✅ FFT COMPLETE
    - ~~FFT-based operators for exponential convergence on periodic domains~~ **Done** (`--spectral`, auto-enabled for all-periodic BCs)
    - Chebyshev for non-periodic directions (following Dedalus architecture) — remaining
 

@@ -2052,7 +2052,7 @@ class TestCanonicalStructure:
 
         Backward-compat path: a term with coefficient_symbolic but no
         explicit order_in_eps gets order=1 (matches the pre-Phase-1
-        behaviour and is correct for current EH).
+        behavior and is correct for current EH).
         """
         from tidal.symbolic.json_loader import HamiltonianTerm
 

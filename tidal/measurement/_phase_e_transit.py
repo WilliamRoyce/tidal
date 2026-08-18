@@ -233,9 +233,9 @@ def compute_transit_diagnostics(  # noqa: PLR0913, PLR0914
     # Post-transit window: ±3·sigma_w around the wavepacket center at
     # t_check_2. With c=1 group velocity for relativistic GWs, center is
     # at x_c + t_check_2. Clamp to box so we never sample beyond [0, L].
-    centre_t2 = x_c + t_check_2
-    post_lo = max(0.0, centre_t2 - 3.0 * sigma_w)
-    post_hi = min(L, centre_t2 + 3.0 * sigma_w)
+    center_t2 = x_c + t_check_2
+    post_lo = max(0.0, center_t2 - 3.0 * sigma_w)
+    post_hi = min(L, center_t2 + 3.0 * sigma_w)
     norm_ic = _integrate_norm_window(src_ic, z, ic_lo, ic_hi)
     norm_post = _integrate_norm_window(src_t2, z, post_lo, post_hi)
     norm_ratio = norm_post / norm_ic if norm_ic > 0 else float("nan")

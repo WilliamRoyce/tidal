@@ -1080,7 +1080,7 @@ class EquationSystem:
         ``mass_sym = 'B0^2/8'``. A caller applying the numeric convention to the
         symbolic matrix gets the sign wrong; negate it explicitly.
 
-        Neither matrix is normalised by the LHS ``kinetic_coefficient_symbolic``.
+        Neither matrix is normalized by the LHS ``kinetic_coefficient_symbolic``.
         For an effective mass², divide by it; see
         :func:`tidal.symbolic.spec_query.effective_coefficient`, which is the
         one implementation of that (#237, #258, #302).

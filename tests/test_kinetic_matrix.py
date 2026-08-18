@@ -103,7 +103,7 @@ class TestBaselineKineticMatrix:
 
 @_needs_baseline
 class TestKineticMatrixToLatex:
-    """The rendered LaTeX uses a labelled array and includes the expected entries."""
+    """The rendered LaTeX uses a labeled array and includes the expected entries."""
 
     def test_baseline_render(self) -> None:
         import tidal.symbolic.latex as latex_mod
@@ -122,7 +122,7 @@ class TestKineticMatrixToLatex:
             latex_mod._metric_symbol = saved_metric
 
         assert r"\mathcal{K}" in out
-        # Labelled array wrapper (replaces the earlier bare bmatrix).
+        # Labeled array wrapper (replaces the earlier bare bmatrix).
         assert r"\begin{array}" in out
         assert r"\end{array}" in out
         # Gertsenshtein off-diagonal: -B_0 ∂_z (after axis remap to z).

@@ -198,7 +198,7 @@ def _evaluate_sweep_overlay(
 
 
 # ------------------------------------------------------------------
-# Colour norm and quality overlay helpers
+# Color norm and quality overlay helpers
 # ------------------------------------------------------------------
 
 
@@ -269,7 +269,7 @@ def _overlay_quality_hatching(
             q = str(quality_grid[i2, i1])
             if q not in hatch_map:
                 continue
-            # Cell bounds: nearest shading means centred on (p1[i1], p2[i2])
+            # Cell bounds: nearest shading means centered on (p1[i1], p2[i2])
             w = float(dp1[min(i1, len(dp1) - 1)])
             h = float(dp2[min(i2, len(dp2) - 1)])
             x0 = float(p1_vals[i1]) - w / 2
@@ -941,7 +941,7 @@ def _render_2d_grid(  # noqa: PLR0913, C901
             handles=[
                 Patch(
                     facecolor="white",
-                    edgecolor="grey",
+                    edgecolor="gray",
                     hatch="///",
                     label="Diverged / invalid",
                 ),
@@ -969,7 +969,7 @@ def render_sweep_2d_with_overlay(
     Creates three side-by-side pcolormesh panels so that the TIDAL
     simulation result can be directly compared against an analytical
     reference formula.  The TIDAL and analytical panels share the same
-    colour scale; the error panel uses a separate sequential colourmap.
+    color scale; the error panel uses a separate sequential colormap.
 
     Parameters
     ----------
@@ -985,7 +985,7 @@ def render_sweep_2d_with_overlay(
         as scalar variables.  Example:
         ``'sin(kappa * Bpeak * R * sqrt(pi/2))**2'``.
     log_scale : bool
-        Use logarithmic colour scale for numerical and analytical panels.
+        Use logarithmic color scale for numerical and analytical panels.
 
     Raises
     ------
@@ -1025,7 +1025,7 @@ def render_sweep_2d_with_overlay(
     # Absolute error
     z_err = np.abs(z_num - z_anal)
 
-    # Shared colour scale for numerical + analytical panels
+    # Shared color scale for numerical + analytical panels
     valid = z_num[np.isfinite(z_num)]
     if log_scale:
         valid = valid[valid > 0]
@@ -1340,7 +1340,7 @@ def render_sweep_parallel(
     draw on top.  Alpha and linewidth scale with distance from median to
     emphasize extreme (most interesting) values.
 
-    Diverged runs (NaN metric) are drawn as dashed grey lines so they
+    Diverged runs (NaN metric) are drawn as dashed gray lines so they
     still show which parameter regions are unstable.
 
     Parameters
@@ -1388,7 +1388,7 @@ def render_sweep_parallel(
         raw = np.array(results.column(name), dtype=np.float64)
         axis_data.append(_safe_normalize(raw))
 
-    # Draw diverged runs first (background, dashed grey)
+    # Draw diverged runs first (background, dashed gray)
     for idx in np.where(~ok_mask)[0]:
         coords = [float(axis_data[a][idx]) for a in range(len(axis_names))]
         # Replace NaN coordinate (metric axis) with 0 so line is visible
@@ -1483,7 +1483,7 @@ def _render_tornado_correlation(
     Bars are colored by statistical significance:
     - Deep red (p < 0.001): highly significant
     - Orange (p < 0.05): significant
-    - Grey: not significant
+    - Gray: not significant
 
     Significance stars are shown next to bar labels.
     """
@@ -1635,7 +1635,7 @@ def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0915
     Diagonal cells show each parameter vs the metric (marginal relationship).
     Off-diagonal cells show pairwise parameter scatter, colored by metric.
 
-    Diverged runs (NaN metric) are plotted as grey 'x' markers so they
+    Diverged runs (NaN metric) are plotted as gray 'x' markers so they
     still map the instability boundary without dominating the color scale.
 
     Parameters
@@ -1719,7 +1719,7 @@ def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0915
                         alpha=0.7,
                         edgecolors="none",
                     )
-                # Diverged runs: grey x markers
+                # Diverged runs: gray x markers
                 if np.any(~ok_mask):
                     ax.scatter(
                         vals[~ok_mask],
@@ -1759,7 +1759,7 @@ def render_sweep_scatter(  # noqa: C901, PLR0912, PLR0913, PLR0915
                         alpha=0.7,
                         edgecolors="none",
                     )
-                # Diverged runs: grey x markers
+                # Diverged runs: gray x markers
                 if np.any(~ok_mask):
                     ax.scatter(
                         x[~ok_mask],

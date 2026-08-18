@@ -5438,7 +5438,7 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "(* The Hamiltonian from the Legendre transform can contain f·∇² g       *)",
             "(* terms alongside |∇f|² terms.  These must CANCEL via IBP to give      *)",
             "(* the correct coefficient on |∇f|².  Evaluating f·∇²g numerically      *)",
-            "(* loses precision because the two large, nearly-cancelling terms are    *)",
+            "(* loses precision because the two large, nearly-canceling terms are    *)",
             "(* computed independently.  Symbolic IBP eliminates this issue.          *)",
             "(* Ref: energy conservation requires all spatial-derivative terms in     *)",
             "(* |∇f|² form for stable numerical evaluation.                          *)",
@@ -6621,7 +6621,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     # treat as success for post-processing.  Crucially: if the JSON's
     # mtime did not change, the failing wolframscript never wrote a new
     # JSON — the existing file is stale from a previous run and the
-    # error must be honoured (LPS abort, parse error, etc.).
+    # error must be honored (LPS abort, parse error, etc.).
     if ret != 0 and resolved.exists():
         post_run_mtime = resolved.stat().st_mtime_ns
         if post_run_mtime <= pre_run_mtime:

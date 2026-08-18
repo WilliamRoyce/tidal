@@ -9,7 +9,7 @@ surfaced later as wrong physics:
   ``(2/r) d_r`` term and stopped conserving energy (1.6e-01), while the energy
   integral still used the correct ``r^2`` volume element.
 * **GH #397/#381** -- pre-fix exports left a vector field's temporal component
-  un-normalised, giving ``d2_t a_0 = -laplacian a_0``: a temporal-only tachyon.
+  un-normalized, giving ``d2_t a_0 = -laplacian a_0``: a temporal-only tachyon.
 
 The guard tests below are as much a regression suite for the *detection* logic
 as for the specs: every exclusion corresponds to a case that a naive check
@@ -199,7 +199,7 @@ class TestTemporalSignGuard:
             broken.unlink()
 
     def test_torsion_family_non_uniformity_is_not_flagged(self) -> None:
-        """Rank-3 torsion components legitimately differ in normalisation.
+        """Rank-3 torsion components legitimately differ in normalization.
 
         ``torsion_dark_photon`` came through re-derivation with its torsion
         sector unchanged, so that structure is what correct code produces.

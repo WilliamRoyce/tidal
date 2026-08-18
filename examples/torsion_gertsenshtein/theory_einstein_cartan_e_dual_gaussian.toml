@@ -2,7 +2,7 @@
 #
 # Strips the b5·R̃² term from torsion_gertsenshtein/theory.toml — torsion becomes
 # purely algebraic (no kinetic terms; non-propagating Einstein-Cartan limit).
-# Drops the uniform-B0 background in favour of the Phase E dual-Gaussian.
+# Drops the uniform-B0 background in favor of the Phase E dual-Gaussian.
 #
 # Lagrangian:
 #   L = (1/kappa^2) R̃ + alpha1 I1 + alpha2 I2 + alpha3 I3
@@ -37,7 +37,7 @@
 
 [theory]
 name = "Einstein-Cartan Minimal + Dual-Gaussian B (Phase E.T2)"
-description = "Einstein-Maxwell + algebraic torsion (three irreducible mass sectors), no kinetic torsion terms, localised dual-Gaussian B"
+description = "Einstein-Maxwell + algebraic torsion (three irreducible mass sectors), no kinetic torsion terms, localized dual-Gaussian B"
 
 [spacetime]
 dimension = 4

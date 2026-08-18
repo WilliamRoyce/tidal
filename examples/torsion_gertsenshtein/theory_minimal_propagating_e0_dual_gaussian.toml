@@ -1,4 +1,4 @@
-# Minimal PGT with Propagating Torsion — Dual-Gaussian Localised Background
+# Minimal PGT with Propagating Torsion — Dual-Gaussian Localized Background
 #
 # Variant of theory_minimal_propagating.toml that replaces the uniform-B
 # background with a dual-Gaussian Erf gauge potential (E.0 geometry from
@@ -28,7 +28,7 @@
 
 [theory]
 name = "Minimal PGT + Propagating Torsion (Barker) — E.0 dual-Gaussian"
-description = "Minimal PGT with localised dual-Gaussian background B for Phase E pos-dep + constraint validation"
+description = "Minimal PGT with localized dual-Gaussian background B for Phase E pos-dep + constraint validation"
 
 [spacetime]
 dimension = 4

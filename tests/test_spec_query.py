@@ -90,7 +90,7 @@ class TestEffectiveCoefficient(unittest.TestCase):
         self.assertEqual(eff.term_count, 0)
 
     def test_terms_for_and_self_terms_agree_on_self_keys(self) -> None:
-        """``self_terms`` is ``terms_for`` specialised to the equation's own field."""
+        """``self_terms`` is ``terms_for`` specialized to the equation's own field."""
         spec = _load("gertsenshtein_eh")
         equation = spec.equations[spec.equation_map["a_0"]]
         self.assertEqual(
@@ -250,7 +250,7 @@ class TestCoefficientProvenance(unittest.TestCase):
         self.assertEqual(prov.effective.numerator, "B0^2/2")
         self.assertEqual(prov.effective.kinetic, "-kappa^(-2)")
 
-        # (b) duplicate encoding: the mass matrix, un-normalised, negated
+        # (b) duplicate encoding: the mass matrix, un-normalized, negated
         self.assertIsNotNone(prov.matrix_entry)
 
         # (c) related but distinct: the Hamiltonian carries B0^2/4, not B0^2/2

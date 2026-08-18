@@ -1,4 +1,4 @@
-# Phase E — Localised wavepacket + localised B-field geometry
+# Phase E — Localized wavepacket + localized B-field geometry
 
 **Created:** 2026-05-10
 **Status:** E.0 empirical validation complete (2026-05-16). **E.1–E.3 IN PROGRESS** (Stage 0 infrastructure landing 2026-05-24; pipelined execution starts immediately after). E.4–E.6 follow after Wave 2 derivations.
@@ -6,7 +6,7 @@
 
 ## Problem
 
-Phase A/B ship with the v2 geometry: plane-wave IC at the source field + spatially-uniform B₀ background. In tachyonic parameter regions, the linearised PDE has eigenvalues with positive real part, so P_max grows as `~exp(γ·t_end)` without bound. Two consequences:
+Phase A/B ship with the v2 geometry: plane-wave IC at the source field + spatially-uniform B₀ background. In tachyonic parameter regions, the linearized PDE has eigenvalues with positive real part, so P_max grows as `~exp(γ·t_end)` without bound. Two consequences:
 
 1. The chain's P_max ranking in tachyonic regions is dominated by exp(γ·t_end), making sup chains hard to interpret as physical "minimum conversion".
 2. Larger t_end gives larger P_max for tachyonic samples, so the headline A_max is t_end-conventional rather than physical.
@@ -15,7 +15,7 @@ The Phase 6 boundary-attractor analysis (`docs/PHASE_6_COMPARISON.md` §"Phase 6
 
 ## Frequency regime (added 2026-05-24)
 
-Phase E commits to the **high-frequency Gertsenshtein regime**: λ_GW ≪ L_field with perturbative κ·B·D ≪ 1. The canonical parameter point in `_geometry.env` realises:
+Phase E commits to the **high-frequency Gertsenshtein regime**: λ_GW ≪ L_field with perturbative κ·B·D ≪ 1. The canonical parameter point in `_geometry.env` realizes:
 
 | Dimensionless quantity | Value | Interpretation |
 |------------------------|-------|----------------|
@@ -33,16 +33,16 @@ Per the validated `examples/gertsenshtein/theory_ungauged.toml` pattern: ICs are
 
 Why: imposing TT on the theory kills the R̃² channel for PGT theories. The IC vs theory distinction is exactly what issue #167 calls for.
 
-## Physical resolution: localised geometry
+## Physical resolution: localized geometry
 
 Replace the plane-wave + uniform-B₀ setup with:
 
-- **Localised wavepacket IC**: `--ic gaussian --ic-component h_5 --ic-amplitude 1e-2 --ic-width σ_w --ic-center x_c`. Already supported in the codebase.
-- **Localised B-field profile**: convert the constant `B0` parameter into a position-dependent background field via `[[background_fields]]` in the relevant `theory.toml` files. Gaussian profile in x: `B0 * exp(-((x - x_B) / σ_B)**2)`. Width σ_B becomes a new parameter.
+- **Localized wavepacket IC**: `--ic gaussian --ic-component h_5 --ic-amplitude 1e-2 --ic-width σ_w --ic-center x_c`. Already supported in the codebase.
+- **Localized B-field profile**: convert the constant `B0` parameter into a position-dependent background field via `[[background_fields]]` in the relevant `theory.toml` files. Gaussian profile in x: `B0 * exp(-((x - x_B) / σ_B)**2)`. Width σ_B becomes a new parameter.
 
 Result: the wavepacket traverses the B-field interaction region in finite time `t_int ~ (σ_w + σ_B) / c`. After traversal, source/target amplitudes propagate in vacuum where the EOM is the free wave equation (no Gertsenshtein conversion). Tachyonic eigenvalues no longer accumulate growth indefinitely — total amplification is bounded by exp(γ·t_int), which is physically meaningful (a finite interaction time turns the unbounded exponential into a finite multiplier).
 
-## E.0 — Dual-Gaussian localised B-field (empirically validated 2026-05-16)
+## E.0 — Dual-Gaussian localized B-field (empirically validated 2026-05-16)
 
 ### Why not single-Gaussian
 
@@ -52,11 +52,11 @@ The original sketch in this document (§"Physical resolution") proposed a single
 A_y(z) = -Bpeak · R · √(π/2) · Erf[z/(√2·R)]
 ```
 
-which runs from −1 to +1 across the domain. This is explicitly non-periodic: `A_y(0) ≠ A_y(L)`. Consequence: any theory TOML using this form must declare **Neumann BCs** (as `examples/gertsenshtein/theory_localized.toml` does explicitly on line 24), which prevents `can_use_modal()` from returning True — the modal solver is never auto-selected for single-Gaussian localised-B runs.
+which runs from −1 to +1 across the domain. This is explicitly non-periodic: `A_y(0) ≠ A_y(L)`. Consequence: any theory TOML using this form must declare **Neumann BCs** (as `examples/gertsenshtein/theory_localized.toml` does explicitly on line 24), which prevents `can_use_modal()` from returning True — the modal solver is never auto-selected for single-Gaussian localized-B runs.
 
 ### Dual-Gaussian trick (supervisor, 2026-05-15)
 
-Use two equal-and-opposite Gaussian peaks with centres symmetric about L/2:
+Use two equal-and-opposite Gaussian peaks with centers symmetric about L/2:
 
 ```text
 B_z(z) = Bpeak · [exp(-(z-zc1)²/(2·sigB²)) − exp(-(z-zc2)²/(2·sigB²))]
@@ -133,7 +133,7 @@ Switch all v3 campaign scripts in `scripts/hpc_submit_drafts/v3_permissive/` (an
 
 Already supported per CLAUDE.md — no code changes needed.
 
-### E.2 — Localised B-field background
+### E.2 — Localized B-field background
 
 Create new theory TOML files for each model (`examples/torsion_gertsenshtein/`, `examples/torsion_gertsenshtein_nonminimal/`, etc.) following the dual-Gaussian pattern validated in E.0. The `[[background_fields]]` block uses the explicit Erf formula — there is no `profile = "gaussian"` shorthand in the TOML schema; the position-dependent expression goes directly into `components`:
 
@@ -170,7 +170,7 @@ Parameter range justification (relative to box L=100):
 - **σ_B ∈ {10, 25, 50}**: B-field width covers 10–50% of L. σ_B=10 is the marginal case where wavepacket and B-field overlap region is comparable to σ_w; σ_B=25 is the design default (full traversal time ~ 50 units, well-clear of t_end ≤ 20); σ_B=50 approaches the uniform-B₀ limit (sanity check that A converges to Phase B values).
 - **t_end ∈ {5, 10, 20}**: brackets the wavepacket transit time σ_w + σ_B. At σ_w + σ_B = 5+10 = 15 the wavepacket has not yet fully cleared the B-field at t_end=10; at σ_w + σ_B = 10 + 50 = 60 the geometry effectively reverts to plane-wave overlap throughout t ≤ 20.
 
-**Quantitative acceptance criterion**: localised geometry is validated for a given (σ_w, σ_B) cell when
+**Quantitative acceptance criterion**: localized geometry is validated for a given (σ_w, σ_B) cell when
 
 ```text
 A(t_end = 20) / A(t_end = 10) < 1.05
@@ -178,11 +178,11 @@ A(t_end = 20) / A(t_end = 10) < 1.05
 
 i.e. amplification has plateaued to within 5% by t_end=10 (relaxed from the asymptotic limit because we only need t-independent ranking for the inference, not exact convergence). Cells failing this criterion are unusable: the geometry hasn't bounded the growth and we'd be back in the plane-wave-like regime.
 
-Output: `examples/data/v3_localised_geometry_tuning/` with the 9-point × 3-t_end CSV and a 2D heatmap.
+Output: `examples/data/v3_localized_geometry_tuning/` with the 9-point × 3-t_end CSV and a 2D heatmap.
 
 ### E.4 — Re-baseline campaign scripts
 
-Write `scripts/hpc_submit_drafts/v3e_localised/` mirroring `v3_permissive/` but with localised geometry. All 12 paired campaigns runnable on the new geometry.
+Write `scripts/hpc_submit_drafts/v3e_localised/` mirroring `v3_permissive/` but with localized geometry. All 12 paired campaigns runnable on the new geometry.
 
 ### E.5 — Re-run highest-value chains under E geometry
 
@@ -194,7 +194,7 @@ Initial scope (smaller than full v3 fan-out):
 
 If those land cleanly, expand to D2.1–D2.3.
 
-### E.6 — Compare Phase B (plane-wave) vs Phase E (localised)
+### E.6 — Compare Phase B (plane-wave) vs Phase E (localized)
 
 Comparison table in `docs/PHASE_E_GEOMETRY.md` (new). Per-coupling marginal D_KL shifts; per-coupling posterior-shape comparison; A_max headline number under each geometry. Decision: which geometry gets the publication numbers.
 

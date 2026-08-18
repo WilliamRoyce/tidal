@@ -47,7 +47,7 @@ def _make_two_field_wave_data(
     n_snapshots: int = 51,
     t_end: float = 5.0,
 ) -> SimulationData:
-    """Build two-field data with travelling waves at different masses.
+    """Build two-field data with traveling waves at different masses.
 
     Both fields have the same wavenumber k0 but different frequencies
     omega_phi = sqrt(k0^2 + m2_phi) and omega_chi = sqrt(k0^2 + m2_chi).

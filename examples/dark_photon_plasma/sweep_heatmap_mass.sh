@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sweep A — 2D Heatmap: mA² vs mT² at fixed (δ=0.3, ξ=1)
 #
-# Produces a 50×50 Cartesian grid for clean heatmap visualisation of
+# Produces a 50×50 Cartesian grid for clean heatmap visualization of
 # the amplification factor A = P(h→a₁)/P_GR where P_GR = sin²(κB₀t/2).
 #
 # Physics:
@@ -60,7 +60,7 @@ tidal sweep "${SPEC}" \
 echo ""
 echo "--- Generating plots ---"
 
-# 2D heatmap coloured by amplification A
+# 2D heatmap colored by amplification A
 tidal plot "${OUTPUT}" --type sweep \
   --metric A \
   --baseline-formula "sin(kappa * B0 * ${T_END} / 2)**2" \

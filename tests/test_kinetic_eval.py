@@ -7,7 +7,7 @@ actually emits:
   * Negative exponents: ``"-kappa^(-2)"`` (caret → ``**``)
   * Mixed small + non-small: must return None (still symbolic, not
     literal zero)
-  * Edge cases: literal zero, self-cancelling ``"b5 - b5"``, malformed
+  * Edge cases: literal zero, self-canceling ``"b5 - b5"``, malformed
     inputs
 
 Safety: no parser node outside the restricted subset (Constant, Name,
@@ -30,13 +30,13 @@ from tidal.symbolic._kinetic_eval import (
 
 
 class TestEvaluateAtZero:
-    # --- Literal zero / self-cancelling ---
+    # --- Literal zero / self-canceling ---
 
     def test_literal_zero(self) -> None:
         assert evaluate_at_zero("0", frozenset()) == 0.0
         assert evaluate_at_zero("0.0", frozenset()) == 0.0
 
-    def test_self_cancelling_small_param(self) -> None:
+    def test_self_canceling_small_param(self) -> None:
         # b5 - b5 with b5 substituted → 0 - 0 = 0
         assert evaluate_at_zero("b5 - b5", {"b5"}) == 0.0
 
@@ -207,7 +207,7 @@ class TestSplitSmallParameterKinetic:
     """Split of a kinetic expression into (M₀, {param: c_p}) for #301 Phase 3.
 
     Must handle the forms ExportJSON.wl actually emits after ``Expand``:
-    sums of monomials. Rejects parenthesised sub-sums, bilinear /
+    sums of monomials. Rejects parenthesized sub-sums, bilinear /
     quadratic small-parameter terms, and denominators containing small
     parameters — all gated by the #273 perturbative contract.
     """

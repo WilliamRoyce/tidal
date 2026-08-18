@@ -127,7 +127,7 @@ Option \"Measure\" -> sqrtDetG supplies the volume factor for curved metrics: th
 variation is performed on the DENSITY Measure*lagrangian and the result divided back \
 through by Measure. This is REQUIRED for any metric whose sqrt|g| is not constant — \
 omitting it drops Christoffel first-derivative terms that arise solely from the \
-measure (issue #394). Default \"Measure\" -> 1 reproduces the flat-metric behaviour \
+measure (issue #394). Default \"Measure\" -> 1 reproduces the flat-metric behavior \
 exactly.";
 
 (* Error messages *)
@@ -2154,7 +2154,7 @@ ComponentEulerLagrange[lagrangian_, fieldFuncs_List, coords_List,
   (* A measure free of the coordinate symbols (flat, sqrt|g| = 1; or     *)
   (* constant-conformal, sqrt|g| = const) factors straight back out of   *)
   (* the linear E-L operator, so we skip the weighting entirely and take *)
-  (* a bit-identical path to the pre-#394 behaviour.                     *)
+  (* a bit-identical path to the pre-#394 behavior.                      *)
   measure = OptionValue["Measure"];
   weighted = !FreeQ[measure, Alternatives @@ coords];
   L = If[weighted, Expand[measure * lagrangian], lagrangian];
@@ -2216,7 +2216,7 @@ ComponentEulerLagrange[lagrangian_, fieldFuncs_List, coords_List,
 
     (* Divide the density-weighted EOM back through by the measure.      *)
     (* The overall factor does not change the physics, but keeps the     *)
-    (* coefficients in the normalised form the exporter expects.         *)
+    (* coefficients in the normalized form the exporter expects.          *)
     (* Expand alone fully distributes the division — verified on the 4D  *)
     (* spherical case (Csc/Cot coefficients) to give a result identical  *)
     (* to Expand[Simplify[...]], so Simplify is not used here: it costs  *)

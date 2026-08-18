@@ -40,7 +40,7 @@ paths:
 - Pass ALL coupled fields in `additionalFields` list to `DecomposeToComponents`
 - Without this, cross-field coupling terms are silently dropped
 
-## Equation Generation: Measure and LHS Normalisation
+## Equation Generation: Measure and LHS Normalization
 These two produce **silently wrong equations** — no error, no warning. Both are
 invisible on flat Minkowski, so any change here must be validated on at least one
 curved-metric AND one multi-component gauge-field theory before landing.
@@ -54,8 +54,8 @@ curved-metric AND one multi-component gauge-field theory before landing.
   `Derivative[1][Abs][u]` in the coefficient, which operator identification cannot match,
   so the term is generated and then **silently dropped on export**. Symptom: the fix
   appears to do nothing at all.
-- **LHS normalisation must dispatch on `NumericQ[lhsCoeff]`, never `Abs[lhsCoeff] =!= 1`**
-  (#381). The latter sends both `+1` and `−1` down a "no normalisation needed" path, so
+- **LHS normalization must dispatch on `NumericQ[lhsCoeff]`, never `Abs[lhsCoeff] =!= 1`**
+  (#381). The latter sends both `+1` and `−1` down a "no normalization needed" path, so
   the `lhsCoeff = -1` that xAct emits for a temporal component under (−,+,+,+) is never
   divided through — yielding a temporal-only tachyon (`∂²ₜa₀ = −∇²a₀`).
 - **Do NOT "fix" these two asymmetries — both are correct physics:**
@@ -64,13 +64,13 @@ curved-metric AND one multi-component gauge-field theory before landing.
     Maxwell. The negative norm belongs in the *energy*; the *equation* is `□A_μ = 0` for
     every μ.
   - `h_5` carries `laplacian_x = -kappa^(-2)` matched by
-    `lhs.kinetic_coefficient_symbolic = -kappa^(-2)`, i.e. correctly normalised.
+    `lhs.kinetic_coefficient_symbolic = -kappa^(-2)`, i.e. correctly normalized.
 - **When comparing coefficients across components, compare EFFECTIVE signs** —
   `sign(coefficient) × sign(kinetic_coefficient)`, summed over *all* matching terms.
   Raw comparison misreads EH-class theories (two self-laplacian terms per component) and
   reports false differences when a re-derivation merely introduces an explicit kinetic
   coefficient. Torsion-family sign non-uniformity is **physical** (rank-3 irreducible
-  components carry different normalisations) — do not flag it.
+  components carry different normalizations) — do not flag it.
 
 ## Common Errors
 - All-zero components → field strength not expanded before decomposition

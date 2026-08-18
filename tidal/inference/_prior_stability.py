@@ -1,8 +1,8 @@
-"""Post-hoc prior stability sweep for nested-sampling visualisation.
+"""Post-hoc prior stability sweep for nested-sampling visualization.
 
 Nested-sampling chains (PolyChord) only contain accepted samples — points
 where the pre-flight stability guard returned ``-inf`` never enter the
-chain.  To visualise the unstable parameter region on a corner plot we
+chain.  To visualize the unstable parameter region on a corner plot we
 sample the prior independently and run only the cheap eigenvalue check
 on each draw, saving the rejected ones as a CSV side file.
 
@@ -12,7 +12,7 @@ simulation — empirically ~1 ms per sample on the dark_photon_plasma
 < 0.3% of a typical 30-minute INTR inference run.
 
 Following anesthetic conventions (Handley 2019, JOSS 4(37) 1414) for
-visualising inaccessible regions of parameter space.
+visualizing inaccessible regions of parameter space.
 """
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ def run_prior_stability_sweep(
         Destination CSV.  Parent must exist.
     n_samples : int
         Number of prior draws.  Defaults to 5000 — dense enough for a
-        scatter-overlay visualisation, ~5 s wall time on one thread.
+        scatter-overlay visualization, ~5 s wall time on one thread.
     seed : int
         Reproducible sampling seed.
     quiet : bool

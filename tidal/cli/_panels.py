@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 # -- Shared constants -------------------------------------------------------
 
 DPI = 150
-VMAX_FLOOR = 0.01  # Minimum symmetric colour-scale magnitude
+VMAX_FLOOR = 0.01  # Minimum symmetric color-scale magnitude
 _LINE_COLORS = (
     "tab:blue",
     "tab:orange",
@@ -103,9 +103,9 @@ def _z_profile_1d(
     snap: np.ndarray,
     data: SimulationData,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Extract z-profile at the centre of x, y for a 3D snapshot.
+    """Extract z-profile at the center of x, y for a 3D snapshot.
 
-    Returns ``(z_coords, profile)`` where *z_coords* are cell centres
+    Returns ``(z_coords, profile)`` where *z_coords* are cell centers
     along the last spatial axis and *profile* is ``snap[ix, iy, :]``.
     """
     ix = snap.shape[0] // 2
@@ -404,7 +404,7 @@ def render_profile(
     *,
     cross_section: tuple[str, float] | None = None,
 ) -> None:
-    """Render 1D field profile at multiple times, overlaid with colour gradient.
+    """Render 1D field profile at multiple times, overlaid with color gradient.
 
     Raises
     ------

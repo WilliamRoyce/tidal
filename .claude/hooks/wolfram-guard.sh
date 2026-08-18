@@ -10,7 +10,7 @@ echo "$COMMAND" | grep -qE '(wolframscript|uv run tidal derive)' || exit 0
 # --- False-positive exclusions (GH #400) ---------------------------------
 # The match above is on command TEXT, so it also catches commands that merely
 # mention wolframscript, or tidal derive invocations that never start it.
-# Those consume no licence and must not be blocked.
+# Those consume no license and must not be blocked.
 
 # 1. Read-only inspections that happen to contain the pattern, e.g.
 #    `pgrep -f wolframscript` — which is exactly what you want to run WHILE a
@@ -33,7 +33,7 @@ case "$FIRST_WORD" in
 esac
 
 # 2. `tidal derive --dry-run` only prints the generated script and returns
-#    before any wolframscript call; --help likewise.  Neither takes the licence.
+#    before any wolframscript call; --help likewise.  Neither takes the license.
 echo "$COMMAND" | grep -qE '(^|[[:space:]])--(dry-run|help)([[:space:]]|$)' && exit 0
 
 # Block if wolframscript is already running.

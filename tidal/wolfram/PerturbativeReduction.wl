@@ -268,7 +268,7 @@ BuildHigherDerivativeSubstitutions[
 (* When the constraint-promotion case is detected (any field with       *)
 (* d_t^2 in lagComp but no d_t^2 in its base EOM), LPS skips with a     *)
 (* clear diagnostic message.  The Hamiltonian for those theories        *)
-(* retains its existing mixed_2_* operators — same behaviour as         *)
+(* retains its existing mixed_2_* operators — same behavior as          *)
 (* pre-LPS.  See follow-up issue for the constraint-promotion           *)
 (* extension.                                                            *)
 

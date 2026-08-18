@@ -1,13 +1,13 @@
 """Tests for :mod:`tidal.symbolic.sign_algebra`.
 
-The suite is organised around the failure it exists to prevent.  Every
+The suite is organized around the failure it exists to prevent.  Every
 confident-but-wrong spec diagnosis recorded in GH #401 is pinned here as a
 named regression test, so a future reader can trace test → historical mistake.
 
 Three layers, in increasing order of what they protect:
 
 * :class:`TestSoundnessProperty` — the ladder must never lie.  Verdicts are
-  cross-checked against numeric evaluation at randomised parameter values,
+  cross-checked against numeric evaluation at randomized parameter values,
   over every coefficient string in the committed corpus.  This is the
   invariant; it keeps holding as tactics are added.
 * :class:`TestSignLattice` / :class:`TestRatioDecisions` — the individual
@@ -40,7 +40,7 @@ from tidal.symbolic.sign_algebra import (
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "data"
 
-# Randomised soundness sampling is seeded so failures reproduce exactly.
+# Randomized soundness sampling is seeded so failures reproduce exactly.
 _SEED = 20260817
 _SAMPLES_PER_EXPRESSION = 40
 
@@ -126,7 +126,7 @@ class TestSignLattice(unittest.TestCase):
         self.assertEqual(result.assumptions, ("xi",))
         self.assertIn("xi", result.describe())
 
-    def test_cancelling_sum_declines_rather_than_guesses(self) -> None:
+    def test_canceling_sum_declines_rather_than_guesses(self) -> None:
         """``-1 + 2*B0^2*rho`` genuinely flips sign, so the answer is UNKNOWN.
 
         This is the load-bearing case: a tool that guessed here would be
@@ -299,7 +299,7 @@ class TestSoundnessProperty(unittest.TestCase):
     """The ladder must never lie — checked against the whole committed corpus."""
 
     def test_every_definite_verdict_agrees_with_numeric_evaluation(self) -> None:
-        """Sample each signed verdict at randomised parameters of both signs.
+        """Sample each signed verdict at randomized parameters of both signs.
 
         Nothing is assumed positive, so a verdict that depended on an unstated
         assumption would be caught here.

@@ -525,7 +525,7 @@ def _draw_axis_title(
     overlay below.
 
     Implemented as three matplotlib ``fig.text`` calls (axis number in
-    black, ↑ in colour_up, ↓ in colour_down) rather than one LaTeX
+    black, ↑ in color_up, ↓ in color_down) rather than one LaTeX
     ``\textcolor`` call because matplotlib's mathtext renderer does
     not honor ``\textcolor`` without a full ``text.usetex=True``
     config; per-text ``color=`` kwargs work in every backend.
@@ -846,7 +846,7 @@ def plot_atlas(
             # Show x-axis labels only on the bottom row of the outer grid
             # and y-axis labels only on the leftmost column.  At 4x4 atlas
             # size, per-panel labels become visual noise; outer-edge-only
-            # labelling preserves identification without repetition.
+            # labeling preserves identification without repetition.
             show_xlabels = r == rows - 1
             show_ylabels = c_idx == 0
             _render_face_panel(

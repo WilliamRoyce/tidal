@@ -1,7 +1,7 @@
 # Ricci-EM Nonminimal (delta1 only) + Dual-Gaussian B-field (Phase E.T4)
 #
 # Phase E variant of torsion_gertsenshtein/theory_nonminimal.toml. Strips the
-# uniform-B0 background in favour of the dual-Gaussian. Otherwise identical:
+# uniform-B0 background in favor of the dual-Gaussian. Otherwise identical:
 # Einstein-Cartan + algebraic torsion masses (alpha1, alpha2, alpha3) +
 # nonminimal Ricci-EM coupling (delta1 * R̃_{[μν]} F^{μν}) + Maxwell.
 #
@@ -31,7 +31,7 @@
 
 [theory]
 name = "Ricci-EM Nonminimal (T4) + Dual-Gaussian B (Phase E.T4)"
-description = "Einstein-Cartan + algebraic torsion + delta1 Ricci-EM nonminimal contact term, localised dual-Gaussian B"
+description = "Einstein-Cartan + algebraic torsion + delta1 Ricci-EM nonminimal contact term, localized dual-Gaussian B"
 
 [spacetime]
 dimension = 4
