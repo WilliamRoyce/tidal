@@ -17,7 +17,7 @@
 # Preconditions (caller must have done these once, not per-job):
 #   1. bash scripts/hpc_shuttle.sh push             # tidal source on HPC
 #   2. bash scripts/hpc_install_polychord.sh        # pypolychord+mpi4py, MPI=1 build
-#   3. bash scripts/hpc_refresh_venv_tar.sh         # /home/wr286/venv_site.tar
+#   3. bash scripts/hpc_refresh_venv_tar.sh         # $HOME/venv_site.tar
 #
 # Per-job steps:
 #   1. Extract the prebuilt site-packages tarball from /home (NFS) to
@@ -59,7 +59,7 @@ date
 # 1. Extract the pre-built venv tarball from /home to local /tmp.
 echo "--- Extracting site-packages tarball ---"
 mkdir -p "${LOCAL_SP}"
-tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
+tar xf $HOME/venv_site.tar -C "${LOCAL_SP}"
 
 source "${TIDAL_ROOT}/.venv/bin/activate"
 export PYTHONPATH="${LOCAL_SP}/site-packages:${PYTHONPATH:-}"
@@ -84,7 +84,7 @@ echo "--- Checking venv freshness ---"
 if ! python -c "from pypolychord import run_polychord; import anesthetic; import mpi4py" 2>&1; then
     cat >&2 <<EOF
 error: pypolychord, anesthetic, or mpi4py missing from the extracted venv.
-The tarball at /home/wr286/venv_site.tar is stale.
+The tarball at $HOME/venv_site.tar is stale.
 
 Refresh it from the local workstation:
 

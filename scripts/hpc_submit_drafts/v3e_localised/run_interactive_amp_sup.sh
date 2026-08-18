@@ -99,7 +99,7 @@ LOCAL_SP="/tmp/site_packages_${SLURM_JOB_ID}"
 if [ ! -d "${LOCAL_SP}/site-packages" ]; then
   echo "Extracting venv tarball..."
   mkdir -p "${LOCAL_SP}"
-  tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
+  tar xf $HOME/venv_site.tar -C "${LOCAL_SP}"
 fi
 
 source "${TIDAL_ROOT}/.venv/bin/activate"

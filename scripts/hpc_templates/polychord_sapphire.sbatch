@@ -39,7 +39,7 @@ date
 # 1. Extract the pre-built venv tarball from /home to local /tmp.
 echo "--- Extracting site-packages tarball ---"
 mkdir -p "${LOCAL_SP}"
-tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
+tar xf $HOME/venv_site.tar -C "${LOCAL_SP}"
 
 source "${TIDAL_ROOT}/.venv/bin/activate"
 export PYTHONPATH="${LOCAL_SP}/site-packages:${PYTHONPATH:-}"
@@ -59,7 +59,7 @@ echo "--- Checking venv freshness ---"
 if ! python -c "from pypolychord import run_polychord; import anesthetic; import mpi4py" 2>&1; then
     cat >&2 <<EOF
 error: pypolychord, anesthetic, or mpi4py missing from the extracted venv.
-The tarball at /home/wr286/venv_site.tar is stale.
+The tarball at $HOME/venv_site.tar is stale.
 
 Refresh it from the local workstation:
 

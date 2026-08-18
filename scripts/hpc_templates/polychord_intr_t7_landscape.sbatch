@@ -45,7 +45,7 @@ date
 
 echo "--- Extracting site-packages tarball ---"
 mkdir -p "${LOCAL_SP}"
-tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
+tar xf $HOME/venv_site.tar -C "${LOCAL_SP}"
 
 source "${TIDAL_ROOT}/.venv/bin/activate"
 export PYTHONPATH="${LOCAL_SP}/site-packages:${PYTHONPATH:-}"

@@ -18,7 +18,7 @@ TIDAL_ROOT="/rds/user/wr286/hpc-work/tidal"
 echo "=== [$(date +%H:%M:%S)] Setting up PolyChord environment ==="
 LOCAL_SP="/tmp/site_packages_${SLURM_JOB_ID}"
 mkdir -p "${LOCAL_SP}"
-tar xf /home/wr286/venv_site.tar -C "${LOCAL_SP}"
+tar xf $HOME/venv_site.tar -C "${LOCAL_SP}"
 
 source "${TIDAL_ROOT}/.venv/bin/activate"
 export PYTHONPATH="${LOCAL_SP}/site-packages:${PYTHONPATH:-}"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# hpc_refresh_venv_tar.sh — regenerate /home/wr286/venv_site.tar on CSD3.
+# hpc_refresh_venv_tar.sh — regenerate $HOME/venv_site.tar on CSD3.
 #
 # The sbatch template at scripts/hpc_templates/polychord_intr.sbatch
 # extracts this tarball to /tmp per job because some CSD3 compute nodes
@@ -30,7 +30,7 @@ set -euo pipefail
 
 readonly HOST="${HPC_HOST:-csd3}"
 readonly REMOTE_ROOT="${HPC_ROOT:-/rds/user/wr286/hpc-work/tidal}"
-readonly TAR_PATH="${HPC_VENV_TAR:-/home/wr286/venv_site.tar}"
+readonly TAR_PATH="${HPC_VENV_TAR:-\$HOME/venv_site.tar}"
 
 if ! ssh -O check "$HOST" 2>/dev/null; then
     cat >&2 <<EOF
