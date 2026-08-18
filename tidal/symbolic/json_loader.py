@@ -749,6 +749,25 @@ class ComponentEquation:
             )
             raise ValueError(msg)
 
+    @property
+    def kinetic_position_dependent(self) -> bool:
+        """Whether the LHS kinetic coefficient depends on spatial coordinates.
+
+        Mirrors :attr:`OperatorTerm.position_dependent`: ``True`` when
+        ``kinetic_coefficient_symbolic`` contains a spatial coordinate call
+        such as ``x[]`` or ``y[]``; time-only dependence (``t[]``) returns
+        ``False``.  Solvers that evaluate the kinetic coefficient without a
+        grid (the modal builders — see GH #421) must refuse such equations
+        rather than evaluate at a single point or silently fall back to
+        M = 1.
+        """
+        if self.kinetic_coefficient_symbolic is None:
+            return False
+        return any(
+            m[0] != "t"
+            for m in _COORD_CALL_RE.findall(self.kinetic_coefficient_symbolic)
+        )
+
     @classmethod
     def from_dict(
         cls,
@@ -1323,6 +1342,23 @@ class EquationSystem:
         suffices.
         """
         return any(t.order_in_eps > 0 for eq in self.equations for t in eq.rhs_terms)
+
+    def has_position_dependent_kinetic(self) -> bool:
+        """Return True if any dynamical equation has a position-dependent kinetic.
+
+        Restricted to dynamical equations (``time_derivative_order > 0``) —
+        consumer-faithful to :func:`tidal.solver._kinetic.build_inverse_kinetic_diag`,
+        which skips constraint rows.  Used by the modal solver's eligibility
+        check and entry guards (GH #421): a position-dependent ``M(x)`` is a
+        k-space convolution ``M̂(k−k′)``, which modal does not implement
+        (GH #427); the time-domain backends handle it via ``grid=``
+        (GH #382).
+        """
+        return any(
+            eq.kinetic_position_dependent
+            for eq in self.equations
+            if eq.time_derivative_order > 0
+        )
 
     def canonicalize_kinetic_for_perturbation(
         self,

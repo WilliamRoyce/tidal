@@ -356,6 +356,12 @@ def can_use_modal(
     3. All boundary conditions periodic
     4. All RHS operators have exact Fourier multipliers
     5. No time-dependent coefficients
+    6. No position-dependent kinetic coefficients (GH #421) — position-
+       dependent RHS coefficients are fine (handled via the ĉ(k−k′)
+       convolution paths), but a position-dependent M(x) needs the
+       mass-side convolution M̂(k−k′), which is not implemented (GH #427).
+       Auto-selection falls through to the time-domain backends, which
+       evaluate such kinetics on the grid (GH #382).
     """
     # 1. Flat metric — curved metrics have non-None volume_element
     if spec.canonical is not None and spec.canonical.volume_element is not None:
@@ -402,7 +408,49 @@ def can_use_modal(
             if term.time_dependent:
                 return False
 
-    return True
+    # 6. No position-dependent kinetic coefficients (GH #421).  Note this
+    # is checked on the ELIGIBILITY spec: for perturbative flows the CLI
+    # passes the canonicalized base spec, whose kinetics are constant even
+    # when the full spec's are position-dependent (GH #380) — so the EH
+    # dual-Gaussian campaign flow stays modal-eligible.
+    return not spec.has_position_dependent_kinetic()
+
+
+def _raise_position_dependent_kinetic(spec: EquationSystem, where: str) -> None:
+    """Raise the GH #421 refusal for a position-dependent kinetic coefficient.
+
+    Shared by the entry guards in :func:`solve_modal`,
+    :func:`solve_modal_pass1` and :func:`_build_evolution_matrices` so
+    every modal path (including the stability probe in
+    :mod:`tidal.measurement._stability`, which reaches
+    ``_build_evolution_matrices`` directly on every likelihood
+    evaluation) fails loudly with the same actionable message instead of
+    evaluating the kinetic without a grid (deep ValueError) or silently
+    falling back to M = 1 (the pre-guard genEig behavior).
+    """
+    posdep_fields = [
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order > 0 and eq.kinetic_position_dependent
+    ]
+    msg = (
+        f"{where} cannot handle a position-dependent kinetic coefficient "
+        f"(field(s) {posdep_fields}). A position-dependent M(x) is a "
+        "k-space convolution — the mass matrix becomes a mode-coupling "
+        "block M̂(k−k′), which the modal solver does not implement "
+        "(GH #427 tracks the feature; GH #421 is this guard). "
+        "Alternatives: (a) use --scheme cvode or --scheme ida — the "
+        "time-domain solvers evaluate position-dependent kinetics on the "
+        "grid (GH #382); (b) if the position-dependence is proportional "
+        "to a small parameter, declare it in [perturbation]."
+        "small_parameters so kinetic canonicalization moves it into O(ε) "
+        "RHS corrections and the base spec stays constant-coefficient "
+        "(GH #380, the Euler-Heisenberg flow); (c) if this spec has a "
+        "[perturbation] block but you passed --perturbative-order 0, the "
+        "full un-canonicalized spec is being solved on the plain modal "
+        "path — drop the override or use a time-domain scheme."
+    )
+    raise NotImplementedError(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -663,6 +711,18 @@ def _build_evolution_matrices(
 
     assert isinstance(coeff_eval, CoefficientEvaluator)
     logger = logging.getLogger(__name__)
+
+    # GH #421 guard AT THE BUILDER, not only at solve_modal: this builder
+    # has five production call sites (solve_modal, modal_jax, and three in
+    # tidal/measurement/_stability.py — the stability probe that gates
+    # every likelihood evaluation in an inference chain).  Without this
+    # check the inline kinetic evaluation below hits `except Exception`
+    # and silently proceeds with M = 1 — wrong physics with no error.
+    # NotImplementedError deliberately does NOT match the probe's
+    # (LinAlgError, ValueError) handler, so it propagates instead of
+    # being mislabeled "tachyonic".
+    if spec.has_position_dependent_kinetic():
+        _raise_position_dependent_kinetic(spec, "_build_evolution_matrices")
 
     n_modes = int(np.prod(rfft_shape))
 
@@ -2528,7 +2588,19 @@ def find_independent_blocks(
 
 
 def _has_position_dependent_terms(spec: EquationSystem) -> bool:
-    """Check if any RHS term has a position-dependent coefficient."""
+    """Check if any RHS term has a position-dependent coefficient.
+
+    Deliberately RHS-only: this is the ROUTING predicate that selects the
+    ĉ(k−k′) convolution builders over the constant-coefficient ones, and
+    those builders convolve RHS coefficients only.  Do NOT extend it to
+    ``kinetic_coefficient_symbolic`` — a position-dependent kinetic needs
+    the mass-side convolution M̂(k−k′) (GH #427), which no current path
+    implements, so routing on it would just move the failure into a
+    different builder.  Position-dependent kinetics are instead refused
+    up front by the GH #421 guards (see
+    :func:`_raise_position_dependent_kinetic`) and excluded from modal
+    eligibility by :func:`can_use_modal`.
+    """
     for eq in spec.equations:
         for term in eq.rhs_terms:
             if term.position_dependent:
@@ -3415,6 +3487,14 @@ def solve_modal(
             f"docs/PERTURBATIVE_REDUCTION_IMPLEMENTATION.md."
         )
         raise ValueError(msg)
+
+    # GH #421: refuse position-dependent kinetics before any matrices are
+    # built.  Redundant with the _build_evolution_matrices guard for the
+    # genEig path, but the per-mode/convolution builders would otherwise
+    # fail later with a grid-less evaluate_coefficient ValueError that
+    # names neither the cause nor a way out.
+    if spec.has_position_dependent_kinetic():
+        _raise_position_dependent_kinetic(spec, "solve_modal")
 
     layout = StateLayout.from_spec(spec, grid.num_points)
     coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
@@ -4361,6 +4441,15 @@ def solve_modal_pass1(
           the driver onto ``PerturbativeResult.validity`` (#272).
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+    # GH #421: the Pass 1 source builder consumes the correction spec's
+    # kinetic coefficients without a grid (`_build_source_matrix_k` has no
+    # grid parameter), so a position-dependent kinetic surviving into the
+    # corrections must be refused here rather than fail deep inside
+    # evaluate_coefficient.  Canonicalized flows (GH #380) never hit this:
+    # their correction kinetics are constants.
+    if correction_spec.has_position_dependent_kinetic():
+        _raise_position_dependent_kinetic(correction_spec, "solve_modal_pass1")
 
     layout = eigendata["state_layout"]
 

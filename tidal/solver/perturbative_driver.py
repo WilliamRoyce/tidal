@@ -447,26 +447,39 @@ class PerturbativeSolver:
             msg = (
                 "PerturbativeSolver requires a constant-coefficient base "
                 "(order_in_eps=0) spec. The provided theory has position-"
-                "dependent terms in the base spec even after kinetic "
-                "canonicalization — v6 Pass 1 Duhamel cannot evaluate "
-                "the augmented matrix exponential without per-mode "
-                "eigendata, which the Krylov expm_multiply path for "
-                "position-dependent systems does not provide. "
-                "Alternatives: (a) drop the [perturbation] block and run "
-                "plain modal (Krylov handles position-dependent base "
-                "directly, no perturbative correction); (b) use --scheme "
-                "cvode or --scheme ida (time-domain solvers integrate "
-                "position-dependent coefficients without modal restrictions). "
-                "If the position-dependence ought to be perturbative "
-                "(O(ε)) but is being tagged O(0), check the Wolfram "
-                "derivation's order_in_eps tagging — see GH #380 for the "
-                "kinetic-canonicalization case."
+                "dependent RHS terms or kinetic coefficients in the base "
+                "spec even after kinetic canonicalization — v6 Pass 1 "
+                "Duhamel cannot evaluate the augmented matrix exponential "
+                "without per-mode eigendata, which the Krylov "
+                "expm_multiply path for position-dependent systems does "
+                "not provide. Alternatives: (a) for position-dependent "
+                "RHS terms only, drop the [perturbation] block and run "
+                "plain modal (Krylov handles a position-dependent RHS "
+                "base directly, no perturbative correction) — NOT "
+                "available for a position-dependent kinetic, which modal "
+                "refuses outright (GH #421/#427); (b) use --scheme cvode "
+                "or --scheme ida (time-domain solvers integrate position-"
+                "dependent coefficients, kinetics included via GH #382, "
+                "without modal restrictions). If the position-dependence "
+                "ought to be perturbative (O(ε)) but is being tagged "
+                "O(0), check the Wolfram derivation's order_in_eps "
+                "tagging — see GH #380 for the kinetic-canonicalization "
+                "case."
             )
             raise NotImplementedError(msg)
 
     def _base_has_position_dependence(self) -> bool:
-        """Return True if base_spec has any position-dependent RHS term."""
+        """Return True if base_spec has position-dependent RHS terms or kinetics.
+
+        The kinetic check (GH #421) catches position-dependence that
+        survives canonicalization because it is NOT proportional to a
+        small parameter — i.e. genuinely O(ε⁰).  Without it the
+        construction-time guard stays silent and the failure surfaces
+        deep inside the modal builders instead.
+        """
         for eq in self.base_spec.equations:
+            if eq.kinetic_position_dependent:
+                return True
             for term in eq.rhs_terms:
                 if term.position_dependent:
                     return True
