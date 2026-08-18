@@ -1,0 +1,10 @@
+# Revisions listed here are excluded from `git blame` output.
+#
+# Enable locally with:
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# Only whole-tree, semantically inert reformats belong in this file.
+
+# style: apply ruff format across the codebase (#399)
+# 52 files, formatting only -- ASTs verified identical before and after.
+1246d7a546e9217dfcce0e000b57aeddea965ed2
