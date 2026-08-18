@@ -166,7 +166,14 @@ def compute_parameter_importance(
     ns = to_anesthetic_samples(result)
 
     # --- Total statistics with bootstrap ---
-    stats = ns.stats(nsamples=n_bootstrap)
+    # anesthetic's bootstrap draws from NumPy's legacy global RNG
+    # (anesthetic.samples.logX uses a bare np.random.rand), so logZ and
+    # D_KL error bars vary run to run on identical input.  Seed and
+    # restore around it so repeated calls agree.  See issue #388.
+    from tidal.inference._visualize import _deterministic_render
+
+    with _deterministic_render():
+        stats = ns.stats(nsamples=n_bootstrap)
 
     d_kl_samples = stats["D_KL"].to_numpy()
     d_g_samples = stats["d_G"].to_numpy()

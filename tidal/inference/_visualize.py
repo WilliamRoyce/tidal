@@ -17,12 +17,44 @@ import math
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
     import numpy as np
 
     from tidal.inference._importance import ParameterImportanceResult
     from tidal.inference._results import InferenceResult
+
+
+# Seed for anesthetic's KDE sample-compression.  See _deterministic_render.
+RENDER_RNG_SEED = 0
+
+
+@contextlib.contextmanager
+def _deterministic_render(seed: int = RENDER_RNG_SEED) -> Iterator[None]:
+    """Make anesthetic's KDE sample-compression reproducible, and local.
+
+    ``anesthetic.utils.compress_weights`` defaults its ``u`` argument to
+    ``np.random.rand(len(w))`` and ``triangular_sample_compression_2d``
+    calls a bare ``np.random.choice``, both of which draw from NumPy's
+    legacy *global* state.  anesthetic exposes no way to thread a
+    ``Generator`` down from its plotting entry points, so seeding that
+    global state is the only lever available at this layer --- hence the
+    ``NPY002`` suppressions below.
+
+    Restoring the previous state on exit is the part that matters.  A bare
+    ``np.random.seed(0)`` leaves the whole process in a known state, so
+    anything drawing from the legacy global afterwards silently becomes a
+    function of how many renders happened first.  See issue #388.
+    """
+    import numpy as np
+
+    state = np.random.get_state()  # noqa: NPY002
+    np.random.seed(seed)  # noqa: NPY002
+    try:
+        yield
+    finally:
+        np.random.set_state(state)  # noqa: NPY002
 
 
 def plot_corner(
@@ -753,6 +785,13 @@ def _render_anesthetic_corner_into(
             atlas T5.1/T5.2 corner panels where one chain hit a sharp peak)
         All fall back to KDE diagonals + scatter cross-panels.
         """
+        # Reseed per attempt: a failed plot_2d has already consumed RNG
+        # state, so without this the fallback would render differently
+        # depending on which attempt succeeded (#388).
+        with _deterministic_render():
+            return _plot_2d_attempts(axes_arg)
+
+    def _plot_2d_attempts(axes_arg: object) -> object:
         try:
             return samples.plot_2d(
                 axes_arg,
