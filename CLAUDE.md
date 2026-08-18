@@ -39,6 +39,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - Gauge fixing via `[[gauge]]` TOML section (presets: Lorenz, de Donder, Coulomb, temporal, axial)
 - Velocity naming: v_{field_name} (e.g., v_phi_0, v_A_1) — E-L velocity form, not canonical momenta
 - **User-facing errors must include hints**: Use `error_with_hint(msg, hints)` from `tidal.cli._console` instead of bare `error()` for all CLI error messages. Each hint should be an actionable suggestion (example syntax, available options, related commands, troubleshooting steps). See existing ~60 error sites across CLI modules for the pattern.
+- **No environment-specific absolute paths in committed files**: TIDAL is meant to be distributed, so anything hardcoding `/workspaces/<name>`, `/home/<user>/...`, a machine-specific venv, or a Claude project slug works only for its author. Derive the root instead — shell scripts use `REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"` (see `scripts/hpc_shuttle.sh:13`); devcontainer lifecycle commands run *from* the workspace folder, so plain relative paths are correct; Claude Code hooks use `$CLAUDE_PROJECT_DIR`; the Claude project-dir slug is the absolute path with every non-alphanumeric character replaced by `-`, so derive it with `sed 's/[^a-zA-Z0-9]/-/g'` rather than pasting it. Machine-local files (`.claude/settings.local.json`, gitignored) are the one exception.
 
 ## Workflow Rules
 
