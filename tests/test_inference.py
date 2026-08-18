@@ -1312,9 +1312,7 @@ class TestMarginalDKLPriorTransforms:
 
     # -- prior_map handling --------------------------------------------
 
-    def test_zero_low_bound_not_dropped(
-        self, caplog: pytest.LogCaptureFixture
-    ) -> None:
+    def test_zero_low_bound_not_dropped(self, caplog: pytest.LogCaptureFixture) -> None:
         """Object-path priors with low == 0.0 must land in the prior map
         (pre-fix: `getattr(p, 'low', None) or ...` dropped falsy 0.0
         into the empirical fallback).  The fallback-with-metadata path
