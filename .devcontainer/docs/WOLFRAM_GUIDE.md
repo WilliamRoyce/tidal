@@ -98,7 +98,7 @@ wolframscript -code "2+2"
 wolframscript -code "Integrate[x^2, x]"
 
 # WolframKernel (direct)
-/home/vscode/.local/wolfram/engine/14.3/Executables/WolframKernel -noprompt -run "Print[2+2]; Exit[]"
+"$HOME/.local/wolfram/engine/14.3/Executables/WolframKernel" -noprompt -run "Print[2+2]; Exit[]"
 
 # Run script files
 wolframscript -file mycode.wls
@@ -128,7 +128,7 @@ session.terminate()
 If session startup fails, ensure the kernel is discoverable on `PATH` or pass the explicit kernel path:
 
 ```python
-kernel = "/home/vscode/.local/wolfram/engine/14.3/Executables/WolframKernel"
+kernel = "$HOME/.local/wolfram/engine/14.3/Executables/WolframKernel"
 session = WolframLanguageSession(kernel)
 ```
 

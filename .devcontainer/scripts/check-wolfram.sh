@@ -49,9 +49,9 @@ print_info() {
 }
 
 # Configuration
-KERNEL_PATH="/home/vscode/.local/wolfram/engine/14.3/Executables/WolframKernel"
-USERBASE_DIR="/home/vscode/.local/wolfram/userbase"
-CACHE_DIR="/home/vscode/.cache/Wolfram"
+KERNEL_PATH="$HOME/.local/wolfram/engine/14.3/Executables/WolframKernel"
+USERBASE_DIR="$HOME/.local/wolfram/userbase"
+CACHE_DIR="$HOME/.cache/Wolfram"
 
 clear
 print_header "Wolfram Engine Health Check"

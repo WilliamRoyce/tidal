@@ -3,9 +3,9 @@
 
 set -euo pipefail
 
-REPO_DIR="/home/vscode/.local/share/lsp-wl"
+REPO_DIR="$HOME/.local/share/lsp-wl"
 REPO_URL="https://github.com/kenkangxgwe/lsp-wl.git"
-KERNEL="/home/vscode/.local/wolfram/engine/14.3/Executables/WolframKernel"
+KERNEL="$HOME/.local/wolfram/engine/14.3/Executables/WolframKernel"
 
 if [[ -d "$REPO_DIR/.git" ]]; then
     git -C "$REPO_DIR" pull --ff-only

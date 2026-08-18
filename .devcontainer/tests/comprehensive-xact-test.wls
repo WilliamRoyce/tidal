@@ -61,11 +61,14 @@ Print[""];
 
 (* Test 3: Installation Persistence *)
 Print["Test 3: Installation Persistence..."];
+(* Resolve the xAct install location from Wolfram itself rather than hardcoding a
+   user's home directory -- same approach as scripts/install-xact-xcoba.sh. *)
+xActRoot = FileNameJoin[{$UserBaseDirectory, "Applications", "xAct"}];
 persistTests = {
-  {"Installation directory", FileExistsQ["/home/vscode/.local/wolfram/userbase/Applications/xAct"]},
-  {"xTensor files", FileExistsQ["/home/vscode/.local/wolfram/userbase/Applications/xAct/xTensor/xTensor.m"]},
-  {"xCoba files", FileExistsQ["/home/vscode/.local/wolfram/userbase/Applications/xAct/xCoba/xCoba.m"]},
-  {"xPerm backup", FileExistsQ["/home/vscode/.local/wolfram/userbase/Applications/xAct/xPerm/xPerm.m.backup"]}
+  {"Installation directory", FileExistsQ[xActRoot]},
+  {"xTensor files", FileExistsQ[FileNameJoin[{xActRoot, "xTensor", "xTensor.m"}]]},
+  {"xCoba files", FileExistsQ[FileNameJoin[{xActRoot, "xCoba", "xCoba.m"}]]},
+  {"xPerm backup", FileExistsQ[FileNameJoin[{xActRoot, "xPerm", "xPerm.m.backup"}]]}
 };
 
 For[i = 1, i <= Length[persistTests], i++,

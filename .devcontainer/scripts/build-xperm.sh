@@ -56,7 +56,7 @@ print_step() {
 
 # Configuration
 XPERM_DIR="$WOLFRAM_USERBASE/Applications/xAct/xPerm/mathlink"
-MATHLINK_DIR="/home/vscode/.local/wolfram/engine/14.3/SystemFiles/Links/MathLink/DeveloperKit/Linux-x86-64/CompilerAdditions"
+MATHLINK_DIR="$HOME/.local/wolfram/engine/14.3/SystemFiles/Links/MathLink/DeveloperKit/Linux-x86-64/CompilerAdditions"
 
 clear
 print_header "xPerm MathLink Compiler and Installer"
@@ -174,7 +174,7 @@ cat > xperm.linux.64-bit.wrapper << 'EOF'
 #!/bin/bash
 # xPerm MathLink Wrapper - Auto-generated
 # This wrapper sets the correct library path for MathLink shared libraries
-MATHLINK_DIR="/home/vscode/.local/wolfram/engine/14.3/SystemFiles/Links/MathLink/DeveloperKit/Linux-x86-64/CompilerAdditions"
+MATHLINK_DIR="$HOME/.local/wolfram/engine/14.3/SystemFiles/Links/MathLink/DeveloperKit/Linux-x86-64/CompilerAdditions"
 export LD_LIBRARY_PATH="$MATHLINK_DIR:$LD_LIBRARY_PATH"
 exec "$(dirname "$0")/xperm.linux.64-bit.compiled" "$@"
 EOF

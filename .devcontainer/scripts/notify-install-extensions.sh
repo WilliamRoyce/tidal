@@ -33,7 +33,7 @@ print_info() {
 }
 
 # Configuration
-NOTIFICATION_FILE="/home/vscode/.vscode-server/data/extension-install-needed.txt"
+NOTIFICATION_FILE="$HOME/.vscode-server/data/extension-install-needed.txt"
 
 echo ""
 echo "${BOLD}${BLUE}VS Code Extension Installation Notification${RESET}"

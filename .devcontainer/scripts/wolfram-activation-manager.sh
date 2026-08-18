@@ -49,9 +49,9 @@ print_info() {
 }
 
 # Configuration
-USERBASE_DIR="/home/vscode/.local/wolfram/userbase"
+USERBASE_DIR="$HOME/.local/wolfram/userbase"
 BACKUP_DIR="$USERBASE_DIR/.activation_backup"
-CACHE_DIR="/home/vscode/.cache/Wolfram"
+CACHE_DIR="$HOME/.cache/Wolfram"
 
 # Verify prerequisites
 if [[ ! -d "$USERBASE_DIR" ]]; then

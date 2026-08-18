@@ -52,7 +52,7 @@ print_info() {
 }
 
 # Configuration
-LOG_FILE="/home/vscode/.vscode-server/data/logs/install-extensions.log"
+LOG_FILE="$HOME/.vscode-server/data/logs/install-extensions.log"
 mkdir -p "$(dirname "$LOG_FILE")"
 
 # Also output to both terminal and log file
@@ -100,7 +100,7 @@ find_vscode_cli() {
     local candidates=(
         "code"
         "/vscode/vscode-server/bin/*/bin/remote-cli/code"
-        "/home/vscode/.vscode-server/bin/*/bin/remote-cli/code"
+        "$HOME/.vscode-server/bin/*/bin/remote-cli/code"
     )
 
     for candidate in "${candidates[@]}"; do
@@ -196,10 +196,10 @@ echo "${BOLD}[Step 3/3]${RESET} Cleaning VS Code Caches..."
 echo ""
 
 print_info "Removing cached profile data..."
-rm -rf /home/vscode/.vscode-server/data/CachedProfilesData 2>/dev/null || true
+rm -rf "$HOME/.vscode-server/data/CachedProfilesData" 2>/dev/null || true
 
 print_info "Removing cached extension data..."
-rm -rf /home/vscode/.vscode-server/data/CachedExtensionsData 2>/dev/null || true
+rm -rf "$HOME/.vscode-server/data/CachedExtensionsData" 2>/dev/null || true
 
 print_success "Cache cleanup complete"
 echo ""
