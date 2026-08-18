@@ -191,11 +191,13 @@ def velocity_row_scale(
     -------
     float | NDArray[np.float64]
         Multiplicative factor to apply to every velocity-row contribution
-        for ``field_name``. ``1.0`` for the no-op path. Modal solver paths
-        that pre-build complex per-mode matrices may receive an array here
-        and need to either reduce it (e.g. take ``.ravel()[0]`` for the
-        constant-coefficient approximation) or fail loudly — see
-        ``modal.py:732`` for the current per-mode-Padé behavior.
+        for ``field_name``. ``1.0`` for the no-op path.
+
+        An array is only ever returned when ``grid`` is supplied, which
+        builds the ``coord_arrays`` the expression needs (GH #382).  The
+        four time-domain backends do this; the modal builders currently do
+        not, so a position-dependent kinetic reaching them raises rather
+        than being silently reduced — see GH #421.
 
     See Also
     --------

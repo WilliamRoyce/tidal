@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -692,11 +693,48 @@ class TestListCommand:
 
         out = capsys.readouterr().out
         assert "klein_gordon_1d.json" in out
-        assert "specifications found" in out
+        # The inline-spec fixtures share one session directory, so the count
+        # depends on which other fixtures have run.  Match either form rather
+        # than depending on test ordering.
+        assert re.search(r"\d+ specifications? found", out)
 
-    def test_list_nonexistent_dir(self) -> None:
+    def test_list_nonexistent_dir(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
         ret = main(["list", "--dir", "/nonexistent/dir"])
         assert ret == 1
+
+        err = capsys.readouterr().err
+        assert "/nonexistent/dir" in err
+        assert "--dir" in err
+
+    def test_list_no_examples_dir_hints_at_repository(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Installed-from-a-wheel case: no examples/data anywhere (#418).
+
+        The distribution ships only the ``tidal`` package, so neither the
+        cwd nor the package parent holds ``examples/data``.  The user gets
+        an actionable hint rather than an empty table.
+        """
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            "tidal.cli._list._find_examples_dir",
+            lambda: tmp_path / "examples" / "data",
+        )
+
+        ret = main(["list"])
+        assert ret == 1
+
+        err = capsys.readouterr().err
+        assert "no examples directory found" in err
+        # Points at the repository rather than just reporting a missing path.
+        assert "repository" in err
+        assert "--dir" in err
 
 
 class TestSimulateCommand:
