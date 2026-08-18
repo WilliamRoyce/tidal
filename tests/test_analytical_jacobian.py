@@ -643,7 +643,12 @@ class TestJacobianDelivery:
         # Lower DENSE_THRESHOLD so system is in sparse tier
         with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
             result = try_analytical_jacobian(
-                options, spec, layout, grid, "periodic", {},
+                options,
+                spec,
+                layout,
+                grid,
+                "periodic",
+                {},
             )
 
         assert result is True
@@ -709,7 +714,12 @@ class TestJacobianDelivery:
             patch("tidal.solver._types.SUPERLU_NNZ_LIMIT", 1),
         ):
             result = try_analytical_jacobian(
-                options, spec, layout, grid, "periodic", {},
+                options,
+                spec,
+                layout,
+                grid,
+                "periodic",
+                {},
             )
 
         assert result is True
@@ -846,7 +856,10 @@ class TestCirculantOperatorMatrix:
             mat = build_operator_matrix(op, grid, ("periodic", "periodic", "periodic"))
             ref = self._build_probing(op, grid, ("periodic", "periodic", "periodic"))
             np.testing.assert_allclose(
-                mat.toarray(), ref.toarray(), atol=1e-14, err_msg=f"{op} mismatch",
+                mat.toarray(),
+                ref.toarray(),
+                atol=1e-14,
+                err_msg=f"{op} mismatch",
             )
 
     def test_identity_uses_probing_fallback(self) -> None:
@@ -912,7 +925,9 @@ class TestMultiTheorySparseJacobian:
             grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
         elif ndim == 2:
             grid = GridInfo(
-                bounds=((0, 10), (0, 10)), shape=(6, 6), periodic=(True, True),
+                bounds=((0, 10), (0, 10)),
+                shape=(6, 6),
+                periodic=(True, True),
             )
         else:
             grid = GridInfo(
@@ -1034,7 +1049,12 @@ class TestTryAnalyticalJacobian:
 
         options: dict[str, Any] = {}
         result = try_analytical_jacobian(
-            options, spec, layout, grid, "periodic", {"H": 1.0},
+            options,
+            spec,
+            layout,
+            grid,
+            "periodic",
+            {"H": 1.0},
         )
 
         assert result is False
@@ -1654,7 +1674,12 @@ class TestSuperLUNnzFallback:
         ):
             warnings.simplefilter("always")
             configure_linear_solver(
-                options, layout, spec, grid, "periodic", parameters={"H": 1.0},
+                options,
+                layout,
+                spec,
+                grid,
+                "periodic",
+                parameters={"H": 1.0},
             )
 
         assert options["linsolver"] == "gmres"
@@ -1681,7 +1706,12 @@ class TestSuperLUNnzFallback:
         options: dict[str, Any] = {}
         with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
             configure_linear_solver(
-                options, layout, spec, grid, "periodic", parameters={"H": 1.0},
+                options,
+                layout,
+                spec,
+                grid,
+                "periodic",
+                parameters={"H": 1.0},
             )
 
         assert options["linsolver"] == "sparse"
@@ -1707,7 +1737,12 @@ class TestSuperLUNnzFallback:
         ):
             warnings.simplefilter("always")
             configure_linear_solver(
-                options, layout, spec, grid, "periodic", parameters={"H": 1.0},
+                options,
+                layout,
+                spec,
+                grid,
+                "periodic",
+                parameters={"H": 1.0},
             )
 
         user_warnings = [

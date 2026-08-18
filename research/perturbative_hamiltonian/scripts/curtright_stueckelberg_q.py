@@ -432,7 +432,9 @@ def EL(L, q):
     return sp.diff(L, q) - sp.diff(sp.diff(L, sp.diff(q, t)), t)
 
 
-EOMs = {n: sp.simplify(EL(L_min_IBP, q)) for n, q in zip(field_names, fields, strict=False)}
+EOMs = {
+    n: sp.simplify(EL(L_min_IBP, q)) for n, q in zip(field_names, fields, strict=False)
+}
 for n, eqn in EOMs.items():
     log(f"EOM[{n}] =", eqn)
 

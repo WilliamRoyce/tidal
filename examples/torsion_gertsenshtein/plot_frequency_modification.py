@@ -79,7 +79,12 @@ def main() -> None:
         try:
             times, p_vals = compute_p(dirname)
             ax_pt.plot(
-                times, p_vals, color=color, linewidth=1.5, label=label, alpha=0.85,
+                times,
+                p_vals,
+                color=color,
+                linewidth=1.5,
+                label=label,
+                alpha=0.85,
             )
         except FileNotFoundError:
             print(f"  Warning: {dirname} not found, skipping")

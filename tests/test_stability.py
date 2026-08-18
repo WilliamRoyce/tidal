@@ -270,7 +270,12 @@ class TestProbePerformance:
         return _load_t1()
 
     def test_probe_perf(self, t1: tuple[EquationSystem, GridInfo]) -> None:
-        """Median probe wall ≤ 6 ms over 1000 random param dicts (T1, N=32)."""
+        """Probe wall stays within the recorded budget (T1, N=32).
+
+        Guard only -- the asserted budget below is the operative number.
+        Wall-clock here is load-sensitive, so this catches gross regressions
+        rather than pinning a precise figure.
+        """
         spec, grid = t1
 
         rng = np.random.default_rng(0)
@@ -311,13 +316,14 @@ class TestProbePerformance:
         #  * Phases 1-2 (commit 350b53b et al.): per-process spec cache
         #    + parameter-independent structural cache for the probe
         #    saved ~2 ms/call.
-        #  * Phase 3 (commit XXXXXXX): ``np.einsum`` → ``np.matmul``
+        #  * Phase 3 (commit 49c9d447): ``np.einsum`` → ``np.matmul``
         #    refactor inside ``_build_evolution_matrices``.  Batched
         #    3-D matmul dispatches to BLAS gemm; the 3-way einsums
         #    that replicated ``(U @ K) @ V`` were ~70× slower without
         #    ``optimize=True``.  Saved ~12 ms/call.
         #
-        # Combined: median dropped from ≈ 27.6 ms → ≈ 13 ms (2.13×).
+        # Combined, as measured at the time: ≈ 27.6 ms → ≈ 13 ms (2.13×).
+        # (Historical -- superseded by the post-#341 figure below.)
         #
         # Post-#341 (threshold 0.30 → 0.15): the spectral-radius
         # prefilter cutoff is ``threshold * t_test`` so dropping the

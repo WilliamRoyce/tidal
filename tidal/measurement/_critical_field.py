@@ -252,7 +252,11 @@ def _process_group(  # noqa: PLR0913, PLR0914, PLR0917
 
     # Error: interpolation model (quadratic vs linear)
     err_interp = _interpolation_model_error(
-        b_vals, m_vals, crossing_idx, threshold, b_min,
+        b_vals,
+        m_vals,
+        crossing_idx,
+        threshold,
+        b_min,
     )
 
     # Combined error (metric error requires replicate data, not available here)

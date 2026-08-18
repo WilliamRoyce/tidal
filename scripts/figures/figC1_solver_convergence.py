@@ -19,9 +19,7 @@ from __future__ import annotations
 
 def main() -> None:
     msg = "figC1_solver_convergence: implement during the App C drafting session."
-    raise NotImplementedError(
-        msg
-    )
+    raise NotImplementedError(msg)
 
 
 if __name__ == "__main__":

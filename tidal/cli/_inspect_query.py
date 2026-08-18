@@ -141,10 +141,17 @@ def show_equation(  # noqa: PLR0913
     records: list[dict[str, Any]] = []
     text: list[str] = []
     for name in requested:
-        text.extend(_equation_lines(spec, name, records, as_json=as_json,
-                                    parameters=parameters,
-                                    assume_positive=assume_positive,
-                                    assume_nonzero=assume_nonzero))
+        text.extend(
+            _equation_lines(
+                spec,
+                name,
+                records,
+                as_json=as_json,
+                parameters=parameters,
+                assume_positive=assume_positive,
+                assume_nonzero=assume_nonzero,
+            )
+        )
 
     if as_json:
         print(json.dumps({"items": [_project(r, fields) for r in records]}, indent=2))

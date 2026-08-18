@@ -688,9 +688,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         default=False,
         help=(
-            "Run stability checks: tachyon detection (negative mass-matrix eigenvalues) "
-            "and ghost detection (wrong-sign kinetic terms from Hamiltonian). "
-            "Uses a 1-point grid; exact for constant-coefficient systems."
+            "Run stability checks: tachyon detection (negative mass-matrix "
+            "eigenvalues). Uses a 1-point grid; exact for constant-coefficient "
+            "systems. Ghost detection is not included -- Hamiltonian kinetic "
+            "coefficients alone cannot distinguish ghosts from gauge structure."
         ),
     )
     validate_parser.add_argument(
@@ -1994,7 +1995,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "(default: -100). For baseline-normalized maximize/minimize runs the "
             "natural physics logL is near 0, so -100 drags logZ to -100 and makes "
             "the PolyChord precision criterion unreachable. Use -15 (or similar) "
-            "to keep logZ in a sensible range. See issue #372."
+            "to keep logZ in a sensible range. See issue #375."
         ),
     )
     # Sampling method

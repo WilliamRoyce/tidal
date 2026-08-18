@@ -24,9 +24,7 @@ def main() -> None:
         "fig3_trace_ghost_growth: implement during the §4.5 drafting session "
         "(conditional on data quality)."
     )
-    raise NotImplementedError(
-        msg
-    )
+    raise NotImplementedError(msg)
 
 
 if __name__ == "__main__":

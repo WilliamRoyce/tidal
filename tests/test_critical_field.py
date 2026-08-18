@@ -188,7 +188,10 @@ class TestInterpolation:
 
         # Without interpolation
         result_no_interp = compute_critical_field(
-            sweep, "B0", threshold=0.5, interpolate=False,
+            sweep,
+            "B0",
+            threshold=0.5,
+            interpolate=False,
         )
         b_min_no_interp = result_no_interp.rows[0]["B_min"]
 

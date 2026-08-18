@@ -66,11 +66,16 @@ def build_q_basis_constrained():
     constraints = []
     for a, b, cc in product(range(4), repeat=3):
         constraints.append(c[a, b, cc] + c[a, cc, b])
-    constraints.extend(sum(ETA_INV[a, a] * c[a, a, cc] for a in range(4)) for cc in range(4))
-    constraints.extend(sum(
-                eps_down(a, b, cc, d) * c[a, b, cc]
-                for a, b, cc in product(range(4), repeat=3)
-            ) for d in range(4))
+    constraints.extend(
+        sum(ETA_INV[a, a] * c[a, a, cc] for a in range(4)) for cc in range(4)
+    )
+    constraints.extend(
+        sum(
+            eps_down(a, b, cc, d) * c[a, b, cc]
+            for a, b, cc in product(range(4), repeat=3)
+        )
+        for d in range(4)
+    )
     sol = sp.linsolve(constraints, syms)
     sub = dict(zip(syms, next(iter(sol)), strict=False))
     free = set()

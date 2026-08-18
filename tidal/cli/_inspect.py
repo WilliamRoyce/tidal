@@ -351,10 +351,14 @@ def _print_equations(spec: object, *, detail: str = "full") -> None:
         )
         for eq in spec.equations:
             kind = "dynamical" if eq.time_derivative_order > 0 else "constraint"
-            print(f"  {eq.field_name:<12s} {kind:<12s} time_order={eq.time_derivative_order}")
+            print(
+                f"  {eq.field_name:<12s} {kind:<12s} time_order={eq.time_derivative_order}"
+            )
         print()
 
-    print("Equations:" if detail != "summary" else "Signs (proven only; ? = undecided):")
+    print(
+        "Equations:" if detail != "summary" else "Signs (proven only; ? = undecided):"
+    )
     for eq in spec.equations:
         for line in _render_equation(eq, summary=detail == "summary"):
             print(line)

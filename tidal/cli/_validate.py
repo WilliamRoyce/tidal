@@ -509,7 +509,8 @@ def validate_command(args: Namespace) -> int:
     errors.extend(pert_errors)
     warnings.extend(pert_warnings)
 
-    # Check 6: Stability — tachyon and ghost mode detection
+    # Check 6: Stability — tachyon detection (see _run_stability_checks:
+    # ghost detection is deliberately not attempted here)
     if getattr(args, "stability", False):
         from tidal.symbolic.json_loader import EquationSystem
 

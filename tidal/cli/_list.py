@@ -41,15 +41,32 @@ def list_command(args: Namespace) -> int:
     from tidal.cli._inspect import discover_parameters
     from tidal.symbolic.json_loader import load_equation_system
 
-    scan_dir = Path(args.dir) if args.dir else _find_examples_dir()
+    explicit_dir = args.dir is not None
+    scan_dir = Path(args.dir) if explicit_dir else _find_examples_dir()
 
     if not scan_dir.is_dir():
         from tidal.cli._console import error_with_hint
 
-        error_with_hint(
-            f"directory not found: {scan_dir}",
-            hints=["Default: examples/data/. Override with positional arg."],
-        )
+        if explicit_dir:
+            error_with_hint(
+                f"directory not found: {scan_dir}",
+                hints=["Check the path given to --dir."],
+            )
+        else:
+            # Neither the cwd nor the package parent holds examples/data.
+            # The usual cause is an installed wheel: the distribution ships
+            # only the ``tidal`` package, so the example specs are absent
+            # (see [tool.setuptools.packages.find] in pyproject.toml).
+            error_with_hint(
+                "no examples directory found",
+                hints=[
+                    "The example specs ship with the repository, not with the "
+                    "installed package.",
+                    "Clone it and run from the checkout: "
+                    "git clone https://github.com/WilliamRoyce/tidal",
+                    "Or scan your own specs: tidal list --dir PATH",
+                ],
+            )
         return 1
 
     json_files = sorted(scan_dir.glob("*.json"))

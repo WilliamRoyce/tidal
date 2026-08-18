@@ -80,7 +80,12 @@ def _plot_energy(ax: Axes, results: dict[str, Any]) -> None:
     for name, series in eng["per_field"].items():
         ax.plot(times, series, label=name, linewidth=1.2)
     ax.plot(
-        times, eng["interaction"], "--", label="interaction", linewidth=1.0, alpha=0.7,
+        times,
+        eng["interaction"],
+        "--",
+        label="interaction",
+        linewidth=1.0,
+        alpha=0.7,
     )
     ax.plot(times, eng["total"], "k-", label="total", linewidth=1.0, alpha=0.5)
     ax.legend(fontsize=7, ncol=2)

@@ -876,7 +876,9 @@ constraint_data = {
     },
 }
 
-with Path(results_dir / "vt_T4_constraint_matrix.json").open("w", encoding="utf-8") as f:
+with Path(results_dir / "vt_T4_constraint_matrix.json").open(
+    "w", encoding="utf-8"
+) as f:
     json.dump(constraint_data, f, indent=2)
 print(f"Wrote constraint analysis to: {results_dir / 'vt_T4_constraint_matrix.json'}")
 print()

@@ -150,7 +150,9 @@ date-released: 2026-01-01
         return temp_dir
 
     def test_get_current_versions(
-        self, mock_project: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        mock_project: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test reading current versions from files."""
         bumper = VersionBumper("0.2.0", dry_run=True)
@@ -166,7 +168,9 @@ date-released: 2026-01-01
         assert "__init__.py" not in versions
 
     def test_update_pyproject_toml_regex(
-        self, mock_project: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        mock_project: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test updating pyproject.toml with regex (no tomli_w)."""
         bumper = VersionBumper("0.2.0", dry_run=False)
@@ -186,7 +190,9 @@ date-released: 2026-01-01
             scripts.bump_version.has_tomli_w = original_has_tomli
 
     def test_update_citation_cff_regex(
-        self, mock_project: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        mock_project: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test updating CITATION.cff with regex (no ruamel.yaml)."""
         bumper = VersionBumper("0.2.0", dry_run=False)
@@ -211,7 +217,9 @@ date-released: 2026-01-01
             scripts.bump_version.has_ruamel_yaml = original_has_ruamel
 
     def test_update_next_phases_md(
-        self, mock_project: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        mock_project: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test updating version in docs/NEXT_PHASES.md."""
         bumper = VersionBumper("0.2.0", dry_run=False)
@@ -225,7 +233,9 @@ date-released: 2026-01-01
         assert "**Tests:** 100 collected" in content
 
     def test_update_roadmap_md(
-        self, mock_project: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        mock_project: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test updating current version in docs/ROADMAP.md."""
         bumper = VersionBumper("0.2.0", dry_run=False)
@@ -239,7 +249,9 @@ date-released: 2026-01-01
         assert "0.0.1 delivered initial" in content
 
     def test_update_security_md(
-        self, mock_project: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        mock_project: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test updating supported version table in SECURITY.md."""
         bumper = VersionBumper("0.6.0", dry_run=False)
@@ -264,7 +276,9 @@ class TestBackupRestore:
             yield Path(tmpdir)
 
     def test_backup_creation(
-        self, temp_dir: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        temp_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that backups are created correctly."""
         # Create test files
@@ -287,7 +301,9 @@ class TestBackupRestore:
         assert backup_file.read_text() == "original content"
 
     def test_backup_restore(
-        self, temp_dir: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        temp_dir: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that backups are restored on rollback."""
         # Create test files
@@ -328,7 +344,9 @@ class TestErrorConditions:
             bumper.validate()
 
     def test_missing_file_raises_error(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Test that missing file raises error during validation."""
         bumper = VersionBumper("0.2.0", dry_run=False, allow_dirty=True)

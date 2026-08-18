@@ -18,9 +18,7 @@ from __future__ import annotations
 
 def main() -> None:
     msg = "fig2_propagating_torsion_map: implement during the §4.4 drafting session."
-    raise NotImplementedError(
-        msg
-    )
+    raise NotImplementedError(msg)
 
 
 if __name__ == "__main__":

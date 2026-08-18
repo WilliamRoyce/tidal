@@ -231,6 +231,11 @@ cmd_submit() {
   if [[ -n "$campaign" ]]; then
     recorded_cmd="${cmd//\$\{CAMPAIGN_DIR\}/${camp_path}}"
   fi
+  # ${RESULTS_DIR} is only defined inside the sbatch script on the compute
+  # node, so a literal one recorded here would be unresolvable at pull time.
+  # The job id is known now, so expand it to the same path the template uses.
+  recorded_cmd="${recorded_cmd//\$\{RESULTS_DIR\}/${REMOTE_ROOT}/hpc_results/${jobid}}"
+  recorded_cmd="${recorded_cmd//\$RESULTS_DIR/${REMOTE_ROOT}/hpc_results/${jobid}}"
   echo "$(date -Iseconds) $jobid $name $template $recorded_cmd" >> "$JOBS_FILE"
   echo "$jobid"
   # User-visible reminder: HPC jobs that crash on startup typically die
@@ -307,6 +312,10 @@ cmd_pull() {
       line="$(awk -v j="$jobid" '$2==j' "$JOBS_FILE" | tail -1)"
       if [[ -n "$line" ]]; then
         src="$(sed -n 's/.*--output \([^ ]*\).*/\1/p' <<<"$line")"
+        # Records written before ${RESULTS_DIR} was expanded at submit time
+        # carry the literal string.  Resolve it here so historical jobs pull.
+        src="${src//\$\{RESULTS_DIR\}/${REMOTE_ROOT}/hpc_results/${jobid}}"
+        src="${src//\$RESULTS_DIR/${REMOTE_ROOT}/hpc_results/${jobid}}"
       fi
     fi
     [[ -n "$src" ]] || die "could not resolve remote output path for job $jobid; pass --src PATH explicitly"

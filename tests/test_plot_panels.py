@@ -234,7 +234,11 @@ class TestRenderSweep1dGrouped:
         results = _make_sweep_results(n_points=5, n_params=2)
         fig, ax = plt.subplots()
         render_sweep_1d_grouped(
-            ax, results, "P_max", x_param="param1", group_param="param0",
+            ax,
+            results,
+            "P_max",
+            x_param="param1",
+            group_param="param0",
         )
         # One line per unique value of param0 (the group parameter).
         # The _make_sweep_results fixture uses linspace(-1, 1, 5) so
@@ -261,7 +265,11 @@ class TestRenderSweep1dGrouped:
         fig, ax = plt.subplots()
         with pytest.raises(ValueError, match="exactly 2 swept parameters"):
             render_sweep_1d_grouped(
-                ax, results_1d, "P_max", x_param="param0", group_param="param0",
+                ax,
+                results_1d,
+                "P_max",
+                x_param="param0",
+                group_param="param0",
             )
         plt.close(fig)
 
@@ -270,7 +278,11 @@ class TestRenderSweep1dGrouped:
         fig, ax = plt.subplots()
         with pytest.raises(ValueError, match="exactly 2 swept parameters"):
             render_sweep_1d_grouped(
-                ax, results_3d, "P_max", x_param="param0", group_param="param1",
+                ax,
+                results_3d,
+                "P_max",
+                x_param="param0",
+                group_param="param1",
             )
         plt.close(fig)
 

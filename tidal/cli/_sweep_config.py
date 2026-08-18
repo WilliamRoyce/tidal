@@ -207,7 +207,8 @@ def _parse_range(
             )
             raise ValueError(msg)
         return cast(
-            "list[float]", np.logspace(np.log10(start), np.log10(stop), count).tolist(),
+            "list[float]",
+            np.logspace(np.log10(start), np.log10(stop), count).tolist(),
         ), {}
     msg = f"[sweep.{name}] unknown scale '{scale}' (expected: linear, log, adaptive)"
     raise ValueError(msg)
@@ -243,7 +244,9 @@ def _parse_sweeps(
             if not isinstance(section, dict):
                 continue
             values, ac = _parse_sweep_section(
-                name, cast("dict[str, Any]", section), strategy=strategy,
+                name,
+                cast("dict[str, Any]", section),
+                strategy=strategy,
             )
             swept[name] = values
             if ac:

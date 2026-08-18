@@ -111,7 +111,11 @@ def _make_rank_deficient_spec() -> EquationSystem:
 def _build_eval_context(
     spec: EquationSystem,
 ) -> tuple[
-    StateLayout, GridInfo, CoefficientEvaluator, list[np.ndarray], tuple[int, ...],
+    StateLayout,
+    GridInfo,
+    CoefficientEvaluator,
+    list[np.ndarray],
+    tuple[int, ...],
 ]:
     grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
     layout = StateLayout.from_spec(spec, grid.num_points)
@@ -354,10 +358,20 @@ def test_svd_schur_continuity_through_critical_point() -> None:
     layout_c, grid_c, ce_c, kg_c, rs_c = _build_eval_context(spec_crit)
 
     A_near, _, _, _, _, _, _, _ = _build_evolution_matrices(
-        spec_near, layout_n, grid_n, ce_n, kg_n, rs_n,
+        spec_near,
+        layout_n,
+        grid_n,
+        ce_n,
+        kg_n,
+        rs_n,
     )
     A_crit, _, _, _, _, _, _, _ = _build_evolution_matrices(
-        spec_crit, layout_c, grid_c, ce_c, kg_c, rs_c,
+        spec_crit,
+        layout_c,
+        grid_c,
+        ce_c,
+        kg_c,
+        rs_c,
     )
 
     # Compare eigenvalues at a representative non-DC mode
@@ -546,10 +560,20 @@ def test_kcc_rank_deficient_pinv_continuity() -> None:
     layout_c, grid_c, ce_c, kg_c, rs_c = _build_eval_context(spec_crit)
 
     A_near, _, _, _, _, _, _, _ = _build_evolution_matrices(
-        spec_near, layout_n, grid_n, ce_n, kg_n, rs_n,
+        spec_near,
+        layout_n,
+        grid_n,
+        ce_n,
+        kg_n,
+        rs_n,
     )
     A_crit, _, _, _, _, _, _, _ = _build_evolution_matrices(
-        spec_crit, layout_c, grid_c, ce_c, kg_c, rs_c,
+        spec_crit,
+        layout_c,
+        grid_c,
+        ce_c,
+        kg_c,
+        rs_c,
     )
 
     m_idx = 2
@@ -569,10 +593,12 @@ def test_kcc_rank_deficient_pinv_continuity() -> None:
 
     # Physical eigenvalues (|λ| > 0.01) should be continuous
     phys_near: list[complex] = sorted(
-        w_near[np.abs(w_near) > 0.01], key=lambda z: -abs(z.imag),
+        w_near[np.abs(w_near) > 0.01],
+        key=lambda z: -abs(z.imag),
     )
     phys_crit: list[complex] = sorted(
-        w_crit[np.abs(w_crit) > 0.01], key=lambda z: -abs(z.imag),
+        w_crit[np.abs(w_crit) > 0.01],
+        key=lambda z: -abs(z.imag),
     )
 
     if phys_near and phys_crit:

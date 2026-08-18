@@ -384,7 +384,9 @@ DT_x_DT_TERMS = [
 
 
 def main():
-    out_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent.replace("scripts", "results")
+    out_dir = pathlib.Path(pathlib.Path(__file__).resolve()).parent.replace(
+        "scripts", "results"
+    )
     pathlib.Path(out_dir).mkdir(exist_ok=True, parents=True)
     transcript_path = os.path.join(out_dir, "recipe1_preflight_transcript.txt")
     json_path = os.path.join(out_dir, "recipe1_q_kinetic_structure.json")

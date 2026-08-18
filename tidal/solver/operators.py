@@ -564,7 +564,10 @@ class _PadBufferCache:
         self._cache.clear()
 
     def get(
-        self, data_shape: tuple[int, ...], axis: int, ng: int | None = None,
+        self,
+        data_shape: tuple[int, ...],
+        axis: int,
+        ng: int | None = None,
     ) -> _PadEntry:
         if ng is None:
             ng = _n_ghost
@@ -643,11 +646,15 @@ def _pad_axis(
             left_ghost_slc = entry.left_slcs[left_ghost_idx]
             if k == 0:
                 np.multiply(
-                    f_lo, data[entry.recursive_left_src[0]], out=buf[left_ghost_slc],
+                    f_lo,
+                    data[entry.recursive_left_src[0]],
+                    out=buf[left_ghost_slc],
                 )
             else:
                 np.multiply(
-                    f_lo, buf[entry.recursive_left_src[k]], out=buf[left_ghost_slc],
+                    f_lo,
+                    buf[entry.recursive_left_src[k]],
+                    out=buf[left_ghost_slc],
                 )
             if c_lo != 0.0:
                 buf[left_ghost_slc] += c_lo
@@ -656,11 +663,15 @@ def _pad_axis(
             right_ghost_slc = entry.right_slcs[right_ghost_idx]
             if k == 0:
                 np.multiply(
-                    f_hi, data[entry.recursive_right_src[0]], out=buf[right_ghost_slc],
+                    f_hi,
+                    data[entry.recursive_right_src[0]],
+                    out=buf[right_ghost_slc],
                 )
             else:
                 np.multiply(
-                    f_hi, buf[entry.recursive_right_src[k]], out=buf[right_ghost_slc],
+                    f_hi,
+                    buf[entry.recursive_right_src[k]],
+                    out=buf[right_ghost_slc],
                 )
             if c_hi != 0.0:
                 buf[right_ghost_slc] += c_hi
