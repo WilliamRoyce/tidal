@@ -563,6 +563,12 @@ def compute_parameter_importance(
         "superadditivity_ok": bool(superadditivity_ok),
         "product_prior": product_prior,
         "saturated_params": saturated,
+        # Kish effective sample size of the posterior weights: the marginal
+        # estimator's noise floor is ~(n_bins - 1)/(2 n_eff) PER PARAMETER,
+        # so tiny n_eff (e.g. floor-contaminated chains) makes every
+        # marginal read as spuriously informative.  Recorded so readers
+        # can judge whether small marginals are signal or floor.
+        "n_eff": n_eff,
         "note": (
             "sum(marginals) <= joint D_KL is exact for product priors; "
             "approximate when a radial_angular joint prior is present. "
