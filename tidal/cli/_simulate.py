@@ -1873,7 +1873,7 @@ def _has_time_dependent_coeffs(spec: EquationSystem) -> bool:
     return any(term.time_dependent for eq in spec.equations for term in eq.rhs_terms)
 
 
-def _resolve_scheme(  # noqa: C901
+def _resolve_scheme(  # noqa: C901, PLR0912
     scheme: str,
     spec: EquationSystem,
     grid: GridInfo | None = None,
@@ -1920,8 +1920,25 @@ def _resolve_scheme(  # noqa: C901
     # ValueError carries an actionable message — propagate it instead
     # of silently falling back to the full spec, which would make the
     # modal-eligibility check fail for an unrelated reason and mislead
-    # the user with "auto-selected: CVODE" (#277).
-    eligibility_spec = spec.base_spec() if spec.has_corrections() else spec
+    # the user with "auto-selected: CVODE" (#277).  KineticEvalError from
+    # canonicalization is a ValueError subclass, so the same contract
+    # covers it.
+    #
+    # GH #421: build the eligibility spec the way PerturbativeSolver
+    # actually will — canonicalize kinetics FIRST, then take the base.
+    # Plain base_spec() keeps a position-dependent kinetic whose
+    # non-constant part is entirely O(ε) (e.g. the Euler-Heisenberg
+    # dual-Gaussian spec), which would wrongly fail can_use_modal's
+    # kinetic check and silently de-select modal for a flow the
+    # perturbative driver handles fine.
+    if spec.has_corrections():
+        pert_meta = spec.metadata.get("perturbation", {}) or {}
+        small = list(pert_meta.get("small_parameters", []))
+        eligibility_spec = spec.canonicalize_kinetic_for_perturbation(small).base_spec(
+            small
+        )
+    else:
+        eligibility_spec = spec
 
     if scheme != "auto":
         if scheme in {"modal", "modal-jax"} and grid is not None:
@@ -1932,7 +1949,8 @@ def _resolve_scheme(  # noqa: C901
                 msg = (
                     f"--scheme {scheme} requested but system is not eligible. "
                     "Modal solver requires: flat metric, all-periodic BCs, "
-                    "time-independent coefficients, and supported spatial "
+                    "time-independent coefficients, constant (non-position-"
+                    "dependent) kinetic coefficients, and supported spatial "
                     "operators.  Use 'auto' or another solver."
                 )
                 raise RuntimeError(msg)

@@ -384,6 +384,47 @@ torsion kinetic term; the torsion fields become algebraic constraints and the sy
 reduces to the standard Einstein-Maxwell Gertsenshtein model.  This is a useful
 control check: the conversion probability should recover $P = \sin^2(\kappa B_0 D/2)$.
 
+\subsubsection{NotImplementedError: position-dependent kinetic coefficient in modal}
+\label{sec:troubleshooting-posdep-kinetic-modal}
+
+\textbf{Symptom:}
+\begin{lstlisting}[style=python]
+NotImplementedError: solve_modal cannot handle a position-dependent kinetic
+coefficient (field(s) ['a_1', 'a_2', 'a_3']). A position-dependent M(x) is a
+k-space convolution ...
+\end{lstlisting}
+from \texttt{solve\_modal}, \texttt{solve\_modal\_pass1},
+\texttt{\_build\_evolution\_matrices}, or the conversion-stability probe.
+
+\textbf{Root cause:} The equation's LHS carries a
+\texttt{kinetic\_coefficient\_symbolic} containing spatial coordinates
+(\texttt{x[]}, \texttt{y[]}, \dots), e.g.\ a localized background folded into the
+kinetic term.  In Fourier space a position-dependent mass matrix is a mode-coupling
+convolution $\hat{M}(k - k')$, which the modal solver does not implement (GH \#427
+tracks the feature; the guards are GH \#421).  Before the guards this failed as a
+grid-less \texttt{evaluate\_coefficient} \texttt{ValueError} on some paths and was
+\emph{silently treated as $M = 1$} on the generalized-eigenvalue path --- including
+inside the inference stability probe.
+
+\textbf{Fix (one of):}
+\begin{itemize}
+  \item Use a time-domain solver: \texttt{--scheme cvode} or \texttt{--scheme ida}.
+    Both evaluate position-dependent kinetics per grid point (GH \#382).
+    Auto-selection already routes such specs away from modal.
+  \item If the position-dependence is proportional to a small parameter, declare it
+    in \texttt{[perturbation].small\_parameters}: kinetic canonicalization
+    (GH \#380) moves it into $O(\varepsilon)$ RHS corrections and the base spec
+    stays constant-coefficient (this is the Euler--Heisenberg dual-Gaussian flow).
+  \item If the spec has a \texttt{[perturbation]} block but you passed
+    \texttt{--perturbative-order 0}, the full un-canonicalized spec is solved on
+    the plain modal path --- drop the override or switch scheme.
+\end{itemize}
+
+\textbf{Diagnostic:} \texttt{spec.has\_position\_dependent\_kinetic()} (or check
+per equation via \texttt{ComponentEquation.kinetic\_position\_dependent}).  The
+only shipped spec with position-dependent kinetics is
+\texttt{examples/data/euler\_heisenberg\_e\_dual\_gaussian.json}.
+
 
 \subsection{Debugging Techniques}
 \label{sec:debugging-techniques}

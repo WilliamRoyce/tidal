@@ -1930,3 +1930,250 @@ class TestOverridePosDepPeriodicScheme:
         new_scheme, msg = _override_pos_dep_periodic_scheme("modal", "auto", spec)
         assert new_scheme == "modal"
         assert msg is None
+
+
+# ---------------------------------------------------------------------------
+# GH #421: position-dependent kinetic coefficients are refused clearly
+# ---------------------------------------------------------------------------
+
+
+class TestGH421PositionDependentKinetic:
+    """The modal solver cannot handle a position-dependent
+    ``kinetic_coefficient_symbolic`` (a mass-side k-space convolution
+    M̂(k−k′), tracked as GH #427).  Pre-guard behavior was a deep
+    grid-less ``evaluate_coefficient`` ValueError on the per-mode and
+    convolution paths, and — worse — a silent ``except Exception → M=1``
+    fallback on the generalized-eig path, which the stability probe (and
+    therefore every inference likelihood evaluation) reaches directly.
+    These tests pin the refusal at every entry and that selection routes
+    around modal.
+    """
+
+    EH_SPEC = "examples/data/euler_heisenberg_e_dual_gaussian.json"
+    EH_PARAMS: dict[str, float] = {
+        "Bpeak": 0.01,
+        "rho": 1.0,
+        "sigma": 1.0,
+        "sigB": 0.4,
+        "zc1": -1.5,
+        "zc2": 1.5,
+    }
+
+    def _load_eh(self, *, strip_perturbation: bool) -> EquationSystem:
+        """Load the only shipped spec with position-dependent kinetics.
+
+        With the ``[perturbation]`` metadata stripped, the CLI's
+        perturbative route (whose canonicalization normalizes the
+        kinetics to '1', GH #380) is disabled and the position
+        dependence reaches the plain modal path unmasked.
+        """
+        import json
+        from pathlib import Path
+
+        raw = json.loads(Path(self.EH_SPEC).read_text(encoding="utf-8"))
+        if strip_perturbation:
+            raw.get("metadata", {}).pop("perturbation", None)
+        return EquationSystem.from_dict(raw)
+
+    @staticmethod
+    def _grid() -> GridInfo:
+        return GridInfo(bounds=((-2.0, 2.0),), shape=(32,), periodic=(True,))
+
+    # -- predicate ------------------------------------------------------
+
+    def test_predicate_on_eh_spec(self) -> None:
+        spec = self._load_eh(strip_perturbation=False)
+        assert spec.has_position_dependent_kinetic()
+        posdep = [
+            eq.field_name for eq in spec.equations if eq.kinetic_position_dependent
+        ]
+        assert posdep == ["a_1", "a_2", "a_3"]
+
+    def test_predicate_constant_and_time_only_kinetics(self) -> None:
+        """Parameter-only and t[]-only kinetics are NOT position-dependent."""
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "-kappa^(-2)"
+        )
+        assert not _make_spec(spec_data).has_position_dependent_kinetic()
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = "1 + t[]"  # type: ignore[index]
+        assert not _make_spec(spec_data).has_position_dependent_kinetic()
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "1 + Sin[x[]]"
+        )
+        assert _make_spec(spec_data).has_position_dependent_kinetic()
+
+    def test_predicate_ignores_constraint_equations(self) -> None:
+        """Only dynamical equations count — consumer-faithful to
+        build_inverse_kinetic_diag, which skips time_order=0 rows.
+        """
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"]["order"]["time"] = 0  # type: ignore[index]
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "1 + Sin[x[]]"
+        )
+        assert not _make_spec(spec_data).has_position_dependent_kinetic()
+
+    # -- eligibility ----------------------------------------------------
+
+    def test_can_use_modal_rejects_posdep_kinetic(self) -> None:
+        spec = self._load_eh(strip_perturbation=True)
+        assert can_use_modal(spec, self._grid(), None) is False
+
+    def test_can_use_modal_accepts_constant_symbolic_kinetic(self) -> None:
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "-kappa^(-2)"
+        )
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        assert can_use_modal(_make_spec(spec_data), grid, None) is True
+
+    def test_can_use_modal_accepts_canonicalized_base(self) -> None:
+        """The EH campaign flow stays modal-eligible: the driver-style
+        canonicalized base spec has constant kinetics (GH #380), so the
+        new check must not fire on it.  This is the regression pin for
+        auto-selection of the perturbative flow.
+        """
+        spec = self._load_eh(strip_perturbation=False)
+        small = list(spec.metadata.get("perturbation", {}).get("small_parameters", []))
+        base = spec.canonicalize_kinetic_for_perturbation(small).base_spec(small)
+        assert not base.has_position_dependent_kinetic()
+        assert can_use_modal(base, self._grid(), None) is True
+
+    # -- entry guards ---------------------------------------------------
+
+    def test_solve_modal_raises_actionable(self) -> None:
+        spec = self._load_eh(strip_perturbation=True)
+        layout = StateLayout.from_spec(spec, self._grid().num_points)
+        y0 = np.zeros(layout.num_slots * self._grid().num_points)
+        with pytest.raises(NotImplementedError, match="kinetic") as exc_info:
+            solve_modal(
+                spec,
+                self._grid(),
+                y0,
+                (0.0, 1.0),
+                parameters=self.EH_PARAMS,
+            )
+        # The message must name a way out, not just the failure.
+        assert "--scheme cvode" in str(exc_info.value)
+        assert "small_parameters" in str(exc_info.value)
+
+    def test_build_evolution_matrices_raises_not_silent_m1(self) -> None:
+        """The genEig builder previously swallowed the evaluation failure
+        (``except Exception → M_mat = 1``) — wrong physics, no error.
+        """
+        from tidal.solver.coefficients import CoefficientEvaluator
+        from tidal.solver.modal import (
+            _build_evolution_matrices,
+            _build_k_axes,
+            _build_k_grid,
+        )
+
+        spec = self._load_eh(strip_perturbation=True)
+        grid = self._grid()
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        ce = CoefficientEvaluator(spec, grid, self.EH_PARAMS)
+        k_grid = _build_k_grid(_build_k_axes(grid))
+        rfft_shape = (grid.shape[0] // 2 + 1,)
+        with pytest.raises(NotImplementedError, match="kinetic"):
+            _build_evolution_matrices(spec, layout, grid, ce, k_grid, rfft_shape)
+
+    def test_stability_probe_propagates_guard(self) -> None:
+        """check_conversion_stability reaches _build_evolution_matrices
+        directly (it gates every likelihood evaluation in inference); its
+        (LinAlgError, ValueError) handler must NOT swallow the guard into
+        a fabricated 'tachyonic' verdict.
+        """
+        from tidal.measurement._stability import check_conversion_stability
+
+        spec = self._load_eh(strip_perturbation=True)
+        with pytest.raises(NotImplementedError, match="kinetic"):
+            check_conversion_stability(
+                spec,
+                self._grid(),
+                self.EH_PARAMS,
+                source="a_1",
+            )
+
+    def test_stability_probe_constant_kinetic_still_works(self) -> None:
+        """A constant symbolic kinetic must still pass through the probe."""
+        from tidal.measurement._stability import check_conversion_stability
+
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = "2"  # type: ignore[index]
+        spec = _make_spec(spec_data)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        result = check_conversion_stability(spec, grid, {"m2": 1.0}, source="phi_0")
+        assert result.stable is not None  # produced a verdict, no raise
+
+    def test_solve_modal_pass1_raises_on_posdep_correction(self) -> None:
+        """The Pass 1 source builder consumes correction-spec kinetics
+        without a grid; the guard must fire before eigendata is touched.
+        """
+        from tidal.solver.modal import solve_modal_pass1
+
+        spec_data = copy.deepcopy(_KG_1D_SPEC)
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "1 + Sin[x[]]"
+        )
+        correction_spec = _make_spec(spec_data)
+        with pytest.raises(NotImplementedError, match="kinetic"):
+            solve_modal_pass1(
+                {},  # never read: the guard fires first
+                correction_spec,
+                self._grid(),
+                np.linspace(0.0, 1.0, 3),
+            )
+
+    # -- scheme resolution ----------------------------------------------
+
+    def test_resolve_scheme_intact_eh_stays_modal(self) -> None:
+        """THE campaign-flow regression pin: the intact perturbative EH
+        spec must keep auto-selecting modal, because eligibility is now
+        judged on the driver-style canonicalized base (constant
+        kinetics), not on plain base_spec() (which keeps them
+        position-dependent).
+        """
+        from tidal.cli._simulate import _resolve_scheme
+
+        spec = self._load_eh(strip_perturbation=False)
+        assert _resolve_scheme("auto", spec, self._grid(), None) == "modal"
+
+    def test_resolve_scheme_stripped_eh_routes_to_time_domain(self) -> None:
+        from tidal.cli._simulate import _resolve_scheme
+
+        spec = self._load_eh(strip_perturbation=True)
+        scheme = _resolve_scheme("auto", spec, self._grid(), None)
+        assert scheme in {"ida", "cvode"}  # both consume kinetics via grid=
+
+    def test_resolve_scheme_explicit_modal_rejected(self) -> None:
+        from tidal.cli._simulate import _resolve_scheme
+
+        spec = self._load_eh(strip_perturbation=True)
+        with pytest.raises(RuntimeError, match="kinetic"):
+            _resolve_scheme("modal", spec, self._grid(), None)
+
+    # -- the documented alternative actually works ----------------------
+
+    def test_stripped_eh_runs_under_cvode(self) -> None:
+        """The guard's alternative (a) must be real: the stripped EH spec
+        integrates under CVODE (which evaluates the position-dependent
+        kinetics on the grid, GH #382).
+        """
+        from tidal.solver.cvode import solve_cvode
+
+        spec = self._load_eh(strip_perturbation=True)
+        grid = self._grid()
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        rng = np.random.default_rng(0)
+        y0 = 1e-3 * rng.standard_normal(layout.num_slots * grid.num_points)
+        result = solve_cvode(
+            spec,
+            grid,
+            y0,
+            (0.0, 0.1),
+            parameters=self.EH_PARAMS,
+            num_snapshots=3,
+        )
+        assert result["success"]
+        assert np.all(np.isfinite(result["y"]))

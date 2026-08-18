@@ -1191,3 +1191,37 @@ class TestGH380PerturbativeRejectsPosDepBase:
         assert "modal" in msg.lower()
         assert "cvode" in msg.lower() or "ida" in msg.lower()
         assert "position" in msg.lower()
+
+
+class TestGH421BaseKineticGuard:
+    """GH #421 blind-spot fix: `_base_has_position_dependence` previously
+    inspected only RHS terms, so an O(ε⁰) position-dependent kinetic —
+    one NOT proportional to any small parameter, which canonicalization
+    therefore cannot remove — slipped the construction-time guard and
+    failed deep inside the modal builders instead.
+    """
+
+    def test_o_eps0_posdep_kinetic_refused_at_construction(self) -> None:
+        spec_data = copy.deepcopy(_KG_WITH_EPS)
+        # Power-form position dependence (mentions no small parameter, so
+        # it survives canonicalization into the base spec).  Call-form
+        # expressions like Sin[x[]] crash lhs_collapses_to_zero earlier
+        # with an unrelated KineticEvalError — a pre-existing gap tracked
+        # separately from #421.
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "1 + x[]^2"
+        )
+        spec = _make_spec(spec_data)
+        with pytest.raises(NotImplementedError, match="kinetic"):
+            PerturbativeSolver(spec)
+
+    def test_o_eps_posdep_kinetic_still_canonicalized(self) -> None:
+        """A kinetic whose position-dependence is O(ε) is handled by
+        canonicalization (GH #380) and must NOT trip the guard.
+        """
+        spec_data = copy.deepcopy(_KG_WITH_EPS)
+        spec_data["equations"][0]["lhs"]["kinetic_coefficient_symbolic"] = (  # type: ignore[index]
+            "1 + eps*Sin[x[]]"
+        )
+        solver = PerturbativeSolver(_make_spec(spec_data))
+        assert not solver.base_spec.has_position_dependent_kinetic()
