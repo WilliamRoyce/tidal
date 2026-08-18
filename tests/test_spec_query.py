@@ -14,7 +14,6 @@ committed specs through the loader instead.
 from __future__ import annotations
 
 import json
-import subprocess
 import unittest
 import warnings
 from pathlib import Path
@@ -323,19 +322,19 @@ class TestCorpusGolden(unittest.TestCase):
 class TestDiffing(unittest.TestCase):
     """Separating a genuine change from a rewritten one."""
 
+    # The pre-#397 spec is vendored rather than read out of git history, which
+    # made these tests fail on any shallow clone (CI's ``actions/checkout``
+    # defaults to ``fetch-depth: 1``).  Byte-identical to blob ``7b779288^``.
+    STALE_UNGAUGED = REPO / "tests" / "data" / "gertsenshtein_ungauged_pre397.json"
+
     @staticmethod
-    def _spec_at_revision(revision: str, relative: str) -> EquationSystem:
-        """Load a spec as it was at a git revision."""
-        blob = subprocess.run(
-            ["git", "show", f"{revision}:{relative}"],  # noqa: S607
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=REPO,
-        ).stdout
+    def _load_spec(path: Path) -> EquationSystem:
+        """Load a spec from disk without re-emitting its deprecation warnings."""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return EquationSystem.from_dict(json.loads(blob))
+            return EquationSystem.from_dict(
+                json.loads(path.read_text(encoding="utf-8")),
+            )
 
     def test_rescaling_is_representational_and_rhs_flip_is_real(self) -> None:
         """The `gertsenshtein_ungauged` re-derivation, classified correctly.
@@ -348,9 +347,8 @@ class TestDiffing(unittest.TestCase):
         Both directions are asserted: a tool that called everything
         representational would pass a test of invariance alone.
         """
-        relative = "examples/data/gertsenshtein_ungauged.json"
-        old = self._spec_at_revision("7b779288^", relative)
-        new = self._spec_at_revision("7b779288", relative)
+        old = self._load_spec(self.STALE_UNGAUGED)
+        new = self._load_spec(REPO / "examples/data/gertsenshtein_ungauged.json")
 
         diff = diff_systems(old, new)
         verdicts = {c.field: c.verdict for c in diff.comparisons}
@@ -375,9 +373,8 @@ class TestDiffing(unittest.TestCase):
 
     def test_comparison_names_the_changed_keys(self) -> None:
         """A real change reports which term keys moved."""
-        relative = "examples/data/gertsenshtein_ungauged.json"
-        old = self._spec_at_revision("7b779288^", relative)
-        new = self._spec_at_revision("7b779288", relative)
+        old = self._load_spec(self.STALE_UNGAUGED)
+        new = self._load_spec(REPO / "examples/data/gertsenshtein_ungauged.json")
         comparison = compare_equations(
             old.equations[old.equation_map["a_0"]],
             new.equations[new.equation_map["a_0"]],

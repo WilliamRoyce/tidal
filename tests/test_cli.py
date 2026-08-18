@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 from typing import ClassVar
 
@@ -139,6 +138,15 @@ class TestInspectSemanticQueries:
 
     EXAMPLES: ClassVar[Path] = Path(__file__).resolve().parent.parent / "examples/data"
 
+    # ``examples/data/gertsenshtein_ungauged.json`` as it stood before the #397
+    # re-derivation (git blob ``7b779288^``), vendored so the diff tests are
+    # hermetic.  Reading it out of git history instead made them fail on any
+    # shallow clone — including CI, whose ``actions/checkout`` defaults to
+    # ``fetch-depth: 1``.
+    STALE_UNGAUGED: ClassVar[Path] = (
+        Path(__file__).resolve().parent / "data" / "gertsenshtein_ungauged_pre397.json"
+    )
+
     def test_coefficient_sums_terms_and_shows_kinetic(
         self,
         capsys: pytest.CaptureFixture[str],
@@ -252,23 +260,13 @@ class TestInspectSemanticQueries:
         assert data["items"]
         assert set(data["items"][0]) == {"operator", "expression"}
 
-    def test_diff_exit_codes_are_declared_outcomes(self, tmp_path: Path) -> None:
+    def test_diff_exit_codes_are_declared_outcomes(self) -> None:
         """``--diff`` exits 1 on real change, 0 when unchanged — the diff(1) contract.
 
         The fixture is the real re-derivation from #397: ``a_0`` changed, while
         ``h_5``/``h_6``/``h_8`` were merely rescaled and must not count.
         """
-        relative = "examples/data/gertsenshtein_ungauged.json"
-        old = tmp_path / "old.json"
-        old.write_text(
-            subprocess.run(
-                ["git", "show", f"7b779288^:{relative}"],  # noqa: S607
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=Path(__file__).resolve().parent.parent,
-            ).stdout,
-        )
+        old = self.STALE_UNGAUGED
         current = str(self.EXAMPLES / "gertsenshtein_ungauged.json")
 
         assert main(["inspect", str(old), "--diff", current]) == 1
@@ -276,21 +274,10 @@ class TestInspectSemanticQueries:
 
     def test_diff_classifies_rescaling_as_representational(
         self,
-        tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """The three false 'fixes' are reported as representational, not real."""
-        relative = "examples/data/gertsenshtein_ungauged.json"
-        old = tmp_path / "old.json"
-        old.write_text(
-            subprocess.run(
-                ["git", "show", f"7b779288^:{relative}"],  # noqa: S607
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=Path(__file__).resolve().parent.parent,
-            ).stdout,
-        )
+        old = self.STALE_UNGAUGED
         main(
             [
                 "inspect",
@@ -311,17 +298,7 @@ class TestInspectSemanticQueries:
         import io
         import json
 
-        relative = "examples/data/gertsenshtein_ungauged.json"
-        old = Path(tempfile.mkdtemp()) / "old.json"
-        old.write_text(
-            subprocess.run(
-                ["git", "show", f"7b779288^:{relative}"],  # noqa: S607
-                capture_output=True,
-                text=True,
-                check=True,
-                cwd=Path(__file__).resolve().parent.parent,
-            ).stdout,
-        )
+        old = self.STALE_UNGAUGED
 
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
