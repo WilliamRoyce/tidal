@@ -7,7 +7,7 @@ paths:
 # Solver Architecture Rules
 
 ## Solver Selection (auto, by priority)
-1. **Modal** — flat metric + periodic BCs + time-independent + 15 supported operators → Padé matrix-exp (path D, `scipy.linalg.expm`). Eigendecomposition retired v0.31+.
+1. **Modal** — flat metric + periodic BCs + time-independent + constant kinetic coefficients (position-dependent kinetics refused, GH #421/#427) + 15 supported operators → Padé matrix-exp (path D, `scipy.linalg.expm`). Eigendecomposition retired v0.31+. Perturbative eligibility is judged on the canonicalized base spec.
 2. **IDA** — constraints present (time_order=0 fields) → implicit SUNDIALS DAE
 3. **IDA** — first-order equations (time_order=1, diffusion) → implicit BDF
 4. **IDA** — dissipation (`first_derivative_t` in RHS) → implicit BDF
