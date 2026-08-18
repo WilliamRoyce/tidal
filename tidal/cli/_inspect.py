@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from argparse import Namespace
 
+    from tidal.symbolic.json_loader import ComponentEquation
+
 # Known math functions/constants to exclude from parameter discovery
 # (Mathematica + Python names)
 _MATH_NAMES = {
@@ -140,6 +142,11 @@ def discover_parameters(spec: object) -> dict[str, list[str]]:
     return param_map
 
 
+def _show(value: object) -> str:
+    """Render a matrix entry, normalizing xCoba coordinate calls to bare names."""
+    return _COORD_CALL.sub(r"\1", str(value))
+
+
 def _format_matrix(
     matrix: tuple[tuple[float, ...], ...],
     symbolic: tuple[tuple[object, ...], ...] | None = None,
@@ -167,7 +174,7 @@ def _format_matrix(
             diag_entries: list[str] = []
             for i in range(n):
                 s = symbolic[i][i]
-                diag_entries.append(str(s) if s is not None else str(matrix[i][i]))
+                diag_entries.append(_show(s) if s is not None else _show(matrix[i][i]))
             return f"diag({', '.join(diag_entries)})"
         diag_vals = [str(matrix[i][i]) for i in range(n)]
         return f"diag({', '.join(diag_vals)})"
@@ -179,7 +186,7 @@ def _format_matrix(
             entries: list[str] = []
             for j in range(n):
                 s = symbolic[i][j]
-                entries.append(str(s) if s is not None else str(matrix[i][j]))
+                entries.append(_show(s) if s is not None else _show(matrix[i][j]))
             rows.append("  [" + ", ".join(entries) + "]")
         else:
             rows.append("  [" + ", ".join(str(matrix[i][j]) for j in range(n)) + "]")
@@ -224,31 +231,133 @@ def _print_spacetime(spec: object) -> None:
     print()
 
 
-def _print_equations(spec: object) -> None:
-    """Print field summary and detailed equation terms."""
+# Coordinate calls are stored as ``x[]`` (xCoba nullary form). Rendered as a
+# bare ``x`` so the brackets do not nest inside the ``[coefficient]`` display
+# convention, which would make the coefficient boundary ambiguous.
+_COORD_CALL = re.compile(r"\b([A-Za-z]\w*)\[\]")
+
+# Proven-sign markers. Spelled as inequalities rather than ``+``/``-`` so they
+# cannot be confused with the ``+`` that separates terms, and prefixed ``eff``
+# because they describe the coefficient *after* division by the LHS kinetic
+# coefficient -- not the numerator printed in the bracket. Those differ in sign
+# whenever the kinetic coefficient is negative: ``h_0`` in coupled_scalars shows
+# ``[-kappa^(-2)]`` yet is ``eff>0``, because the LHS carries ``-kappa^(-2)``
+# too and the two cancel.
+_SIGN_MARKER = {
+    "positive": "eff>0",
+    "negative": "eff<0",
+    "nonnegative": "eff>=0",
+    "nonpositive": "eff<=0",
+    "zero": "eff=0",
+}
+
+
+def _render_equation(
+    equation: ComponentEquation,
+    *,
+    summary: bool = False,
+) -> list[str]:
+    """Render one equation as lines, kinetic coefficient on the left-hand side.
+
+    The printed line *is* the equation: ``[K] d2_t(phi) = [c] op(field) + ...``.
+    Carrying ``K`` on the LHS is what makes the output complete — without it a
+    reader cannot tell that a bare ``-1`` coefficient in one component and a
+    bare ``+1`` in another may describe the same physics, which is the
+    misreading recorded as row 1 of GH #401.
+
+    Each ``(operator, field)`` key appears exactly once with its terms summed,
+    via :func:`tidal.symbolic.spec_query.effective_coefficient`, so no key can
+    be read while a duplicate goes unnoticed. The individual contributions stay
+    visible inside the sum, preserving base-versus-correction provenance.
+
+    Two annotations appear only when they carry information:
+
+    * ``eps:0,1`` when a key spans perturbative orders — merging would
+      otherwise hide the split ``filter_by_order`` depends on.
+    * ``eff>0`` / ``eff<0`` / ``eff>=0`` when the sign is *proven*. This is the
+      sign of the coefficient **after** dividing by the LHS kinetic
+      coefficient, which is the physically meaningful quantity and is not
+      generally the sign of the bracket beside it: a negative kinetic
+      coefficient flips the two apart. Most coefficients are free parameters
+      whose sign is genuinely unknowable, and those stay unmarked rather than
+      guessed at.
+
+    Parameters
+    ----------
+    equation : ComponentEquation
+        The equation to render.
+    summary : bool
+        Emit one compact line per key with the sign only, omitting coefficients.
+
+    Returns
+    -------
+    list[str]
+        Rendered lines, without trailing newlines.
+    """
+    from tidal.symbolic.spec_query import effective_coefficient
+
+    order = equation.time_derivative_order
+    name = equation.field_name
+    kinetic = equation.kinetic_coefficient_symbolic
+    head = f"d{order}_t({name})" if order else f"{name} (constraint)"
+    kinetic_shown = _COORD_CALL.sub(r"\1", kinetic) if kinetic else None
+    lhs = f"[{kinetic_shown}] {head}" if kinetic_shown else head
+
+    keys = sorted({(t.operator, t.field) for t in equation.rhs_terms})
+    if summary:
+        out: list[str] = []
+        for operator, field in keys:
+            eff = effective_coefficient(equation, field, operator)
+            marker = _SIGN_MARKER.get(eff.sign().sign.value, "?")
+            out.append(f"  {name} {operator}({field}) {marker}")
+        return out
+
+    lines = [f"  {lhs} ="]
+    for operator, field in keys:
+        eff = effective_coefficient(equation, field, operator)
+        coeff = _COORD_CALL.sub(r"\1", eff.numerator)
+        tags: list[str] = []
+        orders = {t.order_in_eps for t in eff.terms}
+        if len(orders) > 1:
+            tags.append("eps:" + ",".join(str(o) for o in sorted(orders)))
+        marker = _SIGN_MARKER.get(eff.sign().sign.value)
+        if marker is not None:
+            tags.append(marker)
+        suffix = "   " + "  ".join(tags) if tags else ""
+        lines.append(f"    + [{coeff}] {operator}({field}){suffix}")
+    return lines
+
+
+def _print_equations(spec: object, *, detail: str = "full") -> None:
+    """Print the field summary and the equations.
+
+    Parameters
+    ----------
+    spec : EquationSystem
+        The loaded equation system.
+    detail : str
+        ``"full"`` for the equation form, ``"summary"`` for one line per key
+        carrying only the proven sign.
+    """
     from tidal.symbolic.json_loader import EquationSystem
 
     if not isinstance(spec, EquationSystem):
         return
-    print(
-        f"Fields ({spec.n_components} component{'s' if spec.n_components != 1 else ''}):",
-    )
-    for eq in spec.equations:
-        t_order = eq.time_derivative_order
-        dynamical = "dynamical" if t_order > 0 else "constraint"
-        print(f"  {eq.field_name:<12s} {dynamical:<12s} time_order={t_order}")
-    print()
 
-    print("Equations:")
+    if detail != "summary":
+        print(
+            f"Fields ({spec.n_components} "
+            f"component{'s' if spec.n_components != 1 else ''}):",
+        )
+        for eq in spec.equations:
+            kind = "dynamical" if eq.time_derivative_order > 0 else "constraint"
+            print(f"  {eq.field_name:<12s} {kind:<12s} time_order={eq.time_derivative_order}")
+        print()
+
+    print("Equations:" if detail != "summary" else "Signs (proven only; ? = undecided):")
     for eq in spec.equations:
-        t_order = eq.time_derivative_order
-        lhs_label = f"d{t_order}_t" if t_order > 0 else "constraint"
-        terms_strs: list[str] = []
-        for term in eq.rhs_terms:
-            sym = term.coefficient_symbolic
-            coeff_str = f"[{sym}]" if sym is not None else f"{term.coefficient:+.4g}"
-            terms_strs.append(f"{coeff_str} {term.operator}({term.field})")
-        print(f"  {lhs_label}({eq.field_name}) = {' '.join(terms_strs)}")
+        for line in _render_equation(eq, summary=detail == "summary"):
+            print(line)
     print()
 
 
@@ -332,7 +441,7 @@ def _build_json_output(spec: object, *, show_params: bool) -> dict[str, Any]:
     return result
 
 
-def inspect_command(args: Namespace) -> int:  # noqa: C901
+def inspect_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912
     """Execute the inspect command.
 
     Parameters
@@ -408,9 +517,18 @@ def inspect_command(args: Namespace) -> int:  # noqa: C901
         print(system_to_latex(spec, output_format=args.latex_format))
         return 0
 
-    _print_header(spec)
-    _print_spacetime(spec)
-    _print_equations(spec)
+    detail = getattr(args, "detail", "full")
+    if detail != "summary":
+        _print_header(spec)
+        _print_spacetime(spec)
+    _print_equations(spec, detail=detail)
+
+    if detail == "summary":
+        # summary exists to be cheap to scan: the parameter list and the
+        # n x n matrices are the two largest remaining blocks and neither
+        # carries a sign verdict, so they are omitted rather than doubling
+        # the cost of the mode.
+        return 0
 
     # Parameters
     param_map = discover_parameters(spec)

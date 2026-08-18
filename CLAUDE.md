@@ -80,6 +80,35 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Plane-wave IC snap on periodic grids**: `--ic plane-wave --ic-wavevector k0` auto-snaps `k0` to the nearest discrete Fourier mode `2π·n/L` (clamped below Nyquist) to eliminate spectral leakage. A `Note:` is printed when the snap is significant. Off-grid `k` causes cos(k·x) to leak amplitude onto every discrete mode; for theories with tachyonic eigenvalues at some k-modes (e.g. PGT torsion with cross-coupling) this triggers spurious `SimulationDivergedError`. Sharp 0.1%-scale stability boundaries in parameter space are a signature of this — if seen, check whether the IC wavevector is off-grid. Override with `--ic-no-snap`. See `docs/tex/plane_wave_ic.tex`.
 - **FV ↔ TorsionCDT dark-photon equivalence map (current convention, post-2026-04-24)**: The CDT Lagrangian in `dark_photon_plasma/theory.toml` is `L ⊃ -alpha3·I3` (note the leading minus, standard Proca convention after the 2026-04-24 sign-flip), giving spatial EOM `m² = +2·alpha3`. FV writes `L ⊃ -½·mT²·t·t` → `m² = +mT²`. Equivalence map: **`mT2 = 2·alpha3`** (same-sign). `alpha3 > 0` ↔ `mT2 > 0` = stable Proca. Confirmed bit-exact (Δ/P_max ≈ 1e-14) at campaign parameters; see `examples/dark_photon_plasma/theory.toml:18-35` and `fv_cdt_equivalence_verified.md`. **Old convention (pre-2026-04-24)**: Lagrangian was `+alpha3·I3`, giving `m² = -2·alpha3` and equivalence `mT2 = -2·alpha3` (opposite-sign). All old-convention HPC runs (28216072, 28226826, 28366464) are archived in CAMPAIGN.md as "wrong regime for the Proca dark-photon analogy" — do not reuse those results under the new convention without re-interpretation.
 
+## Reading Equation Specifications
+
+**Never read a spec JSON directly, and never write a fresh scan over `examples/data/`.**
+Both are how six confidently-wrong diagnoses were produced (GH #401). A torsion spec is
+~96,000 tokens of JSON; the commands below answer a question in a few hundred, and the
+answer comes from a vetted accessor rather than from inference by eye.
+
+| question | command | ~tokens |
+| --- | --- | --- |
+| what is this coefficient, and where else is it recorded? | `tidal inspect SPEC --coefficient 'h_5:identity(h_5)'` | 200 |
+| which components belong together, which are temporal? | `tidal inspect SPEC --families` | 130 |
+| what does one equation say? | `tidal inspect SPEC --equation h_5` (accepts `a,b` or `all`) | 760 |
+| did re-derivation change the physics? | `tidal inspect OLD --diff NEW` (exit 1 = real change) | varies |
+| just the proven signs, whole spec | `tidal inspect SPEC --detail summary` | 4,000 |
+
+**Corpus-level questions are already answered.** `tests/data/spec_semantics.txt` is a
+committed report of families, index structure and proven sign conflicts for every spec.
+Read it instead of scanning. Regenerate with `python -m scripts.spec_semantics_report`.
+
+**Prefer the text output to `--json`** — measured, `--json` costs ~3x more and buys
+nothing when you are reading rather than parsing. `--json` is for scripts.
+
+Two properties worth relying on: a sign verdict says `unknown` rather than guessing when
+it cannot be proven, and every verdict names the tactic that decided it. Only ~8% of
+coefficients have a provable sign — most are free sweep parameters — so use
+`--assume-positive`/`--assume-nonzero` when you have physical grounds. Python API:
+`tidal.symbolic.spec_query` (accessors) and `tidal.symbolic.sign_algebra` (the sign
+decisions). See `/spec` for worked recipes.
+
 ## Claude Code Skills
 
 Custom commands in `.claude/skills/` (main conversation only, not available to subagents):

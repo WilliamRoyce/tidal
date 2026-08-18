@@ -292,6 +292,132 @@ class TestInspectSemanticQueries:
         for field in ("h_5", "h_6", "h_8"):
             assert field not in real_section
 
+    def test_default_shows_kinetic_coefficient_and_merges_keys(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The default listing is complete and deduplicated (GH #401 row 1).
+
+        The misreading this prevents: `a_0` showed a bare `+1 laplacian_x(a_0)`
+        and `a_1` a bare `-1 laplacian_x(a_1)`, which look contradictory. They
+        are not — `a_1` carries a kinetic coefficient that used to be invisible.
+        The same key also appeared twice per equation, so a reader could take
+        one and miss the other.
+        """
+        ret = main(["inspect", str(self.EXAMPLES / "gertsenshtein_eh.json")])
+        assert ret == 0
+        out = capsys.readouterr().out
+        equations = out.split("Equations:")[1].split("Required parameters")[0]
+
+        # the kinetic coefficient is on the LHS, where it belongs
+        assert "[-1 + 2*B0^2*rho - 16*B0^2*sigma] d2_t(a_1)" in equations
+        # and each (operator, field) key appears exactly once per equation
+        a1_block = equations.split("d2_t(a_1)")[1].split("d2_t(a_2)")[0]
+        assert a1_block.count("laplacian_x(a_1)") == 1
+
+    def test_position_dependent_coefficients_render_without_nested_brackets(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Coordinates print as `x`, not `x[]`, so the coefficient boundary is clear.
+
+        `[...]` delimits the coefficient, and a raw `x[]` inside it nests with
+        that delimiter and makes the end of the coefficient ambiguous.
+        """
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "dark_photon_plasma_e_dual_gaussian.json"),
+            ],
+        )
+        assert ret == 0
+        out = capsys.readouterr().out
+        equations = out.split("Equations:")[1].split("Required parameters")[0]
+        assert "x[]" not in equations
+        assert "sigB" in equations  # the position-dependent coefficients are present
+        # the matrix display carries the same coefficients and the same rationale
+        assert "x[]" not in out
+
+    def test_perturbative_orders_are_flagged_not_hidden(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A key spanning perturbative orders is marked, since merging hides it.
+
+        Euler-Heisenberg `a_0` carries an eps^0 base term and an eps^1
+        correction on the same key. Summing them is right for the coefficient,
+        but the split is what `filter_by_order` depends on, so it must remain
+        visible.
+        """
+        ret = main(["inspect", str(self.EXAMPLES / "euler_heisenberg.json")])
+        assert ret == 0
+        out = capsys.readouterr().out
+        equations = out.split("Equations:")[1].split("Required parameters")[0]
+        assert "eps:0,1" in equations
+
+    def test_sign_marker_is_labeled_as_the_effective_sign(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The sign marker describes the post-division value, and says so.
+
+        `coupled_scalars` `h_0` prints `[-kappa^(-2)] laplacian_x(h_0)` — a
+        negative bracket — while the marker reads `eff>0`. Both are right: the
+        LHS carries `-kappa^(-2)` as well, so the two cancel to +1. An
+        unlabeled `>0` beside a visibly negative coefficient is exactly the
+        kind of two-quantities-one-line confusion this tooling exists to
+        remove, so the marker is prefixed `eff`.
+        """
+        ret = main(["inspect", str(self.EXAMPLES / "coupled_scalars.json")])
+        assert ret == 0
+        equations = capsys.readouterr().out.split("Equations:")[1]
+        line = next(
+            ln for ln in equations.splitlines() if "laplacian_x(h_0)" in ln
+        )
+        assert "[-kappa^(-2)]" in line  # the numerator is negative
+        assert "eff>0" in line  # the effective coefficient is positive
+        # and no bare ">0" that could be read as annotating the bracket
+        assert " >0" not in line.replace("eff>0", "")
+
+    def test_detail_summary_is_substantially_cheaper(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`--detail summary` must actually save context, or it is not worth having."""
+        spec = str(self.EXAMPLES / "torsion_gertsenshtein_complete_even.json")
+        main(["inspect", spec, "--detail", "summary"])
+        summary = len(capsys.readouterr().out)
+        main(["inspect", spec])
+        full = len(capsys.readouterr().out)
+        assert summary < full / 2, f"summary {summary} vs full {full}"
+
+    def test_equation_accepts_a_list_and_all(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """One invocation can cover several components, or every component."""
+        spec = str(self.EXAMPLES / "gertsenshtein_eh.json")
+        assert main(["inspect", spec, "--equation", "a_0,a_1"]) == 0
+        pair = capsys.readouterr().out
+        assert "d2_t(a_0)" in pair
+        assert "d2_t(a_1)" in pair
+
+        assert main(["inspect", spec, "--equation", "all"]) == 0
+        every = capsys.readouterr().out
+        assert every.count("kinetic =") == 6  # all components of this spec
+
+    def test_equation_with_unknown_name_in_a_list_errors(self) -> None:
+        """A bad name anywhere in the list fails before printing a partial answer."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "a_0,nope",
+            ],
+        )
+        assert ret == 2
+
     def test_diff_json_envelope_carries_component_deltas(self) -> None:
         """`--diff --json` reports verdicts plus components unique to either side."""
         import contextlib

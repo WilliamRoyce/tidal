@@ -116,24 +116,73 @@ def show_equation(  # noqa: PLR0913
     assume_positive: Iterable[str] | None,
     assume_nonzero: Iterable[str] | None,
 ) -> int:
-    """Print one equation with its effective coefficients.
+    """Print one or more equations with their effective coefficients.
+
+    Parameters
+    ----------
+    field : str
+        A component name, a comma-separated list, or ``all``.
 
     Returns
     -------
     int
-        ``EXIT_OK``, or ``EXIT_ERROR`` if the component is unknown.
+        ``EXIT_OK``, or ``EXIT_ERROR`` if any component is unknown.
     """
-    from tidal.symbolic.spec_query import effective_coefficient
-
-    index = spec.equation_map.get(field)
-    if index is None:
+    requested = _resolve_fields(spec, field)
+    if requested is None:
         return _fail(
             "unknown_component",
-            f"unknown component: {field!r}",
+            f"unknown component in {field!r}",
+            f"Use --families to list components, or --equation all. "
             f"Components: {', '.join(spec.component_names)}",
             as_json=as_json,
         )
 
+    records: list[dict[str, Any]] = []
+    text: list[str] = []
+    for name in requested:
+        text.extend(_equation_lines(spec, name, records, as_json=as_json,
+                                    parameters=parameters,
+                                    assume_positive=assume_positive,
+                                    assume_nonzero=assume_nonzero))
+
+    if as_json:
+        print(json.dumps({"items": [_project(r, fields) for r in records]}, indent=2))
+        return EXIT_OK
+    for line in text:
+        print(line)
+    return EXIT_OK
+
+
+def _resolve_fields(spec: EquationSystem, requested: str) -> list[str] | None:
+    """Expand an ``--equation`` value into component names.
+
+    Accepts a single name, a comma-separated list, or ``all``. Returns ``None``
+    if any name is unknown, so the caller reports one clear error rather than
+    printing part of the answer.
+    """
+    if requested.strip() == "all":
+        return list(spec.component_names)
+    names = [n.strip() for n in requested.split(",") if n.strip()]
+    if any(n not in spec.equation_map for n in names):
+        return None
+    return names
+
+
+def _equation_lines(  # noqa: PLR0913
+    spec: EquationSystem,
+    field: str,
+    records: list[dict[str, Any]],
+    *,
+    as_json: bool,  # noqa: ARG001
+    parameters: Mapping[str, float] | None,
+    assume_positive: Iterable[str] | None,
+    assume_nonzero: Iterable[str] | None,
+) -> list[str]:
+    """Render one component, appending its records for the JSON form."""
+    from tidal.symbolic.spec_query import effective_coefficient
+
+    index = spec.equation_map[field]
     equation = spec.equations[index]
     keys = sorted({(t.operator, t.field) for t in equation.rhs_terms})
 
@@ -147,7 +196,6 @@ def show_equation(  # noqa: PLR0913
         "",
         "  effective coefficients (all matching terms summed, kinetic divided out):",
     ]
-    records: list[dict[str, Any]] = []
     for operator, target in keys:
         eff = effective_coefficient(equation, target, operator)
         result = eff.sign(
@@ -175,13 +223,7 @@ def show_equation(  # noqa: PLR0913
             },
         )
 
-    if as_json:
-        print(json.dumps({"items": [_project(r, fields) for r in records]}, indent=2))
-        return EXIT_OK
-
-    for line in text:
-        print(line)
-    return EXIT_OK
+    return text
 
 
 # --- --coefficient ---
@@ -212,7 +254,8 @@ def show_coefficient(  # noqa: PLR0913, C901
         return _fail(
             "invalid_selector",
             str(exc),
-            "Example: --coefficient 'h_5:laplacian_x(h_5)'",
+            "Example: --coefficient 'h_5:laplacian_x(h_5)'. "
+            "Use --equation FIELD to list the operator(field) keys available.",
             as_json=as_json,
         )
 
@@ -222,6 +265,7 @@ def show_coefficient(  # noqa: PLR0913, C901
         return _fail(
             "unknown_component",
             f"unknown component: {equation_field!r}",
+            f"Use --families to see components grouped by tensor family. "
             f"Components: {', '.join(spec.component_names)}",
             as_json=as_json,
         )
