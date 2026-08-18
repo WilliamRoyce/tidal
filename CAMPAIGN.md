@@ -3,7 +3,7 @@
 **Central question:** Can PGT torsion amplify the Gertsenshtein effect? If so, which
 Lagrangian sector and at what parameters?
 
-**Plan file:** `/home/vscode/.claude/plans/binary-snacking-chipmunk.md`
+**Phase status:** [docs/V3_PHASE_TRACKER.md](docs/V3_PHASE_TRACKER.md); architecture in [docs/V3_ARCHITECTURE.md](docs/V3_ARCHITECTURE.md)
 **Branch:** `hpc/pgt-survey` (created from `feature/torsion-sweeps`; rebase onto `main` once PR merges)
 
 **Fixed params throughout:** `kappa=1.0`, `B0=0.01`

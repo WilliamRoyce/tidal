@@ -6,8 +6,10 @@ theory has a ``[perturbation]`` section), this module composes the
 modal solver's Pass 0 base evolution with one or more Pass 1 Duhamel
 corrections into a single :class:`PerturbativeResult`.
 
-See :doc:`/home/vscode/.claude/plans/flickering-gathering-orbit.md`
-for the full architecture. Key guarantees:
+The full architecture is documented in
+``docs/tex/perturbative_reduction_design.tex`` ("Perturbative Reduction:
+Implementation Design"); the driver's constant-coefficient base-spec
+limitation is tracked in GitHub issue #383. Key guarantees:
 
 - Ghost-free by construction: the LHS operator at every order is the
   base 2nd-order operator; higher-derivative terms appear only as

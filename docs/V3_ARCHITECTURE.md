@@ -3,10 +3,10 @@
 **Created:** 2026-05-10
 **Branch:** `hpc/pgt-survey`
 **Status:** Phase A in progress; supersedes the canonical-probe ("v2") architecture
-**Reference plan:** `/home/vscode/.claude/plans/binary-snacking-chipmunk.md`
+**Phase status:** [docs/V3_PHASE_TRACKER.md](V3_PHASE_TRACKER.md)
 **Supervisor meeting:** [docs/meetings/2026-05-08_supervisor.md](meetings/2026-05-08_supervisor.md)
 
-This document is the canonical architecture reference for the v3 era. It survives context loss / session boundaries so any future agent or person picking up the campaign has a complete picture without needing the plan file.
+This document is the canonical architecture reference for the v3 era. It survives context loss / session boundaries so any future agent or person picking up the campaign has a complete picture from the repository alone.
 
 ## Why v3?
 
@@ -55,9 +55,14 @@ The cubed-sphere joint-prior path (parallel session) is the alternative; both sh
 
 A coupling-aware probe metric (`gamma_conversion = log(|target_amp|)/t_test` from the Padé probe output) is **deferred to its own future session** (Phase A-γ) — failure-mode investigation identified showstoppers (log-zero, source-decay-masking, P_max-correlation-unverified) that need refactoring + empirical validation before it can be load-bearing.
 
-## Parallel session
+## Cubed-sphere joint prior (Phase C) — landed
 
-`/home/vscode/.claude/plans/read-this-plan-file-scalable-church.md` is implementing the cubed-sphere joint prior (Phase C) using the supervisor's unpublished `psalter` package as the reference design. That session ships:
+The cubed-sphere joint prior was built in a parallel session, using the supervisor's
+unpublished `psalter` package as the reference design, and has since shipped. The canonical
+reference is `docs/V3_PHASE_C_REFERENCE.md`; open follow-ups are
+[#359](https://github.com/WilliamRoyce/tidal/issues/359) (per-coupling positivity fold) and
+[#360](https://github.com/WilliamRoyce/tidal/issues/360) (PSALTer integration for
+chain-sample-time ghost tagging). Components:
 
 - `tidal/inference/_sphere.py` — cubed-sphere geometry (face indexing, gnomonic cube→sphere, sub-tiles, random rotation).
 - `RadialAngularPrior` joint-prior class in `tidal/inference/_prior.py`.
@@ -65,7 +70,7 @@ A coupling-aware probe metric (`gamma_conversion = log(|target_amp|)/t_test` fro
 - `tidal plot --type atlas` rendering 2N face panels in `tidal/cli/_plot.py`.
 - `docs/V3_PHASE_C_REFERENCE.md` — handoff doc (canonical reference for the cubed-sphere conventions).
 
-These files are **owned by that session** — do not edit from this session.
+(That session owned these files while it was in flight; the work is now merged.)
 
 ## Phase tracker (updated as work converges)
 

@@ -85,7 +85,7 @@ Per-tile output goes to `<output>/<face_label>_tile<sub>/...`. `tidal plot <outp
 
 ## v3 plan items the parallel agent can drop
 
-The v3 plan at `/home/vscode/.claude/plans/binary-snacking-chipmunk.md` lists Phase C as DEFERRED and earmarks specific tasks. With this implementation landed, those tasks are now closed:
+`docs/V3_PHASE_TRACKER.md` lists Phase C as DEFERRED and earmarks specific tasks. With this implementation landed, those tasks are now closed:
 
 1. **Phase C entirely.** `tidal.inference._sphere`, `RadialAngularPrior`, `tidal sample --joint-prior`, `tidal plot --type atlas` are live. Drop the deferred Phase C from active tracking.
 2. **Phase C.2 supervisor email** — closed by his 10 May reply (saved at `docs/meetings/2026-05-10_supervisor_reply_grouping.md`). No follow-up needed.

@@ -17,7 +17,7 @@ Commit trail (branch `feature/torsion-sweeps`):
 | 6C.3+6C.4 | `2e3d297` | Near-degeneracy + cross-block + review cleanup |
 | Stage 7 | _(in progress)_ | Docs, CHANGELOG, version bump |
 
-Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM symbolic reduction approach (deleted). Full plan: `/home/vscode/.claude/plans/flickering-gathering-orbit.md`. GitHub issue: [#267](https://github.com/WilliamRoyce/tidal/issues/267).
+Tracks the v6 iterative-numerical perturbative expansion. Supersedes the v5 JLM symbolic reduction approach (deleted). Full design: `docs/tex/perturbative_reduction_design.tex`; the constraint-promotion barrier is analysed in `docs/tex/perturbative_reduction_constraint_barrier.tex`. GitHub issues: [#267](https://github.com/WilliamRoyce/tidal/issues/267), [#321](https://github.com/WilliamRoyce/tidal/issues/321) (extend LPS to the constraint-promotion case), [#383](https://github.com/WilliamRoyce/tidal/issues/383) (driver requires a constant-coefficient base spec).
 
 **Architecture (v6, 2026-04-19)**: Treat small-parameter corrections (b₅R̃², ρ·EH, etc.) as sources for a second solver pass atop the unmodified base equations. Theory-agnostic, ghost-free, no classification needed. Phase C in Wolfram reduces to order-tagging in JSON; all perturbative work happens at simulate time in Python.
 

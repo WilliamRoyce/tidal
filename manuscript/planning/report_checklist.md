@@ -144,8 +144,8 @@ Phase 2 produces *scaffolding with content plans*: section/subsection headers
 with semantic labels, named-paragraph topic stubs, equation placeholders with
 labels, figure placeholders with caption stubs, and cross-references that
 resolve. **No prose for any section** — each per-section drafting session is
-a separate later effort. See plan archived as
-`/home/vscode/.claude/plans/we-are-planning-to-federated-papert.md`.
+a separate later effort. See `manuscript/planning/report_plan.md` for the
+full drafting plan.
 
 ### Bibliography hygiene additions
 

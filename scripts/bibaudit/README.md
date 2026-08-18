@@ -5,8 +5,8 @@ Read-only helpers for the manuscript citation audit. **None of these scripts edi
 *propose* exact edits; all actual changes go through the Edit tool (exact string
 replacement that fails loudly on mismatch) so a parser bug can never silently
 corrupt the bibliography. See `manuscript/planning/citation_audit_tracker.md` for
-live progress and `/home/vscode/.claude/plans/working-on-the-manuscript-*.md` for
-the full plan.
+live progress and `manuscript/planning/report_plan.md` for the full
+manuscript plan.
 
 ## Modules
 

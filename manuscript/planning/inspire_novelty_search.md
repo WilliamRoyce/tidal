@@ -75,6 +75,6 @@ For §1 ¶9 (adapt during drafting; this is a starting point, not committed pros
 
 ## See also
 
-- The full lit-review plan: [planning-the-manuscript-writing-structured-goose.md](../../../home/vscode/.claude/plans/planning-the-manuscript-writing-structured-goose.md) (note: lives under `~/.claude/plans/`, not in the repo)
-- Project-side narrative context: [literature_critical_analysis.md](../../../home/vscode/.claude/projects/-workspaces-torsion-gertsenshtein/memory/literature_critical_analysis.md)
-- The three constructive paths discussed at §1 ¶8: [perturbative_reduction_v6_complete.md](../../../home/vscode/.claude/projects/-workspaces-torsion-gertsenshtein/memory/perturbative_reduction_v6_complete.md)
+- The full drafting plan: [report_plan.md](report_plan.md)
+- Project-side narrative context: [../../docs/references.md](../../docs/references.md) and the literature framing in [../sections/discussion.tex](../sections/discussion.tex)
+- The three constructive paths discussed at §1 ¶8: [../../docs/tex/perturbative_reduction_design.tex](../../docs/tex/perturbative_reduction_design.tex) and [../sections/appendices/perturbative_regime.tex](../sections/appendices/perturbative_regime.tex)

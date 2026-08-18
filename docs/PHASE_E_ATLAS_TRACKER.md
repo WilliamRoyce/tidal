@@ -14,7 +14,7 @@
 
 - Phase E **localized** is paused (see `docs/PHASE_E_TRACKER.md` PAUSED banner). Localized infrastructure preserved unchanged in `scripts/hpc_submit_drafts/v3e_localised/`.
 - Pivot direction (user, 2026-05-29): demonstrate **cubed-sphere atlas methodology** on **v3 uniform-field** posteriors. Hard deadline 2026-06-01.
-- Approved plan: `/home/vscode/.claude/plans/currently-we-are-working-goofy-oasis.md`.
+- Design: `docs/V3_PHASE_E_DESIGN.md`; the pivot rationale and every subsequent choice are in the decision log below. Localised track deferred per [#352](https://github.com/WilliamRoyce/tidal/issues/352).
 
 ## Decision log (append-only)
 
