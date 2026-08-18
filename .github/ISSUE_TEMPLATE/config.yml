@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Documentation
-    url: https://github.com/WilliamRoyce/torsion-gertsenshtein/tree/main/docs
+    url: https://github.com/WilliamRoyce/tidal/tree/main/docs
     about: Check the documentation for usage guides and troubleshooting
   - name: Discussions
-    url: https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions
+    url: https://github.com/WilliamRoyce/tidal/discussions
     about: Ask questions and discuss ideas with the community

@@ -61,11 +61,11 @@ color = ["rich-argparse>=1.4"]
 tidal = "tidal.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/WilliamRoyce/torsion-gertsenshtein"
-Documentation = "https://williamroyce.github.io/torsion-gertsenshtein/"
-Repository = "https://github.com/WilliamRoyce/torsion-gertsenshtein"
-Issues = "https://github.com/WilliamRoyce/torsion-gertsenshtein/issues"
-Changelog = "https://github.com/WilliamRoyce/torsion-gertsenshtein/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/WilliamRoyce/tidal"
+Documentation = "https://williamroyce.github.io/tidal/"
+Repository = "https://github.com/WilliamRoyce/tidal"
+Issues = "https://github.com/WilliamRoyce/tidal/issues"
+Changelog = "https://github.com/WilliamRoyce/tidal/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [

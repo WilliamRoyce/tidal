@@ -267,7 +267,7 @@ Issues should be tagged with appropriate labels:
 
 ## Contributing to the Roadmap
 
-See tracked issues with the [`roadmap`](https://github.com/WilliamRoyce/torsion-gertsenshtein/labels/roadmap) label.
+See tracked issues with the [`roadmap`](https://github.com/WilliamRoyce/tidal/labels/roadmap) label.
 
 **To propose new features:**
 

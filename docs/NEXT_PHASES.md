@@ -202,7 +202,7 @@ A comprehensive parameter sweep framework implemented as two CLI commands (`tida
 
 ### What and Why
 
-This is the integration example that combines Phase A (and optionally Phase B) into the first fully automated, Lagrangian-derived simulation of the Gertsenshtein effect. The repository is named "torsion-gertsenshtein" — this example is the raison d'être.
+This is the integration example that combines Phase A (and optionally Phase B) into the first fully automated, Lagrangian-derived simulation of the Gertsenshtein effect. The torsion-Gertsenshtein investigation is the project's original motivation — this example is its raison d'être.
 
 ### Delivered
 

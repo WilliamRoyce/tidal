@@ -4503,7 +4503,7 @@ def _validate_perturbation_config(
     print("  abort with a clear diagnostic.")
     print()
     print("  See: docs/tex/perturbative_reduction_constraint_barrier.tex")
-    print("       https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/321")
+    print("       https://github.com/WilliamRoyce/tidal/issues/321")
     print("=" * 76)
     print()
 

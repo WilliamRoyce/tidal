@@ -364,7 +364,7 @@ For systems with constraints (gauge theories):
    be complicated by constraint solver accuracy and spectral content.
 
    **Note:** The `coupled_proca/` example now uses **periodic BCs** to
-   avoid this issue (energy conserved to ~1e-10).  See [#103](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/103)
+   avoid this issue (energy conserved to ~1e-10).  See [#103](https://github.com/WilliamRoyce/tidal/issues/103)
    for detailed analysis and future SBP remedy.
 
    **Remedies (for users who need Dirichlet BCs):**

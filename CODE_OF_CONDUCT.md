@@ -25,7 +25,7 @@ This Code of Conduct applies to all project spaces, including GitHub issues, pul
 ## Reporting
 
 If you experience or witness unacceptable behavior, please report it by opening an issue at:
-https://github.com/WilliamRoyce/torsion-gertsenshtein/issues
+https://github.com/WilliamRoyce/tidal/issues
 
 All reports will be reviewed and investigated promptly and fairly.
 

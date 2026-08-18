@@ -6,7 +6,7 @@ TIDAL has multiple support channels depending on your needs:
 
 ### GitHub Discussions (Recommended)
 
-https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions
+https://github.com/WilliamRoyce/tidal/discussions
 
 Use Discussions for:
 
@@ -17,7 +17,7 @@ Use Discussions for:
 
 ### Issue Tracker
 
-https://github.com/WilliamRoyce/torsion-gertsenshtein/issues
+https://github.com/WilliamRoyce/tidal/issues
 
 Use Issues for:
 
@@ -27,7 +27,7 @@ Use Issues for:
 
 ### Documentation
 
-https://williamroyce.github.io/torsion-gertsenshtein/
+https://williamroyce.github.io/tidal/
 
 Includes:
 

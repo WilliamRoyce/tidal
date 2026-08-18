@@ -9,7 +9,7 @@ authors:
 version: 0.48.4
 date-released: "2026-08-17"
 license: MIT
-repository-code: "https://github.com/WilliamRoyce/torsion-gertsenshtein"
+repository-code: "https://github.com/WilliamRoyce/tidal"
 keywords:
 - "symbolic computation"
 - "tensor calculus"

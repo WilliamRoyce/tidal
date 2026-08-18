@@ -2,7 +2,7 @@
 
 **Created:** 2026-05-10
 **Companion to:** [V3_ARCHITECTURE.md](V3_ARCHITECTURE.md)
-**Issue:** [#346](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/346)
+**Issue:** [#346](https://github.com/WilliamRoyce/tidal/issues/346)
 
 ## Methodology
 
