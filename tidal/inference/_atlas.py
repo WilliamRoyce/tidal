@@ -768,15 +768,13 @@ def plot_atlas(
     else:
         rows, cols = _grid_shape(n_dims, layout_cols)
 
-    # Seed numpy's legacy RNG so KDE sample-compression in anesthetic
-    # (anesthetic.utils.triangular_sample_compression_2d uses bare
-    # `np.random.choice` without a Generator) is deterministic across
-    # renders.  Without this, repeated atlas renders of the same survey
-    # produce pixel-different output, which is bad for review diffs.
-    # The legacy global API is required here because anesthetic does not
-    # accept an RNG / Generator handle to thread through; NPY002 cannot
-    # be addressed at this layer.
-    np.random.seed(0)  # noqa: NPY002
+    # KDE sample-compression in anesthetic draws from NumPy's legacy
+    # global RNG, so renders are non-deterministic without a seed.  The
+    # per-panel renders funnel through _render_anesthetic_corner_into,
+    # which seeds and *restores* the global state around each plot_2d
+    # (see _deterministic_render).  A bare np.random.seed() here used to
+    # leave the process in a fixed state for whatever ran next; that is
+    # no longer needed and was itself a leak.  See issue #388.
 
     # Layout figure.
     panel_in = 1.6  # inches per face panel; gives ~5x6 inch atlas for N=6

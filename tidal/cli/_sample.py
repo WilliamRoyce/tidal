@@ -151,6 +151,9 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     from tidal.inference._likelihood import SOFT_FLOOR_LOGL
 
     soft_floor_logl: float = float(getattr(args, "soft_floor_logl", SOFT_FLOOR_LOGL))
+    # Read --seed here rather than at the "Common settings" block below: the
+    # likelihood needs it so soft-floor noise is reproducible (issue #408).
+    seed: int = getattr(args, "seed", 42)
     try:
         likelihood_config = parse_likelihood(
             likelihood_spec,
@@ -158,6 +161,7 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
             permissive=(not gated),
             soft_floor_noise_sigma=soft_floor_noise,
             soft_floor_logl=soft_floor_logl,
+            noise_seed=seed,
         )
     except ValueError as e:
         error_with_hint(str(e), ["Check --likelihood format: METRIC:TYPE[:ARGS]"])
@@ -208,7 +212,6 @@ def sample_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR
     # --- Common settings ---
     method: str = getattr(args, "method", "mc")
     n_workers: int | None = getattr(args, "parallel", None)
-    seed: int = getattr(args, "seed", 42)
     quiet: bool = getattr(args, "quiet", False)
 
     param_names = prior_param_names(priors)

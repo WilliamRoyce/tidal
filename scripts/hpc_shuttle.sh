@@ -305,17 +305,63 @@ cmd_pull() {
 
   if [[ -z "$src" ]]; then
     # Parse the --output PATH recorded for this jobid in .hpc_jobs.
-    # Records are space-separated: <iso-date> <jobid> <name> <template> <full-cmd>
-    # The full-cmd contains "--output <path>" which we extract.
+    # A record starts with an ISO date and reads
+    #   <iso-date> <jobid> <name> <template> <full-cmd>
+    # but the full-cmd is often written with backslash continuations, so a
+    # record can span many lines and the --output may sit on any of them.
+    # Collect the whole record, not just its first line.
+    #
+    # NOTE: the record-start regex uses literal digit repetition rather than
+    # {4}.  mawk (the default awk here) does not support interval
+    # expressions, so /^[0-9]{4}-/ silently matches nothing.
     if [[ -f "$JOBS_FILE" ]]; then
-      local line
-      line="$(awk -v j="$jobid" '$2==j' "$JOBS_FILE" | tail -1)"
-      if [[ -n "$line" ]]; then
-        src="$(sed -n 's/.*--output \([^ ]*\).*/\1/p' <<<"$line")"
-        # Records written before ${RESULTS_DIR} was expanded at submit time
-        # carry the literal string.  Resolve it here so historical jobs pull.
+      local record
+      record="$(awk -v j="$jobid" '
+        /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T/ {
+          inrec = ($2 == j)
+          if (inrec) rec = ""          # last submission of a resubmitted id wins
+        }
+        inrec { rec = rec $0 "\n" }
+        END { printf "%s", rec }
+      ' "$JOBS_FILE")"
+      if [[ -n "$record" ]]; then
+        # Take the FIRST --output: chained commands (`tidal sample ... &&
+        # tidal plot ... --output .../corner.png`) put the run directory
+        # first and a figure last, and pull wants the directory.  grep -o
+        # rather than sed, because a greedy sed collapses to the last match
+        # on each line.
+        src="$(printf '%s' "$record" \
+          | grep -o -- '--output[[:space:]][[:space:]]*[^[:space:]][^[:space:]]*' \
+          | head -1 \
+          | sed 's/^--output[[:space:]][[:space:]]*//')"
+
+        # Records written before submit-time expansion carry literal shell
+        # variables.  Resolve the ones that are derivable here.
+        #
+        # OUTPUT_DIR is not template-defined -- it is assigned inline in the
+        # recorded command itself -- so recover it from the record.
+        if [[ "$src" == *'${OUTPUT_DIR}'* || "$src" == *'$OUTPUT_DIR'* ]]; then
+          local outdir
+          outdir="$(printf '%s' "$record" \
+            | grep -o 'OUTPUT_DIR=[^ ;]*' | head -1 | cut -d= -f2-)"
+          if [[ -n "$outdir" ]]; then
+            src="${src//\$\{OUTPUT_DIR\}/${outdir}}"
+            src="${src//\$OUTPUT_DIR/${outdir}}"
+          fi
+        fi
         src="${src//\$\{RESULTS_DIR\}/${REMOTE_ROOT}/hpc_results/${jobid}}"
         src="${src//\$RESULTS_DIR/${REMOTE_ROOT}/hpc_results/${jobid}}"
+        src="${src//\$\{TIDAL_ROOT\}/${REMOTE_ROOT}}"
+        src="${src//\$\{REMOTE_ROOT\}/${REMOTE_ROOT}}"
+        src="${src//\$\{SLURM_JOB_ID\}/${jobid}}"
+
+        # Anything still carrying a shell variable cannot be resolved from
+        # the record alone (e.g. ${CAMPAIGN_DIR} on a job submitted without
+        # --campaign); fail loudly rather than rsync a malformed path.
+        if [[ "$src" == *'$'* ]]; then
+          die "recorded --output for job $jobid still contains an unresolved variable: $src
+       pass --src PATH explicitly"
+        fi
       fi
     fi
     [[ -n "$src" ]] || die "could not resolve remote output path for job $jobid; pass --src PATH explicitly"

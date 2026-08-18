@@ -31,6 +31,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from argparse import Namespace
+    from collections.abc import Sequence
 
 
 # Soft penalty floor for numerical-failure samples (sim divergence, NaN
@@ -63,6 +64,30 @@ def _soft_floor_logl(
     if rng is None:
         rng = np.random.default_rng()
     return floor + float(rng.normal(0.0, sigma_explore))
+
+
+def _floor_rng(noise_seed: int, theta: Sequence[float]) -> np.random.Generator:
+    """Derive the soft-floor generator from the seed and the sample itself.
+
+    Seeding on ``theta`` makes the floor a deterministic function of the
+    parameter point, independent of which worker evaluated it or in what
+    order.  A call counter cannot do this: ``_likelihood_worker_init``
+    gives every ``multiprocessing`` fork a counter starting at zero, so
+    the k-th task on each worker would draw the same noise, and
+    ``pool.imap`` dispatch order is not reproducible in the first place.
+    Storing a ``Generator`` on ``LikelihoodConfig`` fails the same way ---
+    the config is pickled into every fork, so all workers would resume
+    from one state.
+
+    See issue #408.
+    """
+    theta_words = np.frombuffer(
+        np.asarray(theta, dtype=np.float64).tobytes(),
+        dtype=np.uint32,
+    )
+    return np.random.default_rng(
+        np.random.SeedSequence([int(noise_seed), *(int(w) for w in theta_words)])
+    )
 
 
 @dataclass(frozen=True)
@@ -112,6 +137,21 @@ class LikelihoodConfig:
     so that ``precision_criterion × |logZ|`` stays achievable.
     See issue #375."""
 
+    noise_seed: int = 0
+    """Seed for the soft-floor exploration noise (default: 0).
+
+    Combined with the sample's own ``theta`` to derive a generator, so a
+    given parameter point always receives the same floor value.  This is
+    a correctness property as much as a reproducibility one: nested
+    sampling assumes the likelihood is a deterministic function of the
+    parameters, and an unseeded floor lets a sample's logL change between
+    live-point insertion and later re-evaluation.
+
+    Seeding on ``theta`` rather than a call counter is deliberate --- a
+    counter restarts at zero in every ``multiprocessing`` worker, so the
+    k-th task on every worker would draw identical noise, and ``imap``
+    dispatch order is not reproducible anyway.  See issue #408."""
+
     def __post_init__(self) -> None:
         valid = {"gaussian", "threshold", "maximize", "minimize", "extremize"}
         if self.likelihood_type not in valid:
@@ -135,6 +175,7 @@ def parse_likelihood(
     permissive: bool = True,
     soft_floor_noise_sigma: float = 1.0,
     soft_floor_logl: float = SOFT_FLOOR_LOGL,
+    noise_seed: int = 0,
 ) -> LikelihoodConfig:
     """Parse a CLI likelihood specification string.
 
@@ -182,6 +223,7 @@ def parse_likelihood(
         "permissive": permissive,
         "soft_floor_noise_sigma": soft_floor_noise_sigma,
         "soft_floor_logl": soft_floor_logl,
+        "noise_seed": noise_seed,
     }
 
     if ltype == "gaussian":
@@ -627,6 +669,7 @@ def _evaluate_likelihood(
                 return _soft_floor_logl(
                     likelihood_config.soft_floor_noise_sigma,
                     likelihood_config.soft_floor_logl,
+                    _floor_rng(likelihood_config.noise_seed, theta),
                 ), {
                     "run_status": "simulation_failed",
                     "exit_code": int(exit_code),
@@ -665,6 +708,7 @@ def _evaluate_likelihood(
             return _soft_floor_logl(
                 likelihood_config.soft_floor_noise_sigma,
                 likelihood_config.soft_floor_logl,
+                _floor_rng(likelihood_config.noise_seed, theta),
             ), {
                 "run_status": "metric_nan",
                 likelihood_config.metric: metric_value_f,
@@ -721,6 +765,7 @@ def _evaluate_likelihood(
             return _soft_floor_logl(
                 likelihood_config.soft_floor_noise_sigma,
                 likelihood_config.soft_floor_logl,
+                _floor_rng(likelihood_config.noise_seed, theta),
             ), {
                 **success_meta,
                 "run_status": "logl_minus_inf",
@@ -747,7 +792,9 @@ def _evaluate_likelihood(
         # still reject these in practice (exp(-100) ~ 4e-44) but sees a
         # gradient in the failure region.
         return _soft_floor_logl(
-            likelihood_config.soft_floor_noise_sigma, likelihood_config.soft_floor_logl
+            likelihood_config.soft_floor_noise_sigma,
+            likelihood_config.soft_floor_logl,
+            _floor_rng(likelihood_config.noise_seed, theta),
         ), {"run_status": "exception"}
 
     finally:
