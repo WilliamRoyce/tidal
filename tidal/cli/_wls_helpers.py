@@ -73,7 +73,9 @@ def wl_skip_tuples(dim: int) -> str:
 def wl_bg_rule_entry(head: str, comps: str, contra: str) -> str:
     """BackgroundFieldRules entry: ``{head, {comps}, {contra}}``."""
     return wl_list(
-        head, wl_list(comps) if comps else "{}", wl_list(contra) if contra else "{}",
+        head,
+        wl_list(comps) if comps else "{}",
+        wl_list(contra) if contra else "{}",
     )
 
 

@@ -284,7 +284,9 @@ class TestPass1ConstraintAndDynamicalAgree:
             expected_lhs_feedback = -b5 * omega2 * _G * phi0
             actual_lhs_feedback = h1 - _G * phi1
             np.testing.assert_allclose(
-                actual_lhs_feedback, expected_lhs_feedback, atol=1e-10,
+                actual_lhs_feedback,
+                expected_lhs_feedback,
+                atol=1e-10,
             )
 
     def test_combined_total_includes_both_passes(self) -> None:
@@ -387,7 +389,12 @@ class TestAugmentedRecoveryMatchesMpmath:
         _spec, solver, grid, y0, layout = _setup()
         params = {"m2": _M2, "b5": 1e-3, "g": _G}
         res = solver.solve(
-            y0, grid, (0.0, 0.5), order=1, parameters=params, num_snapshots=11,
+            y0,
+            grid,
+            (0.0, 0.5),
+            order=1,
+            parameters=params,
+            num_snapshots=11,
         )
         n = grid.num_points
         phi_slot = layout.field_slot_map["phi"]

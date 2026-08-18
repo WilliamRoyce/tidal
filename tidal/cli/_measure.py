@@ -284,7 +284,10 @@ def _run_conversion(
     )
 
     source, target = _resolve_source_target(
-        data, source, target, measurement_name="conversion",
+        data,
+        source,
+        target,
+        measurement_name="conversion",
     )
 
     # Single-field or group conversion
@@ -329,10 +332,14 @@ def _run_spectrum(data: SimulationData) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for name in data.fields:
         snap_initial = compute_spectrum(
-            data.fields[name][0], data.grid_spacing, data.periodic,
+            data.fields[name][0],
+            data.grid_spacing,
+            data.periodic,
         )
         snap_final = compute_spectrum(
-            data.fields[name][-1], data.grid_spacing, data.periodic,
+            data.fields[name][-1],
+            data.grid_spacing,
+            data.periodic,
         )
         result[name] = {
             "initial": {
@@ -405,7 +412,10 @@ def _run_asymptotic(
     from tidal.measurement import compute_asymptotic_conversion
 
     source, target = _resolve_source_target(
-        data, source, target, measurement_name="asymptotic",
+        data,
+        source,
+        target,
+        measurement_name="asymptotic",
     )
 
     result = compute_asymptotic_conversion(data, list(source), list(target))
@@ -467,7 +477,11 @@ def _run_velocity_mismatch(
     from tidal.measurement import compute_velocity_mismatch
 
     source, target = _resolve_source_target(
-        data, source, target, require_both=True, measurement_name="velocity mismatch",
+        data,
+        source,
+        target,
+        require_both=True,
+        measurement_name="velocity mismatch",
     )
 
     result = compute_velocity_mismatch(data, list(source), list(target))
@@ -491,7 +505,11 @@ def _run_resonance(
     from tidal.measurement import compute_resonance_analysis
 
     source, target = _resolve_source_target(
-        data, source, target, require_both=True, measurement_name="resonance",
+        data,
+        source,
+        target,
+        require_both=True,
+        measurement_name="resonance",
     )
 
     result = compute_resonance_analysis(data, list(source), list(target))
@@ -842,7 +860,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
 
     if "conservation" in measurements:
         results["conservation"] = _run_measurement_safe(
-            _run_conservation, data, threshold,
+            _run_conservation,
+            data,
+            threshold,
         )
 
     if "conversion" in measurements or "mixing" in measurements:
@@ -872,23 +892,33 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
             )
             return 1
         results["dispersion"] = _run_measurement_safe(
-            _run_dispersion, data, dyn_in_source,
+            _run_dispersion,
+            data,
+            dyn_in_source,
         )
 
     if "effective_mass" in measurements:
         dyn_in_source = _filter_to_dynamical(source, data, "effective_mass")
         results["effective_mass"] = _run_measurement_safe(
-            _run_effective_mass, data, dyn_in_source,
+            _run_effective_mass,
+            data,
+            dyn_in_source,
         )
 
     if "asymptotic" in measurements:
         results["asymptotic"] = _run_measurement_safe(
-            _run_asymptotic, data, source, target,
+            _run_asymptotic,
+            data,
+            source,
+            target,
         )
 
     if "peak_conversion" in measurements:
         results["peak_conversion"] = _run_measurement_safe(
-            _run_peak_conversion, data, source, target,
+            _run_peak_conversion,
+            data,
+            source,
+            target,
         )
 
     if "velocity" in measurements:
@@ -896,12 +926,18 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
         results["velocity"] = _run_measurement_safe(_run_velocity, data, dyn_in_source)
         if "error" not in results["velocity"] and target is not None:
             results["velocity_mismatch"] = _run_measurement_safe(
-                _run_velocity_mismatch, data, tuple(dyn_in_source), target,
+                _run_velocity_mismatch,
+                data,
+                tuple(dyn_in_source),
+                target,
             )
 
     if "resonance" in measurements:
         results["resonance"] = _run_measurement_safe(
-            _run_resonance, data, source, target,
+            _run_resonance,
+            data,
+            source,
+            target,
         )
 
     return results

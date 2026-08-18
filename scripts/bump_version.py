@@ -535,7 +535,11 @@ class VersionBumper:
                 self.citation_cff,
                 self.root / "uv.lock",
             ]
-            files_to_stage.extend(optional for optional in [self.next_phases_md, self.roadmap_md, self.security_md] if optional.exists())
+            files_to_stage.extend(
+                optional
+                for optional in [self.next_phases_md, self.roadmap_md, self.security_md]
+                if optional.exists()
+            )
             subprocess.run(
                 ["git", "add", "--", *[str(f) for f in files_to_stage]],
                 cwd=self.root,

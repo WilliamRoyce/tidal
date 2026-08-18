@@ -255,7 +255,8 @@ class TestLoadResumeState:
         from tidal.symbolic import load_equation_system
 
         snap_dir = _make_snapshot_dir(
-            tmp_path, parameters={"m2": math.pi, "coupling": 0.5},
+            tmp_path,
+            parameters={"m2": math.pi, "coupling": 0.5},
         )
         spec = load_equation_system(kg_spec)
 
@@ -290,7 +291,9 @@ class TestLoadResumeState:
         np.testing.assert_array_equal(actual, expected.ravel())
 
     def test_negative_snapshot_index_raises(
-        self, tmp_path: Path, kg_spec: Path,
+        self,
+        tmp_path: Path,
+        kg_spec: Path,
     ) -> None:
         """Negative snapshot indices raise ValueError."""
         from tidal.symbolic import load_equation_system
@@ -459,7 +462,9 @@ class TestSimulateResume:
         np.testing.assert_allclose(ckpt_vel, resumed_vel, atol=1e-10)
 
     def test_resume_specific_snapshot(
-        self, inline_kg_1d_json: Path, tmp_path: Path,
+        self,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """Resume from a specific mid-run snapshot."""
         from tidal.cli import main
@@ -564,7 +569,9 @@ class TestSimulateResume:
         assert ret == 1
 
     def test_resume_parameter_override(
-        self, inline_kg_1d_json: Path, tmp_path: Path,
+        self,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """CLI --param overrides checkpoint metadata parameters."""
         from tidal.cli import main

@@ -93,7 +93,8 @@ def _build_k_grid(
         dx = grid_spacing[axis]
         if axis == ndim - 1:
             freq = np.asarray(
-                np.fft.rfftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64,
+                np.fft.rfftfreq(n, d=dx) * (2.0 * np.pi),
+                dtype=np.float64,
             )
         else:
             freq = np.asarray(np.fft.fftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64)

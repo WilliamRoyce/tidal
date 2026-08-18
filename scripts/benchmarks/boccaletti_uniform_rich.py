@@ -472,9 +472,7 @@ def append_convergence(*, out: Path, parallel: int, work_dir: Path) -> None:
             f"--append-convergence requires existing {out}; run the full "
             "benchmark first."
         )
-        raise FileNotFoundError(
-            msg
-        )
+        raise FileNotFoundError(msg)
     with out.open(encoding="utf-8") as fh:
         data = json.load(fh)
     existing = data.get("convergence", [])
@@ -484,9 +482,7 @@ def append_convergence(*, out: Path, parallel: int, work_dir: Path) -> None:
     t_converge = data["metadata"]["parameters"].get("t_converge_point")
     if b0_converge is None or t_converge is None:
         msg = "existing JSON metadata lacks b0_converge_point/t_converge_point"
-        raise RuntimeError(
-            msg
-        )
+        raise RuntimeError(msg)
 
     work_dir.mkdir(parents=True, exist_ok=True)
     new_rows: list[dict] = []

@@ -371,9 +371,7 @@ class TestInspectSemanticQueries:
         ret = main(["inspect", str(self.EXAMPLES / "coupled_scalars.json")])
         assert ret == 0
         equations = capsys.readouterr().out.split("Equations:")[1]
-        line = next(
-            ln for ln in equations.splitlines() if "laplacian_x(h_0)" in ln
-        )
+        line = next(ln for ln in equations.splitlines() if "laplacian_x(h_0)" in ln)
         assert "[-kappa^(-2)]" in line  # the numerator is negative
         assert "eff>0" in line  # the effective coefficient is positive
         # and no bare ">0" that could be read as annotating the bracket

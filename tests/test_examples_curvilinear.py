@@ -121,7 +121,9 @@ class TestVolumeElementGuard:
             ]
         import tempfile
 
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as fh:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", suffix=".json", delete=False
+        ) as fh:
             json.dump(stripped, fh)
             broken = Path(fh.name)
         try:
@@ -187,7 +189,9 @@ class TestTemporalSignGuard:
                     term["coefficient_symbolic"] = f"-({term['coefficient_symbolic']})"
         import tempfile
 
-        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as fh:
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", suffix=".json", delete=False
+        ) as fh:
             json.dump(data, fh)
             broken = Path(fh.name)
         try:

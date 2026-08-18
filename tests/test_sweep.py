@@ -317,7 +317,9 @@ class TestSweepResults:
         assert len(data["rows"]) == 3
 
     def test_save_sweep_json(
-        self, sample_results: SweepResults, tmp_path: Path,
+        self,
+        sample_results: SweepResults,
+        tmp_path: Path,
     ) -> None:
         sweep_file = tmp_path / "sweep.json"
         sample_results.save_sweep_json(sweep_file)
@@ -328,7 +330,9 @@ class TestSweepResults:
         assert data["completed_runs"] == 3
 
     def test_save_sweep_json_includes_run_dirs(
-        self, sample_results: SweepResults, tmp_path: Path,
+        self,
+        sample_results: SweepResults,
+        tmp_path: Path,
     ) -> None:
         sweep_file = tmp_path / "sweep.json"
         sample_results.save_sweep_json(sweep_file)
@@ -651,7 +655,8 @@ class TestRunStatusTracking:
         assert all(r["run_status"] != "success" for r in f.rows)
 
     def test_successful_rows_preserves_run_dirs(
-        self, mixed_results: SweepResults,
+        self,
+        mixed_results: SweepResults,
     ) -> None:
         s = mixed_results.successful_rows()
         assert len(s.run_dirs) == 2
@@ -1109,7 +1114,9 @@ class TestSweepValidation:
         assert code == 1
 
     def test_unknown_swept_param_warns(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Swept param not in spec should warn but not error."""
         from tidal.cli import main
@@ -1402,7 +1409,10 @@ class TestSweepPlotOverlay:
         results = _make_1d_sweep_results()
         fig, ax = plt.subplots()
         render_sweep_1d(
-            ax, results, "P_final", overlay="sin(kappa * B0 * t_end / 2)**2",
+            ax,
+            results,
+            "P_final",
+            overlay="sin(kappa * B0 * t_end / 2)**2",
         )
 
         lines = ax.get_lines()
@@ -1454,7 +1464,10 @@ class TestSweepPlotOverlay:
         results = _make_1d_sweep_results()
         fig, ax = plt.subplots()
         render_sweep_1d(
-            ax, results, "P_final", overlay="sin(kappa * B0 * t_end / 2)**2",
+            ax,
+            results,
+            "P_final",
+            overlay="sin(kappa * B0 * t_end / 2)**2",
         )
 
         # The second line is the overlay
@@ -1481,7 +1494,10 @@ class TestSweepPlotOverlay:
         results = _make_2d_sweep_results()
         fig = plt.figure(figsize=(15, 5))
         render_sweep_2d_with_overlay(
-            fig, results, "P_final", "sin(kappa * Bpeak * R * sqrt(pi/2))**2",
+            fig,
+            results,
+            "P_final",
+            "sin(kappa * Bpeak * R * sqrt(pi/2))**2",
         )
 
         assert len(fig.axes) >= 3
@@ -1499,7 +1515,10 @@ class TestSweepPlotOverlay:
         results = _make_2d_sweep_results()
         fig = plt.figure(figsize=(15, 5))
         render_sweep_2d_with_overlay(
-            fig, results, "P_final", "sin(kappa * Bpeak * R * sqrt(pi/2))**2",
+            fig,
+            results,
+            "P_final",
+            "sin(kappa * Bpeak * R * sqrt(pi/2))**2",
         )
 
         # The third pcolormesh (error panel) should have near-zero values

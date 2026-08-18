@@ -38,7 +38,10 @@ def _make_overview_plot(sim_data: SimulationData, grid_info: GridInfo) -> str:
 
     n_fields = len(sim_data.fields)
     fig, axes = plt.subplots(
-        1, max(n_fields, 1), figsize=(5 * n_fields, 4), squeeze=False,
+        1,
+        max(n_fields, 1),
+        figsize=(5 * n_fields, 4),
+        squeeze=False,
     )
 
     for i, (name, data) in enumerate(sim_data.fields.items()):

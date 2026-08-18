@@ -177,7 +177,10 @@ def compute_sobol_indices(
 
     try:
         si = sobol_analyze.analyze(  # type: ignore[reportUnknownVariableType]
-            problem, y, calc_second_order=False, num_resamples=n_bootstrap,
+            problem,
+            y,
+            calc_second_order=False,
+            num_resamples=n_bootstrap,
         )
     except RuntimeError as exc:
         msg = (

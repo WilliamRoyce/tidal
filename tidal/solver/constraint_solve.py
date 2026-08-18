@@ -802,14 +802,20 @@ def _solve_coupled(  # noqa: PLR0912, PLR0913, PLR0914, PLR0917, C901
             methods[terms.field_name] = method
             if method != "fft":
                 op_matrices[terms.field_name] = _probe_operator_matrix(
-                    terms.self_terms, grid, bc,
+                    terms.self_terms,
+                    grid,
+                    bc,
                 )
 
         for _iteration in range(max_iter):
             max_change = 0.0
             for terms in groups:
                 source = _evaluate_source(
-                    terms.source_terms, fields, grid, bc, name_map,
+                    terms.source_terms,
+                    fields,
+                    grid,
+                    bc,
+                    name_map,
                 )
                 method = methods[terms.field_name]
 

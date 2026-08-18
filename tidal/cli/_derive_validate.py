@@ -531,7 +531,9 @@ def _validate_linearization(
 
     if matter_perts:
         _validate_matter_perturbations(
-            config, matter_perts, has_lagrangian=has_lagrangian,
+            config,
+            matter_perts,
+            has_lagrangian=has_lagrangian,
         )
 
 

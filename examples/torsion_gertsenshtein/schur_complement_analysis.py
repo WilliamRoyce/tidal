@@ -76,7 +76,12 @@ def extract_h5_a1_block(
     """
     coeff_eval = CoefficientEvaluator(spec, grid, params)
     A_reduced, _, _, _, _, mapping = _build_evolution_matrices(
-        spec, layout, grid, coeff_eval, k_grid, rfft_shape,
+        spec,
+        layout,
+        grid,
+        coeff_eval,
+        k_grid,
+        rfft_shape,
     )
 
     # Map original slots to reduced slots
@@ -362,7 +367,12 @@ def mini_solver_amplification(
         """Get the full 14x14 reduced system and slot mapping."""
         coeff_eval = CoefficientEvaluator(spec, grid, params)
         A_red, _, _, _, _, mapping = _build_evolution_matrices(
-            spec, layout, grid, coeff_eval, k_grid, rfft_shape,
+            spec,
+            layout,
+            grid,
+            coeff_eval,
+            k_grid,
+            rfft_shape,
         )
         return A_red, mapping
 

@@ -53,7 +53,6 @@ CRITICAL TEST: does the Curtright/dual-graviton formulation of the tensor
 torsion sector convert b5·(∂q)^2 into a regular kinetic term + auxiliary?
 """
 
-
 print("=" * 72)
 print("LINE 6: Dual formulation / Curtright-Hull duality")
 print("=" * 72)

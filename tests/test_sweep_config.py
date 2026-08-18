@@ -27,7 +27,8 @@ class TestParseSweepSection:
 
     def test_linear_range(self) -> None:
         values, adaptive = _parse_sweep_section(
-            "g0", {"start": 0.1, "stop": 1.0, "count": 5},
+            "g0",
+            {"start": 0.1, "stop": 1.0, "count": 5},
         )
         assert len(values) == 5
         assert values[0] == pytest.approx(0.1)
@@ -80,13 +81,15 @@ class TestParseSweepSection:
     def test_log_negative_bounds(self) -> None:
         with pytest.raises(ValueError, match="positive bounds"):
             _parse_sweep_section(
-                "g0", {"start": -1.0, "stop": 1.0, "count": 5, "scale": "log"},
+                "g0",
+                {"start": -1.0, "stop": 1.0, "count": 5, "scale": "log"},
             )
 
     def test_unknown_scale(self) -> None:
         with pytest.raises(ValueError, match="unknown scale"):
             _parse_sweep_section(
-                "g0", {"start": 0.0, "stop": 1.0, "count": 5, "scale": "cubic"},
+                "g0",
+                {"start": 0.0, "stop": 1.0, "count": 5, "scale": "cubic"},
             )
 
     def test_explicit_values_too_few(self) -> None:
@@ -223,7 +226,9 @@ class TestLoadSweepConfig:
         assert config.output == subdir / ".." / "results"
 
     def test_unknown_sections_warn(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         toml = tmp_path / "sweep.toml"
         spec = tmp_path / "spec.json"

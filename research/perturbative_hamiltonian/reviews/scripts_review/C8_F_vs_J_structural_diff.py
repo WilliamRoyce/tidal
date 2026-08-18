@@ -31,7 +31,6 @@ DIFF:
     mass, decoupling.  Auxiliaries h, b, a have finite kinetic.
 """
 
-
 import sympy as sp
 from sympy import Matrix, symbols
 
