@@ -56,7 +56,7 @@ def _soft_floor_logl(
     tests via ``--soft-floor-noise=0``).  The floor defaults to
     ``SOFT_FLOOR_LOGL`` but can be overridden per-run via
     ``--soft-floor-logl`` when the default -100 contaminates logZ for
-    baseline-normalized likelihoods (see issue #372).
+    baseline-normalized likelihoods (see issue #375).
     """
     if sigma_explore <= 0.0:
         return floor
@@ -110,7 +110,7 @@ class LikelihoodConfig:
     to -100 and makes the PolyChord precision criterion unreachable.  Use
     ``--soft-floor-logl -15`` (or similar) to keep logZ in a sensible range
     so that ``precision_criterion × |logZ|`` stays achievable.
-    See issue #372."""
+    See issue #375."""
 
     def __post_init__(self) -> None:
         valid = {"gaussian", "threshold", "maximize", "minimize", "extremize"}
