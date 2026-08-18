@@ -15,8 +15,13 @@
 #   sup_path    — relative path to sup PolyChord subdir
 #   param_names — ordered list of parameter labels matching the chain columns
 #
-# Priors are read from <amp_path>/inference.json when available; chains that
-# pre-date the inference.json schema must supply a [chain.priors] override.
+# Priors are read from <amp_path>/inference.json when available. Chains that
+# pre-date the inference.json schema get an all-arctan_uniform(-89,89)
+# fallback; where that is wrong for specific parameters, supply
+#   prior_overrides = { name = "DIST:LO:HI", ... }
+# using the same syntax as the campaign --prior flags (provenance:
+# scripts/hpc_templates/*.sbatch). Names refer to param_names (i.e. the
+# relabeled column names, matched positionally to the recorded priors).
 
 [[chain]]
 theory = "dark_photon_plasma"
@@ -85,6 +90,10 @@ jobid = "29682868"
 amp_path = "hpc_results/29682868/t7_amp_v2"
 sup_path = "hpc_results/29682868/t7_sup_v2"
 param_names = ["beta1", "beta2", "beta3", "xi", "delta1", "zeta1", "zeta2", "zeta3", "chi1", "chi2", "chi3", "chi4", "chi5", "chi6", "chi7", "chi8", "chi9", "chi10"]
+# No inference.json in these chain dirs; the T7 run used log-uniform xi
+# (scripts/hpc_templates/polychord_intr_t7_rescue.sbatch), not the arctan
+# fallback.
+prior_overrides = { xi = "log_uniform:1e-3:1e3" }
 
 [[chain]]
 theory = "np_chi_closure"
@@ -117,6 +126,10 @@ jobid = "29687506"
 amp_path = "hpc_results/29687506/t6_amp_v2"
 sup_path = "hpc_results/29687506/t6_sup_v2"
 param_names = ["beta1", "beta2", "beta3", "xi", "delta1", "chi", "zeta1", "zeta2", "zeta3", "d14", "d15", "d17", "d19", "d20", "d21", "tildezeta1", "tildezeta2", "tildezeta3", "tildezeta5", "tildezeta6"]
+# No inference.json in these chain dirs; the T6 run used log-uniform xi
+# (scripts/hpc_templates/polychord_intr_t6_rescue.sbatch), not the arctan
+# fallback.
+prior_overrides = { xi = "log_uniform:1e-3:1e3" }
 
 [[chain]]
 theory = "complete_parity_odd"

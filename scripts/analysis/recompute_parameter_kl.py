@@ -89,10 +89,147 @@ def _read_priors(chain_dir: Path, param_names: list[str]) -> list[dict[str, Any]
     ]
 
 
-def _build_stub(chain_dir: Path, param_names: list[str]) -> StubResult:
+def _align_priors_to_params(
+    priors: list[dict[str, Any]],
+    param_names: list[str],
+    chain_label: str,
+) -> list[dict[str, Any]]:
+    """Rename prior records positionally onto the TOML ``param_names``.
+
+    ``d_kl_chains.toml`` may relabel chain columns (e.g. ricci_em's
+    ``alpha*`` → ``beta*`` so figure axes match §4 notation) while the
+    recorded prior names keep the original labels.  The name-based lookup
+    in ``compute_parameter_importance`` then misses every renamed column
+    and silently falls back to a uniform-over-sample-range reference
+    (GH #420 — the miss was masked pre-fix because the saturated
+    estimator produced near-identical numbers either way).
+
+    Records are matched to columns positionally: record order equals
+    column order by construction (``build_prior_transform`` concatenates
+    prior dimensions in declaration order, and the chain writer emits
+    columns the same way).  ``radial_angular`` records consume
+    ``len(names)`` consecutive columns.  On any arity mismatch the
+    original records are returned unchanged (with a warning) so the
+    failure mode stays visible rather than mis-assigned.
+    """
+    aligned: list[dict[str, Any]] = []
+    pos = 0
+    for rec in priors:
+        if rec.get("kind") == "radial_angular":
+            names = list(rec.get("names", []))
+            new_names = param_names[pos : pos + len(names)]
+            if len(new_names) != len(names):
+                log.warning(
+                    "[%s] prior/param arity mismatch (joint record needs %d "
+                    "columns, %d remain) — keeping original prior names",
+                    chain_label,
+                    len(names),
+                    len(new_names),
+                )
+                return priors
+            if names != new_names:
+                log.info(
+                    "[%s] positional prior match: %s -> %s",
+                    chain_label,
+                    names,
+                    new_names,
+                )
+            aligned.append({**rec, "names": new_names})
+            pos += len(names)
+        else:
+            if pos >= len(param_names):
+                log.warning(
+                    "[%s] more prior records than columns — keeping "
+                    "original prior names",
+                    chain_label,
+                )
+                return priors
+            new_name = param_names[pos]
+            if rec.get("name") != new_name:
+                log.info(
+                    "[%s] positional prior match: %r -> %r (%s)",
+                    chain_label,
+                    rec.get("name"),
+                    new_name,
+                    rec.get("distribution"),
+                )
+            aligned.append({**rec, "name": new_name})
+            pos += 1
+    if pos != len(param_names):
+        log.warning(
+            "[%s] %d prior dimensions for %d columns — keeping original prior names",
+            chain_label,
+            pos,
+            len(param_names),
+        )
+        return priors
+    return aligned
+
+
+def _apply_prior_overrides(
+    priors: list[dict[str, Any]],
+    overrides: dict[str, str],
+    chain_label: str,
+) -> list[dict[str, Any]]:
+    """Replace named scalar prior records with ``DIST:LO:HI`` overrides.
+
+    ``d_kl_chains.toml`` entries may carry ``prior_overrides = {name =
+    "log_uniform:1e-3:1e3", ...}`` for chains that pre-date the
+    inference.json priors schema, where ``_read_priors`` fabricates an
+    all-arctan fallback.  The override strings use the same syntax as the
+    campaign ``--prior`` flags (see scripts/hpc_templates/*.sbatch, the
+    provenance for these values).  Names refer to the TOML ``param_names``
+    (i.e. post-alignment).
+    """
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for rec in priors:
+        name = rec.get("name")
+        if name in overrides:
+            dist, lo, hi = overrides[name].split(":")
+            log.info(
+                "[%s] prior override: %s = %s (was %s)",
+                chain_label,
+                name,
+                overrides[name],
+                rec.get("distribution"),
+            )
+            out.append(
+                {
+                    "kind": "scalar",
+                    "name": name,
+                    "distribution": dist,
+                    "low": float(lo),
+                    "high": float(hi),
+                }
+            )
+            seen.add(str(name))
+        else:
+            out.append(rec)
+    missing = set(overrides) - seen
+    if missing:
+        log.warning(
+            "[%s] prior_overrides for unknown parameter(s): %s",
+            chain_label,
+            sorted(missing),
+        )
+    return out
+
+
+def _build_stub(
+    chain_dir: Path,
+    param_names: list[str],
+    prior_overrides: dict[str, str] | None = None,
+) -> StubResult:
     """Build a StubResult pointing at the on-disk chain root."""
     chain_root = chain_dir / "_chains" / "tidal"
-    priors = _read_priors(chain_dir, param_names)
+    priors = _align_priors_to_params(
+        _read_priors(chain_dir, param_names),
+        param_names,
+        chain_dir.name,
+    )
+    if prior_overrides:
+        priors = _apply_prior_overrides(priors, prior_overrides, chain_dir.name)
     return StubResult(
         method="nested",
         param_names=list(param_names),
@@ -128,8 +265,9 @@ def _process_chain(entry: dict[str, Any], n_bootstrap: int) -> None:
     }
 
     # Per-direction parameter importance (amp + sup).
+    prior_overrides: dict[str, str] = dict(entry.get("prior_overrides", {}))
     for direction, chain_dir in (("amp", amp_path), ("sup", sup_path)):
-        stub = _build_stub(chain_dir, params)
+        stub = _build_stub(chain_dir, params, prior_overrides)
         try:
             imp = compute_parameter_importance(stub, n_bootstrap=n_bootstrap)
         except (ValueError, RuntimeError, KeyError) as exc:
@@ -148,6 +286,8 @@ def _process_chain(entry: dict[str, Any], n_bootstrap: int) -> None:
             "log_evidence": imp.log_evidence,
             "log_evidence_err": imp.log_evidence_err,
             "marginal_d_kl": imp.marginal_d_kl,
+            # Self-check block (#420): superadditivity, saturation, n_eff.
+            "consistency": imp.consistency,
         }
 
     # Cross-amp-sup per-parameter D_KL: load both chains via anesthetic
