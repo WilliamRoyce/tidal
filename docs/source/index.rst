@@ -2,8 +2,9 @@ TIDAL Documentation
 ====================
 
 **TIDAL** (Tensor Integration and Derivation for Any Lagrangian) is a symbolic physics
-pipeline that derives PDEs from Lagrangians using xAct/Mathematica and simulates them
-numerically with py-pde. All equation structure comes from symbolic computation —
+pipeline that derives PDEs from Lagrangians using xAct/Mathematica and integrates them
+numerically with SUNDIALS (IDA/CVODE), an exact spectral modal solver, symplectic
+leapfrog, or scipy. All equation structure comes from symbolic computation —
 no physics is hardcoded.
 
 Key Features
@@ -11,11 +12,10 @@ Key Features
 
 * **Symbolic Pipeline**: Lagrangian → Euler-Lagrange → Component Decomposition → JSON → PDE Simulation
 * **CLI Tool**: ``tidal`` command with derive, simulate, measure, inspect, list, and validate subcommands
-* **20 Working Examples**: Spanning 1+1D through 3+1D spacetimes
+* **Worked Examples**: Spanning 1+1D through 3+1D spacetimes
 * **Multi-Field Support**: Scalars, vectors, and rank-3+ tensors with cross-field coupling
 * **Curvilinear Coordinates**: Automatic Christoffel symbol computation for non-Cartesian grids
 * **Parameter Sweeps**: Override symbolic coefficients at runtime without re-deriving
-* **900+ Python Tests + ~115 Wolfram Tests**: Comprehensive validation of both pipeline stages
 
 Quick Start
 -----------
@@ -42,14 +42,20 @@ Install and run:
    # Run a pipeline example
    cd examples/scalar_field && bash run.sh
 
-.. toctree::
-   :maxdepth: 2
-   :caption: User Guide
+User Guide
+----------
 
-   pipeline
-   cli
-   examples
-   TEX_SUPPORT
+.. note::
+
+   **This section is not written yet.** The narrative documentation — pipeline
+   internals, CLI reference, JSON schema, solver backends, gauge fixing,
+   background fields, inference and troubleshooting — currently lives as LaTeX
+   sources under ``docs/tex/`` in the repository and has not yet been migrated
+   into this site. Until it is, the API Reference below is the only
+   documentation published here.
+
+   Progress is tracked in `issue #416
+   <https://github.com/WilliamRoyce/tidal/issues/416>`_.
 
 .. toctree::
    :maxdepth: 2
