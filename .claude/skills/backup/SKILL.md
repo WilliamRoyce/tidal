@@ -6,18 +6,18 @@ description: Backup Claude memory, plans, and project settings. Check MEMORY.md 
 # Memory Backup & Health Check
 
 ## Current MEMORY.md size
-!`wc -l /home/vscode/.claude/projects/-workspaces-torsion-gertsenshtein/memory/MEMORY.md 2>/dev/null`
+!`wc -l "$HOME/.claude/projects/$(printf '%s' "$PWD" | sed 's/[^a-zA-Z0-9]/-/g')/memory/MEMORY.md" 2>/dev/null`
 
 ## Instructions
 
 1. Run the backup script:
 ```bash
-bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/sync-claude-memory.sh backup
+bash .devcontainer/scripts/sync-claude-memory.sh backup
 ```
 
 2. Show status:
 ```bash
-bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/sync-claude-memory.sh status
+bash .devcontainer/scripts/sync-claude-memory.sh status
 ```
 
 3. Check MEMORY.md line count. If over 200 lines, WARN:

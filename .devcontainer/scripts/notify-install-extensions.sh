@@ -57,9 +57,9 @@ during container initialization.
 
 TO INSTALL ALL REQUIRED EXTENSIONS:
 
-  1. Open a terminal in VS Code
+  1. Open a terminal in VS Code (it opens at the repository root)
   2. Run the installation script:
-     bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/install-extensions-final.sh
+     bash .devcontainer/scripts/install-extensions-final.sh
   3. After completion, reload the VS Code window:
      Press: Ctrl+Shift+P
      Type: "Developer: Reload Window"

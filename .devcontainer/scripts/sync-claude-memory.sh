@@ -6,14 +6,19 @@
 #   sync-claude-memory.sh status   -- Show sync status
 set -euo pipefail
 
-MEMORY_DIR="/home/vscode/.claude/projects/-workspaces-torsion-gertsenshtein/memory"
-MEMORY_BACKUP="/workspaces/torsion-gertsenshtein/.claude-memory-backup"
+# Derive every path -- nothing here may assume a particular clone location.
+# Claude Code names a project directory after the absolute workspace path with
+# every non-alphanumeric character replaced by "-".
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PROJECT_SLUG="$(printf '%s' "$REPO_ROOT" | sed 's/[^a-zA-Z0-9]/-/g')"
 
-PLANS_DIR="/home/vscode/.claude/plans"
-PLANS_BACKUP="/workspaces/torsion-gertsenshtein/.claude-plans-backup"
+PROJECT_DIR="$HOME/.claude/projects/$PROJECT_SLUG"
+MEMORY_DIR="$PROJECT_DIR/memory"
+PLANS_DIR="$HOME/.claude/plans"
 
-PROJECT_DIR="/home/vscode/.claude/projects/-workspaces-torsion-gertsenshtein"
-PROJECT_BACKUP="/workspaces/torsion-gertsenshtein/.claude-project-backup"
+MEMORY_BACKUP="$REPO_ROOT/.claude-memory-backup"
+PLANS_BACKUP="$REPO_ROOT/.claude-plans-backup"
+PROJECT_BACKUP="$REPO_ROOT/.claude-project-backup"
 
 _backup_dir() {
   local src="$1" dst="$2" label="$3"

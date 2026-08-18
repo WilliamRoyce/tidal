@@ -6,6 +6,9 @@
 
 set -e
 
+# Derive the repo root -- never assume a particular clone location.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
 # Colors for output
 if command -v tput &> /dev/null && [ -t 1 ]; then
     GREEN=$(tput setaf 2)
@@ -144,7 +147,7 @@ if [[ -z "$CODE_BIN" ]] || ! command -v "$CODE_BIN" &>/dev/null; then
     echo ""
     echo "${BOLD}What to do:${RESET}"
     echo "  Wait a few minutes and try running this script manually:"
-    echo "  ${BLUE}bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/install-extensions-final.sh${RESET}"
+    echo "  ${BLUE}bash ${REPO_ROOT}/.devcontainer/scripts/install-extensions-final.sh${RESET}"
     echo ""
     exit 0  # Don't fail - just skip for now
 fi

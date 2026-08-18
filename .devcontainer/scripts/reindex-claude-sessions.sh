@@ -6,8 +6,14 @@
 # Usage: bash .devcontainer/scripts/reindex-claude-sessions.sh
 set -euo pipefail
 
+# Derive paths -- never assume a particular clone location. Claude Code names a
+# project directory after the absolute workspace path with every
+# non-alphanumeric character replaced by "-".
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+PROJECT_SLUG="$(printf '%s' "$REPO_ROOT" | sed 's/[^a-zA-Z0-9]/-/g')"
+
 CLAUDE_DIR="$HOME/.claude"
-PROJECT_DIR="$CLAUDE_DIR/projects/-workspaces-torsion-gertsenshtein"
+PROJECT_DIR="$CLAUDE_DIR/projects/$PROJECT_SLUG"
 INDEX_FILE="$PROJECT_DIR/sessions-index.json"
 HISTORY_FILE="$CLAUDE_DIR/history.jsonl"
 
@@ -25,17 +31,17 @@ fi
 
 echo "Found $session_count session file(s). Rebuilding index..."
 
-python3 << 'PYEOF'
+PROJECT_DIR="$PROJECT_DIR" PROJECT_PATH="$REPO_ROOT" python3 << 'PYEOF'
 import json
 import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-project_dir = Path(os.path.expanduser("~/.claude/projects/-workspaces-torsion-gertsenshtein"))
+project_dir = Path(os.environ["PROJECT_DIR"])
 index_file = project_dir / "sessions-index.json"
 history_file = Path(os.path.expanduser("~/.claude/history.jsonl"))
-project_path = "/workspaces/torsion-gertsenshtein"
+project_path = os.environ["PROJECT_PATH"]
 
 # Load existing history session IDs
 existing_history = set()
