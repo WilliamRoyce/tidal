@@ -1124,6 +1124,358 @@ class TestParameterImportance:
 
 
 # ===================================================================
+# Marginal D_KL prior transforms (#420)
+# ===================================================================
+
+
+class TestMarginalDKLPriorTransforms:
+    """Regression tests for #420: marginal D_KL must transform each column
+    into the space where its prior is uniform for EVERY supported prior
+    kind, not just log_uniform.  The null test is exact: samples drawn
+    from the prior itself have true marginal D_KL = 0, so any sizable
+    reported value is estimator artifact (pre-fix: ~2.5 nats for
+    arctan_uniform).
+    """
+
+    #: Histogram-KL bias for N samples in K bins is ~(K-1)/(2N) ≈ 1e-4
+    #: at N=200k, K=40; 0.02 leaves two orders of magnitude of headroom.
+    NULL_TOL = 0.02
+
+    @pytest.mark.parametrize(
+        ("kind", "lo", "hi"),
+        [
+            ("uniform", -1.0, 1.0),
+            ("log_uniform", 1e-3, 1e3),
+            ("arctan_uniform", -89.0, 89.0),
+            ("normal", 0.0, 1.0),
+        ],
+    )
+    def test_null_prior_equals_posterior(self, kind: str, lo: float, hi: float) -> None:
+        """Samples from the prior report marginal D_KL ≈ 0 for every kind."""
+        from tidal.inference._importance import (
+            _hist_kl_vs_uniform,
+            _uniformizing_transform,
+        )
+        from tidal.inference._prior import Prior
+
+        rng = np.random.default_rng(42)
+        n = 200_000
+        samples = Prior(name="p", distribution=kind, low=lo, high=hi).sample(rng, n)
+        transform = _uniformizing_transform(kind, lo, hi)
+        assert transform is not None, f"no transform for supported kind {kind}"
+        fn, a, b = transform
+        kl = _hist_kl_vs_uniform(fn(samples), np.full(n, 1.0 / n), a, b)
+        assert kl < self.NULL_TOL, f"{kind}: null D_KL {kl:.4f} not ~0"
+
+    def test_positive_control_uniform(self) -> None:
+        """A genuinely constrained posterior reports the analytic D_KL."""
+        from tidal.inference._importance import (
+            _hist_kl_vs_uniform,
+            _uniformizing_transform,
+        )
+
+        rng = np.random.default_rng(3)
+        lo, hi = -1.0, 1.0
+        sigma = (hi - lo) / 20
+        post = rng.normal(0.0, sigma, 200_000)
+        post = post[(post > lo) & (post < hi)]
+        transform = _uniformizing_transform("uniform", lo, hi)
+        assert transform is not None
+        fn, a, b = transform
+        kl = _hist_kl_vs_uniform(fn(post), np.full(len(post), 1.0 / len(post)), a, b)
+        analytic = math.log((hi - lo) / (sigma * math.sqrt(2 * math.pi * math.e)))
+        assert kl > 0.5
+        assert kl == pytest.approx(analytic, abs=0.15)
+
+    def test_arctan_transform_ignores_recorded_bounds(self) -> None:
+        """Prior.sample ignores low/high for arctan_uniform (fixed
+        eps-truncated theta range), so the uniformizing transform must
+        too — using the recorded (-89, 89) as the histogram range is
+        the original #420 bug.
+        """
+        from tidal.inference._importance import _uniformizing_transform
+        from tidal.inference._prior import _ARCTAN_EPS
+
+        t1 = _uniformizing_transform("arctan_uniform", -89.0, 89.0)
+        t2 = _uniformizing_transform("arctan_uniform", -30.0, 30.0)
+        assert t1 is not None
+        assert t2 is not None
+        assert (
+            t1[1:]
+            == t2[1:]
+            == (
+                -(math.pi / 2 - _ARCTAN_EPS),
+                math.pi / 2 - _ARCTAN_EPS,
+            )
+        )
+
+    # -- radial_angular ------------------------------------------------
+
+    @staticmethod
+    def _ra_record(q: np.ndarray) -> dict:
+        return {
+            "kind": "radial_angular",
+            "names": ["c1", "c2", "c3", "c4"],
+            "r_lo": 1e-3,
+            "r_hi": 1e3,
+            "face_idx": 1,
+            "sub_tile": [1, 2, 1],
+            "M": 2,
+            "Q": np.asarray(q).tolist(),
+        }
+
+    @pytest.mark.parametrize("rotate", [False, True])
+    def test_vectorized_sampler_matches_transform(self, rotate: bool) -> None:
+        """_sample_radial_angular reproduces RadialAngularPrior.transform."""
+        from tidal.inference._importance import _sample_radial_angular
+        from tidal.inference._prior import RadialAngularPrior
+        from tidal.inference._sphere import random_rotation
+
+        q = random_rotation(4, seed=5) if rotate else np.eye(4)
+        record = self._ra_record(q)
+        prior = RadialAngularPrior(
+            names=("c1", "c2", "c3", "c4"),
+            r_lo=1e-3,
+            r_hi=1e3,
+            face_idx=1,
+            sub_tile=(1, 2, 1),
+            M=2,
+            Q=q,
+        )
+        u_test = np.random.default_rng(7).random((100, 4))
+
+        class _FixedRng:
+            def random(self, shape: tuple[int, ...]) -> np.ndarray:
+                assert shape == u_test.shape
+                return u_test
+
+        vec = _sample_radial_angular(record, 100, _FixedRng())  # type: ignore[arg-type]
+        ref = np.array([prior.transform(u) for u in u_test])
+        np.testing.assert_allclose(vec, ref, atol=1e-12)
+
+    def test_radial_angular_null(self) -> None:
+        """Posterior drawn from the radial_angular prior → D_KL ≈ 0 per
+        coupling (pre-fix: these columns fell to a self-referential
+        uniform fallback because the joint record has no 'name' key).
+        """
+        from tidal.inference._importance import (
+            _RA_REFERENCE_SAMPLES,
+            _RA_REFERENCE_SEED,
+            _marginal_dkl_empirical,
+            _sample_radial_angular,
+        )
+
+        record = self._ra_record(np.eye(4))
+        reference = _sample_radial_angular(
+            record, _RA_REFERENCE_SAMPLES, np.random.default_rng(_RA_REFERENCE_SEED)
+        )
+        n_post = 20_000
+        posterior = _sample_radial_angular(record, n_post, np.random.default_rng(11))
+        weights = np.full(n_post, 1.0 / n_post)
+        for j in range(4):
+            kl = _marginal_dkl_empirical(
+                posterior[:, j], weights, reference[:, j], record["r_lo"]
+            )
+            assert kl < 0.05, f"c{j + 1}: null D_KL {kl:.4f} not ~0"
+
+    def test_radial_angular_positive_control(self) -> None:
+        """Constraining r to the top decade produces a clearly positive
+        D_KL (guards against the metric collapsing to useless-zero,
+        e.g. from linear binning over the 6-decade log-uniform range).
+        """
+        from tidal.inference._importance import (
+            _RA_REFERENCE_SAMPLES,
+            _RA_REFERENCE_SEED,
+            _marginal_dkl_empirical,
+            _sample_radial_angular,
+        )
+
+        record = self._ra_record(np.eye(4))
+        reference = _sample_radial_angular(
+            record, _RA_REFERENCE_SAMPLES, np.random.default_rng(_RA_REFERENCE_SEED)
+        )
+        n_post = 20_000
+        u = np.random.default_rng(13).random((n_post, 4))
+        u[:, 0] = 5 / 6 + u[:, 0] / 6  # top decade of the 6-decade r range
+
+        class _FixedRng:
+            def random(self, shape: tuple[int, ...]) -> np.ndarray:
+                assert shape == u.shape
+                return u
+
+        posterior = _sample_radial_angular(record, n_post, _FixedRng())  # type: ignore[arg-type]
+        weights = np.full(n_post, 1.0 / n_post)
+        kl = _marginal_dkl_empirical(
+            posterior[:, 0], weights, reference[:, 0], record["r_lo"]
+        )
+        assert kl > 0.5
+
+    # -- prior_map handling --------------------------------------------
+
+    def test_zero_low_bound_not_dropped(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Object-path priors with low == 0.0 must land in the prior map
+        (pre-fix: `getattr(p, 'low', None) or ...` dropped falsy 0.0
+        into the empirical fallback).  The fallback-with-metadata path
+        now warns, so a clean log is the discriminator (the KL value
+        itself barely differs: the empirical range ≈ the true bounds).
+        """
+        pytest.importorskip("anesthetic")
+        import logging
+
+        from tidal.inference._importance import compute_parameter_importance
+        from tidal.inference._prior import Prior
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(9)
+        n, nlive = 3000, 500
+        prior = Prior(name="x", distribution="uniform", low=0.0, high=5.0)
+        x = prior.sample(rng, n)
+        log_l = np.zeros(n)
+        result = InferenceResult(
+            samples=x[:, None],
+            log_likelihood=log_l,
+            log_prior=np.zeros(n),
+            param_names=["x"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            # Prior OBJECT (not dict) in metadata: exercises the getattr
+            # path where the falsy-zero `or`-chain bug lived.
+            metadata={"sampler": "test", "nlive": nlive, "priors": [prior]},
+        )
+        with caplog.at_level(logging.WARNING, logger="tidal.inference"):
+            imp = compute_parameter_importance(result, n_bootstrap=10)
+        assert "no usable prior record" not in caplog.text, (
+            "low=0.0 prior fell through to the empirical fallback"
+        )
+        assert math.isfinite(imp.marginal_d_kl["x"])
+
+    def test_integration_with_priors_metadata(self) -> None:
+        """End-to-end through compute_parameter_importance with recorded
+        priors metadata: an arctan_uniform column of prior-distributed
+        samples reports ≈ 0 (pre-fix: ~2.4 nats), and radial_angular
+        columns are finite (pre-fix path made them fallback values).
+
+        Tolerances are looser than the helper-level nulls because the
+        anesthetic reconstruction assigns geometric nested-sampling
+        weights even for constant logL, capping the effective sample
+        size at ~2*nlive; the histogram-KL bias is ~n_bins/(2*N_eff).
+        """
+        pytest.importorskip("anesthetic")
+        from tidal.inference._importance import compute_parameter_importance
+        from tidal.inference._prior import Prior
+        from tidal.inference._results import InferenceResult
+
+        rng = np.random.default_rng(21)
+        n, nlive = 6000, 1000
+        arctan = Prior(
+            name="alpha", distribution="arctan_uniform", low=-89.0, high=89.0
+        )
+        a_col = arctan.sample(rng, n)
+        from tidal.inference._importance import _sample_radial_angular
+
+        record = self._ra_record(np.eye(4))
+        ra_cols = _sample_radial_angular(record, n, rng)
+        samples = np.column_stack([a_col, ra_cols])
+        log_l = np.zeros(n)  # posterior == prior
+        result = InferenceResult(
+            samples=samples,
+            log_likelihood=log_l,
+            log_prior=np.zeros(n),
+            param_names=["alpha", "c1", "c2", "c3", "c4"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={
+                "sampler": "test",
+                "nlive": nlive,
+                "priors": [
+                    {
+                        "kind": "scalar",
+                        "name": "alpha",
+                        "distribution": "arctan_uniform",
+                        "low": -89.0,
+                        "high": 89.0,
+                    },
+                    record,
+                ],
+            },
+        )
+        imp = compute_parameter_importance(result, n_bootstrap=10)
+        assert imp.marginal_d_kl["alpha"] < 0.1, (
+            f"arctan null reported {imp.marginal_d_kl['alpha']:.3f} nats "
+            "(pre-#420 bug reported ~2.4)"
+        )
+        for name in ("c1", "c2", "c3", "c4"):
+            assert math.isfinite(imp.marginal_d_kl[name])
+            assert imp.marginal_d_kl[name] < 0.2
+        # Consistency block present and healthy for a null posterior.
+        assert imp.consistency
+        assert imp.consistency["superadditivity_ok"]
+        assert imp.consistency["saturated_params"] == []
+
+    # -- consistency self-checks ---------------------------------------
+
+    def test_superadditivity_warning_trips_on_buggy_style_marginals(
+        self,
+    ) -> None:
+        """format_importance_table surfaces the impossible sum > joint
+        signature (the way #420 announced itself in recorded outputs).
+        """
+        from tidal.inference._importance import (
+            ParameterImportanceResult,
+            format_importance_table,
+        )
+
+        buggy = ParameterImportanceResult(
+            param_names=["a", "b"],
+            d_kl=4.64,
+            d_kl_err=0.05,
+            d_g=2.0,
+            d_g_err=0.1,
+            marginal_d_kl={"a": 3.18, "b": 4.37},
+            log_evidence=-10.0,
+            log_evidence_err=0.5,
+            consistency={
+                "sum_marginals": 7.55,
+                "joint_d_kl": 4.64,
+                "superadditivity_ok": False,
+                "product_prior": True,
+                "saturated_params": ["b"],
+                "note": "",
+            },
+        )
+        table = format_importance_table(buggy)
+        assert "WARNING" in table
+        assert "exceeds joint D_KL" in table
+        assert "resolution ceiling" in table
+
+        healthy = ParameterImportanceResult(
+            param_names=["a"],
+            d_kl=2.0,
+            d_kl_err=0.05,
+            d_g=1.0,
+            d_g_err=0.1,
+            marginal_d_kl={"a": 1.5},
+            log_evidence=-10.0,
+            log_evidence_err=0.5,
+            consistency={
+                "sum_marginals": 1.5,
+                "joint_d_kl": 2.0,
+                "superadditivity_ok": True,
+                "product_prior": True,
+                "saturated_params": [],
+                "note": "",
+            },
+        )
+        assert "WARNING" not in format_importance_table(healthy)
+
+
+# ===================================================================
 # Analyze CLI (inference path)
 # ===================================================================
 

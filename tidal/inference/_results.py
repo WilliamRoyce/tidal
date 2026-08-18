@@ -415,6 +415,7 @@ class InferenceResult:
                     "d_g": importance.d_g,
                     "d_g_err": importance.d_g_err,
                     "marginal_d_kl": importance.marginal_d_kl,
+                    "consistency": importance.consistency,
                 }
                 # Also save as standalone file
                 with (output_dir / "importance.json").open("w") as f:
@@ -428,6 +429,7 @@ class InferenceResult:
                             "marginal_d_kl": importance.marginal_d_kl,
                             "log_evidence": importance.log_evidence,
                             "log_evidence_err": importance.log_evidence_err,
+                            "consistency": importance.consistency,
                         },
                         f,
                         indent=2,
