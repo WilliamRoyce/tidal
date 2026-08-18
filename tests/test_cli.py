@@ -355,7 +355,7 @@ class TestInspectSemanticQueries:
         equations = out.split("Equations:")[1].split("Required parameters")[0]
         assert "eps:0,1" in equations
 
-    def test_sign_marker_is_labelled_as_the_effective_sign(
+    def test_sign_marker_is_labeled_as_the_effective_sign(
         self,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
@@ -364,7 +364,7 @@ class TestInspectSemanticQueries:
         `coupled_scalars` `h_0` prints `[-kappa^(-2)] laplacian_x(h_0)` — a
         negative bracket — while the marker reads `eff>0`. Both are right: the
         LHS carries `-kappa^(-2)` as well, so the two cancel to +1. An
-        unlabelled `>0` beside a visibly negative coefficient is exactly the
+        unlabeled `>0` beside a visibly negative coefficient is exactly the
         kind of two-quantities-one-line confusion this tooling exists to
         remove, so the marker is prefixed `eff`.
         """
