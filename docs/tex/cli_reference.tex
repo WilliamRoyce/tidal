@@ -98,6 +98,39 @@ tidal inspect examples/data/chern_simons.json
 
 Output includes: spacetime dimension, field names, equation count, operator types, mass/coupling matrices.
 
+\paragraph{The equation listing.}
+The default listing carries the kinetic coefficient on the left-hand side, so the
+printed line \emph{is} the equation, and shows each \texttt{operator(field)} key once
+with its terms summed:
+
+\begin{lstlisting}[style=bash]
+[-kappa^(-2)] d2_t(h_5) =
+    + [(B0) + (-2*B0^3*rho)] gradient_x(a_1)
+    + [-kappa^(-2)] laplacian_x(h_5)   eff>0
+\end{lstlisting}
+
+Before this, the kinetic coefficient was not printed at all and a key could appear
+twice, so a bare $+1$ in one component and a bare $-1$ in another looked contradictory
+when they were not --- the misreading recorded as row 1 of GH \#401. Above, the
+left-hand side and the laplacian carry the same factor, so they cancel: a standard wave
+operator.
+
+Two annotations appear only when they carry information. \texttt{eff>0} /
+\texttt{eff<0} / \texttt{eff>=0} marks a \emph{proven} sign of the coefficient
+\emph{after} division by the left-hand kinetic coefficient --- which is not generally
+the sign of the bracket beside it, since a negative kinetic coefficient flips the two
+apart. Above, \texttt{laplacian\_x(h\_5)} prints a negative \texttt{[-kappa\^{}(-2)]}
+yet is marked \texttt{eff>0}, because the left-hand side carries the same factor and
+they cancel. Coefficients whose sign cannot be proven are left unmarked rather than
+guessed at. \texttt{eps:0,1} marks a key spanning perturbative
+orders, since summing would otherwise hide the split \texttt{filter\_by\_order} depends
+on. Coordinates print as \texttt{x} rather than the stored \texttt{x[]}, so the brackets
+do not nest inside the coefficient delimiter.
+
+\texttt{--detail summary} reduces the listing to one line per key with only the proven
+sign --- roughly a quarter of the default's size on a 32-component spec, for scanning.
+\texttt{--equation} accepts a comma-separated list or \texttt{all}.
+
 \paragraph{Semantic queries.}
 Four flags read \emph{part} of a spec through the vetted accessors in
 \texttt{tidal/symbolic/spec\_query.py} rather than leaving the reader to

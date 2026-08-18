@@ -91,14 +91,23 @@ Fields (2 components):
   h_0          dynamical    time_order=2
 
 Equations:
-  d2_t(a_0) = [-omegaP2] identity(a_0) [B0] gradient_x(h_0) +1 laplacian_x(a_0)
-  d2_t(h_0) = [B0^2] identity(h_0) [mg2/kappa^2] identity(h_0) [B0] gradient_x(a_0) [-kappa^(-2)] laplacian_x(h_0)
+  d2_t(a_0) =
+    + [B0] gradient_x(h_0)
+    + [-omegaP2] identity(a_0)
+    + [1.0] laplacian_x(a_0)   eff>0
+  [-kappa^(-2)] d2_t(h_0) =
+    + [B0] gradient_x(a_0)
+    + [(B0^2) + (mg2/kappa^2)] identity(h_0)
+    + [-kappa^(-2)] laplacian_x(h_0)   eff>0
 
 Required parameters:
   B0  (in: a_0, h_0)
   kappa  (in: h_0)
   mg2  (in: h_0)
   omegaP2  (in: a_0)
+
+Mass matrix:    diag(-omegaP2, (B0^2) + (mg2/kappa^2))
+Coupling matrix: zeros(2x2)
 ```
 
 **4. Simulate.** The solver is chosen automatically from the structure of the equations — here the modal solver, since the system is periodic with time-independent coefficients:

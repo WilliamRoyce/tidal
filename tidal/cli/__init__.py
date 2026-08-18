@@ -196,11 +196,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     inspect_query.add_argument(
         "--equation",
-        metavar="FIELD",
+        metavar="FIELDS",
         default=None,
         help=(
-            "Show one component's equation with effective coefficients "
-            "(all matching terms summed, kinetic coefficient divided out)"
+            "Show a component's equation with effective coefficients (all "
+            "matching terms summed, kinetic coefficient divided out). Accepts "
+            "a comma-separated list, or 'all' for every component"
         ),
     )
     inspect_query.add_argument(
@@ -257,6 +258,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Comma-separated parameters to assume non-vanishing without claiming "
             "a sign (e.g. kappa, whose vanishing would remove the Einstein-Hilbert "
             "term). Sharpens kappa^2 from '0+' to '+'"
+        ),
+    )
+    inspect_query.add_argument(
+        "--detail",
+        choices=["summary", "full"],
+        default="full",
+        help=(
+            "How much to print for the equation listing. 'summary' gives one "
+            "line per operator-field key with only the proven sign, which is "
+            "far cheaper for scanning a large spec; 'full' (default) gives the "
+            "equations with their coefficients"
         ),
     )
     inspect_query.add_argument(
