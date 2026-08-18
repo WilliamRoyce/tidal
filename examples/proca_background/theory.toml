@@ -1,5 +1,7 @@
 # Coupled Proca with Lorentzian Scalar Background
 #
+# Derivation timing: ~20s wall (last verified: 2026-08-16, 6 fields, 23 H terms, v0.47.9)
+#
 # Physics: Two massive vector fields A, B with coupling modulated by a
 # spatially localized scalar background G(x,y) = g0 / (1 + (x^2+y^2)/R^2).
 #

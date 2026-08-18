@@ -17,7 +17,7 @@
 #   nlive 400→1200 + cluster growth: ~3-4× more dead points
 #   τ=0.15 probe accepts more borderline samples → more multi-modal sup surface
 #   Empirical: intr_reduced (nlive=600/grid=256) timed out at 35 clusters in 1h (28983285)
-#   At v2 settings ~4-6× more expensive per eval → 12h wall (job 28982018 at 6h cancelled)
+#   At v2 settings ~4-6× more expensive per eval → 12h wall (job 28982018 at 6h canceled)
 
 set -euo pipefail
 

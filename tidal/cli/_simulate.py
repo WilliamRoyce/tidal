@@ -61,8 +61,9 @@ VMAX_FLOOR = 0.01
 # Curated namespace for --ic-formula eval().
 # Includes np for backward compatibility (e.g. np.exp(...) in formulas)
 # plus named math functions for convenience.
-FORMULA_NAMESPACE: dict[str, object] = {
-    "np": np,
+# Functions and constants a formula may use. This is the security boundary:
+# a formula can reach exactly these and nothing else.
+_FORMULA_FUNCTIONS: dict[str, object] = {
     "pi": np.pi,
     "e": np.e,
     "sin": np.sin,
@@ -81,6 +82,44 @@ FORMULA_NAMESPACE: dict[str, object] = {
     "heaviside": np.heaviside,
     "where": np.where,
 }
+
+
+class _NumpyShim:
+    """Stand-in for ``numpy`` exposing only :data:`_FORMULA_FUNCTIONS`.
+
+    Formulas have long been written as ``np.exp(...)``, and that spelling still
+    works. What no longer works is reaching the rest of the module: binding the
+    real ``numpy`` here made ``np.load(path, None, True)`` a route to executing
+    a pickle, and ``np.save`` / ``np.fromfile`` routes to arbitrary file access
+    (GH #406). Formulas arrive from TOML sweep configs as well as the command
+    line, so the file is the boundary that matters.
+
+    The AST validator rejects those names too; this shim means the objects are
+    simply absent, so validation is not the only thing standing between a
+    config file and the filesystem.
+    """
+
+    __slots__ = ()
+
+    def __getattr__(self, name: str) -> object:
+        """Return an allowlisted numpy function.
+
+        Raises
+        ------
+        AttributeError
+            For any name outside the allowlist.
+        """
+        try:
+            return _FORMULA_FUNCTIONS[name]
+        except KeyError:
+            msg = (
+                f"'np.{name}' is not available in formulas. "
+                f"Allowed: {', '.join(sorted(_FORMULA_FUNCTIONS))}"
+            )
+            raise AttributeError(msg) from None
+
+
+FORMULA_NAMESPACE: dict[str, object] = {"np": _NumpyShim(), **_FORMULA_FUNCTIONS}
 
 
 def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:  # noqa: C901
@@ -494,14 +533,58 @@ def _validate_formula_ast(expr: str, allowed_names: set[str]) -> None:
                 )
                 raise ValueError(msg)
         elif isinstance(node, ast.Attribute):
-            # Allow np.something (one level only)
-            if isinstance(node.value, ast.Name) and node.value.id == "np":
+            # `np.<name>` is allowed only for allowlisted names. Permitting any
+            # attribute made np.load / np.save / np.fromfile reachable, which
+            # defeats the sandbox entirely (GH #406).
+            if (
+                isinstance(node.value, ast.Name)
+                and node.value.id == "np"
+                and node.attr in _FORMULA_FUNCTIONS
+            ):
                 continue
+            if isinstance(node.value, ast.Name) and node.value.id == "np":
+                msg = (
+                    f"'np.{node.attr}' is not available in formulas. "
+                    f"Allowed: {', '.join(sorted(_FORMULA_FUNCTIONS))}"
+                )
+                raise ValueError(msg)
             msg = f"Attribute access not allowed in formula: '.{node.attr}'"
             raise ValueError(msg)
         elif not isinstance(node, safe_nodes):
             msg = f"Disallowed construct in formula: {type(node).__name__}"
             raise TypeError(msg)
+
+
+def safe_formula_eval(expr: str, namespace: dict[str, object]) -> object:
+    """Validate *expr* against *namespace*, then evaluate it.
+
+    The single entry point for user- and config-supplied formulas. Five call
+    sites previously evaluated straight into :data:`FORMULA_NAMESPACE` with no
+    validation at all; formulas reach those paths from TOML sweep configs as
+    well as the command line, so they are file input (GH #406).
+
+    Parameters
+    ----------
+    expr : str
+        Formula source.
+    namespace : dict[str, object]
+        Names the formula may reference — normally
+        :data:`FORMULA_NAMESPACE` plus data variables such as ``t`` or ``x``.
+
+    Returns
+    -------
+    object
+        The evaluated result, scalar or array.
+
+    Both exception types propagate from :func:`_validate_formula_ast`: a
+    disallowed name raises ``ValueError``, a disallowed AST node ``TypeError``.
+    """
+    _validate_formula_ast(expr, set(namespace))
+    return eval(  # noqa: S307
+        compile(expr, "<formula>", "eval"),
+        {"__builtins__": {}},
+        namespace,
+    )
 
 
 # --- Initial condition helpers ---
@@ -565,7 +648,7 @@ def _gaussian_slots(  # noqa: PLR0913, PLR0917
 ) -> dict[str, np.ndarray]:
     """Compute Gaussian IC as slot_data dict.
 
-    When ``--ic-wavevector`` is provided, creates a travelling wave packet:
+    When ``--ic-wavevector`` is provided, creates a traveling wave packet:
     a Gaussian envelope modulated by a carrier wave, with matching velocity
     for unidirectional propagation.  Positive wavevector gives a right-mover.
 
@@ -658,7 +741,7 @@ def _snap_wavevector_to_grid(
         # The Nyquist mode itself aliases (cos(π·n) = (-1)^n) and carries no
         # directional information for real signals, so we exclude it by using
         # n_pts // 2 - 1 as the cap.  For n_pts=2 the clamp degenerates to
-        # {-0, 0} which keeps the zero-mode behaviour for trivial grids.
+        # {-0, 0} which keeps the zero-mode behavior for trivial grids.
         n_max = max(0, n_pts // 2 - 1)
         n_target = round(k_req / dk)
         n_clamped = max(-n_max, min(n_max, n_target))
@@ -690,7 +773,7 @@ def _plane_wave_slots(  # noqa: PLR0913, PLR0917
     On periodic axes, ``--ic-wavevector`` is automatically snapped to the
     nearest discrete Fourier mode to eliminate spectral leakage (which can
     excite tachyonic modes at unintended k-values, e.g. in PGT torsion
-    models).  Override with ``--ic-no-snap`` to keep the legacy behaviour
+    models).  Override with ``--ic-no-snap`` to keep the legacy behavior
     where ``cos(k·x)`` is evaluated verbatim at grid points.
     """
     if args.ic_wavevector is not None:
@@ -740,7 +823,7 @@ def _formula_slots(
     """Compute formula-based IC as slot_data dict.
 
     Supports optional ``--ic-formula-velocity`` for setting the velocity
-    slot alongside the field, enabling custom travelling wave ICs.
+    slot alongside the field, enabling custom traveling wave ICs.
 
     Raises
     ------
@@ -1536,7 +1619,7 @@ def _setup_memory_accumulator_native(  # noqa: PLR0913, PLR0917
 
     Produces an :class:`InMemoryAccumulator` and a ``(t, y_flat, yp_flat)``
     callback that writes to it.  Intended for the inference likelihood
-    path: the accumulator is materialised into a ``SimulationData`` at
+    path: the accumulator is materialized into a ``SimulationData`` at
     the end of ``_simulate`` and never touches disk.
     """
     from tidal.measurement._writer import InMemoryAccumulator, compute_snapshot_count
@@ -2124,7 +2207,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0915
             log("  Note: IDA requires FD operators; spectral auto-disabled")
         elif args.scheme == "auto":
             # User explicitly requested --spectral, scheme auto-selected IDA
-            # → switch to CVODE to honour spectral request
+            # → switch to CVODE to honor spectral request
             scheme = "cvode"
             log("  Note: --spectral incompatible with IDA; switching to CVODE")
         else:

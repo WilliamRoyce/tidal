@@ -142,6 +142,116 @@ def _parse_validate_params(raw: list[str], spec: EquationSystem) -> dict[str, fl
     return params
 
 
+def _describe_conflict(spec: EquationSystem, head: str, left: str, right: str) -> str:
+    """Phrase one sign conflict as a derivation-integrity finding.
+
+    Deliberately does **not** claim a tachyon.  What the check establishes is
+    that two components of the same tensor family carry opposite effective
+    self-laplacian orientation, which for a field whose wave operator acts
+    identically on every component means the export is internally inconsistent
+    -- the signature of a spec predating the GH #381 LHS normalization fix.
+
+    Whether any resulting mode is genuinely tachyonic is a spectral question
+    requiring the full kinetic and mass sectors, which this does not examine;
+    see GH #360 (PSALTer integration) for that.
+    """
+    from tidal.symbolic.spec_query import field_families
+
+    family = next((f for f in field_families(spec) if f.head == head), None)
+    roles = ""
+    if family is not None:
+        left_slots = family.temporal_slots(left)
+        right_slots = family.temporal_slots(right)
+        if left_slots is not None and right_slots is not None:
+            roles = (
+                f" ({left} has {left_slots} temporal index/indices, "
+                f"{right} has {right_slots})"
+            )
+    return (
+        f"Field '{head}': components '{left}' and '{right}' have opposite "
+        f"effective self-laplacian orientation{roles}. The wave operator acts "
+        "identically on every component of a family, so this spec is "
+        "internally inconsistent -- it predates the GH #381 LHS normalization "
+        "fix and needs re-deriving (see GH #397). This is a derivation-"
+        "integrity finding, not a spectral one: use GH #360 for ghost and "
+        "tachyon analysis."
+    )
+
+
+def _check_volume_element_consistency(spec: object) -> list[str]:
+    """Require Christoffel gradient terms when the volume element is non-constant (GH #394).
+
+    ``ComponentEulerLagrange`` varies a Lagrangian *density*.  When the metric
+    has a non-constant ``sqrt|g|`` the equations must carry the first-derivative
+    terms it generates.  If ``canonical.volume_element`` is non-constant but no
+    equation has a spatial gradient term, the measure was dropped during
+    derivation and the energy integral no longer matches the operator that
+    evolves the fields -- exactly the #393/#394 failure.
+    """
+    from tidal.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        return []
+    canonical = spec.canonical
+    if canonical is None or canonical.volume_element is None:
+        return []
+
+    ve = str(canonical.volume_element)
+    coords = set(spec.coordinates)
+    if not any(f"{c}[]" in ve for c in coords):
+        return []  # constant measure: factors out, nothing to check
+
+    has_gradient = any(
+        term.operator.startswith("gradient")
+        for eq in spec.equations
+        for term in eq.rhs_terms
+    )
+    if has_gradient:
+        return []
+    return [
+        f"Non-constant volume_element '{ve}' but no spatial gradient term in any "
+        "equation. The sqrt|g| measure was likely dropped during Euler-Lagrange "
+        "variation, so the energy integral will not match the evolution operator "
+        "(see GH #394).",
+    ]
+
+
+def _check_temporal_component_sign(spec: object) -> list[str]:
+    """Check that a tensor family's components agree in self-laplacian sign (GH #397).
+
+    The wave operator acts identically on every component of a family, so once
+    each equation is normalized by its own kinetic coefficient they must share
+    a self-laplacian orientation.  Pre-GH-#381 exports left the temporal
+    component un-normalized (``lhsCoeff = -1`` never divided through), giving
+    ``d2_t a_0 = -laplacian a_0`` while ``a_1..a_3`` kept ``+laplacian``.
+
+    Reports a **derivation-integrity** defect -- an internally inconsistent
+    export that needs re-deriving -- and deliberately makes no spectral claim.
+    Establishing that a mode is genuinely tachyonic needs the full kinetic and
+    mass sectors; see GH #360 (PSALTer) for that work.
+
+    All reasoning is delegated to
+    :func:`tidal.symbolic.spec_query.sibling_sign_conflicts`, which normalizes
+    by the kinetic coefficient, sums every matching term, and reports a
+    conflict only when the opposing sign is *proven* -- returning nothing
+    rather than guessing when it cannot decide.  This guard previously carried
+    its own sign helpers; they were unsound (treating ``-1 + 2*B0^2*rho`` as
+    negative when it flips sign, and summing per-term signs rather than the
+    terms themselves) and are gone (GH #401).
+    """
+    from tidal.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        return []
+
+    from tidal.symbolic.spec_query import sibling_sign_conflicts
+
+    return [
+        _describe_conflict(spec, head, reference, member)
+        for head, reference, member in sibling_sign_conflicts(spec)
+    ]
+
+
 def _check_perturbative_consistency(spec: object) -> tuple[list[str], list[str]]:
     """Check perturbative-reduction scope for theories with [perturbation].
 
@@ -383,6 +493,13 @@ def validate_command(args: Namespace) -> int:
 
     # Check 5: Parameters (warnings, not errors)
     warnings.extend(_check_parameters(spec))
+
+    # Check 5c: Derivation-integrity guards.  Both catch defects that are
+    # silent at derivation time and only surface as wrong physics later --
+    # a dropped sqrt|g| measure (#394) and an un-normalized temporal
+    # component (#397).
+    errors.extend(_check_volume_element_consistency(spec))
+    errors.extend(_check_temporal_component_sign(spec))
 
     # Check 5b: Perturbative-reduction scope (warnings).  Active when the
     # spec has [perturbation]; flags constraint-promotion theories where

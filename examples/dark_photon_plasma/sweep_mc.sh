@@ -95,10 +95,10 @@ tidal plot "${OUTPUT}" --type sweep-tornado \
   --title "Plasma dark photon: parameter sensitivity (P_max)" \
   --output "${OUTPUT}/plot_tornado.png" --quiet
 
-# Scatter matrix: all parameter pairs coloured by P_max
+# Scatter matrix: all parameter pairs colored by P_max
 tidal plot "${OUTPUT}" --type sweep-scatter \
   --metric P_max \
-  --title "Plasma dark photon: parameter space (coloured by P_max)" \
+  --title "Plasma dark photon: parameter space (colored by P_max)" \
   --output "${OUTPUT}/plot_scatter.png" --quiet
 
 # Parallel coordinates: multi-parameter trends
@@ -115,7 +115,7 @@ echo "=== Sweep complete ==="
 echo "Results: ${OUTPUT}"
 echo "Plots:"
 echo "  ${OUTPUT}/plot_tornado.png   [parameter sensitivity ranking]"
-echo "  ${OUTPUT}/plot_scatter.png   [pairwise scatter, coloured by P_max]"
+echo "  ${OUTPUT}/plot_scatter.png   [pairwise scatter, colored by P_max]"
 echo "  ${OUTPUT}/plot_parallel.png  [parallel coordinates]"
 echo ""
 echo "Physics notes:"

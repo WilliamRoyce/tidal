@@ -4,7 +4,7 @@ What this file actually tests (and what it does not)
 ----------------------------------------------------
 
 The tests here exercise TIDAL's end-to-end EH pipeline (Wolfram derive →
-Phase-3 canonicalise → modal / perturbative solve → spectral measure) at
+Phase-3 canonicalize → modal / perturbative solve → spectral measure) at
 various points in (ρ, σ, B₀) space. They verify:
 
 - The symbolic JSON dispersion formulas match the numerical simulation
@@ -624,7 +624,7 @@ class TestEHPerturbativeEnergy:
       deviate from the Adler prediction and this test would fail.
 
     Derivation of the expected ratio:
-      For a_2 (⊥ polarisation), the Wolfram Hamiltonian has:
+      For a_2 (⊥ polarization), the Wolfram Hamiltonian has:
         Order-0 gradient term: 0.5 × |∇a_2|²
         Order-1 gradient term: −3ρB₀² × |∇a_2|² (from euler_heisenberg.json)
       At t=0 with zero-velocity IC, only gradient terms contribute.  For a

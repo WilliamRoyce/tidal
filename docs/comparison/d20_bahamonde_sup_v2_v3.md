@@ -1,7 +1,7 @@
 # D2.0 Bahamonde sup: v2 vs v3 comparison
 
 **Status:** Truncated result — supervisor-approved 1-INTR-session policy (2026-05-15).
-The v3 chain was cancelled after 7 INTR sessions (job 29271186 cancelled at session 8 boundary,
+The v3 chain was canceled after 7 INTR sessions (job 29271186 canceled at session 8 boundary,
 last completed checkpoint from job 29269357 session 7). Not converged; logZ still changing.
 
 **Corner plot:** `hpc_results/29232780/corner_d20_sup_v3.png`
@@ -14,7 +14,7 @@ last completed checkpoint from job 29269357 session 7). Not converged; logZ stil
 | ESS | 877 | — (chain not converged) |
 | Dead points | ~full | 58,457 |
 | Active clusters | 0 (converged) | 174 / 401 total |
-| Run status | Standard 12 h queue | 7× INTR (cancelled) |
+| Run status | Standard 12 h queue | 7× INTR (canceled) |
 
 ## Parameters
 

@@ -53,6 +53,12 @@ _MINKOWSKI_SIGNATURES: dict[int, list[int]] = {
     4: [-1, 1, 1, 1],
 }
 
+# Sign of Det[g].  Every signature above has exactly one timelike direction, so
+# the determinant is negative.  This is passed to xAct's DefMetric[signdet, ...]
+# and reused for the Euler-Lagrange volume measure sqrt(signdet * Det[g]) — the
+# two must agree, so both read this constant rather than repeating the literal.
+_METRIC_DET_SIGN = -1
+
 
 _MIN_PREFIX_LEN = 2
 
@@ -451,8 +457,15 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
         f"  DefManifold[{ctx.manifold}, {ctx.dim}, {wl_list(idx_str)}]",
         "];",
         "",
+        "(* metricDetSign is the sign of Det[g], declared once here and reused  *)",
+        "(* wherever the metric determinant is taken (e.g. the Euler-Lagrange  *)",
+        "(* volume measure).  It MUST match DefMetric's first argument below.  *)",
+        "(* TIDAL uses the (-,+,+,...) convention with exactly one timelike     *)",
+        "(* direction, so Det[g] < 0 and the sign is -1.                        *)",
+        f"metricDetSign = {_METRIC_DET_SIGN};",
+        "",
         f"If[!MetricQ[{ctx.metric}],",
-        f"  DefMetric[-1, {ctx.metric}[-a, -b], {ctx.cd},",
+        f"  DefMetric[{_METRIC_DET_SIGN}, {ctx.metric}[-a, -b], {ctx.cd},",
         '    SymbolOfCovD -> {";", "\\[Del]"},',
         '    PrintAs -> "\\[Eta]"]',
         "];",
@@ -5425,7 +5438,7 @@ def _wls_canonical_phase_b(ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "(* The Hamiltonian from the Legendre transform can contain f·∇² g       *)",
             "(* terms alongside |∇f|² terms.  These must CANCEL via IBP to give      *)",
             "(* the correct coefficient on |∇f|².  Evaluating f·∇²g numerically      *)",
-            "(* loses precision because the two large, nearly-cancelling terms are    *)",
+            "(* loses precision because the two large, nearly-canceling terms are    *)",
             "(* computed independently.  Symbolic IBP eliminates this issue.          *)",
             "(* Ref: energy conservation requires all spatial-derivative terms in     *)",
             "(* |∇f|² form for stable numerical evaluation.                          *)",
@@ -5998,8 +6011,32 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0915
                     "] // DeleteDuplicates // Sort;",
                     'Print["  Field functions: ", Length[fieldFuncsEL], " — ", fieldFuncsEL];',
                     "",
+                    "(* Full spacetime volume measure sqrt|det g|.  Standard         *)",
+                    "(* Euler-Lagrange is only valid on a Lagrangian DENSITY, so     *)",
+                    "(* lagComp must be weighted by this before variation — omitting *)",
+                    "(* it drops (or sign-flips) Christoffel first-derivative terms   *)",
+                    "(* for any non-flat metric.  See issue #394.                    *)",
+                    "(* NOTE: this is the FULL spacetime determinant, distinct from  *)",
+                    "(* sqrtDetGSpatial (the spatial 3-determinant) used later for    *)",
+                    "(* the canonical volume_element export.                         *)",
+                    "(* metricDetSign (declared with DefMetric) makes the radicand   *)",
+                    "(* positive without Abs.  Abs is NOT symbolically               *)",
+                    "(* differentiable: D[Sqrt[Abs[u]], x] leaves an unevaluated     *)",
+                    "(* Derivative[1][Abs][u] in the coefficient, which the operator *)",
+                    "(* identification cannot match — so the Christoffel term is     *)",
+                    "(* generated but then silently dropped on export.               *)",
+                    "(* PowerExpand resolves the root under the standard positive-   *)",
+                    "(* coordinate ranges (r > 0, sin(theta) > 0 on (0, pi)).        *)",
+                    "sqrtDetGFull = PowerExpand[Sqrt[Simplify[",
+                    f"  metricDetSign * Det[{ctx.prefix}MetricMatrix]]]];",
+                    "If[!FreeQ[sqrtDetGFull, Abs | Sign],",
+                    '  Print["WARNING: E-L measure still contains Abs/Sign — '
+                    'Christoffel terms may be dropped: ", sqrtDetGFull]];',
+                    'Print["E-L measure sqrt|det g|: ", sqrtDetGFull];',
+                    "",
                     "(* Compute Euler-Lagrange equations *)",
-                    "eomListEL = ComponentEulerLagrange[lagComp, fieldFuncsEL, coordSyms];",
+                    "eomListEL = ComponentEulerLagrange[lagComp, fieldFuncsEL, coordSyms,",
+                    '  "Measure" -> sqrtDetGFull];',
                     "",
                     "(* Replace fieldEquations with component E-L results *)",
                     "fieldEquations = {};",
@@ -6503,7 +6540,18 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         config_dir=config_path.parent.resolve(),
     )
 
+    # --- Save the generated script (GH #398) ---
+    # This runs BEFORE the --dry-run and cache-hit early returns.  Both of those
+    # are precisely the cases where you want the script without paying for a
+    # derivation, and silently ignoring an explicit flag is worse than either.
+    if args.save_script:
+        save_path = Path(args.save_script)
+        save_path.write_text(script_content, encoding="utf-8")
+        print(f"Saved script to: {save_path.resolve()}")
+
     if args.dry_run:
+        # --save-script has already written the file above; --dry-run only
+        # suppresses execution.
         print(script_content)
         return 0
 
@@ -6534,8 +6582,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
 
     if args.save_script:
         save_path = Path(args.save_script)
-        save_path.write_text(script_content, encoding="utf-8")
-        print(f"Saved script to: {save_path.resolve()}")
+        # Already written above; reuse the path for the wolframscript run.
         if shutil.which("wolframscript") is None:
             print(
                 "Note: wolframscript not found. Run the script manually when available.",
@@ -6574,7 +6621,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     # treat as success for post-processing.  Crucially: if the JSON's
     # mtime did not change, the failing wolframscript never wrote a new
     # JSON — the existing file is stale from a previous run and the
-    # error must be honoured (LPS abort, parse error, etc.).
+    # error must be honored (LPS abort, parse error, etc.).
     if ret != 0 and resolved.exists():
         post_run_mtime = resolved.stat().st_mtime_ns
         if post_run_mtime <= pre_run_mtime:

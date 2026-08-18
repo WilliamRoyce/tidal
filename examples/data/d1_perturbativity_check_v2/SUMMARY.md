@@ -36,7 +36,7 @@ survive to t_end=25. The t-independent "static" component (light-mediator
 enhancement à la 1/m²) is approximately A_static ≈ A(t=10) / exp(γ·t_end)
 ≈ 38 / exp(1.37) ≈ **10**.
 
-## Probe-truncation artefact
+## Probe-truncation artifact
 
 An earlier check at the **3-decimal truncated** MAP coords gave γ_eff =
 0.0001 for 28896653 — orders of magnitude below the full-precision

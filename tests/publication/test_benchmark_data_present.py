@@ -11,7 +11,7 @@ import json
 import pytest
 import yaml
 
-from .conftest import MANIFEST_PATH, REPO_ROOT, iter_artefacts
+from .conftest import MANIFEST_PATH, REPO_ROOT, iter_artifacts
 
 pytestmark = pytest.mark.publication
 
@@ -22,7 +22,7 @@ REQUIRED_METADATA_KEYS = {"timestamp", "host", "git_sha", "parameters"}
     ("appendix", "name", "entry"),
     [
         pytest.param(*x, id=f"{x[0]}/{x[1]}")
-        for x in iter_artefacts(
+        for x in iter_artifacts(
             yaml.safe_load(MANIFEST_PATH.read_text()), kinds=("figure", "table")
         )
     ],

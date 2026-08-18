@@ -6,14 +6,14 @@
 
 ## Goal
 
-De-risk Phase E (localised wavepacket + localised B-field geometry) by verifying that the necessary infrastructure already exists and works end-to-end on a v3 theory.
+De-risk Phase E (localized wavepacket + localized B-field geometry) by verifying that the necessary infrastructure already exists and works end-to-end on a v3 theory.
 
 ## What needs to work for Phase E
 
 | Capability | Required for | Status |
 | --- | --- | --- |
-| `--ic gaussian --ic-component <f> --ic-width σ_w --ic-center x_c` | Localised wavepacket IC at the source field (E.1) | ✅ verified |
-| `[[background_fields]]` with arbitrary Mathematica expressions in `components` | Localised Gaussian B-field profile (E.2) | ✅ verified |
+| `--ic gaussian --ic-component <f> --ic-width σ_w --ic-center x_c` | Localized wavepacket IC at the source field (E.1) | ✅ verified |
+| `[[background_fields]]` with arbitrary Mathematica expressions in `components` | Localized Gaussian B-field profile (E.2) | ✅ verified |
 | Periodic-boundary spectral solver running with Gaussian IC on the v3 nonminimal theory | Combined E.1 + E.2 end-to-end | ✅ verified |
 
 ## Verification
@@ -61,7 +61,7 @@ No symbolic-pipeline extension needed. The existing `tidal/symbolic/_derive.py` 
 
 ### Combined E.1 + E.2
 
-The smoke run above used a *uniform* background (`B0 = 0.01` constant); E.2 swaps that for a localised Gaussian. Combining them just requires:
+The smoke run above used a *uniform* background (`B0 = 0.01` constant); E.2 swaps that for a localized Gaussian. Combining them just requires:
 
 1. Re-deriving the affected theory file with the Gaussian-profile `Abar` (`tidal derive examples/torsion_gertsenshtein_nonminimal/theory.toml` — ~30 min Wolfram wall, one-time cost per theory)
 2. Submitting the simulation with both `--ic gaussian` and the new derived JSON

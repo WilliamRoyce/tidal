@@ -19,6 +19,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from tidal.symbolic._eval_utils import evaluate_coefficient
+from tidal.symbolic._kinetic_eval import (
+    KineticEvalError,
+    evaluate_with_substitutions,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -804,6 +808,10 @@ class ComponentEquation:
 # --- Symbolic coefficient resolution ---
 
 
+class _UnresolvableCoefficientError(Exception):
+    """Internal signal that a coefficient could not be reduced to a number."""
+
+
 def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float | None:
     """Resolve a symbolic coefficient string with parameter values.
 
@@ -811,6 +819,20 @@ def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float 
     compound expressions (``"-2*m2"``).  Returns *None* if the expression
     cannot be evaluated with the given parameters, so the caller can fall
     back to the raw numeric coefficient.
+
+    Two results are preserved deliberately, because callers depend on the
+    ``None`` fallback rather than on an exception:
+
+    * a division by zero (``"m2/0"``) returns ``None``, though the underlying
+      evaluator raises;
+    * a non-finite result (``"1e309"``) returns ``None``, since mass and
+      coupling entries must be finite reals.
+
+    Raises
+    ------
+    _UnresolvableCoefficientError
+        Never propagates; raised internally to funnel an unresolved free
+        parameter into the same ``None`` fallback as an evaluation failure.
     """
     # Fast path: negated parameter name
     if sym.startswith("-") and sym[1:] in parameters:
@@ -818,12 +840,17 @@ def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float 
     # Fast path: direct parameter name
     if sym in parameters:
         return parameters[sym]
-    # Compound expression: e.g., "-2*m2", "3*lambda"
+    # Compound expression: e.g., "-2*m2", "3*lambda".
+    #
+    # Evaluated through the restricted-AST evaluator rather than eval(): these
+    # strings come from JSON spec files, and `{"__builtins__": {}}` narrows the
+    # namespace without restricting the grammar (GH #406).
     try:
-        py_expr = sym.replace("^", "**")
-        result = eval(py_expr, {"__builtins__": {}}, dict(parameters))  # noqa: S307
-        value = float(result)
-    except (NameError, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+        resolved = evaluate_with_substitutions(sym, dict(parameters))
+        if resolved is None:  # a free parameter survived
+            raise _UnresolvableCoefficientError  # noqa: TRY301
+        value = float(resolved)
+    except (KineticEvalError, _UnresolvableCoefficientError, TypeError, ValueError):
         logger.debug(
             "Could not resolve symbolic coefficient '%s' with parameters %s; "
             "matrix entry will use raw numeric coefficient",
@@ -1000,7 +1027,7 @@ class EquationSystem:
                 raise ValueError(msg)
 
     @staticmethod
-    def _compute_matrices_from_terms(
+    def _compute_matrices_from_terms(  # noqa: C901
         equations: tuple[ComponentEquation, ...],
         component_names: tuple[str, ...],
         parameters: Mapping[str, float] | None = None,
@@ -1015,19 +1042,57 @@ class EquationSystem:
         Scans each equation's RHS terms for ``identity`` operators acting on
         known field names (not velocity references like ``v_N``).
 
-        Convention: ``matrix[i][j] = -(coefficient)`` where ``coefficient``
-        is the numeric coefficient of the ``identity(field_j)`` term in
-        equation *i*.  This makes mass² positive for the standard Lagrangian
-        sign convention ``∂²_t φ = … - m² φ``.
+        The matrices are *derived* from ``equations`` and are never stored:
+        ``ExportJSON.wl`` used to emit a ``coupling`` section computed the same
+        way in Wolfram, and the loader stopped reading it in c407240d
+        (2026-02-07) without the export stopping. Two copies of one calculation
+        then drifted apart unnoticed for six months — both truncating
+        multi-term coefficients, and disagreeing on sign (GH #403, #404). The
+        export was removed rather than repaired, because derived data does not
+        belong in the file.
+
+        The truncation was a real defect, not a cosmetic one: the entry held
+        only the *last* contributing term, so ``coupled_scalars`` ``h_0`` read
+        ``mg2/kappa^2`` with its ``B0^2`` contribution silently gone, across 26
+        of 48 specs. It changed no simulation result only because these
+        matrices are display-only — solvers build their own from the terms, and
+        energy uses ``canonical.hamiltonian_terms``. Wrong data, shown by
+        ``tidal inspect``, never fed into a result.
+
+        **Summing the terms has one implementation**, and it is not here:
+        the symbolic entry is delegated to
+        :func:`tidal.symbolic.spec_query.effective_coefficient`. See that
+        module's docstring for why the summation belongs to the reader rather
+        than to the Wolfram derivation.
+
+        The numeric and symbolic matrices describe the same quantity under
+        different conventions, which is deliberate and load-bearing:
+
+        * ``mass``/``coupling`` (numeric) — ``matrix[i][j] = -(coefficient)`` of
+          the ``identity(field_j)`` term in equation *i*. The negation makes
+          mass² positive for the standard Lagrangian sign convention
+          ``∂²_t φ = … - m² φ``.
+        * ``mass_sym``/``coupling_sym`` (symbolic) — the term's
+          ``coefficient_symbolic`` **verbatim, un-negated**, so it can be
+          resolved at runtime against real parameter values.
+
+        So an identity term ``B0^2/8`` gives ``mass = -0.125`` and
+        ``mass_sym = 'B0^2/8'``. A caller applying the numeric convention to the
+        symbolic matrix gets the sign wrong; negate it explicitly.
+
+        Neither matrix is normalized by the LHS ``kinetic_coefficient_symbolic``.
+        For an effective mass², divide by it; see
+        :func:`tidal.symbolic.spec_query.effective_coefficient`, which is the
+        one implementation of that (#237, #258, #302).
+
+        Contributions **accumulate**: a component may carry several ``identity``
+        terms acting on the same field, and the entry is their sum, symbolic
+        entries included (GH #403).
 
         When *parameters* are provided and a term has ``coefficient_symbolic``,
         the symbolic expression is resolved with the parameter values to
         produce the correct numeric matrix entry. Without parameters, the
         raw numeric coefficient (a shape-factor like ±1.0) is used.
-
-        Symbolic expressions are always preserved as-is from the term (not
-        evaluated) so that they can be resolved at runtime with actual
-        parameter values.
 
         Parameters
         ----------
@@ -1053,6 +1118,16 @@ class EquationSystem:
         name_to_idx = {name: i for i, name in enumerate(component_names)}
         has_symbolic = False
 
+        # Summing a component's identity terms is done in exactly one place:
+        # spec_query.effective_coefficient. Building the summed expression here
+        # too is what let the Wolfram and Python matrix builders drift apart
+        # (GH #403, #404), so the symbolic entry is delegated rather than
+        # re-derived. Only the numeric accumulation, which has its own
+        # per-term parameter-resolution fallback, is done inline.
+        from tidal.symbolic.spec_query import effective_coefficient  # noqa: PLC0415
+
+        symbolic_keys: set[tuple[int, int]] = set()
+
         for i, eq in enumerate(equations):
             for term in eq.rhs_terms:
                 if term.operator == "identity" and term.field in name_to_idx:
@@ -1070,14 +1145,24 @@ class EquationSystem:
                     neg_coeff = -effective_coeff
                     if i == j:
                         mass[i][j] += neg_coeff
-                        if term.coefficient_symbolic is not None:
-                            mass_sym[i][j] = term.coefficient_symbolic
-                            has_symbolic = True
                     else:
                         coupling[i][j] += neg_coeff
-                        if term.coefficient_symbolic is not None:
-                            coupling_sym[i][j] = term.coefficient_symbolic
-                            has_symbolic = True
+                    if term.coefficient_symbolic is not None:
+                        symbolic_keys.add((i, j))
+                        has_symbolic = True
+
+        for i, j in symbolic_keys:
+            # The un-negated sum: the symbolic matrices store
+            # coefficient_symbolic verbatim, while the numeric ones negate.
+            summed = effective_coefficient(
+                equations[i],
+                component_names[j],
+                "identity",
+            ).numerator
+            if i == j:
+                mass_sym[i][j] = summed
+            else:
+                coupling_sym[i][j] = summed
 
         mass_sym_t: tuple[tuple[str | None, ...], ...] = ()
         coupling_sym_t: tuple[tuple[str | None, ...], ...] = ()
@@ -1360,7 +1445,11 @@ class EquationSystem:
                     # coordinate_dependent explicitly — otherwise the modal
                     # source-evaluation call will not pass coord_arrays and
                     # eval() raises NameError on the bare coord.
-                    detected_coords: list[str] = [coord_name for coord_name in ("t", "x", "y", "z") if re.search(rf"\b{coord_name}\b", synth_sym)]
+                    detected_coords: list[str] = [
+                        coord_name
+                        for coord_name in ("t", "x", "y", "z")
+                        if re.search(rf"\b{coord_name}\b", synth_sym)
+                    ]
                     inherited = tuple(base_term.coordinate_dependent or ())
                     coord_dep = tuple(dict.fromkeys((*inherited, *detected_coords)))
                     synthesized.append(

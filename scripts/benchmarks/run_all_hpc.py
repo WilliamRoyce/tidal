@@ -158,7 +158,7 @@ def _config_cap(benchmark: str, n: int, path: str | None) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Worker initialiser: pin to a core; cache setups per (benchmark, key).
+# Worker initializer: pin to a core; cache setups per (benchmark, key).
 # ---------------------------------------------------------------------------
 
 _WORKER_CORE: int | None = None
@@ -844,7 +844,7 @@ def main() -> int:
 
         # Per-worker SETUP_CACHE growth is bounded inside the worker via an
         # LRU cap (see `_setup_pade`/`_setup_sparse` callers) — workers
-        # therefore hold at most a few matrix-build artefacts at a time,
+        # therefore hold at most a few matrix-build artifacts at a time,
         # preventing the multi-GB cache bloat that killed the first pass.
         with ProcessPoolExecutor(
             max_workers=args.parallel,

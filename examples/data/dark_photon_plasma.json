@@ -16,7 +16,7 @@
 				"h_4"
 			]
 		},
-		"derivation_hash": "bfd64491c01eebdf1fb84c85a03248ae1af0aeb3bd801b6babe9dde8f1ba6cfc"
+		"derivation_hash": "83fe6126fa82c6901cc99cbebe6a23cf60e19229dc1ace3cdf8dcd8a8a7ae723"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -251,51 +251,51 @@
 				"type": "linear_combination",
 				"terms": [
 					{
-						"coefficient": 1.0,
+						"coefficient": -1.0,
 						"operator": "identity",
 						"field": "a_0",
-						"coefficient_symbolic": "mA2"
+						"coefficient_symbolic": "-mA2"
 					},
 					{
-						"coefficient": -1.0,
+						"coefficient": 1.0,
 						"operator": "laplacian_x",
 						"field": "a_0"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "laplacian_x",
 						"field": "t_13",
-						"coefficient_symbolic": "-2*deltam"
+						"coefficient_symbolic": "2*deltam"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "laplacian_x",
 						"field": "t_20",
-						"coefficient_symbolic": "-2*deltam"
+						"coefficient_symbolic": "2*deltam"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "laplacian_x",
 						"field": "t_6",
-						"coefficient_symbolic": "-2*deltam"
+						"coefficient_symbolic": "2*deltam"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "gradient_x",
 						"field": "v_t_10",
-						"coefficient_symbolic": "-2*deltam"
+						"coefficient_symbolic": "2*deltam"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "gradient_x",
 						"field": "v_t_17",
-						"coefficient_symbolic": "-2*deltam"
+						"coefficient_symbolic": "2*deltam"
 					},
 					{
-						"coefficient": -2.0,
+						"coefficient": 2.0,
 						"operator": "gradient_x",
 						"field": "v_t_2",
-						"coefficient_symbolic": "-2*deltam"
+						"coefficient_symbolic": "2*deltam"
 					}
 				]
 			}
@@ -1569,7 +1569,7 @@
 	"coupling": {
 		"mass_matrix_symbolic": [
 			[
-				"mA2",
+				"-mA2",
 				null,
 				null,
 				null,

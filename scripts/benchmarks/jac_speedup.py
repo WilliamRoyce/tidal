@@ -553,7 +553,7 @@ def run(
 ) -> dict:
     """Run the full benchmark.
 
-    ``order`` controls the traversal sequence: ``shuffle`` (default) randomises
+    ``order`` controls the traversal sequence: ``shuffle`` (default) randomizes
     across all (theory, N_grid) configurations to average out monotonic
     thermal drift; ``ascending`` sorts by n_total so cheap small-N configs
     complete first — useful when you want rapid early checkpoints.  After
@@ -649,7 +649,7 @@ def main() -> None:
         "--order",
         choices=["shuffle", "ascending"],
         default="shuffle",
-        help="Config traversal order: 'shuffle' (default, randomises) or "
+        help="Config traversal order: 'shuffle' (default, randomizes) or "
         "'ascending' (sort by n_total — small/cheap configs first).",
     )
     args = parser.parse_args()

@@ -77,7 +77,7 @@ def build_grid(n: int) -> GridInfo:
 
 
 def k_max_for_n(n: int) -> float:
-    """Nyquist wavenumber for periodic discretisation of [0, L]."""
+    """Nyquist wavenumber for periodic discretization of [0, L]."""
     dx = DOMAIN_LENGTH / n
     return math.pi / dx
 

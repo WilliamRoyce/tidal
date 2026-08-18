@@ -806,7 +806,7 @@ class TestIBPHamiltonian:
         h_eval = _compute_hamiltonian_from_canonical(data, 0)
 
         # Parseval path gives the analytically exact value (matches energy_exact,
-        # not energy_ibp which is the pre-#312 FD behaviour).
+        # not energy_ibp which is the pre-#312 FD behavior).
         np.testing.assert_allclose(h_eval, energy_exact, rtol=1e-12)
 
     def test_ibp_cross_derivative_term(self) -> None:
@@ -1034,7 +1034,7 @@ class TestParsevalGradientEnergy:
         test verifies that at N ∈ {256, 512, 1024} the measured
         Parseval-FD gap matches the theoretical `(k·dx)²/12` to within 1%
         of the predicted value — a tight lock-down on the FD stencil's
-        asymptotic behaviour and a proof that Parseval is the reference
+        asymptotic behavior and a proof that Parseval is the reference
         truth the FD path converges towards.
         """
         from tidal.measurement._energy import (
@@ -4640,7 +4640,7 @@ class TestHamiltonianPositionDependentEnergy:
         n = 8
         dx = 1.0
         # phi = x (linear ramp), so grad_x(phi) = 1 everywhere
-        xs = np.arange(n, dtype=float) * dx + 0.5  # cell-centred, avoid x=0
+        xs = np.arange(n, dtype=float) * dx + 0.5  # cell-centered, avoid x=0
         phi = np.tile(xs[:, np.newaxis], (1, n))
         pi = np.zeros((n, n))
         sd = SimulationData(

@@ -27,7 +27,7 @@
 
 [theory]
 name = "Euler-Heisenberg + Dual-Gaussian B (Phase E.EH)"
-description = "QED 1-loop quartic photon corrections in a localised dual-Gaussian magnetic field background"
+description = "QED 1-loop quartic photon corrections in a localized dual-Gaussian magnetic field background"
 
 [spacetime]
 dimension = 4
@@ -69,7 +69,7 @@ components = [
 names = ["Bpeak", "sigB", "zc1", "zc2", "rho", "sigma"]
 
 # Full EH Lagrangian: Maxwell + both 1-loop QED quartic invariants.
-# Parenthesised so the multi-line expression parses correctly in wolframscript.
+# Parenthesized so the multi-line expression parses correctly in wolframscript.
 [lagrangian]
 expression = "(-1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d] + rho/8 (F[-a,-b] eta[a,c] eta[b,d] F[-c,-d])^2 + sigma/8 (epsiloneta[a,b,c,d] F[-a,-b] F[-c,-d])^2)"
 

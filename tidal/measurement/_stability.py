@@ -141,7 +141,7 @@ class ConversionStabilityResult:
     The borderline strip is the empirical false-negative regime
     documented in #323: probe verdict ``stable=True`` but the simulation
     can still evolve into the non-perturbative regime within ``t_end``.
-    Post-hoc audit prioritises borderline samples for re-simulation."""
+    Post-hoc audit prioritizes borderline samples for re-simulation."""
 
     profile_name: str = PROBE_PROFILE_NAME
     """Stable probe-version identifier persisted into chain CSV
@@ -453,7 +453,7 @@ def check_conversion_stability(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR091
             f"ic_k={ic_k:.4f}). "
             f"Worst: gamma_eff={max_excess:.4f}/s at k={worst_k:.4f} "
             f"(block size {block_size} fields). "
-            f"Source IC will grow non-perturbatively; any P_max is an artefact."
+            f"Source IC will grow non-perturbatively; any P_max is an artifact."
         )
         return ConversionStabilityResult(
             stable=False,

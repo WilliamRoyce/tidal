@@ -320,9 +320,9 @@ def _eval_baseline(
         ns.update(params)
 
     try:
-        return float(
-            eval(formula, {"__builtins__": {}}, ns),  # noqa: S307
-        )
+        from tidal.cli._simulate import safe_formula_eval
+
+        return float(safe_formula_eval(formula, ns))  # type: ignore[arg-type]
     except Exception as exc:  # noqa: BLE001
         import logging
 

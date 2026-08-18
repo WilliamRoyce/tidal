@@ -256,7 +256,7 @@ all bins         | 0.000  | every sample
 ```
 
 Suppression chain is stable everywhere it explored — confirms expectation.
-The 31 rejections are isolated artefacts (γ_eff just above 0.3) with negligible
+The 31 rejections are isolated artifacts (γ_eff just above 0.3) with negligible
 posterior weight.
 
 ### Rejection-region map — Stage A v5 sup (28477675)
@@ -277,7 +277,7 @@ posterior weight.
 [ 0.400, 0.500)  | 0.145  |   62
 ```
 
-α₃ rejection scales with α₃ magnitude — the Proca mass term destabilises the
+α₃ rejection scales with α₃ magnitude — the Proca mass term destabilizes the
 torsion mode at finite α₃ (the CDT trace channel `m² = +2·α₃`). Rejection rate
 peaks at α₃≈0.25 (37%), where the conversion-stability gap closes. The MAP
 α₃=0.001 is in the safest bin (12% rejection); rerun should preserve the MAP
@@ -478,10 +478,10 @@ Marginal D_KL: δ₁=0.81 (dominant), α₁=0.45, α₂=0.32, α₃=0.32.
 
 | | log Z_amp | log Z_sup | B = exp(amp−sup) | Verdict |
 |--|-----------|-----------|------------------|---------|
-| Original (k_IC=2.0, no probe) | −2.261 | +15.911 | **1.3×10⁻⁸** | Sup overwhelmingly favoured |
-| Canonical (k_IC=2π/100, probe) | +2.094 | +12.471 | **3.1×10⁻⁵** | Sup still overwhelmingly favoured |
+| Original (k_IC=2.0, no probe) | −2.261 | +15.911 | **1.3×10⁻⁸** | Sup overwhelmingly favored |
+| Canonical (k_IC=2π/100, probe) | +2.094 | +12.471 | **3.1×10⁻⁵** | Sup still overwhelmingly favored |
 
-The qualitative verdict is unchanged: **T4 Ricci-EM strongly favours suppression over amplification** under any numerical setting. Under canonical settings the Bayes factor narrows from ~10⁸ to ~3×10⁴ (still decisive), driven by the k_IC change exposing genuine stable-sector amplification. The absolute log Z values shift substantially due to the combined k_IC + probe gate change (see amp result section above), but the *relative* evidence firmly maintains the suppression conclusion.
+The qualitative verdict is unchanged: **T4 Ricci-EM strongly favors suppression over amplification** under any numerical setting. Under canonical settings the Bayes factor narrows from ~10⁸ to ~3×10⁴ (still decisive), driven by the k_IC change exposing genuine stable-sector amplification. The absolute log Z values shift substantially due to the combined k_IC + probe gate change (see amp result section above), but the *relative* evidence firmly maintains the suppression conclusion.
 
 **Corner plots:**
 - Amp std: `hpc_results/28789437/corner_28789437_amp_clean.png`
@@ -555,8 +555,8 @@ D_KL = 8.872 nats; ESS = 1918 (std) / 2204 (INTR r2).
 
 **Interpretation:**
 - The canonical probe is **probe-neutral on both sides** — it shifts amp log Z by ~+0.04 nats and sup log Z by ~+0.14 nats, both within 1σ of zero.
-- The k_IC change (2.0 → 2π/100) is the dominant driver on both sides: it raises amp log Z (+4.32 nats, exposing stable-sector amplification at long wavelengths) and lowers sup log Z (−3.58 nats, as the suppression landscape at k_IC=2π/100 is less favourable for multi-modal clustering than at k_IC=2.0).
-- **The qualitative verdict is unchanged at every setting:** T4 Ricci-EM strongly favours suppression over amplification across all numerical configurations tested.
+- The k_IC change (2.0 → 2π/100) is the dominant driver on both sides: it raises amp log Z (+4.32 nats, exposing stable-sector amplification at long wavelengths) and lowers sup log Z (−3.58 nats, as the suppression landscape at k_IC=2π/100 is less favorable for multi-modal clustering than at k_IC=2.0).
+- **The qualitative verdict is unchanged at every setting:** T4 Ricci-EM strongly favors suppression over amplification across all numerical configurations tested.
 - The Bayes factor range is B ∈ [1.2×10⁻⁸, 3.1×10⁻⁵] — decisive suppression evidence regardless of probe or k_IC choice.
 
 ---
@@ -595,7 +595,7 @@ D_KL = 8.872 nats; ESS = 1918 (std) / 2204 (INTR r2).
 
 ## Phase 6 — Unified Summary Table (final, 2026-05-04)
 
-All cells populated. Verdict gates: `|Δlog Z| < 0.1` → **Confirmed**; `0.1 ≤ |Δ| < 0.5` → **Refined**; `|Δ| ≥ 0.5` → **Material correction**. Track 2 rows are *new results at the campaign-canonical wavevector* (k_IC = 2π/100), not corrections — labelled accordingly.
+All cells populated. Verdict gates: `|Δlog Z| < 0.1` → **Confirmed**; `0.1 ≤ |Δ| < 0.5` → **Refined**; `|Δ| ≥ 0.5` → **Material correction**. Track 2 rows are *new results at the campaign-canonical wavevector* (k_IC = 2π/100), not corrections — labeled accordingly.
 
 | Row | k_IC | Probe | Job | log Z | D_KL (nats) | MAP δ₁ (or α₃ for Stage A) | A_max (amp) / A_min (sup) | Δlog Z vs original | Verdict |
 |-----|------|-------|-----|-------|-------------|---------------------------|---------------------------|---------------------|---------|
@@ -640,7 +640,7 @@ The four-paragraph block below is the headline output of Phase 6 — to be folde
 
 ### D1 amp Track 1 (k_IC = 2.0) — probe-only correction
 
-The canonical-probe correction shifts the published D1 amplification log Z from **−2.261 ± 0.066** (28520217) to **−2.226 ± 0.065** (28838011) — a **+0.035-nat** change, well within the G4 gate of ±0.1 nats and consistent at <0.4σ. The δ₁ marginal D_KL is essentially unchanged: original 1.679 nats vs Track 1 **1.676 nats**. The amp MAP shifts from (α₁=−0.703, α₂=−0.795, α₃=+0.130, δ₁=+0.074) to (α₁=−0.889, α₂=−1.149, α₃=+0.734, δ₁=−0.067) — both consistent with |δ₁| ≪ 1, confirming that the original chain's preference for the low-|δ₁| stable region was not a probe artefact. **Recommendation:** add a one-line *Methods* note that the published log Z is robust to canonical probe gating; no figure or numerical update needed.
+The canonical-probe correction shifts the published D1 amplification log Z from **−2.261 ± 0.066** (28520217) to **−2.226 ± 0.065** (28838011) — a **+0.035-nat** change, well within the G4 gate of ±0.1 nats and consistent at <0.4σ. The δ₁ marginal D_KL is essentially unchanged: original 1.679 nats vs Track 1 **1.676 nats**. The amp MAP shifts from (α₁=−0.703, α₂=−0.795, α₃=+0.130, δ₁=+0.074) to (α₁=−0.889, α₂=−1.149, α₃=+0.734, δ₁=−0.067) — both consistent with |δ₁| ≪ 1, confirming that the original chain's preference for the low-|δ₁| stable region was not a probe artifact. **Recommendation:** add a one-line *Methods* note that the published log Z is robust to canonical probe gating; no figure or numerical update needed.
 
 ### D1 amp Track 2 (k_IC = 2π/L = 0.0628) — new positive result
 
@@ -674,7 +674,7 @@ Stage A v5 sup log Z shifts from **+0.654 ± 0.056** (28477675) to **+0.602 ± 0
 
 ## Perturbativity validation at the hi-res MAP — issue #340 (2026-05-04)
 
-**Verdict: B₀ check PASS, t_end check FAIL.** The published Phase 6.C.2 publication number A_max = 200 is a **tachyonic-instability artefact** at the hi-res D1 amp MAP, not genuine perturbative amplification. The canonical stability probe (t_test=20, γ_eff>0.3) did not catch the mode because γ at this MAP sits just below the threshold (γ_measured ≈ 0.27 vs γ_threshold = 0.30). #340 stays OPEN; follow-up issue filed for probe-architecture review.
+**Verdict: B₀ check PASS, t_end check FAIL.** The published Phase 6.C.2 publication number A_max = 200 is a **tachyonic-instability artifact** at the hi-res D1 amp MAP, not genuine perturbative amplification. The canonical stability probe (t_test=20, γ_eff>0.3) did not catch the mode because γ at this MAP sits just below the threshold (γ_measured ≈ 0.27 vs γ_threshold = 0.30). #340 stays OPEN; follow-up issue filed for probe-architecture review.
 
 **MAP tested (from 28789437 std, the primary publication chain):**
 
@@ -698,7 +698,7 @@ Note: the chain is multi-modal — both 28789437 and 28789579 hit A=200 at MAP (
 | 4.64×10⁻³ | 1.08×10⁻¹ | 5.39×10⁻⁴ | 201.14 |
 | 10⁻² | 5.00×10⁻¹ | 2.50×10⁻³ | 200.17 |
 
-**A varies by 0.62% over 2 decades — well within the 20% tolerance.** This confirms B₀-independence and rules out P_max-saturation breakdown of the linearised conversion measurement at fixed t_end. Plot: `examples/data/d1_perturbativity_check_hires/b0_scaling.png`.
+**A varies by 0.62% over 2 decades — well within the 20% tolerance.** This confirms B₀-independence and rules out P_max-saturation breakdown of the linearized conversion measurement at fixed t_end. Plot: `examples/data/d1_perturbativity_check_hires/b0_scaling.png`.
 
 ### Sweep 2 — t_end independence at B₀ = 10⁻⁴ (FAIL)
 
@@ -738,14 +738,14 @@ Plot: `examples/data/d1_perturbativity_check_hires/tend_independence.png`.
 **Interpretation:**
 - The −1.342 nat shift is **Material** (>0.5 nat), confirming that the τ=0.3 chain's positive amplification evidence was significantly inflated by near-tachyonic samples near the γ ≈ 0.27 ridge.
 - Under τ=0.15, A_max ≈ 19 ≈ exp(0.15·20) — consistent with the probe growth bound at t_test=20. The MAP sits exactly at the τ=0.15 boundary (γ_eff=0.1500, stable=True); marginal D_KL on δ₁ collapses from ~1.3 → 0.097 nats (δ₁ is nearly inert at the new MAP).
-- **Bayes factor (cross-probe):** B = exp(log Z_amp_τ015 − log Z_sup_canonical_τ03) = exp(0.752 − 12.471) = **8.1×10⁻⁶** — suppression remains decisively favoured even under the tighter probe.
+- **Bayes factor (cross-probe):** B = exp(log Z_amp_τ015 − log Z_sup_canonical_τ03) = exp(0.752 − 12.471) = **8.1×10⁻⁶** — suppression remains decisively favored even under the tighter probe.
 - The log Z = +0.752 > 0 reflects residual evidence for modest amplification from samples just within τ=0.15 stability boundary; this is physically real but far weaker than the tachyonically-contaminated τ=0.3 result.
 
 Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
 
 ### Implication for the publication
 
-**The Phase 6.C.2 τ=0.3 publication number A_max = 200 is confirmed NOT genuine linearised amplification** — it was the tachyonic-growth value at t_end=10, capped only by the Hwang–Noh gate at P_max < 0.5. The τ=0.15 rerun's A_max ≈ 19 from the boundary-stable MAP is the correct amplification upper bound under the canonical probe.
+**The Phase 6.C.2 τ=0.3 publication number A_max = 200 is confirmed NOT genuine linearized amplification** — it was the tachyonic-growth value at t_end=10, capped only by the Hwang–Noh gate at P_max < 0.5. The τ=0.15 rerun's A_max ≈ 19 from the boundary-stable MAP is the correct amplification upper bound under the canonical probe.
 
 **Publishable numbers from Phase 6.C.2 (τ=0.15, 28883112):**
 - log Z_amp = **+0.752 ± 0.047** (positive but small; residual signal from boundary-stable samples)
@@ -859,7 +859,7 @@ Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
 
 - [x] INTR cross-checks submitted and running
 - [x] Amp INTR reduced completed (+0.679 — confirms expected amp range)
-- [x] Sup 6h cancelled; 12h resubmitted as 28985879
+- [x] Sup 6h canceled; 12h resubmitted as 28985879
 - [ ] 28982006 amp std converged
 - [ ] 28985879 sup std converged
 - [ ] Phase 6.I: pull both, perturbativity cross-check at new MAPs, update table, close #340/#341
@@ -917,6 +917,6 @@ Corner: `hpc_results/28883112/corner_28883112_d1_amp_tau015.png`
 
 **2. Sup landscape is bounds-stable in L≥75.** The L=50→L=75 drop (+16.329 → +12.814, −3.5 nats) is large, but L=75→L=100 (+12.814 → +12.957, +0.14 nats) is within σ. Suggests the sup landscape is saturated for L≥75.
 
-**3. Bayes factor stability is the key publication-quality result.** B ≈ 5–6×10⁻⁶ at both L=75 and L=100 (log B within 0.30 nats of each other, well within combined errors). The suppression verdict is bounds-independent in the L≥75 regime — the ~10⁻⁶ Bayes factor is not an artefact of choosing L=100. Future paired runs at L≥75 with comparable settings will produce comparable Bayes factors.
+**3. Bayes factor stability is the key publication-quality result.** B ≈ 5–6×10⁻⁶ at both L=75 and L=100 (log B within 0.30 nats of each other, well within combined errors). The suppression verdict is bounds-independent in the L≥75 regime — the ~10⁻⁶ Bayes factor is not an artifact of choosing L=100. Future paired runs at L≥75 with comparable settings will produce comparable Bayes factors.
 
 **Implication:** L=100 (canonical Phase 6.H setting) is a defensible choice — it's deep in the bounds-stable plateau, not at an extremum. The original L=50 amp/sup numbers (Phase 6.D) were outside this plateau and therefore mis-represented the model; Phase 6.G's L=100 re-run was a necessary correction, but no further bounds extension is needed.

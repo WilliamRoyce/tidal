@@ -7,7 +7,7 @@ Post-processes a `tidal sweep` output directory by:
    - ``run_status != "success"``
    - ``P_max > 0.5`` (linearized regime broken)
    - ``P_max(t_end=50) > 4.1 · P_max(t_end=25)`` (super-sin² growth,
-     tachyonic artefact per issue #238)
+     tachyonic artifact per issue #238)
 
 2. **Paired comparison** — if ``--paired-dir`` is given (a plasma-only
    sweep at the same mA² values), computes the dark-photon amplification

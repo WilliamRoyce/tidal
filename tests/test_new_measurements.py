@@ -42,12 +42,12 @@ def _build_coupled_scalars_spec() -> EquationSystem:
     return EquationSystem.from_dict(_COUPLED_SCALARS_SPEC)  # type: ignore[arg-type]
 
 
-def _make_travelling_wave_data(
+def _make_traveling_wave_data(
     k0: float = 3.0,
     n_grid: int = 128,
     n_snapshots: int = 51,
 ) -> SimulationData:
-    """Build two-field data with a right-travelling wave in phi_0.
+    """Build two-field data with a right-traveling wave in phi_0.
 
     phi_0(x, 0) = cos(k0 * x) * gaussian(x)
     chi_0(x, 0) = 0
@@ -65,7 +65,7 @@ def _make_travelling_wave_data(
 
     m2_phi = float(spec.mass_matrix[0][0])
 
-    # Right-travelling wave packet
+    # Right-traveling wave packet
     omega = np.sqrt(k0**2 + m2_phi)
     sigma = 2.0
     envelope = np.exp(-((x - domain / 4) ** 2) / (2 * sigma**2))
@@ -177,7 +177,7 @@ class TestEffectiveMass:
 
     def test_basic_result_type(self) -> None:
         """compute_effective_mass returns EffectiveMassResult."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = compute_effective_mass(data, ["phi_0"])
         assert isinstance(result, EffectiveMassResult)
         assert result.n_active_modes > 0
@@ -185,14 +185,14 @@ class TestEffectiveMass:
 
     def test_effective_mass_finite(self) -> None:
         """m²_eff should be a finite number."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = compute_effective_mass(data, ["phi_0"])
         assert np.isfinite(result.m2_eff)
         assert np.isfinite(result.m2_eff_std)
 
     def test_arrays_consistent(self) -> None:
         """Per-mode arrays should have consistent shapes."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = compute_effective_mass(data, ["phi_0"])
         assert len(result.m2_eff_values) == result.n_active_modes
         assert len(result.wavenumbers) == result.n_active_modes
@@ -200,7 +200,7 @@ class TestEffectiveMass:
 
     def test_group_fields(self) -> None:
         """Effective mass over a field group sums spectral power."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = compute_effective_mass(data, ["phi_0", "chi_0"])
         assert isinstance(result, EffectiveMassResult)
         assert "phi_0" in result.field_name
@@ -217,7 +217,7 @@ class TestAsymptoticConversion:
 
     def test_basic_result(self) -> None:
         """Returns AsymptoticConversionResult with expected fields."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = compute_asymptotic_conversion(data, "phi_0", "chi_0")
         assert isinstance(result, AsymptoticConversionResult)
         assert result.P_final >= 0
@@ -228,25 +228,25 @@ class TestAsymptoticConversion:
 
     def test_transmitted_reflected_sum(self) -> None:
         """P_transmitted + P_reflected ≈ P_final."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = compute_asymptotic_conversion(data, "phi_0", "chi_0")
         assert result.P_transmitted + result.P_reflected == pytest.approx(
             result.P_final, rel=1e-2,
         )
 
     def test_source_wavevector_positive(self) -> None:
-        """Source wavevector should have positive k for a right-travelling wave."""
-        data = _make_travelling_wave_data(k0=3.0)
+        """Source wavevector should have positive k for a right-traveling wave."""
+        data = _make_traveling_wave_data(k0=3.0)
         result = compute_asymptotic_conversion(data, "phi_0", "chi_0")
         # 1D: source_wavevector is a 1-tuple
         assert len(result.source_wavevector) == 1
-        assert result.source_wavevector[0] > 0  # Right-travelling
+        assert result.source_wavevector[0] > 0  # Right-traveling
 
     def test_negative_wavevector(self) -> None:
-        """Source wavevector should be negative for a left-travelling wave."""
-        data = _make_travelling_wave_data(k0=-3.0)
+        """Source wavevector should be negative for a left-traveling wave."""
+        data = _make_traveling_wave_data(k0=-3.0)
         result = compute_asymptotic_conversion(data, "phi_0", "chi_0")
-        assert result.source_wavevector[0] < 0  # Left-travelling
+        assert result.source_wavevector[0] < 0  # Left-traveling
 
     def test_standing_wave_equal_split(self) -> None:
         """Standing wave has no net direction → equal forward/reflected split."""
@@ -259,19 +259,19 @@ class TestAsymptoticConversion:
 
     def test_auto_detect_target(self) -> None:
         """target_fields=None auto-detects remaining dynamical fields."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = compute_asymptotic_conversion(data, "phi_0")
         assert result.target_field == "chi_0"
 
     def test_overlap_raises(self) -> None:
         """Overlapping source and target raises ValueError."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         with pytest.raises(ValueError, match="overlap"):
             compute_asymptotic_conversion(data, "phi_0", "phi_0")
 
     def test_energies_positive(self) -> None:
         """Source and target energies are non-negative."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = compute_asymptotic_conversion(data, "phi_0", "chi_0")
         assert result.E_source_initial > 0
         assert result.E_target_final >= 0
@@ -299,14 +299,14 @@ class TestSourceWavevector:
 
     def test_returns_correct_shape(self) -> None:
         """Source wavevector has ndim components."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         k = _source_wavevector(data, ["phi_0"])
         assert k.shape == (1,)  # 1D problem
 
     def test_plane_wave_recovers_k0(self) -> None:
         """For a clean plane wave, spectral centroid ≈ k0."""
         k0 = 3.0
-        data = _make_travelling_wave_data(k0=k0)
+        data = _make_traveling_wave_data(k0=k0)
         k = _source_wavevector(data, ["phi_0"])
         # The spectral centroid should be close to k0
         # (not exact due to Gaussian envelope and grid discretization)
@@ -316,9 +316,9 @@ class TestSourceWavevector:
 class TestDirectionalSplit:
     """Tests for _directional_split (analytic signal decomposition)."""
 
-    def test_travelling_wave_mostly_forward(self) -> None:
-        """Right-travelling wave cos(kx - ωt) → mostly forward energy."""
-        data = _make_travelling_wave_data(k0=3.0)
+    def test_traveling_wave_mostly_forward(self) -> None:
+        """Right-traveling wave cos(kx - ωt) → mostly forward energy."""
+        data = _make_traveling_wave_data(k0=3.0)
         k_hat = np.array([1.0])  # Forward = positive k
         fwd, ref = _directional_split(data, ["phi_0"], 0, k_hat)
         # Analytic signal correctly assigns most energy to forward direction
@@ -327,7 +327,7 @@ class TestDirectionalSplit:
 
     def test_fractions_sum_to_one(self) -> None:
         """Forward + reflected should sum to ≈ 1."""
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         k_hat = np.array([1.0])
         fwd, ref = _directional_split(data, ["phi_0"], 0, k_hat)
         assert fwd + ref == pytest.approx(1.0, abs=0.02)
@@ -355,7 +355,7 @@ class TestPeakConversion:
             _run_peak_conversion,  # pyright: ignore[reportPrivateUsage]
         )
 
-        data = _make_travelling_wave_data()
+        data = _make_traveling_wave_data()
         result = _run_peak_conversion(data, ("phi_0",), ("chi_0",))
         assert "P_max" in result
         assert "P_max_time" in result

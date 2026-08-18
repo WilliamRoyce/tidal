@@ -1,6 +1,6 @@
-"""Boccaletti path-integrated reproduction (localised B-field).
+"""Boccaletti path-integrated reproduction (localized B-field).
 
-For a finite magnetised region the Boccaletti formula generalises to
+For a finite magnetized region the Boccaletti formula generalizes to
 the path-integrated form
 
   P = sin^2( (kappa / 2) * int_{-inf}^{+inf} B_x(z) dz )
@@ -12,7 +12,7 @@ and for the Gaussian profile B_x(z) = Bpeak * exp(-z^2 / (2 R^2)),
 This benchmark sweeps (Bpeak, R) on a 2D grid using the
 gertsenshtein_localized.json spec (derived from theory_localized.toml).
 Each cell runs a Gaussian graviton wave-packet on h_7 that traverses
-the magnetised region at z=0, then measures the h_7 -> a_2 conversion
+the magnetized region at z=0, then measures the h_7 -> a_2 conversion
 probability. Residuals against the path-integrated form are recorded
 per cell.
 

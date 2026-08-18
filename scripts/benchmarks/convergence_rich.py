@@ -76,9 +76,9 @@ RABI_SNAPSHOT_DT = 0.1  # ~2000 snapshots over t_end=200
 # (c) Time-integration order params. Restricted to the symplectic family
 # (leapfrog Y2, Y4) which is the only family where the slope is a
 # meaningful convergence-order diagnostic on a wave problem at fixed
-# spatial discretisation. Implicit schemes (CVODE, IDA, scipy DOP853)
+# spatial discretization. Implicit schemes (CVODE, IDA, scipy DOP853)
 # saturate at their rtol setting and exhibit a flat horizontal in this
-# panel; their behaviour is already covered by the multi-method
+# panel; their behavior is already covered by the multi-method
 # agreement figure.
 TIO_SCHEMES_FULL: list[tuple[str, list[str]]] = [
     ("leapfrog_Y2", ["--scheme", "leapfrog", "--leapfrog-order", "2"]),
@@ -203,7 +203,7 @@ def _proca_omega(out_dir: Path, component: str = "a_1") -> tuple[float, float]:
 
 
 def _worker_init(avail_cores: list[int]) -> None:
-    """Pin each worker to a private core to minimise cache thrashing."""
+    """Pin each worker to a private core to minimize cache thrashing."""
     worker_id = mp.current_process()._identity  # type: ignore[attr-defined]
     idx = (worker_id[0] - 1) % len(avail_cores) if worker_id else 0
     try:

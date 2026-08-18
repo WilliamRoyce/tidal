@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 # -- Shared constants -------------------------------------------------------
 
 DPI = 150
-VMAX_FLOOR = 0.01  # Minimum symmetric colour-scale magnitude
+VMAX_FLOOR = 0.01  # Minimum symmetric color-scale magnitude
 _LINE_COLORS = (
     "tab:blue",
     "tab:orange",
@@ -100,11 +100,12 @@ def _spatial_dim(data: SimulationData) -> int:
 
 
 def _z_profile_1d(
-    snap: np.ndarray, data: SimulationData,
+    snap: np.ndarray,
+    data: SimulationData,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Extract z-profile at the centre of x, y for a 3D snapshot.
+    """Extract z-profile at the center of x, y for a 3D snapshot.
 
-    Returns ``(z_coords, profile)`` where *z_coords* are cell centres
+    Returns ``(z_coords, profile)`` where *z_coords* are cell centers
     along the last spatial axis and *profile* is ``snap[ix, iy, :]``.
     """
     ix = snap.shape[0] // 2
@@ -112,7 +113,9 @@ def _z_profile_1d(
     z_min, z_max = data.grid_bounds[2]
     n_z = snap.shape[2]
     z = np.linspace(
-        z_min + data.grid_spacing[2] / 2, z_max - data.grid_spacing[2] / 2, n_z,
+        z_min + data.grid_spacing[2] / 2,
+        z_max - data.grid_spacing[2] / 2,
+        n_z,
     )
     return z, snap[ix, iy, :]
 
@@ -354,7 +357,9 @@ def _plot_overlay(ax: Axes, data: SimulationData, formula: str) -> None:
     t = data.times
     ns = {**FORMULA_NAMESPACE, "t": t}
     try:
-        values = eval(formula, {"__builtins__": {}}, ns)  # noqa: S307
+        from tidal.cli._simulate import safe_formula_eval
+
+        values = np.asarray(safe_formula_eval(formula, ns), dtype=float)
     except Exception as exc:
         msg = f"Error evaluating overlay formula '{formula}': {exc}"
         raise ValueError(msg) from exc
@@ -399,7 +404,7 @@ def render_profile(
     *,
     cross_section: tuple[str, float] | None = None,
 ) -> None:
-    """Render 1D field profile at multiple times, overlaid with colour gradient.
+    """Render 1D field profile at multiple times, overlaid with color gradient.
 
     Raises
     ------
@@ -422,7 +427,9 @@ def render_profile(
             x_min, x_max = data.grid_bounds[0]
             n_x = snap.shape[0]
             x = np.linspace(
-                x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, n_x,
+                x_min + data.grid_spacing[0] / 2,
+                x_max - data.grid_spacing[0] / 2,
+                n_x,
             )
             ax.plot(
                 x,

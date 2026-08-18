@@ -251,7 +251,6 @@ def _make_minimal_constraint_spec(
                 },
             },
         ],
-        "coupling": {"matrix": [[0, 0], [0, 0]]},
     }
     return EquationSystem.from_dict(spec_data)
 

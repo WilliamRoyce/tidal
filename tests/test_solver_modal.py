@@ -50,7 +50,6 @@ _KG_1D_SPEC: dict[str, object] = {
             },
         },
     ],
-    "coupling": {"mass_matrix_symbolic": [["-m2"]]},
 }
 
 # Coupled scalars: phi + chi with mass and coupling
@@ -110,10 +109,6 @@ _COUPLED_SPEC: dict[str, object] = {
             },
         },
     ],
-    "coupling": {
-        "mass_matrix_symbolic": [["-mPhi2", None], [None, "-mChi2"]],
-        "coupling_matrix_symbolic": [[None, "-gCpl"], ["-gCpl", None]],
-    },
 }
 
 # Constraint spec (time_order=0) — modal should reject

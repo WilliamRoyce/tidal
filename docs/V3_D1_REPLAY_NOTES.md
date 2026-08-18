@@ -25,8 +25,8 @@ The 1428 tachyonic samples have `γ_eff ∈ [0.15, ∞]` per the probe — by co
 ## What this does NOT validate
 
 - The new logL values for the admitted tachyonic samples — those need a real Phase B sim run because the v2 chain CSV doesn't store P_max for prior-rejected samples (the sim was never run for them under v2).
-- The soft-floor noise behaviour — verified at unit-test level only.
-- The end-to-end PolyChord behaviour with the new architecture — Phase B's smoke run (B.1) is the first integration test.
+- The soft-floor noise behavior — verified at unit-test level only.
+- The end-to-end PolyChord behavior with the new architecture — Phase B's smoke run (B.1) is the first integration test.
 
 ## Notes on the original 28520217 chain
 
@@ -38,7 +38,7 @@ The replay therefore uses 28982029 (v2 INTR-reduced, post-#258 metadata) as the 
 
 - `v2_admission_shift.png` — two-panel figure: v2 in-chain logL distribution + v2 rejected-tachyonic γ_eff histogram with the τ=0.15 gate marked
 - `v2_admission_shift_summary.csv` — admission counts per category
-- `v1_logl_distribution.png`, `run_status_summary.csv` — original 28520217 replay artefacts (kept for reference; show that 28520217 pre-dates rejected-sample tracking)
+- `v1_logl_distribution.png`, `run_status_summary.csv` — original 28520217 replay artifacts (kept for reference; show that 28520217 pre-dates rejected-sample tracking)
 
 ## References
 

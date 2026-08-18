@@ -161,13 +161,13 @@ class GridInfo:
 
     @cached_property
     def dx(self) -> tuple[float, ...]:
-        """Grid spacing per axis (cell-centred: dx = (hi - lo) / N)."""
+        """Grid spacing per axis (cell-centered: dx = (hi - lo) / N)."""
         return tuple(
             (hi - lo) / n for (lo, hi), n in zip(self.bounds, self.shape, strict=False)
         )
 
     def axes_coords(self, axis: int) -> np.ndarray:
-        """1-D array of cell centres along *axis*.
+        """1-D array of cell centers along *axis*.
 
         Returns shape ``(shape[axis],)`` — a single 1-D vector, not a
         broadcasted grid.  Useful for building per-axis coordinate arrays
@@ -188,10 +188,10 @@ class GridInfo:
 
     @cached_property
     def cell_coords(self) -> np.ndarray:
-        """Cell-centre coordinates, shape ``(*shape, ndim)``.
+        """Cell-center coordinates, shape ``(*shape, ndim)``.
 
-        For a 1D grid with bounds (0, 10) and shape (4,), the cell centres
-        are at [1.25, 3.75, 6.25, 8.75] (centred in each cell).
+        For a 1D grid with bounds (0, 10) and shape (4,), the cell centers
+        are at [1.25, 3.75, 6.25, 8.75] (centered in each cell).
 
         Unlike py-pde's ``CartesianGrid.cell_coords`` (which returns a list
         of arrays with inconsistent shapes), this always returns a single

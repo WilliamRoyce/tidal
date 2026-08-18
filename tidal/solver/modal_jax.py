@@ -248,7 +248,7 @@ def _solve_modal_jax_constrained(  # noqa: PLR0917
 
     n_dyn = A_reduced.shape[1]
 
-    # --- Generalised eigenvalue B @ dy_d/dt = A @ y_d ------------------------
+    # --- Generalized eigenvalue B @ dy_d/dt = A @ y_d ------------------------
     # Fold B^{-1} into A so the JAX kernel only needs the matrix exponential.
     # ``_build_evolution_matrices`` pre-solves this in most paths (returns
     # B=None); the explicit-B branch survives for theories where the solve
@@ -307,7 +307,7 @@ def _solve_modal_jax_constrained(  # noqa: PLR0917
     # --- Reconstruct full Fourier state (dynamical + constraint slots) -------
     y_hat_all = np.zeros((num_snap, n_slots, n_modes), dtype=np.complex128)
 
-    # Dynamical slots: vectorised scatter via orig_to_reduced
+    # Dynamical slots: vectorized scatter via orig_to_reduced
     orig_indices = np.array(list(orig_to_reduced.keys()))
     red_indices = np.array(list(orig_to_reduced.values()))
     # ys_np[:, :, red_indices].transpose(0, 2, 1) gives (n_snapshots, n_dyn, n_modes)

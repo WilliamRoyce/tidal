@@ -1,5 +1,5 @@
 """
-TIDAL CLI Banner — nabla + ripple rings with colour gradients.
+TIDAL CLI Banner — nabla + ripple rings with color gradients.
 
 Algorithmically rasterized from the TIDAL SVG logo using half-block
 characters (▀ ▄ █) for universal terminal compatibility.
@@ -8,7 +8,7 @@ Usage:
     from tidal.banner import print_banner
     print_banner()                      # default ocean theme
     print_banner(theme="sunset")        # warm gradient
-    print_banner(theme="plain")         # no colour (safe for pipes / CI)
+    print_banner(theme="plain")         # no color (safe for pipes / CI)
 
 Themes: "ocean", "ice", "sunset", "neon", "plain"
 """
@@ -86,7 +86,7 @@ def _build_minimal() -> list[str]:
 
 
 # ────────────────────────────────────────────────────────────
-#  Colour themes
+#  Color themes
 # ────────────────────────────────────────────────────────────
 
 THEMES: dict[str, list[tuple[int, int, int]]] = {

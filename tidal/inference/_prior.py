@@ -186,7 +186,7 @@ def parse_prior(spec: str) -> Prior:
 class RadialAngularPrior:
     """Joint prior over (r, theta_hat) for a coupling vector ``c = r * theta_hat``.
 
-    The N coupling values form a vector in ``R^N``.  The prior factorises
+    The N coupling values form a vector in ``R^N``.  The prior factorizes
     into a magnitude ``r`` (sampled ``log_uniform(r_lo, r_hi)``) and a
     direction ``theta_hat`` on the unit sphere ``S^(N-1)`` (sampled
     uniformly within one cubed-sphere sub-tile).  See

@@ -19,7 +19,7 @@ Pins three correctness properties and one perf budget:
    Gertsenshtein fixture under plane-wave IC stays within budget.
 
 The kill-switch ``TIDAL_MODAL_SPARSE_IC=0`` recovers legacy
-behaviour bit-exactly; tests use it to compare paths.
+behavior bit-exactly; tests use it to compare paths.
 """
 
 from __future__ import annotations

@@ -25,7 +25,7 @@ source .venv/bin/activate
 # Per-job results directory.  Callers that want a stable on-HPC output
 # location for ``--output`` use ``${RESULTS_DIR}/<subdir>``; the shuttle's
 # ``pull <jobid>`` walks the recorded --output path and brings the
-# whitelisted artefacts back locally.
+# whitelisted artifacts back locally.
 export RESULTS_DIR="{{REMOTE_ROOT}}/hpc_results/${SLURM_JOB_ID}"
 mkdir -p "${RESULTS_DIR}"
 

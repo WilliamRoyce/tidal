@@ -4,7 +4,7 @@ Several hot paths (the inference likelihood pre-flight, the sweep
 pre-flight, the prior-stability sweep) parsed the equation JSON on
 every call.  At ~1–3 ms per parse and ~10⁵ likelihood evaluations per
 chain, that's a few minutes of pure JSON-decoding overhead per worker
-per run.  This cache amortises the cost: the second time a path is
+per run.  This cache amortizes the cost: the second time a path is
 loaded within the process, the parsed :class:`EquationSystem` is
 returned directly.
 

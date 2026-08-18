@@ -1,10 +1,10 @@
-# Phase E Tracker — Localised-Field HPC Campaign
+# Phase E Tracker — Localized-Field HPC Campaign
 
 > **⏸ PAUSED 2026-05-29 — pivoted to atlas-on-uniform until 2026-06-01 deadline.**
 >
-> The localised campaign is on hold because the per-eval cost makes landscape
+> The localized campaign is on hold because the per-eval cost makes landscape
 > PolyChord on 38-field PGT-torsion theories infeasible in the remaining 3 days
-> (jobs 29714807 / 29715239 hit walltime without converging). All localised
+> (jobs 29714807 / 29715239 hit walltime without converging). All localized
 > infrastructure below is preserved unchanged and will resume after the paper.
 > See **[`PHASE_E_ATLAS_TRACKER.md`](PHASE_E_ATLAS_TRACKER.md)** for the active
 > uniform-field cubed-sphere atlas campaign.
@@ -34,7 +34,7 @@
 | 2026-05-24 | `R_ATLAS=0.4` | brackets ~35% of T4 v3 MAP magnitude (\|MAP\|≈1.16); near-perturbative, small enough not to swamp tachyonic boundaries | stage0-bootstrap |
 | 2026-05-24 | `K_CARRIER=3` | k·σ_B = 15 → high-frequency Gertsenshtein regime; 5.4 cells/λ at Δz=0.39 | stage0-bootstrap |
 | 2026-05-24 | ~~`T_END=60`, `T_CHECK_1=40`, `T_CHECK_2=60`~~ → `T_END=80`, `T_CHECK_1=60`, `T_CHECK_2=80` | Mid-transit `t_check_1` made the A-plateau diagnostic spurious (still-converting samples flagged as growth). Both checkpoints now POST-transit so A-plateau cleanly distinguishes saturation from in-vacuum growth. Wavepacket back clears field at t≈55; new window gives 25 units of post-transit margin. Verified on E.cal: ratio = 1.011 (well within 5% tol) | stage1-cal-iteration |
-| 2026-05-24 | Post-transit norm window now tracks `x_c + t_check_2 ± 3σ_w` instead of fixed `[zc1+3σ_B, L/2-σ_w]` | Old window assumed wavepacket at L/2; with the new t_check_2=80 the wavepacket center is at z=95, partly past the old upper bound (norm_ratio fell to 0.47 from clipping). Tracking the moving centre gives 0.9989 norm conservation on E.cal | stage1-cal-iteration |
+| 2026-05-24 | Post-transit norm window now tracks `x_c + t_check_2 ± 3σ_w` instead of fixed `[zc1+3σ_B, L/2-σ_w]` | Old window assumed wavepacket at L/2; with the new t_check_2=80 the wavepacket center is at z=95, partly past the old upper bound (norm_ratio fell to 0.47 from clipping). Tracking the moving center gives 0.9989 norm conservation on E.cal | stage1-cal-iteration |
 | 2026-05-24 | **E.T2 DROPPED from active roster** | Pure Einstein-Cartan with algebraic torsion masses has no torsion-photon coupling mechanism (torsion sourced by spin currents which photons lack at linear order). v3 result was D_KL=0.003 nats null. E.cal positive control is the calibration baseline; no need for E.T2 atlas/corner. | user-catch |
 | 2026-05-24 | **Switched to interactive INTR pattern for amp+sup parallel** | Per user feedback. One sapphire allocation (112 cores) runs amp+sup in PARALLEL with 32 ranks each (64 cores total), leaving headroom for OS. Eliminates the serial submit-and-wait latency of separate sbatch INTR jobs. | user-catch |
 | 2026-05-24 | ntasks reduced 76 → 32 per chain | E.T2 OOM-killed at 76 ranks × 1.5GB/rank limit. 32 ranks × 3GB/rank on sapphire is safer for 38-field PGT theories. nlive=25*ndim still well-served by 32 ranks at ndim≤8. | user-catch |
@@ -59,7 +59,7 @@
 ### Stage 1 — Wolfram derivations (interleaved with Stage 2+)
 
 - [x] 1.1 E.cal `gertsenshtein/theory_ungauged_e_dual_gaussian.toml` (~5 min — DONE; 14 components, 73KB JSON; PASS verdict on stability diagnostics, P/h0² ≈ 0.0036 matches Boccaletti sin²(0.063) ≈ 0.0039 within ~10%)
-- [x] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` — **UNBLOCKED**: derivation (#378) and modal-perturbative simulation (#380) both fixed. Wolfram now keeps the small-param-bearing kinetic coefficient un-normalised (ExportJSON.wl), letting Python's existing `canonicalize_kinetic_for_perturbation` split M = M₀ + εM₁ and synthesise Pass-1 corrections. Modal Pass 0 + Pass 1 complete end-to-end. Tachyonic eigenvalue at t≥10 is a pre-existing physics property of Maxwell in this dual-Gaussian B background (present at ρ=σ=0); separate from the solver blocker. Non-blocking for the PGT roster.
+- [x] 1.1b E.EH `euler_heisenberg/theory_e_dual_gaussian.toml` — **UNBLOCKED**: derivation (#378) and modal-perturbative simulation (#380) both fixed. Wolfram now keeps the small-param-bearing kinetic coefficient un-normalized (ExportJSON.wl), letting Python's existing `canonicalize_kinetic_for_perturbation` split M = M₀ + εM₁ and synthesize Pass-1 corrections. Modal Pass 0 + Pass 1 complete end-to-end. Tachyonic eigenvalue at t≥10 is a pre-existing physics property of Maxwell in this dual-Gaussian B background (present at ρ=σ=0); separate from the solver blocker. Non-blocking for the PGT roster.
 - [x] 1.2 E.T1 `dark_photon_plasma/theory_e_dual_gaussian.toml` — DONE (26 fields, 86 H terms)
 - [x] 1.3 E.T2 `torsion_gertsenshtein/theory_einstein_cartan_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms; smoke PASS)
 - [x] 1.4 E.T4 `torsion_gertsenshtein/theory_nonminimal_e_dual_gaussian.toml` — DONE (38 fields, 82 H terms)
@@ -134,7 +134,7 @@ Stability column: `PASS` / `SOFT-PENALIZED` / `CATASTROPHIC`.
 | E.T7s | Complete-even (already R̃²-free; no stripping needed) | ☑ (38 fields) | ☐ jobid | ☐ jobid | (≤5D only) | — | — |
 | E.T8s | Complete-odd (already R̃²-free; no stripping needed) | ☐ deriving | ☐ jobid | ☐ jobid | (≤5D only) | — | — |
 
-## Per-theory artefact index (append per HPC pull)
+## Per-theory artifact index (append per HPC pull)
 
 _None yet — fill as `hpc_results/<jobid>/phase_e/<theory>/README.md` files land._
 

@@ -1,3 +1,10 @@
+# Derivation timing: ~18s wall (last verified: 2026-08-16, 1 field, 3 H terms, v0.47.9)
+#
+# Radial reduction of the 4D spherical metric. The (2/r) d_r Christoffel term is
+# supplied by the sqrt|g| volume measure in the Euler-Lagrange variation (GH #394);
+# without it the equation reduces to the flat wave operator and the r^2-weighted
+# energy is not conserved. Verified: max |dE/E| = 3.8e-06.
+
 [theory]
 name = "Spherical Klein-Gordon (radial plane wave)"
 

@@ -13,7 +13,7 @@
 #   Deviation from constancy would indicate:
 #   - Higher-order B₀ effects (nonlinear backreaction)
 #   - Breakdown of the linearized regime (P_GR approaching 1)
-#   - Numerical artefacts from the modal solver
+#   - Numerical artifacts from the modal solver
 #
 # Refs:
 #   An, Pospelov, Pradler (2013), arXiv:1302.3884 — conversion formulas

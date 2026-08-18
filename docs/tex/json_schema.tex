@@ -18,8 +18,7 @@ Complete reference for the JSON specification format used as the interface betwe
   "metadata":  { ... },
   "spacetime": { ... },
   "fields":    [ ... ],
-  "equations": [ ... ],
-  "coupling":  { ... }
+  "equations": [ ... ]
 }
 \end{lstlisting}
 
@@ -35,7 +34,6 @@ Key & Required & Description \\
 \texttt{spacetime} & \textbf{Yes} & Dimension, signature, coordinates \\
 \texttt{fields}    & \textbf{Yes} & List of field components \\
 \texttt{equations} & \textbf{Yes} & Equations of motion (one per field) \\
-\texttt{coupling}  & \textbf{Yes} & Mass/coupling matrices (auto-computed from terms) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -605,26 +603,18 @@ Mathematica & Python & Notes \\
 \end{table}
 
 
-\subsection{Coupling}
+\subsection{Mass and Coupling Matrices (not stored)}
 \label{sec:json-coupling}
 
-Mass and coupling matrices extracted from \texttt{identity} operator terms. Only symbolic matrices are stored in JSON; numeric values are auto-computed at load time from symbolic expressions and metadata parameters.
+The JSON contains \textbf{no} \texttt{coupling} section. Mass and coupling
+matrices are fully determined by the \texttt{identity} operator terms already
+present in \texttt{equations}, so storing them would duplicate data the reader
+can derive.
 
-\begin{table}[htbp]
-\centering
-\caption{Coupling section fields.}
-\label{tab:json-coupling}
-\begin{tabular}{@{}llll@{}}
-\toprule
-Key & Type & Required & Description \\
-\midrule
-\texttt{mass\_matrix\_symbolic}     & array[array[string$|$null]] & \textbf{Yes} & $n \times n$ symbolic mass matrix entries \\
-\texttt{coupling\_matrix\_symbolic} & array[array[string$|$null]] & \textbf{Yes} & $n \times n$ symbolic coupling matrix entries \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\textbf{Note:} Prior to the Numeric Matrix Cleanup, JSON also contained numeric \texttt{mass\_matrix} and \texttt{coupling\_matrix} arrays. These have been removed --- numeric values are now computed by \texttt{EquationSystem.from\_dict()} using symbolic expressions resolved against \texttt{metadata.parameters}.
+They are available on the loaded model as
+\texttt{EquationSystem.mass\_matrix}, \texttt{.coupling\_matrix} and their
+\texttt{\_symbolic} counterparts, computed once by
+\texttt{\_compute\_matrices\_from\_terms}.
 
 \paragraph{Convention.}
 \label{par:json-coupling-convention}
@@ -634,37 +624,38 @@ Key & Type & Required & Description \\
   \label{eq:matrix-convention}
 \end{equation}
 
-This makes mass-squared positive for the standard Lagrangian sign convention: $\ddt^2 \phi = \ldots - m^2 \phi$ produces $\texttt{mass\_matrix[i][i]} = m^2$.
+This makes mass-squared positive for the standard Lagrangian sign convention:
+$\ddt^2 \phi = \ldots - m^2 \phi$ produces $\texttt{mass\_matrix[i][i]} = m^2$.
 
 \begin{itemize}
-  \item Diagonal entries ($i = j$) go in \texttt{mass\_matrix\_symbolic}
-  \item Off-diagonal entries ($i \neq j$) go in \texttt{coupling\_matrix\_symbolic}
-  \item Null entries indicate zero coupling
+  \item Diagonal entries ($i = j$) go in \texttt{mass\_matrix}
+  \item Off-diagonal entries ($i \neq j$) go in \texttt{coupling\_matrix}
+  \item Contributions \textbf{accumulate}: a component may carry several
+        \texttt{identity} terms acting on the same field, and the entry is
+        their sum
+  \item Neither matrix is normalised by the LHS kinetic coefficient; for an
+        effective mass-squared divide by it, via
+        \texttt{spec\_query.effective\_coefficient}
 \end{itemize}
 
-\paragraph{Auto-Computation.}
-\label{par:json-coupling-auto}
+The numeric and symbolic forms differ deliberately: the numeric matrices apply
+the negation above, while the symbolic ones hold
+\texttt{coefficient\_symbolic} verbatim so it can be resolved at runtime
+against real parameter values. An identity term \texttt{B0\^{}2/8} therefore
+gives \texttt{mass\_matrix = -0.125} and
+\texttt{mass\_matrix\_symbolic = "B0\^{}2/8"}.
 
-\texttt{EquationSystem.from\_dict()} always recomputes numeric matrices from the equation terms via \texttt{\_compute\_matrices\_from\_terms}. The \texttt{\_resolve\_symbolic\_coeff} helper resolves symbolic expressions (e.g., \texttt{"-m2"}) against the \texttt{metadata.parameters} dict to produce correct numeric values.
+\paragraph{History.}
+\label{par:json-coupling-history}
 
-\textbf{Example (coupled scalars):}
-
-Given \texttt{phi\_0} equation has term \texttt{\{"coefficient": -1.0, "operator": "identity", "field": "phi\_0", "coefficient\_symbolic": "-m2"\}} and \texttt{\{"coefficient": -0.5, "operator": "identity", "field": "chi\_0", "coefficient\_symbolic": "-g"\}}:
-
-\begin{lstlisting}[style=json]
-{
-  "coupling": {
-    "mass_matrix_symbolic": [
-      ["-m2", null],
-      [null, "-mchi2"]
-    ],
-    "coupling_matrix_symbolic": [
-      [null, "-g"],
-      ["-g", null]
-    ]
-  }
-}
-\end{lstlisting}
+Before \texttt{c407240d} (2026-02-07) the loader \emph{read}
+\texttt{coupling.mass\_matrix} from the JSON and those values were
+authoritative. That commit switched to deriving them from the equation terms,
+but the exporter kept writing the section --- so a second, unread copy was
+produced by a separate Wolfram implementation for six months, and the two
+drifted apart without anything noticing (GH \#403, \#404). The export was
+removed rather than repaired. Specs derived before that removal still carry a
+\texttt{coupling} section; it is ignored.
 
 
 \subsection{Constraint Solver}
@@ -868,11 +859,7 @@ Source: \texttt{examples/data/klein\_gordon\_1d.json}
         ]
       }
     }
-  ],
-  "coupling": {
-    "mass_matrix_symbolic": [[null]],
-    "coupling_matrix_symbolic": [[null]]
-  }
+  ]
 }
 \end{lstlisting}
 
@@ -932,17 +919,7 @@ Two scalar fields $\phi$ and $\chi$ with mutual coupling. Note how \texttt{phi\_
         ]
       }
     }
-  ],
-  "coupling": {
-    "mass_matrix_symbolic": [
-      ["-m2", null],
-      [null, "-mchi2"]
-    ],
-    "coupling_matrix_symbolic": [
-      [null, "-g"],
-      ["-g", null]
-    ]
-  }
+  ]
 }
 \end{lstlisting}
 

@@ -200,7 +200,7 @@ def overlay_corner(
         msg = "At least one of amp_chains_dir / sup_chains_dir is required"
         raise ValueError(msg)
 
-    # Initialise axes from the first available source, then overlay any
+    # Initialize axes from the first available source, then overlay any
     # additional sources on the same axes. Anesthetic's plot_2d returns
     # an AxesDataFrame (pandas-like), not a (fig, axes) tuple.  Each source
     # in `sources` is a (tag, samples, color, alpha) 4-tuple so the prior

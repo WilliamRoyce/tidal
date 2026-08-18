@@ -200,7 +200,7 @@ Any future template-cache attempt must satisfy ALL FOUR before being merged:
 
 ---
 
-## 5. Reverted artefacts
+## 5. Reverted artifacts
 
 ```
 $ git show --stat 62352c4
@@ -260,5 +260,5 @@ still required, the right sequence is:
    above satisfied.
 
 This retrospective and `feedback_modal_template_cache_failure.md` (in the
-Claude memory) are the durable artefacts — re-attempting the optimization
+Claude memory) are the durable artifacts — re-attempting the optimization
 naively without addressing the prerequisites will reproduce this same failure.

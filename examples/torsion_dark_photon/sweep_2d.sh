@@ -81,7 +81,7 @@ echo ""
 echo "--- Generating plots ---"
 
 # 2D heatmap: P_max over (alpha, deltam) parameter plane
-# Colours show amplification; dashed contour at P = sin^2(0.25) ~ 0.0617
+# Colors show amplification; dashed contour at P = sin^2(0.25) ~ 0.0617
 # shows the Gertsenshtein baseline (amplification boundary).
 tidal plot "${OUTPUT}" --type sweep \
   --metric P_max --log-scale \

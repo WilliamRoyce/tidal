@@ -1190,7 +1190,7 @@ class TestPositionDependentJacobian:
         # dependent diagonal entries from -sign * coeff * I = +sin(x_i)
         block = dF_dy[vel_rows, field_cols].toarray()
         diag_vals = np.diag(block)
-        # sin(x) evaluated at grid cell centres should vary
+        # sin(x) evaluated at grid cell centers should vary
         assert not np.allclose(diag_vals, diag_vals[0])
 
     def test_all_time_independent_method(self) -> None:

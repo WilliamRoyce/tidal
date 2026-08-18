@@ -396,7 +396,7 @@ class InMemoryAccumulator:
     The :meth:`append` signature matches :class:`SnapshotWriter` so the
     existing snapshot-callback plumbing in ``_simulate`` works unchanged
     when an accumulator is wired in place of the writer.  Call
-    :meth:`to_sim_data` after the solver finishes to materialise a
+    :meth:`to_sim_data` after the solver finishes to materialize a
     :class:`tidal.measurement._io.SimulationData`.
 
     Memory bound: ``n_snapshots * grid_size * (n_fields + n_velocities) *
@@ -561,7 +561,7 @@ class InMemoryAccumulator:
         self.close()
 
     def to_sim_data(self, spec: EquationSystem) -> SimulationData:
-        """Materialise a :class:`SimulationData` from the accumulated arrays.
+        """Materialize a :class:`SimulationData` from the accumulated arrays.
 
         Slices arrays to the actual count in case the solver finished
         early, then hands the slices (which are views, not copies) to

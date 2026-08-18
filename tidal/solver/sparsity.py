@@ -7,7 +7,7 @@ allocates a dense N x N array) and gives exact structure in milliseconds.
 
 The sparsity pattern is returned as a ``scipy.sparse.csc_matrix`` suitable
 for passing to ``sksundae.ida.IDA(linsolver='sparse', sparsity=pattern)``,
-which uses SuperLU_MT for direct factorisation.
+which uses SuperLU_MT for direct factorization.
 
 Reference: SuperLU_MT, Li & Demmel, ACM TOMS 29(2), 2003.
 """

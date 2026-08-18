@@ -175,12 +175,12 @@ def test_transform_returns_correct_shape() -> None:
     assert c.shape == (4,)
 
 
-def test_transform_geometric_centre() -> None:
-    """``u = (0.5, 0.5, ..., 0.5)`` on M=1 face 1+ projects to face centre.
+def test_transform_geometric_center() -> None:
+    """``u = (0.5, 0.5, ..., 0.5)`` on M=1 face 1+ projects to face center.
 
     At u[0] = 0.5 the magnitude is the geometric mean of r_lo and r_hi
     (log_uniform midpoint).  At u[1:] = 0.5 the face-cube position is
-    ``u_face = -1 + 1 * 1 = 0`` -- i.e. the face centre, which projects
+    ``u_face = -1 + 1 * 1 = 0`` -- i.e. the face center, which projects
     to ``+e_1`` for face 1+.  So c = r_mid * +e_1.
     """
     p = _make_prior(("a", "b", "c"))  # N = 3
@@ -419,6 +419,6 @@ def test_build_prior_transform_unchanged_for_legacy_callers() -> None:
     ]
     transform = build_prior_transform(priors_legacy)
     out = transform(np.array([0.5, 0.5]))
-    # Reproduces existing behaviour exactly
+    # Reproduces existing behavior exactly
     np.testing.assert_allclose(out[0], 0.0, atol=1e-12)
     np.testing.assert_allclose(out[1], 1.0, atol=1e-12)

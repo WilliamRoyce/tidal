@@ -132,7 +132,7 @@ def _eig_expm(M: np.ndarray, dt: float) -> np.ndarray:
 # `build_pade_setup` builds the per-mode matrices for one (theory, n_label).
 # This is the expensive O(n_modes × n_slots²) construction cost; the master
 # driver caches the result per (theory, n_label) inside each worker so
-# multiple timed reps amortise the build.
+# multiple timed reps amortize the build.
 #
 # `time_one_pade_rep` times exactly one (Padé, Eig) pair on a pre-built
 # setup. The master driver invokes this once per (theory, n_label, rep_idx).

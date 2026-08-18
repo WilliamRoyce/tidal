@@ -1096,7 +1096,7 @@ class TestBuildInitialY0:
 
         Uses ``ic_no_snap=True`` so the off-grid ``k=3`` is used verbatim and
         the ``sin(3x)`` mask lines up with the velocity pattern. The snap
-        behaviour (default) is covered by ``test_plane_wave_snap_*`` below.
+        behavior (default) is covered by ``test_plane_wave_snap_*`` below.
         """
         spec = _make_kg_spec()
         from tidal.solver.grid import GridInfo
@@ -1159,8 +1159,8 @@ class TestBuildInitialY0:
         x = gi.axes_coords(0)
         np.testing.assert_allclose(field, np.cos(k_on_grid * x), atol=1e-12)
 
-    def test_plane_wave_snap_disabled_legacy_behaviour(self) -> None:
-        """--ic-no-snap keeps the off-grid k verbatim (legacy behaviour)."""
+    def test_plane_wave_snap_disabled_legacy_behavior(self) -> None:
+        """--ic-no-snap keeps the off-grid k verbatim (legacy behavior)."""
         spec = _make_kg_spec()
         from tidal.solver.grid import GridInfo
 

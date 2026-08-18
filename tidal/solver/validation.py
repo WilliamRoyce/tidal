@@ -14,6 +14,9 @@ from typing import TYPE_CHECKING
 from tidal.solver.operators import operator_min_dim
 
 if TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
+
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
@@ -122,40 +125,73 @@ def check_cfl_stability(
     return warnings
 
 
+def _summed_self_mass_profile(
+    coeff_eval: CoefficientEvaluator,
+    spec: EquationSystem,
+    eq_idx: int,
+) -> tuple[NDArray[np.float64] | None, str]:
+    """Return an equation's total position-dependent self-mass profile.
+
+    A component can carry several ``identity`` terms acting on its own field —
+    in the dual-Gaussian backgrounds each carries three — and the physical mass
+    is their **sum**.  Testing them one at a time can warn about a term that
+    crosses zero while the sum never does, or stay silent when each term is
+    single-signed but the sum is not.
+
+    Returns ``(None, "")`` when the equation has no position-dependent
+    self-mass, otherwise the summed profile and a label naming the terms.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    eq = spec.equations[eq_idx]
+    total: NDArray[np.float64] | None = None
+    labels: list[str] = []
+
+    for term_idx, term in enumerate(eq.rhs_terms):
+        if (
+            term.operator != "identity"
+            or term.field != eq.field_name
+            or term.coefficient_symbolic is None
+            or not term.position_dependent
+            or term.time_dependent
+        ):
+            continue
+        resolved = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
+        if not isinstance(resolved, np.ndarray):
+            continue
+        total = resolved.copy() if total is None else total + resolved
+        labels.append(term.coefficient_symbolic)
+
+    if total is None:
+        return None, ""
+    return total, " + ".join(labels)
+
+
 def check_mass_sign(
     coeff_eval: CoefficientEvaluator,
     spec: EquationSystem,
 ) -> list[str]:
     """Check for sign-changing position-dependent mass terms.
 
+    The check is on the **summed** self-mass of each equation, not on individual
+    terms: several ``identity`` terms may act on the same field, and only their
+    sum is the physical mass.
+
     Returns a list of warning strings for tachyonic diagnostics.
     """
-    import numpy as np  # noqa: PLC0415
-
     warnings: list[str] = []
     for eq_idx, eq in enumerate(spec.equations):
-        for term_idx, term in enumerate(eq.rhs_terms):
-            if (
-                term.operator != "identity"
-                or term.field != eq.field_name
-                or term.coefficient_symbolic is None
-                or not term.position_dependent
-                or term.time_dependent
-            ):
-                continue
-
-            result = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
-            if (
-                isinstance(result, np.ndarray)
-                and float(result.min()) * float(result.max()) < 0
-            ):
-                warnings.append(
-                    f"Position-dependent mass term "
-                    f"'{term.coefficient_symbolic}' for field "
-                    f"'{eq.field_name}' changes sign across "
-                    f"the grid (min={float(result.min()):.4g}, "
-                    f"max={float(result.max()):.4g}).",
-                )
+        profile, label = _summed_self_mass_profile(coeff_eval, spec, eq_idx)
+        if profile is None:
+            continue
+        low, high = float(profile.min()), float(profile.max())
+        if low * high < 0:
+            warnings.append(
+                f"Position-dependent mass term "
+                f"'{label}' for field "
+                f"'{eq.field_name}' changes sign across "
+                f"the grid (min={low:.4g}, max={high:.4g}).",
+            )
     return warnings
 
 
@@ -178,7 +214,7 @@ class StabilityResult:
         self.notes: list[str] = []
 
 
-def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914
+def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914, PLR0915
     coeff_eval: CoefficientEvaluator,
     spec: EquationSystem,
     grid: GridInfo,
@@ -202,6 +238,25 @@ def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914
     Returns a :class:`StabilityResult` with ``errors`` (instability) and
     ``notes`` (informational diagnostics like asymmetry detection).
 
+    Each row is divided by its equation's ``kinetic_coefficient_symbolic``
+    before the eigenvalue check, so the eigenvalues are those of ``K⁻¹M``
+    rather than of ``M`` alone (GH #237).  Without that scaling every
+    non-unit-kinetic theory is judged on the wrong matrix — all torsion models
+    carry ``kin = -xi`` and the gravitons ``-kappa^(-2)`` — which is why the
+    propagating-torsion model was reported unstable when it is not.
+
+    .. warning::
+
+       This establishes positive-semidefiniteness of ``K⁻¹M``; it is **not** a
+       complete stability analysis.  In particular a *negative* kinetic
+       coefficient signals a ghost, which inverts how the eigenvalue sign
+       should be read, and that case is not diagnosed here.  Full spectral
+       health — the generalized eigenproblem and ghost identification — is
+       GH #360 (PSALTer integration).
+
+    Returns a :class:`StabilityResult` with ``errors`` (instability) and
+    ``notes`` (informational diagnostics like asymmetry detection).
+
     Notes
     -----
     The stability condition is that the potential matrix M (defined as the
@@ -212,6 +267,8 @@ def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914
     at the coupling peak.
     """
     import numpy as np  # noqa: PLC0415
+
+    from tidal.solver._kinetic import build_inverse_kinetic_diag  # noqa: PLC0415
 
     result = StabilityResult()
     grid_shape = grid.shape
@@ -247,6 +304,35 @@ def check_pointwise_mass_stability(  # noqa: C901, PLR0912, PLR0914
                 pot[i, j] -= coeff  # position-dependent: subtract broadcast array
             else:
                 pot[i, j] -= float(coeff)  # constant: subtract scalar
+
+    # Divide each row by its equation's kinetic coefficient, so the spectrum
+    # is that of K^-1 M rather than of M alone (GH #237). Rows whose kinetic
+    # coefficient is absent or unity are left untouched.
+    inv_kinetic = build_inverse_kinetic_diag(
+        spec,
+        dict(coeff_eval.parameters),
+        grid,
+    )
+    if inv_kinetic:
+        ghosts: list[str] = []
+        for i, name in enumerate(dyn_names):
+            scale = inv_kinetic.get(name)
+            if scale is None:
+                continue
+            pot[i] *= scale
+            if float(np.min(scale)) < 0:
+                ghosts.append(name)
+        if ghosts:
+            # A negative kinetic coefficient means the field enters with the
+            # wrong-sign kinetic term. The eigenvalue test below still runs,
+            # but its sign no longer reads as "stable"; say so rather than
+            # let a caller over-trust the verdict. Full analysis is GH #360.
+            result.notes.append(
+                f"Fields {sorted(ghosts)} have a negative kinetic coefficient "
+                "(wrong-sign kinetic term). Eigenvalue signs below are those "
+                "of K^-1 M and do not by themselves establish stability for "
+                "these fields; see GH #360 for ghost analysis.",
+            )
 
     # Vectorized eigenvalue check: reshape to (n_grid, n, n) batch.
     pot_flat = pot.reshape(n, n, -1).transpose(2, 0, 1)  # (n_grid, n, n)

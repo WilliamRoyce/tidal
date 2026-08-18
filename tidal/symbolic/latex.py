@@ -1050,7 +1050,7 @@ def _render_kinetic_cell(cell: KineticMatrixCell) -> str:
 
 
 def kinetic_matrix_to_latex(km: KineticMatrix, spec: EquationSystem) -> str:
-    r"""Render an assembled :class:`KineticMatrix` as a labelled array.
+    r"""Render an assembled :class:`KineticMatrix` as a labeled array.
 
     The matrix may be rectangular for theories with velocity-pair
     columns: rows are indexed by the q-field equations
@@ -1077,7 +1077,7 @@ def kinetic_matrix_to_latex(km: KineticMatrix, spec: EquationSystem) -> str:
     row_labels = [_field_label(f) for f in km.row_fields]
     col_labels = [_field_label(f) for f in km.column_fields]
 
-    # Build the labelled array: an `array{c|cc...}` whose first row holds the
+    # Build the labeled array: an `array{c|cc...}` whose first row holds the
     # column field labels (after a leading empty corner cell and an \hline),
     # then one row per row-field prefixed by its label, with cell (i, j)
     # holding the rendered K_{ij} entry.
@@ -1477,7 +1477,7 @@ def _get_field_meta(
     return tensor_metadata.get(lookup_name)  # type: ignore[no-any-return]
 
 
-#: Default axis letters for coordinate labelling (matching AXIS_LETTERS in json_loader).
+#: Default axis letters for coordinate labeling (matching AXIS_LETTERS in json_loader).
 _DEFAULT_COORD_LABELS: tuple[str, ...] = ("t", "x", "y", "z", "w", "v")
 
 

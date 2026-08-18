@@ -86,13 +86,17 @@ class TestInspectCommand:
         assert ret == 1
 
     def test_inspect_with_params_flag(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(["inspect", str(inline_kg_1d_json), "--params"])
         assert ret == 0
 
     def test_inspect_json_output(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--json should output valid, parseable JSON."""
         import json
@@ -110,7 +114,9 @@ class TestInspectCommand:
         assert "coupling_matrix" in data
 
     def test_inspect_json_with_params(
-        self, inline_coupled_scalars_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--json --params should include default parameter values."""
         import json
@@ -123,6 +129,429 @@ class TestInspectCommand:
         assert len(data["fields"]) == 2
 
 
+class TestInspectSemanticQueries:
+    """The ``tidal inspect`` query flags added for #401.
+
+    These exercise the CLI contract a program depends on — exit codes, the
+    JSON envelope, stream separation — as well as the physics rendering.
+    """
+
+    EXAMPLES: ClassVar[Path] = Path(__file__).resolve().parent.parent / "examples/data"
+
+    # ``examples/data/gertsenshtein_ungauged.json`` as it stood before the #397
+    # re-derivation (git blob ``7b779288^``), vendored so the diff tests are
+    # hermetic.  Reading it out of git history instead made them fail on any
+    # shallow clone — including CI, whose ``actions/checkout`` defaults to
+    # ``fetch-depth: 1``.
+    STALE_UNGAUGED: ClassVar[Path] = (
+        Path(__file__).resolve().parent / "data" / "gertsenshtein_ungauged_pre397.json"
+    )
+
+    def test_coefficient_sums_terms_and_shows_kinetic(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`gertsenshtein_eh` a_1 has two terms and a kinetic coefficient (#401 rows 1, 3)."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--coefficient",
+                "a_1:laplacian_x(a_1)",
+            ],
+        )
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "from 2 RHS term(s)" in out
+        assert "-1 + 2*B0^2*rho - 16*B0^2*sigma" in out
+
+    def test_equation_text_mode_shows_effective_coefficients(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`--equation` without `--json` renders the human view.
+
+        Each row shows the effective coefficient and the deciding tactic, and
+        a multi-term key is labeled as summed rather than silently collapsed.
+        """
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "a_1",
+            ],
+        )
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "kinetic =" in out
+        assert "laplacian_x(a_1)" in out
+        assert "terms summed" in out
+        assert "via" in out  # the deciding tactic is always reported
+
+    def test_coefficient_separates_hamiltonian_as_distinct(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The Hamiltonian counterpart is labeled distinct, not 'the same coefficient'."""
+        main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                "--coefficient",
+                "h_5:identity(h_5)",
+            ],
+        )
+        out = capsys.readouterr().out
+        assert "RELATED BUT DISTINCT" in out
+        assert "NOT the same number" in out
+
+    def test_families_reports_temporal_index_structure(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Rank-3 torsion is split by temporal-index count, not by name suffix."""
+        ret = main(
+            ["inspect", str(self.EXAMPLES / "torsion_dark_photon.json"), "--families"],
+        )
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "rank=3" in out
+        assert "2 temporal index/indices" in out
+
+    def test_json_output_uses_items_envelope(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Structured output is an object, never a bare array."""
+        import json
+
+        main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "torsion_dark_photon.json"),
+                "--families",
+                "--json",
+            ],
+        )
+        data = json.loads(capsys.readouterr().out)
+        assert isinstance(data, dict)
+        assert isinstance(data["items"], list)
+
+    def test_fields_projects_json_output(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """``--fields`` bounds output size, which matters for a 32-component spec."""
+        import json
+
+        main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "a_1",
+                "--json",
+                "--fields",
+                "operator,expression",
+            ],
+        )
+        data = json.loads(capsys.readouterr().out)
+        assert data["items"]
+        assert set(data["items"][0]) == {"operator", "expression"}
+
+    def test_diff_exit_codes_are_declared_outcomes(self) -> None:
+        """``--diff`` exits 1 on real change, 0 when unchanged — the diff(1) contract.
+
+        The fixture is the real re-derivation from #397: ``a_0`` changed, while
+        ``h_5``/``h_6``/``h_8`` were merely rescaled and must not count.
+        """
+        old = self.STALE_UNGAUGED
+        current = str(self.EXAMPLES / "gertsenshtein_ungauged.json")
+
+        assert main(["inspect", str(old), "--diff", current]) == 1
+        assert main(["inspect", current, "--diff", current]) == 0
+
+    def test_diff_classifies_rescaling_as_representational(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """The three false 'fixes' are reported as representational, not real."""
+        old = self.STALE_UNGAUGED
+        main(
+            [
+                "inspect",
+                str(old),
+                "--diff",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+            ],
+        )
+        out = capsys.readouterr().out
+        real_section = out.split("REPRESENTATIONAL")[0]
+        assert "a_0" in real_section
+        for field in ("h_5", "h_6", "h_8"):
+            assert field not in real_section
+
+    def test_diff_json_envelope_carries_component_deltas(self) -> None:
+        """`--diff --json` reports verdicts plus components unique to either side."""
+        import contextlib
+        import io
+        import json
+
+        old = self.STALE_UNGAUGED
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            ret = main(
+                [
+                    "inspect",
+                    str(old),
+                    "--diff",
+                    str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                    "--json",
+                ],
+            )
+        assert ret == 1  # real changes: a declared outcome, not an error
+        data = json.loads(buf.getvalue())
+        assert data["has_real_changes"] is True
+        assert "only_left" in data
+        assert "only_right" in data
+        verdicts = {i["field"]: i["verdict"] for i in data["items"]}
+        assert verdicts["a_0"] == "real"
+        assert verdicts["h_5"] == "representational"
+
+    def test_param_values_give_numeric_corroboration(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """`--param` supplies a numeric value beside the structural verdict."""
+        import json
+
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                "--coefficient",
+                "h_5:identity(h_5)",
+                "--param",
+                "B0=0.25",
+                "--param",
+                "kappa=2.0",
+                "--json",
+            ],
+        )
+        assert ret == 0
+        record = json.loads(capsys.readouterr().out)["items"][0]
+        # (B0^2/2) / (-kappa^(-2)) at B0=0.25, kappa=2 -> 0.03125 / -0.25
+        assert record["numeric"] == pytest.approx(-0.125)
+
+    def test_malformed_param_errors_cleanly(self) -> None:
+        """A `--param` without '=' exits with the usage code, not a traceback."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                "--families",
+                "--param",
+                "nonsense",
+            ],
+        )
+        assert ret == 2
+
+    def test_diff_against_missing_file_errors(self) -> None:
+        """`--diff` on a non-existent spec reports an error, not a crash."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+                "--diff",
+                "/nonexistent/spec.json",
+            ],
+        )
+        assert ret == 2
+
+    def test_unknown_component_errors_with_hints(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """A bad name fails cleanly on stderr with the valid options listed."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "not_a_field",
+            ],
+        )
+        assert ret == 2
+        captured = capsys.readouterr()
+        assert not captured.out
+        assert "Hint:" in captured.err
+
+    def test_json_errors_emit_a_machine_readable_envelope(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Under `--json`, failures carry a stable `kind` on stderr.
+
+        A caller should branch on the classification rather than match on
+        prose, and stdout must stay clean so a `| jq` pipeline is unaffected.
+        """
+        import json
+
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "nope",
+                "--json",
+            ],
+        )
+        assert ret == 2
+        captured = capsys.readouterr()
+        assert not captured.out
+        envelope = json.loads(captured.err.strip().splitlines()[-1])
+        assert envelope["error"]["kind"] == "unknown_component"
+        assert envelope["error"]["hint"]
+
+    def test_text_mode_errors_carry_no_json(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Without `--json` the envelope is not emitted, only the human form."""
+        main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--equation",
+                "nope",
+            ],
+        )
+        err = capsys.readouterr().err
+        assert "Hint:" in err
+        assert '"kind"' not in err
+
+    def test_malformed_selector_errors(self) -> None:
+        """A malformed ``--coefficient`` selector is rejected, not guessed at."""
+        ret = main(
+            [
+                "inspect",
+                str(self.EXAMPLES / "gertsenshtein_eh.json"),
+                "--coefficient",
+                "nonsense",
+            ],
+        )
+        assert ret == 2
+
+    def test_assume_nonzero_sharpens_a_verdict(
+        self,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Declaring kappa non-zero moves a verdict from '0+' to a definite sign."""
+        args = [
+            "inspect",
+            str(self.EXAMPLES / "gertsenshtein_ungauged.json"),
+            "--coefficient",
+            "h_5:identity(h_5)",
+        ]
+        main(args)
+        default_out = capsys.readouterr().out
+        main([*args, "--assume-nonzero", "B0"])
+        assumed_out = capsys.readouterr().out
+        assert "assuming B0" in assumed_out
+        assert default_out != assumed_out
+
+
+class TestDerivationIntegrityGuard:
+    """`_check_temporal_component_sign` after its refactor onto the shared layer.
+
+    The guard used to carry its own sign helpers (`_leading_sign`,
+    `_effective_self_sign`), which were unsound: they treated
+    ``-1 + 2*B0^2*rho`` as negative although it flips sign, and summed per-term
+    *signs* rather than the terms themselves. Both are gone; the guard now
+    delegates to `spec_query.sibling_sign_conflicts` (GH #401).
+    """
+
+    EXAMPLES: ClassVar[Path] = Path(__file__).resolve().parent.parent / "examples/data"
+
+    # The specs whose photon components carry the GH #397 signature. Pinned as
+    # a count so the refactor is verifiably behavior-preserving.
+    EXPECTED_FLAGGED: ClassVar[int] = 19
+
+    @staticmethod
+    def _flagged(examples: Path) -> list[str]:
+        import warnings
+
+        from tidal.cli._validate import _check_temporal_component_sign
+        from tidal.symbolic.json_loader import load_equation_system
+
+        names: list[str] = []
+        for path in sorted(examples.glob("*.json")):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                spec = load_equation_system(path, strict_v6=False)
+            if _check_temporal_component_sign(spec):
+                names.append(path.name)
+        return names
+
+    def test_flags_the_known_affected_specs(self) -> None:
+        """The refactor preserved exactly which specs are reported."""
+        assert len(self._flagged(self.EXAMPLES)) == self.EXPECTED_FLAGGED
+
+    def test_euler_heisenberg_is_not_flagged(self) -> None:
+        """EH must pass on its merits, not by an accidental tie.
+
+        The old helper summed per-term signs, so EH's two self-laplacians
+        canceled to 0 and the caller skipped the spec. The shared layer
+        divides by the kinetic coefficient and finds no proven conflict.
+        """
+        flagged = self._flagged(self.EXAMPLES)
+        assert "gertsenshtein_eh.json" not in flagged
+        assert "gertsenshtein_eh_top.json" not in flagged
+
+    def test_message_makes_no_spectral_claim(self) -> None:
+        """The finding is derivation integrity, not a tachyon diagnosis.
+
+        A sign comparison cannot establish that a mode is tachyonic — that
+        needs the full kinetic and mass sectors (GH #360). The message must
+        promise only what the check verifies.
+        """
+        import warnings
+
+        from tidal.cli._validate import _check_temporal_component_sign
+        from tidal.symbolic.json_loader import load_equation_system
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            spec = load_equation_system(
+                self.EXAMPLES / "torsion_gertsenshtein_complete_even.json",
+                strict_v6=False,
+            )
+        errors = _check_temporal_component_sign(spec)
+        assert errors
+        message = errors[0]
+        assert "tachyon" not in message.lower().split("ghost and tachyon")[0]
+        assert "derivation-integrity" in message
+        assert "#360" in message
+
+    def test_message_names_temporal_role_from_metadata(self) -> None:
+        """Where tensor metadata exists, the message says which component is temporal."""
+        import warnings
+
+        from tidal.cli._validate import _check_temporal_component_sign
+        from tidal.symbolic.json_loader import load_equation_system
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            spec = load_equation_system(
+                self.EXAMPLES / "torsion_gertsenshtein_complete_even.json",
+                strict_v6=False,
+            )
+        message = _check_temporal_component_sign(spec)[0]
+        assert "temporal index/indices" in message
+
+
 class TestListCommand:
     def test_list_default_dir(self, capsys: pytest.CaptureFixture[str]) -> None:
         ret = main(["list"])
@@ -130,7 +559,9 @@ class TestListCommand:
         assert ret == 0
 
     def test_list_custom_dir(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(["list", "--dir", str(inline_kg_1d_json.parent)])
         assert ret == 0
@@ -146,7 +577,9 @@ class TestListCommand:
 
 class TestSimulateCommand:
     def test_simulate_1d_summary(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -232,7 +665,9 @@ class TestSimulateCommand:
         assert ret == 0
 
     def test_simulate_gaussian_custom(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -257,7 +692,9 @@ class TestSimulateCommand:
         assert "Results:" in out
 
     def test_simulate_off_center_gaussian(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -282,7 +719,9 @@ class TestSimulateCommand:
         assert "Results:" in out
 
     def test_simulate_chern_simons_constraint(
-        self, chern_simons_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        chern_simons_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Test simulation of a system with constraint (time_order=0) + dynamical fields."""
         ret = main(
@@ -335,7 +774,9 @@ class TestSimulateCommand:
         assert ret == 1
 
     def test_simulate_custom_grid(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -357,7 +798,9 @@ class TestSimulateCommand:
     # --- Feature: --bc (mixed boundary conditions) ---
 
     def test_simulate_bc_single(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -403,7 +846,9 @@ class TestSimulateCommand:
         assert ret == 1
 
     def test_simulate_bc_dirichlet_accepted(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Dirichlet BC is supported by the native solver."""
         ret = main(
@@ -424,7 +869,9 @@ class TestSimulateCommand:
     # --- Feature: --ic formula ---
 
     def test_simulate_formula_ic(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -461,7 +908,9 @@ class TestSimulateCommand:
         assert ret == 1
 
     def test_simulate_formula_ic_constant(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -520,7 +969,9 @@ class TestSimulateCommand:
     # --- Feature: --mode constraint ---
 
     def test_simulate_constraint_mode(
-        self, inline_constraint_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_constraint_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -547,7 +998,9 @@ class TestSimulateCommand:
     # --- Solver options ---
 
     def test_simulate_explicit_dt(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -565,7 +1018,9 @@ class TestSimulateCommand:
         assert ret == 0
 
     def test_simulate_default_scheme(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Verify default scheme (auto) auto-selects and logs solver choice."""
         ret = main(
@@ -587,7 +1042,9 @@ class TestSimulateCommand:
         assert "Scheme:" in combined
 
     def test_auto_selects_modal_for_periodic_constraints(
-        self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_em_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Periodic constraint equations should auto-select modal (Schur)."""
         ret = main(
@@ -608,7 +1065,9 @@ class TestSimulateCommand:
         assert "Auto-selected solver: modal" in captured.out + captured.err
 
     def test_simulate_ida_scheme(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Verify IDA solver runs end-to-end on Klein-Gordon."""
         ret = main(
@@ -631,7 +1090,9 @@ class TestSimulateCommand:
         assert "snapshots stored" in combined
 
     def test_simulate_ida_plane_wave(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """IDA with plane-wave IC should preserve amplitude."""
         ret = main(
@@ -652,7 +1113,9 @@ class TestSimulateCommand:
         assert ret == 0
 
     def test_simulate_leapfrog_scheme(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Verify leapfrog solver runs end-to-end on Klein-Gordon."""
         ret = main(
@@ -677,7 +1140,9 @@ class TestSimulateCommand:
         assert "snapshots stored" in combined
 
     def test_simulate_custom_snapshots(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         ret = main(
             [
@@ -697,7 +1162,9 @@ class TestSimulateCommand:
     # --- Edge-case validation ---
 
     def test_simulate_explicit_format_flag(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Explicit --format flag should work for all formats."""
         ret = main(
@@ -717,7 +1184,9 @@ class TestSimulateCommand:
         assert "Results:" in out
 
     def test_simulate_periodic_flag(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--no-periodic should produce non-periodic (Neumann) BCs."""
         ret = main(
@@ -735,7 +1204,9 @@ class TestSimulateCommand:
         assert ret == 0
 
     def test_simulate_wavevector_custom(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--ic-wavevector should override default wavevector for plane-wave."""
         ret = main(
@@ -824,7 +1295,9 @@ class TestSimulateCommand:
     # --- Feature: --quiet ---
 
     def test_simulate_quiet_suppresses_progress(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--quiet should suppress progress messages but keep results."""
         ret = main(
@@ -849,7 +1322,9 @@ class TestSimulateCommand:
         assert "Running simulation" not in out
 
     def test_simulate_quiet_short_flag(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """-q should work as shorthand for --quiet."""
         ret = main(
@@ -874,7 +1349,9 @@ class TestZeroEvolutionWarning:
     """Tests for the zero-evolution diagnostic warning."""
 
     def test_em_plane_wave_no_warning(
-        self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_em_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Plane-wave IC on EM A_2 (transverse) provides non-zero π → no warning."""
         ret = main(
@@ -895,7 +1372,9 @@ class TestZeroEvolutionWarning:
         assert "all evolution rates are zero" not in captured.err
 
     def test_kg_gaussian_no_warning(
-        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """KG Gaussian IC has non-zero dπ/dt from laplacian → no warning."""
         ret = main(
@@ -956,7 +1435,9 @@ class TestZeroEvolutionWarning:
 
 class TestDeriveCommand:
     def test_derive_toml_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         config = tmp_path / "theory.toml"
         config.write_text("""
@@ -1060,6 +1541,45 @@ path = "output.json"
         assert "DefTensor" in content
         assert "tsA" in content or "tvA" in content  # Prefixed field name
 
+    def test_derive_save_script_with_dry_run(self, tmp_path: Path) -> None:
+        """--save-script must write even with --dry-run (GH #398).
+
+        --dry-run returns before wolframscript runs; the script write used to sit
+        below that early return, so an explicit --save-script was silently ignored
+        in exactly the case where you most want the script.
+        """
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Dry Run Save"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["m2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - m2/2 phi[]^2"
+
+[output]
+path = "output.json"
+""")
+        script_path = tmp_path / "dry.wls"
+        assert (
+            main(
+                ["derive", str(config), "--dry-run", "--save-script", str(script_path)]
+            )
+            == 0
+        )
+        assert script_path.exists(), "--save-script ignored under --dry-run"
+        assert "DefManifold" in script_path.read_text()
+
     def test_derive_nonexistent_file(self) -> None:
         ret = main(["derive", "/nonexistent/theory.toml"])
         assert ret == 1
@@ -1069,7 +1589,9 @@ path = "output.json"
         assert ret == 1
 
     def test_derive_multi_field_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         config = tmp_path / "coupled.toml"
         config.write_text("""
@@ -1106,7 +1628,9 @@ path = "output.json"
         assert "BuildMultiFieldJSONStructure" in out
 
     def test_derive_tensor_field_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         config = tmp_path / "tensor.toml"
         config.write_text("""
@@ -1305,7 +1829,9 @@ path = "output.json"
         assert "VarD[ncUy[]" in out
 
     def test_derive_linearization_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Linearization (xPert) TOML should generate valid WLS."""
         config = tmp_path / "gw.toml"
@@ -1353,7 +1879,9 @@ path = "output.json"
         assert '"linearized" -> True' in out
 
     def test_derive_massive_gravity_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Fierz-Pauli linearization with bg tensor generates valid WLS."""
         config = tmp_path / "mg.toml"
@@ -3315,7 +3843,8 @@ path = "output.json"
 
 class TestExceptionHandling:
     def test_value_error_shows_clean_message(
-        self, capsys: pytest.CaptureFixture[str],
+        self,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """ValueError should produce a clean '[ERROR]' message, not a traceback."""
         ret = main(["simulate", "/nonexistent/spec.json"])
@@ -3668,7 +4197,9 @@ class TestMatterPerturbations:
     """Tests for [[linearization.matter_perturbations]] multi-field support."""
 
     def test_matter_perturbation_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Einstein-Maxwell config with matter perturbation generates correct WLS."""
         config = tmp_path / "theory.toml"
@@ -3765,7 +4296,9 @@ path = "output.json"
         assert '"BackgroundFieldRules"' in wls
 
     def test_matter_perturbation_vector_2d_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """2D vector matter perturbation with position-dependent background."""
         config = tmp_path / "theory.toml"
@@ -3994,7 +4527,8 @@ path = "output.json"
         assert ret == 1
 
     def test_matter_perturbation_gauge_on_perturbation_name(
-        self, tmp_path: Path,
+        self,
+        tmp_path: Path,
     ) -> None:
         """Gauge can target a perturbation_name (not just a [[fields]] name)."""
         config = tmp_path / "theory.toml"
@@ -4266,7 +4800,9 @@ class TestTorsionPipeline:
     """Tests for PGT torsion pipeline extensions (torsion = true)."""
 
     def test_partial_antisymmetry_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Partial antisymmetry generates correct xAct Antisymmetric spec."""
         config = tmp_path / "theory.toml"
@@ -4305,7 +4841,9 @@ path = "/tmp/partial_antisym_test.json"
         assert "Antisymmetric[{-a, -b, -c}]" not in wls_text
 
     def test_torsion_covd_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Torsion = true generates DefCovD with Torsion -> True."""
         config = tmp_path / "theory.toml"
@@ -4347,7 +4885,9 @@ path = "/tmp/torsion_covd_test.json"
         assert "RicciScalar" in wls_text
 
     def test_torsion_perturbation_dry_run(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """[torsion] + linearization registers torsion perturbation with configured name."""
         config = tmp_path / "theory.toml"
@@ -4398,7 +4938,9 @@ path = "/tmp/torsion_pert_test.json"
         assert "Antisymmetric[{-b, -c}]" in wls_text
 
     def test_no_torsion_no_covd(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Without [torsion] section, no CDT is defined."""
         config = tmp_path / "theory.toml"
@@ -4437,7 +4979,9 @@ path = "/tmp/no_torsion_test.json"
         assert "TorsionPert" not in wls_text
 
     def test_reserved_field_name_rejected(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Field named 'CD' is rejected as a reserved name."""
         config = tmp_path / "theory.toml"
@@ -4462,7 +5006,9 @@ path = "/tmp/reserved_test.json"
         assert "reserved" in err.lower() or ret != 0
 
     def test_reserved_constant_name_rejected(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Constant named 'eta' is rejected as a reserved name."""
         config = tmp_path / "theory.toml"
@@ -4488,7 +5034,9 @@ path = "/tmp/reserved_const_test.json"
         assert ret != 0
 
     def test_torsion_missing_perturbation_name_rejected(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """[torsion] without perturbation_name raises ValueError."""
         config = tmp_path / "theory.toml"
@@ -4517,7 +5065,9 @@ path = "/tmp/missing_pert_test.json"
         assert ret != 0
 
     def test_torsion_pert_name_collision_with_field_rejected(
-        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
     ) -> None:
         """[torsion].perturbation_name colliding with [[fields]] name is rejected."""
         config = tmp_path / "theory.toml"

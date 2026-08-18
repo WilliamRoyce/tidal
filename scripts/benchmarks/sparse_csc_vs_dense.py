@@ -1,10 +1,10 @@
-"""Sparse-CSC vs dense ``expm_multiply`` wall-time on localised Gertsenshtein.
+"""Sparse-CSC vs dense ``expm_multiply`` wall-time on localized Gertsenshtein.
 
 Serves:   manuscript/sections/appendices/numerical.tex (tab:SparseCSCBenchmark)
 Consumes: scripts/tables/tab_sparse_csc.py
 Writes:   benchmark_results/canonical/sparse_csc_vs_dense.json by default
 
-Builds the full convolution evolution matrix for the localised
+Builds the full convolution evolution matrix for the localized
 Gertsenshtein system (Gaussian B-field background), then times
 ``scipy.sparse.linalg.expm_multiply`` in dense and CSC formats at
 N ∈ {128, 256, 512}.  Density is reported alongside the wall times so
@@ -43,13 +43,13 @@ from tidal.symbolic.json_loader import EquationSystem
 
 THEORY_JSON = REPO_ROOT / "examples" / "data" / "gertsenshtein_localized.json"
 PARAMS = {"kappa": 1.0, "Bpeak": 0.1, "R": 5.0}
-DOMAIN = (-50.0, 50.0)  # background Gaussian centred at 0, width R=5
+DOMAIN = (-50.0, 50.0)  # background Gaussian centered at 0, width R=5
 
 # Dense `expm_multiply` becomes infeasible above N≈1024 (matrix exceeds
 # 300 MB at N=2048). N=4096 is capped because building the convolution
 # matrix needs the dense intermediate (~9.7 GB) even for the sparse-only
 # path. Sparse-CSC reaches N=2048 here; production goes higher because
-# the matrix is built mode-by-mode without ever fully materialising.
+# the matrix is built mode-by-mode without ever fully materializing.
 N_DENSE = [64, 128, 256, 512, 1024]
 N_SPARSE = [64, 128, 256, 512, 1024, 2048]
 
@@ -112,7 +112,7 @@ def build_sparse_setup(n: int, path: str) -> dict:
     """Build matrix + IC for one (n, path).
 
     path ∈ {"dense", "sparse"} — only the requested representation is
-    materialised, so memory cost matches the actual path being timed.
+    materialized, so memory cost matches the actual path being timed.
     """
     with THEORY_JSON.open(encoding="utf-8") as fh:
         spec = EquationSystem.from_dict(json.load(fh))

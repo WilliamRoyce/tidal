@@ -12,7 +12,7 @@ Three delivery modes depending on system size:
   array with ``dF_dy + cj * dF_dyp``.  ~5.3x speedup vs FD.
 - **Sparse tier** (DENSE_THRESHOLD < N <= SPARSE_THRESHOLD):  ``jacfn``
   fills a 1D CSC data array with ``dF_dy.data + cj * dF_dyp.data``,
-  paired with a sparsity pattern for SuperLU_MT direct factorisation.
+  paired with a sparsity pattern for SuperLU_MT direct factorization.
   Requires sksundae >= 1.1.2.  IDA: ~2.5x, CVODE: ~1.2-1.4x.
 - **GMRES tier** (N > SPARSE_THRESHOLD):  ``jactimes`` provides an
   analytical Jacobian-vector product ``Jv = dF_dy @ v + cj * dF_dyp @ v``
@@ -894,7 +894,7 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
 
     - **Dense** (N <= DENSE_THRESHOLD): 2D ``jacfn`` fills dense array.
     - **Sparse** (DENSE_THRESHOLD < N <= SPARSE_THRESHOLD): 1D CSC
-      ``jacfn`` + SuperLU_MT direct factorisation.  Falls through to
+      ``jacfn`` + SuperLU_MT direct factorization.  Falls through to
       GMRES if nnz exceeds ``SUPERLU_NNZ_LIMIT``.
     - **GMRES** (N > SPARSE_THRESHOLD): ``jactimes`` provides analytical
       Jacobian-vector product for iterative GMRES.
@@ -936,7 +936,7 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
         )
 
     elif n_state <= SPARSE_THRESHOLD:
-        # Sparse tier: 1D CSC jacfn + SuperLU_MT direct factorisation.
+        # Sparse tier: 1D CSC jacfn + SuperLU_MT direct factorization.
         # Eliminates O(n_colors) FD residual evaluations per Newton step.
         # Requires sksundae >= 1.1.2 (fixes aux.jacfn overwrite bug).
 

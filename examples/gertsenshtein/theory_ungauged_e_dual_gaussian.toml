@@ -27,7 +27,7 @@
 
 [theory]
 name = "Gertsenshtein Effect (Ungauged graviton + Dual-Gaussian B, Phase E.cal)"
-description = "Einstein-Maxwell with TT-IC + unconstrained graviton dynamics; localised dual-Gaussian B background; modal-solver-compatible periodic geometry"
+description = "Einstein-Maxwell with TT-IC + unconstrained graviton dynamics; localized dual-Gaussian B background; modal-solver-compatible periodic geometry"
 
 [spacetime]
 dimension = 4

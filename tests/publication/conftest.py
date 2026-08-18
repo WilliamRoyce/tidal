@@ -1,4 +1,4 @@
-"""Shared fixtures for publication-artefact tests.
+"""Shared fixtures for publication-artifact tests.
 
 These tests validate the publication-figure infrastructure:
     - the manifest is parseable
@@ -31,7 +31,7 @@ def repo_root() -> Path:
     return REPO_ROOT
 
 
-def iter_artefacts(
+def iter_artifacts(
     manifest: dict, *, kinds: tuple[str, ...] = ()
 ) -> list[tuple[str, str, dict]]:
     out: list[tuple[str, str, dict]] = []

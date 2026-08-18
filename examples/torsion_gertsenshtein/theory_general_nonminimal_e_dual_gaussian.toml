@@ -40,7 +40,7 @@
 
 [theory]
 name = "General Nonminimal PGT + Dual-Gaussian B (Phase E.T5/NP)"
-description = "Bahamonde family safe propagating-vector-torsion + non-minimal couplings, localised dual-Gaussian B; covers E.T5/T5.1/T5.2/T5.3/NP via prior restriction"
+description = "Bahamonde family safe propagating-vector-torsion + non-minimal couplings, localized dual-Gaussian B; covers E.T5/T5.1/T5.2/T5.3/NP via prior restriction"
 
 [spacetime]
 dimension = 4

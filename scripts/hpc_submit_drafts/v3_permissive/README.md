@@ -7,7 +7,7 @@
 - **Likelihood:** `P_max:maximize` (amp) / `P_max:minimize` (sup). Sim runs every sample. No probe gate (--gated NOT set), no Hwang-Noh, no upper P_max cap.
 - **Soft floor:** `logL = -100 + Normal(0, 1.0)` for sim divergence / NaN / exception. Tunable via `--soft-floor-noise SIGMA`.
 - **Compactified priors:** sign-symmetric dimensionless couplings → `arctan_uniform:-89:89`; positive-definite kinetic → `log_uniform:1e-3:1e3`.
-- **Geometry:** plane-wave + uniform B₀ as in v2 (Phase E will replace with localised geometry).
+- **Geometry:** plane-wave + uniform B₀ as in v2 (Phase E will replace with localized geometry).
 - **Probe metadata:** γ_eff, k_dominant, n_tachyonic_modes, borderline_stability all flow through chain CSV for post-hoc analysis (no longer gates).
 
 ## Script inventory

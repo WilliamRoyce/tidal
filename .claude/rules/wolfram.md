@@ -40,11 +40,45 @@ paths:
 - Pass ALL coupled fields in `additionalFields` list to `DecomposeToComponents`
 - Without this, cross-field coupling terms are silently dropped
 
+## Equation Generation: Measure and LHS Normalization
+These two produce **silently wrong equations** — no error, no warning. Both are
+invisible on flat Minkowski, so any change here must be validated on at least one
+curved-metric AND one multi-component gauge-field theory before landing.
+
+- **`ComponentEulerLagrange` varies a DENSITY, not a Lagrangian** (#394). A non-constant
+  `√|g|` must be passed via the `"Measure"` option. Omitting it drops Christoffel
+  first-derivative terms for spatially curvilinear metrics, and *sign-flips* them for
+  time-dependent ones (de Sitter came out `+2H` anti-damping instead of `−H`).
+- **Build the measure as `PowerExpand[Sqrt[metricDetSign * Det[g]]]` — never `Abs`.**
+  `Abs` is not symbolically differentiable: `D[Sqrt[Abs[u]], x]` leaves an unevaluated
+  `Derivative[1][Abs][u]` in the coefficient, which operator identification cannot match,
+  so the term is generated and then **silently dropped on export**. Symptom: the fix
+  appears to do nothing at all.
+- **LHS normalization must dispatch on `NumericQ[lhsCoeff]`, never `Abs[lhsCoeff] =!= 1`**
+  (#381). The latter sends both `+1` and `−1` down a "no normalization needed" path, so
+  the `lhsCoeff = -1` that xAct emits for a temporal component under (−,+,+,+) is never
+  divided through — yielding a temporal-only tachyon (`∂²ₜa₀ = −∇²a₀`).
+- **Do NOT "fix" these two asymmetries — both are correct physics:**
+  - `canonical.hamiltonian_terms` gives the temporal photon `a_0 = -0.5` against
+    `a_3 = +0.5`. That is the negative-norm temporal photon of Lorenz-gauge-fixed
+    Maxwell. The negative norm belongs in the *energy*; the *equation* is `□A_μ = 0` for
+    every μ.
+  - `h_5` carries `laplacian_x = -kappa^(-2)` matched by
+    `lhs.kinetic_coefficient_symbolic = -kappa^(-2)`, i.e. correctly normalized.
+- **When comparing coefficients across components, compare EFFECTIVE signs** —
+  `sign(coefficient) × sign(kinetic_coefficient)`, summed over *all* matching terms.
+  Raw comparison misreads EH-class theories (two self-laplacian terms per component) and
+  reports false differences when a re-derivation merely introduces an explicit kinetic
+  coefficient. Torsion-family sign non-uniformity is **physical** (rank-3 irreducible
+  components carry different normalizations) — do not flag it.
+
 ## Common Errors
 - All-zero components → field strength not expanded before decomposition
 - Cross terms missing → other fields not in additionalFields
 - Epsilon not evaluating → chart name mismatch or mixed index signs
 - Package function unevaluated → missing `::usage` declaration in public section
+- Christoffel first-derivative term missing on a curved metric → `"Measure"` not passed,
+  or built with `Abs` (see Equation Generation above)
 
 ## Perturbative Reduction
 - **`order_in_eps`** tagging lives in `ExportJSON.wl` — `Max[Total[Exponent]]` over `small_parameters`. Always `∈ {0, 1}` by architecture (quadratic Lagrangians × linear couplings). `order=2` is permanently gated by `NotImplementedError` (#273).

@@ -19,7 +19,7 @@ uniform background:
 Sweeps (B0, t_end) on a 2D grid (HPC-parallel) and records P_final, P_max,
 and the residual against each of the three analytic predictions per cell.
 Adds a multi-resolution N-sweep at a regime point to certify the
-discretisation does not dominate the residual.
+discretization does not dominate the residual.
 
 Serves:   manuscript/sections/appendices/validation.tex (App D §1)
 Consumes: scripts/figures/figD_boccaletti_uniform.py
@@ -63,7 +63,7 @@ IC_COMPONENT = "h_5"
 # the saturated regime where the bare sin^2 and the Raffelt-Stodolsky
 # two-mode formula begin to differ visibly. Grid N=512 keeps the Nyquist
 # wavenumber (k_max = pi*N/L = 16 for L=100) well below the FD-4
-# stencil's high-k discretisation artifact at k ~ 32 where the stability
+# stencil's high-k discretization artifact at k ~ 32 where the stability
 # guard would otherwise refuse to run; the IC at k=1 is far from this
 # Nyquist band and the result is converged at this N.
 FULL_B0_LO, FULL_B0_HI, FULL_B0_N = 0.005, 0.25, 24

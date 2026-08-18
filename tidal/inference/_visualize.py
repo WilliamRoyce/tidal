@@ -715,7 +715,7 @@ def _render_anesthetic_corner_into(
         the standalone path (anesthetic uses "inner" by default).
     show_diagonal : bool, optional
         Whether the diagonal 1D KDE marginals are drawn.  True by
-        default.  Only honoured on the composable path.
+        default.  Only honored on the composable path.
     fill_two_tone : bool, optional
         Apply :func:`_force_solid_credible_fills` after rendering to
         replace anesthetic's per-panel-normalized gradient with the
@@ -1064,7 +1064,7 @@ def _force_solid_credible_fills(
     fig : Figure or SubFigure
         Walked via ``fig.axes`` to find filled ContourSet collections.
     palette : (str, str) or None
-        ``(outer_95_colour, inner_68_colour)`` hex pair.  ``None``
+        ``(outer_95_color, inner_68_color)`` hex pair.  ``None``
         (default) uses Planck-blue ``("#aac8e9", "#3877b8")``.  The
         bespoke K.2 atlas passes the IBM Carbon magenta 30/70 pair
         ``("#ffafd2", "#9f1853")``.
@@ -1104,7 +1104,7 @@ def _apply_solid_fill(
     *is* a single Collection, ``.set_facecolor`` takes one entry per band).
     """
 
-    def colour_for(j: int) -> tuple[float, float, float, float]:
+    def color_for(j: int) -> tuple[float, float, float, float]:
         return mcolors.to_rgba(  # type: ignore[attr-defined]
             palette[min(j, len(palette) - 1)],
             alpha=0.85,
@@ -1120,7 +1120,7 @@ def _apply_solid_fill(
                     # the scalar array first removes that competition.
                     if hasattr(col, "set_array"):
                         col.set_array(None)
-                    col.set_facecolor(colour_for(j))
+                    col.set_facecolor(color_for(j))
                     col.set_edgecolor("none")
             return
         n_bands = max(len(getattr(cs, "levels", [])) - 1, 1)
@@ -1131,7 +1131,7 @@ def _apply_solid_fill(
         # like a no-op despite get_facecolor() reporting the new colors.
         if hasattr(cs, "set_array"):
             cs.set_array(None)  # type: ignore[attr-defined]
-        cs.set_facecolor([colour_for(j) for j in range(n_bands)])  # type: ignore[attr-defined]
+        cs.set_facecolor([color_for(j) for j in range(n_bands)])  # type: ignore[attr-defined]
         cs.set_edgecolor("none")  # type: ignore[attr-defined]
     except (AttributeError, TypeError):
         return
@@ -1224,7 +1224,7 @@ def _add_corner_legend(
         return
 
     # Pull anesthetic's auto-added contour patches (one per cell where
-    # plot_2d ran) by collecting all labelled handles from the figure.
+    # plot_2d ran) by collecting all labeled handles from the figure.
     fig = target.get_figure() if hasattr(target, "get_figure") else None
     handles: list[object] = []
     seen_labels: set[str] = set()

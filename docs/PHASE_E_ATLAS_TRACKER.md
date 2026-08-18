@@ -12,7 +12,7 @@
 
 ## Context
 
-- Phase E **localised** is paused (see `docs/PHASE_E_TRACKER.md` PAUSED banner). Localised infrastructure preserved unchanged in `scripts/hpc_submit_drafts/v3e_localised/`.
+- Phase E **localized** is paused (see `docs/PHASE_E_TRACKER.md` PAUSED banner). Localized infrastructure preserved unchanged in `scripts/hpc_submit_drafts/v3e_localised/`.
 - Pivot direction (user, 2026-05-29): demonstrate **cubed-sphere atlas methodology** on **v3 uniform-field** posteriors. Hard deadline 2026-06-01.
 - Approved plan: `/home/vscode/.claude/plans/currently-we-are-working-goofy-oasis.md`.
 
@@ -20,7 +20,7 @@
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-05-29 | Pivot localised → uniform-field atlas | Localised overnight jobs 29714807/29715239 hit walltime; pre-#384 per-eval cost makes landscape PolyChord infeasible in remaining 3 days |
+| 2026-05-29 | Pivot localized → uniform-field atlas | Localized overnight jobs 29714807/29715239 hit walltime; pre-#384 per-eval cost makes landscape PolyChord infeasible in remaining 3 days |
 | 2026-05-29 | `R_LO=0.35, R_HI=0.45` (narrow shell) | Sphere-volume bias r^(N-1) bounded by 1.286^8 ≈ 6 even at ndim=9 (cf. 10^54 for the smoke tile 29204991's [1e-3, 1e3]) |
 | 2026-05-29 | amp likelihood only (no sup) | Methodology demo; halves cost; angular structure visible from amp alone |
 | 2026-05-29 | M=1 single tile per face | First-pass coverage; sub-tile subdivision deferred |

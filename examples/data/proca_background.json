@@ -1,0 +1,827 @@
+{
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "(-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] + 1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-d][A[-c]] - mA2/2 A[-a] eta[a,b] A[-b] - 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]] + 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-d][B[-c]] - mB2/2 B[-a] eta[a,b] B[-b] + G[] * gcoup * A[-a] eta[a,b] B[-b])",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": false,
+		"derivation_hash": "585956b6f016cefd2cb01baced3526d1bb35ca35ca7ee7c3ab07e22279e5fdc4"
+	},
+	"spacetime": {
+		"dimension": 3,
+		"signature": [
+			-1,
+			1,
+			1
+		],
+		"coordinates": [
+			"t",
+			"x",
+			"y"
+		]
+	},
+	"fields": [
+		{
+			"name": "A_0",
+			"index": 0,
+			"is_dynamical": true,
+			"tensor_head": "A",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				0
+			]
+		},
+		{
+			"name": "A_1",
+			"index": 1,
+			"is_dynamical": true,
+			"tensor_head": "A",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				1
+			]
+		},
+		{
+			"name": "A_2",
+			"index": 2,
+			"is_dynamical": true,
+			"tensor_head": "A",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				2
+			]
+		},
+		{
+			"name": "B_0",
+			"index": 3,
+			"is_dynamical": true,
+			"tensor_head": "B",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				0
+			]
+		},
+		{
+			"name": "B_1",
+			"index": 4,
+			"is_dynamical": true,
+			"tensor_head": "B",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				1
+			]
+		},
+		{
+			"name": "B_2",
+			"index": 5,
+			"is_dynamical": true,
+			"tensor_head": "B",
+			"tensor_rank": 1,
+			"tensor_indices": [
+				2
+			]
+		}
+	],
+	"equations": [
+		{
+			"field": "A_0",
+			"lhs": {
+				"expression": "A_0",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "A_0",
+						"coefficient_symbolic": "mA2"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "B_0",
+						"coefficient_symbolic": "-((g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2))",
+						"coordinate_dependent": [
+							"x",
+							"y"
+						]
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "A_0"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "A_0"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "v_A_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_A_1"
+					}
+				]
+			},
+			"constraint_solver": {
+				"enabled": true,
+				"method": "auto",
+				"max_iterations": 30,
+				"tolerance": 1e-10,
+				"boundary_conditions": {
+					"x": {
+						"type": "periodic"
+					},
+					"y": {
+						"type": "periodic"
+					}
+				}
+			}
+		},
+		{
+			"field": "A_1",
+			"lhs": {
+				"expression": "d2_t(A_1)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "A_1",
+						"coefficient_symbolic": "-mA2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "B_1",
+						"coefficient_symbolic": "(g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2)",
+						"coordinate_dependent": [
+							"x",
+							"y"
+						]
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "A_1"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xy",
+						"field": "A_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_A_0"
+					}
+				]
+			}
+		},
+		{
+			"field": "A_2",
+			"lhs": {
+				"expression": "d2_t(A_2)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "A_2",
+						"coefficient_symbolic": "-mA2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "B_2",
+						"coefficient_symbolic": "(g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2)",
+						"coordinate_dependent": [
+							"x",
+							"y"
+						]
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xy",
+						"field": "A_1"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "A_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "v_A_0"
+					}
+				]
+			}
+		},
+		{
+			"field": "B_0",
+			"lhs": {
+				"expression": "B_0",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "B_0",
+						"coefficient_symbolic": "mB2"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "A_0",
+						"coefficient_symbolic": "-((g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2))",
+						"coordinate_dependent": [
+							"x",
+							"y"
+						]
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "B_0"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "B_0"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "v_B_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_B_1"
+					}
+				]
+			},
+			"constraint_solver": {
+				"enabled": true,
+				"method": "auto",
+				"max_iterations": 30,
+				"tolerance": 1e-10,
+				"boundary_conditions": {
+					"x": {
+						"type": "periodic"
+					},
+					"y": {
+						"type": "periodic"
+					}
+				}
+			}
+		},
+		{
+			"field": "B_1",
+			"lhs": {
+				"expression": "d2_t(B_1)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "B_1",
+						"coefficient_symbolic": "-mB2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "A_1",
+						"coefficient_symbolic": "(g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2)",
+						"coordinate_dependent": [
+							"x",
+							"y"
+						]
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "B_1"
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xy",
+						"field": "B_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_B_0"
+					}
+				]
+			}
+		},
+		{
+			"field": "B_2",
+			"lhs": {
+				"expression": "d2_t(B_2)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "B_2",
+						"coefficient_symbolic": "-mB2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "A_2",
+						"coefficient_symbolic": "(g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2)",
+						"coordinate_dependent": [
+							"x",
+							"y"
+						]
+					},
+					{
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xy",
+						"field": "B_1"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "B_2"
+					},
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "v_B_0"
+					}
+				]
+			}
+		}
+	],
+	"coupling": {
+		"mass_matrix_symbolic": [
+			[
+				"mA2",
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				"-mA2",
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				"-mA2",
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				"mB2",
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				"-mB2",
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				"-mB2"
+			]
+		],
+		"coupling_matrix_symbolic": [
+			[
+				null,
+				null,
+				null,
+				"-((g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2))",
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				"(g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2)",
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				"(g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2)"
+			],
+			[
+				"-((g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2))",
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				"(g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2)",
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				"(g0*gcoup*R^2)/(R^2 + x[]^2 + y[]^2)",
+				null,
+				null,
+				null
+			]
+		]
+	},
+	"canonical": {
+		"hamiltonian_terms": [
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "A_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "A_0",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "-1/2*mA2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "A_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "A_1",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "mA2/2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "A_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "A_2",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "mA2/2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "B_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "B_0",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "-1/2*mB2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "B_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "B_1",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "mB2/2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "B_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "B_2",
+					"operator": "identity"
+				},
+				"term_class": "self",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "mB2/2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "A_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "B_0",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "(g0*gcoup)/(1 + (x[]^2 + y[]^2)/R^2)",
+				"coordinate_dependent": [
+					"x",
+					"y"
+				]
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "A_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "B_1",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "-((g0*gcoup)/(1 + (x[]^2 + y[]^2)/R^2))",
+				"coordinate_dependent": [
+					"x",
+					"y"
+				]
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "A_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "B_2",
+					"operator": "identity"
+				},
+				"term_class": "interaction",
+				"order_in_eps": 0,
+				"coefficient_symbolic": "-((g0*gcoup)/(1 + (x[]^2 + y[]^2)/R^2))",
+				"coordinate_dependent": [
+					"x",
+					"y"
+				]
+			},
+			{
+				"coefficient": -0.5,
+				"factor_a": {
+					"field": "A_0",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "A_0",
+					"operator": "gradient_y"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "A_1",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "A_1",
+					"operator": "gradient_y"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": -0.5,
+				"factor_a": {
+					"field": "B_0",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "B_0",
+					"operator": "gradient_y"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "B_1",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "B_1",
+					"operator": "gradient_y"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": -0.5,
+				"factor_a": {
+					"field": "A_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "A_0",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": -1.0,
+				"factor_a": {
+					"field": "A_1",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "A_2",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "A_2",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "A_2",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": -0.5,
+				"factor_a": {
+					"field": "B_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "B_0",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": -1.0,
+				"factor_a": {
+					"field": "B_1",
+					"operator": "gradient_y"
+				},
+				"factor_b": {
+					"field": "B_2",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "B_2",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "B_2",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "A_1",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "A_1",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "A_2",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "A_2",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "B_1",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "B_1",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			},
+			{
+				"coefficient": 0.5,
+				"factor_a": {
+					"field": "B_2",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "B_2",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"order_in_eps": 0
+			}
+		]
+	}
+}

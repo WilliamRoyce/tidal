@@ -569,12 +569,12 @@ class TestPeriodicCoefficientContinuity:
         """Centered dipolar B²·x²: localized with small boundary values.
 
         Models the Gertsenshtein false-positive scenario.  The coefficient
-        peaks at ~10 in the centre but boundary values are ~0.02.  The old
+        peaks at ~10 in the center but boundary values are ~0.02.  The old
         relative-jump check warned (rel_jump ~2-6%), but the leak metric
         (rel_jump * boundary_fraction) is ~8e-6, consistent with the
         observed |dE/E| = 4.53e-7 in actual simulations.
         """
-        # Simulate B(x)² * x² where B is a Gaussian centred at x=π
+        # Simulate B(x)² * x² where B is a Gaussian centered at x=π
         # on [0, 2π].  The x² factor breaks strict periodicity but both
         # boundary values are negligible (B(0)² * 0² ≈ 0, B(2π)² * (2π)² ≈ tiny).
         spec = _make_spec(

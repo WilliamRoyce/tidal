@@ -416,17 +416,25 @@ For systems with constraints (gauge theories):
 
 ## 9. Implementation Map
 
-| Concept | Function | Location |
-|---------|----------|----------|
-| First derivative (FFT/FD) | `_first_derivative` | `_energy.py:89` |
-| Second derivative (FFT/FD) | `_second_derivative` | `_energy.py:111` |
-| Gradient energy density | `_gradient_energy_density` | `_energy.py:138` |
-| Spatial operator dispatch | `_apply_spatial_operator` | `_energy.py:156` |
-| Momentum field detection | `_is_momentum_field` | `_energy.py:211` |
-| Term coefficient resolution | `_resolve_term_coefficient` | `_energy.py:216` |
-| Term target resolution | `_resolve_term_target` | `_energy.py:237` |
-| Single-field energy | `compute_field_energy` | `_energy.py:278` |
-| Mass matrix resolution | `_resolve_mass_squared` | `_energy.py:332` |
-| **Virial potential** | `_compute_virial_potential` | `_energy.py:369` |
-| **Constraint self-energy** | `_compute_constraint_self_energy` | `_energy.py:422` |
-| **System Hamiltonian** | `compute_system_energy` | `_energy.py:456` |
+| Concept | Function |
+|---------|----------|
+| Spatial operator dispatch | `_apply_spatial_operator` |
+| Mixed-operator parsing | `_parse_mixed_operator` |
+| Mixed-factor evaluation | `_evaluate_mixed_factor` |
+| Velocity field detection | `_is_velocity_field` |
+| Term coefficient resolution | `_resolve_term_coefficient` |
+| Coefficient evaluation on the grid | `_resolve_coefficient_on_grid` |
+| Term target resolution | `_resolve_term_target` |
+| Acceleration from the EOM | `_compute_acceleration_from_eom` |
+| Hamiltonian factor evaluation | `_evaluate_hamiltonian_factor` |
+| Gradient-product density | `_gradient_product_density` |
+| Parseval (k-space) gradient energy | `_gradient_product_parseval` |
+| **Per-field Hamiltonian** | `_compute_hamiltonian_per_field` |
+| **Canonical Hamiltonian** | `_compute_hamiltonian_from_canonical` |
+| **System Hamiltonian** | `compute_system_energy` |
+| **Energy time series** | `compute_energy_timeseries` |
+
+Line numbers are deliberately omitted: they rot on every edit and nothing
+verifies them. This table was previously wrong in all twelve of its entries —
+eight named functions that no longer existed, and `compute_system_energy` was
+listed at line 456 while sitting at 1280.

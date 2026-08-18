@@ -1,6 +1,6 @@
 """Regression tests for the unified modal-solver evolution-matrix builder (#256).
 
-Pins the failure mode and the correct behaviour before and after the
+Pins the failure mode and the correct behavior before and after the
 unification of `build_constraint_eliminated_matrices` and
 `_build_evolution_matrices` into one path.
 

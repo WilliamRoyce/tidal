@@ -4,9 +4,9 @@ Mirrors the ``[INFO]``/``[WARN]``/``[ERROR]``/``[OK]`` pattern used in
 the shell scripts (``scripts/verify-wolfram-setup.sh`` etc.).
 
 **Accessibility principle:** Prefixes are ALWAYS present regardless of
-colour capability.  Colour is an additive enhancement, never the sole
+color capability.  Color is an additive enhancement, never the sole
 carrier of meaning.  Structural separators (``====``, ``---``) remain.
-Output must be fully readable without colour.
+Output must be fully readable without color.
 
 All messages go to *stderr* so that structured data on stdout (``--json``,
 piped output) is never contaminated.
@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 import sys
 
-# ── ANSI colour codes ────────────────────────────────────────────
+# ── ANSI color codes ────────────────────────────────────────────
 
 _RESET = "\033[0m"
 _BOLD = "\033[1m"
@@ -29,13 +29,13 @@ _YELLOW = "\033[1;33m"
 _BLUE = "\033[0;34m"
 _CYAN = "\033[0;36m"
 
-# ── Colour support detection ────────────────────────────────────
+# ── Color support detection ────────────────────────────────────
 # Replicates the logic in tidal/banner.py but checks stderr (where
 # all console output is directed).
 
 
 def _supports_color() -> bool:
-    """Return True when stderr supports ANSI colour codes."""
+    """Return True when stderr supports ANSI color codes."""
     if os.environ.get("NO_COLOR"):
         return False
     if os.environ.get("FORCE_COLOR"):
@@ -59,7 +59,7 @@ def configure(*, verbose: bool = False, quiet: bool = False) -> None:
 
 
 def _color() -> bool:
-    """Lazy colour detection (cached after first call)."""
+    """Lazy color detection (cached after first call)."""
     global _use_color  # noqa: PLW0603
     if _use_color is None:
         _use_color = _supports_color()
@@ -67,7 +67,7 @@ def _color() -> bool:
 
 
 def _styled(prefix: str, color: str, msg: str) -> str:
-    """Format a prefixed message, optionally with colour."""
+    """Format a prefixed message, optionally with color."""
     if _color():
         return f"{color}{_BOLD}{prefix}{_RESET} {msg}"
     return f"{prefix} {msg}"
@@ -126,7 +126,7 @@ def error_with_hint(msg: str, hints: list[str]) -> None:
 def header(title: str) -> str:
     """Return a section header with ``====`` separators.
 
-    Colour is additive — the ``====`` bars remain for non-colour contexts.
+    Color is additive — the ``====`` bars remain for non-color contexts.
     """
     sep = "=" * 64
     if _color():
@@ -149,7 +149,7 @@ def table(
 ) -> str:
     """Return a simple aligned table with header underline.
 
-    Colour is additive — the table is readable without colour.
+    Color is additive — the table is readable without color.
     """
     # Compute column widths
     n_cols = len(headers)
@@ -178,7 +178,7 @@ def table(
 
 
 def pass_fail(label: str, *, passed: bool) -> str:
-    """Return ``PASS``/``FAIL`` with colour when available."""
+    """Return ``PASS``/``FAIL`` with color when available."""
     tag = "PASS" if passed else "FAIL"
     if _color():
         c = _GREEN if passed else _RED

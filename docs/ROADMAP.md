@@ -2,8 +2,8 @@
 
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
-**Last Updated:** April 2026 (v0.33.9)
-**Project Status:** Phase 13+ Complete; perturbative reduction v6 complete (Stage 7 closed 2026-04-20, issue #271 resolved). Euler–Heisenberg quartic-EM path fully supported; matter-only derivative-only theories now unblocked. 1,991 Python tests + ~115 Wolfram tests.
+**Last Updated:** August 2026 (v0.47.9)
+**Project Status:** Phase 13+ Complete; perturbative reduction v6 complete (Stage 7 closed 2026-04-20, issue #271 resolved). Euler–Heisenberg quartic-EM path fully supported; matter-only derivative-only theories now unblocked. 2,449 Python tests + 133 Wolfram test cases.
 
 ## Overview
 
@@ -41,10 +41,10 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 | Issue                                                      | Priority    | Type    | Status       |
 | ---------------------------------------------------------- | ----------- | ------- | ------------ |
-| [#TBD] Add Animation Module Test Coverage                  | 🟠 High     | Testing | 🔄 Remaining |
+| [#73] Add Animation Module Test Coverage                   | 🟠 High     | Testing | ⛔ Obsolete  |
 | [#74] Add Code Coverage Reporting to CI                    | 🟠 High     | CI/CD   | ✅ Done      |
-| [#TBD] Add Wolfram Tests to GitHub Actions CI              | 🔴 Critical | CI/CD   | 🔄 Remaining |
-| [#TBD] Add Tests for Observers, Profiling, Runners Modules | 🟡 Medium   | Testing | 🔄 Remaining |
+| [#69] Add Wolfram Tests to GitHub Actions CI               | 🔴 Critical | CI/CD   | 🔄 Remaining |
+| [#78] Add Tests for Observers, Profiling, Runners Modules  | 🟡 Medium   | Testing | ⛔ Obsolete  |
 
 **Delivered so far:**
 
@@ -55,10 +55,14 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 **Still needed:**
 
-- `test_animation_builder.py` with 10-15 test cases
 - codecov.io integration for dynamic badge and PR reports
-- Optional Wolfram test workflow (label-triggered or weekly)
-- ~20-30 tests for observers, profiling, runners modules
+- Optional Wolfram test workflow (label-triggered or weekly) — [#69]
+
+**No longer applicable:** the animation, observers, profiling and runners test items
+covered modules in the `kgsim` subpackage, which was deleted in `3940efdf`. Where the
+functionality survived it is already covered (`tidal/measurement/_energy.py`,
+`tidal/solver/progress.py`, the `tidal/solver/` backends); animation and profiling have
+no successor module. Issues [#73] and [#78] are closed accordingly.
 
 ---
 
@@ -156,7 +160,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | Simulation progress bar — tqdm-based `SimulationProgress` class, auto-suppressed in sweep inner runs | ✅ Complete |
 | Simulation resume — `--resume DIR [--snapshot N] [--t-additional T]` checkpoint loading | ✅ Complete |
 | Gertsenshtein effect (Phase D) — graviton-photon conversion validated: uniform B₀ (sin²(κB₀t/2)), localized Gaussian (Boccaletti formula). **Torsion-independence proven**: minimal PGT coupling cannot amplify Gertsenshtein for any vacuum GW (#199, #200) | ✅ Complete |
-| Torsion-Gertsenshtein investigation — combined PGT+EM theory (23 components), polarisation block-diagonal structure, field-filtered energy measurement for Ostrogradsky theories | ✅ Complete |
+| Torsion-Gertsenshtein investigation — combined PGT+EM theory (23 components), polarization block-diagonal structure, field-filtered energy measurement for Ostrogradsky theories | ✅ Complete |
 
 ---
 
@@ -214,10 +218,10 @@ Issues should be tagged with appropriate labels:
 - ✅ Gauge fixing: optional per-field Lorenz/de Donder/Coulomb/temporal/axial (Phase B)
 - ✅ Constraint pre-solve: FFT/sparse three-tier solver (Phase J)
 - ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 12 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
-- ✅ CLI (`tidal` command) implemented: 9 subcommands, zero new dependencies
+- ✅ CLI (`tidal` command) implemented: 11 subcommands, zero new dependencies
 - ✅ Measurement module: 12 types (energy, conversion, mixing, spectrum, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
-- ✅ 20 working examples spanning 1+1D through 3+1D
-- ✅ 1,700 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- ✅ 19 working examples spanning 1+1D through 3+1D
+- ✅ 2,449 Python tests + 133 Wolfram test cases passing, 0 ruff violations, 0 pyright errors
 - ✅ 21 of 25 original issues resolved (84%)
 - ✅ **Phase D (Gertsenshtein):** Complete — all physical regimes validated, torsion-independence proven for minimal PGT
 - 🔄 **Primary remaining focus:** Non-minimal torsion-EM coupling investigation (T·F terms), ghost-free parameter conditions
@@ -251,7 +255,7 @@ Issues should be tagged with appropriate labels:
    - Yang-Mills equations (linearized sector)
    - SU(2) and SU(3) gauge groups
 
-4. **Spectral Spatial Discretisation (Phase E)** — ✅ FFT COMPLETE
+4. **Spectral Spatial Discretization (Phase E)** — ✅ FFT COMPLETE
    - ~~FFT-based operators for exponential convergence on periodic domains~~ **Done** (`--spectral`, auto-enabled for all-periodic BCs)
    - Chebyshev for non-periodic directions (following Dedalus architecture) — remaining
 
@@ -288,7 +292,7 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **MINOR** (0.X.0): New features (3+1D examples, JSON schema extensions)
 - **PATCH** (0.0.X): Bug fixes, documentation improvements
 
-**Current Version:** 0.47.9
+**Current Version:** 0.48.4
 **Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve; 0.5.0 delivered parameter sweep framework (Phase C) with 12 measurements, sensitivity analysis, and advanced visualization
 **Next Major Release (1.0.0):** Phase D (Gertsenshtein example) + Wolfram CI
 

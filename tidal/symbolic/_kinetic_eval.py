@@ -74,6 +74,37 @@ def evaluate_at_one(expr: str, one_names: set[str] | frozenset[str]) -> float | 
     return evaluate_with_substitutions(expr, dict.fromkeys(one_names, 1.0))
 
 
+_RE_NULLARY_CALL = re.compile(r"(\b\w+)\s*\[\s*\]")
+
+
+def normalize_inputform(expr: str) -> str:
+    """Return ``expr`` rewritten from Wolfram InputForm into parseable Python source.
+
+    Two rewrites, both purely syntactic:
+
+    * ``^`` → ``**`` (Wolfram exponentiation).
+    * nullary xCoba coordinate calls such as ``x[]`` → ``x``, because
+      :func:`ast.parse` rejects empty subscripts. Coordinates become bare
+      names; a caller may substitute them like any other symbol. See #380.
+
+    Shared by :func:`evaluate_with_substitutions` and by
+    :mod:`tidal.symbolic.sign_algebra` so both consume identically
+    normalized source. Every coefficient string emitted by ``ExportJSON.wl``
+    across the committed example corpus parses after this rewrite.
+
+    Parameters
+    ----------
+    expr : str
+        Coefficient expression in Wolfram InputForm.
+
+    Returns
+    -------
+    str
+        Python-parseable expression source.
+    """
+    return _RE_NULLARY_CALL.sub(r"\1", expr.replace("^", "**"))
+
+
 def evaluate_with_substitutions(
     expr: str,
     substitutions: dict[str, float],
@@ -110,12 +141,7 @@ def evaluate_with_substitutions(
             f"evaluate_with_substitutions: expected a str, got {type(expr).__name__!r}"
         )
         raise KineticEvalError(msg)
-    # Wolfram InputForm to Python-AST: ^ → **, and strip nullary xCoba
-    # coordinate calls like `x[]` (ast.parse rejects empty subscripts).
-    # Coords are then bare names; if a caller provides a substitution for
-    # them they're evaluated, otherwise the term stays symbolic. See #380.
-    normalized = expr.replace("^", "**")
-    normalized = re.sub(r"(\b\w+)\s*\[\s*\]", r"\1", normalized)
+    normalized = normalize_inputform(expr)
 
     try:
         tree = ast.parse(normalized, mode="eval")

@@ -35,7 +35,7 @@ detectable level?
 The approach in this project is unapologetically phenomenological
 — instead of picking one specific extension of GR and defending
 it, I'm systematically scanning the space of curvature, torsion,
-and electromagnetic modifications of linearised GR and asking
+and electromagnetic modifications of linearized GR and asking
 which sectors, if any, amplify the conversion.
 
 ▶ NEXT — slide 2: the Gertsenshtein effect
@@ -75,12 +75,12 @@ square of the Planck mass.
 
 Gertsenshtein himself in 1962 gave the formula and immediately
 recognised it was hopelessly small. Boccaletti and collaborators
-in 1970 did the full analytic solution for a localised B-field
+in 1970 did the full analytic solution for a localized B-field
 region. Raffelt and Stodolsky in 1988 embedded the problem in
 the axion-photon-mixing framework, which is the modern standard
 for the effect.
 
-We must remember that this formula is exact in linearised
+We must remember that this formula is exact in linearized
 Einstein–Maxwell — there are no approximations to wave away. Any
 amplification has to come from genuine new physics.
 
@@ -127,7 +127,7 @@ neither GR nor PGT keeps.
 ▶ Slide 5 — 05 pgt_b (~60 s)
 ═══════════════════════════════════════════════════════════════
 
-Although we have a nice moral standpoint for PGT, we realise that
+Although we have a nice moral standpoint for PGT, we realize that
 leaving the geometric perspective for a field theoretic viewpoint,
 it becomes clear that there are a huge number of possible terms
 that become available to construct our Lagrangian from.
@@ -161,7 +161,7 @@ can amplify the Gertsenshtein conversion. We are not looking for
 a specific mechanism, but rather asking whether any mechanism
 exists at all.
 
-For every Lagrangian we test, we first derive the linearised
+For every Lagrangian we test, we first derive the linearized
 field equations symbolically — by hand they're intractable for
 anything but the simplest case. We then route those equations
 through our solver to compute the conversion probability and
@@ -200,7 +200,7 @@ too.
 ═══════════════════════════════════════════════════════════════
 
 The core numerical engine is the spectral solver tailored for the
-linearised gauge theories the survey produces. The linearisation
+linearized gauge theories the survey produces. The linearization
 is key, allowing us to work in Fourier space and solve for each
 mode independently, which is a huge speedup compared to a full
 nonlinear PDE solver. I want to be able to handle any new terms
@@ -248,7 +248,7 @@ tells us the expected amplification for the theory, and the KL
 divergence, which tells us whether any enhancement is broadly
 distributed or concentrated within the parameter space.
 
-We must keep to the linearised regime, taking the limit of
+We must keep to the linearized regime, taking the limit of
 vanishingly small magnetic fields at which the amplification
 becomes independent of the experimental setup and is purely a
 characteristic property of the theory we wish to measure. In
@@ -262,7 +262,7 @@ a uniform magnetic field filling all of spacetime.
 ▶ Slide 10 — 11 results (~90 s)
 ═══════════════════════════════════════════════════════════════
 
-To help characterise the direction of the full campaign, I ran
+To help characterize the direction of the full campaign, I ran
 a few preliminary tests on some simple theories. The aim is to
 not just run a single campaign with the most general theory, but
 to also investigate the structure of theories of interest to the

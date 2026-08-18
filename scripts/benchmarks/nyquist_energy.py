@@ -4,7 +4,7 @@ Sweeps N ∈ {128, 256, 512, 1024} for ``coupled_scalars`` (massless) and
 ``coupled_scalars_massive`` (omegaP2=1), measuring the relative energy drift
 |dE/E| under
 the Fourier modal solver with ``_zero_nyquist=True`` (production default)
-and ``_zero_nyquist=False`` (reproduces the pre-fix behaviour).
+and ``_zero_nyquist=False`` (reproduces the pre-fix behavior).
 
 The IC is a broad Gaussian plus a small Nyquist component (amplitude
 ``NYQ_AMP``), so that the Nyquist energy fraction is ~1e-5 of total.

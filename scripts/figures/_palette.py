@@ -45,7 +45,7 @@ PRIOR_ALPHA = 0.15
 
 
 # 2024 Cambridge brand palette (Johnson Banks refresh).
-# Source: cam.ac.uk/brand-resources/guidelines/colour.
+# Source: cam.ac.uk/brand-resources/guidelines/color.
 # Used by the talk-deck figure variants so the corner-plot accents match
 # the slide accents; manuscript figures continue to use IBM_PALETTE.
 CAMBRIDGE_PALETTE = {

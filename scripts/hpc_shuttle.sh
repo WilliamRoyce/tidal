@@ -320,7 +320,7 @@ cmd_pull() {
     note "WARNING: --all pulls raw sim data; may be large"
     rsync -az -e ssh "${HOST}:${src}" "$dst"
   else
-    note "pulling lightweight artefacts only (figures, csvs, summary/result/sweep jsons, nested-sampling chains)"
+    note "pulling lightweight artifacts only (figures, csvs, summary/result/sweep jsons, nested-sampling chains)"
     rsync -az -e ssh \
       --include='*/' \
       --include='figures/***' \
@@ -348,7 +348,7 @@ cmd_pull_campaign() {
   local src="${REMOTE_ROOT}/hpc_results/campaigns/${name}"
   local dst="${REPO_ROOT}/hpc_results/campaigns/${name}"
   mkdir -p "${dst}"
-  note "pulling campaign artefacts: ${name}"
+  note "pulling campaign artifacts: ${name}"
   rsync -az -e ssh \
     --include='*/' \
     --include='figures/***' \
@@ -498,10 +498,10 @@ Subcommands:
   wait <jobid> [interval_s]         wait for job to start via file-existence (NOT squeue), then tail -f
   tail <jobid> [--follow|-f]        tail remote slurm log
   htop <jobid>                      attach htop on the compute node
-  pull <jobid> [--all] [--src PATH] rsync lightweight artefacts back (--all for raw data).
+  pull <jobid> [--all] [--src PATH] rsync lightweight artifacts back (--all for raw data).
                                     Source path auto-parsed from --output in .hpc_jobs;
                                     override with --src for ad-hoc jobs.
-  pull-campaign NAME                pull campaign artefacts from hpc_results/campaigns/NAME
+  pull-campaign NAME                pull campaign artifacts from hpc_results/campaigns/NAME
                                     (use after resume runs complete with === DONE ===)
   interactive [--time HH:MM:SS] [--nodes N] [--ntasks N] [--name X] [--account P]
                                     book a full sapphire node via sbatch sleep (INTR QOS);

@@ -55,7 +55,7 @@ cd "$REPO_ROOT"
 if [[ -n "$no_pull" ]]; then
     echo "==> [1/4] --no-pull: assuming hpc_results/${jobid}/ already exists"
 else
-    echo "==> [1/4] Pulling chain artefacts for $jobid"
+    echo "==> [1/4] Pulling chain artifacts for $jobid"
     if [[ -n "$src" ]]; then
         bash scripts/hpc_shuttle.sh pull "$jobid" --src "$src"
     else

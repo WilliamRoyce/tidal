@@ -112,7 +112,7 @@ def _process_chain(entry: dict[str, Any], n_bootstrap: int) -> None:
         return
     # PolyChord runs that produced zero dead points (e.g. catastrophic
     # eigenvalue overflow) write only `_chains/tidal_phys_live.txt`, never
-    # `_chains/tidal.txt`.  These can't be analysed via anesthetic; skip.
+    # `_chains/tidal.txt`.  These can't be analyzed via anesthetic; skip.
     if not (amp_path / "_chains" / "tidal.txt").is_file():
         log.warning("[%s] skipping — no dead points (chain did not converge)", theory)
         return

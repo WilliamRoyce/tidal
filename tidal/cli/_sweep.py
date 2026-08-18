@@ -2346,7 +2346,7 @@ def _init_worker() -> None:
        Without this, each worker pays a ~10 s cold-import cost on its first
        task (profiled against a 90-point sweep on sapphire: 16 cold tasks
        at 10 s each vs 74 warm tasks at 0.9 s each).  Paying the import
-       cost once at worker startup amortises it into pool creation and
+       cost once at worker startup amortizes it into pool creation and
        converts the sweep from ``16 cold + 74 warm / 16 workers ≈ 15 s
        compute wall`` to ``90 warm / 16 workers ≈ 5 s compute wall``.
     """
@@ -2367,7 +2367,7 @@ def _init_worker() -> None:
 
 
 # Backwards-compatibility alias: some older call sites may still reference
-# the pre-v0.30.3 name.  Kept as a one-liner so there's no behavioural
+# the pre-v0.30.3 name.  Kept as a one-liner so there's no behavioral
 # divergence.
 _set_single_thread_blas = _init_worker
 
