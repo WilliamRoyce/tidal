@@ -6,7 +6,7 @@ description: Detect physics regressions from recent code changes. Maps changed s
 # Physics Regression Detection
 
 ## Recent changes to physics code
-!`cd /workspaces/torsion-gertsenshtein && git diff --name-only HEAD~5 -- tidal/solver/ tidal/measurement/ tidal/symbolic/ 2>/dev/null | sort -u`
+!`git diff --name-only HEAD~5 -- tidal/solver/ tidal/measurement/ tidal/symbolic/ 2>/dev/null | sort -u`
 
 ## Instructions
 

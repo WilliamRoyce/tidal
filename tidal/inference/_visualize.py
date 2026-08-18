@@ -928,7 +928,7 @@ def _plot_corner_anesthetic(
     # (v3 chains have higher ESS than v2) anesthetic's default scatter
     # rendering becomes a solid mess with no extra information beyond the
     # lower-triangle KDE contours.  See docs/V3_ARCHITECTURE.md and
-    # https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/347.
+    # https://github.com/WilliamRoyce/tidal/issues/347.
     _hide_upper_triangle(axes_df, plot_params)
     if full_prior_bounds:
         _set_full_prior_axis_limits(

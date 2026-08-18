@@ -44,5 +44,5 @@ The replay therefore uses 28982029 (v2 INTR-reduced, post-#258 metadata) as the 
 
 - [docs/V3_ARCHITECTURE.md](V3_ARCHITECTURE.md) — soft-penalty table
 - [docs/V3_PHASE_TRACKER.md](V3_PHASE_TRACKER.md) — A.5 status
-- GH issue [#349](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/349)
+- GH issue [#349](https://github.com/WilliamRoyce/tidal/issues/349)
 - `hpc_results/28982029/d1_amp_v2_intr_reduced/_rejected_prior.csv` — source data

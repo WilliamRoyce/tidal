@@ -33,7 +33,7 @@ This project follows a standard code of conduct:
 
 ### Finding Issues to Work On
 
-- Check the [issue tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues)
+- Check the [issue tracker](https://github.com/WilliamRoyce/tidal/issues)
 - Look for issues labeled `good first issue` or `help wanted`
 - Comment on an issue to let others know you're working on it
 
@@ -43,8 +43,8 @@ This project follows a standard code of conduct:
 
 ```bash
 # Fork the repository on GitHub, then clone your fork
-git clone https://github.com/YOUR_USERNAME/torsion-gertsenshtein.git
-cd torsion-gertsenshtein
+git clone https://github.com/YOUR_USERNAME/tidal.git
+cd tidal
 ```
 
 ### 2. Set Up Development Environment
@@ -423,8 +423,8 @@ Closes #42
 
 ## Getting Help
 
-- **Questions**: Open a [discussion](https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions)
-- **Bugs**: Open an [issue](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues)
+- **Questions**: Open a [discussion](https://github.com/WilliamRoyce/tidal/discussions)
+- **Bugs**: Open an [issue](https://github.com/WilliamRoyce/tidal/issues)
 - **Feature Requests**: Open an issue with the `enhancement` label
 
 ## Project Structure

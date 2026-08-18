@@ -149,7 +149,7 @@ with 7.7% of A_dd entries differing by up to 0.04.
   params (verified to machine precision).
 - The Schur elimination is the dominant non-linearity for the *post-Schur*
   output (S_cc_inv is rational in params).
-- Stage 1 sparse-IC mode skip ([8ecaf76](https://github.com/WilliamRoyce/torsion-gertsenshtein/commit/8ecaf76))
+- Stage 1 sparse-IC mode skip ([8ecaf76](https://github.com/WilliamRoyce/tidal/commit/8ecaf76))
   is unaffected and works as intended.
 
 ### Wrong
@@ -234,7 +234,7 @@ $ git show --stat 62352c4
 
 ## 6. What lives on (unchanged by this revert)
 
-- **Stage 1 sparse-IC mode skip** ([8ecaf76](https://github.com/WilliamRoyce/torsion-gertsenshtein/commit/8ecaf76))
+- **Stage 1 sparse-IC mode skip** ([8ecaf76](https://github.com/WilliamRoyce/tidal/commit/8ecaf76))
   — independent and working. Reduces per-call wall when the IC is sparse
   (single-mode plane-wave). Tests in `tests/test_modal_sparse_ic.py`.
 - **Stage 3 multiplier cache** was bundled into 62352c4 and reverted with it.

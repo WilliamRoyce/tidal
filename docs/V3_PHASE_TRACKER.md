@@ -15,11 +15,11 @@
 | A.0e | GitHub issues created for v3-A/A-γ/B/D/E/C tracking | ✅ done | #345–#355 |
 | A.0f | Obsolete HPC jobs (28982006, 28985879) canceled | ✅ done | 2026-05-10 |
 | A.0g | Phase A.0 persistence committed | ✅ done | 62c7ac9 |
-| A.1 | Soft-penalty refactor in `tidal/inference/_likelihood.py` | ✅ done | [#345](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/345) — Hwang-Noh + P_max>2 cap removed; soft floor `-100 + Normal(0, σ)` for sim/NaN/exception; distinct `run_status` tags. New `--gated` and `--soft-floor-noise SIGMA` flags. |
-| A.2 | Lagrangian de-pruning audit + per-param `arctan_uniform` scripts | ✅ done | [#346](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/346) — `docs/lagrangian_depruning_audit.md` + 12 v3_permissive scripts |
-| A.3 | Corner-plot upper-triangle removal in `tidal/inference/_visualize.py` | ✅ done | [#347](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/347) — `_hide_upper_triangle()` helper |
-| A.4 | Soft-penalty tests (`test_likelihood_*.py`) | ✅ done | [#348](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/348) — 3 new modules, 36 new test cases, all green |
-| A.5 | D1 v1 chain replay sanity check | ✅ done | [#349](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/349) — `examples/data/v3_d1_replay/`; v3 admits 14.3% more samples than v2 |
+| A.1 | Soft-penalty refactor in `tidal/inference/_likelihood.py` | ✅ done | [#345](https://github.com/WilliamRoyce/tidal/issues/345) — Hwang-Noh + P_max>2 cap removed; soft floor `-100 + Normal(0, σ)` for sim/NaN/exception; distinct `run_status` tags. New `--gated` and `--soft-floor-noise SIGMA` flags. |
+| A.2 | Lagrangian de-pruning audit + per-param `arctan_uniform` scripts | ✅ done | [#346](https://github.com/WilliamRoyce/tidal/issues/346) — `docs/lagrangian_depruning_audit.md` + 12 v3_permissive scripts |
+| A.3 | Corner-plot upper-triangle removal in `tidal/inference/_visualize.py` | ✅ done | [#347](https://github.com/WilliamRoyce/tidal/issues/347) — `_hide_upper_triangle()` helper |
+| A.4 | Soft-penalty tests (`test_likelihood_*.py`) | ✅ done | [#348](https://github.com/WilliamRoyce/tidal/issues/348) — 3 new modules, 36 new test cases, all green |
+| A.5 | D1 v1 chain replay sanity check | ✅ done | [#349](https://github.com/WilliamRoyce/tidal/issues/349) — `examples/data/v3_d1_replay/`; v3 admits 14.3% more samples than v2 |
 | A.6 | Commit + version bump | ✅ done | 400a455 (v0.39.0) |
 
 ## Phase A-γ — γ_conversion (deferred to its own session)

@@ -22,7 +22,7 @@ This is anesthetic's 95%-credible contour correctly stopping at the iso-density 
 
 **Improvement opportunity (cosmetic)**: add outer 99%/99.9% credibility contours so the tail-falloff is visible alongside the 95% contour. Single-file change in `tidal/inference/_visualize.py` plot_2d call (`levels=` argument). Optional, not blocking.
 
-Tracked as GH issue [#365](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/365) `[v3-viz] Add outer 99% contour to corner plots for tail visibility`.
+Tracked as GH issue [#365](https://github.com/WilliamRoyce/tidal/issues/365) `[v3-viz] Add outer 99% contour to corner plots for tail visibility`.
 
 ## Finding 2 — Joint-prior + positive-only-kinetic: four candidate approaches
 
@@ -62,7 +62,7 @@ Concrete examples:
 
 **This affects observed B.4a/B.4b results**: Stage A sup (29199129) MAP has `alpha3 = 0.00117`, hitting the v3 prior lower bound `1e-3`. The chain wants to push α₃ even smaller (or potentially negative if it's mass-like), being clipped by prior. The strong joint D_KL = 7.30 nats may be partly driven by this prior-edge effect.
 
-**Action: supervisor clarification needed per parameter per theory** before we can correctly apply Approach A. Tracked as GH issue [#363](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/363) `[v3.2-classify] Kinetic vs mass-like per-parameter classification (supervisor input)`.
+**Action: supervisor clarification needed per parameter per theory** before we can correctly apply Approach A. Tracked as GH issue [#363](https://github.com/WilliamRoyce/tidal/issues/363) `[v3.2-classify] Kinetic vs mass-like per-parameter classification (supervisor input)`.
 
 ## Finding 3 — PSALTer ghost-detection integration
 
@@ -82,14 +82,14 @@ Why this path over a homegrown check: PSALTer correctly handles gauge-fixing + c
 
 **Target timeline: Phase C+ / Phase E+, not now**. The integration is a 1–2 day implementation IF PSALTer's loader is stable, but waiting for our JSON format and Phase C joint-prior conventions to land first is prudent.
 
-Tracked as GH issue [#364](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/364) `[v3.2-psalter] PSALTer integration for chain-sample-time ghost tagging`.
+Tracked as GH issue [#364](https://github.com/WilliamRoyce/tidal/issues/364) `[v3.2-psalter] PSALTer integration for chain-sample-time ghost tagging`.
 
 ## Decisions
 
 1. **Don't cancel current Phase B chains** (B.1, B.2, B.3, B.4a, B.4b). They stand as the v3.1 baseline with documented asymmetric per-param priors. They have genuine scientific value and validate the v3 methodology shift.
 2. **No homegrown ghost detection in TIDAL**. User explicitly defers ghost-detection to PSALTer integration.
 3. **No prior architecture changes until investigation complete**. Continue Phase B as-is under v3.1 priors; v3.2 is a follow-up that happens only after supervisor reviews v3.1 results AND classifies which params are kinetic vs mass-like.
-4. **Approach A (per-coupling abs-fold) is the v3.2 interim plan** (GH issue [#366](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/366)); Approach D (PSALTer-tagged) is the ultimate goal. v3.2 implementation is GATED on `[v3.2-classify]` issue [#363](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/363) completion.
+4. **Approach A (per-coupling abs-fold) is the v3.2 interim plan** (GH issue [#366](https://github.com/WilliamRoyce/tidal/issues/366)); Approach D (PSALTer-tagged) is the ultimate goal. v3.2 implementation is GATED on `[v3.2-classify]` issue [#363](https://github.com/WilliamRoyce/tidal/issues/363) completion.
 
 ## Supervisor question (draft for next meeting)
 

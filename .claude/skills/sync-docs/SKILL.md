@@ -6,7 +6,7 @@ description: Review and update all documentation for accuracy. Use when docs hav
 # Documentation Sync
 
 ## Current project stats
-!`cd /workspaces/torsion-gertsenshtein && echo "Tests: $(uv run pytest tests/ --collect-only -q 2>&1 | tail -1)" && echo "Examples: $(ls examples/*/theory.toml 2>/dev/null | wc -l) theory.toml files" && echo "JSON specs: $(ls examples/data/*.json 2>/dev/null | wc -l)" && echo "Skills: $(ls .claude/skills/*/SKILL.md 2>/dev/null | wc -l)" && echo "Version: $(python3 -c "import re; m=re.search(r'version = \"([^\"]+)\"', open('pyproject.toml').read()); print(m.group(1) if m else '?')")"
+!`echo "Tests: $(uv run pytest tests/ --collect-only -q 2>&1 | tail -1)" && echo "Examples: $(ls examples/*/theory.toml 2>/dev/null | wc -l) theory.toml files" && echo "JSON specs: $(ls examples/data/*.json 2>/dev/null | wc -l)" && echo "Skills: $(ls .claude/skills/*/SKILL.md 2>/dev/null | wc -l)" && echo "Version: $(python3 -c "import re; m=re.search(r'version = \"([^\"]+)\"', open('pyproject.toml').read()); print(m.group(1) if m else '?')")"
 
 ## Open ROADMAP items
 !`grep -n "🔄\|TODO\|BLOCKED\|In Progress" docs/ROADMAP.md 2>/dev/null | head -15`

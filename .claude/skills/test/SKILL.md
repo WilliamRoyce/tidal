@@ -6,7 +6,7 @@ description: Run pytest with smart scope detection based on recently changed fil
 # Smart Test Runner
 
 ## Changed files
-!`cd /workspaces/torsion-gertsenshtein && (git diff --name-only HEAD 2>/dev/null; git diff --name-only --staged 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) | sort -u`
+!`(git diff --name-only HEAD 2>/dev/null; git diff --name-only --staged 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) | sort -u`
 
 ## Instructions
 

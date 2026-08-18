@@ -1,7 +1,7 @@
 #!/bin/bash
 # PreCompact hook: inject branch/commit context before context compaction
 # After compaction, Claude loses conversation history — this breadcrumb helps
-cd /workspaces/torsion-gertsenshtein 2>/dev/null || exit 0
+cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}" 2>/dev/null || exit 0
 BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 RECENT=$(git log --oneline -5 2>/dev/null || echo "no commits")
 MODIFIED=$(git diff --name-only HEAD 2>/dev/null | head -10)

@@ -6,7 +6,7 @@ _CITATION = """\
 If you use TIDAL in your research, please cite:
 
   Royce, W. "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
-  https://github.com/WilliamRoyce/torsion-gertsenshtein
+  https://github.com/WilliamRoyce/tidal
 
 Dependencies you may also wish to cite:
 

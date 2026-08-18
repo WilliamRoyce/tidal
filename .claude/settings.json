@@ -27,9 +27,8 @@
       "Bash(cat:*)",
       "Bash(head:*)",
       "Bash(tail:*)",
-      "Bash(bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/:*)",
-      "Bash(bash /workspaces/torsion-gertsenshtein/scripts/:*)",
-      "Read(/workspaces/torsion-gertsenshtein/**)",
+      "Bash(bash .devcontainer/scripts/:*)",
+      "Bash(bash scripts/:*)",
       "Read(/home/vscode/.claude/**)"
     ]
   },

@@ -6,22 +6,22 @@ description: Conventional commit with mandatory pre-commit testing and auto-form
 # Conventional Commit
 
 ## Git status
-!`cd /workspaces/torsion-gertsenshtein && git status --short`
+!`git status --short`
 
 ## Changed files
-!`cd /workspaces/torsion-gertsenshtein && (git diff --name-only HEAD 2>/dev/null; git diff --name-only --staged 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) | sort -u`
+!`(git diff --name-only HEAD 2>/dev/null; git diff --name-only --staged 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) | sort -u`
 
 ## Recent commits (for style matching)
-!`cd /workspaces/torsion-gertsenshtein && git log --oneline -5`
+!`git log --oneline -5`
 
 ## Version status
-!`cd /workspaces/torsion-gertsenshtein && echo "v$(python3 -c "import re; print(re.search(r'^version\s*=\"([^\"]+)\"', open('pyproject.toml').read(), re.MULTILINE).group(1))" 2>/dev/null) — $(git log --oneline $(git log --all --grep='chore: bump version' --format='%H' -1 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD 2>/dev/null | wc -l) commits since last bump"`
+!`echo "v$(python3 -c "import re; print(re.search(r'^version\s*=\"([^\"]+)\"', open('pyproject.toml').read(), re.MULTILINE).group(1))" 2>/dev/null) — $(git log --oneline $(git log --all --grep='chore: bump version' --format='%H' -1 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD 2>/dev/null | wc -l) commits since last bump"`
 
 ## Docs mentioning changed components
-!`cd /workspaces/torsion-gertsenshtein && for f in $(git diff --name-only HEAD 2>/dev/null | head -5); do base=$(basename "$f" .py); grep -rl --include="*.tex" --include="*.md" "$base" docs/ 2>/dev/null; done | sort -u | head -10`
+!`for f in $(git diff --name-only HEAD 2>/dev/null | head -5); do base=$(basename "$f" .py); grep -rl --include="*.tex" --include="*.md" "$base" docs/ 2>/dev/null; done | sort -u | head -10`
 
 ## Related open issues
-!`cd /workspaces/torsion-gertsenshtein && gh issue list --limit 10 --json number,title --jq '.[] | "#\(.number): \(.title)"' 2>/dev/null`
+!`gh issue list --limit 10 --json number,title --jq '.[] | "#\(.number): \(.title)"' 2>/dev/null`
 
 ## Instructions
 

@@ -140,7 +140,7 @@ _None yet — fill as `hpc_results/<jobid>/phase_e/<theory>/README.md` files lan
 
 ## Open blockers (dated, drop when resolved)
 
-- [ ] **2026-05-24** [#378](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/378) — E.EH derivation produces multi-exp denominator that overflows in coefficient evaluation. `_invert_exp_denominator` only handles single-exp case. Non-blocking for PGT roster; E.EH deferred from Wave 1.
+- [ ] **2026-05-24** [#378](https://github.com/WilliamRoyce/tidal/issues/378) — E.EH derivation produces multi-exp denominator that overflows in coefficient evaluation. `_invert_exp_denominator` only handles single-exp case. Non-blocking for PGT roster; E.EH deferred from Wave 1.
 
 ## Resolved blockers (archive)
 

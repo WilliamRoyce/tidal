@@ -6,7 +6,7 @@ description: Full pipeline validation with auto-fix for lint, type, and spell er
 # Full Pipeline Validation (Auto-Fix)
 
 ## Current status
-!`cd /workspaces/torsion-gertsenshtein && echo "=== Lint ===" && uv run ruff check --output-format concise 2>&1 | tail -10 && echo "=== Type ===" && uv run pyright --outputjson 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'{len(d.get(\"generalDiagnostics\",[]))} type errors')" 2>&1 || echo "pyright needed"`
+!`echo "=== Lint ===" && uv run ruff check --output-format concise 2>&1 | tail -10 && echo "=== Type ===" && uv run pyright --outputjson 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); print(f'{len(d.get(\"generalDiagnostics\",[]))} type errors')" 2>&1 || echo "pyright needed"`
 
 ## Instructions
 

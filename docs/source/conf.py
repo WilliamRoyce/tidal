@@ -63,7 +63,7 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "GitHub",
-            "url": "https://github.com/WilliamRoyce/torsion-gertsenshtein",
+            "url": "https://github.com/WilliamRoyce/tidal",
             "icon": "fa-brands fa-github",
         },
     ],

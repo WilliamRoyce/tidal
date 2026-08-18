@@ -1329,7 +1329,7 @@ def compute_system_energy(
             "H = sum(pi_i * v_i) - L is not the correct conserved quantity "
             "for theories with non-trivial constraints (Dirac-Bergmann "
             "theory). Energy measurements may show systematic drift. "
-            "See: https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/178",
+            "See: https://github.com/WilliamRoyce/tidal/issues/178",
             stacklevel=2,
         )
 

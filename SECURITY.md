@@ -30,7 +30,7 @@ This security policy covers:
 
 If you discover a security vulnerability, please report it via **GitHub Security Advisories**:
 
-1. Go to the [Security tab](https://github.com/WilliamRoyce/torsion-gertsenshtein/security)
+1. Go to the [Security tab](https://github.com/WilliamRoyce/tidal/security)
 2. Click "Report a vulnerability"
 3. Fill out the form with details about the vulnerability
 

@@ -5,19 +5,19 @@
 
 <p align="center">
 
-[![CI Tests](https://github.com/WilliamRoyce/torsion-gertsenshtein/workflows/test/badge.svg)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions)
+[![CI Tests](https://github.com/WilliamRoyce/tidal/actions/workflows/test.yml/badge.svg)](https://github.com/WilliamRoyce/tidal/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: pyright](https://img.shields.io/badge/type%20checked-pyright-informational)](https://github.com/microsoft/pyright)
-[![codecov](https://codecov.io/gh/WilliamRoyce/torsion-gertsenshtein/branch/main/graph/badge.svg)](https://codecov.io/gh/WilliamRoyce/torsion-gertsenshtein)
+[![codecov](https://codecov.io/gh/WilliamRoyce/tidal/branch/main/graph/badge.svg)](https://codecov.io/gh/WilliamRoyce/tidal)
 
 </p>
 
 ## About
 
 By William Royce (`wr286@cantab.ac.uk`) — developed in the Astrophysics Group, Cavendish Laboratory, University of Cambridge.
-Documentation: <https://williamroyce.github.io/torsion-gertsenshtein/>
+Documentation: <https://williamroyce.github.io/tidal/>
 
 TIDAL derives and integrates the linearized equations of motion of **any tensorial Lagrangian** on a given background. You write the Lagrangian in a TOML file; TIDAL performs the variation symbolically in Mathematica/xAct, decomposes the result into components, exports a JSON specification, and evolves it numerically. The numerical layer contains no physics — every equation it solves was derived from your Lagrangian.
 
@@ -31,7 +31,7 @@ A software paper describing TIDAL is in preparation. Until it appears, please ci
 
 ```text
 W. Royce, "TIDAL: Tensor Integration and Derivation for Any Lagrangian",
-https://github.com/WilliamRoyce/torsion-gertsenshtein
+https://github.com/WilliamRoyce/tidal
 ```
 
 `tidal --cite` prints this along with the citations for SUNDIALS, SciPy, NumPy and xAct, which you should cite alongside TIDAL when you use the corresponding components. Physics work using TIDAL is also in preparation.
@@ -311,10 +311,10 @@ Development continues, towards a distributable package and the associated public
 
 ## Getting help
 
-- **Questions and ideas**: [GitHub Discussions](https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions)
-- **Bugs**: [Issue tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues), with the `bug` label
-- **Feature requests**: [Issue tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues), with the `enhancement` label
-- **API reference**: <https://williamroyce.github.io/torsion-gertsenshtein/>
+- **Questions and ideas**: [GitHub Discussions](https://github.com/WilliamRoyce/tidal/discussions)
+- **Bugs**: [Issue tracker](https://github.com/WilliamRoyce/tidal/issues), with the `bug` label
+- **Feature requests**: [Issue tracker](https://github.com/WilliamRoyce/tidal/issues), with the `enhancement` label
+- **API reference**: <https://williamroyce.github.io/tidal/>
 
 ## Contributing
 
