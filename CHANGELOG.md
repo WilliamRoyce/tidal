@@ -10,6 +10,25 @@ commits reworked a load-bearing part of the Wolfram pipeline that future
 maintainers need to be able to trace. Earlier versions are not
 retroactively covered; see `git log` for the full history.
 
+## [Unreleased]
+
+### Fixed
+
+- **Pass-1 cross-block guard is now purely scale-relative (#429)**. The
+  floored-relative threshold `max(1e-14, max|M_src|·1e-10)` introduced for
+  #275 (recorded below under v0.33.x) let the absolute floor dominate
+  whenever `max|M_src| < 1e-4`, silently passing — and then discarding —
+  cross-block source coupling that is a large fraction of the source norm.
+  The EH dual-Gaussian spec's physical O(ε) a_0↔a_3 coupling (~3% of the
+  source norm at Phase E geometry, where max|M_src| ≈ 8e-15) was masked
+  this way; the May 2026 "Pass 0 + Pass 1 complete end-to-end" runs were
+  therefore silently wrong, and the corresponding claim in
+  `docs/PHASE_E_TRACKER.md` is retracted. The threshold is now
+  `max|M_src|·1e-10` with no absolute floor: the spec refuses honestly at
+  every ρ, the refusal message names the coupled sectors, and sub-tolerance
+  discards are logged. Cross-block support is tracked in #439; the related
+  corner-collapse of position-dependent source coefficients in #438.
+
 ## [v0.34.0 – v0.47.9] — not individually recorded
 
 Changelog maintenance lapsed during the PGT survey campaign and the MSci
