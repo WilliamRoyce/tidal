@@ -164,6 +164,11 @@ def plot_importance(
 
     Parameters ranked by marginal D_KL (most constrained first).
     Color-coded: strong (red), moderate (orange), weak (blue).
+    Floor-dominated parameters (``consistency["floor_dominated_params"]``,
+    #433) render as gray hatched bars — those values are estimator noise,
+    not constraint — and the largest per-parameter noise floor is drawn
+    as a dashed vertical line so the chart cannot present a
+    floor-limited chain as a clean ranking.
 
     Parameters
     ----------
@@ -179,6 +184,11 @@ def plot_importance(
     import matplotlib.pyplot as plt
     import numpy as np
 
+    consistency = result.consistency or {}
+    floor_dominated = set(consistency.get("floor_dominated_params") or [])
+    noise_floor: dict[str, float] = consistency.get("noise_floor") or {}
+    max_floor = max(noise_floor.values(), default=0.0)
+
     # Rank by D_KL
     ranked = sorted(
         result.marginal_d_kl.items(),
@@ -187,29 +197,58 @@ def plot_importance(
     names = [name for name, _ in ranked]
     values = [dkl if math.isfinite(dkl) else 0.0 for _, dkl in ranked]
 
-    # Color by importance
+    # Color by importance; floor-dominated bars are gray + hatched
+    # regardless of magnitude (their magnitude IS the floor).
     colors = []
-    for v in values:
-        if v > 1.0:
-            colors.append("#d62728")  # red = strong
-        elif v > 0.1:
-            colors.append("#ff7f0e")  # orange = moderate
+    hatches = []
+    for name, v in zip(names, values, strict=True):
+        if name in floor_dominated:
+            colors.append("#bbbbbb")
+            hatches.append("///")
         else:
-            colors.append("#1f77b4")  # blue = weak
+            hatches.append("")
+            if v > 1.0:
+                colors.append("#d62728")  # red = strong
+            elif v > 0.1:
+                colors.append("#ff7f0e")  # orange = moderate
+            else:
+                colors.append("#1f77b4")  # blue = weak
 
     fig, ax = plt.subplots(figsize=(8, max(3, 0.6 * len(names))))
     y_pos = np.arange(len(names))
-    ax.barh(y_pos, values, color=colors, edgecolor="none", height=0.6)
+    bars = ax.barh(y_pos, values, color=colors, edgecolor="none", height=0.6)
+    for bar, hatch in zip(bars, hatches, strict=True):
+        if hatch:
+            bar.set_hatch(hatch)
+            bar.set_edgecolor("#888888")
     ax.set_yticks(y_pos)
     ax.set_yticklabels(names)
     ax.set_xlabel("Marginal $D_{\\mathrm{KL}}$ (nats)")
-    ax.set_title(
-        f"Parameter Importance  ($d_G = {result.d_g:.1f}$ of {len(names)} params)",
-    )
+    n_floor = len(floor_dominated)
+    title = f"Parameter Importance  ($d_G = {result.d_g:.1f}$ of {len(names)} params)"
+    if n_floor:
+        n_eff = consistency.get("n_eff", float("nan"))
+        title += (
+            f"\n{n_floor} of {len(names)} at estimator noise floor "
+            f"($N_\\mathrm{{eff}} \\approx {n_eff:.0f}$) — hatched bars are "
+            f"not rankable"
+        )
+    ax.set_title(title)
 
     # Threshold line
     ax.axvline(0.1, color="gray", linestyle="--", linewidth=0.8, alpha=0.6)
     ax.text(0.1, len(names) - 0.3, "weak", fontsize=8, color="gray", ha="left")
+    # Noise-floor line (#433): values left of this are estimator bias.
+    if max_floor > 0:
+        ax.axvline(max_floor, color="#555555", linestyle=":", linewidth=1.2, alpha=0.9)
+        ax.text(
+            max_floor,
+            -0.45,
+            "noise floor",
+            fontsize=8,
+            color="#555555",
+            ha="left",
+        )
 
     fig.tight_layout()
 

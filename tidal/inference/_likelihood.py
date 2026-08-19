@@ -44,6 +44,37 @@ if TYPE_CHECKING:
 # it can't tell directions apart.
 SOFT_FLOOR_LOGL: float = -100.0
 
+# Once-per-process latch for the GH #421 "stability probe unavailable"
+# warning: the condition is a property of the spec, and repeating the
+# warning on every likelihood evaluation would flood chain logs.
+_posdep_probe_warned = False
+
+
+def _posdep_probe_unavailable_meta(exc: BaseException) -> dict[str, Any]:
+    """Metadata + once-per-process warning for a GH #421-guarded spec.
+
+    The modal-based stability probe raises ``NotImplementedError`` for
+    specs with position-dependent kinetic coefficients (GH #421/#427).
+    That is a per-spec property, not a per-sample failure: warn ONCE and
+    return an explicit ``stability_profile`` marker so chain CSVs record
+    WHY the gamma_eff / borderline_stability / n_tachyonic_modes columns
+    are absent instead of silently losing them (post-merge review H4 —
+    previously this fell into a bare ``except Exception`` at debug level
+    and the gate vanished without trace).
+    """
+    import logging
+
+    global _posdep_probe_warned  # noqa: PLW0603
+    if not _posdep_probe_warned:
+        _posdep_probe_warned = True
+        logging.getLogger("tidal.inference").warning(
+            "Pre-flight tachyonic probe unavailable for this spec "
+            "(position-dependent kinetic coefficient — GH #421/#427); "
+            "sampling continues WITHOUT the stability gate: %s",
+            exc,
+        )
+    return {"stability_profile": "unavailable-posdep-kinetic"}
+
 
 def _soft_floor_logl(
     sigma_explore: float,
@@ -601,6 +632,10 @@ def _evaluate_likelihood(
                     "run_status": "tachyonic_gated",
                     **stability_meta,
                 }
+        except NotImplementedError as exc:
+            # GH #421 guard (position-dependent kinetic): record the marker
+            # and warn once — see _posdep_probe_unavailable_meta.
+            stability_meta = _posdep_probe_unavailable_meta(exc)
         except Exception:  # noqa: BLE001
             import logging
 
