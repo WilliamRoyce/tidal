@@ -202,15 +202,21 @@ def emit_per_theory(results: list[dict[str, Any]], out_path: Path) -> None:
     )
     for r in results:
         theory = THEORY_DISPLAY.get(r["theory"], r["theory"])
-        amp_marg = r.get("amp", {}).get("marginal_d_kl", {})
-        sup_marg = r.get("sup", {}).get("marginal_d_kl", {})
+        amp = r.get("amp", {})
+        sup = r.get("sup", {})
+        amp_marg = amp.get("marginal_d_kl", {})
+        sup_marg = sup.get("marginal_d_kl", {})
         cross = r.get("cross_amp_sup_kl", {})
-        # Rank by union score: max of (amp marginal, sup marginal, cross)
+        # Floor-dominated marginals (#433) are estimator noise: they are
+        # excluded from the ranking score (cross remains valid — it is a
+        # prior-free estimator) and their cells carry a dagger.
+        floor_amp = set(amp.get("consistency", {}).get("floor_dominated_params") or [])
+        floor_sup = set(sup.get("consistency", {}).get("floor_dominated_params") or [])
         names = list(amp_marg.keys())
         scores = {
             n: max(
-                amp_marg.get(n, 0.0) or 0.0,
-                sup_marg.get(n, 0.0) or 0.0,
+                0.0 if n in floor_amp else (amp_marg.get(n, 0.0) or 0.0),
+                0.0 if n in floor_sup else (sup_marg.get(n, 0.0) or 0.0),
                 cross.get(n, 0.0) or 0.0,
             )
             for n in names
@@ -228,11 +234,26 @@ def emit_per_theory(results: list[dict[str, Any]], out_path: Path) -> None:
             )
         )
         for n in ranked:
-            lines.append(
-                f"{_label(n)} & {_fmt(amp_marg.get(n))}"
-                f" & {_fmt(sup_marg.get(n))} & {_fmt(cross.get(n))} \\\\"
+            amp_cell = _fmt(amp_marg.get(n)) + (
+                r"$^{\dagger}$" if n in floor_amp else ""
             )
-        lines.extend((r"\hline\hline", r"\end{tabular}", ""))
+            sup_cell = _fmt(sup_marg.get(n)) + (
+                r"$^{\dagger}$" if n in floor_sup else ""
+            )
+            lines.append(
+                f"{_label(n)} & {amp_cell} & {sup_cell} & {_fmt(cross.get(n))} \\\\"
+            )
+        lines.extend((r"\hline\hline", r"\end{tabular}"))
+        if floor_amp or floor_sup:
+            n_eff_a = amp.get("consistency", {}).get("n_eff", float("nan"))
+            n_eff_s = sup.get("consistency", {}).get("n_eff", float("nan"))
+            lines.append(
+                rf"\par\noindent{{\footnotesize $^{{\dagger}}$at the estimator "
+                rf"noise floor ($N_\mathrm{{eff}} \approx {n_eff_a:.0f}$ amp / "
+                rf"{n_eff_s:.0f}$ sup); not rankable — see the results "
+                rf"amendments record.}}"
+            )
+        lines.append("")
     out_path.write_text("\n".join(lines) + "\n")
     log.info("wrote %s (%d theories)", out_path.relative_to(REPO_ROOT), len(results))
 
@@ -246,9 +267,26 @@ def emit_headline_claims(results: list[dict[str, Any]], out_path: Path) -> None:
     for r in results:
         theory = THEORY_DISPLAY.get(r["theory"], r["theory"])
         cross = r.get("cross_amp_sup_kl", {})
-        amp_marg = r.get("amp", {}).get("marginal_d_kl", {})
+        amp = r.get("amp", {})
+        amp_marg = amp.get("marginal_d_kl", {})
+        cons = amp.get("consistency", {})
+        floor_amp = set(cons.get("floor_dominated_params") or [])
+        # Floor-dominated marginals cannot carry a headline claim (#433);
+        # rank only the rankable ones.  Cross stays as-is (prior-free).
+        rankable = {n: v for n, v in amp_marg.items() if n not in floor_amp}
         top_cross = _top_k(cross, 2)
-        top_amp = _top_k(amp_marg, 2)
+        top_amp = _top_k(rankable, 2)
+        if amp_marg and not rankable:
+            n_eff = cons.get("n_eff", float("nan"))
+            lines.extend(
+                (
+                    f"% {theory}: ALL amp marginals at the estimator noise "
+                    f"floor (N_eff ~ {n_eff:.0f}) — no rankable amp carrier; "
+                    f"cross discriminator only.",
+                    "",
+                )
+            )
+            top_amp = []
         if not top_cross or not top_amp:
             lines.append(f"% {theory}: no carrier data")
             continue
@@ -282,10 +320,20 @@ For each surveyed sector we report two flavors of Kullback--Leibler
 divergence.  The \emph{per-direction marginal} $D_\mathrm{KL}(P_\pm(\theta_i)
 \,\|\, \pi(\theta_i))$ measures, parameter-by-parameter, how much the
 amplification ($+$) or suppression ($-$) posterior has contracted relative
-to its prior.  It is computed via the standard anesthetic histogram-against-prior
-estimator (binning each marginal in the natural space of its prior, where the
-prior density is uniform).  Bootstrap uncertainties are propagated from
-PolyChord's nested-sampling estimator.
+to its prior.  It is computed by a histogram estimator implemented in
+\textsc{tidal} (\texttt{tidal.inference.\_importance}; anesthetic supplies
+only the joint $D_\mathrm{KL}$, $d_G$ and $\log Z$): each posterior column
+is first mapped into the space where its prior is uniform — identity for
+uniform priors, $\log x$ for log-uniform, $\arctan x$ on the fixed
+eps-truncated range for arctan-uniform, the Gaussian CDF for normal — and
+binned there against the uniform reference; cubed-sphere
+(\emph{radial-angular}) couplings, which have no closed-form 1-D marginal
+CDF, are instead scored against a fixed-seed empirical prior sample in
+$\operatorname{asinh}$ space.  The estimator carries a per-parameter noise
+floor of $(n_\mathrm{bins}-1)/(2N_\mathrm{eff})$: marginals at or below the
+floor are estimator bias, not constraint, and are excluded from rankings
+(marked $\dagger$ in the tables).  Bootstrap uncertainties on the joint
+quantities are propagated from PolyChord's nested-sampling estimator.
 
 The \emph{cross-amp-sup} divergence $D_\mathrm{KL}(P_+(\theta_i)
 \,\|\, P_-(\theta_i))$ measures, parameter-by-parameter, how much the

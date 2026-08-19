@@ -62,8 +62,19 @@ class StubResult:
     priors: list[dict[str, Any]]
 
 
-def _read_priors(chain_dir: Path, param_names: list[str]) -> list[dict[str, Any]]:
-    """Load priors from inference.json if available, else infer arctan_uniform."""
+def _read_priors(
+    chain_dir: Path,
+    param_names: list[str],
+) -> tuple[list[dict[str, Any]], str]:
+    """Load priors from inference.json if available, else fabricate arctan.
+
+    Returns ``(records, provenance)`` where ``provenance`` is ``"recorded"``
+    or ``"fabricated"``.  Fabrication is LOUD: the Barker amp chain
+    (GH #434) had an ``inference.json`` *without* a ``priors`` key and was
+    silently scored against fabricated all-arctan(±89) priors for months —
+    file existence is not prior provenance, so the caller records the
+    provenance in the output JSON and the report prints it from data.
+    """
     inf_json = chain_dir / "inference.json"
     if inf_json.is_file():
         try:
@@ -71,9 +82,24 @@ def _read_priors(chain_dir: Path, param_names: list[str]) -> list[dict[str, Any]
                 meta = json.load(f)
             priors = meta.get("priors")
             if priors:
-                return priors
+                return priors, "recorded"
+            log.warning(
+                "[%s] inference.json exists but has NO priors key "
+                "(pre-schema or reconstructed run) — fabricating "
+                "all-arctan(+-89) priors; add prior_overrides in "
+                "d_kl_chains.toml for any parameter whose sbatch template "
+                "used a different kind (GH #434)",
+                chain_dir.name,
+            )
         except (json.JSONDecodeError, OSError) as exc:
             log.warning("could not read priors from %s: %s", inf_json, exc)
+    else:
+        log.warning(
+            "[%s] no inference.json — fabricating all-arctan(+-89) priors; "
+            "verify against the sbatch template and add prior_overrides "
+            "where wrong (GH #434)",
+            chain_dir.name,
+        )
     # Fallback: assume arctan_uniform with the convention used elsewhere
     # in the survey (±89 for sign-symmetric couplings).  This is only used
     # to support older chains pre-dating the inference.json schema.
@@ -86,7 +112,7 @@ def _read_priors(chain_dir: Path, param_names: list[str]) -> list[dict[str, Any]
             "high": 89.0,
         }
         for name in param_names
-    ]
+    ], "fabricated"
 
 
 def _align_priors_to_params(
@@ -108,9 +134,11 @@ def _align_priors_to_params(
     column order by construction (``build_prior_transform`` concatenates
     prior dimensions in declaration order, and the chain writer emits
     columns the same way).  ``radial_angular`` records consume
-    ``len(names)`` consecutive columns.  On any arity mismatch the
-    original records are returned unchanged (with a warning) so the
-    failure mode stays visible rather than mis-assigned.
+    ``len(names)`` consecutive columns.  Any arity mismatch RAISES —
+    proceeding with misaligned (or original-named) records would score
+    every column against the wrong or no prior, the silent-misassignment
+    class the #420 campaign was about; the caller skips the chain with a
+    visible error instead.
     """
     aligned: list[dict[str, Any]] = []
     pos = 0
@@ -119,14 +147,12 @@ def _align_priors_to_params(
             names = list(rec.get("names", []))
             new_names = param_names[pos : pos + len(names)]
             if len(new_names) != len(names):
-                log.warning(
-                    "[%s] prior/param arity mismatch (joint record needs %d "
-                    "columns, %d remain) — keeping original prior names",
-                    chain_label,
-                    len(names),
-                    len(new_names),
+                msg = (
+                    f"[{chain_label}] prior/param arity mismatch: joint "
+                    f"record needs {len(names)} columns, {len(new_names)} "
+                    f"remain — refusing to score against misaligned priors"
                 )
-                return priors
+                raise ValueError(msg)
             if names != new_names:
                 log.info(
                     "[%s] positional prior match: %s -> %s",
@@ -138,12 +164,11 @@ def _align_priors_to_params(
             pos += len(names)
         else:
             if pos >= len(param_names):
-                log.warning(
-                    "[%s] more prior records than columns — keeping "
-                    "original prior names",
-                    chain_label,
+                msg = (
+                    f"[{chain_label}] more prior records than columns — "
+                    f"refusing to score against misaligned priors"
                 )
-                return priors
+                raise ValueError(msg)
             new_name = param_names[pos]
             if rec.get("name") != new_name:
                 log.info(
@@ -156,13 +181,12 @@ def _align_priors_to_params(
             aligned.append({**rec, "name": new_name})
             pos += 1
     if pos != len(param_names):
-        log.warning(
-            "[%s] %d prior dimensions for %d columns — keeping original prior names",
-            chain_label,
-            pos,
-            len(param_names),
+        msg = (
+            f"[{chain_label}] {pos} prior dimensions for "
+            f"{len(param_names)} columns — refusing to score against "
+            f"misaligned priors"
         )
-        return priors
+        raise ValueError(msg)
     return aligned
 
 
@@ -178,15 +202,34 @@ def _apply_prior_overrides(
     inference.json priors schema, where ``_read_priors`` fabricates an
     all-arctan fallback.  The override strings use the same syntax as the
     campaign ``--prior`` flags (see scripts/hpc_templates/*.sbatch, the
-    provenance for these values).  Names refer to the TOML ``param_names``
-    (i.e. post-alignment).
+    provenance for these values), and are validated through
+    :func:`tidal.inference._prior.parse_prior` so a malformed value fails
+    with the parameter name and the offending string instead of a bare
+    unpacking error.  Names refer to the TOML ``param_names`` (i.e.
+    post-alignment).
+
+    Raises
+    ------
+    ValueError
+        If an override string is malformed, or names a parameter that has
+        no scalar record (a typo, or a coupling inside a radial_angular
+        joint record — which cannot be overridden per-component).
     """
+    from tidal.inference._prior import parse_prior
+
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for rec in priors:
         name = rec.get("name")
         if name in overrides:
-            dist, lo, hi = overrides[name].split(":")
+            try:
+                parsed = parse_prior(f"{name}={overrides[name]}")
+            except ValueError as exc:
+                msg = (
+                    f"[{chain_label}] malformed prior_overrides entry "
+                    f"{name} = {overrides[name]!r}: {exc}"
+                )
+                raise ValueError(msg) from exc
             log.info(
                 "[%s] prior override: %s = %s (was %s)",
                 chain_label,
@@ -198,9 +241,9 @@ def _apply_prior_overrides(
                 {
                     "kind": "scalar",
                     "name": name,
-                    "distribution": dist,
-                    "low": float(lo),
-                    "high": float(hi),
+                    "distribution": parsed.distribution,
+                    "low": parsed.low,
+                    "high": parsed.high,
                 }
             )
             seen.add(str(name))
@@ -208,11 +251,14 @@ def _apply_prior_overrides(
             out.append(rec)
     missing = set(overrides) - seen
     if missing:
-        log.warning(
-            "[%s] prior_overrides for unknown parameter(s): %s",
-            chain_label,
-            sorted(missing),
+        # An unmatched override means the numbers would silently be wrong
+        # for exactly the parameter someone bothered to override — refuse.
+        msg = (
+            f"[{chain_label}] prior_overrides for parameter(s) with no "
+            f"scalar record: {sorted(missing)} (typo, or the coupling "
+            f"lives inside a radial_angular joint record)"
         )
+        raise ValueError(msg)
     return out
 
 
@@ -220,22 +266,27 @@ def _build_stub(
     chain_dir: Path,
     param_names: list[str],
     prior_overrides: dict[str, str] | None = None,
-) -> StubResult:
-    """Build a StubResult pointing at the on-disk chain root."""
+) -> tuple[StubResult, str]:
+    """Build a StubResult pointing at the on-disk chain root.
+
+    Returns ``(stub, provenance)`` — provenance is ``"recorded"`` /
+    ``"fabricated"``, with ``"+overrides"`` appended when
+    ``prior_overrides`` replaced any record, and is persisted into the
+    output JSON so the report can print prior provenance from data
+    instead of inferring it from file existence (GH #434).
+    """
     chain_root = chain_dir / "_chains" / "tidal"
-    priors = _align_priors_to_params(
-        _read_priors(chain_dir, param_names),
-        param_names,
-        chain_dir.name,
-    )
+    raw_priors, provenance = _read_priors(chain_dir, param_names)
+    priors = _align_priors_to_params(raw_priors, param_names, chain_dir.name)
     if prior_overrides:
         priors = _apply_prior_overrides(priors, prior_overrides, chain_dir.name)
+        provenance += "+overrides"
     return StubResult(
         method="nested",
         param_names=list(param_names),
         priors=priors,
         metadata={"chain_root": str(chain_root), "priors": priors},
-    )
+    ), provenance
 
 
 def _process_chain(entry: dict[str, Any], n_bootstrap: int) -> None:
@@ -267,8 +318,8 @@ def _process_chain(entry: dict[str, Any], n_bootstrap: int) -> None:
     # Per-direction parameter importance (amp + sup).
     prior_overrides: dict[str, str] = dict(entry.get("prior_overrides", {}))
     for direction, chain_dir in (("amp", amp_path), ("sup", sup_path)):
-        stub = _build_stub(chain_dir, params, prior_overrides)
         try:
+            stub, provenance = _build_stub(chain_dir, params, prior_overrides)
             imp = compute_parameter_importance(stub, n_bootstrap=n_bootstrap)
         except (ValueError, RuntimeError, KeyError) as exc:
             log.warning(
@@ -288,6 +339,9 @@ def _process_chain(entry: dict[str, Any], n_bootstrap: int) -> None:
             "marginal_d_kl": imp.marginal_d_kl,
             # Self-check block (#420): superadditivity, saturation, n_eff.
             "consistency": imp.consistency,
+            # recorded | fabricated [+overrides] — from _read_priors, so the
+            # report prints provenance from data, not file existence (#434).
+            "priors_provenance": provenance,
         }
 
     # Cross-amp-sup per-parameter D_KL: load both chains via anesthetic
