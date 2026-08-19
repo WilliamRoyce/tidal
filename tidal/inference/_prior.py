@@ -40,8 +40,22 @@ class Prior:
         ``"arctan_uniform"``.
     low : float
         Lower bound (for uniform/log_uniform) or mean (for normal).
+        **Ignored for arctan_uniform** — see below.
     high : float
         Upper bound (for uniform/log_uniform) or std (for normal).
+        **Ignored for arctan_uniform** — see below.
+
+    Notes
+    -----
+    ``arctan_uniform`` does NOT use ``low``/``high`` (GH #425): the angle
+    is uniform on the fixed eps-truncated range
+    ``(-pi/2 + _ARCTAN_EPS, +pi/2 - _ARCTAN_EPS)``, so the support is
+    always ``|x| <= tan(pi/2 - _ARCTAN_EPS) ~= 19.98`` regardless of the
+    recorded bounds.  A ``UserWarning`` fires at construction when the
+    given bounds differ from that implied support.  Honoring the bounds
+    would silently redefine the prior for every archived chain whose
+    metadata records these unused numbers, so any change must be
+    versioned — deliberately deferred, see the options in GH #425.
     """
 
     name: str
@@ -63,6 +77,28 @@ class Prior:
         if self.distribution == "normal" and self.high <= 0:
             msg = f"Normal prior std must be positive, got {self.high}"
             raise ValueError(msg)
+        if self.distribution == "arctan_uniform":
+            # GH #425: sample/transform/log_prob use the fixed eps-truncated
+            # theta range and ignore low/high entirely.  Tell the user at
+            # launch rather than let the recorded bounds masquerade as the
+            # support (which is how the #420 marginal D_KL inflation got a
+            # (-89, 89) histogram range for a +-20 distribution).
+            import warnings
+
+            support = math.tan(math.pi / 2 - _ARCTAN_EPS)
+            if not (
+                math.isclose(self.low, -support, rel_tol=1e-9)
+                and math.isclose(self.high, support, rel_tol=1e-9)
+            ):
+                warnings.warn(
+                    f"arctan_uniform ignores its bounds: requested "
+                    f"[{self.low}, {self.high}] but the sampled support is "
+                    f"fixed at [-{support:.2f}, {support:.2f}] "
+                    f"(theta uniform on +-(pi/2 - {_ARCTAN_EPS})). "
+                    f"See GH #425.",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
     # ------------------------------------------------------------------
     # Sampling (Monte Carlo)
@@ -154,7 +190,8 @@ def parse_prior(spec: str) -> Prior:
         "alpha=uniform:0.01:10"
         "xi=log_uniform:0.01:10"
         "delta=normal:0:1"
-        "alpha=arctan_uniform:-30:30"
+        "alpha=arctan_uniform:-30:30"   # bounds recorded but IGNORED:
+                                        # support is fixed at ~+-20 (GH #425)
 
     Raises
     ------
