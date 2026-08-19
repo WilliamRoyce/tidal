@@ -18,6 +18,12 @@ This document is the canonical architecture reference for the v3 era. It survive
 > compactified-prior table below misstates the `arctan_uniform` support: the
 > bounds `-89:89` are **ignored by the sampler** (GH #425) and the support is
 > fixed at ±tan(π/2 − 0.05) ≈ **±19.98**, not "degrees → tan(±89°) ≈ ±57".
+> The corner plot implemented that same ±57.3 misreading until v0.49.2, drawing
+> `--full-prior-bounds` panels ~2.9× wider than the sampled range (GH #451, fixed);
+> no committed figure script or campaign template passes that flag, so no recorded
+> figure is affected. Since v0.49.2 the support has a single source of truth,
+> `tidal.inference._prior.effective_support`, and new chains record
+> `effective_low`/`effective_high` per prior.
 > Post-v0.48.8, `importance.json` carries a `consistency` block (N_eff, noise
 > floors, superadditivity); marginals below their floor must not be ranked
 > (GH #433).

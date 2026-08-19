@@ -74,6 +74,24 @@ unused.  (Campaign metadata that records \texttt{arctan\_uniform:-89:89}
 describes bounds that were never sampled --- this mismatch was one of the
 two mechanisms behind the GH \#420 marginal-$D_\mathrm{KL}$ inflation.)
 
+\paragraph{Effective support --- one source of truth}
+Because the recorded bounds can describe nothing, no consumer may re-derive
+a prior's range from them.  \texttt{tidal.inference.\_prior.effective\_support(%
+distribution, low, high)} is the single accessor for \emph{the range that was
+actually sampled}: the recorded bounds for uniform and log-uniform, the fixed
+$\pm 19.98$ for arctan-uniform, and $(-\infty, +\infty)$ for normal (whose
+support is genuinely unbounded --- callers needing a finite plotting range
+derive one themselves rather than being handed a silent truncation).  Every
+module that answered this question privately answered it wrongly: the
+marginal-$D_\mathrm{KL}$ estimator histogrammed a $\pm 20$ posterior over
+$(-89, 89)$ (GH \#420) and the \texttt{--full-prior-bounds} corner plot read
+the bounds as \emph{degrees} and drew $\pm\tan(89^\circ) \approx \pm 57.3$
+panels (GH \#451).  Chains written from v0.49.2 also record
+\texttt{effective\_low}/\texttt{effective\_high} in each scalar prior record
+(omitted when the support is unbounded, since \texttt{Infinity} is not valid
+strict JSON); archived chains, which record only the requested bounds, have
+their support reconstructed on read.
+
 Each prior implements three operations required by the sampling pipeline:
 \texttt{sample(rng, n)} for Monte Carlo, \texttt{log\_prob(x)} for posterior
 weighting, and \texttt{transform(u)} for nested sampling's unit-cube protocol.
