@@ -26,6 +26,16 @@ if TYPE_CHECKING:
 # Arctan mapping boundary guard: avoid tan(±pi/2) = ±inf
 _ARCTAN_EPS = 0.05
 
+#: Every distribution kind ``Prior`` accepts.  Single source of truth:
+#: ``Prior.__post_init__`` validates against this set, and the marginal
+#: D_KL estimator's kind-coverage test
+#: (tests/test_inference.py::TestMarginalDKLPriorTransforms) parametrizes
+#: over it — so adding a kind here without teaching
+#: ``tidal.inference._importance._uniformizing_transform`` about it FAILS
+#: the suite instead of silently falling back to the pre-#420
+#: sample-range reference.
+VALID_DISTRIBUTIONS = frozenset({"uniform", "log_uniform", "normal", "arctan_uniform"})
+
 
 @dataclass(frozen=True)
 class Prior:
@@ -52,7 +62,9 @@ class Prior:
     ``(-pi/2 + _ARCTAN_EPS, +pi/2 - _ARCTAN_EPS)``, so the support is
     always ``|x| <= tan(pi/2 - _ARCTAN_EPS) ~= 19.98`` regardless of the
     recorded bounds.  A ``UserWarning`` fires at construction when the
-    given bounds differ from that implied support.  Honoring the bounds
+    given bounds differ from that implied support; pass ``0:0`` (the
+    sanctioned sentinel used in the docs) to declare the bounds
+    deliberately unused without warning.  Honoring the bounds
     would silently redefine the prior for every archived chain whose
     metadata records these unused numbers, so any change must be
     versioned — deliberately deferred, see the options in GH #425.
@@ -64,9 +76,11 @@ class Prior:
     high: float
 
     def __post_init__(self) -> None:
-        valid = {"uniform", "log_uniform", "normal", "arctan_uniform"}
-        if self.distribution not in valid:
-            msg = f"Unknown distribution '{self.distribution}'. Must be one of {sorted(valid)}."
+        if self.distribution not in VALID_DISTRIBUTIONS:
+            msg = (
+                f"Unknown distribution '{self.distribution}'. Must be one "
+                f"of {sorted(VALID_DISTRIBUTIONS)}."
+            )
             raise ValueError(msg)
         if self.distribution == "log_uniform" and (self.low <= 0 or self.high <= 0):
             msg = f"log_uniform requires positive bounds, got [{self.low}, {self.high}]"
@@ -83,21 +97,28 @@ class Prior:
             # launch rather than let the recorded bounds masquerade as the
             # support (which is how the #420 marginal D_KL inflation got a
             # (-89, 89) histogram range for a +-20 distribution).
+            # ``0:0`` is the sanctioned "bounds unused" sentinel (used by
+            # docs/tex/inference.tex examples) and does not warn; bounds
+            # matching the implied support do not warn either.
+            # stacklevel=3 skips the generated dataclass __init__ so the
+            # warning points at the parse_prior / user call site.
             import warnings
 
             support = math.tan(math.pi / 2 - _ARCTAN_EPS)
-            if not (
-                math.isclose(self.low, -support, rel_tol=1e-9)
-                and math.isclose(self.high, support, rel_tol=1e-9)
-            ):
+            is_sentinel = self.low == 0.0 and self.high == 0.0
+            matches_support = math.isclose(
+                self.low, -support, rel_tol=1e-9
+            ) and math.isclose(self.high, support, rel_tol=1e-9)
+            if not (is_sentinel or matches_support):
                 warnings.warn(
                     f"arctan_uniform ignores its bounds: requested "
                     f"[{self.low}, {self.high}] but the sampled support is "
                     f"fixed at [-{support:.2f}, {support:.2f}] "
                     f"(theta uniform on +-(pi/2 - {_ARCTAN_EPS})). "
+                    f"Use 0:0 to declare the bounds deliberately unused. "
                     f"See GH #425.",
                     UserWarning,
-                    stacklevel=2,
+                    stacklevel=3,
                 )
 
     # ------------------------------------------------------------------
