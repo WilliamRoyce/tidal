@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -1946,6 +1947,320 @@ class TestMarginalDKLPriorTransforms:
         imp = compute_parameter_importance(result, n_bootstrap=10)
         assert imp.consistency["floor_dominated_params"] == []
         assert "(<= floor)" not in format_importance_table(imp)
+
+
+class TestEffectivePriorSupport:
+    """GH #451/#425: one source of truth for the range a prior samples.
+
+    Consumers must never re-derive the support from the recorded
+    ``low``/``high`` — ``arctan_uniform`` ignores them, and every
+    independent re-derivation of that fact so far has been wrong (the
+    #420 estimator read them as a histogram range; the corner plot read
+    them as degrees).
+    """
+
+    def test_arctan_support_is_the_sampled_range_not_the_bounds(self) -> None:
+        from tidal.inference._prior import _ARCTAN_EPS, effective_support
+
+        lo, hi = effective_support("arctan_uniform", -89.0, 89.0)
+        expected = math.tan(math.pi / 2 - _ARCTAN_EPS)
+        assert lo == pytest.approx(-expected)
+        assert hi == pytest.approx(expected)
+        # The two wrong answers this replaced.
+        assert hi == pytest.approx(19.98, abs=0.01)
+        assert hi != pytest.approx(89.0)
+        assert hi != pytest.approx(math.tan(math.radians(89.0)), abs=1.0)
+
+    def test_arctan_support_matches_what_sample_actually_draws(self) -> None:
+        """The contract is empirical: draws must lie inside the support."""
+        from tidal.inference._prior import Prior
+
+        with pytest.warns(UserWarning, match="ignores its bounds"):
+            prior = Prior(name="a", distribution="arctan_uniform", low=-89.0, high=89.0)
+        lo, hi = prior.effective_support
+        draws = prior.sample(np.random.default_rng(0), 20000)
+        assert draws.min() >= lo
+        assert draws.max() <= hi
+        # And the support is tight, not a loose envelope.
+        assert draws.max() > 0.9 * hi
+
+    def test_bounded_kinds_report_their_bounds(self) -> None:
+        from tidal.inference._prior import effective_support
+
+        assert effective_support("uniform", -2.0, 3.0) == (-2.0, 3.0)
+        assert effective_support("log_uniform", 1e-3, 1e3) == (1e-3, 1e3)
+
+    def test_normal_support_is_infinite_not_silently_truncated(self) -> None:
+        from tidal.inference._prior import effective_support
+
+        lo, hi = effective_support("normal", 0.0, 1.0)
+        assert lo == -math.inf
+        assert hi == math.inf
+
+    def test_unknown_kind_raises(self) -> None:
+        from tidal.inference._prior import effective_support
+
+        with pytest.raises(ValueError, match="Unknown distribution"):
+            effective_support("cauchy", 0.0, 1.0)
+
+    def test_every_valid_kind_has_a_support(self) -> None:
+        """Adding a kind without teaching effective_support fails here."""
+        from tidal.inference._prior import VALID_DISTRIBUTIONS, effective_support
+
+        for kind in VALID_DISTRIBUTIONS:
+            lo, hi = effective_support(kind, 0.5, 2.0)
+            assert lo < hi
+
+
+class TestPriorMapUsesEffectiveSupport:
+    """The corner-plot prior map must report sampled ranges (GH #451)."""
+
+    @staticmethod
+    def _result(priors: list[dict[str, object]]) -> object:
+        from tidal.inference._results import InferenceResult
+
+        n = 32
+        return InferenceResult(
+            samples=np.zeros((n, 1)),
+            log_likelihood=np.zeros(n),
+            log_prior=np.zeros(n),
+            param_names=["a"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata={"priors": priors},
+        )
+
+    def test_archived_record_without_effective_keys_is_corrected_on_read(
+        self,
+    ) -> None:
+        """Old chains record only the unused bounds; do not trust them."""
+        from tidal.inference._visualize import (
+            _extract_prior_map,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        result = self._result(
+            [
+                {
+                    "kind": "scalar",
+                    "name": "a",
+                    "distribution": "arctan_uniform",
+                    "low": -89.0,
+                    "high": 89.0,
+                }
+            ]
+        )
+        dist, _lo, hi = _extract_prior_map(result)["a"]
+        assert dist == "arctan_uniform"
+        assert hi == pytest.approx(19.98, abs=0.01)
+        # Neither the recorded bound nor the degrees misreading.
+        assert hi != pytest.approx(89.0)
+        assert hi < 30.0
+
+    def test_recorded_effective_keys_are_used_verbatim(self) -> None:
+        from tidal.inference._visualize import (
+            _extract_prior_map,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        result = self._result(
+            [
+                {
+                    "kind": "scalar",
+                    "name": "a",
+                    "distribution": "arctan_uniform",
+                    "low": -89.0,
+                    "high": 89.0,
+                    "effective_low": -19.98,
+                    "effective_high": 19.98,
+                }
+            ]
+        )
+        _dist, lo, hi = _extract_prior_map(result)["a"]
+        assert (lo, hi) == (-19.98, 19.98)
+
+    def test_unbounded_support_is_omitted_not_truncated(self) -> None:
+        from tidal.inference._visualize import (
+            _extract_prior_map,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        result = self._result(
+            [
+                {
+                    "kind": "scalar",
+                    "name": "a",
+                    "distribution": "normal",
+                    "low": 0.0,
+                    "high": 1.0,
+                }
+            ]
+        )
+        assert "a" not in _extract_prior_map(result)
+
+    def test_full_prior_axis_limits_use_the_sampled_range(self) -> None:
+        """The GH #451 defect itself: panels drawn to +-57.3, not +-19.98."""
+        matplotlib = pytest.importorskip("matplotlib")
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        from tidal.inference._visualize import (
+            _set_full_prior_axis_limits,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        fig, ax = plt.subplots()
+        axes = np.array([[ax]], dtype=object)
+        _set_full_prior_axis_limits(
+            axes, ["a"], {"a": ("arctan_uniform", -19.98, 19.98)}
+        )
+        _lo, hi = ax.get_xlim()
+        plt.close(fig)
+        assert hi == pytest.approx(19.98, abs=0.01)
+        assert hi < 30.0, "regressed to the tan(degrees) misreading"
+
+    def test_arctan_prior_overlay_is_drawn(self) -> None:
+        """#309's null check was unavailable for arctan params."""
+        matplotlib = pytest.importorskip("matplotlib")
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        from tidal.inference._visualize import (
+            _overlay_priors,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        result = self._result(
+            [
+                {
+                    "kind": "scalar",
+                    "name": "a",
+                    "distribution": "arctan_uniform",
+                    "low": -89.0,
+                    "high": 89.0,
+                }
+            ]
+        )
+        fig, ax = plt.subplots()
+        axes = np.array([[ax]], dtype=object)
+        _overlay_priors(axes, result)
+        lines = [ln for ln in ax.get_lines() if ln.get_label() == "prior"]
+        assert len(lines) == 1, "no prior density drawn for arctan_uniform"
+        xs = np.asarray(lines[0].get_xdata(), dtype=float)
+        ys = np.asarray(lines[0].get_ydata(), dtype=float)
+        # Cauchy shape: peaked at 0, decaying by 1/(1+x^2).
+        peak = float(np.max(ys))
+        assert float(ys[int(np.argmin(np.abs(xs)))]) == pytest.approx(peak, rel=1e-6)
+        assert float(ys[0]) < 0.01 * peak
+        plt.close(fig)
+
+
+class TestFloorDominatedAccessor:
+    """GH #433: every ranking consumer asks the same question one way."""
+
+    def test_reads_the_consistency_block(self) -> None:
+        from tidal.inference._importance import floor_dominated_params
+
+        block = {
+            "marginal_d_kl": {"a": 0.9, "b": 0.1},
+            "consistency": {"floor_dominated_params": ["a"]},
+        }
+        assert floor_dominated_params(block) == frozenset({"a"})
+
+    def test_pre_consistency_block_returns_empty(self) -> None:
+        """A pre-v0.48.8 block has no floors computed — not 'no floors'."""
+        from tidal.inference._importance import floor_dominated_params
+
+        assert floor_dominated_params({"marginal_d_kl": {"a": 0.9}}) == frozenset()
+
+    def test_malformed_consistency_does_not_raise(self) -> None:
+        from tidal.inference._importance import floor_dominated_params
+
+        assert floor_dominated_params({"consistency": "nonsense"}) == frozenset()
+        assert (
+            floor_dominated_params({"consistency": {"floor_dominated_params": None}})
+            == frozenset()
+        )
+
+    def test_figure_ranking_drops_floor_marginals_but_keeps_cross(self) -> None:
+        """The kl_carrier_corner selection must not rank on estimator noise."""
+        import importlib.util
+        import sys
+
+        path = (
+            Path(__file__).resolve().parents[1]
+            / "scripts"
+            / "figures"
+            / "kl_carrier_corner.py"
+        )
+        spec = importlib.util.spec_from_file_location("_kl_carrier_corner", path)
+        assert spec is not None
+        assert spec.loader is not None
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        try:
+            spec.loader.exec_module(mod)
+        finally:
+            sys.modules.pop(spec.name, None)
+
+        importance = {
+            "amp": {
+                "marginal_d_kl": {"noise": 0.90, "real": 0.05},
+                "consistency": {"floor_dominated_params": ["noise", "real"]},
+            },
+            "sup": {
+                "marginal_d_kl": {"noise": 0.88, "real": 0.04},
+                "consistency": {"floor_dominated_params": ["noise", "real"]},
+            },
+            # Prior-free, unaffected by #420/#433 — this is the real signal.
+            "cross_amp_sup_kl": {"noise": 0.01, "real": 3.2},
+        }
+        assert mod._pick_top_k(importance, 1) == ["real"]
+
+
+class TestNestedSaveWithoutPriorsWarns:
+    """GH #434: a nested chain saved with no priors block must say so."""
+
+    @staticmethod
+    def _result(metadata: dict[str, object]) -> object:
+        from tidal.inference._results import InferenceResult
+
+        n = 40
+        rng = np.random.default_rng(3)
+        return InferenceResult(
+            samples=rng.uniform(-1, 1, (n, 1)),
+            log_likelihood=np.zeros(n),
+            log_prior=np.zeros(n),
+            param_names=["a"],
+            method="nested",
+            log_evidence=0.0,
+            log_evidence_err=0.1,
+            weights=np.ones(n) / n,
+            metadata=metadata,
+        )
+
+    def test_missing_priors_warns_and_names_the_consequence(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        result = self._result({"sampler": "test", "nlive": 10})
+        with caplog.at_level(logging.WARNING, logger="tidal.inference"):
+            result.save(tmp_path)  # pyright: ignore[reportAttributeAccessIssue]
+        assert "no priors metadata" in caplog.text
+        assert "#434" in caplog.text
+
+    def test_recorded_priors_do_not_warn(
+        self,
+        tmp_path: Path,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        from tidal.inference._prior import Prior
+
+        prior = Prior(name="a", distribution="uniform", low=-1.0, high=1.0)
+        result = self._result(
+            {"sampler": "test", "nlive": 10, "priors": [prior]},
+        )
+        with caplog.at_level(logging.WARNING, logger="tidal.inference"):
+            result.save(tmp_path)  # pyright: ignore[reportAttributeAccessIssue]
+        assert "no priors metadata" not in caplog.text
 
 
 # ===================================================================
