@@ -102,17 +102,41 @@ def _label(name: str) -> str:
 
 
 def _pick_top_k(importance: dict, k: int) -> list[str]:
-    """Rank parameters by combined max(amp marginal, sup marginal, cross)."""
+    """Rank parameters by combined max(amp marginal, sup marginal, cross).
+
+    Floor-dominated marginals are dropped from the score (GH #433): on a
+    low-N_eff chain they are estimator bias of up to ~0.9 nats, which
+    would out-rank a legitimate cross-KL and pick the figure's "carrier"
+    coupling by noise.  The cross-KL term is prior-free and keeps its
+    vote, so a parameter with real amp-vs-sup structure still ranks even
+    when both its marginals are floor.
+    """
+    from tidal.inference._importance import floor_dominated_params
+
     amp = importance.get("amp", {}).get("marginal_d_kl", {}) or {}
     sup = importance.get("sup", {}).get("marginal_d_kl", {}) or {}
     cross = importance.get("cross_amp_sup_kl", {}) or {}
+    amp_floor = floor_dominated_params(importance.get("amp", {}))
+    sup_floor = floor_dominated_params(importance.get("sup", {}))
+    if amp_floor or sup_floor:
+        log.warning(
+            "floor-dominated marginals excluded from ranking — amp: %s; sup: %s",
+            sorted(amp_floor) or "none",
+            sorted(sup_floor) or "none",
+        )
     names = list(amp.keys() or sup.keys() or cross.keys())
+
+    def _val(d: dict, name: str, excluded: frozenset[str]) -> float:
+        if name in excluded:
+            return 0.0
+        v = d.get(name, 0.0)
+        return v if v is not None and math.isfinite(v) else 0.0
 
     def score(name: str) -> float:
         return max(
-            amp.get(name, 0.0) if math.isfinite(amp.get(name, 0.0) or 0.0) else 0.0,
-            sup.get(name, 0.0) if math.isfinite(sup.get(name, 0.0) or 0.0) else 0.0,
-            cross.get(name, 0.0) if math.isfinite(cross.get(name, 0.0) or 0.0) else 0.0,
+            _val(amp, name, amp_floor),
+            _val(sup, name, sup_floor),
+            _val(cross, name, frozenset()),
         )
 
     return sorted(names, key=lambda n: -score(n))[:k]
