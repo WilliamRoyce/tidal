@@ -21,6 +21,7 @@ import pytest
 
 from tidal.symbolic._kinetic_eval import (
     KineticEvalError,
+    _UnsupportedNodeError,
     evaluate_at_one,
     evaluate_at_zero,
     evaluate_with_substitutions,
@@ -151,6 +152,54 @@ class TestLhsCollapsesToZero:
         assert lhs_collapses_to_zero("2*b5 + 3*b1", ["b5", "b1"]) is True
         # Only b5 is small → 0 + 3*b1 = symbolic, does not collapse
         assert lhs_collapses_to_zero("2*b5 + 3*b1", ["b5"]) is False
+
+
+class TestGH428CallFormKinetics:
+    """GH #428: call-form kinetics must not crash the demotion predicate.
+
+    ``Sin[x[]]`` normalizes to ``Sin[x]`` (an ``ast.Subscript``), which the
+    safe evaluator cannot interpret. Pre-fix this escaped
+    ``lhs_collapses_to_zero`` as ``KineticEvalError: unsupported AST node``,
+    crashing ``EquationSystem.base_spec`` before the #421 position-dependence
+    guard could produce its actionable message. The predicate now treats
+    unsupported-but-parseable constructs as still-symbolic (no demotion);
+    strict evaluators keep raising.
+    """
+
+    def test_call_form_kinetic_no_demotion(self) -> None:
+        # The morally-identical power form "1 + x[]^2" already sailed
+        # through (still-symbolic → None → False); the call form must
+        # reach the same verdict instead of crashing.
+        assert lhs_collapses_to_zero("1 + Sin[x[]]", ["rho"]) is False
+
+    def test_python_call_form_no_demotion(self) -> None:
+        # ast.Call lands on the same unsupported-node raise.
+        assert lhs_collapses_to_zero("sin(b5)", ["b5"]) is False
+
+    def test_still_symbolic_coordinate_no_demotion(self) -> None:
+        # rho→0 leaves 0*x, still symbolic in x — no demotion. (Handled
+        # by the pre-existing still-symbolic path; pinned for contrast.)
+        assert lhs_collapses_to_zero("rho * x[]", ["rho"]) is False
+
+    def test_would_collapse_but_call_form_stays_conservative(self) -> None:
+        # rho→0 makes this mathematically 0·Sin(x) = 0, i.e. it WOULD
+        # collapse — but the call form is unsupported, so the predicate
+        # conservatively keeps the field dynamical. Later strict guards
+        # (the #421 position-dependence guard) classify it properly.
+        assert lhs_collapses_to_zero("rho * Sin[x[]]", ["rho"]) is False
+
+    def test_divide_by_zero_still_propagates(self) -> None:
+        # Genuine evaluation errors are NOT unsupported-node cases and
+        # must keep raising out of the predicate.
+        with pytest.raises(KineticEvalError, match="divide-by-zero"):
+            lhs_collapses_to_zero("1/rho", ["rho"])
+
+    def test_strict_evaluator_still_raises_on_call_form(self) -> None:
+        # The leniency lives in lhs_collapses_to_zero only; the strict
+        # evaluators (evaluate_at_zero/evaluate_at_one, #290 K_eff) keep
+        # raising, as the specific KineticEvalError subclass.
+        with pytest.raises(_UnsupportedNodeError, match="unsupported AST node"):
+            evaluate_at_zero("1 + Sin[x[]]", {"rho"})
 
 
 class TestEvaluateAtOne:

@@ -52,6 +52,20 @@ class KineticEvalError(ValueError):
     """Raised when a kinetic coefficient string cannot be parsed safely."""
 
 
+class _UnsupportedNodeError(KineticEvalError):
+    """The expression contains a construct the safe evaluator cannot interpret.
+
+    Distinct from a construct that *evaluated* to an error (divide-by-zero,
+    ``0 ** negative``), which stays a plain :class:`KineticEvalError`.
+    Wolfram call-form expressions like ``Sin[x[]]`` normalize to ``Sin[x]``
+    (an ``ast.Subscript``) and land here, as do ``ast.Call`` forms like
+    ``sin(b5)`` (GH #428). Lenient predicates that only need a
+    collapse-to-zero verdict (:func:`lhs_collapses_to_zero`) may catch this
+    and treat the expression as still-symbolic; strict evaluators must let
+    it propagate.
+    """
+
+
 def evaluate_at_zero(expr: str, zero_names: set[str] | frozenset[str]) -> float | None:
     """Return ``expr`` evaluated after substituting every name in ``zero_names`` with ``0.0``.
 
@@ -132,15 +146,19 @@ def evaluate_with_substitutions(
 
     Raises
     ------
-    KineticEvalError
-        If ``expr`` contains an AST node kind outside the safe
-        subset (literals, names, unary +/-, binary +/-/*/////**).
+    _UnsupportedNodeError
+        If ``expr`` is not a string, cannot be parsed, or contains an
+        AST node kind outside the safe subset (literals, names, unary
+        +/-, binary +/-/*/////**). Subclass of :class:`KineticEvalError`,
+        so existing broad handlers are unaffected. Genuine evaluation
+        errors (divide-by-zero, ``0 ** negative``) propagate from the
+        recursive evaluator as plain :class:`KineticEvalError`.
     """
     if not isinstance(expr, str):  # type: ignore[reportUnnecessaryIsInstance]
         msg = (
             f"evaluate_with_substitutions: expected a str, got {type(expr).__name__!r}"
         )
-        raise KineticEvalError(msg)
+        raise _UnsupportedNodeError(msg)
     normalized = normalize_inputform(expr)
 
     try:
@@ -150,7 +168,7 @@ def evaluate_with_substitutions(
             f"evaluate_with_substitutions: cannot parse {expr!r} "
             f"(after ^→**: {normalized!r}): {e}"
         )
-        raise KineticEvalError(msg) from e
+        raise _UnsupportedNodeError(msg) from e
 
     try:
         return _eval_node(tree.body, substitutions)
@@ -179,7 +197,7 @@ def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:  # noqa
             f"evaluate_with_substitutions: unsupported literal type "
             f"{type(node.value).__name__!r}"
         )
-        raise KineticEvalError(msg)
+        raise _UnsupportedNodeError(msg)
 
     if isinstance(node, ast.Name):
         if node.id in substitutions:
@@ -193,7 +211,7 @@ def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:  # noqa
                 f"evaluate_with_substitutions: unsupported unary op "
                 f"{type(node.op).__name__}"
             )
-            raise KineticEvalError(msg)
+            raise _UnsupportedNodeError(msg)
         return op_fn(_eval_node(node.operand, substitutions))
 
     if isinstance(node, ast.BinOp):
@@ -203,7 +221,7 @@ def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:  # noqa
                 f"evaluate_with_substitutions: unsupported binary op "
                 f"{type(node.op).__name__}"
             )
-            raise KineticEvalError(msg)
+            raise _UnsupportedNodeError(msg)
         left = _eval_node(node.left, substitutions)
         right = _eval_node(node.right, substitutions)
         # 0**0 is mathematically ambiguous; treat as 1 per IEEE, which is
@@ -221,7 +239,7 @@ def _eval_node(node: ast.AST, substitutions: dict[str, float]) -> float:  # noqa
         return op_fn_bin(left, right)
 
     msg = f"evaluate_with_substitutions: unsupported AST node {type(node).__name__}"
-    raise KineticEvalError(msg)
+    raise _UnsupportedNodeError(msg)
 
 
 def split_small_parameter_kinetic(
@@ -516,9 +534,20 @@ def lhs_collapses_to_zero(
 
     ``None`` kinetic coefficients are implicitly non-perturbative
     (e.g. ``kinetic == 1`` by convention); they never trigger demotion.
+
+    Unsupported-but-parseable constructs (Wolfram call forms such as
+    ``Sin[x[]]``, GH #428) are treated as still-symbolic → non-vanishing →
+    ``False`` (no demotion). This is deliberately conservative: the field
+    stays dynamical and later strict guards classify the kinetic properly
+    (the #421 position-dependence guard, the #290 ``K_eff`` extraction).
+    Genuine evaluation errors (divide-by-zero) still propagate as
+    :class:`KineticEvalError`.
     """
     if kinetic_symbolic is None or not small_parameters:
         return False
     zero_names = frozenset(small_parameters)
-    value = evaluate_at_zero(kinetic_symbolic, zero_names)
+    try:
+        value = evaluate_at_zero(kinetic_symbolic, zero_names)
+    except _UnsupportedNodeError:
+        return False
     return value == 0.0

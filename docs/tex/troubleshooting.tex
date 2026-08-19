@@ -435,6 +435,40 @@ per equation via \texttt{ComponentEquation.kinetic\_position\_dependent}).  The
 only shipped spec with position-dependent kinetics is
 \texttt{examples/data/euler\_heisenberg\_e\_dual\_gaussian.json}.
 
+\subsubsection{NotImplementedError: Pass 1 source matrix couples blocks}
+\label{sec:troubleshooting-pass1-cross-block}
+
+\textbf{Symptom:}
+\begin{lstlisting}[style=python]
+NotImplementedError: Pass 1 source matrix couples blocks that Pass 0 evolved
+independently: block ['a_0', 'v_a_0'] is sourced by out-of-block slot(s)
+['a_3', 'v_a_3'] (max|cross|=... > ..., relative to max|M_src|=...) ...
+\end{lstlisting}
+from \texttt{\_evolve\_duhamel\_per\_mode} during a perturbative
+(\texttt{[perturbation]}-block) run.
+
+\textbf{Root cause:} The $O(\varepsilon)$ correction terms source one Pass-0
+block from another (for the Euler--Heisenberg dual-Gaussian spec this is the
+physical $a_0 \leftrightarrow a_3$ coupling, $\sim$3\% of the source norm at
+Phase~E geometry).  The per-mode Duhamel kernel evolves Pass-0 blocks
+independently and cannot represent cross-block sources; the alternative would
+be silently discarding them, which is what happened before the guard's
+threshold was made purely scale-relative (GH~\#429) --- the earlier absolute
+$10^{-14}$ floor masked the coupling whenever the source scale was small.
+The refusal is structural (the coupling ratio is independent of the small
+parameter): reducing $\rho$ does not make the spec eligible.
+
+\textbf{Fix (one of):}
+\begin{itemize}
+  \item Run the full spec on a time-domain scheme: \texttt{--scheme cvode} or
+    \texttt{--scheme ida}.
+  \item Solve the full spec non-perturbatively on plain modal with
+    \texttt{--perturbative-order 0} (requires modal support for the full
+    spec's coefficients; for position-dependent kinetics see GH~\#427).
+  \item Cross-block Pass-1 support (merged Pass-0 partitioning) is tracked in
+    GH~\#439.
+\end{itemize}
+
 
 \subsection{Debugging Techniques}
 \label{sec:debugging-techniques}

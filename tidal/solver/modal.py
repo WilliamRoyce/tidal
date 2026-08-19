@@ -4509,7 +4509,11 @@ def _evolve_duhamel_per_mode(
     Higham, N.J. (2009). "The scaling and squaring method for the matrix
     exponential revisited." *SIAM Review* 51(4):747-764.
     """
+    import logging  # noqa: PLC0415
+
     import scipy.linalg as sla  # type: ignore[import-untyped]  # noqa: PLC0415
+
+    logger = logging.getLogger(__name__)
 
     n_slots = layout.num_slots
     n_pts = layout.num_points
@@ -4530,7 +4534,8 @@ def _evolve_duhamel_per_mode(
 
     y_hat_snap = np.zeros((n_snapshots, n_slots, n_modes), dtype=np.complex128)
 
-    # Cross-block scale (same threshold logic as the legacy implementation).
+    # Cross-block scale: the guard below compares off-block source entries
+    # against a tolerance RELATIVE to this global source magnitude.
     m_scale_total = 0.0
     for _M_n in M_src_k_by_order.values():
         if _M_n.size:
@@ -4560,27 +4565,61 @@ def _evolve_duhamel_per_mode(
         # Cross-block coupling check: any non-zero in M_src_n's rows of this
         # block but columns outside it would mean Pass 1 mixes Pass 0 sectors
         # that were independent. Pass 0's block decomposition cannot represent
-        # that — raise early. Threshold is scale-relative (see #275).
+        # that — raise early. Threshold is PURELY scale-relative (#429): the
+        # former absolute 1e-14 floor (`max(1e-14, rel)`) masked *physical*
+        # coupling whenever max|M_src| < 1e-4 — the EH dual-Gaussian spec at
+        # Phase E geometry has max|M_src| ~ 8e-15, so the floor exceeded the
+        # entire source by ~10 orders while the intra-block slicing below
+        # silently discarded a 3%-of-norm coupling. Schur-tail roundoff
+        # (#275) scales WITH max|M_src|, so the relative form still tolerates
+        # it (pinned by test_cross_block_guard_tolerates_schur_tail_noise).
         mask = np.ones(n_slots, dtype=bool)
         mask[idx] = False
-        cross_max = 0.0
+        out_cols = np.flatnonzero(mask)
+        # Max |entry| per out-of-block column, over modes/rows/orders — used
+        # both for the verdict and to name the offending slots on refusal.
+        col_max = np.zeros(out_cols.size)
         for M_n in M_src_k_by_order.values():
-            if M_n.size == 0:
+            if M_n.size == 0 or out_cols.size == 0:
                 continue
-            full_rows_n = M_n[:, idx, :]
-            cross_n = full_rows_n[:, :, mask]
-            if cross_n.size > 0:
-                cross_max = max(cross_max, float(np.max(np.abs(cross_n))))
-        atol = max(1e-14, m_scale_total * 1e-10)
+            cross_n = np.abs(M_n[:, idx, :][:, :, out_cols])
+            col_max = np.maximum(col_max, cross_n.max(axis=(0, 1)))
+        cross_max = float(col_max.max()) if col_max.size else 0.0
+        atol = m_scale_total * 1e-10
         if cross_max > atol:
+            in_names = [layout.slots[i].name for i in slot_indices]
+            offending = [
+                layout.slots[int(c)].name
+                for c, mag in zip(out_cols, col_max, strict=True)
+                if mag > atol
+            ]
             msg = (
                 f"Pass 1 source matrix couples blocks that Pass 0 evolved "
-                f"independently (max|cross|={cross_max:.3e} > {atol:.3e}). "
-                f"Cross-block coupling is not supported — the correction "
-                f"theory likely mixes previously-independent sectors, which "
-                f"Pass 0 cannot represent. Report this spec to the TIDAL team."
+                f"independently: block {in_names} is sourced by "
+                f"out-of-block slot(s) {offending} "
+                f"(max|cross|={cross_max:.3e} > {atol:.3e}, relative to "
+                f"max|M_src|={m_scale_total:.3e}). Coupling above the "
+                f"roundoff tolerance means the correction theory mixes "
+                f"sectors Pass 0 evolved separately, which the per-mode "
+                f"Duhamel kernel cannot represent (GH #439 tracks "
+                f"cross-block support). Alternatives: run the full spec on "
+                f"a time-domain scheme (--scheme cvode or --scheme ida), "
+                f"or solve the full spec on plain modal with "
+                f"--perturbative-order 0 (requires modal support for the "
+                f"full spec's coefficients; see GH #427)."
             )
             raise NotImplementedError(msg)
+        if cross_max > 0.0:
+            # Sub-tolerance entries are roundoff by construction (anything
+            # physical raises above); note the discard for auditability
+            # since the intra-block slicing below drops them silently.
+            logger.info(
+                "Pass 1: discarding sub-roundoff cross-block entries for "
+                "block %s (max|cross|=%.3e <= atol=%.3e)",
+                [layout.slots[i].name for i in slot_indices],
+                cross_max,
+                atol,
+            )
 
         # Build the effective source S = Σ_n M_src_n · Aⁿ per mode, where
         # A = M_block. For the augmented form, S absorbs the time-derivative
